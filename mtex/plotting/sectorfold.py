@@ -46,24 +46,7 @@ def uniqueNormals(sR):
 # of a triangle, and the area centroid of anything larger. The fold is a symmetry of the
 # sector, so it is this centre and not the group's Dirichlet centre that it turns about
 def regionCenter(sR, resolution=1 * degree):
-  N = uniqueNormals(sR)
-  if len(N) < 2:
-    return np.array([0.0, 0.0, 1.0]) if not N else _unit(N[0])
-  V = sR.vertices().data.reshape(-1, 3)
-  if len(V) < 3:
-    best, bi, bj = -1.0, 0, 1
-    for i in range(len(N) - 1):
-      for j in range(i + 1, len(N)):
-        a = _angle(N[i], N[j])
-        if a > best:
-          best, bi, bj = a, i, j
-    return _unit(N[bi] + N[bj])
-  if len(V) < 4:
-    return _unit(np.sum(V, axis=0))
-  g = equispacedS2Grid(resolution=resolution)
-  inside = g.data[sR.checkInside(g)]
-  c = np.sum(inside, axis=0) if len(inside) else np.zeros(3)
-  return np.array([0.0, 0.0, 1.0]) if np.linalg.norm(c) < 1e-4 else _unit(c)
+  return sR.center(resolution).data.reshape(3)
 
 
 # the reflection in a plane is a symmetry of the sector when it maps its boundary planes

@@ -12,8 +12,9 @@
 # The first example is a calcite scan stored on a 301-by-151 grid, or 45451 grid
 # positions. It contains 20119 indexed calcite measurements, 32 `notIndexed`
 # measurements, and 25300 padding positions with no measurement. Padding and the
-# `notIndexed` phase are not the same. The positions form a square lattice turned by 45
-# degrees, which is the lattice the port keeps; MATLAB pads an axis-aligned one.
+# `notIndexed` phase are not the same. The lattice of the positions is turned by 45 degrees
+# against the map, so its grid is closed by padding far outside the measured box; the
+# extent, the phase counts and the plots leave the padding out.
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,11 +34,7 @@ ipfKey = ipfColorKey(ebsd)
 ipfKey
 
 # +
-ext = ebsd['indexed'].extent()
-
 plot(ebsd, ipfKey.orientation2color(ebsd.orientations))
-plt.xlim(ext[0], ext[1])
-plt.ylim(ext[2], ext[3])
 # -
 
 # The printed summary distinguishes the measurements from the grid size. The key display
@@ -80,7 +77,7 @@ mtexColorbar()
 setColorRange([-25, -14])
 
 # mark values outside the displayed range
-cmap = mtexColormap('WhiteJet').with_extremes(over=(1, 0, 1), under=(1, 0, 1))
+cmap = mtexColormap('viridis').with_extremes(over=(1, 0, 1), under=(1, 0, 1))
 mtexColorMap(cmap)
 # -
 
@@ -92,8 +89,6 @@ mtexColorMap(cmap)
 
 # +
 plot(ebsd, color)
-plt.xlim(ext[0], ext[1])
-plt.ylim(ext[2], ext[3])
 
 setColorRange([-25, -14])
 mtexColorMap(cmap)
@@ -124,8 +119,6 @@ meanOri = mean(ebsd.orientations, robust=True)
 ipfKey.ipfDirection = meanOri * ipfKey.whiteCenter
 
 plot(ebsd, ipfKey.orientation2color(ebsd.orientations))
-plt.xlim(ext[0], ext[1])
-plt.ylim(ext[2], ext[3])
 # -
 
 # Almost everything is grey because most selected IPF directions lie near the white
@@ -136,8 +129,6 @@ plt.ylim(ext[2], ext[3])
 # +
 ipfKey.maxAngle = 7.5 * degree
 plot(ebsd, ipfKey.orientation2color(ebsd.orientations))
-plt.xlim(ext[0], ext[1])
-plt.ylim(ext[2], ext[3])
 # -
 
 # White still represents the mean. A selected IPF direction becomes more saturated as it

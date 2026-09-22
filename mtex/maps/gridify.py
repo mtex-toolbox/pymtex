@@ -71,7 +71,8 @@ class scanLayout:
 #
 # A complete scan is already in map order, so for one the whole function is a reshape and
 # the gridded map shares its arrays with the scattered one. A cell with no measurement is
-# filled in at its ideal position, not indexed, with a NaN rotation and zero properties.
+# padding: filled in at its ideal position, not indexed, with a NaN rotation and zero
+# properties, and marked in isPadding.
 def gridify(ebsd):
   from .ebsd import EBSD, _rotations, _vectors
   if ebsd.isGridded:
@@ -91,7 +92,7 @@ def gridify(ebsd):
     rot = _rotations(ebsd.rotations.data.reshape(dims + (4,)))
     prop = {k: v.reshape(dims + v.shape[1:]) for k, v in ebsd.prop.items()}
     return EBSD(pos, rot, ebsd.phaseId.reshape(dims), ebsd.CSList, prop, scanUnit=ebsd.scanUnit, frame=ebsd.frame,
-                lattice=gl, meta=ebsd.meta, phaseMap=ebsd.phaseMap, id=ebsd.id.reshape(dims))
+                lattice=gl, meta=ebsd.meta, phaseMap=ebsd.phaseMap, id=ebsd.id.reshape(dims), isPadding=ebsd.isPadding.reshape(dims))
   lin = np.full(n, -1, dtype=np.int64)
   # a count per cell, one pass; np.unique would hash and sort the cells
   counts = np.bincount(cells, minlength=n)
@@ -117,7 +118,8 @@ def gridify(ebsd):
     out[missing] = 0
     prop[key] = out.reshape(dims + src.shape[1:])
   return EBSD(_vectors(pos.reshape(dims + (3,)), ebsd.frame), _rotations(rot.reshape(dims + (4,))), ph.reshape(dims),
-              ebsd.CSList, prop, scanUnit=ebsd.scanUnit, frame=ebsd.frame, lattice=gl, meta=ebsd.meta, phaseMap=ebsd.phaseMap, id=ids.reshape(dims))
+              ebsd.CSList, prop, scanUnit=ebsd.scanUnit, frame=ebsd.frame, lattice=gl, meta=ebsd.meta, phaseMap=ebsd.phaseMap, id=ids.reshape(dims),
+              isPadding=missing.reshape(dims))
 
 
 __all__ = ["gridify"]

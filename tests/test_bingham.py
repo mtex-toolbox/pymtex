@@ -134,3 +134,22 @@ def test_B4_S2FunBingham():
   assert np.corrcoef(est(sample), g(sample))[0, 1] > 0.99
   assert S2FunBingham.fit(vector3d(sample, frame=cs)).frame is cs
   assert "S2FunBingham" in repr(est)
+
+
+def test_discreteSample_of_a_bingham_distribution_has_its_moments():
+  from mtex import BinghamODF, discreteSample, equispacedSO3Grid
+  A = np.linalg.qr(rng.standard_normal((4, 4)))[0]
+  A[:, 0] *= np.sign(np.linalg.det(A))
+  f = BinghamODF([0, 5, 20, 40], A, crystalFrame('1'))
+  q = discreteSample(f, 100000, rng=rng).data.reshape(-1, 4)
+  # the second moments along the axes, against the density weighted over a grid
+  g = equispacedSO3Grid(crystalFrame('1'), resolution=2 * degree)
+  w = f(g).ravel()
+  qg = g.data.reshape(-1, 4)
+  Tg = A.T @ ((qg * (w / w.sum())[:, None]).T @ qg) @ A
+  T = A.T @ (q.T @ q / len(q)) @ A
+  assert np.allclose(np.diag(T), np.diag(Tg), atol=3e-3)
+  # with crystal symmetry every sample is a symmetric copy
+  f = BinghamODF([0, 0, 0, 30], crystalFrame('432'))
+  o = discreteSample(f, 1000, rng=rng)
+  assert o.CS is crystalFrame('432') and np.all(np.isfinite(o.data))

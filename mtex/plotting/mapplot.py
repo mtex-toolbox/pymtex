@@ -319,6 +319,10 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
   elif ebsd.lattice is not None and style != "points":
     from matplotlib.collections import PolyCollection
     corners = mapCells(ebsd, layout=mP.layout)
+    keep = _drawn(ebsd, values, scalar)
+    if keep is not None:
+      corners, values = corners[keep], values[keep]
+      alpha = alpha if np.ndim(alpha) == 0 else np.asarray(alpha).reshape(-1)[keep]
     h = PolyCollection(corners, closed=True, linewidths=lineWidth if edgeColor is not None else 0,
                        edgecolors=edgeColor if edgeColor is not None else "face", alpha=alpha, zorder=1, **kw)
     if scalar:
@@ -332,6 +336,10 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     raise ValueError("the map is not on a lattice, so it has no cells; backend='scatter' draws its measurements")
   else:
     P = mapPoints(ebsd, layout=mP.layout)
+    keep = _drawn(ebsd, values, scalar)
+    if keep is not None:
+      P, values = P[keep], values[keep]
+      alpha = alpha if np.ndim(alpha) == 0 else np.asarray(alpha).reshape(-1)[keep]
     if scalar:
       h = ax.scatter(P[:, 0], P[:, 1], c=values, cmap=cmap, norm=norm, s=MarkerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
     else:
@@ -344,6 +352,16 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
       gcm().colorbar(label=color if isinstance(color, str) else "")
   _finish(mP, ebsd, micronbar, refFrame, legend, color, location)
   return h
+
+
+# the measurements a cell or a point is drawn for, None for all: the padding of a grid is no
+# measurement, and a colour that is no colour, of a site without an orientation, is nothing
+# drawn, as in the picture
+def _drawn(ebsd, values, scalar):
+  keep = np.ones(ebsd.size, dtype=bool) if ebsd._pad is None else ~ebsd._pad.reshape(-1)
+  if not scalar:
+    keep &= np.all(np.isfinite(values), axis=-1)
+  return None if keep.all() else keep
 
 
 # twice the pixels of the axes on each side, at the figure's dpi

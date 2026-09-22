@@ -22,6 +22,7 @@ import math
 
 import numpy as np
 
+from ..geometry.display import sizeString
 from ..geometry.frames import crystalFrame, specimenFrame
 from ..geometry.latticetype import latticeType
 from ..geometry.orientation import orientation
@@ -142,7 +143,7 @@ def _rotateBatch(u0, alpha, offsets, Q):
       X = np.moveaxis(X, d + 1, -1)
       X = np.einsum("n...b,nab->n...a", X, Q)
       X = np.moveaxis(X, -1, d + 1)
-    out[:, r] = X.reshape(n, -1)
+    out[:, r] = X.reshape(n, r.stop - r.start)
   return out
 
 
@@ -284,13 +285,18 @@ class embedding:
     self._same(other)
     return np.sum(self.u * other.u, axis=0).reshape(self.shape)
 
-  def norm(self):
-    return np.linalg.norm(self.u, axis=0).reshape(self.shape)
+  # with normalized the norm over the norm every orientation's image has
+  def norm(self, normalized=False):
+    n = np.linalg.norm(self.u, axis=0).reshape(self.shape)
+    return n / np.linalg.norm(self.spec.u0) if normalized else n
 
   def isclose(self, other, atol=1e-10):
     return isinstance(other, embedding) and other.spec is self.spec and self.u.shape == other.u.shape and bool(np.allclose(self.u, other.u, atol=atol))
 
   def mean(self, weights=None):
+    # the mean of nothing is not a number, as the mean of an empty orientation list
+    if self.size == 0:
+      return self._new(np.full(self.spec.u0.size, np.nan), ())
     w = np.full(self.size, 1 / self.size) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
     return self._new(self.u @ w, ())
 
@@ -309,10 +315,11 @@ class embedding:
       return self.rotate(r)
     return self._new(self.u * np.asarray(r, dtype=float))
 
-  # the Euclidean coordinates in the orthonormal basis, one row per orientation
-  def double(self):
-    d = self.spec.basis.T @ self.u
-    return d[:, 0] if self.shape == () else d.T.reshape(self.shape + (self.dim,))
+  # the Euclidean coordinates in the orthonormal basis, one row per orientation; with full
+  # the tensor components, repeated ones included
+  def double(self, full=False):
+    d = self.u if full else self.spec.basis.T @ self.u
+    return d[:, 0] if self.shape == () else d.T.reshape(self.shape + (d.shape[0],))
 
   def setDouble(self, d):
     d = np.asarray(d, dtype=float).reshape(-1, self.dim)
@@ -341,8 +348,8 @@ class embedding:
     return orientation(self.project(**kwargs), self.spec.frame, specimenFrame.default if SS is None else SS)
 
   def __repr__(self):
-    size = "x".join(str(n) for n in self.shape) if self.shape else "1"
-    return f"embedding ({self.spec.frame.char()})\n  size: {size}\n  dimension: {self.dim}\n  ranks: {self.spec.alpha}"
+    ranks = " ".join(str(a) for a in self.spec.alpha)
+    return f"embedding\n symmetry: {self.spec.frame.char()}\n ranks: {ranks}\n dim: {self.dim}\n size: {sizeString(self.shape)}"
 
 
 # a handful of orientations to start from, the coarsest grid the group allows
@@ -351,8 +358,8 @@ def _seedRotations(cs):
   return equispacedSO3Grid(cs, points=20).data.reshape(-1, 4)
 
 
-def double(e):
-  return e.double()
+def double(e, full=False):
+  return e.double(full)
 
 
 def setDouble(e, d):

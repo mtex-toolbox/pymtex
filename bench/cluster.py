@@ -1,7 +1,7 @@
 # classix and calcCluster against the Julia port, for docs/research/benchmark-sampling.md
 #
 #   .venv/bin/python bench/cluster.py            writes the point sets bench/cluster.jl reads
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/cluster.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/cluster.jl)
 #
 # Five Gaussian clouds in three dimensions at 10 000, 100 000 and 1 000 000 points for the
 # raw algorithm, the same as directions, and four orientation clouds of a cubic crystal at

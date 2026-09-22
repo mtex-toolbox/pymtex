@@ -79,8 +79,8 @@ each other on the sphere.
 ```
 .venv/bin/python bench/optimalsample.py
 .venv/bin/python bench/cluster.py
-(cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/optimalsample.jl)
-(cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/cluster.jl)
+(cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/optimalsample.jl)
+(cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/cluster.jl)
 ```
 
 The results land in `bench/out/optimalsample_{python,julia}.csv` and

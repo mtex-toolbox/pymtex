@@ -55,7 +55,8 @@ def test_the_shape_of_a_region():
     assert np.any(angle(V, vector3d(*v)) < 1e-8)
   for rho in 2 * pi * rng.random(20):
     iv = sR.thetaInterval(rho)
-    theta = np.linspace(0, pi, 91)
+    # off the poles: the pole is a corner of the triangle, a single point of every meridian
+    theta = np.linspace(0.5 * degree, pi - 0.5 * degree, 91)
     inside = sR.checkInside(vector3d.byPolar(theta, rho), tolerance=0)
     expected = np.zeros(91, dtype=bool) if iv is None else (iv[0] - 1e-9 <= theta) & (theta <= iv[1] + 1e-9)
     assert np.all(inside == expected)
@@ -103,3 +104,42 @@ def test_crystal_sectors_follow_the_plotting_convention():
     for v in samples[:20]:
       assert np.sum(sector.checkInside(els * v, tolerance=1e-9)) == 1
   assert sectorCenter(crystalFrame("m-3m")) == vector3d(1, 1, 1).normalize() + vector3d(1, 0, 1).normalize() + zvector
+
+
+GROUPS = ["1", "-1", "2", "m", "2/m", "222", "mm2", "mmm", "4", "-4", "4/m", "422", "4mm", "-42m", "-4m2", "4/mmm", "3", "-3", "321",
+          "312", "3m1", "31m", "-31m", "-3m1", "6", "-6", "6/m", "622", "6mm", "-6m2", "-62m", "6/mmm", "23", "m-3", "432", "-43m", "m-3m"]
+
+
+def test_the_fundamental_sector_of_a_crystal_frame_is_the_conventional_one():
+  from mtex.geometry.sphericalregion import tilesSphere
+  for s in GROUPS:
+    cs = crystalFrame(s)
+    for antipodal in (False, True):
+      grp = cs.sym.Laue() if antipodal else cs.sym
+      conv = conventionalSector(grp, up=cs.how2plot.outOfScreen, east=cs.how2plot.east)
+      assert tilesSphere(conv, grp), s
+      assert fundamentalSector(cs, antipodal=antipodal).N.shape == conv.N.shape and np.allclose(fundamentalSector(cs, antipodal=antipodal).N, conv.N)
+  # a calcite direction just below the equator goes to MATLAB's equivalent above it, azimuth -22 degrees,
+  # not the one at -38 degrees below it, which a Dirichlet domain about an off-centre point keeps
+  cs = crystalFrame("-3m", [5, 5, 17], mineral="calcite")
+  p = project2FundamentalRegion(vector3d(1.11272303, -0.86934213, -0.07804949, frame=cs))
+  assert np.allclose(p.data, [1.309234, -0.528975, 0.078049], atol=1e-6)
+
+
+def test_a_turned_group_takes_the_dirichlet_domain():
+  from mtex.geometry.kernels import qmul
+  from mtex.geometry.sphericalregion import dirichletSector, tilesSphere
+  r = rotation.byAxisAngle(vector3d(1, 2, 3), 37 * degree).data.reshape(4)
+  vs = vector3d(rng.normal(size=(3000, 3)))
+  for s in ("222", "3", "32", "422", "622", "23", "432"):
+    q = crystalFrame(s).sym.rot.data.reshape(-1, 5)[:, :4]
+    for turned in (False, True):
+      pg = symmetry(rotation._fromData(np.array([qmul(qmul(r, x), r * [1, -1, -1, -1]) for x in q]) if turned else q))
+      for antipodal in (False, True):
+        grp = pg.Laue() if antipodal else pg
+        sR = fundamentalSector(pg, antipodal=antipodal)
+        # the rules of the conventional sector read the standard axes, so a turned group falls back
+        assert tilesSphere(conventionalSector(grp), grp) != turned
+        if turned:
+          assert sR == dirichletSector(grp)
+        assert np.all(sR.checkInside(projectIntoRegion(vs, sR, grp)))

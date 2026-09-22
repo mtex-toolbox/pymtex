@@ -1,6 +1,6 @@
 # Documentation (P7)
 
-Status: D0 done 2026-09-22, D1 under way (Vectors, Rotations and CrystalGeometry done, CrystalOrientations next), D2 under way (ODFAnalysis done 2026-09-22), D3 under way (EBSDAnalysis and Grains done 2026-09-22, GrainBoundaries next), D4 under way (PoleFigureAnalysis done 2026-09-22).
+Status: D0 done 2026-09-22, D1 under way (Vectors, Rotations, CrystalGeometry and CrystalOrientations done, Misorientations next), D2 under way (ODFAnalysis done 2026-09-22), D3 under way (EBSDAnalysis and Grains done 2026-09-22, GrainBoundaries next), D4 under way (PoleFigureAnalysis done 2026-09-22).
 
 The MATLAB documentation, `../frameSymmetry/doc`, is 229 content scripts in twenty
 chapters, publish-style: prose in comment blocks, code between, the output and the figures
@@ -116,6 +116,12 @@ the labelled markers and arrows, `circle` with a parent, `eq(antipodal=True)`, `
 `olivine1997` and `quartzPattern`, MATLAB's capitalised options on shapes and maps, and found the
 unreconciled frames of `angle`, the equator poles, the empty icosahedral Laue sector and the rest in
 `docs/findings.md`.
+CrystalOrientations DONE 2026-09-22, all 16 checked: the chapter wrote `plot3d(odf)` as MATLAB's
+isosurfaces (marching tetrahedra in `plotting/space.py`), `orientation.load` with the data set `tongue`,
+`regularSO3Grid`, `std`, `rotation.rand(n, maxAngle=w)`, `byEuler` of triples, the embedding's MATLAB
+spellings, an exact Bingham sampler, 3D plots in a `newMtexFigure` layout, and found the grain exchange
+flag ignored by the regions, the projection and the sections, the sampled largest angle of a region, the
+321 chart sector, the held axis angle plots taking Euler coordinates, all in `docs/findings.md`.
 
 **D2 - the functions.** SphericalFunctions (16), SO3Functions (13), ODFAnalysis (18),
 GeneralConcepts (12), Plotting (11), Tutorials (5): 75 pages on P2 and P5's S1 to S3 (the

@@ -17,6 +17,7 @@ import numpy as np
 from ..geometry.frames import crystalFrame
 from ..geometry.miller import brackets, indexString
 from ..geometry.plottingconvention import plottingConvention
+from ..geometry.quaternion import rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.units import degree
@@ -435,7 +436,13 @@ def plotSector(fr, antipodal=False, how2plot=None):
   pg = fr.sym
   if antipodal and not pg.isLaue:
     pg = pg.Laue()
-  return conventionalSector(pg, up=pC.outOfScreen, east=pC.east, frame=fr)
+  sR = conventionalSector(pg, up=pC.outOfScreen, east=pC.east, frame=fr)
+  # MATLAB draws the wedge of 321 from an m direction, half way between the two-folds the
+  # conventional sector starts at
+  if pg.pointGroup == "321":
+    turn = rotation.byAxisAngle(vector3d(pC.outOfScreen.data), -np.pi / 6)
+    sR = sphericalRegion((turn * vector3d(sR.N)).data.reshape(-1, 3), sR.alpha, frame=fr)
+  return sR
 
 
 # the azimuth interval of a region: the whole circle when a pole lies inside, otherwise

@@ -24,6 +24,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .load import loadEBSD
+from .orientations import loadOrientation
 from .vectors import loadVector3d
 
 with open(os.path.join(os.path.dirname(__file__), "sampledata.json")) as _f:
@@ -86,7 +87,7 @@ def mtexdatafile(name, root=None, download=True):
   return paths[0] if len(paths) == 1 else paths
 
 
-def mtexdata(name=None, root=None, download=True):
+def mtexdata(name=None, root=None, download=True, silent=False):
   """the sample data of the documentation
 
     mtexdata()                       the table of the data sets
@@ -95,7 +96,8 @@ def mtexdata(name=None, root=None, download=True):
 
   The files are fetched from the MTEX repository on first use and kept under
   getMTEXpref('mtexDataPath'), MTEX_DATA or ~/.mtex/data; root names another folder, a
-  local copy of MTEX's data folder for instance, and download=False never fetches.
+  local copy of MTEX's data folder for instance, and download=False never fetches; silent
+  is MATLAB's flag, the loading printing nothing anyway.
   """
   if name is None:
     return SampleTable()
@@ -167,7 +169,7 @@ def _withPhaseId(e, ids):
   rot = e.rotations.data.copy()
   rot[ids == 0] = np.nan
   return EBSD(e.pos, rotation(rot), ids, e.CSList, e.prop, scanUnit=e.scanUnit, meta=e.meta, phaseMap=e.phaseMap, id=e.id,
-              lattice=e.lattice)
+              lattice=e.lattice, isPadding=e.isPadding)
 
 
 def _proper(e, names):
@@ -361,6 +363,8 @@ _dataset("dubnaODF", "SO3Fun", "the ODF reconstructed from the Dubna quartz pole
 _dataset("eclogite", "EBSD", "sparse eclogite map whose positions collide on a lattice, kept as a list", "eclogite", lambda p: loadEBSD(p))
 _dataset("vectors", "vector3d", "a thousand directions as polar and azimuth angles", "vectors",
          lambda p: loadVector3d(p, columnNames=["polar angle", "azimuth angle"])[0])
+_dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzite as Bunge Euler angles", "tongue",
+         lambda p: loadOrientation(p, crystalFrame.load("quartz.cif"), columnNames=["phi1", "Phi", "phi2"])[0])
 _dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _later("a VPSC file"))
 _dataset("odf", "SO3Fun", "an ODF tabulated on a Bunge Euler grid, read as values", "odf", _odf)
 

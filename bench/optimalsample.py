@@ -1,7 +1,7 @@
 # optimalSample against the Julia port, for docs/research/benchmark-sampling.md
 #
 #   .venv/bin/python bench/optimalsample.py
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/optimalsample.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/optimalsample.jl)
 #
 # The same targets and the same deterministic starting nodes on both sides, a fixed number
 # of L-BFGS steps with the tolerances at zero, best of three after one warm-up run; the

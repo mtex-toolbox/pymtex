@@ -101,24 +101,29 @@ def symAngle(a, b, antipodal=False):
   return np.arctan2(c, d).min(axis=-1)
 
 
-# the centre of the Dirichlet domain of a frame, and every direction of a list moved into
-# it: the element whose image of the centre is closest to the direction, applied inversely
+# every direction of a list folded into the fundamental sector of its frame, the one an
+# inverse pole figure shows; an axis into the sector of the Laue group. Given a centre, a
+# direction goes to the equivalent nearest it instead: the element whose image of the
+# centre is closest to the direction, applied inversely
 def project2FundamentalRegion(v, center=None):
   if not reducesOverGroup(v):
     return v
-  from .sphericalregion import sectorCenter
   fr = v.frame
+  if center is None:
+    from .sphericalregion import fundamentalSector, projectIntoRegion
+    return projectIntoRegion(v, fundamentalSector(fr, antipodal=v.antipodal), fr.sym.Laue() if v.antipodal else fr.sym)
   o = fr.rot.data.reshape(-1, 5)
-  c = sectorCenter(fr) if center is None else center
-  c = c.data if isinstance(c, vector3d) else np.asarray(c, dtype=float)
+  c = center.data if isinstance(center, vector3d) else np.asarray(center, dtype=float)
   imgs = qrot(o[:, :4], c[None]) * o[:, 4:5]
   return v._new(projectDirections(v.data, imgs, o[:, :4], o[:, 4]))
 
 
-# the distinct directions of a list up to the group: each is projected to the fundamental
-# sector of its frame first, so equivalent ones become the same vector
+# the distinct directions of a list up to the group: each is moved to its equivalent nearest
+# the centre first, so equivalent ones become the same vector even on the rim of a sector,
+# where a fold into it could keep two of them
 def symUnique(v, tolerance=1e-6, return_index=False, return_inverse=False):
-  rep = project2FundamentalRegion(v).data.reshape(-1, 3)
+  from .sphericalregion import sectorCenter
+  rep = project2FundamentalRegion(v, center=sectorCenter(v.frame)).data.reshape(-1, 3) if reducesOverGroup(v) else v.data.reshape(-1, 3)
   n = np.linalg.norm(rep, axis=1)
   d = rep @ rep.T / np.outer(n, n)
   same = d > 1 - tolerance
@@ -232,7 +237,35 @@ def project2FundamentalRegionOrientation(o, ref=None):
     common = commonRotations(L, R)
     if len(common) > 1:
       cimgs = qrot(common, commonAxisCenter(common)[None])
-  return o._new(projectToRef(o.data, es, frm, L, R, refq, common, cimgs))
+  p = projectToRef(o.data, es, frm, L, R, refq, common, cimgs)
+  if o.antipodal and abs(refq[0]) > 1 - 1e-12:
+    p = _exchangeIntoSector(p, commonRotations(L, R))
+  return o._new(p)
+
+
+# with grain exchange the inverse, the same angle about the opposite axis, is a further
+# representative: among the conjugates of p and of its inverse by the shared rotations the
+# first whose axis lies in the sector of the shared rotations with inversion, else the one
+# whose axis is nearest its centre
+def _exchangeIntoSector(p, common):
+  from .orientationregion import commonAxisSector
+  from .kernels import qmul
+  sector, center = commonAxisSector(common, True)
+  q = p.reshape(-1, 4)
+  cands = []
+  for c in (common if len(common) else np.array([[1.0, 0, 0, 0]])):
+    ci = c * [1, -1, -1, -1]
+    for x in (q, q * [1, -1, -1, -1]):
+      cands.append(qmul(qmul(ci, x), c))
+  cands = np.stack(cands, axis=1)
+  cands *= np.where(cands[..., :1] < 0, -1.0, 1.0)
+  axes = cands[..., 1:]
+  inside = np.all(axes @ sector.N.T >= -1e-9 * np.linalg.norm(axes, axis=-1, keepdims=True), axis=-1)
+  score = np.where(inside, 2.0, axes @ center / np.maximum(np.linalg.norm(axes, axis=-1), 1e-300))
+  best = cands[np.arange(len(q)), np.argmax(score, axis=1)]
+  # a rotation about no axis stays as it is
+  best = np.where((np.linalg.norm(q[:, 1:], axis=1) < 1e-12)[:, None], q, best)
+  return best.reshape(p.shape)
 
 
 # the distinct orientations of a list up to symmetry: representatives in the fundamental

@@ -14,9 +14,9 @@ does not exist; **Pending** not started.
 | Chapter | Total | Checked | Adapted | Partial | Written | Blocked | Pending |
 |---|---|---|---|---|---|---|---|
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
-| CrystalOrientations | 16 | 4 | 0 | 0 | 0 | 0 | 12 |
+| CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | EBSD3Analysis | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
-| EBSDAnalysis | 25 | 12 | 1 | 4 | 4 | 4 | 0 |
+| EBSDAnalysis | 25 | 13 | 1 | 4 | 3 | 4 | 0 |
 | Elasticity | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
 | GeneralConcepts | 12 | 0 | 0 | 0 | 0 | 0 | 12 |
 | GrainBoundaries | 15 | 0 | 0 | 0 | 0 | 0 | 15 |
@@ -33,7 +33,7 @@ does not exist; **Pending** not started.
 | Tensors | 8 | 0 | 0 | 0 | 0 | 0 | 8 |
 | Tutorials | 5 | 0 | 0 | 0 | 0 | 0 | 5 |
 | Vectors | 7 | 5 | 0 | 2 | 0 | 0 | 0 |
-| **All** | 229 | 75 | 2 | 10 | 5 | 4 | 133 |
+| **All** | 229 | 88 | 2 | 10 | 4 | 4 | 121 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|
@@ -48,21 +48,21 @@ does not exist; **Pending** not started.
 | CrystalGeometry/QuasiCrystals | QuasiCrystals | Checked 2026-09-22; 60 and 120 elements, the sector, the dodecahedron and the two keys as MATLAB's; the port names the groups 532 and -5-32/m where MATLAB says unknown; wrote `plot(key, complete=True)`; found the sector of the centrosymmetric icosahedral group empty, its centre now the Moebius triangle of neighbouring axes | Checked |
 | CrystalGeometry/SymmetryAlignment | SymmetryAlignment | Checked 2026-09-22; 10 and 0, the two Voigt matrices and 320.5 twice as MATLAB's, two figures; the tensor file is the data set `olivine1997` | Checked |
 | CrystalOrientations/DefinitionAsCoordinateTransform | DefinitionAsCoordinateTransform | Checked 2026-09-22; every display, the transformed stiffness, 37.1140 and the residuals (0 and 2.2e-15 for MATLAB's 1.2e-06 and 3.4e-06) as MATLAB's, the cube with its arrows as MATLAB's up to the camera elevation; `symmetrise` gives 24 where MATLAB gives 48 and 24, the proper-only class again; found the Miller and tensor displays counting significant digits where MATLAB rounds to four decimals, fixed | Checked |
-| CrystalOrientations/MTEXvsBungeConvention |  | Pending | Checked |
+| CrystalOrientations/MTEXvsBungeConvention | MTEXvsBungeConvention | Checked 2026-09-22; the vectors, 0, (10, 50, 20), (160, 50, 170), the matrix and 0 as MATLAB's (0 for MATLAB's single precision 1.7e-06); the two cubes as MATLAB's but the arrow shows through the cube, matplotlib having no occlusion; wrote `byEuler` of an array of triples, 3D shapes into a `newMtexFigure` layout with `nextAxis`, MATLAB's `text(x, y, z, s)` | Checked |
 | CrystalOrientations/OrientationDefinition | OrientationDefinition | Checked 2026-09-22; the three displays, 100 and the Goss angle (2.7e-15 for MATLAB's exact 0) as MATLAB's, one figure as MATLAB's; `symmetrise` gives 24 and 96 where MATLAB gives 48 and 384, the semantics' proper-only class, said in the page; dropped the dead `proper` keyword of `symmetrise` | Checked |
-| CrystalOrientations/OrientationEmbeddings |  | Pending | Checked |
-| CrystalOrientations/OrientationExport |  | Pending | Checked |
-| CrystalOrientations/OrientationFibre |  | Pending | Checked |
-| CrystalOrientations/OrientationFundamentalRegion |  | Pending | Checked |
-| CrystalOrientations/OrientationGrid |  | Pending | Checked |
-| CrystalOrientations/OrientationImport |  | Pending | Checked |
-| CrystalOrientations/OrientationInversePoleFigure |  | Pending | Checked |
-| CrystalOrientations/OrientationPoleFigure |  | Pending | Checked |
+| CrystalOrientations/OrientationEmbeddings | OrientationEmbeddings | Checked 2026-09-22; the naive and intrinsic means, the embedding display, the 315 degree mean, the ones, 81 and 9 as MATLAB's; MATLAB's run fails in the de la Vallee Poussin loop asking for zero samples, the port draws both families; wrote `std`, `norm(e, normalized=True)`, `double(e, full=True)`, `orientation(e)`, `BinghamODF(kappa, cs)`, MATLAB's embedding display, an exact Bingham sampler (the page went from six minutes to eight seconds) | Checked |
+| CrystalOrientations/OrientationExport | OrientationExport | Checked 2026-09-22; the headers and layouts of the four tables and both VPSC files as MATLAB's, the weight sum 1; the values are a random sample; the table writer now fits each column as MATLAB's cprintf, shared with the vector export | Checked |
+| CrystalOrientations/OrientationFibre | OrientationFibre | Checked 2026-09-22; the four fibre displays, 6 copies, the volumes 7.39 and 26.32 for MATLAB's 7.26 and 25.93 (the page's 58 and 100 percent are stale in MATLAB too), all figures as MATLAB's; wrote `plot3d(odf)` as MATLAB's isosurfaces in the Euler box, the fibre in inverse pole figures, `DisplayName` on fibres, `project2FundamentalRegion` on fibre plots, MATLAB's `Location` of a legend, the Euler box ticked as MATLAB's; the port draws 96 copies of the symmetrised beta fibre where MATLAB's figure shows fewer | Checked |
+| CrystalOrientations/OrientationFundamentalRegion | OrientationFundamentalRegion | Checked 2026-09-22; 6.0553 as MATLAB's, all figures as MATLAB's after the fixes; the boundary counts 11714 and 16524 for 11751 and 15872 from the default reconstruction (3185 grains for 3106, the closing of GrainReconstruction); found the grain exchange flag ignored by the region, the projection and the axis angle sections, orientations drawn into a held axis angle plot in Euler coordinates, misorientations scattered in Euler space, `all` and `ignoreFundamentalRegion` without effect, section angles after a family read as marker values, all fixed; the port's antipodal half is a different, equally valid half of MATLAB's | Checked |
+| CrystalOrientations/OrientationGrid | OrientationGrid | Checked 2026-09-22; 24624, 265 and 8.75 as MATLAB's, the regular grid's pole figure ranges 0.79 to 2.62 and 0.75 to the digit; the equispaced grid has 5177 nodes for MATLAB's 4923 and is flatter, 0.98 to 1.02 for 0.93 to 1.02; wrote `regularSO3Grid` | Checked |
+| CrystalOrientations/OrientationImport | OrientationImport | Checked 2026-09-22; 382 orientations and the two pole figures as MATLAB's; wrote `orientation.load` and `loadOrientation` (Euler or quaternion columns, radians, passive, positions) and the data set `tongue`; MATLAB's page warns of three defects of its importer that the port does not have, said in the page | Checked |
+| CrystalOrientations/OrientationInversePoleFigure | OrientationInversePoleFigure | Checked 2026-09-22; 6 and 300 as MATLAB's, the figures as MATLAB's in structure, the random orientation differing; wrote `rotation.rand(n, maxAngle=w)`; found the 321 sector bounded by the a directions where MATLAB bounds it by the m directions, fixed in the charts | Checked |
+| CrystalOrientations/OrientationPoleFigure | OrientationPoleFigure | Checked 2026-09-22; 6 and all figures as MATLAB's in structure (a random orientation); the port lays the four panels out 2x2 and shares one colour bar | Checked |
 | CrystalOrientations/OrientationStandard | OrientationStandard | Checked 2026-09-22; Copper at 5.0000, the nine $(hkl)[uvw]$ labels and every marker position as MATLAB's, eight figures; wrote `legend`, MTEX's colour table behind `ind2color`, `DisplayName` on markers and in space, `add2all` on section plots; found `round2Miller` rounding over four indices where MATLAB rounds over twelve, the orthorhombic sector not turned by the plotting convention, a contour overlay replacing the surface under it and a held row of pole figures opening a second figure, all fixed; the contour levels are shared over the panels of one call where MATLAB gives each its own, and a held plot does not take the next colour of the order | Checked |
 | CrystalOrientations/OrientationSymmetry | OrientationSymmetry | Checked 2026-09-22; the three equivalent lists, 12, [12, 6] and both angle columns to the digit as MATLAB's; the complete pole figure as MATLAB's but for the Z at the chart centre; wrote `ori * cs` and `ss * ori`; found `complete` never reaching the pole figure chart, the specimen group missing from the poles and the sample budget ignoring it, all fixed; `symmetrise` gives 24 for cubic where MATLAB gives 48 and 24 | Checked |
-| CrystalOrientations/OrientationVisualization3d |  | Pending | Checked |
-| CrystalOrientations/OrientationVisualizationSections |  | Pending | Checked |
-| CrystalOrientations/SpecimenSymmetry |  | Pending | Checked |
+| CrystalOrientations/OrientationVisualization3d | OrientationVisualization3d | Checked 2026-09-22; the four figures as MATLAB's; the port's markers are filled where MATLAB draws hollow circles | Checked |
+| CrystalOrientations/OrientationVisualizationSections | OrientationVisualizationSections | Checked 2026-09-22; the phi2, sigma and axis angle sections as MATLAB's; found the largest angle of a region sampled (61.6 for 62.8 degrees), now exact at a vertex in Rodrigues space, so the sections sit at 5.233 to 57.566 degrees and are labelled as MATLAB's | Checked |
+| CrystalOrientations/SpecimenSymmetry | SpecimenSymmetry | Checked 2026-09-22; 8, 4, 1, 2, the frames and both pole figures with their ranges 6.9 and 3.4 as MATLAB's; the texture indices 27.89 and 7.27 have no MATLAB value, its NFFT MEX failing to load | Checked |
 | EBSD3Analysis/Grains3D |  | Pending | Blocked |
 | EBSD3Analysis/Grains3DOperations |  | Pending | Blocked |
 | EBSD3Analysis/Grains3DProperties |  | Pending | Blocked |
@@ -88,7 +88,7 @@ does not exist; **Pending** not started.
 | EBSDAnalysis/EBSDPseudoSymmetry |  | Blocked: `cleanUpPseudoSym` is M10 | Checked |
 | EBSDAnalysis/EBSDReferenceFrame | EBSDReferenceFrame | Checked 2026-09-22; the Euler correction (315, 180, 45), the eight large grains, all seven figures as MATLAB's, the crystal shapes on the maps included; needed `ebsd.EulerCorrection`, `rotate(ebsd, r, 'keepEuler')` at the package level, the `location` of the scale bar and `ipfDirection` of a map | Checked |
 | EBSDAnalysis/EBSDSelect | EBSDSelect | Checked 2026-09-22; 152345, 178403, 187467, 20301, 881, 4052 and 13359 to the digit, all seven figures and the histogram as MATLAB's; the region rectangle is a matplotlib patch | Checked |
-| EBSDAnalysis/EBSDSharpPlot | EBSDSharpPlot | Written 2026-09-22, held back: the calcite map is gridded onto a 45 degree lattice whose sites come out as a dark triangle in every backend, so the map figures are wrong; the inverse pole figure, the key and the forsterite grain figures match; found the means failing on NaN sites, `maxAngle` of the HSV key without a setter, colours in the map's shape refused
+| EBSDAnalysis/EBSDSharpPlot | EBSDSharpPlot | Checked 2026-09-22; the display (32 notIndexed, 20119 calcite, [0 → 200] x [-100 → 0]), the azimuth median -22.27, the 98 percent between -23.89 and -17.76 and the tail to -41.72 as MATLAB's, every map with its few purple outliers, the inverse pole figure, the keys and the forsterite grain figures as MATLAB's; the value maps in viridis for parula; found the padding counted and drawn as notIndexed (fixed, `isPadding`), the fundamental sector a Dirichlet domain other than the conventional one (fixed), the means failing on NaN sites, `maxAngle` of the HSV key without a setter, colours in the map's shape refused | Checked |
 | EBSDAnalysis/EBSDSimulation |  | Blocked: `simulateEBSD` and its verbs are M10 | Checked |
 | EBSDAnalysis/EBSDSpatialTransform |  | Blocked: the spatial transforms, affine and projective with their fits, are M10 | Adapted |
 | EBSDAnalysis/EBSDTrueEbsd |  | Blocked: the TrueEBSD registration and the staged distortion models are not ported, as in Julia | Blocked |

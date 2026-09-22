@@ -42,12 +42,21 @@ def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, az
     fig = gcm()
     if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot"):
       return fig.children[-1]._mtexSpacePlot
-    from .mtexfigure import figureSize
-    fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
-    # the markers are drawn after the region they lie in, whatever matplotlib makes of
-    # the depth of one big translucent surface
-    ax = fig.fig.add_subplot(1, 1, 1, projection="3d", computed_zorder=False)
-    fig.children.append(ax)
+    # the axes nextAxis prepared, or the first of a fresh newMtexFigure, becomes a 3D axes
+    if fig is not None and (fig.pending is not None or (not fig.children and not fig.hold)):
+      flat = fig.takeAxis()
+      k = fig.children.index(flat)
+      spec = flat.get_subplotspec()
+      flat.remove()
+      ax = fig.fig.add_subplot(spec, projection="3d", computed_zorder=False)
+      fig.children[k] = ax
+    else:
+      from .mtexfigure import figureSize
+      fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
+      # the markers are drawn after the region they lie in, whatever matplotlib makes of
+      # the depth of one big translucent surface
+      ax = fig.fig.add_subplot(1, 1, 1, projection="3d", computed_zorder=False)
+      fig.children.append(ax)
   sP = spacePlot(ax, frame)
   ax.set_box_aspect((1, 1, 1))
   lim = (-limits, limits) if np.isscalar(limits) else limits
@@ -95,17 +104,31 @@ def _sphere(sP, resolution=5 * degree, values=None, colormap="WhiteJet", colorRa
   return poly
 
 
+# the Euler box in degrees at equal scale, ticked every 30 degrees along a side up to 180
+# and every 60 beyond, as MATLAB ticks it
+def _eulerBox(ax, box):
+  from matplotlib.ticker import MultipleLocator
+  for axis, b, name in zip((ax.xaxis, ax.yaxis, ax.zaxis), box, ("φ1 / °", "Φ / °", "φ2 / °")):
+    axis.set_major_locator(MultipleLocator(30 if b <= 180 else 60))
+    axis.set_label_text(name)
+  ax.set_xlim(0, box[0])
+  ax.set_ylim(0, box[1])
+  ax.set_zlim(0, box[2])
+  ax.set_box_aspect(tuple(box / box.max()))
+
+
 def _keys(kw):
   axesKw = {k: kw.pop(k) for k in ("figSize", "parent", "azimuth", "elevation", "title") if k in kw}
   return axesKw
 
 
 def plot3d(x, *args, **kw):
-  """plot3d(v), plot3d(v, data), plot3d(sF), plot3d(vF), plot3d(oR), plot3d(ori)
+  """plot3d(v), plot3d(v, data), plot3d(sF), plot3d(vF), plot3d(oR), plot3d(ori), plot3d(odf)
 
   Directions as markers on the sphere in space, a function as the sphere coloured, a field
   as arrows on it, the fundamental region of orientation space as its boundary in axis angle
-  space, and a list of orientations as points in it.
+  space, a list of orientations as points in it, and an ODF as its isosurfaces in the Euler
+  box.
   """
   if isinstance(x, orientationRegion):
     return plotRegion3d(x, **kw)
@@ -116,6 +139,8 @@ def plot3d(x, *args, **kw):
   from ..geometry.fibre import fibre
   if isinstance(x, fibre):
     return plotFibre3d(x, *args, **kw)
+  if hasattr(x, "pdf") and hasattr(x, "CS") and hasattr(x, "SS"):
+    return plotODF3d(x, **kw)
   if _isField(x):
     return quiver3d(x, **kw)
   if _isFunction(x):
@@ -217,6 +242,9 @@ def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, line
   axesKw = _keys(kw)
   limit = 1.15 * oR.maxAngle() / degree
   sP = _spaceAxes(oR.frameA, limits=limit, decorated=True, **axesKw)
+  # orientations drawn into the region later come in its coordinates
+  if not hasattr(sP, "coordinates"):
+    sP.coordinates, sP.reduced = "axisAngle", True
   _regionLabels(sP.ax)
   return _region(sP, oR, resolution, color, alpha, lines, lineColor)
 
@@ -296,8 +324,9 @@ def _spaceFlags(args, Euler, axisAngle, Rodrigues):
 
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
                         ignoreFundamentalRegion=False, points=None, MarkerSize=5, color=MARKER_COLOR, colormap="WhiteJet",
-                        colorRange=None, colorbar=False, **kw):
-  """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle')
+                        colorRange=None, colorbar=False, all=False, **kw):
+  """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
+  scatter(ori, all=True)
 
   Orientations as points in axis angle space, in Rodrigues space or in Euler angle space,
   brought into the fundamental region unless ignoreFundamentalRegion, with the boundary of
@@ -310,20 +339,30 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   ignoreFundamentalRegion = ignoreFundamentalRegion or complete
   color, style = _markerStyle(kw, color, MarkerSize)
   axesKw = _keys(kw)
-  # an orientation with its frames scatters in the Euler region by default, a bare rotation
-  # in axis angle space, as MATLAB does; a list is sampled to 2000 points unless asked otherwise
+  # an orientation with its frames scatters in the Euler region by default, a misorientation
+  # and a bare rotation in axis angle space, into held axes in their coordinates, as MATLAB
+  # does; a list is sampled to 2000 points unless asked otherwise
   isOri = hasattr(o, "CS")
-  euler = Euler or (not axisAngle and not Rodrigues and isOri)
-  coordinates = "Rodrigues" if Rodrigues else "Euler" if euler else "axisAngle"
+  fig = gcm()
+  heldSP = fig.children[-1]._mtexSpacePlot if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot") else None
+  if heldSP is not None and getattr(heldSP, "coordinates", None) and not (Euler or axisAngle or Rodrigues):
+    coordinates = heldSP.coordinates
+  else:
+    euler = Euler or (not axisAngle and not Rodrigues and isOri and not o.isMisorientation)
+    coordinates = "Rodrigues" if Rodrigues else "Euler" if euler else "axisAngle"
   reduced = isOri and fundamentalRegion and not ignoreFundamentalRegion
-  region = region and isOri
+  if heldSP is not None and hasattr(heldSP, "reduced"):
+    reduced = heldSP.reduced
+  region = region and isOri and not ignoreFundamentalRegion
+  # orientations kept as they are are looked at closely, without the region
+  zoom = isOri and ignoreFundamentalRegion and not complete
   o = o.flatten()
   # an orientation that is not there, a NaN, is left out with its value
   keep = ~np.isnan(o.data).any(axis=-1)
   if not np.all(keep):
     o = o[keep]
     data = None if data is None else np.asarray(data).reshape(-1)[keep]
-  points = 2000 if points is None else points
+  points = o.size if all else 2000 if points is None else points
   if points < o.size:
     print(f"plot {points} random orientations out of {o.size} given orientations")
     take = np.sort(np.random.default_rng(0).permutation(o.size)[:points])
@@ -339,24 +378,25 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
     sP = _spaceAxes(frame, limits=(0, float(bounds.max())), decorated=True, **axesKw)
     # held axes keep their box
     if not held:
-      sP.ax.set_xlim(0, bounds[0])
-      sP.ax.set_ylim(0, bounds[1])
-      sP.ax.set_zlim(0, bounds[2])
-      sP.ax.set_box_aspect(tuple(bounds / bounds.max()))
-      sP.ax.set_xlabel("φ1 / °")
-      sP.ax.set_ylabel("Φ / °")
-      sP.ax.set_zlabel("φ2 / °")
+      _eulerBox(sP.ax, bounds)
   else:
     finite = P[np.all(np.isfinite(P), axis=1)]
     bound = float(np.max(np.abs(finite))) if len(finite) else 1.0
-    if coordinates == "axisAngle" and (region or not reduced):
+    if coordinates == "axisAngle" and (region or not reduced) and not zoom:
       bound = max(bound, oR.maxAngle() / degree if region else 180.0)
     sP = _spaceAxes(frame, limits=1.1 * bound, decorated=True, **axesKw)
+    if zoom and not held and len(finite):
+      lo, hi = finite.min(axis=0), finite.max(axis=0)
+      pad = 0.05 * max(float(np.max(hi - lo)), 1e-9)
+      sP.ax.set_xlim(lo[0] - pad, hi[0] + pad)
+      sP.ax.set_ylim(lo[1] - pad, hi[1] + pad)
+      sP.ax.set_zlim(lo[2] - pad, hi[2] + pad)
+      sP.ax.set_box_aspect(tuple(hi - lo + 2 * pad))
     if coordinates == "axisAngle":
       _regionLabels(sP.ax)
       if region:
         _region(sP, oR)
-      elif not reduced and noRegion is None:
+      elif not reduced and noRegion is None and not zoom:
         _ball(sP)
     else:
       sP.ax.set_xlabel("r1")
@@ -472,6 +512,8 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   color = kw.pop("lineColor", kw.pop("LineColor", color))
   lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  # MATLAB's name of the flag
+  fundamentalRegion = kw.pop("project2FundamentalRegion", fundamentalRegion)
   coordinates = "Rodrigues" if Rodrigues else "axisAngle" if axisAngle else "Euler"
   o = f.flatten().orientation(points) if f.ndim > 0 else f.orientation(points)
   reduced = fundamentalRegion and not ignoreFundamentalRegion and not complete
@@ -483,13 +525,7 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
     sP = _spaceAxes(o.CS, limits=(0, float(np.nanmax(np.abs(P)))), decorated=True, **axesKw)
     if not held:
       bounds = np.array(eulerRegion(o.CS, o.SS) if reduced else (2 * np.pi, np.pi, 2 * np.pi)) / degree
-      sP.ax.set_xlim(0, bounds[0])
-      sP.ax.set_ylim(0, bounds[1])
-      sP.ax.set_zlim(0, bounds[2])
-      sP.ax.set_box_aspect(tuple(bounds / bounds.max()))
-      sP.ax.set_xlabel("φ1 / °")
-      sP.ax.set_ylabel("Φ / °")
-      sP.ax.set_zlabel("φ2 / °")
+      _eulerBox(sP.ax, bounds)
   else:
     # the ball of axis angle space, or the fundamental region with its boundary
     oR = fundamentalRegion_(o)
@@ -510,7 +546,39 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   jump = np.linalg.norm(np.diff(P, axis=0), axis=1) > 5 * np.nanmedian(np.linalg.norm(np.diff(P, axis=0), axis=1))
   Q = P.copy()
   Q[1:][jump] = np.nan
-  return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, **kw)[0]
+  label = kw.pop("DisplayName", kw.pop("displayName", None))
+  return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
+
+
+# plot3d(odf): the isosurfaces of an ODF at surf3 levels from zero to its maximum over the
+# Euler box of its frames, the higher the less transparent (MATLAB @SO3Fun/plot3d)
+def plotODF3d(odf, surf3=10, resolution=5 * degree, colormap="parula", **kw):
+  from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  from .space import isosurface
+  axesKw = _keys(kw)
+  bounds = np.array(eulerRegion(odf.CS, odf.SS))
+  axes = [np.arange(0, b + 1e-9, resolution) for b in bounds]
+  E = np.meshgrid(*axes, indexing="ij")
+  V = np.real(np.asarray(odf(orientation.byEuler(E[0], E[1], E[2], "Bunge", odf.CS, odf.SS)))).reshape(E[0].shape)
+  top = float(np.max(V))
+  levels = np.linspace(0, top, int(surf3)) if np.isscalar(surf3) else np.asarray(surf3, dtype=float)
+  sP = _spaceAxes(odf.CS, limits=(0, float(bounds.max() / degree)), decorated=True, **axesKw)
+  box = bounds / degree
+  _eulerBox(sP.ax, box)
+  sP.coordinates, sP.reduced = "Euler", True
+  cmap = mtexColormap(colormap)
+  deg = [a / degree for a in axes]
+  hs = []
+  for v in levels:
+    T = isosurface(*deg, V, v)
+    if len(T) == 0:
+      continue
+    rgba = list(cmap(v / top if top > 0 else 0))
+    rgba[3] = v / top if top > 0 else 0
+    h = Poly3DCollection(T, facecolors=[rgba], edgecolors="none")
+    sP.ax.add_collection3d(h)
+    hs.append(h)
+  return hs
 
 
 def fundamentalRegion_(o):

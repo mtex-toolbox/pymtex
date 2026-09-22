@@ -150,6 +150,21 @@ def _pickData(o, args):
   return h, data
 
 
+# a fibre is the curve of its orientations, drawn as dots in its line colour
+def _fibreAsCurve(o, points, all, kw):
+  from ..geometry.fibre import fibre
+  if not isinstance(o, fibre):
+    return o, points, all
+  color = kw.pop("lineColor", kw.pop("LineColor", "k"))
+  kw.pop("lineWidth", None)
+  kw.pop("LineWidth", None)
+  kw.setdefault("MarkerSize", 1.5)
+  kw.setdefault("MarkerFaceColor", color)
+  kw.setdefault("MarkerEdgeColor", color)
+  o = o.flatten().orientation(points or 1000) if hasattr(o, "flatten") else o.orientation(points or 1000)
+  return o, None, True
+
+
 def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
   """plotPDF(ori, h), plotPDF(ori, data, h), plotPDF(ori, h, points=100, contourf=True, antipodal=True)
 
@@ -157,16 +172,7 @@ def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
   of h, as markers on the specimen sector, coloured by a value per orientation when given;
   a style draws the density of the poles instead. An ODF draws its pole density functions.
   """
-  from ..geometry.fibre import fibre
-  if isinstance(o, fibre):
-    # a fibre is the curve of its orientations, drawn as dots in its line colour
-    color = kw.pop("lineColor", "k")
-    kw.pop("lineWidth", None)
-    kw.setdefault("MarkerSize", 1.5)
-    kw.setdefault("MarkerFaceColor", color)
-    kw.setdefault("MarkerEdgeColor", color)
-    o, all = o.flatten().orientation(points or 1000) if hasattr(o, "flatten") else o.orientation(points or 1000), True
-    points = None
+  o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
     return sphericalplot.plotPDF(o, *args, superposition=superposition, **kw)
   h, data = _pickData(o, args)
@@ -188,6 +194,7 @@ def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
 def plotIPDF(o, *args, points=None, all=False, **kw):
   """plotIPDF(ori, r), plotIPDF(ori, data, r): the inverse pole figures of a list of orientations,
   the crystal directions along r as markers on the crystal sector"""
+  o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
     return sphericalplot.plotIPDF(o, *args, **kw)
   r, data = _pickData(o, args)

@@ -195,3 +195,13 @@ def test_the_compiled_and_the_numpy_filters_agree():
     setMTEXpref("kernels", before)
   for a, b in zip(out["numba"], out["numpy"]):
     assert np.array_equal(np.isnan(a), np.isnan(b)) and np.nanmax(np.abs(a - b)) < 1e-6
+
+
+def test_the_padding_of_a_grid_is_never_filled():
+  from test_gridify import turnedMap
+  g = turnedMap().gridify()
+  pad = g.isPadding.reshape(-1)
+  for f in (g.fill(), g.fill(extrapolate=True), g.smooth(halfQuadraticFilter(), fill=True, extrapolate=True)):
+    assert np.all(f.isPadding.reshape(-1) == pad) and f.rotations.isnan().reshape(-1)[pad].all() and np.all(f.phaseId.reshape(-1)[pad] == 0)
+  # the one measured notIndexed pixel is filled, since it is inside the scan
+  assert len(g.fill(extrapolate=True)["notIndexed"]) == 0

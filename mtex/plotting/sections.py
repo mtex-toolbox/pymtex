@@ -412,9 +412,12 @@ class axisAngleSections(ODFSections):
     # on the conventional sector of those, in the convention of the frame the rotation maps
     # into, so that the sections sit the same way up as the pole figures
     self.pC = plottingConvention(CS2.how2plot) if CS2.how2plot is not None else plottingConvention.default
+    # with grain exchange an axis and its opposite are one, the inverse misorientation
     common = self.oR.common
-    if len(common) > 1:
-      self.jointCS = symmetry(rotation._fromData(common))
+    if len(common) > 1 or antipodal:
+      self.jointCS = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))
+      if antipodal:
+        self.jointCS = self.jointCS.Laue()
       self.jointSector = conventionalSector(self.jointCS, up=self.pC.outOfScreen, east=self.pC.east, frame=CS1)
     else:
       self.jointCS = None
@@ -431,7 +434,8 @@ class axisAngleSections(ODFSections):
     return self.jointSector
 
   def sectionLabel(self, k):
-    return f"{_name('omega')} = {round(self.values[k] / degree)}°"
+    # three decimals at most, as MATLAB's xnum2str writes the angle
+    return f"{_name('omega')} = {round(float(self.values[k] / degree), 3):g}°"
 
   def sectionCharts(self, k):
     return makeSphericalProjection(self.axesSectors[k], how2plot=self.pC)

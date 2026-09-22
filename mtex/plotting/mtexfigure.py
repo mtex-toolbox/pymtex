@@ -271,6 +271,9 @@ def legend(location="northeast", numColumns=1, fontSize=None, **kw):
         seen.add(l)
         handles.append(h)
         labels.append(l)
+  # MATLAB's capitalised spellings
+  location = kw.pop("Location", location)
+  numColumns = kw.pop("NumColumns", numColumns)
   kw.setdefault("ncols", int(numColumns))
   kw.setdefault("fontsize", getMTEXpref("FontSize", 13) if fontSize is None else fontSize)
   where = str(kw.pop("location", location)).lower()

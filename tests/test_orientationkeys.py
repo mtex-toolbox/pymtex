@@ -159,3 +159,10 @@ def test_the_compiled_grid_route_agrees_with_the_numpy_one():
   same = np.all(np.abs(fast - slow) < 1e-12, axis=-1)
   assert np.mean(same) > 0.99
   assert np.max(np.abs(fast - slow)) < 0.2
+
+
+def test_an_orientation_never_measured_has_no_colour():
+  cs = crystalFrame("m-3m")
+  q = np.array([[1.0, 0, 0, 0], [np.nan] * 4])
+  rgb = ipfColorKey(cs).orientation2color(orientation(q, cs))
+  assert np.all(np.isfinite(rgb[0])) and np.isnan(rgb[1]).all()

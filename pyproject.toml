@@ -26,6 +26,7 @@ dev = [
     "matplotlib>=3.8",
     "jupytext>=1.19.5",
     "ipykernel>=7.3.0",
+    "pyside6>=6.11.2",
 ]
 
 [build-system]

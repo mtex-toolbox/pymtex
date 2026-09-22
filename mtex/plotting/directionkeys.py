@@ -99,6 +99,63 @@ def sphereColor(radius, rho, grayValue=KEY_GRAY_VALUE, grayGradient=KEY_GRAY_GRA
   return angleRadiusColor(np.mod(rho / (2 * np.pi), 1), t, gr, hueCorrection)
 
 
+# OKLab (Ottosson 2020) to and from gamma encoded sRGB, over arrays of shape (..., 3)
+_LMS = np.array([[0.4122214708, 0.5363325363, 0.0514459929], [0.2119034982, 0.6806995451, 0.1073969566],
+                 [0.0883024619, 0.2817188376, 0.6299787005]])
+_LAB = np.array([[0.2104542553, 0.7936177850, -0.0040720468], [1.9779984951, -2.4285922050, 0.4505937099],
+                 [0.0259040371, 0.7827717662, -0.8086757660]])
+_LMS_INV, _LAB_INV = np.linalg.inv(_LMS), np.linalg.inv(_LAB)
+
+
+def rgb2oklab(rgb):
+  c = np.asarray(rgb, dtype=float)
+  lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+  return np.cbrt(lin @ _LMS.T) @ _LAB.T
+
+
+def oklab2rgb(lab):
+  lin = ((np.asarray(lab, dtype=float) @ _LAB_INV.T) ** 3) @ _LMS_INV.T
+  lin = np.clip(lin, 0, 1)
+  return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * lin ** (1 / 2.4) - 0.055)
+
+
+# the perceptual colour sphere: a double cone in OKLab, the lightness falling linearly from
+# the white centre over the boundary to the black one and the chroma growing linearly away
+# from both, the azimuth turning the hue. Equal steps along the radius, and equal steps
+# along the arc, are then equal colour differences everywhere, at the price of the chroma:
+# it stops at what every hue reaches in sRGB at the lightness of the boundary
+PERCEPTUAL_CONE = (0.95, 0.75, 0.125)   # the lightness at the white centre and on the boundary, the chroma there
+PERCEPTUAL_HUE_SMOOTHING = 12 * degree
+
+
+# OKLab spends 81 degrees of hue from red to yellow and 33 from yellow to green, so an evenly
+# turning hue gives red two thirds of that side of the sector. The azimuth is taken instead
+# through the hues of red, yellow, green, cyan, blue and magenta at every sixth of the turn,
+# the slope between them smoothed by a Gaussian so the steps leave no seam in the key
+def _perceptualHue(steps=3600, smoothing=PERCEPTUAL_HUE_SMOOTHING):
+  anchors = np.array([np.arctan2(*rgb2oklab(c)[[2, 1]]) for c in
+                      ([1.0, 0, 0], [1.0, 1, 0], [0, 1.0, 0], [0, 1.0, 1], [0, 0, 1.0], [1.0, 0, 1])])
+  gaps = np.mod(np.diff(np.append(anchors, anchors[0])), 2 * np.pi)
+  slope = np.repeat(gaps / (np.pi / 3), steps // 6)
+  x = (np.arange(steps) - steps // 2) * 2 * np.pi / steps
+  w = np.exp(-x ** 2 / (2 * smoothing ** 2))
+  slope = np.real(np.fft.ifft(np.fft.fft(slope) * np.fft.fft(np.fft.ifftshift(w / w.sum()))))
+  return anchors[0] + np.concatenate([[0.0], np.cumsum(slope)]) * 2 * np.pi / steps
+
+
+PERCEPTUAL_HUE = _perceptualHue()
+
+
+def perceptualSphereColor(radius, rho, gray=None):
+  radius, rho = np.broadcast_arrays(np.asarray(radius, dtype=float), np.asarray(rho, dtype=float))
+  Lw, Lb, Cb = PERCEPTUAL_CONE
+  s = 2 * (1 - radius)
+  L = Lw - (Lw - Lb) * s
+  C = Cb * (1 - np.abs(1 - s)) * (1.0 if gray is None else np.asarray(gray, dtype=float))
+  h = np.interp(np.mod(rho, 2 * np.pi), np.linspace(0, 2 * np.pi, len(PERCEPTUAL_HUE)), PERCEPTUAL_HUE)
+  return oklab2rgb(np.stack([L, C * np.cos(h), C * np.sin(h)], axis=-1))
+
+
 # ------------------------------------------------------------------ the keys
 
 def _asDirections(h):
@@ -145,13 +202,16 @@ class HSVDirectionKey(directionColorKey):
 
     HSVDirectionKey(cs)
     HSVDirectionKey(cs, whiteCenter=v, maxAngle=5*degree)
+    HSVDirectionKey(cs, perceptual=True)
 
   A finite maxAngle makes the key sharp: the whole colour circle is spent on the cap of that
-  opening about the white centre and everything outside it is black.
+  opening about the white centre and everything outside it is black. perceptual=True takes
+  the colours from a double cone in OKLab instead of MTEX's HSL sphere: the colour changes
+  at the same rate all over the sector, and the key is paler.
   """
 
   def __init__(self, cs=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
-               grayGradient=KEY_GRAY_GRADIENT, antipodal=False):
+               grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False):
     # HSVDirectionKey() colours the whole sphere of the specimen; antipodal=True the key of axes
     from ..geometry.frames import specimenFrame
     from ..geometry.vector3d import vector3d as _v
@@ -173,8 +233,11 @@ class HSVDirectionKey(directionColorKey):
     self.reference = pC.east
     self.maxAngle = float(maxAngle)
     self.colorStretching, self.grayValue, self.grayGradient = colorStretching, grayValue, grayGradient
+    self.perceptual = bool(perceptual)
 
   def _sphereColor(self, radius, rho, gray=None):
+    if self.perceptual:
+      return perceptualSphereColor(radius, rho, gray)
     return sphereColor(radius, rho, self.grayValue, self.grayGradient, self.colorStretching, gray)
 
   # the colour of directions: each is brought into the sector, then into the white half, the

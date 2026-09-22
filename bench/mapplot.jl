@@ -1,6 +1,6 @@
 # the Julia inverse pole figure colouring and map plot on the maps of bench/mapplot.py, for docs/research/benchmark-mapplot.md
 #
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/mapplot.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/mapplot.jl)
 using MTEX, CairoMakie, LinearAlgebra, Printf
 import CairoMakie: save
 const out = joinpath(@__DIR__, "out")

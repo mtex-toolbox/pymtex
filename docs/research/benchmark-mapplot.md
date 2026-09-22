@@ -87,7 +87,7 @@ run, the five minute rule.
 
 ```
 .venv/bin/python bench/mapplot.py
-(cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/mapplot.jl)
+(cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/mapplot.jl)
 bench/matlab/bench_mapplot.sh        # the mtexfs bridge must be running
 ```
 

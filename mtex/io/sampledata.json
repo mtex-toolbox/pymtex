@@ -241,6 +241,13 @@
       "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/titanium.txt"
     }
   ],
+  "tongue": [
+    {
+      "path": "orientation/Tongue_Quartzite_Bunge_Euler",
+      "sha256": "acf9d2886d54b4191b6a3e79adb0629060778be8b60b43fe6d6d1b437d2a799c",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/orientation/Tongue_Quartzite_Bunge_Euler"
+    }
+  ],
   "twins": [
     {
       "path": "EBSD/twins.ctf",

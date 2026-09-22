@@ -1,6 +1,6 @@
 # the Julia loaders on the same files, for docs/research/benchmark-io.md
 #
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/load_text.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/load_text.jl)
 using MTEX, Printf
 files = ["/home/hielscher/mtex/frameSymmetry/data/EBSD/Forsterite.ctf", "/home/hielscher/mtex/frameSymmetry/data/EBSD/ferrite.ang",
          "/home/hielscher/mtex/frameSymmetry/data/EBSD/olivineopticalmap.ang", "/home/hielscher/mtex/data/1C_1.ctf"]

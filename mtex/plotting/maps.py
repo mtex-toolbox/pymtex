@@ -54,9 +54,12 @@ def latticeTable(ebsd):
 
 # the corners of the box round the measurements, in the plane of the map: the box of a map
 # in a coordinate plane is exactly its extent, and a map of forty million points is not
-# projected point by point to learn where it ends
+# projected point by point to learn where it ends. The padding of a grid is left out.
 def mapBox(x):
   P = x.pos.data.reshape(-1, 3)
+  pad = getattr(x, "_pad", None)
+  if pad is not None:
+    P = P[~pad.reshape(-1)]
   if len(P) == 0:
     return np.zeros((0, 2))
   lo, hi = _columnBounds(P)
@@ -161,6 +164,10 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   inside = (ia >= 0) & (ia < lin.shape[0]) & (ib >= 0) & (ib < lin.shape[1])
   index = np.full((ny, nx), -1, dtype=np.int32)
   index[inside] = lin[ia[inside], ib[inside]]
+  # the padding of a grid is no measurement and shows nothing
+  pad = getattr(ebsd, "_pad", None)
+  if pad is not None:
+    index[index >= 0] = np.where(pad.reshape(-1)[index[index >= 0]], -1, index[index >= 0])
   return xs, ys, index
 
 

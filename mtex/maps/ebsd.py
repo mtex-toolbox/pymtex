@@ -6,12 +6,18 @@
 #   ebsd['Forsterite'], ebsd['indexed'], ebsd[mask], ebsd[i, j]   sub-maps
 #   ebsd.orientations                                the framed orientations of the one phase present
 #   ebsd.mad                                         a property, one value per measurement
+#   ebsd.isPadding                                   the cells of a grid that hold no measurement
 #
 # The storage rank is the whole difference between MTEX's @EBSD and its @EBSDsquare and
 # @EBSDhex: a gridded map holds its arrays in map shape, so ebsd[i, j] is a scan position,
 # and every method is written once. What a map is measured on is the lattice, a statement
 # about the positions and not about the storage. A map is not a container: indexing
 # returns a map, and one measurement is a map of one.
+#
+# A grid turned against the axes of the plane is closed into a rectangle by padding, cells
+# that were never measured: MATLAB gives them the phase NaN, here they are notIndexed and
+# marked in isPadding. The extent, the phase counts, the phase selections and the plots
+# leave them out, and nothing fills them.
 from __future__ import annotations
 
 import numpy as np
@@ -26,13 +32,13 @@ from ..geometry.vector3d import vector3d
 from .lattice import lattice, latticeBasis
 from .phaselist import phaseList, phaseTable
 
-FIELDS = ("pos", "rotations", "phaseId", "CSList", "lattice", "prop", "meta", "scanUnit", "phaseMap", "id")
+FIELDS = ("pos", "rotations", "phaseId", "CSList", "lattice", "prop", "meta", "scanUnit", "phaseMap", "id", "_pad")
 
 
 class EBSD:
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, unitCell=None, scanUnit="um", frame=None,
-               lattice=None, meta=None, phaseMap=None, id=None):
+               lattice=None, meta=None, phaseMap=None, id=None, isPadding=None):
     if not isinstance(rotations, MtexArray):
       rotations = rotation(rotations)
     # single precision when either array is
@@ -66,6 +72,8 @@ class EBSD:
     object.__setattr__(self, "phaseMap", np.arange(len(cs)) if phaseMap is None else np.asarray(phaseMap))
     object.__setattr__(self, "id", np.arange(ph.size).reshape(shape) if id is None else np.asarray(id).reshape(shape))
     object.__setattr__(self, "lattice", None)
+    pad = None if isPadding is None else np.asarray(isPadding, dtype=bool).reshape(shape)
+    object.__setattr__(self, "_pad", pad if pad is not None and pad.any() else None)
     for k, v in (prop or {}).items():
       self._setProp(k, v)
     # the nan positions are dropped, as MATLAB does
@@ -152,6 +160,11 @@ class EBSD:
     from ..geometry.plottingconvention import plottingConvention
     pC = getattr(self.frame, "how2plot", None)
     return plottingConvention.default if pC is None else pC
+
+  # the cells of a grid that hold no measurement
+  @property
+  def isPadding(self):
+    return np.zeros(self.shape, dtype=bool) if self._pad is None else self._pad
 
   @property
   def isIndexed(self):
@@ -258,7 +271,7 @@ class EBSD:
         mask |= ~self.isIndexed
       else:
         mask |= self.phaseId == self.CSList.phaseId(name)
-    return mask
+    return mask & ~self.isPadding
 
   # the sub-map of a NumPy selection: every array sliced, the phases and the frame kept,
   # the lattice restricted to the sites kept
@@ -298,13 +311,14 @@ class EBSD:
     l = self.lattice
     if l is not None:
       l = l.subset(flat) if len(flat) and len(np.unique(flat)) == len(flat) else None
+    pad = None if self._pad is None else self._pad.reshape(-1)[flat].reshape(shape)
     return EBSD(pos, rot, ph, self.CSList, prop, scanUnit=self.scanUnit, frame=self.frame, lattice=l, meta=self.meta, phaseMap=self.phaseMap,
-                id=self.id.reshape(-1)[flat].reshape(shape))
+                id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
 
   def copy(self):
     return EBSD(self.pos.copy(), self.rotations.copy(), self.phaseId.copy(), self.CSList,
                 {k: v.copy() for k, v in self.prop.items()}, scanUnit=self.scanUnit, frame=self.frame,
-                lattice=self.lattice, meta=dict(self.meta), phaseMap=self.phaseMap, id=self.id.copy())
+                lattice=self.lattice, meta=dict(self.meta), phaseMap=self.phaseMap, id=self.id.copy(), isPadding=self._pad)
 
   # the list of several maps, the phases of the first
   @classmethod
@@ -319,8 +333,9 @@ class EBSD:
     rot = np.concatenate([m.rotations.data.reshape(-1, 4) for m in maps])
     ph = np.concatenate([m.phaseId.reshape(-1) for m in maps])
     prop = {k: np.concatenate([m.prop[k].reshape((-1,) + m.prop[k].shape[m.ndim:]) for m in maps]) for k in first.prop}
+    pad = np.concatenate([m.isPadding.reshape(-1) for m in maps])
     return cls(_vectors(pos, first.frame), _rotations(rot), ph, first.CSList, prop, scanUnit=first.scanUnit,
-               meta=first.meta, phaseMap=first.phaseMap)
+               meta=first.meta, phaseMap=first.phaseMap, isPadding=pad)
 
   def flatten(self):
     return self if self.ndim == 1 else self._subset(np.unravel_index(np.arange(self.size), self.shape))
@@ -389,11 +404,14 @@ class EBSD:
 
   def _moved(self, pos, rot):
     return EBSD(_vectors(pos, self.frame), _rotations(rot), self.phaseId, self.CSList, self.prop,
-                scanUnit=self.scanUnit, meta=self.meta, phaseMap=self.phaseMap, id=self.id)
+                scanUnit=self.scanUnit, meta=self.meta, phaseMap=self.phaseMap, id=self.id, isPadding=self._pad)
 
-  # the bounds of the positions, [xmin, xmax, ymin, ymax]
+  # the bounds of the measured positions, [xmin, xmax, ymin, ymax]; the padding of a grid is
+  # no measurement, and on a turned grid it reaches far beyond the map
   def extent(self):
     P = self.pos.data.reshape(-1, 3)
+    if self._pad is not None:
+      P = P[~self._pad.reshape(-1)]
     return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max()])
 
   # ------------------------------------------------------------------ the lattice
@@ -478,7 +496,7 @@ class EBSD:
     if self.size == 0:
       return lines[0] + "\n  the map is empty"
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
-    ids, counts = np.unique(self.phaseId, return_counts=True)
+    ids, counts = np.unique(self.phaseId[~self.isPadding], return_counts=True)
     share = [f"{c} ({100 * c / self.size:.3g}%)" for c in counts]
     lines.append(phaseTable(self.CSList.frames, ids, share))
     # a short list shows its measurements, as MATLAB does up to twenty

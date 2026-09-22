@@ -158,3 +158,23 @@ def test_an_unindexed_measurement_is_drawn_as_nothing_and_the_picture_colours_wh
   whole, _ = mapValues(ebsd, "orientation")
   assert narrow.shape == (at.size, 3)
   assert np.array_equal(np.nan_to_num(narrow, nan=-1.0), np.nan_to_num(whole[at], nan=-1.0))
+
+
+def test_the_padding_of_a_grid_is_not_drawn():
+  from mtex import ipfColorKey
+  from mtex.plotting.maps import mapBox, mapRaster
+  from test_gridify import turnedMap
+  g = turnedMap().gridify()
+  # the picture and the limits span the measurements, and no pixel shows a padding cell
+  box = mapBox(g)
+  assert np.allclose([box[:, 0].min(), box[:, 0].max(), box[:, 1].min(), box[:, 1].max()], [0, 20, -10, 0])
+  (_, _), (_, _), ind = mapRaster(g, maxPixels=20_000)
+  assert not g.isPadding.reshape(-1)[ind[ind >= 0]].any()
+  # the cells and the points leave the padding and the colourless sites out
+  rgb = ipfColorKey(g).orientation2color(g.orientations)
+  assert np.isnan(rgb[g.isPadding]).all()
+  measured = g.size - g.isPadding.sum()
+  for backend, count in (("patch", lambda h: len(h.get_paths())), ("scatter", lambda h: len(h.get_offsets()))):
+    plt.figure()
+    assert count(plot(g, rgb, backend=backend)) == measured - 1
+    assert count(plot(g, backend=backend)) == measured

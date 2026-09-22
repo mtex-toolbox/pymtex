@@ -65,3 +65,34 @@ def test_gridify_refuses_what_it_cannot_grid():
   pos[5] = pos[6] + [0.01, 0, 0]
   twice = EBSD(pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList)
   assert twice.lattice is None or pytest.raises(ValueError, gridify, twice)
+
+
+# the positions of mtexdata('sharp') in small: rows of step 2 along x, each shifted by half a
+# step's quarter against the one below, cut to an axis aligned box, so the lattice is
+# turned by 45 degrees against the box and its grid is closed by padding
+def turnedMap():
+  pts = [(2 * a + 0.5 * b, 0.5 * b - 10) for b in range(41) for a in range(-12, 12)]
+  pts = np.array([p for p in pts if 0 <= p[0] <= 20 and -10 <= p[1] <= 0])
+  n = len(pts)
+  ph = np.ones(n, dtype=np.int8)
+  ph[5] = 0
+  pos = np.column_stack([pts, np.zeros(n)])
+  return EBSD(pos, rotation.byAxisAngle(vector3d(0, 0, 1), np.linspace(0, 0.1, n)), ph, phaseList(crystalFrame("m-3m", mineral="test")),
+              {"mad": np.ones(n)})
+
+
+def test_the_padding_of_a_turned_grid_is_no_measurement():
+  lst = turnedMap()
+  g = gridify(lst)
+  pad = g.isPadding
+  assert g.isGridded and pad.sum() == g.size - len(lst) and pad.sum() > len(lst) / 2
+  assert not lst.isPadding.any() and pad.shape == g.shape
+  # padding is not indexed, yet neither counted, selected nor measured as notIndexed
+  assert np.all(g.phaseId[pad] == 0) and np.isnan(g.rotations.data[pad]).all()
+  assert len(g["notIndexed"]) == 1 and len(g["indexed"]) == len(lst) - 1 and len(g["test"]) == len(lst) - 1
+  assert close(g.extent(), [0, 20, -10, 0]) and close(g.extent(), lst.extent())
+  assert "0      1 (" in repr(g) and "X x Y: [0 → 20] x [-10 → 0]" in repr(g)
+  # the mark travels with the map through selections, copies and moves
+  assert g.flatten().isPadding.sum() == pad.sum() and g.copy().isPadding.sum() == pad.sum()
+  assert np.array_equal(g[2:5, 3:9].isPadding, pad[2:5, 3:9]) and g.shift([1.0, 0, 0]).isPadding.sum() == pad.sum()
+  assert gridify(g.flatten()).isPadding.sum() == pad.sum()

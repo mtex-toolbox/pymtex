@@ -14,7 +14,7 @@ import numpy as np
 
 from ._array import MtexArray
 from .display import sizeString, table
-from .representations import (EULER_LABELS, axis2quat, eulerConvention, euler2quat, fitKernel, isnull,
+from .representations import (EULER_LABELS, axis2quat, eulerConvention, euler2quat, eulerTriple, fitKernel, isnull,
                               map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
                               quatAngle, quatAxis, rodrigues2quat)
 from .homochoric import cubo2homo, homo2cubo, homochoric2quat, quat2homochoric
@@ -71,11 +71,20 @@ class quaternion(MtexArray):
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (4,), np.nan))
 
-  # uniformly distributed rotations, the Haar measure
+  # uniformly distributed rotations, the Haar measure; with maxAngle restricted to the ball
+  # of that rotational angle about the identity, the angle by inverting its distribution
+  # (w - sin w) / pi, the axis uniform
   @classmethod
-  def rand(cls, *shape, rng=None):
+  def rand(cls, *shape, rng=None, maxAngle=None):
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
+    if maxAngle is not None and maxAngle < np.pi:
+      w = np.linspace(0, maxAngle, 4001)
+      cdf = w - np.sin(w)
+      omega = np.interp(rng.random(shape) * cdf[-1], cdf, w)
+      axis = rng.standard_normal(tuple(shape) + (3,))
+      axis /= np.linalg.norm(axis, axis=-1, keepdims=True)
+      return cls(np.concatenate([np.cos(omega / 2)[..., None], np.sin(omega / 2)[..., None] * axis], axis=-1))
     alpha = 2 * np.pi * rng.random(shape)
     beta = np.arccos(2 * rng.random(shape) - 1)
     gamma = 2 * np.pi * rng.random(shape)
@@ -281,6 +290,14 @@ class quaternion(MtexArray):
         return self._new(q[keep]).mean(weights=None if weights is None else w[keep], robust=True)
     return m
 
+  # the mean angular deviation from the mean, quaternion/std; for orientations the angle is
+  # the symmetry-reduced one, as the mean is
+  def std(self, weights=None, robust=False):
+    if self.size == 0:
+      return float("nan")
+    m = self.mean(weights=weights, robust=robust)
+    return float(np.sqrt(np.nanmean(m.angle(self) ** 2)))
+
   # ------------------------------------------------------------------ display
 
   def _eulerTable(self):
@@ -333,8 +350,9 @@ class rotation(quaternion):
     return orthogonalTransform(cls.id, True)
 
   @classmethod
-  def byEuler(cls, a, b, c, convention=None):
-    return cls._fromData(euler2quat(a, b, c, convention))
+  def byEuler(cls, a, b=None, c=None, convention=None):
+    a, b, c, rest = eulerTriple(a, b, c, () if convention is None else (convention,))
+    return cls._fromData(euler2quat(a, b, c, rest[0] if rest else None))
 
   @classmethod
   def byAxisAngle(cls, v, omega):
@@ -481,7 +499,7 @@ class orthogonalTransform(MtexArray):
     return cls(rotation._fromData(q), improper)
 
   @classmethod
-  def byEuler(cls, a, b, c, convention=None):
+  def byEuler(cls, a, b=None, c=None, convention=None):
     return cls(rotation.byEuler(a, b, c, convention), False)
 
   @classmethod

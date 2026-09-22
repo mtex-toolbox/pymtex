@@ -371,7 +371,7 @@ def withPhases(ebsd, CS):
   if len(frames) != len(have):
     raise ValueError(f"the file declares {len(have) - 1} phases and the list names {len(frames)}, the not indexed one first")
   return EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId, phaseList(frames), ebsd.prop, scanUnit=ebsd.scanUnit, meta=ebsd.meta,
-              phaseMap=ebsd.phaseMap, id=ebsd.id, lattice=ebsd.lattice)
+              phaseMap=ebsd.phaseMap, id=ebsd.id, lattice=ebsd.lattice, isPadding=ebsd.isPadding)
 
 
 __all__ = ["loadEBSD"]

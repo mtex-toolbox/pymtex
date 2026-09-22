@@ -66,6 +66,18 @@ def matthies2quat(alpha, beta, gamma):
   return np.stack([cP * np.cos(hp), -sP * np.sin(hm), sP * np.cos(hm), cP * np.sin(hp)], axis=-1)
 
 
+# byEuler(E, ...) with E an (..., 3) array of triples, as MATLAB's byEuler([phi1 Phi phi2]):
+# the three angles and the arguments after them
+def eulerTriple(a, b, c, rest):
+  isAngle = lambda x: isinstance(x, (int, float, np.number, np.ndarray, list, tuple))
+  if b is not None and isAngle(b):
+    return a, b, c, rest
+  E = np.asarray(a, dtype=float)
+  if E.shape[-1:] != (3,):
+    raise ValueError("byEuler takes three angles or an array of triples")
+  return E[..., 0], E[..., 1], E[..., 2], tuple(x for x in (b, c) if x is not None) + tuple(rest)
+
+
 def euler2quat(a, b, c, convention=None):
   return matthies2quat(*toMatthies(eulerConvention(convention), a, b, c))
 

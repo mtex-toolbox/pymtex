@@ -128,9 +128,12 @@ def plotSection(x, *args, **kw):
     return plotSectionS2(x, *args, **kw)
   kw.pop("silent", None)
   kind, shapes = None, None
-  for a in args:
+  for i, a in enumerate(args):
     if isinstance(a, (str, ODFSections)):
       kind = a
+    elif i > 0 and isinstance(args[i - 1], str) and args[i - 1].lower() in ("phi1", "phi2", "alpha", "gamma", "sigma", "omega", "axisangle"):
+      # plotSection(ori, 'axisAngle', angles): the numbers after a family are its sections
+      kw["angles" if args[i - 1].lower() == "axisangle" else args[i - 1]] = a
     elif isinstance(a, crystalShape):
       # plotSection(ori, ori * cS, oS): a crystal shape per orientation drawn at its place
       shapes = a
@@ -141,6 +144,9 @@ def plotSection(x, *args, **kw):
     oS = kind
   else:
     CS1, CS2 = (x.CS, x.SS)
+    # misorientations with grain exchange are drawn on the antipodal sections
+    if getattr(x, "antipodal", False) and CS1 is CS2:
+      kw.setdefault("antipodal", True)
     oS = newODFSectionPlot(CS1, CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)

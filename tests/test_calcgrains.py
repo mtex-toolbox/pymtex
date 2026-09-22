@@ -185,17 +185,22 @@ def test_a_diagonal_neighbour_does_not_save_an_undersized_grain():
   assert g.isIndexed.sum() == 1 and g[g.isIndexed].numPixel[0] == n * n - 1
 
 
-def test_gridify_padding_segments_like_not_indexed_pixels():
+def test_gridify_padding_segments_like_the_list():
   oris = rotation.byAxisAngle(zvector, np.arange(1, 17) * 7 * degree)
   base = squareBlockGrid(6, 4, oris)
   hole = np.zeros(base.shape, dtype=bool)
   hole[9:16, 5:14] = True                         # spans four orientation blocks
-  # the hole as missing measurements padded back by gridify, and the same cells marked not indexed
-  a = gridify(base[~hole])
+  # the hole as missing measurements, as a list and padded back by gridify, and the same
+  # cells measured but not indexed
+  lst = base[~hole]
+  a = gridify(lst)
   b = base.copy()
   b.phaseId[hole] = 0
-  assert (~a.isIndexed).sum() == (~base.isIndexed).sum() + hole.sum()
-  gA, gB = calcGrains(a, angle=5 * degree), calcGrains(b, angle=5 * degree)
-  niA, niB = np.sort(gA[~gA.isIndexed].numPixel), np.sort(gB[~gB.isIndexed].numPixel)
-  assert np.array_equal(niA, niB) and gA.isIndexed.sum() == gB.isIndexed.sum()
-  assert len(niA) < hole.sum()                    # contiguous padding is not split into single-pixel grains
+  assert np.array_equal(a.isPadding, hole) and not b.isPadding.any()
+  gL, gA, gB = (calcGrains(m, angle=5 * degree) for m in (lst, a, b))
+  # the padding is no measurement: the grid segments as its list does, the hole is a hole
+  assert len(gA) == len(gL) and len(gA.boundary) == len(gL.boundary)
+  assert np.isclose(gA.boundary.segLength.sum(), gL.boundary.segLength.sum())
+  assert not (~gA.isIndexed).any() and np.all(a.grainId[hole] == 0)
+  # while measured notIndexed cells make a notIndexed grain
+  assert (~gB.isIndexed).sum() == 1

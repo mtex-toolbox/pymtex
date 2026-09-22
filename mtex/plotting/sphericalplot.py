@@ -608,13 +608,28 @@ def scatter(v, data=None, minmax=False, symmetrised=False, colorbar=False, **kw)
   return hs
 
 
-def text(v, labels, **kw):
-  """text(v, labels): text at directions; text(ebsd, labels): labels on the map"""
+def text(v, labels, *more, **kw):
+  """text(v, labels): text at directions; text(ebsd, labels): labels on the map;
+  text(x, y, s) and text(x, y, z, s): text at a point of the current axes, as MATLAB's text"""
+  if more or isinstance(labels, (int, float, np.number)):
+    return _textAt((v, labels) + more[:-1], more[-1], **kw)
   if _mapKind(v) is not None:
     from .mapplot import textMap
     return textMap(v, labels, **kw)
   kw.setdefault("MarkerSize", 0)
   return scatter(v, label=labels, **kw)
+
+
+# a string at coordinates of the current axes, in space when the axes are 3D
+def _textAt(xyz, s, **kw):
+  import matplotlib.pyplot as plt
+  fig = gcm()
+  ax = fig.children[-1] if fig is not None and fig.children else plt.gca()
+  # MATLAB's property names, capitalised or not
+  names = {"fontweight": "fontweight", "fontsize": "fontsize", "color": "color", "horizontalalignment": "ha",
+           "verticalalignment": "va", "backgroundcolor": "backgroundcolor"}
+  kw = {names.get(k.lower(), k): val for k, val in kw.items()}
+  return ax.text(*[float(c) for c in xyz], s, **kw)
 
 
 # the great circles normal to directions, as lines through the charts

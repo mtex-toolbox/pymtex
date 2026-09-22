@@ -16,7 +16,7 @@ import numpy as np
 
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
+from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text, writeTable
 
 # the words a coordinate column may be named by, and what they read as
 COORDINATES = {"x": "x", "y": "y", "z": "z",
@@ -120,14 +120,7 @@ def exportVector3d(v, fname, *args, radians=False):
       raise ValueError(f"the column {key!r} has {val.size} values for {d.shape[0]} vectors")
     names.append(str(key))
     cols.append(val)
-  # six significant digits, every column as wide as its widest entry, as MATLAB writes it
-  cells = [[f"{x:g}" for x in c] for c in cols]
-  widths = [max(len(n), *(len(s) for s in c)) for n, c in zip(names, cells)]
-  lines = [" ".join(n.rjust(w) for n, w in zip(names, widths))]
-  for row in zip(*cells):
-    lines.append(" ".join(s.rjust(w) for s, w in zip(row, widths)))
-  with open(os.fspath(fname), "w", encoding="utf-8") as f:
-    f.write("\n".join(lines) + "\n")
+  writeTable(os.fspath(fname), names, cols)
   return os.fspath(fname)
 
 

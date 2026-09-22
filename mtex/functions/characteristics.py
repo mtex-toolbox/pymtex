@@ -26,6 +26,7 @@ from ..geometry.symreduce import reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from .bingham import SO3FunBingham, binghamSample
 from .funops import conv
 from .handles import S2FunHandle, S2FunSum, SO3FunComposition, SO3FunGeneric, SO3FunHandle
 from .kernelfunctions import SO3DeLaValleePoussinKernel
@@ -492,7 +493,8 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
 # the nodes of a grid drawn with probability proportional to f, moved by a random rotation
 # within the grid resolution and by a random element of each group; a radial basis function
 # exactly: a centre by its weight, the angle by inverse transform of the kernel density, a
-# uniform axis, a group element on each side; a sum of kernel forms term by term
+# uniform axis, a group element on each side; a Bingham distribution exactly by rejection; a
+# sum of kernel forms term by term
 def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False):
   rng = np.random.default_rng() if rng is None else rng
   n = int(n)
@@ -522,6 +524,11 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False):
     w = omega[np.minimum(np.searchsorted(cdf, rng.random(n)), len(omega) - 1)]
     turned = rotation(cs[k[fromCentre]]) * rotation.byAxisAngle(vector3d.rand(int(fromCentre.sum()), rng=rng), w[fromCentre])
     out[fromCentre] = turned.data
+    if f.antipodal:
+      flip = rng.random(n) < 0.5
+      out[flip] = rotation(out[flip]).inv().data
+  elif isinstance(f, SO3FunBingham):
+    out = binghamSample(f.kappa, f.A, n, rng)
     if f.antipodal:
       flip = rng.random(n) < 0.5
       out[flip] = rotation(out[flip]).inv().data

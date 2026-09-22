@@ -1,6 +1,6 @@
 # the Julia optimalSample on the cases of bench/optimalsample.py, for docs/research/benchmark-sampling.md
 #
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/optimalsample.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/optimalsample.jl)
 using MTEX, LinearAlgebra, Printf
 const out = joinpath(@__DIR__, "out")
 mkpath(out)

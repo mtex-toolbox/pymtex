@@ -1,6 +1,6 @@
 # the Julia classix and calcCluster on the point sets of bench/cluster.py, for docs/research/benchmark-sampling.md
 #
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/cluster.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/cluster.jl)
 using MTEX, LinearAlgebra, DelimitedFiles, Printf
 const out = joinpath(@__DIR__, "out")
 

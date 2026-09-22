@@ -142,8 +142,9 @@ def floodBorder(bg, stencil):
 
 # ------------------------------------------------------------------ the sites
 
-# classify every lattice cell and place the sites
-def buildSites(l, P, present, alpha=3.1):
+# classify every lattice cell and place the sites; a cell of the padding of a grid is not
+# measured and lies outside the map as a cell beyond the lattice does
+def buildSites(l, P, present, alpha=3.1, measured=None):
   ij = l.ij
   n = len(ij)
   r = alpha * l.dxy
@@ -152,11 +153,12 @@ def buildSites(l, P, present, alpha=3.1):
   lo = (int(ij[:, 0].min()) - pad, int(ij[:, 1].min()) - pad)
   dims = (int(ij[:, 0].max()) - lo[0] + pad + 1, int(ij[:, 1].max()) - lo[1] + pad + 1)
   a, b = ij[:, 0] - lo[0], ij[:, 1] - lo[1]
+  m = np.ones(n, dtype=bool) if measured is None else measured
   hasPixel = np.zeros(dims, dtype=bool)
   isPresent = np.zeros(dims, dtype=bool)
   pixelOf = np.full(dims, NO_PIXEL, dtype=np.int32)
-  hasPixel[a, b] = True
-  pixelOf[a, b] = np.arange(n, dtype=np.int32)
+  hasPixel[a[m], b[m]] = True
+  pixelOf[a[m], b[m]] = np.arange(n, dtype=np.int32)[m]
   isPresent[a[present], b[present]] = True
   # the edge of the map is not the edge of a hole: what the scan never covered counts as
   # material while the closing runs and is clipped away after, so a cell on the rim is
@@ -337,7 +339,7 @@ def decompose(ebsd, alpha=3.1, tolerance=None, backend=None):
     raise ValueError("the map is not on a lattice, so it cannot be decomposed")
   P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
   present = ebsd.isIndexed.reshape(-1)
-  sites = buildSites(l, P, present, alpha)
+  sites = buildSites(l, P, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1))
   cells, verts, unbounded = localVoronoi(sites, l.A, alpha, backend=backend)
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")

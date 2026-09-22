@@ -5,6 +5,7 @@
 #   lines, offset = linesFrom(data, offset, k)    the next k lines
 #   M = readTable(data, offset, comments='#')     the numeric block as an (n, k) float array
 #   header = headerDict(pairs)                    the flat header MATLAB keeps in ebsd.opt.header
+#   writeTable(fname, names, cols)                columns under their names, as MATLAB's cprintf
 #
 # The numeric block goes to the row parser of kernels.py as it stands: a decimal comma is
 # decided once for the block, and a row of the wrong width names itself. Nothing here
@@ -127,3 +128,15 @@ def isNumericRow(line):
 
 
 __all__ = []
+
+
+# columns under a line of their names, six significant digits, every column as wide as its
+# widest entry, as MATLAB's cprintf writes a table
+def writeTable(fname, names, cols):
+  cells = [[f"{x:g}" for x in np.asarray(c, dtype=float).reshape(-1)] for c in cols]
+  widths = [max(len(n), *(len(s) for s in c)) for n, c in zip(names, cells)]
+  lines = [" ".join(n.rjust(w) for n, w in zip(names, widths))]
+  for row in zip(*cells):
+    lines.append(" ".join(s.rjust(w) for s, w in zip(row, widths)))
+  with open(fname, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")

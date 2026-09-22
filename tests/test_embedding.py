@@ -32,7 +32,7 @@ def test_T10_the_isometric_embedding():
   assert embedding(o).dim == 9 and embeddingSpec(crystalFrame("m-3")).dim == 7 and embedding(crystalFrame("-3m")).dim == 12
   with pytest.raises(ValueError):
     embedding(orientation.rand(cs, rng=rng).inv())
-  assert "embedding" in repr(embedding(o)) and "dimension: 9" in repr(embedding(o))
+  assert "embedding" in repr(embedding(o)) and "dim: 9" in repr(embedding(o))
 
 
 def test_T11_back_from_the_embedding():

@@ -37,6 +37,15 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   `isinstance(x, MtexArray)`, never `hasattr(x, "data")`: an ndarray has `.data` too.
 - A base-class method must not call `self.dot` or `self.angle`: the orientation subclass
   intercepts them with the symmetry-reduced versions.
+- The padding `gridify` adds to close a grid is notIndexed (phase 0, since a phase id indexes
+  the phase list) and marked in `ebsd.isPadding`, MATLAB's NaN phase: the extent, the phase
+  counts and selections, the plots, the decomposition and `fill` leave it out, so a grid
+  segments exactly as its list does. New code over a map's cells must do the same.
+- `fundamentalSector` is the conventional sector, the one MATLAB and an inverse pole figure
+  show, wherever `tilesSphere` confirms it is a fundamental domain of the group (every
+  crystal frame); for a group turned against its axes, as the rotations two frames share,
+  it is `dirichletSector`. Directions are folded into it, the orientation projection takes
+  the conjugate whose axis lies in it; "the equivalent nearest a centre" is a separate call.
 
 ## Running
 
@@ -152,7 +161,7 @@ jupytext light format, `docs/make.py` builds it into `docs/build/`, `docs/matlab
 runs the MATLAB script through the bridge into `docs/matlab/<Page>/` for the comparison,
 `docs/notebook.py <Page>` opens a page as a notebook in VS Code to run it section by section,
 `docs/findings.md` keeps what the pages found and `docs/plans/remaining-pages.md` the status
-of every page. D0, the Vectors and Rotations chapters of D1, the ODFAnalysis chapter of D2 and the EBSDAnalysis and Grains chapters of D3 are done (`docs/plans/remaining-pages.md` has every page's state, `docs/findings.md` what they found; the isosurface plot `plot3d(odf)` is the piece the ODF pages leave as prose); CrystalGeometry is done too (9 checked, Operations written), and PoleFigureAnalysis, the whole D4 chapter, all 11 checked; CrystalOrientations is next here.
+of every page. D0, the Vectors and Rotations chapters of D1, the ODFAnalysis chapter of D2 and the EBSDAnalysis and Grains chapters of D3 are done (`docs/plans/remaining-pages.md` has every page's state, `docs/findings.md` what they found); CrystalGeometry is done too (9 checked, Operations written), PoleFigureAnalysis, the whole D4 chapter, all 11 checked, and CrystalOrientations, all 16 checked (`plot3d(odf)` now draws MATLAB's isosurfaces, so the ODF pages that left it as prose can take it); Misorientations is next here.
 P8, the import wizard (`docs/plans/wizard.md`), is built through W6: `importWizard()` opens a
 PySide6 window (the `wizard` extra) over a headless core, `mtex/wizard/state.py` and
 `callbacks.py`, with `inspectEBSD` in `mtex/io/inspect.py` describing a file from its header

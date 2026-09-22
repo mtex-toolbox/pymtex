@@ -193,4 +193,20 @@ def _mergeClose(g, delta, candidates):
   return g.subGrid(~drop) if np.any(drop) else g
 
 
-__all__ = ["SO3Grid", "equispacedSO3Grid"]
+# the Euler angle raster over the Euler box of the frames, MATLAB's regularSO3Grid: sections
+# of phi2 from zero below its bound, and on each the (Phi, phi1) grid with both ends of Phi
+# and phi1 from zero below its bound, all at the resolution
+def regularSO3Grid(CS, SS=None, resolution=5 * degree, sections=None):
+  from ..frames import specimenFrame
+  from ..orientationregion import eulerRegion
+  SS = specimenFrame.default if SS is None else SS
+  maxPhi1, maxPhi, maxPhi2 = eulerRegion(CS, SS)
+  nsec = int(round(maxPhi2 / resolution)) if sections is None else int(sections)
+  phi2 = np.linspace(0, maxPhi2, nsec + 1)[:-1]
+  Phi = np.linspace(0, maxPhi, int(round(maxPhi / resolution)) + 1)
+  phi1 = np.linspace(0, maxPhi1, int(round(maxPhi1 / resolution)) + 1)[:-1]
+  B, A, C = np.meshgrid(Phi, phi1, phi2, indexing="ij")
+  return orientation.byEuler(A, B, C, "Bunge", CS, SS)
+
+
+__all__ = ["SO3Grid", "equispacedSO3Grid", "regularSO3Grid"]

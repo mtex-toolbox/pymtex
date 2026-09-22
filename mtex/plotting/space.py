@@ -122,6 +122,60 @@ def regionLines(oR, step=15 * degree):
   return [surfacePoints(oR, l) for l in sphereGridLines(step)]
 
 
+# ------------------------------------------------------------------ isosurfaces
+
+# the corners of a cube and its split into six tetrahedra about the diagonal 0-6, the same
+# in every cube, so that the split faces of neighbours agree
+_CUBE = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]])
+_TETRAS = [(0, 1, 2, 6), (0, 2, 3, 6), (0, 3, 7, 6), (0, 7, 4, 6), (0, 4, 5, 6), (0, 5, 1, 6)]
+
+
+# the triangles of every sign pattern of a tetrahedron, as triples of edges (a, b): one
+# triangle cut off a single corner, two cutting a pair of corners from the other pair
+def _tetraCases():
+  cases = {}
+  for mask in range(1, 15):
+    inside = [k for k in range(4) if mask >> k & 1]
+    outside = [k for k in range(4) if not mask >> k & 1]
+    if len(inside) == 2:
+      (a, b), (c, d) = inside, outside
+      cases[mask] = [((a, c), (a, d), (b, d)), ((a, c), (b, d), (b, c))]
+    else:
+      odd, rest = (inside[0], outside) if len(inside) == 1 else (outside[0], inside)
+      cases[mask] = [tuple((odd, o) for o in rest)]
+  return cases
+
+
+_CASES = _tetraCases()
+
+
+# the isosurface V = level of values on the grid of the axes x, y, z (V indexed [i, j, k]
+# along x, y, z) as a list of triangles, an (n, 3, 3) array, by marching tetrahedra
+def isosurface(x, y, z, V, level):
+  X = np.stack(np.meshgrid(x, y, z, indexing="ij"), axis=-1)
+  nx, ny, nz = V.shape
+  i, j, k = (a.ravel() for a in np.meshgrid(np.arange(nx - 1), np.arange(ny - 1), np.arange(nz - 1), indexing="ij"))
+  corners = [(i + d[0], j + d[1], k + d[2]) for d in _CUBE]
+  P = np.stack([X[c] for c in corners], axis=1)
+  F = np.stack([V[c] for c in corners], axis=1) - level
+  tris = []
+  for t in _TETRAS:
+    Pt, Ft = P[:, t], F[:, t]
+    mask = np.sum((Ft > 0) * (1 << np.arange(4)), axis=1)
+    for m, faces in _CASES.items():
+      rows = mask == m
+      if not rows.any():
+        continue
+      Pm, Fm = Pt[rows], Ft[rows]
+      for face in faces:
+        pts = []
+        for a, b in face:
+          s = Fm[:, a] / (Fm[:, a] - Fm[:, b])
+          pts.append(Pm[:, a] + s[:, None] * (Pm[:, b] - Pm[:, a]))
+        tris.append(np.stack(pts, axis=1))
+  return np.concatenate(tris) if tris else np.zeros((0, 3, 3))
+
+
 # ------------------------------------------------------------------ crystal shapes
 
 # the faces a viewer along view sees: those whose outward normal points at the viewer, a

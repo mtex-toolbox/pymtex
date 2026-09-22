@@ -80,7 +80,9 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   source = np.where(comp > 0, np.arange(n), -1)
   offs = np.array([tuple(int(x) for x in o) for o in l.stencil], dtype=np.int64)
   if fill:
+    # the padding of a grid lies outside the scan, whatever extrapolate asks
     outside = np.zeros(n, dtype=bool) if extrapolate else outsideMask(l, lk, isData)
+    outside |= ebsd.isPadding.reshape(-1)
     front = np.flatnonzero(comp > 0)
     while len(front):
       nxt = []

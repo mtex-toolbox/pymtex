@@ -95,6 +95,28 @@ def _axesMatrix(A):
   return np.asarray(A, dtype=float), None, False
 
 
+# n quaternions of the density exp(q' A diag(kappa) A' q) on S^3, exactly: rejection from the
+# angular central Gaussian envelope of Kent, Ganeiber and Mardia (arXiv 1310.8110), written for
+# exp(-x' B x) with B = A diag(max(kappa) - kappa) A' positive semidefinite
+def binghamSample(kappa, A, n, rng):
+  from scipy.optimize import brentq
+  lam = 2 * (np.max(kappa) - np.asarray(kappa, dtype=float))
+  # b solves sum 1 / (b + lam_i) = 1 in (0, 4]
+  b = 4.0 if np.all(lam < 1e-12) else brentq(lambda b: np.sum(1 / (b + lam)) - 1, 1e-10, 4.0)
+  omega = 1 + lam / b
+  logM = -(4 - b) / 2 + 2 * np.log(4 / b)
+  out = np.empty((0, 4))
+  while len(out) < n:
+    m = 2 * (n - len(out)) + 16
+    y = rng.standard_normal((m, 4)) / np.sqrt(omega)
+    x = y / np.linalg.norm(y, axis=1, keepdims=True)
+    xBx = (x ** 2) @ (lam / 2)
+    xOx = (x ** 2) @ omega
+    accept = np.log(rng.random(m)) < -xBx + 2 * np.log(xOx) - logM
+    out = np.concatenate([out, x[accept]])
+  return out[:n] @ np.asarray(A, dtype=float).T
+
+
 class SO3FunBingham(SO3FunGeneric):
 
   def __init__(self, kappa, A, *frames, weight=1.0, antipodal=False):
@@ -228,7 +250,7 @@ def _fibreAxes(h, r):
 
 
 def BinghamODF(kappa, A=None, *frames, **kwargs):
-  """BinghamODF(kappa, U), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.eye, cs)
+  """BinghamODF(kappa, U), BinghamODF(kappa, cs), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.eye, cs)
 
   A Bingham distribution from four concentrations and four orthogonal quaternion axes, the
   axes as a 4x4 matrix, four orientations, or one orientation standing for the identity
@@ -236,7 +258,11 @@ def BinghamODF(kappa, A=None, *frames, **kwargs):
   same concentration, as MATLAB's constructor does.
   """
   from ..geometry.fibre import fibre
+  from ..geometry.frames import referenceFrame
   kappa = np.asarray(kappa, dtype=float).ravel()
+  # BinghamODF(kappa, cs): the identity basis
+  if isinstance(A, referenceFrame):
+    A, frames = None, (A,) + frames
   if isinstance(A, fibre):
     kappa = np.concatenate([kappa[:1], kappa[:1]]) if kappa.size == 1 else kappa
     frames = frames if frames else (A.CS, A.SS)

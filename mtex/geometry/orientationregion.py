@@ -9,13 +9,15 @@
 # an axis sector picks one.
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 
 from ._array import MtexArray
 
 from .quaternion import qmul, rotation
 from .representations import quatAngle, quatAxis
-from .sphericalregion import fundamentalSector, sectorCenter, sphericalRegion
+from .sphericalregion import dirichletSector, fundamentalSector, sectorCenter, sphericalRegion
 from .symmetry import symmetry
 from .symreduce import reductionGroups, uniqueRotations
 from .vector3d import vector3d
@@ -26,12 +28,26 @@ def commonRotations(L, R):
   return L[np.any(np.abs(L @ R.T) > 1 - 1e-8, axis=1)]
 
 
-# the sector of the axes: the Dirichlet sector of the shared rotations, and its centre
-def commonAxisSector(common):
-  if len(common) <= 1:
+# the sector of the axes: the fundamental sector of the shared rotations, and a centre whose
+# Dirichlet domain under them is that sector, the one the projection takes the conjugate
+# nearest to; with grain exchange a misorientation is its inverse, the same angle about the
+# opposite axis, so the sector is that of the shared rotations with the inversion
+def commonAxisSector(common, antipodal=False):
+  if len(common) <= 1 and not antipodal:
     return None, np.array([0.0, 0.0, 1.0])
-  pg = symmetry(rotation._fromData(common))
-  return fundamentalSector(pg), sectorCenter(pg).data
+  pg = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))
+  grp = pg.Laue() if antipodal else pg
+  # the axes are signed: the sector holds the axis, not the axis or its opposite
+  sector = sphericalRegion(fundamentalSector(pg, antipodal=antipodal))
+  sector.antipodal = False
+  center = sector.center().data.reshape(3)
+  # the centre of the conventional sector is the one of its Dirichlet domain for every group
+  # of rotations; where it were not, the sector would be the Dirichlet domain, so that the
+  # region and the projection never disagree
+  if not antipodal and dirichletSector(grp, center) != sector:
+    center = sectorCenter(grp).data.reshape(3)
+    sector = sphericalRegion(dirichletSector(grp, center))
+  return sector, center
 
 
 def commonAxisCenter(common):
@@ -57,8 +73,6 @@ class orientationRegion:
 
   def checkInside(self, o, tolerance=2e-3):
     q = o.data if isinstance(o, MtexArray) else np.asarray(o, dtype=float)
-    if len(self.N) == 0:
-      return np.ones(q.shape[:-1], dtype=bool)
     t = tolerance / 2
     d = q @ self.N.T
     inside = np.all(d <= t, axis=-1) | np.all(d >= -t, axis=-1)
@@ -86,7 +100,8 @@ class orientationRegion:
       alpha += list(sector.alpha)
     return sphericalRegion(np.array(N).reshape(-1, 3), np.array(alpha), frame=self.frameA)
 
-  # the largest rotation angle inside the region, by sampling, or about a given axis
+  # the largest rotation angle inside the region, at a vertex of it in Rodrigues space, or
+  # about a given axis
   def maxAngle(self, v=None, hits=2000):
     if v is not None:
       d = v.normalize().data if isinstance(v, vector3d) else np.asarray(v, dtype=float) / np.linalg.norm(v)
@@ -102,6 +117,9 @@ class orientationRegion:
       return omega
     if len(self.N) == 0:
       return float(np.pi)
+    exact = self._maxAngleVertices()
+    if exact is not None:
+      return exact
     rng = np.random.default_rng(0)
     best, n, found = 0.0, 0, 0
     while found < hits and n < 100 * hits:
@@ -114,8 +132,43 @@ class orientationRegion:
         best = max(best, float(np.max(quatAngle(q[inside]))))
     return best
 
+  # in Rodrigues space every bound is a plane, dot(q, N) <= 0 reading n . rho <= -N_0 and a
+  # sector through the origin -m . rho <= 0, so the region is a polyhedron and its largest
+  # angle is at a vertex: every triple of planes solved, the points inside kept; a half turn
+  # when the polyhedron is open, None when the sector has caps that are not planes
+  def _maxAngleVertices(self, tol=1e-9):
+    A = [n[1:] for n in self.N]
+    b = [-n[0] for n in self.N]
+    if self.sector is not None:
+      if np.any(np.abs(self.sector.alpha) > 1e-12):
+        return None
+      A += [-m for m in self.sector.N]
+      b += [0.0] * len(self.sector.N)
+    A, b = np.array(A), np.array(b)
+    # the region is open, holding the half turns of some axis, when a direction u has
+    # A u <= 0; such cones are spanned by the edges of pairs of planes, or by what no plane
+    # sees when they span less than space
+    cand = [np.cross(A[i], A[j]) for i, j in itertools.combinations(range(len(A)), 2)]
+    _, s, Vt = np.linalg.svd(A)
+    cand += list(Vt[np.sum(s > 1e-10):])
+    for u in cand:
+      nu = np.linalg.norm(u)
+      if nu > 1e-10 and (np.all(A @ u <= 1e-9 * nu) or np.all(A @ -u <= 1e-9 * nu)):
+        return float(np.pi)
+    best = None
+    for i, j, k in itertools.combinations(range(len(A)), 3):
+      M = A[[i, j, k]]
+      if abs(np.linalg.det(M)) < 1e-10:
+        continue
+      rho = np.linalg.solve(M, b[[i, j, k]])
+      if np.all(A @ rho <= b + tol * (1 + np.abs(b))):
+        r = float(np.linalg.norm(rho))
+        best = r if best is None else max(best, r)
+    return None if best is None else float(2 * np.arctan(best))
+
   def __repr__(self):
-    return f"orientationRegion ({self.frameA.char()} → {self.frameB.char()})\n  faces: {len(self.N)}\n  max angle: {self.maxAngle() * 180 / np.pi:.4g}°"
+    ap = "\n  antipodal: true" if self.antipodal else ""
+    return f"orientationRegion ({self.frameA.char()} → {self.frameB.char()})\n  faces: {len(self.N)}{ap}\n  max angle: {self.maxAngle() * 180 / np.pi:.4g}°"
 
 
 # the fundamental region of a pair of groups: the Dirichlet domain of the identity under
@@ -150,7 +203,7 @@ def fundamentalRegion(frA, frB=None, antipodal=False):
         angles.append(w)
   N = np.array([[-np.sin(w / 4), *(np.cos(w / 4) * d)] for d, w in zip(axes, angles)]).reshape(-1, 4)
   common = commonRotations(L, R)
-  sector, center = commonAxisSector(common)
+  sector, center = commonAxisSector(common, antipodal)
   return orientationRegion(N, frA, frB, antipodal, common, sector, center)
 
 

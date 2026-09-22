@@ -84,8 +84,11 @@ class ipfColorKey(orientationColorKey):
     d = self.ipfDirection.normalize().data.reshape(3)
     return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.CS1, isNormalized=True)
 
+  # an orientation that was never measured has no colour, and a map shows nothing for it
   def orientation2color(self, ori):
-    return self.dirMap.direction2color(self.crystalDirection(ori))
+    rgb = self.dirMap.direction2color(self.crystalDirection(ori))
+    rgb[~np.all(np.isfinite(ori.data[..., :4]), axis=-1)] = np.nan
+    return rgb
 
   @property
   def whiteCenter(self):

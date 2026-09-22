@@ -5,7 +5,7 @@ import pytest
 
 from mtex import (HKLDirectionKey, HSVDirectionKey, Miller, S2DeLaValleePoussinKernel, TSLDirectionKey, crystalFrame, degree,
                   rotation, specimenFrame, spotDirectionKey, vector3d, xvector, yvector, zvector)
-from mtex.plotting.directionkeys import hsl2hsv, hsv2rgb, rgb2hsv, sphereColor
+from mtex.plotting.directionkeys import hsl2hsv, hsv2rgb, oklab2rgb, rgb2hsv, rgb2oklab, sphereColor
 
 rng = np.random.default_rng(2)
 
@@ -121,3 +121,38 @@ def test_the_colour_arithmetic():
   # the white centre of the colour sphere is pale, the black one dark, the rim saturated
   assert np.all(np.abs(sphereColor(1.0, 0.0) - 0.9) < 0.02) and np.all(np.abs(sphereColor(0.0, 0.0) - 0.25) < 0.02)
   assert sphereColor(0.5, 0.0).max() > 0.99 and sphereColor(0.5, 2 * np.pi / 3).argmax() == 1
+
+
+# the rate at which the colour of a key changes, in OKLab per degree, at random directions
+# of its sector and along two perpendicular steps
+def _colourSpeed(key, n=4000, d=0.15 * degree):
+  v = vector3d.rand(6 * n, rng=np.random.default_rng(3)).data.reshape(-1, 3)
+  v = v[key.sR.checkInside(vector3d(v)).reshape(-1)][:n]
+  e1 = np.cross(v, [0.3, -0.5, 0.8])
+  e1 /= np.linalg.norm(e1, axis=-1, keepdims=True)
+  lab = rgb2oklab(key.direction2color(vector3d(v)))
+  g = []
+  for e in (e1, np.cross(v, e1)):
+    w = v + d * e
+    out = ~key.sR.checkInside(vector3d(w)).reshape(-1)
+    w[out] = v[out] - d * e[out]
+    w /= np.linalg.norm(w, axis=-1, keepdims=True)
+    g.append(np.linalg.norm(rgb2oklab(key.direction2color(vector3d(w))) - lab, axis=-1) / (d / degree))
+  return np.hypot(*g)
+
+
+def test_the_perceptual_key():
+  rgb = np.array([[1.0, 0, 0], [0, 1.0, 0], [0.2, 0.4, 0.9], [0.5, 0.5, 0.5]])
+  assert np.allclose(oklab2rgb(rgb2oklab(rgb)), rgb, atol=1e-6)
+  # MTEX's key changes its colour three times as fast in some parts of the sector as in
+  # others; the perceptual one at a nearly steady rate
+  for name in ("m-3m", "6/mmm", "-3m", "4mm"):
+    for perceptual, bound in ((False, 2.5), (True, 1.6)):
+      g = _colourSpeed(HSVDirectionKey(crystalFrame(name), perceptual=perceptual))
+      assert (np.percentile(g, 90) / np.percentile(g, 10) < bound) == perceptual
+  # the centre pale, the vertices of the cubic triangle red, green and blue
+  key = HSVDirectionKey(crystalFrame("m-3m"), perceptual=True)
+  assert rgb2oklab(key.direction2color(key.whiteCenter))[0] > 0.94
+  corners = key.direction2color(vector3d([[0, 0, 1], [1, 0, 1], [1, 1, 1]]))
+  assert list(np.argmax(corners, axis=-1)) == [0, 1, 2]
+  assert np.all((corners >= 0) & (corners <= 1))

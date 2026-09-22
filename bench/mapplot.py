@@ -2,7 +2,7 @@
 # and MATLAB, for docs/research/benchmark-mapplot.md
 #
 #   .venv/bin/python bench/mapplot.py                      writes the tiled maps the other two read
-#   (cd ../mtexJulia && julia -t auto --project=dev ../mtexPython/bench/mapplot.jl)
+#   (cd ../mtexJulia && julia -t auto --project=dev ../pymtex/bench/mapplot.jl)
 #   bench/matlab/bench_mapplot.sh
 #
 # The Forsterite map, the Emsland map and the Forsterite map tiled two by two and four by

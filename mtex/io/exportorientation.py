@@ -10,9 +10,12 @@
 # one.
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 from ..geometry.units import degree
+from .table import writeTable
 
 EULER_NAMES = {"Bunge": ("phi1", "Phi", "phi2"), "Matthies": ("alpha", "beta", "gamma"), "ZYZ": ("alpha", "beta", "gamma"),
                "Roe": ("Psi", "Theta", "Phi"), "Kocks": ("Psi", "Theta", "phi")}
@@ -44,10 +47,7 @@ def exportOrientation(ori, fname, *args, radians=False, quaternion=False):
       for key, value in a.items():
         names.append(str(key))
         d = np.concatenate([d, np.asarray(value, dtype=float).reshape(-1, 1)], axis=1)
-  with open(fname, "w", encoding="utf-8") as f:
-    f.write(" ".join(f"{n:>10}" for n in names) + "\n")
-    for row in d:
-      f.write(" ".join(f"{x:10.5g}" for x in row) + "\n")
+  writeTable(os.fspath(fname), names, d.T)
 
 
 # the letter VPSC uses for the convention

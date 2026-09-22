@@ -64,7 +64,7 @@ How to run:
     ~/.juliaup/bin/julia --project=../mtexJulia/dev bench/geometry.jl
     cd ../frameSymmetry && docs/agents/matlab-bridge/start_session.sh
     docs/agents/matlab-bridge/.venv/bin/python docs/agents/matlab-bridge/matlab_run.py \
-      "restoredefaultpath; cd('/home/hielscher/mtex/frameSymmetry'); startup_mtex; addpath('/home/hielscher/mtex/mtexPython/bench'); geometry(1000000)"
+      "restoredefaultpath; cd('/home/hielscher/mtex/frameSymmetry'); startup_mtex; addpath('/home/hielscher/mtex/pymtex/bench'); geometry(1000000)"
 
 The NumPy column is `setMTEXpref('kernels', 'numpy')` before the run, or a venv without
 numba. The MATLAB path reset is needed: the saved path on this machine carries `../master`,

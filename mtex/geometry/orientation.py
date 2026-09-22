@@ -22,7 +22,7 @@ from .display import sizeString
 from .frames import crystalFrame, referenceFrame, specimenFrame
 from .quaternion import _readCoefficients, orthogonalTransform, qrot, quaternion, rotation
 from .homochoric import homochoric2quat
-from .representations import axis2quat, euler2quat, fitKernel, map1Kernel, map2Kernel, mat2quat, rodrigues2quat
+from .representations import axis2quat, euler2quat, eulerTriple, fitKernel, map1Kernel, map2Kernel, mat2quat, rodrigues2quat
 from .session import SESSION
 from .units import degree
 from .vector3d import classproperty, vector3d
@@ -56,6 +56,9 @@ class orientation(rotation):
     # orientation(f, points=n) samples a fibre
     if args and hasattr(args[0], "isFull") and hasattr(args[0], "o1"):
       args = [args[0].orientation(points)] + list(args[1:])
+    # orientation(e) projects an embedding back onto the orientations
+    elif args and hasattr(args[0], "spec") and hasattr(args[0], "project"):
+      args = [args[0].orientation()] + list(args[1:])
     if args and isinstance(args[0], orientation):
       o = args[0]
       data = o.data.copy()
@@ -92,10 +95,18 @@ class orientation(rotation):
     return obj
 
   @classmethod
-  def byEuler(cls, a, b, c, *args, antipodal=False):
+  def byEuler(cls, a, b=None, c=None, *args, antipodal=False):
+    a, b, c, args = eulerTriple(a, b, c, args)
     args, frames = _splitFrames(args)
     convention = args[0] if args else None
     return cls._fromRotation(euler2quat(a, b, c, convention), frames, antipodal)
+
+  # orientation.load(fname, cs, columnNames=['phi1', 'Phi', 'phi2']): the orientations of a
+  # text table; loadOrientation returns the other columns too
+  @classmethod
+  def load(cls, fname, *args, **kwargs):
+    from ..io.orientations import loadOrientation
+    return loadOrientation(fname, *args, **kwargs)[0]
 
   @classmethod
   def byAxisAngle(cls, v, omega, *frames, antipodal=False):
@@ -138,9 +149,9 @@ class orientation(rotation):
     return cls._fromRotation(fitKernel(_xyz(u), _xyz(v), weights), _splitFrames(frames)[1])
 
   @classmethod
-  def rand(cls, *args, rng=None, antipodal=False):
+  def rand(cls, *args, rng=None, antipodal=False, maxAngle=None):
     args, frames = _splitFrames(args)
-    return cls._fromRotation(rotation.rand(*args, rng=rng).data, frames, antipodal)
+    return cls._fromRotation(rotation.rand(*args, rng=rng, maxAngle=maxAngle).data, frames, antipodal)
 
   @classmethod
   def id(cls, *args):

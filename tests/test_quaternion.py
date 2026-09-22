@@ -179,3 +179,14 @@ def test_repr():
   assert s.startswith("rotation\n  Bunge Euler angles in degree\n  phi1  Phi  phi2\n") and "10" in s and "30" in s
   assert "size: 3" in repr(rotation.rand(3, rng=rng)) and "phi1" not in repr(rotation.rand(30, rng=rng))
   assert repr(quaternion(1, 2, 3, 4)) == "quaternion\n  a  b  c  d\n  1  2  3  4"
+
+
+def test_rand_within_a_maximum_angle_follows_the_haar_measure():
+  from mtex import degree
+  r = rotation.rand(50000, maxAngle=12 * degree, rng=np.random.default_rng(5))
+  w = r.angle()
+  assert w.max() <= 12 * degree + 1e-12
+  # the mean angle of the Haar measure restricted to the ball
+  t = np.linspace(0, 12 * degree, 2001)
+  expected = np.trapezoid(t * (1 - np.cos(t)), t) / np.trapezoid(1 - np.cos(t), t)
+  assert abs(np.mean(w) - expected) < 0.05 * degree
