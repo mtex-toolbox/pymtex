@@ -1,0 +1,25 @@
+# the values of an ODF along a fibre, against the angle along it (MATLAB @SO3Fun/plotFibre)
+import numpy as np
+
+from ..geometry.units import degree
+from .mtexfigure import gcm, mtexFigure
+
+
+def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw):
+  """plotFibre(odf, f): the ODF along the fibre f, as a line over the angle along the fibre"""
+  fig = gcm()
+  if fig is not None and fig.hold and fig.children:
+    ax = fig.children[-1]
+  else:
+    ax = mtexFigure(figSize=kw.pop("figSize", None)).nextAxis()
+  o = f.orientation(points)
+  omega = np.linspace(0, 2 * np.pi, o.size)
+  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  h = ax.plot(omega / degree, np.real(odf.eval(o)), linewidth=lineWidth, **kw)
+  ax.set_xlim(0, 360)
+  ax.set_xlabel("angle along the fibre in degree")
+  ax.set_ylabel("mrd")
+  return h
+
+
+__all__ = ["plotFibre"]

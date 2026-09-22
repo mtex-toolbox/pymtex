@@ -1,0 +1,43 @@
+{
+  "settings": {
+    "name": "ThermoFisher",
+    "key_path": { "mode": "absolute", "value": "/Info/SoftwareVersion"},
+    "manufacturer_keys": {"data": "xTalView"}
+  },
+  "ebsd": {
+    "type": "default",
+    "key": {"mode": "absolute", "value": "/Site/EBSD"},
+    "position": {
+      "type": "indirect",
+      "indirect": {
+        "step_size_x": { "mode": "absolute", "value": "/Site/Acquisition/StepSize"},
+        "step_size_y": { "mode": "absolute", "value": "/Site/Acquisition/StepSize"},
+        "grid_size_y": { "mode": "absolute", "value": "/Site/Acquisition/MapHeight"},
+        "grid_size_x": { "mode": "absolute", "value": "/Site/Acquisition/MapWidth"},
+        "first": {"data": "x"}	  
+      }
+    },
+    "phase": {"mode": "search_root", "value": "Phase", "type": "stack"},
+    "rotation": {
+      "type": "euler_stack",
+      "euler_stack": {
+        "format": { "data": "degree"},
+        "phi": { "mode": "search_root", "value": "EulerAngles" }
+      }
+    },
+    "cs": {
+      "type": "default",
+      "multiple": true,
+      "key": { "mode": "search_root", "value": "/EBSD/Phase" },
+      "default": {
+        "reference_frame": { "data": "X||a*, Z||c"},
+        "space_group": { "mode": "search_root", "value": "SpaceGroupNumber", "type": "default" },
+        "name": { "mode": "search_root", "value": "Name"},
+        "lattice": {
+          "angle": { "mode": "search_root", "value": "LatticeAngles"},
+          "dim": { "mode": "search_root", "value": "LatticeParameters"}
+        }
+      }
+    }
+  }
+}

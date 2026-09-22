@@ -1,0 +1,118 @@
+# the compiled kernels agree with their NumPy forms, on every shape the port uses them with
+import numpy as np
+import pytest
+
+import mtex
+from mtex import crystalFrame, orientation, rotation, setMTEXpref, vector3d
+from mtex.geometry import kernels
+from mtex.geometry.kernels import (_bestDotNumpy, _closestImageNumpy, _projectDirectionsNumpy, _projectToRefNumpy, _qmulNumpy,
+                                   _qrotNumpy, _symReduceNumpy)
+from mtex.geometry.orientationregion import commonAxisCenter, commonRotations
+from mtex.geometry.symreduce import reductionGroups, referenceImages
+
+rng = np.random.default_rng(3)
+numba = pytest.importorskip("numba")
+
+
+@pytest.fixture
+def numbaBackend():
+  setMTEXpref("kernels", "numba")
+  assert kernels.backend() == "numba"
+  yield
+  setMTEXpref("kernels", "numba")
+
+
+def test_backend_follows_the_preference():
+  setMTEXpref("kernels", "numpy")
+  assert kernels.backend() == "numpy"
+  setMTEXpref("kernels", "numba")
+  assert kernels.backend() == "numba"
+
+
+def test_product_and_rotation_agree_with_numpy(numbaBackend):
+  p, q = rotation.rand(1000, rng=rng).data, rotation.rand(1000, rng=rng).data
+  v = vector3d.rand(1000, rng=rng).data
+  assert np.allclose(kernels.qmul(p, q), _qmulNumpy(p, q), atol=1e-15)
+  assert np.allclose(kernels.qrot(p, v), _qrotNumpy(p, v), atol=1e-15)
+  # broadcasting on the leading axes, a single element, a strided slice, an integer input
+  assert np.allclose(kernels.qmul(p[:, None, :], q[None, :5, :]), _qmulNumpy(p[:, None, :], q[None, :5, :]))
+  assert np.allclose(kernels.qrot(p[:, None, :], v[None, :7, :]), _qrotNumpy(p[:, None, :], v[None, :7, :]))
+  assert np.allclose(kernels.qmul(p[0], q[0]), _qmulNumpy(p[0], q[0])) and kernels.qmul(p[0], q[0]).shape == (4,)
+  wide = np.concatenate([p, np.ones((1000, 1))], axis=1)
+  assert np.allclose(kernels.qmul(wide[:, :4], q), _qmulNumpy(p, q))
+  assert np.allclose(kernels.qmul(np.array([1, 0, 0, 0]), q), q)
+  assert kernels.qmul(p.astype(np.float32), q.astype(np.float32)).dtype == np.float32
+  assert kernels.qmul(np.empty((0, 4)), np.empty((0, 4))).shape == (0, 4)
+
+
+def test_searches_agree_with_numpy(numbaBackend):
+  cs, hx = crystalFrame("m-3m"), crystalFrame("6/mmm")
+  for frames, exchange in [((cs,), False), ((cs, hx), False), ((cs, cs), True)]:
+    o1, o2 = orientation.rand(500, *frames, rng=rng), orientation.rand(500, *frames, rng=rng)
+    L, R = reductionGroups(o1)
+    es, _ = referenceImages(o2[0].data, L, R, exchange)
+    val, idx = kernels.bestDot(o1.data, es)
+    valN, idxN = _bestDotNumpy(o1.data, es)
+    assert np.allclose(val, valN, atol=1e-14) and np.array_equal(idx, idxN)
+    got = kernels.symReduce(o1.data, o2.data, L, R, exchange)
+    want = _symReduceNumpy(o1.data, o2.data, L, R, exchange)
+    assert np.allclose(got[0], want[0], atol=1e-14)
+    assert all(np.array_equal(g, w) for g, w in zip(got[1:], want[1:]))
+    # one reference against a list, and a single pair
+    got = kernels.symReduce(o2[0].data, o1.data, L, R, exchange)
+    want = _symReduceNumpy(np.broadcast_to(o2[0].data, o1.data.shape), o1.data, L, R, exchange)
+    assert np.allclose(got[0], want[0], atol=1e-14) and got[0].shape == (500,)
+    assert kernels.symReduce(o1[0].data, o2[0].data, L, R, exchange)[0].shape == ()
+    # the pair search with its image, against a list and against one reference
+    vals, img = kernels.closestImage(o1.data, o2.data, L, R, exchange)
+    valsN, imgN = _closestImageNumpy(o1.data, o2.data, L, R, exchange)
+    assert np.allclose(vals, valsN, atol=1e-14) and np.allclose(img, imgN, atol=1e-14)
+    assert np.all(np.sum(img * o1.data, axis=-1) >= 0)
+    assert kernels.closestImage(o2[0].data, o1.data, L, R, exchange)[1].shape == (500, 4)
+    # the projection onto one reference, and onto the identity where the conjugates tie
+    for ref in (o2[0].data, np.array([1.0, 0, 0, 0])):
+      es, frm = referenceImages(ref, L, R, exchange)
+      common = commonRotations(L, R) if ref[0] == 1 else None
+      cimgs = kernels.qrot(common, commonAxisCenter(common)[None]) if common is not None and len(common) > 1 else None
+      got = kernels.projectToRef(o1.data, es, frm, L, R, ref, common, cimgs)
+      want = _projectToRefNumpy(o1.data, es, frm, L, R, ref, np.empty((0, 4)) if cimgs is None else common, np.empty((0, 3)) if cimgs is None else cimgs)
+      assert np.allclose(got, want, atol=1e-13)
+
+
+def test_direction_projection_agrees_with_numpy(numbaBackend):
+  for name in ("m-3m", "-3m", "4/m", "-6m2"):
+    fr = crystalFrame(name)
+    o = fr.rot.data.reshape(-1, 5)
+    v = vector3d.rand(2000, rng=rng).data
+    imgs = kernels.qrot(o[:, :4], np.array([[0.3, 0.2, 0.9]])) * o[:, 4:5]
+    got = kernels.projectDirections(v, imgs, o[:, :4], o[:, 4])
+    assert np.allclose(got, _projectDirectionsNumpy(v, imgs, o[:, :4], o[:, 4]), atol=1e-14)
+    assert kernels.projectDirections(v[0], imgs, o[:, :4], o[:, 4]).shape == (3,)
+
+
+def test_the_public_operations_agree_between_backends():
+  cs, hx = crystalFrame("m-3m"), crystalFrame("6/mmm")
+  mo, mo2 = orientation.rand(300, cs, hx, rng=rng), orientation.rand(300, cs, hx, rng=rng)
+  r, v = rotation.rand(300, rng=rng), vector3d.rand(300, rng=rng)
+  out = {}
+  for name in ("numpy", "numba"):
+    setMTEXpref("kernels", name)
+    out[name] = [(r * r).data, (r * v).data, mtex.dot(mo, mo2), mtex.dot(mo, mo[0]), mtex.angle(mo, mo2),
+                 mo.project2FundamentalRegion(mo2[0]).data, mo.project2FundamentalRegion(mo2).data, mtex.mean(mo).data,
+                 mo.project2FundamentalRegion().data, orientation(mo.data, cs, cs).project2FundamentalRegion().data,
+                 mtex.angle(mo), mtex.Miller(v, cs).project2FundamentalRegion().data]
+  setMTEXpref("kernels", "numba")
+  for a, b in zip(out["numpy"], out["numba"]):
+    assert np.allclose(a, b, atol=1e-12)
+
+
+def test_euler_angles_agree_with_numpy(numbaBackend):
+  from mtex.geometry.kernels import eulerQuat
+  from mtex.geometry.representations import matthies2quat
+  rng = np.random.default_rng(3)
+  a, b, g = (rng.uniform(-7, 7, size=(40, 60)) for _ in range(3))
+  q = eulerQuat(a, b, g)
+  if q is None:
+    return
+  setMTEXpref("kernels", "numpy")
+  assert np.allclose(q, matthies2quat(a, b, g), atol=1e-15)

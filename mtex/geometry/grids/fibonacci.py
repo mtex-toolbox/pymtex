@@ -1,0 +1,93 @@
+# the spherical Fibonacci grid (MATLAB fibonacciS2Grid): N = 2n + 1 points with z linear
+# in the index and the azimuth advancing by the golden angle; an eps-band in z is an index
+# range, so a search computes azimuths for the band only
+from __future__ import annotations
+
+import numpy as np
+from scipy import sparse
+
+from ..units import degree
+from ..vector3d import vector3d
+
+
+class fibonacciS2Grid(vector3d):
+
+  def __init__(self, N=None, resolution=None):
+    # the count MATLAB fits to the resolution, rounded once to the half count
+    if N is None:
+      resolution = 5 * degree if resolution is None else resolution
+      N = np.exp(2.512) / resolution ** 2
+    n = max(int(np.round((N - 1) / 2)), 0)
+    golden = (1 + np.sqrt(5)) / 2
+    i = np.arange(n, -n - 1, -1)
+    z = 2 * i / (2 * n + 1)
+    rho = np.mod(2 * np.pi / golden * i, 2 * np.pi)
+    r = np.sqrt(1 - z ** 2)
+    vector3d.__init__(self, np.stack([r * np.cos(rho), r * np.sin(rho), z], axis=-1), isNormalized=True)
+    self.n = n
+
+  def _new(self, data, **attrs):
+    obj = object.__new__(vector3d)
+    obj.data = data
+    for name in self._carried:
+      setattr(obj, name, attrs.pop(name, getattr(self, name)))
+    return obj
+
+  @property
+  def resolution(self):
+    return np.sqrt(np.exp(2.512) / self.size)
+
+  # the indices with |z - z_i| <= dz, a contiguous range since z_i falls with the index
+  def _zBand(self, z, dz):
+    N = 2 * self.n + 1
+    lo = max(self.n - int(np.floor((z + dz) * N / 2)), 0)
+    hi = min(self.n - int(np.ceil((z - dz) * N / 2)), N - 1)
+    return np.arange(lo, hi + 1)
+
+  def neighbourIndices(self, v, eps):
+    d = (v if isinstance(v, vector3d) else vector3d(v)).normalize().data
+    band = self._zBand(d[2], 2 * np.sin(eps / 2))
+    return band[self.data[band] @ d >= np.cos(eps)]
+
+  # the nearest point: the best of a band as wide as the spacing, widened until the band
+  # contains every point closer than the best found
+  def _nearestIndex(self, xyz):
+    d = xyz / np.linalg.norm(xyz)
+    eps = 2 * self.resolution
+    while True:
+      band = self._zBand(d[2], 2 * np.sin(eps / 2))
+      if len(band):
+        dots = self.data[band] @ d
+        best, bd = band[np.argmax(dots)], np.max(dots)
+        omega = np.arccos(np.clip(bd, -1, 1))
+        if omega <= eps:
+          return int(best)
+        eps = omega
+      else:
+        eps *= 2
+      if eps >= np.pi:
+        return int(np.argmax(self.data @ d))
+
+  def find(self, v, eps=None):
+    v = v if isinstance(v, vector3d) else vector3d(v)
+    xyz = v.data.reshape(-1, 3)
+    if eps is None:
+      ind = np.array([self._nearestIndex(x) for x in xyz], dtype=int).reshape(v.shape)
+      p = self.data[ind]
+      x = xyz.reshape(v.shape + (3,))
+      return ind, np.arctan2(np.linalg.norm(np.cross(p, x), axis=-1), np.sum(p * x, axis=-1))
+    rows, cols, vals = [], [], []
+    for r, x in enumerate(xyz):
+      ind = self.neighbourIndices(x, eps)
+      rows.append(np.full(len(ind), r))
+      cols.append(ind)
+      vals.append(np.arctan2(np.linalg.norm(np.cross(self.data[ind], x), axis=-1), self.data[ind] @ x))
+    rows, cols, vals = (np.concatenate(a) if a else np.zeros(0) for a in (rows, cols, vals))
+    shape = (len(xyz), self.size)
+    return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape), sparse.csr_matrix((vals, (rows, cols)), shape=shape)
+
+  def __repr__(self):
+    return f"fibonacciS2Grid\n  points: {self.size}\n  resolution: {self.resolution / degree:.4g}°"
+
+
+__all__ = ["fibonacciS2Grid"]

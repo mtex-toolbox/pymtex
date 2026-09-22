@@ -1,0 +1,196 @@
+# the grain boundary criteria (MATLAB grainBoundaryCriteria/, Julia criteria.jl)
+#
+#   gbcAngle(10 * degree)                 a threshold on the misorientation angle
+#   gbcAngle([10 * degree, 2 * degree])   a high and a low angle threshold
+#   gbcAngle(..., byPhase={'Forsterite': 15 * degree})   a phase with thresholds of its own
+#   gbcSoft(10 * degree, width)           the error function transition instead of a threshold
+#   gbcEqual('variantId')                 two measurements belong together when a property agrees
+#   gbcCustom(f), gbcCustom(values, threshold)
+#   crit.evaluate(ebsd, i, j), connectivity(crit, ebsd, i, j)
+#
+# A criterion answers, for pairs of neighbouring measurements, how connected they are: 1
+# no boundary, 0.5 a low angle boundary inside a grain, 0 a boundary. Anything between
+# means the same by the same rule, above zero the two are joined and at most one half a
+# boundary is drawn, so a continuous criterion needs no separate path. Different phases
+# are never joined; two not indexed measurements always are. The angle criterion compares
+# the largest |dot| over the proper group against each level transformed once, never an
+# angle in the loop.
+from __future__ import annotations
+
+import numpy as np
+
+from ..geometry._array import MtexArray
+from ..geometry.kernels import qmul
+from ..geometry.units import degree
+from ..geometry.vector3d import vector3d
+
+
+class grainBoundaryCriterion:
+
+  def evaluate(self, ebsd, i, j):
+    raise NotImplementedError
+
+  def __call__(self, ebsd, i, j):
+    return self.evaluate(ebsd, i, j)
+
+
+def connectivity(crit, ebsd, i, j):
+  return crit.evaluate(ebsd, i, j)
+
+
+# the levels of a criterion: one angle, or a high and a low angle one, as a tuple
+def _levels(x):
+  return tuple(float(t) for t in np.atleast_1d(np.asarray(x, dtype=float)))
+
+
+# whether a threshold names one entry per phase, MATLAB's cell list in CSList order
+def _perPhase(x):
+  if not isinstance(x, (list, tuple)):
+    return False
+  # a pair of numbers is [highAngle, lowAngle]; any other list names the phases in turn
+  return len(x) != 2 or any(isinstance(t, (list, tuple, np.ndarray)) for t in x)
+
+
+def _pairs(ebsd, i, j):
+  i, j = np.asarray(i).reshape(-1), np.asarray(j).reshape(-1)
+  if i.shape != j.shape:
+    raise ValueError("i and j are equally sized lists of neighbouring measurements")
+  return i, j, ebsd.phaseId.reshape(-1), ebsd.rotations.data.reshape(-1, 4)
+
+
+# the largest |<q_i, q_j g>| over the proper group of a frame, for pairs of rotations
+def _bestDot(fr, q1, q2):
+  G = fr.sym.properGroup().rotations().data.reshape(-1, 4).astype(q1.dtype)
+  m = qmul(q2 * np.array([1, -1, -1, -1], dtype=q1.dtype), q1)
+  return np.max(np.abs(m @ G.T), axis=1)
+
+
+# ------------------------------------------------------------------ the angle criterion
+
+class gbcAngle(grainBoundaryCriterion):
+
+  def __init__(self, threshold=10 * degree, byPhase=None):
+    self.threshold = threshold
+    self.byPhase = byPhase
+
+  # the levels of a phase: its own from byPhase or the per phase list, else the common ones
+  def levelsFor(self, CSList, p):
+    if self.byPhase is not None:
+      for key, t in self.byPhase.items():
+        if CSList.phaseId(key) == p:
+          return _levels(t)
+    if _perPhase(self.threshold):
+      return _levels(self.threshold[p])
+    return _levels(self.threshold)
+
+  def evaluate(self, ebsd, i, j):
+    i, j, ph, rot = _pairs(ebsd, i, j)
+    out = np.zeros(len(i), dtype=rot.dtype)
+    for p in range(len(ebsd.CSList)):
+      sel = (ph[i] == p) & (ph[j] == p)
+      if not sel.any():
+        continue
+      fr = ebsd.CSList[p]
+      if not fr.isIndexed:
+        out[sel] = 1                              # nothing was measured, nothing separates
+        continue
+      cosT = np.cos(np.array(self.levelsFor(ebsd.CSList, p), dtype=rot.dtype) / 2)
+      d = _bestDot(fr, rot[i[sel]], rot[j[sel]])
+      out[sel] = np.sum(d[:, None] > cosT[None, :], axis=1) / len(cosT)
+    return out
+
+  def __repr__(self):
+    t = self.threshold if _perPhase(self.threshold) else np.asarray(self.threshold) / degree
+    return f"gbcAngle (threshold {t}°" + (", by phase" if self.byPhase else "") + ")"
+
+
+# ------------------------------------------------------------------ the soft criterion
+
+# a smooth transition instead of a threshold, so a pair near the threshold is joined or
+# not by how far it is from it rather than by which side it fell on
+class gbcSoft(grainBoundaryCriterion):
+
+  def __init__(self, threshold=10 * degree, width=None, byPhase=None):
+    t = _levels(threshold) if not _perPhase(threshold) else (float(threshold[0][0]),)
+    self.threshold = t[0]
+    self.width = float(width) if width is not None else (t[1] if len(t) > 1 else t[0] / 2)
+    self.byPhase = byPhase
+
+  def levelsFor(self, CSList, p):
+    if self.byPhase is not None:
+      for key, t in self.byPhase.items():
+        if CSList.phaseId(key) == p:
+          lv = _levels(t)
+          return lv[0], (lv[1] if len(lv) > 1 else self.width)
+    return self.threshold, self.width
+
+  def evaluate(self, ebsd, i, j):
+    from scipy.special import erf
+    i, j, ph, rot = _pairs(ebsd, i, j)
+    out = np.zeros(len(i), dtype=rot.dtype)
+    for p in range(len(ebsd.CSList)):
+      sel = (ph[i] == p) & (ph[j] == p)
+      if not sel.any():
+        continue
+      fr = ebsd.CSList[p]
+      if not fr.isIndexed:
+        out[sel] = 1
+        continue
+      theta, w = self.levelsFor(ebsd.CSList, p)
+      omega = 2 * np.arccos(np.minimum(_bestDot(fr, rot[i[sel]], rot[j[sel]]), 1.0))
+      out[sel] = 1 - (1 + erf(2 * (omega - theta) / w)) / 2
+    return out
+
+  def __repr__(self):
+    return f"gbcSoft (threshold {self.threshold / degree:.4g}°, width {self.width / degree:.4g}°)"
+
+
+# ------------------------------------------------------------------ by a property
+
+# two measurements belong together when the values of a property agree, which is how a
+# segmentation by variant, by parent grain or by any imported label is done
+class gbcEqual(grainBoundaryCriterion):
+
+  def __init__(self, key):
+    self.key = key
+
+  def evaluate(self, ebsd, i, j):
+    i, j, _, rot = _pairs(ebsd, i, j)
+    v = getattr(ebsd, self.key) if isinstance(self.key, str) else np.asarray(self.key)
+    v = v.reshape((-1,) + v.shape[ebsd.ndim:]) if isinstance(self.key, str) else v.reshape((ebsd.size, -1))
+    same = np.all((v[i] == v[j]).reshape(len(i), -1), axis=1)
+    return same.astype(rot.dtype)
+
+  def __repr__(self):
+    return f"gbcEqual ({self.key!r})" if isinstance(self.key, str) else "gbcEqual (values)"
+
+
+# a criterion given as a function of the map and the two measurement indices, or as a
+# per-pixel property with the largest difference that still counts as one grain
+class gbcCustom(grainBoundaryCriterion):
+
+  def __init__(self, values, threshold=None, antipodal=False):
+    if callable(values):
+      self.f, self.values, self.threshold = values, None, None
+    else:
+      self.f, self.values, self.threshold = None, values, float(threshold)
+    self.antipodal = antipodal
+
+  def evaluate(self, ebsd, i, j):
+    i, j, _, rot = _pairs(ebsd, i, j)
+    if self.f is not None:
+      return np.asarray(self.f(ebsd, i, j), dtype=rot.dtype).reshape(len(i))
+    v = self.values
+    if isinstance(v, MtexArray):
+      flat = v.flatten()
+      d = flat[i].angle(flat[j], antipodal=self.antipodal) if isinstance(v, vector3d) else flat[i].angle(flat[j])
+    else:
+      v = np.asarray(v).reshape(ebsd.size, -1)
+      d = np.linalg.norm(v[i] - v[j], axis=1)
+    return (d <= self.threshold).astype(rot.dtype)
+
+  def __repr__(self):
+    return "gbcCustom (function)" if self.f is not None else f"gbcCustom (threshold {self.threshold:.4g})"
+
+
+__all__ = ["grainBoundaryCriterion", "gbcAngle", "gbcSoft", "gbcEqual", "gbcCustom", "connectivity"]

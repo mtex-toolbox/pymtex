@@ -1,0 +1,358 @@
+# the Bingham distributions, on SO(3) as f(q) = w/C(kappa) exp(sum kappa_i <q, a_i>^2) with four
+# orthonormal quaternions a_i, on the sphere as f(v) = exp(sum Z_i <v, a_i>^2) / C(Z); the
+# constant C is the hypergeometric function of matrix argument 1F1(1/2; s/2; diag kappa),
+# the mean of the exponential over the unit sphere of R^s, by the series of Hillier, Kan
+# and Wang (2009) (MATLAB @SO3FunBingham, BinghamODF, calcBinghamODF, @S2FunBingham;
+# docs/plans/functions.md F5)
+from __future__ import annotations
+
+import math
+
+import numpy as np
+
+from ..geometry.frames import referenceFrame
+from ..geometry.orientation import orientation
+from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
+from ..geometry.session import getMTEXpref
+from ..geometry.symreduce import reductionGroups
+from ..geometry.vector3d import vector3d
+from .funops import _antipodalPole, _rotatedFrame
+from .handles import S2FunHandle, SO3FunGeneric
+from .rbf import _readFrames, _rotationsFor
+from .s2fun import S2FunHarmonic
+
+
+# the coefficients c_1 .. c_s of prod (x - kappa_i) = x^s + c_1 x^{s-1} + ... + c_s
+def _charpolyCoefficients(kappa):
+  c = np.array([1.0])
+  for k in kappa:
+    c = np.concatenate([c, [0.0]]) - np.concatenate([[0.0], k * c])
+  return c[1:]
+
+
+# 1F1(1/2; s/2; diag kappa) for a vector kappa of length s >= 2
+def mhyper(kappa):
+  kappa = np.asarray(kappa, dtype=float).ravel()
+  s = len(kappa)
+  if s < 2:
+    raise ValueError("the argument has at least two entries")
+  p = _charpolyCoefficients(kappa)[::-1]
+  beta1 = s / 2
+  d = np.ones(s) / beta1
+  y = 1.0
+  i = 0
+  for j in range(1, s):
+    i = j
+    d[i] = np.sum(-(np.arange(i, 2 * i) / (2 * i)) * p[s - i:s] * d[:i])
+    y += d[i]
+    d /= beta1 + i
+  circ = np.arange(1, s + 1) % s
+  kp = np.arange(-s, 0) / 2 * p
+  while np.linalg.norm(d) > np.finfo(float).eps:
+    i += 1
+    d[0] = np.sum(-(kp / i + p) * d)
+    y += d[0]
+    d = d[circ] / (beta1 + i)
+  return float(y)
+
+
+# d log 1F1 / d kappa_i by central differences, the moments E[x_i^2] of the distribution
+def _logMhyperGradient(kappa, h=1e-5):
+  kappa = np.asarray(kappa, dtype=float)
+  out = np.empty(len(kappa))
+  for i in range(len(kappa)):
+    e = np.zeros(len(kappa))
+    e[i] = h
+    out[i] = (math.log(mhyper(kappa + e)) - math.log(mhyper(kappa - e))) / (2 * h)
+  return out
+
+
+# the concentrations with the given moments lambda (summing to one), the smallest fixed at zero
+def _concentrationsFor(lam, iterations=50, tol=1e-10):
+  lam = np.asarray(lam, dtype=float)
+  s = len(lam)
+  kappa = np.maximum(-1 / (2 * lam) - np.min(-1 / (2 * lam)), 0.0)
+  kappa[s - 1] = 0
+  free = slice(0, s - 1)
+  for _ in range(iterations):
+    r = _logMhyperGradient(kappa)[free] - lam[free]
+    if np.linalg.norm(r) < tol:
+      break
+    J = np.zeros((s - 1, s - 1))
+    for j in range(s - 1):
+      e = np.zeros(s)
+      e[j] = 1e-4
+      J[:, j] = (_logMhyperGradient(kappa + e)[free] - _logMhyperGradient(kappa - e)[free]) / 2e-4
+    kappa[free] -= np.linalg.solve(J, r)
+  return kappa
+
+
+def _axesMatrix(A):
+  if isinstance(A, orientation):
+    return rotation(A).data.reshape(-1, 4).T, (A.CS, A.SS), A.antipodal
+  if isinstance(A, quaternion):
+    return A.data.reshape(-1, 4).T, None, False
+  return np.asarray(A, dtype=float), None, False
+
+
+class SO3FunBingham(SO3FunGeneric):
+
+  def __init__(self, kappa, A, *frames, weight=1.0, antipodal=False):
+    A, framesOf, exchange = _axesMatrix(A)
+    frames = frames if frames or framesOf is None else framesOf
+    self.CS, self.SS = _readFrames(frames)
+    self.kappa = np.asarray(kappa, dtype=float).ravel()
+    if len(self.kappa) != 4 or A.shape != (4, 4):
+      raise ValueError("four concentrations and a 4x4 matrix of axes")
+    if abs(abs(np.linalg.det(A)) - 1) > 1e-6:
+      raise ValueError("the axes must be orthonormal")
+    antipodal = bool(antipodal or exchange)
+    if antipodal and self.CS is not self.SS:
+      raise ValueError("exchange symmetry needs the same frame on both sides")
+    self.A, self.weight, self.antipodal = A, float(weight), antipodal
+    self.C0 = mhyper(self.kappa)
+
+  @property
+  def bandwidth(self):
+    return getMTEXpref("maxSO3Bandwidth")
+
+  # the four principal quaternion axes as orientations, MATLAB's odf.A
+  @property
+  def axes(self):
+    return orientation._fromRotation(self.A.T.copy(), (self.CS, self.SS))
+
+  def mean(self):
+    return self.weight
+
+  # the axes moved by every pair of the groups, <l q r, a> = <q, l^-1 a r^-1>, and the
+  # conjugates under exchange symmetry, one 4x4 matrix per copy
+  def _symmetricAxes(self):
+    L, R = reductionGroups(orientation(rotation.id, self.CS, self.SS))
+    axes = rotation(self.A.T)
+    copies = []
+    for l in rotation(L):
+      for r in rotation(R):
+        moved = l.inv() * axes * r.inv()
+        copies.append(moved.data.T)
+        if self.antipodal:
+          copies.append(moved.inv().data.T)
+    return np.stack(copies)
+
+  def eval(self, x):
+    r = _rotationsFor(self, x)
+    q = r.data.reshape(-1, 4)
+    copies = self._symmetricAxes()
+    acc = np.zeros(len(q))
+    for M in copies:
+      acc += np.exp(((q @ M) ** 2) @ self.kappa)
+    return (self.weight / self.C0 * acc / len(copies)).reshape(r.shape)
+
+  def __mul__(self, a):
+    if isinstance(a, (int, float, np.number)):
+      return SO3FunBingham(self.kappa, self.A, self.CS, self.SS, weight=a * self.weight, antipodal=self.antipodal)
+    from .so3fun import SO3FunHarmonic
+    return SO3FunHarmonic(self) * a
+
+  __rmul__ = __mul__
+
+  def rotate(self, r, side="left"):
+    rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
+    axes = rotation(self.A.T)
+    if side == "left":
+      moved, CS, SS = rot * axes, self.CS, _rotatedFrame(self.SS, rot)
+    elif side == "right":
+      moved, CS, SS = axes * rot, _rotatedFrame(self.CS, rot), self.SS
+    else:
+      raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+    return SO3FunBingham(self.kappa, moved.data.T, CS, SS, weight=self.weight, antipodal=self.antipodal and CS is SS)
+
+  # the pole figure by Kunze and Schaeben: on the fibre q(phi) = cos(phi/2) q1 + sin(phi/2) q2
+  # with q1 h = r and q2 = q1 (h, pi), the exponent is a + b cos phi + c sin phi and the mean
+  # over the fibre is exp(a) I0(sqrt(b^2 + c^2))
+  def pdf(self, h, bandwidth=None):
+    from scipy.special import ive
+    h = h if isinstance(h, vector3d) else vector3d(h)
+    if h.size != 1:
+      raise ValueError("one crystal direction at a time")
+    if h.frame is not None and h.frame is not self.CS:
+      raise ValueError("the crystal direction must live in the crystal frame of the function")
+    hn = vector3d(h.normalize().data.reshape(3))
+    copies = self._symmetricAxes()
+    flip = rotation.byAxisAngle(hn, np.pi)
+
+    def value(rs):
+      rn = vector3d(rs.data.reshape(-1, 3)).normalize()
+      q1 = rotation.map(hn, rn)
+      q1 = rotation(q1.data.reshape(-1, 4))
+      q2 = (q1 * flip).data.reshape(-1, 4)
+      q1 = q1.data
+      acc = np.zeros(len(q1))
+      for M in copies:
+        A1, A2 = q1 @ M, q2 @ M
+        a = ((A1 ** 2 + A2 ** 2) @ self.kappa) / 2
+        b = ((A1 ** 2 - A2 ** 2) @ self.kappa) / 2
+        c = (A1 * A2) @ self.kappa
+        acc += np.exp(a) * ive(0, np.hypot(b, c)) * np.exp(np.hypot(b, c))
+      return (self.weight / self.C0 * acc / len(copies)).reshape(rs.shape)
+
+    L = min(64, getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
+    return S2FunHarmonic(S2FunHandle(value, self.SS, bandwidth=L, antipodal=_antipodalPole(h, self.CS)))
+
+  def __repr__(self):
+    lines = [f"SO3FunBingham ({self.CS.char()} → {self.SS.char()})", f"  kappa: {np.array2string(self.kappa, precision=3)}", f"  weight: {self.weight:.4g}"]
+    if self.antipodal:
+      lines.append("  antipodal: true")
+    return "\n".join(lines)
+
+
+# the four quaternion axes of a fibre: the quaternions along which h is sent to r, and
+# those across (MATLAB fibre2A)
+def _fibreAxes(h, r):
+  h = h.normalize().data.reshape(3)
+  r = r.normalize().data.reshape(3)
+  qr, qh = np.array([0.0, *r]), np.array([0.0, *h])
+  from ..geometry.kernels import qmul
+  rh = qmul(qr[None], qh[None]).reshape(4)
+  q1 = np.array([1.0, 0, 0, 0]) - rh
+  q2 = qr + qh
+  if np.linalg.norm(h - r) < 1e-10:
+    v1 = np.cross(h, [1.0, 0, 0] if abs(h[0]) < 0.9 else [0, 1.0, 0])
+    v1 /= np.linalg.norm(v1)
+    v2 = np.cross(h, v1)
+    q3, q4 = np.array([0.0, *v1]), np.array([0.0, *v2])
+  else:
+    q3 = np.array([1.0, 0, 0, 0]) + rh
+    q4 = qr - qh
+  A = np.stack([q1, q2, q3, q4], axis=1)
+  return A / np.linalg.norm(A, axis=0)
+
+
+def BinghamODF(kappa, A=None, *frames, **kwargs):
+  """BinghamODF(kappa, U), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.eye, cs)
+
+  A Bingham distribution from four concentrations and four orthogonal quaternion axes, the
+  axes as a 4x4 matrix, four orientations, or one orientation standing for the identity
+  basis; fewer concentrations are padded with zeros; a fibre takes its two axes with the
+  same concentration, as MATLAB's constructor does.
+  """
+  from ..geometry.fibre import fibre
+  kappa = np.asarray(kappa, dtype=float).ravel()
+  if isinstance(A, fibre):
+    kappa = np.concatenate([kappa[:1], kappa[:1]]) if kappa.size == 1 else kappa
+    frames = frames if frames else (A.CS, A.SS)
+    A = _fibreAxes(A.h, A.r)
+  elif isinstance(A, vector3d) and frames and isinstance(frames[0], vector3d):
+    kappa = np.concatenate([kappa[:1], kappa[:1]]) if kappa.size == 1 else kappa
+    A, frames = _fibreAxes(A, frames[0]), frames[1:]
+  elif isinstance(A, quaternion) and A.size == 1:
+    # one orientation: the identity basis, its frames
+    if isinstance(A, orientation):
+      frames = frames if frames else (A.CS, A.SS)
+    A = np.eye(4)
+  elif A is None:
+    A = np.eye(4)
+  if kappa.size < 4:
+    kappa = np.concatenate([kappa, np.zeros(4 - kappa.size)])
+  return SO3FunBingham(kappa, A, *frames, **kwargs)
+
+
+# the estimate from orientations: the eigen decomposition of the quaternion tensor of the
+# sample projected to the fundamental region about its mean gives the axes, and the
+# concentrations follow from the eigenvalues, by the large concentration approximation
+# kappa_i = -1/(2 lambda_i) shifted to a smallest value of zero, or exactly by Newton on the moments
+def calcBinghamODF(o, weights=None, exact=False):
+  o = o if isinstance(o, orientation) else orientation(o)
+  m = o.mean(weights=weights)
+  q = o.project2FundamentalRegion(m).data.reshape(-1, 4)
+  w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
+  T = (q * w[:, None]).T @ q
+  lam, A = np.linalg.eigh(T)
+  order = np.argsort(lam)[::-1]
+  lam, A = lam[order], A[:, order]
+  if exact:
+    kappa = _concentrationsFor(lam)
+  else:
+    kappa = -1 / (2 * lam)
+    kappa = kappa - np.min(kappa)
+  return SO3FunBingham(kappa, A, o.CS, o.SS, antipodal=o.antipodal)
+
+
+# ------------------------------------------------------------------ the sphere
+
+
+class S2FunBingham:
+  isReal = True
+  antipodal = True
+
+  def __init__(self, Z, a=None, frame=None):
+    if isinstance(a, referenceFrame):
+      a, frame = None, a
+    if isinstance(a, vector3d):
+      frame = a.frame if frame is None else frame
+      a = a.data.reshape(-1, 3).T
+    self.Z = np.asarray(Z, dtype=float).ravel()
+    self.a = np.eye(3) if a is None else np.asarray(a, dtype=float)
+    if len(self.Z) != 3 or self.a.shape != (3, 3):
+      raise ValueError("three shape parameters and a 3x3 matrix of axes")
+    if abs(abs(np.linalg.det(self.a)) - 1) > 1e-6:
+      raise ValueError("the axes must be orthonormal")
+    self.frame = frame
+    self.C = mhyper(self.Z)
+
+  @property
+  def CS(self):
+    return self.frame
+
+  @property
+  def bandwidth(self):
+    return getMTEXpref("maxS2Bandwidth")
+
+  def mean(self):
+    return 1.0
+
+  def _symmetricAxes(self):
+    if self.frame is None:
+      return self.a[None]
+    els = self.frame.sym.rot.flatten().rot
+    return np.stack([(els[i].inv() * vector3d(self.a.T)).data.T for i in range(els.size)])
+
+  def __call__(self, x):
+    return self.eval(x)
+
+  def eval(self, x):
+    v = x if isinstance(x, vector3d) else vector3d(x)
+    d = v.normalize().data.reshape(-1, 3)
+    copies = self._symmetricAxes()
+    acc = np.zeros(len(d))
+    for M in copies:
+      acc += np.exp(((d @ M) ** 2) @ self.Z)
+    return (acc / (self.C * len(copies))).reshape(v.shape)
+
+  def _harmonicS2(self, bandwidth=None):
+    L = self.bandwidth if bandwidth is None else int(bandwidth)
+    return S2FunHarmonic(lambda v: self.eval(v), self.frame, bandwidth=L, antipodal=True, real=True)
+
+  def rotate(self, r):
+    rot = rotation(r.data.reshape(4))
+    return S2FunBingham(self.Z, (rot * vector3d(self.a.T)).data.T, None if self.frame is None else _rotatedFrame(self.frame, rot))
+
+  # the fit to directions or axes: the eigen decomposition of the scatter matrix gives the
+  # axes, the mode first, Newton on the moments the shape parameters, descending with the
+  # largest at zero, as in MTEX
+  @classmethod
+  def fit(cls, v, weights=None):
+    v = v if isinstance(v, vector3d) else vector3d(v)
+    d = v.normalize().data.reshape(-1, 3)
+    w = np.full(len(d), 1 / len(d)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
+    S = (d * w[:, None]).T @ d
+    lam, a = np.linalg.eigh(S)
+    order = np.argsort(lam)[::-1]
+    kappa = _concentrationsFor(lam[order])
+    return cls(kappa - kappa[0], a[:, order], v.frame)
+
+  def __repr__(self):
+    info = "" if self.frame is None else f" ({self.frame.char()})"
+    return f"S2FunBingham{info}\n  Z: {np.array2string(self.Z, precision=3)}"
+
+
+__all__ = ["mhyper", "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham"]

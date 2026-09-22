@@ -1,0 +1,184 @@
+# build the documentation pages: every script in docs/pages/<Chapter>/ is executed cell by
+# cell and becomes docs/build/<Page>.md with its figures beside it. A page is in the
+# jupytext light format: a paragraph of comment lines is prose, a paragraph of code is one
+# cell, "# +" and "# -" wrap a cell of several paragraphs. Usage:
+#   .venv/bin/python docs/make.py              every page
+#   .venv/bin/python docs/make.py VectorDefinition ...
+import ast
+import contextlib
+import io
+import os
+import shutil
+import sys
+import traceback
+import warnings
+
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+np.set_printoptions(legacy="1.25", precision=4, suppress=True)
+
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+pagesDir = os.path.join(root, "docs", "pages")
+buildDir = os.path.join(root, "docs", "build")
+HEAD, TAIL, LIMIT = 15, 10, 30
+
+
+# the paragraphs of a page: ("prose", text) or ("code", text)
+def parse(src):
+  blocks, para, kind, wrapped = [], [], None, False
+  for line in src.split("\n") + [""]:
+    if line.strip() == "# +":
+      wrapped = True
+      continue
+    if line.strip() == "# -":
+      wrapped = False
+      blocks.append(("code", "\n".join(para).strip("\n")))
+      para = []
+      continue
+    if line.strip() == "" and not wrapped:
+      if para:
+        prose = all(l.startswith("#") for l in para)
+        text = "\n".join(l[2:] if l.startswith("# ") else l[1:] for l in para) if prose else "\n".join(para)
+        blocks.append(("prose" if prose else "code", text))
+      para = []
+    else:
+      para.append(line)
+  return [(k, t) for k, t in blocks if t.strip()]
+
+
+# an output block longer than LIMIT lines keeps HEAD and TAIL lines around an ellipsis
+def cut(text):
+  lines = text.rstrip("\n").split("\n")
+  if len(lines) > LIMIT:
+    lines = lines[:HEAD] + ["⋮"] + lines[-TAIL:]
+  return "\n".join(lines)
+
+
+# the display of a trailing expression: a number as MATLAB's format short, an integer
+# without decimals, nothing for the handles a plot returns, the repr of everything else
+def show(value):
+  if isinstance(value, (bool, np.bool_)) or value is None:
+    return None if value is None else str(bool(value))
+  if isinstance(value, np.ndarray) and value.ndim == 0:
+    value = value[()]
+  if isinstance(value, (int, float, np.integer, np.floating)):
+    x = float(value)
+    if x == int(x) and abs(x) < 1e15:
+      return str(int(x))
+    return f"{x:.4f}" if 1e-3 <= abs(x) < 1e5 else f"{x:.4e}"
+  items = value if isinstance(value, (list, tuple)) else [value]
+  while any(isinstance(x, (list, tuple)) for x in items):
+    items = [y for x in items for y in (x if isinstance(x, (list, tuple)) else [x])]
+  items = [x for x in items if x is not None]
+  if not items and isinstance(value, (list, tuple)):
+    return None
+  if items and all(type(x).__module__.startswith(("matplotlib", "mpl_toolkits", "mtex.plotting")) for x in items):
+    return None
+  return repr(value)
+
+
+# run one cell in the namespace: what it prints, then the display of a trailing expression
+def runCell(code, ns):
+  tree = ast.parse(code)
+  last = tree.body[-1] if tree.body and isinstance(tree.body[-1], ast.Expr) else None
+  buf = io.StringIO()
+  # a warning is part of the output, as MATLAB's diary shows it
+  with contextlib.redirect_stdout(buf), warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    warnings.simplefilter("ignore", ResourceWarning)
+    if last is not None:
+      tree.body = tree.body[:-1]
+    exec(compile(tree, "<cell>", "exec"), ns)
+    if last is not None:
+      text = show(eval(compile(ast.Expression(last.value), "<cell>", "eval"), ns))
+      if text is not None:
+        print(text)
+  return "".join(f"Warning: {w.message}\n" for w in caught) + buf.getvalue()
+
+
+def build(page):
+  chapter, name = page
+  src = open(os.path.join(pagesDir, chapter, name + ".py"), encoding="utf-8").read()
+  # the pictures a chapter keeps beside its pages go along
+  for f in os.listdir(os.path.join(pagesDir, chapter)):
+    if f.endswith((".png", ".jpg", ".svg")):
+      shutil.copy(os.path.join(pagesDir, chapter, f), os.path.join(buildDir, f))
+  # the figures of the previous build go, so that none outlives the cell that made it
+  for f in os.listdir(buildDir):
+    if f.startswith(name + "-") and f.endswith(".png"):
+      os.remove(os.path.join(buildDir, f))
+  ns = {"__name__": "__mtexdoc__"}
+  out, k, ok = [], 0, True
+  snapshots = {}
+  plt.close("all")
+  for kind, text in parse(src):
+    if kind == "prose":
+      out.append(text + "\n")
+      continue
+    k += 1
+    out.append("```python\n" + text + "\n```\n")
+    try:
+      printed = runCell(text, ns)
+    except Exception:
+      printed = traceback.format_exc()
+      ok = False
+    if printed.strip():
+      out.append("```text\n" + cut(printed) + "\n```\n")
+    # figures live on across the cells, as in MATLAB's publish, and a figure is shown after
+    # the cell that made or changed it
+    changed = []
+    for num in plt.get_fignums():
+      fig = plt.figure(num)
+      # a figure has changed when it is new or holds more artists; a settling layout is no change
+      count = sum(len(ax.get_children()) for ax in fig.axes)
+      if snapshots.get(num) == count:
+        continue
+      snapshots[num] = count
+      buf = io.BytesIO()
+      fig.savefig(buf, format="png", dpi=120)
+      changed.append(buf.getvalue())
+    for f, data in enumerate(changed, 1):
+      png = f"{name}-{k}.png" if len(changed) == 1 else f"{name}-{k}-{f}.png"
+      open(os.path.join(buildDir, png), "wb").write(data)
+      out.append(f"![]({png})\n")
+    if not ok:
+      out.append("**The page stopped here.**\n")
+      print(f"FAILED {chapter}/{name} at cell {k}\n{printed}")
+      break
+  plt.close("all")
+  open(os.path.join(buildDir, name + ".md"), "w", encoding="utf-8").write("\n".join(out))
+  # a picture kept beside the page, a screenshot the page shows, goes into the build as it is
+  for f in os.listdir(os.path.join(pagesDir, chapter)):
+    if f.endswith(".png"):
+      shutil.copyfile(os.path.join(pagesDir, chapter, f), os.path.join(buildDir, f))
+  return ok
+
+
+def pages(names):
+  found = []
+  for chapter in sorted(os.listdir(pagesDir)):
+    d = os.path.join(pagesDir, chapter)
+    if os.path.isdir(d):
+      found += [(chapter, f[:-3]) for f in sorted(os.listdir(d)) if f.endswith(".py")]
+  return [p for p in found if not names or p[1] in names]
+
+
+# every page runs in a process of its own, as a MATLAB page runs in a fresh workspace: the
+# session default frame and convention, a colour set on an interned frame, the figures
+def buildApart(page):
+  import subprocess
+  r = subprocess.run([sys.executable, os.path.abspath(__file__), "--one", page[0], page[1]], cwd=root)
+  return r.returncode == 0
+
+
+if __name__ == "__main__":
+  os.makedirs(buildDir, exist_ok=True)
+  os.chdir(root)
+  if len(sys.argv) > 1 and sys.argv[1] == "--one":
+    sys.exit(0 if build((sys.argv[2], sys.argv[3])) else 1)
+  failed = [p for p in pages(sys.argv[1:]) if not buildApart(p)]
+  sys.exit(1 if failed else 0)

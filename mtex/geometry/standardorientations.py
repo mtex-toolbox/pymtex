@@ -1,0 +1,204 @@
+# orientations defined by directions, the named orientation relationships, the variants of
+# a relationship and the coincidence site lattices (MATLAB orientation/byMiller,
+# orientation/variants, the static methods of orientation.m)
+from __future__ import annotations
+
+from math import gcd
+
+import numpy as np
+
+from .frames import crystalFrame, specimenFrame
+from .miller import Miller
+from .quaternion import qmul, rotation
+from .symmetryops import project2FundamentalRegionOrientation, symmetrise
+from .symreduce import _conj, reductionGroups, symReduce
+from .units import degree
+from .vector3d import vector3d, xvector, zvector
+
+
+# the group of a direction's phase: a direction written group-free for one plane still
+# belongs to the phase, which the register knows as the largest group over that basis
+def phaseFrame(x):
+  if not isinstance(x, vector3d) or x.frame is None:
+    return None
+  if x.isCrystalDirection and x.frame.numSym() == 1:
+    return x.frame.fullSym()
+  return x.frame
+
+
+# the orientation with ori * hkl parallel to z and ori * uvw parallel to x, from the
+# symmetric equivalent of uvw closest to perpendicular to hkl; among those equally close
+# the one closest to uvw itself, so the choice does not depend on the element order
+def byMiller(hkl, uvw, *frames):
+  from .orientation import orientation
+  frames = [f for f in frames if hasattr(f, "sym")]
+  if not isinstance(hkl, vector3d):
+    cs = frames.pop(0)
+    hkl, uvw = Miller(*np.asarray(hkl, dtype=float), cs), Miller(*np.asarray(uvw, dtype=float), cs, "uvw")
+  # the frame of hkl given again is the crystal frame, the next one the specimen frame
+  frames = [f for f in frames if f is not phaseFrame(hkl)]
+  ss = frames[0] if frames else specimenFrame.default
+  n = hkl.normalize().data
+  u = uvw.normalize().data
+  cands = symmetrise(uvw).data.reshape(-1, 3)
+  cands = cands / np.linalg.norm(cands, axis=1, keepdims=True)
+  dev = np.round(np.abs(np.pi / 2 - np.arctan2(np.linalg.norm(np.cross(cands, n), axis=1), cands @ n)), 8)
+  score = np.lexsort((-np.round(cands[:, 2], 8), -np.round(cands[:, 1], 8), -np.round(cands[:, 0], 8), -np.round(cands @ u, 8), dev))
+  d = cands[score[0]]
+  if dev[score[0]] > 1 * degree:
+    import warnings
+    warnings.warn(f"the Miller indices are not orthogonal, deviation {dev[score[0]] / degree:.3g}°")
+  d = d - (d @ n) * n
+  return orientation(rotation.map(vector3d(n), zvector, vector3d(d), xvector), phaseFrame(hkl), ss)
+
+
+# each relationship maps a plane and a direction of the parent onto those of the child
+def relationship(nParent, nChild, dParent, dChild):
+  from .orientation import orientation
+  return orientation.map(nParent, nChild, dParent, dChild, phaseFrame(nParent), phaseFrame(nChild))
+
+
+def Bain(csG, csA):
+  return relationship(Miller(1, 0, 0, csG), Miller(1, 0, 0, csA), Miller(0, 1, 0, csG, "uvw"), Miller(0, 1, 1, csA, "uvw"))
+
+
+def KurdjumovSachs(csG, csA):
+  return relationship(Miller(1, 1, 1, csG), Miller(0, 1, 1, csA), Miller(-1, 0, 1, csG, "uvw"), Miller(-1, -1, 1, csA, "uvw"))
+
+
+def NishiyamaWassermann(csG, csA):
+  return relationship(Miller(1, 1, 1, csG), Miller(0, 1, 1, csA), Miller(1, 1, -2, csG, "uvw"), Miller(0, -1, 1, csA, "uvw"))
+
+
+def Pitsch(csG, csA):
+  return relationship(Miller(0, 1, 0, csG), Miller(1, 0, 1, csA), Miller(1, 0, 1, csG, "uvw"), Miller(-1, 1, 1, csA, "uvw"))
+
+
+def GreningerTrojano(csG, csA):
+  from .orientation import orientation
+  return orientation.byEuler(2.7 * degree, 46.6 * degree, 7.5 * degree, csA, csG).inv()
+
+
+def Bagaryatsky(csT, csA):
+  return relationship(Miller(1, 0, 0, csT), Miller(1, -1, 0, csA), Miller(0, 1, 0, csT, "uvw"), Miller(1, 1, 1, csA, "uvw"))
+
+
+def Burgers(csParent, csChild):
+  if csParent.lattice.isTriHex:
+    return Burgers(csChild, csParent).inv()
+  return relationship(Miller(1, 1, 0, csParent), Miller(0, 0, 0, 1, csChild), Miller(-1, 1, -1, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
+
+
+def PitschSchrader(csParent, csChild):
+  return relationship(Miller(0, 1, 1, csParent), Miller(0, 0, 0, 1, csChild), Miller(1, 0, 0, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
+
+
+def Potter(csParent, csChild):
+  return relationship(Miller(0, 1, 1, csParent), Miller(0, 1, -1, 1, csChild), Miller(1, 1, -1, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
+
+
+def ShojiNishiyama(csG, csE):
+  return relationship(Miller(1, 1, 1, csG), Miller(0, 0, 0, 1, csE), Miller(1, 0, -1, csG, "uvw"), Miller(2, -1, -1, 0, csE, "uvw"))
+
+
+# the child variants of a parent-to-child relationship: the distinct p2c * r over the parent
+# group modulo the child group; the parent variants with the sides swapped; the child
+# orientations of parents, all of them or one chosen per parent by its id
+def variants(p2c, second=None, ids=None, parent=False):
+  from .orientation import orientation
+  if isinstance(second, str):
+    parent, second = second == "parent", None
+  if second is None:
+    if parent:
+      G = p2c.frameB.sym.properGroup().rotations().data.reshape(-1, 4)
+      cand = p2c._new(qmul(G, p2c.data[None]))
+      keep = _distinctModulo(cand, "right")
+    else:
+      G = p2c.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
+      cand = p2c._new(qmul(p2c.data[None], G))
+      keep = _distinctModulo(cand, "left")
+    return cand[keep]
+  vs = variants(p2c)
+  par = second.data.reshape(-1, 4)
+  if ids is None:
+    q = qmul(par[:, None, :], _conj(vs.data)[None, :, :])
+    return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameB, second.frameB)
+  ids = np.asarray(ids).reshape(-1) - 1
+  return orientation(rotation._fromData(qmul(par, _conj(vs.data[ids]))), p2c.frameB, second.frameB)
+
+
+def _distinctModulo(cand, side):
+  L, R = reductionGroups(cand)
+  one = np.array([[1.0, 0, 0, 0]])
+  L, R = (L, one) if side == "left" else (one, R)
+  q = cand.data
+  keep = []
+  for k in range(len(q)):
+    if not any(symReduce(q[j], q[k], L, R)[0] > 1 - 1e-4 for j in keep):
+      keep.append(k)
+  return keep
+
+
+# (112)[-1-11] is Bunge (90, 35, 45), (112)[11-1] its twin (270, 35, 45)
+def copper(cs, *ss):
+  return byMiller([1, 1, 2], [-1, -1, 1], cs, *ss)
+
+
+def copper2(cs, *ss):
+  return byMiller([1, 1, 2], [1, 1, -1], cs, *ss)
+
+
+# the other named components of rolling textures, by their Bunge Euler angles in degrees
+STANDARD_EULER = {"cube": (0, 0, 0), "cubeND22": (22, 0, 0), "cubeND45": (45, 0, 0), "cubeRD": (0, 22, 0), "goss": (0, 45, 0),
+                  "SR": (53, 35, 63), "SR2": (233, 35, 63), "SR3": (307, 35, 27), "SR4": (127, 35, 27), "brass": (35, 45, 0),
+                  "brass2": (325, 45, 0), "PLage": (65, 45, 0), "PLage2": (245, 45, 0), "QLage": (65, 20, 0), "QLage2": (245, 20, 0),
+                  "QLage3": (115, 160, 0), "QLage4": (295, 160, 0), "invGoss": (90, 45, 0)}
+
+
+def _byEulerDegrees(name):
+  def build(cs, *ss):
+    from .orientation import orientation
+    from .units import degree
+    a, b, c = STANDARD_EULER[name]
+    return orientation.byEuler(a * degree, b * degree, c * degree, cs, *ss)
+  build.__name__ = name
+  return build
+
+
+for _name in STANDARD_EULER:
+  globals()[_name] = _byEulerDegrees(_name)
+del _name
+
+
+# coincidence site lattice misorientations of a cubic lattice, from the definition (Grimmer,
+# Bollmann, Warrington 1974): a rotation whose quaternion has integer components with no
+# common divisor is a CSL misorientation, and Sigma is the sum of their squares with every
+# factor of two divided out; the classes of one Sigma come out in ascending angle
+def CSL(sigma, cs):
+  from .orientation import orientation
+  if sigma < 1 or sigma % 2 == 0:
+    raise ValueError(f"Sigma is an odd positive integer, not {sigma}")
+  if cs.sym.properGroup().numSym() != 24:
+    raise ValueError("the coincidence site lattices are those of a cubic lattice")
+  m = int(np.floor(np.sqrt(4 * sigma)))
+  found = []
+  for a in range(m + 1):
+    for b in range(m + 1):
+      for c in range(b + 1):
+        for d in range(c + 1):
+          n = a * a + b * b + c * c + d * d
+          if n == 0 or gcd(gcd(gcd(a, b), c), d) != 1:
+            continue
+          while n % 2 == 0:
+            n //= 2
+          if n != sigma:
+            continue
+          o = project2FundamentalRegionOrientation(orientation(a, b, c, d, cs, cs, antipodal=True))
+          if not any(f.angle(o) < 1e-8 for f in found):
+            found.append(o)
+  found.sort(key=lambda o: float(o.angle()))
+  return orientation.cat(*found) if found else orientation(cs, cs, antipodal=True)
+
+
+__all__ = ["byMiller", "Bain", "KurdjumovSachs", "NishiyamaWassermann", "Pitsch", "GreningerTrojano", "Bagaryatsky",
+           "Burgers", "PitschSchrader", "Potter", "ShojiNishiyama", "variants", "copper", "copper2", "CSL", "STANDARD_EULER"] + list(STANDARD_EULER)

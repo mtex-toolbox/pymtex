@@ -1,0 +1,5 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "jupyter.interactiveWindow.textEditor.executeSelection": true
+}
