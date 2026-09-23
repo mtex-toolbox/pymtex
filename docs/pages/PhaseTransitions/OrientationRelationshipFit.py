@@ -65,7 +65,7 @@ p2cGlobal
 
 plt.close('all')
 plt.hist(fitGlobal / degree, bins=50)
-plt.axvline(np.quantile(fitGlobal, 0.9) / degree, color='k', linestyle='--', label='90% cutoff')
+plt.axvline(np.nanquantile(fitGlobal, 0.9) / degree, color='k', linestyle='--', label='90% cutoff')
 plt.legend()
 plt.xlabel('disorientation to the closest variant in degrees')
 plt.ylabel('number of neighbouring grain pairs')

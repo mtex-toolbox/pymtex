@@ -67,7 +67,7 @@ fcc2bcc, boundaryFit = calcParent2Child(grains.selectByGrainId(grainPairs).meanO
 
 changeFromKS = angle(KS, fcc2bcc) / degree
 print(changeFromKS)
-boundaryFitQuantiles = np.quantile(boundaryFit / degree, [0.2, 0.4, 0.6, 0.8])
+boundaryFitQuantiles = np.nanquantile(boundaryFit / degree, [0.2, 0.4, 0.6, 0.8])
 boundaryFitQuantiles
 # -
 
@@ -135,7 +135,7 @@ plt.ylabel('similarity')
 
 # +
 boundaryProbability = 1 - 0.5 * (1 + erf(2 * (boundaryFit - boundaryThreshold) / boundaryTolerance))
-boundaryProbabilityQuantiles = np.quantile(boundaryProbability, [0.1, 0.5, 0.9])
+boundaryProbabilityQuantiles = np.nanquantile(boundaryProbability, [0.1, 0.5, 0.9])
 print(boundaryProbabilityQuantiles)
 
 boundaryA = coo_matrix((boundaryProbability, (grainPairs[:, 0] - 1, grainPairs[:, 1] - 1)), shape=(len(grains), len(grains))).tocsr()
@@ -301,7 +301,7 @@ isNowFCC = (boundaryParentGrains.phaseId[np.maximum(1, gid) - 1] == ebsd.name2id
 parentOri, pixelFit = calcParent(ebsd[isNowFCC].orientations, boundaryParentGrains.selectByGrainId(gid[isNowFCC]).meanOrientation, fcc2bcc)
 boundaryParentEBSD[isNowFCC] = parentOri
 
-pixelFitQuantiles = np.quantile(pixelFit / degree, [0.5, 0.9, 0.99])
+pixelFitQuantiles = np.nanquantile(pixelFit / degree, [0.5, 0.9, 0.99])
 print(pixelFitQuantiles)
 
 plot(boundaryParentEBSD['Iron fcc'], boundaryParentEBSD['Iron fcc'].orientations, figSize='large')
@@ -367,7 +367,7 @@ tPori = grains.selectByGrainId(tP.grainId).meanOrientation.reshape(-1, 3)
 
 _, tripleFit = calcParent(tPori, fcc2bcc, id=True, threshold=5 * degree)
 
-tripleFitQuantiles = np.quantile(tripleFit / degree, [0.2, 0.4, 0.6, 0.8])
+tripleFitQuantiles = np.nanquantile(tripleFit / degree, [0.2, 0.4, 0.6, 0.8])
 print(tripleFitQuantiles)
 
 plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
@@ -395,7 +395,7 @@ tripleThreshold = 3 * degree
 tripleTolerance = 2 * degree
 
 tripleProbability = 1 - 0.5 * (1 + erf(2 * (tripleFit - tripleThreshold) / tripleTolerance))
-tripleProbabilityQuantiles = np.quantile(tripleProbability, [0.1, 0.5, 0.9])
+tripleProbabilityQuantiles = np.nanquantile(tripleProbability, [0.1, 0.5, 0.9])
 print(tripleProbabilityQuantiles)
 
 n = len(grains)

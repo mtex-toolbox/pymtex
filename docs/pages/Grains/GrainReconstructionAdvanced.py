@@ -249,7 +249,7 @@ notIndexedGrains
 
 # +
 numPixel = notIndexedGrains.numPixel
-print(f'median pixels: {np.median(numPixel):g}, 99th percentile: {np.quantile(numPixel, 0.99):g}, '
+print(f'median pixels: {np.median(numPixel):g}, 99th percentile: {np.nanquantile(numPixel, 0.99):g}, '
       f'maximum: {np.max(numPixel)}, maximum equivalent radius in pixels: {np.sqrt(np.max(numPixel) / np.pi):.2f}')
 # -
 

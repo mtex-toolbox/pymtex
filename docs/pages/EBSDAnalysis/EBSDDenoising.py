@@ -68,7 +68,7 @@ colorKey.oriRef = grainMean
 
 # keep one colour scale for every comparison on this page
 rawDeviation = angle(ebsd.orientations, grainMean)
-colorKey.maxAngle = np.quantile(rawDeviation, 0.8)
+colorKey.maxAngle = np.nanquantile(rawDeviation, 0.8)
 
 plot(ebsd, colorKey.orientation2color(ebsd.orientations))
 hold(True)

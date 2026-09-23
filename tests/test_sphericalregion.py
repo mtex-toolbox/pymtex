@@ -143,3 +143,16 @@ def test_a_turned_group_takes_the_dirichlet_domain():
         if turned:
           assert sR == dirichletSector(grp)
         assert np.all(sR.checkInside(projectIntoRegion(vs, sR, grp)))
+
+
+def test_an_icosahedral_group_from_rounded_axes_has_its_sector():
+  # the threefold axis at the rounded angle 37.377 degrees closes the group only to about
+  # 1e-5, and its sector is still the kite of the proper group, the triangle of the Laue one
+  from mtex import cat
+  rot5 = rotation.byAxisAngle(zvector, 72 * degree)
+  rot3 = rotation.byAxisAngle(vector3d.byPolar(37.377 * degree, 0), 120 * degree)
+  for els, faces in ((cat(rot5, rot3), 4), (cat(rot5, rot3, rotation.inversion), 3)):
+    cs = crystalFrame.byElements(els)
+    from mtex.geometry.sphericalregion import tilesSphere
+    sR = conventionalSector(cs)
+    assert len(sR.N) == faces and tilesSphere(sR, cs.sym) and sR.checkInside(sectorCenter(cs.sym))

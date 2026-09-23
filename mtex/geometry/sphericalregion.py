@@ -242,7 +242,9 @@ def sectorCenter(pg):
     # axes, the kite of two such triangles for the proper group, whatever the alignment
     R = pg.rot[~pg.rot.isImproper]
     omega, axes = R.angle(), R.axis().data
-    fold = lambda order: axes[np.abs(omega - 2 * np.pi / order) < 1e-6]
+    # a group generated from rounded axes closes only approximately, so the orders are read
+    # with a tolerance far below the gap between them
+    fold = lambda order: axes[np.abs(omega - 2 * np.pi / order) < 1e-3]
     f = fold(5)[0]
     t = max(fold(3), key=lambda x: abs(x @ f)) * np.sign(fold(3)[np.argmax(np.abs(fold(3) @ f))] @ f)
     t = t if t @ f > 0 else -t
@@ -266,10 +268,12 @@ def _offFixed(pg, c):
 
 # the bisectors that bound the domain: a great circle is a face when it carries an edge,
 # two distinct vertices inside the domain
-def _essentialNormals(N):
+def _essentialNormals(N, tol=1e-4):
   if len(N) <= 1:
     return N
-  inside = lambda v: np.all(N @ v >= -1e-9)
+  # a group generated from rounded axes meets at its corners only to about 1e-5, so a corner
+  # is taken to that tolerance, far below the distance between the corners of any sector
+  inside = lambda v: np.all(N @ v >= -tol)
   verts = []
   for i in range(len(N) - 1):
     for j in range(i + 1, len(N)):
@@ -277,11 +281,11 @@ def _essentialNormals(N):
       if np.linalg.norm(w) < 1e-10:
         continue
       for v in (_unit(w), -_unit(w)):
-        if inside(v) and not any(u @ v > 1 - 1e-9 for u in verts):
+        if inside(v) and not any(u @ v > 1 - tol ** 2 for u in verts):
           verts.append(v)
   if not verts:
     return N
-  return np.array([n for n in N if sum(abs(n @ v) < 1e-9 for v in verts) >= 2])
+  return np.array([n for n in N if sum(abs(n @ v) < tol for v in verts) >= 2])
 
 
 # the great circles bisecting the centre and its images: the Dirichlet domain, a fundamental

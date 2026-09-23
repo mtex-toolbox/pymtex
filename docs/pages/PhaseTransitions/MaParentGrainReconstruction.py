@@ -69,7 +69,7 @@ job
 
 # +
 initialFit = job.calcGBFit()[0] / degree
-fitQuantilesInitial = np.quantile(initialFit, [0.2, 0.4, 0.6, 0.8])
+fitQuantilesInitial = np.nanquantile(initialFit, [0.2, 0.4, 0.6, 0.8])
 print(fitQuantilesInitial)
 
 # a line plot must not reuse the map figure - its axes leaves no room for labels
@@ -79,7 +79,7 @@ plt.hist(initialFit, bins=int(np.sqrt(len(initialFit))), histtype='stepfilled', 
 job.calcParent2Child()
 
 optimizedFit = job.calcGBFit()[0] / degree
-fitQuantilesOptimized = np.quantile(optimizedFit, [0.2, 0.4, 0.6, 0.8])
+fitQuantilesOptimized = np.nanquantile(optimizedFit, [0.2, 0.4, 0.6, 0.8])
 print(fitQuantilesOptimized)
 plt.hist(optimizedFit, bins=int(np.sqrt(len(optimizedFit))), histtype='stepfilled', alpha=0.6, label='fitted OR')
 plt.xlabel('disorientation angle (degrees)')

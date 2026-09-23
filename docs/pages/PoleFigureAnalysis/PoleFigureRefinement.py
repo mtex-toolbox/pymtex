@@ -166,7 +166,7 @@ for k in range(nsteps):
       r_old = pf_measured[l].r
       _, r_new = refine(r_old)
       pf_predicted = calcPoleFigure(odf_recalc, h[l], r_new)
-      threshold = np.quantile(pf_predicted.intensities, 0.75)
+      threshold = np.nanquantile(pf_predicted.intensities, 0.75)
       r[l] = pf_predicted.r[pf_predicted.intensities > threshold]
 # -
 

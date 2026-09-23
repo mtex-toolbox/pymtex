@@ -39,6 +39,8 @@ def test_round():
   h = Miller(1, 3, -4, 8, cs, "UVTW")
   assert close(h.uvw, np.array([5, 7, 8]) / 3)
   assert close(h.round().UVTW, [1, 3, -4, 8]) and h.round().dispStyle == "UVTW"
+  # a component rounded to zero is written 0, never -0
+  assert str(vector3d(-1e-9, 0.0, 1).round()) == "(0,0,1)"
   hUvw = h.round("uvw")
   assert close(hUvw.uvw, [5, 7, 8]) and parallel(h, hUvw) and hUvw.dispStyle == "UVTW"
   assert close(hUvw.UVTW, np.round(hUvw.UVTW)) and not close(hUvw.UVTW, [1, 3, -4, 8])

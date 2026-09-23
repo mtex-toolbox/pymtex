@@ -52,7 +52,7 @@ job.p2c = initialP2C
 print(job)
 
 initialFit = job.calcGBFit()[0] / degree
-fitQuantilesInitial = np.quantile(initialFit, [0.2, 0.4, 0.6, 0.8])
+fitQuantilesInitial = np.nanquantile(initialFit, [0.2, 0.4, 0.6, 0.8])
 fitQuantilesInitial
 # -
 
@@ -66,7 +66,7 @@ job.calcParent2Child()
 print(job)
 
 optimizedFit = job.calcGBFit()[0] / degree
-fitQuantilesOptimized = np.quantile(optimizedFit, [0.2, 0.4, 0.6, 0.8])
+fitQuantilesOptimized = np.nanquantile(optimizedFit, [0.2, 0.4, 0.6, 0.8])
 print(fitQuantilesOptimized)
 changeFromKS = angle(initialP2C, job.p2c) / degree
 changeFromKS
@@ -105,7 +105,7 @@ graphWeights = triu(job.graph, 1).data
 graphWeights = graphWeights[graphWeights != 0]
 numGraphEdges = len(graphWeights)
 print(numGraphEdges)
-graphWeightQuantiles = np.quantile(graphWeights, [0.1, 0.5, 0.9])
+graphWeightQuantiles = np.nanquantile(graphWeights, [0.1, 0.5, 0.9])
 graphWeightQuantiles
 # -
 
@@ -169,7 +169,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 
 # +
 finiteGraphFit = job.grains.fit[np.isfinite(job.grains.fit)] / degree
-graphFitQuantiles = np.quantile(finiteGraphFit, [0.5, 0.9, 0.99])
+graphFitQuantiles = np.nanquantile(finiteGraphFit, [0.5, 0.9, 0.99])
 print(graphFitQuantiles)
 
 plot(job.grains, job.grains.fit / degree)
@@ -291,7 +291,7 @@ numChildrenInSelectedParent
 
 parentEBSD = job.calcParentEBSD()
 pixelFit = parentEBSD['Iron fcc'].fit / degree
-pixelFitQuantiles = np.quantile(pixelFit[~np.isnan(pixelFit)], [0.5, 0.9, 0.99])
+pixelFitQuantiles = np.nanquantile(pixelFit, [0.5, 0.9, 0.99])
 pixelFitQuantiles
 
 # The printed fit quantiles are the compact numerical check for this graph reconstruction. The

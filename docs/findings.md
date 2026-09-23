@@ -164,6 +164,12 @@ has to know.
 | BoundarySelect | Euler angle displays round to three significant digits (25.3, 260) where MATLAB shows six (239.134); the triple point display writes `outside` for `notIndexed` | open |
 | BoundaryNormalDistribution | the tension twin GBCD peaks 4.8 degrees from the (10-12) plane where MATLAB's text says 1.3 and Julia about 1; the GBND agrees, so the pairing of the two sides to the reference is suspect | open |
 | TriplePoints, BoundaryCurvature, CSLBoundaries | the closing of `calcGrains`: 78 triple points for 70, 924 grains for 885 on the csl map, a titanium lobe 10.55 degrees across left a grain of its own | open, an M3 question with GrainReconstruction |
+| GrainReconstruction | after the absorption, `calcGrains` on its own result made every absorbed pixel (a phase, no rotation) a grain of its own: 2814 grains for 227 | fixed 2026-09-23: such a pixel is segmented as the notIndexed pixel it was, so repeated calls agree |
+| QuasiCrystals | the sector of an icosahedral group generated from the rounded axis angle 37.377 degrees, which closes only to about 2e-5, lost its corners to tolerances of 1e-9 and came out a lune | fixed 2026-09-23: the orders and the corners read to 1e-4 |
+| RotationFibre | a rounded direction printed a negative zero, `(-0,0,1)` | fixed 2026-09-23 |
+| EBSDSharpPlot, EBSDGrid | the shares of the phase table were printed to three digits (99.8%) where MATLAB writes two (100%) | fixed 2026-09-23: two significant digits of all cells |
+| GrainMerge | 20 triple points for MATLAB's 15 after the merge; the other pages now agree (SelectingGrains 6, 133, 43, 13 for 6, 135, 43, 13, GrainExport 3360 for 3370) | open |
+| AxisDistributionFunction | the bandwidth hint of the ADF moved from 512 to 250 where MATLAB's is 500 | open |
 
 ## Gaps beside MTEX
 
@@ -338,6 +344,7 @@ has to know.
 | GrainSmoothing | the zoom `axis([x0 x1 y0 y1])` after a map plot | `region=[x0, x1, y0, y1]` on the plot, in map coordinates whatever the convention |
 | BoundaryNormalDistribution | the GBND a function on the sphere | an axis density carrying the phase symmetry, which MATLAB's numbers need |
 | QuadruplePoints, BoundaryProperties | the grain ids and the sides of a segment | numbered along x, the sides ordered by grain id, so a ring grain is 2 for 1 and a misorientation may be the inverse |
+| LowLevelParentGrainReconstruction, MaParentGrainReconstructionAdvanced and the other pages taking quantiles | `quantile(x, p)` skips NaN, so the absorbed pixels without a rotation drop out | `np.nanquantile(x, p)` |
 
 ## Practicalities
 

@@ -137,7 +137,8 @@ def roundIndices(v, style=None, maxHKL=12):
       err = np.round(np.sum((mNew - np.round(mNew)) ** 2) / np.sum(mNew ** 2) * 1e7) * 1e-7
       if err < bestErr:
         best, bestErr = n, err
-    rounded = np.round(row / mMax * best)
+    # adding zero turns the negative zero of a rounded small component into zero
+    rounded = np.round(row / mMax * best) + 0.0
     if style == "UVTW":
       ints = [int(x) for x in rounded]
       g = max(gcd(gcd(gcd(abs(ints[0]), abs(ints[1])), abs(ints[2])), abs(ints[3])), 1)

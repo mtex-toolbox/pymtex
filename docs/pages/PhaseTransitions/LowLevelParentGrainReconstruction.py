@@ -70,7 +70,7 @@ tP
 tPori = grains.selectByGrainId(tP.grainId).meanOrientation.reshape(-1, 3)
 tripleParentId, tripleFit = calcParent(tPori, beta2alpha, numFit=2, id=True, threshold=5 * degree)
 
-tripleFitQuantiles = np.quantile(tripleFit[:, 0] / degree, [0.25, 0.5, 0.75])
+tripleFitQuantiles = np.nanquantile(tripleFit[:, 0] / degree, [0.25, 0.5, 0.75])
 print(tripleFitQuantiles)
 
 hold(True)
@@ -201,7 +201,7 @@ oriBeta = parentGrains.selectByGrainId(grainPairs[:, 1]).meanOrientation
 
 pairParentId, pairFit = calcParent(oriAlpha, oriBeta, beta2alpha, numFit=2, id=True)
 
-pairFitQuantiles = np.quantile(pairFit[:, 0] / degree, [0.25, 0.5, 0.75])
+pairFitQuantiles = np.nanquantile(pairFit[:, 0] / degree, [0.25, 0.5, 0.75])
 pairFitQuantiles
 # -
 
@@ -272,7 +272,7 @@ parentOri, pixelFit = calcParent(parentEBSD[isNowBeta].orientations, parentGrain
                                  beta2alpha)
 parentEBSD[isNowBeta] = parentOri
 
-pixelFitQuantiles = np.quantile(pixelFit / degree, [0.5, 0.9, 0.99])
+pixelFitQuantiles = np.nanquantile(pixelFit / degree, [0.5, 0.9, 0.99])
 print(pixelFitQuantiles)
 
 plot(parentEBSD[isNowBeta], pixelFit / degree, figSize='large')
@@ -346,7 +346,7 @@ hold(False)
 betaPixels = parentEBSD[betaName]
 betaMean = parentGrains.selectByGrainId(betaPixels.grainId.reshape(-1)).meanOrientation
 mis2MeanDegree = angle(betaPixels.orientations.reshape(-1), betaMean) / degree
-mis2MeanQuantiles = np.quantile(mis2MeanDegree, [0.5, 0.9, 0.99])
+mis2MeanQuantiles = np.nanquantile(mis2MeanDegree, [0.5, 0.9, 0.99])
 print(mis2MeanQuantiles)
 
 cKey = axisAngleColorKey()

@@ -219,7 +219,7 @@ plot(parentEBSD['Ti (Beta)'], parentColor, figSize='large')
 
 # +
 fitDegree = parentEBSD['Ti (Beta)'].fit / degree
-fitQuantiles = np.quantile(fitDegree[~np.isnan(fitDegree)], [0.5, 0.9, 0.99])
+fitQuantiles = np.nanquantile(fitDegree[~np.isnan(fitDegree)], [0.5, 0.9, 0.99])
 print(fitQuantiles)
 
 plot(parentEBSD, parentEBSD.fit / degree, figSize='large')

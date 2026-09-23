@@ -178,7 +178,7 @@ ipfKey.oriRef = grains.selectByGrainId(indexed.grainId).meanOrientation
 
 # keep the raw 80th percentile as one scale for both maps
 rawDeviation = angle(indexed.orientations, ipfKey.oriRef)
-ipfKey.maxAngle = np.quantile(rawDeviation, 0.8)
+ipfKey.maxAngle = np.nanquantile(rawDeviation, 0.8)
 
 plot(indexed, ipfKey.orientation2color(indexed.orientations))
 
