@@ -513,8 +513,9 @@ class EBSD:
     if self.size == 0:
       return lines[0] + "\n  the map is empty"
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
+    # the shares are of the measurements, the padding of a grid left out
     ids, counts = np.unique(self.phaseId[~self.isPadding], return_counts=True)
-    share = [f"{c} ({100 * c / self.size:.3g}%)" for c in counts]
+    share = [f"{c} ({100 * c / max(counts.sum(), 1):.3g}%)" for c in counts]
     lines.append(phaseTable(self.CSList.frames, ids, share))
     # a short list shows its measurements, as MATLAB does up to twenty
     if self.size <= 20:

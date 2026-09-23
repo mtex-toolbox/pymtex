@@ -99,6 +99,11 @@ def test_S9_a_filled_hole_is_absorbed_a_boundary_through_it_is_not():
   assert len(np.unique(e.grainId[hole])) == 1
   # the filled pixels take the phase of their grain and no rotation
   assert np.all(e.isIndexed[hole]) and np.all(np.isnan(e.rotations.data[hole.reshape(-1)]))
+  # the map calcGrains returned segments again into the same grains, the absorbed pixels
+  # taken as the not indexed pixels they were
+  gid = e.grainId.copy()
+  g2 = calcGrains(e, angle=5 * degree)
+  assert len(g2) == len(g) and np.array_equal(e.grainId, gid) and np.all(e.isIndexed[hole])
   # the same hole straddling the boundary between two grains: the pixels the boundary
   # runs through belong to neither and keep zero
   ph2 = np.ones(n * n, dtype=np.int8)

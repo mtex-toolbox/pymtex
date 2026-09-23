@@ -28,6 +28,7 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
+  releaseAbsorbed(ebsd)
   # the cull changes the map the closing runs on, so it is a second pass over the whole
   # reconstruction and not a filter on the grains that came out
   for pas in (1, 2):
@@ -58,6 +59,13 @@ def absorbNotIndexed(ebsd, grains):
     return
   ebsd.phaseId.reshape(-1)[absorbed] = np.asarray(grains.phaseId).reshape(-1)[gid[absorbed] - 1]
   ebsd.rotations.data.reshape(-1, 4)[absorbed] = np.nan
+
+
+# a pixel a previous reconstruction absorbed has a phase but no rotation; it is segmented
+# as the not indexed pixel it was, so that calcGrains on its own result gives the same grains
+def releaseAbsorbed(ebsd):
+  blank = ebsd.isIndexed.reshape(-1) & np.isnan(ebsd.rotations.data.reshape(-1, 4)[:, 0])
+  ebsd.phaseId.reshape(-1)[blank] = 0
 
 
 # the pixels of indexed grains that came out below minPixel
