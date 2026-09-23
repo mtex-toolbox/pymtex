@@ -17,7 +17,8 @@
 
 import numpy as np
 
-from mtex import Miller, angle, cat, degree, mean, mtexdata, norm, orientation, plot, plotIPDF, plotPDF, plottingConvention, unimodalODF, vector3d
+from mtex import (Miller, angle, annotate, cat, degree, mean, mtexdata, norm, orientation, plot, plotIPDF, plotPDF,
+                  plottingConvention, unimodalODF, vector3d)
 
 plottingConvention.default('y↑→x')
 
@@ -139,13 +140,18 @@ plot(axisDensity, complete=True)
 pf = mtexdata('dubna')
 
 CS = pf.CS
+
+plot(pf[0])
 # -
 
-# MTEX draws a measured pole figure, `plot(pf.select(0))`, on the upper hemisphere because
-# its specimen directions already represent axes. The lower hemisphere would repeat the
-# same measurements. Although a direction annotated on it may point downwards, its
-# equivalent upper endpoint is labelled in the plot. The plot of a measured pole figure is
-# not ported yet, so the picture is left out here.
+# MTEX draws this measured pole figure on the upper hemisphere because its specimen
+# directions already represent axes. The lower hemisphere would repeat the same
+# measurements.
+
+annotate(vector3d(1, 0, -1), labeled=True, backgroundColor='w')
+
+# Although the annotated direction points downwards, its equivalent upper endpoint is
+# labelled in the plot.
 
 # ## Pole Figures Computed from an ODF
 #

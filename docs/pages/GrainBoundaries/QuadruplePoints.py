@@ -134,7 +134,7 @@ plot(grains, grainColors, lineWidth=2, micronbar='off')
 # neighbouring bends in opposite directions.
 
 # +
-gB = grains[0].boundary
+gB = grains[1].boundary
 
 plot(gB, gB.curvature(10), lineWidth=6, micronbar='off')
 mtexColorMap('blue2red')
@@ -174,3 +174,10 @@ mtexColorbar(title='signed curvature in 1/grid unit')
 # rotations, MATLAB's constructor of the same name; the rows of the array are the rows of
 # pixels. An array of identities is written as `rotation.byEuler` of three arrays, where
 # MATLAB has `rotation.id(size)`.
+#
+# MATLAB numbers the ring grain 1 and the surrounding grain 2, the port the other way
+# round, so the curvature is drawn for `grains[1]` where MATLAB writes `grains(1)`. The
+# smaller id is the first side of a segment in both, so MATLAB walks the ring with the ring
+# on its left and the port with the surrounding grain on its left, and the signs, the
+# colours of the figure, are reversed. The inverse pole figure key of the triclinic frame colours the two orientations
+# grey and purple where MATLAB colours them red and mint.

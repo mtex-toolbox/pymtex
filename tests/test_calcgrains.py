@@ -76,7 +76,10 @@ def test_S7_minPixel_culls_and_segments_again():
   assert g0.isIndexed.sum() == 16 and g0.numPixel[g0.isIndexed].min() == 4      # the stump is a grain
   g = calcGrains(e, angle=5 * degree, minPixel=10)
   assert g.isIndexed.sum() == 15 and np.all(g.numPixel[g.isIndexed] >= 10)     # the small one is gone
-  assert (~e.isIndexed).sum() == 25                                             # and marked not indexed in the map
+  # its pixels are marked not indexed, and those the closing gives to a neighbour take
+  # its phase without a rotation, as MATLAB's [grains, ebsd] = calcGrains returns them
+  given = (e.grainId.reshape(-1) > 0) & np.isnan(e.rotations.data.reshape(-1, 4)[:, 0])
+  assert (~e.isIndexed).sum() + given.sum() == 25 and np.all(e.isIndexed.reshape(-1)[given])
 
 
 def test_S9_a_filled_hole_is_absorbed_a_boundary_through_it_is_not():
@@ -90,10 +93,12 @@ def test_S9_a_filled_hole_is_absorbed_a_boundary_through_it_is_not():
   ph = np.ones(n * n, dtype=np.int8)
   ph[np.hypot(i - 15, j - 15) <= 1.5] = 0
   e = EBSD(pos, rot, ph, phaseList(CS))
+  hole = ~e.isIndexed
   g = calcGrains(e, angle=5 * degree)
   assert (e.grainId == 0).sum() == 0 and len(g) == 9
-  hole = ~e.isIndexed
   assert len(np.unique(e.grainId[hole])) == 1
+  # the filled pixels take the phase of their grain and no rotation
+  assert np.all(e.isIndexed[hole]) and np.all(np.isnan(e.rotations.data[hole.reshape(-1)]))
   # the same hole straddling the boundary between two grains: the pixels the boundary
   # runs through belong to neither and keep zero
   ph2 = np.ones(n * n, dtype=np.int8)

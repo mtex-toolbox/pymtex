@@ -99,6 +99,10 @@ class grain2d(polygonSet):
   def CS(self):
     return self.CSList[self._onePhase()]
 
+  # the phase id of a frame, a mineral name or a number, MATLAB's cs2phaseId
+  def cs2phaseId(self, cs):
+    return self.CSList.phaseId(cs)
+
   @property
   def mineral(self):
     return self.CS.mineral
@@ -173,10 +177,18 @@ class grain2d(polygonSet):
   # ------------------------------------------------------------------ neighbours
 
   # the pairs of ids of grains sharing a boundary, both in the selection, or either with
-  # full; as a symmetric sparse matrix indexed by id with matrix
+  # full; as a symmetric sparse matrix indexed by id with matrix; with other grains the pairs
+  # of one of these and one of those
   def neighbors(self, full=False, matrix=False):
     g = self.boundary.grainId
     a, b = g[:, 0], g[:, 1]
+    # g1.neighbors(g2): the pairs with the first grain in g1 and the second in g2
+    if isinstance(full, grain2d):
+      other = full.id
+      ab = (a > 0) & (b > 0) & (a != b)
+      fwd = ab & np.isin(a, self.id) & np.isin(b, other)
+      bwd = ab & np.isin(b, self.id) & np.isin(a, other)
+      return np.unique(np.concatenate([g[fwd], g[bwd][:, ::-1]]), axis=0)
     ok = (a > 0) & (b > 0) & (a != b)
     ina, inb = np.isin(a, self.id), np.isin(b, self.id)
     ok &= (ina | inb) if full else (ina & inb)
@@ -237,6 +249,20 @@ class grain2d(polygonSet):
       return self._subset(self._phaseMask(key))
     return self._subset(key)
 
+  # grains[ind] = ori: the mean orientations of the grains named and the phase of their frame,
+  # MATLAB's grains(ind).meanOrientation = ori, the boundary phases following
+  def __setitem__(self, key, ori):
+    ind = np.arange(self.size)[key].reshape(-1)
+    q = self.meanRotation.data.reshape(-1, 4).copy()
+    q[ind] = np.broadcast_to(ori.data.reshape(-1, 4), (len(ind), 4))
+    ph = self.phaseId.copy()
+    ph[ind] = self.CSList.phaseId(ori.CS)
+    object.__setattr__(self, "meanRotation", self.meanRotation._new(q))
+    object.__setattr__(self, "phaseId", ph)
+    new = self.update()
+    object.__setattr__(self, "boundary", new.boundary)
+    object.__setattr__(self, "innerBoundary", new.innerBoundary)
+
   def _phaseMask(self, names):
     mask = np.zeros(self.size, dtype=bool)
     for name in names:
@@ -259,13 +285,16 @@ class grain2d(polygonSet):
                    loops=None if self.loops is None else [self.loops[i] for i in ids], phaseMap=self.phaseMap)
 
   # the positions of grain ids in this list
+  # the positions of grain ids in the list, in the shape of the ids: one for a number, a
+  # pair per boundary segment for gB.grainId
   def id2ind(self, ids):
     pos = {int(g): k for k, g in enumerate(self.id)}
-    ids = np.atleast_1d(np.asarray(ids)).reshape(-1)
-    if not all(int(i) in pos for i in ids):
+    a = np.asarray(ids)
+    flat = a.reshape(-1)
+    if not all(int(i) in pos for i in flat):
       raise ValueError("a requested grain id is not in the selection")
-    out = np.array([pos[int(i)] for i in ids], dtype=int)
-    return out[0] if np.ndim(ids) == 1 and len(out) == 1 and np.isscalar(ids[0]) and not isinstance(ids, np.ndarray) else out
+    out = np.array([pos[int(i)] for i in flat], dtype=int).reshape(a.shape)
+    return int(out) if np.isscalar(ids) else out
 
   # the grains of the phase of ori whose mean orientation lies within epsilon of it, or of
   # a fibre
@@ -295,30 +324,59 @@ class grain2d(polygonSet):
 
   # ------------------------------------------------------------------ merging
 
-  # join grains of one phase into one: by pairs of ids, by the segments of a boundary, or
-  # by a misorientation threshold across the shared boundaries. The merge is a relabelling
-  # and nothing else: the boundary between two grains that became one moves to the inner
-  # boundary, the loops are traced again, the mean is the pixel-weighted mean of the parts.
-  # The id of the parent of every grain is written into grains.parentId, the merged grains
-  # carry the ids of their parts as childId
-  def merge(self, pairs=None, threshold=None):
+  # join grains into one: by pairs of ids, by the segments of a boundary, by a graph of
+  # grains indexed by id, by a label per grain, or by a misorientation threshold across the
+  # shared boundaries; inclusions=True (or a mask) joins every inclusion below maxSize
+  # pixels to the grain around it, host a mask of the grains that may take one. The merge
+  # is a relabelling and nothing else: the boundary between two grains that became one
+  # moves to the inner boundary, the loops are traced again, the mean is the pixel-weighted
+  # mean of the parts. A phase boundary is merged only by an inclusion, and the merged
+  # grain is then the host's phase and orientation. The id of the parent of every grain is
+  # written into grains.parentId, the merged grains carry the ids of their parts as
+  # childId; testRun returns the parent ids alone
+  def merge(self, pairs=None, threshold=None, inclusions=None, host=None, maxSize=np.inf, testRun=False):
+    if len(np.unique(self.id)) != self.size:
+      raise ValueError("merging requires distinct grains")
+    pos = self._positions()
+    labels = None
     if threshold is not None:
       pairs = self._pairsBelow(threshold)
     elif hasattr(pairs, "grainId"):
       pairs = pairs.grainId
-    pairs = np.asarray(pairs, dtype=np.int64).reshape(-1, 2)
-    if len(np.unique(self.id)) != self.size:
-      raise ValueError("merging requires distinct grains")
-    from .segment import components
-    pos = {int(g): k for k, g in enumerate(self.id)}
-    a = np.array([pos.get(int(x), -1) for x in pairs[:, 0]], dtype=np.int64)
-    b = np.array([pos.get(int(x), -1) for x in pairs[:, 1]], dtype=np.int64)
+    elif hasattr(pairs, "tocoo") or (isinstance(pairs, np.ndarray) and pairs.ndim == 2 and pairs.shape[0] == pairs.shape[1] != 2):
+      A = pairs.tocoo() if hasattr(pairs, "tocoo") else None
+      r, c = (A.row, A.col) if A is not None else np.nonzero(pairs)
+      nz = (A.data != 0) if A is not None else np.ones(len(r), dtype=bool)
+      pairs = np.stack([r[nz], c[nz]], axis=1) + 1
+    elif pairs is not None and np.ndim(pairs) == 1 and len(pairs) == self.size:
+      labels = np.asarray(pairs).reshape(-1)
+      pairs = None
+    pairs = np.zeros((0, 2), dtype=np.int64) if pairs is None else np.asarray(pairs, dtype=np.int64).reshape(-1, 2)
+    a, b = self._pairPositions(pairs, pos)
     ok = (a >= 0) & (b >= 0)
-    ok[ok] &= self.phaseId[a[ok]] == self.phaseId[b[ok]]        # a phase boundary is never merged
-    roots = components(self.size, a[ok], b[ok], backend="numpy")
-    _, first, inverse = np.unique(roots, return_index=True, return_inverse=True)
+    ok[ok] &= self.phaseId[a[ok]] == self.phaseId[b[ok]]
+    a, b = a[ok], b[ok]
+    isIncl = np.zeros(self.size, dtype=bool)
+    if inclusions is not None and inclusions is not False:
+      hostId = self.inclusionHost
+      isIncl = (hostId > 0) & (self.numPixel < maxSize)
+      if not isinstance(inclusions, bool):
+        isIncl &= np.asarray(inclusions, dtype=bool).reshape(-1)
+      hostPos = np.where(hostId > 0, pos[np.maximum(hostId, 0)], -1)
+      if host is not None:
+        isIncl[isIncl] &= np.asarray(host, dtype=bool).reshape(-1)[hostPos[isIncl]]
+      a = np.concatenate([a, np.flatnonzero(isIncl)])
+      b = np.concatenate([b, hostPos[isIncl]])
+    if labels is not None:
+      _, first, inverse = np.unique(labels, return_index=True, return_inverse=True)
+    else:
+      from .segment import components
+      roots = components(self.size, a, b, backend="numpy")
+      _, first, inverse = np.unique(roots, return_index=True, return_inverse=True)
     parent = (np.argsort(np.argsort(first))[inverse] + 1).astype(np.int32)
     n = len(first)
+    if testRun:
+      return self.id.copy() if n == self.size else parent
     self.parentId = self.id.copy() if n == self.size else parent
     if n == self.size:
       out = self.copy()
@@ -331,10 +389,20 @@ class grain2d(polygonSet):
     numPixel = np.array([self.numPixel[m].sum() for m in members], dtype=np.int32)
     meanRot = np.zeros((n, 4), dtype=T)
     gos = np.zeros(n, dtype=T)
+    hostOf = np.zeros(n, dtype=np.int64) - 1
+    if isIncl.any():
+      bSize = self.boundarySize
+      for k, m in enumerate(members):
+        if isIncl[m].any():
+          hostOf[k] = m[np.argmax(bSize[m])]
     for k, m in enumerate(members):
       w = self.numPixel[m].astype(T)
       big = m[np.argmax(w)]
       gos[k] = np.sum(self.GOS[m] * w) / max(1, w.sum())
+      if hostOf[k] >= 0:
+        phaseId[k] = self.phaseId[hostOf[k]]
+        meanRot[k] = self.meanRotation.data[hostOf[k]]
+        continue
       if not self.CSList.isIndexed(phaseId[k]) or len(m) == 1:
         meanRot[k] = self.meanRotation.data[big]
         continue
@@ -348,21 +416,66 @@ class grain2d(polygonSet):
     return grain2d(np.arange(1, n + 1), phaseId, self.CSList, numPixel, meanRot, gos, self.frame, {"childId": [self.id[m].tolist() for m in members]},
                    boundary=gB, innerBoundary=inner, phaseMap=self.phaseMap)
 
+  # the position of every id in the list, -1 for an id that is not
+  def _positions(self):
+    pos = np.full(int(self.id.max(initial=0)) + 1, -1, dtype=np.int64)
+    pos[self.id] = np.arange(self.size)
+    return pos
+
+  def _pairPositions(self, pairs, pos):
+    def at(ids):
+      inside = (ids >= 0) & (ids < len(pos))
+      return np.where(inside, pos[np.where(inside, ids, 0)], -1)
+    return at(pairs[:, 0]), at(pairs[:, 1])
+
+  # the id of the grain whose hole the grain lies in, 0 for none: every grain bordering a
+  # hole of another, MATLAB's second output of isInclusion
+  @property
+  def inclusionHost(self):
+    out = np.zeros(self.size, dtype=np.int32)
+    gB = self.boundary
+    pos = self._positions()
+    for k in np.flatnonzero(self.hasHole):
+      holeV = np.concatenate(self.loops[k][1:])
+      onHole = np.all(np.isin(gB.F, holeV), axis=1) & np.any(gB.grainId == self.id[k], axis=1)
+      incl = np.unique(gB.grainId[onHole])
+      incl = incl[(incl != self.id[k]) & (incl > 0) & (incl < len(pos))]
+      incl = pos[incl]
+      out[incl[incl >= 0]] = self.id[k]
+    return out
+
+  # the grains with the phase of every boundary segment read off the grain it borders, as
+  # it has to be after the grains changed phase (MATLAB grains.update)
+  def update(self):
+    out = self.copy()
+    pos = self._positions()
+    for name in ("boundary", "innerBoundary"):
+      gB = getattr(self, name)
+      if gB is None:
+        continue
+      gid = gB.grainId
+      inside = (gid > 0) & (gid < len(pos))
+      p = np.where(inside, pos[np.where(inside, gid, 0)], -1)
+      ph = np.where(p >= 0, self.phaseId[np.maximum(p, 0)], gB.phaseId).astype(np.int8)
+      object.__setattr__(out, name, gB._with(phaseId=ph, CSList=self.CSList))
+    return out
+
   # the pairs of neighbours of one indexed phase whose mean orientations are within the threshold
   def _pairsBelow(self, threshold):
-    pos = {int(g): k for k, g in enumerate(self.id)}
-    out = []
-    for idA, idB in self.neighbors():
-      a, b = pos[int(idA)], pos[int(idB)]
-      p = self.phaseId[a]
-      if p != self.phaseId[b] or not self.CSList.isIndexed(p):
+    pairs = self.neighbors()
+    pos = self._positions()
+    a, b = pos[pairs[:, 0]], pos[pairs[:, 1]]
+    keep = np.zeros(len(pairs), dtype=bool)
+    q = self.meanRotation.data.reshape(-1, 4)
+    for p in np.unique(self.phaseId):
+      sel = np.flatnonzero((self.phaseId[a] == p) & (self.phaseId[b] == p))
+      if len(sel) == 0 or not self.CSList.isIndexed(p):
         continue
-      fr = self.CSList[p]
-      o1 = orientation._fromRotation(self.meanRotation.data[a], (fr, self.frame))
-      o2 = orientation._fromRotation(self.meanRotation.data[b], (fr, self.frame))
-      if o1.angle(o2) <= threshold:
-        out.append((idA, idB))
-    return np.array(out, dtype=np.int64).reshape(-1, 2)
+      fr = self.CSList[int(p)]
+      o1 = orientation._fromRotation(q[a[sel]], (fr, self.frame))
+      o2 = orientation._fromRotation(q[b[sel]], (fr, self.frame))
+      keep[sel] = np.asarray(o1.angle(o2)).reshape(-1) <= threshold
+    return pairs[keep].astype(np.int64).reshape(-1, 2)
 
   # the boundary of the merged grains: a segment between two grains that became one is
   # inside one now; neighbours outside the selection keep ids above the merged ones

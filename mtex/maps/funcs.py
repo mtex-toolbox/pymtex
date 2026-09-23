@@ -39,6 +39,7 @@ grainMean = _method("grainMean")
 spatialProfile = _method("spatialProfile")
 calcMisorientation = _method("calcMisorientation")
 calcGND = _method("calcGND")
+weightedBurgersVec = _method("weightedBurgersVec")
 smooth = _method("smooth")
 fill = _method("fill")
 fillByGrainId = _method("fillByGrainId")
@@ -46,4 +47,4 @@ reduce = _method("reduce")
 subsample = _method("subsample")
 interp = _method("interp")
 
-__all__ = ["gridify", "extent", "shift", "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean", "spatialProfile", "calcMisorientation", "calcGND", "smooth", "fill", "fillByGrainId", "reduce", "subsample", "interp"]
+__all__ = ["gridify", "extent", "shift", "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean", "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId", "reduce", "subsample", "interp"]

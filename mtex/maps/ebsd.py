@@ -262,6 +262,19 @@ class EBSD:
       raise IndexError("ebsd[i, j] addresses a pixel of a gridded map; on a list ask for a position with ebsd['xy', x, y]")
     return self._subset(key)
 
+  # ebsd[ind] = ori: the orientations of the measurements named and the phase of their frame,
+  # MATLAB's ebsd(ind).orientations = ori
+  def __setitem__(self, key, ori):
+    flat = isinstance(key, np.ndarray) and key.ndim == 1 and self.ndim > 1
+    ind = (np.arange(self.size)[key] if flat else np.arange(self.size).reshape(self.shape)[key]).reshape(-1)
+    q = self.rotations.data.reshape(-1, 4)
+    q[ind] = np.broadcast_to(ori.data.reshape(-1, 4), (len(ind), 4))
+    self.phaseId.reshape(-1)[ind] = self.CSList.phaseId(ori.CS)
+
+  # the phase id of a mineral name, MATLAB's name2id
+  def name2id(self, name):
+    return self.CSList.phaseId(name)
+
   def _phaseMask(self, names):
     mask = np.zeros(self.shape, dtype=bool)
     for name in names:
@@ -391,6 +404,10 @@ class EBSD:
     pos = self.pos.data if keepXY else qrot(rot.data, self.pos.data)
     r = self.rotations.data if keepEuler else qmul(rot.data, self.rotations.data)
     return self._moved(pos, r)
+
+  # MATLAB's rot * ebsd: the positions and the orientations turned together
+  def __rmul__(self, rot):
+    return self.rotate(rot) if isinstance(rot, rotation) else NotImplemented
 
   def shift(self, v):
     v = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)

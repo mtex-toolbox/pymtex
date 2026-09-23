@@ -5,7 +5,7 @@
 #   textureindex(odf), entropy(odf), volume(odf, center, radius), fibreVolume(odf, h, r, radius)
 #   values, modes = max(odf, numLocal=, resolution=, accuracy=);  min(odf)
 #   modes, weights, centerId = calcComponents(odf, seed=, weights=, tolerance=, radius=, exact=)
-#   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | CS, resolution=), calcAxisDistribution(odf, v)
+#   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | cs1, cs2 | mori), calcAxisDistribution(odf, v)
 #   calcMIndex(odf), discreteSample(odf, n, rng=), calcError(odf1, odf2, 'l2'), calcKernel(ori, 'klcv')
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ import numpy as np
 
 from ..geometry._array import MtexArray
 from ..geometry.fibre import fibre
-from ..geometry.frames import referenceFrame
+from ..geometry.frames import crystalFrame, referenceFrame
 from ..geometry.grids.localgrids import localOrientationGrid, localS2Grid
+from ..geometry.grids.fibonacci import fibonacciS2Grid
 from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.grids.so3grid import equispacedSO3Grid
 from ..geometry.orientation import orientation
@@ -26,17 +27,18 @@ from ..geometry.symreduce import reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
-from .bingham import SO3FunBingham, binghamSample
+from .bingham import S2FunBingham, SO3FunBingham, binghamSample
 from .funops import conv
 from .handles import S2FunHandle, S2FunSum, SO3FunComposition, SO3FunGeneric, SO3FunHandle
 from .kernelfunctions import SO3DeLaValleePoussinKernel
 from .quadrature import bandwidthFor, quadratureS2Grid, quadratureSO3Grid
 from .rbf import SO3FunCBF, SO3FunRBF, _rotationsFor, uniformODF
 from .s2fun import S2FunHarmonic
+from .s2funtri import S2FunTri
 from .so3fun import SO3FunHarmonic
 
 SO3_KINDS = (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric)
-S2_KINDS = (S2FunHarmonic, S2FunHandle, S2FunSum)
+S2_KINDS = (S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri)
 
 
 def _isSO3(f):
@@ -161,37 +163,60 @@ def _framesOf(f):
   return reductionGroups(orientation(rotation.id, f.CS, f.SS))
 
 
-# the density of the misorientation angle over the fundamental region: at each angle the
-# axes are sampled with a count following sin^2(omega/2), kept when the rotation lies in the
-# region, and the uniform density (2/pi) sin^2(omega/2) times the copies is scaled by the
-# mean of f over them; returns the angles and the density normalised to integrate to one
-def calcAngleDistribution(f, SS=None, resolution=0.5 * degree):
+# the distribution of the misorientation angle, MATLAB's order (density, omega):
+#   calcAngleDistribution(cs1, cs2)   the uniform one, the area of the axis sector at each
+#                                     angle times sin^2(omega/2), with mean one over the angles
+#   calcAngleDistribution(mori)       a histogram of the disorientation angles in percent
+#   calcAngleDistribution(f)          the uniform one times the mean of f over the axes at each
+#                                     angle, found by sampling the axes with a count following
+#                                     sin^2(omega/2) and keeping the rotations of minimal angle
+def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * degree):
+  from ..geometry.orientationregion import fundamentalRegion
+  if args and isinstance(args[0], referenceFrame):
+    SS, args = args[0], args[1:]
+  else:
+    SS = None
+  if args and omega is None:
+    omega = np.asarray(args[0], dtype=float).ravel()
   if isinstance(f, referenceFrame):
-    f = uniformODF(f, f if SS is None else SS)
+    oR = fundamentalRegion(f, SS)
+    w = np.linspace(0, oR.maxAngle(), 200) if omega is None else omega[omega < oR.maxAngle() + 1e-8]
+    # the area of the axis sector at each angle, counted on a Fibonacci grid, which has no
+    # rings to alias with the circular caps of the sector
+    V = fibonacciS2Grid(1000000).data.reshape(-1, 3)
+    V = V[oR.axisSector(0.0).checkInside(V)]
+    ad = np.array([np.count_nonzero(oR.axisSector(x).checkInside(V)) for x in w]) * np.sin(w / 2) ** 2
+    return ad / np.mean(ad), w
+  if isinstance(f, orientation):
+    top = fundamentalRegion(f.CS, f.SS).maxAngle()
+    e = np.linspace(0, top, int(min(50, max(5, f.size / 20)))) if edges is None else np.asarray(edges, dtype=float)
+    counts, _ = np.histogram(f.angle().ravel(), e)
+    return 100 * counts / np.sum(counts), (e[:-1] + e[1:]) / 2
   L, R = _framesOf(f)
-  omega = np.arange(resolution / 2, np.pi, resolution)
+  top = fundamentalRegion(f.CS, f.SS).maxAngle()
+  w = np.linspace(0, top, 200) if omega is None else omega[omega < top + 1e-8]
   rots, which = [], []
-  for k, w in enumerate(omega):
-    n = max(4, round(4 / 3 * math.sin(w / 2) ** 2 / resolution ** 2))
-    axes = equispacedS2Grid(points=n)
-    rots.append(rotation.byAxisAngle(vector3d(axes.data), w).data.reshape(-1, 4))
+  for k, x in enumerate(w):
+    n = max(4, round(4 / 3 * math.sin(x / 2) ** 2 / resolution ** 2))
+    axes = fibonacciS2Grid(n)
+    rots.append(rotation.byAxisAngle(vector3d(axes.data), x).data.reshape(-1, 4))
     which.append(np.full(len(rots[-1]), k))
   q, which = np.concatenate(rots), np.concatenate(which)
   inside = _minimalAngle(q, L, R)
   v = np.zeros(len(q))
-  v[inside] = np.real(f(_ori(q[inside], f)))
-  sums = np.bincount(which, weights=v, minlength=len(omega))
-  counts = np.bincount(which, minlength=len(omega))
-  p = 2 / np.pi * np.sin(omega / 2) ** 2 * sums / counts
-  return omega, p / (np.sum(p) * resolution)
+  v[inside] = np.maximum(np.real(f(_ori(q[inside], f))), 0)
+  counts = np.bincount(which, minlength=len(w))
+  uniform = np.sin(w / 2) ** 2 * np.bincount(which, weights=inside.astype(float), minlength=len(w)) / counts
+  density = np.sin(w / 2) ** 2 * np.bincount(which, weights=v, minlength=len(w)) / counts
+  return density / np.mean(uniform), w
 
 
 # the M-index: half the total variation between the angle distributions of the uniform
 # and the uncorrelated misorientation distribution
 def calcMIndex(f, resolution=1 * degree):
   m = calcMDF(f)
-  _, pu = calcAngleDistribution(uniformODF(f.CS, f.CS, antipodal=True), resolution=resolution)
-  _, pm = calcAngleDistribution(m, resolution=resolution)
+  pu, _ = calcAngleDistribution(uniformODF(f.CS, f.CS, antipodal=True), resolution=resolution)
+  pm, _ = calcAngleDistribution(m, resolution=resolution)
   return float(np.sum(np.abs(pu / np.sum(pu) - pm / np.sum(pm))) / 2)
 
 
@@ -218,16 +243,53 @@ def _axisDensity(f, resolution=2.5 * degree, minAngle=0.0, maxAngle=np.pi):
   return value
 
 
+# the axis density of uniformly distributed rotations in the fundamental region: the angle
+# integral of sin^2(omega/2) up to the largest angle about the axis, (w - sin w) / 2, which
+# the planes of the region give in closed form; mean one over the sphere
+def _uniformAxisDensity(oR):
+  def wmax(xyz):
+    w = np.full(len(xyz), np.pi)
+    for n in oR.N:
+      a = n[1:]
+      s = np.linalg.norm(a)
+      c = xyz @ a / s
+      pos = c > 1e-9
+      w[pos] = np.minimum(w[pos], 2 * np.arctan(-n[0] / s / c[pos]))
+    return w
+
+  V = fibonacciS2Grid(200000).data.reshape(-1, 3)
+  w = wmax(V)
+  scale = 1 / np.mean(w - np.sin(w))
+
+  def value(vs):
+    xyz = vector3d(vs.data.reshape(-1, 3)).normalize().data.reshape(-1, 3)
+    w = wmax(xyz)
+    return (scale * (w - np.sin(w))).reshape(vs.shape)
+
+  return value
+
+
 def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
   if isinstance(f, referenceFrame):
+    # the uniform distribution exactly, not as a truncated expansion
+    from ..geometry.orientationregion import fundamentalRegion
     CS = f
     SS = v if isinstance(v, referenceFrame) else CS
     v = None if isinstance(v, referenceFrame) else v
-    f = uniformODF(CS, SS, antipodal=CS is SS)
+    value = _uniformAxisDensity(fundamentalRegion(CS, SS))
+    if v is not None:
+      return value(v if isinstance(v, vector3d) else vector3d(v))
+    return S2FunHandle(value, CS if CS is SS else None, antipodal=True)
   if v is not None:
     return _axisDensity(f, **kwargs)(v if isinstance(v, vector3d) else vector3d(v))
-  frame = f.CS if f.CS is f.SS else None
-  return S2FunHarmonic(S2FunHandle(_axisDensity(f, **kwargs), frame, bandwidth=bandwidth, antipodal=True))
+  # the axes live in the first crystal frame, symmetric under the rotations the two frames
+  # share, and antipodal only with grain exchange
+  antipodal = bool(getattr(f, "antipodal", False))
+  frame = None
+  if isinstance(f.CS, crystalFrame) and isinstance(f.SS, crystalFrame):
+    g = f.CS.sym.disjoint(f.SS.sym).properGroup()
+    frame = f.CS if f.CS is f.SS and not antipodal else f.CS.sibling(g.Laue() if antipodal else g)
+  return S2FunHarmonic(S2FunHandle(_axisDensity(f, **kwargs), frame, bandwidth=bandwidth, antipodal=antipodal))
 
 
 # the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' is half
@@ -365,10 +427,51 @@ def _localMaximaS2(f, numLocal=1, resolution=2.5 * degree, accuracy=0.05 * degre
 
 
 # the largest value and where it is taken; numLocal > 1 gives the numLocal best local maxima
+# max(f, g), min(f, 1): the pointwise extremum of two functions, or of a function and a number,
+# expanded by quadrature at the larger bandwidth, antipodal when both are
+def _pointwiseS2(op, f, g):
+  isFun = isinstance(g, S2_KINDS)
+  L = max(f.bandwidth, g.bandwidth) if isFun else f.bandwidth
+  fun = (lambda v: op(np.real(f(v)), np.real(g(v)))) if isFun else (lambda v: op(np.real(f(v)), g))
+  antipodal = f.antipodal and (g.antipodal if isFun else True)
+  return S2FunHarmonic(fun, f.frame, bandwidth=L, antipodal=antipodal, real=True)
+
+
+# the pointwise extremum of two functions on SO(3), or of one and a number, a handle
+# evaluated when asked, as MATLAB's
+def _pointwiseSO3(op, f, g):
+  isFun = _isSO3(g)
+  fun = (lambda o: op(np.real(f.eval(o)), np.real(g.eval(o)))) if isFun else (lambda o: op(np.real(f.eval(o)), g))
+  L = max(f.bandwidth, g.bandwidth) if isFun else f.bandwidth
+  return SO3FunHandle(fun, f.CS, f.SS, bandwidth=L)
+
+
+# a handle of several values reduced over one axis of its values, which follow the axes of
+# the directions it is evaluated at
+def _reduceHandle(f, op, axis):
+  def fun(v):
+    vals = np.asarray(f.eval(v))
+    return op(vals, axis=np.ndim(v.data) - 1 + axis)
+  return S2FunHandle(fun, f.frame, bandwidth=f.bandwidth, antipodal=f.antipodal, real=f.isReal, symmetrise=False)
+
+
 def max_(f, *args, numLocal=1, **kwargs):
   # a pole figure clips or reports its intensities
   if hasattr(f, "allI"):
     return f.max(*args)
+  # a list of functions reduced along an axis, MATLAB's max(sF, [], d)
+  if kwargs.get("axis") is not None and isinstance(f, S2FunHarmonic):
+    return f._reduce(np.max, kwargs["axis"])
+  if kwargs.get("axis") is not None and isinstance(f, S2FunHandle):
+    return _reduceHandle(f, np.max, kwargs["axis"])
+  # the pointwise maximum with another function or a number
+  if args and isinstance(f, S2_KINDS) and (isinstance(args[0], S2_KINDS) or np.isscalar(args[0])):
+    return _pointwiseS2(np.maximum, f, args[0])
+  if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
+    return _pointwiseSO3(np.maximum, f, args[0])
+  # a function on the circle knows its own extrema
+  if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
+    return f.max(**kwargs)
   if not (_isSO3(f) or isinstance(f, S2_KINDS)):
     return max(f, *args, **kwargs)
   v, p = (_localMaximaSO3 if _isSO3(f) else _localMaximaS2)(f, numLocal=numLocal, **kwargs)
@@ -378,6 +481,16 @@ def max_(f, *args, numLocal=1, **kwargs):
 def min_(f, *args, numLocal=1, **kwargs):
   if hasattr(f, "allI"):
     return f.min(*args)
+  if kwargs.get("axis") is not None and isinstance(f, S2FunHarmonic):
+    return f._reduce(np.min, kwargs["axis"])
+  if kwargs.get("axis") is not None and isinstance(f, S2FunHandle):
+    return _reduceHandle(f, np.min, kwargs["axis"])
+  if args and isinstance(f, S2_KINDS) and (isinstance(args[0], S2_KINDS) or np.isscalar(args[0])):
+    return _pointwiseS2(np.minimum, f, args[0])
+  if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
+    return _pointwiseSO3(np.minimum, f, args[0])
+  if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
+    return f.min(**kwargs)
   if not (_isSO3(f) or isinstance(f, S2_KINDS)):
     return min(f, *args, **kwargs)
   v, p = max_(-1 * f, numLocal=numLocal, **kwargs)
@@ -618,7 +731,7 @@ def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose
   from ..geometry.frames import specimenFrame
   f0 = SO3FunHarmonic(odf, bandwidth=bandwidth)
   # the specimen group is what is being looked for, so the series drops it
-  f = SO3FunHarmonic(f0.fhat, f0.CS, specimenFrame.default, real=f0.isReal, antipodal=f0.antipodal, symmetrise=False)
+  f = SO3FunHarmonic(f0._fhat, f0.CS, specimenFrame.default, real=f0.isReal, antipodal=f0.antipodal, symmetrise=False, _internal=True)
   scale = f.norm()
   v0 = xvector if v0 is None else v0
 

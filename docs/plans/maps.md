@@ -1,6 +1,6 @@
 # Subplan P3 - maps
 
-Status: written 2026-09-21; M1 to M7 done the same day, M8 on 2026-09-22. Syntax reference:
+Status: written 2026-09-21; M1 to M7 done the same day, M8 on 2026-09-22, M9 on 2026-09-23. Syntax reference:
 `../frameSymmetry/EBSDAnalysis/` with its `CLAUDE.md` and the ADRs 0002 (walk order) and
 0004 (FMC defaults) of that branch. Design reference: `../mtexJulia/lib/MTEXMaps/` and its
 `docs/plans/ebsd.md`, M0 to M11 done there, which this document follows package by
@@ -197,11 +197,90 @@ SM5, `check_boundaryChains`, `check_chainOrder`.
 
 **M8 - denoising and repair. DONE 2026-09-22** (`denoising.py`, `variational.py`; the Julia D1 to D9; 684 tests). `smooth(ebsd, F=l1TVFilter(), fill=, extrapolate=, props=)`, `fill(ebsd, F, extrapolate=)` (MATLAB's name for Julia's `fillMissing`), `fillByGrainId`, `reduce(ebsd, fak)` (MATLAB's name, `subsample` the alias, the sublattice rebuilt fak times coarser) and `interp(ebsd, pos | x, y, F=, fill=, extrapolate=)`; the filters `meanFilter`, `medianFilter`, `KuwaharaFilter` with MATLAB's `numNeighbours`, `splineFilter`, `halfQuadraticFilter` with MATLAB's `alpha`, `eps`, `threshold`, `iterMax`, `tol`, `l1TV`, `l1DataFit`, `l1TVFilter`, `infimalConvolutionFilter` with `alpha` and `beta` (its two weights are derived from the smoothing length as Julia has them, not MATLAB's `lambda` and `mu`), every variational one taking a smoothing length first as the boundary filters do. The Julia design throughout: every filter is a vector field on the graph of the map within the components (grains or phases), `smoothingGraph` deciding the components, the edges and which pixel a hole is solved from, `tangentField` the field at the mean of every component; filling is the same model with the data term off and the measurements pinned; the properties are fields on the same graph. Two things changed against Julia for the machine: the variational solve runs over the whole graph at once instead of component by component, since the edges never cross a component and the one system is block diagonal in them, and the surrogate of every IRLS step is solved by a Jacobi preconditioned conjugate gradient kernel over the CSR graph (`_cgLoop`, three passes over the map per step) rather than a Cholesky per component, with SuperLU on the whole system as the fallback and oracle, agreed to 1e-6 degrees. The one thing a global solve must keep from the per-component one is that every component stops on its own: on the benchmark map the median grain converges in four IRLS steps and four grains run to the cap of a hundred, in both ports, and a global stopping rule would run every grain to the cap; so the IRLS freezes a component once nothing in it moves by more than `tol`, and the norms, the weights, the operator and the conjugate gradient skip frozen pixels, so a step costs what the active pixels cost. A component the weights cut off from every measurement is left at the mean of the previous iterate by both solvers. The window filters, the tangent field, the exponential and the reweighting are kernels too. On the 600 x 600 map against Julia's single thread, both measured on a machine at a load of two to four (the mean filter read 0.23 s there against 0.12 s quiet): mean 0.12 s quiet (Julia 0.12), median 0.17 (0.16), Kuwahara 0.12 (0.26), spline 0.36 (1.26), l1TV 1.79 s loaded against Julia's 1.56 s under the same load and 1.37 s quiet, so about parity; its remaining cost after the first twenty steps is the per-step overhead of the kernel launches and the gathers over the whole map for the four grains still active, about 9 ms a step against Julia's 3 ms.
 
-**M9 - parent grain reconstruction.** `reconstruction.py` (`parentGrainReconstructor`,
-`calcParent2Child`, `calcGBVotes`, `calcTPVotes`, `calcVariantGraph`,
-`clusterVariantGraph`, `calcParentFromVote`, `mergeSimilar`, `mergeInclusions`, `revert`,
-`calcParentEBSD`, `calcVariants`). `parent2child.py` of G7 is written before this
-package. Tests R1 to R7 on the synthetic two-parent map.
+**M9 - parent grain reconstruction. DONE 2026-09-23.** `reconstruction.py` and `variantgraph.py`, MATLAB's
+`@parentGrainReconstructor` (2500 lines, the one handle class of the port) against Julia's
+`reconstruction.jl`; the doc pages of `PhaseTransitions` use all of it, so the MATLAB surface
+is ported but for `selectInteractive`, `plotVariantPF`, `calcGrainVotes` (no page calls it, and
+its reshape of the fits is broken in MATLAB), the `includeTwins` option of the clustering and
+`peakFitting` of `calcParent2Child`. The steps change the job and return nothing.
+
+- `parentGrainReconstructor(ebsd, grains, p2c, useBoundaryOrientations=)` with the phases
+  guessed as MATLAB guesses them (the most frequent indexed phase the child, the rarest the
+  parent, even at zero pixels), the map projected next to the grain means, the parent frame
+  appended to the phase lists of the job's copies; the MATLAB properties (`csParent`,
+  `csChild`, `parentPhaseId`, `childPhaseId`, `numChilds`, `isChild`, `isParent`,
+  `isTransformed`, `isMerged`, `parentGrains`, `childGrains`, `transformedGrains`, `ebsd`,
+  `parentEBSD`, `variantId`, `packetId`, `bainId`, `parentId`, `variantMap`, `c2c`) and its
+  display with the fit quintiles and the closest ideal OR.
+- one extraction of the grain pairs (c2c, p2c with the parent first, p2p) with the grain
+  means or, with `useBoundaryOrientations`, the means of their pixels along the boundary, each
+  moved next to its grain mean, a child pixel of a grain that is a parent now counted with the
+  parent it gives nearest that mean (MATLAB computes the whole parent map for this).
+- `calcGBFit`, `calcParent2Child` (the p2c average and G7's fit of the c2c misorientations,
+  combined by count, `variantMap` kept), `calcGBVotes` (`p2c`, `c2c`, `reconsiderAll`,
+  `curvatureFactor`, `bestFit`, `count`, `minFit`, `maxFit`, `numFit`), `calcTPVotes`,
+  `calcParentFromVote` (`minProb`, `minDelta`, `minFit`, `minAlpha`, `minCount`, `maxCount`),
+  `mergeSimilar`, `mergeInclusions`, `revert` in its four cases, `calcParentEBSD` (`exactOR`,
+  per pixel `variantId`, `packetId`, `fit`), `calcVariants`, `parent2ChildInfo`;
+  `calcGraph`, `clusterGraph` over `mclComponents`, `calcParentFromGraph`, `mergeByGraph`,
+  `plotGraph`, `calcVariantGraph`, `clusterVariantGraph` (`includeSimilar`, `mergeSimilar`,
+  `noPseudoDiagonal`, `sym`, `keepGraph`).
+- `grain2d.merge` takes a label per grain, a graph of grains, `inclusions`/`host`/`maxSize`
+  (an inclusion merges across a phase boundary and the grain keeps the host's phase and
+  orientation, MATLAB's `'inclusion'` rule) and `testRun`; `grains.inclusionHost` is
+  MATLAB's second output of `isInclusion`, `grains.update()` reads the boundary phases off
+  the grains; the threshold merge is one vectorised angle per phase.
+
+The votes are MATLAB's table (decided with the user): the best `numFit` variants per grain,
+sorted, `job.votes.parentId` and `.prob` (or `.fit`, `.count`), accumulated as MATLAB does,
+so a `minProb` of a MATLAB script means the same. Julia's normalised distribution is not
+taken. Four things had to be MATLAB's exactly for the numbers to agree:
+
+- MTEX shadows MATLAB's `quantile` with its own, the `round(n q)`-th sorted value without
+  interpolation; the votes take the 0.875 quantile per grain and variant with it, the OR
+  refinement and the display too.
+- `probMax .* prob ./ sum(prob, 2)` divides by the sum of the unscaled probabilities.
+- the variants are numbered as MTEX numbers them: the proper group enumerated as the
+  products of the cyclic groups of its Laue class's generators (first factor fastest), the 24
+  child variants of a cubic parent reordered to Morito's numbering, and a variant id counted
+  from the parent's representative in the fundamental region (`mtexEnumeration` and
+  `variants` in `standardorientations.py`; G7's test built its children from other
+  representatives). Before this, packets came out 4865/1725/1812/2201 instead of MATLAB's
+  2445/2434/2852/2867.
+- `calcParent` sorts the variant pairs and triples column-major, the first index fastest, which
+  is how MATLAB breaks the many exact ties of the KS pairs.
+
+Ties the port cannot reproduce: for Kurdjumov-Sachs up to four parent candidates fit a pair of
+variants alike, and which two a pair keeps depends on which grain of the pair comes first,
+that is on the order the segmentation numbers the grains in, which differs between the ports.
+The synthetic map of the tests is built so that no grain depends on such a tie (the left
+parent is variants 2, 7, 14, the Julia map's 1, 2, 3 has two parents that fit alike), and there
+all six grains carry MATLAB's variant ids and probabilities to 1e-12.
+
+The angle between the parent candidates of two children depends only on their
+misorientation, so `variantAngles` in `geometry/kernels.py` is one compiled loop, `PV_k^-1 m
+PV_l` reduced over the parent group with the angle taken from the vector part (acos loses the
+ties near zero), the NumPy blocks the fallback and oracle; `calcParent`'s pairs and triples
+(the triples in blocks of 256) and the variant graph use it.
+
+Martensite map of MaParentGrainReconstruction against the MATLAB bridge
+(`bench/reconstruction.py --matlab-p2c --routes`, `bench/matlab/probe_reconstruction.m`,
+`probe_votes.m`), with MATLAB's refined OR so that G7's own fit (3.50 degrees from KS against
+MATLAB's 3.42, lower misfit quintiles) does not enter: fit quintiles, variant graph entries
+402272 (401934, the port has 9 more grains), cluster votes to four digits, parents after the
+vote 10514 (10508), after the growth 10578 (10573), grains after `mergeSimilar` 437 (433) and
+`mergeInclusions` 329/280 parents (325/280), packets 2448/2433/2853/2869 (2445/2434/2852/2867),
+parent map fit quintiles to four digits, boundary votes [0.2967 0.419 0.5349 0.6554]
+([0.2966 0.4188 0.5349 0.6551]), triple point votes [0.1001 0.2072 0.3398 0.5213] ([0.0997
+0.2074 0.3397 0.5213]), `calcParentFromGraph` 10538 (10532) parents. Times, Python against
+MATLAB: `calcVariantGraph` 0.46 s (4.8), `clusterVariantGraph` 3.6 (5.4), `mergeSimilar` 0.16
+(0.40), `calcParentEBSD` 1.0 (1.15), `calcGBVotes` 2.1 (5.9), `calcTPVotes` 27 (30),
+`calcParentFromGraph` 33 (96), `calcParent2Child` 17 (19.5).
+
+Tests `tests/test_reconstruction.py` (the Julia R1 to R7 on the synthetic two-parent map, R2
+pinned to MATLAB, R2b the growth, the accumulation of the votes), `tests/test_variantgraph.py`
+(R4, R4b, the vote restriction, MCL, the grain graph route, the compiled angles against their
+oracles), `tests/test_grains.py` G8b for the merges.
 
 **M10 - the rest.** `gridify(ebsd, step, angle)`, `simulateEBSD` and its four verbs,
 `cleanUpPseudoSym`, `affineTransform`, `projectiveTransform`, `weightedBurgersVec`,
@@ -233,7 +312,8 @@ mtex/maps/
   dislocations.py     fitDislocationSystems
   denoising.py        EBSD filters, fill, interp
   variational.py      the graph solver
-  reconstruction.py   parentGrainReconstructor
+  reconstruction.py   parentGrainReconstructor, the votes
+  variantgraph.py     the grain graph and the variant graph, MCL
   gbnd.py             calcGBND
   simulate.py         simulateEBSD
   spatialtransform.py affineTransform, projectiveTransform

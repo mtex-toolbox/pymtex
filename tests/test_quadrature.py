@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (WignerD, bandwidthFor, clenshawCurtis, crystalFrame, degreeBlock, deg2dim, folds, gaussLegendre,
+from mtex.functions.harmonics import _WignerD
+from mtex import (bandwidthFor, clenshawCurtis, crystalFrame, degreeBlock, deg2dim, folds, gaussLegendre,
                   legendreP, orientation, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid, specimenFrame)
 
 
@@ -31,7 +32,7 @@ def test_SO3_grid():
     assert len(g) == rots.size == (2 * L + 2) ** 2 * (2 * L + 1) and len(g.beta) == 2 * L + 1
     assert len(quadratureSO3Grid(L, "GaussLegendre")) == (2 * L + 2) ** 2 * (L + 1)
     # the rule integrates the orthonormal basis exactly
-    D = WignerD(rots, bandwidth=2)
+    D = _WignerD(rots, bandwidth=2)
     B = np.concatenate([np.sqrt(2 * n + 1) * D[n].reshape(rots.size, -1).T for n in range(3)])
     assert np.allclose((B * w) @ B.conj().T, np.eye(deg2dim(3)))
   # frames give folds, orientations in those frames and a bandwidth the folds divide
@@ -48,11 +49,11 @@ def test_SO3_grid():
     quadratureSO3Grid(10, rA=4)
   assert repr(g).startswith("quadratureSO3Grid (ClenshawCurtis)")
   # the folded rule agrees with the full rule on the invariant functions of degree 2
-  P, Q = WignerD(ss, bandwidth=2), WignerD(cs, bandwidth=2)
+  P, Q = _WignerD(ss, bandwidth=2), _WignerD(cs, bandwidth=2)
   gram = []
   for grid in (g, quadratureSO3Grid(L)):
     rots, w = grid.nodes(), grid.weights
-    D = WignerD(rots, 2)
+    D = _WignerD(rots, 2)
     B = np.einsum("ab,ibc,cd->iad", P[2], D, Q[2]).reshape(rots.size, -1).T
     gram.append((B * w) @ B.conj().T)
   assert np.allclose(gram[0], gram[1], atol=1e-12) and np.linalg.norm(gram[0]) > 1e-3
@@ -64,7 +65,7 @@ def test_S2_grid():
       g = quadratureS2Grid(L, scheme)
       v, w = g.nodes(), g.weights
       assert np.isclose(np.sum(w), 4 * pi) and v.size == len(g)
-      assert len(g.theta) == (2 * L + 1 if scheme == "ClenshawCurtis" else L + 1)
+      assert len(g.thetaGrid) == (2 * L + 1 if scheme == "ClenshawCurtis" else L + 1)
       from mtex import sphericalY
       Y = np.concatenate([sphericalY(l, v) for l in range(4)])
       assert np.allclose((Y * w) @ Y.conj().T, np.eye(16))

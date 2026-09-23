@@ -16,11 +16,13 @@ from collections import namedtuple
 import numpy as np
 
 from ..geometry.frames import crystalFrame, referenceFrame
+from ..geometry.kernels import backend
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import spinTensor, strainTensor
+from .kernels import taylorKernel
 
 LinearProgramResult = namedtuple("LinearProgramResult", ["solution", "status", "iterations", "residual"])
 TaylorResult = namedtuple("TaylorResult", ["M", "b", "W"])
@@ -144,7 +146,7 @@ class TaylorModel:
     if spinSelection not in ("basic", "minimumNorm"):
       raise ValueError("spinSelection is 'basic' or 'minimumNorm'")
     full = sS.symmetrise()
-    D = full.deformationTensor()
+    D = full._dyads()
     keys = np.concatenate([np.round(D.reshape(len(full), 9) * 1e10), full.CRSS[:, None]], axis=1)
     _, first = np.unique(keys, axis=0, return_index=True)
     keep = np.sort(first)
@@ -225,6 +227,27 @@ def _taylorCrystal(E, model, plasticWork=False, spinSelection=None):
   return factor, x, W
 
 
+# many strains in the crystal frame: the factors, the shears and the spins, through the
+# compiled loop or one simplex after the other
+def _taylorMany(E, model, plasticWork, spinSelection):
+  E = np.ascontiguousarray(E, dtype=float).reshape(-1, 3, 3)
+  for e in E:
+    _checkStrain(e)
+  n, k = len(E), len(model)
+  M, b, W = np.zeros(n), np.zeros((n, k)), np.zeros((n, 3, 3))
+  loop = taylorKernel() if backend() == "numba" else None
+  if loop is None:
+    for j in range(n):
+      M[j], b[j], W[j] = _taylorCrystal(E[j], model, plasticWork, spinSelection)
+    return M, b, W
+  status = np.zeros(n, dtype=np.int64)
+  loop(E, np.ascontiguousarray(model.A), model.crss, np.ascontiguousarray(model.spins), spinSelection == "minimumNorm",
+       plasticWork, 1e-9, 10000, M, b, W, status)
+  if np.any(status != 0):
+    raise ValueError(f"the Taylor solve failed for {np.count_nonzero(status)} of {n} strains")
+  return M, b, W
+
+
 def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=32, smoothing=0.0):
   """the Taylor factor, the shears of the slip systems and the plastic spin of a strain
 
@@ -247,10 +270,7 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
     # the frame of the systems, or the sibling without its group that inv(ori) * eps writes in
     if not (fr is model.frame or fr._basis is model.frame._basis):
       raise ValueError("the strain and the slip systems are of different crystals")
-    E = eps.M.reshape(-1, 3, 3)
-    M, b, W = np.zeros(len(E)), np.zeros((len(E), len(model))), np.zeros((len(E), 3, 3))
-    for k in range(len(E)):
-      M[k], b[k], W[k] = _taylorCrystal(E[k], model, plasticWork, spinSelection)
+    M, b, W = _taylorMany(eps.M, model, plasticWork, model.spinSelection if spinSelection is None else spinSelection)
     if eps.ndim == 0:
       return TaylorResult(float(M[0]), b[0], spinTensor(W[0], fr))
     return TaylorResult(M.reshape(eps.shape), b.reshape(eps.shape + (len(model),)), spinTensor(W.reshape(eps.shape + (3, 3)), fr))
@@ -272,22 +292,18 @@ def _taylorField(eps, model, plasticWork, spinSelection, bandwidth, smoothing):
   L = max(1, bandwidthFor(bandwidth, rA, rB))
   grid = quadratureSO3Grid(L, ca, cb)
   nodes = grid.nodes()
-  Q = rotation(nodes.data).matrix()
-  values = np.zeros((nodes.size, 4))
-  for j in range(nodes.size):
-    localE = Q[j].T @ eps.M @ Q[j]
-    Mj, _, W = _taylorCrystal(localE, model, plasticWork, spinSelection)
-    v = Q[j] @ np.array([W[2, 1], W[0, 2], W[1, 0]])
-    values[j] = [Mj, v[0], v[1], v[2]]
+  Q = rotation(nodes.data).matrix().reshape(-1, 3, 3)
+  M, _, W = _taylorMany(np.einsum("nji,jk,nkl->nil", Q, eps.M, Q), model, plasticWork, spinSelection)
+  values = np.column_stack([M, np.einsum("nij,nj->ni", Q, np.stack([W[:, 2, 1], W[:, 0, 2], W[:, 1, 0]], axis=-1))])
   # the projections onto the invariant and the equivariant functions remove what the
   # folded rule aliases, so they come before the truncation
   coeff = _adjointColumns(grid, values, L, grid.weights)
-  factor = SO3FunHarmonic(coeff[:, 0], cs, ss, real=True).truncate(bandwidth)
+  factor = SO3FunHarmonic(coeff[:, 0], cs, ss, real=True, _internal=True).truncate(bandwidth)
   spin = SO3VectorFieldHarmonic(coeff[:, 1:4], cs, ss, "left").truncate(bandwidth)
   if smoothing > 0:
     A = SO3DeLaValleePoussinKernel(halfwidth=smoothing).calcFourier(bandwidth)
     for l in range(bandwidth + 1):
-      spin.fhat[deg2dim(l):deg2dim(l + 1), :] *= A[l] / (2 * l + 1)
+      spin._fhat[deg2dim(l):deg2dim(l + 1), :] *= A[l] / (2 * l + 1)
   return TaylorResult(factor, None, spin)
 
 

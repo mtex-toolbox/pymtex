@@ -64,11 +64,11 @@ def test_V8_algebra_quadrature_handles():
   vs = vector3d.rand(6, rng=rng)
   # the field from a callable and from samples on the rule
   L = G.bandwidth
-  assert norm(S2VectorFieldHarmonic(lambda v: G(v), bandwidth=L) - G) < 1e-5 * norm(G)
+  assert S2VectorFieldHarmonic(lambda v: G(v), bandwidth=L).isclose(G, 1e-5)
   g = quadratureS2Grid(L)
-  assert norm(S2VectorFieldHarmonic(g.nodes(), G(g.nodes()), bandwidth=L, weights=g.weights) - G) < 1e-5 * norm(G)
-  assert norm(interpolate(g.nodes(), G(g.nodes()), bandwidth=L, weights=g.weights) - G) < 1e-4 * norm(G)
-  assert norm(S2VectorFieldHarmonic([G.component(i) for i in range(3)]) - G) < 1e-12
+  assert S2VectorFieldHarmonic(g.nodes(), G(g.nodes()), bandwidth=L, weights=g.weights).isclose(G, 1e-5)
+  assert interpolate(g.nodes(), G(g.nodes()), bandwidth=L, weights=g.weights).isclose(G, 1e-4)
+  assert S2VectorFieldHarmonic([G.component(i) for i in range(3)]).isclose(G, 1e-12)
   # the pointwise algebra
   d = dot(G, H)
   assert np.allclose(d(vs), np.sum(G(vs).data * H(vs).data, axis=-1), rtol=1e-5)
@@ -94,7 +94,7 @@ def test_V8_algebra_quadrature_handles():
     v = vs[i]
     et, er = thetaVector(v), rhoVector(v)
     assert abs(et.dot(v)) < 1e-12 and abs(er.dot(v)) < 1e-12 and abs(et.dot(er)) < 1e-12
-    assert np.isclose(et.norm(), 1) and np.isclose(er.norm(), 1)
+    assert np.isclose(norm(et.norm()), 1) and np.isclose(norm(er.norm()), 1)
     assert np.allclose(et.cross(er).data, v.data)
   # a framed field evaluates framed directions of its frame only
   cs = crystalFrame("m-3m")
@@ -104,3 +104,10 @@ def test_V8_algebra_quadrature_handles():
     Hc(vector3d(xvector, frame=specimenFrame("1")))
   M = cs.sym.rot.flatten()[2].matrix()
   assert np.linalg.norm(Hc(vector3d(M @ xvector.data)).data - M @ Hc(xvector).data) < 1e-10
+
+
+def test_the_normal_field():
+  # MATLAB's S2VectorFieldHarmonic.normal: v at v, exact at bandwidth two
+  f = S2VectorFieldHarmonic.normal()
+  v = vector3d.rand(20)
+  assert f.bandwidth == 2 and np.allclose(f.eval(v).data, v.normalize().data, atol=1e-10)

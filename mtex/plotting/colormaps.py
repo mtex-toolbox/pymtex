@@ -34,12 +34,21 @@ def colormapColors(name, n=256):
   return np.stack([np.interp(t, pos, colors[:, k]) for k in range(3)], axis=1)
 
 
-# the matplotlib colour map of a name: MTEX's own, registered on first use, or matplotlib's
-def mtexColormap(name="WhiteJet"):
+# the matplotlib colour map of a name: MTEX's own, registered on first use, or matplotlib's;
+# a matrix of colours or a named map function as MATLAB passes them, and without a name the
+# preference defaultColorMap
+def mtexColormap(name=None):
   import matplotlib
-  from matplotlib.colors import Colormap, LinearSegmentedColormap
+  from matplotlib.colors import Colormap, LinearSegmentedColormap, ListedColormap
+  if name is None:
+    from ..geometry.session import getMTEXpref
+    name = getMTEXpref("defaultColorMap", "WhiteJet")
+  if callable(name) and not isinstance(name, Colormap):
+    name = name()
   if isinstance(name, Colormap):
     return name
+  if not isinstance(name, str):
+    return ListedColormap(np.asarray(name, dtype=float))
   stops = colormapStops(name)
   if stops is None:
     return matplotlib.colormaps[name]
@@ -105,8 +114,19 @@ white2blackColorMap = _namedMap("white2black")
 black2whiteColorMap = _namedMap("black2white")
 WhiteJetColorMap = _namedMap("whitejet")
 
+# vega20(n): n colours of the twenty of vega's categorical map, repeated beyond twenty
+VEGA20 = np.array([(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120), (44, 160, 44), (152, 223, 138),
+                   (214, 39, 40), (255, 152, 150), (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),
+                   (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199), (188, 189, 34), (219, 219, 141),
+                   (23, 190, 207), (158, 218, 229)]) / 255
+
+
+def vega20(n=20):
+  return VEGA20[np.arange(n) % len(VEGA20)]
+
+
 __all__ = ["mtexColorMap", "contourLevels", "str2rgb", "ind2color", "num2rgb", "blue2redColorMap", "red2blueColorMap", "LaboTeXColorMap",
-           "white2blackColorMap", "black2whiteColorMap", "WhiteJetColorMap"]
+           "white2blackColorMap", "black2whiteColorMap", "WhiteJetColorMap", "vega20"]
 
 
 # the colour order MTEX sets as its preference, plotting/plotting_tools/colors.mat: the
@@ -123,5 +143,18 @@ MTEX_COLORS = np.array([
 
 
 # ind2color(i): the i-th colour of MTEX's colour order, MATLAB's counting from one
-def ind2color(i):
-  return MTEX_COLORS[(int(i) - 1) % len(MTEX_COLORS)].copy()
+# ind2color(i): the colour of index i of the order, one RGB row per index of an array, NaN
+# where the index is 0 or NaN; 'ordered' takes MATLAB's order in which neighbouring ids get
+# related colours, a matrix of colours an order of its own
+ORDERED = np.array([1, 6, 19, 12, 20, 22, 3, 11, 18, 16, 23, 8, 7, 2, 14, 15, 9, 5, 21, 4, 24, 13, 10, 17]) - 1
+
+
+def ind2color(i, cmap=None):
+  colors = MTEX_COLORS[ORDERED] if isinstance(cmap, str) and cmap == "ordered" else MTEX_COLORS if cmap is None else np.asarray(cmap, dtype=float)
+  if np.ndim(i) == 0:
+    return colors[(int(i) - 1) % len(colors)].copy()
+  ind = np.asarray(i, dtype=float).reshape(-1)
+  out = np.full((len(ind), 3), np.nan)
+  ok = np.isfinite(ind) & (ind > 0)
+  out[ok] = colors[(ind[ok].astype(int) - 1) % len(colors)]
+  return out

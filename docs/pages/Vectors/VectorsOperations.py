@@ -10,7 +10,8 @@
 
 import numpy as np
 
-from mtex import angle, cat, cross, degree, dot, mean, mtexdatafile, norm, normalize, plottingConvention, scatter, vector3d
+from mtex import (angle, arrow3d, cat, cross, degree, dot, hold, mean, mtexdatafile, newMtexFigure, norm, normalize,
+                  plottingConvention, scatter, vector3d)
 
 plottingConvention.default('y↑→x')
 
@@ -31,9 +32,16 @@ u = dot(v, vector3d.Y) * vector3d.Y + 2 * cross(v, vector3d.Z)
 u
 
 # The first term is $2\vec Y$, while the second is $4\vec X-2\vec Y$. Their Y components
-# cancel, leaving $\vec u=4\vec X$. MTEX draws the original vector in the XY plane and the
-# result along positive X as arrows in space with `arrow3d`; the three dimensional plots
-# are not ported yet, so the picture is left out here.
+# cancel, leaving $\vec u=4\vec X$. The arrows show the original vector in the XY plane and
+# the result along positive X.
+
+# +
+newMtexFigure()
+arrow3d(v, label='v')
+hold(True)
+arrow3d(u, label='u')
+hold(False)
+# -
 
 # ## Angles
 #

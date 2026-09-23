@@ -15,8 +15,8 @@
 # used below.
 
 import numpy as np
-from mtex import (HSVDirectionKey, axis, axisAngleColorKey, calcGrains, degree, discreteSample, hold, inpolygon, mtexColorbar, mtexdata,
-                  plot, plottingConvention, quiver, smoothBoundary)
+from mtex import (HSVDirectionKey, axis, axisAngleColorKey, calcGrains, degree, discreteSample, hold, inpolygon, legend, mtexColorbar,
+                  mtexdata, plot, plottingConvention, quiver, smoothBoundary)
 
 # +
 # import the data in its specimen reference frame
@@ -57,6 +57,7 @@ hold(False)
 gB_Fo = grains.boundary['Fo', 'Fo']
 
 plot(grains, translucent=1, micronbar='off')
+legend('off')
 hold(True)
 plot(gB_Fo, gB_Fo.misorientation.angle() / degree, linewidth=4)
 hold(False)
@@ -90,6 +91,7 @@ axisKey = HSVDirectionKey(axesCrystal)
 axisColor = axisKey.direction2color(axesCrystal)
 
 plot(grains, translucent=1, micronbar='off')
+legend('off')
 hold(True)
 plot(gB_Fo, lineColor='black', linewidth=6)
 plot(gB_Fo, axisColor, linewidth=4)
@@ -119,6 +121,7 @@ hold(False)
 
 # +
 plot(grains, translucent=1, micronbar='off')
+legend('off')
 hold(True)
 plot(gB_Fo, axisColor, linewidth=4)
 
@@ -156,6 +159,7 @@ hold(False)
 
 # +
 plot(grains, micronbar='off')
+legend('off')
 
 foKey = axisAngleColorKey(gB_Fo.misorientation.CS, gB_Fo.misorientation.SS)
 foColor = foKey.orientation2color(gB_Fo.misorientation)

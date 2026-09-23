@@ -6,7 +6,7 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from mtex import (axisAngleSections, crystalFrame, degree, gcm, orientation, plotSection, sigmaSections, specimenFrame,
+from mtex import (vector3d, axisAngleSections, crystalFrame, degree, gcm, orientation, plotSection, sigmaSections, specimenFrame,
                   unimodalODF)
 from mtex.plotting.sectionplot import _gridColumns
 
@@ -26,6 +26,8 @@ def plotsOf(fig):
 def test_the_grid_of_cells():
   assert _gridColumns(1) == 1 and _gridColumns(3) == 3 and _gridColumns(6) == 3 and _gridColumns(9) == 3
   assert _gridColumns(7) == 3 and _gridColumns(18) == 6
+  # up to three wide Euler sections, 360 by 90 degrees, stack in one column, as MATLAB's
+  assert _gridColumns(3, aspect=0.25) == 1 and _gridColumns(2, aspect=0.25) == 1
 
 
 def test_sections_of_an_odf():
@@ -40,6 +42,21 @@ def test_sections_of_an_odf():
   assert all(isinstance(x, matplotlib.collections.QuadMesh) for x in h)
   # one colour range over the sections
   assert len({x.get_clim() for x in h}) == 1 and fig.colorRange == h[0].get_clim()
+  # a vector field on SO(3) as arrows, into Euler and into sigma sections
+  from mtex import SO3VectorFieldHarmonic, hold, plot
+  F = SO3VectorFieldHarmonic(lambda o: vector3d(np.ones((o.size, 3))), cs, ss, bandwidth=2)
+  for kind in ("phi2", "sigma"):
+    plotSection(odf, kind, sections=2, resolution=10 * degree)
+    hold(True)
+    hs = plot(F, color="k")
+    hold(False)
+    assert len(hs) == 2 and all(h is not None for h in hs)
+  # a style flag after the angles, as MATLAB's plotSection(odf, 'phi2', angles, 'contourf')
+  h = plotSection(odf, 'phi2', np.array([0, 45]) * degree, 'contourf', resolution=10 * degree)
+  assert len(h) == 2 and all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
+  # noGrid leaves out the reference field of the sigma sections, as MATLAB's
+  plotSection(odf, "sigma", sections=2, resolution=10 * degree, noGrid=True)
+  assert all(len(ax.collections) == 1 for ax in gcm().children if hasattr(ax, "_mtexSphericalPlot"))
   # sigma sections by name, with the reference field, as filled contours with a bar
   h = plotSection(odf, "sigma", sections=4, resolution=10 * degree, contourf=True, colorbar=True)
   fig = gcm()

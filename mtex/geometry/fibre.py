@@ -271,7 +271,7 @@ class fibre:
       return "\n".join(lines)
     h = self.h.round()
     hChar = Miller(h, self.CS.stripSym()).char() if isinstance(self.CS, crystalFrame) else str(h)
-    lines.append(f"  h || r: {hChar} || {str(vector3d(np.round(self.r.data, 4) + 0.0))}")
+    lines.append(f"  h || r: {hChar} || {str(vector3d(self.r.data).round())}")
     if not np.all(self.isFull):
       lines.append(f"  o1 → o2: {_eulerString(self.o1)} → {_eulerString(self.o2)}")
     return "\n".join(lines)

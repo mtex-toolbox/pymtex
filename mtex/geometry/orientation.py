@@ -310,9 +310,11 @@ class orientation(rotation):
     from .symmetryops import orientationMean
     return orientationMean(self, weights=weights, robust=robust, iterations=iterations)
 
-  def project2FundamentalRegion(self, ref=None):
+  def project2FundamentalRegion(self, ref=None, antipodal=False):
     from .symmetryops import project2FundamentalRegionOrientation
-    return project2FundamentalRegionOrientation(self, ref)
+    # antipodal adds grain exchange to the reduction, MATLAB's 'antipodal'
+    o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
+    return project2FundamentalRegionOrientation(o, ref)
 
   # the tangent vector at the reference pointing to this orientation, the pair reduced by
   # symmetry first so that its norm is angle(ori, ref)
@@ -344,6 +346,12 @@ class orientation(rotation):
     from .standardorientations import variants
     return variants(self, second, ids, parent)
 
+  # the distinct relationships c p2c over the child group c: a child times them is every
+  # parent it can come from, MATLAB's parents
+  def parents(self):
+    from .standardorientations import variants
+    return variants(self, parent=True)
+
   # ------------------------------------------------------------------ orientations from frames and directions
 
   @classmethod
@@ -374,13 +382,32 @@ class orientation(rotation):
   def _frameSummary(self):
     return f"{self.frameA.char()} → {self.frameB.char()}"
 
+  # the parallel planes and directions a single misorientation is made of, when low indices
+  # (up to 5) give it exactly, MATLAB's char of a misorientation; None otherwise
+  def _relation(self):
+    if not self.isMisorientation or self.size != 1:
+      return None
+    from .parent2child import round2Miller
+    n1, n2, d1, d2 = round2Miller(self.reshape(()), maxIndex=5)
+    exact = orientation.map(n1, n2, d1, d2)
+    if exact.angle(self.reshape(()), noSymmetry=False) >= 1e-3 * degree:
+      return None
+    return f"{n1.char()} || {n2.char()}   {d1.char()} || {d2.char()}"
+
+  def char(self):
+    rel = self._relation()
+    return rel if rel is not None else self._eulerLine() if self.size == 1 else self._eulerTable()
+
   def __repr__(self):
     lines = [("misorientation" if self.isMisorientation else "orientation") + f" ({self._frameSummary()})"]
     if self.size != 1:
       lines.append(f"  size: {sizeString(self.shape)}")
     if self.antipodal:
       lines.append("  antipodal: true")
-    if 0 < self.size < 20:
+    rel = self._relation()
+    if rel is not None:
+      lines.append(f" {rel}")
+    elif 0 < self.size < 20:
       lines.append(self._eulerTable())
     return "\n".join(lines)
 

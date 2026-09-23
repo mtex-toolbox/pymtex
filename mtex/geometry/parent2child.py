@@ -5,7 +5,7 @@
 #   p2c = calcParent2Child(c2c, p2c0), calcParent2Child(childOri, p2c0), ... local=True, quantile=0.8
 #   p2c, fit = calcParent2Child(c2c, p2c0, fit=True)
 #   variantId, packetId, bainId, fit = calcVariantId(parentOri, childOri, p2c)
-#   parentOri, fit = calcParent(childOri, p2c), calcParent(childOri, parentOri, p2c), calcParent(childPairs, p2c, id=True)
+#   parentOri, fit = calcParent(childOri, p2c), calcParent(childOri, parentOri, p2c), ids, fit = calcParent(childPairs, p2c, id=True)
 #   hkl, uvw = round2Miller(ori); n1, n2, d1, d2 = round2Miller(mori)
 #
 # For the relationship p mapping parent to child, the child variants are p S_k over the
@@ -26,7 +26,9 @@ import numpy as np
 from .frames import crystalFrame, specimenFrame
 from .miller import Miller
 from .orientation import orientation
+from .kernels import variantAngles
 from .quaternion import qmul, quaternion, rotation
+from .symreduce import reductionGroups
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
 
@@ -191,9 +193,16 @@ def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, max
   mori = _subSample(mori, maxSample)
   h = int(np.ceil(quantile * mori.size))
   _vprint(silent, " optimizing parent to child orientation relationship")
+  start = p2c
   if not local:
     p2c = _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, maxIteration, silent)
-  p2c, _ = _fitLocal(mori, p2c, h, tau, maxIteration, silent)
+  p2c, s = _fitLocal(mori, p2c, h, tau, maxIteration, silent)
+  # the candidates were refined on a subsample, so the start refined on all the data may
+  # still reach a lower minimum; it stays a candidate
+  if not local:
+    p0, s0 = _fitLocal(mori, start, h, tau, maxIteration)
+    if s0["fit"] < s["fit"]:
+      p2c = p0
   if fit:
     return p2c, _misfit(moriAll, p2c, moriAll.size, tau)["omega"]
   return p2c
@@ -254,15 +263,17 @@ def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):
 
 def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 * degree):
   """parentOri, fit = calcParent(childOri, p2c)               the parent of the children of one grain
-  parentId, fit = calcParent(childOri, parentOri, p2c)        the parent variant of every child
-  parentId, fit = calcParent(childPairs, p2c)                 the variant pair of every boundary
-  parentId, fit = calcParent(childTriples, p2c)               the variant triple of every triple point
+  parentOri, fit = calcParent(childOri, parentOri, p2c)       the parent variant of every child
+  parentOri, fit = calcParent(childPairs, p2c)                the variant pair of every boundary
+  parentOri, fit = calcParent(childTriples, p2c)              the variant triple of every triple point
 
   The parent of many children of one grain: every child proposes its parent variants, the
-  proposal the others agree with best is refined as their weighted mean, and id=True gives
-  the variant of every child instead. For pairs and triples of children the ids of the
-  variants that agree best on a parent, and their disorientation; numFit gives the best
-  few instead of one. The fit is the disorientation to the relationship.
+  proposal the others agree with best is refined as their weighted mean. For a child with a
+  parent orientation, one or one for all, the candidate of the child nearest it; for pairs and
+  triples of children the candidates that agree best on a parent, and their disorientation;
+  numFit gives the best few instead of one. With id=True the one based ids of the parent
+  variants instead of the orientations, child * PV[id] being the parent. The fit is the
+  disorientation to the relationship.
   """
   parentOri = None
   if len(args) == 2:
@@ -276,28 +287,46 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
   if parentOri is not None:
     # every child with its parent: the parent variant their misorientation is nearest to,
     # reduced over the parent group alone, so that child * PV[id] is the parent as stored
-    mori = _stripChild(childOri.flatten().inv() * parentOri.flatten())
+    child = childOri.flatten()
+    par = parentOri.flatten()
+    if par.size == 1 and child.size > 1:
+      par = par._new(np.broadcast_to(par.data.reshape(1, 4), (child.size, 4)).copy())
+    mori = _stripChild(child.inv() * par)
     fit = mori.reshape(-1, 1).angle(_stripChild(PV).reshape(1, -1))
-    return _best(fit, numFit, (numV,))
-  if childOri.ndim == 2 and childOri.shape[1] == 2:
-    # pairs of children: the variant pair whose parents agree best
-    pv = childOri.reshape(-1, 2, 1) * PV.reshape(1, 1, numV)
-    fit = pv[:, 0, :].reshape(-1, numV, 1).angle(pv[:, 1, :].reshape(-1, 1, numV)).reshape(-1, numV * numV)
-    return _best(fit, numFit, (numV, numV))
-  if childOri.ndim == 2 and childOri.shape[1] == 3:
-    # triples of children: the largest of the three pairwise disagreements, where the
-    # first pair agrees within the threshold
-    pv = childOri.reshape(-1, 3, 1) * PV.reshape(1, 1, numV)
-    n = pv.shape[0]
-    f12 = pv[:, 0, :].reshape(n, numV, 1).angle(pv[:, 1, :].reshape(n, 1, numV))
-    f23 = pv[:, 1, :].reshape(n, numV, 1).angle(pv[:, 2, :].reshape(n, 1, numV))
-    f13 = pv[:, 0, :].reshape(n, numV, 1).angle(pv[:, 2, :].reshape(n, 1, numV))
-    fit = np.broadcast_to(f12[:, :, :, None], (n, numV, numV, numV)).copy()
-    ok = np.any(f12 < threshold, axis=1)
-    fit = np.where(ok[:, None, :, None], np.maximum(fit, f23[:, None, :, :]), fit)
-    ok = np.any(fit < threshold, axis=2)
-    fit = np.where(ok[:, :, None, :], np.maximum(fit, f13[:, :, None, :]), fit)
-    return _best(fit.reshape(n, -1), numFit, (numV, numV, numV))
+    return _asParents(childOri.flatten(), PV, *_best(fit, numFit, (numV,)), id)
+  if childOri.ndim == 2 and childOri.shape[1] in (2, 3):
+    # the angle between the parent candidates of two children depends on their misorientation
+    # alone, so each pair is one table over the variant pairs
+    pv = childOri[:, :1] * PV[:1].reshape(1, 1)
+    L, G = reductionGroups(pv)
+    q = childOri.data.reshape(-1, childOri.shape[1], 4)
+
+    def table(a, b):
+      if len(L) > 1:
+        c1 = childOri[:, a].reshape(-1, 1) * PV.reshape(1, -1)
+        c2 = childOri[:, b].reshape(-1, 1) * PV.reshape(1, -1)
+        return np.asarray(c1.reshape(-1, numV, 1).angle(c2.reshape(-1, 1, numV)))
+      return variantAngles(qmul(_conj(q[:, a]), q[:, b]), PV.data.reshape(-1, 4), G)
+
+    if childOri.shape[1] == 2:
+      # pairs of children: the variant pair whose parents agree best
+      return _asParents(childOri, PV, *_best(table(0, 1).transpose(0, 2, 1).reshape(-1, numV * numV), numFit, (numV, numV)), id)
+    # triples of children: the largest of the three pairwise disagreements, where the first
+    # pair agrees within the threshold, in blocks that bound the table of variant triples
+    f12, f23, f13 = table(0, 1), table(1, 2), table(0, 2)
+    n = len(q)
+    ids, vals = [], []
+    for s0 in range(0, n, 256):
+      b = slice(s0, min(n, s0 + 256))
+      fit = np.broadcast_to(f12[b, :, :, None], (f12[b].shape[0], numV, numV, numV)).copy()
+      ok = np.any(f12[b] < threshold, axis=1)
+      fit = np.where(ok[:, None, :, None], np.maximum(fit, f23[b, None, :, :]), fit)
+      ok = np.any(fit < threshold, axis=2)
+      fit = np.where(ok[:, :, None, :], np.maximum(fit, f13[b, :, None, :]), fit)
+      i, v = _best(fit.transpose(0, 3, 2, 1).reshape(fit.shape[0], -1), numFit, (numV, numV, numV))
+      ids.append(i)
+      vals.append(v)
+    return _asParents(childOri, PV, np.concatenate(ids), np.concatenate(vals), id)
   # many children of one parent
   childOri = childOri.flatten()
   w = np.ones(childOri.size) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
@@ -306,7 +335,7 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
   candidates = orientation(rotation._fromData(qmul(seed.data.reshape(1, 4), PV.data.reshape(-1, 4))), p2c.frameA, childOri.frameB)
   best, bestFit, bestIds = None, np.inf, None
   for k in range(numV):
-    ids, _ = calcParent(childOri, candidates[k]._new(np.broadcast_to(candidates[k].data.reshape(1, 4), (childOri.size, 4)).copy()), p2c)
+    ids, _ = calcParent(childOri, candidates[k], p2c, id=True)
     pOri = orientation(rotation._fromData(qmul(childOri.data.reshape(-1, 4), PV.data.reshape(-1, 4)[ids - 1])), p2c.frameA, childOri.frameB)
     m = pOri.mean(weights=w, robust=True)
     f = float(np.sum(pOri.angle(m) * w))
@@ -315,11 +344,30 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
   return (bestIds if id else best), bestFit
 
 
+# the ids as they are, or the parents they name: every child times its parent variant
+def _asParents(childOri, PV, ids, fit, id):
+  if id:
+    return ids, fit
+  q = childOri.data.reshape(childOri.shape[0], -1, 4) if childOri.ndim == 2 else childOri.data.reshape(-1, 1, 4)
+  ids = np.asarray(ids)
+  if ids.ndim == 1:
+    parents = qmul(q[:, 0], PV.data.reshape(-1, 4)[ids - 1])
+  elif ids.ndim == 2 and childOri.ndim == 1:
+    parents = qmul(q[:, :1], PV.data.reshape(-1, 4)[ids - 1])
+  elif ids.ndim == 2:
+    parents = qmul(q, PV.data.reshape(-1, 4)[ids - 1])
+  else:
+    parents = qmul(q[:, None], PV.data.reshape(-1, 4)[ids - 1])
+  return orientation(rotation._fromData(parents), PV.frameA, childOri.frameB), fit
+
+
 def _stripChild(o):
   return orientation(rotation._fromData(o.data), o.frameA, o.frameB.stripSym())
 
 
-# the best fits of every row as one based ids into the variant table, and the values
+# the best fits of every row as one based ids into the variant table, and the values; a row
+# of several variants is laid out with the first running fastest, which is how MATLAB
+# breaks ties between fits
 def _best(fit, numFit, dims):
   if numFit == 1:
     k = np.argmin(fit, axis=1)
@@ -328,7 +376,7 @@ def _best(fit, numFit, dims):
     order = np.argsort(fit, axis=1, kind="stable")[:, :numFit]
     value = np.take_along_axis(fit, order, axis=1)
     k = order
-  ids = np.stack(np.unravel_index(k, dims), axis=-1) + 1
+  ids = np.stack(np.unravel_index(k, dims, order="F"), axis=-1) + 1
   return (ids[..., 0] if len(dims) == 1 else ids), value
 
 
@@ -387,13 +435,40 @@ def round2Miller(mori, penalty=0.002, maxIndex=None, nextFit=1):
   ih, idx = np.unravel_index(order[nextFit - 1], fit.shape)
   # the four winners are the planes and directions this one rotation takes onto each
   # other, not the families they come from
-  return _stripped(n1[ih], "hkl"), _stripped(rn2[ih], "hkl"), _stripped(d1[idx], "uvw"), _stripped(rd2[idx], "uvw")
+  out = (_stripped(n1[ih], "hkl"), _stripped(rn2[ih], "hkl"), _stripped(d1[idx], "uvw"), _stripped(rd2[idx], "uvw"))
+  return millerRelation(out, mori)
+
+
+class millerRelation(tuple):
+  """n1, n2, d1, d2 of round2Miller(mori), displayed as MATLAB's table of the parallel planes,
+  the parallel directions and the angle to the misorientation they make"""
+
+  def __new__(cls, parts, mori):
+    obj = super().__new__(cls, parts)
+    obj.mori = mori
+    return obj
+
+  def __repr__(self):
+    from .orientation import orientation
+    n1, n2, d1, d2 = self
+    fit = orientation.map(n1, n2, d1, d2).angle(self.mori.reshape(()), noSymmetry=False) / degree
+    planes, dirs = f"{n1.char()} || {n2.char()}", f"{d1.char()} || {d2.char()}"
+    return (f"{'plane parallel':>{len(planes)}}   {'direction parallel':>{len(dirs)}}     fit\n"
+            f"{planes}   {dirs}  {round(float(fit), 2):>4g}°")
 
 
 # a plane or direction as one of its own, the group gone but the four index style kept
 def _stripped(v, style):
   out = vector3d(v.data.reshape(3), frame=v.frame.stripSym())
   out.dispStyle = ("hkil" if style == "hkl" else "UVTW") if v.lattice.isTriHex else style
+  # the smallest integers in the style shown, [011-1] rather than [033-3]
+  idx = np.asarray(getattr(out, out.dispStyle), dtype=float).reshape(-1)
+  r = np.round(idx)
+  if np.all(np.abs(idx - r) < 1e-6) and np.any(r != 0):
+    g = np.gcd.reduce(np.abs(r).astype(int))
+    if g > 1:
+      out = out / g
+      out.dispStyle = ("hkil" if style == "hkl" else "UVTW") if v.lattice.isTriHex else style
   return out
 
 

@@ -135,39 +135,100 @@ class quadratureSO3Grid:
   def weights(self):
     return np.broadcast_to(self.wbeta, self.shape).ravel()
 
+  # MATLAB's view of the grid: the nodes that differ under the symmetries, on which an
+  # evaluator need be called, and the full grid; two nodes are one when their symmetric
+  # equivalents coincide, the largest equivalent quaternion up to sign the key
+  @property
+  def fullGrid(self):
+    return self.nodes()
+
+  def _unique(self):
+    if not hasattr(self, "_uniqueIndex"):
+      full = self.nodes()
+      q = full.data.reshape(-1, 4)
+      if self.CS is None:
+        self._uniqueIndex, self._uniqueInverse = np.arange(len(q)), np.arange(len(q))
+      else:
+        a = self.CS.sym.properGroup().rotations().data.reshape(-1, 4)
+        b = (self.SS if self.SS is not None else specimenFrame.default).sym.properGroup().rotations().data.reshape(-1, 4)
+        from ..geometry.kernels import _qmulNumpy
+        eq = _qmulNumpy(_qmulNumpy(b[None, :, None, :], q[:, None, None, :]), a[None, None, :, :]).reshape(len(q), -1, 4)
+        # q and -q are one rotation: the first component that does not vanish is positive
+        lead = np.take_along_axis(eq, np.argmax(np.abs(eq) > 1e-9, axis=-1)[..., None], axis=-1)
+        key = np.round(eq * np.where(lead < 0, -1.0, 1.0), 8)
+        # the largest equivalent in lexicographic order
+        idx = np.zeros(len(q), dtype=np.int64)
+        for j in range(1, key.shape[1]):
+          cur, cand = key[np.arange(len(q)), idx], key[:, j]
+          diff = cand - cur
+          first = np.argmax(diff != 0, axis=1)
+          larger = diff[np.arange(len(q)), first] > 0
+          idx = np.where(larger, j, idx)
+        canon = key[np.arange(len(q)), idx]
+        _, first, inverse = np.unique(canon, axis=0, return_index=True, return_inverse=True)
+        self._uniqueIndex = np.sort(first)
+        self._uniqueInverse = np.searchsorted(self._uniqueIndex, first)[inverse.ravel()]
+    return self._uniqueIndex, self._uniqueInverse
+
+  # the number of the distinct nodes, MATLAB's numel(grid)
+  @property
+  def size(self):
+    return len(self._unique()[0])
+
+  # the distinct nodes, MATLAB's grid(:)
+  def flatten(self):
+    return self.nodes().flatten()[self._unique()[0]]
+
+  # values at the distinct nodes spread onto the full grid, values at the full grid kept
+  def fullValues(self, values):
+    values = np.asarray(values)
+    index, inverse = self._unique()
+    if values.shape[0] == len(index) and len(index) != len(self):
+      return values[inverse]
+    return values
+
   def __repr__(self):
     return f"quadratureSO3Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}\n  folds: {self.folds}"
 
 
-class quadratureS2Grid:
+class quadratureS2Grid(vector3d):
+  """the nodes of a quadrature rule on the sphere, a list of directions as in MATLAB, rho
+  slowest and theta fastest over the axes thetaGrid and rhoGrid, with its weights"""
 
   def __init__(self, bandwidth, *args, dtype=np.float64):
     frames, self.scheme = _readArgs(args)
-    self.CS = frames[0] if frames else None
     L = int(bandwidth)
     m = 2 * L + 2
     x, w = _polarRule(self.scheme, L)
     self.bandwidth = L
-    self.theta = np.arccos(np.clip(x, -1, 1)).astype(dtype)
-    self.rho = (2 * np.pi * np.arange(m) / m).astype(dtype)
+    self.thetaGrid = np.arccos(np.clip(x, -1, 1)).astype(dtype)
+    self.rhoGrid = (2 * np.pi * np.arange(m) / m).astype(dtype)
     self.wtheta = (w * 2 * np.pi / m).astype(dtype)
+    r, t = np.meshgrid(self.rhoGrid, self.thetaGrid, indexing="ij")
+    xyz = np.stack([np.sin(t) * np.cos(r), np.sin(t) * np.sin(r), np.cos(t)], axis=-1).reshape(-1, 3)
+    vector3d.__init__(self, xyz, isNormalized=True, frame=frames[0] if frames else None)
 
+  # anything derived from the grid is a plain vector3d
+  def _new(self, data, **attrs):
+    obj = object.__new__(vector3d)
+    obj.data = data
+    for name in self._carried:
+      setattr(obj, name, attrs.pop(name, getattr(self, name)))
+    return obj
+
+  # the shape of the nodes over the axes, rho by theta
   @property
-  def shape(self):
-    return (len(self.rho), len(self.theta))
+  def gridShape(self):
+    return (len(self.rhoGrid), len(self.thetaGrid))
 
-  def __len__(self):
-    return math.prod(self.shape)
-
-  # the nodes as directions, theta fastest
+  # the nodes as a plain list of directions
   def nodes(self):
-    r, t = np.meshgrid(self.rho, self.theta, indexing="ij")
-    return vector3d(np.sin(t) * np.cos(r), np.sin(t) * np.sin(r), np.cos(t)).flatten()
+    return self._new(self.data)
 
   # the weights integrate to 4 pi, the surface measure of the sphere
   @property
   def weights(self):
-    return np.broadcast_to(self.wtheta, self.shape).ravel()
+    return np.broadcast_to(self.wtheta, self.gridShape).ravel()
 
   def __repr__(self):
     return f"quadratureS2Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}"

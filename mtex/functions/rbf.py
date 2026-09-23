@@ -25,7 +25,7 @@ from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .funops import _antipodalPole, _rotatedFrame, conv
-from .harmonics import deg2dim, degreeBlock, sphericalY
+from .harmonics import deg2dim, degreeBlock, _sphericalY
 from .kernelfunctions import S2DeLaValleePoussinKernel, S2Kernel, SO3DeLaValleePoussinKernel, SO3Kernel, SO3vonMisesFisherKernel
 from .quadrature import folds
 from .s2fun import S2FunHarmonic
@@ -165,11 +165,16 @@ class SO3FunRBF:
     for n in range(L + 1):
       degreeBlock(fhat, n)[...] *= A[n] / (2 * n + 1)
     fhat[0] = self.mean()
-    return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, antipodal=self.antipodal)
+    return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, antipodal=self.antipodal, _internal=True)
 
   # the gradient: minus the kernel's angular derivative along the geodesic to every
   # equivalent within its support; a query with none in reach takes the nearest centre alone
-  def grad(self, x, side="left"):
+  # the gradient at orientations, or without them the field of gradients of the harmonic
+  # expansion, as MATLAB's
+  def grad(self, x=None, side="left"):
+    if x is None:
+      from .so3fun import SO3FunHarmonic
+      return SO3FunHarmonic(self).grad(side=side)
     if isinstance(x, str):
       raise TypeError("the gradient of a kernel function is evaluated at orientations")
     if side not in ("left", "right"):
@@ -206,7 +211,7 @@ class SO3FunRBF:
     L = self.psi.bandwidth if bandwidth is None else int(bandwidth)
     ant = _antipodalPole(h, self.CS)
     if self.center.size == 0:
-      return S2FunHarmonic([math.sqrt(4 * np.pi) * self.c0], self.SS, real=True, antipodal=ant)
+      return S2FunHarmonic([math.sqrt(4 * np.pi) * self.c0], self.SS, real=True, antipodal=ant, _internal=True)
     _, R = reductionGroups(self.center)
     hs = rotation(R) * vector3d(h.normalize().data.reshape(3))
     c = self.center.data.reshape(-1, 4)
@@ -364,12 +369,15 @@ class SO3FunCBF:
     A = self.psi.calcFourier(L)
     fhat = np.zeros(deg2dim(L + 1), dtype=complex)
     for l in range(L + 1):
-      Yh, Yr = sphericalY(l, self.h), sphericalY(l, self.r)
+      Yh, Yr = _sphericalY(l, self.h), _sphericalY(l, self.r)
       degreeBlock(fhat, l)[...] = A[l] * 4 * np.pi / (2 * l + 1) ** 1.5 * np.einsum("i,ki,ai->ka", self.weights, Yr, np.conj(Yh))
-    return SO3FunHarmonic(fhat, self.CS, self.SS, real=True)
+    return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, _internal=True)
 
   # the gradient: psi'(t) (g h x r) on the left, psi'(t) (h x g^-1 r) on the right, over every pair
-  def grad(self, x, side="left"):
+  def grad(self, x=None, side="left"):
+    if x is None:
+      from .so3fun import SO3FunHarmonic
+      return SO3FunHarmonic(self).grad(side=side)
     if side not in ("left", "right"):
       raise ValueError(f"the side is 'left' or 'right', not {side!r}")
     r = _rotationsFor(self, x)
@@ -504,6 +512,12 @@ def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
   return SO3FunCBF(h, r, w, psi, SS)
 
 
+# an ODF by its Fourier coefficients, or another ODF in its harmonic form (MATLAB FourierODF)
+def FourierODF(C, *args, **kwargs):
+  from .so3fun import SO3FunHarmonic
+  return SO3FunHarmonic(C, *args, **kwargs)
+
+
 # the Santa Fe sample ODF (MATLAB SantaFe): cubic crystal and orthorhombic specimen symmetry,
 # a uniform portion of 0.73 and a von Mises Fisher component of 10 degree halfwidth at
 # (122)[221] carrying the other 0.27
@@ -515,4 +529,4 @@ def SantaFe():
   return 0.73 + 0.27 * unimodalODF(ori, cs, ss, SO3vonMisesFisherKernel(halfwidth=10 * degree))
 
 
-__all__ = ["SO3FunRBF", "SO3FunCBF", "uniformODF", "unimodalODF", "fibreODF", "supportCosine", "SantaFe"]
+__all__ = ["SO3FunRBF", "SO3FunCBF", "uniformODF", "unimodalODF", "fibreODF", "FourierODF", "supportCosine", "SantaFe"]

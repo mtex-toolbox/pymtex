@@ -6,8 +6,9 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from mtex import (S1FunHarmonic, S2FunHarmonic, calcDensity, characteristicShape, crystalFrame, degree, gcm, histogram, hold, plot, plotSection,
-                  plottingConvention, setView, specimenFrame, vector3d)
+from mtex import (S1FunHarmonic, S2FunHarmonic, S2VectorFieldHarmonic, calcDensity, characteristicShape, crystalFrame, degree, gcm,
+                  histogram, hold, legend, mtexColorbar, mtexColorMap, newMtexFigure, nextAxis, plot, plotSection, plottingConvention,
+                  quiverSection, setView, specimenFrame, vector3d)
 from mtex.plotting.polarplot import polarAxes
 
 
@@ -62,12 +63,54 @@ def test_functions_on_the_circle_and_sections_of_the_sphere():
   # a function on the sphere along the great circle normal to z peaks where it should
   s = S2FunHarmonic(lambda v: 1 + v.x ** 2, bandwidth=8)
   h = plotSection(s, vector3d.Z, lineWidth=3)
-  theta, r = h.get_xdata(), h.get_ydata()
-  assert axesOf().name == "polar" and np.isclose(r.max(), 2, atol=0.05) and np.isclose(r.min(), 1, atol=0.05)
-  # the interpolation through samples resolves them and no more
+  r = np.hypot(h.get_xdata(), h.get_ydata())
+  assert axesOf().name != "polar" and np.isclose(r.max(), 2, atol=0.05) and np.isclose(r.min(), 1, atol=0.05)
+  # seen down z with x east, the peaks lie left and right
+  x, y = h.get_xdata(), h.get_ydata()
+  assert np.isclose(abs(x).max(), 2, atol=0.05) and np.isclose(abs(y[np.argmin(abs(x))]), 1, atol=0.05)
+  h = plotSection(s, vector3d.Z, polarplot=True)
+  assert axesOf().name == "polar" and np.isclose(h.get_ydata().max(), 2, atol=0.05)
+  # MATLAB's color 'interp' colours the line by its values, which the colour bar reads
+  h = plotSection(s, vector3d.Z, color="interp", linewidth=5)
+  assert np.isclose(h.get_array().max(), 2, atol=0.05) and h.get_linewidth()[0] == 5
+  assert gcm()._mappables()[-1][1] is h
+  # samples with the end point repeated are fitted by least squares at a quarter of their number, as MATLAB does
   omega = np.linspace(0, 2 * np.pi, 361)
   g = S1FunHarmonic.interpolate(omega, 0.85 + 0.15 * np.cos(2 * (omega - 71 * degree)))
-  assert g.bandwidth == 179 and np.isclose(np.degrees(g.max()[1]) % 180, 71, atol=0.3) and np.isclose(np.degrees(g.min()[1]) % 180, 161, atol=0.3)
+  assert g.bandwidth == 90 and np.isclose(np.degrees(g.max()[1]) % 180, 71, atol=0.3) and np.isclose(np.degrees(g.min()[1]) % 180, 161, atol=0.3)
+
+
+def test_rings_and_arrows_along_a_section():
+  s1 = S2FunHarmonic(lambda v: 2 + v.x ** 2, bandwidth=8)
+  s2 = S2FunHarmonic(lambda v: 1 + 0 * v.x, bandwidth=2)
+  newMtexFigure(layout=[1, 2])
+  a = plotSection(s1, vector3d.Z, color="interp", DisplayName="outer")
+  hold(True)
+  b = plotSection(s2, vector3d.Z, color="interp", DisplayName="inner")
+  # the normals as arrows at the outer ring, of MATLAB's autoscaled length
+  q = quiverSection(s1, S2VectorFieldHarmonic.normal(), vector3d.Z, color="k", autoScaleFactor=0.5, DisplayName="n")
+  # an axis field as segments both ways, the reverse half left out of the legend
+  axes = lambda v: vector3d(v.data, antipodal=True)
+  qa = quiverSection(s2, axes, vector3d.Z, color="m", DisplayName="p")
+  hold(False)
+  assert len(q) == 1 and len(qa) == 2 and qa[0].get_label() == "_nolegend_"
+  # arrow tails sit on the outer ring and point outwards
+  X, U = np.stack([q[0].X, q[0].Y], axis=1), np.stack([q[0].U, q[0].V], axis=1)
+  r = np.hypot(X[:, 0], X[:, 1])
+  assert np.all((r > 1.99) & (r < 3.01)) and np.all(np.sum(X * U, axis=1) > 0)
+  spacing = np.sqrt(np.sum(((X.max(axis=0) - X.min(axis=0)) / 6) ** 2))
+  assert np.isclose(np.hypot(U[:, 0], U[:, 1]).max(), 0.5 * spacing, rtol=0.05)
+  # the rings share one colour range and follow the colour map of the figure
+  assert np.allclose(a.get_clim(), b.get_clim()) and np.isclose(a.get_clim()[0], 1, atol=0.01) and np.isclose(a.get_clim()[1], 3, atol=0.05)
+  mtexColorMap("blue2red")
+  assert a.get_cmap().name == b.get_cmap().name
+  leg = legend("outer", "inner", "n", "p")
+  assert [t.get_text() for t in leg.get_texts()] == ["outer", "inner", "n", "p"] and leg.legend_handles[3].get_label() != "_nolegend_"
+  # one colour bar title per panel
+  nextAxis()
+  plotSection(s1, vector3d.Z, color="interp")
+  bars = mtexColorbar(title=["km/s", "s/km"])
+  assert [cb.ax.get_xlabel() or cb.ax.get_ylabel() for cb in bars] == ["km/s", "s/km"]
 
 
 def test_a_characteristic_shape():
@@ -84,3 +127,15 @@ def test_a_characteristic_shape():
   assert axesOf().name == "polar" and h.get_label() == "cubes"
   plot(s, normalize=True, plain=True)
   assert len(axesOf().get_yticks()) == 0
+
+
+def test_rose_diagrams_go_into_the_subplots_the_user_made():
+  # MATLAB's figure; subplot(1,2,1); histogram(v): the rose takes the polar axes prepared for it
+  from mtex import histogram, vector3d
+  v = vector3d.rand(200, rng=np.random.default_rng(0))
+  f = plt.figure()
+  a1 = plt.subplot(1, 2, 1, projection="polar")
+  histogram(v, 36)
+  a2 = plt.subplot(1, 2, 2, projection="polar")
+  histogram(v, 36)
+  assert plt.gcf() is f and len(f.axes) == 2 and len(a1.patches) == 36 and len(a2.patches) == 36

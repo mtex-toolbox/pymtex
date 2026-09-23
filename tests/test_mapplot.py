@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from mtex import (EBSD, calcGrains, crystalFrame, degree, gcm, hold, ipfHSVKey, loadEBSD, phaseList, plot, quiver, rotation,
-                  vector3d, xvector, zvector)
+                  vector3d, xvector, zvector, mtexColorMap, mtexColorbar, setColorRange)
 from mtex.plotting.mapplot import mapValues
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd", "Forsterite_cut.ctf")
@@ -127,6 +127,14 @@ def test_grains_boundaries_and_arrows(forsterite):
   h = quiver(g, g.longAxis(), color="w")
   hold(False)
   assert isinstance(h, matplotlib.collections.LineCollection) and len(h.get_segments()) <= g.size
+  # two quivers without a colour take the first two of the colour order, as MATLAB's
+  plot(g)
+  hold(True)
+  h1 = quiver(g, g.longAxis(), displayName="long axis")
+  h2 = quiver(g, g.longAxis(), displayName="again")
+  hold(False)
+  c1, c2 = (matplotlib.colors.to_hex(h.get_edgecolor()[0] if len(h.get_edgecolor()) else h.get_color()) for h in (h1, h2))
+  assert c1 != c2 and c1 == matplotlib.colors.to_hex("C0") and h1.get_label() == "long axis"
   plot(ebsd)
   hold(True)
   h = quiver(ebsd, vector3d(np.ones((ebsd.size, 3))))
@@ -178,3 +186,111 @@ def test_the_padding_of_a_grid_is_not_drawn():
     plt.figure()
     assert count(plot(g, rgb, backend=backend)) == measured - 1
     assert count(plot(g, backend=backend)) == measured
+
+
+def test_boundary_needles_translucent_grains_and_legend_off(forsterite):
+  from mtex import legend
+  ebsd, g = forsterite
+  gB = g.boundary["Forsterite", "Forsterite"]
+  # a boundary quiver is MATLAB's quiver3 of v and -v from every midpoint, the longest half
+  # 0.9 f times the spacing of the points
+  plot(g)
+  hold(True)
+  v = vector3d(np.tile([1.0, 0, 0], (len(gB), 1)))
+  h = quiver(gB, v, autoScaleFactor=0.4)
+  hold(False)
+  segs = np.array(h.get_segments())
+  c = gB.midPoint.data.reshape(-1, 3)[:, :2]
+  k = np.sqrt(2 * len(gB))
+  spacing = np.sqrt(3) * np.hypot(np.ptp(c[:, 0]) / k, np.ptp(c[:, 1]) / k)
+  # the half towards the viewer on top, starting at the midpoint; the other half beneath
+  assert len(segs) == len(gB) and np.allclose(np.abs(segs[:, 0]), np.abs(c))
+  assert np.allclose(np.linalg.norm(segs[:, 1] - segs[:, 0], axis=-1), 0.4 * 0.9 * spacing)
+  assert h.get_zorder() > 1 and min(x.get_zorder() for x in gcm().children[-1].collections) < 1
+  # translucent fades a grain by its colour: pale grains let the map below show
+  h = plot(g, translucent=1)
+  rgb = np.asarray(h.get_facecolors())[:, :3]
+  assert np.allclose(h.get_alpha(), 1 - rgb.min(axis=1))
+  # legend('off') removes the legend of the phase map
+  assert gcm().children[-1].get_legend() is not None
+  legend("off")
+  assert gcm().children[-1].get_legend() is None
+
+
+def test_triple_points_join_the_legend_and_none_leave_the_limits(forsterite):
+  ebsd, g = forsterite
+  plot(g)
+  hold(True)
+  plot(g.triplePoints, color="b")
+  mP = mapOf(g)
+  n = len(mP.ax.get_legend().get_texts())
+  limits = mP.ax.get_xlim(), mP.ax.get_ylim()
+  plot(g.triplePoints[:3], DisplayName="three", color="r")
+  plot(g.triplePoints[np.zeros(len(g.triplePoints), dtype=bool)], color="m")
+  hold(False)
+  assert [t.get_text() for t in mP.ax.get_legend().get_texts()][-1] == "three" and len(mP.ax.get_legend().get_texts()) == n + 1
+  assert (mP.ax.get_xlim(), mP.ax.get_ylim()) == limits
+
+
+def test_an_infinite_value_takes_the_end_of_the_colour_map():
+  ebsd = gridMap(4, 3, 1.0)
+  v = np.arange(ebsd.size, dtype=float)
+  v[0], v[1], v[2] = -np.inf, np.inf, np.nan
+  plot(ebsd, v, backend="imagesc")
+  img = gcm().children[-1].images[0].get_array()
+  assert np.ma.count_masked(img) == 1
+
+
+def test_grains_of_one_face_colour_name_no_phases(forsterite):
+  ebsd, g = forsterite
+  plot(g, faceColor=[0.8, 0.8, 0.8])
+  assert mapOf(g).ax.get_legend() is None
+  plot(g[0], faceColor=[0.2, 0.8, 0.8], DisplayName="largest grain")
+  assert [t.get_text() for t in mapOf(g[0]).ax.get_legend().get_texts()] == ["largest grain"]
+
+
+def test_a_colour_map_and_range_reach_every_boundary_coloured(forsterite):
+  ebsd, g = forsterite
+  gB = g.boundary
+  plot(gB[:50], np.arange(50.0))
+  hold(True)
+  plot(gB[50:100], np.arange(50.0) + 100)
+  hold(False)
+  mtexColorMap("blue2red")
+  setColorRange([-1, 1])
+  ms = mapOf(g).mappables
+  assert len(ms) == 2 and all(m.get_clim() == (-1, 1) and m.get_cmap().name == ms[0].get_cmap().name for m in ms)
+  assert len(mtexColorbar()) == 1
+
+
+def test_a_fresh_figure_takes_the_shape_of_its_map():
+  from mtex import newMtexFigure
+  ebsd = gridMap(40, 10, 1.0)
+  newMtexFigure(figSize="large")
+  plot(ebsd, ebsd.bc)
+  w, h = gcm().fig.get_size_inches()
+  assert w > 2 * h and np.isclose(w, 1.3 * 7.0)
+
+
+def test_the_outline_of_grains_takes_their_face_colour(forsterite):
+  # MATLAB passes FaceColor on to the boundary, so a grain map of one colour has no outline
+  import matplotlib.colors as mc
+  ebsd, g = forsterite
+  plot(g, faceColor=[0.9, 0.9, 0.9])
+  line = gcm().children[-1].lines[0]
+  assert np.allclose(mc.to_rgb(line.get_color()), [0.9, 0.9, 0.9])
+  plot(g, faceColor=[0.9, 0.9, 0.9], lineColor="r")
+  assert mc.to_hex(gcm().children[-1].lines[0].get_color()) == "#ff0000"
+  plot(g, faceColor="none")
+  assert mc.to_hex(gcm().children[-1].lines[0].get_color()) == "#000000"
+
+
+def test_a_thin_segment_shows_its_alpha_twice(forsterite):
+  # MATLAB draws a thin segment there and back, so alpha a shows as 1 - (1 - a)^2
+  ebsd, g = forsterite
+  gB = g.boundary
+  a = np.linspace(0, 1, len(gB))
+  h = plot(gB, edgeAlpha=a, lineWidth=1.5)
+  assert np.allclose(h.get_colors()[:, 3], 1 - (1 - a) ** 2)
+  h = plot(gB, edgeAlpha=a, lineWidth=4)
+  assert np.allclose(h.get_colors()[:, 3], a)

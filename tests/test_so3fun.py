@@ -42,10 +42,10 @@ def test_F3a_construction_and_evaluation():
   assert not g.isReal and np.array_equal(g.fhat, fhat)
   assert SO3FunHarmonic(fhat, cs, ss).isclose(symmetrise(g))
   gr = SO3FunHarmonic(fhat, cs, ss, real=True, symmetrise=False)
-  assert gr.isReal and isRealWigner(gr.fhat) and SO3FunHarmonic(g, real=True, symmetrise=False).isclose(gr)
+  assert gr.isReal and isRealWigner(gr._fhat) and SO3FunHarmonic(g, real=True, symmetrise=False).isclose(gr)
   assert np.array_equal(SO3FunHarmonic(gr, real=False, symmetrise=False).fhat, gr.fhat)
-  with pytest.raises(ValueError):
-    SO3FunHarmonic(rng.standard_normal(7), cs, ss)
+  # a vector ending inside a degree block is padded to its end, as MATLAB does
+  assert SO3FunHarmonic(rng.standard_normal(7), cs, ss).bandwidth == 1
   # from a callable by quadrature, and from samples on the quadrature nodes
   h = SO3FunHarmonic(lambda o: f(o), cs, ss, bandwidth=f.bandwidth)
   assert h.isclose(f, 1e-6)
@@ -92,7 +92,7 @@ def test_F3b_symmetry():
   assert h.withExchange(False).withExchange().isclose(h)
   # a real function stays real under everything
   fr = SO3FunHarmonic(randomCoefficients(5), cs, ss, real=True)
-  assert isRealWigner(fr.fhat) and isRealWigner(fr.inv().fhat) and isRealWigner(fr.conj().fhat)
+  assert isRealWigner(fr._fhat) and isRealWigner(fr.inv()._fhat) and isRealWigner(fr.conj()._fhat)
 
 
 def test_F3c_algebra():

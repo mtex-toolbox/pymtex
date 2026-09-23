@@ -229,6 +229,15 @@ def SO3FunSBF(sS, E, bandwidth=None):
   ODF of Schaeben that a single slip system produces under that strain, as a handle"""
   from ..geometry.session import getMTEXpref
   from ..functions.handles import SO3FunHandle
+
+  # the handle that says which system and which strain it stands for, as MATLAB's display
+  class _SBF(SO3FunHandle):
+    def __repr__(self):
+      lam = np.round(np.real(E.eig()[0])[::-1], 4)
+      return "\n".join([f"SO3FunSBF ({self.CS.char()} → {self.SS.char()})",
+                        f"  slip system: {sS.n.char()}{sS.b.char()}",
+                        "  strain:      " + " ".join(f"{x:g}" for x in lam)])
+
   cs = sS.CS
   if not isinstance(cs, crystalFrame):
     raise ValueError("the slip system has to live in a crystal frame")
@@ -255,7 +264,7 @@ def SO3FunSBF(sS, E, bandwidth=None):
     return (1 / (np.cosh(Gamma) - np.sin(2 * (phi2 - chi)) * np.sinh(Gamma))).reshape(o.shape)
 
   fr = E.frame if isinstance(E.frame, referenceFrame) and not isinstance(E.frame, crystalFrame) else specimenFrame.default
-  return SO3FunHandle(fun, cs, fr, bandwidth=getMTEXpref("maxSO3Bandwidth") if bandwidth is None else bandwidth)
+  return _SBF(fun, cs, fr, bandwidth=getMTEXpref("maxSO3Bandwidth") if bandwidth is None else bandwidth)
 
 
 # ------------------------------------------------------------------ the transport of a texture
@@ -291,7 +300,7 @@ class _TextureTransport:
     values = np.real(self.plan(fhat))
     coeff = _adjointColumns(self.grid, values[:, None] * self.spin, self.L, self.grid.weights)
     flux = SO3VectorFieldHarmonic(coeff, self.f.CS, self.f.SS, self.side, symmetrise=False)
-    d = SO3FunHarmonic(div(flux), self.f.CS, self.f.SS, bandwidth=self.L, real=True).fhat
+    d = SO3FunHarmonic(div(flux), self.f.CS, self.f.SS, bandwidth=self.L, real=True)._fhat
     d[0] = 0
     return -d
 
@@ -312,10 +321,10 @@ def doEulerStep(spin, x, n=1, bandwidth=None):
     raise TypeError("doEulerStep moves orientations or a density")
   from ..functions.so3fun import SO3FunHarmonic
   p = _TextureTransport(spin, x, bandwidth)
-  fhat = p.f.fhat.astype(complex)
+  fhat = p.f._fhat.astype(complex)
   for _ in range(n):
     fhat = fhat + p.derivative(fhat) / n
-  return SO3FunHarmonic(fhat, p.f.CS, p.f.SS, real=True, symmetrise=False)
+  return SO3FunHarmonic(fhat, p.f.CS, p.f.SS, real=True, symmetrise=False, _internal=True)
 
 
 def _install():

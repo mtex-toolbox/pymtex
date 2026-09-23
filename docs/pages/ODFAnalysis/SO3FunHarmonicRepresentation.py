@@ -75,7 +75,7 @@ f = SO3FunHarmonic(odf, bandwidth=32)
 # $k=-n,\ldots,n$ and columns to $l=-n,\ldots,n$. MATLAB stores the columns one after
 # another. The degree-two coefficient matrix is therefore
 
-f.fhat[10:35].reshape(5, 5)
+f.fhat[10:35].reshape(5, 5, order='F')
 
 # Up to its bandwidth, this vector completely characterizes the harmonic function. The
 # compact representation also makes many calculations algebraic. For example,
@@ -219,7 +219,8 @@ mtexColorbar(title='misorientation angle in degree')
 # ## Technical Details
 #
 # `f.fhat` is a NumPy vector indexed from zero, so MATLAB's `f.fhat(11:35)` is
-# `f.fhat[10:35]`, and NumPy fills the block row by row where MATLAB fills columns, so the
-# same reshape gives MATLAB's matrix. `min(f)` returns the pair of the value and the
-# orientation. The Dubna ODF is reconstructed here where MATLAB's page does the same, so
-# the coefficients differ from MATLAB's in the digits.
+# `f.fhat[10:35]`, and MATLAB's `reshape` fills columns, which is NumPy's `order='F'`. The
+# vector holds MATLAB's coefficients; the port computes internally in the Condon-Shortley
+# convention and converts at the boundary (`docs/design/harmonics.md`). `min(f)` returns
+# the pair of the value and the orientation. The Dubna ODF is reconstructed here where
+# MATLAB's page does the same, so the coefficients differ from MATLAB's in the digits.

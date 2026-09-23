@@ -91,6 +91,24 @@ def test_the_symmetric_cases_and_a_large_sample():
     h = 1e-5
     vp, vm = p.residual(_step(p, xs, g, h), c)[0], p.residual(_step(p, xs, g, -h), c)[0]
     assert np.isclose((vp - vm) / (2 * h), g @ g, atol=1e-9, rtol=1e-5)
+  # a specimen group with a two-fold about z: the gradient through the folded plan is the
+  # gradient of the direct sums, and the basal fibre sample puts the c-axes along Z
+  import mtex.analysis.optimalsample as osm
+  hexa = crystalFrame("622")
+  fib = fibreODF(hexa.cAxis, zvector, specimenFrame("mmm"))
+  xs, c = _initial(fib, osm.DIRECT_SUM_NODES), np.full(osm.DIRECT_SUM_NODES, 1 / osm.DIRECT_SUM_NODES)
+  planned = _Problem(fib, xs, 16)
+  assert planned.plan is not None
+  old, osm.DIRECT_SUM_NODES = osm.DIRECT_SUM_NODES, 10 ** 9
+  try:
+    direct = _Problem(fib, xs, 16)
+  finally:
+    osm.DIRECT_SUM_NODES = old
+  gp = planned.gradient(xs, c, planned.residual(xs, c)[1])
+  gd = direct.gradient(xs, c, direct.residual(xs, c)[1])
+  assert np.linalg.norm(gp - gd) < 1e-5 * np.linalg.norm(gd)
+  basal = optimalSample(fib, 300, bandwidth=16, maxIter=40)
+  assert np.mean(np.abs((basal * Miller(0, 0, 0, 1, hexa)).normalize().data[..., 2])) > 0.9
   # a larger sample keeps optimising: the first per node step is below the step tolerance
   # while the discrepancy is still far from its minimum
   odf = 0.5 * uniformODF(cs) + 0.5 * fibreODF(Miller(0, 0, 1, cs), zvector, halfwidth=20 * degree)

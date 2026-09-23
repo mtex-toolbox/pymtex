@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mtex import (Miller, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, SO3FunCBF, SO3FunHarmonic, SO3FunRBF,
+from mtex import (FourierODF, Miller, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, SO3FunCBF, SO3FunHarmonic, SO3FunRBF,
                   calcPDF, crystalFrame, degree, fibre, fibreODF, grad, ipdf, mean, orientation, pdf, radon, rotation,
                   specimenFrame, uniformODF, unimodalODF, vector3d, xvector, yvector, zvector)
 from mtex.geometry.symreduce import reductionGroups
@@ -104,6 +104,8 @@ def test_R4_fibre_ODFs():
   # the harmonic form
   H = SO3FunHarmonic(f)
   assert np.isclose(mean(H), 1) and H.isReal
+  # MATLAB's FourierODF is the same
+  assert isinstance(FourierODF(f), SO3FunHarmonic) and np.allclose(FourierODF(f).fhat, H.fhat)
   rs = rotation.rand(100, rng=rng)
   assert np.max(np.abs(H(rs) - f(rs))) < 2e-2 * np.max(f(rs))
   # from a fibre of P1, and several fibres

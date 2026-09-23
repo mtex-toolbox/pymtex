@@ -4,7 +4,7 @@ import importlib as _importlib
 
 __all__ = []
 for _name in ("spherical", "colormaps", "mtexfigure", "sphericalplot", "sections", "sectionplot", "fibreplot", "sectorfold", "directionkeys",
-              "orientationkeys", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot"):
+              "orientationkeys", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot", "distributionplot"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
     globals()[_public] = getattr(_module, _public)
@@ -15,6 +15,7 @@ for _name in ("spherical", "colormaps", "mtexfigure", "sphericalplot", "sections
 def _install():
   from ..functions.bingham import S2FunBingham, SO3FunBingham
   from ..functions.handles import S2FunHandle, S2FunSum, SO3FunGeneric
+  from ..functions.s2funtri import S2FunTri
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
   from ..functions.s2axisfield import S2AxisField
   from ..functions.s2fun import S2FunHarmonic
@@ -48,7 +49,7 @@ def _install():
     for f in (sp.plot, sp.scatter, sp.text, sp.contourf, sp.contour, sp.pcolor, sp.quiver):
       setattr(cls, f.__name__, method(f))
     setattr(cls, "smooth", method(sp.pcolor))
-  for cls in (S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham):
+  for cls in (S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri):
     for f in (sp.plot, sp.contourf, sp.contour, sp.pcolor):
       setattr(cls, f.__name__, method(f))
   for cls in (S2VectorField, S2AxisField):
@@ -96,6 +97,8 @@ def _install():
   plane3d.plot = method(shp.plotPlane)
   for f in (shp.plotInnerFace, shp.plotInnerDirection, shp.plotSlipSystem):
     setattr(crystalShape, f.__name__, method(f))
+  from ..geometry.plottingconvention import plottingConvention
+  plottingConvention.setView = method(pp.setView)
 
 
 _install()

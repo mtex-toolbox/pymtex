@@ -76,7 +76,7 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
     from ..functions.density import calcDensity, interpolate
     fs = [calcDensity(vs, halfwidth=halfwidth) if vals is None else interpolate(vs, np.asarray(vals, dtype=float).reshape(-1))
           for vs, vals in zip(vss, valuess or [None] * len(vss))]
-    return _plotRow(fs, titles, style=style, colorbar=colorbar, colorRange="equal" if colorRange is None else colorRange,
+    return _plotRow(fs, titles, style=style, colorbar=colorbar, colorRange="individual" if colorRange is None else colorRange,
                     noTitle=noTitle, minmax=minmax, **kw)
   projKw, axesKw, whereKw = _split(kw)
   complete = projKw.pop("complete", False)
@@ -165,6 +165,21 @@ def _fibreAsCurve(o, points, all, kw):
   return o, None, True
 
 
+# MATLAB's positional styles: a string is a flag ('upper', 'antipodal', 'contourf'), an RGB
+# triple beside anything but three orientations the marker colour
+def _positionalStyle(o, args, kw):
+  out = []
+  for a in args:
+    if isinstance(a, str):
+      kw[a] = True
+    elif isinstance(a, (tuple, list, np.ndarray)) and len(a) == 3 and all(isinstance(x, (int, float, np.number)) for x in a) \
+        and np.size(o) != 3:
+      kw.setdefault("MarkerFaceColor", np.asarray(a, dtype=float))
+    else:
+      out.append(a)
+  return tuple(out)
+
+
 def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
   """plotPDF(ori, h), plotPDF(ori, data, h), plotPDF(ori, h, points=100, contourf=True, antipodal=True)
 
@@ -175,6 +190,13 @@ def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
     return sphericalplot.plotPDF(o, *args, superposition=superposition, **kw)
+  args = _positionalStyle(o, args, kw)
+  # plotPDF(ori, 'add2all') without directions, or into held pole figures: the poles of the
+  # directions they already show
+  fig = sphericalplot.gcm()
+  if (kw.get("add2all") or (fig is not None and fig.hold)) and not any(isinstance(a, vector3d) or (isinstance(a, (list, tuple)) and a and isinstance(a[0], vector3d)) for a in args):
+    kw["add2all"] = True
+    return sphericalplot.plot(o, **kw)
   h, data = _pickData(o, args)
   hs = _asList(h)
   flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
@@ -197,7 +219,7 @@ def plotIPDF(o, *args, points=None, all=False, **kw):
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
     return sphericalplot.plotIPDF(o, *args, **kw)
-  r, data = _pickData(o, args)
+  r, data = _pickData(o, _positionalStyle(o, args, kw))
   rs = _asList(r)
   flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
   style = "scatter" if flag is None else "pcolor" if flag == "smooth" else flag

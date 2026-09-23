@@ -159,8 +159,10 @@ def gradient(ebsd, direction=None, stencil="oneSided"):
     if abs(d @ pl.normal) > 1e-10:
       return vector3d(np.full(ebsd.shape + (3,), np.nan), frame=ebsd.frame)
     return vector3d((d @ pl.e1) * gx.data + (d @ pl.e2) * gy.data, frame=ebsd.frame)
+  # MATLAB's name of the axial stencil
+  stencil = "lattice" if stencil == "1hop" else stencil
   if stencil not in STENCILS:
-    raise ValueError(f"the stencil is 'oneSided', 'lattice' or 'full', not {stencil!r}")
+    raise ValueError(f"the stencil is 'oneSided', 'lattice' ('1hop') or 'full', not {stencil!r}")
   l = mapLattice(ebsd)
   lk, m = latticeLookup(l), mapPairs(ebsd)
   if stencil == "oneSided":
@@ -238,16 +240,57 @@ def gradientZ(ebsd, stencil="oneSided"):
 
 # ------------------------------------------------------------------ the curvature
 
-# the curvature tensor of every pixel, kappa = d omega / d x, in specimen coordinates as
-# an (..., 3, 3) array, its rows the components of the rotation vector and its columns the
-# directions of the specimen. A two dimensional map says nothing about how the orientation
-# changes along its normal, so every column the normal reaches is unknown and NaN
+# the curvature tensor of every pixel, kappa = d omega / d x, in the specimen frame per scan
+# unit, its rows the components of the rotation vector and its columns the directions of the
+# specimen. A two dimensional map says nothing about how the orientation changes along its
+# normal, so every column the normal reaches is unknown and NaN
 def curvature(ebsd, stencil="oneSided"):
+  from ..tensors.tensor import curvatureTensor
   gx, gy = gradient(ebsd, stencil=stencil)
   pl = mapLattice(ebsd).plane
   M = gx.data[..., :, None] * pl.e1[None, :] + gy.data[..., :, None] * pl.e2[None, :]
   M[..., :, np.abs(pl.normal) > 1e-10] = np.nan
-  return M
+  return curvatureTensor(M, ebsd.frame, unit=f"1/{ebsd.scanUnit}")
+
+
+# ------------------------------------------------------------------ the weighted Burgers vector
+
+# weightedBurgersVec(ebsd), weightedBurgersVec(ebsd, windowSize=2), weightedBurgersVec(ebsd,
+# 'gradient', stencil='full'): the net Burgers vector crossing the map per unit area, after
+# Wheeler et al. (2009), a vector per pixel in the specimen frame per scan unit. The integral
+# method sums the crystal coordinates of the specimen x and y axes around a square loop of
+# 2 windowSize + 1 pixels, on the gridded map, NaN where the loop leaves the grain or the
+# map; the gradient method is the column of Nye's tensor along the normal of the map
+def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=False):
+  from scipy.ndimage import correlate, maximum_filter, minimum_filter
+  from ..analysis.mechanics import dislocationDensity
+  if gradient or "gradient" in args:
+    alpha = dislocationDensity(curvature(ebsd, stencil=stencil))
+    return vector3d(alpha.M[..., :, 2], frame=ebsd.frame)
+  if ebsd.ndim != 2:
+    raise ValueError("the integral method runs on the rows and columns of a map: gridify it first")
+  # every orientation the equivalent nearest the last measured one of its grain, as MATLAB's
+  # project2FundamentalRegion of a map, so that the loop sums no jumps between equivalents
+  # a map without grains is one grain
+  gid = np.asarray(ebsd.prop["grainId"]) if "grainId" in ebsd.prop else np.ones(ebsd.shape)
+  gid = np.where(ebsd.isIndexed, gid, 0).reshape(-1).astype(np.int64)
+  last = np.zeros(gid.max(initial=0) + 1, dtype=np.int64)
+  np.maximum.at(last, gid, np.arange(gid.size))
+  oris = ebsd.orientations
+  ori = oris.project2FundamentalRegion(oris.reshape(-1)[last[gid]].reshape(ebsd.shape))
+  oriX, oriY = ((ori.inv() * vector3d(v, frame=ebsd.frame)).data for v in ([1.0, 0, 0], [0, 1.0, 0]))
+  w = int(windowSize)
+  fY = np.zeros((2 * w + 1, 2 * w + 1))
+  fY[:, 0], fY[:, -1] = -1, 1
+  fY[[0, -1], 0], fY[[0, -1], -1] = -0.5, 0.5
+  fX = -fY.T
+  W = np.stack([correlate(oriX[..., c], fX, mode="constant") + correlate(oriY[..., c], fY, mode="constant") for c in range(3)], axis=-1)
+  # a loop reaching into another grain, a missing pixel or over the rim has no value
+  g = np.where(ebsd.isIndexed, gid.reshape(ebsd.shape).astype(float), -1.0)
+  W[maximum_filter(g, 2 * w + 1, mode="constant", cval=-2) != minimum_filter(g, 2 * w + 1, mode="constant", cval=-2)] = np.nan
+  d = float(np.min(np.linalg.norm(mapLattice(ebsd).A, axis=0)))
+  W = ori * vector3d(W, frame=ori.CS)
+  return vector3d(W.data / (4 * w ** 2 * d), frame=ebsd.frame)
 
 
 # ------------------------------------------------------------------ KAM
@@ -415,12 +458,13 @@ def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rn
   d0 = np.linalg.norm(P1.max(axis=0) - P1.min(axis=0)) / 100 if minDistance is None else float(minDistance)
   i1, i2 = rng.integers(0, len(o1), sampleSize), rng.integers(0, len(o2), sampleSize)
   keep = np.linalg.norm(P1[i1] - P2[i2], axis=1) > d0
-  q = qmul(_conj(o2.data.reshape(-1, 4)[i2[keep]]), o1.data.reshape(-1, 4)[i1[keep]])
-  return orientation._fromRotation(q, (o1.frameA, o2.frameA), antipodal=o1.frameA is o2.frameA)
+  # inv(o1) * o2 as MATLAB's o1 .\ o2: the second crystal's coordinates into the first's
+  q = qmul(_conj(o1.data.reshape(-1, 4)[i1[keep]]), o2.data.reshape(-1, 4)[i2[keep]])
+  return orientation._fromRotation(q, (o2.frameA, o1.frameA), antipodal=o1.frameA is o2.frameA)
 
 
 for _name, _f in (("gradient", gradient), ("gradientX", gradientX), ("gradientY", gradientY), ("gradientZ", gradientZ), ("curvature", curvature),
-                  ("KAM", KAM), ("calcGROD", calcGROD), ("grainMean", grainMean), ("spatialProfile", spatialProfile), ("calcMisorientation", calcMisorientation)):
+                  ("KAM", KAM), ("calcGROD", calcGROD), ("grainMean", grainMean), ("spatialProfile", spatialProfile), ("calcMisorientation", calcMisorientation), ("weightedBurgersVec", weightedBurgersVec)):
   setattr(EBSD, _name, _f)
 
 __all__ = ["neighbourBall"]

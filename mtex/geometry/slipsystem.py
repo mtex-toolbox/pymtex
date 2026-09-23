@@ -16,7 +16,8 @@ from __future__ import annotations
 import numpy as np
 
 from .frames import crystalFrame
-from .miller import Miller, indexChar
+from .display import numString, sizeString, table
+from .miller import Miller
 from .symmetryops import symmetrise as _symmetrise
 from .vector3d import vector3d
 
@@ -46,13 +47,6 @@ def _unit(a):
 def _asList(v):
   v = vector3d(v) if not isinstance(v, vector3d) else v
   return v.reshape(-1) if v.ndim != 1 else v
-
-
-# a vector as its Miller indices where it has a crystal frame, as coordinates otherwise
-def _char(v):
-  if isinstance(v.frame, crystalFrame):
-    return indexChar(v)
-  return "(" + ", ".join(f"{x:.3g}" for x in v.data.reshape(-1)) + ")"
 
 
 def _sameFrame(a, b, what):
@@ -93,13 +87,20 @@ class slipSystem:
     return s
 
   def __len__(self):
-    return len(self.CRSS)
+    return self.CRSS.shape[0] if self.CRSS.ndim else 1
 
   @property
   def size(self):
-    return len(self.CRSS)
+    return self.CRSS.size
+
+  # a list, or an array once a column of orientations has rotated a row of systems
+  @property
+  def shape(self):
+    return self.CRSS.shape
 
   def __getitem__(self, key):
+    if self.CRSS.ndim > 1:
+      return self._new(self.b[key], self.n[key], self.CRSS[key])
     sel = np.arange(len(self))[key].reshape(-1)
     return self._new(self.b[sel], self.n[sel], self.CRSS[sel])
 
@@ -131,9 +132,10 @@ class slipSystem:
 
   # the systems of every family: the pairs of the orbits that stay orthogonal, both signs of
   # the Burgers vector unless antipodal
-  def symmetrise(self, antipodal=False):
+  def symmetrise(self, antipodal=False, return_index=False):
+    # return_index also gives the system every equivalent comes from, MATLAB's slipId
     if not self.isCrystal:
-      return self
+      return (self, np.arange(len(self))) if return_index else self
     bs, ns, crss = [], [], []
     for k in range(len(self)):
       mm = _symmetrise(self.b[k], unique=True, antipodal=True).data.reshape(-1, 3)
@@ -148,33 +150,46 @@ class slipSystem:
     b = vector3d(np.concatenate(bs), frame=self.b.frame)
     n = vector3d(np.concatenate(ns), frame=self.n.frame)
     b.dispStyle, n.dispStyle = self.b.dispStyle, self.n.dispStyle
-    return self._new(b, n, np.concatenate(crss))
+    out = self._new(b, n, np.concatenate(crss))
+    return (out, np.repeat(np.arange(len(self)), [len(c) for c in crss])) if return_index else out
 
-  # the Schmid factor cos(phi) cos(lambda) of tension directions, a (systems, directions)
-  # matrix, in the coordinates the systems are written in
+  # the Schmid factor cos(phi) cos(lambda) of tension directions in the coordinates the
+  # systems are written in, MATLAB's (directions, systems) matrix: the directions keep their
+  # shape, a single one gives one factor per system
   def SchmidFactor(self, v, relative=False):
-    v = _asList(v)
+    v = v if isinstance(v, vector3d) else vector3d(v)
     _sameFrame(self.b, v, "the slip systems and the tension direction")
-    r = _unit(v.data)
-    m = (_unit(self.b.data) @ r.T) * (_unit(self.n.data) @ r.T)
+    r = _unit(v.data.reshape(-1, 3))
+    m = (r @ _unit(self.b.data).T) * (r @ _unit(self.n.data).T)
     if relative:
-      m = m / self.CRSS[:, None]
-    return m[:, 0] if len(v) == 1 else m
+      m = m / self.CRSS
+    if v.size == 1:
+      return float(m[0, 0]) if self.size == 1 else m[0]
+    return m.reshape(v.shape + (len(self),))
 
-  # the dyad b n^T of every system, and its symmetric part
+  # the dyad b n^T of the normalised vectors, one (3, 3) matrix per system
+  def _dyads(self):
+    return _unit(self.b.data)[..., :, None] * _unit(self.n.data)[..., None, :]
+
+  # the dyad as a tensor in the frame of the systems, a single one for a single system; the
+  # Schmid tensor is the same dyad, MATLAB's velocity gradient of a unit shear
   def deformationTensor(self):
-    return _unit(self.b.data)[:, :, None] * _unit(self.n.data)[:, None, :]
+    from ..tensors.tensor import tensor
+    M = self._dyads()
+    return tensor(M[0] if len(self) == 1 else M, self.frame, rank=2)
 
   def SchmidTensor(self):
-    M = self.deformationTensor()
-    return (M + np.swapaxes(M, 1, 2)) / 2
+    from ..tensors.tensor import velocityGradientTensor
+    M = self._dyads()
+    return velocityGradientTensor(M[0] if len(self) == 1 else M, self.frame)
 
-  # the Luster-Morris parameter of two lists of systems and the residual Burgers vector
+  # the Luster-Morris parameter |(n1 . n2)(b1 . b2)| and the residual Burgers vector of paired
+  # systems, entry by entry as NumPy broadcasts, MATLAB's element by element
   def mPrime(self, other):
-    return np.abs((_unit(self.b.data) @ _unit(other.b.data).T) * (_unit(self.n.data) @ _unit(other.n.data).T))
+    return np.abs(np.sum(_unit(self.b.data) * _unit(other.b.data), axis=-1) * np.sum(_unit(self.n.data) * _unit(other.n.data), axis=-1))
 
   def residualBurgersVector(self, other):
-    return np.linalg.norm(self.b.data[:, None, :] - other.b.data[None, :, :], axis=-1)
+    return np.linalg.norm(self.b.data - other.b.data, axis=-1)
 
   # the trace of the slip plane in the surface normal to a direction, the xy plane by default
   def trace(self, nrm=None):
@@ -184,9 +199,11 @@ class slipSystem:
     t.antipodal = True
     return t
 
-  # an orientation or a rotation carries the systems into specimen coordinates
+  # an orientation or a rotation carries the systems into specimen coordinates, broadcast as
+  # NumPy does: a column of orientations times a row of systems is MATLAB's outer ori * sS
   def rotate(self, rot):
-    return self._new(rot * self.b, rot * self.n, self.CRSS)
+    b, n = rot * self.b, rot * self.n
+    return self._new(b, n, np.broadcast_to(self.CRSS, b.shape).copy())
 
   def __rmul__(self, rot):
     return self.rotate(rot)
@@ -201,14 +218,33 @@ class slipSystem:
     flipped = np.all(np.isclose(self.b.data, -other.b.data), axis=-1) & np.all(np.isclose(self.n.data, -other.n.data), axis=-1)
     return bool(np.all(same | flipped))
 
+  # one plane and one direction in it, (111)[01-1], one string per system; char(sS, 'latex')
+  # as one piece of mathematics
+  def char(self, style=None):
+    out = [(self.n.reshape(-1)[k].char(style, family=False) + self.b.reshape(-1)[k].char(style, family=False)).replace("$$", "")
+           for k in range(self.size)]
+    return out[0] if self.size == 1 else out
+
+  # MATLAB's display: the Burgers vector and the plane normal in indices beside the CRSS, a
+  # rotated system in specimen coordinates to two decimals
   def __repr__(self):
-    head = f"slipSystem ({self.frame.char()})" if self.frame is not None else "slipSystem"
-    lines = [head, f"  size: {len(self)}"]
-    rows = min(len(self), 12)
-    for k in range(rows):
-      lines.append(f"  {_char(self.n[k])}{_char(self.b[k])}" + (f"  CRSS {self.CRSS[k]:g}" if self.CRSS[k] != 1 else ""))
-    if len(self) > rows:
-      lines.append(f"  ... {len(self) - rows} more")
+    lines = [f"slipSystem ({self.b._headerChar()})"]
+    if len(self) > 24:
+      lines.append("  CRSS: " + " ".join(f"{c:g}" for c in np.unique(self.CRSS)))
+    if self.size != 1:
+      lines.append(f"  size: {sizeString(self.shape)}")
+    if not 0 < self.size <= 45:
+      return "\n".join(lines)
+    if self.isCrystal:
+      if self.CS.lattice.isTriHex:
+        labels, d = ["U", "V", "T", "W", "| H", "K", "I", "L", "CRSS"], [self.b.UVTW, self.n.hkil]
+      else:
+        labels, d = ["u", "v", "w", "| h", "k", "l", "CRSS"], [self.b.uvw, self.n.hkl]
+      d = np.concatenate(d + [self.CRSS[..., None]], axis=-1).reshape(self.size, -1)
+      lines.append(table(labels, list(np.round(d, 4).T), decimals=4, tiny=1e-10))
+    else:
+      d = np.round(100 * np.concatenate([self.b.data, self.n.data], axis=-1).reshape(self.size, 6)) / 100
+      lines.append(table(["x", "y", "z", "|  x", "y", "z"], list(d.T), decimals=2, tiny=1e-10))
     return "\n".join(lines)
 
   # ------------------------------------------------------------------ the families
@@ -321,13 +357,20 @@ class dislocationSystem:
     return d
 
   def __len__(self):
-    return len(self.u)
+    return self.u.shape[0] if self.u.ndim else 1
 
   @property
   def size(self):
-    return len(self.u)
+    return self.u.size
+
+  # a list, or an array once a column of orientations has rotated a row of systems
+  @property
+  def shape(self):
+    return self.u.shape
 
   def __getitem__(self, key):
+    if self.u.ndim > 1:
+      return self._new(self.b[key], self.l[key], self.u[key])
     sel = np.arange(len(self))[key].reshape(-1)
     return self._new(self.b[sel], self.l[sel], self.u[sel])
 
@@ -347,21 +390,41 @@ class dislocationSystem:
   def isScrew(self):
     return ~self.isEdge
 
-  # the dislocation density tensor of every system, b (x) l^
+  # the dislocation density tensor of every system, b (x) l^, in the length unit of the axes
   def tensor(self):
-    return self.b.data[:, :, None] * _unit(self.l.data)[:, None, :]
+    from ..tensors.tensor import dislocationDensityTensor
+    M = self.b.data[..., :, None] * _unit(self.l.data)[..., None, :]
+    return dislocationDensityTensor(M[0] if self.size == 1 else M, self.frame, unit="au")
 
+  # an orientation carries the systems into the specimen, broadcast as NumPy does: a column
+  # of orientations times a row of systems is MATLAB's outer ori * dS
   def rotate(self, rot):
-    l = rot * self.l
+    b, l = rot * self.b, rot * self.l
     l.antipodal = True
-    return self._new(rot * self.b, l, self.u)
+    return self._new(b, l, np.broadcast_to(self.u, b.shape).copy())
 
   def __rmul__(self, rot):
     return self.rotate(rot)
 
+  # MATLAB's display: the edge and the screw dislocations each as a table of their Burgers
+  # and line vectors, energies and lengths
   def __repr__(self):
-    head = f"dislocationSystem ({self.frame.char()})" if self.frame is not None else "dislocationSystem"
-    lines = [head, f"  size: {len(self)}, edge: {int(np.count_nonzero(self.isEdge))}, screw: {int(np.count_nonzero(self.isScrew))}"]
+    lines = ["dislocationSystem"]
+    if self.CS is not None:
+      lines.append(("  mineral: " if self.CS.mineral else "  symmetry: ") + self.CS.char())
+    names = lambda v, sel: ["[" + "  ".join(numString(x) for x in row) + "]" for row in np.round(v.coordinates[sel], 4)]
+    for label, sel, withLine in (("edge dislocations : ", self.isEdge, True), ("screw dislocations: ", self.isScrew, False)):
+      if not np.any(sel):
+        continue
+      lines.append(f"  {label}{int(np.count_nonzero(sel))}")
+      if self.CS is None or self.u.ndim > 1:
+        continue
+      cols = [("Burgers vector", names(self.b, sel))] + ([("line vector", names(self.l, sel))] if withLine else [])
+      cols += [("energy", [numString(x) for x in self.u[sel]]), ("length", [numString(x, decimals=2) for x in np.round(self.b[sel].norm(), 2)])]
+      widths = [max(len(h), *(len(c) for c in col)) for h, col in cols]
+      lines.append("  " + "  ".join(h.rjust(w) for (h, _), w in zip(cols, widths)))
+      for row in zip(*(col for _, col in cols)):
+        lines.append("  " + "  ".join(c.rjust(w) for c, w in zip(row, widths)))
     return "\n".join(lines)
 
   @staticmethod
@@ -377,4 +440,8 @@ class dislocationSystem:
     return _familyOf("hcp", cs)
 
 
-__all__ = ["slipSystem", "dislocationSystem"]
+def mPrime(sS1, sS2):
+  return sS1.mPrime(sS2)
+
+
+__all__ = ["slipSystem", "dislocationSystem", "mPrime"]

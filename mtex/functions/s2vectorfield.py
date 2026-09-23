@@ -21,7 +21,7 @@ from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.tangent import spinTensor
 from ..geometry.vector3d import vector3d
 from .funops import _rotatedFrame
-from .harmonics import WignerD
+from .harmonics import mtexCoefficientsS2, _WignerD
 from .quadrature import quadratureS2Grid
 from .s2fun import S2FunHarmonic, realizeSpherical
 from .so3vectorfield import _projectSphericalRows, equivariantProjection
@@ -102,8 +102,9 @@ class S2VectorField:
     return mapField(lambda a, b: np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1)), self, w,
                     bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
 
+  # the length at every direction, a function on the sphere, as MATLAB's norm
   def norm(self):
-    return S2VectorFieldHarmonic(self).norm()
+    return self.abs()
 
   def mean(self):
     return S2VectorFieldHarmonic(self).mean()
@@ -137,9 +138,9 @@ class S2VectorFieldHarmonic(S2VectorField):
       v = fhat
       frame = v.frame
       if isinstance(v, S2VectorFieldHarmonic):
-        fhat, symmetrise = (v.truncate(bandwidth).fhat if bandwidth is not None else v.fhat), False
+        fhat, symmetrise = (v.truncate(bandwidth)._fhat if bandwidth is not None else v._fhat), False
       else:
-        fhat, symmetrise = v._harmonicField(bandwidth).fhat, False
+        fhat, symmetrise = v._harmonicField(bandwidth)._fhat, False
     elif isinstance(fhat, vector3d) and args and not isinstance(args[0], referenceFrame):
       pts, values = fhat, args[0]
       frame = pts.frame if frame is None else frame
@@ -148,10 +149,13 @@ class S2VectorFieldHarmonic(S2VectorField):
       w = np.full(d.size, 4 * np.pi / d.size) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(d, _values(values), L, w)
     elif isinstance(fhat, (list, tuple)) and fhat and isinstance(fhat[0], S2FunHarmonic):
-      if len(fhat) != 3:
-        raise ValueError("three component functions are needed")
+      # the x, y and z components, or x and y with z zero
+      if len(fhat) not in (2, 3):
+        raise ValueError("two or three component functions are needed")
+      if len(fhat) == 2:
+        fhat = [*fhat, 0 * fhat[0]]
       L = max(f.bandwidth for f in fhat)
-      fhat = np.stack([f.truncate(L).fhat for f in fhat], axis=-1)
+      fhat = np.stack([f.truncate(L)._fhat for f in fhat], axis=-1)
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       L = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
       g = quadratureS2Grid(L)
@@ -165,36 +169,70 @@ class S2VectorFieldHarmonic(S2VectorField):
       raise ValueError("a coefficient matrix has (L+1)^2 rows for its bandwidth L")
     for i in range(3):
       realizeSpherical(fhat[:, i])
-    self.fhat, self.frame = fhat, frame
+    self._fhat, self.frame = fhat, frame
     if symmetrise:
-      self.fhat = self.symmetrise().fhat
+      self._fhat = self.symmetrise()._fhat
 
   def _rebuild(self, fhat, **changes):
     v = object.__new__(S2VectorFieldHarmonic)
-    v.fhat, v.frame = np.asarray(fhat), self.frame
+    v._fhat, v.frame = np.asarray(fhat), self.frame
     for k, x in changes.items():
       setattr(v, k, x)
     return v
 
+  # the coefficients of the components in MTEX's basis, one column per component
+  @property
+  def fhat(self):
+    return mtexCoefficientsS2(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsS2(self._fhat)
+
   @property
   def bandwidth(self):
-    return math.isqrt(self.fhat.shape[0]) - 1
+    return math.isqrt(self._fhat.shape[0]) - 1
+
+  # the field of the outer normals, v at v, exact at bandwidth one
+  @classmethod
+  def normal(cls):
+    return cls(lambda v: v, bandwidth=2)
 
   def truncate(self, L):
     if L == self.bandwidth:
       return self
-    fhat = np.zeros(((L + 1) ** 2, 3), dtype=self.fhat.dtype)
-    n = min(len(fhat), len(self.fhat))
-    fhat[:n] = self.fhat[:n]
+    fhat = np.zeros(((L + 1) ** 2, 3), dtype=self._fhat.dtype)
+    n = min(len(fhat), len(self._fhat))
+    fhat[:n] = self._fhat[:n]
     return self._rebuild(fhat)
+
+  # S2VectorFieldHarmonic.quadrature(f, bandwidth=L), from a callable or from nodes and
+  # values with their weights, MATLAB's name for the constructor
+  @classmethod
+  def quadrature(cls, f, *args, bandwidth=None, weights=None):
+    return cls(f, *args, bandwidth=bandwidth, weights=weights)
+
+  # the least squares fit to vectors at directions
+  @classmethod
+  def interpolate(cls, nodes, values, **kwargs):
+    return interpolateField(nodes, values, **kwargs)
+
+  # the Cartesian components as functions
+  @property
+  def x(self):
+    return self.component(0)
+
+  @property
+  def y(self):
+    return self.component(1)
+
+  @property
+  def z(self):
+    return self.component(2)
 
   # one component as a function without the group
   def component(self, i):
-    return S2FunHarmonic(self.fhat[:, i], None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False)
+    return S2FunHarmonic(self._fhat[:, i], None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
 
   def eval(self, x):
     v = _vectorsFor(self, x).normalize()
-    return vector3d(_seriesColumns(self.fhat, v).reshape(*v.shape, 3))
+    return vector3d(_seriesColumns(self._fhat, v).reshape(*v.shape, 3))
 
   # the projection onto the equivariant fields of the frame, v(s xi) = s v(xi) for the
   # elements of the group including the improper ones
@@ -206,13 +244,13 @@ class S2VectorFieldHarmonic(S2VectorField):
     actions = [els[i].matrix() for i in range(els.size)]
     Ds = []
     for i in range(els.size):
-      D = WignerD(els[i].rot, bandwidth=L)
+      D = _WignerD(els[i].rot, bandwidth=L)
       Ds.append([(-1 if els[i].isImproper and l % 2 else 1) * D[l] for l in range(L + 1)])
-    return self._rebuild(_projectSphericalRows(self.fhat.copy(), equivariantProjection(actions, Ds)))
+    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, Ds)))
 
   def __add__(self, w):
     if isinstance(w, vector3d):
-      fhat = self.fhat.copy()
+      fhat = self._fhat.copy()
       fhat[0] += math.sqrt(4 * math.pi) * w.data.reshape(3)
       return self._rebuild(fhat)
     if not isinstance(w, S2VectorField):
@@ -220,21 +258,18 @@ class S2VectorFieldHarmonic(S2VectorField):
     self._sameFrames(w)
     w = S2VectorFieldHarmonic(w)
     L = max(self.bandwidth, w.bandwidth)
-    return self._rebuild(self.truncate(L).fhat + w.truncate(L).fhat)
+    return self._rebuild(self.truncate(L)._fhat + w.truncate(L)._fhat)
 
   def _scaled(self, a):
-    return self._rebuild(a * self.fhat)
+    return self._rebuild(a * self._fhat)
 
   def mean(self):
-    return vector3d(np.real(self.fhat[0]) / math.sqrt(4 * math.pi))
-
-  def norm(self):
-    return float(np.linalg.norm(self.fhat)) / math.sqrt(4 * math.pi)
+    return vector3d(np.real(self._fhat[0]) / math.sqrt(4 * math.pi))
 
   def isclose(self, w, rtol=1e-8):
     w = S2VectorFieldHarmonic(w)
     L = max(self.bandwidth, w.bandwidth)
-    a, b = self.truncate(L).fhat, w.truncate(L).fhat
+    a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= rtol * np.linalg.norm(b))
 
   # the inner product with a constant vector, exact, a function without the group
@@ -244,14 +279,14 @@ class S2VectorFieldHarmonic(S2VectorField):
     x = x if isinstance(x, vector3d) else vector3d(x)
     if x.frame is not None and self.frame is not None and x.frame is not self.frame:
       raise ValueError("the vector lives in another frame than the field")
-    return S2FunHarmonic(self.fhat @ x.data.reshape(3), None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False)
+    return S2FunHarmonic(self._fhat @ x.data.reshape(3), None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
 
   # F x x = -[x]_x F, on the rows of the coefficients F [x]_x
   def cross(self, x):
     if isinstance(x, S2VectorField):
       return S2VectorField.cross(self, x)
     x = x if isinstance(x, vector3d) else vector3d(x)
-    return self._rebuild(self.fhat @ spinTensor(x.data.reshape(3)))
+    return self._rebuild(self._fhat @ spinTensor(x.data.reshape(3)))
 
   # v'(xi) = r v(r^-1 xi): the components rotate and mix
   def rotate(self, r):
@@ -261,17 +296,17 @@ class S2VectorFieldHarmonic(S2VectorField):
       return self.rotate(rotation(r))._rebuild(None, frame=r.SS) if False else _reframe(self.rotate(rotation(r)), r.SS)
     rot = rotation(r.data.reshape(4))
     L = self.bandwidth
-    D = WignerD(rot, bandwidth=L)
-    fhat = self.fhat.copy()
+    D = _WignerD(rot, bandwidth=L)
+    fhat = self._fhat.copy()
     for l in range(L + 1):
-      fhat[l * l:(l + 1) ** 2] = D[l] @ self.fhat[l * l:(l + 1) ** 2]
+      fhat[l * l:(l + 1) ** 2] = D[l] @ self._fhat[l * l:(l + 1) ** 2]
     fhat = fhat @ rot.matrix().T
     return self._rebuild(fhat, frame=None if self.frame is None else _rotatedFrame(self.frame, rot))
 
   # the field of the antipode, v(-xi)
   def antipode(self):
-    l = np.floor(np.sqrt(np.arange(len(self.fhat)))).astype(int)
-    return self._rebuild(np.where(l % 2, -1.0, 1.0)[:, None] * self.fhat)
+    l = np.floor(np.sqrt(np.arange(len(self._fhat)))).astype(int)
+    return self._rebuild(np.where(l % 2, -1.0, 1.0)[:, None] * self._fhat)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({self.frame.char()})"
@@ -279,7 +314,7 @@ class S2VectorFieldHarmonic(S2VectorField):
 
 
 def _reframe(v, frame):
-  return v._rebuild(v.fhat, frame=frame)
+  return v._rebuild(v._fhat, frame=frame)
 
 
 # ------------------------------------------------------------------ the surface gradient
@@ -326,7 +361,7 @@ def grad(f, x=None):
       return S2VectorFieldHarmonic(np.zeros((1, 3), dtype=complex), f.frame, symmetrise=False)
     return S2VectorFieldHarmonic(lambda v: grad(f, vector3d(v.data)), f.frame, bandwidth=f.bandwidth + 1, symmetrise=False)
   v = f._vectorsFor(x).normalize()
-  Lf = _seriesColumns(angularDerivatives(f.fhat), v)
+  Lf = _seriesColumns(angularDerivatives(f._fhat), v)
   return vector3d(np.cross(Lf, v.data.reshape(-1, 3)).reshape(*v.shape, 3))
 
 
@@ -355,7 +390,7 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
   if values.ndim == 2:
     return S2VectorFieldHarmonic(_adjointColumns(g, values, L, g.weights), v.frame, symmetrise=False)
   fr = v.frame if invariant or v.frame is None else v.frame.stripSym()
-  return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), fr, real=True, symmetrise=False)
+  return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), fr, real=True, symmetrise=False, _internal=True)
 
 
 # ------------------------------------------------------------------ the handle and the polar basis
@@ -379,7 +414,7 @@ class S2VectorFieldHandle(S2VectorField):
 
   @property
   def fhat(self):
-    return S2VectorFieldHarmonic(self).fhat
+    return S2VectorFieldHarmonic(self)._fhat
 
   def _scaled(self, a):
     return S2VectorFieldHandle(lambda x: a * _values(self.fun(x)), self.frame, bandwidth=self.bandwidth)

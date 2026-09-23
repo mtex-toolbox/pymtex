@@ -25,11 +25,13 @@ plottingConvention.default('y↑→x')
 # ## Two Grains to Work With
 #
 # The example is an EBSD map of magnesium containing extension twins. The map first has to
-# be divided into [grains](GrainReconstruction.html). Orientations in the port are proper
-# rotations, so the proper symmetry operations are the ones used throughout.
+# be divided into [grains](GrainReconstruction.html).
 
 # +
 ebsd = mtexdata('twins', silent=True)
+
+# use only proper symmetry operations, which are rotations
+ebsd['M'].CS = ebsd['M'].CS.properGroup()
 
 # compute and smooth the grains
 grains = calcGrains(ebsd, threshold=5 * degree, minPixel=5)
@@ -38,22 +40,23 @@ CS = grains.CS
 # -
 
 # The two labelled grains share the white boundary. Their adjacency makes the relative
-# orientation a grain-boundary misorientation.
+# orientation a grain-boundary misorientation. The port numbers the grains differently from
+# MATLAB, where these two are grains 57 and 58.
 
 # +
 plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
 
 hold(True)
-plot(grains[[56, 57]].boundary, edgecolor='w', linewidth=2)
+plot(grains[[42, 46]].boundary, edgecolor='w', linewidth=2)
 hold(False)
 
-text(grains[[56, 57]], ['1', '2'])
+text(grains[[42, 46]], ['1', '2'])
 # -
 
 # Their mean orientations are the two inputs used below.
 
-ori1 = grains[56].meanOrientation
-ori2 = grains[57].meanOrientation
+ori1 = grains[42].meanOrientation
+ori2 = grains[46].meanOrientation
 
 # ## Misorientation Angle and Disorientation
 #
@@ -67,13 +70,13 @@ disorientationAngle
 # *disorientation angle*.
 
 ori2Equivalent = ori2.symmetrise()
-symmetryAwareRange = np.array([np.min(angle(ori1, ori2Equivalent)), np.max(angle(ori1, ori2Equivalent))]) / degree
+symmetryAwareRange = np.hstack([np.min(angle(ori1, ori2Equivalent)), np.max(angle(ori1, ori2Equivalent))]) / degree
 symmetryAwareRange
 
 # Every symmetry-aware comparison therefore returns the same value. If symmetry is ignored,
 # the same representatives span many rotation angles.
 
-rawAngleRange = np.array([np.min(angle(ori1, ori2Equivalent, noSymmetry=True)),
+rawAngleRange = np.hstack([np.min(angle(ori1, ori2Equivalent, noSymmetry=True)),
                           np.max(angle(ori1, ori2Equivalent, noSymmetry=True))]) / degree
 rawAngleRange
 
@@ -138,7 +141,7 @@ legend(location='southoutside', FontSize=13, numColumns=4)
 # $\{\bar1011\}$ on $\{\bar1011\}$. Their angular separations are about half a degree and a
 # fifth of a degree.
 
-nearCoincidenceError = np.array([angle(mori * Miller(1, 1, -2, 0, CS), Miller(1, 1, -2, 0, CS)),
+nearCoincidenceError = np.hstack([angle(mori * Miller(1, 1, -2, 0, CS), Miller(1, 1, -2, 0, CS)),
                                  angle(mori * Miller(-1, 0, 1, 1, CS), Miller(-1, 0, 1, 1, CS))]) / degree
 nearCoincidenceError
 
@@ -146,7 +149,7 @@ nearCoincidenceError
 # the basal plane $(0001)$, and the basal plane maps near the prism plane. Both separations
 # are about $4.3^\circ$.
 
-crossPlaneError = np.array([angle(mori * Miller(1, -1, 0, 0, CS), Miller(0, 0, 0, 1, CS)),
+crossPlaneError = np.hstack([angle(mori * Miller(1, -1, 0, 0, CS), Miller(0, 0, 0, 1, CS)),
                             angle(mori * Miller(0, 0, 0, 1, CS), Miller(1, -1, 0, 0, CS))]) / degree
 crossPlaneError
 
@@ -215,7 +218,7 @@ twinMaximumAngle
 # The measured grain pair is $0.7^\circ$ from the ideal twin. The 90 degree coincidence
 # approximation is $3.7^\circ$ from it.
 
-twinDeviation = np.array([angle(mori, twinning), angle(coincidenceMori, twinning)]) / degree
+twinDeviation = np.hstack([angle(mori, twinning), angle(coincidenceMori, twinning)]) / degree
 twinDeviation
 
 # ## Finding the Twin Boundaries

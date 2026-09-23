@@ -61,9 +61,10 @@ class sphericalPlot:
     xlo, xhi, ylo, yhi = self.bounds
     ax.set_xlim(xlo, xhi)
     ax.set_ylim((yhi, ylo) if proj.isPlain else (ylo, yhi))
+    # the grid lies over the data, as MATLAB's, under the boundary and the markers
     if grid:
       for x, y in proj.gridLines(grid_res):
-        self.grid += ax.plot(x, y, color=GRID_COLOR, linewidth=0.5, zorder=1)
+        self.grid += ax.plot(x, y, color=GRID_COLOR, linewidth=0.5, zorder=4)
     for x, y in proj.boundary():
       self.boundary += ax.plot(x, y, color=BOUNDARY_COLOR, linewidth=1.5, zorder=5)
     if not noLabel:
@@ -146,6 +147,12 @@ def _targets(v, projKw, axesKw, whereKw, titles=None):
     sPs = [ax._mtexSphericalPlot for ax in fig.children if hasattr(ax, "_mtexSphericalPlot")]
     if sPs:
       return sPs
+  # a held plot draws into the axes nextAxis named, else into the current one
+  if fig is not None and fig.hold and fig.pending is not None and hasattr(fig.pending, "_mtexSphericalPlot"):
+    return [fig.takeAxis()._mtexSphericalPlot]
+  if fig is not None and fig.hold and fig.current is not None and fig.current is not fig.children[-1] and \
+     hasattr(fig.current, "_mtexSphericalPlot"):
+    return [fig.current._mtexSphericalPlot]
   if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSphericalPlot"):
     # the two hemispheres of one sphere take a held plot together, each clipping its own
     sPs = [ax._mtexSphericalPlot for ax in fig.children if hasattr(ax, "_mtexSphericalPlot")]
@@ -190,10 +197,10 @@ MARKER_KEYS = {"MarkerSize": "size", "Marker": "marker", "MarkerFaceColor": "col
                "MarkerEdgeAlpha": "alpha", "MarkerFaceAlpha": "alpha", "MarkerAlpha": "alpha", "alpha": "alpha",
                "MarkerEdgeColor": "edgecolor", "color": "color", "markersize": "size", "marker": "marker",
                "markerEdgeColor": "edgecolor", "markerFaceColor": "color", "markerColor": "color", "markeredgecolor": "edgecolor",
-               "markerfacecolor": "color"}
+               "markerfacecolor": "color", "markerSize": "size", "Markersize": "size"}
 
 
-def _markers(sP, v, data=None, label=None, rgb=None, colormap="WhiteJet", colorRange=None, zorder=6, **kw):
+def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=None, zorder=6, **kw):
   # 'all' asks for every point, and 'filled' for a filled marker, which is what is drawn anyway
   kw.pop("all", None)
   kw.pop("filled", None)
@@ -201,14 +208,37 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap="WhiteJet", colorR
   if kw.pop("labeled", False) and label is None:
     label = [_nameOf(v.flatten()[i]) for i in range(v.size)]
   background = kw.pop("backgroundColor", kw.pop("backgroundcolor", kw.pop("BackgroundColor", None)))
-  above = kw.pop("textAboveMarker", False)
-  opts = {"size": getMTEXpref("markerSize", 10), "marker": "o", "color": MARKER_COLOR, "edgecolor": "k"}
+  # the text goes below the marker unless textAboveMarker, MATLAB's textBelowMarker being that default
+  above = kw.pop("textAboveMarker", False) and not kw.pop("textBelowMarker", False)
+  kw.pop("textBelowMarker", None)
+  # the markers shrink with the spacing of many directions, as MATLAB's do; the spacing is
+  # that of as many directions spread evenly
+  sizeGiven = any(key in kw for key, name in MARKER_KEYS.items() if name == "size")
+  size = getMTEXpref("markerSize", 10)
+  if not sizeGiven and v.size > 4:
+    size = min(size, 50 * max(np.sqrt(4 * np.pi / v.size / (1 + v.antipodal)), 0.5 * degree))
+  opts = {"size": size, "marker": "o", "color": MARKER_COLOR, "edgecolor": "k"}
+  # an open marker, MarkerFaceColor 'none', still takes the colour of the order, on its edge
+  faceNone = any(name == "color" and isinstance(kw.get(key), str) and kw[key].lower() == "none" for key, name in MARKER_KEYS.items())
+  edgeGiven = any(key in kw for key, name in MARKER_KEYS.items() if name == "edgecolor")
+  ownColor = any(key in kw for key, name in MARKER_KEYS.items() if name == "color") and not faceNone
   for key, name in MARKER_KEYS.items():
     if key in kw:
       opts[name] = kw.pop(key)
+  # every further set of markers in one chart takes the next colour of the order, as MATLAB's
+  # held plots do; text alone, markers of size zero, takes none
+  if not ownColor and data is None and rgb is None and opts["size"]:
+    from .colormaps import MTEX_COLORS
+    k = getattr(sP, "markerSets", 0)
+    opts["color"] = tuple(MTEX_COLORS[k % len(MTEX_COLORS)])
+    sP.markerSets = k + 1
+  if faceNone:
+    if not edgeGiven:
+      opts["edgecolor"] = opts["color"]
+    opts["color"] = "none"
   # MATLAB's marker names; a line width is the width of the marker edge
   opts["marker"] = MARKER_NAMES.get(str(opts["marker"]).lower(), opts["marker"])
-  edgeWidth = kw.pop("lineWidth", None)
+  edgeWidth = kw.pop("lineWidth", kw.pop("linewidth", kw.pop("LineWidth", None)))
   # MATLAB's DisplayName names the markers in a legend
   legendName = kw.pop("DisplayName", kw.pop("displayName", None))
   # an axis on the rim of a hemisphere chart is marked at both ends; values stay one per point
@@ -229,19 +259,24 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap="WhiteJet", colorR
     return None
   ax = sP.ax
   size = opts["size"]
-  # one size for all or one per marker; the edge thins with the marker, so a small marker
-  # still shows its face
+  # one size for all, a diameter, or one per marker, an area as MATLAB's scatter reads it;
+  # the edge thins with the marker, so a small marker still shows its face
   sizes = np.asarray(size, dtype=float)
-  if sizes.ndim > 0:
-    sizes = sizes.reshape(-1)[keep] if sizes.size == len(x) else sizes.reshape(-1)
+  area = sizes ** 2
+  if sizes.ndim > 0 and sizes.size > 1:
+    area = sizes.reshape(-1)[keep] if sizes.size == len(x) else sizes.reshape(-1)
+    sizes = np.sqrt(area)
   small = float(np.min(sizes)) if sizes.size else float(sizes)
-  common = dict(marker=opts["marker"], s=sizes ** 2, edgecolors=opts["edgecolor"] if small >= 2 else "none",
+  common = dict(marker=opts["marker"], s=area, edgecolors=opts["edgecolor"] if small >= 2 else "none",
                 linewidths=0.5 * min(1.0, small / 6) if edgeWidth is None else edgeWidth, zorder=zorder,
                 alpha=opts.get("alpha"), label=legendName, **kw)
   if data is not None:
     vals = np.asarray(data, dtype=float).ravel()[keep]
     sP.updateMinMax(vals)
     lo, hi = (np.nanmin(vals), np.nanmax(vals)) if colorRange is None else colorRange
+    # a marker coloured by its value is edged in the same colour
+    if not edgeGiven:
+      common["edgecolors"] = "face"
     h = ax.scatter(x[keep], y[keep], c=vals, cmap=mtexColormap(colormap), vmin=lo, vmax=hi, **common)
     sP.mappable = h
   elif rgb is not None:
@@ -299,9 +334,11 @@ def _blocks(X):
   return [(edges[k], edges[k + 1]) for k in range(0, len(edges), 2) if edges[k + 1] - edges[k] >= 2]
 
 
-def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap="WhiteJet", colorRange=None, log=False,
+def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorRange=None, log=False,
             lineColor=None, lineWidth=0.5, contourLabels=False, zorder=2, **kw):
   from matplotlib.colors import LogNorm, Normalize
+  # the colour map is fixed when the surface is drawn, a later preference leaves it alone
+  colormap = mtexColormap(colormap)
   # the bands of a contour plot are cut for one range and one colour map, so a change of
   # either draws it again
   again = dict(style=style, contours=contours, log=log, lineColor=lineColor, lineWidth=lineWidth,
@@ -318,11 +355,14 @@ def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap="WhiteJet", 
   if not hi > lo:
     hi = lo + max(abs(lo), 1.0) * 1e-6
 
+  levels = contourLevels(lo, hi, contours, log=log) if np.isscalar(contours) else np.asarray(contours, dtype=float)
+
+  # a new colour range or map recolours the bands and keeps their levels, as MATLAB's
+  # setColorRange moves the colour limits of a contour plot and not its contours
   def refill(colorRange=(lo, hi), colormap=colormap):
-    return _filled(sP, X, Y, values, colorRange=colorRange, colormap=colormap, **again)
+    return _filled(sP, X, Y, values, colorRange=colorRange, colormap=colormap, **dict(again, contours=levels))
 
   sP.refill = refill if style in ("contourf", "contour") else None
-  levels = contourLevels(lo, hi, contours, log=log) if np.isscalar(contours) else np.asarray(contours, dtype=float)
   cmap = mtexColormap(colormap)
   norm = LogNorm(lo, hi) if log and lo > 0 else Normalize(lo, hi)
   ax = sP.ax
@@ -349,6 +389,11 @@ def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap="WhiteJet", 
         ax.clabel(cs, fontsize=sP.fontSize - 3)
       h = h if h is not None else cs
   sP.mappable = h if h is not None else sP.mappable
+  # a surface drawn in blocks is recoloured block by block
+  if style == "pcolor" and len(bucket) > 1:
+    sP.mappables = list(bucket)
+  elif h is not None and hasattr(sP, "mappables"):
+    del sP.mappables
   return h
 
 
@@ -363,24 +408,37 @@ def _drawFunction(sP, f, style="pcolor", resolution=1 * degree, **kw):
 
 # arrows in the plane: the tangent vector w at v carried through the projection, the
 # longest one arrowSize times the grid spacing, all of that length with normalize
-def _arrows(sP, v, w, resolution=10 * degree, arrowSize=1.2, normalize=False, color="k", axisField=False, zorder=6, lineWidth=1.0, **kw):
+def _arrows(sP, v, w, resolution=10 * degree, arrowSize=0.5, normalize=False, color="k", axisField=False, zorder=6, lineWidth=1.0, **kw):
   from matplotlib.collections import LineCollection
   eps = 1e-4
   x0, y0 = sP.proj.project(v)
   x1, y1 = sP.proj.project(v.normalize() + eps * w)
-  x0, y0, x1, y1 = (np.asarray(a, dtype=float).ravel() for a in (x0, y0, x1, y1))
+  x2, y2 = sP.proj.project(v.normalize() - eps * w)
+  x0, y0, x1, y1, x2, y2 = (np.asarray(a, dtype=float).ravel() for a in (x0, y0, x1, y1, x2, y2))
+  # a step over the rim of the chart lands far away or nowhere, so the shorter one-sided
+  # difference is the derivative
+  forward = np.hypot(x1 - x0, y1 - y0)
+  backward = np.hypot(x0 - x2, y0 - y2)
+  useBackward = ~np.isfinite(forward) | (np.isfinite(backward) & (backward < forward))
+  x1, y1 = np.where(useBackward, 2 * x0 - x2, x1), np.where(useBackward, 2 * y0 - y2, y1)
   keep = np.isfinite(x0) & np.isfinite(x1)
   if not np.any(keep):
     return None
   dx, dy = (x1 - x0)[keep] / eps, (y1 - y0)[keep] / eps
   length = np.hypot(dx, dy)
-  if normalize:
-    dx, dy = dx / np.where(length > 0, length, 1.0), dy / np.where(length > 0, length, 1.0)
-    length = np.hypot(dx, dy)
-  longest = np.max(length) if np.max(length) > 0 else 1.0
+  dx, dy = dx / np.where(length > 0, length, 1.0), dy / np.where(length > 0, length, 1.0)
+  # as MATLAB's quiver: the tangential part at its length, the longest vector of the whole
+  # field half the grid spacing, so a direction almost normal to the sphere draws almost nothing
   unit = resolution / degree if sP.proj.isPlain else resolution
-  scale = arrowSize * unit / longest
-  dx, dy = dx * scale, dy * scale
+  if normalize:
+    size = np.ones(len(dx))
+  else:
+    V = v.normalize().data.reshape(-1, 3)
+    W = np.broadcast_to(np.asarray(w.data if isinstance(w, vector3d) else w, dtype=float).reshape(-1, 3), V.shape)
+    full = np.linalg.norm(W, axis=1)
+    size = np.linalg.norm(W - np.sum(W * V, axis=1, keepdims=True) * V, axis=1)[keep]
+    size = size / (np.max(full) if np.max(full) > 0 else 1.0)
+  dx, dy = dx * size * arrowSize * unit, dy * size * arrowSize * unit
   x0, y0 = x0[keep], y0[keep]
   if axisField:
     segments = np.stack([np.stack([x0 - dx / 2, y0 - dy / 2], axis=1), np.stack([x0 + dx / 2, y0 + dy / 2], axis=1)], axis=1)
@@ -460,7 +518,7 @@ def plot(v, *args, **kw):
   from .tensorplot import isRGB, plotRGB
   if isRGB(v):
     kw.pop("rgb", None)
-    return plotRGB(v, *args, **kw)
+    return plotRGB(v, *[a for a in args if not (isinstance(a, str) and a == "rgb")], **kw)
   # a tensor is drawn as its directional magnitude
   if hasattr(v, "rank") and hasattr(v, "M"):
     return plot(v.directionalMagnitude(), *args, **kw)
@@ -489,9 +547,10 @@ def plot(v, *args, **kw):
     from .spaceplot import plot3d
     return plot3d(v, *args, **kw)
   # a function on the circle and a characteristic shape are polar lines
+  from ..functions.handles import S1FunHandle
   from ..functions.s1fun import S1FunHarmonic
   from ..maps.shape import shape2d
-  if isinstance(v, S1FunHarmonic):
+  if isinstance(v, (S1FunHarmonic, S1FunHandle)):
     from .polarplot import plotS1
     return plotS1(v, *args, **kw)
   if isinstance(v, shape2d):
@@ -502,11 +561,22 @@ def plot(v, *args, **kw):
     from . import mapplot
     f = {"ebsd": mapplot.plotEBSD, "grains": mapplot.plotGrains, "boundary": mapplot.plotBoundary,
          "triplePoints": mapplot.plotTriplePoints}[kind]
-    return f(v, *args, **mapplot.mapAliases(kw))
+    return f(v, *args, **mapplot.mapAliases(kw, grains=kind == "grains"))
   if _isField(v):
     return quiver(v, *args, **kw)
+  # a vector field on SO(3) as arrows in the sections of orientation space
+  if type(v).__name__.startswith("SO3VectorField"):
+    from .sectionplot import quiverSectionField
+    return quiverSectionField(v, *args, **kw)
   if _isFunction(v):
+    # MATLAB's positional flags, plot(sF, 'complete', 'smooth', 'upper', 'lower')
+    kw.update({a: True for a in args if isinstance(a, str)})
     style = next((f for f in FILL_FLAGS if kw.pop(f, False)), "pcolor")
+    # a list of functions: one panel for each, each on its own colour range
+    if getattr(v, "shape", ()):
+      fs = [v[k] for k in np.ndindex(v.shape)]
+      kw.setdefault("colorRange", "individual")
+      return _plotRow(fs, [None] * len(fs), style="pcolor" if style == "smooth" else style, **kw)
     return _plotFunction(v, style="pcolor" if style == "smooth" else style, **kw)
   # a key of two properties as its image
   if hasattr(v, "property2color"):
@@ -521,45 +591,96 @@ def plot(v, *args, **kw):
     from .shapeplot import plotShape
     return plotShape(v, *args, **kw)
   v = v if isinstance(v, vector3d) else vector3d(v)
+  # MATLAB's positional flags, plot(v, 'contourf', 'fundamentalRegion')
+  for a in [a for a in args if isinstance(a, str)]:
+    kw[a] = True
+  args = tuple(a for a in args if not isinstance(a, str))
   if kw.pop("plane", False):
     return _planeCircles(v, **kw)
   if args and isinstance(args[0], vector3d):
     return quiver(v, args[0], **kw)
   style = next((f for f in FILL_FLAGS if kw.pop(f, False)), None)
   data = args[0] if args else None
+  if style is not None and data is not None and getattr(v, "_plotGrid", None) is not None:
+    return _plotOnGrid(v, data, style="pcolor" if style == "smooth" else style, **kw)
   if style is not None:
     return _plotVectorDensity(v, data, style="pcolor" if style == "smooth" else style, **kw)
   return scatter(v, data, **kw)
 
 
+# values on the directions of plotS2Grid, drawn where they lie on the charts of its hemisphere
+def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
+  for key, value in v._plotGrid.items():
+    kw.setdefault(key, value)
+  projKw, axesKw, whereKw = _split(kw)
+  values = np.asarray(data, dtype=float).reshape(v.shape)
+  sPs = _targets(v, projKw, axesKw, whereKw)
+  if colorRange is None:
+    colorRange = _rangeOf([values])
+  hs = []
+  for sP in sPs:
+    x, y = sP.proj.project(v)
+    hs.append(_filled(sP, np.asarray(x, dtype=float), np.asarray(y, dtype=float), values, style=style, colorRange=colorRange, **kw))
+  if colorbar:
+    gcm().colorbar()
+  return hs
+
+
 # circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
 # chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)
 def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0, parent=None, **kw):
-  lineColor = kw.pop("color", kw.pop("linecolor", kw.pop("LineColor", lineColor)))
+  vs = v if isinstance(v, vector3d) else vector3d(v)
+  t = np.linspace(0, 2 * np.pi, 361)
+  rings = []
+  for k in range(vs.size):
+    n = vs.flatten()[k].normalize()
+    u = n.orth()
+    w = n.cross(u).normalize()
+    rings.append(np.cos(radius) * n.data.reshape(1, 3) + np.sin(radius) * (np.cos(t)[:, None] * u.data.reshape(1, 3) + np.sin(t)[:, None] * w.data.reshape(1, 3)))
+  return _curves(rings, vs.frame, vs.antipodal, add2all, lineColor, lineWidth, EdgeAlpha, parent, "circle", **kw)
+
+
+def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0, parent=None, **kw):
+  """ellipse(rot, a, b): the ellipse of semi-axes a and b, in radians, about rot * z, its
+  axes along rot * x and rot * y, onto the spherical plots of the figure"""
+  from ..geometry.quaternion import rotation
+  rots = rot.flatten() if rot.size > 1 else [rot]
+  a, b = np.broadcast_to(np.asarray(a, dtype=float).ravel(), (len(rots),)), np.broadcast_to(np.asarray(b, dtype=float).ravel(), (len(rots),))
+  rho = np.linspace(0, 2 * np.pi, 361)
+  rings = []
+  for r, ai, bi in zip(rots, a, b):
+    # the polar distance of the ellipse from its centre, then turned into place
+    theta = ai * bi / np.sqrt((ai * np.cos(rho)) ** 2 + (bi * np.sin(rho)) ** 2)
+    c = rotation(r.data.reshape(4)) * vector3d.byPolar(theta, rho)
+    rings.append(c.data.reshape(-1, 3))
+  return _curves(rings, None, False, add2all, lineColor, lineWidth, EdgeAlpha, parent, "ellipse", **kw)
+
+
+# rings of directions as lines on the spherical plots: the one drawn last, every one with
+# add2all, or those named
+def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, EdgeAlpha, parent, name, **kw):
+  lineColor = kw.pop("color", kw.pop("linecolor", kw.pop("LineColor", kw.pop("lineColor", lineColor))))
   lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
   kw.pop("doNotDraw", None)
   fig = gcm()
   if parent is not None:
     axes = list(parent) if isinstance(parent, (list, tuple)) else [parent]
   elif fig is None or not fig.children:
-    raise ValueError("circle draws onto a spherical plot; plot the directions first")
+    raise ValueError(f"{name} draws onto a spherical plot; plot the directions first")
   elif add2all:
     axes = [ax for ax in fig.children if hasattr(ax, "_mtexSphericalPlot")]
   else:
     ax = fig.takeAxis() if fig.pending is not None else fig.children[-1]
     axes = [ax]
-  vs = v if isinstance(v, vector3d) else vector3d(v)
-  t = np.linspace(0, 2 * np.pi, 361)
   hs = []
-  for k in range(vs.size):
-    n = vs.flatten()[k].normalize()
-    u = n.orth()
-    w = n.cross(u).normalize()
-    ring = np.cos(radius) * n.data.reshape(1, 3) + np.sin(radius) * (np.cos(t)[:, None] * u.data.reshape(1, 3) + np.sin(t)[:, None] * w.data.reshape(1, 3))
+  for ring in rings:
     for ax in axes:
       sP = ax._mtexSphericalPlot
-      x, y = sP.proj.project(vector3d(ring, frame=vs.frame, antipodal=vs.antipodal))
+      x, y = sP.proj.project(vector3d(ring, frame=frame, antipodal=antipodal))
       x, y = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+      # a curve leaving the chart, or folded to its antipode, is broken where it jumps
+      jump = np.flatnonzero(np.hypot(np.diff(x), np.diff(y)) > 0.25 * np.nanmax(np.hypot(x, y)))
+      x, y = np.insert(x, jump + 1, np.nan), np.insert(y, jump + 1, np.nan)
       hs.append(ax.plot(x, y, color=lineColor, linewidth=lineWidth, alpha=EdgeAlpha, zorder=7, **kw))
   return hs
 
@@ -578,10 +699,16 @@ def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw):
   return h
 
 
-def scatter(v, data=None, minmax=False, symmetrised=False, colorbar=False, **kw):
+def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, **kw):
   """scatter(v), scatter(v, data), scatter(v, label=texts): directions as markers; scatter(ori)
-  puts orientations into axis angle space"""
+  puts orientations into axis angle space; scatter(x, y, sz, c, 'filled') of two coordinate
+  lists marks points on the current map"""
+  from ..geometry._array import MtexArray
   from ..geometry.quaternion import quaternion
+  if not isinstance(v, MtexArray) and data is not None and not isinstance(data, MtexArray) and np.ndim(v) == 1 \
+     and np.shape(data) == np.shape(v):
+    from .mapplot import scatterXY
+    return scatterXY(v, data, *args, **kw)
   if isinstance(v, quaternion):
     from .spaceplot import scatterOrientations
     return scatterOrientations(v, data, **kw)
@@ -608,15 +735,25 @@ def scatter(v, data=None, minmax=False, symmetrised=False, colorbar=False, **kw)
   return hs
 
 
-def text(v, labels, *more, **kw):
-  """text(v, labels): text at directions; text(ebsd, labels): labels on the map;
-  text(x, y, s) and text(x, y, z, s): text at a point of the current axes, as MATLAB's text"""
+def text(v, labels=None, *more, **kw):
+  """text(v, labels): text at directions, text(v, labeled=True) each direction's own name;
+  text(ebsd, labels): labels on the map; text(x, y, s) and text(x, y, z, s): text at a point
+  of the current axes, as MATLAB's text"""
+  if labels is None and not kw.get("labeled"):
+    raise TypeError("text needs the labels or labeled=True")
   if more or isinstance(labels, (int, float, np.number)):
     return _textAt((v, labels) + more[:-1], more[-1], **kw)
   if _mapKind(v) is not None:
     from .mapplot import textMap
     return textMap(v, labels, **kw)
   kw.setdefault("MarkerSize", 0)
+  # text is added to the charts of the current figure, as MATLAB's text adds to its axes,
+  # or to the one nextAxis chose in a held figure
+  fig = gcm()
+  chosen = fig is not None and fig.hold and (fig.pending is not None or (fig.current is not None and bool(fig.children)
+                                                                         and fig.current is not fig.children[-1]))
+  if not chosen:
+    kw.setdefault("add2all", True)
   return scatter(v, label=labels, **kw)
 
 
@@ -765,9 +902,14 @@ def annotate(v, *args, **kw):
   return plot(v, **kw)
 
 
-def _plotVectorDensity(v, data=None, style="contourf", halfwidth=5 * degree, **kw):
+# the density of directions, weighted on request, axial with MATLAB's 'antipodal'; or the
+# interpolant of values given at them
+def _plotVectorDensity(v, data=None, style="contourf", halfwidth=5 * degree, weights=None, **kw):
   from ..functions.density import calcDensity, interpolate
-  f = calcDensity(v, halfwidth=halfwidth) if data is None else interpolate(v, np.asarray(data, dtype=float).ravel())
+  if data is None:
+    f = calcDensity(v, halfwidth=halfwidth, weights=weights, antipodal=bool(kw.get("antipodal", False)))
+  else:
+    f = interpolate(v, np.asarray(data, dtype=float).ravel())
   return _plotFunction(f, style=style, **kw)
 
 
@@ -777,7 +919,7 @@ def _plotFunction(f, style="pcolor", resolution=1 * degree, minmax=False, colorb
   fr = getattr(f, "frame", None)
   if projKw.get("complete", False):
     projKw.setdefault("antipodal", bool(getattr(f, "antipodal", False)))
-    sPs = _targets(sphericalRegion(frame=fr), projKw, axesKw, whereKw)
+    sPs = _targets(sphericalRegion(frame=fr), dict(projKw, symmetric=hasSymmetry(fr)), axesKw, whereKw)
   else:
     sPs = _targets(f, projKw, axesKw, whereKw)
   grids = [sP.proj.grid(resolution) for sP in sPs]
@@ -829,7 +971,8 @@ def quiver(v, w=None, resolution=10 * degree, **kw):
   projKw, axesKw, whereKw = _split(kw)
   if w is None:
     f = v
-    projKw.setdefault("antipodal", _isAxisField(f))
+    # the values of an axis field are axes, its argument a direction: both hemispheres
+    projKw.setdefault("antipodal", False)
     sPs = _targets(f, projKw, axesKw, whereKw)
     hs = []
     # the arrows sit on an equispaced grid, so that they do not crowd the pole
@@ -927,19 +1070,21 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
   for f, title in zip(fs, titles):
     if complete:
       v = sphericalRegion(frame=getattr(f, "frame", None))
-      pk = dict(projKw, complete=True, antipodal=projKw.get("antipodal", bool(getattr(f, "antipodal", False))))
+      pk = dict(projKw, complete=True, antipodal=projKw.get("antipodal", bool(getattr(f, "antipodal", False))),
+                symmetric=hasSymmetry(v.frame))
     else:
       v, pk = f, projKw
     for p in makeSphericalProjection(v, **pk):
       charts.append((f, p, None if noTitle else title))
   # a held figure of as many charts takes the surface on top of what it has; the axes
-  # nextAxis prepared takes a single chart, a fresh figure of newMtexFigure the charts;
-  # else a new figure, laid out as asked
+  # nextAxis prepared takes the first chart and the axes after it the others, as a row of
+  # a newMtexFigure layout continues; a fresh figure of newMtexFigure the charts; else a
+  # new figure, laid out as asked
   fig = gcm()
   if fig is not None and fig.hold and len(fig.children) == len(charts) and all(hasattr(ax, "_mtexSphericalPlot") for ax in fig.children):
     sPs = [ax._mtexSphericalPlot for ax in fig.children]
-  elif fig is not None and fig.pending is not None and len(charts) == 1:
-    sPs = [sphericalPlot(fig.takeAxis(), charts[0][1], **axesKw, title=charts[0][2])]
+  elif fig is not None and fig.pending is not None:
+    sPs = [sphericalPlot(fig.takeAxis() if i == 0 else fig.nextAxis(), p, **axesKw, title=t) for i, (_, p, t) in enumerate(charts)]
   elif fig is not None and not fig.children and not fig.hold:
     sPs = [sphericalPlot(fig.nextAxis(), p, **axesKw, title=t) for _, p, t in charts]
   else:
@@ -970,6 +1115,8 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
 
 def plotPDF(odf, h, *args, superposition=None, **kw):
   """plotPDF(odf, h): the pole figures of an ODF, one axes per crystal direction"""
+  # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf')
+  kw.update({a: True for a in args if isinstance(a, str)})
   hs = _asList(h)
   if superposition is not None:
     from ..functions.density import calcPDF
@@ -989,6 +1136,8 @@ def plotPDF(odf, h, *args, superposition=None, **kw):
     fs = [odf.pdf(x) if x.size == 1 else calcPDF(odf, x) for x in hs]
     titles = [x.char() for x in hs]
     poles = hs
+  # every pole figure on its own range, as MATLAB's; colorRange='equal' shares one
+  kw.setdefault("colorRange", "individual")
   out = _plotRow(fs, titles, **kw)
   tagPoleAxes(poles, len(out))
   return out
@@ -1034,5 +1183,5 @@ def plotIPDF(odf, r, *args, **kw):
   return _plotRow(fs, [_directionTitle(x) for x in rs], **kw)
 
 
-__all__ = ["plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate", "contourf", "contour", "pcolor", "quiver", "plotRegion", "plotKernel", "circle",
+__all__ = ["plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate", "contourf", "contour", "pcolor", "quiver", "plotRegion", "plotKernel", "circle", "ellipse",
            "plotPDF", "plotIPDF", "plotKey"]

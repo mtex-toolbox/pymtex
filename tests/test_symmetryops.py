@@ -157,3 +157,12 @@ def test_comparison_needs_fitting_frames():
     angle(o, inv(o))
   assert angle(o, orientation.rand(crystalFrame("m-3m", mineral="other"), rng=rng)) <= pi
   assert not (o == orientation(o, crystalFrame("432")))
+
+
+def test_the_axis_of_a_pair_turns_the_second_onto_the_first():
+  from mtex import axis, degree
+  cs = crystalFrame('432')
+  rng = np.random.default_rng(8)
+  o1, o2 = orientation.rand(500, cs, rng=rng), orientation.rand(500, cs, rng=rng)
+  R = rotation.byAxisAngle(vector3d(axis(o1, o2).data), angle(o1, o2))
+  assert np.max(angle(R * o2, o1)) < 1e-9

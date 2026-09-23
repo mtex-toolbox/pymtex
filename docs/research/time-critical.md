@@ -16,7 +16,7 @@ in the other notes of this directory.
 | pole figure inversion `calcODF` | two `S2FourierPlan`s per iteration, Voronoi weights, dense harmonic weights | dense solve only below 4000 nodes |
 | optimal sampling | re-pointed plans at the low oversampling, vectorised derivatives | behind Julia only on the large sphere case |
 | clustering `classix`, `calcCluster` | NumPy classix, k-d tree, batch embedding | ahead of Julia; the hierarchical method is quadratic, binned above 1000 |
-| Taylor model `calcTaylor` | Python simplex per orientation | 0.4 ms each, 40 s for 1e5 orientations |
+| Taylor model `calcTaylor` | compiled simplex over the orientations (`analysis/kernels.py`) | the Taylor field of the TaylorModel page 14 s for 1278 s |
 | texture evolution `doEulerStep` | prepared transport | 7 s per step, explicit scheme only |
 | text import, lattice detection | numba row parser in `io/kernels.py` | done (`benchmark-io.md`) |
 | decomposition clipping, segmentation, boundary tracing, KAM, GROD, GND simplex | numba in `maps/kernels.py` | done (`benchmark-decomposition.md`, `benchmark-maps.md`) |
@@ -31,8 +31,8 @@ in the other notes of this directory.
   list of the SO(3) grid, so that an ODF of a thousand centres evaluates and finds its
   modes in seconds; the tests of the clustering and the characteristics check modes by
   evaluation until then.
-- [ ] `calcTaylor` over a map: the simplex as one numba loop over the orientations, or
-  the active set of one orientation warm-starting the next.
+- [x] `calcTaylor` over a map: the simplex as one numba loop over the orientations,
+  `analysis/kernels.py`; the Taylor field of the TaylorModel page in 14 s for 1278 s.
 - [ ] `doEulerStep`: an implicit scheme, and the transport prepared once per bandwidth
   rather than per call.
 - [ ] `calcODF`: the harmonic quadrature weights above 4000 nodes through a

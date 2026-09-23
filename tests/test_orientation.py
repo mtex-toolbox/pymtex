@@ -171,3 +171,14 @@ def test_products():
   hs = Miller([[1, 0, 0], [1, 1, 0]], cs)
   assert (os[:, None] * hs[None, :]).shape == (5, 2)
   assert (inv(os[:, None]) * os[None, :]).shape == (5, 5)
+
+
+def test_project2FundamentalRegion_antipodal():
+  # MATLAB's 'antipodal': the projection with grain exchange, the misorientation or its inverse
+  cs = crystalFrame("m-3m")
+  m = orientation.rand(50, cs, cs, rng=np.random.default_rng(1))
+  p = m.project2FundamentalRegion(antipodal=True)
+  q = orientation._fromRotation(m.data, (cs, cs), True).project2FundamentalRegion()
+  assert same(p, q) and not m.antipodal
+  # each projected one is the misorientation or its inverse up to symmetry
+  assert np.all(np.minimum(angle(p, m), angle(p, inv(m))) < 1e-6)

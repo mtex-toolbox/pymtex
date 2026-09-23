@@ -13,7 +13,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d
-from .harmonics import WignerD, deg2dim, degreeBlock, dim2deg, sphericalY
+from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY
 from .kernelfunctions import S1Kernel, S2Kernel, SO3Kernel
 from .quadrature import bandwidthFor, legendreP, quadratureS2Grid, quadratureSO3Grid
 from .s1fun import S1FunHarmonic
@@ -41,7 +41,7 @@ def _degreesOf(n):
 
 def _rotatedCoefficients(fhat, r, side):
   L = dim2deg(len(fhat))
-  D = WignerD(r, bandwidth=L, dtype=fhat.real.dtype)
+  D = _WignerD(r, bandwidth=L, dtype=fhat.real.dtype)
   out = np.empty_like(fhat)
   for n in range(L + 1):
     F = degreeBlock(fhat, n)
@@ -89,15 +89,15 @@ def rotate(f, r, *args, side="left", **kwargs):
     if side == "left":
       if o.CS is not f.SS:
         raise ValueError("a left rotation maps out of the specimen frame of the function")
-      return SO3FunHarmonic(_rotatedCoefficients(f.fhat, rot, "left"), f.CS, o.SS, real=f.isReal, symmetrise=False)
+      return SO3FunHarmonic(_rotatedCoefficients(f._fhat, rot, "left"), f.CS, o.SS, real=f.isReal, symmetrise=False, _internal=True)
     if o.SS is not f.CS:
       raise ValueError("a right rotation maps into the crystal frame of the function")
-    return SO3FunHarmonic(_rotatedCoefficients(f.fhat, rot, "right"), o.CS, f.SS, real=f.isReal, symmetrise=False)
+    return SO3FunHarmonic(_rotatedCoefficients(f._fhat, rot, "right"), o.CS, f.SS, real=f.isReal, symmetrise=False, _internal=True)
   rot = _oneRotation(r)
-  fhat = _rotatedCoefficients(f.fhat, rot, side)
+  fhat = _rotatedCoefficients(f._fhat, rot, side)
   CS = _rotatedFrame(f.CS, rot) if side == "right" else f.CS
   SS = _rotatedFrame(f.SS, rot) if side == "left" else f.SS
-  return SO3FunHarmonic(fhat, CS, SS, real=f.isReal, antipodal=f.antipodal and CS is SS, symmetrise=False)
+  return SO3FunHarmonic(fhat, CS, SS, real=f.isReal, antipodal=f.antipodal and CS is SS, symmetrise=False, _internal=True)
 
 
 # on the sphere f'(v) = f(r^-1 v), fhat_l <- D_l(r) fhat_l
@@ -106,17 +106,17 @@ def _rotateS2(f, r):
     if f.frame is not None and r.CS is not f.frame:
       raise ValueError("the orientation maps out of the frame of the function")
     # the function lands in the specimen frame of the orientation, its crystal frame left behind
-    plain = S2FunHarmonic(f.fhat, None, real=f.isReal, antipodal=f.antipodal, symmetrise=False)
+    plain = S2FunHarmonic(f._fhat, None, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
     g = _rotateS2(plain, rotation(r))
-    return S2FunHarmonic(g.fhat, r.SS, real=f.isReal, antipodal=f.antipodal, symmetrise=False)
+    return S2FunHarmonic(g._fhat, r.SS, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
   rot = _oneRotation(r)
   L = f.bandwidth
-  D = WignerD(rot, bandwidth=L, dtype=f.fhat.real.dtype)
-  fhat = np.empty_like(f.fhat)
+  D = _WignerD(rot, bandwidth=L, dtype=f._fhat.real.dtype)
+  fhat = np.empty_like(f._fhat)
   for l in range(L + 1):
-    fhat[l * l:(l + 1) ** 2] = D[l] @ f.fhat[l * l:(l + 1) ** 2]
+    fhat[l * l:(l + 1) ** 2] = D[l] @ f._fhat[l * l:(l + 1) ** 2]
   frame = None if f.frame is None else _rotatedFrame(f.frame, rot)
-  return S2FunHarmonic(fhat, frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False)
+  return S2FunHarmonic(fhat, frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
 
 
 # ------------------------------------------------------------------ convolution
@@ -130,6 +130,25 @@ def _rotateS2(f, r):
 #   S2 x kernel: (s * psi)(v) = (1/4pi) int s(xi) psi(<xi, v>) dxi, shat_l <- A_l / (2l+1) shat_l
 
 
+# the child texture of a parent texture: the mean of the parent ODF over the parents every
+# child orientation can come from (MATLAB transformODF, called as variants(p2c, odf)); with
+# vSel, a function of the parent orientations, the parents weighted by it
+def transformODF(odfP, p2c, vSel=None):
+  from ..geometry.quaternion import qmul
+  PV = p2c.variants(parent=True).data.reshape(-1, 4)
+
+  def f(cori):
+    q = qmul(cori.data.reshape(-1, 1, 4), PV[None]).reshape(-1, 4)
+    pori = orientation._fromRotation(q, (p2c.frameA, odfP.SS))
+    val = np.asarray(odfP.eval(pori)).reshape(-1, len(PV))
+    if vSel is not None:
+      w = np.asarray(vSel.eval(pori)).reshape(-1, len(PV))
+      val = val * w / np.mean(w, axis=1, keepdims=True)
+    return np.mean(val, axis=1).reshape(cori.shape)
+
+  return SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
+
+
 def conv(f, g):
   if isinstance(f, (SO3Kernel, S2Kernel, S1Kernel)) and not isinstance(g, (SO3Kernel, S2Kernel, S1Kernel)):
     return conv(g, f)
@@ -140,38 +159,38 @@ def conv(f, g):
       if g.SS is not f.CS:
         raise ValueError("the specimen frame of the second factor must be the crystal frame of the first")
       L = min(f.bandwidth, g.bandwidth)
-      fhat = np.zeros(deg2dim(L + 1), dtype=np.result_type(f.fhat, g.fhat))
+      fhat = np.zeros(deg2dim(L + 1), dtype=np.result_type(f._fhat, g._fhat))
       for n in range(L + 1):
-        degreeBlock(fhat, n)[...] = degreeBlock(f.fhat, n) @ degreeBlock(g.fhat, n) / math.sqrt(2 * n + 1)
-      return SO3FunHarmonic(fhat, g.CS, f.SS, real=f.isReal and g.isReal, symmetrise=False)
+        degreeBlock(fhat, n)[...] = degreeBlock(f._fhat, n) @ degreeBlock(g._fhat, n) / math.sqrt(2 * n + 1)
+      return SO3FunHarmonic(fhat, g.CS, f.SS, real=f.isReal and g.isReal, symmetrise=False, _internal=True)
     if isinstance(g, SO3Kernel):
       return _convDegrees(f, g.calcFourier(min(f.bandwidth, g.bandwidth)) / (2 * np.arange(min(f.bandwidth, g.bandwidth) + 1) + 1))
     if isinstance(g, S2FunHarmonic):
       if g.frame is not None and g.frame is not f.SS:
         raise ValueError("the spherical function must live in the specimen frame of the SO(3) function")
       L = min(f.bandwidth, g.bandwidth)
-      fhat = np.zeros((L + 1) ** 2, dtype=np.result_type(f.fhat, g.fhat))
+      fhat = np.zeros((L + 1) ** 2, dtype=np.result_type(f._fhat, g._fhat))
       for l in range(L + 1):
-        fhat[l * l:(l + 1) ** 2] = degreeBlock(f.fhat, l).T @ g.fhat[l * l:(l + 1) ** 2] / math.sqrt(2 * l + 1)
-      return S2FunHarmonic(fhat, f.CS, real=f.isReal and g.isReal, symmetrise=False)
+        fhat[l * l:(l + 1) ** 2] = degreeBlock(f._fhat, l).T @ g._fhat[l * l:(l + 1) ** 2] / math.sqrt(2 * l + 1)
+      return S2FunHarmonic(fhat, f.CS, real=f.isReal and g.isReal, symmetrise=False, _internal=True)
     if isinstance(g, (np.ndarray, list)):
       return _convDegrees(f, np.asarray(g, dtype=float))
   if isinstance(f, S2FunHarmonic):
     if isinstance(g, S2FunHarmonic):
       L = min(f.bandwidth, g.bandwidth)
-      fhat = np.zeros(deg2dim(L + 1), dtype=np.result_type(f.fhat, g.fhat))
+      fhat = np.zeros(deg2dim(L + 1), dtype=np.result_type(f._fhat, g._fhat))
       for l in range(L + 1):
         k = np.arange(-l, l + 1)
-        t = g.fhat[l * l:(l + 1) ** 2][::-1]
-        s = f.fhat[l * l:(l + 1) ** 2]
+        t = g._fhat[l * l:(l + 1) ** 2][::-1]
+        s = f._fhat[l * l:(l + 1) ** 2]
         degreeBlock(fhat, l)[...] = np.outer(np.where(k % 2, -1.0, 1.0) * t, s) / math.sqrt(2 * l + 1)
       from ..geometry.frames import specimenFrame
       frameOf = lambda x: specimenFrame.default if x.frame is None else x.frame
-      return SO3FunHarmonic(fhat, frameOf(f), frameOf(g), real=f.isReal and g.isReal, symmetrise=False)
+      return SO3FunHarmonic(fhat, frameOf(f), frameOf(g), real=f.isReal and g.isReal, symmetrise=False, _internal=True)
     if isinstance(g, (S2Kernel, SO3Kernel)):
       L = min(f.bandwidth, g.bandwidth)
       A = g.calcFourier(L) / (2 * np.arange(L + 1) + 1)
-      return S2FunHarmonic(A[_degreesOf((L + 1) ** 2)] * f.truncate(L).fhat, f.frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False)
+      return S2FunHarmonic(A[_degreesOf((L + 1) ** 2)] * f.truncate(L)._fhat, f.frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
   raise TypeError(f"no convolution of {type(f).__name__} with {type(g).__name__}")
 
 
@@ -179,10 +198,10 @@ def conv(f, g):
 # with a plain vector, which is how the odd degrees are zeroed or flipped
 def _convDegrees(f, A):
   L = min(f.bandwidth, len(A) - 1)
-  fhat = f.truncate(L).fhat.copy()
+  fhat = f.truncate(L)._fhat.copy()
   for n in range(L + 1):
     degreeBlock(fhat, n)[...] *= A[n]
-  return SO3FunHarmonic(fhat, f.CS, f.SS, real=f.isReal, antipodal=f.antipodal, symmetrise=False)
+  return SO3FunHarmonic(fhat, f.CS, f.SS, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
 
 
 # ------------------------------------------------------------------ differentiation
@@ -205,8 +224,8 @@ def laplace(f):
   if isinstance(f, SO3FunHarmonic):
     n = np.concatenate([np.full((2 * n + 1) ** 2, n) for n in range(f.bandwidth + 1)])
   else:
-    n = _degreesOf(len(f.fhat))
-  return f._rebuild(-(n * (n + 1)) * f.fhat)
+    n = _degreesOf(len(f._fhat))
+  return f._rebuild(-(n * (n + 1)) * f._fhat)
 
 
 # ------------------------------------------------------------------ the Radon transform
@@ -241,35 +260,40 @@ def _oneVector(h, frame, what):
 def pdf(f, h):
   h = _oneVector(h, f.CS, "crystal direction")
   L = f.bandwidth
-  fhat = np.zeros((L + 1) ** 2, dtype=f.fhat.dtype)
+  fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
   hv = vector3d(h.normalize().data.reshape(3))
   for l in range(L + 1):
-    Y = sphericalY(l, hv)
-    F = degreeBlock(f.fhat, l)
+    Y = _sphericalY(l, hv)
+    F = degreeBlock(f._fhat, l)
     k = np.arange(-l, l + 1)
     fhat[l * l:(l + 1) ** 2] = 4 * np.pi / math.sqrt(2 * l + 1) * np.where(k % 2, -1.0, 1.0) * (F[::-1] @ Y)
-  return S2FunHarmonic(fhat, f.SS, real=f.isReal, antipodal=_antipodalPole(h, f.CS), symmetrise=False)
+  return S2FunHarmonic(fhat, f.SS, real=f.isReal, antipodal=_antipodalPole(h, f.CS), symmetrise=False, _internal=True)
 
 
 def ipdf(f, r):
   r = _oneVector(r, f.SS, "specimen direction")
   L = f.bandwidth
-  fhat = np.zeros((L + 1) ** 2, dtype=f.fhat.dtype)
+  fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
   rv = vector3d(r.normalize().data.reshape(3))
   for l in range(L + 1):
-    Y = sphericalY(l, rv)
-    F = degreeBlock(f.fhat, l)
+    Y = _sphericalY(l, rv)
+    F = degreeBlock(f._fhat, l)
     fhat[l * l:(l + 1) ** 2] = 4 * np.pi / math.sqrt(2 * l + 1) * (np.conj(Y) @ F)
-  return S2FunHarmonic(fhat, f.CS, real=f.isReal, antipodal=_antipodalPole(r, f.SS), symmetrise=False)
+  return S2FunHarmonic(fhat, f.CS, real=f.isReal, antipodal=_antipodalPole(r, f.SS), symmetrise=False, _internal=True)
 
 
 # radon(f, h) the pole figure, radon(f, r=r) the inverse pole figure, radon(f, h, r) the values;
 # on the sphere the Funk transform, the mean over the great circle orthogonal to v,
 # shat_l <- P_l(0) shat_l
+# radon(sF): the mean over the great circle perpendicular to every direction; radon(sF,
+# delta) over the small circle at pi/2 + delta from it, by Funk-Hecke the degree n scaled
+# by P_n(cos(pi/2 + delta)); the great circle holds a direction with its antipode
 def radon(f, h=None, r=None):
   if isinstance(f, S2FunHarmonic):
-    P = legendreP(f.bandwidth, 0.0)
-    return S2FunHarmonic(P[_degreesOf(len(f.fhat))] * f.fhat, f.frame, real=f.isReal, antipodal=True, symmetrise=False)
+    delta = 0.0 if h is None else float(h)
+    P = legendreP(f.bandwidth, math.cos(math.pi / 2 + delta))
+    return S2FunHarmonic(P[_degreesOf(len(f._fhat))] * f._fhat, f.frame, real=f.isReal, antipodal=delta == 0 or f.antipodal,
+                         symmetrise=False, _internal=True)
   if h is None and r is None:
     raise TypeError("radon needs the crystal direction h, the specimen direction r, or both")
   if r is None:
@@ -281,9 +305,9 @@ def radon(f, h=None, r=None):
 
 def invRadon(s):
   P = legendreP(s.bandwidth, 0.0)
-  l = _degreesOf(len(s.fhat))
-  fhat = np.where(l % 2, 0, s.fhat / np.where(l % 2, 1.0, P[l]))
-  return S2FunHarmonic(fhat, s.frame, real=s.isReal, antipodal=True, symmetrise=False)
+  l = _degreesOf(len(s._fhat))
+  fhat = np.where(l % 2, 0, s._fhat / np.where(l % 2, 1.0, P[l]))
+  return S2FunHarmonic(fhat, s.frame, real=s.isReal, antipodal=True, symmetrise=False, _internal=True)
 
 
 # ------------------------------------------------------------------ pointwise operations
@@ -305,16 +329,16 @@ def mapFun(op, f, *gs, bandwidth=None):
     q = quadratureSO3Grid(L, f.CS, f.SS)
     values = op(f(q), *(g(q) for g in gs))
     fhat = wignerSeriesAdjoint(q, values, L)[:deg2dim(L0 + 1)]
-    return SO3FunHarmonic(fhat, f.CS, f.SS, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs))
+    return SO3FunHarmonic(fhat, f.CS, f.SS, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs), _internal=True)
   if isinstance(f, S2FunHarmonic):
     for g in gs:
       f._sameFrames(g)
     L = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
     q = quadratureS2Grid(L)
     values = op(f(q), *(g(q) for g in gs))
-    return S2FunHarmonic(sphericalSeriesAdjoint(q, values, L), f.frame, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs))
+    return S2FunHarmonic(sphericalSeriesAdjoint(q, values, L), f.frame, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs), _internal=True)
   L = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)
   return S1FunHarmonic(lambda x: op(f(x), *(g(x) for g in gs)), bandwidth=L)
 
 
-__all__ = ["mapFun"]
+__all__ = ["mapFun", "transformODF"]

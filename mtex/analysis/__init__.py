@@ -3,7 +3,7 @@
 import importlib as _importlib
 
 __all__ = []
-for _name in ("elasticity", "mechanics", "optics", "taylor", "texture", "pf2odf", "embedding", "optimalsample", "cluster", "variational", "dislocations", "denoising"):
+for _name in ("elasticity", "mechanics", "optics", "taylor", "texture", "pf2odf", "embedding", "optimalsample", "cluster", "variational", "dislocations", "denoising", "gbnd"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
     globals()[_public] = getattr(_module, _public)

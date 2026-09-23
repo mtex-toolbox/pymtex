@@ -127,10 +127,15 @@ def test_B4_S2FunBingham():
   cand = vector3d.rand(200_000, rng=rng)
   vals = g(cand)
   sample = cand[rng.random(cand.size) * np.max(vals) < vals]
-  # in the convention of the fit: the mode first, shape parameters descending from zero
+  # in MTEX's convention: shape parameters ascending to zero at the mode, the third axis
   est = S2FunBingham.fit(sample)
-  assert np.max(np.abs(est.Z - [0.0, -3.0, -8.0])) < 1.5
-  assert abs(vector3d(est.a[:, 0]).dot(rot * zvector)) > 0.99
+  assert np.max(np.abs(est.Z - [-8.0, -3.0, 0.0])) < 1.5
+  assert abs(est.a[2].dot(rot * zvector)) > 0.99
+  # the confidence ellipse of the modal axis is centred on it and shrinks with the sample
+  est, ab, r = S2FunBingham.fit(sample, confidenceEllipse=True)
+  assert abs((r * zvector).dot(est.a[2])) > 1 - 1e-9 and np.all(ab > 0) and np.all(ab < 5 * np.pi / 180)
+  _, ab10, _ = S2FunBingham.fit(sample[:sample.size // 10], confidenceEllipse=True)
+  assert np.all(ab10 > 2 * ab)
   assert np.corrcoef(est(sample), g(sample))[0, 1] > 0.99
   assert S2FunBingham.fit(vector3d(sample, frame=cs)).frame is cs
   assert "S2FunBingham" in repr(est)

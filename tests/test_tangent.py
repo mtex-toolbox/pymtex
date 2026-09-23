@@ -299,3 +299,12 @@ def test_display():
   assert s.startswith("SO3TangentVector (left") and "reference: orientation" in s and "size: 3" in s
   assert "reference: orientation" in repr(right(t)) and "W" in repr(right(t)).split("\n")[3]
   assert "reference: rotation" in repr(log(rotation.rand(rng=rng)))
+
+
+def test_exp_of_a_tangent_vector_at_its_own_reference():
+  # ori.exp(v) with v an SO3TangentVector at ori, as the texture evolution steps write it
+  from mtex import SO3TangentVector, crystalFrame, orientation, vector3d
+  cs = crystalFrame("432")
+  o = orientation.rand(3, cs, rng=np.random.default_rng(5))
+  t = SO3TangentVector(vector3d(np.full((3, 3), 0.01)), o)
+  assert np.allclose(o.exp(-t).data, (-t).exp().data)

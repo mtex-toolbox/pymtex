@@ -363,6 +363,8 @@ _dataset("dubnaODF", "SO3Fun", "the ODF reconstructed from the Dubna quartz pole
 _dataset("eclogite", "EBSD", "sparse eclogite map whose positions collide on a lattice, kept as a list", "eclogite", lambda p: loadEBSD(p))
 _dataset("vectors", "vector3d", "a thousand directions as polar and azimuth angles", "vectors",
          lambda p: loadVector3d(p, columnNames=["polar angle", "azimuth angle"])[0])
+_dataset("smiley", "vector3d", "777 directions with the values of the smiley function", "smiley",
+         lambda p: loadVector3d(p, columnNames=["x", "y", "z", "values"]))
 _dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzite as Bunge Euler angles", "tongue",
          lambda p: loadOrientation(p, crystalFrame.load("quartz.cif"), columnNames=["phi1", "Phi", "phi2"])[0])
 _dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _later("a VPSC file"))
@@ -377,6 +379,13 @@ def _olivine1997(path):
   return stiffnessTensor.load(path, crystalFrame("mmm", [4.7646, 10.2296, 5.9942], mineral="Olivine"))
 
 
+# the piezoelectric modulus of right-handed quartz in pC/N, a Voigt table with the doubled shear columns
+def _quartzPiezo(path):
+  from ..tensors.tensor import tensor
+  cs = crystalFrame("32", [4.916, 4.916, 5.4054], "X||a*", "Z||c", mineral="Quartz")
+  return tensor.load(path, cs, rank=3, doubleConvention=True, name="piezoelectric strain", unit="pC/N")
+
+
 # the simulated spherical Kikuchi master pattern of quartz: a MATLAB v7.3 object file whose
 # one large array is the harmonic coefficients, read with h5py into the quartz frame
 def _quartzPattern(path):
@@ -389,5 +398,7 @@ def _quartzPattern(path):
   return S2FunHarmonic(fhat, frame=loadCIF("quartz"))
 
 
+_dataset("quartzPiezo", "tensor", "the piezoelectric modulus of right-handed quartz (Frondel 1962)", "quartzpiezo",
+         _quartzPiezo)
 _dataset("olivine1997", "tensor", "the stiffness tensor of San Carlos olivine at room pressure", "olivine1997", _olivine1997)
 _dataset("quartzPattern", "S2Fun", "a spherical Kikuchi master pattern of quartz", "quartzpattern", _quartzPattern)

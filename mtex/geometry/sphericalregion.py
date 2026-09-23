@@ -84,19 +84,19 @@ class sphericalRegion:
       if not any(m @ n > 1 - 1e-9 for m in N):
         N.append(n)
     if len(N) < 2:
-      return vector3d(np.array([0.0, 0.0, 1.0]) if not N else _unit(N[0]), isNormalized=True)
+      return vector3d(np.array([0.0, 0.0, 1.0]) if not N else _unit(N[0]), isNormalized=True, frame=self.frame)
     V = self.vertices().data.reshape(-1, 3)
     if len(V) < 3:
       pairs = [(i, j) for i in range(len(N) - 1) for j in range(i + 1, len(N))]
       i, j = max(pairs, key=lambda ij: np.arccos(np.clip(N[ij[0]] @ N[ij[1]], -1, 1)))
-      return vector3d(_unit(N[i] + N[j]), isNormalized=True)
+      return vector3d(_unit(N[i] + N[j]), isNormalized=True, frame=self.frame)
     if len(V) < 4:
-      return vector3d(_unit(np.sum(V, axis=0)), isNormalized=True)
+      return vector3d(_unit(np.sum(V, axis=0)), isNormalized=True, frame=self.frame)
     from .grids.s2grid import equispacedS2Grid
     g = equispacedS2Grid(resolution=resolution)
     inside = g.data[self.checkInside(g)]
     c = np.sum(inside, axis=0) if len(inside) else np.zeros(3)
-    return vector3d(np.array([0.0, 0.0, 1.0]) if np.linalg.norm(c) < 1e-4 else _unit(c), isNormalized=True)
+    return vector3d(np.array([0.0, 0.0, 1.0]) if np.linalg.norm(c) < 1e-4 else _unit(c), isNormalized=True, frame=self.frame)
 
   def __eq__(self, other):
     return (isinstance(other, sphericalRegion) and self.N.shape == other.N.shape

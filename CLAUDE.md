@@ -37,10 +37,16 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   `isinstance(x, MtexArray)`, never `hasattr(x, "data")`: an ndarray has `.data` too.
 - A base-class method must not call `self.dot` or `self.angle`: the orientation subclass
   intercepts them with the symmetry-reduced versions.
+- The coefficients a user reads and passes, `fhat`, are MATLAB's: MTEX's spherical harmonics
+  without the Condon-Shortley phase, MTEX's Wigner blocks, `S1FunHarmonic` over e^{-ikx}. The
+  internal `_fhat` keep `docs/design/harmonics.md`; the constructors and the `fhat` property
+  convert, and internal code builds with `_internal=True`.
 - The padding `gridify` adds to close a grid is notIndexed (phase 0, since a phase id indexes
   the phase list) and marked in `ebsd.isPadding`, MATLAB's NaN phase: the extent, the phase
   counts and selections, the plots, the decomposition and `fill` leave it out, so a grid
   segments exactly as its list does. New code over a map's cells must do the same.
+- `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
+  as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `fundamentalSector` is the conventional sector, the one MATLAB and an inverse pole figure
   show, wherever `tilesSphere` confirms it is a fundamental domain of the group (every
   crystal frame); for a group turned against its axes, as the rotations two frames share,
@@ -96,12 +102,11 @@ container and the lattice, M2, the decomposition with its numba clipping, M3, th
 criteria, the segmentation and `calcGrains` with the grain table, M4, the boundaries with
 their resampling and smoothing, M5, the grain polygons with their measures and `merge`,
 M6, the shape parameters over the `polygonSet` mixin with G7's `hull.py`, M7, the
-intragranular quantities and `calcGND` with G7's `slipsystem.py`, and M8, the denoising
-filters over the graph of the map with `fill`, `interp` and `reduce`, are done; next is
-M9, the parent grain reconstruction, with G7's `parent2child.py`. The P2
-session's `rotate` in `mtex/functions/funops.py` shadows the geometry verb at the package
-level, so `rotate(ebsd, r)` fails until it dispatches to a method; the maps tests use
-`ebsd.rotate(r)`. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
+intragranular quantities and `calcGND` with G7's `slipsystem.py`, M8, the denoising
+filters over the graph of the map with `fill`, `interp` and `reduce`, and M9, the parent grain
+reconstruction (`maps/reconstruction.py`, `maps/variantgraph.py`: `parentGrainReconstructor`
+with MATLAB's vote table, the grain and variant graphs, checked against MATLAB on the
+martensite map), are done. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
 `loadEBSD` and `EBSD.load` for `.ang`, `.ctf`, named-column tables, `.cpr`/`.crc`, `.osc`
 and the vendors' HDF5 (h5py, the `io` extra, configs in `io/hdf5_config/`) in `mtex/io`;
 the numeric block of a text file is a parallel numba row parser (`io/kernels.py`,
@@ -161,7 +166,7 @@ jupytext light format, `docs/make.py` builds it into `docs/build/`, `docs/matlab
 runs the MATLAB script through the bridge into `docs/matlab/<Page>/` for the comparison,
 `docs/notebook.py <Page>` opens a page as a notebook in VS Code to run it section by section,
 `docs/findings.md` keeps what the pages found and `docs/plans/remaining-pages.md` the status
-of every page. D0, the Vectors and Rotations chapters of D1, the ODFAnalysis chapter of D2 and the EBSDAnalysis and Grains chapters of D3 are done (`docs/plans/remaining-pages.md` has every page's state, `docs/findings.md` what they found); CrystalGeometry is done too (9 checked, Operations written), PoleFigureAnalysis, the whole D4 chapter, all 11 checked, and CrystalOrientations, all 16 checked (`plot3d(odf)` now draws MATLAB's isosurfaces, so the ODF pages that left it as prose can take it); Misorientations is next here.
+of every page. D0, the Vectors and Rotations chapters of D1, the ODFAnalysis chapter of D2 and the EBSDAnalysis and Grains chapters of D3 are done (`docs/plans/remaining-pages.md` has every page's state, `docs/findings.md` what they found); CrystalGeometry is done too (9 checked, Operations written), PoleFigureAnalysis, the whole D4 chapter, all 11 checked, CrystalOrientations, all 16 checked (`plot3d(odf)` now draws MATLAB's isosurfaces, so the ODF pages that left it as prose can take it), and Misorientations, all 6 checked, which completes D1; PhaseTransitions, all 11 checked on M9 (2026-09-23), Tensors, Elasticity and Plasticity, all 26 checked, GrainBoundaries, 12 checked and 3 partial, and the five Partial ODF and Vectors pages taking `plot3d` and `arrow3d` (2026-09-23); SphericalFunctions, all 16 checked (2026-09-23); SO3Functions (D2) is next here.
 P8, the import wizard (`docs/plans/wizard.md`), is built through W6: `importWizard()` opens a
 PySide6 window (the `wizard` extra) over a headless core, `mtex/wizard/state.py` and
 `callbacks.py`, with `inspectEBSD` in `mtex/io/inspect.py` describing a file from its header

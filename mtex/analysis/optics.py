@@ -33,13 +33,17 @@ def refractiveIndex(rI, v):
 
 
 # the two indices and polarisations of light travelling along directions: the tensor
-# restricted to the plane normal to each, over an (n, 3) array
+# restricted to the plane normal to each, over an (n, 3) array; a list of tensors pairs
+# with the directions, one of either side broadcast
 def _birefringence(rI, U):
+  M = rI.M.reshape(-1, 3, 3)
+  n = max(len(U), len(M))
+  U = np.broadcast_to(U, (n, 3))
   p1 = vector3d(U).orth().normalize().data
   p2 = np.cross(U, p1)
   p2 = p2 / np.linalg.norm(p2, axis=-1, keepdims=True)
   P = np.stack([p1, p2], axis=-2)                       # (n, 2, 3)
-  B = np.einsum("nai,ij,nbj->nab", P, rI.M, P)
+  B = np.einsum("nai,nij,nbj->nab", P, np.broadcast_to(M, (n, 3, 3)), P)
   lam, V = np.linalg.eigh((B + np.swapaxes(B, -1, -2)) / 2)
   fast = V[:, 0, 0, None] * p1 + V[:, 1, 0, None] * p2
   slow = V[:, 0, 1, None] * p1 + V[:, 1, 1, None] * p2
@@ -59,7 +63,8 @@ def birefringence(rI, vprop=None):
     return delta, fast, slow
   v = vprop if isinstance(vprop, vector3d) else vector3d(vprop)
   delta, fast, slow, _, _ = _birefringence(rI, _unit(rI, v).reshape(-1, 3))
-  return delta.reshape(v.shape), _axes(fast.reshape(v.shape + (3,)), rI.frame), _axes(slow.reshape(v.shape + (3,)), rI.frame)
+  shape = np.broadcast_shapes(v.shape, rI.shape)
+  return delta.reshape(shape), _axes(fast.reshape(shape + (3,)), rI.frame), _axes(slow.reshape(shape + (3,)), rI.frame)
 
 
 # polarisation axes in the frame of the tensor, shown by their coordinates
@@ -75,14 +80,14 @@ def opticalAxis(rI, tolerance=1e-8):
   n, V = rI.eig()
   e = V.data
   if abs(n[0] - n[2]) < tolerance:
-    return vector3d(np.zeros((0, 3)), antipodal=True, frame=rI.frame)
+    return _axes(np.zeros((0, 3)), rI.frame)
   if abs(n[0] - n[1]) < tolerance:
-    return vector3d(e[2], antipodal=True, frame=rI.frame)
+    return _axes(e[2], rI.frame)
   if abs(n[1] - n[2]) < tolerance:
-    return vector3d(e[0], antipodal=True, frame=rI.frame)
+    return _axes(e[0], rI.frame)
   a = math.sqrt((n[2] - n[1]) / (n[2] - n[0]))
   b = math.sqrt((n[1] - n[0]) / (n[2] - n[0]))
-  return vector3d(np.stack([-a * e[2] + b * e[0], a * e[2] + b * e[0]]), antipodal=True, frame=rI.frame)
+  return _axes(np.stack([-a * e[2] + b * e[0], a * e[2] + b * e[0]]), rI.frame)
 
 
 def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=None, tau=45 * np.pi / 180, phi=np.pi / 2, bandwidth=32):
@@ -102,16 +107,16 @@ def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=Non
   U = _unit(rI, v).reshape(-1, 3)
   delta, fast, _, _, _ = _birefringence(rI, U)
   if polarizationDirection is None:
-    t = np.full(len(U), float(tau))
+    t = np.full(len(fast), float(tau))
   else:
     p = polarizationDirection if isinstance(polarizationDirection, vector3d) else vector3d(polarizationDirection)
-    P = np.broadcast_to(p.normalize().data.reshape(-1, 3), U.shape)
+    P = np.broadcast_to(p.normalize().data.reshape(-1, 3), fast.shape)
     t = np.arccos(np.minimum(1.0, np.abs(np.sum(P * fast, axis=-1))))
   d = delta * thickness
   # the transmitted spectrum of every direction, weighed with the colour matching functions
   s = np.cos(phi) ** 2 - np.sin(2 * (t - phi))[:, None] * np.sin(2 * t)[:, None] * np.sin(np.pi * d[:, None] / WAVELENGTHS) ** 2
   rgb = (s @ CIE1931) @ ADOBE_RGB.T / 100
-  return rgb.reshape(3) if v.ndim == 0 else rgb.reshape(v.shape + (3,))
+  return rgb.reshape(np.broadcast_shapes(v.shape, rI.shape) + (3,))
 
 
 def _install():

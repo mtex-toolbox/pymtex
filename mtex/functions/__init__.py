@@ -2,7 +2,7 @@
 import importlib as _importlib
 
 __all__ = []
-for _name in ("harmonics", "quadrature", "kernelfunctions", "transforms", "so3fun", "s2fun", "s1fun", "funops", "rbf", "density", "handles", "bingham", "so3vectorfield", "s2vectorfield", "s2axisfield", "characteristics", "polefigure", "funcs", "so3funclass"):
+for _name in ("harmonics", "quadrature", "kernelfunctions", "transforms", "so3fun", "s2fun", "s2funtri", "s1fun", "funops", "rbf", "density", "handles", "bingham", "so3vectorfield", "s2vectorfield", "s2axisfield", "characteristics", "polefigure", "funcs", "so3funclass", "s2funclass"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
     globals()[_public] = getattr(_module, _public)

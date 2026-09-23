@@ -31,6 +31,8 @@ from mtex import (Miller, angle, axis, calcGrains, degree, hold, inv, mtexColorM
 # load the example map in its specimen plotting frame
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')
+for name in ('error', 'bands'):
+  del ebsd.prop[name]
 
 # reconstruct the grains
 grains = calcGrains(ebsd, angle=10 * degree, minPixel=3)
@@ -356,5 +358,9 @@ print(f'{np.max(straightness):>10.5f}{np.median(straightness):>10.5f}{np.count_n
 # the page follows is grain 4 inside grain 42 in MATLAB's reconstruction and grain 9 inside
 # grain 1 here; the two segmentations number their grains differently. `ebsd['id', M]` returns one measurement per entry of the matrix `M`, in its
 # shape, so the two columns of `ebsdId` are the two sides of every segment.
+# The two sides of a segment are its grains in the order of their ids, so the misorientation
+# of the first segment of the inclusion runs from the host to the inclusion here and is the
+# inverse of MATLAB's. `ebsd['id', M]` lists its rows in the shape of `M`, row by row,
+# where MATLAB lists the first column and then the second.
 # `componentId` counts from one, so a value indexes its component's entry at
 # `componentId - 1`. MATLAB's `table` is a printed line.

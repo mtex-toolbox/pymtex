@@ -60,6 +60,10 @@ class vector3d(MtexArray):
         A = 0.5 * (M - np.swapaxes(M, -1, -2))
         data = np.stack([A[..., 2, 1], A[..., 0, 2], A[..., 1, 0]], axis=-1)
         frame = a.frame if frame is None else frame
+      # vector3d(T): the components of a rank one tensor, in its frame
+      elif hasattr(a, "M") and getattr(a, "rank", None) == 1:
+        data = np.asarray(a.M, dtype=float).copy()
+        frame = a.frame if frame is None else frame
       else:
         a = np.asarray(a, dtype=float)
         if a.ndim >= 1 and a.shape[-1] == 3:
@@ -256,6 +260,13 @@ class vector3d(MtexArray):
   def calcDensity(self, *args, **kwargs):
     from ..functions.density import calcDensity
     return calcDensity(self, *args, **kwargs)
+
+  # interp(v, y, 'linear' | 'harmonic' | 'nearest' | 'inverseDistance'): a function on the
+  # sphere through the values y at the directions v, by the function spaces above this
+  # layer, vector3d/interp; interp(v, y, vi, ...) its values at vi
+  def interp(self, y, *args, **kwargs):
+    from ..functions.density import interpS2
+    return interpS2(self, y, *args, **kwargs)
 
   # v.export('vectors.txt'): the directions written as a text table
   def export(self, fname, *args, **kwargs):

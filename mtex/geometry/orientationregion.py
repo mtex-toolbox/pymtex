@@ -132,11 +132,9 @@ class orientationRegion:
         best = max(best, float(np.max(quatAngle(q[inside]))))
     return best
 
-  # in Rodrigues space every bound is a plane, dot(q, N) <= 0 reading n . rho <= -N_0 and a
-  # sector through the origin -m . rho <= 0, so the region is a polyhedron and its largest
-  # angle is at a vertex: every triple of planes solved, the points inside kept; a half turn
-  # when the polyhedron is open, None when the sector has caps that are not planes
-  def _maxAngleVertices(self, tol=1e-9):
+  # the region in Rodrigues space as A rho <= b: a bound dot(q, N) <= 0 reads n . rho <= -N_0
+  # and a sector plane through the origin -m . rho <= 0; None when the sector has caps
+  def rodriguesPlanes(self):
     A = [n[1:] for n in self.N]
     b = [-n[0] for n in self.N]
     if self.sector is not None:
@@ -144,7 +142,54 @@ class orientationRegion:
         return None
       A += [-m for m in self.sector.N]
       b += [0.0] * len(self.sector.N)
-    A, b = np.array(A), np.array(b)
+    return np.array(A).reshape(-1, 3), np.array(b)
+
+  # the edges of the region, each a chain of points in axis angle coordinates in radians:
+  # every pair of planes meets in a line of Rodrigues space, kept where the other planes
+  # allow it; an open region is cut at a turn of nearly 180 degrees
+  def edges(self, points=40, tol=1e-9):
+    planes = self.rodriguesPlanes()
+    if planes is None:
+      return []
+    A, b = planes
+    far = np.tan(0.4999 * np.pi)
+    out = []
+    for i, j in itertools.combinations(range(len(A)), 2):
+      d = np.cross(A[i], A[j])
+      if np.linalg.norm(d) < 1e-10:
+        continue
+      d /= np.linalg.norm(d)
+      p0 = np.linalg.lstsq(A[[i, j]], b[[i, j]], rcond=None)[0]
+      lo, hi = -far, far
+      for k in range(len(A)):
+        if k in (i, j):
+          continue
+        a, r = A[k] @ d, b[k] - A[k] @ p0
+        if abs(a) < 1e-12:
+          if r < -tol:
+            lo, hi = 1.0, 0.0
+            break
+          continue
+        if a > 0:
+          hi = min(hi, r / a)
+        else:
+          lo = max(lo, r / a)
+      if hi - lo < 1e-9:
+        continue
+      rho = p0 + np.linspace(lo, hi, points)[:, None] * d
+      n = np.linalg.norm(rho, axis=1, keepdims=True)
+      out.append(np.where(n > 1e-12, 2 * np.arctan(n) * rho / np.maximum(n, 1e-12), 0.0))
+    return out
+
+  # in Rodrigues space every bound is a plane, dot(q, N) <= 0 reading n . rho <= -N_0 and a
+  # sector through the origin -m . rho <= 0, so the region is a polyhedron and its largest
+  # angle is at a vertex: every triple of planes solved, the points inside kept; a half turn
+  # when the polyhedron is open, None when the sector has caps that are not planes
+  def _maxAngleVertices(self, tol=1e-9):
+    planes = self.rodriguesPlanes()
+    if planes is None:
+      return None
+    A, b = planes
     # the region is open, holding the half turns of some axis, when a direction u has
     # A u <= 0; such cones are spanned by the edges of pairs of planes, or by what no plane
     # sees when they span less than space
@@ -265,4 +310,10 @@ def eulerRegion(frA, frB=None):
   return (maxPhi1, np.pi / 2, maxPhi2)
 
 
-__all__ = ["orientationRegion", "fundamentalRegion", "eulerRegion", "fundamentalRegionEuler", "project2EulerFR"]
+# maxAngle(cs), maxAngle(cs1, cs2): the largest rotation angle of the fundamental region of
+# the frames, MATLAB's maxAngle of a symmetry
+def maxAngle(frA, frB=None, antipodal=False):
+  return fundamentalRegion(frA, frB, antipodal=antipodal).maxAngle()
+
+
+__all__ = ["orientationRegion", "fundamentalRegion", "eulerRegion", "fundamentalRegionEuler", "project2EulerFR", "maxAngle"]

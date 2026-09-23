@@ -20,7 +20,7 @@
 import numpy as np
 
 from mtex import (Miller, angle, cat, crystalFrame, degree, discreteSample, fibre, fibreODF, max, mean, mtexColorbar, mtexTitle,
-                  newMtexFigure, nextAxis, norm, orientation, plotPDF, plotSection, plottingConvention, setColorRange, vector3d)
+                  newMtexFigure, nextAxis, norm, orientation, plot3d, plotPDF, plotSection, plottingConvention, setColorRange, vector3d)
 
 plottingConvention.default('y↑→x')
 
@@ -49,10 +49,10 @@ odf
 
 # ## The Tube in Orientation Space
 #
-# A three-dimensional contour plot shows surfaces of equal density around the fibre. The
-# isosurface plot `plot3d(odf)` is not ported yet, so the page continues with the
-# sections.
-#
+# A three-dimensional contour plot shows surfaces of equal density around the fibre.
+
+plot3d(odf)
+
 # The translucent branches are sections of one tubular ridge folded by cubic symmetry.
 # They are symmetry-equivalent descriptions of the same fibre component, not additional
 # physical components.
@@ -220,7 +220,7 @@ linearityRatio
 
 # ## Technical Details
 #
-# The isosurface plot of the tube is not ported. `fibre.fit` returns the fibre alone
+# `fibre.fit` returns the fibre alone
 # unless `diagnostics=True` asks for MATLAB's three outputs, the eigenvalues and the
 # mean distance. The random sample differs from MATLAB's draw, so the fitted numbers are
 # of the same size but not the same digits.

@@ -72,8 +72,9 @@ def test_variant_ids_and_the_parent_of_children():
   p2c = orientation.KurdjumovSachs(cP, cC)
   V = p2c.variants().flatten()
   assert V.size == 24
-  # every child of a parent is recognised with its variant, one based as MATLAB counts
-  parent = orientation.rand(40, cP, rng=rng)
+  # every child of a parent is recognised with its variant, one based as MATLAB counts from
+  # the parent's representative in the fundamental region
+  parent = orientation.rand(40, cP, rng=rng).project2FundamentalRegion()
   ids = rng.integers(1, 25, 40)
   child = perturb(parent * V[ids - 1].inv(), vector3d.rand(40, rng=rng), 0.3 * degree)
   r = calcVariantId(parent, child, p2c)
@@ -89,7 +90,7 @@ def test_variant_ids_and_the_parent_of_children():
   with pytest.raises(ValueError):
     calcVariantId(parent[:3], child, p2c)
   # the parent of a grain's children, whatever representatives the children are stored as
-  P = orientation.rand(cP, rng=rng)
+  P = orientation.rand(cP, rng=rng).project2FundamentalRegion()
   ks = np.array([1, 5, 9, 14, 20])
   kids = perturb(P * V[ks - 1].inv(), vector3d.rand(5, rng=rng), 0.5 * degree)
   G = cC.sym.properGroup().rotations().data.reshape(-1, 4)
@@ -102,21 +103,26 @@ def test_variant_ids_and_the_parent_of_children():
   # child with parent: the id names the parent variant the child as stored is taken to
   # its parent by, so child * PV[id] is that parent
   Pn = P._new(np.broadcast_to(P.data.reshape(1, 4), (5, 4)).copy())
-  pid, f = calcParent(kids, Pn, p2c)
+  pid, f = calcParent(kids, Pn, p2c, id=True)
   assert pid.shape == (5,) and np.all(f < 1 * degree)
   PV = p2c.variants(parent=True).flatten()
   back = orientation(rotation._fromData(qmul(kids.data, PV.data[pid - 1])), cP)
   assert np.all(back.angle(P) < 1 * degree)
-  ids2, f2 = calcParent(kids, Pn, p2c, numFit=2)
+  ids2, f2 = calcParent(kids, Pn, p2c, numFit=2, id=True)
   assert ids2.shape == (5, 2) and f2.shape == (5, 2) and np.array_equal(ids2[:, 0], pid)
+  # without id the parents themselves, as MATLAB returns them, one parent serving all
+  parents, f1 = calcParent(kids, P, p2c)
+  assert parents.frameA is cP and np.all(parents.angle(P) < 1 * degree) and np.allclose(f1, f)
   # pairs of children, as at grain boundaries, and triples, as at triple points
   pairs = orientation(rotation._fromData(np.stack([kids.data[:4], kids.data[1:5]], axis=1)), cC)
-  pid, f = calcParent(pairs, p2c)
+  pid, f = calcParent(pairs, p2c, id=True)
   assert pid.shape == (4, 2) and np.all(f < 1.5 * degree) and np.all(pid >= 1)
-  ids2, f2 = calcParent(pairs, p2c, numFit=2)
+  pp, _ = calcParent(pairs, p2c)
+  assert pp.shape == (4, 2) and np.all(pp.angle(P) < 2 * degree)
+  ids2, f2 = calcParent(pairs, p2c, numFit=2, id=True)
   assert ids2.shape == (4, 2, 2) and f2.shape == (4, 2)
   triples = orientation(rotation._fromData(np.stack([kids.data[:3], kids.data[1:4], kids.data[2:5]], axis=1)), cC)
-  pid, f = calcParent(triples, p2c)
+  pid, f = calcParent(triples, p2c, id=True)
   assert pid.shape == (3, 3) and np.all(f < 1.5 * degree)
   # a relationship given the other way round is turned
   assert calcParent(kids, p2c.inv())[0].angle(P) < 1 * degree

@@ -58,7 +58,7 @@ class _Problem:
       mass = 4 * np.pi * np.real(h.mean())
       if not (np.isfinite(mass) and mass > 0):
         raise ValueError("the density must have positive finite mass")
-      self.target = S2FunHarmonic(h.fhat / mass, h.frame, real=True, antipodal=h.antipodal, symmetrise=False)
+      self.target = S2FunHarmonic(h._fhat / mass, h.frame, real=True, antipodal=h.antipodal, symmetrise=False, _internal=True)
       A = S2RestrictedDistanceKernel().calcFourier(L)
       beta = np.zeros((L + 1) ** 2)
       for l in range(1, L + 1):
@@ -72,12 +72,14 @@ class _Problem:
       mass = float(np.real(h.mean()))
       if not (np.isfinite(mass) and mass > 0):
         raise ValueError("the density must have positive finite mass")
-      self.target = SO3FunHarmonic(h.fhat / mass, h.CS, h.SS, real=True, antipodal=h.antipodal, symmetrise=False)
+      self.target = SO3FunHarmonic(h._fhat / mass, h.CS, h.SS, real=True, antipodal=h.antipodal, symmetrise=False, _internal=True)
       A = SO3RestrictedDistanceKernel().calcFourier(L)
-      beta = np.zeros(len(h.fhat))
+      beta = np.zeros(len(h._fhat))
       for l in range(1, L + 1):
         beta[_range(l)] = A[l] / (2 * l + 1)
-      self.folds = folds(h.CS, h.SS)
+      # the gradient evaluates left derivatives, which a left symmetry does not keep, so the
+      # plan folds by the crystal side alone
+      self.folds = (folds(h.CS, h.SS)[0], 1)
       self.projection = (invariantProjection(h.SS, L), invariantProjection(h.CS, L))
     self.beta = beta
     self.ones = np.ones(len(xs))
@@ -87,7 +89,7 @@ class _Problem:
     if L > 0 and len(xs) >= DIRECT_SUM_NODES:
       nufft = dict(eps=1e-7, upsampfac=1.25)
       self.plan = S2FourierPlan(vector3d(xs), L, real=True, **nufft) if self.sphere else SO3FourierPlan(rotation(xs), L, real=True, folds=self.folds, **nufft)
-    if not np.all(np.isfinite(self.target.fhat)):
+    if not np.all(np.isfinite(self.target._fhat)):
       raise ValueError("the density coefficients have to be finite")
 
   # the plan follows the nodes: the finufft points and the half array phase
@@ -150,7 +152,7 @@ class _Problem:
 
   def residual(self, xs, c):
     self.setNodes(xs)
-    d = self.moment(xs, c) - self.target.fhat
+    d = self.moment(xs, c) - self.target._fhat
     return self.objective(d), d
 
   # the gradient with respect to the nodes, and to the softmax logits of the weights
@@ -248,7 +250,7 @@ def _weightStep(p, xs, c, residual, innerIter):
     alpha = min(-slope / denom, 1 / np.max(np.abs(lam)))
     cn = np.maximum(c + alpha * d, 0)
     cn /= np.sum(cn)
-    dn = p.moment(xs, cn) - p.target.fhat
+    dn = p.moment(xs, cn) - p.target._fhat
     if p.objective(dn) > p.objective(residual):
       break
     c, residual = cn, dn

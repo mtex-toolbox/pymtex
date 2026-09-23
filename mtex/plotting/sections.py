@@ -110,21 +110,30 @@ class ODFSections:
   def sectionField(self, k, resolution=15 * degree):
     return None
 
-  # the grid a function is evaluated on: per section and chart the directions of the chart
-  # grid, their plane coordinates and the orientations they stand for (MATLAB makeGrid)
+  # ori = oS.makeGrid(): the orientations of the nodes of every section chart, section by
+  # section, at which values are computed for oS.plot(values), MATLAB's makeGrid
   def makeGrid(self, resolution=2.5 * degree):
-    out = []
+    oris, counts = [], []
     for k in range(self.numSections):
-      cells = []
       for proj in self.sectionCharts(k):
-        V, X, Y = proj.grid(resolution)
-        cells.append((proj, V, X, Y, self.orientationsAt(k, V.flatten()) if V.size else None))
-      out.append(cells)
-    return out
+        V = proj.grid(resolution)[0]
+        counts.append(V.size)
+        if V.size:
+          oris.append(self.orientationsAt(k, V.flatten()))
+    self.plotGrid = (resolution, counts)
+    return orientation.cat(*oris)
 
-  def plot(self, x, **kwargs):
-    from .sectionplot import plotSection
-    return plotSection(x, self, **kwargs)
+  # oS.plot(odf), oS.plot(ori), and oS.plot(values, 'smooth') of values on makeGrid's nodes
+  def plot(self, x, *args, **kwargs):
+    from .sectionplot import _plotSectionFun, plotSection
+    if isinstance(x, np.ndarray) or isinstance(x, list):
+      if getattr(self, "plotGrid", None) is None:
+        raise ValueError("values are drawn on the nodes of makeGrid: call oS.makeGrid() first")
+      resolution, counts = self.plotGrid
+      values = iter(np.split(np.asarray(x, dtype=float).reshape(-1), np.cumsum([c for c in counts if c])[:-1]))
+      kwargs.update({a: True for a in args if isinstance(a, str)})
+      return _plotSectionFun(lambda ori: next(values), self, resolution=resolution, **kwargs)
+    return plotSection(x, self, *args, **kwargs)
 
   def __repr__(self):
     vals = ", ".join(f"{v / degree:g}" for v in self.values)
@@ -163,10 +172,16 @@ class eulerSections(ODFSections):
       raise TypeError(f"unknown option {next(iter(kwargs))}")
     p1, pPhi, p2 = eulerRegion(CS1, CS2)
     self.period, azimuth = (p1, p2) if self.first else (p2, p1)
+    self._tolerance = tolerance
     super().__init__(CS1, CS2, sectionList(values, self.period, sections), tolerance)
     self.maxPhi = pPhi if maxPhi is None else maxPhi
     self.maxAzimuth = azimuth if maxAzimuth is None else maxAzimuth
     self.sR = eulerBox(self.maxPhi, self.maxAzimuth)
+
+  # the section angles set afterwards, sP.phi1 = (0:10:90)*degree
+  def _setValues(self, values):
+    self.values = np.asarray(values, dtype=float).reshape(-1)
+    self.tol = sectionTolerance(self.values, self._tolerance)
 
   @property
   def names(self):
@@ -224,6 +239,10 @@ class phi2Sections(eulerSections):
   def phi2(self):
     return self.values
 
+  @phi2.setter
+  def phi2(self, values):
+    self._setValues(values)
+
 
 class phi1Sections(eulerSections):
   convention, first = "Bunge", True
@@ -231,6 +250,10 @@ class phi1Sections(eulerSections):
   @property
   def phi1(self):
     return self.values
+
+  @phi1.setter
+  def phi1(self, values):
+    self._setValues(values)
 
 
 class gammaSections(eulerSections):
@@ -240,6 +263,10 @@ class gammaSections(eulerSections):
   def gamma(self):
     return self.values
 
+  @gamma.setter
+  def gamma(self, values):
+    self._setValues(values)
+
 
 class alphaSections(eulerSections):
   convention, first = "Matthies", True
@@ -247,6 +274,10 @@ class alphaSections(eulerSections):
   @property
   def alpha(self):
     return self.values
+
+  @alpha.setter
+  def alpha(self, values):
+    self._setValues(values)
 
 
 # ------------------------------------------------------------------ pole figure sections

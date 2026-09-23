@@ -61,7 +61,7 @@ def frameAxes(fr):
   if isinstance(fr, crystalFrame):
     axes = [np.asarray(fr.sym.axes[k], dtype=float) for k in range(3)]
     return [(a / np.linalg.norm(a), n) for a, n in zip(axes, fr.axesNames)]
-  names = fr.axesNames if fr is not None else ("x", "y", "z")
+  names = fr.axesNames if fr is not None else ("X", "Y", "Z")
   return [(np.eye(3)[k], names[k]) for k in range(3)]
 
 

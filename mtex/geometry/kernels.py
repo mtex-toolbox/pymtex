@@ -182,6 +182,56 @@ def bestDot(qs, es):
   return val.reshape(shape), idx.reshape(shape)
 
 
+# the angle between the parent candidates o1 PV_k and o2 PV_l of every pair of children, from
+# their misorientation m = inv(o1) o2 alone: PV_k^-1 m PV_l reduced over the parent group G
+def _variantAngleLoop(m, PV, G, out):
+  n, nV, nG = m.shape[0], PV.shape[0], G.shape[0]
+  for p in range(n):
+    m0, m1, m2, m3 = m[p, 0], m[p, 1], m[p, 2], m[p, 3]
+    for k in range(nV):
+      # conj(PV_k) * m
+      a0, a1, a2, a3 = PV[k, 0], -PV[k, 1], -PV[k, 2], -PV[k, 3]
+      b0 = a0 * m0 - a1 * m1 - a2 * m2 - a3 * m3
+      b1 = a0 * m1 + a1 * m0 + a2 * m3 - a3 * m2
+      b2 = a0 * m2 - a1 * m3 + a2 * m0 + a3 * m1
+      b3 = a0 * m3 + a1 * m2 - a2 * m1 + a3 * m0
+      for l in range(nV):
+        c0, c1, c2, c3 = PV[l, 0], PV[l, 1], PV[l, 2], PV[l, 3]
+        x0 = b0 * c0 - b1 * c1 - b2 * c2 - b3 * c3
+        x1 = b0 * c1 + b1 * c0 + b2 * c3 - b3 * c2
+        x2 = b0 * c2 - b1 * c3 + b2 * c0 + b3 * c1
+        x3 = b0 * c3 + b1 * c2 - b2 * c1 + b3 * c0
+        best, bj = -1.0, 0
+        for j in range(nG):
+          d = abs(x0 * G[j, 0] + x1 * G[j, 1] + x2 * G[j, 2] + x3 * G[j, 3])
+          if d > best:
+            best, bj = d, j
+        # the angle of x conj(G_j) from its vector part, accurate near zero
+        g0, g1, g2, g3 = G[bj, 0], -G[bj, 1], -G[bj, 2], -G[bj, 3]
+        y1 = x0 * g1 + x1 * g0 + x2 * g3 - x3 * g2
+        y2 = x0 * g2 - x1 * g3 + x2 * g0 + x3 * g1
+        y3 = x0 * g3 + x1 * g2 - x2 * g1 + x3 * g0
+        out[p, k, l] = 2 * np.arctan2(np.sqrt(y1 * y1 + y2 * y2 + y3 * y3), best)
+
+
+# the angles of variantAngles for every misorientation, (n, nV, nV)
+def variantAngles(m, PV, G):
+  m = np.ascontiguousarray(m, dtype=np.float64).reshape(-1, 4)
+  PV = np.ascontiguousarray(PV, dtype=np.float64).reshape(-1, 4)
+  G = np.ascontiguousarray(G, dtype=np.float64).reshape(-1, 4)
+  out = np.empty((len(m), len(PV), len(PV)))
+  if backend() == "numba":
+    _loop("variantAngles", _variantAngleLoop)(m, PV, G, out)
+    return out
+  left = PV * np.array([1.0, -1, -1, -1])
+  for s in range(0, len(m), 256):
+    x = _qmulNumpy(_qmulNumpy(left[None, :, None, :], m[s:s + 256, None, None, :]), PV[None, None, :, :])
+    j = np.argmax(np.abs(x @ G.T), axis=-1)
+    y = _qmulNumpy(x, G[j] * np.array([1.0, -1, -1, -1]))
+    out[s:s + 256] = 2 * np.arctan2(np.linalg.norm(y[..., 1:], axis=-1), np.abs(y[..., 0]))
+  return out
+
+
 # ------------------------------------------------------------------ the pair search
 
 # for each pair the reduced |<q1, l q2 r>| maximised over L and R (and inv(q2) under

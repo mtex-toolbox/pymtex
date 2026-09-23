@@ -90,6 +90,21 @@ def test_T2_orientation_keys():
   assert ipf.orientation2color(os_).shape == (20, 3) and np.isclose(ipf.maxAngle, 7.5 * degree)
 
 
+def test_the_spectral_transmission_key():
+  from mtex import refractiveIndexTensor, spectralTransmission, spectralTransmissionColorKey, xvector, zvector
+  cs = crystalFrame("mmm")
+  rI = refractiveIndexTensor(np.diag([1.670, 1.635, 1.651]), cs)
+  os_ = orientation(rotation.rand(8, rng=rng), cs)
+  key = spectralTransmissionColorKey(rI, 22800)
+  assert key.CS1 is cs and np.isclose(key.phi, 90 * degree)
+  # the default setup: light along z, the polariser along x of the specimen
+  direct = spectralTransmission(rI, os_.inv() * zvector, 22800, polarizationDirection=os_.inv() * xvector)
+  assert np.allclose(key.orientation2color(os_), direct)
+  # no polariser is the circular branch, the fast wave at 45 degrees
+  key.polarizer = None
+  assert np.allclose(key.orientation2color(os_), spectralTransmission(rI, os_.inv() * zvector, 22800))
+
+
 def test_P9_the_colour_key_on_a_grid():
   cs = crystalFrame("432")
   key = HSVDirectionKey(cs)

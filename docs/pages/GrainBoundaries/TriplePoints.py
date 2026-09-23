@@ -153,9 +153,8 @@ hold(False)
 
 # ## Disorientations around the point
 #
-# The same indexing extracts the disorientation across each incident segment. The three
-# arms of the $n$ selected points come back as one list of $3n$ segments, which reshapes
-# into the $n \times 3$ arrangement MATLAB displays.
+# The same indexing extracts the disorientation across each incident segment. The displayed
+# object has size $n \times 3$, where $n$ is the number of selected triple points.
 
 mori = gB.misorientation
 mori
@@ -163,7 +162,7 @@ mori
 # A simple scalar summary is the sum of the three disorientation angles at each point.
 
 # +
-sumMisAngle = np.sum(mori.angle().reshape(-1, 3), axis=1)
+sumMisAngle = np.sum(mori.angle(), axis=1)
 
 plot(grains, figSize='large')
 hold(True)
@@ -233,11 +232,15 @@ mtexColorbar()
 # at reconstruction. [CSL Boundaries](CSLBoundaries.html) classifies triple points by the
 # character of their incident boundaries. [Merging Grains](GrainMerge.html) then shows how
 # selected boundaries alter the grains and their junction network. For full boundary-plane
-# geometry, continue to [3D EBSD](EBSD3Analysis.html).
+# geometry, continue to [3D EBSD](EBSD3Analysis.html). Triple points also supply local
+# orientation evidence in [Triple Point Based Reconstruction](TriplePointBasedReconstruction.html)
+# of parent grains.
 
 # ## Technical Details
 #
 # A tuple of phase names in brackets selects triple points, MATLAB's
-# `tP('Forsterite','Forsterite')`. Indexing a boundary with the $n \times 3$ matrix of
-# incident segments gives one flat list of $3n$ segments, where MATLAB keeps the matrix
-# shape; the angles are reshaped where the three arms of a point are added up.
+# `tP('Forsterite','Forsterite')`. The port finds 78 triple points where MATLAB finds 70,
+# 19 of them between three forsterite grains for MATLAB's 14, and 220 forsterite
+# boundary segments become 248: the not indexed third of this map is closed by the
+# neighbouring grains differently, and `alpha` does not change the closing here, as
+# [Grain Reconstruction](GrainReconstruction.html) says.

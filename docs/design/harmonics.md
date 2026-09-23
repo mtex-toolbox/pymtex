@@ -45,7 +45,17 @@ the container shape, `(2l+1, ...)`; `normalizedLegendre(l, x)` the `P̄_l^m(x)`,
 in front of the shape of `x`. MTEX's `sphericalY.m` omits the `(-1)^m` for `m < 0`.
 Rotation: `Y_l^m(R ξ) = Σ_{m'} conj(D_l^{m m'}(R)) Y_l^{m'}(ξ)`, as vectors
 `Y_l(R ξ) = conj(D_l(R)) Y_l(ξ)` and `Y_l(R⁻¹ ξ) = D_l(R)ᵀ Y_l(ξ)`; the test tries the
-four placements and this is the one that holds.
+four placements and this is the one that holds. These are `_sphericalY`, the internal basis;
+the public `sphericalY` is MTEX's, `Y_l^m` times `-1` for odd `m > 0`, so `Y_l^{-m} =
+conj(Y_l^m)` and `Y_1^{±1}(x) = 0.3455` as in MATLAB.
+
+**The public coefficients.** What a user reads from and passes as `fhat` means what it
+means in MATLAB. The internal arrays (`_fhat`) stay in the conventions of this document and
+are converted at the boundary, the constructors from an array and the `fhat` property, by
+two involutions in `harmonics.py`: `mtexCoefficientsS2` multiplies the coefficient of order
+`m` by `-1` for odd `m > 0`; `mtexCoefficientsSO3` transposes every block `f̂_n` and
+multiplies it by `s sᵀ`, `s_m = -1` for odd `m > 0`. Both are checked against MATLAB's
+evaluation of unit coefficients. Internal constructors pass `_internal=True`.
 
 **H5 - the series and the sides.** A function on SO(3) is
 `f(R) = Σ_n √(2n+1) Σ_{k,l} f̂_n^{kl} D_n^{kl}(R)`, `wignerSeries(fhat, r)` by the direct

@@ -246,6 +246,10 @@ class quaternion(MtexArray):
 
   # the rotation a tangent vector at this reference points to, exp(ori, v) of MATLAB
   def exp(self, v, side=None):
+    from .tangent import SO3TangentVector
+    # a tangent vector carries its reference, which is this rotation
+    if isinstance(v, SO3TangentVector):
+      return v.exp()
     return v.exp(self, side)
 
   # the point at s in [0, 1] on the shortest path from this rotation to another
@@ -299,6 +303,11 @@ class quaternion(MtexArray):
     return float(np.sqrt(np.nanmean(m.angle(self) ** 2)))
 
   # ------------------------------------------------------------------ display
+
+  # one rotation as MATLAB's char writes it, its Euler angles to three digits
+  def _eulerLine(self):
+    e = np.stack(quat2euler(self.data.reshape(-1, 4)[:1], eulerConvention()), axis=-1)[0] / degree
+    return "(" + ",".join(f"{0.0 if abs(x) < 1e-8 else x:.3g}°" for x in e) + ")"
 
   def _eulerTable(self):
     convention = eulerConvention()

@@ -2,7 +2,7 @@
 # dislocation content (MATLAB @EBSD/calcGND, @curvatureTensor/fitDislocationSystems; Julia
 # dislocations.jl)
 #
-#   rho = fitDislocationSystems(kappa, dS)
+#   rho, factor = fitDislocationSystems(kappa, dS), fitDislocationSystems(ebsd.curvature(), ebsd.orientations.reshape(-1, 1) * dS)
 #   gnd, rho = ebsd.calcGND(dS), ebsd.calcGND(dS, stencil='full')
 #
 # The fit of the densities is a linear program, the least total line energy that
@@ -11,13 +11,13 @@
 # needs the Optimization Toolbox for the same step. The equations are the components of
 # the curvature the map actually
 # knows, read off the tensor's own NaNs. The densities come out in the units the map and
-# the crystal are given in: a density per length of the scan unit times a length of the
-# Burgers vector; to read them as 1/m^2, divide by the product of the two lengths in metres.
+# the crystal are given in, a density per length of the scan unit times a length of the
+# Burgers vector, and the factor MATLAB returns beside them turns them into 1/m^2.
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import backend, qrot
+from ..geometry.kernels import backend
 from ..maps.ebsd import EBSD
 from ..maps.intragranular import curvature
 
@@ -48,42 +48,56 @@ def fitDensities(M, known, b, l, u):
   return res.x[:ns] - res.x[ns:]
 
 
-# the dislocation densities that account for a curvature tensor with the least total line
-# energy, one signed density per system; the tensor and the systems are in one frame
+# the length of a unit in metres: the scan units and 'au', the Angstrom of the axes
+UNIT_SCALE = {"m": 1.0, "mm": 1e-3, "um": 1e-6, "µm": 1e-6, "nm": 1e-9, "au": 1e-10, "A": 1e-10}
+
+
+# rho, factor = fitDislocationSystems(kappa, dS): the dislocation densities that account for
+# the curvature with the least total line energy, one signed density per system, NaN where no
+# combination of them reproduces it. The curvature is one tensor or a map of them, the systems
+# one list for all or, rotated by the orientations of the map, a (pixels, systems) array; both
+# in one frame. The factor turns the densities into 1/m^2, from the units of the curvature
+# and of the Burgers vectors
 def fitDislocationSystems(kappa, dS):
-  M = np.asarray(kappa, dtype=float).reshape(9)
-  known = np.flatnonzero(~np.isnan(M))
-  return fitDensities(M, known, dS.b.data, dS.l.data, dS.u)
-
-
-# the geometrically necessary dislocation content of every pixel, after Pantleon (2008):
-# the curvature of the map is explained by the dislocation systems with the least total
-# line energy, and the energy of that solution is the GND. Returns the energy per pixel and
-# the signed density of every system
-def calcGND(ebsd, dS, stencil="oneSided"):
-  kappa = np.ascontiguousarray(curvature(ebsd, stencil=stencil).reshape(-1, 9))
-  n, ns = len(kappa), len(dS)
-  b0, l0, u = np.ascontiguousarray(dS.b.data, dtype=float), np.ascontiguousarray(_unit(dS.l.data)), np.ascontiguousarray(dS.u, dtype=float)
-  rot = np.ascontiguousarray(ebsd.rotations.data, dtype=float).reshape(-1, 4)
-  ind = np.ascontiguousarray(ebsd.isIndexed.reshape(-1))
-  known = np.flatnonzero(~np.isnan(kappa[0])) if n else np.zeros(0, dtype=int)
-  gnd, rho = np.full(n, np.nan), np.full((n, ns), np.nan)
+  from ..tensors.tensor import tensor
+  M = kappa.M if isinstance(kappa, tensor) else np.asarray(kappa, dtype=float)
+  single = M.shape == (3, 3)
+  K = np.ascontiguousarray(M.reshape(-1, 9))
+  ns = dS.shape[-1]
+  b = np.ascontiguousarray(dS.b.data.reshape(-1, ns, 3), dtype=float)
+  l = np.ascontiguousarray(_unit(dS.l.data).reshape(-1, ns, 3))
+  u = np.ascontiguousarray(np.broadcast_to(dS.u, dS.shape).reshape(-1, ns), dtype=float)
+  known = np.flatnonzero(~np.isnan(K[0])) if len(K) else np.zeros(0, dtype=int)
+  gnd, rho = np.full(len(K), np.nan), np.full((len(K), ns), np.nan)
+  loop = None
   if backend() == "numba":
     from ..maps.kernels import pixelKernel
     loop = pixelKernel("gnd")
-    if loop is not None:
-      loop(rot, ind, kappa, np.ascontiguousarray(known, dtype=np.int64), b0, l0, u, 1e-9, 10000, gnd, rho)
-      return gnd.reshape(ebsd.shape), rho
-  for k in np.flatnonzero(ind):
-    if np.any(np.isnan(kappa[k, known])):
-      continue
-    # the systems in crystal coordinates, rotated into the specimen at this pixel
-    b, l = qrot(rot[k], b0), qrot(rot[k], l0)
-    x = fitDensities(kappa[k], known, b, l, u)
-    if x is None:
-      continue
-    rho[k] = x
-    gnd[k] = np.sum(np.abs(x) * u)
+  if loop is not None:
+    loop(K, np.ascontiguousarray(known, dtype=np.int64), b, l, u, 1e-9, 10000, gnd, rho)
+  else:
+    for k in range(len(K)):
+      kb = k if len(b) > 1 else 0
+      if np.any(np.isnan(K[k, known])) or np.any(np.isnan(b[kb])) or np.any(np.isnan(l[kb])):
+        continue
+      x = fitDensities(K[k], known, b[kb], l[kb], u[kb])
+      if x is not None:
+        rho[k] = x
+  unit = getattr(kappa, "unit", None)
+  factor = 1 / UNIT_SCALE["au"] / UNIT_SCALE[unit.replace("1/", "")] if unit else 1.0
+  return (rho[0] if single else rho), factor
+
+
+# gnd, rho = calcGND(ebsd, dS): the geometrically necessary dislocation content of every
+# pixel after Pantleon (2008), MATLAB's route: the curvature of the map, the systems rotated
+# into every pixel, the densities of least total line energy reproducing the curvature. The
+# content is the sum of the line energies times the absolute densities, in 1/m^2 for line
+# energies without a unit, and the densities one row per pixel
+def calcGND(ebsd, dS, stencil="oneSided"):
+  kappa = curvature(ebsd, stencil=stencil)
+  dSRot = ebsd.orientations.reshape(-1, 1) * dS
+  rho, factor = fitDislocationSystems(kappa, dSRot)
+  gnd = factor * np.sum(np.abs(rho * dSRot.u), axis=1)
   return gnd.reshape(ebsd.shape), rho
 
 

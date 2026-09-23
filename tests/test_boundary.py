@@ -107,7 +107,9 @@ def test_B4_a_block_map_has_the_boundaries_it_must():
   tp = gB.triplePoints
   assert tp.isempty and tp.grainId.shape == (0, 3)
   assert np.all(gB.grainId[:, 1] > 0) and np.sum(gB.grainId[:, 0] == 0) == 80
-  assert "outside" in repr(gB) and "segments" in repr(gB)
+  assert "notIndexed" in repr(gB) and "segments" in repr(gB)
+  # the length rounded in the scan unit, as MATLAB writes it
+  assert " µm  " in repr(gB) and "e+" not in repr(gB)
 
 
 def test_B5_lengths_midpoints_and_directions():
@@ -248,13 +250,15 @@ def test_B12_flipping_swaps_the_sides_and_reverses_the_walk():
 def test_B13_a_line_across_the_map_and_a_box_around_a_block():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   # the map runs from -0.5 to 19.5 with the cross at 9.5
-  idx, pts = gB.intersect([-2.0, 5.0], [22.0, 5.0])
-  xy = gB.plane.to2d(pts.data)
-  assert len(idx) == 3 and close(xy[:, 0], [-0.5, 9.5, 19.5]) and close(xy[:, 1], 5)
-  idx2, _ = gB.intersect([22.0, 5.0], [-2.0, 5.0])
-  assert np.array_equal(idx2, idx[::-1])
-  assert len(gB.intersect([-2.0, 25.0], [22.0, 25.0])[0]) == 0
-  along, _ = gB.intersect([9.5, -2.0], [9.5, 22.0])
+  # MATLAB's [x, y] = intersect(gB, xy1, xy2): per segment, NaN where it is not crossed
+  x, y = gB.intersect([-2.0, 5.0], [22.0, 5.0])
+  cut = ~np.isnan(x)
+  assert x.shape == (len(gB),) and cut.sum() == 3 and close(np.sort(x[cut]), [-0.5, 9.5, 19.5]) and close(y[cut], 5)
+  x2, _, seg = gB.intersect([22.0, 5.0], [-2.0, 5.0], segLength=True)
+  assert np.array_equal(~np.isnan(x2), cut) and close(seg, [10, 10])
+  assert np.all(np.isnan(gB.intersect([-2.0, 25.0], [22.0, 25.0])[0]))
+  # a line along the cross cuts only the segments across it
+  along = ~np.isnan(gB.intersect([9.5, -2.0], [9.5, 22.0])[0])
   assert np.all(gB.V[gB.F[along, 0], 0] != gB.V[gB.F[along, 1], 0])
   # the segments of the lower left block, the cross excluded
   ind = gB.inpolygon([[-1.0, -1.0], [9.0, -1.0], [9.0, 9.0], [-1.0, 9.0]])
@@ -285,3 +289,10 @@ def test_triple_points_chains_and_components():
   g1 = g[0]
   assert len(g1.boundary) < len(gB) and np.all(np.any(g1.boundary.grainId == g1.id[0], axis=1))
   assert "triple points: 1" in repr(g)
+  # a selection keeps the points of the whole network at its vertices, boundaryId into the whole
+  assert len(g1.triplePoints) == 1 and len(gB[:1].triplePoints) <= 1 and gB[np.zeros(len(gB), dtype=bool)].triplePoints.isempty
+  arms = gB[tp.boundaryId]
+  assert np.array_equal(np.sort(arms.grainId.reshape(-1)), np.sort(gB.grainId[tp.boundaryId.reshape(-1)].reshape(-1)))
+  assert len(inner[inner.grainId[:, 0] == g.id[0]].triplePoints) == 1
+  # an index matrix, the three arms of each point, keeps its shape for the misorientations
+  assert arms.misorientation.shape == (1, 3) and len(arms) == 3

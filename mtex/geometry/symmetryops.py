@@ -39,6 +39,10 @@ def _images(frame, xyz):
 # (shape numSym x size); antipodal adds the negatives unless the group holds the inversion
 # or the vector is an axis; unique keeps the distinct images of one direction only
 def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tolerance=1e-6):
+  # symmetrise(v, cs): the coordinates of v read in the frame given, as MATLAB's
+  from .frames import referenceFrame
+  if isinstance(unique, referenceFrame):
+    v, unique = v._new(v.data, _frame=unique), False
   if not v.isCrystalDirection:
     return v.reshape((1,) + v.shape)
   fr = v.frame
@@ -313,11 +317,14 @@ def orientationMean(o, weights=None, robust=False, iterations=3):
 # the rotational axis of a misorientation: that of the representative in the fundamental
 # region; only the rotations both frames share leave it invariant, and grain exchange takes
 # away its sign, which for a crystal direction is the Laue sibling of the frame
+# the frame an axis is expressed in: that of the first crystal of a misorientation, as MATLAB
+# labels it, the specimen for an orientation; the axis is fixed by the rotation, so its
+# components are the same in both frames
 def axisFrame(o):
   g = o.frameA.sym.disjoint(o.frameB.sym).properGroup()
   if o.antipodal:
     g = g.Laue()
-  return o.frameB.sibling(g)
+  return (o.frameA if o.isMisorientation else o.frameB).sibling(g)
 
 
 def orientationAxis(o, noSymmetry=False):
@@ -341,6 +348,8 @@ def pairAxis(o1, o2):
   cand = qmul(qmul(a[..., None, :], G), _conj(b)[..., None, :])      # (..., |G|, 4)
   k = np.argmax(np.abs(cand[..., 0]), axis=-1)
   best = np.take_along_axis(cand, k[..., None, None], axis=-2)[..., 0, :]
+  # q and -q are one rotation; the axis is that of the one with a positive scalar part
+  best = best * np.where(best[..., :1] < 0, -1.0, 1.0)
   return vector3d(quatAxis(best), isNormalized=True, antipodal=True, frame=o1.frameB)
 
 

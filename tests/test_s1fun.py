@@ -13,7 +13,7 @@ def test_F3e_S1FunHarmonic():
   assert np.allclose(f(xs), S1FejerKernel(12)(xs)) and np.isclose(mean(f), 1) and f.isReal and f.even
   c = rng.standard_normal(9) + 1j * rng.standard_normal(9)
   g = S1FunHarmonic(c)
-  assert np.allclose(g(xs), [np.sum(c * np.exp(1j * np.arange(-4, 5) * x)) for x in xs])
+  assert np.allclose(g(xs), [np.sum(c * np.exp(-1j * np.arange(-4, 5) * x)) for x in xs])
   assert np.allclose((f + g)(xs), f(xs) + g(xs)) and np.allclose((2 * g - 1)(xs), 2 * g(xs) - 1)
   assert np.allclose(g.diff()(xs), [(g(x + 1e-6) - g(x - 1e-6)) / 2e-6 for x in xs], atol=1e-6)
   assert np.allclose(g.rotate(0.4)(xs), g(xs - 0.4))
@@ -28,13 +28,14 @@ def test_F3e_S1FunHarmonic():
   # the Gaussian on the circle: its halfwidth is where it has fallen to half its peak
   psi = S1GaussKernel(halfwidth=10 * degree)
   assert np.isclose(psi.halfwidth(), 10 * degree) and np.isclose(psi(10 * degree), psi(0) / 2, rtol=1e-6)
-  # a density of angles has mean one, follows its weights, and smoothing twice adds the variances
+  # a density of angles has mean one, follows its weights, and smoothing twice adds the
+  # variances; MATLAB's cutoff at round(4 / sigma) leaves ripples of e^-8
   d = calcDensity([0.0, 2.0], weights=[1, 3], sigma=0.2)
-  assert np.isclose(mean(d), 1) and d.min()[0] > -1e-6
-  assert np.isclose(d(2.0), 3 * d(0.0), rtol=1e-6)
+  assert d.bandwidth == 20 and np.isclose(mean(d), 1) and d.min()[0] > -1e-3
+  assert np.isclose(d(2.0), 3 * d(0.0), rtol=1e-3)
   v, x = d.max()
   assert abs(x - 2.0) < 1e-3 and np.isclose(v, d(2.0), rtol=1e-6)
-  assert conv(d, S1GaussKernel(0.3)).isclose(calcDensity([0.0, 2.0], weights=[1, 3], sigma=np.sqrt(0.2 ** 2 + 0.3 ** 2)))
+  assert conv(d, S1GaussKernel(0.3)).isclose(calcDensity([0.0, 2.0], weights=[1, 3], sigma=np.sqrt(0.2 ** 2 + 0.3 ** 2), bandwidth=20))
   # axes: the density repeats after half a turn and keeps only the even modes
   a = calcDensity([0.3, 1.0], sigma=0.2, antipodal=True)
   assert np.isclose(a(0.3), a(0.3 + pi)) and a.antipodal

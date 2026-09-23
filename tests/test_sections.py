@@ -46,6 +46,9 @@ def test_E2_euler_sections():
   # the sections of the first Euler angle read the box the other way round
   oS1 = phi1Sections(cs, ss)
   assert oS1.axisLabels == ("φ2", "Φ") and np.isclose(oS1.values[-1], 90 * degree * 5 / 6)
+  # the angles set afterwards, as MATLAB's sP.phi1 = (0:10:90)*degree
+  oS1.phi1 = np.arange(0, 91, 10) * degree
+  assert oS1.numSections == 10 and np.isclose(oS1.tol, 10 * degree / 2.1)
   assert gammaSections(cs, ss).axisLabels == ("α", "β") and alphaSections(cs, ss).axisLabels == ("γ", "β")
   # a chart of an Euler section is the plain box in degrees
   c = oS.sectionCharts(0)
@@ -175,3 +178,15 @@ def test_the_chooser():
   assert "sigmaSections" in repr(oS)
   with pytest.raises(ValueError):
     newODFSectionPlot(cs, ss, "beta")
+
+
+def test_values_on_the_nodes_of_makeGrid():
+  import matplotlib
+  matplotlib.use("Agg")
+  from mtex import axisAngleSections, orientation
+  cs = crystalFrame("622")
+  sP = axisAngleSections(cs, cs)
+  ori = sP.makeGrid(resolution=10 * degree)
+  assert isinstance(ori, orientation) and ori.ndim == 1
+  hs = sP.plot(ori.angle(), "smooth")
+  assert any(h is not None for h in hs)

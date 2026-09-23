@@ -5,7 +5,7 @@ import pytest
 
 from mtex import (EBSD, phaseList, lattice, latticeBasis, crystalFrame, specimenFrame, orientation, rotation, vector3d,
                   zvector, degree, angle, extent, shift, transform, gridify, findByLocation, findByOrientation,
-                  inpolygon, fibre)
+                  inpolygon, fibre, rotate)
 from conftest import close
 
 
@@ -152,6 +152,11 @@ def test_E4a_rotate_positions_and_orientations_separately():
   assert np.array_equal(onlyPositions.mad, ebsd.mad) and np.array_equal(onlyOrientations.mad, ebsd.mad)
   # a number turns about z, as MATLAB reads it
   assert close(ebsd.rotate(30 * degree).pos.data, both.pos.data)
+  # the function form dispatches to the method, MATLAB's flags as strings
+  assert close(rotate(ebsd, r).pos.data, both.pos.data)
+  # MATLAB's rot * ebsd turns both
+  assert close((r * ebsd).pos.data, both.pos.data) and close((r * ebsd).rotations.data, both.rotations.data)
+  assert np.array_equal(rotate(ebsd, r, 'keepEuler').rotations.data, rotations)
   with pytest.raises(ValueError):
     ebsd.rotate(r, keepXY=True, keepEuler=True)
 

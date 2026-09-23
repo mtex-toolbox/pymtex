@@ -32,10 +32,12 @@ class sphericalProjection:
     proj.iproject(x, y)    the direction drawn at a point of the plane
 
   Fields: sR, the region shown; pC, the plotting convention; antipodal, whether v and -v
-  are one point; upper, whether the chart shows the hemisphere out of the screen.
+  are one point; upper, whether the chart shows the hemisphere out of the screen;
+  symmetric, whether the data carry the symmetry of the frame, as a function does.
   """
 
   name = "earea"
+  symmetric = False
 
   def __init__(self, sR=None, pC=None, antipodal=False, upper=True):
     self.sR = sphericalRegion(frame=None) if sR is None else sR
@@ -210,9 +212,14 @@ class sphericalProjection:
     fr = self.frame
     if isinstance(fr, crystalFrame):
       V = self.sR.vertices()
+      # a symmetric function over the whole sphere is labelled at the equivalent corners of
+      # the sector, anything else at the crystal axes, the positive end where it lies inside
+      if V.size == 0 and self.symmetric:
+        V = _equivalentVertices(fr, self.sR)
       if V.size == 0:
-        V = [s * a for a in (fr.aAxis, fr.bAxis, fr.cAxis) for s in (1, -1) if self.sR.checkInside(s * a)]
-        V = vector3d(np.array([v.data.reshape(3) for v in V]).reshape(-1, 3), isNormalized=True) if V else vector3d()
+        V = [next(s * a for s in (1, -1) if self.sR.checkInside(s * a)) for a in (fr.aAxis, fr.bAxis, fr.cAxis)
+             if self.sR.checkInside(a) or self.sR.checkInside(-a)]
+        V = vector3d(np.array([v.data.reshape(3) for v in V]).reshape(-1, 3)).normalize() if V else vector3d()
       return [(v, s) for v in V.flatten() for s in (millerLabel(v, fr),) if s is not None]
     names = ("X", "Y", "Z") if fr is None else tuple(fr.axesNames)
     labels = []
@@ -378,14 +385,26 @@ def isLower(sR, pC):
 # both hemispheres; an antipodal region needs the upper one only; the plain projection
 # shows everything in one chart (MATLAB makeSphericalProjection)
 def makeSphericalProjection(v=None, projection="earea", upper=False, lower=False, complete=False, antipodal=None,
-                            how2plot=None, fundamentalRegion=False):
+                            how2plot=None, fundamentalRegion=False, symmetric=None):
   sR, how2plot, ax = _regionFor(v, antipodal, how2plot, fundamentalRegion)
   antipodal = ax if antipodal is None else bool(antipodal)
   cls = projectionClass(projection)
   pC = _conventionOf(sR.frame) if how2plot is None else plottingConvention(how2plot)
-  # complete drops the symmetry sector; with upper or lower one hemisphere of it is drawn
+  # complete drops the symmetry sector; with upper or lower one hemisphere of it is drawn,
+  # with both of them, as MATLAB reads 'upper', 'lower', the two
   if upper and lower:
-    raise ValueError("upper and lower exclude each other")
+    upper, lower, complete = False, False, True
+  # a function of a frame with symmetry carries that symmetry, a set of directions not; a
+  # function drawn over the whole sphere passes its region and says so
+  if symmetric is None:
+    symmetric = v is not None and not isinstance(v, (vector3d, sphericalRegion)) and hasSymmetry(sR.frame)
+  charts = _charts(cls, sR, pC, antipodal, upper, lower, complete)
+  for c in charts:
+    c.symmetric = symmetric
+  return charts
+
+
+def _charts(cls, sR, pC, antipodal, upper, lower, complete):
   if cls is plainProjection:
     return [cls(sR, pC, antipodal, True)]
   # an antipodal chart shows a region of the far hemisphere through its antipode
@@ -484,6 +503,21 @@ def millerLabel(v, fr, utf8=None):
   return None
 
 
+# a region without vertices is labelled by the vertices of the fundamental sector in all
+# their equivalent positions inside it, those at a pole or on the equator, as MATLAB does
+def _equivalentVertices(fr, sR):
+  V = fr.fundamentalSector().vertices()
+  if V.size == 0:
+    return vector3d()
+  X = np.einsum("nij,mj->nmi", fr.rot.matrix(), V.data.reshape(-1, 3)).reshape(-1, 3)
+  X = X / np.linalg.norm(X, axis=-1, keepdims=True)
+  X = X[np.unique(np.round(X, 6), axis=0, return_index=True)[1]]
+  X = X[sR.checkInside(X)]
+  theta = np.arccos(np.clip(X[:, 2], -1, 1))
+  X = X[np.min(np.abs(theta[:, None] - np.array([0, np.pi / 2, np.pi])), axis=1) < degree]
+  return vector3d(X, isNormalized=True)
+
+
 # ------------------------------------------------------------------ helpers
 
 def _asVectors(v):
@@ -505,6 +539,26 @@ def _withMargin(xs, ys, margin):
   return xlo - d, xhi + d, ylo - d, yhi + d
 
 
+# plotS2Grid(resolution=0.5 * degree, 'upper', cs): the directions a chart samples its surface
+# at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
+# lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid
+def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=False, antipodal=None):
+  from ..geometry.frames import referenceFrame
+  flags = {a.lower() for a in args if isinstance(a, str)}
+  upper, lower, complete = upper or "upper" in flags, lower or "lower" in flags, complete or "complete" in flags
+  sR = next((a for a in args if isinstance(a, sphericalRegion)), None)
+  fr = next((a for a in args if isinstance(a, referenceFrame)), None)
+  sR = sR if sR is not None else sphericalRegion(frame=fr)
+  charts = makeSphericalProjection(sR, upper=upper, lower=lower, complete=complete, antipodal=antipodal)
+  grids = [c.grid(resolution)[0].data for c in charts]
+  # the two hemispheres side by side, a blank column between them
+  data = grids[0] if len(grids) == 1 else np.concatenate([grids[0], np.full((grids[0].shape[0], 1, 3), np.nan), grids[1]], axis=1)
+  V = vector3d(data, frame=sR.frame if fr is None else fr)
+  V._plotGrid = dict(upper=upper or (len(charts) == 1 and charts[0].upper), lower=lower or (len(charts) == 1 and not charts[0].upper),
+                     antipodal=charts[0].antipodal)
+  return V
+
+
 __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistProjection", "orthographicProjection",
            "gnomonicProjection", "plainProjection", "makeSphericalProjection", "plotRegion", "plotSector", "rhoRange",
-           "isUpper", "isLower", "millerLabel"]
+           "isUpper", "isLower", "millerLabel", "plotS2Grid"]

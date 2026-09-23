@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pytest
 
-from mtex.io.table import coerceNumeric, headerDict, isNumericRow, leadingLines, linesFrom, readTable, validName
+from mtex.io.table import cprintf, coerceNumeric, headerDict, isNumericRow, leadingLines, linesFrom, readTable, validName
 
 
 def test_readTable_reads_tabs_carriage_returns_blank_lines_and_comments():
@@ -104,3 +104,12 @@ def test_the_two_backends_read_the_same_numbers():
   a = parseBlockNumpy(block.replace(b".", b","), True, None)
   b = parseBlockNumba(block.replace(b".", b","), True, None)
   assert b is None or np.array_equal(a, b)
+
+
+def test_cprintf_prints_one_width_for_all_columns(capsys):
+  # the layout of MATLAB's cprintf on the IsotropicTheory page
+  cprintf([63.0889, 60.326, 58.5696, 57.107, 54.0503], '-Lc', ['Voigt', '+HS', 'Hill', '-HS', 'Reuss'])
+  assert capsys.readouterr().out == "  Voigt     +HS    Hill     -HS   Reuss\n63.0889  60.326 58.5696  57.107 54.0503\n"
+  # a matrix with row names keeps the row names' own width
+  cprintf([[1, 2], [3, 40]], Lc=['a', 'b'], Lr=['row1', 'r2'])
+  assert capsys.readouterr().out == "      a  b\nrow1  1  2\n  r2  3 40\n"

@@ -12,7 +12,7 @@ import threading
 
 import numpy as np
 
-from ..geometry.frames import referenceFrame, specimenFrame
+from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.kernels import qrot
 from ..geometry.orientation import orientation
@@ -187,8 +187,9 @@ class axisAngleColorKey(orientationColorKey):
   colour is NaN above thresholdAngle. Without a reference the identity is the reference.
   """
 
-  def __init__(self, x, CS2=None, oriRef=None, maxAngle=None, thresholdAngle=np.inf):
-    super().__init__(x, CS2)
+  def __init__(self, x=None, CS2=None, oriRef=None, maxAngle=None, thresholdAngle=np.inf):
+    # without a frame the key reads the axes in the specimen and needs no crystal
+    super().__init__(crystalFrame("1") if x is None else x, CS2)
     self.oriRef = oriRef
     self.maxAngle = None if maxAngle is None else float(maxAngle)
     self.thresholdAngle = float(thresholdAngle)
@@ -273,6 +274,32 @@ class spotColorKey(orientationColorKey):
       hsv = rgb2hsv(color[j])
       rgb = rgb * hsv2rgb(hsv[0], w * hsv[1], 1.0)
     return rgb.reshape(ori.shape + (3,))
+
+
+class spectralTransmissionColorKey(orientationColorKey):
+  """the colour of a thin section of an anisotropic crystal between polariser and analyser:
+  light along the propagation direction of the specimen through a plate of the given
+  thickness in nanometres; no polariser is circular polarisation
+
+    key = spectralTransmissionColorKey(rI, thickness)
+    key.propagationDirection, key.polarizer, key.phi
+  """
+
+  def __init__(self, rI, thickness):
+    super().__init__(rI.frame)
+    self.rI = rI
+    self.thickness = thickness
+    self.propagationDirection = vector3d(0, 0, 1)
+    self.polarizer = vector3d(1, 0, 0)
+    self.phi = 90 * degree
+
+  def orientation2color(self, ori):
+    from ..analysis.optics import spectralTransmission
+    back = ori.inv()
+    prop = back * self.propagationDirection
+    if self.polarizer is None:
+      return spectralTransmission(self.rI, prop, self.thickness, phi=self.phi)
+    return spectralTransmission(self.rI, prop, self.thickness, polarizationDirection=back * self.polarizer, phi=self.phi)
 
 
 # ------------------------------------------------------------------ the key on a grid
@@ -361,4 +388,4 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
 
 
 __all__ = ["orientationColorKey", "ipfColorKey", "ipfHSVKey", "ipfTSLKey", "ipfHKLKey", "ipfSpotKey", "axisAngleColorKey",
-           "BungeColorKey", "spotColorKey", "colorGrid", "ipfColors"]
+           "BungeColorKey", "spotColorKey", "spectralTransmissionColorKey", "colorGrid", "ipfColors"]

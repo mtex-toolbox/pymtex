@@ -5,7 +5,7 @@
 #   ori, S = loadOrientation('ori.txt', cs, ss, columnNames=['Quat real', 'Quat i', 'Quat j', 'Quat k'])
 #   orientation.load('ori.txt', cs, columnNames=[...])    the orientations alone
 #
-# The Euler angles are Bunge's under phi1, Phi, phi2 and Matthies' under alpha, beta, gamma,
+# The Euler angles are Bunge's under phi1, Phi, phi2 or Euler 1, 2, 3 and Matthies' under alpha, beta, gamma,
 # in degrees unless radians=True; four quaternion columns need no unit. passive=True reads
 # the rows as the inverse map. The columns that are not coordinates come back in S, a dict
 # of one array per name, lower case and without whitespace, as MATLAB names its fields.
@@ -21,7 +21,8 @@ from ..geometry.units import degree
 from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
 
 # the Euler conventions by the names of their three columns
-EULER_COLUMNS = {("phi1", "phi", "phi2"): "Bunge", ("alpha", "beta", "gamma"): "Matthies"}
+EULER_COLUMNS = {("phi1", "phi", "phi2"): "Bunge", ("euler 1", "euler 2", "euler 3"): "Bunge",
+                 ("alpha", "beta", "gamma"): "Matthies"}
 QUATERNION_COLUMNS = ("quat real", "quat i", "quat j", "quat k")
 
 

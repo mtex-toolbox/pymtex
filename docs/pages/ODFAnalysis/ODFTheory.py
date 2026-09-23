@@ -18,7 +18,7 @@
 # following convention draws Y upward and X to the right. It does not rotate the specimen
 # or change any orientation.
 
-from mtex import (calcDensity, crystalShape, degree, hold, max, mean, mtexColorMap, mtexdata, orientation, plot, plotSection,
+from mtex import (calcDensity, crystalShape, degree, hold, max, mean, mtexColorMap, mtexdata, orientation, plot, plot3d, plotSection,
                   plottingConvention, reduce, volume, zvector)
 
 plottingConvention.default('y↑→x')
@@ -120,11 +120,14 @@ volumeFraction
 # ## Looking at an ODF
 #
 # An ODF is a function on a three-dimensional curved space. A 3-D plot can show how the
-# measured orientations relate to its high-density regions. MATLAB draws the isosurfaces
-# of the density with `plot3d(odf, 'Euler')` and the measured orientations on top of them;
-# the port draws the orientations alone, since the isosurface plot is not ported yet.
+# measured orientations relate to its high-density regions.
 
+# +
+plot3d(odf, 'Euler')
+hold(True)
 plot(oriPlot, 'Euler', MarkerEdgeColor='k')
+hold(False)
+# -
 
 # The black point clusters pass through the coloured density lobes. This is the visual
 # connection between the discrete measurements and their ODF.
@@ -182,6 +185,5 @@ mtexColorMap('LaboTeX')
 
 # ## Technical Details
 #
-# The isosurface plot `plot3d(odf)` of MATLAB is not ported; the page draws the sampled
-# orientations in Euler angle space without the density behind them. `max(odf)` returns
+# `max(odf)` returns
 # the pair of the value and the orientation, as MATLAB's two outputs do.

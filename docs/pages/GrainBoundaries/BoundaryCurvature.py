@@ -269,4 +269,16 @@ mtexColorbar(title=f'grain-relative curvature in 1/{gB.scanUnit}')
 #
 # MATLAB's `testgrains` is a stored map of forty artificial shapes; this port draws its own
 # map of fifteen, so the page follows grain 4 where the MATLAB page follows grain 2, and
-# the enclosed grain is 5 inside the ring-shaped 3 rather than 23 and 31.
+# the enclosed grain is 5 inside the ring-shaped 3 rather than 23 and 31; the arc length
+# profile is of grain 13 where MATLAB's is of grain 15. The total turning of grain 4 is
+# ∓1.0244 for MATLAB's ∓1.0199 of grain 2, and two of the first hundred segments are
+# undefined in both. `testgrains.mat` holds one MATLAB grain object, which the port does
+# not read. The enclosed grains 5 and 7 have larger ids than their rings 3 and 2, so the
+# loop draws them last and the red of their own convex boundaries lies over the blue the
+# rings give the same segments; in MATLAB the rings come after the grains they enclose.
+#
+# On the titanium map the port keeps the small lobe below the selected grain as a grain of
+# its own: its boundary to the grain is 10.55 degrees at its lowest, just over the
+# threshold, where MATLAB joins the two, so the curvature runs round the triangle alone.
+# The curvature reaches 0.058 per µm but is paler along most of the boundary than
+# MATLAB's.

@@ -699,14 +699,14 @@ def _voronoiWeights(v):
 # of the real system the harmonics at the points set up, dense for a few thousand points
 # and by LSQR on the transform above; they can turn negative on an irregular set
 def _harmonicWeights(v):
-  from .harmonics import sphericalY
+  from .harmonics import _sphericalY
   x = v.flatten().normalize()
   n = x.size
   L = max(1, int(math.sqrt(n / (2 if v.antipodal else 1))) - 1)
   degrees = range(0, L + 1, 2) if v.antipodal else range(L + 1)
   w0 = np.full(n, 4 * np.pi / n)
   if n <= 4000:
-    Y = np.concatenate([sphericalY(l, vector3d(x.data)) for l in degrees])
+    Y = np.concatenate([_sphericalY(l, vector3d(x.data)) for l in degrees])
     A = np.concatenate([Y.real, Y.imag])
     b = np.zeros(A.shape[0])
     b[0] = math.sqrt(4 * np.pi)

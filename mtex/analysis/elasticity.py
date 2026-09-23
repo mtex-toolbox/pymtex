@@ -92,23 +92,29 @@ def _christoffel(C, n):
   return EinsteinSum(C, [1, -1, 2, -2], u, [-1], u, [-2]).M, C.frame, C.density
 
 
-def velocity(C, n=None, *args, density=None, harmonic=False):
+def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
   """the elastic wave velocities and their polarisations from the Christoffel tensor
 
     vp, vs1, vs2, pp, ps1, ps2 = velocity(C, n, density=rho)   in the direction n, or at a list of them
     vp, vs1, vs2, pp, ps1, ps2 = velocity(C, density=rho)      as functions on the sphere and axis fields
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, 'harmonic')       as harmonic expansions of bandwidth 48
 
   A stiffness in GPa and a density in g/cm^3 give velocities in km/s; the density stored
-  on the tensor is used when none is given.
+  on the tensor is used when none is given, and MATLAB's velocity(C, n, rho) passes it
+  third.
   """
   C = _stiffness(C)
-  rho = C.density if density is None else density
+  if isinstance(n, str):
+    n, args = None, (n,) + args
+  harmonic = harmonic or "harmonic" in args
+  numbers = [a for a in args if not isinstance(a, str)]
+  rho = numbers[0] if numbers and density is None else C.density if density is None else density
   if rho is None:
     rho = 1.0
   if not np.isfinite(rho) or rho <= 0:
     raise ValueError("the density has to be finite and positive")
-  if n is None or (isinstance(n, str) and n == "harmonic"):
-    return _velocityFields(C, rho)
+  if n is None:
+    return _velocityHarmonics(C, rho, bandwidth) if harmonic else _velocityFields(C, rho)
   u = _unit(C, n)
   E = EinsteinSum(C, [1, -1, 2, -2], u, [-1], u, [-2]).M
   lam, vecs = np.linalg.eigh(E)
@@ -121,6 +127,19 @@ def _velocityFields(C, rho):
   from ..functions.s2axisfield import S2AxisFieldHandle
   speed = lambda k: _sphericalFunction(lambda v: velocity(C, v, density=rho)[k], C)
   field = lambda k: S2AxisFieldHandle(lambda v: velocity(C, vector3d(v.data), density=rho)[k].data, C.frame, bandwidth=32)
+  return Velocities(speed(0), speed(1), speed(2), field(3), field(4), field(5))
+
+
+# the speeds and the polarisations sampled once on a quadrature grid and expanded
+def _velocityHarmonics(C, rho, L):
+  from ..functions.quadrature import quadratureS2Grid
+  from ..functions.s2axisfield import S2AxisFieldHarmonic
+  from ..functions.s2fun import S2FunHarmonic
+  g = quadratureS2Grid(L)
+  x = vector3d(g.nodes().data.reshape(-1, 3))
+  w = velocity(C, x, density=rho)
+  speed = lambda k: S2FunHarmonic.quadrature(g, w[k], C.frame, bandwidth=L, antipodal=True)
+  field = lambda k: S2AxisFieldHarmonic(x, w[k].data, C.frame, bandwidth=L, weights=g.weights)
   return Velocities(speed(0), speed(1), speed(2), field(3), field(4), field(5))
 
 
@@ -141,7 +160,9 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
   a = _unit(C, polarization)
   out = EinsteinSum(C, [1, -2, -3, -4], a, [-2], u, [-3], a, [-4])
   data = out.data if hasattr(out, "data") else np.asarray(out)
-  return vector3d(data / (rho * np.asarray(speed, dtype=float)[..., None]), frame=C.frame)
+  v = vector3d(data / (rho * np.asarray(speed, dtype=float)[..., None]), frame=C.frame)
+  v.dispStyle = "xyz"
+  return v
 
 
 # ------------------------------------------------------------------ the moduli

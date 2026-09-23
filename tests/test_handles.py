@@ -80,6 +80,9 @@ def test_H5c_sums():
   assert np.allclose(s(rs), 0.5 * u(rs) + 0.5 * fb(rs))
   t = s + h - u
   assert isinstance(t, SO3FunComposition) and len(t.components) == 4 and np.allclose(t(rs), s(rs) + h(rs) - u(rs))
+  # the absolute value of a difference is a handle, MATLAB's mean(abs(f - g))
+  a = abs(h - u)
+  assert isinstance(a, SO3FunHandle) and np.allclose(a(rs), np.abs(h(rs) - u(rs)))
   assert np.allclose((s + 2)(rs), s(rs) + 2) and np.isclose(mean(s + 2), 3)
   H = SO3FunHarmonic(s)
   assert H.isReal and H.CS is cs

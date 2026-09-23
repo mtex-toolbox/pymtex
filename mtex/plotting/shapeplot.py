@@ -164,7 +164,7 @@ def _parse(args):
   return cS, rest
 
 
-def plotShape(*args, faceColor=None, faceAlpha=1.0, edgeColor="k", lineWidth=0.8, colored=None, colormap="viridis",
+def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.8, colored=None, colormap="viridis",
               DisplayName=None, **kw):
   """plot(cS), plot(cS, faceColor='red', faceAlpha=0.5), plot(cS, colored=True), plot(cS, colored=key),
   plot(x, y, cS), plot(x, y, z, cS), plot(xy, cS), plot(cS, N), plot(cS, sS)
@@ -181,8 +181,11 @@ def plotShape(*args, faceColor=None, faceAlpha=1.0, edgeColor="k", lineWidth=0.8
   lineWidth = kw.pop("LineWidth", lineWidth)
   cS, rest = _parse(args)
   if rest and isinstance(rest[0], slipSystem):
-    return plotSlipSystem(cS, rest[0], faceColor=faceColor if faceColor is not None else "red", faceAlpha=faceAlpha, edgeColor=edgeColor,
+    # a slip plane is translucent unless told otherwise, as MATLAB's plotSlipSystem
+    return plotSlipSystem(cS, rest[0], faceColor=faceColor if faceColor is not None else "red",
+                          faceAlpha=0.5 if faceAlpha is None else faceAlpha, edgeColor=edgeColor,
                           lineWidth=lineWidth, DisplayName=DisplayName, **kw)
+  faceAlpha = 1.0 if faceAlpha is None else faceAlpha
   if rest and isinstance(rest[0], vector3d):
     return plotInnerFace(cS, rest[0], faceColor=faceColor if faceColor is not None else "blue", faceAlpha=faceAlpha, edgeColor=edgeColor,
                          lineWidth=lineWidth, DisplayName=DisplayName, **kw)
@@ -247,14 +250,18 @@ def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, 
   return hs[0] if len(hs) == 1 else hs
 
 
-def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, DisplayName=None, **kw):
-  """plotSlipSystem(cS, sS), plot(cS, sS): the slip plane through the centre of the shape with
-  the slip direction as an arrow in it"""
+def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, DisplayName=None, label=None, **kw):
+  """plotSlipSystem(cS, sS), plot(cS, sS, label='b'): the slip plane through the centre of the
+  shape with the slip direction as an arrow in it, the arrow named at its tip"""
   kind, target = _target(cS, kw)
   h = plotInnerFace(cS, sS.n, faceColor=faceColor, faceAlpha=faceAlpha, edgeColor=edgeColor, lineWidth=lineWidth, DisplayName=DisplayName,
                     parent=target.ax)
   for k in range(len(sS)):
     _arrow(kind, target, cS, sS.b[k], faceColor, 2.0)
+    if label is not None and kind != "map":
+      u = cS._direction(sS.b[k])
+      tip = cS.V.data.reshape(-1, 3).mean(axis=0) + 1.05 * cS.exitDistance(u) * u
+      target.ax.text(*tip, label, ha="center", va="center")
   return h
 
 

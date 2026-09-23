@@ -2,6 +2,8 @@
 # dispatches to the method of its first argument, kernel or harmonic function alike
 from __future__ import annotations
 
+import numpy as np
+
 from ..geometry.funcs import _method
 from .characteristics import max_, min_
 from .so3vectorfield import antiderivative, component, curl, div
@@ -20,7 +22,7 @@ calcFourier = _method("calcFourier")
 truncate = _method("truncate")
 withExchange = _method("withExchange")
 even = _method("even")
-sqrt = _method("sqrt")
+sqrt = _method("sqrt", np.sqrt)
 diff = _method("diff")
 max = max_
 min = min_

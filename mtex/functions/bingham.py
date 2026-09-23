@@ -317,10 +317,10 @@ class S2FunBingham:
       frame = a.frame if frame is None else frame
       a = a.data.reshape(-1, 3).T
     self.Z = np.asarray(Z, dtype=float).ravel()
-    self.a = np.eye(3) if a is None else np.asarray(a, dtype=float)
-    if len(self.Z) != 3 or self.a.shape != (3, 3):
+    self._A = np.eye(3) if a is None else np.asarray(a, dtype=float)
+    if len(self.Z) != 3 or self._A.shape != (3, 3):
       raise ValueError("three shape parameters and a 3x3 matrix of axes")
-    if abs(abs(np.linalg.det(self.a)) - 1) > 1e-6:
+    if abs(abs(np.linalg.det(self._A)) - 1) > 1e-6:
       raise ValueError("the axes must be orthonormal")
     self.frame = frame
     self.C = mhyper(self.Z)
@@ -328,6 +328,11 @@ class S2FunBingham:
   @property
   def CS(self):
     return self.frame
+
+  # the principal axes as directions, the modal axis a[2], as MATLAB's a
+  @property
+  def a(self):
+    return vector3d(self._A.T, frame=self.frame)
 
   @property
   def bandwidth(self):
@@ -338,9 +343,9 @@ class S2FunBingham:
 
   def _symmetricAxes(self):
     if self.frame is None:
-      return self.a[None]
+      return self._A[None]
     els = self.frame.sym.rot.flatten().rot
-    return np.stack([(els[i].inv() * vector3d(self.a.T)).data.T for i in range(els.size)])
+    return np.stack([(els[i].inv() * vector3d(self._A.T)).data.T for i in range(els.size)])
 
   def __call__(self, x):
     return self.eval(x)
@@ -360,13 +365,15 @@ class S2FunBingham:
 
   def rotate(self, r):
     rot = rotation(r.data.reshape(4))
-    return S2FunBingham(self.Z, (rot * vector3d(self.a.T)).data.T, None if self.frame is None else _rotatedFrame(self.frame, rot))
+    return S2FunBingham(self.Z, (rot * vector3d(self._A.T)).data.T, None if self.frame is None else _rotatedFrame(self.frame, rot))
 
   # the fit to directions or axes: the eigen decomposition of the scatter matrix gives the
-  # axes, the mode first, Newton on the moments the shape parameters, descending with the
-  # largest at zero, as in MTEX
+  # axes, Newton on the moments the shape parameters, ascending to zero at the mode, the
+  # third axis, as in MTEX; confidenceEllipse=True returns with it the semi-axes ab, in
+  # radians, and the rotation rot of the confidence ellipse at the level p of the modal axis
+  # (Tanaka 1999), for ellipse(rot, ab[0], ab[1])
   @classmethod
-  def fit(cls, v, weights=None):
+  def fit(cls, v, weights=None, confidenceEllipse=False, p=0.95):
     v = v if isinstance(v, vector3d) else vector3d(v)
     d = v.normalize().data.reshape(-1, 3)
     w = np.full(len(d), 1 / len(d)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
@@ -374,7 +381,27 @@ class S2FunBingham:
     lam, a = np.linalg.eigh(S)
     order = np.argsort(lam)[::-1]
     kappa = _concentrationsFor(lam[order])
-    return cls(kappa - kappa[0], a[:, order], v.frame)
+    f = cls((kappa - kappa[0])[::-1], a[:, order[::-1]], v.frame)
+    if not confidenceEllipse:
+      return f
+    from scipy.stats import chi2
+    # the asymptotic covariance of the modal axis in the tangent plane of the other two
+    A = f._A
+    Y = d @ A
+    lam = lam[order[::-1]] / lam.sum()
+    g1, g2 = lam[2] - lam[0], lam[2] - lam[1]
+    n = len(d)
+    Sigma = np.array([[np.mean(Y[:, 0] ** 2 * Y[:, 2] ** 2) / (n * g1 ** 2), np.mean(Y[:, 0] * Y[:, 1] * Y[:, 2] ** 2) / (n * g1 * g2)],
+                      [0.0, np.mean(Y[:, 1] ** 2 * Y[:, 2] ** 2) / (n * g2 ** 2)]])
+    Sigma[1, 0] = Sigma[0, 1]
+    E, V = np.linalg.eigh(Sigma)
+    ab = np.sqrt(chi2.ppf(p, 2) * E)
+    # the tangent basis turned onto the axes of the ellipse, the modal axis kept
+    B = A.T.copy()
+    B[:2] = V.T @ B[:2]
+    if np.linalg.det(B) < 0:
+      B[0] = -B[0]
+    return f, ab, rotation.byMatrix(B.T)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({self.frame.char()})"

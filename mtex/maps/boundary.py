@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.display import xnum2str
 from ..geometry.kernels import qmul, _jit
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -50,12 +51,18 @@ class grainBoundary:
     self.CSList, self.plane, self.frame = CSList, plane, frame
     # the chain structure is derived from F and V once; a boundary is never edited in place
     self._memo = {}
+    self._shape = None
+    # the whole network a selection was taken from, which holds its triple points
+    self._root = None
 
   def _with(self, **kw):
     fields = dict(V=self.V, F=self.F, grainId=self.grainId, ebsdId=self.ebsdId, phaseId=self.phaseId, misrotation=self.misrotation,
                   CSList=self.CSList, plane=self.plane, frame=self.frame, scanUnit=self.scanUnit)
     fields.update(kw)
-    return grainBoundary(**fields)
+    gB = grainBoundary(**fields)
+    if "V" not in kw:
+      gB._root = self._root
+    return gB
 
   def __len__(self):
     return len(self.F)
@@ -113,7 +120,8 @@ class grainBoundary:
       raise ValueError("these segments lie on the border of the map")
     if not (np.all(self.phaseId[:, 0] == p1) and np.all(self.phaseId[:, 1] == p2)):
       raise ValueError("the boundary carries more than one pair of phases; select one with hasPhase")
-    return orientation._fromRotation(self.misrotation.data, (self.CSList[p1], self.CSList[p2]), antipodal=p1 == p2)
+    mori = orientation._fromRotation(self.misrotation.data, (self.CSList[p1], self.CSList[p2]), antipodal=p1 == p2)
+    return mori.reshape(*self._shape) if self._shape is not None else mori
 
   # ------------------------------------------------------------------ chains
 
@@ -241,9 +249,16 @@ class grainBoundary:
 
   # ------------------------------------------------------------------ triple points
 
+  # the triple points of the network, of a selection those at a vertex of its segments, with
+  # boundaryId into the whole network, as MATLAB's
   @property
   def triplePoints(self):
-    return triplePoints(self)
+    if self._root is None:
+      if "triplePoints" not in self._memo:
+        self._memo["triplePoints"] = triplePoints(self)
+      return self._memo["triplePoints"]
+    tP = self._root.triplePoints
+    return tP[np.isin(tP.vertexId, self.F)]
 
   # ------------------------------------------------------------------ subsets
 
@@ -253,9 +268,14 @@ class grainBoundary:
       return self._withFirstPhase(self[self.hasPhase(key)], key)
     if isinstance(key, tuple) and len(key) == 2 and (isinstance(key[0], str) or hasattr(key[0], "sym")):
       return self._withFirstPhase(self[self.hasPhase(*key)], key[0])
-    sel = np.arange(len(self))[key].reshape(-1)
-    return self._with(F=self.F[sel], grainId=self.grainId[sel], ebsdId=self.ebsdId[sel], phaseId=self.phaseId[sel],
-                      misrotation=self.misrotation.data[sel])
+    sel = np.arange(len(self))[key]
+    gB = self._with(F=self.F[sel.reshape(-1)], grainId=self.grainId[sel.reshape(-1)], ebsdId=self.ebsdId[sel.reshape(-1)],
+                    phaseId=self.phaseId[sel.reshape(-1)], misrotation=self.misrotation.data[sel.reshape(-1)])
+    gB._root = self if self._root is None else self._root
+    # a matrix of segment ids, the three arms of triple points, keeps its shape for the misorientations
+    if sel.ndim > 1:
+      gB._shape = sel.shape
+    return gB
 
   # the segments between the two phases named, in either order, or with one named on either side
   def hasPhase(self, a, b=None):
@@ -272,8 +292,17 @@ class grainBoundary:
     return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
   # the segments with a grain of the list on either side, walked again: a junction of the
-  # whole boundary may have lost its third segment, so the chains of the subset are longer
+  # whole boundary may have lost its third segment, so the chains of the subset are longer;
+  # for pairs of ids the segments between the two of a pair, with the row of its pair
   def selectByGrainId(self, ids):
+    ids = np.asarray(ids)
+    if ids.ndim == 2 and ids.shape[1] == 2:
+      M = int(max(ids.max(initial=0), self.grainId.max(initial=0))) + 1
+      key = lambda g: np.minimum(g[:, 0], g[:, 1]).astype(np.int64) * M + np.maximum(g[:, 0], g[:, 1])
+      pk = key(ids)
+      order = np.argsort(pk)
+      gB = orderWalk(self[np.isin(key(self.grainId), pk)])
+      return gB, order[np.searchsorted(pk[order], key(gB.grainId))]
     return orderWalk(self[np.isin(self.grainId[:, 0], ids) | np.isin(self.grainId[:, 1], ids)])
 
   # a segment turned round: its two sides swap and the misorientation inverts
@@ -367,9 +396,10 @@ class grainBoundary:
     p = p.data if isinstance(p, vector3d) else np.asarray(p, dtype=float)
     return p if p.shape[-1] == 2 else self.plane.to2d(p)
 
-  # where a line crosses the boundary: the segments it cuts, ordered along the line, and
-  # the points they are cut at
-  def intersect(self, p, q):
+  # where the line from p to q crosses each segment, MATLAB's [x, y] = intersect(gB, xy1, xy2):
+  # the coordinates per segment, NaN where it is not crossed; segLength=True adds the
+  # intercepts between successive crossings along the line
+  def intersect(self, p, q, segLength=False):
     a, b = self._as2d(p).reshape(2), self._as2d(q).reshape(2)
     ab = b - a
     v1, v2 = self.V[self.F[:, 0]], self.V[self.F[:, 1]]
@@ -378,11 +408,14 @@ class grainBoundary:
     with np.errstate(invalid="ignore", divide="ignore"):
       t = _cross2(v1 - a, d) / den
       s = _cross2(v1 - a, ab[None, :]) / den
-    hit = (den != 0) & (t >= 0) & (t <= 1) & (s >= 0) & (s <= 1)
-    idx = np.flatnonzero(hit)
-    o = np.argsort(t[idx], kind="stable")
-    idx = idx[o]
-    return idx, vector3d(self.plane.from2d(a + t[idx][:, None] * ab), frame=self.frame)
+    # MATLAB's tolerance, so a line through a vertex cuts both segments there
+    tol = 1e-5
+    hit = (den != 0) & (t >= -tol) & (t <= 1 + tol) & (s >= -tol) & (s <= 1 + tol)
+    P = self.plane.from2d(a + np.where(hit, t, np.nan)[:, None] * ab)
+    x, y = P[:, 0], P[:, 1]
+    if not segLength:
+      return x, y
+    return x, y, np.diff(np.sort(t[hit])) * np.linalg.norm(ab)
 
   # the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]
   def inpolygon(self, region):
@@ -405,8 +438,11 @@ class grainBoundary:
     pairs, inverse = np.unique(key, axis=0, return_inverse=True)
     L = np.bincount(inverse.reshape(-1), weights=self.segLength)
     counts = np.bincount(inverse.reshape(-1))
-    name = lambda p: "outside" if p < 0 else self.CSList[int(p)].mineral
-    rows = [f"  {c:>8}  {l:>10.4g}  {name(p[0])}  {name(p[1])}" for p, c, l in zip(pairs, counts, L)]
+    # the side outside the map is notIndexed, as MATLAB names it
+    name = lambda p: "notIndexed" if p < 0 else self.CSList[int(p)].mineral
+    # the length rounded in the scan unit, as MATLAB writes it
+    unit = "µm" if self.scanUnit == "um" else self.scanUnit
+    rows = [f"  {c:>8}  {f'{xnum2str(l)} {unit}':>10}  {name(p[0])}  {name(p[1])}" for p, c, l in zip(pairs, counts, L)]
     lines.append("  segments      length  mineral 1  mineral 2")
     lines += rows
     return "\n".join(lines)
@@ -416,9 +452,11 @@ class grainBoundary:
 
 class triplePointList:
 
-  def __init__(self, V, grainId, phaseId, boundaryId, angles, CSList, plane, frame):
+  def __init__(self, V, grainId, phaseId, boundaryId, angles, CSList, plane, frame, vertexId=None):
     self.V, self.grainId, self.phaseId, self.boundaryId, self.angles = V, grainId, phaseId, boundaryId, angles
     self.CSList, self.plane, self.frame = CSList, plane, frame
+    # the index of each point into the vertex list of its boundary
+    self.vertexId = np.full(len(grainId), -1, dtype=np.int64) if vertexId is None else vertexId
 
   def __len__(self):
     return len(self.grainId)
@@ -443,6 +481,10 @@ class triplePointList:
       out &= np.sum(self.phaseId == p, axis=1) >= ids.count(p)
     return out
 
+  # tP('Iron bcc', 'Iron bcc', 'Iron bcc'): the points of those phases, MATLAB's call form
+  def __call__(self, *names):
+    return self[self.hasPhase(*names)]
+
   def __getitem__(self, key):
     if isinstance(key, str):
       return self[self.hasPhase(key)]
@@ -450,7 +492,7 @@ class triplePointList:
       return self[self.hasPhase(*key)]
     sel = np.arange(len(self))[key].reshape(-1)
     return triplePointList(self.V[sel], self.grainId[sel], self.phaseId[sel], self.boundaryId[sel], self.angles[sel], self.CSList,
-                           self.plane, self.frame)
+                           self.plane, self.frame, self.vertexId[sel])
 
   def __repr__(self):
     if self.isempty:
@@ -472,7 +514,7 @@ def triplePoints(gB):
   order = np.argsort(v, kind="stable")
   vs, ss = v[order], seg[order]
   starts = np.searchsorted(vs, np.arange(len(gB.V) + 1))
-  Vs, rows, segs, angs = [], [], [], []
+  Vs, rows, segs, angs, vids = [], [], [], [], []
   for vert in np.flatnonzero(deg == 3):
     at = ss[starts[vert]:starts[vert + 1]]
     g = np.unique(gB.grainId[at])
@@ -481,6 +523,7 @@ def triplePoints(gB):
     if len(g) != 3 or g.min() <= 0:
       continue
     Vs.append(gB.V[vert])
+    vids.append(vert)
     rows.append(g)
     segs.append(at)
     far = np.where(gB.F[at, 0] == vert, gB.F[at, 1], gB.F[at, 0])
@@ -499,7 +542,7 @@ def triplePoints(gB):
       hit = np.flatnonzero(gB.grainId[bid[i]] == gid[i, c])
       k, side = divmod(hit[0], 2)
       pid[i, c] = gB.phaseId[bid[i, k], side]
-  return triplePointList(V, gid, pid, bid, ang, gB.CSList, gB.plane, gB.frame)
+  return triplePointList(V, gid, pid, bid, ang, gB.CSList, gB.plane, gB.frame, np.array(vids, dtype=np.int64))
 
 
 # ------------------------------------------------------------------ the walk

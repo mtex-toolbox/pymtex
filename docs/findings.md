@@ -89,13 +89,88 @@ has to know.
 | OrientationEmbeddings | `discreteSample` of a Bingham distribution evaluated it on a 1.5 degree grid, 0.8 s per call, six minutes for the page | fixed 2026-09-22: exact rejection sampling from the angular central Gaussian (Kent, Ganeiber and Mardia), 0.2 s for 200000 samples |
 | OrientationEmbeddings | an embedding of an empty list failed in the batch rotation, its mean divided by zero | fixed 2026-09-22: the mean of nothing is NaN, as `std` of no orientations |
 | OrientationExport | the orientation table wrote fixed `%10.5g` columns where MATLAB's cprintf fits each column to its entries | fixed 2026-09-22: one writer, `writeTable` in `io/table.py`, for orientations and vectors |
+| MisorientationDistributionFunction | `calcMisorientation(ebsd1, ebsd2)` returned inv(o2) o1 labelled (1 → 2), where MATLAB returns inv(o1) o2 labelled (2 → 1), which is why MATLAB's page calls it with (En, Fo) to match `boundary('Fo', 'En')` | fixed 2026-09-23; `test_I9` pinned the old direction and was changed |
+| MisorientationDistributionFunction | the axis of a misorientation between two phases was labelled with its second frame, MATLAB labels it with the first | fixed 2026-09-23 in `axisFrame` |
+| MisorientationDistributionFunction | `calcAxisDistribution` of a two-phase MDF was built as an antipodal function without a frame: h and -h were averaged, the maximum 1.43 for MATLAB's 1.97, and the plot showed the whole sphere | fixed 2026-09-23: the frame of the shared symmetry, antipodal only with grain exchange; 1.94 |
+| AxisDistributionFunction | `axis(o1, o2)` took the axis of the best quaternion without making its scalar part positive, so the axis of every pair whose best representative came out negative pointed the other way | fixed 2026-09-23, with a test |
+| AxisDistributionFunction | the uniform axis distribution was a bandwidth-64 expansion of a sampled integral, min 0.568 and max 1.598 for MATLAB's 0.597 and 1.565 | fixed 2026-09-23: exact, from the largest angle of the region about each axis, 0.598 and 1.578 |
+| AngleDistributionFunction | the uniform angle distribution measured its sector areas on a latitude-longitude grid, so the hexagonal curve was a sawtooth | fixed 2026-09-23: a Fibonacci grid, for the function branch too |
+| MisorientationGrainExchangeSym | a region was drawn as a surface with a latitude grid and no edges; `boundaryColor` and `noSurface` were ignored; the axes kept a fixed box | fixed 2026-09-23: the edges from the planes in Rodrigues space, MATLAB's two options, the axes fitted to the region |
+| MisorientationTheory | held marker plots all took the first colour of the order where MATLAB's take the next | fixed 2026-09-23 for spherical markers and the angle distributions |
+| MisorientationTheory | a misorientation displayed its Euler angles where MATLAB shows its parallel planes and directions when they are exact at low indices; `round2Miller` gave a triple of four-index directions three times too large | fixed 2026-09-23 |
+| ParentChildVariants | `variants(p2c)` and `variants(p2c, 'parent')` held MATLAB's set in another order, so variant, packet and vote ids named other variants; on the martensite map the packets came out 4865/1725/1812/2201 for MATLAB's 2445/2434/2852/2867 | fixed 2026-09-23: the proper group enumerated as MTEX does (`mtexEnumeration`, the products of the cyclic groups of the Laue class's generators, the first fastest), the 24 child variants of a cubic parent in Morito's order, the id counted from the parent's representative in the fundamental region; both lists and the packets now match MATLAB |
+| ParentChildVariants | `nextAxis(k)` counted from zero and reached only axes that existed, and a held plot drew into the last axes instead of the current one | fixed 2026-09-23: one based as MATLAB, the axes made up to k, the figure keeps its current axes |
+| ParentChildVariants | an open marker (`MarkerFaceColor='none'`) was drawn black and took no colour of the order, so the next held set took the first colour again | fixed 2026-09-23: the edge takes the colour of the order and the order advances |
+| ParentChildVariants, OrientationRelationshipFit | positional flags (`plotPDF(ori, h, 'upper')`, `plot(v, 'contourf', 'fundamentalRegion')`) and a positional RGB colour were read as data | fixed 2026-09-23 |
+| ParentChildVariants | `variants(p2c, childOri, 'parent')` and `orientation.parents()` were missing | fixed 2026-09-23 |
+| MartensiteVariants | a four-index direction given with `'uvw'` displayed in three indices, `<100>` for MATLAB's ⟨2̅110⟩ | fixed 2026-09-23 |
+| MartensiteVariants | `plotPDF(ori, 'add2all')` and `plotPDF(ori)` into held pole figures asked for the directions; `ind2color` took one index only and had no `'ordered'`; the axis angle scatter took an RGB row per orientation as values | fixed 2026-09-23 |
+| OrientationRelationshipFit | `calcParent2Child` could return a relationship worse than the start refined locally: the scan scores its candidates on a subsample, and on the martensite map the winner reached a basin of trimmed misfit 7.966e-4 where the KS start reaches 7.948e-4 | fixed 2026-09-23: the start refined on all the data stays a candidate |
+| TransformationTexture | `variants(p2c, odf)`, MATLAB's `transformODF`, was missing | fixed 2026-09-23 (`transformODF` in `functions/funops.py`); the texture index of the direct route 17.4509 as MATLAB's |
+| MaParentGrainReconstruction | `smooth(ebsd, F, fill=grains)` took the grains as a plain flag; `gB.selectByGrainId(pairs)` had no pair index; `grains.findByLocation` was missing | fixed 2026-09-23: the grains fill only the empty pixels their polygons hold, each from its own grain |
+| LowLevelParentGrainReconstruction | `calcParent(child, parent, p2c)` and the pair and triple forms returned variant ids where MATLAB returns the parent orientations unless `'id'` | fixed 2026-09-23: MATLAB's outputs, `id=True` for the ids, one parent orientation broadcast over the children |
+| LowLevelParentGrainReconstruction | `majorityVote`, `g1.neighbors(g2)`, `tP('Ti (alpha)', ...)`, `grains.cs2phaseId`, `ebsd.name2id` and an `axisAngleColorKey()` without a frame were missing | fixed 2026-09-23 |
+| MartensiteVariants | `calcGrains(ebsd, minPixel=2)` on the emsland map leaves 32462 austenite measurements in the map where MATLAB's returned map keeps 34651, although the grains agree (3523 and 5201 austenite and ferrite grains for MATLAB's 3551 and 5225): the port marks every pixel of an undersized grain notIndexed, MATLAB's returned map keeps some of them indexed | narrowed 2026-09-23: `calcGrains` gives the notIndexed pixels inside a grain its phase, as MATLAB (`absorbNotIndexed`), so the map keeps 34782 for MATLAB's 34651; the remaining 131 are open |
+| MaParentGrainReconstructionAdvanced | `calcGrains(..., minPixel=5, removeQuadruplePoints=True)` on the martensite map gives 4467 grains and 11233 neighbour pairs above 5 degrees where MATLAB has 4443 and 11290; without the quadruple point removal the counts agree within two | open, an M3 question; the Markov clustering of the page amplifies it (725 components for 707) |
+| EBSDReferenceFrame | the package-level `rotate(ebsd, r, 'keepEuler')` passed the flag by position, so it landed on `keepXY` and both diagnostic maps turned the orientations alone | fixed 2026-09-23: `rotate` turns MATLAB's string flags into keywords, `'left'` and `'right'` into `side`; both maps as MATLAB's |
+| VectorsOperations, RotationOperations, RotationDefinition | `arrow3d` in fresh axes drew a tilted perspective with its labels cut, where MATLAB shows the top view | fixed 2026-09-23: an orthographic camera down the convention's out-of-screen axis, the limits holding the labels |
+| TensorArithmetics | the stress of `C * eps` carried the density of the stiffness | fixed 2026-09-23: the product classes take no density |
+| TensorDefinition | a complete chart was labelled with the crystal axes where MATLAB labels the sector corners in all their equivalent positions | fixed 2026-09-23 |
+| TensorVisualisation | the `defaultColorMap` preference was set by pages but never read | fixed 2026-09-23: the spherical plots take it when no map is named |
+| TensorAverage | the needles of an axis field on the equator stepped over the rim, the antipodal chart put the step's end on the opposite rim, the longest arrow measured about 28000 and every other needle shrank to nothing, in every `plotSeismicVelocities` in the specimen frame | fixed 2026-09-23: `_arrows` takes the shorter one-sided difference |
+| MagneticAnisotropy, PiezoElectricity | `plotPDF` and `plot` of a function dropped MATLAB's positional flags (`'antipodal', 'contourf'`); `'upper', 'lower'` together raised | fixed 2026-09-23: the flags reach the plot, both hemispheres drawn |
+| PiezoElectricity | the rim labels of a trigonal chart are the a directions `[-12-10]`, four of them, where MATLAB writes `[01-10]`, six | open |
+| TensorAverage | the phase legend of a map lists the phases present where MATLAB lists all four of the epidote map's | open |
+| S2FunQuadrature | `S2FunHarmonic.quadrature(S2G, values)` expanded to degree 250 instead of the bandwidth of the grid, a difference of 1826 from the function; a `quadratureS2Grid` was no list of directions, so `fun(S2G)` failed | fixed 2026-09-23: the grid is a `vector3d` with its axes `thetaGrid`, `rhoGrid`, and brings its bandwidth |
+| S2FunQuadrature | a series of low degree on a few thousand directions went through the NUFFT, exact only to 1e-9 where MATLAB's NFSFT gives round-off | fixed 2026-09-23: the exact trigonometric sum up to a work of 2e6 terms, which is also faster there |
+| S2FunOperations | `sqrt` of a plain number raised | fixed 2026-09-23, NumPy's the fallback |
+| S2FunPlotting | `plotSection(sF, N)` drew a polar axes with its grid, clipping negative values; MATLAB draws the ring pushed out by the values, seen down N, axes off | fixed 2026-09-23; `polarplot=True` keeps the polar form |
+| S2FunPlotting | `nextAxis(i, j)`, `setCamera(how2plot)`, `FontSize` of `plotSpektra`, the axes arrows of `plot3d(sF)` and its camera; a camera change was not a changed figure to the page builder | fixed 2026-09-23 |
+| S2FunApproximationInterpolation, EBSDIPFMap | a marker size per marker was read as a diameter where MATLAB's scatter reads it as an area, and the EBSDIPFMap page passed the square root | fixed 2026-09-23, the page as MATLAB's |
+| S2FunApproximationInterpolation | the scatter of many directions kept the full marker size; MATLAB caps it at 50 times the spacing | fixed 2026-09-23 |
+| S2FunSampling, S2Kernels | `legend` and `hold` after `plt.figure()`/`plt.subplot` went to the last MTEX figure | fixed 2026-09-23: a plain figure is adopted with its axes, a subplot takes the line plot |
+| S2FunSym | `specimenFrame('222', pC)` dropped the convention | fixed 2026-09-23 |
+| S2Kernels | `arrow3d` into a held surface cropped it by its zoom; `arrowWidth` was absolute where MATLAB's is relative to the length | fixed 2026-09-23 |
+| S2Bingham | `S2FunBingham.fit` returned the axes with the mode first and `Z` descending, `a` was a matrix | fixed 2026-09-23: MATLAB's order, `a` a `vector3d`, `confidenceEllipse=True` for the ellipse of the modal axis |
+| S2Bingham | an unused cell of a `newMtexFigure` grid showed empty axes with ticks; a curve on an antipodal chart was joined across the fold | fixed 2026-09-23 |
+| IsotropicTheory | the chart labels of a frame without sector vertices were projected unnormalised, the triclinic [001] at the centre | fixed 2026-09-23 |
+| AnisotropicTheory | `inv` kept the unit and a product carried the left factor's | fixed 2026-09-23, as MATLAB |
+| WaveVelocities | `_arrows` scaled the needles by the largest on-screen length, so almost radial axes drew long, in every seismic plot | fixed 2026-09-23: the tangential part, the largest vector half the grid spacing, as MATLAB |
+| WaveVelocities | `velocity(C, harmonic=True)` was accepted and ignored | fixed 2026-09-23 |
+| CPOSeismicProperties | `text` after `nextAxis` in a held figure wrote into every panel | fixed 2026-09-23 |
+| SchmidFactor | `SchmidFactor(r)` of many directions was transposed against MATLAB's matrix; the Schmid factor function was not antipodal; `slipSystem.SchmidTensor()` was the symmetric part; `calcGND` lacked MATLAB's factor 1e16; `micronbar='off'` drew the bar; held 3D plots, `mtexTitle` and `setView` went to the last axes after `nextAxis(i, j)` | fixed 2026-09-23 |
+| SchmidFactor, TensorDefinition | a complete chart labelled every equivalent axis whatever was drawn; MATLAB labels the equivalent sector corners only for a function carrying the symmetry, and the positive crystal axes for directions and functions without it | fixed 2026-09-23: `makeSphericalProjection(symmetric=)`, set by the function plots |
+| SlipTransmission | `mPrime` and `residualBurgersVector` formed all pairs where MATLAB goes entry by entry | fixed 2026-09-23 |
+| SchmidFactor | the grain quiver used a fixed in-plane length where MATLAB draws 0.2 times the diameter along the 3D direction, an axis both ways | fixed 2026-09-23 |
+| TaylorModel | `calcTaylor` over orientation space took 1278 s, a Python simplex per node | fixed 2026-09-23: the compiled loop of `analysis/kernels.py`, 14 s |
+| TaylorHex | `optimalSample` left the sample unmoved for a specimen group with a two-fold about z, the left symmetry not carried through the left derivative | fixed 2026-09-23: the crystal side folded alone |
+| TaylorHex | `plotPDF` of an ODF shared one colour range over the row where MATLAB gives each pole figure its own | fixed 2026-09-23; `colorRange='equal'` shares one |
+| VPSCImport | `setColorRange` redrew the contour levels over the common range, emptying the weak panels | fixed 2026-09-23: it recolours, as MATLAB |
+| SingleSlipModel | `sS.deformationTensor()` of several systems was one rank three tensor | fixed 2026-09-23 |
+| TaylorModel | map `quiver` ignored `displayName` and drew black where MATLAB takes the colour order | fixed 2026-09-23 |
+| TextureEvolution | `plotSection` read a style flag such as `'contourf'` as a section family | fixed 2026-09-23 |
+| S1FunHarmonics | the coefficients of `S1FunHarmonic` were taken for e^{ikx}, so `S1FunHarmonic([-1i, 0.5, 4, 0.5, 1i])` was 4 + cos x - 2 sin 2x where MATLAB's is + 2 sin 2x | fixed 2026-09-23: MATLAB's e^{-ikx}, the derivative and the rotation with it |
+| S1FunHarmonics | `S1FunHarmonic.interpolate` was the quadrature, right for equispaced angles only; `smooth`, `sum`, `max(f)` of a function on the circle and `plot(S1FunHandle)` were missing; a series on many angles went through the NUFFT to 1e-10 | fixed 2026-09-23: MATLAB's regularised least squares at round(n/4) for other angles, the exact sum where cheap |
+| S2FunVectorField | `norm(vF)` was a number where MATLAB's is the function of the lengths; `quiver3` put arrows on a mesh far finer than the resolution and through the sphere | fixed 2026-09-23 |
+| S2FunAxisField | an axis field was drawn on one hemisphere, its argument taken for an axis | fixed 2026-09-23 |
+| S2FunVectorValued | `interpolate` of several value columns and `plot` of a list of functions failed | fixed 2026-09-23 |
+| BoundarySelect | the notIndexed pixels inside a grain kept phase 0 after `calcGrains`, MATLAB giving them the grain's phase and no rotation, so the port's maps were speckled white where MATLAB's are solid | fixed 2026-09-23: `absorbNotIndexed` in `maps/calcgrains.py`, the padding left out; every page plotting or counting a map after `calcGrains` changes |
+| BoundaryPlots | `translucent` on grains was a constant alpha; ±∞ values drew nothing; the boundary quiver drew centred needles three segments long | fixed 2026-09-23: MATLAB's fading by colour, the end colours, `quiver3` needles of v and −v with the inner half under the faces (the length a factor measured on MATLAB's figures, not derived) |
+| BoundaryMisorientations, SubGrainBoundaries | grain outlines always black; a fresh `newMtexFigure(figSize=)` square around a map; the `edgeAlpha` of thin segments single where MATLAB draws them there and back | fixed 2026-09-23 |
+| TriplePoints | the triple points of a grain or boundary selection were computed from the selection alone and empty; a boundary indexed by an id matrix flattened its misorientations; an empty point plot stretched the map to the origin | fixed 2026-09-23 |
+| BoundaryCurvature | `mtexColorMap`, `setColorRange` and the colour bar reached only the last value-coloured plot of a map | fixed 2026-09-23 |
+| BoundaryIntersections | grains of one `faceColor` drew a phase legend | fixed 2026-09-23 |
+| TwinningBoundaries, TiltAndTwistBoundaries, GrainSmoothing | `xlabel` wrote over the tick labels of a plain axes; `scatter(mori)` framed a ±100 degree cube; `mtexColorbar` after RGB boundary colours drew no bar; the rose `histogram` ignored a polar subplot; the boundary display wrote `1.649e+04` without a unit | fixed 2026-09-23 |
+| BoundarySelect | Euler angle displays round to three significant digits (25.3, 260) where MATLAB shows six (239.134); the triple point display writes `outside` for `notIndexed` | open |
+| BoundaryNormalDistribution | the tension twin GBCD peaks 4.8 degrees from the (10-12) plane where MATLAB's text says 1.3 and Julia about 1; the GBND agrees, so the pairing of the two sides to the reference is suspect | open |
+| TriplePoints, BoundaryCurvature, CSLBoundaries | the closing of `calcGrains`: 78 triple points for 70, 924 grains for 885 on the csl map, a titanium lobe 10.55 degrees across left a grain of its own | open, an M3 question with GrainReconstruction |
 
 ## Gaps beside MTEX
 
 | Page | Missing |
 |---|---|
 | EBSDGrid | `gridLayout` with `'rowMajor'` and `'columnMajor'`, `ebsd.layout`, `oldId` and the second output of `gridify`, `gridify(ebsd, unitCell=)` resampling onto another cell, `spatialTransformProjective.byTilt` and `transform(ebsd, T)`; M10 |
-| EBSDFilling | `fill(ebsd, grains)` and `smooth(ebsd, F, 'fill', grains)` constrained by the grain polygons: a site outside every grain stays notIndexed, a corridor between grains is never filled; the port fills from the grain of the surrounding measurements and needs `extrapolate=True` for a hole that reaches the rim | M8 |
+| EBSDFilling | `fill(ebsd, grains)` constrained by the grain polygons: a site outside every grain stays notIndexed, a corridor between grains is never filled; the port fills from the grain of the surrounding measurements and needs `extrapolate=True` for a hole that reaches the rim; `smooth(ebsd, F, fill=grains)` has the polygon form since 2026-09-23 | M8 |
 | EBSDFilling | the `quality` property `smooth` writes, zero where no orientation was measured |
 | VectorsOperations | `arrow3d`, the arrows in space of the vector sum; S5 |
 | VectorsOperations | the dynamic marker size: MTEX shrinks the markers of a long list, the port draws 764 directions at the size of one; S6 names it |
@@ -142,6 +217,15 @@ has to know.
 | OrientationStandard | `legend('show', 'location', 'southoutside', 'numColumns', 3)` | added 2026-09-22, `plotting/mtexfigure.py`: `legend(location=..., numColumns=...)` gathers every artist a `DisplayName` named over all the charts of the figure, MATLAB's compass locations and the outside ones |
 | OrientationStandard | `ind2color` reads MTEX's own 24 colours | added 2026-09-22: the table of `plotting/plotting_tools/colors.mat`, where the port took matplotlib's ten |
 | OrientationStandard | `DisplayName` on markers and on a scatter in orientation space, `add2all` on a section plot, `'filled'` | added 2026-09-22 |
+| MaParentGrainReconstruction | `job.selectInteractive`, `job.plotVariantPF`, `calcGrainVotes`, the `includeTwins` option of `clusterVariantGraph` and `peakFitting` of `calcParent2Child` | M9 left them out |
+| S2FunApproximationInterpolation | `interp(v, y, 'linear' / 'harmonic' / 'nearest' / 'inverseDistance')`, `S2FunTri` and `S2Triangulation` | added 2026-09-23: `functions/s2funtri.py`, `geometry/s2triangulation.py`, the convex hull and a walk over its neighbours; the sample file is `mtexdata('smiley')` |
+| S2FunSampling | `S2FunHarmonic.adjointNFSFT`, `sum` of a function, `norm` of a lazy sum | added 2026-09-23 |
+| S2Bingham | `ellipse(rot, a, b)` | added 2026-09-23 |
+| S2FunRadon | `radon(sF, delta)`, the means over small circles | added 2026-09-23 |
+| BoundaryPlots, EBSDAdvancedMaps | `PatalaColorKey` | not ported |
+| BoundaryNormalDistribution | `calcGBND`, `calcGBNDKernel` (`nonneg`, `bump`, the GBCD) | added 2026-09-23, `analysis/gbnd.py`; MATLAB's default kernel by inversion, `grain3d` and the DREAM.3D reader are missing |
+| BoundaryCurvature | `testgrains.mat` is a MATLAB grain object | the port's `testgrains` is its own synthetic map; a one-off export of the file through the bridge would make it loadable |
+| BoundaryIntersections, BoundarySelect, CSLBoundaries | MATLAB's `[x, y] = gB.intersect(xy1, xy2)`, `line` and `scatter(x, y)` on maps, `legend('off')`, `xnum2str`, `project2FundamentalRegion('antipodal')` | added 2026-09-23 |
 
 ## Conventions that differ
 
@@ -219,6 +303,41 @@ has to know.
 | OrientationImport | the generic importer ignores `'radians'` and guesses the unit, applies `'passive'` twice, fails on quaternion columns | reads the unit it is told, inverts once, reads the quaternion columns |
 | OrientationFibre | `symmetrise` of a fibre with specimen symmetry fails in a bare call on the branch; its figure shows few copies | 96 copies, crystal and specimen |
 | OrientationVisualization3d | orientations in space are hollow circles | filled markers |
+| MisorientationTheory, AxisDistributionFunction | grains are numbered in pixel order along y first, so the twins' grains 57 and 58 are neighbours, and the smaller id is the first side of a segment | numbered along x first: the same grains are 43 and 47, and the directed specimen axes of the segments whose sides swap point the other way |
+| AxisDistributionFunction | `smoothBoundary` keeps a (stale) pixel pair on segments it simplified or resampled, though its help says they no longer run between one pair | leaves their `ebsdId` empty; the page reads the pairs from boundaries smoothed with `noSimplify` and `noRefine`, as that help advises |
+| AxisDistributionFunction | the uniform ADF is an expansion to bandwidth 500 | exact, from the largest angle of the region about each axis |
+| MaParentGrainReconstructionAdvanced | `ebsd(ind).orientations = ori`, `grains(ind).meanOrientation = ori` | `ebsd[ind] = ori`, `grains[ind] = ori`: the orientations and the phase of their frame; a subset is a copy, so assigning to one cannot write back |
+| MaParentGrainReconstructionAdvanced | `[grains, parentId] = merge(grains, ...)` | `merged = grains.merge(...)` with `grains.parentId` written, and `grains.merge(..., testRun=True)` returning the labels |
+| MaParentGrainReconstruction | `job.calcGBVotes(...)` and the other steps return the job | they change the job and return nothing; the votes and the graph are cleared by a merge, which MATLAB leaves stale |
+| OrientationRelationshipFit, GrainGraphBasedReconstruction, MaParentGrainReconstructionAdvanced | `calcParent2Child` from KS on the martensite map | the port's fit reaches a lower basin: trimmed misfit 7.948e-4 for MATLAB's 7.957e-4 on the fit page, first misfit quintile 1.19 for 1.45 and 1.22 for 1.48 degrees on the two reconstruction pages; the counts after the fit follow it, and with MATLAB's relationship set by hand they are MATLAB's |
+| ParentChildVariants | the Burgers relationship prints as `(110) || (0001)   [11̅1] || [2̅110]` | `[1̅11̅] || [21̅1̅0]`, the same pair with both directions reversed; `round2Miller` breaks the sign tie otherwise |
+| ODFTheory | the orientations drawn into a held `plot3d(odf)` replace the isosurfaces in MATLAB's run | the port draws both, as the page's prose describes |
+| VectorsAxes, PoleFigureDubna | the MATLAB runs draw measured pole figures in parula | WhiteJet, MTEX's default map |
+| TensorImport | `stiffnessTensor.load` leaves out the density a file states | read, so `C` displays the density 3.355 |
+| TensorDefinition | `propertyname` | `name=`, displayed as `name:` |
+| TensorVisualisation | blue2red | a little darker in the middle of each branch |
+| TensorVisualisation | `[V, D] = eig(T)` | `D, V = eig(T)`, the values first |
+| SphericalHarmonics, SO3FunHarmonicRepresentation | the coefficients `fhat` are in MTEX's basis, no Condon-Shortley phase, `Y_l^{-m} = conj(Y_l^m)` | the same since 2026-09-23: the port computes in the Condon-Shortley basis of `docs/design/harmonics.md` and converts at the boundary, `sphericalY` returns MTEX's values |
+| S2FunOperations | `S2FunHarmonic.unimodal` reuses the degree variable in its normalisation: mean 0.1629, 9.72 at the centre, 0.30 at 34 degrees | a density of mean one, 97.85 at the centre, so the page's maximum and minima differ; a MATLAB bug |
+| S2FunOperations | the page says the gradient of the smiley at X is 0.0012 | MATLAB's run gives 1.8e-4, the port 1.6e-4, both aliasing of the quadrature on a flat stretch; from MATLAB's coefficients the port reproduces MATLAB's |
+| S2FunHarmonicRepresentation, S2FunOperations | a callable is expanded to degree 250 | the same, `quadratureBandwidth()` |
+| S2FunQuadrature | at bandwidth 1 the error of `v_x v_y` is 0.6667, aliasing of MATLAB's coarse grid | 0.5, the exact projection |
+| S2FunSampling | `[v, c] = optimalSample(...)` | `optimalSample(..., optimizeWeights=True)` |
+| S2FunSym | `S2FunHarmonicSym(sF, ss)` attaches a symmetry, `symmetrise` averages; `symmetrise` returns a plain `S2FunHarmonic`, whose plot shows the octant of mmm, half a fundamental domain of 222 | `symmetrise(sF, ss)`, a function in a frame with a group being the symmetric function; the sector of 222 |
+| S2Kernels | the Dirichlet kernels display the halfwidth 180 degree | the half maximum angle, 11.6 and 21.4 degree |
+| S2Bingham | the normalisation constant by a saddle point, mean 1.0377 | exact, mean one; `fit` solves for Z exactly |
+| TaylorHex, TextureEvolution | `linprog`'s interior point inside a degenerate optimal face | the simplex's vertex, the spin the minimum norm point: the Taylor factors agree, the shears, spins and family totals differ, compression twins exact 0 for about 1e-10 |
+| TaylorModel | pointwise `norm(WFun)` | `abs(WFun)`; `norm` is the L2 norm |
+| WaveVelocities | `[vp, vs1, vs2, pp, ps1, ps2] = velocity(C)`, interpolated on a grid of 18338 nodes | a named tuple of exact handles, `velocity(C).vp` |
+| IsotropicTheory, CPOSeismicProperties | the several outputs of `mean` and `calcTensor` | `'all'`; `addOption(C, 'density', rho)` is `C.density = rho` |
+| SchmidFactor, DislocationSystems | the outer `ori * sS` | a column times a row, `ori.reshape(-1, 1) * sS`; `axis off` is `plt.axis('off')`, `mtex.axis` being the rotation axis |
+| TwinningTutorial, SachsModel | the Schmid factor of one slip system is a number | a length one array, a slip system being a list |
+| Lankford | `[grains, ebsd.grainId] = calcGrains(ebsd)` | `calcGrains` writes `grainId` into the map it is given |
+| S1FunHarmonics | the periodic density is cut at round(4/sigma) | the same since 2026-09-23 (the port had 6/sigma) |
+| S2FunRadon | `'bandwidth', 48` displays 49 | 48 |
+| GrainSmoothing | the zoom `axis([x0 x1 y0 y1])` after a map plot | `region=[x0, x1, y0, y1]` on the plot, in map coordinates whatever the convention |
+| BoundaryNormalDistribution | the GBND a function on the sphere | an axis density carrying the phase symmetry, which MATLAB's numbers need |
+| QuadruplePoints, BoundaryProperties | the grain ids and the sides of a segment | numbered along x, the sides ordered by grain id, so a ring grain is 2 for 1 and a misorientation may be the inverse |
 
 ## Practicalities
 
@@ -246,5 +365,8 @@ has to know.
 | SymmetryAlignment | the tensor file of MATLAB's data folder is the data set `olivine1997` here, and Bruker's `crystal.phl` ships beside the CIF files |
 | PoleFigureSimulation, PoleFigureSantaFe, PoleFigureCorrection | the Poisson draw of `noisepf` and the spoiled measurements of the outlier example are not seeded, as MATLAB's are not, so their numbers move between builds; the Correction page seeds its own generator, and MATLAB's own run differs from the numbers its page quotes |
 | PoleFigure2ODF | `calcODF` is silent unless `silent=False`, where MATLAB prints its iteration trace unless `'silent'` is given |
-| OrientationEmbeddings, SpecimenSymmetry | MATLAB's runs of the page fail: zero samples in the de la Vallee Poussin loop, the NFFT MEX not loading for `norm(odf)`; those numbers have no MATLAB reference |
+| OrientationEmbeddings | MATLAB's run of the page fails asking for zero samples in the de la Vallee Poussin loop; that curve has no MATLAB reference |
 | OrientationInversePoleFigure, OrientationPoleFigure, OrientationExport | the pages draw random orientations; NumPy's generator cannot reproduce MATLAB's `rng(635)`, so their figures compare in structure only |
+| AngleDistributionFunction, AxisDistributionFunction, MisorientationDistributionFunction, SpecimenSymmetry | after a long day the bridge's MATLAB could no longer load its NFFT MEX files ("cannot allocate memory in static TLS block"); restarting the session fixed it, and the four pages were run again |
+| CSLBoundaries, BoundaryNormalDistribution | the bridge's MATLAB failed to load `wignerTrafoAdjointmex` and the NFFT MEX ("cannot allocate memory in static TLS block"), losing the MDF and GBND cells of both runs; a restart of the bridge fixed the same failure on SpecimenSymmetry |
+

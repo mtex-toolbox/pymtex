@@ -703,7 +703,8 @@ class specimenFrame(referenceFrame):
     if name is None:
       self._registered = specimenFrame.default
     elif isinstance(name, str):
-      self._registered = withGroup(specimenFrame.default, name)
+      # the group on the frame that carries the convention asked for
+      self._registered = withGroup(specimenFrame.default if how2plot is None else specimenFrame.frameFor(how2plot), name)
     elif isinstance(name, plottingConvention):
       self._registered = specimenFrame.frameFor(name)
     elif isinstance(name, specimenFrame):

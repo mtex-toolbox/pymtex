@@ -166,6 +166,33 @@ def test_G8_merging_relabels_the_grains_and_keeps_the_area():
   assert not mi.isBoundary[0] and not (mi.boundary.grainId == 0).any() and close(mi.area, [ins.area.sum()])
 
 
+def test_G8b_merging_by_labels_graphs_and_inclusions():
+  g = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
+  # a label per grain, a graph of grains by id, and the labels alone with testRun
+  m = g.merge(np.array([1, 1, 2, 2]))
+  assert len(m) == 2 and np.array_equal(g.parentId, [1, 1, 2, 2])
+  from scipy.sparse import csr_matrix
+  A = csr_matrix((np.ones(1), ([0], [1])), shape=(4, 4))
+  assert np.array_equal(g.merge(A, testRun=True), [1, 1, 2, 3]) and len(g.merge(A)) == 3
+  # an inclusion joins the grain around it, which keeps its phase and orientation
+  gi = calcGrains(inclusionMap(), angle=5 * degree)
+  big = int(np.argmax(gi.numPixel))
+  host = gi.inclusionHost
+  assert host[big] == 0 and host[1 - big] == gi.id[big]
+  assert len(gi.merge(inclusions=True, maxSize=10)) == 2
+  keep = np.zeros(2, dtype=bool)
+  assert len(gi.merge(inclusions=True, host=keep)) == 2
+  mi = gi.merge(inclusions=True)
+  assert len(mi) == 1 and mi.numPixel[0] == 21 * 21 and not mi.hasHole[0]
+  assert np.allclose(np.abs(mi.meanRotation.data[0] @ gi.meanRotation.data[big]), 1)
+  # a grain turned into another phase takes its boundary along with update
+  CS2 = crystalFrame("m-3m", mineral="other")
+  two = gi.copy()
+  object.__setattr__(two, "CSList", phaseList(CSG, CS2))
+  two.phaseId[1 - big] = 2
+  u = two.update()
+  assert np.all(u.boundary.phaseId[np.any(u.boundary.grainId == gi.id[1 - big], axis=1)].max(axis=1) == 2)
+
 # ------------------------------------------------------------------ the areas M3 and M4 left open
 
 def test_S10_the_rim_closes_and_alpha_bounds_both():
@@ -239,3 +266,12 @@ def test_the_compiled_and_the_python_tracing_agree():
     for x, y in zip(la, lb):
       # the same ring, whichever vertex it starts at
       assert len(x) == len(y) and close(signedArea2(V[x]), signedArea2(V[y])) and set(x.tolist()) == set(y.tolist())
+
+
+def test_id2ind_keeps_the_shape_of_the_ids():
+  ebsd = blockMap(np.eye(2), 3, 4)
+  grains = calcGrains(ebsd)
+  ids = grains.boundary.grainId
+  ind = grains.id2ind(ids[ids.min(axis=1) > 0])
+  assert ind.ndim == 2 and ind.shape[1] == 2 and np.array_equal(grains.id[ind], ids[ids.min(axis=1) > 0])
+  assert isinstance(grains.id2ind(int(grains.id[0])), int)

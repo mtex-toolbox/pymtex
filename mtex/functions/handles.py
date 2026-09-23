@@ -21,7 +21,7 @@ from ..geometry.vector3d import vector3d
 from .funops import conv
 from .rbf import SO3FunCBF, SO3FunRBF, _readFrames, _rotationsFor, uniformODF
 from .s1fun import S1FunHarmonic
-from .s2fun import S2FunHarmonic
+from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
 
 
@@ -43,6 +43,13 @@ class SO3FunGeneric:
 
   def norm(self):
     return SO3FunHarmonic(self).norm()
+
+  # the pointwise absolute value stays a handle, evaluated when asked, as MATLAB's
+  def __abs__(self):
+    return SO3FunHandle(lambda o: np.abs(self.eval(o)), self.CS, self.SS, bandwidth=self.bandwidth, antipodal=self.antipodal)
+
+  def abs(self):
+    return abs(self)
 
   def pdf(self, h, bandwidth=None):
     return SO3FunHarmonic(self, bandwidth=bandwidth).pdf(h)
@@ -236,7 +243,7 @@ class S2FunHandle:
     self.frame = frame
     average = (antipodal or False) if symmetrise is None else symmetrise
     self.fun = _symmetrisedS2(fun, frame, antipodal) if average else fun
-    self.bandwidth = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
+    self.bandwidth = quadratureBandwidth() if bandwidth is None else int(bandwidth)
     self.antipodal, self.isReal = bool(antipodal), bool(real)
 
   @property
@@ -268,6 +275,10 @@ class S2FunHandle:
   def mean(self):
     return S2FunHarmonic(self).mean()
 
+  # the surface integral, MATLAB's sum
+  def sum(self):
+    return 4 * np.pi * self.mean()
+
   def norm(self):
     return S2FunHarmonic(self).norm()
 
@@ -288,7 +299,7 @@ class S2FunHandle:
 
   def __add__(self, g):
     if isinstance(g, (int, float, complex, np.number)):
-      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal))
+      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal, _internal=True))
     return S2FunSum(self, g)
 
   __radd__ = __add__
@@ -304,6 +315,29 @@ class S2FunHandle:
 
   def rotate(self, r):
     return S2FunHarmonic(self).rotate(r)
+
+  # the pointwise functions of a handle stay handles, evaluated when asked, as MATLAB's
+  def _mapped(self, op):
+    return S2FunHandle(lambda v: op(self.eval(v)), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal,
+                       real=self.isReal, symmetrise=False)
+
+  def __abs__(self):
+    return self._mapped(np.abs)
+
+  def abs(self):
+    return abs(self)
+
+  def sqrt(self):
+    return self._mapped(np.sqrt)
+
+  def exp(self):
+    return self._mapped(np.exp)
+
+  def log(self):
+    return self._mapped(np.log)
+
+  def __pow__(self, p):
+    return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({self.frame.char()})"
@@ -352,6 +386,12 @@ class S2FunSum:
   def mean(self):
     return sum(t.mean() for t in self.components)
 
+  def sum(self):
+    return 4 * np.pi * self.mean()
+
+  def norm(self):
+    return S2FunHarmonic(self).norm()
+
   def _harmonicS2(self, bandwidth=None):
     L = self.bandwidth if bandwidth is None else int(bandwidth)
     return sum(S2FunHarmonic(t, bandwidth=min(L, t.bandwidth)) for t in self.components)
@@ -368,7 +408,7 @@ class S2FunSum:
 
   def __add__(self, g):
     if isinstance(g, (int, float, complex, np.number)):
-      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal))
+      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal, _internal=True))
     return S2FunSum(self, g)
 
   __radd__ = __add__
@@ -376,8 +416,28 @@ class S2FunSum:
   def __sub__(self, g):
     return self + (-1) * g
 
+  def __rsub__(self, g):
+    return g + (-1) * self
+
   def __neg__(self):
     return -1 * self
+
+  # the pointwise functions of a sum are handles, evaluated when asked
+  def _mapped(self, op):
+    return S2FunHandle(lambda v: op(self.eval(v)), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal,
+                       real=self.isReal, symmetrise=False)
+
+  def __abs__(self):
+    return self._mapped(np.abs)
+
+  def abs(self):
+    return abs(self)
+
+  def sqrt(self):
+    return self._mapped(np.sqrt)
+
+  def __pow__(self, p):
+    return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({self.frame.char()})"
@@ -421,5 +481,25 @@ class S1FunHandle:
   def __repr__(self):
     return f"S1FunHandle\n  bandwidth hint: {self.bandwidth}"
 
+
+# the pointwise functions of any function on SO(3) are handles, evaluated when asked, as
+# MATLAB's abs, sqrt, exp, log and .^
+def _pointwiseSO3(f, op):
+  return SO3FunHandle(lambda o: op(f.eval(o)), f.CS, f.SS, bandwidth=f.bandwidth)
+
+
+for _cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric):
+  _cls.__abs__ = lambda self: _pointwiseSO3(self, np.abs)
+  _cls.abs = lambda self: _pointwiseSO3(self, np.abs)
+  _cls.sqrt = lambda self: _pointwiseSO3(self, np.sqrt)
+  _cls.exp = lambda self: _pointwiseSO3(self, np.exp)
+  _cls.log = lambda self: _pointwiseSO3(self, np.log)
+  _cls.__pow__ = lambda self, p: _pointwiseSO3(self, lambda x: x ** p)
+  # the integral over SO(3), 8 pi^2 times the mean, MATLAB's sum
+  _cls.sum = lambda self: 8 * np.pi ** 2 * self.mean()
+  # MATLAB's names of the crystal and the specimen frame; assigning one relabels the
+  # function and leaves its values, symmetrise then projects
+  _cls.SRight = property(lambda self: self.CS, lambda self, fr: setattr(self, "CS", fr))
+  _cls.SLeft = property(lambda self: self.SS, lambda self, fr: setattr(self, "SS", fr))
 
 __all__ = ["SO3FunHandle", "SO3FunComposition", "S2FunHandle", "S2FunSum", "S1FunHandle"]

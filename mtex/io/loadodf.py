@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -100,13 +101,24 @@ def loadODF_VPSC(fname, *args, CS=None, **kwargs):
   heads = [(i, m) for i, m in ((i, re.match(r"^\s*([BbKkRr])\s+(\d+)\s*$", l)) for i, l in enumerate(lines)) if m]
   if not heads or heads[0][0] != 3:
     raise ValueError("the file is not a VPSC texture file: its fourth line names the convention and the count")
+  # the leading numbers of a header line, NaN for what a weight file leaves out
+  def numbers(line, k):
+    v = [float(x) for x in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", line.split("<--")[0])][:k]
+    return np.array(v + [np.nan] * (k - len(v)))
+
   odfs = []
   for i, m in heads:
     n = int(m.group(2))
     convention = VPSC_CONVENTIONS[m.group(1).upper()]
     block = np.array([[float(x) for x in l.split()] for l in lines[i + 1:i + 1 + n]], dtype=float)
     ori = orientation.byEuler(block[:, 0] * degree, block[:, 1] * degree, block[:, 2] * degree, convention, CS, SS)
-    odfs.append(calcDensity(ori, weights=block[:, 3], **kwargs))
+    odf = calcDensity(ori, weights=block[:, 3], **kwargs)
+    # the strain, the phase ellipsoid, the orientations and the further columns, MATLAB's odf.opt
+    strain = re.search(r"STRAIN\s*=\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)", lines[i - 3])
+    odf.opt = SimpleNamespace(strain=float(strain.group(1)) if strain else np.nan,
+                              strainEllipsoid=numbers(lines[i - 2], 3), strainEllipsoidAngles=numbers(lines[i - 1], 3),
+                              orientations=ori, data=block[:, 4:])
+    odfs.append(odf)
   return odfs[0] if len(odfs) == 1 else odfs
 
 

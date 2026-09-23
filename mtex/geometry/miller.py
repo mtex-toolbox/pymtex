@@ -25,14 +25,16 @@ from .session import getMTEXpref
 from .vector3d import vector3d
 
 STYLES = ("hkl", "hkil", "uvw", "UVTW", "xyz")
+# MATLAB reads the style names without regard to case, 'HKIL' for 'hkil'
+_STYLE = {s.lower(): s for s in STYLES}
 
 
 def Miller(*args, antipodal=False, dispStyle=None):
   style = dispStyle
   for a in args:
-    if isinstance(a, str) and a in STYLES:
-      style = a
-  args = [a for a in args if not (isinstance(a, str) and a in STYLES)]
+    if isinstance(a, str) and a.lower() in _STYLE:
+      style = _STYLE[a.lower()]
+  args = [a for a in args if not (isinstance(a, str) and a.lower() in _STYLE)]
   frames = [a for a in args if isinstance(a, crystalFrame)]
   if not frames:
     if args and isinstance(args[0], vector3d) and args[0].isCrystalDirection:
@@ -82,6 +84,9 @@ def Miller(*args, antipodal=False, dispStyle=None):
         m.UVTW = idx
     else:
       m.hkl = idx
+    # four indices given are shown as four, whichever of the two names asked for them
+    if idx.shape[-1] == 4 and style is not None:
+      style = "UVTW" if direct else "hkil"
   if style is not None:
     m.dispStyle = style
   return m
@@ -108,11 +113,16 @@ def _parse(s, cs):
 # the smallest multiple whose indices are close to integers, up to maxHKL; UVTW is reduced
 # by its gcd, the smallest integer four index form
 def roundIndices(v, style=None, maxHKL=12):
-  v._needsCrystal()
-  style = v.dispStyle if style is None else style
-  if style == "xyz":
-    style = "hkl"
-  m = getattr(v, style).reshape(-1, len(style))
+  # a direction without a lattice: its Cartesian coordinates to the nearest small integers
+  if not v.isCrystalDirection:
+    m = v.data.reshape(-1, 3)
+    style = "xyz"
+  else:
+    v._needsCrystal()
+    style = v.dispStyle if style is None else style
+    if style == "xyz":
+      style = "hkl"
+    m = getattr(v, style).reshape(-1, len(style))
   if style == "hkil":
     m = m[:, [0, 1, 3]]
   out = np.empty_like(m)
@@ -133,6 +143,8 @@ def roundIndices(v, style=None, maxHKL=12):
       g = max(gcd(gcd(gcd(abs(ints[0]), abs(ints[1])), abs(ints[2])), abs(ints[3])), 1)
       rounded = rounded / g
     out[r] = rounded
+  if style == "xyz":
+    return v._new(out.reshape(v.shape + (3,)).astype(float))
   result = v.copy()
   if style == "hkil":
     out = np.concatenate([out[:, :2], -out[:, :1] - out[:, 1:2], out[:, 2:]], axis=1)
@@ -171,13 +183,27 @@ def brackets(style, family):
 # the family brackets {hkl}, <uvw> for a direction in a frame with symmetry, the plain ones
 # (hkl), [uvw] when family is False, as a label on a plot names one direction
 def indexChar(v, style=None, utf8=None, family=None):
+  # char(m, 'LaTex'): the indices as mathematics, a bar over the negative ones
+  latex = isinstance(style, str) and style.lower() == "latex"
   utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8
-  style = v.dispStyle if style is None else style
+  style = v.dispStyle if style is None or latex else style
   family = v.frame.numSym() > 1 if family is None else family
   left, right = brackets(style, family)
   coord = v.data if style == "xyz" else getattr(v, style)
   coord = np.where(np.abs(coord) < 1e-8, 0.0, coord).reshape(-1, coord.shape[-1])
+  if latex:
+    tex = {"{": r"\{", "}": r"\}", "<": r"\langle ", ">": r"\rangle"}
+    return "".join("$" + tex.get(left, left) + _latexIndices(row) + tex.get(right, right) + "$" for row in coord)
   return "".join(left + indexString(row, utf8) + right for row in coord)
+
+
+def _latexIndices(idx):
+  parts = []
+  for x in idx:
+    isInt = abs(x - round(x)) < 1e-6
+    r = str(int(round(x))) if isInt else f"{x:.2f}"
+    parts.append(r"\bar{" + r[1:] + "}" if isInt and x < -0.5 else r)
+  return ("\\," if any(abs(x) > 9 for x in idx) else "").join(parts)
 
 
 __all__ = ["Miller"]

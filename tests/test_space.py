@@ -33,7 +33,7 @@ def test_S5_the_sphere_in_space():
   assert [n for _, n in frameAxes(specimenFrame("1"))] == ["X", "Y", "Z"]
   ax = frameAxes(crystalFrame("6/mmm"))
   assert [n for _, n in ax] == ["a", "b", "c"] and abs(ax[0][0] @ ax[1][0] - np.cos(120 * degree)) < 1e-9
-  assert [n for _, n in frameAxes(None)] == ["x", "y", "z"]
+  assert [n for _, n in frameAxes(None)] == ["X", "Y", "Z"]
 
 
 def test_S5b_the_fundamental_region_in_axis_angle_space():

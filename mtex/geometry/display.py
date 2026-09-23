@@ -25,6 +25,24 @@ def numString(x, digits=3, tiny=1e-10, decimals=None):
   return f"{x:.{digits}g}"
 
 
+# a number as MATLAB's xnum2str writes it: the decimals follow the size, trailing zeros
+# and a trailing point dropped, 27532, 1.3, 0.25
+def xnum2str(x):
+  x = float(x)
+  if x != x:
+    return "NaN"
+  m = abs(x)
+  if m > 1e6 or m <= 1e-4:
+    s = f"{x:.2g}"
+  else:
+    decimals = 0 if m >= 10 else 1 if m >= 1 else 2 if m > 0.1 else 3 if m > 0.01 else 4 if m > 0.001 else 5
+    # half away from zero, as MATLAB rounds
+    s = f"{np.copysign(np.floor(m * 10 ** decimals + 0.5) / 10 ** decimals, x):.{decimals}f}"
+    if decimals:
+      s = s.rstrip("0").rstrip(".")
+  return "0" if s == "-0" else s
+
+
 # columns under their labels, right aligned, two spaces of indent
 def table(labels, columns, digits=3, tiny=1e-10, decimals=None):
   cells = [[numString(x, digits, tiny, decimals) for x in np.asarray(c).ravel()] for c in columns]

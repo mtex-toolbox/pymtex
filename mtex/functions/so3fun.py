@@ -6,7 +6,7 @@
 #   SO3F = SO3FunHarmonic(psi, CS, SS)                  a kernel centred at the identity
 #   SO3F = SO3FunHarmonic(fun, CS, SS, bandwidth=L)      a callable by exact quadrature
 #   SO3F = SO3FunHarmonic.quadrature(nodes, values, bandwidth=L, weights=w)
-#   SO3F.fhat, SO3F.CS, SO3F.SS, SO3F.bandwidth, SO3F.isReal, SO3F.antipodal, SO3F.power
+#   SO3F._fhat, SO3F.CS, SO3F.SS, SO3F.bandwidth, SO3F.isReal, SO3F.antipodal, SO3F.power
 #   SO3F(ori), SO3F.eval(ori), SO3F.symmetrise(), SO3F.inv(), SO3F.conj(), SO3F.truncate(L)
 #   SO3F.mean(), SO3F.norm(), SO3F.dot(G), the linear algebra, SO3F.withExchange()
 #
@@ -22,7 +22,7 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.session import getMTEXpref
-from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, project
+from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
 from .transforms import isRealWigner, wignerSeries, wignerSeriesAdjoint
@@ -75,7 +75,13 @@ def _readFrames(args):
 
 class SO3FunHarmonic:
 
-  def __init__(self, fhat, *frames, real=None, antipodal=None, symmetrise=True, bandwidth=None, dtype=None):
+  def __init__(self, fhat, *frames, real=None, antipodal=None, symmetrise=True, bandwidth=None, dtype=None, _internal=False):
+    # coefficients given are MTEX's, those the port passes itself its own
+    fromUser = not _internal
+    # the quadrature scheme, 'ClenshawCurtis' or 'GaussLegendre', named among the frames
+    schemes = [a for a in frames if isinstance(a, str)]
+    scheme = schemes[0] if schemes else "ClenshawCurtis"
+    frames = tuple(a for a in frames if not isinstance(a, str))
     # another representation converts itself to its harmonic form
     if not isinstance(fhat, SO3FunHarmonic) and hasattr(fhat, "_harmonic"):
       fhat, bandwidth = fhat._harmonic(bandwidth), None
@@ -84,40 +90,45 @@ class SO3FunHarmonic:
       CS, SS = _readFrames(frames) if frames else (f.CS, f.SS)
       real = f.isReal if real is None else real
       antipodal = f.antipodal if antipodal is None else antipodal
-      fhat = f.truncate(bandwidth).fhat if bandwidth is not None else f.fhat
-      bandwidth = None
+      fhat = f.truncate(bandwidth)._fhat if bandwidth is not None else f._fhat
+      bandwidth, fromUser = None, False
     elif isinstance(fhat, SO3Kernel):
       CS, SS = _readFrames(frames)
       fhat = _kernelCoefficients(fhat, bandwidth)
-      real, bandwidth = True, None
+      real, bandwidth, fromUser = True, None, False
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       CS, SS = _readFrames(frames)
-      fhat, real = _byQuadrature(fhat, CS, SS, bandwidth, real, antipodal)
-      bandwidth = None
+      fhat, real = _byQuadrature(fhat, CS, SS, bandwidth, real, antipodal, scheme)
+      bandwidth, fromUser = None, False
     else:
       CS, SS = _readFrames(frames)
     fhat = np.array(fhat, dtype=_complexType(np.result_type(np.asarray(fhat).dtype, np.float64) if dtype is None else dtype)).reshape(-1)
-    L = dim2deg(len(fhat))
+    # a vector ending inside a degree block is padded with zeros to its end, as MATLAB does
+    L = 0
+    while deg2dim(L + 1) < len(fhat):
+      L += 1
     if deg2dim(L + 1) != len(fhat):
-      raise ValueError("a coefficient vector has length deg2dim(L+1) for its bandwidth L")
+      fhat = np.concatenate([fhat, np.zeros(deg2dim(L + 1) - len(fhat), dtype=fhat.dtype)])
     if bandwidth is not None and bandwidth != L:
       fhat = _cut(fhat, bandwidth)
+    if fromUser:
+      fhat = mtexCoefficientsSO3(fhat)
     antipodal = bool(antipodal)
     if antipodal and CS is not SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
     real = isRealWigner(fhat) if real is None else bool(real)
     if real:
       realizeWigner(fhat)
-    self.fhat, self.CS, self.SS, self.isReal, self.antipodal = fhat, CS, SS, real, antipodal
+    self._fhat, self.CS, self.SS, self.isReal, self.antipodal = fhat, CS, SS, real, antipodal
     if symmetrise:
-      self.fhat = self.symmetrise().fhat
+      self._fhat = self.symmetrise()._fhat
     elif antipodal:
-      self.fhat = (fhat + invertedCoefficients(fhat)) / 2
+      self._fhat = (fhat + invertedCoefficients(fhat)) / 2
 
   # the same function with other coefficients, everything else kept
   def _rebuild(self, fhat, **changes):
     f = object.__new__(SO3FunHarmonic)
-    f.fhat, f.CS, f.SS, f.isReal, f.antipodal = np.asarray(fhat), self.CS, self.SS, self.isReal, self.antipodal
+    f._fhat, f.CS, f.SS, f.isReal, f.antipodal = np.asarray(fhat), self.CS, self.SS, self.isReal, self.antipodal
     for k, v in changes.items():
       setattr(f, k, v)
     return f
@@ -131,6 +142,9 @@ class SO3FunHarmonic:
     L = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
     values = np.asarray(values)
     if isinstance(nodes, quadratureSO3Grid):
+      # a grid brings its bandwidth, and values at its distinct nodes spread onto all of them
+      L = nodes.bandwidth if bandwidth is None else L
+      values = nodes.fullValues(values)
       CS, SS = (nodes.CS, nodes.SS if nodes.SS is not None else specimenFrame.default) if nodes.CS is not None else _readFrames(frames)
       fhat = wignerSeriesAdjoint(nodes, values.ravel(), L, weights)
     else:
@@ -140,28 +154,53 @@ class SO3FunHarmonic:
       else:
         CS, SS = _readFrames(frames)
       fhat = wignerSeriesAdjoint(nodes, values.ravel(), L, weights, folds=folds(CS, SS))
-    return cls(fhat, CS, SS, real=(values.dtype.kind != "c") if real is None else real, antipodal=antipodal)
+    return cls(fhat, CS, SS, real=(values.dtype.kind != "c") if real is None else real, antipodal=antipodal, _internal=True)
 
   approximate = quadrature
 
   # ------------------------------------------------------------------ properties
 
+  # the coefficients in MTEX's basis, as MATLAB's SO3F.fhat reads and assigns them
+  @property
+  def fhat(self):
+    return mtexCoefficientsSO3(self._fhat)
+
+  @fhat.setter
+  def fhat(self, value):
+    self._fhat = mtexCoefficientsSO3(np.asarray(value, dtype=self._fhat.dtype))
+
+  # SO3F.isReal = True makes the coefficients those of the real part, as MATLAB's does
+  @property
+  def isReal(self):
+    return self._isReal
+
+  @isReal.setter
+  def isReal(self, real):
+    self._isReal = bool(real)
+    if self._isReal and hasattr(self, "_fhat"):
+      self._fhat = realizeWigner(np.array(self._fhat, dtype=complex))
+
   @property
   def bandwidth(self):
-    return dim2deg(len(self.fhat))
+    return dim2deg(len(self._fhat))
+
+  # SO3F.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does
+  @bandwidth.setter
+  def bandwidth(self, L):
+    self._fhat = _cut(self._fhat, int(L))
 
   # the harmonic power per degree, the norm of the coefficients of that degree
   @property
   def power(self):
-    return np.array([np.linalg.norm(self.fhat[deg2dim(n):deg2dim(n + 1)]) for n in range(self.bandwidth + 1)])
+    return np.array([np.linalg.norm(self._fhat[deg2dim(n):deg2dim(n + 1)]) for n in range(self.bandwidth + 1)])
 
   @property
   def dtype(self):
-    return self.fhat.dtype
+    return self._fhat.dtype
 
   # the coefficient vector cut or padded to a bandwidth
   def truncate(self, L):
-    return self if L == self.bandwidth else self._rebuild(_cut(self.fhat, L))
+    return self if L == self.bandwidth else self._rebuild(_cut(self._fhat, L))
 
   # ------------------------------------------------------------------ evaluation
 
@@ -184,34 +223,34 @@ class SO3FunHarmonic:
   # on the reduced index set of their z folds
   def eval(self, x):
     if isinstance(x, quadratureSO3Grid):
-      return wignerSeries(self.fhat, x, real=self.isReal)
+      return wignerSeries(self._fhat, x, real=self.isReal)
     r = self._rotationsFor(x)
-    return wignerSeries(self.fhat, r, real=self.isReal, folds=folds(self.CS, self.SS))
+    return wignerSeries(self._fhat, r, real=self.isReal, folds=folds(self.CS, self.SS))
 
   # ------------------------------------------------------------------ symmetry
 
   # the projection of H5 on both sides, and the exchange symmetry f(g) = f(g^-1)
   def symmetrise(self):
     L = self.bandwidth
-    P, Q = invariantProjection(self.SS, L, self.fhat.real.dtype), invariantProjection(self.CS, L, self.fhat.real.dtype)
-    fhat = project(self.fhat.copy(), P, Q)
+    P, Q = invariantProjection(self.SS, L, self._fhat.real.dtype), invariantProjection(self.CS, L, self._fhat.real.dtype)
+    fhat = project(self._fhat.copy(), P, Q)
     if self.antipodal:
       fhat = (fhat + invertedCoefficients(fhat)) / 2
     return self._rebuild(fhat)
 
   def inv(self):
-    return self._rebuild(invertedCoefficients(self.fhat), CS=self.SS, SS=self.CS)
+    return self._rebuild(invertedCoefficients(self._fhat), CS=self.SS, SS=self.CS)
 
   def withExchange(self, x=True):
     if x and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
-    fhat = (self.fhat + invertedCoefficients(self.fhat)) / 2 if x else self.fhat.copy()
+    fhat = (self._fhat + invertedCoefficients(self._fhat)) / 2 if x else self._fhat.copy()
     return self._rebuild(fhat, antipodal=bool(x))
 
   # ------------------------------------------------------------------ the algebra
 
   def conj(self):
-    return self._rebuild(conjugateCoefficients(self.fhat))
+    return self._rebuild(conjugateCoefficients(self._fhat))
 
   def _sameFrames(self, g):
     if g.CS is not self.CS or g.SS is not self.SS:
@@ -224,18 +263,18 @@ class SO3FunHarmonic:
     if isinstance(g, SO3FunHarmonic):
       self._sameFrames(g)
       L = max(self.bandwidth, g.bandwidth)
-      return SO3FunHarmonic(self.truncate(L).fhat + g.truncate(L).fhat, self.CS, self.SS, real=self.isReal and g.isReal,
-                            antipodal=self.antipodal and g.antipodal, symmetrise=False)
+      return SO3FunHarmonic(self.truncate(L)._fhat + g.truncate(L)._fhat, self.CS, self.SS, real=self.isReal and g.isReal,
+                            antipodal=self.antipodal and g.antipodal, symmetrise=False, _internal=True)
     if isinstance(g, (int, float, complex, np.number)):
-      fhat = self.fhat.copy()
+      fhat = self._fhat.copy()
       fhat[0] += g
-      return SO3FunHarmonic(fhat, self.CS, self.SS, real=self.isReal and np.isreal(g), antipodal=self.antipodal, symmetrise=False)
+      return SO3FunHarmonic(fhat, self.CS, self.SS, real=self.isReal and np.isreal(g), antipodal=self.antipodal, symmetrise=False, _internal=True)
     return NotImplemented
 
   __radd__ = __add__
 
   def __neg__(self):
-    return self._rebuild(-self.fhat)
+    return self._rebuild(-self._fhat)
 
   def __sub__(self, g):
     return self + (-g)
@@ -248,7 +287,7 @@ class SO3FunHarmonic:
       from .funops import mapFun
       return mapFun(np.multiply, self, a)
     if isinstance(a, (int, float, complex, np.number)):
-      return SO3FunHarmonic(a * self.fhat, self.CS, self.SS, real=self.isReal and np.isreal(a), antipodal=self.antipodal, symmetrise=False)
+      return SO3FunHarmonic(a * self._fhat, self.CS, self.SS, real=self.isReal and np.isreal(a), antipodal=self.antipodal, symmetrise=False, _internal=True)
     return NotImplemented
 
   __rmul__ = __mul__
@@ -290,25 +329,25 @@ class SO3FunHarmonic:
   # ------------------------------------------------------------------ the moments
 
   def mean(self):
-    return self.fhat[0].real if self.isReal else self.fhat[0]
+    return self._fhat[0].real if self.isReal else self._fhat[0]
 
   # the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)
   def norm(self, s=None):
     if s is None:
-      return float(np.linalg.norm(self.fhat))
-    return float(math.sqrt(sum((2 * n + 1) ** (2 * s) * np.sum(np.abs(self.fhat[deg2dim(n):deg2dim(n + 1)]) ** 2) for n in range(self.bandwidth + 1))))
+      return float(np.linalg.norm(self._fhat))
+    return float(math.sqrt(sum((2 * n + 1) ** (2 * s) * np.sum(np.abs(self._fhat[deg2dim(n):deg2dim(n + 1)]) ** 2) for n in range(self.bandwidth + 1))))
 
   # the inner product int conj(f) g, the first argument conjugated
   def dot(self, g):
     self._sameFrames(g)
     L = max(self.bandwidth, g.bandwidth)
-    x = np.vdot(self.truncate(L).fhat, g.truncate(L).fhat)
+    x = np.vdot(self.truncate(L)._fhat, g.truncate(L)._fhat)
     return x.real if self.isReal and g.isReal else x
 
   # the same coefficients up to a tolerance
   def isclose(self, g, rtol=1e-8, atol=0.0):
     L = max(self.bandwidth, g.bandwidth)
-    a, b = self.truncate(L).fhat, g.truncate(L).fhat
+    a, b = self.truncate(L)._fhat, g.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
 
   # ------------------------------------------------------------------ the operations of funops
@@ -382,10 +421,10 @@ def _kernelCoefficients(psi, bandwidth):
 # a callable by exact quadrature on the folded rule; the callable receives the orientations
 # of the rule. The projection is block diagonal in the degree and commutes with the cut, so
 # the bandwidth asked for is taken before it runs
-def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal):
+def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal, scheme="ClenshawCurtis"):
   L0 = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
   L = bandwidthFor(L0, CS, SS)
-  g = quadratureSO3Grid(L, CS, SS)
+  g = quadratureSO3Grid(L, scheme, CS, SS)
   values = np.asarray(fun(g.nodes())).ravel()
   fhat = wignerSeriesAdjoint(g, values, L)[:deg2dim(L0 + 1)]
   return fhat, (values.dtype.kind != "c") if real is None else real

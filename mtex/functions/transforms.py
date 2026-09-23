@@ -26,13 +26,16 @@ from ..geometry.kernels import _jit, _loop, backend
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.vector3d import vector3d
-from .harmonics import WignerD, deg2dim, degreeBlock, dim2deg, sphericalY, wignerdDegrees
+from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .harmonics import wignerSeries as _wignerSeriesDirect
 from .quadrature import quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
 
 DIRECT_SUM_NODES = 50
-# on the sphere a plan costs more than a trigonometric sum on the Fourier array up to here
+# on the sphere a plan costs more than a trigonometric sum on the Fourier array up to here,
+# in nodes, or in nodes times the (2L+1)^2 terms of the sum; the sum is exact, the plan
+# only to its tolerance
 DIRECT_TRIG_NODES_S2 = 400
+DIRECT_TRIG_WORK_S2 = 2e6
 NUFFT_EPS = 1e-8          # finufft's tolerance in double precision
 NUFFT_EPS_SINGLE = 1e-5   # and in single, where 1e-8 is out of reach
 
@@ -519,9 +522,9 @@ class S2GridPlan:
     if not 0 < L <= g.bandwidth:
       raise ValueError(f"a bandwidth {L} does not fit the grid of bandwidth {g.bandwidth}")
     self.L, self.real, self.grid = L, bool(real), g
-    self.dtype = _complexType(g.theta.dtype)
-    self.shape = g.shape
-    self.lattice = np.zeros((len(g.rho), 4 * g.bandwidth), dtype=self.dtype)
+    self.dtype = _complexType(g.thetaGrid.dtype)
+    self.shape = g.gridShape
+    self.lattice = np.zeros((len(g.rhoGrid), 4 * g.bandwidth), dtype=self.dtype)
 
   def __len__(self):
     return len(self.grid)
@@ -603,7 +606,7 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
   if n < DIRECT_SUM_NODES or L == 0:
     (_, _, _), dtype = _euler(rots)
     fhat = np.zeros(deg2dim(L + 1), dtype=_complexType(np.result_type(dtype, values.dtype)))
-    D = WignerD(rots.flatten(), bandwidth=L)
+    D = _WignerD(rots.flatten(), bandwidth=L)
     for n_ in range(L + 1):
       degreeBlock(fhat, n_)[...] = math.sqrt(2 * n_ + 1) * np.einsum("i,ikl->kl", weights * values, np.conj(D[n_]))
     return fhat
@@ -613,17 +616,60 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
 # the direct spherical sum, degree by degree through the harmonics of F0
 def _sphericalSeriesDirect(fhat, v):
   L = math.isqrt(fhat.shape[-1]) - 1
-  total = np.zeros(v.shape, dtype=_complexType(fhat.dtype))
-  for l in range(L + 1):
-    total += np.tensordot(fhat[l * l:(l + 1) ** 2], sphericalY(l, v), axes=(0, 0))
-  return total
+  x = np.cos(v.theta).reshape(-1).astype(float)
+  rho = np.asarray(v.rho, dtype=float).reshape(-1)
+  st = np.sqrt(np.maximum(0, 1 - x * x))
+  m = np.arange(L + 1)
+  # the normalised associated Legendre functions degree by degree, all orders at once: the
+  # diagonal P_m^m by its own recursion, the rest by the three term recursion in the degree
+  diag = np.empty((L + 1, x.size))
+  diag[0] = 1 / math.sqrt(4 * math.pi)
+  for k in range(1, L + 1):
+    diag[k] = diag[k - 1] * (-math.sqrt((2 * k + 1) / (2 * k)) * st)
+  A = np.zeros((L + 1, x.size), dtype=_complexType(fhat.dtype))
+  B = np.zeros((L + 1, x.size), dtype=_complexType(fhat.dtype))
+  p2 = np.zeros((L + 1, x.size))
+  p1 = np.zeros((L + 1, x.size))
+  for n in range(L + 1):
+    p = np.zeros((L + 1, x.size))
+    p[n] = diag[n]
+    if n > 0:
+      mm = m[:n]
+      a = np.sqrt((4 * n * n - 1) / (n * n - mm * mm))
+      b = np.sqrt(np.maximum((n - 1) ** 2 - mm * mm, 0) / (4 * (n - 1) ** 2 - 1))
+      p[:n] = a[:, None] * (x * p1[:n] - b[:, None] * p2[:n])
+    # the coefficients of orders m and -m of this degree weight the Legendre values
+    base = n * n + n
+    A[:n + 1] += fhat[base + m[:n + 1]][:, None] * p[:n + 1]
+    B[1:n + 1] += fhat[base - m[1:n + 1]][:, None] * p[1:n + 1]
+    p2, p1 = p1, p
+  E = np.exp(1j * np.outer(m, rho))
+  # Y_n^-m = (-1)^m conj(Y_n^m)
+  total = np.sum(A * E, axis=0) + np.sum(np.where(m % 2, -1.0, 1.0)[:, None] * B * np.conj(E), axis=0)
+  return total.reshape(v.shape)
 
 
 # the bivariate Fourier series of H7 summed directly at a few nodes, where a NUFFT plan
 # costs more than the sum: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}
+# the transforms of the last few coefficient vectors, by the hash of their bytes: a search
+# that evaluates one function at many small node sets pays for its transform once
+_TRIG_CACHE = {}
+
+
+def _cachedTransform(fhat, L, real):
+  key = (hash(np.ascontiguousarray(fhat).tobytes()), fhat.dtype.str, L, bool(real))
+  G = _TRIG_CACHE.get(key)
+  if G is None:
+    G = sphericalTransform(fhat, L, real)
+    if len(_TRIG_CACHE) >= 4:
+      _TRIG_CACHE.pop(next(iter(_TRIG_CACHE)))
+    _TRIG_CACHE[key] = G
+  return G
+
+
 def _sphericalSeriesTrig(fhat, v, real):
   L = math.isqrt(fhat.shape[-1]) - 1
-  G = sphericalTransform(fhat, L, real)
+  G = _cachedTransform(fhat, L, real)
   theta, rho = v.flatten().theta, v.flatten().rho
   m = np.arange(L + 1) if real else np.arange(-L, L + 1)
   Et = np.exp(-1j * np.outer(theta, np.arange(-L, L + 1)))
@@ -644,7 +690,7 @@ def sphericalSeries(fhat, v, real=None):
   if v.size < DIRECT_SUM_NODES or L == 0:
     f = _sphericalSeriesDirect(fhat, v)
     f = np.real(f) if real else f
-  elif v.size < DIRECT_TRIG_NODES_S2:
+  elif v.size < DIRECT_TRIG_NODES_S2 or v.size * (2 * L + 1) ** 2 < DIRECT_TRIG_WORK_S2:
     f = _sphericalSeriesTrig(fhat, v, real)
   else:
     f = S2FourierPlan(v, L, real)(fhat).reshape(v.shape)
@@ -664,7 +710,7 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
   if n < DIRECT_SUM_NODES or L == 0:
     fhat = np.zeros((L + 1) ** 2, dtype=_complexType(values.dtype))
     for l in range(L + 1):
-      fhat[l * l:(l + 1) ** 2] = np.conj(sphericalY(l, v)) @ (weights * values)
+      fhat[l * l:(l + 1) ** 2] = np.conj(_sphericalY(l, v)) @ (weights * values)
     return fhat
   return S2FourierPlan(v, L, real).adjoint(values, weights)
 
@@ -676,7 +722,8 @@ def fourierSeries(chat, x, real=None):
   if isinstance(x, quadratureS1Grid):
     x = x.nodes()
   x = np.asarray(x)
-  if x.size < DIRECT_SUM_NODES:
+  # the direct sum is exact, the plan only to its tolerance; the sum is cheap for few terms
+  if x.size < DIRECT_SUM_NODES or x.size * (2 * L + 1) < DIRECT_TRIG_WORK_S2:
     f = np.exp(1j * np.outer(x.ravel(), np.arange(-L, L + 1))) @ chat
   else:
     f = S1FourierPlan(x, L)(chat)

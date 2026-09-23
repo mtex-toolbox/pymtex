@@ -45,7 +45,19 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
     c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
   ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId).reshape(ebsd.shape)
+  absorbNotIndexed(ebsd, grains)
   return grains
+
+
+# a not indexed pixel inside a grain takes the phase of the grain and no rotation, as
+# MATLAB's [grains, ebsd] = calcGrains returns the map; the padding of a grid stays empty
+def absorbNotIndexed(ebsd, grains):
+  gid = ebsd.grainId.reshape(-1)
+  absorbed = ~ebsd.isIndexed.reshape(-1) & (gid > 0) & ~ebsd.isPadding.reshape(-1)
+  if not absorbed.any():
+    return
+  ebsd.phaseId.reshape(-1)[absorbed] = np.asarray(grains.phaseId).reshape(-1)[gid[absorbed] - 1]
+  ebsd.rotations.data.reshape(-1, 4)[absorbed] = np.nan
 
 
 # the pixels of indexed grains that came out below minPixel

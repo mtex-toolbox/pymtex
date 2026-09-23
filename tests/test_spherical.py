@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (S2FunHarmonic, conventionalSector, crystalFrame, degree, fundamentalSector, plottingConvention,
-                  rotation, specimenFrame, sphericalRegion, vector3d, xvector, zvector)
+from mtex import (Miller, S2FunHarmonic, conventionalSector, crystalFrame, degree, fundamentalSector, plottingConvention,
+                  rotation, specimenFrame, sphericalRegion, stiffnessTensor, vector3d, xvector, zvector)
 from mtex.plotting.spherical import (eangleProjection, eareaProjection, edistProjection, gnomonicProjection, isLower, isUpper,
                                      makeSphericalProjection, millerLabel, orthographicProjection, plainProjection, plotRegion,
                                      projectionClass, rhoRange, sphericalProjection)
@@ -72,8 +72,8 @@ def test_P2_charts_and_the_hemispheres():
   assert isUpper(sphere.restrict2Upper(pC), pC) and not isLower(sphere.restrict2Upper(pC), pC)
   assert not isUpper(sphere, pC) and not isLower(sphere, pC)
   assert len(makeSphericalProjection(sphere, projection="plain")) == 1
-  with pytest.raises(ValueError):
-    makeSphericalProjection(sphere, upper=True, lower=True)
+  assert len(makeSphericalProjection(sphere, upper=True, lower=True)) == 2
+  assert len(makeSphericalProjection(sphere, antipodal=True, upper=True, lower=True)) == 2
   # a list of axes is drawn on one chart, a list of directions on two
   assert len(makeSphericalProjection(vector3d.rand(5, antipodal=True, rng=rng))) == 1
   assert len(makeSphericalProjection(vector3d.rand(5, rng=rng))) == 2
@@ -113,6 +113,13 @@ def test_P3_the_grid_the_boundary_and_the_labels():
   assert len(b) == 3 and all(np.all(np.isfinite(x)) for x, _ in b)
   # the corners are labelled with Miller indices
   assert {s for _, s in c.labels()} == {"[001]", "[101]", "[111]"}
+  # a complete chart of a symmetric function names the equivalent sector corners at the pole
+  # and on the rim, a complete chart of directions the positive crystal axes, as MATLAB
+  sphere = sphericalRegion(frame=crystalFrame("m-3m"))
+  full = makeSphericalProjection(sphere, complete=True, upper=True, symmetric=True)[0]
+  assert {s for _, s in full.labels()} >= {"[001]", "[100]", "[110]"} and "[111]" not in {s for _, s in full.labels()}
+  full = makeSphericalProjection(vector3d(0, 0, 1, frame=crystalFrame("m-3m")), complete=True, upper=True)[0]
+  assert {s for _, s in full.labels()} == {"[001]", "[100]", "[010]"}
   assert millerLabel(vector3d(1, 1, 0), cs) == "[110]" and millerLabel(vector3d(-1, 0, 0), cs, utf8=False) == "[-100]"
   # a specimen frame labels its axes where they are visible
   ss = specimenFrame("1")
@@ -144,8 +151,9 @@ def test_P3_the_grid_the_boundary_and_the_labels():
   expected = conventionalSector(crystalFrame("432").sym.Laue(), up=pC.outOfScreen, east=pC.east)
   assert np.allclose(makeSphericalProjection(a, fundamentalRegion=True)[0].sR.N[1:], expected.N) or \
     np.allclose(makeSphericalProjection(a, fundamentalRegion=True)[0].sR.N, expected.N)
-  # the trigonal sector reaches into both hemispheres and gets two charts
-  assert len(makeSphericalProjection(fundamentalSector(crystalFrame("-3m")))) == 2
+  # the polar trigonal sector reaches into both hemispheres and gets two charts, the Laue one not
+  assert len(makeSphericalProjection(fundamentalSector(crystalFrame("3m")))) == 2
+  assert len(makeSphericalProjection(fundamentalSector(crystalFrame("-3m")))) == 1
   # a chart says what it is
   assert "earea" in repr(c) and "upper" in repr(c)
 
@@ -170,3 +178,24 @@ def test_P4_a_per_plot_convention_selects_a_drawable_sector():
   # a projection made from a frame carries its convention
   p = sphericalProjection(sphericalRegion(frame=specimenFrame.rolling))
   assert p.pC == specimenFrame.rolling.how2plot
+
+
+def test_the_axes_of_a_triclinic_chart_are_labelled_where_they_lie():
+  # albite: c is 1.18 degrees off z, so its label sits by the pole of z, not at the centre
+  cs = crystalFrame('-1', [8.290, 12.966, 7.151], np.array([91.18, 116.31, 90.14]) * degree, 'x||a*', 'y||b')
+  chart = makeSphericalProjection(stiffnessTensor(np.eye(6), cs).YoungsModulus(), complete=True, upper=True)[0]
+  labels = {s: v for v, s in chart.labels()}
+  c = vector3d(Miller(0, 0, 1, cs, 'uvw')).normalize()
+  assert np.allclose(chart.project(labels['[001]']), chart.project(c))
+  assert np.allclose(np.linalg.norm(labels['[001]'].data), 1) and np.hypot(*chart.project(c)) > 0.4
+
+
+def test_plotS2Grid_and_values_drawn_on_it():
+  import matplotlib
+  matplotlib.use("Agg")
+  from mtex import contourf, plotS2Grid
+  cs = crystalFrame("m-3m")
+  g = plotS2Grid("upper", cs, resolution=5 * degree)
+  assert g.ndim == 2 and g.frame is cs and np.nanmin(g.z) > -1e-9
+  hs = contourf(g, g.z)
+  assert len(hs) == 1 and hs[0] is not None

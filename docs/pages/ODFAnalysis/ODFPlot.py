@@ -31,7 +31,7 @@
 
 import numpy as np
 
-from mtex import (Miller, crystalFrame, degree, fibre, fibreODF, fundamentalRegionEuler, mtexColorMap, mtexColorbar, orientation, plot,
+from mtex import (Miller, crystalFrame, degree, fibre, fibreODF, fundamentalRegionEuler, mtexColorMap, mtexColorbar, orientation, plot, plot3d,
                   plotSection, plottingConvention, specimenFrame, unimodalODF, vector3d)
 
 plottingConvention.default('y↑→x')
@@ -52,9 +52,14 @@ odf = 0.1 * unimodalODF(mod1) + 0.2 * unimodalODF(mod2) + 0.7 * fibreODF(Miller(
 # ## Three-Dimensional Bunge Plot
 #
 # [plot3d](SO3Fun.plot3d.html) with `'Bunge'` uses the Euler angles
-# $(\varphi_1,\Phi,\varphi_2)$ as Cartesian plot coordinates. The isosurface plot of an ODF
-# is not ported yet, so this page shows only the sections and the fibre below.
-#
+# $(\varphi_1,\Phi,\varphi_2)$ as Cartesian plot coordinates.
+
+# +
+plot3d(odf, 'Bunge')
+mtexColorMap('LaboTeX')
+mtexColorbar(title='mrd')
+# -
+
 # The fibre forms extended tubes, while the localized components form compact blobs.
 # Several symmetry-equivalent appearances can lie in the rectangular Euler plotting box;
 # they are not additional components. Rotate this figure interactively to see features
@@ -70,7 +75,13 @@ odf = 0.1 * unimodalODF(mod1) + 0.2 * unimodalODF(mod2) + 0.7 * fibreODF(Miller(
 #
 # where $\mathbf{n}$ is the rotation axis and $\omega$ is the rotation angle of a
 # symmetry-reduced representative.
-#
+
+# +
+plot3d(odf, 'axisAngle')
+mtexColorMap('LaboTeX')
+mtexColorbar(title='mrd')
+# -
+
 # The same tube and blobs now occupy a compact, curved fundamental region. Radial
 # distance has the useful meaning of rotation angle, but apparent volume is still
 # distorted. Axis--angle coordinates are not an equal-volume map. They are often easier
@@ -204,7 +215,5 @@ projectedEuler
 
 # ## Technical Details
 #
-# The two three-dimensional plots, `plot3d(odf, 'Bunge')` and `plot3d(odf, 'axisAngle')`,
-# are the isosurface plot the port has not got yet; their sections stay as prose.
 # `fundamentalRegionEuler` returns the three bounds in radians, as MATLAB's three outputs
 # do, and `project2EulerFR` the three Euler angles.

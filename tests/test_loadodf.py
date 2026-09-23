@@ -34,3 +34,11 @@ def test_vpsc_blocks(tmp_path):
   fname.write_text(f"texture exported\n\n\nB 4\n{rows}\n")
   odf = SO3Fun.load(fname, cs, halfwidth=10 * degree)
   assert abs(mean(odf) - 1) < 1e-6 and odf.CS is cs
+  # a weight file has no strain and no ellipsoid, MATLAB's NaN
+  assert np.isnan(odf.opt.strain) and np.all(np.isnan(odf.opt.strainEllipsoid)) and odf.opt.orientations.size == 4
+  # a VPSC output block keeps its header and its further columns in opt
+  rows = "\n".join(f"{10 * k:7.2f} {20:7.2f} {30:7.2f} {0.25:11.7f} {0.3:9.6f} {2.5:9.6f}" for k in range(4))
+  fname.write_text(f"TEXTURE AT STRAIN =    0.2500\n   1.123   1.127   0.750  <-- axes\n -180.00   90.00 -180.00  <-- angles\nB 4\n{rows}\n")
+  odf = SO3Fun.load(fname, cs, halfwidth=10 * degree)
+  assert odf.opt.strain == 0.25 and np.allclose(odf.opt.strainEllipsoid, [1.123, 1.127, 0.75])
+  assert np.allclose(odf.opt.strainEllipsoidAngles, [-180, 90, -180]) and odf.opt.data.shape == (4, 2)

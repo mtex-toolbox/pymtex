@@ -24,6 +24,17 @@ def test_the_matplotlib_maps():
   assert mtexColormap("whitejet").name == "WhiteJet" and mtexColormap(cmap) is cmap
   assert mtexColormap("viridis").name == "viridis"
   assert mtexColorMap("blue2red").name == "blue2red"
+  # the preference defaultColorMap is the map when none is named, a colour matrix or a named map function as MATLAB passes it
+  from mtex import blue2redColorMap, getMTEXpref, setMTEXpref
+  old = getMTEXpref("defaultColorMap")
+  try:
+    assert mtexColormap().name == "WhiteJet" or old is not None
+    setMTEXpref("defaultColorMap", blue2redColorMap)
+    assert np.allclose(mtexColormap()(0.0)[:3], blue2redColorMap()[0])
+    setMTEXpref("defaultColorMap", blue2redColorMap())
+    assert np.allclose(mtexColormap()(1.0)[:3], blue2redColorMap()[-1])
+  finally:
+    setMTEXpref("defaultColorMap", old)
 
 
 def test_contour_levels():
@@ -31,3 +42,9 @@ def test_contour_levels():
   assert np.allclose(contourLevels(1, 100, 3, log=True), [1, 10, 100])
   lv = contourLevels(2, 2, 3)
   assert len(lv) == 3 and lv[-1] > lv[0]
+
+
+def test_vega20():
+  from mtex import vega20
+  C = vega20(24)
+  assert C.shape == (24, 3) and np.allclose(C[20], C[0]) and np.allclose(C[0], np.array([31, 119, 180]) / 255)

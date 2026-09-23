@@ -1,0 +1,982 @@
+# parent grain reconstruction (MATLAB @parentGrainReconstructor, Julia reconstruction.jl)
+#
+#   job = parentGrainReconstructor(ebsd, grains, p2c)
+#   job.calcParent2Child(); fit, pairs = job.calcGBFit()
+#   job.calcGBVotes(p2c=True, threshold=2*degree), job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree)
+#   job.calcParentFromVote(minProb=0.5)
+#   job.calcVariantGraph(), job.clusterVariantGraph(), job.calcGraph(), job.clusterGraph(),
+#   job.calcParentFromGraph(), job.mergeByGraph()                                    (variantgraph.py)
+#   job.mergeSimilar(threshold=7.5*degree), job.mergeInclusions(maxSize=50), job.revert(ind)
+#   job.calcVariants(), job.calcParentEBSD(), job.parentGrains, job.transformedGrains, job.packetId
+#
+# A child grain of mean orientation o has one parent candidate per variant, o * PV_k with PV
+# the parent variants of the relationship; the reconstruction picks one per grain so that
+# neighbouring grains agree. Two routes meet in job.votes: the votes of the boundaries and
+# of the triple points, and the clusters of the variant graph (arXiv:2201.02103). The votes
+# are MATLAB's table, the best numFit variants of every grain sorted with their accumulated
+# probability (or fit, or count), so that a threshold of a MATLAB script means the same here.
+# A job is the one handle of the port: a reconstruction is a sequence of steps over a state
+# that grows, each judged before the next is taken; the steps change the job and return
+# nothing.
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import numpy as np
+from scipy.special import erf
+
+from ..geometry.orientation import orientation
+from ..geometry.parent2child import calcParent, calcParent2Child, calcVariantId, round2Miller
+from ..geometry.quaternion import qmul
+from ..geometry.units import degree
+from .phaselist import phaseList
+
+
+def _conj(q):
+  return q * np.array([1.0, -1, -1, -1])
+
+
+def _ori(q, frameA, frameB):
+  return orientation._fromRotation(np.asarray(q, dtype=float).reshape(-1, 4), (frameA, frameB))
+
+
+# the probability that a misfit of that angle still means one parent: the cumulative
+# Gaussian around the threshold over the width of the tolerance
+def probabilityOf(fit, threshold, tolerance):
+  return 1 - 0.5 * (1 + erf(2 * (np.asarray(fit, dtype=float) - threshold) / tolerance))
+
+
+# MTEX's quantile, which shadows MATLAB's: the round(n q)-th of the n sorted values without
+# nan, no interpolation
+def _quantile(x, q):
+  x = np.sort(np.asarray(x, dtype=float).reshape(-1))
+  x = x[~np.isnan(x)]
+  return x[max(1, int(np.floor(len(x) * q + 0.5))) - 1] if len(x) else np.nan
+
+
+# a number as MATLAB's xnum2str writes it: the decimals by its size, trailing zeros dropped
+def _xnum(x):
+  if np.isnan(x):
+    return "NaN"
+  a = abs(x)
+  if a > 1e6 or (a <= 1e-4 and a > 0):
+    s = f"{x:.2g}"
+  elif a >= 10:
+    s = f"{x:.0f}"
+  else:
+    digits = 1 if a >= 1 else 2 if a > 0.1 else 3 if a > 0.01 else 4 if a > 0.001 else 5
+    s = f"{x:.{digits}f}".rstrip("0") if a > 0 else "0"
+  s = s.rstrip(".")
+  return "0" if s == "-0" else s
+
+
+class voteTable:
+  """MATLAB's table of votes: a row per grain, parentId the best variants of the grain and
+  prob, fit or count their value, sorted best first"""
+
+  def __init__(self, parentId, **value):
+    (kind, v), = value.items()
+    self.parentId = np.asarray(parentId)
+    self.kind = kind
+    setattr(self, kind, np.asarray(v, dtype=float))
+
+  @property
+  def value(self):
+    return getattr(self, self.kind)
+
+  def __len__(self):
+    return len(self.parentId)
+
+  def __repr__(self):
+    return f"voteTable ({len(self)} grains)\n  parentId: {self.parentId.shape}\n  {self.kind}: {self.value.shape}"
+
+
+# the votes of many (grain, variant, fit) rows turned into a table of n grains: each row is a
+# vote with its numFit best variants, the best first. The fits become probabilities, summed
+# per grain and variant and scaled by a high quantile of them and by the share of the grain;
+# with bestFit the best fit per variant is kept, with count the number of fits below the
+# threshold
+def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf,
+               weights=None, bestFit=False, count=False):
+  fit = np.asarray(fit, dtype=float).reshape(-1, numFit)
+  grainInd = np.asarray(grainInd, dtype=np.int64).reshape(-1, numFit)
+  parentId = np.asarray(parentId, dtype=np.int64).reshape(-1, numFit)
+  keep = fit[:, 0] < minFit
+  if numFit > 1:
+    keep &= fit[:, 1] > maxFit
+  fit, grainInd, parentId = fit[keep], grainInd[keep], parentId[keep]
+  threshold = min(2 * degree, minFit) if threshold is None else threshold
+  numV = int(parentId.max(initial=0))
+  g, v, f = grainInd.reshape(-1), parentId.reshape(-1) - 1, fit.reshape(-1)
+  if bestFit:
+    M = np.full((n, numV), np.inf)
+    np.minimum.at(M, (g, v), f)
+    M[np.isinf(M)] = np.nan
+    order = np.argsort(np.where(np.isnan(M), np.inf, M), axis=1, kind="stable")
+    return voteTable(order + 1, fit=np.take_along_axis(M, order, axis=1))
+  if count:
+    M = np.zeros((n, numV))
+    np.add.at(M, (g, v), f < threshold)
+    M[M.sum(axis=1) == 0] = np.nan
+  else:
+    tolerance = threshold if tolerance is None else tolerance
+    prob = probabilityOf(f, threshold, tolerance)
+    prob[prob < 1e-2] = 0
+    if weights is not None and np.size(weights) > 1:
+      prob = prob * np.asarray(weights, dtype=float).reshape(-1, numFit)[keep].reshape(-1)
+    M = np.zeros((n, numV))
+    np.add.at(M, (g, v), prob)
+    # the share of every variant in the grain's votes, scaled by how strong its votes are
+    with np.errstate(invalid="ignore", divide="ignore"):
+      M = _groupQuantile(g, v, prob, n, numV, 1 - 1 / (4 * numFit)) * M / M.sum(axis=1, keepdims=True) if numV else M
+  # descending, a row without votes first as MATLAB sorts nan
+  order = np.argsort(np.where(np.isnan(M), -np.inf, -M), axis=1, kind="stable")[:, :numFit]
+  value = np.take_along_axis(M, order, axis=1)
+  kind = "count" if count else "prob"
+  return voteTable(order + 1, **{kind: value})
+
+
+# the quantile of the values of every (grain, variant) cell, 0 where a cell has none
+def _groupQuantile(g, v, x, n, numV, q):
+  out = np.zeros((n, numV))
+  if len(x) == 0:
+    return out
+  key = g * numV + v
+  order = np.lexsort((x, key))
+  key, x = key[order], x[order]
+  starts = np.flatnonzero(np.r_[True, key[1:] != key[:-1]])
+  sizes = np.diff(np.r_[starts, len(key)])
+  pos = np.maximum(1, np.floor(sizes * q + 0.5).astype(np.int64))
+  out.reshape(-1)[key[starts]] = x[starts + pos - 1]
+  return out
+
+
+def majorityVote(id, votes, maxId=None, strict=False, weights=None):
+  """vote, numVotes = majorityVote(id, votes, maxId): the vote of every id from the votes cast
+  for it, a row per id up to maxId (position id - 1), NaN where it got none: the most frequent
+  one, the smallest of a tie; with strict only where all its votes agree; with weights the one
+  of the largest summed weight and numVotes its lead over the second"""
+  id = np.asarray(id, dtype=np.int64).reshape(-1)
+  votes = np.asarray(votes, dtype=float).reshape(-1)
+  maxId = int(id.max(initial=0)) if maxId is None else int(maxId)
+  vote = np.full(maxId, np.nan)
+  numVotes = np.zeros(maxId)
+  ok = np.isfinite(votes) & (id > 0)
+  id, votes = id[ok], votes[ok]
+  if weights is not None:
+    w = np.asarray(weights, dtype=float).reshape(-1)[ok]
+    from scipy.sparse import coo_matrix
+    W = coo_matrix((w, (id - 1, votes.astype(np.int64) - 1)), shape=(maxId, int(votes.max(initial=1)))).toarray()
+    best = np.argmax(W, axis=1)
+    top = W[np.arange(maxId), best]
+    W[np.arange(maxId), best] = 0
+    has = top > 0
+    vote[has] = best[has] + 1
+    numVotes = top / (1e-3 + W.max(axis=1, initial=0) + top)
+    return vote, numVotes
+  if strict:
+    order = np.argsort(id, kind="stable")
+    id, votes = id[order], votes[order]
+    starts = np.flatnonzero(np.r_[True, id[1:] != id[:-1]])
+    first = np.repeat(votes[starts], np.diff(np.r_[starts, len(id)]))
+    same = votes == first
+    equal = np.logical_and.reduceat(same, starts) if len(starts) else np.zeros(0, dtype=bool)
+    g = id[starts] - 1
+    vote[g[equal]] = votes[starts][equal]
+    numVotes[g[equal]] = np.add.reduceat(same.astype(float), starts)[equal]
+    return vote, numVotes
+  # the most frequent vote of every id, the smallest of a tie
+  pairs, counts = np.unique(np.stack([id, votes], axis=1), axis=0, return_counts=True)
+  order = np.lexsort((pairs[:, 1], -counts, pairs[:, 0]))
+  pairs, counts = pairs[order], counts[order]
+  starts = np.flatnonzero(np.r_[True, pairs[1:, 0] != pairs[:-1, 0]])
+  g = pairs[starts, 0].astype(np.int64) - 1
+  vote[g] = pairs[starts, 1]
+  numVotes[g] = counts[starts]
+  return vote, numVotes
+
+
+# the map with every pixel of a grain moved to the equivalent next to the grain's mean
+def _projectToGrains(ebsd, grains):
+  out = ebsd.copy()
+  gid = np.asarray(out.grainId).reshape(-1)
+  ph = out.phaseId.reshape(-1)
+  rot = out.rotations.data.reshape(-1, 4)
+  pos = grains._positions()
+  inside = (gid > 0) & (gid < len(pos))
+  gp = np.where(inside, pos[np.where(inside, gid, 0)], -1)
+  for p in out.CSList.indexedPhaseId:
+    sel = (gp >= 0) & (ph == p)
+    sel[sel] &= grains.phaseId[gp[sel]] == p
+    if sel.any():
+      o = _ori(rot[sel], out.CSList[int(p)], out.frame)
+      rot[sel] = o.project2FundamentalRegion(grains.meanRotation.data[gp[sel]]).data.reshape(-1, 4)
+  return out
+
+
+# a phase list with the frames appended that it does not hold yet
+def _withFrames(pl, frames):
+  missing = [f for f in frames if f is not None and not any(f is g for g in pl.frames)]
+  return pl if not missing else phaseList(list(pl.frames) + missing)
+
+
+def _registerGrains(grains, pl):
+  if grains.CSList is pl:
+    return grains
+  out = grains.copy()
+  object.__setattr__(out, "CSList", pl)
+  for name in ("boundary", "innerBoundary"):
+    gB = getattr(out, name)
+    if gB is not None:
+      object.__setattr__(out, name, gB._with(CSList=pl))
+  return out
+
+
+class parentGrainReconstructor:
+  """job = parentGrainReconstructor(ebsd, grains, p2c)
+
+  The state of a parent grain reconstruction: the map and the grains it starts from
+  (ebsdPrior, grainsPrior), the orientation relationship p2c, the grains after every step
+  taken so far (grains) and which of them every prior grain went into (mergeId, the id of
+  the current grain per prior grain). Without grains the map is segmented at 3 degrees;
+  without p2c the phases are guessed, the most frequent indexed one the child and the
+  rarest the parent, and job.p2c is set afterwards. The parent frame is added to the phase
+  lists of the job's copies when the map carries only the child. With
+  useBoundaryOrientations a pair of grains votes with the means of their pixels along the
+  boundary they share rather than with the grain means.
+  """
+
+  def __init__(self, ebsd, grains=None, p2c=None, useBoundaryOrientations=False, reportFit=True):
+    if grains is None:
+      from .calcgrains import calcGrains
+      ebsd = ebsd.copy()
+      grains = calcGrains(ebsd, threshold=3 * degree)
+    if "grainId" not in ebsd.prop:
+      raise ValueError("the map carries no grain id; reconstruct the grains with calcGrains(ebsd) first")
+    self.useBoundaryOrientations = useBoundaryOrientations
+    self.reportFit = reportFit
+    self.ebsdPrior = _projectToGrains(ebsd, grains)
+    self.grainsPrior = grains.copy()
+    self.grains = grains.copy()
+    self.mergeId = grains.id.astype(np.int64).copy()
+    self.votes = None
+    self.graph = None
+    self._p2c = None
+    self._variantMap = None
+    # the most frequent indexed phase is the child, the rarest the parent
+    ph = ebsd.phaseId[~ebsd.isPadding].reshape(-1)
+    idx = ebsd.CSList.indexedPhaseId
+    counts = np.bincount(ph, minlength=len(ebsd.CSList))[idx]
+    self._csChild = ebsd.CSList[int(idx[np.argmax(counts)])] if len(idx) else None
+    self._csParent = ebsd.CSList[int(idx[np.argmin(counts)])] if len(idx) > 1 else None
+    if p2c is not None:
+      self.p2c = p2c
+
+  # ------------------------------------------------------------------ the relationship and the phases
+
+  @property
+  def p2c(self):
+    return self._p2c
+
+  @p2c.setter
+  def p2c(self, p2c):
+    self._p2c = p2c
+    self._variantMap = None
+    self._register(p2c.frameA, p2c.frameB)
+
+  # the frames added to the phase lists of the map and of both grain sets
+  def _register(self, *frames):
+    pl = _withFrames(self.ebsdPrior.CSList, frames)
+    if pl is not self.ebsdPrior.CSList:
+      self.ebsdPrior.CSList = pl
+    self.grainsPrior = _registerGrains(self.grainsPrior, _withFrames(self.grainsPrior.CSList, frames))
+    self.grains = _registerGrains(self.grains, _withFrames(self.grains.CSList, frames))
+
+  @property
+  def csParent(self):
+    return self._p2c.frameA if self._p2c is not None else self._csParent
+
+  @csParent.setter
+  def csParent(self, cs):
+    self._csParent = cs
+    self._register(cs)
+
+  @property
+  def csChild(self):
+    return self._p2c.frameB if self._p2c is not None else self._csChild
+
+  @csChild.setter
+  def csChild(self, cs):
+    self._csChild = cs
+    self._register(cs)
+
+  @property
+  def parentPhaseId(self):
+    return self.grains.CSList.phaseId(self.csParent)
+
+  @property
+  def childPhaseId(self):
+    return self.grains.CSList.phaseId(self.csChild)
+
+  # the order the variants are numbered in, kept across a refit of the relationship
+  @property
+  def variantMap(self):
+    n = self.p2c.variants().size
+    return np.arange(1, n + 1) if self._variantMap is None or len(self._variantMap) != n else self._variantMap
+
+  @variantMap.setter
+  def variantMap(self, vMap):
+    self._variantMap = np.asarray(vMap, dtype=np.int64)
+
+  # variant ids of the unmapped list as the ids of the mapped one
+  def _mapVariants(self, vId):
+    vm = self.variantMap
+    back = np.zeros(len(vm) + 1)
+    back[vm] = np.arange(1, len(vm) + 1)
+    vId = np.asarray(vId, dtype=float)
+    ok = np.isfinite(vId)
+    out = np.full(vId.shape, np.nan)
+    out[ok] = back[vId[ok].astype(np.int64)]
+    return out
+
+  # the child to child misorientations of the relationship, the identity included
+  @property
+  def c2c(self):
+    V = self.p2c.variants().data.reshape(-1, 4)
+    return _ori(qmul(self.p2c.data.reshape(1, 4), _conj(V)), self.csChild, self.csChild)
+
+  # ------------------------------------------------------------------ the state
+
+  def _pos(self, ids):
+    return self.grains._positions()[np.asarray(ids, dtype=np.int64)]
+
+  @property
+  def numChilds(self):
+    return np.bincount(self._pos(self.mergeId), minlength=self.grains.size)
+
+  @property
+  def isMerged(self):
+    return self.numChilds[self._pos(self.mergeId)] > 1
+
+  @property
+  def isTransformed(self):
+    return (self.grainsPrior.phaseId == self.childPhaseId) & (self.grains.phaseId[self._pos(self.mergeId)] == self.parentPhaseId)
+
+  @property
+  def isChild(self):
+    return self.grains.phaseId == self.childPhaseId
+
+  @property
+  def isParent(self):
+    return self.grains.phaseId == self.parentPhaseId
+
+  @property
+  def parentGrains(self):
+    return self.grains[self.isParent]
+
+  @property
+  def childGrains(self):
+    return self.grains[self.isChild]
+
+  @property
+  def transformedGrains(self):
+    return self.grainsPrior[self.isTransformed]
+
+  @property
+  def ebsd(self):
+    return self.calcParentEBSD()
+
+  @property
+  def parentEBSD(self):
+    return self.ebsd[self.csParent]
+
+  def _priorProp(self, name):
+    p = self.grainsPrior.prop.get(name)
+    return np.full(self.grainsPrior.size, np.nan) if p is None else p
+
+  @property
+  def variantId(self):
+    return self._priorProp("variantId")
+
+  @property
+  def packetId(self):
+    return self._priorProp("packetId")
+
+  @property
+  def bainId(self):
+    return self._priorProp("bainId")
+
+  # the parent variant every transformed prior grain was reconstructed with
+  @property
+  def parentId(self):
+    out = np.full(self.grainsPrior.size, np.nan)
+    tr = np.flatnonzero(self.isTransformed)
+    if len(tr):
+      ids, _ = calcParent(self._meanOri(self.grainsPrior, tr, self.csChild),
+                          self._meanOri(self.grains, self._pos(self.mergeId[tr]), self.csParent), self.p2c, id=True)
+      out[tr] = ids
+    return out
+
+  @property
+  def hasVariantGraph(self):
+    return self.graph is not None and self.graph.shape[0] > 1.5 * self.grains.size
+
+  @property
+  def hasGraph(self):
+    return self.graph is not None and self.graph.shape[0] < 1.5 * self.grains.size
+
+  def _meanOri(self, g, idx, frame):
+    return _ori(g.meanRotation.data.reshape(-1, 4)[np.asarray(idx, dtype=np.int64)], frame, g.frame)
+
+  # the parent variants of the relationship as quaternions
+  def _PV(self):
+    return self.p2c.variants(parent=True).data.reshape(-1, 4)
+
+  # the grains after a change of mean orientations and phases, the boundary phases updated
+  def _setGrains(self, idx, q, phase):
+    g = self.grains.copy()
+    object.__setattr__(g, "meanRotation", g.meanRotation._new(g.meanRotation.data.copy()))
+    object.__setattr__(g, "phaseId", g.phaseId.copy())
+    g.meanRotation.data.reshape(-1, 4)[idx] = q
+    g.phaseId[idx] = phase
+    self.grains = g.update()
+
+  # ------------------------------------------------------------------ the pairs of grains
+
+  # the neighbouring grains of the kinds c2c, p2c (the parent first) or p2p, with the
+  # orientations they vote with: their means, or the means of their pixels along the
+  # boundary they share; minDelta drops pairs of orientations too close to tell a parent
+  def _pairs(self, kind, minDelta=None):
+    g = self.grains
+    P, C = self.parentPhaseId, self.childPhaseId
+    pairs = g.neighbors()
+    pos = g._positions()
+    a, b = pos[pairs[:, 0]], pos[pairs[:, 1]]
+    pa, pb = g.phaseId[a], g.phaseId[b]
+    if kind == "c2c":
+      keep, frames = (pa == C) & (pb == C), (self.csChild, self.csChild)
+    elif kind == "p2p":
+      keep, frames = (pa == P) & (pb == P), (self.csParent, self.csParent)
+    else:
+      keep, frames = ((pa == P) & (pb == C)) | ((pa == C) & (pb == P)), (self.csParent, self.csChild)
+      flip = keep & (pa == C)
+      pairs[flip] = pairs[flip][:, ::-1]
+    pairs = pairs[keep]
+    a, b = pos[pairs[:, 0]], pos[pairs[:, 1]]
+    q1 = g.meanRotation.data.reshape(-1, 4)[a]
+    q2 = g.meanRotation.data.reshape(-1, 4)[b]
+    if self.useBoundaryOrientations and len(pairs):
+      q1, q2 = self._boundaryMeans(pairs, q1, q2)
+    o1, o2 = _ori(q1, frames[0], g.frame), _ori(q2, frames[1], g.frame)
+    if minDelta is not None and kind != "p2c" and len(pairs):
+      far = np.asarray(o1.angle(o2)).reshape(-1) >= minDelta
+      pairs, o1, o2 = pairs[far], o1[far], o2[far]
+    return pairs, o1, o2
+
+  # the row of every boundary segment in a list of grain pairs, -1 where it is none of them
+  def _segmentRows(self, pairs, gid):
+    M = int(max(gid.max(initial=0), pairs.max(initial=0))) + 1
+    key = np.minimum(pairs[:, 0], pairs[:, 1]) * M + np.maximum(pairs[:, 0], pairs[:, 1])
+    order = np.argsort(key)
+    skey = np.minimum(gid[:, 0], gid[:, 1]).astype(np.int64) * M + np.maximum(gid[:, 0], gid[:, 1])
+    at = np.minimum(np.searchsorted(key[order], skey), len(key) - 1)
+    return np.where(key[order][at] == skey, order[at], -1)
+
+  # the mean of the pixels of each side along the boundary of every pair, each pixel moved
+  # next to the mean of its grain first; a child pixel of a grain that is a parent now
+  # counts with the parent it gives nearest that mean
+  def _boundaryMeans(self, pairs, q1, q2):
+    g, e = self.grains, self.ebsdPrior
+    gB = g.boundary
+    row = self._segmentRows(pairs, gB.grainId)
+    ids = np.asarray(e.id).reshape(-1)
+    idOrder = np.argsort(ids)
+    rot = e.rotations.data.reshape(-1, 4)
+    ph = e.phaseId.reshape(-1)
+    pos = g._positions()
+    acc = np.zeros((len(pairs), 2, 4))
+    for col in (0, 1):
+      seg = np.flatnonzero((row >= 0) & (gB.ebsdId[:, col] >= 0))
+      r = row[seg]
+      grain = gB.grainId[seg, col]
+      side = np.where(grain == pairs[r, 0], 0, 1)
+      pix = idOrder[np.searchsorted(ids[idOrder], gB.ebsdId[seg, col])]
+      ref = np.where(side[:, None] == 0, q1[r], q2[r])
+      gph = g.phaseId[pos[grain]]
+      q = rot[pix].copy()
+      ok = ph[pix] == gph
+      conv = (ph[pix] == self.childPhaseId) & (gph == self.parentPhaseId)
+      if conv.any():
+        q[conv] = self._parentOf(q[conv], ref[conv])[0]
+        ok |= conv
+      for p in np.unique(gph[ok]):
+        s = ok & (gph == p)
+        q[s] = _ori(q[s], g.CSList[int(p)], g.frame).project2FundamentalRegion(ref[s]).data.reshape(-1, 4)
+      q = np.where(np.sum(q * ref, axis=1, keepdims=True) < 0, -q, q)
+      np.add.at(acc, (r[ok], side[ok]), q[ok])
+    out = [q1.copy(), q2.copy()]
+    for side in (0, 1):
+      n = np.linalg.norm(acc[:, side], axis=1)
+      out[side][n > 0] = acc[n > 0, side] / n[n > 0, None]
+    return out[0], out[1]
+
+  # the parent a child orientation gives nearest a reference parent, with the variant and
+  # its misfit
+  def _parentOf(self, childQ, parentQ):
+    child = _ori(childQ, self.csChild, self.grains.frame)
+    ids, fit = calcParent(child, _ori(parentQ, self.csParent, self.grains.frame), self.p2c, id=True)
+    return qmul(np.asarray(childQ).reshape(-1, 4), self._PV()[ids - 1]), ids, fit
+
+  # ------------------------------------------------------------------ the fit of the relationship
+
+  def calcGBFit(self, p2c=False, c2c=False):
+    """fit, pairs = job.calcGBFit(): the misfit of every parent to child and child to child
+    boundary to the relationship, and the ids of the grains on either side; p2c or c2c
+    takes one kind alone"""
+    noOpt = not (p2c or c2c)
+    fits, pairs = [], []
+    if noOpt or p2c:
+      pr, oP, oC = self._pairs("p2c")
+      if len(pr):
+        fits.append(np.asarray((oC.inv() * oP).angle(self.p2c)).reshape(-1))
+        pairs.append(pr)
+    if noOpt or c2c:
+      pr, o1, o2 = self._pairs("c2c")
+      if len(pr):
+        mori = o1.inv() * o2
+        fits.append(np.min(mori.reshape(-1, 1).angle(self.c2c.reshape(1, -1)), axis=1))
+        pairs.append(pr)
+    if not fits:
+      return np.zeros(0), np.zeros((0, 2), dtype=np.int64)
+    return np.concatenate(fits), np.concatenate(pairs)
+
+  def calcParent2Child(self, p2c0=None, p2c=False, c2c=False, threshold=None, quantile=None, noP2C=False, **fitOptions):
+    """job.calcParent2Child(): the relationship refined on the boundaries of the map.
+
+    Where the parent phase covers more than one percent of the map, the misorientations of
+    the parent to child boundaries within threshold (5 degrees) and the quantile (0.5) of
+    the current guess are averaged, three times; where the guess is more than 5 degrees
+    from the identity, the child to child misorientations above 5 degrees are fitted by
+    calcParent2Child of the geometry, and both are combined weighted by their counts.
+    p2c or c2c takes one kind alone; the variants keep their numbers through job.variantMap.
+    """
+    noOpt = not (p2c or c2c)
+    guess = p2c0 if p2c0 is not None else self.p2c
+    thr = 5 * degree if threshold is None else threshold
+    quant = 0.5 if quantile is None else quantile
+    p2cData, nP2C = None, 0
+    ph = self.ebsdPrior.phaseId.reshape(-1)
+    if np.count_nonzero(ph == self.parentPhaseId) > 0.01 * ph.size and (noOpt or p2c):
+      pr, oP, oC = self._pairs_means("p2c")
+      mori = oC.inv() * oP
+      for _ in range(3):
+        omega = np.asarray(mori.angle(guess)).reshape(-1)
+        ind = omega < min(thr, _quantile(omega, quant))
+        guess = mori[ind].mean()
+      p2cData, nP2C = guess, len(pr)
+    if (noOpt and guess.angle(noSymmetry=False) > 5 * degree) or c2c:
+      pr, o1, o2 = self._pairs("c2c")
+      mori = (o1.inv() * o2).flatten()
+      mori = mori[np.asarray(mori.angle()).reshape(-1) >= 5 * degree]
+      start = p2c0 if p2c0 is not None else self.p2c
+      kw = dict(fitOptions)
+      if threshold is not None:
+        kw["threshold"] = threshold
+      if quantile is not None:
+        kw["quantile"] = quantile
+      new = calcParent2Child(mori, start, **kw)
+      if p2cData is not None and not noP2C:
+        both = _ori(np.stack([new.data.reshape(4), p2cData.data.reshape(4)]), new.frameA, new.frameB)
+        new = both.mean(weights=[len(pr), nP2C])
+    else:
+      new = guess
+    old = self.p2c
+    self._p2c = new.reshape(()) if new.size == 1 else new
+    self._variantMap = None
+    if old is not None:
+      Vn, Vo = new.variants(), old.variants()
+      if Vn.size == Vo.size:
+        # the child variants compared up to the child symmetry alone
+        a = _ori(Vn.data, new.frameA.stripSym(), new.frameB).reshape(-1, 1)
+        b = _ori(Vo.data, new.frameA.stripSym(), new.frameB).reshape(1, -1)
+        self._variantMap = np.argmin(a.angle(b), axis=1) + 1
+
+  # the pairs with the grain means, whatever useBoundaryOrientations says
+  def _pairs_means(self, kind):
+    keep = self.useBoundaryOrientations
+    self.useBoundaryOrientations = False
+    try:
+      return self._pairs(kind)
+    finally:
+      self.useBoundaryOrientations = keep
+
+  # ------------------------------------------------------------------ the votes
+
+  def calcGBVotes(self, ind=None, p2c=False, c2c=False, reconsiderAll=False, numFit=2, threshold=None, tolerance=None,
+                  minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False, curvatureFactor=None):
+    """job.calcGBVotes(): the votes the grain boundaries cast into job.votes.
+
+    Every pair of neighbouring child grains votes for the numFit variant pairs that let both
+    come from one parent, every child next to a parent for the numFit variants that fit it;
+    a vote is the probability that its misfit still means one parent, 1 below threshold -
+    tolerance/2, 0 above threshold + tolerance/2 (threshold 2 degrees, tolerance the
+    threshold). p2c or c2c takes one kind alone. With reconsiderAll every prior child grain
+    votes afresh from its measured orientation for the variant that fits its parent
+    neighbours, which is the growth step of a reconstruction; a grain with a child
+    neighbour stays undecided then, and curvatureFactor weighs a boundary by its curvature.
+    ind restricts reconsiderAll to prior grains of those positions and returns the table.
+    """
+    opts = dict(threshold=threshold, tolerance=tolerance, minFit=minFit, maxFit=maxFit, bestFit=bestFit, count=count)
+    if reconsiderAll:
+      votes = self._reconsiderVotes(ind, curvatureFactor, opts)
+      if ind is not None:
+        return votes
+      self.votes = votes
+      return None
+    noOpt = not (p2c or c2c)
+    g = self.grains
+    pos = g._positions()
+    rows, vids, fits = [], [], []
+    if len(self.parentGrains) and (noOpt or p2c):
+      pr, oP, oC = self._pairs("p2c")
+      if len(pr):
+        ids, fit = calcParent(oC, oP, self.p2c, numFit=numFit, id=True)
+        rows.append(np.repeat(pos[pr[:, 1]][:, None], numFit, axis=1).reshape(-1, numFit))
+        vids.append(np.asarray(ids).reshape(-1, numFit))
+        fits.append(np.asarray(fit).reshape(-1, numFit))
+    if noOpt or c2c:
+      pr, o1, o2 = self._pairs("c2c", minDelta=2 * degree)
+      if len(pr):
+        both = _ori(np.stack([o1.data.reshape(-1, 4), o2.data.reshape(-1, 4)], axis=1).reshape(-1, 4), self.csChild, g.frame).reshape(-1, 2)
+        ids, fit = calcParent(both, self.p2c, numFit=numFit, id=True)
+        ids = np.asarray(ids).reshape(-1, numFit, 2)
+        fit = np.asarray(fit).reshape(-1, numFit)
+        for side in (0, 1):
+          rows.append(np.repeat(pos[pr[:, side]][:, None], numFit, axis=1))
+          vids.append(ids[:, :, side])
+          fits.append(fit)
+    if rows:
+      grain, vid, fit = np.concatenate(rows), np.concatenate(vids), np.concatenate(fits)
+    else:
+      grain = vid = np.zeros((0, numFit), dtype=np.int64)
+      fit = np.zeros((0, numFit))
+    self.votes = accumVotes(grain, vid, fit, g.size, numFit=numFit, **opts)
+
+  # every prior child grain against its parent neighbours, every variant of its measured
+  # orientation one column of the vote
+  def _reconsiderVotes(self, ind, curvatureFactor, opts):
+    g = self.grains
+    P, C = self.parentPhaseId, self.childPhaseId
+    pos = g._positions()
+    sel = np.flatnonzero(self.grainsPrior.phaseId == C) if ind is None else np.asarray(ind, dtype=np.int64).reshape(-1)
+    PV = self._PV()
+    numV = len(PV)
+    pairs = g.neighbors(full=True)
+    both = np.concatenate([pairs, pairs[:, ::-1]])
+    cur = self.mergeId[sel]
+    hit = np.isin(both[:, 0], cur)
+    both = both[hit]
+    rowOf = {int(c): k for k, c in enumerate(cur)}
+    r = np.array([rowOf[int(c)] for c in both[:, 0]], dtype=np.int64)
+    nb = pos[both[:, 1]]
+    isP = g.phaseId[nb] == P
+    fit = np.full((len(both), numV), np.nan)
+    if isP.any():
+      child = self.grainsPrior.meanRotation.data.reshape(-1, 4)[sel[r[isP]]]
+      cand = qmul(child[:, None, :], PV[None, :, :])
+      oP = _ori(g.meanRotation.data.reshape(-1, 4)[nb[isP]], self.csParent, g.frame)
+      oV = _ori(cand.reshape(-1, 4), self.csParent, g.frame).reshape(-1, numV)
+      fit[isP] = np.asarray(oV.angle(oP.reshape(-1, 1))).reshape(-1, numV)
+    w = None
+    if curvatureFactor is not None and len(both):
+      w = np.repeat(self._boundaryWeights(both, curvatureFactor)[:, None], numV, axis=1)
+    # the grain a row votes for is its place in the whole list of grains
+    grain = np.repeat(sel[r][:, None], numV, axis=1) if ind is None else np.repeat(r[:, None], numV, axis=1)
+    n = self.grains.size if ind is None else len(sel)
+    vid = np.repeat(np.arange(1, numV + 1)[None, :], len(both), axis=0)
+    return accumVotes(grain, vid, fit, n, numFit=numV, weights=w, **opts)
+
+  # the weight of a boundary by its curvature: 1 plus the upper quartile of the capped and
+  # normalised curvature of its segments
+  def _boundaryWeights(self, pairs, factor):
+    gB = self.grains.boundary
+    kappa = np.abs(np.asarray(gB.curvature(), dtype=float))
+    kappa = np.minimum(kappa, _quantile(kappa, 0.9))
+    kappa = factor * kappa / np.nanmax(kappa)
+    row = self._segmentRows(pairs, gB.grainId)
+    out = np.ones(len(pairs))
+    for k in np.unique(row[row >= 0]):
+      out[k] = 1 + _quantile(kappa[row == k], 0.75)
+    return np.nan_to_num(out, nan=1.0)
+
+  def calcTPVotes(self, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False):
+    """job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree): the votes the triple points of
+    three child grains cast, each corner for the variant of the parent that fits all three;
+    minFit asks the best fit of a triple point to be below it, maxFit the second best above"""
+    g = self.grains
+    tP = g.triplePoints
+    C = self.childPhaseId
+    sel = np.all(tP.phaseId == C, axis=1)
+    gid = tP.grainId[sel]
+    pos = g._positions()
+    n = len(gid)
+    if n:
+      ori = _ori(g.meanRotation.data.reshape(-1, 4)[pos[gid.reshape(-1)]], self.csChild, g.frame).reshape(n, 3)
+      ids, fit = calcParent(ori, self.p2c, numFit=numFit, threshold=5 * degree if threshold is None else threshold, id=True)
+      ids = np.asarray(ids).reshape(n, numFit, 3).transpose(0, 2, 1).reshape(-1, numFit)
+      fit = np.repeat(np.asarray(fit).reshape(n, 1, numFit), 3, axis=1).reshape(-1, numFit)
+      grain = np.repeat(pos[gid].reshape(-1, 1), numFit, axis=1)
+    else:
+      ids = grain = np.zeros((0, numFit), dtype=np.int64)
+      fit = np.zeros((0, numFit))
+    self.votes = accumVotes(grain, ids, fit, g.size, numFit=numFit, threshold=threshold, tolerance=tolerance, minFit=minFit,
+                            maxFit=maxFit, bestFit=bestFit, count=count)
+
+  def calcParentFromVote(self, minProb=0, minDelta=None, minFit=5 * degree, minAlpha=None, minCount=0, maxCount=None):
+    """job.calcParentFromVote(minProb=0.5): every grain whose leading vote is strong enough
+    takes the parent orientation of that variant and the parent phase: for probabilities
+    above minProb and ahead of the second by minDelta, for fits below minFit and behind the
+    second by minDelta, for counts at least minCount with the second below maxCount"""
+    v = self.votes
+    if v is None:
+      raise ValueError("compute the votes first, with calcGBVotes, calcTPVotes or clusterVariantGraph")
+    val = v.value
+    second = val[:, 1] if val.shape[1] > 1 else np.full(len(val), np.nan)
+    with np.errstate(invalid="ignore"):
+      if v.kind == "fit":
+        do = val[:, 0] < minFit
+        if minDelta is not None:
+          do &= second - val[:, 0] > minDelta
+        if minAlpha is not None:
+          do &= val[:, 0] > minAlpha * second
+      elif v.kind == "prob":
+        do = (v.parentId[:, 0] > 0) & (val[:, 0] > minProb)
+        if minDelta is not None:
+          do &= val[:, 0] - second > minDelta
+      else:
+        do = val[:, 0] >= minCount
+        if maxCount is not None:
+          do &= second < maxCount
+    idx = np.flatnonzero(do)
+    if len(idx) == 0:
+      return
+    # a grain that is a parent already is reconstructed again from its measured orientation
+    src = self.grainsPrior if self.isParent[idx].any() else self.grains
+    child = src.meanRotation.data.reshape(-1, 4)[idx]
+    q = qmul(child, self._PV()[v.parentId[idx, 0] - 1])
+    self._setGrains(idx, q, self.parentPhaseId)
+    val[idx] = np.nan
+
+  # ------------------------------------------------------------------ merging and reverting
+
+  # the prior grains follow the grains they went into
+  def _followMerge(self, merged):
+    parent = self.grains.parentId
+    self.mergeId = parent[self._pos(self.mergeId)].astype(np.int64)
+    self.grains = merged.update()
+    self.votes = None
+    self.graph = None
+
+  def mergeSimilar(self, threshold=5 * degree):
+    """job.mergeSimilar(threshold=7.5*degree): neighbouring grains of one phase whose mean
+    orientations are within the threshold become one; job.grains.clusterSize counts the
+    prior grains in each"""
+    self._followMerge(self.grains.merge(threshold=threshold))
+    self.grains.clusterSize = np.bincount(self._pos(self.mergeId), minlength=self.grains.size)
+
+  def mergeInclusions(self, maxSize=np.inf):
+    """job.mergeInclusions(maxSize=50): the child and parent grains lying inside a parent
+    grain, below maxSize pixels, become part of it, with its orientation"""
+    self._followMerge(self.grains.merge(inclusions=self.isChild | self.isParent, host=self.isParent, maxSize=maxSize))
+
+  def revert(self, ind=None):
+    """job.revert(), job.revert(ind): the grains named (a mask or positions into job.grains,
+    or grains) given back the phase and the orientation of their prior grains; a grain
+    merged of several comes apart into them, the others stay merged"""
+    self.votes = None
+    self.graph = None
+    g = self.grains
+    if ind is None:
+      do = np.ones(g.size, dtype=bool)
+    elif hasattr(ind, "numPixel"):
+      do = np.zeros(g.size, dtype=bool)
+      do[self._pos(ind.id)] = True
+    else:
+      ind = np.asarray(ind)
+      do = ind.astype(bool) if ind.dtype == bool else np.isin(np.arange(g.size), ind)
+    doPrior = do[self._pos(self.mergeId)]
+    prior = self.grainsPrior
+    if not doPrior.any():
+      return
+    if doPrior.all():
+      self.grains = prior.copy()
+      self.mergeId = prior.id.astype(np.int64).copy()
+      return
+    at = self._pos(self.mergeId)
+    if np.bincount(at[doPrior]).max() == 1:
+      self._setGrains(at[doPrior], prior.meanRotation.data.reshape(-1, 4)[doPrior], prior.phaseId[doPrior])
+      return
+    # the reverted prior grains stand alone, the others are merged again as they were
+    labels = self.mergeId.copy()
+    labels[doPrior] = labels.max() + 1 + np.arange(np.count_nonzero(doPrior))
+    merged = prior.merge(labels)
+    parent = prior.parentId
+    q = merged.meanRotation.data.reshape(-1, 4).copy()
+    ph = merged.phaseId.copy()
+    npos = merged._positions()[parent]
+    q[npos[doPrior]] = prior.meanRotation.data.reshape(-1, 4)[doPrior]
+    ph[npos[doPrior]] = prior.phaseId[doPrior]
+    q[npos[~doPrior]] = g.meanRotation.data.reshape(-1, 4)[at[~doPrior]]
+    ph[npos[~doPrior]] = g.phaseId[at[~doPrior]]
+    object.__setattr__(merged, "meanRotation", merged.meanRotation._new(q))
+    object.__setattr__(merged, "phaseId", ph)
+    self.grains = merged.update()
+    self.mergeId = parent.astype(np.int64)
+
+  # ------------------------------------------------------------------ the results
+
+  def calcParentEBSD(self, exactOR=False):
+    """parentEBSD = job.calcParentEBSD(): the map with the grain ids of the current grains
+    and every child pixel of a grain that is a parent now given the parent orientation of
+    its grain, its variant and packet id, and fit, its misfit to the variant; with exactOR
+    every pixel carries the parent its own orientation gives"""
+    ebsd = self.ebsdPrior.copy()
+    gid = np.asarray(ebsd.grainId).reshape(-1).copy()
+    ph = ebsd.phaseId.reshape(-1)
+    ppos = self.grainsPrior._positions()
+    inside = (gid > 0) & (gid < len(ppos))
+    inside[inside] &= ppos[gid[inside]] >= 0
+    gid[inside] = self.mergeId[ppos[gid[inside]]]
+    ebsd.grainId = gid.reshape(ebsd.shape)
+    cur = np.full(gid.shape, -1, dtype=np.int64)
+    cur[inside] = self._pos(gid[inside])
+    now = inside & (ph == self.childPhaseId)
+    now[now] &= self.grains.phaseId[cur[now]] == self.parentPhaseId
+    if not now.any():
+      return ebsd
+    rot = ebsd.rotations.data.reshape(-1, 4)
+    child = rot[now]
+    pm = self.grains.meanRotation.data.reshape(-1, 4)[cur[now]]
+    if exactOR:
+      pm = self._parentOf(child, pm)[0]
+    fr = self.grains.frame
+    vId, pId, _, fit = calcVariantId(_ori(pm, self.csParent, fr), _ori(child, self.csChild, fr), self.p2c)
+    V = self.p2c.variants().data.reshape(-1, 4)
+    pfr = _ori(pm, self.csParent, fr).project2FundamentalRegion().data.reshape(-1, 4)
+    q = qmul(qmul(pfr, _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    fit = np.asarray(fit, dtype=float)
+    vId = self._mapVariants(vId)
+    pId = np.asarray(pId, dtype=float)
+    vId[np.isnan(fit)] = np.nan
+    pId[np.isnan(fit)] = np.nan
+    for name, val in (("variantId", vId), ("packetId", pId), ("fit", fit)):
+      full = np.full(gid.shape, np.nan)
+      full[now] = val
+      setattr(ebsd, name, full.reshape(ebsd.shape))
+    rot[now] = q
+    ph[now] = self.parentPhaseId
+    return ebsd
+
+  def calcVariants(self, **options):
+    """job.calcVariants(): the variant, packet and Bain id of every transformed prior grain
+    against the parent it went into, as job.variantId, job.packetId, job.bainId; the parent
+    grains take the representative of the last of their children"""
+    tr = np.flatnonzero(self.isTransformed)
+    if len(tr) == 0:
+      return
+    child = self._meanOri(self.grainsPrior, tr, self.csChild)
+    at = self._pos(self.mergeId[tr])
+    parent = self._meanOri(self.grains, at, self.csParent)
+    vId, pId, bId, _ = calcVariantId(parent, child, self.p2c, **options)
+    for name, val in (("variantId", self._mapVariants(vId)), ("packetId", pId), ("bainId", bId)):
+      full = np.array(self._priorProp(name), dtype=float)
+      full[tr] = val
+      setattr(self.grainsPrior, name, full)
+    V = self.p2c.variants().data.reshape(-1, 4)
+    q = qmul(qmul(parent.project2FundamentalRegion().data.reshape(-1, 4), _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    self._setGrains(at, q, self.parentPhaseId)
+
+  def parent2ChildInfo(self):
+    """OR = job.parent2ChildInfo(): the relationship with its closest rational parallel
+    planes and directions, their deviations, its axis in both crystals and the angles and
+    axes of the variants, printed and returned"""
+    if self.p2c is None:
+      raise ValueError("no p2c defined; set job.p2c or run job.calcParent2Child()")
+    p2c = self.p2c
+    n1, n2, d1, d2 = round2Miller(p2c, maxIndex=8)
+    rational = orientation.map(n1, n2, d1, d2)
+    V = p2c.variants()
+    c2c = _ori(qmul(V.data.reshape(-1, 4), _conj(V.data.reshape(-1, 4)[:1])), self.csChild, self.csChild)
+    OR = SimpleNamespace(p2c=p2c, p2cRational=rational, plane=SimpleNamespace(parent=n1, child=n2),
+                         direction=SimpleNamespace(parent=d1, child=d2),
+                         devAngle=SimpleNamespace(plane=float(np.min(np.asarray((p2c * n1.symmetrise()).angle(n2)))),
+                                                  direction=float(np.min(np.asarray((p2c * d1.symmetrise()).angle(d2))))),
+                         variants=SimpleNamespace(orientation=V, c2c=c2c, angle=np.asarray(c2c.angle()).reshape(-1)))
+    print(" -> OR info:")
+    print(f"    - OR misorientation angle = {float(p2c.angle()) / degree:.4g}°")
+    print(" -> Parallel planes")
+    print(f"    - Closest parent plane = {n1.char()}")
+    print(f"    - Closest child plane = {n2.char()}")
+    print(f"    - Ang. dev. from parallel plane relationship from OR = {OR.devAngle.plane / degree:.4g}°")
+    print(" -> Parallel directions")
+    print(f"    - Closest parent direction = {d1.char()}")
+    print(f"    - Closest child direction = {d2.char()}")
+    print(f"    - Ang. dev. from parallel directions relationship from OR = {OR.devAngle.direction / degree:.4g}°")
+    print(" -> Angle of unique variants")
+    vm = self.variantMap
+    for j in range(V.size):
+      print(f"    - {j + 1}: {OR.variants.angle[vm[j] - 1] / degree:.2f}°")
+    return OR
+
+  # ------------------------------------------------------------------ display
+
+  def __repr__(self):
+    g = self.grains
+    lines = ["parentGrainReconstructor", ""]
+    gs = g.numPixel.astype(float)
+    total = max(gs.sum(), 1)
+    rows = [("phase", "mineral", "symmetry", "grains", "area", "reconstructed")]
+    if self.csParent is not None:
+      P = self.parentPhaseId if self.csParent in g.CSList else None
+      nP = 0 if P is None else int(np.count_nonzero(g.phaseId == P))
+      area = 0 if P is None else 100 * gs[g.phaseId == P].sum() / total
+      priorC = np.count_nonzero(self.grainsPrior.phaseId == self.childPhaseId) if self.csChild is not None else 0
+      rec = 100 * np.count_nonzero(self.isTransformed) / priorC if priorC and P is not None else 0
+      rows.append(("parent", self.csParent.mineral, self.csParent.pointGroup, str(nP), f"{_xnum(area)}%", f"{_xnum(rec)}%"))
+    if self.csChild is not None:
+      C = self.childPhaseId
+      rows.append(("child", self.csChild.mineral, self.csChild.pointGroup, str(int(np.count_nonzero(g.phaseId == C))),
+                   f"{_xnum(100 * gs[g.phaseId == C].sum() / total)}%", ""))
+    widths = [max(len(r[j]) for r in rows) for j in range(6)]
+    lines += ["  " + "  ".join(x.ljust(w) for x, w in zip(r, widths)) for r in rows]
+    if self.p2c is not None and self.reportFit:
+      lines += ["", f" OR: {self.p2c.char()}"]
+      for kind in ("p2c", "c2c"):
+        fit = self.calcGBFit(**{kind: True})[0] / degree
+        if len(fit):
+          qs = ", ".join(f"{_xnum(_quantile(fit, q))}°" for q in (0.2, 0.4, 0.6, 0.8))
+          lines.append(f"   {kind} fit: {qs} (quintiles)")
+      # the nearest relationship of low indices, when this one is not rational itself
+      n1, n2, d1, d2 = round2Miller(self.p2c, maxIndex=5)
+      ideal = orientation.map(n1, n2, d1, d2)
+      dev = float(ideal.angle(self.p2c)) / degree
+      if dev > 1e-3:
+        lines.append(f"   closest ideal OR: {ideal.char()} fit: {_xnum(dev)}°")
+    if self.hasGraph:
+      mId = g.merge(self.graph, testRun=True)
+      n = np.bincount(mId)[1:]
+      lines += ["", f" graph: {int(n[n > 1].sum())} grains in {int(np.count_nonzero(n > 1))} clusters + "
+                    f"{int(np.count_nonzero(n == 1))} single grain clusters"]
+    elif self.hasVariantGraph:
+      lines += ["", f" variant graph: {self.graph.nnz} entries"]
+    if self.votes is not None:
+      val = self.votes.value[:, 0]
+      val = val[~np.isnan(val)]
+      if len(val):
+        scale, name, unit = {"fit": (1 / degree, "fit", "°"), "prob": (100, "probabilities", "%"), "count": (1, "counts", "")}[self.votes.kind]
+        qs = ", ".join(f"{_xnum(_quantile(val * scale, q))}{unit}" for q in (0.8, 0.6, 0.4, 0.2))
+        lines += ["", f" votes: {len(val)} × 1", f"   {name}: {qs} (quintiles)"]
+    return "\n".join(lines)
+
+
+__all__ = ["parentGrainReconstructor", "voteTable", "majorityVote"]

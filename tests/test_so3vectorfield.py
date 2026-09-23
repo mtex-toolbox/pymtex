@@ -197,6 +197,12 @@ def test_V4_quadrature_interpolation_and_the_handle():
     assert np.linalg.norm(gh(o).data - grad(f, o, "right").data) < 1e-5 * np.linalg.norm(grad(f, o, "right").data)
 
 
+def test_V4b_quadrature_cuts_a_polynomial_field_to_its_degree():
+  cs = crystalFrame("222")
+  F = SO3VectorFieldHarmonic.quadrature(lambda o: SO3TangentVector(vector3d(np.ones((o.size, 3))), o), cs)
+  assert F.bandwidth <= 1 and np.allclose(F(orientation.rand(3, cs, rng=rng)).data, 1, atol=1e-8)
+
+
 def test_V5_the_pointwise_algebra():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   f = randomField(6, cs, ss) + 3
@@ -217,7 +223,10 @@ def test_V5_the_pointwise_algebra():
   assert np.allclose(n(os), np.linalg.norm(g(os).data, axis=-1), rtol=5e-2)
   u = g.normalize()
   assert np.allclose(np.linalg.norm(u(os).data, axis=-1), 1, rtol=1e-1)
-  assert np.allclose(u(os).data, g(os).data / np.linalg.norm(g(os).data, axis=-1, keepdims=True), rtol=1e-1, atol=1e-2)
+  # the direction is singular where the gradient vanishes: compare where it is not small
+  G = g(os).data
+  big = np.linalg.norm(G, axis=-1) > 0.5 * np.mean(np.linalg.norm(G, axis=-1))
+  assert np.allclose(u(os).data[big], (G / np.linalg.norm(G, axis=-1, keepdims=True))[big], rtol=1e-1, atol=1e-2)
   assert np.allclose((2 * g - g + h)(os[0]).data, (g + h)(os[0]).data)
   assert np.isclose(norm(g / 2), norm(g) / 2)
 

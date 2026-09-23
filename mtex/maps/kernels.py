@@ -605,33 +605,35 @@ def _linearProgram(A, b, c, tol, maxit, x):
   return 0
 
 
-# the dislocation fit of every pixel: the systems rotated into the specimen, the curvature
-# of each system on the known components as the columns of the program, both signs of every
-# system, the line energies as the cost
-def _gndLoop(rot, indexed, kappa, known, b0, l0, u, tol, maxit, gnd, rho):
-  n = rot.shape[0]
-  ns = b0.shape[0]
+# the dislocation fit of every pixel: the systems in the frame of the curvature, one set for
+# all pixels or one per pixel, the curvature of each system on the known components as the
+# columns of the program, both signs of every system, the line energies as the cost; a pixel
+# with an unknown curvature or systems is left NaN
+def _gndLoop(kappa, known, b, l, u, tol, maxit, gnd, rho):
+  n = kappa.shape[0]
+  ns = b.shape[1]
   m = known.shape[0]
   for k in prange(n):
     gnd[k] = np.nan
     for j in range(ns):
       rho[k, j] = np.nan
-    if not indexed[k]:
-      continue
+    kb = np.int64(k) if b.shape[0] > 1 else np.int64(0)
     ok = True
     for r in range(m):
       if np.isnan(kappa[k, known[r]]):
         ok = False
+    for j in range(ns):
+      if np.isnan(b[kb, j, 0]) or np.isnan(l[kb, j, 0]):
+        ok = False
     if not ok:
       continue
-    q0, q1, q2, q3 = rot[k, 0], rot[k, 1], rot[k, 2], rot[k, 3]
     A = np.empty((m, 2 * ns))
     bvec = np.empty(m)
     for r in range(m):
       bvec[r] = kappa[k, known[r]]
     for j in range(ns):
-      bx, by, bz = _qrot(q0, q1, q2, q3, b0[j, 0], b0[j, 1], b0[j, 2])
-      lx, ly, lz = _qrot(q0, q1, q2, q3, l0[j, 0], l0[j, 1], l0[j, 2])
+      bx, by, bz = b[kb, j, 0], b[kb, j, 1], b[kb, j, 2]
+      lx, ly, lz = l[kb, j, 0], l[kb, j, 1], l[kb, j, 2]
       half = (bx * lx + by * ly + bz * lz) / 2
       for r in range(m):
         idx = known[r]
@@ -643,24 +645,16 @@ def _gndLoop(rot, indexed, kappa, known, b0, l0, u, tol, maxit, gnd, rho):
         A[r, ns + j] = -val
     cvec = np.empty(2 * ns)
     for j in range(ns):
-      cvec[j] = u[j]
-      cvec[ns + j] = u[j]
+      cvec[j] = u[kb, j]
+      cvec[ns + j] = u[kb, j]
     x = np.empty(2 * ns)
     if _linearProgram(A, bvec, cvec, tol, maxit, x) != 0:
       continue
     total = 0.0
     for j in range(ns):
       rho[k, j] = x[j] - x[ns + j]
-      total += abs(rho[k, j]) * u[j]
+      total += abs(rho[k, j]) * u[kb, j]
     gnd[k] = total
-
-
-# a vector turned by a unit quaternion
-def _qrot(q0, q1, q2, q3, x, y, z):
-  tx = 2 * (q2 * z - q3 * y)
-  ty = 2 * (q3 * x - q1 * z)
-  tz = 2 * (q1 * y - q2 * x)
-  return (x + q0 * tx + (q2 * tz - q3 * ty), y + q0 * ty + (q3 * tx - q1 * tz), z + q0 * tz + (q1 * ty - q2 * tx))
 
 
 
@@ -949,7 +943,7 @@ def _expLoop(ref, v, out):
 
 # ------------------------------------------------------------------ the compilation of these
 
-_PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram", "_qrot")
+_PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
 

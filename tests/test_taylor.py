@@ -56,8 +56,8 @@ def test_X3_the_Taylor_model():
   # the cube orientation of an fcc crystal in tension has the Taylor factor 2.45
   assert np.isclose(M, 2.449, atol=5e-3) and np.count_nonzero(b > 1e-9) <= 5
   # the shears reproduce the strain they were computed for, the spin is antisymmetric
-  D = np.einsum("k,kij->ij", b, m.systems.SchmidTensor())
-  assert np.allclose(D, eps.M, atol=1e-8) and isinstance(W, spinTensor) and W.isSkewSymmetric
+  D = np.einsum("k,kij->ij", b, m.systems.SchmidTensor().M)
+  assert np.allclose((D + D.T) / 2, eps.M, atol=1e-8) and isinstance(W, spinTensor) and W.isSkewSymmetric
   assert np.isclose(calcTaylor(eps, m).M, M) and np.isclose(calcTaylor(eps, sS, plasticWork=True).M, M)
   assert np.isclose(calcTaylor(eps, sS, "plasticWork").M, M)
   # the minimum norm selection keeps the factor, reduces the shears and makes the spin unique
@@ -127,3 +127,26 @@ def test_the_harmonic_Taylor_fields():
   assert np.allclose(np.real(MF(turned)), np.real(MF(os))) and np.allclose(WF(turned).data, WF(os).data)
   # a page value: the factor of the (0, 30, 15) orientation of the fcc crystal
   assert abs(np.real(MF(orientation.byEuler(0, 30 * degree, 15 * degree, cs, ss))) - 2.52) < 0.15
+
+
+def test_the_compiled_solve_against_the_simplex():
+  pytest.importorskip("numba")
+  from mtex import setMTEXpref
+  cs = crystalFrame("432")
+  sS = slipSystem.bcc(cs).symmetrise()
+  eps = strainTensor(np.diag([1.0, 0.0, -1.0]))
+  os = orientation.rand(40, cs, rng=rng)
+  for selection in ("basic", "minimumNorm"):
+    fast = calcTaylor(inv(os) * eps, sS, spinSelection=selection)
+    setMTEXpref("kernels", "numpy")
+    try:
+      slow = calcTaylor(inv(os) * eps, sS, spinSelection=selection)
+    finally:
+      setMTEXpref("kernels", "numba")
+    assert np.allclose(fast.M, slow.M, atol=1e-10) and np.allclose(fast.W.M, slow.W.M, atol=1e-7)
+  # the degenerate vertex on which the active set of the compiled form cycles at the tolerance
+  E = np.array([[-0.98720962, 0.12760682, -0.02018955], [0.12760682, 0.62712738, 0.48429689],
+                [-0.02018955, 0.48429689, 0.36008224]])
+  E -= np.trace(E) / 3 * np.eye(3)
+  single = calcTaylor(strainTensor(np.stack([E, E]), cs), sS, spinSelection="minimumNorm")
+  assert np.isclose(single.M[0], 2.17502016, atol=1e-6)

@@ -55,3 +55,18 @@ def test_the_spectral_transmission():
   assert len(channels) == 3 and channels[0].antipodal and channels[0].frame is OLIVINE
   assert np.allclose([np.real(c(v)) for c in channels], direct, atol=2e-2)
   assert np.allclose([np.real(c(v)) for c in rI.spectralTransmission(30000, tau=15 * degree)], direct, atol=2e-2)
+
+
+def test_a_list_of_tensors_pairs_with_the_directions():
+  from mtex import orientation
+  rI = refractiveIndexTensor(np.diag([1.670, 1.635, 1.651]), OLIVINE)
+  ori = orientation(rotation.rand(6, rng=rng), OLIVINE)
+  # rotating the tensor into the specimen or the directions into the crystal is the same
+  byTensor = (ori * rI).spectralTransmission(zvector, 22800, polarizationDirection=xvector)
+  byDirection = rI.spectralTransmission(ori.inv() * zvector, 22800, polarizationDirection=ori.inv() * xvector)
+  assert byTensor.shape == (6, 3) and np.allclose(byTensor, byDirection, atol=1e-10)
+  dn, fast, _ = birefringence(ori * rI, zvector)
+  assert dn.shape == (6,) and fast.shape == (6,) and np.allclose(dn, birefringence(rI, ori.inv() * zvector)[0])
+  # the optical axes show their coordinates
+  assert opticalAxis(rI).dispStyle == "xyz"
+

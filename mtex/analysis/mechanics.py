@@ -78,11 +78,11 @@ def maxStrain(eps):
 
 # ------------------------------------------------------------------ the Schmid tensor
 
-# the Schmid tensor b (x) n of a slip plane normal and a slip direction, in their frame; of a
-# slip system its symmetric part, one per system; SchmidTensor(n, b) is the class constructor
+# the Schmid tensor b (x) n of a slip plane normal and a slip direction, in their frame, one per
+# slip system; SchmidTensor(n, b) is the class constructor
 def _schmidTensor(n, b=None):
   if isinstance(n, slipSystem):
-    return n.SchmidTensor(), n.frame if n.frame is not None else specimenFrame.default
+    return n._dyads(), n.frame if n.frame is not None else specimenFrame.default
   fr = _frameOf(n) if b is None or not isinstance(b, vector3d) or b.frame is None else b.frame
   nn, bb = _unit(n), _unit(b)
   return bb[..., :, None] * nn[..., None, :], fr
@@ -99,11 +99,14 @@ def SchmidFactor(sS, sigma=None, relative=False):
   """the Schmid factor of slip systems under a stress tensor: the shear the stress resolves
   on the system over the difference of the extreme principal stresses, so that a uniaxial
   tension gives the direction cosines; without a load the functions of the tension
-  direction on the sphere, one per system"""
+  direction on the sphere, one function for one system and a vector valued one for several,
+  antipodal as a tension along r and along -r are one load"""
   if sigma is None:
     from ..functions.s2fun import S2FunHarmonic
     fr = sS.frame.stripSym() if sS.frame is not None else None
-    return [S2FunHarmonic(lambda v, k=k: sS[k].SchmidFactor(vector3d(v.data)), fr, bandwidth=2, real=True) for k in range(len(sS))]
+    one = len(sS) == 1
+    return S2FunHarmonic(lambda v: (lambda m: m[:, 0] if one else m)(sS.SchmidFactor(vector3d(v.data.reshape(-1, 3))).reshape(-1, len(sS))),
+                         fr, bandwidth=2, real=True, antipodal=True)
   if isinstance(sigma, vector3d):
     return sS.SchmidFactor(sigma, relative=relative)
   if not isinstance(sigma, stressTensor):
@@ -111,13 +114,18 @@ def SchmidFactor(sS, sigma=None, relative=False):
   lam = sigma.eigvals()
   spread = lam[..., -1] - lam[..., 0]
   P = SchmidTensor(sS).M
+  # one stress on every system, a list of stresses on a list of systems as a (stresses,
+  # systems) matrix, or systems and stresses of one shape entry by entry
   if sigma.ndim == 0:
-    m = np.einsum("kij,ij->k", P, sigma.M) / spread
-  else:
+    m = np.einsum("...ij,ij->...", P, sigma.M) / spread
+  elif P.ndim == 3:
     m = np.einsum("kij,...ij->...k", P, sigma.M) / spread[..., None]
+  else:
+    m = np.einsum("...ij,...ij->...", P, sigma.M) / spread
   if relative:
     m = m / sS.CRSS
-  return m
+  # one system under one load is one number
+  return float(np.ravel(m)[0]) if np.size(m) == 1 and sigma.ndim == 0 else m
 
 
 # ------------------------------------------------------------------ deformation and its rate
@@ -214,12 +222,13 @@ def dislocationDensity(kappa):
   M = np.swapaxes(K, -1, -2).copy()
   for i in range(3):
     M[..., i, i] = -sum(K[..., j, j] for j in range(3) if j != i)
-  return dislocationDensityTensor(M, kappa.frame)
+  return dislocationDensityTensor(M, kappa.frame, unit=kappa.unit)
 
 
 def curvature(alpha):
   A = alpha.M
-  return curvatureTensor(np.swapaxes(A, -1, -2) - 0.5 * np.trace(A, axis1=-2, axis2=-1)[..., None, None] * np.eye(3), alpha.frame)
+  return curvatureTensor(np.swapaxes(A, -1, -2) - 0.5 * np.trace(A, axis1=-2, axis2=-1)[..., None, None] * np.eye(3), alpha.frame,
+                         unit=alpha.unit)
 
 
 # ------------------------------------------------------------------ installation

@@ -151,6 +151,11 @@ class polygonSet:
     return out
 
   # the positions of the outlines a point lies in
+  # the position of the outline holding each point, -1 for a point in none
+  def findByLocation(self, xy):
+    hit = self.checkInside(xy)
+    return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
+
   def inpolygon(self, xy):
     return np.flatnonzero(self.checkInside(xy).any(axis=0))
 

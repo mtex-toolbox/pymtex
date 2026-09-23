@@ -682,8 +682,14 @@ class S2DirichletKernel(S2Kernel):
 class S2BumpKernel(S2Kernel):
   _label = "bump"
 
-  def __init__(self, delta=10 * degree, *, halfwidth=None):
+  def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
     self.delta = float(delta if halfwidth is None else halfwidth)
+    self._L = None if bandwidth is None else int(bandwidth)
+
+  # the degree the expansion is cut at, given or by MATLAB's rule
+  @cached_property
+  def bandwidth(self):
+    return self._cutoffBandwidth() if self._L is None else self._L
 
   # the cap of radius delta scaled to a density, A_n = (P_{n-1}(c) - P_{n+1}(c)) / (1 - c)
   def _rule(self, L):

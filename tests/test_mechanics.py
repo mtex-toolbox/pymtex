@@ -40,7 +40,7 @@ def test_T7_the_Schmid_tensor_and_factor():
   P = SchmidTensor(Miller(1, 1, 1, cs), Miller(1, -1, 0, cs, "uvw"))
   assert isinstance(P, SchmidTensor) and P.frame is cs and np.allclose(P.M, np.outer([1, -1, 0], [1, 1, 1]) / np.sqrt(6))
   Ps = SchmidTensor(sS)
-  assert Ps.shape == (1,) and Ps.isSymmetric
+  assert Ps.shape == (1,) and np.allclose(Ps.M[0], sS.SchmidTensor().M)
   # the stress route reproduces the direction cosines, free of the scale and with the sign
   m = sS.SchmidFactor(r)
   sigma = stressTensor.uniaxial(r)
@@ -55,8 +55,11 @@ def test_T7_the_Schmid_tensor_and_factor():
   assert np.allclose(tau, SF) and np.isclose(abs(tau[active]), np.max(np.abs(tau)))
   # the function of the tension direction is exact, a polynomial of degree two
   F = sS.SchmidFactor()
-  assert len(F) == 1 and F[0].bandwidth == 2 and np.isclose(np.real(F[0](r)), m, atol=1e-10)
-  assert F[0].frame.numSym() == 1
+  assert F.shape == () and F.bandwidth == 2 and np.isclose(np.real(F(r)), m, atol=1e-10)
+  assert F.frame.numSym() == 1
+  # several systems give one vector valued function
+  Fall = sSall.SchmidFactor()
+  assert Fall.shape == (len(sSall),) and np.allclose(np.real(Fall(r)).ravel(), sSall.SchmidFactor(r), atol=1e-10)
   # the system turned into the specimen and the stress turned into the crystal agree
   o = orientation.byEuler(20 * degree, 35 * degree, 10 * degree, cs)
   sz = stressTensor.uniaxial(zvector)

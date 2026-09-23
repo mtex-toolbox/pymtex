@@ -50,6 +50,8 @@ def test_F3d_S2FunHarmonic():
   q = quadratureS2Grid(6)
   assert S2FunHarmonic.quadrature(vector3d(q.nodes(), frame=cs), g(q.nodes()), bandwidth=6, weights=q.weights).isclose(g, 1e-6)
   assert S2FunHarmonic.quadrature(q, g(q.nodes()), cs, bandwidth=6).isclose(g, 1e-6)
+  # a grid is a list of directions and brings its bandwidth, as in MATLAB
+  assert S2FunHarmonic.quadrature(q, g(q), cs).bandwidth == 6 and S2FunHarmonic.quadrature(q, g(q), cs).isclose(g, 1e-6)
   # the algebra and the moments by quadrature
   f2 = S2FunHarmonic(randomCoefficients(25))
   ns, w = q.nodes(), q.weights
@@ -61,3 +63,24 @@ def test_F3d_S2FunHarmonic():
   assert abs(dot(f, f2) - np.sum(qd.weights * np.conj(f(qd.nodes())) * f2(qd.nodes())) / (4 * np.pi)) < 1e-6 * abs(dot(f, f2))
   assert np.allclose(f2.conj()(ns), np.conj(f2(ns)))
   assert "S2FunHarmonic" in repr(g)
+
+
+def test_a_list_of_functions_is_one_container():
+  from mtex import cat
+  basis = S2FunHarmonic(np.eye(9))
+  v = vector3d.rand(5, rng=np.random.default_rng(2))
+  assert basis.shape == (9,) and basis.bandwidth == 2 and basis.eval(v).shape == (5, 9)
+  # each function is the one its row selects
+  assert np.allclose(basis[4].eval(v), S2FunHarmonic(np.eye(9)[4]).eval(v))
+  B = basis.reshape(3, -1)
+  assert B.shape == (3, 3) and B.T.shape == (3, 3) and np.allclose(B.T[0, 1].fhat, B[1, 0].fhat)
+  # moments per function, sums and means along an axis are functions
+  assert np.allclose(basis.norm(), 1 / np.sqrt(4 * np.pi)) and basis.mean().shape == (9,)
+  assert np.allclose(B.sum(axis=1).eval(v), B.eval(v).sum(axis=-1))
+  assert np.allclose(B.mean(axis=0).eval(v), B.eval(v).mean(axis=-2))
+  # a callable with several components, and joining lists
+  f = S2FunHarmonic(lambda w: np.stack([w.x, w.y, w.z], axis=-1), bandwidth=4)
+  assert f.shape == (3,) and np.allclose(f.eval(v), v.data.reshape(-1, 3), atol=1e-10)
+  assert cat(f, basis[:2]).shape == (5,)
+  # a scalar times a function stays a function
+  assert np.allclose((np.float64(2) * basis[0]).fhat, 2 * basis[0].fhat)

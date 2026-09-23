@@ -4,9 +4,9 @@
 import numpy as np
 import pytest
 
-from mtex import (EinsteinSum, Kelvin, Voigt, checkSymmetry, colon, complianceTensor, crystalFrame, degree, directionalMagnitude,
+from mtex import (EinsteinSum, Kelvin, Voigt, cat, checkSymmetry, colon, complianceTensor, crystalFrame, degree, directionalMagnitude,
                   dyad, eig, inv, mean, orientation, rotate, rotation, specimenFrame, stiffnessTensor, strainTensor, stressTensor,
-                  symmetrise, tensor, trace, transformReferenceFrame, vector3d, xvector, zvector)
+                  symmetrise, tensor, times, trace, transformReferenceFrame, vector3d, xvector, zvector)
 
 rng = np.random.default_rng(20)
 CUBIC = np.array([[231.0, 134, 134, 0, 0, 0], [134, 231, 134, 0, 0, 0], [134, 134, 231, 0, 0, 0], [0, 0, 0, 116, 0, 0],
@@ -173,3 +173,51 @@ def test_T9_factories():
   s = stressTensor.uniaxial(zvector)
   assert isinstance(s, stressTensor) and np.allclose(s.M, np.diag([0, 0, 1.0]))
   assert np.allclose(stressTensor.uniaxial(vector3d(1, 1, 0), 2).M, np.array([[1, 1, 0], [1, 1, 0], [0, 0, 0]]))
+
+
+def test_T10_display_componentwise_product_and_vectors():
+  # a single tensor shows its coefficients at every rank, the specimen frame by its convention
+  t0 = repr(tensor(5, rank=0))
+  assert "rank: 0 ()" in t0 and t0.rstrip().endswith("5")
+  assert repr(tensor([1, 2, 3], rank=1)).split()[-3:] == ["1", "2", "3"]
+  d = tensor(np.array([[0, 0, 0, 0.1, 0, 0]] * 3), rank=3, doubleConvention=True, name="piezo")
+  assert "doubleConvention: true" in repr(d) and "compact matrix form" in repr(d) and "name: piezo" in repr(d)
+  # MATLAB's .* multiplies corresponding coefficients and keeps the rank
+  A, B = tensor.rand(3, rank=2, rng=rng), tensor.rand(3, rank=2, rng=rng)
+  assert times(A, B).rank == 2 and np.allclose(times(A, B).M, A.M * B.M)
+  with pytest.raises(ValueError):
+    times(A, tensor([1, 2, 3], rank=1))
+  # a rank one tensor and a vector convert into each other
+  v = vector3d(tensor(xvector))
+  assert isinstance(v, vector3d) and np.allclose(v.data, [1, 0, 0])
+  # Hooke's law gives a stress without the density or the unit of the stiffness, as MATLAB's
+  C = stiffnessTensor(CUBIC, density=3.3)
+  sigma = C * strainTensor(np.diag([1.0, 0, -1]))
+  assert sigma.density is None and sigma.unit is None
+  assert colon(C.inv(), sigma).unit is None
+
+
+def test_the_inverse_inverts_the_unit():
+  # MATLAB's tensor/inv: GPa to 1 / GPa and back, a compliance in 1/GPa by default
+  C = stiffnessTensor(np.eye(6) * 100 + np.ones((6, 6)), crystalFrame("m-3m"))
+  assert C.unit == "GPa" and C.inv().unit == "1 / GPa" and C.inv().inv().unit == "GPa"
+  assert complianceTensor(np.eye(6)).unit == "1/GPa" and complianceTensor(np.eye(6)).inv().unit == "GPa"
+  assert tensor(np.eye(3), unit="m/s").inv().unit == "s / m"
+
+
+def test_a_weighted_list_mean_gives_MATLABs_three_outputs():
+  # the list keeps one density per tensor, and the Reuss mean is the inverse of the mean inverse
+  A = stiffnessTensor(np.eye(6) * 100 + np.ones((6, 6)), density=3.0)
+  B = stiffnessTensor(np.eye(6) * 200 + 2 * np.ones((6, 6)), density=4.0)
+  L = cat(A, B)
+  assert np.allclose(L.density, [3, 4]) and cat(A, A).density == 3.0
+  V, R, H = mean(L, 'all', weights=[0.25, 0.75])
+  assert np.allclose(Voigt(V), 0.25 * Voigt(A) + 0.75 * Voigt(B))
+  assert np.allclose(Voigt(R.inv()), 0.25 * Voigt(A.inv()) + 0.75 * Voigt(B.inv()))
+  assert np.allclose(H.M, (V.M + R.M) / 2) and np.isclose(V.density, 3.75) and np.isclose(H.density, 3.75)
+  assert np.allclose(mean(L, 'Hill', weights=[0.25, 0.75]).M, H.M)
+
+
+def test_the_display_rounds_the_density():
+  # MATLAB's five digits
+  assert "density: 3.3449" in repr(stiffnessTensor(np.eye(6), density=3.3448528380995057))

@@ -1,6 +1,6 @@
 # Documentation pages
 
-Snapshot: 2026-09-22. One row per content script one chapter below `../frameSymmetry/doc`,
+Snapshot: 2026-09-23. One row per content script one chapter below `../frameSymmetry/doc`,
 ordered by chapter; the chapter navigation scripts are site work. A page is checked once its
 Python cells execute and its numbers and figures match the MATLAB run of the same script
 through the bridge; the findings go to `docs/findings.md`. The last column is the status the
@@ -17,23 +17,23 @@ does not exist; **Pending** not started.
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | EBSD3Analysis | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
 | EBSDAnalysis | 25 | 13 | 1 | 4 | 3 | 4 | 0 |
-| Elasticity | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| Elasticity | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | GeneralConcepts | 12 | 0 | 0 | 0 | 0 | 0 | 12 |
-| GrainBoundaries | 15 | 0 | 0 | 0 | 0 | 0 | 15 |
+| GrainBoundaries | 15 | 12 | 0 | 3 | 0 | 0 | 0 |
 | Grains | 15 | 11 | 1 | 1 | 0 | 0 | 2 |
-| Misorientations | 6 | 0 | 0 | 0 | 0 | 0 | 6 |
-| ODFAnalysis | 18 | 15 | 0 | 3 | 0 | 0 | 0 |
-| PhaseTransitions | 11 | 0 | 0 | 0 | 0 | 0 | 11 |
-| Plasticity | 14 | 0 | 0 | 0 | 0 | 0 | 14 |
+| Misorientations | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| ODFAnalysis | 18 | 18 | 0 | 0 | 0 | 0 | 0 |
+| PhaseTransitions | 11 | 11 | 0 | 0 | 0 | 0 | 0 |
+| Plasticity | 14 | 14 | 0 | 0 | 0 | 0 | 0 |
 | Plotting | 11 | 0 | 0 | 0 | 0 | 0 | 11 |
 | PoleFigureAnalysis | 11 | 11 | 0 | 0 | 0 | 0 | 0 |
 | Rotations | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | SO3Functions | 13 | 0 | 0 | 0 | 0 | 0 | 13 |
-| SphericalFunctions | 16 | 0 | 0 | 0 | 0 | 0 | 16 |
-| Tensors | 8 | 0 | 0 | 0 | 0 | 0 | 8 |
+| SphericalFunctions | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
+| Tensors | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | Tutorials | 5 | 0 | 0 | 0 | 0 | 0 | 5 |
-| Vectors | 7 | 5 | 0 | 2 | 0 | 0 | 0 |
-| **All** | 229 | 88 | 2 | 10 | 4 | 4 | 121 |
+| Vectors | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
+| **All** | 229 | 148 | 2 | 8 | 4 | 4 | 63 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|
@@ -62,7 +62,7 @@ does not exist; **Pending** not started.
 | CrystalOrientations/OrientationSymmetry | OrientationSymmetry | Checked 2026-09-22; the three equivalent lists, 12, [12, 6] and both angle columns to the digit as MATLAB's; the complete pole figure as MATLAB's but for the Z at the chart centre; wrote `ori * cs` and `ss * ori`; found `complete` never reaching the pole figure chart, the specimen group missing from the poles and the sample budget ignoring it, all fixed; `symmetrise` gives 24 for cubic where MATLAB gives 48 and 24 | Checked |
 | CrystalOrientations/OrientationVisualization3d | OrientationVisualization3d | Checked 2026-09-22; the four figures as MATLAB's; the port's markers are filled where MATLAB draws hollow circles | Checked |
 | CrystalOrientations/OrientationVisualizationSections | OrientationVisualizationSections | Checked 2026-09-22; the phi2, sigma and axis angle sections as MATLAB's; found the largest angle of a region sampled (61.6 for 62.8 degrees), now exact at a vertex in Rodrigues space, so the sections sit at 5.233 to 57.566 degrees and are labelled as MATLAB's | Checked |
-| CrystalOrientations/SpecimenSymmetry | SpecimenSymmetry | Checked 2026-09-22; 8, 4, 1, 2, the frames and both pole figures with their ranges 6.9 and 3.4 as MATLAB's; the texture indices 27.89 and 7.27 have no MATLAB value, its NFFT MEX failing to load | Checked |
+| CrystalOrientations/SpecimenSymmetry | SpecimenSymmetry | Checked 2026-09-22; 8, 4, 1, 2, the frames and both pole figures with their ranges 6.9 and 3.4 as MATLAB's; the texture indices 27.8852 and 7.2683 as MATLAB's after a restart of the bridge, its NFFT MEX failing to load in the first run | Checked |
 | EBSD3Analysis/Grains3D |  | Pending | Blocked |
 | EBSD3Analysis/Grains3DOperations |  | Pending | Blocked |
 | EBSD3Analysis/Grains3DProperties |  | Pending | Blocked |
@@ -92,10 +92,10 @@ does not exist; **Pending** not started.
 | EBSDAnalysis/EBSDSimulation |  | Blocked: `simulateEBSD` and its verbs are M10 | Checked |
 | EBSDAnalysis/EBSDSpatialTransform |  | Blocked: the spatial transforms, affine and projective with their fits, are M10 | Adapted |
 | EBSDAnalysis/EBSDTrueEbsd |  | Blocked: the TrueEBSD registration and the staged distortion models are not ported, as in Julia | Blocked |
-| Elasticity/AnisotropicTheory |  | Pending | Checked |
-| Elasticity/CPOSeismicProperties |  | Pending | Checked |
-| Elasticity/IsotropicTheory |  | Pending | Checked |
-| Elasticity/WaveVelocities |  | Pending | Checked |
+| Elasticity/AnisotropicTheory | AnisotropicTheory | Checked 2026-09-23; σ, the recovered ε, 1178.27 three ways, 286.9284, 0.0018, [0.1515 0.3383] and G 77 as MATLAB's, four figures; found a product by Hooke's law carrying the stiffness's unit, fixed; the moduli are handles where MATLAB expands them to bandwidths 250, 16 and 2 | Checked |
+| Elasticity/CPOSeismicProperties | CPOSeismicProperties | Checked 2026-09-23; the phase fractions 81.3, 13.9, 4.8 percent and CHillOdf to every digit (density 3.3449), the map and three `plotSeismicVelocities` figures with all 18 anisotropies as MATLAB's; wrote `rot * ebsd`, `cat` of tensors keeping a density each, `mean(list, 'all', weights=w)`; found `text` after `nextAxis` in a held figure writing into every panel, fixed | Checked |
+| Elasticity/IsotropicTheory | IsotropicTheory | Checked 2026-09-23; the Voigt, Reuss and Hill tensors, G 41.4333, K 63.0889, E 101.9759, ν 0.2306 and the Hashin-Shtrikman table 60.326/57.107 and 36.7537/32.8495 as MATLAB's, two figures; wrote `cprintf`, `mean(C, odf, 'all')`, the unit of an inverse (GPa to 1/GPa); found the triclinic chart labelling [001] at its centre, fixed | Checked |
+| Elasticity/WaveVelocities | WaveVelocities | Checked 2026-09-23; the speeds, polarisations, `vpXYZ`, the isotropic 8.4147 and 4.8690, `Ve`, 10.7498, the `|Ve|` table, T and its eigen pairs as MATLAB's, five figures; 9.7739 and AVp 24.3398 exact for MATLAB's grid-based 9.7735 and 24.3329; wrote `velocity(C, 'harmonic')`, `velocity(C, n, rho)`, `quiverSection(sF, vF, n)`, `S2VectorFieldHarmonic.normal()`, a colour bar title per panel; found axis needles drawn at the chart length for almost radial axes, fixed to MATLAB's tangential part at half the grid spacing | Checked |
 | GeneralConcepts/ClusterDemo |  | Pending | Checked |
 | GeneralConcepts/Contribute2Doc |  | Pending | Adapted |
 | GeneralConcepts/DensityEstimation |  | Pending | Checked |
@@ -108,21 +108,21 @@ does not exist; **Pending** not started.
 | GeneralConcepts/OptimalKernel |  | Pending | Checked |
 | GeneralConcepts/Properties |  | Pending | Checked |
 | GeneralConcepts/changelog |  | Pending | Adapted |
-| GrainBoundaries/BoundaryCurvature |  | Pending | Checked |
-| GrainBoundaries/BoundaryIntersections |  | Pending | Checked |
-| GrainBoundaries/BoundaryMisorientations |  | Pending | Checked |
-| GrainBoundaries/BoundaryNormalDistribution |  | Pending | Checked |
-| GrainBoundaries/BoundaryPlots |  | Pending | Checked |
-| GrainBoundaries/BoundaryProperties |  | Pending | Checked |
-| GrainBoundaries/BoundarySelect |  | Pending | Checked |
-| GrainBoundaries/CSLBoundaries |  | Pending | Checked |
-| GrainBoundaries/GrainSmoothing |  | Pending | Checked |
-| GrainBoundaries/GrainSmoothingAdvanced |  | Pending | Checked |
-| GrainBoundaries/QuadruplePoints |  | Pending | Checked |
-| GrainBoundaries/SubGrainBoundaries |  | Pending | Checked |
-| GrainBoundaries/TiltAndTwistBoundaries |  | Pending | Checked |
-| GrainBoundaries/TriplePoints |  | Pending | Checked |
-| GrainBoundaries/TwinningBoundaries |  | Pending | Checked |
+| GrainBoundaries/BoundaryCurvature | BoundaryCurvature | Partial 2026-09-23; the port's `testgrains` is a synthetic map of 15 shapes, MATLAB's `testgrains.mat` a grain object it cannot read, the grains mapped as the page says; turns ∓1.0244 for ∓1.0199 and 2 undefined as MATLAB's, four figures in structure; on titanium a lobe 10.55 degrees across stays a grain of its own where MATLAB joins it; found `mtexColorMap` and `setColorRange` reaching only the last value-coloured plot of a map, fixed | Checked |
+| GrainBoundaries/BoundaryIntersections | BoundaryIntersections | Checked 2026-09-23; 18, 43.8406 and 2.4356 to the digit, the figure as MATLAB's; wrote MATLAB's `[x, y] = gB.intersect(xy1, xy2)` with `segLength=True`, `line(x, y)` and `scatter(x, y, sz, c, 'filled')` on a map | Checked |
+| GrainBoundaries/BoundaryMisorientations | BoundaryMisorientations | Checked 2026-09-23; the median 0.6 degrees, 8 of 126 and 1 of 960 for 8 of 127 and 1 of 955, three figures as MATLAB's; wrote `newMtexFigure` taking its map's shape, outlines taking `FaceColor` | Checked |
+| GrainBoundaries/BoundaryNormalDistribution | BoundaryNormalDistribution | Partial 2026-09-23; the 2D half: the peak 1.3912 at 5.58 degrees and the range 0.859 to 1.085 as the text; MATLAB's run lost the 2D cells to the NFFT MEX; the 3D half (`grain3d`, DREAM.3D) is prose; wrote `calcGBND` and `calcGBNDKernel` (`analysis/gbnd.py`); the GBCD peaks 4.8 degrees from the twin plane where the text says 1.3 | Checked |
+| GrainBoundaries/BoundaryPlots | BoundaryPlots | Partial 2026-09-23; the angles 15.9 to 108.8 with median 56.4 as MATLAB's, the angle, axis, key, quiver and iron maps as MATLAB's, nine figures; `PatalaColorKey` is not ported, the whole-misorientation maps use `axisAngleColorKey`; wrote `translucent` for grains, `legend('off')`, the boundary quiver as MATLAB's `quiver3` needles; found −∞ values drawn as nothing, fixed | Checked |
+| GrainBoundaries/BoundaryProperties | BoundaryProperties | Checked 2026-09-23; 0.5282, 84.2556, 43.2195, 0.1054 and 721.70 for 0.5280, 84.2547, 43.2434, 0.1053 and 722.25, the twin table 1648 and 54 and the straightness table to the digit, nine figures as MATLAB's; the inclusion's first misorientation is the inverse, the sides ordered by grain id; wrote `xnum2str` | Checked |
+| GrainBoundaries/BoundarySelect | BoundarySelect | Checked 2026-09-23; the boundary table within the segmentation (1196 for 1178 Fo–Fo, 471 for 478 above 60 degrees), grain 47's boundary (23 segments 1077 µm, 7 segments 311 µm) as MATLAB's, six figures; MATLAB's `grains(47)` is `grains[72]`, the numbering along x; `innerBoundary` 1 segment for 11 by `minPixel`; found notIndexed pixels inside a grain keeping phase 0 where MATLAB gives them the grain's phase, fixed in `calcGrains`, and the outside labelled `outside`, fixed | Checked |
+| GrainBoundaries/CSLBoundaries | CSLBoundaries | Checked 2026-09-23; Σ3 42.10 percent for 42.68 on 17759 segments for 17569, the 83 triple points as MATLAB's, 924 grains merged to 453 for 885 to 415, the Σ5/7/9/11 counts 26, 30, 506, 187 for 26, 41, 504, 187, the volumes 40.25 and 2.01 for 40.76 and 2.07, the maps and the region as MATLAB's; the MDF peak 53.6 at 60 degrees about ⟨111⟩ checked against the prose, MATLAB's run losing its MDF cells to a MEX load failure; the differences follow the closing of `calcGrains`; wrote `project2FundamentalRegion(antipodal=True)` | Checked |
+| GrainBoundaries/GrainSmoothing | GrainSmoothing | Checked 2026-09-23; 19597 to 15819 µm, 19 percent shorter (MATLAB 19419 to 15648), Laplace −2.24 and −61.5, Taubin −0.10 and −8.5 for −2.43/−59.0 and −0.09/−6.9, 21495, 18621, 21495 segments for 21269, 18452, 21269, all figures as MATLAB's; MATLAB's zoom `axis([...])` is `region=`; found the rose `histogram` ignoring a polar subplot, fixed | Checked |
+| GrainBoundaries/GrainSmoothingAdvanced | GrainSmoothingAdvanced | Checked 2026-09-23; 21495, 5313, 18621 and 9445 segments for 21269, 5229, 18452 and 9396, 457 of 539 grains for 443 of 523, the Laplace, Taubin, curvature and Huber changes (−0.22/−19.8 and −0.15/−7.5 for −0.26/−19.8 and −0.16/−7.5), all figures as MATLAB's | Checked |
+| GrainBoundaries/QuadruplePoints | QuadruplePoints | Checked 2026-09-23; 3 grains then 2, the length 52 (52.0014) and 0 strict triple points as MATLAB's, five figures; MATLAB numbers the ring grain 1, the port 2, so the curvature signs are reversed, said in the page | Checked |
+| GrainBoundaries/SubGrainBoundaries | SubGrainBoundaries | Checked 2026-09-23; 15732, 31046, 30582, 464 for 15739, 31041, 30581, 460, and 28.7 and 30.1 percent for 29.1 and 30.8, five figures as MATLAB's; wrote the doubled alpha of thin segments, a floor for named figure sizes | Checked |
+| GrainBoundaries/TiltAndTwistBoundaries | TiltAndTwistBoundaries | Checked 2026-09-23; (001) and (071), the axis (0.192, 0.706, 0.682) for (0.195, 0.706, 0.68), the scatters 19.4 and 22.5 degrees to the digit, 31773 segments for 31803, all figures as MATLAB's; found `mtexColorbar` after RGB boundary colours drawing no bar, fixed | Checked |
+| GrainBoundaries/TriplePoints | TriplePoints | Checked 2026-09-23; the selections by phase, grain and boundary, the arms, the misorientations (19 x 3 for 14 x 3) and both coloured maps as MATLAB's, seven figures; 78 triple points for 70 and 248 Fo–Fo segments for 220 from the gap closing, said in the page; found the triple points of a grain or boundary selection empty and an empty point plot widening the map, fixed | Checked |
+| GrainBoundaries/TwinningBoundaries | TwinningBoundaries | Checked 2026-09-23; 2698 Mg–Mg segments for 2696, the twin law, 86.2992 and 180, 1408 candidates for 1406 and 49.71 percent of the trace for 49.66, all figures as MATLAB's; the 85–87 degree peak 899 segments for 917, the robust mean within 0.63 for 0.451 degrees; the axes print as other equivalent indices; found `xlabel` over the tick labels and `scatter(mori)` framing a ±100 degree cube, fixed | Checked |
 | Grains/Dream3dGrains |  | Pending | Blocked |
 | Grains/EllipseBasedParameters | EllipseBasedParameters | Checked 2026-09-22; ten figures as MATLAB's; the long axis peaks 72.3 and 89.5 degrees for MATLAB's 74.2 and 78.8, the caliper peaks 73.3 and 85.3 for 74.3 and 82.0, the boundary peak 82.9 at 0.94 of the grid axis for 75 at 0.97, the characteristic aspect ratios 1.344 and 1.343 for 1.329 and 1.339, the ellipse being the one of the second moments; wrote `histogram(v)` rose diagrams, `plot(S1Fun)`, `plotSection(S2Fun, sec)`, `plot(shape2d)`, `setView`, `plotEllipse`, `ebsd.how2plot`, the `periodic` flag | Checked |
 | Grains/GrainExport | GrainExport | Checked 2026-09-22; the grain table, the orientation table with its extra columns, the VPSC file with its weights summing to one, the polygon file and the boundary table written and read back as MATLAB's, the first interior grain another one here; one figure; MATLAB's `table`, `writetable` and `save` are a dictionary of columns, the `csv` module and `pickle`; wrote `export(ori, fname)` and `export_VPSC` in `io/exportorientation.py` | Checked |
@@ -138,55 +138,55 @@ does not exist; **Pending** not started.
 | Grains/ProjectionBasedParameters | ProjectionBasedParameters | Checked 2026-09-22; the grain of the largest diameter is MATLAB's grain 515 (6925.8 and 1631.7 to the digit), the PAROR minima 0.7118 and 0.7241 for 0.7118 and 0.7214, the sampled directions within a degree, SURFOR within 0.002 and a degree, the characteristic caliper angles as MATLAB's; nine figures; the rectangles come from the port's own test shapes; wrote `caliper(dirs)` over a list of directions, `S1FunHarmonic.interpolate`, `quiver(noScaling=True)` | Checked |
 | Grains/SelectingGrains | SelectingGrains | Checked 2026-09-22; fourteen figures as MATLAB's; the grain at (9000, 3500) with its 323 pixels, the three similar grains with 523 pixels, the four selected grains and the edge grains as MATLAB's, the ids and the largest area (4.098e6 for 4.112e6) differ with the native reconstruction; `selectInteractive` is prose; wrote `grains.phase`, `id2ind`, `findByOrientation` | Checked |
 | Grains/ShapeParameters | ShapeParameters | Checked 2026-09-22; the largest forsterite area 2.8049e6 and its share 0.1531 to the digit, the paris summary 2.766 and 43.02 for 43.30, the correlation 0.477 for 0.4715, the same extreme grain with and without the edge grains as MATLAB's, the fractal dimensions 1.145, 1.018, 0.963 for 1.128, 1.011, 0.965; eight figures; grain nine is another grain here (the order differs); wrote `hist(grains)`, `histogram(grains)`, `logAxis` | Checked |
-| Misorientations/AngleDistributionFunction |  | Pending | Checked |
-| Misorientations/AxisDistributionFunction |  | Pending | Checked |
-| Misorientations/MisorientationDistributionFunction |  | Pending | Checked |
-| Misorientations/MisorientationGrainExchangeSym |  | Pending | Checked |
-| Misorientations/MisorientationTheory |  | Pending | Checked |
-| Misorientations/Twinning |  | Pending | Checked |
+| Misorientations/AngleDistributionFunction | AngleDistributionFunction | Checked 2026-09-23; 62.7994 and 87.1380 as MATLAB's, 3285 segments for 3286, all curves as MATLAB's (the uncorrelated one has no MATLAB figure, its NFFT failing in the first run); wrote `calcAngleDistribution` in MATLAB's order and forms, `maxAngle(cs)`, positional legend labels, MATLAB's colour order for bars and lines | Checked |
+| Misorientations/AxisDistributionFunction | AxisDistributionFunction | Checked 2026-09-23; 30.8638 for 30.8183, the twin axis [2-1-10], 2808 segments for 2803, the references and the uncorrelated ADF as MATLAB's; the uniform ADF is exact where MATLAB expands it to bandwidth 500 (0.598 and 1.578 for 0.597 and 1.565); the pixel pairs come from boundaries smoothed without simplification and resampling, the port leaving their ids empty; the directed specimen axes differ by the grain numbering, said in the page; wrote `calcDensity(..., Fourier=True)` | Checked |
+| Misorientations/MisorientationDistributionFunction | MisorientationDistributionFunction | Checked 2026-09-23; 118.71 for 118.34 mrd at 89.98 degrees about (001) of forsterite, 2.13 for 2.06, 5.09 for 4.94 percent, all sections, distributions and axis distributions as MATLAB's; found `calcMisorientation` reversed against MATLAB, the axis of a misorientation labelled with its second frame, and the axis distribution of a two-phase MDF symmetrised as antipodal, all fixed | Checked |
+| Misorientations/MisorientationGrainExchangeSym | MisorientationGrainExchangeSym | Checked 2026-09-23; 14.0873, 144, 0, 288, True and False as MATLAB's, the two regions nested as MATLAB's; wrote the edges of a region, `boundaryColor` and `noSurface`, the axes fitted to a region | Checked |
+| Misorientations/MisorientationTheory | MisorientationTheory | Checked 2026-09-23; 85.7299, 179.8286, 107.9164, 0.4592/0.1766, 4.2748/4.2919, 86.2992, 180, 0.7322/3.7008 and the misorientation relations to the digit, 0.4906 for 0.4902, the maps (with MATLAB's 622 key), the pole figure of coincident planes, the histogram, the axis distribution and the eight variants as MATLAB's; 24 for MATLAB's 48 descriptions (the proper-only `symmetrise`); MATLAB's grains 57 and 58 are the port's 43 and 47, the grains being numbered along x; wrote `plotAngleDistribution`, `plotAxisDistribution`, `char(m, 'LaTex')`, `textBelowMarker`, MATLAB's display of a misorientation as its parallel planes and directions, `round2Miller`'s table, the next colour of the order for held markers, `edgecolor` on boundaries | Checked |
+| Misorientations/Twinning | Twinning | Checked 2026-09-23; the round2Miller table, 86.2992 and 180, 49.06 for 49.02 percent, the histogram and the map as MATLAB's; the crystal shapes as MATLAB's up to the camera | Checked |
 | ODFAnalysis/BinghamODFs | BinghamODFs | Checked 2026-09-22; the concentrations of every constructor form as MATLAB's, the fitted ones of the same rule on another draw, the four axes, eight figures; wrote `BinghamODF(kappa, ori)`, `BinghamODF(kappa, fibre)`, the zero padding, `odf.axes`, `orientation.eye`, `quaternion.eye`, `plot(ori, add2all=True)` on pole figures; contour bands now take the colour of their lower level | Checked |
 | ODFAnalysis/DetectionOfSampleSymmetry | DetectionOfSampleSymmetry | Checked 2026-09-22; the recovered mounting rotation 1.34 degrees for 1.32 on another draw, the Aachen ODF maximum 16.94 as MATLAB's 16.95, the correction 3.12 degrees for 2.87 with the offsets 3.12, 3.01 for 2.87, 2.87, the six figures; found the Aachen reader taking the tilt marker of every ring as an intensity; `centerSpecimen` returns its four outputs and runs its search silently; the measured pole figures draw as markers without MATLAB's dynamic size | Checked |
 | ODFAnalysis/EulerAngleSections | EulerAngleSections | Checked 2026-09-22; the bounds 90 90 90, the six section galleries in MATLAB's layouts with the markers and the beta fibre drawn into them; wrote `crystalFrame.load` for CIF files, the named rolling components `orientation.brass` and the rest, `annotate(ori)` and `plot(f)` into held sections, the `layout`, `coordinates='off'`, `xlabel` and `ylabel` options; the beta fibre's specimen direction is turned by 180 degrees about Z by `byMiller`'s representative | Checked |
-| ODFAnalysis/FibreODFs | FibreODFs | Partial 2026-09-22; the beta fibre's h (12 6 11), the ridge 3.9239, the halfwidth table 7.62, 2.36, 1.26 and 15.21, 3.93, 2.06 to the digit, the fitted fibre and its eigenvalue ratio of the same size, five figures; the isosurface plot is prose; the named fibres now take MATLAB's raw ends where the port had projected the far end, `fibre.fit(..., diagnostics=True)` for the three outputs | Checked |
+| ODFAnalysis/FibreODFs | FibreODFs | Checked 2026-09-23; the beta fibre's h (12 6 11), the ridge 3.9239, the halfwidth tables 7.62, 2.36, 1.26 and 15.21, 3.93, 2.06 to the digit, the tube in the Euler box with its branches as MATLAB's, five figures; `fibre.fit(..., diagnostics=True)` for MATLAB's three outputs; the random sample differs | Checked |
 | ODFAnalysis/ODFCharacteristics | ODFCharacteristics | Checked 2026-09-22; the texture index 72.17 exact where MATLAB's quadrature gives 72.1424, the measured one 16.35 for 16.21 and the peak 95.16 for 93.97 by the recomputed Dubna ODF, the entropy -2.8385 for -2.8402, the volume 38.15 for 37.98, the fibre volume 94.04 where MATLAB prints 95.16 and the exact integral is 94.00, the seven annotated pole figures; found the fibre volume's cap grid biased outward and `mtexdata('dubnaODF')` returning the pole figures | Checked |
 | ODFAnalysis/ODFComponents | ODFComponents | Checked 2026-09-22; the peak 109.4 for 110.4, the balls 11.2, 5.2 and the uniform 0.169, the components 48.9, 22.1, 21.3, 7.7 for 48.4, 22.1, 21.3, 7.3, the four annotated section galleries as MATLAB's; the third local maximum is a shoulder at 43.5 mrd where MATLAB reports 31.9; `calcComponents` returns its three outputs; found its clustering quadratic in Python and the radial evaluation slow, both now through vectorised angles and the harmonic form | Checked |
 | ODFAnalysis/ODFExport | ODFExport | Checked 2026-09-22; the generic file's first rows 3.46659 and 2.63068 and the VPSC header to the digit, the six sections; MATLAB's `.mat` copy is `pickle`, which now hands the frames back as the session's handles; wrote `export(odf, ...)` with the generic, mtex and VPSC interfaces | Checked |
 | ODFAnalysis/ODFImport | ODFImport | Checked 2026-09-22; the interpolation 1.205 and 3.50 mrd, the densities 1.177, 1.117, 1.031 and 3.11, 2.35, 1.56 as MATLAB's, the sections and the row of four pole figures; wrote `SO3Fun.load` with `'interp'`, `'density'`, `columnNames` and `halfwidth`, the VPSC reader, the sample table `mtexdatafile('odf')`; the interpolation is a harmonic least squares where MATLAB fits a radial function | Checked |
 | ODFAnalysis/ODFInversePoleFigure | ODFInversePoleFigure | Checked 2026-09-22; 22.9594, 0.0249 and 5.4244 to the digit, the four inverse pole figure pairs as MATLAB's; wrote `calcPDF(odf, None, r)` for MATLAB's empty crystal direction | Checked |
 | ODFAnalysis/ODFModeling | ODFModeling | Checked 2026-09-22; the maximum 15.9611 for 15.9609, the mean 1, the three pole figure pairs and the rotation warning as MATLAB's; the specimen frame now displays its group, a uniform part joins any radial function, `rotate` warns when it strips the specimen symmetry | Checked |
-| ODFAnalysis/ODFPlot | ODFPlot | Partial 2026-09-22; the phi2 and sigma sections, the fibre profile and the Euler bounds 90 90 90 as MATLAB's; the two `plot3d` figures are prose; wrote `fundamentalRegionEuler`, `project2EulerFR`, the two-column grid of wide Euler sections | Checked |
+| ODFAnalysis/ODFPlot | ODFPlot | Checked 2026-09-23; the Bunge and axis angle isosurfaces with LaboTeX and the mrd bar, the phi2 and sigma sections, the fibre profile and the Euler bounds 90 90 90 as MATLAB's; the bar tops out at 51.8, the maximum on the 5 degree grid, where MATLAB's grid misses the peak (46 and 45); wrote `plot3d(odf, 'axisAngle')`, the positional flags, `mtexColorMap` and `mtexColorbar` on plots in space, `fundamentalRegionEuler`, `project2EulerFR`, the two-column grid of wide Euler sections | Checked |
 | ODFAnalysis/ODFPoleFigure | ODFPoleFigure | Checked 2026-09-22; 0.1982 and the mean 1 to the digit, the four figures with `complete` and `antipodal` and the fibre profile as MATLAB's; a list of four-index directions is a `Miller` from a matrix of rows | Checked |
 | ODFAnalysis/ODFShapes | ODFShapes | Checked 2026-09-22; the halfwidths and bandwidths to the digit but the bump kernel's 33 for 1024, the Dirichlet minimum -8.666, the three curve figures as MATLAB's; wrote `plot(psi)` of an SO(3) kernel, `symmetric=True` of a spherical one, `plotSpektra`, `hold` adopting a plain matplotlib figure | Checked |
-| ODFAnalysis/ODFTheory | ODFTheory | Partial 2026-09-22; 0.8166, 9.0004 for 9.0003, the mean 1 and the volume 0.0235 to the digit, the map with the prisms, the Euler cloud and the six sigma sections as MATLAB's; the isosurface plot `plot3d(odf)` is prose; wrote `plot(ebsd, cS)`, MATLAB's named figure sizes, `plot(ori, 'Euler')` as a positional flag | Checked |
+| ODFAnalysis/ODFTheory | ODFTheory | Checked 2026-09-23; 0.8166, 9.0004 for 9.0003, the mean 1 and the volume 0.0235 to the digit, all figures as MATLAB's, the Euler isosurfaces with the orientations on top as the prose describes; MATLAB's own run of that cell loses the density and shows hollow markers alone; wrote `plot(ebsd, cS)`, MATLAB's named figure sizes, `plot(ori, 'Euler')` as a positional flag | Checked |
 | ODFAnalysis/RadialODFs | RadialODFs | Checked 2026-09-22; the displays, the means 2 and 1 and the 2 x 3 gallery on one colour range as MATLAB's; found `plotPDF` opening a figure of its own inside a prepared `newMtexFigure` | Checked |
 | ODFAnalysis/RandomSampling | RandomSampling | Checked 2026-09-22; the seven figures, the errors, the texture indices and the fitted laws of the same size as MATLAB's on another random fibre and draw (the exponents -0.23 and -0.26 for -0.21 and -0.26, the optimized kernel about a third sharper); wrote `plot(ori)` into held sections, `ind2color`, `calcError(..., 'L1')`; the page builds in four minutes | Checked |
 | ODFAnalysis/SO3FunHarmonicRepresentation | SO3FunHarmonicRepresentation | Checked 2026-09-22; the degree two block 0.0997-0.2354i, 0.9289-0.4739i, 1.1373 for 0.0990-0.2350i, 0.9290-0.4718i, 1.1372 by the recomputed Dubna ODF, `isReal` False, the minimum -1.2645 to the digit, the approximation error 1.07 for 1.27 on another draw, the five figures; the same `reshape(5, 5)` gives MATLAB's matrix | Checked |
 | ODFAnalysis/SigmaSections | SigmaSections | Checked 2026-09-22; the ten figures as MATLAB's: the section geometry with its reference field, the stars of a-axes, the hexagonal prisms in their panels, the four maxima one to a panel, the girdles, the twelve panels about (10-11); wrote `plot(oS)`, `quiver(ori, v)` in sections, `plotSection(ori, ori * cS, oS)`, settable `h1`, `h2`, `omega`, `cs.cAxis` as a Miller; replacing the reference field is prose | Written |
-| PhaseTransitions/GrainGraphBasedReconstruction |  | Pending | Pending |
-| PhaseTransitions/LowLevelParentGrainReconstruction |  | Pending | Pending |
-| PhaseTransitions/MaParentGrainReconstruction |  | Pending | Checked |
-| PhaseTransitions/PhaseTransitions |  | Pending | Checked |
-| PhaseTransitions/MaParentGrainReconstructionAdvanced |  | Pending | Pending |
-| PhaseTransitions/MartensiteVariants |  | Pending | Checked |
-| PhaseTransitions/OrientationRelationshipFit |  | Pending | Checked |
-| PhaseTransitions/ParentChildVariants |  | Pending | Checked |
-| PhaseTransitions/TiBetaReconstruction |  | Pending | Checked |
-| PhaseTransitions/TransformationTexture |  | Pending | Checked |
-| PhaseTransitions/TriplePointBasedReconstruction |  | Pending | Checked |
-| Plasticity/DislocationSystems |  | Pending | Checked |
-| Plasticity/GND |  | Pending | Checked |
-| Plasticity/Lankford |  | Pending | Checked |
-| Plasticity/SachsModel |  | Pending | Checked |
-| Plasticity/SchmidFactor |  | Pending | Checked |
-| Plasticity/SingleSlipModel |  | Pending | Checked |
-| Plasticity/SlipSystems |  | Pending | Checked |
-| Plasticity/SlipTransmission |  | Pending | Checked |
-| Plasticity/TaylorHex |  | Pending | Rendered |
-| Plasticity/TaylorModel |  | Pending | Checked |
-| Plasticity/TextureEvolution |  | Pending | Rendered |
-| Plasticity/TwinningTutorial |  | Pending | Checked |
-| Plasticity/VPSCImport |  | Pending | Checked |
-| Plasticity/WBV |  | Pending | Rendered |
+| PhaseTransitions/GrainGraphBasedReconstruction | GrainGraphBasedReconstruction | Checked 2026-09-23; the initial fit quintiles as MATLAB's to four digits; the port's `calcParent2Child` reaches a lower basin (first quintile 1.19 for 1.45 degrees), so the counts after it differ, and with MATLAB's relationship set by hand the graph route gives MATLAB's numbers (11149 edges for 11154, 236 components and 54 single grains for 237 and 54, 839 rejected for 848, 606/380/176 child grains for 614/387/174), said in Technical Details; wrote `calcGraph`, `clusterGraph`, `calcParentFromGraph`, `plotGraph` of M9 | Pending |
+| PhaseTransitions/LowLevelParentGrainReconstruction | LowLevelParentGrainReconstruction | Checked 2026-09-23; 54824 seeds for 54868, 26804 seed grains for 26828, 113 parents for 114, 16216 grown for 16205, 1.23 percent alpha left for 1.21, the fit and deviation quantiles to three digits; wrote `majorityVote`, `g1.neighbors(g2)`, the call form of the triple points, `ebsd[ind] = ori` and `grains[ind] = ori`, MATLAB's outputs of `calcParent`, `axisAngleColorKey()` without a frame | Pending |
+| PhaseTransitions/MaParentGrainReconstruction | MaParentGrainReconstruction | Checked 2026-09-23; 10654 grains for 10645, the initial fit quintiles to four digits, 10580 parents after the vote for 10581, 10600 and 54 child grains after the growth for 10597 and 48, the merged and filled parent maps as MATLAB's; the fitted relationship lies 2.3 degrees from NW where MATLAB's lies 2.5, the port's fit being the better; wrote the display in MATLAB's number format, `gB.selectByGrainId(pairs)` with the pair index, `grains.findByLocation`, `smooth(ebsd, F, fill=grains)` | Checked |
+| PhaseTransitions/PhaseTransitions | PhaseTransitions | Checked 2026-09-23; the chapter page, its figure and the workflow picture | Checked |
+| PhaseTransitions/MaParentGrainReconstructionAdvanced | MaParentGrainReconstructionAdvanced | Checked 2026-09-23; the fitted relationship reaches the lower basin again (first quintile 1.22 for 1.48 degrees), and the segmentation with `removeQuadruplePoints` has 4467 grains for 4443, which the Markov clustering amplifies; with MATLAB's relationship set by hand 3.1318 degrees from KS, similarity quantiles 0.306 and 0.948 for 0.304 and 0.948, 725 components for 707, 361 accepted for 360, the triple-point fits to three digits; said in Technical Details | Pending |
+| PhaseTransitions/MartensiteVariants | MartensiteVariants | Checked 2026-09-23; spread 1.4884, the KS misfit 3.9349, the fitted ORs 2.492 and 2.495 degrees for 2.491 and 2.493, all figures; the austenite left after `minPixel=2` is 32462 measurements for MATLAB's 34651 (an open M3 finding); wrote `ind2color` of arrays and `'ordered'`, `plotPDF(ori, 'add2all')`, the four-index display of a `'uvw'` direction | Checked |
+| PhaseTransitions/OrientationRelationshipFit | OrientationRelationshipFit | Checked 2026-09-23; the port's global fit has the lower trimmed misfit (7.948e-4 for MATLAB's 7.957e-4, 0.22 degrees apart) and its KS-started local fit reaches it too, where MATLAB's stays 1.46 degrees away; said in Technical Details; found and fixed the global scan returning a relationship worse than the refined start | Checked |
+| PhaseTransitions/ParentChildVariants | ParentChildVariants | Checked 2026-09-23; all counts and figures as MATLAB's; found and fixed the variant numbering, `nextAxis(k)`, open markers and the colour order, positional flags of the pole figures; the Burgers relationship prints its directions with both signs reversed | Checked |
+| PhaseTransitions/TiBetaReconstruction | TiBetaReconstruction | Checked 2026-09-23; 45804 child grains for 45802, 44447 parents after the vote for 44445, 1785 child grains left as MATLAB, 122 and 41 parent grains for 123 and 42, fit quantiles 1.19, 2.11 and 3.61 for 1.19, 2.10 and 3.58 | Checked |
+| PhaseTransitions/TransformationTexture | TransformationTexture | Checked 2026-09-23; the direct texture index 17.4509 as MATLAB's, the sampled 3.478 for 3.481 (a random sample), all figures; wrote `variants(p2c, odf)` as `transformODF` | Checked |
+| PhaseTransitions/TriplePointBasedReconstruction | TriplePointBasedReconstruction | Checked 2026-09-23; 85338 triple points for 85407, 37075 voting grains for 37089, 29347 seeds for 29259, growth to 1612, 1125 and 1098 child grains for 1609, 1127 and 1097, 143 and 53 parents for 144 and 55, fit quantiles to three digits | Checked |
+| Plasticity/DislocationSystems | DislocationSystems | Checked 2026-09-23; both displays as MATLAB's tables, [12 6], [48 4], 0.866 and 0.7071, the 52 tensors in `au`, two figures; wrote MATLAB's dislocationSystem display, `dS.tensor()` in `au`, dislocation systems as arrays; `dS(dS.isEdge).u = 1` is `dS.u[dS.isEdge] = 1` | Checked |
+| Plasticity/GND | GND | Checked 2026-09-23; 5151 x 52 densities, the factor 1e16, the worked route equal to `calcGND` (difference 0), the curvature and Nye tensors with their NaN columns as MATLAB's, the maps with the same structures; wrote `ebsd.curvature()` in 1/um, `fitDislocationSystems` returning `(rho, factor)` over a map, `calcGND` in 1/m², `setColorScale('log')`, `tensor.sum(axis=)`; the noise differs, `halfQuadraticFilter` smoothing less | Checked |
+| Plasticity/Lankford | Lankford | Checked 2026-09-23; twiceRbar 1.0060, Rbar 0.5030 and deltaR -0.3274 to the digit, the Brass and ODF curves, the titanium map, R(θ) and min(M), five figures as MATLAB's | Checked |
+| Plasticity/SachsModel | SachsModel | Checked 2026-09-23; 12 systems, (10000, 12), MSachs 2.2309, the mean Taylor factor 3.0671 and the minimum 0.2789 for 2.2364, 3.0646 and 0.2786 on other draws, both figures as MATLAB's | Checked |
+| Plasticity/SchmidFactor | SchmidFactor | Checked 2026-09-23; −0.4082 both routes, SFMax 0.5000 at (−1.4387, −3.1996, 0.3231), the 12 systems and 0.4082, all figures as MATLAB's; wrote `plotS2Grid`, `vega20`, `plottingConvention.default3D.setView()`, `sS.char('latex')`, slip systems as arrays, `max(f, axis=0)` of handles, `symmetrise(v, cs)`; found `SchmidFactor(r)` transposed, the Schmid factor function not antipodal, `micronbar='off'` drawing the bar, held 3D plots going to the last axes, the grain quiver's lengths, and complete charts labelling every equivalent axis, all fixed; the grid's system ids come in another order, `stressTensor.uniaxial(Miller)` is normalised | Checked |
+| Plasticity/SingleSlipModel | SingleSlipModel | Checked 2026-09-23; the SBF displays, bandwidth 3, meanError 0.0011 as MATLAB's, eight figures; wrote `SO3FunSBF` with MATLAB's display, `SO3VectorFieldHarmonic.quadrature` at the field's degree, `abs` of SO(3) handles, `noGrid`; found `deformationTensor()` of several systems one rank three tensor, fixed; `doEulerStep` 29 s to 2.7 s | Checked |
+| Plasticity/SlipSystems | SlipSystems | Checked 2026-09-23; every display as MATLAB's table, 3 and [3 3 3], the deformation and Schmid tensors 0.5 and 0.866, the specimen-frame system, the shape figure; wrote MATLAB's slipSystem display, `deformationTensor()` as a tensor, `SchmidTensor()` as MATLAB's full dyad; the second and third symmetrised systems have the opposite sign to MATLAB's | Checked |
+| Plasticity/SlipTransmission | SlipTransmission | Checked 2026-09-23; 87 grains for 85, the roundoff 4.4e-16 with 0 changed systems, m′ 0.0001, 0.3727, 0.9835 for 0.0001, 0.3719, 0.9611, all figures as MATLAB's; wrote `mPrime` entry by entry, `sP.makeGrid()` and `sP.plot(values, 'smooth')`, `grains.id2ind` keeping the shape, `quiver(..., project2plane=True)` | Checked |
+| Plasticity/TaylorHex | TaylorHex | Checked 2026-09-23; the basal fibre and the 3 x 3 pole figures as MATLAB's, the mean rotations 8.09 and 15.49 for 8.32 and 15.42, the family table a simplex vertex against MATLAB's interior point, said in the page; wrote `FourierODF`, `symmetrise(return_index=True)`, `ori.exp(-W)`; found `optimalSample` unmoved for a two-fold about z and `plotPDF` sharing one colour range, both fixed | Rendered |
+| Plasticity/TaylorModel | TaylorModel | Checked 2026-09-23; 96 systems, M 2.1208, the field value 2.1049 and the spin, the phi1 sections with spin arrows, the spin magnitude and the map with two quivers as MATLAB's, seven figures; wrote the compiled Taylor solve (1278 s to 14 s), the Euler section angle setters, `plot(WFun)` in sections, `text(v, labeled=True)`; found map `quiver` ignoring `displayName` and the colour order, fixed; MATLAB's pointwise `norm(WFun)` is `abs(WFun)` | Checked |
+| Plasticity/TextureEvolution | TextureEvolution | Checked 2026-09-23; M 2.3153, the rolling pole figures and phi2 sections as MATLAB's, two figures; the crystal turns 0.5320 degrees for 0.4975 on the degenerate optimal face, the texture indices 1.0010, 1.158, 1.490, 1.847 for 1.0012, 1.143, 1.482, 1.892 from a random start, said in the page; wrote `ori.exp(W)`, `plotSection(odf, 'phi2', angles, 'contourf')` | Rendered |
+| Plasticity/TwinningTutorial | TwinningTutorial | Checked 2026-09-23; ±0.4990, the twelve and six entries, both frame routes 0.2156 (difference 5.6e-17) as MATLAB's, two figures; wrote `sS.SchmidFactor()` of no load as one function | Checked |
+| Plasticity/VPSCImport | VPSCImport | Checked 2026-09-23; the nine strains, the `opt` fields and the ACT table, the sigma sections, the 4 x 3 pole figures with one colour bar and the slip mode curves as MATLAB's, three figures; wrote `odf.opt`, `ylabel(ax, text)`, one colour bar for a common range; found `setColorRange` redrawing contour levels, fixed to recolour | Checked |
+| Plasticity/WBV | WBV | Checked 2026-09-23; 101 x 101 with the 400 rim pixels undefined, all figures as MATLAB's in structure; wrote `weightedBurgersVec` with its integral, gradient and `'1hop'` forms, `quiver(ebsd, v, antipodal=True)`, `plot(v, weights=..., contourf=True)`; the gradient norms run higher (0.0436 and 0.470 for 0.0288 and 0.434) by the filter, all 10201 pixels defined for MATLAB's 10198 | Rendered |
 | Plotting/Annotations |  | Pending | Checked |
 | Plotting/AxesAlignment |  | Pending | Checked |
 | Plotting/ColorMaps |  | Pending | Checked |
@@ -230,30 +230,30 @@ does not exist; **Pending** not started.
 | SO3Functions/SO3FunVectorValued |  | Pending | Adapted |
 | SO3Functions/SO3Kernels |  | Pending | Checked |
 | SO3Functions/WignerFunctions |  | Pending | Checked |
-| SphericalFunctions/S1FunHarmonics |  | Pending | Checked |
-| SphericalFunctions/S2Bingham |  | Pending | Checked |
-| SphericalFunctions/S2FunApproximationInterpolation |  | Pending | Checked |
-| SphericalFunctions/S2FunAxisField |  | Pending | Checked |
-| SphericalFunctions/S2FunConcept |  | Pending | Checked |
-| SphericalFunctions/S2FunHarmonicRepresentation |  | Pending | Checked |
-| SphericalFunctions/S2FunOperations |  | Pending | Checked |
-| SphericalFunctions/S2FunPlotting |  | Pending | Checked |
-| SphericalFunctions/S2FunQuadrature |  | Pending | Checked |
-| SphericalFunctions/S2FunRadon |  | Pending | Checked |
-| SphericalFunctions/S2FunSampling |  | Pending | Checked |
-| SphericalFunctions/S2FunSym |  | Pending | Checked |
-| SphericalFunctions/S2FunVectorField |  | Pending | Checked |
-| SphericalFunctions/S2FunVectorValued |  | Pending | Adapted |
-| SphericalFunctions/S2Kernels |  | Pending | Checked |
-| SphericalFunctions/SphericalHarmonics |  | Pending | Checked |
-| Tensors/BirefringenceDemo |  | Pending | Checked |
-| Tensors/MagneticAnisotropy |  | Pending | Checked |
-| Tensors/PiezoElectricity |  | Pending | Checked |
-| Tensors/TensorArithmetics |  | Pending | Checked |
-| Tensors/TensorAverage |  | Pending | Checked |
-| Tensors/TensorDefinition |  | Pending | Checked |
-| Tensors/TensorImport |  | Pending | Checked |
-| Tensors/TensorVisualisation |  | Pending | Checked |
+| SphericalFunctions/S1FunHarmonics | S1FunHarmonics | Checked 2026-09-23; every display, 4, 2.2e-14, bandwidth 3 and 3.4361e-4, 1.2661, 7.9549, e at 0 and 1/e at 180 as MATLAB's; the coefficients now MATLAB's e^{-ik rho}; wrote MATLAB's regularised `interpolate`, `smooth`, `sum`, the periodic cutoff round(4/sigma), `plot(S1FunHandle)` into subplots | Checked |
+| SphericalFunctions/S2Bingham | S2Bingham | Checked 2026-09-23; the figures as MATLAB's; mean 1 for MATLAB's approximate 1.0377; wrote the confidence ellipse of `fit`, `ellipse`, `a` as directions | Checked |
+| SphericalFunctions/S2FunApproximationInterpolation | S2FunApproximationInterpolation | Checked 2026-09-23; 1.0e-15 and 0.0605 for MATLAB's 2.0e-14 and 0.0606, four figures; wrote `interp`, `S2FunTri`, `S2Triangulation`, Voronoi weights by default | Checked |
+| SphericalFunctions/S2FunAxisField | S2FunAxisField | Checked 2026-09-23; three figures as MATLAB's; wrote `S2AxisFieldHarmonic.interpolate` and `quadrature`, both hemispheres for an axis field | Checked |
+| SphericalFunctions/S2FunConcept | S2FunConcept | Checked 2026-09-23; 1.004 mrd and six maxima as MATLAB's; wrote `S2Fun`, the family's class with `smiley`, `unimodal`, `interpolate` | Checked |
+| SphericalFunctions/S2FunHarmonicRepresentation | S2FunHarmonicRepresentation | Checked 2026-09-23; the smiley truncations, the spectrum and its truncation to 9, the ten basis functions as MATLAB's; wrote lists of functions (`S2FunHarmonic(np.eye(10))`), `truncate()` with MATLAB's cutoff, the `bandwidth` setter, lazy `abs` and `sqrt` | Checked |
+| SphericalFunctions/S2FunOperations | S2FunOperations | Checked 2026-09-23; shift 1.0, mean 0.0064, the integral norm 0.4229 as MATLAB's; the maximum 97.85 and minima -7.47 for MATLAB's 15.717 and -7.203 from MATLAB's `unimodal` bug; the gradient at X is aliasing in both; wrote `sum`, pointwise `max`/`min` of two functions | Checked |
+| SphericalFunctions/S2FunPlotting | S2FunPlotting | Checked 2026-09-23; eleven figures as MATLAB's; wrote `setCamera`, `plot3d(sF)` with MATLAB's arrows and camera, `plotSection` seen down its normal, `nextAxis(i, j)` | Checked |
+| SphericalFunctions/S2FunQuadrature | S2FunQuadrature | Checked 2026-09-23; 8.9e-16 and 0 as MATLAB's, 0.5 for MATLAB's aliased 0.6667; `quadratureS2Grid` became a list of directions | Checked |
+| SphericalFunctions/S2FunRadon | S2FunRadon | Checked 2026-09-23; 0.138892, 0.072733, 0.0599 and the round-off checks as MATLAB's, the ring and the small circle figures; wrote `radon(sF, delta)` | Checked |
+| SphericalFunctions/S2FunSampling | S2FunSampling | Checked 2026-09-23; the table as MATLAB's up to the random columns and the norm's factor sqrt(4 pi); wrote `adjointNFSFT`, MATLAB's marker areas | Checked |
+| SphericalFunctions/S2FunSym | S2FunSym | Checked 2026-09-23; the complete plot and the 6/m contours as MATLAB's; the sector of 222 is the half, MATLAB's plot the octant | Checked |
+| SphericalFunctions/S2FunVectorField | S2FunVectorField | Checked 2026-09-23; the displays, 3.2e-8 and the mean for MATLAB's 2.6e-8 and -3e-8; wrote `quadrature`, `interpolate`, `x`, `y`, `z`, two components, `norm` as the function of lengths, `quiver3` as MATLAB's | Checked |
+| SphericalFunctions/S2FunVectorValued | S2FunVectorValued | Checked 2026-09-23; (4, 3, 2), (2,), (4,) and the panels as MATLAB's; wrote the componentwise `interpolate`, `plot` of a list, one panel each | Adapted |
+| SphericalFunctions/S2Kernels | S2Kernels | Checked 2026-09-23; every display and kappa 40.34, 22.64 as MATLAB's; Dirichlet halfwidths 11.6 and 21.4 for MATLAB's 180; wrote the bump's `bandwidth`, MATLAB's `arrowWidth`, subplots | Checked |
+| SphericalFunctions/SphericalHarmonics | SphericalHarmonics | Checked 2026-09-23; `sphericalY(1, x)` and the series 0.3455 as MATLAB's since the switch of the public coefficients to MTEX's basis | Checked |
+| Tensors/BirefringenceDemo | BirefringenceDemo | Checked 2026-09-23; the principal indices, 0.023675, pMin and pMax, the optical axes (±0.689, 0.725, 0), both RGB triplets (0.2061, 0.5346, 0.6825) and the route and key differences (3.4e-13 and 0 for MATLAB's 8e-11 and 7e-11), nine figures; wrote `spectralTransmissionColorKey`, optics of a list of tensors, `quiver3` onto a held sphere, `plot(channels, 'rgb')`; the RGB spheres show the mmm sector where MATLAB shows the disc, the key's sections have no arrows, the optical axes show through the sphere and the animation is its last frame, said in the page | Checked |
+| Tensors/MagneticAnisotropy | MagneticAnisotropy | Checked 2026-09-23; K1 4.09416, Js 1.9705 and the energy and J50 table at 0, 45, 55, 90 degrees within the random sample (0.1588 and 1.9111 for 0.1623 and 1.9097), two figures; found `plotPDF` ignoring the positional flags `'antipodal', 'contourf'`, fixed | Checked |
+| Tensors/PiezoElectricity | PiezoElectricity | Checked 2026-09-23; 382 orientations, the ranges ±2.3000 and ±0.5940 as MATLAB's, the sector, both hemispheres, `surf` and the two polar sections, six figures; wrote the `'Euler 1'` to `'Euler 3'` columns of `orientation.load`, positional flags on `plot` of a function, `'upper', 'lower'` together as both hemispheres; the rim labels are the a directions `[-12-10]` where MATLAB writes `[01-10]`, four for MATLAB's six | Checked |
+| Tensors/TensorArithmetics | TensorArithmetics | Checked 2026-09-23; the stresses 248.9, -8.65, -161.9, the dyad, 7, 0.0018, 460.25 and the rotated rank three table as MATLAB's, the conductivity figure as MATLAB's; wrote `times(A, B)` for MATLAB's `.*`; found the stress of `C * eps` carrying the density of the stiffness, fixed; the rank three display scales by 10^-11 where MATLAB scales by 10^-12 | Checked |
+| Tensors/TensorAverage | TensorAverage | Checked 2026-09-23; the phase fractions 0.2466 and 0.7534, the bulk moduli 103.5843, 94.3986, 98.9915, the shear moduli 66.5252, 60.8907, 63.7079, the glaucophane Voigt 102.67, Reuss 92.1248 and 91.7198, Hill 97.3974 and 97.1949 and the seismic anisotropies 19.5, 11.4, 9.8, 4.5, 11.6, 17.6 as MATLAB's, four figures; MATLAB's three outputs are `calcTensor(..., 'all')`; found the polarisation needles of `plotSeismicVelocities` all but invisible, fixed | Checked |
+| Tensors/TensorDefinition | TensorDefinition | Checked 2026-09-23; every display and the Young's modulus range 166.61 to 306.49 as MATLAB's, the figure as MATLAB's; wrote the tensor display of every rank (compact matrix form, `doubleConvention: true`, the specimen frame by its convention) and `vector3d(T)` of a rank one tensor; found a complete chart labelled with the crystal axes where MATLAB labels the sector corners in all their equivalent positions, fixed | Checked |
+| Tensors/TensorImport | TensorImport | Checked 2026-09-23; both displays and [True, True] as MATLAB's, a missing `doubleConvention` caught by `checkSymmetry`; wrote the data set `quartzPiezo` for the quartz file of MATLAB's data folder; the port's `C` shows the density 3.355 the file states, MATLAB's none | Checked |
+| Tensors/TensorVisualisation | TensorVisualisation | Checked 2026-09-23; 320.5 along [100], the eigenvalues -1, 1, 3 with their axes, three figures as MATLAB's; wrote the `defaultColorMap` preference and `plotSection` with `color='interp'`, `linewidth` and a colour bar; `eig` returns the values first where MATLAB returns the vectors first, said in the page; MATLAB colours the Poisson's ratio section with parula, the port with the preferred blue2red | Checked |
 | Tutorials/BoundaryTutorial |  | Pending | Checked |
 | Tutorials/EBSDTutorial |  | Pending | Checked |
 | Tutorials/GrainTutorial |  | Pending | Checked |
@@ -261,8 +261,8 @@ does not exist; **Pending** not started.
 | Tutorials/PoleFigureTutorial |  | Pending | Checked |
 | Vectors/VectorDefinition | VectorDefinition | Checked 2026-09-22; every display and the four figures as MATLAB's, the grid under `z←↑y` about the screen centre where MATLAB's follows Z | Checked |
 | Vectors/VectorGrids | VectorGrids | Checked 2026-09-22; the four grids and their counts as MATLAB's after `HEALPixS2Grid` was written and the Fibonacci count rule taken from MATLAB; the L1 deviations to the digit, the L2 ones sqrt(4 pi) smaller by the port's norm convention, said in the page | Checked |
-| Vectors/VectorsAxes | VectorsAxes | Partial 2026-09-22; every angle and mean to the digit, ten of twelve figures as MATLAB's; `plot(pf)` and the annotation on it wait on S6; found the `complete` flag dropped for antipodal functions | Checked |
+| Vectors/VectorsAxes | VectorsAxes | Checked 2026-09-23; every angle and mean to the digit, all twelve figures as MATLAB's, the measured pole figure `plot(pf[0])` with the annotated (1,0,-1) at its upper end; MATLAB's run shows the annotation on an empty chart, the bridge closing figures between cells; the pole figure is WhiteJet where MATLAB's run draws parula; found the `complete` flag dropped for antipodal functions | Checked |
 | Vectors/VectorsDensityEstimation | VectorsDensityEstimation | Checked 2026-09-22; the halfwidth table, the three local maxima, the basis densities, the Dirichlet minimum and the observed fraction to the digit, the volume 0.1721 for 0.1723, 1152 grains for 1151, all ten figures as MATLAB's; found the local maxima seeds and the Laue antipodality | Checked |
 | Vectors/VectorsExport | VectorsExport | Checked 2026-09-22; the three tables digit for digit, the round trip errors 3.3461e-05 and 3.3333e-07 as on the page; the azimuth in [0, 360) where MATLAB writes the constructed angle, said in the page | Checked |
 | Vectors/VectorsImport | VectorsImport | Checked 2026-09-22; `vector3d.load` written for it, the thousand directions and both figures as MATLAB's | Checked |
-| Vectors/VectorsOperations | VectorsOperations | Partial 2026-09-22; every number to the digit and the selection figure as MATLAB's; the `arrow3d` figure waits on S5 | Checked |
+| Vectors/VectorsOperations | VectorsOperations | Checked 2026-09-23; every number to the digit, the selection figure and the `arrow3d` figure of v and u as MATLAB's; found `arrow3d` in fresh axes drawn in a tilted perspective with its labels cut, now MATLAB's top view in the plotting convention | Checked |

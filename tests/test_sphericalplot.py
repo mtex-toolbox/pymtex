@@ -6,9 +6,10 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from mtex import (Miller, S2FunHarmonic, annotate, contour, contourf, crystalFrame, degree, fundamentalSector, gcm, grad, hold,
+from mtex import (Miller, S2FunHarmonic, S2VectorFieldHarmonic, annotate, cat, contour, contourf, crystalFrame, degree, fundamentalSector, gcm, grad, hold, newMtexFigure, nextAxis,
                   orientation, pcolor, plot, plotIPDF, plotPDF, quiver, scatter, specimenFrame, sphericalRegion, text,
                   unimodalODF, vector3d, xvector, yvector, zvector)
+from mtex.functions.s2axisfield import S2AxisFieldHandle
 from mtex.plotting.sphericalplot import sphericalPlot
 
 rng = np.random.default_rng(7)
@@ -33,6 +34,8 @@ def test_directions_as_markers():
   sPs = plotsOf(fig)
   assert all(isinstance(sP, sphericalPlot) for sP in sPs) and sPs[0].proj.upper and not sPs[1].proj.upper
   assert len(sPs[0].grid) == 11 and len(sPs[0].boundary) == 1 and sPs[0].labels
+  # the grid lies over a surface, as MATLAB draws it, and under the boundary
+  assert sPs[0].grid[0].get_zorder() > 2 and sPs[0].grid[0].get_zorder() < sPs[0].boundary[0].get_zorder()
   # every marker lies inside the bounds of its chart, and the two charts share the list
   n = 0
   for sP, h in zip(sPs, hs):
@@ -88,10 +91,14 @@ def test_miller_indices_symmetrised_and_in_the_sector():
   text(m, ["a", "b", "c", "d"])
   hold(False)
   assert len(gcm().children) == 1 and sum(t.get_text() in "abcd" for t in gcm().children[0].texts) == 4
+  # text(v, 'labeled') writes each direction's own name, into the charts already there
+  text(cat(xvector, zvector), labeled=True)
+  assert len(gcm().children) == 1 and "x" in {t.get_text() for t in gcm().children[0].texts}
 
 
 def test_a_spherical_region_and_annotate():
-  tri = crystalFrame("-3m")
+  # the polar trigonal sector reaches into both hemispheres
+  tri = crystalFrame("3m")
   h = plot(fundamentalSector(tri))
   assert len(gcm().children) == 2 and len(h) >= 2
   # annotate draws into every axes of the current figure, the corners of the sector here
@@ -135,6 +142,9 @@ def test_functions_on_the_sphere():
   assert len(gcm().children) == 1 and len(plotsOf(gcm())[0].sR.N) >= 2
   contourf(sc, complete=True)
   assert len(gcm().children) == 2
+  # MATLAB's positional flags, both hemispheres named
+  plot(sc, 'complete', 'smooth', 'upper', 'lower')
+  assert len(gcm().children) == 2
 
 
 def test_the_density_of_directions():
@@ -152,7 +162,8 @@ def test_vector_and_axis_fields_as_arrows():
   G = grad(s)
   h = plot(G, upper=True, resolution=10 * degree)
   assert len(gcm().children) == 1 and isinstance(h[0], matplotlib.quiver.Quiver)
-  assert abs(np.max(np.hypot(h[0].U, h[0].V)) - 1.2 * 10 * degree) < 1e-9
+  # MATLAB's length: the longest arrow half the grid spacing
+  assert abs(np.max(np.hypot(h[0].U, h[0].V)) - 0.5 * 10 * degree) < 1e-9
   h = quiver(G, upper=True, normalize=True)
   L = np.hypot(h[0].U, h[0].V)
   assert np.allclose(L, L[0])
@@ -162,6 +173,12 @@ def test_vector_and_axis_fields_as_arrows():
   plot(G, color="white")
   hold(False)
   assert len(gcm().children) == 1
+  # an axis field over the whole hemisphere: a needle on the rim steps back rather than over
+  # it, so the interior needles keep their length
+  A = S2AxisFieldHandle(lambda v: vector3d(v.cross(zvector).data + 0.3 * zvector.data, antipodal=True), bandwidth=12)
+  h = quiver(A, upper=True, resolution=10 * degree)
+  lengths = np.linalg.norm(np.diff(np.asarray(h[0].get_segments()), axis=1)[:, 0], axis=-1)
+  assert np.median(lengths) > 0.3 * lengths.max()
   # a pair of lists
   v = vector3d.rand(10, rng=rng)
   h = quiver(v, v.orth(), upper=True)
@@ -174,14 +191,41 @@ def test_pole_figures_of_an_odf():
   h = plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs))
   fig = gcm()
   assert len(fig.children) == 3 and [ax.get_title() for ax in fig.children] == ["{100}", "{110}", "{111}"]
-  # one colour range over the row, the specimen sector of the 222 group
   clims = {x.get_clim() for x in h}
+  # a second row continues a newMtexFigure layout from the axes nextAxis points to
+  newMtexFigure(layout=[2, 3])
+  lay = gcm()
+  plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs))
+  nextAxis()
+  plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs), noTitle=True)
+  assert gcm() is lay and len(lay.children) == 6 and all(hasattr(ax, "_mtexSphericalPlot") for ax in lay.children)
+  # a shared colour range recolours the contour bands and keeps each panel's levels, as MATLAB's
+  from mtex import setColorRange
+  hs = plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs), 'contourf')
+  before = [tuple(np.round(h.levels, 9)) for h in hs]
+  setColorRange('equal')
+  after = [tuple(np.round(ax._mtexSphericalPlot.mappable.levels, 9)) for ax in gcm().children]
+  assert before == after and gcm().colorRange[1] >= max(max(l) for l in before)
+  # one bar for the common range, and a label beside a chart, MATLAB's ylabel(ax, ...)
+  from mtex import mtexColorbar, ylabel
+  assert len(mtexColorbar()) == 1
+  ylabel(gcm().children[0], 'row one')
+  assert any(t.get_text() == 'row one' for t in gcm().children[0].texts)
+  # every pole figure on its own range, as MATLAB's, or one over the row when asked
+  assert len(clims) == 3
+  h = plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs), colorRange='equal')
+  clims = {x.get_clim() for x in h}
+  fig = gcm()
   assert len(clims) == 1 and fig.colorRange == next(iter(clims))
+  # the specimen sector of the 222 group
   assert all(len(sP.sR.N) == 3 for sP in plotsOf(fig))
   assert all(sP.proj.antipodal for sP in plotsOf(fig))
+  # MATLAB's positional flags
+  h = plotPDF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
+  assert isinstance(h[0], matplotlib.contour.QuadContourSet)
   h = plotPDF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True, noTitle=True)
   fig = gcm()
-  assert len(fig.children) == 2 and fig.children[0].get_title() == "" and len(fig.colorbars) == 1
+  assert len(fig.children) == 2 and fig.children[0].get_title() == "" and len(fig.colorbars) == 2
   assert all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
   # complete asks for both hemispheres even of an antipodal pole figure, as MATLAB draws it
   odf.plotPDF(Miller(1, 0, 0, cs), complete=True)
@@ -212,3 +256,28 @@ def test_where_a_plot_goes():
   hold(False)
   plot(vs, upper=True)
   assert gcm() is not first
+
+
+def test_arrows_draw_the_tangential_part_at_its_length():
+  # as MATLAB's quiver: the normal field draws nothing, a tangential one its full size
+  h = plot(S2VectorFieldHarmonic.normal(), upper=True)[0]
+  assert np.hypot(h.U, h.V).max() < 1e-8
+  t = S2VectorFieldHarmonic(lambda v: v.cross(zvector), bandwidth=4)
+  h = plot(t, upper=True)[0]
+  assert np.isclose(np.hypot(h.U, h.V).max(), 0.5 * 10 * degree, rtol=0.02)
+
+
+def test_text_goes_where_nextAxis_points_in_a_held_figure():
+  # MATLAB's text adds to the current axes; without a chosen one to every chart
+  newMtexFigure(layout=[1, 3])
+  for k in range(3):
+    if k:
+      nextAxis()
+    plot(S2FunHarmonic(lambda v: v.z ** 2, bandwidth=4), upper=True)
+  nextAxis(1, 2)
+  hold(True)
+  text(xvector, ["a"])
+  hold(False)
+  assert [len([t for t in ax.texts if t.get_text() == "a"]) for ax in gcm().children] == [0, 1, 0]
+  text(xvector, ["b"])
+  assert all(any(t.get_text() == "b" for t in ax.texts) for ax in gcm().children)

@@ -37,3 +37,10 @@ def test_the_rank_two_file():
   cs = crystalFrame("mmm", [4.7646, 10.2296, 5.9942], mineral="Olivine")
   T = tensor.load(os.path.join(LOCAL, "Fosterite_PC_model.TEXP"), cs)
   assert T.rank == 2 and np.allclose(np.diag(T.M), [9.435, 14.846, 11.808]) and T.frame is cs
+
+
+def test_the_quartz_data_set_recipe():
+  # mtexdata('quartzPiezo'): the piezoelectric table in the quartz frame with the doubled shear columns
+  from mtex.io.sampledata import _quartzPiezo
+  P = _quartzPiezo(os.path.join(FIXTURES, "Single_RH_quartz_poly.P"))
+  assert P.rank == 3 and P.doubleConvention and P.unit == "pC/N" and checkSymmetry(P)

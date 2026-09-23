@@ -14,7 +14,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d
 from .funops import mapFun, smoothBandwidth
-from .harmonics import WignerD
+from .harmonics import mtexCoefficientsS2, _WignerD
 from .quadrature import quadratureS2Grid
 from .s2fun import S2FunHarmonic, realizeSpherical
 from .s2vectorfield import S2VectorField, _adjointColumns, _seriesColumns, _values, _vectorsFor
@@ -107,23 +107,43 @@ class S2AxisFieldHarmonic(S2AxisField):
       raise ValueError("a coefficient matrix has (L+1)^2 rows for its bandwidth L")
     for i in range(6):
       realizeSpherical(fhat[:, i])
-    self.fhat, self.frame = fhat, frame
+    self._fhat, self.frame = fhat, frame
     if symmetrise:
-      self.fhat = self.symmetrise().fhat
+      self._fhat = self.symmetrise()._fhat
+
+  # S2AxisFieldHarmonic.quadrature(f, bandwidth=L), MATLAB's name for the constructor
+  @classmethod
+  def quadrature(cls, f, *args, bandwidth=None, weights=None):
+    return cls(f, *args, bandwidth=bandwidth, weights=weights)
+
+  # the least squares fit to axes at directions: the six components of v v^T one by one
+  @classmethod
+  def interpolate(cls, nodes, values, *, bandwidth=None, weights=None, **kwargs):
+    from .density import interpolate
+    d = vector3d(nodes.data.reshape(-1, 3)).normalize()
+    comps = outerComponents(_values(values))
+    fs = [interpolate(d, comps[:, i], bandwidth=bandwidth, weights=weights, **kwargs) for i in range(6)]
+    L = max(f.bandwidth for f in fs)
+    return cls(np.stack([f.truncate(L)._fhat for f in fs], axis=-1), nodes.frame)
 
   def _rebuild(self, fhat):
     a = object.__new__(S2AxisFieldHarmonic)
-    a.fhat, a.frame = np.asarray(fhat), self.frame
+    a._fhat, a.frame = np.asarray(fhat), self.frame
     return a
+
+  # the coefficients of the components in MTEX's basis, one column per component
+  @property
+  def fhat(self):
+    return mtexCoefficientsS2(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsS2(self._fhat)
 
   @property
   def bandwidth(self):
-    return math.isqrt(self.fhat.shape[0]) - 1
+    return math.isqrt(self._fhat.shape[0]) - 1
 
   # the leading eigenvector of the reconstructed matrix
   def eval(self, x):
     v = _vectorsFor(self, x).normalize()
-    M = symmetricMatrices(_seriesColumns(self.fhat, v))
+    M = symmetricMatrices(_seriesColumns(self._fhat, v))
     _, vecs = np.linalg.eigh(M)
     return vector3d(vecs[..., :, 2].reshape(*v.shape, 3), antipodal=True)
 
@@ -136,9 +156,9 @@ class S2AxisFieldHarmonic(S2AxisField):
     actions = [symmetricAction(els[i].matrix()) for i in range(els.size)]
     Ds = []
     for i in range(els.size):
-      D = WignerD(els[i].rot, bandwidth=L)
+      D = _WignerD(els[i].rot, bandwidth=L)
       Ds.append([(-1 if els[i].isImproper and l % 2 else 1) * D[l] for l in range(L + 1)])
-    return self._rebuild(_projectSphericalRows(self.fhat.copy(), equivariantProjection(actions, Ds)))
+    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, Ds)))
 
   # the cosine of the angle to a constant axis, sqrt(x^T (a a^T) x), and to another field
   def dot(self, x):
@@ -149,13 +169,13 @@ class S2AxisFieldHarmonic(S2AxisField):
       g = quadratureS2Grid(L)
       xs = self._framed(g.nodes())
       values = np.abs(np.sum(_values(self(xs)) * _values(x(xs)), axis=-1))
-      return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), self.frame, real=True, symmetrise=False)
+      return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), self.frame, real=True, symmetrise=False, _internal=True)
     x = x if isinstance(x, vector3d) else vector3d(x)
     if x.frame is not None and self.frame is not None and x.frame is not self.frame:
       raise ValueError("the axis lives in another frame than the field")
     y = x.data.reshape(3)
-    q = self.fhat @ np.array([y[i] * y[j] * (1 if i == j else 2) for i, j in AXIS_COMPONENTS])
-    f = S2FunHarmonic(q, None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False)
+    q = self._fhat @ np.array([y[i] * y[j] * (1 if i == j else 2) for i, j in AXIS_COMPONENTS])
+    f = S2FunHarmonic(q, None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
     return mapFun(lambda t: np.sqrt(np.maximum(t, 0)), f, bandwidth=smoothBandwidth(f))
 
   def angle(self, x):

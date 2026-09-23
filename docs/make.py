@@ -133,8 +133,10 @@ def build(page):
     changed = []
     for num in plt.get_fignums():
       fig = plt.figure(num)
-      # a figure has changed when it is new or holds more artists; a settling layout is no change
-      count = sum(len(ax.get_children()) for ax in fig.axes)
+      # a figure has changed when it is new, holds more artists or looks from elsewhere; a
+      # settling layout is no change
+      count = (sum(len(ax.get_children()) for ax in fig.axes),
+               tuple((getattr(ax, "elev", None), getattr(ax, "azim", None), getattr(ax, "roll", None), ax.axison) for ax in fig.axes))
       if snapshots.get(num) == count:
         continue
       snapshots[num] = count

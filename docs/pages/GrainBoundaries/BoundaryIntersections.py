@@ -18,9 +18,8 @@
 # maps.
 
 # +
-import matplotlib.pyplot as plt
 import numpy as np
-from mtex import calcGrains, hold, mtexdata, plot, plottingConvention, smoothBoundary
+from mtex import calcGrains, hold, line, mtexdata, plot, plottingConvention, scatter, smoothBoundary
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')
@@ -47,7 +46,7 @@ xy1 = [10, 10]   # start point
 xy2 = [41, 41]   # end point
 
 hold(True)
-plt.plot([xy1[0], xy2[0]], [xy1[1], xy2[1]], linestyle=':', linewidth=4, color='w')
+line([xy1[0], xy2[0]], [xy1[1], xy2[1]], LineStyle=':', LineWidth=4, Color='w')
 hold(False)
 # -
 
@@ -60,10 +59,11 @@ hold(False)
 # in which the line meets them.
 
 # +
-crossed, points = gB.intersect(xy1, xy2)
+x, y = gB.intersect(xy1, xy2)
+isIntersection = ~np.isnan(x)
 
 hold(True)
-plt.scatter(points.x, points.y, s=36, c='b')
+scatter(x[isIntersection], y[isIntersection], 36, 'b', 'filled')
 hold(False)
 # -
 
@@ -79,14 +79,26 @@ hold(False)
 # quantities are printed because they are the result of the example.
 
 # +
-nIntersections = len(crossed)
-lineLength = np.linalg.norm(np.array(xy2) - np.array(xy1))
-meanIntercept = lineLength / nIntersections
-print(f'{nIntersections} intersections over {lineLength:.4f} µm, mean intercept {meanIntercept:.4f} µm')
+nIntersections = np.count_nonzero(isIntersection)
+nIntersections
 # -
 
-# This 43.84 µm traverse crosses 17 boundary segments. Its mean lineal intercept is
-# 2.58 µm. This is apparent grain size on a two-dimensional section, not a mean grain
+# ---
+
+# +
+lineLength = np.linalg.norm(np.subtract(xy2, xy1))
+lineLength
+# -
+
+# ---
+
+# +
+meanIntercept = lineLength / nIntersections
+meanIntercept
+# -
+
+# This 43.84 µm traverse crosses 18 boundary segments. Its mean lineal intercept is
+# 2.44 µm. This is apparent grain size on a two-dimensional section, not a mean grain
 # diameter in three dimensions.
 
 # ## From one traverse to a measurement
@@ -128,8 +140,5 @@ print(f'{nIntersections} intersections over {lineLength:.4f} µm, mean intercept
 
 # ## Technical Details
 #
-# `intersect` returns the pair of the crossed segments and the crossing points as
-# directions of the map, where MATLAB returns one `x` and one `y` per segment with `NaN`
-# for a miss. The two forms hold the same crossings, and the count is the length of the
-# list rather than a count of finite entries. The test line itself is drawn with
-# matplotlib, since it is a plain line on the map rather than an MTEX object.
+# `line` and `scatter` of two coordinate lists draw into the current map under its layout,
+# as MATLAB's do.

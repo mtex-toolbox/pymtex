@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (Miller, WignerD, clebschGordan, clebschGordanTensor, crystalFrame, deg2dim, degree, degreeBlock,
+from mtex.functions.harmonics import _WignerD, _sphericalY
+from mtex import (Miller, S2FunHarmonic, SO3FunHarmonic, WignerD, clebschGordan, clebschGordanTensor, crystalFrame, deg2dim, degree, degreeBlock,
                   degreeRange, dim2deg, normalizedLegendre, rotation, specimenFrame, sphericalY, symmetry, vector3d,
                   wigner3j, wignerSeries, wignerd, xvector)
 from conftest import close
@@ -97,36 +98,47 @@ def test_H2_wignerd():
 def test_H3_WignerD():
   for _ in range(10):
     r1, r2 = rotation.rand(rng=rng), rotation.rand(rng=rng)
-    D1, D2, D12 = WignerD(r1, bandwidth=4), WignerD(r2, bandwidth=4), WignerD(r1 * r2, bandwidth=4)
-    Dinv = WignerD(r1.inv(), bandwidth=4)
+    D1, D2, D12 = _WignerD(r1, bandwidth=4), _WignerD(r2, bandwidth=4), _WignerD(r1 * r2, bandwidth=4)
+    Dinv = _WignerD(r1.inv(), bandwidth=4)
     for n in range(5):
       assert close(D12[n], D1[n] @ D2[n])
       assert close(Dinv[n], D1[n].conj().T)
       assert close(D1[n] @ D1[n].conj().T, np.eye(2 * n + 1))
-  assert all(close(WignerD(rotation.id, n), np.eye(2 * n + 1)) for n in range(4))
+  assert all(close(_WignerD(rotation.id, n), np.eye(2 * n + 1)) for n in range(4))
   # the definition in the Matthies angles, and the mapping to MTEX's WignerD.m
   r = rotation.byEuler(0.4, 1.1, 2.3, "Matthies")
   d = wignerd(1.1, 3)
   D = np.array([[np.exp(-1j * k * 0.4) * d[k + 3, l + 3] * np.exp(-1j * l * 2.3) for l in range(-3, 4)] for k in range(-3, 4)])
-  assert close(WignerD(r, 3), D)
+  assert close(_WignerD(r, 3), D)
   Dmtex = np.array([[np.exp(-1j * k * 2.3) * d[l + 3, k + 3] * np.exp(-1j * l * 0.4) for l in range(-3, 4)] for k in range(-3, 4)])
   assert close(Dmtex, D.T)
   # a container stacks the matrices in front, and single precision gives complex64
   rs = rotation.rand(2, 3, rng=rng)
-  Ds = WignerD(rs, 2)
-  assert Ds.shape == (2, 3, 5, 5) and close(Ds[1, 2], WignerD(rs[1, 2], 2))
-  assert WignerD(r, 3, dtype=np.float32).dtype == np.complex64
+  Ds = _WignerD(rs, 2)
+  assert Ds.shape == (2, 3, 5, 5) and close(Ds[1, 2], _WignerD(rs[1, 2], 2))
+  assert _WignerD(r, 3, dtype=np.float32).dtype == np.complex64
+  # MATLAB's matrices, the basis of the public coefficients: its run of WignerFunctions
+  d = WignerD(90 * degree, 1)
+  assert close(d, [[0.5, -np.sqrt(0.5), -0.5], [np.sqrt(0.5), 0, np.sqrt(0.5)], [-0.5, -np.sqrt(0.5), 0.5]])
+  R = rotation.byEuler(20 * degree, 40 * degree, 10 * degree)
+  W = WignerD(R, 1, normalize=True)
+  assert np.allclose(W[2, 0], 0.1995 + 0.0352j, atol=1e-4) and np.allclose(W[0, 0], 1.3245 + 0.7647j, atol=1e-4)
+  for n in range(4):
+    c = rng.standard_normal((2 * n + 1) ** 2) + 1j * rng.standard_normal((2 * n + 1) ** 2)
+    fhat = np.concatenate([np.zeros(deg2dim(n)), c])
+    # MATLAB stores a block column by column
+    assert close(SO3FunHarmonic(fhat).eval(R), np.sum(c.reshape(2 * n + 1, 2 * n + 1, order="F") * WignerD(R, n, normalize=True)))
 
 
 def test_H4_spherical_harmonics():
   for _ in range(5):
     v = vector3d.rand(rng=rng)
     theta, rho = v.theta, v.rho
-    assert close(sphericalY(0, v), [1 / np.sqrt(4 * pi)])
-    assert close(sphericalY(1, v), [np.sqrt(3 / 8 / pi) * np.sin(theta) * np.exp(-1j * rho), np.sqrt(3 / 4 / pi) * np.cos(theta), -np.sqrt(3 / 8 / pi) * np.sin(theta) * np.exp(1j * rho)])
-    assert close(sphericalY(2, v)[4], np.sqrt(15 / 32 / pi) * np.sin(theta) ** 2 * np.exp(2j * rho))
+    assert close(_sphericalY(0, v), [1 / np.sqrt(4 * pi)])
+    assert close(_sphericalY(1, v), [np.sqrt(3 / 8 / pi) * np.sin(theta) * np.exp(-1j * rho), np.sqrt(3 / 4 / pi) * np.cos(theta), -np.sqrt(3 / 8 / pi) * np.sin(theta) * np.exp(1j * rho)])
+    assert close(_sphericalY(2, v)[4], np.sqrt(15 / 32 / pi) * np.sin(theta) ** 2 * np.exp(2j * rho))
     for l in range(6):
-      Y = sphericalY(l, v)
+      Y = _sphericalY(l, v)
       assert all(close(Y[l - m], (-1) ** m * np.conj(Y[l + m])) for m in range(l + 1))
   # orthonormality by a product rule exact to degree 12
   x, w = np.polynomial.legendre.leggauss(8)
@@ -134,21 +146,29 @@ def test_H4_spherical_harmonics():
   X, I = np.meshgrid(x, np.arange(m), indexing="ij")
   nodes = vector3d(np.sqrt(1 - X ** 2) * np.cos(2 * pi * I / m), np.sqrt(1 - X ** 2) * np.sin(2 * pi * I / m), X).flatten()
   weights = np.repeat(w, m) * 2 * pi / m
-  Y = np.concatenate([sphericalY(l, nodes) for l in range(6)])
+  Y = np.concatenate([_sphericalY(l, nodes) for l in range(6)])
   assert close(Y @ np.diag(weights) @ Y.conj().T, np.eye(36))
   # rotation: Y_l(R xi) = conj(D_l(R)) Y_l(xi), and none of the other placements
   for _ in range(5):
     r, v = rotation.rand(rng=rng), vector3d.rand(rng=rng)
     for l in range(1, 5):
-      Y, D = sphericalY(l, v), WignerD(r, l)
-      assert close(sphericalY(l, r * v), np.conj(D) @ Y)
-      assert close(sphericalY(l, r.inv() * v), D.T @ Y)
-      assert not close(sphericalY(l, r * v), D @ Y) and not close(sphericalY(l, r * v), D.conj().T @ Y)
+      Y, D = _sphericalY(l, v), _WignerD(r, l)
+      assert close(_sphericalY(l, r * v), np.conj(D) @ Y)
+      assert close(_sphericalY(l, r.inv() * v), D.T @ Y)
+      assert not close(_sphericalY(l, r * v), D @ Y) and not close(_sphericalY(l, r * v), D.conj().T @ Y)
   # a framed direction and a container
   cs = crystalFrame("m-3m")
-  assert close(sphericalY(2, Miller(1, 0, 0, cs)), sphericalY(2, xvector))
-  assert sphericalY(3, vector3d.rand(7, rng=rng)).shape == (7, 7)
+  assert close(_sphericalY(2, Miller(1, 0, 0, cs)), _sphericalY(2, xvector))
+  assert _sphericalY(3, vector3d.rand(7, rng=rng)).shape == (7, 7)
   assert normalizedLegendre(4, np.linspace(-1, 1, 5)).shape == (5, 5)
+  # MTEX's basis, the one of the public coefficients: Y_l^{-m} = conj(Y_l^m), MATLAB's values at x
+  assert close(sphericalY(1, xvector), [0.345494149471335, 0, 0.345494149471335])
+  for l in range(5):
+    v = vector3d.rand(3, rng=rng)
+    Y = sphericalY(l, v)
+    assert all(close(Y[l - m], np.conj(Y[l + m])) for m in range(l + 1))
+    c = rng.standard_normal(2 * l + 1) + 1j * rng.standard_normal(2 * l + 1)
+    assert close(S2FunHarmonic(np.concatenate([np.zeros(l * l), c])).eval(v), c @ Y)
 
 
 def test_H5_series_and_sides():
@@ -158,7 +178,7 @@ def test_H5_series_and_sides():
   # the action of a rotation on either side
   left, right = fhat.copy(), fhat.copy()
   for n in range(L + 1):
-    Dt = WignerD(s, n).T
+    Dt = _WignerD(s, n).T
     degreeBlock(left, n)[...] = Dt @ degreeBlock(fhat, n)
     degreeBlock(right, n)[...] = degreeBlock(fhat, n) @ Dt
   assert close(wignerSeries(left, r), wignerSeries(fhat, s * r))
@@ -169,14 +189,14 @@ def test_H5_series_and_sides():
   assert close(wignerSeries(np.stack([fhat, left]), rs)[1], wignerSeries(left, rs))
   # orthonormality of the basis under the normalised Haar measure
   nodes, weights = so3Quadrature(2 * L)
-  D = WignerD(nodes, bandwidth=L)
+  D = _WignerD(nodes, bandwidth=L)
   B = np.concatenate([np.sqrt(2 * n + 1) * D[n].swapaxes(-1, -2).reshape(nodes.size, -1).T for n in range(L + 1)])
   assert close(B @ np.diag(weights) @ B.conj().T, np.eye(deg2dim(L + 1)))
   assert close(np.sum(weights), 1)
   # group projections: idempotent, Hermitian, and the projected function is invariant
   for name in ("m-3m", "622", "-3m", "2/m", "-1", "4mm"):
     pg = symmetry(name)
-    P = WignerD(pg, bandwidth=L)
+    P = _WignerD(pg, bandwidth=L)
     for n in range(L + 1):
       assert close(P[n] @ P[n], P[n])
       assert close(P[n], P[n].conj().T)
@@ -188,10 +208,10 @@ def test_H5_series_and_sides():
       assert close(wignerSeries(sym, r * e), wignerSeries(sym, r))
       assert close(wignerSeries(sym, e * r), wignerSeries(sym, r))
     # a frame delegates to its group, whose elements are written in the frame's axes
-    assert close(WignerD(crystalFrame(name), 2), WignerD(crystalFrame(name).sym, 2))
-  assert close(WignerD(symmetry("1"), 2), np.eye(5))
-  assert close(WignerD(specimenFrame("-1"), 2), np.eye(5))
-  assert WignerD(symmetry("622"), 2, dtype=np.float32).dtype == np.complex64
+    assert close(_WignerD(crystalFrame(name), 2), _WignerD(crystalFrame(name).sym, 2))
+  assert close(_WignerD(symmetry("1"), 2), np.eye(5))
+  assert close(_WignerD(specimenFrame("-1"), 2), np.eye(5))
+  assert _WignerD(symmetry("622"), 2, dtype=np.float32).dtype == np.complex64
 
 
 def test_H6_Clebsch_Gordan():
@@ -209,11 +229,11 @@ def test_H6_Clebsch_Gordan():
   # the expansion of a product of Wigner-D matrices, check_clebschGordan.m
   g = rotation.byEuler(-72 * degree, 88 * degree, 134 * degree, "Bunge")
   for l1, l2 in ((1, 1), (1, 2), (2, 1), (2, 2)):
-    D1, D2 = WignerD(g, l1), WignerD(g, l2)
+    D1, D2 = _WignerD(g, l1), _WignerD(g, l2)
     ref = np.kron(D1, D2)
     got = np.zeros_like(ref)
     for J in range(abs(l1 - l2), l1 + l2 + 1):
       C = clebschGordanTensor(l1, l2, J).reshape(-1, 2 * J + 1)
-      got += C @ WignerD(g, J) @ C.T
+      got += C @ _WignerD(g, J) @ C.T
     assert close(got, ref, 1e-10)
     assert np.linalg.norm(ref) > 1e-6

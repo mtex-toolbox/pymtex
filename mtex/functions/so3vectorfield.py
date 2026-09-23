@@ -31,7 +31,7 @@ from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from .funops import _rotatedCoefficients, _rotatedFrame
-from .harmonics import WignerD, deg2dim, degreeBlock, dim2deg, invariantProjection, projectLeft, projectRight
+from .harmonics import mtexCoefficientsSO3, _WignerD, deg2dim, degreeBlock, dim2deg, invariantProjection, projectLeft, projectRight
 from .kernelfunctions import SO3DeLaValleePoussinKernel, SO3Kernel
 from .quadrature import bandwidthFor, quadratureSO3Grid
 from .rbf import _conj, _qmul, _readFrames, _rotationsFor, supportCosine
@@ -273,7 +273,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       CS, SS = v.CS, v.SS
       side = side if [a for a in args if isinstance(a, str)] else v.tangentSpace
       if isinstance(v, SO3VectorFieldHarmonic) and side == v.tangentSpace:
-        fhat = v.truncate(bandwidth).fhat if bandwidth is not None else v.fhat
+        fhat = v.truncate(bandwidth)._fhat if bandwidth is not None else v._fhat
         symmetrise = False
       else:
         fhat = v._harmonicField(side, bandwidth)._fhat_
@@ -294,12 +294,12 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       if len(fhat) != 3:
         raise ValueError("three component functions are needed")
       L = max(f.bandwidth for f in fhat)
-      fhat = np.stack([f.truncate(L).fhat for f in fhat], axis=-1)
+      fhat = np.stack([f.truncate(L)._fhat for f in fhat], axis=-1)
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       fhat, cut = self._byQuadrature(fhat, CS, SS, side, bandwidth)
-      self.fhat, self.CS, self.SS, self.tangentSpace = fhat, CS, SS, side
-      self.fhat = self.symmetrise().fhat
-      self.fhat = self.truncate(cut).fhat
+      self._fhat, self.CS, self.SS, self.tangentSpace = fhat, CS, SS, side
+      self._fhat = self.symmetrise()._fhat
+      self._fhat = self.truncate(cut)._fhat
       return
     fhat = np.array(fhat, dtype=complex)
     if fhat.ndim != 2 or fhat.shape[1] != 3:
@@ -308,9 +308,21 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       raise ValueError("a coefficient matrix has deg2dim(L+1) rows for its bandwidth L")
     for i in range(3):
       realizeWigner(fhat[:, i])
-    self.fhat, self.CS, self.SS, self.tangentSpace = fhat, CS, SS, side
+    self._fhat, self.CS, self.SS, self.tangentSpace = fhat, CS, SS, side
     if symmetrise:
-      self.fhat = self.symmetrise().fhat
+      self._fhat = self.symmetrise()._fhat
+
+  # MATLAB's SO3VectorFieldHarmonic.quadrature(fun, cs): the field of a callable, cut to
+  # the last degree that carries more than rounding, as a polynomial field is
+  @classmethod
+  def quadrature(cls, fun, *args, bandwidth=None, tol=1e-10):
+    F = cls(fun, *args, bandwidth=bandwidth)
+    size = np.abs(F._fhat).max(axis=1)
+    big = np.flatnonzero(size > tol * max(size.max(), np.finfo(float).tiny))
+    L = 0
+    while big.size and deg2dim(L + 1) <= big[-1]:
+      L += 1
+    return F.truncate(L)
 
   # from a callable by exact quadrature on the rule of the component frames, then the
   # projection, which the folded rule needs; the callable receives the orientations of
@@ -327,45 +339,50 @@ class SO3VectorFieldHarmonic(SO3VectorField):
 
   @property
   def _fhat_(self):
-    return self.fhat
+    return self._fhat
 
   def _harmonicField(self, side, bandwidth):
     return self.toSide(side).truncate(self.bandwidth if bandwidth is None else bandwidth)
 
   def _rebuild(self, fhat, **changes):
     v = object.__new__(SO3VectorFieldHarmonic)
-    v.fhat, v.CS, v.SS, v.tangentSpace = np.asarray(fhat), self.CS, self.SS, self.tangentSpace
+    v._fhat, v.CS, v.SS, v.tangentSpace = np.asarray(fhat), self.CS, self.SS, self.tangentSpace
     for k, x in changes.items():
       setattr(v, k, x)
     return v
 
+  # the coefficients of the components in MTEX's basis, one column per component
+  @property
+  def fhat(self):
+    return mtexCoefficientsSO3(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsSO3(self._fhat)
+
   @property
   def bandwidth(self):
-    return dim2deg(self.fhat.shape[0])
+    return dim2deg(self._fhat.shape[0])
 
   def truncate(self, L):
     if L == self.bandwidth:
       return self
-    fhat = np.zeros((deg2dim(L + 1), 3), dtype=self.fhat.dtype)
-    n = min(len(fhat), len(self.fhat))
-    fhat[:n] = self.fhat[:n]
+    fhat = np.zeros((deg2dim(L + 1), 3), dtype=self._fhat.dtype)
+    n = min(len(fhat), len(self._fhat))
+    fhat[:n] = self._fhat[:n]
     return self._rebuild(fhat)
 
   # one component as a function on the component frames
   def component(self, i):
     cA, cB = self.componentFrames()
-    return SO3FunHarmonic(self.fhat[:, i], cA, cB, real=True, symmetrise=False)
+    return SO3FunHarmonic(self._fhat[:, i], cA, cB, real=True, symmetrise=False, _internal=True)
 
   def eval(self, x):
     r = self._rotationsFor(x)
-    return self._tangent(_seriesColumns(self.fhat, r), x)
+    return self._tangent(_seriesColumns(self._fhat, r), x)
 
   # the projection onto the equivariant fields of the frames: the invariant side one
   # component at a time, the equivariant side F -> s F(s^-1 R) on the left, F -> s F(R s)
   # on the right, by the Kronecker products
   def symmetrise(self):
     L = self.bandwidth
-    fhat = self.fhat.copy()
+    fhat = self._fhat.copy()
     if self.tangentSpace == "left":
       Q = invariantProjection(self.CS, L)
       for i in range(3):
@@ -379,10 +396,10 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       return self._rebuild(fhat)
     actions = [rotation(q).matrix() for q in rots]
     if self.tangentSpace == "left":
-      Ds = [[np.conj(D) for D in WignerD(rotation(q), bandwidth=L)] for q in rots]
+      Ds = [[np.conj(D) for D in _WignerD(rotation(q), bandwidth=L)] for q in rots]
       _projectRows(fhat, equivariantProjection(actions, Ds))
     else:
-      Ds = [WignerD(rotation(q), bandwidth=L) for q in rots]
+      Ds = [_WignerD(rotation(q), bandwidth=L) for q in rots]
       _projectColumns(fhat, equivariantProjection(actions, Ds))
     return self._rebuild(fhat)
 
@@ -394,22 +411,22 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     self._sameFrames(w)
     w = SO3VectorFieldHarmonic(w, self.tangentSpace)
     L = max(self.bandwidth, w.bandwidth)
-    return self._rebuild(self.truncate(L).fhat + w.truncate(L).fhat)
+    return self._rebuild(self.truncate(L)._fhat + w.truncate(L)._fhat)
 
   def _scaled(self, a):
-    return self._rebuild(a * self.fhat)
+    return self._rebuild(a * self._fhat)
 
   # the mean over SO(3) and the L2 norm of the field
   def mean(self):
-    return vector3d(np.real(self.fhat[0]))
+    return vector3d(np.real(self._fhat[0]))
 
   def norm(self):
-    return float(np.linalg.norm(self.fhat))
+    return float(np.linalg.norm(self._fhat))
 
   def isclose(self, w, rtol=1e-8):
     w = SO3VectorFieldHarmonic(w, self.tangentSpace)
     L = max(self.bandwidth, w.bandwidth)
-    a, b = self.truncate(L).fhat, w.truncate(L).fhat
+    a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= rtol * np.linalg.norm(b))
 
   # the inner product with a constant vector, exact, a function on the component frames
@@ -420,7 +437,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     if x.frame is not None and x.frame is not (self.SS if self.tangentSpace == "left" else self.CS):
       raise ValueError("the vector lives in another frame than the components")
     cA, cB = self.componentFrames()
-    return SO3FunHarmonic(self.fhat @ x.data.reshape(3), cA, cB, real=True, symmetrise=False)
+    return SO3FunHarmonic(self._fhat @ x.data.reshape(3), cA, cB, real=True, symmetrise=False, _internal=True)
 
   # ---- rotation and inversion
 
@@ -438,7 +455,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
         raise ValueError("a right rotation maps into the crystal frame of the field")
       return _reframe(self.rotate(rotation(o), side), o.CS, self.SS)
     rot = rotation(r.data.reshape(4))
-    fhat = np.stack([_rotatedCoefficients(self.fhat[:, i], rot, side) for i in range(3)], axis=-1)
+    fhat = np.stack([_rotatedCoefficients(self._fhat[:, i], rot, side) for i in range(3)], axis=-1)
     M = _coordinateRotation(rot, self.tangentSpace, side)
     if M is not None:
       fhat = fhat @ M.T
@@ -449,7 +466,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   # the push-forward under R -> R^-1: a left vector v at R becomes the right vector -v at
   # R^-1, so inv(grad f) = grad(inv f); the frames swap with the side
   def inv(self):
-    fhat = np.stack([-invertedCoefficients(self.fhat[:, i]) for i in range(3)], axis=-1)
+    fhat = np.stack([-invertedCoefficients(self._fhat[:, i]) for i in range(3)], axis=-1)
     return self._rebuild(fhat, CS=self.SS, SS=self.CS, tangentSpace=_other(self.tangentSpace))
 
   def __repr__(self):
@@ -457,7 +474,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
 
 
 def _reframe(v, CS, SS):
-  return v._rebuild(v.fhat, CS=CS, SS=SS) if isinstance(v, SO3VectorFieldHarmonic) else v._reframe(CS, SS)
+  return v._rebuild(v._fhat, CS=CS, SS=SS) if isinstance(v, SO3VectorFieldHarmonic) else v._reframe(CS, SS)
 
 
 def _coordinateRotation(r, storage, side):
@@ -480,16 +497,16 @@ def _divergenceCoefficients(fhat, side):
 # the divergence, invariant under both groups
 def div(v, x=None):
   v = SO3VectorFieldHarmonic(v)
-  f = SO3FunHarmonic(_divergenceCoefficients(v.fhat, v.tangentSpace), v.CS, v.SS, real=True, symmetrise=False)
+  f = SO3FunHarmonic(_divergenceCoefficients(v._fhat, v.tangentSpace), v.CS, v.SS, real=True, symmetrise=False, _internal=True)
   return f if x is None else f(x)
 
 
 # the curl, the dual of the exterior derivative, a field of the same side
 def curl(v, x=None):
   v = SO3VectorFieldHarmonic(v)
-  G = [differentiate(v.fhat[:, k], v.tangentSpace) for k in range(3)]
+  G = [differentiate(v._fhat[:, k], v.tangentSpace) for k in range(3)]
   rot = np.stack([G[2][:, 1] - G[1][:, 2], G[0][:, 2] - G[2][:, 0], G[1][:, 0] - G[0][:, 1]], axis=-1)
-  c = v._rebuild(rot + v.fhat if v.tangentSpace == "left" else rot - v.fhat)
+  c = v._rebuild(rot + v._fhat if v.tangentSpace == "left" else rot - v._fhat)
   return c if x is None else c(x)
 
 
@@ -498,12 +515,12 @@ def curl(v, x=None):
 def antiderivative(v, x=None, conservative=False, tolerance=1e-4):
   v = SO3VectorFieldHarmonic(v)
   d = div(v)
-  fhat = d.fhat.copy()
+  fhat = d._fhat.copy()
   fhat[0] = 0
   for n in range(1, d.bandwidth + 1):
     degreeBlock(fhat, n)[...] /= -(n * (n + 1))
   f = d._rebuild(fhat)
-  if not conservative and np.linalg.norm(differentiate(f.fhat, v.tangentSpace) - v.fhat) > tolerance * max(np.linalg.norm(v.fhat), np.finfo(float).eps):
+  if not conservative and np.linalg.norm(differentiate(f._fhat, v.tangentSpace) - v._fhat) > tolerance * max(np.linalg.norm(v._fhat), np.finfo(float).eps):
     raise ValueError("the field is not conservative: it is not the gradient of a function")
   return f if x is None else f(x)
 
@@ -517,7 +534,7 @@ def grad(f, x=None, side="left", delta=0.05 * degree):
   if isinstance(f, SO3FunHarmonic):
     if not f.isReal:
       raise ValueError("the gradient of a complex valued function is not a real vector field")
-    field = SO3VectorFieldHarmonic(differentiate(f.fhat, side), f.CS, f.SS, side, symmetrise=False)
+    field = SO3VectorFieldHarmonic(differentiate(f._fhat, side), f.CS, f.SS, side, symmetrise=False)
     return field if x is None else field(x)
   if x is not None and hasattr(f, "grad"):
     return f.grad(x, side)
@@ -570,7 +587,7 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
   if values.ndim == 2:
     return SO3VectorFieldHarmonic(_adjointColumns(g, values, L, g.weights), v.CS, v.SS, v.tangentSpace).truncate(L0)
   fhat = wignerSeriesAdjoint(g, values, L)
-  f = SO3FunHarmonic(fhat, v.CS, v.SS, real=True) if invariant else SO3FunHarmonic(fhat, cA, cB, real=True)
+  f = SO3FunHarmonic(fhat, v.CS, v.SS, real=True, _internal=True) if invariant else SO3FunHarmonic(fhat, cA, cB, real=True, _internal=True)
   return f.truncate(L0)
 
 
@@ -598,7 +615,7 @@ class SO3VectorFieldHandle(SO3VectorField):
 
   @property
   def _fhat_(self):
-    return self.fhat
+    return self._fhat
 
   def _scaled(self, a):
     return SO3VectorFieldHandle(lambda o: a * _tangentValues(self.fun(o), self.tangentSpace), self.CS, self.SS, self.tangentSpace, bandwidth=self.bandwidth)
@@ -732,7 +749,7 @@ class SO3VectorFieldRBF(SO3VectorField):
 
   @property
   def _fhat_(self):
-    return self.fhat
+    return self._fhat
 
   def _scaled(self, a):
     return SO3VectorFieldRBF(self.center, a * self.weights, self.psi, self.tangentSpace)
@@ -765,7 +782,7 @@ class SO3VectorFieldRBF(SO3VectorField):
 
 # every field converts through the harmonic one; the property the constructor reads
 for _cls in (SO3VectorFieldHandle, SO3VectorFieldRBF):
-  _cls.fhat = property(lambda self: SO3VectorFieldHarmonic(self).fhat)
+  _cls._fhat = property(lambda self: SO3VectorFieldHarmonic(self)._fhat)
 
 # the tangent vectors of a field at orientations by least squares componentwise on the
 # component frames

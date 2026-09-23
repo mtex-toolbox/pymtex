@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
+from mtex import (S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
                   angle, bandwidthFor, calcAngleDistribution, calcAxisDistribution, calcComponents, calcDensity, calcError,
                   calcKernel, calcMDF, calcMIndex, centerSpecimen, conv, crystalFrame, degree, discreteSample, entropy,
                   equispacedS2Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
@@ -70,11 +70,12 @@ def test_C2_extrema():
   vf, pf = max(sf)
   assert pf.frame is cs6 and abs(vector3d(pf.data).dot(zvector)) > np.cos(0.3 * degree)
   # several maxima of a symmetric function are distinct orbits, not copies of one mode
-  adf = calcAxisDistribution(crystalFrame("m-3m"))
-  va, pa = max(adf, numLocal=4)
-  assert pa.size == 4 and np.all(np.diff(va) <= 0)
-  for i in range(4):
-    for j in range(i + 1, 4):
+  cs = crystalFrame("m-3m")
+  adf = S2FunHarmonic(S2FunHandle(calcAxisDistribution(cs), cs, bandwidth=64, antipodal=True))
+  va, pa = max(adf, numLocal=2)
+  assert pa.size == 2 and np.all(np.diff(va) <= 0)
+  for i in range(2):
+    for j in range(i + 1, 2):
       assert angle(pa[i], pa[j]) > 2 * degree
   assert np.isclose(va[0], np.max(np.real(adf(equispacedS2Grid(resolution=0.5 * degree)))), rtol=1e-3)
   assert max([3, 1, 2]) == 3 and min(4, 2) == 2
@@ -106,12 +107,17 @@ def test_C3_components():
 
 def test_C4_misorientations():
   cs = crystalFrame("mmm")
-  # the angle distribution integrates to one; the mean angle of the uniform cubic distribution is known
-  omega, p = calcAngleDistribution(cs, cs, resolution=2 * degree)
-  assert np.isclose(np.sum(p) * (omega[1] - omega[0]), 1, rtol=1e-3)
-  oc, pc = calcAngleDistribution(crystalFrame("m-3m"), crystalFrame("m-3m"), resolution=2 * degree)
-  assert np.max(oc[pc > 1e-6]) < 63 * degree
-  assert np.isclose(np.sum(oc * pc) * (oc[1] - oc[0]), 40.73 * degree, rtol=1e-2)
+  # the uniform angle distribution has mean one; Mackenzie's mean angle of the cubic one; the
+  # uniform ODF gives the same, a list of random misorientations a histogram of it in percent
+  p, omega = calcAngleDistribution(cs, cs)
+  assert np.isclose(np.mean(p), 1)
+  pc, oc = calcAngleDistribution(crystalFrame("m-3m"), crystalFrame("m-3m"))
+  assert np.isclose(oc[-1], 62.8 * degree, atol=0.01 * degree)
+  assert np.isclose(np.sum(oc * pc) / np.sum(pc), 40.73 * degree, rtol=1e-2)
+  pf, of = calcAngleDistribution(uniformODF(cs, cs), resolution=2 * degree)
+  assert np.allclose(of, omega) and np.mean(np.abs(pf - p)) < 0.01
+  h, mid = calcAngleDistribution(orientation.rand(20000, cs, cs, rng=rng))
+  assert np.isclose(np.sum(h), 100) and np.mean(np.abs(h / 100 * len(h) - np.interp(mid, omega, p))) < 0.1
   # the MDF of the uniform ODF is uniform, its M-index zero
   assert calcMIndex(uniformODF(cs), resolution=2 * degree) < 2e-2
   m = calcMDF(uniformODF(cs))

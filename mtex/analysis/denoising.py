@@ -79,9 +79,22 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   comp[~isData | (comp < 0)] = 0
   source = np.where(comp > 0, np.arange(n), -1)
   offs = np.array([tuple(int(x) for x in o) for o in l.stencil], dtype=np.int64)
-  if fill:
+  # fill=grains: an empty pixel is filled only inside the grain whose polygon holds it
+  host = None
+  if fill is not False and fill is not None and hasattr(fill, "checkInside"):
+    empty = np.flatnonzero(~isData & ~ebsd.isPadding.reshape(-1))
+    host = np.zeros(n, dtype=np.int64)
+    if len(empty):
+      from ..geometry.vector3d import vector3d
+      hit = fill.checkInside(vector3d(ebsd.pos.data.reshape(-1, 3)[empty], frame=ebsd.frame))
+      has = hit.any(axis=1)
+      host[empty[has]] = fill.id[np.argmax(hit[has], axis=1)]
+  if fill is not False and fill is not None:
     # the padding of a grid lies outside the scan, whatever extrapolate asks
-    outside = np.zeros(n, dtype=bool) if extrapolate else outsideMask(l, lk, isData)
+    if host is not None:
+      outside = host == 0
+    else:
+      outside = np.zeros(n, dtype=bool) if extrapolate else outsideMask(l, lk, isData)
     outside |= ebsd.isPadding.reshape(-1)
     front = np.flatnonzero(comp > 0)
     while len(front):
@@ -91,6 +104,8 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
         ok = (nb >= 0)
         nbb = np.maximum(nb, 0)
         ok &= (comp[nbb] == 0) & ~isData[nbb] & ~outside[nbb]
+        if host is not None:
+          ok &= host[nbb] == comp[front]
         # a site reached from two pixels of the front takes the first of them
         nb, src = nb[ok], front[ok]
         _, first = np.unique(nb, return_index=True)
@@ -271,14 +286,14 @@ def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
 
 # the map with every orientation replaced by one computed from its neighbours, within the
 # grains where the map knows them and within the phases where it does not. fill solves for
-# the pixels that carry no measurement as well; a window filter can solve for nothing, so
+# the pixels that carry no measurement as well, fill=grains only for those inside a grain; a window filter can solve for nothing, so
 # there the holes are closed by fill first. props names the numeric properties smoothed
 # along with the orientations, none by default
 def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
   F = l1TVFilter() if F is None else F
   window = isinstance(F, windowFilter)
   out = ebsd.fill(extrapolate=extrapolate) if fill and window else ebsd.copy()
-  comp, edges, isData, source = smoothingGraph(out, fill=fill and not window, extrapolate=extrapolate)
+  comp, edges, isData, source = smoothingGraph(out, fill=False if window else fill, extrapolate=extrapolate)
   u, ref = tangentField(out, comp, isData)
   v = _applyFilter(F, out, comp, edges, isData, u, False)
   _writeBack(out, comp, ref, v, isData, source, np.ones(len(comp), dtype=bool))

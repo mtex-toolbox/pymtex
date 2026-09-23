@@ -22,7 +22,7 @@ import math
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.display import table
+from ..geometry.display import numString, table
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
@@ -223,23 +223,33 @@ class tensor(MtexArray):
     return bool(np.all(np.linalg.norm((self + self.transpose()).data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
 
   def __repr__(self):
-    lines = [f"{type(self).__name__} ({self._frame.char()})"]
+    # a crystal tensor is headed by its frame, a specimen one by the convention it is drawn in, as a vector is
+    fr = self._frame
+    lines = [f"{type(self).__name__} ({fr.char() if isinstance(fr, crystalFrame) else fr.conventionChar() or fr.char()})"]
+    if self.name is not None:
+      lines.append(f"  name: {self.name}")
     if self.density is not None:
-      lines.append(f"  density: {self.density}")
+      d = self.density
+      lines.append(f"  density: {numString(d, digits=5) if np.ndim(d) == 0 else ', '.join(numString(x, digits=5) for x in np.ravel(d))}")
     if self.unit is not None:
       lines.append(f"  unit: {self.unit}")
     size = " x ".join(str(n) for n in self.shape) if self.ndim else ""
-    lines.append(f"  rank: {self.rank} ({' x '.join(['3'] * self.rank) or '1'})" + (f", size: {size}" if size else ""))
-    if self.ndim == 0 and self.rank in (2, 3, 4):
-      A = self.M if self.rank == 2 else Voigt(self)
+    lines.append(f"  rank: {self.rank} ({' x '.join(['3'] * self.rank)})" + (f", size: {size}" if size else ""))
+    if type(self) is tensor and self.doubleConvention:
+      lines.append("  doubleConvention: true")
+    # a single tensor shows its coefficients: a number, a column, a matrix, the compact or the Voigt matrix
+    if self.ndim == 0:
+      A = self.M.reshape(1, 1) if self.rank == 0 else self.M.reshape(3, 1) if self.rank == 1 else self.M if self.rank == 2 else Voigt(self)
       finite = np.abs(A[np.isfinite(A)])
       m = float(finite.max()) if finite.size else 0.0
       p = 0 if m == 0 else math.floor(math.log10(m))
       scale = p if (p >= 3 or p <= -2) else 0
       lines.append("")
-      lines.append(("tensor in matrix representation" if self.rank == 2 else "tensor in Voigt matrix representation") + (f": *10^{scale}" if scale else ""))
+      title = {3: "tensor in compact matrix form", 4: "tensor in Voigt matrix representation"}.get(self.rank)
+      if title or scale:
+        lines.append((title + ": " if title else " ") + (f"*10^{scale}" if scale else "") if scale else title)
       S = A / 10.0 ** scale
-      lines.append(table([""] * S.shape[1], [S[:, j] for j in range(S.shape[1])], decimals=4))
+      lines.append(table([""] * S.shape[1], [S[:, j] for j in range(S.shape[1])], decimals=4).split("\n", 1)[1])
     return "\n".join(lines)
 
   # ------------------------------------------------------------------ the algebra
@@ -304,6 +314,15 @@ class tensor(MtexArray):
   # the double contraction with its class: a stiffness on a strain is a stress
   def _contractedProduct(self, other):
     return colon(self, other)
+
+  # MATLAB's .*: the product of corresponding coefficients, the rank kept
+  def times(self, other):
+    if isinstance(other, tensor):
+      self._sameFrame(other)
+      if other.rank != self.rank:
+        raise ValueError("the componentwise product is of tensors of one rank")
+      return self._rebuild(self.data * other.data)
+    return self._rebuild(self.data * np.asarray(other, dtype=float)[..., None])
 
   def __truediv__(self, a):
     if isinstance(a, tensor):
@@ -375,14 +394,16 @@ class tensor(MtexArray):
   def inv(self):
     cls = self._inverseClass()
     if self.rank == 2:
-      return self._as(cls, _flatten(np.linalg.inv(self.M), 2))
-    if self.rank == 4:
+      out = self._as(cls, _flatten(np.linalg.inv(self.M), 2))
+    elif self.rank == 4:
       V = np.linalg.inv(Voigt(self))
       double = cls._double if cls is not tensor else not self.doubleConvention
       out = self._as(cls, _flatten(_fromVoigt(V, 4, _voigtWeights(double)), 4))
       out.doubleConvention = double
-      return out
-    raise ValueError("the inverse is of a tensor of rank two or four")
+    else:
+      raise ValueError("the inverse is of a tensor of rank two or four")
+    out.unit = _inverseUnit(self.unit)
+    return out
 
   def _inverseClass(self):
     return type(self)
@@ -400,6 +421,7 @@ class tensor(MtexArray):
         vals = np.take_along_axis(vals, order, axis=-1)
         vecs = np.take_along_axis(vecs, order[..., None, :], axis=-1)
       v = vector3d(np.moveaxis(vecs, -1, -2), antipodal=True, frame=self._frame)
+      v.dispStyle = "xyz"
       return vals, v
     if self.rank == 4:
       vals, vecs = np.linalg.eigh(Voigt(self))
@@ -479,6 +501,11 @@ class tensor(MtexArray):
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)
+    # MATLAB's other outputs: the inverse of the mean inverse, the Hill mean, all three
+    which = next((a for a in args if a in ("Reuss", "Hill", "all")), None)
+    if which is not None:
+      V, R = self.mean(weights=weights), self.inv().mean(weights=weights).inv()
+      return {"Reuss": R, "Hill": (V + R) / 2, "all": (V, R, (V + R) / 2)}[which]
     if self.ndim == 0:
       return self
     flat = self.data.reshape(-1, self._ncoord)
@@ -495,8 +522,30 @@ class tensor(MtexArray):
       t.density = float(d.mean() if weights is None else (np.asarray(weights, dtype=float).ravel() * d).sum() / np.sum(weights))
     return t
 
-  def sum(self):
-    return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
+  # the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)
+  def sum(self, axis=None):
+    if axis is None:
+      return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
+    return self._as(type(self), self.data.sum(axis=axis % self.ndim))
+
+  # the list of tensors of different densities keeps one density per tensor, as MATLAB's
+  # [C1, C2] does, which is what a weighted mean averages
+  @classmethod
+  def cat(cls, *arrays, axis=0):
+    dens = [a.density for a in arrays]
+    if all(d is None for d in dens) or all(d is not None and np.array_equal(d, dens[0]) for d in dens):
+      return super().cat(*arrays, axis=axis)
+    if any(d is None for d in dens):
+      raise ValueError("cannot combine tensors with and without a density")
+    parts = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
+    bare = []
+    for a in parts:
+      b = a._new(a.data)
+      b.density = None
+      bare.append(b)
+    out = super().cat(*bare, axis=axis)
+    out.density = np.concatenate([np.broadcast_to(np.asarray(a.density, dtype=float), a.shape) for a in parts], axis=axis)
+    return out
 
   # ------------------------------------------------------------------ factories
 
@@ -645,6 +694,7 @@ def colon(A, B):
     cls = A._productClass(B) if hasattr(A, "_productClass") else None
     if cls is not None:
       out = A._as(cls, out.data)
+      out.density, out.unit = None, None
   return out
 
 
@@ -667,6 +717,17 @@ def dyad(a, b=None, n=None):
   return EinsteinSum(a, list(range(1, ra + 1)), b, list(range(ra + 1, ra + rb + 1)))
 
 
+# the unit of the inverse, as MATLAB writes it: GPa to 1 / GPa, 1/GPa to GPa, m/s to s / m
+def _inverseUnit(unit):
+  if unit is None:
+    return None
+  if "/" not in unit:
+    return "1 / " + unit.strip()
+  a, b = unit.split("/", 1)
+  a = a.replace("1", "").strip()
+  return b.strip() if not a else f"{b.strip()} / {a}"
+
+
 # ------------------------------------------------------------------ the physical tensors
 
 class stiffnessTensor(tensor):
@@ -687,6 +748,10 @@ class stiffnessTensor(tensor):
 class complianceTensor(tensor):
   """the elastic compliance S = inv(C), its Voigt matrix carrying the factors of the double convention"""
   _rank, _double = 4, True
+
+  def __init__(self, M, *args, **kwargs):
+    kwargs.setdefault("unit", "1/GPa")
+    super().__init__(M, *args, **kwargs)
 
   def _inverseClass(self):
     return stiffnessTensor
@@ -807,6 +872,10 @@ def antiSym(T):
   return T.antiSym()
 
 
+def times(A, B):
+  return A.times(B)
+
+
 def trace(T):
   return T.trace()
 
@@ -818,4 +887,4 @@ def eig(T):
 __all__ = ["tensor", "stiffnessTensor", "complianceTensor", "stressTensor", "strainTensor", "strainRateTensor",
            "deformationGradientTensor", "velocityGradientTensor", "spinTensor", "curvatureTensor", "dislocationDensityTensor",
            "ChristoffelTensor", "refractiveIndexTensor", "SchmidTensor", "EinsteinSum", "colon", "doubleContract", "dyad",
-           "Voigt", "Kelvin", "checkSymmetry", "directionalMagnitude", "sym", "antiSym", "trace", "eig"]
+           "Voigt", "Kelvin", "times", "checkSymmetry", "directionalMagnitude", "sym", "antiSym", "trace", "eig"]

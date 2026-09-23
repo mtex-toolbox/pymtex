@@ -87,6 +87,12 @@ def test_T5_the_waves():
   assert np.allclose(VeF(n).data, Ve.data)
   with pytest.raises(ValueError):
     velocity(C, xvector, density=-1)
+  # MATLAB's density as the third argument, and the harmonic expansions of bandwidth 48
+  assert np.isclose(velocity(Co, xvector, 2.0).vp, velocity(Co, xvector, density=2.0).vp)
+  h = velocity(Co, 'harmonic')
+  assert h.vp.bandwidth == 48 and h.pp.bandwidth == 48
+  assert np.isclose(h.vp.eval(xvector), v.vp, atol=1e-6) and np.isclose(h.vs2.eval(n), velocity(Co, n).vs2, atol=1e-4)
+  assert abs(np.dot(h.pp.eval(n).data.ravel(), ppn.data.ravel())) > 1 - 1e-6
 
 
 def test_P4g_the_Hashin_Shtrikman_bounds():

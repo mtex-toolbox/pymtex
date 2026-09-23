@@ -3,10 +3,11 @@
 # Clebsch-Gordan coefficients (MATLAB tools/math_tools: deg2dim, WignerD, sphericalY)
 #
 #   wignerd(beta, l), wignerd(beta, bandwidth=L)      d_l(beta), or the list d_0 .. d_L
-#   WignerD(rot, l), WignerD(rot, bandwidth=L)        D_l(rot) = e^{-ik alpha} d_l e^{-il gamma}
-#   WignerD(cs, l), WignerD(cs, bandwidth=L)          the projection mean of D_l(s)^T over the group
+#   _WignerD(rot, l), _WignerD(rot, bandwidth=L)      D_l(rot) = e^{-ik alpha} d_l e^{-il gamma}
+#   _WignerD(cs, l), _WignerD(cs, bandwidth=L)        the projection mean of D_l(s)^T over the group
+#   WignerD(rot, l, normalize=True), WignerD(beta, l) MTEX's matrices, the basis of the public fhat
 #   wignerSeries(fhat, rot)                           sum_n sqrt(2n+1) <fhat_n, D_n(rot)>
-#   sphericalY(l, v), normalizedLegendre(l, x)        Y_l^m and P_l^m, m in front
+#   sphericalY(l, v), normalizedLegendre(l, x)        MTEX's Y_l^m and P_l^m, m in front
 #   clebschGordan(j1, m1, j2, m2, J, M), wigner3j, clebschGordanTensor(l1, l2, J)
 from __future__ import annotations
 
@@ -47,6 +48,39 @@ def degreeBlock(fhat, n):
   fhat = np.asarray(fhat)
   m = 2 * n + 1
   return fhat[..., degreeRange(n)].reshape(*fhat.shape[:-1], m, m).swapaxes(-1, -2)
+
+
+# ------------------------------------------------------------------ MTEX's coefficients
+
+# the port computes in the Condon-Shortley basis (docs/design/harmonics.md); MTEX's spherical
+# harmonics carry no (-1)^m and its Wigner blocks are stored transposed. The coefficients a
+# user reads and passes are MTEX's: on the sphere they differ by (-1)^m on the positive
+# orders, on SO(3) every degree block is transposed and signed on both indices. Both maps
+# are their own inverse.
+def _orderSign(n):
+  m = np.arange(-n, n + 1)
+  return np.where((m > 0) & (m % 2 == 1), -1.0, 1.0)
+
+
+def mtexCoefficientsS2(fhat):
+  fhat = np.asarray(fhat)
+  L = math.isqrt(fhat.shape[-1]) - 1
+  s = np.concatenate([_orderSign(l) for l in range(L + 1)])
+  return fhat * s
+
+
+def mtexCoefficientsSO3(fhat):
+  fhat = np.asarray(fhat)
+  out = np.empty_like(fhat)
+  n = 0
+  while deg2dim(n + 1) <= fhat.shape[-1]:
+    r = degreeRange(n)
+    m = 2 * n + 1
+    s = _orderSign(n)
+    block = fhat[..., r].reshape(*fhat.shape[:-1], m, m)
+    out[..., r] = (np.outer(s, s) * block.swapaxes(-1, -2)).reshape(*fhat.shape[:-1], m * m)
+    n += 1
+  return out
 
 
 # the one degree or the whole list, from the MATLAB pair of call forms
@@ -137,7 +171,7 @@ def _wignerDGroup(pg, L, dtype):
   return [M / len(rots) for M in P]
 
 
-def WignerD(g, degree=None, *, bandwidth=None, dtype=None):
+def _WignerD(g, degree=None, *, bandwidth=None, dtype=None):
   L, single = _degrees(degree, bandwidth)
   if isinstance(g, referenceFrame):
     g = g.sym
@@ -147,11 +181,31 @@ def WignerD(g, degree=None, *, bandwidth=None, dtype=None):
   if isinstance(g, orthogonalTransform):
     g = g.rot
   if not isinstance(g, quaternion):
-    raise TypeError("WignerD takes a rotation, a point group or a frame")
+    raise TypeError("_WignerD takes a rotation, a point group or a frame")
   dtype = g.data.dtype if dtype is None else np.dtype(dtype)
   qs = g.data.reshape(-1, 4)
   per = [_wignerDRotation(q, L, dtype) for q in qs]
   out = [np.stack([p[n] for p in per]).reshape(*g.shape, 2 * n + 1, 2 * n + 1) for n in range(L + 1)]
+  return out[-1] if single else out
+
+
+# MATLAB's WignerD(R, n): the matrix of MTEX's Wigner functions, the internal one transposed
+# with the signs s_k s_l, s_m = -1 for odd m > 0, the basis the public coefficients fhat are
+# taken in; normalize=True scales by sqrt(2n + 1), so that f(R) = sum fhat_n^{kl} D_n^{kl}(R);
+# WignerD(beta, n) the real Wigner-d matrix at the second Euler angle
+def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
+  L, single = _degrees(degree, bandwidth)
+  if isinstance(g, (int, float, np.floating, np.integer)):
+    mats = [wignerd(float(g), n) for n in range(L + 1)]
+  elif isinstance(g, (referenceFrame, symmetry)):
+    return _WignerD(g, degree, bandwidth=bandwidth, dtype=dtype)
+  else:
+    mats = _WignerD(g, bandwidth=L, dtype=dtype)
+  out = []
+  for n, M in enumerate(mats):
+    s = _orderSign(n)
+    W = np.outer(s, s) * np.swapaxes(M, -1, -2)
+    out.append(math.sqrt(2 * n + 1) * W if normalize else W)
   return out[-1] if single else out
 
 
@@ -271,7 +325,7 @@ def projectRight(fhat, Q):
 def wignerSeries(fhat, r):
   fhat = np.asarray(fhat)
   L = dim2deg(fhat.shape[-1])
-  D = WignerD(r, bandwidth=L)
+  D = _WignerD(r, bandwidth=L)
   out = np.zeros((*fhat.shape[:-1], *r.shape), dtype=np.result_type(fhat.dtype, D[0].dtype))
   for n in range(L + 1):
     block = degreeBlock(fhat, n).reshape(*fhat.shape[:-1], *([1] * r.ndim), 2 * n + 1, 2 * n + 1)
@@ -303,8 +357,9 @@ def normalizedLegendre(l, x):
   return P
 
 
-# the spherical harmonics Y_l^m, m = -l..l, in front of the container shape
-def sphericalY(l, v):
+# the spherical harmonics Y_l^m, m = -l..l, in front of the container shape, with the
+# Condon-Shortley phase the internal coefficients are taken in
+def _sphericalY(l, v):
   v = v if isinstance(v, vector3d) else vector3d(v)
   theta, rho = v.theta, v.rho
   P = normalizedLegendre(l, np.cos(theta))
@@ -314,6 +369,13 @@ def sphericalY(l, v):
     Y[l + m] = y
     Y[l - m] = -np.conj(y) if m % 2 else np.conj(y)
   return Y
+
+
+# MTEX's spherical harmonics, Y_l^{-m} = conj(Y_l^m) without the Condon-Shortley phase:
+# the basis the public coefficients fhat are taken in
+def sphericalY(l, v):
+  Y = _sphericalY(l, v)
+  return _orderSign(l).reshape((-1,) + (1,) * (Y.ndim - 1)) * Y
 
 
 # ------------------------------------------------------------------ H6 Clebsch-Gordan

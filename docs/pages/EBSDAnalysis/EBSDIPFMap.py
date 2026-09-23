@@ -102,9 +102,9 @@ plot(ipfKey, complete=True, upper=True)
 #
 # The same information can be plotted in the inverse pole figure itself. Each grain is
 # placed at the crystal direction parallel to the normal, and marker area is scaled by
-# grain area; a marker size is a diameter here, so the square root of MATLAB's number.
+# grain area.
 
-plotIPDF(bigGrains['olivine'].meanOrientation, colors, vector3d.Z, MarkerSize=np.sqrt(0.05 * bigGrains['olivine'].area), MarkerEdgeColor='k')
+plotIPDF(bigGrains['olivine'].meanOrientation, colors, vector3d.Z, MarkerSize=0.05 * bigGrains['olivine'].area, MarkerEdgeColor='k')
 
 # The markers cover the sector rather than clustering in one corner. These large grains
 # therefore have no single strongly preferred crystal axis along the specimen normal.

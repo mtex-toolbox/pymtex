@@ -104,8 +104,9 @@ def test_I3_a_boundary_is_where_the_field_stops():
 def test_I4_the_curvature_of_the_linear_field():
   e = linearMap(np.eye(2), 8)
   kappa = e.curvature()
-  assert kappa.shape == e.shape + (3, 3)
-  M = kappa[20]
+  # MATLAB's curvatureTensor of the map, per scan unit
+  assert type(kappa).__name__ == "curvatureTensor" and kappa.shape == e.shape and kappa.unit == "1/um"
+  M = kappa[20].M
   assert close(M[2, 0], K1) and close(M[2, 1], K2) and abs(M[0, 0]) < 1e-12 and abs(M[1, 1]) < 1e-12
   # nothing is known along the normal of the map
   assert np.all(np.isnan(M[:, 2])) and curvature(e, stencil="full").shape == kappa.shape
@@ -197,8 +198,8 @@ def test_I9_uncorrelated_misorientations():
   # every pair really is that far apart
   m2 = calcMisorientation(e, sampleSize=200, minDistance=15.0, rng=1)
   assert len(m2) < 200 and m2.angle().max() < 62.8 * degree
-  # two phases: the pair carries a direction of the first phase into the second, as a
-  # boundary between them does
+  # two phases: inv(o1) * o2 as MATLAB's o1 .\ o2, a direction of the second phase into the
+  # first, so that calcMisorientation(B, A) runs as a boundary between A and B does
   csA, csB = crystalFrame("m-3m", mineral="phaseA"), crystalFrame("622", mineral="phaseB")
   i, j = np.meshgrid(np.arange(10), np.arange(10), indexing="xy")
   pos = np.stack([i.reshape(-1), j.reshape(-1), np.zeros(100)], axis=-1).astype(float)
@@ -206,8 +207,8 @@ def test_I9_uncorrelated_misorientations():
   eA = EBSD(pos, rotation(np.tile(qA.data, (100, 1))), np.ones(100, dtype=np.int8), phaseList(csA))
   eB = EBSD(pos, rotation(np.tile(qB.data, (100, 1))), np.ones(100, dtype=np.int8), phaseList(csB))
   mAB = eA.calcMisorientation(eB, sampleSize=50, minDistance=0.0)
-  assert mAB.CS is csA and mAB.SS is csB and not mAB.antipodal
-  expected = orientation._fromRotation((qB.inv() * qA).data, (csA, csB))
+  assert mAB.CS is csB and mAB.SS is csA and not mAB.antipodal
+  expected = orientation._fromRotation((qA.inv() * qB).data, (csB, csA))
   assert np.all(mAB.angle(expected) < 1e-9)
 
 
@@ -218,7 +219,7 @@ def test_I10_single_precision_and_the_shape_of_the_output():
   assert np.max(np.abs(gx.data[ok, 2] - K1)) < 1e-5 and np.max(np.abs(gy.data[ok, 2] - K2)) < 1e-5
   # a gridded map answers in its own shape
   gr = gridify(linearMap(np.eye(2), 6))
-  assert gr.gradient()[0].shape == gr.shape and gr.KAM().shape == gr.shape and gr.curvature().shape == gr.shape + (3, 3)
+  assert gr.gradient()[0].shape == gr.shape and gr.KAM().shape == gr.shape and gr.curvature().shape == gr.shape
   with pytest.raises(ValueError):
     linearMap(np.eye(2), 6)[[1, 1]].KAM()
 
@@ -244,3 +245,18 @@ def test_the_numba_and_the_numpy_gradient_and_KAM_agree():
     setMTEXpref("kernels", before)
   for a, b in zip(out["numba"], out["numpy"]):
     assert np.array_equal(np.isnan(a), np.isnan(b)) and np.allclose(a, b, atol=1e-12, equal_nan=True)
+
+
+def test_the_weighted_Burgers_vector():
+  # the gradient method is the normal column of Nye's tensor of the curvature
+  e = linearMap(np.eye(2), 8)
+  W = e.weightedBurgersVec("gradient")
+  alpha = e.curvature().dislocationDensity()
+  assert W.shape == e.shape and np.allclose(W.data, alpha.M[..., :, 2], equal_nan=True)
+  assert e.weightedBurgersVec(gradient=True, stencil="1hop").shape == e.shape
+  # the integral method on the grid: the rim, where the loop leaves the map, is undefined
+  g = gridify(linearMap(np.eye(2), 8))
+  Wi = g.weightedBurgersVec()
+  n = Wi.norm()
+  assert n.shape == g.shape and np.all(np.isnan(n[0])) and np.all(np.isfinite(n[1:-1, 1:-1]))
+  assert np.count_nonzero(np.isfinite(g.weightedBurgersVec(windowSize=2).norm())) < np.count_nonzero(np.isfinite(n))

@@ -18,12 +18,20 @@ def _lineAxes(kw):
   figSize = kw.pop("figSize", None)
   fig = gcm()
   import matplotlib.pyplot as plt
-  # a plain figure the user opened after the last MTEX figure takes the plot
+  # a plain figure the user opened after the last MTEX figure takes the plot, and so does
+  # an axes the user added to the MTEX figure, as MATLAB's subplot
   if plt.get_fignums() and (fig is None or plt.gcf() is not fig.fig):
     return plt.gca()
-  # a held figure takes the line on its last axes, a fresh one on its first
+  if fig is not None and fig.fig.axes and fig.fig.gca() not in fig.children:
+    ax = fig.fig.gca()
+    fig.children.append(ax)
+    fig.current = ax
+    return ax
+  # a held figure takes the line on its current axes, a fresh one on its first
   if fig is not None and (fig.hold or not fig.children):
-    return fig.children[-1] if fig.children else fig.nextAxis()
+    if fig.children:
+      return fig.current if fig.current in fig.children else fig.children[-1]
+    return fig.nextAxis()
   return mtexFigure(figSize=figureSize(figSize, (6.0, 4.0))).nextAxis()
 
 
@@ -52,8 +60,20 @@ def plotSpektra(x, bandwidth=None, logarithmic=False, **kw):
   """plotSpektra(psi), plotSpektra(odf): the Chebyshev coefficients of a kernel, or the harmonic
   power of a function, per degree"""
   from ..functions.kernelfunctions import S2Kernel, SO3Kernel
+  fontSize = kw.pop("FontSize", kw.pop("fontSize", None))
   ax = _lineAxes(kw)
   kw = _lineKw(kw)
+  h = _spektra(ax, x, bandwidth, logarithmic, kw)
+  # MATLAB's FontSize: the labels and the ticks
+  if fontSize is not None:
+    ax.tick_params(labelsize=fontSize)
+    ax.xaxis.label.set_size(fontSize)
+    ax.yaxis.label.set_size(fontSize)
+  return h
+
+
+def _spektra(ax, x, bandwidth, logarithmic, kw):
+  from ..functions.kernelfunctions import S2Kernel, SO3Kernel
   if isinstance(x, (SO3Kernel, S2Kernel)):
     A = np.asarray(x.A, dtype=float).reshape(-1)
     L = min(32 if bandwidth is None else int(bandwidth), len(A) - 1)
@@ -68,8 +88,10 @@ def plotSpektra(x, bandwidth=None, logarithmic=False, **kw):
     ax.set_xlabel("harmonic degree")
     ax.set_ylabel("Chebyshev coefficient")
     return h
+  from ..functions.s2fun import S2FunHarmonic
   from ..functions.so3fun import SO3FunHarmonic
-  f = x if isinstance(x, SO3FunHarmonic) else SO3FunHarmonic(x)
+  # a function on the sphere: the norm of the coefficients of each degree
+  f = x if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)) else S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
   L = f.bandwidth if bandwidth is None else int(bandwidth)
   power = np.zeros(L + 1)
   LL = min(L, f.bandwidth)

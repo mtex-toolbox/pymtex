@@ -17,7 +17,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .colormaps import mtexColormap
-from .mtexfigure import gcm, mtexFigure
+from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
 from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
 
@@ -33,6 +33,41 @@ class spacePlot:
     ax._mtexSpacePlot = self
 
 
+# the camera of MATLAB's two dimensional view: looking down the out of screen axis of the
+# plotting convention of the frame, east to the right
+def _conventionView(ax, frame):
+  from .spherical import _conventionOf
+  _camera(ax, _conventionOf(frame))
+
+
+def _camera(ax, pC):
+  o, e = pC.outOfScreen.normalize().data.reshape(3), pC.east.normalize().data.reshape(3)
+  elev, azim = np.arcsin(np.clip(o[2], -1, 1)), np.arctan2(o[1], o[0])
+  # screen right before the roll, then the roll that turns east onto it
+  r0 = np.array([-np.sin(azim), np.cos(azim), 0.0])
+  roll = -np.arctan2(np.dot(np.cross(r0, e), o), np.dot(r0, e))
+  ax.view_init(elev=elev / degree, azim=azim / degree, roll=roll / degree)
+  ax.set_proj_type("ortho")
+  # an axis arrow whose tip the sphere hides from this camera is not drawn
+  for d, length, artists in getattr(ax, "_mtexAxisArrows", ()):
+    visible = np.dot(d, o) > -np.sqrt(1 - 1 / (1 + length) ** 2)
+    for a in artists:
+      a.set_visible(bool(visible))
+
+
+def setCamera(how2plot=None, ax=None):
+  """setCamera(how2plot): the 3D view of the current axes looking down how2plot.outOfScreen,
+  with how2plot.north up; without a convention the default one"""
+  import matplotlib.pyplot as plt
+
+  from ..geometry.plottingconvention import plottingConvention
+  pC = plottingConvention.default if how2plot is None else how2plot
+  if ax is None:
+    fig = gcm()
+    ax = fig.children[-1] if fig is not None and fig.children else plt.gca()
+  _camera(ax, pC)
+
+
 # a 3D axes in a new figure, or the current one when it is held, looking at the unit sphere
 # or at a shape of the given extent
 def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, azimuth=None, elevation=None, title=None):
@@ -40,8 +75,12 @@ def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, az
     ax = parent
   else:
     fig = gcm()
-    if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot"):
-      return fig.children[-1]._mtexSpacePlot
+    # a held plot draws into the axes drawn into last, which nextAxis need not have made last
+    if fig is not None and fig.hold and fig.children:
+      cur = getattr(fig, "current", None)
+      cur = cur if cur in fig.children else fig.children[-1]
+      if hasattr(cur, "_mtexSpacePlot"):
+        return cur._mtexSpacePlot
     # the axes nextAxis prepared, or the first of a fresh newMtexFigure, becomes a 3D axes
     if fig is not None and (fig.pending is not None or (not fig.children and not fig.hold)):
       flat = fig.takeAxis()
@@ -50,6 +89,7 @@ def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, az
       flat.remove()
       ax = fig.fig.add_subplot(spec, projection="3d", computed_zorder=False)
       fig.children[k] = ax
+      fig.current = ax
     else:
       from .mtexfigure import figureSize
       fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
@@ -140,7 +180,7 @@ def plot3d(x, *args, **kw):
   if isinstance(x, fibre):
     return plotFibre3d(x, *args, **kw)
   if hasattr(x, "pdf") and hasattr(x, "CS") and hasattr(x, "SS"):
-    return plotODF3d(x, **kw)
+    return plotODF3d(x, *args, **kw)
   if _isField(x):
     return quiver3d(x, **kw)
   if _isFunction(x):
@@ -178,29 +218,115 @@ def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet
   return h
 
 
-def plotFunction3d(f, resolution=5 * degree, colormap="WhiteJet", colorRange=None, colorbar=False, radial=False, grid=None,
+def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=None, colorbar=False, radial=False, grid=False,
                    noLabel=None, grid_res=30 * degree, **kw):
-  """plot3d(sF, radial=True): a function as the sphere coloured, or pushed out by its values"""
+  """plot3d(sF, radial=True): a function as the sphere coloured, or pushed out by its values,
+  seen as the 3D plotting convention says, with the axes of its frame as arrows"""
   axesKw = _keys(kw)
   V, _ = sphereMesh(resolution)
   fr = getattr(f, "frame", None)
   vals = np.real(np.asarray(f(vector3d(V, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1)
-  limits = max(1e-12, 1.1 * np.max(np.abs(vals))) if radial else 1.3
+  limits = max(1e-12, 1.1 * np.max(np.abs(vals))) if radial else 1.12
   sP = _spaceAxes(fr, limits=limits, **axesKw)
-  h = _sphere(sP, resolution, vals, colormap, colorRange, radial, grid=(not radial) if grid is None else grid,
-              noLabel=radial if noLabel is None else noLabel, grid_res=grid_res)
+  h = _sphere(sP, resolution, vals, colormap, colorRange, radial, grid=grid, noLabel=True, grid_res=grid_res)
+  # the axes of the frame as arrows standing on the sphere, as MATLAB draws them
+  if not (radial if noLabel is None else noLabel):
+    for d, name in frameAxes(fr):
+      _axisArrow(sP.ax, d, name)
+  if "azimuth" not in axesKw and "elevation" not in axesKw:
+    from ..geometry.plottingconvention import plottingConvention
+    _camera(sP.ax, plottingConvention.default3D)
   if colorbar:
     sP.ax.figure.colorbar(h, ax=sP.ax, shrink=0.6)
   return h
 
 
-def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, noLabel=False, **kw):
+# a black arrow from the unit sphere outwards along d, its name beyond the tip
+def _axisArrow(ax, d, name, length=0.15):
+  from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  d = np.asarray(d, dtype=float) / np.linalg.norm(d)
+  u = np.cross(d, [0, 0, 1.0] if abs(d[2]) < 0.9 else [1.0, 0, 0])
+  u /= np.linalg.norm(u)
+  w = np.cross(d, u)
+  t = np.linspace(0, 2 * np.pi, 17)[:-1]
+  ring = np.cos(t)[:, None] * u + np.sin(t)[:, None] * w
+  base, tip = d, (1 + length) * d
+  shaft = [np.array([base + 0.012 * ring[i], base + 0.012 * ring[i - 1], base + 0.6 * length * d + 0.012 * ring[i - 1],
+                     base + 0.6 * length * d + 0.012 * ring[i]]) for i in range(len(t))]
+  cone = [np.array([base + 0.6 * length * d + 0.035 * ring[i], base + 0.6 * length * d + 0.035 * ring[i - 1], tip]) for i in range(len(t))]
+  body = Poly3DCollection(shaft + cone, facecolor="k", edgecolor="none")
+  ax.add_collection3d(body)
+  label = ax.text(*((1 + 1.6 * length) * d), name, ha="center", va="center", fontsize=getMTEXpref("FontSize", 13) - 2, family="serif")
+  ax._mtexAxisArrows = getattr(ax, "_mtexAxisArrows", []) + [(d, length, (body, label))]
+
+
+# surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
+# complex one; a list of functions one panel each; a single real function is first scaled
+# to (f - mean) / (max - min) + 1 unless noScaling, as MATLAB's surf does
+def surf(sF, layout=None, figSize=None, noScaling=False, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
+         **kw):
+  from matplotlib.colors import Normalize
+  from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  from .mtexfigure import figureSize
+  edgeColor = kw.pop("EdgeColor", edgeColor)
+  fs = [sF] if not getattr(sF, "shape", ()) else [sF[k] for k in np.ndindex(sF.shape)]
+  V, F = sphereMesh(resolution)
+  fr = getattr(sF, "frame", None)
+  values = [np.real(np.asarray(f(vector3d(V, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1) for f in fs]
+  if len(fs) == 1 and getattr(sF, "isReal", True) and not noScaling:
+    a, b = values[0].min(), values[0].max()
+    if b > a:
+      values[0] = (values[0] - np.mean(values[0])) / (b - a) + 1
+  fig = gcm()
+  if not (fig is not None and not fig.children and not fig.hold) or len(fs) > 1:
+    fig = mtexFigure(len(fs), layout=layout, figSize=figureSize(figSize, (3.2 * min(len(fs), 5), 3.2 * -(-len(fs) // 5))))
+  cmap = mtexColormap(colormap)
+  hs = []
+  for vals in values:
+    nextAxis(fig=fig)
+    sP = _spaceAxes(fr, decorated=True, **_keys(kw))
+    R = np.abs(vals)[:, None] * V
+    faceValues = np.mean(vals[F], axis=1)
+    # a constant function takes the middle of the colour map, not its rounding noise
+    lo, hi = vals.min(), vals.max()
+    if hi - lo <= 1e-9 * max(abs(hi), abs(lo), 1e-300):
+      lo, hi = lo - 1, hi + 1
+    poly = Poly3DCollection(R[F], facecolors=cmap(Normalize(lo, hi)(faceValues)), edgecolors=edgeColor, linewidths=0.2)
+    # the colour bar reads the values the faces are coloured by
+    poly.set_cmap(cmap)
+    poly.set_norm(Normalize(lo, hi))
+    poly.set_array(faceValues)
+    sP.mappable = poly
+    sP.ax.add_collection3d(poly)
+    lo, hi = R.min(axis=0), R.max(axis=0)
+    sP.ax.set_xlim(lo[0], hi[0])
+    sP.ax.set_ylim(lo[1], hi[1])
+    sP.ax.set_zlim(lo[2], hi[2])
+    sP.ax.set_box_aspect(tuple(np.maximum(hi - lo, 1e-9)))
+    hs.append(poly)
+  return hs if len(hs) > 1 else hs[0]
+
+
+def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, noLabel=True, **kw):
   """plot3d(vF): a vector or axis field as arrows on the sphere in space"""
+  from ..geometry.grids.s2grid import equispacedS2Grid
   axesKw = _keys(kw)
   fr = getattr(vF, "frame", None)
-  sP = _spaceAxes(fr, **axesKw)
-  _sphere(sP, grid=grid, noLabel=noLabel)
-  V, _ = sphereMesh(resolution)
+  fig = gcm()
+  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  sP = _spaceAxes(fr, limits=1.2, **axesKw)
+  # a held plot draws the field onto the sphere already there; a new one is seen as the 3D
+  # convention says
+  if not held:
+    _sphere(sP, grid=grid, noLabel=noLabel)
+    if "azimuth" not in axesKw and "elevation" not in axesKw:
+      from ..geometry.plottingconvention import plottingConvention
+      _camera(sP.ax, plottingConvention.default3D)
+  # the arrows stand on an equispaced grid of the resolution, as MATLAB's, those of the
+  # hemisphere facing the camera, which matplotlib would draw through the sphere
+  V = equispacedS2Grid(resolution=resolution).data.reshape(-1, 3)
+  e, a = np.radians(sP.ax.elev), np.radians(sP.ax.azim)
+  V = V[V @ np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)]) > -0.05]
   W = vF(vector3d(V, frame=fr, isNormalized=True)).data.reshape(-1, 3)
   # the longest arrow spans the grid spacing, the rest in proportion
   scale = 0.9 * resolution * arrowSize / max(np.max(np.linalg.norm(W, axis=1)), 1e-12)
@@ -235,22 +361,51 @@ def _ball(sP, radius=180.0):
   sP.ax.plot_wireframe(X, Y, Z, color=GRID3_COLOR, linewidth=0.4)
 
 
-def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", **kw):
-  """plot(oR): the fundamental region in axis angle space, in degrees, its surface with the
-  parallels and meridians on it"""
-  from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
+                 noSurface=False, **kw):
+  """plot(oR), plot(oR, boundaryColor='r', noSurface=True): the fundamental region in axis
+  angle space, in degrees, its surface with the parallels and meridians on it and its edges"""
   axesKw = _keys(kw)
   limit = 1.15 * oR.maxAngle() / degree
+  fig = gcm()
+  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
   sP = _spaceAxes(oR.frameA, limits=limit, decorated=True, **axesKw)
   # orientations drawn into the region later come in its coordinates
   if not hasattr(sP, "coordinates"):
     sP.coordinates, sP.reduced = "axisAngle", True
   _regionLabels(sP.ax)
-  return _region(sP, oR, resolution, color, alpha, lines, lineColor)
+  h = _region(sP, oR, resolution, color, alpha, lines, lineColor, boundaryColor, noSurface)
+  # a new plot looks at the region, as MATLAB fits its axes to it
+  if not held:
+    _fitRegion(sP, oR)
+  return h
 
 
-def _region(sP, oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k"):
+# the axes fitted to a region of axis angle space and the points in it, at equal scale; a
+# region reaching the half turn keeps the ball around it
+def _fitRegion(sP, oR, points=None):
+  edges = oR.edges()
+  if not edges or oR.maxAngle() >= np.pi - 1e-6:
+    return
+  P = np.concatenate(edges) / degree
+  if points is not None and len(points):
+    P = np.concatenate([P, points])
+  lo, hi = P.min(axis=0), P.max(axis=0)
+  pad = 0.05 * float(np.max(hi - lo))
+  lo, hi = lo - pad, hi + pad
+  sP.ax.set_xlim(lo[0], hi[0])
+  sP.ax.set_ylim(lo[1], hi[1])
+  sP.ax.set_zlim(lo[2], hi[2])
+  sP.ax.set_box_aspect(tuple(hi - lo))
+
+
+def _region(sP, oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
+            noSurface=False):
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  # the edges where two faces of the region meet, as MATLAB outlines it
+  hs = [sP.ax.plot(*(e / degree).T, color=boundaryColor, linewidth=1.5, zorder=3)[0] for e in oR.edges()]
+  if noSurface:
+    return hs
   P, F = regionSurface(oR, resolution)
   P = P / degree
   keep = np.all(np.isfinite(P[F]).reshape(len(F), -1), axis=1)
@@ -357,17 +512,19 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   # orientations kept as they are are looked at closely, without the region
   zoom = isOri and ignoreFundamentalRegion and not complete
   o = o.flatten()
+  # a value or an RGB row per orientation
+  data = None if data is None else np.asarray(data).reshape(o.size, -1)
   # an orientation that is not there, a NaN, is left out with its value
   keep = ~np.isnan(o.data).any(axis=-1)
   if not np.all(keep):
     o = o[keep]
-    data = None if data is None else np.asarray(data).reshape(-1)[keep]
+    data = None if data is None else data[keep]
   points = o.size if all else 2000 if points is None else points
   if points < o.size:
     print(f"plot {points} random orientations out of {o.size} given orientations")
     take = np.sort(np.random.default_rng(0).permutation(o.size)[:points])
     o = o[take]
-    data = None if data is None else np.asarray(data).reshape(-1)[take]
+    data = None if data is None else data[take]
   P = orientationPoints(o, coordinates, reduced)
   oR = fundamentalRegion_(o) if isOri else None
   frame = o.CS if isOri else None
@@ -396,6 +553,8 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
       _regionLabels(sP.ax)
       if region:
         _region(sP, oR)
+        if not held:
+          _fitRegion(sP, oR, finite)
       elif not reduced and noRegion is None and not zoom:
         _ball(sP)
     else:
@@ -406,6 +565,8 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   sP.coordinates, sP.reduced = coordinates, reduced
   if data is None:
     h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], color=color, **style)
+  elif data.shape[1] == 3:
+    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], c=np.clip(np.nan_to_num(data.astype(float), nan=1.0), 0, 1), **style)
   else:
     vals = np.asarray(data, dtype=float).reshape(-1)
     lo, hi = _rangeOf([vals]) if colorRange is None else colorRange
@@ -419,7 +580,11 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
 # quiver3(t): a tangent vector as an arrow at its reference in orientation space, in the
 # coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
 # to the longest of the list, points to, as MATLAB draws it
-def quiver3(t, *args, lineWidth=1.5, color="b", normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+  # a field on the sphere is drawn as arrows on the sphere in space
+  if _isField(t):
+    return quiver3d(t, color="k" if color is None else color, **kw)
+  color = "b" if color is None else color
   _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
   axesKw = _keys(kw)
@@ -458,25 +623,32 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   fig = gcm()
   held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
   sP = _spaceAxes(v.frame, **axesKw)
+  # fresh axes look down on the screen plane, as MATLAB's new axes do
+  if not held and "azimuth" not in axesKw and "elevation" not in axesKw:
+    _conventionView(sP.ax, v.frame)
   D = v.data.reshape(-1, 3)
   base = np.zeros_like(D) if anchor is None else np.broadcast_to((anchor.data if isinstance(anchor, vector3d) else np.asarray(anchor, dtype=float)).reshape(-1, 3), D.shape)
   scale = max(float(np.max(np.linalg.norm(D, axis=1))), 1e-12)
-  r = 0.035 * scale if arrowWidth is None else float(arrowWidth)
   t = np.linspace(0, 2 * np.pi, 25)[:-1]
   faces = []
   for b, d in zip(base, D):
     L = float(np.linalg.norm(d))
     if L < 1e-12:
       continue
+    # MATLAB's arrowWidth is the radius of the tail relative to the length, the head 2.5
+    # times as wide and a tenth of the length long
+    if arrowWidth is None:
+      r, head, wide = 0.035 * scale, min(0.2 * scale, 0.5 * L), 2.2
+    else:
+      r, head, wide = float(arrowWidth) * L, 0.1 * L, 2.5
     n = d / L
     u = np.cross(n, [0, 0, 1.0] if abs(n[2]) < 0.9 else [1.0, 0, 0])
     u /= np.linalg.norm(u)
     w = np.cross(n, u)
     ring = np.cos(t)[:, None] * u + np.sin(t)[:, None] * w
-    head = min(0.2 * scale, 0.5 * L)
     shaftEnd = b + n * (L - head)
     tip = b + d
-    c0, c1, c2 = b + r * ring, shaftEnd + r * ring, shaftEnd + 2.2 * r * ring
+    c0, c1, c2 = b + r * ring, shaftEnd + r * ring, shaftEnd + wide * r * ring
     k = np.arange(len(t))
     j = (k + 1) % len(t)
     faces += [[c0[i], c0[j[i]], c1[j[i]], c1[i]] for i in k]
@@ -492,8 +664,8 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
     for b, d, t in zip(base, D, texts):
       tip = b + 1.12 * d
       sP.ax.text(tip[0], tip[1], tip[2], str(t), fontsize=getMTEXpref("FontSize", 13), ha="center", va="center")
-  # the axes fit every arrow drawn so far, at equal scale, as MATLAB's do
-  pts = np.concatenate([base, base + D])
+  # the axes fit every arrow and label drawn so far, at equal scale, as MATLAB's do
+  pts = np.concatenate([base, base + (1.25 if label is not None else 1.0) * D])
   lo, hi = pts.min(axis=0) - 0.1 * scale, pts.max(axis=0) + 0.1 * scale
   if held:
     cur = np.array([sP.ax.get_xlim(), sP.ax.get_ylim(), sP.ax.get_zlim()])
@@ -501,7 +673,8 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   sP.ax.set_xlim(lo[0], hi[0])
   sP.ax.set_ylim(lo[1], hi[1])
   sP.ax.set_zlim(lo[2], hi[2])
-  sP.ax.set_box_aspect(tuple(hi - lo), zoom=1.3)
+  # arrows alone fill the axes; joining a held plot they leave its framing
+  sP.ax.set_box_aspect(tuple(hi - lo), zoom=1.0 if held else 1.3)
   return poly
 
 
@@ -550,34 +723,74 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
 
 
-# plot3d(odf): the isosurfaces of an ODF at surf3 levels from zero to its maximum over the
-# Euler box of its frames, the higher the less transparent (MATLAB @SO3Fun/plot3d)
-def plotODF3d(odf, surf3=10, resolution=5 * degree, colormap="parula", **kw):
+# plot3d(odf), plot3d(odf, 'axisAngle'): the isosurfaces of an ODF at surf3 levels from zero
+# to its maximum, over the Euler box of its frames or inside its fundamental region in axis
+# angle space, the higher the less transparent (MATLAB @SO3Fun/plot3d)
+def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, **kw):
+  from matplotlib.cm import ScalarMappable
+  from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .space import isosurface
+  _, Euler, axisAngle, Rodrigues, noRegion, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  if Rodrigues:
+    raise ValueError("the isosurfaces of an ODF are drawn in Euler angle or axis angle space")
   axesKw = _keys(kw)
-  bounds = np.array(eulerRegion(odf.CS, odf.SS))
-  axes = [np.arange(0, b + 1e-9, resolution) for b in bounds]
-  E = np.meshgrid(*axes, indexing="ij")
-  V = np.real(np.asarray(odf(orientation.byEuler(E[0], E[1], E[2], "Bunge", odf.CS, odf.SS)))).reshape(E[0].shape)
+  if axisAngle:
+    # a cube of axis angle vectors about the region, the values outside the region zero
+    oR = fundamentalRegion(odf.CS, odf.SS, antipodal=odf.antipodal)
+    w = oR.maxAngle()
+    axes = [np.linspace(-w, w, int(np.ceil(2 * w / resolution)) + 1)] * 3
+    E = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+    omega = np.linalg.norm(E, axis=-1)
+    n = E / np.where(omega > 0, omega, 1)[..., None]
+    q = np.concatenate([np.cos(omega / 2)[..., None], np.sin(omega / 2)[..., None] * n], axis=-1)
+    ori = orientation._fromRotation(q.reshape(-1, 4), (odf.CS, odf.SS), odf.antipodal)
+    inside = (omega.reshape(-1) <= w) & oR.checkInside(ori)
+    V = np.zeros(inside.size)
+    V[inside] = np.real(np.asarray(odf(ori[inside]))).reshape(-1)
+    V = V.reshape(omega.shape)
+    sP = _spaceAxes(odf.CS, limits=1.1 * w / degree, decorated=True, **axesKw)
+    _regionLabels(sP.ax)
+    if noRegion is None:
+      _region(sP, oR)
+    sP.coordinates = "axisAngle"
+  else:
+    bounds = np.array(eulerRegion(odf.CS, odf.SS))
+    axes = [np.arange(0, b + 1e-9, resolution) for b in bounds]
+    E = np.meshgrid(*axes, indexing="ij")
+    V = np.real(np.asarray(odf(orientation.byEuler(E[0], E[1], E[2], "Bunge", odf.CS, odf.SS)))).reshape(E[0].shape)
+    sP = _spaceAxes(odf.CS, limits=(0, float(bounds.max() / degree)), decorated=True, **axesKw)
+    _eulerBox(sP.ax, bounds / degree)
+    sP.coordinates = "Euler"
+  sP.reduced = True
   top = float(np.max(V))
   levels = np.linspace(0, top, int(surf3)) if np.isscalar(surf3) else np.asarray(surf3, dtype=float)
-  sP = _spaceAxes(odf.CS, limits=(0, float(bounds.max() / degree)), decorated=True, **axesKw)
-  box = bounds / degree
-  _eulerBox(sP.ax, box)
-  sP.coordinates, sP.reduced = "Euler", True
-  cmap = mtexColormap(colormap)
   deg = [a / degree for a in axes]
-  hs = []
+  hs, hLevels = [], []
   for v in levels:
     T = isosurface(*deg, V, v)
     if len(T) == 0:
       continue
-    rgba = list(cmap(v / top if top > 0 else 0))
-    rgba[3] = v / top if top > 0 else 0
-    h = Poly3DCollection(T, facecolors=[rgba], edgecolors="none")
+    h = Poly3DCollection(T, edgecolors="none")
     sP.ax.add_collection3d(h)
     hs.append(h)
+    hLevels.append(v)
+  # a level takes its colour from the map, its opacity from its height
+  sP.mappable = ScalarMappable(Normalize(0, top), mtexColormap(colormap))
+
+  def refill(colormap=None, colorRange=None):
+    if colormap is not None:
+      sP.mappable.set_cmap(mtexColormap(colormap) if isinstance(colormap, str) else colormap)
+    if colorRange is not None:
+      sP.mappable.set_clim(*colorRange)
+    lo, hi = sP.mappable.get_clim()
+    for h, v in zip(hs, hLevels):
+      rgba = list(sP.mappable.to_rgba(v))
+      rgba[3] = float(np.clip((v - lo) / (hi - lo), 0, 1)) if hi > lo else 0.0
+      h.set_facecolor([rgba])
+
+  sP.refill = refill
+  refill()
   return hs
 
 
@@ -585,4 +798,4 @@ def fundamentalRegion_(o):
   return fundamentalRegion(o.CS, o.SS, antipodal=o.antipodal)
 
 
-__all__ = ["plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3"]
+__all__ = ["plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera"]

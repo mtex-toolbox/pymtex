@@ -6,6 +6,7 @@
 #   M = readTable(data, offset, comments='#')     the numeric block as an (n, k) float array
 #   header = headerDict(pairs)                    the flat header MATLAB keeps in ebsd.opt.header
 #   writeTable(fname, names, cols)                columns under their names, as MATLAB's cprintf
+#   cprintf(d, '-Lc', names)                      the same table printed
 #
 # The numeric block goes to the row parser of kernels.py as it stands: a decimal comma is
 # decided once for the block, and a row of the wrong width names itself. Nothing here
@@ -127,16 +128,36 @@ def isNumericRow(line):
   return bool(line.strip()) and _NUMBER.match(line) is not None
 
 
-__all__ = []
-
-
 # columns under a line of their names, six significant digits, every column as wide as its
-# widest entry, as MATLAB's cprintf writes a table
-def writeTable(fname, names, cols):
+# widest entry, as MATLAB's cprintf writes a file; row names in a first column, one width
+# for all columns as cprintf prints
+def tableLines(names, cols, rowNames=None, uniform=False):
   cells = [[f"{x:g}" for x in np.asarray(c, dtype=float).reshape(-1)] for c in cols]
+  if names is None:
+    names = [""] * len(cells)
+  if rowNames is not None:
+    names, cells = [""] + list(names), [list(rowNames)] + cells
   widths = [max(len(n), *(len(s) for s in c)) for n, c in zip(names, cells)]
-  lines = [" ".join(n.rjust(w) for n, w in zip(names, widths))]
+  if uniform:
+    widths = widths[:1] + [max(widths[1:])] * (len(widths) - 1) if rowNames is not None else [max(widths)] * len(widths)
+  lines = [" ".join(n.rjust(w) for n, w in zip(names, widths))] if any(names) else []
   for row in zip(*cells):
     lines.append(" ".join(s.rjust(w) for s, w in zip(row, widths)))
+  return lines
+
+
+def writeTable(fname, names, cols):
   with open(fname, "w", encoding="utf-8") as f:
-    f.write("\n".join(lines) + "\n")
+    f.write("\n".join(tableLines(names, cols)) + "\n")
+
+
+# MATLAB's cprintf(d, '-Lc', labels, '-Lr', rows): a matrix printed as a table, a vector as
+# one row
+def cprintf(d, *args, Lc=None, Lr=None):
+  opts = dict(zip(args[::2], args[1::2]))
+  Lc, Lr = opts.get("-Lc", Lc), opts.get("-Lr", Lr)
+  d = np.atleast_2d(np.asarray(d, dtype=float))
+  print("\n".join(tableLines(Lc, d.T, Lr, uniform=True)))
+
+
+__all__ = ["cprintf"]

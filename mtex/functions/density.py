@@ -28,9 +28,11 @@ from .so3fun import SO3FunHarmonic, invertedCoefficients
 from .transforms import S2FourierPlan, SO3FourierPlan
 
 
-def calcDensity(x, **kwargs):
+def calcDensity(x, Fourier=False, **kwargs):
   if isinstance(x, quaternion):
-    return _calcDensitySO3(x, **kwargs)
+    f = _calcDensitySO3(x, **kwargs)
+    # MATLAB's 'Fourier' asks for the harmonic form
+    return SO3FunHarmonic(f) if Fourier and not isinstance(f, SO3FunHarmonic) else f
   if isinstance(x, vector3d):
     return _calcDensityS2(x, **kwargs)
   # angles are periodic by nature, the flag names what they are
@@ -69,7 +71,7 @@ def _calcDensityS2(v, kernel=None, halfwidth=None, weights=None, bandwidth=None,
   keep = ~np.any(np.isnan(d), axis=1)
   d, w = d[keep], w[keep]
   if len(d) == 0:
-    return S2FunHarmonic([math.sqrt(4 * np.pi)], v.frame, real=True, antipodal=antipodal)
+    return S2FunHarmonic([math.sqrt(4 * np.pi)], v.frame, real=True, antipodal=antipodal, _internal=True)
   L = min(getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth), psi.bandwidth)
   pts = vector3d(d, frame=v.frame, antipodal=antipodal).normalize()
   s = S2FunHarmonic.quadrature(pts, np.ones(len(d)), bandwidth=L, weights=4 * np.pi * w / np.sum(w), real=True, antipodal=antipodal)
@@ -147,11 +149,29 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     At = lambda z: sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
     b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
     fhat = sym(_lsqr(A, At, b, deg2dim(L + 1), maxit, tol))
-    return SO3FunHarmonic(fhat, o.CS, o.SS, real=real, antipodal=o.antipodal)
+    return SO3FunHarmonic(fhat, o.CS, o.SS, real=real, antipodal=o.antipodal, _internal=True)
   v = (nodes if isinstance(nodes, vector3d) else vector3d(nodes)).flatten().normalize()
+  # values with component axes after the node axis: one fit per component, a list of functions
+  values = np.asarray(values)
+  if values.size != v.size:
+    rest = values.shape[1:]
+    cols = values.reshape(v.size, -1)
+    fits = [interpolate(v, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+            for k in range(cols.shape[1])]
+    fhat = np.stack([f._fhat for f in fits]).reshape(rest + fits[0]._fhat.shape)
+    return S2FunHarmonic(fhat, v.frame, real=all(f.isReal for f in fits), antipodal=v.antipodal, _internal=True)
   lam = 0.0 if lambda_ is None else lambda_
   L = math.ceil(math.sqrt(v.size / 2)) if bandwidth is None else int(bandwidth)
-  w = np.full(v.size, 1 / v.size) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
+  # the nodes weighted by the areas of their Voronoi cells, so that dense regions do not
+  # dominate the fit, or equally
+  if isinstance(weights, str) and weights == "equal":
+    w = np.full(v.size, 1 / v.size)
+  elif weights is None:
+    from .polefigure import _voronoiWeights
+    w = _voronoiWeights(v)
+    w = np.full(v.size, 1 / v.size) if w is None else np.asarray(w, dtype=float).ravel() / np.sum(w)
+  else:
+    w = np.asarray(weights, dtype=float).ravel() / np.sum(weights)
   sw = np.sqrt(w)
   p = S2FourierPlan(v, L)
   reg = math.sqrt(lam) * np.sqrt(_sobolevWeightsS2(L, s))
@@ -159,7 +179,57 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   At = lambda z: p.adjoint(sw * z[:v.size], np.ones(v.size)) + reg * z[v.size:]
   b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
   fhat = _lsqr(A, At, b, (L + 1) ** 2, maxit, tol)
-  return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal)
+  return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
+
+
+# interp(v, y, 'linear'): a function through values at directions, by the method named,
+# MATLAB's vector3d/interp; with directions vi after the values, its values there
+def interpS2(v, y, *args, **kwargs):
+  from .handles import S2FunHandle
+  from .s2funtri import S2FunTri
+  vi = next((a for a in args if isinstance(a, vector3d)), None)
+  flags = {a for a in args if isinstance(a, str)}
+  symmetric = getattr(v.frame, "sym", None) is not None and v.frame.sym.rotations().size > 1
+  if symmetric and not flags & {"linear", "nearest", "inverseDistance", "noSymmetry"}:
+    flags.add("harmonic")
+  if vi is not None and "linear" not in flags and not flags & {"harmonic", "nearest", "inverseDistance"}:
+    flags.add("spline")
+  if isinstance(y, vector3d):
+    if "harmonic" not in flags:
+      raise NotImplementedError("a vector field through vectors is interpolated with 'harmonic'")
+    sF = interpolate(v, y, **kwargs)
+  else:
+    y = np.asarray(y).reshape(v.size, -1).squeeze(-1) if np.asarray(y).size == v.size else np.asarray(y).reshape(v.size, -1)
+    nodes = v.flatten()
+    if "nearest" in flags:
+      res = nodes.resolution
+
+      def nearest(w):
+        ind, d = nodes.find(w)
+        out = y[np.asarray(ind).ravel()].astype(float)
+        out[np.asarray(d).ravel() > 2 * res] = np.nan
+        return out.reshape(w.shape)
+      sF = S2FunHandle(nearest, v.frame)
+    elif "harmonic" in flags:
+      sF = interpolate(v, y, **kwargs)
+    elif flags & {"spline", "inverseDistance"}:
+      from .kernelfunctions import S2DeLaValleePoussinKernel
+      psi = S2DeLaValleePoussinKernel(halfwidth=nodes.resolution / 2)
+      V = nodes.normalize().data.reshape(-1, 3)
+
+      # the mean of the four nearest values, weighted by the kernel or the inverse distance
+      def spline(w):
+        W = w.normalize().data.reshape(-1, 3)
+        omega = np.arccos(np.clip(W @ V.T, -1, 1))
+        j = np.argsort(omega, axis=1)[:, :4]
+        so = np.take_along_axis(omega, j, axis=1)
+        M = np.minimum(1 / so, 1e10) if "inverseDistance" in flags else np.real(psi.eval(np.cos(so)))
+        M = M / M.sum(axis=1, keepdims=True)
+        return np.sum(M * y[j], axis=1).reshape(w.shape)
+      sF = S2FunHandle(spline, v.frame)
+    else:
+      sF = S2FunTri(v, y)
+  return sF.eval(vi) if vi is not None else sF
 
 
 __all__ = ["calcDensity", "calcPDF", "interpolate"]

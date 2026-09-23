@@ -1,5 +1,7 @@
 # S1FunHarmonic: a function on the circle as the Fourier series of H7 (MATLAB @S1FunHarmonic;
-# docs/plans/functions.md F3), and the density of a list of angles
+# docs/plans/functions.md F3), and the density of a list of angles; the coefficients are
+# MATLAB's, f(x) = sum_k fhat_k e^{-ikx}, the transforms of transforms.py taking e^{ikx}, so
+# the coefficients are reversed where they meet
 #
 #   sF = S1FunHarmonic(fhat), S1FunHarmonic(psi), S1FunHarmonic(fun, bandwidth=L)
 #   sF = S1FunHarmonic.quadrature(x, values, bandwidth=L, weights=w)
@@ -46,7 +48,7 @@ class S1FunHarmonic:
       L = getMTEXpref("maxS1Bandwidth") if bandwidth is None else int(bandwidth)
       g = quadratureS1Grid(L)
       values = np.asarray(fhat(g.nodes())).ravel()
-      fhat = fourierSeriesAdjoint(g, values, L)
+      fhat = fourierSeriesAdjoint(g, values, L)[::-1]
       real = (values.dtype.kind != "c") if real is None else real
       bandwidth = None
     chat = np.array(fhat, dtype=_complexType(np.result_type(np.asarray(fhat).dtype, np.float64) if dtype is None else dtype)).reshape(-1)
@@ -66,16 +68,36 @@ class S1FunHarmonic:
       setattr(f, k, v)
     return f
 
-  # the Fourier series through samples on the circle: the quadrature over them, an angle
-  # given twice, at 0 and at 2 pi, counted once
+  # the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
+  # quadrature; others merged where they coincide and fitted by least squares at the
+  # bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR
   @classmethod
-  def interpolate(cls, x, values, bandwidth=None):
-    x = np.asarray(x, dtype=float).reshape(-1)
-    values = np.asarray(values).reshape(-1)
-    if len(x) > 1 and abs((x[-1] - x[0]) - 2 * np.pi) < 1e-9:
-      x, values = x[:-1], values[:-1]
-    # the samples resolve the frequencies below their Nyquist limit and no more
-    return cls.quadrature(x, values, bandwidth=(len(x) - 1) // 2 if bandwidth is None else bandwidth)
+  def interpolate(cls, x, values, bandwidth=None, weights=None, regularization=1e-5, SobolevIndex=2, tol=1e-6, maxit=100):
+    x = np.mod(np.asarray(x, dtype=float).reshape(-1), 2 * np.pi)
+    values = np.asarray(values).reshape(len(x))
+    order = np.argsort(x, kind="stable")
+    x, values = x[order], values[order]
+    n = len(x)
+    if np.linalg.norm(x - 2 * np.pi * np.arange(n) / n) < 1e-12:
+      return cls.quadrature(x, values, bandwidth=(n - 1) // 2 if bandwidth is None else bandwidth)
+    w = np.full(n, 1 / n) if weights is None else np.asarray(weights, dtype=float).ravel()[order]
+    # coinciding angles, within 1e-6, take the mean of their values
+    key = np.round(x / 1e-6).astype(np.int64)
+    key[key == round(2 * np.pi / 1e-6)] = 0
+    u, first, inv = np.unique(key, return_index=True, return_inverse=True)
+    count = np.bincount(inv)
+    x = x[first]
+    values = np.bincount(inv, weights=np.real(values)) / count + (1j * np.bincount(inv, weights=np.imag(values)) / count if np.iscomplexobj(values) else 0)
+    w = w[first]
+    n = len(x)
+    L = min(int(np.floor(n / 4 + 0.5)), getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)
+    from .density import _lsqr
+    sw = np.sqrt(w)
+    reg = math.sqrt(regularization) * np.abs(np.arange(-L, L + 1)) ** SobolevIndex
+    A = lambda c: np.concatenate([sw * fourierSeries(c[::-1], x, real=False), reg * c])
+    At = lambda z: fourierSeriesAdjoint(x, sw * z[:n], L, np.ones(n))[::-1] + reg * z[n:]
+    b = np.concatenate([sw * values, np.zeros(2 * L + 1)]).astype(complex)
+    return cls(_lsqr(A, At, b, 2 * L + 1, maxit, tol), real=not np.iscomplexobj(values))
 
   @classmethod
   def quadrature(cls, x, values=None, *, bandwidth=None, weights=None, real=None):
@@ -83,7 +105,7 @@ class S1FunHarmonic:
       return cls(x, bandwidth=bandwidth, real=real)
     L = getMTEXpref("maxS1Bandwidth") if bandwidth is None else int(bandwidth)
     values = np.asarray(values)
-    return cls(fourierSeriesAdjoint(x, values.ravel(), L, weights), real=(values.dtype.kind != "c") if real is None else real)
+    return cls(fourierSeriesAdjoint(x, values.ravel(), L, weights)[::-1], real=(values.dtype.kind != "c") if real is None else real)
 
   approximate = quadrature
 
@@ -112,12 +134,12 @@ class S1FunHarmonic:
     return self.eval(x)
 
   def eval(self, x):
-    return fourierSeries(self.fhat, x, real=self.isReal)
+    return fourierSeries(self.fhat[::-1], x, real=self.isReal)
 
-  # the derivative multiplies c_k by ik
+  # the derivative multiplies c_k by -ik
   def diff(self):
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
-    return S1FunHarmonic(1j * k * self.fhat, real=self.isReal)
+    return S1FunHarmonic(-1j * k * self.fhat, real=self.isReal)
 
   def grad(self, x=None):
     return self.diff() if x is None else self.diff()(x)
@@ -125,7 +147,13 @@ class S1FunHarmonic:
   # the rotation f(x - phi)
   def rotate(self, phi):
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
-    return S1FunHarmonic(np.exp(-1j * k * phi) * self.fhat, real=self.isReal)
+    return S1FunHarmonic(np.exp(1j * k * phi) * self.fhat, real=self.isReal)
+
+  # the convolution with a de la Vallee Poussin kernel, 2.9 degree unless a kernel or a
+  # halfwidth is given
+  def smooth(self, psi=None, halfwidth=2.9 * degree):
+    from .kernelfunctions import S1DeLaValleePoussinKernel
+    return self.conv(S1DeLaValleePoussinKernel(halfwidth=halfwidth) if psi is None else psi)
 
   # smoothing by a kernel is one factor per mode
   def conv(self, psi):
@@ -237,6 +265,10 @@ class S1FunHarmonic:
     x = (lo + hi) / 2 % (2 * np.pi)
     return float(np.real(self(x))), float(x)
 
+  # the integral over the circle, 2 pi times the mean, MATLAB's sum
+  def sum(self):
+    return 2 * np.pi * self.mean()
+
   def max(self, resolution=0.25 * degree):
     return self._extremum(1, resolution)
 
@@ -282,7 +314,11 @@ def calcDensity(rho, *, sigma=None, kernel=None, weights=None, antipodal=False, 
   if x.size == 0:
     raise ValueError("a density needs at least one angle")
   psi = kernel if kernel is not None else S1GaussKernel(silvermanWidth(x) if sigma is None else float(sigma))
-  L = psi.bandwidth if bandwidth is None else int(bandwidth)
+  # MATLAB's cutoff for the Gauss kernel, round(4 / sigma), where the modes fall to e^-8
+  if bandwidth is None:
+    L = max(1, int(np.floor(4 / psi.sigma + 0.5))) if kernel is None else psi.bandwidth
+  else:
+    L = int(bandwidth)
   w = np.full(x.size, 1 / x.size) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
   f = S1FunHarmonic.quadrature(x, np.ones(x.size), bandwidth=L, weights=w).conv(psi)
   if antipodal:

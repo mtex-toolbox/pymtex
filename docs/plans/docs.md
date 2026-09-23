@@ -1,6 +1,6 @@
 # Documentation (P7)
 
-Status: D0 done 2026-09-22, D1 under way (Vectors, Rotations, CrystalGeometry and CrystalOrientations done, Misorientations next), D2 under way (ODFAnalysis done 2026-09-22), D3 under way (EBSDAnalysis and Grains done 2026-09-22, GrainBoundaries next), D4 under way (PoleFigureAnalysis done 2026-09-22).
+Status: D0 done 2026-09-22, D1 done (Vectors, Rotations, CrystalGeometry, CrystalOrientations and Misorientations), D2 under way (ODFAnalysis done 2026-09-22), D3 under way (EBSDAnalysis and Grains done 2026-09-22, GrainBoundaries 2026-09-23, 12 checked and 3 partial), D4 under way (PoleFigureAnalysis done 2026-09-22, PhaseTransitions done 2026-09-23).
 
 The MATLAB documentation, `../frameSymmetry/doc`, is 229 content scripts in twenty
 chapters, publish-style: prose in comment blocks, code between, the output and the figures
@@ -122,6 +122,13 @@ isosurfaces (marching tetrahedra in `plotting/space.py`), `orientation.load` wit
 spellings, an exact Bingham sampler, 3D plots in a `newMtexFigure` layout, and found the grain exchange
 flag ignored by the regions, the projection and the sections, the sampled largest angle of a region, the
 321 chart sector, the held axis angle plots taking Euler coordinates, all in `docs/findings.md`.
+Misorientations DONE 2026-09-23, all 6 checked, which completes D1: the chapter wrote
+`plotAngleDistribution` and `plotAxisDistribution`, `calcAngleDistribution` in MATLAB's order and three
+forms, `maxAngle(cs)`, the exact uniform axis distribution, the edges of an orientation region with
+`boundaryColor` and `noSurface`, MATLAB's display of a misorientation as its parallel planes and
+directions, positional legend labels and MATLAB's colour order for held plots, and found
+`calcMisorientation` reversed, the sign of `axis(o1, o2)`, the two-phase axis distribution averaged as
+antipodal, all in `docs/findings.md`.
 
 **D2 - the functions.** SphericalFunctions (16), SO3Functions (13), ODFAnalysis (18),
 GeneralConcepts (12), Plotting (11), Tutorials (5): 75 pages on P2 and P5's S1 to S3 (the
@@ -192,14 +199,13 @@ the pages say so: the Geesthacht normalisation, where MATLAB's two scans carry d
 antipodal flags after the correction; the refinement loop, where MATLAB's `refine` measures
 below the cap; and the counts of the equispaced SO(3) grids. The Dubna reconstruction takes
 about 11 s on the 5 degree grid, and PoleFigureSimulation runs its fourteen reconstructions
-in twelve minutes. Tensors (8),
-Elasticity (4), Plasticity (14) are open since P4's tensors landed on 2026-09-22 (section
+in twelve minutes. Tensors, Elasticity and Plasticity, all 26 checked on 2026-09-23, were open since P4's tensors landed on 2026-09-22 (section
 11 of `docs/plans/functions.md` lists the names, MATLAB's throughout: `stiffnessTensor`,
 `Voigt`, `EinsteinSum`, `C.YoungsModulus()` with parentheses, `velocity(C)`,
 `calcTaylor`, `calcLankford`, `SchmidTensor`; not ported are `plot(C)`,
 `plotSeismicVelocities`, the implicit `doEulerStep`, `calcEaring` and the json and mpod
 tensor files, and `max` of a velocity field and `calcLankford` of an ODF are slow);
-PhaseTransitions (11) after M9; EBSD3Analysis (4) blocked with Julia.
+PhaseTransitions (11) done 2026-09-23, all checked, on M9; EBSD3Analysis (4) blocked with Julia.
 
 **D5 - the site.** The chapter navigation from the `.toc` files, the function reference
 from the docstrings, the executed pages as the check in CI.

@@ -17,6 +17,15 @@ def test_euler_columns_with_a_property_and_positions(tmp_path):
   assert np.allclose(S['grainid'], np.arange(3))
 
 
+def test_euler_numbered_columns_are_bunge(tmp_path):
+  # MATLAB's 'Euler 1', 'Euler 2', 'Euler 3' name the Bunge angles
+  ori = orientation.byEuler(np.array([10, 200]) * degree, np.array([40, 50]) * degree, np.array([70, 5]) * degree, cs)
+  f = tmp_path / 'ori.txt'
+  np.savetxt(f, np.stack([ori.phi1, ori.Phi, ori.phi2], axis=-1) / degree)
+  o = orientation.load(f, cs, columnNames=['Euler 1', 'Euler 2', 'Euler 3'])
+  assert np.max(o.angle(ori)) < 1e-6
+
+
 def test_radians_passive_and_quaternions(tmp_path):
   ori = orientation.rand(5, cs, rng=np.random.default_rng(1))
   f = tmp_path / 'rad.txt'

@@ -103,28 +103,70 @@ def ShojiNishiyama(csG, csE):
 
 # the child variants of a parent-to-child relationship: the distinct p2c * r over the parent
 # group modulo the child group; the parent variants with the sides swapped; the child
-# orientations of parents, all of them or one chosen per parent by its id
+# orientations of parents, all of them or one chosen per parent by its id; the parent
+# orientations of children, whose frame is the child's. The variants are numbered as MTEX
+# numbers them, which is what a variant id means
 def variants(p2c, second=None, ids=None, parent=False):
   from .orientation import orientation
   if isinstance(second, str):
     parent, second = second == "parent", None
+  if isinstance(ids, str):
+    parent, ids = ids == "parent", None
   if second is None:
     if parent:
-      G = p2c.frameB.sym.properGroup().rotations().data.reshape(-1, 4)
+      G = mtexEnumeration(p2c.frameB.sym)
       cand = p2c._new(qmul(G, p2c.data[None]))
       keep = _distinctModulo(cand, "right")
     else:
-      G = p2c.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
+      G = mtexEnumeration(p2c.frameA.sym)
+      if len(G) == 24:
+        G = G[KS_ORDER - 1]
       cand = p2c._new(qmul(p2c.data[None], G))
       keep = _distinctModulo(cand, "left")
     return cand[keep]
-  vs = variants(p2c)
+  # variants(p2c, odf): the child texture, by the function spaces above this layer
+  if not hasattr(second, "frameA") and hasattr(second, "eval"):
+    from ..functions.funops import transformODF
+    return transformODF(second, p2c, ids)
   par = second.data.reshape(-1, 4)
+  if second.frameA is p2c.frameB and second.frameA is not p2c.frameA:
+    PV = variants(p2c, parent=True).data
+    PV = PV if ids is None else PV[np.asarray(ids).reshape(-1) - 1]
+    q = qmul(par[:, None, :], PV[None, :, :]) if ids is None else qmul(par, PV)
+    return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameA, second.frameB)
+  # a variant id counts from the representative of the parent in the fundamental region
+  par = project2FundamentalRegionOrientation(second).data.reshape(-1, 4)
+  vs = variants(p2c)
   if ids is None:
     q = qmul(par[:, None, :], _conj(vs.data)[None, :, :])
     return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameB, second.frameB)
   ids = np.asarray(ids).reshape(-1) - 1
   return orientation(rotation._fromData(qmul(par, _conj(vs.data[ids]))), p2c.frameB, second.frameB)
+
+
+# MTEX's numbering of the 24 child variants of a cubic parent, Morito's for Kurdjumov-Sachs
+KS_ORDER = np.array([1, 17, 2, 16, 3, 18, 8, 22, 9, 24, 7, 23, 19, 11, 20, 10, 21, 12, 6, 15, 4, 14, 5, 13])
+
+
+# the proper rotations of a group in the order MTEX enumerates them, the order its variant
+# ids are counted in: the products r1 r2 r3 of the cyclic groups about the generating axes
+# of its Laue class, the first factor running fastest; the closure order where no
+# generator list of MTEX spans the group
+def mtexEnumeration(sym):
+  G = sym.properGroup().rotations().data.reshape(-1, 4)
+  a, b, c = sym.axes
+  for gens in ([], [(a, 2)], [(b, 2)], [(c, 2)], [(a, 2), (c, 2)], [(c, 3)], [(a, 2), (c, 3)], [(a - b, 2), (c, 3)], [(c, 4)],
+               [(a, 2), (c, 4)], [(c, 6)], [(a, 2), (c, 6)], [(a + b + c, 3), (a, 2), (c, 2)], [(a + b + c, 3), (a + b, 2), (c, 4)]):
+    if int(np.prod([n for _, n in gens])) != len(G):
+      continue
+    E = np.array([[1.0, 0, 0, 0]])
+    for v, n in gens:
+      w = np.arange(n) * 2 * np.pi / n
+      r = np.c_[np.cos(w / 2), np.sin(w / 2)[:, None] * (v / np.linalg.norm(v))]
+      E = qmul(E[None, :, :], r[:, None, :]).reshape(-1, 4)
+    if np.all(np.max(np.abs(E @ G.T), axis=1) > 1 - 1e-6) and np.all(np.max(np.abs(G @ E.T), axis=1) > 1 - 1e-6):
+      return E
+  return G
 
 
 def _distinctModulo(cand, side):

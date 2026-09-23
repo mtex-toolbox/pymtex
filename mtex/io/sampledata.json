@@ -203,6 +203,13 @@
       "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/quartzPattern.mat"
     }
   ],
+  "quartzpiezo": [
+    {
+      "path": "tensor/Single_RH_quartz_poly.P",
+      "sha256": "fabccb36e6b8512b6df4f52ac08b8bf1592aaf129970bf65ec77739d2a446896",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/tensor/Single_RH_quartz_poly.P"
+    }
+  ],
   "sharp": [
     {
       "path": "EBSD/sharp.txt",
@@ -215,6 +222,13 @@
       "path": "EBSD/single_grain_aluminum.txt",
       "sha256": "89cf549d5893974ccfdeef26ece2d6a6582bfa8929233e074d3bc57d1dd5825f",
       "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/single_grain_aluminum.txt"
+    }
+  ],
+  "smiley": [
+    {
+      "path": "vector3d/smiley.csv",
+      "sha256": "2b24c8e0186e4937d49f0001dc3fa62deb9570aa2a2adb9052d3e9e0c2b18f54",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/vector3d/smiley.csv"
     }
   ],
   "steel": [

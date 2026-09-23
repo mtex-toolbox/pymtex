@@ -34,7 +34,7 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
   aspect = max((lambda b: (b[3] - b[2]) / (b[1] - b[0]))(c[0].bounds()) for c in charts)
   # layout=[rows, cols] names the grid, as MATLAB's option does
   layout = whereKw.get("layout")
-  ncols = (int(layout[1]) if layout is not None else columns if columns else _gridColumns(n, aspect)) * wide
+  ncols = (int(layout[1]) if layout is not None else columns if columns else _gridColumns(n, aspect, wide)) * wide
   nrows = -(-n * wide // ncols)
   # a held figure of the same sections takes the plot on top of what it has
   held = gcm()
@@ -47,10 +47,12 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
         next(axes)
     return held, plots
   from .mtexfigure import figureSize
-  figSize = figureSize(whereKw.get("figSize"), (min(3.2 * ncols, 16), min(3.2 * aspect * nrows + 0.4 * nrows, 12)))
+  labels = oS.axisLabels
+  # a row takes its panel and, with axis labels, room for the title, the ticks and the label
+  margin = 0.9 if labels is not None else 0.4
+  figSize = figureSize(whereKw.get("figSize"), (min(3.2 * ncols, 16), min(3.2 * aspect * nrows + margin * nrows, 12)))
   fig = mtexFigure(n * wide, columns=ncols, figSize=figSize)
   fig.sections = oS
-  labels = oS.axisLabels
   outer = oS.outerSector
   noLabel = axesKw.pop("noLabel", labels is not None or outer is not None)
   plots = []
@@ -83,9 +85,14 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
 # that no cell of the last row is left empty
 # the columns of a grid of n cells of the given height to width ratio: the figure about
 # 1.6 times as wide as tall, so wide Euler sections stack in two columns as MATLAB's do
-def _gridColumns(n, aspect=1.0):
-  if n <= 3 and aspect >= 0.5:
+def _gridColumns(n, aspect=1.0, wide=1):
+  # up to four round sections side by side, three of two panels each, as MATLAB lays them
+  # out on a wide screen
+  if n <= (4 if wide == 1 else 3) and aspect >= 0.5:
     return n
+  # up to three wide sections stack in one column, as MATLAB's do
+  if n <= 3:
+    return 1
   want = np.sqrt(1.6 * n * min(aspect, 1.0))
   divisors = [c for c in range(2, min(n - 1, 8) + 1) if n % c == 0]
   return int(np.ceil(np.sqrt(n))) if not divisors else min(divisors, key=lambda c: abs(c - want))
@@ -129,7 +136,10 @@ def plotSection(x, *args, **kw):
   kw.pop("silent", None)
   kind, shapes = None, None
   for i, a in enumerate(args):
-    if isinstance(a, (str, ODFSections)):
+    # MATLAB's style flags, plotSection(odf, 'phi2', angles, 'contourf')
+    if isinstance(a, str) and a in FILL_FLAGS:
+      kw[a] = True
+    elif isinstance(a, (str, ODFSections)):
       kind = a
     elif i > 0 and isinstance(args[i - 1], str) and args[i - 1].lower() in ("phi1", "phi2", "alpha", "gamma", "sigma", "omega", "axisangle"):
       # plotSection(ori, 'axisAngle', angles): the numbers after a family are its sections
@@ -150,8 +160,11 @@ def plotSection(x, *args, **kw):
     oS = newODFSectionPlot(CS1, CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)
-  # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes
+  # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes;
+  # noGrid leaves out the reference field a pole figure section counts from, as MATLAB's
   decor = {k: kw.pop(k) for k in ("coordinates", "xlabel", "ylabel") if k in kw}
+  if kw.pop("noGrid", False) and _isSO3Fun(x):
+    kw["field"] = False
   if _isSO3Fun(x):
     hs = _plotSectionFun(x, oS, **kw)
   elif shapes is not None:
@@ -212,9 +225,14 @@ def plotFibreSection(f, points=1000, lineColor="k", **kw):
   return _plotSectionOri(ori, oS, all=True, onto=True, **kw)
 
 
-def quiverSection(ori, w, color="k", lineWidth=1.0, resolution=10 * degree, **kw):
+def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw):
   """quiver(ori, w) on a section plot: an arrow along w at every orientation, w a specimen
-  direction per orientation"""
+  direction per orientation; quiverSection(sF, vF, sec) the vector field along the polar
+  section of a function on the sphere"""
+  from ..geometry.quaternion import quaternion
+  if not isinstance(ori, quaternion):
+    from .polarplot import quiverSectionS2
+    return quiverSectionS2(ori, w, *args, color=color, lineWidth=kw.pop("linewidth", lineWidth), **kw)
   oS = _currentSections()
   projKw, axesKw, whereKw = _split(kw)
   lineWidth = kw.pop("lineWidth", lineWidth)
@@ -229,6 +247,60 @@ def quiverSection(ori, w, color="k", lineWidth=1.0, resolution=10 * degree, **kw
       continue
     for sP in cell:
       hs.append(_arrows(sP, vs[ind], ws[src[ind]], resolution=resolution, normalize=True, color=color, lineWidth=lineWidth, **kw))
+  return hs
+
+
+def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw):
+  """plot(WFun) of a vector field on SO(3): in every section an arrow where a small turn
+  about the field's axis moves the orientation within the section, its length the size of
+  the field; into the sections of a held figure, or new phi2 sections"""
+  from ..geometry.grids.s2grid import equispacedS2Grid
+  from ..geometry.kernels import qmul
+  from .sections import eulerSections, pfSections
+  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
+  oS = next((a for a in args if isinstance(a, ODFSections)), None)
+  held = gcm()
+  if oS is None:
+    oS = getattr(held, "sections", None) if held is not None and held.hold else None
+  if oS is None:
+    oS = newODFSectionPlot(F.CS, F.SS, next((a for a in args if isinstance(a, str)), None))
+  if not isinstance(oS, (eulerSections, pfSections)):
+    raise NotImplementedError("a vector field on SO(3) is drawn into Euler angle or pole figure sections")
+  projKw, axesKw, whereKw = _split(kw)
+  kw.pop("add2all", None)
+  fig, plots = _sectionAxes(oS, 0, axesKw, whereKw, onto=True)
+  if isinstance(oS, eulerSections):
+    # a regular grid over the box of a section, the cell centres
+    theta = np.arange(resolution / 2, oS.maxPhi, resolution)
+    azim = np.arange(resolution / 2, oS.maxAzimuth, resolution)
+    T, A = np.meshgrid(theta, azim, indexing="ij")
+    vs = vector3d.byPolar(T.ravel(), A.ravel())
+  else:
+    # the pole grid inside the sector of the sections
+    vs = equispacedS2Grid(resolution=resolution)
+    vs = vector3d(vs.data.reshape(-1, 3)[oS.sR.checkInside(vs).ravel()])
+  t = 1e-4
+  hs = []
+  for k, cell in enumerate(plots):
+    ori = oS.orientationsAt(k, vs)
+    v = F.eval(ori)
+    v = np.asarray(v.data if isinstance(v, vector3d) else v, dtype=float).reshape(-1, 3)
+    if isinstance(oS, pfSections):
+      # a left turn about v moves the pole ori * h1, which is the point of the chart, along v x pole
+      w = vector3d(np.cross(v, vs.normalize().data.reshape(-1, 3)))
+    else:
+      # the left turn exp(t v) ori, and where it lands in the two angles of the section
+      size = np.linalg.norm(v, axis=1)
+      axis = v / np.where(size > 0, size, 1.0)[:, None]
+      step = np.column_stack([np.cos(t * size / 2), np.sin(t * size / 2)[:, None] * axis])
+      moved = qmul(step, ori.data.reshape(-1, 4))
+      _, th, az = oS._triples(moved)
+      dth = (th - T.ravel()) / t
+      daz = (np.mod(az - A.ravel() + np.pi, 2 * np.pi) - np.pi) / t
+      w = vector3d.byPolar(T.ravel() + 1e-6 * dth, A.ravel() + 1e-6 * daz) - vs
+      w = vector3d(w.data / 1e-6)
+    for sP in cell:
+      hs.append(_arrows(sP, vs, w, resolution=resolution, arrowSize=0.9, color=color, lineWidth=lineWidth, **kw))
   return hs
 
 
@@ -323,7 +395,7 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
   return hs
 
 
-__all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection"]
+__all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection", "quiverSectionField"]
 
 
 # plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
