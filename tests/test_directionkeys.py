@@ -145,14 +145,19 @@ def test_the_perceptual_key():
   rgb = np.array([[1.0, 0, 0], [0, 1.0, 0], [0.2, 0.4, 0.9], [0.5, 0.5, 0.5]])
   assert np.allclose(oklab2rgb(rgb2oklab(rgb)), rgb, atol=1e-6)
   # MTEX's key changes its colour three times as fast in some parts of the sector as in
-  # others; the perceptual one at a nearly steady rate
+  # others; the perceptual one at a steadier rate, and less steady as its lightness follows the hue
+  def spread(name, **kw):
+    g = _colourSpeed(HSVDirectionKey(crystalFrame(name), **kw))
+    return np.percentile(g, 90) / np.percentile(g, 10)
+
   for name in ("m-3m", "6/mmm", "-3m", "4mm"):
-    for perceptual, bound in ((False, 2.5), (True, 1.6)):
-      g = _colourSpeed(HSVDirectionKey(crystalFrame(name), perceptual=perceptual))
-      assert (np.percentile(g, 90) / np.percentile(g, 10) < bound) == perceptual
+    even, follows, mtex = spread(name, perceptual=True), spread(name, perceptual=True, hueLightness=1), spread(name)
+    assert even < 2.4 < 2.9 < mtex and even < follows < mtex
   # the centre pale, the vertices of the cubic triangle red, green and blue
   key = HSVDirectionKey(crystalFrame("m-3m"), perceptual=True)
   assert rgb2oklab(key.direction2color(key.whiteCenter))[0] > 0.94
-  corners = key.direction2color(vector3d([[0, 0, 1], [1, 0, 1], [1, 1, 1]]))
-  assert list(np.argmax(corners, axis=-1)) == [0, 1, 2]
-  assert np.all((corners >= 0) & (corners <= 1))
+  for hueLightness in (0, 0.5, 1):
+    key = HSVDirectionKey(crystalFrame("m-3m"), perceptual=True, hueLightness=hueLightness)
+    corners = key.direction2color(vector3d([[0, 0, 1], [1, 0, 1], [1, 1, 1]]))
+    assert list(np.argmax(corners, axis=-1)) == [0, 1, 2]
+    assert np.all((corners >= 0) & (corners <= 1))

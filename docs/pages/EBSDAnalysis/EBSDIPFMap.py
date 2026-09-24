@@ -251,4 +251,5 @@ plot(ipfTSLKey(crystalFrame('-3m')), complete=True, lower=True)
 # figures, inverse pole figures, and sections through orientation space.
 # [Sharp Color Keys](EBSDSharpPlot.html) increases contrast when a phase occupies only a
 # small orientation range. [Advanced Color Keys](EBSDAdvancedMaps.html) covers
-# Euler-angle, axis-angle, and spot keys.
+# Euler-angle, axis-angle, and spot keys. [A Perceptual Key](EBSDPerceptualKey.html) varies
+# the default key so that its colour changes at a nearly steady rate over the sector.

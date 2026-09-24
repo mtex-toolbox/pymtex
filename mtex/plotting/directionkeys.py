@@ -8,6 +8,8 @@
 # taken in HSL, which holds the lightness steady around the circle where HSV does not.
 from __future__ import annotations
 
+from functools import lru_cache
+
 import numpy as np
 
 from ..geometry.frames import referenceFrame
@@ -119,41 +121,95 @@ def oklab2rgb(lab):
   return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * lin ** (1 / 2.4) - 0.055)
 
 
-# the perceptual colour sphere: a double cone in OKLab, the lightness falling linearly from
-# the white centre over the boundary to the black one and the chroma growing linearly away
-# from both, the azimuth turning the hue. Equal steps along the radius, and equal steps
-# along the arc, are then equal colour differences everywhere, at the price of the chroma:
-# it stops at what every hue reaches in sRGB at the lightness of the boundary
-PERCEPTUAL_CONE = (0.95, 0.75, 0.125)   # the lightness at the white centre and on the boundary, the chroma there
+# the perceptual colour sphere: a double cone in OKLab over the hue circle, the lightness
+# running linearly from the white centre to the boundary and on to the black centre, the
+# chroma growing linearly away from both centres, the azimuth turning the hue. Equal steps
+# along the radius and along the arc are then equal colour differences for every hue.
+# hueLightness moves the lightness of the boundary from one value for all hues (0, the most
+# even key) to the lightness at which each hue is most saturated in sRGB (1, bright yellow
+# and cyan beside dark blue, close to MTEX's key); the chroma of the boundary is at each hue
+# the largest the whole cone keeps inside sRGB
+PERCEPTUAL_CONE = (0.95, 0.62, 0.30)   # the lightness at the white centre, on the boundary and at the black centre
 PERCEPTUAL_HUE_SMOOTHING = 12 * degree
+_HUES = np.linspace(0, 2 * np.pi, 360, endpoint=False)
+
+
+# a periodic table convolved with a Gaussian of the given width in radians
+def _circularSmooth(values, width):
+  n = len(values)
+  x = (np.arange(n) - n // 2) * 2 * np.pi / n
+  w = np.exp(-x ** 2 / (2 * width ** 2))
+  return np.real(np.fft.ifft(np.fft.fft(values) * np.fft.fft(np.fft.ifftshift(w / w.sum()))))
 
 
 # OKLab spends 81 degrees of hue from red to yellow and 33 from yellow to green, so an evenly
 # turning hue gives red two thirds of that side of the sector. The azimuth is taken instead
 # through the hues of red, yellow, green, cyan, blue and magenta at every sixth of the turn,
-# the slope between them smoothed by a Gaussian so the steps leave no seam in the key
+# the slope between them smoothed so the steps leave no seam in the key
 def _perceptualHue(steps=3600, smoothing=PERCEPTUAL_HUE_SMOOTHING):
   anchors = np.array([np.arctan2(*rgb2oklab(c)[[2, 1]]) for c in
                       ([1.0, 0, 0], [1.0, 1, 0], [0, 1.0, 0], [0, 1.0, 1], [0, 0, 1.0], [1.0, 0, 1])])
   gaps = np.mod(np.diff(np.append(anchors, anchors[0])), 2 * np.pi)
-  slope = np.repeat(gaps / (np.pi / 3), steps // 6)
-  x = (np.arange(steps) - steps // 2) * 2 * np.pi / steps
-  w = np.exp(-x ** 2 / (2 * smoothing ** 2))
-  slope = np.real(np.fft.ifft(np.fft.fft(slope) * np.fft.fft(np.fft.ifftshift(w / w.sum()))))
+  slope = _circularSmooth(np.repeat(gaps / (np.pi / 3), steps // 6), smoothing)
   return anchors[0] + np.concatenate([[0.0], np.cumsum(slope)]) * 2 * np.pi / steps
 
 
 PERCEPTUAL_HUE = _perceptualHue()
 
 
-def perceptualSphereColor(radius, rho, gray=None):
+def _inGamut(L, C, h):
+  lin = ((np.stack(np.broadcast_arrays(L, C * np.cos(h), C * np.sin(h)), axis=-1) @ _LAB_INV.T) ** 3) @ _LMS_INV.T
+  return np.all((lin >= -1e-9) & (lin <= 1 + 1e-9), axis=-1)
+
+
+# the largest c for which the chroma c t at the lightness L stays in sRGB, over every hue at
+# once: L and t are (hues, samples), the result one value per hue
+def _largestChroma(L, t, steps=26):
+  lo, hi = np.zeros(len(_HUES)), np.full(len(_HUES), 0.45)
+  for _ in range(steps):
+    m = (lo + hi) / 2
+    ok = np.all(_inGamut(L, m[:, None] * t, _HUES[:, None]), axis=-1)
+    lo, hi = np.where(ok, m, lo), np.where(ok, hi, m)
+  return lo
+
+
+# the lightness at which each hue reaches its largest chroma in sRGB, the cusp of the gamut
+@lru_cache(maxsize=1)
+def _cuspLightness():
+  Ls = np.linspace(0.3, 0.99, 139)
+  C = np.stack([_largestChroma(np.full((len(_HUES), 1), L), np.ones(1)) for L in Ls], axis=-1)
+  return Ls[np.argmax(C, axis=-1)]
+
+
+# the boundary lightness and chroma of the cone at every hue of _HUES; the chroma is
+# smoothed and then lowered until it is nowhere above the largest one
+@lru_cache(maxsize=8)
+def _perceptualCone(hueLightness):
+  L0 = PERCEPTUAL_CONE[1]
+  Lb = L0 if hueLightness == 0 else _circularSmooth(L0 + hueLightness * (_cuspLightness() - L0), 10 * degree)
+  Lb = np.broadcast_to(Lb, _HUES.shape)
+  s = np.linspace(0.01, 1.99, 199)
+  L = _coneLightness(s[None, :], Lb[:, None])
+  Cb = _largestChroma(L, 1 - np.abs(1 - s)[None, :])
+  smooth = _circularSmooth(Cb, 8 * degree)
+  return Lb, smooth - max(0.0, np.max(smooth - Cb))
+
+
+# the lightness at s, 0 at the white centre, 1 on the boundary of lightness Lb, 2 at the black centre
+def _coneLightness(s, Lb):
+  Lw, _, Ld = PERCEPTUAL_CONE
+  return np.where(s <= 1, Lw + (Lb - Lw) * s, Lb + (Ld - Lb) * (s - 1))
+
+
+def perceptualSphereColor(radius, rho, gray=None, hueLightness=0.0):
   radius, rho = np.broadcast_arrays(np.asarray(radius, dtype=float), np.asarray(rho, dtype=float))
-  Lw, Lb, Cb = PERCEPTUAL_CONE
-  s = 2 * (1 - radius)
-  L = Lw - (Lw - Lb) * s
-  C = Cb * (1 - np.abs(1 - s)) * (1.0 if gray is None else np.asarray(gray, dtype=float))
+  Lbs, Cbs = _perceptualCone(float(hueLightness))
   h = np.interp(np.mod(rho, 2 * np.pi), np.linspace(0, 2 * np.pi, len(PERCEPTUAL_HUE)), PERCEPTUAL_HUE)
-  return oklab2rgb(np.stack([L, C * np.cos(h), C * np.sin(h)], axis=-1))
+  Lb = np.interp(np.mod(h, 2 * np.pi), _HUES, Lbs, period=2 * np.pi)
+  Cb = np.interp(np.mod(h, 2 * np.pi), _HUES, Cbs, period=2 * np.pi)
+  s = 2 * (1 - radius)
+  C = Cb * (1 - np.abs(1 - s)) * (1.0 if gray is None else np.asarray(gray, dtype=float))
+  return oklab2rgb(np.stack([_coneLightness(s, Lb), C * np.cos(h), C * np.sin(h)], axis=-1))
 
 
 # ------------------------------------------------------------------ the keys
@@ -202,16 +258,18 @@ class HSVDirectionKey(directionColorKey):
 
     HSVDirectionKey(cs)
     HSVDirectionKey(cs, whiteCenter=v, maxAngle=5*degree)
-    HSVDirectionKey(cs, perceptual=True)
+    HSVDirectionKey(cs, perceptual=True, hueLightness=0.5)
 
   A finite maxAngle makes the key sharp: the whole colour circle is spent on the cap of that
   opening about the white centre and everything outside it is black. perceptual=True takes
   the colours from a double cone in OKLab instead of MTEX's HSL sphere: the colour changes
-  at the same rate all over the sector, and the key is paler.
+  at a nearly steady rate over the sector. hueLightness, from 0 to 1, lets the lightness of
+  the boundary follow the hue towards where each hue is brightest: yellow comes back as
+  yellow, and the key comes closer to MTEX's and less even.
   """
 
   def __init__(self, cs=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
-               grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False):
+               grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False, hueLightness=0.0):
     # HSVDirectionKey() colours the whole sphere of the specimen; antipodal=True the key of axes
     from ..geometry.frames import specimenFrame
     from ..geometry.vector3d import vector3d as _v
@@ -233,11 +291,11 @@ class HSVDirectionKey(directionColorKey):
     self.reference = pC.east
     self.maxAngle = float(maxAngle)
     self.colorStretching, self.grayValue, self.grayGradient = colorStretching, grayValue, grayGradient
-    self.perceptual = bool(perceptual)
+    self.perceptual, self.hueLightness = bool(perceptual), float(hueLightness)
 
   def _sphereColor(self, radius, rho, gray=None):
     if self.perceptual:
-      return perceptualSphereColor(radius, rho, gray)
+      return perceptualSphereColor(radius, rho, gray, self.hueLightness)
     return sphereColor(radius, rho, self.grayValue, self.grayGradient, self.colorStretching, gray)
 
   # the colour of directions: each is brought into the sector, then into the white half, the
