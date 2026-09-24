@@ -64,18 +64,30 @@ def segmentFrom(c, ebsd, connect, backend=None):
   raw = components(n, p1[join], p2[join], backend)
   hasCell = np.zeros(n, dtype=bool)
   hasCell[c.site2pixel[c.site2pixel >= 0]] = True
-  grainId = np.zeros(n, dtype=np.int32)
-  roots = raw[hasCell]
-  _, first, inverse = np.unique(roots, return_index=True, return_inverse=True)
-  order = np.argsort(np.argsort(first))
-  grainId[hasCell] = order[inverse] + 1
-  nGrains = len(first)
+  grainId, nGrains = relabel(raw, hasCell, backend)
   g1 = np.where(p1 >= 0, grainId[np.maximum(p1, 0)], 0)
   g2 = np.where(p2 >= 0, grainId[np.maximum(p2, 0)], 0)
   outside = (p1 < 0) | (p2 < 0)
   isOuter = (outside & ((p1 >= 0) | (p2 >= 0))) | (~outside & (g1 != g2))
   isInner = ~outside & (g1 == g2) & (connect <= 0.5)
   return segmentation(grainId, nGrains, connect, isInner, isOuter)
+
+
+# the grains numbered from 1 in order of the first measurement of their component, over the
+# measurements that have a cell
+def relabel(raw, hasCell, backend=None):
+  n = len(raw)
+  if (getMTEXpref("kernels", "numba") if backend is None else backend) == "numba":
+    from .kernels import grainKernel
+    loop = grainKernel("relabel")
+    if loop is not None:
+      grainId = np.zeros(n, dtype=np.int32)
+      nGrains = loop(np.ascontiguousarray(raw, dtype=np.int64), hasCell, np.zeros(n, dtype=np.int64), grainId)
+      return grainId, int(nGrains)
+  grainId = np.zeros(n, dtype=np.int32)
+  _, first, inverse = np.unique(raw[hasCell], return_index=True, return_inverse=True)
+  grainId[hasCell] = np.argsort(np.argsort(first))[inverse] + 1
+  return grainId, len(first)
 
 
 def segment(c, ebsd, crit, backend=None):

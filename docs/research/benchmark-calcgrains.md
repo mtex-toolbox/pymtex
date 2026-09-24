@@ -125,6 +125,41 @@ absorption of the gaps into grains. P-M, P-J, J-M are the three pairs.
 - **The quadruple point split (case d)** agrees between the port and Julia on both maps and
   moves forsterite from 3185 to 3005 grains (MATLAB 3160 to 2944).
 
+## Closing the gap to Julia, 2026-09-24
+
+The 2.53 million pixel steel map `1C_1.ctf` (Fe-BCC and Fe-FCC, 0.15 µm steps) runs on request,
+`bench/calcgrains.py export 1C_1`, against Julia only. Both ports give the same grains on it
+(118 930 at the defaults, 334 629 without the closing). This port first took 9.7 s where Julia
+takes 5.7 s, the time spread over every stage; each stage was then made a compiled pass, the
+NumPy form kept as the fallback and the oracle, and every one of the 22 map and case runs gives
+counts and partitions byte-identical to the results before, the boundaries and polygons of
+twins, forsterite and 1C_1 bit-identical as well.
+
+| stage on 1C_1 | before | after | what changed |
+|---|---:|---:|---|
+| decomposition | 4.2 s | 1.0 s | the vertex weld one numba pass over a coarse bucket grid with a union-find, the rules of the NumPy weld kept |
+| misorientation criterion | 1.5 s | 0.13 s | one parallel loop over the pairs against a padded table of the proper groups |
+| grain numbering | 0.58 s | 0.29 s | numbered by first appearance in one loop instead of unique and a double argsort |
+| grain table | 1.2 s | 0.17 s | compiled passes: the reference, the symmetry reduction, the sums in `np.add.at` order, the spread |
+| boundary, outer and inner | 1.4 s | 0.26 s | built once in its final order, the walk and the chain reversal one permutation, the sorts counting sorts |
+| grain polygons | 0.70 s | 0.15 s | the loops traced in parallel, each grain into its own slice |
+| absorption of notIndexed pixels | 2.9 s (forsterite) | 0.1 s | the corner search one numba loop |
+
+`calcGrains`, best of three, 12 threads each, the machine at a load of about 3 from other work:
+
+| map | case | Python before | Python after | Julia |
+|---|---|---:|---:|---:|
+| 1C_1 | a, defaults | 9.75 s | 2.11 s | 3.44 s |
+| 1C_1 | c, no closing | 10.71 s | 3.11 s | 2.68 s |
+| forsterite | a | 2.93 s | 0.36 s | 0.26 s |
+| forsterite | b, 5°, minPixel 5 | | 0.59 s | 0.47 s |
+| emsland | a | 1.99 s | 0.38 s | 0.28 s |
+| emsland | b | | 0.65 s | 0.51 s |
+
+The port is now within 1.2 to 1.7 times of Julia on every case and ahead of it on the large map
+at the defaults. What is left is mostly the NumPy glue between the kernels (gathers and
+concatenations of the per-pixel arrays), not one stage.
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three

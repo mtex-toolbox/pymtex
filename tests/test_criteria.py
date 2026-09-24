@@ -82,3 +82,17 @@ def test_a_property_and_a_custom_function():
   ax.data[1] = -ax.data[0]
   c = connectivity(gbcCustom(ax, 1 * degree, antipodal=True), e, [0], [1])
   assert c[0] == 1 and connectivity(gbcCustom(ax, 1 * degree), e, [0], [1])[0] == 0
+
+
+def test_the_compiled_angle_criterion_is_the_numpy_one():
+  # two indexed phases of different groups, notIndexed pixels, a pair of levels and a phase
+  # with levels of its own: every pair gets the value of the NumPy form, in both precisions
+  n = 400
+  for dtype in (np.float32, np.float64):
+    rot = rotation.rand(n, rng=rng).astype(dtype)
+    pos = np.stack([np.arange(float(n)), np.zeros(n), np.zeros(n)], axis=-1)
+    ph = rng.integers(0, 3, n).astype(np.int8)
+    e = EBSD(pos, rot, ph, phaseList(crystalFrame("m-3m", mineral="a"), crystalFrame("6/mmm", mineral="b")), lattice=None)
+    i, j = rng.integers(0, n, 3000), rng.integers(0, n, 3000)
+    for crit in (gbcAngle(10 * degree), gbcAngle([15 * degree, 2 * degree]), gbcAngle(10 * degree, byPhase={"b": [60 * degree, 5 * degree]})):
+      assert np.array_equal(crit.evaluate(e, i, j, backend="numba"), crit.evaluate(e, i, j, backend="numpy"))

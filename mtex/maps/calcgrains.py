@@ -127,15 +127,59 @@ def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
 #
 # The mean is the quaternion mean of the pixels of a grain, each first brought to the
 # equivalent closest to the first one so that the symmetry does not tear the average
-# apart; the spread is the mean angle to that mean. Both run vectorised over all the
-# pixels of a phase at once, with the reference of every pixel that of its grain.
-def grainTable(seg, ebsd, boundary=None, innerBoundary=None):
+# apart; the spread is the mean angle to that mean. Both run as compiled passes over all
+# the pixels, the NumPy form phase by phase their fallback and oracle.
+def grainTable(seg, ebsd, boundary=None, innerBoundary=None, backend=None):
   n = seg.nGrains
   gid = seg.grainId
   ph = ebsd.phaseId.reshape(-1)
   rot = ebsd.rotations.data.reshape(-1, 4)
-  T = rot.dtype
   numPixel = np.bincount(gid, minlength=n + 1)[1:].astype(np.int32)
+  table = _grainTableNumba(gid, ph, rot, n, numPixel, ebsd.CSList) if (backend or kernelBackend()) == "numba" else None
+  phaseId, meanRot, gos = table if table is not None else _grainTableNumpy(gid, ph, rot, n, numPixel, ebsd.CSList)
+  return grain2d(np.arange(1, n + 1), phaseId, ebsd.CSList, numPixel, meanRot, gos, ebsd.frame, boundary=boundary, innerBoundary=innerBoundary, phaseMap=ebsd.phaseMap)
+
+
+# the grain table in compiled passes over all pixels at once: the images at the first pixel
+# of every grain, their sums per grain in the order of the pixels, the normalised mean, and
+# the chord angles to it; None without numba
+def _grainTableNumba(gid, ph, rot, n, numPixel, CSList):
+  from .criteria import phaseGroups
+  from .kernels import grainKernel
+  loops = [grainKernel(k) for k in ("firstPixel", "toReference", "sumByGrain")]
+  if any(f is None for f in loops):
+    return None
+  firstPixel, toReference, sumByGrain = loops
+  T = rot.dtype
+  gid64, ph64 = np.ascontiguousarray(gid, dtype=np.int64), np.ascontiguousarray(ph, dtype=np.int64)
+  first = np.full(n + 1, -1, dtype=np.int64)
+  firstPixel(gid64, first)
+  phaseId = ph[first[1:]].astype(np.int8)
+  Gall, nG, indexed = phaseGroups(CSList)
+  r64 = np.ascontiguousarray(rot, dtype=np.float64)
+  refs = r64[np.maximum(first, 0)]
+  q = np.zeros((len(gid), 4))
+  dev = np.zeros(len(gid))
+  toReference(r64, ph64, gid64, refs, Gall, nG, indexed, False, q, dev)
+  acc = np.zeros((n + 1, 4), dtype=T)
+  sumByGrain(gid64, ph64, indexed, q.astype(T, copy=False), acc)
+  m = acc[1:]
+  norm = np.linalg.norm(m, axis=1, keepdims=True)
+  m = np.where(norm > 0, m / np.where(norm > 0, norm, 1), m)
+  hasMean = indexed[phaseId]
+  meanRot = np.full((n, 4), np.nan, dtype=T)
+  meanRot[hasMean] = m[hasMean]
+  refs = np.vstack([np.zeros((1, 4)), m.astype(np.float64)])
+  toReference(r64, ph64, gid64, refs, Gall, nG, indexed, True, q, dev)
+  spread = np.zeros((n + 1, 1), dtype=T)
+  sumByGrain(gid64, ph64, indexed, dev.astype(T, copy=False).reshape(-1, 1), spread)
+  gos = np.zeros(n, dtype=T)
+  gos[hasMean] = spread[1:, 0][hasMean] / numPixel[hasMean]
+  return phaseId, meanRot, gos
+
+
+def _grainTableNumpy(gid, ph, rot, n, numPixel, CSList):
+  T = rot.dtype
   phaseId = np.zeros(n, dtype=np.int8)
   first = np.full(n + 1, -1, dtype=np.int64)
   order = np.argsort(gid, kind="stable")
@@ -144,8 +188,8 @@ def grainTable(seg, ebsd, boundary=None, innerBoundary=None):
   phaseId[:] = ph[first[1:]]
   meanRot = np.full((n, 4), np.nan, dtype=T)
   gos = np.zeros(n, dtype=T)
-  for p in range(len(ebsd.CSList)):
-    fr = ebsd.CSList[p]
+  for p in range(len(CSList)):
+    fr = CSList[p]
     if not fr.isIndexed:
       continue
     pix = np.flatnonzero((ph == p) & (gid > 0))
@@ -167,7 +211,7 @@ def grainTable(seg, ebsd, boundary=None, innerBoundary=None):
     spread = np.zeros(n + 1, dtype=T)
     np.add.at(spread, gid[pix], dev)
     gos[grainsOfPhase - 1] = spread[grainsOfPhase] / numPixel[grainsOfPhase - 1]
-  return grain2d(np.arange(1, n + 1), phaseId, ebsd.CSList, numPixel, meanRot, gos, ebsd.frame, boundary=boundary, innerBoundary=innerBoundary, phaseMap=ebsd.phaseMap)
+  return phaseId, meanRot, gos
 
 
 __all__ = ["calcGrains"]

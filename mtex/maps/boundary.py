@@ -18,7 +18,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.display import xnum2str
-from ..geometry.kernels import qmul, _jit
+from ..geometry.kernels import backend, qmul, _jit
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
@@ -28,6 +28,7 @@ from .phaselist import phaseTable
 
 OUTSIDE = -1
 _COMPILED = {}
+prange = range
 
 
 def _conj(q):
@@ -600,10 +601,14 @@ def chainOrder(F, nV):
     return np.zeros(0, dtype=np.int32), np.zeros(0, dtype=np.int32)
   deg = np.bincount(F.reshape(-1), minlength=nV).astype(np.int32)
   offset = np.concatenate([[0], np.cumsum(deg)]).astype(np.int64)
-  # contiguous adjacency, in increasing segment order at each vertex
-  v = F.reshape(-1)
-  order = np.argsort(v, kind="stable")
-  at = np.repeat(np.arange(n, dtype=np.int32), 2)[order]
+  # contiguous adjacency, in increasing segment order at each vertex: a compiled counting
+  # sort, or the stable argsort it replaces
+  at = None
+  if backend() == "numba":
+    from .kernels import adjacencyNumba
+    at = adjacencyNumba(F, offset)
+  if at is None:
+    at = np.repeat(np.arange(n, dtype=np.int32), 2)[np.argsort(F.reshape(-1), kind="stable")]
   perm = np.zeros(n, dtype=np.int32)
   entry = np.zeros(n, dtype=np.int32)
   loop = _compiledChainOrder()
@@ -630,80 +635,218 @@ def buildBoundary(c, seg, ebsd, inner=False):
   keep = np.flatnonzero(seg.isInner if inner else seg.isOuter)
   sites = c.sites
   T = c.V.dtype
-  s1, s2 = c.cells[keep, 0], c.cells[keep, 1]
-  p1, p2 = sites.pixel[s1], sites.pixel[s2]
-  gid = seg.grainId
-  ph = ebsd.phaseId.reshape(-1)
-  g1 = np.where(p1 >= 0, gid[np.maximum(p1, 0)], 0)
-  g2 = np.where(p2 >= 0, gid[np.maximum(p2, 0)], 0)
-  ph1 = np.where(p1 >= 0, ph[np.maximum(p1, 0)], OUTSIDE).astype(np.int8)
-  ph2 = np.where(p2 >= 0, ph[np.maximum(p2, 0)], OUTSIDE).astype(np.int8)
+  # the measurements are named by their id, which outlives a selection, not by their place
+  ids = np.asarray(ebsd.id).reshape(-1)
+  s1, s2, p1, p2, gid, pid, eid = _sides(c.cells[keep, 0], c.cells[keep, 1], sites.pixel, seg.grainId, ebsd.phaseId.reshape(-1), ids)
+  mori = _misrotations(ebsd.rotations.data.reshape(-1, 4), p1, p2, T)
+  F = c.F[keep]
+
+  # the point left of a segment: the site of its first grain, or the mirror of the second
+  # site in the segment where the first side is outside
+  def leftOf(r):
+    mid = (c.V[F[r, 0]] + c.V[F[r, 1]]) / 2
+    return np.where((p1[r] >= 0)[:, None], sites.pos[s1[r]], 2 * mid - sites.pos[s2[r]])
+
+  idx, F = _walkOrder(F, c.V, leftOf)
+  return grainBoundary(c.V, F, gid[idx], eid[idx], pid[idx], mori[idx], ebsd.CSList, c.plane, ebsd.frame, scanUnit=ebsd.scanUnit)
+
+
+# the two sides of every face as the boundary lists them: the sites, the measurements, the
+# grains, the phases and the measurement ids, swapped where the second side comes first
+def _sides(s1, s2, pixel, grainId, phaseId, ids):
+  n = len(s1)
+  if backend() == "numba":
+    loop = _compiledSides()
+    if loop is not None:
+      sa, sb = np.empty(n, dtype=s1.dtype), np.empty(n, dtype=s2.dtype)
+      pa, pb = np.empty(n, dtype=pixel.dtype), np.empty(n, dtype=pixel.dtype)
+      gid, pid, eid = np.empty((n, 2), dtype=np.int32), np.empty((n, 2), dtype=np.int8), np.empty((n, 2), dtype=np.int32)
+      loop(s1, s2, pixel, grainId, phaseId, ids, OUTSIDE, NO_PIXEL, sa, sb, pa, pb, gid, pid, eid)
+      return sa, sb, pa, pb, gid, pid, eid
+  p1, p2 = pixel[s1], pixel[s2]
+  g1 = np.where(p1 >= 0, grainId[np.maximum(p1, 0)], 0)
+  g2 = np.where(p2 >= 0, grainId[np.maximum(p2, 0)], 0)
+  ph1 = np.where(p1 >= 0, phaseId[np.maximum(p1, 0)], OUTSIDE).astype(np.int8)
+  ph2 = np.where(p2 >= 0, phaseId[np.maximum(p2, 0)], OUTSIDE).astype(np.int8)
   swap = (ph1 > ph2) | ((ph1 == ph2) & (g1 > g2))
   s1, s2 = np.where(swap, s2, s1), np.where(swap, s1, s2)
   p1, p2 = np.where(swap, p2, p1), np.where(swap, p1, p2)
   g1, g2 = np.where(swap, g2, g1), np.where(swap, g1, g2)
   ph1, ph2 = np.where(swap, ph2, ph1), np.where(swap, ph1, ph2)
-  rot = ebsd.rotations.data.reshape(-1, 4)
-  both = (p1 >= 0) & (p2 >= 0)
-  mori = np.full((len(keep), 4), np.nan, dtype=T)
-  mori[both] = qmul(_conj(rot[p2[both]]), rot[p1[both]])
-  F = c.F[keep]
-  mid = (c.V[F[:, 0]] + c.V[F[:, 1]]) / 2
-  leftOf = np.where((p1 >= 0)[:, None], sites.pos[s1], 2 * mid - sites.pos[s2])
-  # the two measurements are named by their id, which outlives a selection, not by their place
-  ids = np.asarray(ebsd.id).reshape(-1)
   e1 = np.where(p1 >= 0, ids[np.maximum(p1, 0)], NO_PIXEL)
   e2 = np.where(p2 >= 0, ids[np.maximum(p2, 0)], NO_PIXEL)
-  gB = grainBoundary(c.V, F, np.stack([g1, g2], 1), np.stack([e1, e2], 1), np.stack([ph1, ph2], 1), mori, ebsd.CSList, c.plane, ebsd.frame,
-                     scanUnit=ebsd.scanUnit)
-  return orderWalk(gB, leftOf)
+  return (s1, s2, p1, p2, np.stack([g1, g2], 1).astype(np.int32), np.stack([ph1, ph2], 1).astype(np.int8),
+          np.stack([e1, e2], 1).astype(np.int32))
+
+
+def _sidesLoop(s1, s2, pixel, grainId, phaseId, ids, outside, noPixel, sa, sb, pa, pb, gid, pid, eid):
+  for k in range(s1.shape[0]):
+    a, b = s1[k], s2[k]
+    qa, qb = pixel[a], pixel[b]
+    ga = grainId[qa] if qa >= 0 else 0
+    gb = grainId[qb] if qb >= 0 else 0
+    pha = phaseId[qa] if qa >= 0 else outside
+    phb = phaseId[qb] if qb >= 0 else outside
+    if pha > phb or (pha == phb and ga > gb):
+      a, b, qa, qb, ga, gb, pha, phb = b, a, qb, qa, gb, ga, phb, pha
+    sa[k], sb[k], pa[k], pb[k] = a, b, qa, qb
+    gid[k, 0], gid[k, 1] = ga, gb
+    pid[k, 0], pid[k, 1] = pha, phb
+    eid[k, 0] = ids[qa] if qa >= 0 else noPixel
+    eid[k, 1] = ids[qb] if qb >= 0 else noPixel
+
+
+# the misrotation of every face with a measurement on both sides, rot2^-1 rot1, NaN elsewhere
+def _misrotations(rot, p1, p2, T):
+  mori = np.empty((len(p1), 4), dtype=T)
+  if backend() == "numba" and _compiled("misrotations", _misrotationsLoop, parallel=True) is not None:
+    _COMPILED["misrotations"](rot, p1, p2, mori)
+    return mori
+  both = (p1 >= 0) & (p2 >= 0)
+  mori[:] = np.nan
+  mori[both] = qmul(_conj(rot[p2[both]]), rot[p1[both]])
+  return mori
+
+
+# the product of the conjugate of rot[p2] with rot[p1] in qmul's arithmetic
+def _misrotationsLoop(rot, p1, p2, mori):
+  for k in prange(p1.shape[0]):
+    if p1[k] < 0 or p2[k] < 0:
+      for j in range(4):
+        mori[k, j] = np.nan
+      continue
+    a0, a1, a2, a3 = rot[p2[k], 0], -rot[p2[k], 1], -rot[p2[k], 2], -rot[p2[k], 3]
+    b0, b1, b2, b3 = rot[p1[k], 0], rot[p1[k], 1], rot[p1[k], 2], rot[p1[k], 3]
+    mori[k, 0] = a0 * b0 - a1 * b1 - a2 * b2 - a3 * b3
+    mori[k, 1] = a1 * b0 + a0 * b1 - a3 * b2 + a2 * b3
+    mori[k, 2] = a2 * b0 + a3 * b1 + a0 * b2 - a1 * b3
+    mori[k, 3] = a3 * b0 - a2 * b1 + a1 * b2 + a0 * b3
+
+
+def _compiledSides():
+  return _compiled("sides", _sidesLoop)
+
+
+# a loop of this module compiled once, or None without numba
+def _compiled(name, f, parallel=False):
+  nb = _jit()
+  if not nb:
+    return None
+  if name not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED[name] = nb.njit(cache=True, parallel=parallel)(f)
+  return _COMPILED[name]
+
+
+# the rows of a boundary in walk order with its segments, every chain turned as a whole
+# until the point leftOf(r) of the first grain of its first row r lies on its left: the walk
+# order and the reversal of the chains compose into one permutation of the rows
+def _walkOrder(F, V, leftOf):
+  perm, entry = chainOrder(F, len(V))
+  if len(perm) == 0:
+    return perm, F
+  deg = np.bincount(F.reshape(-1), minlength=len(V))
+  if backend() == "numba" and _compiled("orient", _orientLoop) is not None:
+    F1 = np.empty_like(F)
+    cid = np.empty(len(F), dtype=np.int64)
+    _COMPILED["orient"](F, perm, entry, deg, F1, cid)
+    starts = np.flatnonzero(np.concatenate([[True], cid[1:] != cid[:-1]]))
+    v1 = V[F1[starts, 0]]
+    d = V[F1[starts, 1]] - v1
+    flip = _cross2(d, leftOf(perm[starts]) - v1) < 0
+    if not flip.any():
+      return perm, F1
+    idx, F2 = np.empty_like(perm), np.empty_like(F1)
+    _compiled("turn", _turnLoop, parallel=True)(F1, perm, cid, starts, np.concatenate([starts[1:], [len(F1)]]), flip, idx, F2)
+    return idx, F2
+  head = entry[perm] == 1
+  F1 = np.where(head[:, None], F[perm], F[perm][:, ::-1])
+  jct = (deg != 2) & (deg > 0)
+  cid = np.concatenate([[1], 1 + np.cumsum((F1[1:, 0] != F1[:-1, 1]) | jct[F1[1:, 0]])])
+  starts = np.flatnonzero(np.concatenate([[True], cid[1:] != cid[:-1]]))
+  v1 = V[F1[starts, 0]]
+  d = V[F1[starts, 1]] - v1
+  flip = _cross2(d, leftOf(perm[starts]) - v1) < 0
+  if not flip.any():
+    return perm, F1
+  # a row of a flipped chain [s, e) takes the row s + e - 1 - i
+  ends = np.concatenate([starts[1:], [len(F1)]])
+  run = np.repeat(np.arange(len(starts)), ends - starts)
+  order = np.arange(len(F1))
+  rows = flip[cid - 1]
+  order[rows] = (starts + ends - 1)[run[rows]] - order[rows]
+  F2 = F1[order]
+  F2[rows] = F2[rows][:, ::-1]
+  return perm[order], F2
+
+
+# the segments in walk order, each turned the way the walk enters it, and the chain of every
+# row: a chain breaks where the head of one segment is not the tail of the next, and at a
+# junction, a vertex where other than two segments meet
+def _orientLoop(F, perm, entry, deg, F1, cid):
+  c = 0
+  for i in range(perm.shape[0]):
+    k = perm[i]
+    if entry[k] == 1:
+      F1[i, 0], F1[i, 1] = F[k, 0], F[k, 1]
+    else:
+      F1[i, 0], F1[i, 1] = F[k, 1], F[k, 0]
+    v = F1[i, 0]
+    if i == 0 or F1[i, 0] != F1[i - 1, 1] or (deg[v] != 2 and deg[v] > 0):
+      c += 1
+    cid[i] = c
+
+
+# the chains marked turned round: a row i of a flipped chain [s, e) takes the row
+# s + e - 1 - i with its segment reversed
+def _turnLoop(F1, perm, cid, starts, ends, flip, idx, F2):
+  for i in prange(F1.shape[0]):
+    c = cid[i] - 1
+    if flip[c]:
+      j = starts[c] + ends[c] - 1 - i
+      idx[i] = perm[j]
+      F2[i, 0], F2[i, 1] = F1[j, 1], F1[j, 0]
+    else:
+      idx[i] = perm[i]
+      F2[i, 0], F2[i, 1] = F1[i, 0], F1[i, 1]
 
 
 # bring the segments into walk order and orient every chain so that the grain in
-# grainId[:, 0] lies to its left. With leftOf the boundary is being built and every chain
-# is turned as a whole until the point of its first grain lies on the left; without it
-# the boundary already holds the invariant on every segment, so a segment the walk enters
-# from its head is turned round on both sides, and a chain is turned by the majority
-def orderWalk(gB, leftOf=None):
+# grainId[:, 0] lies to its left: the boundary already holds that invariant on every
+# segment, so a segment the walk enters from its head is turned round on both sides, and a
+# chain is turned by the majority
+def orderWalk(gB):
   perm, entry = chainOrder(gB.F, len(gB.V))
   if len(perm) == 0:
     return gB
   head = entry[perm] == 1
   F = np.where(head[:, None], gB.F[perm], gB.F[perm][:, ::-1])
   out = gB._with(F=F, grainId=gB.grainId[perm], ebsdId=gB.ebsdId[perm], phaseId=gB.phaseId[perm], misrotation=gB.misrotation.data[perm])
-  consistent = leftOf is None
-  if consistent:
-    out = out._flipSegments(~head)._with(F=F)
+  out = out._flipSegments(~head)._with(F=F)
   cid = out.chainId
-  starts = np.flatnonzero(out.isChainStart)
-  if leftOf is None:
-    kept = np.bincount(cid, weights=head)[1:]
-    total = np.bincount(cid)[1:]
-    flip = 2 * kept < total
-  else:
-    v1 = out.V[out.F[starts, 0]]
-    d = out.V[out.F[starts, 1]] - v1
-    flip = _cross2(d, leftOf[perm[starts]] - v1) < 0
+  kept = np.bincount(cid, weights=head)[1:]
+  total = np.bincount(cid)[1:]
+  flip = 2 * kept < total
   if not flip.any():
     return out
-  return reverseChains(out, cid, flip, swap=consistent)
+  return reverseChains(out, cid, flip)
 
 
-# reverse the chains marked, in the order of their rows and within each segment, and with
-# swap on both sides of every segment turned
-def reverseChains(gB, cid, flip, swap=False):
+# reverse the chains marked, in the order of their rows and within each segment, both
+# sides of every segment turned with it
+def reverseChains(gB, cid, flip):
   n = len(gB)
-  order = np.arange(n)
+  # a row of a flipped chain [s, e) takes the row s + e - 1 - i, the others stay
   starts = np.flatnonzero(np.concatenate([[True], cid[1:] != cid[:-1]]))
   ends = np.concatenate([starts[1:], [n]])
-  for s, e in zip(starts, ends):
-    if flip[cid[s] - 1]:
-      order[s:e] = order[s:e][::-1]
-  rows = flip[cid[order] - 1]
+  run = np.repeat(np.arange(len(starts)), ends - starts)
+  order = np.arange(n)
+  rows = flip[cid - 1]
+  order[rows] = (starts + ends - 1)[run[rows]] - order[rows]
   F = gB.F[order]
   F[rows] = F[rows][:, ::-1]
   out = gB._with(F=F, grainId=gB.grainId[order], ebsdId=gB.ebsdId[order], phaseId=gB.phaseId[order], misrotation=gB.misrotation.data[order])
-  return out._flipSegments(rows)._with(F=F) if swap else out
+  return out._flipSegments(rows)._with(F=F)
 
 
 __all__ = ["grainBoundary", "triplePointList", "triplePoints", "chainOrder"]

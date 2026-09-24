@@ -296,3 +296,31 @@ def test_triple_points_chains_and_components():
   assert len(inner[inner.grainId[:, 0] == g.id[0]].triplePoints) == 1
   # an index matrix, the three arms of each point, keeps its shape for the misorientations
   assert arms.misorientation.shape == (1, 3) and len(arms) == 3
+
+
+def test_the_compiled_boundary_is_the_numpy_one():
+  # square and hexagonal maps with holes and two phases: every field of the outer and the
+  # inner boundary, the walk order and the orientation of every segment agree exactly
+  from mtex import setMTEXpref, getMTEXpref
+  CS2 = crystalFrame("6/mmm", mineral="other")
+  for A in (SQ4, HEX4):
+    e = boundaryMap(A, 5, 6)
+    n = len(e)
+    i = np.arange(n)
+    ph = np.where(i % 7 == 0, 0, np.where((i // 30) % 3 == 0, 2, 1)).astype(np.int8)
+    e = EBSD(e.pos, e.rotations, ph, phaseList(CS, CS2))
+    c = decompose(e)
+    s = segment(c, e, gbcAngle([60 * degree, 5 * degree]))
+    before = getMTEXpref("kernels", "numba")
+    try:
+      out = {}
+      for kernels in ("numba", "numpy"):
+        setMTEXpref("kernels", kernels)
+        out[kernels] = [buildBoundary(c, s, e), buildBoundary(c, s, e, inner=True)]
+    finally:
+      setMTEXpref("kernels", before)
+    for a, b in zip(out["numba"], out["numpy"]):
+      assert len(a) > 0 or len(b) == 0
+      for f in ("F", "grainId", "ebsdId", "phaseId"):
+        assert np.array_equal(getattr(a, f), getattr(b, f))
+      assert np.array_equal(a.misrotation.data, b.misrotation.data, equal_nan=True) and a.V is b.V

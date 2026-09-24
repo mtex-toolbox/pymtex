@@ -20,7 +20,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.kernels import qmul
+from ..geometry.kernels import backend as kernelBackend, qmul
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 
@@ -58,6 +58,18 @@ def _pairs(ebsd, i, j):
   return i, j, ebsd.phaseId.reshape(-1), ebsd.rotations.data.reshape(-1, 4)
 
 
+# the proper groups of the phases of a map as one table for the kernels: their rotations
+# padded to the largest group, their sizes, and whether a phase has orientations at all
+def phaseGroups(CSList, dtype=np.float64):
+  groups = [fr.sym.properGroup().rotations().data.reshape(-1, 4) if fr.isIndexed else np.zeros((0, 4)) for fr in CSList]
+  Gall = np.zeros((len(groups), max([len(G) for G in groups] + [1]), 4), dtype=dtype)
+  for p, G in enumerate(groups):
+    Gall[p, :len(G)] = G
+  nG = np.array([len(G) for G in groups], dtype=np.int64)
+  indexed = np.array([fr.isIndexed for fr in CSList], dtype=np.bool_)
+  return Gall, nG, indexed
+
+
 # the largest |<q_i, q_j g>| over the proper group of a frame, for pairs of rotations
 def _bestDot(fr, q1, q2):
   G = fr.sym.properGroup().rotations().data.reshape(-1, 4).astype(q1.dtype)
@@ -83,8 +95,23 @@ class gbcAngle(grainBoundaryCriterion):
       return _levels(self.threshold[p])
     return _levels(self.threshold)
 
-  def evaluate(self, ebsd, i, j):
+  def evaluate(self, ebsd, i, j, backend=None):
     i, j, ph, rot = _pairs(ebsd, i, j)
+    # all pairs in one compiled loop over the tables of the phases, the loop below its fallback
+    if (backend or kernelBackend()) == "numba":
+      from .kernels import grainKernel
+      loop = grainKernel("angleCriterion")
+      if loop is not None:
+        CSList = ebsd.CSList
+        Gall, nG, indexed = phaseGroups(CSList, rot.dtype)
+        levels = [self.levelsFor(CSList, p) if CSList[p].isIndexed else (0.0,) for p in range(len(CSList))]
+        cosT = np.zeros((len(CSList), max(len(lv) for lv in levels)), dtype=rot.dtype)
+        for p, lv in enumerate(levels):
+          cosT[p, :len(lv)] = np.cos(np.array(lv, dtype=rot.dtype) / 2)
+        out = np.empty(len(i), dtype=rot.dtype)
+        loop(np.ascontiguousarray(rot), np.ascontiguousarray(ph, dtype=np.int64), np.ascontiguousarray(i, dtype=np.int64),
+             np.ascontiguousarray(j, dtype=np.int64), Gall, nG, indexed, cosT, np.array([len(lv) for lv in levels], dtype=np.int64), out)
+        return out
     out = np.zeros(len(i), dtype=rot.dtype)
     for p in range(len(ebsd.CSList)):
       sel = (ph[i] == p) & (ph[j] == p)

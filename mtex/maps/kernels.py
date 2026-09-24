@@ -192,6 +192,125 @@ def unionFind(n, a, b):
   return parent
 
 
+# ------------------------------------------------------------------ the weld of the vertices
+
+# the point stored under the bucket b and the fine grid cell (k0[p], k1[p]): a bucket keeps
+# the first point of each of its cells in a short list through nxt, and p is stored when its
+# cell is new
+def _gridInsert(head, nxt, k0, k1, b, p):
+  q = head[b]
+  while q >= 0:
+    if k0[q] == k0[p] and k1[q] == k1[p]:
+      return q
+    q = nxt[q]
+  nxt[p] = head[b]
+  head[b] = p
+  return p
+
+
+def _root(parent, x):
+  while parent[x] != x:
+    parent[x] = parent[parent[x]]
+    x = parent[x]
+  return x
+
+
+# the first point on the fine grid cell of every flagged point, after the shift h: the fine
+# cells and their coarse buckets computed once, then the threads share the coarse rows so
+# that no bucket is written by two of them, and the first point of a cell is the smallest
+# index on it whatever the schedule
+def _firstOnCell(xy, lo0, lo1, c, h, M, n1, flag, head, nxt, k0, k1, bucket, owner, out, nT):
+  n = xy.shape[0]
+  for i in prange(n):
+    a = np.int64(np.floor((xy[i, 0] - lo0) / c + h))
+    b = np.int64(np.floor((xy[i, 1] - lo1) / c + h))
+    k0[i], k1[i] = a, b
+    r = a // M + 1
+    bucket[i] = r * n1 + b // M + 1
+    owner[i] = r % nT
+  for t in prange(nT):
+    for i in range(n):
+      if owner[i] == t and flag[i]:
+        out[i] = _gridInsert(head, nxt, k0, k1, bucket[i], i)
+
+
+# the vertex groups of meshVertices before its tolerance grid: the points on one cell of the
+# fine grid are one group, a point within rounding of a boundary of that grid joins the first
+# point on its cell of the half-shifted grid, and the groups this links are one; returns the
+# group of every point, numbered by first occurrence, and the first point of every group
+def _weldLoop(xy, lo0, lo1, c, M, nT, group, first):
+  n = xy.shape[0]
+  k0max = k1max = np.int64(0)
+  for i in range(n):
+    k0max = max(k0max, np.int64(np.floor((xy[i, 0] - lo0) / c + 0.5)))
+    k1max = max(k1max, np.int64(np.floor((xy[i, 1] - lo1) / c + 0.5)))
+  # the coarse cells grow until there are no more buckets than a few per point
+  while (k0max // M + 3) * (k1max // M + 3) > 4 * n + 16:
+    M *= 2
+  n1 = k1max // M + 3
+  head = np.full((k0max // M + 3) * n1, -1, np.int32)
+  nxt = np.empty(n, np.int32)
+  k0, k1 = np.empty(n, np.int64), np.empty(n, np.int64)
+  bucket, owner = np.empty(n, np.int32), np.empty(n, np.int32)
+  near = np.ones(n, np.bool_)
+  rep = np.empty(n, np.int32)
+  _firstOnCell(xy, lo0, lo1, c, 0.0, M, n1, near, head, nxt, k0, k1, bucket, owner, rep, nT)
+  # the points within rounding of a boundary of the fine grid
+  for i in prange(n):
+    u0, u1 = (xy[i, 0] - lo0) / c, (xy[i, 1] - lo1) / c
+    f0, f1 = u0 - np.floor(u0), u1 - np.floor(u1)
+    near[i] = f0 < 1e-3 or f0 > 1 - 1e-3 or f1 < 1e-3 or f1 > 1 - 1e-3
+  head[:] = -1
+  mate = nxt.copy()
+  _firstOnCell(xy, lo0, lo1, c, 0.5, M, n1, near, head, nxt, k0, k1, bucket, owner, mate, nT)
+  # the groups the half-shifted grid links, rooted at their smallest point, then numbered
+  # by first occurrence; bucket is free again and holds the numbers
+  parent = owner
+  for i in prange(n):
+    parent[i] = i
+  for i in range(n):
+    if near[i]:
+      a, b = _root(parent, rep[i]), _root(parent, rep[mate[i]])
+      if a != b:
+        if a < b:
+          parent[b] = a
+        else:
+          parent[a] = b
+  label = bucket
+  label[:] = -1
+  m = 0
+  for i in range(n):
+    r = _root(parent, rep[i])
+    if label[r] < 0:
+      label[r] = m
+      first[m] = i
+      m += 1
+    group[i] = label[r]
+  return m
+
+
+# the groups and first points of meshVertices through the compiled weld, or None without numba;
+# the coarse grid has cells of about cell in the units of xy
+def weldNumba(xy, lo, c, cell):
+  nb = _jit()
+  if not nb:
+    return None
+  if "weld" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    for name in ("_gridInsert", "_root"):
+      _COMPILED[name] = nb.njit(cache=True)(globals()[name])
+      globals()[name] = _COMPILED[name]
+    _COMPILED["_firstOnCell"] = nb.njit(cache=True, parallel=True)(_firstOnCell)
+    globals()["_firstOnCell"] = _COMPILED["_firstOnCell"]
+    _COMPILED["weld"] = nb.njit(cache=True, parallel=True)(_weldLoop)
+  xy = np.ascontiguousarray(xy, dtype=np.float64)
+  group = np.empty(len(xy), np.int32)
+  first = np.empty(len(xy), np.int32)
+  M = max(int(cell / c), 1)
+  m = _COMPILED["weld"](xy, float(lo[0]), float(lo[1]), float(c), np.int64(M), np.int64(nb.get_num_threads()), group, first)
+  return group, first[:m]
+
+
 # ------------------------------------------------------------------ compilation
 
 _HELPERS = ("_clip", "_cellOf")
@@ -238,7 +357,7 @@ def localVoronoiNumba(sites, levels, distortTol=0.05, chunkSize=4096):
       return None
     cap *= 2
   keep = np.concatenate([np.arange(t * cap, t * cap + counts[t]) for t in range(nChunks)])
-  return cellsBuf.reshape(-1, 2)[keep], vBuf.reshape(-1, 4)[keep], int(unbounded.sum())
+  return cellsBuf.reshape(-1, 2).take(keep, axis=0), vBuf.reshape(-1, 4).take(keep, axis=0), int(unbounded.sum())
 
 
 
@@ -267,43 +386,45 @@ def _range(sorted_, v):
 # the loops of every grain from its directed edges, tails ea and heads eb sorted by grain
 # with the offsets goff: a walk leaves a vertex by the one edge that starts there, or by the
 # one that turns most tightly clockwise where the grain touches itself, which keeps the face
-# on the left. The vertices of the loops go into loopV, the start of every loop into loff,
-# its grain into lgrain and twice its signed area into larea; a loop of fewer than three
-# vertices is dropped. Returns the count of loops and of vertices
-def _traceLoopsLoop(V, ea, eb, goff, loopV, loff, lgrain, larea):
-  nl = 0
-  nv = 0
-  for g in range(goff.shape[0] - 1):
+# on the left. The grains are walked in parallel, each into its own slice [goff[g], goff[g+1])
+# of the scratch, which holds its loops since a loop has as many vertices as edges: the
+# vertices into vtmp, the start of every loop into ltmp, twice its signed area into atmp, the
+# counts of loops and vertices into nlg and nvg; a loop of fewer than three vertices is dropped
+def _traceGrainsLoop(V, ea, eb, goff, used, vtmp, ltmp, atmp, nlg, nvg):
+  for g in prange(goff.shape[0] - 1):
     s, e = goff[g], goff[g + 1]
     m = e - s
+    nlg[g] = 0
+    nvg[g] = 0
     if m == 0:
       continue
     order = np.argsort(ea[s:e]) + s
     tails = ea[order]
-    used = np.zeros(m, dtype=np.bool_)
+    nv = s
+    nl = s
     for st in range(m):
-      if used[st]:
-        continue
       k = s + st
+      if used[k]:
+        continue
       start = nv
       area = 0.0
       while True:
-        used[k - s] = True
-        loopV[nv] = ea[k]
+        used[k] = True
+        vtmp[nv] = ea[k]
         nv += 1
         area += V[ea[k], 0] * V[eb[k], 1] - V[eb[k], 0] * V[ea[k], 1]
         lo, hi = _range(tails, eb[k])
         nxt = -1
         if hi - lo == 1:
           c = order[lo]
-          if not used[c - s]:
+          if not used[c]:
             nxt = c
         elif hi - lo > 1:
           ax, ay = V[eb[k], 0] - V[ea[k], 0], V[eb[k], 1] - V[ea[k], 1]
           best = -np.inf
           for t in range(lo, hi):
             c = order[t]
-            if used[c - s]:
+            if used[c]:
               continue
             bx, by = V[eb[c], 0] - V[ea[c], 0], V[eb[c], 1] - V[ea[c], 1]
             turn = np.arctan2(ax * by - ay * bx, ax * bx + ay * by)
@@ -313,30 +434,108 @@ def _traceLoopsLoop(V, ea, eb, goff, loopV, loff, lgrain, larea):
           break
         k = nxt
       if nv - start >= 3:
-        loff[nl] = start
-        lgrain[nl] = g
-        larea[nl] = area
+        ltmp[nl] = start
+        atmp[nl] = area
         nl += 1
       else:
         nv = start
-  loff[nl] = nv
-  return nl, nv
+    nlg[g] = nl - s
+    nvg[g] = nv - s
+
+
+# the slices of the grains moved together in grain order, the loop starts made flat
+def _compactLoopsLoop(goff, nlg, nvg, loopOff, vertOff, vtmp, ltmp, atmp, loopV, loff, lgrain, larea):
+  for g in prange(goff.shape[0] - 1):
+    s = goff[g]
+    for j in range(nvg[g]):
+      loopV[vertOff[g] + j] = vtmp[s + j]
+    for j in range(nlg[g]):
+      loff[loopOff[g] + j] = ltmp[s + j] - s + vertOff[g]
+      lgrain[loopOff[g] + j] = g
+      larea[loopOff[g] + j] = atmp[s + j]
 
 
 # the loops of every grain through the compiled walk: the flat vertices, the loop offsets,
-# the grain and twice the signed area of every loop; None without numba
+# the grain and twice the signed area of every loop, in grain order; None without numba
 def traceLoopsNumba(V, ea, eb, goff):
-  loop = _compileLoops()
-  if loop is None:
+  loops = _compileLoops()
+  if loops is None:
     return None
-  n = len(ea)
-  loopV = np.empty(n, dtype=np.int32)
-  loff = np.empty(n + 1, dtype=np.int64)
-  lgrain = np.empty(n, dtype=np.int64)
-  larea = np.empty(n)
-  nl, nv = loop(np.ascontiguousarray(V, dtype=np.float64), np.ascontiguousarray(ea, dtype=np.int32), np.ascontiguousarray(eb, dtype=np.int32),
-                np.ascontiguousarray(goff, dtype=np.int64), loopV, loff, lgrain, larea)
-  return loopV[:nv], loff[:nl + 1], lgrain[:nl], larea[:nl]
+  trace, compact = loops
+  n, G = len(ea), len(goff) - 1
+  goff = np.ascontiguousarray(goff, dtype=np.int64)
+  ea, eb = np.ascontiguousarray(ea, dtype=np.int32), np.ascontiguousarray(eb, dtype=np.int32)
+  vtmp, ltmp, atmp = np.empty(n, dtype=np.int32), np.empty(n, dtype=np.int64), np.empty(n)
+  nlg, nvg = np.empty(G, dtype=np.int64), np.empty(G, dtype=np.int64)
+  trace(np.ascontiguousarray(V, dtype=np.float64), ea, eb, goff, np.zeros(n, dtype=np.bool_), vtmp, ltmp, atmp, nlg, nvg)
+  loopOff = np.concatenate([[0], np.cumsum(nlg)])
+  vertOff = np.concatenate([[0], np.cumsum(nvg)])
+  nl, nv = int(loopOff[-1]), int(vertOff[-1])
+  loopV, loff = np.empty(nv, dtype=np.int32), np.empty(nl + 1, dtype=np.int64)
+  lgrain, larea = np.empty(nl, dtype=np.int64), np.empty(nl)
+  compact(goff, nlg, nvg, loopOff, vertOff, vtmp, ltmp, atmp, loopV, loff, lgrain, larea)
+  loff[nl] = nv
+  return loopV, loff, lgrain, larea
+
+
+# the segments at every vertex in increasing segment order, a counting sort that is the
+# stable argsort of F.reshape(-1): entry i of that list is segment i // 2
+def _adjacencyLoop(F, offset, at):
+  ptr = offset[:-1].copy()
+  for i in range(2 * F.shape[0]):
+    v = F[i // 2, i % 2]
+    at[ptr[v]] = i // 2
+    ptr[v] += 1
+
+
+# the directed edges of every grain, a counting sort by grain that is the stable argsort of
+# the edges of the first sides followed by those of the second: a segment runs forward for
+# its first grain and backward for its second, grains outside ids (pos -1) left out
+def _edgesByGrainLoop(F, gid, posOf, goff, ea, eb):
+  ptr = goff[:-1].copy()
+  n = F.shape[0]
+  for side in range(2):
+    for k in range(n):
+      g = posOf[gid[k, side]]
+      if g >= 0:
+        ea[ptr[g]] = F[k, side]
+        eb[ptr[g]] = F[k, 1 - side]
+        ptr[g] += 1
+
+
+def _compileSorts():
+  nb = _jit()
+  if not nb:
+    return None
+  if "adjacency" not in _COMPILED:
+    _COMPILED["adjacency"] = nb.njit(cache=True)(_adjacencyLoop)
+    _COMPILED["edgesByGrain"] = nb.njit(cache=True)(_edgesByGrainLoop)
+  return _COMPILED
+
+
+# the adjacency of chainOrder, or None without numba
+def adjacencyNumba(F, offset):
+  compiled = _compileSorts()
+  if compiled is None:
+    return None
+  at = np.empty(2 * len(F), dtype=np.int32)
+  compiled["adjacency"](np.ascontiguousarray(F, dtype=np.int32), np.ascontiguousarray(offset, dtype=np.int64), at)
+  return at
+
+
+# the directed edges of the grains in ids sorted by grain with their offsets, or None without numba
+def edgesByGrainNumba(F, gid, posOf, nIds):
+  compiled = _compileSorts()
+  if compiled is None:
+    return None
+  gid = np.ascontiguousarray(gid, dtype=np.int64)
+  g0, g1 = posOf[gid[:, 0]], posOf[gid[:, 1]]
+  counts = np.bincount(g0[g0 >= 0], minlength=nIds) + np.bincount(g1[g1 >= 0], minlength=nIds)
+  goff = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
+  ea = np.empty(goff[-1], dtype=np.int32)
+  eb = np.empty(goff[-1], dtype=np.int32)
+  compiled["edgesByGrain"](np.ascontiguousarray(F, dtype=np.int32), gid, np.ascontiguousarray(posOf, dtype=np.int64), goff, ea, eb)
+  return ea, eb, goff
 
 
 # ------------------------------------------------------------------ the gradient and the KAM
@@ -997,7 +1196,7 @@ def _compileLoops():
   if nb is None:
     return None
   if "traceLoops" not in _COMPILED:
-    _COMPILED["traceLoops"] = nb.njit(cache=True)(_traceLoopsLoop)
+    _COMPILED["traceLoops"] = (nb.njit(cache=True, parallel=True)(_traceGrainsLoop), nb.njit(cache=True, parallel=True)(_compactLoopsLoop))
   return _COMPILED["traceLoops"]
 
 
@@ -1008,6 +1207,120 @@ def pixelKernel(name):
   if name not in _COMPILED:
     _COMPILED[name] = nb.njit(cache=True, parallel=True)({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop}[name])
   return _COMPILED[name]
+
+
+# ------------------------------------------------------------------ the criterion and the grain table
+
+# the angle criterion on every pair of neighbours: the largest |<q_j^-1 q_i, g>| over the
+# proper group of their phase, the share of the phase's levels whose half cosine it exceeds;
+# a pair of two phases is 0, a pair of a phase without orientations 1; criteria.gbcAngle's
+# NumPy form is the oracle
+def _angleCriterionLoop(rot, ph, i, j, Gall, nG, indexed, cosT, nLevels, out):
+  for k in prange(len(i)):
+    a, b = i[k], j[k]
+    p = ph[a]
+    if ph[b] != p:
+      out[k] = 0.0
+      continue
+    if not indexed[p]:
+      out[k] = 1.0
+      continue
+    a1, b1, c1, d1 = rot[b, 0], -rot[b, 1], -rot[b, 2], -rot[b, 3]
+    a2, b2, c2, d2 = rot[a, 0], rot[a, 1], rot[a, 2], rot[a, 3]
+    m0 = a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2
+    m1 = b1 * a2 + a1 * b2 - d1 * c2 + c1 * d2
+    m2 = c1 * a2 + d1 * b2 + a1 * c2 - b1 * d2
+    m3 = d1 * a2 - c1 * b2 + b1 * c2 + a1 * d2
+    best = -1.0
+    for g in range(nG[p]):
+      d = abs(m0 * Gall[p, g, 0] + m1 * Gall[p, g, 1] + m2 * Gall[p, g, 2] + m3 * Gall[p, g, 3])
+      if d > best:
+        best = d
+    cnt = 0
+    for l in range(nLevels[p]):
+      if best > cosT[p, l]:
+        cnt += 1
+    out[k] = cnt / nLevels[p]
+
+
+# every pixel of a grain of an indexed phase moved to its equivalent closest to the reference
+# of its grain, signed towards it, as geometry.kernels.closestImage with the identity on the
+# left; with chord the chord angle to the reference in dev instead of the image in q
+def _toReferenceLoop(rot, ph, gid, refs, Gall, nG, indexed, chord, q, dev):
+  for k in prange(len(gid)):
+    g = gid[k]
+    p = ph[k]
+    if g <= 0 or not indexed[p]:
+      continue
+    t0, t1, t2, t3 = refs[g, 0], refs[g, 1], refs[g, 2], refs[g, 3]
+    c0, c1, c2, c3 = rot[k, 0], -rot[k, 1], -rot[k, 2], -rot[k, 3]
+    m0 = c0 * t0 - c1 * t1 - c2 * t2 - c3 * t3
+    m1 = c1 * t0 + c0 * t1 - c3 * t2 + c2 * t3
+    m2 = c2 * t0 + c3 * t1 + c0 * t2 - c1 * t3
+    m3 = c3 * t0 - c2 * t1 + c1 * t2 + c0 * t3
+    best, br = -1.0, 0
+    for r in range(nG[p]):
+      d = abs(m0 * Gall[p, r, 0] + m1 * Gall[p, r, 1] + m2 * Gall[p, r, 2] + m3 * Gall[p, r, 3])
+      if d > best:
+        best, br = d, r
+    b0, b1, b2, b3 = rot[k, 0], rot[k, 1], rot[k, 2], rot[k, 3]
+    r0, r1, r2, r3 = Gall[p, br, 0], Gall[p, br, 1], Gall[p, br, 2], Gall[p, br, 3]
+    p0 = b0 * r0 - b1 * r1 - b2 * r2 - b3 * r3
+    p1 = b1 * r0 + b0 * r1 - b3 * r2 + b2 * r3
+    p2 = b2 * r0 + b3 * r1 + b0 * r2 - b1 * r3
+    p3 = b3 * r0 - b2 * r1 + b1 * r2 + b0 * r3
+    if p0 * t0 + p1 * t1 + p2 * t2 + p3 * t3 < 0:
+      p0, p1, p2, p3 = -p0, -p1, -p2, -p3
+    if chord:
+      h = np.sqrt((t0 - p0) ** 2 + (t1 - p1) ** 2 + (t2 - p2) ** 2 + (t3 - p3) ** 2)
+      dev[k] = 4 * np.arcsin(min(h / 2, 1.0))
+    else:
+      q[k, 0], q[k, 1], q[k, 2], q[k, 3] = p0, p1, p2, p3
+
+
+# the first measurement of every grain, the images summed per grain in the order of the
+# measurements, and the chord angles summed likewise: the serial halves of the grain table
+def _firstPixelLoop(gid, first):
+  for k in range(len(gid)):
+    if first[gid[k]] < 0:
+      first[gid[k]] = k
+
+
+def _sumByGrainLoop(gid, ph, indexed, x, acc):
+  for k in range(len(gid)):
+    g = gid[k]
+    if g > 0 and indexed[ph[k]]:
+      for c in range(x.shape[1]):
+        acc[g, c] += x[k, c]
+
+
+# the grains numbered in order of first appearance of their root over the measurements that
+# have a cell, segment.segmentFrom's np.unique form the oracle
+def _relabelLoop(raw, hasCell, label, grainId):
+  cnt = 0
+  for k in range(len(raw)):
+    if hasCell[k]:
+      r = raw[k]
+      if label[r] == 0:
+        cnt += 1
+        label[r] = cnt
+      grainId[k] = label[r]
+  return cnt
+
+
+_GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_toReferenceLoop, True),
+                "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False)}
+
+
+def grainKernel(name):
+  nb = _preparePixel()
+  if nb is None:
+    return None
+  key = "grain:" + name
+  if key not in _COMPILED:
+    f, parallel = _GRAIN_LOOPS[name]
+    _COMPILED[key] = nb.njit(cache=True, parallel=parallel)(f)
+  return _COMPILED[key]
 
 
 # the linear program of one problem through the compiled simplex, None without numba, and

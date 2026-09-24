@@ -188,11 +188,11 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   # smooth distortion of the map as the measurements do and not the affine fit of the whole
   from scipy import ndimage
   near = ndimage.distance_transform_edt(~hasPixel, return_distances=False, return_indices=True)
-  nearest = pixelOf[near[0].reshape(-1)[flat], near[1].reshape(-1)[flat]]
-  step = (sij - ij[nearest]).astype(P.dtype)
-  pos = (P[nearest] + step @ l.A.T).astype(P.dtype)
-  has = pixel >= 0
-  pos[has] = P[pixel[has]]
+  nearest = pixelOf.reshape(-1)[np.ravel_multi_index((near[0].reshape(-1)[flat], near[1].reshape(-1)[flat]), dims)]
+  step = (sij - ij.take(nearest, axis=0)).astype(P.dtype)
+  pos = (P.take(nearest, axis=0) + step @ l.A.T).astype(P.dtype)
+  has = np.flatnonzero(pixel >= 0)
+  pos[has] = P.take(pixel.take(has), axis=0)
   isHole = (pixel < 0) & onMap
   return siteSet(pos, sij, pixel, isHole, lookup, lo)
 
@@ -294,10 +294,19 @@ def localVoronoi(sites, A, alpha=3.1, distortTol=0.05, backend=None):
 # rounding of a boundary of that grid are welded again on the half-shifted grid, which is
 # where a single grid misses. The tolerance grid then merges what lies within a hundredth
 # of the spacing, and a face whose two vertices welded together is dropped
-def meshVertices(cells, verts, tol):
+def meshVertices(cells, verts, tol, backend=None):
   n = len(cells)
   xy = verts.reshape(-1, 2)
-  lo = xy.min(axis=0) if n else np.zeros(2)
+  # column by column, which NumPy reduces ten times faster than along the first axis
+  lo = np.array([xy[:, 0].min(), xy[:, 1].min()], dtype=xy.dtype) if n else np.zeros(2)
+  # the groups through one hashed pass over the points, the sorts below its fallback and oracle
+  backend = getMTEXpref("kernels", "numba") if backend is None else backend
+  if backend == "numba" and n and xy.dtype == np.float64:
+    from .kernels import weldNumba
+    out = weldNumba(xy, lo, tol * 1e-7, 50 * tol)
+    if out is not None:
+      group, first = out
+      return _weldedMesh(cells, xy, lo, tol, group, first)
   u = (xy - lo) / (tol * 1e-7)
   _, _, group = np.unique(_gridKey(u), return_index=True, return_inverse=True)
   group = group.reshape(-1)
@@ -314,12 +323,26 @@ def meshVertices(cells, verts, tol):
   # the first point of every group, without a sort
   first = np.empty(nG, dtype=np.int64)
   first[group[::-1]] = np.arange(len(group))[::-1]
+  return _weldedMesh(cells, xy, lo, tol, group, first)
+
+
+# the tolerance grid over the first point of every group, and the faces on the merged vertices;
+# the groups taken in the order of their first points, so that where two share a cell of the
+# tolerance grid the vertex is the earlier one whatever the groups were numbered
+def _weldedMesh(cells, xy, lo, tol, group, first):
+  n = len(cells)
+  if np.any(np.diff(first) < 0):
+    order = np.argsort(first)
+    rank = np.empty_like(order)
+    rank[order] = np.arange(len(order))
+    first, group = first[order], rank[group]
   reps = xy[first]
   _, firstV, inverse = np.unique(_gridKey((reps - lo) / tol), return_index=True, return_inverse=True)
   V = reps[firstV]
-  F = inverse.reshape(-1)[group].reshape(n, 2).astype(np.int32)
-  keep = F[:, 0] != F[:, 1]
-  return V, F[keep], cells[keep]
+  F = inverse.reshape(-1).astype(np.int32)[group].reshape(n, 2)
+  # the rows kept by index, which NumPy copies several times faster than by a mask
+  keep = np.flatnonzero(F[:, 0] != F[:, 1])
+  return V, F.take(keep, axis=0), cells.take(keep, axis=0)
 
 
 # one integer per grid cell of points given in grid units
@@ -344,7 +367,7 @@ def decompose(ebsd, alpha=3.1, tolerance=None, backend=None):
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")
   tol = l.dxy / 100 if tolerance is None else tolerance
-  V, F, cells = meshVertices(cells, verts, tol)
+  V, F, cells = meshVertices(cells, verts, tol, backend=backend)
   return cellComplex(V, F, cells, sites, l.A, l.plane, l.shape)
 
 

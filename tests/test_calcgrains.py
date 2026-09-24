@@ -224,3 +224,27 @@ def test_the_compiled_absorption_is_the_numpy_one():
   calcGrains(a, angle=5 * degree, backend="numba")
   calcGrains(b, angle=5 * degree, backend="numpy")
   assert np.array_equal(a.grainId, b.grainId) and (a.grainId > 0).sum() > (b.isIndexed & ~b.isPadding).sum() - 20
+
+
+def test_the_compiled_grain_table_is_the_numpy_one():
+  # blocks with a spread inside, holes and two phases: the same grains, and the mean
+  # orientations and spreads of the compiled passes those of the NumPy form to 1e-12
+  from mtex.maps.calcgrains import grainTable
+  from mtex.maps.decomposition import decompose
+  from mtex.maps.segment import segment
+  e = blockMap(SQ3, 5, 8, notIndexed=((8, 8, 1.5), (24, 24, 3.2)))
+  q = e.rotations.data.reshape(-1, 4)
+  noise = rotation.byAxisAngle(vector3d(1, 2, 3), np.linspace(0, 2 * degree, len(q))).data.reshape(-1, 4)
+  from mtex.geometry.kernels import qmul
+  ph = e.phaseId.reshape(-1).copy()
+  ph[(ph > 0) & (np.arange(len(ph)) % 97 < 40)] = 2
+  e2 = EBSD(e.pos, rotation(qmul(q, noise)), ph, phaseList(CS, crystalFrame("6/mmm", mineral="hex")))
+  c = decompose(e2)
+  seg = segment(c, e2, gbcAngle(5 * degree), "numba")
+  segN = segment(c, e2, gbcAngle(5 * degree), "numpy")
+  assert np.array_equal(seg.grainId, segN.grainId) and seg.nGrains == segN.nGrains and np.array_equal(seg.connect, segN.connect)
+  a, b = grainTable(seg, e2, backend="numba"), grainTable(seg, e2, backend="numpy")
+  assert np.array_equal(np.asarray(a.phaseId), np.asarray(b.phaseId)) and np.array_equal(np.asarray(a.numPixel), np.asarray(b.numPixel))
+  ma, mb = a.meanRotation.data.reshape(-1, 4), b.meanRotation.data.reshape(-1, 4)
+  assert np.array_equal(np.isnan(ma), np.isnan(mb)) and np.nanmax(np.abs(ma - mb)) < 1e-12
+  assert np.max(np.abs(np.asarray(a.GOS) - np.asarray(b.GOS))) < 1e-12 and np.asarray(a.GOS).max() > 0

@@ -542,25 +542,20 @@ def tracePolygons(gB, ids):
 # the directed edges of every grain sorted by grain, walked in one compiled pass; the loops
 # of a grain come back with the outer one, the largest positive area, first
 def _tracePolygonsNumba(gB, ids):
-  from .kernels import traceLoopsNumba
+  from .kernels import edgesByGrainNumba, traceLoopsNumba
   top = int(max(ids.max(initial=0), gB.grainId.max(initial=0))) + 1
   posOf = np.full(top, -1, dtype=np.int64)
   posOf[ids] = np.arange(len(ids))
-  g = np.concatenate([posOf[gB.grainId[:, 0]], posOf[gB.grainId[:, 1]]])
-  ea = np.concatenate([gB.F[:, 0], gB.F[:, 1]])
-  eb = np.concatenate([gB.F[:, 1], gB.F[:, 0]])
-  keep = g >= 0
-  order = np.argsort(g[keep], kind="stable")
-  ea, eb, g = ea[keep][order], eb[keep][order], g[keep][order]
-  goff = np.concatenate([[0], np.cumsum(np.bincount(g, minlength=len(ids)))])
+  ea, eb, goff = edgesByGrainNumba(gB.F, gB.grainId, posOf, len(ids))
   traced = traceLoopsNumba(gB.V, ea, eb, goff)
   if traced is None:
     return None
   loopV, loff, lgrain, larea = traced
-  out = [[] for _ in ids]
-  for k in np.lexsort((-larea, lgrain)):
-    out[lgrain[k]].append(loopV[loff[k]:loff[k + 1]])
-  return out
+  # the loops sorted by grain and within a grain by falling area, cut into the grains
+  lo = loff.tolist()
+  ordered = [loopV[lo[k]:lo[k + 1]] for k in np.lexsort((-larea, lgrain)).tolist()]
+  bounds = np.concatenate([[0], np.cumsum(np.bincount(lgrain, minlength=len(ids)))]).tolist()
+  return [ordered[a:b] for a, b in zip(bounds[:-1], bounds[1:])]
 
 
 # close the directed edges into loops; where a grain touches itself the walk leaves a

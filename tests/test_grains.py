@@ -275,3 +275,40 @@ def test_id2ind_keeps_the_shape_of_the_ids():
   ind = grains.id2ind(ids[ids.min(axis=1) > 0])
   assert ind.ndim == 2 and ind.shape[1] == 2 and np.array_equal(grains.id[ind], ids[ids.min(axis=1) > 0])
   assert isinstance(grains.id2ind(int(grains.id[0])), int)
+
+
+def test_the_compiled_edge_sort_is_the_stable_argsort():
+  # the directed edges of every grain, the first sides before the second, each in row order
+  from mtex.maps.kernels import edgesByGrainNumba
+  g = calcGrains(inclusionMap(), angle=5 * degree)
+  gB = g.boundary
+  ids = np.asarray(g.id)[::2]
+  posOf = np.full(int(gB.grainId.max()) + 1, -1, dtype=np.int64)
+  posOf[ids] = np.arange(len(ids))
+  ea, eb, goff = edgesByGrainNumba(gB.F, gB.grainId, posOf, len(ids))
+  k = np.concatenate([posOf[gB.grainId[:, 0]], posOf[gB.grainId[:, 1]]])
+  keep = k >= 0
+  order = np.argsort(k[keep], kind="stable")
+  assert np.array_equal(ea, np.concatenate([gB.F[:, 0], gB.F[:, 1]])[keep][order])
+  assert np.array_equal(eb, np.concatenate([gB.F[:, 1], gB.F[:, 0]])[keep][order])
+  assert np.array_equal(goff, np.concatenate([[0], np.cumsum(np.bincount(k[keep], minlength=len(ids)))]))
+
+
+def test_the_parallel_tracing_of_many_grains_is_the_python_one():
+  # enough grains for every thread, some with holes: the loops of the parallel walk are the
+  # rings of the Python walk in the same order, whichever vertex each starts at
+  e = blockMap(SQ3, 12, 6, notIndexed=((8, 8, 1.5), (30, 30, 2.5), (50, 20, 1.0)))
+  g = calcGrains(e, angle=5 * degree)
+  before = getMTEXpref("kernels", "numba")
+  try:
+    setMTEXpref("kernels", "numba")
+    a = tracePolygons(g.boundary, g.id)
+    setMTEXpref("kernels", "numpy")
+    b = tracePolygons(g.boundary, g.id)
+  finally:
+    setMTEXpref("kernels", before)
+  assert len(a) == len(b) == len(g)
+  for la, lb in zip(a, b):
+    assert len(la) == len(lb)
+    for x, y in zip(la, lb):
+      assert len(x) == len(y) and close(signedArea2(g.V[x]), signedArea2(g.V[y])) and set(x.tolist()) == set(y.tolist())

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from mtex import EBSD, phaseList, crystalFrame, rotation, vector3d, zvector, degree, shift, decompose
-from mtex.maps.decomposition import alphaClose, dilate, NO_PIXEL
+from mtex.maps.decomposition import alphaClose, dilate, localVoronoi, meshVertices, NO_PIXEL
 from mtex.geometry.kernels import _jit
 
 CSTEST = crystalFrame("m-3m", mineral="test")
@@ -159,3 +159,19 @@ def test_the_compiled_loop_matches_the_numpy_form():
   line = EBSD(np.stack([np.arange(n) * 0.3, np.zeros(n), np.zeros(n)], axis=-1), rotation.rand(n), np.ones(n, dtype=int), [CSTEST])
   with pytest.raises(ValueError):
     decompose(line)
+
+
+@pytest.mark.skipif(not _jit(), reason="numba missing")
+def test_the_compiled_weld_is_the_numpy_one():
+  # the faces of a hexagonal map with holes, their vertices moved by rounding noise, and a
+  # square one far from the origin: the hashed weld groups every vertex as the sorts do
+  rng = np.random.default_rng(3)
+  for A, holes, off in ((HEX2, ((15, 15, 1.5), (5, 22, 3.0)), 0.0), (SQ2, ((8, 8, 2.0),), 1e4)):
+    e = shift(decompMap(A, 30, holes=holes), vector3d(off, -off, 0))
+    l = e.lattice
+    c = decompose(e, backend="numpy")
+    cells, verts, _ = localVoronoi(c.sites, l.A, backend="numpy")
+    verts = verts * (1 + 1e-15 * rng.standard_normal(verts.shape))
+    tol = l.dxy / 100
+    a, b = meshVertices(cells, verts, tol, backend="numpy"), meshVertices(cells, verts, tol, backend="numba")
+    assert all(np.array_equal(x, y) and x.dtype == y.dtype for x, y in zip(a, b))
