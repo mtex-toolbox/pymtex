@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import backend as kernelBackend
 from ..geometry.symreduce import chordAngle, closestImage
 from ..geometry.units import degree
 from .boundary import buildBoundary
@@ -45,7 +46,7 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   if removeQuadruplePoints:
     c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
-  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId).reshape(ebsd.shape)
+  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, backend=backend).reshape(ebsd.shape)
   absorbNotIndexed(ebsd, grains)
   return grains
 
@@ -86,7 +87,7 @@ def markNotIndexed(ebsd, mask):
 # nearest to it, so the footprint of the pixel is sampled at its corners and the pixel
 # joins the grain only when every corner lands in it. Zero stays for a pixel a boundary
 # runs through.
-def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95):
+def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
   out = grainId.copy()
   l = ebsd.lattice
   if l is None:
@@ -96,11 +97,22 @@ def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95):
   siteGrain = np.zeros(c.nSites, dtype=np.int32)
   has = c.site2pixel >= 0
   siteGrain[has] = grainId[c.site2pixel[has]]
-  for k in np.flatnonzero(out == 0):
+  todo = np.flatnonzero(out == 0)
+  # the corners of all pixels in one compiled loop, the Python loop below its fallback
+  if (backend or kernelBackend()) == "numba":
+    from .kernels import pixelKernel
+    loop = pixelKernel("absorb")
+    if loop is not None:
+      s = c.sites
+      loop(todo.astype(np.int64), np.ascontiguousarray(P[:, :2], dtype=float), np.ascontiguousarray(l.ij, dtype=np.int64),
+           np.ascontiguousarray(nudge * np.asarray(corners, dtype=float)[:, :2]), np.ascontiguousarray(s.lookup, dtype=np.int64),
+           int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, out)
+      return out
+  for k in todo:
     g = 0
     ok = True
     for v in corners:
-      s = c.siteAt(P[k] + nudge * v, l.ij[k])
+      s = c.siteAt(P[k] + nudge * v, l.ij[k], reach)
       gs = 0 if s == NO_PIXEL else siteGrain[s]
       if gs == 0 or (g != 0 and gs != g):
         ok = False

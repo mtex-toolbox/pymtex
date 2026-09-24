@@ -214,3 +214,13 @@ def test_gridify_padding_segments_like_the_list():
   assert not (~gA.isIndexed).any() and np.all(a.grainId[hole] == 0)
   # while measured notIndexed cells make a notIndexed grain
   assert (~gB.isIndexed).sum() == 1
+
+
+def test_the_compiled_absorption_is_the_numpy_one():
+  # holes of several sizes in and across grains: the compiled corner search gives every pixel
+  # the grain the Python loop gives it
+  e = blockMap(SQ3, 5, 8, notIndexed=((8, 8, 1.5), (16, 20, 2.5), (31, 7, 1.0), (24, 24, 3.2)))
+  a, b = e.copy(), e.copy()
+  calcGrains(a, angle=5 * degree, backend="numba")
+  calcGrains(b, angle=5 * degree, backend="numpy")
+  assert np.array_equal(a.grainId, b.grainId) and (a.grainId > 0).sum() > (b.isIndexed & ~b.isPadding).sum() - 20

@@ -943,6 +943,35 @@ def _expLoop(ref, v, out):
 
 # ------------------------------------------------------------------ the compilation of these
 
+# the grain of every pixel the closing left without a cell: the grain of the site nearest
+# to each nudged corner of its footprint, searched over the lattice cells around the pixel,
+# kept only when all corners agree; calcgrains.absorbInteriorPixels is the NumPy form
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, out):
+  n1, n2 = lookup.shape
+  for t in prange(len(todo)):
+    k = todo[t]
+    a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
+    g = 0
+    ok = True
+    for c in range(corners.shape[0]):
+      qx, qy = P[k, 0] + corners[c, 0], P[k, 1] + corners[c, 1]
+      best, bestD = -1, np.inf
+      for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
+        for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
+          s = lookup[a, b]
+          if s >= 0:
+            d = (sitePos[s, 0] - qx) ** 2 + (sitePos[s, 1] - qy) ** 2
+            if d < bestD:
+              best, bestD = s, d
+      gs = 0 if best < 0 else siteGrain[best]
+      if gs == 0 or (g != 0 and gs != g):
+        ok = False
+        break
+      g = gs
+    if ok:
+      out[k] = g
+
+
 _PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
@@ -977,7 +1006,7 @@ def pixelKernel(name):
   if nb is None:
     return None
   if name not in _COMPILED:
-    _COMPILED[name] = nb.njit(cache=True, parallel=True)({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop}[name])
+    _COMPILED[name] = nb.njit(cache=True, parallel=True)({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop}[name])
   return _COMPILED[name]
 
 
