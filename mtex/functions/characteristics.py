@@ -387,7 +387,10 @@ def _localMaximaSO3(f, numLocal=1, resolution=5 * degree, accuracy=0.25 * degree
   reps = [int(np.flatnonzero(ids == k)[np.argmax(vals[ids == k])]) for k in np.unique(ids)]
   order = np.argsort(vals[reps])[::-1][:min(numLocal, len(reps))]
   sel = np.array(reps)[order]
-  return vals[sel], _ori(modes[sel], f)
+  # the values of the modes found, from the function itself: a sum of many kernels is
+  # searched through its harmonic form, which can undershoot the function
+  best = _ori(modes[sel], f)
+  return np.real(f(best)).ravel(), best
 
 
 def _localMaximaS2(f, numLocal=1, resolution=2.5 * degree, accuracy=0.05 * degree):
@@ -446,6 +449,17 @@ def _pointwiseSO3(op, f, g):
   return SO3FunHandle(fun, f.CS, f.SS, bandwidth=L)
 
 
+# a list of functions on SO(3): along an axis the pointwise extremum, MATLAB's min(f, [], d),
+# else the extremum of every function, the values and the positions
+def _listExtremaSO3(f, op, one, numLocal, kwargs):
+  from .funops import mapFun
+  axis = kwargs.pop("axis", None)
+  if axis is not None:
+    return mapFun(lambda x: op(np.real(x), axis=1 + int(axis)), f, bandwidth=f.bandwidth)
+  pairs = [one(f[k], numLocal=numLocal, **kwargs) for k in np.ndindex(f.shape)]
+  return np.array([p[0] for p in pairs]).reshape(f.shape), [p[1] for p in pairs]
+
+
 # a handle of several values reduced over one axis of its values, which follow the axes of
 # the directions it is evaluated at
 def _reduceHandle(f, op, axis):
@@ -469,6 +483,8 @@ def max_(f, *args, numLocal=1, **kwargs):
     return _pointwiseS2(np.maximum, f, args[0])
   if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
     return _pointwiseSO3(np.maximum, f, args[0])
+  if isinstance(f, SO3FunHarmonic) and f.shape:
+    return _listExtremaSO3(f, np.max, max_, numLocal, kwargs)
   # a function on the circle knows its own extrema
   if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
     return f.max(**kwargs)
@@ -489,6 +505,8 @@ def min_(f, *args, numLocal=1, **kwargs):
     return _pointwiseS2(np.minimum, f, args[0])
   if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
     return _pointwiseSO3(np.minimum, f, args[0])
+  if isinstance(f, SO3FunHarmonic) and f.shape:
+    return _listExtremaSO3(f, np.min, min_, numLocal, kwargs)
   if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
     return f.min(**kwargs)
   if not (_isSO3(f) or isinstance(f, S2_KINDS)):

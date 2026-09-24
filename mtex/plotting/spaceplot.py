@@ -180,7 +180,8 @@ def plot3d(x, *args, **kw):
   if isinstance(x, fibre):
     return plotFibre3d(x, *args, **kw)
   if hasattr(x, "pdf") and hasattr(x, "CS") and hasattr(x, "SS"):
-    return plotODF3d(x, *args, **kw)
+    from .mtexfigure import firstOfList
+    return plotODF3d(firstOfList(x), *args, **kw)
   if _isField(x):
     return quiver3d(x, **kw)
   if _isFunction(x):
@@ -584,6 +585,8 @@ def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fals
   # a field on the sphere is drawn as arrows on the sphere in space
   if _isField(t):
     return quiver3d(t, color="k" if color is None else color, **kw)
+  if type(t).__name__.startswith("SO3VectorField"):
+    return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw)
   color = "b" if color is None else color
   _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
@@ -607,6 +610,43 @@ def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fals
   P2 = orientationPoints(t.exp(), coordinates, reduced)
   D = P2 - P1
   return sP.ax.quiver(P1[:, 0], P1[:, 1], P1[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, linewidths=lineWidth, arrow_length_ratio=0.25, **kw)
+
+
+# a field on SO(3): its vectors on an equispaced grid of the fundamental region, drawn in the
+# direction they move the orientations and scaled so that the longest spans nine tenths of
+# the grid spacing, as MATLAB's quiver scales them
+def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw):
+  from scipy.spatial import cKDTree
+  from ..geometry.grids.so3grid import equispacedSO3Grid
+  from ..geometry.orientation import orientation
+  color = "b" if color is None else color
+  res = kw.pop("resolution", 10 * degree)
+  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
+  axesKw = _keys(kw)
+  g = equispacedSO3Grid(F.CS, F.SS, resolution=res)
+  o = orientation._fromRotation(g.data.reshape(-1, 4), (F.CS, F.SS)).project2FundamentalRegion()
+  t = F.eval(o)
+  fig = gcm()
+  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  if not held:
+    scatterOrientations(o, coordinates, MarkerSize=0.1, **axesKw)
+  sP = gcm().children[-1]._mtexSpacePlot
+  coordinates = getattr(sP, "coordinates", coordinates)
+  lengths = np.asarray(t.norm(), dtype=float).reshape(-1)
+  # the direction by a small step from the representatives in the region, both ends
+  # unreduced so that a step over the boundary is not folded back
+  step = 1e-4 / max(float(np.max(lengths)), 1e-12)
+  P1 = orientationPoints(o, coordinates, False)
+  P2 = orientationPoints((t * step).exp(), coordinates, False)
+  D = (P2 - P1) / step
+  if normalize:
+    D = D / np.maximum(np.linalg.norm(D, axis=1, keepdims=True), 1e-12)
+  spacing = float(np.median(cKDTree(P1).query(P1, k=2)[0][:, 1])) if len(P1) > 1 else 1.0
+  D = 0.9 * spacing * D / max(float(np.max(np.linalg.norm(D, axis=1))), 1e-12)
+  return sP.ax.quiver(P1[:, 0], P1[:, 1], P1[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, linewidths=lineWidth,
+                      arrow_length_ratio=0.3, **kw)
 
 
 # arrow3d(v): solid arrows from the origin, or from anchor, to the tips v, into the held

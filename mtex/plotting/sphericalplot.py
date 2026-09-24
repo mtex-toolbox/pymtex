@@ -337,6 +337,10 @@ def _blocks(X):
 def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorRange=None, log=False,
             lineColor=None, lineWidth=0.5, contourLabels=False, zorder=2, **kw):
   from matplotlib.colors import LogNorm, Normalize
+  # MATLAB's faceAlpha is the transparency of the surface
+  for name in ("faceAlpha", "FaceAlpha"):
+    if name in kw:
+      kw["alpha"] = kw.pop(name)
   # the colour map is fixed when the surface is drawn, a later preference leaves it alone
   colormap = mtexColormap(colormap)
   # the bands of a contour plot are cut for one range and one colour map, so a change of

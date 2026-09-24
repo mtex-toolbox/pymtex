@@ -275,6 +275,12 @@ class quaternion(MtexArray):
     return out if len(out) > 1 else u
 
   # the mean: the principal eigenvector of the moment matrix, quaternion/mean
+  # interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
+  # values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp
+  def interp(self, values=None, *flags, **kwargs):
+    from ..functions.rbfinterpolation import interpSO3
+    return interpSO3(self, values, *flags, **kwargs)
+
   def mean(self, weights=None, robust=False):
     q = self.data.reshape(-1, 4)
     w = np.ones(q.shape[0]) if weights is None else np.asarray(weights, dtype=float).reshape(-1)

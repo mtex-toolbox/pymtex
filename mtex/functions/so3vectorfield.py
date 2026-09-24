@@ -228,7 +228,7 @@ class SO3VectorField:
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def norm(self):
-    return SO3VectorFieldHarmonic(self).norm()
+    return self.abs()
 
   def curl(self, x=None):
     return curl(self, x)
@@ -290,6 +290,11 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     elif isinstance(fhat, orientation) and rest and not isinstance(rest[0], referenceFrame):
       o, values = fhat, rest[0]
       return self.__init__(SO3TangentVector(vector3d(_tangentValues(values, side).reshape(*o.shape, 3)), o, side), bandwidth=bandwidth, weights=weights, symmetrise=symmetrise)
+    elif isinstance(fhat, SO3FunHarmonic) and fhat.shape == (3,):
+      # a list of three functions: their components, in their frames
+      if not frames:
+        CS, SS = fhat.CS, fhat.SS
+      fhat = np.moveaxis(fhat._fhat, 0, -1)
     elif isinstance(fhat, (list, tuple)) and fhat and isinstance(fhat[0], SO3FunHarmonic):
       if len(fhat) != 3:
         raise ValueError("three component functions are needed")
@@ -323,6 +328,11 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     while big.size and deg2dim(L + 1) <= big[-1]:
       L += 1
     return F.truncate(L)
+
+  # MATLAB's approximate: the quadrature of a callable or of values at orientations
+  @classmethod
+  def approximate(cls, fun, *args, **kwargs):
+    return cls.quadrature(fun, *args, **kwargs)
 
   # from a callable by exact quadrature on the rule of the component frames, then the
   # projection, which the folded rule needs; the callable receives the orientations of
@@ -416,12 +426,12 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   def _scaled(self, a):
     return self._rebuild(a * self._fhat)
 
-  # the mean over SO(3) and the L2 norm of the field
+  # the mean over SO(3), and the length of the vectors as a function, MATLAB's norm
   def mean(self):
     return vector3d(np.real(self._fhat[0]))
 
   def norm(self):
-    return float(np.linalg.norm(self._fhat))
+    return self.abs()
 
   def isclose(self, w, rtol=1e-8):
     w = SO3VectorFieldHarmonic(w, self.tangentSpace)
@@ -434,6 +444,10 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     if isinstance(x, SO3VectorField):
       return SO3VectorField.dot(self, x)
     x = x if isinstance(x, vector3d) else vector3d(x)
+    # a vector of the frame of the other side takes the components of that side
+    other = self.CS if self.tangentSpace == "left" else self.SS
+    if x.frame is not None and x.frame is other and other is not (self.SS if self.tangentSpace == "left" else self.CS):
+      return self.toSide(_other(self.tangentSpace)).dot(x)
     if x.frame is not None and x.frame is not (self.SS if self.tangentSpace == "left" else self.CS):
       raise ValueError("the vector lives in another frame than the components")
     cA, cB = self.componentFrames()

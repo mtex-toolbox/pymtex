@@ -10,6 +10,7 @@ import numpy as np
 
 from ..geometry.crystalshape import crystalShape
 from ..geometry.orientation import orientation
+from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .mtexfigure import gcm, mtexFigure
@@ -48,10 +49,18 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
     return held, plots
   from .mtexfigure import figureSize
   labels = oS.axisLabels
+  # the panels go into the axes nextAxis prepared and those after it, or the first of a
+  # fresh newMtexFigure, where the layout has room for them
+  fig = ax = None
+  if held is not None and not held.hold and (held.pending is not None or not held.children):
+    free = held.nrows * held.ncols - len(held.children) + (held.pending is not None)
+    if n * wide <= free:
+      fig, ax = held, held.takeAxis()
   # a row takes its panel and, with axis labels, room for the title, the ticks and the label
   margin = 0.9 if labels is not None else 0.4
   figSize = figureSize(whereKw.get("figSize"), (min(3.2 * ncols, 16), min(3.2 * aspect * nrows + margin * nrows, 12)))
-  fig = mtexFigure(n * wide, columns=ncols, figSize=figSize)
+  if fig is None:
+    fig = mtexFigure(n * wide, columns=ncols, figSize=figSize)
   fig.sections = oS
   outer = oS.outerSector
   noLabel = axesKw.pop("noLabel", labels is not None or outer is not None)
@@ -59,7 +68,7 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
   for k in range(n):
     cell = []
     for j, proj in enumerate(charts[k]):
-      ax = fig.nextAxis()
+      ax = fig.nextAxis() if ax is None or (k, j) != (0, 0) else ax
       sP = sphericalPlot(ax, proj, noLabel=noLabel, title=oS.sectionLabel(k) if j == 0 else None, **axesKw)
       if labels is not None:
         ax.set_xlabel(labels[0], fontsize=sP.fontSize)
@@ -130,6 +139,9 @@ def plotSection(x, *args, **kw):
   """
   # a function on the sphere along a circle: the polar section
   from ..geometry.vector3d import vector3d
+  from .mtexfigure import firstOfList
+  if _isSO3Fun(x):
+    x = firstOfList(x)
   if args and isinstance(args[0], vector3d) and not hasattr(x, "frameA"):
     from .polarplot import plotSectionS2
     return plotSectionS2(x, *args, **kw)
@@ -139,6 +151,8 @@ def plotSection(x, *args, **kw):
     # MATLAB's style flags, plotSection(odf, 'phi2', angles, 'contourf')
     if isinstance(a, str) and a in FILL_FLAGS:
       kw[a] = True
+    elif isinstance(a, str) and a == "complete":
+      kw["complete"] = True
     elif isinstance(a, (str, ODFSections)):
       kind = a
     elif i > 0 and isinstance(args[i - 1], str) and args[i - 1].lower() in ("phi1", "phi2", "alpha", "gamma", "sigma", "omega", "axisangle"):
@@ -154,6 +168,9 @@ def plotSection(x, *args, **kw):
     oS = kind
   else:
     CS1, CS2 = (x.CS, x.SS)
+    # complete: the sections of the whole orientation space, the frames without their groups
+    if kw.pop("complete", False):
+      CS1, CS2 = CS1.stripSym(), CS2.stripSym()
     # misorientations with grain exchange are drawn on the antipodal sections
     if getattr(x, "antipodal", False) and CS1 is CS2:
       kw.setdefault("antipodal", True)
@@ -352,11 +369,18 @@ def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, c
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
   grids = [[sP.proj.grid(resolution) for sP in cell] for cell in plots]
+
+  # the sections of a complete plot live in the frames without their groups; the function
+  # is asked in its own frames
+  def at(o):
+    if getattr(o, "CS", None) is not f.CS or getattr(o, "SS", None) is not f.SS:
+      o = orientation(rotation(o.data), f.CS, f.SS)
+    return f(o)
   values = []
   for k, cell in enumerate(grids):
     vals = []
     for V, X, Y in cell:
-      vals.append(np.real(np.asarray(f(oS.orientationsAt(k, V.flatten())), dtype=complex)).reshape(X.shape) if V.size else np.zeros((0, 0)))
+      vals.append(np.real(np.asarray(at(oS.orientationsAt(k, V.flatten())), dtype=complex)).reshape(X.shape) if V.size else np.zeros((0, 0)))
     values.append(vals)
   if isinstance(colorRange, str) and colorRange == "equal":
     colorRange = _rangeOf([v for cell in values for v in cell])

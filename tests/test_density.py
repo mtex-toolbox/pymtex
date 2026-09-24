@@ -67,13 +67,19 @@ def test_R6_densities_on_the_sphere():
 def test_R7_least_squares_from_samples():
   cs, ss = crystalFrame("mmm"), specimenFrame("1")
   f = SO3FunHarmonic(rng.standard_normal(deg2dim(6)) + 1j * rng.standard_normal(deg2dim(6)), cs, ss, real=True)
-  o = orientation(rotation.rand(3000, rng=rng), cs, ss)
-  g = interpolate(o, f(o), bandwidth=5, lambda_=0)
+  # nodes closer than 0.02 are merged, so exact samples are taken at distinct ones
+  o = orientation(rotation.rand(3000, rng=rng), cs, ss).unique(tolerance=0.02)
+  g = interpolate(o, f(o), bandwidth=5, lambda_=0, tol=1e-10)
   assert g.isclose(f, 1e-4)
+  # a node given twice with two values is one node with their mean
+  o2 = orientation(np.concatenate([o.data, o.data[:1]]), cs, ss)
+  v2 = np.concatenate([f(o), [f(o)[0] + 2]])
+  v2[0] -= 2
+  assert interpolate(o2, v2, bandwidth=5, lambda_=0, tol=1e-10).isclose(f, 1e-4)
   rs = rotation.rand(20, rng=rng)
   assert np.allclose(g(rs), f(rs), rtol=1e-4, atol=1e-4 * np.max(np.abs(f(rs))))
   # the regularised fit of noisy data stays close and is symmetric
-  gn = SO3FunHarmonic.interpolate(o, f(o) + 0.01 * rng.standard_normal(3000), bandwidth=5, lambda_=1e-6)
+  gn = SO3FunHarmonic.interpolate(o, f(o) + 0.01 * rng.standard_normal(o.size), bandwidth=5, lambda_=1e-6)
   assert np.max(np.abs(gn(rs) - f(rs))) < 0.1 * np.max(np.abs(f(rs)))
   assert symmetrise(gn).isclose(gn)
   # samples that cover one fundamental region and nothing else: the fit is the symmetric

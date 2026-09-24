@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mtex import (SO3DeLaValleePoussinKernel, SO3FunHandle, SO3FunHarmonic, SO3TangentVector, SO3VectorFieldHandle,
+from mtex import (Miller, SO3DeLaValleePoussinKernel, SO3FunHandle, SO3FunHarmonic, SO3TangentVector, SO3VectorFieldHandle,
                   SO3VectorFieldHarmonic, SO3VectorFieldRBF, antiderivative, bandwidthFor, component, cross, crystalFrame, curl,
                   deg2dim, degreeBlock, degree, div, dot, equispacedSO3Grid, grad, interpolate, inv, laplace, left, norm,
                   orientation, quadratureSO3Grid, right, rotate, rotation, specimenFrame, symmetrise, vector3d, xvector,
@@ -11,6 +11,11 @@ from mtex import (SO3DeLaValleePoussinKernel, SO3FunHandle, SO3FunHarmonic, SO3T
 from mtex.functions.so3vectorfield import componentFrames, differentiate
 
 rng = np.random.default_rng(71)
+
+
+# the L2 norm of a field, over its coefficients
+def l2(v):
+  return float(np.linalg.norm(v._fhat))
 
 
 def randomField(L, cs, ss, real=True):
@@ -79,8 +84,8 @@ def test_V1_the_two_sides_of_a_gradient_field():
   assert c.CS is cs and c.SS is ss.stripSym()
   assert np.allclose(c(rotation(os)), t.z)
   assert dot(g1, zvector).isclose(c)
-  with pytest.raises(ValueError):
-    dot(g1, vector3d(zvector, frame=cs))
+  # a crystal direction meets the left field through its right components
+  assert dot(g1, vector3d(zvector, frame=cs)).isclose(dot(right(g1), vector3d(zvector, frame=cs)))
   assert np.linalg.norm(g1.mean().data) < 1e-12
 
 
@@ -91,8 +96,8 @@ def test_V2_curl_divergence_and_antiderivative():
   g2 = right(g1)
   # the curl of a gradient vanishes on both sides, exactly on the side it was taken on and
   # to the accuracy of the transform on the other
-  assert norm(curl(g1)) < 1e-10 * norm(g1)
-  assert norm(curl(g2)) < 1e-5 * norm(g2)
+  assert l2(curl(g1)) < 1e-10 * l2(g1)
+  assert l2(curl(g2)) < 1e-5 * l2(g2)
   # the antiderivative of the gradient is the function up to its mean
   for g, tol in ((g1, 1e-10), (g2, 1e-5)):
     F = antiderivative(g) + f.mean()
@@ -113,17 +118,17 @@ def test_V2_curl_divergence_and_antiderivative():
   h = SO3VectorFieldHarmonic(rng.standard_normal((deg2dim(7), 3)) + 1j * rng.standard_normal((deg2dim(7), 3)), cs, ss)
   c1, c2 = curl(h), curl(right(h))
   for r in rotation.rand(3, rng=rng):
-    assert np.linalg.norm((r * vector3d(c2(r).data)).data - c1(r).data) < 1e-5 * norm(c1)
+    assert np.linalg.norm((r * vector3d(c2(r).data)).data - c1(r).data) < 1e-5 * l2(c1)
     assert np.linalg.norm(curl(h, r).data - c1(r).data) < 1e-12
   with pytest.raises(ValueError):
     antiderivative(h)
   # div and curl are linear
   assert norm(div(g1 + h) - d1 - div(h)) < 1e-10 * norm(d1)
-  assert norm(curl(g1 + h) - curl(h)) < 1e-8 * norm(h)
+  assert l2(curl(g1 + h) - curl(h)) < 1e-8 * l2(h)
   # the push-forward under the inversion commutes with the gradient
   gi = inv(g1)
   assert gi.tangentSpace == "right" and gi.CS is ss and gi.SS is cs
-  assert np.linalg.norm(gi.fhat - grad(inv(f), "right").fhat) < 1e-10 * norm(g1)
+  assert np.linalg.norm(gi.fhat - grad(inv(f), "right").fhat) < 1e-10 * l2(g1)
 
 
 def test_V3_rotate_commutes_with_grad():
@@ -152,14 +157,14 @@ def test_V3_rotate_commutes_with_grad():
   fz = randomField(6, cs, specimenFrame("222"))
   gz = rotate(grad(fz), rotation.byAxisAngle(zvector, 90 * degree))
   assert gz.SS is specimenFrame("222")
-  assert np.linalg.norm(symmetrise(gz).fhat - gz.fhat) < 1e-10 * norm(gz)
+  assert np.linalg.norm(symmetrise(gz).fhat - gz.fhat) < 1e-10 * l2(gz)
 
 
 def test_V4_quadrature_interpolation_and_the_handle():
   cs, ss = crystalFrame("-3m"), specimenFrame("222")
   f = randomField(10, cs, ss) + 5
   g = grad(f)
-  relative = lambda h, g: norm(h - g) / norm(g)
+  relative = lambda h, g: l2(h - g) / l2(g)
   cA, cB = g.componentFrames()
   L = bandwidthFor(g.bandwidth, cA, cB)
   rule = quadratureSO3Grid(L, cA, cB)
@@ -228,7 +233,7 @@ def test_V5_the_pointwise_algebra():
   big = np.linalg.norm(G, axis=-1) > 0.5 * np.mean(np.linalg.norm(G, axis=-1))
   assert np.allclose(u(os).data[big], (G / np.linalg.norm(G, axis=-1, keepdims=True))[big], rtol=1e-1, atol=1e-2)
   assert np.allclose((2 * g - g + h)(os[0]).data, (g + h)(os[0]).data)
-  assert np.isclose(norm(g / 2), norm(g) / 2)
+  assert np.isclose(l2(g / 2), l2(g) / 2)
 
 
 def test_V6_the_radial_basis_vector_field():
@@ -267,3 +272,17 @@ def test_V6_the_radial_basis_vector_field():
   assert vq.SS is ss
   assert np.linalg.norm(vq(q * r).data - (q * vector3d(v(r).data)).data) < 1e-10
   assert np.linalg.norm((2 * v)(r).data - 2 * v(r).data) < 1e-12
+
+
+# MATLAB's norm is the length of the vectors, and a crystal direction meets a left field
+# through its right components
+def test_norm_is_the_length_and_dot_takes_the_side_of_the_vector():
+  cs, ss = crystalFrame("432"), specimenFrame("1")
+  g = grad(randomField(6, cs, ss) + 5)
+  o = orientation(rotation.rand(20, rng=rng), cs, ss)
+  lengths = np.linalg.norm(g(o).data, axis=-1)
+  # the length has a kink where the field vanishes, so the typical error is compared
+  assert np.median(np.abs(np.real(norm(g)(o)) - lengths)) < 1e-2 * np.max(lengths)
+  h = Miller(1, 0, 0, cs)
+  assert np.allclose(np.real(dot(g, h)(o)), np.real(dot(right(g), h)(o)))
+  assert np.allclose(np.real(dot(g, h)(o)), right(g(o)).data @ np.array([1.0, 0, 0]), atol=1e-6)

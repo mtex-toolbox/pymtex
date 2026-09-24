@@ -363,6 +363,8 @@ _dataset("dubnaODF", "SO3Fun", "the ODF reconstructed from the Dubna quartz pole
 _dataset("eclogite", "EBSD", "sparse eclogite map whose positions collide on a lattice, kept as a list", "eclogite", lambda p: loadEBSD(p))
 _dataset("vectors", "vector3d", "a thousand directions as polar and azimuth angles", "vectors",
          lambda p: loadVector3d(p, columnNames=["polar angle", "azimuth angle"])[0])
+_dataset("dubnaValues", "orientation", "values of the Dubna ODF at 19848 orientations of a 5 degree grid", "dubnaValues",
+         lambda p: loadOrientation(p, columnNames=["phi1", "Phi", "phi2", "values"]))
 _dataset("smiley", "vector3d", "777 directions with the values of the smiley function", "smiley",
          lambda p: loadVector3d(p, columnNames=["x", "y", "z", "values"]))
 _dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzite as Bunge Euler angles", "tongue",

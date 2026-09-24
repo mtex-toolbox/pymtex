@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mtex import (calcGrains, calcTaylor, cat, crystalFrame, degree, hold, inv, mtexColorbar, mtexColorMap, mtexdata,
-                  newMtexFigure, orientation, phi1Sections, plot, plottingConvention, quiver, sigmaSections,
+                  newMtexFigure, norm, orientation, phi1Sections, plot, plottingConvention, quiver, sigmaSections,
                   slipSystem, smoothBoundary, specimenFrame, strainTensor, symmetrise, text, xvector, yvector, zvector)
 
 # ## Set the specimen frame and strain
@@ -108,16 +108,15 @@ hold(False)
 # For an infinitesimal strain step, the norm of the spin tensor is the angle through
 # which the corresponding crystal rotates in the Taylor model. The values below are
 # angles for the strain step stored in `epsilon` and scale with the size of that step.
-# The pointwise norm of a field is `abs(WFun)`; `norm(WFun)` is its $L^2$ norm, a number.
 
-plot(abs(WFun) / degree, 'smooth', sP, resolution=0.5 * degree)
+plot(norm(WFun) / degree, 'smooth', sP, resolution=0.5 * degree)
 mtexColorbar()
 
 # The symmetry-related peaks mark orientations that rotate most during this plane-strain
 # increment. This plot reproduces the construction in Fig. 8 of Bunge (1970).
 
 sP = sigmaSections(cs)
-plot(abs(WFun) / degree, 'smooth', sP)
+plot(norm(WFun) / degree, 'smooth', sP)
 mtexColorbar()
 
 # Sigma sections slice the same spin-magnitude function along a different family of paths

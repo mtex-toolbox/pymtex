@@ -38,8 +38,15 @@ class SO3FunGeneric:
     L = self.bandwidth if bandwidth is None else int(bandwidth)
     return SO3FunHarmonic(lambda o: self.eval(o), self.CS, self.SS, bandwidth=L, real=self.isReal, antipodal=self.antipodal)
 
-  def mean(self):
-    return SO3FunHarmonic(self).mean()
+  # the mean by the harmonic expansion, or with a resolution the average over an
+  # equispaced grid of it, as MATLAB's
+  def mean(self, resolution=None):
+    if resolution is None:
+      return SO3FunHarmonic(self).mean()
+    from ..geometry.grids.so3grid import equispacedSO3Grid
+    nodes = equispacedSO3Grid(self.CS, self.SS, resolution=resolution)
+    v = np.mean(np.asarray(self.eval(nodes.flatten())))
+    return float(np.real(v)) if np.isclose(np.imag(v), 0) else v
 
   def norm(self):
     return SO3FunHarmonic(self).norm()
@@ -488,15 +495,15 @@ def _pointwiseSO3(f, op):
   return SO3FunHandle(lambda o: op(f.eval(o)), f.CS, f.SS, bandwidth=f.bandwidth)
 
 
+# the classes keep what they define themselves, the harmonic form its own products
+_POINTWISE = {"__abs__": lambda self: _pointwiseSO3(self, np.abs), "abs": lambda self: _pointwiseSO3(self, np.abs),
+              "sqrt": lambda self: _pointwiseSO3(self, np.sqrt), "exp": lambda self: _pointwiseSO3(self, np.exp),
+              "log": lambda self: _pointwiseSO3(self, np.log), "__pow__": lambda self, p: _pointwiseSO3(self, lambda x: x ** p),
+              "sum": lambda self: 8 * np.pi ** 2 * self.mean()}
 for _cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric):
-  _cls.__abs__ = lambda self: _pointwiseSO3(self, np.abs)
-  _cls.abs = lambda self: _pointwiseSO3(self, np.abs)
-  _cls.sqrt = lambda self: _pointwiseSO3(self, np.sqrt)
-  _cls.exp = lambda self: _pointwiseSO3(self, np.exp)
-  _cls.log = lambda self: _pointwiseSO3(self, np.log)
-  _cls.__pow__ = lambda self, p: _pointwiseSO3(self, lambda x: x ** p)
-  # the integral over SO(3), 8 pi^2 times the mean, MATLAB's sum
-  _cls.sum = lambda self: 8 * np.pi ** 2 * self.mean()
+  for _name, _f in _POINTWISE.items():
+    if _name not in vars(_cls):
+      setattr(_cls, _name, _f)
   # MATLAB's names of the crystal and the specimen frame; assigning one relabels the
   # function and leaves its values, symmetrise then projects
   _cls.SRight = property(lambda self: self.CS, lambda self, fr: setattr(self, "CS", fr))

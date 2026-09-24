@@ -115,9 +115,12 @@ class mtexFigure:
 
   # ------------------------------------------------------------------ colour
 
-  # one colour range over every axes ('equal'), or one given as (lo, hi)
+  # one colour range over every axes ('equal'), each axes its own ('tight'), or one given
+  # as (lo, hi)
   def setColorRange(self, colorRange="equal"):
     ms = self._mappables()
+    if isinstance(colorRange, str) and colorRange == "tight":
+      return self._tightColorRange(ms)
     # a figure of explicit colours keeps the range for the bar mtexColorbar draws
     if not ms:
       if not isinstance(colorRange, str):
@@ -137,7 +140,22 @@ class mtexFigure:
       else:
         refill(colorRange=(lo, hi))
     self.colorRange = (lo, hi)
-    # the bars follow the range: one for all once the ranges agree, as MATLAB redraws them
+    self._redrawColorbars()
+
+  # every axes back to the range of its own data
+  def _tightColorRange(self, ms):
+    for ax, m in ms:
+      refill = _refillOf(ax)
+      sP = getattr(ax, "_mtexSphericalPlot", None)
+      if refill is not None and sP is not None and np.isfinite(sP.minData):
+        refill(colorRange=(sP.minData, sP.maxData))
+      elif refill is None:
+        m.autoscale()
+    self.colorRange = None
+    self._redrawColorbars()
+
+  # the bars follow the range: one for all once the ranges agree, as MATLAB redraws them
+  def _redrawColorbars(self):
     if self.colorbars:
       labels = [cb.ax.get_ylabel() for cb in self.colorbars]
       for cb in self.colorbars:
@@ -464,3 +482,13 @@ def _sameSize(leg, size=36.0):
 
 __all__ = ["logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar",
            "setColorRange", "setColorScale"]
+
+
+# a list of functions is drawn by its first one, with MATLAB's warning
+def firstOfList(f):
+  if getattr(f, "shape", ()):
+    import warnings
+    warnings.warn("You try to plot a vector valued function. Plot the desired components manually. "
+                  "In the following the first component is plotted.")
+    return f[(0,) * len(f.shape)]
+  return f

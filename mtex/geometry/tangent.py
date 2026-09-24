@@ -335,8 +335,13 @@ class SO3TangentVector(vector3d):
 
   # ------------------------------------------------------------------ display
 
+  # the components in x, y, z of the frame of the side, as MATLAB prints a tangent vector
   def __repr__(self):
-    lines = vector3d.__repr__(self).split("\n")
+    style, self.dispStyle = self.dispStyle, "xyz"
+    try:
+      lines = vector3d.__repr__(self).split("\n")
+    finally:
+      self.dispStyle = style
     lines[0] = f"SO3TangentVector ({self.side}, {self._headerChar()})"
     ref = self.oriRef
     what = ("misorientation" if ref.isMisorientation else "orientation") + f" ({ref._frameSummary()})" if isinstance(ref, orientation) else "rotation"

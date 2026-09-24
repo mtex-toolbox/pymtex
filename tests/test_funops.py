@@ -77,14 +77,14 @@ def test_F3g_convolution():
   scale = np.max(np.abs(fs(vector3d.rand(20, rng=rng))))
   for hh in vector3d.rand(3, rng=rng):
     assert abs(fs(hh) - np.sum(w * f(S) * s(S * hh))) < 1e-6 * scale
-  # S2 x S2: (s * t)(R) = int s(xi) t(R xi) dxi
+  # S2 x S2: (s * t)(R) = (1/4pi) int s(xi) t(R xi) dxi
   s1 = S2FunHarmonic(randomCoefficients(25), real=True)
   t1 = S2FunHarmonic(randomCoefficients(25), real=True)
   st = conv(s1, t1)
   qs = quadratureS2Grid(8)
   xi, wxi = qs.nodes(), qs.weights
   for R in rotation.rand(3, rng=rng):
-    assert np.isclose(st(R), np.sum(wxi * s1(xi) * t1(R * xi)), rtol=1e-5)
+    assert np.isclose(st(R), np.sum(wxi * s1(xi) * t1(R * xi)) / (4 * pi), rtol=1e-5)
   # S2 x kernel: (s * psi)(v) = (1/4pi) int s(xi) psi(<xi, v>) dxi
   psi2 = S2DeLaValleePoussinKernel(20)
   sk = conv(s1, psi2)

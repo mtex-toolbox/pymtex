@@ -274,19 +274,38 @@ def _exchangeIntoSector(p, common):
 
 # the distinct orientations of a list up to symmetry: representatives in the fundamental
 # region, then unique on those
+# the pairs of orientations within the tolerance, over all their symmetric images, as a
+# sparse matrix from the radius search of a quaternion tree
+def _neighbours(o, tolerance, noSymmetry):
+  from scipy import sparse
+  n = o.size
+  if noSymmetry:
+    from scipy.spatial import cKDTree
+    q = o.data.reshape(-1, 4)
+    hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tolerance / 4), workers=-1)
+    rows = np.repeat(np.arange(n), [len(h) for h in hits])
+    cols = np.concatenate([np.asarray(h, dtype=int) for h in hits]) % n
+    return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=(n, n))
+  from .grids.orientationtree import OrientationTree
+  flat = o.flatten()
+  return OrientationTree(flat).radius(flat, tolerance)[0].tocsr()
+
+
 def orientationUnique(o, tolerance=1e-3, noSymmetry=False, return_index=False, return_inverse=False):
-  rep = o.data.reshape(-1, 4) if noSymmetry else project2FundamentalRegionOrientation(o.flatten()).data
-  c = np.cos(tolerance / 2)
-  same = np.abs(rep @ rep.T) > c
-  keep = np.ones(len(rep), dtype=bool)
-  first = np.arange(len(rep))
-  for k in range(len(rep)):
+  n = o.size
+  same = _neighbours(o, tolerance, noSymmetry)
+  keep = np.ones(n, dtype=bool)
+  first = np.arange(n)
+  # every orientation not yet taken absorbs the later ones within the tolerance
+  for k in range(n):
     if keep[k]:
-      later = np.flatnonzero(same[k, k + 1:]) + k + 1
+      nb = same.indices[same.indptr[k]:same.indptr[k + 1]]
+      later = nb[nb > k]
+      later = later[keep[later]]
       keep[later] = False
       first[later] = k
   iv = np.flatnonzero(keep)
-  rank = np.empty(len(rep), dtype=int)
+  rank = np.empty(n, dtype=int)
   rank[iv] = np.arange(len(iv))
   iu = rank[first]
   u = o._new(o.data.reshape(-1, 4)[iv])

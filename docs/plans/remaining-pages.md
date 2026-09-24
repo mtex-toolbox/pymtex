@@ -28,12 +28,12 @@ does not exist; **Pending** not started.
 | Plotting | 11 | 0 | 0 | 0 | 0 | 0 | 11 |
 | PoleFigureAnalysis | 11 | 11 | 0 | 0 | 0 | 0 | 0 |
 | Rotations | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
-| SO3Functions | 13 | 0 | 0 | 0 | 0 | 0 | 13 |
+| SO3Functions | 13 | 13 | 0 | 0 | 0 | 0 | 0 |
 | SphericalFunctions | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | Tensors | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | Tutorials | 5 | 0 | 0 | 0 | 0 | 0 | 5 |
 | Vectors | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| **All** | 229 | 148 | 2 | 8 | 4 | 4 | 63 |
+| **All** | 229 | 161 | 2 | 8 | 4 | 4 | 50 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|
@@ -217,19 +217,19 @@ does not exist; **Pending** not started.
 | Rotations/RotationRepresentations | RotationRepresentations | Checked 2026-09-22; the Rodrigues lengths, the homochoric radius 1.3307 to the digit, the cubochoric round trip 3.7e-13 for MATLAB's 3.4e-6; the histogram and the two boundaries as MATLAB's, drawn with matplotlib; `cubo2homo` exported, `rotation.byCubochoric` exists here | Checked |
 | Rotations/RotationSpinTensor | RotationSpinTensor | Checked 2026-09-22; T, the two skew matrices, the axes (1,2,3) and (-0.318, 1.03, 3.58), the zero residuals and the crystal axis (1 2 -3 3) to the digit; one figure; `spinTensor(S)` reads the axial vector, `vector3d(S)` too, `exp(S, ref, side)`; found `orientation.byAxisAngle(Miller, w)` built against the specimen frame and `Miller(tangentVector, cs)` keeping the UVTW style, both fixed | Checked |
 | Rotations/RotationTangentSpace | RotationTangentSpace | Checked 2026-09-22; the residuals at round-off, the displays of the left, right and summed vectors 0.2, 0.581, 0.427 as MATLAB's; one figure; wrote `quiver3(t)` at the base point, `plot(rot)` into axis angle space; the side is `'left'`/`'right'` for `SO3TangentSpace.leftVector` | Checked |
-| SO3Functions/HarmonicApproximationTheory |  | Pending | Checked |
-| SO3Functions/RBFApproximationTheory |  | Pending | Pending |
-| SO3Functions/SO3FunApproximationTheory |  | Pending | Checked |
-| SO3Functions/SO3FunConcept |  | Pending | Checked |
-| SO3Functions/SO3FunConvolution |  | Pending | Checked |
-| SO3Functions/SO3FunDefinition |  | Pending | Checked |
-| SO3Functions/SO3FunOperations |  | Pending | Checked |
-| SO3Functions/SO3FunQuadrature |  | Pending | Checked |
-| SO3Functions/SO3FunSymmetricFunctions |  | Pending | Checked |
-| SO3Functions/SO3FunVectorField |  | Pending | Pending |
-| SO3Functions/SO3FunVectorValued |  | Pending | Adapted |
-| SO3Functions/SO3Kernels |  | Pending | Checked |
-| SO3Functions/WignerFunctions |  | Pending | Checked |
+| SO3Functions/HarmonicApproximationTheory | HarmonicApproximationTheory | Checked 2026-09-23; counts 10432, 7770, 47905 and the spectra as MATLAB's; residuals 0.0013 and 0.0062 for 0.0159 and 0.0239, MATLAB's LSQR running an NFSOFT of cutoff 1; sections of a triclinic function on both hemispheres; wrote `setColorRange('tight')`, sections filling a layout | Checked |
+| SO3Functions/RBFApproximationTheory | RBFApproximationTheory | Checked 2026-09-23; best halfwidth 7.5 with 0.0533 for 0.0556, iterations 8 and 41, centres 73610 for 71802 after the thinning; wrote `functions/lsqr.py` with MATLAB's stopping rules, `unimodalODF` thinning; the tight residual limited by the harmonic evaluation | Pending |
+| SO3Functions/SO3FunApproximationTheory | SO3FunApproximationTheory | Checked 2026-09-23; bandwidths 18, 16 and 40, residuals 0.0463, 0.1057, 0.0130, 0.0015, the density minimum and mean, the Bingham kappa 92 92 0 0, all figures; wrote the merge of close nodes, `unique` through the tree, exact values of found extrema | Checked |
+| SO3Functions/SO3FunConcept | SO3FunConcept | Checked 2026-09-23; the displays and sections of the Dubna ODF; wrote `SO3Fun.dubna`, `how2plot`, `isReal` with its setter | Checked |
+| SO3Functions/SO3FunConvolution | SO3FunConvolution | Checked 2026-09-23; convolution of SO(3) with SO(3) and S2 functions; found the S2 by S2 convolution missing 1/(4pi), fixed; wrote `conv(f, g, 'inv')` | Checked |
+| SO3Functions/SO3FunDefinition | SO3FunDefinition | Checked 2026-09-23; the constructions by coefficients, quadrature and handles; wrote the padding of short coefficient vectors, `SO3Fun.example` | Checked |
+| SO3Functions/SO3FunOperations | SO3FunOperations | Checked 2026-09-23; the algebra, `mean`, `norm`, `max` and `min`; wrote the pointwise `abs`, `sqrt`, `exp`, `log`, `power` of every kind, the extrema of handles | Checked |
+| SO3Functions/SO3FunQuadrature | SO3FunQuadrature | Checked 2026-09-23; the quadrature grids with MATLAB's distinct nodes, 4060 and 2250 for MATLAB's 4500 and 2400 by the representatives; wrote `fullGrid`, `fullValues`, `quadrature(f, frames)` | Checked |
+| SO3Functions/SO3FunSymmetricFunctions | SO3FunSymmetricFunctions | Checked 2026-09-23; `SRight`, `SLeft`, the orbit spread before and after `symmetrise`, 9.84 for 4.71 by the generator; wrote the `SRight`/`SLeft` setters, `plot(f, 'complete')` | Checked |
+| SO3Functions/SO3FunVectorField | SO3FunVectorField | Checked 2026-09-23; gradient, div, curl, antiderivative, the Taylor spin, its norm, dot with [100] and divergence as MATLAB's; wrote `norm` of a field as a function, the side-aware `dot`, `quiver3` of a field, `approximate`, `faceAlpha`; the spin field in left components | Pending |
+| SO3Functions/SO3FunVectorValued | SO3FunVectorValued | Checked 2026-09-23; lists of SO(3) functions, the list shape in front of the coefficients; wrote `cat`, `reshape`, `T`, `mean`/`sum`/`min` along an axis; the quadrature functions depend on the sign representative, so their spectra differ | Adapted |
+| SO3Functions/SO3Kernels | SO3Kernels | Checked 2026-09-23; halfwidths, bandwidths and spectra as MATLAB's by its cutoff rule over 1000 coefficients; wrote `SO3BumpKernel(bandwidth=)` | Checked |
+| SO3Functions/WignerFunctions | WignerFunctions | Checked 2026-09-23; the Wigner-D values in MTEX's basis as MATLAB's; wrote the public `WignerD(g, n, normalize=)` of real angles and rotations, `sphericalY` in MTEX's basis | Checked |
 | SphericalFunctions/S1FunHarmonics | S1FunHarmonics | Checked 2026-09-23; every display, 4, 2.2e-14, bandwidth 3 and 3.4361e-4, 1.2661, 7.9549, e at 0 and 1/e at 180 as MATLAB's; the coefficients now MATLAB's e^{-ik rho}; wrote MATLAB's regularised `interpolate`, `smooth`, `sum`, the periodic cutoff round(4/sigma), `plot(S1FunHandle)` into subplots | Checked |
 | SphericalFunctions/S2Bingham | S2Bingham | Checked 2026-09-23; the figures as MATLAB's; mean 1 for MATLAB's approximate 1.0377; wrote the confidence ellipse of `fit`, `ellipse`, `a` as directions | Checked |
 | SphericalFunctions/S2FunApproximationInterpolation | S2FunApproximationInterpolation | Checked 2026-09-23; 1.0e-15 and 0.0605 for MATLAB's 2.0e-14 and 0.0606, four figures; wrote `interp`, `S2FunTri`, `S2Triangulation`, Voronoi weights by default | Checked |

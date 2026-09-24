@@ -60,6 +60,15 @@ def plotSpektra(x, bandwidth=None, logarithmic=False, **kw):
   """plotSpektra(psi), plotSpektra(odf): the Chebyshev coefficients of a kernel, or the harmonic
   power of a function, per degree"""
   from ..functions.kernelfunctions import S2Kernel, SO3Kernel
+  # a list of functions, MATLAB's [f, g]: one line each in the same axes
+  if isinstance(x, (list, tuple)):
+    from .mtexfigure import hold
+    hs = [plotSpektra(x[0], bandwidth, logarithmic, **kw)]
+    hold(True)
+    for f in x[1:]:
+      hs.append(plotSpektra(f, bandwidth, logarithmic, **{k: v for k, v in kw.items() if k != "figSize"}))
+    hold(False)
+    return hs
   fontSize = kw.pop("FontSize", kw.pop("fontSize", None))
   ax = _lineAxes(kw)
   kw = _lineKw(kw)
@@ -93,12 +102,14 @@ def _spektra(ax, x, bandwidth, logarithmic, kw):
   # a function on the sphere: the norm of the coefficients of each degree
   f = x if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)) else S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
   L = f.bandwidth if bandwidth is None else int(bandwidth)
-  power = np.zeros(L + 1)
+  # a list of functions draws one line for each
+  P = np.asarray(f.power).reshape(-1, f.bandwidth + 1)
+  power = np.zeros((len(P), L + 1))
   LL = min(L, f.bandwidth)
-  power[:LL + 1] = f.power[:LL + 1]
+  power[:, :LL + 1] = P[:, :LL + 1]
   kw.setdefault("marker", "o")
   kw.setdefault("linestyle", ":")
-  h = ax.plot(np.arange(L + 1), power, **kw)
+  h = ax.plot(np.arange(L + 1), power.T, **kw)
   ax.set_xlim(0, L)
   ax.set_xlabel("harmonic degree")
   ax.set_ylabel("power")

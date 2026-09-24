@@ -149,12 +149,18 @@ def transformODF(odfP, p2c, vSel=None):
   return SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
 
 
-def conv(f, g):
+# conv(f, g, 'inv'): the convolution of the inverse of f with g, MATLAB's flag
+def conv(f, g, *flags):
+  if "inv" in flags:
+    return conv(f.inv(), g)
   if isinstance(f, (SO3Kernel, S2Kernel, S1Kernel)) and not isinstance(g, (SO3Kernel, S2Kernel, S1Kernel)):
     return conv(g, f)
   if isinstance(f, S1FunHarmonic):
     return f.conv(g)
   if isinstance(f, SO3FunHarmonic):
+    # another representation of a function on SO(3) takes its harmonic form
+    if not isinstance(g, (SO3FunHarmonic, SO3Kernel)) and hasattr(g, "_harmonic"):
+      g = SO3FunHarmonic(g)
     if isinstance(g, SO3FunHarmonic):
       if g.SS is not f.CS:
         raise ValueError("the specimen frame of the second factor must be the crystal frame of the first")
@@ -183,7 +189,8 @@ def conv(f, g):
         k = np.arange(-l, l + 1)
         t = g._fhat[l * l:(l + 1) ** 2][::-1]
         s = f._fhat[l * l:(l + 1) ** 2]
-        degreeBlock(fhat, l)[...] = np.outer(np.where(k % 2, -1.0, 1.0) * t, s) / math.sqrt(2 * l + 1)
+        # the normalised measure of the sphere, 1 / (4 pi) of its area, as MATLAB's
+        degreeBlock(fhat, l)[...] = np.outer(np.where(k % 2, -1.0, 1.0) * t, s) / math.sqrt(2 * l + 1) / (4 * math.pi)
       from ..geometry.frames import specimenFrame
       frameOf = lambda x: specimenFrame.default if x.frame is None else x.frame
       return SO3FunHarmonic(fhat, frameOf(f), frameOf(g), real=f.isReal and g.isReal, symmetrise=False, _internal=True)
@@ -327,8 +334,11 @@ def mapFun(op, f, *gs, bandwidth=None):
     L0 = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
     L = bandwidthFor(L0, f.CS, f.SS)
     q = quadratureSO3Grid(L, f.CS, f.SS)
-    values = op(f(q), *(g(q) for g in gs))
-    fhat = wignerSeriesAdjoint(q, values, L)[:deg2dim(L0 + 1)]
+    values = np.asarray(op(f(q), *(g(q) for g in gs)))
+    # values of a list of functions: the nodes first, then the shape of the list
+    shape = values.shape[1:]
+    cols = values.reshape(values.shape[0], -1)
+    fhat = np.stack([wignerSeriesAdjoint(q, cols[:, k], L)[:deg2dim(L0 + 1)] for k in range(cols.shape[1])]).reshape(shape + (deg2dim(L0 + 1),))
     return SO3FunHarmonic(fhat, f.CS, f.SS, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs), _internal=True)
   if isinstance(f, S2FunHarmonic):
     for g in gs:

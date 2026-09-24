@@ -100,3 +100,21 @@ def test_sections_of_orientations():
   assert 100 < n <= len(oS.sectionData(ori)[0]) <= 300
   h = plotSection(ori, oS, points=50)
   assert sum(len(x.get_offsets()) for x in h) < n
+
+
+# one section of each function into the cells of a layout, as nextAxis names them
+def test_sections_fill_the_cells_of_a_layout():
+  from mtex import newMtexFigure, nextAxis, setColorRange
+  cs = crystalFrame("432")
+  odfs = [unimodalODF(orientation.byEuler(0, 0, 0, cs), halfwidth=h * degree) for h in (10, 20, 30)]
+  fig = newMtexFigure(layout=[1, 3])
+  for i, odf in enumerate(odfs):
+    if i > 0:
+      nextAxis()
+    plotSection(odf, "sigma", 0 * degree)
+  assert gcm() is fig and len(fig.children) == 3 and len(plt.get_fignums()) == 1
+  # each cell back to the range of its own values, the widest halfwidth the lowest peak
+  setColorRange("equal")
+  setColorRange("tight")
+  highs = [ax._mtexSphericalPlot.mappable.get_clim()[1] for ax in fig.children]
+  assert highs[0] > highs[1] > highs[2]

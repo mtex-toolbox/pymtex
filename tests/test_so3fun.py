@@ -30,8 +30,10 @@ def test_F3a_construction_and_evaluation():
   f0 = SO3FunHarmonic(psi, cs, ss, symmetrise=False)
   for r in rotation.rand(3, rng=rng):
     assert abs(f0(r) - psi(r)) < 1e-2 * psi(1.0)
+  # the frames stripped of their groups are the same frames, another frame is not
+  assert np.isclose(f(orientation(rotation.id, cs.stripSym(), ss.stripSym())), f(rotation.id))
   with pytest.raises(ValueError):
-    f(orientation(rotation.id, cs, specimenFrame("1")))
+    f(orientation(rotation.id, cs, specimenFrame.rolling))
   # arrays and containers keep their shape and value type
   os = orientation(rotation.rand(4, 5, rng=rng), cs, ss)
   assert f(os).shape == (4, 5) and f(os).dtype == np.float64

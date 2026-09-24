@@ -110,12 +110,17 @@ def _sobolevWeightsS2(L, s):
 
 
 def _lsqr(A, At, b, n, maxit, tol):
-  from scipy.sparse.linalg import LinearOperator, lsqr
-  op = LinearOperator((len(b), n), matvec=A, rmatvec=At, dtype=complex)
-  return lsqr(op, b, atol=tol, btol=tol, iter_lim=maxit)[0]
+  return _lsqrFull(A, At, b, n, maxit, tol)[0]
 
 
-def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxit=100, tol=1e-6):
+# the solution, scipy's stop reason, the iterations and the residual norm
+def _lsqrFull(A, At, b, n, maxit, tol):
+  from .lsqr import lsqr
+  return lsqr(A, At, np.asarray(b, dtype=complex), n, tol=tol, maxit=maxit)
+
+
+def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxit=100, tol=None,
+                withParameters=False):
   from ..geometry.tangent import SO3TangentVector
   if isinstance(nodes, SO3TangentVector):
     from .so3vectorfield import interpolateField
@@ -125,14 +130,38 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     return interpolateField(nodes, values, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
   y = np.asarray(values).ravel()
   real = y.dtype.kind != "c"
+  # MATLAB's tolerance of LSQR: 1e-3 on SO(3), 1e-6 on the sphere
+  tol = (1e-3 if isinstance(nodes, quaternion) else 1e-6) if tol is None else tol
+  if isinstance(nodes, quaternion) and np.size(values) != nodes.size:
+    # values with component axes after the node axis: one fit per component, a list of functions
+    vals = np.asarray(values)
+    cols = vals.reshape(nodes.size, -1)
+    fits = [interpolate(nodes, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+            for k in range(cols.shape[1])]
+    L = max(f.bandwidth for f in fits)
+    fhat = np.stack([f.truncate(L)._fhat for f in fits]).reshape(vals.shape[1:] + (fits[0].truncate(L)._fhat.shape[-1],))
+    return fits[0]._rebuild(fhat, _isReal=all(f.isReal for f in fits))
   if isinstance(nodes, quaternion):
     o = nodes if isinstance(nodes, orientation) else orientation(nodes)
+    # nodes closer than 0.02 are one node carrying the mean of their values, as MATLAB's
+    o, iu = o.flatten().unique(tolerance=0.02, return_inverse=True)
+    count = np.bincount(iu, minlength=o.size)
+    y = (np.bincount(iu, y.real, o.size) + 1j * np.bincount(iu, y.imag, o.size) if not real else np.bincount(iu, y, o.size)) / count
+    if weights is not None and not isinstance(weights, str):
+      weights = np.bincount(iu, np.asarray(weights, dtype=float).ravel(), o.size)
     lam = 1e-8 if lambda_ is None else lambda_
     q = o.data.reshape(-1, 4)
     nA, nB = o.CS.sym.properGroup().rotations().size, o.SS.sym.properGroup().rotations().size
     nSym = nA * nB * (2 if real else 1)
     L = min(dim2deg(max(1, round(len(q) * nSym / 2))), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
-    w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
+    # the nodes weighted by their Voronoi volumes below 10000 of them, else equally, as MATLAB's
+    if isinstance(weights, str) and weights == "equal" or weights is None and len(q) >= 1e4:
+      w = np.full(len(q), 1 / len(q))
+    elif weights is None or isinstance(weights, str):
+      from .rbfinterpolation import voronoiVolumes
+      w = voronoiVolumes(o)
+    else:
+      w = np.asarray(weights, dtype=float).ravel() / np.sum(weights)
     sw = np.sqrt(w)
     p = SO3FourierPlan(rotation(q), L, real=False)
     reg = math.sqrt(lam) * np.sqrt(_sobolevWeightsSO3(L, s))
@@ -148,8 +177,13 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     A = lambda x: (v := sym(x), np.concatenate([sw * p(v), reg * v]))[1]
     At = lambda z: sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
     b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
-    fhat = sym(_lsqr(A, At, b, deg2dim(L + 1), maxit, tol))
-    return SO3FunHarmonic(fhat, o.CS, o.SS, real=real, antipodal=o.antipodal, _internal=True)
+    x, flag, relres, itn = _lsqrFull(A, At, b, deg2dim(L + 1), maxit, tol)
+    f = SO3FunHarmonic(sym(x), o.CS, o.SS, real=real, antipodal=o.antipodal, _internal=True)
+    if withParameters:
+      # MATLAB's lsqr parameters: the flag, 1 when the iterations ran out, the relative
+      # residual and the number of iterations
+      return f, (flag, relres, itn)
+    return f
   v = (nodes if isinstance(nodes, vector3d) else vector3d(nodes)).flatten().normalize()
   # values with component axes after the node axis: one fit per component, a list of functions
   values = np.asarray(values)

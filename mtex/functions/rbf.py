@@ -66,10 +66,16 @@ def supportCosine(psi, tol=1e-9):
   return math.cos(omega[i[0]] / 2) if i.size else -1.0
 
 
+# one frame, with or without its group: a symmetric function is also asked at the
+# orientations of the frame stripped of it, as MATLAB's stripSym gives them
+def _sameFrame(a, b):
+  return a is b or (a is not None and b is not None and a.stripSym() is b.stripSym())
+
+
 # the rotations of a query in the frames of a function
 def _rotationsFor(f, x):
   if isinstance(x, orientation):
-    if x.CS is not f.CS or x.SS is not f.SS:
+    if not (_sameFrame(x.CS, f.CS) and _sameFrame(x.SS, f.SS)):
       raise ValueError("the orientation lives in other frames than the function")
     return x
   if isinstance(x, orthogonalTransform):
@@ -81,6 +87,12 @@ def _rotationsFor(f, x):
 
 class SO3FunRBF:
   isReal = True
+
+  # the sum of kernels through values at orientations, MATLAB's SO3FunRBF.interpolate
+  @staticmethod
+  def interpolate(nodes, values, **kwargs):
+    from .rbfinterpolation import interpolateRBF
+    return interpolateRBF(nodes, values, **kwargs)
 
   def __init__(self, center, psi=None, weights=None, c0=0.0):
     if not isinstance(center, orientation):
@@ -477,8 +489,9 @@ def _densityKernel(space, kernel, halfwidth):
   return SO3DeLaValleePoussinKernel(halfwidth=hw) if space == "SO3" else S2DeLaValleePoussinKernel(halfwidth=hw)
 
 
-# a unimodal ODF, the weights normalised to a mean of one
-def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None):
+# a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
+# dropped unless nothinning
+def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, nothinning=False):
   if isinstance(center, (referenceFrame, SO3Kernel)):
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
@@ -491,6 +504,13 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None):
   psi = _densityKernel("SO3", kernel, halfwidth)
   n = center.size
   w = np.full(n, 1 / (n * psi.mean())) if weights is None else np.asarray(weights, dtype=float).reshape(-1) / (np.sum(weights) * psi.mean())
+  # the centres whose share of the weight stays below a hundredth of a kernel's peak over
+  # their number are dropped, as MATLAB thins
+  if not nothinning and weights is not None:
+    keep = w / np.sum(w) > 1e-2 / np.real(psi.eval(1.0)) / n
+    if not np.all(keep):
+      center, w = center.flatten()[np.flatnonzero(keep)], w[keep]
+      w = w / (np.sum(w) * psi.mean())
   return SO3FunRBF(center, psi, w)
 
 

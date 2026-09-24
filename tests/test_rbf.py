@@ -27,8 +27,10 @@ def test_R1_uniform_and_unimodal_ODFs():
     direct = np.sum([psi(L[j] * o[k] * R[i], r) for k in range(5) for i in range(R.size) for j in range(L.size)]) / (5 * L.size * R.size * psi.mean())
     assert np.isclose(f(r), direct, rtol=1e-4)
     assert f(orientation(r, cs, ss)) == f(r)
+  # the frames stripped of their groups are the same frames, another frame is not
+  assert np.isclose(f(orientation(rotation.id, cs.stripSym(), ss.stripSym())), f(rotation.id))
   with pytest.raises(ValueError):
-    f(orientation(rotation.id, cs, specimenFrame("1")))
+    f(orientation(rotation.id, cs, specimenFrame.rolling))
   # the harmonic form agrees away from the truncation, is symmetric and has mean one
   h = SO3FunHarmonic(f)
   assert np.isclose(mean(h), 1) and h.CS is cs and h.isReal

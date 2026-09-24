@@ -30,7 +30,7 @@ def _canonical(name):
   return re.sub(r"\s+", " ", str(name).strip().lower())
 
 
-def loadOrientation(fname, cs, ss=None, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
+def loadOrientation(fname, cs=None, ss=None, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
                     passive=False):
   """the orientations a text table holds, and the other columns it names
 
@@ -39,7 +39,12 @@ def loadOrientation(fname, cs, ss=None, columnNames=None, columns=None, radians=
     loadOrientation('ori.txt', cs, columnNames=[...], columns=[3, 1, 6])          the columns the names sit in, from zero
     loadOrientation('ori.txt', cs, columnNames=['Quat real', 'Quat i', 'Quat j', 'Quat k'])
   """
+  # no crystal frame named: the triclinic one, as MATLAB's; a .csv file separates by commas
+  from ..geometry.frames import crystalFrame
+  cs = crystalFrame("1") if cs is None else cs
   ss = specimenFrame.default if ss is None else ss
+  if delimiter is None and str(fname).lower().endswith(".csv"):
+    delimiter = ","
   data = readFile(fname)
   if header is None:
     sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None

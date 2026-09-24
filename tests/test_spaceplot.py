@@ -160,3 +160,21 @@ def test_scatter_of_misorientations_fits_the_region():
   ax = gcm().children[-1]
   (x0, x1), (z0, z1) = ax.get_xlim(), ax.get_zlim()
   assert x0 > -20 and x1 < 110 and z0 > -30 and z1 < 50
+
+
+# a field on SO(3): one arrow per grid point of the fundamental region, pointing where the
+# field moves the orientation, the longest nine tenths of the grid spacing
+def test_quiver3_of_an_SO3_vector_field():
+  import matplotlib.pyplot as plt
+  from mtex import SO3VectorFieldHandle, crystalFrame, degree, quiver3
+  cs = crystalFrame("432")
+  VF = SO3VectorFieldHandle(lambda m: m.axis() * m.angle(), cs, cs)
+  h = quiver3(VF, 'axisAngle', resolution=10 * degree)
+  # matplotlib keeps three segments per arrow, the shaft from the tip to the tail first
+  segs = np.asarray(h._segments3d)[0::3]
+  assert len(segs) > 10
+  # axis times angle points away from the identity: every arrow runs outwards
+  start, end = segs[:, 1, :], segs[:, 0, :]
+  far = np.linalg.norm(start, axis=1) > 1
+  assert np.all(np.linalg.norm(end[far], axis=1) > np.linalg.norm(start[far], axis=1))
+  plt.close("all")

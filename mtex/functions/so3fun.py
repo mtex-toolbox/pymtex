@@ -102,13 +102,15 @@ class SO3FunHarmonic:
       bandwidth, fromUser = None, False
     else:
       CS, SS = _readFrames(frames)
-    fhat = np.array(fhat, dtype=_complexType(np.result_type(np.asarray(fhat).dtype, np.float64) if dtype is None else dtype)).reshape(-1)
+    # the coefficients on the last axis, the shape of a list of functions in front
+    fhat = np.array(fhat, dtype=_complexType(np.result_type(np.asarray(fhat).dtype, np.float64) if dtype is None else dtype))
+    fhat = fhat.reshape(1) if fhat.ndim == 0 else fhat
     # a vector ending inside a degree block is padded with zeros to its end, as MATLAB does
     L = 0
-    while deg2dim(L + 1) < len(fhat):
+    while deg2dim(L + 1) < fhat.shape[-1]:
       L += 1
-    if deg2dim(L + 1) != len(fhat):
-      fhat = np.concatenate([fhat, np.zeros(deg2dim(L + 1) - len(fhat), dtype=fhat.dtype)])
+    if deg2dim(L + 1) != fhat.shape[-1]:
+      fhat = _cut(fhat, L)
     if bandwidth is not None and bandwidth != L:
       fhat = _cut(fhat, bandwidth)
     if fromUser:
@@ -123,21 +125,74 @@ class SO3FunHarmonic:
     if symmetrise:
       self._fhat = self.symmetrise()._fhat
     elif antipodal:
-      self._fhat = (fhat + invertedCoefficients(fhat)) / 2
+      self._fhat = self.withExchange()._fhat
 
   # the same function with other coefficients, everything else kept
   def _rebuild(self, fhat, **changes):
     f = object.__new__(SO3FunHarmonic)
-    f._fhat, f.CS, f.SS, f.isReal, f.antipodal = np.asarray(fhat), self.CS, self.SS, self.isReal, self.antipodal
+    f._fhat, f.CS, f.SS, f._isReal, f.antipodal = np.asarray(fhat), self.CS, self.SS, self.isReal, self.antipodal
     for k, v in changes.items():
       setattr(f, k, v)
     return f
+
+  # ------------------------------------------------------------------ a list of functions
+
+  __array_ufunc__ = None
+
+  # the shape of a list of functions, () for one
+  @property
+  def shape(self):
+    return self._fhat.shape[:-1]
+
+  @property
+  def size(self):
+    return int(np.prod(self.shape))
+
+  def __len__(self):
+    return self.size
+
+  def __getitem__(self, idx):
+    if not self.shape:
+      raise TypeError("a single function has no elements to index")
+    return self._rebuild(self._fhat[idx])
+
+  def reshape(self, *shape):
+    shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
+    return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
+
+  # the list transposed, a row of n functions becoming a column
+  @property
+  def T(self):
+    if not self.shape:
+      return self
+    if len(self.shape) == 1:
+      return self._rebuild(self._fhat[:, None, :])
+    return self._rebuild(np.swapaxes(self._fhat, -2, -3))
+
+  @classmethod
+  def cat(cls, *fs, axis=0):
+    L = max(f.bandwidth for f in fs)
+    parts = [f.truncate(L)._fhat for f in fs]
+    parts = [p[None] if p.ndim == 1 else p for p in parts]
+    return fs[0]._rebuild(np.concatenate(parts, axis=axis), _isReal=all(f.isReal for f in fs))
+
+  # an operation written for one function applied to every function of the list
+  def _each(self, op):
+    if not self.shape:
+      return op(self)
+    out = [op(self._rebuild(r)) for r in self._fhat.reshape(-1, self._fhat.shape[-1])]
+    if isinstance(out[0], SO3FunHarmonic):
+      L = max(f.bandwidth for f in out)
+      return out[0]._rebuild(np.stack([f.truncate(L)._fhat for f in out]).reshape(self.shape + (deg2dim(L + 1),)))
+    return np.array(out).reshape(self.shape)
 
   # from weighted samples at nodes, projected onto the invariant functions; a quadrature
   # grid brings its weights
   @classmethod
   def quadrature(cls, nodes, values=None, *frames, bandwidth=None, weights=None, real=None, antipodal=False):
-    if callable(nodes) and values is None:
+    # quadrature(fun, cs, ss): a callable takes its frames right after it
+    if callable(nodes) and not isinstance(nodes, quaternion) and (values is None or isinstance(values, referenceFrame)):
+      frames = frames if values is None else (values, *frames)
       return cls(nodes, *frames, bandwidth=bandwidth, real=real, antipodal=antipodal)
     L = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
     values = np.asarray(values)
@@ -157,6 +212,12 @@ class SO3FunHarmonic:
     return cls(fhat, CS, SS, real=(values.dtype.kind != "c") if real is None else real, antipodal=antipodal, _internal=True)
 
   approximate = quadrature
+
+  # the harmonic expansion of the Dubna ODF, MTEX's example function
+  @staticmethod
+  def example():
+    from .so3funclass import SO3Fun
+    return SO3FunHarmonic(SO3Fun.dubna())
 
   # ------------------------------------------------------------------ properties
 
@@ -178,11 +239,14 @@ class SO3FunHarmonic:
   def isReal(self, real):
     self._isReal = bool(real)
     if self._isReal and hasattr(self, "_fhat"):
-      self._fhat = realizeWigner(np.array(self._fhat, dtype=complex))
+      fhat = np.array(self._fhat, dtype=complex)
+      for row in fhat.reshape(-1, fhat.shape[-1]):
+        realizeWigner(row)
+      self._fhat = fhat
 
   @property
   def bandwidth(self):
-    return dim2deg(len(self._fhat))
+    return dim2deg(self._fhat.shape[-1])
 
   # SO3F.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does
   @bandwidth.setter
@@ -192,7 +256,7 @@ class SO3FunHarmonic:
   # the harmonic power per degree, the norm of the coefficients of that degree
   @property
   def power(self):
-    return np.array([np.linalg.norm(self._fhat[deg2dim(n):deg2dim(n + 1)]) for n in range(self.bandwidth + 1)])
+    return np.stack([np.linalg.norm(self._fhat[..., deg2dim(n):deg2dim(n + 1)], axis=-1) for n in range(self.bandwidth + 1)], axis=-1)
 
   @property
   def dtype(self):
@@ -207,7 +271,8 @@ class SO3FunHarmonic:
   # the rotations of an argument in the frames of the function
   def _rotationsFor(self, x):
     if isinstance(x, orientation):
-      if x.CS is not self.CS or x.SS is not self.SS:
+      from .rbf import _sameFrame
+      if not (_sameFrame(x.CS, self.CS) and _sameFrame(x.SS, self.SS)):
         raise ValueError("the orientation lives in other frames than the function")
       return x
     if isinstance(x, orthogonalTransform):
@@ -222,6 +287,10 @@ class SO3FunHarmonic:
   # the coefficients are invariant under the groups of the frames, so the transform may run
   # on the reduced index set of their z folds
   def eval(self, x):
+    if self.shape:
+      # a list of functions: the values at the arguments first, then the shape of the list
+      vals = [f.eval(x) for f in (self._rebuild(r) for r in self._fhat.reshape(-1, self._fhat.shape[-1]))]
+      return np.stack(vals, axis=-1).reshape(np.shape(vals[0]) + self.shape)
     if isinstance(x, quadratureSO3Grid):
       return wignerSeries(self._fhat, x, real=self.isReal)
     r = self._rotationsFor(x)
@@ -231,6 +300,8 @@ class SO3FunHarmonic:
 
   # the projection of H5 on both sides, and the exchange symmetry f(g) = f(g^-1)
   def symmetrise(self):
+    if self.shape:
+      return self._each(lambda f: f.symmetrise())
     L = self.bandwidth
     P, Q = invariantProjection(self.SS, L, self._fhat.real.dtype), invariantProjection(self.CS, L, self._fhat.real.dtype)
     fhat = project(self._fhat.copy(), P, Q)
@@ -239,17 +310,23 @@ class SO3FunHarmonic:
     return self._rebuild(fhat)
 
   def inv(self):
+    if self.shape:
+      return self._each(lambda f: f.inv())
     return self._rebuild(invertedCoefficients(self._fhat), CS=self.SS, SS=self.CS)
 
   def withExchange(self, x=True):
     if x and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
+    if self.shape:
+      return self._each(lambda f: f.withExchange(x))
     fhat = (self._fhat + invertedCoefficients(self._fhat)) / 2 if x else self._fhat.copy()
     return self._rebuild(fhat, antipodal=bool(x))
 
   # ------------------------------------------------------------------ the algebra
 
   def conj(self):
+    if self.shape:
+      return self._each(lambda f: f.conj())
     return self._rebuild(conjugateCoefficients(self._fhat))
 
   def _sameFrames(self, g):
@@ -267,7 +344,7 @@ class SO3FunHarmonic:
                             antipodal=self.antipodal and g.antipodal, symmetrise=False, _internal=True)
     if isinstance(g, (int, float, complex, np.number)):
       fhat = self._fhat.copy()
-      fhat[0] += g
+      fhat[..., 0] += g
       return SO3FunHarmonic(fhat, self.CS, self.SS, real=self.isReal and np.isreal(g), antipodal=self.antipodal, symmetrise=False, _internal=True)
     return NotImplemented
 
@@ -328,11 +405,25 @@ class SO3FunHarmonic:
 
   # ------------------------------------------------------------------ the moments
 
-  def mean(self):
-    return self._fhat[0].real if self.isReal else self._fhat[0]
+  # the mean of every function; with an axis, MATLAB's mean(SO3F, d), the function that is the
+  # mean along that axis of the list
+  def mean(self, axis=None):
+    if axis is not None:
+      return self._rebuild(self._fhat.mean(axis=_leadingAxis(axis, self.shape)))
+    m = self._fhat[..., 0]
+    m = m.real if self.isReal else m
+    return m[()] if not self.shape else m
+
+  # the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list
+  def sum(self, axis=None):
+    if axis is not None:
+      return self._rebuild(self._fhat.sum(axis=_leadingAxis(axis, self.shape)))
+    return 8 * np.pi ** 2 * self.mean()
 
   # the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)
   def norm(self, s=None):
+    if self.shape:
+      return self._each(lambda f: f.norm(s))
     if s is None:
       return float(np.linalg.norm(self._fhat))
     return float(math.sqrt(sum((2 * n + 1) ** (2 * s) * np.sum(np.abs(self._fhat[deg2dim(n):deg2dim(n + 1)]) ** 2) for n in range(self.bandwidth + 1))))
@@ -356,9 +447,9 @@ class SO3FunHarmonic:
     from .funops import rotate
     return rotate(self, rot, side)
 
-  def conv(self, g):
+  def conv(self, g, *flags):
     from .funops import conv
-    return conv(self, g)
+    return conv(self, g, *flags)
 
   def grad(self, x=None, side="left"):
     from .so3vectorfield import grad
@@ -392,7 +483,13 @@ class SO3FunHarmonic:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [f"SO3FunHarmonic ({self.CS.char()} → {self.SS.char()})", f"  bandwidth: {self.bandwidth}", f"  mean: {self.mean():.4g}"]
+    lines = [f"SO3FunHarmonic ({self.CS.char()} → {self.SS.char()})"]
+    if self.shape:
+      from ..geometry.display import sizeString
+      lines.append(f"  size: {sizeString(self.shape)}")
+    lines.append(f"  bandwidth: {self.bandwidth}")
+    if not self.shape:
+      lines.append(f"  mean: {self.mean():.4g}")
     if self.antipodal:
       lines.append("  antipodal: true")
     if not self.isReal:
@@ -402,10 +499,16 @@ class SO3FunHarmonic:
 
 # a coefficient vector cut or padded to a bandwidth
 def _cut(fhat, L):
-  out = np.zeros(deg2dim(L + 1), dtype=fhat.dtype)
-  n = min(len(out), len(fhat))
-  out[:n] = fhat[:n]
+  out = np.zeros(fhat.shape[:-1] + (deg2dim(L + 1),), dtype=fhat.dtype)
+  n = min(out.shape[-1], fhat.shape[-1])
+  out[..., :n] = fhat[..., :n]
   return out
+
+
+# MATLAB's dimension of a list counted from zero, the coefficient axis behind it
+def _leadingAxis(axis, shape):
+  axis = int(axis)
+  return axis + len(shape) if axis < 0 else axis
 
 
 # a radial kernel centred at the identity: fhat_n^{kk} = A_n / sqrt(2n+1)
@@ -425,8 +528,12 @@ def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal, scheme="ClenshawCurti
   L0 = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
   L = bandwidthFor(L0, CS, SS)
   g = quadratureSO3Grid(L, scheme, CS, SS)
-  values = np.asarray(fun(g.nodes())).ravel()
-  fhat = wignerSeriesAdjoint(g, values, L)[:deg2dim(L0 + 1)]
+  values = np.asarray(fun(g.nodes()))
+  n = len(g)
+  # a function of several values, one row per node: a list of functions, one per column
+  shape = values.shape[1:] if values.size != n else ()
+  cols = values.reshape(n, -1)
+  fhat = np.stack([wignerSeriesAdjoint(g, cols[:, k], L)[:deg2dim(L0 + 1)] for k in range(cols.shape[1])]).reshape(shape + (deg2dim(L0 + 1),))
   return fhat, (values.dtype.kind != "c") if real is None else real
 
 

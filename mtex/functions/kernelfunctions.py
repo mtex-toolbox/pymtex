@@ -67,25 +67,23 @@ class _Kernel:
   def _eval(self, t):
     return self._clenshaw(self._coefficients, t)
 
-  # ---- bandwidth: MATLAB's cutoff rule, the first degree n >= 1 at which |A_n| / (n+1)^2
-  # drops to FFTAccuracy / 150 of the largest such term
+  # ---- bandwidth: MATLAB's cutoff rule, the first degree n >= 1 at which A_n / (n+1)^2
+  # drops to max(min(min_n A_n / (n+1)^2, 10 eps), eps), eps = FFTAccuracy / 150
 
   @cached_property
   def bandwidth(self):
     return self._cutoffBandwidth()
 
+  # over the 1000 coefficients MATLAB computes before it cuts
   def _cutoffBandwidth(self, cap=KERNEL_MAX_BANDWIDTH):
-    threshold = getMTEXpref("FFTAccuracy", 1e-2) / 150
-    L = 64
-    while True:
-      A = self._rule(min(L, cap))
-      s = np.abs(A) / (np.arange(len(A)) + 1) ** 2
-      small = np.flatnonzero(s[1:] <= threshold * s.max())
-      if small.size:
-        return int(small[0]) + 1
-      if L >= cap:
-        return cap
-      L *= 2
+    eps = getMTEXpref("FFTAccuracy", 1e-2) / 150
+    A = self._rule(min(1000, cap))
+    s = np.real(A) / (np.arange(len(A)) + 1) ** 2
+    if len(s) < 2:
+      return len(s) - 1
+    threshold = max(min(np.min(s[1:]), 10 * eps), eps)
+    small = np.flatnonzero(s[1:] <= threshold)
+    return int(small[0]) + 1 if small.size else len(s) - 1
 
   # ---- evaluation
 
@@ -409,8 +407,14 @@ class SO3SquareSingularityKernel(SO3Kernel):
 class SO3BumpKernel(SO3Kernel):
   _label = "bump"
 
-  def __init__(self, delta=10 * degree, *, halfwidth=None):
+  def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
     self.delta = float(delta if halfwidth is None else halfwidth)
+    self._L = bandwidth
+
+  # the discontinuity needs many degrees: MATLAB keeps maxS1Bandwidth of them unless told
+  @cached_property
+  def bandwidth(self):
+    return int(getMTEXpref("maxS1Bandwidth") if self._L is None else self._L)
 
   # the ball of radius delta, A_n = (2/pi) c int_0^delta sin((2n+1) omega/2) sin(omega/2) d omega
   def _rule(self, L):

@@ -17,8 +17,9 @@ def test_H5a_SO3FunHandle():
   f = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16)
   o = orientation(rotation.rand(7, rng=rng), cs, ss)
   assert np.allclose(f(o), 1 + np.cos(angle(o, noSymmetry=True))) and f(o[0]) == f(o)[0] and f(o[0]) == f(rotation(o[0]))
+  # another frame is refused; the same frames without their groups are not another frame
   with pytest.raises(ValueError):
-    f(orientation(rotation.rand(2, rng=rng), cs, specimenFrame("1")))
+    f(orientation(rotation.rand(2, rng=rng), cs, specimenFrame.rolling))
   g = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=True)
   E, S = cs.sym.rot.flatten().rot, ss.sym.rot.flatten().rot
   for i in range(E.size):

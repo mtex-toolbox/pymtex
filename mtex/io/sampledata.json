@@ -90,6 +90,13 @@
       "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2811-22%29_amp.cnv"
     }
   ],
+  "dubnaValues": [
+    {
+      "path": "orientation/dubna.csv",
+      "sha256": "2712703537d06914e35eaee47d02f8dd462ae49fd5822495b172cfb27b84155c",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/orientation/dubna.csv"
+    }
+  ],
   "eclogite": [
     {
       "path": "EBSD/eclogite.ctf",
