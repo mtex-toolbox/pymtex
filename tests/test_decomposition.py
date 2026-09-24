@@ -175,3 +175,18 @@ def test_the_compiled_weld_is_the_numpy_one():
     tol = l.dxy / 100
     a, b = meshVertices(cells, verts, tol, backend="numpy"), meshVertices(cells, verts, tol, backend="numba")
     assert all(np.array_equal(x, y) and x.dtype == y.dtype for x, y in zip(a, b))
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_the_ends_of_a_vanishing_face_weld(backend):
+  # emsland at (27.2381, 0): four sites nearly on one circle leave a face 1e-4 long between
+  # two cells, whose ends lie a lattice multiple of the spacing from the origin and so at the
+  # centre of a cell of the tolerance grid; they weld and the face is dropped, whatever the
+  # lowest vertex of the complex is, so the two cells are no neighbours
+  tol = 1.00882 / 100
+  x = 2700 * tol
+  cells = np.array([[0, 1], [1, 2], [2, 3]], dtype=np.int32)
+  for lo in (0.0, -0.50441, -15.6367):
+    verts = np.array([[lo, lo, x, 1.5], [x - 5e-5, 1.5, x + 5e-5, 1.5], [x + 5e-5, 1.5, x, 3.0]])
+    V, F, C = meshVertices(cells, verts, tol, backend=backend)
+    assert len(V) == 3 and [tuple(c) for c in C] == [(0, 1), (2, 3)]

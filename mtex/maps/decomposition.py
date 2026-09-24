@@ -306,7 +306,7 @@ def meshVertices(cells, verts, tol, backend=None):
     out = weldNumba(xy, lo, tol * 1e-7, 50 * tol)
     if out is not None:
       group, first = out
-      return _weldedMesh(cells, xy, lo, tol, group, first)
+      return _weldedMesh(cells, xy, tol, group, first)
   u = (xy - lo) / (tol * 1e-7)
   _, _, group = np.unique(_gridKey(u), return_index=True, return_inverse=True)
   group = group.reshape(-1)
@@ -323,13 +323,17 @@ def meshVertices(cells, verts, tol, backend=None):
   # the first point of every group, without a sort
   first = np.empty(nG, dtype=np.int64)
   first[group[::-1]] = np.arange(len(group))[::-1]
-  return _weldedMesh(cells, xy, lo, tol, group, first)
+  return _weldedMesh(cells, xy, tol, group, first)
 
 
 # the tolerance grid over the first point of every group, and the faces on the merged vertices;
 # the groups taken in the order of their first points, so that where two share a cell of the
-# tolerance grid the vertex is the earlier one whatever the groups were numbered
-def _weldedMesh(cells, xy, lo, tol, group, first):
+# tolerance grid the vertex is the earlier one whatever the groups were numbered. The grid is
+# rounded from the origin of the map, whose measurements lie at multiples of the spacing from
+# it, so its cells are centred on the vertices of a square lattice: a grid floored from the
+# lowest vertex puts the vertices on cell edges wherever that vertex falls on the lattice, and
+# two vertices a rounding apart - the ends of the vanishing face of a near four way tie - part
+def _weldedMesh(cells, xy, tol, group, first):
   n = len(cells)
   if np.any(np.diff(first) < 0):
     order = np.argsort(first)
@@ -337,7 +341,7 @@ def _weldedMesh(cells, xy, lo, tol, group, first):
     rank[order] = np.arange(len(order))
     first, group = first[order], rank[group]
   reps = xy[first]
-  _, firstV, inverse = np.unique(_gridKey((reps - lo) / tol), return_index=True, return_inverse=True)
+  _, firstV, inverse = np.unique(_gridKey(reps / tol + 0.5), return_index=True, return_inverse=True)
   V = reps[firstV]
   F = inverse.reshape(-1).astype(np.int32)[group].reshape(n, 2)
   # the rows kept by index, which NumPy copies several times faster than by a mask
