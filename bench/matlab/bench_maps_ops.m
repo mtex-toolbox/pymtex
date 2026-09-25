@@ -1,21 +1,27 @@
 % the operations of bench/maps_ops.py in MATLAB
 function bench_maps_ops(out, ops, K, large)
 
-A = reshape(fread(fopen(fullfile(out,'map.bin')),'double'),10,[]).'; fclose('all');
+A = reshape(fread(fopen(fullfile(out,'map.bin')),'double'),3,[]).'; fclose('all');
 cs = crystalSymmetry('m-3m','mineral','test');
-ebsd = EBSD(vector3d(A(:,1),A(:,2),0), rotation(quaternion(A(:,7),A(:,8),A(:,9),A(:,10))), ones(size(A,1),1), {cs}, struct());
+ebsd = EBSD(vector3d(A(:,1),A(:,2),0), rotation.byAxisAngle(zvector,A(:,3)), ones(size(A,1),1), {cs}, struct());
 xy = [ebsd.pos.x(:) ebsd.pos.y(:)];
 grains = []; c = []; big = [];
 if any(strcmp(ops,'calcgrains_1C_1')), big = loadNeutral(large); end
+% the measured maps as the EBSDDenoising page prepares them
+measured = struct;
+for m = {'twins','ferrite'}
+  if any(endsWith(ops, m{1})), measured.(m{1}) = prepare(m{1}); end
+end
 
 % nested functions, since an anonymous one would keep the empty grains it was made with
 names = {'calcgrains_1C_1','calcgrains','perimeter','aspect','smooth_boundary','kam','grod', ...
-  'smooth_mean','smooth_spline','smooth_l1tv'};
+  'smooth_mean_twins','smooth_spline_twins','smooth_l1tv_twins','smooth_hq_twins', ...
+  'smooth_mean_ferrite','smooth_spline_ferrite','smooth_l1tv_ferrite','smooth_hq_ferrite'};
 T = [names.', cellfun(@(n) @() operation(n), names, 'UniformOutput', false).', ...
   cellfun(@(n) @(res) rows(n, res), names, 'UniformOutput', false).'];
 algos = {'grain segmentation','grain shape','boundary smoothing','intragranular misorientation','orientation denoising'};
-crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5])), K, {'calcgrains'}, ...
-  containers.Map({'calcgrains_1C_1'}, {1}));
+crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5])), K, {'calcgrains'}, ...
+  containers.Map({'calcgrains_1C_1','smooth_l1tv_twins','smooth_l1tv_ferrite','smooth_hq_twins','smooth_hq_ferrite'}, {1, 1, 1, 1, 1}));
 
   function res = operation(name)
     switch name
@@ -32,9 +38,11 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5])), 
       case 'smooth_boundary', res = smoothBoundary(grains, 5);
       case 'kam', res = ebsd.KAM;
       case 'grod', res = angle(ebsd.calcGROD(grains));
-      case 'smooth_mean', res = smooth(ebsd, meanFilter);
-      case 'smooth_spline', res = smooth(ebsd, splineFilter);
-      case 'smooth_l1tv', res = smooth(ebsd, l1TVFilter);
+      otherwise
+        parts = split(name, '_');
+        filters = struct('mean', @meanFilter, 'spline', @splineFilter, 'l1tv', @l1TVFilter, 'hq', @halfQuadraticFilter);
+        res = smooth(measured.(parts{3}), filters.(parts{2})());
+        res = res('indexed');
     end
   end
 
@@ -51,6 +59,14 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5])), 
     end
   end
 
+end
+
+
+% a measured map with its grains, indexed pixels only
+function ebsd = prepare(name)
+ebsd = mtexdata(name, 'silent');
+[~, ebsd] = calcGrains(ebsd, 'angle', 10*degree, 'minPixel', 5);
+ebsd = ebsd('indexed');
 end
 
 

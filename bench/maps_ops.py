@@ -8,11 +8,11 @@
 #
 # The map of bench/maps.py: N x N pixels of unit spacing, the grains the Voronoi cells of random
 # seeds, each with its orientation about z and a gradient of 0.002 rad per pixel along x inside,
-# and on top a noise of 1 degree per axis, written as rows (x, y, true quaternion, noisy
-# quaternion); the ports work on the noisy one, and the denoising is also scored against the true.
-# The large map is the 2.5 million pixels of steel 1C_1 as bench/calcgrains.py exports it. The
-# ports number grains and pixels their own way, so every result row starts with a key, the grain's
-# centroid or the pixel's position, and compare matches by it.
+# written as rows (x, y, angle). The large map is the 2.5 million pixels of steel 1C_1 as
+# bench/calcgrains.py exports it. The denoising runs on two measured maps, each port reading them
+# itself, as the EBSDDenoising page prepares them: twins (magnesium, square grid) and ferrite (hex
+# grid). The ports number grains and pixels their own way, so every result row starts with a key,
+# the grain's centroid or the pixel's position, and compare matches by it.
 from __future__ import annotations
 
 import os
@@ -52,13 +52,23 @@ ALGORITHM = [
   {"name": "orientation denoising",
    "entry": {"matlab": ["@EBSD.smooth", "@l1TVFilter.smooth"],
              "python": ["mtex.analysis.denoising.smooth", "mtex.analysis.variational.l1TVFilter.smooth"]},
-   "cases": {"smooth_mean": "smooth(meanFilter), every pixel", "smooth_spline": "smooth(splineFilter), every pixel",
-             "smooth_l1tv": "smooth(l1TVFilter), every pixel"},
+   "cases": {"smooth_mean_twins": "smooth(meanFilter) of the twins map, every indexed pixel",
+             "smooth_spline_twins": "smooth(splineFilter) of the twins map",
+             "smooth_l1tv_twins": "smooth(l1TVFilter) of the twins map",
+             "smooth_mean_ferrite": "smooth(meanFilter) of the ferrite map, hexagonal grid",
+             "smooth_spline_ferrite": "smooth(splineFilter) of the ferrite map",
+             "smooth_l1tv_ferrite": "smooth(l1TVFilter) of the ferrite map",
+             "smooth_hq_twins": "smooth(halfQuadraticFilter) of the twins map",
+             "smooth_hq_ferrite": "smooth(halfQuadraticFilter) of the ferrite map"},
    # the misorientation angle in radians
    "tolerance": 1e-6},
 ]
+DENOISE = [f"smooth_{f}_{m}" for m in ("twins", "ferrite") for f in ("mean", "spline", "l1tv", "hq")]
 COLS = {"calcgrains": 3, "calcgrains_1C_1": 3, "perimeter": 3, "aspect": 3, "smooth_boundary": 3, "kam": 3,
-        "grod": 3, "smooth_mean": 6, "smooth_spline": 6, "smooth_l1tv": 6}
+        "grod": 3} | {op: 6 for op in DENOISE}
+SYM = {"twins": "6/mmm", "ferrite": "m-3m"}
+# the ops timed by a single run
+ONCE = ("calcgrains_1C_1", "smooth_l1tv_twins", "smooth_l1tv_ferrite", "smooth_hq_twins", "smooth_hq_ferrite")
 LARGE = os.path.join(HERE, "out", "calcgrains", "1C_1.bin")
 
 
@@ -70,27 +80,19 @@ def export():
   P = np.column_stack([i.reshape(-1), j.reshape(-1)]).astype(float)
   grain = cKDTree(rng.uniform(0, N, (NG, 2))).query(P)[1]
   ang = rng.uniform(0, 2 * np.pi, NG)[grain] + 0.002 * P[:, 0]
-  q = np.column_stack([np.cos(ang / 2), 0 * ang, 0 * ang, np.sin(ang / 2)])
-  # the noise: a rotation of normally distributed rotation vector, 1 degree per axis, from the right
-  r = rng.normal(0, np.radians(1), (len(P), 3))
-  w = np.linalg.norm(r, axis=1)
-  n = np.column_stack([np.cos(w / 2), np.sin(w / 2)[:, None] * r / w[:, None]])
-  a1, b1, c1, d1 = q.T
-  a2, b2, c2, d2 = n.T
-  noisy = np.column_stack([a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2, a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2,
-                           a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2, a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2])
-  np.column_stack([P, q, noisy]).astype("<f8").tofile(os.path.join(OUT, "map.bin"))
+  np.column_stack([P, ang]).astype("<f8").tofile(os.path.join(OUT, "map.bin"))
   if not os.path.exists(LARGE):
     subprocess.run([sys.executable, os.path.join(HERE, "calcgrains.py"), "export", "1C_1"], check=True)
 
 
 def run(ops):
-  from mtex import EBSD, calcGrains, crystalFrame, degree, l1TVFilter, meanFilter, phaseList, rotation, splineFilter
+  from mtex import (EBSD, calcGrains, crystalFrame, degree, halfQuadraticFilter, l1TVFilter, meanFilter, mtexdata,
+                    phaseList, rotation, splineFilter, zvector)
   sys.path.insert(0, HERE)
   import calcgrains
-  A = np.fromfile(os.path.join(OUT, "map.bin"), "<f8").reshape(-1, 10)
+  A = np.fromfile(os.path.join(OUT, "map.bin"), "<f8").reshape(-1, 3)
   pos = np.column_stack([A[:, :2], np.zeros(len(A))])
-  e = EBSD(pos, rotation(A[:, 6:10]), np.ones(len(A), dtype=np.int8), phaseList(crystalFrame("m-3m", mineral="test")))
+  e = EBSD(pos, rotation.byAxisAngle(zvector, A[:, 2]), np.ones(len(A), dtype=np.int8), phaseList(crystalFrame("m-3m", mineral="test")))
   xy = np.asarray(e.pos.data, float).reshape(-1, 3)[:, :2]
   s = {}
 
@@ -108,7 +110,20 @@ def run(ops):
     g = calcGrains(s["large"], angle=10 * degree)
     return np.column_stack([np.asarray(g.centroid.data, float).reshape(-1, 3)[:, :2], np.asarray(g.area, float)])
 
+  # the measured maps as the EBSDDenoising page prepares them
+  def measured(name):
+    m = mtexdata(name)
+    calcGrains(m, angle=10 * degree, minPixel=5)
+    return m["indexed"]
+
   s["large"] = calcgrains.loadMap("1C_1") if "calcgrains_1C_1" in ops else None
+  maps = {m: measured(m) for m in SYM if any(op.endswith(m) for op in ops if op in DENOISE)}
+  filters = {"mean": meanFilter, "spline": splineFilter, "l1tv": l1TVFilter, "hq": halfQuadraticFilter}
+  # the input of the denoising, to measure how far each port moves it
+  for m, e0 in maps.items():
+    np.column_stack([np.asarray(e0.pos.data, float).reshape(-1, 3)[:, :2],
+                     np.asarray(e0.rotations.data, float).reshape(-1, 4)]).astype("<f8").tofile(os.path.join(OUT, f"input_{m}.bin"))
+  denoise = lambda op: lambda: maps[op.split("_")[2]].smooth(filters[op.split("_")[1]]())["indexed"]
   table = {
     "calcgrains_1C_1": (large, lambda r: r),
     "calcgrains": (grains, lambda g: byGrain(g.area)),
@@ -117,11 +132,19 @@ def run(ops):
     "smooth_boundary": (lambda: s["g"].smoothBoundary(5), lambda g: byGrain(g.perimeter)),
     "kam": (lambda: e.KAM(), byPixel),
     "grod": (lambda: e.calcGROD(s["g"]).angle(), byPixel),
-    "smooth_mean": (lambda: e.smooth(meanFilter()), quat),
-    "smooth_spline": (lambda: e.smooth(splineFilter()), quat),
-    "smooth_l1tv": (lambda: e.smooth(l1TVFilter()), quat),
-  }
-  crosscheck.run(OUT, ALGORITHM, table, ops, reps={"calcgrains_1C_1": 1}, always=("calcgrains",))
+  } | {op: (denoise(op), quat) for op in DENOISE}
+  crosscheck.run(OUT, ALGORITHM, table, ops, reps={op: 1 for op in ONCE}, always=("calcgrains",))
+
+
+# MATLAB one op per call, each limited to 20 times Python's time per run plus loading, since a
+# call that overruns keeps MATLAB busy after its client is gone: the first timeout ends the batch
+def matlab(ops):
+  for op in ops:
+    f = os.path.join(OUT, f"python_{op}.txt")
+    runs = 2 if op in ONCE else 7
+    limit = min(290, 20 * float(open(f).read()) * runs + 40) if os.path.exists(f) else 290
+    print(f"{op}: limit {limit:.0f} s", flush=True)
+    crosscheck.matlab("bench_maps_ops", repr(OUT), crosscheck.cellOf([op]), "1e7", repr(LARGE), timeout=limit)
 
 
 # rows matched by their keys (the first two columns, a centroid or a position) to the nearest within
@@ -134,7 +157,7 @@ def deviation(op, a, b):
   va, vb = a[:, 2:], b[j, 2:]
   if va.shape[1] == 4:
     from mtex import angle, crystalFrame, orientation, rotation
-    cs = crystalFrame("m-3m")
+    cs = crystalFrame(SYM[op.split("_")[2]])
     return float(np.max(np.asarray(angle(orientation(rotation(va), cs), orientation(rotation(vb), cs)))))
   both = ~(np.isnan(va) | np.isnan(vb))
   if (np.isnan(va) != np.isnan(vb)).any():
@@ -142,29 +165,37 @@ def deviation(op, a, b):
   return float(np.max(np.abs(va - vb)[both]) / np.max(np.abs(vb[both])))
 
 
-# the table, and every denoising scored against the true orientations
+# the table; for the denoising every pair of ports by the median and largest misorientation and
+# the share of pixels apart by more than 0.1 degree, and how far each port moved the measured map
 def compare():
+  crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)
   from scipy.spatial import cKDTree
   from mtex import angle, crystalFrame, orientation, rotation
-  crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)
-  A = np.fromfile(os.path.join(OUT, "map.bin"), "<f8").reshape(-1, 10)
-  cs = crystalFrame("m-3m")
-  truth = orientation(rotation(A[:, 2:6]), cs)
-  mean = lambda q, idx: np.degrees(np.mean(np.asarray(angle(orientation(rotation(q), cs), truth[idx]))))
-  print(f"mean misorientation to the true map, degree: noisy {mean(A[:, 6:10], np.arange(len(A))):.3f}")
-  tree = cKDTree(A[:, :2])
-  for op in ("smooth_mean", "smooth_spline", "smooth_l1tv"):
-    line = f"  {op:18s}"
-    for port in ("python", "matlab"):
-      f = os.path.join(OUT, f"{port}_{op}.bin")
-      if os.path.exists(f):
-        r = np.fromfile(f, "<f8").reshape(-1, 6)
-        line += f"   {port} {mean(r[:, 2:], tree.query(r[:, :2])[1]):.3f}"
-    print(line)
+  load = lambda f: np.fromfile(f, "<f8").reshape(-1, 6) if os.path.exists(f) else None
+
+  # the pixels both have, at one position and finite in both
+  def apart(a, b, cs):
+    d, j = cKDTree(b[:, :2]).query(a[:, :2])
+    ok = (d < 1e-6) & np.isfinite(a[:, 2]) & np.isfinite(b[j, 2])
+    return np.degrees(np.asarray(angle(orientation(rotation(a[ok, 2:]), cs), orientation(rotation(b[j[ok], 2:]), cs))))
+
+  print(f"\n{'denoising':22s} {'moved the measured map, median degree':>40s}   ports apart: median / max degree, share > 0.1, pixels compared")
+  for op in DENOISE:
+    m = op.split("_")[2]
+    cs = crystalFrame(SYM[m])
+    r = {p: load(os.path.join(OUT, f"{p}_{op}.bin")) for p in ("python", "matlab", "julia")}
+    inp = load(os.path.join(OUT, f"input_{m}.bin"))
+    moved = "  ".join(f"{p} {np.median(apart(r[p], inp, cs)):.3f}" for p in r if r[p] is not None and inp is not None)
+    print(f"  {op:20s} {moved:>40s}")
+    pairs = []
+    for p, q in (("python", "matlab"), ("python", "julia"), ("julia", "matlab")):
+      if r[p] is not None and r[q] is not None:
+        w = apart(r[p], r[q], cs)
+        print(f"  {'':20s} {p:>6s} ~ {q:6s} {np.median(w):.1e} / {w.max():5.2f} / {np.mean(w > 0.1):4.0%}, {len(w)} pixels")
 
 
 if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"export": export, "run": lambda: run(names),
-   "matlab": lambda: crosscheck.matlab("bench_maps_ops", repr(OUT), crosscheck.cellOf(names), "1e7", repr(LARGE)),
+   "matlab": lambda: matlab(names),
    "compare": compare}[cmd]()
