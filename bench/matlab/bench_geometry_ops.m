@@ -1,4 +1,4 @@
-% the operations of bench/geometry_ops.py in MATLAB: best of five, one profiled run, the first K results
+% the operations of bench/geometry_ops.py in MATLAB
 function bench_geometry_ops(out, ops, K, NQ, NR)
 
 load = @(name, k) reshape(fread(fopen(fullfile(out,[name '.bin'])),'double'),k,[]).';
@@ -33,21 +33,9 @@ T = {
   'grid_nearest', @() nearest(ori(1:NQ)), col;
   'grid_radius', @() radius(ori(1:NR)), @(I) full(sum(I ~= 0, 1 + (size(I,1) == NR))).';
 };
-algo = struct('r','rotation products','d','symmetry-reduced dot','p','fundamental region projection','g','orientation grid search');
-
-for k = 1:size(T,1)
-  op = T{k,1};
-  if ~any(strcmp(op, ops)) && ~strcmp(op,'grid_build'), continue; end
-  f = T{k,2}; res = f();
-  t = inf;
-  for rep = 1:5, tic; f(); t = min(t, toc); end
-  profile clear; profile on; f(); profile off;
-  profileDump(fullfile(out,['profile_matlab_' op '.json']), algo.(op(1)), 'matlab', op, t);
-  fid = fopen(fullfile(out,['matlab_' op '.txt']),'w'); fprintf(fid,'%.9g\n',t); fclose(fid);
-  R = double(T{k,3}(res)); R = R(1:min(K,size(R,1)),:).';
-  fid = fopen(fullfile(out,['matlab_' op '.bin']),'w'); fwrite(fid,R(:),'double'); fclose(fid);
-  fprintf('%-18s %9.1f ms\n', op, 1e3*t);
-end
+names = {'rotation products','symmetry-reduced dot','fundamental region projection','orientation grid search'};
+algo = containers.Map(T(:,1), names([1 1 2 2 2 2 3 3 3 3 3 4 4 4]));
+crosscheckRun(out, T, ops, algo, K, {'grid_build'});
 benchGrid = [];
 
   function g = buildGrid(cs)

@@ -179,8 +179,20 @@ def runtimeCounterparts(ix, pyNodes, aliases):
     nid = f"py:{mod}.{qual}"
     return nid if nid in ix.byId and "<" not in qual else fallback
 
+  # a MATLAB class answers to its own methods and those it inherits
+  def reachable(c, seen=None):
+    seen = seen if seen is not None else set()
+    if c in seen:
+      return {}
+    seen.add(c)
+    out = {}
+    for s in ix.mClass.get(c, {}).get("supers", []):
+      out.update(reachable(s, seen))
+    return out | ix.mMethods.get(c, {})
+
   edges = []
-  for c, methods in ix.mMethods.items():
+  for c in set(ix.mMethods) | set(ix.mClass):
+    methods = reachable(c)
     pname = c if c in pyClass else byAlias.get(c)
     if not pname or pname not in pyClass:
       continue
@@ -299,7 +311,8 @@ def algorithms(ix, benchDir):
             n["entry"].setdefault(port, [])
             n["entry"][port] += [e for e in es if e not in n["entry"][port]]
           n["cases"].update(a.get("cases", {}))
-          n["tolerance"].update({c: a.get("tolerance") for c in a.get("cases", {})})
+          tol = a.get("tolerance")
+          n["tolerance"].update({c: tol.get(c) if isinstance(tol, dict) else tol for c in a.get("cases", {})})
           n["stages"] = max(n.get("stages", 0), a.get("stages", 10))
           n["files"].append(os.path.relpath(path, ROOT))
   nodes, edges = [], []

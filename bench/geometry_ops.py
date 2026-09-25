@@ -19,7 +19,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 
 import numpy as np
 
@@ -27,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "out", "geometry")
 sys.path.insert(0, os.path.join(ROOT, "tools", "graph"))
+import crosscheck  # noqa: E402
 
 ALGORITHM = [
   {"name": "rotation products",
@@ -55,7 +55,6 @@ ALGORITHM = [
              "grid_radius": "find(grid, ori, 7.5 degree), 2000 queries"},
    "tolerance": 2e-2},
 ]
-ALGO = {case: a["name"] for a in ALGORITHM for case in a["cases"]}
 N, K, NQ, NR = 10**6, 20000, 10**4, 2000
 
 
@@ -111,36 +110,8 @@ def operations(x):
   }
 
 
-def timed(f):
-  t = time.perf_counter()
-  out = f()
-  return out, time.perf_counter() - t
-
-
 def run(ops):
-  import profiling
-  x = inputs()
-  table = operations(x)
-  for op, (f, result) in table.items():
-    if op not in ops and not op == "grid_build":
-      continue
-    f()
-    out, best = min((timed(f) for _ in range(5)), key=lambda r: r[1])
-    _, wall, recs = profiling.profileCall(f)
-    profiling.write(os.path.join(OUT, f"profile_python_{op}.json"), ALGO[op], "python", op, best, recs)
-    open(os.path.join(OUT, f"python_{op}.txt"), "w").write(f"{best}\n")
-    result(out).astype("<f8").tofile(os.path.join(OUT, f"python_{op}.bin"))
-    print(f"{op:18s} {1e3 * best:9.1f} ms", flush=True)
-
-
-def matlab(ops):
-  bridge = os.path.join(os.path.dirname(ROOT), "master", "docs", "agents", "matlab-bridge")
-  cmd = (f"addpath('{os.path.join(HERE, 'matlab')}'); addpath('{os.path.join(ROOT, 'tools', 'graph')}'); "
-         f"bench_geometry_ops('{OUT}', {{{', '.join(repr(o) for o in ops)}}}, {K}, {NQ}, {NR});")
-  r = subprocess.run([os.path.join(bridge, ".venv", "bin", "python"), os.path.join(bridge, "matlab_run.py"), cmd],
-                     timeout=290)
-  if r.returncode:
-    sys.exit("MATLAB failed")
+  crosscheck.run(OUT, ALGORITHM, operations(inputs()), ops, always=("grid_build",))
 
 
 # the Julia twins print one line per operation on their own random input: times only
@@ -169,25 +140,12 @@ def deviation(op, a, b):
   return float(np.max(np.abs(a - b)))
 
 
-def compare():
-  ports = ("python", "matlab", "julia")
-  print(f"{'operation':18s}" + "".join(f"{p:>11s}" for p in ports) + "   deviation python ~ matlab")
-  for a in ALGORITHM:
-    print(a["name"])
-    for op in a["cases"]:
-      t = [os.path.join(OUT, f"{p}_{op}.txt") for p in ports]
-      line = f"  {op:16s}" + "".join(f"{1e3 * float(open(x).read()):9.1f}ms" if os.path.exists(x) else f"{'-':>11s}" for x in t)
-      res = [os.path.join(OUT, f"{p}_{op}.bin") for p in ports[:2]]
-      if all(os.path.exists(x) for x in res):
-        pa, ma = (np.fromfile(x, "<f8") for x in res)
-        cols = 1 if op.startswith(("dot", "grid")) else 3 if op in ("r_v", "p2fr_m") else 4
-        pa, ma = pa.reshape(-1, cols), ma.reshape(-1, cols)
-        d = deviation(op, pa, ma) if pa.shape == ma.shape or op.startswith("grid") else float("nan")
-        line += f"   {d:.1e} {'ok' if d <= a['tolerance'] else 'DIFFERS'}" + ("" if pa.shape == ma.shape else f" shapes {pa.shape} {ma.shape}")
-      print(line)
+def cols(op):
+  return 1 if op.startswith(("dot", "grid")) else 3 if op in ("r_v", "p2fr_m") else 4
 
 
 if __name__ == "__main__":
-  cmd, names = sys.argv[1] if len(sys.argv) > 1 else "run", sys.argv[2:] or list(ALGO)
-  {"export": export, "run": lambda: run(names), "matlab": lambda: matlab(names), "julia": julia,
-   "compare": compare}[cmd]()
+  cmd, names = sys.argv[1] if len(sys.argv) > 1 else "run", sys.argv[2:] or [c for a in ALGORITHM for c in a["cases"]]
+  {"export": export, "run": lambda: run(names), "julia": julia,
+   "matlab": lambda: crosscheck.matlab("bench_geometry_ops", repr(OUT), crosscheck.cellOf(names), str(K), str(NQ), str(NR)),
+   "compare": lambda: crosscheck.compare(OUT, ALGORITHM, cols, deviation)}[cmd]()
