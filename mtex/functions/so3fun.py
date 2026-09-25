@@ -25,21 +25,12 @@ from ..geometry.session import getMTEXpref
 from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
+from .kernels import realizeWigner
 from .transforms import isRealWigner, wignerSeries, wignerSeriesAdjoint
 
 
 def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
-
-
-# the conjugate symmetry of a real valued function imposed on a coefficient array
-def realizeWigner(fhat):
-  for n in range(dim2deg(fhat.shape[-1]) + 1):
-    F = degreeBlock(fhat, n)
-    k = np.arange(-n, n + 1)
-    sign = np.where((k[:, None] - k[None, :]) % 2, -1.0, 1.0)
-    F[...] = (F + (sign * np.conj(F))[::-1, ::-1]) / 2
-  return fhat
 
 
 # f(g^-1): D_n^{kl}(g^-1) = (-1)^{k-l} D_n^{-l,-k}(g), so fhat'^{ab} = (-1)^{a-b} fhat^{-b,-a}
@@ -121,7 +112,7 @@ class SO3FunHarmonic:
     real = isRealWigner(fhat) if real is None else bool(real)
     if real:
       realizeWigner(fhat)
-    self._fhat, self.CS, self.SS, self.isReal, self.antipodal = fhat, CS, SS, real, antipodal
+    self._fhat, self.CS, self.SS, self._isReal, self.antipodal = fhat, CS, SS, real, antipodal
     if symmetrise:
       self._fhat = self.symmetrise()._fhat
     elif antipodal:

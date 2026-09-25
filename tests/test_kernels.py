@@ -116,3 +116,14 @@ def test_euler_angles_agree_with_numpy(numbaBackend):
     return
   setMTEXpref("kernels", "numpy")
   assert np.allclose(q, matthies2quat(a, b, g), atol=1e-15)
+
+
+# blasThreads sets the thread count of every loaded OpenBLAS for a block and restores it
+def test_blas_threads_are_set_and_restored():
+  import scipy.linalg  # noqa: F401 - SciPy's own OpenBLAS beside NumPy's
+  from mtex.geometry.kernels import _openblasLibraries, blasThreads
+  libs = _openblasLibraries()
+  before = [g() for g, _ in libs]
+  with blasThreads(1):
+    assert all(g() == 1 for g, _ in libs)
+  assert [g() for g, _ in libs] == before

@@ -84,3 +84,22 @@ def test_a_list_of_functions_is_one_container():
   assert cat(f, basis[:2]).shape == (5,)
   # a scalar times a function stays a function
   assert np.allclose((np.float64(2) * basis[0]).fhat, 2 * basis[0].fhat)
+
+
+# the projection onto the symmetric functions is the mean of eps_s^l D_l(r_s) over every
+# element, improper ones included, however the held projections compose it
+def test_symmetrise_is_the_group_mean():
+  from mtex.functions.harmonics import _WignerD
+  rng = np.random.default_rng(3)
+  L = 7
+  for name in ("1", "-1", "2/m", "-4", "4/m", "3m", "-3m", "622", "-6m2", "-43m", "m-3m", "432"):
+    cs = crystalFrame(name)
+    fhat = rng.standard_normal((L + 1) ** 2) + 1j * rng.standard_normal((L + 1) ** 2)
+    els = cs.sym.rot.flatten()
+    D = _WignerD(els.rot, bandwidth=L)
+    expected = fhat.copy()
+    for l in range(L + 1):
+      sign = np.where(els.isImproper & (l % 2 == 1), -1.0, 1.0)
+      expected[l * l:(l + 1) ** 2] = fhat[l * l:(l + 1) ** 2] @ np.einsum("i,ikl->kl", sign, D[l]).T / els.size
+    got = S2FunHarmonic(fhat, cs, symmetrise=False, _internal=True).symmetrise()._fhat
+    assert np.max(np.abs(got - expected)) < 1e-12, name

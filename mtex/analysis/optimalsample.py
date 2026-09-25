@@ -22,6 +22,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..geometry.kernels import blasThreads
 from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
@@ -30,11 +31,11 @@ from ..geometry.vector3d import vector3d
 from ..functions.harmonics import invariantProjection, project
 from ..functions.kernelfunctions import S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel
 from ..functions.quadrature import folds
-from ..functions.s2fun import S2FunHarmonic, evenize, realizeSpherical, sphericalProjection
+from ..functions.s2fun import S2FunHarmonic, evenize, projectSpherical, realizeSpherical
 from ..functions.s2vectorfield import angularDerivatives
 from ..functions.so3fun import SO3FunHarmonic, invertedCoefficients, realizeWigner
 from ..functions.so3vectorfield import differentiate
-from ..functions.transforms import (DIRECT_SUM_NODES, S2FourierPlan, SO3FourierPlan, _euler, sphericalSeries, sphericalSeriesAdjoint,
+from ..functions.transforms import (DIRECT_SUM_NODES, S2FourierPlan, SO3FourierPlan, sphericalSeries, sphericalSeriesAdjoint,
                          wignerSeries, wignerSeriesAdjoint)
 
 OptimalSampleResult = namedtuple("OptimalSampleResult", ["nodes", "weights", "discrepancy", "history", "iterations", "converged", "reason", "bandwidth"])
@@ -66,7 +67,7 @@ class _Problem:
           continue
         beta[l * l:(l + 1) ** 2] = 4 * np.pi * A[l] / (2 * l + 1)
       fr = h.frame
-      self.projection = sphericalProjection(fr.sym, L) if fr is not None and fr.numSym() > 1 else None
+      self.projection = fr.sym if fr is not None and fr.numSym() > 1 else None
     else:
       h = SO3FunHarmonic(f, bandwidth=L).truncate(L)
       mass = float(np.real(h.mean()))
@@ -92,38 +93,16 @@ class _Problem:
     if not np.all(np.isfinite(self.target._fhat)):
       raise ValueError("the density coefficients have to be finite")
 
-  # the plan follows the nodes: the finufft points and the half array phase
+  # the plan follows the nodes
   def setNodes(self, xs):
-    p = self.plan
-    if p is None:
-      return
-    if self.sphere:
-      v = vector3d(xs)
-      dtype = p.dtype.type(0).real.dtype
-      x = np.ascontiguousarray(np.mod(-v.rho, 2 * np.pi), dtype=dtype)
-      y = np.ascontiguousarray(v.theta, dtype=dtype)
-      p.forward.setpts(x, y)
-      p.backward.setpts(x, y)
-      s = p.dims[0] // 2 if p.real else 0
-      p.phase = np.exp(-1j * s * x).astype(p.dtype)
-    else:
-      (alpha, beta, gamma), dtype = _euler(rotation(xs))
-      rA, rB = p.folds
-      x = np.ascontiguousarray(np.mod(rA * gamma, 2 * np.pi), dtype=dtype)
-      y = np.ascontiguousarray(np.mod(rB * alpha, 2 * np.pi), dtype=dtype)
-      z = np.ascontiguousarray(beta, dtype=dtype)
-      p.forward.setpts(x, y, z)
-      p.backward.setpts(x, y, z)
-      s = p.dims[0] // 2 if p.real else 0
-      p.phase = np.exp(-1j * s * x).astype(p.dtype)
+    if self.plan is not None:
+      self.plan.setNodes(vector3d(xs) if self.sphere else rotation(xs))
 
   # the coefficients onto the symmetric, even or exchange invariant real functions
   def project(self, c):
     if self.sphere:
       if self.projection is not None:
-        for l in range(self.L + 1):
-          r = slice(l * l, (l + 1) ** 2)
-          c[r] = self.projection[l] @ c[r]
+        projectSpherical(c, self.projection)
       if self.target.antipodal:
         evenize(c)
       realizeSpherical(c)
@@ -437,8 +416,11 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
   c = c / np.sum(c)
   tw = 1e-3 / M if tolWeights is None else float(tolWeights)
   p = _Problem(f, xs, L)
-  xs, c, value, history, iterations, reason = _optimize(p, xs, c, optimizeWeights, maxIter, tol, memory,
-                                                        min(warmUp, max(0, maxIter - 1)), tw, tolJ, innerIter, minWeight)
+  # the iteration's BLAS calls are products of vectors, and OpenBLAS's waiting threads would
+  # take the cores of the transforms between them
+  with blasThreads(1):
+    xs, c, value, history, iterations, reason = _optimize(p, xs, c, optimizeWeights, maxIter, tol, memory,
+                                                          min(warmUp, max(0, maxIter - 1)), tw, tolJ, innerIter, minWeight)
   if sphere:
     nodes = vector3d(xs, antipodal=bool(p.target.antipodal), frame=p.target.frame)
   else:

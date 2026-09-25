@@ -220,8 +220,30 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
 # rotation part) projects with the identity and is held as no matrices at all
 class InvariantProjection:
 
-  def __init__(self, fold, blocks):
+  def __init__(self, fold, blocks, held=None):
     self.fold, self.blocks = int(fold), blocks
+    self._held, self._nonzeros = held, None
+
+  # the entries of the blocks above rounding level as flat lists over the degrees, degree n
+  # at ptr[n]:ptr[n+1], with block indices: what the compiled projection visits. A held
+  # projection keeps them, a leading block of degrees reads a prefix
+  def nonzeros(self):
+    if self._held is not None:
+      ptr, rows, cols, vals = self._held.nonzeros()
+      end = ptr[len(self.blocks)]
+      return ptr[:len(self.blocks) + 1], rows[:end], cols[:end], vals[:end]
+    if self._nonzeros is None:
+      ptr, rows, cols, vals = [0], [], [], []
+      for n, B in enumerate(self.blocks):
+        sup = self.support(n)
+        r, c = np.nonzero(np.abs(B) > PROJECTION_ZERO)
+        rows.append(sup[r])
+        cols.append(sup[c])
+        vals.append(B[r, c])
+        ptr.append(ptr[-1] + len(r))
+      self._nonzeros = (np.array(ptr, dtype=np.int64), np.concatenate(rows).astype(np.int64),
+                        np.concatenate(cols).astype(np.int64), np.concatenate(vals))
+    return self._nonzeros
 
   @property
   def isIdentity(self):
@@ -234,6 +256,11 @@ class InvariantProjection:
   # the indices an r fold about z leaves at degree n, k = 0 mod r, as block indices
   def support(self, n):
     return foldRange(self.fold, n)
+
+
+# the entries of a projection block below this are rounding: the dihedral and cubic groups
+# have most of their blocks zero up to it
+PROJECTION_ZERO = 1e-14
 
 
 def foldRange(r, n):
@@ -264,19 +291,22 @@ def _projectionBytes(r, L, dtype):
   return 2 * np.dtype(dtype).itemsize * sum((2 * (n // r) + 1) ** 2 for n in range(L + 1))
 
 
-def invariantProjection(g, L, dtype=np.float64):
+# proper=True gives the projection onto the functions invariant under the proper elements
+# of the group alone, which the sphere needs beside the rotation parts of all elements
+def invariantProjection(g, L, dtype=np.float64, proper=False):
   pg = g.sym if isinstance(g, referenceFrame) else g
   dtype = np.dtype(dtype)
-  if pg.nfold() == 1:
+  group = pg.properSubGroup() if proper else pg
+  if group.nfold() == 1:
     return InvariantProjection(1, [])
-  if _projectionBytes(pg.multiplicityZ, L, dtype) > PROJECTION_CACHE_MAX_BYTES:
-    return _buildProjection(pg, L, dtype)
-  key = (id(pg), dtype.name)
+  if _projectionBytes(group.multiplicityZ, L, dtype) > PROJECTION_CACHE_MAX_BYTES:
+    return _buildProjection(group, L, dtype)
+  key = (id(pg), dtype.name, bool(proper))
   held = _PROJECTIONS.get(key)
   if held is None or held[1].bandwidth < L:
-    held = (pg, _buildProjection(pg, L, dtype))
+    held = (pg, _buildProjection(group, L, dtype))
     _PROJECTIONS[key] = held
-  return InvariantProjection(held[1].fold, held[1].blocks[:L + 1])
+  return InvariantProjection(held[1].fold, held[1].blocks[:L + 1], held[1])
 
 
 # B <- P_n B, B <- B Q_n and B <- P_n B Q_n on one degree block, in place: what the
@@ -303,9 +333,15 @@ def _projectBlock(B, P, Q, n):
   return B
 
 
+# the compiled projection over the nonzeros where numba is there, the matrix products of
+# _projectBlock otherwise and as its oracle
 def project(fhat, P, Q):
-  for n in range(dim2deg(fhat.shape[-1]) + 1):
-    _projectBlock(degreeBlock(fhat, n), P, Q, n)
+  from .kernels import projectBlocks
+  if projectBlocks(fhat, P, Q):
+    return fhat
+  for row in np.asarray(fhat).reshape(-1, fhat.shape[-1]) if fhat.ndim > 1 else (fhat,):
+    for n in range(dim2deg(fhat.shape[-1]) + 1):
+      _projectBlock(degreeBlock(row, n), P, Q, n)
   return fhat
 
 

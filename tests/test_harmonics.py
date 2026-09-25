@@ -237,3 +237,29 @@ def test_H6_Clebsch_Gordan():
       got += C @ _WignerD(g, J) @ C.T
     assert close(got, ref, 1e-10)
     assert np.linalg.norm(ref) > 1e-6
+
+
+# the compiled projection over the nonzeros of the blocks equals the matrix products, for
+# sparse (dihedral) and dense (cubic) groups, one side or both, on lists of coefficients
+def test_sparse_projection_against_the_products():
+  from mtex import crystalFrame, invariantProjection, setMTEXpref, specimenFrame
+  from mtex.functions.harmonics import project
+  rng = np.random.default_rng(8)
+  for cs, ss, L in (("622", "222", 20), ("-3m", "2", 17), ("1", "mmm", 12), ("m-3m", "1", 9), ("321", "1", 0), ("222", "1", 1)):
+    CS, SS = crystalFrame(cs), specimenFrame(ss) if ss != "1" else specimenFrame.default
+    P, Q = invariantProjection(SS, L), invariantProjection(CS, L)
+    f = rng.standard_normal((3, deg2dim(L + 1))) + 1j * rng.standard_normal((3, deg2dim(L + 1)))
+    setMTEXpref("kernels", "numpy")
+    expected = np.stack([project(r.copy(), P, Q) for r in f])
+    setMTEXpref("kernels", "numba")
+    assert np.max(np.abs(project(f.copy(), P, Q) - expected)) < 1e-13
+
+
+# the compiled Wigner-d table at any angle equals the recursion, the ends 0 and pi included
+def test_wignerd_table_against_the_recursion():
+  from mtex.functions.harmonics import wignerdDegrees
+  from mtex.functions.kernels import wignerdTable
+  for beta in (0.0, 0.4, np.pi / 2, 2.7, np.pi):
+    T = wignerdTable(beta, 25)
+    for n, d in wignerdDegrees(np.float64(beta), 25):
+      assert np.max(np.abs(T[deg2dim(n):deg2dim(n + 1)].reshape(2 * n + 1, 2 * n + 1) - d)) < 1e-13

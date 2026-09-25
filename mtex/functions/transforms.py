@@ -22,13 +22,17 @@ import math
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.kernels import _jit, _loop, backend
+from ..geometry.kernels import backend, passiveOpenMP, threads
+from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.vector3d import vector3d
+from .kernels import (halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
+                      sphericalForward, wignerAdjoint, wignerForward)
+from .nfft import NFFTPlan, nfftLibrary
 from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .harmonics import wignerSeries as _wignerSeriesDirect
-from .quadrature import quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
+from .quadrature import bandwidthFor, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
 
 DIRECT_SUM_NODES = 50
 # on the sphere a plan costs more than a trigonometric sum on the Fourier array up to here,
@@ -41,6 +45,7 @@ NUFFT_EPS_SINGLE = 1e-5   # and in single, where 1e-8 is out of reach
 
 
 def _finufft():
+  passiveOpenMP()
   import finufft
   return finufft
 
@@ -55,16 +60,19 @@ def _eps(eps, dtype):
 
 # the options of a plan: one thread below a work of nodes times modes, where finufft's
 # thread start-up costs more than the transform (30 ms against 2 ms on 100 nodes at
-# bandwidth 32); a caller that trades accuracy for the FFT of a smaller lattice, as the
-# sampler does, asks for the low oversampling factor itself
+# bandwidth 32), else the threads of the preference; the oversampling factor by the density
+# of the nodes, MATLAB's nfftParameters rule measured on finufft: 1.25 where the nodes are
+# fewer than a quarter of the lattice and the FFT dominates, 2 where the spreading does or
+# where the tolerance is below what the narrow oversampling reaches
 NUFFT_SINGLE_THREAD_WORK = 2e8
+NUFFT_LOW_UPSAMPLING_EPS = 1e-9
 
 
-def _threads(nodes, dims, upsampfac=None):
-  opts = {"nthreads": 1} if nodes * int(np.prod(dims)) < NUFFT_SINGLE_THREAD_WORK else {}
-  if upsampfac is not None:
-    opts["upsampfac"] = float(upsampfac)
-  return opts
+def _options(nodes, dims, eps, upsampfac=None):
+  size = int(np.prod(dims))
+  if upsampfac is None:
+    upsampfac = 1.25 if nodes < size / 4 and eps >= NUFFT_LOW_UPSAMPLING_EPS else 2.0
+  return {"nthreads": 1 if nodes * size < NUFFT_SINGLE_THREAD_WORK else threads(), "upsampfac": float(upsampfac)}
 
 
 # ------------------------------------------------------------------ the Wigner-d matrices at pi/2
@@ -120,22 +128,7 @@ def _blockPhase(n, real, dtype):
   return P.astype(_complexType(dtype))
 
 
-# one degree into the array, j >= 0 only: the loop compiled, and the NumPy form
-def _wignerForwardLoop(G, C, d, n, off, real, rA, rB, Kb, La):
-  la, kb = n // rA, n // rB
-  for lp in range(0 if real else -la, la + 1):
-    l = lp * rA
-    il = lp if real else lp + La
-    for kp in range(-kb, kb + 1):
-      k = kp * rB
-      c = C[k + n, l + n]
-      if c == 0:
-        continue
-      ic = kp + Kb
-      for j in range(n, 2 * n + 1):
-        G[il, ic, off + j] += c * d[j, k + n] * d[j, l + n]
-
-
+# one degree into the array, j >= 0 only, the NumPy form
 def _wignerForwardNumpy(G, C, d, n, off, real, rA, rB, Kb, La):
   la, kb = n // rA, n // rB
   lp = np.arange(0 if real else -la, la + 1)
@@ -146,34 +139,12 @@ def _wignerForwardNumpy(G, C, d, n, off, real, rA, rB, Kb, La):
 
 
 # one degree block out of the array, the sum over j of d d h[-j]
-def _wignerAdjointLoop(F, H, d, n, off, real, rA, rB, Kb, La):
-  la, kb = n // rA, n // rB
-  for lp in range(0 if real else -la, la + 1):
-    l = lp * rA
-    il = lp if real else lp + La
-    for kp in range(-kb, kb + 1):
-      k = kp * rB
-      ic = kp + Kb
-      acc = 0j
-      for jj in range(2 * n + 1):
-        acc += d[jj, k + n] * d[jj, l + n] * H[il, ic, off + 2 * n - jj]
-      F[k + n, l + n] = acc
-
-
 def _wignerAdjointNumpy(F, H, d, n, off, real, rA, rB, Kb, La):
   la, kb = n // rA, n // rB
   lp = np.arange(0 if real else -la, la + 1)
   kp = np.arange(-kb, kb + 1)
   Hsub = H[np.ix_(lp if real else lp + La, kp + Kb, np.arange(off + 2 * n, off - 1, -1))]
   F[np.ix_(kp * rB + n, lp * rA + n)] = np.einsum("jk,jl,lkj->kl", d[:, kp * rB + n], d[:, lp * rA + n], Hsub)
-
-
-def _forwardKernel():
-  return _loop("wignerForward", _wignerForwardLoop) if backend() == "numba" else _wignerForwardNumpy
-
-
-def _adjointKernel():
-  return _loop("wignerAdjoint", _wignerAdjointLoop) if backend() == "numba" else _wignerAdjointNumpy
 
 
 # the sign of the j mirror: G[l, k, -j] = (-1)^{k+l} G[l, k, j]
@@ -185,20 +156,27 @@ def _mirrorSign(L, real, folds):
   return np.where((l[:, None] + k[None, :]) % 2, -1.0, 1.0)
 
 
+# the compiled kernels of mtex/functions/kernels.py on the quadrant table, or the NumPy form
+# degree by degree on the full matrices of halfPiDegrees or of the degrees given
 def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
-  fhat = np.asarray(fhat)
-  cdtype = _complexType(fhat.dtype)
+  cdtype = _complexType(np.asarray(fhat).dtype)
+  fhat = np.ascontiguousarray(fhat, dtype=cdtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
+  if deg2dim(L + 1) > fhat.shape[-1]:
+    raise ValueError(f"the coefficients end before degree {L}")
+  if backend() == "numba" and degrees is None:
+    G = np.empty(foldedDims(L, real, folds), dtype=cdtype)
+    wignerForward(G, fhat, halfPiQuadrants(L, rdtype), L, real, folds)
+    return G
   rA, rB = folds
   La, Kb = L // rA, L // rB
   G = np.zeros(foldedDims(L, real, folds), dtype=cdtype)
-  kernel = _forwardKernel()
   for n, dn in (halfPiDegrees(L, rdtype) if degrees is None else degrees):
     F = degreeBlock(fhat, n)
     if not np.any(F):
       continue
     C = np.ascontiguousarray(F * _blockPhase(n, real, rdtype), dtype=cdtype)
-    kernel(G, C, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, L - n, real, rA, rB, Kb, La)
+    _wignerForwardNumpy(G, C, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, L - n, real, rA, rB, Kb, La)
   G[:, :, :L] = _mirrorSign(L, real, folds)[:, :, None] * G[:, :, L + 1:][:, :, ::-1]
   return G
 
@@ -208,16 +186,19 @@ def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
 # the rest follows from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA
 # and k by rB, since the projection of H5 zeroes the rest anyway
 def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None):
-  H = np.ascontiguousarray(H)
   cdtype = H.dtype
   rdtype = np.dtype(cdtype).type(0).real.dtype
+  fhat = np.zeros(deg2dim(L + 1), dtype=cdtype)
+  # the compiled loop reads a view in any axis order, the NFFT's lattice as it is
+  if backend() == "numba" and degrees is None:
+    wignerAdjoint(fhat, H, halfPiQuadrants(L, rdtype), L, real, folds)
+    return fhat
+  H = np.ascontiguousarray(H)
   rA, rB = folds
   La, Kb = L // rA, L // rB
-  fhat = np.zeros(deg2dim(L + 1), dtype=cdtype)
-  kernel = _adjointKernel()
   for n, dn in (halfPiDegrees(L, rdtype) if degrees is None else degrees):
     F = np.zeros((2 * n + 1, 2 * n + 1), dtype=cdtype)
-    kernel(F, H, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, L - n, real, rA, rB, Kb, La)
+    _wignerAdjointNumpy(F, H, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, L - n, real, rA, rB, Kb, La)
     F *= _blockPhase(n, False, rdtype)
     if real:
       k = np.arange(-n, n + 1)
@@ -238,6 +219,8 @@ def sphericalTransform(fhat, L, real=False, degrees=None):
   fhat = np.asarray(fhat)
   cdtype = _complexType(fhat.dtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
+  if backend() == "numba" and degrees is None:
+    return sphericalForward(np.ascontiguousarray(fhat[:(L + 1) ** 2], dtype=cdtype), L, real, cdtype)
   G = np.zeros((L + 1 if real else 2 * L + 1, 2 * L + 1), dtype=cdtype)
   for l, dl in (halfPiDegrees(L, rdtype) if degrees is None else degrees):
     m = np.arange(0 if real else -l, l + 1)
@@ -257,6 +240,8 @@ def sphericalTransform(fhat, L, real=False, degrees=None):
 # h[m, j] = sum_q w_q v_q e^{-i(m rho_q - j theta_q)}
 def sphericalTransformAdjoint(H, L, real=False, degrees=None):
   H = np.asarray(H)
+  if backend() == "numba" and degrees is None:
+    return sphericalAdjoint(H, L, real)
   cdtype = H.dtype
   rdtype = np.dtype(cdtype).type(0).real.dtype
   fhat = np.zeros((L + 1) ** 2, dtype=cdtype)
@@ -278,25 +263,11 @@ def sphericalTransformAdjoint(H, L, real=False, degrees=None):
 # a coefficient vector is real valued when fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}) on
 # SO(3), fhat_l^{-m} = (-1)^m conj(fhat_l^m) on S2, c_{-k} = conj(c_k) on S1
 def isRealWigner(fhat, tol=1e-10):
-  fhat = np.asarray(fhat)
-  for n in range(dim2deg(fhat.shape[-1]) + 1):
-    F = degreeBlock(fhat, n)
-    k = np.arange(-n, n + 1)
-    sign = np.where((k[:, None] - k[None, :]) % 2, -1.0, 1.0)
-    if not np.all(np.abs(F[::-1, ::-1] - sign * np.conj(F)) <= tol * np.maximum(1, np.abs(F))):
-      return False
-  return True
+  return realDefectWigner(fhat, tol)
 
 
 def isRealSpherical(fhat, tol=1e-10):
-  fhat = np.asarray(fhat)
-  L = math.isqrt(fhat.shape[-1]) - 1
-  for l in range(L + 1):
-    c = fhat[l * l:(l + 1) ** 2]
-    m = np.arange(-l, l + 1)
-    if not np.all(np.abs(c[::-1] - np.where(m % 2, -1.0, 1.0) * np.conj(c)) <= tol * np.maximum(1, np.abs(c))):
-      return False
-  return True
+  return realDefectSpherical(fhat, tol)
 
 
 def isRealFourier(chat, tol=1e-10):
@@ -307,89 +278,210 @@ def isRealFourier(chat, tol=1e-10):
 # ------------------------------------------------------------------ the plans on arbitrary nodes
 
 
-# the Matthies angles of a rotation container as flat arrays, and their float type
-def _euler(rots):
+# the quaternions of a rotation container, flat
+def _quaternions(rots):
   if isinstance(rots, orthogonalTransform):
     rots = rots.rot
   if not isinstance(rots, quaternion):
     raise TypeError("the nodes are a container of rotations")
-  q = rots.data.reshape(-1, 4)
+  return rots.data.reshape(-1, 4)
+
+
+# the Matthies angles of a rotation container as flat arrays, and their float type
+def _euler(rots):
+  q = _quaternions(rots)
   return quat2euler(q, "Matthies"), q.dtype
 
 
-# the NUFFT of one node set on SO(3), reusable across coefficient vectors. folds says that
-# the function is invariant under those z folds on the two sides: in the forward its
-# coefficients outside them are zero, in the adjoint the projection of H5 is about to zero
-# them. Both directions then run on the reduced index set, where the two periodic axes of
-# the array shrink by the folds and the nodes are rescaled
-class SO3FourierPlan:
+# the NUFFT of one node set, reusable across coefficient vectors: type 2 evaluates, type 1 is
+# the adjoint, each built on its first use since most calls take one direction. The nodes
+# follow setNodes; a node that is not finite evaluates to NaN and adds nothing to an adjoint
+class _FourierPlan:
 
-  def __init__(self, rots, L, real=True, folds=(1, 1), eps=None, upsampfac=None):
-    (alpha, beta, gamma), dtype = _euler(rots)
-    self.L, self.real, self.folds = int(L), bool(real), usableFolds(L, real, folds)
-    rA, rB = self.folds
-    self.dims = foldedDims(self.L, self.real, self.folds)
-    self.dtype = _complexType(dtype)
-    x = np.ascontiguousarray(np.mod(rA * gamma, 2 * np.pi), dtype=dtype)
-    y = np.ascontiguousarray(np.mod(rB * alpha, 2 * np.pi), dtype=dtype)
-    z = np.ascontiguousarray(beta, dtype=dtype)
-    f, eps, threads = _finufft(), _eps(eps, dtype), _threads(len(x), self.dims, upsampfac)
-    self.forward = f.Plan(2, self.dims, eps=eps, isign=-1, dtype=self.dtype.name, **threads)
-    self.forward.setpts(x, y, z)
-    self.backward = f.Plan(1, self.dims, eps=eps, isign=1, dtype=self.dtype.name, **threads)
-    self.backward.setpts(x, y, z)
-    # e^{-i s gamma} moves the half array onto the centred index set of the NUFFT
-    s = self.dims[0] // 2 if self.real else 0
-    self.phase = np.exp(-1j * s * x).astype(self.dtype)
+  def _init(self, n, dtype, dims, eps, upsampfac):
+    self.dims, self.dtype = dims, _complexType(dtype)
+    self.eps = _eps(eps, dtype)
+    self.opts, self._plans = _options(n, dims, self.eps, upsampfac), {}
+
+  def _plan(self, kind):
+    p = self._plans.get(kind)
+    if p is None:
+      p = _finufft().Plan(kind, self.dims, eps=self.eps, isign=-1 if kind == 2 else 1, dtype=self.dtype.name, **self.opts)
+      p.setpts(*self.nodes)
+      self._plans[kind] = p
+    return p
+
+  @property
+  def forward(self):
+    return self._plan(2)
+
+  @property
+  def backward(self):
+    return self._plan(1)
+
+  def _setNodes(self, nodes, phase, bad):
+    self.nodes, self.phase, self.bad = nodes, phase, bad
+    # the finufft plans move their points, an NFFT plan is built again
+    self._plans = {kind: p for kind, p in self._plans.items() if isinstance(kind, int)}
+    for p in self._plans.values():
+      p.setpts(*nodes)
+
+  # the shift of the half array of a real function onto the centred index set of finufft
+  @property
+  def _shift(self):
+    return self.dims[0] // 2 if self.real else 0
 
   def __len__(self):
     return len(self.phase)
+
+  def _evaluate(self, G):
+    f = self.forward.execute(G)
+    f = 2 * np.real(self.phase * f) if self.real else f
+    if self.bad is not None:
+      f[self.bad] = np.nan
+    return f
+
+  def _spread(self, values, weights):
+    u = np.asarray(weights).ravel() * values * np.conj(self.phase)
+    if self.bad is not None:
+      u[self.bad] = 0
+    return self.backward.execute(np.ascontiguousarray(u, dtype=self.dtype))
+
+  # the NFFT of ../nfft (mtex/functions/nfft.py) where its library is there, at the default
+  # tolerance its windows reach: every transform under the preference NUFFT = 'nfft', none
+  # under 'finufft', and under 'auto' the SO(3) adjoint of fewer nodes than lattice points,
+  # where its pruned FFT counts; with more the spreading does and finufft's is faster
+  # (1e7 nodes at bandwidth 25: 3.8 s against 1.4)
+  def _useNFFT(self, direction):
+    choice = getMTEXpref("NUFFT", "auto")
+    if choice == "finufft" or self.dtype != np.complex128 or self.eps < NUFFT_EPS or nfftLibrary() is None:
+      return False
+    return choice == "nfft" or self._nfftDefault(direction)
+
+  # one NFFT plan per value type serves both directions; the preference NFFTPrecompute keeps
+  # the window values at the nodes (PRE_PSI)
+  def _nfftPlan(self, real):
+    p = self._plans.get(("nfft", real))
+    if p is None:
+      N, X = self._nfftLattice(real)
+      p = self._plans[("nfft", real)] = NFFTPlan(N, X, real, keep=bool(getMTEXpref("NFFTPrecompute", False)))
+    return p
+
+  # the nodes as the NFFT reads them, the angles over 2 pi in [-1/2, 1/2)
+  @staticmethod
+  def _nfftNodes(*angles):
+    X = np.stack(angles, axis=1) / (2 * np.pi)
+    X -= X >= 0.5
+    return X
+
+  def _nfftEvaluate(self, G):
+    p = self._nfftPlan(self.real)
+    p.fhat[...] = 0
+    self._toNFFT(p.fhat, G)
+    f = p.trafo()
+    f = f.real.copy() if self.real else f.copy()
+    if self.bad is not None:
+      f[self.bad] = np.nan
+    return f
+
+  def _nfftSpread(self, values, weights, real):
+    u = np.asarray(weights).ravel() * values
+    if self.bad is not None:
+      u[self.bad] = 0
+    p = self._nfftPlan(real)
+    p.f[:] = u
+    return self._fromNFFT(p.adjoint(), real)
+
+
+# on SO(3): folds says that the function is invariant under those z folds on the two sides:
+# in the forward its coefficients outside them are zero, in the adjoint the projection of H5
+# is about to zero them. Both directions then run on the reduced index set, where the two
+# periodic axes of the array shrink by the folds and the nodes are stretched
+class SO3FourierPlan(_FourierPlan):
+
+  def __init__(self, rots, L, real=True, folds=(1, 1), eps=None, upsampfac=None):
+    q = _quaternions(rots)
+    self.L, self.real, self.folds = int(L), bool(real), usableFolds(L, real, folds)
+    self._init(len(q), q.dtype, foldedDims(self.L, self.real, self.folds), eps, upsampfac)
+    self.setNodes(rots)
+
+  def setNodes(self, rots):
+    x, y, z, phase, bad = so3Nodes(_quaternions(rots), self.folds, self._shift)
+    self._setNodes((x, y, z), phase, bad)
 
   def __call__(self, fhat):
     G = wignerTransform(np.asarray(fhat, dtype=self.dtype), self.L, self.real, self.folds)
-    f = self.forward.execute(G)
-    return 2 * np.real(self.phase * f) if self.real else f
+    return self._nfftEvaluate(G) if self._useNFFT("forward") else self._evaluate(G)
 
-  # coefficients from weighted values at the nodes
+  # coefficients from weighted values at the nodes; the NFFT reads real values on half the
+  # lattice
   def adjoint(self, values, weights):
     values = np.asarray(values).ravel()
-    u = np.ascontiguousarray(np.asarray(weights).ravel() * values * np.conj(self.phase), dtype=self.dtype)
-    H = self.backward.execute(u)
-    return wignerTransformAdjoint(H, self.L, self.real and values.dtype.kind != "c", self.folds)
+    if self._useNFFT("adjoint"):
+      real = values.dtype.kind != "c"
+      return wignerTransformAdjoint(self._nfftSpread(values, weights, real), self.L, real, self.folds)
+    # a real plan holds half the lattice, complex values are the sum of two real adjoints
+    if self.real and values.dtype.kind == "c":
+      return self.adjoint(values.real, weights) + 1j * self.adjoint(values.imag, weights)
+    return wignerTransformAdjoint(self._spread(values, weights), self.L, self.real, self.folds)
+
+  def _nfftDefault(self, direction):
+    return direction == "adjoint" and len(self) < math.prod(self.dims)
+
+  # the NFFT lattice has the axes (k, j, l), l last so that a real plan halves it, and every
+  # frequency at its index + N/2: the first index of each axis is the unused -N/2
+  def _nfftLattice(self, real):
+    La, Kb = self.L // self.folds[0], self.L // self.folds[1]
+    x, y, z = self.nodes
+    return (2 * Kb + 2, 2 * self.L + 2, 2 * La + 2), self._nfftNodes(y, z, x)
+
+  def _toNFFT(self, fh, G):
+    (fh[1:, 1:, :] if self.real else fh[1:, 1:, 1:])[...] = G.transpose(1, 2, 0)
+
+  def _fromNFFT(self, fh, real):
+    return (fh[1:, 1:, :] if real else fh[1:, 1:, 1:]).transpose(2, 0, 1)
 
 
-class S2FourierPlan:
+class S2FourierPlan(_FourierPlan):
 
   def __init__(self, v, L, real=False, eps=None, upsampfac=None):
     v = v if isinstance(v, vector3d) else vector3d(v)
-    theta, rho = v.flatten().theta, v.flatten().rho
     dtype = v.data.dtype if v.data.dtype.kind == "f" else np.float64
     self.L, self.real = int(L), bool(real)
-    self.dims = (self.L + 1 if self.real else 2 * self.L + 1, 2 * self.L + 1)
-    self.dtype = _complexType(dtype)
-    x = np.ascontiguousarray(np.mod(-rho, 2 * np.pi), dtype=dtype)
-    y = np.ascontiguousarray(theta, dtype=dtype)
-    f, eps, threads = _finufft(), _eps(eps, dtype), _threads(len(x), self.dims, upsampfac)
-    self.forward = f.Plan(2, self.dims, eps=eps, isign=-1, dtype=self.dtype.name, **threads)
-    self.forward.setpts(x, y)
-    self.backward = f.Plan(1, self.dims, eps=eps, isign=1, dtype=self.dtype.name, **threads)
-    self.backward.setpts(x, y)
-    s = self.dims[0] // 2 if self.real else 0
-    self.phase = np.exp(-1j * s * x).astype(self.dtype)
+    self._init(v.size, dtype, (self.L + 1 if self.real else 2 * self.L + 1, 2 * self.L + 1), eps, upsampfac)
+    self.setNodes(v)
 
-  def __len__(self):
-    return len(self.phase)
+  def setNodes(self, v):
+    v = v if isinstance(v, vector3d) else vector3d(v)
+    x, y, phase, bad = s2Nodes(v.data.astype(self.dtype.type(0).real.dtype, copy=False), self._shift)
+    self._setNodes((x, y), phase, bad)
 
   def __call__(self, fhat):
     G = sphericalTransform(np.asarray(fhat, dtype=self.dtype), self.L, self.real)
-    f = self.forward.execute(G)
-    return 2 * np.real(self.phase * f) if self.real else f
+    return self._nfftEvaluate(G) if self._useNFFT("forward") else self._evaluate(G)
 
   def adjoint(self, values, weights):
     values = np.asarray(values).ravel()
-    u = np.ascontiguousarray(np.asarray(weights).ravel() * values * np.conj(self.phase), dtype=self.dtype)
-    H = self.backward.execute(u)
-    return sphericalTransformAdjoint(H, self.L, self.real and values.dtype.kind != "c")
+    if self._useNFFT("adjoint"):
+      real = values.dtype.kind != "c"
+      return sphericalTransformAdjoint(self._nfftSpread(values, weights, real), self.L, real)
+    if self.real and values.dtype.kind == "c":
+      return self.adjoint(values.real, weights) + 1j * self.adjoint(values.imag, weights)
+    return sphericalTransformAdjoint(self._spread(values, weights), self.L, self.real)
+
+  def _nfftDefault(self, direction):
+    return False
+
+  # the NFFT lattice has the axes (j, m), m last so that a real plan halves it
+  def _nfftLattice(self, real):
+    x, y = self.nodes
+    return (2 * self.L + 2, 2 * self.L + 2), self._nfftNodes(y, x)
+
+  def _toNFFT(self, fh, G):
+    (fh[1:, :] if self.real else fh[1:, 1:])[...] = G.T
+
+  def _fromNFFT(self, fh, real):
+    return (fh[1:, :] if real else fh[1:, 1:]).T
 
 
 # the circle: f(x) = sum_{k=-L}^{L} c_k e^{ikx}
@@ -400,10 +492,11 @@ class S1FourierPlan:
     dtype = x.dtype if x.dtype.kind == "f" else np.float64
     self.L, self.dtype = int(L), _complexType(dtype)
     x = np.ascontiguousarray(np.mod(x, 2 * np.pi), dtype=dtype)
-    f, eps, threads = _finufft(), _eps(eps, dtype), _threads(len(x), (2 * self.L + 1,))
-    self.forward = f.Plan(2, (2 * self.L + 1,), eps=eps, isign=1, dtype=self.dtype.name, **threads)
+    f, eps = _finufft(), _eps(eps, dtype)
+    opts = _options(len(x), (2 * self.L + 1,), eps)
+    self.forward = f.Plan(2, (2 * self.L + 1,), eps=eps, isign=1, dtype=self.dtype.name, **opts)
     self.forward.setpts(x)
-    self.backward = f.Plan(1, (2 * self.L + 1,), eps=eps, isign=-1, dtype=self.dtype.name, **threads)
+    self.backward = f.Plan(1, (2 * self.L + 1,), eps=eps, isign=-1, dtype=self.dtype.name, **opts)
     self.backward.setpts(x)
     self.n = len(x)
 
@@ -424,11 +517,13 @@ def adjointTransform(plan, values, weights):
 # ------------------------------------------------------------------ the plans on a Clenshaw-Curtis grid
 # every angle of the grid is equispaced, so the series on it is a plain multivariate DFT.
 # On SO(3) f(alpha, beta, gamma) = sum G[l, k, j] e^{-i(k alpha + j beta + l gamma)} with
-# beta_b = pi b/(2L), alpha_a = 2pi a/(2L+2), gamma_c = 2pi c/(2L+2) is a forward transform
-# of length 4L in beta and 2L+2 in alpha and gamma, the array wrapped into that shape and
-# the first 2L+1 beta rows kept; the adjoint is the same transform backwards. An r fold
-# leaves k = 0 mod r and k/r indexes a transform of length (2L+2)/r, so the folded ring
-# shrinks the transform by the fold exactly and leaves the forbidden coefficients at zero
+# beta_b = pi b/(2Lg), b = 0..2Lg, alpha_a = 2pi a/(2Lg+2), gamma_c = 2pi c/(2Lg+2), Lg the
+# grid's bandwidth: beta is a transform of length 4Lg cut to the grid's rows, alpha and gamma
+# transforms of the grid's own lengths, which an r fold divides by r, the order k/r at its
+# residue. The transforms run one axis at a time, each on the data it has: beta on the
+# occupied planes (l, k), alpha on the rows of beta, gamma last, where a real function is
+# 2 Re of the half sum and one real valued inverse FFT. The adjoint takes the axes backwards,
+# each inverse FFT keeping the orders the next one reads
 
 
 def _fft():
@@ -436,22 +531,32 @@ def _fft():
   return scipy.fft
 
 
-# the coefficient array and the lattice hold the same numbers in different places: the
-# periodic axes are already indexed by l/rA and k/rB, only j wraps modulo the polar length
-def _wignerLattice(A, G, L, real, folds, out):
-  rA, rB = folds
-  La, Kb = L // rA, L // rB
-  nl, nk = G.shape[0], G.shape[1]
-  ic = np.mod(np.arange(nl) - (0 if real else La), A.shape[0])
-  ib = np.mod(np.arange(nk) - Kb, A.shape[1])
-  Nb = A.shape[2]
-  head, tail = np.ix_(ic, ib, np.arange(L + 1)), np.ix_(ic, ib, np.arange(Nb - L, Nb))
-  if out:
-    G[:, :, L:] = A[head]
-    G[:, :, :L] = A[tail]
-  else:
-    A[head] = G[:, :, L:]
-    A[tail] = G[:, :, :L]
+# a plan's placement buffers: written at the same indices every call, zero elsewhere for good
+class _GridBuffers:
+
+  def __init__(self, dtype):
+    self.dtype, self.held = dtype, {}
+
+  def __call__(self, name, shape):
+    B = self.held.get(name)
+    if B is None or B.shape != shape:
+      B = self.held[name] = np.zeros(shape, dtype=self.dtype)
+    return B
+
+
+# the orders -r..r at their residues modulo n
+def _residues(r, n):
+  return np.mod(np.arange(-r, r + 1), n)
+
+
+# the Fourier array's j axis, j at L + j, wrapped onto the polar length and back
+def _wrapPolar(B, G, L):
+  B[..., :L + 1] = G[..., L:]
+  B[..., B.shape[-1] - L:] = G[..., :L]
+
+
+def _unwrapPolar(X, L):
+  return np.concatenate([X[..., X.shape[-1] - L:], X[..., :L + 1]], axis=-1)
 
 
 class SO3GridPlan:
@@ -465,54 +570,48 @@ class SO3GridPlan:
     self.L, self.real, self.folds, self.grid = L, bool(real), g.folds, g
     self.dtype = _complexType(g.beta.dtype)
     self.shape = g.shape
-    self.lattice = np.zeros((len(g.gamma), len(g.alpha), 4 * g.bandwidth), dtype=self.dtype)
+    self.polar = 4 * g.bandwidth
+    rA, rB = self.folds
+    self._k = _residues(L // rB, self.shape[1])
+    self._l = _residues(L // rA, self.shape[0])
+    self._buffers = _GridBuffers(self.dtype)
 
   def __len__(self):
     return len(self.grid)
 
   def __call__(self, fhat):
-    G = wignerTransform(np.asarray(fhat, dtype=self.dtype), self.L, self.real, self.folds)
-    fft, A = _fft(), self.lattice
-    A[...] = 0
-    _wignerLattice(A, G, self.L, self.real, self.folds, False)
-    # beta and alpha on the occupied gamma planes, then gamma at the polar nodes only
-    ng, nb = (self.L // self.folds[0] + 1) if self.real else A.shape[0], self.shape[2]
-    A[:ng] = fft.fftn(A[:ng], axes=(1, 2))
-    v = fft.fft(A[:, :, :nb], axis=0)
-    return (2 * np.real(v) if self.real else v).ravel()
+    fft, w, L = _fft(), threads(), self.L
+    Ng, Na, nb = self.shape
+    G = wignerTransform(np.asarray(fhat, dtype=self.dtype), L, self.real, self.folds)
+    B = self._buffers("beta", G.shape[:2] + (self.polar,))
+    _wrapPolar(B, G, L)
+    A = self._buffers("alpha", (G.shape[0], Na, nb))
+    A[:, self._k] = fft.fft(B, axis=2, workers=w)[..., :nb]
+    Z = fft.fft(A, axis=1, workers=w)
+    if self.real:
+      Z = np.conj(Z, out=Z)
+      Z[0] *= 2
+      return fft.irfft(Z, n=Ng, axis=0, norm="forward", workers=w).ravel()
+    C = self._buffers("gamma", (Ng, Na, nb))
+    C[self._l] = Z
+    return fft.fft(C, axis=0, workers=w).ravel()
 
   def adjoint(self, values, weights):
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
-    fft, A = _fft(), self.lattice
-    A[...] = 0
-    nb = self.shape[2]
-    A[:, :, :nb] = (np.asarray(weights).ravel() * values).reshape(self.shape)
-    # alpha and gamma at the polar nodes, then beta on the gamma planes the transform reads
-    A[:, :, :nb] = fft.ifftn(A[:, :, :nb], axes=(0, 1), norm="forward")
-    ng = (self.L // self.folds[0] + 1) if real else A.shape[0]
-    A[:ng] = fft.ifft(A[:ng], axis=2, norm="forward")
-    H = np.empty(foldedDims(self.L, real, self.folds), dtype=self.dtype)
-    _wignerLattice(A, H, self.L, real, self.folds, True)
-    return wignerTransformAdjoint(H, self.L, real, self.folds)
+    fft, w, L = _fft(), threads(), self.L
+    x = (np.asarray(weights).ravel() * values).reshape(self.shape)
+    if real:
+      Z = np.conj(fft.rfft(x, axis=0, workers=w)[:L // self.folds[0] + 1])
+    else:
+      Z = fft.ifft(x, axis=0, norm="forward", workers=w)[self._l]
+    W = fft.ifft(Z, axis=1, norm="forward", workers=w)[:, self._k]
+    X = fft.ifft(W, n=self.polar, axis=2, norm="forward", workers=w)
+    return wignerTransformAdjoint(_unwrapPolar(X, L), L, real, self.folds)
 
 
-# the sphere: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}, a transform of length 4L in
-# theta and 2L+2 in rho, the order held at -m so that both directions are forward transforms
-def _sphericalLattice(A, G, L, real, out):
-  nm = G.shape[0]
-  m = np.arange(nm) - (0 if real else L)
-  ic = np.mod(-m, A.shape[0])
-  Nt = A.shape[1]
-  head, tail = np.ix_(ic, np.arange(L + 1)), np.ix_(ic, np.arange(Nt - L, Nt))
-  if out:
-    G[:, L:] = A[head]
-    G[:, :L] = A[tail]
-  else:
-    A[head] = G[:, L:]
-    A[tail] = G[:, :L]
-
-
+# the sphere: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}, theta a transform of length
+# 4Lg cut to the grid's rows, rho one of the grid's length, real valued for a real function
 class S2GridPlan:
 
   def __init__(self, g, L=None, real=False):
@@ -524,37 +623,35 @@ class S2GridPlan:
     self.L, self.real, self.grid = L, bool(real), g
     self.dtype = _complexType(g.thetaGrid.dtype)
     self.shape = g.gridShape
-    self.lattice = np.zeros((len(g.rhoGrid), 4 * g.bandwidth), dtype=self.dtype)
+    self.polar = 4 * g.bandwidth
+    self._m = _residues(L, self.shape[0])
+    self._buffers = _GridBuffers(self.dtype)
 
   def __len__(self):
     return len(self.grid)
 
-  def _rows(self, real):
-    return np.mod(-np.arange(self.L + 1 if real else 2 * self.L + 1) + (0 if real else self.L), self.lattice.shape[0])
-
   def __call__(self, fhat):
-    G = sphericalTransform(np.asarray(fhat, dtype=self.dtype), self.L, self.real)
-    fft, A = _fft(), self.lattice
-    A[...] = 0
-    _sphericalLattice(A, G, self.L, self.real, False)
-    rows, nt = self._rows(self.real), self.shape[1]
-    A[rows] = fft.fft(A[rows], axis=1)
-    v = fft.fft(A[:, :nt], axis=0)
-    return (2 * np.real(v) if self.real else v).ravel()
+    fft, w, L = _fft(), threads(), self.L
+    Nr, nt = self.shape
+    G = sphericalTransform(np.asarray(fhat, dtype=self.dtype), L, self.real)
+    B = self._buffers("theta", (G.shape[0], self.polar))
+    _wrapPolar(B, G, L)
+    Y = fft.fft(B, axis=1, workers=w)[:, :nt]
+    if self.real:
+      Y[0] *= 2
+      return fft.irfft(Y, n=Nr, axis=0, norm="forward", workers=w).ravel()
+    C = self._buffers("rho", (Nr, nt))
+    C[self._m] = Y
+    return fft.ifft(C, axis=0, norm="forward", workers=w).ravel()
 
   def adjoint(self, values, weights):
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
-    fft, A = _fft(), self.lattice
-    A[...] = 0
-    nt = self.shape[1]
-    A[:, :nt] = (np.asarray(weights).ravel() * values).reshape(self.shape)
-    A[:, :nt] = fft.ifft(A[:, :nt], axis=0, norm="forward")
-    rows = self._rows(real)
-    A[rows] = fft.ifft(A[rows], axis=1, norm="forward")
-    H = np.empty((self.L + 1 if real else 2 * self.L + 1, 2 * self.L + 1), dtype=self.dtype)
-    _sphericalLattice(A, H, self.L, real, True)
-    return sphericalTransformAdjoint(H, self.L, real)
+    fft, w, L = _fft(), threads(), self.L
+    x = (np.asarray(weights).ravel() * values).reshape(self.shape)
+    Z = fft.rfft(x, axis=0, workers=w)[:L + 1] if real else fft.fft(x, axis=0, workers=w)[self._m]
+    X = fft.ifft(Z, n=self.polar, axis=1, norm="forward", workers=w)
+    return sphericalTransformAdjoint(_unwrapPolar(X, L), L, real)
 
 
 # the plan for a node set: the NUFFT at arbitrary nodes, the FFT on a Clenshaw-Curtis grid,
@@ -611,6 +708,38 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
       degreeBlock(fhat, n_)[...] = math.sqrt(2 * n_ + 1) * np.einsum("i,ikl->kl", weights * values, np.conj(D[n_]))
     return fhat
   return SO3FourierPlan(rots, L, values.dtype.kind != "c", folds).adjoint(values, weights)
+
+
+# the adjoint of many rotations approximately: every rotation rounded to the nearest node of
+# a Clenshaw-Curtis grid, the weighted values summed there, and the grid's exact FFT
+# adjoint (MATLAB SO3FunHarmonic.adjoint(..., 'gridded')). The error is at most half the grid
+# spacing, pi/(4 NG) in beta, which a kernel of bandwidth L cannot see when the grid has
+# NG = min(2L, max(L, 128)); the cost no longer grows with the rotations. The folds act on the
+# folded angles, which is all a folded coefficient sees, so the grid covers their region only
+GRIDDED_ROTATIONS_PER_L3 = 10
+
+
+def wignerSeriesAdjointGridded(rots, values, L, weights=None, folds=(1, 1)):
+  values = np.asarray(values).ravel()
+  q = _quaternions(rots)
+  w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights).ravel()
+  NG = bandwidthFor(min(2 * L, max(L, 128)), *folds)
+  g = quadratureSO3Grid(NG, rA=folds[0], rB=folds[1])
+  Ng, Na, nb = g.shape
+  x, y, z, _, bad = so3Nodes(q, folds)
+  # the folded gamma and alpha on the grid's own lengths, beta on the polar nodes
+  c = np.rint(x * Ng / (2 * np.pi)).astype(np.int64) % Ng
+  a = np.rint(y * Na / (2 * np.pi)).astype(np.int64) % Na
+  b = np.clip(np.rint(z * (nb - 1) / np.pi).astype(np.int64), 0, nb - 1)
+  u = w * values
+  if bad is not None:
+    u = np.where(bad, 0, u)
+  idx = (c * Na + a) * nb + b
+  if values.dtype.kind == "c":
+    v = np.bincount(idx, u.real, minlength=len(g)) + 1j * np.bincount(idx, u.imag, minlength=len(g))
+  else:
+    v = np.bincount(idx, u, minlength=len(g))
+  return SO3GridPlan(g, L, real=values.dtype.kind != "c").adjoint(v, np.ones(len(g)))
 
 
 # the direct spherical sum, degree by degree through the harmonics of F0
@@ -747,5 +876,5 @@ def fourierSeriesAdjoint(x, values, L, weights=None):
 __all__ = ["halfPiDegrees", "foldedDims", "usableFolds", "wignerTransform", "wignerTransformAdjoint",
            "sphericalTransform", "sphericalTransformAdjoint", "isRealWigner", "isRealSpherical", "isRealFourier",
            "SO3FourierPlan", "S2FourierPlan", "S1FourierPlan", "SO3GridPlan", "S2GridPlan", "adjointTransform",
-           "wignerPlan", "sphericalPlan", "wignerSeries", "wignerSeriesAdjoint", "sphericalSeries",
+           "wignerPlan", "sphericalPlan", "wignerSeries", "wignerSeriesAdjoint", "wignerSeriesAdjointGridded", "sphericalSeries",
            "sphericalSeriesAdjoint", "fourierSeries", "fourierSeriesAdjoint"]

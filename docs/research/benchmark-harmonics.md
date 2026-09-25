@@ -63,3 +63,259 @@ D6 holds: finufft for scattered nodes, `scipy.fft` on the Clenshaw-Curtis grids,
 sums below 50 nodes. The one gap against Julia is the missing threading inside a degree of
 the Wigner transforms, a factor of two at L = 64 and above; a `prange` over l in the numba
 loops would close it and is left for the day the transform is the bottleneck of a caller.
+
+## Against MATLAB's master of 2026-09-25, and T1 of `docs/plans/harmonics-speed.md`
+
+`bench/harmonics_user.py` and `bench/matlab/bench_harmonics.m`, the user facing calls, times
+in ms, 10 physical cores; the 1e6 node rows vary by up to four times between runs. The
+baseline and the MATLAB column are the table of the plan's section 1.
+
+| case | before | T1 | MATLAB |
+|---|---:|---:|---:|
+| SO3 eval L=64, 1e6, 1 / m-3m | 1280 / 1666 | 217 / 239 | 351 / 232 |
+| SO3 eval L=128, 1e4, 1 / m-3m | 1364 / 495 | 620 / 180 | 326 / 101 |
+| SO3 eval L=128, 1e6, 1 / m-3m | 2467 / 1567 | 821 / 448 | 660 / 397 |
+| SO3 quadrature L=64, 1e6, 1 / m-3m | 1626 / 2635 | 278 / 288 | 292 / 247 |
+| SO3 quadrature L=128, 1e4, 1 / m-3m | 2051 / 920 | 877 / 337 | 321 / 161 |
+| SO3 quadrature L=128, 1e6, 1 / m-3m | 3710 / 2220 | 1268 / 817 | 1170 / 665 |
+| SO3 Clenshaw-Curtis L=127, 1/1 | 1842 / 2525 | 755 / 908 | 506 / 587 |
+| SO3 Clenshaw-Curtis L=127, 432/1 | 509 / 848 | 190 / 351 | 113 / 210 |
+| SO3 Clenshaw-Curtis L=128, 622/222 | 224 / 275 | 93 / 211 | 53 / 88 |
+| SO3 isReal L=128 | 36 | 3.2 | 3.6 |
+| S2 eval / quadrature L=128, 1e6 | 197 / 170 | 84 / 91 | 98 / 130 |
+| S2 symmetrise m-3m L=128 | 2813 | 3.8 | 24 |
+| S2 calcDensity 1e5 | 30 | 20 | 17 |
+
+What T1 did: the nodes and their phase from one compiled loop (`mtex/functions/kernels.py`),
+a plan building only the direction a call takes, finufft on the physical cores with the
+oversampling factor by density, `scipy.fft` on the cores, the real defect in one pass over
+half of every block, and the S2 projection from the held projections of H5. At L=64 the
+scattered routes are level with MATLAB; what is left at L=128 and on the grids is the serial
+Wigner transform (T2) and the lattice of the grid route (T4).
+
+## T2: the Wigner transforms as parallel kernels, 2026-09-25
+
+The quadrant `d_n^{jk}(pi/2)`, j, k >= 0, as one flat table by a compiled recursion, and
+the two transforms parallel over the planes l of the Fourier array, each thread reading the
+column l of every degree block and writing its plane once (`mtex/functions/kernels.py`).
+Equal to the NumPy form to 3e-15.
+
+| real, ms | L=64 forward / adjoint | L=128 forward / adjoint |
+|---|---:|---:|
+| before, serial per degree | 27 / 37 | 419 / 569 |
+| T2, no folds | 4.1 / 4.1 | 51 / 52 |
+| T2, fold 4 | 1.2 / 1.6 | 13 / 14 |
+
+The user facing rows after T2 (ms, MATLAB in brackets): SO3 eval L=128 1e4 221 (326) and
+91 (101) for m-3m, 1e6 480 (660) and 453 (397); the Clenshaw-Curtis grid L=127 1/1 396 (506)
+and 468 (587), 432/1 87 (113) and 207 (210), 622/222 32 (53) and 121 (88). The quadrature at
+scattered nodes is now the NUFFT alone: L=128 1e4 431-479 (321), where finufft's type 1 on
+the half lattice is FFT bound.
+
+## finufft against the NFFT of `../nfft` (feature/mtex-kernels), 2026-09-25
+
+The branch built with CMake as `libnfft3_omp.so`, driven through a ctypes shim the way
+`nfftmex` drives it (`NFFT_REAL`, `NFFT_PRUNED_FFT`, `NFFT_OMP_BLOCKWISE_ADJOINT`, no
+`PRE_PSI`, `nfftParameters`' m and sigma), against finufft on the half lattice at eps 1e-8;
+plan, nodes and transform, 10 threads, random nodes, ms.
+
+| | NFFT real trafo / adjoint | finufft type 2 / type 1 |
+|---|---:|---:|
+| L=64, 1e6 nodes | 228 / 214 | 179 / 245 |
+| L=128, 1e4 | 182 / 164 | 192 / 345 |
+| L=128, 1e6 | 449 / 438 | 427 / 614 |
+
+The evaluation is level; the adjoint is 15 to 50 % faster in the NFFT, most at few nodes on
+a large lattice, where the pruned FFT counts.
+
+The NFFT as the optional backend of the SO(3) adjoint (`mtex/functions/nfft.py`, used where
+the library is configured and the tolerance is the default), the compiled Wigner adjoint
+reading the NFFT's lattice in its own axis order without a copy; `SO3FunHarmonic.quadrature`,
+ms, MATLAB in brackets:
+
+| | finufft | NFFT backend |
+|---|---:|---:|
+| L=64, 1e6, 1 / m-3m | 252 / 304 | 240 / 175 (292 / 247) |
+| L=128, 1e4, 1 / m-3m | 480 / 224 | 258 / 161 (321 / 161) |
+| L=128, 1e6, 1 / m-3m | 693 / 661 | 556 / 465-670 (1170 / 665) |
+
+## T3: the spherical transforms by rows, 2026-09-25
+
+The column m of d_l(pi/2) is its row m up to sign, and the rows come degree by degree from
+the recursion at a fixed row: a thread owns an order m, carries three rows of length L + 1,
+and reads only the row 0 of every degree and the factors of the recursion, which split into
+row and column vectors so that an entry costs four products. No quadrant table, which
+streamed from memory was the whole cost (2.9 GB at L = 1024). Entries born below 2^-1000,
+in a band around k = m from m of about 1000 on, are carried as mantissa and exponent until
+they grow to 2^-60, as MATLAB does since `a91aef87f`; before that the transform was 12 % off
+at L = 1100, now 7e-14 against the direct sum (1e-11 at L = 2000, the direct sum's own
+rounding being of that order). Equal to the NumPy form to 2e-15 (1.5e-14 at L = 300, where
+the NumPy recursion's cos(pi/2) = 6e-17 accumulates).
+
+| ms | L=256 | L=512 | L=1024 | L=2000 |
+|---|---:|---:|---:|---:|
+| before, forward / adjoint | 72 / 147 | 3056 / 3516 | 25939 / 30444 | |
+| T3 | 5 / 6 | 23 / 24 | 234 / 209 | 2449 / 3426 |
+| MATLAB mex, forward | | | 400 | 3300 |
+
+User rows after T3 (MATLAB in brackets): S2 eval L=128 1e6 67 (98), quadrature 58 (89-130),
+Clenshaw-Curtis eval L=256 9.6 (28), L=512 84 (83), quadrature of a callable L=256 22 (19),
+calcDensity 1e5 20 (17). What is left on the grid is its FFT route, T4.
+
+## T4: the Clenshaw-Curtis grids one axis at a time, 2026-09-25
+
+The grid plans transform one axis at a time, each on the data it has: beta by an FFT of
+length 4Lg on the occupied planes (l, k), cut to the grid's rows, alpha on those rows,
+gamma last as one real valued inverse FFT for a real function (`irfft` of the conjugated
+half array with the plane l = 0 doubled back), placement buffers held by the plan and zero
+where nothing is written; the adjoint backwards, `rfft` in gamma first. Before, a lattice of
+(2L+2)^2 4L numbers, 532 MB at L = 127, was zeroed and transformed on every call. Exact
+against the direct sums at the grid nodes to 1e-12.
+
+Two things found on the way:
+- `quadratureSO3Grid.fullValues` found the distinct nodes of the grid (MATLAB's uniqueGrid)
+  on every quadrature to tell values at the distinct nodes from values at all of them, 28 s
+  for 622/222 at L = 128; values at all nodes now skip it. `_unique` itself is still that
+  slow where it is asked for (`size`, `flatten`, values at the distinct nodes).
+- The symmetry projection of the dihedral groups has 1.5 % (222) to 5 % (622) of its block
+  entries above rounding; `project` runs a compiled loop over the nonzeros, parallel over
+  the degrees, where both sides are below a quarter full (MATLAB's `symmetriseWignermex`),
+  and the matrix products of BLAS for the dense cubic blocks: 622/222 20 -> 4 ms. The checks
+  that a reshape is a view took `np.shares_memory`, milliseconds on a coefficient vector;
+  a contiguous array is the test now.
+
+| ms, MATLAB in brackets | eval | quadrature |
+|---|---:|---:|
+| SO3 L=127 1/1 | 286 (506) | 300 (587) |
+| SO3 L=127 432/1 | 85 (113) | 125 (210) |
+| SO3 L=128 622/222 | 21 (53) | 44 (88) |
+| S2 L=256 / 512 / 1024 | 13 / 60 / 351 (28 / 83 / 517) | |
+
+SO3 symmetrise L=128: 9 / 26 / 14 ms for 622/222, 432/mmm, 432/1 (15 / 24 / 22). The ring
+length 2L+2 with a large prime factor costs 25 to 35 % (L = 96, 194 = 2 * 97: 149 ms against
+115 for the neighbours); it defines the grid, whose node count MATLAB shares, so it stays.
+
+## Closing: Python, MATLAB and Julia in one sitting, 2026-09-25
+
+`bench/harmonics_user.py`, `bench/matlab/bench_harmonics.m` (MATLAB R2024b, master of
+2026-09-25 through the bridge) and `bench/harmonics_user.jl` (`../mtexJulia/dev`, 10
+threads, with the uncommitted state of that checkout), one after the other, times in ms.
+The 1e6 node rows move by up to a factor of two between runs on this hybrid CPU; the NFFT
+column is the same Python with the NFFT backend of the SO(3) adjoint. Julia crashed in
+FFTW's threads (segfault) at L = 128 with 1e6 m-3m nodes, eval and quadrature alike.
+
+| case | Python | Python, NFFT | MATLAB | Julia |
+|---|---:|---:|---:|---:|
+| SO3 eval L=64 1e6, 1 / m-3m | 201 / 231 | | 282 / 239 | 399 / 1445 |
+| SO3 eval L=128 1e4, 1 / m-3m | 250 / 101 | | 313 / 104 | 487 / 1438 |
+| SO3 eval L=128 1e6, 1 / m-3m | 450 / 304 | | 1096 / 607 | 1049 / crash |
+| SO3 quadrature L=64 1e6, 1 / m-3m | 275 / 296 | 287 / 243 | 302 / 352 | 583 / 1589 |
+| SO3 quadrature L=128 1e4, 1 / m-3m | 419 / 182 | 376 / 208 | 417 / 184 | 948 / 1651 |
+| SO3 quadrature L=128 1e6, 1 / m-3m | 708 / 614 | 962 / 663 | 1298 / 696 | 1698 / crash |
+| SO3 grid L=127 1/1, eval / quadrature | 335 / 397 | | 513 / 609 | 955 / 989 |
+| SO3 grid L=127 432/1 | 96 / 142 | | 115 / 202 | 211 / 317 |
+| SO3 grid L=128 622/222 | 22 / 46 | | 56 / 89 | 105 / 172 |
+| SO3 symmetrise L=128 622/222, 432/mmm, 432/1 | 6 / 23 / 18 | | 18 / 28 / 32 | 36 / 25 / 27 |
+| SO3 isReal L=128 | 3.0 | | 3.7 | |
+| SO3 rotate L=128 / 64 | 135 / 20 | | 119 / 17 | |
+| S2 eval / quadrature L=128 1e6 | 70 / 98 | | 103 / 95 | 272 / 186 |
+| S2 grid eval L=256 / 512 / 1024 | 13 / 75 / 508 | | 22 / 85 / 747 | 17 / 275 / 2960 |
+| S2 quadrature of a callable L=256 | 26 | | 30 | |
+| S2 symmetrise m-3m L=128 | 3.8 | | 27 | 2682 |
+| S2 calcDensity 1e5 | 15 | | 21 | 20 |
+
+Python is faster than both on every row but three, where it is level with MATLAB within the
+run to run spread: the quadrature at 1e4 nodes at L = 128 (419 against 417, the NFFT backend
+376), the S2 quadrature at 1e6 nodes (98 against 95, 58 in an earlier run) and `rotate`
+(135 against 119; the phases around a real d_n(beta) from a compiled table, the O(L^4) of the
+products left). The NFFT backend is ahead at few nodes on a large lattice and within the
+spread elsewhere.
+
+## The Dubna chain: SO3Fun.dubna, discreteSample(1e7), calcDensity, 2026-09-25
+
+`bench/dubna_density.py`, `bench/dubna_density.jl`, `bench/matlab/bench_dubna_density.m`;
+warm runs, s. MATLAB's `SO3Fun.dubna` answers 0.31 s from the second call on; its
+`calcODF(pf)` alone is 1.0 to 1.2 s, the fair comparison of the first step.
+
+| step | Python before | Python after | MATLAB | Julia |
+|---|---:|---:|---:|---:|
+| odf = SO3Fun.dubna (calcODF of the seven pole figures) | 11.6 | 1.85 (3.0 under load) | 1.0-1.2 | 2.3 |
+| discreteSample(1e7) | 5.5 | 0.46 (0.8 under load) | 1.5 | 2.3 |
+| calcDensity(ori) | 1.26 | 1.3 (2.3 under load) | 1.06 | 4.3 |
+
+What changed:
+- **The OpenMP runtimes of finufft (its own libgomp) and the NFFT spin their threads after a
+  transform**, and numba's TBB pool runs on the same cores: a 2D transform of 1e5 nodes on a
+  97 x 97 lattice took 115 to 265 ms after a numba kernel instead of 3. `OMP_WAIT_POLICY` is
+  set to `PASSIVE` before either library loads (`passiveOpenMP` in `geometry/kernels.py`, a
+  policy the user set stays); calcODF 14 -> 2 s, calcDensity 4 -> 1.3 s against `ACTIVE`.
+- **The pole figure operator takes real plans**: its values are real, the half lattice
+  serves, 1.95 -> 1.85 s, the ODF equal to 1e-8.
+- **The radial basis function sampler is one compiled loop** (`rbfSample` in
+  `functions/kernels.py`): a centre by its weight, the angle by the kernel's inverse cdf, a
+  uniform axis, the group elements on both sides, uniforms from the caller's generator in
+  chunks of 2^20, so a seeded generator gives the same sample; 5.5 -> 0.46 s.
+
+Measured and left:
+- **The NFFT with precomputed windows (PRE_PSI) for the kept S2 plans of the solver** is slower
+  than finufft at these sizes (60 to 120 thousand nodes, 97 x 97): 5.9 / 5.3 ms, 8.1 / 7.1 ms
+  with PRE_PSI, against finufft's 2.7 / 4.2 ms.
+- **The operator through one SO(3) transform on the grid** (Y_n(g h) = conj(D_n(g)) Y_n(h),
+  the grid's Wigner coefficients shared by every pole figure, the backward summed over them
+  into one series) gives the same ODF to 9e-9 but is slower, 2.4 s: the 3D spreading of the
+  20040 grid nodes costs more than the 2D spreading of their 60 to 120 thousand images.
+- **finufft with upsampfac 2, ten threads and FFTW_ESTIMATE** took 355 ms for a transform that
+  takes 38 ms with FFTW_MEASURE (20040 nodes, 17 x 97 x 97); the density rule picks 1.25
+  there, but the combination is a trap for other sizes.
+
+## The gridded adjoint, the NFFT for the whole chain, and calcODF against MATLAB, 2026-09-25
+
+**The gridded adjoint** (`wignerSeriesAdjointGridded`, MATLAB's `adjoint(..., 'gridded')`):
+above 10 L^3 centres `SO3FunRBF._harmonic` rounds them onto a Clenshaw-Curtis grid of
+bandwidth min(2L, max(L, 128)), folded by the z folds of the frames, and runs the grid's
+exact FFT adjoint. calcDensity of 1e7 Dubna samples 1.27 -> 0.77 s (MATLAB 1.06); the
+density's values move by 0.7 %, the rounding MATLAB accepts on the same grid.
+
+**The NFFT for every transform** (preference `NUFFT = 'nfft'`, equal to finufft to 3.5e-8):
+calcODF 2.8-3.1 s, 2.2-2.3 s with PRE_PSI, against finufft's 1.7-2.6 s; calcDensity 3.4-4.0 s
+against 1.2-2.2 s. The spreading of many nodes is finufft's strength; under `auto` the NFFT
+now takes the SO(3) adjoint only for fewer nodes than lattice points, where its pruned FFT
+counts. A regression found on the way: `nfftLibrary()` without a configured path asked
+`ctypes.util.find_library` on every transform, which starts processes; calcODF went from
+1.7 to 8 s until the lookup was held.
+
+**calcODF against MATLAB.** The same algorithm with the same counts: 7 iterations, 56 forward
+and 56 backward operator calls, 224 transforms, bandwidth 48, gh nodes 59544 or 119088 per
+pole figure (Python 60120 or 120240, its grid 20040 orientations against MATLAB's 19848),
+1368 specimen directions.
+
+| | MATLAB | Python |
+|---|---:|---:|
+| total | 1.14 s | 1.68 s |
+| transforms | 1.09 s (nfsftmex, 729 calls, plan precomputation included) | 1.22-1.24 s (224 finufft executes) |
+| the rest | about 0.3 s (init 0.29) | 0.45 s: the grid 0.15, the plans 0.06, the S2 coefficient transforms 0.09, the solver's vector arithmetic 0.11 |
+
+The large transforms take 11.9 / 14.3 ms (type 1, 60 / 120 thousand nodes) and 5.5 / 8.5 ms
+(type 2) inside the loop, against 5.6 / 7.6 and 2.2 / 4.1 ms for the same seven plans called
+in turn in isolation; at the isolated times the transforms would be 0.55 s and calcODF about
+1.1 s. Not the cause: the order of the plans (measured), the numba pool (numba off is no
+faster), the threading layer (TBB is the fastest of the three). The runs were made at a load
+average of 5 to 9 from other processes, with the same configuration varying from 1.7 to 2.8 s,
+so the cause of the in-loop factor is left for a quiet machine.
+
+**The cause, on a quiet machine.** The large transforms of calcODF took 12 / 14 ms (type 1)
+and 5 / 8 ms (type 2) inside the solver and 2.4 / 3.5 and 1.2 / 2.2 ms alone, on the same
+plans and the same inputs; not the numba pool (numba off: as slow), not subnormal inputs (none),
+not the plans (the solver's own plan alone is as fast as a fresh one). It was OpenBLAS: the
+solver's products of vectors run on NumPy's OpenBLAS, whose ten threads busy wait after
+every call and take the cores of the transforms. With `OPENBLAS_NUM_THREADS=1` calcODF went
+from 1.77 to 0.69 s. The environment variable acts only before NumPy loads, so
+`blasThreads(n)` in `geometry/kernels.py` sets every loaded OpenBLAS (NumPy's and SciPy's are
+separate libraries) through ctypes for a block and restores it; the solver's iteration and
+optimalSample's run under `blasThreads(1)`. calcODF 0.65 to 0.77 s (MATLAB 1.14), optimalSample
+of the 222 fibre at L = 64 3.79 -> 2.21 s; the quadrature rows of `harmonics_user.py`, which
+call BLAS once per transform, do not move.
+
+The Dubna chain after it, s: `SO3Fun.dubna` 1.0 to 1.13 (the pole figures read and calcODF;
+MATLAB 0.31 from its cache, its calcODF 1.14), `discreteSample(1e7)` 0.54 to 0.59 (MATLAB
+1.5), `calcDensity` 0.92 to 1.0 (MATLAB 1.06); Julia 2.3 / 2.3 / 4.3.

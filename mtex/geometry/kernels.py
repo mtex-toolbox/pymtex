@@ -28,6 +28,86 @@ def backend():
   return "numba" if getMTEXpref("kernels", "numba") == "numba" and _jit() else "numpy"
 
 
+# the threads a parallel call takes: the preference 'threads', else one per physical core
+# this process may run on, since two threads on the hyperthreads of one core run slower
+# than one in the transforms (finufft warns); the count read from the kernel's topology
+_physicalCores = None
+
+
+def threads():
+  n = getMTEXpref("threads")
+  if n:
+    return int(n)
+  global _physicalCores
+  if _physicalCores is None:
+    import os
+    cpus = os.sched_getaffinity(0) if hasattr(os, "sched_getaffinity") else range(os.cpu_count() or 1)
+    try:
+      cores = {open(f"/sys/devices/system/cpu/cpu{c}/topology/core_cpus_list").read().strip() for c in cpus}
+    except OSError:
+      cores = cpus
+    _physicalCores = max(1, len(cores))
+  return _physicalCores
+
+
+# the OpenMP runtimes of finufft and the NFFT spin their threads after a transform by default,
+# which starves numba's pool and every other one on the same cores: a small transform after a
+# parallel kernel took 115-265 ms instead of 3 (docs/research/benchmark-harmonics.md). The
+# runtime reads the policy when it is loaded, so it is set before the first such library is;
+# a policy the user set stays
+def passiveOpenMP():
+  import os
+  os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
+
+
+# OpenBLAS keeps its threads busy waiting for a while after every threaded call, so a loop
+# that interleaves small BLAS products with finufft or numba finds its cores taken: the
+# transforms of calcODF ran four times slower than alone (docs/research/benchmark-harmonics.md).
+# blasThreads(n) sets the thread count of every OpenBLAS the process has loaded (NumPy's and
+# SciPy's are separate libraries) for the block and restores it; where none is found, or on
+# a system without /proc, it does nothing
+_BLAS_SETTERS = ("scipy_openblas_set_num_threads64_", "scipy_openblas_set_num_threads", "openblas_set_num_threads64_",
+                 "openblas_set_num_threads")
+_BLAS_GETTERS = ("scipy_openblas_get_num_threads64_", "scipy_openblas_get_num_threads", "openblas_get_num_threads64_",
+                 "openblas_get_num_threads")
+
+
+def _openblasLibraries():
+  import ctypes
+  try:
+    paths = {line.split()[-1] for line in open("/proc/self/maps") if "openblas" in line and ".so" in line}
+  except OSError:
+    return []
+  libs = []
+  for path in sorted(paths):
+    try:
+      lib = ctypes.CDLL(path)
+    except OSError:
+      continue
+    setter = next((getattr(lib, n) for n in _BLAS_SETTERS if hasattr(lib, n)), None)
+    getter = next((getattr(lib, n) for n in _BLAS_GETTERS if hasattr(lib, n)), None)
+    if setter is not None and getter is not None:
+      libs.append((getter, setter))
+  return libs
+
+
+class blasThreads:
+
+  def __init__(self, n):
+    self.n = int(n)
+
+  def __enter__(self):
+    self.saved = [(g, st, g()) for g, st in _openblasLibraries()]
+    for _, st, _ in self.saved:
+      st(self.n)
+    return self
+
+  def __exit__(self, *exc):
+    for _, st, n in self.saved:
+      st(n)
+    return False
+
+
 def _loop(name, f):
   if name not in _compiled:
     _compiled[name] = _numba.njit(cache=True, nogil=True)(f)

@@ -13,7 +13,8 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d
-from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY
+from ..geometry.representations import quat2euler
+from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .kernelfunctions import S1Kernel, S2Kernel, SO3Kernel
 from .quadrature import bandwidthFor, legendreP, quadratureS2Grid, quadratureSO3Grid
 from .s1fun import S1FunHarmonic
@@ -39,13 +40,34 @@ def _degreesOf(n):
 # orientation carries the new frame of the rotated side
 
 
+# the Wigner-d matrices d_0(beta) .. d_L(beta), from the compiled table or the recursion
+def _wignerdAt(beta, L):
+  from ..geometry.kernels import backend
+  if backend() != "numba":
+    return wignerdDegrees(np.float64(beta), L)
+  from .kernels import wignerdTable
+  T = wignerdTable(beta, L)
+  return ((n, T[deg2dim(n):deg2dim(n + 1)].reshape(2 * n + 1, 2 * n + 1)) for n in range(L + 1))
+
+
+# conj(D_n) = diag(e^{ik alpha}) d_n(beta) diag(e^{il gamma}) with d_n real: the phases scale
+# rows and columns and the real d_n multiplies the real and imaginary parts, half the work of
+# a complex product, D_n never formed
 def _rotatedCoefficients(fhat, r, side):
   L = dim2deg(len(fhat))
-  D = _WignerD(r, bandwidth=L, dtype=fhat.real.dtype)
+  q = (r.rot if isinstance(r, orthogonalTransform) else r).data.reshape(-1, 4)[0]
+  alpha, beta, gamma = (float(e) for e in quat2euler(q, "Matthies"))
   out = np.empty_like(fhat)
-  for n in range(L + 1):
+  for n, d in _wignerdAt(beta, L):
+    k = np.arange(-n, n + 1)
+    a, c = np.exp(1j * k * alpha), np.exp(1j * k * gamma)
     F = degreeBlock(fhat, n)
-    degreeBlock(out, n)[...] = np.conj(D[n]) @ F if side == "left" else F @ np.conj(D[n])
+    if side == "left":
+      X = c[:, None] * F
+      degreeBlock(out, n)[...] = a[:, None] * (d @ X.real + 1j * (d @ X.imag))
+    else:
+      X = F * a[None, :]
+      degreeBlock(out, n)[...] = (X.real @ d + 1j * (X.imag @ d)) * c[None, :]
   return out
 
 

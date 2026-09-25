@@ -10,7 +10,7 @@ in the other notes of this directory.
 |---|---|---|
 | quaternion products, symmetry reduction, fundamental region projection | numba kernels in `geometry/kernels.py`, NumPy fallback as oracle | at or below Julia single thread (`benchmark-geometry.md`, `benchmark-e2-kernels.md`) |
 | nearest and radius search on S2 rings and on SO(3) through the k-d tree | compiled searches in `geometry/grids/` | done (`benchmark-gridsearch.md`) |
-| Wigner and spherical coefficient transforms | NumPy ladders, finufft on scattered nodes, `scipy.fft` on the Clenshaw-Curtis grid, direct sum below 50 nodes, one thread below a work of 2e8 | done (`benchmark-harmonics.md`, `benchmark-sampling.md`) |
+| Wigner and spherical coefficient transforms | parallel numba kernels on the quadrant of d(pi/2) (SO3) and by rows (S2, exact beyond L = 1023), finufft on scattered nodes with the NFFT of `../nfft` as optional adjoint, the grid route one axis at a time, direct sum below 50 nodes | done, faster than MATLAB's master and Julia (`benchmark-harmonics.md`, `docs/plans/harmonics-speed.md`) |
 | RBF evaluation, `calcComponents`, `max(odf)` with hundreds of centres | none | hangs on hundreds of centres; the halo cell list is the planned fix |
 | kernel density estimation `calcDensity` | harmonic route | fine on the sphere, untimed at scale on SO(3) |
 | pole figure inversion `calcODF` | two `S2FourierPlan`s per iteration, Voronoi weights, dense harmonic weights | dense solve only below 4000 nodes |

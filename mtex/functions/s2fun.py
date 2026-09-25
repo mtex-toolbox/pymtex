@@ -20,9 +20,10 @@ from ..geometry.frames import referenceFrame
 from ..geometry.quaternion import rotation
 from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.vector3d import vector3d
-from .harmonics import _WignerD, mtexCoefficientsS2
+from .harmonics import _WignerD, _projectBlock, invariantProjection, mtexCoefficientsS2
 from .kernelfunctions import S2Kernel
 from .quadrature import quadratureS2Grid
+from .kernels import realizeSpherical
 from .transforms import isRealSpherical, sphericalSeries, sphericalSeriesAdjoint
 
 
@@ -37,16 +38,6 @@ def quadratureBandwidth():
 
 def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
-
-
-# the conjugate symmetry of a real valued function imposed on a coefficient array
-def realizeSpherical(fhat):
-  L = math.isqrt(fhat.shape[-1]) - 1
-  for l in range(L + 1):
-    c = fhat[..., l * l:(l + 1) ** 2]
-    m = np.arange(-l, l + 1)
-    c[...] = (c + np.where(m % 2, -1.0, 1.0) * np.conj(c)[..., ::-1]) / 2
-  return fhat
 
 
 # an axis valued function has even degrees only
@@ -67,18 +58,25 @@ def _degrees(n):
   return np.floor(np.sqrt(np.arange(n))).astype(int)
 
 
-# the projection onto the functions invariant under a group: an element s acts by
-# f(s^-1 v), so the projection of degree l is the mean of eps_s^l D_l(r_s) with eps the
-# parity of s, over all elements including the improper ones
-def sphericalProjection(pg, L, dtype=np.float64):
-  els = pg.rot.flatten()
-  P = [np.zeros((2 * l + 1, 2 * l + 1), dtype=_complexType(dtype)) for l in range(L + 1)]
-  D = _WignerD(els.rot, bandwidth=L, dtype=dtype)
-  improper = els.isImproper
+# the projection onto the functions invariant under a group, in place: an element s acts by
+# f(s^-1 v) with its parity eps_s on the degree, so degree l projects by the mean of
+# eps_s^l D_l(r_s). On the even degrees that is the projection P_K onto the rotation parts K
+# of all elements; on the odd ones the proper elements H count +1 and the improper ones -1,
+# which sums to 2|H|/|G| P_H - P_K. Both are the held projections of H5
+def projectSpherical(fhat, pg):
+  L = math.isqrt(fhat.shape[-1]) - 1
+  dtype = fhat.real.dtype
+  K = invariantProjection(pg, L, dtype)
+  H = None if pg.isProper else invariantProjection(pg, L, dtype, proper=True)
+  c = 2 * pg.numProper() / pg.numSym()
+  rows = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
   for l in range(L + 1):
-    sign = np.where(improper & (l % 2 == 1), -1.0, 1.0)
-    P[l] = np.einsum("i,ikl->kl", sign, D[l]) / els.size
-  return P
+    B = rows[:, l * l:(l + 1) ** 2]
+    b = _projectBlock(B.copy(), None, K, l)
+    B[...] = b if H is None or l % 2 == 0 else c * _projectBlock(B.copy(), None, H, l) - b
+  if not fhat.flags.c_contiguous:
+    fhat[...] = rows.reshape(fhat.shape)
+  return fhat
 
 
 class S2FunHarmonic:
@@ -303,14 +301,10 @@ class S2FunHarmonic:
     if rots is not None:
       rots = rots.flatten()
       D = _WignerD(rots, bandwidth=L, dtype=self._fhat.real.dtype)
-      P = [np.mean(D[l], axis=0) for l in range(L + 1)]
-    elif self.frame is not None:
-      P = sphericalProjection(self.frame.sym, L, self._fhat.real.dtype)
-    else:
-      P = None
-    if P is not None:
       for l in range(L + 1):
-        fhat[..., l * l:(l + 1) ** 2] = fhat[..., l * l:(l + 1) ** 2] @ P[l].T
+        fhat[..., l * l:(l + 1) ** 2] = fhat[..., l * l:(l + 1) ** 2] @ np.mean(D[l], axis=0).T
+    elif self.frame is not None:
+      projectSpherical(fhat, self.frame.sym)
     if self.antipodal:
       evenize(fhat)
     return self._rebuild(fhat)

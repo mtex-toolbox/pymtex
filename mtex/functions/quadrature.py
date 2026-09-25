@@ -182,6 +182,9 @@ class quadratureSO3Grid:
   # values at the distinct nodes spread onto the full grid, values at the full grid kept
   def fullValues(self, values):
     values = np.asarray(values)
+    # values at every node need no distinct nodes, which take seconds to find
+    if values.shape[0] == len(self):
+      return values
     index, inverse = self._unique()
     if values.shape[0] == len(index) and len(index) != len(self):
       return values[inverse]

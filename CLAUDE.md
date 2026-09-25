@@ -65,9 +65,15 @@ The products, the searches of the symmetry reduction and the projections are num
 in `mtex/geometry/kernels.py`, compiled on first call, with NumPy forms as fallback and test
 oracle; the maps layer keeps its own in `mtex/maps/kernels.py` (the clipping, the union-find,
 the loop tracing, the fused gradient, KAM and GROD over the lattice, the simplex of the
-dislocation fit), the planar hull in `mtex/geometry/hull.py` and the inverse pole figure
-colouring of a map in `mtex/plotting/kernels.py`, on the same pattern; `setMTEXpref('kernels', 'numpy')` selects the fallback. Never import numba at
-module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
+dislocation fit), the planar hull in `mtex/geometry/hull.py`, the inverse pole figure
+colouring of a map in `mtex/plotting/kernels.py` and the NUFFT nodes and real defects of the
+harmonic transforms in `mtex/functions/kernels.py`, on the same pattern;
+`setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
+physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft and
+`scipy.fft`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
+`libnfft3_omp.so`) is an optional backend of the SO(3) adjoint through ctypes,
+`mtex/functions/nfft.py`, found by the preference `NFFTLibrary` or `MTEX_NFFT_LIBRARY`;
+finufft stays the dependency. Never import numba at module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
 k-d tree, `mtex/geometry/grids/orientationtree.py`, for nearest, k-nearest and radius; the
 radius search is what ODF reconstruction needs. The S2 ring grid keeps its compiled ring
 search in `mtex/geometry/grids/gridsearch.py`. The nearest search of the ring grids is the same pattern in
