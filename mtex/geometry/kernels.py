@@ -114,6 +114,19 @@ def _loop(name, f):
   return _compiled[name]
 
 
+prange = range
+
+
+# a loop compiled over the cores, run on the threads of the preference
+def _parallel(name, f):
+  global prange
+  prange = _numba.prange
+  if name not in _compiled:
+    _compiled[name] = _numba.njit(cache=True, parallel=True, nogil=True)(f)
+  _numba.set_num_threads(min(threads(), _numba.config.NUMBA_NUM_THREADS))
+  return _compiled[name]
+
+
 # the floating type two operands share, float64 for anything else
 def _floatType(*arrays):
   dtypes = {a.dtype for a in arrays}
@@ -569,67 +582,64 @@ def _projectDirectionsNumpy(xyz, imgs, q, parity):
 # ------------------------------------------------------------------ the projection into a region
 
 # every direction moved into a region by the group: the first image of it that lies inside,
-# the direction itself when none does. A region is a few planes, so the test is a dot
-# product against each and the loop leaves as soon as one image is in - which is why this
-# is a loop and not the (n, |G|, 3) block of images the NumPy form has to build.
-def _projectIntoSectorLoop(xyz, els, N, alpha, regionAnti, vAnti, tol, out):
-  m, p = els.shape[0], N.shape[0]
-  for i in range(xyz.shape[0]):
+# else the image missing the region by least if it misses by less than the tolerance, else
+# the direction itself. The plane k of the region tests the image R_j x as (R_j^T N_k) . x,
+# so the loop takes P = R_j^T N_k, (m, p, 3), and rotates only the image it keeps; it leaves
+# as soon as one image is in - which is why this is a loop and not the (n, |G|, 3) block of
+# images the NumPy form has to build.
+def _projectIntoSectorLoop(xyz, R, P, alpha, regionAnti, vAnti, tol, out):
+  m, p = P.shape[0], P.shape[1]
+  for i in prange(xyz.shape[0]):
     x, y, z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
-    out[i, 0], out[i, 1], out[i, 2] = x, y, z
     n = np.sqrt(x * x + y * y + z * z)
+    best, bj, bs = -np.inf, -1, 1.0
     done = False
     for side in range(2):
       if done or (side == 1 and not vAnti):
         break
       sign = 1.0 if side == 0 else -1.0
       for j in range(m):
-        a, b, c, d, par = els[j, 0], els[j, 1], els[j, 2], els[j, 3], els[j, 4]
-        s = 2 * (x * b + y * c + z * d)
-        a2 = 2 * a
-        an = a * a - (b * b + c * c + d * d)
-        tx = sign * par * (a2 * (c * z - y * d) + s * b + an * x)
-        ty = sign * par * (a2 * (d * x - z * b) + s * c + an * y)
-        tz = sign * par * (a2 * (b * y - x * c) + s * d + an * z)
-        ok = True
+        # the margin of the image: the least signed distance to the planes, of it or its antipode
+        margin, marginNeg = np.inf, np.inf
         for k in range(p):
-          if tx * N[k, 0] + ty * N[k, 1] + tz * N[k, 2] < (alpha[k] - tol) * n:
-            ok = False
-            break
-        if not ok and regionAnti:
-          ok = True
-          for k in range(p):
-            if -(tx * N[k, 0] + ty * N[k, 1] + tz * N[k, 2]) < (alpha[k] - tol) * n:
-              ok = False
-              break
-        if ok:
-          out[i, 0], out[i, 1], out[i, 2] = tx, ty, tz
+          t = sign * (P[j, k, 0] * x + P[j, k, 1] * y + P[j, k, 2] * z)
+          margin = min(margin, t - alpha[k] * n)
+          marginNeg = min(marginNeg, -t - alpha[k] * n)
+        if regionAnti:
+          margin = max(margin, marginNeg)
+        if margin > best:
+          best, bj, bs = margin, j, sign
+        if margin >= 0:
           done = True
           break
+    if bj < 0 or best < -tol * n:
+      out[i, 0], out[i, 1], out[i, 2] = x, y, z
+    else:
+      for c in range(3):
+        out[i, c] = bs * (R[bj, c, 0] * x + R[bj, c, 1] * y + R[bj, c, 2] * z)
 
 
 def _projectIntoSectorNumpy(xyz, els, N, alpha, regionAnti, vAnti, tol):
   out = xyz.copy()
-  inRegion = lambda w: (np.ones(w.shape[:-1], dtype=bool) if len(N) == 0 else
-                        np.all(w @ N.T >= (alpha - tol) * np.linalg.norm(w, axis=-1)[..., None], axis=-1))
+  margin = lambda w: (np.full(w.shape[:-1], np.inf) if len(N) == 0 else
+                      np.min(w @ N.T - alpha * np.linalg.norm(w, axis=-1)[..., None], axis=-1))
   # the images in chunks, so that the block of every image of every direction stays small
   step = max(1, 200000 // max(len(els), 1))
   for k in range(0, len(xyz), step):
     x = xyz[k:k + step]
     imgs = _qrotNumpy(els[None, :, :4], x[:, None, :]) * els[None, :, 4:5]
-    inside = inRegion(imgs)
+    # the candidates in the order of the loop: the images, then those of the antipode
+    cand = np.concatenate([imgs, -imgs], axis=1) if vAnti else imgs
+    mg = margin(cand)
     if regionAnti:
-      inside |= inRegion(-imgs)
-    hit = np.any(inside, axis=1)
-    chosen = imgs[np.arange(len(x)), np.argmax(inside, axis=1)]
-    if vAnti:
-      insideNeg = inRegion(-imgs)
-      if regionAnti:
-        insideNeg |= inside
-      hitNeg = ~hit & np.any(insideNeg, axis=1)
-      chosen = np.where(hitNeg[:, None], -imgs[np.arange(len(x)), np.argmax(insideNeg, axis=1)], chosen)
-      hit |= hitNeg
-    out[k:k + step] = np.where(hit[:, None], chosen, x)
+      mg = np.maximum(mg, margin(-cand))
+    inside = mg >= 0
+    first = np.argmax(inside, axis=1)
+    closest = np.argmax(mg, axis=1)
+    pick = np.where(np.any(inside, axis=1), first, closest)
+    rows = np.arange(len(x))
+    ok = mg[rows, pick] >= -tol * np.linalg.norm(x, axis=1)
+    out[k:k + step] = np.where(ok[:, None], cand[rows, pick], x)
   return out
 
 
@@ -642,8 +652,12 @@ def projectIntoSector(xyz, els, N, alpha, regionAnti=False, vAnti=False, tol=1e-
   if backend() == "numpy":
     out = _projectIntoSectorNumpy(xyz, els, N, alpha, bool(regionAnti), bool(vAnti), float(tol))
   else:
+    # the matrices of the elements, the parity in them, and the planes turned back by them
+    R = _qrotNumpy(els[:, None, :4], np.eye(3)[None]).transpose(0, 2, 1) * els[:, 4, None, None]
+    P = np.ascontiguousarray(np.einsum("jik,pi->jpk", R, N)) if len(N) else np.zeros((len(els), 0, 3))
     out = np.empty_like(xyz)
-    _loop("projectIntoSector", _projectIntoSectorLoop)(xyz, els, N, alpha, bool(regionAnti), bool(vAnti), float(tol), out)
+    _parallel("projectIntoSector", _projectIntoSectorLoop)(xyz, np.ascontiguousarray(R), P, alpha, bool(regionAnti),
+                                                            bool(vAnti), float(tol), out)
   return out.reshape(shape + (3,))
 
 

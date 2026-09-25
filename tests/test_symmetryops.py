@@ -166,3 +166,23 @@ def test_the_axis_of_a_pair_turns_the_second_onto_the_first():
   o1, o2 = orientation.rand(500, cs, rng=rng), orientation.rand(500, cs, rng=rng)
   R = rotation.byAxisAngle(vector3d(axis(o1, o2).data), angle(o1, o2))
   assert np.max(angle(R * o2, o1)) < 1e-9
+
+
+@pytest.mark.parametrize("backend", ["numba", "numpy"])
+@pytest.mark.parametrize("s, antipodal", [("m-3m", False), ("432", False), ("6/mmm", False), ("-3m", True), ("2/m", True)])
+def test_folded_directions_lie_in_the_sector_exactly(backend, s, antipodal):
+  # an image within the tolerance of the rim must not win over the equivalent one inside
+  cs = crystalFrame(s)
+  x = rng.standard_normal((20000, 3))
+  m = Miller(vector3d(x / np.linalg.norm(x, axis=1, keepdims=True)), cs, antipodal=antipodal)
+  sR = mtex.fundamentalSector(cs, antipodal=antipodal)
+  mtex.setMTEXpref("kernels", backend)
+  try:
+    p = mtex.project2FundamentalRegion(m).data.reshape(-1, 3)
+  finally:
+    mtex.setMTEXpref("kernels", "numba")
+  margin = np.min(p @ np.asarray(sR.N).T - sR.alpha, axis=1)
+  if sR.antipodal:
+    margin = np.maximum(margin, np.min(-p @ np.asarray(sR.N).T - sR.alpha, axis=1))
+  assert margin.min() > -1e-12
+  assert np.max(np.abs(angle(Miller(vector3d(p), cs), m, noSymmetry=False))) < 1e-8
