@@ -31,7 +31,9 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 - `xvector`, `yvector`, `zvector` are minted on every access (module `__getattr__`), since
   a shared mutable constant once carried a frame from one test into the next.
 - `find` returns the MATLAB pair: `(ind, d)`, `(ind, d)` with k columns, or two sparse
-  matrices for a radius.
+  matrices for a radius. On an SO(3) grid the nearest form's `d` is cos(w/2), as MATLAB's
+  `SO3Grid/find`, the other forms angles. Internal searches (the orientation tree, the
+  kernels) return cos(w/2), which needs no arccos; only a public function converts.
 - Every container is an `MtexArray` over one `(..., k)` NumPy array with carried
   attributes; a single element is the zero-dimensional container. Test a container with
   `isinstance(x, MtexArray)`, never `hasattr(x, "data")`: an ndarray has `.data` too.

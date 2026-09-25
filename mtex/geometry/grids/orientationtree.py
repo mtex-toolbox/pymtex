@@ -4,7 +4,8 @@
 # union of the hits is the symmetry-reduced neighbourhood. It uses only the grid's points, so
 # it serves any SO(3) grid - the ring grid or the Fibonacci grid - the same way. An
 # orientation angle w maps to the Euclidean radius 2 sin(w/4) on the double cover [q, -q], so
-# a ball on the tree is a misorientation ball.
+# a ball on the tree is a misorientation ball. The searches return cos(w/2), the absolute
+# quaternion dot, which the kernels take and which needs no arccos.
 from __future__ import annotations
 
 import numpy as np
@@ -14,8 +15,13 @@ from scipy.spatial import cKDTree
 from ..symmetryops import symmetriseOrientation
 
 
-def _angleFromChord(d):
-  return 2 * np.arccos(np.clip(1 - d * d / 2, -1.0, 1.0))
+# cos(w/2) from the chord d between unit quaternions, |q - g|^2 = 2 - 2 q.g
+def _cosFromChord(d):
+  return np.clip(1 - d * d / 2, -1.0, 1.0)
+
+
+def _angle(c):
+  return 2 * np.arccos(np.minimum(c, 1.0))
 
 
 class OrientationTree:
@@ -34,7 +40,7 @@ class OrientationTree:
     imgs = symmetriseOrientation(o)
     return np.moveaxis(imgs.data.reshape(imgs.data.shape[0], -1, 4), 0, 1)
 
-  # the nearest grid rotation of each query and the reduced angle, over the images. A
+  # the nearest grid rotation of each query and cos(w/2) of the reduced angle, over the images. A
   # distance-bounded query, widened until every query is resolved: scipy's plain nearest
   # query prunes poorly on the 4-sphere, the bound makes it prune to the region
   def nearest(self, o):
@@ -61,15 +67,15 @@ class OrientationTree:
       delta *= 1.7
       if not todo.any() or delta >= np.pi:
         break
-    return idx, _angleFromChord(np.where(np.isfinite(best), best, 2.0))
+    return idx, _cosFromChord(np.where(np.isfinite(best), best, 2.0))
 
-  # the k nearest grid rotations of each query and their reduced angles, distinct grid points
+  # the k nearest grid rotations of each query and cos(w/2) of their reduced angles, distinct grid points
   def knn(self, o, k):
     imgs = self._images(o)
     nq, S = imgs.shape[0], imgs.shape[1]
     flat = imgs.reshape(-1, 4)
     outI = np.zeros((nq, k), dtype=int)
-    outD = np.full((nq, k), np.pi)
+    outD = np.zeros((nq, k))
     todo = np.ones(nq, dtype=bool)
     delta = 3.0 * self.res * np.cbrt(k)
     while True:
@@ -96,7 +102,7 @@ class OrientationTree:
             break
         if len(gi) == k:
           outI[q] = gi
-          outD[q] = _angleFromChord(np.array(gd))
+          outD[q] = _cosFromChord(np.array(gd))
           todo[q] = False
       delta *= 1.7
       if not todo.any() or delta >= np.pi:
@@ -104,7 +110,7 @@ class OrientationTree:
     return outI, outD
 
   # every grid rotation within eps of each query, up to symmetry: the sparse incidence
-  # (nq x n) and the sparse reduced angles, the min over the images that reach a grid point
+  # (nq x n) and the sparse cos(w/2) of the reduced angles, the max over the images that reach a grid point
   def radius(self, o, eps):
     r = 2 * np.sin(eps / 4)
     imgs = self._images(o)
@@ -131,22 +137,27 @@ class OrientationTree:
     first = np.ones(len(rows), dtype=bool)
     first[1:] = (rows[1:] != rows[:-1]) | (cols[1:] != cols[:-1])
     rows, cols, dots = rows[first], cols[first], dots[first]
-    ang = 2 * np.arccos(np.minimum(dots, 1.0))
     shape = (nq, self.n)
     I = sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape)
-    D = sparse.csr_matrix((ang, (rows, cols)), shape=shape)
+    D = sparse.csr_matrix((np.minimum(dots, 1.0), (rows, cols)), shape=shape)
     return I, D
 
 
-# the cached tree of a grid, built on first search
+# the tree of a grid, cached on it and built on first search; of any other orientations a
+# fresh one
 def orientationTree(grid):
+  from .so3grid import SO3Grid
+  from .superfibonacci import SO3FibonacciGrid
+  if not isinstance(grid, (SO3Grid, SO3FibonacciGrid)):
+    return OrientationTree(grid.flatten())
   if getattr(grid, "_otree", None) is None:
     grid._otree = OrientationTree(grid)
   return grid._otree
 
 
 # the MATLAB find on an orientation grid through the tree: nearest (eps None), k nearest (int),
-# or all within a radius (float), returning the MATLAB shapes
+# or all within a radius (float), returning the MATLAB shapes; the nearest form gives cos(w/2)
+# of the misorientation angle w as MATLAB's SO3Grid/find does, the other two the angles
 def findInGrid(grid, o, epsOrK=None):
   from ..orientation import orientation
   o = o if isinstance(o, orientation) else orientation(o, grid.frameA, grid.frameB)
@@ -155,8 +166,11 @@ def findInGrid(grid, o, epsOrK=None):
     ind, d = tree.nearest(o.flatten())
     return ind.reshape(o.shape), d.reshape(o.shape)
   if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
-    return tree.knn(o.flatten(), int(epsOrK))
-  return tree.radius(o.flatten(), float(epsOrK))
+    ind, c = tree.knn(o.flatten(), int(epsOrK))
+    return ind, _angle(c)
+  I, C = tree.radius(o.flatten(), float(epsOrK))
+  C.data = _angle(C.data)
+  return I, C
 
 
 __all__ = ["OrientationTree", "orientationTree", "findInGrid"]

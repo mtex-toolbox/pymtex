@@ -21,8 +21,8 @@ def test_nearest_is_the_reduced_closest(name):
     o = orientation.rand(400, g.frameA, rng=rng)
     ind, d = mtex.find(g, o)
     dall = mtex.angle(o[:, None], g[None, :])
-    assert np.allclose(d, dall.min(axis=1), atol=1e-9)
-    assert np.allclose(d, mtex.angle(o, g[ind]), atol=1e-9)
+    assert np.allclose(d, np.cos(dall.min(axis=1) / 2), atol=1e-9)
+    assert np.allclose(d, np.cos(mtex.angle(o, g[ind]) / 2), atol=1e-9)
 
 
 @pytest.mark.parametrize("name", ["m-3m", "222"])
@@ -55,7 +55,7 @@ def test_grid_finds_itself_and_shapes():
   cs = crystalFrame("m-3m")
   g = equispacedSO3Grid(cs, resolution=6 * mtex.degree)
   ii, dd = mtex.find(g, g[:100])
-  assert np.array_equal(ii, np.arange(100)) and np.max(dd) < 1e-9
+  assert np.array_equal(ii, np.arange(100)) and np.min(dd) > 1 - 1e-12
   o = orientation.rand((3, 4), cs, rng=rng)
   ind, d = mtex.find(g, o)
   assert ind.shape == (3, 4) and d.shape == (3, 4)

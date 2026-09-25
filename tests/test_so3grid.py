@@ -19,7 +19,7 @@ def test_equispaced_orientation_grids(case):
   d = dot(g[None, :], o[:, None])
   ind, dist = g.find(o)
   assert np.all(np.abs(np.max(d, axis=1) - d[np.arange(60), ind]) < 1e-10)
-  assert np.allclose(np.cos(dist / 2), d[np.arange(60), ind])
+  assert np.allclose(dist, d[np.arange(60), ind])
   # coverage up to symmetry, below the resolution
   assert np.max(2 * np.arccos(np.minimum(1, np.max(d, axis=1)))) < res
   eps = 1.5 * res

@@ -88,7 +88,8 @@ class SO3Grid(orientation):
 
   # the nearest grid rotation of every orientation, or the k nearest, or all within a
   # radius, up to the symmetries of the grid's frames, through the quaternion k-d tree of
-  # orientationtree.py (MATLAB SO3Grid/find). The angles are the reduced misorientation ones
+  # orientationtree.py (MATLAB SO3Grid/find): cos(w/2) of the reduced misorientation angle w
+  # for the nearest, the angles for the k nearest and the radius
   def find(self, o, epsOrK=None):
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
@@ -183,7 +184,8 @@ def _mergeClose(g, delta, candidates):
   idx = np.flatnonzero(candidates)
   if idx.size == 0:
     return g
-  I, D = g.find(g[idx], delta)
+  from .orientationtree import orientationTree
+  I, _ = orientationTree(g).radius(g[idx], delta)
   I = I.tocoo()
   pairs = sorted(((min(i, j), max(i, j)) for c, i in zip(I.row, I.col) for j in [idx[c]] if i != j), key=lambda p: p[1])
   drop = np.zeros(g.size, dtype=bool)

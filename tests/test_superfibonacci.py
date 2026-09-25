@@ -13,7 +13,8 @@ def test_covers_the_fundamental_region(name):
   g = superfibonacciSO3Grid(cs, resolution=5 * mtex.degree)
   # every random orientation is within about one resolution of a grid point (good covering)
   o = orientation.rand(5000, cs, rng=np.random.default_rng(0))
-  _, d = mtex.find(g, o)
+  _, c = mtex.find(g, o)
+  d = 2 * np.arccos(np.minimum(c, 1))
   assert np.degrees(d.max()) < 12 and np.degrees(np.mean(d)) < 6
 
 
