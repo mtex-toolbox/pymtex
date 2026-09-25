@@ -138,7 +138,8 @@ def matlabNames(n):
 
 
 # a MATLAB class without a Python class of its name is spelled by the Python class sharing
-# most of its method names: Miller by vector3d, crystalSymmetry by crystalFrame
+# most of its method names (Miller by vector3d, crystalSymmetry by crystalFrame), else by its
+# nearest ancestor that Python has
 def classAliases(ix, pyNodes):
   pyNames = {}
   for n in pyNodes:
@@ -153,6 +154,15 @@ def classAliases(ix, pyNodes):
     shared = len(names & best[1] - ARITHMETIC)
     if shared >= 3 and shared >= 0.25 * len(names):
       aliases.setdefault(best[0], []).append(c)
+      continue
+    # else the nearest MATLAB ancestor Python has: EBSDsquare is an EBSD whose grid pymtex keeps inside
+    frontier = list(ix.mClass.get(c, {}).get("supers", []))
+    while frontier:
+      a = frontier.pop(0)
+      if a in ix.pClass:
+        aliases.setdefault(a, []).append(c)
+        break
+      frontier += ix.mClass.get(a, {}).get("supers", [])
   return aliases
 
 
@@ -303,7 +313,11 @@ def algorithms(ix, benchDir):
     tree = ast.parse(open(path).read())
     for st in tree.body:
       if isinstance(st, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "ALGORITHM" for t in st.targets):
-        decl = ast.literal_eval(st.value)
+        try:
+          decl = ast.literal_eval(st.value)
+        except ValueError:
+          print(f"{os.path.relpath(path, ROOT)}: ALGORITHM is not a literal, skipped")
+          continue
         for a in decl if isinstance(decl, list) else [decl]:
           n = algos.setdefault(a["name"], dict(id=f"algo:{a['name']}", port="algorithm", kind="algorithm",
                                                name=a["name"], entry={}, cases={}, files=[], tolerance={}))
