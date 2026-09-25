@@ -52,7 +52,7 @@ def render(ebsd, name, **kw):
 
 def main():
   print(f"python {sys.version.split()[0]}, numpy {np.__version__}, matplotlib {matplotlib.__version__}")
-  print("map,n,colors grid,colors exact,key exact,raster,plot,save,boundaries")
+  print("map,n,colors grid,colors exact,key,key exact,raster,plot,save,boundaries")
   fo = loadEBSD(os.path.join(D, "Forsterite.ctf"))
   maps = [("Forsterite", fo), ("Emsland", loadEBSD(os.path.join(D, "Emsland_plessite_500x_15.ctf")))]
   for k in (2, 4):
@@ -68,8 +68,10 @@ def main():
     # the key itself on the orientations of the largest phase
     big = max(ebsd.CSList.indexedPhaseId, key=lambda i: np.count_nonzero(ebsd.phaseId == i))
     ori = ebsd[ebsd.phaseId == big].orientations
+    # the key as it is called, through its grid from GRID_FROM orientations on, and exactly
+    tKey, _ = timed(lambda: ipfHSVKey(ori.CS).orientation2color(ori))
     key = ipfHSVKey(ori.CS)
-    tKey, _ = timed(lambda: key.orientation2color(ori), repeat=1 if n > 2_000_000 else 3)
+    tKeyExact, _ = timed(lambda: key.dirMap.direction2color(key.crystalDirection(ori)), repeat=1 if n > 2_000_000 else 3)
     tRaster, _ = timed(lambda: mapRaster(ebsd))
     tPlot, fig = timed(lambda: render(ebsd, name), repeat=1 if n > 2_000_000 else 3)
     png = os.path.join(out, f"mapplot_{name.replace(' ', '_')}.png")
@@ -82,7 +84,7 @@ def main():
         plot(grains.boundary, lineWidth=0.5)
         fig.savefig(os.path.join(out, f"mapplot_{name.replace(' ', '_')}_grains.png"), dpi=DPI)
       tB, _ = timed(overlay)
-    row = (name, n, tGrid, tExact, tKey, tRaster, tPlot, tSave, tB)
+    row = (name, n, tGrid, tExact, tKey, tKeyExact, tRaster, tPlot, tSave, tB)
     print(",".join(f"{x:.4f}" if isinstance(x, float) else str(x) for x in row), flush=True)
     rows.append(row)
   with open(os.path.join(out, "mapplot_python.csv"), "w") as fh:

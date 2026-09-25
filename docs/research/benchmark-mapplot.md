@@ -317,3 +317,34 @@ on (`GRID_FROM`, MATLAB's estimate of where it pays); `ipfColors`, the map plot,
 - `bench/mapplot_parts.py`: `ipfColors` of the 3.9 million point map in 55 ms, the compiled
   loop and the array form agreeing on every point. `bench/mapplot_large.py` (rings still):
   the 15.7 million point map in 0.25 s for the colours and 0.35 s for the plot.
+
+## The three ports again, with the cube map (2026-09-25)
+
+Run 2026-09-25 evening, the machine quiet (load below 3), the three sides one after the
+other: `bench/mapplot.py`, `bench/mapplot.jl` (Julia 1.12.7, twelve threads),
+`bench/matlab/bench_mapplot.sh` (R2024b, `frameSymmetry`, now the four by four map too, 19 s
+for both tiled maps). The key columns are the key on the orientations of the largest phase;
+`key grid` is the key as Python calls it now (its cube map from 1e5 orientations on) and
+MATLAB's after `precompute`; `map colours` is `ipfColors` of the whole map, all phases, the
+route of the map plot; `plot` is the whole map plotted for Python and Julia and MATLAB's
+`plot(ebsd(phase), ebsd(phase).orientations)`, colouring included, `drawnow`; `save` a PNG
+at 150 dpi (Julia one pixel per unit). Seconds.
+
+| map | points | key exact Py / Jl / ML | key grid Py / ML | map colours Py / Jl | plot Py / Jl / ML | save Py / Jl / ML |
+|---|---:|---|---|---|---|---|
+| Forsterite | 245 952 | 0.042 / 0.085 / 0.123 | 0.004 / 0.019 | 0.003 / 0.009 | 0.029 / 0.036 / 0.61 | 0.13 / 0.022 / 0.82 |
+| Emsland | 270 000 | 0.080 / 0.197 / 0.207 | 0.003 / 0.023 | 0.004 / 0.007 | 0.032 / 0.039 / 0.80 | 0.15 / 0.032 / 2.08 |
+| Forsterite 2x2 | 983 808 | 0.193 / 0.383 / 0.268 | 0.005 / 0.056 | 0.010 / 0.033 | 0.067 / 0.073 / 0.47 | 0.17 / 0.030 / 0.58 |
+| Forsterite 4x4 | 3 935 232 | 0.762 / 1.570 / 0.873 | 0.010 / 0.217 | 0.044 / 0.104 | 0.120 / 0.366 / 0.78 | 0.18 / 0.059 / 0.54 |
+
+- The colours: Python leads on every route. The map through the cube map is 2.4 to 3.3
+  times Julia's ring grid, the key through its grid 5 to 22 times MATLAB's precomputed one,
+  and the exact key, the parallel fold, 1.1 to 2.6 times ahead of MATLAB and 2 times of
+  Julia. MATLAB's grid deviates from its exact key by 0.009 to 0.04, the cube map by 0.009
+  and 0.043 (m-3m, 1e7 orientations, above).
+- The plot: Python and Julia level on the small maps, Python three times faster on the four
+  by four; MATLAB 5 to 25 times slower, for one phase where the other two draw the map.
+- The file is where Python stays behind Julia: matplotlib's resampling and PIL's PNG
+  encoding take 130 to 180 ms where CairoMakie writes in 22 to 59 ms. Plot and file together:
+  Python 0.16, 0.19, 0.24 and 0.30 s, Julia 0.06, 0.07, 0.10 and 0.42 s, MATLAB 1.4, 2.9, 1.1
+  and 1.3 s.
