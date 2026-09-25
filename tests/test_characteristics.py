@@ -208,3 +208,23 @@ def test_C7_kernel_selection_and_specimen_centering():
   _, correction, v1, v2 = centerSpecimen(tilted)
   assert abs(v1.dot(v2)) < 1e-6
   assert angle(mount, correction.inv()) < 5 * degree
+
+
+# the compiled sampler of a radial basis function draws from the same distribution as the
+# NumPy form: the moments up to degree 4 of both samples agree to their sampling error, with
+# symmetry on both sides and a uniform part, and for an exchange symmetric function
+def test_rbf_sampler_kernel_against_numpy():
+  from mtex import setMTEXpref
+  rng = np.random.default_rng(11)
+  cs, ss = crystalFrame("321"), specimenFrame("222")
+  mixed = 0.7 * unimodalODF(orientation(rotation.rand(3, rng=rng), cs, ss), halfwidth=12 * degree) + 0.3 * uniformODF(cs, ss)
+  exchange = unimodalODF(orientation(rotation.rand(2, rng=rng), cs, cs, antipodal=True), halfwidth=15 * degree)
+  assert exchange.antipodal
+  for f in (mixed, exchange):
+    moments = {}
+    for kernels in ("numba", "numpy"):
+      setMTEXpref("kernels", kernels)
+      o = discreteSample(f, 200000, rng=np.random.default_rng(3))
+      moments[kernels] = SO3FunHarmonic.quadrature(o, np.ones(o.size), bandwidth=4).fhat
+    setMTEXpref("kernels", "numba")
+    assert np.max(np.abs(moments["numba"] - moments["numpy"])) < 0.05

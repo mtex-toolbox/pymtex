@@ -16,6 +16,7 @@ import numpy as np
 from ..geometry._array import MtexArray
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame
+from ..geometry.kernels import backend
 from ..geometry.grids.localgrids import localOrientationGrid, localS2Grid
 from ..geometry.grids.fibonacci import fibonacciS2Grid
 from ..geometry.grids.s2grid import equispacedS2Grid
@@ -28,6 +29,7 @@ from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from .bingham import S2FunBingham, SO3FunBingham, binghamSample
+from .kernels import rbfSample
 from .funops import conv
 from .handles import S2FunHandle, S2FunSum, SO3FunComposition, SO3FunGeneric, SO3FunHandle
 from .kernelfunctions import SO3DeLaValleePoussinKernel
@@ -648,8 +650,10 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False):
     cdf = np.cumsum(pdf)
     cdf /= cdf[-1]
     probs = np.concatenate([f.weights * f.psi.mean(), [f.c0]])
-    k = rng.choice(len(probs), size=n, p=probs / probs.sum())
     cs = f.center.data.reshape(-1, 4)
+    if backend() == "numba":
+      return _ori(rbfSample(n, rng, cs, probs, omega, cdf, L, R, f.antipodal), f)
+    k = rng.choice(len(probs), size=n, p=probs / probs.sum())
     out = rotation.rand(n, rng=rng).data
     fromCentre = k < len(cs)
     w = omega[np.minimum(np.searchsorted(cdf, rng.random(n)), len(omega) - 1)]

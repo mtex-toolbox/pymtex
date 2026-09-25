@@ -21,6 +21,7 @@ import math
 import numpy as np
 
 from ..geometry.grids.so3grid import equispacedSO3Grid
+from ..geometry.kernels import blasThreads
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.session import getMTEXpref
@@ -65,21 +66,21 @@ class PoleFigureOperator:
     sym = r.frame.properGroup().rotations().flatten()
     self.nSym = sym.size
     rs = (rotation(sym.data.reshape(-1, 1, 4)) * vector3d(r.flatten().normalize().data)).data.reshape(-1, 3)
-    self.planGH = S2FourierPlan(vector3d(gh), L)
-    self.planR = S2FourierPlan(vector3d(rs), L)
+    self.planGH = S2FourierPlan(vector3d(gh), L, real=True)
+    self.planR = S2FourierPlan(vector3d(rs), L, real=True)
 
   # Psi c: the pole figure the coefficients predict
   def forward(self, c):
     cext = np.outer(np.asarray(c, dtype=float), self.refl).ravel()
-    fhat = self.planGH.adjoint(cext.astype(complex), np.ones(cext.size))
-    I = np.real(self.planR(fhat * self.A))
+    fhat = self.planGH.adjoint(cext, np.ones(cext.size))
+    I = self.planR(fhat * self.A)
     return I.reshape(self.nSym, self.nR).mean(axis=0)
 
   # Psi^T I: the same plans in the other order, the adjoint by construction
   def backward(self, I):
     Iext = np.tile(np.asarray(I, dtype=float), self.nSym) / self.nSym
-    fhat = self.planR.adjoint(Iext.astype(complex), np.ones(Iext.size))
-    d = np.real(self.planGH(fhat * self.A))
+    fhat = self.planR.adjoint(Iext, np.ones(Iext.size))
+    d = self.planGH(fhat * self.A)
     return d.reshape(self.n, self.nH) @ self.refl
 
 
@@ -292,8 +293,14 @@ class MLSSolver:
     e = np.array([np.linalg.norm(self.u[i]) / np.linalg.norm(self.pf.allI[i].ravel() * self.weights[i]) for i in range(len(self.ops))])
     return e, float(np.sqrt(np.sum(e ** 2)))
 
-  # the iteration, stopped when the residual improves by less than five percent
+  # the iteration, stopped when the residual improves by less than five percent; its BLAS
+  # calls are products of vectors, and OpenBLAS's waiting threads would take the cores of the
+  # transforms between them
   def iterate(self):
+    with blasThreads(1):
+      return self._iterate()
+
+  def _iterate(self):
     self.initIter()
     e, last = self.residual()
     if not self.silent:

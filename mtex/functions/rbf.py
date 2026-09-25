@@ -30,7 +30,7 @@ from .kernelfunctions import S2DeLaValleePoussinKernel, S2Kernel, SO3DeLaValleeP
 from .quadrature import folds
 from .s2fun import S2FunHarmonic
 from .so3fun import SO3FunHarmonic
-from .transforms import wignerSeriesAdjoint
+from .transforms import GRIDDED_ROTATIONS_PER_L3, wignerSeriesAdjoint, wignerSeriesAdjointGridded
 
 CHUNK = 1024
 # above this many kernel terms an evaluation goes through the harmonic form
@@ -167,12 +167,17 @@ class SO3FunRBF:
   # the harmonic form: the point measure of the centres convolved with the kernel,
   # projected; the transform runs at the narrower of the two bandwidths, and the mean is
   # known exactly
-  def _harmonic(self, bandwidth=None):
+  def _harmonic(self, bandwidth=None, exact=False):
     L = min(self.psi.bandwidth, getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth))
+    fo = folds(self.CS, self.SS)
     if self.center.size == 0:
       fhat = np.zeros(deg2dim(L + 1), dtype=complex)
+    # many centres are rounded onto a grid, whose FFT costs nothing per centre (MATLAB's
+    # crossover of 10 L^3, SO3FunRBF/calcFourier); exact asks for the transform at the centres
+    elif self.center.size > GRIDDED_ROTATIONS_PER_L3 * L ** 3 and not exact:
+      fhat = wignerSeriesAdjointGridded(self.center, np.ones(self.center.size), L, weights=self.weights, folds=fo)
     else:
-      fhat = wignerSeriesAdjoint(self.center, np.ones(self.center.size), L, weights=self.weights, folds=folds(self.CS, self.SS))
+      fhat = wignerSeriesAdjoint(self.center, np.ones(self.center.size), L, weights=self.weights, folds=fo)
     A = self.psi.calcFourier(L)
     for n in range(L + 1):
       degreeBlock(fhat, n)[...] *= A[n] / (2 * n + 1)
