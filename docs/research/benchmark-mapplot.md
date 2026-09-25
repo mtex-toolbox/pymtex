@@ -348,3 +348,12 @@ at 150 dpi (Julia one pixel per unit). Seconds.
   encoding take 130 to 180 ms where CairoMakie writes in 22 to 59 ms. Plot and file together:
   Python 0.16, 0.19, 0.24 and 0.30 s, Julia 0.06, 0.07, 0.10 and 0.42 s, MATLAB 1.4, 2.9, 1.1
   and 1.3 s.
+- The file, then: of the 130 to 180 ms, 96 to 134 were Pillow's zlib at its default level
+  6. `mtexFigure.savefig` writes a PNG at level 1 unless the caller gives a level: the same
+  pixels, the four by four map's file 677 kB for 611 kB (level 0: 2 MB, 67 ms; level 9:
+  905 ms), and the save 65, 85, 82 and 91 ms for 128, 181, 172 and 180. Plot and file
+  together: Python 0.09, 0.11, 0.15 and 0.22 s, Julia 0.06, 0.07, 0.10 and 0.42 s. What is
+  left of the save on the Forsterite map is a third each: the compression (31 ms), the
+  image resampled into the axes (27 ms) and the text laid out again (31 ms), since
+  matplotlib gives a save at another resolution than the figure's a new renderer and so an
+  empty text cache.

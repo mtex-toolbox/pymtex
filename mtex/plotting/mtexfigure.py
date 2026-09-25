@@ -241,7 +241,16 @@ class mtexFigure:
   def drawNow(self):
     self.fig.canvas.draw_idle()
 
+  # a PNG is written at zlib level 1, not Pillow's 6: the same pixels, a file about a tenth
+  # larger, in half the time a large map took, most of which was the compression
   def savefig(self, *args, **kwargs):
+    import os
+    import matplotlib
+    name = args[0] if args else kwargs.get("fname")
+    ext = os.path.splitext(os.fspath(name))[1][1:] if isinstance(name, (str, os.PathLike)) else ""
+    fmt = kwargs.get("format") or ext or matplotlib.rcParams["savefig.format"]
+    if fmt.lower() == "png":
+      kwargs["pil_kwargs"] = {"compress_level": 1, **(kwargs.get("pil_kwargs") or {})}
     return self.fig.savefig(*args, **kwargs)
 
   def show(self):

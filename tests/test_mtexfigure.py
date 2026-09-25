@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from mtex.plotting.mtexfigure import layoutFor
+from mtex.plotting.mtexfigure import layoutFor, newMtexFigure
 
 
 def test_the_layout_fills_a_row():
@@ -88,3 +88,18 @@ def test_a_named_size_keeps_room_for_the_labels():
   assert figureSize("small", (3.2, 3.2)) == (2.5, 2.5)
   assert figureSize("large", (3.2, 3.2)) == (1.3 * 3.2, 1.3 * 3.2)
   assert figureSize("small", (7.0, 2.0)) == (0.6 * 7.0, 2.0)
+
+
+def test_a_png_is_written_fast_and_the_same(tmp_path):
+  import io
+  from PIL import Image
+  fig = newMtexFigure()
+  fig.currentAxes.imshow(np.random.default_rng(0).random((200, 300, 3)))
+  fig.savefig(tmp_path / "fast.png")
+  fig.savefig(tmp_path / "slow.png", pil_kwargs={"compress_level": 6})
+  buf = io.BytesIO()
+  fig.savefig(buf)
+  fast, slow = (np.asarray(Image.open(tmp_path / f)) for f in ("fast.png", "slow.png"))
+  assert np.array_equal(fast, slow) and np.array_equal(np.asarray(Image.open(buf)), fast)
+  # zlib level 1 by default, a caller's own level kept
+  assert (tmp_path / "fast.png").stat().st_size > (tmp_path / "slow.png").stat().st_size
