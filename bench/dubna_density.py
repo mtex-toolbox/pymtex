@@ -5,8 +5,8 @@
 #   .venv/bin/python bench/dubna_density.py run [step ...]      this port: best of two or three, one profiled run, the values
 #   .venv/bin/python bench/dubna_density.py matlab [step ...]   bench/matlab/bench_dubna_density.m through the bridge of ../master
 #   .venv/bin/python bench/dubna_density.py julia               bench/dubna_density.jl, times only
-#   .venv/bin/python bench/dubna_density.py compare             times, the ports' ODFs against each other and
-#                                                               the density of the sample against its ODF
+#   .venv/bin/python bench/dubna_density.py compare             times, and the ports' ODFs and sample densities
+#                                                               against each other
 #
 # The steps run in order and hand on their result: calcODF, discreteSample, calcDensity; a step not
 # named still runs, untimed. Each port writes <port>_<step>.txt (the best time) and
@@ -128,9 +128,9 @@ def compare():
   odf = {p: load(p, "odf_values") for p in ports[:2]}
   den = {p: load(p, "density_values") for p in ports[:2]}
   print(f"\nmaximum deviation relative to the maximum, at {NAT} orientations")
-  rows = [("calcODF python ~ matlab", odf["python"], odf["matlab"], tol["pole figure inversion"])]
-  rows += [(f"calcDensity ~ its ODF, {p}", den[p], odf[p], tol["discrete sampling"]) for p in ports[:2]]
-  rows += [("calcDensity python ~ matlab", den["python"], den["matlab"], tol["density estimation"])]
+  # the samples differ between the ports, so the density checks sampling and estimation together
+  rows = [("calcODF python ~ matlab", odf["python"], odf["matlab"], tol["pole figure inversion"]),
+          ("sample density python ~ matlab", den["python"], den["matlab"], tol["density estimation"])]
   for label, a, b, t in rows:
     if a is not None and b is not None:
       d = np.max(np.abs(a - b)) / np.max(np.abs(b))
