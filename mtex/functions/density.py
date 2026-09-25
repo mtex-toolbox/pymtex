@@ -14,6 +14,7 @@ import math
 import numpy as np
 
 from ..geometry.frames import crystalFrame
+from ..geometry.kernels import blasThreads
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
@@ -113,10 +114,13 @@ def _lsqr(A, At, b, n, maxit, tol):
   return _lsqrFull(A, At, b, n, maxit, tol)[0]
 
 
-# the solution, scipy's stop reason, the iterations and the residual norm
+# the solution, scipy's stop reason, the iterations and the residual norm; the operators are
+# transforms and the iteration's norms and products of vectors run on BLAS, whose waiting
+# threads would take the transforms' cores (docs/research/threads.md)
 def _lsqrFull(A, At, b, n, maxit, tol):
   from .lsqr import lsqr
-  return lsqr(A, At, np.asarray(b, dtype=complex), n, tol=tol, maxit=maxit)
+  with blasThreads(1):
+    return lsqr(A, At, np.asarray(b, dtype=complex), n, tol=tol, maxit=maxit)
 
 
 def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxit=100, tol=None,

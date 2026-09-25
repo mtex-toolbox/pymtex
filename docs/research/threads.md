@@ -35,24 +35,31 @@ isolation does not show it.
   stays.
 - A loop that interleaves transforms or numba kernels with BLAS on vectors runs under
   `blasThreads(1)`: `MLSSolver.iterate` in `mtex/analysis/pf2odf.py`, `optimalSample` in
-  `mtex/analysis/optimalsample.py`. BLAS stays threaded everywhere else, where a large matrix
-  product needs the threads.
+  `mtex/analysis/optimalsample.py`, the least squares fits below. BLAS stays threaded
+  everywhere else, where a large matrix product needs the threads.
 - The environment variables act only before the library loads: `OPENBLAS_NUM_THREADS` before
   NumPy, `OMP_WAIT_POLICY` before finufft. `blasThreads` sets the loaded libraries through
   ctypes, found in `/proc/self/maps`; on a system without it, it does nothing.
 
-## Suspected, not measured
+## The least squares fits, measured 2026-09-25
 
 The same mix, a transform plan as the operator of an iteration with norms and dot products
-of the iterates between the calls:
+of the iterates between the calls, 2e4 nodes, s:
 
-- `lsqr` in `mtex/functions/lsqr.py`, which `interpolate` in `mtex/functions/density.py` runs
-  over `S2FourierPlan` and `SO3FourierPlan`;
-- `calcQuadratureWeights` in `mtex/functions/polefigure.py`, SciPy's LSQR over a NUFFT
-  operator;
-- the least squares fit of `S1FunHarmonic` in `mtex/functions/s1fun.py`.
+| | before | under `blasThreads(1)` |
+|---|---:|---:|
+| `interpolate` on S2 (`lsqr` in `mtex/functions/lsqr.py` over `S2FourierPlan`) | 3.3 | 0.63 |
+| `interpolate` on SO(3), L = 16 (over `SO3FourierPlan`) | 0.8 | 0.38 |
+| `S1FunHarmonic.interpolate` (`mtex/functions/s1fun.py`) | 1.1 to 1.4 | 0.28 |
+| `calcQuadratureWeights` with `method='harmonic'` (SciPy's LSQR over a NUFFT operator) | 8.4 | 2.3 |
 
-The test is the one that found it: time the iteration with and without
+The three fits share `_lsqrFull` in `mtex/functions/density.py`, which runs `lsqr` under
+`blasThreads(1)`; `calcQuadratureWeights` does it around its LSQR branch in
+`mtex/functions/polefigure.py`, the dense least squares below 4000 nodes keeping its BLAS
+threads. `lsqr` itself stays unwrapped: `mtex/functions/rbfinterpolation.py` runs it over a
+matrix, where the threads help.
+
+The test that finds the next one: time the iteration with and without
 `OPENBLAS_NUM_THREADS=1` in the environment, on a quiet machine; a gain says the loop wants
 `blasThreads(1)`.
 

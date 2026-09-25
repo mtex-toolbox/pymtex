@@ -22,6 +22,7 @@ import numpy as np
 from ..geometry._array import MtexArray
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.s2grid import S2Grid
+from ..geometry.kernels import blasThreads
 from ..geometry.products import dropGroup
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.units import degree
@@ -728,7 +729,9 @@ def _harmonicWeights(v):
                         rmatvec=rmatvec, dtype=complex)
     target = np.zeros(rows.size, dtype=complex)
     target[0] = math.sqrt(4 * np.pi)
-    d = np.real(lsqr(op, target - op.matvec(w0), atol=1e-10, btol=1e-10, iter_lim=200)[0])
+    # BLAS on one thread between the transforms, docs/research/threads.md
+    with blasThreads(1):
+      d = np.real(lsqr(op, target - op.matvec(w0), atol=1e-10, btol=1e-10, iter_lim=200)[0])
   w = w0 + d
   return w / np.sum(w)
 
