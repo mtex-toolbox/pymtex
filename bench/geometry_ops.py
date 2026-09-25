@@ -1,0 +1,193 @@
+# the geometry layer against MATLAB and Julia on one input: the rotation products, the
+# symmetry-reduced dot, the projection into the fundamental region and the SO(3) grid search,
+# each operation timed, profiled and its results compared element by element
+#
+#   .venv/bin/python bench/geometry_ops.py export               the input, N = 1e6 of each kind
+#   .venv/bin/python bench/geometry_ops.py run [op ...]         this port: best of five, one profiled run, the results
+#   .venv/bin/python bench/geometry_ops.py matlab [op ...]      bench/matlab/bench_geometry_ops.m through the bridge of ../master
+#   .venv/bin/python bench/geometry_ops.py julia                bench/geometry.jl and bench/gridsearch.jl, times only
+#   .venv/bin/python bench/geometry_ops.py compare
+#
+# The input in bench/out/geometry: four sets of unit quaternions A B C D and two of unit vectors
+# V W. r = A, s = B, ori and ori2 are A and B in m-3m, mori and mori2 are C and D from m-3m to
+# 6/mmm, v = V, m = W in m-3m, the grid queries are the first 1e4 of ori. Each port writes
+# <port>_<op>.txt (the best time), <port>_<op>.bin (the first K results as float64 rows) and
+# profile_<port>_<op>.json.
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import sys
+import time
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+OUT = os.path.join(HERE, "out", "geometry")
+sys.path.insert(0, os.path.join(ROOT, "tools", "graph"))
+
+ALGORITHM = [
+  {"name": "rotation products",
+   "entry": {"matlab": ["@quaternion.times", "@rotation.times", "@quaternion.mtimes"],
+             "python": ["mtex.geometry.quaternion.quaternion.__mul__", "mtex.geometry.quaternion.rotation.__mul__"]},
+   "cases": {"r_s": "r .* s, 1e6 rotations", "r_v": "r .* v, 1e6 rotations and vectors"},
+   "tolerance": 1e-12},
+  {"name": "symmetry-reduced dot",
+   "entry": {"matlab": ["@orientation.dot"], "python": ["mtex.geometry.orientation.orientation.dot"]},
+   "cases": {"dot_ori_ori2": "dot(ori, ori2), m-3m, 1e6 pairs", "dot_ori_ref": "dot(ori, ref), one reference",
+             "dot_mori_mori2": "dot(mori, mori2), m-3m -> 6/mmm", "dot_mori_mref": "dot(mori, mref)"},
+   "tolerance": 1e-12},
+  {"name": "fundamental region projection",
+   "entry": {"matlab": ["@orientation.project2FundamentalRegion", "@vector3d.project2FundamentalRegion",
+                        "@Miller.project2FundamentalRegion"],
+             "python": ["mtex.geometry.symmetryops.project2FundamentalRegion",
+                        "mtex.geometry.orientation.orientation.project2FundamentalRegion"]},
+   "cases": {"p2fr_m": "project2FundamentalRegion(m), m-3m", "p2fr_ori_ref": "project2FundamentalRegion(ori, ref)",
+             "p2fr_ori_ori2": "project2FundamentalRegion(ori, ori2)", "p2fr_mori_mref": "project2FundamentalRegion(mori, mref)",
+             "p2fr_mori_mori2": "project2FundamentalRegion(mori, mori2)"},
+   "tolerance": 1e-12},
+  {"name": "orientation grid search",
+   "entry": {"matlab": ["equispacedSO3Grid", "@SO3Grid.find"],
+             "python": ["mtex.geometry.grids.so3grid.equispacedSO3Grid", "mtex.geometry.grids.search.find"]},
+   "cases": {"grid_build": "equispacedSO3Grid(m-3m, 2.5 degree)", "grid_nearest": "find(grid, ori), 1e4 queries",
+             "grid_radius": "find(grid, ori, 7.5 degree), 2000 queries"},
+   "tolerance": 2e-2},
+]
+ALGO = {case: a["name"] for a in ALGORITHM for case in a["cases"]}
+N, K, NQ, NR = 10**6, 20000, 10**4, 2000
+
+
+def export():
+  os.makedirs(OUT, exist_ok=True)
+  rng = np.random.default_rng(0)
+  for name, k in (("A", 4), ("B", 4), ("C", 4), ("D", 4), ("V", 3), ("W", 3)):
+    x = rng.standard_normal((N, k))
+    (x / np.linalg.norm(x, axis=1, keepdims=True)).astype("<f8").tofile(os.path.join(OUT, f"{name}.bin"))
+
+
+def inputs():
+  import mtex
+  load = lambda name, k: np.fromfile(os.path.join(OUT, f"{name}.bin"), "<f8").reshape(-1, k)
+  cs, hx = mtex.crystalFrame("m-3m"), mtex.crystalFrame("6/mmm")
+  A, B, C, D = (load(x, 4) for x in "ABCD")
+  x = dict(r=mtex.rotation(A), s=mtex.rotation(B), v=mtex.vector3d(load("V", 3)),
+           ori=mtex.orientation(mtex.rotation(A), cs), ori2=mtex.orientation(mtex.rotation(B), cs),
+           mori=mtex.orientation(mtex.rotation(C), cs, hx), mori2=mtex.orientation(mtex.rotation(D), cs, hx),
+           m=mtex.Miller(mtex.vector3d(load("W", 3)), cs), cs=cs)
+  x["ref"], x["mref"] = x["ori"][0], x["mori"][0]
+  return x
+
+
+# the operations: the call, and the first K results as float64 rows
+def operations(x):
+  import mtex
+  deg = mtex.degree
+  grid = {}
+
+  def build():
+    grid["g"] = mtex.equispacedSO3Grid(x["cs"], resolution=2.5 * deg)
+    return grid["g"]
+
+  rows = lambda a, k: np.asarray(a.data if hasattr(a, "data") else a, dtype=float).reshape(-1, k)[:K]
+  return {
+    "r_s": (lambda: x["r"] * x["s"], lambda o: rows(o, 4)),
+    "r_v": (lambda: x["r"] * x["v"], lambda o: rows(o, 3)),
+    "dot_ori_ori2": (lambda: mtex.dot(x["ori"], x["ori2"]), lambda o: rows(o, 1)),
+    "dot_ori_ref": (lambda: mtex.dot(x["ori"], x["ref"]), lambda o: rows(o, 1)),
+    "dot_mori_mori2": (lambda: mtex.dot(x["mori"], x["mori2"]), lambda o: rows(o, 1)),
+    "dot_mori_mref": (lambda: mtex.dot(x["mori"], x["mref"]), lambda o: rows(o, 1)),
+    "p2fr_m": (lambda: mtex.project2FundamentalRegion(x["m"]), lambda o: rows(o, 3)),
+    "p2fr_ori_ref": (lambda: mtex.project2FundamentalRegion(x["ori"], x["ref"]), lambda o: rows(o, 4)),
+    "p2fr_ori_ori2": (lambda: mtex.project2FundamentalRegion(x["ori"], x["ori2"]), lambda o: rows(o, 4)),
+    "p2fr_mori_mref": (lambda: mtex.project2FundamentalRegion(x["mori"], x["mref"]), lambda o: rows(o, 4)),
+    "p2fr_mori_mori2": (lambda: mtex.project2FundamentalRegion(x["mori"], x["mori2"]), lambda o: rows(o, 4)),
+    "grid_build": (build, lambda o: np.array([[o.size]], dtype=float)),
+    # the grids order their points differently: the distance to the nearest point is compared
+    "grid_nearest": (lambda: mtex.find(grid["g"], x["ori"][:NQ]), lambda o: rows(o[1], 1)),
+    "grid_radius": (lambda: mtex.find(grid["g"], x["ori"][:NR], 7.5 * deg),
+                    lambda o: np.diff(o[0].tocsr().indptr).astype(float).reshape(-1, 1)),
+  }
+
+
+def timed(f):
+  t = time.perf_counter()
+  out = f()
+  return out, time.perf_counter() - t
+
+
+def run(ops):
+  import profiling
+  x = inputs()
+  table = operations(x)
+  for op, (f, result) in table.items():
+    if op not in ops and not op == "grid_build":
+      continue
+    f()
+    out, best = min((timed(f) for _ in range(5)), key=lambda r: r[1])
+    _, wall, recs = profiling.profileCall(f)
+    profiling.write(os.path.join(OUT, f"profile_python_{op}.json"), ALGO[op], "python", op, best, recs)
+    open(os.path.join(OUT, f"python_{op}.txt"), "w").write(f"{best}\n")
+    result(out).astype("<f8").tofile(os.path.join(OUT, f"python_{op}.bin"))
+    print(f"{op:18s} {1e3 * best:9.1f} ms", flush=True)
+
+
+def matlab(ops):
+  bridge = os.path.join(os.path.dirname(ROOT), "master", "docs", "agents", "matlab-bridge")
+  cmd = (f"addpath('{os.path.join(HERE, 'matlab')}'); addpath('{os.path.join(ROOT, 'tools', 'graph')}'); "
+         f"bench_geometry_ops('{OUT}', {{{', '.join(repr(o) for o in ops)}}}, {K}, {NQ}, {NR});")
+  r = subprocess.run([os.path.join(bridge, ".venv", "bin", "python"), os.path.join(bridge, "matlab_run.py"), cmd],
+                     timeout=290)
+  if r.returncode:
+    sys.exit("MATLAB failed")
+
+
+# the Julia twins print one line per operation on their own random input: times only
+def julia():
+  jl = ["julia", "--project=" + os.path.join(os.path.dirname(ROOT), "mtexJulia", "dev"), "-t", "auto"]
+  names = {"r * s": "r_s", "r * v": "r_v", "dot(ori, ori2)": "dot_ori_ori2", "dot(ori, ref)": "dot_ori_ref",
+           "dot(mori, mori2)": "dot_mori_mori2", "dot(mori, mref)": "dot_mori_mref", "project2FR(m)": "p2fr_m",
+           "project2FR(ori, ref)": "p2fr_ori_ref", "project2FR(ori, ori2)": "p2fr_ori_ori2",
+           "project2FR(mori, mref)": "p2fr_mori_mref", "project2FR(mori, mori2)": "p2fr_mori_mori2",
+           "build": "grid_build", "nearest": "grid_nearest", "radius": "grid_radius"}
+  for script in ("geometry.jl", "gridsearch.jl"):
+    r = subprocess.run(jl + [os.path.join(HERE, script)], capture_output=True, text=True, timeout=290)
+    print(r.stdout, r.stderr[-1000:])
+    for line in r.stdout.splitlines():
+      m = re.match(r"\s*(.+?)\s+(?:\d+\s+)?([\d.]+) ms", line)
+      if m and m.group(1).strip() in names:
+        open(os.path.join(OUT, f"julia_{names[m.group(1).strip()]}.txt"), "w").write(f"{float(m.group(2)) / 1e3}\n")
+
+
+def deviation(op, a, b):
+  # the grids of the ports differ in their points, so a grid result is compared by its mean
+  if op.startswith("grid"):
+    return abs(float(np.mean(a) - np.mean(b))) / abs(float(np.mean(b)))
+  if op in ("r_s",) or op.startswith("p2fr_") and a.shape[1] == 4:
+    return float(np.max(1 - np.abs(np.sum(a * b, axis=1))))   # a quaternion and its negative are one rotation
+  return float(np.max(np.abs(a - b)))
+
+
+def compare():
+  ports = ("python", "matlab", "julia")
+  print(f"{'operation':18s}" + "".join(f"{p:>11s}" for p in ports) + "   deviation python ~ matlab")
+  for a in ALGORITHM:
+    print(a["name"])
+    for op in a["cases"]:
+      t = [os.path.join(OUT, f"{p}_{op}.txt") for p in ports]
+      line = f"  {op:16s}" + "".join(f"{1e3 * float(open(x).read()):9.1f}ms" if os.path.exists(x) else f"{'-':>11s}" for x in t)
+      res = [os.path.join(OUT, f"{p}_{op}.bin") for p in ports[:2]]
+      if all(os.path.exists(x) for x in res):
+        pa, ma = (np.fromfile(x, "<f8") for x in res)
+        cols = 1 if op.startswith(("dot", "grid")) else 3 if op in ("r_v", "p2fr_m") else 4
+        pa, ma = pa.reshape(-1, cols), ma.reshape(-1, cols)
+        d = deviation(op, pa, ma) if pa.shape == ma.shape or op.startswith("grid") else float("nan")
+        line += f"   {d:.1e} {'ok' if d <= a['tolerance'] else 'DIFFERS'}" + ("" if pa.shape == ma.shape else f" shapes {pa.shape} {ma.shape}")
+      print(line)
+
+
+if __name__ == "__main__":
+  cmd, names = sys.argv[1] if len(sys.argv) > 1 else "run", sys.argv[2:] or list(ALGO)
+  {"export": export, "run": lambda: run(names), "matlab": lambda: matlab(names), "julia": julia,
+   "compare": compare}[cmd]()
