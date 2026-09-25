@@ -7,7 +7,7 @@ import pytest
 
 from mtex import (BungeColorKey, HSVDirectionKey, SO3DeLaValleePoussinKernel, axisAngleColorKey, crystalFrame, degree,
                   ipfColorKey, ipfColors, ipfHKLKey, ipfHSVKey, ipfSpotKey, ipfTSLKey, loadEBSD, orientation, rotation,
-                  specimenFrame, spotColorKey, vector3d, xvector, zvector, Miller)
+                  setMTEXpref, specimenFrame, spotColorKey, vector3d, xvector, zvector, Miller)
 from mtex.plotting.orientationkeys import COLOR_NAN, colorGrid, keyColorGrid
 
 rng = np.random.default_rng(3)
@@ -181,3 +181,34 @@ def test_an_orientation_never_measured_has_no_colour():
   q = np.array([[1.0, 0, 0, 0], [np.nan] * 4])
   rgb = ipfColorKey(cs).orientation2color(orientation(q, cs))
   assert np.all(np.isfinite(rgb[0])) and np.isnan(rgb[1]).all()
+
+
+@pytest.mark.parametrize("name", ["m-3m", "mmm", "-3m", "2/m"])
+def test_a_precomputed_key_reads_its_grid(name):
+  cs = crystalFrame(name)
+  ori = orientation(rotation.rand(20000, rng=np.random.default_rng(3)), cs)
+  exact = ipfHSVKey(cs).orientation2color(ori)
+  key = ipfHSVKey(cs).precompute()
+  grid = key.orientation2color(ori)
+  # the colours of the node nearest each direction, half a degree apart
+  assert np.mean(np.abs(grid - exact).max(axis=1)) < 0.02 and np.max(np.abs(grid - exact)) < 0.1
+  setMTEXpref("kernels", "numpy")
+  try:
+    assert np.allclose(key.orientation2color(ori), grid)
+  finally:
+    setMTEXpref("kernels", "numba")
+
+
+def test_a_precomputed_key_follows_its_changes_and_leaves_unmeasured_blank():
+  cs = crystalFrame("m-3m")
+  ori = orientation(rotation.rand(2000, rng=np.random.default_rng(4)), cs)
+  key = ipfHSVKey(cs).precompute()
+  shared = key._grid[1]
+  key.maxAngle = 10 * degree
+  sharp = ipfHSVKey(cs, maxAngle=10 * degree).orientation2color(ori)
+  assert key._grid[1] is shared and np.mean(np.abs(key.orientation2color(ori) - sharp).max(axis=1)) < 0.05
+  assert key._grid[1] is not shared
+  d = ori.data.copy()
+  d[5] = np.nan
+  rgb = key.orientation2color(orientation(rotation(d), cs))
+  assert np.all(np.isnan(rgb[5])) and np.all(np.isfinite(rgb[:5]))

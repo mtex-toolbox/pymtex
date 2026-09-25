@@ -13,7 +13,6 @@ import threading
 import numpy as np
 
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
-from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.kernels import qrot
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import eulerRegion
@@ -77,6 +76,7 @@ class ipfColorKey(orientationColorKey):
     super().__init__(x)
     self.ipfDirection = vector3d(zvector if ipfDirection is None else ipfDirection)
     self.dirMap = HSVDirectionKey(self.CS1) if dirMap is None else dirMap
+    self._grid = None
 
   # the crystal directions along the specimen direction of every orientation
   def crystalDirection(self, ori):
@@ -84,11 +84,43 @@ class ipfColorKey(orientationColorKey):
     d = self.ipfDirection.normalize().data.reshape(3)
     return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.CS1, isNormalized=True)
 
-  # an orientation that was never measured has no colour, and a map shows nothing for it
+  # MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
+  # colours then read off the node nearest each crystal direction without folding it into the
+  # sector. An unchanged HSV key takes the grid its crystal frame keeps for the session,
+  # any other key a grid of its own, rebuilt when the key has changed since
+  def precompute(self, resolution=None):
+    resolution = COLOR_GRID_RESOLUTION if resolution is None else resolution
+    state = _keyState(self.dirMap)
+    if self._grid is not None and self._grid[0] == state and self._grid[1].resolution == resolution:
+      return self
+    default = state is not None and state == _keyState(HSVDirectionKey(self.CS1))
+    self._grid = (state, keyColorGrid(self.CS1, resolution) if default else colorGrid(self.dirMap, resolution))
+    return self
+
+  # an orientation that was never measured has no colour, and a map shows nothing for it.
+  # From GRID_FROM orientations on the key goes through its grid, which it builds once
   def orientation2color(self, ori):
+    if self._grid is None and ori.size >= GRID_FROM:
+      self.precompute()
+    if self._grid is not None:
+      self.precompute(self._grid[1].resolution)
+      return self._gridColors(ori)
     rgb = self.dirMap.direction2color(self.crystalDirection(ori))
     rgb[~np.all(np.isfinite(ori.data[..., :4]), axis=-1)] = np.nan
     return rgb
+
+  # the colours through the precomputed grid: one compiled loop over the quaternions where
+  # numba is there, the grid's own look-up of the crystal directions otherwise
+  def _gridColors(self, ori):
+    from .kernels import ipfGridColors
+    g = self._grid[1]
+    q = np.ascontiguousarray(ori.data.reshape(-1, 4)[:, :4])
+    d = self.ipfDirection.normalize().data.reshape(3)
+    out = np.empty((len(q), 3))
+    if not ipfGridColors(q, np.arange(len(q)), d, g.n, g.colors, out, blank=(np.nan,) * 3):
+      out = g.direction2color(self.crystalDirection(ori)).reshape(-1, 3)
+      out[~np.all(np.isfinite(q), axis=-1)] = np.nan
+    return out.reshape(ori.shape + (3,))
 
   @property
   def whiteCenter(self):
@@ -305,26 +337,24 @@ class spectralTransmissionColorKey(orientationColorKey):
 # ------------------------------------------------------------------ the key on a grid
 
 # the colour of a direction changes smoothly over the sphere, so the key can be evaluated
-# once on an equispaced grid and looked up afterwards; the lookup absorbs the symmetry,
-# where the exact route expands every direction over the group to bring it into the sector
+# once on a grid and looked up afterwards; the lookup absorbs the symmetry, where the exact
+# route expands every direction over the group to bring it into the sector. The grid is a
+# cube map (plotting/kernels.py), n cells to the edge of a face so that the widest, at the
+# face centre, is the resolution: its node is found without trigonometry
 COLOR_GRID_RESOLUTION = 0.5 * degree
+GRID_FROM = 100000    # the count from which a key's grid pays for itself, MATLAB's estimate
 COLOR_NAN = np.array([1.0, 1.0, 1.0])
 
 
 class colorGrid:
 
   def __init__(self, key, resolution=COLOR_GRID_RESOLUTION):
+    from .kernels import cubeMapNodes
     self.key = key.dirMap if isinstance(key, ipfColorKey) else key
-    self.grid = equispacedS2Grid(resolution=resolution)
-    self.colors = self.key.direction2color(vector3d(self.grid.data, isNormalized=True)).reshape(-1, 3)
-    self.stepwise = self.grid.hasUniformSteps
     self.resolution = resolution
-    # the first node, step and count of every ring, what the arithmetic look-up needs
-    g = self.grid
-    rings = g.rhoGrid
-    self.ladders = (float(g.thetaGrid.points[0]), float(g.thetaGrid.step), np.array([r.points[0] for r in rings], dtype=float),
-                    np.array([r.step if len(r) > 1 else 1.0 for r in rings], dtype=float), np.array([len(r) for r in rings], dtype=np.int64),
-                    np.asarray(g.offset, dtype=np.int64)) if self.stepwise else None
+    self.n = max(1, int(np.ceil(2 / resolution)))
+    self.grid = vector3d(cubeMapNodes(self.n), isNormalized=True)
+    self.colors = self.key.direction2color(self.grid).reshape(-1, 3)
 
   def __len__(self):
     return len(self.colors)
@@ -332,18 +362,25 @@ class colorGrid:
   # a NaN or zero direction, the pole of an unmeasured orientation, has no grid node and is
   # coloured white, as MTEX greys such a cell rather than failing the map
   def direction2color(self, h):
+    from .kernels import cubeMapIndex
     xyz = (h.data if isinstance(h, vector3d) else np.asarray(h, dtype=float)).reshape(-1, 3)
-    ok = np.all(np.isfinite(xyz), axis=-1) & (np.linalg.norm(xyz, axis=-1) > 0)
+    ind = cubeMapIndex(xyz, self.n)
     out = np.tile(COLOR_NAN, (len(xyz), 1))
-    if np.any(ok):
-      v = vector3d(xyz[ok], isNormalized=False)
-      ind = self.grid.nearestStepwise(v) if self.stepwise else self.grid.find(v)[0]
-      out[ok] = self.colors[np.asarray(ind).reshape(-1)]
+    out[ind >= 0] = self.colors[ind[ind >= 0]]
     return out.reshape(np.shape(h)[:-1] + (3,) if not isinstance(h, vector3d) else h.shape + (3,))
 
 
 _GRIDS = {}
 _GRID_LOCK = threading.RLock()
+
+
+# the settings a direction key's colours depend on, None for a key other than the HSV one
+def _keyState(key):
+  if type(key) is not HSVDirectionKey:
+    return None
+  return (id(key.CS), key.maxAngle, tuple(np.round(key.whiteCenter.data.reshape(3), 12)), key.colorStretching,
+          tuple(np.ravel(key.grayValue)), tuple(np.ravel(key.grayGradient)), key.perceptual, key.hueLightness,
+          tuple(np.round(np.asarray(key.sR.N).reshape(-1), 12)))
 
 
 # the grid held by the frame's identity: frames are interned, so the same frame brings the
@@ -381,7 +418,7 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
       continue
     cs = x.CSList[i]
     key = HSVDirectionKey(cs) if exact else keyColorGrid(cs, resolution)
-    if exact or key.ladders is None or not ipfGridColors(q, sub, d, key.ladders, key.colors, out):
+    if exact or not ipfGridColors(q, sub, d, key.n, key.colors, out):
       dirs = qrot(_conj(q[sub]), np.tile(d, (len(sub), 1)))
       out[sub] = key.direction2color(vector3d(dirs, frame=cs)).reshape(-1, 3)
   return out if at is not None else out.reshape(rots.shape + (3,))

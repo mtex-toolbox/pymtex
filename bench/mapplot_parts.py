@@ -38,6 +38,7 @@ def row(name, n, **parts):
 
 def colourParts(ebsd, name):
   from mtex.geometry.kernels import qrot
+  from mtex.plotting.kernels import cubeMapIndex
   from mtex.plotting.orientationkeys import _conj, ipfColors, keyColorGrid
   n = ebsd.size
   q = ebsd.rotations.data.reshape(-1, 4)
@@ -46,7 +47,7 @@ def colourParts(ebsd, name):
   d = np.array([0.0, 0.0, 1.0])
   grid = keyColorGrid(cs)
   tRot, dirs = timed(lambda: qrot(_conj(q[at]), np.tile(d, (len(at), 1))))
-  tLook, ind = timed(lambda: grid.grid.nearestStepwise(dirs))
+  tLook, ind = timed(lambda: cubeMapIndex(dirs, grid.n))
   tGather, _ = timed(lambda: grid.colors[np.asarray(ind).reshape(-1)])
   tGrid, _ = timed(lambda: ipfColors(ebsd))
   tKernel, rgb = timed(lambda: ipfKernelColors(q, at, grid))
@@ -56,45 +57,13 @@ def colourParts(ebsd, name):
   print(f"  the numba kernel agrees on {100 * same:.2f} % of the points", flush=True)
 
 
-_KERNEL = {}
-
-
-# the grid route as one compiled loop: the crystal direction of the specimen direction, its
-# polar angles, the ring, the node, the colour
+# the grid route as the one compiled loop of plotting/kernels.py: the crystal direction of the
+# specimen direction, its node of the cube map, the colour
 def ipfKernelColors(q, at, grid):
-  import numba
-  if "f" not in _KERNEL:
-    @numba.njit(parallel=True, cache=False)
-    def f(q, theta0, dtheta, nth, first, step, n, offset, colors, out):
-      for i in numba.prange(len(q)):
-        w, x, y, z = q[i, 0], -q[i, 1], -q[i, 2], -q[i, 3]
-        # the rotation of (0, 0, 1) by the conjugate quaternion
-        vx = 2 * (x * z + w * y)
-        vy = 2 * (y * z - w * x)
-        vz = 1 - 2 * (x * x + y * y)
-        th = np.arccos(min(1.0, max(-1.0, vz)))
-        rh = np.arctan2(vy, vx)
-        k = int(round((th - theta0) / dtheta))
-        k = min(max(k, 0), nth - 1)
-        if n[k] == 1:
-          j = 0
-        else:
-          j = int(round((rh - first[k]) / step[k])) % n[k]
-        idx = offset[k] + j
-        out[i, 0] = colors[idx, 0]
-        out[i, 1] = colors[idx, 1]
-        out[i, 2] = colors[idx, 2]
-    _KERNEL["f"] = f
-  g = grid.grid
-  rings = g.rhoGrid
-  first = np.array([r.points[0] for r in rings], dtype=float)
-  step = np.array([r.step if len(r) > 1 else 1.0 for r in rings], dtype=float)
-  cnt = np.array([len(r) for r in rings], dtype=np.int64)
-  offset = np.asarray(g.offset, dtype=np.int64)
-  out = np.empty((len(at), 3))
-  _KERNEL["f"](np.ascontiguousarray(q[at], dtype=float), float(g.thetaGrid.points[0]), float(g.thetaGrid.step), len(rings), first, step, cnt, offset,
-               np.ascontiguousarray(grid.colors), out)
-  return out
+  from mtex.plotting.kernels import ipfGridColors
+  out = np.empty((len(q), 3))
+  ipfGridColors(q, at, np.array([0.0, 0.0, 1.0]), grid.n, grid.colors, out)
+  return out[at]
 
 
 # ------------------------------------------------------------------ the raster

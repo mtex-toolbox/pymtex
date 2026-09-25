@@ -78,3 +78,20 @@ def test_P5_the_keys_that_jump_and_the_trivial_group():
   assert np.allclose(regionCenter(sR), unit(np.sum(sR.vertices().data, axis=0)))
   lune = conventionalSector(crystalFrame("2/m"))
   assert lune.checkInside(regionCenter(lune)) and np.allclose(regionCenter(lune), unit(np.sum(lune.N, axis=0)))
+
+
+@pytest.mark.parametrize("name", ["m-3m", "-3m", "mmm", "2/m"])
+def test_the_compiled_polar_radius_is_the_array_one(name):
+  from mtex import setMTEXpref
+  sR = conventionalSector(crystalFrame(name))
+  c = regionCenter(sR).reshape(3)
+  x = np.random.default_rng(1).standard_normal((5000, 3))
+  x = np.vstack([x / np.linalg.norm(x, axis=1, keepdims=True), c])
+  out = {}
+  for backend in ("numba", "numpy"):
+    setMTEXpref("kernels", backend)
+    try:
+      out[backend] = polarCoordinates(sR, x, c)[0]
+    finally:
+      setMTEXpref("kernels", "numba")
+  assert np.allclose(out["numba"], out["numpy"], atol=1e-12)

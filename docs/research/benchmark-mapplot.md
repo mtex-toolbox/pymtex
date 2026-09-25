@@ -280,3 +280,40 @@ Two more things came out of the same exchange.
   degree to four. The Forsterite inset is 147 px wide and meshes at 1.2 degree: three keys
   and a draw, 0.94 s to 0.31 s, where asking for two degrees outright gives 0.29 s. A key
   drawn large for a page still gets the half degree.
+
+## The key at ten million orientations (2026-09-25)
+
+`ipfHSVKey(cs).orientation2color(ori)` on 1e7 random orientations, twelve cores, with other
+sessions on the machine (load 5 to 6, so the absolute times run up to twice those of a quiet
+machine; each comparison below was taken under the same load). The exact key folds every
+crystal direction into the sector and then works out its polar coordinates and its colour
+in NumPy. MATLAB's `precompute`, a grid of the key looked up without the fold, is
+`key.precompute()` here, and `orientation2color` takes it by itself from 1e5 orientations
+on (`GRID_FROM`, MATLAB's estimate of where it pays); `ipfColors`, the map plot, always did.
+
+| m-3m, 1e7 | nodes | built once per frame | look-up | mean error | max error |
+|---|---:|---:|---:|---:|---:|
+| exact key | | | 16.5 s | | |
+| rings, half a degree (before) | 165 016 | 0.11 s | 236 ms | 0.011 | 0.048 |
+| cube map, 230 cells an edge | 317 400 | 0.29 s | 83 ms | 0.009 | 0.043 |
+| cube map, 512 cells an edge | 1 572 864 | 1.1 s | 82 ms | 0.004 | 0.026 |
+
+- The grid is now a cube map (`cubeMapNodes`, `cubeMapIndex` and the loop in
+  `plotting/kernels.py`): a direction falls on the face of its largest component, and its
+  cell is the other two components over that one, two divisions. The rings needed an arccos
+  for the ring and an arctan2 for the place in it, and those were the cost; the cube map is
+  three times faster and, at the same widest cell, nearer the key. The edge count is
+  ceil(2 / resolution), the cell at a face centre being the widest.
+- Lower precision does not pay: float32 quaternions and float32 or byte colours took the
+  ring look-up from 227 ms to 198 ms at best, the loop being bound by its arithmetic, not
+  by memory; float32 moves 74 of 1e7 directions to another node, and converting a float64
+  map costs 40 ms. numba has no float16 arithmetic.
+- The fold is no longer what the exact key costs: `projectIntoSector` runs over the cores
+  in 0.21 s of the 6.7 s a profiled run takes; the rest is the colour arithmetic of
+  `sphereColor` and `hsv2rgb`, a dozen arrays of 1e7 x 3, memory bound.
+- The unmeasured orientations are coloured inside the look-up loop (`blank`, NaN for
+  `orientation2color`, white for the map), which halved the call: the separate `isfinite`
+  pass over 1e7 quaternions took as long as the look-up itself.
+- `bench/mapplot_parts.py`: `ipfColors` of the 3.9 million point map in 55 ms, the compiled
+  loop and the array form agreeing on every point. `bench/mapplot_large.py` (rings still):
+  the 15.7 million point map in 0.25 s for the colours and 0.35 s for the plot.

@@ -1,5 +1,5 @@
 # the compiled kernels of the drawing: the colour of every orientation of a map read off the
-# grid of its key, and the polar coordinates of a sector fold that the key is built from,
+# cube map of its key, and the polar coordinates of a sector fold that the key is built from,
 # each a loop compiled by numba on its first call. Where numba is not there, or the
 # preference 'kernels' asks for NumPy, the loop reports that it did nothing and the caller
 # takes its own array route, which is the oracle of the tests. The pattern is the
@@ -8,32 +8,67 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _jit, _loop, backend
+from ..geometry.kernels import _jit, backend, threads
 
 _COMPILED = {}
 prange = range
 
 
-# the colour loop compiled over the cores: a map holds millions of measurements and each
-# one's colour is read on its own, so the loop splits over them; `_loop` compiles the
-# sector fold, which runs once per key and is short
+# the loops compiled over the cores, run on the threads of the preference: a map holds
+# millions of measurements and each one's colour, or polar radius, is read on its own, so
+# the loop splits over them
 def _parallel(name, f):
+  nb = _jit()
   if name not in _COMPILED:
-    nb = _jit()
     global prange
     prange = nb.prange
     _COMPILED[name] = nb.njit(cache=True, parallel=True)(f)
+  nb.set_num_threads(min(threads(), nb.config.NUMBA_NUM_THREADS))
   return _COMPILED[name]
 
 
 # ------------------------------------------------------------------ the colour of a map
 
+# the key of a map is read off a cube map of the sphere: a direction falls on the face of its
+# largest component, and its place there is the other two components over that one, in
+# [-1, 1] and cut into n cells a side. The node is two divisions away, where a grid of rings
+# needs an arccos and an arctan2. Face f is the axis f // 2, positive for even f; its cells
+# run over the other two axes in increasing order
+def cubeMapNodes(n):
+  t = (np.arange(n) + 0.5) / n * 2 - 1
+  U, V = np.meshgrid(t, t, indexing="ij")
+  faces = []
+  for axis in range(3):
+    u, v = [a for a in range(3) if a != axis]
+    for sign in (1.0, -1.0):
+      p = np.empty((n, n, 3))
+      p[..., axis], p[..., u], p[..., v] = sign, U, V
+      faces.append(p.reshape(-1, 3))
+  p = np.concatenate(faces)
+  return p / np.linalg.norm(p, axis=1, keepdims=True)
+
+
+# the node of every direction, -1 for a zero or NaN one; the array form of the loop below
+def cubeMapIndex(xyz, n):
+  xyz = np.asarray(xyz, dtype=float).reshape(-1, 3)
+  a = np.abs(xyz)
+  axis = np.argmax(a, axis=1)
+  rows = np.arange(len(xyz))
+  m = a[rows, axis]
+  ok = np.isfinite(m) & (m > 0)
+  face = 2 * axis + (xyz[rows, axis] <= 0)
+  u = np.where(ok, xyz[rows, np.where(axis == 0, 1, 0)], 0.0)
+  v = np.where(ok, xyz[rows, np.where(axis == 2, 1, 2)], 0.0)
+  mm = np.where(ok, m, 1.0)
+  iu = np.clip(((u / mm + 1) * 0.5 * n).astype(np.int64), 0, n - 1)
+  iv = np.clip(((v / mm + 1) * 0.5 * n).astype(np.int64), 0, n - 1)
+  return np.where(ok, (face * n + iu) * n + iv, -1)
+
+
 # the colour of every measurement of one phase: the crystal direction along the specimen
-# direction, then the node of the key's grid it falls in, which is arithmetic on a grid of
-# uniform steps - the ring from the polar angle, the place in the ring from the azimuth.
-# A measurement without an orientation is white, as the grid's own route colours it.
-def _ipfGridColorsLoop(q, sub, d, theta0, dtheta, first, step, count, offset, colors, out):
-  nTheta = first.shape[0]
+# direction, then its node of the cube map. A measurement without an orientation takes the
+# colour `blank`, white on a map.
+def _ipfGridColorsLoop(q, sub, d, n, colors, blank, out):
   for t in prange(sub.shape[0]):
     i = sub[t]
     a, b, c, e = q[i, 0], -q[i, 1], -q[i, 2], -q[i, 3]
@@ -43,44 +78,31 @@ def _ipfGridColorsLoop(q, sub, d, theta0, dtheta, first, step, count, offset, co
     x = a2 * (c * d[2] - d[1] * e) + s * b + an * d[0]
     y = a2 * (e * d[0] - d[2] * b) + s * c + an * d[1]
     z = a2 * (b * d[1] - d[0] * c) + s * e + an * d[2]
-    r = np.sqrt(x * x + y * y + z * z)
-    if not (r > 0) or not np.isfinite(r):
-      out[i, 0], out[i, 1], out[i, 2] = 1.0, 1.0, 1.0
-      continue
-    w = z / r
-    if w > 1.0:
-      w = 1.0
-    elif w < -1.0:
-      w = -1.0
-    k = int(np.round((np.arccos(w) - theta0) / dtheta))
-    if k < 0:
-      k = 0
-    elif k > nTheta - 1:
-      k = nTheta - 1
-    if count[k] == 1:
-      j = 0
+    ax, ay, az = abs(x), abs(y), abs(z)
+    if ax >= ay and ax >= az:
+      f, m, u, v = (0 if x > 0 else 1), ax, y, z
+    elif ay >= az:
+      f, m, u, v = (2 if y > 0 else 3), ay, x, z
     else:
-      j = int(np.round((np.arctan2(y, x) - first[k]) / step[k])) % count[k]
-    node = offset[k] + j
+      f, m, u, v = (4 if z > 0 else 5), az, x, y
+    if not (m > 0) or not np.isfinite(m):
+      out[i, 0], out[i, 1], out[i, 2] = blank[0], blank[1], blank[2]
+      continue
+    iu = min(max(int((u / m + 1) * 0.5 * n), 0), n - 1)
+    iv = min(max(int((v / m + 1) * 0.5 * n), 0), n - 1)
+    node = (f * n + iu) * n + iv
     out[i, 0], out[i, 1], out[i, 2] = colors[node, 0], colors[node, 1], colors[node, 2]
 
 
 # whether the compiled route ran; the caller colours through the grid itself when it did not
-def ipfGridColors(q, sub, d, ladders, colors, out):
-  if backend() == "numpy" or ladders is None:
-    return False
-  theta0, dtheta, first, step, count, offset = ladders
-  if not (dtheta > 0):
+def ipfGridColors(q, sub, d, n, colors, out, blank=(1.0, 1.0, 1.0)):
+  if backend() == "numpy":
     return False
   q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
   sub = np.ascontiguousarray(sub, dtype=np.int64).reshape(-1)
   d = np.ascontiguousarray(d, dtype=np.float64).reshape(3)
   colors = np.ascontiguousarray(colors, dtype=np.float64).reshape(-1, 3)
-  _parallel("ipfGridColors", _ipfGridColorsLoop)(q, sub, d, float(theta0), float(dtheta),
-                                                np.ascontiguousarray(first, dtype=np.float64),
-                                                np.ascontiguousarray(step, dtype=np.float64),
-                                                np.ascontiguousarray(count, dtype=np.int64),
-                                                np.ascontiguousarray(offset, dtype=np.int64), colors, out)
+  _parallel("ipfGridColors", _ipfGridColorsLoop)(q, sub, d, int(n), colors, np.asarray(blank, dtype=np.float64).reshape(3), out)
   return True
 
 
@@ -91,7 +113,7 @@ def ipfGridColors(q, sub, d, ladders, colors, out):
 # Every quantity here is a cross product and an angle of one direction, which as a loop
 # needs none of the (n, 3) temporaries the array form builds per boundary.
 def _polarRadiusLoop(N, xyz, c, out):
-  for i in range(xyz.shape[0]):
+  for i in prange(xyz.shape[0]):
     x, y, z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
     # the pole of the geodesic through the direction and the centre
     wx = y * c[2] - z * c[1]
@@ -154,7 +176,7 @@ def polarRadius(N, xyz, c):
   if backend() == "numpy":
     return _polarRadiusNumpy(N, xyz, c)
   out = np.empty(len(xyz))
-  _loop("polarRadius", _polarRadiusLoop)(N, xyz, c, out)
+  _parallel("polarRadius", _polarRadiusLoop)(N, xyz, c, out)
   return out
 
 
