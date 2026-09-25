@@ -27,14 +27,16 @@ def timed(f):
 
 
 # table: op -> (call, results as rows); ops run in table order, the ones not asked for only when
-# a later one needs them (always)
+# a later one needs them (always); reps a number or one per op, a single run without a warm up
 def run(out, algorithms, table, ops, reps=5, always=()):
   algo = {case: a["name"] for a in algorithms for case in a["cases"]}
   for op, (f, result) in table.items():
     if op not in ops and op not in always:
       continue
-    f()
-    res, best = min((timed(f) for _ in range(reps)), key=lambda r: r[1])
+    n = reps.get(op, 5) if isinstance(reps, dict) else reps
+    if n > 1:
+      f()
+    res, best = min((timed(f) for _ in range(n)), key=lambda r: r[1])
     _, _, recs = profiling.profileCall(f)
     profiling.write(os.path.join(out, f"profile_python_{op}.json"), algo[op], "python", op, best, recs)
     open(os.path.join(out, f"python_{op}.txt"), "w").write(f"{best}\n")
