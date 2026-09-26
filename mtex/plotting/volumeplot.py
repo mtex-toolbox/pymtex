@@ -52,12 +52,15 @@ def plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
   lineWidth, colormap, colorRange, ipfDirection; lineStyle='none' draws no edges.
   """
   kw = _options(kw)
+  # a patch takes the colour map of MATLAB's axes, parula, not MTEX's default
+  kw.setdefault("colormap", "parula")
   return _draw(grainMesh(grains, color, **kw), how2plot, figSize, grains.frame)
 
 
 def plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw):
   """plot(gB), plot(gB, values), plot(gB, faceColor=...): the faces of a 3D grain boundary"""
   kw = _options(kw)
+  kw.setdefault("colormap", "parula")
   return _draw(boundaryMesh(gB, color, **kw), how2plot, figSize, gB.frame)
 
 

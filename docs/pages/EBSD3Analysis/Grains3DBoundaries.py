@@ -195,5 +195,6 @@ print(lowAngleAreaFraction)
 #
 # `calcGrains` alters the volume it is given (the grain ids stay on it), so MATLAB's
 # `[grains, ebsd] = calcGrains(ebsd, ...)` is `grains = calcGrains(ebsd, ...)`. `edges` and
-# `nodeType` are methods of the boundary, `accumarray` is `np.bincount`, and the grain and
-# voxel ids count from 1 as MATLAB's, 0 standing for the outside.
+# `nodeType` are methods of the boundary and `accumarray` is `np.bincount`. The grain ids count
+# from 1 as MATLAB's, 0 standing for the outside; `ebsdId` counts the voxels from 0 in the
+# port's array order, -1 standing for the outside, as for every map of the port.

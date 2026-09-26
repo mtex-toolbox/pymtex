@@ -85,9 +85,10 @@ def histogram(x, *args, **kw):
   if isinstance(x, vector3d):
     from .polarplot import histogram as rose
     return rose(x, *args, **kw)
-  # a plain list of numbers is an ordinary histogram, as MATLAB's histogram(x, n) is
+  # a plain list of numbers is an ordinary histogram, as MATLAB's histogram(x, n) is, its bins
+  # chosen from the data unless given, as MATLAB's automatic binning
   if isinstance(x, np.ndarray) or (isinstance(x, (list, tuple)) and not hasattr(x, "loops")):
-    bins = args[0] if args else kw.pop("bins", 10)
+    bins = args[0] if args else kw.pop("bins", "auto")
     ax = _axes(kw.pop("parent", None))
     return ax.hist(np.asarray(x, dtype=float).reshape(-1), bins=bins, **kw)
   return _grainHistogram(x, *args, **kw)

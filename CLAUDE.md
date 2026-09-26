@@ -190,7 +190,7 @@ MATLAB catalogue in `geometry/data/crystalshapes.py`; a list of shapes is one ob
 G7's `plane.py` (`plane3d`, `plot(plane)` clipped by the axes). `tensorplot.py` draws P4's tensors: `plot(T)`, `plot((r, g, b))` for
 the interference colours, `plotSeismicVelocities(C)`. The plotting subplan is complete but for the pieces `docs/plans/plotting.md`
 lists as left out. P3b, the maps of volumes (`docs/plans/maps3d.md`, `mtex/maps3d`, `../master` the one
-reference), is done through V7: `EBSD3` over a `voxelLattice`, `calcGrains` on voxels, `grain3d` and
+reference), is done through V8, its ten doc pages checked against master: `EBSD3` over a `voxelLattice`, `calcGrains` on voxels, `grain3d` and
 `grain3Boundary`, sections, the DREAM.3D and Neper readers, smoothing, the intragranular quantities,
 and the drawing: a `scene3d` of NumPy arrays (`plotting/scene3d.py`) held by an `mtexFigure` and shown
 as the picture PyVista renders offscreen (`render3d.py`, the `plot3d` extra), so hold and `setCamera` act

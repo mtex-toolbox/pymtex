@@ -15,7 +15,7 @@ does not exist; **Pending** not started.
 |---|---|---|---|---|---|---|---|
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
-| EBSD3Analysis | 9 | 0 | 0 | 0 | 9 | 0 | 0 |
+| EBSD3Analysis | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | EBSDAnalysis | 25 | 20 | 1 | 2 | 2 | 0 | 0 |
 | Elasticity | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | GeneralConcepts | 12 | 9 | 3 | 0 | 0 | 0 | 0 |
@@ -63,15 +63,15 @@ does not exist; **Pending** not started.
 | CrystalOrientations/OrientationVisualization3d | OrientationVisualization3d | Checked 2026-09-22; the four figures as MATLAB's; the port's markers are filled where MATLAB draws hollow circles | Checked |
 | CrystalOrientations/OrientationVisualizationSections | OrientationVisualizationSections | Checked 2026-09-22; the phi2, sigma and axis angle sections as MATLAB's; found the largest angle of a region sampled (61.6 for 62.8 degrees), now exact at a vertex in Rodrigues space, so the sections sit at 5.233 to 57.566 degrees and are labelled as MATLAB's | Checked |
 | CrystalOrientations/SpecimenSymmetry | SpecimenSymmetry | Checked 2026-09-22; 8, 4, 1, 2, the frames and both pole figures with their ranges 6.9 and 3.4 as MATLAB's; the texture indices 27.8852 and 7.2683 as MATLAB's after a restart of the bridge, its NFFT MEX failing to load in the first run | Checked |
-| EBSD3Analysis/Grains3D | Grains3D | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/Grains3DOperations | Grains3DOperations | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/Grains3DProperties | Grains3DProperties | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/NeperInterface | NeperInterface | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/EBSD3Analysis | EBSD3Analysis | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/EBSD3Plotting | EBSD3Plotting | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/Grains3DBoundaries | Grains3DBoundaries | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/Grains3DReconstruction | Grains3DReconstruction | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
-| EBSD3Analysis/Grains3DSmoothing | Grains3DSmoothing | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3D | Grains3D | Checked 2026-09-26 against master (`matlabrun.py --master`, a session with OpenGL); [419, 0], the largest grain, every figure's geometry as MATLAB's; the colours (master's AvgQuats order) and the tilted slice (master's overlapping pieces) differed until both were fixed in master the same day | Checked |
+| EBSD3Analysis/Grains3DOperations | Grains3DOperations | Checked 2026-09-26; 1000 grains of volume 32, the slice 164/495/281, 28 to 88 faces and every figure as MATLAB's | Checked |
+| EBSD3Analysis/Grains3DProperties | Grains3DProperties | Checked 2026-09-26; 0.4954, 0.4797, 0.0238, 12 11, 1000 527 and the figures as MATLAB's; the antipodal quiver blue for MATLAB's next colour | Checked |
+| EBSD3Analysis/NeperInterface | NeperInterface | Checked 2026-09-26; master ignored `neper.id` (seed 1: 623 faces, section 42) until fixed the same day; the (1,-1,0) section drawn axis-aligned where MATLAB turns it by 45° | Checked |
+| EBSD3Analysis/EBSD3Analysis | EBSD3Analysis | Checked 2026-09-26; the volume, the grains per phase, the five largest (the 4th and 5th tied, swapped), 0.0970/0.0962 and the figures as MATLAB's | Checked |
+| EBSD3Analysis/EBSD3Plotting | EBSD3Plotting | Checked 2026-09-26; the z = 0 slice phase for phase as MATLAB's after the halfway voxel was taken upwards; the oblique panel face on where MATLAB shows it in a 3D box | Checked |
+| EBSD3Analysis/Grains3DBoundaries | Grains3DBoundaries | Checked 2026-09-26; every count, 0.8423 and 0.0292 as MATLAB's; `ebsdId` in the port's 0-based order; faces in parula as MATLAB's | Checked |
+| EBSD3Analysis/Grains3DReconstruction | Grains3DReconstruction | Checked 2026-09-26; 812 grains, 15625, the stored 813, 812/749, 0.1562 and 2.52e-04 as MATLAB's | Checked |
+| EBSD3Analysis/Grains3DSmoothing | Grains3DSmoothing | Checked 2026-09-26; the node types, 289348 faces, 6 collapsed, the volumes, 0.6447/11.961/3.3128, 1157392 and the surface changes as MATLAB's to the printed digits | Checked |
 | EBSDAnalysis/EBSD2ODF | EBSD2ODF | Checked 2026-09-22; the peaks 3.727, 37.26, 1.476, the halfwidths 2.7377 and 4.7247, the distances 0.160 and 0.012 as MATLAB's, the grain-based numbers within the few grains the reconstructions differ by (374 for 368), all eight figures; MATLAB's tables are printed rows Partial |
 | EBSDAnalysis/EBSDAdvancedMaps | EBSDAdvancedMaps | Checked 2026-09-22; the Bunge key and its seams, the spot and fibre keys, the six lobes and the two layered maps as MATLAB's, the fibre count 24.8 to the digit; the spot count 13.8 for 12.1 because the robust means differ; needed `plot(key)` in sections for the Bunge and spot keys, a spot key constructed from a phase, its centre, colour and kernel settable, `MarkerAlpha`; `PatalaColorKey` is not ported Checked |
 | EBSDAnalysis/EBSDDenoising | EBSDDenoising | Checked 2026-09-22; the raw deviation 0.70 as MATLAB's, all nine figures; the variational filters take a smoothing length where MATLAB's spline selects its parameter, so the total variation and spline deviations are 0.63 and 0.64 for MATLAB's 0.58 and 0.59, said in the page; `grains.selectByGrainId(ebsd.grainId)` for MATLAB's `grains(ebsd.grainId)` Checked |

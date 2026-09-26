@@ -208,6 +208,5 @@ setCamera(how2plot)
 #
 # `neper = neper.init()` binds the one interface to the name MATLAB's static class uses, so
 # that the assignments read as MATLAB's. The orientations of the simulated grains are
-# sampled at random, so the pictures differ from MATLAB's in their colours, not in the
-# geometry Neper builds from the seed 529. MATLAB's `neper.getSlice`, a section written by
+# sampled at random, so the pictures differ from MATLAB's in their colours. MATLAB's `neper.getSlice`, a section written by
 # Neper to a file, is left out: `grains.slice` cuts the loaded grains directly.

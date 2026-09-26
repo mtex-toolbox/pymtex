@@ -167,7 +167,8 @@ class EBSD3(EBSD):
     l = g.lattice
     t = l.index(P)
     inside = np.all((t > -1e-9) & (t < np.array(l.shape) - 1 + 1e-9), axis=1)
-    ijk = np.clip(np.rint(t).astype(np.int64), 0, np.array(l.shape) - 1)
+    # a position halfway between two voxels takes the upper one, as MATLAB's nearest interpolant
+    ijk = np.clip(np.floor(t + 0.5 + 1e-9).astype(np.int64), 0, np.array(l.shape) - 1)
     src = np.ravel_multi_index(ijk.T, l.shape)
     inside &= ~g.isPadding.reshape(-1)[src]
     n = len(P)
