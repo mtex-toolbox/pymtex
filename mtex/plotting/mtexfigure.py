@@ -106,7 +106,7 @@ class mtexFigure:
   def _mappables(self):
     out = []
     for ax in self.children:
-      for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot"):
+      for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot"):
         plot = getattr(ax, holder, None)
         m = getattr(plot, "mappable", None)
         if m is not None:

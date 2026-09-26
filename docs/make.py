@@ -109,7 +109,7 @@ def build(page):
       shutil.copy(os.path.join(pagesDir, chapter, f), os.path.join(buildDir, f))
   # the figures of the previous build go, so that none outlives the cell that made it
   for f in os.listdir(buildDir):
-    if f.startswith(name + "-") and f.endswith(".png"):
+    if f.startswith(name + "-") and f.endswith((".png", ".html")):
       os.remove(os.path.join(buildDir, f))
   ns = {"__name__": "__mtexdoc__"}
   out, k, ok = [], 0, True
@@ -136,17 +136,25 @@ def build(page):
       # a figure has changed when it is new, holds more artists or looks from elsewhere; a
       # settling layout is no change
       count = (sum(len(ax.get_children()) for ax in fig.axes),
-               tuple((getattr(ax, "elev", None), getattr(ax, "azim", None), getattr(ax, "roll", None), ax.axison) for ax in fig.axes))
+               tuple((getattr(ax, "elev", None), getattr(ax, "azim", None), getattr(ax, "roll", None), ax.axison) for ax in fig.axes),
+               getattr(fig, "_mtexSceneVersion", None))
       if snapshots.get(num) == count:
         continue
       snapshots[num] = count
       buf = io.BytesIO()
       fig.savefig(buf, format="png", dpi=120)
-      changed.append(buf.getvalue())
-    for f, data in enumerate(changed, 1):
+      changed.append((buf.getvalue(), getattr(fig, "_mtexScene", None)))
+    # a figure holding a 3D scene is its picture linked to the interactive page of the scene
+    for f, (data, scene) in enumerate(changed, 1):
       png = f"{name}-{k}.png" if len(changed) == 1 else f"{name}-{k}-{f}.png"
       open(os.path.join(buildDir, png), "wb").write(data)
-      out.append(f"![]({png})\n")
+      if scene is None:
+        out.append(f"![]({png})\n")
+      else:
+        from mtex.plotting.render3d import writeHTML
+        page = png[:-4] + ".html"
+        writeHTML(scene, os.path.join(buildDir, page), title=f"{name}, figure {k}")
+        out.append(f"[![]({png})]({page})\n")
     if not ok:
       out.append("**The page stopped here.**\n")
       print(f"FAILED {chapter}/{name} at cell {k}\n{printed}")

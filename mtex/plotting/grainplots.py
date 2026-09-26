@@ -19,8 +19,14 @@ from .mtexfigure import gcm, mtexFigure
 
 
 # the bins and the share of the area of every phase in each, one column per indexed phase
+# the measure a grain is weighted by: its volume in 3D, its area in a map
+def _measure(grains):
+  from ..maps3d.grain3d import grain3d
+  return ("volume", grains.volume) if isinstance(grains, grain3d) else ("area", grains.area)
+
+
 def _areaShares(grains, prop, bins):
-  area = np.asarray(grains.area, dtype=float)
+  area = np.asarray(_measure(grains)[1], dtype=float)
   prop = area if prop is None else np.asarray(prop, dtype=float).reshape(-1)
   if np.isscalar(bins):
     bins = np.linspace(0, np.max(prop) + np.finfo(float).eps, int(bins))
@@ -97,9 +103,10 @@ def _grainHistogram(grains, prop=None, bins=15, **kw):
                      edgecolor=palette[int(p)], label=grains.CSList[int(p)].mineral, **kw))
   ax.set_xlim(bins[0], bins[-1])
   size = getMTEXpref("FontSize", 13)
-  ax.set_ylabel("relative area (%)", fontsize=size)
+  measure = _measure(grains)[0]
+  ax.set_ylabel(f"relative {measure} (%)", fontsize=size)
   if prop is None:
-    ax.set_xlabel("grain area", fontsize=size)
+    ax.set_xlabel(f"grain {measure}", fontsize=size)
   ax.legend()
   return hs
 

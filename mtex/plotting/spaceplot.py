@@ -62,6 +62,17 @@ def setCamera(how2plot=None, ax=None):
 
   from ..geometry.plottingconvention import plottingConvention
   pC = plottingConvention.default if how2plot is None else how2plot
+  # a figure holding a 3D scene is drawn again from the new camera, and a map seen from off
+  # its normal becomes a scene of the maps drawn into it
+  from .volumeplot import gcs, refresh, toScene
+  fig = gcm()
+  if ax is None and fig is not None and gcs(fig) is None and fig.children and getattr(fig.children[-1], "_mtexMapSources", None):
+    n = fig.children[-1]._mtexMapPlot.plane.normal
+    if abs(abs(float(pC.outOfScreen.normalize().data.reshape(3) @ n)) - 1) > 1e-9:
+      toScene(fig)
+  if ax is None and gcs(fig) is not None:
+    gcs(fig).how2plot = pC
+    return refresh(fig)
   if ax is None:
     fig = gcm()
     ax = fig.children[-1] if fig is not None and fig.children else plt.gca()

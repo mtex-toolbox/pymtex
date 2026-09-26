@@ -4,7 +4,8 @@ import importlib as _importlib
 
 __all__ = []
 for _name in ("spherical", "colormaps", "mtexfigure", "sphericalplot", "sections", "sectionplot", "fibreplot", "sectorfold", "directionkeys",
-              "orientationkeys", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot", "distributionplot"):
+              "orientationkeys", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot", "distributionplot",
+              "scene3d", "render3d", "volumeplot"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
     globals()[_public] = getattr(_module, _public)
@@ -103,6 +104,15 @@ def _install():
     setattr(crystalShape, f.__name__, method(f))
   from ..geometry.plottingconvention import plottingConvention
   plottingConvention.setView = method(pp.setView)
+  from ..maps3d.ebsd3 import EBSD3
+  from ..maps3d.grain3boundary import grain3Boundary
+  from ..maps3d.grain3d import grain3d
+  from . import volumeplot as vp
+  for cls in (grain3d, grain3Boundary, EBSD3):
+    cls.plot = method(vp.plot3dMap)
+  for cls in (grain3d, grain3Boundary):
+    cls.quiver = method(vp.quiver3d)
+  grain3d.histogram = method(gp.histogram)
 
 
 _install()

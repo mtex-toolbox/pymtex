@@ -292,6 +292,29 @@ def _norm(values, colorRange):
 
 # ------------------------------------------------------------------ the EBSD map
 
+# a map plotted into a held 3D scene, or into a held map of another plane, goes into space;
+# every other map is recorded on its axes, so that setCamera can turn the axes into a scene
+def _liftable(f):
+  import functools
+
+  @functools.wraps(f)
+  def g(x, *args, **kw):
+    from . import volumeplot as vp
+    if kw.get("parent") is None:
+      out = vp.mapInto3d(f, x, args, kw)
+      if out is not None:
+        return out
+    out = f(x, *args, **kw)
+    ax = getattr(out, "axes", None) if not isinstance(out, list) else getattr(out[0], "axes", None) if out else None
+    if ax is None and kw.get("parent") is None and gcm() is not None and gcm().children:
+      ax = gcm().children[-1]
+    if kw.get("parent") is None:
+      vp.recordMap(ax, f, x, args, kw)
+    return out
+  return g
+
+
+@_liftable
 def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None,
              refFrame=True, location=None, ipfDirection=None, maxPixels=None, edgeColor=None, lineWidth=0.5, alpha=1.0, legend=None, DisplayName=None,
              MarkerSize=4, **kw):
@@ -438,6 +461,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
 
 # ------------------------------------------------------------------ the grains and the boundary
 
+@_liftable
 def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None, refFrame=True,
                location=None, ipfDirection=None, noBoundary=False, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, DisplayName=None,
                translucent=None, **kw):
@@ -563,6 +587,7 @@ def _boundaryLines(mP, gB, color, lineWidth, zorder=3, **kw):
   return h
 
 
+@_liftable
 def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis", colorRange=None, colorbar=False, edgeAlpha=1.0,
                  micronbar=None, refFrame=True, DisplayName=None, **kw):
   """plot(gB), plot(gB, values), plot(gB, rgb), plot(gB, lineColor='r', lineWidth=2)

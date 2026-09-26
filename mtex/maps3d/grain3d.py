@@ -3,12 +3,19 @@
 #   grains.id, grains.phaseId, grains.numPixel, grains.meanOrientation, grains.GOS
 #   grains.I_GF              grains x faces of grains.boundary: +1 where the face normal points
 #                            out of the grain, -1 where it points in
-#   grains.boundary          the grain3Boundary of all faces
-#   grains.V, grains.F       the vertices and the triangles of the boundary
-#   grains.volume, grains.centroid, grains.surfaceArea, grains.numFaces, grains.extent
+#   grains.boundary          the grain3Boundary of the faces of the grains
+#   grains.V, grains.F       the vertices and the faces of the boundary
+#   grains.volume, grains.centroid, grains.surfaceArea, grains.diameter, grains.extent
+#   grains.principalComponents()      the half axes of the ellipsoid of the same moments
+#   grains.neighbors(), grains.numNeighbors, grains.intersected(plane), grains.slice(plane)
+#   grains[k], grains[mask], grains['Iron'], grains['id', ids], grains.rotate(rot)
+#   grain3d.fromFaces(V, F, I_GF, ori, CSList, phaseId)    MATLAB's grain3d(V, F, I_GF, ...)
+#   grain3d.load('grains.dream3d'), grain3d.load('grains.tess'), grains.orientFaces()
 #
-# The volume and the centroid are the divergence theorem over the oriented triangles, the
-# tetrahedra from the origin, as MATLAB's volume and centroid.
+# The volume, the centroid and the second moments are the divergence theorem over the
+# oriented faces, a polygon taken as the fan of triangles from its first corner, as
+# MATLAB's volume, centroid and principalComponents. A selection keeps the ids of the
+# grains and of the faces, as MATLAB's subSet.
 from __future__ import annotations
 
 import numpy as np
@@ -33,6 +40,44 @@ class grain3d:
     self.prop = {} if prop is None else dict(prop)
     self.phaseMap = np.arange(len(CSList)) if phaseMap is None else np.asarray(phaseMap)
 
+  # the grains of vertices, faces and the incidence of grains and faces, as MATLAB's
+  # constructor: the face lies between the grain it is +1 for and the one it is -1 for, the
+  # misorientation from the mean rotations, the voxels unknown
+  @staticmethod
+  def fromFaces(V, F, I_GF, ori=None, CSList=None, phaseId=None, frame=None):
+    from scipy.sparse import csr_matrix
+    from ..geometry.frames import specimenFrame
+    from ..geometry.kernels import qmul
+    from ..maps.phaselist import phaseList
+    from .grain3boundary import grain3Boundary
+    I = csr_matrix(I_GF)
+    n, m = I.shape
+    cs = CSList if isinstance(CSList, phaseList) else phaseList(CSList if CSList is not None else ["notIndexed"])
+    ph = np.full(n, 1 if len(cs) > 1 else 0, dtype=np.int8) if phaseId is None else np.asarray(phaseId, dtype=np.int8).reshape(-1)
+    q = np.full((n, 4), np.nan) if ori is None else np.asarray(ori.data if hasattr(ori, "data") else ori, dtype=float).reshape(-1, 4)
+    C = I.tocoo()
+    gid = np.zeros((m, 2), dtype=np.int64)
+    gid[C.col[C.data > 0], 0] = C.row[C.data > 0] + 1
+    gid[C.col[C.data < 0], 1] = C.row[C.data < 0] + 1
+    both = np.all(gid > 0, axis=1)
+    mori = np.full((m, 4), np.nan)
+    mori[both] = qmul(q[gid[both, 1] - 1] * np.array([1, -1, -1, -1]), q[gid[both, 0] - 1])
+    side = np.where(gid > 0, ph[np.maximum(gid, 1) - 1], -1)
+    fr = specimenFrame.default if frame is None else frame
+    gB = grain3Boundary(V, F, gid, None, side, mori, cs, fr)
+    return grain3d(np.arange(1, n + 1), ph, cs, np.ones(n), q, np.zeros(n), I, gB, fr)
+
+  # the faces turned consistently around every grain, the normals out of it, as MATLAB's orientFaces
+  def orientFaces(self):
+    from .orientfaces import orientFaces
+    return orientFaces(self)
+
+  # grain3d.load('grains.dream3d'), grain3d.load('grains.tess', CS=cs)
+  @staticmethod
+  def load(fname, *args, **kwargs):
+    from ..io.loadgrains3d import loadGrains3d
+    return loadGrains3d(fname, *args, **kwargs)
+
   def __len__(self):
     return len(self.id)
 
@@ -45,13 +90,108 @@ class grain3d:
     return np.array([self.CSList[int(p)].isIndexed for p in self.phaseId], dtype=bool)
 
   @property
+  def indexedPhaseId(self):
+    present = np.unique(self.phaseId)
+    return np.array([p for p in present if self.CSList.isIndexed(p)], dtype=int)
+
+  @property
+  def mineralList(self):
+    return self.CSList.mineralList
+
+  @property
   def meanOrientation(self):
     p = np.unique(self.phaseId)
     if len(p) != 1:
       raise ValueError("the grains are of several phases; select one first")
     q = self.meanRotation.data.reshape(-1, 4)
-    from ..geometry.frames import specimenFrame
-    return orientation(rotation._fromData(q), self.CSList[int(p[0])], self.frame.stripSym() if hasattr(self.frame, "stripSym") else specimenFrame.default)
+    return orientation(rotation._fromData(q), self.CSList[int(p[0])], self.frame.stripSym())
+
+  # new orientations, one per grain, their crystal frame the phase of every grain, the
+  # misorientations of the boundary recomputed, as MATLAB's grains.meanOrientation = ori
+  @meanOrientation.setter
+  def meanOrientation(self, ori):
+    from ..geometry.kernels import qmul
+    from ..maps.phaselist import phaseList
+    q = np.broadcast_to(ori.data.reshape(-1, 4), (len(self), 4)).copy()
+    frames = [f for f in self.CSList.frames if not f.isIndexed] or ["notIndexed"]
+    self.CSList = phaseList(list(frames) + [ori.CS])
+    p = len(self.CSList) - 1
+    self.phaseId = np.full(len(self), p, dtype=np.int8)
+    self.meanRotation = rotation._fromData(q)
+    gB = self.boundary
+    g = gB.grainId
+    both = np.all(g > 0, axis=1)
+    pos = np.zeros(int(g.max(initial=0)) + 1, dtype=np.int64)
+    pos[self.id] = np.arange(len(self))
+    mori = np.full((len(gB), 4), np.nan)
+    mori[both] = qmul(q[pos[g[both, 1]]] * np.array([1, -1, -1, -1]), q[pos[g[both, 0]]])
+    gB.misrotation = rotation._fromData(mori)
+    gB.phaseId = np.where(g > 0, p, -1).astype(np.int8)
+    gB.CSList = self.CSList
+
+  # ------------------------------------------------------------------ selections
+
+  def _new(self, rows, I_GF=None, boundary=None, meanRotation=None):
+    I = self.I_GF[rows] if I_GF is None else I_GF
+    if boundary is None:
+      cols = np.unique(I.nonzero()[1])
+      I, boundary = I[:, cols], self.boundary[cols]
+    prop = {k: np.asarray(v)[rows] for k, v in self.prop.items()}
+    q = self.meanRotation.data.reshape(-1, 4)[rows] if meanRotation is None else meanRotation
+    return grain3d(self.id[rows], self.phaseId[rows], self.CSList, self.numPixel[rows], q, self.GOS[rows], I, boundary,
+                   self.frame, prop, self.phaseMap)
+
+  # the position of grain ids
+  def id2ind(self, ids):
+    ids = np.asarray(ids)
+    pos = {g: k for k, g in enumerate(self.id)}
+    try:
+      return np.array([pos[int(g)] for g in ids.reshape(-1)], dtype=np.int64).reshape(ids.shape)
+    except KeyError:
+      raise ValueError("no grain of that id") from None
+
+  def __getitem__(self, key):
+    if isinstance(key, str):
+      key = [key]
+    if isinstance(key, (list, tuple)) and key and isinstance(key[0], str):
+      if key[0] == "id":
+        return self._new(self.id2ind(key[1] if len(key) == 2 else list(key[1:])))
+      mask = np.zeros(len(self), dtype=bool)
+      for name in key:
+        if name.lower() == "indexed":
+          mask |= self.isIndexed
+        else:
+          mask |= self.phaseId == self.CSList.phaseId(name)
+      return self._new(np.flatnonzero(mask))
+    rows = np.arange(len(self))[key]
+    return self._new(np.atleast_1d(rows))
+
+  # the grains turned about a centre: their faces and, unless keepEuler, their orientations
+  def rotate(self, rot, keepXY=False, keepEuler=False, center=(0.0, 0.0, 0.0)):
+    R = rotation(rot.data if hasattr(rot, "data") else rot)
+    q = self.meanRotation.data.reshape(-1, 4)
+    if not keepEuler:
+      from ..geometry.kernels import qmul
+      q = qmul(np.broadcast_to(R.data.reshape(4), q.shape), q)
+    gB = self.boundary
+    if not keepXY:
+      c = np.asarray(center.data if isinstance(center, vector3d) else center, dtype=float).reshape(3)
+      gB = gB[np.arange(len(gB))]
+      gB.allV = c + (gB.allV - c) @ R.matrix().reshape(3, 3).T
+    return self._new(np.arange(len(self)), self.I_GF, gB, q)
+
+  # the faces of polygonal grains as triangles, the fan from the first corner of every face
+  def triangulate(self):
+    gB = self.boundary
+    n = gB.numCorners - 2
+    face = np.repeat(np.arange(len(gB)), n)
+    start = np.repeat(gB._ptr[:-1], n)
+    j = np.arange(len(face)) - np.repeat(np.cumsum(n) - n, n)
+    T = np.stack([gB._idx[start], gB._idx[start + j + 1], gB._idx[start + j + 2]], axis=1)
+    from .grain3boundary import grain3Boundary
+    tri = grain3Boundary(gB.allV, T, gB.grainId[face], gB.ebsdId[face], gB.phaseId[face], gB.misrotation.data.reshape(-1, 4)[face],
+                         gB.CSList, gB.frame, gB.scanUnit, gB.id[face])
+    return self._new(np.arange(len(self)), self.I_GF[:, face], tri)
 
   # ------------------------------------------------------------------ the polyhedra
 
@@ -71,31 +211,132 @@ class grain3d:
   def numFaces(self):
     return np.asarray((self.I_GF != 0).sum(axis=1)).reshape(-1)
 
-  # six times the signed volume of the tetrahedron of every triangle and the origin
-  def _tetra(self):
-    A = self.boundary._corners()
-    return np.einsum("ij,ij->i", A[:, 0], np.cross(A[:, 1] - A[:, 0], A[:, 2] - A[:, 0]))
+  # a quantity summed over the fan triangles of every face, then over the faces of every grain
+  def _integral(self, f):
+    T, face = self.boundary._fan()
+    a, b, c = T[:, 0], T[:, 1], T[:, 2]
+    N = np.cross(b - a, c - a)
+    x = self.boundary._sumByFace(f(a, b, c, N), face)
+    return self.I_GF @ x
 
   @property
   def volume(self):
-    return self.I_GF @ self._tetra() / 6
+    return self._integral(lambda a, b, c, N: np.einsum("ij,ij->i", a, N)) / 6
+
+  def _centroid(self, vol):
+    return self._integral(lambda a, b, c, N: N * ((a + b) ** 2 + (b + c) ** 2 + (c + a) ** 2)) / 48 / vol[:, None]
 
   @property
   def centroid(self):
-    A = self.boundary._corners()
-    a, b, c = A[:, 0], A[:, 1], A[:, 2]
-    N = np.cross(b - a, c - a)
-    m = N * ((a + b) ** 2 + (b + c) ** 2 + (c + a) ** 2) / 48
-    return vector3d((self.I_GF @ m) / self.volume[:, None], frame=self.frame)
+    return vector3d(self._centroid(self.volume), frame=self.frame)
 
   @property
   def surfaceArea(self):
-    return np.abs(self.I_GF) @ self.boundary.area
+    return abs(self.I_GF) @ self.boundary.area
+
+  # MATLAB's name for the surface area
+  def surface(self):
+    return self.surfaceArea
 
   @property
   def extent(self):
     P = self.boundary.allV[self.boundary.idV]
     return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
+
+  # the largest distance between two vertices of every grain, on MATLAB's rounding to 1e-4
+  @property
+  def diameter(self):
+    from scipy.spatial import ConvexHull
+    V = np.round(1e4 * self.boundary.allV)
+    I = self._vertexIncidence()
+    out = np.zeros(len(self))
+    for k in range(len(self)):
+      P = V[I.indices[I.indptr[k]:I.indptr[k + 1]]]
+      if len(P) > 100:
+        P = P[ConvexHull(P).vertices]
+      out[k] = np.sqrt(np.max(np.sum((P[:, None] - P[None]) ** 2, axis=-1)))
+    return out / 1e4
+
+  # grains x vertices, as a CSR matrix
+  def _vertexIncidence(self):
+    return ((abs(self.I_GF) > 0).astype(np.int64) @ self.boundary.I_VF.T.astype(np.int64)).tocsr() > 0
+
+  # the half axes of the ellipsoid of the same second moments and volume, the longest first
+  def principalComponents(self):
+    vol = self.volume
+    c = self._centroid(vol)
+
+    def moments(a, b, c_, N):
+      P1 = (a + b + c_) / 3
+      P2, P3, P4 = (3 * a + b + c_) / 5, (a + 3 * b + c_) / 5, (a + b + 3 * c_) / 5
+      I3 = -9 / 16 * P1 ** 3 + 25 / 48 * (P2 ** 3 + P3 ** 3 + P4 ** 3)
+      Ixyz = -9 / 16 * P1.prod(axis=1) + 25 / 48 * (P2.prod(axis=1) + P3.prod(axis=1) + P4.prod(axis=1))
+      return np.concatenate([N * I3 / 6, N * Ixyz[:, None] / 2], axis=1)
+
+    m = self._integral(moments)
+    diag = m[:, :3] - vol[:, None] * c ** 2
+    off = m[:, 3:] - vol[:, None] * np.stack([c[:, 1] * c[:, 2], c[:, 0] * c[:, 2], c[:, 0] * c[:, 1]], axis=1)
+    M = np.zeros((len(self), 3, 3))
+    M[:, [0, 1, 2], [0, 1, 2]] = diag
+    M[:, 1, 2] = M[:, 2, 1] = off[:, 0]
+    M[:, 0, 2] = M[:, 2, 0] = off[:, 1]
+    M[:, 0, 1] = M[:, 1, 0] = off[:, 2]
+    lam, vec = np.linalg.eigh(M)
+    v = np.swapaxes(vec, 1, 2) * np.sqrt(np.maximum(lam, 0))[:, :, None]
+    v = v * (vol / (4 / 3 * np.pi * np.prod(np.linalg.norm(v, axis=2), axis=1)))[:, None, None] ** (1 / 3)
+    return tuple(vector3d(v[:, k], frame=self.frame, antipodal=True) for k in (2, 1, 0))
+
+  # ------------------------------------------------------------------ neighbours
+
+  # the pairs of neighbouring grains, each sorted, among the grains of the set or with full
+  # all pairs any of them has
+  def neighbors(self, full=False):
+    g = self.boundary.grainId
+    g = np.unique(np.sort(g[np.all(g > 0, axis=1)], axis=1), axis=0)
+    if full:
+      return g
+    return g[np.all(np.isin(g, self.id), axis=1)]
+
+  @property
+  def numNeighbors(self):
+    pairs = self.neighbors(full=True)
+    counts = np.bincount(pairs.reshape(-1), minlength=int(self.id.max(initial=0)) + 1)
+    return counts[self.id]
+
+  # ------------------------------------------------------------------ smoothing
+
+  def smoothBoundary(self, *args, **kwargs):
+    from .smoothing3d import _smoothBoundary3d
+    return _smoothBoundary3d(self, *args, **kwargs)
+
+  def reduceBoundary(self, *args, **kwargs):
+    from .smoothing3d import _reduceBoundary3d
+    return _reduceBoundary3d(self, *args, **kwargs)
+
+  def refineBoundary(self, *args, **kwargs):
+    from .smoothing3d import _refineBoundary3d
+    return _refineBoundary3d(self, *args, **kwargs)
+
+  # ------------------------------------------------------------------ sections
+
+  # whether a plane runs through a grain: vertices of it on both sides
+  def intersected(self, plane, P0=None):
+    from ..geometry.plane import plane3d
+    if not isinstance(plane, plane3d):
+      plane = plane3d(plane, P0 if P0 is not None else 0)
+    d = np.asarray(plane.dist(vector3d(self.boundary.allV, frame=self.frame))).reshape(-1)
+    I = self._vertexIncidence()
+    out = np.zeros(len(self), dtype=bool)
+    for k in range(len(self)):
+      dk = d[I.indices[I.indptr[k]:I.indptr[k + 1]]]
+      out[k] = dk.size > 0 and dk.max() > 0 and dk.min() < 0
+    return out
+
+  # the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain
+  # every section came from
+  def slice(self, plane, P0=None):
+    from .section3d import sliceGrains
+    return sliceGrains(self, plane, P0)
 
   def __repr__(self):
     from ..maps.phaselist import phaseTable

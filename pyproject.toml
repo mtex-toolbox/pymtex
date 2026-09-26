@@ -16,6 +16,9 @@ plot = ["matplotlib>=3.8"]
 wizard = [
     "pyside6>=6.11.2",
 ]
+plot3d = [
+    "pyvista>=0.49.0",
+]
 
 [dependency-groups]
 dev = [

@@ -185,7 +185,13 @@ angle, Euler or Rodrigues space) on matplotlib's 3D axes, and `shapeplot.py` (`p
 MATLAB catalogue in `geometry/data/crystalshapes.py`; a list of shapes is one object over `(n, nV)` vertices) and
 G7's `plane.py` (`plane3d`, `plot(plane)` clipped by the axes). `tensorplot.py` draws P4's tensors: `plot(T)`, `plot((r, g, b))` for
 the interference colours, `plotSeismicVelocities(C)`. The plotting subplan is complete but for the pieces `docs/plans/plotting.md`
-lists as left out. P7 documentation
+lists as left out. P3b, the maps of volumes (`docs/plans/maps3d.md`, `mtex/maps3d`, `../master` the one
+reference), is done through V7: `EBSD3` over a `voxelLattice`, `calcGrains` on voxels, `grain3d` and
+`grain3Boundary`, sections, the DREAM.3D and Neper readers, smoothing, the intragranular quantities,
+and the drawing: a `scene3d` of NumPy arrays (`plotting/scene3d.py`) held by an `mtexFigure` and shown
+as the picture PyVista renders offscreen (`render3d.py`, the `plot3d` extra), so hold and `setCamera` act
+on it; `exportHTML` writes it as a three.js page and the doc build links every 3D figure to one; a 2D
+map in a plane of space enters a scene as the picture of its own map plot (`volumeplot.py`). P7 documentation
 (`docs/plans/docs.md`) started 2026-09-22 with the MATLAB pages of `../frameSymmetry/doc` as
 the one reference, text and numbers: a page is `docs/pages/<Chapter>/<Page>.py` in the
 jupytext light format, `docs/make.py` builds it into `docs/build/`, `docs/matlabrun.py`

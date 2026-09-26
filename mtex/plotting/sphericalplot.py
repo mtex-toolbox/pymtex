@@ -489,6 +489,9 @@ def plot(v, *args, **kw):
   """
   if isinstance(v, sphericalRegion):
     return plotRegion(v, **kw)
+  from .volumeplot import is3dMap, plot3dMap
+  if is3dMap(v):
+    return plot3dMap(v, *args, **kw)
   from ..geometry.frames import referenceFrame
   if isinstance(v, referenceFrame):
     return plotSymmetry(v, *args, **kw)
@@ -972,6 +975,9 @@ smooth = pcolor
 def quiver(v, w=None, resolution=10 * degree, **kw):
   """quiver(v, w), quiver(vF), quiver(ori, w): arrows at directions, a vector or axis field,
   or arrows at orientations in the sections of the current figure"""
+  from .volumeplot import is3dMap, quiver3d
+  if is3dMap(v):
+    return quiver3d(v, w, **kw)
   if _mapKind(v) is not None:
     from .mapplot import quiverMap
     return quiverMap(v, w, **kw)

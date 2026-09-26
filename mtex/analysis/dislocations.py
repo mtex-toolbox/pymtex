@@ -19,7 +19,6 @@ import numpy as np
 
 from ..geometry.kernels import backend
 from ..maps.ebsd import EBSD
-from ..maps.intragranular import curvature
 
 
 def _unit(a):
@@ -94,7 +93,8 @@ def fitDislocationSystems(kappa, dS):
 # content is the sum of the line energies times the absolute densities, in 1/m^2 for line
 # energies without a unit, and the densities one row per pixel
 def calcGND(ebsd, dS, stencil="oneSided"):
-  kappa = curvature(ebsd, stencil=stencil)
+  # the curvature of the map, or of the volume, whose curvature is complete
+  kappa = ebsd.curvature(stencil=stencil)
   dSRot = ebsd.orientations.reshape(-1, 1) * dS
   rho, factor = fitDislocationSystems(kappa, dSRot)
   gnd = factor * np.sum(np.abs(rho * dSRot.u), axis=1)
