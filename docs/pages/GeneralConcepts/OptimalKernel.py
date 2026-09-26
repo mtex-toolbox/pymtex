@@ -7,8 +7,8 @@
 #
 # There is no universally optimal halfwidth. The useful value depends on both the number of
 # independent observations and the smoothness of the unknown density. This page compares the
-# three selection methods provided by [calcKernel](orientation.calcKernel.html) and shows how
-# to check their choices against a known model.
+# selection methods provided by [calcKernel](orientation.calcKernel.html) and shows how to
+# check their choices against a known model.
 
 # +
 import matplotlib.pyplot as plt
@@ -82,7 +82,32 @@ mtexColorbar(title='mrd')
 # `reconstructionError` compares density values over orientation space. It is not an angular
 # error and must not be labelled in degrees.
 #
-# ## What the three methods use
+# ## Select from the error of the density
+#
+# Two further methods judge a candidate kernel by the error of the density it produces.
+# `'UCV'` (unbiased cross-validation) estimates the integrated squared error of every
+# candidate from the harmonic coefficients of the sample and takes the halfwidth where it is
+# least. `'conservative'` replaces the texture's harmonic energies by lower confidence bounds
+# and ignores the harmonic degrees it cannot resolve. The halfwidth it returns is then at least
+# as wide as the one of least error, and at least as wide as needed to keep noise bumps
+# below a fifth of the estimate's maximum. Both cost about one harmonic transform of the
+# sample, under a second for a million orientations. They use their own random generator
+# here, which splits the sample into the parts it compares.
+
+# +
+rngSelect = np.random.default_rng(2)
+for m in ['UCV', 'conservative']:
+  psiM = calcKernel(ori, method=m, rng=rngSelect)
+  errorM = calcError(calcDensity(ori, kernel=psiM), modelODF, resolution=5 * degree)
+  print(f'{m:12s} halfwidth {psiM.halfwidth() / degree:.3g} degree, error {errorM:.3g}')
+# -
+
+# UCV asks for 4.1 degrees and the conservative rule for 5.5, against the 7.1 degrees of
+# KLCV above, and both errors, 0.131 and 0.119, lie below KLCV's 0.139. `calcError`
+# measures the mean absolute difference of the densities rather than the squared error UCV
+# aims at, which is why the wider conservative kernel scores best here.
+#
+# ## What the methods use
 #
 # The method names are sometimes described as flags in older material. The current interface
 # passes each name as the value of `method`.
@@ -92,6 +117,8 @@ mtexColorbar(title='mrd')
 # | `'KLCV'` | leave-one-out likelihood on candidate kernels | default; data-adaptive |
 # | `'RuleOfThumb'` | nearest-neighbour resolution of the sample | quick scale estimate |
 # | `'magicRule'` | sample size and crystal/specimen symmetry | conservative asymptotic rule |
+# | `'UCV'` | unbiased estimate of the integrated squared error | aims at the best halfwidth |
+# | `'conservative'` | lower bounds of the harmonic energies, a bound on the noise | errs towards smoothing |
 #
 # Older descriptions say that `'RuleOfThumb'` uses the variance of the orientations to
 # estimate smoothness. The current implementation instead uses a quantile of
@@ -112,14 +139,14 @@ mtexColorbar(title='mrd')
 sampleSize = [30, 100, 300, 1000]
 # sampleSize = 10 ** np.arange(1, 7)   # full study: 10 through 1000000
 
-method = ['KLCV', 'RuleOfThumb', 'magicRule']
+method = ['KLCV', 'RuleOfThumb', 'magicRule', 'UCV', 'conservative']
 halfwidthInDegree = np.zeros((len(sampleSize), len(method)))
 estimationError = np.zeros((len(sampleSize), len(method)))
 
 for i, n in enumerate(sampleSize):
   oriTrial = discreteSample(modelODF, n, rng=rng)
   for j, m in enumerate(method):
-    psiTrial = calcKernel(oriTrial, method=m, samplingSize=1000, rng=rng)
+    psiTrial = calcKernel(oriTrial, method=m, samplingSize=1000, rng=rngSelect if m in ('UCV', 'conservative') else rng)
     trialODF = calcDensity(oriTrial, kernel=psiTrial)
     halfwidthInDegree[i, j] = psiTrial.halfwidth() / degree
     estimationError[i, j] = calcError(trialODF, modelODF, resolution=7.5 * degree)
@@ -135,9 +162,15 @@ for r, row in zip(rowName, estimationError):
   print(f'{r:8}' + ''.join(f'{v:13.5f}' for v in row))
 # -
 
-# Read each row as one random sample tested three ways. This controls the sample-to-sample
+# Read each row as one random sample tested five ways. This controls the sample-to-sample
 # variation when comparing methods within a row. One draw at each size is a demonstration,
 # not evidence that one method is always best.
+#
+# UCV follows KLCV closely in error while choosing narrower kernels from 100 orientations
+# on. The conservative rule is the widest data-driven choice at every size: with 30
+# orientations no harmonic degree of the texture is resolved and it returns its widest
+# candidate, 40 degrees; from there it narrows as the sample grows, to 11 degrees at 1000
+# orientations, where its error approaches KLCV's.
 
 plt.figure()
 plt.loglog(sampleSize, estimationError, 'o-', linewidth=2)
@@ -154,8 +187,12 @@ plt.grid(True, which='both')
 #
 # Automatic selection assumes that the input orientations represent the intended population.
 # Neighbouring pixels in one EBSD grain are strongly correlated, so treating every pixel as
-# independent can select a kernel that follows intragranular scatter. Use grain means to
-# select the kernel when grains are the independent sampling units.
+# independent can select a kernel that follows intragranular scatter. The orientations of a
+# map therefore carry the mark `notIID`, and `calcKernel` refuses them. `'UCV'` and
+# `'conservative'` accept them with the grain id of every pixel, `groups=ebsd.grainId`, or
+# the map itself once its grains are computed; they then compare only parts of the sample
+# that share no grain. Otherwise use grain means to select the kernel when grains are the
+# independent sampling units.
 #
 # Weighting answers a separate question. After selecting a kernel from grain means, an
 # area-based ODF may still use pixels or grain-area weights.
@@ -175,6 +212,24 @@ plt.grid(True, which='both')
 # The rule therefore narrows the kernel as the sample grows. It cannot use the unknown
 # density's feature sizes, which is why it is conservative. Rule-of-thumb and
 # cross-validation methods use the observations to add information about those scales.
+#
+# ## The maths behind UCV and the conservative rule
+#
+# Write the density in harmonics orthonormal for the uniform distribution,
+# $f = 1 + \sum_{\ell \ge 1} f_\ell$, with the degree energies $A_\ell = \|f_\ell\|^2$.
+# A radial kernel multiplies degree $\ell$ by a factor $b_\ell$ that falls as the halfwidth
+# grows. For $N$ independent orientations the mean integrated squared error is exactly
+#
+# $$ \mathrm{MISE} = \sum_{\ell \ge 1} (1 - b_\ell)^2 A_\ell + \frac{1}{N} \sum_{\ell \ge 1}
+#    b_\ell^2 \left( d_\ell - A_\ell \right), $$
+#
+# where $d_\ell$ is the dimension of degree $\ell$ reduced by the crystal and specimen
+# symmetry. `'UCV'` inserts unbiased estimates of $A_\ell$, obtained from products of
+# disjoint parts of the sample, and minimises over the candidates. `'conservative'`
+# inserts lower confidence bounds and sets the unresolved high degrees to zero. Lowering
+# the energies can only move the minimiser to a wider kernel, so the choice is at least the
+# halfwidth of least error whenever the bounds hold. Splitting a map into parts that share
+# no grain keeps the estimates unbiased when pixels of one grain are correlated.
 #
 # ## References
 #

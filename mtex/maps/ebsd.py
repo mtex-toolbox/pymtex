@@ -210,7 +210,10 @@ class EBSD:
     p = self._onePhase()
     q = np.array(self.rotations.data, dtype=float)
     q[self.phaseId != p] = np.nan
-    return orientation._fromRotation(q, (self.CSList[p], self.frame))
+    o = orientation._fromRotation(q, (self.CSList[p], self.frame))
+    # neighbouring pixels repeat the orientation of their grain: not independent draws
+    o.notIID = True
+    return o
 
   # the properties, reachable as ebsd.mad next to the fields themselves
   def __getattr__(self, name):

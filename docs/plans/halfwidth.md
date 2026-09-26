@@ -1,7 +1,11 @@
 # Subplan - automatic halfwidth selection on S2 and SO(3)
 
-Status: written 2026-09-26 as a plan for collecting and evaluating ideas; no selector is
-implemented. It takes the densities of directions on S2 first and generalises to orientations
+Status: written 2026-09-26; H0, H1 and H2 are built the same day (section 8): the energy vector
+and the selectors C1 to C3 on S2 and SO(3) in `mtex/functions/halfwidth.py`, `calcKernel` with
+`'conservative'` and `'UCV'` for directions and orientations, the flag `notIID` on the
+orientations of a map, the studies `bench/halfwidth_s2.py` and `bench/halfwidth_so3.py` (their
+tables in `bench/out/halfwidth/`). H3 to H6 are open; `calcDensity` still defaults to 10 degrees
+and `calcKernel` of orientations to KLCV until H5. It takes the densities of directions on S2 first and generalises to orientations
 with crystal and specimen symmetry afterwards. The existing selectors are MATLAB's
 `calcKernel` on the frameSymmetry branch (`../frameSymmetry/geometry/@orientation/calcKernel.m`
 with `KLCV.m`, `LSCV.m`, `BCV.m`) and their port in `mtex/functions/characteristics.py`. The
@@ -464,18 +468,97 @@ bridge, never a MATLAB benchmark of more than five minutes without asking.
 
 ## 8. Work plan
 
-**H0, the energy vector** (Python, a day): one function computing (e_l)_l, the fold energies and
-their jackknife errors for vector3d and orientation samples, with weights, folds by index or by a
-grouping (grain ids), the symmetric traces c_l; tests against the direct pairwise sums at
-n = 200. Decided: the representation shared with the tests (section 10).
+**H0, the energy vector** (done): `degreeEnergies(v | ori | ebsd, bandwidth, weights=, groups=,
+folds=8)` holds ||mu_l||^2, the energies A^_l cross-fitted over F folds (E <C_f, C_g> = W_f W_g A_l
+for disjoint folds, so the estimate is unbiased whatever the dependence inside a fold), their
+jackknife errors over the folds, s2 = sum w^2 and the largest weight over the independent units
+(points, or groups), and the symmetric traces c_l on a subsample of 2000 (Legendre sums over the
+frame's group on S2, characters over the pairs of the proper groups on SO(3), the antipode as one
+more copy). Equal points go to random folds, groups and weighted points to folds of equal weight.
+The coefficients come from one adjoint transform per fold at bandwidth L and tolerance 1e-6
+(the energies move by about that relative amount), orthonormal for the uniform probability and
+projected as the estimate is. With `folds=1` independent points take a single transform, the
+energies being the U-statistic (||mu_l||^2 - s2 c_l) / (1 - s2) with the traces averaged by w^2
+over the subsample; UCV, which needs no errors, runs this way unless there are groups. Checked against the direct pairwise sums
+at n = 150 to 200 (weights; m-3m directions; axes; -1, m-3m, 6/mmm with 222 and antipodal
+cubic misorientations on SO(3)) to 1e-9, `tests/test_halfwidth.py`.
 
-**H1, S2 selectors C1 to C3** (Python): each as a function of the energy vector; the pilot of 5.1
-promoted to `bench/halfwidth_s2.py` with the test densities and error measures of section 7.
-Decided at the end: L0, z, F, the candidate grid, tau; whether C2 alone or with C3 is the default.
+**H1, S2 selectors** (done): `ucvHalfwidth` (C1), `lowerBoundHalfwidth` (C2),
+`noiseFloorHalfwidth` (C3) and `selectHalfwidth(E, 'conservative' | 'UCV')`, the conservative
+choice being max(C2, C3). The risk of a candidate adds the energies above the kernel's degree
+extent as bias (b below 1e-3 counts as zero); for groups the variance term is the measured
+||mu_l||^2 - a_l below the energy bandwidth and the iid form times the design effect of the upper
+degrees above it. C3 is Bernstein's inequality with the variance s2 B y (B the symmetrised
+kernel's peak, y = K_h*f), a union bound over a covering of mesh delta / L (delta = 1/4), and a
+tolerance tau + tauRel y with tau = tauMax M, M the maximum of the C2 estimate at 200 points of a
+subsample. `bench/halfwidth_s2.py`: eight test densities (model A and B of 5.1, single bumps of 5,
+10, 20 degrees, 5 % of a 3 degree peak on a uniform background, a girdle, axial model A), exact
+samplers, the exact risk against the oracle of 60 candidates from 1 to 60 degrees, 20 replicates
+below 1e5 and 4 above, and the fluctuation max_x (|fhat - K_h*f| - tauRel K_h*f) / max K_h*f on
+20000 points. Results (`bench/out/halfwidth/s2_study.txt`), median MISE over the oracle's:
 
-**H2, SO(3)**: the same functions with Wigner energies and symmetry, the clustered EBSD case
-with grain-disjoint folds, timing to 1e7. Decided: whether the default is fast enough for
-`calcDensity` to select without being asked, and at what n it starts doing so.
+| | n = 1e2 | 1e3 | 1e4 | >= 1e5 | below the oracle |
+|---|---|---|---|---|---|
+| UCV | 1.02 to 1.07 (worst 2.2) | 1.00 to 1.02 | 1.00 to 1.01 | 1.00 | 25 to 50 % of the runs at n <= 1e3 |
+| C2, z = 2 | 1.00 to 1.57 | 1.01 to 1.15, sharp 1.87 | 1.00 to 1.10 | 1.00 to 1.11 | never (720 runs) |
+| C2, Bonferroni z | 1.00 to 2.19 | 1.01 to 1.90 | 1.01 to 1.19 | 1.00 to 1.11 | never |
+| C2 with the C3 floor, tauMax = 0.2 | 1.0 to 8.2 | 1.7 to 5.1 | 1.0 to 1.7 | 1.00 to 1.11 | never |
+| fixed 10 degrees | 1.0 to 9.8 | 1.2 to 40 | 1.2 to 174 | 3.6 to 1100 | |
+
+At C2's own halfwidth the measured fluctuation beyond tauRel K_h*f is already small: median 0.00
+to 0.12 of the maximum (0.23 for the girdle at n = 100). The C3 bound is about ten times loose
+(with tauMax = 0.2 the realised excess is 0.00 to 0.03): Bernstein takes K^2 <= B K where the
+variance is R y with R = ||K||^2, about B/2, and the union bound counts grid points where about
+4/h^2 kernel footprints are independent (the measured maxima are 2.3 to 4.8 local standard
+deviations against sqrt(2 Lambda) = 5.2 to 5.8). So the floor binds at n <= 1e4 and dominates the
+risk there; tauMax = 0.05 or 0.1 cost 4 to 14 times the oracle's MISE. The bandwidth L0 = 32 beat
+16. On the sharp model at n = 1e3 every lower bound is zero and C2 falls back to 33 degrees
+(Bonferroni: 60), the honest answer that no degree is resolved.
+
+Decided: L0 = 32, F = 8, z = 2 (Bonferroni over alpha = 0.05 as `z=None`, the stated
+probability), 60 geometric candidates from 1 to 60 degrees on S2, 40 from 2 to 40 on SO(3),
+alpha = 0.05, tauMax = 0.2, tauRel = 0.5. Timing on S2 (`timing`, energies plus selection): the conservative choice 0.32 s at 1e6 and
+1.7 s at 1e7; UCV at bandwidth 256 in one transform 0.17 s and 1.1 s.
+
+**H2, SO(3)** (done): the same functions with the Wigner coefficients projected by both groups,
+the characters for the traces, the pilot maximum over the symmetric copies.
+`bench/halfwidth_so3.py`: dlVP components of 5, 10, 20 degrees in m-3m, 10 degrees in -1 and in
+6/mmm with 222, SantaFe, a cubic mixture (0.5 uniform, 7 and 15 degree components), and pixels
+of lognormal grains (mean 50 pixels, 1 degree scatter) drawn from the mixture, 10 replicates at
+1e3, 1e4, 1e5; the truth in its harmonic form at bandwidth 96, the realised ISE of every
+candidate from the projected coefficients, the oracle the candidate of least mean ISE (which
+restricts the candidates to 2.5 degrees and above). Results (`bench/out/halfwidth/so3_study.txt`),
+median ISE over the oracle's in the same replicate:
+
+| | n = 1e3 | 1e4 | 1e5 | below the oracle |
+|---|---|---|---|---|
+| UCV | 1.00 to 1.04 | 1.00 to 1.01 | 1.00 | 10 to 50 % |
+| C2 | 1.00 to 1.10 | 1.00 to 1.03 | 1.00 to 1.01 | never |
+| conservative (C2 + C3) | 2.6 to 7.4 | 1.0 to 2.5 | 1.00 to 1.01 | never |
+| KLCV (the port's, without replacement) | 1.0 to 1.7 | 1.03 to 2.6 | | 0 to 100 % |
+| magicRule | 2.3 to 20 | 3.4 to 54 | 4.2 to 74 | |
+| fixed 10 degrees | 1.5 to 8.9 | 4.2 to 30 | 16 to 75 | |
+
+Clustered pixels (15, 237, 1976 grains at 1e3, 1e4, 1e5 pixels): taken as independent, every
+selector collapses to the smallest candidate, 6 to 31 times the oracle's ISE, the failure section
+10 guards against. Folded by grains, UCV is at the oracle (1.00 to 1.02, worst 3.4 with 15 grains),
+C2 is safe but wide (1.2, 1.9, 1.5: 40, 22, 6 degrees against 13, 7, 4), and the C3 floor is far
+too wide (2.2 to 4.9), since with groups it runs on the Kish number of the area-weighted grains
+and the grain's full weight as the largest summand. Timing, m-3m (after the speed-up of 2026-09-27: tolerance 1e-6, UCV in one transform, the
+pilot's kernel cut at three halfwidths where its powers ran into denormal numbers, the fold
+rotations taken without renormalising): `calcKernel(ori, 'conservative')` 0.50 s at 1e6 (the
+eight fold transforms at bandwidth 32 0.34 s, the pilot maximum 0.17 s) and about 3 s at 1e7;
+`'UCV'` at bandwidth 64 0.37 s and 2.3 s, plus 0.3 s once per session for the projections of
+the group at that bandwidth. The z-folds of the group would shrink the transforms, but finufft
+takes a slow path on the folded lattice at bandwidth 65 (1.1 s for 125000 nodes against 0.13
+s unfolded), so they are not used. On the copper map of EBSD2ODF (16116 pixels, 375 grains) the grain folds give 'conservative'
+40 degrees and 'UCV' 3.7 degrees (the smallest candidate bandwidth 64 resolves), the grain means
+14.5, 3.7 and KLCV 4.7.
+
+Open for H5: the threshold of `calcDensity`. C2 alone beats the fixed 10 degrees from n = 100 on
+almost every test density; with the C3 floor at tauMax = 0.2 only from n = 1e4 on (S2 and SO(3)).
+Either the default selects above 1e4, or C3 gets the tighter constants (the variance R y, an
+effective count of kernel footprints; no longer a proof) and the threshold drops.
 
 **H3, C4 and C5**: the diffusion plug-in (and the MATLAB `kde1d` fix recorded in
 docs/findings.md), full-data KLCV with leave-one-grain-out. Decided: which accurate method becomes
@@ -485,9 +568,10 @@ docs/findings.md), full-data KLCV with leave-one-grain-out. Decided: which accur
 it; the questions of section 9 that join the lines run on the MATLAB master harness or its
 Python counterpart, depending on the decision in section 10.
 
-**H5, the API and the pages**: `calcKernel` for vector3d and orientation, `calcDensity(...,
-halfwidth='auto')` or a keyword, the OptimalKernel and VectorsDensityEstimation pages extended by
-the new methods and the full N study; MATLAB's `calcKernel` gets the same methods if the user
+**H5, the API and the pages**: `calcKernel` for vector3d and orientation (done with H2), the
+OptimalKernel, VectorsDensityEstimation and EBSD2ODF pages extended by the new methods (done
+2026-09-26); `calcDensity(..., halfwidth='auto')` or a keyword, the switch of the defaults, and
+the full N study on the pages; MATLAB's `calcKernel` gets the same methods if the user
 wants them there.
 
 **H6, later**: local bandwidth (section 3.8), designed samples, uncertainty of the selected
@@ -501,7 +585,9 @@ How far above the oracle does truncated-energy oversmoothing land as a function 
 on S2 and on SO(3) with symmetry, and does the gap close at the rate the lower confidence bounds
 shrink? The comparison is against `calcKernel` with `magicRule`, which is conservative too but
 by a factor that does not shrink. Concerns `calcKernel`, `@orientation/calcKernel`,
-`mtex/functions/density.py`.
+`mtex/functions/density.py`. Measured (H1, H2): with L0 = 32 and z = 2 C2 lands at 1.0 to 1.6
+times the oracle's MISE at n = 100 and within 10 % from 1e3 on (sharp S2 texture at 1e3: 1.9),
+never below the oracle, where magicRule is 2 to 74 times the oracle's ISE on SO(3).
 
 ### Can the conservative guarantee be made simultaneous and finite-sample?
 
@@ -514,14 +600,19 @@ valid at n = 100? Concerns `calcKernel` and the degree energies behind `discrepa
 Constants of the Marcinkiewicz-Zygmund and Bernstein inequalities for spherical and Wigner
 polynomials, and whether the resulting h_C3 is below the oracle for realistic tau, i.e. whether
 C3 is a floor that rarely binds or the dominant term. Concerns `calcDensity`, `S2FunHarmonic`,
-`SO3FunHarmonic` and the maximum search `max`.
+`SO3FunHarmonic` and the maximum search `max`. Measured (H1): with Bernstein and a covering the
+floor dominates below n = 1e4 and is about ten times loose; the variance R y in place of B y and
+the number of independent kernel footprints in place of the covering are the two factors.
 
 ### What is the effective sample size of EBSD pixels, degree by degree?
 
 Measure E ||mu_l||^2 - A_l on real maps against n, n_grains and the Kish number, and test whether
 grain-disjoint folds remove the bias at all degrees, including those that resolve the
 intragranular spread; compare with spatial blocks when no grains exist. Concerns `calcGrains`,
-`calcDensity`, `calcKernel`, `@EBSD/calcDensity`.
+`calcDensity`, `calcKernel`, `@EBSD/calcDensity`. Measured on simulated grains (H2): taken as
+independent the pixels drive every selector to the smallest candidate; the grain folds put UCV at
+the oracle, so the cross-fitted energies do remove the bias; C2 with groups is wide by a factor of
+1.5 to 3 in halfwidth, since the jackknife over eight folds of a few hundred grains is coarse.
 
 ### How much does crystal symmetry really multiply the sample?
 

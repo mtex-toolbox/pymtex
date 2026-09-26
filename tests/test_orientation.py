@@ -182,3 +182,15 @@ def test_project2FundamentalRegion_antipodal():
   assert same(p, q) and not m.antipodal
   # each projected one is the misorientation or its inverse up to symmetry
   assert np.all(np.minimum(angle(p, m), angle(p, inv(m))) < 1e-6)
+
+
+def test_notIID_is_carried():
+  cs = crystalFrame("m-3m")
+  o = orientation(rotation.rand(6), cs)
+  assert not o.notIID
+  o.notIID = True
+  # indexing, reshaping, copies, the copy constructor, products and lists keep the mark
+  assert o[1:3].notIID and o.flatten().notIID and o.copy().notIID and orientation(o).notIID
+  assert (o * rotation.rand()).notIID and (inv(o[0]) * o).notIID
+  assert cat(orientation(rotation.rand(2), cs), o).notIID
+  assert not orientation(rotation.rand(2), cs).notIID

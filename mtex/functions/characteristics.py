@@ -702,14 +702,37 @@ def _discreteSampleS2(f, n, resolution, rng):
 # ------------------------------------------------------------------ kernel selection and specimen centering
 
 
-# the de la Vallee Poussin kernel a density estimate of the orientations should use (MATLAB
-# calcKernel): 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross validation,
-# 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample size and
-# the symmetries alone
-def calcKernel(o, method="klcv", samplingSize=1000, rng=None):
+# the de la Vallee Poussin kernel a density estimate of orientations or directions should use
+# (MATLAB calcKernel): 'conservative' and 'UCV' select from the degree energies of the sample
+# (docs/plans/halfwidth.md), 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
+# validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
+# size and the symmetries alone; directions take the first two only. groups are the grain ids
+# of pixels, which the energies fold by; a map brings its own
+def calcKernel(o, method=None, samplingSize=1000, rng=None, *, groups=None, weights=None, bandwidth=None, halfwidths=None):
+  from .halfwidth import degreeEnergies, selectHalfwidth
+  from .kernelfunctions import S2DeLaValleePoussinKernel
+  if not isinstance(o, (quaternion, vector3d)) and hasattr(o, "orientations"):
+    groups = o.prop.get("grainId") if groups is None and "grainId" in o.prop else groups
+    o = o.orientations
+  directions = isinstance(o, vector3d)
+  method = ("conservative" if directions else "klcv") if method is None else method
   # the method however it is capitalised, MATLAB's 'RuleOfThumb' included
-  method = {"klcv": "klcv", "ruleofthumb": "ruleOfThumb", "magicrule": "magicRule"}.get(str(method).lower(), method)
+  method = {"klcv": "klcv", "ruleofthumb": "ruleOfThumb", "magicrule": "magicRule", "conservative": "conservative",
+            "ucv": "UCV"}.get(str(method).lower(), method)
   rng = np.random.default_rng() if rng is None else rng
+  if method in ("conservative", "UCV"):
+    L = (32 if method == "conservative" else (256 if directions else 64)) if bandwidth is None else int(bandwidth)
+    # UCV needs no errors of the energies, so independent points take one transform
+    folds = 1 if method == "UCV" and groups is None else 8
+    h = selectHalfwidth(degreeEnergies(o, L, weights=weights, groups=groups, folds=folds, rng=rng), method, halfwidths)
+    return S2DeLaValleePoussinKernel(halfwidth=h) if directions else SO3DeLaValleePoussinKernel(halfwidth=h)
+  if directions:
+    raise ValueError(f"the kernel of directions is selected by 'conservative' or 'UCV', not {method!r}")
+  # the cross validation and the rules count pixels as independent draws
+  if isinstance(o, orientation) and o.notIID:
+    raise ValueError(f"{method!r} counts the pixels of a map as independent draws, which neighbouring pixels of one "
+                     "grain are not: select with 'conservative' or 'UCV' and the grain ids, or from the grain mean "
+                     "orientations")
   o = o.flatten()
   N = o.size
   if N == 0:
@@ -745,7 +768,7 @@ def calcKernel(o, method="klcv", samplingSize=1000, rng=None):
       scores.append(np.mean(np.log(np.maximum(fj, np.finfo(float).tiny))))
     best = candidates[int(np.argmax(scores))]
     return SO3DeLaValleePoussinKernel(fak * best.kappa)
-  raise ValueError(f"the kernel selection method is 'klcv', 'ruleOfThumb' or 'magicRule', not {method!r}")
+  raise ValueError(f"the kernel selection method is 'conservative', 'UCV', 'klcv', 'ruleOfThumb' or 'magicRule', not {method!r}")
 
 
 # two perpendicular twofold axes of an assumed orthotropic texture, found and rotated onto

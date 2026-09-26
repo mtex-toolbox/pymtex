@@ -13,7 +13,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S2DeLaValleePoussinKernel, S2DirichletKernel, angle, calcDensity, calcGrains, cat, contourf, degree,
+from mtex import (S2DeLaValleePoussinKernel, S2DirichletKernel, angle, calcDensity, calcGrains, calcKernel, cat, contourf, degree,
                   discreteSample, hold, inv, max, mean, min, mtexColorMap, mtexColorbar, mtexTitle, mtexdata,
                   newMtexFigure, nextAxis, plot, plottingConvention, setColorRange, vector3d, volume)
 
@@ -125,10 +125,11 @@ for k in range(len(hw)):
 #
 # The relevant sample size is the number of independent observations, not merely the
 # number of pixels. Neighbouring EBSD pixels are spatially correlated because many sample
-# the same grain. MTEX does not select a halfwidth automatically for directional data. For
-# orientation data, [ODF Estimation from EBSD Data](EBSD2ODF.html) explains this
-# dependence and [Optimal Kernel Selection](OptimalKernel.html) describes automatic
-# methods.
+# the same grain. `calcKernel` selects a halfwidth from the data with the grains taken
+# into account; the section *Letting the Data Choose the Halfwidth* below applies it once
+# the grains are reconstructed. For orientation data,
+# [ODF Estimation from EBSD Data](EBSD2ODF.html) explains this dependence and
+# [Optimal Kernel Selection](OptimalKernel.html) describes the selection methods.
 
 # ## Weighting Changes the Question
 #
@@ -137,7 +138,8 @@ for k in range(len(hw)):
 # threshold, then keep the Forsterite grains.
 
 # +
-grains = calcGrains(ebsd['indexed'], angle=10 * degree)
+ebsdIndexed = ebsd['indexed']
+grains = calcGrains(ebsdIndexed, angle=10 * degree)
 grains = grains['Fo']
 
 # one c-axis per grain
@@ -176,6 +178,55 @@ mtexFig.drawNow()
 # by its mean orientation removes the within-grain spread. The scientifically correct
 # weights depend on whether the population of interest is grains, mapped area, or
 # something else.
+
+# ## Letting the Data Choose the Halfwidth
+#
+# `calcKernel` selects the kernel from the axes themselves. Its method `'UCV'` estimates
+# the integrated squared error of the density for every candidate halfwidth and takes the
+# halfwidth where the estimate is least; `'conservative'`, the default for directions,
+# takes a halfwidth that is at least as wide as that optimum with high probability and
+# wide enough that the estimate shows no noise bump of note.
+# [Optimal Kernel Selection](OptimalKernel.html) explains both.
+#
+# Both rules take the observations as independent unless told otherwise. Pixel axes are
+# not, and directions do not carry that knowledge, so pass the grain id of every pixel.
+# `calcGrains` left the ids on `ebsdIndexed`, in the order of the Forsterite pixels of
+# `cAxes`.
+
+# +
+rng = np.random.default_rng(0)
+pixelGrainId = ebsdIndexed['Fo'].grainId
+
+psiAsIndependent = calcKernel(cAxes, 'UCV', rng=rng)
+psiPixels = calcKernel(cAxes, 'UCV', groups=pixelGrainId, rng=rng)
+psiGrainArea = calcKernel(cAxesGrains, 'UCV', weights=grains.area, rng=rng)
+psiGrains = calcKernel(cAxesGrains, 'UCV', rng=rng)
+
+for name, psi in [('pixels as independent', psiAsIndependent), ('pixels with grain ids', psiPixels),
+                  ('grains weighted by area', psiGrainArea), ('grains, one vote each', psiGrains)]:
+  print(f'{name:24s} {psi.halfwidth() / degree:5.3g} degree')
+# -
+
+# Taken as independent, the 152345 pixel axes drive the selection to the narrowest
+# candidate, 1 degree: neighbouring pixels repeat one axis, and the rule reads the
+# repetition as a sharp density. With the grain ids it asks for 13 degrees, close to the
+# 14 degrees of the grain axes weighted by their area, which describe the same mapped
+# area.
+#
+# One vote per grain returns 1 degree again. Of the 1151 grains 531 are single pixels,
+# mostly fragments beside a grain of nearly the same orientation, so the grain axes
+# repeat each other as well: 1675 pairs of them lie within 1 degree, several times what
+# independent axes would give. The area weight gives those fragments almost no say.
+#
+# The conservative rule on the pixels with their grain ids:
+
+psiConservative = calcKernel(cAxes, groups=pixelGrainId, rng=rng)
+psiConservative.halfwidth() / degree
+
+# It returns its widest candidate, 60 degrees. Weighted by area, the few large grains
+# dominate the map, and the rule finds no harmonic degree of the axis distribution resolved
+# at the confidence it asks for. A reported halfwidth is therefore worth checking against
+# the plots of the previous section rather than taken on trust.
 
 # ## Working with the Density Function
 #

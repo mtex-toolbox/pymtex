@@ -196,8 +196,14 @@ mtexColorbar(title='mrd')
 # leaves one orientation out, estimates a density from the rest, and scores how well that
 # estimate predicts the omitted one. The halfwidth with the best score over the whole
 # sample wins. No model of the texture is needed, only the sample.
+#
+# The orientations of a map carry the mark `notIID`, since neighbouring pixels are not
+# independent draws, and `calcKernel` refuses them. To see what cross-validation makes of
+# the pixels anyway, clear the mark on a copy.
 
-psiPixel = calcKernel(ori)
+oriPixels = ori.copy()
+oriPixels.notIID = False
+psiPixel = calcKernel(oriPixels)
 pixelHalfwidth = psiPixel.halfwidth() / degree
 pixelHalfwidth
 
@@ -237,6 +243,33 @@ for name, psi in [('KLCV', psiGrain), ('RuleOfThumb', psiThumb), ('magicRule', p
 # orientations do not buy a sharp estimate.
 # [Optimal Kernel Selection](OptimalKernel.html) compares the three methods against a
 # known model ODF, where the best halfwidth can be measured rather than argued.
+#
+# ### Selecting from the pixels and their grains
+#
+# Two further methods of `calcKernel` estimate the error of the density itself, from the
+# harmonic coefficients of the sample. `'UCV'` aims at the halfwidth of least integrated
+# squared error, `'conservative'` at one that is at least as wide. Both accept the map once
+# its grains are computed: the pixels are then compared only across groups of grains that
+# share no grain, so the near copies inside a grain drop out without discarding a pixel.
+# `calcGrains` above left the grain ids on `ebsd`.
+
+# +
+rng = np.random.default_rng(0)
+copperPixels = ebsd['copper']
+psiUCV = calcKernel(copperPixels, method='UCV', rng=rng)
+psiConservative = calcKernel(copperPixels, method='conservative', rng=rng)
+
+for name, psi in [('UCV', psiUCV), ('conservative', psiConservative)]:
+  print(f'{name:12s} selected halfwidth {psi.halfwidth() / degree:.4g} degree')
+# -
+
+# The two answers span the whole range of candidates, and again the spread is the
+# result. The grains are few and of very different sizes: weighted by their area, the
+# map carries as much information as about a hundred equally sized grains. The
+# conservative rule finds no harmonic degree of the texture resolved at the confidence it
+# asks for and returns its widest candidate, 40 degrees. UCV follows the sample down to
+# the narrowest kernel its default harmonic bandwidth resolves. Neither is wrong; both say
+# that this map does not determine a halfwidth.
 
 # ## What one observation stands for
 #
@@ -281,8 +314,9 @@ maxSpread
 # numbers.
 #
 # A practical division of labour follows from the two sections: select the halfwidth
-# from grain means, which are approximately independent, and estimate the density from
-# the pixels, which carry the area and the intragranular spread.
+# from grain means, which are approximately independent, or from the pixels together with
+# their grain ids, and estimate the density from the pixels, which carry the area and the
+# intragranular spread.
 #
 # Whatever the choice, state it. An area fraction measured in a section is not
 # automatically a bulk volume fraction; that step needs sampling and stereological
@@ -317,7 +351,8 @@ maxSpread
 # * R. Hielscher, [Kernel density estimation on the rotation group and its application to crystallographic texture analysis](https://doi.org/10.1016/j.jmva.2013.03.014),
 #   _Journal of Multivariate Analysis_ 119 (2013), 119--143, gives the estimator used by
 #   `calcDensity`, the cross-validation rule used by `calcKernel`, and the fast algorithms
-#   behind both.
+#   behind both. The `'UCV'` and `'conservative'` rules are described in
+#   [Optimal Kernel Selection](OptimalKernel.html).
 # * H.-J. Bunge, [Texture Analysis in Materials Science: Mathematical Methods](https://doi.org/10.1016/C2013-0-11769-2),
 #   Butterworths, English ed., 1982, develops orientation distributions, their symmetry,
 #   and the mrd normalization used throughout this page.

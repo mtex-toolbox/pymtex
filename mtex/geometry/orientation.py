@@ -47,7 +47,10 @@ def _largestImage(o):
 
 
 class orientation(rotation):
-  _carried = ("frameA", "frameB", "antipodal")
+  _carried = ("frameA", "frameB", "antipodal", "notIID")
+  # orientations that are not independent draws, the pixels of a map: an automatic halfwidth
+  # asks for their grains (docs/plans/halfwidth.md, section 10)
+  notIID = False
 
   def __init__(self, *args, antipodal=False, dtype=None, points=1000):
     args, frames = _splitFrames(args)
@@ -59,10 +62,12 @@ class orientation(rotation):
     # orientation(e) projects an embedding back onto the orientations
     elif args and hasattr(args[0], "spec") and hasattr(args[0], "project"):
       args = [args[0].orientation()] + list(args[1:])
+    notIID = False
     if args and isinstance(args[0], orientation):
       o = args[0]
       data = o.data.copy()
       antipodal = antipodal or o.antipodal
+      notIID = o.notIID
       frameA = o.frameA if frameA is None else frameA
       frameB = o.frameB if frameB is None else frameB
     elif args and isinstance(args[0], orthogonalTransform):
@@ -79,6 +84,8 @@ class orientation(rotation):
     self.frameA = crystalFrame("1") if frameA is None else frameA
     self.frameB = specimenFrame.default if frameB is None else frameB
     self.antipodal = bool(antipodal)
+    if notIID:
+      self.notIID = True
     _checkExchange(self.antipodal, self.frameA, self.frameB)
 
   # ------------------------------------------------------------------ constructors
@@ -215,7 +222,7 @@ class orientation(rotation):
   # the frames of a list are joined by the ADR 0009 rule on both sides
   def _join(self, other):
     return {"frameA": SESSION.joinFrames(self.frameA, other.frameA), "frameB": SESSION.joinFrames(self.frameB, other.frameB),
-            "antipodal": self.antipodal and other.antipodal}
+            "antipodal": self.antipodal and other.antipodal, "notIID": self.notIID or getattr(other, "notIID", False)}
 
   def _coerce(self, other):
     if isinstance(other, orientation):

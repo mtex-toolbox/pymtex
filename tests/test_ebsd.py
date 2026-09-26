@@ -255,3 +255,9 @@ def test_the_phase_shares_are_of_the_measurements_not_the_padding():
   e = gridify(base[~hole])
   n = np.count_nonzero(e.isIndexed & ~e.isPadding)
   assert e.isPadding.sum() == hole.sum() and f"{n} ({float(f'{100 * n / (e.size - hole.sum()):.2g}'):g}%)" in repr(e)
+
+
+def test_the_orientations_of_a_map_are_not_independent():
+  ebsd = sampleMap()
+  o = ebsd.orientations
+  assert o.notIID and o[3:9].notIID and ebsd[10:20].orientations.notIID

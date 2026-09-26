@@ -243,6 +243,7 @@ has to know.
 
 | Page | MATLAB | Python |
 |---|---|---|
+| EBSD2ODF | `calcKernel(ebsd.orientations)` scores the pixels as independent draws and selects 2.7° | `ebsd.orientations` carries `notIID`, kept through indexing and products, and every `calcKernel` method refuses it; `'conservative'` and `'UCV'` take the map (or `groups=` the grain ids) and fold by grains (docs/plans/halfwidth.md, section 10); the page clears the mark on a copy to show the 2.7° |
 | VectorDefinition | `vector3d(M)` with a 3 x 3 matrix warns and reads by columns | reads by rows, one vector per row of three, as `byXYZ` and the `(..., 3)` layout do; no warning |
 | VectorDefinition | `size(v)` is `1 5` for five vectors, `v(2)` the second | `v.shape` is `(5,)`, `v[1]` the second, zero based |
 | VectorDefinition | the grid of a spherical plot follows the frame's Z axis, so under `'z←↑y'` the meridians run between the poles at the rim | the grid is drawn about the screen centre whatever the layout |
