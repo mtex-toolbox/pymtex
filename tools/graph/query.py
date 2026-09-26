@@ -7,6 +7,7 @@
 #   query.py impact <node|file>               transitive callers in both ports, the tests and algorithms that reach it
 #   query.py algo [<name>]                    an algorithm's entry points and where its time goes, port by port
 #   query.py gaps <prefix>                    MATLAB functions under a folder without a Python counterpart
+#   query.py questions [<text>]               the research questions the notes ask, filtered by text, file or a named node
 #   query.py layer <layer>                    a layer in both ports: counterparts, tests, notes, algorithms, per class
 #
 # A node is its id (m:@rotation.calcDensity, py:mtex.functions.density.calcDensity), a unique
@@ -127,10 +128,30 @@ def cmdNode(G_, q):
       print("  notes:")
       for j in ns:
         print(f"    {G_.nodes[j]['file']}  {G_.nodes[j].get('title', '')}")
+    qs = [e["src"] for e in G_.inn[i] if e["kind"] == "question"]
+    if qs:
+      print("  research questions:")
+      for j in qs:
+        q = G_.nodes[j]
+        print(f"    {q['title']}  ({q['file']}:{q['line']})")
     al = [e["src"] for e in G_.inn[i] if e["kind"] == "entry"]
     if al:
       print(f"  entry point of: {', '.join(al)}")
     print()
+
+
+# the research questions the notes ask, those whose title, file or named nodes contain the text
+def cmdQuestions(G_, text):
+  t = (text or "").lower()
+  qs = [q for q in G_.nodes.values() if q["kind"] == "question"]
+  shown = 0
+  for q in sorted(qs, key=lambda q: (q["file"], q["line"])):
+    named = [e["dst"] for e in G_.out[q["id"]] if e["kind"] == "question"]
+    if t and t not in q["title"].lower() and t not in q["file"].lower() and not any(t in n.lower() for n in named):
+      continue
+    shown += 1
+    print(f"{q['title']}\n  {q['file']}:{q['line']}" + (f"\n  names: {', '.join(named[:8])}" + (" ..." if len(named) > 8 else "") if named else ""))
+  print(f"{shown} of {len(qs)} research questions")
 
 
 def cmdWalk(G_, q, depth, up, dispatch):
@@ -187,9 +208,13 @@ def cmdAlgo(G_, name):
     print()
 
 
+# the MATLAB functions decided not to be ported (docs/PLAN.md section 2), which are no gap
+NOT_PORTED = {"calcFEMODF", "neuralgas", "hex2cube", "cube2hex", "calcInvTaylor", "S2FunGrid"}
+
+
 def cmdGaps(G_, prefix):
   mNodes = [n for n in G_.nodes.values() if n["port"] == "matlab" and n["kind"] in ("function", "method")
-            and n.get("file", "").startswith(prefix) and not n.get("plumbing")]
+            and n.get("file", "").startswith(prefix) and not n.get("plumbing") and n["name"] not in NOT_PORTED]
   missing = [n for n in mNodes if not G_.counterparts(n["id"])]
   print(f"MATLAB under {prefix}: {len(mNodes)} functions and methods besides plumbing, "
         f"{len(mNodes) - len(missing)} with a Python counterpart")
@@ -270,6 +295,8 @@ def main():
     cmdAlgo(G_, a.arg)
   elif a.cmd == "layer":
     cmdLayer(G_, a.arg or "geometry")
+  elif a.cmd == "questions":
+    cmdQuestions(G_, a.arg)
   elif a.cmd == "gaps":
     cmdGaps(G_, a.arg or "")
   else:

@@ -63,6 +63,12 @@ Non-goals:
   planned 2026-09-22 on Qt widgets.
 - GPU. Design the kernels so a NumPy-compatible array library could be swapped in later,
   do nothing else.
+- MATLAB functions decided not to be ported (user, 2026-09-26): `calcFEMODF` (the finite
+  element pole figure inversion) and `neuralgas`; `hex2cube` and `cube2hex` (the conversion
+  between a hexagonal and a square grid) and `calcInvTaylor`; `S2FunGrid`, whose one use in
+  MATLAB, the colour cache of `ipfColorKey`, is `colorGrid` in `plotting/orientationkeys.py`
+  (a cube map looked up by its nearest node). `tools/graph/query.py gaps`
+  leaves them out (`NOT_PORTED` there).
 
 ## 3. Phases
 

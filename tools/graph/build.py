@@ -5,7 +5,9 @@
 # Layers, each regenerated: the static call graphs of both ports (scan_matlab.py, scan_python.py),
 # the counterpart edges between them (same class and method names, the MATLAB names a Python
 # header or docstring cites, the names the imported port answers to), the notes that mention a node (agent memory, TODO.md, ADRs,
-# docs/research), the algorithms the benchmarks declare (bench/*.py, ALGORITHM) with the
+# docs/research, the research notes of MATLAB master's tests and of the Julia port), the research
+# questions those notes ask (every subsection, or else every bullet, under a heading naming questions
+# or a research agenda), the algorithms the benchmarks declare (bench/*.py, ALGORITHM) with the
 # profiles their runs leave in bench/out/<algorithm>/, and the coverage the test runs leave in
 # tools/graph/out/coverage_<port>.json.
 from __future__ import annotations
@@ -26,6 +28,7 @@ import scan_matlab  # noqa: E402
 import scan_python  # noqa: E402
 
 OUT = os.path.join(HERE, "out")
+JULIA = os.path.join(os.path.dirname(ROOT), "mtexJulia")
 MEMORY = [os.path.expanduser(f"~/.claude/projects/-home-hielscher-mtex-{p}/memory") for p in ("master", "pymtex")]
 # names too common to link a note by: they would attach every note to every class
 GENERIC = set("""eval plot mean size length find angle dot norm sum max min abs sqrt display char
@@ -263,8 +266,6 @@ def counterparts(ix, pyNodes):
 # the note files and the nodes each one mentions
 def notes(ix, sources):
   nodes, edges = [], []
-  tick = re.compile(r"`([^`\n]{1,120})`")
-  token = re.compile(r"[@\w./+-]*\w")
   for label, pattern in sources:
     for path in sorted(glob.glob(pattern)):
       text = open(path, encoding="utf-8", errors="replace").read()
@@ -272,16 +273,56 @@ def notes(ix, sources):
       nid = f"note:{label}/{os.path.basename(path)}"
       nodes.append(dict(id=nid, port="note", kind="note", name=os.path.basename(path), file=path,
                         title=(desc.group(1) if desc else "").strip()[:160]))
-      cands = set()
-      for span in tick.findall(text):
-        cands |= set(token.findall(span))
-      cands |= set(re.findall(r"@\w+/\w+", text))
-      cands |= set(re.findall(r"[\w/@+-]+\.(?:m|py)\b", text))
-      hits = set()
-      for c in cands:
-        hits |= set(mentioned(ix, c))
-      edges += [dict(src=nid, dst=h, kind="note", resolution="mention") for h in sorted(hits)]
+      edges += [dict(src=nid, dst=h, kind="note", resolution="mention") for h in sorted(mentions(ix, text))]
+      for k, (line, title, body) in enumerate(questionBlocks(text)):
+        qid = f"question:{label}/{os.path.basename(path)}#{k}"
+        nodes.append(dict(id=qid, port="question", kind="question", name=title[:80], title=title[:160], file=path, line=line))
+        edges.append(dict(src=qid, dst=nid, kind="asked", resolution="section"))
+        edges += [dict(src=qid, dst=h, kind="question", resolution="mention") for h in sorted(mentions(ix, body))]
   return nodes, edges
+
+
+# the nodes a text names: in backticks, as @Class/method, or as a source file
+def mentions(ix, text):
+  tick = re.compile(r"`([^`\n]{1,120})`")
+  token = re.compile(r"[@\w./+-]*\w")
+  cands = set()
+  for span in tick.findall(text):
+    cands |= set(token.findall(span))
+  cands |= set(re.findall(r"@\w+/\w+", text))
+  cands |= set(re.findall(r"[\w/@+-]+\.(?:m|py)\b", text))
+  hits = set()
+  for c in cands:
+    hits |= set(mentioned(ix, c))
+  return hits
+
+
+QUESTION_HEADING = re.compile(r"questions|research agenda|open problems", re.I)
+
+
+# the research questions of a note: under a heading that names questions, every subsection is one,
+# or, where it has none, every top level list item; (line, title, text) each
+def questionBlocks(text):
+  lines = text.split("\n")
+  head = [(i, len(m.group(1)), m.group(2).strip()) for i, l in enumerate(lines) if (m := re.match(r"(#{1,6})\s+(.*)", l))]
+  out = []
+  for k, (i, level, title) in enumerate(head):
+    if level < 2 or not QUESTION_HEADING.search(title):
+      continue
+    end = next((j for j, lv, _ in head[k + 1:] if lv <= level), len(lines))
+    subs = [(j, t) for j, lv, t in head[k + 1:] if j < end and lv == level + 1]
+    if subs:
+      for n, (j, t) in enumerate(subs):
+        stop = subs[n + 1][0] if n + 1 < len(subs) else end
+        out.append((j + 1, re.sub(r"^[\d.]+\s*", "", t), "\n".join(lines[j:stop])))
+      continue
+    items = [j for j in range(i + 1, end) if re.match(r"(?:[-*]|\d+[.)])\s+\S", lines[j])]
+    for n, j in enumerate(items):
+      stop = items[n + 1] if n + 1 < len(items) else end
+      body = "\n".join(lines[j:stop])
+      first = re.sub(r"^(?:[-*]|\d+[.)])\s+", "", lines[j]).replace("**", "").strip()
+      out.append((j + 1, first, body))
+  return out
 
 
 def mentioned(ix, c):
@@ -412,7 +453,7 @@ def stale(graph=os.path.join(OUT, "graph.json"), matlabRoot=None, memory=MEMORY)
   skip = scan_matlab.SKIP | {".venv", "__pycache__", "build", "matlab", "out"}
   roots = [(mRoot, (".m", ".md")), (os.path.join(ROOT, "mtex"), (".py",)), (os.path.join(ROOT, "tests"), (".py",)),
            (os.path.join(ROOT, "bench"), (".py",)), (HERE, (".py",)), (os.path.join(ROOT, "docs"), (".md",))]
-  roots += [(d, (".md",)) for d in memory]
+  roots += [(d, (".md",)) for d in memory] + [(os.path.join(JULIA, "docs", "research"), (".md",))]
   for root, ext in roots:
     for dirpath, dirnames, filenames in os.walk(root):
       dirnames[:] = [d for d in dirnames if d not in skip]
@@ -441,7 +482,9 @@ def main(argv=None):
   sources += [("matlab", os.path.join(mRoot, "TODO.md")),
              ("matlab-adr", os.path.join(mRoot, "docs", "adr", "*.md")),
              ("python-research", os.path.join(ROOT, "docs", "research", "*.md")),
-             ("python-plans", os.path.join(ROOT, "docs", "plans", "*.md"))]
+             ("python-plans", os.path.join(ROOT, "docs", "plans", "*.md")),
+             ("matlab-tests", os.path.join(mRoot, "tests", "*.md")),
+             ("julia-research", os.path.join(JULIA, "docs", "research", "*.md"))]
   nn, ne = notes(ix, sources)
   an, ae = algorithms(ix, os.path.join(ROOT, "bench"))
   prof = profiles(ix, os.path.join(ROOT, "bench", "out"), mRoot)

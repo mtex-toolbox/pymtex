@@ -96,7 +96,11 @@ search in `mtex/geometry/grids/gridsearch.py`. The nearest search of the ring gr
 loop, binary searches over the ladders, the Python `find` as fallback and oracle.
 
 `tools/graph/build.py` writes the dependency graph of both ports (`tools/graph/query.py` asks
-it: `node`, `impact`, `algo`, `gaps`, `layer`). Its algorithms are the `ALGORITHM` literals of
+it: `node`, `impact`, `algo`, `gaps`, `layer`, `questions`). A research question is a
+`###` subsection, or else a top level bullet, under a heading naming questions ("Open questions",
+"Research questions", "research agenda") in any note the graph reads (plans, research notes,
+memory, MATLAB master's `tests/*.md`, the Julia port's research notes); name the functions it
+concerns in backticks and it links to them. Its algorithms are the `ALGORITHM` literals of
 the benchmarks; the `bench/*_ops.py` (geometry, functions, tensors, embedding, maps, analysis,
 io, plotting) check this port against MATLAB on one input through `tools/graph/crosscheck.py`,
 `run`, `matlab` one op per bridge call, `compare`, each tolerance with its reason beside it.

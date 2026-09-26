@@ -74,6 +74,7 @@ and link into it - they show up as backlinks there.
 - `generated/algorithms/` the cross-port benchmarks: entry points, cases, time per port and
   where it goes
 - `generated/memory/`, `generated/docs/` the agent memory, ADRs, research notes and plans
+- `generated/questions/` the research questions the notes ask, linked to the classes they name
 
 The local graph (a note plus depth 1 or 2) is the view to work with; the global one is a map.
 With the Dataview plugin, for instance
@@ -110,10 +111,21 @@ def write_vault(vault):
     if "/memory" in n["file"]:
       noteName[i] = base
     else:
-      kind = "adr" if "/adr/" in n["file"] else "research" if "/research/" in n["file"] else "plan" if "/plans/" in n["file"] else "todo"
+      kind = "adr" if "/adr/" in n["file"] else "research" if "/research/" in n["file"] or "/tests/" in n["file"] else "plan" if "/plans/" in n["file"] else "todo"
       noteName[i] = f"{kind} {base}"
       write(os.path.join(out, "docs", slug(noteName[i]) + ".md"),
             f"---\ntype: {kind}\nfile: {n['file']}\n---\n# {n.get('title') or base}\n\n[{n['file']}](file://{n['file']})\n")
+
+  # the research questions, each linked to the note that asks it and to the containers it names
+  for i, n in nodes.items():
+    if n["kind"] != "question":
+      continue
+    asked = [noteName[e["dst"]] for e in G_.out[i] if e["kind"] == "asked" and e["dst"] in noteName]
+    named = sorted({owner[e["dst"]] for e in G_.out[i] if e["kind"] == "question" and owner.get(e["dst"])})
+    write(os.path.join(out, "questions", slug(f"question {n['title'][:60]}") + ".md"),
+          f"---\ntype: question\nfile: {n['file']}\nline: {n['line']}\n---\n# {n['title']}\n\n"
+          f"[{n['file']}:{n['line']}](file://{n['file']})" + (f"\n\nasked in {', '.join(link(a) for a in asked)}" if asked else "")
+          + (f"\n\nnames {' '.join(link(c) for c in named)}" if named else "") + "\n")
 
   # every memory entry, since the entries link each other whether or not they mention the code
   import build
