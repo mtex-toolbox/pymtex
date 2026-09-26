@@ -195,8 +195,25 @@ none), `aachenexp`, `dubnaODF`. Fixtures of five formats under `tests/fixtures/p
 the Geesthacht and Seifert files read from the local data folder; 7 tests plus the sample
 data test. The MATLAB `'HEADER', 21` of the generic page example skips the first data row
 of the Seifert file; `header` counts the lines above the block, and without it the block
-is found by itself. Not ported: the twenty other `loadPoleFigure_*` readers of MATLAB (they
-follow the same pattern when a file asks for them), the import wizard.
+is found by itself.
+
+**I6b - the other pole figure formats. DONE 2026-09-26.** `mtex/io/polefigureformats.py`
+ports the readers of the Julia port (ana, popla, LaboTEX, Aachen, Philips, plf, IBM, GADDS
+out1 and gpol, slc, BearTex, xrd, Siemens, Jülich, Geesthacht, nja, pwd, the three Rigaku
+ones, xrdml), and `chooseFormat` in `loadpolefigure.py` replaces MATLAB's trial of every
+reader by the Julia rule: the extension names the candidates, the marker of the header
+decides between them, a file no candidate claims or several claim is an error naming them,
+`interface=` settles it, a plain block of numbers and an extension no format writes are a
+table, and a table option (`columnNames`, `header`, ...) names the table reader. Every file
+of MATLAB's `data/PoleFigure` reads with MATLAB's counts but `out1.out`, which names no
+reflections and asks for them, and `a52214s.int`, which MATLAB cannot read either; MATLAB
+needs its trial for `aachen` (no extension), `aachen.cpf` (no block format in the header,
+read as 18 fields of 4 as MATLAB defaults) and `ptx.rpf` (CR line ends), which the rule
+reads by the header's fixed columns and all three line ends. The numbers of the Julia tests
+are pinned in `tests/test_polefigureformats.py` on its fixtures. Where the two ports part
+the reader follows Julia: Aachen blocks read in full, nja by its named keys, the Rigaku
+text ladder without the step off the pole, out1 without MATLAB's list of eight guessed
+reflections. Not ported: `scintag` and `rigaku_txt2`, of which no sample file exists.
 
 **I7 - tensor files. DONE 2026-09-22.** `mtex/io/loadtensor.py`: `loadTensor` and
 `tensor.load`, `stiffnessTensor.load`, ... for the text files of `data/tensor`: the last

@@ -101,3 +101,36 @@ def test_the_geesthacht_table_and_the_generic_columns():
   with pytest.raises(ValueError, match="columnNames"):
     loadPoleFigure(fname, header=21)
   assert mean(g)[0] > 0
+
+
+# the extension narrows, the marker of the header decides, a named interface settles it
+def test_which_reader_a_file_gets(tmp_path):
+  from mtex.io.loadpolefigure import chooseFormat
+  assert chooseFormat(fixture("popla.epf")) == "popla" and chooseFormat(fixture("LaboTEX.epf")) == "labotex"
+  assert chooseFormat(fixture("aachen.txt")) == "aachen" and chooseFormat(fixture("philips-111.txt")) == "philips"
+  assert chooseFormat(fixture("Rigaku002.txt")) == "rigaku" and chooseFormat(fixture("Rigaku_txt.TXT")) == "rigaku_txt"
+  assert chooseFormat(fixture("siemens.dat")) == "siemens" and chooseFormat(fixture("rigaku_cut.DAT")) == "rigaku_dat"
+  assert chooseFormat(fixture("juelich130")) == "juelich" and chooseFormat(fixture("popla.epf"), "labotex") == "labotex"
+  # a file of a known extension that no format claims is an error naming the candidates
+  bad = tmp_path / "broken.epf"
+  bad.write_text("a comment\nno header here\n")
+  with pytest.raises(ValueError, match="popla, labotex"):
+    chooseFormat(str(bad))
+  # a plain block of numbers is a table, and so is an extension no format writes
+  block = tmp_path / "block.txt"
+  block.write_text("\n".join(" ".join([str(k + 1.0)] * 20) for k in range(19)))
+  assert chooseFormat(str(block)) is None and chooseFormat(str(tmp_path / "scan.csv")) is None
+  assert loadPoleFigure(str(block), crystalFrame("m-3m")).allI[0].shape == (19, 20)
+  with pytest.raises(ValueError, match="no pole figure interface"):
+    chooseFormat(fixture("popla.epf"), "mars")
+
+
+# the files of the MATLAB data folder whose layout MATLAB found by trying: an Aachen file
+# without an extension or without the format of its block, and a Siemens dump of CR lines
+@pytest.mark.skipif(not os.path.isdir(LOCAL), reason="the MTEX data folder is not here")
+def test_the_files_MATLAB_reads_by_trying():
+  cub = crystalFrame("m-3m")
+  counts = {"aachen": (2, 2736), "aachen.cpf": (12, 14256), "saclay_004": (1, 1824), "EMSE_multi.cor": (1, 16560), "ptx.rpf": (3, 3456)}
+  for name, (npf, n) in counts.items():
+    pf = loadPoleFigure(os.path.join(LOCAL, name), cub)
+    assert (pf.numPF, sum(I.size for I in pf.allI)) == (npf, n), name

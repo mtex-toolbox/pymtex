@@ -7,9 +7,12 @@
 #   pf = loadPoleFigure('scan.dat', cs, interface='geesthacht')
 #
 # A file names its reflection in its name or its header; the crystal direction is read off
-# it when none is given, the crystal frame being the one passed. Every loader returns the
-# pole figures of one file; loadPoleFigure joins the files and puts the directions and the
-# structure coefficients given on the result.
+# it when none is given, the crystal frame being the one passed. The format is chosen, not
+# searched for: the extension names the candidates and the marker of the header decides
+# between them (chooseFormat below); the readers of the formats this file does not hold
+# are polefigureformats.py. Every reader returns the pole figures of one file;
+# loadPoleFigure joins the files and puts the directions and the structure coefficients
+# given on the result.
 from __future__ import annotations
 
 import os
@@ -23,10 +26,8 @@ from ..geometry.grids.s2grid import regularS2Grid
 from ..geometry.miller import Miller
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from . import polefigureformats as F
 from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
-
-INTERFACES = ("dubna", "siemens", "geesthacht", "uxd", "aachen_exp", "rw1", "generic")
-
 
 # ------------------------------------------------------------------ the reflection in a name
 
@@ -55,8 +56,9 @@ def _frames(args):
   return cs, ss
 
 
+# the lines of a file, whichever of the three line ends it writes
 def _lines(fname):
-  return [text(l).rstrip("\r") for l in readFile(fname).split(b"\n")]
+  return [text(l) for l in re.split(rb"\r\n|\r|\n", readFile(fname))]
 
 
 # ------------------------------------------------------------------ the formats
@@ -319,29 +321,114 @@ def loadPoleFigure_generic(fname, *args, columnNames=None, columns=None, radians
   return PoleFigure(string2Miller(fname, cs) if h is None else h, r, at["intensity"], *frames, superposition=superposition, complete=complete)
 
 
-# ------------------------------------------------------------------ the dispatcher
+# ------------------------------------------------------------------ which reader a file gets
+#
+# The extension narrows and a signature decides: `.epf` is written by Popla and by LaboTEX,
+# `.txt` by Philips, Aachen and two Rigaku programs, `.dat` by Siemens, Geesthacht and a
+# Rigaku raster, so every format states the marker its own header carries. MATLAB instead
+# tries its readers in turn and keeps the first that does not throw, which reads a broken
+# file of one format as some other format. A file of a known extension that no candidate
+# claims, or that several claim, is an error naming them, and interface= settles it; an
+# extension no format writes is a table whose columns the caller names, as for EBSD.load.
 
-LOADERS = {"dubna": loadPoleFigure_dubna, "siemens": loadPoleFigure_siemens, "geesthacht": loadPoleFigure_geesthacht,
-           "uxd": loadPoleFigure_uxd, "aachen_exp": loadPoleFigure_aachen_exp, "rw1": loadPoleFigure_rw1,
-           "generic": loadPoleFigure_generic}
-EXTENSIONS = {"cnv": "dubna", "cns": "dubna", "ptx": "siemens", "uxd": "uxd", "exp": "aachen_exp", "rw1": "rw1"}
+
+def isPopla(lines):
+  s = lines[1] if len(lines) > 1 else ""
+  return len(s) >= 45 and F.millerIndices(s[:5]) is not None and all(F._float(s[5 * k:5 * k + 5]) is not None for k in range(1, 5))
 
 
-# the format read off the extension, else off the first bytes
-def _detect(fname):
-  ext = os.path.splitext(fname)[1].lower().lstrip(".")
-  if ext in EXTENSIONS:
-    return EXTENSIONS[ext]
-  head = readFile(fname)[:4096]
-  if head.startswith(b"CREATOR"):
-    return "geesthacht"
-  if head.startswith(b"AUTEX"):
-    return "aachen_exp"
-  if b"*Pole figure:" in head:
-    return "siemens"
-  if b"_FILEVERSION" in head or b"_KHI" in head:
-    return "uxd"
-  return "generic"
+SIGNATURES = {
+  "popla": isPopla,
+  "labotex": lambda lines: any(l.strip().upper().startswith("STRUCTURE CODE") for l in lines[:6]),
+  "aachen": lambda lines: any(F.isAachenHeader(l) for l in lines[:4]),
+  "philips": lambda lines: any(l.strip().startswith("Psi:") for l in lines),
+  "siemens": lambda lines: any("*Pole figure:" in l for l in lines),
+  "uxd": lambda lines: any(l.strip().startswith("_KHI") for l in lines),
+  "juelich": lambda lines: len(lines) > 1 and re.search(r"alpha\s+beta\s+intensity", lines[1], re.I) is not None,
+  "geesthacht": lambda lines: bool(lines) and "CREATOR" in lines[0],
+  "nja": lambda lines: any(l.strip().startswith("#Values") for l in lines),
+  "rigaku": lambda lines: bool(lines) and lines[0].strip().startswith("#") and any("axis type" in l or "number of data" in l for l in lines),
+  "rigaku_dat": lambda lines: bool(lines) and [f.lower() for f in lines[0].split()] == ["x", "y", "z", "data"],
+  "rigaku_txt": lambda lines: any(l.startswith("ScanningMode") for l in lines) and
+                any(F.firstToken(l.replace(",", " ")).lower() == "start" for l in lines),
+}
+
+
+# a reader of the vendor module as one of the table: the pole figures of one file
+def _vendor(read, binary=False):
+  def load(fname, lines, cs, ss, h=None, **kwargs):
+    extra = {"raw": readFile(fname)} if binary else {}
+    hs, rs, Is, fr = read(lines, fname, cs, h=h, **extra, **kwargs)
+    return PoleFigure(hs, rs, Is, *(f for f in (fr, ss) if f is not None))
+  return load
+
+
+# a reader of this module as one of the table
+def _own(read):
+  def load(fname, lines, cs, ss, h=None, **kwargs):
+    return read(fname, *(f for f in (cs, ss) if f is not None), **kwargs)
+  return load
+
+
+# the name MATLAB gives the interface, the extensions it is written with and its reader
+FORMATS = {
+  "dubna": ((".cnv", ".cns"), _own(loadPoleFigure_dubna)),
+  "ana": ((".ana", ".cor"), _vendor(F.readAna)),
+  "popla": ((".epf", ".gpf"), _vendor(F.readPopla)),
+  "labotex": ((".epf", ".pow", ".ppf"), _vendor(F.readLabotex)),
+  "aachen": ((".txt", ".cpf", ""), _vendor(F.readAachen)),
+  "aachen_exp": ((".exp",), _own(loadPoleFigure_aachen_exp)),
+  "philips": ((".txt",), _vendor(F.readPhilips)),
+  "plf": ((".plf",), _vendor(F.readPlf)),
+  "ibm": ((".ibm",), _vendor(F.readIbm)),
+  "out1": ((".out",), _vendor(F.readOut1)),
+  "slc": ((".slc",), _vendor(F.readSlc)),
+  "beartex": ((".xpa", ".xpe"), _vendor(F.readBeartex)),
+  "xrd": ((".asc", ".ras"), _vendor(F.readXrd)),
+  "siemens": ((".dat", ".ptx", ".rpf"), _vendor(F.readSiemens)),
+  "uxd": ((".uxd",), _own(loadPoleFigure_uxd)),
+  "juelich": ((".jul", ""), _vendor(F.readJuelich)),
+  "geesthacht": ((".dat",), _vendor(F.readGeesthacht)),
+  "nja": ((".nja",), _vendor(F.readNja)),
+  "pwd": ((".pwd",), _vendor(F.readPwd)),
+  "rigaku": ((".txt",), _vendor(F.readRigaku)),
+  "rigaku_dat": ((".dat",), _vendor(F.readRigakuDat)),
+  "rigaku_txt": ((".txt",), _vendor(F.readRigakuTxt)),
+  "gpol": ((".gpol",), _vendor(F.readGpol, binary=True)),
+  "rw1": ((".rw1",), _own(loadPoleFigure_rw1)),
+  "xrdml": ((".xrdml", ".xml"), _vendor(F.readXrdml, binary=True)),
+}
+INTERFACES = tuple(FORMATS) + ("generic",)
+BINARY = {".gpol", ".rw1", ".xrdml", ".xml"}
+# the options of a table, which name the generic reader whatever the extension
+TABLE_KEYS = {"columnNames", "columns", "header", "delimiter", "radians"}
+
+
+# the format of a file: the one named, else the one candidate of its extension whose
+# signature the file carries; None for an extension no format writes
+def chooseFormat(fname, interface=None):
+  if interface is not None:
+    name = str(interface).lower()
+    if name not in INTERFACES:
+      raise ValueError(f"no pole figure interface {interface!r}; the interfaces are {', '.join(INTERFACES)}")
+    return name
+  ext = os.path.splitext(fname)[1].lower()
+  candidates = [n for n, (exts, _) in FORMATS.items() if ext in exts]
+  if not candidates:
+    return None
+  if len(candidates) == 1 and candidates[0] not in SIGNATURES:
+    return candidates[0]
+  lines = [] if ext in BINARY else _lines(fname)
+  claimed = [n for n in candidates if SIGNATURES.get(n, lambda _: True)(lines)]
+  if len(claimed) == 1:
+    return claimed[0]
+  # a file no format claims that is a plain block of numbers is a table
+  if not claimed and F.isNumericRow(next((l for l in lines if l.strip()), "")):
+    return None
+  if not claimed:
+    raise ValueError(f"{fname} carries the marker of none of the {ext!r} formats {', '.join(candidates)}; "
+                     f"pass interface=..., or columnNames=[...] for a table")
+  raise ValueError(f"{fname} carries the marker of {' and '.join(claimed)}; pass interface={claimed[0]!r}")
 
 
 def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
@@ -353,17 +440,25 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
     loadPoleFigure('scan.txt', cs, columnNames=['polar angle', 'azimuth angle', 'intensity'], header=21)
 
   The crystal directions are read off the file names unless given, one per file or, for
-  a file of several pole figures, a list of them; the frames are given positionally.
+  a file of several pole figures, a list of them; the frames are given positionally. The
+  format follows the extension and the marker the file carries, interface= names one of
+  INTERFACES, and a table option (columnNames, columns, header, delimiter, radians) reads a
+  table whose columns the caller names.
   """
   fnames = [os.fspath(f) for f in fname] if isinstance(fname, (list, tuple)) else [os.fspath(fname)]
   hs = [a for a in args if isinstance(a, vector3d) or isinstance(a, (list, tuple))]
   frames = [a for a in args if isinstance(a, referenceFrame)]
   parts = []
-  for f in fnames:
-    name = _detect(f) if interface is None else str(interface).lower()
-    if name not in LOADERS:
-      raise ValueError(f"no pole figure interface {interface!r}; the interfaces are {', '.join(INTERFACES)}")
-    parts.append(LOADERS[name](f, *frames, **kwargs))
+  cs, ss = _frames(frames)
+  for k, f in enumerate(fnames):
+    name = "generic" if interface is None and TABLE_KEYS & kwargs.keys() else chooseFormat(f, interface)
+    if name in (None, "generic"):
+      parts.append(loadPoleFigure_generic(f, *frames, **kwargs))
+      continue
+    # the directions the caller names go to a reader whose file names none
+    hk = None if not hs else hs[0] if len(fnames) == 1 else list(hs[0])[k]
+    lines = [] if os.path.splitext(f)[1].lower() in BINARY else _lines(f)
+    parts.append(FORMATS[name][1](f, lines, cs, ss, h=hk, **kwargs))
   pf = PoleFigure.cat(*parts)
   if hs:
     h = hs[0]
