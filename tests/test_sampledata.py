@@ -6,7 +6,8 @@ import pytest
 
 import mtex
 from mtex import mtexdata, mtexdatafile, setMTEXpref
-from mtex.io.sampledata import DATASETS, MANIFEST, SOURCES, mtexDataPath, testGrainsMap
+from mtex.io.sampledata import DATASETS, MANIFEST, SOURCES, mtexDataPath
+from mtex.io.sampledata import testGrainsMap as grainsMap
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data")
@@ -101,7 +102,7 @@ def test_a_download_is_checked_against_its_digest(monkeypatch, tmp_path):
 
 
 def test_testgrains_needs_no_file():
-  e = testGrainsMap()
+  e = grainsMap()
   assert e.shape == (120, 160) and int((e.phaseId == 0).sum()) > 0
   grains = mtexdata("testgrains")
   assert len(grains) == 15

@@ -3,12 +3,12 @@ import numpy as np
 import pytest
 
 from mtex import calcGBND, calcGBNDKernel, calcGrains, degree
-from mtex.io.sampledata import testGrainsMap
+from mtex.io.sampledata import testGrainsMap as grainsMap
 
 
 @pytest.fixture(scope="module")
 def section():
-  ebsd = testGrainsMap()
+  ebsd = grainsMap()
   grains = calcGrains(ebsd, 5 * degree)
   return ebsd, grains, grains.boundary["indexed"]
 

@@ -1,8 +1,23 @@
 [project]
 name = "mtex"
-version = "0.0.1"
+version = "0.1.0"
 description = "MTEX, the crystallographic texture analysis toolbox, in Python"
-requires-python = ">=3.11"
+readme = "README.md"
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Ralf Hielscher" }]
+keywords = ["texture", "crystallography", "EBSD", "orientation", "ODF", "pole figure", "materials science"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.12"
 dependencies = [
     "finufft>=2.5.1",
     "numpy>=2.0",
@@ -15,10 +30,18 @@ io = ["h5py>=3"]
 plot = ["matplotlib>=3.8"]
 wizard = [
     "pyside6>=6.11.2",
+    "matplotlib>=3.8",
 ]
 plot3d = [
     "pyvista>=0.49.0",
 ]
+all = ["mtex[numba,io,plot,wizard,plot3d]"]
+
+[project.urls]
+Homepage = "https://mtex-toolbox.github.io"
+Documentation = "https://mtex-toolbox.github.io/documentation.html"
+Source = "https://github.com/mtex-toolbox/pymtex"
+Issues = "https://github.com/mtex-toolbox/pymtex/issues"
 
 [dependency-groups]
 dev = [
@@ -33,11 +56,14 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mtex"]
+
+[tool.hatch.build.targets.sdist]
+include = ["mtex", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,6 @@
 # Subplan P8 - the import wizard
 
-Status: planned 2026-09-22; W0 to W4 done the same day, W5 the design pass and W6 the pages open. Design reference: the Julia wizard,
+Status: W0 to W4 and W6 done, W5 the design pass open. Design reference: the Julia wizard,
 `../mtexJulia/docs/plans/wizard.md` (W0 to W18 done there) and `../mtexJulia/ext/MTEXWizardExt/`
 with `lib/MTEXInterfaces/src/{wizard,inspect}.jl`; its window as it stands after the W9,
 W10 and W14 design passes is the look to reproduce. Syntax reference:

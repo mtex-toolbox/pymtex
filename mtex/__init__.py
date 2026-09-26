@@ -1,4 +1,12 @@
 # MTEX: the crystallographic texture analysis toolbox
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError, version as _version
+
+# the version of the installed distribution
+try:
+  __version__ = _version("mtex")
+except _PackageNotFoundError:
+  __version__ = "unknown"
+
 from . import geometry as _geometry
 from .geometry import *  # noqa: F401,F403
 from .geometry import __all__ as _geometry_all

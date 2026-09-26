@@ -1,6 +1,6 @@
 # Subplan P1 - geometry
 
-Status: draft, 2026-09-21. Nothing implemented. Syntax reference:
+Status: G0 to G7 done. Syntax reference:
 `../frameSymmetry/geometry/` (the MATLAB branch that already spells ADR 0008). Design
 reference: `../mtexJulia/lib/MTEXGeometry/`, its `docs/plans/geometry.md`,
 `docs/design/semantics.md` and ADR 0001 to 0011. Tests: `../frameSymmetry/tests/core/`

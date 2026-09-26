@@ -1,8 +1,9 @@
 # MTEX for Python - rough plan
 
-Status: draft, 2026-09-21. Nothing below is implemented. This is the top-level plan: what
-the port covers, which decisions to take, and which experiments should take them. Each
-piece gets its own subplan under `docs/plans/` once the decisions here are settled.
+Status: 2026-09-27. P1 to P6 and P3b are built, P7 has every chapter written, P8 stands at W6;
+section 11 is what the first release still needs. This is the top-level plan: what the port
+covers, which decisions it took, and which experiments took them. Each piece has its own
+subplan under `docs/plans/`.
 
 ## 1. The starting point is the Julia port, not the MATLAB tree
 
@@ -384,12 +385,13 @@ the Julia subplan of the same name and stating: what transfers unchanged, what i
 respelled for Python (D2, D3), what the Julia subplan left out and is still left out, the
 tests, and the experiments it depends on.
 
-1. `docs/plans/geometry.md` - P1. WRITTEN 2026-09-21.
-2. `docs/plans/functions.md` - P2 and P4. WRITTEN 2026-09-21 (P2; P4 pole figures and tensors still to add).
-3. `docs/plans/maps.md` - P3. WRITTEN 2026-09-21.
-4. `docs/plans/plotting.md` - P5.
-5. `docs/plans/io.md` - P6.
-6. `docs/plans/docs.md` - P7. WRITTEN 2026-09-22; the page table in `docs/plans/remaining-pages.md`.
+1. `docs/plans/geometry.md` - P1, done.
+2. `docs/plans/functions.md` - P2 and P4, done.
+3. `docs/plans/maps.md` - P3, done through M11; `docs/plans/maps3d.md` - P3b, done through V8.
+4. `docs/plans/plotting.md` - P5, done but for the pieces it lists as left out.
+5. `docs/plans/io.md` - P6, done but for the ODF, orientation and tensor files.
+6. `docs/plans/docs.md` - P7, every chapter written; the page table in `docs/plans/remaining-pages.md`.
+7. `docs/plans/wizard.md` - P8, through W6.
 
 Subplans 2 to 5 can be executed in parallel once the geometry layer is stable, each
 against the geometry API, each by a separate agent.
@@ -407,3 +409,33 @@ against the geometry API, each by a separate agent.
 - **Type-hint completeness versus the array model.** Containers whose `__getitem__`
   returns their own class and whose arrays have free `dtype` are awkward to type strictly;
   the public layer is typed, the kernels are not, and this is accepted.
+
+## 11. Release
+
+Decided 2026-09-27: MTEX for Python is GPL-2.0, as MTEX for MATLAB; the distribution is `mtex` on
+PyPI (the name is free, as is `pymtex`), for Python 3.12 or later, NumPy's support window; the
+extras are `numba`, `io`, `plot`, `plot3d`, `wizard` and `all`. finufft, the one compiled
+dependency, has wheels for Linux x86_64, macOS arm64 and Windows, not for Linux aarch64 or macOS
+x86_64. The documentation is not a site of its own: the pages join MATLAB's on
+mtex-toolbox.github.io with a switch per page (`docs/plans/docs.md`, D5).
+
+In place: `LICENSE`, `README.md`, `CHANGELOG.md`, the metadata of `pyproject.toml` with an sdist
+of the package and the tests only, `mtex.__version__`, and the workflows
+`.github/workflows/test.yml` (Linux, macOS and Windows on 3.12 to 3.14 with numba, and once the
+NumPy fallback without it, which passes the kernel tests as is) and `release.yml` (a tag
+`v<version>` builds and publishes by PyPI's trusted publishing, the environment `pypi` to be set
+up on PyPI and GitHub). The wheel installs and runs on 3.12.
+
+Before 0.1.0:
+
+- the tree committed, the suite green on the CI matrix, a TestPyPI upload;
+- the bug rows of `docs/findings.md` fixed or stated as known differences, the `calcGrains`
+  closing difference first;
+- the documented calls that raise: `mtexdata('vpsc')`, the default kernel of `calcGBND`,
+  `fill(ebsd, grains)`;
+- the RBF evaluation, `calcComponents` and `max(odf)` with hundreds of centres, which hang
+  (`docs/research/time-critical.md`, the halo search);
+- D5, the pages on the site.
+
+After it: the halfwidth steps H3 to H6, the singular functions from step 5, the wizard's W5,
+the other time critical items, the pieces the subplans leave out, D12 before 1.0.

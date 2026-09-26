@@ -1,6 +1,6 @@
 # Documentation (P7)
 
-Status: D0 done 2026-09-22, D1 done (Vectors, Rotations, CrystalGeometry, CrystalOrientations and Misorientations), D2 under way (ODFAnalysis done 2026-09-22), D3 under way (EBSDAnalysis and Grains done 2026-09-22, GrainBoundaries 2026-09-23, 12 checked and 3 partial), D4 under way (PoleFigureAnalysis done 2026-09-22, PhaseTransitions done 2026-09-23).
+Status: D0 to D4 done, all twenty chapters written, 221 of 235 pages checked against MATLAB (`docs/plans/remaining-pages.md`); D5, the site, planned 2026-09-27.
 
 The MATLAB documentation, `../frameSymmetry/doc`, is 229 content scripts in twenty
 chapters, publish-style: prose in comment blocks, code between, the output and the figures
@@ -207,8 +207,16 @@ in twelve minutes. Tensors, Elasticity and Plasticity, all 26 checked on 2026-09
 tensor files, and `max` of a velocity field and `calcLankford` of an ODF are slow);
 PhaseTransitions (11) done 2026-09-23, all checked, on M9; EBSD3Analysis (4) blocked with Julia.
 
-**D5 - the site.** The chapter navigation from the `.toc` files, the function reference
-from the docstrings, the executed pages as the check in CI.
+**D5 - the site.** The Python pages join the MATLAB pages on mtex-toolbox.github.io (the Jekyll
+site, `../web`) as sibling pages, `CrystalShapes_py.html` beside `CrystalShapes.html`, with a
+MATLAB | Python switch in each title bar that remembers the reader's language and keeps the
+section; the site's navigation and search stay MATLAB's and are rewritten in Python mode. The
+hand-off plan for the site's side is the doc "MATLAB | Python switch for the MTEX
+documentation"; this side is `docs/make.py --site ../web`, writing
+`pages/documentation_python/<Page>.md` with Jekyll front matter, the figures into
+`images/python/` quantised, and `_data/python_pages.yml` from the table of
+`remaining-pages.md`. The function reference from the docstrings comes later, on the same
+scheme.
 
 Each step ends with the page counts of the status table and the findings it left, as the
 other subplans end with the test count.

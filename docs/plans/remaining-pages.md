@@ -1,6 +1,6 @@
 # Documentation pages
 
-Snapshot: 2026-09-26. One row per content script one chapter below `../frameSymmetry/doc`,
+Snapshot: 2026-09-27. One row per content script one chapter below `../frameSymmetry/doc`,
 ordered by chapter; the chapter navigation scripts are site work. A page is checked once its
 Python cells execute and its numbers and figures match the MATLAB run of the same script
 through the bridge; the findings go to `docs/findings.md`. The last column is the status the
@@ -16,7 +16,7 @@ does not exist; **Pending** not started.
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | EBSD3Analysis | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| EBSDAnalysis | 25 | 20 | 1 | 2 | 2 | 0 | 0 |
+| EBSDAnalysis | 26 | 20 | 2 | 2 | 2 | 0 | 0 |
 | Elasticity | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | GeneralConcepts | 12 | 9 | 3 | 0 | 0 | 0 | 0 |
 | GrainBoundaries | 15 | 12 | 0 | 3 | 0 | 0 | 0 |
@@ -33,7 +33,7 @@ does not exist; **Pending** not started.
 | Tensors | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | Tutorials | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | Vectors | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| **All** | 234 | 212 | 5 | 5 | 12 | 0 | 0 |
+| **All** | 235 | 221 | 6 | 5 | 3 | 0 | 0 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|

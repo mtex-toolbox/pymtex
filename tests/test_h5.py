@@ -11,7 +11,7 @@ from mtex.io.h5 import (H5Scope, alignmentList, eulerColumns, h5PhaseShift, h5Re
 h5py = pytest.importorskip("h5py")
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd", "h5")
-CORPUS = "/home/hielscher/mtex/data/h5Data"
+CORPUS = os.environ.get("MTEX_TEST_H5", "")
 
 
 def fixture(name):
