@@ -57,28 +57,21 @@ def _toVoigt(M, rank, w):
   raise ValueError("the Voigt notation is for tensors of rank two, three and four")
 
 
-# the tensor of a Voigt matrix, the factors taken out again and the pair symmetry filled in
+# the tensor of a Voigt matrix, the factors taken out again and the pair symmetry filled in,
+# as one gather through the Voigt index of every pair
 def _fromVoigt(V, rank, w):
   V = np.asarray(V, dtype=float)
-  lead = V.shape[:-2] if rank > 2 else V.shape[:-1]
-  M = np.zeros(lead + (3,) * rank)
+  pair = np.zeros((3, 3), dtype=int)
+  for i, (a, b) in enumerate(VOIGT):
+    pair[a, b] = pair[b, a] = i
   if rank == 4:
-    for i, (a, b) in enumerate(VOIGT):
-      for j, (c, d) in enumerate(VOIGT):
-        v = V[..., i, j] / (w[i] * w[j])
-        for p, q in ((a, b), (b, a)):
-          for r, s in ((c, d), (d, c)):
-            M[..., p, q, r, s] = v
+    I, J = pair.reshape(9, 1), pair.reshape(1, 9)
+    M = (V / (w[:, None] * w[None, :]))[..., I, J]
   elif rank == 3:
-    for j, (a, b) in enumerate(VOIGT):
-      v = V[..., :, j] / w[j]
-      M[..., :, a, b] = v
-      M[..., :, b, a] = v
+    M = (V / w)[..., :, pair.reshape(9)]
   else:
-    for i, (a, b) in enumerate(VOIGT):
-      M[..., a, b] = V[..., i] / w[i]
-      M[..., b, a] = V[..., i] / w[i]
-  return M
+    M = (V / w)[..., pair.reshape(9)]
+  return M.reshape(M.shape[:-2 if rank == 4 or rank == 3 else -1] + (3,) * rank)
 
 
 def Voigt(T):
@@ -488,11 +481,13 @@ class tensor(MtexArray):
       raise ValueError("the direction is written in another frame than the tensor")
     u = v.normalize().data
     R = self.rank
-    idx = LETTERS[:R]
-    lead = "" if self.ndim == 0 else "..."
-    vlead = "" if v.ndim == 0 else "..."
-    subs = lead + idx + "".join("," + vlead + c for c in idx) + "->..."
-    return np.einsum(subs, self.M, *([u] * R))
+    if R == 0:
+      return np.broadcast_to(self.M, np.broadcast_shapes(self.shape, v.shape)).copy()
+    a, b = (R + 1) // 2, R // 2
+    M2 = self.M.reshape(self.shape + (3 ** a, 3 ** b))
+    Ua = _vecPower(u, a)
+    W = Ua @ M2 if self.ndim == 0 else (Ua[..., None, :] @ M2)[..., 0, :]
+    return np.sum(W * _vecPower(u, b), axis=-1) if b else W[..., 0]
 
   # ------------------------------------------------------------------ lists
 
@@ -609,28 +604,36 @@ def _positiveDefinite(T):
   return cls(V, T.frame, **({} if cls is not tensor else {"rank": 4, "doubleConvention": T.doubleConvention})).symmetrise()
 
 
-# Q acting on every index of M: out_{i...} = Q_{i i'} ... M_{i'...}, over broadcast leading dims
+# Q acting on every index of M: out_{i...} = Q_{i i'} ... M_{i'...}, over broadcast leading
+# dims; the indices split into two groups, each turned by a Kronecker power of Q, so that
+# rank four is two products of 9 x 9 matrices
 def _applyMatrix(M, Q, rank):
   Q = np.asarray(Q, dtype=float)
-  out = M
-  for d in range(rank):
-    out = _modeProduct(out, Q, rank, d)
-  return _flatten(out, rank)
+  if rank == 0:
+    return _flatten(M, rank)
+  a, b = (rank + 1) // 2, rank // 2
+  lead = M.shape[:M.ndim - rank]
+  M2 = M.reshape(lead + (3 ** a, 3 ** b))
+  out = _kronPower(Q, a) @ M2
+  if b:
+    out = out @ np.swapaxes(_kronPower(Q, b), -1, -2)
+  return out.reshape(out.shape[:-2] + (3 ** rank,))
 
 
-# the product of Q with the d-th index of M
-def _modeProduct(M, Q, rank, d):
-  axis = M.ndim - rank + d
-  X = np.moveaxis(M, axis, -1)
-  lead = np.broadcast_shapes(X.shape[:X.ndim - rank], Q.shape[:-2])
-  Xb = np.broadcast_to(X, lead + X.shape[X.ndim - rank:])
-  Qb = np.broadcast_to(Q, lead + (3, 3))
-  # the tensor indices other than d sit between the list dims and the last axis
-  other = Xb.shape[len(lead):-1]
-  Xr = Xb.reshape(lead + (int(np.prod(other)),) + (3,)) if other else Xb.reshape(lead + (1, 3))
-  Y = np.einsum("...ab,...nb->...na", Qb, Xr)
-  Y = Y.reshape(lead + other + (3,))
-  return np.moveaxis(Y, -1, Y.ndim - rank + d)
+# Q x ... x Q, n times, with the row-major order of the flattened indices
+def _kronPower(Q, n):
+  K = Q
+  for _ in range(n - 1):
+    K = (K[..., :, None, :, None] * Q[..., None, :, None, :]).reshape(Q.shape[:-2] + (3 * K.shape[-2], 3 * K.shape[-1]))
+  return K
+
+
+# the vectors u x ... x u, n times, flattened in row-major order
+def _vecPower(u, n):
+  U = u
+  for _ in range(n - 1):
+    U = (U[..., :, None] * u[..., None, :]).reshape(u.shape[:-1] + (3 * U.shape[-1],))
+  return U
 
 
 # ------------------------------------------------------------------ the Einstein sum

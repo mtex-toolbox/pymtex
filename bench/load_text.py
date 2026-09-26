@@ -6,6 +6,13 @@ import time
 
 import mtex
 
+ALGORITHM = {
+  "name": "EBSD import",
+  "entry": {"matlab": ["@EBSD.load", "loadEBSD_ang", "loadEBSD_ctf"],
+            "python": ["mtex.io.load.loadEBSD", "mtex.io.ang.loadEBSD_ang", "mtex.io.ctf.loadEBSD_ctf"]},
+  "cases": {"load_text": "loadEBSD of Forsterite.ctf, ferrite.ang, olivineopticalmap.ang and the 2.5 million rows of 1C_1.ctf, as a list and on the grid"},
+  "tolerance": None}
+
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
 FILES = [os.path.join(DATA, f) for f in ("Forsterite.ctf", "ferrite.ang", "olivineopticalmap.ang")]
 FILES += [f for f in ("/home/hielscher/mtex/data/1C_1.ctf",) if os.path.exists(f)]

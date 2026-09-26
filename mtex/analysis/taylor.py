@@ -198,11 +198,13 @@ def _minimumNormShears(A, c, y, x, tol=1e-9):
 
 
 def _checkStrain(E):
+  E = np.asarray(E, dtype=float).reshape(-1, 3, 3)
   if not np.all(np.isfinite(E)):
     raise ValueError("the strain has to be finite")
-  scale = np.linalg.norm(E)
+  scale = np.linalg.norm(E, axis=(1, 2))
   tol = max(1e-9, 16 * np.finfo(float).eps)
-  if np.linalg.norm(E - E.T) > tol * scale or abs(np.trace(E)) > tol * scale:
+  asym = np.linalg.norm(E - np.swapaxes(E, 1, 2), axis=(1, 2))
+  if np.any(asym > tol * scale) or np.any(np.abs(np.trace(E, axis1=1, axis2=2)) > tol * scale):
     raise ValueError("the Taylor solve needs a symmetric, traceless strain")
 
 
@@ -231,8 +233,7 @@ def _taylorCrystal(E, model, plasticWork=False, spinSelection=None):
 # compiled loop or one simplex after the other
 def _taylorMany(E, model, plasticWork, spinSelection):
   E = np.ascontiguousarray(E, dtype=float).reshape(-1, 3, 3)
-  for e in E:
-    _checkStrain(e)
+  _checkStrain(E)
   n, k = len(E), len(model)
   M, b, W = np.zeros(n), np.zeros((n, k)), np.zeros((n, 3, 3))
   loop = taylorKernel() if backend() == "numba" else None

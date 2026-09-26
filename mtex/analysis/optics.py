@@ -43,11 +43,16 @@ def _birefringence(rI, U):
   p2 = np.cross(U, p1)
   p2 = p2 / np.linalg.norm(p2, axis=-1, keepdims=True)
   P = np.stack([p1, p2], axis=-2)                       # (n, 2, 3)
-  B = np.einsum("nai,nij,nbj->nab", P, np.broadcast_to(M, (n, 3, 3)), P)
-  lam, V = np.linalg.eigh((B + np.swapaxes(B, -1, -2)) / 2)
-  fast = V[:, 0, 0, None] * p1 + V[:, 1, 0, None] * p2
-  slow = V[:, 0, 1, None] * p1 + V[:, 1, 1, None] * p2
-  return lam[:, 1] - lam[:, 0], fast, slow, lam[:, 0], lam[:, 1]
+  B = (P @ (M[0] if len(M) == 1 else M)) @ np.swapaxes(P, -1, -2)
+  # the eigen decomposition of the symmetric 2 x 2 in closed form: the difference of the
+  # indices without cancellation, the axes by the angle of the larger one
+  a, c, b = B[:, 0, 0], B[:, 1, 1], (B[:, 0, 1] + B[:, 1, 0]) / 2
+  delta = 2 * np.hypot((a - c) / 2, b)
+  mid = (a + c) / 2
+  theta = np.arctan2(2 * b, a - c)[:, None] / 2
+  slow = np.cos(theta) * p1 + np.sin(theta) * p2
+  fast = -np.sin(theta) * p1 + np.cos(theta) * p2
+  return delta, fast, slow, mid - delta / 2, mid + delta / 2
 
 
 def birefringence(rI, vprop=None):

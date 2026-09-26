@@ -186,11 +186,11 @@ def _transport(p, w, xs, d, alpha):
   W = out[:3 * M].reshape(M, 3)
   V = d[:3 * M].reshape(M, 3)
   speed = np.linalg.norm(V, axis=1)
-  for j in np.flatnonzero(speed > 0):
-    u = V[j] / speed[j]
-    t = alpha * speed[j]
-    a = W[j] @ u
-    W[j] = W[j] - a * (math.sin(t) * xs[j] + 2 * math.sin(t / 2) ** 2 * u)
+  j = np.flatnonzero(speed > 0)
+  u = V[j] / speed[j, None]
+  t = alpha * speed[j, None]
+  a = np.sum(W[j] * u, axis=1, keepdims=True)
+  W[j] = W[j] - a * (np.sin(t) * xs[j] + 2 * np.sin(t / 2) ** 2 * u)
   return out
 
 

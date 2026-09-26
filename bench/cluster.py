@@ -18,6 +18,15 @@ from mtex import calcCluster, classix, crystalFrame, degree, orientation, rotati
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 os.makedirs(out, exist_ok=True)
 rng = np.random.default_rng(7)
+ALGORITHM = {
+  "name": "clustering",
+  "entry": {"matlab": ["@vector3d.calcCluster", "@orientation.calcCluster"],
+            "python": ["mtex.analysis.cluster.calcCluster", "mtex.analysis.cluster.classix"]},
+  "cases": {"classix": "classix of five Gaussian clouds, 1e4, 1e5 and 1e6 points",
+            "directions": "calcCluster of the clouds as directions, 1e4 and 1e5",
+            "orientations": "calcCluster(ori, 'classix') of four cubic clouds through the embedding, 2000 and 20000"},
+  "tolerance": None}
+
 CENTERS = np.array([[0, 0, 0], [3, 0, 0], [0, 3, 0], [0, 0, 3], [2, 2, 2]], dtype=float)
 
 

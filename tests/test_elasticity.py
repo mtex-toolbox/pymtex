@@ -95,6 +95,26 @@ def test_T5_the_waves():
   assert abs(np.dot(h.pp.eval(n).data.ravel(), ppn.data.ravel())) > 1 - 1e-6
 
 
+def test_T5_the_compiled_eigen_decomposition():
+  from mtex import setMTEXpref
+  from mtex.tensors.kernels import eigh3
+  # random matrices, diagonal ones and the double and triple eigenvalues of isotropic ones
+  E = rng.standard_normal((500, 3, 3))
+  E = np.concatenate([E + np.swapaxes(E, 1, 2), np.eye(3) * rng.standard_normal((50, 1, 3)),
+                      np.broadcast_to(np.diag([1.0, 1, 2]), (3, 3, 3)), np.zeros((2, 3, 3)), np.eye(3)[None]])
+  E = E.reshape(2, -1, 3, 3)
+  lam, V = eigh3(E)
+  setMTEXpref("kernels", "numpy")
+  try:
+    lam0, _ = eigh3(E)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert lam.shape == (2, 278, 3) and V.shape == (2, 278, 3, 3)
+  assert np.allclose(lam, lam0, atol=1e-13) and np.all(np.diff(lam, axis=-1) >= 0)
+  assert np.allclose(np.swapaxes(V, -1, -2) @ V, np.eye(3), atol=1e-13)
+  assert np.allclose(E @ V, V * lam[..., None, :], atol=1e-12)
+
+
 def test_P4g_the_Hashin_Shtrikman_bounds():
   cs = crystalFrame("m-3m")
   C = stiffnessTensor(CUBIC, cs)

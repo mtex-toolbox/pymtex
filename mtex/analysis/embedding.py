@@ -106,45 +106,42 @@ def _isotropicTensor(alpha):
   return A.ravel()
 
 
-# Q acting on the d-th index of a flattened rank alpha tensor
-def _modeProductFlat(v, alpha, Q, d):
-  A = v.reshape((3,) * alpha)
-  return np.moveaxis(np.tensordot(Q, np.moveaxis(A, d, 0), axes=(1, 0)), 0, d).ravel()
+# Q on every index of the flattened rank alpha tensors, the rows of X: Q on the first index
+# and that index moved last, alpha times, so that every step is one batched product; Q one
+# matrix or one per row
+def _turn(X, alpha, Q):
+  n = len(X)
+  for _ in range(alpha):
+    X = (Q @ X.reshape(n, 3, -1)).transpose(0, 2, 1).reshape(n, -1)
+  return X
 
 
-def _rotateFlat(v, alpha, Q):
-  for d in range(alpha):
-    v = _modeProductFlat(v, alpha, Q, d)
-  return v
+# the derivative of the rotation action along a generator: the spin matrix S on one index
+# after the other, summed, the terms cycled along with the tensor
+def _derive(X, alpha, S):
+  n = len(X)
+  Y = np.zeros_like(X)
+  for _ in range(alpha):
+    Y = Y + (S @ X.reshape(n, 3, -1)).reshape(n, -1)
+    X = X.reshape(n, 3, -1).transpose(0, 2, 1).reshape(n, -1)
+    Y = Y.reshape(n, 3, -1).transpose(0, 2, 1).reshape(n, -1)
+  return Y
 
 
-# the derivative of the rotation action along a generator: the spin matrix on every index
-def _generatorFlat(v, alpha, S):
-  return sum(_modeProductFlat(v, alpha, S, d) for d in range(alpha))
-
-
-def _actBlocks(f, v, alpha, offsets, Q):
-  out = np.empty_like(v)
-  for k, a in enumerate(alpha):
-    r = slice(offsets[k], offsets[k + 1])
-    out[r] = f(v[r], a, Q)
+# f on every term of the images, the rows of U, in chunks that stay in the cache
+def _blocks(f, U, alpha, offsets, Q, chunk=256):
+  out = np.empty(U.shape)
+  for i in range(0, len(U), chunk):
+    q = Q if np.ndim(Q) == 2 else Q[i:i + chunk]
+    for k, a in enumerate(alpha):
+      r = slice(offsets[k], offsets[k + 1])
+      out[i:i + chunk, r] = f(U[i:i + chunk, r], a, q)
   return out
 
 
-# the identity image turned by a list of rotations at once: every index of every term
-# multiplied by the matrices, the batch on the first axis
+# the identity image turned by a list of rotations, one row each
 def _rotateBatch(u0, alpha, offsets, Q):
-  n = len(Q)
-  out = np.empty((n, len(u0)))
-  for k, a in enumerate(alpha):
-    r = slice(offsets[k], offsets[k + 1])
-    X = np.broadcast_to(u0[r].reshape((3,) * a), (n,) + (3,) * a).copy()
-    for d in range(a):
-      X = np.moveaxis(X, d + 1, -1)
-      X = np.einsum("n...b,nab->n...a", X, Q)
-      X = np.moveaxis(X, -1, d + 1)
-    out[:, r] = X.reshape(n, r.stop - r.start)
-  return out
+  return _blocks(_turn, np.broadcast_to(u0, (len(Q), len(u0))), alpha, offsets, Q)
 
 
 _GENERATORS = [np.array([[0, 0, 0], [0, 0, -1.0], [0, 1.0, 0]]), np.array([[0, 0, 1.0], [0, 0, 0], [-1.0, 0, 0]]),
@@ -168,7 +165,7 @@ def _orbitBasis(v, alpha, offsets, tol=1e-8):
   while queue:
     w = queue.pop(0)
     for S in _GENERATORS:
-      add(_actBlocks(_generatorFlat, w, alpha, offsets, S))
+      add(_blocks(_derive, w[None], alpha, offsets, S)[0])
   return np.stack(B, axis=1)
 
 
@@ -303,7 +300,7 @@ class embedding:
   # the images turned by a rotation
   def rotate(self, r):
     Q = rotation(r.data).matrix()
-    return self._new(np.stack([_actBlocks(_rotateFlat, self.u[:, k], self.spec.alpha, self.spec.offsets, Q) for k in range(self.size)], axis=1), self.shape)
+    return self._new(_blocks(_turn, self.u.T, self.spec.alpha, self.spec.offsets, Q).T, self.shape)
 
   # the images of the seeds of a projection, the batch route
   @staticmethod
@@ -325,23 +322,31 @@ class embedding:
     d = np.asarray(d, dtype=float).reshape(-1, self.dim)
     return self._new(self.spec.basis @ d.T, () if d.shape[0] == 1 else (d.shape[0],))
 
-  # the orientation whose image is closest, by steepest ascent from the best of a few seeds
-  def project(self, seeds=None, maxIter=200, tol=1e-10):
-    out = np.zeros((self.size, 4))
-    qs = rotation(_seedRotations(self.spec.frame)) if seeds is None else rotation(seeds)
-    Qs = qs.matrix()
-    for k in range(self.size):
-      n = np.linalg.norm(self.u[:, k])
-      target = (np.linalg.norm(self.spec.u0) / n) * self.u[:, k] if n > 0 else self.spec.u0.copy()
-      scores = _rotateBatch(self.spec.u0, self.spec.alpha, self.spec.offsets, Qs) @ target
-      q = qs[int(np.argmax(scores))]
+  # the orientation whose image is closest, by steepest ascent from the best of a few seeds,
+  # all images at once; the gradient along a generator G is <G u, t> = -<u, G t>, the action
+  # being skew, so G t is formed once per target and every step is one batch of images
+  def project(self, seeds=None, maxIter=200, tol=1e-10, chunk=2048):
+    sp = self.spec
+    qs = rotation(_seedRotations(sp.frame)) if seeds is None else rotation(seeds)
+    seedImages = _rotateBatch(sp.u0, sp.alpha, sp.offsets, qs.matrix())
+    U = self.u.T
+    n = np.linalg.norm(U, axis=1)
+    out = np.empty((len(U), 4))
+    for i in range(0, len(U), chunk):
+      Ui, ni = U[i:i + chunk], n[i:i + chunk]
+      T = np.where(ni[:, None] > 0, (np.linalg.norm(sp.u0) / np.where(ni > 0, ni, 1))[:, None] * Ui, sp.u0)
+      H = np.stack([_blocks(_derive, T, sp.alpha, sp.offsets, S) for S in _GENERATORS], axis=1)
+      q = qs.data.reshape(-1, 4)[np.argmax(seedImages @ T.T, axis=0)]
+      active = np.arange(len(T))
       for _ in range(maxIter):
-        u = _actBlocks(_rotateFlat, self.spec.u0, self.spec.alpha, self.spec.offsets, q.matrix())
-        g = np.array([_actBlocks(_generatorFlat, u, self.spec.alpha, self.spec.offsets, S) @ target for S in _GENERATORS])
-        if np.linalg.norm(g) < tol:
+        u = _rotateBatch(sp.u0, sp.alpha, sp.offsets, rotation(q[active]).matrix())
+        g = -np.einsum("nd,njd->nj", u, H[active])
+        moving = np.linalg.norm(g, axis=1) >= tol
+        active, g = active[moving], g[moving]
+        if not len(active):
           break
-        q = vector3d(g).exp() * q
-      out[k] = q.data
+        q[active] = (vector3d(g).exp() * rotation(q[active])).data.reshape(-1, 4)
+      out[i:i + chunk] = q
     return rotation(out.reshape(self.shape + (4,)) if self.shape != () else out[0])
 
   def orientation(self, SS=None, **kwargs):

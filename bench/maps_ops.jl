@@ -4,7 +4,7 @@ using MTEX, Printf
 
 const OUT = joinpath(@__DIR__, "out", "maps")
 const FILTERS = Dict("mean" => () -> MeanFilter(; radius = 1), "spline" => () -> SplineFilter(),
-  "l1tv" => () -> L1TVFilter(), "hq" => () -> HalfQuadraticFilter())
+  "l1tv" => () -> L1TVFilter(), "hq" => () -> HalfQuadraticFilter(), "fill" => () -> SplineFilter())
 
 # the measured map as the EBSDDenoising page prepares it
 function measured(name)
@@ -19,8 +19,8 @@ function run(ops)
     _, f, m = split(op, "_")
     e = get!(() -> measured(m), maps, m)
     F = FILTERS[f]()
-    s = smooth(e, F)
-    t = minimum(@elapsed(smooth(e, F)) for _ in 1:3)
+    s = smooth(e, F; fill = f == "fill")
+    t = minimum(@elapsed(smooth(e, F; fill = f == "fill")) for _ in 1:3)
     s = s[isIndexed(s)]
     P = vec(data(s.pos))
     r = s.rot
@@ -35,4 +35,4 @@ function run(ops)
   end
 end
 
-run(isempty(ARGS) ? ["smooth_$(f)_$(m)" for m in ("twins", "ferrite") for f in ("mean", "spline", "l1tv", "hq")] : ARGS)
+run(isempty(ARGS) ? ["smooth_$(f)_$(m)" for m in ("twins", "ferrite") for f in ("mean", "spline", "l1tv", "hq", "fill")] : ARGS)

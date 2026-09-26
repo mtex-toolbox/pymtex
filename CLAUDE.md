@@ -77,7 +77,8 @@ oracle; the maps layer keeps its own in `mtex/maps/kernels.py` (the clipping, th
 the loop tracing, the fused gradient, KAM and GROD over the lattice, the simplex of the
 dislocation fit), the planar hull in `mtex/geometry/hull.py`, the inverse pole figure
 colouring of a map in `mtex/plotting/kernels.py` and the NUFFT nodes and real defects of the
-harmonic transforms in `mtex/functions/kernels.py`, on the same pattern;
+harmonic transforms in `mtex/functions/kernels.py` and the batched symmetric 3 x 3 eigen
+decomposition of the wave velocities in `mtex/tensors/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
 physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft and
 `scipy.fft`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
@@ -90,6 +91,11 @@ search in `mtex/geometry/grids/gridsearch.py`. The nearest search of the ring gr
 `mtex/geometry/grids/gridsearch.py`: the structured ring search compiled as one parallel
 loop, binary searches over the ladders, the Python `find` as fallback and oracle.
 
+`tools/graph/build.py` writes the dependency graph of both ports (`tools/graph/query.py` asks
+it: `node`, `impact`, `algo`, `gaps`, `layer`). Its algorithms are the `ALGORITHM` literals of
+the benchmarks; the `bench/*_ops.py` (geometry, functions, tensors, embedding, maps, analysis,
+io, plotting) check this port against MATLAB on one input through `tools/graph/crosscheck.py`,
+`run`, `matlab` one op per bridge call, `compare`, each tolerance with its reason beside it.
 One test file per source file, named `tests/test_<file>.py`; `tests/test_semantics.py`
 holds one test per statement of the semantics document and must stay green. The Julia
 port runs with `julia --project=../mtexJulia/dev`; MATLAB through the bridge in

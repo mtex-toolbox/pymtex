@@ -27,6 +27,15 @@ os.makedirs(out, exist_ok=True)
 DPI = 150
 
 
+ALGORITHM = {
+  "name": "map plotting",
+  "entry": {"matlab": ["@ipfColorKey.orientation2color", "@EBSD.plot"],
+            "python": ["mtex.plotting.orientationkeys.ipfColors", "mtex.plotting.orientationkeys.ipfColorKey.orientation2color",
+                       "mtex.plotting.mapplot.plotEBSD"]},
+  "cases": {"mapplot": "the IPF colours through the key's grid and exactly, the raster, the plot and the PNG of the Forsterite and Emsland maps, tiled up to four by four"},
+  "tolerance": None}
+
+
 def timed(fun, repeat=3):
   fun()
   best, r = np.inf, None

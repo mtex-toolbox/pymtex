@@ -23,6 +23,7 @@ import numpy as np
 from ..geometry.frames import referenceFrame
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor
+from ..tensors.kernels import eigh3
 
 Bounds = namedtuple("Bounds", ["voigt", "reuss", "hill"])
 Velocities = namedtuple("Velocities", ["vp", "vs1", "vs2", "pp", "ps1", "ps2"])
@@ -88,8 +89,16 @@ def _sphericalFunction(fun, T, invariant=True):
 # in the direction n; ChristoffelTensor(C, n) is the class constructor
 def _christoffel(C, n):
   C = _stiffness(C)
-  u = _unit(C, n)
-  return EinsteinSum(C, [1, -1, 2, -2], u, [-1], u, [-2]).M, C.frame, C.density
+  return _christoffelMatrix(C, _unit(C, n)), C.frame, C.density
+
+
+# E_ik = C_ijkl u_j u_l; for one tensor the products u_j u_l against C read as a 9 x 9 matrix
+def _christoffelMatrix(C, u):
+  if C.ndim:
+    return EinsteinSum(C, [1, -1, 2, -2], u, [-1], u, [-2]).M
+  x = u.data
+  Cp = np.transpose(C.M, (0, 2, 1, 3)).reshape(9, 9)
+  return ((x[..., :, None] * x[..., None, :]).reshape(x.shape[:-1] + (9,)) @ Cp.T).reshape(x.shape[:-1] + (3, 3))
 
 
 def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
@@ -115,9 +124,8 @@ def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
     raise ValueError("the density has to be finite and positive")
   if n is None:
     return _velocityHarmonics(C, rho, bandwidth) if harmonic else _velocityFields(C, rho)
-  u = _unit(C, n)
-  E = EinsteinSum(C, [1, -1, 2, -2], u, [-1], u, [-2]).M
-  lam, vecs = np.linalg.eigh(E)
+  E = _christoffelMatrix(C, _unit(C, n))
+  lam, vecs = eigh3(E)
   v = np.sqrt(np.maximum(lam, 0) / rho)
   axes = lambda k: _axes(np.moveaxis(vecs, -1, -2)[..., k, :], C.frame)
   return Velocities(v[..., 2], v[..., 1], v[..., 0], axes(2), axes(1), axes(0))

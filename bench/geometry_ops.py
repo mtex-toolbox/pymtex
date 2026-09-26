@@ -104,7 +104,8 @@ def operations(x):
     "p2fr_mori_mori2": (lambda: mtex.project2FundamentalRegion(x["mori"], x["mori2"]), lambda o: rows(o, 4)),
     "grid_build": (build, lambda o: np.array([[o.size]], dtype=float)),
     # the grids order their points differently: the distance to the nearest point is compared
-    "grid_nearest": (lambda: mtex.find(grid["g"], x["ori"][:NQ]), lambda o: rows(o[1], 1)),
+    # find returns the cosine of half the distance, compared as the angle as in MATLAB's half
+    "grid_nearest": (lambda: mtex.find(grid["g"], x["ori"][:NQ]), lambda o: rows(2 * np.arccos(np.minimum(np.asarray(o[1]), 1)), 1)),
     "grid_radius": (lambda: mtex.find(grid["g"], x["ori"][:NR], 7.5 * deg),
                     lambda o: np.diff(o[0].tocsr().indptr).astype(float).reshape(-1, 1)),
   }
@@ -132,7 +133,13 @@ def julia():
 
 
 def deviation(op, a, b):
-  # the grids of the ports differ in their points, so a grid result is compared by its mean
+  # the grids of the ports differ in their points, so a grid result is compared by its mean; the
+  # nearest distance by its median, since MATLAB's search misses the nearest point of about one
+  # query in a hundred (up to 30 degree on the 2.5 degree grid), counted separately
+  if op == "grid_nearest":
+    print(f"  grid_nearest: largest distance {np.degrees(np.max(a)):.2f} / {np.degrees(np.max(b)):.2f} degree, "
+          f"{int(np.sum(b > np.max(a)))} MATLAB queries beyond this port's largest")
+    return abs(float(np.median(a) - np.median(b))) / abs(float(np.median(b)))
   if op.startswith("grid"):
     return abs(float(np.mean(a) - np.mean(b))) / abs(float(np.mean(b)))
   if op in ("r_s",) or op.startswith("p2fr_") and a.shape[1] == 4:

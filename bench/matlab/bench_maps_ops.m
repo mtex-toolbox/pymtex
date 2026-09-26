@@ -16,11 +16,12 @@ end
 % nested functions, since an anonymous one would keep the empty grains it was made with
 names = {'calcgrains_1C_1','calcgrains','perimeter','aspect','smooth_boundary','kam','grod', ...
   'smooth_mean_twins','smooth_spline_twins','smooth_l1tv_twins','smooth_hq_twins', ...
-  'smooth_mean_ferrite','smooth_spline_ferrite','smooth_l1tv_ferrite','smooth_hq_ferrite'};
+  'smooth_mean_ferrite','smooth_spline_ferrite','smooth_l1tv_ferrite','smooth_hq_ferrite', ...
+  'smooth_fill_twins','smooth_fill_ferrite'};
 T = [names.', cellfun(@(n) @() operation(n), names, 'UniformOutput', false).', ...
   cellfun(@(n) @(res) rows(n, res), names, 'UniformOutput', false).'];
 algos = {'grain segmentation','grain shape','boundary smoothing','intragranular misorientation','orientation denoising'};
-crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5])), K, {'calcgrains'}, ...
+crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5 5 5])), K, {'calcgrains'}, ...
   containers.Map({'calcgrains_1C_1','smooth_l1tv_twins','smooth_l1tv_ferrite','smooth_hq_twins','smooth_hq_ferrite'}, {1, 1, 1, 1, 1}));
 
   function res = operation(name)
@@ -40,8 +41,9 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 
       case 'grod', res = angle(ebsd.calcGROD(grains));
       otherwise
         parts = split(name, '_');
-        filters = struct('mean', @meanFilter, 'spline', @splineFilter, 'l1tv', @l1TVFilter, 'hq', @halfQuadraticFilter);
-        res = smooth(measured.(parts{3}), filters.(parts{2})());
+        filters = struct('mean', @meanFilter, 'spline', @splineFilter, 'l1tv', @l1TVFilter, 'hq', @l1TVFilter, 'fill', @splineFilter);
+        if strcmp(parts{2}, 'fill'), flag = {'fill'}; else, flag = {}; end
+        res = smooth(measured.(parts{3}), filters.(parts{2})(), flag{:});
         res = res('indexed');
     end
   end

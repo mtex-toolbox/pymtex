@@ -30,6 +30,13 @@ def targets():
   return {"S2 1+0.6z": fs, "SO3 1+0.6(Rz).z": fr, "SO3 222 fibre": fibre}
 
 
+ALGORITHM = {
+  "name": "discrete sampling",
+  "entry": {"matlab": ["@S2Fun.optimalSample"], "python": ["mtex.analysis.optimalsample.optimalSample"]},
+  "cases": {"optimal_s2": "optimalSample of 1 + 0.6 z on the sphere, 100 and 1000 nodes",
+            "optimal_so3": "optimalSample of SO(3) densities, a 222 fibre ODF up to 2000 nodes"},
+  "tolerance": None}
+
 CASES = [("S2 1+0.6z", 32, 100, 20, False), ("S2 1+0.6z", 32, 100, 20, True), ("S2 1+0.6z", 128, 1000, 20, False),
          ("SO3 1+0.6(Rz).z", 16, 100, 20, False), ("SO3 1+0.6(Rz).z", 16, 100, 20, True),
          ("SO3 222 fibre", 16, 500, 20, False), ("SO3 222 fibre", 32, 500, 20, False), ("SO3 222 fibre", 32, 2000, 50, False),
