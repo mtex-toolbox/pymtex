@@ -87,20 +87,23 @@ class sphericalPlot:
     if title is not None:
       ax.set_title(plotText(title), fontsize=self.fontSize)
 
-  # a crystal sector hangs its labels outside the corners, away from the centre; any other
-  # chart writes its axes names on the rim in a white box
+  # a crystal sector hangs its labels at the corners, centred over a corner in the upper half
+  # and under one in the lower, so that they take no width beside the sector; a corner at half
+  # height takes its label beside it, away from the centre. Any other chart writes its axes
+  # names on the rim in a white box
   def _drawLabels(self, outside):
     xlo, xhi, ylo, yhi = self.bounds
     cx, cy = (xlo + xhi) / 2, (ylo + yhi) / 2
     for v, name in self.proj.labels():
       x, y = (float(c) for c in self.proj.projectUnchecked(v))
       if outside and not self.proj.isPlain:
-        dx, dy = x - cx, y - cy
-        r = np.hypot(dx, dy)
-        dx, dy = (dx / r, dy / r) if r > 1e-6 else (0.0, 0.0)
-        ha = "left" if dx > 0.3 else "right" if dx < -0.3 else "center"
-        va = "bottom" if dy > 0.3 else "top" if dy < -0.3 else "center"
-        self.labels.append(self.ax.annotate(plotText(name), (x, y), xytext=(8 * dx, 8 * dy), textcoords="offset points",
+        if abs(y - cy) > 0.05 * (yhi - ylo):
+          up = y > cy
+          xytext, ha, va = (0, 5 if up else -5), "center", "bottom" if up else "top"
+        else:
+          right = x > cx
+          xytext, ha, va = (6 if right else -6, 0), "left" if right else "right", "center"
+        self.labels.append(self.ax.annotate(plotText(name), (x, y), xytext=xytext, textcoords="offset points",
                                             ha=ha, va=va, fontsize=self.fontSize, zorder=8))
       else:
         self.labels.append(self.ax.text(x, y, plotText(name), ha="center", va="center", fontsize=self.fontSize, zorder=8,

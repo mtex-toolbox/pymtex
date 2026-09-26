@@ -93,3 +93,31 @@ def test_a_click_picks_the_key(loaded):
   assert st.keyPhase == 2 and table.item(2, 2).font().bold() and not table.item(1, 2).font().bold()
   table.onClick(0, 3)
   assert st.keyPhase == 2
+
+
+# a point group picked in the dropdown is committed at once and the dropdown closed, without the
+# focus leaving the cell; the phase, and with it the key and the script, follow
+def test_a_choice_takes_effect_at_once(loaded):
+  from PySide6.QtWidgets import QComboBox, QWidget
+  from mtex.wizard.phases import ChoiceDelegate
+  delegate = ChoiceDelegate(["mmm", "222"])
+  committed, closed = [], []
+  delegate.commitData.connect(committed.append)
+  delegate.closeEditor.connect(lambda editor, hint: closed.append(editor))
+  parent = QWidget()
+  box = delegate.createEditor(parent, None, None)
+  box.setCurrentIndex(1)
+  box.activated.emit(1)
+  assert committed == [box] and closed == [box]
+  # and through the table, the phase changed and the key following it
+  from mtex.wizard.views import KeyPanel
+  st = loaded
+  table = PhaseTable(st, QFont())
+  panel = KeyPanel(st)
+  cb.pickKeyPhase(st, 1)
+  table.editItem(table.item(1, 5))
+  editor = table.findChild(QComboBox)
+  editor.hidePopup()
+  editor.setCurrentIndex(editor.findText("222"))
+  editor.activated.emit(editor.currentIndex())
+  assert st.ebsd.CSList.frames[1].pointGroup == "222" and "222" in panel.title.text()

@@ -220,7 +220,7 @@ P8, the import wizard (`docs/plans/wizard.md`), is built through W6: `importWiza
 PySide6 window (the `wizard` extra) over a headless core, `mtex/wizard/state.py` and
 `callbacks.py`, with `inspectEBSD` in `mtex/io/inspect.py` describing a file from its header
 and `buildImportWizardScript` in `mtex/io/importscript.py` writing the Python of an import;
-the window is `window.py`, `browser.py`, `phases.py`, `pictogram.py`, `views.py`, the Julia
+the window is `window.py`, `browser.py`, `phases.py`, `pictogram.py`, `views.py`, `scriptview.py`, the Julia
 window as the look, its pictograms and its chooser of the eight conventions included;
 `bench/wizard.py` grabs it offscreen into `bench/out/wizard-<tab>.png`, which is also the
 picture of the EBSDImport page. The drawing has its own compiled kernels beside the

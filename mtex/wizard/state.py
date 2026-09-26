@@ -39,6 +39,7 @@ class WizardState:
     self.headerPhases = None
     self.drawn = {}
     self.loadSeconds = None
+    self.imports = 0           # the imports started, so that only the latest is committed
     # the two reference frames as entries of AXIS_CONVENTIONS, and the axis names of each
     self.mapConvention = 0
     self.eulerConvention = 0

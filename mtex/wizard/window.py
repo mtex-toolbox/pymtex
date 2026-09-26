@@ -19,6 +19,7 @@ from . import callbacks as cb
 from .browser import BrowserSide, framed
 from .phases import PhaseTable
 from .pictogram import CoordinatePanel
+from .scriptview import ScriptView
 from .state import WizardState
 from .views import KeyPanel, MillerBar, ViewCanvas
 
@@ -81,9 +82,10 @@ class WizardWindow(QMainWindow):
     split = QSplitter(Qt.Horizontal)
     self.setCentralWidget(split)
     # the browser side
-    self.browser = BrowserSide(st, self.small, worker=self.worker, clipboard=self.app.clipboard() if self.app else None)
+    self.browser = BrowserSide(st, self.small, worker=self.worker)
     split.addWidget(self.browser)
-    # the analysis side: the two frames, the phase table and the key of one phase in one row, the views under them
+    # the analysis side: the two frames, the phase table, the script of the import and the key of
+    # one phase in one row, the views under them
     right = QWidget()
     rlay = QVBoxLayout(right)
     rlay.setContentsMargins(4, 4, 4, 4)
@@ -93,9 +95,10 @@ class WizardWindow(QMainWindow):
     self.coordinates = CoordinatePanel(st)
     self.phases = PhaseTable(st, self.small)
     self.key = KeyPanel(st)
+    self.script = ScriptView(st)
     top.addWidget(self.coordinates)
     top.addWidget(framed(self.phases), 0)
-    top.addStretch(1)
+    top.addWidget(framed(self.script), 1)
     top.addWidget(framed(self.key), 0)
     rlay.addLayout(top)
     self.tabs = QTabBar()

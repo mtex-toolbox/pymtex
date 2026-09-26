@@ -110,12 +110,9 @@ def test_outputs(st, tmp_path):
   assert "EBSD.load(fname)" in text and "csList" not in text
   cb.editPhase(st, 1, "mineral", "Fo")
   assert "csList" in cb.scriptOf(st) and "mineral='Fo'" in cb.scriptOf(st)
-  path = cb.writeScript(st, tmp_path)
-  assert os.path.isfile(path) and os.path.basename(path) == "import_Forsterite_cut.py"
-  assert cb.copyCall(st).startswith("ebsd = EBSD.load(")
-  ns = {}
-  assert cb.toVariable(st, "fo", ns) is st.ebsd and ns["fo"] is st.ebsd and st.variable == "fo"
-  assert cb.toVariable(st, "1x", ns) is None and st.status[0] == "failed"
+  assert os.path.basename(cb.defaultScriptPath(st)) == "import_Forsterite_cut.py"
+  path = cb.writeScript(st, os.path.join(tmp_path, "mine.py"))
+  assert os.path.isfile(path) and open(path).read() == cb.scriptOf(st) and st.status[1].startswith("written")
 
 
 def test_data_sets(st):
@@ -123,7 +120,7 @@ def test_data_sets(st):
   cb.openEntry(st, os.path.join(FIXTURES, "h5", "emsphinx_cut.h5"))
   assert len(st.info.dataSets) == 4 and st.ebsd.meta["dataSet"] == "/Scan 1/EBSD"
   cb.setDataSet(st, 2)
-  assert st.ebsd.meta["dataSet"] == "/Scan 3/EBSD" and "dataSet=2" in cb.copyCall(st) and "dataSet=2" in cb.scriptOf(st)
+  assert st.ebsd.meta["dataSet"] == "/Scan 3/EBSD" and "dataSet=2" in cb.scriptOf(st)
 
 
 # the pictures a file holds: the ones its loader indexed and the ones that came in the
@@ -163,3 +160,17 @@ def test_parent_and_letter_rows():
   f = [j for j, n in enumerate(names) if n.startswith("f")]
   assert len(f) == 2 and cb.letterRow(st, None, "F") == f[0] and cb.letterRow(st, f[0], "f") == f[1] and cb.letterRow(st, f[1], "f") == f[0]
   assert cb.letterRow(st, 0, "#") is None
+
+
+# two maps clicked one after the other, the first read the slower: only the second is taken
+def test_only_the_latest_import_is_taken():
+  st = WizardState(FIXTURES)
+  jobs = []
+  worker = lambda load, commit: jobs.append((load, commit))
+  cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"), worker)
+  cb.openEntry(st, os.path.join(FIXTURES, "olivine_cut.ang"), worker)
+  (loadA, commitA), (loadB, commitB) = jobs
+  commitB(loadB())
+  commitA(loadA())
+  assert st.status[0] == "loaded" and st.status[1].startswith("olivine_cut.ang") and st.selected.endswith("olivine_cut.ang")
+  assert st.ebsd.size == loadB()[0].size

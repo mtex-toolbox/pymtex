@@ -135,9 +135,10 @@ def test_a_key_of_both_hemispheres(monkeypatch):
   drawn.clear()
   views.keyPicture(crystalFrame("mmm"), px=120)
   assert drawn == [{}]
-  # the two stand over one another where that leaves them larger, as for these flat sectors
-  pic = views.keyPicture(crystalFrame("6"), px=120)
-  assert pic.shape[0] > pic.shape[1]
+  # the two stand over or beside one another, whichever leaves them larger in a square
+  wide, tall = np.zeros((20, 60, 4), dtype=np.uint8), np.zeros((60, 20, 4), dtype=np.uint8)
+  assert views._arrange([wide, wide], 2).shape[:2] == (42, 60)
+  assert views._arrange([tall, tall], 2).shape[:2] == (60, 42)
 
 
 # the pole figures are drawn ahead once the density is there, and the tab shows that picture

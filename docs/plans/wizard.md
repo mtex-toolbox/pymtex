@@ -104,8 +104,8 @@ file holds more than one map, picking one being the import; the file information
 metadata of the map as one tree of name and value, the file's own rows at its top - the
 vendor, the date, the grid with its step, the extent, the Euler correction, what the window
 shows nowhere else (`infoRows`: the name, size, points, phases, properties and data sets are
-the list's, the band's, the table's and the tabs') - the header of the loaded map after them; the exports, a name field with *to variable*,
-*write script* and *copy load call*.
+the list's, the band's, the table's and the tabs') - the header of the loaded map after them.
+The script of the import is saved and copied from its panel beside the phase table (W4h).
 
 No panel carries a heading, at the project owner's asking on 2026-09-22: what a panel
 holds is said by what is in it - the file's own rows, the names of the data sets, the
@@ -330,6 +330,23 @@ reaches matplotlib through `guiFont` (the family Qt resolves its generic one to,
 same family); the bar is mathtext's `\bar` now wherever a spherical plot writes a Miller index
 (`plotText`), since matplotlib sets the combining overline `Miller.char` writes beside the
 digit, and a label on a marker of size zero stands on its point.
+
+**W4h - the script beside the phase table. 2026-09-26.** The room between the phase table and
+the key, a hundred pixels at 1600 and several hundred on a wider screen, shows the import script
+as it stands (`ScriptView` in `scriptview.py`): `scriptOf` rewritten with every change that alters
+it - the map, the phases, the two frames, the phases drawn, the data set, the name the map is
+bound to - read only in a small fixed-width font, comments grey and strings green, *save…* and
+*copy* in its corner, children of the text so that they stay over it, each saying on itself for a
+moment that it did its work. Narrower than 240 px a line cannot be read, and a note asks for a
+wider window instead. The exports under the browser - the name, *to variable*, *write script*,
+*copy load call* - went with it: the script is copied or saved from here, and `importWizard()`
+returns the map. The vertex labels of a crystal sector stand centred over or under their corner
+(beside it at half height), so that the key takes no width beside the sector and fills its panel.
+A choice in a dropdown of the phase table is committed as it is picked, not when the focus leaves
+the cell, so the key follows the click. Every import is numbered and only the latest is taken
+(`st.imports`): a map clicked while a slower one was read had been replaced by it when that
+finished, which looked like a click that did not open; and a double click on a file reads it
+when it is not the one selected, since two quick clicks near one another come as a double click.
 
 **W6 - the pages. DONE 2026-09-22** for what exists: the wizard section of
 `EBSDAnalysis/EBSDImport` shows `importWizard()` and the offscreen grab, kept as

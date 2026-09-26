@@ -10,7 +10,7 @@ import numpy as np
 
 from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QFrame, QHeaderView, QStyle,
+from PySide6.QtWidgets import (QAbstractItemDelegate, QAbstractItemView, QApplication, QComboBox, QFrame, QHeaderView, QStyle,
                                QStyleOptionButton, QStyleOptionViewItem, QStyledItemDelegate, QTableWidget,
                                QTableWidgetItem)
 
@@ -79,11 +79,18 @@ class ChoiceDelegate(QStyledItemDelegate):
     super().__init__()
     self.choices = choices
 
+  # a choice picked is committed at once and the dropdown closed, rather than when the focus
+  # leaves the cell, so that the key and the script follow the click
   def createEditor(self, parent, option, index):
     box = QComboBox(parent)
     box.addItems(self.choices)
     box.setEditable(False)
+    box.activated.connect(lambda _: self.pick(box))
     return box
+
+  def pick(self, box):
+    self.commitData.emit(box)
+    self.closeEditor.emit(box, QAbstractItemDelegate.NoHint)
 
   def setEditorData(self, editor, index):
     k = editor.findText(index.data(Qt.EditRole) or "")

@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import os
-import sys
 import threading
 import time
 
@@ -15,7 +14,7 @@ import numpy as np
 from ..geometry.frames import closestAlignment, crystalFrame, notIndexedFrame
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, closestConvention, plottingConvention
 from ..geometry.units import degree
-from ..io.importscript import buildImportWizardScript, loadCall
+from ..io.importscript import buildImportWizardScript
 from ..io.inspect import ebsdFiles, inspectEBSD, isEBSDFile
 from ..maps.phaselist import phaseList
 from .state import FileRow, WizardState
@@ -181,6 +180,10 @@ def startImport(st, worker=None):
   if st.info is None:
     return
   path, k, several = st.selected, st.dataSet, len(st.info.dataSets) > 1
+  # every import is numbered and only the latest is taken: a map clicked while another was
+  # still being read would otherwise be replaced by it when the earlier one finished later
+  st.imports += 1
+  number = st.imports
   st.status = ("loading", f"reading {os.path.basename(path)} ...")
   st.changed("status")
   if worker is not None:
@@ -193,6 +196,8 @@ def startImport(st, worker=None):
     return loadEBSD(path, **kw), time.perf_counter() - t
 
   def commit(result):
+    if number != st.imports:
+      return
     if isinstance(result, BaseException):
       st.status = ("failed", f"{os.path.basename(path)}: {result}")
       st.changed("status")
@@ -613,13 +618,12 @@ def scriptOf(st):
                                  variable=st.variable, drawn={k: phaseCounts(st).get(k, 0) for k, on in st.drawn.items() if on})
 
 
-# the script beside the session, never in somebody's data folder
-def writeScript(st, folder=None):
+# the script written to a file, by default beside the session and never in somebody's data folder
+def writeScript(st, path=None):
   text = scriptOf(st)
   if not text:
     return None
-  stem = os.path.splitext(os.path.basename(st.selected))[0]
-  path = os.path.join(folder or os.getcwd(), f"import_{stem}.py")
+  path = path or defaultScriptPath(st)
   with open(path, "w", encoding="utf-8") as f:
     f.write(text)
   st.status = ("loaded", f"written {path}")
@@ -627,28 +631,10 @@ def writeScript(st, folder=None):
   return path
 
 
-def copyCall(st):
-  if st.info is None:
-    return ""
-  return loadCall(st.selected, st.dataSet, st.info.dataSets, st.variable)
-
-
-# the map bound to a name in the session, the analogue of MATLAB's assignin
-def toVariable(st, name=None, namespace=None):
-  if st.ebsd is None:
-    return None
-  name = (name or st.variable or "ebsd").strip()
-  if not name.isidentifier():
-    st.status = ("failed", f"{name!r} is not a variable name")
-    st.changed("status")
-    return None
-  st.variable = name
-  ns = sys.modules["__main__"].__dict__ if namespace is None else namespace
-  ns[name] = st.ebsd
-  st.status = ("loaded", f"the map is {name} in the session")
-  st.changed("status", "variable")
-  return st.ebsd
+def defaultScriptPath(st, folder=None):
+  stem = os.path.splitext(os.path.basename(st.selected))[0]
+  return os.path.join(folder or os.getcwd(), f"import_{stem}.py")
 
 
 __all__ = ["WizardState", "setFolder", "toggleFolder", "pickFile", "selectEntry", "openEntry", "startImport", "setDataSet",
-           "pickTab", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript", "copyCall", "toVariable"]
+           "pickTab", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]

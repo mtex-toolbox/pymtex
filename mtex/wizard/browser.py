@@ -1,6 +1,5 @@
 # the browser side of the import wizard: the path, the status band, the tree, the data
-# sets, the file information with the metadata of the map, and the exports
-# (docs/plans/wizard.md W2)
+# sets, the file information with the metadata of the map (docs/plans/wizard.md W2)
 #
 # Every control reads the state and writes back through one callback; nothing here holds
 # data of its own.
@@ -10,8 +9,8 @@ import os
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget,
-                               QMenu, QPushButton, QSizePolicy, QStyledItemDelegate, QToolButton, QTreeWidget,
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, QListView, QListWidget,
+                               QMenu, QSizePolicy, QStyledItemDelegate, QToolButton, QTreeWidget,
                                QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from . import callbacks as cb
@@ -250,10 +249,16 @@ class FileList(QListView):
       return
     super().mouseReleaseEvent(event)
 
+  # a folder is walked into; a file is read unless it is the one selected already, which the
+  # first click of the double click has read - two quick clicks near one another come as a
+  # double click too, and the second must not be lost
   def onDoubleClick(self, index):
     row = self.st.entries[index.row()]
     if row.isDir:
       cb.setFolder(self.st, row.path)
+    elif self.st.selected != row.path:
+      self.setCurrentIndex(index)
+      cb.openEntry(self.st, row.path, self.worker)
 
   # the arrow keys describe the current row; Return opens it
   def currentChanged(self, current, previous):
@@ -434,50 +439,12 @@ class InfoTree(QTreeWidget):
       cb.pickMeta(self.st, i)
 
 
-# ------------------------------------------------------------------ the exports
-
-class Exports(QWidget):
-  """the map to a name in the session, the script to a file, the load call to the clipboard"""
-
-  def __init__(self, st, clipboard=None):
-    super().__init__()
-    self.st = st
-    self.clipboard = clipboard
-    lay = QVBoxLayout(self)
-    lay.setContentsMargins(0, 4, 0, 0)
-    row = QHBoxLayout()
-    self.name = QLineEdit(st.variable)
-    self.name.setPlaceholderText("variable")
-    self.name.editingFinished.connect(lambda: setattr(st, "variable", self.name.text().strip() or "ebsd"))
-    toVar = QPushButton("to variable")
-    toVar.clicked.connect(lambda: cb.toVariable(st, self.name.text()))
-    row.addWidget(self.name, 1)
-    row.addWidget(toVar)
-    lay.addLayout(row)
-    row = QHBoxLayout()
-    write = QPushButton("write script")
-    write.clicked.connect(lambda: cb.writeScript(st))
-    copy = QPushButton("copy load call")
-    copy.clicked.connect(self.copyCall)
-    row.addWidget(write)
-    row.addWidget(copy)
-    lay.addLayout(row)
-    st.on("variable", lambda: self.name.setText(st.variable))
-
-  def copyCall(self):
-    text = cb.copyCall(self.st)
-    if text and self.clipboard is not None:
-      self.clipboard.setText(text)
-      self.st.status = ("loaded", "the load call is on the clipboard")
-      self.st.changed("status")
-
-
 # ------------------------------------------------------------------ the side
 
 class BrowserSide(QWidget):
   """the whole browser side, top to bottom"""
 
-  def __init__(self, st, small, worker=None, clipboard=None):
+  def __init__(self, st, small, worker=None):
     super().__init__()
     lay = QVBoxLayout(self)
     lay.setContentsMargins(4, 4, 4, 4)
@@ -487,14 +454,12 @@ class BrowserSide(QWidget):
     self.files = FileList(st, small, worker)
     self.dataSets = DataSetList(st, worker)
     self.info = InfoTree(st, small)
-    self.exports = Exports(st, clipboard)
     lay.addWidget(self.breadcrumb)
     lay.addWidget(self.status)
     lay.addWidget(framed(self.files), 3)
     self.dataSetPanel = framed(self.dataSets)
     lay.addWidget(self.dataSetPanel)
     lay.addWidget(framed(self.info), 3)
-    lay.addWidget(self.exports)
     st.on("info", self.showDataSets)
     self.showDataSets()
 

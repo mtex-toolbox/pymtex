@@ -42,11 +42,6 @@ def test_browser_side():
   k = [r.name for r in st.entries].index("olivine_cut.ang")
   files.setCurrentIndex(files.model_.index(k, 0))
   assert st.info.name == "olivine_cut.ang" and st.ebsd.CSList.frames[1].name == "Forsterite"
-  # the exports: the variable name and the load call
-  side.exports.name.setText("fo")
-  side.exports.name.editingFinished.emit()
-  assert st.variable == "fo"
-  assert cb.copyCall(st).startswith("fo = EBSD.load(")
 
 
 def test_data_set_list():
@@ -173,3 +168,26 @@ def test_keyboard_navigation():
   assert files.currentIndex().row() == first
   QTest.keyClick(files, "o")
   assert st.entries[files.currentIndex().row()].name.startswith("olivine")
+
+
+# a double click on a file reads it when it is not the one selected - two quick clicks near one
+# another come as one - and does not read again the file its first click has just read
+def test_double_click_on_a_file():
+  from PySide6.QtTest import QTest
+  app = application()
+  st = WizardState(FIXTURES)
+  cb.setFolder(st, FIXTURES)
+  side = BrowserSide(st, QFont())
+  files = side.files
+  files.resize(300, 600)
+  files.show()
+  app.processEvents()
+  started = []
+  worker = lambda load, commit: started.append(load)
+  files.worker = worker
+  k = [r.name for r in st.entries].index("Forsterite_cut.ctf")
+  center = files.visualRect(files.model_.index(k, 0)).center()
+  QTest.mouseDClick(files.viewport(), Qt.LeftButton, Qt.NoModifier, center)
+  assert st.selected.endswith("Forsterite_cut.ctf") and len(started) == 1 and files.currentIndex().row() == k
+  QTest.mouseDClick(files.viewport(), Qt.LeftButton, Qt.NoModifier, center)
+  assert len(started) == 1
