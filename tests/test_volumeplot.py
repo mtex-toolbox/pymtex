@@ -104,3 +104,21 @@ def test_the_histogram_of_3d_grains_is_weighted_by_volume():
   ax = hs[0][0].axes
   # two grains of 12 voxels each, both in the second bin
   assert np.allclose([b.get_height() for b in hs[0]], [0, 100]) and ax.get_ylabel() == "relative volume (%)"
+
+
+def test_scenes_in_a_layout_and_a_held_map_turned_into_a_scene():
+  from mtex import newMtexFigure, nextAxis
+  g = calcGrains(volume(), angle=10 * degree)
+  g2 = g.slice(plane3d(vector3d(0, 0, 1), vector3d(1.5, 1, 0.5)))
+  fig = newMtexFigure(layout=[1, 2])
+  plot(g2, g2.meanOrientation, micronbar="off")
+  nextAxis()
+  plot(g)
+  assert len(fig.children) == 2 and gcs() is not None and len(fig.fig._mtexScenes) == 1
+  # a grain set plotted over a held map: the map becomes a picture in the scene of the grains
+  plot(g2, micronbar="off")
+  hold(True)
+  plot(g, faceAlpha=0.5)
+  hold(False)
+  kinds = [type(it).__name__ for it in gcs().items]
+  assert kinds == ["picture3d", "mesh3d"]

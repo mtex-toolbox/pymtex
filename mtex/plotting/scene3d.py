@@ -3,7 +3,7 @@
 # convention. PyVista, matplotlib and the HTML writer of render3d.py draw a scene.
 import numpy as np
 
-__all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "grainMesh", "boundaryMesh", "volumeSlices"]
+__all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices"]
 
 
 class mesh3d:
@@ -138,6 +138,37 @@ def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSi
   T = np.concatenate([side, bottom], axis=1).reshape(-1, 3)
   heads = mesh3d(V, np.arange(0, 3 * len(T) + 1, 3), T.reshape(-1), np.repeat(c, 2 * sides, axis=0), edgeColor=None)
   return [shafts, heads]
+
+
+class points3d:
+  """markers at positions (k, 3), a colour per marker (k, 3) or one for all, their size in
+  points"""
+
+  def __init__(self, P, color=(0.0, 0.447, 0.741), markerSize=6.0):
+    self.P = np.asarray(P, dtype=float).reshape(-1, 3)
+    c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
+    self.color = np.clip(np.tile(c.reshape(3), (len(self.P), 1)) if c.size == 3 else c.reshape(-1, 3), 0, 1)
+    self.markerSize = float(markerSize)
+
+  def bounds(self):
+    return self.P.min(axis=0), self.P.max(axis=0)
+
+
+# ellipsoids with the half axes a, b, c about their centres, the surfaces of MATLAB's
+# plotEllipsoid on a grid of n longitudes and m latitudes, one colour each
+def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12):
+  C, A, B, Cc = (np.asarray(x, dtype=float).reshape(-1, 3) for x in (center, a, b, c))
+  k = len(C)
+  rho, theta = np.meshgrid(np.linspace(0, 2 * np.pi, n + 1)[:-1], np.linspace(0, np.pi, m + 1), indexing="ij")
+  st, ct, sr, cr = (f.reshape(-1) for f in (np.sin(theta), np.cos(theta), np.sin(rho), np.cos(rho)))
+  V = C[:, None] + Cc[:, None] * (st * cr)[None, :, None] + B[:, None] * (st * sr)[None, :, None] + A[:, None] * ct[None, :, None]
+  i, j = np.meshgrid(np.arange(n), np.arange(m), indexing="ij")
+  node = lambda i, j: (i % n) * (m + 1) + j
+  quad = np.stack([node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)], axis=-1).reshape(-1, 4)
+  F = (quad[None] + (m + 1) * n * np.arange(k)[:, None, None]).reshape(-1, 4)
+  col = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
+  col = np.tile(col.reshape(3), (k, 1)) if col.size == 3 else col.reshape(-1, 3)
+  return mesh3d(V.reshape(-1, 3), np.arange(0, 4 * len(F) + 1, 4), F.reshape(-1), np.repeat(col, len(quad), axis=0), edgeAlpha=edgeAlpha)
 
 
 class scene3d:

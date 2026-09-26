@@ -2,6 +2,8 @@
 # checkout and keep what it printed and drew in docs/matlab/<Page>/: diary.txt with a
 # "#### cell k" marker before every cell's output, <Page>-<k>-<f>.png for every figure a
 # cell left open. Usage: .venv/bin/python docs/matlabrun.py Vectors/VectorDefinition [...]
+# With --master the page comes from ../master/doc and runs on MATLAB master, the reference of
+# the 3D pages, in the session SESSION_NAME (default mtexpy3d) started from master's bridge.
 import os
 import re
 import subprocess
@@ -63,6 +65,18 @@ def script(page, cs, pageDir):
   return "\n".join(lines) + "\n"
 
 
+# the pages of MATLAB master: its doc folder and bridge, and its own MTEX on the path
+def useMaster():
+  global docRoot, bridge, preamble, session
+  docRoot = os.path.join(mtexRoot, "master", "doc")
+  bridge = os.path.join(mtexRoot, "master", "docs", "agents", "matlab-bridge")
+  preamble = "close all;"
+  session = os.environ.get("SESSION_NAME", "mtexpy3d")
+
+
+session = "mtexfs"
+
+
 def run(page):
   src = open(os.path.join(docRoot, page + ".m"), encoding="utf-8").read()
   pageDir = os.path.join(out, page.split("/")[-1])
@@ -72,7 +86,7 @@ def run(page):
   runFile = os.path.join(pageDir, "run.m")
   open(runFile, "w", encoding="utf-8").write(script(page, cells(src), pageDir))
   cmd = f"{preamble} run('{runFile}');"
-  env = dict(os.environ, SESSION_NAME="mtexfs")
+  env = dict(os.environ, SESSION_NAME=session)
   r = subprocess.run([os.path.join(bridge, ".venv", "bin", "python"), os.path.join(bridge, "matlab_run.py"), cmd],
                      capture_output=True, text=True, env=env)
   # the anchors of MATLAB's linked displays carry nothing a comparison reads
@@ -86,4 +100,8 @@ def run(page):
 
 
 if __name__ == "__main__":
-  sys.exit(max(run(p) for p in sys.argv[1:]))
+  args = sys.argv[1:]
+  if "--master" in args:
+    args.remove("--master")
+    useMaster()
+  sys.exit(max(run(p) for p in args))

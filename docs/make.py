@@ -143,18 +143,22 @@ def build(page):
       snapshots[num] = count
       buf = io.BytesIO()
       fig.savefig(buf, format="png", dpi=120)
-      changed.append((buf.getvalue(), getattr(fig, "_mtexScene", None)))
-    # a figure holding a 3D scene is its picture linked to the interactive page of the scene
-    for f, (data, scene) in enumerate(changed, 1):
+      changed.append((buf.getvalue(), getattr(fig, "_mtexScenes", None) or []))
+    # a figure holding 3D scenes is its picture linked to the interactive page of the first,
+    # the pages of the others linked below it
+    for f, (data, scenes) in enumerate(changed, 1):
       png = f"{name}-{k}.png" if len(changed) == 1 else f"{name}-{k}-{f}.png"
       open(os.path.join(buildDir, png), "wb").write(data)
-      if scene is None:
+      if not scenes:
         out.append(f"![]({png})\n")
-      else:
-        from mtex.plotting.render3d import writeHTML
-        page = png[:-4] + ".html"
+        continue
+      from mtex.plotting.render3d import writeHTML
+      pages = [png[:-4] + (".html" if j == 0 else f"-{j + 1}.html") for j in range(len(scenes))]
+      for scene, page in zip(scenes, pages):
         writeHTML(scene, os.path.join(buildDir, page), title=f"{name}, figure {k}")
-        out.append(f"[![]({png})]({page})\n")
+      out.append(f"[![]({png})]({pages[0]})\n")
+      if len(pages) > 1:
+        out.append("3D views: " + ", ".join(f"[{j + 1}]({p})" for j, p in enumerate(pages)) + "\n")
     if not ok:
       out.append("**The page stopped here.**\n")
       print(f"FAILED {chapter}/{name} at cell {k}\n{printed}")

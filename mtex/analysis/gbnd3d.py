@@ -30,6 +30,8 @@ def calcGBND(gB, *args, **kwargs):
 def _calcGBND3d(gB, grains=None, moriRef=None, halfwidth=10 * degree, noSymmetry=False, total=False, **kwargs):
   from ..functions.density import calcDensity
   from ..geometry.miller import Miller
+  # a face of no area has no normal and no weight
+  gB = gB[gB.area > 0]
   if grains is None:
     return calcDensity(vector3d(gB.N.data, frame=gB.frame, antipodal=True), weights=gB.area, halfwidth=halfwidth, **kwargs)
   if moriRef is None:

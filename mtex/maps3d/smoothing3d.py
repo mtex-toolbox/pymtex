@@ -122,7 +122,8 @@ def _reduceBoundary3d(grains, n=2, cell=None, quadric=False):
 # the vertex of every cluster placed where the planes of its faces meet in the least squares
 # sense, drawn towards the mean by a small regularisation
 def _quadricPlacement(Vc, c, gB):
-  N = gB.N.data
+  # a face of no area has no plane
+  N = np.nan_to_num(gB.N.data)
   d = -np.sum(N * gB.centroid.data, axis=1)
   cF = c[gB.F].reshape(-1)
   f = np.repeat(np.arange(len(gB)), 3)
@@ -133,7 +134,9 @@ def _quadricPlacement(Vc, c, gB):
     b[:, i] = np.bincount(cF, weights=-d[f] * N[f, i], minlength=nC)
     for j in range(i, 3):
       A[:, i, j] = A[:, j, i] = np.bincount(cF, weights=N[f, i] * N[f, j], minlength=nC)
+  # a cluster no face touches, of a vertex a selection left unused, stays at its mean
   reg = 1e-3 * np.trace(A, axis1=1, axis2=2)
+  reg[reg == 0] = 1
   A += reg[:, None, None] * np.eye(3)
   b += reg[:, None] * Vc
   return np.linalg.solve(A, b[:, :, None])[:, :, 0]

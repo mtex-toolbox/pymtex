@@ -66,7 +66,7 @@ def _resolve(source, root, download):
   # a file with no address is written locally, by the script its recipe names
   if not source["url"]:
     raise FileNotFoundError(f"the sample data file {source['path']} is not under {root} and is not hosted yet; "
-                            "bench/matlab/export_trueebsd.m writes it through the MATLAB bridge")
+                            "copy it there from MTEX's data folder (bench/matlab/export_trueebsd.m writes the TrueEBSD one)")
   os.makedirs(os.path.dirname(full), exist_ok=True)
   print(f"  downloading {source['url']}\n  to {full}")
   urllib.request.urlretrieve(source["url"], full)
@@ -266,6 +266,12 @@ class imageSet(SimpleNamespace):
     return "\n".join(f"  {k:>{w}}: {v}" for k, v in rows)
 
 
+# a volume, read by EBSD3.load
+def _volume(path):
+  from ..maps3d.ebsd3 import EBSD3
+  return EBSD3.load(path)
+
+
 # the WC-Co map of TrueEBSD with its four forescatter images, the centre half of the full
 # field every fourth point, as MATLAB's .mat holds it, read from the HDF5 file of plain
 # arrays bench/matlab/export_trueebsd.m writes: h5py reads MATLAB's arrays transposed
@@ -419,6 +425,8 @@ _dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzi
 _dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _later("a VPSC file"))
 _dataset("trueEbsdWCCoSmall", "EBSD", "WC-Co map with four forescatter images of the same area, for TrueEBSD", "trueebsdwccosmall",
          _trueEbsdWCCoSmall)
+_dataset("xnovo", "EBSD3", "a simulated multiphase xnovo volume, a cylinder of nine phases", "xnovo", _volume)
+_dataset("SmallIN100", "EBSD3", "the IN100 nickel superalloy volume of DREAM.3D with its grain mesh", "smallin100", _volume)
 _dataset("odf", "SO3Fun", "an ODF tabulated on a Bunge Euler grid, read as values", "odf", _odf)
 
 __all__ = ["mtexdata", "mtexdatafile", "mtexDataPath"]

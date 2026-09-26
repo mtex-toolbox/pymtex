@@ -111,7 +111,7 @@ def _install():
   for cls in (grain3d, grain3Boundary, EBSD3):
     cls.plot = method(vp.plot3dMap)
   for cls in (grain3d, grain3Boundary):
-    cls.quiver = method(vp.quiver3d)
+    cls.quiver = method(vp.quiver3dMap)
   grain3d.histogram = method(gp.histogram)
 
 

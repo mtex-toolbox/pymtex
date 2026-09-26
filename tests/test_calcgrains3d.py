@@ -70,3 +70,14 @@ def test_IN100_as_MATLAB_reconstructs_it():
   e = EBSD3.load(DREAM3D)
   g = calcGrains(e, angle=5 * degree, minPixel=10)
   assert len(g) == 809 and len(g.F) == 757554 and (e.grainId[0, 0, 0], e.grainId[49, 29, 69]) == (149, 700)
+
+
+def test_the_grains_a_file_stored():
+  e = twoGrains()
+  # two stored grains, the lone voxel of another orientation inside the first, and a voxel of no grain
+  e.grainId = np.ones(e.shape, dtype=np.int64)
+  e.grainId[2:] = 2
+  e.grainId[1, 0, 0] = 0
+  g = calcGrains(e, 'grainId')
+  assert sorted(g.numPixel[g.isIndexed]) == [e.grainId[:2].size - 1, e.grainId[2:].size]
+  assert np.count_nonzero(~g.isIndexed) == 1 and e.phaseId[1, 0, 0] == 0

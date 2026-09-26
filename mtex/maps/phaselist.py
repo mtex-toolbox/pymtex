@@ -136,7 +136,7 @@ def colorTriplet(c):
   return np.asarray(c, dtype=float).reshape(3)
 
 
-def phaseTable(frames, ids, counts=None):
+def phaseTable(frames, ids, counts=None, countLabel="Orientations"):
   names = phaseColorNames(frames)
   rows = []
   for k, i in enumerate(ids):
@@ -146,7 +146,7 @@ def phaseTable(frames, ids, counts=None):
       f.mineral, "" if names[i] is None else (names[i] if isinstance(names[i], str) else np.array2string(np.asarray(names[i], dtype=float), precision=3)),
       f.pointGroup if cs else "", f.char() if cs else ""]
     rows.append(row)
-  labels = ["Phase"] + (["Orientations"] if counts is not None else []) + ["Mineral", "Color", "Symmetry", "Crystal reference frame"]
+  labels = ["Phase"] + ([countLabel] if counts is not None else []) + ["Mineral", "Color", "Symmetry", "Crystal reference frame"]
   widths = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(len(labels))]
   line = lambda r: "  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))
   return "\n".join([line(labels)] + [line(r) for r in rows])

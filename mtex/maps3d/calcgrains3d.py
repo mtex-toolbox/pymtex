@@ -30,13 +30,24 @@ from .grain3d import grain3d
 def calcGrains(ebsd, *args, **kwargs):
   if not isinstance(ebsd, EBSD3):
     return _calcGrains2d(ebsd, *args, **kwargs)
+  # calcGrains(ebsd, 'grainId'): MATLAB's flag
+  if "grainId" in args:
+    args = tuple(a for a in args if not (isinstance(a, str) and a == "grainId"))
+    kwargs["grainId"] = True
   return _calcGrains3d(ebsd, *args, **kwargs)
 
 
-def _calcGrains3d(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1):
+def _calcGrains3d(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, grainId=False):
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
+  # the grains a file stored: voxels of one stored id belong together, an id of 0 to no grain
+  stored = None
+  if grainId:
+    if getattr(ebsd, "grainId", None) is None:
+      raise ValueError("calcGrains(ebsd, 'grainId') needs the grain ids stored with the voxels")
+    stored = np.asarray(ebsd.grainId).reshape(ebsd.shape).copy()
+    ebsd.phaseId[stored == 0] = 0
   g, newId = ebsd.gridify(return_index=True)
   shape = g.shape
   n = int(np.prod(shape))
@@ -46,8 +57,16 @@ def _calcGrains3d(ebsd, angle=10 * degree, threshold=None, criterion=None, minPi
   pad = e.isPadding.reshape(-1)
   L = np.arange(n).reshape(shape, order="F")
   Dl, Dr, dim = _pairs(L)
+  if stored is not None:
+    sid = np.zeros(n, dtype=np.int64)
+    sid[newId] = stored.reshape(-1)
+    sid = sid[toC]
   for pas in (1, 2):
-    connect = np.asarray(crit.evaluate(e, Dl, Dr), dtype=float)
+    if stored is None:
+      connect = np.asarray(crit.evaluate(e, Dl, Dr), dtype=float)
+    else:
+      ph = e.phaseId.reshape(-1)
+      connect = ((sid[Dl] == sid[Dr]) & (ph[Dl] == ph[Dr])).astype(float)
     join = (connect > 0) & ~pad[Dl] & ~pad[Dr]
     grainId, nGrains = _byLastVoxel(components(n, Dl[join], Dr[join]), ~pad)
     if minPixel <= 1 or pas == 2:

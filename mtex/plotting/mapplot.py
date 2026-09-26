@@ -694,7 +694,11 @@ def _onMap(x, y):
 
 # line(x, y, LineStyle=':', LineWidth=4, Color='w'): a polyline in the coordinates of the
 # current map, drawn under its layout, MATLAB's line
-def line(x, y, **kw):
+def line(x, y, z=None, **kw):
+  # a line in space goes into a 3D scene
+  if z is not None:
+    from .volumeplot import line3
+    return line3(x, y, z, **kw)
   kw = {k.lower(): v for k, v in kw.items()}
   ax, P = _onMap(x, y)
   return ax.plot(P[:, 0], P[:, 1], linestyle=kw.pop("linestyle", "-"), linewidth=kw.pop("linewidth", 0.5),

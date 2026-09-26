@@ -15,12 +15,12 @@ does not exist; **Pending** not started.
 |---|---|---|---|---|---|---|---|
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
-| EBSD3Analysis | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| EBSD3Analysis | 9 | 0 | 0 | 0 | 9 | 0 | 0 |
 | EBSDAnalysis | 25 | 20 | 1 | 2 | 2 | 0 | 0 |
 | Elasticity | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | GeneralConcepts | 12 | 0 | 0 | 0 | 0 | 0 | 12 |
 | GrainBoundaries | 15 | 12 | 0 | 3 | 0 | 0 | 0 |
-| Grains | 15 | 12 | 1 | 1 | 0 | 0 | 1 |
+| Grains | 15 | 13 | 1 | 1 | 0 | 0 | 0 |
 | Misorientations | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
 | ODFAnalysis | 18 | 18 | 0 | 0 | 0 | 0 | 0 |
 | PhaseTransitions | 11 | 11 | 0 | 0 | 0 | 0 | 0 |
@@ -63,10 +63,15 @@ does not exist; **Pending** not started.
 | CrystalOrientations/OrientationVisualization3d | OrientationVisualization3d | Checked 2026-09-22; the four figures as MATLAB's; the port's markers are filled where MATLAB draws hollow circles | Checked |
 | CrystalOrientations/OrientationVisualizationSections | OrientationVisualizationSections | Checked 2026-09-22; the phi2, sigma and axis angle sections as MATLAB's; found the largest angle of a region sampled (61.6 for 62.8 degrees), now exact at a vertex in Rodrigues space, so the sections sit at 5.233 to 57.566 degrees and are labelled as MATLAB's | Checked |
 | CrystalOrientations/SpecimenSymmetry | SpecimenSymmetry | Checked 2026-09-22; 8, 4, 1, 2, the frames and both pole figures with their ranges 6.9 and 3.4 as MATLAB's; the texture indices 27.8852 and 7.2683 as MATLAB's after a restart of the bridge, its NFFT MEX failing to load in the first run | Checked |
-| EBSD3Analysis/Grains3D |  | Pending | Blocked |
-| EBSD3Analysis/Grains3DOperations |  | Pending | Blocked |
-| EBSD3Analysis/Grains3DProperties |  | Pending | Blocked |
-| EBSD3Analysis/NeperInterface |  | Pending | Blocked |
+| EBSD3Analysis/Grains3D | Grains3D | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3DOperations | Grains3DOperations | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3DProperties | Grains3DProperties | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/NeperInterface | NeperInterface | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/EBSD3Analysis | EBSD3Analysis | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/EBSD3Plotting | EBSD3Plotting | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3DBoundaries | Grains3DBoundaries | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3DReconstruction | Grains3DReconstruction | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
+| EBSD3Analysis/Grains3DSmoothing | Grains3DSmoothing | Written 2026-09-26 from `../master/doc` (the 3D reference), built with interactive 3D views; the MATLAB master run (`docs/matlabrun.py --master`) still to compare | Written |
 | EBSDAnalysis/EBSD2ODF | EBSD2ODF | Checked 2026-09-22; the peaks 3.727, 37.26, 1.476, the halfwidths 2.7377 and 4.7247, the distances 0.160 and 0.012 as MATLAB's, the grain-based numbers within the few grains the reconstructions differ by (374 for 368), all eight figures; MATLAB's tables are printed rows Partial |
 | EBSDAnalysis/EBSDAdvancedMaps | EBSDAdvancedMaps | Checked 2026-09-22; the Bunge key and its seams, the spot and fibre keys, the six lobes and the two layered maps as MATLAB's, the fibre count 24.8 to the digit; the spot count 13.8 for 12.1 because the robust means differ; needed `plot(key)` in sections for the Bunge and spot keys, a spot key constructed from a phase, its centre, colour and kernel settable, `MarkerAlpha`; `PatalaColorKey` is not ported Checked |
 | EBSDAnalysis/EBSDDenoising | EBSDDenoising | Checked 2026-09-22; the raw deviation 0.70 as MATLAB's, all nine figures; the variational filters take a smoothing length where MATLAB's spline selects its parameter, so the total variation and spline deviations are 0.63 and 0.64 for MATLAB's 0.58 and 0.59, said in the page; `grains.selectByGrainId(ebsd.grainId)` for MATLAB's `grains(ebsd.grainId)` Checked |
@@ -124,7 +129,7 @@ does not exist; **Pending** not started.
 | GrainBoundaries/TiltAndTwistBoundaries | TiltAndTwistBoundaries | Checked 2026-09-23; (001) and (071), the axis (0.192, 0.706, 0.682) for (0.195, 0.706, 0.68), the scatters 19.4 and 22.5 degrees to the digit, 31773 segments for 31803, all figures as MATLAB's; found `mtexColorbar` after RGB boundary colours drawing no bar, fixed | Checked |
 | GrainBoundaries/TriplePoints | TriplePoints | Checked 2026-09-23; the selections by phase, grain and boundary, the arms, the misorientations (19 x 3 for 14 x 3) and both coloured maps as MATLAB's, seven figures; 78 triple points for 70 and 248 Fo–Fo segments for 220 from the gap closing, said in the page; found the triple points of a grain or boundary selection empty and an empty point plot widening the map, fixed | Checked |
 | GrainBoundaries/TwinningBoundaries | TwinningBoundaries | Checked 2026-09-23; 2698 Mg–Mg segments for 2696, the twin law, 86.2992 and 180, 1408 candidates for 1406 and 49.71 percent of the trace for 49.66, all figures as MATLAB's; the 85–87 degree peak 899 segments for 917, the robust mean within 0.63 for 0.451 degrees; the axes print as other equivalent indices; found `xlabel` over the tick labels and `scatter(mori)` framing a ±100 degree cube, fixed | Checked |
-| Grains/Dream3dGrains |  | Pending | Blocked |
+| Grains/Dream3dGrains | Dream3dGrains | Checked 2026-09-26; the summary (794 grains, volume 15625, 757564 faces) and the outward normals of grain 2 as MATLAB master's; `quiver3(pos, dir)` into a held scene | Checked |
 | Grains/EllipseBasedParameters | EllipseBasedParameters | Checked 2026-09-22; ten figures as MATLAB's; the long axis peaks 72.3 and 89.5 degrees for MATLAB's 74.2 and 78.8, the caliper peaks 73.3 and 85.3 for 74.3 and 82.0, the boundary peak 82.9 at 0.94 of the grid axis for 75 at 0.97, the characteristic aspect ratios 1.344 and 1.343 for 1.329 and 1.339, the ellipse being the one of the second moments; wrote `histogram(v)` rose diagrams, `plot(S1Fun)`, `plotSection(S2Fun, sec)`, `plot(shape2d)`, `setView`, `plotEllipse`, `ebsd.how2plot`, the `periodic` flag | Checked |
 | Grains/GrainExport | GrainExport | Checked 2026-09-22; the grain table, the orientation table with its extra columns, the VPSC file with its weights summing to one, the polygon file and the boundary table written and read back as MATLAB's, the first interior grain another one here; one figure; MATLAB's `table`, `writetable` and `save` are a dictionary of columns, the `csv` module and `pickle`; wrote `export(ori, fname)` and `export_VPSC` in `io/exportorientation.py` | Checked |
 | Grains/GrainMerge | GrainMerge | Checked 2026-09-22; 1408 of 2698 candidate twin segments for MATLAB's 1406 of 2696, 91 grains merged into 28, 16.63 percent twin area for 16.64, the weighted GOS higher in 14 of 28 parents by 0.579 degrees for 0.581; merged grain 16 holds six children for MATLAB's nine, the merge ids differing; nine figures; wrote the function form `merge(grains, gB)` | Partial |

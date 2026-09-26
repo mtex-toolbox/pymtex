@@ -502,7 +502,7 @@ class grain2d(polygonSet):
     lines.append(f"  size: {self.size}")
     ids, counts = np.unique(self.phaseId, return_counts=True)
     pixels = [int(self.numPixel[self.phaseId == p].sum()) for p in ids]
-    lines.append(phaseTable(self.CSList.frames, ids, [f"{c} ({px} pixels)" for c, px in zip(counts, pixels)]).replace("Orientations", "Grains       "))
+    lines.append(phaseTable(self.CSList.frames, ids, [f"{c} ({px} pixels)" for c, px in zip(counts, pixels)], "Grains"))
     if self.boundary is not None:
       lines.append(f"  boundary segments: {len(self.boundary)}, inner: {len(self.innerBoundary)}, triple points: {len(self.triplePoints)}")
     if self.prop:

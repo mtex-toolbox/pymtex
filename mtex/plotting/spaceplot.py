@@ -66,8 +66,9 @@ def setCamera(how2plot=None, ax=None):
   # its normal becomes a scene of the maps drawn into it
   from .volumeplot import gcs, refresh, toScene
   fig = gcm()
-  if ax is None and fig is not None and gcs(fig) is None and fig.children and getattr(fig.children[-1], "_mtexMapSources", None):
-    n = fig.children[-1]._mtexMapPlot.plane.normal
+  cur = None if fig is None or not fig.children else (fig.current if fig.current in fig.children else fig.children[-1])
+  if ax is None and gcs(fig) is None and getattr(cur, "_mtexMapSources", None):
+    n = cur._mtexMapPlot.plane.normal
     if abs(abs(float(pC.outOfScreen.normalize().data.reshape(3) @ n)) - 1) > 1e-9:
       toScene(fig)
   if ax is None and gcs(fig) is not None:
@@ -593,6 +594,12 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
 # coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
 # to the longest of the list, points to, as MATLAB draws it
 def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+  # arrows at positions in space go into a 3D scene
+  if isinstance(t, vector3d) and args and isinstance(args[0], vector3d):
+    from .volumeplot import quiverVectors
+    if color is not None:
+      kw["color"] = color
+    return quiverVectors(t, args[0], lineWidth=lineWidth if lineWidth != 1.5 else 2.0, **kw)
   # a field on the sphere is drawn as arrows on the sphere in space
   if _isField(t):
     return quiver3d(t, color="k" if color is None else color, **kw)

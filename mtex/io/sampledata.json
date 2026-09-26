@@ -343,5 +343,19 @@
       "sha256": "5c7ca570d326894fa7e98cbe468045f2612d7801fba44853b97d77ba38d358ad",
       "url": ""
     }
+  ],
+  "smallin100": [
+    {
+      "path": "EBSD/SmallIN100_MeshStats.dream3d",
+      "sha256": "21e59d9b6655411efaaa39ae4b5717ac28318f7943a3bbfd59745f98a046866f",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/SmallIN100_MeshStats.dream3d"
+    }
+  ],
+  "xnovo": [
+    {
+      "path": "EBSD3/SimulatedMultiPhase.h5",
+      "sha256": "a73741f170735585acbbdbac01d8a2daed91e61edbd87b29356dc1b46abbfe6e",
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD3/SimulatedMultiPhase.h5"
+    }
   ]
 }

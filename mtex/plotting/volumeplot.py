@@ -7,9 +7,9 @@ import numpy as np
 from ..geometry.session import getMTEXpref
 from .mtexfigure import gcm, mtexFigure
 from .render3d import drawMatplotlib, hasPyVista, renderImage, writeHTML
-from .scene3d import arrows3d, boundaryMesh, grainMesh, picture3d, scene3d, volumeSlices
+from .scene3d import arrows3d, boundaryMesh, ellipsoids3d, lines3d, points3d, grainMesh, picture3d, scene3d, volumeSlices
 
-__all__ = ["plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture", "quiver3d"]
+__all__ = ["plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture", "quiver3dMap", "quiverVectors", "plotEllipsoid", "plotPoints3d", "scatter3"]
 
 
 def is3dMap(x):
@@ -71,7 +71,7 @@ def plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
   return _draw(volumeSlices(ebsd, color, at=at, **kw), how2plot, figSize, ebsd.frame)
 
 
-def quiver3d(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, noScaling=False, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
+def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, noScaling=False, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
   """quiver(grains, dir), quiver(gB, dir): arrows at the centroids of 3D grains or of their
   boundary faces, as MATLAB's; a grain's arrow as long as the direction, a face's a fifth of
   the face's diameter, both times autoScaleFactor"""
@@ -87,24 +87,114 @@ def quiver3d(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, noScaling=False, 
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=anti), how2plot, figSize, x.frame)
 
 
+def quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, how2plot=None, figSize=None, **kw):
+  """quiver3(v, d): arrows at the positions v along d times arrowSize in a 3D scene, as
+  MATLAB's vector3d/quiver3; an antipodal d points both ways without heads"""
+  kw = _options(kw)
+  color = kw.pop("Color", color)
+  P = np.asarray(v.data).reshape(-1, 3)
+  D = arrowSize * np.asarray(d.data, dtype=float).reshape(-1, 3)
+  return _draw(arrows3d(P, D, color, lineWidth, antipodal=bool(getattr(d, "antipodal", False))), how2plot, figSize, v.frame)
+
+
+def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2plot=None, figSize=None, **kw):
+  """plotEllipsoid(centre, a, b, c, faceColor=rgb): ellipsoids with the half axes a, b, c,
+  one colour for all or one per ellipsoid, as MATLAB's"""
+  kw = _options(kw)
+  faceColor = kw.pop("faceColor", faceColor)
+  data = lambda v: np.asarray(v.data if hasattr(v, "data") else v, dtype=float)
+  fr = getattr(center, "frame", None)
+  return _draw(ellipsoids3d(data(center), data(a), data(b), data(c), faceColor, kw.pop("edgeAlpha", edgeAlpha)), how2plot, figSize, fr)
+
+
+# MATLAB's colour order, the colour of the n-th set of markers in one scene
+COLOR_ORDER = [(0.0, 0.447, 0.741), (0.85, 0.325, 0.098), (0.929, 0.694, 0.125), (0.494, 0.184, 0.556), (0.466, 0.674, 0.188),
+               (0.301, 0.745, 0.933), (0.635, 0.078, 0.184)]
+
+
+def plotPoints3d(v, color=None, MarkerSize=6.0, **kw):
+  """plot(v) into a held 3D scene: the vectors as markers at their positions, each set in the
+  next colour of MATLAB's colour order"""
+  kw = _options(kw)
+  s = gcs()
+  if color is None:
+    color = kw.pop("MarkerFaceColor", kw.pop("MarkerColor", None))
+  if color is None:
+    k = sum(isinstance(it, points3d) for it in s.items) if s is not None else 0
+    color = COLOR_ORDER[k % len(COLOR_ORDER)]
+  size = kw.pop("markerSize", kw.pop("MarkerSize", MarkerSize))
+  return _draw(points3d(np.asarray(v.data).reshape(-1, 3), color, size), None, None, v.frame)
+
+
+def line3(x, y, z, color="k", lineWidth=0.5, **kw):
+  """line(x, y, z): a polyline in a 3D scene, NaN separating its pieces, as MATLAB's line"""
+  kw = {k.lower(): v for k, v in kw.items()}
+  color = kw.pop("color", color)
+  lineWidth = kw.pop("linewidth", lineWidth)
+  P = np.column_stack([np.asarray(c, dtype=float).reshape(-1) for c in (x, y, z)])
+  ok = np.all(np.isfinite(P), axis=1)
+  seg = ok[:-1] & ok[1:]
+  segments = np.stack([P[:-1][seg], P[1:][seg]], axis=1)
+  return _draw(lines3d(segments, color, lineWidth), None, None, None)
+
+
+def scatter3(x, y, z, s=36, c=None, *args, **kw):
+  """scatter3(x, y, z, s, c): markers of area s in a 3D scene, in one colour or one each, as
+  MATLAB's scatter3; 'filled' is accepted and markers are always filled"""
+  kw = {k.lower(): v for k, v in kw.items()}
+  c = kw.pop("color", c)
+  P = np.column_stack([np.asarray(v, dtype=float).reshape(-1) for v in (x, y, z)])
+  size = float(np.sqrt(np.mean(s)))
+  if c is None:
+    c = COLOR_ORDER[0]
+  elif isinstance(c, str) and len(c) == 1:
+    c = {"b": "blue", "r": "red", "g": "green", "k": "black", "w": "white", "c": "cyan", "m": "magenta", "y": "yellow"}[c]
+  return _draw(points3d(P, c, size), None, None, None)
+
+
 # ------------------------------------------------------------------ the figure
 
-# the scene of the current figure, None when it holds none
+# the axes a figure draws into now: the one drawn into last
+def _currentAxes(fig):
+  if fig is None or not fig.children:
+    return None
+  cur = getattr(fig, "current", None)
+  return cur if cur in fig.children else fig.children[-1]
+
+
+# the scene of the current axes of a figure, None when it holds none
 def gcs(fig=None):
-  fig = gcm() if fig is None else fig
-  return getattr(fig, "scene3d", None)
+  return getattr(_currentAxes(gcm() if fig is None else fig), "_mtexScene", None)
+
+
+# the axes a new scene goes into: the one nextAxis prepared, the first of a fresh
+# newMtexFigure, or a new figure of its own
+def _sceneAxes(figSize):
+  fig = gcm()
+  if fig is not None and fig.pending is not None:
+    return fig, fig.takeAxis()
+  if fig is not None and not fig.children and not fig.hold:
+    return fig, fig.nextAxis()
+  from .mtexfigure import figureSize
+  fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
+  return fig, fig.nextAxis()
 
 
 def _draw(item, how2plot, figSize, frame):
   fig = gcm()
-  if fig is None or not fig.hold or gcs(fig) is None:
-    from .mtexfigure import figureSize
-    fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
-    fig.scene3d = scene3d(how2plot)
+  s = gcs(fig) if fig is not None and fig.hold else None
+  # a held map turns into a scene the 3D item joins
+  if s is None and fig is not None and fig.hold and getattr(_currentAxes(fig), "_mtexMapSources", None):
+    s = toScene(fig, how2plot)
+  if s is None:
+    fig, ax = _sceneAxes(figSize)
+    s = scene3d(how2plot)
+    ax._mtexScene = s
+    fig.current = ax
   elif how2plot is not None:
-    fig.scene3d.how2plot = how2plot
+    s.how2plot = how2plot
   for it in item if isinstance(item, list) else [item]:
-    fig.scene3d.add(it)
+    s.add(it)
   refresh(fig)
   return fig
 
@@ -133,37 +223,47 @@ class _scenePlot:
     self.mappable = mappable
 
 
-def refresh(fig=None):
-  """draw the scene of a figure again, after a change of its items or its camera"""
+# the axes in the place of another, flat or 3D, the scene carried over
+def _replaceAxes(fig, ax, projection):
+  spec = ax.get_subplotspec()
+  s = ax._mtexScene
+  k = fig.children.index(ax)
+  ax.remove()
+  new = fig.fig.add_subplot(spec, projection=projection, computed_zorder=False) if projection else fig.fig.add_subplot(spec)
+  new._mtexScene = s
+  fig.children[k] = new
+  return new
+
+
+def refresh(fig=None, ax=None):
+  """draw the scene of an axes again, after a change of its items or its camera"""
   fig = gcm() if fig is None else fig
-  s = gcs(fig)
-  ax = fig.children[0] if fig.children else None
+  ax = _currentAxes(fig) if ax is None else ax
+  s = ax._mtexScene
   if _backend() == "pyvista":
-    if ax is None or getattr(ax, "name", "") == "3d":
-      if ax is not None:
-        ax.remove()
-        fig.children.clear()
-      ax = fig.nextAxis()
+    if getattr(ax, "name", "") == "3d":
+      ax = _replaceAxes(fig, ax, None)
     ax.cla()
-    # a square picture, cropped to what it shows, and the figure of its width in that shape
-    if not hasattr(fig, "sceneWidth"):
+    # a square picture cropped to what it shows; a figure of one panel takes its shape
+    single = len(fig.children) == 1
+    if single and not hasattr(fig, "sceneWidth"):
       fig.sceneWidth = float(fig.fig.get_size_inches()[0])
-    n = int(fig.sceneWidth * fig.fig.dpi * 1.5)
+    w, h = fig.fig.get_size_inches() / np.array([fig.ncols, fig.nrows])
+    n = int((fig.sceneWidth if single else max(w, h)) * fig.fig.dpi * 1.5)
     img = _crop(renderImage(s, (n, n)))
-    fig.fig.set_size_inches(fig.sceneWidth, fig.sceneWidth * img.shape[0] / img.shape[1])
+    if single:
+      fig.fig.set_size_inches(fig.sceneWidth, fig.sceneWidth * img.shape[0] / img.shape[1])
     ax.imshow(img, interpolation="antialiased")
     ax.set_axis_off()
   else:
-    if ax is None or getattr(ax, "name", "") != "3d":
-      if ax is not None:
-        ax.remove()
-        fig.children.clear()
-      ax = fig.fig.add_subplot(1, 1, 1, projection="3d", computed_zorder=False)
-      fig.children.append(ax)
+    if getattr(ax, "name", "") != "3d":
+      ax = _replaceAxes(fig, ax, "3d")
     ax.cla()
     drawMatplotlib(s, ax)
   fig.current = ax
-  fig.fig._mtexScene = s
+  scenes = [c._mtexScene for c in fig.children if getattr(c, "_mtexScene", None) is not None]
+  fig.fig._mtexScene = scenes[0] if scenes else None
+  fig.fig._mtexScenes = scenes
   fig.fig._mtexSceneVersion = getattr(fig.fig, "_mtexSceneVersion", 0) + 1
   # the values of the last item coloured by them are what a colour bar shows
   ax._mtexScenePlot = None
@@ -211,6 +311,8 @@ def mapPicture(sources, pixels=1600):
   canvas = FigureCanvasAgg(fig)
   canvas.draw()
   rgba = np.asarray(canvas.buffer_rgba(), dtype=float)[::-1] / 255
+  # white is what a map paints where nothing was measured, and in space it hides what lies behind
+  rgba[np.all(rgba[..., :3] == 1, axis=-1), 3] = 0
   mP = ax._mtexMapPlot
   xlo, xhi = ax.get_xlim()
   ylo, yhi = ax.get_ylim()
@@ -240,10 +342,11 @@ def mapInto3d(plotFun, x, args, kw):
   fig = gcm()
   if fig is None or not fig.hold:
     return None
-  if gcs(fig) is not None:
-    _addMap(fig.scene3d, (plotFun, x, tuple(args), dict(kw)))
+  s = gcs(fig)
+  if s is not None:
+    _addMap(s, (plotFun, x, tuple(args), dict(kw)))
     return refresh(fig)
-  ax = fig.children[-1] if fig.children else None
+  ax = _currentAxes(fig)
   mP = getattr(ax, "_mtexMapPlot", None)
   sources = getattr(ax, "_mtexMapSources", None)
   if mP is None or not sources:
@@ -251,8 +354,8 @@ def mapInto3d(plotFun, x, args, kw):
   from .maps import planeOf
   if _samePlane(planeOf(x), mP.plane):
     return None
-  toScene(fig)
-  _addMap(fig.scene3d, (plotFun, x, tuple(args), dict(kw)))
+  s = toScene(fig)
+  _addMap(s, (plotFun, x, tuple(args), dict(kw)))
   return refresh(fig)
 
 
@@ -261,17 +364,17 @@ def _samePlane(a, b):
   return abs(abs(float(n1 @ n2)) - 1) < 1e-9 and abs(float(a.o @ n1) - float(b.o @ n1) * np.sign(n1 @ n2)) < 1e-9 * max(1, float(np.abs(a.o).max()))
 
 
-# the map plot of a figure's axes as a scene of the pictures of every map drawn into it
+# the map plot of a figure's current axes as a scene of the pictures of every map drawn
+# into it, held by that axes, cleared of the map
 def toScene(fig=None, how2plot=None):
   fig = gcm() if fig is None else fig
-  ax = fig.children[-1]
-  sources = ax._mtexMapSources
+  ax = _currentAxes(fig)
   s = scene3d(how2plot)
-  for source in sources:
+  for source in ax._mtexMapSources:
     _addMap(s, source)
-  ax.remove()
-  fig.children.remove(ax)
-  fig.scene3d = s
+  ax.cla()
+  ax._mtexMapPlot = ax._mtexMapSources = None
+  ax._mtexScene = s
   return s
 
 

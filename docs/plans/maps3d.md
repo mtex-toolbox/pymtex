@@ -6,7 +6,8 @@ V2 too (`calcgrains3d.py`, `grain3d.py`, `grain3boundary.py`: IN100's grains as 
 V3 on 2026-09-26 (`section3d.py`; the measures, selections and the z section as MATLAB's);
 V4 the same day (`io/loadgrains3d.py`, `orientfaces.py`, `neper.py`); V5 too (`smoothing3d.py`,
 `analysis/gbnd3d.py`); V6 too (`intragranular3d.py`); V7 too (`plotting/scene3d.py`, `render3d.py`,
-`volumeplot.py`, section 4). Syntax and algorithm reference: `../master/EBSDAnalysis/@EBSD3`,
+`volumeplot.py`, section 4); V8 written the same day: the nine EBSD3Analysis pages and
+`Grains/Dream3dGrains` build (Dream3dGrains checked), the comparison with the MATLAB master run open. Syntax and algorithm reference: `../master/EBSDAnalysis/@EBSD3`,
 `@EBSD3square`, `@grain3d`, `@grain3Boundary`, `@neper`, the loaders
 `../master/interfaces/loadEBSD_dream3d.m`, `loadEBSD_xnovo.m`, `loadNeperTess.m`,
 `loadGrains_Dream3d.m`, and the nine pages of `../master/doc/EBSD3Analysis` with

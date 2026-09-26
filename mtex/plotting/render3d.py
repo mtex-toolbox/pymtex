@@ -7,7 +7,7 @@ import zlib
 
 import numpy as np
 
-from .scene3d import lines3d, mesh3d, picture3d, slices3d
+from .scene3d import lines3d, mesh3d, picture3d, points3d, slices3d
 
 __all__ = ["hasPyVista", "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML"]
 
@@ -63,6 +63,8 @@ def pyvistaPlotter(scene, off_screen=False, window_size=(800, 800), plotter=None
         grid.cell_data["rgb"] = _uint8(rgb.reshape(-1, 3, order="F"))
         p.add_mesh(grid, scalars="rgb", rgb=True, lighting=False)
     elif isinstance(it, picture3d):
+      # the pixels are opaque or transparent, which depth peeling keeps from blending
+      p.enable_depth_peeling()
       quad = pv.PolyData(it.corners, np.array([4, 0, 1, 3, 2]))
       quad.active_texture_coordinates = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=float)
       tex = pv.Texture(_uint8(it.rgba)[::-1])
@@ -73,6 +75,10 @@ def pyvistaPlotter(scene, off_screen=False, window_size=(800, 800), plotter=None
       poly = pv.PolyData(it.segments.reshape(-1, 3), lines=np.column_stack([np.full(k, 2), 2 * np.arange(k), 2 * np.arange(k) + 1]).reshape(-1))
       poly.cell_data["rgb"] = _uint8(it.color)
       p.add_mesh(poly, scalars="rgb", rgb=True, line_width=it.lineWidth, opacity=it.alpha, lighting=False)
+    elif isinstance(it, points3d):
+      cloud = pv.PolyData(it.P)
+      cloud.point_data["rgb"] = _uint8(it.color)
+      p.add_mesh(cloud, scalars="rgb", rgb=True, point_size=it.markerSize * 1.5, render_points_as_spheres=True, lighting=False)
   _pvCamera(p, scene)
   return p
 
@@ -133,6 +139,8 @@ def drawMatplotlib(scene, ax):
     elif isinstance(it, lines3d):
       from mpl_toolkits.mplot3d.art3d import Line3DCollection
       ax.add_collection3d(Line3DCollection(it.segments, colors=np.column_stack([it.color, np.full(len(it.color), it.alpha)]), linewidths=it.lineWidth))
+    elif isinstance(it, points3d):
+      ax.scatter(it.P[:, 0], it.P[:, 1], it.P[:, 2], c=it.color, s=it.markerSize ** 2, depthshade=False)
   # a flat scene is given a thickness of a thousandth of its size
   lo, hi = scene.bounds()
   pad = np.where(hi - lo > 0, 0, 5e-4 * max(np.max(hi - lo), 1e-12))
@@ -182,6 +190,8 @@ def _payload(scene):
     elif isinstance(it, lines3d):
       items.append({"kind": "lines", "P": _blob((it.segments.reshape(-1, 3) - c).astype(np.float32)),
                     "C": _blob(_uint8(np.repeat(it.color, 2, axis=0))), "alpha": it.alpha})
+    elif isinstance(it, points3d):
+      items.append({"kind": "points", "P": _blob((it.P - c).astype(np.float32)), "C": _blob(_uint8(it.color)), "size": it.markerSize})
   o, up = scene.camera()
   return {"items": items, "out": o.tolist(), "up": up.tolist(), "radius": float(max(np.linalg.norm(hi - lo) / 2, 1e-12))}
 
@@ -241,6 +251,11 @@ for (const it of S.items) {
     g.setAttribute("position", new THREE.BufferAttribute(await inflate(it.P, Float32Array), 3));
     g.setAttribute("color", new THREE.BufferAttribute(await inflate(it.C, Uint8Array), 3, true));
     scene.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: it.alpha < 1, opacity: it.alpha })));
+  } else if (it.kind === "points") {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(await inflate(it.P, Float32Array), 3));
+    g.setAttribute("color", new THREE.BufferAttribute(await inflate(it.C, Uint8Array), 3, true));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({ vertexColors: true, size: 1.5 * it.size * window.devicePixelRatio, sizeAttenuation: false })));
   } else if (it.kind === "slice" || it.kind === "picture") {
     const tex = new THREE.DataTexture(await inflate(it.rgba, Uint8Array), it.w, it.h, THREE.RGBAFormat);
     tex.magFilter = tex.minFilter = THREE.NearestFilter;

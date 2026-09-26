@@ -1,0 +1,250 @@
+# # Three-Dimensional EBSD Analysis
+#
+# Everything measured on a polished surface is a section through something
+# three-dimensional, and a section is a biased witness. A section through a grain almost
+# never passes through its widest part, so its apparent size is smaller than that grain's
+# full extent. An elongated grain can look equiaxed when it is cut across rather than along
+# its long direction, and the inclination of a grain boundary away from the section is lost
+# altogether.
+#
+# Three-dimensional data removes these compromises. It can come from serial sectioning,
+# from diffraction techniques that probe a volume, or from a simulated microstructure. This
+# page walks through the whole analysis on one such data set: import the volume, look at
+# it, cut sections, reconstruct the grains, measure them, and smooth their boundaries. Every
+# step has a page of its own in this chapter that treats it in depth.
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from mtex import (calcGrains, degree, histogram, hold, mtexColorMap, mtexTitle, mtexdata, newMtexFigure, nextAxis, plane3d, plot, plottingConvention,
+                  reduceBoundary, setCamera, smoothBoundary, taubinFilter, vector3d)
+
+plottingConvention.default('y↑→x')
+how2plot = plottingConvention.default3D
+
+# ## Import a volume
+#
+# `EBSD3.load` reads a volume from a DREAM.3D file or from the Xnovo GrainMapper3D format
+# and detects which of the two it is given. The sample data set is a simulated nine-phase
+# volume in the Xnovo format, which `mtexdata` fetches by name.
+
+ebsd = mtexdata('xnovo')
+print(ebsd)
+
+# The summary reports a 50 x 50 x 50 grid rather than a list: the measurements are held in
+# an `EBSD3` object whose entries are addressed as `ebsd[i, j, k]` along $x$, $y$ and $z$.
+# Each of the nine phases occupies about a twelfth of the voxels and the remaining fifth is
+# not indexed. The voxel is 10 micron on a side and the volume spans half a millimetre in
+# each direction.
+
+print([ebsd.dx, ebsd.dy, ebsd.dz])
+print(ebsd.extent())
+
+# [Volume Data and Slices](EBSD3Plotting.html) describes the object and its import in
+# detail.
+
+# ## Display the volume
+#
+# `plot(ebsd)` draws three slice planes through the middle of the volume; its figure links
+# to an interactive page, and `show3d()` opens it in a window. For a figure of chosen
+# planes, cut the three central slices with `slice` and draw them into one axes. Each slice
+# is an ordinary two-dimensional EBSD map, coloured by phase.
+
+# +
+plot(ebsd.slice(plane3d(vector3d.Z, vector3d(0, 0, 0))), micronbar='off')
+hold(True)
+plot(ebsd.slice(plane3d(vector3d.X, vector3d(0, 0, 0))), micronbar='off')
+plot(ebsd.slice(plane3d(vector3d.Y, vector3d(0, 0, 0))), micronbar='off')
+hold(False)
+setCamera(how2plot)
+# -
+
+# The specimen is a cylinder standing along $z$: the horizontal section is a disc and the
+# two vertical sections are rectangles that end at its rim. The nine phases are mixed
+# through the volume without any layering.
+
+# ## Cut sections
+#
+# A slice is taken through any plane, given by its normal and one point on it. The
+# measurements of a section keep their position in the specimen, and the section is seen
+# along the normal of the plane it was cut with, so an oblique cut displays like any other
+# map.
+
+# +
+newMtexFigure(layout=[1, 2], figSize='large')
+plot(ebsd.slice(plane3d(vector3d.Z, vector3d(0, 0, 0.15))), micronbar='off')
+mtexTitle('normal || z, at z = 0.15 mm')
+nextAxis()
+plot(ebsd.slice(plane3d(vector3d(1, 1, 1), vector3d(0, 0, 0))), micronbar='off')
+mtexTitle('normal || (1,1,1)')
+# -
+
+# Everything written for planar data applies to a section unchanged. The quartz
+# orientations of the oblique cut, for instance, are coloured with the usual inverse pole
+# figure key.
+
+# +
+ebsdCut = ebsd.slice(plane3d(vector3d(1, 1, 1), vector3d(0, 0, 0)))
+plot(ebsdCut, ebsdCut.prop['Completeness'], faceAlpha=0.1)
+mtexColorMap('white2black')
+hold(True)
+plot(ebsdCut['Quartz'], ebsdCut['Quartz'].orientations, micronbar='off')
+hold(False)
+# -
+
+# [Volume Data and Slices](EBSD3Plotting.html) shows slices at several depths and how a
+# section relates to the volume it was cut from.
+
+# ## Reconstruct the grains
+#
+# A grain is a connected region of voxels of one phase whose orientations differ by less
+# than a threshold. `calcGrains` segments the volume with the same misorientation criteria
+# as the planar case and returns a `grain3d` object. Where an `EBSD3` holds one measurement
+# per voxel, a `grain3d` holds each grain as a closed polyhedron: its faces carry the
+# geometry, its phase and mean orientation describe the material inside. `minPixel`
+# dissolves grains of fewer than ten voxels into their neighbours; a grain that small is all
+# corners and no surface.
+
+grains = calcGrains(ebsd, angle=2 * degree, minPixel=10)
+print(grains)
+
+# Voxels that are not indexed form regions of their own, which are listed as grains of the
+# phase `notIndexed`. The indexed grains are selected the way a phase is selected on a map.
+
+grains = grains['indexed']
+
+# Plotting the whole collection shows the outer surface of the volume, one colour per
+# phase. Every grain behind it is present in the collection.
+
+plot(grains, micronbar='off', edgeAlpha=0.1)
+setCamera(how2plot)
+
+# Individual grains are addressed by their `id`. The five largest grains of the volume,
+# drawn together, show the surface a reconstruction from voxels produces: every face is a
+# voxel face, so the surface is a staircase whose normals all point along the axes.
+
+# +
+order = np.argsort(-grains.volume, kind='stable')
+largest = grains[order[:5]]
+print(largest)
+
+plot(largest, micronbar='off', edgeAlpha=0.2)
+setCamera(how2plot)
+# -
+
+# [Grain Reconstruction](Grains3DReconstruction.html) explains the criteria, the `minPixel`
+# option and how to compare the result with the grain ids a file already carries.
+# [Three-Dimensional Grains](Grains3D.html) imports a mesh from DREAM.3D instead of
+# reconstructing one.
+
+# ## Measure the grains
+#
+# A three-dimensional grain has a `volume` and a `surface` area, and neither needs a
+# stereological correction. Volumes are in cubic millimetres here, the unit of the
+# coordinates.
+
+print(np.column_stack([largest.volume, largest.surface()]))
+
+# The two combine into a dimensionless measure of compactness, the surface area divided by
+# the volume to the power two thirds. A sphere gives the smallest possible value,
+# $(36\pi)^{1/3} \approx 4.84$, a cube gives 6, and a grain with a rough or elongated
+# surface gives more.
+
+# +
+shapeQuotient = grains.surface() / grains.volume ** (2 / 3)
+
+newMtexFigure()
+histogram(shapeQuotient)
+plt.xlabel('surface / volume$^{2/3}$')
+plt.ylabel('number of grains')
+# -
+
+# Every grain lies well above the cube's 6, although the grains are equiaxed and convex.
+# The staircase inflates the surface: a voxel surface has the area of the axis-aligned
+# faces it is made of, whatever shape it encloses. Sizes are unaffected, since the volume
+# of a voxel grain is exact.
+#
+# [Properties](Grains3DProperties.html) covers diameters, principal axes, neighbours and
+# the per-face properties of the boundary.
+
+# ## Smooth the boundaries
+#
+# The staircase is removed in two steps. `reduceBoundary` merges the vertices of each
+# voxel-sized cell of a coarser lattice, which already averages the steps and leaves a mesh
+# a quarter the size. `smoothBoundary` then moves the vertices with one of the boundary
+# filters of the planar case. Triple lines, quadruple points and the outer hull of the
+# volume stay where they are, so the network keeps its topology.
+
+# +
+grainsS = smoothBoundary(reduceBoundary(grains, 2, quadric=True), taubinFilter(20))
+
+plot(grainsS['id', largest.id], micronbar='off', edgeAlpha=0.2)
+setCamera(how2plot)
+# -
+
+# The same five grains are now bounded by smooth surfaces. The volume of the whole specimen
+# is conserved exactly, since its hull is fixed. Between the grains and the unindexed
+# regions between them a fraction of a percent moves, and the volume of a single grain
+# changes by a few percent.
+
+print([grains.volume.sum(), grainsS.volume.sum()])
+
+# The compactness measure responds as it should: the surfaces lost their steps, and the
+# histogram moves down towards the range between a sphere and a cube.
+
+# +
+shapeQuotientS = grainsS.surface() / grainsS.volume ** (2 / 3)
+
+edges = np.arange(5, 10.5 + 1e-9, 0.25)
+newMtexFigure()
+histogram(shapeQuotient, edges, label='voxel surface')
+hold(True)
+histogram(shapeQuotientS, edges, label='smoothed', alpha=0.7)
+hold(False)
+plt.legend(loc='upper right')
+plt.xlabel('surface / volume$^{2/3}$')
+plt.ylabel('number of grains')
+# -
+
+# [Smoothing](Grains3DSmoothing.html) compares the filters and the placement rules of the
+# coarsening, with the volume they cost per grain.
+# [Boundary Network](Grains3DBoundaries.html) reads the faces, triple lines and quadruple
+# points of the smoothed mesh, and
+# [Boundary Normal Distribution](BoundaryNormalDistribution.html) contrasts boundary
+# normals measured from the faces with stereological estimates from traces.
+
+# ## Where to read on
+#
+# [Neper Interface](NeperInterface.html) generates a synthetic polycrystal or imports an
+# existing `.tess` file, which gives a microstructure of known construction to test an
+# analysis against. [Operations](Grains3DOperations.html) traces planar sections back to
+# their parent grains, triangulates polygonal faces and rotates a collection.
+#
+# The two-dimensional foundations are developed in [EBSD](EBSDAnalysis.html),
+# [Grains](Grains.html) and [Grain Boundaries](GrainBoundaries.html).
+
+# ## References
+#
+# * F. Bachmann, R. Hielscher, and H. Schaeben,
+#   [Grain Detection from 2d and 3d EBSD Data - Specification of the MTEX Algorithm](https://doi.org/10.1016/j.ultramic.2011.08.002),
+#   *Ultramicroscopy* 111 (2011), 1720-1733, develops the spatial cells and connectivity
+#   used to define grains from two- and three-dimensional data.
+# * S. Maddali, S. Ta'asan, R. M. Suter,
+#   [Topology-faithful nonparametric estimation and tracking of bulk interface networks](https://doi.org/10.1016/j.commatsci.2016.08.021),
+#   *Computational Materials Science* 125 (2016), 328-340, is the stratified smoothing
+#   scheme that keeps triple lines and quadruple points in place.
+# * M. A. Groeber and M. A. Jackson,
+#   [DREAM.3D: A Digital Representation Environment for the Analysis of Microstructure in 3D](https://doi.org/10.1186/2193-9772-3-5),
+#   *Integrating Materials and Manufacturing Innovation* 3 (2014), 56-72, describes the
+#   data environment and surface-mesh representation of the other importer.
+
+# ## Next
+#
+# Continue with [Volume Data and Slices](EBSD3Plotting.html), the first page of the
+# chapter, and follow the sidebar from there.
+
+# ## Technical details
+#
+# `calcGrains` alters the volume it is given, so MATLAB's `[grains, ebsd] =
+# calcGrains(ebsd, ...)` is `grains = calcGrains(ebsd, ...)`; `'quadric'` is the keyword
+# `quadric=True`. MATLAB's plain `histogram` is matplotlib's, `DisplayName` its `label`.

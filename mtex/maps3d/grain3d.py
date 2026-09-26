@@ -98,6 +98,22 @@ class grain3d:
   def mineralList(self):
     return self.CSList.mineralList
 
+  # the crystal frame of grains of one indexed phase
+  @property
+  def CS(self):
+    ids = self.indexedPhaseId
+    if len(ids) != 1:
+      raise ValueError(f"the grains have {len(ids)} indexed phases, so name one: grains['phase']")
+    return self.CSList[int(ids[0])]
+
+  # the colour of the phase of every grain, n x 3, as MATLAB's grains.color
+  @property
+  def color(self):
+    from ..maps.phaselist import colorTriplet, phaseColorNames
+    names = phaseColorNames(self.CSList.frames)
+    rgb = np.array([colorTriplet(c) if c is not None else (1.0, 1.0, 1.0) for c in names], dtype=float)
+    return rgb[self.phaseId]
+
   @property
   def meanOrientation(self):
     p = np.unique(self.phaseId)
@@ -180,6 +196,10 @@ class grain3d:
       gB.allV = c + (gB.allV - c) @ R.matrix().reshape(3, 3).T
     return self._new(np.arange(len(self)), self.I_GF, gB, q)
 
+  # MATLAB's rot * grains: the faces and the orientations turned together
+  def __rmul__(self, rot):
+    return self.rotate(rot) if isinstance(rot, rotation) else NotImplemented
+
   # the faces of polygonal grains as triangles, the fan from the first corner of every face
   def triangulate(self):
     gB = self.boundary
@@ -244,6 +264,12 @@ class grain3d:
     return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
 
   # the largest distance between two vertices of every grain, on MATLAB's rounding to 1e-4
+  # the centre of the box of the vertices, as MATLAB's midPoint
+  @property
+  def midPoint(self):
+    V = self.boundary.V.data.reshape(-1, 3)
+    return vector3d((V.min(axis=0) + V.max(axis=0)) / 2, frame=self.frame)
+
   @property
   def diameter(self):
     from scipy.spatial import ConvexHull
@@ -341,8 +367,12 @@ class grain3d:
   def __repr__(self):
     from ..maps.phaselist import phaseTable
     ids, counts = np.unique(self.phaseId, return_counts=True)
-    lines = [f"grain3d ({self.frame.char()})", phaseTable(self.CSList.frames, ids, [str(c) for c in counts])]
+    vol = self.volume
+    cells = [f"{c} (volume {vol[self.phaseId == p].sum():.6g})" for p, c in zip(ids, counts)]
+    lines = [f"grain3d ({self.frame.char()})", phaseTable(self.CSList.frames, ids, cells, "Grains")]
     lines.append(f"  boundary faces: {len(self.boundary)}")
+    if self.prop:
+      lines.append("  properties: " + ", ".join(sorted(self.prop)))
     return "\n".join(lines)
 
 

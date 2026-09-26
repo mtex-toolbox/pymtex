@@ -93,14 +93,29 @@ class grain3Boundary:
     np.add.at(out, face, x)
     return out
 
+  # faces by position or mask, or by the phases on their sides: 'indexed' the faces between
+  # two indexed grains, a mineral the faces with it on one side, two minerals those between them
   def __getitem__(self, sel):
+    if isinstance(sel, str) or (isinstance(sel, tuple) and sel and isinstance(sel[0], str)):
+      return self[self.hasPhase(*((sel,) if isinstance(sel, str) else sel))]
     rows = np.arange(len(self))[sel]
     rows = np.atleast_1d(rows)
     counts = self.numCorners[rows]
-    ptr = np.concatenate([[0], np.cumsum(counts)])
-    idx = self._idx[np.concatenate([np.arange(self._ptr[r], self._ptr[r + 1]) for r in rows])] if len(rows) else np.zeros(0, dtype=np.int64)
+    ptr = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
+    idx = self._idx[np.repeat(self._ptr[rows], counts) + np.arange(ptr[-1]) - np.repeat(ptr[:-1], counts)]
     return grain3Boundary(self.allV, (ptr, idx), self.grainId[rows], self.ebsdId[rows], self.phaseId[rows],
                           self.misrotation.data.reshape(-1, 4)[rows], self.CSList, self.frame, self.scanUnit, self.id[rows])
+
+  # the faces with a phase on one side, or between two phases, by name, frame or number
+  def hasPhase(self, a, b=None):
+    if b is None and isinstance(a, str) and a.lower() in ("indexed", "notindexed") and a.lower() not in [m.lower() for m in self.CSList.mineralList]:
+      inside = np.all(self.phaseId > 0, axis=1)
+      return inside if a.lower() == "indexed" else ~inside
+    p = self.CSList.phaseId(a)
+    if b is None:
+      return np.any(self.phaseId == p, axis=1)
+    q = self.CSList.phaseId(b)
+    return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
   # the two sides exchanged, of all faces or a selection, as MATLAB's flip
   def flip(self, sel=None):
@@ -136,10 +151,12 @@ class grain3Boundary:
     T, face = self._fan()
     return self._sumByFace(np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]), face)
 
+  # the unit normal of every face, NaN for a face of no area
   @property
   def N(self):
     c = self._vectorArea()
-    return vector3d(c / np.linalg.norm(c, axis=1, keepdims=True), frame=self.frame)
+    with np.errstate(invalid="ignore", divide="ignore"):
+      return vector3d(c / np.linalg.norm(c, axis=1, keepdims=True), frame=self.frame)
 
   @property
   def area(self):
@@ -191,6 +208,11 @@ class grain3Boundary:
 
   # ------------------------------------------------------------------ the sides
 
+  # whether the grain on either side is indexed, (m, 2); the outside is not
+  @property
+  def isIndexed(self):
+    return self.phaseId > 0
+
   @property
   def misorientation(self):
     p1, p2 = self.phaseId[:, 0], self.phaseId[:, 1]
@@ -205,11 +227,6 @@ class grain3Boundary:
     return orientation(rotation._fromData(q), self.CSList[a], self.CSList[b], antipodal=a == b)
 
   # whether a face touches a phase, or lies between two
-  def hasPhase(self, p, q=None):
-    if q is None:
-      return np.any(self.phaseId == p, axis=1)
-    return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
-
   # whether a face touches a grain, or lies between two
   def hasGrain(self, g, h=None):
     if h is None:
