@@ -25,7 +25,7 @@ from .segment import segment
 
 
 def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               backend=None):
+               mcl=None, backend=None):
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
@@ -34,7 +34,7 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   # reconstruction and not a filter on the grains that came out
   for pas in (1, 2):
     c = decompose(ebsd, alpha, backend=backend)
-    seg = segment(c, ebsd, crit, backend)
+    seg = segment(c, ebsd, crit, backend, mcl)
     if minPixel <= 1 or pas == 2:
       break
     under = undersized(seg, ebsd, minPixel)

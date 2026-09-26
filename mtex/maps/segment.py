@@ -55,13 +55,19 @@ def faceConnectivity(c, ebsd, crit):
 
 # the connected components of the faces the criterion joins, and the flags that say what
 # every face became; the grains are numbered over the measurements that have a cell, in
-# order of first appearance, so an absorbed pixel does not open a grain of its own
-def segmentFrom(c, ebsd, connect, backend=None):
+# order of first appearance, so an absorbed pixel does not open a grain of its own. With
+# mcl = (p, maxIter) the links go through Markov clustering first (MATLAB's 'mcl'): the
+# grains are the components of what it keeps, and a pair it keeps no link for is a boundary
+def segmentFrom(c, ebsd, connect, backend=None, mcl=None):
   n = ebsd.size
   p1, p2 = c.site2pixel[c.cells[:, 0]], c.site2pixel[c.cells[:, 1]]
   connect = np.asarray(connect, dtype=float)
   join = (p1 >= 0) & (p2 >= 0) & (connect > 0)
-  raw = components(n, p1[join], p2[join], backend)
+  if mcl is not None:
+    a, b, cut = _mclLinks(n, p1, p2, connect, join, mcl)
+    raw = components(n, a, b, backend)
+  else:
+    raw = components(n, p1[join], p2[join], backend)
   hasCell = np.zeros(n, dtype=bool)
   hasCell[c.site2pixel[c.site2pixel >= 0]] = True
   grainId, nGrains = relabel(raw, hasCell, backend)
@@ -69,8 +75,28 @@ def segmentFrom(c, ebsd, connect, backend=None):
   g2 = np.where(p2 >= 0, grainId[np.maximum(p2, 0)], 0)
   outside = (p1 < 0) | (p2 < 0)
   isOuter = (outside & ((p1 >= 0) | (p2 >= 0))) | (~outside & (g1 != g2))
-  isInner = ~outside & (g1 == g2) & (connect <= 0.5)
+  isInner = ~outside & (g1 == g2) & (cut if mcl is not None else connect <= 0.5)
   return segmentation(grainId, nGrains, connect, isInner, isOuter)
+
+
+# the links Markov clustering keeps of the criterion's weighted graph over the neighbour
+# pairs, each pair once from the lower to the higher measurement as MATLAB enters it, and
+# for every face whether its pair lost its link
+def _mclLinks(n, p1, p2, connect, join, mcl):
+  from scipy.sparse import coo_matrix
+  from .variantgraph import mclComponents
+  p, maxIter = (float(mcl), 4) if np.ndim(mcl) == 0 else (float(mcl[0]), mcl[1] if len(mcl) > 1 else 4)
+  lo, hi = np.minimum(p1, p2), np.maximum(p1, p2)
+  A = coo_matrix((connect[join], (lo[join], hi[join])), shape=(n, n)).tocsr()
+  A.sum_duplicates()
+  M = mclComponents(A, p, maxIter).tocoo()
+  inside = (p1 >= 0) & (p2 >= 0)
+  linked = np.zeros(len(p1), dtype=bool)
+  if inside.any():
+    Mc = M.tocsr()
+    linked[inside] = np.asarray(Mc[lo[inside], hi[inside]]).reshape(-1) != 0
+  keep = M.data != 0
+  return M.row[keep], M.col[keep], ~linked
 
 
 # the grains numbered from 1 in order of the first measurement of their component, over the
@@ -90,8 +116,8 @@ def relabel(raw, hasCell, backend=None):
   return grainId, len(first)
 
 
-def segment(c, ebsd, crit, backend=None):
-  return segmentFrom(c, ebsd, faceConnectivity(c, ebsd, crit), backend)
+def segment(c, ebsd, crit, backend=None, mcl=None):
+  return segmentFrom(c, ebsd, faceConnectivity(c, ebsd, crit), backend, mcl)
 
 
 __all__ = []

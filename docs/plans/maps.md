@@ -360,7 +360,7 @@ functions that need it, `calcGBND` and the GBND kernel.
 As in Julia: 3D (`EBSD3`, `grain3d`, `grain3Boundary`, the 3D `calcGBND`, `neper`);
 registration (`mapImage`, `trueEbsd`, `pairShifts`, the seven other spatial transforms);
 import and export (P6); plotting and colour keys (P5); `calcTensor`, `calcTraces` (P4);
-FMC and MCL segmentation; the distance-weighted Laplace kernels; generalised cross
+FMC segmentation (MCL came with M9's `mclComponents`, `calcGrains(..., mcl=)`); the distance-weighted Laplace kernels; generalised cross
 validation for the spline filter; the `maxFit` guard of `mergeInclusions`.
 
 Where the Julia port changed a MATLAB result and this port follows it: the alpha closing
