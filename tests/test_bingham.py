@@ -54,8 +54,11 @@ def test_B2_SO3FunBingham():
     assert False
   except ValueError:
     pass
+  # frames that differ only in the group share their axes and serve, as in MATLAB; a frame
+  # with other axes does not
+  assert np.isclose(fs(orientation(r, cs, specimenFrame("222"))), fs(r))
   try:
-    fs(orientation(r, cs, specimenFrame("222")))
+    fs(orientation(r, crystalFrame("-3m"), ss))
     assert False
   except ValueError:
     pass

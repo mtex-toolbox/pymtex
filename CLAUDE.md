@@ -49,6 +49,14 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   segments exactly as its list does. New code over a map's cells must do the same.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
+- `calcGrains` alters the map it is given, as the Julia port does and MATLAB's
+  `grains = calcGrains(ebsd)` does not: the grain ids, the pixels the `minPixel` cull drops and
+  the absorbed pixels stay on it. This is deliberate; reconstructions to be compared run on
+  copies (`ebsd.copy()`).
+- A function on SO(3) is evaluated at an orientation whose frames are its own or their
+  siblings differing only in the group (`stripSym`, another group on the same axes), by the
+  rotation, as MATLAB, whose compatibility check in `eval` is commented out; a frame with
+  other axes is refused (`_sameFrame` in `functions/rbf.py`).
 - `fundamentalSector` is the conventional sector, the one MATLAB and an inverse pole figure
   show, wherever `tilesSphere` confirms it is a fundamental domain of the group (every
   crystal frame); for a group turned against its axes, as the rotations two frames share,
