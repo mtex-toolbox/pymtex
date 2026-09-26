@@ -455,6 +455,10 @@ def main(argv=None):
     kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
   print(f"{len(g['nodes'])} nodes, {len(g['edges'])} edges {kinds}, {len(prof)} profiles, "
         f"{len(an)} algorithms in {time.perf_counter() - t:.1f} s", file=sys.stderr)
+  # the Obsidian vault, when there is one
+  import obsidian
+  if os.path.isdir(obsidian.VAULT):
+    obsidian.write_vault(obsidian.VAULT)
   for a in an:
     if a["missing"]:
       print(f"algorithm {a['name']}: entry points not in the graph: {a['missing']}", file=sys.stderr)
