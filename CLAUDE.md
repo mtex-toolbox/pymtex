@@ -72,7 +72,7 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 ```
 .venv/bin/python -m pytest -q            # about 70 s; the SO3Grid and CSL tests dominate
 .venv/bin/python bench/g1_layout.py      # the kernel benchmark of docs/research/benchmark-g1.md
-uv sync                                  # Python 3.14, NumPy 2, SciPy, finufft; orix, pytest and numba for tests
+uv sync                                  # Python 3.14, NumPy 2, SciPy, finufft; pytest and numba for tests
 ```
 
 The products, the searches of the symmetry reduction, the projections and the membership in a

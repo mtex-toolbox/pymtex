@@ -240,8 +240,8 @@ L = 64 in 0.35 s, 1e6 directions at L = 256 in 0.05 s) as the budget.
 
 **D7 - Relation to orix.** orix (pyxem) has `Quaternion`, `Rotation`, `Orientation`,
 `Misorientation`, `Symmetry`, `Phase`, `CrystalMap`, fundamental regions, IPF colour keys
-and readers for ang, ctf and h5ebsd. Options: (a) build on it; (b) independent, orix as a
-test oracle and a conversion adapter. Recommendation: (b). orix attaches the point group
+and readers for ang, ctf and h5ebsd. Options: (a) build on it; (b) independent, with a
+conversion adapter. Recommendation: (b). orix attaches the point group
 to the orientation, not to a frame, which is the model ADR 0008 replaces; it canonicalises
 quaternion signs; and its containers are not the function-space or frame model. The
 reasoning is the Julia ADR 0001 argument again. An optional `mtex.compat.orix` with
@@ -334,7 +334,7 @@ pushed into the kernels.
 
 Core: numpy, scipy. Transforms: finufft. IO: h5py, and the standard library for text.
 Sample data: pooch. Plotting: matplotlib; pyvista optional. Accelerator: numba or a
-nanobind/maturin extension, per E2. Oracles in the tests only: orix,
+nanobind/maturin extension, per E2. Oracles in the tests only:
 scipy.spatial.transform, quaternion (moble). Docs: Jupyter Book or Sphinx with MyST and
 sphinx-gallery; the Literate pages of MTEX.jl are the source.
 

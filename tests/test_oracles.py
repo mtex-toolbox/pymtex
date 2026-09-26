@@ -1,4 +1,4 @@
-# the Euler conventions and products against SciPy and orix, test dependencies only
+# the Euler conventions and products against SciPy
 #
 # The formulas of S9 and S10 are checked against SciPy without any MTEX class, so they
 # hold before G1; the MTEX objects are compared once they exist.
@@ -76,13 +76,3 @@ def test_axis_angle_against_scipy():
   r = mtex.rotation.byEuler(*TRIPLES.T)
   assert close(mtex.angle(r), np.linalg.norm(s.as_rotvec(), axis=-1))
 
-
-# orix reads Bunge angles as the map from specimen to crystal coordinates, so its rotation
-# is the inverse of MTEX's, which maps crystal to specimen (S19)
-def test_bunge_against_orix():
-  orix = pytest.importorskip("orix.quaternion")
-  need("rotation")
-  o = orix.Rotation.from_euler(TRIPLES, degrees=False)
-  r = mtex.rotation.byEuler(*TRIPLES.T)
-  assert same_rotation(r.data, (~o).data)
-  assert not same_rotation(r.data, o.data)
