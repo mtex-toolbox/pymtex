@@ -33,7 +33,7 @@ def test_window_offscreen(tmp_path):
   pump(app, lambda: st.status[0] in ("loaded", "failed"))
   assert st.status[0] == "loaded", st.status
   assert w.tabs.count() == len(st.tabs) and w.tabs.currentIndex() == st.tab and st.currentTab == "IPF Z"
-  assert w.phases.rowCount() == 5 and w.browser.info.rowCount() > 5
+  assert w.phases.rowCount() == 5 and len(w.browser.info.fileRows()) >= 3
   assert w.browser.status.text().startswith("Forsterite_cut.ctf")
   for k in range(len(st.tabs)):
     cb.pickTab(st, k)

@@ -50,6 +50,8 @@ class WizardState:
     self.tab = 0
     self.millers = ["100", "010", "001"]
     self.densities = {}
+    # the phase whose inverse pole figure key the key panel shows
+    self.keyPhase = None
     self.metaRows = []
     self.metaOpen = set()
     self.images = []

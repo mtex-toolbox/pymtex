@@ -331,3 +331,19 @@ def test_an_image_is_drawn_on_the_specimen():
   plt.close("all")
   e = plot(mg, edge=True)
   assert e.get_array().shape == (3, 4)
+
+
+# the key of a group without the inversion whose sector reaches into both hemispheres takes
+# two insets in the legend, the upper over the lower; a Laue group's one
+def test_the_key_legend_draws_both_hemispheres():
+  from mtex.plotting.mapplot import keyLegend
+  pl = phaseList(crystalFrame("mm2", mineral="polar"), crystalFrame("m-3m", mineral="cubic"))
+  i, j = np.meshgrid(np.arange(10), np.arange(10))
+  pos = np.column_stack([i.ravel(), j.ravel(), np.zeros(100)])
+  e = EBSD(pos, rotation.rand(100), np.where(i.ravel() < 5, 1, 2).astype(np.int8), pl)
+  plot(e, "orientation")
+  axes = keyLegend(plt.gcf().axes[0]._mtexMapPlot, e)
+  assert len(axes) == 3 and axes[0].get_title() == "polar" and axes[2].get_title() == "cubic"
+  upper, lower = axes[0]._mtexSphericalPlot, axes[1]._mtexSphericalPlot
+  assert upper.proj.upper and not lower.proj.upper
+  assert axes[0].get_position().y0 > axes[1].get_position().y1

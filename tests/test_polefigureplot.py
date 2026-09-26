@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from mtex import (Miller, PoleFigure, calcODF, crystalFrame, degree, discreteSample, gcm, loadPoleFigure, orientation, plot,
                   plotDiff, plotIPDF, plotPDF, rotation, specimenFrame, unimodalODF, vector3d, xvector, zvector)
+from mtex.plotting.sphericalplot import plotText
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "polefigure")
 QUARTZ = crystalFrame("321", [4.916, 4.916, 5.4054], mineral="Quartz")
@@ -85,7 +86,7 @@ def test_a_measured_pole_figure():
   pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
   h = plot(pf)
   fig = gcm()
-  assert len(fig.children) == 1 and fig.children[0].get_title() == pf.allH[0][0].char()
+  assert len(fig.children) == 1 and fig.children[0].get_title() == plotText(pf.allH[0][0].char()) == "{10$\\bar{1}$0}"
   # the markers carry the intensities, and their size follows how many there are
   assert len(h[0].get_offsets()) == pf.allI[0].size and np.isclose(h[0].get_array().max(), pf.allI[0].max())
   assert h[0].get_sizes()[0] < 100

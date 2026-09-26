@@ -254,7 +254,7 @@ def refresh(fig=None, ax=None):
     w, h = fig.fig.get_size_inches() / np.array([fig.ncols, fig.nrows])
     n = int((fig.sceneWidth if single else max(w, h)) * fig.fig.dpi * 1.5)
     img = _crop(renderImage(s, (n, n)))
-    if single:
+    if single and not fig.fixedSize:
       fig.fig.set_size_inches(fig.sceneWidth, fig.sceneWidth * img.shape[0] / img.shape[1])
     ax.imshow(img, interpolation="antialiased")
     ax.set_axis_off()

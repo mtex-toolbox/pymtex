@@ -28,3 +28,18 @@ def test_binned_density_peaks_where_the_full_one_does():
   # a short list is estimated as it is
   small = binnedDensity(o[:100])
   assert type(small).__name__ == "SO3FunHarmonic"
+
+
+# the preview density of a phase from at most so many measurements, the same draw every time,
+# and still peaking where the density of all of them does
+def test_the_preview_density_subsamples():
+  from mtex.wizard.binning import previewDensity
+  ebsd = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"))
+  k = next(i for i, f in enumerate(ebsd.CSList.frames) if f.name == "Forsterite")
+  n = int(np.sum((ebsd.phaseId.reshape(-1) == k) & ebsd.isIndexed.reshape(-1)))
+  full, sub = previewDensity(ebsd, k), previewDensity(ebsd, k, maxPoints=n // 3)
+  again = previewDensity(ebsd, k, maxPoints=n // 3)
+  h = Miller(1, 0, 0, ebsd.CSList.frames[k])
+  p1, p2, p3 = (calcPDF(f, h, None) for f in (full, sub, again))
+  assert abs(float(p2.max()[0]) - float(p1.max()[0])) < 0.25 * float(p1.max()[0])
+  assert float(p2.max()[0]) == float(p3.max()[0])

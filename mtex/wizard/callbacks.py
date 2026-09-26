@@ -65,6 +65,37 @@ def toggleFolder(st, i):
   st.changed("entries")
 
 
+# what the file says that the window shows nowhere else: the name is the list's and the status
+# band's, the size the list's, the points the band's, the phases the table's, the properties
+# the tabs', the data sets their list's; the vendor names the format, which is the extension
+INFO_SHOWN_ELSEWHERE = ("file", "format", "size", "points", "phases", "properties", "data sets")
+
+
+def infoRows(st):
+  if st.info is None:
+    return []
+  rows = [(k, v) for k, v in st.info.describe() if k not in INFO_SHOWN_ELSEWHERE]
+  return [(k, v or st.info.format) if k == "vendor" else (k, v) for k, v in rows]
+
+
+# the row of the folder an entry was unfolded from, None for one at the top
+def parentRow(st, i):
+  depth = st.entries[i].depth
+  return next((j for j in range(i - 1, -1, -1) if st.entries[j].depth < depth), None)
+
+
+# the row a letter typed goes to: the first entry whose name starts with it, or the next one
+# after the current row when that starts with it already, round to the top; None for none
+def letterRow(st, current, letter):
+  letter = letter.lower()
+  hits = [j for j, r in enumerate(st.entries) if r.name.lower().startswith(letter)]
+  if not hits:
+    return None
+  if current is not None and 0 <= current < len(st.entries) and st.entries[current].name.lower().startswith(letter):
+    return next((j for j in hits if j > current), hits[0])
+  return hits[0]
+
+
 # the crumbs of the path, the root first, each with the folder it reaches
 def breadcrumbs(st):
   parts = st.folder.split(os.sep)
@@ -195,8 +226,11 @@ def commitMap(st, ebsd, seconds):
   st.metaOpen = {i for i, (depth, _, _, branch, _) in enumerate(st.metaRows) if branch and depth == 0 and childCount(st.metaRows, i) <= 40}
   st.image = 0
   st.imageCache = {}
+  st.keyPhase = dominantPhase(st)
+  if st.keyPhase is None:
+    st.keyPhase = next((k for k, f in enumerate(ebsd.CSList.frames) if f.isIndexed), None)
   st.status = ("loaded", f"{os.path.basename(st.selected)}: {ebsd.size} points in {seconds:.2f} s")
-  st.changed("ebsd", "phases", "eulerConvention", "tabs", "tab", "meta", "images", "status")
+  st.changed("ebsd", "phases", "eulerConvention", "tabs", "tab", "meta", "images", "keyPhase", "status")
 
 
 def _loadedPath(st):
@@ -215,7 +249,7 @@ def setDataSet(st, k, worker=None):
 # ------------------------------------------------------------------ the views
 
 # the views a map has: the map always, IPF and pole figures once something is indexed, one
-# tab per property, the images where the file brought some, the metadata
+# tab per property, the images where the file brought some
 def viewsOf(ebsd, images=None):
   indexed = any(f.isIndexed for f in ebsd.CSList.frames) and bool(np.any(ebsd.isIndexed))
   tabs = [("phase", "phase")]
@@ -226,7 +260,6 @@ def viewsOf(ebsd, images=None):
     tabs.append(("pole figures", "polefigures"))
   if imagesOf(ebsd) if images is None else images:
     tabs.append(("images", "images"))
-  tabs.append(("metadata", "metadata"))
   return [t for t, _ in tabs], [k for _, k in tabs]
 
 
@@ -467,6 +500,14 @@ def dominantPhase(st):
   frames = st.ebsd.CSList.frames if st.ebsd is not None else []
   ids = [k for k, on in st.drawn.items() if on and k in counts and k < len(frames) and frames[k].isIndexed]
   return max(ids, key=lambda k: counts[k]) if ids else None
+
+
+# the phase whose key the key panel shows, an indexed one
+def pickKeyPhase(st, phaseId):
+  frames = st.ebsd.CSList.frames if st.ebsd is not None else []
+  if 0 <= phaseId < len(frames) and frames[phaseId].isIndexed and phaseId != st.keyPhase:
+    st.keyPhase = phaseId
+    st.changed("keyPhase")
 
 
 # a cell edited: the row's frame rebuilt with the lattice snapped to what the group forces.

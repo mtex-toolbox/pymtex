@@ -77,3 +77,19 @@ def _click(table, row, column=0):
   for kind in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
     QApplication.instance().sendEvent(table.viewport(), QMouseEvent(kind, r.center(), table.viewport().mapToGlobal(r.center()),
                                                                     Qt.LeftButton, Qt.LeftButton, Qt.NoModifier))
+
+
+def test_a_lattice_parameter_left_undefined_is_shown_as_it_is():
+  from mtex.wizard.phases import _fmt
+  assert _fmt(float("nan")) == "nan" and _fmt(4.756) == "4.756" and _fmt(90.0) == "90"
+
+
+# a click on a row shows its phase's key, whose name then stands out; the row never indexed has none
+def test_a_click_picks_the_key(loaded):
+  st = loaded
+  table = PhaseTable(st, QFont())
+  assert table.item(1, 2).font().bold() and st.keyPhase == 1
+  table.onClick(2, 3)
+  assert st.keyPhase == 2 and table.item(2, 2).font().bold() and not table.item(1, 2).font().bold()
+  table.onClick(0, 3)
+  assert st.keyPhase == 2

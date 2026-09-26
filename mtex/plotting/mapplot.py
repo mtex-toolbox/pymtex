@@ -171,7 +171,7 @@ def _target(x, mapKw):
     return mapPlot(fig.takeAxis(), x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
   # a fresh figure of one panel takes the shape of the map at the size it was asked for
   if fig is not None and not fig.children and not fig.hold:
-    if fig.nrows * fig.ncols == 1:
+    if fig.nrows * fig.ncols == 1 and not fig.fixedSize:
       fig.fig.set_size_inches(*_mapFigSize(x, mapKw, getattr(fig, "figSize", None)))
     return mapPlot(fig.nextAxis(), x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
   fig = mtexFigure(1, figSize=_mapFigSize(x, mapKw, mapKw.get("figSize")))
@@ -942,6 +942,7 @@ def keyResolution(px):
 
 def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
   from .directionkeys import HSVDirectionKey
+  from .spherical import makeSphericalProjection
   from .sphericalplot import plotKey
   pl = x.CSList
   present = set(np.asarray(x.phaseId).reshape(-1).tolist())
@@ -953,11 +954,21 @@ def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
   fig = mP.ax.figure
   mesh = resolution if resolution is not None else keyResolution(fig.get_figwidth() * fig.dpi * mP.ax.get_position().width * width)
   for row, i in enumerate(ids):
-    inset = mP.ax.inset_axes([1.08, 1 - (row + 0.9) * step, width, 0.7 * step])
     key = HSVDirectionKey(pl[i])
-    plotKey(key, resolution=mesh, parent=inset, how2plot=pl[i].how2plot, fontSize=fontSize)
-    inset.set_title(pl[i].mineral or pl[i].name, fontsize=fontSize + 1)
-    axes.append(inset)
+    # a sector reaching into both hemispheres, of a group without the inversion, takes two
+    # insets in its row, the upper hemisphere over the lower
+    n = len(makeSphericalProjection(key.keySector, how2plot=pl[i].how2plot))
+    # the two keep a gap for the labels that stand below the upper and above the lower
+    h, gap = (0.7 * step, 0.0) if n == 1 else (0.3 * step, 0.2 * step)
+    for j in range(n):
+      inset = mP.ax.inset_axes([1.08, 1 - (row + 0.9) * step - (n - 1) * 0.05 * step + (n - 1 - j) * (h + gap), width, h])
+      side = {} if n == 1 else {"upper": True} if j == 0 else {"lower": True}
+      plotKey(key, resolution=mesh, parent=inset, how2plot=pl[i].how2plot, fontSize=fontSize, **side)
+      if n == 2:
+        inset._mtexSphericalPlot.hemisphereLabel()
+      if j == 0:
+        inset.set_title(pl[i].mineral or pl[i].name, fontsize=fontSize + 1)
+      axes.append(inset)
   return axes
 
 

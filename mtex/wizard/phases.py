@@ -122,7 +122,7 @@ class PhaseTable(QTableWidget):
     self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     self.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
     self.setFixedWidth(sum(WIDTHS) + self.verticalScrollBar().sizeHint().width() + 4)
-    for name in ("ebsd", "phases", "drawn"):
+    for name in ("ebsd", "phases", "drawn", "keyPhase"):
       st.on(name, self.refresh)
     self.refresh()
 
@@ -164,7 +164,13 @@ class PhaseTable(QTableWidget):
         phase.setForeground(QColor("black") if 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 140 else QColor("white"))
         phase.setToolTip("click to choose the colour")
       self.setItem(i, 1, phase)
-      self.setItem(i, 2, self._cell(f.name))
+      # the phase whose key the panel shows stands out by its name
+      name = self._cell(f.name)
+      if k == self.st.keyPhase:
+        font = name.font()
+        font.setBold(True)
+        name.setFont(font)
+      self.setItem(i, 2, name)
       self.setItem(i, 3, self._fixed(str(count), right=True))
       self.setItem(i, 4, self._fixed(f"{100 * count / total:.1f}", right=True))
       if f.isIndexed:
@@ -228,14 +234,17 @@ class PhaseTable(QTableWidget):
       self.st.changed("status")
       self.refresh()
 
-  # a click opens the cell's editor; the phase cell is the swatch, the id and the target for the colour dialog in one
+  # a click on a row shows the key of its phase; it also opens the cell's editor, and the phase
+  # cell is the swatch, the id and the target for the colour dialog in one
   def onClick(self, i, j):
+    rows = self.rows()
+    if 0 <= i < len(rows):
+      cb.pickKeyPhase(self.st, rows[i][0])
     if j != 1:
       item = self.item(i, j)
       if item is not None and item.flags() & Qt.ItemIsEditable:
         self.editItem(item)
       return
-    rows = self.rows()
     if not 0 <= i < len(rows):
       return
     from PySide6.QtWidgets import QColorDialog
@@ -247,8 +256,12 @@ class PhaseTable(QTableWidget):
       cb.editPhase(self.st, k, "color", (c.redF(), c.greenF(), c.blueF()))
 
 
+# a lattice parameter as few digits as it needs; one a file left undefined as it is
 def _fmt(v):
-  return f"{float(v):.4g}" if abs(v - round(v)) > 1e-9 else str(int(round(v)))
+  v = float(v)
+  if not np.isfinite(v):
+    return str(v)
+  return f"{v:.4g}" if abs(v - round(v)) > 1e-9 else str(int(round(v)))
 
 
 # a colour name or triple as 0 to 255

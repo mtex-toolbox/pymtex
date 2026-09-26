@@ -8,11 +8,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import matplotlib
 
 matplotlib.use("QtAgg")
-from PySide6.QtGui import QFont
 
 from mtex.wizard import callbacks as cb
 from mtex.wizard.state import WizardState
-from mtex.wizard.views import MetaTree, MillerBar, ViewCanvas, millerOf
+from mtex.wizard.pictogram import SIDE
+from mtex.wizard.views import KeyPanel, MillerBar, ViewCanvas, millerOf
 from mtex.wizard.window import application
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -57,33 +57,30 @@ def test_miller_bar_and_metadata(loaded):
   assert st.millers[0] == "110"
   h = millerOf("1-10", st.ebsd.CSList.frames[1])
   assert np.allclose(h.hkl, [1, -1, 0]) if hasattr(h, "hkl") else True
-  tree = MetaTree(st, QFont())
-  assert tree.topLevelItemCount() >= 1 and tree.topLevelItem(0).text(0) == "header"
 
 
-# the keys stand beside a map that leaves room for them and over one that does not
-def test_key_placement(loaded):
+# the key panel shows one phase's key at a fixed size, at first the phase with the most pixels,
+# then the one picked; the map carries no keys of its own
+def test_the_key_panel(loaded):
   st = loaded
+  panel = KeyPanel(st)
+  frames = st.ebsd.CSList.frames
+  assert st.keyPhase == cb.dominantPhase(st) and frames[st.keyPhase].name in panel.title.text()
+  assert panel.picture.size().width() == panel.side and not panel.picture.pixmap().isNull()
+  assert panel.picture.pixmap().width() <= panel.side * panel.devicePixelRatioF() + 1
+  # as tall as the two pictograms, less its frame, so the top row keeps their height
+  assert panel.height() == 2 * SIDE + 3 - 4
+  other = next(k for k, f in enumerate(frames) if f.isIndexed and k != st.keyPhase)
+  cb.pickKeyPhase(st, other)
+  assert st.keyPhase == other and frames[other].name in panel.title.text()
+  # the phase never indexed has no key, and picking it changes nothing
+  cb.pickKeyPhase(st, 0)
+  assert st.keyPhase == other
   canvas = ViewCanvas(st)
   cb.pickTab(st, st.tabs.index("IPF Z"))
-  canvas.figure.set_size_inches(12, 6)
   canvas.draw_view()
   canvas.draw()
-  # the keys are built after the map is on screen and not before it
-  assert canvas.keyAxes == [] and canvas.keyPending
-  # one key a turn, so that building them does not hold the window
-  for _ in range(4):
-    application().processEvents()
-  assert len(canvas.keyAxes) == 3 and len(canvas.keyGrounds) == 3 and not canvas.keyPending
-  # this map is wider than the canvas, so it is drawn to the whole width and the keys lie over it
-  assert canvas.ax.get_position().width > 0.9
-  assert all(ax.get_axes_locator().bounds[0] < 1 for ax in canvas.keyAxes)
-  # a map narrower than the canvas leaves room beside it, and the keys take it
-  canvas.ax.set_xlim(0, 100)
-  canvas.ax.set_ylim(0, 100)
-  canvas.placeKeys()
-  assert not canvas.keyGrounds
-  assert all(ax.get_axes_locator().bounds[0] > 1 for ax in canvas.keyAxes)
+  assert len(canvas.figure.axes) == 1
 
 
 # a colour bar is made for a property and taken away again, however many properties are
@@ -109,3 +106,57 @@ def test_colorbar_comes_and_goes(loaded):
   canvas.draw_view()
   canvas.draw()
   assert canvas.colorbar is not None
+
+
+# the figure of the canvas keeps the widget's size: a map drawn into it does not take its own
+# shape, which left the rest of the widget unpainted
+def test_the_map_keeps_the_canvas_size(loaded):
+  st = loaded
+  canvas = ViewCanvas(st)
+  canvas.resize(900, 700)
+  canvas.draw()
+  before = tuple(canvas.figure.get_size_inches())
+  for name in ("phase", "IPF Z", "pole figures"):
+    cb.pickTab(st, st.tabs.index(name))
+    canvas.draw_view()
+    canvas.draw()
+    assert tuple(canvas.figure.get_size_inches()) == before, name
+
+
+# a key whose sector reaches into both hemispheres is drawn as both, a Laue group's as one
+def test_a_key_of_both_hemispheres(monkeypatch):
+  import mtex.wizard.views as views
+  from mtex import crystalFrame
+  drawn = []
+  real = views._hemispherePicture
+  monkeypatch.setattr(views, "_hemispherePicture", lambda key, cs, px, side, **kw: drawn.append(dict(side)) or real(key, cs, px, side, **kw))
+  views.keyPicture(crystalFrame("mm2"), px=120)
+  assert drawn == [{"upper": True}, {"lower": True}]
+  drawn.clear()
+  views.keyPicture(crystalFrame("mmm"), px=120)
+  assert drawn == [{}]
+  # the two stand over one another where that leaves them larger, as for these flat sectors
+  pic = views.keyPicture(crystalFrame("6"), px=120)
+  assert pic.shape[0] > pic.shape[1]
+
+
+# the pole figures are drawn ahead once the density is there, and the tab shows that picture
+# pixel for pixel; a direction changed draws them anew
+def test_the_pole_figures_are_drawn_ahead(loaded):
+  st = loaded
+  canvas = ViewCanvas(st)
+  canvas.resize(900, 600)
+  cb.pickTab(st, st.tabs.index("IPF Z"))
+  canvas.draw_view()
+  k = cb.dominantPhase(st)
+  canvas.density(k)
+  canvas.drawAhead()
+  key, picture = canvas.pfPicture
+  w, h = canvas.figure.get_size_inches() * canvas.figure.dpi
+  assert key == canvas.poleFigureKey() and picture.shape[:2] == (round(h), round(w))
+  cb.pickTab(st, st.tabs.index("pole figures"))
+  canvas.draw_view()
+  assert canvas.pfPicture[1] is picture and len(canvas.figure.images) == 1 and not canvas.figure.axes
+  cb.setMiller(st, 0, "110")
+  canvas.draw_view()
+  assert canvas.pfPicture[0] != key and canvas.pfPicture[0][2][0] == "110"

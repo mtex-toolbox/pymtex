@@ -31,7 +31,12 @@ def test_browser_side():
   k = [r.name for r in st.entries].index("Forsterite_cut.ctf")
   files.onClick(files.model_.index(k, 0))
   assert st.status[0] == "loaded" and STATUS_COLORS["loaded"] in side.status.styleSheet()
-  assert side.info.rowCount() > 5 and side.info.item(0, 1).text() == "Forsterite_cut.ctf"
+  # the file's own rows the window shows nowhere else, at the top, the metadata of the map after them
+  rows = dict(side.info.fileRows())
+  assert rows["vendor"] == "Oxford" and "grid" in rows and "extent" in rows
+  assert not {"file", "format", "size", "points", "phases", "properties", "data sets"} & set(rows)
+  tops = [side.info.topLevelItem(k).text(0) for k in range(side.info.topLevelItemCount())]
+  assert tops[:len(rows)] == list(rows) and tops[len(rows)] == "header"
   assert not side.dataSetPanel.isVisibleTo(side)
   # the arrow keys describe the current row without reading it
   k = [r.name for r in st.entries].index("olivine_cut.ang")
@@ -107,3 +112,64 @@ def test_return_opens(tmp_path):
   files.setCurrentIndex(files.model_.index(k, 0))
   files.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier))
   assert st.status[0] == "loaded"
+
+
+# a double click walks into a folder, though its first click has unfolded it and so reset the
+# list; a single click still only unfolds, and an open folder folded by the first click is walked into too
+def test_double_click_walks_into_a_folder():
+  from PySide6.QtTest import QTest
+  app = application()
+  st = WizardState(FIXTURES)
+  cb.setFolder(st, FIXTURES)
+  side = BrowserSide(st, QFont())
+  files = side.files
+  files.resize(300, 600)
+  files.show()
+  app.processEvents()
+  k = next(i for i, r in enumerate(st.entries) if r.isDir)
+  name = st.entries[k].name
+  center = lambda: files.visualRect(files.model_.index(k, 0)).center()
+  QTest.mouseClick(files.viewport(), Qt.LeftButton, Qt.NoModifier, center())
+  assert st.entries[k].open and st.folder == os.path.abspath(FIXTURES)
+  QTest.mouseDClick(files.viewport(), Qt.LeftButton, Qt.NoModifier, center())
+  app.processEvents()
+  assert st.folder == os.path.join(os.path.abspath(FIXTURES), name)
+  # the release that ends it acts on nothing of the new folder
+  QTest.mouseRelease(files.viewport(), Qt.LeftButton, Qt.NoModifier, center())
+  assert not files.swallowRelease and not any(r.open for r in st.entries)
+
+
+# the keys: Right unfolds a folder and steps into it, Left steps out and folds it, a letter goes
+# to the first entry starting with it and again to the next, Backspace walks up onto the folder
+def test_keyboard_navigation():
+  from PySide6.QtTest import QTest
+  app = application()
+  st = WizardState(FIXTURES)
+  cb.setFolder(st, os.path.join(FIXTURES, "h5"))
+  side = BrowserSide(st, QFont())
+  files = side.files
+  files.show()
+  app.processEvents()
+  # up to the fixtures, onto the folder the list came out of
+  QTest.keyClick(files, Qt.Key_Backspace)
+  k = files.currentIndex().row()
+  assert st.folder == os.path.abspath(FIXTURES) and st.entries[k].name == "h5" and st.entries[k].isDir
+  QTest.keyClick(files, Qt.Key_Right)
+  assert st.entries[k].open and files.currentIndex().row() == k
+  QTest.keyClick(files, Qt.Key_Right)
+  assert files.currentIndex().row() == k + 1 and st.entries[k + 1].depth == 1
+  QTest.keyClick(files, Qt.Key_Left)
+  assert files.currentIndex().row() == k and st.entries[k].open
+  QTest.keyClick(files, Qt.Key_Left)
+  assert not st.entries[k].open and files.currentIndex().row() == k
+  # a letter: the first name starting with it, the same letter again the next
+  QTest.keyClick(files, "f")
+  first = files.currentIndex().row()
+  assert st.entries[first].name.lower().startswith("f") and st.selected == st.entries[first].path
+  QTest.keyClick(files, "F")
+  second = files.currentIndex().row()
+  assert second > first and st.entries[second].name.lower().startswith("f")
+  QTest.keyClick(files, "f")
+  assert files.currentIndex().row() == first
+  QTest.keyClick(files, "o")
+  assert st.entries[files.currentIndex().row()].name.startswith("olivine")

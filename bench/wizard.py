@@ -38,7 +38,7 @@ if __name__ == "__main__":
   w = runWizard(dataDir, exec=False)
   st = w.st
   app.processEvents()
-  print("window", w.size().width(), "x", w.size().height(), "browser", w.browser.width(), "table", w.phases.width(), "meta", w.meta.width())
+  print("window", w.size().width(), "x", w.size().height(), "browser", w.browser.width(), "table", w.phases.width(), "key", w.key.width())
   cb.openEntry(st, os.path.join(dataDir, "Forsterite.ctf"), w.worker)
   seconds = pump(app, lambda: st.status[0] in ("loaded", "failed"))
   print(st.status, f"window live for {seconds:.2f} s")

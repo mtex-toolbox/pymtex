@@ -10,6 +10,8 @@
 # is kept on the axes so that a second plot into it reuses them.
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 from ..geometry.frames import crystalFrame
@@ -31,6 +33,19 @@ WHERE_KEYS = ("parent", "add2all", "figSize", "layout", "marginx", "marginy")
 MARKER_COLOR = (0.0, 0.447, 0.741)
 BOUNDARY_COLOR = (0.35, 0.35, 0.35)
 GRID_COLOR = (0.8, 0.8, 0.8)
+
+
+# a negative index as Miller.char writes it, the digit followed by a combining overline, set
+# as mathtext's bar, which matplotlib places over the digit; the combining character it
+# leaves beside it. A run of them is one formula, and a text that is mathtext already stays.
+_BARRED = re.compile("((?:.\u0305)+)")
+
+
+def plotText(s):
+  s = str(s)
+  if "\u0305" not in s or "$" in s:
+    return s
+  return _BARRED.sub(lambda m: "$" + "".join(r"\bar{%s}" % c for c in m.group(0)[::2]) + "$", s)
 
 
 class sphericalPlot:
@@ -70,7 +85,7 @@ class sphericalPlot:
     if not noLabel:
       self._drawLabels(outside)
     if title is not None:
-      ax.set_title(title, fontsize=self.fontSize)
+      ax.set_title(plotText(title), fontsize=self.fontSize)
 
   # a crystal sector hangs its labels outside the corners, away from the centre; any other
   # chart writes its axes names on the rim in a white box
@@ -85,10 +100,10 @@ class sphericalPlot:
         dx, dy = (dx / r, dy / r) if r > 1e-6 else (0.0, 0.0)
         ha = "left" if dx > 0.3 else "right" if dx < -0.3 else "center"
         va = "bottom" if dy > 0.3 else "top" if dy < -0.3 else "center"
-        self.labels.append(self.ax.annotate(name, (x, y), xytext=(8 * dx, 8 * dy), textcoords="offset points",
+        self.labels.append(self.ax.annotate(plotText(name), (x, y), xytext=(8 * dx, 8 * dy), textcoords="offset points",
                                             ha=ha, va=va, fontsize=self.fontSize, zorder=8))
       else:
-        self.labels.append(self.ax.text(x, y, name, ha="center", va="center", fontsize=self.fontSize, zorder=8,
+        self.labels.append(self.ax.text(x, y, plotText(name), ha="center", va="center", fontsize=self.fontSize, zorder=8,
                                         bbox=dict(boxstyle="square,pad=0.15", facecolor="white", edgecolor="none")))
 
   @property
@@ -331,12 +346,14 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
   if label is not None:
     texts = [label] * len(x) if isinstance(label, str) else [str(t) for t in np.asarray(label, dtype=object).ravel()]
     # MATLAB's tex interpreter: v_1 and x^2 are set as sub- and superscripts
-    texts = [f"${t}$" if ("_" in t or "^" in t) and "$" not in t and " " not in t else t for t in texts]
+    texts = [f"${t}$" if ("_" in t or "^" in t) and "$" not in t and " " not in t else plotText(t) for t in texts]
     bbox = None if background is None else dict(facecolor=background, edgecolor="none", pad=1)
+    # text alone, on markers of size zero, stands on its point rather than below it
+    alone = np.ndim(size) == 0 and float(size) == 0
     for i in np.flatnonzero(keep):
-      ax.annotate(texts[i], (x[i], y[i]), xytext=(0, size / 2 + 1 if above else -size / 2 - 1), textcoords="offset points", ha="center",
-                  va="bottom" if above else "top", fontsize=sP.fontSize - 2 if labelFontSize is None else labelFontSize, zorder=8, bbox=bbox,
-                  color=textColor or "k")
+      ax.annotate(texts[i], (x[i], y[i]), xytext=(0, 0 if alone else size / 2 + 1 if above else -size / 2 - 1), textcoords="offset points",
+                  ha="center", va="center" if alone else "bottom" if above else "top",
+                  fontsize=sP.fontSize - 2 if labelFontSize is None else labelFontSize, zorder=8, bbox=bbox, color=textColor or "k")
   return h
 
 

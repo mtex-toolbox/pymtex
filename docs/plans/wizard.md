@@ -97,10 +97,14 @@ with the rest behind a leading ellipsis that lists them, each a target and each 
 loading, green with the time when loaded, red with the message when failed; the tree of the
 folder, folders first, a folder unfolding where it stands on a click and walked into on a
 double click, the vendor extensions as the filter, the arrow keys moving the current row
-with the description following and Return opening; the data set list, shown only when the
-file holds more than one map, picking one being the import; the file information as the
-two column table of name and value, with the vendor, the date, the size, the grid, the step,
-the extent, the phases, the properties; the exports, a name field with *to variable*,
+with the description following and Return opening, Right unfolding a folder where it stands
+and stepping into it, Left stepping out and folding it, Backspace walking up onto the folder
+left, a letter going to the first entry starting with it and again to the next; the data set list, shown only when the
+file holds more than one map, picking one being the import; the file information and the
+metadata of the map as one tree of name and value, the file's own rows at its top - the
+vendor, the date, the grid with its step, the extent, the Euler correction, what the window
+shows nowhere else (`infoRows`: the name, size, points, phases, properties and data sets are
+the list's, the band's, the table's and the tabs') - the header of the loaded map after them; the exports, a name field with *to variable*,
 *write script* and *copy load call*.
 
 No panel carries a heading, at the project owner's asking on 2026-09-22: what a panel
@@ -115,9 +119,10 @@ for and offering the eight as pictures when clicked; the phase table beside them
 the phase cell filled with its colour and printed with its id, mineral, pixels, per cent,
 symmetry as a dropdown over the point groups, `a b c α β γ` each under its own heading with
 the cells the lattice forces greyed background and all, and the alignment as a dropdown over
-the twelve setups; the metadata tree taking the slack of the row; and under them the tab
+the twelve setups; at the right end of the row the inverse pole figure key of one phase, at a
+fixed size, the phase picked by a click on its row of the table and named in bold there; and under them the tab
 strip over one canvas: *phase*, *IPF X*, *IPF Y*, *IPF Z*, one tab per property, *pole
-figures*, *images* where the file brought one, *metadata*, coloured by category, a strip of
+figures*, *images* where the file brought one, coloured by category, a strip of
 one tab hidden. A property map carries a colour bar; the pole figures carry editable Miller
 labels and the Euler frame's axes in red; the window opens on *IPF Z* when anything is
 indexed. Every panel in a `#c8c8c8` frame, the numeric columns right aligned, two font sizes.
@@ -248,7 +253,8 @@ from the binned density through the package's `plotPDF` with the Euler frame's a
 marks, the three crystal directions as fields over the canvas (`MillerBar`) shown on that
 tab alone, the images the metadata holds, the metadata as `MetaTree` with the top level
 open. The strip: phase, IPF X, IPF Y, IPF Z, one tab per property, pole figures, images
-where there are any, metadata, coloured by kind; opens on IPF Z.
+where there are any, coloured by kind; opens on IPF Z. (A *metadata* tab that only pointed at
+the tree was dropped with W4f, when the tree moved into the browser side.)
 
 **W4a - the redraw path. 2026-09-22.** The parallel session's `benchmark-mapplot.md` made
 `plot(ebsd)` several times faster and pointed out that the wizard's redraw kept the per
@@ -287,6 +293,43 @@ script to a file in the working directory, the load call to the clipboard. Then 
 W9, W10 and W14 items as a checklist against `bench/out/wizard.png`: no elided lattice
 parameter, every column wide enough for `-5-32/m` and `X||a*, Z||c*`, two font sizes,
 three titles on one band, the rows of the browser the height of their line.
+
+**W4f - one key, in a fixed place. 2026-09-26.** The project owner did not like the keys
+over the map, whose size and place changed with the map and the canvas, and asked to join the
+file information with the metadata browser so that the corner the browser held could show one
+key. The file's rows and the metadata are one tree on the browser side (`InfoTree` in
+`browser.py`); `KeyPanel` in `views.py` shows the key of `st.keyPhase` at 190 px, drawn at the
+screen's pixels and cut to what is drawn so that its labels stand whole; a click on a row of
+the phase table picks the phase (`pickKeyPhase`), the load picks the one with the most pixels,
+and the key stays on every tab. The canvas carries no keys and gives the map its whole width.
+A key of a group without the inversion whose sector reaches into the lower hemisphere (1, m,
+mm2, 3, 4mm, 6, ...) is drawn as both hemispheres, each named, beside or over one another as
+fills the square best; the key legend of a map plot (`keyLegend`) had drawn the upper one only
+too and stacks the two in the phase's row now.
+The same pass found the artefact the canvas showed around a map: a map plot resized a fresh
+figure to its own shape, the canvas's figure too, and left the rest of the widget unpainted;
+a figure pyplot does not manage is fixed in size now (`mtexFigure.fixedSize`).
+
+**W4g - the pole figure tab, opened at once. 2026-09-26.** The project owner asked for the tab
+to open immediately, the Euler axes as names on a white ground without a marker, the headings
+close to the charts, a colour bar under each, the preview computed faster, and then for headings
+in the window's font with the bars of a negative index in place. Measured first: the density is
+7 ms once warm, and what costs is matplotlib, 220 to 380 ms to render three charts at the
+canvas's size with or without the layout engine, which no faster plotting removes. So the
+density runs on the worker behind the map (`ViewCanvas.density`, a result for a map since
+replaced dropped), from at most 100 000 measurements drawn at random but the same every time
+(`previewDensity`: 1.8 s to 96 ms on the 2.5 million points of 1C_1, the pole figure 1.7 % of
+its maximum off), and when it arrives the pole figures are drawn off the screen on the next turn
+of the event loop, at the canvas's size, as a picture the tab shows pixel for pixel
+(`figimage`): the tab opens in 30 to 50 ms, 120 ms on 1C_1. Not on the worker thread, since
+matplotlib's fonts are shared between figures. The picture is keyed by the density, the
+directions, the Euler names and the canvas's size, so the Miller bar keeps its room when hidden
+and the canvas has one size on every tab. The charts are evaluated at 1.5 degree (3 showed the facets of the grid), the row laid out
+in a band as tall as it needs across the middle, the titles without padding. The window's font
+reaches matplotlib through `guiFont` (the family Qt resolves its generic one to, mathtext in the
+same family); the bar is mathtext's `\bar` now wherever a spherical plot writes a Miller index
+(`plotText`), since matplotlib sets the combining overline `Miller.char` writes beside the
+digit, and a label on a marker of size zero stands on its point.
 
 **W6 - the pages. DONE 2026-09-22** for what exists: the wizard section of
 `EBSDAnalysis/EBSDImport` shows `importWizard()` and the offscreen grab, kept as
@@ -335,13 +378,7 @@ it has read, so looking at one again is free.
   against the left edge whatever its alignment says, so the column has a delegate that
   draws the cell without one and puts the box in the middle, and a click anywhere in the
   cell ticks it.
-- *The keys lie over a map that fills the width.* Inset axes are counted by the layout, so
-  three keys outside the map took a quarter of its width. Where the map is wider than the
-  canvas - which is when it is drawn to the full width - the keys are placed inside it
-  instead, each on a white ground of its own that follows the box the aspect leaves it;
-  where the canvas is wider than the map they stay outside, in the room that is there. The
-  placement follows the canvas through a locator in the map's own coordinates, so a resized
-  window keeps it.
+- *The keys lie over a map that fills the width* - replaced by the key panel of W4f.
 - *Return walks into a folder*, as a double click does; a single click still unfolds it
   where it stands.
 

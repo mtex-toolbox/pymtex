@@ -1,4 +1,4 @@
-# the views of the import wizard on one canvas, and the metadata tree (docs/plans/wizard.md W4)
+# the views of the import wizard on one canvas, and the key panel (docs/plans/wizard.md W4, W4f)
 #
 # The map is drawn once per import through the package's own plot, and a tab that is a
 # colouring of it - the phase, the three IPF directions, a property - rewrites the picture's
@@ -11,82 +11,146 @@ import numpy as np
 import matplotlib
 import matplotlib.figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from PySide6.QtCore import QMetaObject, Qt, Slot
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QAbstractItemView, QFrame, QHBoxLayout, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtCore import QMetaObject, Qt, QTimer, Slot
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from ..geometry.miller import Miller
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import xvector, yvector, zvector
 from . import callbacks as cb
+from .pictogram import SIDE
 
 MAP_KINDS = ("phase", "ipf", "property")
-KEY_WIDTH = 0.28
 MAX_PIXELS = 1_500_000    # of the picture the map is drawn as, whatever the canvas holds
-PICTURE_INK = "#1f4e79"   # a leaf of the metadata that is a picture, and can be looked at
-
-
+PF_RESOLUTION = 1.5 * np.pi / 180   # the pole figures' grid, fine enough to show no facets
 KEY_PIXELS = 300          # the side a key is drawn at, once, before it is a picture
 KEY_CACHE = {}
+
+
+# the window's font as matplotlib takes it: the family Qt resolves its generic one to, where
+# matplotlib has that family, mathtext set in it too so that a barred index matches the digits
+# around it, and the size in points of a figure of that dpi that give the pixels of the window's
+GUI_FALLBACK = "DejaVu Sans"
+
+
+def guiFont(dpi):
+  from matplotlib import font_manager
+  from PySide6.QtGui import QFontInfo
+  from PySide6.QtWidgets import QApplication
+  family, pixels = GUI_FALLBACK, 13
+  if QApplication.instance() is not None:
+    info = QFontInfo(QApplication.font())
+    pixels = info.pixelSize() or pixels
+    try:
+      font_manager.findfont(font_manager.FontProperties(family=info.family()), fallback_to_default=False)
+      family = info.family()
+    except ValueError:
+      pass
+  rc = {"font.family": family, "mathtext.fontset": "custom", "mathtext.rm": family, "mathtext.it": f"{family}:italic",
+        "mathtext.bf": f"{family}:bold", "mathtext.sf": family, "mathtext.cal": family, "mathtext.tt": family}
+  return rc, pixels * 72 / dpi
 
 
 # a key is a picture of its phase and of nothing else: it does not change with the map, the
 # tab or the size of the window, and matplotlib re-renders a mesh of tens of thousands of
 # quads on every draw. So each is drawn once into a figure of its own and shown as an image
-# afterwards, which takes a map of five phases from a second a draw to a millisecond.
+# afterwards, which takes a map of five phases from a second a draw to a millisecond. The
+# picture is cut to what is drawn, the labels of the key standing outside its sector included.
+# A sector reaching into both hemispheres, of a group without the inversion, is drawn as both,
+# each named as the key drawn on its own names them, beside or over one another as fills a
+# square best.
 def keyPicture(cs, px=KEY_PIXELS):
-  import matplotlib.figure
-  from matplotlib.backends.backend_agg import FigureCanvasAgg
   from ..plotting.directionkeys import HSVDirectionKey
-  from ..plotting.mapplot import keyResolution
-  from ..plotting.sphericalplot import plotKey
-  hit = KEY_CACHE.get(id(cs))
+  from ..plotting.spherical import makeSphericalProjection
+  hit = KEY_CACHE.get((id(cs), px))
   if hit is not None and hit[0] is cs:
     return hit[1]
-  fig = matplotlib.figure.Figure(figsize=(px / 100, px / 100), dpi=100)
-  FigureCanvasAgg(fig)
-  fig.patch.set_alpha(0)
-  ax = fig.add_axes([0.02, 0.02, 0.96, 0.96])
-  ax.patch.set_alpha(0)
-  plotKey(HSVDirectionKey(cs), resolution=keyResolution(px), parent=ax, how2plot=cs.how2plot, fontSize=16)
-  fig.canvas.draw()
-  picture = np.asarray(fig.canvas.buffer_rgba()).copy()
-  KEY_CACHE[id(cs)] = (cs, picture)
+  key = HSVDirectionKey(cs)
+  n = len(makeSphericalProjection(key.keySector, how2plot=cs.how2plot))
+  if n == 1:
+    picture = _hemispherePicture(key, cs, px, {})
+  else:
+    # the two are shrunk to share the square, so their labels are drawn larger
+    parts = [_hemispherePicture(key, cs, px, {side: True}, fontScale=1.5, label=True) for side in ("upper", "lower")]
+    picture = _arrange(parts, gap=max(2, px // 30))
+  KEY_CACHE[(id(cs), px)] = (cs, picture)
   return picture
 
 
-# an inset in the map's own coordinates, which follows the map when the window is resized
-class KeyPlacement:
+# one chart of a key as a picture cut to what it draws
+def _hemispherePicture(key, cs, px, side, fontScale=1.0, label=False):
+  import io
+  import matplotlib
+  import matplotlib.figure
+  import matplotlib.image
+  from matplotlib.backends.backend_agg import FigureCanvasAgg
+  from ..plotting.mapplot import keyResolution
+  from ..plotting.sphericalplot import plotKey
+  rc, _ = guiFont(100)
+  with matplotlib.rc_context(rc):
+    fig = matplotlib.figure.Figure(figsize=(px / 100, px / 100), dpi=100)
+    FigureCanvasAgg(fig)
+    fig.patch.set_alpha(0)
+    ax = fig.add_axes([0.02, 0.02, 0.96, 0.96])
+    ax.patch.set_alpha(0)
+    plotKey(key, resolution=keyResolution(px), parent=ax, how2plot=cs.how2plot, fontSize=16 * fontScale * px / KEY_PIXELS, **side)
+    # the hemisphere named above all the chart draws, where no label of the key can stand
+    if label:
+      box = fig.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans).transformed(fig.transFigure.inverted())
+      fig.text(box.x0, box.y1 + 0.01, next(iter(side)), ha="left", va="bottom", fontsize=16 * fontScale * px / KEY_PIXELS)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100, bbox_inches="tight", pad_inches=0.02, transparent=True)
+  buf.seek(0)
+  return (matplotlib.image.imread(buf, format="png") * 255 + 0.5).astype(np.uint8)
 
-  def __init__(self, parent, bounds):
-    self.parent, self.bounds = parent, bounds
 
-  def __call__(self, ax, renderer):
-    from matplotlib.transforms import Bbox, TransformedBbox
-    box = TransformedBbox(Bbox.from_bounds(*self.bounds), self.parent.transAxes)
-    return TransformedBbox(box, ax.figure.transSubfigure.inverted())
+# two pictures beside or over one another, whichever leaves them larger in a square
+def _arrange(parts, gap):
+  (h1, w1), (h2, w2) = parts[0].shape[:2], parts[1].shape[:2]
+  beside = min(1 / (w1 + w2 + gap), 1 / max(h1, h2))
+  over = min(1 / max(w1, w2), 1 / (h1 + h2 + gap))
+  if beside >= over:
+    out = np.zeros((max(h1, h2), w1 + w2 + gap, 4), dtype=np.uint8)
+    out[(out.shape[0] - h1) // 2:(out.shape[0] - h1) // 2 + h1, :w1] = parts[0]
+    out[(out.shape[0] - h2) // 2:(out.shape[0] - h2) // 2 + h2, w1 + gap:] = parts[1]
+  else:
+    out = np.zeros((h1 + h2 + gap, max(w1, w2), 4), dtype=np.uint8)
+    out[:h1, (out.shape[1] - w1) // 2:(out.shape[1] - w1) // 2 + w1] = parts[0]
+    out[h1 + gap:, (out.shape[1] - w2) // 2:(out.shape[1] - w2) // 2 + w2] = parts[1]
+  return out
+
+
 IPF_DIRECTIONS = {"IPF X": lambda: xvector, "IPF Y": lambda: yvector, "IPF Z": lambda: zvector}
 
 
 class ViewCanvas(FigureCanvasQTAgg):
 
-  def __init__(self, st):
+  def __init__(self, st, worker=None):
     super().__init__(matplotlib.figure.Figure(layout="constrained"))
     self.st = st
+    # the window's worker runs the density of the pole figures off the main thread; the
+    # (map, phase) pairs being computed there
+    self.worker = worker
+    self.computing = set()
+    # the pole figures drawn ahead as a picture, (what it shows, the pixels), and the timer that
+    # draws them anew once a resize has settled
+    self.pfPicture = None
+    self.resized = QTimer(self)
+    self.resized.setSingleShot(True)
+    self.resized.setInterval(250)
+    self.resized.timeout.connect(self.afterResize)
     self.drawnFor = None       # (map identity, map convention) the base picture stands for
     self.image = None
     self.colorbar = None
     self.mappable = None
     self.legend = None
-    self.keyAxes = []
-    self.keyGrounds = []
-    self.keyPending = False
     self.coloured = None
     self.pending = False
     for name in ("ebsd", "drawn", "phases", "mapConvention", "millers", "image", "meta"):
       st.on(name, self.scheduleDraw)
-    # the side the keys stand on follows the shape of the canvas
-    self.mpl_connect("resize_event", lambda event: self.placeKeys())
+    st.on("densities", self.onDensity)
+    self.mpl_connect("resize_event", lambda event: self.resized.start())
 
   # ------------------------------------------------------------------ the dispatch
 
@@ -114,8 +178,6 @@ class ViewCanvas(FigureCanvasQTAgg):
         self.drawPoleFigures()
       elif kind == "images":
         self.drawImage()
-      else:
-        self.clear("the metadata is in the tree above")
     except Exception as e:
       import traceback
       traceback.print_exc()
@@ -126,7 +188,6 @@ class ViewCanvas(FigureCanvasQTAgg):
   def clear(self, text=None):
     self.figure.clear()
     self.image = self.colorbar = self.mappable = self.legend = self.drawnFor = None
-    self.keyAxes, self.keyGrounds = [], []
     if text:
       self.figure.text(0.5, 0.5, text, ha="center", va="center", color="#777")
     self.draw_idle()
@@ -148,7 +209,6 @@ class ViewCanvas(FigureCanvasQTAgg):
     if self.drawnFor != key or self.image is None:
       self.figure.clear()
       self.colorbar = self.mappable = None
-      self.keyAxes, self.keyGrounds = [], []
       mtexFigure(1, figure=self.figure)
       self.image = plotEBSD(st.ebsd, color, legend=False, colorbar=False, maxPixels=MAX_PIXELS, **kw)
       # the artist's own alpha would override the transparency of a phase not drawn
@@ -161,13 +221,13 @@ class ViewCanvas(FigureCanvasQTAgg):
       scalar = kind == "property" and np.ndim(self.image.get_array() if hasattr(self.image, "get_array") else None) in (1, 2)
       self.setColorbar(matplotlib.colormaps["viridis"] if scalar else None,
                        getattr(norm, "vmin", 0.0) or 0.0, getattr(norm, "vmax", 1.0) or 1.0, name)
-      self.setKeyLegend(kind == "ipf")
       if shown.all():
         self.draw_idle()
+        self.prepareDensity()
         return
     self.recolour(kind, name, shown)
-    self.setKeyLegend(kind == "ipf")
     self.draw_idle()
+    self.prepareDensity()
 
   # the colours of the picture rewritten, the map's own never assembled: mapValues colours
   # the measurements the picture shows and no others
@@ -216,81 +276,6 @@ class ViewCanvas(FigureCanvasQTAgg):
       elif hasattr(self.image, "set_color"):
         self.image.set_color(rgba)
 
-  # ------------------------------------------------------------------ the keys
-
-  # the inverse pole figure key of every phase beside an IPF map, as MATLAB shows it. It is
-  # built on the turn of the event loop after the map is drawn and not before it: the keys
-  # of a map of five phases cost a second, and a second of the map not being there is what
-  # the user would see. Once built they are kept and hidden on the tabs that are not IPF.
-  def setKeyLegend(self, on):
-    if on and not self.keyAxes and not self.keyPending:
-      self.keyPending = True
-      QMetaObject.invokeMethod(self, "buildKeys", Qt.QueuedConnection)
-    for ax in self.keyAxes:
-      ax.set_visible(on)
-    self.placeKeys()
-
-  @Slot()
-  def buildKeys(self):
-    st = self.st
-    self.keyPending = False
-    if self.image is None or st.ebsd is None or st.tabKinds[st.tab] != "ipf":
-      return
-    pl = st.ebsd.CSList
-    present = set(np.asarray(st.ebsd.phaseId).reshape(-1).tolist())
-    ids = [i for i in pl.indexedPhaseId if i in present]
-    if len(self.keyAxes) >= len(ids):
-      return
-    # one key a turn: five of them cost two seconds to draw the first time, and a window
-    # that cannot be moved for two seconds is what building them together would give
-    i = ids[len(self.keyAxes)]
-    step = 1 / max(len(ids), 1)
-    inset = self.ax.inset_axes([1.08, 0, KEY_WIDTH, 0.7 * step])
-    inset.imshow(keyPicture(pl[i]), interpolation="antialiased")
-    inset.set_axis_off()
-    inset.set_title(pl[i].mineral or pl[i].name, fontsize=max(6, min(10, 22 * step)) + 1)
-    self.keyAxes.append(inset)
-    self.placeKeys()
-    self.draw_idle()
-    if len(self.keyAxes) < len(ids):
-      self.keyPending = True
-      QMetaObject.invokeMethod(self, "buildKeys", Qt.QueuedConnection)
-
-  # the keys stand beside a map that leaves room for them and over one that does not: a map
-  # wider than the canvas is drawn to its whole width, and keys outside would take that
-  # width from it - the layout counts them, so the map lost a quarter of its width to three
-  def placeKeys(self):
-    from matplotlib.patches import Rectangle
-    for r in self.keyGrounds:
-      r.remove()
-    self.keyGrounds = []
-    if not self.keyAxes:
-      return
-    w, h = self.figure.get_size_inches()
-    xlo, xhi = self.ax.get_xlim()
-    ylo, yhi = self.ax.get_ylim()
-    over = abs(xhi - xlo) / max(abs(yhi - ylo), 1e-12) > w / max(h, 1e-12)
-    n = len(self.keyAxes)
-    # over the map the stack is fitted inside it, since a key that runs off the edge is cut
-    # and the ground of each is a child of its own axes, dropped when they move back out
-    step = (0.9 if over else 1.0) / n
-    # beside the map the stack stands clear of it, but never past the edge of the canvas:
-    # what is outside the figure is cut, and what is cut is the labels of the key
-    box = self.ax.get_position()
-    beside = min(1.08, (0.995 - box.x0) / max(box.width, 1e-9) - KEY_WIDTH)
-    for row, ax in enumerate(self.keyAxes):
-      x0 = 0.985 - KEY_WIDTH if over else beside
-      y0 = (0.93 if over else 1.0) - (row + 0.9) * step
-      ax.set_axes_locator(KeyPlacement(self.ax, [x0, y0, KEY_WIDTH, 0.7 * step]))
-      if over:
-        # a key over a map carries its own ground, or it is read against the colours. The
-        # ground is a child of the key's own axes, so it follows the box the aspect leaves
-        # it; the box is drawn in its coordinates from below its labels to above its name.
-        ground = Rectangle((-0.12, -0.1), 1.24, 1.32, transform=ax.transAxes, facecolor="white", alpha=0.78,
-                           edgecolor="none", zorder=-5, clip_on=False)
-        ax.add_patch(ground)
-        self.keyGrounds.append(ground)
-
   # what the tab colours the map by: its phases, the crystal direction along a specimen
   # direction, or one of its properties
   def colorArgs(self, kind, name):
@@ -330,32 +315,130 @@ class ViewCanvas(FigureCanvasQTAgg):
   # the pole figures of the dominant drawn phase from its binned density, through the
   # package's own plotPDF; the axes of the Euler frame drawn in red on every chart so that a
   # wrong Euler convention is visible
-  def drawPoleFigures(self):
-    from ..plotting.mtexfigure import mtexFigure
-    from ..plotting.sphericalplot import annotate, plotPDF
-    from .binning import binnedDensity
+  # ------------------------------------------------------------------ the pole figures
+
+  # the density of a phase, computed on the worker where there is one, so that the tab opens
+  # on it at once; None while it is computed, the tab redrawn when it is there. A result for a
+  # map that has since been replaced is dropped.
+  def density(self, k):
+    from .binning import previewDensity
     st = self.st
-    self.figure.clear()
-    self.image = self.colorbar = self.mappable = self.drawnFor = None
+    if k in st.densities:
+      return st.densities[k]
+    if self.worker is None:
+      st.densities[k] = previewDensity(st.ebsd, k)
+      return st.densities[k]
+    ebsd = st.ebsd
+    if (id(ebsd), k) not in self.computing:
+      self.computing.add((id(ebsd), k))
+
+      def commit(odf):
+        self.computing.discard((id(ebsd), k))
+        if st.ebsd is ebsd and not isinstance(odf, BaseException):
+          st.densities[k] = odf
+          st.changed("densities")
+      self.worker(lambda: previewDensity(ebsd, k), commit)
+    return None
+
+  # the density of the phase the pole figures will show started behind the map, on the worker
+  def prepareDensity(self):
+    k = cb.dominantPhase(self.st)
+    if self.worker is not None and k is not None:
+      self.density(k)
+
+  # a density arrived: the pole figures drawn, or drawn ahead on the next turn of the event
+  # loop, after the map is on the screen, so that the tab opens on a finished picture
+  def onDensity(self):
+    if self.onPoleFigures():
+      self.scheduleDraw()
+    else:
+      QTimer.singleShot(0, self.drawAhead)
+
+  def onPoleFigures(self):
+    st = self.st
+    return 0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures"
+
+  # what the picture of the pole figures shows, None when the density is not there yet
+  def poleFigureKey(self):
+    st = self.st
+    k = cb.dominantPhase(st) if st.ebsd is not None else None
+    if k is None or k not in st.densities:
+      return None
+    w, h = self.figure.get_size_inches()
+    return (id(st.densities[k]), k, tuple(st.millers), tuple(st.eulerAxesNames), round(w * self.figure.dpi), round(h * self.figure.dpi))
+
+  @Slot()
+  def drawAhead(self):
+    key = self.poleFigureKey()
+    if key is not None and (self.pfPicture is None or self.pfPicture[0] != key):
+      self.pfPicture = (key, self.renderPoleFigures(key))
+
+  # a resize draws the pole figures anew at the new size, once it has settled
+  @Slot()
+  def afterResize(self):
+    if self.onPoleFigures():
+      self.scheduleDraw()
+    else:
+      self.drawAhead()
+
+  # the tab shows the picture drawn ahead, drawing it first when it is not there or stale
+  def drawPoleFigures(self):
+    st = self.st
     k = cb.dominantPhase(st)
     if k is None:
       self.clear("no indexed phase is drawn")
       return
-    if k not in st.densities:
-      st.densities[k] = binnedDensity(st.ebsd[st.ebsd.CSList.frames[k]].orientations)
-    odf = st.densities[k]
-    cs = st.ebsd.CSList.frames[k]
-    hs = [millerOf(text, cs) for text in st.millers]
-    mtexFigure(len(hs), figure=self.figure)
-    plotPDF(odf, hs, colorbar=False)
-    corr = st.ebsd.EulerCorrection
-    for v, n in zip((xvector, yvector, zvector), st.eulerAxesNames):
-      try:
-        annotate(corr * v, label=n, MarkerFaceColor="red", MarkerEdgeColor="red", color="red", add2all=True)
-      except Exception:
-        pass
-    self.figure.suptitle(f"{cs.name}: pole figures of the density", fontsize=9)
+    if self.density(k) is None:
+      self.clear("computing the pole figures ...")
+      return
+    self.drawAhead()
+    self.figure.clear()
+    self.image = self.colorbar = self.mappable = self.drawnFor = None
+    # the picture pixel for pixel, as it was drawn at the canvas's size, with no axes around it
+    self.figure.figimage(self.pfPicture[1], origin="upper")
     self.draw_idle()
+
+  # the pole figures of the dominant phase drawn off the screen at the canvas's size: a colour
+  # bar under each on its own range, the titles close above, the Euler frame's axes as red
+  # names on a white ground where they point; the row in a band as tall as it needs across the
+  # middle, since a chart keeps its aspect in a taller cell and its title and bar would stand
+  # at the ends of the cell, far from it
+  def renderPoleFigures(self, key):
+    import matplotlib.figure
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from ..plotting.mtexfigure import mtexFigure
+    from ..plotting.sphericalplot import annotate, plotPDF
+    st = self.st
+    _, k, millers, names, w, h = key
+    cs = st.ebsd.CSList.frames[k]
+    hs = [millerOf(text, cs) for text in millers]
+    # in the window's font: the titles a step above its size, the names and the ticks at it
+    rc, size = guiFont(self.figure.dpi)
+    with matplotlib.rc_context(rc):
+      fig = matplotlib.figure.Figure(figsize=(w / self.figure.dpi, h / self.figure.dpi), dpi=self.figure.dpi, layout="constrained")
+      FigureCanvasAgg(fig)
+      frac = min(1.0, (0.92 * w / len(hs) + 90) / max(h, 1))
+      fig.get_layout_engine().set(rect=(0, (1 - frac) / 2, 1, frac))
+      mtexFigure(len(hs), figure=fig)
+      plotPDF(st.densities[k], hs, colorbar=False, resolution=PF_RESOLUTION, fontSize=size + 1)
+      for ax in list(fig.axes):
+        sP = getattr(ax, "_mtexSphericalPlot", None)
+        if sP is None:
+          continue
+        ax.set_title(ax.get_title(), fontsize=size + 2, pad=0)
+        for t in sP.labels:
+          t.set_fontsize(size)
+        if sP.mappable is not None:
+          bar = fig.colorbar(sP.mappable, ax=ax, location="bottom", shrink=0.7, aspect=25, pad=0)
+          bar.ax.tick_params(labelsize=size - 1)
+      corr = st.ebsd.EulerCorrection
+      for v, n in zip((xvector, yvector, zvector), names):
+        try:
+          annotate(corr * v, label=n, MarkerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
+        except Exception:
+          pass
+      fig.canvas.draw()
+    return np.asarray(fig.canvas.buffer_rgba()).copy()
 
 
   # ------------------------------------------------------------------ the images
@@ -416,7 +499,8 @@ class MillerBar(QWidget):
     self.st = st
     lay = QHBoxLayout(self)
     lay.setContentsMargins(6, 0, 6, 0)
-    lay.addWidget(QLabel("pole figures of"))
+    self.lead = QLabel("pole figures of")
+    lay.addWidget(self.lead)
     self.fields = []
     for k in range(3):
       f = QLineEdit(st.millers[k])
@@ -426,82 +510,77 @@ class MillerBar(QWidget):
       lay.addWidget(f)
       self.fields.append(f)
     lay.addStretch(1)
-    st.on("tab", self.show_)
-    st.on("tabs", self.show_)
+    for name in ("tab", "tabs", "ebsd", "phases", "drawn"):
+      st.on(name, self.show_)
+    # hidden it keeps its room, so the canvas has one size on every tab and the pole figures
+    # drawn ahead at that size are the ones the tab shows
+    policy = self.sizePolicy()
+    policy.setRetainSizeWhenHidden(True)
+    self.setSizePolicy(policy)
     self.show_()
 
   def commit(self, k, f):
     if f.text().strip() != self.st.millers[k]:
       cb.setMiller(self.st, k, f.text())
 
+  # shown on the pole figure tab alone, naming the phase the pole figures are of
   def show_(self):
     st = self.st
     self.setVisible(0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures")
+    k = cb.dominantPhase(st) if st.ebsd is not None else None
+    self.lead.setText("pole figures of" if k is None else f"{st.ebsd.CSList.frames[k].name}: pole figures of")
 
 
-# ------------------------------------------------------------------ the metadata
+# ------------------------------------------------------------------ the key
 
-class MetaTree(QTreeWidget):
-  """the metadata of the map as a tree, a value preview per leaf
+class KeyPanel(QWidget):
+  """the inverse pole figure key of one phase, at a fixed size in a fixed place: the phase
+  picked in the phase table, at first the one with the most pixels"""
 
-  A picture is a leaf like any other and says so; clicking it shows it, which is what the
-  images view is for.
-  """
-
-  def __init__(self, st, small):
+  def __init__(self, st):
     super().__init__()
     self.st = st
-    self.small = small
-    self.setColumnCount(2)
-    # the columns say what they hold; a band reading field and value over them does not
-    self.setHeaderLabels(["field", "value"])
-    self.setHeaderHidden(True)
-    self.setFrameShape(QFrame.NoFrame)
-    self.setSelectionMode(QAbstractItemView.SingleSelection)
-    self.setIndentation(12)
-    self.header().setStretchLastSection(True)
-    self.setColumnWidth(0, 180)
-    self.itemClicked.connect(self.onClick)
-    st.on("meta", self.refresh)
-    st.on("image", self.mark)
+    lay = QVBoxLayout(self)
+    lay.setContentsMargins(6, 4, 6, 4)
+    lay.setSpacing(2)
+    self.title = QLabel("x")
+    self.title.setAlignment(Qt.AlignCenter)
+    # as tall as the two frame pictograms beside the phase table, less the frame around it (a
+    # border and a margin of a pixel each, above and below), so the row keeps their height;
+    # the picture a square of what the title leaves
+    height = 2 * SIDE + 3 - 4
+    self.side = height - 8 - 2 - self.title.sizeHint().height()
+    self.picture = QLabel()
+    self.picture.setFixedSize(self.side, self.side)
+    self.picture.setAlignment(Qt.AlignCenter)
+    lay.addWidget(self.title)
+    lay.addWidget(self.picture, 0, Qt.AlignHCenter)
+    self.setToolTip("the colour key of the IPF maps; click a phase in the table to show its key")
+    self.setFixedSize(self.side + 12, height)
+    for name in ("ebsd", "phases", "keyPhase"):
+      st.on(name, self.refresh)
     self.refresh()
 
   def refresh(self):
-    self.clear()
-    stack = [(-1, self.invisibleRootItem())]
-    for i, (depth, key, value, branch, picture) in enumerate(self.st.metaRows):
-      while stack and stack[-1][0] >= depth:
-        stack.pop()
-      parent = stack[-1][1] if stack else self.invisibleRootItem()
-      item = QTreeWidgetItem(parent, [key, value])
-      item.setData(0, Qt.UserRole, i)
-      if branch:
-        stack.append((depth, item))
-        item.setExpanded(i in self.st.metaOpen)
-      elif picture is not None:
-        item.setForeground(1, QColor(PICTURE_INK))
-        item.setToolTip(1, "click to look at it")
-    self.mark()
-
-  # the picture being looked at is the one selected in the tree
-  def mark(self):
-    for item in self.walk():
-      i = item.data(0, Qt.UserRole)
-      row = self.st.metaRows[i] if i is not None and i < len(self.st.metaRows) else None
-      if row is not None and row[4] is not None and row[4] == self.st.image:
-        self.setCurrentItem(item)
-
-  def walk(self, parent=None):
-    parent = parent or self.invisibleRootItem()
-    for k in range(parent.childCount()):
-      child = parent.child(k)
-      yield child
-      yield from self.walk(child)
-
-  def onClick(self, item, column):
-    i = item.data(0, Qt.UserRole)
-    if i is not None:
-      cb.pickMeta(self.st, i)
+    st = self.st
+    frames = st.ebsd.CSList.frames if st.ebsd is not None else []
+    k = st.keyPhase
+    if k is None or not 0 <= k < len(frames) or not frames[k].isIndexed:
+      self.title.setText("")
+      self.picture.clear()
+      return
+    cs = frames[k]
+    self.title.setText(f"<b>{cs.name}</b> &nbsp;{cs.pointGroup}")
+    # drawn at the pixels of the screen, so the picture is not scaled after
+    ratio = self.devicePixelRatioF()
+    side = int(round(self.side * ratio))
+    rgba = np.ascontiguousarray(keyPicture(cs, px=side))
+    h, w = rgba.shape[:2]
+    pixmap = QPixmap.fromImage(QImage(rgba.data, w, h, 4 * w, QImage.Format_RGBA8888).copy())
+    # the picture with its labels fitted into the square, whatever shape the sector has
+    pixmap = pixmap.scaled(side, side, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    pixmap.setDevicePixelRatio(ratio)
+    self.picture.setPixmap(pixmap)
 
 
-__all__ = ["ViewCanvas", "MetaTree", "MillerBar"]
+__all__ = ["ViewCanvas", "KeyPanel", "MillerBar"]

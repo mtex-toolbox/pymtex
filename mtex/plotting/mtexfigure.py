@@ -58,6 +58,9 @@ class mtexFigure:
     self.figSize = figSize
     figSize = figureSize(figSize, (min(3.2 * self.ncols, 16), min(3.2 * self.nrows, 12)))
     self.fig = plt.figure(figsize=figSize, layout="constrained") if figure is None else figure
+    # a figure pyplot does not manage is embedded in a window, whose size is the widget's:
+    # no plot resizes it
+    self.fixedSize = figure is not None and getattr(figure.canvas, "manager", None) is None
     # MATLAB's marginx and marginy: the space around each axes in pixels, 96 to the inch
     if figure is None and (marginx is not None or marginy is not None):
       self.fig.get_layout_engine().set(**({} if marginx is None else {"w_pad": float(marginx) / 96}),
@@ -81,8 +84,9 @@ class mtexFigure:
       rows, cols = self.nrows, self.ncols
       self.nrows, self.ncols = layoutFor(k + 1)
       # the figure grows with its layout, so the panels keep their size
-      w, h = self.fig.get_size_inches()
-      self.fig.set_size_inches(min(w * self.ncols / cols, 16), min(h * self.nrows / rows, 12))
+      if not self.fixedSize:
+        w, h = self.fig.get_size_inches()
+        self.fig.set_size_inches(min(w * self.ncols / cols, 16), min(h * self.nrows / rows, 12))
       gs = self.fig.add_gridspec(self.nrows, self.ncols)
       for i, ax in enumerate(self.children):
         ax.set_subplotspec(gs[i])

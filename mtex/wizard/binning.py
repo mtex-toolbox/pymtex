@@ -1,6 +1,7 @@
 # the pole figure preview's density, estimated from a binned map (Julia W4)
 #
 #   odf = binnedDensity(ori, cell=4*degree)
+#   odf = previewDensity(ebsd, phaseId)        of at most PREVIEW_POINTS measurements
 #
 # A preview density is a convolution, so what it costs is the number of centres; for a
 # large map the orientations are merged onto a regular grid of their Euler angles, one
@@ -14,6 +15,7 @@ import numpy as np
 from ..geometry.units import degree
 
 BIN_ABOVE = 500
+PREVIEW_POINTS = 100_000   # the measurements a preview density is estimated from
 
 
 def binnedDensity(ori, cell=4 * degree, halfwidth=None, **kwargs):
@@ -25,6 +27,17 @@ def binnedDensity(ori, cell=4 * degree, halfwidth=None, **kwargs):
     return calcDensity(ori, halfwidth=halfwidth, harmonic=True, **kwargs)
   reps, weights = binOrientations(ori, cell)
   return calcDensity(reps, weights=weights, halfwidth=halfwidth, harmonic=True, **kwargs)
+
+
+# the density of one phase of a map for the preview: a larger map is subsampled first, drawn
+# at random but the same draw every time, since a pole figure at the kernel's width looks the
+# same from a hundred thousand measurements as from millions, and the selection and the
+# binning of millions cost a second
+def previewDensity(ebsd, phaseId, maxPoints=PREVIEW_POINTS):
+  idx = np.flatnonzero((np.asarray(ebsd.phaseId).reshape(-1) == phaseId) & np.asarray(ebsd.isIndexed).reshape(-1))
+  if idx.size > maxPoints:
+    idx = np.sort(np.random.default_rng(0).choice(idx, maxPoints, replace=False))
+  return binnedDensity(ebsd[idx].orientations)
 
 
 # one representative per occupied cell of the Euler grid, and the count of the cell
@@ -39,4 +52,4 @@ def binOrientations(ori, cell=4 * degree):
   return ori[first], counts.astype(float)
 
 
-__all__ = ["binnedDensity", "binOrientations"]
+__all__ = ["binnedDensity", "binOrientations", "previewDensity"]

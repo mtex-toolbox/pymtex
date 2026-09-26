@@ -20,12 +20,12 @@ from .browser import BrowserSide, framed
 from .phases import PhaseTable
 from .pictogram import CoordinatePanel
 from .state import WizardState
-from .views import MetaTree, MillerBar, ViewCanvas
+from .views import KeyPanel, MillerBar, ViewCanvas
 
 FONT_SIZE = 10
 BROWSER_WIDTH = 360   # the browser side on opening: the longest file name and the file table fit
 FONT_SMALL = 9
-TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "polefigures": "#6a1b9a", "images": "#e65100", "metadata": "#333333"}
+TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "polefigures": "#6a1b9a", "images": "#e65100"}
 
 
 # ------------------------------------------------------------------ the worker
@@ -83,7 +83,7 @@ class WizardWindow(QMainWindow):
     # the browser side
     self.browser = BrowserSide(st, self.small, worker=self.worker, clipboard=self.app.clipboard() if self.app else None)
     split.addWidget(self.browser)
-    # the analysis side: the two frames, the phase table and the metadata in one row, the views under them
+    # the analysis side: the two frames, the phase table and the key of one phase in one row, the views under them
     right = QWidget()
     rlay = QVBoxLayout(right)
     rlay.setContentsMargins(4, 4, 4, 4)
@@ -92,10 +92,11 @@ class WizardWindow(QMainWindow):
     top.setSpacing(3)
     self.coordinates = CoordinatePanel(st)
     self.phases = PhaseTable(st, self.small)
-    self.meta = MetaTree(st, self.small)
+    self.key = KeyPanel(st)
     top.addWidget(self.coordinates)
     top.addWidget(framed(self.phases), 0)
-    top.addWidget(framed(self.meta), 1)
+    top.addStretch(1)
+    top.addWidget(framed(self.key), 0)
     rlay.addLayout(top)
     self.tabs = QTabBar()
     self.tabs.setExpanding(False)
@@ -104,7 +105,7 @@ class WizardWindow(QMainWindow):
     rlay.addWidget(self.tabs)
     self.millers = MillerBar(st)
     rlay.addWidget(self.millers)
-    self.canvas = ViewCanvas(st)
+    self.canvas = ViewCanvas(st, worker=self.worker)
     self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     rlay.addWidget(self.canvas, 1)
     split.addWidget(right)

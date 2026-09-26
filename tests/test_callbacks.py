@@ -49,7 +49,7 @@ def test_import_and_views(st):
   st.on("status", lambda: seen.append(st.status[0]))
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   assert seen == ["idle", "loading", "loaded"] and st.hasMap and st.loadSeconds is not None
-  assert st.tabs[:4] == ["phase", "IPF X", "IPF Y", "IPF Z"] and st.tabs[-2:] == ["pole figures", "metadata"]
+  assert st.tabs[:4] == ["phase", "IPF X", "IPF Y", "IPF Z"] and st.tabs[-1] == "pole figures"
   assert "bc" in st.tabs and st.currentTab == "IPF Z"
   assert st.drawn == {0: True, 1: True, 2: True, 3: True, 4: True} and st.ebsd.lattice is not None
   assert cb.dominantPhase(st) == 1
@@ -151,3 +151,15 @@ def test_pictures(st):
   assert cb.pictureOf(st, st.image).shape == (40, 60)
   assert cb.asPicture(np.zeros((3, 40, 60), dtype=np.uint8)).shape == (40, 60, 3)
   assert cb.asPicture(np.zeros((4, 4))) is None and cb.asPicture("not an array") is None
+
+
+def test_parent_and_letter_rows():
+  st = WizardState(FIXTURES)
+  cb.setFolder(st, FIXTURES)
+  k = next(i for i, r in enumerate(st.entries) if r.isDir)
+  cb.toggleFolder(st, k)
+  assert cb.parentRow(st, k + 1) == k and cb.parentRow(st, k) is None
+  names = [r.name.lower() for r in st.entries]
+  f = [j for j, n in enumerate(names) if n.startswith("f")]
+  assert len(f) == 2 and cb.letterRow(st, None, "F") == f[0] and cb.letterRow(st, f[0], "f") == f[1] and cb.letterRow(st, f[1], "f") == f[0]
+  assert cb.letterRow(st, 0, "#") is None

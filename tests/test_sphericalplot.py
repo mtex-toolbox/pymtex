@@ -349,3 +349,14 @@ def test_plotHKL_and_symmetrised_labels_in_an_antipodal_sector():
   plot(Miller(0, 0, 0, 1, cs), symmetrised=True, labeled=True)
   hold(False)
   assert [t.get_text() for t in gcm().children[0].texts if t.get_text().startswith('(')] == ['(0001)']
+
+
+# a label on a marker of size zero, text alone, stands on its point; beside a marker below it
+def test_text_alone_stands_on_its_point():
+  plot(vector3d.rand(5, rng=rng), upper=True)
+  annotate(yvector, label="Y1", MarkerSize=0, backgroundColor="w", color="red")
+  annotate(xvector, label="X1")
+  alone = next(t for t in gcm().children[0].texts if t.get_text() == "Y1")
+  marked = next(t for t in gcm().children[0].texts if t.get_text() == "X1")
+  assert alone.get_va() == "center" and tuple(alone.xyann) == (0, 0) and alone.get_color() == "red"
+  assert alone.get_bbox_patch() is not None and marked.get_va() == "top" and marked.xyann[1] < 0
