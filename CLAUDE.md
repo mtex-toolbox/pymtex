@@ -128,7 +128,7 @@ intragranular quantities and `calcGND` with G7's `slipsystem.py`, M8, the denois
 filters over the graph of the map with `fill`, `interp` and `reduce`, and M9, the parent grain
 reconstruction (`maps/reconstruction.py`, `maps/variantgraph.py`: `parentGrainReconstructor`
 with MATLAB's vote table, the grain and variant graphs, checked against MATLAB on the
-martensite map), are done. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
+martensite map), are done, and M10 (2026-09-26): `gridify(ebsd, gL)` and `gridify(ebsd, unitCell=)` with `gridLayout` (`geometry/gridlayout.py`), `cleanUpPseudoSym` (`maps/pseudosym.py`), `simulateEBSD` (`maps/simulate.py`) and the `spatialTransform` family (`geometry/spatialtransform.py`); MCL segmentation is `calcGrains(..., mcl=)`. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
 `loadEBSD` and `EBSD.load` for `.ang`, `.ctf`, named-column tables, `.cpr`/`.crc`, `.osc`
 and the vendors' HDF5 (h5py, the `io` extra, configs in `io/hdf5_config/`) in `mtex/io`;
 the numeric block of a text file is a parallel numba row parser (`io/kernels.py`,

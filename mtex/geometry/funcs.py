@@ -28,6 +28,9 @@ mean = _method("mean", np.mean)
 sum = _method("sum", np.sum)
 std = _method("std", np.std)
 unique = _method("unique", np.unique)
+discretize = _method("discretize")
+displacement = _method("displacement")
+fitStage = _method("fitStage")
 matrix = _method("matrix")
 Euler = _method("Euler")
 Rodrigues = _method("Rodrigues")
@@ -90,4 +93,4 @@ def rotate(v, rot, *args, **kwargs):
 
 __all__ = ["angle", "dot", "cross", "angle_outer", "dot_outer", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler",
            "Rodrigues", "axis", "log", "exp", "eq", "homochoric", "cubochoric", "orth", "perp", "polar",
-           "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "eqTol", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "fundamentalSector", "conventionalSector", "fundamentalRegion", "checkInside", "find", "subGrid"]
+           "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "eqTol", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "fundamentalSector", "conventionalSector", "fundamentalRegion", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]

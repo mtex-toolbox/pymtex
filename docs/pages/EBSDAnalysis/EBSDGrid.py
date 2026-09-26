@@ -16,8 +16,9 @@
 
 import numpy as np
 
-from mtex import (EBSD, calcGrains, degree, gridify, gridLayout, hold, mtexColorMap, mtexdata, mtexdatafile, newMtexFigure, nextAxis, norm,
-                  plot, plottingConvention, rotate, rotation, setColorRange, mtexTitle, vector3d, xvector, yvector, zvector)
+from mtex import (EBSD, calcGrains, degree, gridify, gridLayout, hold, mean, mtexColorMap, mtexdata, mtexdatafile, newMtexFigure, nextAxis,
+                  norm, plot, plottingConvention, rotate, rotation, setColorRange, smoothBoundary, spatialTransformProjective, mtexTitle,
+                  transform, vector3d, xvector, yvector, zvector)
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')
@@ -334,14 +335,96 @@ gridify(ebsdR.flatten())
 # region. A dummy cell is a synthetic cell beyond the scanned edge; it has no id and never
 # becomes a grain.
 #
-# MATLAB's page imposes a known tilt on the forsterite map with a projective
-# `spatialTransform`, `spatialTransformProjective.byTilt`, and shows that every pixel
-# moves by up to 2.48 cells, 0.80 cell remaining after the affine foreshortening is
-# removed, and that the grid indices, the cell mesh and the grain boundaries come out the
-# same as for the undistorted map. The spatial transforms are not ported yet, so that
-# demonstration is left out here; [Spatial Transforms](EBSDSpatialTransform.html)
-# introduces the transform models and [TrueEBSD Distortion Correction](EBSDTrueEbsd.html)
-# fits them to measured images.
+# The example uses a real map because the failure appears only when the map is
+# realistically wide. A small synthetic grid remains safe at distortion levels that already
+# misindex a wide map.
+
+ebsd = mtexdata('small')
+
+# [transform](EBSD.transform.html) moves every pixel and its unit cell. It leaves
+# orientations and all other per-pixel properties untouched. The command takes a
+# [spatialTransform](spatialTransform.html), which records the mapping as an object; see
+# [Spatial Transforms](EBSDSpatialTransform.html).
+#
+# A tilt is a projective transform. Straight lines remain straight, but parallel lines need
+# not, and scale varies across the frame. Three values specify it: the surface tilt, the
+# working distance, and the point left in place. `byTilt` tilts about the x axis, so the
+# tilt angle foreshortens the map across that axis, along y. The working distance controls
+# perspective, which vanishes as that distance grows.
+#
+# Here the tilt is known and imposed. Recovering an unknown tilt from two measured images
+# is the inverse problem. [spatialTransformTilt](spatialTransformTilt.html) fits it in
+# stages.
+
+# +
+theta = 20 * degree                                  # surface tilt
+wd = 8 * (ebsd.pos.y.max() - ebsd.pos.y.min())       # working distance
+centre = mean(ebsd.pos)                              # what the tilt leaves in place
+
+distort = spatialTransformProjective.byTilt(theta, wd, centre)
+distort
+# -
+
+# The map is compressed along y, from 3000 to 2820 micrometres, while the x extent is left
+# alone by the tilt and only stretched by perspective. It tapers towards the edge that is
+# farther away.
+
+# +
+ebsdDistorted = transform(ebsd, distort)
+
+plot(ebsdDistorted['Fo'], ebsdDistorted['Fo'].orientations)
+hold(True)
+plot(ebsdDistorted['En'], ebsdDistorted['En'].orientations)
+plot(ebsdDistorted['Di'], ebsdDistorted['Di'].orientations)
+hold(False)
+# -
+
+# The following pair measures the imposed distortion in cell units. Its first value is the
+# maximum pixel displacement. Its second is the largest residual after the best affine
+# grid has been removed.
+
+# +
+pos0 = ebsd.pos.data.reshape(-1, 3)[:, :2]
+posD = ebsdDistorted.pos.data.reshape(-1, 3)[:, :2]
+ijD = ebsdDistorted.lattice.ij.astype(float)
+isIndexed = ebsdDistorted.isIndexed.reshape(-1)
+affineDesign = np.column_stack([np.ones(len(ijD)), ijD])
+affineFit = np.linalg.lstsq(affineDesign[isIndexed], posD[isIndexed], rcond=None)[0]
+cellSize = ebsd.lattice.dxy
+distortionInCells = np.array([np.linalg.norm(posD - pos0, axis=1).max(),
+                              np.linalg.norm(posD - affineDesign @ affineFit, axis=1).max()]) / cellSize
+distortionInCells
+# -
+
+# Every pixel has moved by up to 2.48 cells. Once the affine foreshortening is removed,
+# 0.80 cell remains. That is enough for a rigid reconstruction to round a pixel onto its
+# neighbour's site. Even so, the same grid indices are recovered as for the undistorted
+# map.
+
+np.array_equal(ebsdDistorted['Fo'].lattice.ij, ebsd['Fo'].lattice.ij)
+
+# Drawing each measurement as its unit cell shows the result. The cells form one
+# continuous deformed mesh, with no cell sheared independently of its neighbours. A rigid
+# reconstruction would make the mesh wavy and would give
+# [calcGrains](EBSD.calcGrains.html) the wrong neighbours.
+
+# +
+plot(ebsdDistorted['Fo'], ebsdDistorted['Fo'].orientations, edgeColor='black')
+hold(True)
+plot(ebsdDistorted['En'], ebsdDistorted['En'].orientations, edgeColor='black')
+plot(ebsdDistorted['Di'], ebsdDistorted['Di'].orientations, edgeColor='black')
+
+# grain reconstruction consequently sees the distorted map as the same neighbourhood graph
+grains = calcGrains(ebsdDistorted, minPixel=3)
+grains = smoothBoundary(grains, noSimplify=True)
+
+plot(grains.boundary, lineWidth=2)
+hold(False)
+grains
+# -
+
+# The boundary overlay remains closed and follows the tapered map. No duplicated or
+# missing grain strips appear along its edges.
 
 # ## Further Reading
 #
