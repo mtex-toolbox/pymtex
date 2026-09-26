@@ -4,7 +4,7 @@ import importlib as _importlib
 
 __all__ = []
 for _name in ("spherical", "colormaps", "mtexfigure", "sphericalplot", "sections", "sectionplot", "fibreplot", "sectorfold", "directionkeys",
-              "orientationkeys", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot", "distributionplot",
+              "orientationkeys", "patalakey", "maps", "mapplot", "poles", "polefigureplot", "space", "spaceplot", "shapeplot", "tensorplot", "planarkey", "polarplot", "grainplots", "kernelplot", "distributionplot",
               "scene3d", "render3d", "volumeplot"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
