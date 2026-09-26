@@ -10,7 +10,8 @@
 #   query.py layer <layer>                    a layer in both ports: counterparts, tests, notes, algorithms, per class
 #
 # A node is its id (m:@rotation.calcDensity, py:mtex.functions.density.calcDensity), a unique
-# name, "@Class.method", "Class.method" or a source file path.
+# name, "@Class.method", "Class.method" or a source file path. A graph older than any of its
+# sources is rebuilt first, about five seconds.
 from __future__ import annotations
 
 import argparse
@@ -250,6 +251,11 @@ def main():
   ap.add_argument("--dispatch", action="store_true", help="also walk through method names of untyped receivers")
   ap.add_argument("--graph", default=os.path.join(HERE, "out", "graph.json"))
   a = ap.parse_args()
+  sys.path.insert(0, HERE)
+  import build
+  if a.graph == os.path.join(HERE, "out", "graph.json") and build.stale():
+    print("the graph is older than its sources, rebuilding", file=sys.stderr)
+    build.main([])
   G_ = G(a.graph)
   if a.cmd == "find":
     for i in sorted(i for i in G_.nodes if a.arg.lower() in i.lower())[:200]:

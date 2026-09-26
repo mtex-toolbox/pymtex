@@ -402,11 +402,31 @@ def coverage(ix, matlabRoot):
   return cov
 
 
-def main():
+# whether a source the graph is built from changed after it: the two trees, the benchmarks and
+# their profiles, the coverage runs and the notes
+def stale(graph=os.path.join(OUT, "graph.json"), matlabRoot=None, memory=MEMORY):
+  if not os.path.exists(graph):
+    return True
+  built = os.path.getmtime(graph)
+  mRoot = matlabRoot or json.load(open(graph)).get("matlabRoot", os.path.join(os.path.dirname(ROOT), "master"))
+  skip = scan_matlab.SKIP | {".venv", "__pycache__", "build", "matlab", "out"}
+  roots = [(mRoot, (".m", ".md")), (os.path.join(ROOT, "mtex"), (".py",)), (os.path.join(ROOT, "tests"), (".py",)),
+           (os.path.join(ROOT, "bench"), (".py",)), (HERE, (".py",)), (os.path.join(ROOT, "docs"), (".md",))]
+  roots += [(d, (".md",)) for d in memory]
+  for root, ext in roots:
+    for dirpath, dirnames, filenames in os.walk(root):
+      dirnames[:] = [d for d in dirnames if d not in skip]
+      if any(f.endswith(ext) and os.path.getmtime(os.path.join(dirpath, f)) > built for f in filenames):
+        return True
+  results = glob.glob(os.path.join(ROOT, "bench", "out", "*", "profile_*.json")) + glob.glob(os.path.join(OUT, "coverage_*.json"))
+  return any(os.path.getmtime(f) > built for f in results)
+
+
+def main(argv=None):
   ap = argparse.ArgumentParser()
   ap.add_argument("--matlab", default=os.path.join(os.path.dirname(ROOT), "master"))
   ap.add_argument("--memory", nargs="*", default=MEMORY)
-  args = ap.parse_args()
+  args = ap.parse_args(argv)
   t = time.perf_counter()
   mRoot = os.path.abspath(args.matlab)
   mn, me = scan_matlab.build(mRoot)
@@ -434,10 +454,10 @@ def main():
   for e in g["edges"]:
     kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
   print(f"{len(g['nodes'])} nodes, {len(g['edges'])} edges {kinds}, {len(prof)} profiles, "
-        f"{len(an)} algorithms in {time.perf_counter() - t:.1f} s")
+        f"{len(an)} algorithms in {time.perf_counter() - t:.1f} s", file=sys.stderr)
   for a in an:
     if a["missing"]:
-      print(f"algorithm {a['name']}: entry points not in the graph: {a['missing']}")
+      print(f"algorithm {a['name']}: entry points not in the graph: {a['missing']}", file=sys.stderr)
 
 
 if __name__ == "__main__":
