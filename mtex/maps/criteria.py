@@ -27,6 +27,10 @@ from ..geometry.vector3d import vector3d
 
 class grainBoundaryCriterion:
 
+  # a criterion that removes the regions below minPixel itself is handed the value by
+  # setMinPixel, and calcGrains skips its own cull
+  handlesMinPixel = False
+
   def evaluate(self, ebsd, i, j):
     raise NotImplementedError
 

@@ -33,7 +33,9 @@ from mtex import calcGrains, degree, gbcSoft, hold, inpolygon, mtexTitle, mtexda
 # yes-or-no threshold. An unweighted graph can still be split by its topology, but equal
 # nonzero weights do not describe which orientation links are weaker than others.
 #
-# We demonstrate the distinction on the deformed austenite in the `EMSphinx` data set.
+# We demonstrate the distinction on the deformed austenite in the `EMSphinx` data set. This
+# is the same region used for the threshold and `gbcFMC` comparison on the
+# [basic reconstruction page](GrainReconstruction.html).
 # `calcGrains` marks the pixels of the grains that `minPixel` drops on the map it is given,
 # so every reconstruction below starts from its own copy of the map.
 
@@ -137,9 +139,9 @@ for p in [1.1, 1.4, 1.8]:
 # where no single threshold angle separates every physical boundary without also cutting
 # through bent lattices.
 #
-# MCL is not the only global approach in MTEX: MATLAB's criterion `gbcFMC` reaches a
-# comparable segmentation of this map without a threshold angle. It is not part of this
-# port.
+# MCL is not the only global approach in MTEX. The criterion `gbcFMC` reaches a comparable
+# segmentation of this map in a fraction of the time and needs no threshold angle. See
+# [Grain Reconstruction](GrainReconstruction.html) for that route.
 #
 # MCL remains the more flexible option. It clusters the weights produced by
 # [`gbcSoft`](gbcSoft.html), [`gbcCustom`](gbcCustom.html), or a criterion of your own

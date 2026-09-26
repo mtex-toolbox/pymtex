@@ -59,7 +59,7 @@ section 9.
 | `ebsd(cond)`, `ebsd('Forsterite')`, `ebsd('indexed')`, `ebsd(i,j)` | `ebsd[mask]`, `ebsd['Forsterite']`, `ebsd['indexed']`, `ebsd[i, j]` on a gridded map | `EBSD` is a table: indexing returns a sub-map |
 | `spatialDecompositionGrid`, `jcvoronoi`, `spatialDecomposition` | `decompose(ebsd, alpha)` returning a cell complex | the local clipping of unit cells, the alpha closing as a distance transform, no Voronoi library |
 | `spatialDecompositionAlpha` (`'delaunay'`) | `decompose(..., method='alphaComplex')` | needs a general triangulation, `scipy.spatial.Delaunay` behind an option |
-| `gbcAngle`, `gbcSoft`, `gbcVariants`, `gbcCustom`, `gbcFMC` | `gbcAngle`, `gbcSoft`, `gbcEqual`, `gbcCustom`; FMC and MCL deferred | one `connectivity(crit, ebsd, i, j)` per pair, levels as the threshold, `byPhase` |
+| `gbcAngle`, `gbcSoft`, `gbcVariants`, `gbcCustom`, `gbcFMC` | `gbcAngle`, `gbcSoft`, `gbcEqual`, `gbcCustom`, `gbcFMC` (`maps/fmc.py`, `calcGrains(..., fmc=)`, MATLAB's hierarchy pair for pair on the same pixel order) | one `connectivity(crit, ebsd, i, j)` per pair, levels as the threshold, `byPhase` |
 | `doSegmentation`, `connectedComponents`, `I_DG` | `segment(complex, ebsd, criterion)` | union-find with path halving |
 | `[grains, ebsd.grainId] = calcGrains(ebsd)` | `grains = calcGrains(ebsd)`, the grain id written into the map, `ebsd.copy()` to keep it | the two-pass cull of `minPixel` |
 | `calcPolygons`, `EulerCycles`, `inclusionId` | `tracePolygons`, a grain is its loops, `keyhole` derived | winding from the walk order, nothing repaired |
@@ -455,8 +455,7 @@ functions that need it, `calcGBND` and the GBND kernel.
 
 As in Julia: 3D (`EBSD3`, `grain3d`, `grain3Boundary`, the 3D `calcGBND`, `neper`);
 registration (`mapImage`, `trueEbsd`, `pairShifts`, the seven other spatial transforms);
-import and export (P6); plotting and colour keys (P5); `calcTensor`, `calcTraces` (P4);
-FMC segmentation (MCL came with M9's `mclComponents`, `calcGrains(..., mcl=)`); the distance-weighted Laplace kernels; generalised cross
+import and export (P6); plotting and colour keys (P5); `calcTensor` (P4); the distance-weighted Laplace kernels; generalised cross
 validation for the spline filter; the `maxFit` guard of `mergeInclusions`.
 
 Where the Julia port changed a MATLAB result and this port follows it: the alpha closing

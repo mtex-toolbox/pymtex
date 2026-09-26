@@ -281,18 +281,49 @@ hold(False)
 # uniform aggregates can therefore be a boundary. A comparable step explained by bending
 # within one grain is not. FMC has no threshold angle.
 #
-# In MTEX the option `'fmc'` selects this criterion. Its value is `cmaha`. This controls
-# how sharply an unexpected residual misorientation suppresses the coupling between two
-# aggregates. Larger values return more grains. At `cmaha = 0.5` the low-angle boundaries
-# missed by the 10 degree threshold appear, without the dense spurious contours produced by
-# the 0.5 degree threshold; at `cmaha = 1.5` more of the substructure within those grains is
-# resolved, including the dislocation cells that carry the deformation. Applied to the full
-# map, FMC clusters the entire map at once rather than one pixel pair at a time, which is
-# why this takes a few seconds; the `'verbose'` flag prints how far the hierarchy coarsened
-# and the scales from which the final grains were read.
+# The option `fmc` selects this criterion. Its value is `cmaha`. This controls how sharply
+# an unexpected residual misorientation suppresses the coupling between two aggregates.
+# Larger values return more grains.
+
+# +
+grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=0.5, minPixel=10), 5)
+
+plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+hold(True)
+plot(grains.boundary, lineWidth=1.5)
+hold(False)
+# -
+
+# The low-angle boundaries missed by the 10 degree threshold now appear, without the dense
+# spurious contours produced by the 0.5 degree threshold.
 #
-# Fast multiscale clustering is not part of this port yet, so the three figures of this
-# section are missing here; see the technical details.
+# Raising `cmaha` resolves more of the substructure within those grains, including the
+# dislocation cells that carry the deformation.
+
+# +
+grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=1.5, minPixel=10), 5)
+
+plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+hold(True)
+plot(grains.boundary, lineWidth=1.5)
+hold(False)
+# -
+
+# Finally, we apply the same reconstruction to the full map. Unlike a local threshold
+# criterion, FMC clusters the entire map at once rather than one pixel pair at a time,
+# which is why this takes a few seconds. The `verbose` flag prints how far the hierarchy
+# coarsened and the scales from which the final grains were read.
+
+# +
+ebsd = mtexdata('EMSphinx')['Iron fcc']
+
+grains = smoothBoundary(calcGrains(ebsd, fmc=1.5, minPixel=10, verbose=True), 5)
+
+plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+hold(True)
+plot(grains.boundary)
+hold(False)
+# -
 
 # ## More ways to reconstruct grains
 #
@@ -341,6 +372,11 @@ hold(False)
 # where MATLAB returns a modified copy of the map as its second output; the phases that
 # `minPixel` marks notIndexed are rewritten in that map too, so a sweep over `minPixel` on
 # one map passes `ebsd.copy()`. The alpha closing keeps the phase of every pixel it absorbs,
-# so the sweep over `alpha` runs on the map itself. Fast multiscale clustering (`'fmc'`)
-# and the Markovian clustering are not ported, as in the Julia port; the three FMC figures
-# of the MATLAB page are missing here.
+# so the sweep over `alpha` runs on the map itself.
+#
+# Fast multiscale clustering picks its seeds in order of coupling and aggregate size, and
+# the order of the pixels decides between equal values. MATLAB stores this map with y
+# running fastest, the port with x. Taken in MATLAB's order, the zoom gives MATLAB's 55 and
+# 107 grains at `cmaha` 0.5 and 1.5 and the same hierarchy pair for pair; in the port's own
+# order it gives 56 and 113. The full map gives 1903 grains, 1900 in MATLAB's order, for
+# MATLAB's 1894, in about 14 seconds for MATLAB's 23.

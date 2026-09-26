@@ -1308,8 +1308,21 @@ def _relabelLoop(raw, hasCell, label, grainId):
   return cnt
 
 
+# the coarse seeds of one FMC step, in the given order over the columns of a CSC coupling
+# matrix: a node becomes a seed when its coupling to the seeds before it stays below its
+# share alphaSum, fmc.coarseSeeds's loop the fallback
+def _fmcSeedsLoop(order, indptr, indices, data, alphaSum, seed):
+  for k in order:
+    s = 0.0
+    for e in range(indptr[k], indptr[k + 1]):
+      if seed[indices[e]]:
+        s += data[e]
+    seed[k] = s < alphaSum[k]
+
+
 _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_toReferenceLoop, True),
-                "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False)}
+                "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False),
+                "fmcSeeds": (_fmcSeedsLoop, False)}
 
 
 def grainKernel(name):

@@ -1,0 +1,178 @@
+# the traces of subregions of a map (MATLAB @EBSD/calcTraces, @grain2d/calcTraces)
+#
+#   traces, rel, cSize = calcTraces(ebsd, clusterId, 'Radon')      the default, or 'Fourier'
+#   traces, rel, cSize = calcTraces(grains, clusterId)              the characteristic shape, or 'calliper', 'hist'
+#
+# A cluster is the set of pixels, or grains, with one value of every column of clusterId;
+# the default is one cluster of all indexed pixels, or of all grains. The trace of a
+# cluster is the direction its lamellae run along, an axis in the plane of the map; rel is
+# how much the winning direction stands out, zero for none. The outputs have the shape of
+# the largest id of every column, NaN and zero where a cluster has minClusterSize pixels or
+# fewer. Reference: Nyyssonen et al., arXiv 2201.02103.
+from __future__ import annotations
+
+import numpy as np
+
+from ..geometry.units import degree
+from ..geometry.vector3d import vector3d
+from .ebsd import EBSD
+from .grains import grain2d
+
+
+# the columns of a cluster id per measurement or grain, the shape of the output and the
+# size of every cluster, from the weights of the members
+def _clusters(clusterId, n, weights):
+  cid = np.ones((n, 1), dtype=np.int64) if clusterId is None else np.asarray(clusterId).reshape(n, -1)
+  cid = np.where(np.isfinite(cid), cid, 0).astype(np.int64)
+  sz = tuple(int(m) for m in np.maximum(cid.max(axis=0), 0))
+  cSize = np.zeros(sz)
+  ok = np.all(cid > 0, axis=1)
+  np.add.at(cSize, tuple((cid[ok] - 1).T), weights[ok])
+  return cid, sz, cSize
+
+
+# the axes of angles in the plane of a map as directions of the specimen, NaN where not computed
+def _axes(plane, omega, frame):
+  d = np.cos(omega)[..., None] * plane.e1 + np.sin(omega)[..., None] * plane.e2
+  return vector3d(d, frame=frame, antipodal=True)
+
+
+# ------------------------------------------------------------------ the map
+
+def _ebsdTraces(ebsd, clusterId=None, method="Radon", minClusterSize=100, cutOff=6):
+  l = ebsd.lattice
+  if l is None:
+    raise ValueError("the traces are computed on a map measured on a lattice")
+  n = ebsd.size
+  if clusterId is None:
+    clusterId = (ebsd.isIndexed & ~ebsd.isPadding).reshape(-1).astype(np.int64)
+  cid, sz, cSize = _clusters(clusterId, n, np.ones(n))
+  P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
+  omega = np.full(sz, np.nan)
+  rel = np.zeros(sz)
+  for ic in zip(*np.nonzero(cSize > minClusterSize)):
+    pix = np.flatnonzero(np.all(cid == np.array(ic) + 1, axis=1))
+    if method.lower() == "radon":
+      omega[ic], rel[ic] = _radonTrace(P[pix], l, cutOff)
+    elif method.lower() == "fourier":
+      omega[ic], rel[ic] = _fourierTrace(l.ij[pix], l.A)
+    else:
+      raise ValueError(f"the method of calcTraces on a map is 'Radon' or 'Fourier', not {method!r}")
+  return _axes(l.plane, omega, ebsd.frame), rel, cSize
+
+
+# the Radon transform of the cluster at every degree, each pixel split into four subpixels
+# sharing their value linearly between the two nearest bins of unit width; the trace is
+# perpendicular to the projection with the most energy at the higher frequencies, those
+# up to cutOff left out as the shape of the cluster dominates them
+def _radonTrace(P, l, cutOff):
+  h = l.dxy
+  sub = np.array([[a, b] for a in (-0.25, 0.25) for b in (-0.25, 0.25)]) @ l.A.T
+  X = ((P[:, None, :] + sub[None, :, :]).reshape(-1, 2) - (P.min(axis=0) + P.max(axis=0)) / 2) / h
+  rLast = int(np.ceil(np.max(np.linalg.norm(X, axis=1)))) + 1
+  theta = np.arange(180) * degree
+  s = X @ np.stack([np.cos(theta), np.sin(theta)]) + rLast
+  lo = np.floor(s).astype(np.int64)
+  frac = s - lo
+  R = np.zeros((2 * rLast + 2, len(theta)))
+  col = np.broadcast_to(np.arange(len(theta)), s.shape)
+  np.add.at(R, (lo, col), (1 - frac) / 4)
+  np.add.at(R, (lo + 1, col), frac / 4)
+  R = R[:2 * rLast + 1]
+  Z = np.abs(np.fft.rfft(R, axis=0))[cutOff + 1:rLast + 1].sum(axis=0)
+  k = int(np.argmax(Z))
+  if not Z[k] > 0:
+    return np.nan, 0.0
+  return theta[k] + np.pi / 2, (Z[k] - Z.mean()) / Z[k]
+
+
+# the second moments of the Fourier transform of the cluster image within half the inner
+# radius; the energy lies across the lamellae, so the trace is the axis of the smaller moment
+def _fourierTrace(ij, A):
+  lo = ij.min(axis=0)
+  shape = tuple(ij.max(axis=0) - lo + 1)
+  X = np.zeros(shape)
+  X[tuple((ij - lo).T)] = 1
+  Y = np.abs(np.fft.fftshift(np.fft.fft2(X - X.mean())))
+  Y = (Y - Y.min()) / (np.ptp(Y) or 1)
+  m = (np.array(shape) - 1) / 2
+  d = np.stack(np.meshgrid(*[np.arange(k) - c for k, c in zip(shape, m)], indexing="ij"), axis=-1).reshape(-1, 2)
+  Y = Y.reshape(-1) * (np.linalg.norm(d, axis=1) < np.min(m + 1) / 2)
+  M = Y[:, None] * d
+  lam, V = np.linalg.eigh(M.T @ M)
+  # a cluster filling its bounding box has no direction
+  if not lam[1] > 0:
+    return np.nan, 0.0
+  t = A @ V[:, 0]
+  return np.arctan2(t[1], t[0]), (lam[1] - lam[0]) / lam[1]
+
+
+# ------------------------------------------------------------------ the grains
+
+def _grainTraces(grains, clusterId=None, method="shape", minClusterSize=100):
+  if method not in ("shape", "calliper", "hist"):
+    raise ValueError(f"the method of calcTraces on grains is 'shape', 'calliper' or 'hist', not {method!r}")
+  gB = grains.boundary
+  cid, sz, cSize = _clusters(clusterId, len(grains), np.asarray(grains.numPixel, dtype=float))
+  omega = np.full(sz, np.nan)
+  rel = np.zeros(sz)
+  ids = np.asarray(grains.id).reshape(-1)
+  for ic in zip(*np.nonzero(cSize > minClusterSize)):
+    members = ids[np.all(cid == np.array(ic) + 1, axis=1)]
+    F = gB.F[np.isin(gB.grainId, members).any(axis=1)]
+    if len(F) == 0:
+      continue
+    lS = gB.V[F[:, 0]] - gB.V[F[:, 1]]
+    omega[ic], rel[ic] = _histTrace(lS) if method == "hist" else _shapeTrace(lS, method == "calliper")
+  return _axes(gB.plane, omega, grains.frame), rel, cSize
+
+
+# the maximum of the density of the segment directions, weighted by their lengths
+def _histTrace(lS):
+  from ..functions.s1fun import calcDensity
+  f = calcDensity(np.arctan2(lS[:, 1], lS[:, 0]), weights=np.linalg.norm(lS, axis=1), sigma=10 * degree, antipodal=True)
+  phi = np.linspace(0, 2 * np.pi, 360)
+  v = np.real(f.eval(phi))
+  k = int(np.argmax(v))
+  return phi[k], (v[k] - 1) / v[k]
+
+
+# the characteristic shape of the segments, sorted by angle and summed up: its principal
+# axis, or the direction across its shortest calliper
+def _shapeTrace(lS, calliper):
+  lS = np.where(lS[:, 1:2] < 0, -lS, lS)
+  dxy = np.vstack([lS, -lS])
+  dxy = dxy[np.argsort(np.arctan2(dxy[:, 1], dxy[:, 0]), kind="stable")]
+  xy = np.cumsum(dxy, axis=0)
+  xy = xy - xy.mean(axis=0)
+  if calliper:
+    d = xy - np.roll(xy, -int(np.round(len(xy) / 2)), axis=0)
+    delta = np.linalg.norm(d, axis=1)
+    a, ib = delta.max(), int(np.argmin(delta))
+    return np.pi / 2 + np.arctan2(d[ib, 1], d[ib, 0]), (a - delta[ib]) / a
+  # the vertices weighted by half the length of their adjacent edges, as principalComponents
+  dist = np.linalg.norm(xy[:-1] - xy[1:], axis=1)
+  dist = 0.5 * (dist + np.roll(dist, 1))
+  w = xy[:-1] * dist[:, None] * np.sum(xy[:-1] ** 2, axis=1, keepdims=True) ** 0.25
+  lam, V = np.linalg.eigh(w.T @ w)
+  a, b = np.sqrt(lam[1]), np.sqrt(lam[0])
+  return np.mod(np.arctan2(V[1, 1], V[0, 1]), np.pi), (a - b) / a
+
+
+def calcTraces(x, clusterId=None, *flags, **kwargs):
+  """traces, rel, cSize = calcTraces(ebsd | grains, clusterId, 'Radon' | 'Fourier' | 'calliper' | 'hist', minClusterSize=100)"""
+  if isinstance(clusterId, str):
+    clusterId, flags = None, (clusterId,) + flags
+  if flags:
+    kwargs["method"] = flags[0]
+  if isinstance(x, EBSD):
+    return _ebsdTraces(x, clusterId, **kwargs)
+  if isinstance(x, grain2d):
+    return _grainTraces(x, clusterId, **kwargs)
+  raise TypeError(f"calcTraces is defined for EBSD maps and grains, not {type(x).__name__}")
+
+
+EBSD.calcTraces = calcTraces
+grain2d.calcTraces = calcTraces
+
+__all__ = ["calcTraces"]

@@ -3,6 +3,7 @@
 #   grains = calcGrains(ebsd, angle=10 * degree)
 #   grains = calcGrains(ebsd, angle=[10 * degree, 2 * degree], minPixel=5, alpha=3.1)
 #   grains = calcGrains(ebsd, criterion=gbcSoft(10 * degree))
+#   grains = calcGrains(ebsd, fmc=3, minPixel=10, verbose=True)     fast multiscale clustering, gbcFMC
 #
 # The map is written into: every measurement gets its grain id in ebsd.grainId, and the
 # cull marks the pixels of the grains it drops as not indexed, so the map that comes back
@@ -19,16 +20,23 @@ from ..geometry.units import degree
 from .boundary import buildBoundary
 from .criteria import gbcAngle, grainBoundaryCriterion
 from .decomposition import NO_PIXEL, decompose
+from .fmc import gbcFMC
 from .grains import grain2d
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 
 
 def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, backend=None):
+               mcl=None, fmc=None, verbose=False, backend=None):
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
+  if criterion is None and fmc is not None:
+    criterion = gbcFMC(fmc, verbose=verbose)
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
+  # a criterion that absorbs the small regions itself takes minPixel instead of the cull
+  if crit.handlesMinPixel:
+    crit = crit.setMinPixel(minPixel) if minPixel > 1 else crit
+    minPixel = 1
   releaseAbsorbed(ebsd)
   # the cull changes the map the closing runs on, so it is a second pass over the whole
   # reconstruction and not a filter on the grains that came out
