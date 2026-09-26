@@ -17,7 +17,7 @@ from ..geometry.vector3d import vector3d
 from .mtexfigure import gcm, mtexFigure
 from .poles import dynamicMarkerSize, inversePoles, poles
 from .spherical import hasSymmetry, makeSphericalProjection, plotRegion
-from .sphericalplot import FILL_FLAGS, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
+from .sphericalplot import fillFlag, intoParents, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
 from . import sphericalplot
 
 
@@ -92,7 +92,9 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
       charts.append((vs, region, p, None if noTitle or i else title, len(projs) == 2))
   # a held figure of as many charts takes the markers on top of what it has
   fig = gcm()
-  if fig is not None and fig.hold and len(fig.children) == len(charts) and all(hasattr(ax, "_mtexSphericalPlot") for ax in fig.children):
+  if whereKw.get("parent") is not None:
+    fig, sPs = intoParents(whereKw["parent"], [(c[2], c[3]) for c in charts], axesKw)
+  elif fig is not None and fig.hold and len(fig.children) == len(charts) and all(hasattr(ax, "_mtexSphericalPlot") for ax in fig.children):
     sPs = [ax._mtexSphericalPlot for ax in fig.children]
   # the axes nextAxis prepared takes one chart, a fresh figure of newMtexFigure its charts
   elif fig is not None and fig.pending is not None and len(charts) == 1:
@@ -107,6 +109,9 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
       if c[4]:
         sP.hemisphereLabel()
   individual = isinstance(colorRange, str) and colorRange == "individual"
+  # 'equal' is one range over the row, the default for markers
+  if isinstance(colorRange, str) and colorRange == "equal":
+    colorRange = None
   if valuess is not None and colorRange is None:
     colorRange = _rangeOf([np.asarray(v, dtype=float) for v in valuess])
   hs = []
@@ -131,7 +136,11 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
     if minmax:
       sP.annotateMinMax()
   if colorbar and any(v is not None for v in valuess):
-    fig.colorbar()
+    # into axes named by parent the bars go beside those axes only
+    if whereKw.get("parent") is not None:
+      fig.colorbars += [fig.fig.colorbar(sP.mappable, ax=sP.ax, shrink=0.7) for sP in sPs if getattr(sP, "mappable", None) is not None]
+    else:
+      fig.colorbar()
   return hs
 
 
@@ -199,7 +208,7 @@ def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
     return sphericalplot.plot(o, **kw)
   h, data = _pickData(o, args)
   hs = _asList(h)
-  flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
+  flag = fillFlag(kw, None)
   style = "scatter" if flag is None else "pcolor" if flag == "smooth" else flag
   antipodal = kw.get("antipodal", False)
   # the budget is in markers, and a marker stands for an orbit
@@ -221,7 +230,7 @@ def plotIPDF(o, *args, points=None, all=False, **kw):
     return sphericalplot.plotIPDF(o, *args, **kw)
   r, data = _pickData(o, _positionalStyle(o, args, kw))
   rs = _asList(r)
-  flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
+  flag = fillFlag(kw, None)
   style = "scatter" if flag is None else "pcolor" if flag == "smooth" else flag
   antipodal = kw.get("antipodal", False)
   budget = "all" if all else points if points is not None else max(100000 // (o.CS.numSym() * o.SS.numSym()), 1)
@@ -242,7 +251,7 @@ def plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
   """plot(pf), plot(pf, contourf=True), plot(pf, minmax=True): a measured pole figure, or a
   data set of them in a row, the specimen directions as markers coloured by intensity"""
   from ..functions.s2fun import S2FunHarmonic
-  flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
+  flag = fillFlag(kw, None)
   titles = [_pfTitle(pf, i) for i in range(pf.numPF)]
   if flag is not None:
     style = "pcolor" if flag == "smooth" else flag
@@ -252,10 +261,18 @@ def plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
   return _dataRow(rs, titles, [pf.allI[i].ravel() for i in range(pf.numPF)], colorRange=colorRange, **kw)
 
 
-def plotDiff(pf, other, mode="RP", epsilon=None, **kw):
+def plotDiff(pf, other, mode="relative", epsilon=None, **kw):
   """plotDiff(pf, odf), plotDiff(pf, pf2, 'l1'): the difference between a measured pole figure
-  and a recalculated one, or two measurements, as a pole figure of the error"""
+  and a recalculated one, or two measurements, as a pole figure of the error; plotDiff(odf, pf)
+  the same, plotDiff(odf1, odf2) the sections of their difference"""
   from ..functions.polefigure import calcErrorPF
+  # plotDiff(odf, pf): the same error, plotDiff(odf1, odf2) the sections of the difference
+  if not hasattr(pf, "allH"):
+    if not hasattr(other, "allH"):
+      from .sectionplot import plotSection
+      return plotSection(pf - other, **kw)
+    pf, other = other, pf
+    kw.setdefault("colorRange", "equal")
   for m in ("RP", "l1", "l2", "relative"):
     if kw.pop(m, False):
       mode = m

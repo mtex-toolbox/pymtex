@@ -36,7 +36,10 @@ class Session:
 SESSION = Session()
 
 
-def getMTEXpref(name, default=None):
+# one preference, or with no name all of them as a new dict, MATLAB's struct
+def getMTEXpref(name=None, default=None):
+  if name is None:
+    return dict(SESSION.prefs)
   return SESSION.prefs.get(name, default)
 
 

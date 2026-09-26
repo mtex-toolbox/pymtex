@@ -25,6 +25,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.symreduce import closestImage
 from ..geometry.vector3d import vector3d
+from .dynprop import dynProp
 from .phaselist import phaseTable
 from .polygon import polygonSet, signedArea2, _insideLoop
 
@@ -43,7 +44,7 @@ class grain2d(polygonSet):
     object.__setattr__(self, "meanRotation", meanRotation if isinstance(meanRotation, MtexArray) else rotation._fromData(meanRotation))
     object.__setattr__(self, "GOS", np.asarray(GOS))
     object.__setattr__(self, "frame", frame)
-    object.__setattr__(self, "prop", {} if prop is None else dict(prop))
+    object.__setattr__(self, "prop", dynProp() if prop is None else dynProp(prop))
     object.__setattr__(self, "boundary", boundary)
     object.__setattr__(self, "innerBoundary", innerBoundary)
     if loops is None and boundary is not None:
@@ -246,7 +247,12 @@ class grain2d(polygonSet):
     if isinstance(key, (list, tuple)) and key and isinstance(key[0], str):
       if key[0] == "id":
         return self.selectByGrainId(key[1:])
-      return self._subset(self._phaseMask(key))
+      # phase names and conditions, MATLAB's grains('Fo', grains.numPixel > 100)
+      mask = self._phaseMask([k for k in key if isinstance(k, str)])
+      for k in key:
+        if not isinstance(k, str):
+          mask &= np.asarray(k, dtype=bool).reshape(-1)
+      return self._subset(mask)
     return self._subset(key)
 
   # grains[ind] = ori: the mean orientations of the grains named and the phase of their frame,

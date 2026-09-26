@@ -105,8 +105,30 @@ def test_a_measured_pole_figure():
 def test_the_difference_plot():
   pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
   odf = calcODF(pf)
-  h = plotDiff(pf, odf)
+  h = plotDiff(pf, odf, RP=True)
   assert len(gcm().children) == 1 and len(gcm().colorbars) == 1 and len(h[0].get_offsets()) <= pf.allI[0].size
   # the RP error drops the directions where the recalculation is small, the l1 error keeps them
   h2 = pf.plotDiff(odf, l1=True, colorbar=False)
   assert len(gcm().colorbars) == 0 and len(h2[0].get_offsets()) == pf.allI[0].size >= len(h[0].get_offsets())
+  # MATLAB's default is the regularised relative error at every direction, also as plotDiff(odf, pf)
+  h3 = plotDiff(odf, pf, colorbar=False)
+  assert len(h3[0].get_offsets()) == pf.allI[0].size
+
+
+def test_plots_into_axes_named_by_parent():
+  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
+  odf = calcODF(pf)
+  plt.figure()
+  axes = [plt.subplot(1, 3, k) for k in (1, 2, 3)]
+  plot(pf, parent=axes[0])
+  plotPDF(odf, pf.allH[0], antipodal=True, parent=axes[1])
+  plotDiff(odf, pf, parent=axes[2])
+  # one figure, each panel in the axes it was given, a bar only beside the difference
+  assert plt.get_fignums() == [plt.gcf().number] and all(hasattr(ax, "_mtexSphericalPlot") for ax in axes)
+  assert len(gcm().colorbars) == 1
+
+
+def test_the_equal_range_of_measured_pole_figures():
+  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
+  h = plot(pf, colorRange='equal')
+  assert h[0].get_clim() == (float(np.min(pf.allI[0])), float(np.max(pf.allI[0])))

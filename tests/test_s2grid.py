@@ -95,3 +95,8 @@ def test_the_sphere_grid_of_a_frame():
   axes = equispacedS2Grid(cs, resolution=3 * degree, antipodal=True)
   laue = equispacedS2Grid(crystalFrame("m-3m"), resolution=3 * degree)
   assert axes.antipodal and axes.size == laue.size and abs(2 * axes.size / sector.size - 1) < 0.1
+
+
+def test_equispaced_default_resolution():
+  # MATLAB's default spacing of an equispaced grid is 2.5 degree
+  assert np.isclose(equispacedS2Grid(antipodal=True).resolution, 2.5 * degree, rtol=0.05)

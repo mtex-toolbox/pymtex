@@ -107,7 +107,9 @@ def _spektra(ax, x, bandwidth, logarithmic, kw):
   power = np.zeros((len(P), L + 1))
   LL = min(L, f.bandwidth)
   power[:, :LL + 1] = P[:, :LL + 1]
+  # open circles on a dotted line, as MATLAB draws the power
   kw.setdefault("marker", "o")
+  kw.setdefault("markerfacecolor", "none")
   kw.setdefault("linestyle", ":")
   h = ax.plot(np.arange(L + 1), power.T, **kw)
   ax.set_xlim(0, L)

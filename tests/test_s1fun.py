@@ -40,4 +40,4 @@ def test_F3e_S1FunHarmonic():
   a = calcDensity([0.3, 1.0], sigma=0.2, antipodal=True)
   assert np.isclose(a(0.3), a(0.3 + pi)) and a.antipodal
   # Silverman's rule gives a width, and a kernel of one's own is taken as it is
-  assert np.isclose(mean(calcDensity(xs)), 1) and np.isclose(mean(calcDensity(xs, kernel=S1FejerKernel(12))), 1)
+  assert np.isclose(mean(calcDensity(xs, periodic=True)), 1) and np.isclose(mean(calcDensity(xs, kernel=S1FejerKernel(12))), 1)

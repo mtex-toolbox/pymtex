@@ -444,10 +444,15 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
   # MATLAB's 'micronbar', 'off'
   if isinstance(micronbar, str):
     micronbar = micronbar.lower() == "on"
+  # and 'refFrame', 'off'
+  if isinstance(refFrame, str):
+    refFrame = refFrame.lower() == "on"
   if micronbar is None:
     micronbar = getMTEXpref("showMicronBar", True) and not getattr(mP, "reused", False)
   if micronbar and not getattr(mP, "scaleBarArtists", None):
-    scaleBarOn(mP, x, location=location or "sw", refFrame=refFrame if getMTEXpref("showRefFrame", True) else False)
+    show = getMTEXpref("showRefFrame", True)
+    show = show.lower() == "on" if isinstance(show, str) else bool(show)
+    scaleBarOn(mP, x, location=location or "sw", refFrame=refFrame if show else False)
     mP.followView()
   # a phase map carries its legend unless told not to, as MATLAB draws it
   if legend is None:

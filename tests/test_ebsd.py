@@ -228,3 +228,30 @@ def test_copy_cat_and_display():
   pos = ebsd.pos.data.copy()
   pos[3] = np.nan
   assert len(EBSD(pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList, ebsd.prop)) == 143
+
+
+def test_the_measurements_of_grains_leave_out_the_padding():
+  from test_calcgrains import squareBlockGrid
+  from mtex import calcGrains
+  oris = rotation.byAxisAngle(zvector, np.arange(1, 5) * 20 * degree)
+  base = squareBlockGrid(12, 2, oris)
+  # one missing measurement inside a grain, padded back by gridify
+  hole = np.zeros(base.shape, dtype=bool)
+  hole[4, 4] = True
+  e = gridify(base[~hole])
+  assert np.array_equal(e.isPadding, hole)
+  g = calcGrains(e, angle=5 * degree)
+  # the closing gives the hole the grain around it, the selection keeps the measurements
+  assert e.grainId[4, 4] > 0
+  sel = e[g["id", int(e.grainId[4, 4])]]
+  assert not sel.isPadding.any() and len(sel) == np.count_nonzero((e.grainId == e.grainId[4, 4]) & ~e.isPadding)
+
+
+def test_the_phase_shares_are_of_the_measurements_not_the_padding():
+  from test_calcgrains import squareBlockGrid
+  base = squareBlockGrid(12, 2, rotation.byAxisAngle(zvector, np.arange(1, 5) * 20 * degree))
+  hole = np.zeros(base.shape, dtype=bool)
+  hole[6:18, 6:18] = True
+  e = gridify(base[~hole])
+  n = np.count_nonzero(e.isIndexed & ~e.isPadding)
+  assert e.isPadding.sum() == hole.sum() and f"{n} ({float(f'{100 * n / (e.size - hole.sum()):.2g}'):g}%)" in repr(e)

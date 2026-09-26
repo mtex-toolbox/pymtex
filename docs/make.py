@@ -113,6 +113,7 @@ def build(page):
       os.remove(os.path.join(buildDir, f))
   ns = {"__name__": "__mtexdoc__"}
   out, k, ok = [], 0, True
+  # the last look of every figure, by the figure, since a closed figure frees its number
   snapshots = {}
   plt.close("all")
   for kind, text in parse(src):
@@ -137,10 +138,14 @@ def build(page):
       # settling layout is no change
       count = (sum(len(ax.get_children()) for ax in fig.axes),
                tuple((getattr(ax, "elev", None), getattr(ax, "azim", None), getattr(ax, "roll", None), ax.axison) for ax in fig.axes),
-               getattr(fig, "_mtexSceneVersion", None))
-      if snapshots.get(num) == count:
+               getattr(fig, "_mtexSceneVersion", None),
+               # a colour bar moved elsewhere, as mtexColorbar('southoutside') after one on the right,
+               # or over another range, as after setColorRange
+               tuple((ax._colorbar.orientation, tuple(round(float(x), 9) for x in ax.get_xlim() + ax.get_ylim()))
+                     for ax in fig.axes if getattr(ax, "_colorbar", None) is not None))
+      if snapshots.get(fig) == count:
         continue
-      snapshots[num] = count
+      snapshots[fig] = count
       buf = io.BytesIO()
       fig.savefig(buf, format="png", dpi=120)
       changed.append((buf.getvalue(), getattr(fig, "_mtexScenes", None) or []))

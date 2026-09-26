@@ -9,8 +9,9 @@ WHITE_JET_STOPS = ([(1.0, 1.0, 1.0), (0.0, 0.0, 0.7), (0.0, 0.85, 0.65), (1.0, 1
 COLORMAP_STOPS = {
   "whitejet": WHITE_JET_STOPS,
   "labotex": ([(1.0, 1.0, 1.0), (1.0, 0.4, 0.4), (0.4, 0.0, 0.0)], [0.0, 0.5, 1.0]),
-  "blue2red": ([(0.0, 0.0, 0.5), (1.0, 1.0, 1.0), (0.5, 0.0, 0.0)], [0.0, 0.5, 1.0]),
-  "red2blue": ([(0.5, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.0, 0.5)], [0.0, 0.5, 1.0]),
+  # MATLAB's blue2redColorMap: dark blue, pure blue, white, pure red, dark red
+  "blue2red": ([(0.0, 0.0, 0.53), (0.0, 0.0, 1.0), (1.0, 1.0, 1.0), (1.0, 0.0, 0.0), (0.51, 0.0, 0.0)], [0.0, 0.16, 0.5, 0.84, 1.0]),
+  "red2blue": ([(0.51, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.0, 1.0), (0.0, 0.0, 0.53)], [0.0, 0.16, 0.5, 0.84, 1.0]),
   "white2black": ([(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)], [0.0, 1.0]),
   "black2white": ([(0.0, 0.0, 0.0), (1.0, 1.0, 1.0)], [0.0, 1.0]),
   "parula": ([(0.2081, 0.1663, 0.5292), (0.1707, 0.2919, 0.7792), (0.0265, 0.4463, 0.8797), (0.0230, 0.5641, 0.7896), (0.1834, 0.6884, 0.6146),
@@ -61,10 +62,29 @@ def mtexColormap(name=None):
 # mtexColorMap WhiteJet: the colour map of the current figure, or of one figure
 def mtexColorMap(name="WhiteJet", fig=None):
   from .mtexfigure import gcm
+  # mtexColorMap(ax, name): the map of one axes of the current figure
+  if hasattr(name, "get_figure"):
+    ax, name = name, fig
+    cmap = mtexColormap(name)
+    if gcm() is not None:
+      gcm().setColormap(cmap, ax=ax)
+    return cmap
+  import matplotlib.pyplot as plt
   cmap = mtexColormap(name)
   target = gcm() if fig is None else fig
+  # an MTEX figure that pyplot no longer has current leaves the map to the current one
+  if fig is None and target is not None and getattr(target.fig, "number", None) is not None and target.fig is not plt.gcf():
+    target = None
   if target is not None:
     target.setColormap(cmap)
+    return cmap
+  # a plain matplotlib figure: its images and filled contours take the map, as MATLAB's
+  # colormap; contour lines keep their colour
+  if plt.get_fignums():
+    for ax in plt.gcf().axes:
+      for c in ax.collections + ax.images:
+        if c.get_array() is not None and getattr(c, "filled", True):
+          c.set_cmap(cmap)
   return cmap
 
 

@@ -232,7 +232,7 @@ def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet
 
 
 def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=None, colorbar=False, radial=False, grid=False,
-                   noLabel=None, grid_res=30 * degree, **kw):
+                   noLabel=None, grid_res=30 * degree, how2plot=None, **kw):
   """plot3d(sF, radial=True): a function as the sphere coloured, or pushed out by its values,
   seen as the 3D plotting convention says, with the axes of its frame as arrows"""
   axesKw = _keys(kw)
@@ -246,9 +246,11 @@ def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=N
   if not (radial if noLabel is None else noLabel):
     for d, name in frameAxes(fr):
       _axisArrow(sP.ax, d, name)
+  # the camera of the convention given, else of the default 3D one
   if "azimuth" not in axesKw and "elevation" not in axesKw:
     from ..geometry.plottingconvention import plottingConvention
-    _camera(sP.ax, plottingConvention.default3D)
+    pC = plottingConvention(how2plot) if isinstance(how2plot, str) else how2plot
+    _camera(sP.ax, plottingConvention.default3D if pC is None else pC)
   if colorbar:
     sP.ax.figure.colorbar(h, ax=sP.ax, shrink=0.6)
   return h
@@ -577,7 +579,17 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   # the coordinates of the axes, for what is drawn into them later
   sP.coordinates, sP.reduced = coordinates, reduced
   if data is None:
-    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], color=color, **style)
+    # a further set in held axes takes the next colour of the order, as MATLAB's held scatter
+    k = getattr(sP, "markerSets", 0)
+    sP.markerSets = k + 1
+    if color is MARKER_COLOR:
+      # markers of no colour of their own are open circles, as MATLAB draws orientations
+      from .colormaps import MTEX_COLORS
+      color = tuple(MTEX_COLORS[k % len(MTEX_COLORS)])
+      style.setdefault("edgecolors", color)
+      h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], facecolors="none", **style)
+    else:
+      h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], color=color, **style)
   elif data.shape[1] == 3:
     h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], c=np.clip(np.nan_to_num(data.astype(float), nan=1.0), 0, 1), **style)
   else:

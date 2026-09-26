@@ -108,6 +108,8 @@ def test_R4_fibre_ODFs():
   assert np.isclose(mean(H), 1) and H.isReal
   # MATLAB's FourierODF is the same
   assert isinstance(FourierODF(f), SO3FunHarmonic) and np.allclose(FourierODF(f).fhat, H.fhat)
+  # FourierODF(odf, L) cuts at the bandwidth L
+  assert FourierODF(f, 8).bandwidth == 8
   rs = rotation.rand(100, rng=rng)
   assert np.max(np.abs(H(rs) - f(rs))) < 2e-2 * np.max(f(rs))
   # from a fibre of P1, and several fibres
@@ -116,7 +118,12 @@ def test_R4_fibre_ODFs():
   assert np.isclose(mean(f2), 1) and f2.SS is ss
   f3 = fibreODF(Miller(vector3d.cat(h, Miller(1, 0, 0, cs)), cs), vector3d.cat(r, vector3d.rand(rng=rng)), ss, weights=[1, 3])
   assert np.isclose(mean(f3), 1) and np.isclose(f3.weights[1], 3 * f3.weights[0])
-  assert "SO3FunCBF" in repr(f)
+  assert "SO3FunCBF" in repr(f) and "fibre: (110) ||" in repr(f)
+  # a Laue group holds the inversion: the fibre of h is that of -h too, so a -3m fibre ODF
+  # takes the same value where g h and where -g h meet r (MATLAB 15.31 on both)
+  laue = fibreODF(Miller(1, 1, 0, crystalFrame("-3m")), zvector)
+  o = fibre(Miller(1, 0, 0, crystalFrame("-3m")), vector3d.X).orientation(360)[[90, 270]]
+  assert np.allclose(laue(o), 15.3, atol=0.1) and np.allclose(SO3FunHarmonic(laue)(o), laue(o), atol=0.1)
   assert isinstance(SO3FunCBF(fb, psi), SO3FunCBF)
 
 

@@ -20,6 +20,8 @@ def test_P1_construction_and_accessors():
   pf = PoleFigure(h, r, np.ones(r.shape))
   assert pf.numPF == 1 and len(pf) == 1 and pf.allI[0].shape == r.shape
   assert pf.CS is cs and pf.SS is ss and pf.frame is ss
+  # the plotting convention is that of the specimen directions
+  assert pf.how2plot is pf.allR[0].how2plot
   assert pf.antipodal and pf.allH[0].size == 1 and pf.c[0] == [1.0]
   # the specimen directions of a measurement are axes, unless the measurement is complete
   d = regularS2Grid(resolution=20 * degree)
@@ -151,6 +153,10 @@ def test_P4_arithmetic():
   assert np.allclose((both / [1, 3]).allI[1], I)
   with pytest.raises(ValueError):
     both / [1, 2, 3]
+  # a mask assigns the intensities it picks, over all pole figures at once
+  clipped = both - 1
+  clipped[clipped.intensities < 0] = 0
+  assert np.allclose(clipped.intensities, np.maximum(both.intensities - 1, 0))
   # turning the specimen turns its pole figures
   rot = rotation.byAxisAngle(zvector, 30 * degree)
   turned = pf.rotate(rot)

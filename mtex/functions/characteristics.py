@@ -6,10 +6,12 @@
 #   values, modes = max(odf, numLocal=, resolution=, accuracy=);  min(odf)
 #   modes, weights, centerId = calcComponents(odf, seed=, weights=, tolerance=, radius=, exact=)
 #   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | cs1, cs2 | mori), calcAxisDistribution(odf, v)
-#   calcMIndex(odf), discreteSample(odf, n, rng=), calcError(odf1, odf2, 'l2'), calcKernel(ori, 'klcv')
+#   calcMIndex(odf), discreteSample(odf, n, rng=), discreteSample(fun, n, range=), calcError(odf1, odf2, 'l2'), calcKernel(ori, 'klcv')
 from __future__ import annotations
 
+import functools
 import math
+import types
 
 import numpy as np
 
@@ -628,9 +630,14 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
 # exactly: a centre by its weight, the angle by inverse transform of the kernel density, a
 # uniform axis, a group element on each side; a Bingham distribution exactly by rejection; a
 # sum of kernel forms term by term
-def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False):
+def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, range=(0, 1)):
   rng = np.random.default_rng() if rng is None else rng
   n = int(n)
+  # a density given as a Python function of real numbers is sampled on 10000 points of range
+  if isinstance(f, (types.FunctionType, functools.partial)):
+    x = np.linspace(range[0], range[1], 10000)
+    p = np.maximum(np.asarray(f(x), dtype=float), 0)
+    return x[rng.choice(len(x), size=n, p=p / p.sum())]
   # a list of orientations or directions is sampled from itself, MATLAB's discreteSample(ori, n)
   if isinstance(f, MtexArray):
     flat = f.flatten()

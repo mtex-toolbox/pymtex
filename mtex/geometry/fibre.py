@@ -255,6 +255,11 @@ class fibre:
     o1 = orientation._fromRotation(vecs[:, -1].copy(), frames)
     o2 = orientation._fromRotation(vecs[:, -2].copy(), frames)
     f = cls(o1, o2, full=True)
+    # the eigenvectors fix the fibre up to (h, r) against (-h, -r); take r in the upper hemisphere
+    r = f.r.data.reshape(3)
+    k = next((j for j in (2, 1, 0) if abs(r[j]) > 1e-9), 2)
+    if r[k] < 0:
+      f = cls(o1, orientation._fromRotation(-vecs[:, -2], frames), full=True)
     if not diagnostics:
       return f
     return f, vals, float(np.nanmean(f.angle(ori)))

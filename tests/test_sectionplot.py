@@ -118,3 +118,18 @@ def test_sections_fill_the_cells_of_a_layout():
   setColorRange("tight")
   highs = [ax._mtexSphericalPlot.mappable.get_clim()[1] for ax in fig.children]
   assert highs[0] > highs[1] > highs[2]
+
+
+def test_orientations_coloured_by_rgb_and_nan_dropped(capsys):
+  cs = crystalFrame('m-3m')
+  ori = orientation.rand(3000, cs, rng=rng)
+  ori.data[:10] = np.nan
+  rgb = np.tile([1.0, 0.0, 0.0], (3000, 1))
+  plt.close("all")
+  plotSection(ori, rgb, all=True)
+  sets = [c for ax in plt.gcf().axes for c in ax.collections if len(c.get_offsets())]
+  assert sets and all(np.allclose(c.get_facecolor()[:, :3], [1, 0, 0]) for c in sets)
+  plt.close("all")
+  plotSection(ori)
+  assert "out of 2990 given" in capsys.readouterr().out
+  plt.close("all")

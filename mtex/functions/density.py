@@ -4,7 +4,8 @@
 #
 #   calcDensity(ori, halfwidth=, kernel=, weights=, harmonic=None, bandwidth=)
 #   calcDensity(v, halfwidth=, kernel=, weights=, bandwidth=)
-#   calcDensity(rho, sigma=, kernel=, weights=, antipodal=)
+#   calcDensity(rho, periodic=True, sigma=, kernel=, weights=, antipodal=)
+#   calcDensity(x, range=, bandwidth=, weights=)    real valued data, one sample per row
 #   calcPDF(odf, h, r, superposition=)
 #   interpolate(ori | v, values, bandwidth=, lambda_=, s=, weights=)
 from __future__ import annotations
@@ -21,6 +22,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d
 from .funops import conv
 from .harmonics import deg2dim, dim2deg, invariantProjection, project
+from .kde import calcDensityReal
 from .kernelfunctions import SO3DirichletKernel
 from .rbf import SO3FunRBF, _densityKernel, uniformODF
 from .s1fun import calcDensity as _calcDensityS1
@@ -36,9 +38,11 @@ def calcDensity(x, Fourier=False, **kwargs):
     return SO3FunHarmonic(f) if Fourier and not isinstance(f, SO3FunHarmonic) else f
   if isinstance(x, vector3d):
     return _calcDensityS2(x, **kwargs)
-  # angles are periodic by nature, the flag names what they are
-  kwargs.pop("periodic", None)
-  return _calcDensityS1(x, **kwargs)
+  # angles are periodic, the flag or an option of the circle says so; other numbers are real
+  # valued data, MATLAB's kernel density estimate on an interval or a box
+  if kwargs.pop("periodic", False) or any(k in kwargs for k in ("sigma", "kernel", "antipodal")):
+    return _calcDensityS1(x, **kwargs)
+  return calcDensityReal(x, **kwargs)
 
 
 # the ODF of a list of orientations: the kernel form up to 200 orientations, the harmonic

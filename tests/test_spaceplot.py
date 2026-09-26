@@ -178,3 +178,20 @@ def test_quiver3_of_an_SO3_vector_field():
   far = np.linalg.norm(start, axis=1) > 1
   assert np.all(np.linalg.norm(end[far], axis=1) > np.linalg.norm(start[far], axis=1))
   plt.close("all")
+
+
+def test_held_orientation_sets_take_the_colour_order_as_open_circles():
+  from mtex.plotting.colormaps import MTEX_COLORS
+  cs = crystalFrame("-3m")
+  odf = unimodalODF(orientation.id(cs))
+  a, b = discreteSample(odf, 20, rng=rng), discreteSample(odf, 20, rng=rng)
+  h1 = scatter(a, 'axisAngle')
+  hold(True)
+  h2 = scatter(b)
+  hold(False)
+  assert np.allclose(h1.get_edgecolor()[0][:3], MTEX_COLORS[0]) and np.allclose(h2.get_edgecolor()[0][:3], MTEX_COLORS[1])
+  assert h1.get_facecolor().size == 0 or np.all(h1.get_facecolor()[:, 3] == 0)
+  # annotate into the space the figure shows, in its own colour
+  from mtex import annotate
+  h3 = annotate(orientation.id(cs), MarkerFaceColor='r')
+  assert np.allclose(h3.get_facecolor()[0][:3], (1, 0, 0))

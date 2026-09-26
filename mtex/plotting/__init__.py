@@ -82,6 +82,7 @@ def _install():
   vector3d.arrow3d = method(spp.arrow3d)
   from ..geometry.frames import referenceFrame
   referenceFrame.plot = method(sp.plotSymmetry)
+  referenceFrame.plotHKL = method(sp.plotHKL)
   SO3TangentVector.quiver3 = method(spp.quiver3)
   orientationRegion.plot = method(spp.plotRegion3d)
   orientationRegion.plot3d = method(spp.plotRegion3d)

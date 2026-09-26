@@ -115,6 +115,9 @@ def test_G6_a_subset_keeps_its_grains_and_their_boundary():
   assert close(g[0].area, g.area[:1]) and close(sub.area, g.area[[0, 1]]) and len(sub.boundary) < len(g.boundary)
   assert np.all(np.isin(sub.boundary.grainId[:, 0], sub.id) | np.isin(sub.boundary.grainId[:, 1], sub.id))
   assert len(g["test"]) == 4 and len(g["id", 2, 3]) == 2
+  # phase names and a condition together, MATLAB's grains('test', grains.numPixel > 100)
+  big = g["test", g.numPixel >= 100]
+  assert np.array_equal(big.id, g.id[g.numPixel >= 100]) and len(g["test", np.zeros(len(g), dtype=bool)]) == 0
 
 
 def test_G7_the_keyhole_form_carries_the_holes():

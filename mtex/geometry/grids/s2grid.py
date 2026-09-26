@@ -203,7 +203,7 @@ def _dots(g, a, b):
 
 # ------------------------------------------------------------------ the equispaced grid
 
-def equispacedS2Grid(*args, resolution=5 * degree, points=None, minTheta=0.0, maxTheta=None, minRho=0.0, maxRho=2 * np.pi,
+def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, maxTheta=None, minRho=0.0, maxRho=2 * np.pi,
                      antipodal=False, hemisphere="complete", noCenter=False, rhoPeriod=2 * np.pi, region=None, frame=None):
   """a grid of nearly equidistant directions: rings of polar angle `resolution` apart, each
   holding sin(theta) times the equator count of azimuths, odd rings offset by half a step

@@ -29,6 +29,7 @@ from ..geometry.kernels import qmul, qrot
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
+from .dynprop import dynProp
 from .lattice import lattice, latticeBasis
 from .phaselist import phaseList, phaseTable
 
@@ -66,7 +67,7 @@ class EBSD:
     object.__setattr__(self, "rotations", _rotations(np.ascontiguousarray(rotations.data)))
     object.__setattr__(self, "phaseId", ph.astype(np.int8))
     object.__setattr__(self, "CSList", cs)
-    object.__setattr__(self, "prop", {})
+    object.__setattr__(self, "prop", dynProp())
     object.__setattr__(self, "meta", {} if meta is None else dict(meta))
     object.__setattr__(self, "scanUnit", scanUnit)
     object.__setattr__(self, "phaseMap", np.arange(len(cs)) if phaseMap is None else np.asarray(phaseMap))
@@ -231,9 +232,10 @@ class EBSD:
     else:
       self._setProp(name, value)
 
-  # a property is one value, or one row, per measurement
+  # a property is one value, or one row, per measurement; a container, a vector3d per
+  # measurement say, is kept as it is
   def _setProp(self, name, value):
-    v = value.data if isinstance(value, MtexArray) else np.asarray(value)
+    v = value if isinstance(value, MtexArray) else np.asarray(value)
     if v.shape[:self.ndim] != self.shape:
       if v.ndim >= 1 and v.shape[0] == self.size:
         v = v.reshape(self.shape + v.shape[1:])
@@ -251,7 +253,8 @@ class EBSD:
     if hasattr(key, "numPixel"):
       if "grainId" not in self.prop:
         raise ValueError("reconstruct grains with calcGrains(ebsd) before selecting their measurements")
-      return self._subset(np.isin(self.grainId, key.id))
+      # the measurements of the grains, not the padding a filled hole gave a grain id
+      return self._subset(np.isin(self.grainId, key.id) & ~self.isPadding)
     if isinstance(key, (list, tuple)) and key and isinstance(key[0], str):
       if key[0] == "xy":
         return self.findByLocation(np.asarray(key[1:], dtype=float))
@@ -533,9 +536,10 @@ class EBSD:
     if self.size == 0:
       return lines[0] + "\n  the map is empty"
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
-    # the shares are of all cells, to two significant digits, as MATLAB writes them
+    # the shares are of all measurements, the padding left out, to two significant digits,
+    # as MATLAB writes them
     ids, counts = np.unique(self.phaseId[~self.isPadding], return_counts=True)
-    share = [f"{c} ({float(f'{100 * c / self.size:.2g}'):g}%)" for c in counts]
+    share = [f"{c} ({float(f'{100 * c / (counts.sum() or 1):.2g}'):g}%)" for c in counts]
     lines.append(phaseTable(self.CSList.frames, ids, share))
     # a short list shows its measurements, as MATLAB does up to twenty
     if self.size <= 20:

@@ -130,6 +130,11 @@ def test_fit_recovers_a_fibre():
   fRec, lam, delta = fibre.fit(ori, diagnostics=True, noSymmetry=True)
   assert fRec.isFull and fRec.CS is cs and fRec.SS is ss and angle(fRec, f) < 1 * degree and delta < 2 * degree
   assert lam.shape == (4,) and close(np.sum(lam), 1) and lam[-2] > 100 * lam[-3]
+  # the fit fixes the sign of (h, r) by r in the upper hemisphere, whatever the sample
+  for k in range(4):
+    sub = ori[rng.permutation(500)[:200]]
+    r = fibre.fit(sub, noSymmetry=True).r.data.reshape(3)
+    assert r[2] > 0 or (abs(r[2]) < 1e-9 and r[1] > 0)
   # a concentrated cloud scattered over the crystal group is gathered at its mean first;
   # with a specimen symmetry on top the fundamental region is too small for a 30 degree
   # arc to count as concentrated, so the cloud has none, as measured orientations do

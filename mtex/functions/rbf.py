@@ -356,9 +356,21 @@ class SO3FunCBF:
   def mean(self):
     return float(np.sum(self.weights)) * self.psi.mean()
 
-  # the fibre pairs (t h_i, s^-1 r_i) over the proper rotations, with weight w_i / m
+  # a Laue group holds the inversion, so the fibre of h is that of -h too
+  @property
+  def _laue(self):
+    return bool(self.CS.sym.isLaue or self.SS.sym.isLaue)
+
+  # the fibre pairs (t h_i, s^-1 r_i) over the proper rotations, with weight w_i / m, and
+  # the pairs (-t h_i, s^-1 r_i) beside them, each at half the weight, for a Laue group
   def _expandedFibres(self):
     L, R = reductionGroups(orientation(rotation.id, self.CS, self.SS))
+    if self._laue:
+      H, Rv, w = SO3FunCBF._pairs(self, L, R)
+      return np.concatenate([H, -H]), np.concatenate([Rv, Rv]), np.concatenate([w, w]) / 2
+    return SO3FunCBF._pairs(self, L, R)
+
+  def _pairs(self, L, R):
     hs = (rotation(R)[None, :] * self.h[:, None]).data.reshape(-1, 3)
     rs = (rotation(_conj(L))[None, :] * self.r[:, None]).data.reshape(-1, 3)
     m = len(L) * len(R)
@@ -387,6 +399,9 @@ class SO3FunCBF:
     fhat = np.zeros(deg2dim(L + 1), dtype=complex)
     for l in range(L + 1):
       Yh, Yr = _sphericalY(l, self.h), _sphericalY(l, self.r)
+      # the average over h and -h leaves the even degrees of a Laue group
+      if self._laue and l % 2:
+        continue
       degreeBlock(fhat, l)[...] = A[l] * 4 * np.pi / (2 * l + 1) ** 1.5 * np.einsum("i,ki,ai->ka", self.weights, Yr, np.conj(Yh))
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, _internal=True)
 
@@ -469,7 +484,9 @@ class SO3FunCBF:
     n = self.h.size
     lines = [f"SO3FunCBF ({self.CS.char()} → {self.SS.char()})", "  fibre component" if n == 1 else "  fibre components", f"    kernel: {self.psi}"]
     for i in range(n):
-      lines.append(f"    fibre: ({self.h[i].x:.3g},{self.h[i].y:.3g},{self.h[i].z:.3g}) || ({self.r[i].x:.3g},{self.r[i].y:.3g},{self.r[i].z:.3g}), weight {self.weights[i]:.3g}")
+      # the crystal direction by its rounded indices, as MATLAB shows it
+      h = Miller(vector3d(self.h[i].data), self.CS).round().char(family=False)
+      lines.append(f"    fibre: {h} || ({self.r[i].x:.3g},{self.r[i].y:.3g},{self.r[i].z:.3g}), weight {self.weights[i]:.3g}")
     lines.append(f"    weight: {self.mean():.4g}")
     return "\n".join(lines)
 
@@ -540,6 +557,10 @@ def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
 # an ODF by its Fourier coefficients, or another ODF in its harmonic form (MATLAB FourierODF)
 def FourierODF(C, *args, **kwargs):
   from .so3fun import SO3FunHarmonic
+  # FourierODF(odf, L): the harmonic form up to the bandwidth L
+  if args and np.isscalar(args[0]) and not isinstance(args[0], str) and not isinstance(C, (np.ndarray, list, tuple)):
+    kwargs.setdefault("bandwidth", int(args[0]))
+    args = args[1:]
   return SO3FunHarmonic(C, *args, **kwargs)
 
 

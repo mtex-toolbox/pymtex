@@ -103,3 +103,62 @@ def test_a_png_is_written_fast_and_the_same(tmp_path):
   assert np.array_equal(fast, slow) and np.array_equal(np.asarray(Image.open(buf)), fast)
   # zlib level 1 by default, a caller's own level kept
   assert (tmp_path / "fast.png").stat().st_size > (tmp_path / "slow.png").stat().st_size
+
+
+def test_saveFigure_crops_and_writes_the_format_of_the_extension(tmp_path):
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  import matplotlib.pyplot as plt
+  from PIL import Image
+  from mtex import plot, saveFigure, vector3d
+  plot(vector3d.rand(20, rng=np.random.default_rng(0)), upper=True)
+  saveFigure(tmp_path / "v.png")
+  saveFigure(tmp_path / "v.pdf")
+  fig = plt.gcf()
+  w, h = Image.open(tmp_path / "v.png").size
+  # cropped to the chart, at 1.5 times the screen resolution
+  assert w < 1.5 * fig.dpi * fig.get_size_inches()[0] + 1 and (tmp_path / "v.pdf").stat().st_size > 0
+  plt.close("all")
+
+
+def test_figure_wide_controls_of_MATLAB():
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  import matplotlib.pyplot as plt
+  from mtex import gcm, legend, mtexColorbar, mtexColorMap, newMtexFigure, nextAxis, plot, vector3d
+  v = vector3d.rand(50, rng=np.random.default_rng(1))
+  fig = newMtexFigure()
+  for cm in ("hot", "cool"):
+    nextAxis()
+    plot(v, 'smooth', upper=True)
+    # mtexColorMap(ax, name) colours only that axes; fig.gca is the axes drawn into last
+    mtexColorMap(fig.gca, cm)
+  maps = [ax._mtexSphericalPlot.mappable.get_cmap().name for ax in fig.children]
+  assert maps == ["hot", "cool"]
+  # 'multiple' gives a bar per axes although the ranges agree
+  assert len(mtexColorbar('multiple')) == 2
+  # drawNow(figSize=...) resizes to a named size of the layout
+  fig.drawNow(figSize='small')
+  assert fig.fig.get_size_inches()[0] < 6.4
+  # a second legend replaces the first
+  plot(vector3d.X, upper=True, DisplayName='x')
+  legend('show')
+  legend('show', location='eastoutside', title='T')
+  f = plt.gcf()
+  assert sum(ax.get_legend() is not None for ax in f.axes) + len(f.legends) == 1
+  # nextAxis(k) leaves the axes it makes on the way blank
+  newMtexFigure(layout=[1, 3])
+  plot(vector3d.X, upper=True)
+  nextAxis(1, 3)
+  assert not gcm().children[1].axison
+  plt.close("all")
+
+
+def test_marginx_sets_the_space_around_the_axes():
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  import matplotlib.pyplot as plt
+  from mtex.plotting.mtexfigure import mtexFigure
+  fig = mtexFigure(2, marginx=48)
+  assert np.isclose(fig.fig.get_layout_engine().get()["w_pad"], 0.5)
+  plt.close("all")

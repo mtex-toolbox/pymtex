@@ -221,7 +221,9 @@ class sphericalProjection:
              if self.sR.checkInside(a) or self.sR.checkInside(-a)]
         V = vector3d(np.array([v.data.reshape(3) for v in V]).reshape(-1, 3)).normalize() if V else vector3d()
       return [(v, s) for v in V.flatten() for s in (millerLabel(v, fr),) if s is not None]
-    names = ("X", "Y", "Z") if fr is None else tuple(fr.axesNames)
+    # a frame-free direction is named by the axes of the session's specimen frame
+    from ..geometry.frames import specimenFrame
+    names = tuple((specimenFrame.default if fr is None else fr).axesNames)
     labels = []
     # an antipodal chart shows an axis of the other hemisphere at its antipode; the axis
     # at the pole of the chart is left unlabelled, since a label there would hide the data

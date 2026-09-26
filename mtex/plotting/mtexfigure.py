@@ -49,7 +49,8 @@ class mtexFigure:
     fig.colorbar()            a colour bar per axes, or one when the ranges are equal
   """
 
-  def __init__(self, n=1, figSize=None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None):
+  def __init__(self, n=1, figSize=None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None,
+               marginx=None, marginy=None):
     global _current
     import matplotlib.pyplot as plt
     self.nrows, self.ncols = (int(layout[0]), int(layout[1])) if layout is not None else layoutFor(n, columns)
@@ -57,6 +58,10 @@ class mtexFigure:
     self.figSize = figSize
     figSize = figureSize(figSize, (min(3.2 * self.ncols, 16), min(3.2 * self.nrows, 12)))
     self.fig = plt.figure(figsize=figSize, layout="constrained") if figure is None else figure
+    # MATLAB's marginx and marginy: the space around each axes in pixels, 96 to the inch
+    if figure is None and (marginx is not None or marginy is not None):
+      self.fig.get_layout_engine().set(**({} if marginx is None else {"w_pad": float(marginx) / 96}),
+                                       **({} if marginy is None else {"h_pad": float(marginy) / 96}))
     # a figure adopted keeps its axes, the current one current
     self.children = [] if figure is None else list(figure.axes)
     self.hold = bool(hold)
@@ -94,9 +99,17 @@ class mtexFigure:
   def takeAxis(self):
     ax, self.pending = self.pending, None
     if ax is not None:
-      ax.set_axis_on()
+      # an axes nextAxis left blank shows its frame again, one drawn into keeps its look
+      if getattr(ax, "_mtexBlank", False):
+        ax.set_axis_on()
+        ax._mtexBlank = False
       self.current = ax
     return ax if ax is not None else self.nextAxis()
+
+  # MATLAB's mtexFig.gca: the axes drawn into last
+  @property
+  def gca(self):
+    return self.current if self.current in self.children else self.currentAxes
 
   @property
   def currentAxes(self):
@@ -159,7 +172,7 @@ class mtexFigure:
     if self.colorbars:
       labels = [cb.ax.get_ylabel() for cb in self.colorbars]
       for cb in self.colorbars:
-        cb.remove()
+        _removeBar(cb)
       self.colorbars = []
       self.colorbar(label=labels[0] if labels else "")
 
@@ -175,15 +188,19 @@ class mtexFigure:
     if self.colorbars:
       labels = [cb.ax.get_ylabel() for cb in self.colorbars]
       for cb in self.colorbars:
-        cb.remove()
+        _removeBar(cb)
       self.colorbars = []
       self.colorbar(label=labels[0] if labels else "")
 
   # a filled contour plot cuts its bands out of the map, so it is drawn again
-  def setColormap(self, cmap):
-    self.colormap = cmap
-    for ax, m in self._mappables():
-      refill = _refillOf(ax)
+  def setColormap(self, cmap, ax=None):
+    # one axes given keeps the map of the figure for the others
+    if ax is None:
+      self.colormap = cmap
+    for a, m in self._mappables():
+      if ax is not None and a is not ax:
+        continue
+      refill = _refillOf(a)
       if refill is None:
         m.set_cmap(cmap)
       else:
@@ -191,10 +208,10 @@ class mtexFigure:
 
   # mtexColorbar: a bar per axes, or one for all when they share a range; a figure that
   # has bars loses them instead, as MATLAB's toggle does
-  def colorbar(self, label="", **kwargs):
+  def colorbar(self, label="", multiple=False, **kwargs):
     if self.colorbars:
       for cb in self.colorbars:
-        cb.remove()
+        _removeBar(cb)
       self.colorbars = []
       return []
     ms = self._mappables()
@@ -214,12 +231,12 @@ class mtexFigure:
     ms = list({id(ax): (ax, m) for ax, m in ms}.values())
     # MATLAB's title list: one title per colour bar, in the order of the axes
     if isinstance(label, (list, tuple)):
-      bars = [self.fig.colorbar(m, ax=ax, shrink=0.7, label=l, **kwargs) for (ax, m), l in zip(ms, label)]
+      bars = [self.fig.colorbar(_barOf(m), ax=ax, shrink=0.7, label=l, **kwargs) for (ax, m), l in zip(ms, label)]
       self.colorbars += bars
       return bars
     # one bar for the common range setColorRange gave, whose contour plots keep their own levels
     common = getattr(self, "colorRange", None)
-    if common is not None and len(ms) > 1 and all(getattr(m, "levels", None) is not None for _, m in ms):
+    if common is not None and not multiple and len(ms) > 1 and all(getattr(m, "levels", None) is not None for _, m in ms):
       import matplotlib.cm
       from matplotlib.colors import Normalize
       from .colormaps import mtexColormap
@@ -228,17 +245,20 @@ class mtexFigure:
       self.colorbars.append(cb)
       return [cb]
     clims = {tuple(np.round(m.get_clim(), 12)) for _, m in ms}
-    if len(clims) == 1 and len(ms) > 1:
-      cb = self.fig.colorbar(ms[-1][1], ax=[ax for ax, _ in ms], shrink=0.7, label=label, **kwargs)
+    if len(clims) == 1 and len(ms) > 1 and not multiple:
+      cb = self.fig.colorbar(_barOf(ms[-1][1]), ax=[ax for ax, _ in ms], shrink=0.7, label=label, **kwargs)
       self.colorbars.append(cb)
       return [cb]
-    bars = [self.fig.colorbar(m, ax=ax, shrink=0.7, label=label, **kwargs) for ax, m in ms]
+    bars = [self.fig.colorbar(_barOf(m), ax=ax, shrink=0.7, label=label, **kwargs) for ax, m in ms]
     self.colorbars += bars
     return bars
 
   # ------------------------------------------------------------------ pass through
 
-  def drawNow(self):
+  # drawNow(figSize='normal'): the figure resized to a named size of its layout, then drawn
+  def drawNow(self, figSize=None):
+    if figSize is not None:
+      self.fig.set_size_inches(*figureSize(figSize, (min(3.2 * self.ncols, 16), min(3.2 * self.nrows, 12))))
     self.fig.canvas.draw_idle()
 
   # a PNG is written at zlib level 1, not Pillow's 6: the same pixels, a file about a tenth
@@ -256,6 +276,25 @@ class mtexFigure:
   def show(self):
     import matplotlib.pyplot as plt
     plt.show()
+
+
+# what a colour bar shows of a drawing: filled bands their map over the range, continuously
+def _barOf(m):
+  bar = getattr(m, "_mtexBar", None)
+  if bar is None:
+    return m
+  import matplotlib.cm
+  return matplotlib.cm.ScalarMappable(norm=bar[1], cmap=bar[0])
+
+
+# a colour bar goes with its axes, also when the drawing it described was redrawn and is
+# gone, where matplotlib fails only after removing it, resetting the gone drawing's axes
+def _removeBar(cb):
+  try:
+    cb.remove()
+  except AttributeError:
+    if getattr(cb.mappable, "axes", None) is not None:
+      raise
 
 
 # the grid n axes are laid out in: the divisor of n nearest to the width of a slightly wide
@@ -289,10 +328,13 @@ def nextAxis(k=None, j=None, fig=None):
   if k is None:
     fig.pending = fig.nextAxis()
     fig.pending.set_axis_off()
-  # the axes up to the k-th that do not exist yet are made
+    fig.pending._mtexBlank = True
+  # the axes up to the k-th that do not exist yet are made, blank
   else:
     while len(fig.children) < int(k):
-      fig.nextAxis()
+      ax = fig.nextAxis()
+      ax.set_axis_off()
+      ax._mtexBlank = True
     fig.pending = fig.children[int(k) - 1]
   return fig.pending
 
@@ -381,12 +423,40 @@ def mtexColorbar(fig=None, title=None, **kwargs):
   if isinstance(fig, str):
     kwargs.setdefault("location", fig)
     fig = None
+  # mtexColorbar('multiple'): a bar per axes, even where the ranges agree
+  if str(kwargs.get("location", "")).lower() == "multiple":
+    kwargs.pop("location")
+    kwargs["multiple"] = True
   if "location" in kwargs:
     kwargs["location"] = COLORBAR_LOCATIONS.get(str(kwargs["location"]).lower(), kwargs["location"])
   if title is not None:
     kwargs["label"] = title
   fig = gcm() if fig is None else fig
   return [] if fig is None else fig.colorbar(**kwargs)
+
+
+# saveFigure('name.png'): the current figure written cropped to its content, the format by the
+# extension; a bitmap at 1.5 times the screen resolution, a map at 2.5 times and without
+# smoothing between its cells, so that no colour is invented between measurements
+# (MATLAB saveFigure); 'crop' and 'pdf' of MATLAB's TeX tools need nothing here
+def saveFigure(fname, fig=None, *args, **kwargs):
+  import os
+  import matplotlib.pyplot as plt
+  m = gcm() if fig is None else fig
+  figure = m.fig if isinstance(m, mtexFigure) else (m if m is not None else plt.gcf())
+  ext = os.path.splitext(os.fspath(fname))[1][1:].lower()
+  if ext not in ("pdf", "eps", "ps", "svg"):
+    isMap = any(hasattr(ax, "_mtexMapPlot") for ax in figure.axes)
+    kwargs.setdefault("dpi", (2.5 if isMap else 1.5) * figure.dpi)
+    if isMap:
+      for ax in figure.axes:
+        for im in ax.images:
+          im.set_interpolation("nearest")
+  kwargs.setdefault("bbox_inches", "tight")
+  kwargs.setdefault("pad_inches", 0.02)
+  if ext == "png":
+    kwargs.setdefault("pil_kwargs", {"compress_level": 1})
+  figure.savefig(fname, **kwargs)
 
 
 # logAxis(ax, xLimits, yLimits): both axes logarithmic, a decade the same length on each
@@ -438,6 +508,12 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
         ax.get_legend().remove()
     return None
   names = [n for n in names if n != "show"]
+  # a new legend replaces the ones the figure has, inside an axes or beside the charts
+  for ax in fig.axes:
+    if ax.get_legend() is not None:
+      ax.get_legend().remove()
+  for leg in list(fig.legends):
+    leg.remove()
   if names:
     # the MTEX figure's last chart, unless a plain figure opened after it is the current one
     m = gcm()
@@ -469,7 +545,10 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
       fig.set_size_inches(width + 0.2, h)
     return leg
   ax = fig.axes[-1] if fig.axes else plt.gca()
-  return _sameSize(ax.legend(handles, labels, loc=LEGEND_LOCATIONS.get(where, where), **kw))
+  leg = _sameSize(ax.legend(handles, labels, loc=LEGEND_LOCATIONS.get(where, where), **kw))
+  # above the labels of a chart, which sit on its rim in white boxes
+  leg.set_zorder(100)
+  return leg
 
 
 # the bars, lines and markers of an axes in the order they were drawn, a set of bars as one
@@ -489,7 +568,7 @@ def _sameSize(leg, size=36.0):
   return leg
 
 
-__all__ = ["logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar",
+__all__ = ["saveFigure", "logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar",
            "setColorRange", "setColorScale"]
 
 

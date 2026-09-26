@@ -27,7 +27,7 @@ from .spherical import hasSymmetry, makeSphericalProjection, plainProjection
 
 PROJECTION_KEYS = ("projection", "upper", "lower", "complete", "antipodal", "how2plot", "fundamentalRegion")
 AXES_KEYS = ("grid", "grid_res", "noLabel", "fontSize")
-WHERE_KEYS = ("parent", "add2all", "figSize", "layout")
+WHERE_KEYS = ("parent", "add2all", "figSize", "layout", "marginx", "marginy")
 MARKER_COLOR = (0.0, 0.447, 0.741)
 BOUNDARY_COLOR = (0.35, 0.35, 0.35)
 GRID_COLOR = (0.8, 0.8, 0.8)
@@ -150,10 +150,11 @@ def _targets(v, projKw, axesKw, whereKw, titles=None):
   # a held plot draws into the axes nextAxis named, else into the current one
   if fig is not None and fig.hold and fig.pending is not None and hasattr(fig.pending, "_mtexSphericalPlot"):
     return [fig.takeAxis()._mtexSphericalPlot]
-  if fig is not None and fig.hold and fig.current is not None and fig.current is not fig.children[-1] and \
+  # a blank axes nextAxis prepared takes a held plot too
+  if fig is not None and fig.hold and fig.pending is None and fig.current is not None and fig.current is not fig.children[-1] and \
      hasattr(fig.current, "_mtexSphericalPlot"):
     return [fig.current._mtexSphericalPlot]
-  if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSphericalPlot"):
+  if fig is not None and fig.hold and fig.pending is None and fig.children and hasattr(fig.children[-1], "_mtexSphericalPlot"):
     # the two hemispheres of one sphere take a held plot together, each clipping its own
     sPs = [ax._mtexSphericalPlot for ax in fig.children if hasattr(ax, "_mtexSphericalPlot")]
     if len(sPs) == 2 and {bool(getattr(sPs[0].proj, "upper", False)), bool(getattr(sPs[1].proj, "upper", False))} == {True, False} and len(fig.children) == 2:
@@ -164,18 +165,41 @@ def _targets(v, projKw, axesKw, whereKw, titles=None):
   # a new figure, laid out as asked
   if fig is not None and fig.pending is not None and len(projs) == 1:
     return [_plotOf(fig.takeAxis(), v, projKw, axesKw)]
+  # the two hemispheres go into the axes prepared and the one after it
+  if fig is not None and fig.pending is not None and len(projs) == 2:
+    sPs = [sphericalPlot(fig.takeAxis() if i == 0 else fig.nextAxis(), p, **axesKw) for i, p in enumerate(projs)]
+    for sP in sPs:
+      sP.hemisphereLabel()
+    return sPs
   if fig is not None and not fig.children and not fig.hold:
     sPs = [sphericalPlot(fig.nextAxis(), p, **axesKw, title=None if titles is None else titles[i]) for i, p in enumerate(projs)]
     if len(projs) == 2:
       for sP in sPs:
         sP.hemisphereLabel()
     return sPs
-  fig = mtexFigure(len(projs), figSize=whereKw.get("figSize"), layout=whereKw.get("layout"))
+  fig = mtexFigure(len(projs), figSize=whereKw.get("figSize"), layout=whereKw.get("layout"), marginx=whereKw.get("marginx"),
+                    marginy=whereKw.get("marginy"))
   sPs = [sphericalPlot(fig.nextAxis(), p, **axesKw, title=None if titles is None else titles[i]) for i, p in enumerate(projs)]
   if len(projs) == 2:
     for sP in sPs:
       sP.hemisphereLabel()
   return sPs
+
+
+# the charts drawn into the axes named by parent, one each, as MATLAB's subplot and
+# 'parent' arrange independent plots; the figure of those axes becomes the current one
+def intoParents(parent, charts, axesKw):
+  axes = list(parent) if isinstance(parent, (list, tuple)) else [parent]
+  fig = gcm()
+  if fig is None or fig.fig is not axes[0].figure:
+    fig = mtexFigure(figure=axes[0].figure)
+  sPs = []
+  for ax, (p, t) in zip(axes, charts):
+    sP = getattr(ax, "_mtexSphericalPlot", None)
+    sPs.append(sP if sP is not None else sphericalPlot(ax, p, **axesKw, title=t))
+    if ax not in fig.children:
+      fig.children.append(ax)
+  return fig, sPs
 
 
 def _plotOf(ax, v, projKw, axesKw):
@@ -211,6 +235,11 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
   # the text goes below the marker unless textAboveMarker, MATLAB's textBelowMarker being that default
   above = kw.pop("textAboveMarker", False) and not kw.pop("textBelowMarker", False)
   kw.pop("textBelowMarker", None)
+  # MATLAB's textColor colours the labels; beside a MarkerFaceColor, color is the text's too
+  textColor = kw.pop("textColor", kw.pop("fontColor", kw.pop("Color", None)))
+  labelFontSize = kw.pop("labelFontSize", None)
+  if textColor is None and label is not None and "color" in kw and ("MarkerFaceColor" in kw or "MarkerColor" in kw):
+    textColor = kw.pop("color")
   # the markers shrink with the spacing of many directions, as MATLAB's do; the spacing is
   # that of as many directions spread evenly
   sizeGiven = any(key in kw for key, name in MARKER_KEYS.items() if name == "size")
@@ -236,6 +265,9 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
     if not edgeGiven:
       opts["edgecolor"] = opts["color"]
     opts["color"] = "none"
+  # a marker is edged in its own colour unless told otherwise, as MATLAB's scatter does
+  elif not edgeGiven:
+    opts["edgecolor"] = "face"
   # MATLAB's marker names; a line width is the width of the marker edge
   opts["marker"] = MARKER_NAMES.get(str(opts["marker"]).lower(), opts["marker"])
   edgeWidth = kw.pop("lineWidth", kw.pop("linewidth", kw.pop("LineWidth", None)))
@@ -260,15 +292,16 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
   ax = sP.ax
   size = opts["size"]
   # one size for all, a diameter, or one per marker, an area as MATLAB's scatter reads it;
-  # the edge thins with the marker, so a small marker still shows its face
+  # the edge thins with the marker, so a small marker still shows its face; an open marker is
+  # all edge and keeps it
   sizes = np.asarray(size, dtype=float)
   area = sizes ** 2
   if sizes.ndim > 0 and sizes.size > 1:
     area = sizes.reshape(-1)[keep] if sizes.size == len(x) else sizes.reshape(-1)
     sizes = np.sqrt(area)
   small = float(np.min(sizes)) if sizes.size else float(sizes)
-  common = dict(marker=opts["marker"], s=area, edgecolors=opts["edgecolor"] if small >= 2 else "none",
-                linewidths=0.5 * min(1.0, small / 6) if edgeWidth is None else edgeWidth, zorder=zorder,
+  common = dict(marker=opts["marker"], s=area, edgecolors=opts["edgecolor"] if small >= 2 or faceNone else "none",
+                linewidths=0.5 * min(1.0, max(small, 3.0 if faceNone else 0.0) / 6) if edgeWidth is None else edgeWidth, zorder=zorder,
                 alpha=opts.get("alpha"), label=legendName, **kw)
   if data is not None:
     vals = np.asarray(data, dtype=float).ravel()[keep]
@@ -297,10 +330,13 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
       h = ax.scatter(x[keep], y[keep], color=color, **common)
   if label is not None:
     texts = [label] * len(x) if isinstance(label, str) else [str(t) for t in np.asarray(label, dtype=object).ravel()]
+    # MATLAB's tex interpreter: v_1 and x^2 are set as sub- and superscripts
+    texts = [f"${t}$" if ("_" in t or "^" in t) and "$" not in t and " " not in t else t for t in texts]
     bbox = None if background is None else dict(facecolor=background, edgecolor="none", pad=1)
     for i in np.flatnonzero(keep):
       ax.annotate(texts[i], (x[i], y[i]), xytext=(0, size / 2 + 1 if above else -size / 2 - 1), textcoords="offset points", ha="center",
-                  va="bottom" if above else "top", fontsize=sP.fontSize - 2, zorder=8, bbox=bbox)
+                  va="bottom" if above else "top", fontsize=sP.fontSize - 2 if labelFontSize is None else labelFontSize, zorder=8, bbox=bbox,
+                  color=textColor or "k")
   return h
 
 
@@ -337,6 +373,12 @@ def _blocks(X):
 def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorRange=None, log=False,
             lineColor=None, lineWidth=0.5, contourLabels=False, zorder=2, **kw):
   from matplotlib.colors import LogNorm, Normalize
+  # MATLAB's 'logarithmic' colour scale
+  log = kw.pop("logarithmic", log)
+  # MATLAB's 'ShowText', 'on' labels the contour lines
+  showText = kw.pop("ShowText", kw.pop("showText", None))
+  if showText is not None:
+    contourLabels = showText.lower() == "on" if isinstance(showText, str) else bool(showText)
   # MATLAB's faceAlpha is the transparency of the surface
   for name in ("faceAlpha", "FaceAlpha"):
     if name in kw:
@@ -378,11 +420,13 @@ def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorR
       bucket.append(h)
     elif style == "contourf":
       # a band takes the colour of its lower level, as MATLAB's contourf does, so the lowest
-      # band of a map that starts white stays white
+      # band of a map that starts white stays white; below the lowest level nothing is filled
       from matplotlib.colors import BoundaryNorm, ListedColormap
-      bands = ListedColormap([cmap(0.0)] + [cmap(norm(l)) for l in levels[:-1]] + [cmap(1.0)], name=cmap.name)
+      bands = ListedColormap([(1.0, 1.0, 1.0, 0.0)] + [cmap(norm(l)) for l in levels[:-1]] + [cmap(1.0)], name=cmap.name)
       h = ax.contourf(Xb, Yb, np.ma.masked_invalid(Cb), levels=levels, cmap=bands, norm=BoundaryNorm(levels, bands.N, extend="both"),
                       extend="both", zorder=zorder, **kw)
+      # the colour bar shows the map over the range continuously, as MATLAB's does
+      h._mtexBar = (cmap, norm)
       bucket.append(h)
     if style in ("contourf", "contour"):
       colors = lineColor if lineColor is not None else "k" if style == "contourf" else None
@@ -479,6 +523,19 @@ def _isSO3Fun(f):
 FILL_FLAGS = ("contourf", "contour", "pcolor", "smooth")
 
 
+# the style flag of a filled plot, popped from the keywords; MATLAB's 'contourf', n or
+# 'contourf', levels also gives the number of contours or the levels themselves
+def fillFlag(kw, default=None):
+  for f in FILL_FLAGS:
+    x = kw.pop(f, None)
+    if x is None or (isinstance(x, (bool, np.bool_)) and not x):
+      continue
+    if not isinstance(x, (bool, np.bool_, str)):
+      kw.setdefault("contours", int(x) if np.isscalar(x) else np.asarray(x, dtype=float))
+    return f
+  return default
+
+
 def plot(v, *args, **kw):
   """plot(v), plot(v, data), plot(v, rgb), plot(v, w), plot(sF), plot(vF), plot(sR)
 
@@ -540,7 +597,16 @@ def plot(v, *args, **kw):
   # plot(ori, add2all=True) on pole figures: the poles of the orientations on every one
   if hasattr(v, "frameA") and hasattr(v, "frameB") and kw.get("add2all") and gcm() is not None and \
       any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None for ax in gcm().children):
+    # the markers shrink with the number of poles, as those of plotPDF(ori, h) do
+    from .poles import dynamicMarkerSize
+    if not any(k in kw for k, name in MARKER_KEYS.items() if name == "size"):
+      kw["MarkerSize"] = dynamicMarkerSize(v.size * max(v.CS.numSym() // 2, 1))
     return _annotatePoles(v, **kw)
+  # plot(f, add2all=True) on pole figures: the poles of the fibre as curves on every one
+  from ..geometry.fibre import fibre
+  if isinstance(v, fibre) and kw.get("add2all") and gcm() is not None and \
+      any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None for ax in gcm().children):
+    return _fibrePoles(v, **kw)
   # the geometry of a section plot: its charts with the reference fields
   from .sections import ODFSections
   if isinstance(v, ODFSections):
@@ -587,7 +653,7 @@ def plot(v, *args, **kw):
   if _isFunction(v):
     # MATLAB's positional flags, plot(sF, 'complete', 'smooth', 'upper', 'lower')
     kw.update({a: True for a in args if isinstance(a, str)})
-    style = next((f for f in FILL_FLAGS if kw.pop(f, False)), "pcolor")
+    style = fillFlag(kw, "pcolor")
     # a list of functions: one panel for each, each on its own colour range
     if getattr(v, "shape", ()):
       fs = [v[k] for k in np.ndindex(v.shape)]
@@ -615,7 +681,7 @@ def plot(v, *args, **kw):
     return _planeCircles(v, **kw)
   if args and isinstance(args[0], vector3d):
     return quiver(v, args[0], **kw)
-  style = next((f for f in FILL_FLAGS if kw.pop(f, False)), None)
+  style = fillFlag(kw, None)
   data = args[0] if args else None
   if style is not None and data is not None and getattr(v, "_plotGrid", None) is not None:
     return _plotOnGrid(v, data, style="pcolor" if style == "smooth" else style, **kw)
@@ -678,6 +744,8 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, EdgeAlpha, p
   lineColor = kw.pop("color", kw.pop("linecolor", kw.pop("LineColor", kw.pop("lineColor", lineColor))))
   lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
   kw.pop("doNotDraw", None)
+  # MATLAB's DisplayName names the first curve on each axes in a legend
+  legendName = kw.pop("DisplayName", kw.pop("displayName", None))
   fig = gcm()
   if parent is not None:
     axes = list(parent) if isinstance(parent, (list, tuple)) else [parent]
@@ -697,7 +765,8 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, EdgeAlpha, p
       # a curve leaving the chart, or folded to its antipode, is broken where it jumps
       jump = np.flatnonzero(np.hypot(np.diff(x), np.diff(y)) > 0.25 * np.nanmax(np.hypot(x, y)))
       x, y = np.insert(x, jump + 1, np.nan), np.insert(y, jump + 1, np.nan)
-      hs.append(ax.plot(x, y, color=lineColor, linewidth=lineWidth, alpha=EdgeAlpha, zorder=7, **kw))
+      named = legendName is not None and ring is rings[0]
+      hs.append(ax.plot(x, y, color=lineColor, linewidth=lineWidth, alpha=EdgeAlpha, zorder=7, label=legendName if named else "_nolegend_", **kw))
   return hs
 
 
@@ -730,8 +799,12 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
     return scatterOrientations(v, data, **kw)
   v = v if isinstance(v, vector3d) else vector3d(v)
   projKw, axesKw, whereKw = _split(kw)
+  # beside labels MATLAB's FontSize is the size of their text, not of the chart's
+  if ("label" in kw or kw.get("labeled")) and "fontSize" in axesKw:
+    kw["labelFontSize"] = axesKw.pop("fontSize")
   if symmetrised and v.isCrystalDirection:
-    s = v.symmetrise()
+    # every distinct equivalent once, so that no label is written twice in one place
+    s = v.symmetrise(unique=data is None and v.size == 1)
     v, data = s.flatten(), None if data is None else np.tile(np.asarray(data).ravel(), s.shape[0])
   sPs = _targets(v, projKw, axesKw, whereKw)
   rgb = None
@@ -742,6 +815,9 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
   hs = []
   for sP in sPs:
     w = projectIntoRegion(v, sP.sR) if projKw.get("fundamentalRegion") and hasSymmetry(v.frame) else v
+    # an antipodal chart shows an equivalent inside it rather than the antipode of one
+    if symmetrised and sP.antipodal and data is None and rgb is None and w.size > 1:
+      w = _insideFirst(w, sP.sR)
     h = _markers(sP, w, data, rgb=rgb, **kw)
     hs.append(h)
     if minmax:
@@ -749,6 +825,15 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
   if colorbar and data is not None:
     gcm().colorbar()
   return hs
+
+
+# the directions without those whose antipode is among them and inside the region
+def _insideFirst(v, sR):
+  xyz = v.normalize().data.reshape(-1, 3)
+  inside = np.asarray(sR.checkInside(v.flatten())).reshape(-1)
+  opposite = (xyz @ xyz.T) < -1 + 1e-6
+  drop = ~inside & np.any(opposite & inside[None, :], axis=1)
+  return v.flatten()[np.flatnonzero(~drop)]
 
 
 def text(v, labels=None, *more, **kw):
@@ -806,6 +891,28 @@ def _planeCircles(v, lineStyle="-", lineWidth=1.0, lineColor="k", **kw):
 # of n corners for an n-fold rotation axis, a lens for a twofold, a hollow one for a
 # rotoinversion axis, a great circle for a mirror plane, a hollow circle for the inversion
 # (MATLAB @referenceFrame/plot)
+def plotHKL(cs, complete=False, **kw):
+  """plotHKL(cs): the low index directions <100>, <110>, <111> of a crystal with all their
+  symmetric equivalents, labelled, on the upper hemisphere unless complete (MATLAB
+  crystalFrame/plotHKL)"""
+  from ..geometry.miller import Miller
+  hkl = ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (0, 1, 1), (1, 0, 1), (1, 1, 1), (-1, -1, 0), (-1, -1, 1))
+  ms = Miller(np.array(hkl, dtype=float), cs).unique()
+  opts = dict(symmetrised=True, labeled=True, MarkerEdgeColor="k", grid=True, backgroundColor="w", noLabel=True)
+  if not complete:
+    opts["upper"] = True
+  opts.update(kw)
+  # in MATLAB's order: <111>, <110>, <100> take the colours of the order
+  ms = ms[::-1]
+  hs = scatter(ms[0], **opts)
+  # the other directions into the charts the first one made
+  axes = [h.axes for h in hs if h is not None]
+  opts.pop("figSize", None)
+  for k in range(1, ms.size):
+    hs += scatter(ms[k], parent=axes, **opts)
+  return hs
+
+
 def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
   from matplotlib.patches import Ellipse, Polygon
   from ..geometry.quaternion import orthogonalTransform
@@ -885,8 +992,19 @@ def annotate(v, *args, **kw):
     if getattr(gcm(), "sections", None) is not None:
       from .sectionplot import annotateSection
       return annotateSection(v, *args, **kw)
-    if gcm() is not None and any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None for ax in gcm().children):
+    if gcm() is not None and any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None or
+                                 getattr(getattr(ax, "_mtexSphericalPlot", None), "r", None) is not None for ax in gcm().children):
       return _annotatePoles(v, **kw)
+    # into the orientation space the figure shows, in its coordinates
+    fig = gcm()
+    if fig is not None and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot"):
+      from .spaceplot import scatterOrientations
+      kw.pop("add2all", None)
+      held, fig.hold = fig.hold, True
+      try:
+        return scatterOrientations(v, *args, **kw)
+      finally:
+        fig.hold = held
   # the great circle normal to a direction, drawn as a line on every axes
   if kw.pop("plane", False):
     return _planeCircles(v, **kw)
@@ -941,7 +1059,7 @@ def _plotFunction(f, style="pcolor", resolution=1 * degree, minmax=False, colorb
   grids = [sP.proj.grid(resolution) for sP in sPs]
   values = [_valuesOn(f, V) if V.size else np.zeros((0, 0)) for V, _, _ in grids]
   if colorRange is None:
-    colorRange = _rangeOf(values)
+    colorRange = _levelRange(kw) or _rangeOf(values)
   hs = [_filled(sP, X, Y, vals, style=style, colorRange=colorRange, **kw) if vals.size else None
         for sP, (_, X, Y), vals in zip(sPs, grids, values)]
   for sP in sPs:
@@ -950,6 +1068,15 @@ def _plotFunction(f, style="pcolor", resolution=1 * degree, minmax=False, colorb
   if colorbar:
     gcm().colorbar()
   return hs
+
+
+# the range of contour levels given explicitly, None for a number of them
+def _levelRange(kw):
+  levels = kw.get("contours")
+  if levels is None or np.isscalar(levels):
+    return None
+  levels = np.asarray(levels, dtype=float)
+  return (float(levels.min()), float(levels.max()))
 
 
 def _rangeOf(values):
@@ -1068,7 +1195,9 @@ def _asList(h):
 # the name of a specimen direction: an axis name of its frame, else its coordinates
 def _directionTitle(r):
   fr = r.frame
-  names = ("X", "Y", "Z") if fr is None else tuple(fr.axesNames)
+  # a frame-free direction is named by the axes of the session's specimen frame
+  from ..geometry.frames import specimenFrame
+  names = tuple((specimenFrame.default if fr is None else fr).axesNames)
   u = r.normalize().data.reshape(3)
   for k, e in enumerate((xvector, yvector, zvector)):
     d = u @ e.data
@@ -1081,11 +1210,11 @@ def _directionTitle(r):
 # pole figures of an ODF
 def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", colorbar=False, minmax=False,
              noTitle=False, **kw):
-  flag = next((f for f in FILL_FLAGS if kw.pop(f, False)), None)
+  flag = fillFlag(kw, None)
   style = ("pcolor" if flag in (None, "smooth") else flag) if style is None else style
   projKw, axesKw, whereKw = _split(kw)
   complete = projKw.pop("complete", False)
-  charts = []
+  charts, halves = [], []
   for f, title in zip(fs, titles):
     if complete:
       v = sphericalRegion(frame=getattr(f, "frame", None))
@@ -1093,25 +1222,38 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
                 symmetric=hasSymmetry(v.frame))
     else:
       v, pk = f, projKw
-    for p in makeSphericalProjection(v, **pk):
-      charts.append((f, p, None if noTitle else title))
+    # a sphere drawn as two hemispheres is titled once and each half says which it is
+    projs = makeSphericalProjection(v, **pk)
+    for i, p in enumerate(projs):
+      charts.append((f, p, None if noTitle or i else title))
+      halves.append(len(projs) == 2)
   # a held figure of as many charts takes the surface on top of what it has; the axes
   # nextAxis prepared takes the first chart and the axes after it the others, as a row of
   # a newMtexFigure layout continues; a fresh figure of newMtexFigure the charts; else a
   # new figure, laid out as asked
   fig = gcm()
-  if fig is not None and fig.hold and len(fig.children) == len(charts) and all(hasattr(ax, "_mtexSphericalPlot") for ax in fig.children):
+  if whereKw.get("parent") is not None:
+    fig, sPs = intoParents(whereKw["parent"], [(p, t) for _, p, t in charts], axesKw)
+  elif fig is not None and fig.hold and len(fig.children) == len(charts) and all(hasattr(ax, "_mtexSphericalPlot") for ax in fig.children):
     sPs = [ax._mtexSphericalPlot for ax in fig.children]
   elif fig is not None and fig.pending is not None:
     sPs = [sphericalPlot(fig.takeAxis() if i == 0 else fig.nextAxis(), p, **axesKw, title=t) for i, (_, p, t) in enumerate(charts)]
   elif fig is not None and not fig.children and not fig.hold:
     sPs = [sphericalPlot(fig.nextAxis(), p, **axesKw, title=t) for _, p, t in charts]
   else:
-    fig = mtexFigure(len(charts), figSize=whereKw.get("figSize"), layout=whereKw.get("layout"))
+    fig = mtexFigure(len(charts), figSize=whereKw.get("figSize"), layout=whereKw.get("layout"), marginx=whereKw.get("marginx"),
+                      marginy=whereKw.get("marginy"))
     sPs = [sphericalPlot(fig.nextAxis(), p, **axesKw, title=t) for _, p, t in charts]
+  if not (fig is not None and fig.hold):
+    for sP, half in zip(sPs, halves):
+      if half:
+        sP.hemisphereLabel()
   grids = [sP.proj.grid(resolution) for sP in sPs]
   values = [_valuesOn(f, V) for (f, _, _), (V, _, _) in zip(charts, grids)]
   # one range over the row, or one per function where the panels are not comparable
+  # explicit contour levels span the colours, as MATLAB's contourf with levels
+  if isinstance(colorRange, str) and _levelRange(kw) is not None:
+    colorRange = _levelRange(kw)
   if isinstance(colorRange, str) and colorRange == "individual":
     own = {}
     for (f, _, _), vals in zip(charts, values):
@@ -1134,9 +1276,18 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
 
 def plotPDF(odf, h, *args, superposition=None, **kw):
   """plotPDF(odf, h): the pole figures of an ODF, one axes per crystal direction"""
-  # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf')
+  # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf'), and a convention
   kw.update({a: True for a in args if isinstance(a, str)})
+  from ..geometry.plottingconvention import plottingConvention
+  for a in args:
+    if isinstance(a, plottingConvention):
+      kw["how2plot"] = a
   hs = _asList(h)
+  # plotPDF(odf, h, '3d'): the pole figure on the sphere in space
+  if kw.pop("3d", False):
+    from .spaceplot import plotFunction3d
+    kw.pop("noTitle", None)
+    return [plotFunction3d(odf.pdf(x), **kw) for x in hs]
   if superposition is not None:
     from ..functions.density import calcPDF
     # one superposed pole figure per entry when the coefficients come as a list of arrays,
@@ -1153,6 +1304,9 @@ def plotPDF(odf, h, *args, superposition=None, **kw):
   else:
     from ..functions.density import calcPDF
     fs = [odf.pdf(x) if x.size == 1 else calcPDF(odf, x) for x in hs]
+    # an antipodal pole figure superposes both hemispheres, as a measurement does
+    if kw.get("antipodal"):
+      fs = [f.even() if not getattr(f, "antipodal", True) and hasattr(f, "even") else f for f in fs]
     titles = [x.char() for x in hs]
     poles = hs
   # every pole figure on its own range, as MATLAB's; colorRange='equal' shares one
@@ -1186,6 +1340,13 @@ def _annotatePoles(ori, **kw):
   hs = []
   for ax in fig.children:
     sP = getattr(ax, "_mtexSphericalPlot", None)
+    # an inverse pole figure: the crystal direction along its specimen direction, in the sector
+    if sP is not None and getattr(sP, "r", None) is not None:
+      from ..geometry.sphericalregion import projectIntoRegion
+      from .poles import inversePoles
+      w = inversePoles(ori.flatten(), sP.r, antipodal=bool(getattr(sP.sR, "antipodal", False))).flatten()
+      hs.append(_markers(sP, projectIntoRegion(w, sP.sR), **dict(kw)))
+      continue
     if sP is None or getattr(sP, "h", None) is None:
       continue
     directions = sP.h if isinstance(sP.h, (list, tuple)) else [sP.h] if sP.h.ndim == 0 else [sP.h[i] for i in range(sP.h.size)]
@@ -1195,12 +1356,43 @@ def _annotatePoles(ori, **kw):
   return hs
 
 
+# the poles of a fibre on the pole figures of the current figure: one curve per equivalent
+# of each pole figure's crystal direction (MATLAB fibre/plot, orientation/line)
+def _fibrePoles(f, points=1000, lineColor="k", lineWidth=1.5, **kw):
+  from .poles import poles
+  kw.pop("add2all", None)
+  label = kw.pop("DisplayName", kw.pop("displayName", None))
+  ori = f.orientation(points).flatten()
+  hs = []
+  for ax in gcm().children:
+    sP = getattr(ax, "_mtexSphericalPlot", None)
+    if sP is None or getattr(sP, "h", None) is None:
+      continue
+    directions = sP.h if isinstance(sP.h, (list, tuple)) else [sP.h] if sP.h.ndim == 0 else [sP.h[i] for i in range(sP.h.size)]
+    for h in directions:
+      p = poles(ori, h, antipodal=bool(getattr(sP.sR, "antipodal", False)) or bool(h.antipodal))
+      xyz = p.data.reshape(ori.size, -1, 3)
+      rings = [xyz[:, j] for j in range(xyz.shape[1])]
+      # the legend names the fibre once per axes
+      for k, h1 in enumerate(_curves(rings, None, p.antipodal, False, lineColor, lineWidth, 1.0, ax, "fibre", **kw)):
+        h1[0].set_label(label if (label is not None and k == 0) else "_nolegend_")
+        hs.append(h1)
+  return hs
+
+
 def plotIPDF(odf, r, *args, **kw):
   """plotIPDF(odf, r): the inverse pole figures of an ODF, one axes per specimen direction"""
   rs = _asList(r)
   fs = [odf.ipdf(x) for x in rs]
-  return _plotRow(fs, [_directionTitle(x) for x in rs], **kw)
+  out = _plotRow(fs, [_directionTitle(x) for x in rs], **kw)
+  # the axes remember their specimen direction, so that annotate(ori) can mark it
+  fig = gcm()
+  if fig is not None and len(out) == len(rs):
+    for ax, x in zip(fig.children[-len(rs):], rs):
+      if hasattr(ax, "_mtexSphericalPlot"):
+        ax._mtexSphericalPlot.r = x
+  return out
 
 
-__all__ = ["plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate", "contourf", "contour", "pcolor", "quiver", "plotRegion", "plotKernel", "circle", "ellipse",
+__all__ = ["plotHKL", "plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate", "contourf", "contour", "pcolor", "quiver", "plotRegion", "plotKernel", "circle", "ellipse",
            "plotPDF", "plotIPDF", "plotKey"]

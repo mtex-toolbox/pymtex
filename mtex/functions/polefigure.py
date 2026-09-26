@@ -168,6 +168,11 @@ class PoleFigure:
   def frame(self):
     return self.SS
 
+  # the plotting convention of the specimen directions, the session's for frame-free ones
+  @property
+  def how2plot(self):
+    return self.allR[0].how2plot
+
   @property
   def antipodal(self):
     return self.allR[0].antipodal
@@ -229,6 +234,15 @@ class PoleFigure:
     if isinstance(key, slice):
       return self.select(range(*key.indices(self.numPF)))
     return self.select(key)
+
+  # pf[mask] = value: the intensities of the measurements the mask picks, MATLAB's
+  # pf(pf.intensities < 0) = 0
+  def __setitem__(self, key, value):
+    if not _isBoolMask(key):
+      raise TypeError("pf[mask] = value takes a mask with one entry per specimen direction")
+    I = self.intensities
+    I[np.asarray(key, dtype=bool).ravel()] = value
+    self.intensities = I
 
   def __repr__(self):
     lines = [f"PoleFigure ({self.CS.char()} → {self.SS.char()})"]

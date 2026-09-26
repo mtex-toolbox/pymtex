@@ -15,7 +15,7 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
-from .sphericalplot import (FILL_FLAGS, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
+from .sphericalplot import (FILL_FLAGS, fillFlag, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
 
 FIELD_COLOR = (0.72, 0.72, 0.72)
 OUTER_COLOR = (0.75, 0.75, 0.75)
@@ -119,14 +119,22 @@ def _scaleLimits(ax, s):
 
 
 # every equivalent of every orientation is a marker, so a long list is thinned first,
-# deterministically (MATLAB 'points', 'all')
+# deterministically (MATLAB 'points', 'all'); the NaN orientations draw nothing and count not
 def _thinned(ori, values, points, all_):
+  ori = ori.flatten()
+  # one value per orientation, or one row, an RGB colour
+  if values is not None:
+    values = np.asarray(values)
+    values = values.ravel() if values.size == ori.size else values.reshape(ori.size, -1)
+  keep = ~np.any(np.isnan(ori.data.reshape(ori.size, -1)), axis=1)
+  if not keep.all():
+    ori, values = ori[keep], None if values is None else values[keep]
   n = ori.size
   if all_ or n <= points:
-    return ori.flatten(), None if values is None else np.asarray(values).ravel()
+    return ori, values
   print(f"plot {points} random orientations out of {n} given orientations")
   idx = np.unique(np.round(np.linspace(0, n - 1, points)).astype(int))
-  return ori.flatten()[idx], None if values is None else np.asarray(values).ravel()[idx]
+  return ori[idx], None if values is None else values[idx]
 
 
 def plotSection(x, *args, **kw):
@@ -364,7 +372,7 @@ def _plotSectionShapes(ori, cS, oS, faceColor=None, faceAlpha=1.0, edgeColor="k"
 
 def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, colorRange="equal", minmax=False,
                     field=True, **kw):
-  flag = next((s for s in FILL_FLAGS if kw.pop(s, False)), None)
+  flag = fillFlag(kw, None)
   style = "pcolor" if flag in (None, "smooth") else flag
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
@@ -405,7 +413,9 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
   # add2all draws into the sections already there, as MATLAB's flag does
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field, onto=onto or add2all)
   vs, sec, src = oS.sectionData(ori)
-  if values is not None and colorRange is None and len(values):
+  # a row per orientation is its RGB colour, a number its value on the colour map
+  rgb = values is not None and values.ndim == 2
+  if values is not None and not rgb and colorRange is None and len(values):
     colorRange = (float(np.nanmin(values)), float(np.nanmax(values)))
   hs = []
   for k, cell in enumerate(plots):
@@ -415,8 +425,11 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
     dirs = vs[ind]
     vals = None if values is None else values[src[ind]]
     for sP in cell:
-      hs.append(_markers(sP, dirs, vals, colorRange=colorRange, MarkerSize=MarkerSize, **kw))
-  if colorbar and values is not None:
+      if rgb:
+        hs.append(_markers(sP, dirs, rgb=vals, MarkerSize=MarkerSize, **kw))
+      else:
+        hs.append(_markers(sP, dirs, vals, colorRange=colorRange, MarkerSize=MarkerSize, **kw))
+  if colorbar and values is not None and not rgb:
     fig.colorbar()
   return hs
 

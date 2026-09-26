@@ -281,3 +281,71 @@ def test_text_goes_where_nextAxis_points_in_a_held_figure():
   assert [len([t for t in ax.texts if t.get_text() == "a"]) for ax in gcm().children] == [0, 1, 0]
   text(xvector, ["b"])
   assert all(any(t.get_text() == "b" for t in ax.texts) for ax in gcm().children)
+
+
+def test_many_open_markers_keep_their_edge():
+  plt.close("all")
+  plot(vector3d.rand(12000, rng=rng), MarkerFaceColor='none', MarkerEdgeColor='k')
+  c = plt.gcf().axes[0].collections[-1]
+  assert len(c.get_edgecolor()) and np.allclose(c.get_edgecolor()[0][:3], 0)
+  plt.close("all")
+
+
+def test_annotations_of_MATLAB():
+  cs = crystalFrame("-3m")
+  mod = orientation.byEuler(110 * degree, 30 * degree, 80 * degree, cs)
+  odf = unimodalODF(mod)
+  # annotate(ori) marks an inverse pole figure at the crystal direction along its r, in the sector
+  plotIPDF(odf, [xvector, zvector], antipodal=True)
+  hs = annotate(mod, marker='s', MarkerFaceColor='r', label='A', color='w')
+  assert len(hs) == 2 and all(h is not None and len(h.get_offsets()) == 1 for h in hs)
+  # beside a MarkerFaceColor, color is the colour of the text
+  assert any(t.get_text() == 'A' and matplotlib.colors.to_hex(t.get_color()) == '#ffffff' for t in gcm().children[0].texts)
+  # a fibre with add2all is drawn on every pole figure as curves, named once per axes
+  from mtex import fibre, legend
+  plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
+  plot(fibre(Miller(1, 1, -2, 1, cs), vector3d.Y), color='red', add2all=True, DisplayName='fibre')
+  leg = legend('show')
+  assert [t.get_text() for t in leg.get_texts()] == ['fibre']
+  # a label with a subscript is set as mathematics, as MATLAB's tex interpreter does
+  plot(vector3d(1, 1, 1), label='v_1')
+  assert any(t.get_text() == '$v_1$' for ax in gcm().children for t in ax.texts)
+
+
+def test_contour_levels_logarithmic_and_the_antipodal_pole_figure():
+  cs = crystalFrame("321")
+  from mtex import fibreODF
+  odf = fibreODF(Miller(1, 1, 0, cs), zvector)
+  h = Miller(1, 1, 0, cs)
+  # 'contourf', levels: the bands at the levels, the colours spread over them, labelled with ShowText
+  plotPDF(odf, h, contourf=np.arange(0, 6), antipodal=True)
+  assert np.allclose(gcm().children[0]._mtexSphericalPlot.mappable.levels, np.arange(0, 6))
+  plotPDF(odf, h, contour=[1, 3], antipodal=True, ShowText='on')
+  assert gcm().children[0]._mtexSphericalPlot.lines[0].labelTexts
+  # 'logarithmic' is a logarithmic colour scale
+  plotPDF(odf, h, antipodal=True, logarithmic=True)
+  assert isinstance(gcm().children[0]._mtexSphericalPlot.mappable.norm, matplotlib.colors.LogNorm)
+  # an antipodal pole figure of a polar crystal superposes both hemispheres: 15.3 = 30.6 / 2
+  plotPDF(odf, h, antipodal=True)
+  assert abs(gcm().children[0]._mtexSphericalPlot.maxData - 15.3) < 0.2
+  # '3d': the pole figure on the sphere in space, seen along the convention given
+  from mtex import plottingConvention
+  pC = plottingConvention()
+  pC.east, pC.outOfScreen = vector3d(9, 3, 3), vector3d(6, 10, 9)
+  plotPDF(odf, h, '3d', pC, grid=True, grid_res=10 * degree, noTitle=True)
+  assert gcm().children[0].name == '3d'
+
+
+def test_plotHKL_and_symmetrised_labels_in_an_antipodal_sector():
+  from mtex import plotHKL
+  newMtexFigure(layout=[1, 2])
+  plotHKL(crystalFrame("m-3m"), projection='edist', grid_res=15 * degree)
+  labels = sorted(t.get_text() for t in gcm().children[0].texts if t.get_text().startswith('('))
+  assert len(labels) == 17 and '(001)' in labels
+  # an equivalent inside the sector is labelled rather than the antipode of one
+  cs = crystalFrame("-3m")
+  plotIPDF(unimodalODF(orientation.id(cs)), xvector, noLabel=True)
+  hold(True)
+  plot(Miller(0, 0, 0, 1, cs), symmetrised=True, labeled=True)
+  hold(False)
+  assert [t.get_text() for t in gcm().children[0].texts if t.get_text().startswith('(')] == ['(0001)']
