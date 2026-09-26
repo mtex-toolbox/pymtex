@@ -54,7 +54,7 @@ ALGORITHM = [
    # MATLAB takes small angles through acos
    "tolerance": 1e-6},
   {"name": "orientation denoising",
-   "entry": {"matlab": ["@EBSD.smooth", "@l1TVFilter.smooth", "@halfQuadraticFilter.smooth"],
+   "entry": {"matlab": ["@EBSD.smooth", "@l1TVFilter.smooth"],
              "python": ["mtex.analysis.denoising.smooth", "mtex.analysis.variational.solveField"]},
    "cases": {"smooth_mean_twins": "smooth(meanFilter) of the twins map, every indexed pixel",
              "smooth_spline_twins": "smooth(splineFilter) of the twins map",
