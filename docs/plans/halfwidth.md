@@ -593,7 +593,7 @@ off a pole figure? Concerns `SO3Fun/slicedWasserstein.m`,
    The flag is the simple, fast safeguard; detection from the data (the effective sample size
    from the degree energies) may come later as a second line.
 5. **The MATLAB defects are fixed now,** independently of this plan, in `../master` only (branch
-   feature/fastHarmonicTransforms, uncommitted), not in the frameSymmetry reference: `calcKernel`
+   feature/fastHarmonicTransforms, commit 186e53d2f), not in the frameSymmetry reference: `calcKernel`
    subsamples with `randperm` instead of `discretesample`; `BCV.m` passes its weights `w` and
    evaluates `psi{i}.eval(1)` and prints nothing; `kde1d.m` pairs the degrees `(1:n-1).^2` with
    `a(2:end)` and no longer prints `t_star`. Checked on the `mtexcc` bridge: 6000 orientations of a
