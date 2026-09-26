@@ -1,6 +1,6 @@
 # Subplan P3 - maps
 
-Status: written 2026-09-21; M1 to M7 done the same day, M8 on 2026-09-22, M9 on 2026-09-23. Syntax reference:
+Status: written 2026-09-21; M1 to M7 done the same day, M8 on 2026-09-22, M9 on 2026-09-23, M10 and M11 on 2026-09-26. Syntax reference:
 `../frameSymmetry/EBSDAnalysis/` with its `CLAUDE.md` and the ADRs 0002 (walk order) and
 0004 (FMC defaults) of that branch. Design reference: `../mtexJulia/lib/MTEXMaps/` and its
 `docs/plans/ebsd.md`, M0 to M11 done there, which this document follows package by
@@ -295,7 +295,23 @@ fitted after Hartley's normalisation; MCL segmentation came along as `calcGrains
 EBSDGrid, EBSDInter, EBSDPseudoSymmetry, EBSDSimulation, EBSDSpatialTransform and
 GrainReconstructionMCL are checked against MATLAB (`docs/findings.md` has what differs).
 
-**M11 - TrueEBSD and map images.** Unblocks EBSDTrueEbsd and EBSDMapsAndImages, the last two
+**M11 - TrueEBSD and map images. DONE 2026-09-26** (`maps/mapimage.py`, `maps/registration.py`,
+`maps/trueebsd.py`, `plotMapImage` in `plotting/mapplot.py`, `gridLayout.assumedFor`, the
+`trueEbsdWCCoSmall` recipe in `io/sampledata.py`; `tests/test_mapimage.py`, `test_registration.py`,
+`test_trueebsd.py`, one drawing test in `test_mapplot.py`). The EBSDTrueEbsd page runs as MATLAB's
+to the digit (`bench/matlab/probe_trueebsd.m`): the measured settings, the retry of the first hop,
+every tile's shift, the peaks to 1e-14, the resized and undistorted images to 1e-13, and the
+undistorted map's phases, positions and rotations identical. Decisions on the way: a list of
+images is a `mapImageList`, a list displaying as MATLAB's table, and the hops a
+`spatialTransformList` likewise; `xcfShift` keeps MATLAB's tile arithmetic counted from one
+internally and answers in positions counted from zero; the EBSD map is resampled by its nearest
+measurement within the reach of its cell (`resampleNearest`, frameSymmetry's `EBSD/interp`, not the
+port's tangent space `interp`); the job's verbs return nothing, as `parentGrainReconstructor`'s.
+The upsampling DFT of all tiles is two GEMMs, the band placed directly into the doubled array.
+Times against MATLAB: `pixelSizeMatch` 0.07 s (0.31), `calcDistortion` 2.7 s (2.2), `undistort`
+0.7 s (0.4). Both pages checked.
+
+The plan as it was written: unblocks EBSDTrueEbsd and EBSDMapsAndImages, the last two
 blocked EBSDAnalysis pages. MATLAB only (`../frameSymmetry`, about 2350 lines); the Julia
 port has none of it, so the design follows MATLAB's classes, which are already split along
 the right lines. The distortion models are M10's `spatialTransform` family and stay as they
@@ -394,7 +410,9 @@ mtex/maps/
   variantgraph.py     the grain graph and the variant graph, MCL
   gbnd.py             calcGBND
   simulate.py         simulateEBSD
-  spatialtransform.py affineTransform, projectiveTransform
+  mapimage.py         mapImage, mapImageList, the image verbs
+  registration.py     xcfShift, pairShifts
+  trueebsd.py         trueEbsd, the automatic settings
   kernels.py          the numba loops with their NumPy forms: clipping, union-find, loop tracing, gradient, KAM, GROD, the simplex, the window filters, the graph CG
 tests/test_<file>.py  one per source file
 tests/fixtures/maps/  the small fixture maps

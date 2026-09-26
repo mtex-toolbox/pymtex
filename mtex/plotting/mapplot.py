@@ -929,3 +929,94 @@ def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
 
 __all__ = ["line", "scatterXY", "mapPlot", "plotEBSD", "plotGrains", "plotBoundary", "plotTriplePoints", "quiverMap", "scaleBarOn", "phaseLegend", "keyLegend",
            "keyResolution", "mapValues", "mapAliases"]
+
+
+# ------------------------------------------------------------------ images on the specimen
+
+# the outline of an image, what a map plot needs to place it: its corners a half pixel out,
+# the plane it lies in, its frame and unit
+def _imageOutline(mg):
+  from types import SimpleNamespace
+  from ..maps.lattice import mapPlane
+  r, c = mg.gridSize()
+  C = mg._origin + np.array([-0.5, -0.5, r - 0.5, r - 0.5])[:, None] * mg._d1 + np.array([-0.5, c - 0.5, -0.5, c - 0.5])[:, None] * mg._d2
+  return SimpleNamespace(V=C[:, :2], F=np.array([[0, 1], [1, 3], [3, 2], [2, 0]]), plane=mapPlane(C), frame=mg.frame, scanUnit=mg.scanUnit)
+
+
+def plotMapImage(mg, channel=None, edge=False, micronbar=None, refFrame=True, colormap=None, layout=None, figSize=None, **kw):
+  """plot(mg), plot(imgList), plot(imgList, edge=True), plot(mg, channel=1)
+
+  An image drawn where it sits on the specimen, in the screen orientation of its frame; a list
+  of images one axes each, titled by their names. One channel is grey through the colour map,
+  three are drawn as RGB; edge draws the edge transform a registration matches on, its
+  contrast stretched over the 2nd to 98th percentile.
+  """
+  from ..maps.mapimage import edgeMap, mapImage
+  from .mtexfigure import newMtexFigure, nextAxis
+  kw = mapAliases(kw)
+  if isinstance(mg, (list, tuple)):
+    fig = newMtexFigure(layout=layout, figSize=figSize) if layout is not None else newMtexFigure(len(mg), figSize=figSize)
+    h = []
+    for m in mg:
+      nextAxis(fig=fig)
+      h.append(plotMapImage(m, channel=channel, edge=edge, micronbar=micronbar, refFrame=refFrame, colormap=colormap,
+                            title=m.name if m.name else None, **kw))
+    return h
+  if not isinstance(mg, mapImage):
+    raise TypeError("plotMapImage draws a mapImage or a list of them")
+  mapKw = _splitMap(kw)
+  mapKw.setdefault("how2plot", mg.how2plot)
+  x = _imageOutline(mg)
+  mP = _target(x, mapKw)
+  ax = mP.ax
+  d = edgeMap(mg) if edge else np.array(mg.img, dtype=float)
+  if d.ndim == 2:
+    d = d[..., None]
+  if channel is not None:
+    d = d[..., np.atleast_1d(channel)]
+  if d.shape[2] not in (1, 3):
+    raise ValueError(f"a {d.shape[2]} channel image is not a picture on its own; name one with channel=k, or take three for RGB")
+  # the rows and the columns of the array on the screen
+  M = mP.layout
+  s1, s2 = M @ mg._d1[:2], M @ mg._d2[:2]
+  P = mg._posData()[..., :2] @ M.T
+  aligned = min(abs(s1[0]), abs(s1[1])) < 1e-9 * np.linalg.norm(s1) and min(abs(s2[0]), abs(s2[1])) < 1e-9 * np.linalg.norm(s2)
+  if d.shape[2] == 3:
+    f = d[np.isfinite(d)]
+    d = (d - f.min()) / (f.max() - f.min()) if f.size and f.max() > f.min() else d
+  if edge:
+    f = d[np.isfinite(d)]
+    lo, hi = np.percentile(f, [2, 98], method="hazen") if f.size else (0, 1)
+  else:
+    lo, hi = np.nanmin(d), np.nanmax(d)
+  cmap = mtexColormap(colormap if colormap is not None else "gray")
+  from matplotlib.colors import Normalize
+  norm = Normalize(lo, hi) if d.shape[2] == 1 and hi > lo else None
+  if aligned:
+    img = d
+    if abs(s1[0]) > abs(s1[1]):
+      img, s1, s2 = img.transpose(1, 0, 2), s2, s1
+    if s1[1] < 0:
+      img = img[::-1]
+    if s2[0] < 0:
+      img = img[:, ::-1]
+    hx, hy = abs(s2[0]) / 2, abs(s1[1]) / 2
+    ext = (P[..., 0].min() - hx, P[..., 0].max() + hx, P[..., 1].min() - hy, P[..., 1].max() + hy)
+    if img.shape[2] == 1:
+      h = ax.imshow(np.ma.masked_invalid(img[..., 0]), extent=ext, origin="lower", interpolation="nearest", cmap=cmap, norm=norm, zorder=1, **kw)
+    else:
+      rgba = np.concatenate([np.nan_to_num(np.clip(img, 0, 1)), np.isfinite(img).all(axis=2, keepdims=True).astype(float)], axis=2)
+      h = ax.imshow(rgba, extent=ext, origin="lower", interpolation="nearest", zorder=1, **kw)
+  else:
+    # turned against the screen: the pixels as quadrilaterals
+    r, c = mg.gridSize()
+    i, j = np.meshgrid(np.arange(r + 1) - 0.5, np.arange(c + 1) - 0.5, indexing="ij")
+    Q = (mg._origin[:2] + i[..., None] * mg._d1[:2] + j[..., None] * mg._d2[:2]) @ M.T
+    if d.shape[2] == 1:
+      h = ax.pcolormesh(Q[..., 0], Q[..., 1], np.ma.masked_invalid(d[..., 0]), cmap=cmap, norm=norm, zorder=1, **kw)
+    else:
+      h = ax.pcolormesh(Q[..., 0], Q[..., 1], np.nan_to_num(np.clip(d, 0, 1)), zorder=1, **kw)
+  if d.shape[2] == 1:
+    mP.mappable = h
+  _finish(mP, x, micronbar, refFrame, False, "image")
+  return h

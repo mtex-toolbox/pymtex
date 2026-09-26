@@ -16,6 +16,7 @@
 #   spatialTransformTilt()                       projective, affine and quadratic stages
 #   spatialTransformInverse(T)                   the inverse of T by fixed point iteration
 #   T = spatialTransformProjective.fit(posA, posB, weights=w)   and so for every class
+#   spatialTransformList([T1, T2])               a list of hops, displayed as MATLAB's table
 #
 # A transform moves x and y and leaves z; it keeps the frame and the shape of the positions.
 from __future__ import annotations
@@ -639,6 +640,27 @@ class spatialTransformInverse(spatialTransform):
     return self.T.paramChar()
 
 
-__all__ = ["spatialTransform", "spatialTransformId", "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective",
+# a list of transforms, one hop each, displayed as MATLAB's table of a spatialTransform array
+class spatialTransformList(list):
+
+  def __getitem__(self, k):
+    out = super().__getitem__(k)
+    return spatialTransformList(out) if isinstance(k, slice) else out
+
+  def __repr__(self):
+    rows = []
+    for n, T in enumerate(self):
+      stages = T.stageList()
+      if len(stages) <= 1:
+        rows.append((str(n), T.shortChar(), "·", T.paramChar()))
+      else:
+        rows += [(str(n) if k == 0 else "", T.shortChar() if k == 0 else "", S.shortChar(), S.paramChar()) for k, S in enumerate(stages)]
+    labels = ("", "model", "stage", "parameters")
+    w = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(4)]
+    line = lambda r: "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
+    return "\n".join([f"spatialTransform\n size: 1 × {len(self)}", "", line(labels)] + [line(r) for r in rows])
+
+
+__all__ = ["spatialTransformList", "spatialTransform", "spatialTransformId", "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective",
            "spatialTransformPoly", "spatialTransformDrift", "spatialTransformField", "spatialTransformHandle", "spatialTransformComposite",
            "spatialTransformTilt", "spatialTransformInverse"]

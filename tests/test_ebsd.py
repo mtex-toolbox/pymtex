@@ -138,6 +138,21 @@ def test_E4_the_map_carries_its_lattice():
     line.unitCell
 
 
+# moving a gridded map never reorders its arrays: the positions move and the layout turns with
+# them, where MATLAB stores a rotated map anew in its default layout (decided 2026-09-26)
+def test_E4b_moving_a_grid_keeps_its_memory_order():
+  from mtex import gridLayout, xvector, yvector
+  grid = gridify(sampleMap())
+  assert grid.layout == gridLayout.columnMajor()
+  for moved, layout in ((rotate(grid, 90 * degree), gridLayout(-xvector, yvector)), (shift(grid, vector3d(3, -1, 0)), gridLayout.columnMajor()),
+                        (transform(grid, lambda p: vector3d(-p.data)), gridLayout(-yvector, -xvector))):
+    assert moved.shape == grid.shape and moved.layout == layout
+    assert np.array_equal(moved.phaseId, grid.phaseId)
+    assert np.array_equal(moved.mad, grid.mad) and np.array_equal(moved.id, grid.id)
+  # a new order is asked for explicitly
+  assert gridify(rotate(grid, 90 * degree), gridLayout.columnMajor()).shape == grid.shape[::-1]
+
+
 def test_E4a_rotate_positions_and_orientations_separately():
   ebsd = sampleMap()
   r = rotation.byAxisAngle(zvector, 30 * degree)

@@ -248,13 +248,24 @@ np.max(norm(ebsdBack.pos - ebsd.pos))
 # ## Where the Point Pairs Come From
 #
 # Nothing above measured a distortion: `posA` and `posB` were manufactured. In practice,
-# pairs often come from correlating two images of the same area. In MATLAB, `xcfShift`
-# divides their shared region into tiles, phase correlates each tile with its counterpart,
-# and returns a displacement and correlation-peak height for every tile; the image
-# registration is not part of this port. The peak height is a fit weight, not a
-# registration diagnostic, and it is passed as
+# pairs often come from correlating two images of the same area.
+# [xcfShift](xcfShift.html) divides their shared region into tiles, phase correlates each
+# tile with its counterpart, and returns a displacement and correlation-peak height for every
+# tile.
 #
+# The images must first share a pixel grid, and their stored order must refer to the same
+# specimen directions. With `mapImage` inputs, `xcfShift` returns positions and displacements
+# in specimen units rather than pixels.
+#
+# The peak height is a fit weight, not a registration diagnostic. A tile on featureless
+# background must not receive an equal vote:
+#
+#     u, peak, pos = xcfShift(imRef, imTest)
 #     T = spatialTransformShift.fit(pos, pos + u, weights=peak)
+#
+# [Maps and Images](EBSDMapsAndImages.html) prepares that common geometry.
+# [TrueEBSD Distortion Correction](EBSDTrueEbsd.html) runs the complete chain on real data
+# and checks the residual after correction.
 #
 # ## References
 #
@@ -276,8 +287,10 @@ np.max(norm(ebsdBack.pos - ebsd.pos))
 #
 # ## Next
 #
-# See [Square and Hex Grids](EBSDGrid.html) when the transformed map must recover or
-# preserve its lattice structure.
+# Continue with [TrueEBSD Distortion Correction](EBSDTrueEbsd.html) to fit a sequence of
+# physical distortion models to real EBSD and SEM images. See
+# [Square and Hex Grids](EBSDGrid.html) when the transformed map must recover or preserve
+# its lattice structure.
 #
 # Correct the geometry before [grain reconstruction](GrainReconstruction.html) when grain
 # shape, boundary length, or correlative overlap matters. If grains already exist,

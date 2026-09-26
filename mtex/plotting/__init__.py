@@ -85,6 +85,10 @@ def _install():
   orientationRegion.plot = method(spp.plotRegion3d)
   orientationRegion.plot3d = method(spp.plotRegion3d)
   crystalShape.plot = method(shp.plotShape)
+  from ..maps.mapimage import mapImage, mapImageList
+  from .mapplot import plotMapImage
+  mapImage.plot = method(plotMapImage)
+  mapImageList.plot = method(plotMapImage)
   from ..maps.shape import shape2d
   from ..functions.s1fun import S1FunHarmonic
   from . import polarplot as pp

@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import urllib.request
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -62,6 +63,10 @@ def _resolve(source, root, download):
       return p
   if not download:
     raise FileNotFoundError(f"the sample data file {source['path']} is not under {root}")
+  # a file with no address is written locally, by the script its recipe names
+  if not source["url"]:
+    raise FileNotFoundError(f"the sample data file {source['path']} is not under {root} and is not hosted yet; "
+                            "bench/matlab/export_trueebsd.m writes it through the MATLAB bridge")
   os.makedirs(os.path.dirname(full), exist_ok=True)
   print(f"  downloading {source['url']}\n  to {full}")
   urllib.request.urlretrieve(source["url"], full)
@@ -252,6 +257,47 @@ def _odf(path):
   return loadODF(path, "Bunge", "interp", CS=crystalFrame("m-3m"), SS=specimenFrame("1"), columnNames=["Euler 1", "Euler 2", "Euler 3", "weights"])
 
 
+class imageSet(SimpleNamespace):
+  """the images a sample map carries along, as MATLAB's struct: img.fsdT1, img.pixSzImg"""
+
+  def __repr__(self):
+    rows = [(k, " x ".join(str(n) for n in np.shape(v)) + " double" if np.ndim(v) else f"{float(v):g}") for k, v in vars(self).items()]
+    w = max(len(k) for k, _ in rows)
+    return "\n".join(f"  {k:>{w}}: {v}" for k, v in rows)
+
+
+# the WC-Co map of TrueEBSD with its four forescatter images, the centre half of the full
+# field every fourth point, as MATLAB's .mat holds it, read from the HDF5 file of plain
+# arrays bench/matlab/export_trueebsd.m writes: h5py reads MATLAB's arrays transposed
+def _trueEbsdWCCoSmall(path):
+  import h5py
+  from ..geometry.frames import notIndexedFrame
+  from ..maps.ebsd import EBSD
+  with h5py.File(path, "r") as f:
+    e = f["ebsd"]
+    x, y = np.asarray(e["x"]).ravel(), np.asarray(e["y"]).ravel()
+    q = np.asarray(e["rotation"]).reshape(4, -1).T
+    phaseId = np.asarray(e["phaseId"]).ravel().astype(int) - 1
+    prop = {k: np.asarray(v).ravel() for k, v in e["prop"].items()}
+    scanUnit = e.attrs["scanUnit"]
+    CSList = []
+    for k in sorted(f["phases"], key=int):
+      a = f["phases"][k].attrs
+      if "pointGroup" not in a:
+        CSList.append(notIndexedFrame())
+        continue
+      align = a["alignment"]
+      align = [s.strip() for s in align.split(",")] if isinstance(align, str) and align else []
+      # the lengths are the norms of MATLAB's axes, which differ in the last digits
+      CSList.append(crystalFrame(a["pointGroup"], list(np.round(a["axes"], 5)), np.round(a["angles"], 4) * degree, *align, mineral=a["mineral"]))
+    im = f["images"]
+    imgs = {k: np.asarray(im[k]).T for k in ("fsdB3", "fsdT3", "fsdT1", "fsdT10")}
+    imgs["pixSzImg"] = float(np.asarray(im["pixSzImg"]).ravel()[0])
+  ebsd = EBSD(np.column_stack([x, y, np.zeros_like(x)]), rotation(q), phaseId, CSList, prop, scanUnit=scanUnit).gridify()
+  ebsd.meta["trueEbsdImgs"] = imageSet(**imgs)
+  return ebsd
+
+
 def _dubnaODF(files):
   from ..analysis.pf2odf import calcODF
   return calcODF(_dubna(files))
@@ -371,6 +417,8 @@ _dataset("smiley", "vector3d", "777 directions with the values of the smiley fun
 _dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzite as Bunge Euler angles", "tongue",
          lambda p: loadOrientation(p, crystalFrame.load("quartz.cif"), columnNames=["phi1", "Phi", "phi2"])[0])
 _dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _later("a VPSC file"))
+_dataset("trueEbsdWCCoSmall", "EBSD", "WC-Co map with four forescatter images of the same area, for TrueEBSD", "trueebsdwccosmall",
+         _trueEbsdWCCoSmall)
 _dataset("odf", "SO3Fun", "an ODF tabulated on a Bunge Euler grid, read as values", "odf", _odf)
 
 __all__ = ["mtexdata", "mtexdatafile", "mtexDataPath"]

@@ -310,3 +310,24 @@ def test_the_scale_bar_follows_a_zoom():
   assert box.get_x() != x0 and 20 <= box.get_x() <= 30 and 10 <= box.get_y() <= 18
   assert len([a for a in ax.patches if a.get_zorder() == 10]) == 1
   plt.close("all")
+
+
+# an image is drawn where it sits, under the convention of its frame: an image of its own
+# row 0 at the top, and a list one axes each, titled by name
+def test_an_image_is_drawn_on_the_specimen():
+  from mtex import mapImage, mapImageList
+  img = np.arange(12.0).reshape(3, 4)
+  mg = mapImage(img, dxy=0.5, origin=vector3d(1, 2, 0), name="bse")
+  h = plot(mg)
+  ax = h.axes
+  assert np.allclose(h.get_extent(), (0.75, 2.75, -3.25, -1.75))
+  # row 0 at the top of the screen: the array is drawn flipped, origin lower
+  assert np.array_equal(np.asarray(h.get_array())[::-1], img)
+  assert ax.get_xlim() == (0.75, 2.75)
+  plt.close("all")
+  hs = plot(mapImageList([mg, mapImage(np.random.rand(3, 4, 3), name="rgb")]), layout=[1, 2])
+  assert len(hs) == 2 and [a.get_title() for a in gcm().children] == ["bse", "rgb"]
+  assert hs[1].get_array().shape == (3, 4, 4)
+  plt.close("all")
+  e = plot(mg, edge=True)
+  assert e.get_array().shape == (3, 4)

@@ -336,5 +336,12 @@
       "sha256": "bdb8b4ec3082f606bac3b3969c3b74a69d6b87e35281e273c983c94e2e4b2c70",
       "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD"
     }
+  ],
+  "trueebsdwccosmall": [
+    {
+      "path": "EBSD/trueEbsdWCCoSmall.h5",
+      "sha256": "5c7ca570d326894fa7e98cbe468045f2612d7801fba44853b97d77ba38d358ad",
+      "url": ""
+    }
   ]
 }

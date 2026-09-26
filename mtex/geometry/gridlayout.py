@@ -4,6 +4,7 @@
 #   gridLayout(row, col)            the first index along row, the second along col, perpendicular
 #   gridLayout.columnMajor()        the first index along y, the second along x: MATLAB's images
 #   gridLayout.rowMajor()           the first index along x, the second along y
+#   gridLayout.assumedFor(fr)       the layout an array drawn in fr's convention is stored in
 #   lin = layoutIndex(gL, (d1, d2), shape, nearest=False)
 #
 # A layout says which way round an array is stored, which is a matter of the array and not of
@@ -44,6 +45,17 @@ class gridLayout:
   def rowMajor():
     return gridLayout(X, Y, name="rowMajor")
 
+  # the layout of an array drawn with row 0 at the top and the columns to the right, read
+  # against the convention of the frame: what the relation was before layouts were stated,
+  # and named so that the assumption shows wherever the layout is displayed
+  @staticmethod
+  def assumedFor(fr):
+    from .plottingconvention import plottingConvention
+    pC = getattr(fr, "how2plot", None)
+    pC = plottingConvention.default if pC is None else pC
+    rot = pC.rot * plottingConvention.ij.rot.inv()
+    return gridLayout(rot * vector3d(Y), rot * vector3d(X), name="assumed from plot")
+
   @property
   def basis(self):
     return vector3d(np.stack([self.row.data, self.col.data, np.cross(self.row.data, self.col.data)]), isNormalized=True)
@@ -61,7 +73,7 @@ class gridLayout:
 # asks: new[r, c] = old.flat[lin[r, c]]. It transposes where the axes are crossed and flips an
 # axis that runs backwards; a tie, a grid turned by 45 degrees, keeps the order unless the
 # column of gL is nearer y than x
-def layoutIndex(gL, d, shape, nearest=False):
+def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):
   d1, d2 = (_unit(v) for v in d)
   t1, t2 = _unit(gL.row), _unit(gL.col)
   Q = np.array([[t1 @ d1, t1 @ d2], [t2 @ d1, t2 @ d2]])
@@ -80,7 +92,8 @@ def layoutIndex(gL, d, shape, nearest=False):
     lin = lin[::-1, :]
   if Q[1, 1] < 0:
     lin = lin[:, ::-1]
-  return np.ascontiguousarray(lin)
+  lin = np.ascontiguousarray(lin)
+  return (lin, bool(transpose)) if return_transpose else lin
 
 
 __all__ = ["gridLayout", "layoutIndex"]

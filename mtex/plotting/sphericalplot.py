@@ -560,6 +560,12 @@ def plot(v, *args, **kw):
   if isinstance(v, shape2d):
     from .polarplot import plotShape
     return plotShape(v, *args, **kw)
+  # an image on the specimen, or a sequence of them
+  from ..maps.mapimage import mapImage
+  if isinstance(v, mapImage) or (isinstance(v, (list, tuple)) and v and all(isinstance(m, mapImage) for m in v)):
+    from .mapplot import plotMapImage
+    kw.update({a: True for a in args if isinstance(a, str)})
+    return plotMapImage(v, **kw)
   kind = _mapKind(v)
   if kind is not None:
     from . import mapplot

@@ -53,6 +53,10 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   `grains = calcGrains(ebsd)` does not: the grain ids, the pixels the `minPixel` cull drops and
   the absorbed pixels stay on it. This is deliberate; reconstructions to be compared run on
   copies (`ebsd.copy()`).
+- Moving a gridded map (`rotate`, `shift`, `transform`) never reorders its arrays: the positions
+  move and `ebsd.layout` turns with them, where MATLAB stores a rotated map anew in its default
+  layout. Deliberate (user, 2026-09-26); reordering is asked for explicitly, by `gridify(ebsd, gL)`
+  or `transformReferenceFrame`.
 - A function on SO(3) is evaluated at an orientation whose frames are its own or their
   siblings differing only in the group (`stripSym`, another group on the same axes), by the
   rotation, as MATLAB, whose compatibility check in `eval` is commented out; a frame with
@@ -128,7 +132,7 @@ intragranular quantities and `calcGND` with G7's `slipsystem.py`, M8, the denois
 filters over the graph of the map with `fill`, `interp` and `reduce`, and M9, the parent grain
 reconstruction (`maps/reconstruction.py`, `maps/variantgraph.py`: `parentGrainReconstructor`
 with MATLAB's vote table, the grain and variant graphs, checked against MATLAB on the
-martensite map), are done, and M10 (2026-09-26): `gridify(ebsd, gL)` and `gridify(ebsd, unitCell=)` with `gridLayout` (`geometry/gridlayout.py`), `cleanUpPseudoSym` (`maps/pseudosym.py`), `simulateEBSD` (`maps/simulate.py`) and the `spatialTransform` family (`geometry/spatialtransform.py`); MCL segmentation is `calcGrains(..., mcl=)`. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
+martensite map), are done, and M10 (2026-09-26): `gridify(ebsd, gL)` and `gridify(ebsd, unitCell=)` with `gridLayout` (`geometry/gridlayout.py`), `cleanUpPseudoSym` (`maps/pseudosym.py`), `simulateEBSD` (`maps/simulate.py`) and the `spatialTransform` family (`geometry/spatialtransform.py`); MCL segmentation is `calcGrains(..., mcl=)`. M11 (2026-09-26): `mapImage` and `mapImageList` (`maps/mapimage.py`), `xcfShift` and `pairShifts` (`maps/registration.py`) and the `trueEbsd` job (`maps/trueebsd.py`), MATLAB's run of the EBSDTrueEbsd page to the digit; `mtexdata('trueEbsdWCCoSmall')` reads the HDF5 file `bench/matlab/export_trueebsd.m` writes, not hosted yet. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
 `loadEBSD` and `EBSD.load` for `.ang`, `.ctf`, named-column tables, `.cpr`/`.crc`, `.osc`
 and the vendors' HDF5 (h5py, the `io` extra, configs in `io/hdf5_config/`) in `mtex/io`;
 the numeric block of a text file is a parallel numba row parser (`io/kernels.py`,

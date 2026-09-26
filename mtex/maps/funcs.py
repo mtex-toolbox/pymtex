@@ -46,5 +46,11 @@ fillByGrainId = _method("fillByGrainId")
 reduce = _method("reduce")
 subsample = _method("subsample")
 interp = _method("interp")
+pos2ind = _method("pos2ind")
+pixelSizeMatch = _method("pixelSizeMatch")
+calcDistortion = _method("calcDistortion")
+undistort = _method("undistort")
+setOptions = _method("setOptions")
 
-__all__ = ["gridify", "extent", "shift", "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean", "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId", "reduce", "subsample", "interp"]
+__all__ = ["gridify", "extent", "shift", "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean", "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId", "reduce", "subsample", "interp", "pos2ind",
+           "pixelSizeMatch", "calcDistortion", "undistort", "setOptions"]
