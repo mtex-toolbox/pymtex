@@ -282,9 +282,87 @@ pinned to MATLAB, R2b the growth, the accumulation of the votes), `tests/test_va
 (R4, R4b, the vote restriction, MCL, the grain graph route, the compiled angles against their
 oracles), `tests/test_grains.py` G8b for the merges.
 
-**M10 - the rest.** `gridify(ebsd, step, angle)`, `simulateEBSD` and its four verbs,
-`cleanUpPseudoSym`, `affineTransform`, `projectiveTransform`, `weightedBurgersVec`,
-`calcGBND` once P2 exists.
+**M10 - the rest. DONE 2026-09-26** (`gridify.py`, `geometry/gridlayout.py`, `pseudosym.py`,
+`simulate.py`, `geometry/spatialtransform.py`; `tests/test_gridify.py`, `test_gridlayout.py`,
+`test_pseudosym.py`, `test_simulate.py`, `test_spatialtransform.py`). `gridify(ebsd, gL)` and
+`gridify(ebsd, unitCell=uC)`, the resampling by the nearest measurement with MATLAB's lattice
+order and layout, `return_index` for MATLAB's `newId`, `ebsd.layout`, `dPos` as MATLAB's
+shortest cell edge; `cleanUpPseudoSym` in place as `calcGrains`, MATLAB's three outputs;
+`simulateEBSD` as MATLAB's class with an `rng`; the `spatialTransform` family of MATLAB's
+frameSymmetry branch (the `affineTransform` and `projectiveTransform` of this plan's first
+draft are `spatialTransformShift` and `spatialTransformProjective` there), the homography
+fitted after Hartley's normalisation; MCL segmentation came along as `calcGrains(..., mcl=)`.
+EBSDGrid, EBSDInter, EBSDPseudoSymmetry, EBSDSimulation, EBSDSpatialTransform and
+GrainReconstructionMCL are checked against MATLAB (`docs/findings.md` has what differs).
+
+**M11 - TrueEBSD and map images.** Unblocks EBSDTrueEbsd and EBSDMapsAndImages, the last two
+blocked EBSDAnalysis pages. MATLAB only (`../frameSymmetry`, about 2350 lines); the Julia
+port has none of it, so the design follows MATLAB's classes, which are already split along
+the right lines. The distortion models are M10's `spatialTransform` family and stay as they
+are; M11 adds what produces their point pairs and what applies them.
+
+The pieces, in the order they depend on each other:
+
+1. `mapImage` (MATLAB `EBSDAnalysis/@mapImage`, 11 files): an image on a REGULAR grid, an
+   origin and two perpendicular step vectors with the positions derived, never stored; k
+   channels, integer images scaled to [0, 1]. Constructors `mapImage(img, dxy=, origin=,
+   name=, scanUnit=)` and `mapImage(ebsd.bc, ebsd)` (a channel of a gridded square map, the
+   map riding along). Methods: `pos`, `layout` (M10's `gridLayout`), `how2plot`, `dx`, `dy`,
+   `extent`, `pos2ind`, `interp(mg, pos)` (bilinear on the regular grid, NaN outside),
+   `subGrid`, `rescale`, `imboxfilt` (SciPy's `uniform_filter`), `edgeMap` (the edge
+   transform registration runs on), `transformReferenceFrame(mg, frame, 'byScreenAlignment')`,
+   display and `plot` (one image, or a list with `layout=`). A list of images is a Python
+   list, as M10's hops are. File: `maps/mapimage.py`; the drawing in `plotting/mapplot.py`.
+2. `xcfShift(A, B, ROISize=, numROI=, XCFMesh=)` (MATLAB `tools/registration_tools`): tile-wise
+   phase correlation of two images on one grid, the peak refined by the matrix-multiply DFT
+   upsampling of Guizar-Sicairos et al. (XCFMesh 250); only where both images are finite;
+   returns `(u, peak, pos)`, in specimen units for two `mapImage`. With it `pairShifts`, the
+   shifts one fit stage was fitted to (`tools/registration_tools/@pairShifts`). File:
+   `maps/registration.py`. Checked against MATLAB tile for tile on two images of the data set
+   (the sub-pixel shifts to 1e-3 pixel).
+3. `trueEbsd(imgList, T)` (MATLAB `EBSDAnalysis/@trueEbsd`, 7 files and 5 private): the job
+   over a chain of images, most distorted first, one unfitted transform per hop (`+` for a
+   staged hop, never `*`, which would drop an identity prototype). A handle class in MATLAB;
+   here an object whose methods alter it and return it, as `parentGrainReconstructor`.
+   `setOptions(n, roiSize=, numROI=, registerOn='edge'|'raw', edgeWidth=, highContrast=)`,
+   `pixelSizeMatch` (every map onto one grid), `calcDistortion(fitErr=, silent=, retryMax=)`
+   (per hop and stage: correlate, fit the stage by `fitStage`, resample, measure again; the
+   ROI doubled on retry), `undistort` (the hops composed and every map resampled into the
+   ground truth's grid; the EBSD map comes out with the images as per-pixel properties), the
+   properties `resizedList`, `undistortedList`, `shifts`, `fitError`, and the progress table.
+   The private `autoTune`, `fitTo`, `measureShift`, `resample` follow. File:
+   `maps/trueebsd.py`.
+4. The pages: EBSDMapsAndImages first (it needs only `mapImage`, layouts and `interp`), then
+   EBSDTrueEbsd, each against `docs/matlabrun.py`.
+
+Open before starting:
+
+- The sample data (decided 2026-09-26): `mtexdata('trueEbsdWCCoSmall')` is read from an HDF5
+  file of plain arrays, `~/.mtex/data/EBSD/trueEbsdWCCoSmall.h5` (3.7 MB), written through the
+  bridge by `bench/matlab/export_trueebsd.m` from MATLAB's `.mat` (a v7.3 file holding an EBSD
+  object, which h5py cannot unpack). The original `.h5oina` is not on this machine; the small
+  set is `../trueEBSD/tools/makeWCCoSmall.m`'s centred half, every fourth point, of
+  `../master/data/EBSD/trueEbsdWCCo.mat` (Zenodo 13870131, a v5 file of 180 MB). The file
+  holds `/ebsd/x`, `/ebsd/y`, `/ebsd/rotation` (a, b, c, d), `/ebsd/prop/<name>` (bc, bs,
+  bands, MAD, quality, oldId), `/ebsd/phaseId` (a list in MATLAB's column order), attributes
+  `scanUnit` and `how2plot`; `/phases/<k>` with `mineral`, `pointGroup`, `axes`, `angles`,
+  `alignment`; `/images/fsdB3` (RGB), `fsdT3`, `fsdT1`, `fsdT10` and `pixSzImg`. h5py reads
+  MATLAB's arrays transposed: the map is 96 x 128 and the images 192 x 256 in MATLAB's order.
+  The recipe goes into `io/sampledata.py` as a local file; where it is hosted for
+  `mtexdatafile` to fetch is still open.
+- Speed: `calcDistortion` correlates 24 x 18 tiles per stage and hop on images of about
+  1000 x 1000; the FFTs go through `scipy.fft` with the `threads` preference, and the
+  upsampling DFT is two small matrix products per tile. Time it against MATLAB on the page.
+- Which of MATLAB's defaults are measured on this one data set (`autoTune`,
+  `highContrast='auto'`, `PARAMETERS.md` in the MATLAB folder) - port them as they are and
+  say so in the page, rather than re-deriving them.
+
+Tests: `tests/test_mapimage.py` (the grid, `interp` exact at pixel centres, `pos2ind` round
+trip, a channel of a map, the layouts), `tests/test_registration.py` (a known sub-pixel shift
+recovered from a synthetic image pair, the peak as weight, NaN padding excluded; the MATLAB
+tiles pinned where the data folder is present), `tests/test_trueebsd.py` (a synthetic chain:
+an image, a drifted and sheared copy, a tilted copy; the fitted hops recover the imposed
+transforms and `undistort` returns the ground truth's grid).
 
 Each step ends with the import-time measurement and the test count, as in P1, and each
 kernel with its budget row against the Julia numbers.
