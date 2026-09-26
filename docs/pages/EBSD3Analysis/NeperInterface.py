@@ -162,11 +162,8 @@ mtexTitle('normal || (2,2,4)')
 # -
 
 # The three panels show differently oriented planes. Their unequal outlines show how the
-# same cuboid and its grains are sampled by horizontal and oblique sections.
-#
-# MATLAB's `neper.getSlice` is a separate route that asks Neper to write a
-# two-dimensional `.tess` file. Use `grains.slice` when the three-dimensional collection is
-# already loaded and no external file is needed.
+# same cuboid and its grains are sampled by horizontal and oblique sections. `grains.slice`
+# cuts the loaded collection itself, with no external file.
 
 # ## Relate a section to its parent grains
 #
@@ -192,8 +189,8 @@ setCamera(how2plot)
 # | Function | Purpose | Function | Purpose |
 # | --- | --- | --- | --- |
 # | `neper.init` | initialize the interface | `simulateGrains` | generate a textured polycrystal |
-# | `grain3d.load` | import an existing 3D tessellation | `getSlice` | write a section through Neper (MATLAB only) |
-# | `grains.slice` | cut a loaded collection in MTEX | `intersected` | select the parent polyhedra |
+# | `grain3d.load` | import an existing 3D tessellation | `grains.slice` | cut a loaded collection |
+# | `intersected` | select the parent polyhedra | | |
 
 # ## References
 #
@@ -212,4 +209,5 @@ setCamera(how2plot)
 # `neper = neper.init()` binds the one interface to the name MATLAB's static class uses, so
 # that the assignments read as MATLAB's. The orientations of the simulated grains are
 # sampled at random, so the pictures differ from MATLAB's in their colours, not in the
-# geometry Neper builds from the seed 529. `neper.getSlice` is not ported.
+# geometry Neper builds from the seed 529. MATLAB's `neper.getSlice`, a section written by
+# Neper to a file, is left out: `grains.slice` cuts the loaded grains directly.

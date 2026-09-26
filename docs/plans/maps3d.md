@@ -37,8 +37,8 @@ A core `mtex.maps3d` above `mtex.maps` (CLAUDE.md's layout reserves it), in MATL
   `nodeType`, `perimeter`, `flip`, the incidences `I_FG`, `I_VF`, `I_VG`, `calcGBND`;
 - `smoothBoundary`, `reduceBoundary`, `refineBoundary` with the Taubin and Laplace filters;
 - on the volume: `KAM`, `fill`, `smooth`, `interp`, `calcGND`, `spatialProfile`;
-- `neper`: `simulateGrains`, `simulateTwinGrains`, `simulateChildGrains`, `getSlice`
-  through the `neper` executable;
+- `neper`: `simulateGrains`, `simulateTwinGrains`, `simulateChildGrains` through the `neper`
+  executable (`getSlice` left out, decided 2026-09-26: `grains.slice` cuts the loaded grains);
 - drawing: `plot(ebsd3)`, `plot(grains3d)`, `plot(gB3)`, `quiver`, `slice` views, on a
   renderer-independent scene with PyVista and matplotlib behind it, and interactive 3D
   figures on the doc pages.
@@ -105,7 +105,7 @@ A core `mtex.maps3d` above `mtex.maps` (CLAUDE.md's layout reserves it), in MATL
 - **V4 - loading grains and Neper.** `grain3d.load` for DREAM.3D meshes (the 758 564
   triangles of IN100) and `.tess`, `orientFaces`, the `neper` interface with its three
   simulations and `mtexdata('NeperGrain3d')`. DONE (`bench/matlab/probe_loadgrains3d.m`) but
-  for `mtexdata('NeperGrain3d')` and `getSlice`, left for V8 where the pages need them (the
+  for `mtexdata('NeperGrain3d')`, left for V8 where the pages need it (the
   pages' orientations are random, so V8 takes MATLAB's grains through a neutral file):
   `grain3d.fromFaces` is MATLAB's `grain3d(V, F, I_GF, ori, CSList, phaseId)`; the IN100 mesh
   (794 grains, 757 564 triangles, the volumes, every inner face +1 and -1 after
