@@ -34,6 +34,31 @@ def test_a_section_through_three_grains():
   assert len(t) == 4 and np.isclose(t.area.sum(), 6) and ids.count(g.id[g.numPixel == 7][0]) == 2
 
 
+# grain A fills a 9 x 7 x 5 box around grain B, grain C is a U at its edge and grain D two
+# diagonal columns joined in the top layer: the middle section has A with a hole, B inside
+# it, the two legs of C and the two columns of D, which touch in one vertex, as MATLAB's
+# check_calcGrains3d/checkSlice
+def test_holes_and_pieces_touching_in_a_vertex():
+  sz = (9, 7, 5)
+  ang = np.zeros(sz)
+  ang[3:6, 2:5, 1:4] = 20
+  ang[8, [0, 2], :] = 40
+  ang[8, 1, 4] = 40
+  ang[6, 5, :] = 60
+  ang[5, 6, :] = 60
+  ang[5, 5, 4] = 60
+  r = rotation.byAxisAngle(vector3d(0, 0, 1), ang.reshape(-1) * degree).data.reshape(sz + (4,))
+  e = EBSD3square(rotation(r), np.ones(sz, dtype=np.int8), phaseList([crystalFrame("m-3m", mineral="Iron")]))
+  g = calcGrains(e, angle=5 * degree)
+  s = g.slice(plane3d(vector3d(0, 0, 1), vector3d(0, 0, 2)))
+  ids = np.asarray(s.prop["Id3d"])
+  area = dict(zip(*np.unique(ids, return_counts=True)))
+  assert np.isclose(s.area.sum(), 63) and len(s) == 6
+  byGrain = {k: s.area[ids == k].sum() for k in area}
+  assert np.isclose(byGrain[e.grainId[0, 0, 0]], 63 - 9 - 2 - 2) and area[e.grainId[0, 0, 0]] == 1
+  assert area[e.grainId[8, 0, 0]] == 2 and area[e.grainId[6, 5, 0]] == 2
+
+
 @pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
 def test_IN100_sections():
   g = calcGrains(EBSD3.load(DREAM3D), angle=10 * degree)

@@ -87,33 +87,53 @@ def _inPlane(N):
 
 
 # the 2D grain of both sides of every segment: a grain's segments, each taken with the grain
-# on its left, fall into connected parts; the anticlockwise parts are pieces, numbered in the
-# order of the grains and then of the pieces a grain has more of, the clockwise parts are
-# holes of the piece that holds them
+# on its left, are walked into loops, at a vertex the one leaving it first clockwise from the
+# way back, so that pieces touching in a vertex stay apart; the anticlockwise loops are
+# pieces, numbered in the order of the grains and then of the pieces a grain has more of, the
+# clockwise loops are holes of the piece that holds them
 def _pieces(F, g, P2, ids):
-  from scipy.sparse import coo_matrix
-  from scipy.sparse.csgraph import connected_components
   half = np.concatenate([np.stack([F[:, 0], F[:, 1], g[:, 0], np.arange(len(F)), np.zeros(len(F), dtype=np.int64)], axis=1),
                          np.stack([F[:, 1], F[:, 0], g[:, 1], np.arange(len(F)), np.ones(len(F), dtype=np.int64)], axis=1)])
   half = half[half[:, 2] > 0]
   newId = np.zeros(F.shape, dtype=np.int64)
-  nV = len(P2)
-  # the parts: half segments of one grain that share a vertex
-  key = half[:, 2] * nV
-  a, b = key + half[:, 0], key + half[:, 1]
-  nodes, inv = np.unique(np.concatenate([a, b]), return_inverse=True)
   m = len(half)
-  G = coo_matrix((np.ones(m), (inv[:m], inv[m:])), shape=(len(nodes), len(nodes)))
-  _, comp = connected_components(G, directed=False)
-  part = comp[inv[:m]]
-  # the signed area of every part, positive around a piece
+  # the half segments leaving every vertex of a grain, by the angle they leave in
+  d = P2[half[:, 1]] - P2[half[:, 0]]
+  phi = np.arctan2(d[:, 1], d[:, 0])
+  order = np.lexsort((phi, half[:, 0], half[:, 2]))
+  key = np.stack([half[order, 2], half[order, 0]], axis=1)
+  start = np.flatnonzero(np.r_[True, np.any(key[1:] != key[:-1], axis=1)])
+  count = np.diff(np.r_[start, m])
+  # the next half segment of a loop: of the grain, leaving the end, first clockwise from back
+  nxt = np.empty(m, dtype=np.int64)
+  pos = np.searchsorted(key[:, 0] * (len(P2) + 1) + key[:, 1],
+                        half[:, 2] * (len(P2) + 1) + half[:, 1])
+  grp = np.searchsorted(start, pos, side="right") - 1
+  single = count[grp] == 1
+  nxt[single] = order[start[grp[single]]]
+  for i in np.flatnonzero(~single):
+    cand = order[start[grp[i]]:start[grp[i]] + count[grp[i]]]
+    back = np.arctan2(-d[i, 1], -d[i, 0])
+    nxt[i] = cand[np.argmin(np.mod(back - phi[cand], 2 * np.pi))]
+  # the loops, the cycles of nxt
+  part = np.full(m, -1, dtype=np.int64)
+  n = 0
+  for i in range(m):
+    if part[i] >= 0:
+      continue
+    j = i
+    while part[j] < 0:
+      part[j] = n
+      j = nxt[j]
+    n += 1
+  # the signed area of every loop, positive around a piece
   x0, y0 = P2[half[:, 0], 0], P2[half[:, 0], 1]
   x1, y1 = P2[half[:, 1], 0], P2[half[:, 1], 1]
-  area = np.bincount(part, weights=x0 * y1 - x1 * y0) / 2
-  grainOf = np.zeros(comp.max() + 1, dtype=np.int64)
+  area = np.bincount(part, weights=x0 * y1 - x1 * y0, minlength=n) / 2
+  grainOf = np.zeros(n, dtype=np.int64)
   grainOf[part] = half[:, 2]
-  parts = np.unique(part)
-  outer = parts[area[parts] > 0]
+  parts = np.arange(n)
+  outer = parts[area > 0]
   first, extra = [], []
   for gid in ids:
     mine = outer[grainOf[outer] == gid]
@@ -121,19 +141,24 @@ def _pieces(F, g, P2, ids):
       first.append(mine[0])
       extra.extend(mine[1:])
   pieceOrder = first + extra
-  label = np.zeros(comp.max() + 1, dtype=np.int64)
+  label = np.zeros(n, dtype=np.int64)
   label[pieceOrder] = np.arange(1, len(pieceOrder) + 1)
-  # a hole to the piece of its grain that holds its first vertex
-  for h in parts[area[parts] <= 0]:
+  # a hole to the smallest piece of its grain that holds it, tested at a vertex off the piece,
+  # since a hole may touch it
+  for h in parts[area <= 0]:
     cand = [p for p in outer if grainOf[p] == grainOf[h]]
     if len(cand) == 1:
       label[h] = label[cand[0]]
       continue
-    q = P2[half[part == h][0, 0]]
+    vh = half[part == h, 0]
+    holding = []
     for p in cand:
-      if _inside(q, P2[half[part == p][:, 0]], P2[half[part == p][:, 1]]):
-        label[h] = label[p]
-        break
+      vp = half[part == p, 0]
+      off = np.setdiff1d(vh, vp)
+      if len(off) and _inside(P2[off[0]], P2[vp], P2[half[part == p, 1]]):
+        holding.append(p)
+    if holding:
+      label[h] = label[min(holding, key=lambda p: area[p])]
   newId[half[:, 3], half[:, 4]] = label[part]
   oldId = grainOf[pieceOrder]
   return newId, oldId
