@@ -3,10 +3,11 @@
 # Julia tests; check_EinsteinSum, check_tensorFactories)
 import numpy as np
 import pytest
+import scipy.linalg
 
 from mtex import (EinsteinSum, Kelvin, Voigt, cat, checkSymmetry, colon, complianceTensor, crystalFrame, degree, directionalMagnitude,
-                  dyad, eig, inv, mean, orientation, rotate, rotation, specimenFrame, stiffnessTensor, strainTensor, stressTensor,
-                  symmetrise, tensor, times, trace, transformReferenceFrame, vector3d, xvector, zvector)
+                  dyad, eig, expm, inv, logm, mean, orientation, polar, rotate, rotation, specimenFrame, sqrtm, stiffnessTensor, strainTensor,
+                  stressTensor, svd, symmetrise, tensor, times, trace, transformReferenceFrame, vector3d, xvector, zvector)
 
 rng = np.random.default_rng(20)
 CUBIC = np.array([[231.0, 134, 134, 0, 0, 0], [134, 231, 134, 0, 0, 0], [134, 134, 231, 0, 0, 0], [0, 0, 0, 116, 0, 0],
@@ -221,3 +222,37 @@ def test_a_weighted_list_mean_gives_MATLABs_three_outputs():
 def test_the_display_rounds_the_density():
   # MATLAB's five digits
   assert "density: 3.3449" in repr(stiffnessTensor(np.eye(6), density=3.3448528380995057))
+
+
+def test_matrix_functions_of_rank_two_and_four():
+  A = rng.normal(size=(4, 3, 3))
+  T = tensor(A, rank=2)
+  E = expm(T)
+  assert np.allclose(E.M[1], scipy.linalg.expm(A[1]))
+  assert np.allclose(expm(logm(E)).M, E.M)
+  P = tensor(A @ np.swapaxes(A, -1, -2), rank=2)
+  assert np.allclose((sqrtm(P) * sqrtm(P)).M, P.M)
+  # a rank four tensor through its Kelvin matrix: the square root squares back by the double contraction
+  C = stiffnessTensor(CUBIC, crystalFrame("m-3m"), name="C")
+  Q = sqrtm(C)
+  assert isinstance(Q, stiffnessTensor) and np.allclose(EinsteinSum(Q, [1, 2, -1, -2], Q, [-1, -2, 3, 4]).M, C.M)
+  L = logm(C)
+  assert L.name == "log C" and np.allclose(expm(L).M, C.M)
+  with pytest.raises(ValueError):
+    expm(tensor(np.ones(3), rank=1))
+
+
+def test_svd_and_polar_decomposition():
+  A = rng.normal(size=(5, 3, 3))
+  T = tensor(A, rank=2)
+  u, s, v = svd(T)
+  assert s.shape == (5, 3) and np.all(np.diff(s, axis=-1) <= 0)
+  assert np.allclose(np.einsum("nij,nkj->nki", A, v.data), u.data * s[..., None])
+  R, SL, SR = polar(T)
+  assert np.allclose((R * SR).M, A) and np.allclose((SL * R).M, A)
+  assert SL.isSymmetric and SR.isSymmetric and np.allclose(R.M @ np.swapaxes(R.M, -1, -2), np.eye(3))
+  # a rank four tensor: the rotation of its mode singular vectors turns the core back into it
+  C = stiffnessTensor(CUBIC, crystalFrame("m-3m"))
+  r, core, V = svd(C)
+  assert isinstance(r, rotation) and V is None
+  assert np.allclose(tensor(core.M, rank=4).rotate(r.matrix()).M, C.M)

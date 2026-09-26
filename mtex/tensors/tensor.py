@@ -6,6 +6,7 @@
 #   T.M, T.rank, T.frame, T.CS, Voigt(C), Kelvin(C)
 #   EinsteinSum(C, [1, 2, -1, -2], eps, [-1, -2]), colon(C, eps), dyad(a, b)
 #   rotate(T, r), ori * T, symmetrise(T), checkSymmetry(T), directionalMagnitude(T, v)
+#   eig(T), svd(T), polar(T), expm(T), logm(T), sqrtm(T)
 #   tensor.eye(rank=4), tensor.rand(5, rank=2), tensor.leviCivita, mean(Ts)
 #
 # A tensor of rank R is an element of (R^3)^(x R) written in a reference frame; a rotation
@@ -424,6 +425,58 @@ class tensor(MtexArray):
   def eigvals(self):
     return self.eig()[0]
 
+  # the matrix functions: a rank two tensor as its matrix, a rank four one as its Kelvin
+  # matrix, whose product is the double contraction, the class kept
+  def _matrixFunction(self, f):
+    if self.rank == 2:
+      return self._rebuild(_flatten(_perMatrix(f, self.M), 2))
+    if self.rank == 4:
+      return self._rebuild(_flatten(_fromVoigt(_perMatrix(f, Kelvin(self)), 4, KELVIN_WEIGHTS), 4))
+    raise ValueError("matrix functions are of tensors of rank two or four")
+
+  def expm(self):
+    from scipy.linalg import expm
+    return self._matrixFunction(expm)
+
+  def logm(self):
+    from scipy.linalg import logm
+    out = self._matrixFunction(logm)
+    out.name = None if self.name is None else f"log {self.name}"
+    return out
+
+  def sqrtm(self):
+    from scipy.linalg import sqrtm
+    return self._matrixFunction(sqrtm)
+
+  # the singular value decomposition: of a rank two tensor the left singular vectors, the
+  # singular values from the largest and the right singular vectors, T v_k = s_k u_k; of a
+  # rank four one the rotation of the higher order SVD and the core, the tensor written in
+  # the basis of its mode singular vectors, and no V
+  def svd(self):
+    if self.rank == 2:
+      U, s, Vt = np.linalg.svd(self.M)
+      u = vector3d(np.swapaxes(U, -1, -2), frame=self._frame)
+      v = vector3d(Vt, frame=self._frame)
+      u.dispStyle = v.dispStyle = "xyz"
+      return u, s, v
+    if self.rank == 4:
+      U = np.linalg.svd(self.M.reshape(self.shape + (3, 27)))[0]
+      U[..., :, 2] *= np.sign(np.linalg.det(U))[..., None]
+      return rotation.byMatrix(U), self._rebuild(_applyMatrix(self.M, np.swapaxes(U, -1, -2), 4)), None
+    raise ValueError("the singular value decomposition is of tensors of rank two or four")
+
+  # the polar decomposition T = R SR = SL R of a rank two tensor, R orthogonal, SL and SR
+  # symmetric
+  def polar(self):
+    if self.rank != 2:
+      raise ValueError("the polar decomposition is of tensors of rank two")
+    U, s, Vt = np.linalg.svd(self.M)
+    V = np.swapaxes(Vt, -1, -2)
+    R = U @ Vt
+    SL = (U * s[..., None, :]) @ np.swapaxes(U, -1, -2)
+    SR = (V * s[..., None, :]) @ Vt
+    return tuple(self._as(tensor, _flatten(A, 2)) for A in (R, SL, SR))
+
   # ------------------------------------------------------------------ the group action
 
   # the tensor turned by a rotation, an orthogonal transform or an orientation; the frame
@@ -586,6 +639,17 @@ class tensor(MtexArray):
   def leviCivita(cls):
     i, j, k = np.indices((3, 3, 3))
     return tensor(((i - j) * (j - k) * (k - i) / 2).astype(float), rank=3)
+
+
+# a function of one square matrix over the matrices of a stack, a result real up to
+# rounding returned real
+def _perMatrix(f, A):
+  n = A.shape[-1]
+  flat = A.reshape(-1, n, n)
+  out = np.stack([np.asarray(f(a)) for a in flat]) if len(flat) else np.zeros_like(flat)
+  if np.iscomplexobj(out) and np.all(np.abs(out.imag) <= 1e-10 * max(1.0, float(np.max(np.abs(out.real), initial=0)))):
+    out = out.real
+  return out.reshape(A.shape)
 
 
 # the trailing rank axes of a coefficient array joined into the one axis the container holds
@@ -887,7 +951,24 @@ def eig(T):
   return T.eig()
 
 
+def expm(T):
+  return T.expm()
+
+
+def logm(T):
+  return T.logm()
+
+
+def sqrtm(T):
+  return T.sqrtm()
+
+
+def svd(T):
+  return T.svd()
+
+
 __all__ = ["tensor", "stiffnessTensor", "complianceTensor", "stressTensor", "strainTensor", "strainRateTensor",
            "deformationGradientTensor", "velocityGradientTensor", "spinTensor", "curvatureTensor", "dislocationDensityTensor",
            "ChristoffelTensor", "refractiveIndexTensor", "SchmidTensor", "EinsteinSum", "colon", "doubleContract", "dyad",
-           "Voigt", "Kelvin", "times", "checkSymmetry", "directionalMagnitude", "sym", "antiSym", "trace", "eig"]
+           "Voigt", "Kelvin", "times", "checkSymmetry", "directionalMagnitude", "sym", "antiSym", "trace", "eig", "expm", "logm",
+           "sqrtm", "svd"]
