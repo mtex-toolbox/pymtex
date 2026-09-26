@@ -17,7 +17,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3Fun, grain3d, histogram, hold, mtexDataPath, mtexTitle, neper, newMtexFigure, nextAxis, plot, plottingConvention, setCamera,
+from mtex import (SO3Fun, grain3d, histogram, hold, mtexdatafile, mtexTitle, neper, newMtexFigure, nextAxis, plot, plottingConvention, setCamera,
                   vector3d)
 
 plottingConvention.default('y↑→x')
@@ -94,7 +94,7 @@ numGrains = 100
 if hasNeper:
   grains = neper.simulateGrains(numGrains, odf, silent=True)
 else:
-  tessFile = os.path.join(mtexDataPath(), 'Neper', 'my100grains.tess')
+  tessFile = mtexdatafile('my100grains')[0]
   grains = grain3d.load(tessFile, CS=odf.CS)
 print(grains)
 # -

@@ -6,7 +6,7 @@ import pytest
 
 import mtex
 from mtex import mtexdata, mtexdatafile, setMTEXpref
-from mtex.io.sampledata import DATASETS, SOURCES, mtexDataPath, testGrainsMap
+from mtex.io.sampledata import DATASETS, MANIFEST, SOURCES, mtexDataPath, testGrainsMap
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data")
@@ -20,7 +20,30 @@ def test_the_table_lists_every_data_set():
   assert "available sample data" in text and "forsterite" in text and "and 6 more" in text
   for d in DATASETS:
     if d["artifact"]:
-      assert d["artifact"] in SOURCES and d["files"]
+      assert d["artifact"].lower() in SOURCES and d["files"]
+
+
+def test_the_manifest_is_the_data_repositorys():
+  m = MANIFEST
+  assert m["repository"] == "mtex-toolbox/mtex-data" and m["version"].startswith("v")
+  for path, f in m["files"].items():
+    assert len(f["sha256"]) == 64 and f["size"] > 0 and f["url"].startswith("https://")
+    # the files of 50 MiB or more are release assets, the others raw files at the tag
+    asset = "/releases/download/" in f["url"]
+    assert asset == (f["size"] >= 50 * 2**20), path
+    assert asset or f"/{m['version']}/" in f["url"]
+  for d in m["datasets"].values():
+    assert all(p in m["files"] for p in d["files"])
+
+
+def test_a_data_set_without_a_recipe_gives_its_files(tmp_path):
+  (tmp_path / "Neper").mkdir()
+  for name in ("my100grains.tess", "my100grains.ori"):
+    (tmp_path / "Neper" / name).write_text("")
+  tess, ori = mtexdatafile("my100grains", root=tmp_path, download=False)
+  assert tess.endswith("my100grains.tess") and ori.endswith("my100grains.ori")
+  with pytest.raises(ValueError, match="mtexdata\\(\\) lists"):
+    mtexdatafile("mars")
 
 
 def test_an_unknown_name_is_an_error():

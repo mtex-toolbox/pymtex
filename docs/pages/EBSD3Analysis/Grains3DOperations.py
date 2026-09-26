@@ -10,12 +10,11 @@
 # [Properties of Three-Dimensional Grains](Grains3DProperties.html) page explains the
 # volume, surface, and face properties used below.
 
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (crystalFrame, degree, grain3d, hold, mtexDataPath, mtexTitle, newMtexFigure, nextAxis, plot, plottingConvention, rotate,
+from mtex import (crystalFrame, degree, grain3d, hold, mtexdatafile, mtexTitle, newMtexFigure, nextAxis, plot, plottingConvention, rotate,
                   rotation, setCamera, vector3d, zvector)
 
 plottingConvention.default('y↑→x')
@@ -25,7 +24,7 @@ plottingConvention.default('y↑→x')
 # +
 # assign trigonal quartz symmetry, as on the Neper Interface page
 cs = crystalFrame.load('quartz.cif')
-tessFile = os.path.join(mtexDataPath(), 'Neper', 'my100grains.tess')
+tessFile = mtexdatafile('my100grains')[0]
 grains = grain3d.load(tessFile, CS=cs)
 print(grains)
 

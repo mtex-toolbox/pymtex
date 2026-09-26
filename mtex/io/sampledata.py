@@ -5,10 +5,11 @@
 #   mtexdatafile('forsterite')    the path of its file, without the recipe
 #
 # A recipe is what the MATLAB page does to the file: the phases it names, the Euler
-# correction it states, the crop or the turn it applies. The files come from a pinned
-# revision of the MTEX repository and are checked against their digests, as the Julia port
-# does; they are kept under the preference 'mtexDataPath', the environment variable
-# MTEX_DATA, or ~/.mtex/data, and a local copy of MTEX's data folder serves as well.
+# correction it states, the crop or the turn it applies. The files come from a pinned tag
+# of mtex-toolbox/mtex-data, the data repository of all ports, whose manifest.json is
+# sampledata.json here, and are checked against their digests; they are kept under the
+# preference 'mtexDataPath', the environment variable MTEX_DATA, or ~/.mtex/data, and a
+# local copy of MTEX's data folder serves as well.
 from __future__ import annotations
 
 import hashlib
@@ -29,15 +30,19 @@ from .orientations import loadOrientation
 from .vectors import loadVector3d
 
 with open(os.path.join(os.path.dirname(__file__), "sampledata.json")) as _f:
-  SOURCES = json.load(_f)
+  MANIFEST = json.load(_f)
 
-# the data sets: name, type, description, the artifact whose files they read, the recipe
+# the files of every data set of the data repository, by its name in lower case
+SOURCES = {name.lower(): [dict(MANIFEST["files"][f], path=f) for f in d["files"]] for name, d in MANIFEST["datasets"].items()}
+
+# the data sets with a recipe: name, type, description, the data set whose files they read
+# ("" for none), the recipe
 DATASETS = []
 
 
 def _dataset(name, kind, description, artifact, recipe):
   DATASETS.append({"name": name, "type": kind, "description": description, "artifact": artifact,
-                   "files": [s["path"] for s in SOURCES.get(artifact, [])], "recipe": recipe})
+                   "files": [s["path"] for s in SOURCES.get(artifact.lower(), [])], "recipe": recipe})
 
 
 def mtexDataPath():
@@ -63,10 +68,6 @@ def _resolve(source, root, download):
       return p
   if not download:
     raise FileNotFoundError(f"the sample data file {source['path']} is not under {root}")
-  # a file with no address is written locally, by the script its recipe names
-  if not source["url"]:
-    raise FileNotFoundError(f"the sample data file {source['path']} is not under {root} and is not hosted yet; "
-                            "copy it there from MTEX's data folder (bench/matlab/export_trueebsd.m writes the TrueEBSD one)")
   os.makedirs(os.path.dirname(full), exist_ok=True)
   print(f"  downloading {source['url']}\n  to {full}")
   urllib.request.urlretrieve(source["url"], full)
@@ -85,10 +86,18 @@ def _find(name):
 
 
 def mtexdatafile(name, root=None, download=True):
-  """the file of a sample data set, or its files, fetched on first use"""
-  d = _find(name)
+  """the file of a sample data set, or its files, fetched on first use
+
+  Besides the data sets mtexdata reads, every data set of the data repository has its
+  files here, the Neper tessellation 'my100grains' for instance.
+  """
+  # a data set without a recipe here is named by the repository
+  key = str(name).lower()
+  artifact = _find(name)["artifact"].lower() if any(d["name"].lower() == key for d in DATASETS) else key
+  if artifact not in SOURCES and artifact:
+    raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
   root = mtexDataPath() if root is None else os.path.abspath(os.path.expanduser(root))
-  paths = [_resolve(s, root, download) for s in SOURCES.get(d["artifact"], [])]
+  paths = [_resolve(s, root, download) for s in SOURCES.get(artifact, [])]
   return paths[0] if len(paths) == 1 else paths
 
 
@@ -99,10 +108,10 @@ def mtexdata(name=None, root=None, download=True, silent=False):
     mtexdata('forsterite')           a map, read from its file with the recipe its page uses
     mtexdata('dubna')                pole figures, read with their directions and coefficients
 
-  The files are fetched from the MTEX repository on first use and kept under
-  getMTEXpref('mtexDataPath'), MTEX_DATA or ~/.mtex/data; root names another folder, a
-  local copy of MTEX's data folder for instance, and download=False never fetches; silent
-  is MATLAB's flag, the loading printing nothing anyway.
+  The files are fetched from the data repository mtex-toolbox/mtex-data on first use and
+  kept under getMTEXpref('mtexDataPath'), MTEX_DATA or ~/.mtex/data; root names another
+  folder, a local copy of MTEX's data folder for instance, and download=False never
+  fetches; silent is MATLAB's flag, the loading printing nothing anyway.
   """
   if name is None:
     return SampleTable()

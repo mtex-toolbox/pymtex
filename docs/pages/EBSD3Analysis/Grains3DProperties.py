@@ -9,12 +9,11 @@
 # elongated grains from compact ones, and identify shapes cut short by the measurement
 # boundary. These questions need different measures and different statistical weights.
 
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (crystalFrame, degree, grain3d, histogram, hold, ipfColorKey, mtexColorbar, mtexDataPath, mtexTitle, newMtexFigure, nextAxis,
+from mtex import (crystalFrame, degree, grain3d, histogram, hold, ipfColorKey, mtexColorbar, mtexdatafile, mtexTitle, newMtexFigure, nextAxis,
                   norm, plot, plotEllipsoid, plottingConvention, quiver, setCamera)
 
 plottingConvention.default('y↑→x')
@@ -30,7 +29,7 @@ plottingConvention.default('y↑→x')
 # +
 # assign trigonal quartz symmetry, as on the Neper Interface page
 cs = crystalFrame.load('quartz.cif')
-tessFile = os.path.join(mtexDataPath(), 'Neper', 'my100grains.tess')
+tessFile = mtexdatafile('my100grains')[0]
 grains = grain3d.load(tessFile, CS=cs)
 print(grains)
 

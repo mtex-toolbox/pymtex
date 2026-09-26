@@ -96,5 +96,5 @@ setCamera(plottingConvention.default3D)
 # ## Technical details
 #
 # MATLAB builds the file name from `mtexDataPath`; here `mtexdatafile('SmallIN100')` gives
-# it, fetching the file from the MTEX repository on first use. The selection by id is
+# it, fetching the file from the MTEX data repository on first use. The selection by id is
 # `grains['id', grainId]`, MATLAB's `grains('id', grainId)`.

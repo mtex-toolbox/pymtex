@@ -1,361 +1,1521 @@
 {
-  "aachen": [
-    {
-      "path": "EBSD/85_829grad_07_09_06.txt",
+  "datasets": {
+    "3d": {
+      "description": "Serial sections of a 3d map, one .ang file per slice",
+      "files": [
+        "EBSD/3dData/S00.ANG",
+        "EBSD/3dData/S01.ANG",
+        "EBSD/3dData/S02.ANG",
+        "EBSD/3dData/S03.ANG",
+        "EBSD/3dData/S04.ANG",
+        "EBSD/3dData/S05.ANG",
+        "EBSD/3dData/S06.ANG",
+        "EBSD/3dData/S07.ANG",
+        "EBSD/3dData/S08.ANG",
+        "EBSD/3dData/S09.ANG",
+        "EBSD/3dData/S10.ANG",
+        "EBSD/3dData/S11.ANG",
+        "EBSD/3dData/S12.ANG",
+        "EBSD/3dData/S13.ANG",
+        "EBSD/3dData/S14.ANG",
+        "EBSD/3dData/S15.ANG",
+        "EBSD/3dData/S16.ANG",
+        "EBSD/3dData/S17.ANG",
+        "EBSD/3dData/S18.ANG",
+        "EBSD/3dData/S19.ANG",
+        "EBSD/3dData/S20.ANG",
+        "EBSD/3dData/S21.ANG",
+        "EBSD/3dData/S22.ANG",
+        "EBSD/3dData/S23.ANG",
+        "EBSD/3dData/S24.ANG",
+        "EBSD/3dData/S25.ANG",
+        "EBSD/3dData/S26.ANG",
+        "EBSD/3dData/S27.ANG",
+        "EBSD/3dData/S28.ANG",
+        "EBSD/3dData/S29.ANG",
+        "EBSD/3dData/S30.ANG",
+        "EBSD/3dData/S31.ANG",
+        "EBSD/3dData/S32.ANG",
+        "EBSD/3dData/S33.ANG",
+        "EBSD/3dData/S34.ANG",
+        "EBSD/3dData/S35.ANG",
+        "EBSD/3dData/S36.ANG",
+        "EBSD/3dData/S37.ANG",
+        "EBSD/3dData/S38.ANG",
+        "EBSD/3dData/S39.ANG",
+        "EBSD/3dData/S40.ANG",
+        "EBSD/3dData/S41.ANG",
+        "EBSD/3dData/S42.ANG",
+        "EBSD/3dData/S43.ANG",
+        "EBSD/3dData/S44.ANG",
+        "EBSD/3dData/S45.ANG",
+        "EBSD/3dData/S46.ANG",
+        "EBSD/3dData/S47.ANG",
+        "EBSD/3dData/S48.ANG",
+        "EBSD/3dData/S49.ANG",
+        "EBSD/3dData/S50.ANG",
+        "EBSD/3dData/S51.ANG",
+        "EBSD/3dData/S52.ANG",
+        "EBSD/3dData/S53.ANG",
+        "EBSD/3dData/S54.ANG",
+        "EBSD/3dData/S55.ANG",
+        "EBSD/3dData/S56.ANG",
+        "EBSD/3dData/S57.ANG",
+        "EBSD/3dData/S58.ANG"
+      ],
+      "type": "EBSD"
+    },
+    "EMSphinx": {
+      "description": "EMSphInx steel map with named iron and cobalt phases",
+      "files": [
+        "EBSD/EMSphinx.h5"
+      ],
+      "type": "EBSD"
+    },
+    "NeperGrain3d": {
+      "description": "1000 grains simulated by Neper from the Dubna ODF",
+      "files": [],
+      "type": "grain3d"
+    },
+    "SmallIN100": {
+      "description": "The IN100 nickel superalloy volume of DREAM.3D with its grain mesh",
+      "files": [
+        "EBSD/SmallIN100_MeshStats.dream3d"
+      ],
+      "type": "EBSD3"
+    },
+    "aachen": {
+      "description": "Two-phase iron and magnesium map",
+      "files": [
+        "EBSD/85_829grad_07_09_06.txt"
+      ],
+      "type": "EBSD"
+    },
+    "aachenexp": {
+      "description": "Aachen experimental pole figures",
+      "files": [
+        "PoleFigure/aachen_exp.EXP"
+      ],
+      "type": "PoleFigure"
+    },
+    "alphaBetaTitanium": {
+      "description": "Alpha and beta titanium map with proper crystal groups",
+      "files": [
+        "EBSD/EDXLMDTi64.cpr",
+        "EBSD/EDXLMDTi64.crc"
+      ],
+      "type": "EBSD"
+    },
+    "alu": {
+      "description": "Polycrystalline aluminium map",
+      "files": [
+        "EBSD/polycrystalline_aluminum.txt"
+      ],
+      "type": "EBSD"
+    },
+    "copper": {
+      "description": "Copper map, EDAX setting 1",
+      "files": [
+        "EBSD/copper.osc"
+      ],
+      "type": "EBSD"
+    },
+    "copper29": {
+      "description": "Oxford h5oina copper map",
+      "files": [
+        "EBSD/copper29.h5oina"
+      ],
+      "type": "EBSD"
+    },
+    "csl": {
+      "description": "Iron map for the coincidence site lattice examples",
+      "files": [
+        "EBSD/CSL.txt"
+      ],
+      "type": "EBSD"
+    },
+    "dc06": {
+      "description": "Ferritic steel after two percent uniaxial tension, EDAX setting 2",
+      "files": [
+        "EBSD/DC06_2uniax.ang"
+      ],
+      "type": "EBSD"
+    },
+    "dubna": {
+      "description": "Quartz pole figures with superposition coefficients",
+      "files": [
+        "PoleFigure/dubna/Q(02-21)_amp.cnv",
+        "PoleFigure/dubna/Q(10-10)_amp.cnv",
+        "PoleFigure/dubna/Q(10-11)(01-11)_amp.cnv",
+        "PoleFigure/dubna/Q(10-12)_amp.cnv",
+        "PoleFigure/dubna/Q(11-20)_amp.cnv",
+        "PoleFigure/dubna/Q(11-21)_amp.cnv",
+        "PoleFigure/dubna/Q(11-22)_amp.cnv"
+      ],
+      "type": "PoleFigure"
+    },
+    "dubnaODF": {
+      "description": "The ODF reconstructed from the Dubna quartz pole figures",
+      "files": [
+        "PoleFigure/dubna/Q(02-21)_amp.cnv",
+        "PoleFigure/dubna/Q(10-10)_amp.cnv",
+        "PoleFigure/dubna/Q(10-11)(01-11)_amp.cnv",
+        "PoleFigure/dubna/Q(10-12)_amp.cnv",
+        "PoleFigure/dubna/Q(11-20)_amp.cnv",
+        "PoleFigure/dubna/Q(11-21)_amp.cnv",
+        "PoleFigure/dubna/Q(11-22)_amp.cnv"
+      ],
+      "type": "SO3Fun"
+    },
+    "dubnaValues": {
+      "description": "Values of the Dubna ODF at 19848 orientations of a 5 degree grid",
+      "files": [
+        "orientation/dubna.csv"
+      ],
+      "type": "orientation"
+    },
+    "eclogite": {
+      "description": "Sparse eclogite map whose positions collide on a lattice, kept as a list",
+      "files": [
+        "EBSD/eclogite.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "emsland": {
+      "description": "Emsland plessite map",
+      "files": [
+        "EBSD/Emsland_plessite_500x_15.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "epidote": {
+      "description": "Multiphase epidote map",
+      "files": [
+        "EBSD/data.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "ferrite": {
+      "description": "Ferrite map, EDAX setting 1",
+      "files": [
+        "EBSD/ferrite.ang"
+      ],
+      "type": "EBSD"
+    },
+    "forsterite": {
+      "description": "Multiphase Forsterite map",
+      "files": [
+        "EBSD/Forsterite.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "geesthacht": {
+      "description": "Geesthacht diffraction pole figures",
+      "files": [
+        "PoleFigure/geesthacht/ST42-104-110.dat"
+      ],
+      "type": "PoleFigure"
+    },
+    "martensite": {
+      "description": "Martensite map with proper crystal groups",
+      "files": [
+        "EBSD/martensite.cpr",
+        "EBSD/martensite.crc"
+      ],
+      "type": "EBSD"
+    },
+    "my100grains": {
+      "description": "A Neper tessellation of 100 grains with their orientations",
+      "files": [
+        "Neper/my100grains.tess",
+        "Neper/my100grains.ori"
+      ],
+      "type": "grain3d"
+    },
+    "mylonite": {
+      "description": "Multiphase mylonite map",
+      "files": [
+        "EBSD/P5629U1.txt"
+      ],
+      "type": "EBSD"
+    },
+    "odf": {
+      "description": "An ODF tabulated on a Bunge Euler grid, read as values",
+      "files": [
+        "ODF/odf.txt"
+      ],
+      "type": "SO3Fun"
+    },
+    "olivine": {
+      "description": "Olivine optical map in the prepared reference frame",
+      "files": [
+        "EBSD/olivineopticalmap.ang"
+      ],
+      "type": "EBSD"
+    },
+    "olivine1997": {
+      "description": "The stiffness tensor of San Carlos olivine at room pressure",
+      "files": [
+        "tensor/Olivine1997PC.GPa"
+      ],
+      "type": "tensor"
+    },
+    "ptx": {
+      "description": "Three orthorhombic pole figures of a Siemens diffractometer",
+      "files": [
+        "PoleFigure/ptx/gt9104.ptx",
+        "PoleFigure/ptx/gt9110.ptx",
+        "PoleFigure/ptx/gt9202.ptx"
+      ],
+      "type": "PoleFigure"
+    },
+    "quartzPattern": {
+      "description": "A spherical Kikuchi master pattern of quartz",
+      "files": [
+        "quartzPattern.mat"
+      ],
+      "type": "S2Fun"
+    },
+    "quartzPiezo": {
+      "description": "The piezoelectric modulus of right-handed quartz (Frondel 1962)",
+      "files": [
+        "tensor/Single_RH_quartz_poly.P"
+      ],
+      "type": "tensor"
+    },
+    "sharp": {
+      "description": "Calcite orientation map",
+      "files": [
+        "EBSD/sharp.txt"
+      ],
+      "type": "EBSD"
+    },
+    "single": {
+      "description": "Single grain aluminium map",
+      "files": [
+        "EBSD/single_grain_aluminum.txt"
+      ],
+      "type": "EBSD"
+    },
+    "small": {
+      "description": "The Forsterite map cropped to a 3000 x 3000 um region",
+      "files": [
+        "EBSD/Forsterite.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "smiley": {
+      "description": "777 directions with the values of the smiley function",
+      "files": [
+        "vector3d/smiley.csv"
+      ],
+      "type": "vector3d"
+    },
+    "steel": {
+      "description": "Steel pole figures turned by 90 degree",
+      "files": [
+        "PoleFigure/steel/AcAR110p.rw1",
+        "PoleFigure/steel/AcAR200p.rw1",
+        "PoleFigure/steel/AcAR211p.rw1"
+      ],
+      "type": "PoleFigure"
+    },
+    "testgrains": {
+      "description": "Artificial grain shapes for the shape parameters",
+      "files": [
+        "testgrains.mat"
+      ],
+      "type": "grain2d"
+    },
+    "titanium": {
+      "description": "Alpha titanium map with X||a",
+      "files": [
+        "EBSD/titanium.txt"
+      ],
+      "type": "EBSD"
+    },
+    "tongue": {
+      "description": "382 quartz orientations of the Tongue quartzite as Bunge Euler angles",
+      "files": [
+        "orientation/Tongue_Quartzite_Bunge_Euler"
+      ],
+      "type": "orientation"
+    },
+    "trueEbsdWCCo": {
+      "description": "The full WC-Co map with forescatter images, for TrueEBSD",
+      "files": [
+        "EBSD/trueEbsdWCCo.mat"
+      ],
+      "type": "EBSD"
+    },
+    "trueEbsdWCCoSmall": {
+      "description": "WC-Co map with four forescatter images of the same area, for TrueEBSD",
+      "files": [
+        "EBSD/trueEbsdWCCoSmall.h5"
+      ],
+      "type": "EBSD"
+    },
+    "twins": {
+      "description": "Magnesium map for the twinning examples",
+      "files": [
+        "EBSD/twins.ctf"
+      ],
+      "type": "EBSD"
+    },
+    "vectors": {
+      "description": "A thousand directions as polar and azimuth angles",
+      "files": [
+        "vector3d/vectors.txt"
+      ],
+      "type": "vector3d"
+    },
+    "vpsc": {
+      "description": "The texture and slip activity history of a VPSC olivine run",
+      "files": [
+        "VPSC/TEX_PH1.OUT",
+        "VPSC/ACT_PH1.OUT"
+      ],
+      "type": "VPSC"
+    },
+    "xnovo": {
+      "description": "A simulated multiphase xnovo volume, a cylinder of nine phases",
+      "files": [
+        "EBSD3/SimulatedMultiPhase.h5"
+      ],
+      "type": "EBSD3"
+    },
+    "zncuti": {
+      "description": "ZnCuTi sheet pole figures corrected by a texture-free reference",
+      "files": [
+        "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_002_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_100_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_101_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_102_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_002_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_100_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_101_R.UXD",
+        "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD"
+      ],
+      "type": "PoleFigure"
+    }
+  },
+  "files": {
+    "EBSD/3dData/S00.ANG": {
+      "sha256": "682775e71b79483e5320142358957e1d0f71b1dc7cb0bb4d7d26249aa65c7ae4",
+      "size": 86583,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S00.ANG"
+    },
+    "EBSD/3dData/S01.ANG": {
+      "sha256": "19fbc4f57c3f3b938dcdf465226c26363fee5299c6dc2b8d26cfd6e4572ef096",
+      "size": 85919,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S01.ANG"
+    },
+    "EBSD/3dData/S02.ANG": {
+      "sha256": "f1951853f05d569dd3e17682820456958e7b0c283b05e6dd1607f506abcfb533",
+      "size": 85921,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S02.ANG"
+    },
+    "EBSD/3dData/S03.ANG": {
+      "sha256": "f7a5c3ba5dc25baad6aec71e4cc12bcce4cefe37d6b7aaace575188b516e1631",
+      "size": 85921,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S03.ANG"
+    },
+    "EBSD/3dData/S04.ANG": {
+      "sha256": "bcda726c0dd3ac09a93d09f502b18179d95d6bb94e377fa4d5465064bf4dede8",
+      "size": 85915,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S04.ANG"
+    },
+    "EBSD/3dData/S05.ANG": {
+      "sha256": "89234951b07895e37f742021d3a68ec6320ded965e64f928df6600aed638e39b",
+      "size": 85923,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S05.ANG"
+    },
+    "EBSD/3dData/S06.ANG": {
+      "sha256": "272e8a6baab7c736e2e99361ad4f569216aeca00bd31c23bf2aad7aaf7df3cc7",
+      "size": 85923,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S06.ANG"
+    },
+    "EBSD/3dData/S07.ANG": {
+      "sha256": "5c499ad770198de6730eaa493e6a478b0361507546e460130f06425953233613",
+      "size": 85927,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S07.ANG"
+    },
+    "EBSD/3dData/S08.ANG": {
+      "sha256": "12f681fcdc8757bda1161d10f3bd0725d4c3b1bf9b91682e0c851828faf7471d",
+      "size": 85911,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S08.ANG"
+    },
+    "EBSD/3dData/S09.ANG": {
+      "sha256": "2ba0292474223de3d6e3fc62da073c8008150ba8292fa080a37883e67ea1fe09",
+      "size": 85917,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S09.ANG"
+    },
+    "EBSD/3dData/S10.ANG": {
+      "sha256": "a4bef250f6e64ee137fd5e377db89fc8d8567dd321ecc6d3bb2161be5745e685",
+      "size": 85931,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S10.ANG"
+    },
+    "EBSD/3dData/S11.ANG": {
+      "sha256": "6245423e2752427ad05e7a4f5312d938d7bd93a4f9ca749039e14b74ba6f847d",
+      "size": 85937,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S11.ANG"
+    },
+    "EBSD/3dData/S12.ANG": {
+      "sha256": "466d2e1b0b99512b10fcfe67d823b15cb8a6d9d1ec2a543430296b3058416998",
+      "size": 85933,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S12.ANG"
+    },
+    "EBSD/3dData/S13.ANG": {
+      "sha256": "7fa41960b9c19314e434e418ba859f251aaf402fcd223242db96f83e7086f98d",
+      "size": 85925,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S13.ANG"
+    },
+    "EBSD/3dData/S14.ANG": {
+      "sha256": "51e29815d8bbdb6bc8b70399d1781cd8d33d0c0e6085a350fb5fe0e6ca0be3e4",
+      "size": 85923,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S14.ANG"
+    },
+    "EBSD/3dData/S15.ANG": {
+      "sha256": "3204478b9a0fd376167411cc9b27e345887f242bacc031a11019bf6ceb51d4cf",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S15.ANG"
+    },
+    "EBSD/3dData/S16.ANG": {
+      "sha256": "fd988ab713c9e1d2dbf918a16167cbade116e8d236aa5e6f8223521b8290f05e",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S16.ANG"
+    },
+    "EBSD/3dData/S17.ANG": {
+      "sha256": "b9aad58d359a949ecc39dba7d28796137240fe689c3a048d216c576448c322ed",
+      "size": 85931,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S17.ANG"
+    },
+    "EBSD/3dData/S18.ANG": {
+      "sha256": "ffdebc7c31e8d3ddfbf7c37eeac4738c8e4432d5703463887e7ebff0e3f74957",
+      "size": 85919,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S18.ANG"
+    },
+    "EBSD/3dData/S19.ANG": {
+      "sha256": "c8be683a8d7e9146e52dda5d0de77e68e5a740ca7de63a65d405266accef9630",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S19.ANG"
+    },
+    "EBSD/3dData/S20.ANG": {
+      "sha256": "a018aa697134b202fa0987e8505cae18a6563af5aeb7bc01ccc3c16d2c3b0ff3",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S20.ANG"
+    },
+    "EBSD/3dData/S21.ANG": {
+      "sha256": "c549a559124e5430c16941126c9b498c7d6aaee487bda710b1c5b5356a94898d",
+      "size": 85925,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S21.ANG"
+    },
+    "EBSD/3dData/S22.ANG": {
+      "sha256": "fd146eaba122ba4a892880e0a3bff230976e282c5591e85b95a17824bb6d2729",
+      "size": 85933,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S22.ANG"
+    },
+    "EBSD/3dData/S23.ANG": {
+      "sha256": "f7f52e44e5ec809995cc5a4dc1896b0ccaa30c5bf35bd64cb8fb7f9bf546452b",
+      "size": 85939,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S23.ANG"
+    },
+    "EBSD/3dData/S24.ANG": {
+      "sha256": "49023e4b02021e0f1e5c358b751bfade6672a4fbd11e140c9ca62d930d66c564",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S24.ANG"
+    },
+    "EBSD/3dData/S25.ANG": {
+      "sha256": "4df6eceec554eeab1a1443de39114d35236e9207cd2cde317dcd21fb5e35ca86",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S25.ANG"
+    },
+    "EBSD/3dData/S26.ANG": {
+      "sha256": "4215190cc2b6b3d3c9a49d6a0d70054ff56a77a4761c6d00c4de75f6d0aaebfa",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S26.ANG"
+    },
+    "EBSD/3dData/S27.ANG": {
+      "sha256": "b90196afa18ef537ee9be3b78b01d94d425d4a7f714ebe1ab38da2f2cc4fe315",
+      "size": 85919,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S27.ANG"
+    },
+    "EBSD/3dData/S28.ANG": {
+      "sha256": "dc8ca72a81339a93956ca065a415b8a582c352f732f0f685b91fdd2dfae326f0",
+      "size": 85921,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S28.ANG"
+    },
+    "EBSD/3dData/S29.ANG": {
+      "sha256": "5eb97029934014ae69e378bd8ab5e1ca883145a1a04a1bc740c8a6967bd041b8",
+      "size": 85935,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S29.ANG"
+    },
+    "EBSD/3dData/S30.ANG": {
+      "sha256": "fe3fa89b76f1cb7c40fb46dda5ff85617ef09e6de695497eada8c6447e228417",
+      "size": 85943,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S30.ANG"
+    },
+    "EBSD/3dData/S31.ANG": {
+      "sha256": "ab071fa0806647904f764a6c09852c8d116219356c6d6b694205c258de4664a5",
+      "size": 85927,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S31.ANG"
+    },
+    "EBSD/3dData/S32.ANG": {
+      "sha256": "0262be1da234f57921c6bd69d0b5c78baded788c9b60f2fc8f821882f7521a37",
+      "size": 85925,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S32.ANG"
+    },
+    "EBSD/3dData/S33.ANG": {
+      "sha256": "8c357b03a2f0a75aae321af6b7ac4ad6449e4de42ad12807c9661acb812c795d",
+      "size": 85923,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S33.ANG"
+    },
+    "EBSD/3dData/S34.ANG": {
+      "sha256": "af7cab6f2fa55deb40f523bfd081c2ea05e4b05e7ae2df70799be823cf473556",
+      "size": 85933,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S34.ANG"
+    },
+    "EBSD/3dData/S35.ANG": {
+      "sha256": "7d33af01b593830c773201a46e2073301bfdf3ec4cecb6068941a003fd9fa5c6",
+      "size": 85923,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S35.ANG"
+    },
+    "EBSD/3dData/S36.ANG": {
+      "sha256": "4bc47db74a0bf49033d7bb04555028bd35dad774bb3b2dde9a943e067ae6cea0",
+      "size": 85939,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S36.ANG"
+    },
+    "EBSD/3dData/S37.ANG": {
+      "sha256": "e82d0dc3aa6675faf5c02b8c1823a2dd8a29b294c5fbba1af96e856a5d986cc7",
+      "size": 85931,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S37.ANG"
+    },
+    "EBSD/3dData/S38.ANG": {
+      "sha256": "55a9c0550559d3f353a6578dc69b968ffe429a3a797bfc4e8b4c1d785a5b8835",
+      "size": 85921,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S38.ANG"
+    },
+    "EBSD/3dData/S39.ANG": {
+      "sha256": "5323e7b6c53ac85b8c2b1882b9f5891bba5d3fa946fde816d2108629b5899335",
+      "size": 85917,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S39.ANG"
+    },
+    "EBSD/3dData/S40.ANG": {
+      "sha256": "e1aaa800aa02cc7f25205383ccb19b41c83a6e62d555bc6b6ded02de24e7fd00",
+      "size": 85915,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S40.ANG"
+    },
+    "EBSD/3dData/S41.ANG": {
+      "sha256": "8ce798bce746312526f48ebd4041973d2e74093b38550c8c9be3a016d502349e",
+      "size": 85919,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S41.ANG"
+    },
+    "EBSD/3dData/S42.ANG": {
+      "sha256": "2076598c1a563a554c9395c92c76c521ca4022ee546a29a06584c67ee270e6fc",
+      "size": 85917,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S42.ANG"
+    },
+    "EBSD/3dData/S43.ANG": {
+      "sha256": "6d5062f6dea879092dbf9938a9be94a61d7202a588450774b90562316e89ea74",
+      "size": 85913,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S43.ANG"
+    },
+    "EBSD/3dData/S44.ANG": {
+      "sha256": "3b6682b38a5788459dd8028de60ef7378581b059f177afea5592ee8cab84a90a",
+      "size": 85911,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S44.ANG"
+    },
+    "EBSD/3dData/S45.ANG": {
+      "sha256": "102b89ed67149fe2484b9c234b8dd60a3093e61965ab715b5ebb5d9ab5b97bdd",
+      "size": 85929,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S45.ANG"
+    },
+    "EBSD/3dData/S46.ANG": {
+      "sha256": "90b856b7e068edf3ed11573f2878bc37c85210d555e2e62290a8e64fd8f8de97",
+      "size": 85933,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S46.ANG"
+    },
+    "EBSD/3dData/S47.ANG": {
+      "sha256": "8792064dd6933514287aacfb01f197dd4e347f8e4d81b88acea875a22f55f3ee",
+      "size": 85921,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S47.ANG"
+    },
+    "EBSD/3dData/S48.ANG": {
+      "sha256": "80eb2d8cdc8184d4601a247e427ae6fa41c8cbe0af7fb3b91c00f3d21ad7a4ad",
+      "size": 85945,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S48.ANG"
+    },
+    "EBSD/3dData/S49.ANG": {
+      "sha256": "2c38f624bd3315c4aa7ca0c0b72334a707569647934fb19bdb612fbd5f464e89",
+      "size": 85937,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S49.ANG"
+    },
+    "EBSD/3dData/S50.ANG": {
+      "sha256": "56cb68cdfd8c7478237c67789644913276f173d08d613ce3d07110e2a4818aa8",
+      "size": 85939,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S50.ANG"
+    },
+    "EBSD/3dData/S51.ANG": {
+      "sha256": "e2a342b7751a4f5e48af24ee16ac44d7668586a7b67042bb4bf6ad4a61583a75",
+      "size": 85933,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S51.ANG"
+    },
+    "EBSD/3dData/S52.ANG": {
+      "sha256": "c60cce51026841843080e0d74e1ef01a26076e3be8d3d4e082e92a1be835ad33",
+      "size": 85925,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S52.ANG"
+    },
+    "EBSD/3dData/S53.ANG": {
+      "sha256": "eb0edb2fbb9244023ea472d7972ab4b7ddea0607b1c2a1dffd946e38cd3f59d8",
+      "size": 85917,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S53.ANG"
+    },
+    "EBSD/3dData/S54.ANG": {
+      "sha256": "f513119cc1e66058c07f344409e93b551ae081e97abf0f3f2ccf4bb7d819436e",
+      "size": 85897,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S54.ANG"
+    },
+    "EBSD/3dData/S55.ANG": {
+      "sha256": "875a213b5a87f125249e630bcd4401ca91f1968360e20068cf4c779c04168510",
+      "size": 85903,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S55.ANG"
+    },
+    "EBSD/3dData/S56.ANG": {
+      "sha256": "9b84a2d77732db9321590732393262139cc2de771d442eb32adfe8f7b86ec90b",
+      "size": 85911,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S56.ANG"
+    },
+    "EBSD/3dData/S57.ANG": {
+      "sha256": "b82bd8a5b285ef95137f06a94efdbfaa94ec23d50b640591d578f024092d2ff1",
+      "size": 85603,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S57.ANG"
+    },
+    "EBSD/3dData/S58.ANG": {
+      "sha256": "dde1fb1982632286b1754faec85069b45af80d3e3f7a8bda8044270be2341226",
+      "size": 85163,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/3dData/S58.ANG"
+    },
+    "EBSD/85_829grad_07_09_06.txt": {
       "sha256": "ef91f4910d487eef26a4fe5465ea0f65780da4902b5faaad4940bd6af3ce7433",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/85_829grad_07_09_06.txt"
-    }
-  ],
-  "aachenexp": [
-    {
-      "path": "PoleFigure/aachen_exp.EXP",
-      "sha256": "2320ca307527172aed8b8d3d4b594fff864e52414a563fbbd347292cc23df40b",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/aachen_exp.EXP"
-    }
-  ],
-  "alphabetatitanium": [
-    {
-      "path": "EBSD/EDXLMDTi64.cpr",
-      "sha256": "45ec1c77271ffb4a055a1044eb298c49a7a113979c689a85f8c5f3c683e214e4",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/EDXLMDTi64.cpr"
+      "size": 3919471,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/85_829grad_07_09_06.txt"
     },
-    {
-      "path": "EBSD/EDXLMDTi64.crc",
-      "sha256": "0948e4aeca57621e8a56b219d17eb07cbb1eb7f0f977d24fa4f2544ff36e599d",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/EDXLMDTi64.crc"
-    }
-  ],
-  "alu": [
-    {
-      "path": "EBSD/polycrystalline_aluminum.txt",
-      "sha256": "4e5664b319cb3408433311ee34a8ed3c9b859f296c492f21801e193708bbf191",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/polycrystalline_aluminum.txt"
-    }
-  ],
-  "copper": [
-    {
-      "path": "EBSD/copper.osc",
-      "sha256": "3379c1388a295043e16ff553eb6e4c53d3edb5370df8925bf6698aacf80b3fdb",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/copper.osc"
-    }
-  ],
-  "csl": [
-    {
-      "path": "EBSD/CSL.txt",
+    "EBSD/ACOM.ang": {
+      "sha256": "71b2a089c44b922e354111ebe373d7898c59ea45f2ce3b6f018462cd4482f9b5",
+      "size": 16862,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/ACOM.ang"
+    },
+    "EBSD/CSL.txt": {
       "sha256": "f60350c11d7e02d5309ca1304c26fcdea19adfb92218f7f7640e7951395087c5",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/CSL.txt"
-    }
-  ],
-  "dc06": [
-    {
-      "path": "EBSD/DC06_2uniax.ang",
+      "size": 7035019,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/CSL.txt"
+    },
+    "EBSD/DC06_2uniax.ang": {
       "sha256": "764b250d445614fa0009548dfebaf5abe655f5c3c99d48babbd732b4f80d7851",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/DC06_2uniax.ang"
-    }
-  ],
-  "dubna": [
-    {
-      "path": "PoleFigure/dubna/Q(02-21)_amp.cnv",
-      "sha256": "bcf503cc0612ba2b90520fd35cdada070b1017846723f654d96b82ebe963df9b",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2802-21%29_amp.cnv"
+      "size": 824012,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/DC06_2uniax.ang"
     },
-    {
-      "path": "PoleFigure/dubna/Q(10-10)_amp.cnv",
-      "sha256": "cadff10880297782a91f5b04be42cc8c469cebb531d91120b5cd5c92765d9531",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2810-10%29_amp.cnv"
+    "EBSD/EDXLMDTi64.cpr": {
+      "sha256": "45ec1c77271ffb4a055a1044eb298c49a7a113979c689a85f8c5f3c683e214e4",
+      "size": 1355,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/EDXLMDTi64.cpr"
     },
-    {
-      "path": "PoleFigure/dubna/Q(10-11)(01-11)_amp.cnv",
-      "sha256": "f04871888c4407dc43c17c2318931d5607abd51696ecb8fec9d7c7bbb0bcc21d",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2810-11%29%2801-11%29_amp.cnv"
+    "EBSD/EDXLMDTi64.crc": {
+      "sha256": "0948e4aeca57621e8a56b219d17eb07cbb1eb7f0f977d24fa4f2544ff36e599d",
+      "size": 4915200,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/EDXLMDTi64.crc"
     },
-    {
-      "path": "PoleFigure/dubna/Q(10-12)_amp.cnv",
-      "sha256": "4b6c58fa00f1c4aeb66c752827cdb4c24cac81b411d989ebdf4508c3fbae0e36",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2810-12%29_amp.cnv"
-    },
-    {
-      "path": "PoleFigure/dubna/Q(11-20)_amp.cnv",
-      "sha256": "f9a97b76d5939c252dd5772eb4638ccb55add1c56b6e57186463bdc5d6f43adf",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2811-20%29_amp.cnv"
-    },
-    {
-      "path": "PoleFigure/dubna/Q(11-21)_amp.cnv",
-      "sha256": "543a0d526b79d74d50e041333e92d0901b8abc23ee0d61ec1f04c746a4e38ef3",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2811-21%29_amp.cnv"
-    },
-    {
-      "path": "PoleFigure/dubna/Q(11-22)_amp.cnv",
-      "sha256": "94e317c1f385f6034650506eb9650c16498dbc2435ff723994c89df020ac51d8",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/dubna/Q%2811-22%29_amp.cnv"
-    }
-  ],
-  "dubnaValues": [
-    {
-      "path": "orientation/dubna.csv",
-      "sha256": "2712703537d06914e35eaee47d02f8dd462ae49fd5822495b172cfb27b84155c",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/orientation/dubna.csv"
-    }
-  ],
-  "eclogite": [
-    {
-      "path": "EBSD/eclogite.ctf",
-      "sha256": "3d72e24fd82bab014f4e67ce63fce20465f6e62d72f5e17d283774f174510248",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/eclogite.ctf"
-    }
-  ],
-  "emsland": [
-    {
-      "path": "EBSD/Emsland_plessite_500x_15.ctf",
-      "sha256": "573e795af67665e8901047d686645495201afd3138619ffc4898c1bdfe09ed10",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/Emsland_plessite_500x_15.ctf"
-    }
-  ],
-  "emsphinx": [
-    {
-      "path": "EBSD/EMSphinx.h5",
+    "EBSD/EMSphinx.h5": {
       "sha256": "f310bcd1ccf61d106bcf7a08875b5234879eddee8d2042e5378593062f17c631",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/EMSphinx.h5"
-    }
-  ],
-  "epidote": [
-    {
-      "path": "EBSD/data.ctf",
-      "sha256": "c307be17e0fc90a52cb5fecb6d78509222adbf61b59bcd31bfbfd9ae5f0859e2",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/data.ctf"
-    }
-  ],
-  "ferrite": [
-    {
-      "path": "EBSD/ferrite.ang",
-      "sha256": "7d38ab292054eb95cd928eb4d9e3d44a3dd2d848ef40c08ca28d9d5347dcab1a",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/ferrite.ang"
-    }
-  ],
-  "forsterite": [
-    {
-      "path": "EBSD/Forsterite.ctf",
+      "size": 50604944,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/EMSphinx.h5"
+    },
+    "EBSD/Emsland_plessite_500x_15.ctf": {
+      "sha256": "573e795af67665e8901047d686645495201afd3138619ffc4898c1bdfe09ed10",
+      "size": 17503200,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/Emsland_plessite_500x_15.ctf"
+    },
+    "EBSD/Forsterite.ctf": {
       "sha256": "f367a28f8b3ad6df24067e22c884dd31f7ff62cb895379a1f18ac7fb031354a3",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/Forsterite.ctf"
-    }
-  ],
-  "geesthacht": [
-    {
-      "path": "PoleFigure/geesthacht/ST42-104-110.dat",
-      "sha256": "51c73216730efde35929142234afc2d09c9fe1502be1a1a121235d1f162a426c",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/geesthacht/ST42-104-110.dat"
-    }
-  ],
-  "martensite": [
-    {
-      "path": "EBSD/martensite.cpr",
-      "sha256": "09dbf03bd8ca8a30be83f130e189af58daf101743a32c626d3a448f3a1936bb2",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/martensite.cpr"
+      "size": 13925969,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/Forsterite.ctf"
     },
-    {
-      "path": "EBSD/martensite.crc",
-      "sha256": "55cb12a189b828fc4605d8ceb7cb5962537f19c3f1edb9d0c06aaa3194021fd2",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/martensite.crc"
-    }
-  ],
-  "mylonite": [
-    {
-      "path": "EBSD/P5629U1.txt",
+    "EBSD/P5629U1.txt": {
       "sha256": "f7105fc93a5d81df3c006a0e09b752a15f0a36981f833aea160e505f8574731c",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/P5629U1.txt"
-    }
-  ],
-  "odf": [
-    {
-      "path": "ODF/odf.txt",
-      "sha256": "2a3e9bc7cbc758a7875eb1c51514720a8079cd6556b765768121ff9038ee8a2f",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/ODF/odf.txt"
-    }
-  ],
-  "olivine": [
-    {
-      "path": "EBSD/olivineopticalmap.ang",
-      "sha256": "6e29ecff1323e7cbe0b710181b81bd08965699cf5575dc87c7eda6b47f0043bf",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/olivineopticalmap.ang"
-    }
-  ],
-  "olivine1997": [
-    {
-      "path": "tensor/Olivine1997PC.GPa",
-      "sha256": "f1c9ac0977999c35d762aead23dda56c7915646a95356e035d94a430a543e43d",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/tensor/Olivine1997PC.GPa"
-    }
-  ],
-  "ptx": [
-    {
-      "path": "PoleFigure/ptx/gt9104.ptx",
-      "sha256": "229432e9ff890c494f7d538ebeef29baf3f05534eacfd68d28061e4fe28fd201",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ptx/gt9104.ptx"
+      "size": 724245,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/P5629U1.txt"
     },
-    {
-      "path": "PoleFigure/ptx/gt9110.ptx",
-      "sha256": "eac7b21744c11a0cd736f8972290f43664a304f1a5ca4d93fef18aa4b38a1272",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ptx/gt9110.ptx"
-    },
-    {
-      "path": "PoleFigure/ptx/gt9202.ptx",
-      "sha256": "5b98041763f5f42ecaacac3ea1db6b6a92cfa16025abce26b4cff83c8ba9e3e3",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ptx/gt9202.ptx"
-    }
-  ],
-  "quartzpattern": [
-    {
-      "path": "quartzPattern.mat",
-      "sha256": "778f44d6219c05592ae9c24603eb025652215708397e69ad7fda2725274424cc",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/quartzPattern.mat"
-    }
-  ],
-  "quartzpiezo": [
-    {
-      "path": "tensor/Single_RH_quartz_poly.P",
-      "sha256": "fabccb36e6b8512b6df4f52ac08b8bf1592aaf129970bf65ec77739d2a446896",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/tensor/Single_RH_quartz_poly.P"
-    }
-  ],
-  "sharp": [
-    {
-      "path": "EBSD/sharp.txt",
-      "sha256": "1349655ba4bc914049e72bfb60f536272c7e69ab8267be60af788fda90b1cbb7",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/sharp.txt"
-    }
-  ],
-  "single": [
-    {
-      "path": "EBSD/single_grain_aluminum.txt",
-      "sha256": "89cf549d5893974ccfdeef26ece2d6a6582bfa8929233e074d3bc57d1dd5825f",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/single_grain_aluminum.txt"
-    }
-  ],
-  "smiley": [
-    {
-      "path": "vector3d/smiley.csv",
-      "sha256": "2b24c8e0186e4937d49f0001dc3fa62deb9570aa2a2adb9052d3e9e0c2b18f54",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/vector3d/smiley.csv"
-    }
-  ],
-  "steel": [
-    {
-      "path": "PoleFigure/steel/AcAR110p.rw1",
-      "sha256": "a25c64c0c582a6453a5e838bbf64e2ad8eb85e6f3c7eb42e14db889499727f85",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/steel/AcAR110p.rw1"
-    },
-    {
-      "path": "PoleFigure/steel/AcAR200p.rw1",
-      "sha256": "e5f2f01566f799628b66f013e3add8ae4421923752b234b3b65e61fb85b4fa3c",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/steel/AcAR200p.rw1"
-    },
-    {
-      "path": "PoleFigure/steel/AcAR211p.rw1",
-      "sha256": "10ee612097925f494c73be11411e363cac48189de6e96137ca6b1ec527ac2b49",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/steel/AcAR211p.rw1"
-    }
-  ],
-  "titanium": [
-    {
-      "path": "EBSD/titanium.txt",
-      "sha256": "712714c9c2c813cc6c61071c203bf9239b63417f1f020c3dec9e71d59845a89d",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/titanium.txt"
-    }
-  ],
-  "tongue": [
-    {
-      "path": "orientation/Tongue_Quartzite_Bunge_Euler",
-      "sha256": "acf9d2886d54b4191b6a3e79adb0629060778be8b60b43fe6d6d1b437d2a799c",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/orientation/Tongue_Quartzite_Bunge_Euler"
-    }
-  ],
-  "twins": [
-    {
-      "path": "EBSD/twins.ctf",
-      "sha256": "cdb0e40625331790803c9c67f6ab56a1908c1997700c13e4bf21f773427171ca",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/twins.ctf"
-    }
-  ],
-  "vectors": [
-    {
-      "path": "vector3d/vectors.txt",
-      "sha256": "725dfa4780fa80968c9e0321c62033bdbd6d1c10ba8ee7fd6b0950489dc8f3b5",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/vector3d/vectors.txt"
-    }
-  ],
-  "vpsc": [
-    {
-      "path": "VPSC/TEX_PH1.OUT",
-      "sha256": "bfc651b5c6545cb4cadbea56a35b4a0cd02275edf07a69e9f02dcc3e9fa8999d",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/VPSC/TEX_PH1.OUT"
-    },
-    {
-      "path": "VPSC/ACT_PH1.OUT",
-      "sha256": "81c83c85e2d317afd87150608b2fa729cb7437553b7a2674bec844d484988e5f",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/VPSC/ACT_PH1.OUT"
-    }
-  ],
-  "zncuti": [
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_002_R.UXD",
-      "sha256": "3a5713a3f3611f7d34beb3c2a13639bd2daf0e9f5cd7be11a7ca0b0d11424185",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_002_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_100_R.UXD",
-      "sha256": "c7b0c931ae1c23325856f1aafbc14460692822c834ca11972019979a2a48079b",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_100_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_101_R.UXD",
-      "sha256": "88c3058dc4776d2f294e339a8745ae8bffeb73dce1521c7712024b7fb7fc822b",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_101_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_102_R.UXD",
-      "sha256": "353f6a296fb6be197585d2afb77a4aeea497e5795e62d9beadaad9dcf9533d79",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_102_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_002_R.UXD",
-      "sha256": "25dcded08d73dff611431bf64212e72b1e42bc09d7117de4dc6b57d6ded347c7",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_002_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_100_R.UXD",
-      "sha256": "94a2b21ea7bf35ddafbfd3f34f99ed0cfce72b27af15683bb33c4044104b0625",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_100_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_101_R.UXD",
-      "sha256": "402d2d9591a5f2d1a4cb2be1478845cdf8ccfc6dc2403ee0611113a0b6cc5114",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_101_R.UXD"
-    },
-    {
-      "path": "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD",
-      "sha256": "bdb8b4ec3082f606bac3b3969c3b74a69d6b87e35281e273c983c94e2e4b2c70",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD"
-    }
-  ],
-  "trueebsdwccosmall": [
-    {
-      "path": "EBSD/trueEbsdWCCoSmall.h5",
-      "sha256": "5c7ca570d326894fa7e98cbe468045f2612d7801fba44853b97d77ba38d358ad",
-      "url": ""
-    }
-  ],
-  "smallin100": [
-    {
-      "path": "EBSD/SmallIN100_MeshStats.dream3d",
+    "EBSD/SmallIN100_MeshStats.dream3d": {
       "sha256": "21e59d9b6655411efaaa39ae4b5717ac28318f7943a3bbfd59745f98a046866f",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD/SmallIN100_MeshStats.dream3d"
-    }
-  ],
-  "xnovo": [
-    {
-      "path": "EBSD3/SimulatedMultiPhase.h5",
+      "size": 176411524,
+      "url": "https://github.com/mtex-toolbox/mtex-data/releases/download/v1/SmallIN100_MeshStats.dream3d"
+    },
+    "EBSD/copper.osc": {
+      "sha256": "3379c1388a295043e16ff553eb6e4c53d3edb5370df8925bf6698aacf80b3fdb",
+      "size": 6456616,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/copper.osc"
+    },
+    "EBSD/copper29.h5oina": {
+      "sha256": "92f49ee909261e7cc040a0568987666b5a308c2547c6dd3d4840f57f83c77538",
+      "size": 163730279,
+      "url": "https://github.com/mtex-toolbox/mtex-data/releases/download/v1/copper29.h5oina"
+    },
+    "EBSD/data.ctf": {
+      "sha256": "c307be17e0fc90a52cb5fecb6d78509222adbf61b59bcd31bfbfd9ae5f0859e2",
+      "size": 2766532,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/data.ctf"
+    },
+    "EBSD/eclogite.ctf": {
+      "sha256": "3d72e24fd82bab014f4e67ce63fce20465f6e62d72f5e17d283774f174510248",
+      "size": 35030,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/eclogite.ctf"
+    },
+    "EBSD/ferrite.ang": {
+      "sha256": "7d38ab292054eb95cd928eb4d9e3d44a3dd2d848ef40c08ca28d9d5347dcab1a",
+      "size": 5616059,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/ferrite.ang"
+    },
+    "EBSD/martensite.cpr": {
+      "sha256": "09dbf03bd8ca8a30be83f130e189af58daf101743a32c626d3a448f3a1936bb2",
+      "size": 1701,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/martensite.cpr"
+    },
+    "EBSD/martensite.crc": {
+      "sha256": "55cb12a189b828fc4605d8ceb7cb5962537f19c3f1edb9d0c06aaa3194021fd2",
+      "size": 8590050,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/martensite.crc"
+    },
+    "EBSD/olivineopticalmap.ang": {
+      "sha256": "6e29ecff1323e7cbe0b710181b81bd08965699cf5575dc87c7eda6b47f0043bf",
+      "size": 6512782,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/olivineopticalmap.ang"
+    },
+    "EBSD/polycrystalline_aluminum.txt": {
+      "sha256": "4e5664b319cb3408433311ee34a8ed3c9b859f296c492f21801e193708bbf191",
+      "size": 442619,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/polycrystalline_aluminum.txt"
+    },
+    "EBSD/sharp.txt": {
+      "sha256": "1349655ba4bc914049e72bfb60f536272c7e69ab8267be60af788fda90b1cbb7",
+      "size": 967296,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/sharp.txt"
+    },
+    "EBSD/single_grain_aluminum.txt": {
+      "sha256": "89cf549d5893974ccfdeef26ece2d6a6582bfa8929233e074d3bc57d1dd5825f",
+      "size": 1652734,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/single_grain_aluminum.txt"
+    },
+    "EBSD/testdata_generator.py": {
+      "sha256": "38a23a4455720fd20447449b0947d6f47b3b5d1423389c6d9b8b83d1271cca20",
+      "size": 2646,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/testdata_generator.py"
+    },
+    "EBSD/testdata_hex.ctf": {
+      "sha256": "aa30286d770de9af19abfe042cc9a3075f2ab4217ef654863750aaa02dea43ba",
+      "size": 45671,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/testdata_hex.ctf"
+    },
+    "EBSD/testdata_sqr.ctf": {
+      "sha256": "8ee3f9dc549e3360546cb697db2b11f2ae6b5a8c55704dc9103d7304fc1a84af",
+      "size": 45506,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/testdata_sqr.ctf"
+    },
+    "EBSD/titanium.txt": {
+      "sha256": "712714c9c2c813cc6c61071c203bf9239b63417f1f020c3dec9e71d59845a89d",
+      "size": 874908,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/titanium.txt"
+    },
+    "EBSD/trueEbsdWCCo.mat": {
+      "sha256": "15590638ffa9ed26278eb4b36fba0fb798773d34b61d6598a32c018a6ae6c2a2",
+      "size": 179398935,
+      "url": "https://github.com/mtex-toolbox/mtex-data/releases/download/v1/trueEbsdWCCo.mat"
+    },
+    "EBSD/trueEbsdWCCoSmall.h5": {
+      "sha256": "5c7ca570d326894fa7e98cbe468045f2612d7801fba44853b97d77ba38d358ad",
+      "size": 3714920,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/trueEbsdWCCoSmall.h5"
+    },
+    "EBSD/trueEbsdWCCoSmall.mat": {
+      "sha256": "e81d528071bf5c690cdd8bba05a4b872ea358929d823218dee8f8076e6b2f2b7",
+      "size": 1707208,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/trueEbsdWCCoSmall.mat"
+    },
+    "EBSD/twins.ctf": {
+      "sha256": "cdb0e40625331790803c9c67f6ab56a1908c1997700c13e4bf21f773427171ca",
+      "size": 1317402,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD/twins.ctf"
+    },
+    "EBSD3/SimulatedMultiPhase.h5": {
       "sha256": "a73741f170735585acbbdbac01d8a2daed91e61edbd87b29356dc1b46abbfe6e",
-      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex/93203281b9e6a5743723f74fedb61661afe55f81/data/EBSD3/SimulatedMultiPhase.h5"
+      "size": 10178618,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/EBSD3/SimulatedMultiPhase.h5"
+    },
+    "Neper/lamnormals.txt": {
+      "sha256": "334446e3d373d51cbc7f648d429125d7670e67241e245348c39bc65e98d4979f",
+      "size": 166430,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/lamnormals.txt"
+    },
+    "Neper/my100GrSlice.ori": {
+      "sha256": "53e77274084c447cfbec621c7df6cfe53af549be8cecdd9e71ddc84f6868041b",
+      "size": 18178,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/my100GrSlice.ori"
+    },
+    "Neper/my100GrSlice.tess": {
+      "sha256": "04e9f0b9ff73c05baece00fc1fbdd4d5517ee5f99612450c0f70dc49e9b36410",
+      "size": 105172,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/my100GrSlice.tess"
+    },
+    "Neper/my100grains.ori": {
+      "sha256": "eecf83a74b19c5a5b157351c483643172f0cef56788a3484e795fcdb8bea0466",
+      "size": 54000,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/my100grains.ori"
+    },
+    "Neper/my100grains.tess": {
+      "sha256": "de517c7c18d53cfecaa3b2223fc825664b79caf7663f5ca3ee7d189308865630",
+      "size": 2129135,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/my100grains.tess"
+    },
+    "Neper/ori_in.txt": {
+      "sha256": "ec5e3789ac07a1d806996329cf9e1869ed4c315440af93935f6be27d20e62ca1",
+      "size": 28767,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/Neper/ori_in.txt"
+    },
+    "ODF/odf.mtex": {
+      "sha256": "bd4d36c17e80d985607e6516166d99e344d325ef15dc8e60435b2e9c0f7c9a01",
+      "size": 739,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/ODF/odf.mtex"
+    },
+    "ODF/odf.txt": {
+      "sha256": "2a3e9bc7cbc758a7875eb1c51514720a8079cd6556b765768121ff9038ee8a2f",
+      "size": 179095,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/ODF/odf.txt"
+    },
+    "ODF/odfvpsc.txt": {
+      "sha256": "8d652e08b146d651aa33ebf7431886c9d15248e7caafc6a2f3b34340c2e74f81",
+      "size": 873707,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/ODF/odfvpsc.txt"
+    },
+    "PoleFigure/BearTex/Test_2.XPa": {
+      "sha256": "14ac8e20aabf8df0b15f684fc4d1091de0a43ab04deab03d434ee93234324799",
+      "size": 58809,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/BearTex/Test_2.XPa"
+    },
+    "PoleFigure/BearTex/go_2_2.XPa": {
+      "sha256": "657d48ead3c3a3c7a2a7dd7e0f79b515e403b10a0c74b8e62a4eb24317096374",
+      "size": 40956,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/BearTex/go_2_2.XPa"
+    },
+    "PoleFigure/Bruker_xrd_10-10.ras": {
+      "sha256": "0d8675e8632b7d9a1831b503ed4d809f25f80760e4be558e59427186ba5c8e41",
+      "size": 300400,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Bruker_xrd_10-10.ras"
+    },
+    "PoleFigure/EMSE102.ana": {
+      "sha256": "da45cad677e45fb98841c8d7b277e3fdc8b2d5a01726f6b029a704faeea984be",
+      "size": 130031,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/EMSE102.ana"
+    },
+    "PoleFigure/EMSE103.ana": {
+      "sha256": "6da7e4d3625e94d4a88e28ba1cc3ca7fbccfee9fe30b97ef3897f57f59e4b986",
+      "size": 130292,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/EMSE103.ana"
+    },
+    "PoleFigure/EMSE2102a.ana": {
+      "sha256": "abb48118b1492130ce37a396cb54bf2651abcb77686830ba6967bb0db6901da6",
+      "size": 130030,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/EMSE2102a.ana"
+    },
+    "PoleFigure/EMSE_multi.cor": {
+      "sha256": "b39b9163d0ac9531fb85b6ec773f38b8e1b87c8e32737d2d7c24717a322ca0bd",
+      "size": 232133,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/EMSE_multi.cor"
+    },
+    "PoleFigure/IBM.ibm": {
+      "sha256": "37087cce65cd4e289cabdbd78c266f88a46b8d5fe0cf43cee6a40c8d77d15d0a",
+      "size": 30810,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/IBM.ibm"
+    },
+    "PoleFigure/LaboTEX.PPF": {
+      "sha256": "eea25330cfa5e658f46e947949dba50d8b79564c0f40155c49b717eb50b5c48d",
+      "size": 48885,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/LaboTEX.PPF"
+    },
+    "PoleFigure/LaboTEX.epf": {
+      "sha256": "342065556f8318b5177993f49b7155e67e4e70f61c2ebf3fcd22baabddbd831c",
+      "size": 36199,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/LaboTEX.epf"
+    },
+    "PoleFigure/LaboTEX.pow": {
+      "sha256": "03a9cd34f4c6f91ef68e8ea0745e3531841426eb532d39d22f3d3a5442dea81a",
+      "size": 36223,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/LaboTEX.pow"
+    },
+    "PoleFigure/Queens_alu.plf": {
+      "sha256": "59621249521bfab24d87a144d84132528b59475379eb2c6d8a69b860d8a434db",
+      "size": 50998,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Queens_alu.plf"
+    },
+    "PoleFigure/Rigaku.DAT": {
+      "sha256": "bfcccbd0815ab9d1e59a2696b388a3f1bce5534b3bc2f466920d906ff92b8b2f",
+      "size": 253343,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku.DAT"
+    },
+    "PoleFigure/Rigaku002.txt": {
+      "sha256": "229348f8267389eeaddee5168fca8cc3208d9c5a79fcb2653944b887419f7c5d",
+      "size": 42950,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku002.txt"
+    },
+    "PoleFigure/Rigaku_txt.TXT": {
+      "sha256": "5a553179d32f9396207cab3f2bba44f0626d8f0ec27039d2d9d67af7a175efd7",
+      "size": 34717,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku_txt.TXT"
+    },
+    "PoleFigure/Rigaku_txt_110.TXT": {
+      "sha256": "ba487f63430e3bfb7b93b5471db994bf0840ea9e1c59843e4e8b67d9761de682",
+      "size": 67476,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku_txt_110.TXT"
+    },
+    "PoleFigure/Rigaku_xrd_110.asc": {
+      "sha256": "a45b851eb1e7a125ea1e264c329d8ef0dbc573bd9f0eec2000d50518b4369a70",
+      "size": 67767,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku_xrd_110.asc"
+    },
+    "PoleFigure/Rigaku_xrd_111.asc": {
+      "sha256": "7b39991f49dcba69a0c0103438d6a3f60f8ef06f7b43af27c6ea4c39cf658320",
+      "size": 51806,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/Rigaku_xrd_111.asc"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_002_R.UXD": {
+      "sha256": "3a5713a3f3611f7d34beb3c2a13639bd2daf0e9f5cd7be11a7ca0b0d11424185",
+      "size": 33625,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_002_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_100_R.UXD": {
+      "sha256": "c7b0c931ae1c23325856f1aafbc14460692822c834ca11972019979a2a48079b",
+      "size": 33626,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_100_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_101_R.UXD": {
+      "sha256": "88c3058dc4776d2f294e339a8745ae8bffeb73dce1521c7712024b7fb7fc822b",
+      "size": 33626,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_101_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_102_R.UXD": {
+      "sha256": "353f6a296fb6be197585d2afb77a4aeea497e5795e62d9beadaad9dcf9533d79",
+      "size": 33626,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_Wal_50_5x5_PF_102_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_002_R.UXD": {
+      "sha256": "25dcded08d73dff611431bf64212e72b1e42bc09d7117de4dc6b57d6ded347c7",
+      "size": 33630,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_002_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_100_R.UXD": {
+      "sha256": "94a2b21ea7bf35ddafbfd3f34f99ed0cfce72b27af15683bb33c4044104b0625",
+      "size": 33630,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_100_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_101_R.UXD": {
+      "sha256": "402d2d9591a5f2d1a4cb2be1478845cdf8ccfc6dc2403ee0611113a0b6cc5114",
+      "size": 33630,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_101_R.UXD"
+    },
+    "PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD": {
+      "sha256": "bdb8b4ec3082f606bac3b3969c3b74a69d6b87e35281e273c983c94e2e4b2c70",
+      "size": 33630,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ZnCuTi/ZnCuTi_defocusing_PF_102_R.UXD"
+    },
+    "PoleFigure/a52214s.int": {
+      "sha256": "4fdd9a2a3a7f2feb99f2bd7f59118650ba65797631dd7669d21be214d14adbef",
+      "size": 1071667,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/a52214s.int"
+    },
+    "PoleFigure/aachen": {
+      "sha256": "f056c2ccce6328f6f60576d3fce24911582d09fd865a5760ed273319611023e3",
+      "size": 16980,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/aachen"
+    },
+    "PoleFigure/aachen.cpf": {
+      "sha256": "5643df83125fce03676de131fea7dd019b0541c66bf1b6cfb900458bfcce4aab",
+      "size": 65304,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/aachen.cpf"
+    },
+    "PoleFigure/aachen.txt": {
+      "sha256": "6bd973e3242ab82eaca3e2f2cc3411b459c90fe9791e4696e1b8033a83635c18",
+      "size": 40445,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/aachen.txt"
+    },
+    "PoleFigure/aachen_exp.EXP": {
+      "sha256": "2320ca307527172aed8b8d3d4b594fff864e52414a563fbbd347292cc23df40b",
+      "size": 45501,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/aachen_exp.EXP"
+    },
+    "PoleFigure/beartex.XPa": {
+      "sha256": "657d48ead3c3a3c7a2a7dd7e0f79b515e403b10a0c74b8e62a4eb24317096374",
+      "size": 40956,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/beartex.XPa"
+    },
+    "PoleFigure/beartex.xpe": {
+      "sha256": "e91b647c3224357e11b02ef3241e60a35ec8e1d9be71a1713e445ec18e649c4d",
+      "size": 104953,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/beartex.xpe"
+    },
+    "PoleFigure/beartex2.xpe": {
+      "sha256": "1d99c6ee8f0ea2c9f6fc32c773fdc27b2853971ea2678c039e24cb3280350c64",
+      "size": 35465,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/beartex2.xpe"
+    },
+    "PoleFigure/bruker.UXD": {
+      "sha256": "175fad845cdc6ef028b4432addb5ba7795f871a5cac3b575c0607c7e76741097",
+      "size": 133688,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/bruker.UXD"
+    },
+    "PoleFigure/dubna.cnv": {
+      "sha256": "bcf503cc0612ba2b90520fd35cdada070b1017846723f654d96b82ebe963df9b",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna.cnv"
+    },
+    "PoleFigure/dubna/Q(02-21)_amp.cnv": {
+      "sha256": "bcf503cc0612ba2b90520fd35cdada070b1017846723f654d96b82ebe963df9b",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2802-21%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(10-10)_amp.cnv": {
+      "sha256": "cadff10880297782a91f5b04be42cc8c469cebb531d91120b5cd5c92765d9531",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2810-10%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(10-11)(01-11)_amp.cnv": {
+      "sha256": "f04871888c4407dc43c17c2318931d5607abd51696ecb8fec9d7c7bbb0bcc21d",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2810-11%29%2801-11%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(10-12)_amp.cnv": {
+      "sha256": "4b6c58fa00f1c4aeb66c752827cdb4c24cac81b411d989ebdf4508c3fbae0e36",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2810-12%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(11-20)_amp.cnv": {
+      "sha256": "f9a97b76d5939c252dd5772eb4638ccb55add1c56b6e57186463bdc5d6f43adf",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2811-20%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(11-21)_amp.cnv": {
+      "sha256": "543a0d526b79d74d50e041333e92d0901b8abc23ee0d61ec1f04c746a4e38ef3",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2811-21%29_amp.cnv"
+    },
+    "PoleFigure/dubna/Q(11-22)_amp.cnv": {
+      "sha256": "94e317c1f385f6034650506eb9650c16498dbc2435ff723994c89df020ac51d8",
+      "size": 14421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/dubna/Q%2811-22%29_amp.cnv"
+    },
+    "PoleFigure/geesthacht.dat": {
+      "sha256": "3e40e2bc7d6f73926c442c0e77ee4afa8ffeadf87b0670f79f9c13a002c3708a",
+      "size": 272843,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/geesthacht.dat"
+    },
+    "PoleFigure/geesthacht/ST42-104-110.dat": {
+      "sha256": "51c73216730efde35929142234afc2d09c9fe1502be1a1a121235d1f162a426c",
+      "size": 182650,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/geesthacht/ST42-104-110.dat"
+    },
+    "PoleFigure/gpol/Al_111.gpol": {
+      "sha256": "75ec3f7f1b5381500ab81e6f52940f243e3da94f80371968fa8c3f98cabaf689",
+      "size": 532480,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/gpol/Al_111.gpol"
+    },
+    "PoleFigure/gpol/Al_200.gpol": {
+      "sha256": "13a42454eac866d20dd5996aca763b51fb6ac565b7c6748a778d35baeb969162",
+      "size": 294912,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/gpol/Al_200.gpol"
+    },
+    "PoleFigure/gpol/Al_220.gpol": {
+      "sha256": "a81341735564be8378a2a140080f82b241d358e19efab4413874db103f4f13ae",
+      "size": 272384,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/gpol/Al_220.gpol"
+    },
+    "PoleFigure/gpol/Al_311.gpol": {
+      "sha256": "e658c6f5373e47497608eb3eb9a4ada28240b5b27a08bbd9dfc81a425207847b",
+      "size": 281088,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/gpol/Al_311.gpol"
+    },
+    "PoleFigure/juelich012.jul": {
+      "sha256": "cf21e1d57e49d3f547d67d6f34f0abfb05b56fdf779b03efe9929990f5c04b40",
+      "size": 467784,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/juelich012.jul"
+    },
+    "PoleFigure/juelich130": {
+      "sha256": "4e21e5d220b7e342a6071b94cc216db2c4a98f1e32db6cf91a157454774339a8",
+      "size": 15897,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/juelich130"
+    },
+    "PoleFigure/nja/seifert-111.nja": {
+      "sha256": "a3cac291dbec4c69a6a5489bcf020ddb3ff6bd899727fdfc5c0a9a16d0e12fad",
+      "size": 87421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/nja/seifert-111.nja"
+    },
+    "PoleFigure/nja/seifert-200.nja": {
+      "sha256": "9e36185351b3fdeaf9a8ef3487e437f84108439e082d8a1acc98ec9047779e81",
+      "size": 87421,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/nja/seifert-200.nja"
+    },
+    "PoleFigure/nja/seifert-220.nja": {
+      "sha256": "b97cb442bcd5ac4531afb69b462a691c375cfe6f23c5ce092d981bea5bef931e",
+      "size": 87422,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/nja/seifert-220.nja"
+    },
+    "PoleFigure/out1.out": {
+      "sha256": "38aee7d7149cd890d31a4572fc4d3e2b4fccfc1ec9dde13f6c2348fb5a872494",
+      "size": 197189,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/out1.out"
+    },
+    "PoleFigure/philips-111.txt": {
+      "sha256": "7543188c792b4eee58b2b93818ac0f396d9f40fb483720f82d3be6916babd530",
+      "size": 266619,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/philips-111.txt"
+    },
+    "PoleFigure/philipsXpert.rw1": {
+      "sha256": "7ce147e76a77f9ac4dfcc9bd0727984314beb8ac51c5b857cbd63bf10a5e6170",
+      "size": 2998,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/philipsXpert.rw1"
+    },
+    "PoleFigure/popla.GPF": {
+      "sha256": "46716508be83d9738ed5aef5309caa0e7469eec791b151325dc78f9a0e56185a",
+      "size": 34902,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/popla.GPF"
+    },
+    "PoleFigure/popla.epf": {
+      "sha256": "34c1672e67926ec0eabd71dc7d47a42b4990d05bb24f75bf217e985c768c79df",
+      "size": 23476,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/popla.epf"
+    },
+    "PoleFigure/popla_108.epf": {
+      "sha256": "94ac48073ad264ac9cb08dd5201e92974530f871a15aa29c0a836137ecaa6de0",
+      "size": 5839,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/popla_108.epf"
+    },
+    "PoleFigure/ptx.ptx": {
+      "sha256": "84ffd7ceddd7fb14d6cacdea783671eb36a5c524d0eccd7d1d690c42a9be55f0",
+      "size": 9962,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ptx.ptx"
+    },
+    "PoleFigure/ptx.rpf": {
+      "sha256": "36afe1972d1ef2d8b617bf00deb4f502aa0624b9309e0e14c6920d646b412a63",
+      "size": 29400,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ptx.rpf"
+    },
+    "PoleFigure/ptx/gt9104.ptx": {
+      "sha256": "229432e9ff890c494f7d538ebeef29baf3f05534eacfd68d28061e4fe28fd201",
+      "size": 10557,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ptx/gt9104.ptx"
+    },
+    "PoleFigure/ptx/gt9110.ptx": {
+      "sha256": "eac7b21744c11a0cd736f8972290f43664a304f1a5ca4d93fef18aa4b38a1272",
+      "size": 10555,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ptx/gt9110.ptx"
+    },
+    "PoleFigure/ptx/gt9202.ptx": {
+      "sha256": "5b98041763f5f42ecaacac3ea1db6b6a92cfa16025abce26b4cff83c8ba9e3e3",
+      "size": 10571,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/ptx/gt9202.ptx"
+    },
+    "PoleFigure/saclay_004": {
+      "sha256": "f82b2a6c9827954178b01a9c2a3fa765823c8c6b49bb5716f7ae1fd426dce9e7",
+      "size": 13056,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/saclay_004"
+    },
+    "PoleFigure/siemens.dat": {
+      "sha256": "6eb20a09e353314f65c8a80e989c3fec96cf6396c4e451462b3f3811288432a3",
+      "size": 44457,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/siemens.dat"
+    },
+    "PoleFigure/siemens.pwd": {
+      "sha256": "ba44859b5bcd7503ddf090db2e78c3215b5e863fcab2155e622347e8f54e559e",
+      "size": 1972,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/siemens.pwd"
+    },
+    "PoleFigure/slc110.slc": {
+      "sha256": "76efc0e2d60ed35093e81e432c97566de162de77ccd9ac7691fc1c7a01ec6a7e",
+      "size": 130154,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/slc110.slc"
+    },
+    "PoleFigure/steel/AcAR110p.rw1": {
+      "sha256": "a25c64c0c582a6453a5e838bbf64e2ad8eb85e6f3c7eb42e14db889499727f85",
+      "size": 3034,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/steel/AcAR110p.rw1"
+    },
+    "PoleFigure/steel/AcAR200p.rw1": {
+      "sha256": "e5f2f01566f799628b66f013e3add8ae4421923752b234b3b65e61fb85b4fa3c",
+      "size": 3034,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/steel/AcAR200p.rw1"
+    },
+    "PoleFigure/steel/AcAR211p.rw1": {
+      "sha256": "10ee612097925f494c73be11411e363cac48189de6e96137ca6b1ec527ac2b49",
+      "size": 3034,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/steel/AcAR211p.rw1"
+    },
+    "PoleFigure/xrdml.xrdml": {
+      "sha256": "782f145d977ad4e168a3a0e0f312f554825ec694d223d7bbd62dbf9975fcef81",
+      "size": 72133,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/PoleFigure/xrdml.xrdml"
+    },
+    "VPSC/ACT_PH1.OUT": {
+      "sha256": "81c83c85e2d317afd87150608b2fa729cb7437553b7a2674bec844d484988e5f",
+      "size": 890,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/VPSC/ACT_PH1.OUT"
+    },
+    "VPSC/TEX_PH1.OUT": {
+      "sha256": "bfc651b5c6545cb4cadbea56a35b4a0cd02275edf07a69e9f02dcc3e9fa8999d",
+      "size": 766584,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/VPSC/TEX_PH1.OUT"
+    },
+    "cif/4060300.cif": {
+      "sha256": "c578d823c4fdd6af7075d1ece605ba12dceff962d58e3fc3e28dfe2bbbeae227",
+      "size": 18367,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/4060300.cif"
+    },
+    "cif/4060301.cif": {
+      "sha256": "ae67f73af6b8441fa955cc2ebb21f292719709fb85835bcfbb2c45b786b9cf90",
+      "size": 12193,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/4060301.cif"
+    },
+    "cif/5000035.cif": {
+      "sha256": "30a22edcb0c3a0e54f76962543d8a5531a338f6761bdad80b08d6f63dc22af53",
+      "size": 2224,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/5000035.cif"
+    },
+    "cif/Ag-Silver.cif": {
+      "sha256": "e450de9c7f480a366f814729c50acfc3cdd65491c29d742a2825443b5c9d7351",
+      "size": 4431,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Ag-Silver.cif"
+    },
+    "cif/Al-Aluminum.cif": {
+      "sha256": "8d87ddef9d5774a45562b83e03cbd97ddb18dcfb05c429574b8f1685173e55c6",
+      "size": 3981,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Al-Aluminum.cif"
+    },
+    "cif/Al2O3-Corundum.cif": {
+      "sha256": "8bf17064690c6ddbcc2af41aeab2c460016063511e5bd341b355b2719fd0449d",
+      "size": 1901,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Al2O3-Corundum.cif"
+    },
+    "cif/C-Diamond.cif": {
+      "sha256": "864e917cc7eecdffb4538f50306d41aca2ec3f14786cae907cd95665a4bfa9b3",
+      "size": 4714,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/C-Diamond.cif"
+    },
+    "cif/Cr-Chromium.cif": {
+      "sha256": "6c2a78ca7784af16885516657e878b5921100e596ae181503e6f59a81b4b9e4b",
+      "size": 3207,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Cr-Chromium.cif"
+    },
+    "cif/Cu-Copper.cif": {
+      "sha256": "5de916da79e934bb7fb728dac9c377b0d09bf669808eff3b3c70dbbc79b65794",
+      "size": 4433,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Cu-Copper.cif"
+    },
+    "cif/Fe-Iron-Austenite.cif": {
+      "sha256": "04162f546114c021ea48e7efc1727fdb2389fc787743a48529d7a0515eee98ec",
+      "size": 4375,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Fe-Iron-Austenite.cif"
+    },
+    "cif/Fe-Iron-alpha.cif": {
+      "sha256": "4fc140ca42101529f8ab34fd54c0a1bdf92ead2b6a6f4a60b799e0d4813bc70e",
+      "size": 3267,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Fe-Iron-alpha.cif"
+    },
+    "cif/Fe-Iron-beta.cif": {
+      "sha256": "f39184ca8204fec9a00f6774448d1c0a962e61f455f16a0e2c2ccd7fbe3c5bdb",
+      "size": 3262,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Fe-Iron-beta.cif"
+    },
+    "cif/Fe-Iron-delta.cif": {
+      "sha256": "774b51216ab8a68101d23c2e5becb1ba4c86e18b2d34797248cedb8477183c5d",
+      "size": 3263,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Fe-Iron-delta.cif"
+    },
+    "cif/Fe-Iron-gamma.cif": {
+      "sha256": "537782c4baae57890bc6753e62d3d10df19f44a468472a9040bfd03a26616cbd",
+      "size": 4428,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Fe-Iron-gamma.cif"
+    },
+    "cif/GaAs.cif": {
+      "sha256": "c7651e013cc2bdee0489060c2cf9ff9209afa3d139782b9b52bea8a126e740b1",
+      "size": 3098,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/GaAs.cif"
+    },
+    "cif/Hematite.cif": {
+      "sha256": "72bc432afb296057d8fb04d3630651a9bb8452e8a8b5676b836e2e2cc0baa389",
+      "size": 1868,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Hematite.cif"
+    },
+    "cif/LaB6.cif": {
+      "sha256": "b4170ace275ed7a9fb2703f86bd83acfdbcdf3db8df030be400b9b0b9e892fed",
+      "size": 1552,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/LaB6.cif"
+    },
+    "cif/Magnetite.cif": {
+      "sha256": "b04f8c82197943701a1c3424d4450c55b472ccfb4d6e185da8c87c8fe925d70a",
+      "size": 4911,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Magnetite.cif"
+    },
+    "cif/Mg-Magnesium.cif": {
+      "sha256": "0d0d3186d88f9fa43d9abfb05ef55a64b9845ed33386c6d2dc6b527f1ee6fc38",
+      "size": 2056,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Mg-Magnesium.cif"
+    },
+    "cif/Mn-Manganese-gamma.cif": {
+      "sha256": "86aed7a7c568c6315394f79412731063ff74fb932b1db22112eb0be0968cfa8a",
+      "size": 4201,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Mn-Manganese-gamma.cif"
+    },
+    "cif/Mo-Molybdenum-bcc.cif": {
+      "sha256": "a8fd04dc425458f70388ddbdd2a1526df6643ca4288f7d5c63b636dafe28209e",
+      "size": 2510,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Mo-Molybdenum-bcc.cif"
+    },
+    "cif/Mo-Molybdenum-fcc.cif": {
+      "sha256": "ebd06c4a92072006bc0608084f25016fd231c31fc82ddafd6a394a9a1d249234",
+      "size": 4209,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Mo-Molybdenum-fcc.cif"
+    },
+    "cif/NaCl-Halite.cif": {
+      "sha256": "f115a213350da1a8c1c98e57701ed81de2d0565e4ca4fb5abffe004e32e4919a",
+      "size": 4092,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/NaCl-Halite.cif"
+    },
+    "cif/Ni-Nickel-cubic.cif": {
+      "sha256": "710b21e89ddb8f45f63061b9ce0cb5c12768414408acbfd5ddca35507f9b69da",
+      "size": 5900,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Ni-Nickel-cubic.cif"
+    },
+    "cif/Ni-Nickel-hexagonal.cif": {
+      "sha256": "454286f53447edd463b7697c0190392ebe382d8044e94338e05d804780562558",
+      "size": 1659,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Ni-Nickel-hexagonal.cif"
+    },
+    "cif/Rhabdite.cif": {
+      "sha256": "d6d289f6177baf18e925658800531ed3d9172d65a9af035409e9bb680e9b346f",
+      "size": 4536,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Rhabdite.cif"
+    },
+    "cif/Si-Silicon.cif": {
+      "sha256": "80342383e4280b951cbdc22b08870524c7ee4de5ab8975e582083dab1ba96d54",
+      "size": 5004,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Si-Silicon.cif"
+    },
+    "cif/Ti-Titanium-alpha.cif": {
+      "sha256": "06a9a6a566daa475b3219a947c7c14cd646f227d7696082bfae01695c741e964",
+      "size": 2199,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Ti-Titanium-alpha.cif"
+    },
+    "cif/Ti-Titanium-beta.cif": {
+      "sha256": "71238aba8e9408ac322e207ad179dde03e7d3905270d41aa443e647df8e6b4a8",
+      "size": 3272,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/Ti-Titanium-beta.cif"
+    },
+    "cif/ZrO2-Baddeleyite.cif": {
+      "sha256": "a18d93e84c1c77b8a24f763533ca3305ebc1817fbe9b5edfcf847aa255240acb",
+      "size": 986,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/ZrO2-Baddeleyite.cif"
+    },
+    "cif/crystal.phl": {
+      "sha256": "2a231afbde26cd6767061ba645b93d4430165602b7c9c4733ad17a8aed39d8d2",
+      "size": 7697,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/crystal.phl"
+    },
+    "cif/olivin.cif": {
+      "sha256": "f0e4f2e307cbc00bb5d0bc0e254183c52f8ed10d53778c0aa7631dfeac9ae9a1",
+      "size": 2428,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/olivin.cif"
+    },
+    "cif/quartz.cif": {
+      "sha256": "10dd04655c03f6b152897a5e2d863e42892bd84561cb6dfc1febd86271e70b57",
+      "size": 1802,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/cif/quartz.cif"
+    },
+    "orientation/Tongue_Quartzite_Bunge_Euler": {
+      "sha256": "acf9d2886d54b4191b6a3e79adb0629060778be8b60b43fe6d6d1b437d2a799c",
+      "size": 8786,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/orientation/Tongue_Quartzite_Bunge_Euler"
+    },
+    "orientation/dubna.csv": {
+      "sha256": "2712703537d06914e35eaee47d02f8dd462ae49fd5822495b172cfb27b84155c",
+      "size": 248891,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/orientation/dubna.csv"
+    },
+    "orientation/quatSO3N4.mat": {
+      "sha256": "277db1e07485303115e984b54cb7f877aa471b9b79b15a608e268316c177fdbe",
+      "size": 2378,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/orientation/quatSO3N4.mat"
+    },
+    "quartzPattern.mat": {
+      "sha256": "778f44d6219c05592ae9c24603eb025652215708397e69ad7fda2725274424cc",
+      "size": 331646,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/quartzPattern.mat"
+    },
+    "tensor/1000055.mpod": {
+      "sha256": "6efdc4ea2ed912c16610d2ba25384c3c0e4c0aa828783ee5b97e95a4772319d5",
+      "size": 1628,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/1000055.mpod"
+    },
+    "tensor/129a_ABC_ol_EULER": {
+      "sha256": "55c219880d564cda7d524211896dd154eae5662810f4e8ac381e0e06ceb0c256",
+      "size": 5200,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/129a_ABC_ol_EULER"
+    },
+    "tensor/Fosterite_PC_model.TEXP": {
+      "sha256": "e3eb035be7dbbf9f2f077b11808ab1627d0b39a8a82ab055245bac0e8e745d14",
+      "size": 276,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/Fosterite_PC_model.TEXP"
+    },
+    "tensor/Mainprice2json.m": {
+      "sha256": "c26162fe70f02364e38ffcba1e6046fbf676152e43b84d88810ba604e9fc3aa6",
+      "size": 695,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/Mainprice2json.m"
+    },
+    "tensor/Olivine1997PC.GPa": {
+      "sha256": "f1c9ac0977999c35d762aead23dda56c7915646a95356e035d94a430a543e43d",
+      "size": 573,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/Olivine1997PC.GPa"
+    },
+    "tensor/Single_RH_quartz_poly.P": {
+      "sha256": "fabccb36e6b8512b6df4f52ac08b8bf1592aaf129970bf65ec77739d2a446896",
+      "size": 279,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/Single_RH_quartz_poly.P"
+    },
+    "tensor/Tongue_Quartzite_Bunge_Euler": {
+      "sha256": "acf9d2886d54b4191b6a3e79adb0629060778be8b60b43fe6d6d1b437d2a799c",
+      "size": 8786,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/tensor/Tongue_Quartzite_Bunge_Euler"
+    },
+    "testgrains.mat": {
+      "sha256": "e87919f6af0695224369773afa1596fc70247acc685aa0a82d0ab7f7fe663738",
+      "size": 674762,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/testgrains.mat"
+    },
+    "vector3d/quadratureS2Grid_chebyshev.mat": {
+      "sha256": "5ddfd1023cf5b8175d706c03be47ef8d50a16a9daa03265129b7011407394f6f",
+      "size": 11589144,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/vector3d/quadratureS2Grid_chebyshev.mat"
+    },
+    "vector3d/quadratureS2Grid_gauss.mat": {
+      "sha256": "42c27b58eea7c43694b419c00b8028be2b09bf998990421c24f3668b6560852b",
+      "size": 98818,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/vector3d/quadratureS2Grid_gauss.mat"
+    },
+    "vector3d/smiley.csv": {
+      "sha256": "2b24c8e0186e4937d49f0001dc3fa62deb9570aa2a2adb9052d3e9e0c2b18f54",
+      "size": 38225,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/vector3d/smiley.csv"
+    },
+    "vector3d/vectors.txt": {
+      "sha256": "725dfa4780fa80968c9e0321c62033bdbd6d1c10ba8ee7fd6b0950489dc8f3b5",
+      "size": 26026,
+      "url": "https://raw.githubusercontent.com/mtex-toolbox/mtex-data/v1/vector3d/vectors.txt"
     }
-  ]
+  },
+  "repository": "mtex-toolbox/mtex-data",
+  "version": "v1"
 }

@@ -283,4 +283,4 @@ for m in job.undistortedList:
 # table, every tile's shift to the last digit, the resampled and undistorted images and the
 # phases and orientations of `ebsdOut` (`bench/matlab/probe_trueebsd.m`). The WC-Co data set
 # is read from an HDF5 file of plain arrays that `bench/matlab/export_trueebsd.m` writes from
-# MATLAB's `.mat`; it is not hosted yet. The map's `opt` is `ebsd.meta` here.
+# MATLAB's `.mat`, hosted in the MTEX data repository. The map's `opt` is `ebsd.meta` here.
