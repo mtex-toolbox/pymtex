@@ -26,7 +26,7 @@ from .boundary import OUTSIDE, grainBoundary, orderWalk
 from .decomposition import NO_PIXEL
 from .grains import grain2d
 from .lattice import mapPlane
-from .polygon import loopEdges, polygonSet, signedArea2
+from .polygon import loopSums, polygonSet, signedArea2
 
 
 # ------------------------------------------------------------------ the moments
@@ -35,15 +35,8 @@ from .polygon import loopEdges, polygonSet, signedArea2
 # about the origin, summed over its loops, as six arrays; or of one list of loops
 def polygonMoments(V, loops, size=None):
   one = size is None
-  P, Q, lab, _ = loopEdges(V, [loops] if one else loops)
-  n = 1 if one else size
-  w = P[:, 0] * Q[:, 1] - Q[:, 0] * P[:, 1]
-  out = (np.bincount(lab, w, n) / 2,
-         np.bincount(lab, (P[:, 0] + Q[:, 0]) * w, n) / 6,
-         np.bincount(lab, (P[:, 1] + Q[:, 1]) * w, n) / 6,
-         np.bincount(lab, (P[:, 1] ** 2 + P[:, 1] * Q[:, 1] + Q[:, 1] ** 2) * w, n) / 12,
-         np.bincount(lab, (P[:, 0] ** 2 + P[:, 0] * Q[:, 0] + Q[:, 0] ** 2) * w, n) / 12,
-         np.bincount(lab, (P[:, 0] * Q[:, 1] + 2 * P[:, 0] * P[:, 1] + 2 * Q[:, 0] * Q[:, 1] + Q[:, 0] * P[:, 1]) * w, n) / 24)
+  S = loopSums(V, [loops] if one else loops, 1 if one else size)
+  out = (S[:, 0] / 2, S[:, 3] / 6, S[:, 4] / 6, S[:, 5] / 12, S[:, 6] / 12, S[:, 7] / 24)
   return tuple(float(x[0]) for x in out) if one else out
 
 
@@ -117,24 +110,17 @@ def _flatHull(self):
   return self.V[flat], np.concatenate([[0], np.cumsum(lengths)]), lengths
 
 
-def _loopLengths(V, loops, size, outerOnly=False):
-  P, Q, lab, outer = loopEdges(V, loops)
-  keep = outer if outerOnly else np.ones(len(lab), dtype=bool)
-  return np.bincount(lab[keep], np.linalg.norm(Q[keep] - P[keep], axis=1), size)
-
-
 # the perimeter of the outer loop alone, without the holes
 def outerPerimeter(self):
-  return _loopLengths(self.V, self.loops, self.size, outerOnly=True)
+  return loopSums(self.V, self.loops, self.size)[:, 1]
 
 
 def hullPerimeter(self):
-  return _loopLengths(self.V, [[h] for h in hullLoops(self)], self.size)
+  return loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 2]
 
 
 def hullArea(self):
-  P, Q, lab, _ = loopEdges(self.V, [[h] for h in hullLoops(self)])
-  return np.abs(np.bincount(lab, P[:, 0] * Q[:, 1] - Q[:, 0] * P[:, 1], self.size)) / 2
+  return np.abs(loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 0]) / 2
 
 
 # the largest and the smallest of a value per outline over its hull vertices

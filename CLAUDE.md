@@ -75,14 +75,15 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 uv sync                                  # Python 3.14, NumPy 2, SciPy, finufft; orix, pytest and numba for tests
 ```
 
-The products, the searches of the symmetry reduction and the projections are numba loops
-in `mtex/geometry/kernels.py`, compiled on first call, with NumPy forms as fallback and test
+The products, the searches of the symmetry reduction, the projections and the membership in a
+fundamental region are numba loops in `mtex/geometry/kernels.py`, compiled on first call, with NumPy forms as fallback and test
 oracle; the maps layer keeps its own in `mtex/maps/kernels.py` (the clipping, the union-find,
-the loop tracing, the fused gradient, KAM and GROD over the lattice, the simplex of the
-dislocation fit), the planar hull in `mtex/geometry/hull.py`, the inverse pole figure
+the loop tracing, the sums of the grain measures over the loops, the fused gradient, KAM and
+GROD over the lattice, the simplex of the dislocation fit), the planar hull in `mtex/geometry/hull.py`, the inverse pole figure
 colouring of a map in `mtex/plotting/kernels.py` and the NUFFT nodes and real defects of the
 harmonic transforms in `mtex/functions/kernels.py` and the batched symmetric 3 x 3 eigen
-decomposition of the wave velocities in `mtex/tensors/kernels.py`, on the same pattern;
+decomposition of the wave velocities and the turn of flattened tensors by many rotations (the
+embedding's images, `ori * T`) in `mtex/tensors/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
 physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft and
 `scipy.fft`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
@@ -90,20 +91,25 @@ physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finu
 `mtex/functions/nfft.py`, found by the preference `NFFTLibrary` or `MTEX_NFFT_LIBRARY`;
 finufft stays the dependency. Never import numba at module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
 k-d tree, `mtex/geometry/grids/orientationtree.py`, for nearest, k-nearest and radius; the
-radius search is what ODF reconstruction needs. The S2 ring grid keeps its compiled ring
-search in `mtex/geometry/grids/gridsearch.py`. The nearest search of the ring grids is the same pattern in
-`mtex/geometry/grids/gridsearch.py`: the structured ring search compiled as one parallel
-loop, binary searches over the ladders, the Python `find` as fallback and oracle.
+radius search, what ODF reconstruction needs, is on `SO3Grid` the structured search of
+`mtex/geometry/grids/gridsearch.py` (one image per coset of the rotations about z, the rings,
+an alpha window per ring and a gamma window per node), the tree its fallback and oracle;
+`gridRadius` picks. The nearest search of the S2 ring grid is the same pattern there: the
+structured ring search compiled as one parallel loop, binary searches over the ladders, the
+Python `find` as fallback and oracle.
 
-`tools/graph/build.py` writes the dependency graph of both ports (`tools/graph/query.py` asks
-it: `node`, `impact`, `algo`, `gaps`, `layer`, `questions`). A research question is a
+`tools/graph/build.py` writes the dependency graph of MATLAB and both ports, the Julia port read
+by `scan_julia.jl` with Julia's own parser (`tools/graph/query.py` asks it: `node`, `impact`,
+`algo`, `gaps [--port julia]`, `layer`, `questions`). A research question is a
 `###` subsection, or else a top level bullet, under a heading naming questions ("Open questions",
 "Research questions", "research agenda") in any note the graph reads (plans, research notes,
 memory, MATLAB master's `tests/*.md`, the Julia port's research notes); name the functions it
 concerns in backticks and it links to them. Its algorithms are the `ALGORITHM` literals of
 the benchmarks; the `bench/*_ops.py` (geometry, functions, tensors, embedding, maps, analysis,
 io, plotting) check this port against MATLAB on one input through `tools/graph/crosscheck.py`,
-`run`, `matlab` one op per bridge call, `compare`, each tolerance with its reason beside it.
+`run`, `matlab` one op per bridge call, `julia` (the `bench/*_ops.jl` of the same name through
+`tools/graph/crosscheck.jl`, warmed up, sampled profiles), `compare`, each tolerance with its
+reason beside it.
 One test file per source file, named `tests/test_<file>.py`; `tests/test_semantics.py`
 holds one test per statement of the semantics document and must stay green. The Julia
 port runs with `julia --project=../mtexJulia/dev`; MATLAB through the bridge in
@@ -136,7 +142,7 @@ intragranular quantities and `calcGND` with G7's `slipsystem.py`, M8, the denois
 filters over the graph of the map with `fill`, `interp` and `reduce`, and M9, the parent grain
 reconstruction (`maps/reconstruction.py`, `maps/variantgraph.py`: `parentGrainReconstructor`
 with MATLAB's vote table, the grain and variant graphs, checked against MATLAB on the
-martensite map), are done, and M10 (2026-09-26): `gridify(ebsd, gL)` and `gridify(ebsd, unitCell=)` with `gridLayout` (`geometry/gridlayout.py`), `cleanUpPseudoSym` (`maps/pseudosym.py`), `simulateEBSD` (`maps/simulate.py`) and the `spatialTransform` family (`geometry/spatialtransform.py`); MCL segmentation is `calcGrains(..., mcl=)`. M11 (2026-09-26): `mapImage` and `mapImageList` (`maps/mapimage.py`), `xcfShift` and `pairShifts` (`maps/registration.py`) and the `trueEbsd` job (`maps/trueebsd.py`), MATLAB's run of the EBSDTrueEbsd page to the digit; `mtexdata('trueEbsdWCCoSmall')` reads the HDF5 file `bench/matlab/export_trueebsd.m` writes, not hosted yet. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
+martensite map), are done, and M10 (2026-09-26): `gridify(ebsd, gL)` and `gridify(ebsd, unitCell=)` with `gridLayout` (`geometry/gridlayout.py`), `cleanUpPseudoSym` (`maps/pseudosym.py`), `simulateEBSD` (`maps/simulate.py`) and the `spatialTransform` family (`geometry/spatialtransform.py`); MCL segmentation is `calcGrains(..., mcl=)`. M11 (2026-09-26): `mapImage` and `mapImageList` (`maps/mapimage.py`), `xcfShift` and `pairShifts` (`maps/registration.py`) and the `trueEbsd` job (`maps/trueebsd.py`), MATLAB's run of the EBSDTrueEbsd page to the digit; `mtexdata('trueEbsdWCCoSmall')` reads the HDF5 file `bench/matlab/export_trueebsd.m` writes, hosted in the data repository. Variants are numbered as MTEX numbers them (`mtexEnumeration`). `rotate(ebsd, r, 'keepEuler')` dispatches to the method, MATLAB's flags as strings. P6 interfaces (`docs/plans/io.md`): the EBSD import is done, I1 to I4,
 `loadEBSD` and `EBSD.load` for `.ang`, `.ctf`, named-column tables, `.cpr`/`.crc`, `.osc`
 and the vendors' HDF5 (h5py, the `io` extra, configs in `io/hdf5_config/`) in `mtex/io`;
 the numeric block of a text file is a parallel numba row parser (`io/kernels.py`,
@@ -145,7 +151,8 @@ of the positions and verified, and every format is timed against the Julia loade
 `docs/research/benchmark-io.md`. I5 export is done too: `export(ebsd, fname)` for `.ang`,
 `.ctf`, a table and the HDF5 write-back into a copy of the source file, every one tested by
 its round trip, and `mtexdata('forsterite')` fetches and reads the sample data with the
-recipes of the pages. I6, the pole figure import (`io/loadpolefigure.py`: `loadPoleFigure`, `PoleFigure.load`, the
+recipes of the pages; the files are the joint data repository `mtex-toolbox/mtex-data` (`../mtex-data`,
+`docs/plans/data-repository.md`), whose `manifest.json` at a tag is `mtex/io/sampledata.json`. I6, the pole figure import (`io/loadpolefigure.py`: `loadPoleFigure`, `PoleFigure.load`, the
 Dubna, Siemens, Geesthacht, Bruker, Aachen, rw1 and generic readers, `mtexdata('dubna')` and
 the other pole figure sets) is done; the ODF, orientation and tensor files wait on P4. P2, the function spaces (`docs/plans/functions.md`), is under way in
 `mtex/functions`: F0 harmonics, F1 kernels, F2 transforms with the quadrature grids, F3 the
@@ -203,6 +210,12 @@ runs the MATLAB script through the bridge into `docs/matlab/<Page>/` for the com
 `docs/notebook.py <Page>` opens a page as a notebook in VS Code to run it section by section,
 `docs/findings.md` keeps what the pages found and `docs/plans/remaining-pages.md` the status
 of every page. D0, the Vectors and Rotations chapters of D1, the ODFAnalysis chapter of D2 and the EBSDAnalysis and Grains chapters of D3 are done (`docs/plans/remaining-pages.md` has every page's state, `docs/findings.md` what they found); CrystalGeometry is done too (9 checked, Operations written), PoleFigureAnalysis, the whole D4 chapter, all 11 checked, CrystalOrientations, all 16 checked (`plot3d(odf)` now draws MATLAB's isosurfaces, so the ODF pages that left it as prose can take it), and Misorientations, all 6 checked, which completes D1; PhaseTransitions, all 11 checked on M9 (2026-09-23), Tensors, Elasticity and Plasticity, all 26 checked, GrainBoundaries, 12 checked and 3 partial, and the five Partial ODF and Vectors pages taking `plot3d` and `arrow3d` (2026-09-23); SphericalFunctions, all 16 checked, and SO3Functions, all 13 checked (2026-09-23), which completes D2; the least squares fits run `functions/lsqr.py`, LSQR with MATLAB's stopping rules. GeneralConcepts, Plotting, Tutorials and EBSD3Analysis are left.
+The halfwidth selection (`docs/plans/halfwidth.md`) is built through H2: `mtex/functions/halfwidth.py`
+(`degreeEnergies`, the cross-fitted degree energies of a sample on S2 or SO(3); `ucvHalfwidth`,
+`lowerBoundHalfwidth`, `noiseFloorHalfwidth`, `selectHalfwidth`), `calcKernel(v | ori | ebsd,
+'conservative' | 'UCV', groups=)`, and `ori.notIID`, set by `ebsd.orientations` and carried through
+indexing and products, which every automatic halfwidth refuses without grain ids; the studies are
+`bench/halfwidth_s2.py` and `bench/halfwidth_so3.py`.
 P8, the import wizard (`docs/plans/wizard.md`), is built through W6: `importWizard()` opens a
 PySide6 window (the `wizard` extra) over a headless core, `mtex/wizard/state.py` and
 `callbacks.py`, with `inspectEBSD` in `mtex/io/inspect.py` describing a file from its header

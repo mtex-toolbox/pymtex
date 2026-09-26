@@ -30,8 +30,8 @@ def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
   G = len(L) * len(R)
   eps = np.pi if exact else min(np.pi, 3.5 * psi.halfwidth() if epsilon is None else epsilon)
   if not exact and isinstance(centres, orientation) and eps < np.pi:
-    from ..geometry.grids.orientationtree import orientationTree
-    _, C = orientationTree(centres).radius(nodes.flatten(), eps)
+    from ..geometry.grids.orientationtree import gridRadius
+    _, C = gridRadius(centres, nodes.flatten(), eps)
     return csr_matrix((np.real(psi.eval(C.data)) / G, C.indices, C.indptr), shape=C.shape)
   # every pair: the kernel at all equivalents of the centres, their mean
   from ..geometry.kernels import _qmulNumpy

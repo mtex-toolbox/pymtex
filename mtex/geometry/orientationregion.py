@@ -193,22 +193,22 @@ class orientationRegion:
     # the region is open, holding the half turns of some axis, when a direction u has
     # A u <= 0; such cones are spanned by the edges of pairs of planes, or by what no plane
     # sees when they span less than space
-    cand = [np.cross(A[i], A[j]) for i, j in itertools.combinations(range(len(A)), 2)]
+    i, j = np.triu_indices(len(A), 1)
     _, s, Vt = np.linalg.svd(A)
-    cand += list(Vt[np.sum(s > 1e-10):])
-    for u in cand:
-      nu = np.linalg.norm(u)
-      if nu > 1e-10 and (np.all(A @ u <= 1e-9 * nu) or np.all(A @ -u <= 1e-9 * nu)):
-        return float(np.pi)
-    best = None
-    for i, j, k in itertools.combinations(range(len(A)), 3):
-      M = A[[i, j, k]]
-      if abs(np.linalg.det(M)) < 1e-10:
-        continue
-      rho = np.linalg.solve(M, b[[i, j, k]])
-      if np.all(A @ rho <= b + tol * (1 + np.abs(b))):
-        r = float(np.linalg.norm(rho))
-        best = r if best is None else max(best, r)
+    cand = np.concatenate([np.cross(A[i], A[j]), Vt[np.sum(s > 1e-10):]])
+    nu = np.linalg.norm(cand, axis=1)
+    Au = cand @ A.T
+    tolU = 1e-9 * nu[:, None]
+    if np.any((nu > 1e-10) & (np.all(Au <= tolU, axis=1) | np.all(-Au <= tolU, axis=1))):
+      return float(np.pi)
+    # every triple of planes at once, the regular ones solved and the vertices inside kept
+    T = np.array(list(itertools.combinations(range(len(A)), 3)), dtype=np.intp).reshape(-1, 3)
+    T = T[np.abs(np.linalg.det(A[T])) >= 1e-10]
+    if not len(T):
+      return None
+    rho = np.linalg.solve(A[T], b[T][..., None])[..., 0]
+    inside = np.all(rho @ A.T <= b + tol * (1 + np.abs(b)), axis=1)
+    best = float(np.max(np.linalg.norm(rho[inside], axis=1))) if np.any(inside) else None
     return None if best is None else float(2 * np.arctan(best))
 
   def __repr__(self):

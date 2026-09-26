@@ -50,3 +50,24 @@ def test_T11_back_from_the_embedding():
     assert np.allclose(double(es)[7], double(es[7]))
     assert mean(es).orientation().angle(mean(os)) < 0.01 * degree
     assert mean(es, weights=np.eye(100)[3]).isclose(es[3])
+
+
+def test_the_compiled_turn_agrees_with_the_products():
+  # the images and a rotation of them through the compiled loop and through the batched products
+  from mtex import getMTEXpref, setMTEXpref
+  pytest.importorskip("numba")
+  before = getMTEXpref("kernels", "numba")
+  try:
+    for name in ("-1", "mmm", "-3m", "6/mmm", "m-3m"):
+      cs = crystalFrame(name)
+      oris = orientation.rand(300, cs, specimenFrame.default, rng=rng)
+      r = rotation.rand(rng=rng)
+      out = {}
+      for be in ("numpy", "numba"):
+        setMTEXpref("kernels", be)
+        es = embedding(oris)
+        out[be] = es.u, (r * es).u
+      assert np.abs(out["numpy"][0] - out["numba"][0]).max() < 1e-13
+      assert np.abs(out["numpy"][1] - out["numba"][1]).max() < 1e-13
+  finally:
+    setMTEXpref("kernels", before)

@@ -315,3 +315,24 @@ def test_the_parallel_tracing_of_many_grains_is_the_python_one():
     assert len(la) == len(lb)
     for x, y in zip(la, lb):
       assert len(x) == len(y) and close(signedArea2(g.V[x]), signedArea2(g.V[y])) and set(x.tolist()) == set(y.tolist())
+
+
+def test_the_compiled_and_the_python_loop_sums_agree():
+  # grains with holes and an inclusion: area, both perimeters, centroid and second moments
+  from mtex.maps.polygon import loopSums
+  e = inclusionMap()
+  ph = e.phaseId.copy()
+  ph[[45, 46, 66, 200, 300, 301, 302]] = 0
+  g = calcGrains(EBSD(e.pos, e.rotations, ph, e.CSList), angle=5 * degree)
+  before = getMTEXpref("kernels", "numba")
+  try:
+    out = {}
+    for be in ("numba", "numpy"):
+      setMTEXpref("kernels", be)
+      out[be] = loopSums(g.V, g.loops, g.size)
+  finally:
+    setMTEXpref("kernels", before)
+  assert out["numba"].shape == (g.size, 8) and np.allclose(out["numba"], out["numpy"], rtol=1e-13, atol=1e-12)
+  # a hole is taken off the area and left out of the outer perimeter only
+  assert np.any(out["numba"][:, 2] > out["numba"][:, 1] + 1e-9)
+  assert np.array_equal(loopSums(g.V, [[] for _ in range(3)], 3), np.zeros((3, 8)))

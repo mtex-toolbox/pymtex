@@ -208,8 +208,8 @@ class MLSSolver:
   def initRegularisation(self, epsilon=None):
     from scipy import sparse
     eps = 2 * self.psi.halfwidth() if epsilon is None else epsilon
-    from ..geometry.grids.orientationtree import orientationTree
-    _, C = orientationTree(self.S3G).radius(self.S3G.flatten(), eps)
+    from ..geometry.grids.orientationtree import gridRadius
+    _, C = gridRadius(self.S3G, self.S3G.flatten(), eps)
     C = C.tocoo()
     A = sparse.csr_matrix((-C.data, (C.row, C.col)), shape=C.shape)
     A.setdiag(0)

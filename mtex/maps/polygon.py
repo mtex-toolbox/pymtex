@@ -14,6 +14,8 @@
 # list and a shape2d another.
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 
 from ..geometry.vector3d import vector3d
@@ -88,21 +90,48 @@ def _insideLoop(V, loop, q):
 # edge belongs to and whether it lies on the outer loop; one pass over the loops, so that
 # every measure below is a bincount and not a loop over the outlines
 def loopEdges(V, loopsPerOutline):
-  idx, lab, outer = [], [], []
-  for k, ls in enumerate(loopsPerOutline):
-    for j, l in enumerate(ls):
-      if len(l):
-        idx.append(l)
-        lab.append(np.full(len(l), k, dtype=np.int64))
-        outer.append(np.full(len(l), j == 0))
-  if not idx:
+  flat, start, lengths, owner, first = _flatLoops(loopsPerOutline)
+  if not len(flat):
     return np.zeros((0, 2)), np.zeros((0, 2)), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool)
-  lengths = np.array([len(l) for l in idx])
-  starts = np.concatenate([[0], np.cumsum(lengths)[:-1]])
-  flat = np.concatenate(idx)
-  pos = np.arange(len(flat)) - np.repeat(starts, lengths)
-  nxt = flat[np.repeat(starts, lengths) + (pos + 1) % np.repeat(lengths, lengths)]
-  return V[flat], V[nxt], np.concatenate(lab), np.concatenate(outer)
+  starts, size = np.repeat(start, lengths), np.repeat(lengths, lengths)
+  nxt = flat[starts + (np.arange(len(flat)) - starts + 1) % size]
+  return V[flat], V[nxt], np.repeat(owner, lengths), np.repeat(first, lengths)
+
+
+# the loops as one vertex list: where each loop starts in it and how long it is, the outline
+# it belongs to and whether it comes first there, the outer loop
+def _flatLoops(loopsPerOutline):
+  nPer = np.fromiter(map(len, loopsPerOutline), dtype=np.int64, count=len(loopsPerOutline))
+  loops = list(itertools.chain.from_iterable(loopsPerOutline))
+  lengths = np.fromiter(map(len, loops), dtype=np.int64, count=len(loops))
+  owner = np.repeat(np.arange(len(nPer)), nPer)
+  first = np.arange(len(loops)) == np.repeat(np.cumsum(nPer) - nPer, nPer)
+  flat = np.concatenate(loops).astype(np.int64, copy=False) if lengths.any() else np.zeros(0, dtype=np.int64)
+  return flat, np.cumsum(lengths) - lengths, lengths, owner, first
+
+
+# the sums over the edges of every outline, one row each: twice the area, the length of the
+# outer loop, the length of all loops, the first moments times six (x, y), the second times
+# twelve (y y, x x) and twenty four (x y), all about the origin
+def loopSums(V, loopsPerOutline, size):
+  from ..geometry.kernels import backend
+  V = np.asarray(V, dtype=float)
+  loop = None
+  if backend() == "numba":
+    from .kernels import grainKernel
+    loop = grainKernel("loopSums")
+  if loop is not None:
+    flat, start, lengths, owner, first = _flatLoops(loopsPerOutline)
+    out = np.zeros((size, 8))
+    loop(np.ascontiguousarray(V), flat, start, lengths, owner, first, out)
+    return out
+  P, Q, lab, outer = loopEdges(V, loopsPerOutline)
+  w = _cross2(P, Q)
+  d = np.linalg.norm(Q - P, axis=1)
+  (px, py), (qx, qy) = P.T, Q.T
+  cols = (w, np.where(outer, d, 0.0), d, (px + qx) * w, (py + qy) * w, (py * py + py * qy + qy * qy) * w,
+          (px * px + px * qx + qx * qx) * w, (px * qy + 2 * px * py + 2 * qx * qy + qx * py) * w)
+  return np.stack([np.bincount(lab, c, size) for c in cols], axis=1).reshape(size, 8)
 
 
 # the measures of a list of outlines, read off loops, V, plane, frame and size of the class
@@ -110,9 +139,6 @@ def loopEdges(V, loopsPerOutline):
 # winding, anticlockwise outside and clockwise around a hole, so a hole is subtracted by
 # itself and nothing has to know it is there
 class polygonSet:
-
-  def _edges(self):
-    return loopEdges(self.V, self.loops)
 
   # the loops of one outline as one vertex list, each hole stitched to the outer loop by
   # repeating its first vertex, the form a renderer or a point in polygon test wants
@@ -162,24 +188,17 @@ class polygonSet:
   # the area an outline covers, its holes taken off
   @property
   def area(self):
-    P, Q, lab, _ = self._edges()
-    return np.bincount(lab, _cross2(P, Q), self.size) / 2
+    return loopSums(self.V, self.loops, self.size)[:, 0] / 2
 
   # the length of the outer loop of an outline, as MATLAB's default; the loops around the
   # inclusions come with perimeterWithInclusion
   @property
   def perimeter(self):
-    out = np.zeros(self.size)
-    for k, ls in enumerate(self.loops):
-      if ls:
-        l = np.asarray(ls[0])
-        out[k] = np.sum(np.linalg.norm(self.V[np.roll(l, -1)] - self.V[l], axis=1))
-    return out
+    return loopSums(self.V, self.loops, self.size)[:, 1]
 
   @property
   def perimeterWithInclusion(self):
-    P, Q, lab, _ = self._edges()
-    return np.bincount(lab, np.linalg.norm(Q - P, axis=1), self.size)
+    return loopSums(self.V, self.loops, self.size)[:, 2]
 
   @property
   def boundarySize(self):
@@ -188,10 +207,8 @@ class polygonSet:
   # the centroid of the area, holes taken off, as a framed point
   @property
   def centroid(self):
-    P, Q, lab, _ = self._edges()
-    w = _cross2(P, Q)
-    a = np.bincount(lab, w, self.size)
-    c = np.stack([np.bincount(lab, w * (P[:, 0] + Q[:, 0]), self.size), np.bincount(lab, w * (P[:, 1] + Q[:, 1]), self.size)], axis=1)
+    S = loopSums(self.V, self.loops, self.size)
+    a, c = S[:, 0], S[:, 3:5]
     with np.errstate(divide="ignore", invalid="ignore"):
       out = np.where(a[:, None] != 0, c / (3 * a[:, None]), 0.0)
     return vector3d(self.plane.from2d(out), frame=self.frame)

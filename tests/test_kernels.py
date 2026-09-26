@@ -127,3 +127,16 @@ def test_blas_threads_are_set_and_restored():
   with blasThreads(1):
     assert all(g() == 1 for g, _ in libs)
   assert [g() for g, _ in libs] == before
+
+
+def test_region_membership_agrees_with_numpy(numbaBackend):
+  # the planes of a fundamental region turned by the rotations about z, as the SO(3) grid tests
+  from mtex import fundamentalRegion
+  from mtex.geometry.kernels import _regionMembershipNumpy
+  N = fundamentalRegion(crystalFrame("m-3m")).N
+  z = rotation.byAxisAngle(vector3d(0, 0, 1), np.arange(4) * np.pi / 2).data * np.array([1, -1, -1, -1])
+  NB = kernels.qmul(z[:, None, :], N[None]).reshape(-1, 4)
+  q = rotation.rand(5000, rng=rng).data
+  keep, near = kernels.regionMembership(q, NB, 4, 1e-3, 0.03)
+  k0, n0 = _regionMembershipNumpy(q, NB, 4, 1e-3, 0.03)
+  assert np.array_equal(keep, k0) and np.array_equal(near, n0) and keep.any() and near.any() and not near.all()

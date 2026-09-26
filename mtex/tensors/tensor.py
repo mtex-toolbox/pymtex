@@ -29,6 +29,7 @@ from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.vector3d import classproperty, vector3d
+from .kernels import turnBlocks
 
 # the pair index of the Voigt notation: 11 22 33 23 13 12
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
@@ -669,12 +670,20 @@ def _positiveDefinite(T):
 
 
 # Q acting on every index of M: out_{i...} = Q_{i i'} ... M_{i'...}, over broadcast leading
-# dims; the indices split into two groups, each turned by a Kronecker power of Q, so that
-# rank four is two products of 9 x 9 matrices
+# dims; the compiled turn index by index where either side is one tensor or matrix or both are
+# as many, else the indices split into two groups, each turned by a Kronecker power of Q, so
+# that rank four is two products of 9 x 9 matrices
 def _applyMatrix(M, Q, rank):
   Q = np.asarray(Q, dtype=float)
   if rank == 0:
     return _flatten(M, rank)
+  lead, qlead = M.shape[:M.ndim - rank], Q.shape[:-2]
+  shape = np.broadcast_shapes(lead, qlead)
+  n, nm, nq = math.prod(shape), math.prod(lead), math.prod(qlead)
+  if n > 1 and nm in (1, n) and nq in (1, n) and (nm == 1 or lead == shape) and (nq == 1 or qlead == shape):
+    out = turnBlocks(M.reshape(nm, 3 ** rank), [rank], [0, 3 ** rank], Q.reshape(nq, 3, 3))
+    if out is not None:
+      return out.reshape(shape + (3 ** rank,))
   a, b = (rank + 1) // 2, rank // 2
   lead = M.shape[:M.ndim - rank]
   M2 = M.reshape(lead + (3 ** a, 3 ** b))

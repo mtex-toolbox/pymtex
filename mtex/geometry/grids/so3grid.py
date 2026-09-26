@@ -16,6 +16,7 @@ from scipy import sparse
 from ..orientation import orientation
 from ..quaternion import qmul, rotation
 from ..representations import euler2quat, quatAngle, quatAxis
+from ..kernels import regionMembership
 from ..symreduce import reductionGroups
 from ..units import degree
 from ..vector3d import vector3d, zvector
@@ -25,15 +26,24 @@ from .s2grid import equispacedS2Grid
 
 class SO3Grid(orientation):
 
-  def __init__(self, rot, frameA, frameB, alphabeta, alpha, beta, gamma, resolution, center=None):
+  # the ladders of gamma as one flat array, node k holding gammaPoints[offset[k]:offset[k + 1]]
+  # on the circle [gammaMin[k], gammaMin[k] + gammaPeriod)
+  def __init__(self, rot, frameA, frameB, alphabeta, alpha, beta, gammaPoints, offset, gammaMin, gammaPeriod,
+               resolution, center=None):
     orientation.__init__(self, rot, frameA, frameB)
     self.alphabeta = alphabeta
     self.alpha, self.beta = np.asarray(alpha, dtype=float), np.asarray(beta, dtype=float)
     self.cb, self.sb = np.cos(self.beta), np.sin(self.beta)
-    self.gamma = list(gamma)
-    self.offset = np.concatenate([[0], np.cumsum([len(g) for g in gamma])])
+    self.gammaPoints, self.offset = np.asarray(gammaPoints, dtype=float), np.asarray(offset, dtype=np.int64)
+    self.gammaMin, self.gammaPeriod = np.asarray(gammaMin, dtype=float), float(gammaPeriod)
     self.res = float(resolution)
     self.center = rotation.id if center is None else center
+
+  # the ladder of every node as an S1Grid
+  @property
+  def gamma(self):
+    return [S1Grid(self.gammaPoints[self.offset[k]:self.offset[k + 1]], min=self.gammaMin[k],
+                   max=self.gammaMin[k] + self.gammaPeriod, periodic=True) for k in range(self.nnodes)]
 
   # anything derived from the grid is a plain orientation list
   def _new(self, data, **attrs):
@@ -71,10 +81,12 @@ class SO3Grid(orientation):
       m = np.zeros(self.size, dtype=bool)
       m[mask] = True
       mask = m
-    keep = np.array([bool(np.any(mask[self.node(k)])) for k in range(self.nnodes)])
-    gamma = [self.gamma[k].subGrid(mask[self.node(k)]) for k in range(self.nnodes) if keep[k]]
+    counts = np.add.reduceat(mask, self.offset[:-1]) if self.size else np.zeros(self.nnodes, dtype=np.int64)
+    keep = counts > 0
+    offset = np.concatenate([[0], np.cumsum(counts[keep])])
     return SO3Grid(rotation._fromData(self.data[mask]), self.frameA, self.frameB, self.alphabeta.subGrid(keep),
-                   self.alpha[keep], self.beta[keep], gamma, self.res, self.center)
+                   self.alpha[keep], self.beta[keep], self.gammaPoints[mask], offset, self.gammaMin[keep],
+                   self.gammaPeriod, self.res, self.center)
 
   # a rotation of the whole grid keeps the structure when the specimen group survives it
   def __rmul__(self, other):
@@ -83,7 +95,8 @@ class SO3Grid(orientation):
       fr = dropGroup(other, self.frameB)
       if fr is self.frameB:
         return SO3Grid(rotation._fromData(qmul(other.data, self.data)), self.frameA, self.frameB, self.alphabeta,
-                       self.alpha, self.beta, self.gamma, self.res, other * self.center)
+                       self.alpha, self.beta, self.gammaPoints, self.offset, self.gammaMin, self.gammaPeriod,
+                       self.res, other * self.center)
     return orientation.__rmul__(self, other)
 
   # the nearest grid rotation of every orientation, or the k nearest, or all within a
@@ -94,6 +107,27 @@ class SO3Grid(orientation):
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
 
+  # every grid rotation within eps of each query, up to symmetry: the sparse incidence
+  # (nq x n) and the sparse cos(w/2) of the reduced angles; the structured search where the
+  # queries carry the grid's frames and numba is there, the tree otherwise
+  def radius(self, o, eps):
+    from ..kernels import backend
+    from .orientationtree import orientationTree
+    if backend() != "numba" or not isinstance(o, orientation) or o.frameA is not self.frameA or o.frameB is not self.frameB:
+      return orientationTree(self).radius(o, eps)
+    from .gridsearch import flatSO3, so3Radius
+    if getattr(self, "_flat", None) is None:
+      L, R = reductionGroups(self)
+      self._flat = flatSO3(self), _cosetReps(L, left=True), _cosetReps(R, left=False), int(np.sum(_isAboutZ(L)))
+    flat, Lr, Rr, nZL = self._flat
+    conj = np.array([1.0, -1.0, -1.0, -1.0])
+    c, q = self.center.data.reshape(4) * conj, o.data.reshape(-1, 4)
+    Q = qmul(c, np.stack([q, q * conj], axis=1) if o.antipodal else q[:, None, :])
+    indptr, cols, vals = so3Radius(flat, Q, Lr, Rr, nZL, eps)
+    shape = (len(q), self.size)
+    return (sparse.csr_matrix((np.ones(len(cols), dtype=bool), cols, indptr), shape=shape),
+            sparse.csr_matrix((vals, cols.copy(), indptr.copy()), shape=shape))
+
   def __repr__(self):
     return f"SO3Grid ({self._frameSummary()})\n  size: {self.size}\n  resolution: {self.res / degree:.4g}°"
 
@@ -102,6 +136,17 @@ class SO3Grid(orientation):
 # cosets p Z for the group acting on the right, left cosets Z p for the one on the left
 def _isAboutZ(q):
   return (quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[..., 2]) > 1 - 1e-8)
+
+
+def _cosetReps(G, left):
+  Z = G[_isAboutZ(G)]
+  reps, covered = [], np.zeros((0, 4))
+  for p in G:
+    if len(covered) and np.max(np.abs(covered @ p)) > 1 - 1e-8:
+      continue
+    reps.append(p)
+    covered = np.concatenate([covered, qmul(Z, p[None]) if left else qmul(p[None], Z)])
+  return np.array(reps).reshape(-1, 4)
 
 
 
@@ -140,15 +185,12 @@ def _buildSO3Grid(CS, SS, L, R, res):
   beta, alpha, _ = ab.polar()
   ng = max(int(np.round(gp / res)), 1)
   resg = gp / ng
-  gamma, rots = [], []
-  for k in range(len(alpha)):
-    # the ladder centred on -alpha, since near beta = 0 only alpha + gamma matters
-    g0 = -alpha[k] - gp / 2
-    pts = g0 + np.arange(ng) * resg
-    gamma.append(S1Grid(pts, min=g0, max=g0 + gp, periodic=True))
-    rots.append(euler2quat(np.full(ng, alpha[k]), np.full(ng, beta[k]), pts, "Matthies"))
-  rot = rotation._fromData(np.concatenate(rots) if rots else np.zeros((0, 4)))
-  g = SO3Grid(rot, CS, SS, ab, alpha, beta, gamma, resg)
+  # the ladders centred on -alpha, since near beta = 0 only alpha + gamma matters
+  g0 = -alpha - gp / 2
+  pts = (g0[:, None] + np.arange(ng) * resg).reshape(-1)
+  node = np.repeat(np.arange(len(alpha)), ng)
+  rot = rotation._fromData(euler2quat(alpha[node], beta[node], pts, "Matthies").reshape(-1, 4))
+  g = SO3Grid(rot, CS, SS, ab, alpha, beta, pts, np.arange(len(alpha) + 1) * ng, g0, gp, resg)
   if len(oR.N) == 0:
     return g
   # the box is one cell of the rotations about z, the region is not: a node stays when one
@@ -162,20 +204,17 @@ def _buildSO3Grid(CS, SS, L, R, res):
 
 
 def _regionMembership(oR, rot, zL, zR, delta):
-  keep = np.zeros(len(rot), dtype=bool)
-  near = np.zeros(len(rot), dtype=bool)
   band = np.sin(delta / 2) + 1e-3
-  sector = oR.sector is not None
+  if oR.sector is None:
+    # dot(l q r, n) = dot(q, l* n r*): the normals turned, one product for every copy
+    conj = np.array([1.0, -1.0, -1.0, -1.0])
+    N = qmul(qmul((zL * conj)[:, None, None], oR.N[None, None]), (zR * conj)[None, :, None]).reshape(-1, 4)
+    return regionMembership(rot, N, len(zL) * len(zR), 1e-3, band)   # checkInside's tolerance
+  keep = np.zeros(len(rot), dtype=bool)
   for l in zL:
     for r in zR:
-      p = qmul(qmul(l[None], rot), r[None])
-      inside = oR.checkInside(p)
-      keep |= inside
-      if sector:
-        near |= inside
-      else:
-        near |= inside & np.any(np.abs(p @ oR.N.T) <= band, axis=1)
-  return keep, near
+      keep |= oR.checkInside(qmul(qmul(l[None], rot), r[None]))
+  return keep, keep.copy()
 
 
 # of two rotations closer than delta up to symmetry, found with the grid's own search, the
@@ -184,12 +223,14 @@ def _mergeClose(g, delta, candidates):
   idx = np.flatnonzero(candidates)
   if idx.size == 0:
     return g
-  from .orientationtree import orientationTree
-  I, _ = orientationTree(g).radius(g[idx], delta)
+  I, _ = g.radius(g[idx], delta)
   I = I.tocoo()
-  pairs = sorted(((min(i, j), max(i, j)) for c, i in zip(I.row, I.col) for j in [idx[c]] if i != j), key=lambda p: p[1])
+  a, b = I.col, idx[I.row]
+  a, b = a[a != b], b[a != b]
+  lo, hi = np.minimum(a, b), np.maximum(a, b)
+  order = np.argsort(hi, kind="stable")
   drop = np.zeros(g.size, dtype=bool)
-  for i, j in pairs:
+  for i, j in zip(lo[order].tolist(), hi[order].tolist()):
     if not drop[i]:
       drop[j] = True
   return g.subGrid(~drop) if np.any(drop) else g

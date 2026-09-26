@@ -256,3 +256,23 @@ def test_svd_and_polar_decomposition():
   r, core, V = svd(C)
   assert isinstance(r, rotation) and V is None
   assert np.allclose(tensor(core.M, rank=4).rotate(r.matrix()).M, C.M)
+
+
+def test_the_compiled_turn_agrees_with_the_kronecker_products():
+  # one tensor by many rotations, many by one, many by as many, rank one to four
+  from mtex import getMTEXpref, setMTEXpref
+  from mtex.tensors.tensor import _applyMatrix
+  pytest.importorskip("numba")
+  Q = rotation.rand(50, rng=rng).matrix()
+  before = getMTEXpref("kernels", "numba")
+  try:
+    for rank in (1, 2, 3, 4):
+      one, many = rng.normal(size=(3,) * rank), rng.normal(size=(50,) + (3,) * rank)
+      out = {}
+      for be in ("numpy", "numba"):
+        setMTEXpref("kernels", be)
+        out[be] = [_applyMatrix(one, Q, rank), _applyMatrix(many, Q[0], rank), _applyMatrix(many, Q, rank)]
+      for a, b in zip(out["numpy"], out["numba"]):
+        assert a.shape == b.shape == (50, 3 ** rank) and np.allclose(a, b, atol=1e-12)
+  finally:
+    setMTEXpref("kernels", before)

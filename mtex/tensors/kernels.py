@@ -1,6 +1,9 @@
 # the compiled kernels of the tensors layer: the eigen decomposition of many symmetric 3 x 3
 # matrices, the Christoffel matrices of the wave velocities, as one parallel loop of cyclic
-# Jacobi rotations. NumPy's eigh is the fallback without numba and the oracle of the tests.
+# Jacobi rotations, and the rotation of flattened tensors on every index, a tensor turned by
+# many orientations and the images of the orientation embedding. NumPy's eigh, the Kronecker
+# products of tensor.py and the batched products of analysis/embedding.py are the fallbacks
+# without numba and the oracles of the tests.
 from __future__ import annotations
 
 import numpy as np
@@ -87,6 +90,62 @@ def eigh3(E):
   lam, V = np.empty((len(X), 3)), np.empty((len(X), 3, 3))
   loop(X, lam, V)
   return lam.reshape(lead + (3,)), V.reshape(lead + (3, 3))
+
+
+# the rows of U turned by Q on every index of each block of ranks alpha, into out: the index
+# of stride s comes in triples (i, i + s, i + 2 s), so a block is turned index by index in
+# place of transposing it; U and Q one row, broadcast, or one per row of out
+def _turnLoop(U, alpha, offsets, Q, out, chunk):
+  n, D = out.shape
+  for c in prange((n + chunk - 1) // chunk):
+    a = np.empty(D)
+    b = np.empty(D)
+    for k in range(c * chunk, min(n, (c + 1) * chunk)):
+      ku = 0 if U.shape[0] == 1 else k
+      kq = 0 if Q.shape[0] == 1 else k
+      q00, q01, q02 = Q[kq, 0, 0], Q[kq, 0, 1], Q[kq, 0, 2]
+      q10, q11, q12 = Q[kq, 1, 0], Q[kq, 1, 1], Q[kq, 1, 2]
+      q20, q21, q22 = Q[kq, 2, 0], Q[kq, 2, 1], Q[kq, 2, 2]
+      for t in range(len(alpha)):
+        o0 = offsets[t]
+        m = offsets[t + 1] - o0
+        for i in range(m):
+          a[i] = U[ku, o0 + i]
+        s = 1
+        for _ in range(alpha[t]):
+          for base in range(0, m, 3 * s):
+            for i in range(base, base + s):
+              x, y, z = a[i], a[i + s], a[i + 2 * s]
+              b[i] = q00 * x + q01 * y + q02 * z
+              b[i + s] = q10 * x + q11 * y + q12 * z
+              b[i + 2 * s] = q20 * x + q21 * y + q22 * z
+          a, b = b, a
+          s *= 3
+        for i in range(m):
+          out[k, o0 + i] = a[i]
+
+
+def _turnKernel():
+  nb = _jit()
+  if not nb:
+    return None
+  if "turn" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["turn"] = nb.njit(cache=True, parallel=True)(_turnLoop)
+  return _COMPILED["turn"]
+
+
+# the rows of U, blocks of flattened tensors of ranks alpha starting at offsets, turned by the
+# rotation matrices Q on every index; U one row or n, Q one matrix or n; None without numba
+def turnBlocks(U, alpha, offsets, Q, chunk=64):
+  loop = _turnKernel() if backend() == "numba" else None
+  if loop is None:
+    return None
+  U = np.ascontiguousarray(np.atleast_2d(U), dtype=np.float64)
+  Q = np.ascontiguousarray(np.asarray(Q, dtype=np.float64).reshape(-1, 3, 3))
+  out = np.empty((max(len(U), len(Q)), U.shape[1]))
+  loop(U, np.asarray(alpha, dtype=np.int64), np.asarray(offsets, dtype=np.int64), Q, out, np.int64(chunk))
+  return out
 
 
 __all__ = []

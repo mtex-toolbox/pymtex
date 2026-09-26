@@ -1,10 +1,16 @@
-# the compiled nearest search of the S2 ring grid: the same structure as the Python search -
-# a binary search for the polar ring and the azimuth point, then the rings within the current
-# best angle - written as one numba loop over the queries, so the logarithmic scaling is kept
-# and the per-query cost leaves the interpreter. The grid passes its sorted ladders as flat
-# arrays and the search binary-searches them. The Python search is the fallback without numba
-# and the oracle of the tests. (The SO(3) grids search through the quaternion k-d tree of
-# orientationtree.py instead, since their radius search is what the ODF reconstruction needs.)
+# the compiled searches of the ring grids. The nearest search of the S2 ring grid has the same
+# structure as the Python search - a binary search for the polar ring and the azimuth point,
+# then the rings within the current best angle - written as one numba loop over the queries,
+# so the logarithmic scaling is kept and the per-query cost leaves the interpreter. The grid
+# passes its sorted ladders as flat arrays and the search binary-searches them. The Python
+# search is the fallback without numba and the oracle of the tests.
+#
+# The radius search of the equispaced SO(3) grid walks the same structure (MATLAB SO3Grid.c,
+# the Julia port's neighbours): a query is expanded over one representative per coset of
+# the rotations about z on either side, the rotations about z being the periods of alpha and
+# gamma; the images of z within eps pick the rings and on each ring an alpha window, and on
+# each node the angle is affine in cos of the gamma difference, which picks a gamma window.
+# The quaternion k-d tree of orientationtree.py is its fallback and oracle.
 from __future__ import annotations
 
 import numpy as np
@@ -115,11 +121,170 @@ def s2Nearest(g, xyz, backend):
   return out
 
 
+# ---------------------------------------------------------------- SO(3) radius
+
+# the first index in [lo, hi) with pts[i] > x
+def _firstGT(pts, lo, hi, x):
+  while lo < hi:
+    mid = (lo + hi) // 2
+    if pts[mid] <= x:
+      lo = mid + 1
+    else:
+      hi = mid
+  return lo
+
+
+# the points of a sorted periodic ladder pts[lo:hi] on [pmin, pmin + per) within w of x, as
+# the two index ranges [a0, a1) and [b0, b1)
+def _window(pts, lo, hi, pmin, per, x, w):
+  if 2 * w >= per:
+    return lo, hi, hi, hi
+  xl = x - w
+  xl = xl - np.floor((xl - pmin) / per) * per
+  xh = xl + 2 * w
+  if xh < pmin + per:
+    return _firstGE(pts, lo, hi, xl), _firstGT(pts, lo, hi, xh), hi, hi
+  return _firstGE(pts, lo, hi, xl), hi, lo, _firstGT(pts, lo, hi, xh - per)
+
+
+# the Hamilton product of two quaternions given by their components
+def _qm(a0, a1, a2, a3, b0, b1, b2, b3):
+  return (a0 * b0 - a1 * b1 - a2 * b2 - a3 * b3, a1 * b0 + a0 * b1 - a3 * b2 + a2 * b3,
+          a2 * b0 + a3 * b1 + a0 * b2 - a1 * b3, a3 * b0 - a2 * b1 + a1 * b2 + a0 * b3)
+
+
+# the grid points within eps of one image (alpha, beta, gamma), their cos(w/2) merged into best
+def _imageNeighbours(al, be, ga, ringBeta, ringOff, ringAlpha, ringNode, ringMin, nodeCb, nodeSb, gOff, gPts, gMin,
+                     gp, ap, nZL, eps, best, touched, t):
+  cE, cH = np.cos(eps), np.cos(eps / 2)
+  cb1, sb1 = np.cos(be), np.sin(be)
+  tol = 1e-9
+  nR = ringBeta.shape[0]
+  for rg in range(_firstGE(ringBeta, 0, nR, be - eps - tol), nR):
+    br = ringBeta[rg]
+    if br > be + eps + tol:
+      break
+    k0, k1 = ringOff[rg], ringOff[rg + 1]
+    # the alpha half width in which the images of z are within eps
+    den = sb1 * np.sin(br)
+    w = np.pi
+    if den > 1e-12:
+      ca = (cE - cb1 * np.cos(br)) / den
+      if ca > 1 + tol:
+        continue
+      if ca > -1:
+        w = np.arccos(min(ca, 1.0))
+    a0, a1, b0, b1 = _window(ringAlpha, k0, k1, ringMin[rg], ap, al, w + tol)
+    for side in range(2):
+      lo, hi = (a0, a1) if side == 0 else (b0, b1)
+      for kk in range(lo, hi):
+        k = ringNode[kk]
+        cbk, sbk = nodeCb[k], nodeSb[k]
+        for m in range(nZL):
+          dA = ringAlpha[kk] + m * ap - al
+          cD, sD = np.cos(dA), np.sin(dA)
+          # tr(R1' R2) = A + P cos(phi) + S sin(phi) with phi the gamma difference
+          A = cb1 * cbk + sb1 * sbk * cD
+          P = cD * (1 + cb1 * cbk) + sb1 * sbk
+          S = -sD * (cb1 + cbk)
+          B = np.sqrt(P * P + S * S)
+          if A - 1 + B < 2 * cE - tol or B <= 1e-15:
+            continue
+          # tr = A + B cos(gamma' - x): the window about x, and the copy of gamma' by the
+          # rotations about z on the right nearest to x, the closest one
+          cg = (1 + 2 * cE - A) / B
+          wg = np.pi if cg <= -1 else np.arccos(min(cg, 1.0))
+          x = ga + np.arctan2(S, P)
+          g0, g1, h0, h1 = _window(gPts, gOff[k], gOff[k + 1], gMin[k], gp, x, wg + tol)
+          for side2 in range(2):
+            lo2, hi2 = (g0, g1) if side2 == 0 else (h0, h1)
+            for j in range(lo2, hi2):
+              u = gPts[j] - x
+              u -= np.round(u / gp) * gp
+              d = np.sqrt(max(0.0, (A + B * np.cos(u) + 1) / 4))
+              if d >= cH:
+                if best[j] < 0:
+                  touched[t] = j
+                  t += 1
+                if d > best[j]:
+                  best[j] = min(d, 1.0)
+  return t
+
+
+# every query's grid points within eps, up to symmetry: the counts first (fill False), then
+# the sorted columns and cos(w/2) into the rows indptr gives (fill True)
+def _so3RadiusLoop(Q, Lr, Rr, ringBeta, ringOff, ringAlpha, ringNode, ringMin, nodeCb, nodeSb, gOff, gPts, gMin, gp, ap,
+                   nZL, eps, chunk, fill, counts, indptr, cols, vals):
+  nq, nb, n = Q.shape[0], Q.shape[1], gPts.shape[0]
+  for c in prange((nq + chunk - 1) // chunk):
+    best = np.full(n, -1.0)
+    touched = np.empty(n, dtype=np.int64)
+    for i in range(c * chunk, min(nq, (c + 1) * chunk)):
+      t = 0
+      for b in range(nb):
+        for li in range(Lr.shape[0]):
+          for ri in range(Rr.shape[0]):
+            l0, l1, l2, l3 = _qm(Lr[li, 0], Lr[li, 1], Lr[li, 2], Lr[li, 3], Q[i, b, 0], Q[i, b, 1], Q[i, b, 2], Q[i, b, 3])
+            p0, p1, p2, p3 = _qm(l0, l1, l2, l3, Rr[ri, 0], Rr[ri, 1], Rr[ri, 2], Rr[ri, 3])
+            # the Matthies angles of the image: alpha + gamma, alpha - gamma and beta
+            sp, dm = 2 * np.arctan2(p3, p0), 2 * np.arctan2(-p1, p2)
+            be = 2 * np.arctan2(np.sqrt(p1 * p1 + p2 * p2), np.sqrt(p0 * p0 + p3 * p3))
+            t = _imageNeighbours((sp + dm) / 2, be, (sp - dm) / 2, ringBeta, ringOff, ringAlpha, ringNode, ringMin, nodeCb,
+                                 nodeSb, gOff, gPts, gMin, gp, ap, nZL, eps, best, touched, t)
+      if fill:
+        idx = np.sort(touched[:t])
+        o = indptr[i]
+        for u in range(t):
+          cols[o + u] = idx[u]
+          vals[o + u] = best[idx[u]]
+      else:
+        counts[i] = t
+      for u in range(t):
+        best[touched[u]] = -1.0
+
+
+# the ladders of an equispaced SO(3) grid as flat arrays: per ring its polar angle, its nodes
+# with their alpha folded into [min, min + period) and sorted, per node its gamma ladder
+def flatSO3(g):
+  ab = g.alphabeta
+  ringOff = np.ascontiguousarray(ab.offset, dtype=np.int64)
+  ringMin = np.array([float(r.min) for r in ab.rhoGrid])
+  ap = float(g.alphaPeriod)
+  ringAlpha, ringNode = np.empty(g.nnodes), np.empty(g.nnodes, dtype=np.int64)
+  for r in range(len(ab.rhoGrid)):
+    k0, k1 = ringOff[r], ringOff[r + 1]
+    a = g.alpha[k0:k1] - np.floor((g.alpha[k0:k1] - ringMin[r]) / ap) * ap
+    o = np.argsort(a, kind="stable")
+    ringAlpha[k0:k1], ringNode[k0:k1] = a[o], k0 + o
+  return (np.ascontiguousarray(ab.thetaGrid.points, dtype=np.float64), ringOff, ringAlpha, ringNode, ringMin,
+          np.ascontiguousarray(g.cb), np.ascontiguousarray(g.sb), g.offset, g.gammaPoints, g.gammaMin, g.gammaPeriod, ap)
+
+
+# the radius search of an equispaced SO(3) grid, Q the queries (nq, nb, 4) turned back by the
+# grid's centre with nb = 2 holding the inverse under exchange, Lr and Rr the coset
+# representatives, nZL the rotations about z on the left; the CSR arrays of the incidence
+def so3Radius(flat, Q, Lr, Rr, nZL, eps, chunk=16):
+  _compileSO3()
+  Q = np.ascontiguousarray(Q, dtype=np.float64)
+  Lr, Rr = np.ascontiguousarray(Lr, dtype=np.float64), np.ascontiguousarray(Rr, dtype=np.float64)
+  nq = Q.shape[0]
+  args = flat[:-2] + (float(flat[-2]), float(flat[-1]))
+  counts = np.zeros(nq, dtype=np.int64)
+  indptr = np.zeros(nq + 1, dtype=np.int64)
+  empty = np.zeros(0, dtype=np.int64), np.zeros(0)
+  loop = _COMPILED["so3Radius"]
+  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), False, counts, indptr, *empty)
+  indptr[1:] = np.cumsum(counts)
+  cols, vals = np.empty(indptr[-1], dtype=np.int64), np.empty(indptr[-1])
+  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), True, counts, indptr, cols, vals)
+  return indptr, cols, vals
+
+
 # ---------------------------------------------------------------- compilation
 
 # the shared helpers njit-compiled once and swapped into the module namespace, so the two
 # parallel loops that reference them by name compile in nopython mode
-_HELPERS = ("_firstGE", "_nearestJ", "_ringBest")
+_HELPERS = ("_firstGE", "_nearestJ", "_ringBest", "_firstGT", "_window", "_qm", "_imageNeighbours")
 
 
 def _compileHelpers():
@@ -136,6 +301,12 @@ def _compileS2():
   if "s2Nearest" not in _COMPILED:
     nb = _compileHelpers()
     _COMPILED["s2Nearest"] = nb.njit(cache=True, parallel=True)(_s2NearestLoop)
+
+
+def _compileSO3():
+  if "so3Radius" not in _COMPILED:
+    nb = _compileHelpers()
+    _COMPILED["so3Radius"] = nb.njit(cache=True, parallel=True)(_so3RadiusLoop)
 
 
 __all__ = []

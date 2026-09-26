@@ -4,6 +4,7 @@
 #   .venv/bin/python bench/maps_ops.py export              the map
 #   .venv/bin/python bench/maps_ops.py run [op ...]        this port
 #   .venv/bin/python bench/maps_ops.py matlab [op ...]     bench/matlab/bench_maps_ops.m through the bridge
+#   .venv/bin/python bench/maps_ops.py julia [op ...]      bench/maps_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/maps_ops.py compare
 #
 # The map of bench/maps.py: N x N pixels of unit spacing, the grains the Voronoi cells of random
@@ -29,7 +30,8 @@ OUT = os.path.join(HERE, "out", "maps")
 N, NG = 300, 200
 ALGORITHM = [
   {"name": "grain segmentation",
-   "entry": {"matlab": ["@EBSD.calcGrains"], "python": ["mtex.maps.calcgrains.calcGrains"]},
+   "entry": {"matlab": ["@EBSD.calcGrains"], "python": ["mtex.maps.calcgrains.calcGrains"],
+             "julia": ["calcGrains!"]},
    "cases": {"calcgrains": "calcGrains of the 300 x 300 map at 5 degree: the area of every grain",
              "calcgrains_1C_1": "calcGrains of the 2.5 million pixel steel map 1C_1 at 10 degree, one run"},
    # MATLAB's boundary vertices sit up to 1e-6 off the pixel lattice; on 1C_1 the closing joins
@@ -38,24 +40,28 @@ ALGORITHM = [
    "tolerance": {"calcgrains": 1e-5, "calcgrains_1C_1": 1e-3}},
   {"name": "grain shape",
    "entry": {"matlab": ["@grain2d.perimeter", "@grain2d.aspectRatio"],
-             "python": ["mtex.maps.polygon.polygonSet.perimeter", "mtex.maps.shape.aspectRatio"]},
+             "python": ["mtex.maps.polygon.polygonSet.perimeter", "mtex.maps.shape.aspectRatio"],
+             "julia": ["perimeter", "aspectRatio"]},
    "cases": {"perimeter": "the perimeter of every grain", "aspect": "aspectRatio of every grain"},
    # the aspect ratio is the one of the ellipse of the second area moments here (docs/plans/maps.md 9)
    "tolerance": {"perimeter": 1e-5, "aspect": 0.2}},
   {"name": "boundary smoothing",
-   "entry": {"matlab": ["@grain2d.smoothBoundary"], "python": ["mtex.maps.smoothing.smoothBoundary"]},
+   "entry": {"matlab": ["@grain2d.smoothBoundary"], "python": ["mtex.maps.smoothing.smoothBoundary"],
+             "julia": ["smoothBoundary"]},
    "cases": {"smooth_boundary": "smoothBoundary(5): the perimeter of every grain after"},
    # the boundary filters take a smoothing length here (docs/plans/maps.md 9)
    "tolerance": 1e-3},
   {"name": "intragranular misorientation",
    "entry": {"matlab": ["@EBSD.KAM", "@EBSD.calcGROD"],
-             "python": ["mtex.maps.intragranular.KAM", "mtex.maps.intragranular.calcGROD"]},
+             "python": ["mtex.maps.intragranular.KAM", "mtex.maps.intragranular.calcGROD"],
+             "julia": ["KAM", "calcGROD"]},
    "cases": {"kam": "KAM, first order, every pixel", "grod": "the angle of calcGROD, every pixel"},
    # MATLAB takes small angles through acos
    "tolerance": 1e-6},
   {"name": "orientation denoising",
    "entry": {"matlab": ["@EBSD.smooth", "@l1TVFilter.smooth"],
-             "python": ["mtex.analysis.denoising.smooth", "mtex.analysis.variational.solveField"]},
+             "python": ["mtex.analysis.denoising.smooth", "mtex.analysis.variational.solveField"],
+             "julia": ["smooth"]},
    "cases": {"smooth_mean_twins": "smooth(meanFilter) of the twins map, every indexed pixel",
              "smooth_spline_twins": "smooth(splineFilter) of the twins map",
              "smooth_l1tv_twins": "smooth(l1TVFilter) of the twins map",
@@ -112,9 +118,9 @@ def run(ops):
   # a smoothed map comes back on its grid, in the grid's order
   quat = lambda m: np.column_stack([np.asarray(m.pos.data, float).reshape(-1, 3)[:, :2],
                                     np.asarray(m.rotations.data, float).reshape(-1, 4)])
-  def large():
-    g = calcGrains(s["large"], angle=10 * degree)
-    return np.column_stack([np.asarray(g.centroid.data, float).reshape(-1, 3)[:, :2], np.asarray(g.area, float)])
+  # the segmentation alone is timed, as in the Julia half; the grains' measures are the result
+  large = lambda: calcGrains(s["large"], angle=10 * degree)
+  byLarge = lambda g: np.column_stack([np.asarray(g.centroid.data, float).reshape(-1, 3)[:, :2], np.asarray(g.area, float)])
 
   # the measured maps as the EBSDDenoising page prepares them
   def measured(name):
@@ -131,7 +137,7 @@ def run(ops):
                      np.asarray(e0.rotations.data, float).reshape(-1, 4)]).astype("<f8").tofile(os.path.join(OUT, f"input_{m}.bin"))
   denoise = lambda op: lambda: maps[op.split("_")[2]].smooth(filters[op.split("_")[1]](), fill=op.split("_")[1] == "fill")["indexed"]
   table = {
-    "calcgrains_1C_1": (large, lambda r: r),
+    "calcgrains_1C_1": (large, byLarge),
     "calcgrains": (grains, lambda g: byGrain(g.area)),
     "perimeter": (lambda: s["g"].perimeter, byGrain),
     "aspect": (lambda: s["g"].aspectRatio(), byGrain),
@@ -209,4 +215,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"export": export, "run": lambda: run(names),
    "matlab": lambda: matlab(names),
+   "julia": lambda: crosscheck.julia("maps_ops.jl", ALGORITHM, names),
    "compare": compare}[cmd]()

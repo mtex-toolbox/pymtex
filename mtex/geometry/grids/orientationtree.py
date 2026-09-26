@@ -8,6 +8,8 @@
 # quaternion dot, which the kernels take and which needs no arccos.
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 from scipy import sparse
 from scipy.spatial import cKDTree
@@ -117,29 +119,27 @@ class OrientationTree:
     nq, S = imgs.shape[0], imgs.shape[1]
     flat = imgs.reshape(-1, 4)
     hits = self.tree.query_ball_point(flat, r, workers=-1)
-    rows, cols, dots = [], [], []
-    for m, hit in enumerate(hits):
-      if not hit:
-        continue
-      i = m // S
-      g = np.asarray(hit, dtype=int) % self.n
-      d = np.abs(flat[m] @ self.pts[g].T)
-      rows.append(np.full(len(g), i))
-      cols.append(g)
-      dots.append(d)
-    if not rows:
+    # the hit lists flattened without a Python loop: their lengths, then their items chained
+    lens = np.fromiter(map(len, hits), dtype=np.intp, count=len(hits))
+    if not lens.any():
       shape = (nq, self.n)
       return sparse.csr_matrix(shape, dtype=bool), sparse.csr_matrix(shape)
-    rows, cols, dots = np.concatenate(rows), np.concatenate(cols), np.concatenate(dots)
-    # keep, per (query, grid) pair, the largest dot (the smallest angle) among the images
-    order = np.lexsort((-dots, cols, rows))
-    rows, cols, dots = rows[order], cols[order], dots[order]
-    first = np.ones(len(rows), dtype=bool)
-    first[1:] = (rows[1:] != rows[:-1]) | (cols[1:] != cols[:-1])
-    rows, cols, dots = rows[first], cols[first], dots[first]
+    cols = np.fromiter(itertools.chain.from_iterable(hits), dtype=np.intp, count=int(lens.sum())) % self.n
+    m = np.repeat(np.arange(len(hits)), lens)
+    rows = m // S
+    dots = np.abs(np.einsum("ij,ij->i", flat[m], self.pts[cols]))
+    # keep, per (query, grid) pair, the largest dot (the smallest angle) among the images: one
+    # sort on the pair's key, which also leaves the rows in the order of a CSR matrix
+    key = rows.astype(np.int64) * self.n + cols
+    order = np.argsort(key)
+    key, dots = key[order], dots[order]
+    starts = np.flatnonzero(np.concatenate([[True], key[1:] != key[:-1]]))
+    dots, key = np.maximum.reduceat(dots, starts), key[starts]
+    rows, cols = key // self.n, key % self.n
+    indptr = np.concatenate([[0], np.cumsum(np.bincount(rows, minlength=nq))])
     shape = (nq, self.n)
-    I = sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape)
-    D = sparse.csr_matrix((np.minimum(dots, 1.0), (rows, cols)), shape=shape)
+    I = sparse.csr_matrix((np.ones(len(cols), dtype=bool), cols, indptr), shape=shape)
+    D = sparse.csr_matrix((np.minimum(dots, 1.0), cols.copy(), indptr.copy()), shape=shape)
     return I, D
 
 
@@ -161,16 +161,22 @@ def orientationTree(grid):
 def findInGrid(grid, o, epsOrK=None):
   from ..orientation import orientation
   o = o if isinstance(o, orientation) else orientation(o, grid.frameA, grid.frameB)
-  tree = orientationTree(grid)
   if epsOrK is None:
-    ind, d = tree.nearest(o.flatten())
+    ind, d = orientationTree(grid).nearest(o.flatten())
     return ind.reshape(o.shape), d.reshape(o.shape)
   if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
-    ind, c = tree.knn(o.flatten(), int(epsOrK))
+    ind, c = orientationTree(grid).knn(o.flatten(), int(epsOrK))
     return ind, _angle(c)
-  I, C = tree.radius(o.flatten(), float(epsOrK))
+  I, C = gridRadius(grid, o.flatten(), float(epsOrK))
   C.data = _angle(C.data)
   return I, C
 
 
-__all__ = ["OrientationTree", "orientationTree", "findInGrid"]
+# every rotation of a grid or list within eps of each query, up to symmetry, as the sparse
+# incidence and the sparse cos(w/2): the structured search of an equispaced grid, else the tree
+def gridRadius(grid, o, eps):
+  from .so3grid import SO3Grid
+  return (grid if isinstance(grid, SO3Grid) else orientationTree(grid)).radius(o, eps)
+
+
+__all__ = ["OrientationTree", "orientationTree", "findInGrid", "gridRadius"]

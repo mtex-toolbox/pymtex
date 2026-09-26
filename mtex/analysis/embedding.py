@@ -28,6 +28,7 @@ from ..geometry.latticetype import latticeType
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.vector3d import vector3d
+from ..tensors.kernels import turnBlocks
 
 _SPECS = {}
 
@@ -139,9 +140,19 @@ def _blocks(f, U, alpha, offsets, Q, chunk=256):
   return out
 
 
+# the rows of U, one or n, turned by Q, one matrix or n: the compiled loop, the chunked
+# products its fallback and oracle
+def _turnRows(U, alpha, offsets, Q):
+  out = turnBlocks(U, alpha, offsets, Q)
+  if out is not None:
+    return out
+  n = max(len(U), len(Q) if np.ndim(Q) == 3 else 1)
+  return _blocks(_turn, np.broadcast_to(U, (n, U.shape[1])), alpha, offsets, Q)
+
+
 # the identity image turned by a list of rotations, one row each
 def _rotateBatch(u0, alpha, offsets, Q):
-  return _blocks(_turn, np.broadcast_to(u0, (len(Q), len(u0))), alpha, offsets, Q)
+  return _turnRows(u0[None], alpha, offsets, Q)
 
 
 _GENERATORS = [np.array([[0, 0, 0], [0, 0, -1.0], [0, 1.0, 0]]), np.array([[0, 0, 1.0], [0, 0, 0], [-1.0, 0, 0]]),
@@ -187,10 +198,18 @@ class embeddingSpec:
     self.offsets = np.concatenate([[0], np.cumsum([len(t) for t in terms])]).astype(int)
     self.u0 = np.concatenate(terms)
     self.basis = _orbitBasis(self.u0, self.alpha, self.offsets)
+    self._seeds = None
 
   @property
   def dim(self):
     return self.basis.shape[1]
+
+  # the seeds of a projection and their images, built on first use
+  def seeds(self):
+    if self._seeds is None:
+      qs = rotation(_seedRotations(self.frame))
+      self._seeds = qs, _rotateBatch(self.u0, self.alpha, self.offsets, qs.matrix())
+    return self._seeds
 
 
 def _spec(cs):
@@ -280,11 +299,12 @@ class embedding:
 
   def dot(self, other):
     self._same(other)
-    return np.sum(self.u * other.u, axis=0).reshape(self.shape)
+    return np.einsum("ij,ij->j", self.u, other.u).reshape(self.shape)
 
-  # with normalized the norm over the norm every orientation's image has
+  # with normalized the norm over the norm every orientation's image has; the sum of squares
+  # without a temporary, which is four times faster than np.linalg.norm on a large list
   def norm(self, normalized=False):
-    n = np.linalg.norm(self.u, axis=0).reshape(self.shape)
+    n = np.sqrt(np.einsum("ij,ij->j", self.u, self.u)).reshape(self.shape)
     return n / np.linalg.norm(self.spec.u0) if normalized else n
 
   def isclose(self, other, atol=1e-10):
@@ -300,7 +320,7 @@ class embedding:
   # the images turned by a rotation
   def rotate(self, r):
     Q = rotation(r.data).matrix()
-    return self._new(_blocks(_turn, self.u.T, self.spec.alpha, self.spec.offsets, Q).T, self.shape)
+    return self._new(_turnRows(self.u.T, self.spec.alpha, self.spec.offsets, Q).T, self.shape)
 
   # the images of the seeds of a projection, the batch route
   @staticmethod
@@ -327,8 +347,11 @@ class embedding:
   # being skew, so G t is formed once per target and every step is one batch of images
   def project(self, seeds=None, maxIter=200, tol=1e-10, chunk=2048):
     sp = self.spec
-    qs = rotation(_seedRotations(sp.frame)) if seeds is None else rotation(seeds)
-    seedImages = _rotateBatch(sp.u0, sp.alpha, sp.offsets, qs.matrix())
+    if seeds is None:
+      qs, seedImages = sp.seeds()
+    else:
+      qs = rotation(seeds)
+      seedImages = _rotateBatch(sp.u0, sp.alpha, sp.offsets, qs.matrix())
     U = self.u.T
     n = np.linalg.norm(U, axis=1)
     out = np.empty((len(U), 4))

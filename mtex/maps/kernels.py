@@ -1320,9 +1320,31 @@ def _fmcSeedsLoop(order, indptr, indices, data, alphaSum, seed):
     seed[k] = s < alphaSum[k]
 
 
+# the sums over the edges of every loop into its outline's row of out: twice the area, the
+# length of the outer loop, the length of all loops, the first moments times six and the
+# second times twelve, twelve and twenty four, the edge list of polygon.loopEdges its oracle
+def _loopSumsLoop(V, flat, start, length, owner, first, out):
+  for l in range(start.shape[0]):
+    k, s, n = owner[l], start[l], length[l]
+    for i in range(n):
+      a, b = flat[s + i], flat[s + (i + 1) % n]
+      px, py, qx, qy = V[a, 0], V[a, 1], V[b, 0], V[b, 1]
+      w = px * qy - qx * py
+      d = np.sqrt((qx - px) ** 2 + (qy - py) ** 2)
+      out[k, 0] += w
+      if first[l]:
+        out[k, 1] += d
+      out[k, 2] += d
+      out[k, 3] += (px + qx) * w
+      out[k, 4] += (py + qy) * w
+      out[k, 5] += (py * py + py * qy + qy * qy) * w
+      out[k, 6] += (px * px + px * qx + qx * qx) * w
+      out[k, 7] += (px * qy + 2 * px * py + 2 * qx * qy + qx * py) * w
+
+
 _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_toReferenceLoop, True),
                 "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False),
-                "fmcSeeds": (_fmcSeedsLoop, False)}
+                "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False)}
 
 
 def grainKernel(name):

@@ -674,4 +674,43 @@ def projectDirections(xyz, imgs, q, parity):
   return out.reshape(shape + (3,))
 
 
+# ------------------------------------------------------------------ the membership in a region
+
+# for every quaternion and every block of planes: inside when every dot is below t or every
+# dot above -t (q or -q in the region), near when also some plane lies within band
+def _regionMembershipLoop(q, N, nBlocks, t, band, keep, near):
+  m = N.shape[0] // nBlocks
+  for i in prange(q.shape[0]):
+    q0, q1, q2, q3 = q[i, 0], q[i, 1], q[i, 2], q[i, 3]
+    k, nr = False, False
+    for b in range(nBlocks):
+      hi, lo, close = -np.inf, np.inf, False
+      for j in range(b * m, (b + 1) * m):
+        d = q0 * N[j, 0] + q1 * N[j, 1] + q2 * N[j, 2] + q3 * N[j, 3]
+        hi, lo = max(hi, d), min(lo, d)
+        close = close or abs(d) <= band
+      if hi <= t or lo >= -t:
+        k = True
+        nr = nr or close
+    keep[i], near[i] = k, nr
+
+
+def _regionMembershipNumpy(q, N, nBlocks, t, band):
+  D = (q @ N.T).reshape(len(q), nBlocks, -1)
+  inside = np.all(D <= t, axis=2) | np.all(D >= -t, axis=2)
+  return inside.any(axis=1), (inside & np.any(np.abs(D) <= band, axis=2)).any(axis=1)
+
+
+# whether each quaternion lies in one of nBlocks regions, N their planes block after block,
+# and whether it lies within band of a plane of a region holding it
+def regionMembership(q, N, nBlocks, t, band):
+  q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
+  N = np.ascontiguousarray(N, dtype=np.float64).reshape(-1, 4)
+  if backend() == "numpy" or len(N) == 0:
+    return _regionMembershipNumpy(q, N, nBlocks, t, band)
+  keep, near = np.empty(len(q), dtype=np.bool_), np.empty(len(q), dtype=np.bool_)
+  _parallel("regionMembership", _regionMembershipLoop)(q, N, np.int64(nBlocks), float(t), float(band), keep, near)
+  return keep, near
+
+
 __all__ = []
