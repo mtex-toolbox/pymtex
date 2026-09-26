@@ -371,8 +371,10 @@ def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, c
   grids = [[sP.proj.grid(resolution) for sP in cell] for cell in plots]
 
   # the sections of a complete plot live in the frames without their groups; the function
-  # is asked in its own frames
+  # is asked in its own frames; values on the nodes of makeGrid come as a plain function
   def at(o):
+    if not hasattr(f, "CS"):
+      return f(o)
     if getattr(o, "CS", None) is not f.CS or getattr(o, "SS", None) is not f.SS:
       o = orientation(rotation(o.data), f.CS, f.SS)
     return f(o)
