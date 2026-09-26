@@ -14,7 +14,7 @@
 
 import matplotlib.pyplot as plt
 
-from mtex import angle, degree, hold, interp, mtexdata, plot, plottingConvention
+from mtex import angle, degree, gridify, hold, interp, mtexdata, plot, plottingConvention, rotate, vector3d
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')
@@ -69,14 +69,38 @@ angle(e1.orientations, e2.orientations) / degree
 
 # ## Resampling onto a Different Grid
 #
-# A unit cell describes the shape and scale of a grid. In MATLAB,
-# `gridify(ebsd, 'unitCell', uC)` derives its cell-to-cell translations, builds a lattice
-# over the map extent, and calls `interp` at the new positions; with a unit cell twice as
-# large and rotated by 45 degrees the orientation regions occupy the same specimen
-# positions, but their pixels are coarser and tilted, and the tilted lattice needs a
-# larger rectangular matrix, 108 by 109, to cover the source extent, so that fewer than
-# half of its cells are indexed. The resampling of a map onto another unit cell is not
-# ported yet; `interp` at a list of positions of your own is the same operation by hand.
+# A unit cell describes the shape and scale of a grid. [gridify](EBSD.gridify.html)
+# derives its cell-to-cell translations, builds a lattice over the map extent, and reads
+# the nearest measurement at the new positions. Here the unit cell is twice as large and
+# rotated by 45 degrees.
+
+# +
+# unit cell of twice the size, rotated by 45 degrees
+uC = rotate(2 * ebsd.unitCell, 45 * degree)
+
+# resample the map on the new lattice
+ebsdNewGrid = gridify(ebsd, unitCell=uC)
+ebsdNewGrid
+# -
+
+# ---
+
+# +
+# plot only cells that received source data
+plot(ebsdNewGrid['indexed'], ebsdNewGrid['indexed'].orientations)
+ext = ebsd.extent()
+plt.xlim(ext[0], ext[1])
+plt.ylim(ext[2], ext[3])
+# -
+
+# Compare this figure with the first map. The orientation regions occupy the same
+# specimen positions, but their pixels are now coarser and tilted. The orientations
+# themselves have not been rotated. The specimen's grains also occupy the same physical
+# regions; only their rasterized outlines have changed.
+#
+# The summary reports a 108 by 109 matrix. A tilted lattice needs a larger rectangular
+# matrix to cover the source extent, so its corner cells project beyond the map. Fewer
+# than half of the cells are indexed, which is why the plot excludes `notIndexed` cells.
 
 # ## From a Hexagonal to a Square Grid
 #
@@ -94,12 +118,28 @@ hexGridSize
 plot(ebsd[0:50, 0:100], ebsd[0:50, 0:100].orientations)
 
 # The staggered pixel rows reveal the hexagonal sampling lattice. Their orientations are
-# measurements. In MATLAB a square cell with half the measurement spacing, passed to
-# `gridify`, redraws those values on a square lattice of 808 by 809 cells in place of the
-# 270 by 234 hexagonal cells, about ten times as many, each new cell repeating its
-# nearest hexagonal measurement; no orientation is invented on the way, and the smaller
-# cell does not improve the map's spatial resolution. That resampling waits with the one
-# above.
+# measurements; the next figure only redraws those values on a different lattice.
+#
+# A square cell with half the measurement spacing gives a drawing grid fine enough to
+# distinguish neighbouring source positions in this example. This smaller cell does not
+# improve the map's spatial resolution.
+
+# +
+# define a square unit cell
+squnitCell = ebsd.dPos / 4 * vector3d([-1, -1, 1, 1], [-1, 1, 1, -1], 0)
+
+# resample on the square lattice
+ebsdS = ebsd.gridify(unitCell=squnitCell)
+
+squareGridSize = ebsdS.shape
+squareGridSize
+# -
+
+plot(ebsdS[0:150, 0:350], ebsdS[0:150, 0:350].orientations)
+
+# The result is a square grid with 808 by 809 cells in place of the 270 by 234 hexagonal
+# cells, about ten times as many. The stepped colour regions show that each new cell
+# repeats its nearest hexagonal measurement. No orientation was invented on the way.
 
 # ## What Regridding Does Not Change
 #

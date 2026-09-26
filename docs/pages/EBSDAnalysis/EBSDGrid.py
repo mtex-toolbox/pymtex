@@ -16,7 +16,8 @@
 
 import numpy as np
 
-from mtex import EBSD, calcGrains, degree, gridify, mtexColorMap, mtexdata, mtexdatafile, newMtexFigure, nextAxis, norm, plot, plottingConvention, rotate, rotation, setColorRange, mtexTitle, zvector
+from mtex import (EBSD, calcGrains, degree, gridify, gridLayout, hold, mtexColorMap, mtexdata, mtexdatafile, newMtexFigure, nextAxis, norm,
+                  plot, plottingConvention, rotate, rotation, setColorRange, mtexTitle, vector3d, xvector, yvector, zvector)
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')
@@ -66,14 +67,48 @@ ebsd[49, 99]
 # pixels. That order need not match the map. [Maps and Images](EBSDMapsAndImages.html)
 # compares a real map with SEM images of the same area.
 #
-# MATLAB offers `gridLayout` objects, `'columnMajor'` and `'rowMajor'`, to store the
-# matrix in another orientation; `gridify(ebsd, gL)` reindexes the map without
-# resampling, every per-pixel property following, and the conversion back is exact. The
-# layouts are not ported: the port stores every gridded map with rows along y and columns
-# along x, and a transposed or flipped array is one NumPy call on a property.
-#
-# Layout changes storage, not the specimen. The positions and orientations are
-# unchanged, and the plotting convention still draws the map in the same specimen frame.
+# `'columnMajor'` and `'rowMajor'` are the two layouts aligned with x and y. Both are
+# [gridLayout](gridLayout.gridLayout.html) objects. A layout names the row direction
+# first, in the same order as the shape of the array. Suppose an image's rows run against
+# x and its columns run along y, as for a detector mounted a quarter turn from the scan.
+
+gL = gridLayout(-xvector, yvector)
+
+# Handing that layout to `gridify` changes the matrix shape and ordering.
+
+ebsdI = gridify(ebsd, gL)
+ebsdI
+
+# The map records the layout in which it is stored.
+
+ebsdI.layout
+
+# Every per-pixel property follows the same layout. For this pair of layouts, band
+# contrast is related by a quarter turn.
+
+np.array_equal(ebsdI.bc, np.rot90(ebsd.bc))
+
+# No value was resampled or invented. A transpose and flips are sufficient, so conversion
+# back to the original layout is exact.
+
+np.array_equal(gridify(ebsdI, ebsd.layout).bc, ebsd.bc)
+
+# Layout changes storage, not the specimen. The positions and orientations are unchanged,
+# and the plotting convention still draws both maps in the same specimen frame.
+
+# +
+newMtexFigure(layout=[1, 2])
+plot(ebsd, ebsd.bc)
+mtexColorMap('gray')
+mtexTitle('columnMajor')
+nextAxis()
+plot(ebsdI, ebsdI.bc)
+mtexColorMap('gray')
+mtexTitle('row against x, column along y')
+# -
+
+# The same features occupy the same screen positions in both panels. Only the labels
+# describe a different order in memory.
 
 # ## Data That Cannot Be Put on a Grid
 #
@@ -140,8 +175,21 @@ plot(ebsdMg[49:100, 4:100], ebsdMg[49:100, 4:100].orientations)
 # line k of the input file.
 #
 # Nothing is lost. The `id` of every measurement keeps its number in the imported list,
-# so `ebsd.id` translates between the two orders. MATLAB keeps the same record under the
-# name `oldId` and returns the reverse translation as the second output of `gridify`.
+# the record MATLAB keeps as the property `oldId`. Its upper left corner shows
+# consecutive ids running along matrix rows.
+
+ebsd.id[0:3, 0:4]
+
+# The index `return_index=True` adds, MATLAB's second output of `gridify`, translates in
+# the other direction. In particular, `ebsdGrid.pos` at `newId` returns the gridded
+# positions in the order of the input list.
+
+# +
+ebsdGrid, newId = gridify(ebsd.flatten(), return_index=True)
+
+np.array_equal(ebsdGrid.pos.flatten()[newId].data, ebsd.flatten().pos.data)
+# -
+
 #
 # This distinction matters only to code that depends on input order. Grain reconstruction
 # does not: [calcGrains](EBSD.calcGrains.html) returns the same grains from the list and
@@ -189,14 +237,63 @@ plot(ebsd[0:20, 0:40], ebsd[0:20, 0:40].orientations, micronbar=False, edgeColor
 
 # ## Switching from a Hexagonal to a Square Grid
 #
-# Some external image-processing tools require square pixels. In MATLAB, passing a
-# square `unitCell` to `gridify` resamples the hexagonal measurements onto such a grid;
-# the new grid sites do not coincide with the measured ones, so `interp` copies values
-# from the nearest measurements, and squares cannot reproduce hexagonal outlines, so
-# grain boundaries are visibly staircased. A smaller square cell reduces the size of the
-# steps without adding spatial resolution. The resampling onto another unit cell is not
-# ported yet. [Regridding and Interpolation](EBSDInter.html) develops the distinction
-# between restoring a map's own lattice and resampling.
+# Some external image-processing tools require square pixels. Passing a square `unitCell`
+# to [gridify](EBSD.gridify.html) resamples the hexagonal measurements onto such a grid.
+
+# +
+# define a square unit cell
+unitCell = 2.5 * vector3d([-1, -1, 1, 1], [-1, 1, 1, -1], 0)
+
+# use the square unit cell for gridify
+ebsdS = ebsd.gridify(unitCell=unitCell)
+ebsdS
+# -
+
+# ---
+
+# +
+# visualize the result
+newMtexFigure(layout=[1, 2])
+plot(ebsd, ebsd.orientations)
+nextAxis()
+plot(ebsdS, ebsdS.orientations)
+# -
+
+# This operation differs fundamentally from restoring a map's own lattice. The new grid
+# sites do not coincide with the measured ones, so every site copies the values of the
+# nearest measurement. The left panel shows the measured hexagons; the right shows the
+# square pixels after resampling.
+#
+# The square cell above has approximately the same size as the hexagonal one. Squares
+# cannot reproduce hexagonal outlines, so grain boundaries in the right panel are visibly
+# staircased. A smaller square cell reduces the size of the steps.
+
+# +
+# a smaller unit cell
+unitCell = 0.5 * vector3d([-1, -1, 1, 1], [-1, 1, 1, -1], 0)
+
+# use the small square unit cell for gridify
+ebsdS = ebsd.gridify(unitCell=unitCell)
+ebsdS
+# -
+
+# ---
+
+# +
+plot(ebsdS, ebsdS.orientations)
+hold(True)
+plot(grains.boundary, lineWidth=2)
+hold(False)
+# -
+
+# The smaller cells follow the original boundary more closely. They do not add spatial
+# resolution: every new orientation still comes from a nearest measured hexagon.
+# [Regridding and Interpolation](EBSDInter.html) develops this distinction in detail.
+#
+# Pixels that remain notIndexed correspond to measurements that were not indexed in the
+# source map. [fill](EBSD.fill.html) may replace them by interpolation;
+# [smooth](EBSD.smooth.html) offers more sophisticated methods; see
+# [Filling Missing Data](EBSDFilling.html).
 
 # ## Rotated Grids
 #

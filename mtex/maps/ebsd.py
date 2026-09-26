@@ -446,13 +446,33 @@ class EBSD:
     n = self.lattice.plane.normal if self.lattice is not None else np.array([0.0, 0.0, 1.0])
     return vector3d(n, frame=self.frame, isNormalized=True)
 
+  # MATLAB's spacing of the positions: the shortest distance from the first corner of the
+  # unit cell to the others, the step on a square lattice and the step over sqrt(3) on a
+  # hexagonal one, where lattice.dxy is the step
   @property
   def dPos(self):
-    return self.lattice.dxy if self.lattice is not None else np.nan
+    if self.lattice is None:
+      return np.nan
+    c = self.lattice.unitCell
+    return float(np.linalg.norm(c[1:] - c[0], axis=1).min())
 
-  def gridify(self):
+  def gridify(self, layout=None, unitCell=None, return_index=False):
     from .gridify import gridify
-    return gridify(self)
+    return gridify(self, layout, unitCell, return_index)
+
+  # the directions the indices of a gridded map run along (MATLAB ebsd.layout); a list has none
+  @property
+  def layout(self):
+    if not self.isGridded:
+      return None
+    from ..geometry.gridlayout import gridLayout
+    from .gridify import arrayDirections
+    d1, d2 = arrayDirections(self)
+    gL = gridLayout(d1, d2)
+    for name in ("columnMajor", "rowMajor"):
+      if gL == getattr(gridLayout, name)():
+        gL.name = name
+    return gL
 
   # EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one
   @classmethod

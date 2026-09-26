@@ -294,3 +294,19 @@ def test_a_thin_segment_shows_its_alpha_twice(forsterite):
   assert np.allclose(h.get_colors()[:, 3], 1 - (1 - a) ** 2)
   h = plot(gB, edgeAlpha=a, lineWidth=4)
   assert np.allclose(h.get_colors()[:, 3], a)
+
+
+# a zoom takes the scale bar into the corner of the new view, as MATLAB redraws its bar
+def test_the_scale_bar_follows_a_zoom():
+  plt.close("all")
+  e = gridMap(40, 30, 1.0)
+  plot(e, e.orientations)
+  ax = plt.gca()
+  bar = lambda: [a for a in ax.patches if a.get_zorder() == 10][0]
+  x0 = bar().get_x()
+  ax.set_xlim(20, 30)
+  ax.set_ylim(10, 18)
+  box = bar()
+  assert box.get_x() != x0 and 20 <= box.get_x() <= 30 and 10 <= box.get_y() <= 18
+  assert len([a for a in ax.patches if a.get_zorder() == 10]) == 1
+  plt.close("all")

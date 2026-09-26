@@ -22,7 +22,7 @@ def test_ferrite_cut_reads_on_its_hexagonal_grid():
   e = loadEBSD(FERRITE)
   assert e.shape == (2, 234)
   assert e.lattice.shape == "hex"
-  assert abs(e.dPos - 0.3) < 1e-5
+  assert abs(e.lattice.dxy - 0.3) < 1e-5 and abs(e.dPos - 0.3 / np.sqrt(3)) < 1e-5
   assert e.CSList.mineralList == ["notIndexed", "Ferrite"]
   assert e.CS.pointGroup == "m-3m"
   assert list(e.phaseMap) == [-1, 0]

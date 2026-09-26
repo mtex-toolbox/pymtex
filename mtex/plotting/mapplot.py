@@ -104,12 +104,31 @@ class mapPlot:
     self.extent = new
     self.ax.set_xlim(new[0], new[1])
     self.ax.set_ylim(new[2], new[3])
+    self._redrawScaleBar()
+
+  def _redrawScaleBar(self):
     if getattr(self, "scaleBarArtists", None):
       for a in self.scaleBarArtists:
         a.remove()
       args = self.scaleBarArgs
       self.scaleBarArtists = []
       scaleBarOn(self, None, **args)
+
+  # a zoom, by xlim and ylim or in a window, takes the scale bar into the new view, as MATLAB
+  # redraws its bar in the corner of what is shown
+  def followView(self):
+    if getattr(self, "_followsView", False):
+      return
+    self._followsView = True
+
+    def moved(ax):
+      (xlo, xhi), (ylo, yhi) = ax.get_xlim(), ax.get_ylim()
+      view = (min(xlo, xhi), max(xlo, xhi), min(ylo, yhi), max(ylo, yhi))
+      if view != tuple(self.extent) and getattr(self, "scaleBarArtists", None):
+        self.extent = view
+        self._redrawScaleBar()
+    self.ax.callbacks.connect("xlim_changed", moved)
+    self.ax.callbacks.connect("ylim_changed", moved)
 
 
 # ------------------------------------------------------------------ where a map goes
@@ -406,6 +425,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
     micronbar = getMTEXpref("showMicronBar", True) and not getattr(mP, "reused", False)
   if micronbar and not getattr(mP, "scaleBarArtists", None):
     scaleBarOn(mP, x, location=location or "sw", refFrame=refFrame if getMTEXpref("showRefFrame", True) else False)
+    mP.followView()
   # a phase map carries its legend unless told not to, as MATLAB draws it
   if legend is None:
     legend = color is None or (isinstance(color, str) and color == "phase")

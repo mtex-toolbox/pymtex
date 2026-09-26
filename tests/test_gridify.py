@@ -1,4 +1,6 @@
 # M1: a map put on its grid, the Julia E5
+import os
+
 import numpy as np
 import pytest
 
@@ -96,3 +98,80 @@ def test_the_padding_of_a_turned_grid_is_no_measurement():
   assert g.flatten().isPadding.sum() == pad.sum() and g.copy().isPadding.sum() == pad.sum()
   assert np.array_equal(g[2:5, 3:9].isPadding, pad[2:5, 3:9]) and g.shift([1.0, 0, 0]).isPadding.sum() == pad.sum()
   assert gridify(g.flatten()).isPadding.sum() == pad.sum()
+
+
+# MATLAB's second output: the flat index of every measurement in the grid
+def test_gridify_returns_where_every_measurement_went():
+  ebsd = sampleMap()
+  holed = ebsd[[k for k in range(144) if k % 7 != 6]]
+  g, newId = gridify(holed, return_index=True)
+  assert newId.shape == (len(holed),) and len(np.unique(newId)) == len(holed)
+  assert np.array_equal(g.pos.data.reshape(-1, 3)[newId], holed.pos.data.reshape(-1, 3))
+  assert np.array_equal(g.rotations.data.reshape(-1, 4)[newId], holed.rotations.data.reshape(-1, 4))
+  g2, same = gridify(g, return_index=True)
+  assert g2 is g and np.array_equal(same, np.arange(len(g)))
+
+
+def square(s):
+  return vector3d(s * np.array([[-1, -1, 0], [-1, 1, 0], [1, 1, 0], [1, -1, 0]], float))
+
+
+# gridify(ebsd, 'unitCell', uC): the lattice of another cell over the extent, every site the
+# nearest measurement within the reach of the map's own cell, nothing interpolated
+def test_a_map_is_resampled_on_another_cell():
+  ebsd = sampleMap()
+  # its own cell gives the map back
+  g = gridify(ebsd, unitCell=square(0.5))
+  assert g.shape == (12, 12) and np.array_equal(g.rotations.data, gridify(ebsd).rotations.data)
+  # a cell of half the size: every site copies a measurement, the nearest one
+  h, newId = gridify(ebsd, unitCell=square(0.25), return_index=True)
+  assert h.shape == (23, 23) and h.isGridded and h.lattice.shape == "square" and close(h.dPos, 0.5)
+  P, Q = ebsd.pos.data.reshape(-1, 3), h.pos.data.reshape(-1, 3)
+  d = np.linalg.norm(Q[:, None, :2] - P[None, :, :2], axis=-1)
+  nearest = np.argmin(d, axis=1)
+  assert np.array_equal(h.rotations.data.reshape(-1, 4), ebsd.rotations.data.reshape(-1, 4)[nearest])
+  assert np.array_equal(h.mad.reshape(-1), ebsd.mad.reshape(-1)[nearest])
+  # every measurement sits on a site of the finer grid
+  assert close(Q[newId], P)
+  # a cell turned by 45 degrees reaches beyond the map, where the sites are not indexed
+  t = gridify(ebsd, unitCell=rotation.byAxisAngle(vector3d(0, 0, 1), np.pi / 4) * square(0.5))
+  far = np.linalg.norm(t.pos.data.reshape(-1, 3)[:, None, :2] - P[None, :, :2], axis=-1).min(axis=1) > np.sqrt(0.5) + 1e-9
+  assert np.all(np.isnan(t.rotations.data.reshape(-1, 4)[far])) and np.all(t.phaseId.reshape(-1)[far] == 0) and far.any()
+  assert np.all(np.isnan(t.mad.reshape(-1)[far]))
+  with pytest.raises(ValueError):
+    gridify(ebsd, unitCell=vector3d(np.array([[1.0, 0, 0], [0.5, 0.87, 0], [-0.5, 0.87, 0], [-1, 0, 0], [-0.5, -0.87, 0], [0.5, -0.87, 0]])))
+
+
+# gridify(ebsd, gL): the arrays reordered by a transpose and flips, nothing resampled
+def test_a_map_is_stored_in_the_layout_asked_for():
+  from mtex import gridLayout, xvector, yvector
+  g = gridify(sampleMap())
+  assert g.layout == gridLayout.columnMajor() and g.layout.name == "columnMajor" and sampleMap().layout is None
+  turned = gridify(g, gridLayout(-xvector, yvector))
+  assert np.array_equal(turned.mad, np.rot90(g.mad)) and turned.layout == gridLayout(-xvector, yvector)
+  assert np.array_equal(turned.pos.data.reshape(-1, 3)[np.argsort(turned.id.reshape(-1))], g.pos.data.reshape(-1, 3)[np.argsort(g.id.reshape(-1))])
+  back = gridify(turned, g.layout)
+  assert np.array_equal(back.mad, g.mad) and np.array_equal(back.rotations.data, g.rotations.data)
+  assert np.array_equal(gridify(g, "rowMajor").mad, g.mad.T) and gridify(g, "rowMajor").layout.name == "rowMajor"
+  # the neighbours come from the lattice and not from the order of the arrays
+  assert np.array_equal(np.sort(turned.lattice.ij, axis=0), np.sort(g.lattice.ij, axis=0))
+  lst, newId = sampleMap(), None
+  t, newId = gridify(lst, gridLayout(-xvector, yvector), return_index=True)
+  assert np.array_equal(t.pos.data.reshape(-1, 3)[newId], lst.pos.data.reshape(-1, 3))
+  with pytest.raises(ValueError):
+    gridify(g, "diagonal")
+
+
+LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data")
+
+
+# MATLAB's gridify(ebsd, 'unitCell', rotate(2*ebsd.unitCell, 45*degree)) on the twins map of
+# doc/EBSDAnalysis/EBSDInter.m, read through bench/matlab/probe_resample.m
+@pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
+def test_the_resampled_twins_map_as_MATLAB():
+  from mtex import degree, mtexdata, rotate
+  ebsd = mtexdata("twins", root=LOCAL, download=False, silent=True)
+  g = gridify(ebsd, unitCell=rotate(2 * ebsd.unitCell, 45 * degree))
+  assert g.shape == (108, 109) and g.isIndexed.sum() == 5713
+  x, y = g.pos.data[..., 0], g.pos.data[..., 1]
+  assert abs(x.min() + 20.7889) < 1e-4 and abs(x.max() - 70.4278) < 1e-4 and abs(y.min() + 25.0316) < 1e-4 and abs(y.max() - 66.1852) < 1e-4

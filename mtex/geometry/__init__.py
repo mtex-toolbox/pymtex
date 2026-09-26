@@ -2,7 +2,7 @@
 import importlib as _importlib
 
 __all__ = []
-for _name in ("units", "session", "vector3d", "quaternion", "homochoric", "plottingconvention", "latticetype", "symmetry", "crystalaxes", "frames", "miller", "orientation", "products", "symreduce", "symmetryops", "sphericalregion", "s2triangulation", "orientationregion", "frametransform", "standardorientations", "tangent", "fibre", "hull", "slipsystem", "crystalshape", "plane", "parent2child", "grids.s1grid", "grids.s2grid", "grids.fibonacci", "grids.healpix", "grids.so3grid", "grids.superfibonacci", "grids.localgrids", "funcs"):
+for _name in ("units", "session", "vector3d", "quaternion", "homochoric", "plottingconvention", "gridlayout", "latticetype", "symmetry", "crystalaxes", "frames", "miller", "orientation", "products", "symreduce", "symmetryops", "sphericalregion", "s2triangulation", "orientationregion", "frametransform", "standardorientations", "tangent", "fibre", "hull", "slipsystem", "crystalshape", "plane", "parent2child", "grids.s1grid", "grids.s2grid", "grids.fibonacci", "grids.healpix", "grids.so3grid", "grids.superfibonacci", "grids.localgrids", "funcs"):
   _module = _importlib.import_module(f"{__name__}.{_name}")
   for _public in _module.__all__:
     globals()[_public] = getattr(_module, _public)
