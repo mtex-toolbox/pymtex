@@ -10,8 +10,7 @@
 # +
 import numpy as np
 
-from mtex import (Euler, Miller, angle, arrow3d, cat, crystalFrame, crystalShape, degree, hold, inv, normalize,
-                  orientation, plot, plottingConvention, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

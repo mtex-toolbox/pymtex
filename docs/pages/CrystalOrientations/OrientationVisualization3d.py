@@ -17,7 +17,7 @@
 # orientations or their reference frames.
 
 # +
-from mtex import crystalFrame, fundamentalRegion, hold, orientation, plot, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

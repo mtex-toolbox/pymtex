@@ -22,8 +22,7 @@
 
 import numpy as np
 
-from mtex import (HSVDirectionKey, angle, calcGrains, degree, grainMean, halfQuadraticFilter, hold, ipfColorKey, mtexColorMap, mtexColorbar,
-                  mtexdata, plot, plottingConvention, smooth, smoothBoundary)
+from mtex import *
 
 # +
 # use the rolling-direction frame carried by the ferrite specimen

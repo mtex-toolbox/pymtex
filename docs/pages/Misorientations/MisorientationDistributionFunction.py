@@ -24,9 +24,7 @@
 # +
 import numpy as np
 
-from mtex import (angle, axis, calcAxisDistribution, calcDensity, calcGrains, calcMDF, calcMisorientation, degree, hold,
-                  legend, max, mtexColorbar, mtexdata, norm, plotAngleDistribution, plotAxisDistribution, plotSection,
-                  plottingConvention, round)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite', silent=True)

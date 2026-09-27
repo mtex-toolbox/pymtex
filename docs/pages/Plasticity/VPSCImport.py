@@ -13,8 +13,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, SO3Fun, crystalFrame, degree, mtexColorbar, mtexDataPath, mtexdatafile, newMtexFigure,
-                  nextAxis, plotPDF, plotSection, setColorRange, ylabel)
+from mtex import *
 
 # ## Import the texture history
 #

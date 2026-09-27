@@ -18,7 +18,7 @@
 
 import numpy as np
 
-from mtex import Miller, angle, cat, crystalFrame, degree, orientation, plot, plottingConvention, specimenFrame
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -25,8 +25,7 @@
 # [On Screen Coordinate System Alignment](AxesAlignment.html) treats plotting conventions
 # in more detail.
 
-from mtex import (EBSD, Miller, calcGrains, crystalShape, degree, hold, mtexdatafile, plot, plotPDF, plottingConvention, rotate,
-                  rotation, specimenFrame, yvector, zvector)
+from mtex import *
 
 # ## The two specimen frames in a data file
 #

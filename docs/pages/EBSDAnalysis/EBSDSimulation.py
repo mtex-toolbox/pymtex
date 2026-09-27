@@ -33,8 +33,7 @@
 
 import numpy as np
 
-from mtex import (angle, calcGrains, crystalFrame, degree, hold, ipfColorKey, mtexColorbar, mtexTitle, newMtexFigure, nextAxis,
-                  orientation, plot, plottingConvention, setColorRange, simulateEBSD, xvector, yvector)
+from mtex import *
 
 # +
 plottingConvention.default('y↓→x')

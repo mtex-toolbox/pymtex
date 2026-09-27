@@ -20,8 +20,7 @@
 # +
 import matplotlib.pyplot as plt
 import numpy as np
-from mtex import (Miller, SantaFe, calcError, calcODF, calcPoleFigure, degree, equispacedS2Grid, hold, max, min, mtexColorMap, noisepf, plot,
-                  plotDiff, plotPDF, plotSpektra, plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

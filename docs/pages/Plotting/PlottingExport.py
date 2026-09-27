@@ -27,7 +27,7 @@
 import os
 import tempfile
 
-from mtex import Miller, mtexColorbar, mtexdata, plot, plotPDF, plottingConvention, saveFigure
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

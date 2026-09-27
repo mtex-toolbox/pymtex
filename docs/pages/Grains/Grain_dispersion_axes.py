@@ -18,8 +18,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, annotate, axisAngleColorKey, calcDensity, calcGrains, degree, equispacedS2Grid, fibre, gcm, hold, mean,
-                  mtexColorbar, mtexdata, nextAxis, plot, plottingConvention, vector3d)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

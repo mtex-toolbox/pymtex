@@ -18,8 +18,7 @@
 # symmetry. Always compare the fitted axes and corrected pole figures with the specimen
 # geometry.
 
-from mtex import (Miller, PoleFigure, angle, annotate, calcDensity, calcODF, cat, centerSpecimen, cross, crystalFrame, degree, discreteSample,
-                  inv, mtexdatafile, orientation, plot, plotPDF, plottingConvention, rotation, specimenFrame, stripSym, unimodalODF, vector3d)
+from mtex import *
 
 # ## A Synthetic Known-Answer Example
 #

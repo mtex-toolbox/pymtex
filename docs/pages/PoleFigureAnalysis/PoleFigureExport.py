@@ -16,7 +16,7 @@ import os
 import tempfile
 
 import numpy as np
-from mtex import PoleFigure, calcODF, calcPoleFigure, export, mtexdata, plot, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 pf = mtexdata('dubna')

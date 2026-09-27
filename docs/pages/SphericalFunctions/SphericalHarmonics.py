@@ -13,7 +13,7 @@
 # +
 import numpy as np
 
-from mtex import S2FunHarmonic, gcm, mtexTitle, norm, plottingConvention, sphericalY, surf, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

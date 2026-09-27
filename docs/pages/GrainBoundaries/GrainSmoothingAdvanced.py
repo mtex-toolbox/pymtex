@@ -14,8 +14,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcGrains, curvatureFilter, histogram, hold, huberFilter, ipfColorKey, mtexdata, mtexTitle, norm,
-                  plot, refineBoundary, simplifyBoundary, smoothBoundary, taubinFilter)
+from mtex import *
 
 # +
 ebsd = mtexdata('csl')

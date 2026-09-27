@@ -23,8 +23,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S1FunHarmonic, angle, calcGrains, characteristicShape, degree, hold, mtexColorbar, mtexdata, norm, paror, plot,
-                  plottingConvention, quiver, smoothBoundary, surfor, vector3d)
+from mtex import *
 
 # +
 # load sample EBSD data in its specimen plotting frame

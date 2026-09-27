@@ -14,7 +14,7 @@
 
 import numpy as np
 
-from mtex import grain3d, hold, mtexdatafile, plot, plottingConvention, quiver3, setCamera
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

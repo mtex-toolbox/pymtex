@@ -12,8 +12,7 @@
 # +
 import numpy as np
 
-from mtex import (angle, axisAngleColorKey, calcGrains, calcParent, degree, halfQuadraticFilter, hold, ipfColorKey, majorityVote,
-                  mtexColorbar, mtexColorMap, mtexdata, orientation, plot, setColorRange, smooth, smoothBoundary, variants, vector3d)
+from mtex import *
 
 ebsd = mtexdata('alphaBetaTitanium', silent=True)
 

@@ -12,8 +12,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, angle, crystalFrame, degree, gcm, hold, ind2color, inv, nextAxis, orientation, plot, plotIPDF, plotPDF,
-                  plottingConvention, unique, variants, vector3d, xlabel)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

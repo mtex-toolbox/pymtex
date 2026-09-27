@@ -15,7 +15,7 @@
 # Miller-index notation is introduced in [Miller Indices](CrystalDirections.html). Review
 # it if unfamiliar.
 
-from mtex import Miller, PoleFigure, crystalFrame, mtexColorbar, mtexdatafile, plot, plottingConvention
+from mtex import *
 
 # ## Start with the import wizard
 #

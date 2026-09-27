@@ -18,8 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (WhiteJetColorMap, blue2redColorMap, crystalFrame, eig, max, mtexColorbar, mtexdatafile, plot, plotSection,
-                  plottingConvention, round, setMTEXpref, stiffnessTensor, tensor, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 setMTEXpref('defaultColorMap', blue2redColorMap)

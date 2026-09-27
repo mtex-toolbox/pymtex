@@ -11,7 +11,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import calcGrains, degree, hold, mtexdata, plot, plottingConvention, smoothBoundary, text, zvector
+from mtex import *
 
 # +
 # load sample EBSD data set

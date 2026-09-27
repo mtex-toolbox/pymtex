@@ -15,8 +15,7 @@
 # used below.
 
 import numpy as np
-from mtex import (HSVDirectionKey, axis, axisAngleColorKey, calcGrains, degree, discreteSample, hold, inpolygon, legend, mtexColorbar,
-                  mtexdata, plot, plottingConvention, quiver, smoothBoundary)
+from mtex import *
 
 # +
 # import the data in its specimen reference frame

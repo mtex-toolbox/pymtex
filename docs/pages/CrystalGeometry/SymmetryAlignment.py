@@ -17,7 +17,7 @@
 
 import numpy as np
 
-from mtex import Miller, angle, crystalFrame, degree, mtexdatafile, nextAxis, plot, plottingConvention, stiffnessTensor, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

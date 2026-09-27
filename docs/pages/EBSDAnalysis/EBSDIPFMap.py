@@ -17,7 +17,7 @@
 
 import numpy as np
 
-from mtex import calcGrains, crystalFrame, crystalShape, hold, ipfHKLKey, ipfHSVKey, ipfTSLKey, mtexdata, plot, plotIPDF, plottingConvention, smoothBoundary, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('olivine')

@@ -20,7 +20,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import angle, cubo2homo, degree, equispacedS2Grid, norm, rotation, vector3d
+from mtex import *
 
 rot = rotation.rand(100000)
 

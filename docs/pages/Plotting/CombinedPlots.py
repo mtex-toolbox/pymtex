@@ -16,9 +16,7 @@
 # +
 import matplotlib.pyplot as plt
 
-from mtex import (Miller, calcODF, crystalFrame, degree, discreteSample, hold, legend, mtexColorMap, mtexdata, orientation,
-                  plot, plotDiff, plotIPDF, plotPDF, plotSection, plottingConvention, rotate, rotation, scatter, unimodalODF,
-                  xvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

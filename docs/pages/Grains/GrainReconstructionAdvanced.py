@@ -27,7 +27,7 @@ import time
 
 import numpy as np
 
-from mtex import Miller, calcGrains, degree, gbcAngle, gbcCustom, gbcSoft, hold, ipfColorKey, mtexColorbar, mtexdata, plot, plottingConvention
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

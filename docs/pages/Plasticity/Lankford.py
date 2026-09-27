@@ -47,8 +47,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcGrains, calcLankford, cat, crystalFrame, degree, hold, mtexdata, orientation, plot, slipSystem,
-                  unimodalODF)
+from mtex import *
 
 # ## One ideal Brass orientation
 #

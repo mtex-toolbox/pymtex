@@ -12,8 +12,7 @@
 # +
 import numpy as np
 
-from mtex import (S2Fun, S2FunHarmonic, dot, mtexColorbar, mtexTitle, newMtexFigure, nextAxis, pcolor, plot, plotSpektra,
-                  plottingConvention, sqrt, surf, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

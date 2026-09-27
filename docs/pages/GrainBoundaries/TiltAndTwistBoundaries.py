@@ -20,9 +20,7 @@
 
 import numpy as np
 
-from mtex import (angle, annotate, axis, blue2redColorMap, calcDensity, calcGrains, degree, hold, ipfColorKey,
-                  mtexColorbar, mtexColorMap, mtexdata, num2rgb, plot, plottingConvention, round, setColorRange,
-                  smoothBoundary, yvector)
+from mtex import *
 
 # load the map in its specimen plotting frame
 plottingConvention.default('y↑→x')

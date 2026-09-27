@@ -12,8 +12,7 @@
 
 import numpy as np
 
-from mtex import (axisAngleSections, calcGrains, hold, inv, legend, mPrime, mtexColorbar, mtexdata, plot, quiver, slipSystem,
-                  smoothBoundary, stressTensor, xvector)
+from mtex import *
 
 # ## Reconstruct the titanium grains
 #

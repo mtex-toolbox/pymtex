@@ -13,8 +13,7 @@
 
 import numpy as np
 
-from mtex import (Miller, PoleFigure, calcError, calcODF, correct, crystalFrame, max, mtexColorMap, mtexdatafile, plot,
-                  plotPDF, plottingConvention, specimenFrame)
+from mtex import *
 
 # ## Describe the experiment
 #

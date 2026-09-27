@@ -12,8 +12,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, calcDensity, calcTaylor, crystalFrame, degree, inv, mtexColorbar, norm, orientation,
-                  plotPDF, plotSection, slipSystem, specimenFrame, strainTensor, symmetrise)
+from mtex import *
 
 # ## Define the deformation model
 #

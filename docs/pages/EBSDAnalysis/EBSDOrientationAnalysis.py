@@ -19,8 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
 
-from mtex import (Miller, angle, calcDensity, cat, circle, degree, fibre, mtexColorbar, mtexdata, nextAxis, perp, plot, plotIPDF, plotPDF,
-                  plottingConvention, volume)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

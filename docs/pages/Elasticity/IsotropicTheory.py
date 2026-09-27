@@ -15,9 +15,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (HashinShtrikmanModulus, cat, colon, complianceTensor, cprintf, crystalFrame, degree, dyad, inv, mean,
-                  mtexColorbar, mtexTitle, newMtexFigure, nextAxis, plot, setColorRange, stiffnessTensor, strainTensor,
-                  stressTensor, tensor, trace, uniformODF, xvector, zvector)
+from mtex import *
 
 # ## Start with an anisotropic crystal
 #

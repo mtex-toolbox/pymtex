@@ -30,8 +30,7 @@
 # Load the forsterite example and display the fields collected in `prop`.
 
 # +
-from mtex import (Miller, calcGrains, degree, mtexColorbar, mtexdata, newMtexFigure, norm, plot, plottingConvention,
-                  setColorRange)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite', silent=True)

@@ -15,8 +15,7 @@
 
 import numpy as np
 
-from mtex import (annotate, crystalFrame, degree, fibre, fibreODF, fundamentalRegionEuler, orientation, phi2Sections, plot, plotSection,
-                  plottingConvention, specimenFrame, unimodalODF)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

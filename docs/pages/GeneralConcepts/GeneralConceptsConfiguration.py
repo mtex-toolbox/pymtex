@@ -19,7 +19,7 @@
 # supply their own default then.
 
 # +
-from mtex import getMTEXpref, setMTEXpref
+from mtex import *
 
 getMTEXpref()
 # -

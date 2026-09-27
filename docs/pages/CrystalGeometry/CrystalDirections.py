@@ -10,7 +10,7 @@
 
 import numpy as np
 
-from mtex import Miller, angle, annotate, cat, crystalFrame, degree, hold, loadCIF, plot, plottingConvention, round
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

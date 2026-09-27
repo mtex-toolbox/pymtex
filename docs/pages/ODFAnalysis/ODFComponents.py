@@ -12,7 +12,7 @@
 
 import numpy as np
 
-from mtex import annotate, calcComponents, calcODF, degree, max, mtexColorbar, mtexdata, plotSection, plottingConvention, uniformODF, volume
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

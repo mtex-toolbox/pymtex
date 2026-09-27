@@ -21,8 +21,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Gaussian, calcDensity, calcGrains, contourf, degree, discreteSample, hold, ind2color, max,
-                  mtexColorbar, mtexColorMap, mtexdata, plot, plotSection, plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 rng = np.random.default_rng(1)

@@ -24,7 +24,7 @@
 # used below.
 
 import numpy as np
-from mtex import calcGrains, degree, hold, mtexColorMap, mtexColorbar, mtexdata, plot, plottingConvention, setColorRange, smoothBoundary
+from mtex import *
 
 # +
 # load the example map in its specimen plotting frame

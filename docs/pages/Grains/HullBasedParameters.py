@@ -11,7 +11,7 @@
 
 import numpy as np
 
-from mtex import hold, mtexColorbar, mtexTitle, mtexdata, newMtexFigure, nextAxis, plot, plottingConvention, smoothBoundary, text
+from mtex import *
 
 # +
 # import the artificial grain shapes

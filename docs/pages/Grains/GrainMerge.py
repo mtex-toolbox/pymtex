@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, calcCluster, calcGrains, degree, hold, ipfColorKey, merge, mtexColorbar, mtexTitle, mtexdata, nextAxis, orientation,
-                  plot, plottingConvention, setColorRange, smoothBoundary)
+from mtex import *
 
 # +
 # load the example in its specimen plotting frame

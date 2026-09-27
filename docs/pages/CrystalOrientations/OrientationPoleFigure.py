@@ -16,7 +16,7 @@
 # screen layout; it does not rotate the specimen or re-express the data.
 
 # +
-from mtex import Miller, crystalFrame, mtexColorbar, orientation, plot, plotPDF, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

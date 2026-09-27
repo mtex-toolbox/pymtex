@@ -14,8 +14,7 @@
 # direction of the coordinate map, including which side a rotation acts on and what
 # happens when the specimen is turned.
 
-from mtex import (Miller, angle, arrow3d, cat, crystalFrame, crystalShape, degree, hold, inv, normalize, orientation,
-                  plot, plottingConvention, rotation, round, stiffnessTensor, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

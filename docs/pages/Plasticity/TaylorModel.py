@@ -8,9 +8,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcGrains, calcTaylor, cat, crystalFrame, degree, hold, inv, mtexColorbar, mtexColorMap, mtexdata,
-                  newMtexFigure, norm, orientation, phi1Sections, plot, plottingConvention, quiver, sigmaSections,
-                  slipSystem, smoothBoundary, specimenFrame, strainTensor, symmetrise, text, xvector, yvector, zvector)
+from mtex import *
 
 # ## Set the specimen frame and strain
 #

@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (HSVDirectionKey, calcGrains, degree, halfQuadraticFilter, hold, inv, mtexColorbar, mtexdata, mtexTitle,
-                  newMtexFigure, nextAxis, plot, quiver, smooth, weightedBurgersVec)
+from mtex import *
 
 # ## Prepare a single-grain map
 #

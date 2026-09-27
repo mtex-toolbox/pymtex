@@ -19,8 +19,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcTaylor, crystalFrame, inv, orientation, slipSystem, strainTensor, stressTensor, symmetrise,
-                  vector3d)
+from mtex import *
 
 # ## Resolve the stress in every grain
 #

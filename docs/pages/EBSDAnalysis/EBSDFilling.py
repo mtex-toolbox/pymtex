@@ -25,8 +25,7 @@
 
 import numpy as np
 
-from mtex import (axisAngleColorKey, calcGrains, degree, fill, halfQuadraticFilter, hold, inpolygon, mtexColorbar, mtexdata, plot,
-                  plottingConvention, smooth, smoothBoundary, zvector)
+from mtex import *
 
 # ## A complete map for comparison
 #

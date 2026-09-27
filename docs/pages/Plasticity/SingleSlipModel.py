@@ -11,9 +11,7 @@
 
 import numpy as np
 
-from mtex import (Miller, SO3FunHarmonic, SO3FunSBF, SO3TangentVector, SO3VectorFieldHarmonic, colon, crystalFrame,
-                  degree, div, doEulerStep, gcm, hold, mean, mtexColorbar, mtexColorMap, plot, plotPDF, plotSection,
-                  plottingConvention, setColorRange, slipSystem, spinTensor, strainRateTensor, uniformODF)
+from mtex import *
 
 # ## Choose the crystal, slip system, and strain
 #

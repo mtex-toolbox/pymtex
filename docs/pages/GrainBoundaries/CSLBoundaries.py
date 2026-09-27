@@ -27,9 +27,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (CSL, angle, annotate, axis, calcDensity, calcGrains, degree, discreteSample, fundamentalRegion, hold,
-                  merge, mtexColorMap, mtexdata, orientation, plot, plottingConvention, round, setColorRange,
-                  smoothBoundary, vector3d, volume, xvector, zvector)
+from mtex import *
 
 # ## Reconstruct the boundary network
 #

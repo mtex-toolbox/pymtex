@@ -20,8 +20,7 @@
 # +
 import numpy as np
 
-from mtex import (S2FunHarmonic, S2VectorFieldHarmonic, cross, degree, dot, equispacedS2Grid, mean, norm, plot,
-                  plottingConvention, quiver3, rotate, rotation, vector3d, xvector, zvector)
+from mtex import *
 
 f = lambda v: vector3d(v.x, v.y, 0 * v.x)
 # -

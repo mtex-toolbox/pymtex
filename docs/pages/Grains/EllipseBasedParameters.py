@@ -23,9 +23,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S1DeLaValleePoussinKernel, calcDensity, calcGrains, caliper, characteristicShape, conv, degree, histogram, hold, mtexColorbar,
-                  mtexTitle, mtexdata, newMtexFigure, nextAxis, norm, plot, plotEllipse, plotSection, plottingConvention, quiver, setColorRange,
-                  setView, smoothBoundary, vector3d)
+from mtex import *
 
 # +
 # load sample EBSD data set

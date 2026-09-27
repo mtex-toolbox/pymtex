@@ -13,7 +13,7 @@
 # This page assumes basic NumPy arrays and indexing. See
 # [Lists and Indexing](ListsAndIndexing.html) if those are new to you.
 
-from mtex import degree, norm, normalize, plot, plottingConvention, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

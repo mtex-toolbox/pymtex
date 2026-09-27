@@ -10,7 +10,7 @@
 # entries of `layout` are the number of rows and columns.
 
 # +
-from mtex import crystalFrame, hold, newMtexFigure, nextAxis, plot, plottingConvention, vector3d
+from mtex import *
 
 mtexFig = newMtexFigure(layout=[2, 3], figSize='normal')
 plottingConvention.default('y↑→x')

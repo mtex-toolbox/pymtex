@@ -29,8 +29,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from mtex import (Miller, SO3FunHarmonic, calcError, calcODF, calcPoleFigure, crystalFrame, degree, equispacedS2Grid, fibre, hold, orientation, plot,
-                  plotSpektra, uniformODF, unimodalODF, yvector)
+from mtex import *
 
 # ## Build a deliberately weak ODF
 

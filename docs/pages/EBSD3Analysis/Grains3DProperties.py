@@ -13,8 +13,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (crystalFrame, degree, grain3d, histogram, hold, ipfColorKey, mtexColorbar, mtexdatafile, mtexTitle, newMtexFigure, nextAxis,
-                  norm, plot, plotEllipsoid, plottingConvention, quiver, setCamera)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

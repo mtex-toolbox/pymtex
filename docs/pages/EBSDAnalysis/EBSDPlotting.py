@@ -11,7 +11,7 @@
 # or the values to colour. This page works through phase, property and orientation maps,
 # then combines two of them.
 
-from mtex import angle, degree, hold, ipfColorKey, mtexColorMap, mtexColorbar, mtexdata, plot, plottingConvention, str2rgb, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

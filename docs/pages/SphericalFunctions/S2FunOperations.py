@@ -13,9 +13,7 @@
 # +
 import numpy as np
 
-from mtex import (S2Fun, S2FunHarmonic, annotate, degree, grad, hold, max, mean, min, mtexTitle, newMtexFigure,
-                  nextAxis, norm, plot, plottingConvention, rotate, rotation, specimenFrame, sqrt, sum, symmetrise,
-                  xvector, yvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

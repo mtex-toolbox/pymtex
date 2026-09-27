@@ -45,9 +45,7 @@ import warnings
 
 import numpy as np
 
-from mtex import (SO3Fun, SO3FunHarmonic, conj, crystalFrame, equispacedSO3Grid, fibre, interp, mean, min,
-                  orientation, plot, plot3d, plotFibre, plotSpektra, plottingConvention, rotation, specimenFrame,
-                  sum)
+from mtex import *
 
 nodes = equispacedSO3Grid(crystalFrame(), specimenFrame(), points=1e5)
 nodes = nodes.flatten()

@@ -21,7 +21,7 @@
 # +
 import matplotlib.pyplot as plt
 import numpy as np
-from mtex import (calcGrains, flip, hold, ipfColorKey, mtexColorMap, mtexColorbar, mtexdata, plot, setColorRange, smoothBoundary)
+from mtex import *
 
 # import artificial grain shapes
 grains = mtexdata('testgrains')

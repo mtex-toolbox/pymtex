@@ -14,8 +14,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, calcDensity, calcError, calcKernel, crystalFrame, degree, discreteSample, fibreODF,
-                  mtexColorbar, orientation, plot, plottingConvention, uniformODF, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 rng = np.random.default_rng(1)

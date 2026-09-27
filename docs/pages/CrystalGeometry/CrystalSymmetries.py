@@ -23,7 +23,7 @@
 
 import matplotlib.pyplot as plt
 
-from mtex import annotate, crystalFrame, disjoint, mtexFigure, nextAxis, orthogonalTransform, plot, rotation, union
+from mtex import *
 
 # ## The 11 Proper-Rotation Groups
 #

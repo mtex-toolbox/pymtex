@@ -17,7 +17,7 @@
 # +
 import numpy as np
 
-from mtex import S2AxisFieldHarmonic, degree, equispacedS2Grid, plot, plottingConvention, quiver, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

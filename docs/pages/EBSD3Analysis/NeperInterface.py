@@ -17,8 +17,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3Fun, grain3d, histogram, hold, mtexdatafile, mtexTitle, neper, newMtexFigure, nextAxis, plot, plottingConvention, setCamera,
-                  vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

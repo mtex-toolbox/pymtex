@@ -25,8 +25,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from mtex import (Miller, SO3FunHarmonic, SantaFe, calcODF, calcPoleFigure, cat, conv, crystalFrame, degree, hold, mtexColorMap, orientation, plot,
-                  plotPDF, plotSpektra, plottingConvention, uniformODF, unimodalODF, vector3d, xvector, yvector, zvector)
+from mtex import *
 
 # ## Too few pole figures
 #

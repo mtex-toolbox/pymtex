@@ -17,7 +17,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import angle, calcGrains, cat, degree, hold, mtexColorbar, mtexdata, plot, plotIPDF, plottingConvention, spatialProfile, xvector, yvector, zvector
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

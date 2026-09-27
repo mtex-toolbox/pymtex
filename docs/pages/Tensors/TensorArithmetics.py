@@ -10,9 +10,7 @@
 
 import numpy as np
 
-from mtex import (EinsteinSum, colon, degree, det, inv, mtexColorbar, mtexdatafile, mtexTitle, newMtexFigure, nextAxis, plot,
-                  plottingConvention, rotate, rotation, setColorRange, stiffnessTensor, strainTensor, tensor, times, trace,
-                  xvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

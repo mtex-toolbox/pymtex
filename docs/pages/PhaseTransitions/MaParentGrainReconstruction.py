@@ -11,9 +11,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, calcGrains, calcVariantId, degree, halfQuadraticFilter, hold, ind2color, mtexColorbar, mtexColorMap, mtexdata,
-                  orientation, parentGrainReconstructor, plot, plotPDF, plottingConvention, setColorRange, smooth, smoothBoundary,
-                  variants)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('martensite', silent=True)

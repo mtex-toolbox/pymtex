@@ -15,9 +15,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, angle, annotate, calcGrains, degree, hold, inv, legend, loadCIF, mtexdata, orientation, plot,
-                  plotAngleDistribution, plotAxisDistribution, plotPDF, plottingConvention, project2FundamentalRegion, round,
-                  smoothBoundary, symmetrise, text, unique, variants, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

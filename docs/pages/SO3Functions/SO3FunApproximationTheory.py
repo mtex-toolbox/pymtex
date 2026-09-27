@@ -13,9 +13,7 @@
 # +
 import numpy as np
 
-from mtex import (SO3DeLaValleePoussinKernel, SO3FunHandle, crystalFrame, degree, equispacedSO3Grid, fibre,
-                  fibreODF, interp, loadOrientation, mean, min, mtexdatafile, norm, orientation, plot, plotSection,
-                  plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

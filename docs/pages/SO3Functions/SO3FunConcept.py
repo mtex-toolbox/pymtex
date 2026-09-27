@@ -20,8 +20,7 @@
 # +
 import numpy as np
 
-from mtex import (SO3FunHandle, angle, crystalFrame, degree, ind2color, max, mtexColorbar, mtexColorMap, numSym,
-                  orientation, plot, plotSection)
+from mtex import *
 
 # define cubic crystal symmetry
 cs = crystalFrame('432')

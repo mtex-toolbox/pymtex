@@ -16,8 +16,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3AbelPoissonKernel, SO3FunRBF, degree, equispacedSO3Grid, interp, loadOrientation, mean, min,
-                  mtexColorbar, mtexdatafile, norm, plot, plotSection, plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

@@ -12,7 +12,7 @@
 # +
 import numpy as np
 
-from mtex import SO3Fun, SO3FunHarmonic, crystalFrame, norm, orientation, plot, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 SO3F = SO3Fun.dubna()

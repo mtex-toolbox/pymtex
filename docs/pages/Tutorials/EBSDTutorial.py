@@ -8,8 +8,7 @@
 # new to you. For your own data, read [Reference Frame](EBSDReferenceFrame.html) before
 # trusting any orientation-dependent result.
 
-from mtex import (EBSD, Miller, calcGrains, crystalShape, degree, hold, mtexColorbar, mtexdatafile, plot, plotIPDF, plotPDF,
-                  rotation, smoothBoundary, vector3d, xvector)
+from mtex import *
 
 # ## Data import
 #

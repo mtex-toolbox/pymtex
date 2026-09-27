@@ -18,7 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import SO3TangentVector, degree, exp, hold, left, log, norm, plot, plottingConvention, quiver3, right, rotation, spinTensor, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

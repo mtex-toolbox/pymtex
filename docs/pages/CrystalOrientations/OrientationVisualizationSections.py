@@ -19,7 +19,7 @@
 # change their reference frames.
 
 # +
-from mtex import crystalFrame, orientation, plotSection, plottingConvention, specimenFrame
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

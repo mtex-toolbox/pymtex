@@ -26,9 +26,7 @@
 # on the correction: a map entry's array order is read off its own `d1` and `d2`, and no
 # plotting convention is consulted anywhere in the workflow.
 
-from mtex import (imboxfilt, mapImage, mapImageList, mtexColorMap, mtexTitle, mtexdata, newMtexFigure, nextAxis, plot,
-                  plottingConvention, rescale, spatialTransformDrift, spatialTransformId, spatialTransformShift,
-                  spatialTransformTilt, trueEbsd, zvector)
+from mtex import *
 
 plottingConvention.default('y↓→x')
 

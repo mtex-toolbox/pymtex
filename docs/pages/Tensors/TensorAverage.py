@@ -15,8 +15,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcDensity, calcTensor, crystalFrame, degree, inpolygon, mtexdata, newMtexFigure, plot,
-                  plotSeismicVelocities, plottingConvention, stiffnessTensor)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -25,7 +25,7 @@
 # `(inflationPower, maxIt)`. MCL does not accept a requested number of grains; the
 # inflation power controls the granularity of the result.
 
-from mtex import calcGrains, degree, gbcSoft, hold, inpolygon, mtexTitle, mtexdata, plot, plottingConvention, smoothBoundary, zvector
+from mtex import *
 
 # ## A criterion with something to say
 #

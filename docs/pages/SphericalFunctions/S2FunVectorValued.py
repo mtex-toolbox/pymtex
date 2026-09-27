@@ -16,8 +16,7 @@
 # +
 import numpy as np
 
-from mtex import (S2Fun, S2FunHarmonic, conj, degree, equispacedS2Grid, mean, min, plot, plottingConvention, sum,
-                  vector3d, xvector, yvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

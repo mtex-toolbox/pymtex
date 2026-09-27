@@ -25,7 +25,7 @@
 # `interfaces/info.md` beside them. Keep format-specific decisions there, especially why
 # a field must not be read or which reference frame a vendor states.
 
-from mtex import EBSD, mtexdatafile
+from mtex import *
 
 # ## A development workflow
 #

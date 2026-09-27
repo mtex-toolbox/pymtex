@@ -12,8 +12,7 @@
 # added and scaled, while individual values can be selected, overwritten or deleted.
 
 import numpy as np
-from mtex import (calcODF, cat, correct, degree, isOutlier, max, mean, min, mtexColorbar, mtexdata, normalize, plot, plottingConvention,
-                  rotate, rotation, setColorRange, xvector)
+from mtex import *
 
 # +
 plottingConvention.default('y←↑x')

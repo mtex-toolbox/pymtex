@@ -18,8 +18,7 @@
 # +
 import numpy as np
 
-from mtex import (S2Fun, annotate, calcCluster, cat, crystalFrame, degree, discreteSample, fibre, fibreODF, ind2color,
-                  mtexColorMap, orientation, plot, plotSection, plottingConvention, scatter, unimodalODF)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 rng = np.random.default_rng(1)

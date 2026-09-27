@@ -10,8 +10,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (FourierODF, Miller, angle, calcTaylor, cat, crystalFrame, degree, fibreODF, inv, mtexColorbar,
-                  newMtexFigure, nextAxis, plotPDF, slipSystem, specimenFrame, strainTensor, vector3d)
+from mtex import *
 
 # ## Set the crystal and specimen frames
 #

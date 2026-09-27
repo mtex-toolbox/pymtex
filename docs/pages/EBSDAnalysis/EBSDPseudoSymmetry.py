@@ -26,8 +26,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, calcGrains, cleanUpPseudoSym, degree, hold, inpolygon, ipfColorKey, mtexColorbar, mtexdata, orientation, plot,
-                  plottingConvention)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

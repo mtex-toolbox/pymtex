@@ -19,8 +19,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, arrow3d, crystalFrame, crystalShape, degree, hold, inv, newMtexFigure, nextAxis, normalize,
-                  orientation, plot, plottingConvention, rotate, rotation, text, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

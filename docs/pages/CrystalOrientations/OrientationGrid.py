@@ -19,8 +19,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, angle, crystalFrame, degree, equispacedSO3Grid, hold, localOrientationGrid, mtexColorbar,
-                  orientation, plot, plotPDF, plottingConvention, regularSO3Grid, setColorRange, unimodalODF)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

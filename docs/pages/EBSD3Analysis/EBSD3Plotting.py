@@ -10,8 +10,7 @@
 # it unchanged. The polyhedral `grain3d` representation is the subject of
 # [Three-Dimensional Grains](Grains3D.html).
 
-from mtex import (calcGrains, hold, ipfColorKey, mtexColorbar, mtexTitle, mtexdata, newMtexFigure, nextAxis, plane3d, plot, plottingConvention,
-                  setCamera, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

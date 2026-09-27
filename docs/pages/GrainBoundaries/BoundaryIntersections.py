@@ -19,7 +19,7 @@
 
 # +
 import numpy as np
-from mtex import calcGrains, hold, line, mtexdata, plot, plottingConvention, scatter, smoothBoundary
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')

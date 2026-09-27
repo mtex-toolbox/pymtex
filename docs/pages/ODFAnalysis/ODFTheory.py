@@ -18,8 +18,7 @@
 # following convention draws Y upward and X to the right. It does not rotate the specimen
 # or change any orientation.
 
-from mtex import (calcDensity, crystalShape, degree, hold, max, mean, mtexColorMap, mtexdata, orientation, plot, plot3d, plotSection,
-                  plottingConvention, reduce, volume, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

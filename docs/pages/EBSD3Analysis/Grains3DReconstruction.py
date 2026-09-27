@@ -10,7 +10,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import EBSD3, calcGrains, degree, histogram, hold, mtexdatafile, newMtexFigure, plot, plottingConvention, setCamera
+from mtex import *
 
 plottingConvention.default('y↑→x')
 how2plot = plottingConvention.default3D

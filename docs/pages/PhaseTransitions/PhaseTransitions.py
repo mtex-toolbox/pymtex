@@ -13,7 +13,7 @@
 # transforms into several variants at once.
 
 # +
-from mtex import Miller, crystalFrame, orientation, plotPDF, plottingConvention, variants
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

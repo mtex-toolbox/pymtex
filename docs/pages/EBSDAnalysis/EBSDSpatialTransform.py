@@ -17,9 +17,7 @@
 
 import numpy as np
 
-from mtex import (discretize, inv, mtexColorMap, mtexTitle, mtexdata, newMtexFigure, nextAxis, norm, plot, plottingConvention,
-                  spatialTransformDrift, spatialTransformPoly, spatialTransformProjective, spatialTransformRigid,
-                  spatialTransformShift, transform, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')

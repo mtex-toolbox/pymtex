@@ -13,9 +13,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (EinsteinSum, Miller, cat, colon, crystalFrame, inv, linearCompressibility, mtexColorbar,
-                  mtexColorMap, mtexdatafile, mtexTitle, newMtexFigure, nextAxis, plot, plotSection, plottingConvention,
-                  setColorRange, stiffnessTensor, strainTensor, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

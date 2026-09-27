@@ -20,8 +20,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, axis, calcGrains, degree, histogram, hold, ipfColorKey, mean, mtexColorbar, mtexdata,
-                  orientation, plot, plottingConvention, round, round2Miller, scatter, smoothBoundary, xlabel)
+from mtex import *
 
 # +
 # load the example in its specimen plotting frame

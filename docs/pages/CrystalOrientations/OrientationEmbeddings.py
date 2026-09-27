@@ -27,8 +27,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (BinghamODF, Rodrigues, SO3DeLaValleePoussinKernel, angle, crystalFrame, degree, discreteSample, double,
-                  embedding, mean, norm, orientation, project2FundamentalRegion, std, tensor, unimodalODF)
+from mtex import *
 
 # cubic proper rotation symmetry
 cs = crystalFrame('432')

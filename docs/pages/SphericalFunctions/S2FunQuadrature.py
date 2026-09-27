@@ -8,7 +8,7 @@
 # +
 import numpy as np
 
-from mtex import S2FunHarmonic, degree, mtexColorbar, plottingConvention, quadratureS2Grid, regularS2Grid, surf
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

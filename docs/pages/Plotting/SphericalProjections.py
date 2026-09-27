@@ -19,8 +19,7 @@
 # +
 import matplotlib.pyplot as plt
 
-from mtex import (Miller, SantaFe, crystalFrame, degree, fibreODF, mtexColorbar, mtexColorMap, mtexTitle, newMtexFigure,
-                  nextAxis, plotHKL, plotPDF, plotSection, plottingConvention, vector3d, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, annotate, cat, degree, mean, mtexdata, norm, orientation, plot, plotIPDF, plotPDF,
-                  plottingConvention, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

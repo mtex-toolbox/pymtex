@@ -21,7 +21,7 @@
 
 import numpy as np
 
-from mtex import Miller, crystalFrame, crystalShape, plot, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -11,7 +11,7 @@
 # angles in degrees.
 
 # +
-from mtex import Miller, crystalFrame, mtexdatafile, orientation, plotPDF, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

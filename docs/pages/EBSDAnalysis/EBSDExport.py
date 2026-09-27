@@ -15,7 +15,7 @@ import tempfile
 
 import numpy as np
 
-from mtex import EBSD, angle, degree, export, mtexdata
+from mtex import *
 
 # ## Choose the output for its purpose
 #

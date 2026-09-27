@@ -16,8 +16,7 @@
 
 import numpy as np
 
-from mtex import (WhiteJetColorMap, blue2redColorMap, crystalFrame, mtexColorbar, mtexdatafile, orientation, plot,
-                  plotSection, plottingConvention, setMTEXpref, surf, tensor, vector3d)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

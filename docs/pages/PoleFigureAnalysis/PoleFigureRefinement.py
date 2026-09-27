@@ -16,8 +16,7 @@
 # figure inversion; see [The Ghost Effect](PoleFigure2ODFAmbiguity.html).
 
 import numpy as np
-from mtex import (Miller, calcError, calcODF, calcODFIterative, calcPoleFigure, crystalFrame, degree, equispacedS2Grid, mtexdata, plot, plotPDF,
-                  plottingConvention, refine, rotation, specimenFrame, unimodalODF, union)
+from mtex import *
 
 # ## Adapting the kernel
 #

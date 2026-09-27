@@ -18,7 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import angle, crystalFrame, degree, fibre, hold, orientation, plot, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

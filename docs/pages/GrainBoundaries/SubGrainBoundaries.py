@@ -22,7 +22,7 @@
 # for the distinction between crystal-frame and specimen-frame axes.
 
 import numpy as np
-from mtex import calcDensity, calcGrains, degree, hold, ipfColorKey, mtexColorbar, mtexdata, plot, plottingConvention, smoothBoundary
+from mtex import *
 
 # +
 # use the rolling-direction frame carried by the ferrite specimen

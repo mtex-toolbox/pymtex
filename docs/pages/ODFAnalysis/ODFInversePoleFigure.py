@@ -31,8 +31,7 @@
 
 import numpy as np
 
-from mtex import (Miller, SO3FunHarmonic, calcPDF, cat, crystalFrame, degree, fibreODF, max, mtexColorMap, mtexColorbar, orientation, plotIPDF,
-                  plottingConvention, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

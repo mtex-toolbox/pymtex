@@ -16,8 +16,7 @@
 # a misorientation.
 
 import numpy as np
-from mtex import (angle, axis, calcGrains, degree, hold, inpolygon, mtexColorMap, mtexColorbar, mtexdata, newMtexFigure, plot,
-                  plottingConvention, quiver, smoothBoundary)
+from mtex import *
 
 # +
 # load the example map in its specimen plotting frame

@@ -12,8 +12,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, calcGrains, cat, crystalShape, hold, ipfColorKey, loadCIF, mtexdata, orientation, plot,
-                  plottingConvention, slipSystem, smoothBoundary)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

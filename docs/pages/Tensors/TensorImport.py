@@ -14,7 +14,7 @@
 # It is distinct from crystal symmetry, which states the point group under
 # which the property is invariant.
 
-from mtex import checkSymmetry, crystalFrame, mtexdatafile, plottingConvention, stiffnessTensor, tensor
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

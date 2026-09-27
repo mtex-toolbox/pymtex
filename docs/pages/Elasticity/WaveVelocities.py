@@ -12,10 +12,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (ChristoffelTensor, S2VectorFieldHarmonic, angle, cat, cprintf, crystalFrame, degree, dot, eig,
-                  energyVector, hold, legend, max, mean, min, mtexColorbar, mtexColorMap, mtexdatafile, mtexTitle,
-                  newMtexFigure, nextAxis, norm, plot, plotSection, plotSeismicVelocities, plottingConvention,
-                  quiverSection, stiffnessTensor, uniformODF, vector3d, velocity)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

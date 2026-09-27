@@ -25,7 +25,7 @@
 # material.
 
 # +
-from mtex import Miller, SantaFe, degree, newMtexFigure, nextAxis, plotPDF
+from mtex import *
 
 odf = SantaFe()
 h = Miller(1, 0, 0, odf.CS)

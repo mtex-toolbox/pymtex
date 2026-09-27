@@ -10,7 +10,7 @@
 # [Import](PoleFigureImport.html). Review [Miller Indices](CrystalDirections.html) if the
 # plane labels are unfamiliar.
 
-from mtex import calcODF, mtexColorMap, mtexColorbar, mtexdata, plot, plotPDF, plottingConvention, setColorRange
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

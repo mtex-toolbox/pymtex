@@ -34,8 +34,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S1FunHandle, S1FunHarmonic, calcDensity, degree, hold, legend, max, mean, min, mtexTitle, plot, sum,
-                  vector3d)
+from mtex import *
 
 S1F = S1FunHandle(lambda rho: 1 + 0.5 * np.cos(2 * rho))
 S1F

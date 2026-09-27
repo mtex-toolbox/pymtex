@@ -18,8 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S2Fun, S2FunHarmonic, contour, contourf, mtexColorbar, mtexColorMap, mtexTitle, newMtexFigure, nextAxis,
-                  plot, plot3d, plotSection, plotSpektra, plottingConvention, setCamera, surf, vector3d, yvector, zvector)
+from mtex import *
 
 # the smiley
 plottingConvention.default('y↑→x')

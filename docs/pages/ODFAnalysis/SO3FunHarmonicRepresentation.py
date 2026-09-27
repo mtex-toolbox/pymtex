@@ -13,8 +13,7 @@
 
 import numpy as np
 
-from mtex import (Miller, SO3FunHandle, SO3FunHarmonic, angle, calcODF, cat, crystalFrame, degree, min, mtexColorbar, mtexdata, orientation,
-                  plot, plotPDF, plotSection, plotSpektra, plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

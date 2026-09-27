@@ -14,8 +14,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, calcPoleFigure, crystalFrame, degree, discreteSample, equispacedS2Grid, fibre, fibreODF, plot,
-                  plotPDF, plottingConvention, scatter, xvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

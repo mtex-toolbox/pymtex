@@ -13,7 +13,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import hold, inpolygon, mtexdata, plot, plottingConvention, text, zvector
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')

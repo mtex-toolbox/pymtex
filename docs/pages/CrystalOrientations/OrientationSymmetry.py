@@ -16,8 +16,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, crystalFrame, degree, orientation, plotPDF, plottingConvention, specimenFrame,
-                  symmetrise)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

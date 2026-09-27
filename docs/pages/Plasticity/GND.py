@@ -14,9 +14,7 @@
 
 import numpy as np
 
-from mtex import (axisAngleColorKey, calcGND, calcGrains, degree, dislocationSystem, fitDislocationSystems, halfQuadraticFilter,
-                  hold, ipfHSVKey, mtexColorbar, mtexColorMap, mtexdata, newMtexFigure, nextAxis, plot, plottingConvention,
-                  setColorRange, setColorScale, smooth, smoothBoundary, yvector)
+from mtex import *
 
 # ## Load and segment the map
 #

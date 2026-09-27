@@ -7,10 +7,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, annotate, arrow3d, calcGrains, contourf, crystalFrame, crystalShape, degree, hold, max,
-                  inv, mtexColorbar, mtexColorMap, mtexdata, mtexTitle, newMtexFigure, nextAxis, normalize, pcolor, plot,
-                  plotS2Grid, plottingConvention, quiver, slipSystem, smoothBoundary, stressTensor, symmetrise, text,
-                  vector3d, vega20)
+from mtex import *
 
 # ## Read the loading geometry
 #

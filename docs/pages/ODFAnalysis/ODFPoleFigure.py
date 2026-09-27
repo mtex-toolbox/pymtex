@@ -31,8 +31,7 @@
 # following convention draws specimen Y upward and specimen X to the right. It does not
 # rotate the specimen or change the ODF.
 
-from mtex import (Miller, calcPDF, crystalFrame, degree, fibre, fibreODF, max, mean, mtexColorMap, orientation, plotFibre, plotPDF,
-                  plottingConvention, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

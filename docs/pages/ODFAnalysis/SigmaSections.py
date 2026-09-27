@@ -16,8 +16,7 @@
 
 import numpy as np
 
-from mtex import (Miller, cat, crystalFrame, crystalShape, degree, hold, orientation, plot, plotPDF, plotSection, plottingConvention,
-                  quiver, sigmaSections, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

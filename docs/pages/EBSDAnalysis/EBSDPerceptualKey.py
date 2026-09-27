@@ -18,7 +18,7 @@
 
 import numpy as np
 
-from mtex import crystalFrame, ipfHSVKey, mtexdata, plot
+from mtex import *
 
 ebsd = mtexdata('twins')
 mg = ebsd['indexed']

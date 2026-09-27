@@ -14,7 +14,7 @@
 
 import matplotlib.pyplot as plt
 
-from mtex import angle, degree, gridify, hold, interp, mtexdata, plot, plottingConvention, rotate, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins')

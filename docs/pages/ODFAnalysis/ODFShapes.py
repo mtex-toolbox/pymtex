@@ -23,9 +23,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3AbelPoissonKernel, SO3BumpKernel, SO3DeLaValleePoussinKernel, SO3DirichletKernel, SO3GaussWeierstrassKernel,
-                  SO3SquareSingularityKernel, SO3vonMisesFisherKernel, degree, fibreVonMisesFisherKernel, hold, plot, plotSpektra,
-                  plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

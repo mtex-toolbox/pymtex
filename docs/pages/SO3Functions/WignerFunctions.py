@@ -16,7 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import SO3FunHarmonic, WignerD, degree, legend, norm, rotation
+from mtex import *
 
 beta = 90 * degree
 d = WignerD(beta, 1)

@@ -12,10 +12,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, SO3Fun, SO3FunHarmonic, SO3VectorFieldHandle, SO3VectorFieldHarmonic, annotate, calcTaylor,
-                  crystalFrame, degree, dot, equispacedSO3Grid, hold, laplace, max, mean, mtexColorbar, mtexColorMap,
-                  nextAxis, norm, orientation, phi1Sections, plot, plottingConvention, quiver3, right, round, slipSystem,
-                  specimenFrame, strainTensor, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

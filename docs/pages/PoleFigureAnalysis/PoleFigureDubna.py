@@ -18,8 +18,7 @@
 # or change their intensities.
 
 # +
-from mtex import (Miller, PoleFigure, calcError, calcODF, crystalFrame, degree, max, min, mtexColorbar, mtexdatafile, plot, plotDiff, plotPDF,
-                  plottingConvention, rotate, rotation, xvector, yvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

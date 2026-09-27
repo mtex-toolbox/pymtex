@@ -13,8 +13,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (S2Fun, S2FunHarmonic, calcDensity, contourf, degree, discreteSample, hold, legend, mean, mtexColorbar,
-                  norm, optimalSample, plottingConvention, scatter, sum)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

@@ -16,9 +16,7 @@
 
 import numpy as np
 
-from mtex import (Miller, arrow3d, calcGrains, cat, degree, hold, inv, ipfColorKey, mtexColorbar, mtexColorMap, mtexdata,
-                  mtexTitle, newMtexFigure, nextAxis, plot, plot3d, plottingConvention, quiver3, refractiveIndexTensor,
-                  rotation, spectralTransmissionColorKey, vector3d)
+from mtex import *
 
 # ## Load an orientation map
 #

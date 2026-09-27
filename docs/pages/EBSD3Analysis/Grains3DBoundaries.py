@@ -10,8 +10,7 @@
 
 import numpy as np
 
-from mtex import (EBSD3, calcGBND, calcGrains, degree, hold, line, mtexColorbar, mtexdatafile, plot, plottingConvention, reduceBoundary, scatter3,
-                  setCamera, smoothBoundary, taubinFilter)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

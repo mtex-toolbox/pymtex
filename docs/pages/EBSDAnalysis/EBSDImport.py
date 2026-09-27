@@ -14,7 +14,7 @@
 # import needs only a filename. The file is one of the sample data files, fetched on first
 # use.
 
-from mtex import EBSD, crystalFrame, mtexdatafile, notIndexedFrame, plot, plottingConvention, rotation, xvector, zvector
+from mtex import *
 
 plottingConvention.default('y↓→x')
 

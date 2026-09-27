@@ -11,8 +11,7 @@
 # specimen directions or viewing orthogonal two-dimensional EBSD sections.
 
 # +
-from mtex import (calcODF, crystalFrame, ipfColorKey, mtexdata, nextAxis, plot, plotPDF, plottingConvention, specimenFrame,
-                  vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

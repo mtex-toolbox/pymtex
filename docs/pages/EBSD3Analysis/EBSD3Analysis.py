@@ -16,8 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (calcGrains, degree, histogram, hold, mtexColorMap, mtexTitle, mtexdata, newMtexFigure, nextAxis, plane3d, plot, plottingConvention,
-                  reduceBoundary, setCamera, smoothBoundary, taubinFilter, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 how2plot = plottingConvention.default3D

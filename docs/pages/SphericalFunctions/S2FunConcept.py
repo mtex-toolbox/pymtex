@@ -13,7 +13,7 @@
 # that crystal direction points along each specimen direction.
 
 # +
-from mtex import Miller, SantaFe, annotate, degree, max, mtexColorbar, plot, vector3d
+from mtex import *
 
 # the famous Santa Fe orientation distribution function
 odf = SantaFe()

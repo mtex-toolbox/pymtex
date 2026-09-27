@@ -24,8 +24,7 @@
 
 import numpy as np
 
-from mtex import (degree, gridify, gridLayout, interp, mapImage, mapImageList, mtexColorMap, mtexTitle, mtexdata, newMtexFigure,
-                  nextAxis, plot, plottingConvention, rotate, transformReferenceFrame, xvector, yvector)
+from mtex import *
 
 plottingConvention.default('y↓→x')
 

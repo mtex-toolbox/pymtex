@@ -11,7 +11,7 @@
 # and the explicit grid--evaluate--quadrature sequence.
 
 # +
-from mtex import SO3Fun, SO3FunHarmonic, calcError, plot, plottingConvention, quadratureSO3Grid
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

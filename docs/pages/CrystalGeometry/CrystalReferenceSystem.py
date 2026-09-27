@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, annotate, arrow3d, cat, crystalFrame, crystalShape, degree, hold, newMtexFigure, nextAxis,
-                  orientation, plot, plotPDF, plottingConvention, rotation, transformationMatrix, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

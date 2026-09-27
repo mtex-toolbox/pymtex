@@ -11,7 +11,7 @@
 # an interface in a two-dimensional section.
 
 import numpy as np
-from mtex import calcGrains, degree, hold, inpolygon, inv, mtexdata, plot, plottingConvention, smoothBoundary
+from mtex import *
 
 # +
 # import the data

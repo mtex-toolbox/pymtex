@@ -10,8 +10,7 @@
 # [ODF Modeling](ODFModeling.html). Every ODF below has mean 1, so its integrals can be
 # read as material fractions.
 
-from mtex import (Miller, annotate, crystalFrame, degree, entropy, fibre, fibreODF, max, mean, mtexColorbar, mtexdata, norm, orientation,
-                  plotPDF, plottingConvention, unimodalODF, vector3d, volume)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

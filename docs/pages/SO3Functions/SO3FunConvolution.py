@@ -23,10 +23,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, S2DeLaValleePoussinKernel, S2Fun, S2FunHandle, S2FunHarmonic, SO3DeLaValleePoussinKernel,
-                  SO3FunHandle, SO3FunHarmonic, SO3FunRBF, angle, calcError, conv, crystalFrame, degree,
-                  equispacedS2Grid, inv, legend, mean, orientation, plot, plotSpektra, plottingConvention, rotation,
-                  specimenFrame, vector3d, xvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

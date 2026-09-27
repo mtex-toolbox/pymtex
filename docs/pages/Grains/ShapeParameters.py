@@ -39,7 +39,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import calcGrains, degree, hist, histogram, hold, logAxis, mtexColorbar, mtexdata, plot, plottingConvention, setColorRange, smoothBoundary, zvector
+from mtex import *
 
 # +
 # load sample EBSD data in its specimen plotting frame

@@ -15,8 +15,7 @@
 # of those segments. They do not recover the boundary plane of an individual segment.
 
 import numpy as np
-from mtex import (Miller, annotate, calcGBND, calcGrains, contourf, degree, hold, ipfColorKey, mtexColorMap, mtexColorbar,
-                  mtexTitle, mtexdata, nextAxis, orientation, plot, plottingConvention, smoothBoundary, symmetrise)
+from mtex import *
 
 # ## Three related distributions
 #

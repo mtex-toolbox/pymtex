@@ -19,7 +19,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import Miller, angle, calcGrains, degree, hold, ipfColorKey, mtexColorbar, mtexdata, orientation, plot, plottingConvention, smoothBoundary
+from mtex import *
 
 # +
 # load the sample in its specimen plotting frame

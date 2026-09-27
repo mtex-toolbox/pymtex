@@ -5,7 +5,7 @@
 # direction of that shear. This page constructs one system, generates its
 # symmetry-equivalent family, and assigns strengths to several families.
 
-from mtex import Miller, cat, crystalFrame, crystalShape, hold, orientation, plot, slipSystem
+from mtex import *
 
 # ## Define one slip system
 #

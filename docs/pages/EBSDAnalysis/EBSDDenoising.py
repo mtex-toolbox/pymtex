@@ -19,8 +19,7 @@
 
 import numpy as np
 
-from mtex import (KuwaharaFilter, angle, axisAngleColorKey, calcGrains, degree, halfQuadraticFilter, hold, infimalConvolutionFilter,
-                  ipfColorKey, meanFilter, medianFilter, mtexdata, plot, plottingConvention, smooth, smoothBoundary, splineFilter)
+from mtex import *
 
 # ## Making the noise visible
 #

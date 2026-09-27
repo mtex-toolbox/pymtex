@@ -19,9 +19,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (angle, axisAngleColorKey, calcGrains, degree, halfQuadraticFilter, hold, inv, ipfColorKey, ipfHSVKey, mean,
-                  mtexColorbar, mtexColorMap, mtexdata, plot, plotIPDF, plottingConvention, project2FundamentalRegion, setColorRange,
-                  smooth, smoothBoundary, vector3d)
+from mtex import *
 from mtex.plotting.colormaps import mtexColormap
 
 # +

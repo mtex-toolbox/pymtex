@@ -17,7 +17,7 @@
 # +
 import matplotlib.pyplot as plt
 import numpy as np
-from mtex import (calcGrains, curvatureFilter, histogram, hold, ipfColorKey, legend, mtexdata, mtexTitle, plot, smoothBoundary, taubinFilter)
+from mtex import *
 
 ebsd = mtexdata('csl')
 grains = calcGrains(ebsd, minPixel=3)

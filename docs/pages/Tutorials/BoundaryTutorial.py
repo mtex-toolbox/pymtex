@@ -16,7 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import calcGrains, degree, histogram, ipfColorKey, mtexColorbar, mtexdata, plot, plottingConvention, xlabel, ylabel
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

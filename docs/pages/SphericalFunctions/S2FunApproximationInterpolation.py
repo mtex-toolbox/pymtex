@@ -8,7 +8,7 @@
 # +
 import numpy as np
 
-from mtex import contourf, interp, loadVector3d, mtexdatafile, newMtexFigure, plottingConvention, scatter
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

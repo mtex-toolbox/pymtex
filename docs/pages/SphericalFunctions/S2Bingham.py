@@ -12,8 +12,7 @@
 # +
 import numpy as np
 
-from mtex import (S2FunBingham, annotate, degree, ellipse, hold, mean, mtexColorbar, mtexTitle, newMtexFigure, nextAxis,
-                  plot, plottingConvention, rotation, setColorRange, vector3d, xvector, yvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

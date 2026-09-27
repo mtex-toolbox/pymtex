@@ -16,8 +16,7 @@
 # This tutorial follows three routes to an ODF: estimate one from individual orientations,
 # reconstruct one from pole figures, and define a model ODF.
 
-from mtex import (calcDensity, calcODF, crystalFrame, degree, fibre, fibreODF, ipfColorKey, max, mtexColorbar, mtexdata, plot,
-                  plotPDF, plottingConvention, specimenFrame)
+from mtex import *
 
 # ## From individual orientations
 #

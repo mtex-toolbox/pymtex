@@ -18,8 +18,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, angle, circle, crystalFrame, cross, degree, dot, eq, gcm, hold, mtexColorMap, mtexdata, multiplicity,
-                  nextAxis, orientation, plot, plottingConvention, round, symmetrise, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

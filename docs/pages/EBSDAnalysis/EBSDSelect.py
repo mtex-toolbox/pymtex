@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
-from mtex import inpolygon, mtexColorbar, mtexdata, plot, plottingConvention, setColorRange, zvector
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

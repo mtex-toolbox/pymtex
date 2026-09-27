@@ -14,8 +14,7 @@
 # [Schmid Factor](SchmidFactor.html) develops the stress projection used here for
 # ordinary slip.
 
-from mtex import (Miller, crystalFrame, crystalShape, degree, hold, inv, mtexColorbar, orientation, plot, slipSystem,
-                  stressTensor, vector3d)
+from mtex import *
 
 # ## Define one magnesium extension-twin shear
 #

@@ -15,8 +15,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, calcGrains, degree, grainMean, hold, ipfColorKey, mtexColorMap, mtexColorbar, mtexdata, planarColorKey, plot,
-                  plottingConvention, quiver, setColorRange, smoothBoundary, text, vector3d, zvector)
+from mtex import *
 
 # +
 # import a demo data set

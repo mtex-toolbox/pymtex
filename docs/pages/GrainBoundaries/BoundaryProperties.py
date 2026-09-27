@@ -24,8 +24,7 @@
 # | `componentId` | connected-component label | `componentSize` | number of segments in the component |
 
 import numpy as np
-from mtex import (Miller, angle, axis, calcGrains, degree, hold, inv, mtexColorMap, mtexColorbar, mtexdata, orientation, plot,
-                  plottingConvention, quiver)
+from mtex import *
 
 # +
 # load the example map in its specimen plotting frame

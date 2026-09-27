@@ -14,9 +14,7 @@
 # +
 import matplotlib.pyplot as plt
 
-from mtex import (FourierODF, Miller, annotate, crystalFrame, degree, fibre, fibreODF, gcm, hold, legend, mtexColorbar,
-                  mtexColorMap, orientation, plot, plotIPDF, plotPDF, plotSection, plotSpektra, plottingConvention, scatter,
-                  setColorRange, unimodalODF, vector3d, xvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

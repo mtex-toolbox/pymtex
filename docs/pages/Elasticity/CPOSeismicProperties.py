@@ -12,9 +12,7 @@
 
 import numpy as np
 
-from mtex import (Miller, calcDensity, calcTensor, cat, crystalFrame, degree, hold, mean, mtexdata, nextAxis, plot,
-                  plotSeismicVelocities, plottingConvention, plotx2north, rotation, stiffnessTensor, text,
-                  transformReferenceFrame, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

@@ -16,8 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, angle, calcGrains, crystalShape, degree, hold, mtexdata, orientation, plot, plottingConvention,
-                  round2Miller, smoothBoundary, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins', silent=True)

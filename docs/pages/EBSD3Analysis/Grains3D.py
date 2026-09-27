@@ -13,7 +13,7 @@
 
 import numpy as np
 
-from mtex import grain3d, hold, mtexdatafile, plane3d, plot, plottingConvention, quiver, setCamera, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 how2plot = plottingConvention.default3D

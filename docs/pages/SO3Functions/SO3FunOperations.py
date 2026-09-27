@@ -14,9 +14,7 @@
 # +
 import numpy as np
 
-from mtex import (SO3DeLaValleePoussinKernel, SO3Fun, SO3FunHarmonic, SO3FunRBF, annotate, degree, grad, hold, inv,
-                  max, mean, min, mtexColorbar, norm, orientation, plot, plottingConvention, rotate, rotation, sqrt,
-                  sum, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 SO3F1 = SO3Fun.dubna()

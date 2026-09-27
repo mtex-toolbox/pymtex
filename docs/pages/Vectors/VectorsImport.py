@@ -8,7 +8,7 @@
 # [Defining Three-Dimensional Vectors](VectorDefinition.html) for their definitions and for
 # the distinction between vectors and directions.
 
-from mtex import contourf, mtexdatafile, plottingConvention, scatter, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

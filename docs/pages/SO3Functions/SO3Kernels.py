@@ -21,9 +21,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3AbelPoissonKernel, SO3BumpKernel, SO3DeLaValleePoussinKernel, SO3DirichletKernel, SO3FunRBF,
-                  SO3GaussWeierstrassKernel, SO3Kernel, SO3LaplaceKernel, SO3SobolevKernel, SO3SquareSingularityKernel,
-                  SO3vonMisesFisherKernel, degree, hold, legend, orientation, plot, plotSpektra)
+from mtex import *
 # -
 
 

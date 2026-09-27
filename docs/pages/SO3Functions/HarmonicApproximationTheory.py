@@ -18,8 +18,7 @@
 # +
 import numpy as np
 
-from mtex import (SO3FunHarmonic, degree, interp, legend, loadOrientation, mtexColorbar, mtexdatafile, newMtexFigure,
-                  nextAxis, norm, plot, plotSection, plotSpektra, setColorRange)
+from mtex import *
 
 rng = np.random.default_rng(1)
 fname = mtexdatafile('dubnaValues')

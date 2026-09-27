@@ -38,9 +38,7 @@
 # +
 import numpy as np
 
-from mtex import (BinghamODF, SO3DeLaValleePoussinKernel, SO3FunCBF, SO3FunHandle, SO3FunHarmonic, angle, calcDensity,
-                  crystalFrame, degree, fibre, mtexColorbar, orientation, plot, plotSpektra, vector3d, xvector, yvector,
-                  zvector)
+from mtex import *
 
 angleFormula = lambda ori: angle(ori) / degree
 # -

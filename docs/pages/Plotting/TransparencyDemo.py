@@ -27,8 +27,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, SantaFe, calcGrains, crystalFrame, crystalShape, degree, hold, legend, mtexColorbar, mtexColorMap,
-                  mtexdata, orientation, plot, plot3d, plotPDF, plottingConvention, slipSystem, smoothBoundary, unimodalODF)
+from mtex import *
 
 cs = crystalFrame('m-3m')
 odf = unimodalODF(orientation.id(cs), halfwidth=10 * degree)

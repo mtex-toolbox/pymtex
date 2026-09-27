@@ -21,8 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from mtex import (SO3FunHarmonic, calcDensity, calcError, crystalFrame, degree, discreteSample, fibre, fibreODF, hold, ind2color,
-                  mtexColorbar, norm, optimalSample, plot, uniformODF)
+from mtex import *
 
 cs = crystalFrame('32')
 fibre_odf = 0.5 * uniformODF(cs) + 0.5 * fibreODF(fibre.rand(cs), halfwidth=20 * degree)

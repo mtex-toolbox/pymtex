@@ -19,8 +19,7 @@
 
 import numpy as np
 
-from mtex import (Miller, angle, cat, crystalFrame, degree, discreteSample, fibre, fibreODF, max, mean, mtexColorbar, mtexTitle,
-                  newMtexFigure, nextAxis, norm, orientation, plot3d, plotPDF, plotSection, plottingConvention, setColorRange, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

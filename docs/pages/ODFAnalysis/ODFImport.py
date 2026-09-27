@@ -29,8 +29,7 @@
 # browses a folder and shows what each file contains. It can either create a variable or
 # write an import script. The following example has the same form as that script.
 
-from mtex import (Miller, SO3Fun, crystalFrame, degree, max, mean, mtexColorbar, mtexTitle, mtexdatafile, newMtexFigure, nextAxis, norm,
-                  plot, plotPDF, plottingConvention, setColorRange, specimenFrame)
+from mtex import *
 
 # +
 # State how specimen x and y are drawn. This changes only the screen layout;

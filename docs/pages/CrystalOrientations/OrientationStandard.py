@@ -13,9 +13,7 @@
 
 import numpy as np
 
-from mtex import (Euler, Miller, angle, cat, crystalFrame, degree, hold, ind2color, legend, orientation, plot,
-                  plotIPDF, plotPDF, plotSection, plottingConvention, round2Miller, specimenFrame, unimodalODF,
-                  vector3d)
+from mtex import *
 
 # ## Predefined Components and Their Frame
 #

@@ -2,6 +2,8 @@
 # falls through to NumPy
 from __future__ import annotations
 
+import builtins
+
 import numpy as np
 
 from ._array import MtexArray, cat
@@ -25,7 +27,6 @@ norm = _method("norm", np.linalg.norm)
 normalize = _method("normalize")
 inv = _method("inv", np.linalg.inv)
 mean = _method("mean", np.mean)
-sum = _method("sum", np.sum)
 std = _method("std", np.std)
 unique = _method("unique", np.unique)
 discretize = _method("discretize")
@@ -66,7 +67,6 @@ alignment = _method("alignment")
 stripSym = _method("stripSym")
 fullSym = _method("fullSym")
 dspacing = _method("dspacing")
-round = _method("round", np.round)
 symmetrise = _method("symmetrise")
 multiplicity = _method("multiplicity")
 project2FundamentalRegion = _method("project2FundamentalRegion")
@@ -74,6 +74,28 @@ transformReferenceFrame = _method("transformReferenceFrame")
 fundamentalSector = _method("fundamentalSector")
 conventionalSector = _method("conventionalSector")
 fundamentalRegion = _method("fundamentalRegion")
+
+
+def round(x, *args, **kwargs):
+  """round(x) of an MTEX object by its own round, of an array, a list or with an axis as NumPy
+  rounds, of a number as Python rounds, so that from mtex import * keeps Python's round"""
+  if isinstance(x, MtexArray) or hasattr(x, "round") and not isinstance(x, (np.ndarray, np.generic)):
+    return x.round(*args, **kwargs)
+  if isinstance(x, (np.ndarray, list, tuple)) or kwargs:
+    return np.round(x, *args, **kwargs)
+  return builtins.round(x, *args)
+
+
+def sum(x, *args, **kwargs):
+  """sum(x) of an MTEX object by its own sum, of an array or with an axis as NumPy sums, of any
+  other iterable as Python sums, so that from mtex import * keeps Python's sum"""
+  if isinstance(x, MtexArray) or hasattr(x, "sum") and not isinstance(x, (np.ndarray, np.generic)):
+    return x.sum(*args, **kwargs)
+  if isinstance(x, (np.ndarray, np.generic)) or kwargs:
+    return np.sum(x, *args, **kwargs)
+  return builtins.sum(x, *args)
+
+
 checkInside = lambda region, x, **kw: region.checkInside(x, **kw)
 find = _method("find", np.flatnonzero)
 subGrid = _method("subGrid")

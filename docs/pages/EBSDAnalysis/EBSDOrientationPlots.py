@@ -20,7 +20,7 @@
 
 import numpy as np
 
-from mtex import Miller, calcGrains, cat, hold, mtexColorbar, mtexdata, plotIPDF, plotPDF, plotSection, plottingConvention, scatter, xvector
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

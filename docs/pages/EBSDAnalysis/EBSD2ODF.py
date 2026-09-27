@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (Miller, calcDensity, calcError, calcGrains, calcKernel, cat, degree, hold, ipfColorKey, max, mtexColorbar, mtexdata,
-                  plot, plotPDF, plotSection, plottingConvention)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

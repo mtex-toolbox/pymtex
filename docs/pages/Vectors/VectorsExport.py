@@ -13,7 +13,7 @@ import tempfile
 
 import numpy as np
 
-from mtex import angle, degree, export, loadVector3d, plottingConvention, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -10,7 +10,7 @@
 # is the domain of an [inverse pole figure](OrientationInversePoleFigure.html). It is also
 # the region into which `project2FundamentalRegion` maps crystal directions.
 
-from mtex import Miller, crystalFrame, hold, mtexTitle, newMtexFigure, plot
+from mtex import *
 
 # ## A Cubic Example
 #

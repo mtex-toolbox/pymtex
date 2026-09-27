@@ -13,7 +13,7 @@
 
 import numpy as np
 
-from mtex import Miller, angle, crystalFrame, degree, det, dot_outer, dspacing, norm
+from mtex import *
 
 cs = crystalFrame('12/m1', [5.2, 6.3, 7.1], np.array([90, 106, 90]) * degree, 'X||a', mineral='Example monoclinic crystal')
 

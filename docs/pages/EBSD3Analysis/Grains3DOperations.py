@@ -14,8 +14,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (crystalFrame, degree, grain3d, hold, mtexdatafile, mtexTitle, newMtexFigure, nextAxis, plot, plottingConvention, rotate,
-                  rotation, setCamera, vector3d, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

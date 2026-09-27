@@ -12,8 +12,7 @@
 import numpy as np
 from scipy.sparse import triu
 
-from mtex import (angle, calcGrains, degree, hold, ind2color, mtexColorbar, mtexdata, orientation, parentGrainReconstructor, plot,
-                  plottingConvention, setColorRange, smoothBoundary)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('martensite', silent=True)

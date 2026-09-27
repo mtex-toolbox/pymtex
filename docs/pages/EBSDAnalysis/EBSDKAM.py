@@ -19,8 +19,7 @@
 
 import numpy as np
 
-from mtex import (EBSD, calcGrains, crystalFrame, degree, halfQuadraticFilter, hold, ipfColorKey, mtexColorMap, mtexColorbar, mtexdata,
-                  newMtexFigure, nextAxis, plot, plottingConvention, rotation, setColorRange, smooth, smoothBoundary, text, vector3d)
+from mtex import *
 from mtex.maps.phaselist import PHASE_COLOR_ORDER
 
 # ## A deformed ferrite specimen

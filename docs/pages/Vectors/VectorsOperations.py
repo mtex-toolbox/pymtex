@@ -10,8 +10,7 @@
 
 import numpy as np
 
-from mtex import (angle, arrow3d, cat, cross, degree, dot, hold, mean, mtexdatafile, newMtexFigure, norm, normalize,
-                  plottingConvention, scatter, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

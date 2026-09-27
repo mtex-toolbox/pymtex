@@ -14,7 +14,7 @@
 
 import numpy as np
 
-from mtex import degree, hold, plottingConvention, rotation, scatter
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -31,8 +31,7 @@
 
 import numpy as np
 
-from mtex import (Miller, crystalFrame, degree, fibre, fibreODF, fundamentalRegionEuler, mtexColorMap, mtexColorbar, orientation, plot, plot3d,
-                  plotSection, plottingConvention, specimenFrame, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -20,8 +20,7 @@
 # [kernel](SO3Kernels.html); [Unimodal ODF Shapes](ODFShapes.html) compares the available
 # choices.
 
-from mtex import (Miller, SO3vonMisesFisherKernel, cat, crystalFrame, degree, mean, mtexColorbar, mtexTitle, newMtexFigure, nextAxis,
-                  orientation, plotPDF, plottingConvention, setColorRange, specimenFrame, uniformODF, unimodalODF)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

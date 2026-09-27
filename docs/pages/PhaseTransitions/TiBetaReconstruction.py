@@ -8,8 +8,7 @@
 # +
 import numpy as np
 
-from mtex import (calcGrains, degree, hold, ipfColorKey, mtexColorbar, mtexColorMap, mtexdata, orientation, parentGrainReconstructor,
-                  plot, setColorRange, smoothBoundary, vector3d)
+from mtex import *
 
 ebsd = mtexdata('alphaBetaTitanium', silent=True)
 

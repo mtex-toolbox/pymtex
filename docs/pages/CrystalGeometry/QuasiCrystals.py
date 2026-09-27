@@ -16,7 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import cat, crystalFrame, degree, hold, ipfHSVKey, normalize, plot, plottingConvention, rotation, vector3d
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

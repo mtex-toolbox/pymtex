@@ -19,8 +19,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, angle, calcGrains, calcParent2Child, calcVariantId, degree, gcm, hold, ind2color, inv, mean, mtexdata,
-                  nextAxis, orientation, plot, plotPDF, plottingConvention, smoothBoundary, std, variants, xlabel)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

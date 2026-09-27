@@ -23,8 +23,7 @@
 # +
 import numpy as np
 
-from mtex import (axis, calcAxisDistribution, calcDensity, calcGrains, calcMDF, crystalFrame, degree, max, min,
-                  mtexColorbar, mtexdata, plot, plotAxisDistribution, plottingConvention, round, smoothBoundary)
+from mtex import *
 
 cs = crystalFrame('432')
 

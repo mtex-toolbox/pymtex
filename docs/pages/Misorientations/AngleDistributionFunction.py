@@ -28,8 +28,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (SO3FunHarmonic, calcAngleDistribution, calcDensity, calcGrains, calcMDF, crystalFrame, degree, hold,
-                  legend, maxAngle, mtexdata, plotAngleDistribution, plottingConvention)
+from mtex import *
 
 cs = crystalFrame('432')
 density, omega = calcAngleDistribution(cs)

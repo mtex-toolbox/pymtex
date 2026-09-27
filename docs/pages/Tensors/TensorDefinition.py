@@ -17,8 +17,7 @@
 
 import numpy as np
 
-from mtex import (crystalFrame, max, min, mtexColorbar, plot, plottingConvention, stiffnessTensor, strainTensor,
-                  stressTensor, tensor, vector3d, xvector, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

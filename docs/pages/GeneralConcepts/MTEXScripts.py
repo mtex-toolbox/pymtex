@@ -19,7 +19,7 @@
 # [orientation distribution functions (ODFs)](SO3Fun.SO3Fun.html). The
 # [Function Reference](FunctionReference.html) lists all MTEX classes and functions.
 
-from mtex import EBSD, calcGrains, degree, hold, mtexdatafile, plot, rotation, xvector
+from mtex import *
 
 # ## Import and inspect data
 #

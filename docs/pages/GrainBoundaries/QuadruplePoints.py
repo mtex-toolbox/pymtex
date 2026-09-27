@@ -20,8 +20,7 @@
 # introduced in [Grain Reconstruction](GrainReconstruction.html).
 
 import numpy as np
-from mtex import (EBSDsquare, calcGrains, crystalFrame, degree, hold, ipfColorKey, mtexColorMap, mtexColorbar, plot, plottingConvention,
-                  rotation, setColorRange, smoothBoundary, taubinFilter)
+from mtex import *
 
 # display matrix rows downwards and columns to the right
 plottingConvention.default('y↓→x')

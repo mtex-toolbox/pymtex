@@ -11,8 +11,7 @@
 # +
 import numpy as np
 
-from mtex import (Miller, calcDensity, crystalFrame, degree, gcm, hold, mean, mtexColorbar, nextAxis, norm, orientation, plot, plotPDF,
-                  plottingConvention, unimodalODF, variants, xlabel)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 rng = np.random.default_rng(1)

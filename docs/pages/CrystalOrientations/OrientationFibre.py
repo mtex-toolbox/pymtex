@@ -19,8 +19,7 @@
 # screen layout, not the orientations.
 
 # +
-from mtex import (Miller, crystalFrame, degree, fibre, fibreODF, hold, ind2color, legend, orientation, plot, plot3d, plotFibre,
-                  plotIPDF, plotPDF, plottingConvention, specimenFrame, vector3d, volume)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

@@ -37,9 +37,7 @@
 
 import numpy as np
 
-from mtex import (BungeColorKey, Miller, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, calcDensity, circle, degree, fibre, hold,
-                  ipfSpotKey, mean, mtexColorMap, mtexColorbar, mtexdata, plot, plotIPDF, plotSection, plottingConvention, spotColorKey,
-                  volume, zvector)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')

@@ -19,7 +19,7 @@ import tempfile
 
 import numpy as np
 
-from mtex import Miller, cat, crystalFrame, degree, equispacedSO3Grid, export, fibreODF, orientation, plot, uniformODF, unimodalODF, xvector, yvector, zvector
+from mtex import *
 
 # ## Define a Model ODF
 #

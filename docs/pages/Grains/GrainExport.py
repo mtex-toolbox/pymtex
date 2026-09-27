@@ -17,7 +17,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import calcGrains, degree, export, export_VPSC, hold, mtexdata, newMtexFigure, plot, plottingConvention, smoothBoundary
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

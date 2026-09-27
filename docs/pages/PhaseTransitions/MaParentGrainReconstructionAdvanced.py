@@ -15,9 +15,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.special import erf
 
-from mtex import (Miller, angle, calcGrains, calcParent, calcParent2Child, calcVariantId, degree, hold, ind2color, mclComponents,
-                  mtexColorbar, mtexColorMap, mtexdata, orientation, plot, plotPDF, plottingConvention, setColorRange,
-                  smoothBoundary, variants)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('martensite', silent=True)

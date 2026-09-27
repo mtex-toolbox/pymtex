@@ -15,8 +15,7 @@
 # +
 import matplotlib.pyplot as plt
 
-from mtex import (S2BumpKernel, S2DeLaValleePoussinKernel, S2DirichletKernel, arrow3d, degree, hold, legend, plot,
-                  plotSpektra, surf, zvector)
+from mtex import *
 
 psi = S2DeLaValleePoussinKernel(halfwidth=10 * degree)
 psi

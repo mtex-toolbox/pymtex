@@ -16,7 +16,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import Miller, arrow3d, crystalFrame, dislocationSystem, hold, normalize, slipSystem, symmetrise, vector3d
+from mtex import *
 
 # ## Edge dislocations
 #

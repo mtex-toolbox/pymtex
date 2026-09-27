@@ -17,8 +17,7 @@
 # evaluation, plotting, and sampling interface as other
 # [orientation functions](SO3FunConcept.html).
 
-from mtex import (BinghamODF, Miller, calcBinghamODF, crystalFrame, degree, discreteSample, fibre, fibreODF, orientation, plot, plotPDF,
-                  plottingConvention, quaternion, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

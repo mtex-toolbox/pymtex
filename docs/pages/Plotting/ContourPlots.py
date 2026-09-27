@@ -20,7 +20,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import S2Fun, calcODF, hold, mtexColorbar, mtexColorMap, mtexdata, plot, plotPDF, plottingConvention
+from mtex import *
 
 plottingConvention.default('y↑→x')
 sF = 0.01 + 10 * S2Fun.smiley()

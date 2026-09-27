@@ -21,9 +21,7 @@
 
 import numpy as np
 
-from mtex import (HSVDirectionKey, Miller, angle, calcDensity, calcGROD, calcGrains, degree, fibre, grainMean, hold, ipfColorKey, mtexColorbar,
-                  mtexTitle, mtexdata, newMtexFigure, nextAxis, plot, plotPDF, plottingConvention, project2FundamentalRegion, setColorRange,
-                  smoothBoundary, vector3d)
+from mtex import *
 
 # +
 # use the map frame shown throughout this example

@@ -9,8 +9,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (EBSD3, calcGBND, calcGrains, degree, laplaceFilter, mtexColorbar, mtexTitle, mtexdatafile, newMtexFigure, nextAxis, plot,
-                  plottingConvention, reduceBoundary, refineBoundary, setCamera, smoothBoundary, taubinFilter)
+from mtex import *
 
 # +
 plottingConvention.default('y↑→x')

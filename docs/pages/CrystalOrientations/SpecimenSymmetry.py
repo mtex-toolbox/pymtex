@@ -1,8 +1,7 @@
 # # Specimen Symmetry
 
 # +
-from mtex import Miller, crystalFrame, degree, mtexColorbar, norm, numProper, numSym, orientation, plotPDF, plottingConvention, \
-    specimenFrame, unimodalODF
+from mtex import *
 
 plottingConvention.default('y↑→x')
 # -

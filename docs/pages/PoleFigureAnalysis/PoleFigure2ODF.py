@@ -20,7 +20,7 @@
 # +
 import time
 import numpy as np
-from mtex import calcError, calcODF, degree, max, mtexdata, plot, plotDiff, plotPDF, plottingConvention, unimodalODF
+from mtex import *
 
 plottingConvention.default('y↑→x')
 pf = mtexdata('dubna')

@@ -20,8 +20,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mtex import (Miller, crystalFrame, degree, discreteSample, dot, inv, mtexColorbar, orientation, plotPDF,
-                  plottingConvention, rotation, specimenFrame, unimodalODF, xvector, zvector)
+from mtex import *
 
 # ## Define the material and its texture
 #

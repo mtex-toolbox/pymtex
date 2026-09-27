@@ -16,8 +16,7 @@
 # +
 import numpy as np
 
-from mtex import (S2FunHarmonic, angle, cross, degree, equispacedS2Grid, invRadon, max, mtexColorbar, normalize, orth,
-                  plot, radon, vector3d)
+from mtex import *
 
 f = lambda v: np.exp(-4 * angle(v, vector3d(1, 1, 1)) ** 2)
 

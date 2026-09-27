@@ -18,8 +18,7 @@
 # For these figures, the plotting convention lays the reference frame out with y up and x
 # to the right. It does not alter the constructed nodes.
 
-from mtex import (HEALPixS2Grid, calcDensity, degree, equispacedS2Grid, fibonacciS2Grid, mtexColorbar, mtexTitle, nextAxis,
-                  norm, plot, plottingConvention, regularS2Grid, setColorRange)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

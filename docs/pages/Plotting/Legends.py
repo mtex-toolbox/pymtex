@@ -15,7 +15,7 @@
 # names a point and a great circle. The pole at the centre remains unnamed.
 
 # +
-from mtex import circle, hold, legend, plot, vector3d
+from mtex import *
 
 plot(vector3d.X, upper=True, DisplayName='point')
 hold(True)

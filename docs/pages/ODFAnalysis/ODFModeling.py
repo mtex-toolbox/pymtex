@@ -27,8 +27,7 @@
 # evaluation, plotting, scaling, and addition. This is why components with different
 # representations can be mixed in one model.
 
-from mtex import (Miller, SO3vonMisesFisherKernel, cat, crystalFrame, degree, max, mean, mtexColorbar, orientation, plotPDF,
-                  plottingConvention, rotate, rotation, specimenFrame, uniformODF, unimodalODF, vector3d)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 

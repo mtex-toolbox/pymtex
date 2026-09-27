@@ -16,8 +16,7 @@
 # equivalent.
 
 # +
-from mtex import (Miller, angle, axis, calcGrains, crystalFrame, degree, fundamentalRegion, hold, inv, legend, mtexdata,
-                  orientation, plot, plottingConvention)
+from mtex import *
 
 plottingConvention.default('y↑→x')
 
