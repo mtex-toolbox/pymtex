@@ -64,8 +64,7 @@ misorientation, `fibre`, `slipSystem`, `stiffnessTensor`, `plottingConvention`, 
 
 ## Status
 
-Plan written 2026-09-27; steps 1 to 6 built the same day, and of step 7 the tests; the doc pages
-are not yet rebuilt with the new displays. `geometry/display.py` holds the layout
+Plan written 2026-09-27; steps 1 to 7 built the same day. `geometry/display.py` holds the layout
 (`display`, `header`, `fields`, `aligned`, `frameLabel`, `framesLabel`, `table` with `takeRows`,
 `textTable`, the preference `displayRows`, default 20); the displays that still build their own
 lines pass through `aligned`. `plotting/richdisplay.py` gives IPython the HTML display (the name
@@ -73,3 +72,10 @@ bold, each frame of the header with its own display as a tooltip) and the termin
 bold); `repr()` is unchanged plain text. The tables of a notebook stay `pre` text rather than HTML
 tables: the text tables are already aligned and read the same everywhere. S2Fun, SO3Fun and
 grainBoundaryCriterion are abstract and keep no display.
+
+Step 7: all 237 pages rebuilt, none with a new error. In 76 pages numbers moved; six of them,
+built again on the commit before the display work, print the numbers they print now, so the moves
+seen there come from other changes (the halfwidth selection, unseeded random draws), and the rest
+were not rebuilt that way. The headers against MATLAB's diaries found
+`triplePointList` and `shape2d` still naming the specimen frame `specimen`, fixed; the
+differences that stay are deliberate and listed under the conventions of `docs/findings.md`.

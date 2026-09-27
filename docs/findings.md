@@ -176,6 +176,7 @@ has to know.
 | EBSDSharpPlot, EBSDGrid | the shares of the phase table were printed to three digits (99.8%) where MATLAB writes two (100%) | fixed 2026-09-23: two significant digits of all cells |
 | GrainMerge | 20 triple points for MATLAB's 15 after the merge; the other pages now agree (SelectingGrains 6, 133, 43, 13 for 6, 135, 43, 13, GrainExport 3360 for 3370) | open |
 | AxisDistributionFunction | the bandwidth hint of the ADF moved from 512 to 250 where MATLAB's is 500 | open |
+| TriplePoints, ShapeParameters | after the display rework the headers of `triplePointList` and `shape2d` still named the specimen frame `specimen` where MATLAB writes its convention, and the mineral columns of the triple points were not aligned | fixed 2026-09-27: `frameLabel` and `textTable`, as the other maps |
 
 ## Gaps beside MTEX
 
@@ -357,6 +358,12 @@ has to know.
 | BoundaryNormalDistribution | the GBND a function on the sphere | an axis density carrying the phase symmetry, which MATLAB's numbers need |
 | QuadruplePoints, BoundaryProperties | the grain ids and the sides of a segment | numbered along x, the sides ordered by grain id, so a ring grain is 2 for 1 and a misorientation may be the inverse |
 | LowLevelParentGrainReconstruction, MaParentGrainReconstructionAdvanced and the other pages taking quantiles | `quantile(x, p)` skips NaN, so the absorbed pixels without a rotation drop out | `np.nanquantile(x, p)` |
+| every page | an object prints as `x = class (frames)`, a blank line, the fields, a blank line, the data; a size `1 × 5`; a long array a link "show Euler angles" | the same layout without `x =` and the blank lines; a size as the array's shape, `5`; a long array its first and last five rows around `⋮` (the preference `displayRows`, 20); in a notebook the class name bold and every frame of the header with its own display as a tooltip, MATLAB's links (docs/plans/display.md) |
+| PoleFigureDubna, PoleFigurePlot, PoleFigureImport, PoleFigureExport, ... | a pole figure is headed by the specimen convention alone, `PoleFigure (y↑→x)` | by both frames, `PoleFigure (Quartz → y↑→x)`, as an ODF is |
+| WaveVelocities | the wave velocity functions are headed by the specimen convention | by the crystal frame they are defined on, `S2FunHarmonic (Olivine)` |
+| RotationTangentSpace, RotationSpinTensor, SO3FunVectorField | `SO3TangentVector (crystal)` | `SO3TangentVector (right, y↑→x)`: the side and the frame |
+| TaylorModel, TextureEvolution, DislocationSystems | a crystal frame without a mineral is written `crystal` | its point group, `1`, `432`, as a crystal frame names itself everywhere else |
+| ODFCharacteristics, SO3FunOperations and the other pages on `mtexdata('dubna')` | the orientations print `Quartz → y↓→x` although the page set `plottingConvention.default('y↑→x')` before loading | `Quartz → y↑→x`; MATLAB's pole figures keep a convention from before the call, cached data perhaps; open, on the MATLAB side |
 
 ## Practicalities
 

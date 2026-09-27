@@ -532,12 +532,13 @@ class triplePointList:
 
   def __repr__(self):
     if self.isempty:
-      return aligned(f"triplePointList ({self.frame.char()})\n  no triple points")
+      return aligned(f"triplePointList ({frameLabel(self.frame)})\n  no triple points")
     key = np.sort(self.phaseId, axis=1)
     trip, counts = np.unique(key, axis=0, return_counts=True)
     name = lambda p: "outside" if p < 0 else self.CSList[int(p)].mineral
-    rows = [f"  {c:>6}  " + "  ".join(name(p) for p in t) for t, c in zip(trip, counts)]
-    return aligned(f"triplePointList ({self.frame.char()})\n  size: {len(self)}\n  points  mineral 1  mineral 2  mineral 3\n" + "\n".join(rows))
+    cells = [[str(c) for c in counts]] + [[name(t[j]) for t in trip] for j in range(3)]
+    return (f"triplePointList ({frameLabel(self.frame)})\n  size: {len(self)}\n"
+            + textTable(["points", "mineral 1", "mineral 2", "mineral 3"], cells))
 
 
 def triplePoints(gB):

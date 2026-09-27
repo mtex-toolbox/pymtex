@@ -29,7 +29,7 @@ from .grains import grain2d
 from .lattice import mapPlane
 from .polygon import loopSums, polygonSet, signedArea2
 from ..geometry.install import install
-from ..geometry.display import aligned
+from ..geometry.display import aligned, frameLabel
 
 
 # ------------------------------------------------------------------ the moments
@@ -379,7 +379,7 @@ class shape2d(polygonSet):
     return shape2d(self.V[hullLoops(self)[0]], plane=self.plane, frame=self.frame)
 
   def __repr__(self):
-    return aligned(f"shape2d ({self.frame.char()})\n  vertices: {len(self.V)}\n  area: {self.area[0]:.4g}\n  aspect ratio: {aspectRatio(self)[0]:.4g}")
+    return aligned(f"shape2d ({frameLabel(self.frame)})\n  vertices: {len(self.V)}\n  area: {self.area[0]:.4g}\n  aspect ratio: {aspectRatio(self)[0]:.4g}")
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
