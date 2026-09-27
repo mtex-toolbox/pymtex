@@ -77,27 +77,26 @@ def xcfFilters(roiSize, fPass):
 
 # the part of the upsampled DFT no tile changes: the transform sampled at
 # (u - fix(w/2)) / mesh pixels, u = 0 .. w-1
-def _dftKernels(f, w, mesh, rs):
+def _dftKernel(f, w, mesh, rs):
   u = np.arange(w) - w // 2
-  pf = -2j * np.pi / (rs * mesh)
-  return np.exp(pf * np.outer(u, f)), np.exp(pf * np.outer(f, u))
+  return np.exp((-2j * np.pi / (rs * mesh)) * np.outer(u, f))
 
 
-# the peak on a grid of spacing 1/mesh centred on the estimate, the phase ramp of each tile
-# applied to its spectrum rather than to a pair of kernels of its own
-def _refine(kern, f, rowShift, colShift, Kr, Kc, mesh, rs):
-  w = Kr.shape[0]
+# the peak on a grid of spacing 1/mesh centred on the estimate, CC_t = K diag(pr_t) Q_t diag(pc_t) K^T:
+# the right factor of all tiles as one product, the row ramp applied to it, and CC_t computed
+# transposed, so that MATLAB's column order is the memory order its maximum is taken in
+def _refine(Q, f, rowShift, colShift, K, mesh, rs):
+  w, nf = K.shape
+  T = Q.shape[0]
   rowShift = _round(rowShift * mesh) / mesh
   colShift = _round(colShift * mesh) / mesh
-  pr = np.exp((-2j * np.pi / rs) * (f[None, :, None] * rowShift[:, None, None]))
-  pc = np.exp((-2j * np.pi / rs) * (f[None, None, :] * colShift[:, None, None]))
-  # Kr X_t Kc for every tile t as two products over all tiles at once
-  T, nb = kern.shape[0], kern.shape[1]
-  X = (kern * pr * pc).transpose(1, 0, 2).reshape(nb, T * nb)
-  Y = (Kr @ X).reshape(w, T, nb).transpose(1, 0, 2).reshape(T * w, nb)
-  CC = (Y @ Kc).reshape(T, w, w)
+  pr = np.exp((-2j * np.pi / rs) * (rowShift[:, None] * f[None, :]))
+  pc = np.exp((-2j * np.pi / rs) * (colShift[:, None] * f[None, :]))
+  Y = ((Q * pc[:, None, :]).reshape(T * nf, nf) @ K.T).reshape(T, nf, w)
+  Y *= pr[:, :, None]
+  CCt = (Y.transpose(0, 2, 1).reshape(T * w, nf) @ K.T).reshape(T, w, w)
   # MATLAB's max of complex numbers is by their modulus, the first in column order
-  a = np.abs(CC).transpose(0, 2, 1).reshape(T, -1)
+  a = np.abs(CCt).reshape(T, -1)
   k = np.argmax(a, axis=1)
   peak = a[np.arange(T), k]
   d = w // 2
@@ -106,15 +105,16 @@ def _refine(kern, f, rowShift, colShift, Kr, Kc, mesh, rs):
 
 # zero mean, unit deviation, window, transform, band pass; a tile with a non finite value or
 # none of either is bad, and its spectrum zero
-def _tileSpectrum(tile, window, band, bandFilt, fft, workers):
+def _tileSpectrum(tile, window, bandPass, fft, workers):
   mu = tile.mean(axis=(1, 2), keepdims=True)
   sd = tile.std(axis=(1, 2), ddof=1, keepdims=True)
   with np.errstate(invalid="ignore", divide="ignore"):
     tile = (tile - mu) / sd
   bad = ~np.isfinite(sd[:, 0, 0]) | (sd[:, 0, 0] == 0) | ~np.isfinite(tile).all(axis=(1, 2))
-  tile = np.where(bad[:, None, None], 0.0, tile)
-  spec = fft.fft2(tile * window, workers=workers)
-  spec = bandFilt * np.take(np.take(spec, band, axis=1), band, axis=2)
+  tile[bad] = 0
+  tile *= window
+  spec = fft.fft2(tile, workers=workers, overwrite_x=True)
+  spec *= bandPass
   spec[bad] = 0
   return spec, bad
 
@@ -122,50 +122,57 @@ def _tileSpectrum(tile, window, band, bandFilt, fft, workers):
 def xcfCorrelate(A, B, cx, cy, roiSize, fPass, mesh, window, bandPass):
   """the sub pixel shift of the tiles about (cx, cy) of B against A, in pixels, with the height
   of their peaks; batched, the coarse correlation held near 128 MB"""
+  from numpy.lib.stride_tricks import sliding_window_view
   fft, workers = _fft()
   coarse = min(48, mesh)
   rs = int(roiSize)
   h = rs // 2
   nR = cx.size
   batch = max(1, (1 << 21) // max(rs * rs, 1))
+  # MATLAB's band, the lowest nKeep frequencies of either sign in FFT order: its two halves
+  # overlap, and the refinement weights a frequency held twice by its multiplicity
   nKeep = int(fPass[2] + fPass[3])
-  band = np.concatenate([np.arange(nKeep), np.arange(rs - nKeep, rs)])
-  bandFilt = bandPass[np.ix_(band, band)]
-  fIdx = np.fft.ifftshift(np.arange(rs)) - rs // 2
-  f = fIdx[band].astype(float)
-  nb = len(band)
+  mult = np.zeros(rs)
+  mult[:nKeep] += 1
+  mult[rs - nKeep:] += 1
+  used = np.flatnonzero(mult)
+  f = (np.fft.ifftshift(np.arange(rs)) - rs // 2)[used].astype(float)
+  M = (mult[:, None] * mult[None, :])[np.ix_(used, used)]
   twoPass = coarse < mesh
-  KrC, KcC = _dftKernels(f, int(np.ceil(coarse * 1.5)), coarse, rs)
+  KC = _dftKernel(f, int(np.ceil(coarse * 1.5)), coarse, rs)
   if twoPass:
-    KrF, KcF = _dftKernels(f, 2 * int(np.ceil(mesh / coarse)) + 1, mesh, rs)
+    KF = _dftKernel(f, 2 * int(np.ceil(mesh / coarse)) + 1, mesh, rs)
   cenX, cenY = cx.reshape(-1, order="F"), cy.reshape(-1, order="F")
   dx, dy, peak = np.zeros(nR), np.zeros(nR), np.zeros(nR)
-  off = np.arange(-h, h)
-  # where the band lands once it is shifted to the centre of a 2 rs array and back
-  lo = rs - nb // 2
-  at = (lo + (np.arange(nb) + nb // 2) % nb + rs) % (2 * rs)
+  winA, winB = sliding_window_view(A, (rs, rs)), sliding_window_view(B, (rs, rs))
+  # the band embedded in a 2 rs array, its low half at the start and its high half at the end,
+  # so that the inverse lands the peak on a half pixel grid over the whole range
+  runs = ((slice(0, nKeep), slice(0, nKeep)), (slice(2 * rs - nKeep, 2 * rs), slice(rs - nKeep, rs)))
   for b0 in range(0, nR, batch):
     b = np.arange(b0, min(b0 + batch, nR))
-    rows = cenY[b][:, None] + off[None, :] - 1
-    cols = cenX[b][:, None] + off[None, :] - 1
-    tA = A[rows[:, :, None], cols[:, None, :]]
-    tB = B[rows[:, :, None], cols[:, None, :]]
-    specA, badA = _tileSpectrum(tA, window, band, bandFilt, fft, workers)
-    specB, badB = _tileSpectrum(tB, window, band, bandFilt, fft, workers)
+    r0, c0 = cenY[b] - h - 1, cenX[b] - h - 1
+    specA, badA = _tileSpectrum(winA[r0, c0], window, bandPass, fft, workers)
+    specB, badB = _tileSpectrum(winB[r0, c0], window, bandPass, fft, workers)
     bad = badA | badB
-    # the kept band embedded in a 2 rs array, so that the inverse lands the peak on a half
-    # pixel grid over the whole range
+    P = specA * np.conj(specB)
+    # transposed, so that the column order MATLAB takes its maximum in is the memory order
+    Pt = P.transpose(0, 2, 1)
     CC = np.zeros((len(b), 2 * rs, 2 * rs), dtype=complex)
-    CC[:, at[:, None], at[None, :]] = specA * np.conj(specB)
-    CC = fft.ifft2(CC, workers=workers)
-    pk = np.argmax(np.abs(CC).transpose(0, 2, 1).reshape(len(b), -1), axis=1)
+    for to1, of1 in runs:
+      for to2, of2 in runs:
+        CC[:, to1, to2] = Pt[:, of1, of2]
+    CC = fft.ifft2(CC, workers=workers, overwrite_x=True)
+    pk = np.argmax(np.abs(CC).reshape(len(b), -1), axis=1)
     rloc, cloc = pk % (2 * rs) + 1, pk // (2 * rs) + 1
     rowShift = np.where(rloc > rs, rloc - 2 * rs - 1, rloc - 1) / 2
     colShift = np.where(cloc > rs, cloc - 2 * rs - 1, cloc - 1) / 2
-    kern = specB * np.conj(specA)
-    rowShift, colShift, pkH = _refine(kern, f, rowShift, colShift, KrC, KcC, coarse, rs)
+    Q = np.conj(P)
+    if len(used) < rs:
+      Q = Q[:, used][:, :, used]
+    Q *= M
+    rowShift, colShift, pkH = _refine(Q, f, rowShift, colShift, KC, coarse, rs)
     if twoPass:
-      rowShift, colShift, pkH = _refine(kern, f, rowShift, colShift, KrF, KcF, mesh, rs)
+      rowShift, colShift, pkH = _refine(Q, f, rowShift, colShift, KF, mesh, rs)
     rowShift[bad], colShift[bad], pkH[bad] = np.nan, np.nan, np.nan
     dy[b], dx[b], peak[b] = rowShift, colShift, pkH
   return dx, dy, peak

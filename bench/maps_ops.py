@@ -1,5 +1,6 @@
 # the maps layer against MATLAB on one synthetic map: grain segmentation, grain shape, boundary
-# smoothing, the intragranular misorientations and the denoising of the orientations
+# smoothing, the intragranular misorientations and the denoising of the orientations; and the
+# registration of the EBSDTrueEbsd page on trueEbsdWCCoSmall
 #
 #   .venv/bin/python bench/maps_ops.py export              the map
 #   .venv/bin/python bench/maps_ops.py run [op ...]        this port
@@ -13,7 +14,9 @@
 # bench/calcgrains.py exports it. The denoising runs on two measured maps, each port reading them
 # itself, as the EBSDDenoising page prepares them: twins (magnesium, square grid) and ferrite (hex
 # grid). The ports number grains and pixels their own way, so every result row starts with a key,
-# the grain's centroid or the pixel's position, and compare matches by it.
+# the grain's centroid or the pixel's position, and compare matches by it. The registration runs the
+# page's job, pixelSizeMatch once outside the timing; its shifts are rows (hop, stage, tile centre,
+# shift, peak), stage -1 the fitError pass, in the tile order both ports share, compared row by row.
 from __future__ import annotations
 
 import os
@@ -74,13 +77,22 @@ ALGORITHM = [
              "smooth_fill_ferrite": "smooth(splineFilter, 'fill') of the ferrite map, the holes filled"},
    # the misorientation angle in radians
    "tolerance": 1e-6},
+  {"name": "map registration",
+   "entry": {"matlab": ["@trueEbsd.calcDistortion", "@trueEbsd.undistort"],
+             "python": ["mtex.maps.trueebsd.trueEbsd.calcDistortion", "mtex.maps.trueebsd.trueEbsd.undistort"],
+             "julia": []},
+   "cases": {"trueebsd_distortion": "calcDistortion('fitErr') of the EBSDTrueEbsd page: every tile's shift and peak",
+             "trueebsd_undistort": "undistort: the phase and rotation of every pixel of the undistorted map"},
+   # the shifts agree to the digit and the peaks, sums of up to 7e6, to 1e-14 (docs/plans/maps.md M11);
+   # the undistorted map is picked by nearest pixel, the same pixels in both
+   "tolerance": 1e-12},
 ]
 DENOISE = [f"smooth_{f}_{m}" for m in ("twins", "ferrite") for f in ("mean", "spline", "l1tv", "hq", "fill")]
 COLS = {"calcgrains": 3, "calcgrains_1C_1": 3, "perimeter": 3, "aspect": 3, "smooth_boundary": 3, "kam": 3,
-        "grod": 3} | {op: 6 for op in DENOISE}
+        "grod": 3, "trueebsd_distortion": 7, "trueebsd_undistort": 7} | {op: 6 for op in DENOISE}
 SYM = {"twins": "6/mmm", "ferrite": "m-3m"}
 # the ops timed by a single run
-ONCE = ("calcgrains_1C_1", "smooth_l1tv_twins", "smooth_l1tv_ferrite", "smooth_hq_twins", "smooth_hq_ferrite")
+ONCE = ("calcgrains_1C_1", "trueebsd_distortion", "smooth_l1tv_twins", "smooth_l1tv_ferrite", "smooth_hq_twins", "smooth_hq_ferrite")
 LARGE = os.path.join(HERE, "out", "calcgrains", "1C_1.bin")
 
 
@@ -129,6 +141,8 @@ def run(ops):
     return m["indexed"]
 
   s["large"] = calcgrains.loadMap("1C_1") if "calcgrains_1C_1" in ops else None
+  if any(op.startswith("trueebsd") for op in ops):
+    s["page"] = trueEbsdPage()
   maps = {m: measured(m) for m in SYM if any(op.endswith(m) for op in ops if op in DENOISE)}
   filters = {"mean": meanFilter, "spline": splineFilter, "l1tv": l1TVFilter, "hq": halfQuadraticFilter, "fill": splineFilter}
   # the input of the denoising, to measure how far each port moves it
@@ -144,8 +158,51 @@ def run(ops):
     "smooth_boundary": (lambda: s["g"].smoothBoundary(5), lambda g: byGrain(g.perimeter)),
     "kam": (lambda: e.KAM(), byPixel),
     "grod": (lambda: e.calcGROD(s["g"]).angle(), byPixel),
-  } | {op: (denoise(op), quat) for op in DENOISE}
-  crosscheck.run(OUT, ALGORITHM, table, ops, reps={op: 1 for op in ONCE}, always=("calcgrains",))
+  } | {op: (denoise(op), quat) for op in DENOISE} | {
+    "trueebsd_distortion": (lambda: distortion(s), shiftRows),
+    "trueebsd_undistort": (lambda: s["job"].undistort() or s["job"].undistortedList[0].ebsd, undistortedRows)}
+  crosscheck.run(OUT, ALGORITHM, table, ops, reps={op: 1 for op in ONCE}, always=("calcgrains", "trueebsd_distortion"))
+
+
+# the images, hops and matched grid of the EBSDTrueEbsd page
+def trueEbsdPage():
+  from mtex import (imboxfilt, mapImage, mapImageList, mtexdata, rescale, spatialTransformDrift, spatialTransformId,
+                    spatialTransformShift, spatialTransformTilt, trueEbsd)
+  ebsd = mtexdata("trueEbsdWCCoSmall")
+  img = ebsd.meta["trueEbsdImgs"]
+  imgList = mapImageList([mapImage(ebsd.bc, ebsd, name="bcImg")] +
+                         [mapImage(getattr(img, n), dxy=img.pixSzImg, name=n) for n in ("fsdB3", "fsdT3", "fsdT1", "fsdT10")])
+  imgList[1:] = rescale(imboxfilt(imgList[1:], 3))
+  hops = lambda: [spatialTransformShift() + spatialTransformDrift(), spatialTransformId(), spatialTransformShift(), spatialTransformTilt()]
+  job = trueEbsd(imgList, hops())
+  job.pixelSizeMatch()
+  return imgList, hops, job.resizedList
+
+
+# a fresh job on the matched grid, since calcDistortion alters the one it runs on
+def distortion(s):
+  from mtex import trueEbsd
+  imgList, hops, resized = s["page"]
+  job = trueEbsd(imgList, hops())
+  job.resizedList = resized
+  job.setOptions(numROI=16)
+  job.calcDistortion("fitErr", silent=True)
+  s["job"] = job
+  return job
+
+
+def shiftRows(job):
+  def rows(n, m, ps):
+    xyz = lambda v: np.asarray(v.data, float).reshape(-1, 3)
+    return np.column_stack([np.full(ps.peak.size, n), np.full(ps.peak.size, m), xyz(ps.pos)[:, :2], xyz(ps.u)[:, :2], ps.peak])
+  R = [rows(n, m, ps) for n, hop in enumerate(job.shifts) for m, ps in enumerate(hop) if not ps.isempty]
+  R += [rows(n, -1, ps) for n, ps in enumerate(job.fitError) if not ps.isempty]
+  return np.vstack(R)
+
+
+def undistortedRows(e):
+  return np.column_stack([np.asarray(e.pos.data, float).reshape(-1, 3)[:, :2], e.phaseId.reshape(-1),
+                          np.asarray(e.rotations.data, float).reshape(-1, 4)])
 
 
 # MATLAB one op per call, each limited to 20 times Python's time per run plus loading, since a
@@ -163,6 +220,11 @@ def matlab(ops):
 # 1e-3; orientations compared by their misorientation angle in m-3m, the other values relative to the largest
 def deviation(op, a, b):
   from scipy.spatial import cKDTree
+  # the tiles in one order in both ports, each column relative to its largest value
+  if op == "trueebsd_distortion":
+    if a.shape != b.shape or (np.isnan(a) != np.isnan(b)).any() or (a[:, :2] != b[:, :2]).any():
+      return float("nan")
+    return float(np.nanmax(np.nanmax(np.abs(a - b), axis=0)[2:] / np.nanmax(np.abs(b), axis=0)[2:]))
   d, j = cKDTree(b[:, :2]).query(a[:, :2])
   # the grains of a large map by the ones both ports find, the others counted
   if op == "calcgrains_1C_1" and len(a) != len(b):

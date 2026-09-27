@@ -307,9 +307,14 @@ images is a `mapImageList`, a list displaying as MATLAB's table, and the hops a
 internally and answers in positions counted from zero; the EBSD map is resampled by its nearest
 measurement within the reach of its cell (`resampleNearest`, frameSymmetry's `EBSD/interp`, not the
 port's tangent space `interp`); the job's verbs return nothing, as `parentGrainReconstructor`'s.
-The upsampling DFT of all tiles is two GEMMs, the band placed directly into the doubled array.
-Times against MATLAB: `pixelSizeMatch` 0.07 s (0.31), `calcDistortion` 2.7 s (2.2), `undistort`
-0.7 s (0.4). Both pages checked.
+The upsampling DFT of all tiles is two GEMMs, the band placed directly into the doubled array
+by slices; MATLAB's band holds 2 nKeep - rs frequencies twice, and the refinement runs on the rs
+distinct ones weighted by their multiplicity, the same sum with 45 % fewer products.
+`resampleNearest(ebsd, pos, at=)` places the values at the grid directly, so that no lattice is
+sought among the moved positions. The page's job is the algorithm "map registration" of
+`bench/maps_ops.py`; times against MATLAB (2026-09-27): `pixelSizeMatch` 0.09 s (0.31),
+`calcDistortion` 2.5 s (4.0), `undistort` 0.23 s (0.36), the shifts identical and the peaks
+to 2e-15. Both pages checked.
 
 The plan as it was written: unblocks EBSDTrueEbsd and EBSDMapsAndImages, the last two
 blocked EBSDAnalysis pages. MATLAB only (`../frameSymmetry`, about 2350 lines); the Julia

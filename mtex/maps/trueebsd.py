@@ -35,10 +35,10 @@ def _round(x):
   return np.sign(x) * np.floor(np.abs(x) + 0.5)
 
 
-def resampleNearest(ebsd, pos):
+def resampleNearest(ebsd, pos, at=None):
   """the map read at positions by its nearest measurement, within the reach of its unit cell,
   as MATLAB's EBSD/interp: a position no measurement reaches is not indexed, with a NaN
-  rotation and NaN properties"""
+  rotation and NaN properties; at, the positions the values are placed at, by default pos"""
   from scipy.spatial import cKDTree
   from ..geometry.quaternion import rotation
   from .ebsd import EBSD
@@ -63,6 +63,8 @@ def resampleNearest(ebsd, pos):
     out = np.full((n,) + flat.shape[1:], np.nan)
     out[ok] = flat[k]
     prop[key] = out
+  if at is not None:
+    Q = np.asarray(at.data if isinstance(at, vector3d) else at, dtype=float).reshape(-1, 3)
   return EBSD(Q, rotation(rot), ph, ebsd.CSList, prop, scanUnit=ebsd.scanUnit, frame=ebsd.frame, meta=ebsd.meta)
 
 
@@ -199,10 +201,8 @@ class trueEbsd:
         from .gridify import gridify
         e = m.ebsd
         src = e.pos.data[0, 0] + (G1 - vn[0][0])[..., None] * b1 + (G2 - vn[1][0])[..., None] * b2
-        eNew = resampleNearest(e, src.reshape(-1, 3))
         pos = (G2[..., None] * b2 + G1[..., None] * b1).reshape(-1, 3)
-        eNew = eNew._moved(pos, eNew.rotations.data)
-        eNew = gridify(eNew, gL)
+        eNew = gridify(resampleNearest(e, src.reshape(-1, 3), at=pos), gL)
         new = mapImage(imgNew, eNew, name=m.name)
       else:
         new = mapImage(imgNew, name=m.name)
@@ -358,9 +358,7 @@ class trueEbsd:
       src = T.inv().eval(mg.pos)
       out[n].img = mg.interp(src, method="nearest")
       if mg.ebsd is not None:
-        e = resampleNearest(mg.ebsd, src)
-        e = e._moved(mg.ebsd.pos.data.reshape(-1, 3), e.rotations.data)
-        out[n].ebsd = gridify(e, mg.layout)
+        out[n].ebsd = gridify(resampleNearest(mg.ebsd, src, at=mg.ebsd.pos.data.reshape(-1, 3)), mg.layout)
     for n in range(nImg):
       if out[n].ebsd is None:
         continue

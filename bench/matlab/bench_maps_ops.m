@@ -5,8 +5,9 @@ A = reshape(fread(fopen(fullfile(out,'map.bin')),'double'),3,[]).'; fclose('all'
 cs = crystalSymmetry('m-3m','mineral','test');
 ebsd = EBSD(vector3d(A(:,1),A(:,2),0), rotation.byAxisAngle(zvector,A(:,3)), ones(size(A,1),1), {cs}, struct());
 xy = [ebsd.pos.x(:) ebsd.pos.y(:)];
-grains = []; c = []; big = [];
+grains = []; c = []; big = []; job = []; page = [];
 if any(strcmp(ops,'calcgrains_1C_1')), big = loadNeutral(large); end
+if any(startsWith(ops,'trueebsd')), page = trueEbsdPage; end
 % the measured maps as the EBSDDenoising page prepares them
 measured = struct;
 for m = {'twins','ferrite'}
@@ -17,12 +18,12 @@ end
 names = {'calcgrains_1C_1','calcgrains','perimeter','aspect','smooth_boundary','kam','grod', ...
   'smooth_mean_twins','smooth_spline_twins','smooth_l1tv_twins','smooth_hq_twins', ...
   'smooth_mean_ferrite','smooth_spline_ferrite','smooth_l1tv_ferrite','smooth_hq_ferrite', ...
-  'smooth_fill_twins','smooth_fill_ferrite'};
+  'smooth_fill_twins','smooth_fill_ferrite','trueebsd_distortion','trueebsd_undistort'};
 T = [names.', cellfun(@(n) @() operation(n), names, 'UniformOutput', false).', ...
   cellfun(@(n) @(res) rows(n, res), names, 'UniformOutput', false).'];
-algos = {'grain segmentation','grain shape','boundary smoothing','intragranular misorientation','orientation denoising'};
-crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5 5 5])), K, {'calcgrains'}, ...
-  containers.Map({'calcgrains_1C_1','smooth_l1tv_twins','smooth_l1tv_ferrite','smooth_hq_twins','smooth_hq_ferrite'}, {1, 1, 1, 1, 1}));
+algos = {'grain segmentation','grain shape','boundary smoothing','intragranular misorientation','orientation denoising','map registration'};
+crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5 5 5 6 6])), K, {'calcgrains','trueebsd_distortion'}, ...
+  containers.Map({'calcgrains_1C_1','trueebsd_distortion','smooth_l1tv_twins','smooth_l1tv_ferrite','smooth_hq_twins','smooth_hq_ferrite'}, {1, 1, 1, 1, 1, 1}));
 
   function res = operation(name)
     switch name
@@ -39,6 +40,16 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 
       case 'smooth_boundary', res = smoothBoundary(grains, 5);
       case 'kam', res = ebsd.KAM;
       case 'grod', res = angle(ebsd.calcGROD(grains));
+      % a fresh job on the matched grid, since calcDistortion alters the one it runs on
+      case 'trueebsd_distortion'
+        job = trueEbsd(page.imgList, page.hops());
+        job.resizedList = page.resized;
+        job.setOptions('numROI',16);
+        job.calcDistortion('fitErr','silent');
+        res = job;
+      case 'trueebsd_undistort'
+        job.undistort;
+        res = job.undistortedList(1).ebsd;
       otherwise
         parts = split(name, '_');
         filters = struct('mean', @meanFilter, 'spline', @splineFilter, 'l1tv', @l1TVFilter, 'hq', @l1TVFilter, 'fill', @splineFilter);
@@ -56,11 +67,51 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 
         R = [c v(:)];
       case {'perimeter','aspect'}, R = [c res(:)];
       case {'kam','grod'}, R = [xy res(:)];
+      % the tiles as (hop, stage, centre, shift, peak), counted from zero as in Python, stage -1 the fitError pass
+      case 'trueebsd_distortion'
+        R = zeros(0,7);
+        for n = 1:numel(res.shifts)
+          for m = 1:numel(res.shifts{n})
+            ps = res.shifts{n}(m);
+            if ~isempty(ps.u), R = [R; tileRows(n-1, m-1, ps)]; end %#ok<AGROW>
+          end
+        end
+        for n = 1:numel(res.fitError)
+          ps = res.fitError(n);
+          if ~isempty(ps.u), R = [R; tileRows(n-1, -1, ps)]; end %#ok<AGROW>
+        end
+      % the phase counted from zero, 0 the notIndexed as in Python
+      case 'trueebsd_undistort'
+        R = [res.pos.x(:) res.pos.y(:) res.phaseId(:)-1 res.rotations.a(:) res.rotations.b(:) res.rotations.c(:) res.rotations.d(:)];
       % a smoothed map comes back on its grid, in the grid's order
       otherwise, R = [res.pos.x(:) res.pos.y(:) res.rotations.a(:) res.rotations.b(:) res.rotations.c(:) res.rotations.d(:)];
     end
   end
 
+end
+
+
+function R = tileRows(n, m, ps)
+k = numel(ps.peak);
+R = [repmat([n m], k, 1) ps.pos.x(:) ps.pos.y(:) ps.u.x(:) ps.u.y(:) ps.peak(:)];
+end
+
+
+% the images, hops and matched grid of the EBSDTrueEbsd page
+function page = trueEbsdPage
+plottingConvention.default('y↓→x');
+ebsd = mtexdata('trueEbsdWCCoSmall','silent');
+img = ebsd.opt.trueEbsdImgs;
+page.imgList = [mapImage(ebsd.bc, ebsd, 'name','bcImg'), ...
+  mapImage(img.fsdB3, 'dxy',img.pixSzImg, 'name','fsdB3'), ...
+  mapImage(img.fsdT3, 'dxy',img.pixSzImg, 'name','fsdT3'), ...
+  mapImage(img.fsdT1, 'dxy',img.pixSzImg, 'name','fsdT1'), ...
+  mapImage(img.fsdT10,'dxy',img.pixSzImg, 'name','fsdT10')];
+page.imgList(2:end) = rescale(imboxfilt(page.imgList(2:end),3));
+page.hops = @() [spatialTransformShift + spatialTransformDrift, spatialTransformId, spatialTransformShift, spatialTransformTilt];
+job = trueEbsd(page.imgList, page.hops());
+job.pixelSizeMatch;
+page.resized = job.resizedList;
 end
 
 
