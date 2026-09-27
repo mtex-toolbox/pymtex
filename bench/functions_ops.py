@@ -4,6 +4,7 @@
 #   .venv/bin/python bench/functions_ops.py export              the input
 #   .venv/bin/python bench/functions_ops.py run [op ...]        this port
 #   .venv/bin/python bench/functions_ops.py matlab [op ...]     bench/matlab/bench_functions_ops.m through the bridge
+#   .venv/bin/python bench/functions_ops.py julia [op ...]      bench/functions_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/functions_ops.py compare
 #
 # The input in bench/out/functions: 1000 centres C (m-3m) with weights w of a de la Vallee Poussin
@@ -26,7 +27,8 @@ ALGORITHM = [
   {"name": "harmonic transforms",
    "entry": {"matlab": ["@SO3FunHarmonic.eval", "@SO3FunHarmonic.quadrature", "@S2FunHarmonic.eval", "@S2FunHarmonic.quadrature"],
              "python": ["mtex.functions.so3fun.SO3FunHarmonic.eval", "mtex.functions.so3fun.SO3FunHarmonic.quadrature",
-                        "mtex.functions.s2fun.S2FunHarmonic.eval", "mtex.functions.s2fun.S2FunHarmonic.quadrature"]},
+                        "mtex.functions.s2fun.S2FunHarmonic.eval", "mtex.functions.s2fun.S2FunHarmonic.quadrature"],
+             "julia": ["SO3FunHarmonic", "S2FunHarmonic"]},
    "cases": {"so3_eval": "SO3FunHarmonic(odf) at 1e5 orientations, L = 64, m-3m",
              "so3_quadrature": "SO3FunHarmonic.quadrature, 1e5 nodes, L = 32, triclinic",
              "s2_quadrature": "S2FunHarmonic.quadrature, 1e5 nodes, L = 128",
@@ -34,7 +36,8 @@ ALGORITHM = [
    "tolerance": 1e-6},
   {"name": "radial basis functions",
    "entry": {"matlab": ["@SO3FunRBF.eval", "@SO3FunRBF.calcFourier"],
-             "python": ["mtex.functions.rbf.SO3FunRBF.eval", "mtex.functions.rbf.SO3FunRBF._harmonic"]},
+             "python": ["mtex.functions.rbf.SO3FunRBF.eval", "mtex.functions.rbf.SO3FunRBF._harmonic"],
+             "julia": ["SO3FunRBF", "SO3FunHarmonic"]},
    "cases": {"rbf_direct": "the ODF of 1000 centres at 1e4 orientations by its kernel sum",
              "rbf_harmonic": "SO3FunHarmonic(odf), bandwidth 64"},
    # MATLAB's kernel sum is 0.39 off its own harmonic form, which agrees with this port's to 1e-9;
@@ -42,7 +45,8 @@ ALGORITHM = [
    "tolerance": {"rbf_direct": 1e-3, "rbf_harmonic": 1e-6}},
   {"name": "least squares approximation",
    "entry": {"matlab": ["@SO3FunHarmonic.interpolate", "@S2FunHarmonic.interpolate"],
-             "python": ["mtex.functions.density.interpolate"]},
+             "python": ["mtex.functions.density.interpolate"],
+             "julia": ["interpolate"]},
    "cases": {"so3_interpolate": "SO3FunHarmonic.interpolate, 2e4 nodes, L = 16, triclinic, at 1e4 orientations",
              "s2_interpolate": "S2FunHarmonic.interpolate, 2e4 nodes, L = 48, at 1e4 directions"},
    # both ports stop LSQR at a relative residual of 1e-3 on SO(3) and 1e-6 on the sphere
@@ -120,4 +124,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or [c for a in ALGORITHM for c in a["cases"]]
   {"export": export, "run": lambda: run(names),
    "matlab": lambda: crosscheck.matlab("bench_functions_ops", repr(OUT), crosscheck.cellOf(names), str(K)),
+   "julia": lambda: crosscheck.julia("functions_ops.jl", ALGORITHM, sys.argv[2:]),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS.get(op, 1), deviation)}[cmd]()

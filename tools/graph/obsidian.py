@@ -20,12 +20,14 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from query import G, testReach  # noqa: E402
+from scan_julia import matlabClasses  # noqa: E402
 
 VAULT = os.path.expanduser("~/mtex/graph-vault")
 
 
-# the note a node belongs to, or None for a test, a doc page, a benchmark or a dispatch node
-def container(n, nodes):
+# the note a node belongs to, or None for a test, a doc page, a benchmark or a dispatch node; a
+# Julia method joins the MATLAB class its type stands for, else the note of its source file
+def container(n, nodes, mClasses=()):
   if n["port"] == "matlab":
     if n["kind"] in ("method", "class") and n.get("cls"):
       return n["cls"]
@@ -41,6 +43,9 @@ def container(n, nodes):
       return n["cls"]
     if n["kind"] in ("function", "module") and n.get("file", "").startswith("mtex/"):
       return "py." + n["file"][5:-3].replace("/", ".").replace(".__init__", "")
+  if n["port"] == "julia" and n["kind"] == "method" and n["file"].startswith("lib/"):
+    cs = matlabClasses(n.get("cls"), mClasses)
+    return cs[0] if cs else "jl." + n["file"].split("/")[1] + "." + os.path.basename(n["file"])[:-3]
   return None
 
 
@@ -68,9 +73,11 @@ README = """# The MTEX dependency graph
 and link into it - they show up as backlinks there.
 
 - `generated/layers/` one note per layer, the way in
-- `generated/classes/` a class of MATLAB and Python under one name: its members, their
-  counterpart in the other port, whether a test reaches them, what it calls and is called by
-- `generated/modules/` a Python module (`py.`) or a MATLAB folder of functions (`m.`)
+- `generated/classes/` a class of MATLAB, Python and Julia under one name: its members (a Julia
+  method by the type of its first argument), their counterparts in the other code bases,
+  whether a test reaches them, what it calls and is called by
+- `generated/modules/` a Python module (`py.`), a MATLAB folder of functions (`m.`) or a Julia
+  source file (`jl.`) with the methods whose type is no MATLAB class
 - `generated/algorithms/` the cross-port benchmarks: entry points, cases, time per port and
   where it goes
 - `generated/memory/`, `generated/docs/` the agent memory, ADRs, research notes and plans
@@ -93,12 +100,13 @@ def write_vault(vault):
   shutil.rmtree(out, ignore_errors=True)
   os.makedirs(os.path.join(vault, "notes"), exist_ok=True)
 
-  owner = {i: container(n, nodes) for i, n in nodes.items()}
+  mClasses = {n["name"] for n in nodes.values() if n["port"] == "matlab" and n["kind"] == "class"}
+  owner = {i: container(n, nodes, mClasses) for i, n in nodes.items()}
   members = defaultdict(list)
   for i, c in owner.items():
     if c and nodes[i]["kind"] not in ("class", "module", "local"):
       members[c].append(i)
-  reached = testReach(G_, "matlab") | testReach(G_, "python")
+  reached = testReach(G_, "matlab") | testReach(G_, "python") | testReach(G_, "julia")
   cov = G_.g.get("coverage", {})
 
   # the notes linked from the graph, under the names their files and their links use
@@ -150,7 +158,7 @@ def write_vault(vault):
         algoOf[owner[e["dst"]]].add(name)
     lines = [f"---\ntype: algorithm\n---\n# {n['name']}\n", f"benchmarks: {', '.join(n.get('files', []))}\n"]
     for port, es in n["entry"].items():
-      lines.append(f"- {port}: " + ", ".join(link(owner.get(('m:' if port == 'matlab' else 'py:') + e) or e, e) for e in es))
+      lines.append(f"- {port}: " + ", ".join(link(owner.get(build.PREFIX[port] + e) or e, e) for e in es))
     profs = [p for p in G_.g["profiles"] if p["algorithm"] == n["name"]]
     for case in sorted({p["case"] for p in profs}):
       lines.append(f"\n## {case}\n\n{n.get('cases', {}).get(case, '')}\n")
@@ -185,14 +193,14 @@ def write_vault(vault):
       plumb = " (plumbing)" if n.get("plumbing") else ""
       rows.append(f"| {n['name']}{plumb} | {n['port']} | {cp} | {tested} | `{n.get('file', '')}:{n.get('line', '')}` |")
     top = lambda d: " ".join(link(k) for k, _ in sorted(d.items(), key=lambda kv: -kv[1])[:25])
-    text = [f"---\ntype: {'class' if not c.startswith(('py.', 'm.')) else 'module'}\nlayer: {layer}\nports: [{', '.join(ports)}]\n"
+    text = [f"---\ntype: {'class' if not c.startswith(('py.', 'm.', 'jl.')) else 'module'}\nlayer: {layer}\nports: [{', '.join(ports)}]\n"
             f"members: {len(ms)}\nwithCounterpart: {sum(1 for i in ms if G_.counterparts(i))}\n---\n# {c}\n",
             f"layer {link('layer ' + layer)}" + ("; algorithms " + ", ".join(link(a) for a in sorted(algoOf[c])) if algoOf[c] else ""),
             "\n## Members\n\n| name | port | counterpart | tested | where |\n|---|---|---|---|---|", *rows,
             f"\n## Calls\n\n{top(calls)}", f"\n## Called by\n\n{top(calledBy)}"]
     if notes:
       text.append("\n## Notes\n\n" + " ".join(link(x) for x in sorted(notes)))
-    write(os.path.join(out, "classes" if not c.startswith(("py.", "m.")) else "modules", slug(c) + ".md"), "\n".join(text) + "\n")
+    write(os.path.join(out, "classes" if not c.startswith(("py.", "m.", "jl.")) else "modules", slug(c) + ".md"), "\n".join(text) + "\n")
 
   for layer, cs in layers.items():
     write(os.path.join(out, "layers", slug(f"layer {layer}") + ".md"),

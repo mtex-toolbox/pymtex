@@ -4,15 +4,16 @@
 #   query.py node <node>                      where it is, counterparts, callers, callees, tests, notes, algorithms
 #   query.py callers <node> [-d 3]            who reaches it, by depth; --dispatch also through ambiguous receivers
 #   query.py callees <node> [-d 2]
-#   query.py impact <node|file>               transitive callers in both ports, the tests and algorithms that reach it
+#   query.py impact <node|file>               transitive callers in every code base, the tests and algorithms that reach it
 #   query.py algo [<name>]                    an algorithm's entry points and where its time goes, port by port
-#   query.py gaps <prefix>                    MATLAB functions under a folder without a Python counterpart
+#   query.py gaps <prefix> [--port julia]     MATLAB functions under a folder without a Python (Julia) counterpart
 #   query.py questions [<text>]               the research questions the notes ask, filtered by text, file or a named node
-#   query.py layer <layer>                    a layer in both ports: counterparts, tests, notes, algorithms, per class
+#   query.py layer <layer>                    a layer in MATLAB and both ports: counterparts, tests, notes, algorithms, per class
 #
-# A node is its id (m:@rotation.calcDensity, py:mtex.functions.density.calcDensity), a unique
-# name, "@Class.method", "Class.method" or a source file path. A graph older than any of its
-# sources is rebuilt first, about five seconds.
+# A node is its id (m:@rotation.calcDensity, py:mtex.functions.density.calcDensity, jl:calcDensity),
+# a name, "@Class.method", "Class.method" or a source file path. A name stands for the MATLAB and
+# Python definitions of it and the Julia generic, calcGrains also for calcGrains!. A graph older
+# than any of its sources is rebuilt first, about fifteen seconds.
 from __future__ import annotations
 
 import argparse
@@ -51,7 +52,9 @@ class G:
             and n["kind"] not in ("local", "dispatch")]
     if hits:
       return hits
-    return [i for i, n in self.nodes.items() if n.get("name") == q and n["kind"] in ("function", "method", "class")]
+    return [i for i, n in self.nodes.items() if n["kind"] in ("function", "method", "class")
+            and (n.get("name") == q or n["port"] == "julia" and n.get("name") == q + "!")
+            and not (n["port"] == "julia" and n["kind"] == "method")]
 
   def where(self, i):
     n = self.nodes[i]
@@ -83,6 +86,11 @@ class G:
   def counterparts(self, i):
     return [(e["dst"], e["resolution"]) for e in self.out[i] if e["kind"] == "counterpart"] + \
            [(e["src"], e["resolution"]) for e in self.inn[i] if e["kind"] == "counterpart"]
+
+  # the counterparts of a node in one port; a Julia generic has those of its methods too
+  def unitCounterparts(self, i, port):
+    ids = [i] + ([e["dst"] for e in self.out[i] if e["kind"] == "dispatch"] if self.nodes[i]["port"] == "julia" else [])
+    return [j for k in ids for j, _ in self.counterparts(k) if self.nodes.get(j, {}).get("port") == port]
 
   def tests(self, ids, depth=12, dispatch=False):
     found = set()
@@ -212,12 +220,12 @@ def cmdAlgo(G_, name):
 NOT_PORTED = {"calcFEMODF", "neuralgas", "hex2cube", "cube2hex", "calcInvTaylor", "S2FunGrid"}
 
 
-def cmdGaps(G_, prefix):
+def cmdGaps(G_, prefix, port):
   mNodes = [n for n in G_.nodes.values() if n["port"] == "matlab" and n["kind"] in ("function", "method")
             and n.get("file", "").startswith(prefix) and not n.get("plumbing") and n["name"] not in NOT_PORTED]
-  missing = [n for n in mNodes if not G_.counterparts(n["id"])]
+  missing = [n for n in mNodes if not G_.unitCounterparts(n["id"], port)]
   print(f"MATLAB under {prefix}: {len(mNodes)} functions and methods besides plumbing, "
-        f"{len(mNodes) - len(missing)} with a Python counterpart")
+        f"{len(mNodes) - len(missing)} with a {port.capitalize()} counterpart")
   byDir = defaultdict(list)
   for n in missing:
     byDir[os.path.dirname(n["file"])].append(n["name"])
@@ -236,36 +244,40 @@ def pct(a, b):
 
 
 def cmdLayer(G_, layer):
-  units = lambda port: [n for n in G_.nodes.values() if n["port"] == port and n.get("layer") == layer
-                        and n["kind"] in ("function", "method") and not n.get("plumbing")
-                        and not (port == "python" and n["name"].startswith("_") and not n["name"].startswith("__"))]
+  # a Julia unit is an exported generic function, matched when it or one of its methods is
+  def units(port):
+    return [n for n in G_.nodes.values() if n["port"] == port and n.get("layer") == layer and not n.get("plumbing")
+            and (n["kind"] == "function" and n.get("exported") if port == "julia" else n["kind"] in ("function", "method"))
+            and not (port != "matlab" and n["name"].startswith("_") and not n["name"].startswith("__"))]
   hasNote = lambda i: any(e["kind"] == "note" for e in G_.inn[i])
+  ports = [("matlab", "MATLAB"), ("python", "Python"), ("julia", "Julia")]
+  us = {p: units(p) for p, _ in ports}
+  reach = {p: testReach(G_, p) for p, _ in ports}
+  count = lambda p, f: (sum(bool(f(n)) for n in us[p]), len(us[p]))
   print(f"layer {layer}")
-  print(f"{'':34s}{'MATLAB':>22s}{'Python':>24s}")
-  m, p = units("matlab"), units("python")
-  rm, rp = testReach(G_, "matlab"), testReach(G_, "python")
-  rows = [("functions and methods", len(m), len(m), len(p), len(p)),
-          ("with a counterpart", sum(bool(G_.counterparts(n["id"])) for n in m), len(m),
-           sum(bool(G_.counterparts(n["id"])) for n in p), len(p)),
-          ("reached by a test (static)", sum(n["id"] in rm for n in m), len(m), sum(n["id"] in rp for n in p), len(p)),
-          ("run by a test (measured)", sum(n["id"] in G_.g["coverage"] for n in m), len(m),
-           sum(n["id"] in G_.g["coverage"] for n in p), len(p)),
-          ("mentioned in a note", sum(hasNote(n["id"]) for n in m), len(m), sum(hasNote(n["id"]) for n in p), len(p))]
-  for label, a, b, c, d in rows:
-    print(f"  {label:32s}{pct(a, b):>22s}  {pct(c, d):>22s}")
+  print(f"{'':34s}" + "".join(f"{label:>24s}" for _, label in ports))
+  rows = [("functions and methods (Julia: exported)", lambda p: count(p, lambda n: True))]
+  rows += [(f"with a {label} counterpart", lambda p, q=q: count(p, lambda n: G_.unitCounterparts(n["id"], q)) if p != q else None)
+           for q, label in ports]
+  rows += [("reached by a test (static)", lambda p: count(p, lambda n: n["id"] in reach[p])),
+           ("run by a test (measured)", lambda p: count(p, lambda n: n["id"] in G_.g["coverage"]) if p != "julia" else None),
+           ("mentioned in a note", lambda p: count(p, lambda n: hasNote(n["id"])))]
+  for label, f in rows:
+    print(f"  {label:32s}" + "".join(f"{pct(*c) if c else '':>24s}" for c in (f(p) for p, _ in ports)))
   plumb = sum(1 for n in G_.nodes.values() if n["port"] == "matlab" and n.get("layer") == layer and n.get("plumbing"))
   print(f"  MATLAB plumbing left out: {plumb} (subsref, display, get./set., ...)")
-  algos = sorted({e["src"] for n in m + p for e in G_.inn[n["id"]] if e["kind"] == "entry"})
+  algos = sorted({e["src"] for p in us for n in us[p] for e in G_.inn[n["id"]] if e["kind"] == "entry"})
   print(f"  algorithms with an entry point here: {', '.join(a[5:] for a in algos) or 'none'}")
-  print(f"\n  {'MATLAB class':24s} {'methods':>7s} {'matched':>7s} {'tested':>7s}  Python class")
+  print(f"\n  {'MATLAB class':24s} {'methods':>7s} {'Python':>7s} {'Julia':>7s} {'tested':>7s}  Python class")
   byCls = defaultdict(list)
-  for n in m:
+  for n in us["matlab"]:
     byCls[n.get("cls") or "(functions)"].append(n)
   pyCls = {n["name"] for n in G_.nodes.values() if n["port"] == "python" and n["kind"] == "class"}
   for c, ns in sorted(byCls.items(), key=lambda kv: -len(kv[1])):
-    matched = sum(bool(G_.counterparts(n["id"])) for n in ns)
-    tested = sum(n["id"] in rm for n in ns)
-    print(f"  {c:24s} {len(ns):7d} {matched:7d} {tested:7d}  {'yes' if c in pyCls else '-'}")
+    py = sum(bool(G_.unitCounterparts(n["id"], "python")) for n in ns)
+    jl = sum(bool(G_.unitCounterparts(n["id"], "julia")) for n in ns)
+    tested = sum(n["id"] in reach["matlab"] for n in ns)
+    print(f"  {c:24s} {len(ns):7d} {py:7d} {jl:7d} {tested:7d}  {'yes' if c in pyCls else '-'}")
 
 
 def main():
@@ -275,6 +287,7 @@ def main():
   ap.add_argument("-d", "--depth", type=int, default=3)
   ap.add_argument("--dispatch", action="store_true", help="also walk through method names of untyped receivers")
   ap.add_argument("--graph", default=os.path.join(HERE, "out", "graph.json"))
+  ap.add_argument("--port", default="python", choices=("python", "julia"), help="the port gaps looks at")
   a = ap.parse_args()
   sys.path.insert(0, HERE)
   import build
@@ -298,7 +311,7 @@ def main():
   elif a.cmd == "questions":
     cmdQuestions(G_, a.arg)
   elif a.cmd == "gaps":
-    cmdGaps(G_, a.arg or "")
+    cmdGaps(G_, a.arg or "", a.port)
   else:
     sys.exit(__doc__)
 

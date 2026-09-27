@@ -3,6 +3,7 @@
 #
 #   .venv/bin/python bench/io_ops.py run [op ...]        this port
 #   .venv/bin/python bench/io_ops.py matlab [op ...]     bench/matlab/bench_io_ops.m through the bridge
+#   .venv/bin/python bench/io_ops.py julia [op ...]      bench/io_ops.jl, the Julia port on the same files
 #   .venv/bin/python bench/io_ops.py compare
 #
 # A map is written as rows (x, y, phase, a, b, c, d), the phase 0 for notIndexed and the rows
@@ -26,7 +27,8 @@ FILES = {"load_ctf": os.path.join(DATA, "EBSD", "Forsterite.ctf"), "load_ang": o
 ALGORITHM = [
   {"name": "EBSD import",
    "entry": {"matlab": ["@EBSD.load", "loadEBSD_ang", "loadEBSD_ctf"],
-             "python": ["mtex.io.load.loadEBSD", "mtex.io.ang.loadEBSD_ang", "mtex.io.ctf.loadEBSD_ctf"]},
+             "python": ["mtex.io.load.loadEBSD", "mtex.io.ang.loadEBSD_ang", "mtex.io.ctf.loadEBSD_ctf"],
+             "julia": ["loadEBSD", "loadAng", "loadCtf"]},
    "cases": {"load_ctf": "EBSD.load of Forsterite.ctf, every measurement",
              "load_ang": "EBSD.load of ferrite.ang, hexagonal grid",
              "load_osc": "EBSD.load of olivineopticalmap.ang, an optical map",
@@ -35,7 +37,8 @@ ALGORITHM = [
    "tolerance": 1e-6},
   {"name": "pole figure import",
    "entry": {"matlab": ["@PoleFigure.load", "loadPoleFigure_dubna"],
-             "python": ["mtex.io.loadpolefigure.loadPoleFigure", "mtex.io.loadpolefigure.loadPoleFigure_dubna"]},
+             "python": ["mtex.io.loadpolefigure.loadPoleFigure", "mtex.io.loadpolefigure.loadPoleFigure_dubna"],
+             "julia": ["loadPoleFigure", "readDubna"]},
    "cases": {"load_dubna": "PoleFigure.load of the seven Dubna quartz pole figures with their superposition"},
    "tolerance": 1e-12},
 ]
@@ -95,4 +98,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"run": lambda: run(names),
    "matlab": lambda: [crosscheck.matlab("bench_io_ops", repr(OUT), crosscheck.cellOf([op]), "1e8", timeout=290) for op in names],
+   "julia": lambda: crosscheck.julia("io_ops.jl", ALGORITHM, names),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)}[cmd]()

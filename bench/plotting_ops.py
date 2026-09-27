@@ -4,6 +4,7 @@
 #   .venv/bin/python bench/plotting_ops.py export              the input
 #   .venv/bin/python bench/plotting_ops.py run [op ...]        this port
 #   .venv/bin/python bench/plotting_ops.py matlab [op ...]     bench/matlab/bench_plotting_ops.m through the bridge
+#   .venv/bin/python bench/plotting_ops.py julia [op ...]      bench/plotting_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/plotting_ops.py compare
 #
 # The colours are rows (r, g, b); MATLAB's orientation2color decides itself whether it goes
@@ -24,7 +25,8 @@ SYM = {"m3m": "m-3m", "6mmm": "6/mmm"}
 ALGORITHM = [
   {"name": "map plotting",
    "entry": {"matlab": ["@ipfColorKey.orientation2color"],
-             "python": ["mtex.plotting.orientationkeys.ipfColorKey.orientation2color"]},
+             "python": ["mtex.plotting.orientationkeys.ipfColorKey.orientation2color"],
+             "julia": ["IPFColorKey", "color", "keyColors", "colorGrid"]},
    "cases": {"ipf_m3m": "ipfHSVKey(cs).orientation2color(ori), 1e5 orientations, m-3m, through the grid",
              "ipf_exact_m3m": "the same colours exactly, direction by direction",
              "ipf_6mmm": "ipfHSVKey(cs).orientation2color(ori), 1e5 orientations, 6/mmm, through the grid",
@@ -67,4 +69,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"export": export, "run": lambda: run(names),
    "matlab": lambda: crosscheck.matlab("bench_plotting_ops", repr(OUT), crosscheck.cellOf(names), str(N)),
+   "julia": lambda: crosscheck.julia("plotting_ops.jl", ALGORITHM, names),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)}[cmd]()

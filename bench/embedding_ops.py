@@ -4,6 +4,7 @@
 #   .venv/bin/python bench/embedding_ops.py export              the input
 #   .venv/bin/python bench/embedding_ops.py run [op ...]        this port
 #   .venv/bin/python bench/embedding_ops.py matlab [op ...]     bench/matlab/bench_embedding_ops.m through the bridge
+#   .venv/bin/python bench/embedding_ops.py julia [op ...]      bench/embedding_ops.jl, the Julia port
 #   .venv/bin/python bench/embedding_ops.py compare
 #
 # The input in bench/out/embedding: 1e5 random orientations O, the same turned by 5 degree about
@@ -29,7 +30,8 @@ ALGORITHM = [
   {"name": "orientation embedding",
    "entry": {"matlab": ["@embedding.embedding", "@embedding.project", "@embedding.mean"],
              "python": ["mtex.analysis.embedding.embedding.__init__", "mtex.analysis.embedding.embedding.project",
-                        "mtex.analysis.embedding.embedding.mean"]},
+                        "mtex.analysis.embedding.embedding.mean"],
+             "julia": ["embedding", "project", "mean"]},
    "cases": {"embed_m3m": "embedding(ori), 1e5 orientations, m-3m: the distance of every image to the first",
              "project_m3m": "orientation((e(O) + e(P)) / 2), 1e4 midpoints, m-3m",
              "mean_m3m": "orientation(mean(embedding(C))), 1e5 orientations about one centre, m-3m",
@@ -95,4 +97,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"export": export, "run": lambda: run(names),
    "matlab": lambda: crosscheck.matlab("bench_embedding_ops", repr(OUT), crosscheck.cellOf(names), str(N)),
+   "julia": lambda: crosscheck.julia("embedding_ops.jl", ALGORITHM, names),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)}[cmd]()

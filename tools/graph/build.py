@@ -1,14 +1,15 @@
-# the dependency graph of MTEX and its Python port, rebuilt from the sources, never edited
+# the dependency graph of MTEX and its Python and Julia ports, rebuilt from the sources, never edited
 #
 #   .venv/bin/python tools/graph/build.py [--matlab ../master] [--memory DIR ...]    writes tools/graph/out/graph.json
 #
-# Layers, each regenerated: the static call graphs of both ports (scan_matlab.py, scan_python.py),
-# the counterpart edges between them (same class and method names, the MATLAB names a Python
-# header or docstring cites, the names the imported port answers to), the notes that mention a node (agent memory, TODO.md, ADRs,
-# docs/research, the research notes of MATLAB master's tests and of the Julia port), the research
+# Layers, each regenerated: the static call graphs of the three code bases (scan_matlab.py,
+# scan_python.py, scan_julia.py), the counterpart edges between them (same class and method names,
+# the MATLAB names a Python docstring or a Julia comment cites, the names the imported port answers
+# to), the notes that mention a node (agent memory, TODO.md, ADRs, docs/research, the research
+# notes of MATLAB master's tests, the Julia port's research, plans and ADRs), the research
 # questions those notes ask (every subsection, or else every bullet, under a heading naming questions
 # or a research agenda), the algorithms the benchmarks declare (bench/*.py, ALGORITHM) with the
-# profiles their runs leave in bench/out/<algorithm>/, and the coverage the test runs leave in
+# profiles their runs leave in bench/out/<algorithm>/ (the Julia halves bench/*_ops.jl included), and the coverage the test runs leave in
 # tools/graph/out/coverage_<port>.json.
 from __future__ import annotations
 
@@ -25,11 +26,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import scan_matlab  # noqa: E402
+import scan_julia  # noqa: E402
 import scan_python  # noqa: E402
 
 OUT = os.path.join(HERE, "out")
 JULIA = os.path.join(os.path.dirname(ROOT), "mtexJulia")
-MEMORY = [os.path.expanduser(f"~/.claude/projects/-home-hielscher-mtex-{p}/memory") for p in ("master", "pymtex")]
+MEMORY = [os.path.expanduser(f"~/.claude/projects/-home-hielscher-mtex-{p}/memory") for p in ("master", "pymtex", "mtexJulia")]
 # names too common to link a note by: they would attach every note to every class
 GENERIC = set("""eval plot mean size length find angle dot norm sum max min abs sqrt display char
 inv times mtimes plus minus rotate project symmetrise conj real imag disp subsref subsasgn
@@ -42,13 +44,13 @@ class Index:
     self.byId = {n["id"]: n for n in nodes}
     self.byName = {}
     self.byFile = {}
-    self.mClass, self.pClass = {}, {}
+    self.mClass, self.pClass, self.jClass = {}, {}, {}
     for n in nodes:
       self.byName.setdefault((n["port"], n.get("name")), []).append(n["id"])
       if n.get("file") and n["kind"] not in ("local", "dispatch"):
         self.byFile.setdefault(n["file"], []).append(n["id"])
       if n["kind"] == "class":
-        (self.mClass if n["port"] == "matlab" else self.pClass)[n["name"]] = n
+        {"matlab": self.mClass, "python": self.pClass, "julia": self.jClass}[n["port"]][n["name"]] = n
     self.mMethods = {}
     for n in nodes:
       if n["port"] == "matlab" and n["kind"] == "method":
@@ -285,7 +287,7 @@ def notes(ix, sources):
 # the nodes a text names: in backticks, as @Class/method, or as a source file
 def mentions(ix, text):
   tick = re.compile(r"`([^`\n]{1,120})`")
-  token = re.compile(r"[@\w./+-]*\w")
+  token = re.compile(r"[@\w./+-]*\w!?")
   cands = set()
   for span in tick.findall(text):
     cands |= set(token.findall(span))
@@ -333,17 +335,23 @@ def mentioned(ix, c):
     mod = "py:module:" + c[:-3].replace("/", ".")
     return [mod] if mod in ix.byId else []
   m = re.fullmatch(r"@?(\w+)[/.](\w+)", c)
-  if m and (m.group(1) in ix.mClass or m.group(1) in ix.pClass):
+  if m and (m.group(1) in ix.mClass or m.group(1) in ix.pClass or m.group(1) in ix.jClass):
     out = [ix.mLookup(m.group(1), m.group(2))]
     out += [i for i in ix.byName.get(("python", m.group(2)), []) if ix.byId[i].get("cls") == m.group(1)]
+    out += [f"jl:{m.group(2)}"] if m.group(1) in ix.jClass and f"jl:{m.group(2)}" in ix.byId else []
     return [o for o in out if o]
-  if not re.fullmatch(r"[A-Za-z]\w{3,}", c) or c in GENERIC:
+  if not re.fullmatch(r"[A-Za-z]\w{3,}!?", c) or c in GENERIC:
     return []
-  if c in ix.mClass or c in ix.pClass:
-    return [x["id"] for x in (ix.mClass.get(c), ix.pClass.get(c)) if x]
+  if c in ix.mClass or c in ix.pClass or c in ix.jClass:
+    return [x["id"] for x in (ix.mClass.get(c), ix.pClass.get(c), ix.jClass.get(c)) if x]
   ids = [i for p in ("matlab", "python") for i in ix.byName.get((p, c), [])
          if ix.byId[i]["kind"] in ("function", "method")]
+  # a Julia name is its generic, not each of its methods
+  ids += [f"jl:{c}"] if f"jl:{c}" in ix.byId else []
   return ids if len(ids) <= 8 else []
+
+
+PREFIX = {"matlab": "m:", "python": "py:", "julia": "jl:"}
 
 
 # the ALGORITHM declarations of every benchmark: a literal dict or list of dicts, read without
@@ -372,23 +380,25 @@ def algorithms(ix, benchDir):
           n["files"].append(os.path.relpath(path, ROOT))
   nodes, edges = [], []
   for n in algos.values():
-    n["missing"] = [e for port, es in n["entry"].items() for e in es
-                    if (("m:" if port == "matlab" else "py:") + e) not in ix.byId]
+    n["missing"] = [e for port, es in n["entry"].items() for e in es if PREFIX[port] + e not in ix.byId]
     nodes.append(n)
-    edges += [dict(src=n["id"], dst=("m:" if port == "matlab" else "py:") + e, kind="entry", resolution="declared")
-              for port, es in n["entry"].items() for e in es]
+    edges += [dict(src=n["id"], dst=PREFIX[port] + e, kind="entry", resolution="declared")
+              for port, es in n["entry"].items() for e in es if PREFIX[port] + e in ix.byId]
   return nodes, edges
 
 
 # the node a raw function record of a port's profiler stands for: MATLAB by file and function
-# name, Python by file and the last definition starting at or before the record's line
+# name, Python and Julia by file and the last definition starting at or before the record's line
+# (a Julia record's line is its method's first line)
 def recordMapper(ix, matlabRoot):
-  mFile, pFile = {}, {}
+  mFile, pFile, jFile = {}, {}, {}
   for n in ix.byId.values():
     if n["port"] == "matlab" and n.get("file"):
       mFile.setdefault(os.path.join(matlabRoot, n["file"]), []).append(n)
     elif n["port"] == "python" and n.get("file") and n["kind"] not in ("module", "class"):
       pFile.setdefault(os.path.join(ROOT, n["file"]), []).append(n)
+    elif n["port"] == "julia" and n.get("file") and n["kind"] in ("method", "bench", "test"):
+      jFile.setdefault(os.path.normpath(os.path.join(JULIA, n["file"])), []).append(n)
 
   def mapM(rec):
     cands = mFile.get(rec["file"], [])
@@ -396,11 +406,11 @@ def recordMapper(ix, matlabRoot):
     hit = [n for n in cands if n["name"] == sub] or [n for n in cands if n["kind"] != "local"]
     return hit[0]["id"] if hit else None
 
-  def mapP(rec):
-    cands = [n for n in pFile.get(rec["file"], []) if n["line"] <= rec["line"]]
+  def mapP(rec, byFile=pFile):
+    cands = [n for n in byFile.get(rec["file"], []) if n["line"] <= rec["line"]]
     return max(cands, key=lambda n: n["line"])["id"] if cands else None
 
-  return lambda port, rec: mapM(rec) if port == "matlab" else mapP(rec)
+  return lambda port, rec: mapM(rec) if port == "matlab" else mapP(rec, jFile) if port == "julia" else mapP(rec)
 
 
 # the profile a benchmark run left: raw function records mapped onto node ids
@@ -419,6 +429,7 @@ def profiles(ix, benchOut, matlabRoot):
       a["total"] += r["total"]
       a["calls"] += r["calls"]
       for c, t in r.get("children", []):
+        c = int(c)
         ck = ids[c] or f"external:{recs[c]['name']}"
         if ck != key:
           a["children"][ck] = a["children"].get(ck, 0.0) + t
@@ -452,8 +463,9 @@ def stale(graph=os.path.join(OUT, "graph.json"), matlabRoot=None, memory=MEMORY)
   mRoot = matlabRoot or json.load(open(graph)).get("matlabRoot", os.path.join(os.path.dirname(ROOT), "master"))
   skip = scan_matlab.SKIP | {".venv", "__pycache__", "build", "matlab", "out"}
   roots = [(mRoot, (".m", ".md")), (os.path.join(ROOT, "mtex"), (".py",)), (os.path.join(ROOT, "tests"), (".py",)),
-           (os.path.join(ROOT, "bench"), (".py",)), (HERE, (".py",)), (os.path.join(ROOT, "docs"), (".md",))]
-  roots += [(d, (".md",)) for d in memory] + [(os.path.join(JULIA, "docs", "research"), (".md",))]
+           (os.path.join(ROOT, "bench"), (".py", ".jl")), (HERE, (".py", ".jl")), (os.path.join(ROOT, "docs"), (".md",))]
+  roots += [(d, (".md",)) for d in memory] + [(os.path.join(JULIA, "docs"), (".md",))]
+  roots += [(os.path.join(JULIA, d), (".jl",)) for d in ("lib", "test", "bench")]
   for root, ext in roots:
     for dirpath, dirnames, filenames in os.walk(root):
       dirnames[:] = [d for d in dirnames if d not in skip]
@@ -472,25 +484,29 @@ def main(argv=None):
   mRoot = os.path.abspath(args.matlab)
   mn, me = scan_matlab.build(mRoot)
   pn, pe = scan_python.build(ROOT)
+  jn, je = scan_julia.build(JULIA, ROOT)
   for n in mn + pn:
     n["layer"] = layerOf(n)
     if isPlumbing(n):
       n["plumbing"] = True
-  ix = Index(mn + pn)
+  ix = Index(mn + pn + jn)
   ce = counterparts(ix, pn)
+  ce += scan_julia.counterparts(ix, jn)
   sources = [(f"memory-{os.path.basename(os.path.dirname(d)).split('-')[-1]}", os.path.join(d, "*.md")) for d in args.memory]
   sources += [("matlab", os.path.join(mRoot, "TODO.md")),
              ("matlab-adr", os.path.join(mRoot, "docs", "adr", "*.md")),
              ("python-research", os.path.join(ROOT, "docs", "research", "*.md")),
              ("python-plans", os.path.join(ROOT, "docs", "plans", "*.md")),
              ("matlab-tests", os.path.join(mRoot, "tests", "*.md")),
-             ("julia-research", os.path.join(JULIA, "docs", "research", "*.md"))]
+             ("julia-research", os.path.join(JULIA, "docs", "research", "*.md")),
+             ("julia-plans", os.path.join(JULIA, "docs", "plans", "*.md")),
+             ("julia-adr", os.path.join(JULIA, "docs", "adr", "*.md"))]
   nn, ne = notes(ix, sources)
   an, ae = algorithms(ix, os.path.join(ROOT, "bench"))
   prof = profiles(ix, os.path.join(ROOT, "bench", "out"), mRoot)
   cov = coverage(ix, mRoot)
-  g = dict(built=time.strftime("%Y-%m-%d %H:%M"), matlabRoot=mRoot, pythonRoot=ROOT,
-           nodes=mn + pn + nn + an, edges=me + pe + ce + ne + ae, profiles=prof, coverage=cov)
+  g = dict(built=time.strftime("%Y-%m-%d %H:%M"), matlabRoot=mRoot, pythonRoot=ROOT, juliaRoot=JULIA,
+           nodes=mn + pn + jn + nn + an, edges=me + pe + je + ce + ne + ae, profiles=prof, coverage=cov)
   os.makedirs(OUT, exist_ok=True)
   json.dump(g, open(os.path.join(OUT, "graph.json"), "w"))
   kinds = {}

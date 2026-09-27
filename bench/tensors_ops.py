@@ -4,6 +4,7 @@
 #   .venv/bin/python bench/tensors_ops.py export              the input
 #   .venv/bin/python bench/tensors_ops.py run [op ...]        this port
 #   .venv/bin/python bench/tensors_ops.py matlab [op ...]     bench/matlab/bench_tensors_ops.m through the bridge
+#   .venv/bin/python bench/tensors_ops.py julia [op ...]      bench/tensors_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/tensors_ops.py compare
 #
 # The input in bench/out/tensors: 1e5 orientations O and directions V. The stiffness is the olivine
@@ -25,25 +26,28 @@ OUT = os.path.join(HERE, "out", "tensors")
 ALGORITHM = [
   {"name": "tensor rotation",
    "entry": {"matlab": ["@tensor.rotate", "@tensor.inv"],
-             "python": ["mtex.tensors.tensor.tensor.rotate", "mtex.tensors.tensor.tensor.inv"]},
+             "python": ["mtex.tensors.tensor.tensor.rotate", "mtex.tensors.tensor.tensor.inv"],
+             "julia": ["rotate", "inv"]},
    "cases": {"rotate": "ori * C of the olivine stiffness, 1e5 orientations",
              "inv": "inv of the 1e5 rotated stiffness tensors"},
    "tolerance": 1e-12},
   {"name": "tensor average",
    "entry": {"matlab": ["@orientation.calcTensor", "@SO3Fun.calcTensor"],
-             "python": ["mtex.analysis.texture.calcTensor"]},
+             "python": ["mtex.analysis.texture.calcTensor"],
+             "julia": ["calcTensor"]},
    "cases": {"average_ori": "calcTensor(ori, C, 'Hill'), 1e5 orientations",
              "average_odf": "calcTensor(odf, C), the Voigt average over a unimodal ODF"},
    # MATLAB's ODF average is 2.3e-8 off the quadrature of the ODF's own values, this port's 1e-9
    "tolerance": {"average_ori": 1e-10, "average_odf": 5e-8}},
   {"name": "elastic wave velocities",
    "entry": {"matlab": ["@stiffnessTensor.velocity", "@stiffnessTensor.YoungsModulus"],
-             "python": ["mtex.analysis.elasticity.velocity", "mtex.analysis.elasticity.YoungsModulus"]},
+             "python": ["mtex.analysis.elasticity.velocity", "mtex.analysis.elasticity.YoungsModulus"],
+             "julia": ["velocity", "YoungsModulus"]},
    "cases": {"velocity": "vp, vs1, vs2 of the olivine stiffness in 1e5 directions",
              "youngs": "YoungsModulus in 1e5 directions"},
    "tolerance": 1e-10},
   {"name": "Taylor model",
-   "entry": {"matlab": ["@strainTensor.calcTaylor"], "python": ["mtex.analysis.taylor.calcTaylor"]},
+   "entry": {"matlab": ["@strainTensor.calcTaylor"], "python": ["mtex.analysis.taylor.calcTaylor"], "julia": ["calcTaylor"]},
    "cases": {"taylor": "calcTaylor(inv(ori) * eps, sS), the factor of 1e4 orientations",
              "taylor_fun": "calcTaylor(eps, sS), the factor as an SO3Fun, at 1e4 orientations"},
    # MATLAB's linprog stops at its optimality tolerance; the harmonic factor is a fit to a kink
@@ -116,4 +120,5 @@ if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or [c for a in ALGORITHM for c in a["cases"]]
   {"export": export, "run": lambda: run(names),
    "matlab": lambda: crosscheck.matlab("bench_tensors_ops", repr(OUT), crosscheck.cellOf(names), str(N)),
+   "julia": lambda: crosscheck.julia("tensors_ops.jl", ALGORITHM, names),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS.get(op, 1), deviation)}[cmd]()

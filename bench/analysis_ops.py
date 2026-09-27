@@ -5,6 +5,7 @@
 #   .venv/bin/python bench/analysis_ops.py export              the input
 #   .venv/bin/python bench/analysis_ops.py run [op ...]        this port
 #   .venv/bin/python bench/analysis_ops.py matlab [op ...]     bench/matlab/bench_analysis_ops.m through the bridge
+#   .venv/bin/python bench/analysis_ops.py julia [op ...]      bench/analysis_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/analysis_ops.py compare
 #
 # The input in bench/out/analysis: 1e5 orientations O and directions V, and four clouds of 500
@@ -28,32 +29,34 @@ OUT = os.path.join(HERE, "out", "analysis")
 ALGORITHM = [
   {"name": "dislocation density",
    "entry": {"matlab": ["@EBSD.calcGND", "@EBSD.curvature", "@curvatureTensor.fitDislocationSystems"],
-             "python": ["mtex.analysis.dislocations.calcGND", "mtex.analysis.dislocations.fitDislocationSystems"]},
+             "python": ["mtex.analysis.dislocations.calcGND", "mtex.analysis.dislocations.fitDislocationSystems"],
+             "julia": ["calcGND", "curvature", "fitDislocationSystems"]},
    "cases": {"gnd": "calcGND(ebsd, dS) of the dc06 map, bcc edge and screw systems, every pixel"},
    # the densities are minima of a linear program, unique in their sum
    "tolerance": 1e-6},
   {"name": "grain boundary normal distribution",
-   "entry": {"matlab": ["@grainBoundary.calcGBND"], "python": ["mtex.analysis.gbnd.calcGBND"]},
+   "entry": {"matlab": ["@grainBoundary.calcGBND"], "python": ["mtex.analysis.gbnd.calcGBND"], "julia": ["calcGBND"]},
    "cases": {"gbnd": "calcGBND(gB, ebsd, 5 degree, 'nonneg') of the twins map at 2000 directions"},
    # the boundaries differ in three segments of 3162 where they meet the border of the map
    "tolerance": 1e-3},
   {"name": "Schmid factor",
-   "entry": {"matlab": ["@slipSystem.SchmidFactor"], "python": ["mtex.geometry.slipsystem.slipSystem.SchmidFactor"]},
+   "entry": {"matlab": ["@slipSystem.SchmidFactor"], "python": ["mtex.geometry.slipsystem.slipSystem.SchmidFactor"],
+             "julia": ["SchmidFactor"]},
    "cases": {"schmid": "sS.SchmidFactor(inv(ori) * x) of the 24 fcc systems, both slip directions, 1e5 orientations"},
    # the ports list the systems in their own order: every row compared sorted
    "tolerance": 1e-12},
   {"name": "birefringence",
-   "entry": {"matlab": ["@refractiveIndexTensor.birefringence"], "python": ["mtex.analysis.optics.birefringence"]},
+   "entry": {"matlab": ["@refractiveIndexTensor.birefringence"], "python": ["mtex.analysis.optics.birefringence"], "julia": ["birefringence"]},
    "cases": {"birefringence": "the birefringence of the forsterite-fayalite mixture of the BirefringenceDemo page, 1e5 directions"},
    # MATLAB's eig2 is 1.3e-11 off the extended precision difference of the two indices, this port 1e-15
    "tolerance": 1e-9},
   {"name": "clustering",
-   "entry": {"matlab": ["@orientation.calcCluster"], "python": ["mtex.analysis.cluster.calcCluster"]},
+   "entry": {"matlab": ["@orientation.calcCluster"], "python": ["mtex.analysis.cluster.calcCluster"], "julia": ["calcCluster"]},
    "cases": {"cluster": "calcCluster(ori, 'numCluster', 4, 'method', 'hierarchical'), 2000 orientations in 432"},
    # the centres are means of clusters that may differ by a few border orientations
    "tolerance": 1e-2},
   {"name": "discrete sampling",
-   "entry": {"matlab": ["@S2Fun.optimalSample"], "python": ["mtex.analysis.optimalsample.optimalSample"]},
+   "entry": {"matlab": ["@S2Fun.optimalSample"], "python": ["mtex.analysis.optimalsample.optimalSample"], "julia": ["optimalSample"]},
    "cases": {"optimal_s2": "optimalSample(1 + 0.6 z, 300, 'bandwidth', 16): the moments of the nodes"},
    # both are approximations of one density, apart by what each misses of it
    "tolerance": 2e-2},
@@ -158,5 +161,6 @@ def deviation(op, a, b):
 if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "compare", sys.argv[2:] or list(COLS)
   {"export": export, "run": lambda: run(names),
+   "julia": lambda: crosscheck.julia("analysis_ops.jl", ALGORITHM, names),
    "matlab": lambda: [crosscheck.matlab("bench_analysis_ops", repr(OUT), crosscheck.cellOf([op]), "1e7", timeout=290) for op in names],
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, lambda op: COLS[op], deviation)}[cmd]()

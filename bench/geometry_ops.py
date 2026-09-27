@@ -5,7 +5,7 @@
 #   .venv/bin/python bench/geometry_ops.py export               the input, N = 1e6 of each kind
 #   .venv/bin/python bench/geometry_ops.py run [op ...]         this port: best of five, one profiled run, the results
 #   .venv/bin/python bench/geometry_ops.py matlab [op ...]      bench/matlab/bench_geometry_ops.m through the bridge of ../master
-#   .venv/bin/python bench/geometry_ops.py julia                bench/geometry.jl and bench/gridsearch.jl, times only
+#   .venv/bin/python bench/geometry_ops.py julia [op ...]       bench/geometry_ops.jl, the Julia port on the same input
 #   .venv/bin/python bench/geometry_ops.py compare
 #
 # The input in bench/out/geometry: four sets of unit quaternions A B C D and two of unit vectors
@@ -16,8 +16,6 @@
 from __future__ import annotations
 
 import os
-import re
-import subprocess
 import sys
 
 import numpy as np
@@ -31,11 +29,12 @@ import crosscheck  # noqa: E402
 ALGORITHM = [
   {"name": "rotation products",
    "entry": {"matlab": ["@quaternion.times", "@rotation.times", "@quaternion.mtimes"],
-             "python": ["mtex.geometry.quaternion.quaternion.__mul__", "mtex.geometry.quaternion.rotation.__mul__"]},
+             "python": ["mtex.geometry.quaternion.quaternion.__mul__", "mtex.geometry.quaternion.rotation.__mul__"],
+             "julia": ["*"]},
    "cases": {"r_s": "r .* s, 1e6 rotations", "r_v": "r .* v, 1e6 rotations and vectors"},
    "tolerance": 1e-12},
   {"name": "symmetry-reduced dot",
-   "entry": {"matlab": ["@orientation.dot"], "python": ["mtex.geometry.orientation.orientation.dot"]},
+   "entry": {"matlab": ["@orientation.dot"], "python": ["mtex.geometry.orientation.orientation.dot"], "julia": ["dot"]},
    "cases": {"dot_ori_ori2": "dot(ori, ori2), m-3m, 1e6 pairs", "dot_ori_ref": "dot(ori, ref), one reference",
              "dot_mori_mori2": "dot(mori, mori2), m-3m -> 6/mmm", "dot_mori_mref": "dot(mori, mref)"},
    "tolerance": 1e-12},
@@ -43,14 +42,16 @@ ALGORITHM = [
    "entry": {"matlab": ["@orientation.project2FundamentalRegion", "@vector3d.project2FundamentalRegion",
                         "@Miller.project2FundamentalRegion"],
              "python": ["mtex.geometry.symmetryops.project2FundamentalRegion",
-                        "mtex.geometry.orientation.orientation.project2FundamentalRegion"]},
+                        "mtex.geometry.orientation.orientation.project2FundamentalRegion"],
+             "julia": ["project2FundamentalRegion", "batchedSymReduce"]},
    "cases": {"p2fr_m": "project2FundamentalRegion(m), m-3m", "p2fr_ori_ref": "project2FundamentalRegion(ori, ref)",
              "p2fr_ori_ori2": "project2FundamentalRegion(ori, ori2)", "p2fr_mori_mref": "project2FundamentalRegion(mori, mref)",
              "p2fr_mori_mori2": "project2FundamentalRegion(mori, mori2)"},
    "tolerance": 1e-12},
   {"name": "orientation grid search",
    "entry": {"matlab": ["equispacedSO3Grid", "@SO3Grid.find"],
-             "python": ["mtex.geometry.grids.so3grid.equispacedSO3Grid", "mtex.geometry.grids.search.find"]},
+             "python": ["mtex.geometry.grids.so3grid.equispacedSO3Grid", "mtex.geometry.grids.search.find"],
+             "julia": ["equispacedSO3Grid", "nearest", "neighbours"]},
    "cases": {"grid_build": "equispacedSO3Grid(m-3m, 2.5 degree)", "grid_nearest": "find(grid, ori), 1e4 queries",
              "grid_radius": "find(grid, ori, 7.5 degree), 2000 queries"},
    "tolerance": 2e-2},
@@ -115,21 +116,9 @@ def run(ops):
   crosscheck.run(OUT, ALGORITHM, operations(inputs()), ops, always=("grid_build",))
 
 
-# the Julia twins print one line per operation on their own random input: times only
-def julia():
-  jl = ["julia", "--project=" + os.path.join(os.path.dirname(ROOT), "mtexJulia", "dev"), "-t", "auto"]
-  names = {"r * s": "r_s", "r * v": "r_v", "dot(ori, ori2)": "dot_ori_ori2", "dot(ori, ref)": "dot_ori_ref",
-           "dot(mori, mori2)": "dot_mori_mori2", "dot(mori, mref)": "dot_mori_mref", "project2FR(m)": "p2fr_m",
-           "project2FR(ori, ref)": "p2fr_ori_ref", "project2FR(ori, ori2)": "p2fr_ori_ori2",
-           "project2FR(mori, mref)": "p2fr_mori_mref", "project2FR(mori, mori2)": "p2fr_mori_mori2",
-           "build": "grid_build", "nearest": "grid_nearest", "radius": "grid_radius"}
-  for script in ("geometry.jl", "gridsearch.jl"):
-    r = subprocess.run(jl + [os.path.join(HERE, script)], capture_output=True, text=True, timeout=290)
-    print(r.stdout, r.stderr[-1000:])
-    for line in r.stdout.splitlines():
-      m = re.match(r"\s*(.+?)\s+(?:\d+\s+)?([\d.]+) ms", line)
-      if m and m.group(1).strip() in names:
-        open(os.path.join(OUT, f"julia_{names[m.group(1).strip()]}.txt"), "w").write(f"{float(m.group(2)) / 1e3}\n")
+# the Julia half, bench/geometry_ops.jl on the same input
+def julia(ops):
+  crosscheck.julia("geometry_ops.jl", ALGORITHM, ops)
 
 
 def deviation(op, a, b):
@@ -153,6 +142,6 @@ def cols(op):
 
 if __name__ == "__main__":
   cmd, names = sys.argv[1] if len(sys.argv) > 1 else "run", sys.argv[2:] or [c for a in ALGORITHM for c in a["cases"]]
-  {"export": export, "run": lambda: run(names), "julia": julia,
+  {"export": export, "run": lambda: run(names), "julia": lambda: julia(sys.argv[2:]),
    "matlab": lambda: crosscheck.matlab("bench_geometry_ops", repr(OUT), crosscheck.cellOf(names), str(K), str(NQ), str(NR)),
    "compare": lambda: crosscheck.compare(OUT, ALGORITHM, cols, deviation)}[cmd]()
