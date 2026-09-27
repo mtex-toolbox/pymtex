@@ -46,7 +46,10 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 - The padding `gridify` adds to close a grid is notIndexed (phase 0, since a phase id indexes
   the phase list) and marked in `ebsd.isPadding`, MATLAB's NaN phase: the extent, the phase
   counts and selections, the plots, the decomposition and `fill` leave it out, so a grid
-  segments exactly as its list does. New code over a map's cells must do the same.
+  segments exactly as its list does. New code over a map's cells must do the same. The one
+  exception is `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)`: a grain's polygon puts
+  the padding it holds inside the scan, so it is filled and stops being padding, as MATLAB's
+  `fill(ebsd, grains, 'gridify')` fills the dropped sites of a sparse map.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `calcGrains` alters the map it is given, as the Julia port does and MATLAB's

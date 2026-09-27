@@ -318,10 +318,10 @@ twinGBCDSummary
 
 # ## Technical Details
 #
-# `calcGBND` estimates from a planar section with the `nonneg` and `bump` kernels; MATLAB's
-# default kernel, which inverts the integral equation of the section, is not ported. The
-# three-dimensional grains, `grain3d` and the DREAM.3D reader, are not ported either, so
-# the second half of the page is MATLAB's code and MATLAB's numbers. MATLAB's run of the
+# `calcGBND` estimates from a planar section with the default kernel, which inverts the
+# integral equation of the section and agrees with MATLAB's to the digit, or with the
+# `nonneg` and `bump` kernels. The second half of the page, on three-dimensional grains,
+# is still MATLAB's code and MATLAB's numbers. MATLAB's run of the
 # two-dimensional half failed on its NFFT library, so its numbers are those of the MATLAB
 # page's text. The crystal GBND takes the symmetry of the phase, as the numbers of the page
 # require: without it the peak lies 8.4 degrees from the twin plane. The tension-twin GBCD

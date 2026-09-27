@@ -172,8 +172,9 @@ class SO3FunRBF:
     fo = folds(self.CS, self.SS)
     if self.center.size == 0:
       fhat = np.zeros(deg2dim(L + 1), dtype=complex)
-    # many centres are rounded onto a grid, whose FFT costs nothing per centre (MATLAB's
-    # crossover of 10 L^3, SO3FunRBF/calcFourier); exact asks for the transform at the centres
+    # many centres are rounded onto a grid, whose FFT costs nothing per centre (above 2 L^3,
+    # where MATLAB's SO3FunRBF/calcFourier crosses at 10 L^3); exact asks for the transform at
+    # the centres
     elif self.center.size > GRIDDED_ROTATIONS_PER_L3 * L ** 3 and not exact:
       fhat = wignerSeriesAdjointGridded(self.center, np.ones(self.center.size), L, weights=self.weights, folds=fo)
     else:

@@ -13,13 +13,20 @@ def section():
   return ebsd, grains, grains.boundary["indexed"]
 
 
-def test_the_kernel_is_nonnegative_and_the_default_waits():
+def test_the_kernel_is_nonnegative():
   Psi, psi = calcGBNDKernel(5 * degree, nonneg=True)
   t = np.linspace(-1, 1, 101)
   assert np.all(Psi.eval(t) >= 0) and Psi.eval(0.0) > Psi.eval(0.5)
   assert psi.bandwidth == 62 and psi.antipodal
-  with pytest.raises(NotImplementedError):
-    calcGBNDKernel(5 * degree)
+
+
+def test_the_default_kernel_inverts_the_integral_equation():
+  # MATLAB's calcGBNDKernel(5*degree) with chebfun, to its printed digits
+  Psi, psi = calcGBNDKernel(5 * degree)
+  assert np.allclose(Psi.eval(np.array([0, 0.05, 0.1, 0.3, 1.0])),
+                     [276.147304114098, 167.866113593382, -9.03704578585202, -20.5916324566095, 2.91254597144238], rtol=1e-9)
+  assert np.isclose(Psi.A[6], -55.4416483062927, rtol=1e-9) and np.all(Psi.A[1::2] == 0)
+  assert psi.bandwidth == 62 and psi.antipodal
 
 
 def test_a_density_of_axes_in_the_crystal_frame(section):
@@ -27,6 +34,8 @@ def test_a_density_of_axes_in_the_crystal_frame(section):
   f = calcGBND(gB, ebsd, halfwidth=10 * degree, nonneg=True)
   assert f.frame is gB.CSList[int(gB.phaseId[0, 0])] and f.antipodal
   assert np.isclose(f.mean(), 1, atol=1e-3)
+  # the default kernel, a density of mean one too
+  assert np.isclose(calcGBND(gB, ebsd, halfwidth=10 * degree).mean(), 1, atol=1e-3)
   # the grains give the orientations of their means, the same boundaries
   g = calcGBND(gB, grains, halfwidth=10 * degree, nonneg=True)
   assert np.isclose(g.mean(), 1, atol=1e-3)

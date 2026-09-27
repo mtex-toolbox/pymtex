@@ -79,10 +79,11 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   comp[~isData | (comp < 0)] = 0
   source = np.where(comp > 0, np.arange(n), -1)
   offs = np.array([tuple(int(x) for x in o) for o in l.stencil], dtype=np.int64)
-  # fill=grains: an empty pixel is filled only inside the grain whose polygon holds it
+  # fill=grains: an empty pixel is filled only inside the grain whose polygon holds it, a
+  # cell of padding too, which a grain's polygon puts inside the scan
   host = None
   if fill is not False and fill is not None and hasattr(fill, "checkInside"):
-    empty = np.flatnonzero(~isData & ~ebsd.isPadding.reshape(-1))
+    empty = np.flatnonzero(~isData)
     host = np.zeros(n, dtype=np.int64)
     if len(empty):
       from ..geometry.vector3d import vector3d
@@ -90,12 +91,12 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
       has = hit.any(axis=1)
       host[empty[has]] = fill.id[np.argmax(hit[has], axis=1)]
   if fill is not False and fill is not None:
-    # the padding of a grid lies outside the scan, whatever extrapolate asks
+    # the padding of a grid lies outside the scan, whatever extrapolate asks, unless a grain holds it
     if host is not None:
       outside = host == 0
     else:
       outside = np.zeros(n, dtype=bool) if extrapolate else outsideMask(l, lk, isData)
-    outside |= ebsd.isPadding.reshape(-1)
+      outside |= ebsd.isPadding.reshape(-1)
     front = np.flatnonzero(comp > 0)
     while len(front):
       nxt = []
@@ -292,7 +293,7 @@ def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
 def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
   F = l1TVFilter() if F is None else F
   window = isinstance(F, windowFilter)
-  out = ebsd.fill(extrapolate=extrapolate) if fill and window else ebsd.copy()
+  out = ebsd.fill(grains=fill if hasattr(fill, "checkInside") else None, extrapolate=extrapolate) if fill and window else ebsd.copy()
   comp, edges, isData, source = smoothingGraph(out, fill=False if window else fill, extrapolate=extrapolate)
   u, ref = tangentField(out, comp, isData)
   v = _applyFilter(F, out, comp, edges, isData, u, False)
@@ -306,22 +307,59 @@ def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
 # exactly as they are: the hole is filled with the continuation of the field that encloses
 # it. A pixel the outside reaches without crossing a measurement stays empty, unless
 # extrapolate. The numeric properties are filled by the same solve, the labels copied from
-# the nearest measured pixel
-def fill(ebsd, F=None, extrapolate=False):
+# the nearest measured pixel. fill(ebsd, grains), MATLAB's form, fills a pixel only from the
+# grain whose polygon holds it: one inside no grain becomes notIndexed, one its grain's
+# measurements do not reach over the lattice takes the grain's mean orientation
+def fill(ebsd, F=None, grains=None, extrapolate=False):
+  if F is not None and hasattr(F, "checkInside"):
+    F, grains = None, F
   F = l1TVFilter() if F is None else F
-  out = ebsd.copy()
-  comp, edges, isData, source = smoothingGraph(out, fill=True, extrapolate=extrapolate)
-  if not np.any((comp > 0) & ~isData):
-    return out
-  u, ref = tangentField(out, comp, isData)
   if isinstance(F, windowFilter):
     raise TypeError(f"{type(F).__name__} has no variational form and cannot fill; use a spline or half quadratic filter")
-  v = _applyFilter(F, out, comp, edges, isData, u, True)
-  _writeBack(out, comp, ref, v, isData, source, ~isData)
-  for key, val in out.prop.items():
-    if np.issubdtype(np.asarray(val).dtype, np.floating):
-      _solveProperty(out, key, F, comp, edges, isData, True)
+  if grains is not None and "grainId" not in ebsd.prop:
+    raise ValueError("filling within grains needs the grain ids of the map; reconstruct them with calcGrains(ebsd)")
+  out = ebsd.copy()
+  comp, edges, isData, source = smoothingGraph(out, fill=True if grains is None else grains, extrapolate=extrapolate)
+  if np.any((comp > 0) & ~isData):
+    u, ref = tangentField(out, comp, isData)
+    v = _applyFilter(F, out, comp, edges, isData, u, True)
+    _writeBack(out, comp, ref, v, isData, source, ~isData)
+    for key, val in out.prop.items():
+      if np.issubdtype(np.asarray(val).dtype, np.floating):
+        _solveProperty(out, key, F, comp, edges, isData, True)
+  if grains is not None:
+    _fillFromGrains(out, grains, comp == 0)
   return out
+
+
+# the empty pixels the flood did not reach: the grain whose polygon holds one gives it its
+# phase, id and mean orientation, and one in no grain is notIndexed
+def _fillFromGrains(ebsd, grains, unreached):
+  empty = np.flatnonzero(unreached & ~ebsd.isPadding.reshape(-1))
+  if not len(empty):
+    return
+  from ..geometry.vector3d import vector3d
+  hit = grains.checkInside(vector3d(ebsd.pos.data.reshape(-1, 3)[empty], frame=ebsd.frame))
+  has = hit.any(axis=1)
+  k = np.argmax(hit[has], axis=1)
+  ph, gid = ebsd.phaseId.reshape(-1), ebsd.prop["grainId"].reshape(-1)
+  ph[empty[has]] = grains.phaseId[k]
+  gid[empty[has]] = grains.id[k]
+  ebsd.rotations.data.reshape(-1, 4)[empty[has]] = grains.meanRotation.data.reshape(-1, 4)[k]
+  _unpad(ebsd, empty[has])
+  # a measured cell in no grain is notIndexed, a cell of padding stays padding
+  out = empty[~has & ~ebsd.isPadding.reshape(-1)[empty]]
+  ph[out] = 0
+  gid[out] = 0
+
+
+# cells of padding that now hold a value are cells of the map
+def _unpad(ebsd, sel):
+  if ebsd._pad is not None:
+    # a copy of a map shares the flags with its source
+    pad = ebsd._pad.copy()
+    pad.reshape(-1)[sel] = False
+    object.__setattr__(ebsd, "_pad", pad if pad.any() else None)
 
 
 # the orientations of the pixels written back from the field, and for the ones that were
@@ -333,6 +371,7 @@ def _writeBack(ebsd, comp, ref, v, isData, source, sel):
   rot[w] = _expAt(ref[comp], v, w).astype(rot.dtype)
   filled = w & ~isData & (source >= 0)
   ph[filled] = ph[source[filled]]
+  _unpad(ebsd, filled)
   for key, val in ebsd.prop.items():
     if not np.issubdtype(np.asarray(val).dtype, np.floating):
       flat = val.reshape(-1, *val.shape[ebsd.ndim:])

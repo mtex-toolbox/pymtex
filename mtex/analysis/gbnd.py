@@ -7,10 +7,13 @@
 # grain boundary character distribution
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 
 from ..functions.density import calcDensity
-from ..functions.kernelfunctions import S2KernelHandle, SO3DeLaValleePoussinKernel, SO3DirichletKernel
+from ..functions.kernelfunctions import (S2DeLaValleePoussinKernel, S2Kernel, S2KernelHandle, SO3DeLaValleePoussinKernel,
+                                         SO3DirichletKernel)
 from ..functions.s2fun import S2FunHarmonic
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -25,22 +28,86 @@ BANDWIDTH = 62
 
 # calcGBNDKernel(halfwidth=10*degree, nonneg=True): the kernel Psi of the inclination, a
 # function of the cosine to the trace, normalised so that a uniform distribution of planes
-# gives one, and the spherical function psi(v) = Psi(v.z) sin(angle(v, x)) it is applied as
+# gives one, and the spherical function psi(v) = Psi(v.z) sin(angle(v, x)) it is applied as;
+# without nonneg or bump Psi is the solution of the integral equation that makes the density
+# of the normals the de la Vallee Poussin kernel of that halfwidth, or the S2Kernel given
+# in its place
 def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   from scipy.integrate import quad
   from scipy.special import ellipe
   if nonneg:
     s = np.sin(halfwidth)
-    Psi = lambda t: 2 / np.sqrt(2 * np.pi) / s * np.exp(-0.5 * (np.asarray(t) / s) ** 2) / 0.5437
+    Psi = S2KernelHandle(lambda t: 2 / np.sqrt(2 * np.pi) / s * np.exp(-0.5 * (np.asarray(t) / s) ** 2) / 0.5437)
   elif bump:
-    Psi = lambda t: (np.abs(np.asarray(t)) < np.arcsin(halfwidth)).astype(float)
+    Psi = S2KernelHandle(lambda t: (np.abs(np.asarray(t)) < np.arcsin(halfwidth)).astype(float))
   else:
-    raise NotImplementedError("the default kernel of calcGBND inverts an integral equation; pass nonneg=True or bump=True")
+    if isinstance(halfwidth, S2Kernel):
+      Psi = S2Kernel(_inclinationKernel(halfwidth))
+    else:
+      Psi = S2Kernel(_defaultInclination(float(halfwidth)))
   # the normalisation against the complete elliptic integral of the second kind, MATLAB's ellip2ke
-  c = (np.pi / 2) / quad(lambda t: float(Psi(t)) * ellipe(1 - t * t), 0, 1, limit=200)[0]
-  kernel = lambda t: c * Psi(t)
-  psi = lambda v: kernel(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, noSymmetry=True))
-  return S2KernelHandle(kernel), S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
+  c = (np.pi / 2) / quad(lambda t: float(Psi.eval(t)) * ellipe(1 - t * t), 0, 1, limit=200)[0]
+  Psi = S2KernelHandle(lambda t, fun=Psi.fun: c * fun(t)) if isinstance(Psi, S2KernelHandle) else S2Kernel(c * Psi.A)
+  psi = lambda v: Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, noSymmetry=True))
+  return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
+
+
+# the inclination kernel of the de la Vallee Poussin kernel of a halfwidth, a solve of five
+# seconds, computed once
+@functools.lru_cache(maxsize=8)
+def _defaultInclination(halfwidth):
+  return _inclinationKernel(S2DeLaValleePoussinKernel(halfwidth=halfwidth))
+
+
+# the Legendre coefficients up to degree 127 of the inclination kernel f whose density of
+# normals is the kernel K: g(t) = 4 int_0^{pi/2} k(theta, t) f(t sin(theta)) dtheta with
+# g(t) = K(sqrt(1 - t^2)), discretised by Nystrom at 1000 Chebyshev points and 120
+# Gauss-Legendre nodes in theta, f the interpolant through the solution extended evenly
+def _inclinationKernel(K, N=1000, nTheta=120, degree=128):
+  from scipy.special import ellipe, ellipk
+  t = (1 - np.cos(np.pi * np.arange(N) / (N - 1))) / 2
+  w = (-1.0) ** np.arange(N)
+  w[0] /= 2
+  w[-1] /= 2
+  x, wx = np.polynomial.legendre.leggauss(nTheta)
+  theta, wth = (x + 1) * np.pi / 4, wx * np.pi / 4
+
+  # the barycentric interpolation rows at the points y
+  def rows(y):
+    d = y[:, None] - t[None, :]
+    hit = np.abs(d) < 1e-14
+    d[hit] = 1
+    r = w / d
+    r /= r.sum(axis=1, keepdims=True)
+    exact = hit.any(axis=1)
+    r[exact] = hit[exact]
+    return r
+
+  # the kernel k(theta, t) = I01(a, b) through the elliptic integrals of parameter m = b / a,
+  # scipy's taking m < 0 as it is
+  def k(th, tv):
+    a = 1 - tv ** 2 + tv ** 2 * np.sin(th) ** 2
+    b = 1 - 2 * tv ** 2 + tv ** 2 * np.sin(th) ** 2
+    m = b / a
+    small = np.abs(m) < 1e-12
+    ms = np.where(small, 1.0, m)
+    with np.errstate(invalid="ignore"):
+      v = np.sqrt(a) * ((ms + 1) * ellipe(ms) + (ms - 1) * ellipk(ms)) / (3 * ms)
+    v = np.where(small, np.sqrt(a) * np.pi / 4, v)
+    return np.where(m == 1, 2 / 3 * np.sqrt(a), v)
+
+  A = np.empty((N, N))
+  for i, ti in enumerate(t):
+    A[i] = (4 * k(theta, ti) * wth) @ rows(ti * np.sin(theta))
+  f = np.linalg.solve(A, K.eval(np.sqrt(1 - t ** 2))) / 0.32
+  # the coefficients of the even extension, (2n + 1) int_0^1 f P_n, exact for the interpolant
+  xq, wq = np.polynomial.legendre.leggauss(N)
+  xq, wq = (xq + 1) / 2, wq / 2
+  fq = rows(xq) @ f
+  P = np.polynomial.legendre.legvander(xq, degree - 1)
+  c = (2 * np.arange(degree) + 1) * ((wq * fq) @ P)
+  c[1::2] = 0
+  return c
 
 
 # the orientations on the two sides of every segment: the measurements beside it or the

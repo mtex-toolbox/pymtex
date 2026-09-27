@@ -116,8 +116,6 @@ def mtexdata(name=None, root=None, download=True, silent=False):
   if name is None:
     return SampleTable()
   d = _find(name)
-  if getattr(d["recipe"], "later", None):
-    d["recipe"](None)
   files = mtexdatafile(name, root, download) if d["files"] else None
   # a binary pair is one map, named by its first file
   if isinstance(files, list) and d["type"] == "EBSD":
@@ -246,11 +244,12 @@ def _emsphinx(path):
   return e
 
 
-def _later(what):
-  def recipe(files):
-    raise NotImplementedError(f"{what} is read by P4, which is not there yet; mtexdatafile gives the file")
-  recipe.later = what
-  return recipe
+# the olivine texture history of a VPSC run as the page reads it: one ODF of halfwidth 10
+# degrees per strain step; the slip activity is the second file of mtexdatafile('vpsc')
+def _vpsc(files):
+  from .loadodf import loadODF_VPSC
+  cs = crystalFrame("222", [4.762, 10.225, 5.994], mineral="olivine")
+  return loadODF_VPSC(files[0], halfwidth=10 * degree, CS=cs)
 
 
 # the pole figure sets: the crystal frame of the page, the directions the file names do
@@ -431,7 +430,7 @@ _dataset("smiley", "vector3d", "777 directions with the values of the smiley fun
          lambda p: loadVector3d(p, columnNames=["x", "y", "z", "values"]))
 _dataset("tongue", "orientation", "382 quartz orientations of the Tongue quartzite as Bunge Euler angles", "tongue",
          lambda p: loadOrientation(p, crystalFrame.load("quartz.cif"), columnNames=["phi1", "Phi", "phi2"])[0])
-_dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _later("a VPSC file"))
+_dataset("vpsc", "VPSC", "the texture and slip activity history of a VPSC olivine run", "vpsc", _vpsc)
 _dataset("trueEbsdWCCoSmall", "EBSD", "WC-Co map with four forescatter images of the same area, for TrueEBSD", "trueebsdwccosmall",
          _trueEbsdWCCoSmall)
 _dataset("xnovo", "EBSD3", "a simulated multiphase xnovo volume, a cylinder of nine phases", "xnovo", _volume)

@@ -205,3 +205,29 @@ def test_the_padding_of_a_grid_is_never_filled():
     assert np.all(f.isPadding.reshape(-1) == pad) and f.rotations.isnan().reshape(-1)[pad].all() and np.all(f.phaseId.reshape(-1)[pad] == 0)
   # the one measured notIndexed pixel is filled, since it is inside the scan
   assert len(g.fill(extrapolate=True)["notIndexed"]) == 0
+
+
+def test_fill_within_the_grains_fills_their_padding_too():
+  # a sparse map whose dropped measurements are padding of its grid, MATLAB's
+  # fill(ebsd, grains, 'gridify')
+  from mtex.io.sampledata import testGrainsMap as grainsMap
+  e = grainsMap()
+  sub = e[np.random.default_rng(1).random(e.size) > 0.6]
+  grains = calcGrains(sub, 5 * degree)
+  g = sub.gridify()
+  pad = g.isPadding.reshape(-1).copy()
+  f = fill(g, grains, splineFilter())
+  assert np.array_equal(g.isPadding.reshape(-1), pad)
+  measured = ~g.rotations.isnan().reshape(-1)
+  assert np.array_equal(f.rotations.data.reshape(-1, 4)[measured], g.rotations.data.reshape(-1, 4)[measured])
+  # what is left empty is padding outside every grain or a measured site in none
+  empty = f.rotations.isnan().reshape(-1)
+  assert pad.sum() > 1000 and f.isPadding.sum() < pad.sum() / 10
+  assert np.all(f.isPadding.reshape(-1)[empty] | (f.phaseId.reshape(-1)[empty] == 0))
+  # a filled site lies in the grain it was filled from
+  k = np.flatnonzero(pad & ~empty)[:200]
+  from mtex import vector3d
+  hit = grains.checkInside(vector3d(f.pos.data.reshape(-1, 3)[k], frame=f.frame))
+  assert np.all(hit[np.arange(len(k)), grains.id2ind(f.grainId.reshape(-1)[k])])
+  # the grains are the second argument or the keyword, and the filter may come first
+  assert np.array_equal(fill(g, splineFilter(), grains=grains).grainId, f.grainId)

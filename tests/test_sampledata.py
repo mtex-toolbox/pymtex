@@ -108,9 +108,11 @@ def test_testgrains_needs_no_file():
   assert len(grains) == 15
 
 
-def test_what_waits_on_P4_says_so():
-  with pytest.raises(NotImplementedError, match="P4"):
-    mtexdata("vpsc", download=False)
+@pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "VPSC")), reason="the MTEX data folder is not here")
+def test_the_vpsc_history_is_one_odf_per_step():
+  odf = mtexdata("vpsc", root=LOCAL, download=False)
+  assert len(odf) == 9 and odf[0].CS.mineral == "olivine"
+  assert np.isclose(odf[1].opt.strain, 0.5) and odf[0].opt.orientations.size == 1000
 
 
 @pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")

@@ -182,7 +182,7 @@ has to know.
 | Page | Missing |
 |---|---|
 | EBSDGrid | `gridLayout` with `'rowMajor'` and `'columnMajor'`, `ebsd.layout`, `oldId` and the second output of `gridify`, `gridify(ebsd, unitCell=)` resampling onto another cell, `spatialTransformProjective.byTilt` and `transform(ebsd, T)`; M10 |
-| EBSDFilling | `fill(ebsd, grains)` constrained by the grain polygons: a site outside every grain stays notIndexed, a corridor between grains is never filled; the port fills from the grain of the surrounding measurements and needs `extrapolate=True` for a hole that reaches the rim; `smooth(ebsd, F, fill=grains)` has the polygon form since 2026-09-23 | M8 |
+| EBSDFilling | `fill(ebsd, grains)` constrained by the grain polygons: a site outside every grain stays notIndexed, a corridor between grains is never filled | done 2026-09-27: `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)` fill a site, padding of a sparse grid included, only from the grain whose polygon holds it, the grain's mean orientation where its measurements do not reach |
 | EBSDFilling | the `quality` property `smooth` writes, zero where no orientation was measured |
 | VectorsOperations | `arrow3d`, the arrows in space of the vector sum; S5 |
 | VectorsOperations | the dynamic marker size: MTEX shrinks the markers of a long list, the port draws 764 directions at the size of one; S6 names it |
@@ -235,7 +235,7 @@ has to know.
 | S2Bingham | `ellipse(rot, a, b)` | added 2026-09-23 |
 | S2FunRadon | `radon(sF, delta)`, the means over small circles | added 2026-09-23 |
 | BoundaryPlots, EBSDAdvancedMaps | `PatalaColorKey` | not ported |
-| BoundaryNormalDistribution | `calcGBND`, `calcGBNDKernel` (`nonneg`, `bump`, the GBCD) | added 2026-09-23, `analysis/gbnd.py`; MATLAB's default kernel by inversion, `grain3d` and the DREAM.3D reader are missing |
+| BoundaryNormalDistribution | `calcGBND`, `calcGBNDKernel` (`nonneg`, `bump`, the GBCD) | added 2026-09-23, `analysis/gbnd.py`; the default kernel by inversion added 2026-09-27, MATLAB's to the digit; the 3D half of the page is still prose |
 | BoundaryCurvature | `testgrains.mat` is a MATLAB grain object | the port's `testgrains` is its own synthetic map; a one-off export of the file through the bridge would make it loadable |
 | BoundaryIntersections, BoundarySelect, CSLBoundaries | MATLAB's `[x, y] = gB.intersect(xy1, xy2)`, `line` and `scatter(x, y)` on maps, `legend('off')`, `xnum2str`, `project2FundamentalRegion('antipodal')` | added 2026-09-23 |
 

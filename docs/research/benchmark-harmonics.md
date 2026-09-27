@@ -271,7 +271,7 @@ Measured and left:
 ## The gridded adjoint, the NFFT for the whole chain, and calcODF against MATLAB, 2026-09-25
 
 **The gridded adjoint** (`wignerSeriesAdjointGridded`, MATLAB's `adjoint(..., 'gridded')`):
-above 10 L^3 centres `SO3FunRBF._harmonic` rounds them onto a Clenshaw-Curtis grid of
+above 2 L^3 centres (10 L^3 until 2026-09-27, MATLAB's crossover) `SO3FunRBF._harmonic` rounds them onto a Clenshaw-Curtis grid of
 bandwidth min(2L, max(L, 128)), folded by the z folds of the frames, and runs the grid's
 exact FFT adjoint. calcDensity of 1e7 Dubna samples 1.27 -> 0.77 s (MATLAB 1.06); the
 density's values move by 0.7 %, the rounding MATLAB accepts on the same grid.
@@ -319,3 +319,30 @@ call BLAS once per transform, do not move.
 The Dubna chain after it, s: `SO3Fun.dubna` 1.0 to 1.13 (the pole figures read and calcODF;
 MATLAB 0.31 from its cache, its calcODF 1.14), `discreteSample(1e7)` 0.54 to 0.59 (MATLAB
 1.5), `calcDensity` 0.92 to 1.0 (MATLAB 1.06); Julia 2.3 / 2.3 / 4.3.
+
+## The crossover of the gridded adjoint lowered to 2 L^3, 2026-09-27
+
+The 1C_1 map (2.2 million Fe-BCC pixels) with the UCV kernel of its grain means, 3.68
+degrees and L = 64, sat at 8.4 L^3, under MATLAB's 10 L^3: calcDensity ran finufft over every
+pixel, 1.05 s, where the grid takes 0.16 s and moves the density by 0.4 % in L2. The sweep over
+the Fe-BCC orientations of 1C_1, `calcDensity` both ways, best of three, the difference at
+5000 random orientations:
+
+| L | N / L^3 | finufft | gridded | rel. L2 |
+|---|---|---|---|---|
+| 25 | 1.3 | 0.012 s | 0.005 s | 4.7e-3 |
+| 25 | 96 | 0.202 s | 0.100 s | 2.3e-3 |
+| 38 | 1.8 | 0.035 s | 0.015 s | 4.2e-3 |
+| 38 | 27 | 0.213 s | 0.106 s | 2.4e-3 |
+| 50 | 0.8 | 0.047 s | 0.025 s | 6.3e-3 |
+| 50 | 12 | 0.216 s | 0.123 s | 3.3e-3 |
+| 64 (3.7 deg) | 1.9 | 0.797 s | 0.073 s | 5.2e-3 |
+| 64 (3.7 deg) | 5.7 | 0.894 s | 0.183 s | 4.2e-3 |
+| 64 (3.0 deg, cut) | 1.9 | 0.630 s | 0.098 s | 8.8e-3 |
+| 64 (2.4 deg, cut) | 1.9 | 0.587 s | 0.069 s | 1.5e-2 |
+| 64 (2.4 deg, cut) | 5.7 | 0.705 s | 0.147 s | 1.3e-2 |
+
+The grid wins from about 0.2 L^3 on; its error falls with N / L^3 and grows as the kernel
+narrows below what L = 64 resolves. 2 L^3 keeps the error under one percent but for kernels
+cut by the bandwidth cap; `exact=True` takes finufft at any size.
+

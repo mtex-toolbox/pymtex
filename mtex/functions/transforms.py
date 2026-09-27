@@ -715,8 +715,11 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
 # adjoint (MATLAB SO3FunHarmonic.adjoint(..., 'gridded')). The error is at most half the grid
 # spacing, pi/(4 NG) in beta, which a kernel of bandwidth L cannot see when the grid has
 # NG = min(2L, max(L, 128)); the cost no longer grows with the rotations. The folds act on the
-# folded angles, which is all a folded coefficient sees, so the grid covers their region only
-GRIDDED_ROTATIONS_PER_L3 = 10
+# folded angles, which is all a folded coefficient sees, so the grid covers their region only.
+# It is taken above 2 L^3 rotations, where it is faster than finufft by 2 to 12 times and the
+# density moves by 0.4 to 0.9 percent in L2, 1.5 at a 2.4 degree kernel cut at L = 64
+# (docs/research/benchmark-harmonics.md); MATLAB crosses at 10 L^3
+GRIDDED_ROTATIONS_PER_L3 = 2
 
 
 def wignerSeriesAdjointGridded(rots, values, L, weights=None, folds=(1, 1)):

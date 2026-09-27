@@ -98,20 +98,18 @@ hold(False)
 # divide the map into interiors that may be filled and boundary corridors that should
 # remain unresolved.
 
-# ## Filling by nearest-neighbour interpolation
+# ## Filling within the grains
 #
-# [fill](EBSD.fill.html) starts with nearest-neighbour interpolation. In MATLAB the
-# reconstructed grains are passed along: positions outside every grain are rejected and
-# an orientation is never carried across a grain boundary, the host grain's mean
-# orientation standing in where the nearest measurement belongs to another grain. This
-# port fills a hole from the grain the measurements around it belong to, and a hole that
-# reaches the rim of the map, as every hole of a sparse map does, is filled only with
-# `extrapolate=True`; the grain polygons do not constrain it yet. `gridify` first
-# materialises the empty sites of the scan lattice as a matrix-shaped map, which is what
-# `fill` then fills; it does not change which values are assigned.
+# [fill](EBSD.fill.html) estimates the missing orientations. Pass the reconstructed grains
+# whenever boundaries are known. MTEX then rejects positions outside every grain and
+# prevents an orientation from being carried across a grain boundary: a position is filled
+# only from the grain whose polygon holds it, and where the measurements of that grain do
+# not reach it, the grain's mean orientation stands in. `gridify` first materialises the
+# empty sites of the scan lattice as a matrix-shaped map, which is what `fill` then fills;
+# it does not change which values are assigned.
 
 # +
-ebsdSub_filled = fill(ebsdSub.gridify(), extrapolate=True)
+ebsdSub_filled = fill(ebsdSub.gridify(), grainsSub)
 
 plot(ebsdSub_filled['indexed'], ebsdSub_filled['indexed'].orientations, ipfDirection=zvector)
 
@@ -120,16 +118,16 @@ plot(grainsSub.boundary, lineWidth=1.5)
 hold(False)
 # -
 
-# The grain interiors are now coloured. Sharp patches remain because a nearest-neighbour
-# estimate repeats a measured orientation instead of creating a gradual orientation
-# field. In MATLAB, positions not covered by a grain remain notIndexed, which preserves
-# holes along the grain boundaries; here the corridors are filled from one side.
+# The grain interiors are now coloured. Positions not covered by a grain remain
+# notIndexed, which preserves holes along the grain boundaries. MATLAB's `fill` repeats the
+# nearest measurement, which leaves sharp patches; the port continues the orientation
+# field of the grain across the hole, by the edge preserving filter `smooth` uses.
 
 # ## Filling with a denoising filter
 #
 # A denoising filter can estimate the missing orientations while smoothing the
-# orientation field. Supply the option `fill=True` to [smooth](EBSD.smooth.html); the
-# grain ids in the map constrain it. The `halfQuadraticFilter` used here is a
+# orientation field. Supply the option `fill` and the grains to
+# [smooth](EBSD.smooth.html). The `halfQuadraticFilter` used here is a
 # total-variation method for rotation-valued data; its mathematical basis is described by
 # [Bergmann et al. (2016)](https://doi.org/10.3934/ipi.2016001).
 #
@@ -143,7 +141,7 @@ F = halfQuadraticFilter()
 F.alpha = 0.25
 
 # interpolate and smooth the missing orientations
-ebsdSub_smoothed = smooth(ebsdSub.gridify(), F, fill=True, extrapolate=True)
+ebsdSub_smoothed = smooth(ebsdSub.gridify(), F, fill=grainsSub)
 
 plot(ebsdSub_smoothed['indexed'], ebsdSub_smoothed['indexed'].orientations, ipfDirection=zvector)
 
@@ -238,15 +236,15 @@ hold(False)
 
 # ## Fill only grain interiors
 #
-# The option `fill=True` asks `smooth` to fill holes inside the grains. The grain ids the
-# reconstruction wrote into the map are what lets MTEX decide whether a position is
-# inside a grain. `notIndexed` positions along grain boundaries remain untouched.
+# The option `fill` asks `smooth` to fill holes inside the grains. Passing `grains` is what
+# lets MTEX decide whether a position is inside a grain. `notIndexed` positions along grain
+# boundaries remain untouched.
 
 # +
 F = halfQuadraticFilter()
 F.alpha = 10
 
-ebsdS = smooth(ebsd, F, fill=True)
+ebsdS = smooth(ebsd, F, fill=grains)
 
 plot(ebsdS['Fo'], ebsdS['Fo'].orientations, ipfDirection=zvector)
 hold(True)
