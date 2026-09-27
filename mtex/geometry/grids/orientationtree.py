@@ -27,6 +27,8 @@ def _angle(c):
 
 
 class OrientationTree:
+  """a k-d tree over the quaternions of an SO(3) grid and their negatives, the nearest, k-nearest
+  and radius search over the symmetric images of the queries, distances as cos(w/2)"""
 
   def __init__(self, grid):
     self.n = grid.size

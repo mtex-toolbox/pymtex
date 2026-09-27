@@ -33,6 +33,7 @@ from .nfft import NFFTPlan, nfftLibrary
 from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .harmonics import wignerSeries as _wignerSeriesDirect
 from .quadrature import bandwidthFor, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
+from ..geometry.display import display, sizeString
 
 DIRECT_SUM_NODES = 50
 # on the sphere a plan costs more than a trigonometric sum on the Fourier array up to here,
@@ -86,6 +87,8 @@ _HALF_PI_TABLES = {}
 
 
 def halfPiDegrees(L, dtype=np.float64):
+  """the Wigner-d matrices d_0(pi/2) .. d_L(pi/2) as pairs (n, d_n), held up to bandwidth 256 and
+  streamed by the recursion above"""
   dtype = np.dtype(dtype)
   if L > HALF_PI_CACHE_MAX:
     return wignerdDegrees(dtype.type(np.pi / 2), L)
@@ -106,6 +109,8 @@ def halfPiDegrees(L, dtype=np.float64):
 
 
 def foldedDims(L, real, folds):
+  """the shape (l, k, j) of the Fourier array of bandwidth L, the two periodic axes shrunk by the
+  z folds, the axis l halved for a real function"""
   rA, rB = folds
   return (L // rA + 1 if real else 2 * (L // rA) + 1, 2 * (L // rB) + 1, 2 * L + 1)
 
@@ -115,6 +120,7 @@ NUFFT_MIN_DIM = 4
 
 
 def usableFolds(L, real, folds):
+  """the z folds a NUFFT array of bandwidth L can carry, (1, 1) when a folded axis would be too thin"""
   d = foldedDims(L, real, folds)
   return (int(folds[0]), int(folds[1])) if min(d[0], d[1]) >= NUFFT_MIN_DIM else (1, 1)
 
@@ -216,6 +222,8 @@ def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None):
 
 
 def sphericalTransform(fhat, L, real=False, degrees=None):
+  """the Fourier array G[m, j] of spherical coefficients of bandwidth L, so that f(theta, rho) is
+  the sum of G e^{i(m rho - j theta)}; for a real function only m >= 0, the column m = 0 halved"""
   fhat = np.asarray(fhat)
   cdtype = _complexType(fhat.dtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
@@ -267,10 +275,12 @@ def isRealWigner(fhat, tol=1e-10):
 
 
 def isRealSpherical(fhat, tol=1e-10):
+  """whether spherical coefficients are those of a real function, fhat_l^{-m} = (-1)^m conj(fhat_l^m)"""
   return realDefectSpherical(fhat, tol)
 
 
 def isRealFourier(chat, tol=1e-10):
+  """whether Fourier coefficients on the circle are those of a real function, c_{-k} = conj(c_k)"""
   chat = np.asarray(chat)
   return bool(np.all(np.abs(chat[::-1] - np.conj(chat)) <= tol * np.maximum(1, np.abs(chat))))
 
@@ -313,10 +323,12 @@ class _FourierPlan:
 
   @property
   def forward(self):
+    """the finufft plan of type 2 on the nodes, which evaluates; built on first use"""
     return self._plan(2)
 
   @property
   def backward(self):
+    """the finufft plan of type 1 on the nodes, the adjoint; built on first use"""
     return self._plan(1)
 
   def _setNodes(self, nodes, phase, bad):
@@ -406,6 +418,7 @@ class SO3FourierPlan(_FourierPlan):
     self.setNodes(rots)
 
   def setNodes(self, rots):
+    """moves the plan to other rotations, the finufft plans kept"""
     x, y, z, phase, bad = so3Nodes(_quaternions(rots), self.folds, self._shift)
     self._setNodes((x, y, z), phase, bad)
 
@@ -441,8 +454,14 @@ class SO3FourierPlan(_FourierPlan):
   def _fromNFFT(self, fh, real):
     return (fh[1:, 1:, :] if real else fh[1:, 1:, 1:]).transpose(2, 0, 1)
 
+  def __repr__(self):
+    return display("SO3FourierPlan", [("bandwidth", self.L), ("nodes", len(self.nodes[0]) if hasattr(self, "nodes") else None),
+                                      ("real", self.real), ("folds", f"{self.folds[0]}, {self.folds[1]}")])
+
 
 class S2FourierPlan(_FourierPlan):
+  """the NUFFT plan of a spherical harmonic series at arbitrary directions v up to bandwidth L,
+  reusable across coefficient vectors: plan(fhat) evaluates, plan.adjoint(values, weights)"""
 
   def __init__(self, v, L, real=False, eps=None, upsampfac=None):
     v = v if isinstance(v, vector3d) else vector3d(v)
@@ -452,6 +471,7 @@ class S2FourierPlan(_FourierPlan):
     self.setNodes(v)
 
   def setNodes(self, v):
+    """moves the plan to other directions, the finufft plans kept"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     x, y, phase, bad = s2Nodes(v.data.astype(self.dtype.type(0).real.dtype, copy=False), self._shift)
     self._setNodes((x, y), phase, bad)
@@ -461,6 +481,7 @@ class S2FourierPlan(_FourierPlan):
     return self._nfftEvaluate(G) if self._useNFFT("forward") else self._evaluate(G)
 
   def adjoint(self, values, weights):
+    """the spherical coefficients from weighted values at the nodes, the adjoint of the evaluation"""
     values = np.asarray(values).ravel()
     if self._useNFFT("adjoint"):
       real = values.dtype.kind != "c"
@@ -482,6 +503,9 @@ class S2FourierPlan(_FourierPlan):
 
   def _fromNFFT(self, fh, real):
     return (fh[1:, :] if real else fh[1:, 1:]).T
+
+  def __repr__(self):
+    return display("S2FourierPlan", [("bandwidth", self.L), ("nodes", len(self.nodes[0]) if hasattr(self, "nodes") else None), ("real", self.real)])
 
 
 class S1FourierPlan:
@@ -507,10 +531,17 @@ class S1FourierPlan:
     return self.forward.execute(np.ascontiguousarray(chat, dtype=self.dtype))
 
   def adjoint(self, values, weights):
+    """the Fourier coefficients c_{-L} .. c_L from weighted values at the nodes, the adjoint of the
+    evaluation"""
     return self.backward.execute(np.ascontiguousarray(np.asarray(weights).ravel() * np.asarray(values).ravel(), dtype=self.dtype))
+
+  def __repr__(self):
+    return display("S1FourierPlan", [("bandwidth", self.L), ("nodes", self.n)])
 
 
 def adjointTransform(plan, values, weights):
+  """adjointTransform(plan, values, weights) is plan.adjoint(values, weights): the coefficients from
+  weighted values at the plan's nodes"""
   return plan.adjoint(values, weights)
 
 
@@ -560,6 +591,8 @@ def _unwrapPolar(X, L):
 
 
 class SO3GridPlan:
+  """the plan of a Wigner series on a Clenshaw-Curtis quadrature grid of SO(3) up to bandwidth L, a
+  sequence of FFTs one axis at a time: plan(fhat) evaluates, plan.adjoint(values, weights)"""
 
   def __init__(self, g, L=None, real=True):
     L = g.bandwidth if L is None else int(L)
@@ -597,6 +630,7 @@ class SO3GridPlan:
     return fft.fft(C, axis=0, workers=w).ravel()
 
   def adjoint(self, values, weights):
+    """the SO(3) coefficients from weighted values on the grid, the FFTs taken backwards"""
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
     fft, w, L = _fft(), threads(), self.L
@@ -608,6 +642,9 @@ class SO3GridPlan:
     W = fft.ifft(Z, axis=1, norm="forward", workers=w)[:, self._k]
     X = fft.ifft(W, n=self.polar, axis=2, norm="forward", workers=w)
     return wignerTransformAdjoint(_unwrapPolar(X, L), L, real, self.folds)
+
+  def __repr__(self):
+    return display("SO3GridPlan", [("bandwidth", self.L), ("grid", sizeString(self.shape)), ("real", self.real)])
 
 
 class S2GridPlan:
@@ -645,6 +682,7 @@ class S2GridPlan:
     return fft.ifft(C, axis=0, norm="forward", workers=w).ravel()
 
   def adjoint(self, values, weights):
+    """the spherical coefficients from weighted values on the grid, the FFTs taken backwards"""
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
     fft, w, L = _fft(), threads(), self.L
@@ -652,6 +690,9 @@ class S2GridPlan:
     Z = fft.rfft(x, axis=0, workers=w)[:L + 1] if real else fft.fft(x, axis=0, workers=w)[self._m]
     X = fft.ifft(Z, n=self.polar, axis=1, norm="forward", workers=w)
     return sphericalTransformAdjoint(_unwrapPolar(X, L), L, real)
+
+  def __repr__(self):
+    return display("S2GridPlan", [("bandwidth", self.L), ("grid", sizeString(self.shape)), ("real", self.real)])
 
 
 def wignerPlan(nodes, L, real=True, folds=(1, 1)):
@@ -663,6 +704,7 @@ def wignerPlan(nodes, L, real=True, folds=(1, 1)):
 
 
 def sphericalPlan(nodes, L, real=False):
+  """the plan for a node set on the sphere: the FFT on a Clenshaw-Curtis grid, the NUFFT otherwise"""
   if isinstance(nodes, quadratureS2Grid):
     return S2GridPlan(nodes, L, real) if nodes.scheme == "ClenshawCurtis" else S2FourierPlan(nodes.nodes(), L, real)
   return S2FourierPlan(nodes, L, real)
@@ -723,6 +765,9 @@ GRIDDED_ROTATIONS_PER_L3 = 2
 
 
 def wignerSeriesAdjointGridded(rots, values, L, weights=None, folds=(1, 1)):
+  """the SO(3) coefficients up to bandwidth L from weighted values, every rotation rounded to the
+  nearest node of a Clenshaw-Curtis grid and the grid's FFT adjoint taken, MATLAB's 'gridded';
+  approximate, and its cost independent of the number of rotations"""
   values = np.asarray(values).ravel()
   q = _quaternions(rots)
   w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights).ravel()
@@ -811,6 +856,8 @@ def _sphericalSeriesTrig(fhat, v, real):
 
 
 def sphericalSeries(fhat, v, real=None):
+  """the spherical harmonic series fhat at directions or on a quadrature grid, the direct sum, the
+  trigonometric sum or the NUFFT by the number of nodes"""
   fhat = np.asarray(fhat)
   L = math.isqrt(fhat.shape[-1]) - 1
   real = isRealSpherical(fhat) if real is None else real
@@ -830,6 +877,8 @@ def sphericalSeries(fhat, v, real=None):
 
 
 def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
+  """the spherical coefficients up to bandwidth L from weighted values at directions, the direct sum
+  below 50 nodes; a quadrature grid brings the weights of its rule"""
   values = np.asarray(values).ravel()
   if isinstance(v, quadratureS2Grid):
     weights = v.weights if weights is None else weights
@@ -848,6 +897,8 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
 
 
 def fourierSeries(chat, x, real=None):
+  """the Fourier series sum of chat_k e^{ikx} at the angles x, directly or by NUFFT; real when the
+  coefficients are those of a real function"""
   chat = np.asarray(chat)
   L = (chat.shape[-1] - 1) // 2
   real = isRealFourier(chat) if real is None else real
@@ -865,6 +916,8 @@ def fourierSeries(chat, x, real=None):
 
 
 def fourierSeriesAdjoint(x, values, L, weights=None):
+  """the Fourier coefficients c_{-L} .. c_L from weighted values at the angles x, the sum of
+  w v e^{-ikx}; a quadrature grid brings the weights of its rule"""
   if isinstance(x, quadratureS1Grid):
     weights = x.weights if weights is None else weights
     x = x.nodes()

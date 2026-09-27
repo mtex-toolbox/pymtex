@@ -38,6 +38,8 @@ _CONFIGS = None
 
 
 def hdf5Configs():
+  """the HDF5 configurations of the vendors, read once from io/hdf5_config: a dict from the name
+  to the parsed JSON"""
   global _CONFIGS
   if _CONFIGS is None:
     _CONFIGS = {}
@@ -57,6 +59,7 @@ class H5Scope:
 
 
 def relativeTo(path, scope):
+  """the path relative to the group scope, the path itself where it lies outside"""
   return path if scope == "/" else (path[len(scope):] if path.startswith(scope) else path)
 
 
@@ -76,6 +79,7 @@ def h5Resolve(paths, entry, scope):
 
 
 def h5One(paths, entry, scope):
+  """the first path of the file an entry of a config matches, None if none does"""
   m = h5Resolve(paths, entry, scope)
   return m[0] if m else None
 
@@ -171,6 +175,8 @@ def _floats(v):
 
 
 def h5LatticeValues(f, paths, entry, scope):
+  """the numbers of a lattice entry of a config, from one data set or from separate scalars,
+  None where one is missing"""
   if not isinstance(entry, dict):
     return None
   if entry.get("type", "") == "separate":
@@ -221,6 +227,7 @@ def h5LatticePaths(paths, entry, scope):
 
 
 def spaceGroupNumber(v):
+  """the space group number a header value holds, None where it is no number"""
   if v is None:
     return None
   x = v[0] if isinstance(v, (list, np.ndarray)) and len(v) else v
@@ -343,10 +350,12 @@ def h5Table(f, paths, ebsd, scope):
 
 
 def loadedField(entry):
+  """the name of the field an entry of a config loads from a table, the empty string if it loads none"""
   return str(entry["load"]["value"]).split(".")[-1] if isinstance(entry, dict) and "load" in entry else ""
 
 
 def h5Loaded(entry, table):
+  """the column of a table an entry of a config loads, None if it loads none"""
   if not (isinstance(entry, dict) and "load" in entry and table is not None):
     return None
   return table.get(loadedField(entry))
@@ -436,6 +445,7 @@ def h5Header(f, paths, groups, scope):
 
 
 def h5ReadGroup(f, paths, groups, group):
+  """a group of the file read whole as nested dicts, data sets above the header size limit left out"""
   out = {}
   for p in paths:
     rel = relativeTo(p, group + "/")

@@ -132,6 +132,7 @@ class PictogramButton(QAbstractButton):
     self.setCursor(Qt.PointingHandCursor)
 
   def paintEvent(self, event):
+    """draws the pictogram on a ground marking it checked or under the pointer"""
     p = QPainter(self)
     ground = "#e8eef6" if self.isChecked() else ("#f2f2f2" if self.underMouse() else "white")
     p.fillRect(self.rect(), QColor(ground))
@@ -141,9 +142,11 @@ class PictogramButton(QAbstractButton):
     p.end()
 
   def enterEvent(self, event):
+    """repaints as the pointer enters"""
     self.update()
 
   def leaveEvent(self, event):
+    """repaints as the pointer leaves"""
     self.update()
 
 
@@ -170,6 +173,7 @@ class ConventionChooser(QMenu):
     self.addAction(action)
 
   def pick(self, k):
+    """the convention k taken as the one picked, and the menu closed"""
     self.picked = k
     self.close()
 
@@ -195,34 +199,43 @@ class ConventionButton(QWidget):
 
   @property
   def index(self):
+    """the index of the convention in force for the frame of the button, map or Euler"""
     return self.st.mapConvention if self.which == "map" else self.st.eulerConvention
 
   @property
   def names(self):
+    """the names of the axes of the frame of the button"""
     return self.st.mapAxesNames if self.which == "map" else self.st.eulerAxesNames
 
   @property
   def ink(self):
+    """the colour the frame is drawn in: the map in ink, the Euler frame in red"""
     # the two frames are told apart by colour: the map in ink, the Euler frame in the red
     # the pole figures carry its axes in
     return EULER_INK if self.which == "euler" else MAP_INK
 
   @property
   def caption(self):
+    """the caption of the button, 'map' or 'Euler'"""
     return "map" if self.which == "map" else "Euler"
 
   def enterEvent(self, event):
+    """the ground lightened as the pointer enters"""
     self.hover = True
     self.update()
 
   def leaveEvent(self, event):
+    """the ground restored as the pointer leaves"""
     self.hover = False
     self.update()
 
   def mousePressEvent(self, event):
+    """opens the chooser at the pointer"""
     self.openChooser(event.globalPosition().toPoint())
 
   def openChooser(self, at=None):
+    """the chooser of the eight conventions opened at a point, below the button by default; the one
+    picked is taken, the menu returned"""
     menu = ConventionChooser(self, self.index, self.names, self.ink)
     menu.exec(at if at is not None else self.mapToGlobal(self.rect().bottomLeft()))
     if menu.picked is not None:
@@ -230,6 +243,7 @@ class ConventionButton(QWidget):
     return menu
 
   def choose(self, k):
+    """the convention k set for the frame of the button in the state"""
     if self.which == "map":
       cb.setMapConvention(self.st, k)
     else:
@@ -237,6 +251,7 @@ class ConventionButton(QWidget):
     self.update()
 
   def paintEvent(self, event):
+    """draws the pictogram of the convention in force, with its tooltip"""
     p = QPainter(self)
     p.fillRect(self.rect(), QColor("#f2f2f2" if self.hover else "transparent"))
     p.setPen(QPen(QColor("#8a8a8a" if self.hover else FRAME), 1))
@@ -265,6 +280,7 @@ class CoordinatePanel(QWidget):
       st.on(name, self.refresh)
 
   def refresh(self):
+    """repaints both frames after the state changed"""
     self.map.update()
     self.euler.update()
 

@@ -23,6 +23,7 @@ from ..geometry.gridlayout import gridLayout, layoutIndex
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import vector3d
 from ..geometry.install import install
+from ..geometry.display import aligned
 
 
 def ownFrame():
@@ -45,6 +46,13 @@ def _toDouble(img):
 
 
 class mapImage:
+  """an image that knows where on the specimen it sits: a regular grid of an origin and two
+  perpendicular steps, d1 from row to row and d2 from column to column; an integer image is
+  scaled to [0, 1]
+
+    mapImage(img)                          unit step, a frame of its own
+    mapImage(img, dxy=0.05, name='bse')    square pixels; dxy=(dx, dy) rectangular ones
+    mapImage(ebsd.bc, ebsd, name='bcImg')  a channel of a gridded square map, the map riding along"""
 
   def __init__(self, img=None, ebsd=None, dxy=1.0, origin=None, name="", scanUnit=None):
     self.img = np.zeros((0, 0))
@@ -102,26 +110,32 @@ class mapImage:
 
   @property
   def origin(self):
+    """the centre of pixel (0, 0)"""
     return vector3d(self._origin)
 
   @origin.setter
   def origin(self, v):
+    """sets the centre of pixel (0, 0)"""
     self._origin = _vec(v)
 
   @property
   def d1(self):
+    """the step from one row to the next"""
     return vector3d(self._d1)
 
   @d1.setter
   def d1(self, v):
+    """sets the step from one row to the next"""
     self._d1 = _vec(v)
 
   @property
   def d2(self):
+    """the step from one column to the next"""
     return vector3d(self._d2)
 
   @d2.setter
   def d2(self, v):
+    """sets the step from one column to the next"""
     self._d2 = _vec(v)
 
   @property
@@ -136,32 +150,40 @@ class mapImage:
 
   @property
   def layout(self):
+    """the gridLayout of the image, the directions its rows and columns advance along"""
     return gridLayout(self._d1, self._d2)
 
   @property
   def how2plot(self):
+    """the plotting convention of the image's frame, None without a frame"""
     return None if self.frame is None else self.frame.how2plot
 
   @property
   def dx(self):
+    """the column step, the length of d2"""
     return float(np.linalg.norm(self._d2))
 
   @property
   def dy(self):
+    """the row step, the length of d1"""
     return float(np.linalg.norm(self._d1))
 
   @property
   def nChannel(self):
+    """the number of channels, 1 for a two dimensional image"""
     return 1 if self.img.ndim == 2 else self.img.shape[2]
 
   @property
   def isempty(self):
+    """whether the image has no pixel"""
     return self.img.size == 0
 
   def gridSize(self):
+    """the number of rows and columns of the image"""
     return self.img.shape[:2]
 
   def copy(self):
+    """a copy of the image with its own pixel array; the map riding along is shared"""
     out = mapImage.__new__(mapImage)
     out.__dict__.update(self.__dict__)
     out.img = self.img.copy()
@@ -252,6 +274,7 @@ class mapImage:
   # ------------------------------------------------------------------ the display
 
   def char(self):
+    """the image as one line of text: its size, channels, steps, name and whether a map rides along"""
     r, c = self.gridSize()
     s = f"{r} × {c}" + (f" × {self.nChannel}" if self.nChannel > 1 else "") + f"  step {self.dx:.4g} × {self.dy:.4g}"
     if self.name:
@@ -259,7 +282,7 @@ class mapImage:
     return s + ("  + map" if self.ebsd is not None else "")
 
   def __repr__(self):
-    return repr(mapImageList([self]))
+    return aligned(repr(mapImageList([self])))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -301,7 +324,7 @@ class mapImageList(list):
 
   def __repr__(self):
     if not self:
-      return "mapImage\n  empty"
+      return aligned("mapImage\n  empty")
     rows = [(str(n), _sizeStr(m.img), _pixelStr(m), _frameStr(m.frame, m.how2plot), _frameStr(None if m.isempty or m.frame is None else m.layout, m.how2plot),
              m.name, _ebsdStr(m.ebsd)) for n, m in enumerate(self)]
     labels = ("", "image", "pixel", "frame", "layout", "name", "EBSD")
@@ -310,7 +333,7 @@ class mapImageList(list):
     pC = self[0].how2plot
     same = pC is not None and all(m.how2plot is not None and m.how2plot == pC for m in self)
     head = f"mapImage ({pC.char()})" if same else "mapImage"
-    return "\n".join([head, "", line(labels)] + [line(r) for r in rows])
+    return aligned("\n".join([head, "", line(labels)] + [line(r) for r in rows]))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

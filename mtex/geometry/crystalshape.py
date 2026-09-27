@@ -146,6 +146,7 @@ class crystalShape:
 
   @property
   def size(self):
+    """the number of shapes, one unless the shape is a list of shapes"""
     return len(self)
 
   # the vertices as (n, nV, 3), a single shape as a list of one
@@ -183,18 +184,23 @@ class crystalShape:
 
   @property
   def CS(self):
+    """the crystal frame of the face normals, the frame the shape was built in"""
     return self.N.CS
 
   @property
   def frame(self):
+    """the frame the vertices stand in: the crystal frame, or the specimen frame once an
+    orientation has turned the shape"""
     return self.V.frame
 
   @property
   def numFaces(self):
+    """the number of faces of the shape"""
     return len(self.F)
 
   @property
   def numVertices(self):
+    """the number of vertices of the shape"""
     return self.V.shape[-1]
 
   @property
@@ -226,10 +232,12 @@ class crystalShape:
 
   @property
   def faceArea(self):
+    """the area of every face, per shape of a list"""
     return self._single(np.linalg.norm(self._faceVectors(), axis=-1))
 
   @property
   def faceCenter(self):
+    """the centre of every face, the mean of its vertices, per shape of a list"""
     V = self._V()
     c = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
     return vector3d(self._single(c), **self._attrs())
@@ -251,6 +259,7 @@ class crystalShape:
 
   @diameter.setter
   def diameter(self, d):
+    """sets the diameter, the largest distance between two vertices, by scaling the shape"""
     self.V = self.V * (np.asarray(d, dtype=float) / self.diameter)
 
   # ------------------------------------------------------------------ moving the shape
@@ -353,18 +362,14 @@ class crystalShape:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
+    from .display import display
     cs = self.CS
-    lines = ["crystalShape"]
-    if len(self) > 1:
-      lines.append(f"  size: {len(self)}")
-    lines.append(f"  mineral: {cs.mineral} ({cs.pointGroup})" if cs.mineral else f"  symmetry: {cs.pointGroup}")
-    if self.V.frame is not cs:
-      lines.append(f"  frame: {self.V.frame.char() if self.V.frame is not None else 'none'}")
-    lines.append(f"  vertices: {self.numVertices}")
-    lines.append(f"  faces: {self.numFaces}")
-    if self.habitus > 0:
-      lines.append(f"  habitus: {self.habitus:g}, extension: {', '.join(f'{e:g}' for e in self.extension)}")
-    return "\n".join(lines)
+    return display("crystalShape", [
+      ("size", len(self) if len(self) > 1 else None),
+      ("mineral", f"{cs.mineral} ({cs.pointGroup})" if cs.mineral else None), ("symmetry", None if cs.mineral else cs.pointGroup),
+      ("frame", (self.V.frame.char() if self.V.frame is not None else "none") if self.V.frame is not cs else None),
+      ("vertices", self.numVertices), ("faces", self.numFaces),
+      ("habitus", f"{self.habitus:g}, extension: {', '.join(f'{e:g}' for e in self.extension)}" if self.habitus > 0 else None)])
 
   # ------------------------------------------------------------------ the simple shapes
 

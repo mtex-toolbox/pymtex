@@ -16,6 +16,8 @@ import numpy as np
 
 
 def orientFaces(grains):
+  """the grains with their faces turned consistently, the normals pointing out of every grain:
+  the signs of I_GF and the sides of the boundary change, the corners do not"""
   from scipy.sparse import coo_matrix, csr_matrix
   from scipy.sparse.csgraph import connected_components
   gB = grains.boundary

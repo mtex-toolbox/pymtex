@@ -7,6 +7,8 @@ import numpy as np
 
 
 class latticeType(enum.Enum):
+  """the Bravais lattice systems, an enumeration whose members carry the conventions that follow
+  from them: the default axis angles, the independent axis lengths, the orthogonal axes"""
   triclinic = 1
   monoclinic = 2
   orthorhombic = 3
@@ -27,6 +29,7 @@ class latticeType(enum.Enum):
 
   @property
   def isTriHex(self):
+    """whether the lattice is trigonal or hexagonal, the lattices of the four index Miller notation"""
     return self in (latticeType.trigonal, latticeType.hexagonal)
 
   @property

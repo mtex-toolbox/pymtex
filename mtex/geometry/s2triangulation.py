@@ -15,9 +15,16 @@ from __future__ import annotations
 import numpy as np
 
 from .vector3d import vector3d
+from .display import display
 
 
 class S2Triangulation:
+  """the Delaunay triangulation of directions on the sphere, their convex hull: the triangles T,
+  counterclockwise from outside, and the triangle opposite each vertex; the directions must
+  surround the origin
+
+    sT = S2Triangulation(v)
+    B = sT.calcBario(w)"""
 
   def __init__(self, vertices):
     from scipy.spatial import ConvexHull, cKDTree
@@ -40,6 +47,7 @@ class S2Triangulation:
 
   @property
   def frame(self):
+    """the frame of the vertices"""
     return self.vertices.frame
 
   def __len__(self):
@@ -63,17 +71,20 @@ class S2Triangulation:
     return t, lam / lam.sum(axis=1, keepdims=True)
 
   def calcBario(self, v):
+    """the barycentric coordinates of directions in the triangulation, a sparse matrix with a row per
+    direction and a column per vertex"""
     from scipy.sparse import csr_matrix
     t, lam = self.locate(v)
     n = len(t)
     return csr_matrix((lam.ravel(), (np.repeat(np.arange(n), 3), self.T[t].ravel())), shape=(n, self.vertices.size))
 
   def checkInside(self, v, t):
+    """whether each direction v lies in the triangle t given for it"""
     W = (v if isinstance(v, vector3d) else vector3d(v)).normalize().data.reshape(-1, 3)
     return np.einsum("nij,nj->ni", self._inverse[np.asarray(t).ravel()], W).min(axis=1) >= -1e-12
 
   def __repr__(self):
-    return f"S2Triangulation\n  vertices: {self.vertices.size}\n  triangles: {len(self.T)}"
+    return display("S2Triangulation", [("vertices", self.vertices.size), ("triangles", len(self.T))])
 
 
 __all__ = ["S2Triangulation"]

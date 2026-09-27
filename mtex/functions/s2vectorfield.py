@@ -27,6 +27,7 @@ from .quadrature import quadratureS2Grid
 from .s2fun import S2FunHarmonic, realizeSpherical
 from .so3vectorfield import _projectSphericalRows, equivariantProjection
 from .transforms import DIRECT_SUM_NODES, S2FourierPlan, sphericalPlan, sphericalSeries, sphericalSeriesAdjoint
+from ..geometry.display import aligned, frameLabel
 
 
 def _seriesColumns(fhat, v):
@@ -65,9 +66,12 @@ def _vectorsFor(f, x):
 
 
 class S2VectorField:
+  """the base of the vector fields on the sphere: evaluation by calling, the pointwise operations by
+  quadrature, the arithmetic with numbers, functions and other fields"""
 
   @property
   def CS(self):
+    """the frame of the field, MATLAB's vF.CS"""
     return self.frame
 
   def __call__(self, x):
@@ -81,25 +85,34 @@ class S2VectorField:
       raise ValueError("the fields live in different frames")
 
   def dot(self, x):
+    """the inner product with another field, pointwise a function on the sphere, or with a
+    constant vector
+
+      dot(vF, wF)
+      dot(vF, vector3d.Z())"""
     if isinstance(x, S2VectorField):
       return mapField(np.multiply, self, x, reduce=True, invariant=True)
     return S2VectorFieldHarmonic(self).dot(x)
 
   def cross(self, w):
+    """the cross product with another field, pointwise a field, or with a constant vector"""
     if isinstance(w, S2VectorField):
       return mapField(np.cross, self, w)
     return S2VectorFieldHarmonic(self).cross(w)
 
   def abs(self):
+    """the length of the field at every direction, a function on the sphere"""
     return mapField(lambda a: np.linalg.norm(a, axis=-1), self, bandwidth=max(2 * self.bandwidth, 32), invariant=True)
 
   def __abs__(self):
     return self.abs()
 
   def normalize(self):
+    """the field scaled to unit length at every direction"""
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def angle(self, w):
+    """the angle between two fields at every direction, a function on the sphere"""
     return mapField(lambda a, b: np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1)), self, w,
                     bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
 
@@ -108,6 +121,7 @@ class S2VectorField:
     return self.abs()
 
   def mean(self):
+    """the mean vector of the field over the sphere"""
     return S2VectorFieldHarmonic(self).mean()
 
   def __neg__(self):
@@ -136,6 +150,13 @@ class S2VectorField:
 
 
 class S2VectorFieldHarmonic(S2VectorField):
+  """a vector field on the sphere by the spherical harmonic expansions of its three Cartesian
+  components, projected onto the fields equivariant under the frame's group
+
+    vF = S2VectorFieldHarmonic(fhat, cs)
+    vF = S2VectorFieldHarmonic(fun, bandwidth=16)          a callable of the directions
+    vF = S2VectorFieldHarmonic(v, values, weights=w)      vectors at directions, by quadrature
+    vF = S2VectorFieldHarmonic([fx, fy, fz])               the component functions"""
 
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     frames = [a for a in args if isinstance(a, referenceFrame)]
@@ -193,6 +214,7 @@ class S2VectorFieldHarmonic(S2VectorField):
 
   @property
   def bandwidth(self):
+    """the harmonic degree up to which the components are expanded"""
     return math.isqrt(self._fhat.shape[0]) - 1
 
   @classmethod
@@ -201,6 +223,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     return cls(lambda v: v, bandwidth=2)
 
   def truncate(self, L):
+    """the field cut off, or padded with zeros, at the bandwidth L"""
     if L == self.bandwidth:
       return self
     fhat = np.zeros(((L + 1) ** 2, 3), dtype=self._fhat.dtype)
@@ -226,10 +249,12 @@ class S2VectorFieldHarmonic(S2VectorField):
 
   @property
   def y(self):
+    """the y component as a function on the sphere"""
     return self.component(1)
 
   @property
   def z(self):
+    """the z component as a function on the sphere"""
     return self.component(2)
 
   def component(self, i):
@@ -237,6 +262,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     return S2FunHarmonic(self._fhat[:, i], None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
 
   def eval(self, x):
+    """the vectors of the field at the directions x, vF(x)"""
     v = _vectorsFor(self, x).normalize()
     return vector3d(_seriesColumns(self._fhat, v).reshape(*v.shape, 3))
 
@@ -270,9 +296,11 @@ class S2VectorFieldHarmonic(S2VectorField):
     return self._rebuild(a * self._fhat)
 
   def mean(self):
+    """the mean vector of the field over the sphere, read off the coefficients of degree zero"""
     return vector3d(np.real(self._fhat[0]) / math.sqrt(4 * math.pi))
 
   def isclose(self, w, rtol=1e-8):
+    """whether two fields agree in their coefficients up to the relative tolerance rtol"""
     w = S2VectorFieldHarmonic(w)
     L = max(self.bandwidth, w.bandwidth)
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
@@ -315,8 +343,8 @@ class S2VectorFieldHarmonic(S2VectorField):
     return self._rebuild(np.where(l % 2, -1.0, 1.0)[:, None] * self._fhat)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    return f"S2VectorFieldHarmonic{info}\n  bandwidth: {self.bandwidth}"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
+    return aligned(f"S2VectorFieldHarmonic{info}\n  bandwidth: {self.bandwidth}")
 
 
 def _reframe(v, frame):
@@ -375,6 +403,8 @@ def grad(f, x=None):
 
 
 def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
+  """a pointwise operation on fields, functions and numbers by quadrature at the bandwidth, a field
+  where op returns vectors and a function on the sphere where it returns numbers"""
   others = [a for a in args if not isinstance(a, (int, float, np.number))]
   L = min(v.bandwidth + sum(a.bandwidth for a in others), getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
   g = quadratureS2Grid(L)
@@ -403,6 +433,10 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
 
 
 class S2VectorFieldHandle(S2VectorField):
+  """a vector field on the sphere given by a callable of the directions, the bandwidth a hint for
+  its harmonic expansion
+
+    vF = S2VectorFieldHandle(lambda v: v.cross(vector3d.Z()))"""
 
   def __init__(self, fun, frame=None, *, bandwidth=None):
     if isinstance(fun, S2VectorField):
@@ -412,6 +446,7 @@ class S2VectorFieldHandle(S2VectorField):
     self.bandwidth = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
 
   def eval(self, x):
+    """the vectors the callable gives at the directions x, vF(x)"""
     v = _vectorsFor(self, x).normalize()
     return vector3d(_values(self.fun(self._framed(v))).reshape(*v.shape, 3))
 
@@ -420,6 +455,7 @@ class S2VectorFieldHandle(S2VectorField):
 
   @property
   def fhat(self):
+    """the coefficients of the harmonic expansion of the field at its bandwidth hint"""
     return S2VectorFieldHarmonic(self)._fhat
 
   def _scaled(self, a):
@@ -429,12 +465,13 @@ class S2VectorFieldHandle(S2VectorField):
     return S2VectorFieldHarmonic(self) + w
 
   def rotate(self, r):
+    """the field rotated by r, v'(xi) = r v(r^-1 xi)"""
     rot = rotation(r.data.reshape(4))
     return S2VectorFieldHandle(lambda x: (rot * self(rot.inv() * vector3d(x.data))).data, None if self.frame is None else _rotatedFrame(self.frame, rot), bandwidth=self.bandwidth)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    return f"S2VectorFieldHandle{info}\n  bandwidth hint: {self.bandwidth}"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
+    return aligned(f"S2VectorFieldHandle{info}\n  bandwidth hint: {self.bandwidth}")
 
 
 def thetaVector(v):
@@ -446,6 +483,7 @@ def thetaVector(v):
 
 
 def rhoVector(v):
+  """the unit vector along the azimuth at a direction, the second vector of the polar basis"""
   v = v if isinstance(v, vector3d) else vector3d(v)
   r = v.rho
   return vector3d(-np.sin(r), np.cos(r), np.zeros_like(r), frame=v.frame)

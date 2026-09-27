@@ -91,6 +91,8 @@ class mapPairs:
     return np.ascontiguousarray(self.indexed), np.ascontiguousarray(self.phase, dtype=np.int64), grain, self.grain is not None
 
   def comparable(self, a, b):
+    """the mask of the pairs (a, b) the orientation field is continuous across: b a measurement,
+    both indexed, of one phase and, where the map has grains, of one grain"""
     ok = (b >= 0)
     bb = np.maximum(b, 0)
     ok &= self.indexed[a] & self.indexed[bb] & (self.phase[a] == self.phase[bb])
@@ -228,14 +230,20 @@ def _gradientNumpy(l, lk, m, offs, D, oneSided):
 
 
 def gradientX(ebsd, stencil="oneSided"):
+  """the derivative of the orientation along the specimen x axis per unit length, gradient(ebsd,
+  xvector); the stencil as for gradient"""
   return gradient(ebsd, [1.0, 0.0, 0.0], stencil=stencil)
 
 
 def gradientY(ebsd, stencil="oneSided"):
+  """the derivative of the orientation along the specimen y axis per unit length, gradient(ebsd,
+  yvector); the stencil as for gradient"""
   return gradient(ebsd, [0.0, 1.0, 0.0], stencil=stencil)
 
 
 def gradientZ(ebsd, stencil="oneSided"):
+  """the derivative of the orientation along the specimen z axis per unit length, gradient(ebsd,
+  zvector), which a planar map has only where z lies in its plane"""
   return gradient(ebsd, [0.0, 0.0, 1.0], stencil=stencil)
 
 

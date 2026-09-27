@@ -19,9 +19,15 @@ import tempfile
 import numpy as np
 
 from ..geometry.session import getMTEXpref
+from ..geometry.display import display
 
 
 class neper:
+  """the interface to Neper, the tessellation program, one per session with its settings: the
+  geometry, the morphology, the iterations and the file path the tessellation is written to
+
+    nep = neper.init()
+    grains = nep.simulateGrains(1000, odf)"""
 
   _instance = None
 
@@ -38,16 +44,19 @@ class neper:
 
   @classmethod
   def instance(cls):
+    """the one interface of the session, created on first call"""
     if cls._instance is None:
       cls._instance = cls()
     return cls._instance
 
   @classmethod
   def init(cls):
+    """the one interface of the session, neper.instance()"""
     return cls.instance()
 
   @property
   def command(self):
+    """the command that runs Neper, the preference neperCommand, 'neper' by default"""
     return getMTEXpref("neperCommand", "neper")
 
   def available(self):
@@ -171,6 +180,9 @@ class neper:
     ori = rotation.rand(len(grains), maxAngle=2 * np.pi / 180, rng=rng) * oriP.flatten()[pId] * p2c.flatten()[vId].inv()
     grains.meanOrientation = ori
     return grains
+
+  def __repr__(self):
+    return display("neper", [("geometry", self.geometry), ("morpho", self.morpho), ("id", self.id), ("filePath", self.filePath)])
 
 
 def _cubeSize(geometry):

@@ -49,6 +49,11 @@ def _header(f, odf):
 
 
 def exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, **kwargs):
+  """writes the values of an ODF to a text file, on a regular Euler grid of the given resolution or
+  on an SO3Grid passed, one row of Euler angles and value per node, in degrees unless radians=True
+
+    exportODF_generic(odf, 'odf.txt', 'Bunge', resolution=10*degree)
+    exportODF_generic(odf, 'odf.txt', S3G, 'ZYZ')"""
   from ..geometry.grids.so3grid import SO3Grid
   convention = _convention(args)
   grid = next((a for a in args if isinstance(a, SO3Grid)), None)
@@ -71,6 +76,8 @@ def exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, *
 
 
 def exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
+  """writes the components of an ODF to a human readable file: the uniform part, the fibres and the
+  radial centres with their kernels and weights; a harmonic component is noted as not written"""
   from ..functions.handles import SO3FunComposition
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
   from ..functions.so3fun import SO3FunHarmonic
@@ -101,6 +108,7 @@ def exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
 
 
 def exportODF_VPSC(odf, fname, *args, points=10000, **kwargs):
+  """writes a sample of points orientations drawn from an ODF as a VPSC texture file"""
   from ..functions.characteristics import discreteSample
   ori = discreteSample(odf, points)
   export_VPSC(ori, fname, *[a for a in args if isinstance(a, str) and a in EULER_NAMES])

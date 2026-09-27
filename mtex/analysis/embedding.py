@@ -22,13 +22,14 @@ import math
 
 import numpy as np
 
-from ..geometry.display import sizeString
+from ..geometry.display import display, frameLabel, header, sizeString
 from ..geometry.frames import crystalFrame, specimenFrame
 from ..geometry.latticetype import latticeType
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.vector3d import vector3d
 from ..tensors.kernels import turnBlocks
+from ..geometry.display import aligned
 
 _SPECS = {}
 
@@ -202,6 +203,7 @@ class embeddingSpec:
 
   @property
   def dim(self):
+    """the dimension of the space the images move in, the number of columns of the basis"""
     return self.basis.shape[1]
 
   def seeds(self):
@@ -210,6 +212,9 @@ class embeddingSpec:
       qs = rotation(_seedRotations(self.frame))
       self._seeds = qs, _rotateBatch(self.u0, self.alpha, self.offsets, qs.matrix())
     return self._seeds
+
+  def __repr__(self):
+    return display(header("embeddingSpec", frameLabel(self.frame)), [("terms", len(self.alpha)), ("dimension", len(self.u0))])
 
 
 def _spec(cs):
@@ -257,14 +262,17 @@ class embedding:
 
   @property
   def CS(self):
+    """the crystal frame the embedding belongs to"""
     return self.spec.frame
 
   @property
   def dim(self):
+    """the dimension of the space of the images, the length of a row of double(e)"""
     return self.spec.dim
 
   @property
   def size(self):
+    """the number of images"""
     return self.u.shape[1]
 
   def __len__(self):
@@ -298,6 +306,7 @@ class embedding:
     return self._new(self.u / np.asarray(s, dtype=float))
 
   def dot(self, other):
+    """the inner product of two embeddings of the same crystal frame, image by image"""
     self._same(other)
     return np.einsum("ij,ij->j", self.u, other.u).reshape(self.shape)
 
@@ -308,9 +317,14 @@ class embedding:
     return n / np.linalg.norm(self.spec.u0) if normalized else n
 
   def isclose(self, other, atol=1e-10):
+    """whether two embeddings belong to the same frame and have the same images up to atol"""
     return isinstance(other, embedding) and other.spec is self.spec and self.u.shape == other.u.shape and bool(np.allclose(self.u, other.u, atol=atol))
 
   def mean(self, weights=None):
+    """the mean image, weighted by weights if given; NaN for an empty list
+
+      mean(e)
+      mean(e, weights=w)"""
     # the mean of nothing is not a number, as the mean of an empty orientation list
     if self.size == 0:
       return self._new(np.full(self.spec.u0.size, np.nan), ())
@@ -339,6 +353,8 @@ class embedding:
     return d[:, 0] if self.shape == () else d.T.reshape(self.shape + (d.shape[0],))
 
   def setDouble(self, d):
+    """the embedding with the given coordinates in the orthonormal basis, one row per image, the
+    inverse of double(e)"""
     d = np.asarray(d, dtype=float).reshape(-1, self.dim)
     return self._new(self.spec.basis @ d.T, () if d.shape[0] == 1 else (d.shape[0],))
 
@@ -373,11 +389,16 @@ class embedding:
     return rotation(out.reshape(self.shape + (4,)) if self.shape != () else out[0])
 
   def orientation(self, SS=None, **kwargs):
+    """the orientations whose images are closest to the embedding, the projection back to the
+    orientations of e.CS in the specimen frame SS; keywords go to project
+
+      e.orientation()
+      mean(e).orientation()          the mean orientation of a list"""
     return orientation(self.project(**kwargs), self.spec.frame, specimenFrame.default if SS is None else SS)
 
   def __repr__(self):
     ranks = " ".join(str(a) for a in self.spec.alpha)
-    return f"embedding\n symmetry: {self.spec.frame.char()}\n ranks: {ranks}\n dim: {self.dim}\n size: {sizeString(self.shape)}"
+    return aligned(f"embedding\n symmetry: {self.spec.frame.char()}\n ranks: {ranks}\n dim: {self.dim}\n size: {sizeString(self.shape)}")
 
 
 # a handful of orientations to start from, the coarsest grid the group allows
@@ -387,14 +408,18 @@ def _seedRotations(cs):
 
 
 def double(e, full=False):
+  """double(e) is e.double(): the coordinates of the images in the orthonormal basis, one row per
+  orientation; with full=True the tensor components"""
   return e.double(full)
 
 
 def setDouble(e, d):
+  """setDouble(e, d) is e.setDouble(d): the embedding with the coordinates d, one row per image"""
   return e.setDouble(d)
 
 
 def project(e, **kwargs):
+  """project(e) is e.project(): the rotations whose images are closest to the embedding"""
   return e.project(**kwargs)
 
 

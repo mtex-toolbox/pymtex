@@ -5,6 +5,8 @@ from . import importWizard
 
 
 def main():
+  """the entry point of python -m mtex.wizard and mtex-wizard: the import wizard opened at the folder
+  or file given on the command line"""
   importWizard(sys.argv[1] if len(sys.argv) > 1 else None)
 
 

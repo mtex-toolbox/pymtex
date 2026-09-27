@@ -26,6 +26,7 @@ from .quaternion import orthogonalTransform, quaternion, rotation
 from .representations import axis2quat, isnull
 from .session import SESSION
 from .vector3d import vector3d
+from .display import aligned
 
 SIDES = ("left", "right")
 REFERENCE_TOLERANCE = 1e-8
@@ -91,6 +92,12 @@ def _frameOf(ref, side):
 
 
 class SO3TangentVector(vector3d):
+  """a tangent vector of SO(3), a rotation vector v at a reference rotation or orientation, on the
+  left, exp(v) * oriRef, or on the right, oriRef * exp(v); from vectors or skew matrices
+
+    SO3TangentVector(v, oriRef)
+    SO3TangentVector(v, oriRef, 'right')
+    SO3TangentVector(S, oriRef, side)      from skew matrices of shape (..., 3, 3)"""
   _carried = ("antipodal", "isNormalized", "dispStyle", "side", "oriRef")
 
   def __init__(self, v, oriRef, side="left"):
@@ -115,18 +122,23 @@ class SO3TangentVector(vector3d):
 
   @property
   def frame(self):
+    """the frame the components are written in: the specimen frame of the reference on the left, its
+    crystal frame on the right"""
     return self._frame
 
   @frame.setter
   def frame(self, fr):
+    """refuses: the frame of a tangent vector follows from its reference and side"""
     raise AttributeError("the frame of a tangent vector is the specimen frame (left) or the crystal frame (right) of its reference")
 
   @property
   def CS(self):
+    """the crystal frame of the reference, None for a rotation"""
     return self.oriRef.CS if isinstance(self.oriRef, orientation) else None
 
   @property
   def SS(self):
+    """the specimen frame of the reference, None for a rotation"""
     return self.oriRef.SS if isinstance(self.oriRef, orientation) else None
 
   # ------------------------------------------------------------------ derived objects
@@ -157,6 +169,7 @@ class SO3TangentVector(vector3d):
     return obj
 
   def copy(self):
+    """a copy of the tangent vectors, components and references"""
     return self._rebuild(self.data.copy(), self.oriRef.copy())
 
   def __getitem__(self, idx):
@@ -172,6 +185,7 @@ class SO3TangentVector(vector3d):
       self.oriRef[idx] = value.oriRef
 
   def reshape(self, *shape):
+    """the tangent vectors in another shape, a reference per element reshaped with them"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     data = self.data.reshape(tuple(shape) + (3,))
     ref = self.oriRef.reshape(data.shape[:-1]) if self.oriRef.ndim else self.oriRef
@@ -179,6 +193,7 @@ class SO3TangentVector(vector3d):
 
   @property
   def T(self):
+    """the transposed array of tangent vectors, a reference per element transposed with them"""
     axes = tuple(range(self.ndim))[::-1] + (self.ndim,)
     return self._rebuild(self.data.transpose(axes), self.oriRef.T if self.oriRef.ndim else self.oriRef)
 
@@ -200,16 +215,19 @@ class SO3TangentVector(vector3d):
   # ------------------------------------------------------------------ the two sides
 
   def left(self):
+    """the vectors on the left side, turned by the reference where they are on the right"""
     if self.side == "left":
       return self
     return self._rebuild(qrot(self.oriRef.data, self.data), side="left")
 
   def right(self):
+    """the vectors on the right side, turned by the inverse reference where they are on the left"""
     if self.side == "right":
       return self
     return self._rebuild(qrot(_conj(self.oriRef.data), self.data), side="right")
 
   def toSide(self, side):
+    """the vectors on the side asked for, 'left' or 'right'"""
     return self.left() if _side(side) == "left" else self.right()
 
   # the other operand brought to this reference and side
@@ -279,9 +297,11 @@ class SO3TangentVector(vector3d):
     return self._rebuild(qrot(q, self.data), rotation._fromData(q) * self.oriRef)
 
   def dot(self, other, **kwargs):
+    """the inner product with tangent vectors at the same reference, brought to this side"""
     return np.sum(self.data * self._fit(other).data, axis=-1)
 
   def cross(self, other):
+    """the cross product with tangent vectors at the same reference, brought to this side"""
     return self._rebuild(np.cross(self.data, self._fit(other).data))
 
   def angle(self, other=None, **kwargs):
@@ -315,11 +335,13 @@ class SO3TangentVector(vector3d):
     return ref.flatten()[0]
 
   def sum(self, axis=None, **kwargs):
+    """the sum of tangent vectors at one shared reference, over all or along an axis"""
     ref = self._oneReference()
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._rebuild(np.sum(self.data, axis=axis), ref)
 
   def mean(self, weights=None, axis=None, **kwargs):
+    """the mean of tangent vectors at one shared reference, weighted when weights are given"""
     ref = self._oneReference()
     axis = tuple(range(self.ndim)) if axis is None else axis
     if weights is None:
@@ -328,6 +350,8 @@ class SO3TangentVector(vector3d):
     return self._rebuild(np.sum(self.data * w[..., None], axis=axis) / np.sum(w, axis=axis), ref)
 
   def unique(self, tolerance=1e-6, return_index=False, return_inverse=False, **kwargs):
+    """the distinct tangent vectors at one shared reference up to a tolerance, in order of first
+    appearance; with return_index and return_inverse the index maps as well"""
     ref = self._oneReference()
     out = vector3d(self.data).unique(tolerance=tolerance, stable=True, return_index=True, return_inverse=True)
     u = self._rebuild(out[0].data, ref)
@@ -347,7 +371,7 @@ class SO3TangentVector(vector3d):
     ref = self.oriRef
     what = ("misorientation" if ref.isMisorientation else "orientation") + f" ({ref._frameSummary()})" if isinstance(ref, orientation) else "rotation"
     lines.insert(1 + (self.size != 1), f"  reference: {what}" + ("" if ref.ndim == 0 else ", one per element"))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -463,10 +487,12 @@ def geodesic(a, b, s):
 
 
 def left(t):
+  """left(t) is t.left(): the tangent vectors on the left side"""
   return t.left()
 
 
 def right(t):
+  """right(t) is t.right(): the tangent vectors on the right side"""
   return t.right()
 
 

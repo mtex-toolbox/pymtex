@@ -363,6 +363,8 @@ def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
 
 
 def withPhases(ebsd, CS):
+  """the map with the phases of a vendor file replaced by the frames given, one per phase of the
+  file in its order; a list of indexed phases alone keeps the file's not indexed one in front"""
   frames = [CS] if isinstance(CS, referenceFrame) else list(CS)
   have = ebsd.CSList.frames
   # a list of indexed phases alone keeps the file's not indexed one in front

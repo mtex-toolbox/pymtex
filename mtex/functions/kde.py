@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from ..geometry.display import aligned
 
 
 def Gaussian(m, delta, x=None):
@@ -41,9 +42,9 @@ class griddedDensity:
     return self._f(np.stack([c.ravel() for c in x], axis=-1)).reshape(x[0].shape)
 
   def __repr__(self):
-    dims = " x ".join(str(len(g)) for g in self.grid)
+    dims = " × ".join(str(len(g)) for g in self.grid)
     bw = "" if self.bandwidth is None else f", bandwidth {np.array2string(np.asarray(self.bandwidth), precision=4)}"
-    return f"griddedDensity ({len(self.grid)}D, {dims} grid{bw})"
+    return aligned(f"griddedDensity ({len(self.grid)}D, {dims} grid{bw})")
 
 
 def calcDensityReal(x, range=None, bandwidth=None, weights=None, rng=None):

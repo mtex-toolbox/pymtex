@@ -29,6 +29,7 @@ from .grains import grain2d
 from .lattice import mapPlane
 from .polygon import loopSums, polygonSet, signedArea2
 from ..geometry.install import install
+from ..geometry.display import aligned
 
 
 # ------------------------------------------------------------------ the moments
@@ -72,6 +73,10 @@ def _axisOf(self, W):
 
 
 def principalComponents(self):
+  """the two half axes of the ellipse with the same second area moments as every outline, the long
+  one first, as antipodal vectors of the specimen frame
+
+    a, b = grains.principalComponents()"""
   A, B = _principal2d(self)
   return _axisOf(self, A), _axisOf(self, B)
 
@@ -82,10 +87,12 @@ def fitEllipse(self):
 
 
 def longAxis(self):
+  """the long half axis of the ellipse of every outline, the larger principal component"""
   return principalComponents(self)[0]
 
 
 def shortAxis(self):
+  """the short half axis of the ellipse of every outline, the smaller principal component"""
   return principalComponents(self)[1]
 
 
@@ -118,10 +125,12 @@ def outerPerimeter(self):
 
 
 def hullPerimeter(self):
+  """the perimeter of the convex hull of every outline"""
   return loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 2]
 
 
 def hullArea(self):
+  """the area of the convex hull of every outline"""
   return np.abs(loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 0]) / 2
 
 
@@ -334,6 +343,7 @@ class shape2d(polygonSet):
 
   @property
   def size(self):
+    """the number of outlines, one"""
     return 1
 
   def __len__(self):
@@ -346,14 +356,17 @@ class shape2d(polygonSet):
 
   @property
   def allV(self):
+    """the vertices of the outline as framed points, the same as Vs"""
     return self.Vs
 
   @property
   def rho(self):
+    """the radius of every vertex in polar coordinates of the plane"""
     return np.linalg.norm(self.V, axis=1)
 
   @property
   def theta(self):
+    """the angle of every vertex in polar coordinates of the plane, from the x axis"""
     return np.arctan2(self.V[:, 1], self.V[:, 0])
 
   def __getitem__(self, key):
@@ -366,7 +379,7 @@ class shape2d(polygonSet):
     return shape2d(self.V[hullLoops(self)[0]], plane=self.plane, frame=self.frame)
 
   def __repr__(self):
-    return f"shape2d ({self.frame.char()})\n  vertices: {len(self.V)}\n  area: {self.area[0]:.4g}\n  aspect ratio: {aspectRatio(self)[0]:.4g}"
+    return aligned(f"shape2d ({self.frame.char()})\n  vertices: {len(self.V)}\n  area: {self.area[0]:.4g}\n  aspect ratio: {aspectRatio(self)[0]:.4g}")
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

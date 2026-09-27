@@ -25,6 +25,8 @@ from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
 from ..geometry.install import install
+from ..geometry.display import frameLabel, framesLabel
+from ..geometry.display import aligned
 
 
 class SO3FunGeneric:
@@ -51,6 +53,7 @@ class SO3FunGeneric:
     return float(np.real(v)) if np.isclose(np.imag(v), 0) else v
 
   def norm(self):
+    """the L2 norm, through the harmonic form"""
     return SO3FunHarmonic(self).norm()
 
   # the pointwise absolute value stays a handle, evaluated when asked, as MATLAB's
@@ -58,25 +61,33 @@ class SO3FunGeneric:
     return SO3FunHandle(lambda o: np.abs(self.eval(o)), self.CS, self.SS, bandwidth=self.bandwidth, antipodal=self.antipodal)
 
   def abs(self):
+    """the pointwise absolute value, a handle evaluated when asked"""
     return abs(self)
 
   def pdf(self, h, bandwidth=None):
+    """the pole figure of the crystal direction h, through the harmonic form of the bandwidth"""
     return SO3FunHarmonic(self, bandwidth=bandwidth).pdf(h)
 
   def ipdf(self, r, bandwidth=None):
+    """the inverse pole figure of the specimen direction r, through the harmonic form of the bandwidth"""
     return SO3FunHarmonic(self, bandwidth=bandwidth).ipdf(r)
 
   def radon(self, h=None, r=None):
+    """the Radon transform through the harmonic form: radon(h) the pole figure, radon(r=r) the
+    inverse pole figure, radon(h, r) the values"""
     return SO3FunHarmonic(self).radon(h, r)
 
   def calcPDF(self, h, r=None, superposition=None):
+    """the pole figure of superposed crystal directions, as a function or at specimen directions r"""
     from .density import calcPDF
     return calcPDF(self, h, r, superposition=superposition)
 
   def conv(self, psi):
+    """the convolution with the kernel psi, through the harmonic form"""
     return conv(SO3FunHarmonic(self), psi)
 
   def grad(self, x=None, side="left"):
+    """the gradient, at the orientations x or as a field, left or right sided"""
     from .so3vectorfield import grad
     return grad(self, x, side)
 
@@ -153,6 +164,12 @@ def _symmetrisedSO3(fun, CS, SS, antipodal):
 
 
 class SO3FunHandle(SO3FunGeneric):
+  """a function on SO(3) given by a callable that receives orientations in the frames
+
+    SO3FunHandle(fun, CS, SS)
+    SO3FunHandle(fun, CS, SS, bandwidth=L)     the bandwidth of its harmonic form
+    SO3FunHandle(fun, CS, SS, symmetrise=True)  averaged over the groups on every call
+    SO3FunHandle(fun, CS, antipodal=True)       with exchange symmetry"""
 
   def __init__(self, fun, *frames, bandwidth=None, antipodal=False, real=True, symmetrise=False):
     if isinstance(fun, (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF)):
@@ -181,13 +198,14 @@ class SO3FunHandle(SO3FunGeneric):
   __rmul__ = __mul__
 
   def rotate(self, r, side="left"):
+    """the function rotated by r from the left or the right, through the harmonic form"""
     return SO3FunHarmonic(self).rotate(r, side)
 
   def __repr__(self):
-    lines = [f"SO3FunHandle ({self.CS.char()} → {self.SS.char()})", f"  bandwidth hint: {self.bandwidth}"]
+    lines = [f"SO3FunHandle ({framesLabel(self.CS, self.SS)})", f"  bandwidth hint: {self.bandwidth}"]
     if self.antipodal:
       lines.append("  antipodal: true")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -213,12 +231,15 @@ class SO3FunComposition(SO3FunGeneric):
 
   @property
   def bandwidth(self):
+    """the largest bandwidth of the components"""
     return max(t.bandwidth for t in self.components)
 
   def eval(self, x):
+    """the sum of the values of the components at the orientations x"""
     return sum(t(x) for t in self.components)
 
   def mean(self):
+    """the sum of the means of the components"""
     return sum(t.mean() for t in self.components)
 
   def _harmonic(self, bandwidth=None):
@@ -233,14 +254,17 @@ class SO3FunComposition(SO3FunGeneric):
   __rmul__ = __mul__
 
   def rotate(self, r, side="left"):
+    """the composition of the components rotated by r from the left or the right"""
     return SO3FunComposition(*(t.rotate(r, side) for t in self.components))
 
   @property
   def CS(self):
+    """the crystal frame the components share"""
     return self._CS
 
   @property
   def SS(self):
+    """the specimen frame the components share"""
     return self._SS
 
   @SS.setter
@@ -251,10 +275,10 @@ class SO3FunComposition(SO3FunGeneric):
     self._SS = fr
 
   def __repr__(self):
-    lines = [f"SO3FunComposition ({self.CS.char()} → {self.SS.char()})", f"  components: {len(self.components)}"]
+    lines = [f"SO3FunComposition ({framesLabel(self.CS, self.SS)})", f"  components: {len(self.components)}"]
     for t in self.components:
       lines.append("  " + repr(t).replace("\n", "\n  "))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -282,6 +306,12 @@ def _symmetrisedS2(fun, frame, antipodal):
 
 
 class S2FunHandle:
+  """a function on the sphere given by a callable that receives directions
+
+    S2FunHandle(fun, frame)
+    S2FunHandle(fun, frame, bandwidth=L)       the bandwidth of its harmonic form
+    S2FunHandle(fun, frame, antipodal=True)    averaged over v and -v and the group
+    S2FunHandle(fun, frame, symmetrise=True)   averaged over the group of the frame on every call"""
 
   # an axis valued handle is averaged over the group of its frame and over v, -v unless
   # symmetrise=False says the callable is symmetric by construction
@@ -299,6 +329,7 @@ class S2FunHandle:
 
   @property
   def CS(self):
+    """the frame of the function, MATLAB's sF.CS"""
     return self.frame
 
   def _vectorsFor(self, x):
@@ -314,6 +345,7 @@ class S2FunHandle:
     return self.eval(x)
 
   def eval(self, x):
+    """the values of the callable at the directions x, taken into the frame of the function"""
     v = self._vectorsFor(x)
     out = np.asarray(self.fun(v))
     out = out.reshape(v.shape) if out.size == v.size else out
@@ -324,6 +356,7 @@ class S2FunHandle:
     return S2FunHarmonic(lambda v: self.eval(v), self.frame, bandwidth=L, antipodal=self.antipodal, real=self.isReal)
 
   def mean(self):
+    """the mean over the sphere, through the harmonic form"""
     return S2FunHarmonic(self).mean()
 
   def sum(self):
@@ -331,6 +364,7 @@ class S2FunHandle:
     return 4 * np.pi * self.mean()
 
   def norm(self):
+    """the L2 norm, through the harmonic form"""
     return S2FunHarmonic(self).norm()
 
   def __mul__(self, a):
@@ -365,6 +399,7 @@ class S2FunHandle:
     return -1 * self
 
   def rotate(self, r):
+    """the function rotated by r, through the harmonic form"""
     return S2FunHarmonic(self).rotate(r)
 
   # the pointwise functions of a handle stay handles, evaluated when asked, as MATLAB's
@@ -376,26 +411,30 @@ class S2FunHandle:
     return self._mapped(np.abs)
 
   def abs(self):
+    """the pointwise absolute value, a handle evaluated when asked"""
     return abs(self)
 
   def sqrt(self):
+    """the pointwise square root, a handle evaluated when asked"""
     return self._mapped(np.sqrt)
 
   def exp(self):
+    """the pointwise exponential, a handle evaluated when asked"""
     return self._mapped(np.exp)
 
   def log(self):
+    """the pointwise logarithm, a handle evaluated when asked"""
     return self._mapped(np.log)
 
   def __pow__(self, p):
     return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
     lines = [f"S2FunHandle{info}", f"  bandwidth hint: {self.bandwidth}"]
     if self.antipodal:
       lines.append("  antipodal: true")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -414,6 +453,8 @@ def _directRatio(f, g):
 
 
 class S2FunSum:
+  """a sum of functions on the sphere of different representations: evaluation adds the values,
+  the harmonic form adds the harmonic forms; what + returns when coefficients cannot be added"""
 
   def __init__(self, *terms):
     flat = []
@@ -429,25 +470,31 @@ class S2FunSum:
 
   @property
   def CS(self):
+    """the frame the summands share, MATLAB's sF.CS"""
     return self.frame
 
   @property
   def bandwidth(self):
+    """the largest bandwidth of the summands"""
     return max(t.bandwidth for t in self.components)
 
   def __call__(self, x):
     return self.eval(x)
 
   def eval(self, x):
+    """the sum of the values of the summands at the directions x"""
     return sum(t(x) for t in self.components)
 
   def mean(self):
+    """the sum of the means of the summands"""
     return sum(t.mean() for t in self.components)
 
   def sum(self):
+    """the surface integral, 4 pi times the mean"""
     return 4 * np.pi * self.mean()
 
   def norm(self):
+    """the L2 norm, through the harmonic form"""
     return S2FunHarmonic(self).norm()
 
   def _harmonicS2(self, bandwidth=None):
@@ -489,20 +536,22 @@ class S2FunSum:
     return self._mapped(np.abs)
 
   def abs(self):
+    """the pointwise absolute value, a handle evaluated when asked"""
     return abs(self)
 
   def sqrt(self):
+    """the pointwise square root, a handle evaluated when asked"""
     return self._mapped(np.sqrt)
 
   def __pow__(self, p):
     return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
     lines = [f"S2FunSum{info}", f"  components: {len(self.components)}"]
     for t in self.components:
       lines.append("  " + repr(t).replace("\n", "\n  "))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -513,6 +562,10 @@ class S2FunSum:
 
 
 class S1FunHandle:
+  """a function on the circle given by a callable that receives angles
+
+    S1FunHandle(fun)
+    S1FunHandle(fun, bandwidth=L)     the bandwidth of its harmonic form"""
 
   def __init__(self, fun, *, bandwidth=None, real=True):
     self.fun = fun
@@ -523,6 +576,7 @@ class S1FunHandle:
     return self.eval(x)
 
   def eval(self, x):
+    """the values of the callable at the angles x"""
     out = np.asarray(self.fun(np.asarray(x, dtype=float)))
     return np.real(out) if self.isReal and out.dtype.kind == "c" else out
 
@@ -531,6 +585,7 @@ class S1FunHandle:
     return S1FunHarmonic(lambda x: self.eval(x), bandwidth=L, real=self.isReal)
 
   def mean(self):
+    """the mean over the circle, through the harmonic form"""
     return S1FunHarmonic(self).mean()
 
   def __mul__(self, a):
@@ -544,7 +599,7 @@ class S1FunHandle:
   __radd__ = __add__
 
   def __repr__(self):
-    return f"S1FunHandle\n  bandwidth hint: {self.bandwidth}"
+    return aligned(f"S1FunHandle\n  bandwidth hint: {self.bandwidth}")
 
 
 # the pointwise functions of any function on SO(3) are handles, evaluated when asked, as

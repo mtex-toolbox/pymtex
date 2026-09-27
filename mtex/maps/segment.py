@@ -16,6 +16,7 @@ import numpy as np
 from ..geometry.session import getMTEXpref
 from .criteria import connectivity
 from .decomposition import NO_PIXEL
+from ..geometry.display import aligned
 
 
 def components(n, a, b, backend=None):
@@ -34,12 +35,14 @@ def components(n, a, b, backend=None):
 
 
 class segmentation:
+  """the result of a segmentation: the grain id of every measurement, the number of grains, the
+  criterion on every face and which faces are inner and which outer boundaries"""
 
   def __init__(self, grainId, nGrains, connect, isInner, isOuter):
     self.grainId, self.nGrains, self.connect, self.isInner, self.isOuter = grainId, nGrains, connect, isInner, isOuter
 
   def __repr__(self):
-    return f"segmentation\n  grains: {self.nGrains}\n  faces: {len(self.connect)}\n  inner faces: {int(self.isInner.sum())}\n  outer faces: {int(self.isOuter.sum())}"
+    return aligned(f"segmentation\n  grains: {self.nGrains}\n  faces: {len(self.connect)}\n  inner faces: {int(self.isInner.sum())}\n  outer faces: {int(self.isOuter.sum())}")
 
 
 def faceConnectivity(c, ebsd, crit):
@@ -117,6 +120,8 @@ def relabel(raw, hasCell, backend=None):
 
 
 def segment(c, ebsd, crit, backend=None, mcl=None):
+  """the segmentation of a decomposition by a criterion: the criterion on every face and the
+  connected components of the faces it joins; mcl=(p, maxIter) runs Markov clustering first"""
   return segmentFrom(c, ebsd, faceConnectivity(c, ebsd, crit), backend, mcl)
 
 

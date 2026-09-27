@@ -15,10 +15,13 @@ _DEFAULT_PREFS = {
   "maxS2Bandwidth": 512,
   "maxSO3Bandwidth": 64,
   "FFTAccuracy": 1e-2,
+  "displayRows": 20,
 }
 
 
 class Session:
+  """the per-session state: the preferences, the frame register, the named frames and the default
+  frame"""
   def __init__(self):
     self.lock = threading.RLock()
     self.reset()
@@ -44,6 +47,10 @@ def getMTEXpref(name=None, default=None):
 
 
 def setMTEXpref(name, value):
+  """sets a preference of the session
+
+    setMTEXpref('maxS2Bandwidth', 256)
+    setMTEXpref('kernels', 'numpy')"""
   SESSION.prefs[name] = value
 
 

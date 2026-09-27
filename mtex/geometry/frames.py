@@ -23,17 +23,21 @@ import numpy as np
 
 from .crystalaxes import alignment as _alignment, crystalAxes, isAlignment, reciprocalAxes
 from .data.pointgroupnames import LAUE_CLASSES, POINT_GROUP_NAMES, findPointGroup, isPointGroupName, monoclinicSetting
-from .latticetype import latticeType
+from .display import display, header, numString
 from .plottingconvention import ARROWS_ASCII, ARROWS_UTF8, plottingConvention
 from .quaternion import orthogonalTransform, quaternion, rotation
 from .session import SESSION, getMTEXpref
 from .symmetry import spaceGroupToPointGroup, symmetry
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector
+from .display import aligned
 
 CANONICAL_BASIS = np.eye(3)
 
 
 class referenceFrame:
+  """a reference frame, the coordinate system data is expressed in: an identity (a name, a
+  mineral), a basis, the point group the data is invariant under and the default plotting
+  convention; a handle compared by identity, registered and sealed by the session"""
   tolAligned = 5e-2      # the same frame: eqTol
   tolCompatible = 1e-1   # a transformable frame: isCompatible
 
@@ -66,49 +70,60 @@ class referenceFrame:
 
   @property
   def basis(self):
+    """the basis vectors of the frame in the canonical Euclidean coordinates, one per row"""
     return vector3d(self._basis.copy())
 
   @basis.setter
   def basis(self, v):
+    """sets the basis; refused on a registered frame"""
     self._assertOpen("basis")
     self._basis = _basisArray(v)
 
   @property
   def axesNames(self):
+    """the names of the three axes, ('X', 'Y', 'Z'), ('a', 'b', 'c') or ('RD', 'TD', 'ND')"""
     return self._axesNames
 
   @axesNames.setter
   def axesNames(self, n):
+    """sets the axes names; refused on a registered frame"""
     self._assertOpen("axes names")
     self._axesNames = tuple(str(x) for x in n)
 
   @property
   def sym(self):
+    """the point group the frame carries, a symmetry"""
     return self._sym
 
   @sym.setter
   def sym(self, s):
+    """sets the point group; refused on a registered frame, whose group changes through sibling"""
     self._assertOpen("point group")
     self._sym = s
 
   @property
   def how2plot(self):
+    """the default plotting convention the frame is drawn with, a plottingConvention or None"""
     return self._how2plot
 
   @how2plot.setter
   def how2plot(self, pC):
+    """sets the plotting convention, from a plottingConvention or its string"""
     self._how2plot = plottingConvention(pC) if isinstance(pC, str) else pC
 
   @property
   def mineral(self):
+    """the mineral of the frame, its name"""
     return self.name
 
   @mineral.setter
   def mineral(self, v):
+    """sets the mineral, the name of the frame"""
     self.name = str(v)
 
   @property
   def isIndexed(self):
+    """whether the frame is an indexed phase, False for the notIndexedFrame"""
     return not isinstance(self, notIndexedFrame)
 
   @property
@@ -118,52 +133,70 @@ class referenceFrame:
 
   @property
   def rot(self):
+    """the elements of the point group, an orthogonalTransform"""
     return self.sym.rot
 
   @property
   def pointGroup(self):
+    """the Hermann-Mauguin symbol of the point group"""
     return self.sym.pointGroup
 
   @property
   def lattice(self):
+    """the crystal system of the point group, a latticeType"""
     return self.sym.lattice
 
   @property
   def multiplicityZ(self):
+    """the highest order of a rotation of the group about the z axis"""
     return self.sym.multiplicityZ
 
   @property
   def multiplicityPerpZ(self):
+    """the highest order of a rotation of the group about an axis perpendicular to z"""
     return self.sym.multiplicityPerpZ
 
   @property
   def isLaue(self):
+    """whether the point group is a Laue group, i.e. contains the inversion"""
     return self.sym.isLaue
 
   @property
   def isProper(self):
+    """whether the point group has proper rotations only"""
     return self.sym.isProper
 
   @property
   def Schoenflies(self):
+    """the Schoenflies symbol of the point group"""
     return self.sym.Schoenflies
 
   def numSym(self):
+    """the number of elements of the point group"""
     return self.sym.numSym()
 
   def numProper(self):
+    """the number of proper rotations in the point group"""
     return self.sym.numProper()
 
   def nfold(self, axis=None):
+    """the highest order of a symmetry axis of the group; with axes, the order about each of them"""
     return self.sym.nfold(axis)
 
   def elements(self, multiplicity=None):
+    """the rotational axes of the group, both signs, and their multiplicities; with a multiplicity
+    only the axes of that order
+
+      axes, mult = cs.elements()
+      axes = cs.elements(3)"""
     return self.sym.elements(multiplicity)
 
   def LaueName(self):
+    """the international symbol of the Laue class of the group"""
     return self.sym.LaueName()
 
   def rotations(self):
+    """the proper rotations of the point group"""
     return self.sym.rotations()
 
   def __len__(self):
@@ -183,6 +216,7 @@ class referenceFrame:
     return referenceFrame.intern(fr)
 
   def clone(self):
+    """an unsealed copy of the frame, not registered"""
     fr = object.__new__(type(self))
     fr.__dict__.update(self.__dict__)
     fr._sealed = False
@@ -190,15 +224,19 @@ class referenceFrame:
     return fr
 
   def stripSym(self):
+    """the sibling frame carrying the trivial group"""
     return self.sibling(symmetry())
 
   def Laue(self):
+    """the sibling frame carrying the Laue group, the group with the inversion added"""
     return self.sibling(self.sym.Laue())
 
   def properGroup(self):
+    """the sibling frame carrying the proper point group, the elements with their parity dropped"""
     return self.sibling(self.sym.properGroup())
 
   def properSubGroup(self):
+    """the sibling frame carrying only the proper rotations of this group"""
     return self.sibling(self.sym.properSubGroup())
 
   def fullSym(self):
@@ -223,6 +261,8 @@ class referenceFrame:
     return self.sibling(symmetry(orthogonalTransform.cat(self.rot, orthogonalTransform(other)), self._basis))
 
   def disjoint(self, other):
+    """the sibling frame carrying the intersection of the two groups; the other frame when it is a
+    specimen frame of the same group"""
     if isinstance(other, referenceFrame):
       if self.sym == other.sym:
         return other if isinstance(other, specimenFrame) else self
@@ -232,6 +272,10 @@ class referenceFrame:
     return self.sibling(d)
 
   def factor(self, other):
+    """the factorisation of the two groups: self = rot1 * d and other = d * rot2 with d the common
+    elements
+
+      rot1, d, rot2 = cs1.factor(cs2)"""
     return self.sym.factor(other.sym)
 
   def __le__(self, other):
@@ -253,14 +297,26 @@ class referenceFrame:
   # ------------------------------------------------------------------ regions
 
   def fundamentalSector(self, center=None, antipodal=False, angle=None):
+    """the fundamental sector of the group on the sphere, the conventional one of the inverse pole
+    figure where it is a fundamental domain; with a centre that centre's Dirichlet domain
+
+      sR = cs.fundamentalSector()
+      sR = cs.fundamentalSector(antipodal=True)
+      sR = cs.fundamentalSector(angle=omega)       for a misorientation angle"""
     from .sphericalregion import fundamentalSector
     return fundamentalSector(self, center=center, antipodal=antipodal, angle=angle)
 
   def conventionalSector(self, up=None, east=None):
+    """the conventional sector of the group, the one MTEX draws, oriented by the up and east
+    directions of the frame's plotting convention"""
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
   def fundamentalRegion(self, other=None, antipodal=False):
+    """the fundamental region in orientation space of this group, or of the pair with another frame
+
+      oR = cs.fundamentalRegion()
+      oR = cs1.fundamentalRegion(cs2, antipodal=True)"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self, other, antipodal=antipodal)
 
@@ -331,12 +387,14 @@ class referenceFrame:
 
   @staticmethod
   def byName(name, fr=None):
+    """the specimen frame registered under a name; with a frame, registers it under that name"""
     if fr is not None:
       SESSION.namedFrames[name] = fr
     return SESSION.namedFrames.get(name)
 
   @staticmethod
   def reset():
+    """empties the frame register, the named frames and the default frame of the session"""
     SESSION.frames.clear()
     SESSION.namedFrames.clear()
     SESSION.defaultFrame = None
@@ -360,20 +418,19 @@ class referenceFrame:
     return northPart + a[1] + self._axesNames[iE] if lr else self._axesNames[iE] + a[0] + northPart
 
   def char(self):
+    """the name of the frame, or its class name"""
     return self.name if self.name else type(self).__name__
 
   def __str__(self):
     return self.char()
 
   def __repr__(self):
-    info = [x for x in (self.name, self.conventionChar()) if x]
-    lines = [type(self).__name__ + (f" ({', '.join(info)})" if info else "")]
+    pairs = []
     if self.numSym() > 1:
-      lines += [f"  symmetry: {self.sym.char()}", f"  elements: {self.numSym()}"]
+      pairs += [("symmetry", self.sym.char()), ("elements", self.numSym())]
     if np.max(np.abs(self._basis - CANONICAL_BASIS)) > 1e-10:
-      for n, b in zip(self._axesNames, self._basis):
-        lines.append(f"  {n}: (" + ",".join(f"{x:.3g}" for x in b) + ")")
-    return "\n".join(lines)
+      pairs += [(n, "(" + ", ".join(numString(x) for x in b) + ")") for n, b in zip(self._axesNames, self._basis)]
+    return display(header(type(self).__name__, self.name, self.conventionChar()), pairs)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -526,12 +583,16 @@ class crystalFrame(referenceFrame):
 
   @classmethod
   def byElements(cls, rot, **kwargs):
+    """the crystal frame of the group generated by the rotations
+
+      cs = crystalFrame.byElements(rot, mineral='...')"""
     return crystalFrame(rot, **kwargs)
 
   # ------------------------------------------------------------------ the lattice
 
   @property
   def axes(self):
+    """the crystal axes a, b, c in Euclidean coordinates, the basis"""
     return self.basis
 
   @property
@@ -542,23 +603,28 @@ class crystalFrame(referenceFrame):
 
   @property
   def abc(self):
+    """the axis lengths a, b, c"""
     return np.linalg.norm(self._basis, axis=1)
 
   @property
   def abg(self):
+    """the axis angles alpha, beta, gamma in radians"""
     b = vector3d(self._basis)
     return np.array([b[1].angle(b[2]), b[2].angle(b[0]), b[0].angle(b[1])])
 
   @property
   def alpha(self):
+    """the angle alpha between the b and c axes, in radians"""
     return self.abg[0]
 
   @property
   def beta(self):
+    """the angle beta between the c and a axes, in radians"""
     return self.abg[1]
 
   @property
   def gamma(self):
+    """the angle gamma between the a and b axes, in radians"""
     return self.abg[2]
 
   # a lattice axis as a Miller direction in this frame: [100] or (100) of the frame
@@ -568,32 +634,41 @@ class crystalFrame(referenceFrame):
 
   @property
   def aAxis(self):
+    """the a axis as the Miller direction [100] of the frame"""
     return self._axisMiller(self._basis[0], 'uvw')
 
   @property
   def bAxis(self):
+    """the b axis as the Miller direction [010] of the frame"""
     return self._axisMiller(self._basis[1], 'uvw')
 
   @property
   def cAxis(self):
+    """the c axis as the Miller direction [001] of the frame"""
     return self._axisMiller(self._basis[2], 'uvw')
 
   @property
   def aAxisRec(self):
+    """the reciprocal axis a* as the Miller plane normal (100) of the frame"""
     return self._axisMiller(reciprocalAxes(self._basis)[0], 'hkl')
 
   @property
   def bAxisRec(self):
+    """the reciprocal axis b* as the Miller plane normal (010) of the frame"""
     return self._axisMiller(reciprocalAxes(self._basis)[1], 'hkl')
 
   @property
   def cAxisRec(self):
+    """the reciprocal axis c* as the Miller plane normal (001) of the frame"""
     return self._axisMiller(reciprocalAxes(self._basis)[2], 'hkl')
 
   def basisDual(self):
+    """the reciprocal axes a*, b*, c* as vectors"""
     return vector3d(reciprocalAxes(self._basis))
 
   def alignment(self):
+    """the alignment of the Euclidean axes to the crystal axes as strings, e.g. ['X||a', 'Z||c*'];
+    empty for an orthogonal lattice"""
     return _alignment(self._basis, self._axesNames)
 
   def transformationMatrix(self, other):
@@ -628,23 +703,19 @@ class crystalFrame(referenceFrame):
     return a[5] + out + a[1] + east
 
   def char(self):
+    """the mineral name of the frame, or the symbol of its point group"""
     return self.name if self.name else self.sym.char()
 
   def __repr__(self):
-    info = [x for x in (self.name, self.conventionChar()) if x]
-    lines = [f"crystalFrame ({', '.join(info)})" if info else "crystalFrame"]
-    if self.name:
-      lines.append(f"  mineral: {self.name}")
-    if self.color is not None:
-      lines.append(f"  color: {self.color}")
-    lines += [f"  symmetry: {self.sym.char()}", f"  elements: {self.numSym()}",
-              "  a, b, c: " + ", ".join(f"{x:.4g}" for x in self.abc)]
-    if self.lattice is not latticeType.cubic:
-      lines.append("  alpha, beta, gamma: " + ", ".join(f"{x * 180 / np.pi:.4g}°" for x in self.abg))
+    # the angles only where the lattice does not imply them, as MATLAB shows them
+    angles = None
+    if np.max(np.abs(np.asarray(self.abg) - self.lattice.defaultAngles)) > 1e-6:
+      angles = ", ".join(f"{x * 180 / np.pi:.4g}°" for x in self.abg)
     al = self.alignment()
-    if al:
-      lines.append("  reference frame: " + ", ".join(al))
-    return "\n".join(lines)
+    return display(header("crystalFrame", self.conventionChar()), [
+      ("mineral", self.name or None), ("color", self.color), ("symmetry", self.sym.char()), ("elements", self.numSym()),
+      ("a, b, c", ", ".join(f"{x:.4g}" for x in self.abc)), ("alpha, beta, gamma", angles),
+      ("reference frame", ", ".join(al) if al else None)])
 
 
 # the first of the named directions a vector lies along, the direct axis before its dual
@@ -764,6 +835,8 @@ class specimenFrame(referenceFrame):
     return SESSION.defaultFrame
 
   def makeDefault(self):
+    """makes this frame the session's default frame, the one supplying the default plotting
+    convention"""
     SESSION.defaultFrame = self
 
   @staticmethod
@@ -835,6 +908,8 @@ specimenFrame = _answerRegistered(specimenFrame)
 # ------------------------------------------------------------------ not indexed
 
 class notIndexedFrame(referenceFrame):
+  """the frame of the measurements that could not be indexed, a phase of a map without basis,
+  group or colour"""
 
   def __init__(self, name="notIndexed", color=None):
     super().__init__(None, name, ("X", "Y", "Z"), None, None, np.array([np.nan, np.nan, np.nan]) if color is None else color)
@@ -845,10 +920,11 @@ class notIndexedFrame(referenceFrame):
   _simPair = _eqTolPair
 
   def sibling(self, s):
+    """the frame itself: a not indexed frame has no group to change"""
     return self
 
   def __repr__(self):
-    return f"notIndexedFrame ({self.name})"
+    return aligned(header("notIndexedFrame", self.name))
 
 
 SESSION.mintDefaultFrame = lambda: specimenFrame.specimen
@@ -882,6 +958,8 @@ ALIGNMENT_SETUPS = (("X||a", "Z||b*"), ("X||a", "Z||c*"), ("X||b", "Z||a*"), ("X
 
 
 def alignmentSetups():
+  """the twelve alignment pairs ['X||a', 'Z||b*'], ... that construct on every lattice and between
+  them reach every distinct frame of a lattice"""
   return [list(s) for s in ALIGNMENT_SETUPS]
 
 
@@ -892,6 +970,8 @@ _CLOSEST_ALIGNMENT = {}
 
 
 def closestAlignment(cs):
+  """the alignment setup a crystal frame is reported in: of the twelve setups the one whose frame
+  lies nearest its basis"""
   key = (cs.pointGroup, np.round(cs._basis, 9).tobytes())
   if key in _CLOSEST_ALIGNMENT:
     return list(_CLOSEST_ALIGNMENT[key])

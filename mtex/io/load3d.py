@@ -23,6 +23,13 @@ DREAM3D_SYMMETRY = ("622", "432", "6", "23", "1", "121", "222", "4", "422", "3",
 
 
 def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
+  """the 3D EBSD map of a volume file, MATLAB's EBSD3.load: the cell data of a DREAM.3D file, the
+  LabDCT volume of an xnovo file, or a stack of 2D maps at the heights z; CS replaces the
+  phases of the file
+
+    loadEBSD3('volume.dream3d')
+    loadEBSD3('volume.h5', interface='xnovo')
+    loadEBSD3(['s0.ang', 's1.ang'], z=[0, 1])"""
   if isinstance(fname, (list, tuple)):
     return _stack(fname, z, *args, **kwargs)
   ext = os.path.splitext(fname)[1].lower().lstrip(".")
@@ -45,6 +52,8 @@ def _xyz(a):
 
 
 def loadEBSD_dream3d(fname, CS=None):
+  """the 3D EBSD map of the image geometry of a DREAM.3D file: the Euler angles, the phases with the
+  mask, every further scalar cell array as a property, the feature ids as grainId"""
   import h5py
   root = "DataStructure/DataContainer"
   with h5py.File(fname, "r") as f:
@@ -74,6 +83,8 @@ def loadEBSD_dream3d(fname, CS=None):
 
 
 def loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
+  """the 3D EBSD map of the LabDCT volume of an xnovo HDF5 file, the orientations from Rodrigues
+  vectors, quaternions or Euler angles, the completeness and grain ids as properties, in mm"""
   import h5py
   with h5py.File(fname, "r") as f:
     g = f[map]

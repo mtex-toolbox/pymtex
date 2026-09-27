@@ -31,6 +31,7 @@ from .quaternion import qmul, quaternion, rotation
 from .symreduce import reductionGroups
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
+from .display import aligned
 
 VariantIds = namedtuple("VariantIds", ["variantId", "packetId", "bainId", "fit"])
 
@@ -226,10 +227,13 @@ def _familyId(p2c, h1, h2):
 
 
 def packetPlanes(cs):
+  """the four {111} planes of the parent phase cs that the packets of the variants are sorted by"""
   return Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], cs)
 
 
 def bainPlanes(cs):
+  """the three {100} directions of the parent phase cs that the Bain groups of the variants are
+  sorted by"""
   return Miller([[0, 0, 1], [1, 0, 0], [0, 1, 0]], cs)
 
 
@@ -453,8 +457,8 @@ class millerRelation(tuple):
     n1, n2, d1, d2 = self
     fit = orientation.map(n1, n2, d1, d2).angle(self.mori.reshape(()), noSymmetry=False) / degree
     planes, dirs = f"{n1.char()} || {n2.char()}", f"{d1.char()} || {d2.char()}"
-    return (f"{'plane parallel':>{len(planes)}}   {'direction parallel':>{len(dirs)}}     fit\n"
-            f"{planes}   {dirs}  {round(float(fit), 2):>4g}°")
+    return (aligned(f"{'plane parallel':>{len(planes)}}   {'direction parallel':>{len(dirs)}}     fit\n"
+            f"{planes}   {dirs}  {round(float(fit), 2):>4g}°"))
 
 
 # a plane or direction as one of its own, the group gone but the four index style kept

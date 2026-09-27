@@ -11,9 +11,15 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.frames import crystalFrame, notIndexedFrame, referenceFrame
+from ..geometry.display import aligned
 
 
 class phaseList:
+  """the phases of a map, the frames its measurements can belong to, the not indexed frame first at
+  index 0, so that a phase id is an index into the list
+
+    phaseList(cs1, cs2)
+    phaseList(['notIndexed', cs1, cs2])      a string names a not indexed frame"""
 
   def __init__(self, *frames):
     if len(frames) == 1 and isinstance(frames[0], (list, tuple)):
@@ -43,17 +49,21 @@ class phaseList:
 
   @property
   def CSList(self):
+    """the frames of the phases as a list, the not indexed one first"""
     return list(self.frames)
 
   @property
   def mineralList(self):
+    """the mineral names of the phases"""
     return [f.mineral for f in self.frames]
 
   @property
   def colorList(self):
+    """the colours the frames of the phases carry, None where they carry none"""
     return [f.color for f in self.frames]
 
   def isIndexed(self, i):
+    """whether phase i carries a lattice"""
     return self.frames[i].isIndexed
 
   @property
@@ -93,7 +103,7 @@ class phaseList:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    return "phaseList\n" + phaseTable(self.frames, range(len(self.frames)))
+    return aligned("phaseList\n" + phaseTable(self.frames, range(len(self.frames))))
 
 
 # the table of the phases with their ids, one extra column of counts when given
@@ -137,6 +147,8 @@ def colorTriplet(c):
 
 
 def phaseTable(frames, ids, counts=None, countLabel="Orientations"):
+  """the table of the phases as text: id, mineral, colour, symmetry and crystal frame, with a column
+  of counts when given"""
   names = phaseColorNames(frames)
   rows = []
   for k, i in enumerate(ids):
@@ -148,7 +160,7 @@ def phaseTable(frames, ids, counts=None, countLabel="Orientations"):
     rows.append(row)
   labels = ["Phase"] + ([countLabel] if counts is not None else []) + ["Mineral", "Color", "Symmetry", "Crystal reference frame"]
   widths = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(len(labels))]
-  line = lambda r: "  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))
+  line = lambda r: ("  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))).rstrip()
   return "\n".join([line(labels)] + [line(r) for r in rows])
 
 

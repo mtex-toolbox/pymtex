@@ -20,6 +20,7 @@ import numpy as np
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
+from ..geometry.display import aligned
 
 EBSD_EXTENSIONS = (".ang", ".ctf", ".cpr", ".crc", ".osc", ".h5", ".h5oina", ".oh5", ".edaxh5", ".hdf5", ".hdf")
 CHUNK = 1 << 18
@@ -28,6 +29,8 @@ HEAD_LIMIT = 1 << 26
 
 @dataclass
 class EBSDFileInfo:
+  """what an EBSD file says about itself from its header alone: format, vendor, phases,
+  properties, data sets, grid, step and Euler correction, as inspectEBSD returns it"""
   path: str
   format: str
   vendor: str
@@ -45,6 +48,7 @@ class EBSDFileInfo:
 
   @property
   def name(self):
+    """the file name without its folder"""
     return os.path.basename(self.path)
 
   @property
@@ -98,7 +102,7 @@ class EBSDFileInfo:
 
   def __repr__(self):
     w = max(len(k) for k, _ in self.describe())
-    return "EBSD file\n" + "\n".join(f"  {k.ljust(w)}  {v}" for k, v in self.describe())
+    return aligned("EBSD file\n" + "\n".join(f"  {k.ljust(w)}  {v}" for k, v in self.describe()))
 
 
 # ------------------------------------------------------------------ the files of a folder
@@ -109,6 +113,7 @@ def isEBSDFile(name):
 
 
 def ebsdFiles(folder):
+  """the EBSD files of a folder by their extension, sorted, a .crc beside its .cpr left out"""
   names = sorted(n for n in os.listdir(folder) if isEBSDFile(n) and os.path.isfile(os.path.join(folder, n)))
   stems = {os.path.splitext(n)[0] for n in names if n.lower().endswith(".cpr")}
   return [n for n in names if not (n.lower().endswith(".crc") and os.path.splitext(n)[0] in stems)]

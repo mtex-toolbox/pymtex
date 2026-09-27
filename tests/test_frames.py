@@ -191,9 +191,11 @@ def test_convention_ownership():
 def test_repr_and_char():
   cs = crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium", color="blue")
   r = repr(cs)
-  assert r.startswith("crystalFrame (Aluminium, ") and "mineral: Aluminium" in r and "color: blue" in r and "elements: 48" in r
+  assert r.startswith("crystalFrame (⊙") and "mineral : Aluminium" in r and "color   : blue" in r and "elements: 48" in r
   assert str(cs) == "Aluminium" and str(crystalFrame("432")) == "432" and str(specimenFrame.rolling) == "rolling"
-  assert "alpha" not in r and "alpha" in repr(crystalFrame("6/mmm", [3, 3, 5]))
+  # the angles only where the lattice does not imply them, as MATLAB shows them
+  assert "alpha" not in r and "alpha" not in repr(crystalFrame("6/mmm", [3, 3, 5]))
+  assert "alpha, beta, gamma: 80°, 90°, 100°" in repr(crystalFrame("-1", [3, 4, 5], [80 * degree, 90 * degree, 100 * degree]))
   assert repr(notIndexedFrame()) == "notIndexedFrame (notIndexed)" and str(specimenFrame.default) == "specimen"
   assert repr(specimenFrame("222")).startswith("specimenFrame (specimen, y↓→x)")
 

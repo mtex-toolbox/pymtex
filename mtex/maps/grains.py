@@ -29,11 +29,17 @@ from ..geometry.vector3d import vector3d
 from .dynprop import dynProp
 from .phaselist import phaseTable
 from .polygon import polygonSet, signedArea2, _insideLoop
+from ..geometry.display import aligned, frameLabel
 
 FIELDS = ("id", "phaseId", "CSList", "numPixel", "meanRotation", "GOS", "frame", "prop", "boundary", "innerBoundary", "loops", "phaseMap")
 
 
 class grain2d(polygonSet):
+  """the grains of a map, MATLAB's grain2d: a table of ids, phases, pixel counts, mean orientations
+  and properties, with the boundary, the inner boundary and the loops of every grain's polygon
+
+    grains = calcGrains(ebsd)
+    grains['Forsterite'], grains[grains.numPixel > 10], grains.selectByGrainId(ids)"""
 
   def __init__(self, id, phaseId, CSList, numPixel, meanRotation, GOS, frame, prop=None, boundary=None, innerBoundary=None, loops=None,
                phaseMap=None):
@@ -56,6 +62,7 @@ class grain2d(polygonSet):
 
   @property
   def size(self):
+    """the number of grains"""
     return len(self.id)
 
   def __len__(self):
@@ -63,20 +70,24 @@ class grain2d(polygonSet):
 
   @property
   def shape(self):
+    """the shape of the list of grains, (size,)"""
     return (self.size,)
 
   @property
   def isIndexed(self):
+    """whether each grain belongs to an indexed phase"""
     indexed = np.array([f.isIndexed for f in self.CSList.frames])
     return indexed[self.phaseId]
 
   @property
   def indexedPhaseId(self):
+    """the ids of the indexed phases present among the grains"""
     present = np.unique(self.phaseId)
     return np.array([p for p in present if self.CSList.isIndexed(p)], dtype=int)
 
   @property
   def mineralList(self):
+    """the mineral names of the phases of the phase list"""
     return self.CSList.mineralList
 
   def _onePhase(self):
@@ -99,6 +110,7 @@ class grain2d(polygonSet):
 
   @property
   def CS(self):
+    """the crystal frame of the one indexed phase of the grains, an error where there are several"""
     return self.CSList[self._onePhase()]
 
   def cs2phaseId(self, cs):
@@ -107,6 +119,7 @@ class grain2d(polygonSet):
 
   @property
   def mineral(self):
+    """the mineral name of the one indexed phase of the grains"""
     return self.CS.mineral
 
   @property
@@ -117,22 +130,27 @@ class grain2d(polygonSet):
 
   @property
   def grainSize(self):
+    """the number of pixels of every grain, grains.numPixel"""
     return self.numPixel
 
   @property
   def triplePoints(self):
+    """the triple points of the grain boundary"""
     return self.boundary.triplePoints
 
   @property
   def V(self):
+    """the vertices of the boundary in the coordinates of the map plane, (n, 2)"""
     return self.boundary.V
 
   @property
   def allV(self):
+    """the vertices of the boundary as framed points of the specimen"""
     return self.boundary.allV
 
   @property
   def plane(self):
+    """the plane the map lies in, a mapPlane"""
     return self.boundary.plane
 
   @property
@@ -204,6 +222,8 @@ class grain2d(polygonSet):
 
   @property
   def numNeighbors(self):
+    """the number of grains every grain shares a boundary with, the neighbours outside the selection
+    included"""
     pairs = self.neighbors(full=True)
     counts = np.bincount(pairs.reshape(-1), minlength=int(self.id.max(initial=0)) + 1)
     return counts[self.id].astype(np.int32)
@@ -224,6 +244,8 @@ class grain2d(polygonSet):
     return counts[self.id].astype(np.int32)
 
   def subBoundaryLength(self, sel=None):
+    """the length of the subgrain boundaries inside every grain, of the inner boundary segments sel
+    selects if given"""
     ib = self.innerBoundary
     sel = np.ones(len(ib), dtype=bool) if sel is None else sel
     L = np.bincount(ib.grainId[sel, 0], weights=ib.segLength[sel], minlength=int(self.id.max(initial=0)) + 1)
@@ -325,6 +347,7 @@ class grain2d(polygonSet):
     return (self[k] for k in range(self.size))
 
   def copy(self):
+    """a copy of the grains with their own table and properties, the boundaries shared"""
     return grain2d(self.id.copy(), self.phaseId.copy(), self.CSList, self.numPixel.copy(), self.meanRotation.data.copy(), self.GOS.copy(),
                    self.frame, {k: (v.copy() if isinstance(v, np.ndarray) else list(v)) for k, v in self.prop.items()},
                    boundary=self.boundary, innerBoundary=self.innerBoundary, loops=self.loops, phaseMap=self.phaseMap)
@@ -503,9 +526,9 @@ class grain2d(polygonSet):
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [f"grain2d ({self.frame.char()})"]
+    lines = [f"grain2d ({frameLabel(self.frame)})"]
     if self.size == 0:
-      return lines[0] + "\n  no grains"
+      return aligned(lines[0] + "\n  no grains")
     lines.append(f"  size: {self.size}")
     ids, counts = np.unique(self.phaseId, return_counts=True)
     pixels = [int(self.numPixel[self.phaseId == p].sum()) for p in ids]
@@ -521,7 +544,7 @@ class grain2d(polygonSet):
       for k in range(self.size):
         euler = f"({e[0, k]:.0f}°,{e[1, k]:.0f}°,{e[2, k]:.0f}°)"
         lines.append(f"  {self.id[k]:>8}{self.phaseId[k]:>8}{self.numPixel[k]:>8}{euler:>20}{self.GOS[k]:>12.3g}")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

@@ -25,6 +25,7 @@ from ..geometry.kernels import backend as kernelBackend, closestImage
 from ..geometry.orientationregion import maxAngle
 from ..geometry.units import degree
 from .criteria import _bestDot, grainBoundaryCriterion
+from ..geometry.display import aligned
 
 KAPPA = 4             # the outlier radius in standard deviations of an aggregate's own spread
 MEMBER = 0.05         # the least membership that counts a node into an aggregate's statistics
@@ -47,11 +48,14 @@ class gbcFMC(grainBoundaryCriterion):
     self.maxDelta, self.minPixel, self.verbose = float(maxDelta), int(minPixel), bool(verbose)
 
   def setMinPixel(self, minPixel):
+    """the same criterion with another smallest region left standing"""
     out = gbcFMC(**{k: getattr(self, k) for k in ("cmaha", "cmaha0", "quatmax", "alpha", "gammaW", "maxDelta", "verbose")})
     out.minPixel = int(minPixel)
     return out
 
   def evaluate(self, ebsd, i, j):
+    """1 for every pair of pixels i, j that FMC puts into one cluster, 0 otherwise, each indexed phase
+    clustered on its own; the pairs within a not indexed phase are always connected"""
     i, j = np.asarray(i, dtype=np.int64).reshape(-1), np.asarray(j, dtype=np.int64).reshape(-1)
     ph = ebsd.phaseId.reshape(-1)
     out = np.zeros(len(i))
@@ -86,7 +90,7 @@ class gbcFMC(grainBoundaryCriterion):
     return label
 
   def __repr__(self):
-    return f"gbcFMC (cmaha {self.cmaha:g}, quatmax {self.quatmax / degree:g}°" + (f", minPixel {self.minPixel}" if self.minPixel > 1 else "") + ")"
+    return aligned(f"gbcFMC (cmaha {self.cmaha:g}, quatmax {self.quatmax / degree:g}°" + (f", minPixel {self.minPixel}" if self.minPixel > 1 else "") + ")")
 
 
 # ------------------------------------------------------------------ the hierarchy

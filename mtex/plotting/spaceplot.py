@@ -20,6 +20,7 @@ from .colormaps import mtexColormap
 from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
 from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
+from ..geometry.display import frameLabel, header
 
 SPHERE_COLOR = (0.93, 0.93, 0.93)
 GRID3_COLOR = (0.75, 0.75, 0.75)
@@ -31,6 +32,9 @@ class spacePlot:
   def __init__(self, ax, frame=None):
     self.ax, self.frame, self.mappable = ax, frame, None
     ax._mtexSpacePlot = self
+
+  def __repr__(self):
+    return header("spacePlot", frameLabel(self.frame))
 
 
 # the camera of MATLAB's two dimensional view: looking down the out of screen axis of the
@@ -865,6 +869,7 @@ def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", ax
 
 
 def fundamentalRegion_(o):
+  """the orientation region of the frames of orientations o, their exchange symmetry included"""
   return fundamentalRegion(o.CS, o.SS, antipodal=o.antipodal)
 
 

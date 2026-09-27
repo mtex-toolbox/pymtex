@@ -22,6 +22,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.display import aligned
 
 
 class sphericalProjection:
@@ -49,10 +50,12 @@ class sphericalProjection:
 
   @staticmethod
   def radius(theta):
+    """the plane radius r(theta) a polar angle is drawn at, 2 sin(theta / 2) for the equal area chart"""
     return 2 * np.sin(theta / 2)
 
   @staticmethod
   def polarAngle(r):
+    """the polar angle drawn at the plane radius r, the inverse of radius"""
     return 2 * np.arcsin(np.clip(r / 2, 0, 1))
 
   @classmethod
@@ -62,10 +65,12 @@ class sphericalProjection:
 
   @property
   def frame(self):
+    """the frame of the region shown"""
     return self.sR.frame
 
   @property
   def isPlain(self):
+    """whether the chart draws the polar angles as plain coordinates, False here"""
     return False
 
   # ------------------------------------------------------------------ projecting
@@ -85,6 +90,7 @@ class sphericalProjection:
     return theta + nan, rho + nan
 
   def project(self, v):
+    """the plane coordinates (x, y) of directions, NaN outside the region"""
     theta, rho = self.polarIn(v)
     r = self.radius(theta)
     return r * np.cos(rho), r * np.sin(rho)
@@ -98,6 +104,7 @@ class sphericalProjection:
     return r * np.cos(rho), r * np.sin(rho)
 
   def iproject(self, x, y):
+    """the direction drawn at the plane point (x, y)"""
     x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
     theta = self.polarAngle(np.hypot(x, y))
     theta = theta if self.upper else np.pi - theta
@@ -239,63 +246,77 @@ class sphericalProjection:
 
   def __repr__(self):
     hemi = "upper" if self.upper else "lower"
-    return (f"{type(self).__name__} ({hemi}{', antipodal' if self.antipodal else ''})\n"
-            f"  convention: {self.pC.char()}\n  region: {len(self.sR.N)} faces")
+    return (aligned(f"{type(self).__name__} ({hemi}{', antipodal' if self.antipodal else ''})\n"
+            f"  convention: {self.pC.char()}\n  region: {len(self.sR.N)} faces"))
 
 
 class eareaProjection(sphericalProjection):
+  """the equal area, Schmidt, projection: r = 2 sin(theta / 2)"""
   name = "earea"
 
 
 class eangleProjection(sphericalProjection):
+  """the equal angle, stereographic, projection: r = tan(theta / 2)"""
   name = "eangle"
 
   @staticmethod
   def radius(theta):
+    """the plane radius tan(theta / 2) of the polar angle theta"""
     return np.tan(theta / 2)
 
   @staticmethod
   def polarAngle(r):
+    """the polar angle 2 arctan(r) drawn at the plane radius r"""
     return 2 * np.arctan(r)
 
 
 class edistProjection(sphericalProjection):
+  """the equidistant projection: r = theta"""
   name = "edist"
 
   @staticmethod
   def radius(theta):
+    """the plane radius of the polar angle theta, theta itself"""
     return np.asarray(theta, dtype=float)
 
   @staticmethod
   def polarAngle(r):
+    """the polar angle drawn at the plane radius r, r itself"""
     return np.asarray(r, dtype=float)
 
 
 class orthographicProjection(sphericalProjection):
+  """the orthographic projection: r = sin(theta)"""
   name = "orthographic"
 
   @staticmethod
   def radius(theta):
+    """the plane radius sin(theta) of the polar angle theta"""
     return np.sin(theta)
 
   @staticmethod
   def polarAngle(r):
+    """the polar angle arcsin(r) drawn at the plane radius r"""
     return np.arcsin(np.clip(r, 0, 1))
 
 
 class gnomonicProjection(sphericalProjection):
+  """the gnomonic projection: r = tan(theta), great circles drawn as straight lines"""
   name = "gnomonic"
 
   @staticmethod
   def radius(theta):
+    """the plane radius tan(theta) of the polar angle theta"""
     return np.tan(theta)
 
   @staticmethod
   def polarAngle(r):
+    """the polar angle arctan(r) drawn at the plane radius r"""
     return np.arctan(r)
 
   @classmethod
   def extent(cls):
+    """the radius of the polar angle 80 degrees, the extent of a gnomonic chart"""
     return cls.radius(80 * degree)
 
 
@@ -305,30 +326,37 @@ class plainProjection(sphericalProjection):
 
   @property
   def isPlain(self):
+    """whether the chart draws the polar angles as plain coordinates, True here"""
     return True
 
   def polarIn(self, v):
+    """the polar coordinates of directions in their own frame, NaN outside the region"""
     v = _asVectors(v).normalize()
     inside = self.sR.checkInside(v)
     nan = np.where(inside, 0.0, np.nan)
     return v.theta + nan, v.rho + nan
 
   def project(self, v):
+    """the plane coordinates (rho, theta) of directions in degrees, NaN outside the region"""
     theta, rho = self.polarIn(v)
     return np.mod(rho, 2 * np.pi) / degree, theta / degree
 
   def projectUnchecked(self, v):
+    """the plane coordinates (rho, theta) in degrees of directions known to lie in the chart"""
     v = _asVectors(v)
     return np.mod(v.rho, 2 * np.pi) / degree, v.theta / degree
 
   def iproject(self, x, y):
+    """the direction of the azimuth x and the polar angle y, both in degrees"""
     x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
     return vector3d.byPolar(y * degree, x * degree)
 
   def withRegion(self, sR):
+    """the same chart showing another region"""
     return type(self)(sR, self.pC, self.antipodal, self.upper)
 
   def chartRegion(self):
+    """the region shown, without its frame"""
     return sphericalRegion(self.sR.N, self.sR.alpha)
 
   def _gridFrom(self, theta, rho, blank):
@@ -339,9 +367,11 @@ class plainProjection(sphericalProjection):
     return V, X, Y
 
   def boundary(self, resolution=0.5 * degree):
+    """the boundary of the region as plane coordinates, one pair of arrays per arc"""
     return [self.projectUnchecked(arc) for arc in self.sR.boundary(resolution)]
 
   def bounds(self, margin=0.0):
+    """the azimuth and polar ranges of the region in degrees, widened by the margin"""
     sR = self.chartRegion()
     rhoLo, rhoHi = rhoRange(sR)
     ivs = [iv for iv in (sR.thetaInterval(rho) for rho in np.linspace(rhoLo, rhoHi, 91)) if iv is not None]
@@ -355,6 +385,8 @@ PROJECTIONS = {"earea": eareaProjection, "schmidt": eareaProjection, "eangle": e
 
 
 def projectionClass(name):
+  """the projection class of a name ('earea', 'schmidt', 'eangle', 'stereo', 'edist',
+  'orthographic', 'gnomonic', 'plain'), of a projection or of a class"""
   if isinstance(name, type) and issubclass(name, sphericalProjection):
     return name
   if isinstance(name, sphericalProjection):
@@ -376,10 +408,12 @@ def withinHemisphere(sR, up, tolerance=1e-6):
 
 
 def isUpper(sR, pC):
+  """whether the region lies within the hemisphere out of the screen of the convention pC"""
   return withinHemisphere(sR, pC.outOfScreen)
 
 
 def isLower(sR, pC):
+  """whether the region lies within the hemisphere into the screen of the convention pC"""
   return withinHemisphere(sR, pC.intoScreen)
 
 
@@ -453,6 +487,8 @@ def plotRegion(fr, fundamentalRegion=False, antipodal=False, how2plot=None):
 
 
 def plotSector(fr, antipodal=False, how2plot=None):
+  """the sector of the frame's group an inverse pole figure shows, that of the Laue group for axes,
+  turned as MATLAB draws it for 321"""
   pC = _conventionOf(fr) if how2plot is None else plottingConvention(how2plot)
   pg = fr.sym
   if antipodal and not pg.isLaue:

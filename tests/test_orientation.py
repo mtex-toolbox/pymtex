@@ -48,7 +48,7 @@ def test_orientation_scalars():
   assert orientation(o, antipodal=False).CS is cs2
   with pytest.raises(TypeError):
     -o
-  assert repr(o).startswith("orientation (Ti → rolling)") and "misorientation (Al → Ti)" in repr(m)
+  assert repr(o).startswith("orientation (Ti → TD←RD↑)") and "misorientation (Al → Ti)" in repr(m)
 
 
 def test_constructors_with_frames():
@@ -119,7 +119,7 @@ def test_orientation_arrays():
   a = angle(os)
   assert a.shape == (10,) and close(a[2], os[2].angle())
   assert Euler(os)[0].shape == (10,)
-  assert "size: 10" in repr(os) and repr(os).startswith("orientation (Al → specimen)")
+  assert "size: 10" in repr(os) and repr(os).startswith("orientation (Al → y↓→x)")
   # float32
   assert os.astype(np.float32).CS is cs and os.astype(np.float32).dtype == np.float32
   assert orientation(rots.astype(np.float32), cs).dtype == np.float32

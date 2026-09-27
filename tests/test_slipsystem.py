@@ -58,7 +58,7 @@ def test_dislocation_systems_of_fcc():
   assert ds.tensor().shape == (18,) and ds.tensor().M.shape == (18, 3, 3) and ds.tensor().unit == "au"
   assert ds.l.antipodal and len(ds[ds.isScrew]) == 6
   # MATLAB's display, one table for the edge and one for the screw dislocations
-  assert "edge dislocations : 12" in repr(ds) and "screw dislocations: 6" in repr(ds) and "Burgers vector" in repr(ds)
+  assert "edge dislocations: 12" in repr(ds) and "screw dislocations: 6" in repr(ds) and "Burgers vector" in repr(ds)
   edge = ds[ds.isEdge]
   assert np.all(np.abs(np.sum(edge.b.data * edge.l.data, axis=-1)) < 1e-10)
   # from vectors of one's own, and a line vector that is neither along nor across
@@ -69,7 +69,7 @@ def test_dislocation_systems_of_fcc():
   # rotated into the specimen
   o = orientation.byEuler(10 * degree, 20 * degree, 30 * degree, cs)
   r = o * ds
-  assert r.CS is None and close(r.b.norm(), ds.b.norm()) and "edge dislocations : 12" in repr(ds)
+  assert r.CS is None and close(r.b.norm(), ds.b.norm()) and "edge dislocations: 12" in repr(ds)
   assert len(dislocationSystem.bcc(cs)) > 18
   with pytest.raises(ValueError):
     dislocationSystem.hcp()

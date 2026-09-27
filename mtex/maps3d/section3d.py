@@ -21,6 +21,11 @@ from ..maps.lattice import mapPlane
 
 
 def sliceGrains(grains, plane, P0=None):
+  """the section of the grains of a volume with a plane, the 2D grains of the pieces the plane
+  cuts with the grain of the volume in the property Id3d; MATLAB's slice of grain3d
+
+    grains2 = sliceGrains(grains3, plane3d(N, P0))
+    grains2 = sliceGrains(grains3, N, P0)"""
   if not isinstance(plane, plane3d):
     plane = plane3d(plane, P0 if P0 is not None else 0)
   N = plane.N.data.reshape(3)

@@ -16,10 +16,11 @@ from __future__ import annotations
 import numpy as np
 
 from .frames import crystalFrame
-from .display import numString, sizeString, table
+from .display import display, header, numString, sizeString, table, takeRows
 from .miller import Miller
 from .symmetryops import symmetrise as _symmetrise
 from .vector3d import vector3d
+from .display import aligned
 
 # the families: slip directions and plane normals, three or four indices
 SLIP_FAMILIES = {
@@ -69,6 +70,13 @@ def _familyOf(family, cs, CRSS=1):
 # ------------------------------------------------------------------ slip systems
 
 class slipSystem:
+  """slip systems: slip directions b with plane normals n orthogonal to them and a critical resolved
+  shear stress each, in crystal coordinates while Miller indexed, in specimen coordinates once
+  an orientation has rotated them
+
+    sS = slipSystem(b, n)
+    sS = slipSystem(b, n, CRSS)
+    sS = slipSystem.fcc(cs)"""
 
   def __init__(self, b, n, CRSS=1):
     b, n = _asList(b), _asList(n)
@@ -91,6 +99,7 @@ class slipSystem:
 
   @property
   def size(self):
+    """the number of slip systems"""
     return self.CRSS.size
 
   @property
@@ -120,14 +129,17 @@ class slipSystem:
 
   @property
   def CS(self):
+    """the crystal frame of the systems, None once they are in specimen coordinates"""
     return self.b.frame if isinstance(self.b.frame, crystalFrame) else None
 
   @property
   def isCrystal(self):
+    """whether the systems are in crystal coordinates"""
     return isinstance(self.b.frame, crystalFrame)
 
   @property
   def frame(self):
+    """the frame the slip directions and plane normals are written in"""
     return self.b.frame
 
   def symmetrise(self, antipodal=False, return_index=False):
@@ -179,6 +191,7 @@ class slipSystem:
     return tensor(M[0] if len(self) == 1 else M, self.frame, rank=2)
 
   def SchmidTensor(self):
+    """the Schmid tensor b n^T of the normalised vectors as a velocity gradient tensor, one per system"""
     from ..tensors.tensor import velocityGradientTensor
     M = self._dyads()
     return velocityGradientTensor(M[0] if len(self) == 1 else M, self.frame)
@@ -189,6 +202,7 @@ class slipSystem:
     return np.abs(np.sum(_unit(self.b.data) * _unit(other.b.data), axis=-1) * np.sum(_unit(self.n.data) * _unit(other.n.data), axis=-1))
 
   def residualBurgersVector(self, other):
+    """the length of the difference of the Burgers vectors of paired systems, entry by entry"""
     return np.linalg.norm(self.b.data - other.b.data, axis=-1)
 
   def trace(self, nrm=None):
@@ -228,81 +242,94 @@ class slipSystem:
   # MATLAB's display: the Burgers vector and the plane normal in indices beside the CRSS, a
   # rotated system in specimen coordinates to two decimals
   def __repr__(self):
-    lines = [f"slipSystem ({self.b._headerChar()})"]
-    if len(self) > 24:
-      lines.append("  CRSS: " + " ".join(f"{c:g}" for c in np.unique(self.CRSS)))
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if not 0 < self.size <= 45:
-      return "\n".join(lines)
+    pairs = [("size", sizeString(self.shape) if self.size != 1 else None)]
+    if not self.size:
+      return display(header("slipSystem", self.b._headerChar()), pairs)
+    take, pos = takeRows(self.size)
+    s = self[take] if len(self.shape) <= 1 else self[np.unravel_index(take, self.shape)]
     if self.isCrystal:
       if self.CS.lattice.isTriHex:
-        labels, d = ["U", "V", "T", "W", "| H", "K", "I", "L", "CRSS"], [self.b.UVTW, self.n.hkil]
+        labels, d = ["U", "V", "T", "W", "| H", "K", "I", "L", "CRSS"], [s.b.UVTW, s.n.hkil]
       else:
-        labels, d = ["u", "v", "w", "| h", "k", "l", "CRSS"], [self.b.uvw, self.n.hkl]
-      d = np.concatenate(d + [self.CRSS[..., None]], axis=-1).reshape(self.size, -1)
-      lines.append(table(labels, list(np.round(d, 4).T), decimals=4, tiny=1e-10))
+        labels, d = ["u", "v", "w", "| h", "k", "l", "CRSS"], [s.b.uvw, s.n.hkl]
+      d = np.concatenate(d + [s.CRSS[..., None]], axis=-1).reshape(len(take), -1)
+      body = table(labels, np.round(d, 4).T, decimals=4, tiny=1e-10, rows=pos)
     else:
-      d = np.round(100 * np.concatenate([self.b.data, self.n.data], axis=-1).reshape(self.size, 6)) / 100
-      lines.append(table(["x", "y", "z", "|  x", "y", "z"], list(d.T), decimals=2, tiny=1e-10))
-    return "\n".join(lines)
+      d = np.round(100 * np.concatenate([s.b.data, s.n.data], axis=-1).reshape(len(take), 6)) / 100
+      body = table(["x", "y", "z", "|  x", "y", "z"], d.T, decimals=2, tiny=1e-10, rows=pos)
+    return display(header("slipSystem", self.b._headerChar()), pairs, body)
 
   # ------------------------------------------------------------------ the families
 
   @staticmethod
   def primitiveCubic(cs, CRSS=1):
+    """the slip system <100>{010} of a primitive cubic crystal"""
     return _familyOf("primitiveCubic", cs, CRSS)
 
   @staticmethod
   def fcc(cs, CRSS=1):
+    """the slip system <01-1>{111} of a face-centred cubic crystal"""
     return _familyOf("fcc", cs, CRSS)
 
   @staticmethod
   def bcc(cs, CRSS=1):
+    """the slip systems <1-11>{011}, <-111>{211} and <-111>{321} of a body-centred cubic crystal"""
     return _familyOf("bcc", cs, CRSS)
 
   @staticmethod
   def hcp(cs=None, CRSS=1):
+    """there is no hcp default: raises an error naming the hexagonal families to choose from
+    (basal, prismaticA, pyramidalCA, twinT1, ...) with their CRSS"""
     return _familyOf("hcp", cs, CRSS)
 
   @staticmethod
   def basal(cs, CRSS=1):
+    """the basal slip system <11-20>(0001) of a hexagonal crystal"""
     return _familyOf("basal", cs, CRSS)
 
   @staticmethod
   def prismaticA(cs, CRSS=1):
+    """the prismatic a slip system <2-1-10>{01-10} of a hexagonal crystal"""
     return _familyOf("prismaticA", cs, CRSS)
 
   @staticmethod
   def prismatic2A(cs, CRSS=1):
+    """the second prismatic a slip system <01-10>{2-1-10} of a hexagonal crystal"""
     return _familyOf("prismatic2A", cs, CRSS)
 
   @staticmethod
   def pyramidalA(cs, CRSS=1):
+    """the pyramidal a slip system <2-1-10>{01-11} of a hexagonal crystal"""
     return _familyOf("pyramidalA", cs, CRSS)
 
   @staticmethod
   def pyramidalCA(cs, CRSS=1):
+    """the pyramidal c+a slip system <2-1-13>{-1101} of a hexagonal crystal"""
     return _familyOf("pyramidalCA", cs, CRSS)
 
   @staticmethod
   def pyramidal2CA(cs, CRSS=1):
+    """the second order pyramidal c+a slip system <2-1-13>{-2112} of a hexagonal crystal"""
     return _familyOf("pyramidal2CA", cs, CRSS)
 
   @staticmethod
   def twinT1(cs, CRSS=1):
+    """the tensile twin T1 <1-101>{-1102} of a hexagonal crystal"""
     return _familyOf("twinT1", cs, CRSS)
 
   @staticmethod
   def twinT2(cs, CRSS=1):
+    """the tensile twin T2 <2-1-16>{-2111} of a hexagonal crystal"""
     return _familyOf("twinT2", cs, CRSS)
 
   @staticmethod
   def twinC1(cs, CRSS=1):
+    """the compressive twin C1 <-110-2>{-1101} of a hexagonal crystal"""
     return _familyOf("twinC1", cs, CRSS)
 
   @staticmethod
   def twinC2(cs, CRSS=1):
+    """the compressive twin C2 <2-1-1-3>{2-1-12} of a hexagonal crystal"""
     return _familyOf("twinC2", cs, CRSS)
 
 
@@ -361,6 +388,7 @@ class dislocationSystem:
 
   @property
   def size(self):
+    """the number of dislocation systems"""
     return self.u.size
 
   @property
@@ -376,18 +404,22 @@ class dislocationSystem:
 
   @property
   def CS(self):
+    """the crystal frame of the systems, None once they are in specimen coordinates"""
     return self.b.frame if isinstance(self.b.frame, crystalFrame) else None
 
   @property
   def frame(self):
+    """the frame the Burgers and line vectors are written in"""
     return self.b.frame
 
   @property
   def isEdge(self):
+    """which systems are edge dislocations, the line vector orthogonal to the Burgers vector"""
     return np.abs(np.sum(_unit(self.b.data) * _unit(self.l.data), axis=-1)) < 1e-5
 
   @property
   def isScrew(self):
+    """which systems are screw dislocations, the line vector parallel to the Burgers vector"""
     return ~self.isEdge
 
   def tensor(self):
@@ -425,22 +457,27 @@ class dislocationSystem:
       lines.append("  " + "  ".join(h.rjust(w) for (h, _), w in zip(cols, widths)))
       for row in zip(*(col for _, col in cols)):
         lines.append("  " + "  ".join(c.rjust(w) for c, w in zip(row, widths)))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   @staticmethod
   def fcc(cs):
+    """the edge and screw dislocations of the symmetrised face-centred cubic slip systems"""
     return dislocationSystem(slipSystem.fcc(cs).symmetrise(antipodal=True))
 
   @staticmethod
   def bcc(cs):
+    """the edge and screw dislocations of the symmetrised body-centred cubic slip systems"""
     return dislocationSystem(slipSystem.bcc(cs).symmetrise(antipodal=True))
 
   @staticmethod
   def hcp(cs=None):
+    """there is no hcp default: raises an error naming the hexagonal families to choose from"""
     return _familyOf("hcp", cs)
 
 
 def mPrime(sS1, sS2):
+  """mPrime(sS1, sS2) is sS1.mPrime(sS2): the Luster-Morris parameter |(n1 . n2)(b1 . b2)| of
+  paired slip systems"""
   return sS1.mPrime(sS2)
 
 

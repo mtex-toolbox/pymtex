@@ -107,6 +107,10 @@ merge = _method("merge")
 
 
 def rotate(v, rot, *args, **kwargs):
+  """rotate(x, rot) is x.rotate(rot), or rot * x for an object without that method; MATLAB's flag
+  strings become keywords, 'left' and 'right' the side
+
+    rotate(ebsd, rot, 'keepEuler')"""
   # MATLAB's flags as keywords, rotate(ebsd, r, 'keepEuler'); 'left' and 'right' name the side
   flags = dict(("side", a) if a in ("left", "right") else (a, True) for a in args if isinstance(a, str))
   args = tuple(a for a in args if not isinstance(a, str))

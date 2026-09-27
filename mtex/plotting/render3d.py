@@ -13,6 +13,7 @@ __all__ = ["hasPyVista", "pyvistaPlotter", "renderImage", "drawMatplotlib", "wri
 
 
 def hasPyVista():
+  """whether PyVista can be imported, the renderer of the 3D scenes"""
   try:
     import pyvista  # noqa: F401
     return True

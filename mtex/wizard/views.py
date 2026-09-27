@@ -35,6 +35,8 @@ GUI_FALLBACK = "DejaVu Sans"
 
 
 def guiFont(dpi):
+  """the matplotlib settings of the window's font, its family where matplotlib has it and the
+  mathtext in it too, and its size in points at the dpi given"""
   from matplotlib import font_manager
   from PySide6.QtGui import QFontInfo
   from PySide6.QtWidgets import QApplication
@@ -125,6 +127,9 @@ IPF_DIRECTIONS = {"IPF X": lambda: xvector, "IPF Y": lambda: yvector, "IPF Z": l
 
 
 class ViewCanvas(FigureCanvasQTAgg):
+  """the canvas of the wizard's views: the map in the colouring of the tab, the pole figures of
+  the dominant phase drawn ahead from a density computed on the worker, and the pictures of the
+  file; redrawn once per turn of the event loop whatever the state announced"""
 
   def __init__(self, st, worker=None):
     super().__init__(matplotlib.figure.Figure(layout="constrained"))
@@ -162,10 +167,13 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   @Slot()
   def flush(self):
+    """the draw the changes scheduled, run on the event loop"""
     self.pending = False
     self.draw_view()
 
   def draw_view(self):
+    """the view of the tab in force drawn: the map, the pole figures or a picture, the error as
+    text and status when the drawing fails"""
     st = self.st
     kind = st.tabKinds[st.tab] if 0 <= st.tab < len(st.tabKinds) else None
     if st.ebsd is None or kind is None:
@@ -186,6 +194,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       st.changed("status")
 
   def clear(self, text=None):
+    """the figure emptied, a text in its middle if given"""
     self.figure.clear()
     self.image = self.colorbar = self.mappable = self.legend = self.drawnFor = None
     if text:
@@ -286,6 +295,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     return name, {}
 
   def colorsOf(self, kind, name, at=None):
+    """the colours or values of the map the tab asks for, of the measurements at alone if given"""
     from ..plotting.mapplot import mapValues
     color, kw = self.colorArgs(kind, name)
     return mapValues(self.st.ebsd, color, at=at, **kw)
@@ -355,6 +365,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       QTimer.singleShot(0, self.drawAhead)
 
   def onPoleFigures(self):
+    """whether the tab in force is the pole figure tab"""
     st = self.st
     return 0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures"
 
@@ -369,6 +380,7 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   @Slot()
   def drawAhead(self):
+    """the picture of the pole figures drawn off the screen, unless the one kept shows the same"""
     key = self.poleFigureKey()
     if key is not None and (self.pfPicture is None or self.pfPicture[0] != key):
       self.pfPicture = (key, self.renderPoleFigures(key))
@@ -444,6 +456,7 @@ class ViewCanvas(FigureCanvasQTAgg):
   # ------------------------------------------------------------------ the images
 
   def drawImage(self):
+    """the picture of the file the state points at, with its label and number"""
     st = self.st
     self.figure.clear()
     self.image = self.colorbar = self.mappable = self.drawnFor = None
@@ -520,6 +533,7 @@ class MillerBar(QWidget):
     self.show_()
 
   def commit(self, k, f):
+    """the crystal direction of the field k taken into the state when its text changed"""
     if f.text().strip() != self.st.millers[k]:
       cb.setMiller(self.st, k, f.text())
 
@@ -562,6 +576,7 @@ class KeyPanel(QWidget):
     self.refresh()
 
   def refresh(self):
+    """the key of the phase picked drawn anew at the pixels of the screen, empty for none"""
     st = self.st
     frames = st.ebsd.CSList.frames if st.ebsd is not None else []
     k = st.keyPhase

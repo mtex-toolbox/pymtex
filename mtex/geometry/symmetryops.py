@@ -23,6 +23,8 @@ from .vector3d import _isCrystalFrame, vector3d
 
 
 def reducesOverGroup(v):
+  """whether an operation on the vectors reduces over a group: crystal directions in a frame of
+  more than one element"""
   return v.isCrystalDirection and v.frame.numSym() > 1
 
 
@@ -292,6 +294,12 @@ def _neighbours(o, tolerance, noSymmetry):
 
 
 def orientationUnique(o, tolerance=1e-3, noSymmetry=False, return_index=False, return_inverse=False):
+  """the orientations with the duplicates within the tolerance removed, symmetric equivalents
+  counting as one unless noSymmetry=True; the first of each kept, in order, with the indices
+  of the kept and the index of every orientation into them when asked
+
+    u = orientationUnique(ori, tolerance=1*degree)
+    u, iv, iu = orientationUnique(ori, return_index=True, return_inverse=True)"""
   n = o.size
   same = _neighbours(o, tolerance, noSymmetry)
   keep = np.ones(n, dtype=bool)
@@ -347,6 +355,9 @@ def axisFrame(o):
 
 
 def orientationAxis(o, noSymmetry=False):
+  """the rotational axes of orientations or misorientations, those of the representatives in the
+  fundamental region, or of the rotations as given with noSymmetry=True, in the frame axisFrame
+  names"""
   from .representations import quatAxis
   q = o.data if noSymmetry else project2FundamentalRegionOrientation(o).data
   return vector3d(quatAxis(q), isNormalized=True, frame=axisFrame(o))

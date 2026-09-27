@@ -19,10 +19,12 @@ GROUP_TAGS = ("_symmetry_space_group_name_H-M", "_space_group_name_H-M_alt", "_s
 
 
 def mtexCifPath():
+  """the directory of the CIF files shipped with MTEX, where crystalFrame.load looks up a name"""
   return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "geometry", "data", "cif")
 
 
 def cifFiles():
+  """the names of the CIF files shipped with MTEX, sorted"""
   return sorted(f for f in os.listdir(mtexCifPath()) if f.endswith(".cif"))
 
 

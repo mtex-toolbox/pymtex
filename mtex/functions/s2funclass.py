@@ -40,6 +40,12 @@ class S2Fun:
 
   @staticmethod
   def smiley(v=None, exact=False, even=False, **kwargs):
+    """the smiley test function on the sphere
+
+      S2Fun.smiley(bandwidth=256)    its harmonic expansion by quadrature
+      S2Fun.smiley(v)                its values at the directions v
+      S2Fun.smiley(exact=True)       the function itself, as a handle
+      S2Fun.smiley(even=True)        the smiley on both hemispheres"""
     from .handles import S2FunHandle
     from .s2fun import S2FunHarmonic
     if isinstance(v, vector3d):
@@ -50,6 +56,8 @@ class S2Fun:
 
   @staticmethod
   def unimodal(v=None, halfwidth=25 * degree, psi=None):
+    """a de la Vallee Poussin bump of the halfwidth given, or the kernel psi, about the direction v
+    (the north pole by default), as a harmonic expansion"""
     from ..geometry.quaternion import rotation
     from .kernelfunctions import S2DeLaValleePoussinKernel
     from .s2fun import S2FunHarmonic
@@ -61,6 +69,7 @@ class S2Fun:
 
   @staticmethod
   def interpolate(nodes, values=None, **kwargs):
+    """a function on the sphere through the values at the nodes, a regularised least squares fit"""
     from .density import interpolate
     return interpolate(nodes, values, **kwargs)
 

@@ -24,7 +24,7 @@ import math
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.display import numString, table
+from ..geometry.display import display, frameLabel, header, numString, sizeString, table
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
@@ -184,55 +184,56 @@ class tensor(MtexArray):
 
   @property
   def M(self):
+    """the coefficients as an array of shape (..., 3, ..., 3), the rank's indices last"""
     return self.data.reshape(self.shape + (3,) * self.rank)
 
   @M.setter
   def M(self, value):
+    """sets the coefficients from an array of shape (..., 3, ..., 3), the shape of the list kept"""
     self.data = np.asarray(value, dtype=float).reshape(self.shape + (self._ncoord,))
 
   @property
   def frame(self):
+    """the frame the tensor is written in, a crystal frame or the specimen frame"""
     return self._frame
 
   @frame.setter
   def frame(self, fr):
+    """sets the frame the tensor is written in, the coefficients kept"""
     if not isinstance(fr, referenceFrame):
       raise TypeError("the frame of a tensor has to be a referenceFrame")
     self._frame = fr
 
   @property
   def CS(self):
+    """the frame the tensor is written in, MATLAB's T.CS"""
     return self._frame
 
   @CS.setter
   def CS(self, fr):
+    """sets the frame the tensor is written in, the coefficients kept"""
     self.frame = fr
 
   @property
   def isSymmetric(self):
+    """whether every tensor of rank two or four equals its transpose, up to a relative 1e-6"""
     if self.rank not in (2, 4):
       raise ValueError("symmetry is checked on tensors of rank two and four")
     return bool(np.all(np.linalg.norm((self - self.transpose()).data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
 
   @property
   def isSkewSymmetric(self):
+    """whether every tensor equals minus its transpose, up to a relative 1e-6"""
     return bool(np.all(np.linalg.norm((self + self.transpose()).data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
 
   def __repr__(self):
     # a crystal tensor is headed by its frame, a specimen one by the convention it is drawn in, as a vector is
-    fr = self._frame
-    lines = [f"{type(self).__name__} ({fr.char() if isinstance(fr, crystalFrame) else fr.conventionChar() or fr.char()})"]
-    if self.name is not None:
-      lines.append(f"  name: {self.name}")
-    if self.density is not None:
-      d = self.density
-      lines.append(f"  density: {numString(d, digits=5) if np.ndim(d) == 0 else ', '.join(numString(x, digits=5) for x in np.ravel(d))}")
-    if self.unit is not None:
-      lines.append(f"  unit: {self.unit}")
-    size = " x ".join(str(n) for n in self.shape) if self.ndim else ""
-    lines.append(f"  rank: {self.rank} ({' x '.join(['3'] * self.rank)})" + (f", size: {size}" if size else ""))
-    if type(self) is tensor and self.doubleConvention:
-      lines.append("  doubleConvention: true")
+    d = self.density
+    lines = display(header(type(self).__name__, frameLabel(self._frame)), [
+      ("name", self.name),
+      ("density", None if d is None else numString(d, digits=5) if np.ndim(d) == 0 else ", ".join(numString(x, digits=5) for x in np.ravel(d))),
+      ("unit", self.unit), ("rank", f"{self.rank} ({sizeString((3,) * self.rank)})" if self.rank else "0"), ("size", sizeString(self.shape) if self.ndim else None),
+      ("doubleConvention", "true" if type(self) is tensor and self.doubleConvention else None)]).split("\n")
     # a single tensor shows its coefficients: a number, a column, a matrix, the compact or the Voigt matrix
     if self.ndim == 0:
       A = self.M.reshape(1, 1) if self.rank == 0 else self.M.reshape(3, 1) if self.rank == 1 else self.M if self.rank == 2 else Voigt(self)
@@ -240,10 +241,9 @@ class tensor(MtexArray):
       m = float(finite.max()) if finite.size else 0.0
       p = 0 if m == 0 else math.floor(math.log10(m))
       scale = p if (p >= 3 or p <= -2) else 0
-      lines.append("")
       title = {3: "tensor in compact matrix form", 4: "tensor in Voigt matrix representation"}.get(self.rank)
       if title or scale:
-        lines.append((title + ": " if title else " ") + (f"*10^{scale}" if scale else "") if scale else title)
+        lines.append("  " + ((title + ": " if title else "") + f"*10^{scale}" if scale else title))
       S = A / 10.0 ** scale
       lines.append(table([""] * S.shape[1], [S[:, j] for j in range(S.shape[1])], decimals=4).split("\n", 1)[1])
     return "\n".join(lines)
@@ -332,15 +332,19 @@ class tensor(MtexArray):
     return not self == other
 
   def isclose(self, other, rtol=1e-8, atol=0.0):
+    """whether two tensors of one rank and shape agree coefficientwise within rtol and atol"""
     return isinstance(other, tensor) and other.rank == self.rank and self.data.shape == other.data.shape and bool(np.allclose(self.data, other.data, rtol=rtol, atol=atol))
 
   def norm(self):
+    """the Frobenius norm of every tensor, over all its coefficients"""
     return np.linalg.norm(self.data, axis=-1)
 
   def normalize(self):
+    """the tensors divided by their Frobenius norms"""
     return self / self.norm()
 
   def trace(self):
+    """the trace of a rank two tensor, or of the Voigt matrix of a rank four one"""
     if self.rank == 2:
       return np.einsum("...ii->...", self.M)
     if self.rank == 4:
@@ -348,6 +352,7 @@ class tensor(MtexArray):
     raise ValueError("the trace is of a tensor of rank two or four")
 
   def det(self):
+    """the determinant of a rank two tensor"""
     if self.rank != 2:
       raise ValueError("the determinant is of a tensor of rank two")
     return np.linalg.det(self.M)
@@ -364,6 +369,7 @@ class tensor(MtexArray):
 
   @property
   def T(self):
+    """the transpose, the indices of a rank two and the index pairs of a rank four swapped"""
     return self.transpose()
 
   ctranspose = transpose
@@ -381,6 +387,7 @@ class tensor(MtexArray):
     return self._rebuild(_flatten(out / len(perms), self.rank))
 
   def antiSym(self):
+    """the antisymmetric part (T - T^t) / 2 of a rank two tensor"""
     if self.rank != 2:
       raise ValueError("the antisymmetric part is of a tensor of rank two")
     return self._rebuild(_flatten((self.M - np.swapaxes(self.M, -1, -2)) / 2, 2))
@@ -425,6 +432,7 @@ class tensor(MtexArray):
     raise ValueError("eigenvalues are of a tensor of rank two or four")
 
   def eigvals(self):
+    """the eigenvalues in ascending order, of a rank two tensor or of the Voigt matrix of a rank four"""
     return self.eig()[0]
 
   # the matrix functions: a rank two tensor as its matrix, a rank four one as its Kelvin
@@ -437,16 +445,22 @@ class tensor(MtexArray):
     raise ValueError("matrix functions are of tensors of rank two or four")
 
   def expm(self):
+    """the matrix exponential of a rank two tensor, or of a rank four one through its Kelvin matrix,
+    the class kept"""
     from scipy.linalg import expm
     return self._matrixFunction(expm)
 
   def logm(self):
+    """the matrix logarithm of a rank two tensor, or of a rank four one through its Kelvin matrix, the
+    class kept"""
     from scipy.linalg import logm
     out = self._matrixFunction(logm)
     out.name = None if self.name is None else f"log {self.name}"
     return out
 
   def sqrtm(self):
+    """the matrix square root of a rank two tensor, or of a rank four one through its Kelvin matrix,
+    the class kept"""
     from scipy.linalg import sqrtm
     return self._matrixFunction(sqrtm)
 
@@ -519,6 +533,8 @@ class tensor(MtexArray):
     return self._rebuild(out / len(Q))
 
   def checkSymmetry(self, atol=1e-6):
+    """whether the tensor is invariant under every element of the group of its frame, up to atol
+    relative to the largest norm"""
     scale = atol * max(float(np.max(self.norm())) if self.size else 0.0, 1e-12)
     return all(np.allclose(_applyMatrix(self.M, q, self.rank), self.data, atol=scale) for q in self._frame.rot.matrix())
 
@@ -601,6 +617,12 @@ class tensor(MtexArray):
 
   @classmethod
   def eye(cls, *args, rank=None, **kwargs):
+    """the identity tensor, rank two the unit matrix, rank four the symmetric identity on rank two
+    tensors; the rank of the class unless rank= is given
+
+      tensor.eye(cs)
+      stiffnessTensor.eye()
+      tensor.eye(rank=4)"""
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     if rank == 2:
@@ -613,12 +635,18 @@ class tensor(MtexArray):
 
   @classmethod
   def ones(cls, *args, rank=None, **kwargs):
+    """a tensor of ones of the rank of the class, or of rank=, the list shape given by the numbers
+
+      tensor.ones(cs, 5)"""
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     return cls(np.ones(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
 
   @classmethod
   def zeros(cls, *args, rank=None, **kwargs):
+    """a tensor of zeros of the rank of the class, or of rank=, the list shape given by the numbers
+
+      tensor.zeros(cs, 5)"""
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     return cls(np.zeros(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
@@ -639,6 +667,7 @@ class tensor(MtexArray):
 
   @classproperty
   def leviCivita(cls):
+    """the Levi-Civita symbol, the rank three tensor of the signs of the permutations of (1, 2, 3)"""
     i, j, k = np.indices((3, 3, 3))
     return tensor(((i - j) * (j - k) * (k - i) / 2).astype(float), rank=3)
 
@@ -863,6 +892,10 @@ class complianceTensor(tensor):
 
 
 class stressTensor(tensor):
+  """a rank two symmetric stress tensor; stressTensor.uniaxial(v, sigma) the uniaxial tension along v
+
+    sigma = stressTensor(M)
+    sigma = stressTensor.uniaxial(vector3d.X)"""
   _rank, _symmetricRank2 = 2, True
 
   @staticmethod
@@ -878,6 +911,10 @@ class stressTensor(tensor):
 
 
 class strainTensor(tensor):
+  """a rank two symmetric strain tensor, in the double convention of the Voigt notation
+
+    eps = strainTensor(M)
+    eps = strainTensor(M, cs)"""
   _rank, _double, _symmetricRank2 = 2, True, True
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -888,10 +925,17 @@ class strainTensor(tensor):
 
 
 class strainRateTensor(tensor):
+  """a rank two symmetric strain rate tensor, the symmetric part of a velocity gradient, in the double
+  convention of the Voigt notation"""
   _rank, _double, _symmetricRank2 = 2, True, True
 
 
 class deformationGradientTensor(tensor):
+  """a deformation gradient tensor F, the rank two tensor carrying a line segment dX of the undeformed
+  body into dx = F dX of the deformed one
+
+    F = deformationGradientTensor(M)
+    F = deformationGradientTensor.uniaxial(d, rate)"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -904,6 +948,12 @@ class deformationGradientTensor(tensor):
 
 
 class velocityGradientTensor(tensor):
+  """a velocity gradient tensor L, the rank two tensor of the spatial derivatives of the velocity; its
+  symmetric part the strain rate, its skew part the spin
+
+    L = velocityGradientTensor(M)
+    L = velocityGradientTensor.uniaxial(d, e)
+    L = velocityGradientTensor.simpleShear(d, n, e)"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -938,6 +988,8 @@ class spinTensor(tensor):
 
 
 class curvatureTensor(tensor):
+  """the lattice curvature tensor, the rank two tensor of the spatial derivatives of the orientation
+  field, what the dislocation density tensor is derived from"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -946,6 +998,10 @@ class curvatureTensor(tensor):
 
 
 class dislocationDensityTensor(tensor):
+  """the dislocation density or Nye tensor, the rank two tensor derived from the curvature tensor,
+  whose fit against dislocation systems gives the geometrically necessary densities
+
+    alpha = dislocationDensityTensor(M, cs)"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -966,6 +1022,9 @@ class ChristoffelTensor(tensor):
 
 
 class refractiveIndexTensor(tensor):
+  """the rank two symmetric refractive index tensor, whose anisotropy makes a crystal birefringent
+
+    rI = refractiveIndexTensor(M, cs)"""
   _rank, _symmetricRank2 = 2, True
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -988,58 +1047,75 @@ class SchmidTensor(tensor):
 # ------------------------------------------------------------------ the verbs as functions
 
 def rotate(T, r):
+  """rotate(T, r) is T.rotate(r): the tensor turned by a rotation, an orientation or a matrix"""
   return T.rotate(r)
 
 
 def symmetrise(T):
+  """symmetrise(T) is T.symmetrise(): the mean of the tensor over the group of its frame"""
   return T.symmetrise()
 
 
 def checkSymmetry(T, atol=1e-6):
+  """checkSymmetry(T) is T.checkSymmetry(): whether the tensor is invariant under the group of its
+  frame"""
   return T.checkSymmetry(atol)
 
 
 def directionalMagnitude(T, v=None):
+  """directionalMagnitude(T, v) is T.directionalMagnitude(v): the tensor contracted with the direction
+  on every index, without v the function on the sphere"""
   return T.directionalMagnitude(v)
 
 
 def transformReferenceFrame(T, fr):
+  """transformReferenceFrame(T, fr) is T.transformReferenceFrame(fr): the tensor read in another
+  frame"""
   return T.transformReferenceFrame(fr)
 
 
 def sym(T):
+  """sym(T) is T.sym(): the symmetric part, the mean over the permutations of the indices"""
   return T.sym()
 
 
 def antiSym(T):
+  """antiSym(T) is T.antiSym(): the antisymmetric part of a rank two tensor"""
   return T.antiSym()
 
 
 def times(A, B):
+  """times(A, B) is A.times(B): the product of corresponding coefficients, MATLAB's A .* B"""
   return A.times(B)
 
 
 def trace(T):
+  """trace(T) is T.trace(): the trace of a rank two tensor, or of the Voigt matrix of a rank four"""
   return T.trace()
 
 
 def eig(T):
+  """eig(T) is T.eig(): the eigenvalues in ascending order and the eigenvectors"""
   return T.eig()
 
 
 def expm(T):
+  """expm(T) is T.expm(): the matrix exponential"""
   return T.expm()
 
 
 def logm(T):
+  """logm(T) is T.logm(): the matrix logarithm"""
   return T.logm()
 
 
 def sqrtm(T):
+  """sqrtm(T) is T.sqrtm(): the matrix square root"""
   return T.sqrtm()
 
 
 def svd(T):
+  """svd(T) is T.svd(): the singular value decomposition, u, s, v of a rank two tensor"""
   return T.svd()
 
 

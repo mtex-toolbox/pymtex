@@ -4,9 +4,14 @@
 from __future__ import annotations
 
 import numpy as np
+from ..display import display
 
 
 class S1Grid:
+  """a sorted list of angles on an interval [min, max], periodic or not, the nearest neighbour and
+  radius search of the tensor product grids S2Grid and SO3Grid
+
+    S1G = S1Grid(points, 0, 2*pi, periodic=True)"""
 
   def __init__(self, points, min=None, max=None, periodic=False):
     p = np.sort(np.asarray(points, dtype=float).reshape(-1))
@@ -24,6 +29,7 @@ class S1Grid:
 
   @property
   def period(self):
+    """the length max - min of a periodic grid, zero for one that is not periodic"""
     return self.max - self.min if self.periodic else 0.0
 
   def fold(self, x):
@@ -96,7 +102,8 @@ class S1Grid:
     return g
 
   def __repr__(self):
-    return f"S1Grid\n  points: {len(self)}\n  range: {self.min * 180 / np.pi:.4g}° to {self.max * 180 / np.pi:.4g}°\n  periodic: {self.periodic}"
+    return display("S1Grid", [("points", len(self)), ("range", f"{self.min * 180 / np.pi:.4g}° to {self.max * 180 / np.pi:.4g}°"),
+                              ("periodic", self.periodic)])
 
 
 # the spacing of an equispaced ladder, zero when the points are not one

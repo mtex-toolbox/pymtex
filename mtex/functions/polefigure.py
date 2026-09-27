@@ -32,6 +32,8 @@ from .characteristics import calcError as _calcErrorODF
 from .funops import conv
 from .s2fun import S2FunHarmonic
 from ..geometry.install import install
+from ..geometry.display import display, framesLabel
+from ..geometry.display import aligned
 
 ERROR_MODES = ("relative", "RP", "l1", "l2")
 
@@ -149,6 +151,7 @@ class PoleFigure:
 
   @property
   def numPF(self):
+    """the number of pole figures"""
     return len(self.allH)
 
   def __len__(self):
@@ -160,14 +163,17 @@ class PoleFigure:
 
   @property
   def CS(self):
+    """the crystal frame, that of the crystal directions allH"""
     return self.allH[0].frame
 
   @property
   def SS(self):
+    """the specimen frame, that of the specimen directions allR"""
     return self.allR[0].frame
 
   @property
   def frame(self):
+    """the frame of the specimen directions, pf.SS"""
     return self.SS
 
   @property
@@ -177,22 +183,27 @@ class PoleFigure:
 
   @property
   def antipodal(self):
+    """whether the specimen directions are axes, r not told from -r"""
     return self.allR[0].antipodal
 
   @property
   def h(self):
+    """the crystal directions of all pole figures in one vector"""
     return vector3d.cat(*[x.flatten() for x in self.allH])
 
   @property
   def r(self):
+    """the specimen directions of all pole figures in one vector"""
     return vector3d.cat(*[x.flatten() for x in self.allR])
 
   @property
   def intensities(self):
+    """the intensities of all pole figures in one array, in the order of pf.r"""
     return np.concatenate([I.ravel() for I in self.allI])
 
   @intensities.setter
   def intensities(self, value):
+    """pf.intensities = I sets the intensities: one number for all, or one per specimen direction"""
     value = np.asarray(value, dtype=float)
     if value.size == 1:
       self.allI = [np.full(I.shape, float(value)) for I in self.allI]
@@ -208,6 +219,7 @@ class PoleFigure:
 
   @property
   def isempty(self):
+    """whether the pole figures hold no measurement"""
     return sum(I.size for I in self.allI) == 0
 
   @property
@@ -216,6 +228,7 @@ class PoleFigure:
     return min(_resolutionOf(r) for r in self.allR)
 
   def select(self, i):
+    """the pole figures of the index or indices i, a data set of their own"""
     idx = [i] if isinstance(i, (int, np.integer)) else list(i)
     return PoleFigure([self.allH[k] for k in idx], [self.allR[k] for k in idx], [self.allI[k] for k in idx],
                       superposition=[self.c[k] for k in idx], complete=True)
@@ -247,11 +260,11 @@ class PoleFigure:
     self.intensities = I
 
   def __repr__(self):
-    lines = [f"PoleFigure ({self.CS.char()} → {self.SS.char()})"]
+    lines = [f"PoleFigure ({framesLabel(self.CS, self.SS)})"]
     for h, r in zip(self.allH, self.allR):
-      shape = " x ".join(str(s) for s in r.shape) if r.ndim > 1 else str(r.size)
+      shape = " × ".join(str(s) for s in r.shape) if r.ndim > 1 else str(r.size)
       lines.append(f"  h = {h.char()}, r = {shape} points")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # ------------------------------------------------------------------ arithmetic
   # a number applies to every pole figure, a sequence one entry per pole figure, another
@@ -298,6 +311,7 @@ class PoleFigure:
     return self._rebuild([-I for I in self.allI])
 
   def scale(self, alpha):
+    """the intensities multiplied by alpha, one number or one per pole figure"""
     return self * alpha
 
   def max(self, other=None):
@@ -307,6 +321,7 @@ class PoleFigure:
     return self._apply(other, np.maximum)
 
   def min(self, other=None):
+    """min(pf) the smallest intensity of each pole figure, min(pf, a) the intensities clipped"""
     if other is None:
       return np.array([np.min(I) for I in self.allI])
     return self._apply(other, np.minimum)
@@ -522,10 +537,12 @@ class PoleFigure:
     return S2FunHarmonic.quadrature(r, I, bandwidth=L, weights=w, real=True, antipodal=r.antipodal)
 
   def calcODF(self, *args, **kwargs):
+    """calcODF(pf, ...): an ODF reconstructed from the pole figure intensities, an SO3FunRBF"""
     from ..analysis.pf2odf import calcODF
     return calcODF(self, *args, **kwargs)
 
   def calcODFIterative(self, *args, **kwargs):
+    """calcODFIterative(pf, ...): the reconstruction refined successively over a ladder of halfwidths"""
     from ..analysis.pf2odf import calcODFIterative
     return calcODFIterative(self, *args, **kwargs)
 
@@ -533,6 +550,7 @@ class PoleFigure:
 
   @staticmethod
   def cat(*pfs, axis=0):
+    """the pole figures of several data sets in one, in order"""
     pfs = [pf for pf in pfs if pf is not None]
     return PoleFigure(sum([pf.allH for pf in pfs], []), sum([pf.allR for pf in pfs], []), sum([pf.allI for pf in pfs], []),
                       superposition=sum([pf.c for pf in pfs], []), complete=True)
@@ -548,26 +566,37 @@ class PoleFigure:
 # ------------------------------------------------------------------ the verbs as functions
 
 def union(pf, *others):
+  """union(pf, ...) is pf.union(...): the pole figures of several data sets in one, those of equal
+  crystal directions joined"""
   return pf.union(*others)
 
 
 def correct(pf, **kwargs):
+  """correct(pf, ...) is pf.correct(...): the background subtracted and the defocusing divided out"""
   return pf.correct(**kwargs)
 
 
 def noisepf(pf, fak=1, background=0, nonnegative=False, rng=None):
+  """noisepf(pf, ...) is pf.noisepf(...): Poisson counts of fak * I + background, the background
+  subtracted again"""
   return pf.noisepf(fak, background, nonnegative, rng)
 
 
 def isOutlier(pf, alpha=2):
+  """isOutlier(pf, alpha) is pf.isOutlier(alpha): the measurements deviating from the mean of their
+  neighbours by more than alpha standard deviations"""
   return pf.isOutlier(alpha)
 
 
 def calcNormalization(pf, other):
+  """calcNormalization(pf, other) is pf.calcNormalization(other): the factor that scales the second
+  pole figure to the mass of the first"""
   return pf.calcNormalization(other)
 
 
 def calcErrorPF(pf, other, mode="relative", epsilon=None):
+  """calcErrorPF(pf, other, mode) is pf.calcErrorPF(other, mode): the pole figures of the
+  deviation from a recalculation, 'relative', 'RP', 'l1' or 'l2'"""
   return pf.calcErrorPF(other, mode, epsilon)
 
 
@@ -796,6 +825,7 @@ class SchulzDefocusingKernel:
     self.mu_t, self.theta, self.r, self.w, self.d, self.dtheta = float(mu_t), float(theta), float(r), float(w), float(d), float(dtheta)
 
   def eval(self, t):
+    """the defocusing factor at t = cos(alpha) of the tilt alpha, 1 at no tilt, infinite at 90 degrees"""
     from scipy.special import erf
     alpha = np.arccos(np.clip(np.asarray(t, dtype=float), -1, 1))
     tau = self.dtheta / math.sqrt(2 * np.pi)
@@ -813,6 +843,10 @@ class SchulzDefocusingKernel:
   def defocusing(self, pf):
     """the correction on the specimen directions of a pole figure, one at the pole"""
     return pf._rebuild([self.eval(np.cos(r.theta)) for r in pf.allR])
+
+  def __repr__(self):
+    return display("SchulzDefocusingKernel", [("mu_t", f"{self.mu_t:g}"), ("theta", f"{self.theta / degree:g}°"), ("r", f"{self.r:g}"),
+                                              ("w", f"{self.w:g}"), ("d", f"{self.d:g}"), ("dtheta", f"{self.dtheta / degree:g}°")])
 
 
 # ------------------------------------------------------------------ installation

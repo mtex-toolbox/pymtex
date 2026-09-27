@@ -58,6 +58,8 @@ def _ori(r, f):
 
 
 def textureindex(f):
+  """the texture index of a function on SO(3) or on the sphere, the squared L2 norm of its harmonic
+  expansion"""
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if _isSO3(f) else S2FunHarmonic(f).norm() ** 2
 
 
@@ -275,6 +277,14 @@ def _uniformAxisDensity(oR):
 
 
 def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
+  """the axis distribution of an SO(3) function, an S2 function of the rotation axes symmetric under
+  the rotations the two frames share; with v its values at the axes v; for two frames the axis
+  distribution of the uniform distribution, exactly
+
+    adf = calcAxisDistribution(odf)
+    value = calcAxisDistribution(odf, v)
+    adf = calcAxisDistribution(odf, minAngle=20*degree, maxAngle=40*degree)
+    adf = calcAxisDistribution(cs1, cs2)"""
   if isinstance(f, referenceFrame):
     # the uniform distribution exactly, not as a truncated expansion
     from ..geometry.orientationregion import fundamentalRegion
@@ -475,6 +485,13 @@ def _reduceHandle(f, op, axis):
 
 
 def max_(f, *args, numLocal=1, **kwargs):
+  """the maximum of a function on SO(3) or the sphere, the value and the position, numLocal local maxima
+  from a grid refined down to the accuracy; with a second function or a number the pointwise
+  maximum; with axis= the maximum of a list of functions along an axis
+
+    value, ori = max(odf)
+    values, oris = max(odf, numLocal=5, resolution=5*degree, accuracy=0.25*degree)
+    f = max(odf1, odf2)"""
   # a pole figure clips or reports its intensities
   if hasattr(f, "allI"):
     return f.max(*args)
@@ -500,6 +517,11 @@ def max_(f, *args, numLocal=1, **kwargs):
 
 
 def min_(f, *args, numLocal=1, **kwargs):
+  """the minimum of a function on SO(3) or the sphere, the value and the position, numLocal local minima;
+  with a second function or a number the pointwise minimum; with axis= along an axis of a list
+
+    value, ori = min(odf)
+    f = min(odf, 0)"""
   if hasattr(f, "allI"):
     return f.min(*args)
   if kwargs.get("axis") is not None and isinstance(f, S2FunHarmonic):
@@ -539,6 +561,12 @@ def _gradientField(f):
 
 
 def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=100, radius=np.inf, exact=False, silent=False):
+  """the modal orientations of an SO(3) function by steepest ascent from seeds, their volumes and which
+  mode each seed flowed into; modes within the tolerance merge, and modes of less than one percent
+  are dropped unless exact=True; the seeds are the centres of a radial function or a 2.5 degree grid
+
+    modes, weights, centerId = calcComponents(odf)
+    modes, weights, centerId = calcComponents(odf, seed=ori, radius=10*degree, exact=True)"""
   if seed is None and isinstance(f, SO3FunRBF):
     seed, weights = f.center, f.weights
   elif seed is None:

@@ -24,6 +24,7 @@ from ..geometry.vector3d import vector3d
 from ..tensors.tensor import spinTensor, strainTensor
 from .kernels import taylorKernel
 from ..geometry.install import install
+from ..geometry.display import aligned, frameLabel
 
 LinearProgramResult = namedtuple("LinearProgramResult", ["solution", "status", "iterations", "residual"])
 TaylorResult = namedtuple("TaylorResult", ["M", "b", "W"])
@@ -162,7 +163,7 @@ class TaylorModel:
     return len(self.crss)
 
   def __repr__(self):
-    return f"TaylorModel ({self.frame.char()})\n  slip systems: {len(self)}\n  spin selection: {self.spinSelection}"
+    return aligned(f"TaylorModel ({frameLabel(self.frame)})\n  slip systems: {len(self)}\n  spin selection: {self.spinSelection}")
 
 
 # the shears of least norm on the work-optimal face, from a vertex of it

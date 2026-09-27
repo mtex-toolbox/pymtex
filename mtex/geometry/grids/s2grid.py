@@ -13,9 +13,13 @@ from ..units import degree
 from ..vector3d import vector3d
 from .s1grid import S1Grid, ladder
 from .gridsearch import flatS2, s2Nearest
+from ..display import display, header
 
 
 class S2Grid(vector3d):
+  """a grid on the sphere with ring structure, a ladder of polar angles theta and one azimuth grid
+  per ring, whose nearest and radius searches use that structure; built by equispacedS2Grid,
+  regularS2Grid and plotS2Grid, and whatever breaks the rings returns a plain vector3d"""
 
   # the grid from its rings: theta a ladder of polar angles, rho one azimuth grid per ring
   def __init__(self, theta, rho, frame=None, resolution=np.nan, antipodal=False):
@@ -41,13 +45,16 @@ class S2Grid(vector3d):
 
   @property
   def resolution(self):
+    """the resolution the grid was built with, NaN when none was given"""
     return self.res
 
   @property
   def nrings(self):
+    """the number of rings, polar angles, of the grid"""
     return len(self.thetaGrid)
 
   def ring(self, k):
+    """the indices of the points on ring k"""
     return np.arange(self.offset[k], self.offset[k + 1])
 
   # the flat ladders for the compiled search, or None when a ring is not an equispaced circle
@@ -138,6 +145,8 @@ class S2Grid(vector3d):
 
   @property
   def hasUniformSteps(self):
+    """whether the polar ladder and every ring of more than one point have uniform steps, so that the
+    nearest point is found by arithmetic"""
     return self.thetaGrid.step > 0 and all(len(r) == 1 or r.step > 0 for r in self.rhoGrid)
 
   # the points of ring k within eps of (theta, rho): the azimuth window from
@@ -192,8 +201,9 @@ class S2Grid(vector3d):
 
   def __repr__(self):
     lens = [len(r) for r in self.rhoGrid]
-    pts = f"{lens[0]} x {len(lens)}" if lens and all(n == lens[0] for n in lens) else str(self.size)
-    return f"S2Grid ({self._headerChar()})\n  points: {pts}\n  resolution: {self.res / degree:.4g}°" + ("\n  antipodal: true" if self.antipodal else "")
+    pts = f"{lens[0]} × {len(lens)}" if lens and all(n == lens[0] for n in lens) else str(self.size)
+    return display(header("S2Grid", self._headerChar()), [("points", pts), ("resolution", f"{self.res / degree:.4g}°"),
+                                                          ("antipodal", "true" if self.antipodal else None)])
 
 
 def _dots(g, a, b):

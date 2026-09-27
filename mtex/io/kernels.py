@@ -136,6 +136,8 @@ def _firstWidth(block, comments):
 
 
 def parseBlockNumba(block, comma, comments):
+  """the numeric block of a text file as a rows x columns array, parsed by the parallel numba
+  loop; None without numba"""
   loop = _compile()
   if loop is None:
     return None
@@ -167,6 +169,8 @@ def parseBlockNumba(block, comma, comments):
 
 
 def parseBlockNumpy(block, comma, comments):
+  """the numeric block of a text file as a rows x columns array, read by np.loadtxt: the fallback
+  and the oracle"""
   if comma:
     block = block.replace(b",", b".")
   try:
@@ -179,6 +183,8 @@ def parseBlockNumpy(block, comma, comments):
 
 
 def parseBlock(block, comma=False, comments=None):
+  """the numeric block of a text file as a rows x columns array, a decimal comma and a comment
+  prefix as given; numba where the preference kernels selects it, else NumPy"""
   if backend() == "numba":
     M = parseBlockNumba(block, comma, comments)
     if M is not None:
@@ -302,6 +308,8 @@ def _compileWriter():
 
 
 def formatTableNumba(cols, decimals, sep=b" ", crlf=False):
+  """the rows of a table as bytes, the columns to the decimals given, written in parallel by numba;
+  None without numba"""
   writer = _compileWriter()
   if writer is None:
     return None
@@ -318,6 +326,8 @@ def formatTableNumba(cols, decimals, sep=b" ", crlf=False):
 
 
 def formatTableNumpy(cols, decimals, sep=b" ", crlf=False):
+  """the rows of a table as bytes, the columns to the decimals given, written by np.savetxt: the
+  fallback and the oracle"""
   cols = np.asarray(cols, dtype=np.float64)
   fmt = ["%d" if d < 0 else f"%.{d}f" for d in decimals]
   buf = io.BytesIO()

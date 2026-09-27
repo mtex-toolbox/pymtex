@@ -11,6 +11,9 @@ class SO3Fun:
 
   @staticmethod
   def load(fname, *args, **kwargs):
+    """an ODF read from a file, loadODF
+
+      odf = SO3Fun.load('odf.txt', CS=cs, columnNames=[...])"""
     from ..io.loadodf import loadODF
     return loadODF(fname, *args, **kwargs)
 
@@ -24,6 +27,7 @@ class SO3Fun:
 
   @staticmethod
   def interpolate(nodes, values=None, **kwargs):
+    """the function on SO(3) through the values at the orientations, interpolate(nodes, values)"""
     from .density import interpolate
     return interpolate(nodes, values, **kwargs)
 

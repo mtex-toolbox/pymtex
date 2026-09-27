@@ -45,6 +45,7 @@ class PythonInk(QSyntaxHighlighter):
     self.string.setForeground(QColor(STRING_INK))
 
   def highlightBlock(self, text):
+    """colours one line: the strings green, from a hash outside a string on the comment grey"""
     strings = [m.span() for m in self.STRING.finditer(text)]
     for a, b in strings:
       self.setFormat(a, b - a, self.string)
@@ -123,6 +124,7 @@ class ScriptView(QWidget):
       x -= 4
 
   def resizeEvent(self, event):
+    """lays the script and the buttons out anew for the new size"""
     super().resizeEvent(event)
     self.fit()
 
@@ -135,6 +137,7 @@ class ScriptView(QWidget):
         b.setStyleSheet(buttonStyle(self.palette()))
 
   def showEvent(self, event):
+    """lays the script and the buttons out when the view is shown"""
     super().showEvent(event)
     self.fit()
 
@@ -144,6 +147,7 @@ class ScriptView(QWidget):
     QTimer.singleShot(1500, lambda: self.mark(button, button.label, False))
 
   def mark(self, button, text, done):
+    """sets a button's text and its done state, green while true, and restyles it"""
     button.setText(text)
     button.setProperty("done", done)
     button.style().unpolish(button)
@@ -152,6 +156,7 @@ class ScriptView(QWidget):
     self.fit()
 
   def copyScript(self):
+    """copies the import script to the clipboard and says so in the status and on the button"""
     script = self.text.toPlainText()
     if script:
       QGuiApplication.clipboard().setText(script)
@@ -160,6 +165,7 @@ class ScriptView(QWidget):
       self.confirm(self.copy, "copied ✓")
 
   def saveScript(self):
+    """writes the import script to a file the user picks, the button confirming it"""
     from PySide6.QtWidgets import QFileDialog
     path, _ = QFileDialog.getSaveFileName(self, "save the import script", cb.defaultScriptPath(self.st), "Python (*.py)")
     if path and cb.writeScript(self.st, path):

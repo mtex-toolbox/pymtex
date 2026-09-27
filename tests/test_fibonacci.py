@@ -16,4 +16,4 @@ def test_fibonacci_grid():
   assert I.shape == (200, 3001) and np.allclose(np.cos(D[3].data), d[3][I[3].indices])
   assert max(np.arccos(np.max(d[k])) for k in range(200)) < g.resolution
   assert fibonacciS2Grid(resolution=5 * degree).size == 2 * ((int(np.round(np.exp(2.512) / (5 * degree) ** 2)) - 1) // 2) + 1
-  assert not isinstance(g[:5], fibonacciS2Grid) and "points: 3001" in repr(g)
+  assert not isinstance(g[:5], fibonacciS2Grid) and "points    : 3001" in repr(g)

@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from ..geometry.display import display, header
 
 _current = None
 
@@ -19,6 +20,8 @@ FIGURE_SIZES = {"tiny": 0.4, "small": 0.6, "medium": 0.8, "normal": 1.0, "large"
 
 
 def figureSize(figSize, default):
+  """the size of a figure in inches: the default, scaled by one of MATLAB's names 'tiny', 'small',
+  'medium', 'normal', 'large', 'huge', or the pair given"""
   if figSize is None:
     return default
   if isinstance(figSize, str):
@@ -79,6 +82,7 @@ class mtexFigure:
   # ------------------------------------------------------------------ the axes
 
   def nextAxis(self):
+    """a new axes in the next cell of the layout, the layout and the figure grown when it is full"""
     k = len(self.children)
     if k >= self.nrows * self.ncols:
       rows, cols = self.nrows, self.ncols
@@ -117,6 +121,7 @@ class mtexFigure:
 
   @property
   def currentAxes(self):
+    """the last axes of the figure, a new one when there is none"""
     return self.children[-1] if self.children else self.nextAxis()
 
   # the drawings on the axes, the objects a colour bar reads
@@ -278,8 +283,12 @@ class mtexFigure:
     return self.fig.savefig(*args, **kwargs)
 
   def show(self):
+    """shows the figures, matplotlib's show"""
     import matplotlib.pyplot as plt
     plt.show()
+
+  def __repr__(self):
+    return display(header("mtexFigure", f"{self.nrows} × {self.ncols}"), [("hold", "on" if self.hold else None)])
 
 
 # what a colour bar shows of a drawing: filled bands their map over the range, continuously
@@ -317,6 +326,9 @@ def layoutFor(n, columns=None):
 
 
 def newMtexFigure(n=1, **kwargs):
+  """a new mtexFigure laid out for n axes
+
+    newMtexFigure(4, figSize='large')"""
   return mtexFigure(n, **kwargs)
 
 
@@ -424,6 +436,12 @@ COLORBAR_LOCATIONS = {"southoutside": "bottom", "northoutside": "top", "eastouts
 
 
 def mtexColorbar(fig=None, title=None, **kwargs):
+  """a colour bar per axes of the current figure, or one when the ranges agree; toggled off when
+  the figure has bars; a MATLAB location as the first argument
+
+    mtexColorbar()
+    mtexColorbar('southoutside', title='mrd')
+    mtexColorbar('multiple')"""
   if isinstance(fig, str):
     kwargs.setdefault("location", fig)
     fig = None
@@ -478,6 +496,11 @@ def logAxis(ax=None, xLimits=None, yLimits=None):
 
 
 def setColorRange(colorRange="equal", fig=None):
+  """one colour range over every axes of the current figure ('equal'), each its own ('tight') or
+  the one given as (lo, hi)
+
+    setColorRange('equal')
+    setColorRange((0, 4))"""
   fig = gcm() if fig is None else fig
   if fig is not None:
     fig.setColorRange(colorRange)

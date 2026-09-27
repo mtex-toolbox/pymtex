@@ -24,6 +24,7 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .kernelfunctions import S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel
 from .transforms import S2FourierPlan, SO3FourierPlan
+from ..geometry.display import aligned
 
 # the points the symmetric traces c_l are averaged over
 TRACE_SAMPLE = 2000
@@ -369,8 +370,8 @@ class degreeEnergies:
     return float(max(1.0, np.median((self.energy[lo:] - self.A[lo:]) / iid)))
 
   def __repr__(self):
-    return (f"degreeEnergies on {self.space}, bandwidth {self.L}, {self.n} points, {self.nUnits} "
-            f"{'groups' if self.grouped else 'units'}, {self.nFolds} folds, n_eff {self.neff:.0f}")
+    return (aligned(f"degreeEnergies on {self.space}, bandwidth {self.L}, {self.n} points, {self.nUnits} "
+            f"{'groups' if self.grouped else 'units'}, {self.nFolds} folds, n_eff {self.neff:.0f}"))
 
 
 # ------------------------------------------------------------------ the selectors

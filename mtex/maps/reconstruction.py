@@ -31,6 +31,7 @@ from ..geometry.parent2child import calcParent, calcParent2Child, calcVariantId,
 from ..geometry.quaternion import qmul
 from ..geometry.units import degree
 from .phaselist import phaseList
+from ..geometry.display import aligned
 
 
 def _conj(q):
@@ -83,13 +84,14 @@ class voteTable:
 
   @property
   def value(self):
+    """the value of the votes, prob, fit or count by the kind of the table, one row per grain"""
     return getattr(self, self.kind)
 
   def __len__(self):
     return len(self.parentId)
 
   def __repr__(self):
-    return f"voteTable ({len(self)} grains)\n  parentId: {self.parentId.shape}\n  {self.kind}: {self.value.shape}"
+    return aligned(f"voteTable ({len(self)} grains)\n  parentId: {self.parentId.shape}\n  {self.kind}: {self.value.shape}")
 
 
 def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf,
@@ -277,10 +279,13 @@ class parentGrainReconstructor:
 
   @property
   def p2c(self):
+    """the parent to child orientation relationship, refined along the reconstruction"""
     return self._p2c
 
   @p2c.setter
   def p2c(self, p2c):
+    """sets the orientation relationship, its frames added to the phase lists of the map and the
+    grains, the variant order reset"""
     self._p2c = p2c
     self._variantMap = None
     self._register(p2c.frameA, p2c.frameB)
@@ -295,28 +300,34 @@ class parentGrainReconstructor:
 
   @property
   def csParent(self):
+    """the frame of the parent phase, that of the orientation relationship once it is set"""
     return self._p2c.frameA if self._p2c is not None else self._csParent
 
   @csParent.setter
   def csParent(self, cs):
+    """sets the parent phase, the frame added to the phase lists"""
     self._csParent = cs
     self._register(cs)
 
   @property
   def csChild(self):
+    """the frame of the child phase, that of the orientation relationship once it is set"""
     return self._p2c.frameB if self._p2c is not None else self._csChild
 
   @csChild.setter
   def csChild(self, cs):
+    """sets the child phase, the frame added to the phase lists"""
     self._csChild = cs
     self._register(cs)
 
   @property
   def parentPhaseId(self):
+    """the phase id of the parent phase"""
     return self.grains.CSList.phaseId(self.csParent)
 
   @property
   def childPhaseId(self):
+    """the phase id of the child phase"""
     return self.grains.CSList.phaseId(self.csChild)
 
   @property
@@ -327,6 +338,7 @@ class parentGrainReconstructor:
 
   @variantMap.setter
   def variantMap(self, vMap):
+    """sets the order the variants are numbered in"""
     self._variantMap = np.asarray(vMap, dtype=np.int64)
 
   # variant ids of the unmapped list as the ids of the mapped one
@@ -353,42 +365,52 @@ class parentGrainReconstructor:
 
   @property
   def numChilds(self):
+    """the number of prior child grains merged into each grain of the current stage"""
     return np.bincount(self._pos(self.mergeId), minlength=self.grains.size)
 
   @property
   def isMerged(self):
+    """which prior grains have been merged with others into a parent grain"""
     return self.numChilds[self._pos(self.mergeId)] > 1
 
   @property
   def isTransformed(self):
+    """which prior child grains have been reconstructed into a parent grain"""
     return (self.grainsPrior.phaseId == self.childPhaseId) & (self.grains.phaseId[self._pos(self.mergeId)] == self.parentPhaseId)
 
   @property
   def isChild(self):
+    """which grains of the current stage are child grains"""
     return self.grains.phaseId == self.childPhaseId
 
   @property
   def isParent(self):
+    """which grains of the current stage are parent grains"""
     return self.grains.phaseId == self.parentPhaseId
 
   @property
   def parentGrains(self):
+    """the parent grains at the current stage of the reconstruction"""
     return self.grains[self.isParent]
 
   @property
   def childGrains(self):
+    """the remaining child grains at the current stage of the reconstruction"""
     return self.grains[self.isChild]
 
   @property
   def transformedGrains(self):
+    """the prior child grains that have been reconstructed"""
     return self.grainsPrior[self.isTransformed]
 
   @property
   def ebsd(self):
+    """the map at the current stage of the reconstruction, calcParentEBSD"""
     return self.calcParentEBSD()
 
   @property
   def parentEBSD(self):
+    """the parent phase of the map at the current stage of the reconstruction"""
     return self.ebsd[self.csParent]
 
   def _priorProp(self, name):
@@ -397,14 +419,17 @@ class parentGrainReconstructor:
 
   @property
   def variantId(self):
+    """the reconstructed variant id of every prior grain, NaN where none is computed"""
     return self._priorProp("variantId")
 
   @property
   def packetId(self):
+    """the reconstructed packet id of every prior grain, NaN where none is computed"""
     return self._priorProp("packetId")
 
   @property
   def bainId(self):
+    """the reconstructed Bain group id of every prior grain, NaN where none is computed"""
     return self._priorProp("bainId")
 
   @property
@@ -420,10 +445,12 @@ class parentGrainReconstructor:
 
   @property
   def hasVariantGraph(self):
+    """whether the graph is a variant graph, one node per grain and parent variant"""
     return self.graph is not None and self.graph.shape[0] > 1.5 * self.grains.size
 
   @property
   def hasGraph(self):
+    """whether the graph is a grain graph, one node per grain"""
     return self.graph is not None and self.graph.shape[0] < 1.5 * self.grains.size
 
   def _meanOri(self, g, idx, frame):
@@ -977,7 +1004,7 @@ class parentGrainReconstructor:
         scale, name, unit = {"fit": (1 / degree, "fit", "°"), "prob": (100, "probabilities", "%"), "count": (1, "counts", "")}[self.votes.kind]
         qs = ", ".join(f"{_xnum(_quantile(val * scale, q))}{unit}" for q in (0.8, 0.6, 0.4, 0.2))
         lines += ["", f" votes: {len(val)} × 1", f"   {name}: {qs} (quintiles)"]
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

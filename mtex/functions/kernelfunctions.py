@@ -28,6 +28,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .quadrature import gaussLegendre, legendreP
+from ..geometry.display import aligned
 
 KERNEL_MAX_BANDWIDTH = 2048
 
@@ -72,6 +73,8 @@ class _Kernel:
 
   @cached_property
   def bandwidth(self):
+    """the degree the series of the kernel is cut at, MATLAB's rule: the first coefficient that
+    drops below the accuracy FFTAccuracy asks for"""
     return self._cutoffBandwidth()
 
   # over the 1000 coefficients MATLAB computes before it cuts
@@ -91,6 +94,8 @@ class _Kernel:
     return self.eval(t, other)
 
   def eval(self, t, other=None):
+    """the kernel at the cosine argument t (the angle on S1), or at a rotation or direction, or
+    between two of them: psi.eval(t), psi.eval(rot), psi.eval(rot1, rot2); psi(t) is the same"""
     return self._eval(self._cosine(t, other))
 
   def _cosine(self, t, other):
@@ -100,6 +105,7 @@ class _Kernel:
   # bracketed on a 0.05 degree grid and bisected
 
   def halfwidth(self):
+    """the halfwidth of the kernel: the angle at which it falls to half its value at zero"""
     psi0 = float(self._eval(self._argument(np.asarray(0.0))))
     if psi0 == 0:
       return 0.0
@@ -149,18 +155,20 @@ class _Kernel:
   __hash__ = None
 
   def mean(self):
+    """the mean of the kernel over its domain, its coefficient of degree zero"""
     return float(self._rule(0)[0])
 
   # ---- display
 
   def char(self):
+    """the kernel as a short text: its name and halfwidth"""
     return f"{self._label}, halfwidth {numString(self.halfwidth() / degree)}{getMTEXpref('degreeChar', '°')}"
 
   def __str__(self):
     return self.char()
 
   def __repr__(self):
-    return f"{type(self).__name__}\n  bandwidth: {self.bandwidth}\n  halfwidth: {numString(self.halfwidth() / degree)}{getMTEXpref('degreeChar', '°')}"
+    return aligned(f"{type(self).__name__}\n  bandwidth: {self.bandwidth}\n  halfwidth: {numString(self.halfwidth() / degree)}{getMTEXpref('degreeChar', '°')}")
 
 
 # the parameter of a one parameter family with a given halfwidth, by bisection on the
@@ -215,13 +223,16 @@ class SO3Kernel(_Kernel):
     return _asFloat(t)
 
   def calcFourier(self, L=None):
+    """the Chebyshev coefficients A_0 .. A_L of the kernel, to its bandwidth by default"""
     return self._rule(self.bandwidth if L is None else int(L))
 
   @cached_property
   def A(self):
+    """the Chebyshev coefficients of the kernel up to its bandwidth"""
     return self.calcFourier()
 
   def norm(self):
+    """the L2 norm of the kernel, the Euclidean norm of its coefficients"""
     return float(np.linalg.norm(self.A))
 
   def radon(self):
@@ -277,6 +288,11 @@ def _dlvpKappa(halfwidth):
 
 
 class SO3DeLaValleePoussinKernel(SO3Kernel):
+  """the de la Vallee Poussin kernel on SO(3), B(3/2, 1/2) / B(3/2, kappa + 1/2) t^(2 kappa):
+  nonnegative and a finite series, the kernel recommended for texture analysis
+
+    SO3DeLaValleePoussinKernel(20)
+    SO3DeLaValleePoussinKernel(halfwidth=10*degree)"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -287,6 +303,7 @@ class SO3DeLaValleePoussinKernel(SO3Kernel):
 
   @cached_property
   def bandwidth(self):
+    """the degree the series is cut at, MATLAB's rule over at most kappa coefficients"""
     return self._cutoffBandwidth(cap=max(1, math.ceil(self.kappa)))
 
   def _eval(self, t):
@@ -296,13 +313,19 @@ class SO3DeLaValleePoussinKernel(SO3Kernel):
     return -_dlvpConstant(self.kappa) * self.kappa * np.sqrt(np.maximum(1 - t * t, 0)) * np.sign(t) * np.abs(t) ** (2 * self.kappa - 1)
 
   def halfwidth(self):
+    """the halfwidth in closed form, 2 acos(2^(-1 / (2 kappa)))"""
     return 2 * math.acos(0.5 ** (1 / (2 * self.kappa)))
 
   def radon(self):
+    """the Radon transform: the de la Vallee Poussin kernel on the sphere of the same kappa"""
     return S2DeLaValleePoussinKernel(self.kappa)
 
 
 class SO3AbelPoissonKernel(SO3Kernel):
+  """the Abel Poisson kernel on SO(3), sum_n (2n+1) kappa^(2n) U_2n(t), kappa in (0, 1)
+
+    SO3AbelPoissonKernel(0.4)
+    SO3AbelPoissonKernel(halfwidth=5*degree)"""
   _label = "Abel Poisson"
 
   def __init__(self, kappa=0.9, *, halfwidth=None):
@@ -321,6 +344,7 @@ class SO3AbelPoissonKernel(SO3Kernel):
     return (1 - k ** 4) / (1 - 2 * k * k * t + k ** 4) ** 1.5
 
   def radon(self):
+    """the Radon transform: the kernel on the sphere of the same coefficients, in closed form"""
     return S2RadonKernel(self)
 
 
@@ -330,6 +354,10 @@ def _vmfConstant(kappa):
 
 
 class SO3vonMisesFisherKernel(SO3Kernel):
+  """the von Mises Fisher kernel on SO(3), proportional to e^(kappa cos omega), kappa > 0
+
+    SO3vonMisesFisherKernel(90)
+    SO3vonMisesFisherKernel(halfwidth=10*degree)"""
   _label = "von Mises Fisher"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -348,6 +376,7 @@ class SO3vonMisesFisherKernel(SO3Kernel):
     return -self.kappa * np.sin(2 * np.arccos(np.clip(t, -1, 1))) * self._eval(t)
 
   def halfwidth(self):
+    """the halfwidth in closed form, acos(1 - log(2) / kappa)"""
     return math.acos(1 - math.log(2) / self.kappa)
 
   def _radonEval(self, t):
@@ -355,10 +384,15 @@ class SO3vonMisesFisherKernel(SO3Kernel):
     return _vmfConstant(k) * ive(0, k * (1 + t) / 2) * np.exp(k * (t - 1))
 
   def radon(self):
+    """the Radon transform: the kernel on the sphere of the same coefficients, in closed form"""
     return S2RadonKernel(self)
 
 
 class SO3GaussWeierstrassKernel(SO3Kernel):
+  """the Gauss Weierstrass kernel on SO(3), sum_n (2n+1) e^(-n(n+1) kappa) U_2n(t), kappa > 0
+
+    SO3GaussWeierstrassKernel(0.1)
+    SO3GaussWeierstrassKernel(halfwidth=10*degree)"""
   _label = "Gauss Weierstrass"
 
   def __init__(self, kappa=0.1, *, halfwidth=None):
@@ -385,6 +419,11 @@ def _legendreQ(L, z):
 
 
 class SO3SquareSingularityKernel(SO3Kernel):
+  """the square singularity kernel on SO(3), kappa in (0, 1), its coefficients the Legendre
+  functions of the second kind
+
+    SO3SquareSingularityKernel(0.9)
+    SO3SquareSingularityKernel(halfwidth=10*degree)"""
   _label = "square singularity"
 
   def __init__(self, kappa=0.9, *, halfwidth=None):
@@ -401,10 +440,16 @@ class SO3SquareSingularityKernel(SO3Kernel):
     return 2 * k / math.log((1 + k) / (1 - k)) / (1 - 2 * k * t + k * k)
 
   def radon(self):
+    """the Radon transform: the kernel on the sphere of the same coefficients, in closed form"""
     return S2RadonKernel(self)
 
 
 class SO3BumpKernel(SO3Kernel):
+  """the bump kernel on SO(3): constant on the rotations of angle below delta, zero beyond, of
+  mean one
+
+    SO3BumpKernel(40*degree)
+    SO3BumpKernel(halfwidth=10*degree, bandwidth=64)"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
@@ -428,9 +473,11 @@ class SO3BumpKernel(SO3Kernel):
     return np.where(t > math.cos(self.delta / 2), math.pi / (self.delta - math.sin(self.delta)), 0.0).astype(t.dtype)
 
   def grad(self, t=None, other=None):
+    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
     return SO3Kernel(0) if t is None else np.zeros_like(self._cosine(t, other))
 
   def halfwidth(self):
+    """the halfwidth, the radius delta of the bump"""
     return self.delta
 
   def _radonEval(self, t):
@@ -439,10 +486,16 @@ class SO3BumpKernel(SO3Kernel):
     return np.where(s <= 1, 2 / (self.delta - math.sin(self.delta)) * np.arccos(np.minimum(s, 1)), 0.0)
 
   def radon(self):
+    """the Radon transform: the kernel on the sphere of the same coefficients, in closed form"""
     return S2RadonKernel(self)
 
 
 class SO3DirichletKernel(SO3Kernel):
+  """the Dirichlet kernel on SO(3), sum_n (2n+1) U_2n(t) up to the degree N, of integral one:
+  the kernel for physical properties
+
+    SO3DirichletKernel(35)
+    SO3DirichletKernel()        N the preference maxSO3Bandwidth"""
   _label = "Dirichlet"
 
   def __init__(self, N=None):
@@ -453,6 +506,7 @@ class SO3DirichletKernel(SO3Kernel):
 
   @property
   def bandwidth(self):
+    """the degree N of the kernel"""
     return self.N
 
   def _eval(self, t):
@@ -464,10 +518,13 @@ class SO3DirichletKernel(SO3Kernel):
     return np.where(small, (1 + N) * (1 + 2 * N) * (3 + 2 * N) / 3, value)
 
   def radon(self):
+    """the Radon transform: the Dirichlet kernel on the sphere of the same degree"""
     return S2DirichletKernel(self.N)
 
 
 class SO3RestrictedDistanceKernel(SO3Kernel):
+  """the restricted distance kernel on SO(3), -sqrt(8) sin(acos(t)), cut at the degree N: negative,
+  a distance between orientations that makes points repel each other"""
   _label = "restricted distance"
 
   def __init__(self, N=None):
@@ -479,6 +536,7 @@ class SO3RestrictedDistanceKernel(SO3Kernel):
 
   @property
   def bandwidth(self):
+    """the degree N the kernel is cut at"""
     return self.N
 
   def _eval(self, t):
@@ -486,6 +544,7 @@ class SO3RestrictedDistanceKernel(SO3Kernel):
 
 
 class SO3LaplaceKernel(SO3Kernel):
+  """the Laplace kernel on SO(3), sum_n (2n+1) / (4 n^2 (2n+2)^2) U_2n(t), without a constant term"""
   _label = "Laplace"
 
   def __init__(self):
@@ -500,6 +559,9 @@ class SO3LaplaceKernel(SO3Kernel):
 
 
 class SO3SobolevKernel(SO3Kernel):
+  """the Sobolev kernel on SO(3), sum_n (2n+1) (n(n+1))^s U_2n(t) up to the bandwidth
+
+    SO3SobolevKernel(1.1, bandwidth=20)"""
   _label = "Sobolev"
 
   def __init__(self, s=1, *, bandwidth=None):
@@ -512,10 +574,16 @@ class SO3SobolevKernel(SO3Kernel):
 
   @property
   def bandwidth(self):
+    """the degree N the kernel is cut at"""
     return self.N
 
 
 class fibreVonMisesFisherKernel(SO3Kernel):
+  """the von Mises Fisher kernel of a fibre, what fibreODF convolves with; kappa the
+  concentration, larger is sharper
+
+    fibreVonMisesFisherKernel(90)
+    fibreVonMisesFisherKernel(halfwidth=10*degree)"""
   _label = "fibre von Mises Fisher"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -530,6 +598,7 @@ class fibreVonMisesFisherKernel(SO3Kernel):
     return A
 
   def halfwidth(self):
+    """the halfwidth in closed form, acos(1 - log(2) / kappa)"""
     return math.acos(1 - math.log(2) / self.kappa)
 
   def _radonEval(self, t):
@@ -537,6 +606,7 @@ class fibreVonMisesFisherKernel(SO3Kernel):
     return 2 * k * np.exp(k * (t - 1)) / (1 - math.exp(-2 * k))
 
   def radon(self):
+    """the Radon transform: the kernel on the sphere of the same coefficients, in closed form"""
     return S2RadonKernel(self)
 
 
@@ -555,6 +625,7 @@ class SO3KernelHandle(SO3Kernel):
 
   @property
   def bandwidth(self):
+    """the degree the coefficients are computed to, the preference maxS1Bandwidth unless given"""
     return self.N
 
   def _eval(self, t):
@@ -598,13 +669,16 @@ class S2Kernel(_Kernel):
     return _asFloat(t)
 
   def calcFourier(self, L=None):
+    """the Legendre coefficients A_0 .. A_L of the kernel, to its bandwidth by default"""
     return self._rule(self.bandwidth if L is None else int(L))
 
   @cached_property
   def A(self):
+    """the Legendre coefficients of the kernel up to its bandwidth"""
     return self.calcFourier()
 
   def norm(self):
+    """the L2 norm of the kernel, sqrt(sum_n A_n^2 / (2n+1))"""
     A = self.A
     return float(np.sqrt(np.sum(A * A / (2 * np.arange(len(A)) + 1))))
 
@@ -613,6 +687,8 @@ class S2Kernel(_Kernel):
     return S2Kernel(self.A * legendreP(self.bandwidth, 0.0))
 
   def conv(self, other):
+    """the convolution with another kernel on the sphere or SO(3): the coefficients multiplied and
+    divided by 2n+1, a kernel on the sphere"""
     if not isinstance(other, (S2Kernel, SO3Kernel)):
       return other.conv(self)
     L = min(self.bandwidth, other.bandwidth)
@@ -647,6 +723,11 @@ S2Kernel._domain = S2Kernel
 
 
 class S2DeLaValleePoussinKernel(S2Kernel):
+  """the de la Vallee Poussin kernel on the sphere, (1 + kappa) ((1 + t) / 2)^kappa: nonnegative and
+  a finite series, the kernel recommended for texture analysis
+
+    S2DeLaValleePoussinKernel(20)
+    S2DeLaValleePoussinKernel(halfwidth=10*degree)"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -657,6 +738,7 @@ class S2DeLaValleePoussinKernel(S2Kernel):
 
   @cached_property
   def bandwidth(self):
+    """the degree the series is cut at, MATLAB's rule over at most kappa coefficients"""
     return self._cutoffBandwidth(cap=max(1, math.ceil(self.kappa)))
 
   def _eval(self, t):
@@ -666,10 +748,15 @@ class S2DeLaValleePoussinKernel(S2Kernel):
     return -np.sqrt(np.maximum(1 - t * t, 0)) * self.kappa * (1 + self.kappa) / 2 * ((1 + t) / 2) ** (self.kappa - 1)
 
   def halfwidth(self):
+    """the halfwidth in closed form, acos(2 * 2^(-1 / kappa) - 1)"""
     return math.acos(2 * 0.5 ** (1 / self.kappa) - 1)
 
 
 class S2DirichletKernel(S2Kernel):
+  """the Dirichlet kernel on the sphere, sum_n (2n+1) P_n(t) up to the degree N, of integral one
+
+    S2DirichletKernel(35)
+    S2DirichletKernel()        N the preference maxS2Bandwidth"""
   _label = "Dirichlet"
 
   def __init__(self, N=None):
@@ -680,10 +767,16 @@ class S2DirichletKernel(S2Kernel):
 
   @property
   def bandwidth(self):
+    """the degree N of the kernel"""
     return self.N
 
 
 class S2BumpKernel(S2Kernel):
+  """the bump kernel on the sphere: 2 / (1 - cos delta) on the cap of radius delta, zero beyond,
+  a density of mean one
+
+    S2BumpKernel(10*degree)
+    S2BumpKernel(halfwidth=10*degree, bandwidth=64)"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
@@ -707,13 +800,17 @@ class S2BumpKernel(S2Kernel):
     return np.where(t > math.cos(self.delta), 2 / (1 - math.cos(self.delta)), 0.0).astype(t.dtype)
 
   def grad(self, t=None, other=None, *, polynomial=False):
+    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
     return S2Kernel(0) if t is None else np.zeros_like(self._cosine(t, other))
 
   def halfwidth(self):
+    """the halfwidth, the radius delta of the cap"""
     return self.delta
 
 
 class S2RestrictedDistanceKernel(S2Kernel):
+  """the restricted distance kernel on the sphere, -2 sin(acos(t) / 2), cut at the degree N:
+  negative, a distance between directions that makes points repel each other"""
   _label = "restricted distance"
 
   def __init__(self, N=None):
@@ -725,6 +822,7 @@ class S2RestrictedDistanceKernel(S2Kernel):
 
   @property
   def bandwidth(self):
+    """the degree N the kernel is cut at"""
     return self.N
 
   def _eval(self, t):
@@ -732,6 +830,10 @@ class S2RestrictedDistanceKernel(S2Kernel):
 
 
 class S2KernelHandle(S2Kernel):
+  """a kernel on the sphere given by a function of the cosine of the polar angle, its Legendre
+  coefficients by Gauss-Legendre quadrature
+
+    S2KernelHandle(lambda t: t**2, bandwidth=16)"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun
@@ -744,6 +846,7 @@ class S2KernelHandle(S2Kernel):
 
   @property
   def bandwidth(self):
+    """the degree the coefficients are computed to, the preference maxS2Bandwidth unless given"""
     return self.N
 
   def _eval(self, t):
@@ -763,6 +866,7 @@ class S2RadonKernel(S2Kernel):
 
   @property
   def bandwidth(self):
+    """the bandwidth of the SO(3) kernel transformed"""
     return self.psi.bandwidth
 
   def _eval(self, t):
@@ -796,11 +900,13 @@ class S1Kernel(_Kernel):
     return c
 
   def calcFourier(self, L=None):
+    """the Fourier coefficients of the kernel, degrees -L .. L, to its bandwidth by default"""
     c = self._rule(self.bandwidth if L is None else int(L))
     return np.concatenate([c[:0:-1], c])
 
   @cached_property
   def fhat(self):
+    """the Fourier coefficients of the kernel, degrees -N .. N up to its bandwidth"""
     return self.calcFourier()
 
   # c_0 + 2 sum_k c_k cos(kx) as a Chebyshev series in cos x
@@ -830,10 +936,12 @@ class S1Kernel(_Kernel):
     return S1Kernel._fromHalf(self._rule(L) + other._rule(L))
 
   def norm(self):
+    """the L2 norm of the kernel, the Euclidean norm of its two sided coefficients"""
     c = self._coefficients
     return float(np.sqrt(c[0] ** 2 + 2 * np.sum(c[1:] ** 2)))
 
   def conv(self, other):
+    """the convolution with another kernel on the circle: the coefficients multiplied"""
     if not isinstance(other, S1Kernel):
       return other.conv(self)
     L = min(self.bandwidth, other.bandwidth)
@@ -860,6 +968,11 @@ def _wrap(x):
 
 
 class S1DeLaValleePoussinKernel(S1Kernel):
+  """the n-th de la Vallee Poussin kernel on the circle, 2 F_(2n-1) - F_(n-1) with F the Fejer
+  kernels: coefficients one up to n, falling to zero at 2n
+
+    S1DeLaValleePoussinKernel(20)
+    S1DeLaValleePoussinKernel(halfwidth=5*degree)"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, n=None, *, halfwidth=None):
@@ -874,6 +987,7 @@ class S1DeLaValleePoussinKernel(S1Kernel):
 
   @property
   def bandwidth(self):
+    """the degree 2n beyond which the coefficients vanish"""
     return 2 * self.n
 
   def _eval(self, x):
@@ -885,6 +999,7 @@ class S1DeLaValleePoussinKernel(S1Kernel):
 
 
 class S1DirichletKernel(S1Kernel):
+  """the Dirichlet kernel on the circle, sum_(k = -n .. n) e^(ikx), of integral one"""
   _label = "Dirichlet"
 
   def __init__(self, n=25):
@@ -895,6 +1010,7 @@ class S1DirichletKernel(S1Kernel):
 
   @property
   def bandwidth(self):
+    """the degree n of the kernel"""
     return self.n
 
   def _eval(self, x):
@@ -905,6 +1021,8 @@ class S1DirichletKernel(S1Kernel):
 
 
 class S1FejerKernel(S1Kernel):
+  """the Fejer kernel on the circle, the mean of the Dirichlet kernels D_0 .. D_n: nonnegative,
+  of integral one"""
   _label = "Fejer"
 
   def __init__(self, n=25):
@@ -915,6 +1033,7 @@ class S1FejerKernel(S1Kernel):
 
   @property
   def bandwidth(self):
+    """the degree n of the kernel"""
     return self.n
 
   def _eval(self, x):
@@ -941,11 +1060,13 @@ class S1BumpKernel(S1Kernel):
     return np.where(np.abs(_wrap(x)) < self.delta, math.pi / self.delta, 0.0).astype(x.dtype)
 
   def grad(self, x=None):
+    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
     if x is None:
       return S1Kernel([0.0])
     return np.zeros_like(_asFloat(x))
 
   def halfwidth(self):
+    """the halfwidth, the half length delta of the interval"""
     return self.delta
 
 
@@ -966,10 +1087,15 @@ class S1GaussKernel(S1Kernel):
     return max(1, math.ceil(6 / self.sigma))
 
   def halfwidth(self):
+    """the halfwidth in closed form, sigma sqrt(2 log 2)"""
     return self.sigma * math.sqrt(2 * math.log(2))
 
 
 class S1KernelHandle(S1Kernel):
+  """a kernel on the circle given by a function of the angle, its Fourier coefficients by the
+  trapezoidal rule
+
+    S1KernelHandle(lambda x: np.cos(x)**2, bandwidth=8)"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun
@@ -983,6 +1109,7 @@ class S1KernelHandle(S1Kernel):
 
   @property
   def bandwidth(self):
+    """the degree the coefficients are computed to, the preference maxS1Bandwidth unless given"""
     return self.N
 
   def _eval(self, x):

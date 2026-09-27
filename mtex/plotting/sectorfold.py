@@ -34,6 +34,7 @@ def _angle(u, v):
 
 
 def uniqueNormals(sR):
+  """the distinct boundary normals of a spherical region, repeated ones dropped"""
   N = []
   for n in sR.N:
     if not any(m @ n > 1 - 1e-9 for m in N):

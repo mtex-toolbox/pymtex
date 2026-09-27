@@ -89,6 +89,8 @@ def symDots(qs, ref, L, R, exchange=False):
 
 
 def symAngles(qs, ref, L, R, exchange=False):
+  """the reduced angles of many rotations to one reference under the two groups L and R, through
+  the closest symmetric image of the reference"""
   es, _ = referenceImages(ref, L, R, exchange)
   k = bestDot(qs, es)[1]
   return chordAngle(qs, es[k])

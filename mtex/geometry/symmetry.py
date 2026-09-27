@@ -152,6 +152,13 @@ def _asAxes(axes):
 # ------------------------------------------------------------------ the class
 
 class symmetry:
+  """a point group: the closure of the generators its Hermann-Mauguin symbol names, written in
+  the given axes; also from its elements or its number among the point groups, the Laue classes
+  or the space groups
+
+    pg = symmetry('m-3m')
+    pg = symmetry(pointId=32)
+    pg = symmetry(spaceId=225)"""
 
   def __init__(self, name=None, axes=None, *, pointId=None, laueId=None, spaceId=None, abg=None):
     if isinstance(name, symmetry):
@@ -185,24 +192,29 @@ class symmetry:
 
   @classproperty
   def pointGroups(cls):
+    """the table of the 32 point groups, the Hermann-Mauguin symbols with their Schoenflies names"""
     return POINT_GROUP_NAMES
 
   # ------------------------------------------------------------------ names
 
   @property
   def pointGroup(self):
+    """the Hermann-Mauguin symbol of the group, 'unknown' when its elements name no group"""
     return self._symbol if self._symbol else "unknown"
 
   @property
   def name(self):
+    """the Hermann-Mauguin symbol of the group, as pointGroup"""
     return self.pointGroup
 
   @property
   def id(self):
+    """the number of the group in the table of the point groups"""
     return pointGroupId(self._symbol)
 
   @property
   def Schoenflies(self):
+    """the Schoenflies symbol of the group, 'unknown' when its elements name no group"""
     k = self.id
     return POINT_GROUP_NAMES[k - 1][1] if k else "unknown"
 
@@ -217,17 +229,21 @@ class symmetry:
     return self.rot.size
 
   def numSym(self):
+    """the number of elements of the group"""
     return self.rot.size
 
   def numProper(self):
+    """the number of proper rotations of the group"""
     return int(np.sum(~self.rot.isImproper))
 
   @property
   def isProper(self):
+    """whether the group holds proper rotations only"""
     return not np.any(self.rot.isImproper)
 
   @property
   def isLaue(self):
+    """whether the group contains the inversion"""
     return rotation.inversion in self
 
   # an element is in the group when the group holds it up to a small angle with its parity
@@ -276,10 +292,12 @@ class symmetry:
 
   @property
   def multiplicityZ(self):
+    """the highest order of a rotation axis of the group along z, 1 if there is none"""
     return self._maxOrder(lambda r: np.abs(r.axis().dot(zvector)) > 1 - 1e-8)
 
   @property
   def multiplicityPerpZ(self):
+    """the highest order of a rotation axis of the group perpendicular to z, 1 if there is none"""
     return self._maxOrder(lambda r: np.abs(r.axis().dot(zvector)) < 1e-4)
 
   @property
@@ -312,6 +330,7 @@ class symmetry:
     return symmetry._fromElements(orthogonalTransform.cat(self._withParity(False), self._withParity(True)), self.axes)
 
   def LaueName(self):
+    """the Hermann-Mauguin symbol of the Laue group, the smallest one containing this group"""
     return self.Laue().pointGroup
 
   def properGroup(self):
@@ -367,14 +386,20 @@ class symmetry:
   # ------------------------------------------------------------------ regions
 
   def fundamentalSector(self, center=None, antipodal=False, angle=None):
+    """the fundamental sector of the group on the sphere: the conventional one where it is a
+    fundamental domain, else the Dirichlet domain; with center that centre's Dirichlet domain"""
     from .sphericalregion import fundamentalSector
     return fundamentalSector(self, center=center, antipodal=antipodal, angle=angle)
 
   def conventionalSector(self, up=None, east=None):
+    """the conventional sector of the group, the one MTEX draws, with up and east choosing its
+    placement"""
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
   def fundamentalRegion(self, other=None, antipodal=False):
+    """the fundamental region of orientations of this group and another one, the Dirichlet domain
+    of the identity"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self, other, antipodal=antipodal)
 
@@ -409,7 +434,9 @@ class symmetry:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    return f"symmetry ({self.char()})\n  symmetry elements: {self.numSym()}\n  lattice: {self.lattice}\n  Laue class: {self.Laue().char()}"
+    from .display import display, header
+    return display(header("symmetry", self.char()), [("elements", self.numSym()), ("lattice", self.lattice),
+                                                     ("Laue class", self.Laue().char())])
 
   def __str__(self):
     return self.char()
@@ -445,6 +472,7 @@ def identifyGroup(els, axes=None):
 
 
 def spaceGroupToPointGroup(n):
+  """the Hermann-Mauguin symbol of the point group of a space group given by its number, 1 to 230"""
   if not 1 <= n <= 230:
     raise ValueError("I know only 230 space groups")
   return findPointGroup(next(sg[1] for sg in SPACE_GROUPS if n <= sg[0]))

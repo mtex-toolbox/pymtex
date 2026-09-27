@@ -43,10 +43,12 @@ def _laueName(fr):
 
 
 def tslCode(fr):
+  """the TSL symmetry code of the Laue class of a frame, as an .ang file writes it; 1 when there is none"""
   return TSL_CODES.get(_laueName(fr), 1)
 
 
 def channelCode(fr):
+  """the Channel 5 Laue group number of a frame, as a .ctf file writes it; 1 when there is none"""
   name = _laueName(fr)
   return CHANNEL_LAUE.index(name) + 1 if name in CHANNEL_LAUE else 1
 

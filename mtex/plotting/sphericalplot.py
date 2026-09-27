@@ -26,6 +26,7 @@ from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from .colormaps import contourLevels, mtexColormap
 from .mtexfigure import gcm, mtexFigure
 from .spherical import hasSymmetry, makeSphericalProjection, plainProjection
+from ..geometry.display import header
 
 PROJECTION_KEYS = ("projection", "upper", "lower", "complete", "antipodal", "how2plot", "fundamentalRegion")
 AXES_KEYS = ("grid", "grid_res", "noLabel", "fontSize")
@@ -42,6 +43,8 @@ _BARRED = re.compile("((?:.\u0305)+)")
 
 
 def plotText(s):
+  """a label as matplotlib sets it: the barred digits of a negative Miller index turned into
+  mathtext bars"""
   s = str(s)
   if "\u0305" not in s or "$" in s:
     return s
@@ -111,13 +114,16 @@ class sphericalPlot:
 
   @property
   def sR(self):
+    """the spherical region the chart shows"""
     return self.proj.sR
 
   @property
   def antipodal(self):
+    """whether the chart shows axes, antipodal directions"""
     return self.proj.antipodal
 
   def updateMinMax(self, values):
+    """widens the recorded data range by the finite values drawn"""
     vals = np.asarray(values, dtype=float).ravel()
     vals = vals[np.isfinite(vals)]
     if vals.size:
@@ -133,8 +139,12 @@ class sphericalPlot:
                    fontsize=self.fontSize - 1, zorder=8)
 
   def hemisphereLabel(self):
+    """writes upper or lower, the hemisphere shown, in the top right corner of the chart"""
     self.ax.text(1, 1, "upper" if self.proj.upper else "lower", transform=self.ax.transAxes, ha="right", va="top",
                  fontsize=self.fontSize - 1, zorder=8)
+
+  def __repr__(self):
+    return header("sphericalPlot", type(self.proj).__name__)
 
 
 # ------------------------------------------------------------------ where a plot goes
@@ -934,6 +944,11 @@ def plotHKL(cs, complete=False, **kw):
 
 
 def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
+  """the elements of the point group of a frame drawn on the upper hemisphere: the mirror planes as
+  great circles, the rotation and rotoinversion axes as polygons of their order; plot(cs)
+
+    plot(cs)
+    plot(cs, symbolSize=2, mirrorLineWidth=1.5)"""
   from matplotlib.patches import Ellipse, Polygon
   from ..geometry.quaternion import orthogonalTransform
   ops = orthogonalTransform(fr).flatten()

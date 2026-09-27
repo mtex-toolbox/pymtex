@@ -21,6 +21,7 @@ from .s2fun import S2FunHarmonic, realizeSpherical
 from .s2vectorfield import S2VectorField, _adjointColumns, _seriesColumns, _values, _vectorsFor
 from .so3vectorfield import _projectSphericalRows, equivariantProjection
 from .transforms import sphericalSeriesAdjoint
+from ..geometry.display import aligned, frameLabel
 
 AXIS_COMPONENTS = ((0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2))
 
@@ -31,6 +32,7 @@ def outerComponents(a):
 
 
 def symmetricMatrices(c):
+  """the symmetric 3 x 3 matrices of the six components xx, xy, xz, yy, yz, zz, as (..., 3, 3)"""
   M = np.empty((*c.shape[:-1], 3, 3))
   for k, (i, j) in enumerate(AXIS_COMPONENTS):
     M[..., i, j] = M[..., j, i] = c[..., k]
@@ -49,9 +51,12 @@ def symmetricAction(M):
 
 
 class S2AxisField:
+  """the axis fields on the sphere, an unoriented axis at every direction: S2AxisFieldHarmonic,
+  S2AxisFieldHandle"""
 
   @property
   def CS(self):
+    """the frame of the directions the field lives on, MATLAB's aF.CS"""
     return self.frame
 
   def __call__(self, x):
@@ -67,21 +72,33 @@ class S2AxisField:
 
 
 class S2AxisFieldHandle(S2AxisField):
+  """an axis field on the sphere given by a function of the directions, with a bandwidth hint
+  for its expansion
+
+    aF = S2AxisFieldHandle(lambda v: ..., cs)"""
 
   def __init__(self, fun, frame=None, *, bandwidth=None):
     self.fun, self.frame = fun, frame
     self.bandwidth = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
 
   def eval(self, x):
+    """the axes of the field at the directions, antipodal vectors"""
     v = _vectorsFor(self, x).normalize()
     return vector3d(_values(self.fun(self._framed(v))).reshape(*v.shape, 3), antipodal=True)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    return f"S2AxisFieldHandle{info}\n  bandwidth hint: {self.bandwidth}"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
+    return aligned(f"S2AxisFieldHandle{info}\n  bandwidth hint: {self.bandwidth}")
 
 
 class S2AxisFieldHarmonic(S2AxisField):
+  """an axis field on the sphere as a harmonic series of the six components of a a^T, evaluated as
+  the leading eigenvector of the reconstructed matrix; symmetrised under the frame's group
+
+    aF = S2AxisFieldHarmonic(fhat, cs)                  coefficients, one column per component
+    aF = S2AxisFieldHarmonic(lambda v: ..., cs, bandwidth=L)
+    aF = S2AxisFieldHarmonic(v, axes)                   axes given at directions
+    aF = S2AxisFieldHarmonic(vF)                        from a vector or axis field"""
 
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     frames = [a for a in args if isinstance(a, referenceFrame)]
@@ -144,6 +161,7 @@ class S2AxisFieldHarmonic(S2AxisField):
 
   @property
   def bandwidth(self):
+    """the harmonic degree of the expansion"""
     return math.isqrt(self._fhat.shape[0]) - 1
 
   def eval(self, x):
@@ -185,14 +203,17 @@ class S2AxisFieldHarmonic(S2AxisField):
     return mapFun(lambda t: np.sqrt(np.maximum(t, 0)), f, bandwidth=smoothBandwidth(f))
 
   def angle(self, x):
+    """the angle between the axes of the field and a constant axis, or another field, as a function
+    on the sphere"""
     return mapFun(lambda t: np.arccos(np.clip(t, -1, 1)), self.dot(x))
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    return f"S2AxisFieldHarmonic{info}\n  bandwidth: {self.bandwidth}"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
+    return aligned(f"S2AxisFieldHarmonic{info}\n  bandwidth: {self.bandwidth}")
 
 
 def self_framed(v, nodes):
+  """the nodes in the frame of the field v, unchanged when it has none"""
   return nodes if v.frame is None else vector3d(nodes.data, frame=v.frame)
 
 

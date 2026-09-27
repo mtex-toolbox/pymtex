@@ -21,6 +21,7 @@ from .kernels import parseBlock
 
 
 def readFile(path):
+  """the bytes of a file, read once"""
   with open(path, "rb") as f:
     return f.read()
 
@@ -125,6 +126,7 @@ _NUMBER = re.compile(rb"^[\s]*[-+]?(\d+[.,]?\d*|[.,]\d+)([eE][-+]?\d+)?([\s,;]+[
 
 
 def isNumericRow(line):
+  """whether a line is a row of numbers, a decimal comma allowed"""
   return bool(line.strip()) and _NUMBER.match(line) is not None
 
 
@@ -147,6 +149,7 @@ def tableLines(names, cols, rowNames=None, uniform=False):
 
 
 def writeTable(fname, names, cols):
+  """writes columns under a line of their names to a text file, as MATLAB's cprintf writes a table"""
   with open(fname, "w", encoding="utf-8") as f:
     f.write("\n".join(tableLines(names, cols)) + "\n")
 

@@ -19,6 +19,8 @@ _COMPILED = {}
 
 
 def convexHull(points):
+  """the indices of the convex hull of points in the plane, anticlockwise, by Andrew's monotone
+  chain; collinear and repeated points never become corners"""
   P = np.ascontiguousarray(np.asarray(points, dtype=float).reshape(-1, 2))
   n = len(P)
   if n <= 2:
@@ -79,6 +81,8 @@ def _hullLoopsLoop(V, flat, offsets, out, outOff):
 
 
 def convexHullLoops(V, loops):
+  """the convex hulls of many loops of indices into the (n, 2) vertices V in one pass, a list of
+  index arrays into V"""
   V = np.ascontiguousarray(np.asarray(V, dtype=float).reshape(-1, 2))
   lengths = np.array([len(l) for l in loops], dtype=np.int64)
   offsets = np.concatenate([[0], np.cumsum(lengths)]).astype(np.int64)

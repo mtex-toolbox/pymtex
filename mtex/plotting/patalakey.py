@@ -183,6 +183,8 @@ class PatalaColorKey(orientationColorKey):
       raise ValueError(f"the Patala colour key is not defined for the symmetry {self.CS1.sym.pointGroup}")
 
   def orientation2color(self, mori):
+    """the colours of misorientations, (..., 3) RGB: the Rodrigues vectors in the fundamental zone
+    with grain exchange, the a axis along x, looked up in the map of the Laue group"""
     v = mori.project2FundamentalRegion(antipodal=True).Rodrigues()
     # the zone as the maps expect it, the a axis along x
     v = v.rotate(rotationAboutZ(-self.CS1.aAxis.rho))
@@ -193,6 +195,7 @@ class PatalaColorKey(orientationColorKey):
 
 
 def rotationAboutZ(w):
+  """the rotation about z by the angle w"""
   from ..geometry.quaternion import rotation
   from ..geometry.vector3d import zvector
   return rotation.byAxisAngle(zvector, w)

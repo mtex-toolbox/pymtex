@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
-from ..geometry.display import xnum2str
+from ..geometry.display import aligned, frameLabel, textTable, xnum2str
 from ..geometry.kernels import backend, qmul, _jit
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -41,6 +41,13 @@ def _cross2(a, b):
 
 
 class grainBoundary:
+  """the grain boundary of a map: the segments F between the vertices V in walk order, each with
+  its two grains, pixels, phases and misrotation, the grain in grainId[:, 0] to the left of the
+  walk; chains, junctions and triple points are derived from that order
+
+    gB = grains.boundary
+    gB['Forsterite', 'Enstatite']
+    gB.segLength, gB.misorientation"""
 
   def __init__(self, V, F, grainId, ebsdId, phaseId, misrotation, CSList, plane, frame, scanUnit="um"):
     self.V = V
@@ -71,10 +78,12 @@ class grainBoundary:
 
   @property
   def size(self):
+    """the number of segments"""
     return len(self.F)
 
   @property
   def isempty(self):
+    """whether the boundary has no segments"""
     return len(self.F) == 0
 
   # ------------------------------------------------------------------ geometry
@@ -86,6 +95,7 @@ class grainBoundary:
 
   @property
   def V_used(self):
+    """the indices of the vertices the segments use, sorted"""
     return np.unique(self.F)
 
   # the midpoints in the plane of the map, the form the geometry works in
@@ -100,9 +110,11 @@ class grainBoundary:
 
   @property
   def segLength(self):
+    """the length of every segment"""
     return np.linalg.norm(self.V[self.F[:, 1]] - self.V[self.F[:, 0]], axis=1)
 
   def perimeter(self):
+    """the total length of the boundary, the sum of the segment lengths"""
     return float(self.segLength.sum())
 
   @property
@@ -128,6 +140,7 @@ class grainBoundary:
   # ------------------------------------------------------------------ chains
 
   def vertexDegree(self):
+    """the number of segments meeting at every vertex"""
     if "degree" not in self._memo:
       self._memo["degree"] = np.bincount(self.F.reshape(-1), minlength=len(self.V)).astype(np.int32)
     return self._memo["degree"]
@@ -140,6 +153,7 @@ class grainBoundary:
 
   @property
   def junctionId(self):
+    """the indices of the junctions, the vertices where a number of segments other than two meet"""
     return np.flatnonzero(self.isJunction)
 
   @property
@@ -158,16 +172,19 @@ class grainBoundary:
 
   @property
   def chainSize(self):
+    """the number of segments of the chain of every segment"""
     cid = self.chainId
     return np.bincount(cid)[cid]
 
   @property
   def isChainStart(self):
+    """whether a segment is the first of its chain"""
     cid = self.chainId
     return np.concatenate([[True], cid[1:] != cid[:-1]]) if len(cid) else np.zeros(0, dtype=bool)
 
   @property
   def isChainEnd(self):
+    """whether a segment is the last of its chain"""
     cid = self.chainId
     return np.concatenate([cid[1:] != cid[:-1], [True]]) if len(cid) else np.zeros(0, dtype=bool)
 
@@ -193,6 +210,7 @@ class grainBoundary:
 
   @property
   def chainLength(self):
+    """the length of the chain of every segment"""
     cid = self.chainId
     return np.bincount(cid, weights=self.segLength)[cid]
 
@@ -228,6 +246,7 @@ class grainBoundary:
 
   @property
   def componentSize(self):
+    """the number of segments of the connected component of every segment"""
     cid = self.componentId
     return np.bincount(cid)[cid]
 
@@ -432,9 +451,9 @@ class grainBoundary:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [f"grainBoundary ({self.frame.char()})"]
+    lines = [f"grainBoundary ({frameLabel(self.frame)})"]
     if self.isempty:
-      return lines[0] + "\n  the boundary is empty"
+      return aligned(lines[0] + "\n  the boundary is empty")
     lines.append(f"  size: {len(self)} segments, {int(self.chainId.max())} chains")
     key = np.sort(self.phaseId, axis=1)
     pairs, inverse = np.unique(key, axis=0, return_inverse=True)
@@ -444,10 +463,9 @@ class grainBoundary:
     name = lambda p: "notIndexed" if p < 0 else self.CSList[int(p)].mineral
     # the length rounded in the scan unit, as MATLAB writes it
     unit = "µm" if self.scanUnit == "um" else self.scanUnit
-    rows = [f"  {c:>8}  {f'{xnum2str(l)} {unit}':>10}  {name(p[0])}  {name(p[1])}" for p, c, l in zip(pairs, counts, L)]
-    lines.append("  segments      length  mineral 1  mineral 2")
-    lines += rows
-    return "\n".join(lines)
+    cells = [[str(c) for c in counts], [f"{xnum2str(l)} {unit}" for l in L], [name(p[0]) for p in pairs], [name(p[1]) for p in pairs]]
+    lines.append(textTable(["segments", "length", "mineral 1", "mineral 2"], cells))
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -461,6 +479,11 @@ class grainBoundary:
 # ------------------------------------------------------------------ triple points
 
 class triplePointList:
+  """the triple points of a boundary: the vertices where three grains meet, each with its three
+  grains, their phases, the three boundary segments and the angles between them
+
+    tP = grains.triplePoints
+    tP('Iron bcc', 'Iron bcc', 'Iron bcc')"""
 
   def __init__(self, V, grainId, phaseId, boundaryId, angles, CSList, plane, frame, vertexId=None):
     self.V, self.grainId, self.phaseId, self.boundaryId, self.angles = V, grainId, phaseId, boundaryId, angles
@@ -473,14 +496,17 @@ class triplePointList:
 
   @property
   def size(self):
+    """the number of triple points"""
     return len(self.grainId)
 
   @property
   def isempty(self):
+    """whether the list holds no triple point"""
     return len(self.grainId) == 0
 
   @property
   def allV(self):
+    """the positions of the triple points as framed points of the specimen"""
     return vector3d(self.plane.from2d(self.V), frame=self.frame)
 
   def hasPhase(self, *names):
@@ -506,12 +532,12 @@ class triplePointList:
 
   def __repr__(self):
     if self.isempty:
-      return f"triplePointList ({self.frame.char()})\n  no triple points"
+      return aligned(f"triplePointList ({self.frame.char()})\n  no triple points")
     key = np.sort(self.phaseId, axis=1)
     trip, counts = np.unique(key, axis=0, return_counts=True)
     name = lambda p: "outside" if p < 0 else self.CSList[int(p)].mineral
     rows = [f"  {c:>6}  " + "  ".join(name(p) for p in t) for t, c in zip(trip, counts)]
-    return f"triplePointList ({self.frame.char()})\n  size: {len(self)}\n  points  mineral 1  mineral 2  mineral 3\n" + "\n".join(rows)
+    return aligned(f"triplePointList ({self.frame.char()})\n  size: {len(self)}\n  points  mineral 1  mineral 2  mineral 3\n" + "\n".join(rows))
 
 
 def triplePoints(gB):
@@ -604,6 +630,9 @@ def _chainOrderLoop(F, deg, offset, at, perm, entry):
 
 
 def chainOrder(F, nV):
+  """the decomposition of an edge list into maximal chains, each walked end to end: the permutation
+  that brings the edges into walk order, and per edge whether the walk enters it at its first
+  (1) or second (2) vertex; a closed chain is cut at its lowest vertex"""
   F = np.asarray(F, dtype=np.int32).reshape(-1, 2)
   n = len(F)
   if n == 0:

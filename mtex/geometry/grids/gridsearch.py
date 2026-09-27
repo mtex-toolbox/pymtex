@@ -112,6 +112,8 @@ def _s2NearestLoop(xyz, betaPts, rhoPts, offset, nrho, rmin, rper, antipodal, ou
 
 
 def s2Nearest(g, xyz, backend):
+  """the index of the nearest node of a ring grid for every row of xyz, the compiled ring search
+  under numba, the grid's Python search otherwise"""
   if backend != "numba":
     return np.array([g._nearestIndex(x) for x in xyz], dtype=np.int64)
   xyz = np.ascontiguousarray(xyz, dtype=np.float64)

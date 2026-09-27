@@ -20,6 +20,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned
 
 
 # the rotation of every measurement of a mask turned on the specimen side by the axis angle
@@ -35,6 +36,14 @@ def _turn(ebsd, mask, v):
 
 
 class simulateEBSD:
+  """a simulated map whose answer is known: a job holding the settings, the grid xdim, ydim and
+  stepSize, the orientations ori0, the noise and the features, and the map EBSDsim at the current
+  stage, which every verb rewrites
+
+    eS = simulateEBSD()
+    eS.makeMap()
+    eS.addFeature_simpleGradient()
+    eS.addnoise()"""
 
   def __init__(self):
     self.xdim = 100
@@ -59,7 +68,7 @@ class simulateEBSD:
             ("mori_angle", f"{self.mori_angle / degree:g}°"),
             ("EBSDsim", "none yet" if self.EBSDsim is None else f"{self.EBSDsim.size} measurements")]
     w = max(len(k) for k, _ in rows)
-    return "simulateEBSD\n" + "\n".join(f"  {k:<{w}}  {v}" for k, v in rows)
+    return aligned("simulateEBSD\n" + "\n".join(f"  {k:<{w}}  {v}" for k, v in rows))
 
   @property
   def CS(self):
@@ -68,6 +77,7 @@ class simulateEBSD:
 
   @CS.setter
   def CS(self, cs):
+    """sets the crystal frame, ori0 kept as rotations in the new frame"""
     self.ori0 = orientation(rotation(self.ori0.data), cs)
 
   def makeMap(self):

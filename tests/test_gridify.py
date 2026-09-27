@@ -93,7 +93,7 @@ def test_the_padding_of_a_turned_grid_is_no_measurement():
   assert np.all(g.phaseId[pad] == 0) and np.isnan(g.rotations.data[pad]).all()
   assert len(g["notIndexed"]) == 1 and len(g["indexed"]) == len(lst) - 1 and len(g["test"]) == len(lst) - 1
   assert close(g.extent(), [0, 20, -10, 0]) and close(g.extent(), lst.extent())
-  assert "0      1 (" in repr(g) and "X x Y: [0 → 20] x [-10 → 0]" in repr(g)
+  assert "0      1 (" in repr(g) and "[0 → 20] × [-10 → 0]" in repr(g)
   # the mark travels with the map through selections, copies and moves
   assert g.flatten().isPadding.sum() == pad.sum() and g.copy().isPadding.sum() == pad.sum()
   assert np.array_equal(g[2:5, 3:9].isPadding, pad[2:5, 3:9]) and g.shift([1.0, 0, 0]).isPadding.sum() == pad.sum()

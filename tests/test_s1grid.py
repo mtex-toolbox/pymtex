@@ -23,4 +23,4 @@ def test_ladder_index():
   assert p.ladderIndex(0.0) == 0 and p.ladderIndex(2 * np.pi - 1e-9) == 0 and p.ladderIndex(np.pi) == 3
   u = S1Grid([0.0, 0.1, 0.7, 2.0])
   assert u.step == 0 and u.ladderIndex(0.69) == 2
-  assert "points: 9" in repr(s)
+  assert "points  : 9" in repr(s)

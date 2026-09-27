@@ -42,6 +42,7 @@ def folderRows(folder, depth=0):
 
 
 def setFolder(st, folder):
+  """makes a folder the one the browser lists, its rows read afresh"""
   st.folder = os.path.abspath(folder)
   st.entries = folderRows(st.folder)
   st.changed("folder", "entries")
@@ -71,6 +72,8 @@ INFO_SHOWN_ELSEWHERE = ("file", "format", "size", "points", "phases", "propertie
 
 
 def infoRows(st):
+  """the rows of the file information panel not shown elsewhere in the window, the vendor falling
+  back to the format; none before a file is selected"""
   if st.info is None:
     return []
   rows = [(k, v) for k, v in st.info.describe() if k not in INFO_SHOWN_ELSEWHERE]
@@ -136,6 +139,7 @@ def selectEntry(st, path):
 
 
 def openEntry(st, path, worker=None):
+  """selects a file and starts its import, inline or through the worker given"""
   if selectEntry(st, path) is None:
     return
   startImport(st, worker)
@@ -149,6 +153,8 @@ def eulerConventionOf(st, correction):
 
 
 def correctionOf(st):
+  """the Euler correction the two chosen conventions make: the rotation of the map convention
+  times the inverse of that of the Euler convention"""
   return plottingConvention(AXIS_CONVENTIONS[st.mapConvention]).rot * plottingConvention(AXIS_CONVENTIONS[st.eulerConvention]).rot.inv()
 
 
@@ -269,6 +275,7 @@ def viewsOf(ebsd, images=None):
 
 
 def pickTab(st, i):
+  """shows tab i, when there is one"""
   if 0 <= i < len(st.tabs):
     st.tab = i
     st.changed("tab")
@@ -345,6 +352,7 @@ def pictureOf(st, k):
 
 
 def showImage(st, k):
+  """shows image k of the file's pictures, when there is one"""
   if 0 <= k < len(st.images):
     st.image = k
     st.changed("image")
@@ -407,6 +415,7 @@ def preview(v):
 
 
 def childCount(rows, i):
+  """the number of rows below metadata row i that lie inside it, its descendants"""
   depth, n = rows[i][0], 0
   for d, *_ in rows[i + 1:]:
     if d <= depth:
@@ -445,6 +454,7 @@ def pickMeta(st, i):
 
 
 def setMiller(st, k, text):
+  """sets the k-th of the three Miller indices the pole figures show, the densities dropped"""
   if 0 <= k < 3:
     st.millers[k] = str(text).strip()
     st.densities = {}
@@ -472,6 +482,8 @@ def setEulerConvention(st, i):
 
 
 def applyEuler(st):
+  """turns the loaded map, the Euler angles only, to the correction of the chosen conventions,
+  the densities with it; nothing when it is already there"""
   if st.ebsd is None:
     return
   new = correctionOf(st)
@@ -493,6 +505,7 @@ PHASE_COLUMNS = ("plot", "phase", "mineral", "pixels", "percent", "symmetry", "a
 
 
 def phaseCounts(st):
+  """the number of pixels of every phase id of the loaded map, empty before one is loaded"""
   if st.ebsd is None:
     return {}
   ids, counts = np.unique(st.ebsd.phaseId, return_counts=True)
@@ -605,11 +618,13 @@ def frameKeys(phases):
 
 
 def frameKey(f):
+  """the value of a frame as a tuple, what an edit of the phase table changes"""
   from ..io.importscript import frameKey as key
   return key(f)
 
 
 def scriptOf(st):
+  """the Python script of the import as the window has set it up, empty before a map is loaded"""
   if st.ebsd is None or st.info is None:
     return ""
   return buildImportWizardScript(st.selected, phases=st.ebsd.CSList, headerPhases=st.headerPhases, dataSet=st.dataSet,
@@ -632,6 +647,8 @@ def writeScript(st, path=None):
 
 
 def defaultScriptPath(st, folder=None):
+  """where the script is written by default: import_<file>.py in the given folder, else the
+  working directory"""
   stem = os.path.splitext(os.path.basename(st.selected))[0]
   return os.path.join(folder or os.getcwd(), f"import_{stem}.py")
 

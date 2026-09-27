@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
-from .display import sizeString, table
+from .display import display, sizeString, table, takeRows
 from .representations import (EULER_LABELS, axis2quat, eulerConvention, euler2quat, eulerTriple, fitKernel, isnull,
                               map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
                               quatAngle, quatAxis, rodrigues2quat)
@@ -22,6 +22,7 @@ from .homochoric import cubo2homo, homo2cubo, homochoric2quat, quat2homochoric
 from .kernels import qmul, qrot
 from .units import degree
 from .vector3d import classproperty, vector3d
+from .display import aligned
 
 
 def _readCoefficients(cls, args, n):
@@ -43,6 +44,11 @@ def _readCoefficients(cls, args, n):
 
 
 class quaternion(MtexArray):
+  """quaternions a + b i + c j + d k, the coefficients along the last axis; q * q2 is the product,
+  q * v rotates a vector
+
+    quaternion(a, b, c, d)
+    quaternion(abcd)                     an array of shape (..., 4) or (4, N)"""
   _ncoord = 4
 
   def __init__(self, *args, dtype=None):
@@ -60,6 +66,7 @@ class quaternion(MtexArray):
 
   @classproperty
   def id(cls):
+    """the identity, 1 + 0i + 0j + 0k"""
     return cls(1.0, 0.0, 0.0, 0.0)
 
   @classproperty
@@ -69,6 +76,7 @@ class quaternion(MtexArray):
 
   @classmethod
   def nan(cls, *shape):
+    """quaternions of NaN coefficients, of the shape given"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (4,), np.nan))
 
@@ -95,38 +103,47 @@ class quaternion(MtexArray):
 
   @property
   def a(self):
+    """the real part a of the quaternions"""
     return self.data[..., 0]
 
   @a.setter
   def a(self, value):
+    """sets the real part a of the quaternions"""
     self.data[..., 0] = value
 
   @property
   def b(self):
+    """the coefficient b of i"""
     return self.data[..., 1]
 
   @b.setter
   def b(self, value):
+    """sets the coefficient b of i"""
     self.data[..., 1] = value
 
   @property
   def c(self):
+    """the coefficient c of j"""
     return self.data[..., 2]
 
   @c.setter
   def c(self, value):
+    """sets the coefficient c of j"""
     self.data[..., 2] = value
 
   @property
   def d(self):
+    """the coefficient d of k"""
     return self.data[..., 3]
 
   @d.setter
   def d(self, value):
+    """sets the coefficient d of k"""
     self.data[..., 3] = value
 
   @property
   def abcd(self):
+    """the coefficients a, b, c, d as one array of shape (..., 4)"""
     return self.data
 
   # ------------------------------------------------------------------ the algebra
@@ -171,15 +188,19 @@ class quaternion(MtexArray):
     raise TypeError(f"expected a quaternion, got {type(other).__name__}")
 
   def conj(self):
+    """the conjugate quaternion a - b i - c j - d k, of a rotation its inverse"""
     return self._new(self.data * [1, -1, -1, -1])
 
   def inv(self):
+    """the inverse quaternion, the conjugate over the squared norm"""
     return quaternion(self.conj().data / np.sum(self.data * self.data, axis=-1)[..., None])
 
   def norm(self):
+    """the norm of the quaternions, sqrt(a^2 + b^2 + c^2 + d^2)"""
     return np.linalg.norm(self.data, axis=-1)
 
   def normalize(self):
+    """the quaternions divided by their norm"""
     return self._new(self.data / self.norm()[..., None])
 
   def dot(self, other, noAntipodal=False):
@@ -197,6 +218,7 @@ class quaternion(MtexArray):
     return 4 * np.arcsin(np.minimum(h / 2, 1.0))
 
   def axis(self):
+    """the rotational axis, a unit vector"""
     return vector3d(quatAxis(self.data), isNormalized=True)
 
   # two quaternions are equal within an angular tolerance
@@ -209,35 +231,47 @@ class quaternion(MtexArray):
     return ~(self == other)
 
   def isnan(self):
+    """whether a quaternion has a NaN coefficient"""
     return np.any(np.isnan(self.data), axis=-1)
 
   # ------------------------------------------------------------------ representations
 
   def Euler(self, convention=None):
+    """the Euler angles (alpha, beta, gamma) in the convention named, the session's by default
+
+      phi1, Phi, phi2 = rot.Euler()
+      alpha, beta, gamma = rot.Euler('ZYZ')"""
     return quat2euler(self.data, convention)
 
   @property
   def phi1(self):
+    """the first Bunge Euler angle phi1"""
     return quat2euler(self.data, "Bunge")[0]
 
   @property
   def Phi(self):
+    """the second Bunge Euler angle Phi"""
     return quat2euler(self.data, "Bunge")[1]
 
   @property
   def phi2(self):
+    """the third Bunge Euler angle phi2"""
     return quat2euler(self.data, "Bunge")[2]
 
   def matrix(self):
+    """the rotation matrices, of shape (..., 3, 3)"""
     return quat2mat(self.data)
 
   def Rodrigues(self):
+    """the Rodrigues vectors, the axes scaled by tan(omega/2)"""
     return vector3d(quat2rodrigues(self.data))
 
   def homochoric(self):
+    """the homochoric vectors, the axes scaled by (3/4 (omega - sin omega))^(1/3)"""
     return vector3d(quat2homochoric(self.data))
 
   def cubochoric(self):
+    """the cubochoric vectors, the homochoric ball mapped onto the cube"""
     return vector3d(homo2cubo(quat2homochoric(self.data)))
 
   def log(self, ref=None, side="left"):
@@ -269,6 +303,8 @@ class quaternion(MtexArray):
     return abcd
 
   def unique(self, tolerance=1e-3, antipodal=False, stable=False, return_index=False, return_inverse=False):
+    """the quaternions with those equal up to the tolerance in the coefficients removed; antipodal=True
+    takes q and -q as one; optionally the indices of the kept ones and the index of each into them"""
     from .vector3d import _uniqueRows
     iv, iu = _uniqueRows(self._uniqueKey(antipodal), tolerance, stable)
     u = self._new(self.data.reshape(-1, self._ncoord)[iv])
@@ -276,13 +312,14 @@ class quaternion(MtexArray):
     return out if len(out) > 1 else u
 
   def interp(self, values=None, *flags, **kwargs):
-    """the mean: the principal eigenvector of the moment matrix, quaternion/mean
-    interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
+    """interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
     values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp"""
     from ..functions.rbfinterpolation import interpSO3
     return interpSO3(self, values, *flags, **kwargs)
 
   def mean(self, weights=None, robust=False):
+    """the mean, the principal eigenvector of the weighted moment matrix; NaN entries left out,
+    robust=True drops the outliers and averages again"""
     q = self.data.reshape(-1, 4)
     w = np.ones(q.shape[0]) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
     # an entry that is not a number, a site without an orientation, does not enter
@@ -317,18 +354,21 @@ class quaternion(MtexArray):
     return "(" + ",".join(f"{0.0 if abs(x) < 1e-8 else x:.3g}°" for x in e) + ")"
 
   def _eulerTable(self):
+    """the Euler angles of the rows a display shows, under the name of their convention"""
+    if not self.size:
+      return None
+    take, pos = takeRows(self.size)
     convention = eulerConvention()
-    e = np.stack(quat2euler(self.data.reshape(-1, 4), convention), axis=-1) / degree
-    return f"  {convention} Euler angles in degree\n" + table(EULER_LABELS[convention], [e[:, 0], e[:, 1], e[:, 2]], tiny=1e-8)
+    e = np.stack(quat2euler(self.data.reshape(-1, 4)[take], convention), axis=-1) / degree
+    return f"  {convention} Euler angles in degree\n" + table(EULER_LABELS[convention], e.T, tiny=1e-8, rows=pos)
+
+  def _sizeField(self):
+    return ("size", sizeString(self.shape) if self.size != 1 else None)
 
   def __repr__(self):
-    lines = [type(self).__name__]
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if 0 < self.size < 20:
-      d = self.data.reshape(-1, 4)
-      lines.append(table(["a", "b", "c", "d"], [d[:, 0], d[:, 1], d[:, 2], d[:, 3]], digits=4, tiny=1e-13))
-    return "\n".join(lines)
+    take, pos = takeRows(self.size)
+    body = table(["a", "b", "c", "d"], self.data.reshape(-1, 4)[take].T, digits=4, tiny=1e-13, rows=pos) if self.size else None
+    return display(type(self).__name__, [self._sizeField()], body)
 
 
 # the elements of a point group, or of the frame carrying one, as MATLAB's rotation(cs)
@@ -338,6 +378,12 @@ def _groupElements(x):
 
 
 class rotation(quaternion):
+  """rotations, unit quaternions with q and -q one rotation; numbers are normalised, a point group
+  or a frame gives its elements, an improper orthogonalTransform is refused
+
+    rotation(a, b, c, d)
+    rotation(q)
+    rotation(cs)"""
 
   # a rotation from numbers normalises; from an orthogonal transform only when proper
   def __init__(self, *args, dtype=None):
@@ -363,15 +409,21 @@ class rotation(quaternion):
 
   @classproperty
   def inversion(cls):
+    """the inversion, the orthogonalTransform -I"""
     return orthogonalTransform(cls.id, True)
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention=None):
+    """the rotations of the Euler angles, Bunge's ZXZ convention unless a convention is named
+
+      rotation.byEuler(phi1, Phi, phi2)
+      rotation.byEuler(alpha, beta, gamma, 'ZYZ')"""
     a, b, c, rest = eulerTriple(a, b, c, () if convention is None else (convention,))
     return cls._fromData(euler2quat(a, b, c, rest[0] if rest else None))
 
   @classmethod
   def byAxisAngle(cls, v, omega):
+    """the rotations by the angle omega about the axis v"""
     return cls._fromData(axis2quat(_xyz(v), omega))
 
   @classmethod
@@ -384,14 +436,17 @@ class rotation(quaternion):
 
   @classmethod
   def byRodrigues(cls, v):
+    """the rotations of Rodrigues vectors, the axes scaled by tan(omega/2)"""
     return cls._fromData(rodrigues2quat(_xyz(v)))
 
   @classmethod
   def byHomochoric(cls, v):
+    """the rotations of homochoric vectors"""
     return cls._fromData(homochoric2quat(_xyz(v)))
 
   @classmethod
   def byCubochoric(cls, v):
+    """the rotations of cubochoric vectors"""
     return cls._fromData(homochoric2quat(cubo2homo(_xyz(v))))
 
   @classmethod
@@ -438,6 +493,7 @@ class rotation(quaternion):
     return super().cat(*arrays, axis=axis)
 
   def inv(self):
+    """the inverse rotation, the conjugate quaternion"""
     return self.conj()
 
   def dot(self, other, noAntipodal=False):
@@ -470,12 +526,7 @@ class rotation(quaternion):
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [type(self).__name__]
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if 0 < self.size < 20:
-      lines.append(self._eulerTable())
-    return "\n".join(lines)
+    return display(type(self).__name__, [self._sizeField()], self._eulerTable())
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -483,6 +534,12 @@ class rotation(quaternion):
 
 
 class orthogonalTransform(MtexArray):
+  """orthogonal transforms, a rotation and a parity as a fifth coordinate, -1 for an improper one,
+  the rotation followed by the inversion
+
+    orthogonalTransform(rot)
+    orthogonalTransform(rot, True)       the improper transform -rot
+    orthogonalTransform(cs)              the elements of a point group"""
   _ncoord = 5
 
   def __init__(self, rot=None, improper=False, dtype=None):
@@ -504,10 +561,12 @@ class orthogonalTransform(MtexArray):
 
   @classproperty
   def id(cls):
+    """the identity transform"""
     return cls(rotation.id, False)
 
   @classproperty
   def inversion(cls):
+    """the inversion -I"""
     return cls(rotation.id, True)
 
   @classmethod
@@ -520,44 +579,54 @@ class orthogonalTransform(MtexArray):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention=None):
+    """the proper transforms of the Euler angles, Bunge's ZXZ convention unless one is named"""
     return cls(rotation.byEuler(a, b, c, convention), False)
 
   @classmethod
   def byAxisAngle(cls, v, omega):
+    """the proper transforms rotating by omega about the axis v"""
     return cls(rotation.byAxisAngle(v, omega), False)
 
   # ------------------------------------------------------------------ parts
 
   @property
   def rot(self):
+    """the rotational part, a rotation"""
     return rotation._fromData(self.data[..., :4])
 
   @property
   def parity(self):
+    """the parity, 1 for a proper and -1 for an improper transform"""
     return self.data[..., 4]
 
   @property
   def isImproper(self):
+    """whether the transform is improper, its determinant -1"""
     return self.data[..., 4] < 0
 
   @property
   def i(self):
+    """whether the transform is improper, MATLAB's rot.i"""
     return self.isImproper
 
   @property
   def a(self):
+    """the coefficient a of the rotational part"""
     return self.data[..., 0]
 
   @property
   def b(self):
+    """the coefficient b of the rotational part"""
     return self.data[..., 1]
 
   @property
   def c(self):
+    """the coefficient c of the rotational part"""
     return self.data[..., 2]
 
   @property
   def d(self):
+    """the coefficient d of the rotational part"""
     return self.data[..., 3]
 
   # ------------------------------------------------------------------ the algebra
@@ -588,21 +657,28 @@ class orthogonalTransform(MtexArray):
     return self._new(self.data * [1, 1, 1, 1, -1])
 
   def inv(self):
+    """the inverse transform, the inverse rotation with the same parity"""
     return self._new(self.data * [1, -1, -1, -1, 1])
 
   def matrix(self):
+    """the orthogonal matrices, the rotation matrix times the parity"""
     return self.parity[..., None, None] * quat2mat(self.data[..., :4])
 
   def angle(self, other=None):
+    """the rotational angle of the rotational part, or the angle between the rotational parts of two"""
     return self.rot.angle(None if other is None else other.rot if isinstance(other, orthogonalTransform) else other)
 
   def axis(self):
+    """the rotational axis of the rotational part"""
     return self.rot.axis()
 
   def Euler(self, convention=None):
+    """the Euler angles of the rotational part, in the convention named or the session's"""
     return quat2euler(self.data[..., :4], convention)
 
   def dot(self, other, noAntipodal=False):
+    """the inner product of the rotational parts up to sign, zero between transforms of different
+    parity; noAntipodal=True keeps the sign"""
     q, p = self._other(other)
     d = np.sum(self.data[..., :4] * q, axis=-1) * (self.parity == p)
     return d if noAntipodal else np.abs(d)
@@ -617,6 +693,8 @@ class orthogonalTransform(MtexArray):
     return ~(self == other)
 
   def unique(self, tolerance=1e-3, stable=False, return_index=False, return_inverse=False):
+    """the transforms with those equal up to the tolerance removed, a rotation and its negative one;
+    optionally the indices of the kept ones and the index of each into them"""
     from .vector3d import _uniqueRows
     key = np.concatenate([self.rot._uniqueKey(True), self.parity.reshape(-1, 1)], axis=-1)
     iv, iu = _uniqueRows(key, tolerance, stable)
@@ -633,7 +711,7 @@ class orthogonalTransform(MtexArray):
       e = np.stack(quat2euler(self.data.reshape(-1, 5)[:, :4], convention), axis=-1) / degree
       lines.append(f"  {convention} Euler angles in degree")
       lines.append(table(EULER_LABELS[convention] + ("Inv.",), [e[:, 0], e[:, 1], e[:, 2], self.isImproper.reshape(-1).astype(int)], tiny=1e-8))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
 
 def reflection(n):

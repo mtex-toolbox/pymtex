@@ -30,6 +30,7 @@ from ..geometry.symreduce import reductionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.display import framesLabel
 from .funops import _rotatedCoefficients, _rotatedFrame
 from .harmonics import mtexCoefficientsSO3, _WignerD, deg2dim, degreeBlock, dim2deg, invariantProjection, projectLeft, projectRight
 from .kernelfunctions import SO3DeLaValleePoussinKernel, SO3Kernel
@@ -37,6 +38,7 @@ from .quadrature import bandwidthFor, quadratureSO3Grid
 from .rbf import _conj, _qmul, _readFrames, _rotationsFor, supportCosine
 from .so3fun import SO3FunHarmonic, invertedCoefficients, realizeWigner
 from .transforms import DIRECT_SUM_NODES, SO3FourierPlan, wignerPlan, wignerSeries, wignerSeriesAdjoint
+from ..geometry.display import aligned
 
 SIDES = ("left", "right")
 
@@ -174,12 +176,18 @@ def _readSide(args):
 
 
 class SO3VectorField:
+  """the base of the vector fields on SO(3): a tangent vector at every orientation, in the left or
+  the right tangent space (tangentSpace), with the algebra, the pointwise operations and the
+  differential operators every field shares; the subclasses implement eval"""
 
   @property
   def side(self):
+    """the tangent space the values are returned in, 'left' or 'right', the same as tangentSpace"""
     return self.tangentSpace
 
   def componentFrames(self):
+    """the frames the components are functions on: the field's frames with the group on the tangent
+    side stripped"""
     return componentFrames(self.CS, self.SS, self.tangentSpace)
 
   def __call__(self, x):
@@ -193,9 +201,11 @@ class SO3VectorField:
     return SO3TangentVector(vector3d(values.reshape(*r.shape, 3)), x if isinstance(x, (orientation, quaternion)) else r, self.tangentSpace)
 
   def left(self):
+    """the field with its values in the left tangent space, as a harmonic field"""
     return self.toSide("left")
 
   def right(self):
+    """the field with its values in the right tangent space, as a harmonic field"""
     return self.toSide("right")
 
   def toSide(self, side):
@@ -211,32 +221,46 @@ class SO3VectorField:
       raise ValueError("the fields live in different frames")
 
   def dot(self, x):
+    """the pointwise inner product: with another field a function on SO(3), with a constant vector a
+    function on the component frames"""
     if isinstance(x, SO3VectorField):
       return mapField(np.multiply, self, x, reduce=True, invariant=True)
     return SO3VectorFieldHarmonic(self).dot(x)
 
   def cross(self, w):
+    """the pointwise cross product with another field, a field of the same side"""
     return mapField(np.cross, self, w)
 
   def abs(self):
+    """the length of the vectors, a function on SO(3) by quadrature at twice the bandwidth"""
     return mapField(lambda a: np.linalg.norm(a, axis=-1), self, bandwidth=max(2 * self.bandwidth, 32), invariant=True)
 
   def __abs__(self):
     return self.abs()
 
   def normalize(self):
+    """the field of unit vectors in the directions of the field, by quadrature at twice the bandwidth"""
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def norm(self):
+    """the length of the vectors as a function on SO(3), the same as abs"""
     return self.abs()
 
   def curl(self, x=None):
+    """the curl, a field of the same side; with x its values at the orientations x"""
     return curl(self, x)
 
   def div(self, x=None):
+    """the divergence, a function on SO(3); with x its values at the orientations x"""
     return div(self, x)
 
   def antiderivative(self, x=None, **kwargs):
+    """the function of mean zero whose gradient the field is; raises unless the field is a gradient,
+    or conservative=True says it is; with x its values at the orientations x
+
+      F.antiderivative()
+      F.antiderivative(conservative=True)
+      F.antiderivative(tolerance=1e-3)"""
     return antiderivative(self, x, **kwargs)
 
   def __neg__(self):
@@ -263,6 +287,14 @@ class SO3VectorField:
 
 
 class SO3VectorFieldHarmonic(SO3VectorField):
+  """a vector field on SO(3) whose three components are series of Wigner functions: from a
+  coefficient matrix, another field, tangent vectors at orientations, three component functions
+  or a callable, in the left or right tangent space, symmetrised to be equivariant
+
+    SO3VectorFieldHarmonic(fhat, cs, ss, 'left')
+    SO3VectorFieldHarmonic(F, 'right')                   another field on the right side
+    SO3VectorFieldHarmonic(t, bandwidth=16)              the field through tangent vectors t
+    SO3VectorFieldHarmonic(lambda ori: ..., cs, ss)      by quadrature"""
 
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     side, rest = _readSide(args)
@@ -368,9 +400,11 @@ class SO3VectorFieldHarmonic(SO3VectorField):
 
   @property
   def bandwidth(self):
+    """the bandwidth, the largest degree of the component expansions"""
     return dim2deg(self._fhat.shape[0])
 
   def truncate(self, L):
+    """the field with its coefficients cut or padded to the bandwidth L"""
     if L == self.bandwidth:
       return self
     fhat = np.zeros((deg2dim(L + 1), 3), dtype=self._fhat.dtype)
@@ -384,6 +418,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     return SO3FunHarmonic(self._fhat[:, i], cA, cB, real=True, symmetrise=False, _internal=True)
 
   def eval(self, x):
+    """the tangent vectors of the field at orientations"""
     r = self._rotationsFor(x)
     return self._tangent(_seriesColumns(self._fhat, r), x)
 
@@ -431,9 +466,11 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     return vector3d(np.real(self._fhat[0]))
 
   def norm(self):
+    """the length of the vectors as a function on SO(3), the same as abs"""
     return self.abs()
 
   def isclose(self, w, rtol=1e-8):
+    """whether two fields have the same coefficients on one side up to the relative tolerance rtol"""
     w = SO3VectorFieldHarmonic(w, self.tangentSpace)
     L = max(self.bandwidth, w.bandwidth)
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
@@ -484,7 +521,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     return self._rebuild(fhat, CS=self.SS, SS=self.CS, tangentSpace=_other(self.tangentSpace))
 
   def __repr__(self):
-    return f"SO3VectorFieldHarmonic ({self.CS.char()} → {self.SS.char()})\n  tangent space: {self.tangentSpace}\n  bandwidth: {self.bandwidth}"
+    return aligned(f"SO3VectorFieldHarmonic ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  bandwidth: {self.bandwidth}")
 
 
 def _reframe(v, CS, SS):
@@ -568,6 +605,7 @@ def grad(f, x=None, side="left", delta=0.05 * degree):
 
 
 def component(v, i):
+  """component(v, i) is the i-th component of the field v, a function on its component frames"""
   return SO3VectorFieldHarmonic(v).component(i)
 
 
@@ -580,6 +618,12 @@ def component(v, i):
 
 
 def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
+  """the field or function of op applied pointwise to a field v and further fields, functions or
+  numbers, by quadrature on the component grid of v; reduce=True sums the result over the
+  components, invariant=True puts a scalar result on the full frames
+
+    mapField(np.cross, v, w)
+    mapField(np.multiply, v, w, reduce=True, invariant=True)     the inner product"""
   others = [a for a in args if not isinstance(a, (int, float, np.number))]
   L0 = min(v.bandwidth + sum(a.bandwidth for a in others), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
   cA, cB = v.componentFrames()
@@ -609,6 +653,10 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
 
 
 class SO3VectorFieldHandle(SO3VectorField):
+  """a vector field on SO(3) given by a callable returning vectors or tangent vectors at
+  orientations, in the left or right tangent space; bandwidth is the hint for its harmonic form
+
+    SO3VectorFieldHandle(lambda ori: ..., cs, ss, 'left')"""
 
   def __init__(self, fun, *args, bandwidth=None):
     side, rest = _readSide(args)
@@ -620,6 +668,7 @@ class SO3VectorFieldHandle(SO3VectorField):
     self.bandwidth = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
 
   def eval(self, x):
+    """the tangent vectors of the field at orientations, by the callable"""
     r = self._rotationsFor(x)
     o = r if isinstance(r, orientation) else orientation._fromRotation(r.data, (self.CS, self.SS))
     return self._tangent(_tangentValues(self.fun(o), self.tangentSpace), x)
@@ -635,6 +684,8 @@ class SO3VectorFieldHandle(SO3VectorField):
     return SO3VectorFieldHandle(lambda o: a * _tangentValues(self.fun(o), self.tangentSpace), self.CS, self.SS, self.tangentSpace, bandwidth=self.bandwidth)
 
   def rotate(self, r, side="left"):
+    """the field turned by a rotation, from the left or with side='right' from the right, again a
+    handle; an orientation turns its harmonic form"""
     side = _side(side)
     if isinstance(r, orientation):
       return SO3VectorFieldHarmonic(self).rotate(r, side)
@@ -658,7 +709,7 @@ class SO3VectorFieldHandle(SO3VectorField):
     return SO3VectorFieldHarmonic(self) + w
 
   def __repr__(self):
-    return f"SO3VectorFieldHandle ({self.CS.char()} → {self.SS.char()})\n  tangent space: {self.tangentSpace}\n  bandwidth hint: {self.bandwidth}"
+    return aligned(f"SO3VectorFieldHandle ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  bandwidth hint: {self.bandwidth}")
 
 
 # ------------------------------------------------------------------ the radial basis field
@@ -668,6 +719,12 @@ class SO3VectorFieldHandle(SO3VectorField):
 
 
 class SO3VectorFieldRBF(SO3VectorField):
+  """a vector field on SO(3) as a sum of radial kernels at centre orientations with weight vectors,
+  exactly equivariant; from tangent vectors at orientations or another field it is fitted
+
+    SO3VectorFieldRBF(center, weights, psi)
+    SO3VectorFieldRBF(t, kernel=psi)                  through tangent vectors t
+    SO3VectorFieldRBF(F, resolution=5*degree)         another field on a grid"""
 
   def __init__(self, center, weights=None, psi=None, *args, kernel=None, resolution=None):
     side, _ = _readSide(args)
@@ -714,14 +771,17 @@ class SO3VectorFieldRBF(SO3VectorField):
 
   @property
   def CS(self):
+    """the crystal frame of the field, that of the centres"""
     return self.center.CS
 
   @property
   def SS(self):
+    """the specimen frame of the field, that of the centres"""
     return self.center.SS
 
   @property
   def bandwidth(self):
+    """the bandwidth of the kernel"""
     return self.psi.bandwidth
 
   # the equivalents of the centres with their turned weights
@@ -739,6 +799,8 @@ class SO3VectorFieldRBF(SO3VectorField):
     return np.concatenate(rots), np.concatenate(w) / n
 
   def eval(self, x):
+    """the tangent vectors of the field at orientations, the kernel sums over the symmetric
+    equivalents of the centres"""
     r = self._rotationsFor(x)
     q = r.data.reshape(-1, 4)
     cs, w = self._expandedCentres()
@@ -776,6 +838,8 @@ class SO3VectorFieldRBF(SO3VectorField):
     return SO3VectorFieldHarmonic(self) + w
 
   def rotate(self, r, side="left"):
+    """the field turned by a rotation, from the left or with side='right' from the right, the centres
+    and weights moved; an orientation turns its harmonic form"""
     side = _side(side)
     if isinstance(r, orientation):
       return SO3VectorFieldHarmonic(self).rotate(r, side)
@@ -791,7 +855,7 @@ class SO3VectorFieldRBF(SO3VectorField):
     return SO3VectorFieldRBF(orientation._fromRotation(self.center.data, (CS, SS)), self.weights, self.psi, self.tangentSpace)
 
   def __repr__(self):
-    return f"SO3VectorFieldRBF ({self.CS.char()} → {self.SS.char()})\n  tangent space: {self.tangentSpace}\n  kernel: {self.psi}\n  center: {self.center.size} orientations"
+    return aligned(f"SO3VectorFieldRBF ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  kernel: {self.psi}\n  center: {self.center.size} orientations")
 
 
 # every field converts through the harmonic one; the property the constructor reads

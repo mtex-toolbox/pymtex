@@ -63,6 +63,13 @@ def sideGroup(o, fr, right):
 
 
 def mtimes(a, b):
+  """the product of orientations with orientations, rotations, frames and vectors, what ori * x
+  computes: the frames fitted between the factors, a frame on either side listing the symmetric
+  equivalents along a new axis, a vector mapped from the crystal frame into the specimen frame
+
+    o1 * o2        o2.SS must fit o1.CS
+    ori * v        a crystal direction in specimen coordinates
+    ori * cs       the equivalents over the proper elements of the crystal side"""
   # a frame on either side lists the symmetric equivalents, the group along a new axis
   if isinstance(a, orientation) and isinstance(b, referenceFrame):
     R = sideGroup(a, b, True)

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import numpy as np
+from ..geometry.display import aligned
 
 # a quarter cell: half of what it takes to round onto the neighbouring voxel
 INDEX_TOL = 0.25
@@ -19,6 +20,11 @@ CORNERS = 0.5 * np.array([[1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1], [1, 1,
 
 
 class voxelLattice:
+  """the lattice a volume is measured on: the origin, the translations d1, d2, d3 as the rows of D
+  and the integer index of every voxel, voxel n at origin + ijk[n] @ D
+
+    voxelLattice(origin, D, ijk)
+    voxelLattice.fromPositions(P)"""
 
   def __init__(self, origin, D, ijk):
     self.origin = np.asarray(origin, dtype=float).reshape(3)
@@ -32,6 +38,7 @@ class voxelLattice:
 
   @property
   def spacing(self):
+    """the lengths of the three translations d1, d2, d3"""
     return np.linalg.norm(self.D, axis=1)
 
   @property
@@ -40,6 +47,7 @@ class voxelLattice:
     return CORNERS @ self.D
 
   def subset(self, flat):
+    """the lattice of the voxels selected by a flat index or mask, origin and translations kept"""
     return voxelLattice(self.origin, self.D, self.ijk[np.asarray(flat)])
 
   def positions(self, ijk=None):
@@ -53,6 +61,8 @@ class voxelLattice:
 
   @classmethod
   def fromPositions(cls, P, D=None):
+    """the lattice of positions P: the translations inferred as the shortest independent differences
+    to the neighbours, or taken from D, the index rounded and checked to a quarter cell"""
     P = np.asarray(P, dtype=float).reshape(-1, 3)
     if len(P) < 4:
       raise ValueError("a volume needs at least four voxels")
@@ -69,7 +79,7 @@ class voxelLattice:
 
   def __repr__(self):
     d = ", ".join(np.array2string(r, precision=4) for r in self.D)
-    return f"voxelLattice {self.shape}, d1 d2 d3 = {d}"
+    return aligned(f"voxelLattice {self.shape}, d1 d2 d3 = {d}")
 
 
 # the three shortest independent differences from a voxel to its neighbours, ordered along

@@ -13,6 +13,7 @@ __all__ = ["plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML"
 
 
 def is3dMap(x):
+  """whether x is a map of a volume: 3D grains, their boundary or an EBSD3 map"""
   from ..maps3d.ebsd3 import EBSD3
   from ..maps3d.grain3boundary import grain3Boundary
   from ..maps3d.grain3d import grain3d
@@ -20,6 +21,8 @@ def is3dMap(x):
 
 
 def plot3dMap(x, *args, **kw):
+  """plot(x, ...) for a map of a volume: the EBSD3 map, the grain3Boundary or the 3D grains drawn
+  as a scene3d"""
   from ..maps3d.ebsd3 import EBSD3
   from ..maps3d.grain3boundary import grain3Boundary
   if isinstance(x, EBSD3):

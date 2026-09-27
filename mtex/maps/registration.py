@@ -20,6 +20,7 @@ import numpy as np
 
 from ..geometry.vector3d import vector3d
 from .mapimage import mapImage
+from ..geometry.display import aligned
 
 
 # MATLAB's round, half away from zero
@@ -229,9 +230,11 @@ class pairShifts:
 
   @property
   def isempty(self):
+    """whether no shift was measured"""
     return self.u.size == 0
 
   def meanShift(self, px):
+    """the mean shift in pixels of size px over the tiles measured, [mean length, mean x, mean y]"""
     x, y = np.asarray(self.u.x).reshape(-1) / px, np.asarray(self.u.y).reshape(-1) / px
     ok = np.isfinite(x) & np.isfinite(y)
     if not ok.any():
@@ -240,7 +243,7 @@ class pairShifts:
 
   def __repr__(self):
     ok = np.isfinite(self.peak)
-    return f"pairShifts\n  tiles: {self.peak.size} ({int(ok.sum())} measured)\n  ROI: {self.roiSize} px"
+    return aligned(f"pairShifts\n  tiles: {self.peak.size} ({int(ok.sum())} measured)\n  ROI: {self.roiSize} px")
 
 
 __all__ = ["xcfShift", "pairShifts"]

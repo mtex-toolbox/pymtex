@@ -153,6 +153,6 @@ def test_fit_recovers_a_fibre():
 def test_display():
   cs = crystalFrame("432")
   s = repr(fibre.alpha(cs))
-  assert s.startswith("fibre (432 → specimen)") and "h || r:" in s and "o1 → o2:" in s
+  assert s.startswith("fibre (432 → y↓→x)") and "h || r :" in s and "o1 → o2:" in s
   assert "o1 → o2" not in repr(fibre.theta(cs)) and "size: 3" in repr(fibre.rand(3, cs, rng=rng))
   assert "[100] || (0,0,1)" in repr(fibre.theta(cs))

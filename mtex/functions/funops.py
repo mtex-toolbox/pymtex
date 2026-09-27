@@ -95,6 +95,13 @@ def _oneRotation(r):
 
 
 def rotate(f, r, *args, side="left", **kwargs):
+  """the function turned by a rotation: an SO(3) function from the left (the specimen side) or with
+  side='right' from the right, a spherical or circular function by the rotation; a container or
+  a map turns by its own method, MATLAB's flags given as strings
+
+    rotate(odf, r)
+    rotate(odf, r, side='right')
+    rotate(ebsd, r, 'keepEuler')"""
   # a container or a map turns by its own method, MATLAB's flags as keywords: rotate(ebsd, r, 'keepEuler')
   if isinstance(f, MtexArray) or type(f).__module__.startswith("mtex.maps"):
     return f.rotate(r, **{a: True for a in args if isinstance(a, str)}, **kwargs)
@@ -239,6 +246,12 @@ def _convDegrees(f, A):
 
 
 def grad(f, x=None, side="left"):
+  """the gradient of a function: the derivative of a function on the circle, the tangent vector
+  field of a function on the sphere or on SO(3), left or right on SO(3); with x its values at x
+
+    grad(sF)
+    grad(odf, ori)
+    grad(odf, side='right')"""
   if isinstance(f, S1FunHarmonic):
     return f.diff() if x is None else f.diff()(x)
   if isinstance(f, S2FunHarmonic):
@@ -287,6 +300,8 @@ def _oneVector(h, frame, what):
 
 
 def pdf(f, h):
+  """the pole figure of the crystal direction h, a function on the sphere in the specimen frame: the
+  mean of f over the orientations sending h to each direction; axis valued where h and -h coincide"""
   h = _oneVector(h, f.CS, "crystal direction")
   L = f.bandwidth
   fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
@@ -300,6 +315,8 @@ def pdf(f, h):
 
 
 def ipdf(f, r):
+  """the inverse pole figure of the specimen direction r, a function on the sphere in the crystal
+  frame: the mean of f over the orientations sending each crystal direction to r"""
   r = _oneVector(r, f.SS, "specimen direction")
   L = f.bandwidth
   fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
@@ -333,6 +350,8 @@ def radon(f, h=None, r=None):
 
 
 def invRadon(s):
+  """the inverse of the Funk transform on the sphere: the even function whose means over the great
+  circles are s, the odd degrees zero"""
   P = legendreP(s.bandwidth, 0.0)
   l = _degreesOf(len(s._fhat))
   fhat = np.where(l % 2, 0, s._fhat / np.where(l % 2, 1.0, P[l]))
@@ -350,6 +369,11 @@ def smoothBandwidth(*fs):
 
 
 def mapFun(op, f, *gs, bandwidth=None):
+  """the harmonic function of op applied pointwise to f and gs, by quadrature at the sum of their
+  bandwidths, capped by the preference, or at the given bandwidth
+
+    mapFun(np.exp, f)
+    mapFun(np.maximum, f, g, bandwidth=64)"""
   if isinstance(f, SO3FunHarmonic):
     for g in gs:
       f._sameFrames(g)

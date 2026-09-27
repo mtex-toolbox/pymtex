@@ -26,6 +26,7 @@ CELLS_MAX = 100_000
 
 
 def identityLayout():
+  """the identity layout, the 2 x 2 matrix that draws the plane's x and y as east and north"""
   return np.eye(2)
 
 
@@ -219,6 +220,8 @@ def mapPoints(ebsd, layout=None):
 
 
 def planeOf(x):
+  """the plane a map, grains or a boundary lie in: the lattice's for a map, else one fitted
+  to its positions"""
   if hasattr(x, "lattice"):
     return x.lattice.plane if x.lattice is not None else mapPlane(x.pos.data.reshape(-1, 3))
   return x.plane
@@ -283,6 +286,7 @@ SCALE_BAR_STEPS = (1, 2, 5, 10, 15, 20, 25, 50, 75, 100, 125, 150, 200, 500, 750
 
 
 def unitLabel(u):
+  """the label of a length unit on a plot, µm for 'um'"""
   return "µm" if u == "um" else str(u)
 
 

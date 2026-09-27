@@ -24,9 +24,16 @@ import numpy as np
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned, frameLabel
 
 
 class grain3d:
+  """the grains of a volume as closed polyhedra, given by the incidence I_GF of grains and the
+  faces of a grain3Boundary: what calcGrains returns for a volume, the counterpart of grain2d
+
+    grains = calcGrains(ebsd3)
+    grain3d.fromFaces(V, F, I_GF, ori, CSList, phaseId)
+    grain3d.load('grains.dream3d')"""
 
   def __init__(self, id, phaseId, CSList, numPixel, meanRotation, GOS, I_GF, boundary, frame, prop=None, phaseMap=None):
     self.id = np.asarray(id, dtype=np.int64).reshape(-1)
@@ -84,19 +91,23 @@ class grain3d:
 
   @property
   def size(self):
+    """the number of grains"""
     return len(self.id)
 
   @property
   def isIndexed(self):
+    """whether the phase of every grain is indexed"""
     return np.array([self.CSList[int(p)].isIndexed for p in self.phaseId], dtype=bool)
 
   @property
   def indexedPhaseId(self):
+    """the ids of the indexed phases among the grains"""
     present = np.unique(self.phaseId)
     return np.array([p for p in present if self.CSList.isIndexed(p)], dtype=int)
 
   @property
   def mineralList(self):
+    """the names of the phases of the phase list"""
     return self.CSList.mineralList
 
   @property
@@ -117,6 +128,8 @@ class grain3d:
 
   @property
   def meanOrientation(self):
+    """the mean orientations of the grains, which must be of one phase; assigning sets new
+    orientations and recomputes the misorientations of the boundary"""
     p = np.unique(self.phaseId)
     if len(p) != 1:
       raise ValueError("the grains are of several phases; select one first")
@@ -218,18 +231,22 @@ class grain3d:
 
   @property
   def F(self):
+    """the faces of the boundary, an (m, 3) array of triangles or a list of polygons"""
     return self.boundary.F
 
   @property
   def allV(self):
+    """all vertices of the boundary, as vectors"""
     return vector3d(self.boundary.allV, frame=self.frame)
 
   @property
   def V(self):
+    """the vertices the faces of the boundary use"""
     return self.boundary.V
 
   @property
   def numFaces(self):
+    """the number of faces of every grain"""
     return np.asarray((self.I_GF != 0).sum(axis=1)).reshape(-1)
 
   # a quantity summed over the fan triangles of every face, then over the faces of every grain
@@ -242,6 +259,7 @@ class grain3d:
 
   @property
   def volume(self):
+    """the volume of every grain, by the divergence theorem over its oriented faces"""
     return self._integral(lambda a, b, c, N: np.einsum("ij,ij->i", a, N)) / 6
 
   def _centroid(self, vol):
@@ -249,10 +267,12 @@ class grain3d:
 
   @property
   def centroid(self):
+    """the centroid of every grain, the centre of mass of the polyhedron"""
     return vector3d(self._centroid(self.volume), frame=self.frame)
 
   @property
   def surfaceArea(self):
+    """the surface area of every grain, the sum of the areas of its faces"""
     return abs(self.I_GF) @ self.boundary.area
 
   def surface(self):
@@ -261,6 +281,7 @@ class grain3d:
 
   @property
   def extent(self):
+    """the box of the vertices, [xmin, xmax, ymin, ymax, zmin, zmax]"""
     P = self.boundary.allV[self.boundary.idV]
     return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
 
@@ -273,6 +294,7 @@ class grain3d:
 
   @property
   def diameter(self):
+    """the diameter of every grain, the largest distance between two of its vertices"""
     from scipy.spatial import ConvexHull
     V = np.round(1e4 * self.boundary.allV)
     I = self._vertexIncidence()
@@ -326,6 +348,7 @@ class grain3d:
 
   @property
   def numNeighbors(self):
+    """the number of neighbouring grains of every grain"""
     pairs = self.neighbors(full=True)
     counts = np.bincount(pairs.reshape(-1), minlength=int(self.id.max(initial=0)) + 1)
     return counts[self.id]
@@ -333,14 +356,27 @@ class grain3d:
   # ------------------------------------------------------------------ smoothing
 
   def smoothBoundary(self, *args, **kwargs):
+    """the grains with their boundary surfaces smoothed, hierarchically: the triple lines along
+    themselves first, then the faces; the vertices where four or more grains meet stay
+
+      grains.smoothBoundary(10)                 a laplaceFilter of 10 iterations
+      grains.smoothBoundary(taubinFilter(20))   any boundary filter
+      grains.smoothBoundary(5, moveOuterBoundary=True)"""
     from .smoothing3d import _smoothBoundary3d
     return _smoothBoundary3d(self, *args, **kwargs)
 
   def reduceBoundary(self, *args, **kwargs):
+    """the grains with their triangulated boundary coarsened, the vertices within cells of n edges
+    merged
+
+      grains.reduceBoundary(3)
+      grains.reduceBoundary(2, quadric=True)"""
     from .smoothing3d import _reduceBoundary3d
     return _reduceBoundary3d(self, *args, **kwargs)
 
   def refineBoundary(self, *args, **kwargs):
+    """the grains with their triangulated boundary refined, every triangle split into four at the
+    midpoints of its edges, n times"""
     from .smoothing3d import _refineBoundary3d
     return _refineBoundary3d(self, *args, **kwargs)
 
@@ -370,11 +406,11 @@ class grain3d:
     ids, counts = np.unique(self.phaseId, return_counts=True)
     vol = self.volume
     cells = [f"{c} (volume {vol[self.phaseId == p].sum():.6g})" for p, c in zip(ids, counts)]
-    lines = [f"grain3d ({self.frame.char()})", phaseTable(self.CSList.frames, ids, cells, "Grains")]
+    lines = [f"grain3d ({frameLabel(self.frame)})", phaseTable(self.CSList.frames, ids, cells, "Grains")]
     lines.append(f"  boundary faces: {len(self.boundary)}")
     if self.prop:
       lines.append("  properties: " + ", ".join(sorted(self.prop)))
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

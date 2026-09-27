@@ -118,7 +118,7 @@ def test_R4_fibre_ODFs():
   assert np.isclose(mean(f2), 1) and f2.SS is ss
   f3 = fibreODF(Miller(vector3d.cat(h, Miller(1, 0, 0, cs)), cs), vector3d.cat(r, vector3d.rand(rng=rng)), ss, weights=[1, 3])
   assert np.isclose(mean(f3), 1) and np.isclose(f3.weights[1], 3 * f3.weights[0])
-  assert "SO3FunCBF" in repr(f) and "fibre: (110) ||" in repr(f)
+  assert "SO3FunCBF" in repr(f) and "fibre : (110) ||" in repr(f)
   # a Laue group holds the inversion: the fibre of h is that of -h too, so a -3m fibre ODF
   # takes the same value where g h and where -g h meet r (MATLAB 15.31 on both)
   laue = fibreODF(Miller(1, 1, 0, crystalFrame("-3m")), zvector)

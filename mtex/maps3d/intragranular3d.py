@@ -35,6 +35,8 @@ def _grid(ebsd):
 
 
 def gradientDim(ebsd, dim):
+  """the derivative of the orientation along the array axis dim of a gridded volume per unit length,
+  the forward difference, backwards at the last voxel, NaN across a grain boundary"""
   g, cs = _grid(ebsd)
   q = g.rotations.data.astype(float)
   q[g.phaseId != g.CSList.phaseId(cs)] = np.nan
@@ -54,18 +56,26 @@ def gradientDim(ebsd, dim):
 
 
 def gradientX(ebsd, stencil=None):
+  """the derivative of the orientation along the first axis of the volume per unit length,
+  gradientDim(ebsd, 0)"""
   return gradientDim(ebsd, 0)
 
 
 def gradientY(ebsd, stencil=None):
+  """the derivative of the orientation along the second axis of the volume per unit length,
+  gradientDim(ebsd, 1)"""
   return gradientDim(ebsd, 1)
 
 
 def gradientZ(ebsd, stencil=None):
+  """the derivative of the orientation along the third axis of the volume per unit length,
+  gradientDim(ebsd, 2)"""
   return gradientDim(ebsd, 2)
 
 
 def curvature(ebsd, stencil=None):
+  """the curvature tensor of every voxel, the gradients along the three lattice directions, in the
+  specimen frame and in the inverse scan unit"""
   from ..tensors.tensor import curvatureTensor
   g = ebsd.gridify()
   D = g.lattice.D
@@ -108,6 +118,7 @@ def KAM(ebsd, order=1, threshold=None, max=False):
 
 
 def max_(a, b):
+  """the larger of two numbers, the builtin max being shadowed by the keyword of KAM"""
   return a if a > b else b
 
 

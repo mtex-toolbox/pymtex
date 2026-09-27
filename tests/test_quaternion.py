@@ -177,7 +177,7 @@ def test_float32():
 def test_repr():
   s = repr(rotation.byEuler(10 * degree, 20 * degree, 30 * degree))
   assert s.startswith("rotation\n  Bunge Euler angles in degree\n  phi1  Phi  phi2\n") and "10" in s and "30" in s
-  assert "size: 3" in repr(rotation.rand(3, rng=rng)) and "phi1" not in repr(rotation.rand(30, rng=rng))
+  assert "size: 3" in repr(rotation.rand(3, rng=rng)) and "⋮" in repr(rotation.rand(30, rng=rng))
   assert repr(quaternion(1, 2, 3, 4)) == "quaternion\n  a  b  c  d\n  1  2  3  4"
 
 

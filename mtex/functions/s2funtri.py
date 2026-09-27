@@ -16,9 +16,16 @@ import numpy as np
 from ..geometry.s2triangulation import S2Triangulation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned
 
 
 class S2FunTri:
+  """a function on the sphere by its values at the vertices of a spherical triangulation, linear
+  in between; a direction given twice takes the mean of its values
+
+    S2FunTri(v, values)          the values at the directions v
+    S2FunTri(sT, values)         on a triangulation already made
+    S2FunTri(fun)                a callable sampled on a 1.5 degree grid"""
 
   def __init__(self, nodes, values=None):
     if callable(nodes) and not isinstance(nodes, (vector3d, S2Triangulation)):
@@ -42,20 +49,25 @@ class S2FunTri:
 
   @property
   def vertices(self):
+    """the vertices of the triangulation, the directions the values are given at"""
     return self.tri.vertices
 
   @property
   def frame(self):
+    """the frame of the vertices"""
     return self.tri.frame
 
   @property
   def CS(self):
+    """the frame of the vertices, MATLAB's sF.CS"""
     return self.frame
 
   def __len__(self):
     return self.values.shape[1]
 
   def eval(self, v):
+    """the values at the directions v, the barycentric mean of the values at the corners of the
+    triangle each lies in; NaN at a NaN direction"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     shape = v.shape
     W = v.data.reshape(-1, 3)
@@ -111,13 +123,15 @@ class S2FunTri:
     return self._mapped(np.abs)
 
   def abs(self):
+    """the absolute value of the function, taken at the vertices"""
     return abs(self)
 
   def sqrt(self):
+    """the square root of the function, taken at the vertices"""
     return self._mapped(np.sqrt)
 
   def __repr__(self):
-    return f"S2FunTri\n  vertices: {self.vertices.size}" + (f"\n  size: {len(self)}" if len(self) > 1 else "")
+    return aligned(f"S2FunTri\n  vertices: {self.vertices.size}" + (f"\n  size: {len(self)}" if len(self) > 1 else ""))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

@@ -21,9 +21,15 @@ from ..geometry.plane import plane3d
 from ..geometry.vector3d import vector3d
 from ..maps.ebsd import EBSD, _rotations, _vectors
 from .voxellattice import voxelLattice
+from ..geometry.display import aligned, frameLabel
 
 
 class EBSD3(EBSD):
+  """the measurements of a volume, a list or an (n1, n2, n3) array of voxels with their positions,
+  rotations and phases, the voxel lattice inferred from the positions when not given
+
+    ebsd = EBSD3(pos, rot, phaseId, CSList)
+    ebsd = EBSD3(pos, rot, phaseId, CSList, prop={'ci': ci})"""
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, scanUnit="um", frame=None, lattice=None, meta=None,
                phaseMap=None, id=None, isPadding=None, D=None):
@@ -41,6 +47,7 @@ class EBSD3(EBSD):
 
   @property
   def isGridded(self):
+    """whether the voxels are held as an (n1, n2, n3) array"""
     return self.ndim == 3
 
   def _vec(self, k):
@@ -50,30 +57,37 @@ class EBSD3(EBSD):
 
   @property
   def d1(self):
+    """the first step vector of the voxel lattice"""
     return self._vec(0)
 
   @property
   def d2(self):
+    """the second step vector of the voxel lattice"""
     return self._vec(1)
 
   @property
   def d3(self):
+    """the third step vector of the voxel lattice"""
     return self._vec(2)
 
   @property
   def dx(self):
+    """the length of the first step of the voxel lattice"""
     return float(self.lattice.spacing[0])
 
   @property
   def dy(self):
+    """the length of the second step of the voxel lattice"""
     return float(self.lattice.spacing[1])
 
   @property
   def dz(self):
+    """the length of the third step of the voxel lattice"""
     return float(self.lattice.spacing[2])
 
   @property
   def dPos(self):
+    """the shortest step of the voxel lattice, NaN without a lattice"""
     return np.nan if self.lattice is None else float(self.lattice.spacing.min())
 
   @property
@@ -82,6 +96,7 @@ class EBSD3(EBSD):
     return vector3d(np.full(3, np.nan), frame=self.frame)
 
   def extent(self):
+    """the bounding box of the voxels, [xmin, xmax, ymin, ymax, zmin, zmax], the padding left out"""
     P = self.pos.data.reshape(-1, 3)
     if self._pad is not None:
       P = P[~self._pad.reshape(-1)]
@@ -112,12 +127,14 @@ class EBSD3(EBSD):
                  meta=self.meta, phaseMap=self.phaseMap, id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
 
   def copy(self):
+    """a copy of the volume with its own arrays, the frames shared"""
     return EBSD3(self.pos.copy(), self.rotations.copy(), self.phaseId.copy(), self.CSList,
                  {k: v.copy() for k, v in self.prop.items()}, scanUnit=self.scanUnit, frame=self.frame,
                  lattice=self.lattice or False, meta=dict(self.meta), phaseMap=self.phaseMap, id=self.id.copy(),
                  isPadding=self._pad)
 
   def flatten(self):
+    """the voxels as a list, the volume itself when it is one"""
     return self if self.ndim == 1 else self._take(np.arange(self.size), (self.size,))
 
   # ------------------------------------------------------------------ the array
@@ -213,9 +230,9 @@ class EBSD3(EBSD):
   def __repr__(self):
     from ..geometry.display import sizeString
     from ..maps.phaselist import phaseTable
-    lines = [f"EBSD3 ({self.frame.char()})"]
+    lines = [f"EBSD3 ({frameLabel(self.frame)})"]
     if self.size == 0:
-      return lines[0] + "\n  the volume is empty"
+      return aligned(lines[0] + "\n  the volume is empty")
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
     ids, counts = np.unique(self.phaseId[~self.isPadding], return_counts=True)
     share = [f"{c} ({float(f'{100 * c / self.size:.2g}'):g}%)" for c in counts]
@@ -224,10 +241,10 @@ class EBSD3(EBSD):
       lines.append("  properties: " + ", ".join(sorted(self.prop)))
     lines.append(f"  scan unit: {self.scanUnit}")
     e = self.extent()
-    lines.append(f"  X x Y x Z: [{e[0]:.4g} → {e[1]:.4g}] x [{e[2]:.4g} → {e[3]:.4g}] x [{e[4]:.4g} → {e[5]:.4g}]")
+    lines.append(f"  X × Y × Z: [{e[0]:.4g} → {e[1]:.4g}] × [{e[2]:.4g} → {e[3]:.4g}] × [{e[4]:.4g} → {e[5]:.4g}]")
     if self.lattice is not None:
-      lines.append(f"  voxel: {' x '.join(f'{s:.4g}' for s in self.lattice.spacing)}")
-    return "\n".join(lines)
+      lines.append(f"  voxel: {' × '.join(f'{s:.4g}' for s in self.lattice.spacing)}")
+    return aligned("\n".join(lines))
 
   @classmethod
   def load(cls, fname, *args, **kwargs):

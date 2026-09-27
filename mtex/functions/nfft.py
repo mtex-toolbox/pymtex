@@ -75,6 +75,8 @@ def _systemLibrary():
 
 
 def nfftLibrary():
+  """the loaded NFFT library, found by the preference NFFTLibrary, then MTEX_NFFT_LIBRARY, then the
+  system's nfft3_omp; None when there is none or it computes no real plans"""
   global _LIB
   path = getMTEXpref("NFFTLibrary") or os.environ.get("MTEX_NFFT_LIBRARY") or _systemLibrary()
   if not path:
@@ -138,10 +140,12 @@ class NFFTPlan:
     self.f = self.plan._array(head.f, M, np.complex128)
 
   def trafo(self):
+    """the values at the nodes of the coefficients in fhat, the plan's array f"""
     self.plan.lib.nfft_trafo(ctypes.addressof(self.plan.buffer))
     return self.f
 
   def adjoint(self):
+    """the adjoint transform of the values in f, the plan's coefficient array fhat"""
     self.plan.lib.nfft_adjoint(ctypes.addressof(self.plan.buffer))
     return self.fhat
 

@@ -21,6 +21,7 @@ from .maps import (CELLS_MAX, boundaryPolyline, boundarySegments, frameOnScreen,
                    mapPoints, mapRaster, phasePalette, planeOf, scaleBar, triadGeometry)
 from .mtexfigure import gcm, mtexFigure
 from .orientationkeys import ipfColorKey, ipfColors, orientationColorKey
+from ..geometry.display import display, frameLabel, header
 
 MAP_KEYS = ("how2plot", "coordinates", "title", "region", "parent", "figSize", "unit")
 
@@ -70,6 +71,7 @@ class mapPlot:
 
   @mappable.setter
   def mappable(self, h):
+    """adds a drawing coloured by values to the list the colour map and range reach; None adds nothing"""
     if not hasattr(self, "mappables"):
       self.mappables = []
     if h is not None:
@@ -91,6 +93,7 @@ class mapPlot:
     return tuple(out)
 
   def onScreen(self, xy):
+    """screen coordinates of points of the map plane, the layout applied to them"""
     return np.asarray(xy, dtype=float) @ self.layout.T
 
   def extend(self, x):
@@ -129,6 +132,9 @@ class mapPlot:
         self._redrawScaleBar()
     self.ax.callbacks.connect("xlim_changed", moved)
     self.ax.callbacks.connect("ylim_changed", moved)
+
+  def __repr__(self):
+    return display(header("mapPlot", frameLabel(self.frame)), [("unit", self.unit)])
 
 
 # ------------------------------------------------------------------ where a map goes
@@ -921,6 +927,8 @@ def _hasColor(c):
 
 
 def phaseLegend(mP, x, loc="upper right"):
+  """the legend of the phases present in a map or grains, one patch per phase in its colour,
+  a not indexed phase only when it was given a colour of its own"""
   from matplotlib.patches import Patch
   from matplotlib.colors import to_rgb
   pl = x.CSList
@@ -933,14 +941,15 @@ def phaseLegend(mP, x, loc="upper right"):
 
 
 def keyResolution(px):
-  """the inverse pole figure key of every indexed phase present, drawn beside the map
-  the step a key of that many pixels is meshed at: about two pixels to a quad over a sector
+  """the step a key of that many pixels is meshed at: about two pixels to a quad over a sector
   some ninety degrees across, never finer than a key drawn for a page nor coarser than the
   eye would catch"""
   return float(np.clip(180 * degree / max(px, 1.0), 0.5 * degree, 4 * degree))
 
 
 def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
+  """the inverse pole figure key of every indexed phase present, drawn in insets beside the map,
+  a sector reaching into both hemispheres as two; returns the inset axes"""
   from .directionkeys import HSVDirectionKey
   from .spherical import makeSphericalProjection
   from .sphericalplot import plotKey

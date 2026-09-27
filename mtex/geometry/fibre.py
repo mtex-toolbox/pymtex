@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
-from .display import sizeString
+from .display import display, header, sizeString
 from .frames import crystalFrame, referenceFrame, specimenFrame
 from .kernels import qmul, qrot
 from .miller import Miller
@@ -42,6 +42,14 @@ def _splitFrames(args):
 
 
 class fibre:
+  """a fibre in orientation space: the orientations mapping the crystal direction h onto the
+  specimen direction r, or the arc of them between two orientations; a list of fibres by shape
+
+    f = fibre(h, r)                    the orientations with ori * h = r
+    f = fibre(h, r, ss)
+    f = fibre(o1, o2)                  the arc from o1 to o2 about the axis between them
+    f = fibre(o1, h)                   the whole fibre through o1 about h
+    f = fibre(o1, o2, full=True)       the full fibre through the arc"""
 
   def __init__(self, a, b, *frames, full=False):
     if isinstance(a, orientation):
@@ -83,18 +91,22 @@ class fibre:
 
   @property
   def r(self):
+    """the specimen direction of the fibre, o1 * h"""
     return self.o1 * self.h
 
   @property
   def CS(self):
+    """the crystal frame of the fibre, MATLAB's f.CS"""
     return self.o1.frameA
 
   @property
   def SS(self):
+    """the specimen frame of the fibre, MATLAB's f.SS"""
     return self.o1.frameB
 
   @property
   def antipodal(self):
+    """whether the fibre is antipodal, read off its crystal direction"""
     return self.h.antipodal
 
   @property
@@ -110,14 +122,17 @@ class fibre:
 
   @property
   def shape(self):
+    """the shape of the list of fibres"""
     return self.h.shape
 
   @property
   def ndim(self):
+    """the number of dimensions of the list of fibres"""
     return self.h.ndim
 
   @property
   def size(self):
+    """the number of fibres in the list"""
     return self.h.size
 
   def __len__(self):
@@ -130,13 +145,16 @@ class fibre:
     return (self[i] for i in range(self.shape[0]))
 
   def flatten(self):
+    """the fibres as a flat list"""
     return self._build(self.o1.flatten(), self.o2.flatten(), self.h.flatten())
 
   def reshape(self, *shape):
+    """the fibres in another shape"""
     return self._build(self.o1.reshape(*shape), self.o2.reshape(*shape), self.h.reshape(*shape))
 
   @classmethod
   def cat(cls, *fibres, axis=0):
+    """the fibres joined into one list along an axis"""
     return cls._build(orientation.cat(*[f.o1 for f in fibres], axis=axis), orientation.cat(*[f.o2 for f in fibres], axis=axis),
                       vector3d.cat(*[f.h for f in fibres], axis=axis))
 
@@ -149,6 +167,7 @@ class fibre:
     return rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))
 
   def orientation(self, points=1000):
+    """the orientations along the fibre, points x shape, turning about h from o1 to o2"""
     return orientation._fromRotation(self.rotation(points).data, (self.CS, self.SS))
 
   # ------------------------------------------------------------------ distance
@@ -202,6 +221,7 @@ class fibre:
     return out[keep]
 
   def multiplicity(self):
+    """the number of distinct symmetrically equivalent fibres"""
     return self.symmetrise(unique=True).size
 
   # two fibres are equal when their frames are the same and h and r agree up to the symmetry
@@ -226,6 +246,11 @@ class fibre:
 
   @classmethod
   def rand(cls, *args, rng=None):
+    """random fibres between random crystal and specimen directions, of the shape and between the
+    frames given
+
+      f = fibre.rand(10, cs)
+      f = fibre.rand(10, cs, ss, rng=rng)"""
     shape, frames = _splitFrames(args)
     cs = frames[0] if frames else crystalFrame("1")
     ss = frames[1] if len(frames) > 1 else specimenFrame.default
@@ -269,19 +294,14 @@ class fibre:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [f"fibre ({self.o1._frameSummary()})"]
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if self.antipodal:
-      lines.append("  antipodal: true")
-    if self.size != 1:
-      return "\n".join(lines)
-    h = self.h.round()
-    hChar = Miller(h, self.CS.stripSym()).char() if isinstance(self.CS, crystalFrame) else str(h)
-    lines.append(f"  h || r: {hChar} || {str(vector3d(self.r.data).round())}")
-    if not np.all(self.isFull):
-      lines.append(f"  o1 → o2: {_eulerString(self.o1)} → {_eulerString(self.o2)}")
-    return "\n".join(lines)
+    pairs = [("size", sizeString(self.shape) if self.size != 1 else None), ("antipodal", "true" if self.antipodal else None)]
+    if self.size == 1:
+      h = self.h.round()
+      hChar = Miller(h, self.CS.stripSym()).char() if isinstance(self.CS, crystalFrame) else str(h)
+      pairs.append(("h || r", f"{hChar} || {str(vector3d(self.r.data).round())}"))
+      if not np.all(self.isFull):
+        pairs.append(("o1 → o2", f"{_eulerString(self.o1)} → {_eulerString(self.o2)}"))
+    return display(header("fibre", self.o1._frameSummary()), pairs)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

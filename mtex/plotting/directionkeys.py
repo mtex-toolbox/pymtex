@@ -19,6 +19,7 @@ from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sp
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector
 from .sectorfold import _angle, _unit, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, uniqueNormals
+from ..geometry.display import aligned
 
 # ------------------------------------------------------------------ colour arithmetic
 
@@ -36,6 +37,7 @@ def rgb2hsv(rgb):
 
 
 def hsl2hsv(h, s, l):
+  """the HSV coordinates of colours given in HSL, as three arrays h, s, v"""
   ll = 2 * np.asarray(l, dtype=float)
   ss = np.where(ll <= 1, s * ll, s * (2 - ll))
   v = (ll + ss) / 2
@@ -44,6 +46,7 @@ def hsl2hsv(h, s, l):
 
 
 def hsv2rgb(h, s, v):
+  """the RGB colours of HSV coordinates, three arrays of any common shape, as (..., 3) in [0, 1]"""
   h, s, v = np.broadcast_arrays(np.asarray(h, dtype=float), np.asarray(s, dtype=float), np.asarray(v, dtype=float))
   h6 = 6 * np.mod(h, 1)
   i = np.floor(h6).astype(int) % 6
@@ -67,6 +70,8 @@ HUE_CORRECTION = _hueCorrection()
 
 
 def correctedHue(h):
+  """the hue passed through the correction that gives red, green and blue as much of the colour
+  circle as yellow, cyan and magenta, MATLAB's ar2rgb"""
   n = len(HUE_CORRECTION)
   t = np.mod(np.asarray(h, dtype=float), 1) * (n - 1)
   i = np.clip(np.floor(t).astype(int), 0, n - 2)
@@ -110,12 +115,14 @@ _LMS_INV, _LAB_INV = np.linalg.inv(_LMS), np.linalg.inv(_LAB)
 
 
 def rgb2oklab(rgb):
+  """the OKLab coordinates of gamma encoded sRGB colours, over arrays of shape (..., 3)"""
   c = np.asarray(rgb, dtype=float)
   lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
   return np.cbrt(lin @ _LMS.T) @ _LAB.T
 
 
 def oklab2rgb(lab):
+  """the gamma encoded sRGB colours of OKLab coordinates, clipped to the gamut, over (..., 3)"""
   lin = ((np.asarray(lab, dtype=float) @ _LAB_INV.T) ** 3) @ _LMS_INV.T
   lin = np.clip(lin, 0, 1)
   return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * lin ** (1 / 2.4) - 0.055)
@@ -202,6 +209,9 @@ def _coneLightness(s, Lb):
 
 
 def perceptualSphereColor(radius, rho, gray=None, hueLightness=0.0):
+  """the colour of a point of the perceptual colour sphere, a double cone in OKLab: the radius, 1
+  at the white centre and 0 at the black one, the azimuth as the hue; hueLightness moves the
+  boundary towards the lightness each hue is brightest at"""
   radius, rho = np.broadcast_arrays(np.asarray(radius, dtype=float), np.asarray(rho, dtype=float))
   Lbs, Cbs = _perceptualCone(float(hueLightness))
   h = np.interp(np.mod(rho, 2 * np.pi), np.linspace(0, 2 * np.pi, len(PERCEPTUAL_HUE)), PERCEPTUAL_HUE)
@@ -242,14 +252,16 @@ class directionColorKey:
     return self.sR
 
   def direction2color(self, h):
+    """the colours of directions, an (..., 3) array in [0, 1]; defined by every key"""
     raise NotImplementedError
 
   def plot(self, **kwargs):
+    """the key drawn on its sector"""
     from .sphericalplot import plotKey
     return plotKey(self, **kwargs)
 
   def __repr__(self):
-    return f"{type(self).__name__} ({self.CS.char()})"
+    return aligned(f"{type(self).__name__} ({self.CS.char()})")
 
 
 class HSVDirectionKey(directionColorKey):
@@ -352,9 +364,12 @@ class TSLDirectionKey(directionColorKey):
 
   @property
   def whiteCenter(self):
+    """the centre of the sector the colours run from"""
     return vector3d(self.center, isNormalized=True)
 
   def direction2color(self, h, gray=None):
+    """the colours of directions, the polar coordinates in the sector about its centre turned into
+    hue and lightness without the hue correction; gray lowers the saturation"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     hs = projectIntoRegion(vector3d(unit, frame=self.sR.frame, isNormalized=True), self.sR, self.sym).data.reshape(-1, 3)
@@ -364,6 +379,10 @@ class TSLDirectionKey(directionColorKey):
 
 
 class HKLDirectionKey(directionColorKey):
+  """the HKL vendor key on the Laue group: the three primaries blended linearly over the polar
+  angle and the azimuth of the fundamental sector
+
+    key = HKLDirectionKey(cs)"""
 
   def __init__(self, cs):
     super().__init__(cs.Laue())
@@ -375,9 +394,11 @@ class HKLDirectionKey(directionColorKey):
 
   @property
   def whiteCenter(self):
+    """the centre of the fundamental sector"""
     return vector3d(regionCenter(self.sR), isNormalized=True)
 
   def direction2color(self, h, gray=None):
+    """the colours of directions, red at the pole of the sector, green and blue along its two edges"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     hs = projectIntoRegion(vector3d(unit, frame=self.sR.frame, isNormalized=True), self.sR, self.sym).data.reshape(-1, 3)
@@ -421,12 +442,15 @@ class spotDirectionKey(directionColorKey):
 
   @center.setter
   def center(self, value):
+    """sets the centres, the equivalents under the group computed beside them"""
     xyz = _asDirections(value)[0]
     self._center = vector3d(xyz, frame=self.frame)
     els = self.sym.rot.flatten().data
     self.equivalents = [qrot(els[:, :4], (c / np.linalg.norm(c))[None]) * els[:, 4:5] for c in xyz]
 
   def direction2color(self, h, gray=None):
+    """the colours of directions: white, multiplied for every centre by its colour faded with the
+    kernel of the angle to the nearest equivalent of the centre"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     psi0 = float(self.psi(1.0))
@@ -444,6 +468,7 @@ class spotDirectionKey(directionColorKey):
 
   @property
   def whiteCenter(self):
+    """the first centre of the key"""
     return self.center[0] if self.center.size > 1 else self.center
 
 

@@ -38,6 +38,8 @@ def _conj(q):
 # ------------------------------------------------------------------ the window filters
 
 class windowFilter(EBSDFilter):
+  """the base of the filters over a window of neighbours, numNeighbours the rings of the lattice
+  the window reaches: meanFilter, medianFilter, KuwaharaFilter"""
 
   def __init__(self, numNeighbours=1):
     self.numNeighbours = int(numNeighbours)

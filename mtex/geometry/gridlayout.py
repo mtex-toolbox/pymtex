@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 
 from .vector3d import vector3d
+from .display import display, header
 
 X, Y = np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])
 
@@ -26,6 +27,11 @@ def _unit(v):
 
 
 class gridLayout:
+  """the order a grid is stored in, the directions its row index and its column index advance along,
+  perpendicular; by default row along y and col along x
+
+    gridLayout()
+    gridLayout(rowDir, colDir, name='fsd')"""
 
   def __init__(self, row=None, col=None, name=""):
     if row is None and col is None:
@@ -39,10 +45,12 @@ class gridLayout:
 
   @staticmethod
   def columnMajor():
+    """the layout with the first index along y, the second along x, MATLAB's images"""
     return gridLayout(Y, X, name="columnMajor")
 
   @staticmethod
   def rowMajor():
+    """the layout with the first index along x, the second along y"""
     return gridLayout(X, Y, name="rowMajor")
 
   @staticmethod
@@ -58,6 +66,7 @@ class gridLayout:
 
   @property
   def basis(self):
+    """the directions row, col and row x col as one vector3d of three"""
     return vector3d(np.stack([self.row.data, self.col.data, np.cross(self.row.data, self.col.data)]), isNormalized=True)
 
   # two layouts are one when their directions are
@@ -66,7 +75,7 @@ class gridLayout:
 
   def __repr__(self):
     fmt = lambda v: "(" + ", ".join(f"{x:g}" for x in np.round(v.data.reshape(3), 4) + 0.0) + ")"
-    return f"gridLayout {self.name}\n  row: {fmt(self.row)}\n  col: {fmt(self.col)}".replace("gridLayout \n", "gridLayout\n")
+    return display(header("gridLayout", self.name), [("row", fmt(self.row)), ("col", fmt(self.col))])
 
 
 def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):

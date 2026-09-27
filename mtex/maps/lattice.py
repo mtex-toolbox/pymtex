@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .polygon import signedArea2, voronoiCell
+from ..geometry.display import display, header, numString
 
 SHAPES = ("square", "hex")
 STENCIL = {"square": np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], dtype=np.int32),
@@ -34,6 +35,11 @@ def _xyz(pts):
 # ------------------------------------------------------------------ the measurement plane
 
 class mapPlane:
+  """the plane of a set of positions with an orthonormal frame: the normal fitted and pointing up,
+  e1 the given direction projected into the plane, the origin the specimen origin's foot on it
+
+    plane = mapPlane(pos)
+    plane.to2d(xyz), plane.from2d(xy)"""
 
   # the plane of a set of positions, with e1 along the given direction projected into it
   #
@@ -63,10 +69,12 @@ class mapPlane:
 
   @property
   def normal(self):
+    """the unit normal of the plane, e1 x e2"""
     return np.cross(self.e1, self.e2)
 
   @property
   def dtype(self):
+    """the floating point type the plane computes in"""
     return self.e1.dtype
 
   def to2d(self, xyz):
@@ -80,12 +88,18 @@ class mapPlane:
     return self.o + xy[..., :1] * self.e1 + xy[..., 1:] * self.e2
 
   def __repr__(self):
-    return f"mapPlane (normal {np.round(self.normal, 4).tolist()})"
+    return header("mapPlane", "normal (" + ", ".join(numString(x, digits=4) for x in self.normal) + ")")
 
 
 # ------------------------------------------------------------------ the lattice
 
 class lattice:
+  """the lattice an EBSD map is measured on: the basis of the two shortest translations, the cell
+  shape 'square' or 'hex', the plane and the integer index of every position, inferred from the
+  positions or fitted to a known basis
+
+    l = lattice(pos)
+    l = lattice(pos, basis=(A, 'hex'))"""
 
   # the lattice of measured positions: the basis from the differences of neighbouring
   # points, the index by fitting the lattice to all of them
@@ -112,6 +126,8 @@ class lattice:
 
   @property
   def stencil(self):
+    """the index offsets of the neighbours of a cell, four for a square lattice and six for a
+    hexagonal one"""
     return STENCIL[self.shape]
 
   def __len__(self):
@@ -139,8 +155,10 @@ class lattice:
     return self._build(self.plane, self.origin + self.A @ lo, self.A, ij - lo, self.shape)
 
   def __repr__(self):
-    a = ", ".join("(" + ", ".join(f"{x:.4g}" for x in self.A[:, j]) + ")" for j in range(2))
-    return f"lattice ({self.shape})\n  sites: {len(self)}\n  spacing: {self.dxy:.4g}\n  basis: {a}\n  normal: {np.round(self.plane.normal, 4).tolist()}"
+    tuple_ = lambda v: "(" + ", ".join(numString(x, digits=4, tiny=1e-10 * max(self.dxy, 1)) for x in v) + ")"
+    return display(header("lattice", self.shape), [("sites", len(self)), ("spacing", f"{self.dxy:.4g}"),
+                                                   ("basis", ", ".join(tuple_(self.A[:, j]) for j in range(2))),
+                                                   ("normal", tuple_(self.plane.normal))])
 
 
 def cellCorners(A, shape):

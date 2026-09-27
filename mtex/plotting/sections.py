@@ -34,6 +34,7 @@ from ..geometry.symmetry import symmetry
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, zvector
 from .spherical import makeSphericalProjection
+from ..geometry.display import aligned
 
 GREEK = {"phi1": "φ1", "Phi": "Φ", "phi2": "φ2", "alpha": "α", "beta": "β", "gamma": "γ", "sigma": "σ", "omega": "ω"}
 
@@ -94,20 +95,25 @@ class ODFSections:
 
   @property
   def CS(self):
+    """the first frame of the sections, CS1"""
     return self.CS1
 
   @property
   def SS(self):
+    """the second frame of the sections, CS2"""
     return self.CS2
 
   @property
   def numSections(self):
+    """the number of sections"""
     return len(self.values)
 
   def sectionScale(self, k):
+    """the scale of the axes of section k, one unless the section shrinks with its value"""
     return 1.0
 
   def sectionField(self, k, resolution=15 * degree):
+    """the directions and vectors of a field drawn over section k, None for sections without one"""
     return None
 
   def makeGrid(self, resolution=2.5 * degree):
@@ -137,7 +143,7 @@ class ODFSections:
 
   def __repr__(self):
     vals = ", ".join(f"{v / degree:g}" for v in self.values)
-    return f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})\n  sections: {vals}°"
+    return aligned(f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})\n  sections: {vals}°")
 
 
 # ------------------------------------------------------------------ Euler angle sections
@@ -185,20 +191,25 @@ class eulerSections(ODFSections):
 
   @property
   def names(self):
+    """the names of the three Euler angles of the convention of the sections"""
     return EULER_LABELS[eulerConvention(self.convention)]
 
   @property
   def angleName(self):
+    """the name of the Euler angle that is constant on each section"""
     return self.names[0 if self.first else 2]
 
   @property
   def axisLabels(self):
+    """the labels of the two chart axes, the other outer Euler angle and the middle one"""
     return (_name(self.names[2 if self.first else 0]), _name(self.names[1]))
 
   def sectionLabel(self, k):
+    """the title of section k, the constant angle in degrees"""
     return f"{_name(self.angleName)} = {round(self.values[k] / degree)}°"
 
   def sectionCharts(self, k):
+    """the chart section k is drawn on, the Euler angle box as a plain projection"""
     return makeSphericalProjection(self.sR, projection="plain", how2plot=plottingConvention.default)
 
   # the angles of the equivalents ordered as the picture reads them: fixed, polar, azimuth
@@ -207,6 +218,8 @@ class eulerSections(ODFSections):
     return (a, b, c) if self.first else (c, b, a)
 
   def sectionData(self, ori):
+    """where the symmetric equivalents of orientations fall: the chart directions, the section of
+    each and the index of the orientation it comes from; a degenerate one falls into every section"""
     q, src = _equivalents(ori)
     fixed, theta, azim = self._triples(q)
     degenerate = (theta <= 1e-5) | (theta >= np.pi - 1e-5)
@@ -226,6 +239,7 @@ class eulerSections(ODFSections):
     return vector3d.byPolar(th, az), np.concatenate(sec).astype(int), np.concatenate(frm).astype(int)
 
   def orientationsAt(self, k, vs):
+    """the orientations at points vs of the chart of section k"""
     s = np.full(vs.shape, self.values[k])
     theta, azim = vs.theta, vs.rho
     a, b, c = (s, theta, azim) if self.first else (azim, theta, s)
@@ -233,50 +247,75 @@ class eulerSections(ODFSections):
 
 
 class phi2Sections(eulerSections):
+  """sections of constant phi2 in the Bunge convention, MTEX's default ODF sections
+
+    oS = phi2Sections(cs, ss)
+    oS = phi2Sections(cs, ss, sections=6)
+    oS = phi2Sections(cs, ss, phi2=np.arange(0, 91, 15)*degree)"""
   convention, first = "Bunge", False
 
   @property
   def phi2(self):
+    """the phi2 values of the sections"""
     return self.values
 
   @phi2.setter
   def phi2(self, values):
+    """sets the phi2 values of the sections"""
     self._setValues(values)
 
 
 class phi1Sections(eulerSections):
+  """sections of constant phi1 in the Bunge convention
+
+    oS = phi1Sections(cs, ss, sections=6)
+    oS = phi1Sections(cs, ss, phi1=np.arange(0, 91, 15)*degree)"""
   convention, first = "Bunge", True
 
   @property
   def phi1(self):
+    """the phi1 values of the sections"""
     return self.values
 
   @phi1.setter
   def phi1(self, values):
+    """sets the phi1 values of the sections"""
     self._setValues(values)
 
 
 class gammaSections(eulerSections):
+  """sections of constant gamma in the Matthies (ZYZ) convention
+
+    oS = gammaSections(cs, ss, sections=6)
+    oS = gammaSections(cs, ss, gamma=np.arange(0, 91, 15)*degree)"""
   convention, first = "Matthies", False
 
   @property
   def gamma(self):
+    """the gamma values of the sections"""
     return self.values
 
   @gamma.setter
   def gamma(self, values):
+    """sets the gamma values of the sections"""
     self._setValues(values)
 
 
 class alphaSections(eulerSections):
+  """sections of constant alpha in the Matthies (ZYZ) convention
+
+    oS = alphaSections(cs, ss, sections=6)
+    oS = alphaSections(cs, ss, alpha=np.arange(0, 91, 15)*degree)"""
   convention, first = "Matthies", True
 
   @property
   def alpha(self):
+    """the alpha values of the sections"""
     return self.values
 
   @alpha.setter
   def alpha(self, values):
+    """sets the alpha values of the sections"""
     self._setValues(values)
 
 
@@ -330,32 +369,40 @@ class pfSections(ODFSections):
 
   @property
   def h1(self):
+    """the crystal direction whose pole figure every section shows, a unit vector"""
     return self._h1
 
   @h1.setter
   def h1(self, h):
+    """sets the crystal direction whose pole figure the sections show"""
     self._d1 = h
     self._setAxes()
 
   @property
   def h2(self):
+    """the part of the second crystal direction perpendicular to h1, whose twist about h1 splits
+    the sections"""
     return self._h2
 
   @h2.setter
   def h2(self, h):
+    """sets the second crystal direction, whose twist about h1 splits the sections"""
     self._d2 = h
     self._setAxes()
 
   @property
   def omega(self):
+    """the twist angles of the sections"""
     return self.values
 
   @omega.setter
   def omega(self, values):
+    """sets the twist angles of the sections"""
     self._values = values
     self._setAxes()
 
   def sectionLabel(self, k):
+    """the title of section k, the twist angle in degrees"""
     return f"{_name(self.angleName)} = {round(self.values[k] / degree)}°"
 
   def referenceField(self, r):
@@ -374,11 +421,15 @@ class pfSections(ODFSections):
     return vector3d(qrot(q, self.referenceField(r).data), isNormalized=True)
 
   def sectionCharts(self, k):
+    """the chart section k is drawn on, the conventional sector of the specimen frame, the upper
+    hemisphere when h1 has a symmetric equivalent opposite it"""
     h = self.h1.data
     equivalentPoles = bool(np.any(qrot(self.CS1.sym.rot.flatten().data[:, :4], h[None]) @ h < -1 + 1e-10))
     return makeSphericalProjection(self.sR, how2plot=self.pC, upper=equivalentPoles)
 
   def sectionData(self, ori, withRotation=False):
+    """where the symmetric equivalents of orientations fall: the direction of ori * h1, the section
+    of the twist of ori * h2 and the index of the orientation; withRotation=True adds the rotations"""
     q, src = _equivalents(ori)
     v = vector3d(qrot(q, np.tile(self.h1.data, (len(q), 1))), isNormalized=True)
     w = vector3d(qrot(q, np.tile(self.h2.data, (len(q), 1))), isNormalized=True)
@@ -395,6 +446,8 @@ class pfSections(ODFSections):
     return vs, self.twisted(vs, self.values[k])
 
   def orientationsAt(self, k, vs):
+    """the orientations at points vs of the chart of section k: h1 on the point, h2 on the twisted
+    reference field there"""
     vs = vector3d(vs.normalize().data)
     n = vs.size
     tw = self.twisted(vs, self.values[k])
@@ -404,14 +457,21 @@ class pfSections(ODFSections):
 
 
 class sigmaSections(pfSections):
+  """pole figure sections of the c axis split by the twist sigma of the a axis about it, the
+  sections MATLAB's sigma sections draw
+
+    oS = sigmaSections(cs, ss, sections=6)
+    oS = sigmaSections(cs, ss, sigma=np.arange(0, 60, 10)*degree)"""
   angleName = "sigma"
 
   @property
   def sigma(self):
+    """the sigma values of the sections"""
     return self.values
 
   @sigma.setter
   def sigma(self, values):
+    """sets the sigma values of the sections"""
     self.omega = values
 
 
@@ -458,17 +518,21 @@ class axisAngleSections(ODFSections):
 
   @property
   def angles(self):
+    """the rotation angles of the sections"""
     return self.values
 
   @property
   def outerSector(self):
+    """the sector the axes are drawn on, the conventional sector of the rotations both frames share"""
     return self.jointSector
 
   def sectionLabel(self, k):
+    """the title of section k, the rotation angle in degrees"""
     # three decimals at most, as MATLAB's xnum2str writes the angle
     return f"{_name('omega')} = {round(float(self.values[k] / degree), 3):g}°"
 
   def sectionCharts(self, k):
+    """the chart section k is drawn on, the axis sector the region allows at its angle"""
     return makeSphericalProjection(self.axesSectors[k], how2plot=self.pC)
 
   def sectionScale(self, k):
@@ -476,6 +540,8 @@ class axisAngleSections(ODFSections):
     return float(np.sin(np.max(self.values) / 2) / np.sin(self.values[k] / 2)) if self.volumeScaling else 1.0
 
   def sectionData(self, ori):
+    """where orientations fall: the rotation axes of their projections into the fundamental region,
+    the section of their angle and the index of the orientation"""
     p = ori.flatten().project2FundamentalRegion()
     q = p.data.reshape(-1, 4)
     k = sectionIndex(quatAngle(q), self.values, self.tol, np.inf)
@@ -486,6 +552,7 @@ class axisAngleSections(ODFSections):
     return axes, k[keep], np.flatnonzero(keep)
 
   def orientationsAt(self, k, vs):
+    """the orientations at axes vs rotated by the angle of section k"""
     return orientation.byAxisAngle(vector3d(vs.normalize().data), self.values[k], self.CS1, self.CS2)
 
 

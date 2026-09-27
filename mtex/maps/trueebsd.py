@@ -26,6 +26,7 @@ from ..geometry.spatialtransform import (spatialTransform, spatialTransformCompo
 from ..geometry.vector3d import vector3d
 from .mapimage import mapImage, mapImageList, edgeMap
 from .registration import pairShifts, xcfShift
+from ..geometry.display import aligned
 
 OPTIONS = ("roiSize", "numROI", "registerOn", "edgeWidth", "highContrast", "pixelTime")
 
@@ -78,6 +79,13 @@ def _pxStr(v):
 
 
 class trueEbsd:
+  """the alignment of a sequence of images and EBSD maps of one area, most distorted first and the
+  ground truth last, one unfitted spatial transform per hop; the methods alter the job
+
+    job = trueEbsd(imgList, T)
+    job.pixelSizeMatch()
+    job.calcDistortion('fitErr')
+    job.undistort()"""
 
   def __init__(self, imgList=None, T=None):
     self.imgList = mapImageList()
@@ -111,6 +119,8 @@ class trueEbsd:
 
   @T.setter
   def T(self, T):
+    """sets the hops, one spatial transform per pair of neighbouring maps, spatialTransformId where
+    nothing separates a pair"""
     T = [] if T is None else ([T] if isinstance(T, spatialTransform) else list(T))
     if not all(isinstance(t, spatialTransform) for t in T):
       raise TypeError("the hops of a trueEbsd job are spatial transforms")
@@ -380,7 +390,7 @@ class trueEbsd:
     head = f"trueEbsd ({self._stage()})"
     n = len(self.imgList)
     if n == 0:
-      return head + "\n  no maps here!"
+      return aligned(head + "\n  no maps here!")
     lst = self.undistortedList or self.resizedList or self.imgList
     rows = []
     for k in range(n):
@@ -394,7 +404,7 @@ class trueEbsd:
     if self.resizedList:
       d = self.resizedList[0]
       out += ["", f" common grid: {' × '.join(str(s) for s in d.img.shape)} at {d.dx:.4g} µm"]
-    return "\n".join(out)
+    return aligned("\n".join(out))
 
   def _hopStr(self, k, what):
     if k >= len(self.imgList) - 1:

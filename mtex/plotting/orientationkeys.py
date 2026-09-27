@@ -21,6 +21,7 @@ from ..geometry.representations import quat2euler
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, zvector
 from .directionkeys import HKLDirectionKey, HSVDirectionKey, TSLDirectionKey, hsv2rgb, rgb2hsv, spotDirectionKey
+from ..geometry.display import aligned, display, header
 
 
 def _framesOf(x, CS2=None):
@@ -47,17 +48,20 @@ class orientationColorKey:
 
   @property
   def CS(self):
+    """the crystal frame of the key, CS1"""
     return self.CS1
 
   @property
   def SS(self):
+    """the specimen frame of the key, CS2"""
     return self.CS2
 
   def orientation2color(self, ori):
+    """the colours of orientations, an (..., 3) array in [0, 1]; defined by every key"""
     raise NotImplementedError
 
   def __repr__(self):
-    return f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})"
+    return aligned(f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})")
 
 
 # ------------------------------------------------------------------ the inverse pole figure keys
@@ -124,9 +128,11 @@ class ipfColorKey(orientationColorKey):
 
   @property
   def whiteCenter(self):
+    """the white centre of the direction key"""
     return self.dirMap.whiteCenter
 
   def plot(self, **kwargs):
+    """the direction key drawn on its sector"""
     from .sphericalplot import plotKey
     return plotKey(self.dirMap, **kwargs)
 
@@ -148,24 +154,37 @@ class ipfHSVKey(ipfColorKey):
 
   @maxAngle.setter
   def maxAngle(self, value):
+    """sets the sharpness of the key on its direction key"""
     self.dirMap.maxAngle = float(value)
 
   @property
   def whiteCenter(self):
+    """the white centre of the key, a crystal direction"""
     return self.dirMap.whiteCenter
 
   @whiteCenter.setter
   def whiteCenter(self, value):
+    """sets the white centre of the key on its direction key"""
     self.dirMap.whiteCenter = vector3d(value).normalize()
 
 
 class ipfTSLKey(ipfColorKey):
+  """the inverse pole figure key of TSL / OIM, the TSLDirectionKey on the Laue group
+
+    key = ipfTSLKey(cs)
+    key = ipfTSLKey(ebsd['Iron'], ipfDirection=xvector)
+    rgb = key.orientation2color(ori)"""
 
   def __init__(self, x, ipfDirection=None):
     super().__init__(x, ipfDirection, TSLDirectionKey(_framesOf(x)[0]))
 
 
 class ipfHKLKey(ipfColorKey):
+  """the inverse pole figure key of HKL Channel 5, the HKLDirectionKey on the Laue group
+
+    key = ipfHKLKey(cs)
+    key = ipfHKLKey(ebsd['Iron'], ipfDirection=xvector)
+    rgb = key.orientation2color(ori)"""
 
   def __init__(self, x, ipfDirection=None):
     super().__init__(x, ipfDirection, HKLDirectionKey(_framesOf(x)[0]))
@@ -182,26 +201,32 @@ class ipfSpotKey(ipfColorKey):
 
   @property
   def center(self):
+    """the centres of the spots, crystal directions"""
     return self.dirMap.center
 
   @center.setter
   def center(self, value):
+    """sets the centres of the spots"""
     self.dirMap.center = value
 
   @property
   def color(self):
+    """the colours of the spots, one RGB row per centre"""
     return self.dirMap.color
 
   @color.setter
   def color(self, value):
+    """sets the colours of the spots, one RGB row per centre"""
     self.dirMap.color = np.asarray(value, dtype=float).reshape(-1, 3)
 
   @property
   def psi(self):
+    """the kernel the spots fade to white with"""
     return self.dirMap.psi
 
   @psi.setter
   def psi(self, value):
+    """sets the kernel the spots fade to white with"""
     self.dirMap.psi = value
 
 
@@ -228,6 +253,12 @@ class axisAngleColorKey(orientationColorKey):
     self.dirMapping = HSVDirectionKey(self.CS2)
 
   def orientation2color(self, ori, oriRef=None):
+    """the colours of orientations: the axis of the rotation from the reference through the key of
+    the sphere, its angle as the saturation, NaN above thresholdAngle; the reference given here
+    takes the place of the key's
+
+      rgb = key.orientation2color(ori)
+      rgb = key.orientation2color(ori, oriRef)"""
     ref = self.oriRef if oriRef is None else oriRef
     if ref is None:
       omega = np.asarray(ori.angle()).reshape(-1)
@@ -258,6 +289,8 @@ class BungeColorKey(orientationColorKey):
     self.phi1Range, self.PhiRange, self.phi2Range = eulerRegion(self.CS1, self.CS2)
 
   def orientation2color(self, ori):
+    """the colours of orientations, the Euler angles of the symmetric equivalent inside the Euler box
+    scaled to red, green and blue"""
     es = ori.flatten().symmetrise()
     q = es.data.reshape(es.shape[0], -1, 4)
     a, b, c = quat2euler(q, "Bunge")
@@ -291,6 +324,8 @@ class spotColorKey(orientationColorKey):
     self.psi = SO3DeLaValleePoussinKernel(halfwidth=10 * degree) if psi is None else psi
 
   def orientation2color(self, ori):
+    """the colours of orientations: white, multiplied for every centre by its colour faded with the
+    kernel of the disorientation to it"""
     if self.center is None:
       raise ValueError("the key has no centre yet; set key.center to an orientation")
     center = self.center.flatten()
@@ -326,6 +361,8 @@ class spectralTransmissionColorKey(orientationColorKey):
     self.phi = 90 * degree
 
   def orientation2color(self, ori):
+    """the colours of the thin section at the orientations, the transmitted spectrum of light along
+    the propagation direction between polariser and analyser"""
     from ..analysis.optics import spectralTransmission
     back = ori.inv()
     prop = back * self.propagationDirection
@@ -347,6 +384,10 @@ COLOR_NAN = np.array([1.0, 1.0, 1.0])
 
 
 class colorGrid:
+  """a direction key evaluated once on a cube map of the sphere at the resolution, its colours
+  then looked up at the node nearest a direction
+
+    g = colorGrid(key, resolution=0.5*degree)"""
 
   def __init__(self, key, resolution=COLOR_GRID_RESOLUTION):
     from .kernels import cubeMapNodes
@@ -368,6 +409,9 @@ class colorGrid:
     out = np.tile(COLOR_NAN, (len(xyz), 1))
     out[ind >= 0] = self.colors[ind[ind >= 0]]
     return out.reshape(np.shape(h)[:-1] + (3,) if not isinstance(h, vector3d) else h.shape + (3,))
+
+  def __repr__(self):
+    return display(header("colorGrid", type(self.key).__name__), [("resolution", f"{self.resolution / degree:.3g}°"), ("nodes", self.grid.size)])
 
 
 _GRIDS = {}

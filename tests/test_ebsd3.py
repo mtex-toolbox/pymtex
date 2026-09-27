@@ -23,7 +23,7 @@ def test_the_container_and_its_lattice():
   assert e.isGridded and e.shape == (4, 5, 6) and e.size == 120
   assert np.allclose(e.d1.data, [0.5, 0, 0]) and np.allclose(e.d3.data, [0, 0, 1]) and (e.dx, e.dy, e.dz) == (0.5, 0.5, 1.0)
   assert np.allclose(e.pos.data[1, 2, 3], [0.5, 1.0, 3.0]) and np.allclose(e.extent(), [0, 1.5, 0, 2, 0, 5])
-  assert np.all(np.isnan(e.N.data)) and "EBSD3" in repr(e) and "voxel: 0.5 x 0.5 x 1" in repr(e)
+  assert np.all(np.isnan(e.N.data)) and "EBSD3" in repr(e) and "voxel     : 0.5 × 0.5 × 1" in repr(e)
   # a voxel, a phase, a condition: lists that keep their lattice
   v = e[1, 2, 3]
   assert isinstance(v, EBSD3) and v.size == 1

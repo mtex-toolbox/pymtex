@@ -1201,6 +1201,8 @@ def _compileLoops():
 
 
 def pixelKernel(name):
+  """the compiled numba loop of the map's pixels named (gradient, kam, gnd, grod, window, ...),
+  compiled on first call; None without numba"""
   nb = _preparePixel()
   if nb is None:
     return None
@@ -1348,6 +1350,8 @@ _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_
 
 
 def grainKernel(name):
+  """the compiled numba loop of the segmentation and the grain table named (angleCriterion,
+  sumByGrain, relabel, ...), compiled on first call; None without numba"""
   nb = _preparePixel()
   if nb is None:
     return None

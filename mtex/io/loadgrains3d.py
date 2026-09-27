@@ -25,6 +25,11 @@ NEPER_SYMMETRY = {"triclinic": "1", "cubic": "m-3m", "hexagonal": "6/mmm", "-1":
 
 
 def loadGrains3d(fname, *args, interface=None, CS=None, noOrientFaces=False, **kwargs):
+  """the 3D grains of a file, MATLAB's grain3d.load: the surface mesh of a DREAM.3D file or the
+  polyhedra of a 3D Neper tessellation; the faces are oriented unless noOrientFaces=True
+
+    loadGrains3d('grains.dream3d')
+    loadGrains3d('grains.tess', CS=cs)"""
   ext = os.path.splitext(fname)[1].lower()
   interface = interface or {".tess": "neper", ".dream3d": "dream3d"}.get(ext)
   if interface == "neper":
@@ -41,6 +46,8 @@ def loadGrains3d(fname, *args, interface=None, CS=None, noOrientFaces=False, **k
 
 
 def loadGrains_Dream3d(fname, CS=None, noOrientFaces=False):
+  """the 3D grains of the surface mesh of a DREAM.3D file, the rotations those of the voxels, where
+  MATLAB's reader turns every grain away from them; the faces oriented unless noOrientFaces=True"""
   import h5py
   from scipy.sparse import csr_matrix
   from ..maps3d.grain3d import grain3d

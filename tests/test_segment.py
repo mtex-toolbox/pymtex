@@ -41,7 +41,7 @@ def test_S8_the_segmentation_marks_the_faces_it_separates(backend):
   # the criterion is evaluated once per face and the segmentation runs on it
   connect = faceConnectivity(c, e, gbcAngle(5 * degree))
   assert len(connect) == len(c) and np.array_equal(segmentFrom(c, e, connect, backend).grainId, seg.grainId)
-  assert "grains: 4" in repr(seg)
+  assert "grains     : 4" in repr(seg)
 
 
 # Markov clustering of the links (MATLAB's calcGrains(ebsd, 'mcl', [p maxIt])): the grains are

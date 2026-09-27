@@ -123,14 +123,17 @@ class _Problem:
     return self.project(np.array(h, dtype=complex))
 
   def values(self, xs, c):
+    """the real values of the function with the coefficients c at the nodes xs"""
     if self.plan is None:
       return np.real(sphericalSeries(c, vector3d(xs), real=True)) if self.sphere else np.real(wignerSeries(c, rotation(xs), real=True))
     return np.real(self.plan(c))
 
   def objective(self, d):
+    """the weighted squared norm sum beta |d|^2 of a coefficient difference d"""
     return float(np.sum(self.beta * np.abs(d) ** 2))
 
   def residual(self, xs, c):
+    """the objective and the coefficient residual of the nodes xs with the weights c against the target"""
     self.setNodes(xs)
     d = self.moment(xs, c) - self.target._fhat
     return self.objective(d), d

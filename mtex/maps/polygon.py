@@ -184,6 +184,7 @@ class polygonSet:
     return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
 
   def inpolygon(self, xy):
+    """the positions of the outlines holding at least one of the points xy"""
     return np.flatnonzero(self.checkInside(xy).any(axis=0))
 
   @property
@@ -199,10 +200,12 @@ class polygonSet:
 
   @property
   def perimeterWithInclusion(self):
+    """the length of all loops of an outline, the outer loop and those around its inclusions"""
     return loopSums(self.V, self.loops, self.size)[:, 2]
 
   @property
   def boundarySize(self):
+    """the number of vertices on the loops of an outline, the holes included"""
     return np.array([sum(len(l) for l in ls) for ls in self.loops], dtype=np.int32)
 
   @property
@@ -216,10 +219,12 @@ class polygonSet:
 
   @property
   def equivalentRadius(self):
+    """the radius of the disc of the same area, sqrt(area / pi)"""
     return np.sqrt(np.maximum(self.area, 0) / np.pi)
 
   @property
   def equivalentPerimeter(self):
+    """the perimeter of the disc of the same area, 2 pi times the equivalent radius"""
     return 2 * np.pi * self.equivalentRadius
 
   @property
@@ -235,6 +240,7 @@ class polygonSet:
 
   @property
   def hasHole(self):
+    """whether an outline has holes, one entry per outline"""
     return np.array([len(ls) > 1 for ls in self.loops], dtype=bool)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)

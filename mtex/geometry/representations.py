@@ -35,6 +35,8 @@ EULER_LABELS = {
 
 
 def eulerConvention(name=None):
+  """the canonical name of an Euler angle convention - Bunge, Matthies, Roe, Kocks or Canova - from
+  any of its names; by default the preference EulerAngleConvention"""
   name = getMTEXpref("EulerAngleConvention") if name is None else name
   try:
     return EULER_CONVENTIONS[str(name).lower()]
@@ -79,6 +81,8 @@ def eulerTriple(a, b, c, rest):
 
 
 def euler2quat(a, b, c, convention=None):
+  """the quaternion coefficients of Euler angles in a convention, by default the preference
+  EulerAngleConvention"""
   return matthies2quat(*toMatthies(eulerConvention(convention), a, b, c))
 
 
@@ -146,11 +150,14 @@ def quatAxis(q):
 # ------------------------------------------------------------------ Rodrigues
 
 def quat2rodrigues(q):
+  """the Rodrigues vectors of quaternion coefficients, the vector part over the scalar part"""
   a = np.where(q[..., 0] == 0, 1e-100, q[..., 0])
   return q[..., 1:] / a[..., None]
 
 
 def rodrigues2quat(xyz):
+  """the quaternion coefficients of Rodrigues vectors, the axis the direction and the angle
+  2 arctan of the length"""
   xyz = np.asarray(xyz, dtype=float)
   return axis2quat(xyz, 2 * np.arctan(np.linalg.norm(xyz, axis=-1)))
 
@@ -158,6 +165,7 @@ def rodrigues2quat(xyz):
 # ------------------------------------------------------------------ matrices
 
 def quat2mat(q):
+  """the rotation matrices of quaternion coefficients, shape (..., 3, 3)"""
   a, b, c, d = np.moveaxis(q, -1, 0)
   M = np.empty(q.shape[:-1] + (3, 3), dtype=q.dtype)
   M[..., 0, 0] = 2 * b * b + 2 * a * a - 1

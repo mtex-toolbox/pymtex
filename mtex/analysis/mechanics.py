@@ -36,6 +36,7 @@ def _unit(v):
 # ------------------------------------------------------------------ stress and strain
 
 def meanStress(sigma):
+  """the mean stress, a third of the trace of the stress tensor"""
   return sigma.trace() / 3
 
 
@@ -49,11 +50,13 @@ deviatoricStrain = deviatoric
 
 
 def equivalentStress(sigma):
+  """the von Mises equivalent stress, sqrt(3/2 s:s) of the deviatoric stress s"""
   s = deviatoric(sigma)
   return np.sqrt(1.5 * np.sum(s.data * s.data, axis=-1))
 
 
 def equivalentStrain(eps):
+  """the von Mises equivalent strain, sqrt(2/3 e:e) of the deviatoric strain e"""
   e = deviatoric(eps)
   return np.sqrt(2 / 3 * np.sum(e.data * e.data, axis=-1))
 
@@ -158,10 +161,12 @@ def _pureShearDeformation(ext, comp, lam=2.0):
 
 
 def CauchyStrain(F):
+  """the Cauchy (small) strain of a deformation gradient, its symmetric part less the identity"""
   return strainTensor((F.sym().M - np.eye(3)), F.frame)
 
 
 def GreenStrain(F):
+  """the Green-Lagrange strain of a deformation gradient, (F^T F - I) / 2"""
   return strainTensor(((F.transpose() * F).M - np.eye(3)) / 2, F.frame)
 
 
@@ -185,23 +190,29 @@ def strainRate(L):
 
 
 def spin(L):
+  """the spin tensor of a velocity gradient, its antisymmetric part"""
   return spinTensor(L.antiSym().M, L.frame)
 
 
 def angularVelocityVector(L):
+  """the angular velocity of a velocity gradient, the axial vector of its antisymmetric part"""
   W = L.antiSym().M
   return vector3d(np.stack([W[..., 2, 1], W[..., 0, 2], W[..., 1, 0]], axis=-1), frame=L.frame)
 
 
 def strainRateMagnitude(L):
+  """the magnitude of the strain rate of a velocity gradient, half its largest absolute principal
+  value, or half its largest singular value when the tensor is not symmetric"""
   return 0.5 * np.max(np.abs(L.sym().eigvals()), axis=-1) if L.isSymmetric else 0.5 * np.max(np.linalg.svd(L.M, compute_uv=False), axis=-1)
 
 
 def rotationRate(L):
+  """the rotation rate of a velocity gradient, the length of its angular velocity vector"""
   return angularVelocityVector(L).norm()
 
 
 def vorticity(L):
+  """the vorticity of a velocity gradient, its rotation rate over the magnitude of its strain rate"""
   return rotationRate(L) / strainRateMagnitude(L)
 
 
@@ -211,6 +222,7 @@ def spinVector(W):
 
 
 def spinTensorOf(v, frame=None):
+  """the spin tensor of an axial vector v, the antisymmetric tensor W with W u = v x u"""
   return spinTensor(v, frame=frame) if frame is not None else spinTensor(v)
 
 
@@ -227,6 +239,7 @@ def dislocationDensity(kappa):
 
 
 def curvature(alpha):
+  """the curvature tensor of a dislocation density tensor by Nye's relation, kappa = alpha^T - tr(alpha) I / 2"""
   A = alpha.M
   return curvatureTensor(np.swapaxes(A, -1, -2) - 0.5 * np.trace(A, axis1=-2, axis2=-1)[..., None, None] * np.eye(3), alpha.frame,
                          unit=alpha.unit)

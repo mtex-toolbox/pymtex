@@ -19,6 +19,10 @@ PREVIEW_POINTS = 100_000   # the measurements a preview density is estimated fro
 
 
 def binnedDensity(ori, cell=4 * degree, halfwidth=None, **kwargs):
+  """the density of orientations for the preview: above 500 of them merged onto a grid of their
+  Euler angles, one weighted representative per cell, the halfwidth 10 degrees unless given
+
+    binnedDensity(ori, cell=4*degree)"""
   from ..functions.density import calcDensity
   # binned counts are no sample to select a halfwidth from: MATLAB's 10 degrees
   halfwidth = 10 * degree if halfwidth is None else halfwidth

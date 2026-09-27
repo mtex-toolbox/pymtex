@@ -55,6 +55,13 @@ def _frames(args, CS, SS):
 
 def loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=None, radians=False, halfwidth=None, resolution=None,
                     **kwargs):
+  """the ODF of a table of Euler angles and one more column: 'interp' fits a function through the
+  values there, 'density' centres kernels of those masses, else varying values mean 'interp';
+  the angles are degrees when one exceeds 15 unless radians=True
+
+    loadODF_generic(fname, CS=cs, SS=ss)
+    loadODF_generic(fname, cs, 'density', halfwidth=10*degree)
+    loadODF_generic(fname, cs, 'Bunge', columnNames=['phi1', 'Phi', 'phi2', 'weights'])"""
   CS, SS = _frames(args, CS, SS)
   if CS is None:
     raise ValueError("no crystal symmetry specified: SO3Fun.load(fname, CS=cs, ...)")
@@ -93,6 +100,9 @@ VPSC_CONVENTIONS = {"B": "Bunge", "K": "Kocks", "R": "Roe"}
 
 
 def loadODF_VPSC(fname, *args, CS=None, **kwargs):
+  """the ODF of a VPSC texture file, one density per block of weighted orientations, a list for
+  several; the strain and the ellipsoid of each block kept in odf.opt, the crystal frame cubic
+  unless given"""
   from ..functions.density import calcDensity
   CS, SS = _frames(args, CS, None)
   CS = crystalFrame("432") if CS is None else CS

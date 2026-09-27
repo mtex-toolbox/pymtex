@@ -20,6 +20,7 @@ from ..geometry.units import degree
 from .kernelfunctions import S1GaussKernel, S1Kernel
 from .quadrature import quadratureS1Grid
 from .transforms import fourierSeries, fourierSeriesAdjoint, isRealFourier
+from ..geometry.display import aligned
 
 
 def _complexType(dtype):
@@ -33,6 +34,12 @@ def realizeFourier(chat):
 
 
 class S1FunHarmonic:
+  """a function on the circle by its Fourier coefficients fhat, k = -L..L, over e^{-ikx} as MATLAB's
+
+    S1FunHarmonic(fhat)
+    S1FunHarmonic(fun, bandwidth=L)     the coefficients of a callable by quadrature
+    S1FunHarmonic(psi, bandwidth=L)     the coefficients of an S1 kernel
+    S1FunHarmonic(f, bandwidth=L)       another function truncated, or any with a harmonic form"""
 
   def __init__(self, fhat, *, real=None, bandwidth=None, dtype=None):
     if not isinstance(fhat, S1FunHarmonic) and hasattr(fhat, "_harmonicS1"):
@@ -102,6 +109,8 @@ class S1FunHarmonic:
 
   @classmethod
   def quadrature(cls, x, values=None, *, bandwidth=None, weights=None, real=None):
+    """the Fourier series of values at the angles x by quadrature with the weights given, or of a
+    callable; the bandwidth defaults to the preference maxS1Bandwidth"""
     if callable(x) and values is None:
       return cls(x, bandwidth=bandwidth, real=real)
     L = getMTEXpref("maxS1Bandwidth") if bandwidth is None else int(bandwidth)
@@ -112,6 +121,7 @@ class S1FunHarmonic:
 
   @property
   def bandwidth(self):
+    """the bandwidth L, the largest frequency of the coefficients"""
     return (len(self.fhat) - 1) // 2
 
   @property
@@ -126,15 +136,18 @@ class S1FunHarmonic:
 
   @property
   def odd(self):
+    """whether f(x) = -f(-x): c_{-k} = -c_k"""
     return bool(np.allclose(self.fhat, -self.fhat[::-1]))
 
   def truncate(self, L):
+    """the function cut, or padded with zeros, to the bandwidth L"""
     return self if L == self.bandwidth else self._rebuild(_cut(self.fhat, L))
 
   def __call__(self, x):
     return self.eval(x)
 
   def eval(self, x):
+    """the values at the angles x"""
     return fourierSeries(self.fhat[::-1], x, real=self.isReal)
 
   def diff(self):
@@ -143,6 +156,7 @@ class S1FunHarmonic:
     return S1FunHarmonic(-1j * k * self.fhat, real=self.isReal)
 
   def grad(self, x=None):
+    """the derivative as a function, or its values at the angles x"""
     return self.diff() if x is None else self.diff()(x)
 
   def rotate(self, phi):
@@ -165,6 +179,7 @@ class S1FunHarmonic:
     return S1FunHarmonic(c * self.fhat, real=self.isReal)
 
   def conj(self):
+    """the complex conjugate function"""
     return self._rebuild(np.conj(self.fhat[::-1]))
 
   def __add__(self, g):
@@ -218,33 +233,41 @@ class S1FunHarmonic:
     return mapFun(np.abs, self, bandwidth=smoothBandwidth(self))
 
   def abs(self):
+    """the pointwise absolute value, a Fourier series of a smoothing bandwidth"""
     return abs(self)
 
   def sqrt(self):
+    """the pointwise square root, a Fourier series of a smoothing bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
 
   def exp(self):
+    """the pointwise exponential, a Fourier series of a smoothing bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
 
   def log(self):
+    """the pointwise logarithm, a Fourier series of a smoothing bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
 
   def mean(self):
+    """the mean over the circle, the coefficient c_0"""
     x = self.fhat[self.bandwidth]
     return x.real if self.isReal else x
 
   def norm(self):
+    """the L2 norm for the normalised measure, the Euclidean norm of the coefficients"""
     return float(np.linalg.norm(self.fhat))
 
   def dot(self, g):
+    """the inner product with g for the normalised measure, by the coefficients"""
     L = max(self.bandwidth, g.bandwidth)
     x = np.vdot(self.truncate(L).fhat, g.truncate(L).fhat)
     return x.real if self.isReal and g.isReal else x
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
+    """whether the coefficients of g agree within atol + rtol times their norm"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L).fhat, g.truncate(L).fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
@@ -271,16 +294,18 @@ class S1FunHarmonic:
     return 2 * np.pi * self.mean()
 
   def max(self, resolution=0.25 * degree):
+    """the largest value and the angle it is taken at, sampled at the resolution and refined"""
     return self._extremum(1, resolution)
 
   def min(self, resolution=0.25 * degree):
+    """the smallest value and the angle it is taken at, sampled at the resolution and refined"""
     return self._extremum(-1, resolution)
 
   def __repr__(self):
     lines = ["S1FunHarmonic", f"  bandwidth: {self.bandwidth}", f"  mean: {self.mean():.4g}"]
     if not self.isReal:
       lines.append("  isReal: false")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

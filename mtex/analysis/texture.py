@@ -25,6 +25,8 @@ from ..geometry.vector3d import vector3d
 from .taylor import TaylorModel, _taylorCrystal, calcTaylor
 from ..tensors.tensor import strainTensor, tensor
 from ..geometry.install import install
+from ..geometry.display import framesLabel
+from ..geometry.display import aligned
 
 AVERAGES = ("Voigt", "Reuss", "Hill", "all")
 
@@ -235,9 +237,9 @@ def SO3FunSBF(sS, E, bandwidth=None):
   class _SBF(SO3FunHandle):
     def __repr__(self):
       lam = np.round(np.real(E.eig()[0])[::-1], 4)
-      return "\n".join([f"SO3FunSBF ({self.CS.char()} → {self.SS.char()})",
+      return aligned("\n".join([f"SO3FunSBF ({framesLabel(self.CS, self.SS)})",
                         f"  slip system: {sS.n.char()}{sS.b.char()}",
-                        "  strain:      " + " ".join(f"{x:g}" for x in lam)])
+                        "  strain:      " + " ".join(f"{x:g}" for x in lam)]))
 
   cs = sS.CS
   if not isinstance(cs, crystalFrame):

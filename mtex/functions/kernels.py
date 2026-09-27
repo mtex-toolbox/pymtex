@@ -92,6 +92,8 @@ def _badNodes(p, count):
 
 
 def so3Nodes(q, folds=(1, 1), shift=0):
+  """the NUFFT nodes of quaternions, (rA gamma, rB alpha, beta) of their Matthies angles folded by
+  the z folds, the phase e^{-i s x} of the shift and the mask of the nodes not finite, or None"""
   q = np.ascontiguousarray(q.reshape(-1, 4))
   x, y, z = (np.empty(len(q), dtype=q.dtype) for _ in range(3))
   phase = np.empty(len(q), dtype=_complexType(q.dtype))
@@ -130,6 +132,8 @@ def _s2NodesNumpy(v, s, x, y, phase):
 
 
 def s2Nodes(xyz, shift=0):
+  """the NUFFT nodes of directions, (-rho mod 2 pi, theta), the phase e^{-i s x} of the shift and
+  the mask of the nodes not finite, or None"""
   v = np.ascontiguousarray(xyz.reshape(-1, 3))
   x, y = (np.empty(len(v), dtype=v.dtype) for _ in range(2))
   phase = np.empty(len(v), dtype=_complexType(v.dtype))
@@ -260,6 +264,7 @@ def _dispatch(name, loop, numpyForm, F, *args):
 
 
 def realDefectWigner(fhat, tol=1e-10):
+  """whether SO(3) coefficients miss the conjugate symmetry of a real function by more than tol"""
   F = _rows(fhat)
   if F.dtype.kind != "c":
     F = F.astype(_complexType(F.dtype))
@@ -267,6 +272,7 @@ def realDefectWigner(fhat, tol=1e-10):
 
 
 def realDefectSpherical(fhat, tol=1e-10):
+  """whether spherical coefficients miss the conjugate symmetry of a real function by more than tol"""
   F = _rows(fhat)
   if F.dtype.kind != "c":
     F = F.astype(_complexType(F.dtype))
@@ -283,6 +289,7 @@ def realizeWigner(fhat):
 
 
 def realizeSpherical(fhat):
+  """the spherical coefficients of the real part of the function, in place on a complex array"""
   F = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
   _dispatch("realizeSpherical", _realizeSphericalLoop, _realizeSphericalNumpy, F, math.isqrt(F.shape[1]) - 1)
   if not fhat.flags.c_contiguous:
@@ -299,6 +306,7 @@ def realizeSpherical(fhat):
 
 
 def quadrantOffset(n):
+  """the offset of degree n in the flat table of the quadrants j, k >= 0 of d_n(pi/2)"""
   return n * (n + 1) * (2 * n + 1) // 6
 
 
@@ -477,11 +485,15 @@ def _wignerAdjointLoop(fhat, H, T, L, real, rA, rB, order):
 
 
 def wignerForward(G, fhat, T, L, real, folds):
+  """the compiled Wigner transform onto the Fourier grid G over the degrees, from the quadrant
+  table of d(pi/2), parallel over the planes l, the z folds of both sides applied"""
   rA, rB = folds
   _parallel("wignerForward", _wignerForwardLoop)(G, fhat, T, L, bool(real), int(rA), int(rB), planeOrder(real, L // rA))
 
 
 def wignerAdjoint(fhat, H, T, L, real, folds):
+  """the compiled adjoint Wigner transform from the Fourier grid H into the coefficients fhat, from
+  the quadrant table of d(pi/2), parallel over the planes l, the z folds of both sides applied"""
   rA, rB = folds
   _parallel("wignerAdjoint", _wignerAdjointLoop)(fhat, H, T, L, bool(real), int(rA), int(rB), planeOrder(real, L // rA))
 
@@ -577,6 +589,8 @@ _ROW_TABLES = {}
 
 
 def rowTables(L, dtype=np.float64):
+  """the recursion factors and the rows 0 of d_n(pi/2) the spherical transforms need up to degree L,
+  held per precision and grown on demand"""
   dtype = np.dtype(dtype)
   held = _ROW_TABLES.get(dtype.name)
   if held is None or held[0] < L:
@@ -677,6 +691,8 @@ def _sphericalAdjointLoop(fhat, H, X, Y, R0, L, real, order):
 
 
 def sphericalForward(fhat, L, real, cdtype):
+  """the compiled spherical transform of coefficients of bandwidth L onto the Fourier grid G over the
+  orders and the rows of d(pi/2), parallel over the orders"""
   X, Y, R0 = rowTables(L, np.dtype(cdtype).type(0).real.dtype)
   G = np.empty((L + 1 if real else 2 * L + 1, 2 * L + 1), dtype=cdtype)
   _parallel("sphericalForward", _sphericalForwardLoop)(G, fhat, X, Y, R0, L, bool(real), orderOrder(L))
@@ -684,6 +700,8 @@ def sphericalForward(fhat, L, real, cdtype):
 
 
 def sphericalAdjoint(H, L, real):
+  """the compiled adjoint spherical transform from the Fourier grid H into the coefficients of
+  bandwidth L, parallel over the orders"""
   X, Y, R0 = rowTables(L, H.real.dtype)
   fhat = np.empty((L + 1) ** 2, dtype=H.dtype)
   _parallel("sphericalAdjoint", _sphericalAdjointLoop)(fhat, H, X, Y, R0, L, bool(real), orderOrder(L))
@@ -808,6 +826,8 @@ def _wignerdLoop(T, L, x, s, c):
 
 
 def wignerdTable(beta, L):
+  """the Wigner-d matrices d_0(beta) .. d_L(beta) as one flat table, degree n at deg2dim(n), from
+  the compiled recursion"""
   T = np.empty(max(1, (L + 1) * (2 * L + 1) * (2 * L + 3) // 3))
   x, s, c = math.cos(beta), math.sin(beta / 2), math.cos(beta / 2)
   _parallel("wignerd", _wignerdLoop)(T, L, x, s, c)
@@ -855,6 +875,8 @@ SAMPLE_CHUNK = 1 << 20
 
 
 def rbfSample(n, rng, cs, probs, omega, cdf, L, R, antipodal):
+  """n random quaternions from a radial basis function: a centre by its weight or the uniform part,
+  the angle from the kernel's distribution, a uniform axis and a random symmetry on both sides"""
   out = np.empty((n, 4))
   cumP = np.cumsum(probs / probs.sum())
   loop = _parallel("rbfSample", _rbfSampleLoop)

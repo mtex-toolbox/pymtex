@@ -33,6 +33,7 @@ from ..functions.polefigure import PoleFigure, calcError, calcQuadratureWeights
 from ..functions.rbf import SO3FunRBF, uniformODF
 from ..functions.s2fun import S2FunHarmonic
 from ..functions.transforms import S2FourierPlan
+from ..geometry.display import display, framesLabel, header
 
 
 # ------------------------------------------------------------------ the forward operator
@@ -121,6 +122,11 @@ class zeroRangeMethod:
       self._h.append(vector3d(hs, frame=pf.CS))
 
   def checkZeroRange(self, x, i=None):
+    """which orientations the zero range method rules out: those some pole figure is zero at in
+    one of their symmetric poles; with i, which directions the i-th pole figure is zero at
+
+      zrm.checkZeroRange(ori)
+      zrm.checkZeroRange(v, i)"""
     if i is not None:
       v = vector3d(x.flatten().normalize().data)
       d = np.real(self.density[i](v))
@@ -135,6 +141,9 @@ class zeroRangeMethod:
         v = q * vector3d(hs[k].data.reshape(3))
         isZero |= self.checkZeroRange(v, i)
     return isZero
+
+  def __repr__(self):
+    return display("zeroRangeMethod", [("pole figures", self.pf.numPF), ("kernel", self.psi), ("threshold", f"{self.threshold:.4g}")])
 
 
 # ------------------------------------------------------------------ the solver
@@ -181,10 +190,12 @@ class MLSSolver:
 
   @property
   def CS(self):
+    """the crystal frame of the pole figures the solver inverts"""
     return self.pf.CS
 
   @property
   def SS(self):
+    """the specimen frame of the pole figures the solver inverts"""
     return self.pf.SS
 
   def init(self):
@@ -347,6 +358,10 @@ class MLSSolver:
       self.iterate()
       self.alpha[:n] = alpha
     return self.odf
+
+  def __repr__(self):
+    return display(header("MLSSolver", framesLabel(self.pf.CS, self.pf.SS)),
+                   [("pole figures", self.pf.numPF), ("kernel", self.psi), ("grid", f"{self.S3G.size} orientations")])
 
 
 def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, iterMin=5, iterMax=10, c0=None,

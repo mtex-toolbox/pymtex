@@ -25,6 +25,8 @@ def _jit():
 
 
 def backend():
+  """the backend of the compiled kernels, 'numba' when the preference 'kernels' asks for it and numba
+  is installed, else 'numpy'"""
   return "numba" if getMTEXpref("kernels", "numba") == "numba" and _jit() else "numpy"
 
 
@@ -35,6 +37,8 @@ _physicalCores = None
 
 
 def threads():
+  """the number of threads a parallel kernel takes: the preference 'threads', else the physical cores
+  this process may run on"""
   n = getMTEXpref("threads")
   if n:
     return int(n)
@@ -92,6 +96,11 @@ def _openblasLibraries():
 
 
 class blasThreads:
+  """a context in which every OpenBLAS the process has loaded runs on n threads, restored on leaving;
+  it does nothing where no OpenBLAS is found
+
+    with blasThreads(1):
+      ..."""
 
   def __init__(self, n):
     self.n = int(n)
@@ -380,6 +389,9 @@ def _symReduceNumpy(q1, q2, L, R, exchange):
 
 
 def symReduce(q1, q2, L, R, exchange=False):
+  """the pair search of the symmetry reduction: for each pair of quaternions the largest |<q1, l q2 r>|
+  over l in L and r in R, and inv(q2) too with exchange, with the l, r and whether the inverse
+  attained it"""
   q1, q2 = np.broadcast_arrays(q1, q2)
   shape = q1.shape[:-1]
   q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
@@ -449,6 +461,8 @@ def _closestImageNumpy(q1, q2, L, R, exchange):
 
 
 def closestImage(q1, q2, L, R, exchange=False):
+  """the pair search of symReduce with the image it chose: for each pair the largest |<q1, l q2 r>|
+  and the image l q2 r, of inv(q2) under exchange, signed so that its dot with q1 is nonnegative"""
   q1, q2 = np.broadcast_arrays(q1, q2)
   shape = q1.shape[:-1]
   q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
@@ -536,6 +550,9 @@ def _projectToRefNumpy(qs, es, frm, L, R, ref, common, cimgs):
 
 
 def projectToRef(qs, es, frm, L, R, ref, common=None, cimgs=None):
+  """every rotation moved to its symmetric equivalent closest to one reference: the nearest of the
+  reference's images es, whose (l, r, inverse) frm names, gives the representative; around the
+  identity the conjugate by the shared rotation common whose image cimgs lies nearest decides"""
   shape = qs.shape[:-1]
   qs = np.ascontiguousarray(qs, dtype=np.float64).reshape(-1, 4)
   es, frm = np.ascontiguousarray(es, dtype=np.float64), np.ascontiguousarray(frm, dtype=np.int64)
@@ -644,6 +661,9 @@ def _projectIntoSectorNumpy(xyz, els, N, alpha, regionAnti, vAnti, tol):
 
 
 def projectIntoSector(xyz, els, N, alpha, regionAnti=False, vAnti=False, tol=1e-4):
+  """every direction moved into a region by the group: the first image inside the planes N with
+  offsets alpha, else the image missing it by least within the tolerance, else the direction
+  itself; els holds the elements as quaternions with their parity as a fifth coordinate"""
   shape = xyz.shape[:-1]
   xyz = np.ascontiguousarray(xyz, dtype=np.float64).reshape(-1, 3)
   els = np.ascontiguousarray(els, dtype=np.float64).reshape(-1, 5)
@@ -662,6 +682,8 @@ def projectIntoSector(xyz, els, N, alpha, regionAnti=False, vAnti=False, tol=1e-
 
 
 def projectDirections(xyz, imgs, q, parity):
+  """every direction moved into a sector: the element whose image of the centre, imgs, is closest to
+  the direction applied inversely, times its parity"""
   shape = xyz.shape[:-1]
   xyz = np.ascontiguousarray(xyz, dtype=np.float64).reshape(-1, 3)
   imgs, q = np.ascontiguousarray(imgs, dtype=np.float64), np.ascontiguousarray(q, dtype=np.float64)

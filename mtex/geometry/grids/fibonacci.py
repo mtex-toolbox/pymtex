@@ -8,9 +8,15 @@ from scipy import sparse
 
 from ..units import degree
 from ..vector3d import vector3d
+from ..display import display
 
 
 class fibonacciS2Grid(vector3d):
+  """the spherical Fibonacci grid: N = 2n + 1 points along a spiral, z linear in the index and
+  the azimuth advancing by the golden angle; by default the count fitting a resolution of 5 degree
+
+    S2G = fibonacciS2Grid(1000)
+    S2G = fibonacciS2Grid(resolution=2*degree)"""
 
   def __init__(self, N=None, resolution=None):
     # the count MATLAB fits to the resolution, rounded once to the half count
@@ -35,6 +41,7 @@ class fibonacciS2Grid(vector3d):
 
   @property
   def resolution(self):
+    """the resolution of the grid, the spacing its number of points gives"""
     return np.sqrt(np.exp(2.512) / self.size)
 
   # the indices with |z - z_i| <= dz, a contiguous range since z_i falls with the index
@@ -45,6 +52,7 @@ class fibonacciS2Grid(vector3d):
     return np.arange(lo, hi + 1)
 
   def neighbourIndices(self, v, eps):
+    """the indices of the grid points within the angle eps of the direction v"""
     d = (v if isinstance(v, vector3d) else vector3d(v)).normalize().data
     band = self._zBand(d[2], 2 * np.sin(eps / 2))
     return band[self.data[band] @ d >= np.cos(eps)]
@@ -69,6 +77,11 @@ class fibonacciS2Grid(vector3d):
         return int(np.argmax(self.data @ d))
 
   def find(self, v, eps=None):
+    """the nearest grid point of every direction and its angle, or with eps the sparse matrices of
+    the points within eps and their angles
+
+      ind, d = S2G.find(v)
+      I, d = S2G.find(v, eps)"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:
@@ -87,7 +100,7 @@ class fibonacciS2Grid(vector3d):
     return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape), sparse.csr_matrix((vals, (rows, cols)), shape=shape)
 
   def __repr__(self):
-    return f"fibonacciS2Grid\n  points: {self.size}\n  resolution: {self.resolution / degree:.4g}°"
+    return display("fibonacciS2Grid", [("points", self.size), ("resolution", f"{self.resolution / degree:.4g}°")])
 
 
 __all__ = ["fibonacciS2Grid"]

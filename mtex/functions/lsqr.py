@@ -15,6 +15,11 @@ import numpy as np
 
 
 def lsqr(A, At, b, n, tol=1e-6, maxit=20):
+  """the least squares solution of A x = b by LSQR of Paige and Saunders with MATLAB's stopping
+  rules, A and At applying the matrix and its adjoint, n the length of x: the tuple
+  (x, flag, relres, iterations), flag 1 when the iterations ran out
+
+    x, flag, relres, it = lsqr(A, At, b, n, tol=1e-6, maxit=20)"""
   b = np.asarray(b)
   normb = float(np.linalg.norm(b))
   # the bidiagonalisation of Golub and Kahan, started at b

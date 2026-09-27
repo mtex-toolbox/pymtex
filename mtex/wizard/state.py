@@ -11,6 +11,7 @@ import os
 from dataclasses import dataclass
 
 from ..geometry.plottingconvention import AXIS_CONVENTIONS
+from ..geometry.display import aligned
 
 
 @dataclass
@@ -25,6 +26,8 @@ class FileRow:
 
 
 class WizardState:
+  """everything the import wizard shows: the browser, the map and its load arguments, the frames
+  and the views; callbacks change it and announce the fields through changed()"""
 
   def __init__(self, folder=None):
     # the browser
@@ -69,6 +72,7 @@ class WizardState:
     self._hooks.setdefault(name, []).append(fn)
 
   def changed(self, *names):
+    """the hooks of the named fields run, the announcement of a change"""
     for n in names:
       for fn in self._hooks.get(n, ()):
         fn()
@@ -77,14 +81,17 @@ class WizardState:
 
   @property
   def conventions(self):
+    """the axis conventions the map and the Euler frames are chosen from"""
     return AXIS_CONVENTIONS
 
   @property
   def currentTab(self):
+    """the view of the tab shown, None when there is none"""
     return self.tabs[self.tab] if 0 <= self.tab < len(self.tabs) else None
 
   @property
   def hasMap(self):
+    """whether a map has been imported"""
     return self.ebsd is not None
 
   def __repr__(self):
@@ -94,7 +101,7 @@ class WizardState:
     if self.ebsd is not None:
       lines.append(f"  map: {self.ebsd.size} points, tab {self.currentTab!r}")
       lines.append(f"  map coordinates {AXIS_CONVENTIONS[self.mapConvention]}, Euler coordinates {AXIS_CONVENTIONS[self.eulerConvention]}")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
 
 __all__ = ["WizardState", "FileRow"]

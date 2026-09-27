@@ -34,6 +34,8 @@ QUADRATURE_BANDWIDTH = 250
 
 
 def quadratureBandwidth():
+  """the bandwidth a callable or scattered values are expanded to when none is asked for, 250
+  within the preference maxS2Bandwidth"""
   return min(QUADRATURE_BANDWIDTH, getMTEXpref("maxS2Bandwidth"))
 
 
@@ -81,6 +83,13 @@ def projectSpherical(fhat, pg):
 
 
 class S2FunHarmonic:
+  """a function on the sphere by its spherical harmonic coefficients, or a list of such functions;
+  symmetrised by the group of its frame, even when antipodal
+
+    S2FunHarmonic(fhat)                         MTEX's coefficients
+    S2FunHarmonic(fhat, cs, antipodal=True)
+    S2FunHarmonic(lambda v: v.z**2, bandwidth=16)     a callable expanded by quadrature
+    S2FunHarmonic(psi)                          a kernel on the sphere"""
   # NumPy leaves the arithmetic with a function to the function, not reading it as a sequence
   __array_ufunc__ = None
 
@@ -179,11 +188,14 @@ class S2FunHarmonic:
 
   @classmethod
   def interpolate(cls, nodes, values, **kwargs):
+    """S2FunHarmonic.interpolate(v, y) is interpolate(v, y): the function of least squares through
+    the values y at the directions v"""
     from .density import interpolate
     return interpolate(nodes, values, **kwargs)
 
   @property
   def CS(self):
+    """the frame of the function, MATLAB's sF.CS"""
     return self.frame
 
   @property
@@ -200,10 +212,12 @@ class S2FunHarmonic:
 
   @fhat.setter
   def fhat(self, value):
+    """the coefficients in MTEX's basis, as MATLAB's sF.fhat reads and assigns them"""
     self._fhat = mtexCoefficientsS2(np.asarray(value, dtype=self._fhat.dtype))
 
   @property
   def bandwidth(self):
+    """the bandwidth, the highest degree of the coefficients"""
     return math.isqrt(self._fhat.shape[-1]) - 1
 
   @bandwidth.setter
@@ -218,6 +232,7 @@ class S2FunHarmonic:
 
   @property
   def size(self):
+    """the number of functions in a list, 1 for one function"""
     return int(np.prod(self.shape))
 
   def __len__(self):
@@ -230,6 +245,7 @@ class S2FunHarmonic:
     return self._rebuild(fhat if fhat.ndim else fhat.reshape(1))
 
   def reshape(self, *shape):
+    """the list of functions in another shape"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
@@ -244,6 +260,10 @@ class S2FunHarmonic:
 
   @classmethod
   def cat(cls, *fs, axis=0):
+    """the functions joined into one list along an axis, cut or padded to the largest bandwidth
+
+      S2FunHarmonic.cat(f, g)
+      S2FunHarmonic.cat(f, g, axis=1)"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -252,6 +272,8 @@ class S2FunHarmonic:
 
   @property
   def power(self):
+    """the power of every degree, the norm of the coefficients of that degree, as an array of
+    length bandwidth + 1 per function"""
     return np.stack([np.linalg.norm(self._fhat[..., l * l:(l + 1) ** 2], axis=-1) for l in range(self.bandwidth + 1)], axis=-1)
 
   def truncate(self, L=None):
@@ -282,6 +304,8 @@ class S2FunHarmonic:
     return self.eval(x)
 
   def eval(self, x):
+    """the function at directions, or at the nodes of a quadrature grid; a list of functions
+    adds its shape after that of the directions"""
     v = x if isinstance(x, quadratureS2Grid) else self._vectorsFor(x).normalize()
     if not self.shape:
       return sphericalSeries(self._fhat, v, real=self.isReal)
@@ -317,6 +341,7 @@ class S2FunHarmonic:
   # ------------------------------------------------------------------ the algebra
 
   def conj(self):
+    """the complex conjugate function"""
     L = self.bandwidth
     out = np.empty_like(self._fhat)
     for l in range(L + 1):
@@ -386,17 +411,21 @@ class S2FunHarmonic:
                        symmetrise=False)
 
   def abs(self):
+    """the absolute value |f| as a handle, evaluated when asked"""
     return abs(self)
 
   def sqrt(self):
+    """the square root of the function, expanded by quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
 
   def exp(self):
+    """the exponential of the function, expanded by quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
 
   def log(self):
+    """the logarithm of the function, expanded by quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
 
@@ -428,6 +457,8 @@ class S2FunHarmonic:
     return float(n) if np.ndim(n) == 0 else n
 
   def dot(self, g):
+    """the inner product with another function of the same frame, for the normalised surface
+    measure: int conj(f) g dS / 4 pi"""
     self._sameFrames(g)
     L = max(self.bandwidth, g.bandwidth)
     x = np.sum(np.conj(self.truncate(L)._fhat) * g.truncate(L)._fhat, axis=-1) / (4 * math.pi)
@@ -442,6 +473,7 @@ class S2FunHarmonic:
     return S2FunHarmonic(fun, self.frame, bandwidth=self.bandwidth, real=self.isReal, antipodal=self.antipodal)
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
+    """whether the coefficients agree with those of g within the tolerances, relative to the norm of g"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L)._fhat, g.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
@@ -456,43 +488,43 @@ class S2FunHarmonic:
     return self.__mul__(other)
 
   def rotate(self, rot):
+    """the function rotated, f(rot^-1 v); rot * f is the same"""
     from .funops import rotate
     return rotate(self, rot)
 
   def conv(self, g):
+    """the convolution with a kernel or another function on the sphere; with a function on the
+    sphere the result is a function on SO(3)"""
     from .funops import conv
     return conv(self, g)
 
   def laplace(self):
+    """the Laplace-Beltrami operator applied to the function, the degree l scaled by -l(l+1)"""
     from .funops import laplace
     return laplace(self)
 
   def grad(self, x=None):
+    """the surface gradient: a vector field, or its values at the directions x"""
     from .s2vectorfield import grad
     return grad(self, x)
 
   def radon(self, delta=None):
+    """the Funk transform, the mean over the great circle perpendicular to every direction;
+    radon(delta) over the small circle at pi/2 + delta"""
     from .funops import radon
     return radon(self, delta)
 
   def invRadon(self):
+    """the inverse of the Funk transform: the even function whose Funk transform this is"""
     from .funops import invRadon
     return invRadon(self)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    lines = [f"S2FunHarmonic{info}"]
-    if self.shape:
-      from ..geometry.display import sizeString
-      lines.append(f"  size: {sizeString(self.shape)}")
-    lines.append(f"  bandwidth: {self.bandwidth}")
-    if not self.shape:
-      lines.append(f"  mean: {self.mean():.4g}")
-    if self.antipodal:
-      lines.append("  antipodal: true")
-    if not self.isReal:
-      lines.append("  isReal: false")
-    return "\n".join(lines)
+    from ..geometry.display import display, frameLabel, header, sizeString
+    return display(header("S2FunHarmonic", frameLabel(self.frame)), [
+      ("size", sizeString(self.shape) if self.shape else None), ("bandwidth", self.bandwidth),
+      ("mean", None if self.shape else f"{self.mean():.4g}"), ("antipodal", "true" if self.antipodal else None),
+      ("isReal", None if self.isReal else "false")])
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

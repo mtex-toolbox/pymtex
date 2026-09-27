@@ -24,6 +24,7 @@ from __future__ import annotations
 import numpy as np
 
 from .vector3d import vector3d
+from .display import aligned
 
 
 def _xyz(pos):
@@ -101,14 +102,22 @@ def polyBasis(x, y, degree):
 # ------------------------------------------------------------------ the transforms
 
 class spatialTransform:
+  """the base of the spatial transforms, maps of the plane of a scan onto itself that move x and y
+  and leave z; T * pos moves positions, T1 * T2 is T2 followed by T1, T1 + T2 chains T1 first
+
+    pos2 = T * pos
+    T.inv(), T.displacement(pos), T.discretize(pos), transform(ebsd, T)"""
 
   def eval(self, pos):
+    """the positions moved by the transform, T * pos"""
     raise NotImplementedError
 
   def inv(self):
+    """the inverse transform"""
     raise NotImplementedError
 
   def paramChar(self):
+    """the parameters of the transform as a line of text for its display"""
     return ""
 
   def __call__(self, pos):
@@ -134,28 +143,36 @@ class spatialTransform:
     return spatialTransformComposite(self, other)
 
   def shortChar(self):
+    """the short name of the transform in its display, the class name without spatialTransform"""
     return type(self).__name__.replace("spatialTransform", "").lower()
 
   def char(self):
+    """the name and the parameters of the transform as one line of text"""
     return f"{self.shortChar()}  {self.paramChar()}"
 
   def fitOptions(self):
+    """the keywords a refit of this transform takes to keep its kind, as a dict"""
     return {}
 
   def matrix(self):
+    """the 3 x 3 homogeneous matrix of the transform, None where it has none"""
     return None
 
   def stageList(self):
+    """the stages the transform is applied in, a list"""
     return [self]
 
   @property
   def isid(self):
+    """whether the transform is the identity"""
     return False
 
   def displacement(self, pos):
+    """the displacement of the positions, T * pos - pos"""
     return self.eval(pos) - pos
 
   def norm(self, pos):
+    """the length of the displacement at every position"""
     return self.displacement(pos).norm()
 
   def discretize(self, pos):
@@ -183,35 +200,47 @@ class spatialTransform:
     w0 = max(len("model"), *(len(r[0]) for r in rows))
     w1 = max(len("stage"), *(len(r[1]) for r in rows))
     lines = [f"  {'model':<{w0}}  {'stage':<{w1}}  parameters"] + [f"  {a:<{w0}}  {b:<{w1}}  {c}" for a, b, c in rows]
-    return f"{type(self).__name__}\n" + "\n".join(lines)
+    return aligned(f"{type(self).__name__}\n" + "\n".join(lines))
 
 
 class spatialTransformId(spatialTransform):
+  """the identity transform, which leaves every position where it is"""
 
   def eval(self, pos):
+    """the positions unchanged"""
     return pos
 
   def inv(self):
+    """the identity itself"""
     return self
 
   @property
   def isid(self):
+    """always True"""
     return True
 
   def shortChar(self):
+    """'identity', the name in the display"""
     return "identity"
 
   def paramChar(self):
+    """the empty parameter entry of the display"""
     return "·"
 
   def stageList(self):
+    """the stages of the identity, none"""
     return []
 
   def matrix(self):
+    """the 3 x 3 identity matrix"""
     return np.eye(3)
 
 
 class spatialTransformShift(spatialTransform):
+  """an affine transform of the plane, given by a 3 x 3 homogeneous matrix with last row [0 0 1]
+
+    T = spatialTransformShift(M)
+    T = spatialTransformShift.fit(posA, posB, weights=w)"""
 
   def __init__(self, M=None):
     M = np.eye(3) if M is None else np.asarray(M, dtype=float)
@@ -222,18 +251,22 @@ class spatialTransformShift(spatialTransform):
     self.M = M
 
   def eval(self, pos):
+    """the positions moved by the affine map"""
     P = _xyz(pos)
     M = self.M
     return _moved(pos, M[0, 0] * P[:, 0] + M[0, 1] * P[:, 1] + M[0, 2], M[1, 0] * P[:, 0] + M[1, 1] * P[:, 1] + M[1, 2])
 
   def inv(self):
+    """the affine map of the inverse matrix"""
     return spatialTransformShift(np.linalg.inv(self.M))
 
   @property
   def isid(self):
+    """whether the matrix is the identity"""
     return np.linalg.norm(self.M - np.eye(3)) < 1e-12
 
   def matrix(self):
+    """the 3 x 3 homogeneous matrix of the affine map"""
     return self.M
 
   def parts(self):
@@ -249,15 +282,22 @@ class spatialTransformShift(spatialTransform):
     return R[0, 0], R[1, 1], 0.0 if abs(rot) < 1e-9 else rot, 0.0 if abs(shear) < 1e-9 else shear
 
   def paramChar(self):
+    """the scales, the rotation, the shear and the translation of the map as a line of text"""
     sx, sy, rot, shear = self.parts()
     return f"scale {sx:.4g} × {sy:.4g}, rotate {rot:.3g}°, shear {shear:.3g}°, move ({self.M[0, 2]:.4g}, {self.M[1, 2]:.4g})"
 
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
+    """the affine map fitted to point pairs by weighted least squares, the positions posA in frame A
+    and where they went, posB"""
     return spatialTransformPoly.fit(posA, posB, weights=weights, degree=1, noRobust=True).shiftMatrix()
 
 
 class spatialTransformRigid(spatialTransformShift):
+  """a translation of the plane by the vector3d u
+
+    T = spatialTransformRigid(vector3d(1, 2, 0))
+    T = spatialTransformRigid.fit(posA, posB, weights=w)"""
 
   def __init__(self, u=None):
     super().__init__()
@@ -269,21 +309,31 @@ class spatialTransformRigid(spatialTransformShift):
 
   @property
   def u(self):
+    """the translation vector"""
     return vector3d(self.M[0, 2], self.M[1, 2], 0.0)
 
   def inv(self):
+    """the translation by -u"""
     return spatialTransformRigid(-self.u)
 
   def paramChar(self):
+    """the translation as a line of text"""
     return f"move ({self.M[0, 2]:.4g}, {self.M[1, 2]:.4g})"
 
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
+    """the translation fitted to point pairs, the weighted mean of their displacements"""
     dx, dy, w, _, _ = fitData(posA, posB, weights)
     return spatialTransformRigid(vector3d(np.sum(w * dx) / np.sum(w), np.sum(w * dy) / np.sum(w), 0.0))
 
 
 class spatialTransformProjective(spatialTransform):
+  """a projective transform of the plane, a homography given by a 3 x 3 matrix normalised to
+  H[2, 2] = 1; straight lines stay straight
+
+    T = spatialTransformProjective(H)
+    T = spatialTransformProjective.byTilt(theta, wd, centre)
+    T = spatialTransformProjective.fit(posA, posB, weights=w)"""
 
   def __init__(self, H=None):
     H = np.eye(3) if H is None else np.asarray(H, dtype=float)
@@ -294,22 +344,27 @@ class spatialTransformProjective(spatialTransform):
     self.H = H / H[2, 2]
 
   def eval(self, pos):
+    """the positions moved by the homography"""
     P = _xyz(pos)
     H = self.H
     d = H[2, 0] * P[:, 0] + H[2, 1] * P[:, 1] + H[2, 2]
     return _moved(pos, (H[0, 0] * P[:, 0] + H[0, 1] * P[:, 1] + H[0, 2]) / d, (H[1, 0] * P[:, 0] + H[1, 1] * P[:, 1] + H[1, 2]) / d)
 
   def inv(self):
+    """the homography of the inverse matrix"""
     return spatialTransformProjective(np.linalg.inv(self.H))
 
   @property
   def isid(self):
+    """whether the homography is the identity"""
     return np.linalg.norm(self.H - np.eye(3)) < 1e-12
 
   def matrix(self):
+    """the 3 x 3 homography"""
     return self.H
 
   def paramChar(self):
+    """the perspective terms of the homography as a line of text"""
     return f"perspective ({self.H[2, 0]:.3g}, {self.H[2, 1]:.3g})"
 
   @staticmethod
@@ -348,6 +403,11 @@ class spatialTransformProjective(spatialTransform):
 
 
 class spatialTransformPoly(spatialTransform):
+  """a polynomial displacement of degree 1 or 2, the coefficients c one column per coordinate over
+  the basis [1 x y] or [1 x y x^2 xy y^2]
+
+    T = spatialTransformPoly(c, 2)
+    T = spatialTransformPoly.fit(posA, posB, degree=2, weights=w)"""
 
   def __init__(self, c=None, degree=None):
     c = np.zeros((3, 2)) if c is None else np.asarray(c, dtype=float)
@@ -358,15 +418,18 @@ class spatialTransformPoly(spatialTransform):
     self.c, self.degree = c, degree
 
   def eval(self, pos):
+    """the positions moved by the polynomial displacement"""
     P = _xyz(pos)
     B = polyBasis(P[:, 0], P[:, 1], self.degree)
     return _moved(pos, P[:, 0] + B @ self.c[:, 0], P[:, 1] + B @ self.c[:, 1])
 
   def inv(self):
+    """the inverse: the inverse affine map at degree 1, the fixed point inverse at degree 2"""
     return self.shiftMatrix().inv() if self.degree == 1 else spatialTransformInverse(self)
 
   @property
   def isid(self):
+    """whether every coefficient vanishes"""
     return np.linalg.norm(self.c) < 1e-12
 
   def shiftMatrix(self):
@@ -377,16 +440,21 @@ class spatialTransformPoly(spatialTransform):
     return spatialTransformShift([[c[1, 0] + 1, c[2, 0], c[0, 0]], [c[1, 1], c[2, 1] + 1, c[0, 1]], [0, 0, 1]])
 
   def shortChar(self):
+    """the name in the display, poly11 or poly22 by the degree"""
     return f"poly{self.degree}{self.degree}"
 
   def paramChar(self):
+    """the size of the coefficients as a line of text"""
     return f"|c| = {np.linalg.norm(self.c):.4g}"
 
   def fitOptions(self):
+    """the degree, the keyword a refit keeps"""
     return {"degree": self.degree}
 
   @staticmethod
   def fit(posA, posB, weights=None, degree=1, noRobust=False, iterMax=50):
+    """the polynomial displacement fitted to point pairs by least squares, reweighted against outliers
+    with Tukey's bisquare unless noRobust=True"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     B = polyBasis(x, y, degree)
     if B.shape[0] < B.shape[1]:
@@ -395,6 +463,11 @@ class spatialTransformPoly(spatialTransform):
 
 
 class spatialTransformDrift(spatialTransform):
+  """a displacement along the slow scan direction: linear between the knots s, the displacements u
+  one row each, NaN beyond them unless extrapolate=True continues the end segments
+
+    T = spatialTransformDrift(s, u, slowScan=vector3d(0, 1, 0))
+    T = spatialTransformDrift.fit(posA, posB)          the median displacement of every scan line"""
 
   def __init__(self, s=None, u=None, slowScan=None, extrapolate=False):
     s = np.zeros(0) if s is None else np.asarray(s, dtype=float).reshape(-1)
@@ -408,6 +481,7 @@ class spatialTransformDrift(spatialTransform):
     self.extrapolate = bool(extrapolate)
 
   def eval(self, pos):
+    """the positions moved by the drift interpolated at their coordinate along the slow scan direction"""
     if len(self.s) == 0:
       return pos
     P = _xyz(pos)
@@ -429,18 +503,22 @@ class spatialTransformDrift(spatialTransform):
     return out
 
   def inv(self):
+    """the inverse by fixed point iteration"""
     return spatialTransformInverse(self)
 
   @property
   def isid(self):
+    """whether the drift has no knots or displaces by nothing"""
     return len(self.s) == 0 or np.linalg.norm(self.u) < 1e-12
 
   def paramChar(self):
+    """the knots and the largest displacement as a line of text"""
     if len(self.s) == 0:
       return "(no knots)"
     return f"{len(self.s)} knots over {self.s[0]:.4g} .. {self.s[-1]:.4g}, |u| <= {np.hypot(self.u[:, 0], self.u[:, 1]).max():.4g}"
 
   def fitOptions(self):
+    """the slow scan direction, the keyword a refit keeps"""
     return {"slowScan": vector3d(self.slowScan)}
 
   @staticmethod
@@ -462,6 +540,11 @@ class spatialTransformDrift(spatialTransform):
 
 
 class spatialTransformField(spatialTransform):
+  """a displacement interpolated between points: linear over their triangulation, the nearest point's
+  beyond it, where MATLAB takes natural neighbours and extrapolates linearly
+
+    T = spatialTransformField(pos, u)
+    T = spatialTransformField.fit(posA, posB)"""
 
   def __init__(self, pos=None, u=None):
     if (pos is None) != (u is None):
@@ -496,25 +579,32 @@ class spatialTransformField(spatialTransform):
     return _moved(pos, P[:, 0] + d[:, 0], P[:, 1] + d[:, 1])
 
   def inv(self):
+    """the inverse by fixed point iteration"""
     return spatialTransformInverse(self)
 
   @property
   def isid(self):
+    """whether the field has no points or displaces by nothing"""
     return self.pos is None or self.pos.size == 0 or np.max(np.linalg.norm(_xyz(self.u), axis=1)) < 1e-12
 
   def paramChar(self):
+    """the number of points and the largest displacement as a line of text"""
     if self.pos is None or self.pos.size == 0:
       return "(empty)"
     return f"{self.pos.size} points, |u| <= {np.max(np.linalg.norm(_xyz(self.u), axis=1)):.4g}"
 
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
+    """the field of the displacements of the point pairs, at the points of frame A"""
     dx, dy, _, x, y = fitData(posA, posB, weights)
     z = np.zeros_like(x)
     return spatialTransformField(vector3d(np.stack([x, y, z], axis=1)), vector3d(np.stack([dx, dy, z], axis=1)))
 
 
 class spatialTransformHandle(spatialTransform):
+  """a transform given by a function of the positions and, for the inverse, a second one
+
+    T = spatialTransformHandle(fun, funInv)"""
 
   def __init__(self, fun, funInv=None):
     if not callable(fun):
@@ -522,20 +612,26 @@ class spatialTransformHandle(spatialTransform):
     self.fun, self.funInv = fun, funInv
 
   def eval(self, pos):
+    """the positions the function returns"""
     return self.fun(pos)
 
   def inv(self):
+    """the transform of the inverse function, an error where none was given"""
     if self.funInv is None:
       raise ValueError("this transform was built from a function with no inverse; supply one as "
                        "spatialTransformHandle(fun, funInv), or fit a transform class that knows its own inverse")
     return spatialTransformHandle(self.funInv, self.fun)
 
   def paramChar(self):
+    """the name of the function as a line of text"""
     name = getattr(self.fun, "__name__", repr(self.fun))
     return name + ("" if self.funInv is not None else "  (no inverse)")
 
 
 class spatialTransformComposite(spatialTransform):
+  """stages applied in order, the first given first; nested composites are flattened
+
+    T = spatialTransformComposite(T1, T2, T3)"""
 
   def __init__(self, *stages):
     self.stages = []
@@ -546,24 +642,30 @@ class spatialTransformComposite(spatialTransform):
         self.stages += t.stages if isinstance(t, spatialTransformComposite) else [t]
 
   def eval(self, pos):
+    """the positions moved through every stage in order"""
     for s in self.stages:
       pos = s.eval(pos)
     return pos
 
   def inv(self):
+    """the inverses of the stages in reverse order"""
     return spatialTransformComposite(*[s.inv() for s in reversed(self.stages)])
 
   @property
   def isid(self):
+    """whether every stage is the identity"""
     return all(s.isid for s in self.stages)
 
   def shortChar(self):
+    """the short names of the stages joined by dashes"""
     return "-".join(s.shortChar() for s in self.stages) if self.stages else "empty"
 
   def paramChar(self):
+    """the stages with their parameters as one line of text"""
     return " -> ".join(s.char() for s in self.stages) if self.stages else "(empty)"
 
   def stageList(self):
+    """the stages, a list"""
     return list(self.stages)
 
   def fitStage(self, s, posA, posB, **kwargs):
@@ -588,13 +690,19 @@ class spatialTransformTilt(spatialTransformComposite):
     super().__init__(*stages)
 
   def inv(self):
+    """the inverses of the stages in reverse order, a plain composite"""
     return spatialTransformComposite(*self.stages).inv()
 
   def shortChar(self):
+    """'tilt', the name in the display"""
     return "tilt"
 
 
 class spatialTransformInverse(spatialTransform):
+  """the inverse of a transform that knows none in closed form, each preimage found by fixed point
+  iteration to the tolerance tol relative to the extent of the positions
+
+    Tinv = spatialTransformInverse(T, tol=1e-10, iterMax=100)"""
 
   def __init__(self, T, tol=1e-10, iterMax=100):
     if not isinstance(T, spatialTransform):
@@ -627,16 +735,20 @@ class spatialTransformInverse(spatialTransform):
     return cur
 
   def inv(self):
+    """the transform it inverts"""
     return self.T
 
   @property
   def isid(self):
+    """whether the inverted transform is the identity"""
     return self.T.isid
 
   def shortChar(self):
+    """the short name of the inverted transform with the prefix inv-"""
     return "inv-" + self.T.shortChar()
 
   def paramChar(self):
+    """the parameters of the inverted transform as a line of text"""
     return self.T.paramChar()
 
 
@@ -658,7 +770,7 @@ class spatialTransformList(list):
     labels = ("", "model", "stage", "parameters")
     w = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(4)]
     line = lambda r: "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
-    return "\n".join([f"spatialTransform\n size: 1 × {len(self)}", "", line(labels)] + [line(r) for r in rows])
+    return aligned("\n".join([f"spatialTransform\n size: 1 × {len(self)}", "", line(labels)] + [line(r) for r in rows]))
 
 
 __all__ = ["spatialTransformList", "spatialTransform", "spatialTransformId", "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective",

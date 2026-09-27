@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.display import sizeString
+from ..geometry.display import frameLabel, sizeString
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.kernels import qmul, qrot
 from ..geometry.orientation import orientation
@@ -33,11 +33,18 @@ from ..geometry.vector3d import vector3d
 from .dynprop import dynProp
 from .lattice import lattice, latticeBasis
 from .phaselist import phaseList, phaseTable
+from ..geometry.display import aligned
 
 FIELDS = ("pos", "rotations", "phaseId", "CSList", "lattice", "prop", "meta", "scanUnit", "phaseMap", "id", "_pad")
 
 
 class EBSD:
+  """an EBSD map: positions, rotations and phase ids with the list of the phases' frames and the
+  properties, a scattered list or, gridified, arrays in map shape; nan positions are dropped and
+  the lattice is read off the positions or a unit cell
+
+    EBSD(pos, rotations, phaseId, CSList, prop)
+    EBSD(pos, rotations, phaseId, CSList, prop, unitCell=uC)"""
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, unitCell=None, scanUnit="um", frame=None,
                lattice=None, meta=None, phaseMap=None, id=None, isPadding=None):
@@ -94,14 +101,17 @@ class EBSD:
 
   @property
   def shape(self):
+    """the shape of the map, (n,) for a list and (rows, columns) for a grid"""
     return self.rotations.shape
 
   @property
   def ndim(self):
+    """the number of array axes, 1 for a list and 2 for a grid"""
     return self.rotations.ndim
 
   @property
   def size(self):
+    """the number of measurements, the padding of a grid included"""
     return self.rotations.size
 
   def __len__(self):
@@ -109,38 +119,47 @@ class EBSD:
 
   @property
   def isempty(self):
+    """whether the map holds no measurement"""
     return self.size == 0
 
   @property
   def isGridded(self):
+    """whether the arrays are in map shape, two dimensional"""
     return self.ndim == 2
 
   @property
   def dtype(self):
+    """the floating point type of the rotations, single or double precision"""
     return self.rotations.dtype
 
   @property
   def frame(self):
+    """the specimen frame of the positions"""
     return self.pos.frame
 
   @property
   def x(self):
+    """the x coordinates of the positions"""
     return self.pos.x
 
   @property
   def y(self):
+    """the y coordinates of the positions"""
     return self.pos.y
 
   @property
   def z(self):
+    """the z coordinates of the positions"""
     return self.pos.z
 
   @property
   def xyz(self):
+    """the positions as one array of shape shape + (3,)"""
     return self.pos.data
 
   @property
   def phase(self):
+    """the phase numbers of the file, the phase ids translated through phaseMap"""
     return self.phaseMap[self.phaseId]
 
   def project2FundamentalRegion(self):
@@ -170,6 +189,7 @@ class EBSD:
 
   @property
   def isIndexed(self):
+    """whether a measurement belongs to an indexed phase"""
     indexed = np.array([f.isIndexed for f in self.CSList.frames])
     return indexed[self.phaseId]
 
@@ -181,10 +201,12 @@ class EBSD:
 
   @property
   def mineralList(self):
+    """the mineral names of the phases, in the order of CSList"""
     return self.CSList.mineralList
 
   @property
   def colorList(self):
+    """the colours of the phases, in the order of CSList"""
     return self.CSList.colorList
 
   @property
@@ -336,6 +358,7 @@ class EBSD:
                 id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
 
   def copy(self):
+    """a copy of the map with its own arrays; the phase list and the lattice are shared"""
     return EBSD(self.pos.copy(), self.rotations.copy(), self.phaseId.copy(), self.CSList,
                 {k: v.copy() for k, v in self.prop.items()}, scanUnit=self.scanUnit, frame=self.frame,
                 lattice=self.lattice, meta=dict(self.meta), phaseMap=self.phaseMap, id=self.id.copy(), isPadding=self._pad)
@@ -358,6 +381,7 @@ class EBSD:
                meta=first.meta, phaseMap=first.phaseMap, isPadding=pad)
 
   def flatten(self):
+    """the map as a list, one dimensional arrays in the order of the grid"""
     return self if self.ndim == 1 else self._subset(np.unravel_index(np.arange(self.size), self.shape))
 
   # ------------------------------------------------------------------ finding measurements
@@ -417,6 +441,7 @@ class EBSD:
     return self.rotate(rot) if isinstance(rot, rotation) else NotImplemented
 
   def shift(self, v):
+    """the map with every position moved by the vector v, the arrays not reordered"""
     v = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
     return self._moved(self.pos.data + v, self.rotations.data)
 
@@ -464,6 +489,9 @@ class EBSD:
     return float(np.linalg.norm(c[1:] - c[0], axis=1).min())
 
   def gridify(self, layout=None, unitCell=None, return_index=False):
+    """the same map with its arrays in map shape, the missing cells padding; with a layout the arrays
+    reordered, with a unitCell resampled onto that lattice, with return_index also the flat index
+    of every measurement in the grid"""
     from .gridify import gridify
     return gridify(self, layout, unitCell, return_index)
 
@@ -501,6 +529,7 @@ class EBSD:
 
   @color.setter
   def color(self, value):
+    """sets the colour of the one phase of the map on its frame"""
     self.CSList.frames[self._onePhasePresent()].color = value
 
   # the one phase, indexed or not, the measurements belong to
@@ -536,9 +565,9 @@ class EBSD:
     return "\n".join([line(labels)] + [line(r) for r in rows])
 
   def __repr__(self):
-    lines = [f"EBSD ({self.frame.char()})"]
+    lines = [f"EBSD ({frameLabel(self.frame)})"]
     if self.size == 0:
-      return lines[0] + "\n  the map is empty"
+      return aligned(lines[0] + "\n  the map is empty")
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
     # the shares are of all measurements, the padding left out, to two significant digits,
     # as MATLAB writes them
@@ -552,13 +581,13 @@ class EBSD:
       lines.append("  properties: " + ", ".join(sorted(self.prop)))
     lines.append(f"  scan unit: {self.scanUnit}")
     ext = self.extent()
-    lines.append(f"  X x Y: [{ext[0]:.4g} → {ext[1]:.4g}] x [{ext[2]:.4g} → {ext[3]:.4g}]")
+    lines.append(f"  X × Y: [{ext[0]:.4g} → {ext[1]:.4g}] × [{ext[2]:.4g} → {ext[3]:.4g}]")
     if self.lattice is not None:
       lines.append(f"  {self.lattice.shape} lattice: spacing {self.lattice.dxy:.4g}")
     sets = self.meta.get("dataSets")
     if sets and len(sets) > 1:
       lines.append(f"  data set: {self.meta.get('dataSet')} of {len(sets)}")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

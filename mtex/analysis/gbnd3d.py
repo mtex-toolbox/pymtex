@@ -20,6 +20,14 @@ from ..geometry.vector3d import vector3d
 
 
 def calcGBND(gB, *args, **kwargs):
+  """the boundary normal distribution of a 3D boundary: the face normals in specimen coordinates
+  weighted by area, with grains the normals in the crystal frame of the one phase, with moriRef
+  the grain boundary character of the faces whose misorientation is near moriRef; a planar
+  grainBoundary goes to the calcGBND of the traces
+
+    calcGBND(gB3)
+    calcGBND(gB3, grains)
+    calcGBND(gB3, grains, moriRef, halfwidth=5*degree)"""
   from ..maps3d.grain3boundary import grain3Boundary
   from .gbnd import calcGBND as calcGBND2d
   if not isinstance(gB, grain3Boundary):

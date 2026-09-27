@@ -22,6 +22,7 @@ from .sphericalregion import dirichletSector, fundamentalSector, sectorCenter, s
 from .symmetry import symmetry
 from .symreduce import reductionGroups, uniqueRotations
 from .vector3d import vector3d
+from .display import display, frameLabel, header
 
 
 def commonRotations(L, R):
@@ -52,10 +53,15 @@ def commonAxisSector(common, antipodal=False):
 
 
 def commonAxisCenter(common):
+  """the centre of the sector of rotation axes of the rotations two groups share, the axis the
+  projection takes the conjugate nearest to"""
   return commonAxisSector(common)[1]
 
 
 class orientationRegion:
+  """a fundamental region of orientation space: the Dirichlet domain of the identity, the
+  quaternions q with dot(q, N) <= 0 for the bounding quaternions N, and a sector of the axes
+  where the two frames share rotations"""
 
   def __init__(self, N, frameA, frameB, antipodal=False, common=None, sector=None, axisCenter=None):
     self.N = np.asarray(N, dtype=float).reshape(-1, 4)
@@ -66,13 +72,16 @@ class orientationRegion:
 
   @property
   def CS1(self):
+    """the first frame of the region, the crystal frame, MATLAB's oR.CS1"""
     return self.frameA
 
   @property
   def CS2(self):
+    """the second frame of the region, the specimen or second crystal frame, MATLAB's oR.CS2"""
     return self.frameB
 
   def checkInside(self, o, tolerance=2e-3):
+    """whether orientations lie inside the region, up to the tolerance, as a boolean array"""
     q = o.data if isinstance(o, MtexArray) else np.asarray(o, dtype=float)
     t = tolerance / 2
     d = q @ self.N.T
@@ -213,8 +222,9 @@ class orientationRegion:
     return None if best is None else float(2 * np.arctan(best))
 
   def __repr__(self):
-    ap = "\n  antipodal: true" if self.antipodal else ""
-    return f"orientationRegion ({self.frameA.char()} → {self.frameB.char()})\n  faces: {len(self.N)}{ap}\n  max angle: {self.maxAngle() * 180 / np.pi:.4g}°"
+    return display(header("orientationRegion", f"{frameLabel(self.frameA)} → {frameLabel(self.frameB)}"),
+                   [("faces", len(self.N)), ("antipodal", "true" if self.antipodal else None),
+                    ("max angle", f"{self.maxAngle() * 180 / np.pi:.4g}°")])
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -293,6 +303,11 @@ def _zFolds(frA, frB):
 
 
 def eulerRegion(frA, frB=None):
+  """the ranges (phi1, Phi, phi2) of the Bunge Euler angles covering the fundamental region of
+  two frames, the specimen frame the default second
+
+    maxPhi1, maxPhi, maxPhi2 = eulerRegion(cs)
+    eulerRegion(cs1, cs2)"""
   from .frames import specimenFrame
   frB = specimenFrame.default if frB is None else frB
   maxPhi1, maxPhi2, L, R = _zFolds(frA, frB)

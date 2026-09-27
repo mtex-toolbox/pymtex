@@ -170,6 +170,9 @@ def _polarRadiusNumpy(N, xyz, c):
 
 
 def polarRadius(N, xyz, c):
+  """the polar radius of the sector fold: per direction the smallest over the boundary normals N of
+  (pi - angle(v, b)) / (pi - angle(c, b)), b where the great circle through v and the centre c
+  crosses the boundary; 1 at the centre"""
   xyz = np.ascontiguousarray(xyz, dtype=np.float64).reshape(-1, 3)
   c = np.ascontiguousarray(c, dtype=np.float64).reshape(3)
   N = np.ascontiguousarray(np.asarray(N, dtype=float).reshape(-1, 3))

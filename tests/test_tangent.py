@@ -296,7 +296,7 @@ def test_display():
   ref = orientation.rand(cs, ss, rng=rng)
   t = log(orientation.rand(3, cs, ss, rng=rng), ref)
   s = repr(t)
-  assert s.startswith("SO3TangentVector (left") and "reference: orientation" in s and "size: 3" in s
+  assert s.startswith("SO3TangentVector (left") and "reference: orientation" in s and "size     : 3" in s
   # right components are x, y, z of the crystal frame, as MATLAB prints them
   assert "reference: orientation" in repr(right(t)) and repr(right(t)).split("\n")[3].split() == ["x", "y", "z"]
   assert "reference: rotation" in repr(log(rotation.rand(rng=rng)))

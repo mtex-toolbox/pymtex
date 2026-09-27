@@ -36,6 +36,7 @@ class CheckDelegate(QStyledItemDelegate):
   in the middle of it, where a column three characters wide wants it"""
 
   def paint(self, painter, option, index):
+    """draws the cell without its own indicator and the check box centred in it"""
     opt = QStyleOptionViewItem(option)
     self.initStyleOption(opt, index)
     opt.features &= ~QStyleOptionViewItem.HasCheckIndicator
@@ -89,15 +90,18 @@ class ChoiceDelegate(QStyledItemDelegate):
     return box
 
   def pick(self, box):
+    """commits the choice of the dropdown and closes it"""
     self.commitData.emit(box)
     self.closeEditor.emit(box, QAbstractItemDelegate.NoHint)
 
   def setEditorData(self, editor, index):
+    """selects the cell's value in the dropdown and opens its list"""
     k = editor.findText(index.data(Qt.EditRole) or "")
     editor.setCurrentIndex(max(k, 0))
     editor.showPopup()
 
   def setModelData(self, editor, model, index):
+    """writes the chosen text into the cell"""
     model.setData(index, editor.currentText(), Qt.EditRole)
 
 

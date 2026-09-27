@@ -12,6 +12,7 @@ from .representations import axis2quat, isnull
 
 
 def homochoricRadius():
+  """the radius (3 pi / 4)^(1/3) of the homochoric ball, the image of the rotations of angle pi"""
   return (3 * np.pi / 4) ** (1 / 3)
 
 

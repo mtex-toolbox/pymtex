@@ -88,6 +88,8 @@ def parseAlignment(s):
 
 
 def isAlignment(s):
+  """whether a string names an alignment, like 'X||a' or 'c*||Z', or a vendor alignment 'EDAX', 'TSL',
+  'OIM'"""
   return isinstance(s, str) and (s.upper() in ALIGNMENT_VENDORS or re.match(r"^\s*([xyzXYZ]\s*\|\|\s*[abcdmABCDM]\*?|[abcdmABCDM]\*?\s*\|\|\s*[xyzXYZ])\s*$", s) is not None)
 
 
@@ -133,6 +135,12 @@ def alignAxes(axes, alignment):
 
 
 def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1, check=True):
+  """the crystal axes a, b, c in Cartesian coordinates as a (3, 3) array, one axis per row, from the
+  cell of a lattice, by default X||a*, Z||c, else in the alignment asked for, then rotated
+
+    crystalAxes(lattice, abc, abg)
+    crystalAxes(lattice, abc, abg, alignment=['X||a', 'Z||c*'])
+    crystalAxes(lattice, abc, abg, alignment=['EDAX'], rotate=rot)"""
   abg = lattice.defaultAngles if abg is None else abg
   abc, abg = completeCell(abc, abg)
   if check:

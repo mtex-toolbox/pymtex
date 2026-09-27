@@ -16,20 +16,25 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.units import degree
+from ..geometry.display import aligned
 
 
 class EBSDFilter:
+  """the base of the denoising filters of a gridded EBSD map, which replace the orientation of
+  every pixel by one computed from its neighbours: smooth(ebsd, F)"""
 
   def _items(self):
     return []
 
   def __repr__(self):
-    return f"{type(self).__name__}\n" + "\n".join(f"  {k}: {v}" for k, v in self._items())
+    return aligned(f"{type(self).__name__}\n" + "\n".join(f"  {k}: {v}" for k, v in self._items()))
 
 
 # ------------------------------------------------------------------ the filters
 
 class variationalFilter(EBSDFilter):
+  """the base of the variational filters, splineFilter, halfQuadraticFilter, l1TVFilter and
+  infimalConvolutionFilter: one energy over the graph of the map, solved by one solver"""
   pass
 
 
@@ -136,6 +141,7 @@ class graphCSR:
     return csr_matrix((np.tile([1.0, -1.0], ne), (rows, cols)), shape=(ne, self.n))
 
   def laplacian(self):
+    """the Laplacian of the graph, D.T @ D with D the difference along the edges, a sparse matrix"""
     D = self.difference()
     return (D.T @ D).tocsr()
 

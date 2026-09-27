@@ -22,6 +22,7 @@ NAMES = {"whitejet": "WhiteJet", "labotex": "LaboTeX", "blue2red": "blue2red", "
 
 
 def colormapStops(name):
+  """the colours and positions of the stops of MTEX's colour map of the name, None for another name"""
   return COLORMAP_STOPS.get(str(name).lower())
 
 
@@ -142,6 +143,7 @@ VEGA20 = np.array([(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 1
 
 
 def vega20(n=20):
+  """n colours of vega's twenty categorical ones, repeated beyond twenty, an n x 3 array"""
   return VEGA20[np.arange(n) % len(VEGA20)]
 
 
@@ -170,6 +172,12 @@ ORDERED = np.array([1, 6, 19, 12, 20, 22, 3, 11, 18, 16, 23, 8, 7, 2, 14, 15, 9,
 
 
 def ind2color(i, cmap=None):
+  """the colour of the id i in MTEX's colour order, ids counting from one as MATLAB's; an RGB row
+  per id of an array, NaN where the id is 0 or NaN
+
+    ind2color(i)
+    ind2color(ids, 'ordered')     the order in which neighbouring ids get related colours
+    ind2color(ids, cmap)          a matrix of colours as the order"""
   colors = MTEX_COLORS[ORDERED] if isinstance(cmap, str) and cmap == "ordered" else MTEX_COLORS if cmap is None else np.asarray(cmap, dtype=float)
   if np.ndim(i) == 0:
     return colors[(int(i) - 1) % len(colors)].copy()

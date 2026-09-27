@@ -16,6 +16,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from .colormaps import mtexColormap
 from .mtexfigure import gcm, mtexFigure
+from ..geometry.display import aligned
 
 
 class planarColorKey:
@@ -78,6 +79,11 @@ class planarColorKey:
     return np.clip(rgb, 0, 1)
 
   def plot(self, v1=None, v2=None, nHue=256, nSat=128, **kw):
+    """draws the key as an image, hue along x and saturation along y; with the two properties v1, v2
+    the axes carry their ranges and labels
+
+      pK.plot()
+      pK.plot(v1, v2)"""
     return plotPlanarKey(self, v1, v2, nHue, nSat, **kw)
 
   def __repr__(self):
@@ -85,7 +91,7 @@ class planarColorKey:
     if np.isfinite(self.periode):
       lines.append(f"  periode: {self.periode:g}")
     lines.append(f"  {self.label1}: {self.range1}, {self.label2}: {self.range2}")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
 
 def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw):

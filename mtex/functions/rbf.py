@@ -25,6 +25,7 @@ from ..geometry.symreduce import reductionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from ..geometry.display import fields, framesLabel, numString
 from .funops import _antipodalPole, _rotatedFrame, conv
 from .harmonics import deg2dim, degreeBlock, _sphericalY
 from .kernelfunctions import S2DeLaValleePoussinKernel, S2Kernel, SO3DeLaValleePoussinKernel, SO3Kernel, SO3vonMisesFisherKernel
@@ -32,6 +33,7 @@ from .quadrature import folds
 from .s2fun import S2FunHarmonic
 from .so3fun import SO3FunHarmonic
 from .transforms import GRIDDED_ROTATIONS_PER_L3, wignerSeriesAdjoint, wignerSeriesAdjointGridded
+from ..geometry.display import aligned
 
 CHUNK = 1024
 # above this many kernel terms an evaluation goes through the harmonic form
@@ -87,6 +89,10 @@ def _rotationsFor(f, x):
 
 
 class SO3FunRBF:
+  """a function on SO(3) as a sum of radial kernels psi at centre orientations with weights, plus a
+  constant c0; the weights default to a mean of one
+
+    SO3FunRBF(ori, psi, weights, c0)"""
   isReal = True
 
   @staticmethod
@@ -108,25 +114,31 @@ class SO3FunRBF:
 
   @property
   def CS(self):
+    """the crystal frame of the function, that of its centres"""
     return self.center.CS
 
   @property
   def SS(self):
+    """the specimen frame of the function, that of its centres"""
     return self.center.SS
 
   @SS.setter
   def SS(self, fr):
+    """sets the specimen frame of the centres, the rotations kept"""
     self.center = orientation._fromRotation(self.center.data, (self.CS, fr), self.antipodal)
 
   @property
   def antipodal(self):
+    """whether the function is antipodal, symmetric under inversion, as its centres are"""
     return self.center.antipodal
 
   @property
   def bandwidth(self):
+    """the harmonic bandwidth of the kernel"""
     return self.psi.bandwidth
 
   def mean(self):
+    """the mean of the function over SO(3), c0 plus the sum of the weights times the kernel's mean"""
     return self.c0 + float(np.sum(self.weights)) * self.psi.mean()
 
   # the equivalents s c t of every centre with the weight w / m, the inverses included
@@ -243,9 +255,16 @@ class SO3FunRBF:
     return conv(s, self.psi.radon()) + self.c0
 
   def ipdf(self, r, bandwidth=None):
+    """the inverse pole figure at the specimen direction r, the pole figure of the inverse function"""
     return self.inv().pdf(r, bandwidth)
 
   def radon(self, h=None, r=None):
+    """the Radon transform: with h the pole figure, with r the inverse pole figure, with both the
+    pole figure of h evaluated at r
+
+      SO3F.radon(h)
+      SO3F.radon(r=r)
+      SO3F.radon(h, r)"""
     if r is None:
       return self.pdf(h)
     if h is None:
@@ -253,13 +272,18 @@ class SO3FunRBF:
     return self.pdf(h)(r)
 
   def calcPDF(self, h, r=None, superposition=None):
+    """the pole figures of the function at the crystal directions h, with r their values at the
+    specimen directions r; superposition weighs several h into one pole figure"""
     from .density import calcPDF
     return calcPDF(self, h, r, superposition=superposition)
 
   def inv(self):
+    """the inverse function f(g^-1), the centres inverted, crystal and specimen sides exchanged"""
     return SO3FunRBF(self.center.inv(), self.psi, self.weights, self.c0)
 
   def rotate(self, r, side="left"):
+    """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
+    side; the frame of the rotated side turns with it"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     if side == "left":
       center = orientation._fromRotation((rot * rotation(self.center)).data, (self.CS, _rotatedFrame(self.SS, rot)), self.antipodal)
@@ -270,6 +294,8 @@ class SO3FunRBF:
     return SO3FunRBF(center, self.psi, self.weights, self.c0)
 
   def conv(self, psi):
+    """the convolution with a kernel psi, again a kernel sum when psi is an SO(3) kernel, otherwise
+    through the harmonic expansion"""
     if isinstance(psi, SO3Kernel):
       return SO3FunRBF(self.center, self.psi.conv(psi), self.weights, self.c0 * psi.mean())
     return conv(SO3FunHarmonic(self), psi)
@@ -308,19 +334,34 @@ class SO3FunRBF:
     return self * -1
 
   def norm(self):
+    """the L2 norm of the function, from its harmonic expansion"""
     return SO3FunHarmonic(self).norm()
 
   def __repr__(self):
-    lines = [f"SO3FunRBF ({self.CS.char()} → {self.SS.char()})"]
+    lines = [f"SO3FunRBF ({framesLabel(self.CS, self.SS)})"]
     if self.antipodal:
       lines.append("  antipodal: true")
     if self.c0:
-      lines += ["  uniform component", f"    weight: {self.c0:.4g}"]
+      lines += ["  uniform component"] + fields([("weight", f"{self.c0:.4g}")], "    ")
     n = self.center.size
     if n:
-      lines += ["  unimodal component" if n == 1 else "  multimodal components", f"    kernel: {self.psi}",
-                f"    center: {n} orientation{'s' if n > 1 else ''}", f"    weight: {np.sum(self.weights) * self.psi.mean():.4g}"]
-    return "\n".join(lines)
+      lines += ["  unimodal component" if n == 1 else "  multimodal components"]
+      lines += fields([("kernel", self.psi), ("center", f"{n} orientation{'s' if n > 1 else ''}"),
+                       ("weight", f"{np.sum(self.weights) * self.psi.mean():.4g}")], "    ")
+      lines.append(self._centerTable())
+    return aligned("\n".join(lines))
+
+  def _centerTable(self):
+    """the centres by their Euler angles with their weights, as MATLAB lists them, a long list
+    by its first and last rows"""
+    from ..geometry.display import table, takeRows
+    from ..geometry.representations import EULER_LABELS, eulerConvention, quat2euler
+    take, pos = takeRows(self.center.size)
+    convention = eulerConvention()
+    e = np.stack(quat2euler(self.center.data.reshape(-1, 4)[take], convention), axis=-1) / degree
+    w = np.asarray(self.weights, dtype=float).reshape(-1)[take] * self.psi.mean()
+    t = table(list(EULER_LABELS[convention]) + ["weight"], [e[:, 0], e[:, 1], e[:, 2], w], tiny=1e-8, rows=pos)
+    return "\n".join("  " + line for line in [f"  {convention} Euler angles in degree"] + t.split("\n"))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -365,6 +406,11 @@ class SO3FunRBF:
 
 
 class SO3FunCBF:
+  """a fibre ODF, a sum over fibres h || r of an S2 kernel psi of the angle between g h and r, with
+  weights normalised to a mean of one by default
+
+    SO3FunCBF(h, r, weights, psi)
+    SO3FunCBF(f, halfwidth=10*degree)      from a fibre f"""
   isReal = True
   antipodal = False
 
@@ -391,9 +437,11 @@ class SO3FunCBF:
 
   @property
   def bandwidth(self):
+    """the harmonic bandwidth of the S2 kernel"""
     return self.psi.bandwidth
 
   def mean(self):
+    """the mean of the function over SO(3), the sum of the weights times the kernel's mean"""
     return float(np.sum(self.weights)) * self.psi.mean()
 
   # a Laue group holds the inversion, so the fibre of h is that of -h too
@@ -422,6 +470,8 @@ class SO3FunCBF:
     return self.eval(x)
 
   def eval(self, x):
+    """the values at rotations or orientations, the kernel sum over the fibres and their symmetric
+    equivalents"""
     r = _rotationsFor(self, x)
     q = rotation(r.data.reshape(-1, 4))
     H, Rv, w = self._expandedFibres()
@@ -470,6 +520,8 @@ class SO3FunCBF:
     return SO3TangentVector(vector3d(out.reshape(*r.shape, 3)), x, side)
 
   def rotate(self, r, side="left"):
+    """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
+    side; the frame of the rotated side turns with it"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     if side == "left":
       return SO3FunCBF(vector3d(self.h.data, frame=self.CS), rot * self.r, self.weights, self.psi, _rotatedFrame(self.SS, rot))
@@ -478,19 +530,26 @@ class SO3FunCBF:
     raise ValueError(f"the side is 'left' or 'right', not {side!r}")
 
   def pdf(self, h, bandwidth=None):
+    """the pole figure at the crystal direction h, from the harmonic expansion"""
     return SO3FunHarmonic(self, bandwidth=bandwidth).pdf(h)
 
   def ipdf(self, r, bandwidth=None):
+    """the inverse pole figure at the specimen direction r, from the harmonic expansion"""
     return SO3FunHarmonic(self, bandwidth=bandwidth).ipdf(r)
 
   def radon(self, h=None, r=None):
+    """the Radon transform through the harmonic expansion: with h the pole figure, with r the inverse
+    pole figure, with both the values"""
     return SO3FunHarmonic(self).radon(h, r)
 
   def calcPDF(self, h, r=None, superposition=None):
+    """the pole figures of the function at the crystal directions h, with r their values at the
+    specimen directions r; superposition weighs several h into one pole figure"""
     from .density import calcPDF
     return calcPDF(self, h, r, superposition=superposition)
 
   def conv(self, psi):
+    """the convolution with a kernel psi, through the harmonic expansion"""
     return conv(SO3FunHarmonic(self), psi)
 
   def __mul__(self, a):
@@ -518,17 +577,19 @@ class SO3FunCBF:
     return -1 * self
 
   def norm(self):
+    """the L2 norm of the function, from its harmonic expansion"""
     return SO3FunHarmonic(self).norm()
 
   def __repr__(self):
     n = self.h.size
-    lines = [f"SO3FunCBF ({self.CS.char()} → {self.SS.char()})", "  fibre component" if n == 1 else "  fibre components", f"    kernel: {self.psi}"]
+    pairs = [("kernel", self.psi)]
     for i in range(n):
       # the crystal direction by its rounded indices, as MATLAB shows it
       h = Miller(vector3d(self.h[i].data), self.CS).round().char(family=False)
-      lines.append(f"    fibre: {h} || ({self.r[i].x:.3g},{self.r[i].y:.3g},{self.r[i].z:.3g}), weight {self.weights[i]:.3g}")
-    lines.append(f"    weight: {self.mean():.4g}")
-    return "\n".join(lines)
+      r = ",".join(numString(float(x)) for x in self.r[i].data.reshape(3))
+      pairs.append(("fibre", f"{h} || ({r}), weight {self.weights[i]:.3g}"))
+    pairs.append(("weight", f"{self.mean():.4g}"))
+    return aligned("\n".join([f"SO3FunCBF ({framesLabel(self.CS, self.SS)})", "  fibre component" if n == 1 else "  fibre components"] + fields(pairs, "    ")))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -578,6 +639,10 @@ def _readFrames(args):
 
 
 def uniformODF(*frames, antipodal=False):
+  """the uniform ODF, constant one, between a crystal and a specimen frame
+
+    uniformODF(cs, ss)
+    uniformODF(cs, ss, antipodal=True)"""
   CS, SS = _readFrames(frames)
   return SO3FunRBF(orientation(rotation.nan(0), CS, SS, antipodal=antipodal), SO3DeLaValleePoussinKernel(halfwidth=10 * degree), np.zeros(0), 1.0)
 

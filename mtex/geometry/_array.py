@@ -12,11 +12,14 @@
 from __future__ import annotations
 
 import numpy as np
+from .display import aligned
 
 _slice = slice(None)
 
 
 class MtexArray:
+  """the container base: one coordinate array of shape (..., k) plus the attributes a subclass
+  carries through indexing, reshape and cat; a single element is the zero-dimensional container"""
   _ncoord: int = 1
   _carried: tuple[str, ...] = ()
   # a NumPy array on the left of an operator hands over to the container's reflected method
@@ -43,27 +46,33 @@ class MtexArray:
     return obj
 
   def copy(self):
+    """a copy of the container with its own coordinate array, the carried attributes kept"""
     return self._new(self.data.copy())
 
   def astype(self, dtype):
+    """the same container over its coordinates converted to another dtype"""
     return self._new(self.data.astype(dtype))
 
   # ------------------------------------------------------------------ the array interface
 
   @property
   def shape(self):
+    """the shape of the container, the leading axes without the coordinate axis"""
     return self.data.shape[:-1]
 
   @property
   def ndim(self):
+    """the number of leading axes, zero for a single element"""
     return self.data.ndim - 1
 
   @property
   def size(self):
+    """the number of elements, MATLAB's numel"""
     return self.data.size // self._ncoord
 
   @property
   def dtype(self):
+    """the dtype of the coordinate array"""
     return self.data.dtype
 
   # the number of elements, MATLAB's numel, so that a single element has length one
@@ -72,6 +81,7 @@ class MtexArray:
 
   @property
   def isempty(self):
+    """whether the container holds no element"""
     return self.size == 0
 
   # the index applies to the leading axes; the coordinate axis is always taken whole
@@ -93,10 +103,15 @@ class MtexArray:
     return (self[i] for i in range(self.shape[0]))
 
   def reshape(self, *shape):
+    """the same elements in another shape of the leading axes, the coordinate axis kept
+
+      v.reshape(2, 3)
+      v.reshape((2, 3))"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._new(self.data.reshape(tuple(shape) + (self._ncoord,)))
 
   def flatten(self):
+    """the elements as a list, reshape(-1)"""
     return self.reshape(-1)
 
   @property
@@ -137,9 +152,11 @@ class MtexArray:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    shape = "x".join(str(n) for n in self.shape) if self.ndim else "1"
-    return f"{type(self).__name__} ({shape})"
+    from .display import header, sizeString
+    return aligned(header(type(self).__name__, sizeString(self.shape)))
 
 
 def cat(*arrays, axis=0):
+  """cat(a, b, ...) is type(a).cat(a, b, ...): the list of the operands, MATLAB's [a, b], the
+  carried attributes joined; axis= the axis to concatenate along"""
   return type(arrays[0]).cat(*arrays, axis=axis)

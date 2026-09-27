@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
-from .display import sizeString
+from .display import display, frameLabel, header
 from .frames import crystalFrame, referenceFrame, specimenFrame
 from .quaternion import _readCoefficients, orthogonalTransform, qrot, quaternion, rotation
 from .homochoric import homochoric2quat
@@ -48,6 +48,12 @@ def _largestImage(o):
 
 
 class orientation(rotation):
+  """orientations and misorientations, rotations taking coordinates in the frame CS to coordinates
+  in the frame SS; a misorientation is one between two crystal frames
+
+    orientation(rot, cs, ss)
+    orientation(a, b, c, d, cs, ss)      the quaternion coefficients
+    orientation(f, cs, points=1000)      points along a fibre"""
   _carried = ("frameA", "frameB", "antipodal", "notIID")
   # orientations that are not independent draws, the pixels of a map: an automatic halfwidth
   # asks for their grains (docs/plans/halfwidth.md, section 10)
@@ -104,6 +110,10 @@ class orientation(rotation):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, *args, antipodal=False):
+    """the orientations of the Euler angles, Bunge's ZXZ convention unless a convention is named
+
+      orientation.byEuler(phi1, Phi, phi2, cs, ss)
+      orientation.byEuler(alpha, beta, gamma, 'ZYZ', cs, ss)"""
     a, b, c, args = eulerTriple(a, b, c, args)
     args, frames = _splitFrames(args)
     convention = args[0] if args else None
@@ -118,6 +128,8 @@ class orientation(rotation):
 
   @classmethod
   def byAxisAngle(cls, v, omega, *frames, antipodal=False):
+    """the orientations of the rotations by omega about the axis v; about a crystal direction and no
+    frames named the rotation of that crystal frame into itself, a misorientation"""
     frames = _splitFrames(frames)[1]
     # about a crystal direction without frames named: the rotation of that crystal frame into itself
     if not frames and isinstance(v, vector3d) and isinstance(v.frame, crystalFrame):
@@ -126,6 +138,7 @@ class orientation(rotation):
 
   @classmethod
   def byMatrix(cls, M, *frames, antipodal=False):
+    """the orientations of rotation matrices; a matrix of determinant -1 is refused"""
     M = np.asarray(M, dtype=float)
     if np.any(np.linalg.det(M) < 0):
       raise ValueError("the matrix has determinant -1; an orientation is proper")
@@ -133,10 +146,12 @@ class orientation(rotation):
 
   @classmethod
   def byRodrigues(cls, v, *frames, antipodal=False):
+    """the orientations of Rodrigues vectors, the axes scaled by tan(omega/2)"""
     return cls._fromRotation(rodrigues2quat(_xyz(v)), _splitFrames(frames)[1], antipodal)
 
   @classmethod
   def byHomochoric(cls, v, *frames, antipodal=False):
+    """the orientations of homochoric vectors"""
     return cls._fromRotation(homochoric2quat(_xyz(v)), _splitFrames(frames)[1], antipodal)
 
   @classmethod
@@ -154,15 +169,22 @@ class orientation(rotation):
 
   @classmethod
   def fit(cls, u, v, *frames, weights=None):
+    """the orientation that maps the directions u best onto the directions v in the least squares
+    sense, weighted by weights"""
     return cls._fromRotation(fitKernel(_xyz(u), _xyz(v), weights), _splitFrames(frames)[1])
 
   @classmethod
   def rand(cls, *args, rng=None, antipodal=False, maxAngle=None):
+    """random orientations, uniformly distributed or within maxAngle of the identity
+
+      orientation.rand(n, cs, ss)
+      orientation.rand(n, cs, maxAngle=10*degree)"""
     args, frames = _splitFrames(args)
     return cls._fromRotation(rotation.rand(*args, rng=rng, maxAngle=maxAngle).data, frames, antipodal)
 
   @classmethod
   def id(cls, *args):
+    """the identical orientations between the frames given, of the shape given"""
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.broadcast_to([1.0, 0.0, 0.0, 0.0], shape + (4,)).copy(), frames)
@@ -174,6 +196,7 @@ class orientation(rotation):
 
   @classmethod
   def nan(cls, *args):
+    """the orientations of NaN coefficients between the frames given, of the shape given"""
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.full(shape + (4,), np.nan), frames)
@@ -182,22 +205,28 @@ class orientation(rotation):
 
   @property
   def CS(self):
+    """the frame the orientation maps from, frameA: the crystal frame"""
     return self.frameA
 
   @CS.setter
   def CS(self, fr):
+    """sets the frame the orientation maps from, frameA"""
     self.frameA = fr
 
   @property
   def SS(self):
+    """the frame the orientation maps to, frameB: the specimen frame, or the second crystal frame
+    of a misorientation"""
     return self.frameB
 
   @SS.setter
   def SS(self, fr):
+    """sets the frame the orientation maps to, frameB"""
     self.frameB = fr
 
   @property
   def isMisorientation(self):
+    """whether both frames are crystal frames, so the orientation is a misorientation"""
     return isinstance(self.frameA, crystalFrame) and isinstance(self.frameB, crystalFrame)
 
   # the frames of a list are joined by the ADR 0009 rule on both sides
@@ -244,6 +273,8 @@ class orientation(rotation):
     return orientationDot(self, other)
 
   def angle(self, other=None, noSymmetry=False):
+    """the rotational angle up to symmetry, of the orientation or of the misorientation to other;
+    noSymmetry=True the plain angle, other='max' the angle of the equivalent that turns the most"""
     from .symmetryops import orientationAngle, orientationSelfAngle
     # angle(mori, 'max'): the angle of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
@@ -291,14 +322,20 @@ class orientation(rotation):
     return ~(self == other)
 
   def unique(self, tolerance=1e-3, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
+    """the orientations with the equivalents within the tolerance removed, the first kept;
+    optionally the indices of the kept ones and the index of each into them"""
     from .symmetryops import orientationUnique
     return orientationUnique(self, tolerance, noSymmetry, return_index, return_inverse)
 
   def mean(self, weights=None, robust=False, iterations=3):
+    """the mean orientation, every element moved to the equivalent closest to the running mean
+    before the quaternion mean is taken; weighted, or robust against outliers"""
     from .symmetryops import orientationMean
     return orientationMean(self, weights=weights, robust=robust, iterations=iterations)
 
   def project2FundamentalRegion(self, ref=None, antipodal=False):
+    """the symmetric equivalents in the fundamental region, or those closest to the reference
+    ref; antipodal=True adds the grain exchange of a misorientation"""
     from .symmetryops import project2FundamentalRegionOrientation
     # antipodal adds grain exchange to the reduction, MATLAB's 'antipodal'
     o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
@@ -311,6 +348,7 @@ class orientation(rotation):
     return logOrientation(self, ref, side, noSymmetry)
 
   def fundamentalRegion(self):
+    """the fundamental region of the orientations, the orientationRegion of the groups of CS and SS"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self)
 
@@ -327,10 +365,23 @@ class orientation(rotation):
     return transformOrientation(self, to, toB, rule, tolerance)
 
   def find(self, w, epsOrK=None):
+    """the orientations of ori nearest to w up to symmetry: the pair (ind, d) of the nearest, the k
+    nearest for an integer, or two sparse matrices of those within the radius eps
+
+      ind, d = ori.find(w)
+      ind, d = ori.find(w, 5)
+      ind, d = ori.find(w, 5*degree)"""
     from .grids.search import find
     return find(self, w, epsOrK)
 
   def variants(self, second=None, ids=None, parent=False):
+    """the variants of a parent-to-child relationship, the distinct p2c * r over the parent group
+    modulo the child group, or the child orientations of parents; numbered as MTEX numbers them
+
+      p2c.variants()
+      p2c.variants(oriParent)
+      p2c.variants(oriParent, ids)
+      p2c.variants(parent=True)            the parent variants"""
     from .standardorientations import variants
     return variants(self, second, ids, parent)
 
@@ -344,23 +395,32 @@ class orientation(rotation):
 
   @classmethod
   def byMiller(cls, hkl, uvw, *frames):
+    """the orientation that takes the crystal plane hkl to z and the crystal direction uvw to x;
+    of uvw the symmetric equivalent closest to perpendicular to hkl is used
+
+      orientation.byMiller(Miller(1, 1, 0, cs), Miller(0, 0, 1, cs, 'uvw'))
+      orientation.byMiller([1, 1, 0], [0, 0, 1], cs)"""
     from .standardorientations import byMiller
     return byMiller(hkl, uvw, *frames)
 
   @classmethod
   def align(cls, frA, frB, tolerance=1e-1):
+    """the orientation two frames stand in by their axes: a point at v in frA sits at
+    orientation.align(frA, frB) * v in frB; the transition has to be a rotation"""
     from .frametransform import align
     return align(frA, frB, tolerance)
 
   @classmethod
   def byScreenAlignment(cls, frA, frB):
+    """the orientation between two frames that are drawn alike on the screen, from their plotting
+    conventions"""
     from .frametransform import byScreenAlignment
     return byScreenAlignment(frA, frB)
 
   # ------------------------------------------------------------------ display
 
   def _frameSummary(self):
-    return f"{self.frameA.char()} → {self.frameB.char()}"
+    return f"{frameLabel(self.frameA)} → {frameLabel(self.frameB)}"
 
   # the parallel planes and directions a single misorientation is made of, when low indices
   # (up to 5) give it exactly, MATLAB's char of a misorientation; None otherwise
@@ -375,21 +435,16 @@ class orientation(rotation):
     return f"{n1.char()} || {n2.char()}   {d1.char()} || {d2.char()}"
 
   def char(self):
+    """the orientation as text: the parallel planes and directions of a misorientation that low
+    indices give exactly, else the Euler angles"""
     rel = self._relation()
     return rel if rel is not None else self._eulerLine() if self.size == 1 else self._eulerTable()
 
   def __repr__(self):
-    lines = [("misorientation" if self.isMisorientation else "orientation") + f" ({self._frameSummary()})"]
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if self.antipodal:
-      lines.append("  antipodal: true")
     rel = self._relation()
-    if rel is not None:
-      lines.append(f" {rel}")
-    elif 0 < self.size < 20:
-      lines.append(self._eulerTable())
-    return "\n".join(lines)
+    return display(header("misorientation" if self.isMisorientation else "orientation", self._frameSummary()),
+                   [self._sizeField(), ("antipodal", "true" if self.antipodal else None)],
+                   f"  {rel}" if rel is not None else self._eulerTable())
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

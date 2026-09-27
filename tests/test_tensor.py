@@ -179,10 +179,10 @@ def test_T9_factories():
 def test_T10_display_componentwise_product_and_vectors():
   # a single tensor shows its coefficients at every rank, the specimen frame by its convention
   t0 = repr(tensor(5, rank=0))
-  assert "rank: 0 ()" in t0 and t0.rstrip().endswith("5")
+  assert "rank: 0" in t0 and t0.rstrip().endswith("5")
   assert repr(tensor([1, 2, 3], rank=1)).split()[-3:] == ["1", "2", "3"]
   d = tensor(np.array([[0, 0, 0, 0.1, 0, 0]] * 3), rank=3, doubleConvention=True, name="piezo")
-  assert "doubleConvention: true" in repr(d) and "compact matrix form" in repr(d) and "name: piezo" in repr(d)
+  assert "doubleConvention: true" in repr(d) and "compact matrix form" in repr(d) and ": piezo" in repr(d) and "  name " in repr(d)
   # MATLAB's .* multiplies corresponding coefficients and keeps the rank
   A, B = tensor.rand(3, rank=2, rng=rng), tensor.rand(3, rank=2, rng=rng)
   assert times(A, B).rank == 2 and np.allclose(times(A, B).M, A.M * B.M)

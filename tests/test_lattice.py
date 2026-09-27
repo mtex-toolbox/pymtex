@@ -136,4 +136,4 @@ def test_map_plane_and_polygon():
 def test_display():
   l = lattice(latticePositions(HEXA, 6))
   s = repr(l)
-  assert s.startswith("lattice (hex)") and "sites: 36" in s and "spacing: 1" in s
+  assert s.startswith("lattice (hex)") and "sites  : 36" in s and "spacing: 1" in s and "basis  : (1, 0), (0.5, 0.866)" in s

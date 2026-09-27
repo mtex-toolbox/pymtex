@@ -23,6 +23,7 @@ from ..geometry.units import degree
 from .boundaryresampling import _coarsenGrains, _refineGrains, simplifyBoundary
 from .grains import grain2d
 from ..geometry.install import install
+from ..geometry.display import aligned
 
 
 # ------------------------------------------------------------------ the network
@@ -69,12 +70,15 @@ class boundaryNetwork:
 
   @property
   def degree(self):
+    """the number of neighbours of every vertex of the network"""
     return np.diff(self.ptr)
 
   def nNeighbors(self, i):
+    """the number of neighbours of vertex i"""
     return int(self.ptr[i + 1] - self.ptr[i])
 
   def neighbors(self, i):
+    """the neighbours of vertex i, indices into the network's vertices"""
     return self.nbr[self.ptr[i]:self.ptr[i + 1]]
 
   def laplacian(self):
@@ -89,12 +93,14 @@ class boundaryNetwork:
     return A.tocsr()
 
   def __repr__(self):
-    return f"boundaryNetwork\n  vertices: {len(self)}, fixed: {int(np.count_nonzero(self.fixed))}"
+    return aligned(f"boundaryNetwork\n  vertices: {len(self)}, fixed: {int(np.count_nonzero(self.fixed))}")
 
 
 # ------------------------------------------------------------------ the filters
 
 class boundaryFilter:
+  """the base of the boundary smoothing filters: smooth(V, net, h) moves the free vertices V of a
+  boundary network sampled at the spacing h, the fixed ones stay"""
 
   def smooth(self, V, net, h):
     """V are the vertices (n, 2) of the network, h the spacing they are sampled at"""
@@ -126,7 +132,7 @@ class boundaryFilter:
     return []
 
   def __repr__(self):
-    return f"{type(self).__name__}\n" + "\n".join(f"  {k}: {v}" for k, v in self._items())
+    return aligned(f"{type(self).__name__}\n" + "\n".join(f"  {k}: {v}" for k, v in self._items()))
 
 
 class laplaceFilter(boundaryFilter):
@@ -141,6 +147,7 @@ class laplaceFilter(boundaryFilter):
     self.iter, self.lambda_ = int(iter), float(lambda_)
 
   def smooth(self, V, net, h):
+    """the vertices after iter steps of local averaging at the rate lambda_ / 2, the fixed ones kept"""
     L, free = net.laplacian(), ~net.fixed
     out = np.array(V, dtype=float)
     for _ in range(self.iter):
@@ -161,6 +168,8 @@ class taubinFilter(boundaryFilter):
     self.iter, self.lambda_, self.mu = int(iter), float(lambda_), float(mu)
 
   def smooth(self, V, net, h):
+    """the vertices after iter pairs of a smoothing step lambda_ and an unshrinking step mu, the fixed
+    ones kept; mu has to be negative"""
     if self.mu >= 0:
       raise ValueError("mu is the unshrinking step and has to be negative")
     L, free = net.laplacian(), ~net.fixed
@@ -196,9 +205,12 @@ class curvatureFilter(boundaryFilter):
     self.alpha = None if alpha is None else float(alpha)
 
   def weight(self, h):
+    """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
+    four times the spacing h by default, to half amplitude"""
     return _weight(self, h)
 
   def smooth(self, V, net, h):
+    """the minimiser of |V - V0|^2 + alpha |L V|^2 over the free vertices, one sparse system"""
     from scipy.sparse import identity
     alpha = self.weight(h)
     V = np.array(V, dtype=float)
@@ -224,9 +236,13 @@ class huberFilter(boundaryFilter):
     self.iterMax, self.tol = int(iterMax), float(tol)
 
   def weight(self, h):
+    """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
+    four times the spacing h by default, to half amplitude"""
     return _weight(self, h)
 
   def smooth(self, V, net, h):
+    """the minimiser of |V - V0|^2 plus alpha times the Huber penalty of the curvature L V, by
+    reweighting the sparse system until nothing moves, the fixed vertices kept"""
     from scipy.sparse import identity, diags
     alpha = self.weight(h)
     V = np.array(V, dtype=float)

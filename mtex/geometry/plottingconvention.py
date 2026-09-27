@@ -19,12 +19,19 @@ import numpy as np
 from .quaternion import rotation
 from .session import SESSION, getMTEXpref
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector
+from .display import aligned
 
 ARROWS_UTF8 = ("←", "→", "↑", "↓", "⊗", "⊙")
 ARROWS_ASCII = ("<-", "->", "^", "v", "(x)", "(.)")
 
 
 class plottingConvention:
+  """how a reference frame is laid out on screen: one rotation taking the screen axes to the
+  reference axes, east = rot * x, north = rot * y, outOfScreen = rot * z
+
+    pC = plottingConvention(outOfScreen, east)
+    pC = plottingConvention('y↑→x')      each axis next to the screen direction it points to
+    pC = plottingConvention.ij          x east, y south, z into the screen"""
 
   def __init__(self, outOfScreen=None, east=None):
     if isinstance(outOfScreen, plottingConvention):
@@ -44,14 +51,17 @@ class plottingConvention:
 
   @classproperty
   def ij(cls):
+    """the convention of images: x east, y south, z into the screen"""
     return cls(rotation(0.0, 1.0, 0.0, 0.0))
 
   @classproperty
   def default3D(cls):
+    """a tilted view for three dimensional plots"""
     return cls(vector3d(-10, -5, 2), vector3d(1, -2, 0))
 
   @classmethod
   def edax(cls, setting=2):
+    """the EDAX/TSL frame of the given setting, 1 to 4, z out of the screen"""
     if not 1 <= setting <= 4:
       raise ValueError("EDAX settings are 1 to 4")
     return cls(zvector, (yvector, -yvector, xvector, -xvector)[setting - 1])
@@ -63,32 +73,39 @@ class plottingConvention:
     return _sessionDefault(_defaultFrame().how2plot)
 
   def makeDefault(self):
+    """makes this convention the session default, that of the default specimen frame"""
     _defaultFrame().how2plot = plottingConvention(self)
 
   # ------------------------------------------------------------------ the screen directions
 
   @property
   def east(self):
+    """the reference direction pointing east on screen"""
     return self.rot * xvector
 
   @property
   def west(self):
+    """the reference direction pointing west on screen"""
     return -self.east
 
   @property
   def north(self):
+    """the reference direction pointing north on screen"""
     return self.rot * yvector
 
   @property
   def south(self):
+    """the reference direction pointing south on screen"""
     return -self.north
 
   @property
   def outOfScreen(self):
+    """the reference direction pointing out of the screen"""
     return self.rot * zvector
 
   @property
   def intoScreen(self):
+    """the reference direction pointing into the screen"""
     return -self.outOfScreen
 
   @east.setter
@@ -98,22 +115,27 @@ class plottingConvention:
 
   @west.setter
   def west(self, v):
+    """sets the direction pointing west, the least rotation that moves it there"""
     self.east = -v
 
   @north.setter
   def north(self, v):
+    """sets the direction pointing north, the least rotation that moves it there"""
     self.rot = rotation.map(self.north, v) * self.rot
 
   @south.setter
   def south(self, v):
+    """sets the direction pointing south, the least rotation that moves it there"""
     self.north = -v
 
   @outOfScreen.setter
   def outOfScreen(self, v):
+    """sets the direction pointing out of the screen, the least rotation that moves it there"""
     self.rot = rotation.map(self.outOfScreen, v) * self.rot
 
   @intoScreen.setter
   def intoScreen(self, v):
+    """sets the direction pointing into the screen, the least rotation that moves it there"""
     self.outOfScreen = -v
 
   # two conventions are the same when they lay the frame out the same way
@@ -137,6 +159,7 @@ class plottingConvention:
 
   @property
   def isPictogram(self):
+    """whether both screen axes lie along reference axes, so that the convention reads as 'y↑→x'"""
     return self.char() != "xyz"
 
   def __str__(self):
@@ -145,8 +168,9 @@ class plottingConvention:
   def __repr__(self):
     if self.isPictogram:
       return f"plottingConvention ({self.char()})"
-    fmt = lambda v: "(" + ",".join(f"{x:.3g}" for x in v.data) + ")"
-    return f"plottingConvention\n  outOfScreen: {fmt(self.outOfScreen)}\n  north: {fmt(self.north)}\n  east: {fmt(self.east)}"
+    from .display import display, numString
+    fmt = lambda v: "(" + ", ".join(numString(x) for x in v.data) + ")"
+    return display("plottingConvention", [("outOfScreen", fmt(self.outOfScreen)), ("north", fmt(self.north)), ("east", fmt(self.east))])
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -246,7 +270,7 @@ class _sessionDefault(plottingConvention):
     plottingConvention(outOfScreen, east).makeDefault()
 
   def __repr__(self):
-    return plottingConvention.__repr__(plottingConvention(self))
+    return aligned(plottingConvention.__repr__(plottingConvention(self)))
 
 
 # the frame that supplies the session default convention, minted by frames.py on first use
@@ -266,26 +290,32 @@ def _setDefault(**directions):
 
 
 def plotx2east():
+  """lets the x axis of the session default convention point east"""
   _setDefault(east=xvector)
 
 
 def plotx2north():
+  """lets the x axis of the session default convention point north"""
   _setDefault(north=xvector)
 
 
 def plotx2west():
+  """lets the x axis of the session default convention point west"""
   _setDefault(west=xvector)
 
 
 def plotx2south():
+  """lets the x axis of the session default convention point south"""
   _setDefault(south=xvector)
 
 
 def plotzOutOfPlane():
+  """lets the z axis of the session default convention point out of the screen"""
   _setDefault(outOfScreen=zvector)
 
 
 def plotzIntoPlane():
+  """lets the z axis of the session default convention point into the screen"""
   _setDefault(intoScreen=zvector)
 
 

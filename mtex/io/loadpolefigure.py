@@ -334,6 +334,8 @@ def loadPoleFigure_generic(fname, *args, columnNames=None, columns=None, radians
 
 
 def isPopla(lines):
+  """whether the lines are those of a Popla file: Miller indices and four numbers in five character
+  fields on the second line"""
   s = lines[1] if len(lines) > 1 else ""
   return len(s) >= 45 and F.millerIndices(s[:5]) is not None and all(F._float(s[5 * k:5 * k + 5]) is not None for k in range(1, 5))
 

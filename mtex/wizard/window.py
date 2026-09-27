@@ -41,6 +41,7 @@ class LoadWorker(QObject):
 
   @Slot()
   def run(self):
+    """runs the load and emits its result, or the exception it raised"""
     try:
       self.done.emit(self.load())
     except Exception as e:
@@ -59,6 +60,7 @@ class LoadBridge(QObject):
 
   @Slot(object)
   def finish(self, result):
+    """stops the thread and commits the result on the main thread, a failure shown as the status"""
     self.thread.quit()
     try:
       self.commit(result)
@@ -69,6 +71,8 @@ class LoadBridge(QObject):
 
 
 class WizardWindow(QMainWindow):
+  """the import wizard's window over a WizardState: the file browser on the left, the frames, the
+  phase table, the script and the key on the right above the tabs of the views"""
 
   def __init__(self, st, app=None):
     super().__init__()
@@ -137,6 +141,7 @@ class WizardWindow(QMainWindow):
   # ------------------------------------------------------------------ the strip
 
   def refreshTabs(self):
+    """rebuilds the tab strip from the state's tabs, hidden while there is only one"""
     self.tabs.blockSignals(True)
     while self.tabs.count():
       self.tabs.removeTab(0)
@@ -150,10 +155,12 @@ class WizardWindow(QMainWindow):
     self.showTab()
 
   def onTab(self, k):
+    """hands a tab chosen in the strip to the state"""
     if k != self.st.tab:
       cb.pickTab(self.st, k)
 
   def showTab(self):
+    """lets the strip follow the state's tab and redraws the view"""
     if self.tabs.currentIndex() != self.st.tab:
       self.tabs.blockSignals(True)
       self.tabs.setCurrentIndex(self.st.tab)
@@ -173,6 +180,7 @@ class WizardWindow(QMainWindow):
 # ------------------------------------------------------------------ running it
 
 def application():
+  """the running QApplication, created on first call, with the wizard's font"""
   app = QApplication.instance()
   if app is None:
     app = QApplication(sys.argv[:1])

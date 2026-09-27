@@ -219,7 +219,7 @@ def test_copy_cat_and_display():
   with pytest.raises(ValueError):
     EBSD.cat(ebsd[:10], EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList))
   s = repr(ebsd)
-  assert s.startswith("EBSD (") and "size: 144" in s and "test" in s and "properties: mad" in s and "square lattice" in s
+  assert s.startswith("EBSD (") and "size: 144" in s and "test" in s and "properties    : mad" in s and "square lattice" in s
   assert "the map is empty" in repr(ebsd[np.zeros(144, dtype=bool)])
   # a float32 map keeps its precision
   e32 = sampleMap(dtype=np.float32)

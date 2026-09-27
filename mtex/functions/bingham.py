@@ -17,10 +17,12 @@ from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.vector3d import vector3d
+from ..geometry.display import frameLabel, framesLabel
 from .funops import _antipodalPole, _rotatedFrame
 from .handles import S2FunHandle, SO3FunGeneric
 from .rbf import _readFrames, _rotationsFor
 from .s2fun import S2FunHarmonic
+from ..geometry.display import aligned
 
 
 # the coefficients c_1 .. c_s of prod (x - kappa_i) = x^s + c_1 x^{s-1} + ... + c_s
@@ -119,6 +121,12 @@ def binghamSample(kappa, A, n, rng):
 
 
 class SO3FunBingham(SO3FunGeneric):
+  """the Bingham distribution on SO(3): the density exp(q' A diag(kappa) A' q) on the quaternions,
+  symmetrised over the crystal and specimen frames, with four concentrations kappa and four
+  orthonormal quaternion axes A; BinghamODF builds it from axes, orientations or a fibre
+
+    SO3FunBingham(kappa, A, cs, ss)
+    SO3FunBingham(kappa, A, cs, cs, antipodal=True)      with exchange symmetry"""
 
   def __init__(self, kappa, A, *frames, weight=1.0, antipodal=False):
     A, framesOf, exchange = _axesMatrix(A)
@@ -137,6 +145,7 @@ class SO3FunBingham(SO3FunGeneric):
 
   @property
   def bandwidth(self):
+    """the bandwidth of the harmonic expansion, the preference maxSO3Bandwidth"""
     return getMTEXpref("maxSO3Bandwidth")
 
   @property
@@ -145,6 +154,7 @@ class SO3FunBingham(SO3FunGeneric):
     return orientation._fromRotation(self.A.T.copy(), (self.CS, self.SS))
 
   def mean(self):
+    """the mean value of the function over SO(3), its weight"""
     return self.weight
 
   # the axes moved by every pair of the groups, <l q r, a> = <q, l^-1 a r^-1>, and the
@@ -162,6 +172,7 @@ class SO3FunBingham(SO3FunGeneric):
     return np.stack(copies)
 
   def eval(self, x):
+    """the values of the distribution at orientations, the mean over the symmetric copies of its axes"""
     r = _rotationsFor(self, x)
     q = r.data.reshape(-1, 4)
     copies = self._symmetricAxes()
@@ -179,6 +190,8 @@ class SO3FunBingham(SO3FunGeneric):
   __rmul__ = __mul__
 
   def rotate(self, r, side="left"):
+    """the distribution turned by a rotation, from the left (the specimen side) or, with
+    side='right', from the right (the crystal side)"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     axes = rotation(self.A.T)
     if side == "left":
@@ -222,10 +235,10 @@ class SO3FunBingham(SO3FunGeneric):
     return S2FunHarmonic(S2FunHandle(value, self.SS, bandwidth=L, antipodal=_antipodalPole(h, self.CS)))
 
   def __repr__(self):
-    lines = [f"SO3FunBingham ({self.CS.char()} → {self.SS.char()})", f"  kappa: {np.array2string(self.kappa, precision=3)}", f"  weight: {self.weight:.4g}"]
+    lines = [f"SO3FunBingham ({framesLabel(self.CS, self.SS)})", f"  kappa: {np.array2string(self.kappa, precision=3)}", f"  weight: {self.weight:.4g}"]
     if self.antipodal:
       lines.append("  antipodal: true")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -316,6 +329,12 @@ def calcBinghamODF(o, weights=None, exact=False):
 
 
 class S2FunBingham:
+  """the Bingham distribution on the sphere: the density exp(v' a diag(Z) a' v) of the axes v, with
+  three shape parameters Z and three orthonormal principal axes a, symmetrised over a frame
+
+    S2FunBingham(Z)                       the coordinate axes
+    S2FunBingham(Z, a)                    the axes as directions or a 3x3 matrix
+    S2FunBingham.fit(v)                   the fit to directions"""
   isReal = True
   antipodal = True
 
@@ -336,6 +355,7 @@ class S2FunBingham:
 
   @property
   def CS(self):
+    """the frame the distribution lives in, its symmetry"""
     return self.frame
 
   @property
@@ -345,9 +365,11 @@ class S2FunBingham:
 
   @property
   def bandwidth(self):
+    """the bandwidth of the harmonic expansion, the preference maxS2Bandwidth"""
     return getMTEXpref("maxS2Bandwidth")
 
   def mean(self):
+    """the mean value over the sphere, one: the distribution is normalised"""
     return 1.0
 
   def _symmetricAxes(self):
@@ -360,6 +382,7 @@ class S2FunBingham:
     return self.eval(x)
 
   def eval(self, x):
+    """the values of the density at directions, the mean over the symmetric copies of its axes"""
     v = x if isinstance(x, vector3d) else vector3d(x)
     d = v.normalize().data.reshape(-1, 3)
     copies = self._symmetricAxes()
@@ -373,6 +396,7 @@ class S2FunBingham:
     return S2FunHarmonic(lambda v: self.eval(v), self.frame, bandwidth=L, antipodal=True, real=True)
 
   def rotate(self, r):
+    """the distribution turned by a rotation, its axes and its frame"""
     rot = rotation(r.data.reshape(4))
     return S2FunBingham(self.Z, (rot * vector3d(self._A.T)).data.T, None if self.frame is None else _rotatedFrame(self.frame, rot))
 
@@ -413,8 +437,8 @@ class S2FunBingham:
     return f, ab, rotation.byMatrix(B.T)
 
   def __repr__(self):
-    info = "" if self.frame is None else f" ({self.frame.char()})"
-    return f"S2FunBingham{info}\n  Z: {np.array2string(self.Z, precision=3)}"
+    info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
+    return aligned(f"S2FunBingham{info}\n  Z: {np.array2string(self.Z, precision=3)}")
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

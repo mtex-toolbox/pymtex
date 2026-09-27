@@ -2,6 +2,7 @@
 # with a colour per face, orthogonal slices of a voxel volume, and the camera of a plotting
 # convention. PyVista, matplotlib and the HTML writer of render3d.py draw a scene.
 import numpy as np
+from ..geometry.display import display, sizeString
 
 __all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices"]
 
@@ -28,6 +29,7 @@ class mesh3d:
 
   @property
   def numCorners(self):
+    """the number of corners of every face"""
     return np.diff(self.ptr)
 
   def triangles(self):
@@ -46,7 +48,11 @@ class mesh3d:
     return np.unique(E, axis=0)
 
   def bounds(self):
+    """the corners (lo, hi) of the box around the vertices"""
     return self.V.min(axis=0), self.V.max(axis=0)
+
+  def __repr__(self):
+    return display("mesh3d", [("faces", len(self)), ("vertices", len(self.V))])
 
 
 class slices3d:
@@ -74,10 +80,14 @@ class slices3d:
     return rgb, vis, self.origin + corners @ self.D
 
   def bounds(self):
+    """the corners (lo, hi) of the box around the voxel volume"""
     n = np.array(self.visible.shape)
     box = np.array([[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)]) * n - 0.5
     P = self.origin + box @ self.D
     return P.min(axis=0), P.max(axis=0)
+
+  def __repr__(self):
+    return display("slices3d", [("voxels", sizeString(self.visible.shape)), ("at", ", ".join(str(a) for a in self.at))])
 
 
 class picture3d:
@@ -90,7 +100,11 @@ class picture3d:
     self.corners = np.asarray(corners, dtype=float).reshape(4, 3)
 
   def bounds(self):
+    """the corners (lo, hi) of the box around the rectangle"""
     return self.corners.min(axis=0), self.corners.max(axis=0)
+
+  def __repr__(self):
+    return display("picture3d", [("pixels", sizeString(self.rgba.shape[:2]))])
 
 
 class lines3d:
@@ -103,8 +117,12 @@ class lines3d:
     self.lineWidth, self.alpha = float(lineWidth), float(alpha)
 
   def bounds(self):
+    """the corners (lo, hi) of the box around the segments"""
     P = self.segments.reshape(-1, 3)
     return P.min(axis=0), P.max(axis=0)
+
+  def __repr__(self):
+    return display("lines3d", [("segments", len(self.segments)), ("lineWidth", f"{self.lineWidth:g}")])
 
 
 def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSize=0.25, sides=12):
@@ -151,7 +169,11 @@ class points3d:
     self.markerSize = float(markerSize)
 
   def bounds(self):
+    """the corners (lo, hi) of the box around the markers"""
     return self.P.min(axis=0), self.P.max(axis=0)
+
+  def __repr__(self):
+    return display("points3d", [("points", len(self.P)), ("markerSize", f"{self.markerSize:g}")])
 
 
 def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12):
@@ -178,10 +200,12 @@ class scene3d:
     self.items, self.how2plot, self.scanUnit = [], how2plot, scanUnit
 
   def add(self, item):
+    """the item added to the scene, and returned"""
     self.items.append(item)
     return item
 
   def bounds(self):
+    """the corners (lo, hi) of the box around all items, the unit cube for an empty scene"""
     if not self.items:
       return np.zeros(3), np.ones(3)
     b = [it.bounds() for it in self.items]
@@ -194,6 +218,12 @@ class scene3d:
     o = pC.outOfScreen.normalize().data.reshape(3)
     up = pC.north.normalize().data.reshape(3)
     return o, up
+
+  def __repr__(self):
+    kinds = {}
+    for it in self.items:
+      kinds[type(it).__name__] = kinds.get(type(it).__name__, 0) + 1
+    return display("scene3d", [("items", ", ".join(f"{n} {k}" for k, n in kinds.items()) or "none"), ("scan unit", self.scanUnit)])
 
 
 def _rgb(c):

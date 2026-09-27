@@ -60,7 +60,7 @@ def test_P1_construction_and_accessors():
   assert both.allI[1].ravel()[0] == r.size
   both.intensities = 3
   assert np.all(both.intensities == 3)
-  assert "PoleFigure" in repr(both) and "36 x 10 points" in repr(both)
+  assert "PoleFigure" in repr(both) and "36 × 10 points" in repr(both)
 
 
 def test_P2_quadrature_weights():

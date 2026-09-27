@@ -22,9 +22,16 @@ from ..units import degree
 from ..vector3d import vector3d, zvector
 from .s1grid import S1Grid
 from .s2grid import equispacedS2Grid
+from ..display import display, header
 
 
 class SO3Grid(orientation):
+  """the equispaced grid of orientations over one fundamental region of its frame pair, MATLAB's
+  SO3Grid: an S2 grid of the images of z with a ladder of gamma per node, so a search costs
+  three binary searches; built by equispacedSO3Grid, and anything derived from it is a plain
+  orientation list
+
+    S3G = equispacedSO3Grid(cs, ss, resolution=5*degree)"""
 
   # the ladders of gamma as one flat array, node k holding gammaPoints[offset[k]:offset[k + 1]]
   # on the circle [gammaMin[k], gammaMin[k] + gammaPeriod)
@@ -57,21 +64,26 @@ class SO3Grid(orientation):
 
   @property
   def resolution(self):
+    """the resolution the grid was built for, in radians"""
     return self.res
 
   @property
   def nnodes(self):
+    """the number of nodes of the S2 grid of (alpha, beta), each carrying a ladder of gamma"""
     return len(self.alpha)
 
   def node(self, k):
+    """the indices of the orientations on the gamma ladder of node k"""
     return np.arange(self.offset[k], self.offset[k + 1])
 
   @property
   def alphaPeriod(self):
+    """the period of alpha, 2 pi over the order of the rotations about z the frames share"""
     return self.alphabeta.rhoGrid[0].period
 
   @property
   def nZ(self):
+    """the number of rotations about z absorbed by the period of alpha"""
     return int(np.round(2 * np.pi / self.alphaPeriod))
 
   def subGrid(self, mask):
@@ -129,7 +141,7 @@ class SO3Grid(orientation):
             sparse.csr_matrix((vals, cols.copy(), indptr.copy()), shape=shape))
 
   def __repr__(self):
-    return f"SO3Grid ({self._frameSummary()})\n  size: {self.size}\n  resolution: {self.res / degree:.4g}°"
+    return display(header("SO3Grid", self._frameSummary()), [("size", self.size), ("resolution", f"{self.res / degree:.4g}°")])
 
 
 # whether rotations are about z, and one rotation per coset of the rotations about z: right

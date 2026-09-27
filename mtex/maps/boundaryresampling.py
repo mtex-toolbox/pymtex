@@ -157,6 +157,8 @@ def simplifyBoundary(gB, epsilon=None, protect=None, keepGrains=None):
 
 
 def defaultEpsilon(gB):
+  """the default tolerance of simplifyBoundary: the median segment length over sqrt(2), the
+  furthest a staircase of that spacing strays from its line"""
   return 0.0 if gB.isempty else float(np.median(gB.segLength)) / np.sqrt(2)
 
 

@@ -28,7 +28,7 @@ def test_a_cube_and_an_octahedron():
   with pytest.raises(ValueError):
     crystalShape(vector3d(1, 0, 0))
   r = repr(cube)
-  assert "crystalShape" in r and "cube" in r and "faces: 6" in r and "vertices: 8" in r
+  assert "crystalShape" in r and "cube" in r and "faces   : 6" in r and "vertices: 8" in r
 
 
 def test_scaling_moving_and_rotating():

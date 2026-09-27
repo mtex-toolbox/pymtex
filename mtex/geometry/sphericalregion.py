@@ -18,6 +18,7 @@ from .quaternion import orthogonalTransform, qrot, rotation
 from .symmetry import symmetry
 from .units import degree
 from .vector3d import vector3d, xvector, yvector, zvector
+from .display import display
 
 
 def _unit(v):
@@ -50,6 +51,7 @@ class sphericalRegion:
 
   @classmethod
   def byVertices(cls, V, frame=None):
+    """the region bounded by the great circles through consecutive vertices V, taken counterclockwise"""
     V = np.asarray(V.data if isinstance(V, vector3d) else V, dtype=float).reshape(-1, 3)
     N = np.cross(V, np.roll(V, -1, axis=0))
     return cls(N, frame=frame)
@@ -115,6 +117,7 @@ class sphericalRegion:
     return sphericalRegion(np.concatenate([u[None], self.N]), np.concatenate([[0.0], self.alpha]), self.frame, self.antipodal)
 
   def restrict2Lower(self, up=None):
+    """the hemisphere opposite to a direction, z by default, added to the region"""
     up = zvector if up is None else up
     return self.restrict2Upper(-up if isinstance(up, vector3d) else -np.asarray(up, dtype=float))
 
@@ -149,6 +152,7 @@ class sphericalRegion:
     return segs
 
   def thetaInterval(self, rho):
+    """the polar interval (min, max) of the region along the meridian rho, None where it misses it"""
     segs = self.thetaIntervals(rho)
     return None if not segs else (segs[0][0], segs[-1][1])
 
@@ -185,7 +189,8 @@ class sphericalRegion:
     return arcs
 
   def __repr__(self):
-    return f"sphericalRegion\n  faces: {len(self.N)}\n  vertices: {0 if len(self.N) == 0 else self.vertices().size}"
+    return display("sphericalRegion", [("faces", len(self.N)), ("vertices", 0 if len(self.N) == 0 else self.vertices().size),
+                                       ("antipodal", "true" if self.antipodal else None)])
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -354,6 +359,8 @@ _TILES = {}
 
 
 def tilesSphere(sR, pg, n=6000):
+  """whether the region is a fundamental domain of the point group: n evenly spread directions
+  folded into it all land inside, and it covers the share of one element; cached"""
   from .kernels import projectIntoSector
   els = _elements(pg)
   key = (np.round(els, 9).tobytes(), np.round(sR.N, 9).tobytes(), np.round(sR.alpha, 9).tobytes())

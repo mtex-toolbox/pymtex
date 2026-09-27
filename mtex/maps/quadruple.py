@@ -72,6 +72,9 @@ def _posKey(a, b):
 
 
 def splitQuadruplePoints(c, seg, ebsd, crit):
+  """the cell complex with every quadruple point of a square grid split into two triple points and the
+  map segmented again: the diagonal pair of cells joined is the one the criterion connects more,
+  then the one of smaller misorientation, then by position"""
   verts, faces = quadruplePoints(c, seg)
   sites = c.sites
   n0 = len(verts)

@@ -23,6 +23,8 @@ from .lattice import lattice, latticeBasis, mapPlane
 
 
 class scanLayout:
+  """how a lattice is scanned: the lattice steps along the rows and between them, the shift of a
+  row against the one below, and the dims of the rectangle of cells the scan covers"""
 
   def __init__(self, l):
     A = l.A

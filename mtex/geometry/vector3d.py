@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
-from .display import sizeString, table
+from .display import display, header, sizeString, table, takeRows
 from .representations import isnull, orthKernel
 
 
@@ -35,6 +35,14 @@ def _scalar(x):
 
 
 class vector3d(MtexArray):
+  """three dimensional vectors, a container over (..., 3) coordinates carrying antipodal,
+  isNormalized, the reference frame and the display style; a vector in a crystal frame is a
+  crystal direction with Miller indices
+
+    vector3d(x, y, z)
+    vector3d(xyz, frame=cs)             coordinates of shape (..., 3) or (3, N)
+    vector3d.byPolar(theta, rho)
+    vector3d.X, vector3d.Y, vector3d.Z"""
   _ncoord = 3
   _carried = ("antipodal", "isNormalized", "_frame", "dispStyle")
 
@@ -94,6 +102,8 @@ class vector3d(MtexArray):
 
   @frame.setter
   def frame(self, fr):
+    """the reference frame the vector is expressed in, None for frame-free data; assigning a frame
+    keeps the components"""
     if _isConvention(fr):
       from .frames import specimenFrame
       fr = specimenFrame.frameFor(fr)
@@ -107,10 +117,12 @@ class vector3d(MtexArray):
 
   @property
   def CS(self):
+    """the crystal frame of a crystal direction, None for any other vector"""
     return self._frame if self.isCrystalDirection else None
 
   @CS.setter
   def CS(self, cs):
+    """assigning a crystal frame to a crystal direction keeps its indices, otherwise its components"""
     if self.isCrystalDirection and self._frame is not cs and self.dispStyle != "xyz":
       style, coord = self.dispStyle, self.coordinates
       self._frame = cs
@@ -121,15 +133,18 @@ class vector3d(MtexArray):
 
   @property
   def how2plot(self):
+    """the plotting convention of the vector, that of its frame or the default"""
     from .plottingconvention import plottingConvention
     return self._frame.how2plot if self._frame is not None else plottingConvention.default
 
   @property
   def isCrystalDirection(self):
+    """whether the vector is given in a crystal frame"""
     return _isCrystalFrame(self._frame)
 
   @property
   def lattice(self):
+    """the lattice type of the crystal frame, latticeType.none for a vector in no crystal frame"""
     from .latticetype import latticeType
     return self._frame.lattice if self.isCrystalDirection else latticeType.none
 
@@ -137,10 +152,12 @@ class vector3d(MtexArray):
 
   @property
   def convention(self):
+    """the convention the vector is written in, its display style: 'xyz', 'hkl', 'hkil', 'uvw' or 'UVTW'"""
     return self.dispStyle
 
   @convention.setter
   def convention(self, s):
+    """assigning the convention sets the display style"""
     self.dispStyle = s
 
   @property
@@ -150,6 +167,7 @@ class vector3d(MtexArray):
 
   @coordinates.setter
   def coordinates(self, c):
+    """the indices in the convention the vector is written in, the components for 'xyz'"""
     if self.dispStyle == "xyz":
       self.data[...] = c
     else:
@@ -161,11 +179,13 @@ class vector3d(MtexArray):
 
   @property
   def hkl(self):
+    """the Miller indices of a plane normal, the coordinates in the dual basis of the crystal frame"""
     self._needsCrystal()
     return self.data @ np.linalg.inv(self._frame.basisDual().data)
 
   @hkl.setter
   def hkl(self, hkl):
+    """assigning Miller indices, three or four, sets the vector and writes it as a plane normal"""
     self._needsCrystal()
     hkl = np.asarray(hkl, dtype=float)
     hkl = hkl[..., [0, 1, -1]]
@@ -175,20 +195,24 @@ class vector3d(MtexArray):
 
   @property
   def hkil(self):
+    """the four Miller-Bravais indices of a plane normal, i = -(h + k)"""
     hkl = self.hkl
     return np.concatenate([hkl[..., :2], -hkl[..., :1] - hkl[..., 1:2], hkl[..., 2:]], axis=-1)
 
   @hkil.setter
   def hkil(self, hkil):
+    """assigning four Miller-Bravais indices sets the vector, as assigning hkl"""
     self.hkl = hkil
 
   @property
   def uvw(self):
+    """the indices of a lattice direction, the coordinates in the basis of the crystal frame"""
     self._needsCrystal()
     return self.data @ np.linalg.inv(self._frame.basis.data)
 
   @uvw.setter
   def uvw(self, uvw):
+    """assigning three direction indices sets the vector and writes it as a direction; four are UVTW"""
     self._needsCrystal()
     uvw = np.asarray(uvw, dtype=float)
     if uvw.shape[-1] == 4:
@@ -205,6 +229,7 @@ class vector3d(MtexArray):
 
   @UVTW.setter
   def UVTW(self, UVTW):
+    """assigning Weber indices, four or three, sets the vector and writes it in UVTW"""
     UVTW = np.asarray(UVTW, dtype=float)
     if UVTW.shape[-1] == 4:
       self.uvw = np.stack([UVTW[..., 0] - UVTW[..., 2], UVTW[..., 1] - UVTW[..., 2], UVTW[..., 3]], axis=-1) / 3
@@ -276,6 +301,10 @@ class vector3d(MtexArray):
 
   @classmethod
   def byPolar(cls, theta, rho, antipodal=False):
+    """the vectors of polar angle theta to z and azimuth rho from x towards y, unit vectors
+
+      vector3d.byPolar(theta, rho)
+      vector3d.byPolar(theta, rho, antipodal=True)      axes"""
     theta, rho = np.broadcast_arrays(np.asarray(theta, dtype=float), np.asarray(rho, dtype=float))
     v = cls(np.sin(theta) * np.cos(rho), np.sin(theta) * np.sin(rho), np.cos(theta), antipodal=antipodal)
     v.isNormalized = True
@@ -304,57 +333,69 @@ class vector3d(MtexArray):
 
   @classmethod
   def zeros(cls, *shape):
+    """the zero vectors of a shape"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.zeros(tuple(shape) + (3,)))
 
   @classmethod
   def nan(cls, *shape):
+    """the vectors of a shape with NaN coordinates"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (3,), np.nan))
 
   @classproperty
   def X(cls):
+    """the unit vector along x, minted anew on every access"""
     return cls(1.0, 0.0, 0.0, isNormalized=True)
 
   @classproperty
   def Y(cls):
+    """the unit vector along y, minted anew on every access"""
     return cls(0.0, 1.0, 0.0, isNormalized=True)
 
   @classproperty
   def Z(cls):
+    """the unit vector along z, minted anew on every access"""
     return cls(0.0, 0.0, 1.0, isNormalized=True)
 
   # ------------------------------------------------------------------ coordinates
 
   @property
   def x(self):
+    """the x coordinates"""
     return self.data[..., 0]
 
   @x.setter
   def x(self, value):
+    """assigning the x coordinates"""
     self.data[..., 0] = value
     self.isNormalized = False
 
   @property
   def y(self):
+    """the y coordinates"""
     return self.data[..., 1]
 
   @y.setter
   def y(self, value):
+    """assigning the y coordinates"""
     self.data[..., 1] = value
     self.isNormalized = False
 
   @property
   def z(self):
+    """the z coordinates"""
     return self.data[..., 2]
 
   @z.setter
   def z(self, value):
+    """assigning the z coordinates"""
     self.data[..., 2] = value
     self.isNormalized = False
 
   @property
   def xyz(self):
+    """the coordinates, an array of shape (..., 3)"""
     return self.data
 
   def polar(self):
@@ -367,10 +408,12 @@ class vector3d(MtexArray):
 
   @property
   def theta(self):
+    """the polar angle to z, in [0, pi]"""
     return self.polar()[0]
 
   @property
   def rho(self):
+    """the azimuth from x towards y, in [0, 2 pi)"""
     return self.polar()[1]
 
   @property
@@ -494,6 +537,7 @@ class vector3d(MtexArray):
     return self._new(np.cross(self.data, other.data), **attrs)
 
   def norm(self):
+    """the length of the vectors"""
     return np.linalg.norm(self.data, axis=-1)
 
   def angle(self, other, N=None, antipodal=False, noSymmetry=False):
@@ -527,6 +571,8 @@ class vector3d(MtexArray):
     return a.angle(b, **kwargs)
 
   def dot_outer(self, other, **kwargs):
+    """the inner products of every entry of self with every entry of other, an array of shape
+    self.shape + other.shape; keywords go to dot"""
     other = self._coerce(other)
     a = self.reshape(self.shape + (1,) * other.ndim)
     b = other.reshape((1,) * self.ndim + other.shape)
@@ -553,11 +599,13 @@ class vector3d(MtexArray):
     return ~(self == other)
 
   def isnan(self):
+    """whether a vector has a NaN coordinate"""
     return np.any(np.isnan(self.data), axis=-1)
 
   # ------------------------------------------------------------------ derived vectors
 
   def normalize(self, zeroToZero=False):
+    """the vectors scaled to unit length; with zeroToZero=True a zero vector stays zero"""
     if self.isNormalized:
       return self
     n = self.norm()
@@ -590,6 +638,7 @@ class vector3d(MtexArray):
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)
 
   def sum(self, axis=None):
+    """the sum of the vectors, over all axes or the given ones"""
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._new(np.sum(self.data, axis=axis), **self._joined(None))
 
@@ -642,6 +691,7 @@ class vector3d(MtexArray):
     return self.__eq__(other) if tolerance is None else self.__eq__(other, tolerance)
 
   def rotate(self, rot):
+    """the vectors turned by a rotation, rot * v; a number is an angle about z"""
     if not isinstance(rot, MtexArray):
       from .quaternion import rotation
       rot = rotation.byAxisAngle(vector3d.Z, rot)
@@ -664,10 +714,17 @@ class vector3d(MtexArray):
     return symmetrise(self, unique=unique, antipodal=antipodal, noAntipodal=noAntipodal)
 
   def multiplicity(self, antipodal=None, noAntipodal=False):
+    """the number of distinct directions symmetrically equivalent to each vector, of axes under
+    antipodal"""
     from .symmetryops import multiplicity
     return multiplicity(self, antipodal=antipodal, noAntipodal=noAntipodal)
 
   def project2FundamentalRegion(self, center=None, antipodal=False):
+    """the directions folded into the fundamental sector of their frame, with antipodal=True into
+    that of the Laue group; given a centre, the equivalent nearest it instead
+
+      v.project2FundamentalRegion()
+      v.project2FundamentalRegion(center)"""
     from .symmetryops import project2FundamentalRegion
     v = self
     if antipodal and self.isCrystalDirection:
@@ -694,19 +751,17 @@ class vector3d(MtexArray):
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [type(self).__name__ + f" ({self._headerChar()})"]
-    if self.size != 1:
-      lines.append(f"  size: {sizeString(self.shape)}")
-    if self.antipodal:
-      lines.append("  antipodal: true")
-    if 0 < self.size < 20:
+    body = None
+    if self.size:
+      take, pos = takeRows(self.size)
+      shown = self.reshape(-1)[take]
       if self.isCrystalDirection and self.dispStyle != "xyz":
-        c = np.round(self.coordinates.reshape(-1, self.coordinates.shape[-1]), 4)
-        lines.append(table(list(self.dispStyle), [c[:, k] for k in range(c.shape[1])], decimals=4, tiny=1e-8))
+        c = np.round(shown.coordinates.reshape(len(take), -1), 4)
+        body = table(list(self.dispStyle), c.T, decimals=4, tiny=1e-8, rows=pos)
       else:
-        d = self.data.reshape(-1, 3)
-        lines.append(table(["x", "y", "z"], [d[:, 0], d[:, 1], d[:, 2]]))
-    return "\n".join(lines)
+        body = table(["x", "y", "z"], shown.data.reshape(-1, 3).T, rows=pos)
+    return display(header(type(self).__name__, self._headerChar()),
+                   [("size", sizeString(self.shape) if self.size != 1 else None), ("antipodal", "true" if self.antipodal else None)], body)
 
   # a crystal direction is headed by its frame, any other by the convention it is drawn in
   def _headerChar(self):
@@ -799,4 +854,5 @@ __lazy__ = ["xvector", "yvector", "zvector"]
 
 
 def isCrystalDirection(v):
+  """whether v is a vector given in a crystal frame"""
   return isinstance(v, vector3d) and v.isCrystalDirection

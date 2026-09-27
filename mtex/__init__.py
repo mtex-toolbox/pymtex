@@ -40,6 +40,11 @@ __all__ += _plotting.__all__
 __all__ += ["importWizard", "xvector", "yvector", "zvector"]
 
 
+# the displays of a notebook and of the IPython terminal, when mtex is imported in one
+from .plotting.richdisplay import registerDisplays as _registerDisplays
+_registerDisplays()
+
+
 # xvector, yvector, zvector are fresh on every access
 def __getattr__(name):
   if name in ("xvector", "yvector", "zvector"):

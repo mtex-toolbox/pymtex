@@ -60,6 +60,7 @@ class Breadcrumb(QWidget):
     self.refresh()
 
   def refresh(self):
+    """the path redrawn from the folder of the state"""
     while self.lay.count():
       item = self.lay.takeAt(0)
       if item.widget() is not None:
@@ -123,6 +124,7 @@ class StatusBand(QLabel):
     self.refresh()
 
   def refresh(self):
+    """the band redrawn from the status of the state, its text and the colour of its kind"""
     kind, text = self.st.status
     self.setText(text)
     self.setStyleSheet(f"background: {STATUS_COLORS.get(kind, STATUS_COLORS['idle'])}; border: 1px solid {FRAME};")
@@ -131,15 +133,18 @@ class StatusBand(QLabel):
 # ------------------------------------------------------------------ the tree
 
 class EntriesModel(QAbstractListModel):
+  """the rows of the browser, the entries of the state, as a Qt list model"""
 
   def __init__(self, st):
     super().__init__()
     self.st = st
 
   def rowCount(self, parent=QModelIndex()):
+    """the number of entries"""
     return 0 if parent.isValid() else len(self.st.entries)
 
   def data(self, index, role=Qt.DisplayRole):
+    """the name of an entry for display, the entry itself for the user role"""
     if not index.isValid():
       return None
     row = self.st.entries[index.row()]
@@ -150,6 +155,7 @@ class EntriesModel(QAbstractListModel):
     return None
 
   def refresh(self):
+    """the model reset, so that the view reads the entries anew"""
     self.beginResetModel()
     self.endResetModel()
 
@@ -162,6 +168,7 @@ class EntryDelegate(QStyledItemDelegate):
     self.small = small
 
   def paint(self, painter, option, index):
+    """a row drawn: the indent, the chevron of a folder, the elided name and the size"""
     row = index.data(Qt.UserRole)
     painter.save()
     if option.state & QAbstractItemView.State_Selected if hasattr(QAbstractItemView, "State_Selected") else False:
@@ -189,6 +196,7 @@ class EntryDelegate(QStyledItemDelegate):
     painter.restore()
 
   def sizeHint(self, option, index):
+    """the height of a row, a line of text with its margins"""
     return QSize(option.rect.width(), QFontMetrics(option.font).height() + 2 * ROW_MARGIN)
 
 
@@ -217,6 +225,7 @@ class FileList(QListView):
     st.on("entries", self.model_.refresh)
 
   def onClick(self, index):
+    """a click on a row: a folder unfolded or folded, a file read"""
     row = self.st.entries[index.row()]
     if row.isDir:
       cb.toggleFolder(self.st, index.row())
@@ -243,6 +252,7 @@ class FileList(QListView):
     super().mousePressEvent(event)
 
   def mouseReleaseEvent(self, event):
+    """the release that ends a double click swallowed, any other passed on"""
     if self.swallowRelease:
       self.swallowRelease = False
       event.accept()
@@ -335,6 +345,7 @@ class DataSetList(QListWidget):
     self.refresh()
 
   def refresh(self):
+    """the list refilled with the data sets of the file, shown only for more than one"""
     self.clear()
     sets = self.st.info.dataSets if self.st.info is not None else []
     for s in sets:
@@ -344,6 +355,7 @@ class DataSetList(QListWidget):
     self.mark()
 
   def mark(self):
+    """the data set of the state selected in the list"""
     if 0 <= self.st.dataSet < self.count():
       self.setCurrentRow(self.st.dataSet)
 
@@ -381,6 +393,8 @@ class InfoTree(QTreeWidget):
     self.refresh()
 
   def refresh(self):
+    """the tree refilled: the rows of the file, then the metadata of the map, branches opened as
+    they were"""
     self.blockSignals(True)
     self.clear()
     for k, v in cb.infoRows(self.st):
@@ -422,6 +436,7 @@ class InfoTree(QTreeWidget):
         self.setCurrentItem(item)
 
   def walk(self, parent=None):
+    """every item below a parent, the whole tree by default, depth first"""
     parent = parent or self.invisibleRootItem()
     for k in range(parent.childCount()):
       child = parent.child(k)
@@ -434,6 +449,7 @@ class InfoTree(QTreeWidget):
     return [(item.text(0), item.text(1)) for item in items if item.data(0, Qt.UserRole) == "file"]
 
   def onClick(self, item, column):
+    """a click on a metadata row: the row picked, a picture shown"""
     i = item.data(0, Qt.UserRole)
     if isinstance(i, int):
       cb.pickMeta(self.st, i)
@@ -464,6 +480,7 @@ class BrowserSide(QWidget):
     self.showDataSets()
 
   def showDataSets(self):
+    """the panel of the data sets shown only when the file holds more than one"""
     sets = self.dataSets.st.info.dataSets if self.dataSets.st.info is not None else []
     self.dataSetPanel.setVisible(len(sets) > 1)
 

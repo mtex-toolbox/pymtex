@@ -63,10 +63,12 @@ class plane3d:
 
   @property
   def shape(self):
+    """the shape of the list of planes"""
     return self.N.shape
 
   @property
   def size(self):
+    """the number of planes"""
     return self.N.size
 
   def __len__(self):
@@ -81,6 +83,7 @@ class plane3d:
 
   @property
   def frame(self):
+    """the frame of the planes, that of their normals"""
     return self.N.frame
 
   # ------------------------------------------------------------------ distances
@@ -142,19 +145,12 @@ class plane3d:
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    head = f"plane3d ({self.N.frame.char()})" if self.N.frame is not None else "plane3d"
-    lines = [head]
-    if self.size != 1:
-      lines.append(f"  size: {' x '.join(str(s) for s in self.shape)}")
-    N = np.where(np.abs(self.N.data) < 1e-10, 0.0, self.N.data).reshape(-1, 3)
-    d = np.asarray(self.d, dtype=float).reshape(-1)
-    rows = min(len(d), 45)
-    lines.append("  " + "".join(f"{h:>10}" for h in ("x", "y", "z", "d")))
-    for k in range(rows):
-      lines.append("  " + "".join(f"{x:10.4g}" for x in (*N[k], d[k])))
-    if len(d) > rows:
-      lines.append(f"  ... {len(d) - rows} more")
-    return "\n".join(lines)
+    from .display import display, frameLabel, header, sizeString, table, takeRows
+    take, pos = takeRows(self.size)
+    N = self.N.data.reshape(-1, 3)[take]
+    d = np.asarray(self.d, dtype=float).reshape(-1)[take]
+    body = table(["x", "y", "z", "d"], [N[:, 0], N[:, 1], N[:, 2], d], digits=4, rows=pos) if self.size else None
+    return display(header("plane3d", frameLabel(self.N.frame)), [("size", sizeString(self.shape) if self.size != 1 else None)], body)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

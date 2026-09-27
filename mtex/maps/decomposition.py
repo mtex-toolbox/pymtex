@@ -21,11 +21,14 @@ import numpy as np
 from ..geometry.session import getMTEXpref
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
+from ..geometry.display import aligned
 
 NO_PIXEL = -1
 
 
 class siteSet:
+  """the sites of the decomposition: their positions, lattice indices, measurements, which are
+  holes, the lookup from lattice cell to site and its offset"""
 
   def __init__(self, pos, ij, pixel, isHole, lookup, offset):
     self.pos, self.ij, self.pixel, self.isHole, self.lookup, self.offset = pos, ij, pixel, isHole, lookup, offset
@@ -35,6 +38,8 @@ class siteSet:
 
 
 class cellComplex:
+  """the spatial decomposition of a map, one cell per site: the vertices V, the vertex pair F and
+  the site pair of every face, the sites and the lattice"""
 
   def __init__(self, V, F, cells, sites, A, plane, shape):
     self.V, self.F, self.cells, self.sites, self.A, self.plane, self.shape = V, F, cells, sites, A, plane, shape
@@ -46,10 +51,12 @@ class cellComplex:
 
   @property
   def siteIJ(self):
+    """the lattice indices of the sites"""
     return self.sites.ij
 
   @property
   def nSites(self):
+    """the number of sites, the measurements, the holes and the outer rings"""
     return len(self.sites)
 
   def __len__(self):
@@ -73,7 +80,7 @@ class cellComplex:
     return cellCorners(self.A, self.shape)
 
   def __repr__(self):
-    return f"cellComplex ({self.shape})\n  sites: {self.nSites}\n  faces: {len(self)}\n  vertices: {len(self.V)}"
+    return aligned(f"cellComplex ({self.shape})\n  sites: {self.nSites}\n  faces: {len(self)}\n  vertices: {len(self.V)}")
 
 
 # ------------------------------------------------------------------ the alpha closing
@@ -276,6 +283,9 @@ def localVoronoiNumpy(sites, levels, distortTol=0.05):
 
 
 def localVoronoi(sites, A, alpha=3.1, distortTol=0.05, backend=None):
+  """the faces of the Voronoi cell of every site, clipped against the lattice neighbours within
+  the reach alpha leaves, as (site, neighbour) pairs and their vertices, with how many cells of
+  the map stayed open; compiled with a NumPy fallback"""
   levels = candidateLevels(np.asarray(A, dtype=sites.pos.dtype), alpha, sites.pos.dtype)
   backend = getMTEXpref("kernels", "numba") if backend is None else backend
   if backend == "numba":

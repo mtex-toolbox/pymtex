@@ -23,11 +23,13 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.session import getMTEXpref
+from ..geometry.display import framesLabel
 from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
 from .kernels import realizeWigner
 from .transforms import isRealWigner, wignerSeries, wignerSeriesAdjoint
+from ..geometry.display import aligned
 
 
 def _complexType(dtype):
@@ -66,6 +68,13 @@ def _readFrames(args):
 
 
 class SO3FunHarmonic:
+  """a function on SO(3) as a series of Wigner functions, symmetric under its crystal and specimen
+  frame: from MTEX's coefficients fhat, another SO(3) function, a kernel or a callable (by
+  quadrature); a list of functions carries its shape in front of the coefficients
+
+    SO3FunHarmonic(fhat, cs, ss)
+    SO3FunHarmonic(odf, bandwidth=32)               the harmonic form of another function
+    SO3FunHarmonic(lambda ori: ori.angle(), cs)     by quadrature"""
 
   def __init__(self, fhat, *frames, real=None, antipodal=None, symmetrise=True, bandwidth=None, dtype=None, _internal=False):
     # coefficients given are MTEX's, those the port passes itself its own
@@ -138,6 +147,7 @@ class SO3FunHarmonic:
 
   @property
   def size(self):
+    """the number of functions of the list, one for a single function"""
     return int(np.prod(self.shape))
 
   def __len__(self):
@@ -149,6 +159,7 @@ class SO3FunHarmonic:
     return self._rebuild(self._fhat[idx])
 
   def reshape(self, *shape):
+    """the list of functions in another shape"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
@@ -163,6 +174,8 @@ class SO3FunHarmonic:
 
   @classmethod
   def cat(cls, *fs, axis=0):
+    """the functions joined into one list along an axis, the coefficients padded to the largest
+    bandwidth"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -220,6 +233,7 @@ class SO3FunHarmonic:
 
   @fhat.setter
   def fhat(self, value):
+    """the harmonic coefficients in MTEX's basis, as MATLAB's SO3F.fhat reads and assigns them"""
     self._fhat = mtexCoefficientsSO3(np.asarray(value, dtype=self._fhat.dtype))
 
   @property
@@ -229,6 +243,8 @@ class SO3FunHarmonic:
 
   @isReal.setter
   def isReal(self, real):
+    """whether the function is real valued; setting it True keeps the coefficients of the real part,
+    as MATLAB's assignment does"""
     self._isReal = bool(real)
     if self._isReal and hasattr(self, "_fhat"):
       fhat = np.array(self._fhat, dtype=complex)
@@ -238,6 +254,7 @@ class SO3FunHarmonic:
 
   @property
   def bandwidth(self):
+    """the bandwidth, the largest degree of the expansion; assigning it cuts or pads the coefficients"""
     return dim2deg(self._fhat.shape[-1])
 
   @bandwidth.setter
@@ -252,6 +269,7 @@ class SO3FunHarmonic:
 
   @property
   def dtype(self):
+    """the dtype of the coefficients"""
     return self._fhat.dtype
 
   def truncate(self, L):
@@ -302,11 +320,14 @@ class SO3FunHarmonic:
     return self._rebuild(fhat)
 
   def inv(self):
+    """the function of the inverse rotations, f(g^-1), its crystal and specimen frame exchanged"""
     if self.shape:
       return self._each(lambda f: f.inv())
     return self._rebuild(invertedCoefficients(self._fhat), CS=self.SS, SS=self.CS)
 
   def withExchange(self, x=True):
+    """the function with the exchange symmetry f(g) = f(g^-1) imposed, by the mean with its inverse;
+    withExchange(False) drops the flag; needs the same frame on both sides"""
     if x and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
     if self.shape:
@@ -317,6 +338,7 @@ class SO3FunHarmonic:
   # ------------------------------------------------------------------ the algebra
 
   def conj(self):
+    """the complex conjugate function"""
     if self.shape:
       return self._each(lambda f: f.conj())
     return self._rebuild(conjugateCoefficients(self._fhat))
@@ -381,17 +403,21 @@ class SO3FunHarmonic:
     return mapFun(np.abs, self, bandwidth=smoothBandwidth(self))
 
   def abs(self):
+    """the absolute value of the function, by quadrature at twice the bandwidth"""
     return abs(self)
 
   def sqrt(self):
+    """the square root of the function, by quadrature at twice the bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
 
   def exp(self):
+    """the exponential of the function, by quadrature at twice the bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
 
   def log(self):
+    """the logarithm of the function, by quadrature at twice the bandwidth"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
 
@@ -436,46 +462,64 @@ class SO3FunHarmonic:
   # ------------------------------------------------------------------ the operations of funops
 
   def rotate(self, rot, side="left"):
+    """the function turned by a rotation, from the left or with side='right' from the right, as
+    rotate(f, rot, side)"""
     from .funops import rotate
     return rotate(self, rot, side)
 
   def conv(self, g, *flags):
+    """the convolution with another SO(3) function, a kernel, a function on the sphere or a vector of
+    multipliers per degree, as conv(f, g); conv(f, g, 'inv') convolves the inverse of f"""
     from .funops import conv
     return conv(self, g, *flags)
 
   def grad(self, x=None, side="left"):
+    """the gradient, a harmonic vector field on SO(3), left or with side='right' right; with x its
+    values at the orientations x"""
     from .so3vectorfield import grad
     return grad(self, x, side)
 
   def laplace(self):
+    """the Laplace-Beltrami operator applied to the function, degree n scaled by -n(n+1)"""
     from .funops import laplace
     return laplace(self)
 
   def pdf(self, h):
+    """the pole figure of the crystal direction h, a function on the sphere in the specimen frame"""
     from .funops import pdf
     return pdf(self, h)
 
   def ipdf(self, r):
+    """the inverse pole figure of the specimen direction r, a function on the sphere in the crystal frame"""
     from .funops import ipdf
     return ipdf(self, r)
 
   def radon(self, h=None, r=None):
+    """the Radon transform: the pole figure of h, the inverse pole figure of r, or with both the values
+
+      f.radon(h)
+      f.radon(r=r)
+      f.radon(h, r)"""
     from .funops import radon
     return radon(self, h, r)
 
   def calcPDF(self, h, r=None, superposition=None):
+    """the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or at
+    the specimen directions r"""
     from .density import calcPDF
     return calcPDF(self, h, r, superposition=superposition)
 
   @classmethod
   def interpolate(cls, nodes, values, **kwargs):
+    """the harmonic function fitted to values at orientations, by regularised least squares, as
+    interpolate(nodes, values, ...)"""
     from .density import interpolate
     return interpolate(nodes, values, **kwargs)
 
   # ------------------------------------------------------------------ display
 
   def __repr__(self):
-    lines = [f"SO3FunHarmonic ({self.CS.char()} → {self.SS.char()})"]
+    lines = [f"SO3FunHarmonic ({framesLabel(self.CS, self.SS)})"]
     if self.shape:
       from ..geometry.display import sizeString
       lines.append(f"  size: {sizeString(self.shape)}")
@@ -486,7 +530,7 @@ class SO3FunHarmonic:
       lines.append("  antipodal: true")
     if not self.isReal:
       lines.append("  isReal: false")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

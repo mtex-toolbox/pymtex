@@ -22,9 +22,12 @@ import numpy as np
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned
 
 
 class grain3Boundary:
+  """the faces between the grains of a volume, triangles or polygons over the vertices allV, with
+  the grains, voxels and phases on their two sides and the misrotation across: grains.boundary"""
 
   def __init__(self, allV, F, grainId, ebsdId, phaseId, misrotation, CSList, frame, scanUnit="um", id=None):
     self.allV = np.asarray(allV.data if isinstance(allV, vector3d) else allV, dtype=float).reshape(-1, 3)
@@ -50,16 +53,19 @@ class grain3Boundary:
 
   @property
   def size(self):
+    """the number of faces"""
     return len(self)
 
   # ------------------------------------------------------------------ the faces
 
   @property
   def numCorners(self):
+    """the number of corners of every face"""
     return np.diff(self._ptr)
 
   @property
   def isTriangulated(self):
+    """whether every face is a triangle"""
     return bool(np.all(self.numCorners == 3))
 
   @property
@@ -141,10 +147,12 @@ class grain3Boundary:
 
   @property
   def idV(self):
+    """the indices into allV of the vertices the faces use, sorted"""
     return np.unique(self._idx)
 
   @property
   def V(self):
+    """the vertices the faces use, as vectors"""
     return vector3d(self.allV[self.idV], frame=self.frame)
 
   # twice the vector area of every face: the sum over its fan triangles
@@ -161,6 +169,7 @@ class grain3Boundary:
 
   @property
   def area(self):
+    """the area of every face"""
     return np.linalg.norm(self._vectorArea(), axis=1) / 2
 
   @property
@@ -175,6 +184,7 @@ class grain3Boundary:
 
   @property
   def perimeter(self):
+    """the perimeter of every face, the length of its edges"""
     V = self.allV
     d = np.linalg.norm(V[self._idx[self._nextCorner()]] - V[self._idx], axis=1)
     return np.bincount(self._faceOfCorner(), weights=d, minlength=len(self))
@@ -216,6 +226,8 @@ class grain3Boundary:
 
   @property
   def misorientation(self):
+    """the misorientation of every face from the second side to the first, NaN where a side is not
+    indexed; the faces must lie between one pair of phases"""
     p1, p2 = self.phaseId[:, 0], self.phaseId[:, 1]
     ok = (p1 > 0) & (p2 > 0)
     if not ok.any():
@@ -245,17 +257,19 @@ class grain3Boundary:
 
   @property
   def I_VF(self):
+    """the incidence of vertices and faces, a sparse boolean matrix vertices x faces"""
     from scipy.sparse import csr_matrix
     return csr_matrix((np.ones(len(self._idx), dtype=bool), (self._idx, self._faceOfCorner())), shape=(len(self.allV), len(self)))
 
   @property
   def I_VG(self):
+    """the incidence of vertices and grains, a sparse boolean matrix vertices x grains"""
     return (self.I_VF.astype(np.int64) @ self.I_FG) > 0
 
   def __repr__(self):
     inner = int(np.sum(np.all(self.grainId > 0, axis=1)))
     kind = "triangles" if self.isTriangulated else "polygons"
-    return f"grain3Boundary\n  faces: {len(self)} {kind} ({inner} between grains, {len(self) - inner} on the outside)\n  vertices: {len(self.idV)}"
+    return aligned(f"grain3Boundary\n  faces: {len(self)} {kind} ({inner} between grains, {len(self) - inner} on the outside)\n  vertices: {len(self.idV)}")
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

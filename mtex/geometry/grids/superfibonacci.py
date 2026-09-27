@@ -11,6 +11,7 @@ import numpy as np
 from ..orientation import orientation
 from ..quaternion import rotation
 from ..units import degree
+from ..display import display, header
 
 # the two irrational rates of the spiral, and the covering constant calibrated so that
 # resolution is the mean nearest-neighbour spacing (119088 points give 3.62 deg on SO(3))
@@ -30,6 +31,11 @@ def _superfib(n):
 
 
 class SO3FibonacciGrid(orientation):
+  """the super-Fibonacci grid of orientations, a low-discrepancy quaternion spiral trimmed to one
+  fundamental region of the frame pair, searched through the quaternion k-d tree; built by
+  superfibonacciSO3Grid
+
+    S3G = superfibonacciSO3Grid(cs, ss, resolution=5*degree)"""
 
   def __init__(self, rot, frameA, frameB, resolution):
     orientation.__init__(self, rot, frameA, frameB)
@@ -48,9 +54,11 @@ class SO3FibonacciGrid(orientation):
 
   @property
   def resolution(self):
+    """the mean nearest-neighbour spacing the grid was built for, in radians"""
     return self.res
 
   def subGrid(self, mask):
+    """the grid of the orientations a mask or an index array selects"""
     return SO3FibonacciGrid(rotation._fromData(self.data[mask]), self.frameA, self.frameB, self.res)
 
   def find(self, o, epsOrK=None):
@@ -59,7 +67,7 @@ class SO3FibonacciGrid(orientation):
     return findInGrid(self, o, epsOrK)
 
   def __repr__(self):
-    return f"SO3FibonacciGrid ({self._frameSummary()})\n  size: {self.size}\n  resolution: {self.res / degree:.4g}°"
+    return display(header("SO3FibonacciGrid", self._frameSummary()), [("size", self.size), ("resolution", f"{self.res / degree:.4g}°")])
 
 
 def superfibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None):

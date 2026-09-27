@@ -56,6 +56,7 @@ def millerIndices(s):
 
 
 def millerFromGroup(s, cs):
+  """the Miller indices a field of a pole figure header writes, in the frame cs"""
   idx = millerIndices(s)
   if idx is None:
     raise ValueError(f"cannot read {s.strip()!r} as Miller indices")
@@ -211,6 +212,8 @@ STRUCTURE_CODES = ("C1", "C2", "D2", "C4", "D4", "T", "O", "C3", "D3", "C6", "D6
 
 
 def structureFrame(code, abc, angles):
+  """the crystal frame of a LaboTEX or BearTex structure code, one to eleven, with the axis lengths
+  and the axis angles in degree"""
   if not 1 <= code <= len(STRUCTURE_CODES):
     raise ValueError(f"{code} is not one of the eleven structure codes")
   return crystalFrame(STRUCTURE_CODES[code - 1], list(abc), [a * degree for a in angles])
@@ -302,6 +305,8 @@ AACHEN_FORMAT = re.compile(r"\(\s*(\d+)\s*[fF]\s*(\d+)")
 
 
 def isAachenHeader(l):
+  """whether a line is the header of an Aachen pole figure: indices, point group, three plausible
+  angular steps and two integer flags in five character fields"""
   if len(l) < 35 or millerIndices(l[:5]) is None:
     return False
   steps = [l[10:15], l[15:20], l[20:25]]
@@ -313,6 +318,8 @@ def isAachenHeader(l):
 
 
 def readAachen(lines, path, cs, h=None):
+  """the pole figures of an Aachen file, one per header, each block to the next header scaled by the
+  factor it states: the lists of directions, grids and intensities and the crystal frame"""
   heads = [i for i, l in enumerate(lines) if isAachenHeader(l)]
   if not heads:
     raise ValueError(f"{path} holds no Aachen header")
@@ -484,6 +491,8 @@ XRD_TOKENS = ((r"\*MEAS_SCAN_START\s*\"(\S*)\"", r"\*MEAS_SCAN_STEP\s*\"(\S*)\""
 
 
 def readXrd(lines, path, cs, h=None):
+  """the pole figure of an xrd file, its grid from the scan and tilt tokens of the header in either
+  spelling of the vendors: the lists of direction, grid and intensities and the crystal frame"""
   def values(token):
     return [float(m.group(1)) for m in (re.search(token, l) for l in lines) if m is not None]
   for start, step, stop, tilt in XRD_TOKENS:

@@ -87,4 +87,4 @@ def test_new_rejects_unknown_attributes_and_astype_keeps_them():
   assert p.astype(np.float32).dtype == np.float32 and p.astype(np.float32).flag
   with pytest.raises(TypeError):
     p._new(p.data, frame=None)
-  assert repr(p) == "Pair (2)" and repr(p[0]) == "Pair (1)" and repr(p.reshape(1, 2)) == "Pair (1x2)"
+  assert repr(p) == "Pair (2)" and repr(p[0]) == "Pair (1)" and repr(p.reshape(1, 2)) == "Pair (1 × 2)"

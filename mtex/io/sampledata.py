@@ -28,6 +28,7 @@ from ..geometry.vector3d import vector3d
 from .load import loadEBSD
 from .orientations import loadOrientation
 from .vectors import loadVector3d
+from ..geometry.display import aligned
 
 with open(os.path.join(os.path.dirname(__file__), "sampledata.json")) as _f:
   MANIFEST = json.load(_f)
@@ -46,6 +47,8 @@ def _dataset(name, kind, description, artifact, recipe):
 
 
 def mtexDataPath():
+  """the directory the sample data are fetched into: the preference mtexDataPath, else the
+  environment variable MTEX_DATA, else ~/.mtex/data"""
   root = getMTEXpref("mtexDataPath") or os.environ.get("MTEX_DATA") or os.path.join(os.path.expanduser("~"), ".mtex", "data")
   return os.path.abspath(os.path.expanduser(root))
 
@@ -145,7 +148,7 @@ class SampleTable:
     labels = ("name", "type", "description", "files")
     widths = [max(len(labels[j]), *(len(r[j]) for r in self.rows)) for j in range(4)]
     line = lambda r: "  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))
-    return "available sample data\n" + "\n".join([line(labels)] + [line(r) for r in self.rows])
+    return aligned("available sample data\n" + "\n".join([line(labels)] + [line(r) for r in self.rows]))
 
 
 # ------------------------------------------------------------------ the recipes
@@ -269,9 +272,9 @@ class imageSet(SimpleNamespace):
   """the images a sample map carries along, as MATLAB's struct: img.fsdT1, img.pixSzImg"""
 
   def __repr__(self):
-    rows = [(k, " x ".join(str(n) for n in np.shape(v)) + " double" if np.ndim(v) else f"{float(v):g}") for k, v in vars(self).items()]
+    rows = [(k, " × ".join(str(n) for n in np.shape(v)) + " double" if np.ndim(v) else f"{float(v):g}") for k, v in vars(self).items()]
     w = max(len(k) for k, _ in rows)
-    return "\n".join(f"  {k:>{w}}: {v}" for k, v in rows)
+    return aligned("\n".join(f"  {k:>{w}}: {v}" for k, v in rows))
 
 
 # a volume, read by EBSD3.load

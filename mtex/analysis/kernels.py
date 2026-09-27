@@ -102,6 +102,8 @@ def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxit, M, X, W
 
 
 def taylorKernel():
+  """the compiled Taylor loop over the pixels, the linear program and the minimum norm solve per
+  orientation, compiled on first call; None where numba is not available"""
   from ..maps import kernels as mk
   nb = mk._preparePixel()
   if nb is None:

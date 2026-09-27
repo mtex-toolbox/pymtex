@@ -23,15 +23,21 @@ from ..geometry._array import MtexArray
 from ..geometry.kernels import backend as kernelBackend, qmul
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned
 
 
 class grainBoundaryCriterion:
+  """the base of the grain boundary criteria: how connected pairs of neighbouring measurements are,
+  1 no boundary, 0.5 a low angle boundary inside a grain, 0 a boundary; a subclass implements
+  evaluate, and calling the criterion evaluates it"""
 
   # a criterion that removes the regions below minPixel itself is handed the value by
   # setMinPixel, and calcGrains skips its own cull
   handlesMinPixel = False
 
   def evaluate(self, ebsd, i, j):
+    """the connectivity of the pairs of neighbouring measurements i[k], j[k] of a map, one value in
+    [0, 1] per pair"""
     raise NotImplementedError
 
   def __call__(self, ebsd, i, j):
@@ -39,6 +45,8 @@ class grainBoundaryCriterion:
 
 
 def connectivity(crit, ebsd, i, j):
+  """connectivity(crit, ebsd, i, j) is crit.evaluate(ebsd, i, j): the connectivity of the pairs of
+  neighbouring measurements"""
   return crit.evaluate(ebsd, i, j)
 
 
@@ -84,6 +92,13 @@ def _bestDot(fr, q1, q2):
 # ------------------------------------------------------------------ the angle criterion
 
 class gbcAngle(grainBoundaryCriterion):
+  """the criterion of a threshold on the misorientation angle: one angle, or a high and a low
+  angle threshold, the pair counting as the share of the levels it stays below; byPhase gives
+  a phase thresholds of its own
+
+    gbcAngle(10*degree)
+    gbcAngle([10*degree, 2*degree])
+    gbcAngle(10*degree, byPhase={'Forsterite': 15*degree})"""
 
   def __init__(self, threshold=10 * degree, byPhase=None):
     self.threshold = threshold
@@ -100,6 +115,9 @@ class gbcAngle(grainBoundaryCriterion):
     return _levels(self.threshold)
 
   def evaluate(self, ebsd, i, j, backend=None):
+    """the connectivity of the pairs i[k], j[k]: the share of the angle levels their misorientation
+    stays below, 0 across phases, 1 between not indexed measurements; a compiled loop when
+    numba is the backend"""
     i, j, ph, rot = _pairs(ebsd, i, j)
     # all pairs in one compiled loop over the tables of the phases, the loop below its fallback
     if (backend or kernelBackend()) == "numba":
@@ -132,7 +150,7 @@ class gbcAngle(grainBoundaryCriterion):
 
   def __repr__(self):
     t = self.threshold if _perPhase(self.threshold) else np.asarray(self.threshold) / degree
-    return f"gbcAngle (threshold {t}°" + (", by phase" if self.byPhase else "") + ")"
+    return aligned(f"gbcAngle (threshold {t}°" + (", by phase" if self.byPhase else "") + ")")
 
 
 # ------------------------------------------------------------------ the soft criterion
@@ -148,6 +166,8 @@ class gbcSoft(grainBoundaryCriterion):
     self.byPhase = byPhase
 
   def levelsFor(self, CSList, p):
+    """the threshold and the width of the transition for phase p, its own from byPhase or the
+    common ones"""
     if self.byPhase is not None:
       for key, t in self.byPhase.items():
         if CSList.phaseId(key) == p:
@@ -156,6 +176,8 @@ class gbcSoft(grainBoundaryCriterion):
     return self.threshold, self.width
 
   def evaluate(self, ebsd, i, j):
+    """the connectivity of the pairs i[k], j[k]: one minus the error function step of width w about
+    the threshold at their misorientation angle, 0 across phases"""
     from scipy.special import erf
     i, j, ph, rot = _pairs(ebsd, i, j)
     out = np.zeros(len(i), dtype=rot.dtype)
@@ -173,7 +195,7 @@ class gbcSoft(grainBoundaryCriterion):
     return out
 
   def __repr__(self):
-    return f"gbcSoft (threshold {self.threshold / degree:.4g}°, width {self.width / degree:.4g}°)"
+    return aligned(f"gbcSoft (threshold {self.threshold / degree:.4g}°, width {self.width / degree:.4g}°)")
 
 
 # ------------------------------------------------------------------ by a property
@@ -186,6 +208,7 @@ class gbcEqual(grainBoundaryCriterion):
     self.key = key
 
   def evaluate(self, ebsd, i, j):
+    """the connectivity of the pairs i[k], j[k]: 1 where the property agrees, 0 where it differs"""
     i, j, _, rot = _pairs(ebsd, i, j)
     v = getattr(ebsd, self.key) if isinstance(self.key, str) else np.asarray(self.key)
     v = v.reshape((-1,) + v.shape[ebsd.ndim:]) if isinstance(self.key, str) else v.reshape((ebsd.size, -1))
@@ -193,7 +216,7 @@ class gbcEqual(grainBoundaryCriterion):
     return same.astype(rot.dtype)
 
   def __repr__(self):
-    return f"gbcEqual ({self.key!r})" if isinstance(self.key, str) else "gbcEqual (values)"
+    return aligned(f"gbcEqual ({self.key!r})" if isinstance(self.key, str) else "gbcEqual (values)")
 
 
 class gbcCustom(grainBoundaryCriterion):
@@ -208,6 +231,8 @@ class gbcCustom(grainBoundaryCriterion):
     self.antipodal = antipodal
 
   def evaluate(self, ebsd, i, j):
+    """the connectivity of the pairs i[k], j[k]: the function's value, or 1 where the property
+    differs by at most the threshold, as an angle for vectors and orientations, 0 otherwise"""
     i, j, _, rot = _pairs(ebsd, i, j)
     if self.f is not None:
       return np.asarray(self.f(ebsd, i, j), dtype=rot.dtype).reshape(len(i))
@@ -221,7 +246,7 @@ class gbcCustom(grainBoundaryCriterion):
     return (d <= self.threshold).astype(rot.dtype)
 
   def __repr__(self):
-    return "gbcCustom (function)" if self.f is not None else f"gbcCustom (threshold {self.threshold:.4g})"
+    return aligned("gbcCustom (function)" if self.f is not None else f"gbcCustom (threshold {self.threshold:.4g})")
 
 
 __all__ = ["grainBoundaryCriterion", "gbcAngle", "gbcSoft", "gbcEqual", "gbcCustom", "connectivity"]

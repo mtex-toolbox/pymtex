@@ -21,11 +21,14 @@ from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.symmetry import symmetry
 from ..geometry.vector3d import vector3d
+from ..geometry.display import display, header
 
 # ------------------------------------------------------------------ H1 layout
 
 
 def deg2dim(n):
+  """the number of harmonic coefficients on SO(3) of the degrees below n, sum of (2k + 1)^2 for
+  k = 0 .. n - 1; deg2dim(L + 1) is the length of an array of bandwidth L"""
   return n * (2 * n - 1) * (2 * n + 1) // 3
 
 
@@ -40,6 +43,7 @@ def dim2deg(d):
 
 
 def degreeRange(n):
+  """the slice of the coefficients of degree n in a flat SO(3) coefficient array"""
   return slice(deg2dim(n), deg2dim(n + 1))
 
 
@@ -63,6 +67,8 @@ def _orderSign(n):
 
 
 def mtexCoefficientsS2(fhat):
+  """the spherical coefficients converted between the internal Condon-Shortley basis and MTEX's,
+  the sign (-1)^m on the odd positive orders; its own inverse"""
   fhat = np.asarray(fhat)
   L = math.isqrt(fhat.shape[-1]) - 1
   s = np.concatenate([_orderSign(l) for l in range(L + 1)])
@@ -70,6 +76,8 @@ def mtexCoefficientsS2(fhat):
 
 
 def mtexCoefficientsSO3(fhat):
+  """the SO(3) coefficients converted between the internal basis and MTEX's, every degree block
+  transposed and signed on both indices; its own inverse"""
   fhat = np.asarray(fhat)
   out = np.empty_like(fhat)
   n = 0
@@ -138,6 +146,10 @@ def _wignerdAll(beta, L):
 
 
 def wignerd(beta, degree=None, *, bandwidth=None):
+  """the real Wigner-d matrix d_l(beta) at one angle, or with bandwidth=L the list d_0 .. d_L
+
+    wignerd(beta, l)
+    wignerd(beta, bandwidth=L)"""
   L, single = _degrees(degree, bandwidth)
   beta = np.asarray(beta)
   beta = beta if beta.dtype.kind == "f" else beta.astype(float)
@@ -247,15 +259,20 @@ class InvariantProjection:
 
   @property
   def isIdentity(self):
+    """whether the projection is the identity, the group acting through the identity alone"""
     return not self.blocks
 
   @property
   def bandwidth(self):
+    """the highest degree the held projection blocks reach"""
     return len(self.blocks) - 1
 
   def support(self, n):
     """the indices an r fold about z leaves at degree n, k = 0 mod r, as block indices"""
     return foldRange(self.fold, n)
+
+  def __repr__(self):
+    return display(header("InvariantProjection", f"{self.fold}-fold"), [("degrees", len(self.blocks))])
 
 
 # the entries of a projection block below this are rounding: the dihedral and cubic groups
@@ -264,6 +281,7 @@ PROJECTION_ZERO = 1e-14
 
 
 def foldRange(r, n):
+  """the block indices k = 0 mod r of degree n, the support an r fold axis along z leaves"""
   m = n // r
   return np.arange(n - r * m, n + r * m + 1, r)
 
@@ -346,10 +364,12 @@ def project(fhat, P, Q):
 
 
 def projectLeft(fhat, P):
+  """the coefficients projected in place on the left, the specimen side, by the projection P"""
   return project(fhat, P, None)
 
 
 def projectRight(fhat, Q):
+  """the coefficients projected in place on the right, the crystal side, by the projection Q"""
   return project(fhat, None, Q)
 
 
@@ -432,6 +452,7 @@ def clebschGordan(j1, m1, j2, m2, J, M):
 
 
 def wigner3j(j1, j2, j3, m1, m2, m3):
+  """the Wigner 3j symbol of (j1 j2 j3; m1 m2 m3), from the Clebsch-Gordan coefficient"""
   return (-1 if (j1 - j2 - m3) % 2 else 1) / math.sqrt(2 * j3 + 1) * clebschGordan(j1, m1, j2, m2, j3, -m3)
 
 

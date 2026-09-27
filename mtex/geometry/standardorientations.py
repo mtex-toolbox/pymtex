@@ -61,45 +61,86 @@ def relationship(nParent, nChild, dParent, dChild):
 
 
 def Bain(csG, csA):
+  """the Bain orientation relationship from fcc to bcc, (100) || (100) and [010] || [011], a
+  misorientation from the parent frame csG to the child frame csA
+
+    p2c = orientation.Bain(csGamma, csAlpha)"""
   return relationship(Miller(1, 0, 0, csG), Miller(1, 0, 0, csA), Miller(0, 1, 0, csG, "uvw"), Miller(0, 1, 1, csA, "uvw"))
 
 
 def KurdjumovSachs(csG, csA):
+  """the Kurdjumov-Sachs orientation relationship from fcc to bcc, (111) || (011) and
+  [-101] || [-1-11], a misorientation from the parent frame csG to the child frame csA
+
+    p2c = orientation.KurdjumovSachs(csGamma, csAlpha)"""
   return relationship(Miller(1, 1, 1, csG), Miller(0, 1, 1, csA), Miller(-1, 0, 1, csG, "uvw"), Miller(-1, -1, 1, csA, "uvw"))
 
 
 def NishiyamaWassermann(csG, csA):
+  """the Nishiyama-Wassermann orientation relationship from fcc to bcc, (111) || (011) and
+  [11-2] || [0-11], a misorientation from the parent frame csG to the child frame csA
+
+    p2c = orientation.NishiyamaWassermann(csGamma, csAlpha)"""
   return relationship(Miller(1, 1, 1, csG), Miller(0, 1, 1, csA), Miller(1, 1, -2, csG, "uvw"), Miller(0, -1, 1, csA, "uvw"))
 
 
 def Pitsch(csG, csA):
+  """the Pitsch orientation relationship from fcc to bcc, (010) || (101) and [101] || [-111], a
+  misorientation from the parent frame csG to the child frame csA
+
+    p2c = orientation.Pitsch(csGamma, csAlpha)"""
   return relationship(Miller(0, 1, 0, csG), Miller(1, 0, 1, csA), Miller(1, 0, 1, csG, "uvw"), Miller(-1, 1, 1, csA, "uvw"))
 
 
 def GreningerTrojano(csG, csA):
+  """the Greninger-Trojano orientation relationship from fcc to bcc, by the Bunge Euler angles
+  (2.7, 46.6, 7.5) degrees of the inverse, a misorientation from csG to csA
+
+    p2c = orientation.GreningerTrojano(csGamma, csAlpha)"""
   from .orientation import orientation
   return orientation.byEuler(2.7 * degree, 46.6 * degree, 7.5 * degree, csA, csG).inv()
 
 
 def Bagaryatsky(csT, csA):
+  """the Bagaryatsky orientation relationship between cementite and ferrite, (100) || (1-10) and
+  [010] || [111], a misorientation from the cementite frame csT to the ferrite frame csA
+
+    mori = orientation.Bagaryatsky(csTheta, csAlpha)"""
   return relationship(Miller(1, 0, 0, csT), Miller(1, -1, 0, csA), Miller(0, 1, 0, csT, "uvw"), Miller(1, 1, 1, csA, "uvw"))
 
 
 def Burgers(csParent, csChild):
+  """the Burgers orientation relationship between bcc and hcp, (110) || (0001) and
+  [-11-1] || [2-1-10], from csParent to csChild; a hexagonal parent gives the inverse of the one
+  from the child
+
+    p2c = orientation.Burgers(csBeta, csAlpha)"""
   if csParent.lattice.isTriHex:
     return Burgers(csChild, csParent).inv()
   return relationship(Miller(1, 1, 0, csParent), Miller(0, 0, 0, 1, csChild), Miller(-1, 1, -1, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
 
 
 def PitschSchrader(csParent, csChild):
+  """the Pitsch-Schrader orientation relationship between bcc and hcp, (011) || (0001) and
+  [100] || [2-1-10], a misorientation from csParent to csChild
+
+    p2c = orientation.PitschSchrader(csParent, csChild)"""
   return relationship(Miller(0, 1, 1, csParent), Miller(0, 0, 0, 1, csChild), Miller(1, 0, 0, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
 
 
 def Potter(csParent, csChild):
+  """the Potter orientation relationship between bcc and hcp, (011) || (01-11) and
+  [11-1] || [2-1-10], a misorientation from csParent to csChild
+
+    p2c = orientation.Potter(csParent, csChild)"""
   return relationship(Miller(0, 1, 1, csParent), Miller(0, 1, -1, 1, csChild), Miller(1, 1, -1, csParent, "uvw"), Miller(2, -1, -1, 0, csChild, "uvw"))
 
 
 def ShojiNishiyama(csG, csE):
+  """the Shoji-Nishiyama orientation relationship from fcc to hcp, (111) || (0001) and
+  [10-1] || [2-1-10], a misorientation from the parent frame csG to the child frame csE
+
+    p2c = orientation.ShojiNishiyama(csGamma, csEps)"""
   return relationship(Miller(1, 1, 1, csG), Miller(0, 0, 0, 1, csE), Miller(1, 0, -1, csG, "uvw"), Miller(2, -1, -1, 0, csE, "uvw"))
 
 
@@ -189,6 +230,10 @@ def copper(cs, *ss):
 
 
 def copper2(cs, *ss):
+  """the second copper component, (112)[11-1], Bunge (270, 35, 45) degrees, in cs and the
+  specimen frame
+
+    ori = orientation.copper2(cs)"""
   return byMiller([1, 1, 2], [1, 1, -1], cs, *ss)
 
 

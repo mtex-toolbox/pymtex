@@ -56,6 +56,8 @@ def findPointGroup(name):
 
 
 def isPointGroupName(name):
+  """whether a string names a point group exactly, by one of its symbols or names, never a
+  substring: the specimen frame 'measurement' is no group m"""
   return any(str(name) in row for row in POINT_GROUP_NAMES)
 
 

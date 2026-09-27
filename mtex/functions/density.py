@@ -34,6 +34,14 @@ from .transforms import S2FourierPlan, SO3FourierPlan
 
 
 def calcDensity(x, Fourier=False, **kwargs):
+  """the density estimate of a sample: an ODF of orientations, a function on the sphere of
+  directions or axes, a function on the circle of angles or a density of real values
+
+    calcDensity(ori)                          the halfwidth selected by UCV
+    calcDensity(ori, halfwidth=5*degree)      a de la Vallee Poussin kernel of that halfwidth
+    calcDensity(ebsd)                         the orientations of a map, grouped by its grains
+    calcDensity(v, kernel=psi, weights=w)     weighted directions
+    calcDensity(ori, Fourier=True)            the harmonic form"""
   # a map: the orientations of its one phase, with its grain ids when grains were computed
   if not isinstance(x, (quaternion, vector3d, np.ndarray, list, tuple)) and hasattr(x, "orientations") and hasattr(x, "prop"):
     if kwargs.get("groups") is None and "grainId" in x.prop:
@@ -153,6 +161,13 @@ def _lsqrFull(A, At, b, n, maxit, tol):
 
 def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxit=100, tol=None,
                 withParameters=False):
+  """the function of least squares through values at nodes, on SO(3) for orientations, on the
+  sphere for directions, a vector field for vector values, fitted by LSQR with a Sobolev
+  penalty lambda_ of order s
+
+    interpolate(ori, y)
+    interpolate(v, y, bandwidth=16, lambda_=1e-4)
+    interpolate(ori, y, withParameters=True)      also LSQR's flag, residual and iterations"""
   from ..geometry.tangent import SO3TangentVector
   if isinstance(nodes, SO3TangentVector):
     from .so3vectorfield import interpolateField

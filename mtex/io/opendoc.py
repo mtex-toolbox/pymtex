@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+from ..geometry.display import aligned
 
 SITE = "https://mtex-toolbox.github.io/"
 
@@ -83,7 +84,7 @@ class docIndex(list):
         lines.append(f"\n{c}")
         chapter = c
       lines.append(f"  {p:<34} {t}")
-    return "\n".join(lines)
+    return aligned("\n".join(lines))
 
 
 def docPages():

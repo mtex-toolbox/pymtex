@@ -23,6 +23,7 @@ from ..geometry.frames import referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
+from ..geometry.display import aligned
 
 SCHEMES = ("ClenshawCurtis", "GaussLegendre")
 
@@ -96,6 +97,11 @@ def _readArgs(args):
 
 
 class quadratureSO3Grid:
+  """the quadrature grid on SO(3) of bandwidth L: equispaced Euler angles alpha and gamma and a
+  Clenshaw-Curtis or Gauss-Legendre rule in beta, reduced by the folds about z of the frames
+
+    quadratureSO3Grid(L)
+    quadratureSO3Grid(L, CS, SS, 'GaussLegendre')"""
 
   # the full rule, or the one for functions with an rA fold axis along z on the crystal side
   # (periodic in gamma) and an rB fold on the specimen side (periodic in alpha); 2L+2 must
@@ -120,6 +126,7 @@ class quadratureSO3Grid:
 
   @property
   def shape(self):
+    """the shape of the grid, the numbers of gamma, alpha and beta nodes"""
     return (len(self.gamma), len(self.alpha), len(self.beta))
 
   def __len__(self):
@@ -133,6 +140,7 @@ class quadratureSO3Grid:
 
   @property
   def weights(self):
+    """the quadrature weights of the nodes, in the order of nodes(); they sum to one, the Haar measure"""
     return np.broadcast_to(self.wbeta, self.shape).ravel()
 
   @property
@@ -191,7 +199,7 @@ class quadratureSO3Grid:
     return values
 
   def __repr__(self):
-    return f"quadratureSO3Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}\n  folds: {self.folds}"
+    return aligned(f"quadratureSO3Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}\n  folds: {self.folds}")
 
 
 class quadratureS2Grid(vector3d):
@@ -234,7 +242,7 @@ class quadratureS2Grid(vector3d):
     return np.broadcast_to(self.wtheta, self.gridShape).ravel()
 
   def __repr__(self):
-    return f"quadratureS2Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}"
+    return aligned(f"quadratureS2Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}")
 
 
 class quadratureS1Grid:
@@ -248,14 +256,16 @@ class quadratureS1Grid:
     return len(self.x)
 
   def nodes(self):
+    """the nodes, 2L+2 equispaced angles in [0, 2 pi)"""
     return self.x
 
   @property
   def weights(self):
+    """the quadrature weights, all equal and summing to one"""
     return np.full(len(self.x), 1 / len(self.x), dtype=self.x.dtype)
 
   def __repr__(self):
-    return f"quadratureS1Grid\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}"
+    return aligned(f"quadratureS1Grid\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}")
 
 
 __all__ = ["gaussLegendre", "clenshawCurtis", "legendreP", "folds", "bandwidthFor", "quadratureSO3Grid",
