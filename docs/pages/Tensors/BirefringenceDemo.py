@@ -273,12 +273,15 @@ polarizerCrystal = inv(ori) * polarizerSpecimen
 
 rgbDirectionRoute = rI.spectralTransmission(vPropCrystal, thickness, polarizationDirection=polarizerCrystal)
 
-maxRouteDifference = np.max(np.abs(rgbTensorRoute - rgbDirectionRoute))
+# the notIndexed pixels calcGrains gave to olivine grains have no orientation
+maxRouteDifference = np.nanmax(np.abs(rgbTensorRoute - rgbDirectionRoute))
 maxRouteDifference
 # -
 
-# The maximum channel difference is at floating-point roundoff. This check is important
-# because plausible colours do not reveal a reference-frame mistake.
+# The notIndexed pixels inside olivine grains, which `calcGrains` gave the phase of their
+# grain but no orientation, have no colour and are left out. The maximum channel difference
+# is at floating-point roundoff. This check is important because plausible colours do not
+# reveal a reference-frame mistake.
 
 # ## Package the model as a colour key
 #
@@ -293,7 +296,7 @@ colorKey.polarizer = vector3d.X
 colorKey.phi = 90 * degree
 
 rgbKey = colorKey.orientation2color(ori)
-maxKeyDifference = np.max(np.abs(rgbKey - rgbDirectionRoute))
+maxKeyDifference = np.nanmax(np.abs(rgbKey - rgbDirectionRoute))
 maxKeyDifference
 # -
 

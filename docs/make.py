@@ -38,7 +38,8 @@ def cut(text):
 
 
 # the display of a trailing expression: a number as MATLAB's format short, an integer
-# without decimals, nothing for the handles a plot returns, the repr of everything else
+# without decimals, NaN and Inf as MATLAB writes them, nothing for the handles a plot
+# returns, the repr of everything else
 def show(value):
   if isinstance(value, (bool, np.bool_)) or value is None:
     return None if value is None else str(bool(value))
@@ -46,6 +47,8 @@ def show(value):
     value = value[()]
   if isinstance(value, (int, float, np.integer, np.floating)):
     x = float(value)
+    if not np.isfinite(x):
+      return "NaN" if np.isnan(x) else ("Inf" if x > 0 else "-Inf")
     if x == int(x) and abs(x) < 1e15:
       return str(int(x))
     return f"{x:.4f}" if 1e-3 <= abs(x) < 1e5 else f"{x:.4e}"
