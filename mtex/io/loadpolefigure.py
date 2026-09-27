@@ -83,10 +83,10 @@ def loadPoleFigure_dubna(fname, *args, **kwargs):
 
 
 # the specimen grid of the Dubna goniometer: 19 rings five degrees apart, each ring of 72
-# azimuths starting where the instrument starts it
+# azimuths five degrees apart, the last at 355 degree, starting where the instrument starts it
 def DubnaGrid(ntheta):
   theta = np.linspace(0, np.pi / 2, 19)[:ntheta]
-  rho = np.linspace(0, 2 * np.pi, 72)
+  rho = np.arange(72) * 5 * degree
   start = np.array([360.00, 336.40, 327.05, 320.11, 314.44, 309.57, 305.26, 301.37, 297.80, 294.47, 291.34, 288.38,
                     285.54, 282.81, 280.16, 277.57, 275.02, 272.50, 270.00])[::-1][:ntheta] * degree
   T, R = np.meshgrid(theta, rho, indexing="xy")

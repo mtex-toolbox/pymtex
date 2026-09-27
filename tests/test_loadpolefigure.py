@@ -36,7 +36,8 @@ def test_the_dubna_files():
   # the goniometer's rings start at their own azimuths
   r = DubnaGrid(19)
   assert r.shape == (72, 19) and r.antipodal and np.isclose(r.theta[0, 3], 15 * degree)
-  assert np.isclose(np.mod(r.rho[1, 1], 2 * np.pi), (272.5 + 360 / 71) * degree)
+  assert np.isclose(np.mod(r.rho[1, 1], 2 * np.pi), (272.5 + 5) * degree)
+  assert np.isclose(np.mod(r.rho[71, 1] - r.rho[0, 1], 2 * np.pi), 355 * degree)
   # a superposed reflection from its name, the coefficients given or the mean
   p3 = loadPoleFigure(fixture("Q(10-11)(01-11)_amp.cnv"), QUARTZ, superposition=[0.52, 1.23])
   assert p3.allH[0].size == 2 and np.allclose(p3.c[0], [0.52, 1.23]) and np.isclose(p3.max()[0], 1360)
