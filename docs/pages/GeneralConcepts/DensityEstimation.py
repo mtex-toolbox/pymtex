@@ -234,7 +234,8 @@ plot(misAxes, fundamentalRegion=True, MarkerFaceAlpha=0.1)
 # of covering that region uniformly, so a density can summarize their preferred directions.
 
 # +
-axisDensity = calcDensity(misAxes)
+# boundary segments of one grain pair repeat an axis, so the halfwidth is named
+axisDensity = calcDensity(misAxes, halfwidth=10 * degree)
 
 contourf(axisDensity)
 mtexColorMap('LaboTeX')
@@ -299,8 +300,9 @@ ebsd = mtexdata('titanium', silent=True)
 grains = calcGrains(ebsd)
 indexedGrains = grains['indexed']
 
-odfEqual = calcDensity(indexedGrains.meanOrientation)
-odfByPixel = calcDensity(indexedGrains.meanOrientation, weights=indexedGrains.numPixel)
+# one halfwidth for both, MATLAB's default, so that only the weights differ
+odfEqual = calcDensity(indexedGrains.meanOrientation, halfwidth=10 * degree)
+odfByPixel = calcDensity(indexedGrains.meanOrientation, weights=indexedGrains.numPixel, halfwidth=10 * degree)
 
 weighting = ['equal grains', 'grain pixel count']
 peakMRD = [max(odfEqual)[0], max(odfByPixel)[0]]

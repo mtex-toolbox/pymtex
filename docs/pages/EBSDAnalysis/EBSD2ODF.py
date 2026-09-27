@@ -192,7 +192,8 @@ mtexColorbar(title='mrd')
 
 # ## Letting the data choose the halfwidth
 #
-# [calcKernel](orientation.calcKernel.html) selects a halfwidth by cross-validation. It
+# [calcKernel](orientation.calcKernel.html) with `method='KLCV'`, MATLAB's default, selects a
+# halfwidth by cross-validation. It
 # leaves one orientation out, estimates a density from the rest, and scores how well that
 # estimate predicts the omitted one. The halfwidth with the best score over the whole
 # sample wins. No model of the texture is needed, only the sample.
@@ -203,7 +204,7 @@ mtexColorbar(title='mrd')
 
 oriPixels = ori.copy()
 oriPixels.notIID = False
-psiPixel = calcKernel(oriPixels)
+psiPixel = calcKernel(oriPixels, method='KLCV')
 pixelHalfwidth = psiPixel.halfwidth() / degree
 pixelHalfwidth
 
@@ -217,7 +218,7 @@ pixelHalfwidth
 # independent either, but they no longer contain the same crystal measured hundreds of
 # times.
 
-psiGrain = calcKernel(copperGrains.meanOrientation)
+psiGrain = calcKernel(copperGrains.meanOrientation, method='KLCV')
 grainHalfwidth = psiGrain.halfwidth() / degree
 grainHalfwidth
 
@@ -263,13 +264,14 @@ for name, psi in [('UCV', psiUCV), ('conservative', psiConservative)]:
   print(f'{name:12s} selected halfwidth {psi.halfwidth() / degree:.4g} degree')
 # -
 
-# The two answers span the whole range of candidates, and again the spread is the
-# result. The grains are few and of very different sizes: weighted by their area, the
-# map carries as much information as about a hundred equally sized grains. The
-# conservative rule finds no harmonic degree of the texture resolved at the confidence it
-# asks for and returns its widest candidate, 40 degrees. UCV follows the sample down to
-# the narrowest kernel its default harmonic bandwidth resolves. Neither is wrong; both say
-# that this map does not determine a halfwidth.
+# UCV asks for 9.7 degrees and the conservative rule for 27, and again the spread is the
+# result. The grains are few and of very different sizes: weighted by their area, the map
+# carries as much information as about a hundred equally sized grains. UCV alone would
+# follow the sample down to the narrowest kernel its harmonic bandwidth resolves; its noise
+# floor stops it where the sampling noise of a hundred grains would raise bumps above a
+# fifth of the maximum. The conservative rule finds the texture's harmonic energies only
+# loosely bounded and stays wide. Close to MATLAB's 10 degrees, then, but for a reason
+# that can be stated.
 
 # ## What one observation stands for
 #

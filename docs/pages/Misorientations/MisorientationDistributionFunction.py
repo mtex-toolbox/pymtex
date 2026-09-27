@@ -100,7 +100,8 @@ mori_uncorrelated
 # orientations, so large phases and densely sampled regions contribute more strongly than
 # small ones.
 
-mdf_uncorrelated = calcDensity(mori_uncorrelated)
+# misorientations of pixels, so the halfwidth is named: MATLAB's default
+mdf_uncorrelated = calcDensity(mori_uncorrelated, halfwidth=10 * degree)
 mdf_uncorrelated
 
 # ---

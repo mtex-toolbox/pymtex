@@ -484,14 +484,19 @@ at n = 150 to 200 (weights; m-3m directions; axes; -1, m-3m, 6/mmm with 222 and 
 cubic misorientations on SO(3)) to 1e-9, `tests/test_halfwidth.py`.
 
 **H1, S2 selectors** (done): `ucvHalfwidth` (C1), `lowerBoundHalfwidth` (C2),
-`noiseFloorHalfwidth` (C3) and `selectHalfwidth(E, 'conservative' | 'UCV')`, the conservative
-choice being max(C2, C3). The risk of a candidate adds the energies above the kernel's degree
-extent as bias (b below 1e-3 counts as zero); for groups the variance term is the measured
-||mu_l||^2 - a_l below the energy bandwidth and the iid form times the design effect of the upper
-degrees above it. C3 is Bernstein's inequality with the variance s2 B y (B the symmetrised
-kernel's peak, y = K_h*f), a union bound over a covering of mesh delta / L (delta = 1/4), and a
-tolerance tau + tauRel y with tau = tauMax M, M the maximum of the C2 estimate at 200 points of a
-subsample. `bench/halfwidth_s2.py`: eight test densities (model A and B of 5.1, single bumps of 5,
+`noiseFloorHalfwidth` (C3) and `selectHalfwidth(E, 'UCV' | 'conservative', noiseFloor=True)`,
+either method bounded below by C3. The risk of a candidate adds the energies above the kernel's
+degree extent as bias (b below 1e-3 counts as zero); for groups the variance term is the measured
+||mu_l||^2 - A^_l below the energy bandwidth, from the unbiased energies also for C2, and the iid
+form times the design effect of the upper degrees above it. C3 bounds the fluctuation at x, a sum
+of independent terms below b = wmax B (B the peak of the symmetrised kernel) with variance
+s2 R y (R = sum b_l^2 c_l its squared norm, y = K_h*f(x)), by Bennett's inequality at every one of
+the N independent kernel footprints of the fundamental region (2/(1 - cos h) on S2, pi/(h - sin
+h) on SO(3), over the symmetry), with the tolerance tau + tauRel y, tau = tauMax M, M the maximum
+of the pilot estimate (the selector's own halfwidth) at 200 points of a subsample. These are
+realistic, not proven constants (section 10, item 6): the first version, Bernstein with the
+variance B y and a union bound over a covering of mesh delta / L, was a proof and about ten
+times loose (below). `bench/halfwidth_s2.py`: eight test densities (model A and B of 5.1, single bumps of 5,
 10, 20 degrees, 5 % of a 3 degree peak on a uniform background, a girdle, axial model A), exact
 samplers, the exact risk against the oracle of 60 candidates from 1 to 60 degrees, 20 replicates
 below 1e5 and 4 above, and the fluctuation max_x (|fhat - K_h*f| - tauRel K_h*f) / max K_h*f on
@@ -515,9 +520,25 @@ risk there; tauMax = 0.05 or 0.1 cost 4 to 14 times the oracle's MISE. The bandw
 16. On the sharp model at n = 1e3 every lower bound is zero and C2 falls back to 33 degrees
 (Bonferroni: 60), the honest answer that no degree is resolved.
 
+With the realistic constants (`bench/out/halfwidth/s2_study_floor.txt`) the bound lies 1.3 to 1.8
+times above the measured maxima of model A (5 and 10 degrees, n = 1e3 and 1e4). UCV with the floor,
+median MISE over the oracle's, and the median realised excess:
+
+| | n = 1e2 | 1e3 | >= 1e4 | below the oracle, n = 1e3 | excess, n = 1e2 |
+|---|---|---|---|---|---|
+| UCV alone | 1.02 to 1.10 | 1.00 to 1.02 | 1.00 to 1.01 | 20 to 55 % | 0.05 to 0.41 |
+| UCV + floor, tauMax = 0.05 | 1.0 to 6.7 | 1.2 to 3.6 | 1.00 to 1.26 | 0 % | -0.27 to 0.05 |
+| UCV + floor, tauMax = 0.1 | 1.0 to 3.6 | 1.0 to 1.9 | 1.00 to 1.01 | 0 to 40 % | -0.26 to 0.08 |
+| UCV + floor, tauMax = 0.2 | 1.0 to 1.9 | 1.00 to 1.16 | 1.00 to 1.01 | 0 to 40 % | -0.26 to 0.11 |
+| C2 alone | 1.0 to 1.4 | 1.02 to 1.85 | 1.00 to 1.10 | 0 % | -0.28 to 0.22 |
+
+The floor removes UCV's worst noise at small n (the girdle at n = 100: 0.41 to 0.03 of the
+maximum) at a price that tauMax sets; 0.2 costs at most 1.9 at n = 100 and 1.16 from 1e3 on, where
+UCV's own undersmoothing is cheap (at most 1.28) and quiet (excess at most 0.10).
+
 Decided: L0 = 32, F = 8, z = 2 (Bonferroni over alpha = 0.05 as `z=None`, the stated
 probability), 60 geometric candidates from 1 to 60 degrees on S2, 40 from 2 to 40 on SO(3),
-alpha = 0.05, tauMax = 0.2, tauRel = 0.5. Timing on S2 (`timing`, energies plus selection): the conservative choice 0.32 s at 1e6 and
+alpha = 0.05, tauMax = 0.2, tauRel = 0.5; the default method UCV with the floor. Timing on S2 (`timing`, energies plus selection): the conservative choice 0.32 s at 1e6 and
 1.7 s at 1e7; UCV at bandwidth 256 in one transform 0.17 s and 1.1 s.
 
 **H2, SO(3)** (done): the same functions with the Wigner coefficients projected by both groups,
@@ -555,10 +576,29 @@ s unfolded), so they are not used. On the copper map of EBSD2ODF (16116 pixels, 
 40 degrees and 'UCV' 3.7 degrees (the smallest candidate bandwidth 64 resolves), the grain means
 14.5, 3.7 and KLCV 4.7.
 
-Open for H5: the threshold of `calcDensity`. C2 alone beats the fixed 10 degrees from n = 100 on
-almost every test density; with the C3 floor at tauMax = 0.2 only from n = 1e4 on (S2 and SO(3)).
-Either the default selects above 1e4, or C3 gets the tighter constants (the variance R y, an
-effective count of kernel footprints; no longer a proof) and the threshold drops.
+With the realistic floor (`bench/out/halfwidth/so3_study_floor.txt`): on the independent SO(3)
+samples UCV with the floor at tauMax = 0.2 costs at most 1.03 at n = 1e3 and nothing above (0.1:
+up to 1.41, 0.05: up to 2.5); KLCV lies at 1.0 to 1.8 and below the oracle in 90 to 100 % of the
+SantaFe runs. On the grain pixels, folded by grains, UCV alone is at the oracle (1.03, 1.01 at
+227 and 1981 grains, worst 4.4 once with 227), C2 with the unbiased variance at 1.60 and 1.10, but
+the floor widens UCV to 1.55 and 1.73: Bennett's bound on the largest term reads the largest
+grain, whose weight is 7 to 17 times the mean for lognormal sizes. A Gaussian tail (no
+largest-term correction) gives 1.16 and 1.02, the 99 % quantile of the grain weights 1.47 and
+1.24. What the largest term measures is real, a single large grain raising its own spike at
+a small halfwidth, which the ISE hardly charges and the floor is meant to prevent; the choice
+is open (section 10).
+
+Done 2026-09-27 (H5, first part): `calcKernel` defaults to `'UCV'` with the floor (`noiseFloor=True`,
+tauMax = 0.2), the new methods seeded so that a default call is reproducible; `calcDensity`
+without a halfwidth or kernel selects that way, takes a map with its grains (`groups=` its grain
+ids), and falls back to MATLAB's 10 degrees with a warning for flagged pixel orientations
+without grain ids and for fewer than two points. The plots keep their fixed halfwidths (5 and
+10 degrees). The pages compared with MATLAB name 10 degrees where their densities are pixels or
+figures compared with MATLAB's (VectorsDensityEstimation, VectorsAxes, DensityEstimation,
+ODFTheory, EBSDOrientationAnalysis, MisorientationDistributionFunction, TransformationTexture,
+EllipseBasedParameters); OptimalKernel, VectorsDensityEstimation and EBSD2ODF show the
+selection. One observation: C2 moves with the random split into folds (5.52 against 4.07
+degrees on the 10000 orientations of OptimalKernel after the draws were reordered).
 
 **H3, C4 and C5**: the diffusion plug-in (and the MATLAB `kde1d` fix recorded in
 docs/findings.md), full-data KLCV with leave-one-grain-out. Decided: which accurate method becomes
@@ -690,6 +730,15 @@ off a pole figure? Concerns `SO3Fun/slicedWasserstein.m`,
    `a(2:end)` and no longer prints `t_star`. Checked on the `mtexcc` bridge: 6000 orientations of a
    10 degree cubic peak give KLCV 3.70 degree (2.2 s) and BCV 2.94 degree (0.5 s, it did not run
    before); 2000 Gaussian samples give the `kde1d` bandwidth 0.2453 against Silverman's 0.2374.
+
+6. **Revised after H2 (user, 2026-09-27).** The default of `calcKernel` and of `calcDensity`
+   without a halfwidth or kernel is UCV bounded below by the noise floor C3, the floor with
+   realistic constants (the variance R y with R = ||K||^2, an effective count of kernel
+   footprints) in place of the proof; `'conservative'` stays as a method. `calcDensity` selects
+   always, not above a sample size. Directions made from flagged pixel orientations do not
+   carry `notIID`; the pages tell the user to pass the grain ids. Next: H3 (the diffusion
+   plug-in, KLCV on all points with leave-one-grain-out), the bandwidth cap of UCV on SO(3),
+   and MATLAB's `calcKernel`; the width of the selection with grain folds is under discussion.
 
 ## 11. References
 

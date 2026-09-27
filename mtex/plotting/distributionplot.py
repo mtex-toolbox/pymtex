@@ -92,8 +92,8 @@ def plotAxisDistribution(obj, *args, halfwidth=None, weights=None, antipodal=Fal
     v = obj.axis(other) if other is not None else obj.axis()
     v.antipodal = bool(antipodal or obj.antipodal)
     if any(kw.get(f) for f in FILL_FLAGS):
-      opts = {} if halfwidth is None else {"halfwidth": halfwidth}
-      f = calcDensity(v, weights=weights, **opts)
+      # the axes of a list of misorientations are smoothed as MATLAB smooths them, by 10 degrees
+      f = calcDensity(v, weights=weights, halfwidth=10 * degree if halfwidth is None else halfwidth)
       return plot(f, fundamentalRegion=True, **kw)
     return plot(v, fundamentalRegion=True, **kw)
   if isinstance(obj, referenceFrame):

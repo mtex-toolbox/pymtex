@@ -54,10 +54,11 @@ ori = discreteSample(modelODF, 10000, rng=rng)
 sampleCount = len(ori)
 sampleCount
 
-# With no method option, `calcKernel` uses Kullback--Leibler cross-validation (KLCV). It
-# returns a de la Vallée Poussin kernel rather than an ODF.
+# MATLAB's `calcKernel` uses Kullback--Leibler cross-validation (KLCV) when no method is
+# named; the port's default is `'UCV'`, described below, so KLCV is named here. It returns a
+# de la Vallée Poussin kernel rather than an ODF.
 
-psi = calcKernel(ori, rng=rng)
+psi = calcKernel(ori, method='KLCV', rng=rng)
 psi
 
 selectedHalfwidth = psi.halfwidth() / degree
@@ -85,12 +86,13 @@ mtexColorbar(title='mrd')
 # ## Select from the error of the density
 #
 # Two further methods judge a candidate kernel by the error of the density it produces.
-# `'UCV'` (unbiased cross-validation) estimates the integrated squared error of every
-# candidate from the harmonic coefficients of the sample and takes the halfwidth where it is
-# least. `'conservative'` replaces the texture's harmonic energies by lower confidence bounds
-# and ignores the harmonic degrees it cannot resolve. The halfwidth it returns is then at least
-# as wide as the one of least error, and at least as wide as needed to keep noise bumps
-# below a fifth of the estimate's maximum. Both cost about one harmonic transform of the
+# `'UCV'` (unbiased cross-validation), the port's default, estimates the integrated squared
+# error of every candidate from the harmonic coefficients of the sample and takes the
+# halfwidth where it is least. `'conservative'` replaces the texture's harmonic energies by
+# lower confidence bounds and ignores the harmonic degrees it cannot resolve; the halfwidth
+# it returns is then at least as wide as the one of least error. Both are bounded below by a
+# noise floor: no halfwidth so narrow that the sampling noise could raise bumps above a
+# fifth of the estimate's maximum, with `noiseFloor=False` to switch it off. Both cost about one harmonic transform of the
 # sample, under a second for a million orientations. They use their own random generator
 # here, which splits the sample into the parts it compares.
 
@@ -102,10 +104,9 @@ for m in ['UCV', 'conservative']:
   print(f'{m:12s} halfwidth {psiM.halfwidth() / degree:.3g} degree, error {errorM:.3g}')
 # -
 
-# UCV asks for 4.1 degrees and the conservative rule for 5.5, against the 7.1 degrees of
-# KLCV above, and both errors, 0.131 and 0.119, lie below KLCV's 0.139. `calcError`
-# measures the mean absolute difference of the densities rather than the squared error UCV
-# aims at, which is why the wider conservative kernel scores best here.
+# Both ask for 4.1 degrees against the 7.1 degrees of KLCV above, and their error, 0.131,
+# lies below KLCV's 0.139. With 10000 orientations the harmonic energies of this texture are
+# resolved well enough that the conservative bound and the unbiased estimate agree.
 #
 # ## What the methods use
 #
@@ -114,10 +115,10 @@ for m in ['UCV', 'conservative']:
 #
 # | method | information used | practical reading |
 # |---|---|---|
-# | `'KLCV'` | leave-one-out likelihood on candidate kernels | default; data-adaptive |
+# | `'KLCV'` | leave-one-out likelihood on candidate kernels | MATLAB's default; data-adaptive |
 # | `'RuleOfThumb'` | nearest-neighbour resolution of the sample | quick scale estimate |
 # | `'magicRule'` | sample size and crystal/specimen symmetry | conservative asymptotic rule |
-# | `'UCV'` | unbiased estimate of the integrated squared error | aims at the best halfwidth |
+# | `'UCV'` | unbiased estimate of the integrated squared error, with a noise floor | the port's default; aims at the best halfwidth |
 # | `'conservative'` | lower bounds of the harmonic energies, a bound on the noise | errs towards smoothing |
 #
 # Older descriptions say that `'RuleOfThumb'` uses the variance of the orientations to
@@ -166,11 +167,11 @@ for r, row in zip(rowName, estimationError):
 # variation when comparing methods within a row. One draw at each size is a demonstration,
 # not evidence that one method is always best.
 #
-# UCV follows KLCV closely in error while choosing narrower kernels from 100 orientations
-# on. The conservative rule is the widest data-driven choice at every size: with 30
-# orientations no harmonic degree of the texture is resolved and it returns its widest
-# candidate, 40 degrees; from there it narrows as the sample grows, to 11 degrees at 1000
-# orientations, where its error approaches KLCV's.
+# With 30 orientations the two new rules return nearly their widest candidates, 38 and 40
+# degrees: the noise floor finds that nothing narrower would stand out of the sampling noise,
+# and their error is the price of that caution. From 300 orientations on they agree, and at
+# 1000 orientations they ask for 6.1 degrees where KLCV asks for 9.4, at nearly the same
+# error.
 
 plt.figure()
 plt.loglog(sampleSize, estimationError, 'o-', linewidth=2)
@@ -230,6 +231,13 @@ plt.grid(True, which='both')
 # the energies can only move the minimiser to a wider kernel, so the choice is at least the
 # halfwidth of least error whenever the bounds hold. Splitting a map into parts that share
 # no grain keeps the estimates unbiased when pixels of one grain are correlated.
+#
+# The noise floor looks at the estimate itself. At an orientation where the smoothed density
+# is $y$, the estimate is a sum of $N$ independent terms, none larger than $\psi(0)/N$, with
+# variance $y\,\|\psi\|^2/N$. Bennett's inequality bounds its deviation at every one of the
+# independent kernel footprints of orientation space, and the floor is the smallest
+# halfwidth at which that bound stays below a fifth of the estimate's maximum plus half the
+# local density.
 #
 # ## References
 #

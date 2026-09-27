@@ -111,7 +111,7 @@ rho = np.linspace(20, 70, 100) * degree
 theta = np.linspace(10, 30, 100) * degree
 v = vector3d.byPolar(theta, rho)
 
-directionDensity = v.calcDensity()
+directionDensity = v.calcDensity(halfwidth=10 * degree)
 plot(directionDensity, complete=True)
 # -
 
@@ -119,7 +119,7 @@ plot(directionDensity, complete=True)
 # point-reflected copy because these observations are still directions.
 
 # +
-axisDensity = v.calcDensity(antipodal=True)
+axisDensity = v.calcDensity(antipodal=True, halfwidth=10 * degree)
 plot(axisDensity, complete=True)
 # -
 

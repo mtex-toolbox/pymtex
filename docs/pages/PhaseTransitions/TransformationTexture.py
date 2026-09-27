@@ -101,7 +101,7 @@ numSimulatedChildren
 # [`calcDensity`](calcDensity.html) turns that discrete set back into an ODF.
 
 # +
-odfBSim = calcDensity(oriBSim)
+odfBSim = calcDensity(oriBSim, halfwidth=10 * degree)
 print(odfBSim)
 
 plotPDF(odfBSim, hC, 'contourf', figSize='medium')
@@ -160,7 +160,7 @@ print(textureIndexSampled, textureIndexDirect)
 # +
 selectedVariantId = np.ones(n, dtype=int)
 oriBSelected = variants(p2c, oriASim, selectedVariantId)
-odfBSelected = calcDensity(oriBSelected)
+odfBSelected = calcDensity(oriBSelected, halfwidth=10 * degree)
 print(odfBSelected)
 
 plotPDF(odfBSelected, hC, 'contourf', figSize='medium')

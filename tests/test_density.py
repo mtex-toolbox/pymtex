@@ -17,11 +17,13 @@ def test_R2_calcDensity_on_orientations():
       odf = calcDensity(o, harmonic=harmonic)
       assert abs(mean(odf) - 1) < 1e-10 and odf.CS is o.CS and odf.SS is o.SS
       assert np.all(np.abs(odf(rotation.rand(5, rng=rng)) - 1) < 1e-6)
-  # a mixed list drops the NaNs, keeps mean one and peaks above two
+  # a mixed list drops the NaNs, keeps mean one and, at MATLAB's 10 degrees, peaks above two
   o = orientation(rotation.cat(rotation.nan(3), rotation.rand(50, rng=rng)), cs, ss)
-  odf = calcDensity(o)
+  odf = calcDensity(o, halfwidth=10 * degree)
   assert isinstance(odf, SO3FunRBF) and odf.center.size == 50 and abs(mean(odf) - 1) < 1e-10
   assert np.max(odf(o[3:])) > 2
+  # without a halfwidth it is selected: fifty uniform orientations resolve nothing
+  assert calcDensity(o).psi.halfwidth() > 20 * degree
   # the route: kernel form below 200, harmonic above, or on request
   big = orientation(rotation.rand(300, rng=rng), cs, ss)
   assert isinstance(calcDensity(big), SO3FunHarmonic) and isinstance(calcDensity(big, harmonic=False), SO3FunRBF)
@@ -94,3 +96,26 @@ def test_R7_least_squares_from_samples():
   vs = vector3d.rand(500, rng=rng)
   t = interpolate(vs, s(vs), bandwidth=5)
   assert t.isclose(s, 1e-4)
+
+
+def test_calcDensity_selects_the_halfwidth():
+  import warnings
+  cs = crystalFrame("m-3m")
+  center = orientation(rotation.rand(rng=rng), cs)
+  from mtex import discreteSample, unimodalODF
+  o = discreteSample(unimodalODF(center, halfwidth=10 * degree), 4000, rng=rng)
+  f = calcDensity(o, harmonic=False)
+  # a sharp sample gets a kernel narrower than MATLAB's fixed 10 degrees, reproducibly
+  assert 2 * degree <= f.psi.halfwidth() < 10 * degree
+  assert np.isclose(calcDensity(o, harmonic=False).psi.halfwidth(), f.psi.halfwidth())
+  # the pixels of a map without their grains keep 10 degrees, with a warning
+  o.notIID = True
+  with warnings.catch_warnings(record=True) as w:
+    warnings.simplefilter("always")
+    g = calcDensity(o, harmonic=False)
+  assert np.isclose(g.psi.halfwidth(), 10 * degree) and any("not independent" in str(x.message) for x in w)
+  # with the grain ids it selects again
+  assert calcDensity(o, groups=np.arange(4000) // 10, harmonic=False).psi.halfwidth() != 10 * degree
+  # directions
+  v = vector3d(rng.standard_normal((3000, 3)))
+  assert calcDensity(v).bandwidth < 25

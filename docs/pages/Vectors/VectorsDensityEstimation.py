@@ -48,9 +48,11 @@ plot(cAxes, upper=True, MarkerFaceColor='none', MarkerEdgeAlpha=0.01, MarkerSize
 # their relative strengths cannot be read from this overlap.
 #
 # [calcDensity](vector3d.calcDensity.html) replaces the point cloud by a continuous
-# spherical function.
+# spherical function. Given no halfwidth, it selects one from the data, which assumes
+# independent observations; the pixel axes of a map are not, as the section *Letting the
+# Data Choose the Halfwidth* shows. So this page names MATLAB's default, 10 degrees.
 
-pdf = calcDensity(cAxes)
+pdf = calcDensity(cAxes, halfwidth=10 * degree)
 pdf
 
 # The summary identifies a harmonic spherical function with bandwidth 25. It also reports
@@ -88,9 +90,8 @@ pdfMean
 
 # ## Choosing the Halfwidth
 #
-# The kernel halfwidth controls how far each observation is spread. The `halfwidth`
-# option defaults to 10 degrees for `vector3d.calcDensity`. Compare four choices on the
-# same axes.
+# The kernel halfwidth controls how far each observation is spread. Compare four choices
+# on the same axes.
 
 # +
 hw = np.array([2.5, 5, 10, 20]) * degree
@@ -161,11 +162,11 @@ plot(pdf, upper=True)
 mtexTitle('one pixel - one vote')
 
 nextAxis()
-plot(calcDensity(cAxesGrains), upper=True)
+plot(calcDensity(cAxesGrains, halfwidth=10 * degree), upper=True)
 mtexTitle('one grain - one vote')
 
 nextAxis()
-plot(calcDensity(cAxesGrains, weights=grains.area), upper=True)
+plot(calcDensity(cAxesGrains, weights=grains.area, halfwidth=10 * degree), upper=True)
 mtexTitle('weighted by grain area')
 
 setColorRange('equal')
@@ -181,11 +182,12 @@ mtexFig.drawNow()
 
 # ## Letting the Data Choose the Halfwidth
 #
-# `calcKernel` selects the kernel from the axes themselves. Its method `'UCV'` estimates
-# the integrated squared error of the density for every candidate halfwidth and takes the
-# halfwidth where the estimate is least; `'conservative'`, the default for directions,
-# takes a halfwidth that is at least as wide as that optimum with high probability and
-# wide enough that the estimate shows no noise bump of note.
+# `calcKernel` selects the kernel from the axes themselves; `calcDensity` calls it whenever
+# no halfwidth is given. Its default method `'UCV'` estimates the integrated squared error
+# of the density for every candidate halfwidth and takes the halfwidth where the estimate
+# is least, but never one so narrow that noise could raise bumps above a fifth of the
+# estimate's maximum. `'conservative'` takes a halfwidth at least as wide as the optimum
+# with high probability.
 # [Optimal Kernel Selection](OptimalKernel.html) explains both.
 #
 # Both rules take the observations as independent unless told otherwise. Pixel axes are
@@ -209,24 +211,26 @@ for name, psi in [('pixels as independent', psiAsIndependent), ('pixels with gra
 
 # Taken as independent, the 152345 pixel axes drive the selection to the narrowest
 # candidate, 1 degree: neighbouring pixels repeat one axis, and the rule reads the
-# repetition as a sharp density. With the grain ids it asks for 13 degrees, close to the
-# 14 degrees of the grain axes weighted by their area, which describe the same mapped
-# area.
+# repetition as a sharp density. Even the noise floor cannot help, since with that many
+# observations it expects hardly any noise. With the grain ids it asks for 21 degrees,
+# close to the 20 degrees of the grain axes weighted by their area, which describe the same
+# mapped area.
 #
-# One vote per grain returns 1 degree again. Of the 1151 grains 531 are single pixels,
-# mostly fragments beside a grain of nearly the same orientation, so the grain axes
-# repeat each other as well: 1675 pairs of them lie within 1 degree, several times what
-# independent axes would give. The area weight gives those fragments almost no say.
+# One vote per grain asks for 2.5 degrees, the narrowest kernel the noise floor admits for
+# 1151 axes. Of the 1151 grains 531 are single pixels, mostly fragments beside a grain of
+# nearly the same orientation, so the grain axes repeat each other as well: 1675 pairs of
+# them lie within 1 degree, several times what independent axes would give. The area
+# weight gives those fragments almost no say.
 #
 # The conservative rule on the pixels with their grain ids:
 
-psiConservative = calcKernel(cAxes, groups=pixelGrainId, rng=rng)
+psiConservative = calcKernel(cAxes, 'conservative', groups=pixelGrainId, rng=rng)
 psiConservative.halfwidth() / degree
 
-# It returns its widest candidate, 60 degrees. Weighted by area, the few large grains
-# dominate the map, and the rule finds no harmonic degree of the axis distribution resolved
-# at the confidence it asks for. A reported halfwidth is therefore worth checking against
-# the plots of the previous section rather than taken on trust.
+# It asks for 24 degrees, a little wider than UCV's 21, as it should: it takes the energies
+# of the axis distribution at their lower confidence bounds. Weighted by area, the few
+# large grains dominate the map, which leaves these bounds loose. A reported halfwidth is
+# worth checking against the plots of the previous section rather than taken on trust.
 
 # ## Working with the Density Function
 #
@@ -308,7 +312,7 @@ h = inv(ebsd['Fo'].orientations) * vector3d.Z
 # [calcDensity](vector3d.calcDensity.html) transfers that symmetry to the density
 # automatically.
 
-ipdf = calcDensity(h)
+ipdf = calcDensity(h, halfwidth=10 * degree)
 ipdf
 
 # The summary identifies an antipodal harmonic function with the Forsterite frame.

@@ -95,11 +95,18 @@ class Truth:
     return np.array(out)
 
 
+def _floored(E, h, tauMax):
+  return max(h, noiseFloorHalfwidth(E, H, tauMax=tauMax, pilot=h))
+
+
 def methods(clustered):
   m = {
     "UCV": lambda E1, E0, o: ucvHalfwidth(E1, H),
+    "UCV+f .05": lambda E1, E0, o: _floored(E1, ucvHalfwidth(E1, H), 0.05),
+    "UCV+f .1": lambda E1, E0, o: _floored(E1, ucvHalfwidth(E1, H), 0.1),
+    "UCV+f .2": lambda E1, E0, o: _floored(E1, ucvHalfwidth(E1, H), 0.2),
     "C2": lambda E1, E0, o: lowerBoundHalfwidth(E0, H),
-    "cons": lambda E1, E0, o: max(h2 := lowerBoundHalfwidth(E0, H), noiseFloorHalfwidth(E0, H, pilot=h2)),
+    "cons .1": lambda E1, E0, o: _floored(E0, lowerBoundHalfwidth(E0, H), 0.1),
     "magicRule": lambda E1, E0, o: calcKernel(o, "magicRule").halfwidth(),
     "10deg": lambda E1, E0, o: 10 * degree,
   }
@@ -161,7 +168,8 @@ def timing():
       E = degreeEnergies(o, L, folds=8 if L == 32 else 1, rng=rng)
       t1 = time.perf_counter()
       Hs = candidateHalfwidths("SO3")
-      h = max(h2 := lowerBoundHalfwidth(E, Hs), noiseFloorHalfwidth(E, Hs, pilot=h2)) if L == 32 else ucvHalfwidth(E, Hs)
+      h0 = lowerBoundHalfwidth(E, Hs) if L == 32 else ucvHalfwidth(E, Hs)
+      h = max(h0, noiseFloorHalfwidth(E, Hs, pilot=h0))
       t2 = time.perf_counter()
       print(f"n {n:.0e} {label:>12}: energies {t1 - t:.3f} s, selection {t2 - t1:.3f} s, h {h / degree:.2f} deg", flush=True)
 

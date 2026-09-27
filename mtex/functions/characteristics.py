@@ -6,7 +6,7 @@
 #   values, modes = max(odf, numLocal=, resolution=, accuracy=);  min(odf)
 #   modes, weights, centerId = calcComponents(odf, seed=, weights=, tolerance=, radius=, exact=)
 #   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | cs1, cs2 | mori), calcAxisDistribution(odf, v)
-#   calcMIndex(odf), discreteSample(odf, n, rng=), discreteSample(fun, n, range=), calcError(odf1, odf2, 'l2'), calcKernel(ori, 'klcv')
+#   calcMIndex(odf), discreteSample(odf, n, rng=), discreteSample(fun, n, range=), calcError(odf1, odf2, 'l2'), calcKernel(ori | v | ebsd, 'UCV')
 from __future__ import annotations
 
 import functools
@@ -703,31 +703,35 @@ def _discreteSampleS2(f, n, resolution, rng):
 
 
 # the de la Vallee Poussin kernel a density estimate of orientations or directions should use
-# (MATLAB calcKernel): 'conservative' and 'UCV' select from the degree energies of the sample
-# (docs/plans/halfwidth.md), 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
+# (MATLAB calcKernel): 'UCV', the default, and 'conservative' select from the degree energies of
+# the sample and are bounded below by a noise floor unless noiseFloor=False
+# (docs/plans/halfwidth.md); 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
 # validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
 # size and the symmetries alone; directions take the first two only. groups are the grain ids
 # of pixels, which the energies fold by; a map brings its own
-def calcKernel(o, method=None, samplingSize=1000, rng=None, *, groups=None, weights=None, bandwidth=None, halfwidths=None):
+def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, weights=None, bandwidth=None, halfwidths=None,
+               noiseFloor=True):
   from .halfwidth import degreeEnergies, selectHalfwidth
   from .kernelfunctions import S2DeLaValleePoussinKernel
   if not isinstance(o, (quaternion, vector3d)) and hasattr(o, "orientations"):
     groups = o.prop.get("grainId") if groups is None and "grainId" in o.prop else groups
     o = o.orientations
   directions = isinstance(o, vector3d)
-  method = ("conservative" if directions else "klcv") if method is None else method
   # the method however it is capitalised, MATLAB's 'RuleOfThumb' included
   method = {"klcv": "klcv", "ruleofthumb": "ruleOfThumb", "magicrule": "magicRule", "conservative": "conservative",
             "ucv": "UCV"}.get(str(method).lower(), method)
-  rng = np.random.default_rng() if rng is None else rng
   if method in ("conservative", "UCV"):
+    # the selection draws subsamples and folds; a fixed seed makes the default reproducible
+    rng = np.random.default_rng(0) if rng is None else rng
     L = (32 if method == "conservative" else (256 if directions else 64)) if bandwidth is None else int(bandwidth)
     # UCV needs no errors of the energies, so independent points take one transform
     folds = 1 if method == "UCV" and groups is None else 8
-    h = selectHalfwidth(degreeEnergies(o, L, weights=weights, groups=groups, folds=folds, rng=rng), method, halfwidths)
+    E = degreeEnergies(o, L, weights=weights, groups=groups, folds=folds, rng=rng)
+    h = selectHalfwidth(E, method, halfwidths, noiseFloor=noiseFloor)
     return S2DeLaValleePoussinKernel(halfwidth=h) if directions else SO3DeLaValleePoussinKernel(halfwidth=h)
+  rng = np.random.default_rng() if rng is None else rng
   if directions:
-    raise ValueError(f"the kernel of directions is selected by 'conservative' or 'UCV', not {method!r}")
+    raise ValueError(f"the kernel of directions is selected by 'UCV' or 'conservative', not {method!r}")
   # the cross validation and the rules count pixels as independent draws
   if isinstance(o, orientation) and o.notIID:
     raise ValueError(f"{method!r} counts the pixels of a map as independent draws, which neighbouring pixels of one "
@@ -768,7 +772,7 @@ def calcKernel(o, method=None, samplingSize=1000, rng=None, *, groups=None, weig
       scores.append(np.mean(np.log(np.maximum(fj, np.finfo(float).tiny))))
     best = candidates[int(np.argmax(scores))]
     return SO3DeLaValleePoussinKernel(fak * best.kappa)
-  raise ValueError(f"the kernel selection method is 'conservative', 'UCV', 'klcv', 'ruleOfThumb' or 'magicRule', not {method!r}")
+  raise ValueError(f"the kernel selection method is 'UCV', 'conservative', 'klcv', 'ruleOfThumb' or 'magicRule', not {method!r}")
 
 
 # two perpendicular twofold axes of an assumed orthotropic texture, found and rotated onto

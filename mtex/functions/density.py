@@ -2,8 +2,9 @@
 # the least squares approximation from samples (MATLAB calcDensity, calcPDF, interpolate;
 # docs/plans/functions.md F4)
 #
-#   calcDensity(ori, halfwidth=, kernel=, weights=, harmonic=None, bandwidth=)
-#   calcDensity(v, halfwidth=, kernel=, weights=, bandwidth=)
+#   calcDensity(ori | ebsd, halfwidth=, kernel=, weights=, groups=, harmonic=None, bandwidth=)
+#   calcDensity(v, halfwidth=, kernel=, weights=, groups=, bandwidth=)
+#   without a halfwidth or kernel the halfwidth is selected, calcKernel(x, 'UCV')
 #   calcDensity(rho, periodic=True, sigma=, kernel=, weights=, antipodal=)
 #   calcDensity(x, range=, bandwidth=, weights=)    real valued data, one sample per row
 #   calcPDF(odf, h, r, superposition=)
@@ -11,6 +12,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 
@@ -32,6 +34,11 @@ from .transforms import S2FourierPlan, SO3FourierPlan
 
 
 def calcDensity(x, Fourier=False, **kwargs):
+  # a map: the orientations of its one phase, with its grain ids when grains were computed
+  if not isinstance(x, (quaternion, vector3d, np.ndarray, list, tuple)) and hasattr(x, "orientations") and hasattr(x, "prop"):
+    if kwargs.get("groups") is None and "grainId" in x.prop:
+      kwargs["groups"] = np.asarray(x.prop["grainId"]).reshape(-1)
+    x = x.orientations
   if isinstance(x, quaternion):
     f = _calcDensitySO3(x, **kwargs)
     # MATLAB's 'Fourier' asks for the harmonic form
@@ -47,9 +54,9 @@ def calcDensity(x, Fourier=False, **kwargs):
 
 # the ODF of a list of orientations: the kernel form up to 200 orientations, the harmonic
 # form above or on request, an empty list the uniform ODF; NaN orientations are dropped
-def _calcDensitySO3(o, kernel=None, halfwidth=None, weights=None, harmonic=None, bandwidth=None):
+def _calcDensitySO3(o, kernel=None, halfwidth=None, weights=None, groups=None, harmonic=None, bandwidth=None):
   o = o if isinstance(o, orientation) else orientation(o)
-  psi = _densityKernel("SO3", kernel, halfwidth)
+  psi = _densityKernel("SO3", kernel, halfwidth) if kernel is not None or halfwidth is not None else _selectedKernel(o, weights, groups)
   q = o.data.reshape(-1, 4)
   w = np.ones(len(q)) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   keep = ~np.any(np.isnan(q), axis=1)
@@ -67,10 +74,11 @@ def _calcDensitySO3(o, kernel=None, halfwidth=None, weights=None, harmonic=None,
 
 # the density of directions or axes on the sphere: the point measure convolved with the
 # kernel, projected by the frame, even for axes
-def _calcDensityS2(v, kernel=None, halfwidth=None, weights=None, bandwidth=None, antipodal=False):
-  psi = _densityKernel("S2", kernel, halfwidth)
+def _calcDensityS2(v, kernel=None, halfwidth=None, weights=None, groups=None, bandwidth=None, antipodal=False):
   # the estimate of axes is even; the flag on the data or on the call says so
   antipodal = bool(antipodal) or bool(v.antipodal)
+  psi = _densityKernel("S2", kernel, halfwidth) if kernel is not None or halfwidth is not None else \
+      _selectedKernel(vector3d(v.data, frame=v.frame, antipodal=antipodal), weights, groups)
   d = v.data.reshape(-1, 3)
   w = np.ones(len(d)) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   keep = ~np.any(np.isnan(d), axis=1)
@@ -81,6 +89,22 @@ def _calcDensityS2(v, kernel=None, halfwidth=None, weights=None, bandwidth=None,
   pts = vector3d(d, frame=v.frame, antipodal=antipodal).normalize()
   s = S2FunHarmonic.quadrature(pts, np.ones(len(d)), bandwidth=L, weights=4 * np.pi * w / np.sum(w), real=True, antipodal=antipodal)
   return conv(s, psi)
+
+
+# the kernel selected from the sample by UCV with its noise floor; MATLAB's 10 degrees for the
+# pixels of a map without their grains, with a warning, and for fewer than two points
+def _selectedKernel(x, weights, groups):
+  from .characteristics import calcKernel
+  space = "S2" if isinstance(x, vector3d) else "SO3"
+  if isinstance(x, orientation) and x.notIID and groups is None:
+    warnings.warn("the orientations come from a map, whose neighbouring pixels are not independent, so the halfwidth "
+                  "was not selected and is 10 degrees; pass the map with its grains computed, groups=ebsd.grainId, "
+                  "or a halfwidth", stacklevel=4)
+    return _densityKernel(space, None, None)
+  try:
+    return calcKernel(x, "UCV", weights=weights, groups=groups)
+  except ValueError:
+    return _densityKernel(space, None, None)
 
 
 # the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or

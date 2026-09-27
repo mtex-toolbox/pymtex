@@ -180,18 +180,17 @@ def realisedISE(x, m, A, energy):
 
 # ------------------------------------------------------------------ the study
 
-def _cons(E0, tauMax):
-  h2 = lowerBoundHalfwidth(E0, H)
-  return max(h2, noiseFloorHalfwidth(E0, H, tauMax=tauMax, pilot=h2))
+def _floored(E, h, tauMax):
+  return max(h, noiseFloorHalfwidth(E, H, tauMax=tauMax, pilot=h))
 
 
 METHODS = {
   "UCV": lambda E1, E0: ucvHalfwidth(E1, H),
-  "C2 z=2": lambda E1, E0: lowerBoundHalfwidth(E0, H, z=2),
-  "C2 bonf": lambda E1, E0: lowerBoundHalfwidth(E0, H),
-  "cons .05": lambda E1, E0: _cons(E0, 0.05),
-  "cons .1": lambda E1, E0: _cons(E0, 0.1),
-  "cons .2": lambda E1, E0: _cons(E0, 0.2),
+  "UCV+f .05": lambda E1, E0: _floored(E1, ucvHalfwidth(E1, H), 0.05),
+  "UCV+f .1": lambda E1, E0: _floored(E1, ucvHalfwidth(E1, H), 0.1),
+  "UCV+f .2": lambda E1, E0: _floored(E1, ucvHalfwidth(E1, H), 0.2),
+  "C2": lambda E1, E0: lowerBoundHalfwidth(E0, H),
+  "cons .1": lambda E1, E0: _floored(E0, lowerBoundHalfwidth(E0, H), 0.1),
 }
 
 
@@ -270,7 +269,7 @@ def timing():
       t = time.perf_counter()
       E = degreeEnergies(x, L, folds=8 if L == 32 else 1, rng=rng)
       t1 = time.perf_counter()
-      h = _cons(E, 0.05) if L == 32 else ucvHalfwidth(E, H)
+      h = _floored(E, lowerBoundHalfwidth(E, H), 0.1) if L == 32 else _floored(E, ucvHalfwidth(E, H), 0.1)
       t2 = time.perf_counter()
       print(f"n {n:.0e} {label:>12}: energies {t1 - t:.3f} s, selection {t2 - t1:.3f} s, h {h / degree:.2f} deg")
 

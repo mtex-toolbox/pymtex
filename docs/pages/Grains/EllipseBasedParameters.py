@@ -138,9 +138,9 @@ mtexTitle('Enstatite')
 # smoothing bandwidth.
 
 # +
-tdfForsterite = calcDensity(grains['forsterite'].longAxis(), weights=norm(grains['forsterite'].longAxis()))
+tdfForsterite = calcDensity(grains['forsterite'].longAxis(), weights=norm(grains['forsterite'].longAxis()), halfwidth=10 * degree)
 
-tdfEnstatite = calcDensity(grains['enstatite'].longAxis(), weights=norm(grains['enstatite'].longAxis()))
+tdfEnstatite = calcDensity(grains['enstatite'].longAxis(), weights=norm(grains['enstatite'].longAxis()), halfwidth=10 * degree)
 # -
 
 # The input was a list of vectors, so the result is a function on the sphere, an

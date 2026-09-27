@@ -20,6 +20,8 @@ PREVIEW_POINTS = 100_000   # the measurements a preview density is estimated fro
 
 def binnedDensity(ori, cell=4 * degree, halfwidth=None, **kwargs):
   from ..functions.density import calcDensity
+  # binned counts are no sample to select a halfwidth from: MATLAB's 10 degrees
+  halfwidth = 10 * degree if halfwidth is None else halfwidth
   q = ori.data.reshape(-1, 4)
   keep = ~np.any(np.isnan(q), axis=1)
   ori = ori.reshape(-1)[keep] if not keep.all() else ori.reshape(-1)

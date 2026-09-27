@@ -137,7 +137,8 @@ fibreFraction
 # explains the kernel and its halfwidth.
 
 # +
-odf = calcDensity(ori)
+# pixels are no independent draws, so the halfwidth is named: MATLAB's default
+odf = calcDensity(ori, halfwidth=10 * degree)
 
 # plot the ODF along the candidate fibre
 plot(odf, f, lineWidth=2)

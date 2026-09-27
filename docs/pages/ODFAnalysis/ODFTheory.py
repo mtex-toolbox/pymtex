@@ -72,7 +72,8 @@ plot(oriPlot, 'Euler')
 # statistical weight.
 
 oriData = ebsd['indexed'].orientations
-odf = calcDensity(oriData)
+# pixels are no independent draws, so the halfwidth is named: MATLAB's default
+odf = calcDensity(oriData, halfwidth=10 * degree)
 odf
 
 # The printed summary identifies the harmonic representation and its bandwidth. Other ODF

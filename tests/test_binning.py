@@ -21,7 +21,7 @@ def test_binning_merges_nothing_away():
 def test_binned_density_peaks_where_the_full_one_does():
   ebsd = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   o = ebsd["Forsterite"].orientations
-  binned, full = binnedDensity(o, 4 * degree), calcDensity(o, harmonic=True)
+  binned, full = binnedDensity(o, 4 * degree), calcDensity(o, halfwidth=10 * degree, harmonic=True)
   h = Miller(1, 0, 0, o.CS)
   p1, p2 = calcPDF(binned, h, None), calcPDF(full, h, None)
   assert abs(float(p1.max()[0]) - float(p2.max()[0])) < 0.1 * float(p2.max()[0])

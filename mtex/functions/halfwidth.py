@@ -2,7 +2,7 @@
 # from the vector of empirical degree energies (docs/plans/halfwidth.md)
 #
 #   E = degreeEnergies(v | ori, bandwidth=32, weights=, groups=, folds=8, rng=)
-#   h = selectHalfwidth(E, method='conservative' | 'UCV', halfwidths=, z=, tau=, tauRel=, alpha=)
+#   h = selectHalfwidth(E, method='UCV' | 'conservative', halfwidths=, noiseFloor=True, z=, tau=, tauMax=, tauRel=)
 #   hUCV, hC2, hC3 = ucvHalfwidth(E), lowerBoundHalfwidth(E), noiseFloorHalfwidth(E)
 #
 # In harmonics orthonormal for the uniform probability a density is f = 1 + sum_l f_l, the
@@ -341,7 +341,7 @@ class degreeEnergies:
   # ---- the variance term
 
   # V_l for l = 0..L given energies a (zero above their length): s2 (c_l - a_l) for independent
-  # points; for groups the measured E ||mu_l||^2 - a_l where the energies were computed, and above
+  # points; for groups the measured ||mu_l||^2 - A_l where the energies were computed, and above
   # the iid form times the design effect of the highest measured degrees
   def variance(self, a, L):
     cbar = self.dims(L)[0]
@@ -350,8 +350,13 @@ class degreeEnergies:
     aa[:k] = a[:k]
     V = self.s2 * np.maximum(cbar - aa, 0)
     if self.grouped:
+      # the unbiased energies, not the ones given: counting the uncertainty of lower bounds in
+      # the variance too widened the selection by half again (plan, H2)
       k = min(self.L, L) + 1
-      V[:k] = np.maximum(self.energy[:k] - aa[:k], V[:k])
+      A = np.zeros(L + 1)
+      A[:k] = np.maximum(self.A[:k], 0)
+      V = self.s2 * np.maximum(cbar - A, 0)
+      V[:k] = np.maximum(self.energy[:k] - self.A[:k], V[:k])
       V[k:] *= self.designEffect()
     V[0] = 0
     return V
@@ -448,54 +453,69 @@ def lowerBoundHalfwidth(E, halfwidths=None, z=2.0, alpha=0.05, returnCurve=False
   return (h, hs, r) if returnCurve else h
 
 
-# the number of grid points whose maximum bounds the supremum of a polynomial of degree L to
-# the factor 1 / (1 - delta): a covering of mesh delta / L, over the fundamental region
-def _gridSize(E, L, delta):
-  if E.space == "S2":
-    return 4.84 * (L / delta) ** 2 / E.nSym
-  return 3.44 * (L / delta) ** 3 / E.nSym
+# the number of independent kernel footprints in the fundamental region: the region over the
+# ball of the halfwidth, 2/(1 - cos h) on S2 and pi/(h - sin h) on SO(3), where a ball of
+# radius h carries the Haar probability (h - sin h)/pi
+def footprints(E, h):
+  n = 2 / (1 - math.cos(h)) if E.space == "S2" else math.pi / (h - math.sin(h))
+  return max(n / E.nSym, 1.0)
 
 
-# C3: the smallest halfwidth at which, with probability 1 - alpha, the fluctuation of the
-# estimate stays below tau + tauRel K_h*f everywhere, tau = tauMax M unless given, M the maximum
-# of the pilot estimate. Bernstein at the points of a grid bounds |fhat - K_h*f|(x) by
-# sqrt(2 B s2 Lam y) + 2/3 B wmax Lam, y = K_h*f(x) <= M, B the kernel's peak with the
-# symmetric copies, Lam = log(2 N / alpha); its excess over tauRel y is largest at
-# y = B s2 Lam / (2 tauRel^2) or at M
-def noiseFloorHalfwidth(E, halfwidths=None, tau=None, tauMax=0.2, tauRel=0.5, alpha=0.05, delta=0.25, pilot=None,
-                        returnCurve=False):
+# Bennett's bound on a sum of independent summands below b with variance sigma2: the
+# deviation t exceeded with probability exp(-Lam), from (sigma2/b^2) g(b t / sigma2) = Lam,
+# g(u) = (1+u) log(1+u) - u, solved by bisection on u in [0, c + 10], where g exceeds c
+def bennettDeviation(sigma2, b, Lam):
+  sigma2 = np.maximum(np.asarray(sigma2, dtype=float), 1e-300)
+  c = Lam * b * b / sigma2
+  lo, hi = np.zeros_like(c), c + 10
+  for _ in range(60):
+    mid = (lo + hi) / 2
+    big = (1 + mid) * np.log1p(mid) - mid > c
+    hi, lo = np.where(big, mid, hi), np.where(big, lo, mid)
+  return sigma2 / b * hi
+
+
+# C3: the smallest halfwidth at which, with probability about 1 - alpha, no fluctuation of the
+# estimate exceeds tau + tauRel K_h*f, tau = tauMax M unless given, M the maximum of the pilot
+# estimate. The fluctuation at x is a sum of independent summands below b = wmax B (B the
+# peak of the symmetrised kernel) with variance s2 R y (R its squared norm, y = K_h*f(x)),
+# bounded by Bennett's inequality at every one of N independent kernel footprints,
+# Lam = log(2 N / alpha); y runs over (0, M]. Realistic rather than proven constants: the
+# footprints stand for the supremum, and R y for the local variance of a smooth density
+def noiseFloorHalfwidth(E, halfwidths=None, tau=None, tauMax=0.2, tauRel=0.5, alpha=0.05, pilot=None, returnCurve=False):
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
-  if tau is None:
-    pilot = lowerBoundHalfwidth(E, hs) if pilot is None else pilot
-    M = E.estimateMax(pilot)
-    tau = tauMax * M
-  else:
-    M = np.inf
+  if pilot is None:
+    pilot = ucvHalfwidth(E, hs) if np.any(np.isnan(E.se)) else lowerBoundHalfwidth(E, hs)
+  M = E.estimateMax(pilot)
+  tau = tauMax * M if tau is None else tau
+  y = M * np.geomspace(1e-3, 1, 48)
   excess = np.empty(len(hs))
   for k, h in enumerate(hs):
     b = familyMultipliers(E.space, h)
-    Lk = len(b) - 1
-    B = float(np.sum(b * E.dims(Lk)[1]))
-    Lam = math.log(2 * _gridSize(E, Lk, delta) / alpha)
-    c = 2 * B * E.s2 * Lam / (1 - delta) ** 2
-    d = 2 / 3 * B * E.wmax * Lam / (1 - delta)
-    y = min(c / (4 * tauRel ** 2), M) if tauRel > 0 else M
-    excess[k] = math.sqrt(c * y) + d - tauRel * y - tau
+    cbar, cmax = E.dims(len(b) - 1)
+    B, R = float(np.sum(b * cmax)), float(np.sum(b * b * cbar))
+    t = bennettDeviation(E.s2 * R * y, E.wmax * B, math.log(2 * footprints(E, h) / alpha))
+    excess[k] = np.max(t - tauRel * y) - tau
   ok = np.flatnonzero(excess <= 0)
   h = float(hs[ok[0]]) if ok.size else float(hs[-1])
   return (h, hs, excess) if returnCurve else h
 
 
-# 'conservative' is C2 with the C3 floor, 'UCV' is C1
-def selectHalfwidth(E, method="conservative", halfwidths=None, z=2.0, alpha=0.05, tau=None, tauMax=0.2, tauRel=0.5):
+# 'UCV' is C1, 'conservative' C2, each bounded below by the noise floor C3 unless noiseFloor=False
+def selectHalfwidth(E, method="UCV", halfwidths=None, noiseFloor=True, z=2.0, alpha=0.05, tau=None, tauMax=0.2,
+                    tauRel=0.5):
   m = str(method).lower()
   if m == "ucv":
-    return ucvHalfwidth(E, halfwidths)
-  if m == "conservative":
-    h2 = lowerBoundHalfwidth(E, halfwidths, z=z, alpha=alpha)
-    return max(h2, noiseFloorHalfwidth(E, halfwidths, tau=tau, tauMax=tauMax, tauRel=tauRel, alpha=alpha, pilot=h2))
-  raise ValueError(f"the halfwidth selection method is 'conservative' or 'UCV', not {method!r}")
+    h = ucvHalfwidth(E, halfwidths)
+  elif m == "conservative":
+    h = lowerBoundHalfwidth(E, halfwidths, z=z, alpha=alpha)
+  else:
+    raise ValueError(f"the halfwidth selection method is 'UCV' or 'conservative', not {method!r}")
+  if noiseFloor:
+    h = max(h, noiseFloorHalfwidth(E, halfwidths, tau=tau, tauMax=tauMax, tauRel=tauRel, alpha=alpha, pilot=h))
+  return h
 
 
 __all__ = ["checkIndependent", "degreeEnergies", "selectHalfwidth", "ucvHalfwidth", "lowerBoundHalfwidth", "noiseFloorHalfwidth",
+           "bennettDeviation", "footprints",
            "candidateHalfwidths", "kernelMultipliers", "riskCurve"]
