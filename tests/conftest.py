@@ -1,3 +1,8 @@
+import os
+
+# the tests see the defaults, never the settings file of whoever runs them
+os.environ["MTEX_SETTINGS"] = ""
+
 import numpy as np
 import pytest
 

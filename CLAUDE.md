@@ -39,6 +39,10 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   `isinstance(x, MtexArray)`, never `hasattr(x, "data")`: an ndarray has `.data` too.
 - A base-class method must not call `self.dot` or `self.angle`: the orientation subclass
   intercepts them with the symmetry-reduced versions.
+- A user's preferences persist in `mtex_settings.json` (`geometry/settings.py`, MATLAB's
+  `mtex_settings.m`), read at import, written by `setMTEXpref(..., save=True)` and
+  `plottingConvention.default(..., save=True)`; a fresh installation draws `y↓→x`. The tests
+  (`conftest.py`) and the doc build set `MTEX_SETTINGS=""` so that they see the defaults.
 - The coefficients a user reads and passes, `fhat`, are MATLAB's: MTEX's spherical harmonics
   without the Condon-Shortley phase, MTEX's Wigner blocks, `S1FunHarmonic` over e^{-ikx}. The
   internal `_fhat` keep `docs/design/harmonics.md`; the constructors and the `fhat` property

@@ -72,9 +72,16 @@ class plottingConvention:
     holding that frame follows a change of it"""
     return _sessionDefault(_defaultFrame().how2plot)
 
-  def makeDefault(self):
-    """makes this convention the session default, that of the default specimen frame"""
+  def makeDefault(self, save=False):
+    """makes this convention the session default, that of the default specimen frame; with
+    save=True also the default of every later session, stored in the user's settings file
+
+      plottingConvention('y↑→x').makeDefault()
+      plottingConvention.default('y↑→x', save=True)"""
     _defaultFrame().how2plot = plottingConvention(self)
+    if save:
+      from .settings import conventionSetting, saveSetting
+      saveSetting("plottingConvention", conventionSetting(self))
 
   # ------------------------------------------------------------------ the screen directions
 
@@ -266,8 +273,8 @@ def closestConvention(rot):
 # convention sets it, plottingConvention.default('y↑→x'), as MATLAB reads it
 class _sessionDefault(plottingConvention):
 
-  def __call__(self, outOfScreen, east=None):
-    plottingConvention(outOfScreen, east).makeDefault()
+  def __call__(self, outOfScreen, east=None, save=False):
+    plottingConvention(outOfScreen, east).makeDefault(save=save)
 
   def __repr__(self):
     return aligned(plottingConvention.__repr__(plottingConvention(self)))

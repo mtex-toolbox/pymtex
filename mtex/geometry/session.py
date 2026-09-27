@@ -46,12 +46,17 @@ def getMTEXpref(name=None, default=None):
   return SESSION.prefs.get(name, default)
 
 
-def setMTEXpref(name, value):
-  """sets a preference of the session
+def setMTEXpref(name, value, save=False):
+  """sets a preference of the session; with save=True also in the user's settings file, so that
+  it holds in every later session
 
     setMTEXpref('maxS2Bandwidth', 256)
-    setMTEXpref('kernels', 'numpy')"""
+    setMTEXpref('kernels', 'numpy')
+    setMTEXpref('displayRows', 40, save=True)"""
   SESSION.prefs[name] = value
+  if save:
+    from .settings import saveSetting
+    saveSetting(name, value)
 
 
 def reset():

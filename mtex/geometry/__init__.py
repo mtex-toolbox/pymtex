@@ -45,6 +45,7 @@ from .spatialtransform import (spatialTransformList, spatialTransform, spatialTr
                                spatialTransformRigid, spatialTransformProjective, spatialTransformPoly,
                                spatialTransformDrift, spatialTransformField, spatialTransformHandle,
                                spatialTransformComposite, spatialTransformTilt, spatialTransformInverse)
+from .settings import settingsFile, loadSettings
 from .funcs import (angle, dot, cross, angle_outer, dot_outer, orthProj, norm, normalize, inv, mean, sum, std, unique,
                     matrix, Euler, Rodrigues, axis, log, exp, eq, homochoric, cubochoric, orth, perp, polar, det, conj,
                     isnan, rotate, cat, merge, Laue, properGroup, properSubGroup, disjoint, union, factor, nfold,
@@ -75,14 +76,14 @@ __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vect
            "superfibonacciSO3Grid", "localOrientationGrid", "localS2Grid", "spatialTransformList", "spatialTransform",
            "spatialTransformId", "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective",
            "spatialTransformPoly", "spatialTransformDrift", "spatialTransformField", "spatialTransformHandle",
-           "spatialTransformComposite", "spatialTransformTilt", "spatialTransformInverse", "angle", "dot", "cross",
-           "angle_outer", "dot_outer", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix",
-           "Euler", "Rodrigues", "axis", "log", "exp", "eq", "homochoric", "cubochoric", "orth", "perp", "polar", "det",
-           "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union",
-           "factor", "nfold", "numSym", "numProper", "LaueName", "eqTol", "sim", "isAligned", "isCompatible",
-           "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise",
-           "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "checkInside", "find", "subGrid",
-           "discretize", "displacement", "fitStage"]
+           "spatialTransformComposite", "spatialTransformTilt", "spatialTransformInverse", "settingsFile",
+           "loadSettings", "angle", "dot", "cross", "angle_outer", "dot_outer", "orthProj", "norm", "normalize", "inv",
+           "mean", "sum", "std", "unique", "matrix", "Euler", "Rodrigues", "axis", "log", "exp", "eq", "homochoric",
+           "cubochoric", "orth", "perp", "polar", "det", "conj", "isnan", "rotate", "cat", "merge", "Laue",
+           "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName",
+           "eqTol", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym",
+           "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame",
+           "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]
 
 from typing import TYPE_CHECKING
 

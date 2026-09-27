@@ -44,6 +44,10 @@ __all__ += ["importWizard", "xvector", "yvector", "zvector"]
 from .plotting.richdisplay import registerDisplays as _registerDisplays
 _registerDisplays()
 
+# the user's saved settings, what MATLAB keeps in mtex_settings.m
+from .geometry.settings import loadSettings as _loadSettings
+_loadSettings()
+
 
 # xvector, yvector, zvector are fresh on every access
 def __getattr__(name):

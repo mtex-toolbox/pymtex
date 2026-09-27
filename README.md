@@ -44,6 +44,21 @@ plotPDF(odf, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ori.CS))
 `mtexdata` downloads the sample data sets on first use from
 [mtex-toolbox/mtex-data](https://github.com/mtex-toolbox/mtex-data).
 
+## Settings
+
+A preference holds for the session; `save=True` keeps it for every later one, stored in
+`mtex_settings.json` in your configuration folder (`~/.config/mtex` on Linux and macOS,
+`%APPDATA%\mtex` on Windows), MATLAB's `mtex_settings.m`:
+
+```python
+plottingConvention.default('y↑→x', save=True)   # maps and pole figures drawn with y up
+setMTEXpref('displayRows', 40, save=True)        # rows a long array shows
+settingsFile()                                   # where the file is
+```
+
+A fresh installation has no file and draws with y down (`y↓→x`). The environment variable
+`MTEX_SETTINGS` names another file, or with an empty value switches the file off.
+
 ## Documentation
 
 The documentation is the [MTEX documentation](https://mtex-toolbox.github.io/documentation.html),

@@ -13,6 +13,9 @@ import sys
 import traceback
 import warnings
 
+# the pages show the defaults, never the settings file of whoever builds them
+os.environ["MTEX_SETTINGS"] = ""
+
 import matplotlib
 import numpy as np
 
