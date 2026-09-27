@@ -19,35 +19,14 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from mtex.io.opendoc import pageCells as parse
+
 np.set_printoptions(legacy="1.25", precision=4, suppress=True)
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
 buildDir = os.path.join(root, "docs", "build")
 HEAD, TAIL, LIMIT = 15, 10, 30
-
-
-# the paragraphs of a page: ("prose", text) or ("code", text)
-def parse(src):
-  blocks, para, kind, wrapped = [], [], None, False
-  for line in src.split("\n") + [""]:
-    if line.strip() == "# +":
-      wrapped = True
-      continue
-    if line.strip() == "# -":
-      wrapped = False
-      blocks.append(("code", "\n".join(para).strip("\n")))
-      para = []
-      continue
-    if line.strip() == "" and not wrapped:
-      if para:
-        prose = all(l.startswith("#") for l in para)
-        text = "\n".join(l[2:] if l.startswith("# ") else l[1:] for l in para) if prose else "\n".join(para)
-        blocks.append(("prose" if prose else "code", text))
-      para = []
-    else:
-      para.append(line)
-  return [(k, t) for k, t in blocks if t.strip()]
 
 
 # an output block longer than LIMIT lines keeps HEAD and TAIL lines around an ellipsis

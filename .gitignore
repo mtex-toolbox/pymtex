@@ -6,4 +6,5 @@ uv.lock
 bench/out/
 docs/build/
 docs/matlab/
+docs/preview/
 tools/graph/out/

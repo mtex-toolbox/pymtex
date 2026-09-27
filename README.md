@@ -21,6 +21,7 @@ pip install "mtex[all]"
 The plain `pip install mtex` needs NumPy, SciPy and finufft only. The extras add the rest:
 `numba` compiled kernels (much faster, strongly recommended), `plot` matplotlib, `io` the HDF5
 formats, `plot3d` PyVista for the 3D scenes, `wizard` the import window; `all` is all of them.
+The import wizard also starts from a terminal: `mtex-wizard [folder or file]`.
 MTEX runs on Python 3.12 or later on Linux, macOS and Windows.
 
 ## A first look

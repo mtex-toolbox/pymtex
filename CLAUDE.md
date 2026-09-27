@@ -208,7 +208,7 @@ on it; `exportHTML` writes it as a three.js page and the doc build links every 3
 map in a plane of space enters a scene as the picture of its own map plot (`volumeplot.py`). P7 documentation
 (`docs/plans/docs.md`) started 2026-09-22 with the MATLAB pages of `../frameSymmetry/doc` as
 the one reference, text and numbers: a page is `docs/pages/<Chapter>/<Page>.py` in the
-jupytext light format, `docs/make.py` builds it into `docs/build/`, `docs/matlabrun.py`
+jupytext light format, `docs/make.py` builds it into `docs/build/`, `docs/site.py <site>` exports the built pages into the Jekyll site of mtex-toolbox.github.io, `docs/preview.py` serves them locally, ordered by MATLAB's tocs, with their status, `openDoc('<Page>')` (`io/opendoc.py`) writes a page as a `# %%` cell script for a reader, the pages shipped in the wheel as `mtex/docpages` by `hatch_build.py`, `docs/matlabrun.py`
 runs the MATLAB script through the bridge into `docs/matlab/<Page>/` for the comparison,
 `docs/notebook.py <Page>` opens a page as a notebook in VS Code to run it section by section,
 `docs/findings.md` keeps what the pages found and `docs/plans/remaining-pages.md` the status

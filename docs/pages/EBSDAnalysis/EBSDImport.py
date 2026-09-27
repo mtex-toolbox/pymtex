@@ -79,6 +79,10 @@ plot(ebsd)
 # ebsd = importWizard('/data/ebsd')   # a folder, or a file to open on start
 # ```
 #
+# Without Python open, the wizard starts from a terminal as `mtex-wizard`, or
+# `mtex-wizard /data/ebsd`. Started this way it has no session to return the map to; save
+# or copy the import script it writes instead.
+#
 # ![](importWizard.png)
 #
 # The folder is browsed at the left, the file's description under it and the data sets of a

@@ -11,6 +11,12 @@ Status words: **Checked** compared with the MATLAB run;
 named feature missing; **Written** built but not compared; **Blocked** needs a feature that
 does not exist; **Pending** not started.
 
+Two pages have no MATLAB source and are counted in no chapter above; `docs/site.py` gives
+them the status **New**, which the site shows without a note: `GeneralConcepts/Installation`
+(Python, VS Code and MTEX for a reader new to Python, the troubleshooting of each platform)
+and `GeneralConcepts/MATLABtoPython` (the translation rules and the deliberate differences,
+every code claim a cell of the page).
+
 | Chapter | Total | Checked | Adapted | Partial | Written | Blocked | Pending |
 |---|---|---|---|---|---|---|---|
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |

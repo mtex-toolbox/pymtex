@@ -37,6 +37,9 @@ plot3d = [
 ]
 all = ["mtex[numba,io,plot,wizard,plot3d]"]
 
+[project.gui-scripts]
+mtex-wizard = "mtex.wizard.__main__:main"
+
 [project.urls]
 Homepage = "https://mtex-toolbox.github.io"
 Documentation = "https://mtex-toolbox.github.io/documentation.html"
@@ -61,8 +64,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["mtex"]
 
+# the documentation pages, which openDoc writes out as cell scripts (hatch_build.py)
+[tool.hatch.build.targets.wheel.hooks.custom]
+
 [tool.hatch.build.targets.sdist]
-include = ["mtex", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+include = ["mtex", "tests", "docs/pages/*/*.py", "hatch_build.py", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
