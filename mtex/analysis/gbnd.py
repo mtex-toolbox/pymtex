@@ -21,18 +21,19 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, zvector
 from ..maps.boundary import grainBoundary
 from ..maps.ebsd import EBSD
+from ..geometry.install import install
 
 # the bandwidth MATLAB expands the inclination kernel to
 BANDWIDTH = 62
 
 
-# calcGBNDKernel(halfwidth=10*degree, nonneg=True): the kernel Psi of the inclination, a
-# function of the cosine to the trace, normalised so that a uniform distribution of planes
-# gives one, and the spherical function psi(v) = Psi(v.z) sin(angle(v, x)) it is applied as;
-# without nonneg or bump Psi is the solution of the integral equation that makes the density
-# of the normals the de la Vallee Poussin kernel of that halfwidth, or the S2Kernel given
-# in its place
 def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
+  """calcGBNDKernel(halfwidth=10*degree, nonneg=True): the kernel Psi of the inclination, a
+  function of the cosine to the trace, normalised so that a uniform distribution of planes
+  gives one, and the spherical function psi(v) = Psi(v.z) sin(angle(v, x)) it is applied as;
+  without nonneg or bump Psi is the solution of the integral equation that makes the density
+  of the normals the de la Vallee Poussin kernel of that halfwidth, or the S2Kernel given
+  in its place"""
   from scipy.integrate import quad
   from scipy.special import ellipe
   if nonneg:
@@ -149,11 +150,11 @@ def _qangle(a, b):
   return 2 * np.arccos(np.clip(np.abs(np.sum(a * b, axis=-1)), 0, 1))
 
 
-# calcGBND(gB, ebsd, halfwidth=5*degree, nonneg=True): the density of the boundary normals in
-# the crystal frame of the one phase of gB; calcGBND(gB, grains, moriRef, ...) the density
-# of the normals of the boundaries near that misorientation, the grain boundary character
-# distribution, taking both sides of a relation that is its own inverse unless oneSide
 def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump=False, oneSide=False):
+  """calcGBND(gB, ebsd, halfwidth=5*degree, nonneg=True): the density of the boundary normals in
+  the crystal frame of the one phase of gB; calcGBND(gB, grains, moriRef, ...) the density
+  of the normals of the boundaries near that misorientation, the grain boundary character
+  distribution, taking both sides of a relation that is its own inverse unless oneSide"""
   both = False
   dSym = None
   if moriRef is not None:
@@ -229,6 +230,6 @@ def _specimen():
   return specimenFrame()
 
 
-grainBoundary.calcGBND = calcGBND
+install(grainBoundary, calcGBND)
 
 __all__ = ["calcGBND", "calcGBNDKernel"]

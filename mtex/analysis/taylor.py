@@ -23,6 +23,7 @@ from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import spinTensor, strainTensor
 from .kernels import taylorKernel
+from ..geometry.install import install
 
 LinearProgramResult = namedtuple("LinearProgramResult", ["solution", "status", "iterations", "residual"])
 TaylorResult = namedtuple("TaylorResult", ["M", "b", "W"])
@@ -309,14 +310,14 @@ def _taylorField(eps, model, plasticWork, spinSelection, bandwidth, smoothing):
 
 
 def _install():
-  strainTensor.calcTaylor = lambda self, sS, *a, **kw: calcTaylor(self, sS, *a, **kw)
+  install(strainTensor, calcTaylor)
   # a spin tensor is the rotation it generates: its axial vector as a tangent vector
-  spinTensor.exp = lambda self, ref=None, side=None: _spinExp(self, ref, side)
+  install(spinTensor, _spinExp, "exp")
 
 
-# the rotation of a spin tensor, or the orientation a spin at a reference points to; a spin
-# in the crystal frame acts on the right of the orientation
-def _spinExp(W, ref, side):
+def _spinExp(W, ref=None, side=None):
+  """the rotation of a spin tensor, or the orientation a spin at a reference points to; a spin
+  in the crystal frame acts on the right of the orientation"""
   from ..geometry.tangent import SO3TangentVector, expVector
   M = W.M
   v = vector3d(np.stack([M[..., 2, 1], M[..., 0, 2], M[..., 1, 0]], axis=-1))

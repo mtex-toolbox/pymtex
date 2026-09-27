@@ -23,10 +23,10 @@ from .quaternion import orthogonalTransform, qmul, qrot, quaternion, rotation
 from .vector3d import vector3d
 
 
-# whether a frame fits the side an orientation acts on: frame-free data passes, the same
-# handle passes, aligned crystal frames pass, compatible ones give the rotation that absorbs
-# the transition, anything else is an error
 def fitFrame(fr, side):
+  """whether a frame fits the side an orientation acts on: frame-free data passes, the same
+  handle passes, aligned crystal frames pass, compatible ones give the rotation that absorbs
+  the transition, anything else is an error"""
   if fr is None or fr is side:
     return None
   if isinstance(fr, crystalFrame) != isinstance(side, crystalFrame):
@@ -41,9 +41,9 @@ def fitFrame(fr, side):
   return rotation.byMatrix(M)
 
 
-# a rotation that is not an element of the group on a side strips the group from that side's
-# frame, silently, and keeps the frame
 def dropGroup(rot, fr):
+  """a rotation that is not an element of the group on a side strips the group from that side's
+  frame, silently, and keeps the frame"""
   if fr.sym.Laue().numSym() <= 2:
     return fr
   if np.all([r in fr for r in rot.flatten()]):
@@ -51,9 +51,9 @@ def dropGroup(rot, fr):
   return fr.stripSym()
 
 
-# the proper elements an orientation is symmetrised by on one side, read off the frame the
-# factor names; the side has to be the one the orientation carries
 def sideGroup(o, fr, right):
+  """the proper elements an orientation is symmetrised by on one side, read off the frame the
+  factor names; the side has to be the one the orientation carries"""
   from .symreduce import reductionGroups
   side = o.frameA if right else o.frameB
   if fr is not side and not (type(fr) is type(side) and fr.isAligned(side)):

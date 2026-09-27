@@ -45,11 +45,11 @@ class gridLayout:
   def rowMajor():
     return gridLayout(X, Y, name="rowMajor")
 
-  # the layout of an array drawn with row 0 at the top and the columns to the right, read
-  # against the convention of the frame: what the relation was before layouts were stated,
-  # and named so that the assumption shows wherever the layout is displayed
   @staticmethod
   def assumedFor(fr):
+    """the layout of an array drawn with row 0 at the top and the columns to the right, read
+    against the convention of the frame: what the relation was before layouts were stated,
+    and named so that the assumption shows wherever the layout is displayed"""
     from .plottingconvention import plottingConvention
     pC = getattr(fr, "how2plot", None)
     pC = plottingConvention.default if pC is None else pC
@@ -69,11 +69,11 @@ class gridLayout:
     return f"gridLayout {self.name}\n  row: {fmt(self.row)}\n  col: {fmt(self.col)}".replace("gridLayout \n", "gridLayout\n")
 
 
-# the index that lays out an array whose first and second index run along d = (d1, d2) as gL
-# asks: new[r, c] = old.flat[lin[r, c]]. It transposes where the axes are crossed and flips an
-# axis that runs backwards; a tie, a grid turned by 45 degrees, keeps the order unless the
-# column of gL is nearer y than x
 def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):
+  """the index that lays out an array whose first and second index run along d = (d1, d2) as gL
+  asks: new[r, c] = old.flat[lin[r, c]]. It transposes where the axes are crossed and flips an
+  axis that runs backwards; a tie, a grid turned by 45 degrees, keeps the order unless the
+  column of gL is nearer y than x"""
   d1, d2 = (_unit(v) for v in d)
   t1, t2 = _unit(gL.row), _unit(gL.col)
   Q = np.array([[t1 @ d1, t1 @ d2], [t2 @ d1, t2 @ d2]])

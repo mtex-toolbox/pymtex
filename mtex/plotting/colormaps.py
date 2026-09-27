@@ -25,8 +25,8 @@ def colormapStops(name):
   return COLORMAP_STOPS.get(str(name).lower())
 
 
-# the map sampled at n colours, an n x 3 array
 def colormapColors(name, n=256):
+  """the map sampled at n colours, an n x 3 array"""
   stops = colormapStops(name)
   if stops is None:
     raise ValueError(f"unknown MTEX colour map {name}; one of {', '.join(NAMES.values())}")
@@ -35,10 +35,10 @@ def colormapColors(name, n=256):
   return np.stack([np.interp(t, pos, colors[:, k]) for k in range(3)], axis=1)
 
 
-# the matplotlib colour map of a name: MTEX's own, registered on first use, or matplotlib's;
-# a matrix of colours or a named map function as MATLAB passes them, and without a name the
-# preference defaultColorMap
 def mtexColormap(name=None):
+  """the matplotlib colour map of a name: MTEX's own, registered on first use, or matplotlib's;
+  a matrix of colours or a named map function as MATLAB passes them, and without a name the
+  preference defaultColorMap"""
   import matplotlib
   from matplotlib.colors import Colormap, LinearSegmentedColormap, ListedColormap
   if name is None:
@@ -59,8 +59,8 @@ def mtexColormap(name=None):
   return matplotlib.colormaps[key]
 
 
-# mtexColorMap WhiteJet: the colour map of the current figure, or of one figure
 def mtexColorMap(name="WhiteJet", fig=None):
+  """mtexColorMap WhiteJet: the colour map of the current figure, or of one figure"""
   from .mtexfigure import gcm
   # mtexColorMap(ax, name): the map of one axes of the current figure
   if hasattr(name, "get_figure"):
@@ -88,14 +88,14 @@ def mtexColorMap(name="WhiteJet", fig=None):
   return cmap
 
 
-# str2rgb('salmon'): the RGB triplet of a colour name, MATLAB tools/str2rgb
 def str2rgb(name):
+  """str2rgb('salmon'): the RGB triplet of a colour name, MATLAB tools/str2rgb"""
   from matplotlib.colors import to_rgb
   return np.array(to_rgb(name), dtype=float)
 
 
-# n levels between the extremes, logarithmic on request
 def contourLevels(lo, hi, n=10, log=False):
+  """n levels between the extremes, logarithmic on request"""
   lo, hi = float(lo), float(hi)
   if not hi > lo:
     hi = lo + max(abs(lo), 1.0) * 1e-6
@@ -104,9 +104,9 @@ def contourLevels(lo, hi, n=10, log=False):
   return np.linspace(lo, hi, n)
 
 
-# num2rgb(values, map, range=[lo, hi]): the colours a colour map gives those numbers,
-# MATLAB's num2rgb; the range defaults to the extent of the values
 def num2rgb(values, colormap="WhiteJet", range=None):
+  """num2rgb(values, map, range=[lo, hi]): the colours a colour map gives those numbers,
+  MATLAB's num2rgb; the range defaults to the extent of the values"""
   v = np.asarray(values, dtype=float).reshape(-1)
   lo, hi = (np.nanmin(v), np.nanmax(v)) if range is None else (float(range[0]), float(range[1]))
   t = np.zeros_like(v) if not hi > lo else np.clip((v - lo) / (hi - lo), 0, 1)

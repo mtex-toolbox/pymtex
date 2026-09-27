@@ -329,8 +329,8 @@ def formatTableNumpy(cols, decimals, sep=b" ", crlf=False):
   return buf.getvalue()
 
 
-# the rows of a table as text, the columns to the decimals given, a negative count an integer
 def formatTable(cols, decimals, sep=b" ", crlf=False):
+  """the rows of a table as text, the columns to the decimals given, a negative count an integer"""
   if backend() == "numba":
     b = formatTableNumba(cols, decimals, sep, crlf)
     if b is not None:

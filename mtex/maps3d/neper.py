@@ -50,8 +50,8 @@ class neper:
   def command(self):
     return getMTEXpref("neperCommand", "neper")
 
-  # whether the command runs
   def available(self):
+    """whether the command runs"""
     try:
       return self._run([self.command, "--version"], check=False).returncode == 0
     except OSError:
@@ -84,8 +84,8 @@ class neper:
     self._run(args, silent)
     return base + ".tess"
 
-  # the grains of a tessellation with one grain per orientation, or n orientations of an ODF
   def simulateGrains(self, ori, odf=None, silent=True, aspectRatio=None):
+    """the grains of a tessellation with one grain per orientation, or n orientations of an ODF"""
     from .grain3d import grain3d
     if np.isscalar(ori):
       ori = odf.discreteSample(int(ori))
@@ -128,8 +128,8 @@ class neper:
     counts[host] = len(grains) - start
     return counts
 
-  # twinned lamellae: every second lamella of a host turned by the twin misorientation
   def simulateTwinGrains(self, numGrains, mori, odf, bndA, width=None, silent=True, aspectRatio=None, rng=None):
+    """twinned lamellae: every second lamella of a host turned by the twin misorientation"""
     from ..geometry.quaternion import rotation
     from .grain3d import grain3d
     rng = np.random.default_rng() if rng is None else rng
@@ -149,8 +149,8 @@ class neper:
     grains.meanOrientation = o
     return grains
 
-  # child lamellae in parent grains: the children of a parent in variants that alternate
   def simulateChildGrains(self, numParents, p2c, odfParent, habitPlane=None, width=0.015, silent=True, aspectRatio=None, rng=None):
+    """child lamellae in parent grains: the children of a parent in variants that alternate"""
     from ..geometry.miller import Miller
     from ..geometry.quaternion import rotation
     from .grain3d import grain3d

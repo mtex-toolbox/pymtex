@@ -117,12 +117,12 @@ def _fftLength(n):
   return n + n % 2
 
 
-# the plan of one node set on the lattice N (even lengths, frequencies -N/2 .. N/2 - 1): the
-# window and oversampling by MATLAB's nfftParameters, the long window where the nodes are
-# fewer than a quarter of the lattice. nodes are the rows of x in [-1/2, 1/2)^d; a real plan
-# holds the frequencies 0 .. N/2 - 1 of the last axis and evaluates 2 Re of the half sum; keep
-# precomputes the window values at the nodes (PRE_PSI) for a plan run many times
 class NFFTPlan:
+  """the plan of one node set on the lattice N (even lengths, frequencies -N/2 .. N/2 - 1): the
+  window and oversampling by MATLAB's nfftParameters, the long window where the nodes are
+  fewer than a quarter of the lattice. nodes are the rows of x in [-1/2, 1/2)^d; a real plan
+  holds the frequencies 0 .. N/2 - 1 of the last axis and evaluates 2 Re of the half sum; keep
+  precomputes the window values at the nodes (PRE_PSI) for a plan run many times"""
 
   def __init__(self, N, nodes, real=False, keep=False):
     lib = nfftLibrary()

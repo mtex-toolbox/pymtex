@@ -18,9 +18,9 @@ from ..geometry.vector3d import vector3d
 from ..functions.funops import _antipodalPole
 
 
-# the distinct images of one direction under the group of a frame, an axis and its
-# antipode counted once, as an (m, 3) array
 def orbit(xyz, fr, antipodal=False, tolerance=1e-6):
+  """the distinct images of one direction under the group of a frame, an axis and its
+  antipode counted once, as an (m, 3) array"""
   x = np.asarray(xyz, dtype=float).reshape(3)
   x = x / np.linalg.norm(x)
   if fr is None or fr.numSym() <= 1:
@@ -51,10 +51,10 @@ def _conj(q):
   return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
-# the poles of orientations: every orientation applied to every distinct equivalent of the
-# crystal direction h, and every image of those under the specimen group, shaped (..., m)
-# in the specimen frame (MATLAB ori.SS * (ori * symmetrise(h)))
 def poles(o, h, antipodal=False):
+  """the poles of orientations: every orientation applied to every distinct equivalent of the
+  crystal direction h, and every image of those under the specimen group, shaped (..., m)
+  in the specimen frame (MATLAB ori.SS * (ori * symmetrise(h)))"""
   h = _oneDirection(h, o.CS, "crystal direction")
   ax = antipodal or _antipodalPole(vector3d(h.data, frame=o.CS, antipodal=h.antipodal), o.CS)
   eq = orbit(h.data, o.CS, ax)
@@ -66,9 +66,9 @@ def poles(o, h, antipodal=False):
   return vector3d(ps.reshape(o.shape + (ps.shape[-2], 3)), frame=o.SS, antipodal=ax, isNormalized=True)
 
 
-# the inverse poles: the crystal directions that lie along the specimen direction r, over
-# the distinct equivalents of r under the specimen group, shaped (..., m) in the crystal frame
 def inversePoles(o, r, antipodal=False):
+  """the inverse poles: the crystal directions that lie along the specimen direction r, over
+  the distinct equivalents of r under the specimen group, shaped (..., m) in the crystal frame"""
   r = _oneDirection(r, o.SS, "specimen direction")
   ax = antipodal or _antipodalPole(vector3d(r.data, frame=o.SS, antipodal=r.antipodal), o.SS)
   eq = orbit(r.data, o.SS, ax)
@@ -77,9 +77,9 @@ def inversePoles(o, r, antipodal=False):
   return vector3d(hs.reshape(o.shape + (len(eq), 3)), frame=o.CS, antipodal=ax, isNormalized=True)
 
 
-# MTEX's dynamic marker size as one rule: fifty times the mean spacing of n markers on a
-# hemisphere, never larger than the default size
 def dynamicMarkerSize(n, default=10):
+  """MTEX's dynamic marker size as one rule: fifty times the mean spacing of n markers on a
+  hemisphere, never larger than the default size"""
   return default if n == 0 else float(np.clip(50 * np.sqrt(2 * np.pi / n), 1.5, default))
 
 

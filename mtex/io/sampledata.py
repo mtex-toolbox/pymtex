@@ -347,12 +347,12 @@ def _aachenexp(path):
   return loadPoleFigure(path)
 
 
-# artificial grain shapes, MTEX's testgrains: a map of one phase in which every shape is a
-# grain of its own orientation, so that every shape parameter has something to react to; a
-# disc, discs with a small and a large hole, an ellipse, a rectangle and a turned one, a
-# clover, a disc with a slit, an L, a triangle, a hexagon and a disc with a bay, inside one
-# background grain. The holes are not indexed, and the orientations step by seven degrees.
 def testGrainsMap():
+  """artificial grain shapes, MTEX's testgrains: a map of one phase in which every shape is a
+  grain of its own orientation, so that every shape parameter has something to react to; a
+  disc, discs with a small and a large hole, an ellipse, a rectangle and a turned one, a
+  clover, a disc with a slit, an L, a triangle, a hexagon and a disc with a bay, inside one
+  background grain. The holes are not indexed, and the orientations step by seven degrees."""
   from ..maps.ebsd import EBSD
   cs = crystalFrame("m-3m", mineral="test")
   n1, n2 = 160, 120

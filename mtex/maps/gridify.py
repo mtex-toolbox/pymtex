@@ -50,39 +50,39 @@ class scanLayout:
     self.lo = np.array([c0, n0])
     self.dims = (int(cells[:, 1].max()) - n0 + 1, int(cells[:, 0].max()) - c0 + 1) if len(cells) else (0, 0)
 
-  # the column and the row of lattice indices (n, 2); a quarter of a cell decides which column
-  # a half shifted row starts in, whatever the fit made of the half
   def scanCell(self, ij):
+    """the column and the row of lattice indices (n, 2); a quarter of a cell decides which column
+    a half shifted row starts in, whatever the fit made of the half"""
     mn = np.asarray(ij) @ self.Binv.T
     col = mn[:, 0] + np.floor((mn[:, 1] - self.lo[1]) * self.s + 0.25).astype(np.int64)
     return np.stack([col, mn[:, 1]], axis=1)
 
-  # the lattice index of columns and rows
   def scanSite(self, c, r):
+    """the lattice index of columns and rows"""
     m = c - np.floor((r - self.lo[1]) * self.s + 0.25).astype(np.int64)
     return np.stack([m, r], axis=-1) @ self.B.T
 
-  # the linear cell of every measurement, rows first
   def scanCells(self, ij):
+    """the linear cell of every measurement, rows first"""
     cells = self.scanCell(ij)
     return (cells[:, 1] - self.lo[1]) * self.dims[1] + (cells[:, 0] - self.lo[0])
 
-  # the lattice index of every cell of the array, in the array's order
   def scanIndex(self):
+    """the lattice index of every cell of the array, in the array's order"""
     r, c = np.meshgrid(np.arange(self.dims[0]) + self.lo[1], np.arange(self.dims[1]) + self.lo[0], indexing="ij")
     return self.scanSite(c.reshape(-1), r.reshape(-1))
 
 
-# the same map with its arrays in map shape
-#
-# A complete scan is already in map order, so for one the whole function is a reshape and
-# the gridded map shares its arrays with the scattered one. A cell with no measurement is
-# padding: filled in at its ideal position, not indexed, with a NaN rotation and zero
-# properties, and marked in isPadding. With return_index the flat index of every measurement
-# in the grid comes too, MATLAB's second output: grid.pos.flatten()[newId] is ebsd.pos. A
-# layout reorders the arrays by a transpose and flips; a hexagonal grid is stored column major
-# whatever is asked, as MATLAB stores it.
 def gridify(ebsd, layout=None, unitCell=None, return_index=False):
+  """the same map with its arrays in map shape
+
+  A complete scan is already in map order, so for one the whole function is a reshape and
+  the gridded map shares its arrays with the scattered one. A cell with no measurement is
+  padding: filled in at its ideal position, not indexed, with a NaN rotation and zero
+  properties, and marked in isPadding. With return_index the flat index of every measurement
+  in the grid comes too, MATLAB's second output: grid.pos.flatten()[newId] is ebsd.pos. A
+  layout reorders the arrays by a transpose and flips; a hexagonal grid is stored column major
+  whatever is asked, as MATLAB stores it."""
   layout = _layoutOf(layout)
   if unitCell is not None:
     return resample(ebsd, unitCell, layout, return_index)
@@ -109,9 +109,9 @@ def _layoutOf(layout):
   raise ValueError(f"a layout is a gridLayout, 'rowMajor' or 'columnMajor', not {layout!r}")
 
 
-# the directions the first and the second index of a gridded map run along, the first taken
-# perpendicular to the second, as a hexagonal row shifts against the one below it
 def arrayDirections(grid):
+  """the directions the first and the second index of a gridded map run along, the first taken
+  perpendicular to the second, as a hexagonal row shifts against the one below it"""
   P = grid.pos.data
   n1, n2 = P.shape[0], P.shape[1]
   d2 = P[0, 1] - P[0, 0] if n2 > 1 else None
@@ -202,14 +202,14 @@ def _cellBasis(C):
   return np.stack([a1, trans[np.flatnonzero(across)[0]]], axis=1)
 
 
-# the map read on the square lattice of another unit cell (MATLAB gridify(ebsd, 'unitCell',
-# uC)): the lattice is laid in the plane of the map over its extent, from the corner of least
-# x and y, and every site takes the nearest measurement - nothing is interpolated - where one
-# lies within the farthest corner of the map's own cell, and is not indexed beyond. The array
-# runs along the cell's translations as MATLAB orders them and is laid out as near the layout
-# as a transpose and flips reach, column major by default. newId is the site every
-# measurement falls in
 def resample(ebsd, unitCell, layout=None, return_index=False):
+  """the map read on the square lattice of another unit cell (MATLAB gridify(ebsd, 'unitCell',
+  uC)): the lattice is laid in the plane of the map over its extent, from the corner of least
+  x and y, and every site takes the nearest measurement - nothing is interpolated - where one
+  lies within the farthest corner of the map's own cell, and is not indexed beyond. The array
+  runs along the cell's translations as MATLAB orders them and is laid out as near the layout
+  as a transpose and flips reach, column major by default. newId is the site every
+  measurement falls in"""
   from scipy.spatial import cKDTree
   from .ebsd import EBSD, _rotations, _vectors
   _, stencil, _ = latticeBasis(unitCell)

@@ -60,24 +60,24 @@ def _characters(t, L):
   return U
 
 
-# the multipliers b_l = A_l / ((2l+1) A_0) of a zonal kernel, the same on S2 (Legendre) and on
-# SO(3) (characters), up to the degree L
 def kernelMultipliers(psi, L):
+  """the multipliers b_l = A_l / ((2l+1) A_0) of a zonal kernel, the same on S2 (Legendre) and on
+  SO(3) (characters), up to the degree L"""
   A = np.asarray(psi._rule(int(L)), dtype=float)
   return A / ((2 * np.arange(L + 1) + 1) * A[0])
 
 
-# the degree beyond which the multipliers of a kernel stay below NEGLIGIBLE
 def kernelDegree(psi, cap=4096):
+  """the degree beyond which the multipliers of a kernel stay below NEGLIGIBLE"""
   L = min(int(psi.bandwidth), cap)
   b = kernelMultipliers(psi, L)
   big = np.flatnonzero(np.abs(b) >= NEGLIGIBLE)
   return int(big[-1]) if big.size else 0
 
 
-# an automatic halfwidth on the pixels of a map needs their grains (docs/plans/halfwidth.md,
-# section 10): neighbouring pixels repeat one orientation and would pass for independent draws
 def checkIndependent(x, groups):
+  """an automatic halfwidth on the pixels of a map needs their grains (docs/plans/halfwidth.md,
+  section 10): neighbouring pixels repeat one orientation and would pass for independent draws"""
   if isinstance(x, orientation) and x.notIID and groups is None:
     raise ValueError("the orientations come from a map, whose neighbouring pixels are not independent: pass their "
                      "grain ids (groups=ebsd.grainId), the map with its grains computed, or the grain mean "
@@ -229,9 +229,9 @@ class degreeEnergies:
       c = project(c, *self._projections)
     return (c + invertedCoefficients(c)) / 2 if self.antipodal else c
 
-  # the number of symmetric copies of a point, the antipode included
   @property
   def nSym(self):
+    """the number of symmetric copies of a point, the antipode included"""
     if self.space == "S2":
       return len(self._group)
     return len(self._group[0]) * len(self._group[1]) * (2 if self.antipodal else 1)
@@ -303,18 +303,18 @@ class degreeEnergies:
       u0, u1 = u1, y2 * u1 - u0
     return c
 
-  # the mean of the traces weighted by w^2, E c_l, and their maximum over the subsample, computed once
-  # to a degree beyond the one asked and cut
   def dims(self, L):
+    """the mean of the traces weighted by w^2, E c_l, and their maximum over the subsample, computed once
+    to a degree beyond the one asked and cut"""
     L = int(L)
     if self._dims is None or len(self._dims[0]) <= L:
       c = self._traces(max(L, 2 * (len(self._dims[0]) - 1) if self._dims is not None else L, 64))
       self._dims = (c @ self._sampleW, c.max(axis=1))
     return self._dims[0][:L + 1], self._dims[1][:L + 1]
 
-  # the largest value of the estimate of halfwidth h at the pilot points, the symmetrised kernel
-  # summed over the pilot sample
   def estimateMax(self, h):
+    """the largest value of the estimate of halfwidth h at the pilot points, the symmetrised kernel
+    summed over the pilot sample"""
     psi = _family(self.space)(halfwidth=float(h))
     at = self._pilot[:PILOT_POINTS]
     copies = self._copies()
@@ -340,10 +340,10 @@ class degreeEnergies:
 
   # ---- the variance term
 
-  # V_l for l = 0..L given energies a (zero above their length): s2 (c_l - a_l) for independent
-  # points; for groups the measured ||mu_l||^2 - A_l where the energies were computed, and above
-  # the iid form times the design effect of the highest measured degrees
   def variance(self, a, L):
+    """V_l for l = 0..L given energies a (zero above their length): s2 (c_l - a_l) for independent
+    points; for groups the measured ||mu_l||^2 - A_l where the energies were computed, and above
+    the iid form times the design effect of the highest measured degrees"""
     cbar = self.dims(L)[0]
     aa = np.zeros(L + 1)
     k = min(len(a), L + 1)
@@ -361,8 +361,8 @@ class degreeEnergies:
     V[0] = 0
     return V
 
-  # the ratio of the measured variance to the iid one over the upper quarter of the degrees
   def designEffect(self):
+    """the ratio of the measured variance to the iid one over the upper quarter of the degrees"""
     cbar = self.dims(self.L)[0]
     lo = max(1, (3 * self.L) // 4)
     iid = self.s2 * np.maximum(cbar[lo:] - self.A[lo:], 1e-300)
@@ -380,26 +380,26 @@ def _family(space):
   return S2DeLaValleePoussinKernel if space == "S2" else SO3DeLaValleePoussinKernel
 
 
-# the multipliers of the family's kernel of halfwidth h up to its degree extent, computed once
-# per halfwidth
 @functools.lru_cache(maxsize=4096)
 def familyMultipliers(space, h):
+  """the multipliers of the family's kernel of halfwidth h up to its degree extent, computed once
+  per halfwidth"""
   psi = _family(space)(halfwidth=float(h))
   b = kernelMultipliers(psi, max(kernelDegree(psi), 1))
   b.flags.writeable = False
   return b
 
 
-# the candidate halfwidths, geometric between hmin and hmax
 def candidateHalfwidths(space, hmin=None, hmax=None, H=60):
+  """the candidate halfwidths, geometric between hmin and hmax"""
   hmin = (1 if space == "S2" else 2) * degree if hmin is None else hmin
   hmax = (60 if space == "S2" else 40) * degree if hmax is None else hmax
   return np.geomspace(hmin, hmax, int(H))
 
 
-# the risk R(h; a, V) at every candidate, the energies a zero above their length; above the
-# kernel's extent the multipliers are zero and the energies are all bias
 def riskCurve(E, halfwidths, a):
+  """the risk R(h; a, V) at every candidate, the energies a zero above their length; above the
+  kernel's extent the multipliers are zero and the energies are all bias"""
   a = np.asarray(a, dtype=float)
   tail = np.concatenate([np.cumsum(a[::-1])[::-1], [0.0]])
   out = np.empty(len(halfwidths))
@@ -418,9 +418,9 @@ def _largestArgmin(r):
   return len(r) - 1 - int(np.argmin(r[::-1]))
 
 
-# C1: the unbiased risk estimate, over the candidates whose multipliers vanish above the
-# bandwidth of the energies
 def ucvHalfwidth(E, halfwidths=None, returnCurve=False):
+  """C1: the unbiased risk estimate, over the candidates whose multipliers vanish above the
+  bandwidth of the energies"""
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
   ok = np.array([len(familyMultipliers(E.space, h)) - 1 <= E.L for h in hs])
   if not np.any(ok):
@@ -431,17 +431,17 @@ def ucvHalfwidth(E, halfwidths=None, returnCurve=False):
   return (h, hs, r) if returnCurve else h
 
 
-# the one-sided normal quantile for a simultaneous bound over the degrees 1..L0 (Bonferroni)
 def bonferroniZ(alpha, L0):
+  """the one-sided normal quantile for a simultaneous bound over the degrees 1..L0 (Bonferroni)"""
   from scipy.special import ndtri
   return float(ndtri(1 - alpha / max(int(L0), 1)))
 
 
-# C2: the risk with lower confidence bounds of the energies, zero above the bandwidth; if the
-# bounds hold for every degree the largest minimiser is at least the MISE-optimal halfwidth.
-# z=None takes the Bonferroni quantile of alpha over the degrees, for which that is a stated
-# probability; the default z = 2 never fell below the oracle in the study of the plan
 def lowerBoundHalfwidth(E, halfwidths=None, z=2.0, alpha=0.05, returnCurve=False):
+  """C2: the risk with lower confidence bounds of the energies, zero above the bandwidth; if the
+  bounds hold for every degree the largest minimiser is at least the MISE-optimal halfwidth.
+  z=None takes the Bonferroni quantile of alpha over the degrees, for which that is a stated
+  probability; the default z = 2 never fell below the oracle in the study of the plan"""
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
   if np.any(np.isnan(E.se)):
     raise ValueError("the lower bounds need the errors of the energies: compute them with folds")
@@ -453,18 +453,18 @@ def lowerBoundHalfwidth(E, halfwidths=None, z=2.0, alpha=0.05, returnCurve=False
   return (h, hs, r) if returnCurve else h
 
 
-# the number of independent kernel footprints in the fundamental region: the region over the
-# ball of the halfwidth, 2/(1 - cos h) on S2 and pi/(h - sin h) on SO(3), where a ball of
-# radius h carries the Haar probability (h - sin h)/pi
 def footprints(E, h):
+  """the number of independent kernel footprints in the fundamental region: the region over the
+  ball of the halfwidth, 2/(1 - cos h) on S2 and pi/(h - sin h) on SO(3), where a ball of
+  radius h carries the Haar probability (h - sin h)/pi"""
   n = 2 / (1 - math.cos(h)) if E.space == "S2" else math.pi / (h - math.sin(h))
   return max(n / E.nSym, 1.0)
 
 
-# Bennett's bound on a sum of independent summands below b with variance sigma2: the
-# deviation t exceeded with probability exp(-Lam), from (sigma2/b^2) g(b t / sigma2) = Lam,
-# g(u) = (1+u) log(1+u) - u, solved by bisection on u in [0, c + 10], where g exceeds c
 def bennettDeviation(sigma2, b, Lam):
+  """Bennett's bound on a sum of independent summands below b with variance sigma2: the
+  deviation t exceeded with probability exp(-Lam), from (sigma2/b^2) g(b t / sigma2) = Lam,
+  g(u) = (1+u) log(1+u) - u, solved by bisection on u in [0, c + 10], where g exceeds c"""
   sigma2 = np.maximum(np.asarray(sigma2, dtype=float), 1e-300)
   c = Lam * b * b / sigma2
   lo, hi = np.zeros_like(c), c + 10
@@ -475,14 +475,14 @@ def bennettDeviation(sigma2, b, Lam):
   return sigma2 / b * hi
 
 
-# C3: the smallest halfwidth at which, with probability about 1 - alpha, no fluctuation of the
-# estimate exceeds tau + tauRel K_h*f, tau = tauMax M unless given, M the maximum of the pilot
-# estimate. The fluctuation at x is a sum of independent summands below b = wmax B (B the
-# peak of the symmetrised kernel) with variance s2 R y (R its squared norm, y = K_h*f(x)),
-# bounded by Bennett's inequality at every one of N independent kernel footprints,
-# Lam = log(2 N / alpha); y runs over (0, M]. Realistic rather than proven constants: the
-# footprints stand for the supremum, and R y for the local variance of a smooth density
 def noiseFloorHalfwidth(E, halfwidths=None, tau=None, tauMax=0.2, tauRel=0.5, alpha=0.05, pilot=None, returnCurve=False):
+  """C3: the smallest halfwidth at which, with probability about 1 - alpha, no fluctuation of the
+  estimate exceeds tau + tauRel K_h*f, tau = tauMax M unless given, M the maximum of the pilot
+  estimate. The fluctuation at x is a sum of independent summands below b = wmax B (B the
+  peak of the symmetrised kernel) with variance s2 R y (R its squared norm, y = K_h*f(x)),
+  bounded by Bennett's inequality at every one of N independent kernel footprints,
+  Lam = log(2 N / alpha); y runs over (0, M]. Realistic rather than proven constants: the
+  footprints stand for the supremum, and R y for the local variance of a smooth density"""
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
   if pilot is None:
     pilot = ucvHalfwidth(E, hs) if np.any(np.isnan(E.se)) else lowerBoundHalfwidth(E, hs)
@@ -501,9 +501,9 @@ def noiseFloorHalfwidth(E, halfwidths=None, tau=None, tauMax=0.2, tauRel=0.5, al
   return (h, hs, excess) if returnCurve else h
 
 
-# 'UCV' is C1, 'conservative' C2, each bounded below by the noise floor C3 unless noiseFloor=False
 def selectHalfwidth(E, method="UCV", halfwidths=None, noiseFloor=True, z=2.0, alpha=0.05, tau=None, tauMax=0.2,
                     tauRel=0.5):
+  """'UCV' is C1, 'conservative' C2, each bounded below by the noise floor C3 unless noiseFloor=False"""
   m = str(method).lower()
   if m == "ucv":
     h = ucvHalfwidth(E, halfwidths)

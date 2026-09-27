@@ -22,17 +22,18 @@ from ..geometry.kernels import _jit, backend
 from .boundary import grainBoundary, orderWalk
 from .decomposition import NO_PIXEL
 from .grains import grain2d
+from ..geometry.install import install
 
 _COMPILED = {}
 
 
 # ------------------------------------------------------------------ the heads that survive
 
-# the heads a coarsening may not dissolve: the end of an open chain is a junction and stays
-# where it is, a vertex where the pair of grains changes is a corner of both grain polygons
-# even where only two segments meet there, and a protected vertex is one another boundary
-# over the same vertices still walks over
 def mustKeep(gB, protect=None):
+  """the heads a coarsening may not dissolve: the end of an open chain is a junction and stays
+  where it is, a vertex where the pair of grains changes is a corner of both grain polygons
+  even where only two segments meet there, and a protected vertex is one another boundary
+  over the same vertices still walks over"""
   closed = gB.isClosed
   keep = gB.isChainEnd & ~closed
   pair = np.sort(gB.grainId, axis=1)
@@ -48,10 +49,10 @@ def mustKeep(gB, protect=None):
   return keep
 
 
-# every closed chain turned so that it ends at a head that stays: its rows are rotated to
-# the first kept one, and a chain with nothing kept is cut where the walk cut it. After this
-# every chain ends with a kept row, so a run of dissolved segments never crosses a chain
 def anchorClosedChains(gB, keep):
+  """every closed chain turned so that it ends at a head that stays: its rows are rotated to
+  the first kept one, and a chain with nothing kept is cut where the walk cut it. After this
+  every chain ends with a kept row, so a run of dissolved segments never crosses a chain"""
   keep = keep.copy()
   closed = gB.isClosed
   starts, ends = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
@@ -70,8 +71,8 @@ def anchorClosedChains(gB, keep):
   return gB[order], keep[order]
 
 
-# a closed chain has no junction to anchor it, so it is given three vertices
 def keepClosedChains(gB, keep):
+  """a closed chain has no junction to anchor it, so it is given three vertices"""
   closed = gB.isClosed
   for s, e in zip(np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)):
     n = e - s + 1
@@ -82,11 +83,11 @@ def keepClosedChains(gB, keep):
   return keep
 
 
-# no grain of the list is coarsened out of existence: a polygon needs three vertices, and a
-# grain smaller than the tolerance loses all of them, so such a grain is left as it was.
-# Which grains have a polygon is the caller's to say; on a bare boundary a grain appears
-# with whatever part of its boundary was selected and none is restored
 def keepGrainPolygons(gB, keep, ids):
+  """no grain of the list is coarsened out of existence: a polygon needs three vertices, and a
+  grain smaller than the tolerance loses all of them, so such a grain is left as it was.
+  Which grains have a polygon is the caller's to say; on a bare boundary a grain appears
+  with whatever part of its boundary was selected and none is restored"""
   nG = int(gB.grainId.max(initial=0))
   ids = np.asarray(ids, dtype=np.int64).reshape(-1) if ids is not None else np.zeros(0, dtype=np.int64)
   if nG == 0 or len(ids) == 0:
@@ -105,11 +106,11 @@ def keepGrainPolygons(gB, keep, ids):
   return keep
 
 
-# every surviving head swallows the run of segments before it, so the boundary stays
-# connected and keeps its length up to the straightening of the dissolved corners. The per
-# segment data is inherited from the last segment of each run; a segment that swallowed a
-# run runs between no one pair of pixels any more and says so
 def mergeRuns(gB, keep):
+  """every surviving head swallows the run of segments before it, so the boundary stays
+  connected and keeps its length up to the straightening of the dissolved corners. The per
+  segment data is inherited from the last segment of each run; a segment that swallowed a
+  run runs between no one pair of pixels any more and says so"""
   if keep.all():
     return gB
   gB, keep = anchorClosedChains(gB, keep)
@@ -128,10 +129,10 @@ def _finish(gB, keep, keepGrains):
 
 # ------------------------------------------------------------------ the two policies
 
-# keep every n-th vertex along each chain, whatever the shape: it thins a straight run and
-# a corner alike, so prefer simplifyBoundary, which spends its vertices where the shape
-# needs them
 def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
+  """keep every n-th vertex along each chain, whatever the shape: it thins a straight run and
+  a corner alike, so prefer simplifyBoundary, which spends its vertices where the shape
+  needs them"""
   if gB.isempty or n <= 1:
     return gB
   starts = np.flatnonzero(gB.isChainStart)
@@ -140,11 +141,11 @@ def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
   return _finish(gB, keep, keepGrains)
 
 
-# drop the vertices that carry no shape, chain by chain: a vertex goes when leaving it out
-# moves the boundary by less than epsilon, which on a pixel grid turns a staircase into the
-# straight line it approximates. The default tolerance is exactly that: a staircase of
-# spacing d never strays further than d / sqrt(2) from the line it approximates
 def simplifyBoundary(gB, epsilon=None, protect=None, keepGrains=None):
+  """drop the vertices that carry no shape, chain by chain: a vertex goes when leaving it out
+  moves the boundary by less than epsilon, which on a pixel grid turns a staircase into the
+  straight line it approximates. The default tolerance is exactly that: a staircase of
+  spacing d never strays further than d / sqrt(2) from the line it approximates"""
   if gB.isempty:
     return gB
   if epsilon is None:
@@ -159,10 +160,10 @@ def defaultEpsilon(gB):
   return 0.0 if gB.isempty else float(np.median(gB.segLength)) / np.sqrt(2)
 
 
-# the heads Douglas-Peucker keeps on every chain, on top of the ones given: the vertices of
-# a chain are the tails of its segments and the head of the last one, and keeping vertex j
-# means keeping the head of segment j - 1
 def keepShapeChains(gB, epsilon, keep=None):
+  """the heads Douglas-Peucker keeps on every chain, on top of the ones given: the vertices of
+  a chain are the tails of its segments and the head of the last one, and keeping vertex j
+  means keeping the head of segment j - 1"""
   starts, ends = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
   offset = np.concatenate([[0], np.cumsum(ends - starts + 2)]).astype(np.int64)
   # the flat vertex list of all chains: the tail of every first segment, then every head
@@ -273,15 +274,15 @@ def _compiledKeepShape():
 
 # ------------------------------------------------------------------ refining
 
-# resample every chain at a constant spacing along its length: the new vertices lie on the
-# old boundary, so its shape does not change, only how it is sampled. The vertices that may
-# not move stay exactly where they are and cut the chain into pieces that are resampled on
-# their own, which is what lets a smoothing that follows work on degrees of freedom that
-# are not tied to the grid. grainId and phaseId are constant along a piece and carry over;
-# the pair of measurements and the misorientation are inherited from the original segment
-# covering the midpoint of the new one, and the pair is dropped where the new segment spans
-# more than one of them
 def refineBoundary(gB, delta=None, protect=None):
+  """resample every chain at a constant spacing along its length: the new vertices lie on the
+  old boundary, so its shape does not change, only how it is sampled. The vertices that may
+  not move stay exactly where they are and cut the chain into pieces that are resampled on
+  their own, which is what lets a smoothing that follows work on degrees of freedom that
+  are not tied to the grid. grainId and phaseId are constant along a piece and carry over;
+  the pair of measurements and the misorientation are inherited from the original segment
+  covering the midpoint of the new one, and the pair is dropped where the new segment spans
+  more than one of them"""
   if gB.isempty:
     return gB
   if delta is None:
@@ -327,9 +328,9 @@ def refineBoundary(gB, delta=None, protect=None):
   return orderWalk(out._with(V=V, F=np.stack([tail, head], axis=1), ebsdId=eid))
 
 
-# half the median segment, which follows the polyline closely where a sample per median
-# length may cut a corner
 def defaultDelta(gB):
+  """half the median segment, which follows the polyline closely where a sample per median
+  length may cut a corner"""
   return 0.0 if gB.isempty else float(np.median(gB.segLength)) / 2
 
 
@@ -345,10 +346,10 @@ def _locate(g, Lc, lo, hi):
 
 # ------------------------------------------------------------------ the grains
 
-# the vertices both boundaries walk over: a vertex where an inner boundary ends on the outer
-# one has degree two to either and would be dissolved, leaving the other hanging off a
-# vertex its walk no longer reaches
 def sharedVertices(grains):
+  """the vertices both boundaries walk over: a vertex where an inner boundary ends on the outer
+  one has degree two to either and would be dissolved, leaving the other hanging off a
+  vertex its walk no longer reaches"""
   n = len(grains.boundary.V)
   outer, inner = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool)
   outer[grains.boundary.F] = True
@@ -356,8 +357,8 @@ def sharedVertices(grains):
   return np.flatnonzero(outer & inner)
 
 
-# the grains over a resampled pair of boundaries, their loops traced again
 def withBoundary(grains, b, ib):
+  """the grains over a resampled pair of boundaries, their loops traced again"""
   return grain2d(grains.id, grains.phaseId, grains.CSList, grains.numPixel, grains.meanRotation, grains.GOS, grains.frame, grains.prop,
                  boundary=b, innerBoundary=ib, phaseMap=grains.phaseMap)
 
@@ -369,9 +370,9 @@ def _coarsenGrains(verb, grains, *args):
                       verb(grains.innerBoundary, *args, protect=p, keepGrains=grains.id))
 
 
-# refining appends its new vertices, so the pool has to reach the second boundary before it
-# is refined in turn, and the first one back afterwards
 def _refineGrains(grains, delta=None):
+  """refining appends its new vertices, so the pool has to reach the second boundary before it
+  is refined in turn, and the first one back afterwards"""
   if delta is None:
     delta = defaultDelta(grains.boundary)
   p = sharedVertices(grains)
@@ -380,15 +381,21 @@ def _refineGrains(grains, delta=None):
   return withBoundary(grains, b._with(V=ib.V), ib)
 
 
-grainBoundary.reduceBoundary = reduceBoundary
-grainBoundary.simplifyBoundary = simplifyBoundary
-grainBoundary.refineBoundary = refineBoundary
-grainBoundary.reduce = reduceBoundary
-grainBoundary.simplify = simplifyBoundary
-grainBoundary.refine = refineBoundary
-grain2d.reduceBoundary = lambda grains, n=2: _coarsenGrains(reduceBoundary, grains, n)
-grain2d.simplifyBoundary = lambda grains, epsilon=None: _coarsenGrains(simplifyBoundary, grains, epsilon)
-grain2d.refineBoundary = _refineGrains
-grain2d.sharedVertices = sharedVertices
+def _reduceGrains(grains, n=2):
+  """the grains thin, simplify or refine their boundary and keep their inner boundary on it"""
+  return _coarsenGrains(reduceBoundary, grains, n)
+
+
+def _simplifyGrains(grains, epsilon=None):
+  return _coarsenGrains(simplifyBoundary, grains, epsilon)
+
+
+for _f in (reduceBoundary, simplifyBoundary, refineBoundary):
+  install(grainBoundary, _f)
+  install(grainBoundary, _f, _f.__name__.removesuffix("Boundary"))
+install(grain2d, _reduceGrains, "reduceBoundary")
+install(grain2d, _simplifyGrains, "simplifyBoundary")
+install(grain2d, _refineGrains, "refineBoundary")
+install(grain2d, sharedVertices)
 
 __all__ = ["mustKeep", "mergeRuns", "sharedVertices"]

@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from ..geometry.plottingconvention import AXIS_CONVENTIONS
 
 
-# one row of the browser: a folder or a map, at its depth below the folder being looked at
 @dataclass
 class FileRow:
+  """one row of the browser: a folder or a map, at its depth below the folder being looked at"""
   name: str
   path: str
   depth: int = 0
@@ -64,8 +64,8 @@ class WizardState:
 
   # ------------------------------------------------------------------ the hooks
 
-  # the window's binding of a field: fn() runs after every change announced for it
   def on(self, name, fn):
+    """the window's binding of a field: fn() runs after every change announced for it"""
     self._hooks.setdefault(name, []).append(fn)
 
   def changed(self, *names):

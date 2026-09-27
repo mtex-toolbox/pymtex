@@ -23,8 +23,8 @@ from ..geometry.units import degree
 from .kernelfunctions import SO3DeLaValleePoussinKernel
 
 
-# the values of the kernels at the centres at the nodes, rows the nodes, columns the centres
 def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
+  """the values of the kernels at the centres at the nodes, rows the nodes, columns the centres"""
   from scipy.sparse import csr_matrix
   L, R = reductionGroups(nodes)
   G = len(L) * len(R)
@@ -43,9 +43,9 @@ def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
   return np.real(psi.eval(t)).reshape(len(q), len(a), len(c), len(b)).mean(axis=(1, 3))
 
 
-# MATLAB's mlsq: least squares over weights of the sign of the start, the steepest descent
-# direction scaled by the weights so that none crosses zero
 def mlsq(A, y, c0, itermax=100, tol=1e-3):
+  """MATLAB's mlsq: least squares over weights of the sign of the start, the steepest descent
+  direction scaled by the weights so that none crosses zero"""
   chat = np.real(np.asarray(c0, dtype=float))
   r = A @ chat - y
   oldErr = np.inf
@@ -67,9 +67,9 @@ def mlsq(A, y, c0, itermax=100, tol=1e-3):
   return chat, k
 
 
-# the volumes of the Voronoi cells of orientations, estimated by the share of a fine grid
-# nearest to each of them, normalised to one
 def voronoiVolumes(nodes, resolution=2.5 * degree):
+  """the volumes of the Voronoi cells of orientations, estimated by the share of a fine grid
+  nearest to each of them, normalised to one"""
   from ..geometry.grids.orientationtree import OrientationTree
   from ..geometry.grids.so3grid import equispacedSO3Grid
   fine = equispacedSO3Grid(nodes.CS, nodes.SS, resolution=resolution).flatten()
@@ -142,9 +142,9 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   return f
 
 
-# MATLAB's rotation/interp: the harmonic fit, the Bingham distribution of the weighted
-# orientations, or the sum of kernels, with MATLAB's names of the options
 def interpSO3(nodes, values=None, *flags, regularization=None, SobolevIndex=None, **kwargs):
+  """MATLAB's rotation/interp: the harmonic fit, the Bingham distribution of the weighted
+  orientations, or the sum of kernels, with MATLAB's names of the options"""
   if "harmonic" in flags:
     from .density import interpolate
     if regularization is not None:

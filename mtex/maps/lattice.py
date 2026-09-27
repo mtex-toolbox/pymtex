@@ -69,13 +69,13 @@ class mapPlane:
   def dtype(self):
     return self.e1.dtype
 
-  # the coordinates in the plane of positions of shape (..., 3), as (..., 2)
   def to2d(self, xyz):
+    """the coordinates in the plane of positions of shape (..., 3), as (..., 2)"""
     d = np.asarray(xyz) - self.o
     return np.stack([d @ self.e1, d @ self.e2], axis=-1)
 
-  # the positions of plane coordinates of shape (..., 2)
   def from2d(self, xy):
+    """the positions of plane coordinates of shape (..., 2)"""
     xy = np.asarray(xy)
     return self.o + xy[..., :1] * self.e1 + xy[..., 1:] * self.e2
 
@@ -117,23 +117,23 @@ class lattice:
   def __len__(self):
     return len(self.ij)
 
-  # the representative spacing: the mean length of the two basis vectors
   @property
   def dxy(self):
+    """the representative spacing: the mean length of the two basis vectors"""
     return float((np.linalg.norm(self.A[:, 0]) + np.linalg.norm(self.A[:, 1])) / 2)
 
-  # the physical position of indices of shape (..., 2), exactly as the ideal lattice places them
   def position(self, ij):
+    """the physical position of indices of shape (..., 2), exactly as the ideal lattice places them"""
     ij = np.asarray(ij, dtype=self.A.dtype)
     return self.plane.from2d(self.origin + ij @ self.A.T)
 
-  # the corners of the cell around a site, relative to it, anticlockwise, shape (k, 3)
   @property
   def unitCell(self):
+    """the corners of the cell around a site, relative to it, anticlockwise, shape (k, 3)"""
     return self.plane.from2d(cellCorners(self.A, self.shape)) - self.plane.o
 
-  # the same lattice on a subset of its sites, the index counted from the least one kept
   def subset(self, ids):
+    """the same lattice on a subset of its sites, the index counted from the least one kept"""
     ij = self.ij[ids]
     lo = ij.min(axis=0)
     return self._build(self.plane, self.origin + self.A @ lo, self.A, ij - lo, self.shape)
@@ -143,9 +143,9 @@ class lattice:
     return f"lattice ({self.shape})\n  sites: {len(self)}\n  spacing: {self.dxy:.4g}\n  basis: {a}\n  normal: {np.round(self.plane.normal, 4).tolist()}"
 
 
-# the corners of the cell around a site in the plane, anticlockwise: the parallelogram of
-# the basis for a square lattice, the Voronoi cell for a hexagonal one
 def cellCorners(A, shape):
+  """the corners of the cell around a site in the plane, anticlockwise: the parallelogram of
+  the basis for a square lattice, the Voronoi cell for a hexagonal one"""
   A = np.asarray(A, dtype=float)
   if shape == "square":
     a1, a2 = A[:, 0] / 2, A[:, 1] / 2
@@ -154,8 +154,8 @@ def cellCorners(A, shape):
   return voronoiCell(np.zeros(2), nb, np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1]))
 
 
-# the basis, the stencil and the spacing a cell polygon of four or six corners describes
 def latticeBasis(cell):
+  """the basis, the stencil and the spacing a cell polygon of four or six corners describes"""
   V3 = _xyz(cell)
   n = len(V3)
   if n not in (4, 6):
@@ -171,8 +171,8 @@ def latticeBasis(cell):
 
 # ------------------------------------------------------------------ inference from positions
 
-# about m points from a square around the centre of the map
 def centrePatch(P, m):
+  """about m points from a square around the centre of the map"""
   n = len(P)
   if n <= m:
     return P
@@ -188,13 +188,13 @@ def centrePatch(P, m):
   return P[:m]
 
 
-# the shortest two translations between neighbouring points
-#
-# The difference vectors to the nearest neighbours cluster on the lattice translations.
-# They are clustered by direction and each cluster represented by its median length, never
-# by a tolerance on the vector: under a smooth distortion one translation is measured with
-# lengths spread over tens of percent, and a direction survives what a tolerance splits.
 def inferBasis(P):
+  """the shortest two translations between neighbouring points
+
+  The difference vectors to the nearest neighbours cluster on the lattice translations.
+  They are clustered by direction and each cluster represented by its median length, never
+  by a tolerance on the vector: under a smooth distortion one translation is measured with
+  lengths spread over tens of percent, and a direction survives what a tolerance splits."""
   if len(P) < 3:
     raise ValueError("a lattice needs at least three positions")
   Q = centrePatch(P, 2000)
@@ -236,8 +236,8 @@ def _cross2(a, b):
   return a[0] * b[1] - a[1] * b[0]
 
 
-# Gauss reduction of a two dimensional basis, and the shape it turns out to have
 def reduceBasis(vs, shape):
+  """Gauss reduction of a two dimensional basis, and the shape it turns out to have"""
   vs = np.asarray(vs, dtype=float)
   order = np.argsort(np.linalg.norm(vs, axis=1))
   cand = vs[order]
@@ -259,10 +259,10 @@ def reduceBasis(vs, shape):
   return canonicalBasis(a1, a2, S), S
 
 
-# one basis for one lattice, whichever pair the reduction returned: a1 is the shortest
-# translation pointing most along the first axis of the plane, a2 the shortest one turning
-# anticlockwise from it by the least angle, so that a1 - a2 is short on a hexagonal lattice
 def canonicalBasis(a1, a2, shape):
+  """one basis for one lattice, whichever pair the reduction returned: a1 is the shortest
+  translation pointing most along the first axis of the plane, a2 the shortest one turning
+  anticlockwise from it by the least angle, so that a1 - a2 is short on a hexagonal lattice"""
   cands = [a1, -a1, a2, -a2]
   if shape == "hex":
     cands += [a1 - a2, a2 - a1]
@@ -278,11 +278,11 @@ def canonicalBasis(a1, a2, shape):
   return np.stack([b1, b2], axis=1)
 
 
-# the shape is how many edges the Voronoi cell of the lattice has, four or six, which is
-# how many neighbours a measurement has, not whether the translations have equal length.
-# A square lattice is exactly degenerate, its four cocircular corners split into slivers
-# under any shear, so an edge counts only above a fraction of the spacing
 def cellShapeOf(a1, a2):
+  """the shape is how many edges the Voronoi cell of the lattice has, four or six, which is
+  how many neighbours a measurement has, not whether the translations have equal length.
+  A square lattice is exactly degenerate, its four cocircular corners split into slivers
+  under any shear, so an edge counts only above a fraction of the spacing"""
   a1, a2 = np.asarray(a1, dtype=float), np.asarray(a2, dtype=float)
   nb = [a1, -a1, a2, -a2, a1 - a2, a2 - a1, a1 + a2, -a1 - a2]
   vs = voronoiCell(np.zeros(2), nb, 2 * max(np.linalg.norm(a1), np.linalg.norm(a2)))
@@ -293,22 +293,22 @@ def cellShapeOf(a1, a2):
 
 # ------------------------------------------------------------------ the integer index
 
-# the integer index of every position, and the lattice that was fitted to reach it
-#
-# For a rigid lattice the index is one rounding of inv(A) (p - p0). A smooth distortion
-# can put a far point more than half a cell from where an affine model places it, so the
-# model is fitted to every measurement first and judged by the largest residual: below a
-# quarter cell no rounding can have flipped. Only above it is the index grown over the
-# neighbour graph, which costs a neighbour query per measurement.
 def assignIndex(P, A0):
+  """the integer index of every position, and the lattice that was fitted to reach it
+
+  For a rigid lattice the index is one rounding of inv(A) (p - p0). A smooth distortion
+  can put a far point more than half a cell from where an affine model places it, so the
+  model is fitted to every measurement first and judged by the largest residual: below a
+  quarter cell no rounding can have flipped. Only above it is the index grown over the
+  neighbour graph, which costs a neighbour query per measurement."""
   fit = affineIndex(P, A0)
   if fit is not None:
     return fit
   return growIndex(P, A0), np.asarray(A0, dtype=P.dtype), P[0]
 
 
-# the index from one affine model, refined and verified, or None where it does not hold
 def affineIndex(P, A0):
+  """the index from one affine model, refined and verified, or None where it does not hold"""
   ij, worst = roundOnto(P, P[0], np.linalg.inv(A0))
   if worst < 0:
     return None
@@ -324,9 +324,9 @@ def affineIndex(P, A0):
   return ij, A, p0
 
 
-# the index of every position under one affine model and how far the worst of them missed
-# its site; negative where the model sends a position out of an index's range
 def roundOnto(P, p0, Ainv):
+  """the index of every position under one affine model and how far the worst of them missed
+  its site; negative where the model sends a position out of an index's range"""
   f = (P - p0) @ Ainv.T
   if not np.all(np.abs(f) < 1e8):
     return None, -1.0
@@ -334,9 +334,9 @@ def roundOnto(P, p0, Ainv):
   return ij.astype(np.int64), float(np.max(np.abs(f - ij))) if len(f) else 0.0
 
 
-# the lattice that fits the positions best for the indices they were given: the least
-# squares solution of p = p0 + i a1 + j a2 over all of them
 def fitLattice(P, ij):
+  """the lattice that fits the positions best for the indices they were given: the least
+  squares solution of p = p0 + i a1 + j a2 over all of them"""
   X = np.column_stack([np.ones(len(P), dtype=P.dtype), ij.astype(P.dtype)])
   M, B = X.T @ X, X.T @ P
   # a map that is a single scan line fixes only one direction: a singular normal matrix
@@ -350,9 +350,9 @@ def fitLattice(P, ij):
   return C[0], C[1:].T
 
 
-# whether two positions were given the same site; a range far larger than the map is a fit
-# that has run away and counts as a collision
 def hasCollision(ij):
+  """whether two positions were given the same site; a range far larger than the map is a fit
+  that has run away and counts as a collision"""
   n = len(ij)
   if n == 0:
     return False
@@ -367,11 +367,11 @@ def hasCollision(ij):
   return int(seen.sum()) < n
 
 
-# the index of every position grown over the graph of nearest neighbours, level by level
-#
-# A single cell step never carries more than a fraction of a smooth distortion, so
-# rounding inv(A) dp is exact for it however far the map drifts overall
 def growIndex(P, A):
+  """the index of every position grown over the graph of nearest neighbours, level by level
+
+  A single cell step never carries more than a fraction of a smooth distortion, so
+  rounding inv(A) dp is exact for it however far the map drifts overall"""
   from scipy.spatial import cKDTree
   n = len(P)
   Ainv = np.linalg.inv(A)

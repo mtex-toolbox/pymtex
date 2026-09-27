@@ -24,8 +24,8 @@ IPF_TABS = {"IPF X": "x", "IPF Y": "y", "IPF Z": "z"}
 
 # ------------------------------------------------------------------ the browser
 
-# the rows of a folder: its folders first, then its maps
 def folderRows(folder, depth=0):
+  """the rows of a folder: its folders first, then its maps"""
   rows = []
   try:
     names = sorted(os.listdir(folder), key=str.lower)
@@ -47,8 +47,8 @@ def setFolder(st, folder):
   st.changed("folder", "entries")
 
 
-# a folder unfolds where it stands, or folds its rows away again
 def toggleFolder(st, i):
+  """a folder unfolds where it stands, or folds its rows away again"""
   row = st.entries[i]
   if not row.isDir:
     return
@@ -77,15 +77,15 @@ def infoRows(st):
   return [(k, v or st.info.format) if k == "vendor" else (k, v) for k, v in rows]
 
 
-# the row of the folder an entry was unfolded from, None for one at the top
 def parentRow(st, i):
+  """the row of the folder an entry was unfolded from, None for one at the top"""
   depth = st.entries[i].depth
   return next((j for j in range(i - 1, -1, -1) if st.entries[j].depth < depth), None)
 
 
-# the row a letter typed goes to: the first entry whose name starts with it, or the next one
-# after the current row when that starts with it already, round to the top; None for none
 def letterRow(st, current, letter):
+  """the row a letter typed goes to: the first entry whose name starts with it, or the next one
+  after the current row when that starts with it already, round to the top; None for none"""
   letter = letter.lower()
   hits = [j for j, r in enumerate(st.entries) if r.name.lower().startswith(letter)]
   if not hits:
@@ -95,8 +95,8 @@ def letterRow(st, current, letter):
   return hits[0]
 
 
-# the crumbs of the path, the root first, each with the folder it reaches
 def breadcrumbs(st):
+  """the crumbs of the path, the root first, each with the folder it reaches"""
   parts = st.folder.split(os.sep)
   out, here = [], ""
   for p in parts:
@@ -105,8 +105,8 @@ def breadcrumbs(st):
   return out
 
 
-# a click on a row: a folder unfolds, a map is described and read
 def pickFile(st, i):
+  """a click on a row: a folder unfolds, a map is described and read"""
   row = st.entries[i]
   if row.isDir:
     toggleFolder(st, i)
@@ -116,8 +116,8 @@ def pickFile(st, i):
 
 # ------------------------------------------------------------------ describing and importing
 
-# the file described from its header alone: the panel, the data sets and the two frames
 def selectEntry(st, path):
+  """the file described from its header alone: the panel, the data sets and the two frames"""
   st.selected = path
   st.dataSet = 0
   try:
@@ -141,9 +141,9 @@ def openEntry(st, path, worker=None):
   startImport(st, worker)
 
 
-# the entry of AXIS_CONVENTIONS whose frame the vendor wrote its angles in, given the
-# correction the loader applied: correction = mapRot * inv(eulerRot)
 def eulerConventionOf(st, correction):
+  """the entry of AXIS_CONVENTIONS whose frame the vendor wrote its angles in, given the
+  correction the loader applied: correction = mapRot * inv(eulerRot)"""
   mapRot = plottingConvention(AXIS_CONVENTIONS[st.mapConvention]).rot
   return closestConvention(correction.inv() * mapRot)[0]
 
@@ -152,12 +152,12 @@ def correctionOf(st):
   return plottingConvention(AXIS_CONVENTIONS[st.mapConvention]).rot * plottingConvention(AXIS_CONVENTIONS[st.eulerConvention]).rot.inv()
 
 
-# the colour of an orientation is a look-up over a grid built once per phase, and five of
-# them are a second and a half - paid, until this, when the first map was drawn and the
-# window could not be moved. The phases are known from the header before the map is read,
-# so the grids are built beside the read: numpy holds no lock over its own arrays, and the
-# register of the grids has one of its own.
 def warmColours(st):
+  """the colour of an orientation is a look-up over a grid built once per phase, and five of
+  them are a second and a half - paid, until this, when the first map was drawn and the
+  window could not be moved. The phases are known from the header before the map is read,
+  so the grids are built beside the read: numpy holds no lock over its own arrays, and the
+  register of the grids has one of its own."""
   frames = [f for f in st.info.phases.frames if f.isIndexed] if st.info is not None else []
   if not frames:
     return None
@@ -175,8 +175,8 @@ def warmColours(st):
   return thread
 
 
-# the load: inline, or handed to a worker as (load, commit) so the window stays live
 def startImport(st, worker=None):
+  """the load: inline, or handed to a worker as (load, commit) so the window stays live"""
   if st.info is None:
     return
   path, k, several = st.selected, st.dataSet, len(st.info.dataSets) > 1
@@ -213,9 +213,9 @@ def startImport(st, worker=None):
     worker(load, commit)
 
 
-# the map taken into the state: its phases as declared, every indexed one drawn, the raster,
-# the views it offers, the Euler frame it was read in
 def commitMap(st, ebsd, seconds):
+  """the map taken into the state: its phases as declared, every indexed one drawn, the raster,
+  the views it offers, the Euler frame it was read in"""
   st.ebsd = ebsd
   st.loadSeconds = seconds
   st.headerPhases = frameKeys(ebsd.CSList)
@@ -242,8 +242,8 @@ def _loadedPath(st):
   return st.ebsd.meta.get("h5", {}).get("file") if st.ebsd is not None else None
 
 
-# picking a data set of a project file is the import
 def setDataSet(st, k, worker=None):
+  """picking a data set of a project file is the import"""
   if st.info is None or not 0 <= k < max(len(st.info.dataSets), 1):
     return
   st.dataSet = k
@@ -253,9 +253,9 @@ def setDataSet(st, k, worker=None):
 
 # ------------------------------------------------------------------ the views
 
-# the views a map has: the map always, IPF and pole figures once something is indexed, one
-# tab per property, the images where the file brought some
 def viewsOf(ebsd, images=None):
+  """the views a map has: the map always, IPF and pole figures once something is indexed, one
+  tab per property, the images where the file brought some"""
   indexed = any(f.isIndexed for f in ebsd.CSList.frames) and bool(np.any(ebsd.isIndexed))
   tabs = [("phase", "phase")]
   if indexed:
@@ -274,10 +274,10 @@ def pickTab(st, i):
     st.changed("tab")
 
 
-# the pictures a file brought: the ones its loader indexed without reading, which is how a
-# vendor's dozen electron images stay out of the map, and the ones that came in the header
-# small enough to have been read. Each is a name and either an array or an entry to read.
 def imagesOf(ebsd):
+  """the pictures a file brought: the ones its loader indexed without reading, which is how a
+  vendor's dozen electron images stay out of the map, and the ones that came in the header
+  small enough to have been read. Each is a name and either an array or an entry to read."""
   out, seen = [], set()
   for entry in ebsd.meta.get("images", []) or []:
     label = pictureName(entry["name"])
@@ -302,16 +302,16 @@ MIN_PICTURE = 16
 GENERIC = ("data", "header", "")
 
 
-# what a picture is called: the last two parts of its path that say anything, since every
-# vendor buries it under a Data or a Header the name of which names nothing
 def pictureName(path):
+  """what a picture is called: the last two parts of its path that say anything, since every
+  vendor buries it under a Data or a Header the name of which names nothing"""
   parts = [p for p in str(path).split("/") if p.lower() not in GENERIC]
   return "/".join(parts[-2:]) if parts else str(path)
 
 
-# the picture an array is, or None: a plane, a plane of three or four channels either way
-# round, and a stack of one channel, which is how a grey picture is written
 def asPicture(v):
+  """the picture an array is, or None: a plane, a plane of three or four channels either way
+  round, and a stack of one channel, which is how a grey picture is written"""
   if not isinstance(v, np.ndarray) or v.dtype.kind not in "iuf" or v.ndim not in (2, 3):
     return None
   a = v
@@ -331,8 +331,8 @@ def asPicture(v):
   return a
 
 
-# the pixels of the picture at k, read from the file the first time it is looked at
 def pictureOf(st, k):
+  """the pixels of the picture at k, read from the file the first time it is looked at"""
   if not 0 <= k < len(st.images):
     return None
   label, thing = st.images[k]
@@ -350,9 +350,9 @@ def showImage(st, k):
     st.changed("image")
 
 
-# the metadata flattened into rows of (depth, name, preview, isBranch, picture), where the
-# picture is the entry of images the row shows, or None. Every branch opens at the top level.
 def metaRowsOf(ebsd, images=()):
+  """the metadata flattened into rows of (depth, name, preview, isBranch, picture), where the
+  picture is the entry of images the row shows, or None. Every branch opens at the top level."""
   rows = []
   where = {label: k for k, (label, thing) in enumerate(images) if isinstance(thing, np.ndarray)}
 
@@ -377,14 +377,14 @@ def metaRowsOf(ebsd, images=()):
   return rows
 
 
-# what a picture says about itself in the tree, whether it is read or only indexed
 def pictureLabel(thing):
+  """what a picture says about itself in the tree, whether it is read or only indexed"""
   shape = thing.shape if isinstance(thing, np.ndarray) else tuple(thing["shape"])
   return f"picture {shape[1]} x {shape[0]}" + (" colour" if len(shape) == 3 else "")
 
 
-# a value in a line: a number, a string, an array by its shape
 def preview(v):
+  """a value in a line: a number, a string, an array by its shape"""
   if isinstance(v, (bytes, np.bytes_)):
     v = v.decode("ascii", errors="replace")
   if isinstance(v, str):
@@ -415,8 +415,8 @@ def childCount(rows, i):
   return n
 
 
-# the rows whose every ancestor is open
 def visibleMeta(st):
+  """the rows whose every ancestor is open"""
   out, hidden = [], None
   for i, (depth, k, v, branch, picture) in enumerate(st.metaRows):
     if hidden is not None and depth > hidden:
@@ -428,10 +428,10 @@ def visibleMeta(st):
   return out
 
 
-# a row of the tree: a branch opens or closes, a picture is shown, and showing it moves to
-# the view that holds the pictures, since a picture picked where it is named is picked to
-# be looked at
 def pickMeta(st, i):
+  """a row of the tree: a branch opens or closes, a picture is shown, and showing it moves to
+  the view that holds the pictures, since a picture picked where it is named is picked to
+  be looked at"""
   if not 0 <= i < len(st.metaRows):
     return
   _, _, _, branch, picture = st.metaRows[i]
@@ -453,8 +453,8 @@ def setMiller(st, k, text):
 
 # ------------------------------------------------------------------ the coordinates
 
-# the map convention only re-views
 def setMapConvention(st, i):
+  """the map convention only re-views"""
   if not 0 <= i < len(AXIS_CONVENTIONS):
     return
   st.mapConvention = i
@@ -462,8 +462,8 @@ def setMapConvention(st, i):
   st.changed("mapConvention")
 
 
-# the Euler convention turns the rotations in place and the densities with them
 def setEulerConvention(st, i):
+  """the Euler convention turns the rotations in place and the densities with them"""
   if not 0 <= i < len(AXIS_CONVENTIONS):
     return
   st.eulerConvention = i
@@ -499,27 +499,27 @@ def phaseCounts(st):
   return {int(i): int(c) for i, c in zip(ids, counts)}
 
 
-# the id of the drawn indexed phase with the most pixels, which the pole figures show
 def dominantPhase(st):
+  """the id of the drawn indexed phase with the most pixels, which the pole figures show"""
   counts = phaseCounts(st)
   frames = st.ebsd.CSList.frames if st.ebsd is not None else []
   ids = [k for k, on in st.drawn.items() if on and k in counts and k < len(frames) and frames[k].isIndexed]
   return max(ids, key=lambda k: counts[k]) if ids else None
 
 
-# the phase whose key the key panel shows, an indexed one
 def pickKeyPhase(st, phaseId):
+  """the phase whose key the key panel shows, an indexed one"""
   frames = st.ebsd.CSList.frames if st.ebsd is not None else []
   if 0 <= phaseId < len(frames) and frames[phaseId].isIndexed and phaseId != st.keyPhase:
     st.keyPhase = phaseId
     st.changed("keyPhase")
 
 
-# a cell edited: the row's frame rebuilt with the lattice snapped to what the group forces.
-# The register interns a frame within a shape tolerance, so a rebuilt frame it hands back
-# unchanged is minted outside it; a colour is set on the frame itself, which is what reaches
-# every map holding it (ADR 0004)
 def editPhase(st, phaseId, column, value):
+  """a cell edited: the row's frame rebuilt with the lattice snapped to what the group forces.
+  The register interns a frame within a shape tolerance, so a rebuilt frame it hands back
+  unchanged is minted outside it; a colour is set on the frame itself, which is what reaches
+  every map holding it (ADR 0004)"""
   if st.ebsd is None or not 0 <= phaseId < len(st.ebsd.CSList):
     return
   if column == "plot":
@@ -563,9 +563,9 @@ def editPhase(st, phaseId, column, value):
   st.changed("phases")
 
 
-# the cell the lattice forces follow the one edited: b and c from a on a cubic lattice, the
-# angles the lattice implies but for the free ones
 def snapLattice(symbol, abc, abg, driver=None):
+  """the cell the lattice forces follow the one edited: b and c from a on a cubic lattice, the
+  angles the lattice implies but for the free ones"""
   from ..geometry.symmetry import symmetry
   from ..geometry.frames import _uniqueMonoclinicAxis
   lat = symmetry(symbol).lattice
@@ -586,8 +586,8 @@ def snapLattice(symbol, abc, abg, driver=None):
   return abc, abg
 
 
-# which cells of a row the lattice leaves free
 def freeCells(cs):
+  """which cells of a row the lattice leaves free"""
   if not cs.isIndexed:
     return {c: False for c in PHASE_COLUMNS}
   from ..geometry.frames import _uniqueMonoclinicAxis
@@ -599,8 +599,8 @@ def freeCells(cs):
 
 # ------------------------------------------------------------------ the outputs
 
-# the value snapshot of a phase list, against which an edit is told: name, group, cell, setup, colour
 def frameKeys(phases):
+  """the value snapshot of a phase list, against which an edit is told: name, group, cell, setup, colour"""
   return [frameKey(f) for f in phases.frames]
 
 
@@ -618,8 +618,8 @@ def scriptOf(st):
                                  variable=st.variable, drawn={k: phaseCounts(st).get(k, 0) for k, on in st.drawn.items() if on})
 
 
-# the script written to a file, by default beside the session and never in somebody's data folder
 def writeScript(st, path=None):
+  """the script written to a file, by default beside the session and never in somebody's data folder"""
   text = scriptOf(st)
   if not text:
     return None

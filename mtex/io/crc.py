@@ -27,9 +27,9 @@ CRC_COLUMNS = [("x", 4), ("y", 4), ("phi1", 4), ("phi", 4), ("phi2", 4), ("mad",
                ("unknown", 1), ("bands", 1), ("error", 1), ("reliabilityindex", 4)]
 
 
-# an INI file as a section to key to value dict, names lowercased without blanks, the values
-# numbers where they are, which is the cpr struct MATLAB keeps in ebsd.opt.header
 def readIni(path):
+  """an INI file as a section to key to value dict, names lowercased without blanks, the values
+  numbers where they are, which is the cpr struct MATLAB keeps in ebsd.opt.header"""
   out = {}
   section = out.setdefault("", {})
   for line in readFile(path).split(b"\n"):
@@ -50,9 +50,9 @@ def _number(ini, section, key, default=None):
   return v if isinstance(v, float) else default
 
 
-# the phases the .cpr declares; a section that does not state its crystallography leaves its
-# pixels not indexed rather than guessing a lattice for them
 def cprPhases(ini, path):
+  """the phases the .cpr declares; a section that does not state its crystallography leaves its
+  pixels not indexed rather than guessing a lattice for them"""
   frames = [notIndexedFrame()]
   n = int(_number(ini, "phases", "count", 0.0))
   missing = []
@@ -80,9 +80,9 @@ def cprPhases(ini, path):
   return phaseList(frames)
 
 
-# the names of the columns the codes stand for: the table above for the twelve Channel
-# writes, the [EDX Windows] section for the windows above a hundred
 def crcNames(ini, codes):
+  """the names of the columns the codes stand for: the table above for the twelve Channel
+  writes, the [EDX Windows] section for the windows above a hundred"""
   names = []
   for c in codes:
     if 1 <= c <= len(CRC_COLUMNS):
@@ -93,9 +93,9 @@ def crcNames(ini, codes):
   return names
 
 
-# the surface the map was acquired on, [Acquisition Surface] Euler1 to Euler3 in degree;
-# a .crc keeps its angles in that surface's frame, CS1, so it is kept and not applied
 def crcAcquisition(ini):
+  """the surface the map was acquired on, [Acquisition Surface] Euler1 to Euler3 in degree;
+  a .crc keeps its angles in that surface's frame, CS1, so it is kept and not applied"""
   e = [_number(ini, "acquisitionsurface", f"euler{k}") for k in (1, 2, 3)]
   return None if any(v is None for v in e) else tuple(e)
 

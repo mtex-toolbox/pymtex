@@ -19,6 +19,7 @@ import numpy as np
 
 from ..geometry.kernels import backend
 from ..maps.ebsd import EBSD
+from ..geometry.install import install
 
 
 def _unit(a):
@@ -26,17 +27,17 @@ def _unit(a):
   return a / np.where(n == 0, 1, n)
 
 
-# the curvature tensor of one dislocation system: the dislocation density tensor of a
-# system is b (x) l^ and Nye's relation turns it into the curvature
 def systemCurvature(b, l):
+  """the curvature tensor of one dislocation system: the dislocation density tensor of a
+  system is b (x) l^ and Nye's relation turns it into the curvature"""
   b, l = np.asarray(b, dtype=float), _unit(np.asarray(l, dtype=float))
   return l[..., :, None] * b[..., None, :] - (np.sum(b * l, axis=-1) / 2)[..., None, None] * np.eye(3)
 
 
-# the densities of least total line energy reproducing the known components of the
-# curvature: min sum u |rho| under sum rho_j kappa_j = kappa, over the systems and their
-# negatives; None where no combination of them reproduces the curvature
 def fitDensities(M, known, b, l, u):
+  """the densities of least total line energy reproducing the known components of the
+  curvature: min sum u |rho| under sum rho_j kappa_j = kappa, over the systems and their
+  negatives; None where no combination of them reproduces the curvature"""
   from scipy.optimize import linprog
   ns = len(b)
   K = systemCurvature(b, l).reshape(ns, 9)[:, known].T
@@ -51,13 +52,13 @@ def fitDensities(M, known, b, l, u):
 UNIT_SCALE = {"m": 1.0, "mm": 1e-3, "um": 1e-6, "µm": 1e-6, "nm": 1e-9, "au": 1e-10, "A": 1e-10}
 
 
-# rho, factor = fitDislocationSystems(kappa, dS): the dislocation densities that account for
-# the curvature with the least total line energy, one signed density per system, NaN where no
-# combination of them reproduces it. The curvature is one tensor or a map of them, the systems
-# one list for all or, rotated by the orientations of the map, a (pixels, systems) array; both
-# in one frame. The factor turns the densities into 1/m^2, from the units of the curvature
-# and of the Burgers vectors
 def fitDislocationSystems(kappa, dS):
+  """rho, factor = fitDislocationSystems(kappa, dS): the dislocation densities that account for
+  the curvature with the least total line energy, one signed density per system, NaN where no
+  combination of them reproduces it. The curvature is one tensor or a map of them, the systems
+  one list for all or, rotated by the orientations of the map, a (pixels, systems) array; both
+  in one frame. The factor turns the densities into 1/m^2, from the units of the curvature
+  and of the Burgers vectors"""
   from ..tensors.tensor import tensor
   M = kappa.M if isinstance(kappa, tensor) else np.asarray(kappa, dtype=float)
   single = M.shape == (3, 3)
@@ -87,12 +88,12 @@ def fitDislocationSystems(kappa, dS):
   return (rho[0] if single else rho), factor
 
 
-# gnd, rho = calcGND(ebsd, dS): the geometrically necessary dislocation content of every
-# pixel after Pantleon (2008), MATLAB's route: the curvature of the map, the systems rotated
-# into every pixel, the densities of least total line energy reproducing the curvature. The
-# content is the sum of the line energies times the absolute densities, in 1/m^2 for line
-# energies without a unit, and the densities one row per pixel
 def calcGND(ebsd, dS, stencil="oneSided"):
+  """gnd, rho = calcGND(ebsd, dS): the geometrically necessary dislocation content of every
+  pixel after Pantleon (2008), MATLAB's route: the curvature of the map, the systems rotated
+  into every pixel, the densities of least total line energy reproducing the curvature. The
+  content is the sum of the line energies times the absolute densities, in 1/m^2 for line
+  energies without a unit, and the densities one row per pixel"""
   # the curvature of the map, or of the volume, whose curvature is complete
   kappa = ebsd.curvature(stencil=stencil)
   dSRot = ebsd.orientations.reshape(-1, 1) * dS
@@ -101,6 +102,6 @@ def calcGND(ebsd, dS, stencil="oneSided"):
   return gnd.reshape(ebsd.shape), rho
 
 
-EBSD.calcGND = calcGND
+install(EBSD, calcGND)
 
 __all__ = ["fitDislocationSystems"]

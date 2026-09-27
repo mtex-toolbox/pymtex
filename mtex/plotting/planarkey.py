@@ -88,9 +88,9 @@ class planarColorKey:
     return "\n".join(lines)
 
 
-# the key as an image, hue along x and saturation along y; with the data the axes carry
-# their ranges and labels
 def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw):
+  """the key as an image, hue along x and saturation along y; with the data the axes carry
+  their ranges and labels"""
   fig = gcm()
   if parent is not None:
     ax = parent

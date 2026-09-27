@@ -32,9 +32,9 @@ def _canonical(name):
   return COLUMN_NAMES.get(n, re.sub(r"\W+", "_", n))
 
 
-# the columns a file names itself, on the last line before its numeric block: a line of
-# words above a block of numbers need not be a header at all, so it has to name the positions
 def tableColumns(head):
+  """the columns a file names itself, on the last line before its numeric block: a line of
+  words above a block of numbers need not be a header at all, so it has to name the positions"""
   if not head:
     return None
   names = [s for s in re.split(r"[\t,;]| ", text(head[-1])) if s.strip()]

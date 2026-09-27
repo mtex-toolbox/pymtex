@@ -56,13 +56,13 @@ class phaseList:
   def isIndexed(self, i):
     return self.frames[i].isIndexed
 
-  # the ids of the phases that carry a lattice
   @property
   def indexedPhaseId(self):
+    """the ids of the phases that carry a lattice"""
     return np.array([i for i, f in enumerate(self.frames) if f.isIndexed], dtype=int)
 
-  # the id of a phase named by its mineral, its frame or its number
   def phaseId(self, key):
+    """the id of a phase named by its mineral, its frame or its number"""
     if isinstance(key, (int, np.integer)):
       if not 0 <= key < len(self.frames):
         raise IndexError(f"the map has {len(self.frames)} phases, there is no phase {key}")
@@ -109,9 +109,9 @@ CSS_255 = {"lightskyblue": (135, 206, 250), "darkseagreen": (143, 188, 143), "go
            "mediumpurple": (147, 112, 219), "moccasin": (255, 228, 181), "olivedrab": (107, 142, 35)}
 
 
-# the colour of every phase of a list: the one its frame carries, else the next name of the
-# order for an indexed phase, None for a not indexed one without a colour
 def phaseColorNames(frames):
+  """the colour of every phase of a list: the one its frame carries, else the next name of the
+  order for an indexed phase, None for a not indexed one without a colour"""
   out, k = [], 0
   for f in frames:
     if f.color is not None and not (isinstance(f.color, np.ndarray) and np.all(np.isnan(f.color))):
@@ -124,8 +124,8 @@ def phaseColorNames(frames):
   return out
 
 
-# a colour as an RGB triplet: a name of the order, or what matplotlib knows, or a triplet
 def colorTriplet(c):
+  """a colour as an RGB triplet: a name of the order, or what matplotlib knows, or a triplet"""
   if c is None:
     return None
   if isinstance(c, str):

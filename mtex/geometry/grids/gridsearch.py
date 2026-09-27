@@ -20,9 +20,9 @@ prange = range
 _COMPILED = {}
 
 
-# the flat, sorted ladders of an S2 ring grid: the ring polar angles, all azimuth points
-# concatenated in grid order, and per ring its start, count, minimum and period
 def flatS2(g):
+  """the flat, sorted ladders of an S2 ring grid: the ring polar angles, all azimuth points
+  concatenated in grid order, and per ring its start, count, minimum and period"""
   betaPts = np.ascontiguousarray(g.thetaGrid.points, dtype=np.float64)
   rhoPts = np.ascontiguousarray(np.concatenate([r.points for r in g.rhoGrid]) if g.rhoGrid else np.zeros(0), dtype=np.float64)
   rmin = np.array([float(r.min) for r in g.rhoGrid])
@@ -243,9 +243,9 @@ def _so3RadiusLoop(Q, Lr, Rr, ringBeta, ringOff, ringAlpha, ringNode, ringMin, n
         best[touched[u]] = -1.0
 
 
-# the ladders of an equispaced SO(3) grid as flat arrays: per ring its polar angle, its nodes
-# with their alpha folded into [min, min + period) and sorted, per node its gamma ladder
 def flatSO3(g):
+  """the ladders of an equispaced SO(3) grid as flat arrays: per ring its polar angle, its nodes
+  with their alpha folded into [min, min + period) and sorted, per node its gamma ladder"""
   ab = g.alphabeta
   ringOff = np.ascontiguousarray(ab.offset, dtype=np.int64)
   ringMin = np.array([float(r.min) for r in ab.rhoGrid])
@@ -260,10 +260,10 @@ def flatSO3(g):
           np.ascontiguousarray(g.cb), np.ascontiguousarray(g.sb), g.offset, g.gammaPoints, g.gammaMin, g.gammaPeriod, ap)
 
 
-# the radius search of an equispaced SO(3) grid, Q the queries (nq, nb, 4) turned back by the
-# grid's centre with nb = 2 holding the inverse under exchange, Lr and Rr the coset
-# representatives, nZL the rotations about z on the left; the CSR arrays of the incidence
 def so3Radius(flat, Q, Lr, Rr, nZL, eps, chunk=16):
+  """the radius search of an equispaced SO(3) grid, Q the queries (nq, nb, 4) turned back by the
+  grid's centre with nb = 2 holding the inverse under exchange, Lr and Rr the coset
+  representatives, nZL the rotations about z on the left; the CSR arrays of the incidence"""
   _compileSO3()
   Q = np.ascontiguousarray(Q, dtype=np.float64)
   Lr, Rr = np.ascontiguousarray(Lr, dtype=np.float64), np.ascontiguousarray(Rr, dtype=np.float64)

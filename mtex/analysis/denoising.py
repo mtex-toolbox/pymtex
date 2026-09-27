@@ -28,6 +28,7 @@ from ..maps.ebsd import EBSD
 from ..maps.intragranular import IDENTITY, latticeLookup, mapLattice, mapPairs, neighbourAt, neighbourBall
 from ..maps.lattice import lattice
 from .variational import EBSDFilter, l1TVFilter, solveField, variationalFilter
+from ..geometry.install import install
 
 
 def _conj(q):
@@ -45,32 +46,32 @@ class windowFilter(EBSDFilter):
     return [("neighbours", self.numNeighbours)]
 
 
-# the mean of the neighbourhood, the fastest filter and the one that blurs a boundary most
 class meanFilter(windowFilter):
+  """the mean of the neighbourhood, the fastest filter and the one that blurs a boundary most"""
   pass
 
 
-# the componentwise median of the neighbourhood, which takes a wild pixel out without
-# pulling the boundary after it
 class medianFilter(windowFilter):
+  """the componentwise median of the neighbourhood, which takes a wild pixel out without
+  pulling the boundary after it"""
   pass
 
 
-# the mean of the most homogeneous of the four quadrants of the window, which smooths within
-# a grain and leaves a step where one is
 class KuwaharaFilter(windowFilter):
+  """the mean of the most homogeneous of the four quadrants of the window, which smooths within
+  a grain and leaves a step where one is"""
   pass
 
 
 # ------------------------------------------------------------------ the field
 
-# the components a filter works within, the neighbour pairs inside them, which pixels carry
-# a measurement and, for the ones that do not, the measured pixel nearest to them. The
-# components are the grains where the map knows them and the phases where it does not. A
-# pixel with no measurement joins the component that reaches it first over the lattice,
-# which is all the flood fill decides, and one the outside of the map reaches without
-# crossing a measurement joins none: it was never inside the scan
 def smoothingGraph(ebsd, fill=False, extrapolate=False):
+  """the components a filter works within, the neighbour pairs inside them, which pixels carry
+  a measurement and, for the ones that do not, the measured pixel nearest to them. The
+  components are the grains where the map knows them and the phases where it does not. A
+  pixel with no measurement joins the component that reaches it first over the lattice,
+  which is all the flood fill decides, and one the outside of the map reaches without
+  crossing a measurement joins none: it was never inside the scan"""
   l = mapLattice(ebsd)
   lk, m = latticeLookup(l), mapPairs(ebsd)
   n = len(l.ij)
@@ -129,9 +130,9 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   return comp, edges, isData, source
 
 
-# the pixels no measurement encloses: those the outside of the map reaches over the lattice
-# without crossing a measured pixel
 def outsideMask(l, lk, isData):
+  """the pixels no measurement encloses: those the outside of the map reaches over the lattice
+  without crossing a measured pixel"""
   n = len(l.ij)
   ij = l.ij
   border = (ij[:, 0] == 0) | (ij[:, 1] == 0) | (ij[:, 0] == lk.shape[0] - 1) | (ij[:, 1] == lk.shape[1] - 1)
@@ -150,10 +151,10 @@ def outsideMask(l, lk, isData):
   return out
 
 
-# every pixel as a tangent vector at the mean orientation of its own component, so that a
-# difference within a component is a difference of vectors; the mean is taken over the
-# measured pixels alone, and a pixel without a measurement starts at it and is solved for
 def tangentField(ebsd, comp, isData):
+  """every pixel as a tangent vector at the mean orientation of its own component, so that a
+  difference within a component is a difference of vectors; the mean is taken over the
+  measured pixels alone, and a pixel without a measurement starts at it and is solved for"""
   m = mapPairs(ebsd)
   n = len(comp)
   nc = int(comp.max(initial=0))
@@ -285,12 +286,12 @@ def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
 
 # ------------------------------------------------------------------ smooth and fill
 
-# the map with every orientation replaced by one computed from its neighbours, within the
-# grains where the map knows them and within the phases where it does not. fill solves for
-# the pixels that carry no measurement as well, fill=grains only for those inside a grain; a window filter can solve for nothing, so
-# there the holes are closed by fill first. props names the numeric properties smoothed
-# along with the orientations, none by default
 def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
+  """the map with every orientation replaced by one computed from its neighbours, within the
+  grains where the map knows them and within the phases where it does not. fill solves for
+  the pixels that carry no measurement as well, fill=grains only for those inside a grain; a window filter can solve for nothing, so
+  there the holes are closed by fill first. props names the numeric properties smoothed
+  along with the orientations, none by default"""
   F = l1TVFilter() if F is None else F
   window = isinstance(F, windowFilter)
   out = ebsd.fill(grains=fill if hasattr(fill, "checkInside") else None, extrapolate=extrapolate) if fill and window else ebsd.copy()
@@ -303,14 +304,14 @@ def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
   return out
 
 
-# the map with every pixel that carries no measurement solved for, the measured ones left
-# exactly as they are: the hole is filled with the continuation of the field that encloses
-# it. A pixel the outside reaches without crossing a measurement stays empty, unless
-# extrapolate. The numeric properties are filled by the same solve, the labels copied from
-# the nearest measured pixel. fill(ebsd, grains), MATLAB's form, fills a pixel only from the
-# grain whose polygon holds it: one inside no grain becomes notIndexed, one its grain's
-# measurements do not reach over the lattice takes the grain's mean orientation
 def fill(ebsd, F=None, grains=None, extrapolate=False):
+  """the map with every pixel that carries no measurement solved for, the measured ones left
+  exactly as they are: the hole is filled with the continuation of the field that encloses
+  it. A pixel the outside reaches without crossing a measurement stays empty, unless
+  extrapolate. The numeric properties are filled by the same solve, the labels copied from
+  the nearest measured pixel. fill(ebsd, grains), MATLAB's form, fills a pixel only from the
+  grain whose polygon holds it: one inside no grain becomes notIndexed, one its grain's
+  measurements do not reach over the lattice takes the grain's mean orientation"""
   if F is not None and hasattr(F, "checkInside"):
     F, grains = None, F
   F = l1TVFilter() if F is None else F
@@ -404,9 +405,9 @@ def _solveProperty(ebsd, key, F, comp, edges, isData, pin):
 
 # ------------------------------------------------------------------ repair
 
-# the map with every pixel of a grain given the mean orientation of that grain, which is the
-# map the grains describe rather than the one they were built from
 def fillByGrainId(ebsd, grains):
+  """the map with every pixel of a grain given the mean orientation of that grain, which is the
+  map the grains describe rather than the one they were built from"""
   if "grainId" not in ebsd.prop:
     raise ValueError("the map carries no grain id; reconstruct it with calcGrains(ebsd)")
   out = ebsd.copy()
@@ -420,8 +421,8 @@ def fillByGrainId(ebsd, grains):
   return out
 
 
-# every n-th measurement along each lattice direction, which is the map at a coarser step
 def reduce(ebsd, fak=2):
+  """every n-th measurement along each lattice direction, which is the map at a coarser step"""
   if fak < 1:
     raise ValueError("the factor of a reduction is at least one")
   l = mapLattice(ebsd)
@@ -433,13 +434,13 @@ def reduce(ebsd, fak=2):
   return out
 
 
-# the map read at positions of one's own choosing: the field is filled where it has holes,
-# by the same solver smooth and fill use, and interpolated within the lattice cell each
-# position falls in, linearly in the tangent space of the component the nearest measurement
-# belongs to and over the corners that belong to it as well, so nothing is averaged across a
-# grain boundary. A position no measured corner surrounds takes the nearest measurement
-# where extrapolate allows it, and is empty otherwise
 def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):
+  """the map read at positions of one's own choosing: the field is filled where it has holes,
+  by the same solver smooth and fill use, and interpolated within the lattice cell each
+  position falls in, linearly in the tangent space of the component the nearest measurement
+  belongs to and over the corners that belong to it as well, so nothing is averaged across a
+  grain boundary. A position no measured corner surrounds takes the nearest measurement
+  where extrapolate allows it, and is empty otherwise"""
   if y is not None:
     pos = np.stack([np.asarray(pos, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)], axis=1)
   src = ebsd.fill(F) if fill else ebsd
@@ -500,6 +501,6 @@ def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):
 
 
 for _name, _f in (("smooth", smooth), ("fill", fill), ("fillByGrainId", fillByGrainId), ("reduce", reduce), ("subsample", reduce), ("interp", interp)):
-  setattr(EBSD, _name, _f)
+  install(EBSD, _f, _name)
 
 __all__ = ["meanFilter", "medianFilter", "KuwaharaFilter"]

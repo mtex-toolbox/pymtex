@@ -1,9 +1,12 @@
 # the tensor layer: the tensor container over the geometry, its algebra and the physical tensors
-import importlib as _importlib
+from .tensor import (tensor, stiffnessTensor, complianceTensor, stressTensor, strainTensor, strainRateTensor,
+                     deformationGradientTensor, velocityGradientTensor, spinTensor, curvatureTensor,
+                     dislocationDensityTensor, ChristoffelTensor, refractiveIndexTensor, SchmidTensor, EinsteinSum,
+                     colon, doubleContract, dyad, Voigt, Kelvin, times, checkSymmetry, directionalMagnitude, sym,
+                     antiSym, trace, eig, expm, logm, sqrtm, svd)
 
-__all__ = []
-for _name in ("tensor",):
-  _module = _importlib.import_module(f"{__name__}.{_name}")
-  for _public in _module.__all__:
-    globals()[_public] = getattr(_module, _public)
-  __all__ += _module.__all__
+__all__ = ["tensor", "stiffnessTensor", "complianceTensor", "stressTensor", "strainTensor", "strainRateTensor",
+           "deformationGradientTensor", "velocityGradientTensor", "spinTensor", "curvatureTensor",
+           "dislocationDensityTensor", "ChristoffelTensor", "refractiveIndexTensor", "SchmidTensor", "EinsteinSum",
+           "colon", "doubleContract", "dyad", "Voigt", "Kelvin", "times", "checkSymmetry", "directionalMagnitude",
+           "sym", "antiSym", "trace", "eig", "expm", "logm", "sqrtm", "svd"]

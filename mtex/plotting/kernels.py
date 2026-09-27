@@ -29,12 +29,12 @@ def _parallel(name, f):
 
 # ------------------------------------------------------------------ the colour of a map
 
-# the key of a map is read off a cube map of the sphere: a direction falls on the face of its
-# largest component, and its place there is the other two components over that one, in
-# [-1, 1] and cut into n cells a side. The node is two divisions away, where a grid of rings
-# needs an arccos and an arctan2. Face f is the axis f // 2, positive for even f; its cells
-# run over the other two axes in increasing order
 def cubeMapNodes(n):
+  """the key of a map is read off a cube map of the sphere: a direction falls on the face of its
+  largest component, and its place there is the other two components over that one, in
+  [-1, 1] and cut into n cells a side. The node is two divisions away, where a grid of rings
+  needs an arccos and an arctan2. Face f is the axis f // 2, positive for even f; its cells
+  run over the other two axes in increasing order"""
   t = (np.arange(n) + 0.5) / n * 2 - 1
   U, V = np.meshgrid(t, t, indexing="ij")
   faces = []
@@ -48,8 +48,8 @@ def cubeMapNodes(n):
   return p / np.linalg.norm(p, axis=1, keepdims=True)
 
 
-# the node of every direction, -1 for a zero or NaN one; the array form of the loop below
 def cubeMapIndex(xyz, n):
+  """the node of every direction, -1 for a zero or NaN one; the array form of the loop below"""
   xyz = np.asarray(xyz, dtype=float).reshape(-1, 3)
   a = np.abs(xyz)
   axis = np.argmax(a, axis=1)
@@ -94,8 +94,8 @@ def _ipfGridColorsLoop(q, sub, d, n, colors, blank, out):
     out[i, 0], out[i, 1], out[i, 2] = colors[node, 0], colors[node, 1], colors[node, 2]
 
 
-# whether the compiled route ran; the caller colours through the grid itself when it did not
 def ipfGridColors(q, sub, d, n, colors, out, blank=(1.0, 1.0, 1.0)):
+  """whether the compiled route ran; the caller colours through the grid itself when it did not"""
   if backend() == "numpy":
     return False
   q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)

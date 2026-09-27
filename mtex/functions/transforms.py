@@ -156,9 +156,9 @@ def _mirrorSign(L, real, folds):
   return np.where((l[:, None] + k[None, :]) % 2, -1.0, 1.0)
 
 
-# the compiled kernels of mtex/functions/kernels.py on the quadrant table, or the NumPy form
-# degree by degree on the full matrices of halfPiDegrees or of the degrees given
 def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
+  """the compiled kernels of mtex/functions/kernels.py on the quadrant table, or the NumPy form
+  degree by degree on the full matrices of halfPiDegrees or of the degrees given"""
   cdtype = _complexType(np.asarray(fhat).dtype)
   fhat = np.ascontiguousarray(fhat, dtype=cdtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
@@ -181,11 +181,11 @@ def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
   return G
 
 
-# the adjoint: fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk} d_n^{jl} h[l, k, -j] for
-# h = sum_m w_m v_m e^{i(k alpha + j beta + l gamma)}; for real values only l >= 0 is given and
-# the rest follows from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA
-# and k by rB, since the projection of H5 zeroes the rest anyway
 def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None):
+  """the adjoint: fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk} d_n^{jl} h[l, k, -j] for
+  h = sum_m w_m v_m e^{i(k alpha + j beta + l gamma)}; for real values only l >= 0 is given and
+  the rest follows from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA
+  and k by rB, since the projection of H5 zeroes the rest anyway"""
   cdtype = H.dtype
   rdtype = np.dtype(cdtype).type(0).real.dtype
   fhat = np.zeros(deg2dim(L + 1), dtype=cdtype)
@@ -236,9 +236,9 @@ def sphericalTransform(fhat, L, real=False, degrees=None):
   return G
 
 
-# the adjoint: fhat_l^m = sqrt((2l+1)/4pi) i^m sum_j d_l^{jm} d_l^{j0} h[m, -j] for
-# h[m, j] = sum_q w_q v_q e^{-i(m rho_q - j theta_q)}
 def sphericalTransformAdjoint(H, L, real=False, degrees=None):
+  """the adjoint: fhat_l^m = sqrt((2l+1)/4pi) i^m sum_j d_l^{jm} d_l^{j0} h[m, -j] for
+  h[m, j] = sum_q w_q v_q e^{-i(m rho_q - j theta_q)}"""
   H = np.asarray(H)
   if backend() == "numba" and degrees is None:
     return sphericalAdjoint(H, L, real)
@@ -260,9 +260,9 @@ def sphericalTransformAdjoint(H, L, real=False, degrees=None):
 # ------------------------------------------------------------------ real coefficient vectors
 
 
-# a coefficient vector is real valued when fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}) on
-# SO(3), fhat_l^{-m} = (-1)^m conj(fhat_l^m) on S2, c_{-k} = conj(c_k) on S1
 def isRealWigner(fhat, tol=1e-10):
+  """a coefficient vector is real valued when fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}) on
+  SO(3), fhat_l^{-m} = (-1)^m conj(fhat_l^m) on S2, c_{-k} = conj(c_k) on S1"""
   return realDefectWigner(fhat, tol)
 
 
@@ -393,11 +393,11 @@ class _FourierPlan:
     return self._fromNFFT(p.adjoint(), real)
 
 
-# on SO(3): folds says that the function is invariant under those z folds on the two sides:
-# in the forward its coefficients outside them are zero, in the adjoint the projection of H5
-# is about to zero them. Both directions then run on the reduced index set, where the two
-# periodic axes of the array shrink by the folds and the nodes are stretched
 class SO3FourierPlan(_FourierPlan):
+  """on SO(3): folds says that the function is invariant under those z folds on the two sides:
+  in the forward its coefficients outside them are zero, in the adjoint the projection of H5
+  is about to zero them. Both directions then run on the reduced index set, where the two
+  periodic axes of the array shrink by the folds and the nodes are stretched"""
 
   def __init__(self, rots, L, real=True, folds=(1, 1), eps=None, upsampfac=None):
     q = _quaternions(rots)
@@ -413,9 +413,9 @@ class SO3FourierPlan(_FourierPlan):
     G = wignerTransform(np.asarray(fhat, dtype=self.dtype), self.L, self.real, self.folds)
     return self._nfftEvaluate(G) if self._useNFFT("forward") else self._evaluate(G)
 
-  # coefficients from weighted values at the nodes; the NFFT reads real values on half the
-  # lattice
   def adjoint(self, values, weights):
+    """coefficients from weighted values at the nodes; the NFFT reads real values on half the
+    lattice"""
     values = np.asarray(values).ravel()
     if self._useNFFT("adjoint"):
       real = values.dtype.kind != "c"
@@ -484,8 +484,8 @@ class S2FourierPlan(_FourierPlan):
     return (fh[1:, :] if real else fh[1:, 1:]).T
 
 
-# the circle: f(x) = sum_{k=-L}^{L} c_k e^{ikx}
 class S1FourierPlan:
+  """the circle: f(x) = sum_{k=-L}^{L} c_k e^{ikx}"""
 
   def __init__(self, x, L, eps=None):
     x = np.asarray(x).ravel()
@@ -610,9 +610,9 @@ class SO3GridPlan:
     return wignerTransformAdjoint(_unwrapPolar(X, L), L, real, self.folds)
 
 
-# the sphere: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}, theta a transform of length
-# 4Lg cut to the grid's rows, rho one of the grid's length, real valued for a real function
 class S2GridPlan:
+  """the sphere: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}, theta a transform of length
+  4Lg cut to the grid's rows, rho one of the grid's length, real valued for a real function"""
 
   def __init__(self, g, L=None, real=False):
     L = g.bandwidth if L is None else int(L)
@@ -654,9 +654,9 @@ class S2GridPlan:
     return sphericalTransformAdjoint(_unwrapPolar(X, L), L, real)
 
 
-# the plan for a node set: the NUFFT at arbitrary nodes, the FFT on a Clenshaw-Curtis grid,
-# the NUFFT on the nodes of a grid whose polar rule is not equispaced
 def wignerPlan(nodes, L, real=True, folds=(1, 1)):
+  """the plan for a node set: the NUFFT at arbitrary nodes, the FFT on a Clenshaw-Curtis grid,
+  the NUFFT on the nodes of a grid whose polar rule is not equispaced"""
   if isinstance(nodes, quadratureSO3Grid):
     return SO3GridPlan(nodes, L, real) if nodes.scheme == "ClenshawCurtis" else SO3FourierPlan(nodes.nodes(), L, real, nodes.folds)
   return SO3FourierPlan(nodes, L, real, folds)
@@ -671,9 +671,9 @@ def sphericalPlan(nodes, L, real=False):
 # ------------------------------------------------------------------ evaluation and adjoint with the cost rule
 
 
-# the series at every rotation of a container or on a quadrature grid; the direct sum below
-# DIRECT_SUM_NODES nodes, and a grid that cannot hold the bandwidth is evaluated at its nodes
 def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
+  """the series at every rotation of a container or on a quadrature grid; the direct sum below
+  DIRECT_SUM_NODES nodes, and a grid that cannot hold the bandwidth is evaluated at its nodes"""
   fhat = np.asarray(fhat)
   L = dim2deg(fhat.shape[-1])
   real = isRealWigner(fhat) if real is None else real
@@ -689,9 +689,9 @@ def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
   return f[()] if f.ndim == 0 else f
 
 
-# coefficients from weighted values: the adjoint sum below DIRECT_SUM_NODES nodes; a
-# quadrature grid brings the weights of its rule
 def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
+  """coefficients from weighted values: the adjoint sum below DIRECT_SUM_NODES nodes; a
+  quadrature grid brings the weights of its rule"""
   values = np.asarray(values).ravel()
   if isinstance(rots, quadratureSO3Grid):
     weights = rots.weights if weights is None else weights

@@ -10,6 +10,7 @@
 # container. Products do not renormalise; construction from user input does.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
@@ -61,9 +62,9 @@ class quaternion(MtexArray):
   def id(cls):
     return cls(1.0, 0.0, 0.0, 0.0)
 
-  # quaternion.eye: MATLAB's other name of the identity
   @classproperty
   def eye(cls):
+    """quaternion.eye: MATLAB's other name of the identity"""
     return cls(1.0, 0.0, 0.0, 0.0)
 
   @classmethod
@@ -71,11 +72,11 @@ class quaternion(MtexArray):
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (4,), np.nan))
 
-  # uniformly distributed rotations, the Haar measure; with maxAngle restricted to the ball
-  # of that rotational angle about the identity, the angle by inverting its distribution
-  # (w - sin w) / pi, the axis uniform
   @classmethod
   def rand(cls, *shape, rng=None, maxAngle=None):
+    """uniformly distributed rotations, the Haar measure; with maxAngle restricted to the ball
+    of that rotational angle about the identity, the angle by inverting its distribution
+    (w - sin w) / pi, the axis uniform"""
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     if maxAngle is not None and maxAngle < np.pi:
@@ -181,13 +182,13 @@ class quaternion(MtexArray):
   def normalize(self):
     return self._new(self.data / self.norm()[..., None])
 
-  # the inner product of the coefficients
   def dot(self, other, noAntipodal=False):
+    """the inner product of the coefficients"""
     return np.sum(self.data * self._coerce(other).data, axis=-1)
 
-  # the rotational angle in [0, pi], or the angle between two, both from atan2 forms that
-  # keep their digits near 0 and pi
   def angle(self, other=None):
+    """the rotational angle in [0, pi], or the angle between two, both from atan2 forms that
+    keep their digits near 0 and pi"""
     if other is None:
       return quatAngle(self.data)
     d = np.sum(self.data * other.data[..., :4], axis=-1)
@@ -239,21 +240,21 @@ class quaternion(MtexArray):
   def cubochoric(self):
     return vector3d(homo2cubo(quat2homochoric(self.data)))
 
-  # the tangent vector pointing from the reference, the identity by default, to this rotation
   def log(self, ref=None, side="left"):
+    """the tangent vector pointing from the reference, the identity by default, to this rotation"""
     from .tangent import logRotation
     return logRotation(self, ref, side)
 
-  # the rotation a tangent vector at this reference points to, exp(ori, v) of MATLAB
   def exp(self, v, side=None):
+    """the rotation a tangent vector at this reference points to, exp(ori, v) of MATLAB"""
     from .tangent import SO3TangentVector
     # a tangent vector carries its reference, which is this rotation
     if isinstance(v, SO3TangentVector):
       return v.exp()
     return v.exp(self, side)
 
-  # the point at s in [0, 1] on the shortest path from this rotation to another
   def geodesic(self, other, s):
+    """the point at s in [0, 1] on the shortest path from this rotation to another"""
     from .tangent import geodesic
     return geodesic(self, other, s)
 
@@ -274,10 +275,10 @@ class quaternion(MtexArray):
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
 
-  # the mean: the principal eigenvector of the moment matrix, quaternion/mean
-  # interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
-  # values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp
   def interp(self, values=None, *flags, **kwargs):
+    """the mean: the principal eigenvector of the moment matrix, quaternion/mean
+    interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
+    values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp"""
     from ..functions.rbfinterpolation import interpSO3
     return interpSO3(self, values, *flags, **kwargs)
 
@@ -300,9 +301,9 @@ class quaternion(MtexArray):
         return self._new(q[keep]).mean(weights=None if weights is None else w[keep], robust=True)
     return m
 
-  # the mean angular deviation from the mean, quaternion/std; for orientations the angle is
-  # the symmetry-reduced one, as the mean is
   def std(self, weights=None, robust=False):
+    """the mean angular deviation from the mean, quaternion/std; for orientations the angle is
+    the symmetry-reduced one, as the mean is"""
     if self.size == 0:
       return float("nan")
     m = self.mean(weights=weights, robust=robust)
@@ -373,9 +374,9 @@ class rotation(quaternion):
   def byAxisAngle(cls, v, omega):
     return cls._fromData(axis2quat(_xyz(v), omega))
 
-  # a proper orthogonal matrix, or a list of them on the leading axes
   @classmethod
   def byMatrix(cls, M):
+    """a proper orthogonal matrix, or a list of them on the leading axes"""
     M = np.asarray(M, dtype=float)
     if np.any(np.linalg.det(M) < 0):
       raise ValueError("the matrix has determinant -1; use orthogonalTransform.byMatrix")
@@ -393,17 +394,17 @@ class rotation(quaternion):
   def byCubochoric(cls, v):
     return cls._fromData(homochoric2quat(cubo2homo(_xyz(v))))
 
-  # the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2
   @classmethod
   def map(cls, u1, v1, u2=None, v2=None):
+    """the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2"""
     if u2 is None:
       return cls._fromData(map1Kernel(_xyz(u1), _xyz(v1)))
     return cls._fromData(map2Kernel(_xyz(u1), _xyz(v1), _xyz(u2), _xyz(v2)))
 
-  # the rotation best mapping the list u onto the list v, by Horn's quaternion method or
-  # Kabsch's matrix method
   @classmethod
   def fit(cls, u, v, weights=None, method="horn"):
+    """the rotation best mapping the list u onto the list v, by Horn's quaternion method or
+    Kabsch's matrix method"""
     return cls._fromData(fitKernel(_xyz(u), _xyz(v), weights, method))
 
   @classmethod
@@ -429,9 +430,9 @@ class rotation(quaternion):
   def __neg__(self):
     return orthogonalTransform(self, True)
 
-  # a list joining rotations with an improper transform is an orthogonalTransform
   @classmethod
   def cat(cls, *arrays, axis=0):
+    """a list joining rotations with an improper transform is an orthogonalTransform"""
     if any(isinstance(a, orthogonalTransform) for a in arrays):
       return orthogonalTransform.cat(*(a if isinstance(a, orthogonalTransform) else orthogonalTransform(a) for a in arrays), axis=axis)
     return super().cat(*arrays, axis=axis)
@@ -439,8 +440,8 @@ class rotation(quaternion):
   def inv(self):
     return self.conj()
 
-  # the inner product up to sign, since q and -q are one rotation
   def dot(self, other, noAntipodal=False):
+    """the inner product up to sign, since q and -q are one rotation"""
     d = np.sum(self.data * self._coerce(other).data, axis=-1)
     if isinstance(other, orthogonalTransform):
       d = d * ~other.isImproper
@@ -476,6 +477,10 @@ class rotation(quaternion):
       lines.append(self._eulerTable())
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.spaceplot import plot3d, scatterOrientations as scatter
+
 
 class orthogonalTransform(MtexArray):
   _ncoord = 5
@@ -505,9 +510,9 @@ class orthogonalTransform(MtexArray):
   def inversion(cls):
     return cls(rotation.id, True)
 
-  # an orthogonal matrix of either sign
   @classmethod
   def byMatrix(cls, M):
+    """an orthogonal matrix of either sign"""
     M = np.asarray(M, dtype=float)
     improper = np.linalg.det(M) < 0
     q = mat2quat(np.where(improper[..., None, None], -M, M))
@@ -631,8 +636,8 @@ class orthogonalTransform(MtexArray):
     return "\n".join(lines)
 
 
-# a reflection at the plane with normal n
 def reflection(n):
+  """a reflection at the plane with normal n"""
   return -rotation.byAxisAngle(n, np.pi)
 
 

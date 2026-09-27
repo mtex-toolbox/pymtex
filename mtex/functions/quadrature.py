@@ -27,16 +27,16 @@ from ..geometry.vector3d import vector3d
 SCHEMES = ("ClenshawCurtis", "GaussLegendre")
 
 
-# nodes and weights of the n point Gauss-Legendre rule on [-1, 1]; scipy's Newton iteration
-# on the asymptotic nodes, since NumPy's leggauss solves a dense eigenproblem, and scipy is
-# loaded on first use
 def gaussLegendre(n):
+  """nodes and weights of the n point Gauss-Legendre rule on [-1, 1]; scipy's Newton iteration
+  on the asymptotic nodes, since NumPy's leggauss solves a dense eigenproblem, and scipy is
+  loaded on first use"""
   from scipy.special import roots_legendre
   return roots_legendre(n)
 
 
-# Clenshaw-Curtis nodes cos(pi b/(n-1)), b = 0..n-1, and weights exact to degree n-1
 def clenshawCurtis(n):
+  """Clenshaw-Curtis nodes cos(pi b/(n-1)), b = 0..n-1, and weights exact to degree n-1"""
   if n == 1:
     return np.zeros(1), np.full(1, 2.0)
   N = n - 1
@@ -48,8 +48,8 @@ def clenshawCurtis(n):
   return np.cos(np.pi * b / N), w
 
 
-# the Legendre polynomials P_0(x) .. P_L(x) by their recurrence, in front of the shape of x
 def legendreP(L, x):
+  """the Legendre polynomials P_0(x) .. P_L(x) by their recurrence, in front of the shape of x"""
   x = np.asarray(x)
   x = x if x.dtype.kind == "f" else x.astype(float)
   P = np.empty((L + 1, *x.shape), dtype=x.dtype)
@@ -69,15 +69,15 @@ def _polarRule(scheme, L):
   raise ValueError(f"the scheme is 'ClenshawCurtis' or 'GaussLegendre', not '{scheme}'")
 
 
-# the z folds on the crystal and on the specimen side: the order of the rotation about z
-# that leaves the frame's group invariant
 def folds(CS, SS=None):
+  """the z folds on the crystal and on the specimen side: the order of the rotation about z
+  that leaves the frame's group invariant"""
   SS = specimenFrame.default if SS is None else SS
   return (CS.sym.multiplicityZ, SS.sym.multiplicityZ)
 
 
-# the smallest bandwidth at least L whose 2L+2 the folds divide
 def bandwidthFor(L, rA, rB=1):
+  """the smallest bandwidth at least L whose 2L+2 the folds divide"""
   if isinstance(rA, referenceFrame):
     rA, rB = folds(rA, rB if isinstance(rB, referenceFrame) else None)
   r = math.lcm(int(rA), int(rB))
@@ -125,8 +125,8 @@ class quadratureSO3Grid:
   def __len__(self):
     return math.prod(self.shape)
 
-  # the nodes as orientations in the frames of the grid, beta fastest, then alpha, then gamma
   def nodes(self):
+    """the nodes as orientations in the frames of the grid, beta fastest, then alpha, then gamma"""
     g, a, b = np.meshgrid(self.gamma, self.alpha, self.beta, indexing="ij")
     r = rotation.byEuler(a.ravel(), b.ravel(), g.ravel(), "Matthies")
     return r if self.CS is None else orientation(r, self.CS, self.SS if self.SS is not None else specimenFrame.default)
@@ -135,11 +135,11 @@ class quadratureSO3Grid:
   def weights(self):
     return np.broadcast_to(self.wbeta, self.shape).ravel()
 
-  # MATLAB's view of the grid: the nodes that differ under the symmetries, on which an
-  # evaluator need be called, and the full grid; two nodes are one when their symmetric
-  # equivalents coincide, the largest equivalent quaternion up to sign the key
   @property
   def fullGrid(self):
+    """MATLAB's view of the grid: the nodes that differ under the symmetries, on which an
+    evaluator need be called, and the full grid; two nodes are one when their symmetric
+    equivalents coincide, the largest equivalent quaternion up to sign the key"""
     return self.nodes()
 
   def _unique(self):
@@ -170,17 +170,17 @@ class quadratureSO3Grid:
         self._uniqueInverse = np.searchsorted(self._uniqueIndex, first)[inverse.ravel()]
     return self._uniqueIndex, self._uniqueInverse
 
-  # the number of the distinct nodes, MATLAB's numel(grid)
   @property
   def size(self):
+    """the number of the distinct nodes, MATLAB's numel(grid)"""
     return len(self._unique()[0])
 
-  # the distinct nodes, MATLAB's grid(:)
   def flatten(self):
+    """the distinct nodes, MATLAB's grid(:)"""
     return self.nodes().flatten()[self._unique()[0]]
 
-  # values at the distinct nodes spread onto the full grid, values at the full grid kept
   def fullValues(self, values):
+    """values at the distinct nodes spread onto the full grid, values at the full grid kept"""
     values = np.asarray(values)
     # values at every node need no distinct nodes, which take seconds to find
     if values.shape[0] == len(self):
@@ -219,26 +219,26 @@ class quadratureS2Grid(vector3d):
       setattr(obj, name, attrs.pop(name, getattr(self, name)))
     return obj
 
-  # the shape of the nodes over the axes, rho by theta
   @property
   def gridShape(self):
+    """the shape of the nodes over the axes, rho by theta"""
     return (len(self.rhoGrid), len(self.thetaGrid))
 
-  # the nodes as a plain list of directions
   def nodes(self):
+    """the nodes as a plain list of directions"""
     return self._new(self.data)
 
-  # the weights integrate to 4 pi, the surface measure of the sphere
   @property
   def weights(self):
+    """the weights integrate to 4 pi, the surface measure of the sphere"""
     return np.broadcast_to(self.wtheta, self.gridShape).ravel()
 
   def __repr__(self):
     return f"quadratureS2Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}"
 
 
-# the circle: 2L+2 equispaced nodes with equal weights integrate degree 2L+1 exactly
 class quadratureS1Grid:
+  """the circle: 2L+2 equispaced nodes with equal weights integrate degree 2L+1 exactly"""
 
   def __init__(self, bandwidth, dtype=np.float64):
     self.bandwidth = int(bandwidth)

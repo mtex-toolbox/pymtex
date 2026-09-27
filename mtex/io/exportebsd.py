@@ -51,8 +51,8 @@ def channelCode(fr):
   return CHANNEL_LAUE.index(name) + 1 if name in CHANNEL_LAUE else 1
 
 
-# a value the header of the file the map came from states, under any of the names given
 def headerValue(ebsd, names, default):
+  """a value the header of the file the map came from states, under any of the names given"""
   h = ebsd.meta.get("header")
   if not isinstance(h, dict):
     return default
@@ -77,24 +77,24 @@ def _headerNumber(ebsd, names, default):
     return default
 
 
-# the first property the format names, under any of the names the vendors give it
 def propertyColumn(ebsd, names, default):
+  """the first property the format names, under any of the names the vendors give it"""
   for name in names:
     if name in ebsd.prop:
       return np.asarray(ebsd.prop[name], dtype=float).reshape(-1)
   return np.full(ebsd.size, float(default))
 
 
-# the step of a grid, the smallest step actually between two of its coordinates
 def gridStep(values):
+  """the step of a grid, the smallest step actually between two of its coordinates"""
   u = np.unique(np.round(values, 6))
   return float(np.diff(u).min()) if len(u) > 1 else 1.0
 
 
-# the scan a header states: the two steps, the points of the first two rows and the rows;
-# from the lattice where the map has one, since a hexagonal scan's x coordinates are half
-# a step apart between its rows, and from the coordinates otherwise
 def scanOf(ebsd):
+  """the scan a header states: the two steps, the points of the first two rows and the rows;
+  from the lattice where the map has one, since a hexagonal scan's x coordinates are half
+  a step apart between its rows, and from the coordinates otherwise"""
   pos = ebsd.pos.data.reshape(-1, 3)
   xs, ys = pos[:, 0], pos[:, 1]
   l = ebsd.lattice
@@ -113,11 +113,11 @@ def scanOf(ebsd):
   return stepX, stepY, nOdd, nEven, nRows, hex
 
 
-# the phase numbers a file writes: the phases the map measures, from one, and zero where
-# nothing was indexed. Only the phases that occur are declared: a file that declares a phase
-# it never uses cannot be told from one that counts its phases from zero, and the rule that
-# decides it is the reader's, so the writer does not leave it the choice.
 def exportPhaseNumbers(ebsd):
+  """the phase numbers a file writes: the phases the map measures, from one, and zero where
+  nothing was indexed. Only the phases that occur are declared: a file that declares a phase
+  it never uses cannot be told from one that counts its phases from zero, and the rule that
+  decides it is the reader's, so the writer does not leave it the choice."""
   ids = ebsd.phaseId.reshape(-1)
   present = np.unique(ids)
   indexed = [int(j) for j in present if ebsd.CSList.isIndexed(int(j))]
@@ -351,9 +351,9 @@ def _writeValue(f, path, value):
   return True
 
 
-# the phase numbers the file writes: the shift the import added taken out again, and the
-# marker the vendor writes where nothing was indexed, -1 in a signed column, the largest value else
 def h5PhaseColumn(ids, dtype, zeroBased, shift):
+  """the phase numbers the file writes: the shift the import added taken out again, and the
+  marker the vendor writes where nothing was indexed, -1 in a signed column, the largest value else"""
   ids = np.asarray(ids, dtype=np.int64)
   marker = -1 if dtype.kind == "i" else (np.iinfo(dtype).max if dtype.kind == "u" else 255)
   out = ids - shift

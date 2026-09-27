@@ -15,17 +15,19 @@
 # images is a mapImageList, a Python list that displays as MATLAB's table.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.frames import specimenFrame
 from ..geometry.gridlayout import gridLayout, layoutIndex
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import vector3d
+from ..geometry.install import install
 
 
-# the frame of an image nothing locates yet: axes iX, iY, iZ, which every display shows as
-# the image's own, and a fresh instance each time, so that two images never share one
 def ownFrame():
+  """the frame of an image nothing locates yet: axes iX, iY, iZ, which every display shows as
+  the image's own, and a fresh instance each time, so that two images never share one"""
   return specimenFrame("image", axesNames=("iX", "iY", "iZ"), how2plot=plottingConvention.ij)
 
 
@@ -122,9 +124,9 @@ class mapImage:
   def d2(self, v):
     self._d2 = _vec(v)
 
-  # the centre of every pixel, (rows, cols)
   @property
   def pos(self):
+    """the centre of every pixel, (rows, cols)"""
     return vector3d(self._posData())
 
   def _posData(self):
@@ -168,24 +170,24 @@ class mapImage:
   def __array__(self, dtype=None, copy=None):
     return self.img if dtype is None else self.img.astype(dtype)
 
-  # [xmin, xmax, ymin, ymax, zmin, zmax] of the pixel centres
   def extent(self):
+    """[xmin, xmax, ymin, ymax, zmin, zmax] of the pixel centres"""
     r, c = self.gridSize()
     C = self._origin + np.array([0, 0, r - 1, r - 1])[:, None] * self._d1 + np.array([0, c - 1, 0, c - 1])[:, None] * self._d2
     return np.array([C[:, 0].min(), C[:, 0].max(), C[:, 1].min(), C[:, 1].max(), C[:, 2].min(), C[:, 2].max()])
 
-  # where positions sit in grid coordinates, fractional rows and columns from zero; the steps
-  # are perpendicular, so each is one projection
   def gridCoordinates(self, pos):
+    """where positions sit in grid coordinates, fractional rows and columns from zero; the steps
+    are perpendicular, so each is one projection"""
     P = np.asarray(pos.data if isinstance(pos, vector3d) else pos, dtype=float)
     if P.shape[-1] == 2:
       P = np.concatenate([P, np.zeros(P.shape[:-1] + (1,))], axis=-1)
     R = P - self._origin
     return R @ self._d1 / (self._d1 @ self._d1), R @ self._d2 / (self._d2 @ self._d2)
 
-  # the pixel covering each position: row and column, not clipped, and whether it lies on the
-  # grid; linear=True the index into the flattened grid, -1 outside
   def pos2ind(self, pos, linear=False):
+    """the pixel covering each position: row and column, not clipped, and whether it lies on the
+    grid; linear=True the index into the flattened grid, -1 outside"""
     u, v = self.gridCoordinates(pos)
     i, j = np.floor(u + 0.5).astype(np.int64), np.floor(v + 0.5).astype(np.int64)
     r, c = self.gridSize()
@@ -194,9 +196,9 @@ class mapImage:
       return np.where(inside, i * c + j, -1)
     return i, j, inside
 
-  # the image values at positions: bilinear on the grid by default, 'nearest' or 'cubic';
-  # outside the grid NaN, or the nearest border value with extrapolationMethod='nearest'
   def interp(self, pos, method="linear", extrapolationMethod="none"):
+    """the image values at positions: bilinear on the grid by default, 'nearest' or 'cubic';
+    outside the grid NaN, or the nearest border value with extrapolationMethod='nearest'"""
     u, v = self.gridCoordinates(pos)
     shape = u.shape
     u, v = u.reshape(-1), v.reshape(-1)
@@ -226,9 +228,9 @@ class mapImage:
     out[outside] = np.nan
     return out.reshape(shape) if img.shape[2] == 1 else out.reshape(shape + (img.shape[2],))
 
-  # a rectangle cut out, rows and cols contiguous and ascending, or the box round a mask; the
-  # map riding along is cut with it and the origin moves, nothing is resampled
   def subGrid(self, rows, cols=None):
+    """a rectangle cut out, rows and cols contiguous and ascending, or the box round a mask; the
+    map riding along is cut with it and the origin moves, nothing is resampled"""
     if cols is None:
       mask = np.asarray(rows, dtype=bool)
       rr, cc = np.flatnonzero(mask.any(axis=1)), np.flatnonzero(mask.any(axis=0))
@@ -259,6 +261,28 @@ class mapImage:
   def __repr__(self):
     return repr(mapImageList([self]))
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from ..plotting.mapplot import plotMapImage as plot
+    def rescale(self, lo=0.0, hi=1.0, perChannel=False) -> Any:
+      """the values stretched to [lo, hi], all channels of an image together or each on its own; a
+      non finite value is left out of the range and left alone, a flat image unchanged"""
+    def imboxfilt(self, k=3) -> Any:
+      """a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
+      a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
+      movmean down the columns and then along the rows)"""
+    def edgeMap(self, padWidth=1) -> Any:
+      """the edge transform: how unlike its eight neighbours at padWidth pixels each pixel is, every
+      channel contrast normalised over its 2nd to 98th percentile, a neighbour off the image
+      differenced against zero. Absolute brightness is not comparable between a band contrast map
+      and a backscatter image, but their boundaries are, so registration correlates this"""
+    def transformReferenceFrame(self, target, *args, byScreenAlignment=False) -> Any:
+      """the images stated in a frame and laid out that way: a layout reindexes and nothing else, a
+      frame restates where they sit by the orientation given, by 'byScreenAlignment', the
+      assertion that the frames were drawn the same way up, or by nothing where the frames are
+      already related. Only a transpose and flips are applied, never a resampling"""
+
 
 # ------------------------------------------------------------------ a list of images
 
@@ -287,6 +311,23 @@ class mapImageList(list):
     same = pC is not None and all(m.how2plot is not None and m.how2plot == pC for m in self)
     head = f"mapImage ({pC.char()})" if same else "mapImage"
     return "\n".join([head, "", line(labels)] + [line(r) for r in rows])
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from ..plotting.mapplot import plotMapImage as plot
+    def rescale(self, lo=0.0, hi=1.0, perChannel=False) -> Any:
+      """the values stretched to [lo, hi], all channels of an image together or each on its own; a
+      non finite value is left out of the range and left alone, a flat image unchanged"""
+    def imboxfilt(self, k=3) -> Any:
+      """a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
+      a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
+      movmean down the columns and then along the rows)"""
+    def transformReferenceFrame(self, target, *args, byScreenAlignment=False) -> Any:
+      """the images stated in a frame and laid out that way: a layout reindexes and nothing else, a
+      frame restates where they sit by the orientation given, by 'byScreenAlignment', the
+      assertion that the frames were drawn the same way up, or by nothing where the frames are
+      already related. Only a transpose and flips are applied, never a resampling"""
 
 
 def _sizeStr(img):
@@ -337,9 +378,9 @@ def _ebsdStr(ebsd):
 
 # ------------------------------------------------------------------ the verbs
 
-# the values stretched to [lo, hi], all channels of an image together or each on its own; a
-# non finite value is left out of the range and left alone, a flat image unchanged
 def rescale(mg, lo=0.0, hi=1.0, perChannel=False):
+  """the values stretched to [lo, hi], all channels of an image together or each on its own; a
+  non finite value is left out of the range and left alone, a flat image unchanged"""
   def stretch(v):
     f = v[np.isfinite(v)]
     if f.size == 0 or f.max() <= f.min():
@@ -375,10 +416,10 @@ def _movmean(v, n, axis):
   return np.moveaxis(out, 0, axis)
 
 
-# a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
-# a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
-# movmean down the columns and then along the rows)
 def imboxfilt(mg, k=3):
+  """a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
+  a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
+  movmean down the columns and then along the rows)"""
   k = (int(k), int(k)) if np.isscalar(k) else tuple(int(x) for x in k)
   if any(x <= 0 or x % 2 == 0 for x in k):
     raise ValueError(f"the box size has to be odd and positive, got {k}")
@@ -391,11 +432,11 @@ def imboxfilt(mg, k=3):
   return _each(mg, one)
 
 
-# the edge transform: how unlike its eight neighbours at padWidth pixels each pixel is, every
-# channel contrast normalised over its 2nd to 98th percentile, a neighbour off the image
-# differenced against zero. Absolute brightness is not comparable between a band contrast map
-# and a backscatter image, but their boundaries are, so registration correlates this
 def edgeMap(mg, padWidth=1):
+  """the edge transform: how unlike its eight neighbours at padWidth pixels each pixel is, every
+  channel contrast normalised over its 2nd to 98th percentile, a neighbour off the image
+  differenced against zero. Absolute brightness is not comparable between a band contrast map
+  and a backscatter image, but their boundaries are, so registration correlates this"""
   img = np.array(mg.img, dtype=float)
   if img.ndim == 2:
     img = img[..., None]
@@ -418,11 +459,11 @@ def edgeMap(mg, padWidth=1):
   return e
 
 
-# the images stated in a frame and laid out that way: a layout reindexes and nothing else, a
-# frame restates where they sit by the orientation given, by 'byScreenAlignment', the
-# assertion that the frames were drawn the same way up, or by nothing where the frames are
-# already related. Only a transpose and flips are applied, never a resampling
 def transformReferenceFrame(mg, target, *args, byScreenAlignment=False):
+  """the images stated in a frame and laid out that way: a layout reindexes and nothing else, a
+  frame restates where they sit by the orientation given, by 'byScreenAlignment', the
+  assertion that the frames were drawn the same way up, or by nothing where the frames are
+  already related. Only a transpose and flips are applied, never a resampling"""
   from ..geometry.frametransform import byScreenAlignment as screenAlignment
   from ..geometry.quaternion import rotation
   if isinstance(target, mapImage):
@@ -461,8 +502,6 @@ def transformReferenceFrame(mg, target, *args, byScreenAlignment=False):
 
 
 for _name, _f in (("rescale", rescale), ("imboxfilt", imboxfilt), ("edgeMap", edgeMap), ("transformReferenceFrame", transformReferenceFrame)):
-  setattr(mapImage, _name, _f)
-  if _name != "edgeMap":
-    setattr(mapImageList, _name, _f)
+  install((mapImage,) if _name == "edgeMap" else (mapImage, mapImageList), _f, _name)
 
 __all__ = ["mapImage", "mapImageList", "rescale", "imboxfilt", "edgeMap"]

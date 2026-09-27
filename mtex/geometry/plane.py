@@ -11,6 +11,7 @@
 # the frame, so a plane in the specimen and a lattice plane are told apart by it.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
@@ -37,10 +38,10 @@ class plane3d:
     else:
       self.d = np.asarray(np.broadcast_to(np.asarray(d, dtype=float) / n, N.shape), dtype=float).copy()
 
-  # the plane through points: the least squares fit through their centroid, the normal
-  # the smallest principal axis of the cloud
   @staticmethod
   def byPoints(v):
+    """the plane through points: the least squares fit through their centroid, the normal
+    the smallest principal axis of the cloud"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     xyz = v.data.reshape(-1, 3)
     xyz = xyz[np.all(np.isfinite(xyz), axis=1)]
@@ -84,9 +85,9 @@ class plane3d:
 
   # ------------------------------------------------------------------ distances
 
-  # the signed distance of points to the plane, or the distance of two parallel planes,
-  # NaN where the planes meet
   def dist(self, v, tolerance=1e-8):
+    """the signed distance of points to the plane, or the distance of two parallel planes,
+    NaN where the planes meet"""
     if isinstance(v, plane3d):
       lam = self.N.dot(v.N, noSymmetry=True)
       lam = np.where(np.abs(np.abs(lam) - 1) < tolerance, lam, np.nan)
@@ -94,20 +95,20 @@ class plane3d:
     v = v if isinstance(v, vector3d) else vector3d(v)
     return self.N.dot(v, noSymmetry=True) - self.d
 
-  # the orthogonal projection of points onto the plane
   def project(self, v):
+    """the orthogonal projection of points onto the plane"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     return v - self.N * self.dist(v)
 
-  # where the segments from v1 to v2 cross the plane, NaN where they do not
   def intersect(self, v1, v2=None, tolerance=1e-13):
+    """where the segments from v1 to v2 cross the plane, NaN where they do not"""
     if v2 is None:
       v1, v2 = v1[..., 0], v1[..., 1]
     return lineIntersect(v1, v2, self.N, self.d, tolerance)
 
-  # the polygon the plane cuts out of the box from lo to hi, its corners in order around
-  # the normal; one plane only
   def clip(self, lo, hi):
+    """the polygon the plane cuts out of the box from lo to hi, its corners in order around
+    the normal; one plane only"""
     if self.size != 1:
       raise ValueError("clip one plane, plane[k]")
     lo, hi = np.asarray(lo, dtype=float).reshape(3), np.asarray(hi, dtype=float).reshape(3)
@@ -129,8 +130,8 @@ class plane3d:
       pts = pts[np.argsort(np.arctan2((pts - c) @ w, (pts - c) @ u))]
     return vector3d(pts, frame=self.N.frame)
 
-  # a rotation turns the normal, the distance stays
   def rotate(self, rot):
+    """a rotation turns the normal, the distance stays"""
     return self._new(rot * self.N, self.d)
 
   def __rmul__(self, rot):
@@ -155,9 +156,13 @@ class plane3d:
       lines.append(f"  ... {len(d) - rows} more")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.shapeplot import plotPlane as plot
 
-# where the segments from a to b cross the planes <n, v> = d, NaN where they do not
+
 def lineIntersect(a, b, n, d, tolerance=1e-13):
+  """where the segments from a to b cross the planes <n, v> = d, NaN where they do not"""
   A = a if isinstance(a, vector3d) else vector3d(a)
   B = b if isinstance(b, vector3d) else vector3d(b)
   N = n if isinstance(n, vector3d) else vector3d(n)

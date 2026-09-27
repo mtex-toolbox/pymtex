@@ -15,6 +15,7 @@ import numpy as np
 
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import refractiveIndexTensor
+from ..geometry.install import install
 
 # CIE XYZ to Adobe RGB
 ADOBE_RGB = np.array([[2.04414, -0.5649, -0.3447], [-0.9693, 1.8760, 0.0416], [0.0134, -0.1184, 1.0154]])
@@ -125,10 +126,8 @@ def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=Non
 
 
 def _install():
-  refractiveIndexTensor.refractiveIndex = lambda self, v: refractiveIndex(self, v)
-  refractiveIndexTensor.birefringence = lambda self, v=None: birefringence(self, v)
-  refractiveIndexTensor.opticalAxis = lambda self, tolerance=1e-8: opticalAxis(self, tolerance)
-  refractiveIndexTensor.spectralTransmission = lambda self, *a, **kw: spectralTransmission(self, *a, **kw)
+  for f in (refractiveIndex, birefringence, opticalAxis, spectralTransmission):
+    install(refractiveIndexTensor, f)
 
 
 _install()

@@ -437,9 +437,9 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
 __all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection", "quiverSectionField"]
 
 
-# plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
-# the sections of orientation space, MATLAB @orientationColorKey/plot
 def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False, **kw):
+  """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
+  the sections of orientation space, MATLAB @orientationColorKey/plot"""
   kind = next((a for a in args if isinstance(a, (str, ODFSections))), None)
   oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.CS1, key.CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:

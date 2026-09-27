@@ -204,8 +204,8 @@ class embeddingSpec:
   def dim(self):
     return self.basis.shape[1]
 
-  # the seeds of a projection and their images, built on first use
   def seeds(self):
+    """the seeds of a projection and their images, built on first use"""
     if self._seeds is None:
       qs = rotation(_seedRotations(self.frame))
       self._seeds = qs, _rotateBatch(self.u0, self.alpha, self.offsets, qs.matrix())
@@ -301,9 +301,9 @@ class embedding:
     self._same(other)
     return np.einsum("ij,ij->j", self.u, other.u).reshape(self.shape)
 
-  # with normalized the norm over the norm every orientation's image has; the sum of squares
-  # without a temporary, which is four times faster than np.linalg.norm on a large list
   def norm(self, normalized=False):
+    """with normalized the norm over the norm every orientation's image has; the sum of squares
+    without a temporary, which is four times faster than np.linalg.norm on a large list"""
     n = np.sqrt(np.einsum("ij,ij->j", self.u, self.u)).reshape(self.shape)
     return n / np.linalg.norm(self.spec.u0) if normalized else n
 
@@ -317,8 +317,8 @@ class embedding:
     w = np.full(self.size, 1 / self.size) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
     return self._new(self.u @ w, ())
 
-  # the images turned by a rotation
   def rotate(self, r):
+    """the images turned by a rotation"""
     Q = rotation(r.data).matrix()
     return self._new(_turnRows(self.u.T, self.spec.alpha, self.spec.offsets, Q).T, self.shape)
 
@@ -332,9 +332,9 @@ class embedding:
       return self.rotate(r)
     return self._new(self.u * np.asarray(r, dtype=float))
 
-  # the Euclidean coordinates in the orthonormal basis, one row per orientation; with full
-  # the tensor components, repeated ones included
   def double(self, full=False):
+    """the Euclidean coordinates in the orthonormal basis, one row per orientation; with full
+    the tensor components, repeated ones included"""
     d = self.u if full else self.spec.basis.T @ self.u
     return d[:, 0] if self.shape == () else d.T.reshape(self.shape + (d.shape[0],))
 
@@ -342,10 +342,10 @@ class embedding:
     d = np.asarray(d, dtype=float).reshape(-1, self.dim)
     return self._new(self.spec.basis @ d.T, () if d.shape[0] == 1 else (d.shape[0],))
 
-  # the orientation whose image is closest, by steepest ascent from the best of a few seeds,
-  # all images at once; the gradient along a generator G is <G u, t> = -<u, G t>, the action
-  # being skew, so G t is formed once per target and every step is one batch of images
   def project(self, seeds=None, maxIter=200, tol=1e-10, chunk=2048):
+    """the orientation whose image is closest, by steepest ascent from the best of a few seeds,
+    all images at once; the gradient along a generator G is <G u, t> = -<u, G t>, the action
+    being skew, so G t is formed once per target and every step is one batch of images"""
     sp = self.spec
     if seeds is None:
       qs, seedImages = sp.seeds()

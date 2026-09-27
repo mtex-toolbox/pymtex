@@ -29,9 +29,9 @@ def identityLayout():
   return np.eye(2)
 
 
-# the layout a convention asks for: the components of east and north along the plane's x
-# and y, snapped to the signed permutation an axis aligned convention is
 def mapLayout(pC=None):
+  """the layout a convention asks for: the components of east and north along the plane's x
+  and y, snapped to the signed permutation an axis aligned convention is"""
   pC = plottingConvention.default if pC is None else plottingConvention(pC)
   e, n = pC.east.data.reshape(3), pC.north.data.reshape(3)
   M = np.array([[e[0], e[1]], [n[0], n[1]]])
@@ -41,9 +41,9 @@ def mapLayout(pC=None):
 
 # ------------------------------------------------------------------ the picture
 
-# the measurements in the plane of the map, and the site of every index of the lattice:
-# the measurement that sits there, -1 where none does
 def latticeTable(ebsd):
+  """the measurements in the plane of the map, and the site of every index of the lattice:
+  the measurement that sits there, -1 where none does"""
   l = ebsd.lattice
   ij = l.ij
   dims = (int(ij[:, 0].max()) + 1, int(ij[:, 1].max()) + 1)
@@ -52,10 +52,10 @@ def latticeTable(ebsd):
   return lin
 
 
-# the corners of the box round the measurements, in the plane of the map: the box of a map
-# in a coordinate plane is exactly its extent, and a map of forty million points is not
-# projected point by point to learn where it ends. The padding of a grid is left out.
 def mapBox(x):
+  """the corners of the box round the measurements, in the plane of the map: the box of a map
+  in a coordinate plane is exactly its extent, and a map of forty million points is not
+  projected point by point to learn where it ends. The padding of a grid is left out."""
   P = x.pos.data.reshape(-1, 3)
   pad = getattr(x, "_pad", None)
   if pad is not None:
@@ -81,9 +81,9 @@ def _columnBounds(P, block=64):
   return lo, hi
 
 
-# how far the measurements sit from the sites of their lattice, the worst of them in cells;
-# a pass over the whole map, so the lattice remembers it
 def latticeResidual(ebsd):
+  """how far the measurements sit from the sites of their lattice, the worst of them in cells;
+  a pass over the whole map, so the lattice remembers it"""
   l = ebsd.lattice
   r = getattr(l, "_residual", None)
   if r is None:
@@ -94,25 +94,25 @@ def latticeResidual(ebsd):
   return r
 
 
-# a picture of at most maxPixels, scaled down with its shape kept and never below a pixel
 def cappedSize(nx, ny, maxPixels):
+  """a picture of at most maxPixels, scaled down with its shape kept and never below a pixel"""
   nx, ny = max(1, nx), max(1, ny)
   f = np.sqrt(maxPixels / (nx * ny))
   return (max(1, int(nx * f)), max(1, int(ny * f))) if f < 1 else (nx, ny)
 
 
-# the picture a map on a rigid lattice is drawn as: the rectangle its cells span and, for
-# every pixel, the measurement whose cell covers it or -1 where none does, as an array of
-# shape (ny, nx) with the first row at the bottom; None where the map is no picture
-#
-# A pixel belongs to the cell of the nearest site: by rounding the lattice coordinates where
-# the lattice is aligned with the screen and the parallelogram is the cell, and otherwise
-# among the four corners of the lattice parallelogram it lies in, since on a hexagonal
-# lattice the parallelogram is a rhombus and not the cell. One pixel per cell where the
-# lattice is aligned with the screen, a quarter of the spacing elsewhere. A lattice the measurements
-# have drifted from has no picture, judged at the scale of the picture with a hundredth of
-# a cell as the floor.
 def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
+  """the picture a map on a rigid lattice is drawn as: the rectangle its cells span and, for
+  every pixel, the measurement whose cell covers it or -1 where none does, as an array of
+  shape (ny, nx) with the first row at the bottom; None where the map is no picture
+
+  A pixel belongs to the cell of the nearest site: by rounding the lattice coordinates where
+  the lattice is aligned with the screen and the parallelogram is the cell, and otherwise
+  among the four corners of the lattice parallelogram it lies in, since on a hexagonal
+  lattice the parallelogram is a rhombus and not the cell. One pixel per cell where the
+  lattice is aligned with the screen, a quarter of the spacing elsewhere. A lattice the measurements
+  have drifted from has no picture, judged at the scale of the picture with a hundredth of
+  a cell as the floor."""
   l = ebsd.lattice
   if l is None or len(l.ij) != ebsd.size or ebsd.size == 0:
     return None
@@ -173,20 +173,20 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
 
 # ------------------------------------------------------------------ the cells
 
-# the lattice offsets of the cells that share each corner of the cell: the sites as far
-# from the corner as the cell's own site is, four round a corner of a square lattice and
-# three round one of a hexagonal lattice
 def cornerSharing(l, cell):
+  """the lattice offsets of the cells that share each corner of the cell: the sites as far
+  from the corner as the cell's own site is, four round a corner of a square lattice and
+  three round one of a hexagonal lattice"""
   tol = 0.15 * l.dxy
   offs = np.array([(i, j) for j in (-1, 0, 1) for i in (-1, 0, 1)])
   return [[o for o in offs if abs(np.linalg.norm(v - l.A @ o) - np.linalg.norm(v)) < tol] for v in cell]
 
 
-# the corners of every cell of a map, shape (n, m, 2), on the screen: a corner is shared by
-# the cells around it and sits at the mean of where each of them puts it, the measured
-# centre plus the ideal offset to the corner. On a rigid grid that is the ideal corner;
-# under a stage drift the corners follow the centres, so the cells tile without gaps
 def mapCells(ebsd, layout=None):
+  """the corners of every cell of a map, shape (n, m, 2), on the screen: a corner is shared by
+  the cells around it and sits at the mean of where each of them puts it, the measured
+  centre plus the ideal offset to the corner. On a rigid grid that is the ideal corner;
+  under a stage drift the corners follow the centres, so the cells tile without gaps"""
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it has no cells to draw")
@@ -212,8 +212,8 @@ def mapCells(ebsd, layout=None):
   return corners @ M.T
 
 
-# the measurements as points on the screen
 def mapPoints(ebsd, layout=None):
+  """the measurements as points on the screen"""
   M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
   return planeOf(ebsd).to2d(ebsd.pos.data.reshape(-1, 3)) @ M.T
 
@@ -226,8 +226,8 @@ def planeOf(x):
 
 # ------------------------------------------------------------------ boundaries and grains
 
-# a boundary as one polyline, the chains in walk order separated by a NaN row
 def boundaryPolyline(gB):
+  """a boundary as one polyline, the chains in walk order separated by a NaN row"""
   iv = gB.chainV
   out = np.full((len(iv), 2), np.nan)
   ok = iv >= 0
@@ -235,18 +235,18 @@ def boundaryPolyline(gB):
   return out
 
 
-# the two vertices of every segment, shape (n, 2, 2)
 def boundarySegments(gB):
+  """the two vertices of every segment, shape (n, 2, 2)"""
   return gB.V[gB.F]
 
 
-# the loops of a grain as a list of rings, the outer one first, each (m, 2)
 def grainPolygons(g, k):
+  """the loops of a grain as a list of rings, the outer one first, each (m, 2)"""
   return [g.V[np.asarray(loop)] for loop in g.loops[k]]
 
 
-# the extent of what a map plot has to show, on the screen: (xlo, xhi, ylo, yhi)
 def mapExtent(x, layout=None):
+  """the extent of what a map plot has to show, on the screen: (xlo, xhi, ylo, yhi)"""
   M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
   if hasattr(x, "lattice"):
     P = mapBox(x)
@@ -264,15 +264,15 @@ def mapExtent(x, layout=None):
   return (float(Q[:, 0].min() - r), float(Q[:, 0].max() + r), float(Q[:, 1].min() - r), float(Q[:, 1].max() + r))
 
 
-# the colour a phase is drawn in: the one its frame carries, else the next of MATLAB's order
-# for an indexed phase, white for a not indexed one without a colour
 def phaseColor(pl, i):
+  """the colour a phase is drawn in: the one its frame carries, else the next of MATLAB's order
+  for an indexed phase, white for a not indexed one without a colour"""
   c = phaseColorNames(pl.frames)[i]
   return "white" if c is None else c
 
 
-# the colour of every phase of a list
 def phasePalette(pl):
+  """the colour of every phase of a list"""
   return [phaseColor(pl, i) for i in range(len(pl))]
 
 
@@ -286,9 +286,9 @@ def unitLabel(u):
   return "µm" if u == "um" else str(u)
 
 
-# the same length in the unit that keeps its number between one and a thousand: the
-# number, its unit and the factor it was multiplied by
 def switchUnit(x, unit):
+  """the same length in the unit that keeps its number between one and a thousand: the
+  number, its unit and the factor it was multiplied by"""
   if unit not in LENGTH_UNITS or x <= 0:
     return float(x), unit, 1.0
   i = LENGTH_UNITS.index(unit)
@@ -300,9 +300,9 @@ def switchUnit(x, unit):
   return y, LENGTH_UNITS[i], f
 
 
-# how long a scale bar of a map should be, in the coordinates the map is drawn in, and how
-# it reads: a round number near a tenth of the width, in the unit that keeps it readable
 def scaleBar(x, unit="um", fraction=0.1):
+  """how long a scale bar of a map should be, in the coordinates the map is drawn in, and how
+  it reads: a round number near a tenth of the width, in the unit that keeps it readable"""
   if not isinstance(x, (int, float, np.floating, np.integer)):
     e = mapExtent(x)
     return scaleBar(e[1] - e[0], getattr(x, "scanUnit", "um"), fraction)
@@ -313,10 +313,10 @@ def scaleBar(x, unit="um", fraction=0.1):
 
 # ------------------------------------------------------------------ the frame triad
 
-# the (right, up, towards the viewer) components of the axes of the frame in the picture of
-# a map: the plane's coordinates taken to the screen by the layout, and the normal towards
-# the viewer, who looks from the other side of the plane when the layout flips it
 def frameOnScreen(pl, layout=None):
+  """the (right, up, towards the viewer) components of the axes of the frame in the picture of
+  a map: the plane's coordinates taken to the screen by the layout, and the normal towards
+  the viewer, who looks from the other side of the plane when the layout flips it"""
   M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
   side = np.sign(np.linalg.det(M))
   n = pl.normal
@@ -328,13 +328,13 @@ def frameOnScreen(pl, layout=None):
   return out
 
 
-# the reference frame indicator MTEX draws in the scale bar box, with the text height t as
-# its unit: an arrow per axis that has a direction on screen, shortened by its tilt out of
-# the plane, a circle for an axis leaving the plane with its label inside, crossed by four
-# spokes when it points away from the viewer, and a label beside every arrow. Returns the
-# arrows as polygons, the symbol as a polyline with NaN breaks, the labels with their
-# positions, and the bounding box (umin, umax, vmin, vmax)
 def triadGeometry(screen, labels, t=1.0):
+  """the reference frame indicator MTEX draws in the scale bar box, with the text height t as
+  its unit: an arrow per axis that has a direction on screen, shortened by its tilt out of
+  the plane, a circle for an axis leaving the plane with its label inside, crossed by four
+  spokes when it points away from the viewer, and a label beside every arrow. Returns the
+  arrows as polygons, the symbol as a polyline with NaN breaks, the labels with their
+  positions, and the bounding box (umin, umax, vmin, vmax)"""
   arm, shaftHalf = 1.2 * t, t / 8
   headHalf, headLen = 3 * shaftHalf, 0.36 * t
   symR, pad = 0.46 * t, 0.45 * t

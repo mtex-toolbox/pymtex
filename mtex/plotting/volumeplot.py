@@ -165,8 +165,8 @@ def _currentAxes(fig):
   return cur if cur in fig.children else fig.children[-1]
 
 
-# the scene of the current axes of a figure, None when it holds none
 def gcs(fig=None):
+  """the scene of the current axes of a figure, None when it holds none"""
   return getattr(_currentAxes(gcm() if fig is None else fig), "_mtexScene", None)
 
 
@@ -285,11 +285,11 @@ def refresh(fig=None, ax=None):
 
 # ------------------------------------------------------------------ maps in space
 
-# the picture of two dimensional map plots on the rectangle of the plane they lie in: the
-# plots drawn by their own commands, one over the other, into an axes filling a figure pyplot
-# does not know, so that every option of the map plots holds in space too. The picture keeps
-# its sources, so that a map in the same plane is drawn into it rather than beside it.
 def mapPicture(sources, pixels=1600):
+  """the picture of two dimensional map plots on the rectangle of the plane they lie in: the
+  plots drawn by their own commands, one over the other, into an axes filling a figure pyplot
+  does not know, so that every option of the map plots holds in space too. The picture keeps
+  its sources, so that a map in the same plane is drawn into it rather than beside it."""
   from matplotlib.backends.backend_agg import FigureCanvasAgg
   from matplotlib.figure import Figure
 
@@ -338,10 +338,10 @@ def _addMap(s, source):
   s.add(mapPicture([source]))
 
 
-# a plot of a map into a held figure: into its scene, or, when the map lies in another plane
-# than the maps the figure shows, the figure turned into a scene of all of them; None when the
-# map is drawn as a map
 def mapInto3d(plotFun, x, args, kw):
+  """a plot of a map into a held figure: into its scene, or, when the map lies in another plane
+  than the maps the figure shows, the figure turned into a scene of all of them; None when the
+  map is drawn as a map"""
   fig = gcm()
   if fig is None or not fig.hold:
     return None
@@ -367,9 +367,9 @@ def _samePlane(a, b):
   return abs(abs(float(n1 @ n2)) - 1) < 1e-9 and abs(float(a.o @ n1) - float(b.o @ n1) * np.sign(n1 @ n2)) < 1e-9 * max(1, float(np.abs(a.o).max()))
 
 
-# the map plot of a figure's current axes as a scene of the pictures of every map drawn
-# into it, held by that axes, cleared of the map
 def toScene(fig=None, how2plot=None):
+  """the map plot of a figure's current axes as a scene of the pictures of every map drawn
+  into it, held by that axes, cleared of the map"""
   fig = gcm() if fig is None else fig
   ax = _currentAxes(fig)
   s = scene3d(how2plot)
@@ -381,8 +381,8 @@ def toScene(fig=None, how2plot=None):
   return s
 
 
-# record the maps drawn into an axes, so that the axes can be drawn again as a scene
 def recordMap(ax, plotFun, x, args, kw):
+  """record the maps drawn into an axes, so that the axes can be drawn again as a scene"""
   if ax is None or getattr(ax, "_mtexMapPlot", None) is None:
     return
   if getattr(ax, "_mtexMapSources", None) is None:

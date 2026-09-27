@@ -27,8 +27,8 @@ PHASE_KEYS = ("materialname", "formula", "info", "symmetry", "pointgroupid", "la
 _KEY = re.compile(r"^#\s*([^\s:]+):?\s*(.*)$")
 
 
-# the Euler to map alignment behind an EDAX setting, MATLAB's eulerCorrectionRotation
 def eulerCorrectionRotation(setting):
+  """the Euler to map alignment behind an EDAX setting, MATLAB's eulerCorrectionRotation"""
   if setting not in (0, 1, 2, 3, 4):
     raise ValueError("the setting has to be 0 to 4")
   if setting == 0:
@@ -46,10 +46,10 @@ def _token(block, token):
   return None
 
 
-# the phases the header declares, placed by the number they declare: olivineopticalmap.ang
-# declares its four phases as 4, 3, 2, 1, so reading them in file order pairs every name
-# with the wrong lattice
 def angPhases(header):
+  """the phases the header declares, placed by the number they declare: olivineopticalmap.ang
+  declares its four phases as 4, 3, 2, 1, so reading them in file order pairs every name
+  with the wrong lattice"""
   starts = [i for i, l in enumerate(header) if re.match(r"^#\s*Phase\s+\d", l)]
   numbered = bool(starts)
   if not numbered:
@@ -70,17 +70,17 @@ def angPhases(header):
   return placedPhases(found), names, families
 
 
-# whether the header is EMSphInx's rather than OIM's: it names no material, states zero
-# reflector families for every phase and carries no version line. The two write the same
-# layout and number the phase column differently, EDAX from one with zero for not indexed,
-# EMSphInx from zero with 255 for not indexed.
 def angIsEMSphInx(header, names, families):
+  """whether the header is EMSphInx's rather than OIM's: it names no material, states zero
+  reflector families for every phase and carries no version line. The two write the same
+  layout and number the phase column differently, EDAX from one with zero for not indexed,
+  EMSphInx from zero with 255 for not indexed."""
   return bool(names) and all(not n for n in names) and all(f == "0" for f in families) and \
     not any(l.startswith("# VERSION") for l in header)
 
 
-# the header lines outside the phase blocks as a flat dict, MATLAB's angHeaderStruct
 def angHeader(header):
+  """the header lines outside the phase blocks as a flat dict, MATLAB's angHeaderStruct"""
   starts = [i for i, l in enumerate(header) if re.match(r"^#\s*Phase\s+\d", l)]
   exclude = np.zeros(len(header), dtype=bool)
   for k, s in enumerate(starts):

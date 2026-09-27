@@ -24,6 +24,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor
 from ..tensors.kernels import eigh3
+from ..geometry.install import install
 
 Bounds = namedtuple("Bounds", ["voigt", "reuss", "hill"])
 Velocities = namedtuple("Velocities", ["vp", "vs1", "vs2", "pp", "ps1", "ps2"])
@@ -355,22 +356,9 @@ def hashinShtrikmanBounds(C):
 
 # ------------------------------------------------------------------ installation
 
-def _install():
-  for cls in (stiffnessTensor, complianceTensor):
-    cls.ChristoffelTensor = lambda self, n: ChristoffelTensor(self, n)
-    cls.velocity = lambda self, n=None, *a, **kw: velocity(self, n, *a, **kw)
-    cls.energyVector = lambda self, *a, **kw: energyVector(self, *a, **kw)
-    cls.YoungsModulus = lambda self, v=None: YoungsModulus(self, v)
-    cls.linearCompressibility = lambda self, v=None: linearCompressibility(self, v)
-    cls.volumeCompressibility = lambda self: volumeCompressibility(self)
-    cls.shearModulus = lambda self, h=None, u=None: shearModulus(self, h, u)
-    cls.PoissonRatio = lambda self, x=None, y=None: PoissonRatio(self, x, y)
-    cls.bulkModulus = lambda self, which=None: bulkModulus(self, which)
-    cls.HashinShtrikmanModulus = lambda self, K0, G0: HashinShtrikmanModulus(self, K0, G0)
-    cls.hashinShtrikmanBounds = lambda self: hashinShtrikmanBounds(self)
-
-
-_install()
+for _f in (ChristoffelTensor, velocity, energyVector, YoungsModulus, linearCompressibility, volumeCompressibility, shearModulus,
+           PoissonRatio, bulkModulus, HashinShtrikmanModulus, hashinShtrikmanBounds):
+  install((stiffnessTensor, complianceTensor), _f)
 
 __all__ = ["velocity", "energyVector", "YoungsModulus", "linearCompressibility", "volumeCompressibility",
            "shearModulus", "PoissonRatio", "bulkModulus", "isotropicShearModulus", "HashinShtrikmanModulus", "hashinShtrikmanBounds"]

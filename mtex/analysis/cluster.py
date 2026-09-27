@@ -24,6 +24,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from ..geometry.install import install
 
 
 # ------------------------------------------------------------------ CLASSIX
@@ -127,8 +128,8 @@ def _renumber(gLabel, sizes):
   return inv, counts
 
 
-# the median distance to the tenth nearest neighbour of a subsample, the estimate CLASSIX suggests
 def knnRadius(X, k=10, sub=1500):
+  """the median distance to the tenth nearest neighbour of a subsample, the estimate CLASSIX suggests"""
   from scipy.spatial import cKDTree
   X = np.asarray(X, dtype=float)
   n = len(X)
@@ -290,8 +291,7 @@ def _nearest(x, center):
 
 
 def _install():
-  vector3d.calcCluster = lambda self, *a, **kw: calcCluster(self, *a, **kw)
-  orientation.calcCluster = lambda self, *a, **kw: calcCluster(self, *a, **kw)
+  install((vector3d, orientation), calcCluster)
 
 
 _install()

@@ -13,6 +13,7 @@
 #   plottingConvention.default      the session default, which makeDefault sets
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from .quaternion import rotation
@@ -55,10 +56,10 @@ class plottingConvention:
       raise ValueError("EDAX settings are 1 to 4")
     return cls(zvector, (yvector, -yvector, xvector, -xvector)[setting - 1])
 
-  # the session default is the convention of the default specimen frame, so that everything
-  # holding that frame follows a change of it
   @classproperty
   def default(cls):
+    """the session default is the convention of the default specimen frame, so that everything
+    holding that frame follows a change of it"""
     return _sessionDefault(_defaultFrame().how2plot)
 
   def makeDefault(self):
@@ -90,9 +91,9 @@ class plottingConvention:
   def intoScreen(self):
     return -self.outOfScreen
 
-  # moving one screen direction is the least rotation that does it
   @east.setter
   def east(self, v):
+    """moving one screen direction is the least rotation that does it"""
     self.rot = rotation.map(self.east, v) * self.rot
 
   @west.setter
@@ -126,8 +127,8 @@ class plottingConvention:
 
   # ------------------------------------------------------------------ pictograms
 
-  # 'y↑→x' when both screen axes are reference axes, the three names run together otherwise
   def char(self, utf8=None, names=("x", "y", "z")):
+    """'y↑→x' when both screen axes are reference axes, the three names run together otherwise"""
     iN, up = _axisOf(self.north)
     iE, right = _axisOf(self.east)
     if iN is None or iE is None:
@@ -146,6 +147,10 @@ class plottingConvention:
       return f"plottingConvention ({self.char()})"
     fmt = lambda v: "(" + ",".join(f"{x:.3g}" for x in v.data) + ")"
     return f"plottingConvention\n  outOfScreen: {fmt(self.outOfScreen)}\n  north: {fmt(self.north)}\n  east: {fmt(self.east)}"
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.polarplot import setView
 
 
 # which reference axis, and with which sign, a screen direction is
@@ -218,13 +223,13 @@ def _parseConvention(s):
 AXIS_CONVENTIONS = ("y↑→x", "y↓→x", "x↑→y", "x↓→y", "x←↑y", "x←↓y", "y←↑x", "y←↓x")
 
 
-# the eight written in the axis names of a frame, 'Y1↑→X1' for an Oxford file
 def conventionNames(names=("x", "y", "z")):
+  """the eight written in the axis names of a frame, 'Y1↑→X1' for an Oxford file"""
   return [plottingConvention(s).char(utf8=True, names=tuple(names)) for s in AXIS_CONVENTIONS]
 
 
-# the entry of AXIS_CONVENTIONS nearest a rotation, and how far it is from it in radians
 def closestConvention(rot):
+  """the entry of AXIS_CONVENTIONS nearest a rotation, and how far it is from it in radians"""
   rot = rot.rot if isinstance(rot, plottingConvention) else rot
   d = np.array([float(rot.angle(plottingConvention(s).rot)) for s in AXIS_CONVENTIONS])
   k = int(np.argmin(d))

@@ -53,8 +53,8 @@ class SO3FibonacciGrid(orientation):
   def subGrid(self, mask):
     return SO3FibonacciGrid(rotation._fromData(self.data[mask]), self.frameA, self.frameB, self.res)
 
-  # nearest (eps None), k nearest (int) or all within a radius (float), through the tree
   def find(self, o, epsOrK=None):
+    """nearest (eps None), k nearest (int) or all within a radius (float), through the tree"""
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
 

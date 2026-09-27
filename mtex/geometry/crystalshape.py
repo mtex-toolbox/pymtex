@@ -16,6 +16,7 @@
 # shape (n, nV) sharing the faces, which is what ori * cS, s * cS and cS + v make.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from itertools import combinations
 
 import numpy as np
@@ -26,6 +27,7 @@ from .frames import crystalFrame
 from .miller import Miller
 from .symmetryops import _images
 from .vector3d import vector3d
+from .install import install
 
 # a face lies where dot(v, n) = 1, up to this
 FACE_TOL = 1e-8
@@ -47,9 +49,9 @@ def _distinctRows(A, tol):
   return np.array(keep, dtype=int)
 
 
-# the vertices and the faces of the intersection of the half spaces <v, n> <= 1: the
-# faces as index lists ordered around their normals, and which normals bound a face
 def polyhedron(normals, tol=FACE_TOL):
+  """the vertices and the faces of the intersection of the half spaces <v, n> <= 1: the
+  faces as index lists ordered around their normals, and which normals bound a face"""
   normals = np.asarray(normals, dtype=float).reshape(-1, 3)
   n = len(normals)
   if n < 4:
@@ -160,16 +162,16 @@ class crystalShape:
   def __iter__(self):
     return (self[k] for k in range(len(self)))
 
-  # n copies of the shape as a list
   def repmat(self, n):
+    """n copies of the shape as a list"""
     return self._new(vector3d(np.broadcast_to(self._V()[0], (int(n),) + self._V().shape[1:]).copy(), **self._attrs()))
 
   def _attrs(self):
     return dict(frame=self.V.frame, dispStyle="xyz")
 
-  # the faces whose outward normal is within a degree of one of the given normals, in
-  # crystal coordinates as the shape was built
   def subSet(self, NSelect):
+    """the faces whose outward normal is within a degree of one of the given normals, in
+    crystal coordinates as the shape was built"""
     NSelect = NSelect if isinstance(NSelect, vector3d) else vector3d(NSelect)
     sel = _unit(NSelect.data.reshape(-1, 3))
     ind = np.any(self._faceN0 @ sel.T > np.cos(SELECT_ANGLE), axis=1)
@@ -195,9 +197,9 @@ class crystalShape:
   def numVertices(self):
     return self.V.shape[-1]
 
-  # the edges as pairs of vertex indices, every edge once
   @property
   def E(self):
+    """the edges as pairs of vertex indices, every edge once"""
     a, b = self.F, np.roll(self.F, -1, axis=1)
     last = np.sum(self.F >= 0, axis=1) - 1
     b[np.arange(len(self.F)), last] = self.F[:, 0]
@@ -218,8 +220,8 @@ class crystalShape:
   def _single(self, a):
     return a[0] if self.V.ndim == 1 else a
 
-  # the outward unit normal of every face, where the shape stands
   def faceNormal(self):
+    """the outward unit normal of every face, where the shape stands"""
     return vector3d(self._single(_unit(self._faceVectors())), **self._attrs())
 
   @property
@@ -232,18 +234,18 @@ class crystalShape:
     c = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
     return vector3d(self._single(c), **self._attrs())
 
-  # a third of the face areas times their distance from the centre
   @property
   def volume(self):
+    """a third of the face areas times their distance from the centre"""
     V = self._V()
     c = V.mean(axis=1)[:, None, :]
     fv = self._faceVectors()
     fc = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
     return self._single(np.sum(np.sum((fc - c) * _unit(fv), axis=-1) * np.linalg.norm(fv, axis=-1), axis=1) / 3)
 
-  # the largest distance between two vertices
   @property
   def diameter(self):
+    """the largest distance between two vertices"""
     V = self._V()
     return self._single(np.max(np.linalg.norm(V[:, :, None] - V[:, None, :], axis=-1), axis=(1, 2)))
 
@@ -288,9 +290,9 @@ class crystalShape:
   def __sub__(self, v):
     return self + (-v if isinstance(v, vector3d) else -np.asarray(v, dtype=float))
 
-  # a rotation turns the shape where it is; an orientation takes it into its specimen; a
-  # list of them makes a list of shapes
   def rotate(self, rot):
+    """a rotation turns the shape where it is; an orientation takes it into its specimen; a
+    list of them makes a list of shapes"""
     rot = rot.reshape(-1, 1) if rot.size > 1 else rot
     return self._new(rot * self.V)
 
@@ -310,8 +312,8 @@ class crystalShape:
       d = np.asarray(v, dtype=float).reshape(3)
     return d / np.linalg.norm(d)
 
-  # how far the ray from the centre along d runs before it leaves the shape
   def exitDistance(self, d):
+    """how far the ray from the centre along d runs before it leaves the shape"""
     if len(self) > 1:
       raise ValueError("the exit distance of a list of shapes: take one, cS[k]")
     d = self._direction(d)
@@ -323,9 +325,9 @@ class crystalShape:
     ok = along > 1e-9
     return float(np.min(h[ok] / along[ok]))
 
-  # the section of the shape by the plane through its centre with the normal n: the
-  # vertices of the polygon in order, in the frame the shape stands in
   def innerFace(self, n):
+    """the section of the shape by the plane through its centre with the normal n: the
+    vertices of the polygon in order, in the frame the shape stands in"""
     if len(self) > 1:
       raise ValueError("the inner face of a list of shapes: take one, cS[k]")
     d = self._direction(n)
@@ -381,6 +383,152 @@ class crystalShape:
     """a tetragonal prism, the faces {100} and {001}"""
     return crystalShape(Miller([[1, 0, 0], [0, 0, 1]], cs))
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from ..plotting.shapeplot import plotShape as plot, plotInnerFace, plotInnerDirection, plotSlipSystem
+    @staticmethod
+    def albite(cs=None, simple=False) -> Any:
+      """the albite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def amphibole(cs=None, simple=False) -> Any:
+      """the amphibole crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def analcime(cs=None, simple=False) -> Any:
+      """the analcime crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def andalusite(cs=None, simple=False) -> Any:
+      """the andalusite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def anorthite(cs=None, simple=False) -> Any:
+      """the anorthite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def antigorite(cs=None, simple=False) -> Any:
+      """the antigorite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def apatite(cs=None, simple=False) -> Any:
+      """the apatite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def aragonite(cs=None, simple=False) -> Any:
+      """the aragonite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def augite(cs=None, simple=False) -> Any:
+      """the augite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def biotite(cs=None, simple=False) -> Any:
+      """the biotite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def brucite(cs=None, simple=False) -> Any:
+      """the brucite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def calcite(cs=None, simple=False) -> Any:
+      """the calcite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def chromite(cs=None, simple=False) -> Any:
+      """the chromite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def clinochlore(cs=None, simple=False) -> Any:
+      """the clinochlore crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def cordierite(cs=None, simple=False) -> Any:
+      """the cordierite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def corundum(cs=None, simple=False) -> Any:
+      """the corundum crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def diamond(cs=None, simple=False) -> Any:
+      """the diamond crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def diopside(cs=None, simple=False) -> Any:
+      """the diopside crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def dolomite(cs=None, simple=False) -> Any:
+      """the dolomite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def enstatite(cs=None, simple=False) -> Any:
+      """the enstatite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def epidote(cs=None, simple=False) -> Any:
+      """the epidote crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def fluorite(cs=None, simple=False) -> Any:
+      """the fluorite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def fluorite_complex(cs=None, simple=False) -> Any:
+      """the fluorite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def forsterite(cs=None, simple=False) -> Any:
+      """the forsterite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def garnet(cs=None, simple=False) -> Any:
+      """the garnet crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def gypsum(cs=None, simple=False) -> Any:
+      """the gypsum crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def halite(cs=None, simple=False) -> Any:
+      """the halite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def ice_VI(cs=None, simple=False) -> Any:
+      """the ice VI crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def ilmenite(cs=None, simple=False) -> Any:
+      """the ilmenite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def kyanite(cs=None, simple=False) -> Any:
+      """the kyanite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def magnesite(cs=None, simple=False) -> Any:
+      """the magnesite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def magnetite(cs=None, simple=False) -> Any:
+      """the magnetite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def microcline(cs=None, simple=False) -> Any:
+      """the microcline crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def monazite(cs=None, simple=False) -> Any:
+      """the monazite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def muscovite(cs=None, simple=False) -> Any:
+      """the muscovite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def olivine(cs=None, simple=False) -> Any:
+      """the olivine crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def orthoclase(cs=None, simple=False) -> Any:
+      """the orthoclase crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def plagioclase(cs=None, simple=False) -> Any:
+      """the Plagioclase crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def quartz(cs=None, simple=False) -> Any:
+      """the Quartz crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def rutile(cs=None, simple=False) -> Any:
+      """the rutile crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def spinel(cs=None, simple=False) -> Any:
+      """the spinel crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def staurolite(cs=None, simple=False) -> Any:
+      """the staurolite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def titanite(cs=None, simple=False) -> Any:
+      """the titanite crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def topaz(cs=None, simple=False) -> Any:
+      """the topaz crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def tourmaline(cs=None, simple=False) -> Any:
+      """the tourmaline crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def zircon(cs=None, simple=False) -> Any:
+      """the zircon crystal shape of the catalogue, in cs when given"""
+    @staticmethod
+    def zoisite(cs=None, simple=False) -> Any:
+      """the zoisite crystal shape of the catalogue, in cs when given"""
+
 
 # the frame the catalogue writes a shape in
 def _catalogueFrame(e):
@@ -388,9 +536,9 @@ def _catalogueFrame(e):
   return crystalFrame(e["symbol"], list(e["abc"]), np.asarray(e["abg"], dtype=float) * degree, *e["alignment"], mineral=e["mineral"])
 
 
-# a shape of the catalogue: its Miller indices in the given frame, which has to be of
-# the catalogue's Laue class, or in the catalogue's own
 def catalogueShape(name, cs=None, simple=False):
+  """a shape of the catalogue: its Miller indices in the given frame, which has to be of
+  the catalogue's Laue class, or in the catalogue's own"""
   suffix = "_simple" if simple else ""
   key = name + suffix if name + suffix in CRYSTAL_SHAPES else name.lower() + suffix
   if key not in CRYSTAL_SHAPES:
@@ -422,7 +570,7 @@ def _catalogueConstructor(name):
 
 for _name in CRYSTAL_SHAPES:
   if not _name.endswith("_simple"):
-    setattr(crystalShape, _name, _catalogueConstructor(_name))
+    install(crystalShape, _catalogueConstructor(_name))
 
 
 def innerFace(cS, n):

@@ -72,10 +72,10 @@ def loadGrains_Dream3d(fname, CS=None, noOrientFaces=False):
   return grains if noOrientFaces else grains.orientFaces()
 
 
-# the parts of a Neper tessellation: the dimension, the vertices, the faces as polygons of
-# vertex indices, the orientations, the crystal system, and the incidence of the polyhedra
-# and the faces (3D) or the cell ids (2D)
 def loadNeperTess(fname):
+  """the parts of a Neper tessellation: the dimension, the vertices, the faces as polygons of
+  vertex indices, the orientations, the crystal system, and the incidence of the polyhedra
+  and the faces (3D) or the cell ids (2D)"""
   from scipy.sparse import csr_matrix
   with open(fname) as fh:
     lines = [ln.rstrip("\n") for ln in fh]

@@ -107,9 +107,9 @@ def _selectedKernel(x, weights, groups):
     return _densityKernel(space, None, None)
 
 
-# the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or
-# at specimen directions r
 def calcPDF(f, h, r=None, superposition=None):
+  """the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or
+  at specimen directions r"""
   # calcPDF(odf, None, r): the inverse pole density function of the specimen direction r
   if h is None or (not isinstance(h, vector3d) and len(h) == 0):
     return f.ipdf(r if isinstance(r, vector3d) else vector3d(r))
@@ -248,9 +248,9 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
 
 
-# interp(v, y, 'linear'): a function through values at directions, by the method named,
-# MATLAB's vector3d/interp; with directions vi after the values, its values there
 def interpS2(v, y, *args, **kwargs):
+  """interp(v, y, 'linear'): a function through values at directions, by the method named,
+  MATLAB's vector3d/interp; with directions vi after the values, its values there"""
   from .handles import S2FunHandle
   from .s2funtri import S2FunTri
   vi = next((a for a in args if isinstance(a, vector3d)), None)

@@ -22,6 +22,7 @@ from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .ebsd3 import EBSD3
+from ..geometry.install import install
 
 
 # the rotations of the gridded volume and a one phase check
@@ -73,9 +74,9 @@ def curvature(ebsd, stencil=None):
   return curvatureTensor(M, g.frame, unit=f"1/{g.scanUnit}")
 
 
-# the mean misorientation angle to the voxels within order steps along the axes, among those
-# of the same grain, or below the threshold where the volume has no grains
 def KAM(ebsd, order=1, threshold=None, max=False):
+  """the mean misorientation angle to the voxels within order steps along the axes, among those
+  of the same grain, or below the threshold where the volume has no grains"""
   from itertools import product
   g, cs = _grid(ebsd)
   p = g.CSList.phaseId(cs)
@@ -118,10 +119,10 @@ def _back(ebsd, g, a):
   return a.reshape(-1)[newId].reshape(ebsd.shape)
 
 
-# the empty voxels, padding and not indexed, given the phase, orientation and properties of
-# the nearest measured voxel; without extrapolate only those enclosed by measured voxels, the
-# ones the outside of the volume reaches over empty voxels staying empty
 def fill(ebsd, extrapolate=False):
+  """the empty voxels, padding and not indexed, given the phase, orientation and properties of
+  the nearest measured voxel; without extrapolate only those enclosed by measured voxels, the
+  ones the outside of the volume reaches over empty voxels staying empty"""
   from scipy.ndimage import distance_transform_edt, label
   g = ebsd.gridify().copy()
   empty = ~g.isIndexed | g.isPadding
@@ -144,8 +145,8 @@ def fill(ebsd, extrapolate=False):
   return g
 
 
-# the voxels along a polyline, sampled at the voxel spacing, and their distance along it
 def spatialProfile(ebsd, points):
+  """the voxels along a polyline, sampled at the voxel spacing, and their distance along it"""
   P = np.asarray(points.data if isinstance(points, vector3d) else points, dtype=float).reshape(-1, 3)
   step = ebsd.dPos
   pts, dist, s0 = [], [], 0.0
@@ -161,7 +162,7 @@ def spatialProfile(ebsd, points):
 
 
 for _f in (gradientX, gradientY, gradientZ, curvature, KAM, fill, spatialProfile):
-  setattr(EBSD3, _f.__name__, _f)
-EBSD3.gradientDim = gradientDim
+  install(EBSD3, _f)
+install(EBSD3, gradientDim)
 
 __all__ = []

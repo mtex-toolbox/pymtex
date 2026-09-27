@@ -20,10 +20,10 @@ def _conj(q):
   return q * [1, -1, -1, -1]
 
 
-# the proper rotations each side reduces over: the rotation parts of the Laue group when
-# either side is centrosymmetric, the proper subgroup otherwise, as symmetry-reduced
-# distances in MTEX have always done it
 def reductionGroups(o):
+  """the proper rotations each side reduces over: the rotation parts of the Laue group when
+  either side is centrosymmetric, the proper subgroup otherwise, as symmetry-reduced
+  distances in MTEX have always done it"""
   a, b = o.frameA.sym, o.frameB.sym
   laue = a.isLaue or b.isLaue
   R = (a.properGroup() if laue else a.properSubGroup()).rotations().data.reshape(-1, 4)   # acts on the right, crystal side
@@ -31,10 +31,10 @@ def reductionGroups(o):
   return L, R
 
 
-# the groups two orientations are compared over: the specimen sides have to fit; two
-# crystal frames of different phases reduce over the products r2 * inv(r1) of both crystal
-# groups (orientation/dot)
 def reductionGroupsPair(a, b):
+  """the groups two orientations are compared over: the specimen sides have to fit; two
+  crystal frames of different phases reduce over the products r2 * inv(r1) of both crystal
+  groups (orientation/dot)"""
   La, Ra = reductionGroups(a)
   if a.frameA is b.frameA:
     return La, Ra
@@ -43,8 +43,8 @@ def reductionGroupsPair(a, b):
   return La, uniqueRotations(prod)
 
 
-# distinct rotations up to sign and a tolerance, pairwise, the first of each kept
 def uniqueRotations(q, tolerance=1e-6):
+  """distinct rotations up to sign and a tolerance, pairwise, the first of each kept"""
   same = np.abs(q @ q.T) > 1 - tolerance
   keep = np.ones(len(q), dtype=bool)
   for k in range(len(q)):
@@ -53,17 +53,17 @@ def uniqueRotations(q, tolerance=1e-6):
   return q[keep]
 
 
-# the chord angle |p -/+ q| = 2 sin(w/4) between rotations, accurate over the whole range
 def chordAngle(p, q):
+  """the chord angle |p -/+ q| = 2 sin(w/4) between rotations, accurate over the whole range"""
   s = np.where(np.sum(p * q, axis=-1) < 0, -1.0, 1.0)[..., None]
   h = np.linalg.norm(p - s * q, axis=-1)
   return 4 * np.arcsin(np.minimum(h / 2, 1.0))
 
 
-# the images l ref r of a reference, those of its inverse appended under grain exchange,
-# each with the (l, r, usedInverse) it came from; for the identity the products l r
-# coincide in whole cosets, so only the distinct images are kept
 def referenceImages(ref, L, R, exchange=False):
+  """the images l ref r of a reference, those of its inverse appended under grain exchange,
+  each with the (l, r, usedInverse) it came from; for the identity the products l r
+  coincide in whole cosets, so only the distinct images are kept"""
   refs = [ref] + ([_conj(ref)] if exchange else [])
   es, frm = [], []
   for useInv, q in enumerate(refs):
@@ -82,8 +82,8 @@ def referenceImages(ref, L, R, exchange=False):
   return es, frm
 
 
-# the reduced dot products and angles of many rotations against one reference
 def symDots(qs, ref, L, R, exchange=False):
+  """the reduced dot products and angles of many rotations against one reference"""
   es, _ = referenceImages(ref, L, R, exchange)
   return bestDot(qs, es)[0]
 
@@ -94,15 +94,15 @@ def symAngles(qs, ref, L, R, exchange=False):
   return chordAngle(qs, es[k])
 
 
-# the disorientation angle of each pair, through the closest image for accuracy near zero
 def symPairAngles(q1, q2, L, R, exchange=False):
+  """the disorientation angle of each pair, through the closest image for accuracy near zero"""
   q1, q2 = np.broadcast_arrays(q1, q2)
   return chordAngle(q1, closestImage(q1, q2, L, R, exchange)[1])
 
 
-# every rotation of a list moved to the equivalent closest to one reference, or to its own
-# reference of a list, the step the orientation mean iterates
 def closestToRef(qs, ref, L, R, exchange=False):
+  """every rotation of a list moved to the equivalent closest to one reference, or to its own
+  reference of a list, the step the orientation mean iterates"""
   return closestImage(ref, qs, L, R, exchange)[1]
 
 

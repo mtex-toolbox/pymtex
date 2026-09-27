@@ -31,8 +31,8 @@ def _asList(h):
 _HINTED = [False]
 
 
-# the sample says its size, as MATLAB does, and how to change it once per session
 def sampleMessage(points, n):
+  """the sample says its size, as MATLAB does, and how to change it once per session"""
   print(f"  I'm plotting {points} random orientations out of {n} given orientations")
   if not _HINTED[0]:
     print('  You can specify the number of points by the option "points".\n  The option "all" ensures that all data are plotted')

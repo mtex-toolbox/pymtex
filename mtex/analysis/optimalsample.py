@@ -37,6 +37,7 @@ from ..functions.so3fun import SO3FunHarmonic, invertedCoefficients, realizeWign
 from ..functions.so3vectorfield import differentiate
 from ..functions.transforms import (DIRECT_SUM_NODES, S2FourierPlan, SO3FourierPlan, sphericalSeries, sphericalSeriesAdjoint,
                          wignerSeries, wignerSeriesAdjoint)
+from ..geometry.install import install
 
 OptimalSampleResult = namedtuple("OptimalSampleResult", ["nodes", "weights", "discrepancy", "history", "iterations", "converged", "reason", "bandwidth"])
 
@@ -93,13 +94,13 @@ class _Problem:
     if not np.all(np.isfinite(self.target._fhat)):
       raise ValueError("the density coefficients have to be finite")
 
-  # the plan follows the nodes
   def setNodes(self, xs):
+    """the plan follows the nodes"""
     if self.plan is not None:
       self.plan.setNodes(vector3d(xs) if self.sphere else rotation(xs))
 
-  # the coefficients onto the symmetric, even or exchange invariant real functions
   def project(self, c):
+    """the coefficients onto the symmetric, even or exchange invariant real functions"""
     if self.sphere:
       if self.projection is not None:
         projectSpherical(c, self.projection)
@@ -113,8 +114,8 @@ class _Problem:
       realizeWigner(c)
     return c
 
-  # the coefficients of the discrete measure with the weights c
   def moment(self, xs, c):
+    """the coefficients of the discrete measure with the weights c"""
     if self.plan is None:
       h = sphericalSeriesAdjoint(vector3d(xs), self.ones, self.L, weights=c) if self.sphere else wignerSeriesAdjoint(rotation(xs), self.ones, self.L, weights=c)
     else:
@@ -134,8 +135,8 @@ class _Problem:
     d = self.moment(xs, c) - self.target._fhat
     return self.objective(d), d
 
-  # the gradient with respect to the nodes, and to the softmax logits of the weights
   def gradient(self, xs, c, residual, weights=False):
+    """the gradient with respect to the nodes, and to the softmax logits of the weights"""
     coeff = self.beta * residual
     dc = angularDerivatives(coeff) if self.sphere else differentiate(coeff, "left")
     vals = np.stack([self.values(xs, dc[:, i]) for i in range(3)], axis=-1)
@@ -434,8 +435,7 @@ def _install():
   from ..functions.bingham import S2FunBingham, SO3FunBingham
   from ..functions.handles import S2FunHandle, S2FunSum, SO3FunGeneric
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
-  for cls in (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF, SO3FunBingham, S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham):
-    cls.optimalSample = lambda self, n, *a, **kw: optimalSample(self, n, *a, **kw)
+  install((SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF, SO3FunBingham, S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham), optimalSample)
 
 
 _install()

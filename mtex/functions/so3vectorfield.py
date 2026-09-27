@@ -51,8 +51,8 @@ def _other(side):
   return "right" if side == "left" else "left"
 
 
-# the frames the components are functions on: the group on the tangent side is stripped
 def componentFrames(CS, SS, side="left"):
+  """the frames the components are functions on: the group on the tangent side is stripped"""
   return (CS, SS.stripSym()) if side == "left" else (CS.stripSym(), SS)
 
 
@@ -65,9 +65,9 @@ def _equivariantGroup(v):
 # ------------------------------------------------------------------ the coefficient derivative and the column transforms
 
 
-# the three derivatives of a coefficient vector, on the rows for the left side and on the
-# columns for the right; the degree is preserved
 def differentiate(fhat, side="left"):
+  """the three derivatives of a coefficient vector, on the rows for the left side and on the
+  columns for the right; the degree is preserved"""
   side = _side(side)
   fhat = np.asarray(fhat)
   L = dim2deg(len(fhat))
@@ -119,11 +119,11 @@ def _tangentValues(x, side):
   return (x.data if isinstance(x, vector3d) else np.asarray(x, dtype=float)).reshape(-1, 3)
 
 
-# the projection of stacked components onto the equivariant fields: for every degree the
-# mean over the group of M(s) kron D(s), M the matrix acting on the components and D the
-# matrix acting on one component from the left; on the columns the component acts by
-# D(s)^T from the right, which is the transpose of the same Kronecker product
 def equivariantProjection(actions, Ds):
+  """the projection of stacked components onto the equivariant fields: for every degree the
+  mean over the group of M(s) kron D(s), M the matrix acting on the components and D the
+  matrix acting on one component from the left; on the columns the component acts by
+  D(s)^T from the right, which is the transpose of the same Kronecker product"""
   L = len(Ds[0]) - 1
   k = actions[0].shape[0]
   P = [np.zeros((k * (2 * n + 1), k * (2 * n + 1)), dtype=complex) for n in range(L + 1)]
@@ -198,9 +198,9 @@ class SO3VectorField:
   def right(self):
     return self.toSide("right")
 
-  # the other side: F_L(R) = R F_R(R), a product with a degree one function, exact by
-  # quadrature at the next bandwidth
   def toSide(self, side):
+    """the other side: F_L(R) = R F_R(R), a product with a degree one function, exact by
+    quadrature at the next bandwidth"""
     side = _side(side)
     if side == self.tangentSpace and isinstance(self, SO3VectorFieldHarmonic):
       return self
@@ -317,10 +317,10 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     if symmetrise:
       self._fhat = self.symmetrise()._fhat
 
-  # MATLAB's SO3VectorFieldHarmonic.quadrature(fun, cs): the field of a callable, cut to
-  # the last degree that carries more than rounding, as a polynomial field is
   @classmethod
   def quadrature(cls, fun, *args, bandwidth=None, tol=1e-10):
+    """MATLAB's SO3VectorFieldHarmonic.quadrature(fun, cs): the field of a callable, cut to
+    the last degree that carries more than rounding, as a polynomial field is"""
     F = cls(fun, *args, bandwidth=bandwidth)
     size = np.abs(F._fhat).max(axis=1)
     big = np.flatnonzero(size > tol * max(size.max(), np.finfo(float).tiny))
@@ -329,9 +329,9 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       L += 1
     return F.truncate(L)
 
-  # MATLAB's approximate: the quadrature of a callable or of values at orientations
   @classmethod
   def approximate(cls, fun, *args, **kwargs):
+    """MATLAB's approximate: the quadrature of a callable or of values at orientations"""
     return cls.quadrature(fun, *args, **kwargs)
 
   # from a callable by exact quadrature on the rule of the component frames, then the
@@ -361,9 +361,9 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       setattr(v, k, x)
     return v
 
-  # the coefficients of the components in MTEX's basis, one column per component
   @property
   def fhat(self):
+    """the coefficients of the components in MTEX's basis, one column per component"""
     return mtexCoefficientsSO3(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsSO3(self._fhat)
 
   @property
@@ -378,8 +378,8 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     fhat[:n] = self._fhat[:n]
     return self._rebuild(fhat)
 
-  # one component as a function on the component frames
   def component(self, i):
+    """one component as a function on the component frames"""
     cA, cB = self.componentFrames()
     return SO3FunHarmonic(self._fhat[:, i], cA, cB, real=True, symmetrise=False, _internal=True)
 
@@ -387,10 +387,10 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     r = self._rotationsFor(x)
     return self._tangent(_seriesColumns(self._fhat, r), x)
 
-  # the projection onto the equivariant fields of the frames: the invariant side one
-  # component at a time, the equivariant side F -> s F(s^-1 R) on the left, F -> s F(R s)
-  # on the right, by the Kronecker products
   def symmetrise(self):
+    """the projection onto the equivariant fields of the frames: the invariant side one
+    component at a time, the equivariant side F -> s F(s^-1 R) on the left, F -> s F(R s)
+    on the right, by the Kronecker products"""
     L = self.bandwidth
     fhat = self._fhat.copy()
     if self.tangentSpace == "left":
@@ -426,8 +426,8 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   def _scaled(self, a):
     return self._rebuild(a * self._fhat)
 
-  # the mean over SO(3), and the length of the vectors as a function, MATLAB's norm
   def mean(self):
+    """the mean over SO(3), and the length of the vectors as a function, MATLAB's norm"""
     return vector3d(np.real(self._fhat[0]))
 
   def norm(self):
@@ -439,8 +439,8 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= rtol * np.linalg.norm(b))
 
-  # the inner product with a constant vector, exact, a function on the component frames
   def dot(self, x):
+    """the inner product with a constant vector, exact, a function on the component frames"""
     if isinstance(x, SO3VectorField):
       return SO3VectorField.dot(self, x)
     x = x if isinstance(x, vector3d) else vector3d(x)
@@ -455,9 +455,9 @@ class SO3VectorFieldHarmonic(SO3VectorField):
 
   # ---- rotation and inversion
 
-  # F'(R) = q F(q^-1 R) for a rotation of the specimen acting on a left field, F(q^-1 R) on
-  # a right one; F'(R) = F(R q^-1) and q^-1 F(R q^-1) for a rotation of the crystal
   def rotate(self, r, side="left"):
+    """F'(R) = q F(q^-1 R) for a rotation of the specimen acting on a left field, F(q^-1 R) on
+    a right one; F'(R) = F(R q^-1) and q^-1 F(R q^-1) for a rotation of the crystal"""
     side = _side(side)
     if isinstance(r, orientation):
       o = r
@@ -477,9 +477,9 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     SS = _rotatedFrame(self.SS, rot) if side == "left" else self.SS
     return self._rebuild(fhat, CS=CS, SS=SS)
 
-  # the push-forward under R -> R^-1: a left vector v at R becomes the right vector -v at
-  # R^-1, so inv(grad f) = grad(inv f); the frames swap with the side
   def inv(self):
+    """the push-forward under R -> R^-1: a left vector v at R becomes the right vector -v at
+    R^-1, so inv(grad f) = grad(inv f); the frames swap with the side"""
     fhat = np.stack([-invertedCoefficients(self._fhat[:, i]) for i in range(3)], axis=-1)
     return self._rebuild(fhat, CS=self.SS, SS=self.CS, tangentSpace=_other(self.tangentSpace))
 
@@ -508,15 +508,15 @@ def _divergenceCoefficients(fhat, side):
   return out
 
 
-# the divergence, invariant under both groups
 def div(v, x=None):
+  """the divergence, invariant under both groups"""
   v = SO3VectorFieldHarmonic(v)
   f = SO3FunHarmonic(_divergenceCoefficients(v._fhat, v.tangentSpace), v.CS, v.SS, real=True, symmetrise=False, _internal=True)
   return f if x is None else f(x)
 
 
-# the curl, the dual of the exterior derivative, a field of the same side
 def curl(v, x=None):
+  """the curl, the dual of the exterior derivative, a field of the same side"""
   v = SO3VectorFieldHarmonic(v)
   G = [differentiate(v._fhat[:, k], v.tangentSpace) for k in range(3)]
   rot = np.stack([G[2][:, 1] - G[1][:, 2], G[0][:, 2] - G[2][:, 0], G[1][:, 0] - G[0][:, 1]], axis=-1)
@@ -524,9 +524,9 @@ def curl(v, x=None):
   return c if x is None else c(x)
 
 
-# the function of mean zero whose gradient the field is, Laplace^-1 div F; the field is
-# checked to be a gradient unless told it is
 def antiderivative(v, x=None, conservative=False, tolerance=1e-4):
+  """the function of mean zero whose gradient the field is, Laplace^-1 div F; the field is
+  checked to be a gradient unless told it is"""
   v = SO3VectorFieldHarmonic(v)
   d = div(v)
   fhat = d._fhat.copy()
@@ -539,9 +539,9 @@ def antiderivative(v, x=None, conservative=False, tolerance=1e-4):
   return f if x is None else f(x)
 
 
-# the gradient of a harmonic function as a harmonic field, of any other function as the
-# central difference handle at 0.05 degree
 def grad(f, x=None, side="left", delta=0.05 * degree):
+  """the gradient of a harmonic function as a harmonic field, of any other function as the
+  central difference handle at 0.05 degree"""
   if isinstance(x, str):
     x, side = None, x
   side = _side(side)
@@ -798,9 +798,9 @@ class SO3VectorFieldRBF(SO3VectorField):
 for _cls in (SO3VectorFieldHandle, SO3VectorFieldRBF):
   _cls._fhat = property(lambda self: SO3VectorFieldHarmonic(self)._fhat)
 
-# the tangent vectors of a field at orientations by least squares componentwise on the
-# component frames
 def interpolateField(t, **kwargs):
+  """the tangent vectors of a field at orientations by least squares componentwise on the
+  component frames"""
   from .density import interpolate
   ref = t.oriRef
   if not isinstance(ref, orientation):

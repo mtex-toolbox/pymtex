@@ -8,7 +8,9 @@ from math import gcd
 import numpy as np
 
 from .frames import crystalFrame, specimenFrame
+from .install import install
 from .miller import Miller
+from .orientation import orientation
 from .quaternion import qmul, rotation
 from .symmetryops import project2FundamentalRegionOrientation, symmetrise
 from .symreduce import _conj, reductionGroups, symReduce
@@ -16,9 +18,9 @@ from .units import degree
 from .vector3d import vector3d, xvector, zvector
 
 
-# the group of a direction's phase: a direction written group-free for one plane still
-# belongs to the phase, which the register knows as the largest group over that basis
 def phaseFrame(x):
+  """the group of a direction's phase: a direction written group-free for one plane still
+  belongs to the phase, which the register knows as the largest group over that basis"""
   if not isinstance(x, vector3d) or x.frame is None:
     return None
   if x.isCrystalDirection and x.frame.numSym() == 1:
@@ -26,10 +28,10 @@ def phaseFrame(x):
   return x.frame
 
 
-# the orientation with ori * hkl parallel to z and ori * uvw parallel to x, from the
-# symmetric equivalent of uvw closest to perpendicular to hkl; among those equally close
-# the one closest to uvw itself, so the choice does not depend on the element order
 def byMiller(hkl, uvw, *frames):
+  """the orientation with ori * hkl parallel to z and ori * uvw parallel to x, from the
+  symmetric equivalent of uvw closest to perpendicular to hkl; among those equally close
+  the one closest to uvw itself, so the choice does not depend on the element order"""
   from .orientation import orientation
   frames = [f for f in frames if hasattr(f, "sym")]
   if not isinstance(hkl, vector3d):
@@ -52,8 +54,8 @@ def byMiller(hkl, uvw, *frames):
   return orientation(rotation.map(vector3d(n), zvector, vector3d(d), xvector), phaseFrame(hkl), ss)
 
 
-# each relationship maps a plane and a direction of the parent onto those of the child
 def relationship(nParent, nChild, dParent, dChild):
+  """each relationship maps a plane and a direction of the parent onto those of the child"""
   from .orientation import orientation
   return orientation.map(nParent, nChild, dParent, dChild, phaseFrame(nParent), phaseFrame(nChild))
 
@@ -101,12 +103,12 @@ def ShojiNishiyama(csG, csE):
   return relationship(Miller(1, 1, 1, csG), Miller(0, 0, 0, 1, csE), Miller(1, 0, -1, csG, "uvw"), Miller(2, -1, -1, 0, csE, "uvw"))
 
 
-# the child variants of a parent-to-child relationship: the distinct p2c * r over the parent
-# group modulo the child group; the parent variants with the sides swapped; the child
-# orientations of parents, all of them or one chosen per parent by its id; the parent
-# orientations of children, whose frame is the child's. The variants are numbered as MTEX
-# numbers them, which is what a variant id means
 def variants(p2c, second=None, ids=None, parent=False):
+  """the child variants of a parent-to-child relationship: the distinct p2c * r over the parent
+  group modulo the child group; the parent variants with the sides swapped; the child
+  orientations of parents, all of them or one chosen per parent by its id; the parent
+  orientations of children, whose frame is the child's. The variants are numbered as MTEX
+  numbers them, which is what a variant id means"""
   from .orientation import orientation
   if isinstance(second, str):
     parent, second = second == "parent", None
@@ -148,11 +150,11 @@ def variants(p2c, second=None, ids=None, parent=False):
 KS_ORDER = np.array([1, 17, 2, 16, 3, 18, 8, 22, 9, 24, 7, 23, 19, 11, 20, 10, 21, 12, 6, 15, 4, 14, 5, 13])
 
 
-# the proper rotations of a group in the order MTEX enumerates them, the order its variant
-# ids are counted in: the products r1 r2 r3 of the cyclic groups about the generating axes
-# of its Laue class, the first factor running fastest; the closure order where no
-# generator list of MTEX spans the group
 def mtexEnumeration(sym):
+  """the proper rotations of a group in the order MTEX enumerates them, the order its variant
+  ids are counted in: the products r1 r2 r3 of the cyclic groups about the generating axes
+  of its Laue class, the first factor running fastest; the closure order where no
+  generator list of MTEX spans the group"""
   G = sym.properGroup().rotations().data.reshape(-1, 4)
   a, b, c = sym.axes
   for gens in ([], [(a, 2)], [(b, 2)], [(c, 2)], [(a, 2), (c, 2)], [(c, 3)], [(a, 2), (c, 3)], [(a - b, 2), (c, 3)], [(c, 4)],
@@ -181,8 +183,8 @@ def _distinctModulo(cand, side):
   return keep
 
 
-# (112)[-1-11] is Bunge (90, 35, 45), (112)[11-1] its twin (270, 35, 45)
 def copper(cs, *ss):
+  """(112)[-1-11] is Bunge (90, 35, 45), (112)[11-1] its twin (270, 35, 45)"""
   return byMiller([1, 1, 2], [-1, -1, 1], cs, *ss)
 
 
@@ -204,19 +206,42 @@ def _byEulerDegrees(name):
     a, b, c = STANDARD_EULER[name]
     return orientation.byEuler(a * degree, b * degree, c * degree, cs, *ss)
   build.__name__ = name
+  build.__doc__ = "the {} component, Bunge Euler angles ({}°, {}°, {}°), in cs and the specimen frame".format(name, *STANDARD_EULER[name])
   return build
 
 
-for _name in STANDARD_EULER:
-  globals()[_name] = _byEulerDegrees(_name)
-del _name
+cube = _byEulerDegrees("cube")
+cubeND22 = _byEulerDegrees("cubeND22")
+cubeND45 = _byEulerDegrees("cubeND45")
+cubeRD = _byEulerDegrees("cubeRD")
+goss = _byEulerDegrees("goss")
+SR = _byEulerDegrees("SR")
+SR2 = _byEulerDegrees("SR2")
+SR3 = _byEulerDegrees("SR3")
+SR4 = _byEulerDegrees("SR4")
+brass = _byEulerDegrees("brass")
+brass2 = _byEulerDegrees("brass2")
+PLage = _byEulerDegrees("PLage")
+PLage2 = _byEulerDegrees("PLage2")
+QLage = _byEulerDegrees("QLage")
+QLage2 = _byEulerDegrees("QLage2")
+QLage3 = _byEulerDegrees("QLage3")
+QLage4 = _byEulerDegrees("QLage4")
+invGoss = _byEulerDegrees("invGoss")
 
 
-# coincidence site lattice misorientations of a cubic lattice, from the definition (Grimmer,
-# Bollmann, Warrington 1974): a rotation whose quaternion has integer components with no
-# common divisor is a CSL misorientation, and Sigma is the sum of their squares with every
-# factor of two divided out; the classes of one Sigma come out in ascending angle
+# the named components and the orientation relationships as constructors, orientation.brass(cs)
+for _f in (copper, copper2, *(globals()[n] for n in STANDARD_EULER), Bain, KurdjumovSachs, NishiyamaWassermann, Pitsch,
+           GreningerTrojano, Bagaryatsky, Burgers, PitschSchrader, Potter, ShojiNishiyama):
+  install(orientation, staticmethod(_f))
+del _f
+
+
 def CSL(sigma, cs):
+  """coincidence site lattice misorientations of a cubic lattice, from the definition (Grimmer,
+  Bollmann, Warrington 1974): a rotation whose quaternion has integer components with no
+  common divisor is a CSL misorientation, and Sigma is the sum of their squares with every
+  factor of two divided out; the classes of one Sigma come out in ascending angle"""
   from .orientation import orientation
   if sigma < 1 or sigma % 2 == 0:
     raise ValueError(f"Sigma is an odd positive integer, not {sigma}")

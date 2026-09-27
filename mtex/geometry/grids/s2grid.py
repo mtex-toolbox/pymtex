@@ -56,14 +56,14 @@ class S2Grid(vector3d):
       self._flatCache = flatS2(self)
     return self._flatCache
 
-  # the polar angles of the grid points, exact from the rings
   def polar(self):
+    """the polar angles of the grid points, exact from the rings"""
     th = np.concatenate([np.full(len(r), t) for t, r in zip(self.thetaGrid.points, self.rhoGrid)])
     rh = np.concatenate([r.points for r in self.rhoGrid])
     return th, rh, np.ones(self.size)
 
-  # the grid points selected by a mask, or within eps of a centre; rings that empty out go
   def subGrid(self, mask, eps=None):
+    """the grid points selected by a mask, or within eps of a centre; rings that empty out go"""
     if eps is not None:
       center, mask = mask, np.zeros(self.size, dtype=bool)
       mask[self.neighbourIndices(center, eps)] = True
@@ -109,12 +109,12 @@ class S2Grid(vector3d):
     j, dj = self._nearestOne(w.theta, w.rho)
     return j if dj > di else i
 
-  # the nearest point without a search, for equispaced ladders: the ring is the polar angle
-  # over the ring step and the point the azimuth over that ring's step, both rounded
-  # the nearest node of a grid with uniform steps, arithmetic on every direction at once: the
-  # ring from the polar angle, the node on the ring from the azimuth against the ring's own
-  # first node, step and count
   def nearestStepwise(self, v):
+    """the nearest point without a search, for equispaced ladders: the ring is the polar angle
+    over the ring step and the point the azimuth over that ring's step, both rounded
+    the nearest node of a grid with uniform steps, arithmetic on every direction at once: the
+    ring from the polar angle, the node on the ring from the azimuth against the ring's own
+    first node, step and count"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     xyz = np.asarray(v.data, dtype=float).reshape(-1, 3)
     r = np.linalg.norm(xyz, axis=-1)
@@ -158,8 +158,8 @@ class S2Grid(vector3d):
     out = [self._ringWindow(k, rho, ceps, ct, st) for k in self.thetaGrid.neighbours(theta, eps)]
     return np.concatenate(out) if out else np.zeros(0, dtype=int)
 
-  # the indices of the grid points within eps of one direction
   def neighbourIndices(self, v, eps):
+    """the indices of the grid points within eps of one direction"""
     v = (v if isinstance(v, vector3d) else vector3d(v)).normalize()
     out = self._neighbourIndicesPolar(float(v.theta), float(v.rho), eps)
     if self.antipodal:
@@ -167,9 +167,9 @@ class S2Grid(vector3d):
       out = np.concatenate([out, self._neighbourIndicesPolar(float(w.theta), float(w.rho), eps)])
     return np.unique(out)
 
-  # the nearest grid point of every direction, or all within eps: an index per direction,
-  # or a sparse incidence matrix (directions x grid) with a sparse matrix of the angles
   def find(self, v, eps=None):
+    """the nearest grid point of every direction, or all within eps: an index per direction,
+    or a sparse incidence matrix (directions x grid) with a sparse matrix of the angles"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:

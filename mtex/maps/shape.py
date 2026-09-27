@@ -17,6 +17,7 @@
 # the loops carry their winding, every sum subtracts an inclusion by itself.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.frames import specimenFrame
@@ -27,13 +28,14 @@ from .decomposition import NO_PIXEL
 from .grains import grain2d
 from .lattice import mapPlane
 from .polygon import loopSums, polygonSet, signedArea2
+from ..geometry.install import install
 
 
 # ------------------------------------------------------------------ the moments
 
-# the moments of the polygon of every outline: the area, the first and the second moments
-# about the origin, summed over its loops, as six arrays; or of one list of loops
 def polygonMoments(V, loops, size=None):
+  """the moments of the polygon of every outline: the area, the first and the second moments
+  about the origin, summed over its loops, as six arrays; or of one list of loops"""
   one = size is None
   S = loopSums(V, [loops] if one else loops, 1 if one else size)
   out = (S[:, 0] / 2, S[:, 3] / 6, S[:, 4] / 6, S[:, 5] / 12, S[:, 6] / 12, S[:, 7] / 24)
@@ -74,8 +76,8 @@ def principalComponents(self):
   return _axisOf(self, A), _axisOf(self, B)
 
 
-# the ellipse of the same second moments: its centre and its two half axes
 def fitEllipse(self):
+  """the ellipse of the same second moments: its centre and its two half axes"""
   return (self.centroid,) + principalComponents(self)
 
 
@@ -87,8 +89,8 @@ def shortAxis(self):
   return principalComponents(self)[1]
 
 
-# the ratio of the two half axes, one for a circle
 def aspectRatio(self):
+  """the ratio of the two half axes, one for a circle"""
   A, B = _principal2d(self)
   a, b = np.linalg.norm(A, axis=1), np.linalg.norm(B, axis=1)
   with np.errstate(divide="ignore", invalid="ignore"):
@@ -97,8 +99,8 @@ def aspectRatio(self):
 
 # ------------------------------------------------------------------ the convex hull
 
-# the hull of the outer loop of every outline, as loops of vertex indices, anticlockwise
 def hullLoops(self):
+  """the hull of the outer loop of every outline, as loops of vertex indices, anticlockwise"""
   return convexHullLoops(self.V, [ls[0] if ls else np.zeros(0, dtype=np.int64) for ls in self.loops])
 
 
@@ -110,8 +112,8 @@ def _flatHull(self):
   return self.V[flat], np.concatenate([[0], np.cumsum(lengths)]), lengths
 
 
-# the perimeter of the outer loop alone, without the holes
 def outerPerimeter(self):
+  """the perimeter of the outer loop alone, without the holes"""
   return loopSums(self.V, self.loops, self.size)[:, 1]
 
 
@@ -134,20 +136,20 @@ def _perOutline(values, offsets, lengths, reduce):
 
 # ------------------------------------------------------------------ the parameters
 
-# how much the outline is indented against its convex hull, in percent
 def paris(self):
+  """how much the outline is indented against its convex hull, in percent"""
   p, hp = outerPerimeter(self), hullPerimeter(self)
   with np.errstate(divide="ignore", invalid="ignore"):
     return np.where(hp == 0, 0.0, 200 * (p - hp) / hp)
 
 
-# the perimeter against that of the circle of the same area, one for a circle
 def shapeFactor(self):
+  """the perimeter against that of the circle of the same area, one for a circle"""
   return self.perimeter / self.equivalentPerimeter
 
 
-# the area against that of the convex hull, one for a convex outline
 def convexity(self):
+  """the area against that of the convex hull, one for a convex outline"""
   a, ha = self.area, hullArea(self)
   with np.errstate(divide="ignore", invalid="ignore"):
     return np.where(ha == 0, 1.0, a / ha)
@@ -211,12 +213,12 @@ def _direction2d(self, arg):
   return np.array([np.cos(float(arg)), np.sin(float(arg))])
 
 
-# the caliper: with nothing, the longest width of every outline as a framed axis of that
-# length; with 'shortest', the narrowest one, with 'shortestPerp' the width measured across
-# the direction perpendicular to it, which is the direction an outline with flat faces is
-# aligned along, with 'longest' the first again; with a direction or an angle to the x axis
-# of the map, the width across it
 def caliper(self, arg=None):
+  """the caliper: with nothing, the longest width of every outline as a framed axis of that
+  length; with 'shortest', the narrowest one, with 'shortestPerp' the width measured across
+  the direction perpendicular to it, which is the direction an outline with flat faces is
+  aligned along, with 'longest' the first again; with a direction or an angle to the x axis
+  of the map, the width across it"""
   if arg is None or (isinstance(arg, str) and arg == "longest"):
     return _axisOf(self, _extremalWidths(self)[1])
   if isinstance(arg, str):
@@ -242,10 +244,10 @@ def caliper(self, arg=None):
 
 # ------------------------------------------------------------------ the projection functions
 
-# the cumulative projection length of the outlines, measured along each direction (Panozzo
-# 1983): the width of the convex hull seen from that direction, summed over the outlines
-# and normalised by its largest value. The hulls are taken once for all the directions
 def paror(self, omega=None):
+  """the cumulative projection length of the outlines, measured along each direction (Panozzo
+  1983): the width of the convex hull seen from that direction, summed over the outlines
+  and normalised by its largest value. The hulls are taken once for all the directions"""
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   H, offsets, lengths = _flatHull(self)
@@ -255,10 +257,10 @@ def paror(self, omega=None):
   return out / out.max()
 
 
-# the cumulative projection length of the boundary segments (Panozzo 1984): a projection
-# is a dot product, the segment vector projected onto the direction, so no angle is formed
-# and none has to be folded into [0, pi)
 def surfor(x, omega=None):
+  """the cumulative projection length of the boundary segments (Panozzo 1984): a projection
+  is a dot product, the segment vector projected onto the direction, so no angle is formed
+  and none has to be folded into [0, pi)"""
   gB = x.boundary if isinstance(x, grain2d) else x
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
@@ -267,11 +269,11 @@ def surfor(x, omega=None):
   return out / out.max()
 
 
-# the characteristic shape of a set of boundary segments: every segment and its antipode,
-# sorted by direction and laid end to end, the convex, centrally symmetric outline whose
-# boundary length in each direction is the boundary length the map has in it. A convex
-# outline of a hundred thousand segments is sampled down to nmax, which keeps its extent
 def characteristicShape(x, nmax=1024):
+  """the characteristic shape of a set of boundary segments: every segment and its antipode,
+  sorted by direction and laid end to end, the convex, centrally symmetric outline whose
+  boundary length in each direction is the boundary length the map has in it. A convex
+  outline of a hundred thousand segments is sampled down to nmax, which keeps its extent"""
   gB = x.boundary if isinstance(x, grain2d) else x
   if gB.isempty:
     raise ValueError("an empty boundary has no characteristic shape")
@@ -285,11 +287,11 @@ def _xyPlane():
   return mapPlane(np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0]]))
 
 
-# one closed outline in the plane of a map, so that every parameter above is there for a
-# curve that came from no segmentation, as the characteristic shape of a boundary and a
-# projection function drawn as a shape are. It is stored anticlockwise, so its area is the
-# positive one
 class shape2d(polygonSet):
+  """one closed outline in the plane of a map, so that every parameter above is there for a
+  curve that came from no segmentation, as the characteristic shape of a boundary and a
+  projection function drawn as a shape are. It is stored anticlockwise, so its area is the
+  positive one"""
 
   def __init__(self, V, plane=None, frame=None):
     if isinstance(V, vector3d):
@@ -306,16 +308,16 @@ class shape2d(polygonSet):
     self.V = np.ascontiguousarray(V)
     self.loops = [[np.arange(len(V), dtype=np.int32)]]
 
-  # an outline in polar coordinates, which is how a projection function becomes the shape
-  # it describes
   @staticmethod
   def byRhoTheta(rho, theta, **kw):
+    """an outline in polar coordinates, which is how a projection function becomes the shape
+    it describes"""
     rho, theta = np.asarray(rho, dtype=float).reshape(-1), np.asarray(theta, dtype=float).reshape(-1)
     return shape2d(np.stack([rho * np.cos(theta), rho * np.sin(theta)], axis=1), **kw)
 
-  # the outline of a set of segments laid end to end by direction, the characteristic shape
   @staticmethod
   def byFV(F, V, nmax=1024, **kw):
+    """the outline of a set of segments laid end to end by direction, the characteristic shape"""
     F = np.asarray(F).reshape(-1, 2)
     V = np.asarray(V, dtype=float)
     if V.shape[1] == 3:
@@ -337,9 +339,9 @@ class shape2d(polygonSet):
   def __len__(self):
     return 1
 
-  # the outline as framed points, and in polar coordinates
   @property
   def Vs(self):
+    """the outline as framed points, and in polar coordinates"""
     return vector3d(self.plane.from2d(self.V), frame=self.frame)
 
   @property
@@ -359,17 +361,21 @@ class shape2d(polygonSet):
       raise IndexError("a shape2d is one outline")
     return self
 
-  # the convex hull of the outline, as an outline
   def hull(self):
+    """the convex hull of the outline, as an outline"""
     return shape2d(self.V[hullLoops(self)[0]], plane=self.plane, frame=self.frame)
 
   def __repr__(self):
     return f"shape2d ({self.frame.char()})\n  vertices: {len(self.V)}\n  area: {self.area[0]:.4g}\n  aspect ratio: {aspectRatio(self)[0]:.4g}"
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.polarplot import plotShape as plot
 
-# the grains with their convex hulls for polygons: the hull edges form the boundary, with
-# nothing on the other side, and there is no inner boundary
+
 def _hullGrains(self):
+  """the grains with their convex hulls for polygons: the hull edges form the boundary, with
+  nothing on the other side, and there is no inner boundary"""
   hl = hullLoops(self)
   lengths = np.array([len(h) for h in hl], dtype=np.int64)
   keep = lengths >= 2
@@ -393,10 +399,9 @@ def _hullGrains(self):
 for _name, _f in (("principalComponents", principalComponents), ("fitEllipse", fitEllipse), ("longAxis", longAxis), ("shortAxis", shortAxis),
                   ("aspectRatio", aspectRatio), ("hullLoops", hullLoops), ("paris", paris), ("shapeFactor", shapeFactor), ("convexity", convexity),
                   ("caliper", caliper), ("paror", paror), ("surfor", surfor)):
-  setattr(polygonSet, _name, _f)
-grain2d.hull = _hullGrains
-grain2d.characteristicShape = characteristicShape
-grainBoundary.surfor = surfor
-grainBoundary.characteristicShape = characteristicShape
+  install(polygonSet, _f, _name)
+install(grain2d, _hullGrains, "hull")
+install((grain2d, grainBoundary), characteristicShape)
+install(grainBoundary, surfor)
 
 __all__ = ["shape2d", "polygonMoments"]

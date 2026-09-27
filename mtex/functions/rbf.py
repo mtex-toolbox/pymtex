@@ -10,6 +10,7 @@
 # Every other operation goes through the harmonic form, SO3FunHarmonic(f, bandwidth=L).
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -48,10 +49,10 @@ def _conj(q):
   return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
-# the cosine of the half angle beyond which the kernel stays below tol of its peak, in
-# closed form for the families with one and found by a scan otherwise; a kernel that never
-# drops that far is summed in full
 def supportCosine(psi, tol=1e-9):
+  """the cosine of the half angle beyond which the kernel stays below tol of its peak, in
+  closed form for the families with one and found by a scan otherwise; a kernel that never
+  drops that far is summed in full"""
   if isinstance(psi, SO3DeLaValleePoussinKernel):
     return tol ** (1 / (2 * psi.kappa))
   if isinstance(psi, SO3vonMisesFisherKernel):
@@ -88,9 +89,9 @@ def _rotationsFor(f, x):
 class SO3FunRBF:
   isReal = True
 
-  # the sum of kernels through values at orientations, MATLAB's SO3FunRBF.interpolate
   @staticmethod
   def interpolate(nodes, values, **kwargs):
+    """the sum of kernels through values at orientations, MATLAB's SO3FunRBF.interpolate"""
     from .rbfinterpolation import interpolateRBF
     return interpolateRBF(nodes, values, **kwargs)
 
@@ -143,9 +144,9 @@ class SO3FunRBF:
   def __call__(self, x):
     return self.eval(x)
 
-  # the kernel sum over the centres and their symmetric copies; a large sum goes through the
-  # harmonic form, exact for a kernel of finite bandwidth, as MTEX does
   def eval(self, x):
+    """the kernel sum over the centres and their symmetric copies; a large sum goes through the
+    harmonic form, exact for a kernel of finite bandwidth, as MTEX does"""
     r = _rotationsFor(self, x)
     q = r.data.reshape(-1, 4)
     L, R = reductionGroups(self.center)
@@ -185,11 +186,11 @@ class SO3FunRBF:
     fhat[0] = self.mean()
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, antipodal=self.antipodal, _internal=True)
 
-  # the gradient: minus the kernel's angular derivative along the geodesic to every
-  # equivalent within its support; a query with none in reach takes the nearest centre alone
-  # the gradient at orientations, or without them the field of gradients of the harmonic
-  # expansion, as MATLAB's
   def grad(self, x=None, side="left"):
+    """the gradient: minus the kernel's angular derivative along the geodesic to every
+    equivalent within its support; a query with none in reach takes the nearest centre alone
+    the gradient at orientations, or without them the field of gradients of the harmonic
+    expansion, as MATLAB's"""
     if x is None:
       from .so3fun import SO3FunHarmonic
       return SO3FunHarmonic(self).grad(side=side)
@@ -218,9 +219,9 @@ class SO3FunRBF:
       np.add.at(out, start + i, -f0[:, None] * p[:, 1:])
     return SO3TangentVector(vector3d(out.reshape(*r.shape, 3)), x, side)
 
-  # the pole figure: the Radon transform of the kernel centred at the images of h under the
-  # centres and the crystal rotations, projected by the specimen frame
   def pdf(self, h, bandwidth=None):
+    """the pole figure: the Radon transform of the kernel centred at the images of h under the
+    centres and the crystal rotations, projected by the specimen frame"""
     h = h if isinstance(h, vector3d) else vector3d(h)
     if h.size != 1:
       raise ValueError("one crystal direction at a time")
@@ -321,6 +322,44 @@ class SO3FunRBF:
                 f"    center: {n} orientation{'s' if n > 1 else ''}", f"    weight: {np.sum(self.weights) * self.psi.mean():.4g}"]
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+                                  calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
+                                  calcError, centerSpecimen)
+    from .polefigure import calcPoleFigure
+    from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sectionplot import plotSection
+    def __abs__(self) -> Any:
+      ...
+    def abs(self) -> Any:
+      ...
+    def sqrt(self) -> Any:
+      ...
+    def exp(self) -> Any:
+      ...
+    def log(self) -> Any:
+      ...
+    def __pow__(self, p) -> Any:
+      ...
+    def sum(self) -> Any:
+      ...
+    @property
+    def SRight(self) -> Any:
+      ...
+    @SRight.setter
+    def SRight(self, value) -> None:
+      ...
+    @property
+    def SLeft(self) -> Any:
+      ...
+    @SLeft.setter
+    def SLeft(self, value) -> None:
+      ...
+
 
 # ------------------------------------------------------------------ fibre components
 
@@ -406,8 +445,8 @@ class SO3FunCBF:
       degreeBlock(fhat, l)[...] = A[l] * 4 * np.pi / (2 * l + 1) ** 1.5 * np.einsum("i,ki,ai->ka", self.weights, Yr, np.conj(Yh))
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, _internal=True)
 
-  # the gradient: psi'(t) (g h x r) on the left, psi'(t) (h x g^-1 r) on the right, over every pair
   def grad(self, x=None, side="left"):
+    """the gradient: psi'(t) (g h x r) on the left, psi'(t) (h x g^-1 r) on the right, over every pair"""
     if x is None:
       from .so3fun import SO3FunHarmonic
       return SO3FunHarmonic(self).grad(side=side)
@@ -491,6 +530,44 @@ class SO3FunCBF:
     lines.append(f"    weight: {self.mean():.4g}")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+                                  calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
+                                  calcError, centerSpecimen)
+    from .polefigure import calcPoleFigure
+    from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sectionplot import plotSection
+    def __abs__(self) -> Any:
+      ...
+    def abs(self) -> Any:
+      ...
+    def sqrt(self) -> Any:
+      ...
+    def exp(self) -> Any:
+      ...
+    def log(self) -> Any:
+      ...
+    def __pow__(self, p) -> Any:
+      ...
+    def sum(self) -> Any:
+      ...
+    @property
+    def SRight(self) -> Any:
+      ...
+    @SRight.setter
+    def SRight(self, value) -> None:
+      ...
+    @property
+    def SLeft(self) -> Any:
+      ...
+    @SLeft.setter
+    def SLeft(self, value) -> None:
+      ...
+
 
 # ------------------------------------------------------------------ the named ODFs
 
@@ -512,9 +589,9 @@ def _densityKernel(space, kernel, halfwidth):
   return SO3DeLaValleePoussinKernel(halfwidth=hw) if space == "SO3" else S2DeLaValleePoussinKernel(halfwidth=hw)
 
 
-# a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
-# dropped unless nothinning
 def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, nothinning=False):
+  """a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
+  dropped unless nothinning"""
   if isinstance(center, (referenceFrame, SO3Kernel)):
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
@@ -537,9 +614,9 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, n
   return SO3FunRBF(center, psi, w)
 
 
-# a fibre ODF from crystal and specimen directions or from a fibre of P1, the weights
-# normalised to a mean of one
 def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
+  """a fibre ODF from crystal and specimen directions or from a fibre of P1, the weights
+  normalised to a mean of one"""
   kernels = [a for a in args if isinstance(a, S2Kernel)]
   kernel = kernels[0] if kernels else kernel
   frames = [a for a in args if isinstance(a, referenceFrame)]
@@ -555,8 +632,8 @@ def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
   return SO3FunCBF(h, r, w, psi, SS)
 
 
-# an ODF by its Fourier coefficients, or another ODF in its harmonic form (MATLAB FourierODF)
 def FourierODF(C, *args, **kwargs):
+  """an ODF by its Fourier coefficients, or another ODF in its harmonic form (MATLAB FourierODF)"""
   from .so3fun import SO3FunHarmonic
   # FourierODF(odf, L): the harmonic form up to the bandwidth L
   if args and np.isscalar(args[0]) and not isinstance(args[0], str) and not isinstance(C, (np.ndarray, list, tuple)):
@@ -565,10 +642,10 @@ def FourierODF(C, *args, **kwargs):
   return SO3FunHarmonic(C, *args, **kwargs)
 
 
-# the Santa Fe sample ODF (MATLAB SantaFe): cubic crystal and orthorhombic specimen symmetry,
-# a uniform portion of 0.73 and a von Mises Fisher component of 10 degree halfwidth at
-# (122)[221] carrying the other 0.27
 def SantaFe():
+  """the Santa Fe sample ODF (MATLAB SantaFe): cubic crystal and orthorhombic specimen symmetry,
+  a uniform portion of 0.73 and a von Mises Fisher component of 10 degree halfwidth at
+  (122)[221] carrying the other 0.27"""
   from ..geometry.plottingconvention import plottingConvention
   cs = crystalFrame("cubic")
   ss = specimenFrame("mmm", plottingConvention("y↑→x"))

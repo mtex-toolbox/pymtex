@@ -14,10 +14,10 @@ class SO3Fun:
     from ..io.loadodf import loadODF
     return loadODF(fname, *args, **kwargs)
 
-  # the ODF of the Dubna quartz pole figures, MTEX's example function; its values at
-  # orientations when given
   @staticmethod
   def dubna(ori=None):
+    """the ODF of the Dubna quartz pole figures, MTEX's example function; its values at
+    orientations when given"""
     from ..io.sampledata import mtexdata
     f = mtexdata("dubnaODF")
     return f if ori is None else f.eval(ori)

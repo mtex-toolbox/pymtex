@@ -25,9 +25,9 @@ from ..geometry.vector3d import vector3d
 from .mtexfigure import gcm, mtexFigure
 
 
-# a polar axes: the parent named, the held one, the one nextAxis prepared turned polar, a
-# fresh figure's first axes, or a new figure
 def polarAxes(parent=None):
+  """a polar axes: the parent named, the held one, the one nextAxis prepared turned polar, a
+  fresh figure's first axes, or a new figure"""
   if parent is not None:
     return parent
   fig = gcm()

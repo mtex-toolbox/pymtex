@@ -12,8 +12,8 @@ import numpy as np
 from .kernels import eulerQuat
 from .session import getMTEXpref
 
-# a small number is zero, MATLAB isnull
 def isnull(x, tol=1e-10):
+  """a small number is zero, MATLAB isnull"""
   return np.abs(x) <= tol
 
 
@@ -42,8 +42,8 @@ def eulerConvention(name=None):
     raise ValueError(f"unknown Euler angle convention '{name}'") from None
 
 
-# the other conventions are substitutions on Matthies, geometry_tools/euler2quat
 def toMatthies(convention, a, b, c):
+  """the other conventions are substitutions on Matthies, geometry_tools/euler2quat"""
   pi = np.pi
   if convention in ("Matthies", "Roe"):
     return a, b, c
@@ -54,8 +54,8 @@ def toMatthies(convention, a, b, c):
   return pi / 2 - a, b, 3 * pi / 2 - c
 
 
-# Rz(alpha) Ry(beta) Rz(gamma) as a quaternion; a long list goes through the kernel
 def matthies2quat(alpha, beta, gamma):
+  """Rz(alpha) Ry(beta) Rz(gamma) as a quaternion; a long list goes through the kernel"""
   alpha, beta, gamma = np.broadcast_arrays(*(np.asarray(x, dtype=float) for x in (alpha, beta, gamma)))
   if alpha.size >= 1024:
     q = eulerQuat(alpha, beta, gamma)
@@ -66,9 +66,9 @@ def matthies2quat(alpha, beta, gamma):
   return np.stack([cP * np.cos(hp), -sP * np.sin(hm), sP * np.cos(hm), cP * np.sin(hp)], axis=-1)
 
 
-# byEuler(E, ...) with E an (..., 3) array of triples, as MATLAB's byEuler([phi1 Phi phi2]):
-# the three angles and the arguments after them
 def eulerTriple(a, b, c, rest):
+  """byEuler(E, ...) with E an (..., 3) array of triples, as MATLAB's byEuler([phi1 Phi phi2]):
+  the three angles and the arguments after them"""
   isAngle = lambda x: isinstance(x, (int, float, np.number, np.ndarray, list, tuple))
   if b is not None and isAngle(b):
     return a, b, c, rest
@@ -82,10 +82,10 @@ def euler2quat(a, b, c, convention=None):
   return matthies2quat(*toMatthies(eulerConvention(convention), a, b, c))
 
 
-# quaternion to Euler angles, quaternion/Euler: the first and third angle in [0, 2pi),
-# the second in [0, pi]; at beta == 0 only the sum of the outer two is determined, and
-# it goes into the first angle of the target convention, the third being zero
 def quat2euler(q, convention=None):
+  """quaternion to Euler angles, quaternion/Euler: the first and third angle in [0, 2pi),
+  the second in [0, pi]; at beta == 0 only the sum of the outer two is determined, and
+  it goes into the first angle of the target convention, the third being zero"""
   convention = eulerConvention(convention)
   pi = np.pi
   a, b, c, d = np.moveaxis(q, -1, 0)
@@ -114,9 +114,9 @@ def quat2euler(q, convention=None):
 
 # ------------------------------------------------------------------ axis and angle
 
-# the identity has no axis; a turn by a multiple of 2pi about nothing is the identity,
-# any other turn about nothing is an error rather than a quaternion of NaNs
 def axis2quat(xyz, omega):
+  """the identity has no axis; a turn by a multiple of 2pi about nothing is the identity,
+  any other turn about nothing is an error rather than a quaternion of NaNs"""
   xyz = np.asarray(xyz, dtype=float)
   omega = np.asarray(omega, dtype=float)
   n = np.linalg.norm(xyz, axis=-1)
@@ -128,13 +128,13 @@ def axis2quat(xyz, omega):
   return np.concatenate([np.cos(omega / 2)[..., None] * np.ones_like(unit[..., :1]), s * unit], axis=-1)
 
 
-# the rotational angle in [0, pi], through atan2 for full accuracy near 0 and pi
 def quatAngle(q):
+  """the rotational angle in [0, pi], through atan2 for full accuracy near 0 and pi"""
   return 2 * np.arctan2(np.linalg.norm(q[..., 1:], axis=-1), np.abs(q[..., 0]))
 
 
-# the rotational axis, a unit vector; x for the identity
 def quatAxis(q):
+  """the rotational axis, a unit vector; x for the identity"""
   s = np.where(q[..., 0] < 0, -1.0, 1.0)[..., None]
   v = s * q[..., 1:]
   n = np.linalg.norm(v, axis=-1)
@@ -172,9 +172,9 @@ def quat2mat(q):
   return M
 
 
-# direction cosine matrix to quaternion, mat2quat: the largest coefficient is taken from
-# the diagonal for accuracy; the matrices must be proper, the caller handles the sign
 def mat2quat(M):
+  """direction cosine matrix to quaternion, mat2quat: the largest coefficient is taken from
+  the diagonal for accuracy; the matrices must be proper, the caller handles the sign"""
   M = np.asarray(M, dtype=float)
   t = np.stack([M[..., 0, 0], M[..., 1, 1], M[..., 2, 2]], axis=-1)
   absQ = np.sqrt(np.maximum(0, np.stack([
@@ -205,15 +205,15 @@ def _unit(v):
   return v / np.linalg.norm(v, axis=-1, keepdims=True)
 
 
-# an arbitrary orthogonal direction, vector3d/orth: (x,y,z) -> (-y,x,0), (0,y,z) -> (1,0,0)
 def orthKernel(xyz):
+  """an arbitrary orthogonal direction, vector3d/orth: (x,y,z) -> (-y,x,0), (0,y,z) -> (1,0,0)"""
   xyz = np.asarray(xyz, dtype=float)
   y = np.where(isnull(xyz[..., 0]), -1.0, xyz[..., 1])
   return _unit(np.stack([-y, xyz[..., 0], np.zeros_like(y)], axis=-1))
 
 
-# the smallest rotation with r * u parallel to v, hr2quat
 def map1Kernel(u, v):
+  """the smallest rotation with r * u parallel to v, hr2quat"""
   u, v = _unit(u), _unit(v)
   n = np.cross(u, v)
   nn = np.linalg.norm(n, axis=-1)
@@ -222,8 +222,8 @@ def map1Kernel(u, v):
   return axis2quat(ax, omega)
 
 
-# the rotation with r * u1 parallel to v1 and r * u2 parallel to v2, rotation/map
 def map2Kernel(u1, v1, u2, v2):
+  """the rotation with r * u1 parallel to v1 and r * u2 parallel to v2, rotation/map"""
   u1, v1, u2, v2 = (_unit(x) for x in (u1, v1, u2, v2))
   ang = lambda a, b: np.arctan2(np.linalg.norm(np.cross(a, b), axis=-1), np.sum(a * b, axis=-1))
   delta = np.abs(ang(u1, u2) - ang(v1, v2))
@@ -237,9 +237,9 @@ def map2Kernel(u1, v1, u2, v2):
   return mat2quat(M)
 
 
-# the rotation best mapping the list u onto the list v, rotation/fit: Horn's quaternion
-# method, or Kabsch's singular value decomposition of the cross covariance
 def fitKernel(u, v, weights=None, method="horn"):
+  """the rotation best mapping the list u onto the list v, rotation/fit: Horn's quaternion
+  method, or Kabsch's singular value decomposition of the cross covariance"""
   u, v = _unit(u).reshape(-1, 3), _unit(v).reshape(-1, 3)
   if weights is not None:
     u = u * np.asarray(weights, dtype=float).reshape(-1, 1)

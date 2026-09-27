@@ -21,6 +21,7 @@ from ..geometry.vector3d import vector3d
 from ..tensors.tensor import (EinsteinSum, SchmidTensor, colon, curvatureTensor, deformationGradientTensor,
                      dislocationDensityTensor, spinTensor, strainRateTensor, strainTensor, stressTensor, tensor,
                      velocityGradientTensor)
+from ..geometry.install import install
 
 
 def _frameOf(v):
@@ -57,22 +58,22 @@ def equivalentStrain(eps):
   return np.sqrt(2 / 3 * np.sum(e.data * e.data, axis=-1))
 
 
-# the octahedral shear and normal strain, from the principal stretches
 def octahedralStrain(eps):
+  """the octahedral shear and normal strain, from the principal stretches"""
   q = (np.sqrt(1 + 2 * eps.eigvals()) - 1)[..., ::-1]
   oG = 2 / 3 * np.sqrt((q[..., 0] - q[..., 1]) ** 2 + (q[..., 1] - q[..., 2]) ** 2 + (q[..., 2] - q[..., 0]) ** 2)
   return oG, q.sum(axis=-1) / 3
 
 
-# the differences of the principal values, largest first
 def axisRatios(T):
+  """the differences of the principal values, largest first"""
   e = T.eigvals()[..., ::-1]
   return e[..., 0] - e[..., 1], e[..., 1] - e[..., 2], e[..., 2] - e[..., 0]
 
 
-# the magnitude of a strain is its largest principal value, which the Taylor factor is
-# measured against; norm stays the Frobenius norm on every class
 def maxStrain(eps):
+  """the magnitude of a strain is its largest principal value, which the Taylor factor is
+  measured against; norm stays the Frobenius norm on every class"""
   return np.max(np.abs(eps.eigvals()), axis=-1)
 
 
@@ -177,9 +178,9 @@ def _simpleShearFlow(d, n, e=1.0):
   return velocityGradientTensor(2 * e * np.outer(_unit(d), _unit(n)), _frameOf(d))
 
 
-# the symmetric part of a velocity gradient is the strain rate, the antisymmetric one the
-# spin, whose axial vector is the angular velocity
 def strainRate(L):
+  """the symmetric part of a velocity gradient is the strain rate, the antisymmetric one the
+  spin, whose axial vector is the angular velocity"""
   return strainRateTensor(L.sym().M, L.frame)
 
 
@@ -204,8 +205,8 @@ def vorticity(L):
   return rotationRate(L) / strainRateMagnitude(L)
 
 
-# the axial vector of a spin tensor
 def spinVector(W):
+  """the axial vector of a spin tensor"""
   return angularVelocityVector(W)
 
 
@@ -215,9 +216,9 @@ def spinTensorOf(v, frame=None):
 
 # ------------------------------------------------------------------ curvature and the dislocation density, Nye's relation
 
-# a diagonal entry of the density is minus the sum of the other two diagonal entries of the
-# curvature, so the entry a map cannot measure drops out of alpha_33
 def dislocationDensity(kappa):
+  """a diagonal entry of the density is minus the sum of the other two diagonal entries of the
+  curvature, so the entry a map cannot measure drops out of alpha_33"""
   K = kappa.M
   M = np.swapaxes(K, -1, -2).copy()
   for i in range(3):
@@ -234,30 +235,24 @@ def curvature(alpha):
 # ------------------------------------------------------------------ installation
 
 def _install():
-  stressTensor.meanStress = lambda self: meanStress(self)
-  stressTensor.deviatoricStress = lambda self: deviatoric(self)
-  stressTensor.equivalentStress = lambda self: equivalentStress(self)
-  stressTensor.calcShearStress = lambda self, sS: calcShearStress(self, sS)
-  strainTensor.deviatoricStrain = lambda self: deviatoric(self)
-  strainTensor.equivalentStrain = lambda self: equivalentStrain(self)
-  strainTensor.octahedralStrain = lambda self: octahedralStrain(self)
-  strainTensor.axisRatios = lambda self: axisRatios(self)
-  strainTensor.maxStrain = lambda self: maxStrain(self)
-  deformationGradientTensor.uniaxial = staticmethod(_uniaxialDeformation)
-  deformationGradientTensor.simpleShear = staticmethod(_simpleShearDeformation)
-  deformationGradientTensor.pureShear = staticmethod(_pureShearDeformation)
-  deformationGradientTensor.CauchyStrain = lambda self: CauchyStrain(self)
-  deformationGradientTensor.GreenStrain = lambda self: GreenStrain(self)
-  velocityGradientTensor.uniaxial = staticmethod(_uniaxialFlow)
-  velocityGradientTensor.simpleShear = staticmethod(_simpleShearFlow)
-  velocityGradientTensor.strainRate = lambda self: strainRate(self)
-  velocityGradientTensor.spin = lambda self: spin(self)
-  velocityGradientTensor.angularVelocityVector = lambda self: angularVelocityVector(self)
-  velocityGradientTensor.rotationRate = lambda self: rotationRate(self)
-  velocityGradientTensor.vorticity = lambda self: vorticity(self)
-  spinTensor.vector = lambda self: spinVector(self)
-  curvatureTensor.dislocationDensity = lambda self: dislocationDensity(self)
-  dislocationDensityTensor.curvature = lambda self: curvature(self)
+  for f in (meanStress, equivalentStress, calcShearStress):
+    install(stressTensor, f)
+  install(stressTensor, deviatoric, "deviatoricStress")
+  install(strainTensor, deviatoric, "deviatoricStrain")
+  for f in (equivalentStrain, octahedralStrain, axisRatios, maxStrain):
+    install(strainTensor, f)
+  install(deformationGradientTensor, staticmethod(_uniaxialDeformation), "uniaxial")
+  install(deformationGradientTensor, staticmethod(_simpleShearDeformation), "simpleShear")
+  install(deformationGradientTensor, staticmethod(_pureShearDeformation), "pureShear")
+  install(deformationGradientTensor, CauchyStrain)
+  install(deformationGradientTensor, GreenStrain)
+  install(velocityGradientTensor, staticmethod(_uniaxialFlow), "uniaxial")
+  install(velocityGradientTensor, staticmethod(_simpleShearFlow), "simpleShear")
+  for f in (strainRate, spin, angularVelocityVector, rotationRate, vorticity):
+    install(velocityGradientTensor, f)
+  install(spinTensor, spinVector, "vector")
+  install(curvatureTensor, dislocationDensity)
+  install(dislocationDensityTensor, curvature)
   # the Schmid factor of the geometry takes directions; a stress tensor and the function
   # form come from here
   direct = slipSystem.SchmidFactor
@@ -267,7 +262,7 @@ def _install():
       return SchmidFactor(self, sigma, relative)
     return direct(self, sigma, relative=relative)
 
-  slipSystem.SchmidFactor = schmidFactor
+  install(slipSystem, schmidFactor, "SchmidFactor")
 
 
 _install()

@@ -26,15 +26,25 @@ from .grain3boundary import grain3Boundary
 from .grain3d import grain3d
 
 
-# a map goes to the reconstruction of mtex.maps with its arguments as given
-def calcGrains(ebsd, *args, **kwargs):
-  if not isinstance(ebsd, EBSD3):
-    return _calcGrains2d(ebsd, *args, **kwargs)
+def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
+               mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
+  """the grains of a map, the pixels joined across every boundary the criterion keeps: a
+  misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
+  culls smaller grains. A map of the plane also takes alpha, the bound of its decomposition,
+  removeQuadruplePoints, mcl and fmc for Markov and fast multiscale clustering; a map of
+  volumes grainId, the grains its file stored. The map keeps the grain ids"""
   # calcGrains(ebsd, 'grainId'): MATLAB's flag
-  if "grainId" in args:
-    args = tuple(a for a in args if not (isinstance(a, str) and a == "grainId"))
-    kwargs["grainId"] = True
-  return _calcGrains3d(ebsd, *args, **kwargs)
+  if isinstance(angle, str) and angle == "grainId":
+    angle, grainId = 10 * degree, True
+  if not isinstance(ebsd, EBSD3):
+    if grainId:
+      raise TypeError("grainId takes the grains a file of volumes stored; a map of the plane has none")
+    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, removeQuadruplePoints, mcl, fmc, verbose, backend)
+  planar = {"alpha": alpha != 3.1, "removeQuadruplePoints": removeQuadruplePoints, "mcl": mcl is not None,
+            "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
+  if any(planar.values()):
+    raise TypeError(f"calcGrains of a map of volumes takes no {', '.join(k for k, v in planar.items() if v)}")
+  return _calcGrains3d(ebsd, angle, threshold, criterion, minPixel, grainId)
 
 
 def _calcGrains3d(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, grainId=False):

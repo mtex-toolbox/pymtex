@@ -273,8 +273,8 @@ def realDefectSpherical(fhat, tol=1e-10):
   return bool(_dispatch("sphericalDefect", _sphericalDefectLoop, _sphericalDefectNumpy, F, math.isqrt(F.shape[1]) - 1, tol))
 
 
-# in place on a complex array, rows of coefficients on the last axis
 def realizeWigner(fhat):
+  """in place on a complex array, rows of coefficients on the last axis"""
   F = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
   _dispatch("realizeWigner", _realizeWignerLoop, _realizeWignerNumpy, F, dim2deg(F.shape[1]))
   if not fhat.flags.c_contiguous:
@@ -351,8 +351,8 @@ def _halfPiNumpy(T, L):
 _HALF_PI_QUADRANTS = {}
 
 
-# the table held per precision, grown to the largest bandwidth asked
 def halfPiQuadrants(L, dtype=np.float64):
+  """the table held per precision, grown to the largest bandwidth asked"""
   dtype = np.dtype(dtype)
   T = _HALF_PI_QUADRANTS.get(dtype.name)
   if T is None or len(T) < quadrantOffset(L + 1):
@@ -374,9 +374,9 @@ def halfPiQuadrants(L, dtype=np.float64):
 # plane once with the phase and the mirror G[l, k, -j] = (-1)^{k+l} G[l, k, j]
 
 
-# the planes in an order that spreads the long ones (small |l| run over most degrees) over
-# the contiguous chunks the parallel loop hands its threads
 def planeOrder(real, La):
+  """the planes in an order that spreads the long ones (small |l| run over most degrees) over
+  the contiguous chunks the parallel loop hands its threads"""
   lp = np.arange(0, La + 1) if real else np.concatenate([[0], np.stack([np.arange(1, La + 1), -np.arange(1, La + 1)], 1).ravel()])
   order = np.empty_like(lp)
   order[0::2], order[1::2] = lp[:(len(lp) + 1) // 2], lp[(len(lp) + 1) // 2:][::-1]
@@ -589,9 +589,9 @@ def rowTables(L, dtype=np.float64):
   return held[1:]
 
 
-# the orders in an order that spreads the long ones (small m run over most degrees) over the
-# contiguous chunks of the parallel loop
 def orderOrder(L):
+  """the orders in an order that spreads the long ones (small m run over most degrees) over the
+  contiguous chunks of the parallel loop"""
   m = np.arange(L + 1)
   out = np.empty_like(m)
   out[0::2], out[1::2] = m[:(L + 2) // 2], m[(L + 2) // 2:][::-1]
@@ -731,8 +731,8 @@ def _projectLoop(F, L, order, Pptr, Pr, Pc, Pv, rP, Qptr, Qr, Qc, Qv, rQ, left, 
 _EMPTY = (np.zeros(1, np.int64), np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0, complex))
 
 
-# True when done: numba there and a complex array of coefficients rows
 def projectBlocks(fhat, P, Q):
+  """True when done: numba there and a complex array of coefficients rows"""
   left = P is not None and not P.isIdentity
   right = Q is not None and not Q.isIdentity
   if not (left or right):

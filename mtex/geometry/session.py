@@ -23,9 +23,9 @@ class Session:
     self.lock = threading.RLock()
     self.reset()
 
-  # the state of a fresh session: default preferences, no frames registered, the default
-  # frame minted again on first use; data objects keep the handles they hold
   def reset(self):
+    """the state of a fresh session: default preferences, no frames registered, the default
+    frame minted again on first use; data objects keep the handles they hold"""
     self.prefs = dict(_DEFAULT_PREFS)
     self.frames = []            # the register, one handle per key
     self.namedFrames = {}       # the named specimen frames, by name
@@ -36,8 +36,8 @@ class Session:
 SESSION = Session()
 
 
-# one preference, or with no name all of them as a new dict, MATLAB's struct
 def getMTEXpref(name=None, default=None):
+  """one preference, or with no name all of them as a new dict, MATLAB's struct"""
   if name is None:
     return dict(SESSION.prefs)
   return SESSION.prefs.get(name, default)
@@ -47,9 +47,9 @@ def setMTEXpref(name, value):
   SESSION.prefs[name] = value
 
 
-# a fresh session: the preferences, the register and the default frame; the way to mint
-# a default frame is what frames.py installed and stays
 def reset():
+  """a fresh session: the preferences, the register and the default frame; the way to mint
+  a default frame is what frames.py installed and stays"""
   mint = SESSION.mintDefaultFrame
   SESSION.reset()
   SESSION.mintDefaultFrame = mint

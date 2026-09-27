@@ -6,6 +6,7 @@
 # docs/plans/functions.md F5)
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -30,8 +31,8 @@ def _charpolyCoefficients(kappa):
   return c[1:]
 
 
-# 1F1(1/2; s/2; diag kappa) for a vector kappa of length s >= 2
 def mhyper(kappa):
+  """1F1(1/2; s/2; diag kappa) for a vector kappa of length s >= 2"""
   kappa = np.asarray(kappa, dtype=float).ravel()
   s = len(kappa)
   if s < 2:
@@ -95,10 +96,10 @@ def _axesMatrix(A):
   return np.asarray(A, dtype=float), None, False
 
 
-# n quaternions of the density exp(q' A diag(kappa) A' q) on S^3, exactly: rejection from the
-# angular central Gaussian envelope of Kent, Ganeiber and Mardia (arXiv 1310.8110), written for
-# exp(-x' B x) with B = A diag(max(kappa) - kappa) A' positive semidefinite
 def binghamSample(kappa, A, n, rng):
+  """n quaternions of the density exp(q' A diag(kappa) A' q) on S^3, exactly: rejection from the
+  angular central Gaussian envelope of Kent, Ganeiber and Mardia (arXiv 1310.8110), written for
+  exp(-x' B x) with B = A diag(max(kappa) - kappa) A' positive semidefinite"""
   from scipy.optimize import brentq
   lam = 2 * (np.max(kappa) - np.asarray(kappa, dtype=float))
   # b solves sum 1 / (b + lam_i) = 1 in (0, 4]
@@ -138,9 +139,9 @@ class SO3FunBingham(SO3FunGeneric):
   def bandwidth(self):
     return getMTEXpref("maxSO3Bandwidth")
 
-  # the four principal quaternion axes as orientations, MATLAB's odf.A
   @property
   def axes(self):
+    """the four principal quaternion axes as orientations, MATLAB's odf.A"""
     return orientation._fromRotation(self.A.T.copy(), (self.CS, self.SS))
 
   def mean(self):
@@ -188,10 +189,10 @@ class SO3FunBingham(SO3FunGeneric):
       raise ValueError(f"the side is 'left' or 'right', not {side!r}")
     return SO3FunBingham(self.kappa, moved.data.T, CS, SS, weight=self.weight, antipodal=self.antipodal and CS is SS)
 
-  # the pole figure by Kunze and Schaeben: on the fibre q(phi) = cos(phi/2) q1 + sin(phi/2) q2
-  # with q1 h = r and q2 = q1 (h, pi), the exponent is a + b cos phi + c sin phi and the mean
-  # over the fibre is exp(a) I0(sqrt(b^2 + c^2))
   def pdf(self, h, bandwidth=None):
+    """the pole figure by Kunze and Schaeben: on the fibre q(phi) = cos(phi/2) q1 + sin(phi/2) q2
+    with q1 h = r and q2 = q1 (h, pi), the exponent is a + b cos phi + c sin phi and the mean
+    over the fibre is exp(a) I0(sqrt(b^2 + c^2))"""
     from scipy.special import ive
     h = h if isinstance(h, vector3d) else vector3d(h)
     if h.size != 1:
@@ -225,6 +226,14 @@ class SO3FunBingham(SO3FunGeneric):
     if self.antipodal:
       lines.append("  antipodal: true")
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .polefigure import calcPoleFigure
+    from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sectionplot import plotSection
 
 
 # the four quaternion axes of a fibre: the quaternions along which h is sent to r, and
@@ -282,11 +291,11 @@ def BinghamODF(kappa, A=None, *frames, **kwargs):
   return SO3FunBingham(kappa, A, *frames, **kwargs)
 
 
-# the estimate from orientations: the eigen decomposition of the quaternion tensor of the
-# sample projected to the fundamental region about its mean gives the axes, and the
-# concentrations follow from the eigenvalues, by the large concentration approximation
-# kappa_i = -1/(2 lambda_i) shifted to a smallest value of zero, or exactly by Newton on the moments
 def calcBinghamODF(o, weights=None, exact=False):
+  """the estimate from orientations: the eigen decomposition of the quaternion tensor of the
+  sample projected to the fundamental region about its mean gives the axes, and the
+  concentrations follow from the eigenvalues, by the large concentration approximation
+  kappa_i = -1/(2 lambda_i) shifted to a smallest value of zero, or exactly by Newton on the moments"""
   o = o if isinstance(o, orientation) else orientation(o)
   m = o.mean(weights=weights)
   q = o.project2FundamentalRegion(m).data.reshape(-1, 4)
@@ -329,9 +338,9 @@ class S2FunBingham:
   def CS(self):
     return self.frame
 
-  # the principal axes as directions, the modal axis a[2], as MATLAB's a
   @property
   def a(self):
+    """the principal axes as directions, the modal axis a[2], as MATLAB's a"""
     return vector3d(self._A.T, frame=self.frame)
 
   @property
@@ -367,13 +376,13 @@ class S2FunBingham:
     rot = rotation(r.data.reshape(4))
     return S2FunBingham(self.Z, (rot * vector3d(self._A.T)).data.T, None if self.frame is None else _rotatedFrame(self.frame, rot))
 
-  # the fit to directions or axes: the eigen decomposition of the scatter matrix gives the
-  # axes, Newton on the moments the shape parameters, ascending to zero at the mode, the
-  # third axis, as in MTEX; confidenceEllipse=True returns with it the semi-axes ab, in
-  # radians, and the rotation rot of the confidence ellipse at the level p of the modal axis
-  # (Tanaka 1999), for ellipse(rot, ab[0], ab[1])
   @classmethod
   def fit(cls, v, weights=None, confidenceEllipse=False, p=0.95):
+    """the fit to directions or axes: the eigen decomposition of the scatter matrix gives the
+    axes, Newton on the moments the shape parameters, ascending to zero at the mode, the
+    third axis, as in MTEX; confidenceEllipse=True returns with it the semi-axes ab, in
+    radians, and the rotation rot of the confidence ellipse at the level p of the modal axis
+    (Tanaka 1999), for ellipse(rot, ab[0], ab[1])"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     d = v.normalize().data.reshape(-1, 3)
     w = np.full(len(d), 1 / len(d)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
@@ -406,6 +415,13 @@ class S2FunBingham:
   def __repr__(self):
     info = "" if self.frame is None else f" ({self.frame.char()})"
     return f"S2FunBingham{info}\n  Z: {np.array2string(self.Z, precision=3)}"
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plot, contourf, contour, pcolor
+    from ..plotting.spaceplot import plot3d
 
 
 __all__ = ["mhyper", "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham"]

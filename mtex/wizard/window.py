@@ -31,8 +31,8 @@ TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "pole
 
 # ------------------------------------------------------------------ the worker
 
-# a load on its own thread, the result or the exception handed back through a signal
 class LoadWorker(QObject):
+  """a load on its own thread, the result or the exception handed back through a signal"""
   done = Signal(object)
 
   def __init__(self, load):
@@ -47,9 +47,9 @@ class LoadWorker(QObject):
       self.done.emit(e)
 
 
-# the receiver on the main thread: a signal connected to a plain callable runs on the
-# emitting thread, so the commit goes through a slot of an object living here
 class LoadBridge(QObject):
+  """the receiver on the main thread: a signal connected to a plain callable runs on the
+  emitting thread, so the commit goes through a slot of an object living here"""
 
   def __init__(self, window, commit, thread):
     super().__init__(window)
@@ -121,8 +121,8 @@ class WizardWindow(QMainWindow):
 
   # ------------------------------------------------------------------ the load
 
-  # the window's shape of a load: the reading on a thread, the commit on this one
   def worker(self, load, commit):
+    """the window's shape of a load: the reading on a thread, the commit on this one"""
     thread = QThread(self)
     w = LoadWorker(load)
     w.moveToThread(thread)
@@ -160,9 +160,9 @@ class WizardWindow(QMainWindow):
       self.tabs.blockSignals(False)
     self.canvas.scheduleDraw()
 
-  # a window closed with a load still running waits for it rather than tearing the thread
-  # down; the table is silenced first, since it announces every cell as it is destroyed
   def closeEvent(self, event):
+    """a window closed with a load still running waits for it rather than tearing the thread
+    down; the table is silenced first, since it announces every cell as it is destroyed"""
     self.phases.blockSignals(True)
     for t in list(self.threads):
       t.quit()
@@ -212,8 +212,8 @@ def _loopRunning():
     return False
 
 
-# the whole window as a picture, at the size it has; wait for the load first
 def grabWindow(window, png):
+  """the whole window as a picture, at the size it has; wait for the load first"""
   window.grab().save(png)
   return png
 

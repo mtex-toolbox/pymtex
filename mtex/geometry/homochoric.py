@@ -15,15 +15,15 @@ def homochoricRadius():
   return (3 * np.pi / 4) ** (1 / 3)
 
 
-# omega - sin omega, with the series for small omega where the difference cancels
 def omegaMinusSin(omega):
+  """omega - sin omega, with the series for small omega where the difference cancels"""
   w2 = omega * omega
   series = omega ** 3 / 6 * (1 - w2 / 20 * (1 - w2 / 42 * (1 - w2 / 72)))
   return np.where(omega < 0.1, series, omega - np.sin(omega))
 
 
-# quaternion/homochoric
 def quat2homochoric(q):
+  """quaternion/homochoric"""
   a, v = q[..., 0], q[..., 1:]
   n = np.linalg.norm(v, axis=-1)
   zero = isnull(n)
@@ -32,8 +32,8 @@ def quat2homochoric(q):
   return np.where(zero[..., None], 0.0, f[..., None] * v)
 
 
-# rotation/byHomochoric: Newton on 3/4 (omega - sin omega) = rho^3
 def homochoric2quat(xyz):
+  """rotation/byHomochoric: Newton on 3/4 (omega - sin omega) = rho^3"""
   xyz = np.asarray(xyz, dtype=float)
   rho = np.linalg.norm(xyz, axis=-1)
   omega = 2 * rho
@@ -50,8 +50,8 @@ def homochoric2quat(xyz):
   return axis2quat(axis, omega)
 
 
-# the pyramid of the cube a point lies in, cuboRegionId, and the permutations of each
 def cuboRegionId(v):
+  """the pyramid of the cube a point lies in, cuboRegionId, and the permutations of each"""
   x, y, z = np.abs(v[..., 0]), np.abs(v[..., 1]), np.abs(v[..., 2])
   id = np.zeros(x.shape, dtype=int)
   id = np.where((x >= z) & (z >= y), 1, id)
@@ -70,8 +70,8 @@ def _permute(v, perm):
   return np.take_along_axis(v, perm, axis=-1)
 
 
-# homo2cubo
 def homo2cubo(h):
+  """homo2cubo"""
   h = np.asarray(h, dtype=float)
   id = cuboRegionId(h)
   w = _permute(h, CUBO_PERM[id])
@@ -91,8 +91,8 @@ def homo2cubo(h):
   return _permute(c, CUBO_IPERM[id])
 
 
-# cubo2homo
 def cubo2homo(c):
+  """cubo2homo"""
   c = np.asarray(c, dtype=float)
   id = cuboRegionId(c)
   X = _permute(c, CUBO_PERM[id])

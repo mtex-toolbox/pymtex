@@ -54,8 +54,8 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   return "\n".join(lines)
 
 
-# the one line load, for the clipboard
 def loadCall(path, dataSet=None, dataSets=(), variable="ebsd"):
+  """the one line load, for the clipboard"""
   args = [repr(os.path.abspath(path))]
   if dataSets is not None and len(dataSets) > 1 and dataSet is not None:
     args.append(f"dataSet={int(dataSet)}")
@@ -64,25 +64,25 @@ def loadCall(path, dataSet=None, dataSets=(), variable="ebsd"):
 
 # ------------------------------------------------------------------ the pieces
 
-# whether the phases differ from what the file declared, in name, group, cell, setup or colour;
-# the header side is a phase list or the value snapshot frameKeys took of one
 def phasesDiffer(phases, header):
+  """whether the phases differ from what the file declared, in name, group, cell, setup or colour;
+  the header side is a phase list or the value snapshot frameKeys took of one"""
   if header is None:
     return True
   keys = [frameKey(f) for f in header.frames] if hasattr(header, "frames") else list(header)
   return [frameKey(f) for f in phases.frames] != keys
 
 
-# the value of a frame as a tuple, what an edit changes
 def frameKey(f):
+  """the value of a frame as a tuple, what an edit changes"""
   if not f.isIndexed:
     return (False, f.name, _color(f))
   return (True, f.name, f.pointGroup, tuple(round(float(v), 6) for v in f.abc), tuple(round(float(v) / degree, 6) for v in f.abg),
           tuple(closestAlignment(f)), _color(f))
 
 
-# the phase the closing plot shows: the largest drawn indexed phase by name, the first indexed one otherwise
 def plotPhase(phases, drawn):
+  """the phase the closing plot shows: the largest drawn indexed phase by name, the first indexed one otherwise"""
   if phases is None:
     return None
   ids = [k for k, f in enumerate(phases.frames) if f.isIndexed and (drawn is None or drawn.get(k, True))]
@@ -93,8 +93,8 @@ def plotPhase(phases, drawn):
   return phases.frames[ids[0]].name
 
 
-# crystalFrame('mmm', [4.756, 10.207, 5.98], [90, 90, 90], 'X||a', 'Z||c*', mineral='Forsterite')
 def frameLiteral(f):
+  """crystalFrame('mmm', [4.756, 10.207, 5.98], [90, 90, 90], 'X||a', 'Z||c*', mineral='Forsterite')"""
   if not f.isIndexed:
     return f"notIndexedFrame({f.name!r})" if f.name != "notIndexed" else "notIndexedFrame()"
   abc = "[" + ", ".join(shortestFloat(v) for v in f.abc) + "]"
@@ -124,9 +124,9 @@ def _color(f):
   return tuple(float(shortestFloat(v)) for v in a[:3])
 
 
-# the shortest decimal that reads back as the same single precision number, so a lattice
-# parameter read off an HDF5 file prints as 4.04 and not as 4.0399999618530273
 def shortestFloat(x):
+  """the shortest decimal that reads back as the same single precision number, so a lattice
+  parameter read off an HDF5 file prints as 4.04 and not as 4.0399999618530273"""
   x = float(x)
   if abs(x - round(x)) < 1e-9 * max(1.0, abs(x)) and abs(x) < 1e12:
     return str(int(round(x)))

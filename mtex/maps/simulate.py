@@ -61,18 +61,18 @@ class simulateEBSD:
     w = max(len(k) for k, _ in rows)
     return "simulateEBSD\n" + "\n".join(f"  {k:<{w}}  {v}" for k, v in rows)
 
-  # the crystal frame is the one of ori0
   @property
   def CS(self):
+    """the crystal frame is the one of ori0"""
     return self.ori0.CS
 
   @CS.setter
   def CS(self, cs):
     self.ori0 = orientation(rotation(self.ori0.data), cs)
 
-  # the map of ori0 over the grid, every measurement of the one phase, gridded; one ori0
-  # per pixel is taken in MATLAB's order of the list, column by column
   def makeMap(self):
+    """the map of ori0 over the grid, every measurement of the one phase, gridded; one ori0
+    per pixel is taken in MATLAB's order of the list, column by column"""
     from .ebsd import EBSD
     from .phaselist import phaseList
     xs = np.arange(1, self.xdim + self.stepSize / 2, self.stepSize, dtype=float)
@@ -90,9 +90,9 @@ class simulateEBSD:
     self.domainID = None
     return self
 
-  # every orientation turned on the specimen side about a random axis by a random angle:
-  # uniform up to noiseMax, or lognormal scaled so that the largest is noiseMax
   def addnoise(self):
+    """every orientation turned on the specimen side about a random axis by a random angle:
+    uniform up to noiseMax, or lognormal scaled so that the largest is noiseMax"""
     e = self.EBSDsim
     n = e.size
     rng = np.random.default_rng() if self.rng is None else self.rng
@@ -110,18 +110,18 @@ class simulateEBSD:
   def _axis(self):
     return np.asarray(self.axS.normalize().data, dtype=float).reshape(3)
 
-  # the orientations of the right third and the upper half of the middle third turned by
-  # mori_angle about axS: a known low angle boundary along the edge of that domain
   def addFeature_singleStep(self):
+    """the orientations of the right third and the upper half of the middle third turned by
+    mori_angle about axS: a known low angle boundary along the edge of that domain"""
     X, Y = self.xdim, self.ydim
     poly = np.array([[X / 3, 0], [X / 3, Y / 2], [2 * X / 3, Y / 2], [2 * X / 3, Y], [X, Y], [X, 0]], dtype=float)
     self.domainID = self.EBSDsim.inpolygon(poly)
     _turn(self.EBSDsim, self.domainID, self._axis() * self.mori_angle)
     return self
 
-  # the orientations of a disc at the centre, of a quarter of the smaller extent, turned by
-  # mori_angle about axS
   def addFeature_circularSubgrain(self):
+    """the orientations of a disc at the centre, of a quarter of the smaller extent, turned by
+    mori_angle about axS"""
     c = np.array([self.xdim / 2, self.ydim / 2])
     r = c.min() / 2
     t = np.linspace(0, 2 * np.pi, 360)
@@ -129,10 +129,10 @@ class simulateEBSD:
     _turn(self.EBSDsim, self.domainID, self._axis() * self.mori_angle)
     return self
 
-  # every orientation turned about axS by mori_angle for every step of its position along
-  # gradDir, the direction squared componentwise as MATLAB's updateOri takes it; an axis
-  # given as a crystal direction is carried into the specimen by every orientation
   def addFeature_simpleGradient(self):
+    """every orientation turned about axS by mori_angle for every step of its position along
+    gradDir, the direction squared componentwise as MATLAB's updateOri takes it; an axis
+    given as a crystal direction is carried into the specimen by every orientation"""
     e = self.EBSDsim
     q = e.rotations.data.reshape(-1, 4)
     if isinstance(getattr(self.axS, "frame", None), crystalFrame):

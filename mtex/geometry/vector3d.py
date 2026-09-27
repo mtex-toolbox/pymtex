@@ -13,6 +13,7 @@
 # join in G4.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
@@ -20,8 +21,8 @@ from .display import sizeString, table
 from .representations import isnull, orthKernel
 
 
-# a property of the class itself, vector3d.X
 class classproperty:
+  """a property of the class itself, vector3d.X"""
   def __init__(self, f):
     self.f = f
 
@@ -85,10 +86,10 @@ class vector3d(MtexArray):
 
   # ------------------------------------------------------------------ the frame
 
-  # the reference frame this vector is expressed in, None for frame-free data; assigning a
-  # frame keeps the components, assigning CS keeps the indices
   @property
   def frame(self):
+    """the reference frame this vector is expressed in, None for frame-free data; assigning a
+    frame keeps the components, assigning CS keeps the indices"""
     return self._frame
 
   @frame.setter
@@ -142,9 +143,9 @@ class vector3d(MtexArray):
   def convention(self, s):
     self.dispStyle = s
 
-  # the indices in the convention the vector is written in
   @property
   def coordinates(self):
+    """the indices in the convention the vector is written in"""
     return self.data if self.dispStyle == "xyz" else getattr(self, self.dispStyle)
 
   @coordinates.setter
@@ -196,9 +197,9 @@ class vector3d(MtexArray):
     self.dispStyle = "uvw"
     self.isNormalized = False
 
-  # the Weber indices: U = 2u - v, V = 2v - u, T = -(u + v), W = 3w
   @property
   def UVTW(self):
+    """the Weber indices: U = 2u - v, V = 2v - u, T = -(u + v), W = 3w"""
     u, v, w = np.moveaxis(self.uvw, -1, 0)
     return np.stack([2 * u - v, 2 * v - u, -u - v, 3 * w], axis=-1)
 
@@ -223,18 +224,18 @@ class vector3d(MtexArray):
   T = property(lambda self: self.UVTW[..., 2])
   W = property(lambda self: self.UVTW[..., 3])
 
-  # the distance between the lattice planes with this normal, in the units of the cell
   def dspacing(self):
+    """the distance between the lattice planes with this normal, in the units of the cell"""
     self._needsCrystal()
     return 1 / self.norm()
 
-  # a crystal direction rounded to integer indices, vector3d/round
   def round(self, style=None, maxHKL=12):
+    """a crystal direction rounded to integer indices, vector3d/round"""
     from .miller import roundIndices
     return roundIndices(self, style, maxHKL)
 
-  # the indices in brackets, {111} or [uvw], Miller/char
   def char(self, style=None, utf8=None, family=None):
+    """the indices in brackets, {111} or [uvw], Miller/char"""
     from .miller import indexChar
     return indexChar(self, style, utf8, family)
 
@@ -248,28 +249,28 @@ class vector3d(MtexArray):
 
   # ------------------------------------------------------------------ constructors
 
-  # vector3d.load('vectors.txt', columnNames=[...]): the directions a text table holds, read
-  # by the interfaces layer above this one; loadVector3d returns the other columns too
   @classmethod
   def load(cls, fname, *args, **kwargs):
+    """vector3d.load('vectors.txt', columnNames=[...]): the directions a text table holds, read
+    by the interfaces layer above this one; loadVector3d returns the other columns too"""
     from ..io.vectors import loadVector3d
     return loadVector3d(fname, *args, **kwargs)[0]
 
-  # v.calcDensity(): the kernel density estimate of a list of directions, by the function
-  # spaces above this layer, vector3d/calcDensity
   def calcDensity(self, *args, **kwargs):
+    """v.calcDensity(): the kernel density estimate of a list of directions, by the function
+    spaces above this layer, vector3d/calcDensity"""
     from ..functions.density import calcDensity
     return calcDensity(self, *args, **kwargs)
 
-  # interp(v, y, 'linear' | 'harmonic' | 'nearest' | 'inverseDistance'): a function on the
-  # sphere through the values y at the directions v, by the function spaces above this
-  # layer, vector3d/interp; interp(v, y, vi, ...) its values at vi
   def interp(self, y, *args, **kwargs):
+    """interp(v, y, 'linear' | 'harmonic' | 'nearest' | 'inverseDistance'): a function on the
+    sphere through the values y at the directions v, by the function spaces above this
+    layer, vector3d/interp; interp(v, y, vi, ...) its values at vi"""
     from ..functions.density import interpS2
     return interpS2(self, y, *args, **kwargs)
 
-  # v.export('vectors.txt'): the directions written as a text table
   def export(self, fname, *args, **kwargs):
+    """v.export('vectors.txt'): the directions written as a text table"""
     from ..io.vectors import exportVector3d
     return exportVector3d(self, fname, *args, **kwargs)
 
@@ -280,9 +281,9 @@ class vector3d(MtexArray):
     v.isNormalized = True
     return v
 
-  # an N x 3 or N x 2 matrix, z zero in the second case
   @classmethod
   def byXYZ(cls, xyz):
+    """an N x 3 or N x 2 matrix, z zero in the second case"""
     xyz = np.asarray(xyz, dtype=float)
     if xyz.size == 0 and xyz.ndim < 2:
       xyz = np.zeros((0, 3))
@@ -292,9 +293,9 @@ class vector3d(MtexArray):
       xyz = np.concatenate([xyz, np.zeros((xyz.shape[0], 1))], axis=-1)
     return cls(xyz)
 
-  # uniformly distributed unit vectors or axes
   @classmethod
   def rand(cls, *shape, antipodal=False, rng=None):
+    """uniformly distributed unit vectors or axes"""
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     theta = np.arccos(2 * rng.random(shape) - 1)
@@ -356,8 +357,8 @@ class vector3d(MtexArray):
   def xyz(self):
     return self.data
 
-  # polar angle to z in [0, pi] and azimuth from x towards y in [0, 2pi), vector3d/polar
   def polar(self):
+    """polar angle to z in [0, pi] and azimuth from x towards y in [0, 2pi), vector3d/polar"""
     r = np.ones(self.shape) if self.isNormalized else self.norm()
     rho = np.arctan2(self.y, self.x)
     rho = rho + (rho < 0) * 2 * np.pi
@@ -372,11 +373,11 @@ class vector3d(MtexArray):
   def rho(self):
     return self.polar()[1]
 
-  # the mean distance between the points (MATLAB vector3d.resolution): the whole circle
-  # for up to four points, the square root of the median Voronoi cell area up to fifty
-  # thousand, the equal area estimate beyond; a grid knows its own
   @property
   def resolution(self):
+    """the mean distance between the points (MATLAB vector3d.resolution): the whole circle
+    for up to four points, the square root of the median Voronoi cell area up to fifty
+    thousand, the equal area estimate beyond; a grid knows its own"""
     n = self.size
     if n <= 4:
       return 2 * np.pi
@@ -469,9 +470,9 @@ class vector3d(MtexArray):
 
   # ------------------------------------------------------------------ products and angles
 
-  # the inner product; an axis on either side reads it up to sign; a crystal direction
-  # reduces over the group of its frame unless noSymmetry says otherwise
   def dot(self, other, antipodal=False, noAntipodal=False, noSymmetry=False, min=False, all=False):
+    """the inner product; an axis on either side reads it up to sign; a crystal direction
+    reduces over the group of its frame unless noSymmetry says otherwise"""
     other = self._coerce(other)
     _joinFrames(self._frame, other._frame)
     if not noSymmetry:
@@ -484,9 +485,9 @@ class vector3d(MtexArray):
       d = np.abs(d)
     return d
 
-  # the cross product of two plane normals is a lattice direction and the one of two
-  # directions a plane normal, so the indices switch sides
   def cross(self, other):
+    """the cross product of two plane normals is a lattice direction and the one of two
+    directions a plane normal, so the indices switch sides"""
     other = self._coerce(other)
     attrs = self._joined(other, antipodal=self.antipodal or other.antipodal)
     attrs["dispStyle"] = _otherStyle(attrs["dispStyle"])
@@ -495,9 +496,9 @@ class vector3d(MtexArray):
   def norm(self):
     return np.linalg.norm(self.data, axis=-1)
 
-  # the angle between two vectors, through atan2 for full accuracy near 0 and pi; with a
-  # normal N the angle in that plane, counterclockwise from self to other
   def angle(self, other, N=None, antipodal=False, noSymmetry=False):
+    """the angle between two vectors, through atan2 for full accuracy near 0 and pi; with a
+    normal N the angle in that plane, counterclockwise from self to other"""
     other = self._coerce(other)
     _joinFrames(self._frame, other._frame)
     if not noSymmetry and N is None:
@@ -517,9 +518,9 @@ class vector3d(MtexArray):
     c = np.linalg.norm(np.cross(self.data, other.data), axis=-1)
     return np.arctan2(c, np.abs(d) if isAntipodal else d)
 
-  # every pair: the angles and the inner products of the entries of self against the
-  # entries of other, an array of shape self.shape + other.shape
   def angle_outer(self, other, **kwargs):
+    """every pair: the angles and the inner products of the entries of self against the
+    entries of other, an array of shape self.shape + other.shape"""
     other = self._coerce(other)
     a = self.reshape(self.shape + (1,) * other.ndim)
     b = other.reshape((1,) * self.ndim + other.shape)
@@ -531,8 +532,8 @@ class vector3d(MtexArray):
     b = other.reshape((1,) * self.ndim + other.shape)
     return a.dot(b, **kwargs)
 
-  # the component orthogonal to a normal N, vector3d/orthProj
   def orthProj(self, N):
+    """the component orthogonal to a normal N, vector3d/orthProj"""
     n = self._coerce(N).normalize()
     return self - n * self.dot(n, noAntipodal=True, noSymmetry=True)
 
@@ -565,12 +566,12 @@ class vector3d(MtexArray):
     with np.errstate(invalid="ignore", divide="ignore"):
       return self._new(self.data / n[..., None], isNormalized=True)
 
-  # an arbitrary orthogonal direction, vector3d/orth
   def orth(self):
+    """an arbitrary orthogonal direction, vector3d/orth"""
     return self._new(orthKernel(self.data), isNormalized=True)
 
-  # the axis best orthogonal to a list of directions, the smallest principal axis
   def perp(self, robust=False):
+    """the axis best orthogonal to a list of directions, the smallest principal axis"""
     v = self[~self.isnan()] if np.any(self.isnan()) else self
     xyz = v.data.reshape(-1, 3)
     w, V = np.linalg.eigh(xyz.T @ xyz)
@@ -582,8 +583,8 @@ class vector3d(MtexArray):
         N = v[keep].perp()
     return N
 
-  # the principal axes of the moment matrix and its eigenvalues, vector3d/eig
   def eig(self):
+    """the principal axes of the moment matrix and its eigenvalues, vector3d/eig"""
     xyz = self.data.reshape(-1, 3)
     w, V = np.linalg.eigh(xyz.T @ xyz)
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)
@@ -592,9 +593,9 @@ class vector3d(MtexArray):
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._new(np.sum(self.data, axis=axis), **self._joined(None))
 
-  # the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
-  # largest principal axis of the moment matrix
   def mean(self, weights=None, antipodal=False, robust=False, axis=None, noSymmetry=False):
+    """the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
+    largest principal axis of the moment matrix"""
     if not noSymmetry and self.isCrystalDirection and self._frame.numSym() > 1 and self.size > 1:
       from .symmetryops import symMean
       return symMean(self, weights=weights)
@@ -614,9 +615,9 @@ class vector3d(MtexArray):
       return self._new(np.sum(self.data * w[..., None], axis=axis), **self._joined(None)).normalize()
     return self._new(np.nanmean(self.data, axis=axis), **self._joined(None))
 
-  # the disjoint list of vectors up to a tolerance, vector3d/unique; under a group the
-  # directions are projected to the fundamental sector first
   def unique(self, tolerance=1e-6, antipodal=False, noAntipodal=False, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
+    """the disjoint list of vectors up to a tolerance, vector3d/unique; under a group the
+    directions are projected to the fundamental sector first"""
     if not noSymmetry and self.isCrystalDirection and self._frame.numSym() > 1:
       from .symmetryops import symUnique
       return symUnique(self, tolerance, return_index, return_inverse)
@@ -631,10 +632,10 @@ class vector3d(MtexArray):
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
 
-  # rotating keeps the frame; an orientation lands in its target frame; a number turns
-  # about z
-  # eq(v, w, antipodal=True): equal up to symmetry, and up to sign when antipodal
   def eq(self, other, antipodal=False, tolerance=None):
+    """rotating keeps the frame; an orientation lands in its target frame; a number turns
+    about z
+    eq(v, w, antipodal=True): equal up to symmetry, and up to sign when antipodal"""
     if antipodal:
       a = self._new(self.data, antipodal=True)
       return a.__eq__(other) if tolerance is None else a.__eq__(other, tolerance)
@@ -651,14 +652,14 @@ class vector3d(MtexArray):
     from .kernels import qrot
     return self._new(qrot(q, self.data))
 
-  # the rotation vector to its rotation: at the identity, or at a reference as a tangent vector
   def exp(self, ref=None, side=None):
+    """the rotation vector to its rotation: at the identity, or at a reference as a tangent vector"""
     from .tangent import expVector
     return expVector(self, ref, side)
 
-  # the symmetrically equivalent directions, the number of distinct ones, and the
-  # representative in the fundamental sector of the frame
   def symmetrise(self, unique=False, antipodal=None, noAntipodal=False):
+    """the symmetrically equivalent directions, the number of distinct ones, and the
+    representative in the fundamental sector of the frame"""
     from .symmetryops import symmetrise
     return symmetrise(self, unique=unique, antipodal=antipodal, noAntipodal=noAntipodal)
 
@@ -673,19 +674,19 @@ class vector3d(MtexArray):
       v = self._new(self.data, _frame=self._frame.Laue())
     return project2FundamentalRegion(v, center)
 
-  # the closest points of this list to others, the k closest, or all within a radius
   def find(self, w, epsOrK=None, antipodal=False):
+    """the closest points of this list to others, the k closest, or all within a radius"""
     from .grids.search import find
     return find(self, w, epsOrK, antipodal)
 
-  # the same direction written in another frame
   def transformReferenceFrame(self, to, rule=None, tolerance=1e-1):
+    """the same direction written in another frame"""
     from .frametransform import transformVector
     return transformVector(self, to, rule, tolerance)
 
-  # the triple product, vector3d/det
-  # det(a, b, c) the triple product; det(v) of three vectors the determinant of their matrix
   def det(self, b=None, c=None):
+    """the triple product, vector3d/det
+    det(a, b, c) the triple product; det(v) of three vectors the determinant of their matrix"""
     if b is None:
       return np.linalg.det(self.data.reshape(3, 3))
     return self.dot(b.cross(c), noAntipodal=True)
@@ -714,6 +715,14 @@ class vector3d(MtexArray):
     from .frames import specimenFrame
     fr = self._frame if self._frame is not None else specimenFrame.default
     return fr.conventionChar(self.how2plot)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..functions.polefigure import calcQuadratureWeights, refine
+    from ..analysis.cluster import calcCluster
+    from ..plotting.sphericalplot import plot, scatter, text, contourf, contour, pcolor, quiver, pcolor as smooth
+    from ..plotting.spaceplot import plot3d, scatter3d, arrow3d
+    from ..plotting.grainplots import histogram
 
 
 # rows equal up to a tolerance: the first index of each and the inverse map
@@ -775,6 +784,13 @@ def __getattr__(name):
   if name in _CONSTANTS:
     return vector3d(_CONSTANTS[name].copy(), isNormalized=True)
   raise AttributeError(name)
+
+
+# what an editor reads for them
+if TYPE_CHECKING:
+  xvector: vector3d
+  yvector: vector3d
+  zvector: vector3d
 
 
 

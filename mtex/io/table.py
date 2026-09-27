@@ -25,13 +25,13 @@ def readFile(path):
     return f.read()
 
 
-# a vendor file is ascii; a mineral name in latin-1 is read as such rather than failing
 def text(line):
+  """a vendor file is ascii; a mineral name in latin-1 is read as such rather than failing"""
   return line.decode("ascii", errors="replace") if isinstance(line, bytes) else line
 
 
-# the numeric block that begins at offset, one row per line, as an (n, k) array
 def readTable(data, offset=0, comments=None, delimiter=None):
+  """the numeric block that begins at offset, one row per line, as an (n, k) array"""
   block = data[offset:] if offset else data
   if delimiter is not None and delimiter.strip():
     block = block.replace(delimiter.encode(), b" ")
@@ -54,9 +54,9 @@ def _decimalComma(block, comments):
   return False
 
 
-# the lines before the first one that stop accepts, and the offset of that line; the file
-# is not cut into lines beyond the header, which for a map of millions is the whole cost
 def leadingLines(data, stop):
+  """the lines before the first one that stop accepts, and the offset of that line; the file
+  is not cut into lines beyond the header, which for a map of millions is the whole cost"""
   lines = []
   pos, n = 0, len(data)
   while pos < n:
@@ -72,8 +72,8 @@ def leadingLines(data, stop):
   return lines, n
 
 
-# count lines from offset on, and the offset after them
 def linesFrom(data, offset, count):
+  """count lines from offset on, and the offset after them"""
   lines = []
   pos, n = offset, len(data)
   for _ in range(count):
@@ -89,8 +89,8 @@ def linesFrom(data, offset, count):
 
 # ------------------------------------------------------------------ the header
 
-# a header value as MATLAB's coerceNumeric reads it: one number where it is one, the text otherwise
 def coerceNumeric(value):
+  """a header value as MATLAB's coerceNumeric reads it: one number where it is one, the text otherwise"""
   s = value.strip()
   if not s:
     return s
@@ -100,8 +100,8 @@ def coerceNumeric(value):
     return s
 
 
-# the field name MATLAB's makeValidName gives a header key
 def validName(key):
+  """the field name MATLAB's makeValidName gives a header key"""
   name = re.sub(r"[^A-Za-z0-9_]", "_", key.strip())
   if not name:
     return ""
@@ -110,8 +110,8 @@ def validName(key):
   return name
 
 
-# the flat header of the loaders, MATLAB's buildHeaderStruct: valid names, numbers where they are
 def headerDict(pairs):
+  """the flat header of the loaders, MATLAB's buildHeaderStruct: valid names, numbers where they are"""
   header = {}
   for key, value in pairs:
     name = validName(key)
@@ -128,10 +128,10 @@ def isNumericRow(line):
   return bool(line.strip()) and _NUMBER.match(line) is not None
 
 
-# columns under a line of their names, six significant digits, every column as wide as its
-# widest entry, as MATLAB's cprintf writes a file; row names in a first column, one width
-# for all columns as cprintf prints
 def tableLines(names, cols, rowNames=None, uniform=False):
+  """columns under a line of their names, six significant digits, every column as wide as its
+  widest entry, as MATLAB's cprintf writes a file; row names in a first column, one width
+  for all columns as cprintf prints"""
   cells = [[f"{x:g}" for x in np.asarray(c, dtype=float).reshape(-1)] for c in cols]
   if names is None:
     names = [""] * len(cells)
@@ -151,9 +151,9 @@ def writeTable(fname, names, cols):
     f.write("\n".join(tableLines(names, cols)) + "\n")
 
 
-# MATLAB's cprintf(d, '-Lc', labels, '-Lr', rows): a matrix printed as a table, a vector as
-# one row
 def cprintf(d, *args, Lc=None, Lr=None):
+  """MATLAB's cprintf(d, '-Lc', labels, '-Lr', rows): a matrix printed as a table, a vector as
+  one row"""
   opts = dict(zip(args[::2], args[1::2]))
   Lc, Lr = opts.get("-Lc", Lc), opts.get("-Lr", Lr)
   d = np.atleast_2d(np.asarray(d, dtype=float))

@@ -18,8 +18,8 @@ from .criteria import connectivity
 from .decomposition import NO_PIXEL
 
 
-# the component of every node of a graph on n nodes with edges (a, b), labelled by a root
 def components(n, a, b, backend=None):
+  """the component of every node of a graph on n nodes with edges (a, b), labelled by a root"""
   backend = getMTEXpref("kernels", "numba") if backend is None else backend
   if backend == "numba":
     from .kernels import unionFind
@@ -42,9 +42,9 @@ class segmentation:
     return f"segmentation\n  grains: {self.nGrains}\n  faces: {len(self.connect)}\n  inner faces: {int(self.isInner.sum())}\n  outer faces: {int(self.isOuter.sum())}"
 
 
-# the criterion on every face of the complex, zero where there is no pair to judge: a face
-# against a site that carries no measurement is a border of the map
 def faceConnectivity(c, ebsd, crit):
+  """the criterion on every face of the complex, zero where there is no pair to judge: a face
+  against a site that carries no measurement is a border of the map"""
   p1, p2 = c.site2pixel[c.cells[:, 0]], c.site2pixel[c.cells[:, 1]]
   inner = (p1 >= 0) & (p2 >= 0)
   connect = np.zeros(len(c), dtype=float)
@@ -53,12 +53,12 @@ def faceConnectivity(c, ebsd, crit):
   return connect
 
 
-# the connected components of the faces the criterion joins, and the flags that say what
-# every face became; the grains are numbered over the measurements that have a cell, in
-# order of first appearance, so an absorbed pixel does not open a grain of its own. With
-# mcl = (p, maxIter) the links go through Markov clustering first (MATLAB's 'mcl'): the
-# grains are the components of what it keeps, and a pair it keeps no link for is a boundary
 def segmentFrom(c, ebsd, connect, backend=None, mcl=None):
+  """the connected components of the faces the criterion joins, and the flags that say what
+  every face became; the grains are numbered over the measurements that have a cell, in
+  order of first appearance, so an absorbed pixel does not open a grain of its own. With
+  mcl = (p, maxIter) the links go through Markov clustering first (MATLAB's 'mcl'): the
+  grains are the components of what it keeps, and a pair it keeps no link for is a boundary"""
   n = ebsd.size
   p1, p2 = c.site2pixel[c.cells[:, 0]], c.site2pixel[c.cells[:, 1]]
   connect = np.asarray(connect, dtype=float)
@@ -99,9 +99,9 @@ def _mclLinks(n, p1, p2, connect, join, mcl):
   return M.row[keep], M.col[keep], ~linked
 
 
-# the grains numbered from 1 in order of the first measurement of their component, over the
-# measurements that have a cell
 def relabel(raw, hasCell, backend=None):
+  """the grains numbered from 1 in order of the first measurement of their component, over the
+  measurements that have a cell"""
   n = len(raw)
   if (getMTEXpref("kernels", "numba") if backend is None else backend) == "numba":
     from .kernels import grainKernel

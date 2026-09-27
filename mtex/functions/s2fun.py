@@ -12,6 +12,7 @@
 # v.shape + sF.shape, and the moments are one per function.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -40,8 +41,8 @@ def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
 
 
-# an axis valued function has even degrees only
 def evenize(fhat):
+  """an axis valued function has even degrees only"""
   L = math.isqrt(fhat.shape[-1]) - 1
   for l in range(1, L + 1, 2):
     fhat[..., l * l:(l + 1) ** 2] = 0
@@ -58,12 +59,12 @@ def _degrees(n):
   return np.floor(np.sqrt(np.arange(n))).astype(int)
 
 
-# the projection onto the functions invariant under a group, in place: an element s acts by
-# f(s^-1 v) with its parity eps_s on the degree, so degree l projects by the mean of
-# eps_s^l D_l(r_s). On the even degrees that is the projection P_K onto the rotation parts K
-# of all elements; on the odd ones the proper elements H count +1 and the improper ones -1,
-# which sums to 2|H|/|G| P_H - P_K. Both are the held projections of H5
 def projectSpherical(fhat, pg):
+  """the projection onto the functions invariant under a group, in place: an element s acts by
+  f(s^-1 v) with its parity eps_s on the degree, so degree l projects by the mean of
+  eps_s^l D_l(r_s). On the even degrees that is the projection P_K onto the rotation parts K
+  of all elements; on the odd ones the proper elements H count +1 and the improper ones -1,
+  which sums to 2|H|/|G| P_H - P_K. Both are the held projections of H5"""
   L = math.isqrt(fhat.shape[-1]) - 1
   dtype = fhat.real.dtype
   K = invariantProjection(pg, L, dtype)
@@ -131,9 +132,9 @@ class S2FunHarmonic:
       setattr(f, k, v)
     return f
 
-  # from weighted samples; the weights integrate to 4 pi, a quadrature grid brings its own
   @classmethod
   def quadrature(cls, nodes, values=None, frame=None, *, bandwidth=None, weights=None, real=None, antipodal=None):
+    """from weighted samples; the weights integrate to 4 pi, a quadrature grid brings its own"""
     # quadrature(fun, cs): a callable takes the frame second
     if callable(nodes) and not isinstance(nodes, vector3d) and (values is None or isinstance(values, referenceFrame)):
       return cls(nodes, values if frame is None else frame, bandwidth=bandwidth, real=real, antipodal=bool(antipodal))
@@ -155,10 +156,10 @@ class S2FunHarmonic:
 
   approximate = quadrature
 
-  # S2FunHarmonic.adjointNFSFT(v, values, bandwidth=32): the adjoint transform, the
-  # coefficients sum_j w_j y_j conj(Y(v_j)) with unit weights unless given, a grid's own on a grid
   @classmethod
   def adjointNFSFT(cls, nodes, values, *, bandwidth=128, weights=None):
+    """S2FunHarmonic.adjointNFSFT(v, values, bandwidth=32): the adjoint transform, the
+    coefficients sum_j w_j y_j conj(Y(v_j)) with unit weights unless given, a grid's own on a grid"""
     values = np.asarray(values)
     if isinstance(nodes, quadratureS2Grid):
       L, w, v = nodes.bandwidth, nodes.weights if weights is None else weights, nodes
@@ -170,9 +171,9 @@ class S2FunHarmonic:
 
   adjoint = adjointNFSFT
 
-  # S2FunHarmonic.unimodal(v, halfwidth=w): MATLAB's other name of S2Fun.unimodal
   @staticmethod
   def unimodal(*args, **kwargs):
+    """S2FunHarmonic.unimodal(v, halfwidth=w): MATLAB's other name of S2Fun.unimodal"""
     from .s2funclass import S2Fun
     return S2Fun.unimodal(*args, **kwargs)
 
@@ -185,16 +186,16 @@ class S2FunHarmonic:
   def CS(self):
     return self.frame
 
-  # the plotting convention of the frame, or the session's
   @property
   def how2plot(self):
+    """the plotting convention of the frame, or the session's"""
     from ..geometry.plottingconvention import plottingConvention
     pC = getattr(self.frame, "how2plot", None)
     return plottingConvention(pC if pC is not None else plottingConvention.default)
 
-  # the coefficients in MTEX's basis, as MATLAB's sF.fhat reads and assigns them
   @property
   def fhat(self):
+    """the coefficients in MTEX's basis, as MATLAB's sF.fhat reads and assigns them"""
     return mtexCoefficientsS2(self._fhat)
 
   @fhat.setter
@@ -205,14 +206,14 @@ class S2FunHarmonic:
   def bandwidth(self):
     return math.isqrt(self._fhat.shape[-1]) - 1
 
-  # sF.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does
   @bandwidth.setter
   def bandwidth(self, L):
+    """sF.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does"""
     self._fhat = _cut(self._fhat, int(L))
 
-  # the shape of a list of functions, () for one
   @property
   def shape(self):
+    """the shape of a list of functions, () for one"""
     return self._fhat.shape[:-1]
 
   @property
@@ -232,9 +233,9 @@ class S2FunHarmonic:
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
-  # the list transposed, a row of n functions becoming a column, and MATLAB's ' as sF.conj().T
   @property
   def T(self):
+    """the list transposed, a row of n functions becoming a column, and MATLAB's ' as sF.conj().T"""
     if not self.shape:
       return self
     if len(self.shape) == 1:
@@ -253,9 +254,9 @@ class S2FunHarmonic:
   def power(self):
     return np.stack([np.linalg.norm(self._fhat[..., l * l:(l + 1) ** 2], axis=-1) for l in range(self.bandwidth + 1)], axis=-1)
 
-  # the coefficients up to degree L; without L the trailing degrees whose power, damped by
-  # (l+1)^2, stays below 1e-8 of the largest are dropped, MATLAB's truncate
   def truncate(self, L=None):
+    """the coefficients up to degree L; without L the trailing degrees whose power, damped by
+    (l+1)^2, stays below 1e-8 of the largest are dropped, MATLAB's truncate"""
     if L is None:
       l = _degrees(self._fhat.shape[-1])
       w = np.abs(self._fhat / (l + 1) ** 2) ** 2
@@ -290,9 +291,9 @@ class S2FunHarmonic:
 
   # ------------------------------------------------------------------ symmetry
 
-  # the projection onto the functions invariant under the group of the frame, or under a
-  # list of rotations forming a group the frame does not name; an axis valued function is even
   def symmetrise(self, rots=None):
+    """the projection onto the functions invariant under the group of the frame, or under a
+    list of rotations forming a group the frame does not name; an axis valued function is even"""
     # symmetrise(sF, frame): the function averaged over the group of the frame, in that frame
     if isinstance(rots, referenceFrame):
       return S2FunHarmonic(self._fhat, rots, real=self.isReal, antipodal=self.antipodal, _internal=True)
@@ -309,8 +310,8 @@ class S2FunHarmonic:
       evenize(fhat)
     return self._rebuild(fhat)
 
-  # the even part, f(v) + f(-v) over two
   def even(self):
+    """the even part, f(v) + f(-v) over two"""
     return self._rebuild(evenize(self._fhat.copy()), antipodal=True)
 
   # ------------------------------------------------------------------ the algebra
@@ -401,24 +402,24 @@ class S2FunHarmonic:
 
   # ------------------------------------------------------------------ the moments
 
-  # the mean over the sphere, int f dS / 4 pi, one per function; with an axis the mean
-  # function along that axis of a list
   def mean(self, axis=None):
+    """the mean over the sphere, int f dS / 4 pi, one per function; with an axis the mean
+    function along that axis of a list"""
     if axis is not None:
       return self._rebuild(np.mean(self._fhat, axis=_leadingAxis(axis, self.shape)))
     x = self._fhat[..., 0] / math.sqrt(4 * math.pi)
     x = x.real if self.isReal else x
     return x[()] if x.ndim == 0 else x
 
-  # the integral over the sphere, int f dS, S2Fun/sum; with an axis the sum of the functions
-  # along that axis of a list
   def sum(self, axis=None):
+    """the integral over the sphere, int f dS, S2Fun/sum; with an axis the sum of the functions
+    along that axis of a list"""
     if axis is not None:
       return self._rebuild(np.sum(self._fhat, axis=_leadingAxis(axis, self.shape)))
     return 4 * math.pi * self.mean()
 
-  # the L2 norm for the normalised surface measure, or the Sobolev norm, one per function
   def norm(self, s=None):
+    """the L2 norm for the normalised surface measure, or the Sobolev norm, one per function"""
     if s is None:
       n = np.linalg.norm(self._fhat, axis=-1) / math.sqrt(4 * math.pi)
     else:
@@ -492,6 +493,13 @@ class S2FunHarmonic:
     if not self.isReal:
       lines.append("  isReal: false")
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plot, contourf, contour, pcolor
+    from ..plotting.spaceplot import plot3d
 
 
 def _cut(fhat, L):

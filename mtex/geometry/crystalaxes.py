@@ -21,8 +21,8 @@ from .latticetype import latticeType
 ALIGNMENT_VENDORS = ("EDAX", "TSL", "OIM")
 
 
-# missing lengths and angles are filled the way MTEX fills them
 def completeCell(abc, abg):
+  """missing lengths and angles are filled the way MTEX fills them"""
   a, b, c = (float(x) for x in abc)
   if c == 0:
     c = max(a, b, c)
@@ -46,8 +46,8 @@ def completeCell(abc, abg):
   return (a, b, c), (alpha, beta, gamma)
 
 
-# a lattice constrains its cell
 def checkCell(lattice, abc, abg, uniqueAxis=1):
+  """a lattice constrains its cell"""
   a, b, c = abc
   if lattice is latticeType.monoclinic:
     if not all(abs(abg[k] - np.pi / 2) < 1e-5 for k in range(3) if k != uniqueAxis):
@@ -60,24 +60,24 @@ def checkCell(lattice, abc, abg, uniqueAxis=1):
       raise ValueError(f"for a {lattice} lattice a, b and c must be equal")
 
 
-# the axes in the default alignment X||a*, Z||c, from the metric
 def defaultAxes(abc, abg):
+  """the axes in the default alignment X||a*, Z||c, from the metric"""
   (a, b, c), (alpha, beta, gamma) = abc, abg
   ca, cb, cg, sa = np.cos(alpha), np.cos(beta), np.cos(gamma), np.sin(alpha)
   V = np.sqrt(1 + 2 * ca * cb * cg - ca ** 2 - cb ** 2 - cg ** 2)
   return np.array([[a * V / sa, a * (cg - ca * cb) / sa, a * cb], [0, b * sa, b * ca], [0, 0, c]])
 
 
-# the reciprocal axes a*, b*, c*
 def reciprocalAxes(axes):
+  """the reciprocal axes a*, b*, c*"""
   axes = np.asarray(axes, dtype=float)
   a, b, c = axes
   d = np.dot(a, np.cross(b, c))
   return np.array([np.cross(b, c), np.cross(c, a), np.cross(a, b)]) / d
 
 
-# 'X||a', 'a||X', 'z||c*' -> ('X', 'a'), ('Z', 'c*')
 def parseAlignment(s):
+  """'X||a', 'a||X', 'z||c*' -> ('X', 'a'), ('Z', 'c*')"""
   m = re.match(r"^\s*([xyzXYZ])\s*\|\|\s*([abcdmABCDM]\*?)\s*$", s)
   if m is not None:
     return m.group(1).upper(), m.group(2).lower()
@@ -91,8 +91,8 @@ def isAlignment(s):
   return isinstance(s, str) and (s.upper() in ALIGNMENT_VENDORS or re.match(r"^\s*([xyzXYZ]\s*\|\|\s*[abcdmABCDM]\*?|[abcdmABCDM]\*?\s*\|\|\s*[xyzXYZ])\s*$", s) is not None)
 
 
-# the lattice direction named by an alignment token
 def latticeDirection(token, axes, dual):
+  """the lattice direction named by an alignment token"""
   a, b, c = axes
   table = {"a": a, "b": b, "c": c, "a*": dual[0], "b*": dual[1], "c*": dual[2], "m": a + b, "d": a + b + c}
   try:
@@ -105,8 +105,8 @@ def _unit(v):
   return v / np.linalg.norm(v)
 
 
-# the axes turned into the requested alignment
 def alignAxes(axes, alignment):
+  """the axes turned into the requested alignment"""
   spec = dict(parseAlignment(s) for s in alignment)
   # with no Z and at most one of X, Y given, Z follows c - or c* when a direct axis was named
   if "Z" not in spec and sum(k in spec for k in ("X", "Y")) <= 1:
@@ -152,9 +152,9 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   return axes
 
 
-# the alignment of the Cartesian axes as strings, e.g. ['X||a', 'Z||c*']: nothing for an
-# orthogonal basis, and the direct axis where it coincides with a reciprocal one
 def alignment(axes, names=("a", "b", "c")):
+  """the alignment of the Cartesian axes as strings, e.g. ['X||a', 'Z||c*']: nothing for an
+  orthogonal basis, and the direct axis where it coincides with a reciprocal one"""
   axes = np.asarray(axes, dtype=float)
   n = axes / np.linalg.norm(axes, axis=1, keepdims=True)
   if np.all(np.abs(n @ n.T - np.eye(3)) < 1e-6):

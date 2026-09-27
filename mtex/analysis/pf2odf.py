@@ -69,15 +69,15 @@ class PoleFigureOperator:
     self.planGH = S2FourierPlan(vector3d(gh), L, real=True)
     self.planR = S2FourierPlan(vector3d(rs), L, real=True)
 
-  # Psi c: the pole figure the coefficients predict
   def forward(self, c):
+    """Psi c: the pole figure the coefficients predict"""
     cext = np.outer(np.asarray(c, dtype=float), self.refl).ravel()
     fhat = self.planGH.adjoint(cext, np.ones(cext.size))
     I = self.planR(fhat * self.A)
     return I.reshape(self.nSym, self.nR).mean(axis=0)
 
-  # Psi^T I: the same plans in the other order, the adjoint by construction
   def backward(self, I):
+    """Psi^T I: the same plans in the other order, the adjoint by construction"""
     Iext = np.tile(np.asarray(I, dtype=float), self.nSym) / self.nSym
     fhat = self.planR.adjoint(Iext, np.ones(Iext.size))
     d = self.planGH(fhat * self.A)
@@ -187,8 +187,8 @@ class MLSSolver:
   def SS(self):
     return self.pf.SS
 
-  # the operators on the grid the zero range method leaves
   def init(self):
+    """the operators on the grid the zero range method leaves"""
     if self.zrm is not None:
       keep = ~self.zrm.checkZeroRange(self.S3G)
       if not self.silent:
@@ -203,9 +203,9 @@ class MLSSolver:
       self.initRegularisation()
     return self
 
-  # a discrete Laplacian on the grid: minus the dots within two halfwidths off the
-  # diagonal, the row sums on it
   def initRegularisation(self, epsilon=None):
+    """a discrete Laplacian on the grid: minus the dots within two halfwidths off the
+    diagonal, the row sums on it"""
     from scipy import sparse
     eps = 2 * self.psi.halfwidth() if epsilon is None else epsilon
     from ..geometry.grids.orientationtree import gridRadius
@@ -219,9 +219,9 @@ class MLSSolver:
     self.RM = self.lambda_ * A.tocsr()
     return self
 
-  # the state the iteration starts from: the normalisation directions a_i, the scalings
-  # alpha_i and the weighted residuals u_i
   def initIter(self):
+    """the state the iteration starts from: the normalisation directions a_i, the scalings
+    alpha_i and the weighted residuals u_i"""
     n = len(self.ops)
     if self.c is None or self.c.size != self.S3G.size:
       self.c = np.full(self.S3G.size, 1 / self.S3G.size)
@@ -238,10 +238,10 @@ class MLSSolver:
       self.u[n] = self.alpha[n] * (self.RM @ self.c)
     return self
 
-  # one step of the modified projected gradient; the gradient is tangent to the
-  # normalisation, <c, v> = 0, so the regularisation block, the Dirichlet energy of the
-  # normalised coefficients, moves linearly along the direction and keeps its scaling
   def doIter(self):
+    """one step of the modified projected gradient; the gradient is tangent to the
+    normalisation, <c, v> = 0, so the regularisation block, the Dirichlet energy of the
+    normalised coefficients, moves linearly along the direction and keeps its scaling"""
     n = len(self.ops)
     reg = self.RM is not None
     c, u, alpha, a = self.c, self.u, self.alpha, self.a
@@ -289,15 +289,15 @@ class MLSSolver:
       J = J + Ar + 2 * tau * Br + tau ** 2 * Cr
     return float(tau[np.argmin(J)])
 
-  # the relative residual of each pole figure, and the norm of the vector of them
   def residual(self):
+    """the relative residual of each pole figure, and the norm of the vector of them"""
     e = np.array([np.linalg.norm(self.u[i]) / np.linalg.norm(self.pf.allI[i].ravel() * self.weights[i]) for i in range(len(self.ops))])
     return e, float(np.sqrt(np.sum(e ** 2)))
 
-  # the iteration, stopped when the residual improves by less than five percent; its BLAS
-  # calls are products of vectors, and OpenBLAS's waiting threads would take the cores of the
-  # transforms between them
   def iterate(self):
+    """the iteration, stopped when the residual improves by less than five percent; its BLAS
+    calls are products of vectors, and OpenBLAS's waiting threads would take the cores of the
+    transforms between them"""
     with blasThreads(1):
       return self._iterate()
 
@@ -316,16 +316,16 @@ class MLSSolver:
       last = err
     return self
 
-  # the ODF the current coefficients describe
   @property
   def odf(self):
+    """the ODF the current coefficients describe"""
     if self.c0 > 0.99:
       return uniformODF(self.CS, self.SS)
     return SO3FunRBF(self.S3G, self.psi, (1 - self.c0) * self.c / np.sum(self.c) / self.psi.mean(), self.c0)
 
-  # the reconstruction, with the uniform portion the data allows fixed by the ghost
-  # correction and put into the constant instead of the components
   def calcODF(self, iterMin=None, iterMax=None, noGhostCorrection=None, silent=None):
+    """the reconstruction, with the uniform portion the data allows fixed by the ghost
+    correction and put into the constant instead of the components"""
     if iterMin is not None:
       self.iterMin = int(iterMin)
     if iterMax is not None:
@@ -349,7 +349,8 @@ class MLSSolver:
     return self.odf
 
 
-def calcODF(pf, *args, **kwargs):
+def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, iterMin=5, iterMax=10, c0=None,
+            noGhostCorrection=False, quadratureWeights=False, intensityWeights=False, regularisation=0.0, silent=True):
   """an ODF reconstructed from pole figure intensities, an SO3FunRBF
 
     calcODF(pf)
@@ -360,7 +361,10 @@ def calcODF(pf, *args, **kwargs):
   solvers = [a for a in args if isinstance(a, MLSSolver)]
   if solvers:
     return solvers[0].calcODF()
-  return MLSSolver(pf, *args, **kwargs).calcODF()
+  return MLSSolver(pf, *args, resolution=resolution, halfwidth=halfwidth, kernel=kernel, S3G=S3G, zeroRange=zeroRange,
+                   iterMin=iterMin, iterMax=iterMax, c0=c0, noGhostCorrection=noGhostCorrection,
+                   quadratureWeights=quadratureWeights, intensityWeights=intensityWeights,
+                   regularisation=regularisation, silent=silent).calcODF()
 
 
 # ------------------------------------------------------------------ successive refinement

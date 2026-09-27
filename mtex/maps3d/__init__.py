@@ -1,9 +1,12 @@
 # the maps of volumes: EBSD3, the voxel lattice, and later the grains and boundaries in 3D
-import importlib as _importlib
+from .voxellattice import voxelLattice
+from .ebsd3 import EBSD3, EBSD3square
+from .grain3boundary import grain3Boundary
+from .grain3d import grain3d
+from .orientfaces import orientFaces
+from .calcgrains3d import calcGrains
+from .neper import neper
+from .smoothing3d import *  # noqa: F401,F403
+from .intragranular3d import *  # noqa: F401,F403
 
-__all__ = []
-for _name in ("voxellattice", "ebsd3", "grain3boundary", "grain3d", "orientfaces", "calcgrains3d", "neper", "smoothing3d", "intragranular3d"):
-  _module = _importlib.import_module(f"{__name__}.{_name}")
-  for _public in _module.__all__:
-    globals()[_public] = getattr(_module, _public)
-  __all__ += _module.__all__
+__all__ = ["voxelLattice", "EBSD3", "EBSD3square", "grain3Boundary", "grain3d", "orientFaces", "calcGrains", "neper"]

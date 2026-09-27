@@ -55,9 +55,9 @@ class sphericalProjection:
   def polarAngle(r):
     return 2 * np.arcsin(np.clip(r / 2, 0, 1))
 
-  # the radius of the whole hemisphere, the natural extent of a chart
   @classmethod
   def extent(cls):
+    """the radius of the whole hemisphere, the natural extent of a chart"""
     return cls.radius(np.pi / 2)
 
   @property
@@ -70,9 +70,9 @@ class sphericalProjection:
 
   # ------------------------------------------------------------------ projecting
 
-  # the polar coordinates of directions in the frame of the convention, folded into the
-  # hemisphere of the chart; NaN outside the region
   def polarIn(self, v):
+    """the polar coordinates of directions in the frame of the convention, folded into the
+    hemisphere of the chart; NaN outside the region"""
     v = _asVectors(v).normalize()
     w = self.pC.rot.inv() * v
     if self.antipodal:
@@ -89,8 +89,8 @@ class sphericalProjection:
     r = self.radius(theta)
     return r * np.cos(rho), r * np.sin(rho)
 
-  # the plane coordinates of directions known to lie in the chart
   def projectUnchecked(self, v):
+    """the plane coordinates of directions known to lie in the chart"""
     w = self.pC.rot.inv() * _asVectors(v)
     theta, rho = w.theta, w.rho
     theta = theta if self.upper else np.pi - theta
@@ -105,23 +105,23 @@ class sphericalProjection:
 
   # ------------------------------------------------------------------ the shape of the chart
 
-  # the same chart showing another region, for an outline drawn behind the data
   def withRegion(self, sR):
+    """the same chart showing another region, for an outline drawn behind the data"""
     sR = sR.restrict2Upper(self.pC) if self.upper else sR.restrict2Lower(self.pC.outOfScreen)
     return type(self)(sR, self.pC, self.antipodal, self.upper)
 
-  # the region as seen in the frame of the convention, folded into the upper hemisphere
   def chartRegion(self):
+    """the region as seen in the frame of the convention, folded into the upper hemisphere"""
     N = (self.pC.rot.inv() * vector3d(self.sR.N)).data.reshape(-1, 3)
     if not self.upper:
       N = N * np.array([1.0, 1.0, -1.0])
     return sphericalRegion(N, self.sR.alpha)
 
-  # a grid regular in the polar angles of the chart, one strip of polar angles per azimuth
-  # so that the cells follow the boundary: the directions, in the frame of the region, and
-  # their plane coordinates, all nTheta x nRho; a column of NaN separates the strips of a
-  # region whose polar set has two branches, where the pieces do not touch
   def grid(self, resolution=1 * degree):
+    """a grid regular in the polar angles of the chart, one strip of polar angles per azimuth
+    so that the cells follow the boundary: the directions, in the frame of the region, and
+    their plane coordinates, all nTheta x nRho; a column of NaN separates the strips of a
+    region whose polar set has two branches, where the pieces do not touch"""
     sR = self.chartRegion()
     rhoLo, rhoHi = rhoRange(sR)
     nRho = max(2, int(round((rhoHi - rhoLo) / resolution)) + 1)
@@ -172,9 +172,9 @@ class sphericalProjection:
     X[:, blank], Y[:, blank] = np.nan, np.nan
     return V, X, Y
 
-  # the boundary of the region as plane curves, one (x, y) pair per arc; a whole
-  # hemisphere has no boundary of its own and gets the horizon
   def boundary(self, resolution=0.5 * degree):
+    """the boundary of the region as plane curves, one (x, y) pair per arc; a whole
+    hemisphere has no boundary of its own and gets the horizon"""
     arcs = self.sR.boundary(resolution)
     if not arcs:
       arcs = [self._horizon()]
@@ -185,9 +185,9 @@ class sphericalProjection:
     u, w = self.pC.east.data, self.pC.north.data
     return vector3d(np.cos(t)[:, None] * u + np.sin(t)[:, None] * w, isNormalized=True)
 
-  # the meridians and small circles of the convention at a spacing, clipped to the region:
-  # plane curves with NaN where they leave it
   def gridLines(self, step=30 * degree):
+    """the meridians and small circles of the convention at a spacing, clipped to the region:
+    plane curves with NaN where they leave it"""
     step = np.pi / max(1, int(round(np.pi / step)))
     curves = []
     rhos = np.linspace(0, 2 * np.pi, 361)
@@ -198,17 +198,17 @@ class sphericalProjection:
       curves.append(self.project(self.pC.rot * vector3d.byPolar(thetas, rho)))
     return curves
 
-  # the bounding box of the drawn region, from its boundary, as (xmin, xmax, ymin, ymax)
   def bounds(self, margin=0.02):
+    """the bounding box of the drawn region, from its boundary, as (xmin, xmax, ymin, ymax)"""
     b = self.boundary(2 * degree)
     xs = np.concatenate([x for x, _ in b])
     ys = np.concatenate([y for _, y in b])
     return _withMargin(xs, ys, margin)
 
-  # the labels: the Miller indices at the corners of the sector of a crystal frame, or at
-  # its axes when it has no sector; the axes names of any other frame where they lie in
-  # the chart; a list of (direction, text)
   def labels(self):
+    """the labels: the Miller indices at the corners of the sector of a crystal frame, or at
+    its axes when it has no sector; the axes names of any other frame where they lie in
+    the chart; a list of (direction, text)"""
     fr = self.frame
     if isinstance(fr, crystalFrame):
       V = self.sR.vertices()
@@ -299,8 +299,8 @@ class gnomonicProjection(sphericalProjection):
     return cls.radius(80 * degree)
 
 
-# rho over theta in degrees: the polar angles of the frame itself, no convention
 class plainProjection(sphericalProjection):
+  """rho over theta in degrees: the polar angles of the frame itself, no convention"""
   name = "plain"
 
   @property
@@ -367,8 +367,8 @@ def projectionClass(name):
 
 # ------------------------------------------------------------------ which charts a plot needs
 
-# does the region lie within the hemisphere towards up, the boundary allowed on the equator
 def withinHemisphere(sR, up, tolerance=1e-6):
+  """does the region lie within the hemisphere towards up, the boundary allowed on the equator"""
   u = _asVectors(up)
   if sR.checkInside(-u, tolerance=-tolerance) or len(sR.N) == 0:
     return False
@@ -383,11 +383,11 @@ def isLower(sR, pC):
   return withinHemisphere(sR, pC.intoScreen)
 
 
-# the charts a region is drawn on: one, or an upper and a lower one when it reaches into
-# both hemispheres; an antipodal region needs the upper one only; the plain projection
-# shows everything in one chart (MATLAB makeSphericalProjection)
 def makeSphericalProjection(v=None, projection="earea", upper=False, lower=False, complete=False, antipodal=None,
                             how2plot=None, fundamentalRegion=False, symmetric=None):
+  """the charts a region is drawn on: one, or an upper and a lower one when it reaches into
+  both hemispheres; an antipodal region needs the upper one only; the plain projection
+  shows everything in one chart (MATLAB makeSphericalProjection)"""
   sR, how2plot, ax = _regionFor(v, antipodal, how2plot, fundamentalRegion)
   antipodal = ax if antipodal is None else bool(antipodal)
   cls = projectionClass(projection)
@@ -438,15 +438,15 @@ def _regionFor(v, antipodal, how2plot, fundamentalRegion):
   return plotRegion(fr, fundamentalRegion, ax, how2plot), how2plot, ax
 
 
-# whether a frame carries a group that folds the sphere: the specimen sector of a pole
-# figure is as real as the crystal sector of an inverse one
 def hasSymmetry(fr):
+  """whether a frame carries a group that folds the sphere: the specimen sector of a pole
+  figure is as real as the crystal sector of an inverse one"""
   return fr is not None and fr.numSym() > 1
 
 
-# the whole sphere, or the conventional sector of the frame's group, that of the Laue group
-# for axes (MATLAB plot 'fundamentalRegion')
 def plotRegion(fr, fundamentalRegion=False, antipodal=False, how2plot=None):
+  """the whole sphere, or the conventional sector of the frame's group, that of the Laue group
+  for axes (MATLAB plot 'fundamentalRegion')"""
   if fundamentalRegion and hasSymmetry(fr):
     return plotSector(fr, antipodal, how2plot)
   return sphericalRegion(frame=fr)
@@ -466,9 +466,9 @@ def plotSector(fr, antipodal=False, how2plot=None):
   return sR
 
 
-# the azimuth interval of a region: the whole circle when a pole lies inside, otherwise
-# the complement of the widest gap between the azimuths of its boundary
 def rhoRange(sR):
+  """the azimuth interval of a region: the whole circle when a pole lies inside, otherwise
+  the complement of the widest gap between the azimuths of its boundary"""
   if len(sR.N) == 0:
     return 0.0, 2 * np.pi
   if sR.checkInside(zvector, tolerance=-1e-8) or sR.checkInside(-zvector, tolerance=-1e-8):
@@ -490,9 +490,9 @@ def rhoRange(sR):
 
 # ------------------------------------------------------------------ labels
 
-# a direction of a crystal frame as its rounded indices, the direct basis first and the
-# reciprocal one if that does not round, in the brackets of one direction; None if neither
 def millerLabel(v, fr, utf8=None):
+  """a direction of a crystal frame as its rounded indices, the direct basis first and the
+  reciprocal one if that does not round, in the brackets of one direction; None if neither"""
   utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8
   u = v.data.reshape(3) / np.linalg.norm(v.data.reshape(3))
   hex_ = fr.lattice.isTriHex
@@ -541,10 +541,10 @@ def _withMargin(xs, ys, margin):
   return xlo - d, xhi + d, ylo - d, yhi + d
 
 
-# plotS2Grid(resolution=0.5 * degree, 'upper', cs): the directions a chart samples its surface
-# at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
-# lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid
 def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=False, antipodal=None):
+  """plotS2Grid(resolution=0.5 * degree, 'upper', cs): the directions a chart samples its surface
+  at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
+  lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid"""
   from ..geometry.frames import referenceFrame
   flags = {a.lower() for a in args if isinstance(a, str)}
   upper, lower, complete = upper or "upper" in flags, lower or "lower" in flags, complete or "complete" in flags

@@ -45,9 +45,9 @@ class S2Triangulation:
   def __len__(self):
     return len(self.T)
 
-  # the triangle every direction lies in and its coordinates there, by a walk from the
-  # triangle with the nearest centre towards the vertex a coordinate says is missing
   def locate(self, v):
+    """the triangle every direction lies in and its coordinates there, by a walk from the
+    triangle with the nearest centre towards the vertex a coordinate says is missing"""
     W = (v if isinstance(v, vector3d) else vector3d(v)).normalize().data.reshape(-1, 3)
     _, t = self._tree.query(W)
     t = np.asarray(t, dtype=np.int64)

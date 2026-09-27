@@ -39,9 +39,9 @@ class cellComplex:
   def __init__(self, V, F, cells, sites, A, plane, shape):
     self.V, self.F, self.cells, self.sites, self.A, self.plane, self.shape = V, F, cells, sites, A, plane, shape
 
-  # the measurement of every site, NO_PIXEL where it has none, and the index of every site
   @property
   def site2pixel(self):
+    """the measurement of every site, NO_PIXEL where it has none, and the index of every site"""
     return self.sites.pixel
 
   @property
@@ -55,9 +55,9 @@ class cellComplex:
   def __len__(self):
     return len(self.F)
 
-  # the site whose cell covers a point: its nearest site, since a cell is the set of points
-  # nearer to its site than to any other, searched over the lattice cells around the point
   def siteAt(self, q, ij, reach=5):
+    """the site whose cell covers a point: its nearest site, since a cell is the set of points
+    nearer to its site than to any other, searched over the lattice cells around the point"""
     s = self.sites
     a0, b0 = int(ij[0]) - s.offset[0], int(ij[1]) - s.offset[1]
     n1, n2 = s.lookup.shape
@@ -68,8 +68,8 @@ class cellComplex:
     d = np.sum((s.pos[cand] - np.asarray(q)) ** 2, axis=1)
     return int(cand[np.argmin(d)])
 
-  # the corners of one lattice cell in the plane's coordinates
   def unitCell2d(self):
+    """the corners of one lattice cell in the plane's coordinates"""
     return cellCorners(self.A, self.shape)
 
   def __repr__(self):
@@ -78,8 +78,8 @@ class cellComplex:
 
 # ------------------------------------------------------------------ the alpha closing
 
-# the lattice offsets within a physical radius r, shape (m, 2)
 def diskOffsets(A, r):
+  """the lattice offsets within a physical radius r, shape (m, 2)"""
   wi = int(np.ceil(r / np.linalg.norm(A[:, 0]))) + 1
   wj = int(np.ceil(r / np.linalg.norm(A[:, 1]))) + 1
   di, dj = np.meshgrid(np.arange(-wi, wi + 1), np.arange(-wj, wj + 1), indexing="ij")
@@ -87,8 +87,8 @@ def diskOffsets(A, r):
   return offs[np.linalg.norm(offs @ A.T, axis=1) <= r]
 
 
-# binary dilation of a raster mask by a set of index offsets, with zero padding
 def dilate(m, offs):
+  """binary dilation of a raster mask by a set of index offsets, with zero padding"""
   m = np.asarray(m, dtype=bool)
   offs = np.asarray(offs, dtype=int).reshape(-1, 2)
   out = np.zeros_like(m)
@@ -101,17 +101,17 @@ def dilate(m, offs):
   return out
 
 
-# the closing of a set by a disk of radius r: the cells no empty disk of that radius
-# covers, as the De Morgan pair of dilations
 def alphaClose(present, A, r):
+  """the closing of a set by a disk of radius r: the cells no empty disk of that radius
+  covers, as the De Morgan pair of dilations"""
   offs = diskOffsets(np.asarray(A, dtype=float), r)
   present = np.asarray(present, dtype=bool)
   return ~dilate(~dilate(present, offs), offs) | present
 
 
-# the cells the scan covered: between the first and the last measurement of every row of
-# the raster, or of every column
 def scanned(hasPixel):
+  """the cells the scan covered: between the first and the last measurement of every row of
+  the raster, or of every column"""
   hasPixel = np.asarray(hasPixel, dtype=bool)
   n1, n2 = hasPixel.shape
   out = np.zeros_like(hasPixel)
@@ -126,8 +126,8 @@ def scanned(hasPixel):
   return out
 
 
-# the background cells connected to the border of the raster
 def floodBorder(bg, stencil):
+  """the background cells connected to the border of the raster"""
   from scipy import ndimage
   bg = np.asarray(bg, dtype=bool)
   structure = np.zeros((3, 3), dtype=bool)
@@ -142,9 +142,9 @@ def floodBorder(bg, stencil):
 
 # ------------------------------------------------------------------ the sites
 
-# classify every lattice cell and place the sites; a cell of the padding of a grid is not
-# measured and lies outside the map as a cell beyond the lattice does
 def buildSites(l, P, present, alpha=3.1, measured=None):
+  """classify every lattice cell and place the sites; a cell of the padding of a grid is not
+  measured and lies outside the map as a cell beyond the lattice does"""
   ij = l.ij
   n = len(ij)
   r = alpha * l.dxy
@@ -199,8 +199,8 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
 
 # ------------------------------------------------------------------ the local Voronoi
 
-# the lattice offsets within kmax steps, sorted by their ideal physical distance
 def candidateOffsets(A, kmax):
+  """the lattice offsets within kmax steps, sorted by their ideal physical distance"""
   di, dj = np.meshgrid(np.arange(-kmax, kmax + 1), np.arange(-kmax, kmax + 1), indexing="ij")
   offs = np.stack([di.reshape(-1), dj.reshape(-1)], axis=1)
   offs = offs[np.any(offs != 0, axis=1)]
@@ -209,10 +209,10 @@ def candidateOffsets(A, kmax):
   return offs[p].astype(np.int64), d[p]
 
 
-# the three candidate lists of increasing reach: the closing bounds the cell of a site
-# with material all round it, and that is what the first covers; a site on the rim of a
-# bay wider than the closing has no such bound, so the search grows for it
 def candidateLevels(A, alpha, dtype):
+  """the three candidate lists of increasing reach: the closing bounds the cell of a site
+  with material all round it, and that is what the first covers; a site on the rim of a
+  bay wider than the closing has no such bound, so the search grows for it"""
   dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
   kmax = int(np.ceil(2 * alpha)) + 2
   levels = []
@@ -248,10 +248,10 @@ def _cellOf(sites, s, offs, dIdeal, W, distortTol):
   return vs, gs, stillOpen
 
 
-# the faces of every cell as (site, neighbour, v1, v2) with site < neighbour, the Python
-# form of the compiled loop and its oracle; returns the faces and how many cells of the
-# map stayed open
 def localVoronoiNumpy(sites, levels, distortTol=0.05):
+  """the faces of every cell as (site, neighbour, v1, v2) with site < neighbour, the Python
+  form of the compiled loop and its oracle; returns the faces and how many cells of the
+  map stayed open"""
   faces = []
   unbounded = 0
   for s in range(len(sites)):
@@ -288,13 +288,13 @@ def localVoronoi(sites, A, alpha=3.1, distortTol=0.05, backend=None):
 
 # ------------------------------------------------------------------ the complex
 
-# the vertices of the face list welded: a Voronoi vertex is computed once per cell that
-# meets there, three or four on a lattice, and the copies are welded. The copies of one
-# vertex differ by rounding, so a fine grid welds them, and the few that lie within
-# rounding of a boundary of that grid are welded again on the half-shifted grid, which is
-# where a single grid misses. The tolerance grid then merges what lies within a hundredth
-# of the spacing, and a face whose two vertices welded together is dropped
 def meshVertices(cells, verts, tol, backend=None):
+  """the vertices of the face list welded: a Voronoi vertex is computed once per cell that
+  meets there, three or four on a lattice, and the copies are welded. The copies of one
+  vertex differ by rounding, so a fine grid welds them, and the few that lie within
+  rounding of a boundary of that grid are welded again on the half-shifted grid, which is
+  where a single grid misses. The tolerance grid then merges what lies within a hundredth
+  of the spacing, and a face whose two vertices welded together is dropped"""
   n = len(cells)
   xy = verts.reshape(-1, 2)
   # column by column, which NumPy reduces ten times faster than along the first axis
@@ -355,12 +355,12 @@ def _gridKey(u):
   return key[:, 0] * (key[:, 1].max(initial=0) - key[:, 1].min(initial=0) + 1) + key[:, 1]
 
 
-# the decomposition of a map: the closing, the sites and their cells
-#
-#   alpha - the closing radius in multiples of the spacing; a region narrower than 2 alpha
-#           cells is filled and its neighbours grow in, a wider one is kept and becomes a
-#           notIndexed grain
 def decompose(ebsd, alpha=3.1, tolerance=None, backend=None):
+  """the decomposition of a map: the closing, the sites and their cells
+
+    alpha - the closing radius in multiples of the spacing; a region narrower than 2 alpha
+            cells is filled and its neighbours grow in, a wider one is kept and becomes a
+            notIndexed grain"""
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it cannot be decomposed")

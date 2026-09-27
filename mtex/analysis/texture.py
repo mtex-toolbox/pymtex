@@ -24,6 +24,7 @@ from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
 from .taylor import TaylorModel, _taylorCrystal, calcTaylor
 from ..tensors.tensor import strainTensor, tensor
+from ..geometry.install import install
 
 AVERAGES = ("Voigt", "Reuss", "Hill", "all")
 
@@ -292,8 +293,8 @@ class _TextureTransport:
     self.plan = wignerPlan(self.grid, self.L, True)
     self.dim = deg2dim(self.L + 1)
 
-  # the coefficients of -div(f spin), projected onto the invariant functions
   def derivative(self, fhat):
+    """the coefficients of -div(f spin), projected onto the invariant functions"""
     from ..functions.funcs import div
     from ..functions.so3fun import SO3FunHarmonic
     from ..functions.so3vectorfield import SO3VectorFieldHarmonic, _adjointColumns
@@ -332,12 +333,10 @@ def _install():
   from ..functions.handles import SO3FunGeneric
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
   from ..functions.bingham import SO3FunBingham
-  for cls in (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF, SO3FunBingham):
-    cls.calcTensor = lambda self, T, *a, **kw: calcTensor(self, T, *a, **kw)
-    cls.calcLankford = lambda self, sS, *a, **kw: calcLankford(self, sS, *a, **kw)
-    cls.calcKearnsFactor = lambda self, h, N=None: calcKearnsFactor(self, h, N)
-  orientation.calcTensor = lambda self, T, *a, **kw: calcTensor(self, T, *a, **kw)
-  orientation.calcLankford = lambda self, sS, *a, **kw: calcLankford(self, sS, *a, **kw)
+  functions = (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF, SO3FunBingham)
+  install(functions + (orientation,), calcTensor)
+  install(functions + (orientation,), calcLankford)
+  install(functions, calcKearnsFactor)
 
 
 _install()

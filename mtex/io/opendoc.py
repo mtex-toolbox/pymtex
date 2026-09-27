@@ -19,8 +19,8 @@ CHAPTERS = ("Tutorials", "GeneralConcepts", "Vectors", "Rotations", "CrystalGeom
             "SO3Functions", "Plotting")
 
 
-# the folder of the pages: the installed copy, else the checkout's
 def pagesDir():
+  """the folder of the pages: the installed copy, else the checkout's"""
   here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
   for d in (os.path.join(here, "docpages"), os.path.join(os.path.dirname(here), "docs", "pages")):
     if os.path.isdir(d):
@@ -28,8 +28,8 @@ def pagesDir():
   raise FileNotFoundError("the documentation pages are not installed with this copy of MTEX")
 
 
-# the paragraphs of a page: ("prose", markdown) or ("code", source)
 def pageCells(src):
+  """the paragraphs of a page: ("prose", markdown) or ("code", source)"""
   blocks, para, wrapped = [], [], False
   for line in src.split("\n") + [""]:
     if line.strip() == "# +":
@@ -51,9 +51,9 @@ def pageCells(src):
   return [(k, t) for k, t in blocks if t.strip()]
 
 
-# the links and pictures of prose, relative on the website, to the website: a page to its Python
-# version when it has one, a picture to the Python images
 def webLinks(text, names):
+  """the links and pictures of prose, relative on the website, to the website: a page to its Python
+  version when it has one, a picture to the Python images"""
   def page(m):
     target, anchor = m.group(1), m.group(2) or ""
     return f"]({SITE}{target}{'_py' if target in names else ''}.html{anchor})"
@@ -61,8 +61,8 @@ def webLinks(text, names):
   return re.sub(r"\]\(([A-Za-z0-9_.]+)\.html(#[^)]*)?\)", page, text)
 
 
-# a page as a cell script: every paragraph of prose a markdown cell, every code paragraph a cell
 def cellScript(src, names=()):
+  """a page as a cell script: every paragraph of prose a markdown cell, every code paragraph a cell"""
   out = []
   for kind, text in pageCells(src):
     if kind == "prose":
@@ -86,8 +86,8 @@ class docIndex(list):
     return "\n".join(lines)
 
 
-# every page with its chapter and its title
 def docPages():
+  """every page with its chapter and its title"""
   root = pagesDir()
   found = [c for c in os.listdir(root) if os.path.isdir(os.path.join(root, c))]
   chapters = [c for c in CHAPTERS if c in found] + sorted(set(found) - set(CHAPTERS))

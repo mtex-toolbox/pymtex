@@ -12,17 +12,17 @@ import math
 import numpy as np
 
 
-# the normal density of mean m and width delta, the standard deviation times sqrt(2)
 def Gaussian(m, delta, x=None):
+  """the normal density of mean m and width delta, the standard deviation times sqrt(2)"""
   def f(x):
     x = np.asarray(x, dtype=float)
     return np.exp(-(x - m) ** 2 / delta ** 2) / delta / math.sqrt(math.pi)
   return f if x is None else f(x)
 
 
-# a density on a regular grid, evaluated by its tensor product spline as MATLAB's
-# griddedInterpolant(..., 'spline'), extrapolating beyond the grid
 class griddedDensity:
+  """a density on a regular grid, evaluated by its tensor product spline as MATLAB's
+  griddedInterpolant(..., 'spline'), extrapolating beyond the grid"""
 
   def __init__(self, grid, values, bandwidth=None):
     from scipy.interpolate import CubicSpline, RegularGridInterpolator
@@ -46,10 +46,10 @@ class griddedDensity:
     return f"griddedDensity ({len(self.grid)}D, {dims} grid{bw})"
 
 
-# the density of samples x, one per row, on the rectangle range (the minima in the first row,
-# the maxima in the second); one dimension by the diffusion estimator on 2^14 points, whose
-# bandwidth may be fixed, more by the regularised EM mixture on round(10^(6/d)) points per axis
 def calcDensityReal(x, range=None, bandwidth=None, weights=None, rng=None):
+  """the density of samples x, one per row, on the rectangle range (the minima in the first row,
+  the maxima in the second); one dimension by the diffusion estimator on 2^14 points, whose
+  bandwidth may be fixed, more by the regularised EM mixture on round(10^(6/d)) points per axis"""
   x = np.asarray(x, dtype=float)
   if x.ndim == 1 or x.shape[1] == 1:
     x = x.ravel()
@@ -111,10 +111,10 @@ def _root(f, N):
       return fminbound(lambda t: abs(f(t)), 0, 0.1)
 
 
-# the diffusion estimator: the histogram on n cells of [lo, hi] smoothed by the heat kernel
-# whose time t is the fixed point, or fixed by the bandwidth sqrt(t) (hi - lo); the bandwidth,
-# the density and the cell centres
 def kde1d(data, n=2 ** 14, lo=None, hi=None, weights=None, bandwidth=None):
+  """the diffusion estimator: the histogram on n cells of [lo, hi] smoothed by the heat kernel
+  whose time t is the fixed point, or fixed by the bandwidth sqrt(t) (hi - lo); the bandwidth,
+  the density and the cell centres"""
   data = np.asarray(data, dtype=float).ravel()
   n = 2 ** math.ceil(math.log2(n))
   if lo is None or hi is None:
@@ -173,9 +173,9 @@ def _regEM(w, mu, Sig, dl, X):
   return w, mu, Sig, dl, ent
 
 
-# the regularised EM mixture of Botev et al. with ceil(sqrt(n)) Gaussians, fitted on the data
-# scaled to the unit box, evaluated at the rows of grid; the density and the bandwidth
 def kdeN(X, grid, gam=None, rng=None):
+  """the regularised EM mixture of Botev et al. with ceil(sqrt(n)) Gaussians, fitted on the data
+  scaled to the unit box, evaluated at the rows of grid; the density and the bandwidth"""
   rng = np.random.default_rng() if rng is None else rng
   X = np.asarray(X, dtype=float)
   X = X[~np.any(np.isnan(X), axis=1)]

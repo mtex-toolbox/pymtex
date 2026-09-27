@@ -237,3 +237,12 @@ emitting thread: connect a worker's signals to a `@Slot` of an object living on 
 Two-space indentation, one-line lowercase comments saying what the next lines do, no
 comment on what the previous version did. A file is one concept. Every edit reads as if
 the previous version never existed.
+
+What the user reaches (a public def, class or method, or a function attached under a public
+name) says what it is in a lowercase docstring, which hover, completion and `help()` show;
+internals keep the `#` comment above them. A module attaches a method to a class defined
+elsewhere only through `install(classes, f, name, declare=)` (`geometry/install.py`), never
+`setattr` or a lambda. The editor reads the package without running it, so
+`.venv/bin/python tools/staticapi.py` writes out what the run assembles: the layers' explicit
+imports, the attached methods declared under `TYPE_CHECKING` in each class body, comments above
+public definitions moved into docstrings. `tests/test_staticapi.py` fails until it has run.

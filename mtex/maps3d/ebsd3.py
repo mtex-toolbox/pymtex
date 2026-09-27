@@ -14,6 +14,7 @@
 # adds is notIndexed and marked in isPadding, as in a 2D map.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.plane import plane3d
@@ -75,9 +76,9 @@ class EBSD3(EBSD):
   def dPos(self):
     return np.nan if self.lattice is None else float(self.lattice.spacing.min())
 
-  # a volume has no measurement plane
   @property
   def N(self):
+    """a volume has no measurement plane"""
     return vector3d(np.full(3, np.nan), frame=self.frame)
 
   def extent(self):
@@ -121,9 +122,9 @@ class EBSD3(EBSD):
 
   # ------------------------------------------------------------------ the array
 
-  # the list on the (n1, n2, n3) array of its lattice, every cell no voxel occupies padded as
-  # notIndexed; with return_index the flat array index of every voxel of the list
   def gridify(self, return_index=False):
+    """the list on the (n1, n2, n3) array of its lattice, every cell no voxel occupies padded as
+    notIndexed; with return_index the flat array index of every voxel of the list"""
     if self.isGridded:
       return (self, np.arange(self.size)) if return_index else self
     l = self.lattice
@@ -156,10 +157,10 @@ class EBSD3(EBSD):
 
   # ------------------------------------------------------------------ sections
 
-  # the voxel holding every position, or none outside the box of voxel centres, as MATLAB's
-  # nearest griddedInterpolant without extrapolation; a 2D array of positions gives a
-  # gridded 2D map, a 3D one a volume
   def interp(self, pos):
+    """the voxel holding every position, or none outside the box of voxel centres, as MATLAB's
+    nearest griddedInterpolant without extrapolation; a 2D array of positions gives a
+    gridded 2D map, a 3D one a volume"""
     P = pos.data if isinstance(pos, vector3d) else np.asarray(pos, dtype=float)
     shape = P.shape[:-1]
     P = P.reshape(-1, 3)
@@ -186,9 +187,9 @@ class EBSD3(EBSD):
     kw = dict(scanUnit=self.scanUnit, frame=self.frame, phaseMap=self.phaseMap)
     return EBSD3(*args, **kw) if len(shape) == 3 else EBSD(*args, **kw)
 
-  # the section through a plane: the volume sampled on a square grid of the voxel spacing in
-  # the plane, spanned by the direction of the box nearest to the plane and the one across
   def slice(self, plane, P0=None):
+    """the section through a plane: the volume sampled on a square grid of the voxel spacing in
+    the plane, spanned by the direction of the box nearest to the plane and the one across"""
     if not isinstance(plane, plane3d):
       plane = plane3d(plane, P0 if P0 is not None else 0)
     N = plane.N.normalize().data.reshape(3)
@@ -228,17 +229,22 @@ class EBSD3(EBSD):
       lines.append(f"  voxel: {' x '.join(f'{s:.4g}' for s in self.lattice.spacing)}")
     return "\n".join(lines)
 
-  # EBSD3.load('volume.dream3d'), EBSD3.load(['s0.ang', 's1.ang'], z=[0, 1])
   @classmethod
   def load(cls, fname, *args, **kwargs):
+    """EBSD3.load('volume.dream3d'), EBSD3.load(['s0.ang', 's1.ang'], z=[0, 1])"""
     from ..io.load3d import loadEBSD3
     return loadEBSD3(fname, *args, **kwargs)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .intragranular3d import gradientX, gradientY, gradientZ, curvature, KAM, fill, spatialProfile, gradientDim
+    from ..plotting.volumeplot import plotEBSD3 as plot
 
-# EBSD3square(rot, phaseId, CSList, dxyz): a volume on its (n1, n2, n3) array, the voxel
-# (i, j, k) at origin + (i dx, j dy, k dz), as MATLAB's EBSD3square builds one
+
 def EBSD3square(rotations, phaseId=None, CSList=None, dxyz=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), scanUnit="um", frame=None,
                 prop=None, D=None):
+  """EBSD3square(rot, phaseId, CSList, dxyz): a volume on its (n1, n2, n3) array, the voxel
+  (i, j, k) at origin + (i dx, j dy, k dz), as MATLAB's EBSD3square builds one"""
   from ..geometry.quaternion import rotation
   from ..geometry._array import MtexArray
   rot = rotations if isinstance(rotations, MtexArray) else rotation(rotations)

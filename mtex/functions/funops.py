@@ -152,10 +152,10 @@ def _rotateS2(f, r):
 #   S2 x kernel: (s * psi)(v) = (1/4pi) int s(xi) psi(<xi, v>) dxi, shat_l <- A_l / (2l+1) shat_l
 
 
-# the child texture of a parent texture: the mean of the parent ODF over the parents every
-# child orientation can come from (MATLAB transformODF, called as variants(p2c, odf)); with
-# vSel, a function of the parent orientations, the parents weighted by it
 def transformODF(odfP, p2c, vSel=None):
+  """the child texture of a parent texture: the mean of the parent ODF over the parents every
+  child orientation can come from (MATLAB transformODF, called as variants(p2c, odf)); with
+  vSel, a function of the parent orientations, the parents weighted by it"""
   from ..geometry.quaternion import qmul
   PV = p2c.variants(parent=True).data.reshape(-1, 4)
 
@@ -171,8 +171,8 @@ def transformODF(odfP, p2c, vSel=None):
   return SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
 
 
-# conv(f, g, 'inv'): the convolution of the inverse of f with g, MATLAB's flag
 def conv(f, g, *flags):
+  """conv(f, g, 'inv'): the convolution of the inverse of f with g, MATLAB's flag"""
   if "inv" in flags:
     return conv(f.inv(), g)
   if isinstance(f, (SO3Kernel, S2Kernel, S1Kernel)) and not isinstance(g, (SO3Kernel, S2Kernel, S1Kernel)):
@@ -248,8 +248,8 @@ def grad(f, x=None, side="left"):
   return gradSO3(f, x, side)
 
 
-# the Laplace-Beltrami operator: fhat_n <- -n(n+1) fhat_n on both spaces
 def laplace(f):
+  """the Laplace-Beltrami operator: fhat_n <- -n(n+1) fhat_n on both spaces"""
   if isinstance(f, SO3FunHarmonic):
     n = np.concatenate([np.full((2 * n + 1) ** 2, n) for n in range(f.bandwidth + 1)])
   else:
@@ -311,13 +311,13 @@ def ipdf(f, r):
   return S2FunHarmonic(fhat, f.CS, real=f.isReal, antipodal=_antipodalPole(r, f.SS), symmetrise=False, _internal=True)
 
 
-# radon(f, h) the pole figure, radon(f, r=r) the inverse pole figure, radon(f, h, r) the values;
-# on the sphere the Funk transform, the mean over the great circle orthogonal to v,
-# shat_l <- P_l(0) shat_l
-# radon(sF): the mean over the great circle perpendicular to every direction; radon(sF,
-# delta) over the small circle at pi/2 + delta from it, by Funk-Hecke the degree n scaled
-# by P_n(cos(pi/2 + delta)); the great circle holds a direction with its antipode
 def radon(f, h=None, r=None):
+  """radon(f, h) the pole figure, radon(f, r=r) the inverse pole figure, radon(f, h, r) the values;
+  on the sphere the Funk transform, the mean over the great circle orthogonal to v,
+  shat_l <- P_l(0) shat_l
+  radon(sF): the mean over the great circle perpendicular to every direction; radon(sF,
+  delta) over the small circle at pi/2 + delta from it, by Funk-Hecke the degree n scaled
+  by P_n(cos(pi/2 + delta)); the great circle holds a direction with its antipode"""
   if isinstance(f, S2FunHarmonic):
     delta = 0.0 if h is None else float(h)
     P = legendreP(f.bandwidth, math.cos(math.pi / 2 + delta))
@@ -344,8 +344,8 @@ def invRadon(s):
 # operands are harmonic, so they are evaluated on the quadrature grid and take the FFT route
 
 
-# an operation that is not polynomial is approximated at twice the bandwidth, at least 32
 def smoothBandwidth(*fs):
+  """an operation that is not polynomial is approximated at twice the bandwidth, at least 32"""
   return max(2 * max(f.bandwidth for f in fs), 32)
 
 

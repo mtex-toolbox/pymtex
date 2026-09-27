@@ -30,16 +30,16 @@ class mesh3d:
   def numCorners(self):
     return np.diff(self.ptr)
 
-  # the fan triangles of the faces, (k, 3), and the face each belongs to
   def triangles(self):
+    """the fan triangles of the faces, (k, 3), and the face each belongs to"""
     n = self.numCorners - 2
     face = np.repeat(np.arange(len(self)), n)
     start = np.repeat(self.ptr[:-1], n)
     j = np.arange(len(face)) - np.repeat(np.cumsum(n) - n, n)
     return np.stack([self.idx[start], self.idx[start + j + 1], self.idx[start + j + 2]], axis=1), face
 
-  # the edges of the polygons, every one once, (e, 2)
   def edges(self):
+    """the edges of the polygons, every one once, (e, 2)"""
     k = np.arange(len(self.idx)) + 1
     k[self.ptr[1:] - 1] = self.ptr[:-1]
     E = np.sort(np.stack([self.idx, self.idx[k]], axis=1), axis=1)
@@ -60,10 +60,10 @@ class slices3d:
     self.origin, self.D = np.asarray(origin, dtype=float).reshape(3), np.asarray(D, dtype=float).reshape(3, 3)
     self.at = tuple(s // 2 for s in self.visible.shape) if at is None else tuple(at)
 
-  # the slice through voxel index i along axis a: its colours (rows, cols, 3) over the other
-  # two axes in increasing index, the voxels shown, and the corners of its rectangle, the
-  # first at index (-1/2, -1/2), then along the rows, the columns, both
   def plane(self, a):
+    """the slice through voxel index i along axis a: its colours (rows, cols, 3) over the other
+    two axes in increasing index, the voxels shown, and the corners of its rectangle, the
+    first at index (-1/2, -1/2), then along the rows, the columns, both"""
     i = self.at[a]
     rgb, vis = np.take(self.rgb, i, axis=a), np.take(self.visible, i, axis=a)
     b, c = [k for k in range(3) if k != a]
@@ -107,9 +107,9 @@ class lines3d:
     return P.min(axis=0), P.max(axis=0)
 
 
-# arrows from P along D as their shafts and cones for their heads, a quarter of their length
-# long, as quiver3 draws them; antipodal arrows point both ways and have no heads
 def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSize=0.25, sides=12):
+  """arrows from P along D as their shafts and cones for their heads, a quarter of their length
+  long, as quiver3 draws them; antipodal arrows point both ways and have no heads"""
   P, D = np.asarray(P, dtype=float).reshape(-1, 3), np.asarray(D, dtype=float).reshape(-1, 3)
   c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
   c = np.tile(c.reshape(3), (len(P), 1)) if c.size == 3 else c.reshape(-1, 3)
@@ -154,9 +154,9 @@ class points3d:
     return self.P.min(axis=0), self.P.max(axis=0)
 
 
-# ellipsoids with the half axes a, b, c about their centres, the surfaces of MATLAB's
-# plotEllipsoid on a grid of n longitudes and m latitudes, one colour each
 def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12):
+  """ellipsoids with the half axes a, b, c about their centres, the surfaces of MATLAB's
+  plotEllipsoid on a grid of n longitudes and m latitudes, one colour each"""
   C, A, B, Cc = (np.asarray(x, dtype=float).reshape(-1, 3) for x in (center, a, b, c))
   k = len(C)
   rho, theta = np.meshgrid(np.linspace(0, 2 * np.pi, n + 1)[:-1], np.linspace(0, np.pi, m + 1), indexing="ij")
@@ -187,8 +187,8 @@ class scene3d:
     b = [it.bounds() for it in self.items]
     return np.min([lo for lo, _ in b], axis=0), np.max([hi for _, hi in b], axis=0)
 
-  # the camera: the direction out of the screen and the one up, unit vectors
   def camera(self):
+    """the camera: the direction out of the screen and the one up, unit vectors"""
     from ..geometry.plottingconvention import plottingConvention
     pC = plottingConvention.default3D if self.how2plot is None else self.how2plot
     o = pC.outOfScreen.normalize().data.reshape(3)

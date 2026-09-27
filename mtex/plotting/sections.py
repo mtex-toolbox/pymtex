@@ -42,9 +42,9 @@ def _name(key):
   return GREEK.get(key, key) if getMTEXpref("UTF8Output") else key
 
 
-# the section a coordinate falls in, or -1 when it falls beside every one: the distance to
-# a section value taken over the period of the coordinate
 def sectionIndex(x, values, tol, period=np.inf):
+  """the section a coordinate falls in, or -1 when it falls beside every one: the distance to
+  a section value taken over the period of the coordinate"""
   x = np.asarray(x, dtype=float)
   d = x[..., None] - np.asarray(values, dtype=float)
   if np.isfinite(period):
@@ -54,14 +54,14 @@ def sectionIndex(x, values, tol, period=np.inf):
   return np.where(np.take_along_axis(d, k[..., None], axis=-1)[..., 0] <= tol, k, -1)
 
 
-# the tolerance a section reaches: never more than half the gap to its neighbour
 def sectionTolerance(values, tol):
+  """the tolerance a section reaches: never more than half the gap to its neighbour"""
   values = np.sort(np.asarray(values, dtype=float))
   return float(tol) if len(values) < 2 else min(float(tol), float(np.min(np.diff(values))) / 2.1)
 
 
-# the section values, either given or a turn of the period cut into equal parts
 def sectionList(values, period, n):
+  """the section values, either given or a turn of the period cut into equal parts"""
   return np.linspace(0, period, n + 1)[:-1] if values is None else np.asarray(values, dtype=float).reshape(-1)
 
 
@@ -110,9 +110,9 @@ class ODFSections:
   def sectionField(self, k, resolution=15 * degree):
     return None
 
-  # ori = oS.makeGrid(): the orientations of the nodes of every section chart, section by
-  # section, at which values are computed for oS.plot(values), MATLAB's makeGrid
   def makeGrid(self, resolution=2.5 * degree):
+    """ori = oS.makeGrid(): the orientations of the nodes of every section chart, section by
+    section, at which values are computed for oS.plot(values), MATLAB's makeGrid"""
     oris, counts = [], []
     for k in range(self.numSections):
       for proj in self.sectionCharts(k):
@@ -123,8 +123,8 @@ class ODFSections:
     self.plotGrid = (resolution, counts)
     return orientation.cat(*oris)
 
-  # oS.plot(odf), oS.plot(ori), and oS.plot(values, 'smooth') of values on makeGrid's nodes
   def plot(self, x, *args, **kwargs):
+    """oS.plot(odf), oS.plot(ori), and oS.plot(values, 'smooth') of values on makeGrid's nodes"""
     from .sectionplot import _plotSectionFun, plotSection
     if isinstance(x, np.ndarray) or isinstance(x, list):
       if getattr(self, "plotGrid", None) is None:
@@ -142,9 +142,9 @@ class ODFSections:
 
 # ------------------------------------------------------------------ Euler angle sections
 
-# the box as a spherical region: a cap theta <= maxTheta cut by the two meridians of the
-# azimuth
 def eulerBox(maxTheta, maxRho):
+  """the box as a spherical region: a cap theta <= maxTheta cut by the two meridians of the
+  azimuth"""
   N, alpha = [], []
   if maxTheta < np.pi - 1e-9:
     N.append((0.0, 0.0, 1.0))
@@ -358,17 +358,17 @@ class pfSections(ODFSections):
   def sectionLabel(self, k):
     return f"{_name(self.angleName)} = {round(self.values[k] / degree)}°"
 
-  # the field the twist is measured against, at directions of the specimen frame
   def referenceField(self, r):
+    """the field the twist is measured against, at directions of the specimen frame"""
     r = r if isinstance(r, vector3d) else vector3d(r)
     xyz = r.normalize().data.reshape(-1, 3)
     up, east = self.pC.outOfScreen.data, self.pC.east.data
     q = rotation.map(np.tile(up, (len(xyz), 1)), xyz).data
     return vector3d(qrot(q, np.tile(east, (len(xyz), 1))).reshape(r.shape + (3,)), isNormalized=True)
 
-  # the field turned about the direction by the angle of the section, where ori * h2 has to
-  # point for the orientation to belong there
   def twisted(self, r, omega):
+    """the field turned about the direction by the angle of the section, where ori * h2 has to
+    point for the orientation to belong there"""
     r = r if isinstance(r, vector3d) else vector3d(r)
     q = rotation.byAxisAngle(vector3d(r.normalize().data), omega).data
     return vector3d(qrot(q, self.referenceField(r).data), isNormalized=True)
@@ -388,8 +388,8 @@ class pfSections(ODFSections):
     out = (vector3d(v.data[keep], frame=self.CS2, isNormalized=True), k[keep], src[keep])
     return out + (q[keep],) if withRotation else out
 
-  # the reference field turned into the section, at an equispaced grid of its region
   def sectionField(self, k, resolution=15 * degree):
+    """the reference field turned into the section, at an equispaced grid of its region"""
     g = equispacedS2Grid(resolution=resolution)
     vs = vector3d(g.data[self.sR.checkInside(g)], isNormalized=True)
     return vs, self.twisted(vs, self.values[k])
@@ -471,8 +471,8 @@ class axisAngleSections(ODFSections):
   def sectionCharts(self, k):
     return makeSphericalProjection(self.axesSectors[k], how2plot=self.pC)
 
-  # the sector shrinks with the angle, so the axes grow with 1/sin(w/2) to keep areas comparable
   def sectionScale(self, k):
+    """the sector shrinks with the angle, so the axes grow with 1/sin(w/2) to keep areas comparable"""
     return float(np.sin(np.max(self.values) / 2) / np.sin(self.values[k] / 2)) if self.volumeScaling else 1.0
 
   def sectionData(self, ori):
@@ -497,9 +497,9 @@ SECTION_OPTIONS = ("sections", "tolerance", "phi1", "phi2", "alpha", "gamma", "s
                    "volumeScaling", "maxPhi", "maxAzimuth", "maxOmega", "h1", "h2", "antipodal")
 
 
-# the sections a plot uses: phi2 sections against a specimen, axis angle sections between
-# two crystals, or the kind named (MATLAB newODFSectionPlot)
 def newODFSectionPlot(CS1, CS2=None, kind=None, **kwargs):
+  """the sections a plot uses: phi2 sections against a specimen, axis angle sections between
+  two crystals, or the kind named (MATLAB newODFSectionPlot)"""
   CS2 = specimenFrame.default if CS2 is None else CS2
   if isinstance(kind, ODFSections):
     return kind

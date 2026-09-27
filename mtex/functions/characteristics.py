@@ -40,6 +40,7 @@ from .rbf import SO3FunCBF, SO3FunRBF, _rotationsFor, uniformODF
 from .s2fun import S2FunHarmonic
 from .s2funtri import S2FunTri
 from .so3fun import SO3FunHarmonic
+from ..geometry.install import install
 
 SO3_KINDS = (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric)
 S2_KINDS = (S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri)
@@ -60,8 +61,8 @@ def textureindex(f):
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if _isSO3(f) else S2FunHarmonic(f).norm() ** 2
 
 
-# -int f log f by the exact rule at a raised bandwidth, since f log f is not bandlimited
 def entropy(f, bandwidth=None):
+  """-int f log f by the exact rule at a raised bandwidth, since f log f is not bandlimited"""
   if _isSO3(f):
     L0 = max(2 * f.bandwidth, 64) if bandwidth is None else int(bandwidth)
     L = bandwidthFor(min(L0, 2 * getMTEXpref("maxSO3Bandwidth")), f.CS, f.SS)
@@ -74,10 +75,10 @@ def entropy(f, bandwidth=None):
   return float(-np.sum(g.weights * np.where(v > 0, v * np.log(np.where(v > 0, v, 1.0)), 0.0)) / (4 * np.pi))
 
 
-# the share of orientations within a radius of a centre: the mean of f on a local grid in
-# the ball, times the ball's share of the fundamental region (its Haar measure times the
-# number of symmetric copies, at most one); a list of orientations gives the count instead
 def volume(f, center, radius, resolution=None):
+  """the share of orientations within a radius of a centre: the mean of f on a local grid in
+  the ball, times the ball's share of the fundamental region (its Haar measure times the
+  number of symmetric copies, at most one); a list of orientations gives the count instead"""
   if isinstance(f, orientation):
     if isinstance(center, fibre):
       return float(np.count_nonzero(center.angle(f) <= radius) / f.size)
@@ -111,12 +112,12 @@ def _volumeS2(f, center, radius, resolution=None):
   return float(np.mean(np.real(f(g))) * share)
 
 
-# the share of crystal directions within a radius of h among those mapped to r: the mean
-# of the inverse pole figure over the cap, times the cap's share of the sphere over the orbit of h
-# the share of the tube about the fibre: the function averaged over the orientations that
-# send h within the radius of r, u = g h on a cap about r and the turn about u equispaced,
-# times the tube's share of orientation space over the copies of h under the group
 def fibreVolume(f, h, r=None, radius=None, resolution=None):
+  """the share of crystal directions within a radius of h among those mapped to r: the mean
+  of the inverse pole figure over the cap, times the cap's share of the sphere over the orbit of h
+  the share of the tube about the fibre: the function averaged over the orientations that
+  send h within the radius of r, u = g h on a cap about r and the turn about u equispaced,
+  times the tube's share of orientation space over the copies of h under the group"""
   if isinstance(h, fibre):
     h, r, radius = h.h, h.r, r
   res = min(1 * degree, radius / 30) if resolution is None else resolution
@@ -146,9 +147,9 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
 # ------------------------------------------------------------------ misorientations
 
 
-# the misorientation distribution of two ODFs, the density of inv(o1) o2 for independent
-# grains, (inv f1 * f2)(g) = int f1(S g^-1) f2(S) dS, with exchange symmetry for one ODF
 def calcMDF(f1, f2=None, bandwidth=32):
+  """the misorientation distribution of two ODFs, the density of inv(o1) o2 for independent
+  grains, (inv f1 * f2)(g) = int f1(S g^-1) f2(S) dS, with exchange symmetry for one ODF"""
   h1 = SO3FunHarmonic(f1, bandwidth=min(bandwidth, f1.bandwidth)).truncate(bandwidth)
   h2 = h1 if f2 is None or f2 is f1 else SO3FunHarmonic(f2, bandwidth=min(bandwidth, f2.bandwidth)).truncate(bandwidth)
   m = conv(h1.conj().inv(), h2)
@@ -167,14 +168,14 @@ def _framesOf(f):
   return reductionGroups(orientation(rotation.id, f.CS, f.SS))
 
 
-# the distribution of the misorientation angle, MATLAB's order (density, omega):
-#   calcAngleDistribution(cs1, cs2)   the uniform one, the area of the axis sector at each
-#                                     angle times sin^2(omega/2), with mean one over the angles
-#   calcAngleDistribution(mori)       a histogram of the disorientation angles in percent
-#   calcAngleDistribution(f)          the uniform one times the mean of f over the axes at each
-#                                     angle, found by sampling the axes with a count following
-#                                     sin^2(omega/2) and keeping the rotations of minimal angle
 def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * degree):
+  """the distribution of the misorientation angle, MATLAB's order (density, omega):
+    calcAngleDistribution(cs1, cs2)   the uniform one, the area of the axis sector at each
+                                      angle times sin^2(omega/2), with mean one over the angles
+    calcAngleDistribution(mori)       a histogram of the disorientation angles in percent
+    calcAngleDistribution(f)          the uniform one times the mean of f over the axes at each
+                                      angle, found by sampling the axes with a count following
+                                      sin^2(omega/2) and keeping the rotations of minimal angle"""
   from ..geometry.orientationregion import fundamentalRegion
   if args and isinstance(args[0], referenceFrame):
     SS, args = args[0], args[1:]
@@ -215,9 +216,9 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
   return density / np.mean(uniform), w
 
 
-# the M-index: half the total variation between the angle distributions of the uniform
-# and the uncorrelated misorientation distribution
 def calcMIndex(f, resolution=1 * degree):
+  """the M-index: half the total variation between the angle distributions of the uniform
+  and the uncorrelated misorientation distribution"""
   m = calcMDF(f)
   pu, _ = calcAngleDistribution(uniformODF(f.CS, f.CS, antipodal=True), resolution=resolution)
   pm, _ = calcAngleDistribution(m, resolution=resolution)
@@ -296,10 +297,10 @@ def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
   return S2FunHarmonic(S2FunHandle(_axisDensity(f, **kwargs), frame, bandwidth=bandwidth, antipodal=antipodal))
 
 
-# the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' is half
-# the mean absolute difference, for densities the fraction of the volume that would have to
-# move to turn one into the other; 'l2' the norm of the difference over the norm of g
 def calcError(f, g, mode="l1", resolution=5 * degree):
+  """the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' is half
+  the mean absolute difference, for densities the fraction of the volume that would have to
+  move to turn one into the other; 'l2' the norm of the difference over the norm of g"""
   mode = str(mode).lower()
   grid = equispacedSO3Grid(f.CS, f.SS, resolution=resolution)
   d1 = np.real(f(grid))
@@ -625,12 +626,12 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
 # ------------------------------------------------------------------ sampling
 
 
-# the nodes of a grid drawn with probability proportional to f, moved by a random rotation
-# within the grid resolution and by a random element of each group; a radial basis function
-# exactly: a centre by its weight, the angle by inverse transform of the kernel density, a
-# uniform axis, a group element on each side; a Bingham distribution exactly by rejection; a
-# sum of kernel forms term by term
 def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, range=(0, 1)):
+  """the nodes of a grid drawn with probability proportional to f, moved by a random rotation
+  within the grid resolution and by a random element of each group; a radial basis function
+  exactly: a centre by its weight, the angle by inverse transform of the kernel density, a
+  uniform axis, a group element on each side; a Bingham distribution exactly by rejection; a
+  sum of kernel forms term by term"""
   rng = np.random.default_rng() if rng is None else rng
   n = int(n)
   # a density given as a Python function of real numbers is sampled on 10000 points of range
@@ -702,15 +703,15 @@ def _discreteSampleS2(f, n, resolution, rng):
 # ------------------------------------------------------------------ kernel selection and specimen centering
 
 
-# the de la Vallee Poussin kernel a density estimate of orientations or directions should use
-# (MATLAB calcKernel): 'UCV', the default, and 'conservative' select from the degree energies of
-# the sample and are bounded below by a noise floor unless noiseFloor=False
-# (docs/plans/halfwidth.md); 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
-# validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
-# size and the symmetries alone; directions take the first two only. groups are the grain ids
-# of pixels, which the energies fold by; a map brings its own
 def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, weights=None, bandwidth=None, halfwidths=None,
                noiseFloor=True):
+  """the de la Vallee Poussin kernel a density estimate of orientations or directions should use
+  (MATLAB calcKernel): 'UCV', the default, and 'conservative' select from the degree energies of
+  the sample and are bounded below by a noise floor unless noiseFloor=False
+  (docs/plans/halfwidth.md); 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
+  validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
+  size and the symmetries alone; directions take the first two only. groups are the grain ids
+  of pixels, which the energies fold by; a map brings its own"""
   from .halfwidth import degreeEnergies, selectHalfwidth
   from .kernelfunctions import S2DeLaValleePoussinKernel
   if not isinstance(o, (quaternion, vector3d)) and hasattr(o, "orientations"):
@@ -775,12 +776,12 @@ def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, wei
   raise ValueError(f"the kernel selection method is 'UCV', 'conservative', 'klcv', 'ruleOfThumb' or 'magicRule', not {method!r}")
 
 
-# two perpendicular twofold axes of an assumed orthotropic texture, found and rotated onto
-# the nearest specimen axes (MATLAB centerSpecimen): the mismatch of a candidate axis is the
-# norm of the difference between the harmonic series of the density and the series turned
-# by 180 degrees about it; the first axis is searched on a cap about v0, the second on the
-# fan perpendicular to it. Returns the centred series, the correction applied, and the axes
 def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose=False):
+  """two perpendicular twofold axes of an assumed orthotropic texture, found and rotated onto
+  the nearest specimen axes (MATLAB centerSpecimen): the mismatch of a candidate axis is the
+  norm of the difference between the harmonic series of the density and the series turned
+  by 180 degrees about it; the first axis is searched on a cap about v0, the second on the
+  fan perpendicular to it. Returns the centred series, the correction applied, and the axes"""
   # MATLAB's flags 'Fourier' and 'silent' change nothing here: the search runs on the harmonic form
   if isinstance(v0, str):
     v0 = None
@@ -833,26 +834,12 @@ def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose
 # ------------------------------------------------------------------ the methods of the function kinds
 
 
-def _attach():
-  for cls in SO3_KINDS + S2_KINDS:
-    cls.max = lambda self, **kw: max_(self, **kw)
-    cls.min = lambda self, **kw: min_(self, **kw)
-    cls.entropy = lambda self, **kw: entropy(self, **kw)
-    cls.textureindex = lambda self: textureindex(self)
-    cls.discreteSample = lambda self, n, **kw: discreteSample(self, n, **kw)
-  for cls in SO3_KINDS:
-    cls.volume = lambda self, *a, **kw: volume(self, *a, **kw)
-    cls.fibreVolume = lambda self, *a, **kw: fibreVolume(self, *a, **kw)
-    cls.calcComponents = lambda self, **kw: calcComponents(self, **kw)
-    cls.calcMDF = lambda self, *a, **kw: calcMDF(self, *a, **kw)
-    cls.calcAngleDistribution = lambda self, **kw: calcAngleDistribution(self, **kw)
-    cls.calcAxisDistribution = lambda self, *a, **kw: calcAxisDistribution(self, *a, **kw)
-    cls.calcMIndex = lambda self, **kw: calcMIndex(self, **kw)
-    cls.calcError = lambda self, g, *a, **kw: calcError(self, g, *a, **kw)
-    cls.centerSpecimen = lambda self, **kw: centerSpecimen(self, **kw)
-
-
-_attach()
+install(SO3_KINDS + S2_KINDS, max_, "max")
+install(SO3_KINDS + S2_KINDS, min_, "min")
+for _f in (entropy, textureindex, discreteSample):
+  install(SO3_KINDS + S2_KINDS, _f)
+for _f in (volume, fibreVolume, calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex, calcError, centerSpecimen):
+  install(SO3_KINDS, _f)
 
 __all__ = ["textureindex", "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex",
            "calcAxisDistribution", "calcError", "calcComponents", "discreteSample", "calcKernel", "centerSpecimen"]

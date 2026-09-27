@@ -107,8 +107,8 @@ def plotRGB(channels, resolution=0.5 * degree, **kw):
   return hs
 
 
-# a tuple or list of three functions on the sphere, the channels of an rgb plot
 def isRGB(x):
+  """a tuple or list of three functions on the sphere, the channels of an rgb plot"""
   from .sphericalplot import _isFunction
   return isinstance(x, (tuple, list)) and len(x) == 3 and all(_isFunction(f) for f in x)
 

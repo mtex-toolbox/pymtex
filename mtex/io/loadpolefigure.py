@@ -28,12 +28,13 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from . import polefigureformats as F
 from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
+from ..geometry.install import install
 
 # ------------------------------------------------------------------ the reflection in a name
 
-# the Miller indices a file name or a header line spells: four digits with optional signs,
-# else three; every such group of the name is one direction, several a superposition
 def string2Miller(s, cs=None):
+  """the Miller indices a file name or a header line spells: four digits with optional signs,
+  else three; every such group of the name is one direction, several a superposition"""
   cs = crystalFrame("m-3m") if cs is None else cs
   s = os.path.basename(str(s))
   # four indices with signs first, then three without a sign, then three with
@@ -82,9 +83,9 @@ def loadPoleFigure_dubna(fname, *args, **kwargs):
   return PoleFigure(h, r, d, *(f for f in (cs, ss) if f is not None), **kwargs)
 
 
-# the specimen grid of the Dubna goniometer: 19 rings five degrees apart, each ring of 72
-# azimuths five degrees apart, the last at 355 degree, starting where the instrument starts it
 def DubnaGrid(ntheta):
+  """the specimen grid of the Dubna goniometer: 19 rings five degrees apart, each ring of 72
+  azimuths five degrees apart, the last at 355 degree, starting where the instrument starts it"""
   theta = np.linspace(0, np.pi / 2, 19)[:ntheta]
   rho = np.arange(72) * 5 * degree
   start = np.array([360.00, 336.40, 327.05, 320.11, 314.44, 309.57, 305.26, 301.37, 297.80, 294.47, 291.34, 288.38,
@@ -404,9 +405,9 @@ BINARY = {".gpol", ".rw1", ".xrdml", ".xml"}
 TABLE_KEYS = {"columnNames", "columns", "header", "delimiter", "radians"}
 
 
-# the format of a file: the one named, else the one candidate of its extension whose
-# signature the file carries; None for an extension no format writes
 def chooseFormat(fname, interface=None):
+  """the format of a file: the one named, else the one candidate of its extension whose
+  signature the file carries; None for an extension no format writes"""
   if interface is not None:
     name = str(interface).lower()
     if name not in INTERFACES:
@@ -471,6 +472,6 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
   return pf
 
 
-PoleFigure.load = staticmethod(lambda fname, *args, **kwargs: loadPoleFigure(fname, *args, **kwargs))
+install(PoleFigure, staticmethod(loadPoleFigure), "load")
 
 __all__ = ["loadPoleFigure", "loadPoleFigure_generic", "string2Miller", "DubnaGrid"]

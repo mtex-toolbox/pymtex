@@ -21,6 +21,7 @@ from ..geometry.parent2child import calcParent
 from ..geometry.quaternion import qmul
 from ..geometry.units import degree
 from .reconstruction import _ori, _quantile, parentGrainReconstructor, probabilityOf, voteTable
+from ..geometry.install import install
 
 
 def _sparse(r, c, v, n):
@@ -42,8 +43,8 @@ def calcGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=False, c2c=
   job.graph = G.maximum(G.T).tocsr()
 
 
-# MCL until the columns settle: expansion, inflation by p, pruning, the columns normalised
 def mclComponents(A, p, maxIter=np.inf):
+  """MCL until the columns settle: expansion, inflation by p, pruning, the columns normalised"""
   from scipy.sparse import identity
   A = A.tocsr().copy()
   A.data[A.data <= 1e-4] = 0
@@ -372,7 +373,7 @@ def clusterVariantGraph(job, inflationPower=1.05, numIter=10, cutOff=1e-4, minCl
 
 
 for _f in (calcGraph, clusterGraph, calcParentFromGraph, mergeByGraph, plotGraph, calcVariantGraph, clusterVariantGraph):
-  setattr(parentGrainReconstructor, _f.__name__, _f)
+  install(parentGrainReconstructor, _f)
 del _f
 
 __all__ = ["mclComponents"]

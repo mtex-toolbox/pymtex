@@ -10,6 +10,7 @@
 # acts by v(s xi) = s v(xi) for every element including the improper ones.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -102,8 +103,8 @@ class S2VectorField:
     return mapField(lambda a, b: np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1)), self, w,
                     bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
 
-  # the length at every direction, a function on the sphere, as MATLAB's norm
   def norm(self):
+    """the length at every direction, a function on the sphere, as MATLAB's norm"""
     return self.abs()
 
   def mean(self):
@@ -127,6 +128,11 @@ class S2VectorField:
     return mapField(lambda x, s: s[:, None] * x, self, a)
 
   __rmul__ = __mul__
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.sphericalplot import plot, quiver
+    from ..plotting.spaceplot import plot3d
 
 
 class S2VectorFieldHarmonic(S2VectorField):
@@ -180,18 +186,18 @@ class S2VectorFieldHarmonic(S2VectorField):
       setattr(v, k, x)
     return v
 
-  # the coefficients of the components in MTEX's basis, one column per component
   @property
   def fhat(self):
+    """the coefficients of the components in MTEX's basis, one column per component"""
     return mtexCoefficientsS2(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsS2(self._fhat)
 
   @property
   def bandwidth(self):
     return math.isqrt(self._fhat.shape[0]) - 1
 
-  # the field of the outer normals, v at v, exact at bandwidth one
   @classmethod
   def normal(cls):
+    """the field of the outer normals, v at v, exact at bandwidth one"""
     return cls(lambda v: v, bandwidth=2)
 
   def truncate(self, L):
@@ -202,20 +208,20 @@ class S2VectorFieldHarmonic(S2VectorField):
     fhat[:n] = self._fhat[:n]
     return self._rebuild(fhat)
 
-  # S2VectorFieldHarmonic.quadrature(f, bandwidth=L), from a callable or from nodes and
-  # values with their weights, MATLAB's name for the constructor
   @classmethod
   def quadrature(cls, f, *args, bandwidth=None, weights=None):
+    """S2VectorFieldHarmonic.quadrature(f, bandwidth=L), from a callable or from nodes and
+    values with their weights, MATLAB's name for the constructor"""
     return cls(f, *args, bandwidth=bandwidth, weights=weights)
 
-  # the least squares fit to vectors at directions
   @classmethod
   def interpolate(cls, nodes, values, **kwargs):
+    """the least squares fit to vectors at directions"""
     return interpolateField(nodes, values, **kwargs)
 
-  # the Cartesian components as functions
   @property
   def x(self):
+    """the Cartesian components as functions"""
     return self.component(0)
 
   @property
@@ -226,17 +232,17 @@ class S2VectorFieldHarmonic(S2VectorField):
   def z(self):
     return self.component(2)
 
-  # one component as a function without the group
   def component(self, i):
+    """one component as a function without the group"""
     return S2FunHarmonic(self._fhat[:, i], None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
 
   def eval(self, x):
     v = _vectorsFor(self, x).normalize()
     return vector3d(_seriesColumns(self._fhat, v).reshape(*v.shape, 3))
 
-  # the projection onto the equivariant fields of the frame, v(s xi) = s v(xi) for the
-  # elements of the group including the improper ones
   def symmetrise(self):
+    """the projection onto the equivariant fields of the frame, v(s xi) = s v(xi) for the
+    elements of the group including the improper ones"""
     if self.frame is None or self.frame.sym.numSym() == 1:
       return self
     L = self.bandwidth
@@ -272,8 +278,8 @@ class S2VectorFieldHarmonic(S2VectorField):
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= rtol * np.linalg.norm(b))
 
-  # the inner product with a constant vector, exact, a function without the group
   def dot(self, x):
+    """the inner product with a constant vector, exact, a function without the group"""
     if isinstance(x, S2VectorField):
       return S2VectorField.dot(self, x)
     x = x if isinstance(x, vector3d) else vector3d(x)
@@ -281,15 +287,15 @@ class S2VectorFieldHarmonic(S2VectorField):
       raise ValueError("the vector lives in another frame than the field")
     return S2FunHarmonic(self._fhat @ x.data.reshape(3), None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
 
-  # F x x = -[x]_x F, on the rows of the coefficients F [x]_x
   def cross(self, x):
+    """F x x = -[x]_x F, on the rows of the coefficients F [x]_x"""
     if isinstance(x, S2VectorField):
       return S2VectorField.cross(self, x)
     x = x if isinstance(x, vector3d) else vector3d(x)
     return self._rebuild(self._fhat @ spinTensor(x.data.reshape(3)))
 
-  # v'(xi) = r v(r^-1 xi): the components rotate and mix
   def rotate(self, r):
+    """v'(xi) = r v(r^-1 xi): the components rotate and mix"""
     if isinstance(r, orientation):
       if self.frame is not None and r.CS is not self.frame:
         raise ValueError("the orientation maps out of the frame of the field")
@@ -303,8 +309,8 @@ class S2VectorFieldHarmonic(S2VectorField):
     fhat = fhat @ rot.matrix().T
     return self._rebuild(fhat, frame=None if self.frame is None else _rotatedFrame(self.frame, rot))
 
-  # the field of the antipode, v(-xi)
   def antipode(self):
+    """the field of the antipode, v(-xi)"""
     l = np.floor(np.sqrt(np.arange(len(self._fhat)))).astype(int)
     return self._rebuild(np.where(l % 2, -1.0, 1.0)[:, None] * self._fhat)
 
@@ -335,9 +341,9 @@ def _ladders(L):
   return _LADDERS[L]
 
 
-# L_i f, the derivative under the rotation about e_i, on the coefficients: the ladder
-# operators as shifts of the coefficient vector, the degrees never mixing
 def angularDerivatives(fhat):
+  """L_i f, the derivative under the rotation about e_i, on the coefficients: the ladder
+  operators as shifts of the coefficient vector, the degrees never mixing"""
   L = math.isqrt(len(fhat)) - 1
   m, up, down = _ladders(L)
   f = np.asarray(fhat)
@@ -352,8 +358,8 @@ def angularDerivatives(fhat):
   return out
 
 
-# the surface gradient (L f) x xi, at directions and as a field of the next bandwidth
 def grad(f, x=None):
+  """the surface gradient (L f) x xi, at directions and as a field of the next bandwidth"""
   if not f.isReal:
     raise ValueError("the gradient of a complex valued function is not a real vector field")
   if x is None:
@@ -431,9 +437,9 @@ class S2VectorFieldHandle(S2VectorField):
     return f"S2VectorFieldHandle{info}\n  bandwidth hint: {self.bandwidth}"
 
 
-# the unit vectors of the polar coordinates at a direction: along the polar angle and
-# along the azimuth
 def thetaVector(v):
+  """the unit vectors of the polar coordinates at a direction: along the polar angle and
+  along the azimuth"""
   v = v if isinstance(v, vector3d) else vector3d(v)
   t, r = v.theta, v.rho
   return vector3d(np.cos(r) * np.cos(t), np.sin(r) * np.cos(t), -np.sin(t), frame=v.frame)
@@ -445,8 +451,8 @@ def rhoVector(v):
   return vector3d(-np.sin(r), np.cos(r), np.zeros_like(r), frame=v.frame)
 
 
-# the vectors at directions by least squares componentwise
 def interpolateField(v, values, **kwargs):
+  """the vectors at directions by least squares componentwise"""
   from .density import interpolate
   d = vector3d(v.data.reshape(-1, 3), frame=v.frame).normalize()
   vals = _values(values)

@@ -47,18 +47,18 @@ class EBSDFileInfo:
   def name(self):
     return os.path.basename(self.path)
 
-  # the width and height the grid spans, in the scan unit
   @property
   def extent(self):
+    """the width and height the grid spans, in the scan unit"""
     if self.grid is None or self.step is None:
       return None
     nx, ny = self.grid
     dx, dy = self.step
     return ((nx - 1) * dx, (ny - 1) * dy)
 
-  # the axis names the vendor writes its Euler angles in
   @property
   def eulerAxesNames(self):
+    """the axis names the vendor writes its Euler angles in"""
     labels = _find(self.header, ("sample surface direction labels", "direction labels"))
     if isinstance(labels, (list, tuple)) and len(labels) == 3:
       return tuple(str(l) for l in labels)
@@ -68,8 +68,8 @@ class EBSDFileInfo:
       return ("X1", "Y1", "Z1")
     return ("x", "y", "z")
 
-  # the rows of the file information panel, name and value
   def describe(self):
+    """the rows of the file information panel, name and value"""
     rows = [("file", self.name), ("format", self.format), ("vendor", self.vendor), ("size", _sizeLabel(self.size))]
     if self.date is not None:
       rows.append(("date", self.date.strftime("%Y-%m-%d %H:%M")))
@@ -103,8 +103,8 @@ class EBSDFileInfo:
 
 # ------------------------------------------------------------------ the files of a folder
 
-# whether a name is an EBSD file by its extension; a .crc beside its .cpr is the same map
 def isEBSDFile(name):
+  """whether a name is an EBSD file by its extension; a .crc beside its .cpr is the same map"""
   return os.path.splitext(name)[1].lower() in EBSD_EXTENSIONS
 
 

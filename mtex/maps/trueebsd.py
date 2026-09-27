@@ -34,10 +34,10 @@ def _round(x):
   return np.sign(x) * np.floor(np.abs(x) + 0.5)
 
 
-# the map read at positions by its nearest measurement, within the reach of its unit cell,
-# as MATLAB's EBSD/interp: a position no measurement reaches is not indexed, with a NaN
-# rotation and NaN properties
 def resampleNearest(ebsd, pos):
+  """the map read at positions by its nearest measurement, within the reach of its unit cell,
+  as MATLAB's EBSD/interp: a position no measurement reaches is not indexed, with a NaN
+  rotation and NaN properties"""
   from scipy.spatial import cKDTree
   from ..geometry.quaternion import rotation
   from .ebsd import EBSD
@@ -104,9 +104,9 @@ class trueEbsd:
     if T is not None:
       self.T = T
 
-  # one unfitted transform per hop
   @property
   def T(self):
+    """one unfitted transform per hop"""
     return self._T
 
   @T.setter

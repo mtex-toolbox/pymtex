@@ -50,12 +50,12 @@ def threads():
   return _physicalCores
 
 
-# the OpenMP runtimes of finufft and the NFFT spin their threads after a transform by default,
-# which starves numba's pool and every other one on the same cores: a small transform after a
-# parallel kernel took 115-265 ms instead of 3 (docs/research/benchmark-harmonics.md). The
-# runtime reads the policy when it is loaded, so it is set before the first such library is;
-# a policy the user set stays
 def passiveOpenMP():
+  """the OpenMP runtimes of finufft and the NFFT spin their threads after a transform by default,
+  which starves numba's pool and every other one on the same cores: a small transform after a
+  parallel kernel took 115-265 ms instead of 3 (docs/research/benchmark-harmonics.md). The
+  runtime reads the policy when it is loaded, so it is set before the first such library is;
+  a policy the user set stays"""
   import os
   os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
 
@@ -155,8 +155,8 @@ def _qmulNumpy(p, q):
     d1 * a2 - c1 * b2 + b1 * c2 + a1 * d2], axis=-1)
 
 
-# the Hamilton product on trailing axes of four, broadcast on the leading ones (quaternion/times)
 def qmul(p, q):
+  """the Hamilton product on trailing axes of four, broadcast on the leading ones (quaternion/times)"""
   p, q = np.asarray(p), np.asarray(q)
   if backend() == "numpy":
     return _qmulNumpy(p, q)
@@ -186,9 +186,9 @@ def _eulerQuatLoop(alpha, beta, gamma, out):
     out[i, 3] = cP * np.sin(hp)
 
 
-# the quaternions of Matthies angles of one shape, or None on the NumPy backend, whose form
-# is representations.matthies2quat
 def eulerQuat(alpha, beta, gamma):
+  """the quaternions of Matthies angles of one shape, or None on the NumPy backend, whose form
+  is representations.matthies2quat"""
   if backend() == "numpy":
     return None
   shape = alpha.shape
@@ -226,8 +226,8 @@ def _qrotNumpy(q, xyz):
     a2 * (b * y - x * c) + s * d + an * z], axis=-1)
 
 
-# q v q* on trailing axes of four and three, broadcast on the leading ones (vector3d/rotate)
 def qrot(q, xyz):
+  """q v q* on trailing axes of four and three, broadcast on the leading ones (vector3d/rotate)"""
   q, xyz = np.asarray(q), np.asarray(xyz)
   if backend() == "numpy":
     return _qrotNumpy(q, xyz)
@@ -262,9 +262,9 @@ def _bestDotNumpy(qs, es):
   return np.take_along_axis(d, k[:, None], axis=1)[:, 0].reshape(qs.shape[:-1]), k.reshape(qs.shape[:-1])
 
 
-# the best |<q, e>| over the images e and where it is, for every q of a list, the first
-# maximum on a tie
 def bestDot(qs, es):
+  """the best |<q, e>| over the images e and where it is, for every q of a list, the first
+  maximum on a tie"""
   if backend() == "numpy":
     return _bestDotNumpy(qs, es)
   shape = qs.shape[:-1]
@@ -307,8 +307,8 @@ def _variantAngleLoop(m, PV, G, out):
         out[p, k, l] = 2 * np.arctan2(np.sqrt(y1 * y1 + y2 * y2 + y3 * y3), best)
 
 
-# the angles of variantAngles for every misorientation, (n, nV, nV)
 def variantAngles(m, PV, G):
+  """the angles of variantAngles for every misorientation, (n, nV, nV)"""
   m = np.ascontiguousarray(m, dtype=np.float64).reshape(-1, 4)
   PV = np.ascontiguousarray(PV, dtype=np.float64).reshape(-1, 4)
   G = np.ascontiguousarray(G, dtype=np.float64).reshape(-1, 4)
@@ -701,9 +701,9 @@ def _regionMembershipNumpy(q, N, nBlocks, t, band):
   return inside.any(axis=1), (inside & np.any(np.abs(D) <= band, axis=2)).any(axis=1)
 
 
-# whether each quaternion lies in one of nBlocks regions, N their planes block after block,
-# and whether it lies within band of a plane of a region holding it
 def regionMembership(q, N, nBlocks, t, band):
+  """whether each quaternion lies in one of nBlocks regions, N their planes block after block,
+  and whether it lies within band of a plane of a region holding it"""
   q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
   N = np.ascontiguousarray(N, dtype=np.float64).reshape(-1, 4)
   if backend() == "numpy" or len(N) == 0:

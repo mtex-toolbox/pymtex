@@ -71,8 +71,8 @@ class gbcFMC(grainBoundaryCriterion):
       out[pair] = (label[ip] == label[jp]) & (label[ip] > 0)
     return out
 
-  # FMC on the pixels isP of one phase over the pair list (ip, jp) within them
   def clusterPhase(self, ebsd, isP, ip, jp, fr):
+    """FMC on the pixels isP of one phase over the pair list (ip, jp) within them"""
     q = ebsd.rotations.data.reshape(-1, 4)[isP].astype(np.float64)
     P3 = ebsd.pos.data.reshape(-1, 3)[isP].astype(np.float64)
     l = ebsd.lattice
@@ -113,9 +113,9 @@ def _project(q, ref, G):
   return closestImage(ref, q, np.array([[1.0, 0, 0, 0]]), G, False)[1]
 
 
-# the whole coarsening of one phase: the memberships and saliencies of every scale, the
-# pixel couplings without the maxDelta cut and what the report prints
 def coarsenAll(crit, q, pos, ip, jp, fr):
+  """the whole coarsening of one phase: the memberships and saliencies of every scale, the
+  pixel couplings without the maxDelta cut and what the report prints"""
   N = len(q)
   a, b = np.minimum(ip, jp), np.maximum(ip, jp)
   key = np.unique(a * N + b)
@@ -160,8 +160,8 @@ def coarsenAll(crit, q, pos, ip, jp, fr):
   return hier
 
 
-# one coarsening step
 def coarsen(s):
+  """one coarsening step"""
   s.sizeW = s.sizeWnext
   diluteEdges(s)
   coarseSeeds(s)
@@ -173,8 +173,8 @@ def coarsen(s):
   s.v = s.vcoarse
 
 
-# drop the edges far weaker than the average coupling of both their ends (Kushnir 2006)
 def diluteEdges(s):
+  """drop the edges far weaker than the average coupling of both their ends (Kushnir 2006)"""
   W = s.W.tocoo()
   sumW = np.asarray(s.W.sum(axis=1)).ravel() - s.W.diagonal()
   n = np.asarray((s.W > 0).sum(axis=0)).ravel()
@@ -183,9 +183,9 @@ def diluteEdges(s):
   s.W = _sparse(W.row, W.col, np.where(weak, 0.0, W.data), (s.sizeW, s.sizeW))
 
 
-# the seeds: in order of decreasing coupling at the finest scale and of decreasing size
-# above it, a node becomes a seed when its coupling to the seeds so far is below alpha of its total
 def coarseSeeds(s):
+  """the seeds: in order of decreasing coupling at the finest scale and of decreasing size
+  above it, a node becomes a seed when its coupling to the seeds so far is below alpha of its total"""
   W = s.W.tocsc()
   W.sort_indices()
   alphaSum = s.alpha * (np.asarray(W.sum(axis=1)).ravel() - W.diagonal())
@@ -206,9 +206,9 @@ def coarseSeeds(s):
   s.sizeWnext = len(s.C)
 
 
-# the interpolation: a fine node in the seeds it couples to, row normalised, a seed in
-# itself; a node coupled to no seed becomes a seed of its own
 def interpolation(s):
+  """the interpolation: a fine node in the seeds it couples to, row normalised, a seed in
+  itself; a node coupled to no seed becomes a seed of its own"""
   from scipy.sparse import diags, hstack
   nC = s.sizeWnext
   P = diags(s.F.astype(np.float64)) @ s.W[:, s.C] + _sparse(s.C, np.arange(nC), np.ones(nC), (s.sizeW, nC))
@@ -225,16 +225,16 @@ def interpolation(s):
   s.P = P
 
 
-# the Galerkin coarse graph and the sizes of the aggregates
 def coarseGraph(s):
+  """the Galerkin coarse graph and the sizes of the aggregates"""
   P = s.P
   s.W = (P.T @ s.W @ P).tocsr()
   s.A_D = (P.T @ s.A_D @ P).tocsr()
   s.vcoarse = P.T @ s.v
 
 
-# the tangent vectors of b in the frame of a, in degree, both rows of unit quaternions
 def tangent(a, b):
+  """the tangent vectors of b in the frame of a, in degree, both rows of unit quaternions"""
   w = np.sum(a * b, axis=1)
   x = a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0] - a[:, 2] * b[:, 3] + a[:, 3] * b[:, 2]
   y = a[:, 0] * b[:, 2] + a[:, 1] * b[:, 3] - a[:, 2] * b[:, 0] - a[:, 3] * b[:, 1]
@@ -252,12 +252,12 @@ def _acc(j, v, n):
   return np.bincount(j, weights=v, minlength=n)[:n]
 
 
-# the statistics of every aggregate from its seed and the fine nodes interpolating into it,
-# all members at once: the mean orientation with the outliers beyond the aggregate's radius
-# taken out against the converged mean, the centroid, the moment sums carried up the
-# hierarchy, and the spread around a constant or, where minimum description length pays
-# for the six parameters, a linear orientation field whose gradient is the lattice curvature
 def aggregateStatistics(s):
+  """the statistics of every aggregate from its seed and the fine nodes interpolating into it,
+  all members at once: the mean orientation with the outliers beyond the aggregate's radius
+  taken out against the converged mean, the centroid, the moment sums carried up the
+  hierarchy, and the spread around a constant or, where minimum description length pays
+  for the six parameters, a linear orientation field whose gradient is the lattice curvature"""
   C = s.C
   nC = s.sizeWnext
   Pc = s.P.tocsc()
@@ -331,9 +331,9 @@ def aggregateStatistics(s):
   s.Gr = np.hstack([gx, gy])
 
 
-# the coarse couplings rescaled by how surprising the misorientation between two aggregates
-# is: the residual neither side's gradient explains, against the smaller of their spreads
 def biasWeights(s):
+  """the coarse couplings rescaled by how surprising the misorientation between two aggregates
+  is: the residual neither side's gradient explains, against the smaller of their spreads"""
   from scipy.sparse import triu
   nC = s.sizeWnext
   U = triu(s.W).tocoo()
@@ -353,8 +353,8 @@ def biasWeights(s):
   s.W = s.W.multiply(B).tocsr()
 
 
-# the saliency of every aggregate, external over internal coupling
 def saliency(s):
+  """the saliency of every aggregate, external over internal coupling"""
   dW, dA = s.W.diagonal(), s.A_D.diagonal()
   with np.errstate(divide="ignore", invalid="ignore"):
     s.Sal = 2 * ((np.asarray(s.W.sum(axis=0)).ravel() - dW) * dA) / (dW * (np.asarray(s.A_D.sum(axis=1)).ravel() - dA))
@@ -386,12 +386,12 @@ def _components(n, a, b):
   return connected_components(_sparse(a, b, np.ones(len(a)), (n, n)), directed=False)[1]
 
 
-# one label per pixel from the hierarchy: every pixel read off at the scale where its
-# dominant aggregate is most salient against the median of that scale, a chosen aggregate
-# joined to the first chosen one above it along the dominant parents, the regions split
-# into their connected parts and the ones below minPixel absorbed, rim first, by the full
-# sized neighbour they couple to most strongly; 0 for a pixel no scale reads off
 def interpret(hier, minPixel=1):
+  """one label per pixel from the hierarchy: every pixel read off at the scale where its
+  dominant aggregate is most salient against the median of that scale, a chosen aggregate
+  joined to the first chosen one above it along the dominant parents, the regions split
+  into their connected parts and the ones below minPixel absorbed, rim first, by the full
+  sized neighbour they couple to most strongly; 0 for a pixel no scale reads off"""
   nc = hier.numClusters
   numS, N = len(nc), nc[0]
   A_D = ((hier.A_D + hier.A_D.T) > 0).tocsr()
@@ -481,9 +481,9 @@ def interpret(hier, minPixel=1):
   return label, rep
 
 
-# what one run did: how the graph coarsened, where the aggregates took a gradient and at
-# which scale the pixels were read off
 def report(crit, mineral, hier, rep):
+  """what one run did: how the graph coarsened, where the aggregates took a gradient and at
+  which scale the pixels were read off"""
   par = f"cmaha {crit.cmaha:g}, cmaha0 {crit.cmaha0:g}, quatmax {crit.quatmax / degree:g}, alpha {crit.alpha:g}, gammaW {crit.gammaW:g}"
   if crit.minPixel > 1:
     par += f", minPixel {crit.minPixel:g}"

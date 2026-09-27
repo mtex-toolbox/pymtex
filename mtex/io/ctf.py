@@ -24,8 +24,8 @@ def _number(s):
   return float(s.strip().replace(",", "."))
 
 
-# the phases a Channel header declares: lattice, angles, name, Laue class, space group
 def ctfPhases(lines, phaseLine, n):
+  """the phases a Channel header declares: lattice, angles, name, Laue class, space group"""
   frames = [notIndexedFrame()]
   for k in range(1, n + 1):
     f = lines[phaseLine + k].split("\t")
@@ -53,9 +53,9 @@ def ctfPhases(lines, phaseLine, n):
   return phaseList(frames)
 
 
-# the general header lines as a flat dict, MATLAB's ctfHeaderStruct: a line of an even number
-# of fields is key value pairs, an odd one carries a leading note that is dropped
 def ctfHeader(lines):
+  """the general header lines as a flat dict, MATLAB's ctfHeaderStruct: a line of an even number
+  of fields is key value pairs, an odd one carries a leading note that is dropped"""
   pairs = []
   for l in lines:
     parts = l.split("\t")
@@ -65,10 +65,10 @@ def ctfHeader(lines):
   return headerDict(pairs)
 
 
-# a .ctf refers its angles to the sample primary frame CS0 and the map lies in the acquisition
-# surface CS1; the tilt of the surface, AcqE2 and AcqE3, is undone before the half turn
-# about z, and a rotation about the surface normal is not, as far as two exports can tell
 def oxfordCorrection(acq):
+  """a .ctf refers its angles to the sample primary frame CS0 and the map lies in the acquisition
+  surface CS1; the tilt of the surface, AcqE2 and AcqE3, is undone before the half turn
+  about z, and a rotation about the surface normal is not, as far as two exports can tell"""
   half = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")
   if acq is not None and (abs(acq[1]) > 1e-6 or abs(acq[2]) > 1e-6):
     return half * rotation.byEuler(0.0, acq[1] * degree, acq[2] * degree, "Bunge").inv()

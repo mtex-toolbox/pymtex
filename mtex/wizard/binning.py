@@ -31,19 +31,19 @@ def binnedDensity(ori, cell=4 * degree, halfwidth=None, **kwargs):
   return calcDensity(reps, weights=weights, halfwidth=halfwidth, harmonic=True, **kwargs)
 
 
-# the density of one phase of a map for the preview: a larger map is subsampled first, drawn
-# at random but the same draw every time, since a pole figure at the kernel's width looks the
-# same from a hundred thousand measurements as from millions, and the selection and the
-# binning of millions cost a second
 def previewDensity(ebsd, phaseId, maxPoints=PREVIEW_POINTS):
+  """the density of one phase of a map for the preview: a larger map is subsampled first, drawn
+  at random but the same draw every time, since a pole figure at the kernel's width looks the
+  same from a hundred thousand measurements as from millions, and the selection and the
+  binning of millions cost a second"""
   idx = np.flatnonzero((np.asarray(ebsd.phaseId).reshape(-1) == phaseId) & np.asarray(ebsd.isIndexed).reshape(-1))
   if idx.size > maxPoints:
     idx = np.sort(np.random.default_rng(0).choice(idx, maxPoints, replace=False))
   return binnedDensity(ebsd[idx].orientations)
 
 
-# one representative per occupied cell of the Euler grid, and the count of the cell
 def binOrientations(ori, cell=4 * degree):
+  """one representative per occupied cell of the Euler grid, and the count of the cell"""
   phi1, Phi, phi2 = (np.asarray(a, dtype=float).reshape(-1) for a in ori.Euler("Bunge"))
   n1, n2, n3 = (int(np.ceil(2 * np.pi / cell)), int(np.ceil(np.pi / cell)) + 1, int(np.ceil(2 * np.pi / cell)))
   i1 = np.clip(np.floor(np.mod(phi1, 2 * np.pi) / cell).astype(np.int64), 0, n1 - 1)

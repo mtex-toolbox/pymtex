@@ -17,6 +17,7 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .ebsd import EBSD
 from .grains import grain2d
+from ..geometry.install import install
 
 
 # the columns of a cluster id per measurement or grain, the shape of the output and the
@@ -172,7 +173,6 @@ def calcTraces(x, clusterId=None, *flags, **kwargs):
   raise TypeError(f"calcTraces is defined for EBSD maps and grains, not {type(x).__name__}")
 
 
-EBSD.calcTraces = calcTraces
-grain2d.calcTraces = calcTraces
+install((EBSD, grain2d), calcTraces)
 
 __all__ = ["calcTraces"]

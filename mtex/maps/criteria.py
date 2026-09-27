@@ -62,9 +62,9 @@ def _pairs(ebsd, i, j):
   return i, j, ebsd.phaseId.reshape(-1), ebsd.rotations.data.reshape(-1, 4)
 
 
-# the proper groups of the phases of a map as one table for the kernels: their rotations
-# padded to the largest group, their sizes, and whether a phase has orientations at all
 def phaseGroups(CSList, dtype=np.float64):
+  """the proper groups of the phases of a map as one table for the kernels: their rotations
+  padded to the largest group, their sizes, and whether a phase has orientations at all"""
   groups = [fr.sym.properGroup().rotations().data.reshape(-1, 4) if fr.isIndexed else np.zeros((0, 4)) for fr in CSList]
   Gall = np.zeros((len(groups), max([len(G) for G in groups] + [1]), 4), dtype=dtype)
   for p, G in enumerate(groups):
@@ -89,8 +89,8 @@ class gbcAngle(grainBoundaryCriterion):
     self.threshold = threshold
     self.byPhase = byPhase
 
-  # the levels of a phase: its own from byPhase or the per phase list, else the common ones
   def levelsFor(self, CSList, p):
+    """the levels of a phase: its own from byPhase or the per phase list, else the common ones"""
     if self.byPhase is not None:
       for key, t in self.byPhase.items():
         if CSList.phaseId(key) == p:
@@ -137,9 +137,9 @@ class gbcAngle(grainBoundaryCriterion):
 
 # ------------------------------------------------------------------ the soft criterion
 
-# a smooth transition instead of a threshold, so a pair near the threshold is joined or
-# not by how far it is from it rather than by which side it fell on
 class gbcSoft(grainBoundaryCriterion):
+  """a smooth transition instead of a threshold, so a pair near the threshold is joined or
+  not by how far it is from it rather than by which side it fell on"""
 
   def __init__(self, threshold=10 * degree, width=None, byPhase=None):
     t = _levels(threshold) if not _perPhase(threshold) else (float(threshold[0][0]),)
@@ -178,9 +178,9 @@ class gbcSoft(grainBoundaryCriterion):
 
 # ------------------------------------------------------------------ by a property
 
-# two measurements belong together when the values of a property agree, which is how a
-# segmentation by variant, by parent grain or by any imported label is done
 class gbcEqual(grainBoundaryCriterion):
+  """two measurements belong together when the values of a property agree, which is how a
+  segmentation by variant, by parent grain or by any imported label is done"""
 
   def __init__(self, key):
     self.key = key
@@ -196,9 +196,9 @@ class gbcEqual(grainBoundaryCriterion):
     return f"gbcEqual ({self.key!r})" if isinstance(self.key, str) else "gbcEqual (values)"
 
 
-# a criterion given as a function of the map and the two measurement indices, or as a
-# per-pixel property with the largest difference that still counts as one grain
 class gbcCustom(grainBoundaryCriterion):
+  """a criterion given as a function of the map and the two measurement indices, or as a
+  per-pixel property with the largest difference that still counts as one grain"""
 
   def __init__(self, values, threshold=None, antipodal=False):
     if callable(values):

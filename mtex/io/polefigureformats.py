@@ -42,9 +42,9 @@ def _frame(cs, fromFile=None):
   return cs if cs is not None else fromFile if fromFile is not None else crystalFrame("m-3m")
 
 
-# the signed indices of a group of digits, three or four of them, a minus binding to the
-# digit after it; None where the group holds another count
 def millerIndices(s):
+  """the signed indices of a group of digits, three or four of them, a minus binding to the
+  digit after it; None where the group holds another count"""
   idx, neg = [], False
   for c in s:
     if c == "-":
@@ -86,15 +86,15 @@ def _entries(h):
   return [h[i] for i in range(h.size)] if h.size > 1 else [h]
 
 
-# the first token of a line, empty where the line is
 def firstToken(line):
+  """the first token of a line, empty where the line is"""
   t = line.split()
   return t[0] if t else ""
 
 
-# the numbers of a row cut into fields of a fixed width, as Fortran writes them: the row
-# holds count of them after a leading remainder that belongs to no field
 def fixedFields(line, width, count):
+  """the numbers of a row cut into fields of a fixed width, as Fortran writes them: the row
+  holds count of them after a leading remainder that belongs to no field"""
   out = []
   for a in range(len(line) % width, len(line) - width + 1, width):
     if len(out) >= count:
@@ -109,9 +109,9 @@ def fixedFields(line, width, count):
   return out
 
 
-# a block of n numbers in rows of count fields of a fixed width, from line i on, and the
-# line after it; toBlank reads to the blank line that ends the block and keeps the first n
 def fixedBlock(lines, i, n, width, count, toBlank=False):
+  """a block of n numbers in rows of count fields of a fixed width, from line i on, and the
+  line after it; toBlank reads to the blank line that ends the block and keeps the first n"""
   out = []
   while i < len(lines) and (toBlank or len(out) < n):
     if not lines[i].strip():
@@ -126,8 +126,8 @@ def fixedBlock(lines, i, n, width, count, toBlank=False):
   return np.array(out[:n]), i
 
 
-# a block of n numbers written free format, from line i on, and the line after it
 def numberBlock(lines, i, n):
+  """a block of n numbers written free format, from line i on, and the line after it"""
   out = []
   while len(out) < n and i < len(lines):
     for f in lines[i].split():
@@ -141,8 +141,8 @@ def numberBlock(lines, i, n):
   return np.array(out[:n]), i
 
 
-# the numbers a run of lines holds, whatever separates them
 def numbersOf(lines):
+  """the numbers a run of lines holds, whatever separates them"""
   out = []
   for l in lines:
     for f in re.split(r"[ \t,;]+", l.strip()):
@@ -152,14 +152,14 @@ def numbersOf(lines):
   return out
 
 
-# a data row starts with a number, a header line does not
 def isNumericRow(line):
+  """a data row starts with a number, a header line does not"""
   t = line.split()
   return bool(t) and _float(t[0].rstrip(",;")) is not None
 
 
-# the columns of the rows that hold numbers, whatever separates the fields
 def readColumns(lines):
+  """the columns of the rows that hold numbers, whatever separates the fields"""
   rows = [[float(f) for f in re.split(r"[ \t,;]+", l.strip()) if f] for l in lines if isNumericRow(l)]
   if not rows:
     raise ValueError("the file holds no data rows")
@@ -170,38 +170,38 @@ def readColumns(lines):
   return [np.array(c) for c in zip(*rows)]
 
 
-# the ladder of a start, a step and a stop in degrees, its count taken from the three of
-# them rather than accumulated, since 26 steps of 0.45 land above 11.7
 def ladderOf(start, step, stop):
+  """the ladder of a start, a step and a stop in degrees, its count taken from the three of
+  them rather than accumulated, since 26 steps of 0.45 land above 11.7"""
   n = int(np.floor((stop - start) / step + 1e-8)) + 1
   if n <= 0:
     raise ValueError(f"a ladder from {start} to {stop} in steps of {step} holds no point")
   return (start + step * np.arange(n)) * degree
 
 
-# the grid of a polar and an azimuth ladder, nRho x nTheta, as axes: a diffraction
-# intensity does not tell a direction from its opposite
 def regularGrid(theta, rho):
+  """the grid of a polar and an azimuth ladder, nRho x nTheta, as axes: a diffraction
+  intensity does not tell a direction from its opposite"""
   return regularS2Grid(theta=np.asarray(theta), rho=np.asarray(rho), antipodal=True)
 
 
-# counts written ring by ring laid onto a grid of nRho x nTheta
 def onGrid(I, r):
+  """counts written ring by ring laid onto a grid of nRho x nTheta"""
   return np.asarray(I, dtype=float).reshape(r.shape[1], r.shape[0]).T
 
 
-# the points of a grid in the order the files write them, ring by ring
 def ringOrder(r):
+  """the points of a grid in the order the files write them, ring by ring"""
   return vector3d(np.swapaxes(r.data, 0, 1).reshape(-1, 3), antipodal=True)
 
 
-# specimen directions from two lists of degrees, as the measurement scanned them
 def polarList(theta, rho):
+  """specimen directions from two lists of degrees, as the measurement scanned them"""
   return vector3d.byPolar(np.asarray(theta, dtype=float) * degree, np.asarray(rho, dtype=float) * degree, antipodal=True)
 
 
-# the lines a marker opens, as the index ranges from one marker to the next
 def markerSections(lines, isMarker):
+  """the lines a marker opens, as the index ranges from one marker to the next"""
   starts = [i for i, l in enumerate(lines) if isMarker(l)]
   return [range(s, starts[k + 1] if k + 1 < len(starts) else len(lines)) for k, s in enumerate(starts)]
 
@@ -216,8 +216,8 @@ def structureFrame(code, abc, angles):
   return crystalFrame(STRUCTURE_CODES[code - 1], list(abc), [a * degree for a in angles])
 
 
-# the point group a five character field names, as much of it as names one
 def latticeFromSymbol(s):
+  """the point group a five character field names, as much of it as names one"""
   t = s.strip()
   for n in range(len(t), 0, -1):
     try:
@@ -229,8 +229,8 @@ def latticeFromSymbol(s):
 
 # ------------------------------------------------------------------ ana
 
-# a comment and twenty numbers that give the two ladders
 def readAna(lines, path, cs, h=None):
+  """a comment and twenty numbers that give the two ladders"""
   head, i = numberBlock(lines, 1, 20)
   n = int(round(head[0]))
   r = regularGrid(ladderOf(head[5] + head[6], head[8], head[5] + head[7]), ladderOf(head[9], head[11], head[10] - head[11]))
@@ -243,11 +243,11 @@ def readAna(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ popla
 
-# a comment, a header of five character fields, then counts in four character ones; two
-# flags of the header say whether a ladder starts at a cell centre or an edge, and the
-# scale is a divisor. Its rings close, 18, 18, 18 and 19 values, so a block is read to its
-# blank line and the header's count kept
 def readPopla(lines, path, cs, h=None):
+  """a comment, a header of five character fields, then counts in four character ones; two
+  flags of the header say whether a ladder starts at a cell centre or an edge, and the
+  scale is a divisor. Its rings close, 18, 18, 18 and 19 values, so a block is read to its
+  blank line and the header's count kept"""
   cs = _frame(cs)
   hs, rs, Is = [], [], []
   i = 0
@@ -270,9 +270,9 @@ def readPopla(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ LaboTEX
 
-# a structure code with the cell, one header line per pole figure with its own ladders,
-# then the blocks in the same order
 def readLabotex(lines, path, cs, h=None):
+  """a structure code with the cell, one header line per pole figure with its own ladders,
+  then the blocks in the same order"""
   c, _ = numberBlock(lines, 3, 7)
   cs = _frame(cs, structureFrame(int(round(c[0])), c[1:4], c[4:7]))
   npf = int(round(numberBlock(lines, 4, 1)[0][0]))
@@ -340,9 +340,9 @@ def readAachen(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ Philips
 
-# the two ladders on their own named lines, the block a table whose first column is the
-# azimuth it stands for; the azimuth ladder closes the turn, so its last point is the first
 def readPhilips(lines, path, cs, h=None):
+  """the two ladders on their own named lines, the block a table whose first column is the
+  azimuth it stands for; the azimuth ladder closes the turn, so its last point is the first"""
   def ladder(name):
     line = next((l for l in lines if l.strip().startswith(name)), None)
     if line is None:
@@ -365,8 +365,8 @@ def readPhilips(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ the grid a constant or a count of the header
 
-# Queens plf: a fixed 90 by 17 grid to 80°, one hkl line and one block per pole figure
 def readPlf(lines, path, cs, h=None):
+  """Queens plf: a fixed 90 by 17 grid to 80°, one hkl line and one block per pole figure"""
   r = regularS2Grid(points=(90, 17), maxTheta=80 * degree, antipodal=True)
   cs = _frame(cs)
   hs, Is = [], []
@@ -384,9 +384,9 @@ def readPlf(lines, path, cs, h=None):
   return hs, [r] * len(hs), Is, cs
 
 
-# IBM: a header line per pole figure with its indices and ring counts, and the polar angle
-# the scan reached on the line after it, where MATLAB spreads the rings over the sphere
 def readIbm(lines, path, cs, h=None):
+  """IBM: a header line per pole figure with its indices and ring counts, and the polar angle
+  the scan reached on the line after it, where MATLAB spreads the rings over the sphere"""
   cs = _frame(cs)
   hs, rs, Is = [], [], []
   i = 0
@@ -410,10 +410,10 @@ def readIbm(lines, path, cs, h=None):
   return hs, rs, Is, cs
 
 
-# GADDS out1: a two column table of several pole figures on one fixed grid, a point not
-# measured written with a negative intensity; the file names no reflections, so the caller
-# has to, where MATLAB fills in a list of eight it keeps in the reader
 def readOut1(lines, path, cs, h=None):
+  """GADDS out1: a two column table of several pole figures on one fixed grid, a point not
+  measured written with a negative intensity; the file names no reflections, so the caller
+  has to, where MATLAB fills in a list of eight it keeps in the reader"""
   r = ringOrder(regularS2Grid(points=(72, 18), maxTheta=85 * degree, antipodal=True))
   n = r.size
   cols = readColumns([l for l in lines if not l.strip().startswith("!@!")])
@@ -437,9 +437,9 @@ def readOut1(lines, path, cs, h=None):
   return hs, rs, Is, _frame(cs)
 
 
-# slc: a table whose first column is the azimuth in tens of degrees and whose others are
-# the polar ladder, from the pole down to the other pole
 def readSlc(lines, path, cs, h=None):
+  """slc: a table whose first column is the azimuth in tens of degrees and whose others are
+  the polar ladder, from the pole down to the other pole"""
   cols = readColumns([l.replace("FRAME", " ") for l in lines])
   if len(cols) <= 2:
     raise ValueError(f"{path} holds {len(cols)} columns")
@@ -448,10 +448,10 @@ def readSlc(lines, path, cs, h=None):
   return [_fromName(path, cs, h)], [r], [np.stack(cols[1:], axis=1)], cs
 
 
-# BearTex: seven header lines per pole figure, the cell and the two structure codes on the
-# sixth and the indices with the polar range of the scan on the seventh; the block holds
-# the whole 5° grid and the header says which rings were measured
 def readBeartex(lines, path, cs, h=None):
+  """BearTex: seven header lines per pole figure, the cell and the two structure codes on the
+  sixth and the indices with the polar range of the scan on the seventh; the block holds
+  the whole 5° grid and the header says which rings were measured"""
   hs, rs, Is = [], [], []
   fr = cs
   grid = ringOrder(regularS2Grid(points=(72, 19), antipodal=True))
@@ -504,11 +504,11 @@ def readXrd(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ the sections a marker opens
 
-# Siemens D5000: `*Pole figure:` opens one and names its indices, `*Khi` opens a ring at its
-# polar angle, and the background lines after it are subtracted from that ring. The counts
-# sit in eight character fields, and a five digit one fills its field, so a line is cut
-# into its fields rather than split at the blanks
 def readSiemens(lines, path, cs, h=None):
+  """Siemens D5000: `*Pole figure:` opens one and names its indices, `*Khi` opens a ring at its
+  polar angle, and the background lines after it are subtracted from that ring. The counts
+  sit in eight character fields, and a five digit one fills its field, so a line is cut
+  into its fields rather than split at the blanks"""
   cs = _frame(cs)
   hs, rs, Is = [], [], []
   for sec in markerSections(lines, lambda l: "*Pole figure:" in l):
@@ -545,8 +545,8 @@ def readSiemens(lines, path, cs, h=None):
   return hs, rs, Is, cs
 
 
-# Jülich: two header lines, then the polar angle, the azimuth and the count
 def readJuelich(lines, path, cs, h=None):
+  """Jülich: two header lines, then the polar angle, the azimuth and the count"""
   cols = readColumns(lines)
   if len(cols) < 3:
     raise ValueError(f"a Jülich file holds three columns, this one {len(cols)}")
@@ -554,10 +554,10 @@ def readJuelich(lines, path, cs, h=None):
   return [_directionOf(h, 0, 1, path, cs)], [polarList(cols[0], cols[1])], [cols[2]], cs
 
 
-# Geesthacht: a `$` commented header and one row per measured direction, its second column
-# the scan the row belongs to and its fourth the elevation above the equator; the last field
-# is the time the point was counted, written 00:07.76. The rows of one scan are one pole figure
 def readGeesthacht(lines, path, cs, h=None):
+  """Geesthacht: a `$` commented header and one row per measured direction, its second column
+  the scan the row belongs to and its fourth the elevation above the equator; the last field
+  is the time the point was counted, written 00:07.76. The rows of one scan are one pole figure"""
   cols = readColumns([l.replace(":", " ") for l in lines if "$" not in l and not l.startswith("CREATOR")])
   if len(cols) < 6:
     raise ValueError(f"a Geesthacht file holds eleven columns, this one {len(cols)}")
@@ -575,11 +575,11 @@ def _keyValue(s):
   return k.strip(), v.strip()
 
 
-# Seifert nja: an `&KEY=value` header that names the reflection and the ladders, and the
-# block the `#Values` line opens, the two angles, the count and its background. MATLAB reads
-# the indices from token positions and the block from a fixed line, which drops its first
-# measurement; both are named in the file and read by their names here
 def readNja(lines, path, cs, h=None):
+  """Seifert nja: an `&KEY=value` header that names the reflection and the ladders, and the
+  block the `#Values` line opens, the two angles, the count and its background. MATLAB reads
+  the indices from token positions and the block from a fixed line, which drops its first
+  measurement; both are named in the file and read by their names here"""
   keys = {}
   for l in lines:
     for f in l.split("&"):
@@ -604,9 +604,9 @@ def readNja(lines, path, cs, h=None):
   return [hkl], [polarList(cols[0], cols[1])], [cols[2]], cs
 
 
-# a Siemens defocussing curve: `R111` opens the curve of that reflection, whose rows hold
-# the polar angle, the intensity and the background under it, one azimuth
 def readPwd(lines, path, cs, h=None):
+  """a Siemens defocussing curve: `R111` opens the curve of that reflection, whose rows hold
+  the polar angle, the intensity and the background under it, one azimuth"""
   cs = _frame(cs)
   hs, rs, Is = [], [], []
   for sec in markerSections(lines, lambda l: re.match(r"^\s*R\s*[0-9\-]+\s*$", l) is not None):
@@ -623,9 +623,9 @@ def readPwd(lines, path, cs, h=None):
   return hs, rs, Is, cs
 
 
-# Rigaku 3DExplore: a header of `#` lines and the elevation above the equator, the azimuth
-# and the count
 def readRigaku(lines, path, cs, h=None):
+  """Rigaku 3DExplore: a header of `#` lines and the elevation above the equator, the azimuth
+  and the count"""
   cols = readColumns(lines)
   if len(cols) < 3:
     raise ValueError(f"a Rigaku table holds three columns, this one {len(cols)}")
@@ -633,9 +633,9 @@ def readRigaku(lines, path, cs, h=None):
   return [_directionOf(h, 0, 1, path, cs)], [polarList(90 - cols[0], cols[1])], [cols[2]], cs
 
 
-# Rigaku raster: a direction written as its two components in the plane, in degrees off the
-# pole, so the polar angle is their distance from it and the azimuth their angle
 def readRigakuDat(lines, path, cs, h=None):
+  """Rigaku raster: a direction written as its two components in the plane, in degrees off the
+  pole, so the polar angle is their distance from it and the azimuth their angle"""
   cols = readColumns(lines)
   if len(cols) < 4:
     raise ValueError(f"a Rigaku raster holds four columns, this one {len(cols)}")
@@ -645,11 +645,11 @@ def readRigakuDat(lines, path, cs, h=None):
   return [_directionOf(h, 0, 1, path, cs)], [r], [cols[3]], cs
 
 
-# Rigaku text: one section per ring, each stating the azimuth ladder it was scanned on. The
-# polar ladder is nowhere in the file: MATLAB takes the azimuth step for it and counts the
-# rings down from the last, reaching past the pole; the same count without that step off
-# the end is the default here, and theta states the ladder the file does not
 def readRigakuTxt(lines, path, cs, h=None, theta=None):
+  """Rigaku text: one section per ring, each stating the azimuth ladder it was scanned on. The
+  polar ladder is nowhere in the file: MATLAB takes the azimuth step for it and counts the
+  rings down from the last, reaching past the pole; the same count without that step off
+  the end is the default here, and theta states the ladder the file does not"""
   secs = markerSections(lines, lambda l: firstToken(l.replace(",", " ")).lower() == "start")
   if not secs:
     raise ValueError(f"{path} holds no Start line")
@@ -685,18 +685,18 @@ def readRigakuTxt(lines, path, cs, h=None, theta=None):
 
 # ------------------------------------------------------------------ the binary ones and the XML one
 
-# the value of one of the eighty character records a GADDS header is written in
 def gaddsRecord(raw, record):
+  """the value of one of the eighty character records a GADDS header is written in"""
   a = (record - 1) * 80
   if a + 80 > len(raw):
     raise ValueError(f"the header holds fewer than {record} records")
   return raw[a + 8:a + 80].decode("latin-1").strip()
 
 
-# GADDS gpol: an image of the pole figure in a stereographic projection, one pixel per
-# measured direction and zero where nothing was, the counts that do not fit a pixel listed
-# after the image as sixteen character records of nine digits of count and seven of position
 def readGpol(lines, path, cs, h=None, raw=None):
+  """GADDS gpol: an image of the pole figure in a stereographic projection, one pixel per
+  measured direction and zero where nothing was, the counts that do not fit a pixel listed
+  after the image as sixteen character records of nine digits of count and seven of position"""
   header = 96 * 80
   if len(raw) <= header:
     raise ValueError(f"{path} is shorter than its own header")
@@ -764,10 +764,10 @@ def _xmlPositions(scan):
   return out
 
 
-# the PANalytical XML: one scan per ring, the direction of a point the goniometer put
-# together out of the four angles the scan states, Rz(phi) Ry(psi) Rx(omega + (pi - 2theta) / 2)
-# applied to y; read with a tag scanner, since the file is machine written and regular
 def readXrdml(lines, path, cs, h=None, raw=None):
+  """the PANalytical XML: one scan per ring, the direction of a point the goniometer put
+  together out of the four angles the scan states, Rz(phi) Ry(psi) Rx(omega + (pi - 2theta) / 2)
+  applied to y; read with a tag scanner, since the file is machine written and regular"""
   txt = raw.decode("utf-8", errors="replace")
   measurements = _xmlElements(txt, "xrdMeasurement")
   if not measurements:

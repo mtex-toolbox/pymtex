@@ -52,15 +52,15 @@ def guiFont(dpi):
   return rc, pixels * 72 / dpi
 
 
-# a key is a picture of its phase and of nothing else: it does not change with the map, the
-# tab or the size of the window, and matplotlib re-renders a mesh of tens of thousands of
-# quads on every draw. So each is drawn once into a figure of its own and shown as an image
-# afterwards, which takes a map of five phases from a second a draw to a millisecond. The
-# picture is cut to what is drawn, the labels of the key standing outside its sector included.
-# A sector reaching into both hemispheres, of a group without the inversion, is drawn as both,
-# each named as the key drawn on its own names them, beside or over one another as fills a
-# square best.
 def keyPicture(cs, px=KEY_PIXELS):
+  """a key is a picture of its phase and of nothing else: it does not change with the map, the
+  tab or the size of the window, and matplotlib re-renders a mesh of tens of thousands of
+  quads on every draw. So each is drawn once into a figure of its own and shown as an image
+  afterwards, which takes a map of five phases from a second a draw to a millisecond. The
+  picture is cut to what is drawn, the labels of the key standing outside its sector included.
+  A sector reaching into both hemispheres, of a group without the inversion, is drawn as both,
+  each named as the key drawn on its own names them, beside or over one another as fills a
+  square best."""
   from ..plotting.directionkeys import HSVDirectionKey
   from ..plotting.spherical import makeSphericalProjection
   hit = KEY_CACHE.get((id(cs), px))
@@ -154,8 +154,8 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   # ------------------------------------------------------------------ the dispatch
 
-  # several changes announced in one go draw once, on the next turn of the event loop
   def scheduleDraw(self):
+    """several changes announced in one go draw once, on the next turn of the event loop"""
     if not self.pending:
       self.pending = True
       QMetaObject.invokeMethod(self, "flush", Qt.QueuedConnection)
@@ -194,11 +194,11 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   # ------------------------------------------------------------------ the map
 
-  # the map drawn once per import and recoloured per tab. The picture is drawn in the
-  # colouring the tab asks for, so the first look at a tab colours nothing twice and builds
-  # no second raster; a tab after it rewrites the colours of the picture alone, which is
-  # what the raster index is kept for.
   def drawMap(self, kind):
+    """the map drawn once per import and recoloured per tab. The picture is drawn in the
+    colouring the tab asks for, so the first look at a tab colours nothing twice and builds
+    no second raster; a tab after it rewrites the colours of the picture alone, which is
+    what the raster index is kept for."""
     from ..plotting.mapplot import plotEBSD
     from ..plotting.mtexfigure import mtexFigure
     st = self.st
@@ -229,9 +229,9 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.draw_idle()
     self.prepareDensity()
 
-  # the colours of the picture rewritten, the map's own never assembled: mapValues colours
-  # the measurements the picture shows and no others
   def recolour(self, kind, name, shown):
+    """the colours of the picture rewritten, the map's own never assembled: mapValues colours
+    the measurements the picture shows and no others"""
     from ..plotting.maps import mapRaster
     st = self.st
     if self.raster is None and hasattr(self.image, "set_data"):
@@ -276,9 +276,9 @@ class ViewCanvas(FigureCanvasQTAgg):
       elif hasattr(self.image, "set_color"):
         self.image.set_color(rgba)
 
-  # what the tab colours the map by: its phases, the crystal direction along a specimen
-  # direction, or one of its properties
   def colorArgs(self, kind, name):
+    """what the tab colours the map by: its phases, the crystal direction along a specimen
+    direction, or one of its properties"""
     if kind == "phase":
       return "phase", {}
     if kind == "ipf":
@@ -290,10 +290,10 @@ class ViewCanvas(FigureCanvasQTAgg):
     color, kw = self.colorArgs(kind, name)
     return mapValues(self.st.ebsd, color, at=at, **kw)
 
-  # the colour bar of a property, which the picture does not carry: it is made from a
-  # mappable of its own. That mappable is kept and re-normed rather than replaced, since a
-  # colour bar can only be removed through the one the figure registered it with.
   def setColorbar(self, cmap, lo=0.0, hi=1.0, label=""):
+    """the colour bar of a property, which the picture does not carry: it is made from a
+    mappable of its own. That mappable is kept and re-normed rather than replaced, since a
+    colour bar can only be removed through the one the figure registered it with."""
     if cmap is None:
       if self.colorbar is not None:
         self.colorbar.remove()
@@ -317,10 +317,10 @@ class ViewCanvas(FigureCanvasQTAgg):
   # wrong Euler convention is visible
   # ------------------------------------------------------------------ the pole figures
 
-  # the density of a phase, computed on the worker where there is one, so that the tab opens
-  # on it at once; None while it is computed, the tab redrawn when it is there. A result for a
-  # map that has since been replaced is dropped.
   def density(self, k):
+    """the density of a phase, computed on the worker where there is one, so that the tab opens
+    on it at once; None while it is computed, the tab redrawn when it is there. A result for a
+    map that has since been replaced is dropped."""
     from .binning import previewDensity
     st = self.st
     if k in st.densities:
@@ -340,15 +340,15 @@ class ViewCanvas(FigureCanvasQTAgg):
       self.worker(lambda: previewDensity(ebsd, k), commit)
     return None
 
-  # the density of the phase the pole figures will show started behind the map, on the worker
   def prepareDensity(self):
+    """the density of the phase the pole figures will show started behind the map, on the worker"""
     k = cb.dominantPhase(self.st)
     if self.worker is not None and k is not None:
       self.density(k)
 
-  # a density arrived: the pole figures drawn, or drawn ahead on the next turn of the event
-  # loop, after the map is on the screen, so that the tab opens on a finished picture
   def onDensity(self):
+    """a density arrived: the pole figures drawn, or drawn ahead on the next turn of the event
+    loop, after the map is on the screen, so that the tab opens on a finished picture"""
     if self.onPoleFigures():
       self.scheduleDraw()
     else:
@@ -358,8 +358,8 @@ class ViewCanvas(FigureCanvasQTAgg):
     st = self.st
     return 0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures"
 
-  # what the picture of the pole figures shows, None when the density is not there yet
   def poleFigureKey(self):
+    """what the picture of the pole figures shows, None when the density is not there yet"""
     st = self.st
     k = cb.dominantPhase(st) if st.ebsd is not None else None
     if k is None or k not in st.densities:
@@ -373,16 +373,16 @@ class ViewCanvas(FigureCanvasQTAgg):
     if key is not None and (self.pfPicture is None or self.pfPicture[0] != key):
       self.pfPicture = (key, self.renderPoleFigures(key))
 
-  # a resize draws the pole figures anew at the new size, once it has settled
   @Slot()
   def afterResize(self):
+    """a resize draws the pole figures anew at the new size, once it has settled"""
     if self.onPoleFigures():
       self.scheduleDraw()
     else:
       self.drawAhead()
 
-  # the tab shows the picture drawn ahead, drawing it first when it is not there or stale
   def drawPoleFigures(self):
+    """the tab shows the picture drawn ahead, drawing it first when it is not there or stale"""
     st = self.st
     k = cb.dominantPhase(st)
     if k is None:
@@ -398,12 +398,12 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.figure.figimage(self.pfPicture[1], origin="upper")
     self.draw_idle()
 
-  # the pole figures of the dominant phase drawn off the screen at the canvas's size: a colour
-  # bar under each on its own range, the titles close above, the Euler frame's axes as red
-  # names on a white ground where they point; the row in a band as tall as it needs across the
-  # middle, since a chart keeps its aspect in a taller cell and its title and bar would stand
-  # at the ends of the cell, far from it
   def renderPoleFigures(self, key):
+    """the pole figures of the dominant phase drawn off the screen at the canvas's size: a colour
+    bar under each on its own range, the titles close above, the Euler frame's axes as red
+    names on a white ground where they point; the row in a band as tall as it needs across the
+    middle, since a chart keeps its aspect in a taller cell and its title and bar would stand
+    at the ends of the cell, far from it"""
     import matplotlib.figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from ..plotting.mtexfigure import mtexFigure
@@ -467,8 +467,8 @@ def _range(values):
   return (float(np.min(v[finite])), float(np.max(v[finite]))) if finite.any() else (0.0, 1.0)
 
 
-# a Miller index typed as '100', '1-10' or '0001', on the frame's lattice
 def millerOf(text, cs):
+  """a Miller index typed as '100', '1-10' or '0001', on the frame's lattice"""
   try:
     digits = [int(c) if c.isdigit() else -int(c[1]) for c in _tokens(text)]
     return Miller(*digits, cs)
@@ -523,8 +523,8 @@ class MillerBar(QWidget):
     if f.text().strip() != self.st.millers[k]:
       cb.setMiller(self.st, k, f.text())
 
-  # shown on the pole figure tab alone, naming the phase the pole figures are of
   def show_(self):
+    """shown on the pole figure tab alone, naming the phase the pole figures are of"""
     st = self.st
     self.setVisible(0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures")
     k = cb.dominantPhase(st) if st.ebsd is not None else None

@@ -9,6 +9,7 @@
 # an axis sector picks one.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import itertools
 
 import numpy as np
@@ -23,16 +24,16 @@ from .symreduce import reductionGroups, uniqueRotations
 from .vector3d import vector3d
 
 
-# the rotations both groups share
 def commonRotations(L, R):
+  """the rotations both groups share"""
   return L[np.any(np.abs(L @ R.T) > 1 - 1e-8, axis=1)]
 
 
-# the sector of the axes: the fundamental sector of the shared rotations, and a centre whose
-# Dirichlet domain under them is that sector, the one the projection takes the conjugate
-# nearest to; with grain exchange a misorientation is its inverse, the same angle about the
-# opposite axis, so the sector is that of the shared rotations with the inversion
 def commonAxisSector(common, antipodal=False):
+  """the sector of the axes: the fundamental sector of the shared rotations, and a centre whose
+  Dirichlet domain under them is that sector, the one the projection takes the conjugate
+  nearest to; with grain exchange a misorientation is its inverse, the same angle about the
+  opposite axis, so the sector is that of the shared rotations with the inversion"""
   if len(common) <= 1 and not antipodal:
     return None, np.array([0.0, 0.0, 1.0])
   pg = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))
@@ -81,10 +82,10 @@ class orientationRegion:
       inside &= (quatAngle(q) < 1e-8) | self.sector.checkInside(ax, tolerance)
     return inside
 
-  # the sector of rotation axes the region allows at a fixed rotation angle: a bound with
-  # N = (-sin(w_i/4), cos(w_i/4) a_i) reads for q = (cos(w/2), sin(w/2) v) as
-  # dot(v, a_i) <= cot(w/2) tan(w_i/4), a small circle about the axis
   def axisSector(self, omega, sector="own"):
+    """the sector of rotation axes the region allows at a fixed rotation angle: a bound with
+    N = (-sin(w_i/4), cos(w_i/4) a_i) reads for q = (cos(w/2), sin(w/2) v) as
+    dot(v, a_i) <= cot(w/2) tan(w_i/4), a small circle about the axis"""
     sector = self.sector if sector == "own" else sector
     N, alpha = [], []
     t = np.inf if omega <= 0 else 1 / np.tan(omega / 2)
@@ -100,9 +101,9 @@ class orientationRegion:
       alpha += list(sector.alpha)
     return sphericalRegion(np.array(N).reshape(-1, 3), np.array(alpha), frame=self.frameA)
 
-  # the largest rotation angle inside the region, at a vertex of it in Rodrigues space, or
-  # about a given axis
   def maxAngle(self, v=None, hits=2000):
+    """the largest rotation angle inside the region, at a vertex of it in Rodrigues space, or
+    about a given axis"""
     if v is not None:
       d = v.normalize().data if isinstance(v, vector3d) else np.asarray(v, dtype=float) / np.linalg.norm(v)
       if self.sector is not None and not self.sector.checkInside(d):
@@ -132,9 +133,9 @@ class orientationRegion:
         best = max(best, float(np.max(quatAngle(q[inside]))))
     return best
 
-  # the region in Rodrigues space as A rho <= b: a bound dot(q, N) <= 0 reads n . rho <= -N_0
-  # and a sector plane through the origin -m . rho <= 0; None when the sector has caps
   def rodriguesPlanes(self):
+    """the region in Rodrigues space as A rho <= b: a bound dot(q, N) <= 0 reads n . rho <= -N_0
+    and a sector plane through the origin -m . rho <= 0; None when the sector has caps"""
     A = [n[1:] for n in self.N]
     b = [-n[0] for n in self.N]
     if self.sector is not None:
@@ -144,10 +145,10 @@ class orientationRegion:
       b += [0.0] * len(self.sector.N)
     return np.array(A).reshape(-1, 3), np.array(b)
 
-  # the edges of the region, each a chain of points in axis angle coordinates in radians:
-  # every pair of planes meets in a line of Rodrigues space, kept where the other planes
-  # allow it; an open region is cut at a turn of nearly 180 degrees
   def edges(self, points=40, tol=1e-9):
+    """the edges of the region, each a chain of points in axis angle coordinates in radians:
+    every pair of planes meets in a line of Rodrigues space, kept where the other planes
+    allow it; an open region is cut at a turn of nearly 180 degrees"""
     planes = self.rodriguesPlanes()
     if planes is None:
       return []
@@ -215,13 +216,17 @@ class orientationRegion:
     ap = "\n  antipodal: true" if self.antipodal else ""
     return f"orientationRegion ({self.frameA.char()} → {self.frameB.char()})\n  faces: {len(self.N)}{ap}\n  max angle: {self.maxAngle() * 180 / np.pi:.4g}°"
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.spaceplot import plotRegion3d as plot, plotRegion3d as plot3d
 
-# the fundamental region of a pair of groups: the Dirichlet domain of the identity under
-# l * q * r, |<q, 1>| >= |<q, s>| for every product s = l r. For s of angle w about the
-# axis a this is the pair of half-spaces (q_v . a) cos(w/4) <= q_0 sin(w/4) and the same
-# for (-a, 2pi - w), each dot(q, N) <= 0 with N = (-sin(w/4), a cos(w/4)); per signed axis
-# the smallest angle binds
+
 def fundamentalRegion(frA, frB=None, antipodal=False):
+  """the fundamental region of a pair of groups: the Dirichlet domain of the identity under
+  l * q * r, |<q, 1>| >= |<q, s>| for every product s = l r. For s of angle w about the
+  axis a this is the pair of half-spaces (q_v . a) cos(w/4) <= q_0 sin(w/4) and the same
+  for (-a, 2pi - w), each dot(q, N) <= 0 with N = (-sin(w/4), a cos(w/4)); per signed axis
+  the smallest angle binds"""
   from .frames import crystalFrame, referenceFrame, specimenFrame
   from .orientation import orientation
   if isinstance(frA, orientation):
@@ -252,17 +257,17 @@ def fundamentalRegion(frA, frB=None, antipodal=False):
   return orientationRegion(N, frA, frB, antipodal, common, sector, center)
 
 
-# the box in Euler angles that carries every orientation at least once
-# (fundamentalRegionEuler): the two-folds perpendicular to z halve Phi, and one of the
-# reflections they make on phi1 or phi2 halves that angle when it folds its turn about zero
-# fundamentalRegionEuler(cs, ss): MATLAB's name of the Euler plotting box
 def fundamentalRegionEuler(frA, frB=None):
+  """the box in Euler angles that carries every orientation at least once
+  (fundamentalRegionEuler): the two-folds perpendicular to z halve Phi, and one of the
+  reflections they make on phi1 or phi2 halves that angle when it folds its turn about zero
+  fundamentalRegionEuler(cs, ss): MATLAB's name of the Euler plotting box"""
   return eulerRegion(frA, frB)
 
 
-# the Bunge Euler angles of the representative of every orientation inside the Euler box
-# of its frames, as MATLAB's project2EulerFR: three arrays in the shape of the list
 def project2EulerFR(o):
+  """the Bunge Euler angles of the representative of every orientation inside the Euler box
+  of its frames, as MATLAB's project2EulerFR: three arrays in the shape of the list"""
   from .representations import quat2euler
   bounds = eulerRegion(o.CS, o.SS)
   # the representative given comes first, so that it stays when it is inside, and the first
@@ -310,9 +315,9 @@ def eulerRegion(frA, frB=None):
   return (maxPhi1, np.pi / 2, maxPhi2)
 
 
-# maxAngle(cs), maxAngle(cs1, cs2): the largest rotation angle of the fundamental region of
-# the frames, MATLAB's maxAngle of a symmetry
 def maxAngle(frA, frB=None, antipodal=False):
+  """maxAngle(cs), maxAngle(cs1, cs2): the largest rotation angle of the fundamental region of
+  the frames, MATLAB's maxAngle of a symmetry"""
   return fundamentalRegion(frA, frB, antipodal=antipodal).maxAngle()
 
 

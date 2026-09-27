@@ -29,8 +29,8 @@ def deg2dim(n):
   return n * (2 * n - 1) * (2 * n + 1) // 3
 
 
-# the bandwidth of a coefficient array of length d, so that dim2deg(deg2dim(n + 1)) == n
 def dim2deg(d):
+  """the bandwidth of a coefficient array of length d, so that dim2deg(deg2dim(n + 1)) == n"""
   n = max(0, round((3 * d / 4) ** (1 / 3)) - 1)
   while deg2dim(n + 2) <= d:
     n += 1
@@ -43,8 +43,8 @@ def degreeRange(n):
   return slice(deg2dim(n), deg2dim(n + 1))
 
 
-# the block of degree n as a view, rows the specimen side k, columns the crystal side l
 def degreeBlock(fhat, n):
+  """the block of degree n as a view, rows the specimen side k, columns the crystal side l"""
   fhat = np.asarray(fhat)
   m = 2 * n + 1
   return fhat[..., degreeRange(n)].reshape(*fhat.shape[:-1], m, m).swapaxes(-1, -2)
@@ -101,11 +101,11 @@ def _frameValues(n, s, c):
   return g * c ** np.arange(2 * n, -1, -1, dtype=s.dtype)
 
 
-# the Wigner-d matrices d_0(beta) .. d_L(beta) one degree at a time by the three-term
-# recursion in the degree, the interior of degree n from the two previous degrees, the frame
-# from the closed form; a generator, so that a transform walking the degrees in order holds
-# three matrices and not the whole table
 def wignerdDegrees(beta, L):
+  """the Wigner-d matrices d_0(beta) .. d_L(beta) one degree at a time by the three-term
+  recursion in the degree, the interior of degree n from the two previous degrees, the frame
+  from the closed form; a generator, so that a transform walking the degrees in order holds
+  three matrices and not the whole table"""
   T = beta.dtype
   x, s, c = np.cos(beta), np.sin(beta / 2), np.cos(beta / 2)
   d = [np.ones((1, 1), dtype=T)]
@@ -189,11 +189,11 @@ def _WignerD(g, degree=None, *, bandwidth=None, dtype=None):
   return out[-1] if single else out
 
 
-# MATLAB's WignerD(R, n): the matrix of MTEX's Wigner functions, the internal one transposed
-# with the signs s_k s_l, s_m = -1 for odd m > 0, the basis the public coefficients fhat are
-# taken in; normalize=True scales by sqrt(2n + 1), so that f(R) = sum fhat_n^{kl} D_n^{kl}(R);
-# WignerD(beta, n) the real Wigner-d matrix at the second Euler angle
 def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
+  """MATLAB's WignerD(R, n): the matrix of MTEX's Wigner functions, the internal one transposed
+  with the signs s_k s_l, s_m = -1 for odd m > 0, the basis the public coefficients fhat are
+  taken in; normalize=True scales by sqrt(2n + 1), so that f(R) = sum fhat_n^{kl} D_n^{kl}(R);
+  WignerD(beta, n) the real Wigner-d matrix at the second Euler angle"""
   L, single = _degrees(degree, bandwidth)
   if isinstance(g, (int, float, np.floating, np.integer)):
     mats = [wignerd(float(g), n) for n in range(L + 1)]
@@ -212,22 +212,22 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
 # ------------------------------------------------------------------ H5 the held projection
 
 
-# the same projection, held and kept in its support. P_n is nonzero only where both indices
-# are 0 mod r, r the order of the group's axis along z: the group contains that rotation,
-# whose Wigner matrix is diagonal with e^{-ik alpha}, so P = P_z P = P P_z. Only that r-th
-# part of a coefficient block is ever read or written. A group acting on orientations
-# through the identity alone (1 and -1, whose elements all have the identity as their
-# rotation part) projects with the identity and is held as no matrices at all
 class InvariantProjection:
+  """the same projection, held and kept in its support. P_n is nonzero only where both indices
+  are 0 mod r, r the order of the group's axis along z: the group contains that rotation,
+  whose Wigner matrix is diagonal with e^{-ik alpha}, so P = P_z P = P P_z. Only that r-th
+  part of a coefficient block is ever read or written. A group acting on orientations
+  through the identity alone (1 and -1, whose elements all have the identity as their
+  rotation part) projects with the identity and is held as no matrices at all"""
 
   def __init__(self, fold, blocks, held=None):
     self.fold, self.blocks = int(fold), blocks
     self._held, self._nonzeros = held, None
 
-  # the entries of the blocks above rounding level as flat lists over the degrees, degree n
-  # at ptr[n]:ptr[n+1], with block indices: what the compiled projection visits. A held
-  # projection keeps them, a leading block of degrees reads a prefix
   def nonzeros(self):
+    """the entries of the blocks above rounding level as flat lists over the degrees, degree n
+    at ptr[n]:ptr[n+1], with block indices: what the compiled projection visits. A held
+    projection keeps them, a leading block of degrees reads a prefix"""
     if self._held is not None:
       ptr, rows, cols, vals = self._held.nonzeros()
       end = ptr[len(self.blocks)]
@@ -253,8 +253,8 @@ class InvariantProjection:
   def bandwidth(self):
     return len(self.blocks) - 1
 
-  # the indices an r fold about z leaves at degree n, k = 0 mod r, as block indices
   def support(self, n):
+    """the indices an r fold about z leaves at degree n, k = 0 mod r, as block indices"""
     return foldRange(self.fold, n)
 
 
@@ -291,9 +291,9 @@ def _projectionBytes(r, L, dtype):
   return 2 * np.dtype(dtype).itemsize * sum((2 * (n // r) + 1) ** 2 for n in range(L + 1))
 
 
-# proper=True gives the projection onto the functions invariant under the proper elements
-# of the group alone, which the sphere needs beside the rotation parts of all elements
 def invariantProjection(g, L, dtype=np.float64, proper=False):
+  """proper=True gives the projection onto the functions invariant under the proper elements
+  of the group alone, which the sphere needs beside the rotation parts of all elements"""
   pg = g.sym if isinstance(g, referenceFrame) else g
   dtype = np.dtype(dtype)
   group = pg.properSubGroup() if proper else pg
@@ -333,9 +333,9 @@ def _projectBlock(B, P, Q, n):
   return B
 
 
-# the compiled projection over the nonzeros where numba is there, the matrix products of
-# _projectBlock otherwise and as its oracle
 def project(fhat, P, Q):
+  """the compiled projection over the nonzeros where numba is there, the matrix products of
+  _projectBlock otherwise and as its oracle"""
   from .kernels import projectBlocks
   if projectBlocks(fhat, P, Q):
     return fhat
@@ -356,9 +356,9 @@ def projectRight(fhat, Q):
 # ------------------------------------------------------------------ H5 the series
 
 
-# the series evaluated by the direct sum at every rotation of a container, the reference
-# for the transforms of F2; leading batch axes of the coefficients come first
 def wignerSeries(fhat, r):
+  """the series evaluated by the direct sum at every rotation of a container, the reference
+  for the transforms of F2; leading batch axes of the coefficients come first"""
   fhat = np.asarray(fhat)
   L = dim2deg(fhat.shape[-1])
   D = _WignerD(r, bandwidth=L)
@@ -372,9 +372,9 @@ def wignerSeries(fhat, r):
 # ------------------------------------------------------------------ H4 spherical harmonics
 
 
-# the fully normalised associated Legendre functions P_l^m(x), m = 0..l, with the
-# Condon-Shortley phase, so that Y_l^m = P_l^m e^{im rho}; m in front of the shape of x
 def normalizedLegendre(l, x):
+  """the fully normalised associated Legendre functions P_l^m(x), m = 0..l, with the
+  Condon-Shortley phase, so that Y_l^m = P_l^m e^{im rho}; m in front of the shape of x"""
   x = np.asarray(x)
   x = x if x.dtype.kind == "f" else x.astype(float)
   T = x.dtype
@@ -407,9 +407,9 @@ def _sphericalY(l, v):
   return Y
 
 
-# MTEX's spherical harmonics, Y_l^{-m} = conj(Y_l^m) without the Condon-Shortley phase:
-# the basis the public coefficients fhat are taken in
 def sphericalY(l, v):
+  """MTEX's spherical harmonics, Y_l^{-m} = conj(Y_l^m) without the Condon-Shortley phase:
+  the basis the public coefficients fhat are taken in"""
   Y = _sphericalY(l, v)
   return _orderSign(l).reshape((-1,) + (1,) * (Y.ndim - 1)) * Y
 
@@ -417,8 +417,8 @@ def sphericalY(l, v):
 # ------------------------------------------------------------------ H6 Clebsch-Gordan
 
 
-# <j1 m1 j2 m2 | J M> by the Racah formula in exact rational arithmetic
 def clebschGordan(j1, m1, j2, m2, J, M):
+  """<j1 m1 j2 m2 | J M> by the Racah formula in exact rational arithmetic"""
   if not (m1 + m2 == M and abs(j1 - j2) <= J <= j1 + j2 and abs(m1) <= j1 and abs(m2) <= j2 and abs(M) <= J):
     return 0.0
   f = math.factorial
@@ -435,8 +435,8 @@ def wigner3j(j1, j2, j3, m1, m2, m3):
   return (-1 if (j1 - j2 - m3) % 2 else 1) / math.sqrt(2 * j3 + 1) * clebschGordan(j1, m1, j2, m2, j3, -m3)
 
 
-# the array C[m1, m2, M] of degrees l1, l2 coupled to J
 def clebschGordanTensor(l1, l2, J):
+  """the array C[m1, m2, M] of degrees l1, l2 coupled to J"""
   C = np.zeros((2 * l1 + 1, 2 * l2 + 1, 2 * J + 1))
   for M in range(-J, J + 1):
     for m2 in range(-l2, l2 + 1):

@@ -10,6 +10,7 @@
 #   calcDensity(rho, sigma=, kernel=, weights=, antipodal=)
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -25,8 +26,8 @@ def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
 
 
-# the conjugate symmetry of a real valued function, c_{-k} = conj(c_k)
 def realizeFourier(chat):
+  """the conjugate symmetry of a real valued function, c_{-k} = conj(c_k)"""
   chat[...] = (chat + np.conj(chat[::-1])) / 2
   return chat
 
@@ -68,11 +69,11 @@ class S1FunHarmonic:
       setattr(f, k, v)
     return f
 
-  # the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
-  # quadrature; others merged where they coincide and fitted by least squares at the
-  # bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR
   @classmethod
   def interpolate(cls, x, values, bandwidth=None, weights=None, regularization=1e-5, SobolevIndex=2, tol=1e-6, maxit=100):
+    """the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
+    quadrature; others merged where they coincide and fitted by least squares at the
+    bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR"""
     x = np.mod(np.asarray(x, dtype=float).reshape(-1), 2 * np.pi)
     values = np.asarray(values).reshape(len(x))
     order = np.argsort(x, kind="stable")
@@ -113,14 +114,14 @@ class S1FunHarmonic:
   def bandwidth(self):
     return (len(self.fhat) - 1) // 2
 
-  # f(x) = f(x + pi): the odd modes vanish
   @property
   def antipodal(self):
+    """f(x) = f(x + pi): the odd modes vanish"""
     return bool(np.all(self.fhat[(self.bandwidth + 1) % 2::2] == 0))
 
-  # f(x) = f(-x): c_{-k} = c_k
   @property
   def even(self):
+    """f(x) = f(-x): c_{-k} = c_k"""
     return bool(np.allclose(self.fhat, self.fhat[::-1]))
 
   @property
@@ -136,27 +137,27 @@ class S1FunHarmonic:
   def eval(self, x):
     return fourierSeries(self.fhat[::-1], x, real=self.isReal)
 
-  # the derivative multiplies c_k by -ik
   def diff(self):
+    """the derivative multiplies c_k by -ik"""
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
     return S1FunHarmonic(-1j * k * self.fhat, real=self.isReal)
 
   def grad(self, x=None):
     return self.diff() if x is None else self.diff()(x)
 
-  # the rotation f(x - phi)
   def rotate(self, phi):
+    """the rotation f(x - phi)"""
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
     return S1FunHarmonic(np.exp(1j * k * phi) * self.fhat, real=self.isReal)
 
-  # the convolution with a de la Vallee Poussin kernel, 2.9 degree unless a kernel or a
-  # halfwidth is given
   def smooth(self, psi=None, halfwidth=2.9 * degree):
+    """the convolution with a de la Vallee Poussin kernel, 2.9 degree unless a kernel or a
+    halfwidth is given"""
     from .kernelfunctions import S1DeLaValleePoussinKernel
     return self.conv(S1DeLaValleePoussinKernel(halfwidth=halfwidth) if psi is None else psi)
 
-  # smoothing by a kernel is one factor per mode
   def conv(self, psi):
+    """smoothing by a kernel is one factor per mode"""
     if isinstance(psi, S1FunHarmonic):
       L = min(self.bandwidth, psi.bandwidth)
       return S1FunHarmonic(self.truncate(L).fhat * psi.truncate(L).fhat, real=self.isReal and psi.isReal)
@@ -265,8 +266,8 @@ class S1FunHarmonic:
     x = (lo + hi) / 2 % (2 * np.pi)
     return float(np.real(self(x))), float(x)
 
-  # the integral over the circle, 2 pi times the mean, MATLAB's sum
   def sum(self):
+    """the integral over the circle, 2 pi times the mean, MATLAB's sum"""
     return 2 * np.pi * self.mean()
 
   def max(self, resolution=0.25 * degree):
@@ -281,6 +282,10 @@ class S1FunHarmonic:
       lines.append("  isReal: false")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.polarplot import plotS1 as plot
+
 
 def _cut(chat, L):
   Lf = (len(chat) - 1) // 2
@@ -293,9 +298,9 @@ def _cut(chat, L):
 # ------------------------------------------------------------------ a density on the circle
 
 
-# the width of Silverman's rule, on the smaller of the standard deviation and the scaled
-# interquartile range
 def silvermanWidth(x):
+  """the width of Silverman's rule, on the smaller of the standard deviation and the scaled
+  interquartile range"""
   if len(x) < 2:
     return 10 * degree
   q1, q3 = np.quantile(x, 0.25), np.quantile(x, 0.75)
@@ -305,11 +310,11 @@ def silvermanWidth(x):
   return ((280 * math.sqrt(math.pi)) / 729) ** 0.2 / (2 * math.pi) * s * len(x) ** -0.2
 
 
-# the density of a list of angles: the weighted point masses smoothed by a Gaussian of
-# width sigma (MATLAB calcDensity on angles), normalised to a mean of one so that one is the
-# uniform density; without sigma the width is Silverman's rule. Angles that are axes, rho
-# and rho + pi meaning the same, keep only the even modes
 def calcDensity(rho, *, sigma=None, kernel=None, weights=None, antipodal=False, bandwidth=None):
+  """the density of a list of angles: the weighted point masses smoothed by a Gaussian of
+  width sigma (MATLAB calcDensity on angles), normalised to a mean of one so that one is the
+  uniform density; without sigma the width is Silverman's rule. Angles that are axes, rho
+  and rho + pi meaning the same, keep only the even modes"""
   x = np.asarray(rho, dtype=float).ravel()
   if x.size == 0:
     raise ValueError("a density needs at least one angle")

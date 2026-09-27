@@ -16,6 +16,7 @@
 # over all corners; a triangulated boundary is the case of offsets in steps of three.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.orientation import orientation
@@ -61,9 +62,9 @@ class grain3Boundary:
   def isTriangulated(self):
     return bool(np.all(self.numCorners == 3))
 
-  # the triangles as an (m, 3) array, a polygonal boundary as a list of index arrays
   @property
   def F(self):
+    """the triangles as an (m, 3) array, a polygonal boundary as a list of index arrays"""
     if self.isTriangulated:
       return self._idx.reshape(-1, 3)
     return [self._idx[a:b] for a, b in zip(self._ptr[:-1], self._ptr[1:])]
@@ -106,8 +107,8 @@ class grain3Boundary:
     return grain3Boundary(self.allV, (ptr, idx), self.grainId[rows], self.ebsdId[rows], self.phaseId[rows],
                           self.misrotation.data.reshape(-1, 4)[rows], self.CSList, self.frame, self.scanUnit, self.id[rows])
 
-  # the faces with a phase on one side, or between two phases, by name, frame or number
   def hasPhase(self, a, b=None):
+    """the faces with a phase on one side, or between two phases, by name, frame or number"""
     if b is None and isinstance(a, str) and a.lower() in ("indexed", "notindexed") and a.lower() not in [m.lower() for m in self.CSList.mineralList]:
       inside = np.all(self.phaseId > 0, axis=1)
       return inside if a.lower() == "indexed" else ~inside
@@ -117,8 +118,8 @@ class grain3Boundary:
     q = self.CSList.phaseId(b)
     return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
-  # the two sides exchanged, of all faces or a selection, as MATLAB's flip
   def flip(self, sel=None):
+    """the two sides exchanged, of all faces or a selection, as MATLAB's flip"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
     gB = self[np.arange(len(self))]
     for a in (gB.grainId, gB.ebsdId, gB.phaseId):
@@ -127,8 +128,8 @@ class grain3Boundary:
     q[rows, 1:] *= -1
     return gB
 
-  # the faces turned round: the corners in the reverse order, the normals the other way
   def flipN(self, sel=None):
+    """the faces turned round: the corners in the reverse order, the normals the other way"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
     gB = self[np.arange(len(self))]
     for r in rows:
@@ -151,9 +152,9 @@ class grain3Boundary:
     T, face = self._fan()
     return self._sumByFace(np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]), face)
 
-  # the unit normal of every face, NaN for a face of no area
   @property
   def N(self):
+    """the unit normal of every face, NaN for a face of no area"""
     c = self._vectorArea()
     with np.errstate(invalid="ignore", divide="ignore"):
       return vector3d(c / np.linalg.norm(c, axis=1, keepdims=True), frame=self.frame)
@@ -162,9 +163,9 @@ class grain3Boundary:
   def area(self):
     return np.linalg.norm(self._vectorArea(), axis=1) / 2
 
-  # the mean of the corners of a triangle, the area centroid of a polygon
   @property
   def centroid(self):
+    """the mean of the corners of a triangle, the area centroid of a polygon"""
     if self.isTriangulated:
       return vector3d(self.allV[self._idx.reshape(-1, 3)].mean(axis=1), frame=self.frame)
     T, face = self._fan()
@@ -178,9 +179,9 @@ class grain3Boundary:
     d = np.linalg.norm(V[self._idx[self._nextCorner()]] - V[self._idx], axis=1)
     return np.bincount(self._faceOfCorner(), weights=d, minlength=len(self))
 
-  # the largest distance between two corners of every face
   @property
   def diameter(self):
+    """the largest distance between two corners of every face"""
     out = np.zeros(len(self))
     for k in np.unique(self.numCorners):
       rows = np.flatnonzero(self.numCorners == k)
@@ -188,9 +189,9 @@ class grain3Boundary:
       out[rows] = np.sqrt(np.max(np.sum((P[:, :, None] - P[:, None, :]) ** 2, axis=-1), axis=(1, 2)))
     return out
 
-  # the edges of a triangulated boundary, sorted pairs of vertices, and the three edges of
-  # every face
   def edges(self):
+    """the edges of a triangulated boundary, sorted pairs of vertices, and the three edges of
+    every face"""
     if not self.isTriangulated:
       raise ValueError("edges needs triangular faces, see grain3d.triangulate")
     F = self._idx.reshape(-1, 3)
@@ -198,8 +199,8 @@ class grain3Boundary:
     E, F2E = np.unique(E, axis=0, return_inverse=True)
     return E, F2E.reshape(3, -1).T
 
-  # the number of grains meeting at every vertex, plus 10 on the surface of the volume
   def nodeType(self):
+    """the number of grains meeting at every vertex, plus 10 on the surface of the volume"""
     t = np.asarray(self.I_VG.sum(axis=1)).reshape(-1)
     hull = np.zeros(len(self.allV), dtype=bool)
     outer = np.any(self.grainId == 0, axis=1)
@@ -208,9 +209,9 @@ class grain3Boundary:
 
   # ------------------------------------------------------------------ the sides
 
-  # whether the grain on either side is indexed, (m, 2); the outside is not
   @property
   def isIndexed(self):
+    """whether the grain on either side is indexed, (m, 2); the outside is not"""
     return self.phaseId > 0
 
   @property
@@ -226,18 +227,18 @@ class grain3Boundary:
     q[~ok] = np.nan
     return orientation(rotation._fromData(q), self.CSList[a], self.CSList[b], antipodal=a == b)
 
-  # whether a face touches a phase, or lies between two
-  # whether a face touches a grain, or lies between two
   def hasGrain(self, g, h=None):
+    """whether a face touches a phase, or lies between two
+    whether a face touches a grain, or lies between two"""
     if h is None:
       return np.isin(self.grainId, np.atleast_1d(g)).any(axis=1)
     return ((self.grainId[:, 0] == g) & (self.grainId[:, 1] == h)) | ((self.grainId[:, 0] == h) & (self.grainId[:, 1] == g))
 
   # ------------------------------------------------------------------ incidences
 
-  # faces x grains, the columns the grain ids
   @property
   def I_FG(self):
+    """faces x grains, the columns the grain ids"""
     from scipy.sparse import csr_matrix
     f, s = np.nonzero(self.grainId > 0)
     return csr_matrix((np.ones(len(f)), (f, self.grainId[f, s] - 1)), shape=(len(self), int(self.grainId.max(initial=0))))
@@ -255,6 +256,10 @@ class grain3Boundary:
     inner = int(np.sum(np.all(self.grainId > 0, axis=1)))
     kind = "triangles" if self.isTriangulated else "polygons"
     return f"grain3Boundary\n  faces: {len(self)} {kind} ({inner} between grains, {len(self) - inner} on the outside)\n  vertices: {len(self.idV)}"
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.volumeplot import plotBoundary3d as plot, quiver3dMap as quiver
 
 
 __all__ = ["grain3Boundary"]

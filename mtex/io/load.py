@@ -37,9 +37,9 @@ EDAX_POINT_GROUPS = ["1", "-1", "2", "m", "2/m", "222", "mm2", "mmm", "4", "-4",
                      "23", "m-3", "432", "-43m", "m-3m"]
 
 
-# the point group an EDAX file states: the Laue group of its symmetry code, refined by the
-# point group id or name where one is given and belongs to that Laue class
 def tslPointGroup(code, pointGroup=None):
+  """the point group an EDAX file states: the Laue group of its symmetry code, refined by the
+  point group id or name where one is given and belongs to that Laue class"""
   try:
     laue = TSL_LAUE[int(float(str(code).split()[0]))]
   except (KeyError, ValueError, IndexError):
@@ -73,13 +73,13 @@ def _edaxPointGroupName(pointGroup):
 
 # ------------------------------------------------------------------ the phase numbering
 
-# how the phase numbers of a file map onto the phase list: 0 when the file counts its phases
-# from one and writes zero for not indexed, 1 when it counts from zero
-#
-# Which one a file does is nowhere stated in it, so it is read off the values: a set that
-# runs from zero and stops one short of the number of declared phases is zero based. A
-# negative value means not indexed and takes no part in the decision.
 def phaseShift(values, nPhases):
+  """how the phase numbers of a file map onto the phase list: 0 when the file counts its phases
+  from one and writes zero for not indexed, 1 when it counts from zero
+
+  Which one a file does is nowhere stated in it, so it is read off the values: a set that
+  runs from zero and stops one short of the number of declared phases is zero based. A
+  negative value means not indexed and takes no part in the decision."""
   v = np.asarray(values)
   v = v if v.dtype.kind in "iu" else np.rint(v.astype(float))
   v = v[v >= 0]
@@ -88,9 +88,9 @@ def phaseShift(values, nPhases):
   return 1 if (v.min() == 0 and v.max() == nPhases - 1) else 0
 
 
-# the phase id of every measurement: the file's number shifted onto the list, and a number
-# outside it a measurement of no phase
 def phaseColumn(raw, shift, nPhases):
+  """the phase id of every measurement: the file's number shifted onto the list, and a number
+  outside it a measurement of no phase"""
   raw = np.asarray(raw)
   v = (raw.astype(np.int64) if raw.dtype.kind in "iu" else np.rint(raw.astype(float)).astype(np.int64)) + shift
   v[(v < 1) | (v >= nPhases)] = 0
@@ -101,9 +101,9 @@ def phaseColumn(raw, shift, nPhases):
 QUALITY_MEASURES = re.compile(r"^(iq|imagequality|image_quality|ci|confidenceindex|confidence_index|confidence|metric|xc|fit|mad|error|bc|bs|bandcontrast|bandslope|quality)$")
 
 
-# the measurements an indexing program wrote without ever having measured them: a phase at
-# the zero orientation with every quality measure the file holds at zero
 def unmeasuredRows(phi1, Phi, phi2, props):
+  """the measurements an indexing program wrote without ever having measured them: a phase at
+  the zero orientation with every quality measure the file holds at zero"""
   quality = [np.asarray(v) for k, v in props.items() if QUALITY_MEASURES.match(str(k).lower()) and np.size(v) == np.size(phi1)]
   if not quality:
     return None
@@ -115,15 +115,15 @@ def unmeasuredRows(phi1, Phi, phi2, props):
 
 # ------------------------------------------------------------------ the map
 
-# the map from the columns every format has: a position, three Euler angles and a phase,
-# with whatever else the file carries as properties
-#
-# phase is the file's own numbering; shift states it where the format fixes it and is read
-# off the values otherwise. unindexed marks what the file says failed by other means, a
-# negative confidence index or a pixel never measured. The rotation of a measurement of no
-# phase is nan.
 def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bunge", eulerCorrection=None,
                     scanUnit="um", frame=None, meta=None, shift=None, unindexed=None, unitCell=None, scanGrid=None):
+  """the map from the columns every format has: a position, three Euler angles and a phase,
+  with whatever else the file carries as properties
+
+  phase is the file's own numbering; shift states it where the format fixes it and is read
+  off the values otherwise. unindexed marks what the file says failed by other means, a
+  negative confidence index or a pixel never measured. The rotation of a measurement of no
+  phase is nan."""
   phases = phases if isinstance(phases, phaseList) else phaseList(phases)
   n = len(phases)
   shift = phaseShift(phase, n - 1) if shift is None else shift
@@ -154,12 +154,12 @@ def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bun
               meta=meta, phaseMap=phaseMap, lattice=lat)
 
 
-# the scan the row order of the positions states: a file written row by row with x running
-# fastest has its first row where y first changes, a square scan rows of one length, and a
-# hexagonal scan rows of two lengths alternating with the second row half a step along;
-# None where the positions are not written that way, which leaves the lattice to be
-# inferred. What comes out is only a statement to be verified against every position.
 def scanGridFromPositions(x, y, dx=None, dy=None):
+  """the scan the row order of the positions states: a file written row by row with x running
+  fastest has its first row where y first changes, a square scan rows of one length, and a
+  hexagonal scan rows of two lengths alternating with the second row half a step along;
+  None where the positions are not written that way, which leaves the lattice to be
+  inferred. What comes out is only a statement to be verified against every position."""
   n = len(y)
   if n < 4:
     return None
@@ -197,14 +197,14 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
   return None
 
 
-# the lattice of the scan a header states, nx by ny cells of steps xs and ys written row by row
-# with x running fastest, a hexagonal scan alternating nx and nxEven points per row with the
-# odd rows shifted by half a step; verified against the positions, and None where they
-# disagree, which leaves the lattice to be inferred from the positions as for any map
-#
-# What a header says about the scan is exact where the positions carry it rounded, and
-# reading the index off the row order costs one pass where inferring it costs a fit.
 def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
+  """the lattice of the scan a header states, nx by ny cells of steps xs and ys written row by row
+  with x running fastest, a hexagonal scan alternating nx and nxEven points per row with the
+  odd rows shifted by half a step; verified against the positions, and None where they
+  disagree, which leaves the lattice to be inferred from the positions as for any map
+
+  What a header says about the scan is exact where the positions carry it rounded, and
+  reading the index off the row order costs one pass where inferring it costs a fit."""
   from ..maps.lattice import lattice, mapPlane
   P3 = np.asarray(pos, dtype=float).reshape(-1, 3)
   n = len(P3)
@@ -272,16 +272,16 @@ def _gridIndex(P, n, ny, nx, nxEven, xs, ys, hex):
   return A, np.stack([i, j], axis=1)
 
 
-# the corners of a regular cell of s sides and diameter d, MATLAB's regularPoly
 def regularPoly(s, d, rot=0.0):
+  """the corners of a regular cell of s sides and diameter d, MATLAB's regularPoly"""
   a = np.pi / s + np.arange(s) * 2 * np.pi / s + rot
   d = np.broadcast_to(np.asarray(d, dtype=float), (2,))
   return np.column_stack([np.cos(a) * d[0], np.sin(a) * d[1], np.zeros(s)]) / np.sqrt(s / 2)
 
 
-# the placed phase list a header declares: the frames by the number the file gives them,
-# a number the header skips a not indexed phase of that number
 def placedPhases(found):
+  """the placed phase list a header declares: the frames by the number the file gives them,
+  a number the header skips a not indexed phase of that number"""
   if not found:
     return phaseList()
   frames = [found.get(k, notIndexedFrame(f"phase {k}")) for k in range(1, max(found) + 1)]
@@ -290,10 +290,10 @@ def placedPhases(found):
 
 # ------------------------------------------------------------------ the grid
 
-# the map on its grid where no measurement is lost by putting it there, MATLAB's tryGridify:
-# a stray position asking for a raster of nothing, two measurements in one cell and a
-# degenerate cell each keep the list with a warning that says why
 def tryGridify(ebsd):
+  """the map on its grid where no measurement is lost by putting it there, MATLAB's tryGridify:
+  a stray position asking for a raster of nothing, two measurements in one cell and a
+  degenerate cell each keep the list with a warning that says why"""
   if ebsd.isGridded or ebsd.isempty:
     return ebsd
   l = ebsd.lattice

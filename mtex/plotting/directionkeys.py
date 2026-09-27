@@ -22,8 +22,8 @@ from .sectorfold import _angle, _unit, azimuthAbout, polarCoordinates, regionCen
 
 # ------------------------------------------------------------------ colour arithmetic
 
-# MATLAB rgb2hsv, hsv2rgb and hsl2hsv on arrays of shape (..., 3) or three arrays
 def rgb2hsv(rgb):
+  """MATLAB rgb2hsv, hsv2rgb and hsl2hsv on arrays of shape (..., 3) or three arrays"""
   rgb = np.asarray(rgb, dtype=float)
   r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
   mx, mn = rgb.max(axis=-1), rgb.min(axis=-1)
@@ -73,8 +73,8 @@ def correctedHue(h):
   return HUE_CORRECTION[i] + (t - i) * (HUE_CORRECTION[i + 1] - HUE_CORRECTION[i])
 
 
-# the hue from the angle, the lightness from the radius and the saturation from the gray
 def angleRadiusColor(hue, radius, gray, hueCorrection=True):
+  """the hue from the angle, the lightness from the radius and the saturation from the gray"""
   hue, radius, gray = np.broadcast_arrays(np.asarray(hue, dtype=float), np.asarray(radius, dtype=float), np.asarray(gray, dtype=float))
   L = (radius - 0.5) * gray + 0.5
   d = 1 - np.abs(2 * L - 1)
@@ -87,10 +87,10 @@ KEY_GRAY_VALUE = (0.2, 0.5)      # the gray of the white and of the black centre
 KEY_GRAY_GRADIENT = (0.5, 0.5)   # how fast the gray fades away from a centre
 
 
-# the colour of a point of the colour sphere: the radius, 1 at the white centre and 0 at
-# the black one, and the azimuth as the hue
 def sphereColor(radius, rho, grayValue=KEY_GRAY_VALUE, grayGradient=KEY_GRAY_GRADIENT, colorStretching=1.0, gray=None,
                 hueCorrection=True):
+  """the colour of a point of the colour sphere: the radius, 1 at the white centre and 0 at
+  the black one, and the azimuth as the hue"""
   radius, rho = np.broadcast_arrays(np.asarray(radius, dtype=float), np.asarray(rho, dtype=float))
   theta = radius * np.pi
   white = theta > np.pi / 2
@@ -236,9 +236,9 @@ class directionColorKey:
     self.sym = _sym(cs)
     self.sR = conventionalSector(cs)
 
-  # a sector the key is drawn over
   @property
   def keySector(self):
+    """a sector the key is drawn over"""
     return self.sR
 
   def direction2color(self, h):
@@ -298,10 +298,10 @@ class HSVDirectionKey(directionColorKey):
       return perceptualSphereColor(radius, rho, gray, self.hueLightness)
     return sphereColor(radius, rho, self.grayValue, self.grayGradient, self.colorStretching, gray)
 
-  # the colour of directions: each is brought into the sector, then into the white half, the
-  # fold telling which of the two centres its colours run from. A sharp key instead brings
-  # each to the equivalent nearest the white centre and reads the radius off the angle to it
   def direction2color(self, h, gray=None):
+    """the colour of directions: each is brought into the sector, then into the white half, the
+    fold telling which of the two centres its colours run from. A sharp key instead brings
+    each to the equivalent nearest the white centre and reads the radius off the angle to it"""
     xyz, shape = _asDirections(h)
     n = len(xyz)
     norm = np.linalg.norm(xyz, axis=-1)
@@ -331,18 +331,18 @@ class HSVDirectionKey(directionColorKey):
     return rgb.reshape(shape + (3,))
 
 
-# the azimuth of h about the centre, measured from the reference direction
 def azimuthAbout2(h, center, ref):
+  """the azimuth of h about the centre, measured from the reference direction"""
   p = h - (h @ center) * center
   r = ref - (ref @ center) * center
   return np.arctan2(np.cross(r, p) @ center, r @ p)
 
 
-# the vendors' keys, both on the Laue group whatever the frame carries (MATLAB
-# TSLDirectionKey, HKLDirectionKey): TSL reads the polar coordinates of the sector from its
-# centre, unfolded and without the hue correction; HKL blends the three primaries linearly
-# over the polar angle and the azimuth of the sector
 class TSLDirectionKey(directionColorKey):
+  """the vendors' keys, both on the Laue group whatever the frame carries (MATLAB
+  TSLDirectionKey, HKLDirectionKey): TSL reads the polar coordinates of the sector from its
+  centre, unfolded and without the hue correction; HKL blends the three primaries linearly
+  over the polar angle and the azimuth of the sector"""
 
   def __init__(self, cs):
     super().__init__(cs.Laue() if isinstance(cs, referenceFrame) else cs.Laue())
@@ -414,9 +414,9 @@ class spotDirectionKey(directionColorKey):
     if center is not None and len(self.color) != len(self.equivalents):
       raise ValueError("one colour per centre")
 
-  # the centres, with the equivalents under the group kept beside them; set as in MATLAB
   @property
   def center(self):
+    """the centres, with the equivalents under the group kept beside them; set as in MATLAB"""
     return self._center
 
   @center.setter

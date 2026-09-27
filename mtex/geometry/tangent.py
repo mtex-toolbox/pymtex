@@ -16,6 +16,7 @@
 # pair by symmetry first, so its norm is angle(ori, oriRef).
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
@@ -40,8 +41,8 @@ def _conj(q):
   return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
-# the rotation vector of a rotation at the identity, through atan2 as the angle is
 def rotationVector(q):
+  """the rotation vector of a rotation at the identity, through atan2 as the angle is"""
   q = np.asarray(q, dtype=float)
   v = q[..., 1:]
   n = np.linalg.norm(v, axis=-1)
@@ -51,15 +52,15 @@ def rotationVector(q):
   return f[..., None] * v
 
 
-# the rotation of a rotation vector at the identity
 def rotationOf(v):
+  """the rotation of a rotation vector at the identity"""
   v = np.asarray(v, dtype=float)
   return axis2quat(v, np.linalg.norm(v, axis=-1))
 
 
-# the skew matrix of a vector, and the vector of a skew matrix, spinTensor(S) reading the
-# axial vector of matrices of shape (..., 3, 3)
 def spinTensor(v):
+  """the skew matrix of a vector, and the vector of a skew matrix, spinTensor(S) reading the
+  axial vector of matrices of shape (..., 3, 3)"""
   if isinstance(v, vector3d):
     v = v.data
   else:
@@ -181,10 +182,10 @@ class SO3TangentVector(vector3d):
     axes = tuple(range(self.ndim))[::-1] + (self.ndim,)
     return self._rebuild(self.data.transpose(axes), self.oriRef.T if self.oriRef.ndim else self.oriRef)
 
-  # tangent vectors concatenate on one side; the references concatenate with them unless
-  # every list shares the same one
   @classmethod
   def cat(cls, *arrays, axis=0):
+    """tangent vectors concatenate on one side; the references concatenate with them unless
+    every list shares the same one"""
     first = arrays[0]
     arrays = [first._fit(a, sameReference=False) for a in arrays]
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
@@ -221,14 +222,14 @@ class SO3TangentVector(vector3d):
 
   # ------------------------------------------------------------------ exp, spin tensor
 
-  # the rotation or orientation the vector points to, with the frames of the reference
   def exp(self):
+    """the rotation or orientation the vector points to, with the frames of the reference"""
     q = rotationOf(self.data)
     ref = self.oriRef.data
     return _withRotation(self.oriRef, qmul(q, ref) if self.side == "left" else qmul(ref, q))
 
-  # the skew matrix as the tensor of the tensors layer, in the frame of the side
   def spinTensor(self):
+    """the skew matrix as the tensor of the tensors layer, in the frame of the side"""
     from ..tensors.tensor import spinTensor as spinTensorClass
     return spinTensorClass(vector3d(self.data, frame=self.frame))
 
@@ -283,8 +284,8 @@ class SO3TangentVector(vector3d):
   def cross(self, other):
     return self._rebuild(np.cross(self.data, self._fit(other).data))
 
-  # the angle of the rotation the vector describes, or the angle between two vectors
   def angle(self, other=None, **kwargs):
+    """the angle of the rotation the vector describes, or the angle between two vectors"""
     if other is None:
       return self.norm()
     other = self._fit(other)
@@ -348,6 +349,10 @@ class SO3TangentVector(vector3d):
     lines.insert(1 + (self.size != 1), f"  reference: {what}" + ("" if ref.ndim == 0 else ", one per element"))
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.spaceplot import quiver3
+
 
 # ------------------------------------------------------------------ construction helpers
 
@@ -407,8 +412,8 @@ def _refAndSide(ref, side):
   return ref, _side(side)
 
 
-# rotations carry no symmetry: the vector of the quotient on the chosen side
 def logRotation(q, ref=None, side="left"):
+  """rotations carry no symmetry: the vector of the quotient on the chosen side"""
   ref, side = _refAndSide(ref, side)
   if ref is None:
     return SO3TangentVector(vector3d(rotationVector(q.data)), rotation.id, side)
@@ -417,9 +422,9 @@ def logRotation(q, ref=None, side="left"):
   return SO3TangentVector(vector3d(rotationVector(m)), ref, side)
 
 
-# orientations: the pair is reduced by symmetry first, as angle does it, so that the norm
-# is angle(ori, ref) and the vector does not depend on the representatives
 def logOrientation(o, ref=None, side="left", noSymmetry=False):
+  """orientations: the pair is reduced by symmetry first, as angle does it, so that the norm
+  is angle(ori, ref) and the vector does not depend on the representatives"""
   ref, side = _refAndSide(ref, side)
   if ref is None:
     ref = orientation.id(o.frameA, o.frameB)
@@ -434,10 +439,10 @@ def logOrientation(o, ref=None, side="left", noSymmetry=False):
   return SO3TangentVector(vector3d(rotationVector(m)), ref, side)
 
 
-# a plain rotation vector: at the identity a rotation, in a crystal frame the misorientation
-# of that frame with itself; with a reference the tangent vector at it, on the right when
-# the vector is a crystal direction
 def expVector(v, ref=None, side=None):
+  """a plain rotation vector: at the identity a rotation, in a crystal frame the misorientation
+  of that frame with itself; with a reference the tangent vector at it, on the right when
+  the vector is a crystal direction"""
   from .frames import crystalFrame
   if isinstance(v, SO3TangentVector):
     return v.exp()
@@ -450,8 +455,8 @@ def expVector(v, ref=None, side=None):
   return SO3TangentVector(v, ref, side).exp()
 
 
-# the geodesic from a to b: exp(s * log(b, a)), s in [0, 1]; a NaN endpoint yields the other
 def geodesic(a, b, s):
+  """the geodesic from a to b: exp(s * log(b, a)), s in [0, 1]; a NaN endpoint yields the other"""
   out = (np.asarray(s, dtype=float) * a._coerce(b).log(a)).exp()
   aNaN, bNaN = np.isnan(a.data).any(axis=-1)[..., None], np.isnan(b.data).any(axis=-1)[..., None]
   return out._new(np.where(aNaN, b.data, np.where(bNaN, a.data, out.data)))

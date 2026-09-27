@@ -30,10 +30,10 @@ FRAME = "#c8c8c8"
 
 # ------------------------------------------------------------------ the phase table
 
-# the check box centred in its cell: an item draws its indicator against the left edge
-# whatever the item's alignment says, so the cell is drawn without one and the box is put
-# in the middle of it, where a column three characters wide wants it
 class CheckDelegate(QStyledItemDelegate):
+  """the check box centred in its cell: an item draws its indicator against the left edge
+  whatever the item's alignment says, so the cell is drawn without one and the box is put
+  in the middle of it, where a column three characters wide wants it"""
 
   def paint(self, painter, option, index):
     opt = QStyleOptionViewItem(option)
@@ -47,15 +47,15 @@ class CheckDelegate(QStyledItemDelegate):
     box.rect = self.boxRect(option, style)
     style.drawControl(QStyle.CE_CheckBox, box, painter)
 
-  # where the box sits: the style's own indicator, centred in the cell
   def boxRect(self, option, style=None):
+    """where the box sits: the style's own indicator, centred in the cell"""
     style = style or QApplication.style()
     size = style.subElementRect(QStyle.SE_CheckBoxIndicator, QStyleOptionButton(), None).size()
     c = option.rect.center()
     return QRect(c.x() - size.width() // 2 + 1, c.y() - size.height() // 2 + 1, size.width(), size.height())
 
-  # a click anywhere in the cell ticks it, as does the space bar
   def editorEvent(self, event, model, option, index):
+    """a click anywhere in the cell ticks it, as does the space bar"""
     if not index.flags() & Qt.ItemIsUserCheckable:
       return False
     toggled = event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton \
@@ -72,16 +72,16 @@ def _checked(index):
   return v is not None and v == Qt.Checked.value
 
 
-# a dropdown in a cell: the point groups, or the twelve setups
 class ChoiceDelegate(QStyledItemDelegate):
+  """a dropdown in a cell: the point groups, or the twelve setups"""
 
   def __init__(self, choices):
     super().__init__()
     self.choices = choices
 
-  # a choice picked is committed at once and the dropdown closed, rather than when the focus
-  # leaves the cell, so that the key and the script follow the click
   def createEditor(self, parent, option, index):
+    """a choice picked is committed at once and the dropdown closed, rather than when the focus
+    leaves the cell, so that the key and the script follow the click"""
     box = QComboBox(parent)
     box.addItems(self.choices)
     box.setEditable(False)
@@ -133,15 +133,15 @@ class PhaseTable(QTableWidget):
       st.on(name, self.refresh)
     self.refresh()
 
-  # the rows: every phase of the map, the not indexed one first as MTEX lists it
   def rows(self):
+    """the rows: every phase of the map, the not indexed one first as MTEX lists it"""
     if self.st.ebsd is None:
       return []
     counts = cb.phaseCounts(self.st)
     return [(k, f, counts.get(k, 0)) for k, f in enumerate(self.st.ebsd.CSList.frames) if f.isIndexed or counts.get(k, 0)]
 
-  # the table filled with its signals blocked, so that no cell set here reads as an edit
   def refresh(self):
+    """the table filled with its signals blocked, so that no cell set here reads as an edit"""
     self.filling += 1
     self.blockSignals(True)
     try:
@@ -211,9 +211,9 @@ class PhaseTable(QTableWidget):
       item.setBackground(GREY)
     return item
 
-  # a cell the user changed; the table emits one per cell as it is torn down with the
-  # window, when the map behind it may already be gone, and those are not edits
   def onEdit(self, i, j):
+    """a cell the user changed; the table emits one per cell as it is torn down with the
+    window, when the map behind it may already be gone, and those are not edits"""
     if self.filling or self.st.ebsd is None:
       return
     try:
@@ -241,9 +241,9 @@ class PhaseTable(QTableWidget):
       self.st.changed("status")
       self.refresh()
 
-  # a click on a row shows the key of its phase; it also opens the cell's editor, and the phase
-  # cell is the swatch, the id and the target for the colour dialog in one
   def onClick(self, i, j):
+    """a click on a row shows the key of its phase; it also opens the cell's editor, and the phase
+    cell is the swatch, the id and the target for the colour dialog in one"""
     rows = self.rows()
     if 0 <= i < len(rows):
       cb.pickKeyPhase(self.st, rows[i][0])

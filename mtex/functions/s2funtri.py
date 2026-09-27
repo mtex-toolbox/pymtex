@@ -10,6 +10,7 @@
 # triangle it lies in, so the function reproduces its values at the vertices exactly.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.s2triangulation import S2Triangulation
@@ -67,8 +68,8 @@ class S2FunTri:
   def __call__(self, v):
     return self.eval(v)
 
-  # the mean by the area of the Voronoi cell of every vertex
   def mean(self):
+    """the mean by the area of the Voronoi cell of every vertex"""
     from .polefigure import _voronoiWeights
     w = _voronoiWeights(self.vertices)
     w = np.asarray(w, dtype=float).ravel()
@@ -117,6 +118,11 @@ class S2FunTri:
 
   def __repr__(self):
     return f"S2FunTri\n  vertices: {self.vertices.size}" + (f"\n  size: {len(self)}" if len(self) > 1 else "")
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from ..plotting.sphericalplot import plot, contourf, contour, pcolor
 
 
 __all__ = ["S2FunTri"]

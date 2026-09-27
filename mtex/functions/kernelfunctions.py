@@ -37,8 +37,8 @@ def _asFloat(t):
   return t if t.dtype.kind == "f" else t.astype(float)
 
 
-# scipy.special is loaded on first use, never at import
 def ive(n, x):
+  """scipy.special is loaded on first use, never at import"""
   from scipy.special import ive
   return ive(n, x)
 
@@ -180,8 +180,8 @@ def _parameterForHalfwidth(K, hw, lo, hi, iterations=60):
 # ------------------------------------------------------------------ SO(3)
 
 
-# a kernel on SO(3) given by its Chebyshev coefficients A
 class SO3Kernel(_Kernel):
+  """a kernel on SO(3) given by its Chebyshev coefficients A"""
 
   def __init__(self, A):
     self._A = np.asarray(A, dtype=float).reshape(-1)
@@ -224,12 +224,12 @@ class SO3Kernel(_Kernel):
   def norm(self):
     return float(np.linalg.norm(self.A))
 
-  # the Radon transform is the S2 kernel with the same coefficients
   def radon(self):
+    """the Radon transform is the S2 kernel with the same coefficients"""
     return S2Kernel(self.A)
 
-  # convolution multiplies the coefficients and divides by 2n+1, on S2 when either factor is
   def conv(self, other):
+    """convolution multiplies the coefficients and divides by 2n+1, on S2 when either factor is"""
     if isinstance(other, S2Kernel):
       return other.conv(self)
     if not isinstance(other, SO3Kernel):
@@ -237,9 +237,9 @@ class SO3Kernel(_Kernel):
     L = min(self.bandwidth, other.bandwidth)
     return SO3Kernel(self._rule(L) * other._rule(L) / (2 * np.arange(L + 1) + 1))
 
-  # the derivative with respect to the angle at the cosine argument t, through
-  # sin(omega/2) psi = sum_n A_n sin((2n+1) omega/2); without an argument the kernel of it
   def grad(self, t=None, other=None):
+    """the derivative with respect to the angle at the cosine argument t, through
+    sin(omega/2) psi = sum_n A_n sin((2n+1) omega/2); without an argument the kernel of it"""
     if t is None:
       return SO3KernelHandle(lambda t: self.grad(t), bandwidth=self.bandwidth)
     return self._grad(self._cosine(t, other))
@@ -411,9 +411,9 @@ class SO3BumpKernel(SO3Kernel):
     self.delta = float(delta if halfwidth is None else halfwidth)
     self._L = bandwidth
 
-  # the discontinuity needs many degrees: MATLAB keeps maxS1Bandwidth of them unless told
   @cached_property
   def bandwidth(self):
+    """the discontinuity needs many degrees: MATLAB keeps maxS1Bandwidth of them unless told"""
     return int(getMTEXpref("maxS1Bandwidth") if self._L is None else self._L)
 
   # the ball of radius delta, A_n = (2/pi) c int_0^delta sin((2n+1) omega/2) sin(omega/2) d omega
@@ -540,8 +540,8 @@ class fibreVonMisesFisherKernel(SO3Kernel):
     return S2RadonKernel(self)
 
 
-# a kernel given by a closed form, its coefficients by Gauss-Legendre quadrature
 class SO3KernelHandle(SO3Kernel):
+  """a kernel given by a closed form, its coefficients by Gauss-Legendre quadrature"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun
@@ -564,8 +564,8 @@ class SO3KernelHandle(SO3Kernel):
 # ------------------------------------------------------------------ S2
 
 
-# a kernel on the sphere given by its Legendre coefficients A
 class S2Kernel(_Kernel):
+  """a kernel on the sphere given by its Legendre coefficients A"""
 
   def __init__(self, A):
     self._A = np.asarray(A, dtype=float).reshape(-1)
@@ -608,8 +608,8 @@ class S2Kernel(_Kernel):
     A = self.A
     return float(np.sqrt(np.sum(A * A / (2 * np.arange(len(A)) + 1))))
 
-  # the Funk transform: A_n P_n(0)
   def radon(self):
+    """the Funk transform: A_n P_n(0)"""
     return S2Kernel(self.A * legendreP(self.bandwidth, 0.0))
 
   def conv(self, other):
@@ -618,10 +618,10 @@ class S2Kernel(_Kernel):
     L = min(self.bandwidth, other.bandwidth)
     return S2Kernel(self._rule(L) * other._rule(L) / (2 * np.arange(L + 1) + 1))
 
-  # the derivative with respect to the polar angle at the cosine argument t, dpsi/dtheta =
-  # -sin(theta) dpsi/dt with dpsi/dt as its own Legendre series; polynomial=True is the
-  # derivative with respect to t, and without an argument the kernel of either
   def grad(self, t=None, other=None, *, polynomial=False):
+    """the derivative with respect to the polar angle at the cosine argument t, dpsi/dtheta =
+    -sin(theta) dpsi/dt with dpsi/dt as its own Legendre series; polynomial=True is the
+    derivative with respect to t, and without an argument the kernel of either"""
     if t is None:
       return self._derivativeSeries() if polynomial else S2KernelHandle(lambda t: self.grad(t), bandwidth=self.bandwidth)
     t = self._cosine(t, other)
@@ -690,9 +690,9 @@ class S2BumpKernel(S2Kernel):
     self.delta = float(delta if halfwidth is None else halfwidth)
     self._L = None if bandwidth is None else int(bandwidth)
 
-  # the degree the expansion is cut at, given or by MATLAB's rule
   @cached_property
   def bandwidth(self):
+    """the degree the expansion is cut at, given or by MATLAB's rule"""
     return self._cutoffBandwidth() if self._L is None else self._L
 
   # the cap of radius delta scaled to a density, A_n = (P_{n-1}(c) - P_{n+1}(c)) / (1 - c)
@@ -750,9 +750,9 @@ class S2KernelHandle(S2Kernel):
     return self.fun(np.clip(t, -1, 1))
 
 
-# the Radon transform of an SO(3) kernel: the S2 kernel with the same coefficients, evaluated
-# by the closed form of the family where MTEX gives one
 class S2RadonKernel(S2Kernel):
+  """the Radon transform of an SO(3) kernel: the S2 kernel with the same coefficients, evaluated
+  by the closed form of the family where MTEX gives one"""
 
   def __init__(self, psi):
     self.psi = psi
@@ -773,8 +773,8 @@ class S2RadonKernel(S2Kernel):
 # ------------------------------------------------------------------ S1
 
 
-# a kernel on the circle given by its Fourier coefficients fhat, degrees -N .. N
 class S1Kernel(_Kernel):
+  """a kernel on the circle given by its Fourier coefficients fhat, degrees -N .. N"""
 
   def __init__(self, fhat):
     fhat = np.asarray(fhat, dtype=float).reshape(-1)
@@ -839,8 +839,8 @@ class S1Kernel(_Kernel):
     L = min(self.bandwidth, other.bandwidth)
     return S1Kernel._fromHalf(self._rule(L) * other._rule(L))
 
-  # the derivative -2 sum_k k c_k sin(kx)
   def grad(self, x=None):
+    """the derivative -2 sum_k k c_k sin(kx)"""
     if x is None:
       return S1KernelHandle(lambda x: self.grad(x), bandwidth=self.bandwidth)
     x = _asFloat(x)
@@ -924,8 +924,8 @@ class S1FejerKernel(S1Kernel):
     return np.where(small, self.n + 1, (np.sin((self.n + 1) * x / 2) / s) ** 2 / (self.n + 1))
 
 
-# the indicator of the interval |x| < delta scaled to a density
 class S1BumpKernel(S1Kernel):
+  """the indicator of the interval |x| < delta scaled to a density"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None):
@@ -949,8 +949,8 @@ class S1BumpKernel(S1Kernel):
     return self.delta
 
 
-# the heat kernel of the circle, a wrapped Gaussian: what smooths a density of angles
 class S1GaussKernel(S1Kernel):
+  """the heat kernel of the circle, a wrapped Gaussian: what smooths a density of angles"""
   _label = "Gauss"
 
   def __init__(self, sigma=None, *, halfwidth=None):
@@ -960,9 +960,9 @@ class S1GaussKernel(S1Kernel):
     k = np.arange(L + 1)
     return np.exp(-k * k * self.sigma ** 2 / 2)
 
-  # the modes beyond 6 / sigma are below e^{-18}
   @property
   def bandwidth(self):
+    """the modes beyond 6 / sigma are below e^{-18}"""
     return max(1, math.ceil(6 / self.sigma))
 
   def halfwidth(self):

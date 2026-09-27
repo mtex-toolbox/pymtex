@@ -29,20 +29,20 @@ MAP_INK = "#333333"
 EULER_INK = "#c62828"
 
 
-# where each reference axis lies on the screen under a convention: its components along
-# east, north and out of the screen, so that the window draws the frame rather than
-# spelling it. An axis with a component near one out of the screen leaves it.
 def conventionArrows(pC):
+  """where each reference axis lies on the screen under a convention: its components along
+  east, north and out of the screen, so that the window draws the frame rather than
+  spelling it. An axis with a component near one out of the screen leaves it."""
   e, n, o = pC.east, pC.north, pC.outOfScreen
   return [[float(ax.dot(d)) for d in (e, n, o)] for ax in (xvector, yvector, zvector)]
 
 
 # ------------------------------------------------------------------ the drawing
 
-# the frame as the map draws it in its corner. The picture is laid out from its crossing
-# and then centred on its ink and not on that crossing, which sits wherever the two arrows
-# leave it: 'x' and 'RD' are different widths, so an origin centred picture is not.
 def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=MAP_INK, caption=""):
+  """the frame as the map draws it in its corner. The picture is laid out from its crossing
+  and then centred on its ink and not on that crossing, which sits wherever the two arrows
+  leave it: 'x' and 'RD' are different widths, so an origin centred picture is not."""
   axes = conventionArrows(pC)
   bold = QFont(p.font())
   bold.setPixelSize(int(LABEL))
@@ -119,8 +119,8 @@ def _centred(p, x, y, text):
 
 # ------------------------------------------------------------------ the chooser
 
-# one of the eight, as a picture that can be picked
 class PictogramButton(QAbstractButton):
+  """one of the eight, as a picture that can be picked"""
 
   def __init__(self, pC, names, ink, side=CHOICE):
     super().__init__()
@@ -147,8 +147,8 @@ class PictogramButton(QAbstractButton):
     self.update()
 
 
-# the eight as pictures, four to a row, the one in force marked
 class ConventionChooser(QMenu):
+  """the eight as pictures, four to a row, the one in force marked"""
 
   def __init__(self, parent, index, names, ink):
     super().__init__(parent)

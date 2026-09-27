@@ -28,9 +28,9 @@ def _commonSite(cells, fa, fb):
   return int(common[0]) if len(common) == 1 else -1
 
 
-# the vertices where four faces meet, all four of them a grain boundary, with their faces
-# in counterclockwise order
 def quadruplePoints(c, seg):
+  """the vertices where four faces meet, all four of them a grain boundary, with their faces
+  in counterclockwise order"""
   nV = len(c.V)
   deg = np.bincount(c.F.reshape(-1), minlength=nV)
   degOuter = np.bincount(c.F[seg.isOuter].reshape(-1), minlength=nV)

@@ -19,6 +19,7 @@ import numpy as np
 from ..tensors.tensor import complianceTensor, stiffnessTensor, tensor
 from ..geometry.frames import crystalFrame
 from .table import readFile, text
+from ..geometry.install import install
 
 _NUMBERS = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 
@@ -83,8 +84,13 @@ def loadTensor(fname, *args, cls=None, **kwargs):
   return cls(M, *args, **kwargs)
 
 
+def _load(cls, fname, *args, **kwargs):
+  """stiffnessTensor.load(fname): the tensor of a file as the class it is called on"""
+  return loadTensor(fname, *args, cls=cls, **kwargs)
+
+
 def _install():
-  tensor.load = classmethod(lambda cls, fname, *a, **kw: loadTensor(fname, *a, cls=cls, **kw))
+  install(tensor, classmethod(_load), "load")
 
 
 _install()

@@ -15,6 +15,7 @@
 # directions are axes unless the measurement is complete.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -30,6 +31,7 @@ from ..geometry.vector3d import vector3d
 from .characteristics import calcError as _calcErrorODF
 from .funops import conv
 from .s2fun import S2FunHarmonic
+from ..geometry.install import install
 
 ERROR_MODES = ("relative", "RP", "l1", "l2")
 
@@ -168,9 +170,9 @@ class PoleFigure:
   def frame(self):
     return self.SS
 
-  # the plotting convention of the specimen directions, the session's for frame-free ones
   @property
   def how2plot(self):
+    """the plotting convention of the specimen directions, the session's for frame-free ones"""
     return self.allR[0].how2plot
 
   @property
@@ -208,9 +210,9 @@ class PoleFigure:
   def isempty(self):
     return sum(I.size for I in self.allI) == 0
 
-  # the resolution of the measurement, the finest over the pole figures
   @property
   def resolution(self):
+    """the resolution of the measurement, the finest over the pole figures"""
     return min(_resolutionOf(r) for r in self.allR)
 
   def select(self, i):
@@ -298,8 +300,8 @@ class PoleFigure:
   def scale(self, alpha):
     return self * alpha
 
-  # max(pf) the largest intensity of each pole figure, max(pf, a) the intensities clipped
   def max(self, other=None):
+    """max(pf) the largest intensity of each pole figure, max(pf, a) the intensities clipped"""
     if other is None:
       return np.array([np.max(I) for I in self.allI])
     return self._apply(other, np.maximum)
@@ -309,19 +311,19 @@ class PoleFigure:
       return np.array([np.min(I) for I in self.allI])
     return self._apply(other, np.minimum)
 
-  # the mean intensity of each pole figure, the integral over the sphere
   def mean(self, weights=None):
+    """the mean intensity of each pole figure, the integral over the sphere"""
     if weights is None:
       weights = [calcQuadratureWeights(r) for r in self.allR]
     return np.array([float(np.sum(I.ravel() * np.asarray(w).ravel())) for I, w in zip(self.allI, weights)])
 
-  # scaled to mean one, or to the pole figures the ODF predicts
   def normalize(self, odf=None):
+    """scaled to mean one, or to the pole figures the ODF predicts"""
     return self / (self.mean() if odf is None else self.calcNormalization(odf))
 
-  # the specimen directions turned; a rotation that is no element of the specimen group
-  # strips the group from the frame
   def rotate(self, rot):
+    """the specimen directions turned; a rotation that is no element of the specimen group
+    strips the group from the frame"""
     if not isinstance(rot, MtexArray):
       rot = rotation.byAxisAngle(vector3d.Z, rot)
     ss = dropGroup(rot, self.SS)
@@ -334,9 +336,9 @@ class PoleFigure:
 
   # ------------------------------------------------------------------ the point sets
 
-  # equivalent specimen directions under the specimen group carry the same pole density,
-  # so they are merged and their intensities averaged
   def unique(self, tolerance=1e-6):
+    """equivalent specimen directions under the specimen group carry the same pole density,
+    so they are merged and their intensities averaged"""
     sym = self.SS.properGroup().rotations()
     if self.SS.numSym() <= 2:
       sym = rotation.id
@@ -360,8 +362,8 @@ class PoleFigure:
       allI.append(sums / counts)
     return self._rebuild(allI, allR)
 
-  # the pole figures of several data sets in one; those of equal crystal directions joined
   def union(self, *others):
+    """the pole figures of several data sets in one; those of equal crystal directions joined"""
     allH, allR, allI, c = list(self.allH), list(self.allR), list(self.allI), list(self.c)
     for pf in others:
       if pf is None:
@@ -382,9 +384,9 @@ class PoleFigure:
         i += 1
     return PoleFigure(allH, allR, allI, superposition=c, complete=True)
 
-  # the measurements whose intensity deviates from the mean of their neighbours within
-  # three resolutions by more than alpha standard deviations
   def isOutlier(self, alpha=2):
+    """the measurements whose intensity deviates from the mean of their neighbours within
+    three resolutions by more than alpha standard deviations"""
     out = []
     for r, I in zip(self.allR, self.allI):
       xyz = r.flatten().normalize().data
@@ -400,8 +402,8 @@ class PoleFigure:
 
   findOutlier = isOutlier
 
-  # Poisson counts of fak * I + background, the background subtracted again
   def noisepf(self, fak=1, background=0, nonnegative=False, rng=None):
+    """Poisson counts of fak * I + background, the background subtracted again"""
     rng = np.random.default_rng() if rng is None else rng
     fak = self._operands(fak)
     allI = []
@@ -412,10 +414,10 @@ class PoleFigure:
 
   # ------------------------------------------------------------------ corrections
 
-  # the background subtracted and the defocusing divided out, each correction a pole
-  # figure of its own, interpolated onto the measured directions where it was measured
-  # elsewhere
   def correct(self, background=None, defocusing=None, defocusingBackground=None):
+    """the background subtracted and the defocusing divided out, each correction a pole
+    figure of its own, interpolated onto the measured directions where it was measured
+    elsewhere"""
     out = self if background is None else self - self._adapt(background)
     if defocusing is None:
       return out
@@ -454,12 +456,12 @@ class PoleFigure:
 
   # ------------------------------------------------------------------ simulation and errors
 
-  # the pole figures an ODF predicts on the measured directions
   def calcPoleFigure(self, odf):
+    """the pole figures an ODF predicts on the measured directions"""
     return calcPoleFigure(odf, self.allH, self.allR, superposition=self.c, complete=True)
 
-  # the factor the second pole figure is scaled by to carry the mass of the first
   def calcNormalization(self, other):
+    """the factor the second pole figure is scaled by to carry the mass of the first"""
     if not isinstance(other, PoleFigure):
       other = self.calcPoleFigure(other)
     out = []
@@ -468,9 +470,9 @@ class PoleFigure:
       out.append(float(w @ np.maximum(I1.ravel(), 0) / (w @ np.maximum(I2.ravel(), 0))))
     return np.array(out)
 
-  # the pole figures of the deviation from a recalculation, normalised against each
-  # other first; 'relative' is the damped relative error, 'RP', 'l1', 'l2' the others
   def calcErrorPF(self, other, mode="relative", epsilon=None):
+    """the pole figures of the deviation from a recalculation, normalised against each
+    other first; 'relative' is the damped relative error, 'RP', 'l1', 'l2' the others"""
     if mode not in ERROR_MODES:
       raise ValueError(f"the error mode is 'relative', 'RP', 'l1' or 'l2', not {mode!r}")
     # the RP measure keeps the directions above one, the regularised one damps by a half
@@ -497,8 +499,8 @@ class PoleFigure:
       allI.append(d.reshape(r.shape))
     return self._rebuild(allI, allR)
 
-  # the mean deviation, one number per pole figure
   def calcError(self, other, mode="relative", epsilon=None):
+    """the mean deviation, one number per pole figure"""
     e = self.calcErrorPF(other, mode, epsilon)
     out = np.array([float(np.mean(I)) if I.size else np.nan for I in e.allI])
     if mode == "l1":
@@ -535,6 +537,13 @@ class PoleFigure:
     return PoleFigure(sum([pf.allH for pf in pfs], []), sum([pf.allR for pf in pfs], []), sum([pf.allI for pf in pfs], []),
                       superposition=sum([pf.c for pf in pfs], []), complete=True)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..io.loadpolefigure import loadPoleFigure
+    from ..io.exportpolefigure import exportPoleFigure as export
+    from ..plotting.polefigureplot import plotPoleFigure as plot, plotDiff
+    load = staticmethod(loadPoleFigure)
+
 
 # ------------------------------------------------------------------ the verbs as functions
 
@@ -562,8 +571,8 @@ def calcErrorPF(pf, other, mode="relative", epsilon=None):
   return pf.calcErrorPF(other, mode, epsilon)
 
 
-# the error between a measurement and a recalculation, or between two SO(3) functions
 def calcError(a, b, *args, **kwargs):
+  """the error between a measurement and a recalculation, or between two SO(3) functions"""
   if isinstance(a, PoleFigure):
     return a.calcError(b, *args, **kwargs)
   return _calcErrorODF(a, b, *args, **kwargs)
@@ -801,8 +810,8 @@ class SchulzDefocusingKernel:
   def __call__(self, t):
     return self.eval(t)
 
-  # the correction on the specimen directions of a pole figure, one at the pole
   def defocusing(self, pf):
+    """the correction on the specimen directions of a pole figure, one at the pole"""
     return pf._rebuild([self.eval(np.cos(r.theta)) for r in pf.allR])
 
 
@@ -813,10 +822,9 @@ def _install():
   from .handles import SO3FunComposition, SO3FunGeneric, SO3FunHandle
   from .rbf import SO3FunCBF, SO3FunRBF
   from .so3fun import SO3FunHarmonic
-  for cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunHandle, SO3FunComposition, SO3FunGeneric, SO3FunBingham):
-    cls.calcPoleFigure = lambda self, h, r=None, **kw: calcPoleFigure(self, h, r, **kw)
-  vector3d.calcQuadratureWeights = lambda self, method="voronoi": calcQuadratureWeights(self, method)
-  vector3d.refine = lambda self: refine(self)
+  install((SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunHandle, SO3FunComposition, SO3FunGeneric, SO3FunBingham), calcPoleFigure)
+  install(vector3d, calcQuadratureWeights)
+  install(vector3d, refine)
 
 
 _install()

@@ -275,11 +275,11 @@ def _axisArrow(ax, d, name, length=0.15):
   ax._mtexAxisArrows = getattr(ax, "_mtexAxisArrows", []) + [(d, length, (body, label))]
 
 
-# surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
-# complex one; a list of functions one panel each; a single real function is first scaled
-# to (f - mean) / (max - min) + 1 unless noScaling, as MATLAB's surf does
 def surf(sF, layout=None, figSize=None, noScaling=False, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
          **kw):
+  """surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
+  complex one; a list of functions one panel each; a single real function is first scaled
+  to (f - mean) / (max - min) + 1 unless noScaling, as MATLAB's surf does"""
   from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .mtexfigure import figureSize
@@ -437,9 +437,9 @@ def _region(sP, oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines
   return poly
 
 
-# the points orientations are, in the coordinates asked for: axis angle and Euler angles in
-# degrees, Rodrigues vectors as they are
 def orientationPoints(o, coordinates="axisAngle", fundamentalRegion=True):
+  """the points orientations are, in the coordinates asked for: axis angle and Euler angles in
+  degrees, Rodrigues vectors as they are"""
   if coordinates == "Euler":
     if fundamentalRegion:
       a, b, c = o.flatten().project2EulerFR()
@@ -602,10 +602,10 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   return h
 
 
-# quiver3(t): a tangent vector as an arrow at its reference in orientation space, in the
-# coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
-# to the longest of the list, points to, as MATLAB draws it
 def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+  """quiver3(t): a tangent vector as an arrow at its reference in orientation space, in the
+  coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
+  to the longest of the list, points to, as MATLAB draws it"""
   # arrows at positions in space go into a 3D scene
   if isinstance(t, vector3d) and args and isinstance(args[0], vector3d):
     from .volumeplot import quiverVectors
@@ -679,9 +679,9 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
                       arrow_length_ratio=0.3, **kw)
 
 
-# arrow3d(v): solid arrows from the origin, or from anchor, to the tips v, into the held
-# axes or a new figure in space, the axes widened to hold them (MATLAB @vector3d/arrow3d)
 def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", labeled=False, label=None, **kw):
+  """arrow3d(v): solid arrows from the origin, or from anchor, to the tips v, into the held
+  axes or a new figure in space, the axes widened to hold them (MATLAB @vector3d/arrow3d)"""
   from matplotlib.colors import to_rgba
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .sphericalplot import _nameOf
@@ -748,10 +748,10 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   return poly
 
 
-# plot(f): a fibre as its curve through orientation space, in the coordinates of the held
-# axes or Euler angles, as MATLAB draws it
 def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=False, Euler=False, fundamentalRegion=True,
                 ignoreFundamentalRegion=False, region=True, points=1000, **kw):
+  """plot(f): a fibre as its curve through orientation space, in the coordinates of the held
+  axes or Euler angles, as MATLAB draws it"""
   _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   color = kw.pop("lineColor", kw.pop("LineColor", color))
   lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
@@ -793,10 +793,10 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
 
 
-# plot3d(odf), plot3d(odf, 'axisAngle'): the isosurfaces of an ODF at surf3 levels from zero
-# to its maximum, over the Euler box of its frames or inside its fundamental region in axis
-# angle space, the higher the less transparent (MATLAB @SO3Fun/plot3d)
 def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, **kw):
+  """plot3d(odf), plot3d(odf, 'axisAngle'): the isosurfaces of an ODF at surf3 levels from zero
+  to its maximum, over the Euler box of its frames or inside its fundamental region in axis
+  angle space, the higher the less transparent (MATLAB @SO3Fun/plot3d)"""
   from matplotlib.cm import ScalarMappable
   from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection

@@ -14,6 +14,7 @@
 # in its coefficients, and every operation keeps it; the precision follows the coefficients.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -33,8 +34,8 @@ def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
 
 
-# f(g^-1): D_n^{kl}(g^-1) = (-1)^{k-l} D_n^{-l,-k}(g), so fhat'^{ab} = (-1)^{a-b} fhat^{-b,-a}
 def invertedCoefficients(fhat):
+  """f(g^-1): D_n^{kl}(g^-1) = (-1)^{k-l} D_n^{-l,-k}(g), so fhat'^{ab} = (-1)^{a-b} fhat^{-b,-a}"""
   out = np.empty_like(fhat)
   for n in range(dim2deg(fhat.shape[-1]) + 1):
     F = degreeBlock(fhat, n)
@@ -44,8 +45,8 @@ def invertedCoefficients(fhat):
   return out
 
 
-# conj(f) has the coefficients (-1)^{k-l} conj(fhat^{-k,-l})
 def conjugateCoefficients(fhat):
+  """conj(f) has the coefficients (-1)^{k-l} conj(fhat^{-k,-l})"""
   out = np.empty_like(fhat)
   for n in range(dim2deg(fhat.shape[-1]) + 1):
     F = degreeBlock(fhat, n)
@@ -130,9 +131,9 @@ class SO3FunHarmonic:
 
   __array_ufunc__ = None
 
-  # the shape of a list of functions, () for one
   @property
   def shape(self):
+    """the shape of a list of functions, () for one"""
     return self._fhat.shape[:-1]
 
   @property
@@ -151,9 +152,9 @@ class SO3FunHarmonic:
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
-  # the list transposed, a row of n functions becoming a column
   @property
   def T(self):
+    """the list transposed, a row of n functions becoming a column"""
     if not self.shape:
       return self
     if len(self.shape) == 1:
@@ -177,10 +178,10 @@ class SO3FunHarmonic:
       return out[0]._rebuild(np.stack([f.truncate(L)._fhat for f in out]).reshape(self.shape + (deg2dim(L + 1),)))
     return np.array(out).reshape(self.shape)
 
-  # from weighted samples at nodes, projected onto the invariant functions; a quadrature
-  # grid brings its weights
   @classmethod
   def quadrature(cls, nodes, values=None, *frames, bandwidth=None, weights=None, real=None, antipodal=False):
+    """from weighted samples at nodes, projected onto the invariant functions; a quadrature
+    grid brings its weights"""
     # quadrature(fun, cs, ss): a callable takes its frames right after it
     if callable(nodes) and not isinstance(nodes, quaternion) and (values is None or isinstance(values, referenceFrame)):
       frames = frames if values is None else (values, *frames)
@@ -204,26 +205,26 @@ class SO3FunHarmonic:
 
   approximate = quadrature
 
-  # the harmonic expansion of the Dubna ODF, MTEX's example function
   @staticmethod
   def example():
+    """the harmonic expansion of the Dubna ODF, MTEX's example function"""
     from .so3funclass import SO3Fun
     return SO3FunHarmonic(SO3Fun.dubna())
 
   # ------------------------------------------------------------------ properties
 
-  # the coefficients in MTEX's basis, as MATLAB's SO3F.fhat reads and assigns them
   @property
   def fhat(self):
+    """the coefficients in MTEX's basis, as MATLAB's SO3F.fhat reads and assigns them"""
     return mtexCoefficientsSO3(self._fhat)
 
   @fhat.setter
   def fhat(self, value):
     self._fhat = mtexCoefficientsSO3(np.asarray(value, dtype=self._fhat.dtype))
 
-  # SO3F.isReal = True makes the coefficients those of the real part, as MATLAB's does
   @property
   def isReal(self):
+    """SO3F.isReal = True makes the coefficients those of the real part, as MATLAB's does"""
     return self._isReal
 
   @isReal.setter
@@ -239,22 +240,22 @@ class SO3FunHarmonic:
   def bandwidth(self):
     return dim2deg(self._fhat.shape[-1])
 
-  # SO3F.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does
   @bandwidth.setter
   def bandwidth(self, L):
+    """SO3F.bandwidth = L cuts or pads the coefficients, as MATLAB's assignment does"""
     self._fhat = _cut(self._fhat, int(L))
 
-  # the harmonic power per degree, the norm of the coefficients of that degree
   @property
   def power(self):
+    """the harmonic power per degree, the norm of the coefficients of that degree"""
     return np.stack([np.linalg.norm(self._fhat[..., deg2dim(n):deg2dim(n + 1)], axis=-1) for n in range(self.bandwidth + 1)], axis=-1)
 
   @property
   def dtype(self):
     return self._fhat.dtype
 
-  # the coefficient vector cut or padded to a bandwidth
   def truncate(self, L):
+    """the coefficient vector cut or padded to a bandwidth"""
     return self if L == self.bandwidth else self._rebuild(_cut(self._fhat, L))
 
   # ------------------------------------------------------------------ evaluation
@@ -275,9 +276,9 @@ class SO3FunHarmonic:
   def __call__(self, x):
     return self.eval(x)
 
-  # the coefficients are invariant under the groups of the frames, so the transform may run
-  # on the reduced index set of their z folds
   def eval(self, x):
+    """the coefficients are invariant under the groups of the frames, so the transform may run
+    on the reduced index set of their z folds"""
     if self.shape:
       # a list of functions: the values at the arguments first, then the shape of the list
       vals = [f.eval(x) for f in (self._rebuild(r) for r in self._fhat.reshape(-1, self._fhat.shape[-1]))]
@@ -289,8 +290,8 @@ class SO3FunHarmonic:
 
   # ------------------------------------------------------------------ symmetry
 
-  # the projection of H5 on both sides, and the exchange symmetry f(g) = f(g^-1)
   def symmetrise(self):
+    """the projection of H5 on both sides, and the exchange symmetry f(g) = f(g^-1)"""
     if self.shape:
       return self._each(lambda f: f.symmetrise())
     L = self.bandwidth
@@ -396,38 +397,38 @@ class SO3FunHarmonic:
 
   # ------------------------------------------------------------------ the moments
 
-  # the mean of every function; with an axis, MATLAB's mean(SO3F, d), the function that is the
-  # mean along that axis of the list
   def mean(self, axis=None):
+    """the mean of every function; with an axis, MATLAB's mean(SO3F, d), the function that is the
+    mean along that axis of the list"""
     if axis is not None:
       return self._rebuild(self._fhat.mean(axis=_leadingAxis(axis, self.shape)))
     m = self._fhat[..., 0]
     m = m.real if self.isReal else m
     return m[()] if not self.shape else m
 
-  # the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list
   def sum(self, axis=None):
+    """the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list"""
     if axis is not None:
       return self._rebuild(self._fhat.sum(axis=_leadingAxis(axis, self.shape)))
     return 8 * np.pi ** 2 * self.mean()
 
-  # the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)
   def norm(self, s=None):
+    """the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)"""
     if self.shape:
       return self._each(lambda f: f.norm(s))
     if s is None:
       return float(np.linalg.norm(self._fhat))
     return float(math.sqrt(sum((2 * n + 1) ** (2 * s) * np.sum(np.abs(self._fhat[deg2dim(n):deg2dim(n + 1)]) ** 2) for n in range(self.bandwidth + 1))))
 
-  # the inner product int conj(f) g, the first argument conjugated
   def dot(self, g):
+    """the inner product int conj(f) g, the first argument conjugated"""
     self._sameFrames(g)
     L = max(self.bandwidth, g.bandwidth)
     x = np.vdot(self.truncate(L)._fhat, g.truncate(L)._fhat)
     return x.real if self.isReal and g.isReal else x
 
-  # the same coefficients up to a tolerance
   def isclose(self, g, rtol=1e-8, atol=0.0):
+    """the same coefficients up to a tolerance"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L)._fhat, g.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
@@ -486,6 +487,30 @@ class SO3FunHarmonic:
     if not self.isReal:
       lines.append("  isReal: false")
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+                                  calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
+                                  calcError, centerSpecimen)
+    from .polefigure import calcPoleFigure
+    from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sectionplot import plotSection
+    @property
+    def SRight(self) -> Any:
+      ...
+    @SRight.setter
+    def SRight(self, value) -> None:
+      ...
+    @property
+    def SLeft(self) -> Any:
+      ...
+    @SLeft.setter
+    def SLeft(self, value) -> None:
+      ...
 
 
 # a coefficient vector cut or padded to a bandwidth

@@ -20,6 +20,7 @@
 # leave them out, and nothing fills them.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry._array import MtexArray
@@ -142,9 +143,9 @@ class EBSD:
   def phase(self):
     return self.phaseMap[self.phaseId]
 
-  # the map with every orientation replaced by its representative in the fundamental
-  # region of its phase
   def project2FundamentalRegion(self):
+    """the map with every orientation replaced by its representative in the fundamental
+    region of its phase"""
     out = self.copy()
     rot = out.rotations.data.reshape(-1, 4)
     for p in self.indexedPhaseId:
@@ -155,16 +156,16 @@ class EBSD:
       rot[sel] = o.project2FundamentalRegion().data.reshape(-1, 4)
     return out
 
-  # the plotting convention of the specimen frame the map is written in
   @property
   def how2plot(self):
+    """the plotting convention of the specimen frame the map is written in"""
     from ..geometry.plottingconvention import plottingConvention
     pC = getattr(self.frame, "how2plot", None)
     return plottingConvention.default if pC is None else pC
 
-  # the cells of a grid that hold no measurement
   @property
   def isPadding(self):
+    """the cells of a grid that hold no measurement"""
     return np.zeros(self.shape, dtype=bool) if self._pad is None else self._pad
 
   @property
@@ -172,9 +173,9 @@ class EBSD:
     indexed = np.array([f.isIndexed for f in self.CSList.frames])
     return indexed[self.phaseId]
 
-  # the indexed phases at least one measurement belongs to
   @property
   def indexedPhaseId(self):
+    """the indexed phases at least one measurement belongs to"""
     present = np.unique(self.phaseId)
     return np.array([p for p in present if self.CSList.isIndexed(p)], dtype=int)
 
@@ -186,14 +187,14 @@ class EBSD:
   def colorList(self):
     return self.CSList.colorList
 
-  # the crystal frame of the one indexed phase present
   @property
   def CS(self):
+    """the crystal frame of the one indexed phase present"""
     return self.CSList[self._onePhase()]
 
-  # ebsd['olivine'].CS = cs.Laue(): the frame of the one phase replaced, for every map sharing the list
   @CS.setter
   def CS(self, value):
+    """ebsd['olivine'].CS = cs.Laue(): the frame of the one phase replaced, for every map sharing the list"""
     self.CSList.frames[self._onePhase()] = value
 
   def _onePhase(self):
@@ -202,11 +203,11 @@ class EBSD:
       raise ValueError(f"the map has {len(ids)} indexed phases, so name one: ebsd['phase']")
     return int(ids[0])
 
-  # the orientations of the one indexed phase present, framed by it and by the specimen
   @property
   # the orientations of the one indexed phase, one per measurement in the shape of the map:
   # a site of another phase or an empty one is NaN, as MATLAB keeps it
   def orientations(self):
+    """the orientations of the one indexed phase present, framed by it and by the specimen"""
     p = self._onePhase()
     q = np.array(self.rotations.data, dtype=float)
     q[self.phaseId != p] = np.nan
@@ -277,8 +278,8 @@ class EBSD:
     q[ind] = np.broadcast_to(ori.data.reshape(-1, 4), (len(ind), 4))
     self.phaseId.reshape(-1)[ind] = self.CSList.phaseId(ori.CS)
 
-  # the phase id of a mineral name, MATLAB's name2id
   def name2id(self, name):
+    """the phase id of a mineral name, MATLAB's name2id"""
     return self.CSList.phaseId(name)
 
   def _phaseMask(self, names):
@@ -339,9 +340,9 @@ class EBSD:
                 {k: v.copy() for k, v in self.prop.items()}, scanUnit=self.scanUnit, frame=self.frame,
                 lattice=self.lattice, meta=dict(self.meta), phaseMap=self.phaseMap, id=self.id.copy(), isPadding=self._pad)
 
-  # the list of several maps, the phases of the first
   @classmethod
   def cat(cls, *maps):
+    """the list of several maps, the phases of the first"""
     first = maps[0]
     for m in maps[1:]:
       if m.frame is not first.frame:
@@ -361,8 +362,8 @@ class EBSD:
 
   # ------------------------------------------------------------------ finding measurements
 
-  # the measurements closest to positions, or within a radius of them
   def findByLocation(self, xy, radius=None):
+    """the measurements closest to positions, or within a radius of them"""
     q = xy.data if isinstance(xy, vector3d) else np.asarray(xy, dtype=float)
     q = q.reshape(-1, q.shape[-1])
     if q.shape[1] == 2:
@@ -374,8 +375,8 @@ class EBSD:
       ids = np.unique(np.concatenate([np.flatnonzero(np.linalg.norm(P - p, axis=1) <= radius) for p in q]))
     return self._subset(ids)
 
-  # the measurements of the phase of ori within an angle of it, or of a fibre
   def findByOrientation(self, ori, epsilon):
+    """the measurements of the phase of ori within an angle of it, or of a fibre"""
     from ..geometry.fibre import fibre
     cs = ori.CS
     sel = self.phaseId == self.CSList.phaseId(cs)
@@ -384,8 +385,8 @@ class EBSD:
     d = ori.angle(o) if isinstance(ori, fibre) else o.angle(ori)
     return self._subset(ids[d <= epsilon])
 
-  # the mask of the measurements inside a rectangle [x, y, w, h] or a polygon (N, 2), edges included
   def inpolygon(self, region):
+    """the mask of the measurements inside a rectangle [x, y, w, h] or a polygon (N, 2), edges included"""
     region = np.asarray(region, dtype=float)
     x, y = self.pos.x, self.pos.y
     if region.ndim == 1:
@@ -401,8 +402,8 @@ class EBSD:
 
   # ------------------------------------------------------------------ moving the map
 
-  # a rigid motion of the map; keepXY moves only the orientations, keepEuler only the positions
   def rotate(self, rot, keepXY=False, keepEuler=False):
+    """a rigid motion of the map; keepXY moves only the orientations, keepEuler only the positions"""
     if keepXY and keepEuler:
       raise ValueError("choose either keepXY or keepEuler, not both")
     if not isinstance(rot, MtexArray):
@@ -419,8 +420,8 @@ class EBSD:
     v = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
     return self._moved(self.pos.data + v, self.rotations.data)
 
-  # any map of the positions; the lattice is inferred again from where they land
   def transform(self, f):
+    """any map of the positions; the lattice is inferred again from where they land"""
     out = f(self.pos)
     pos = out.data if isinstance(out, vector3d) else np.asarray(out, dtype=float)
     return self._moved(pos, self.rotations.data)
@@ -429,9 +430,9 @@ class EBSD:
     return EBSD(_vectors(pos, self.frame), _rotations(rot), self.phaseId, self.CSList, self.prop,
                 scanUnit=self.scanUnit, meta=self.meta, phaseMap=self.phaseMap, id=self.id, isPadding=self._pad)
 
-  # the bounds of the measured positions, [xmin, xmax, ymin, ymax]; the padding of a grid is
-  # no measurement, and on a turned grid it reaches far beyond the map
   def extent(self):
+    """the bounds of the measured positions, [xmin, xmax, ymin, ymax]; the padding of a grid is
+    no measurement, and on a turned grid it reaches far beyond the map"""
     P = self.pos.data.reshape(-1, 3)
     if self._pad is not None:
       P = P[~self._pad.reshape(-1)]
@@ -439,24 +440,24 @@ class EBSD:
 
   # ------------------------------------------------------------------ the lattice
 
-  # the cell of the lattice about a site, as its corners
   @property
   def unitCell(self):
+    """the cell of the lattice about a site, as its corners"""
     if self.lattice is None:
       raise ValueError("the positions are not on a lattice, so the map has no unit cell")
     return vector3d(self.lattice.unitCell, frame=self.frame)
 
-  # the normal of the measurement plane
   @property
   def N(self):
+    """the normal of the measurement plane"""
     n = self.lattice.plane.normal if self.lattice is not None else np.array([0.0, 0.0, 1.0])
     return vector3d(n, frame=self.frame, isNormalized=True)
 
-  # MATLAB's spacing of the positions: the shortest distance from the first corner of the
-  # unit cell to the others, the step on a square lattice and the step over sqrt(3) on a
-  # hexagonal one, where lattice.dxy is the step
   @property
   def dPos(self):
+    """MATLAB's spacing of the positions: the shortest distance from the first corner of the
+    unit cell to the others, the step on a square lattice and the step over sqrt(3) on a
+    hexagonal one, where lattice.dxy is the step"""
     if self.lattice is None:
       return np.nan
     c = self.lattice.unitCell
@@ -466,9 +467,9 @@ class EBSD:
     from .gridify import gridify
     return gridify(self, layout, unitCell, return_index)
 
-  # the directions the indices of a gridded map run along (MATLAB ebsd.layout); a list has none
   @property
   def layout(self):
+    """the directions the indices of a gridded map run along (MATLAB ebsd.layout); a list has none"""
     if not self.isGridded:
       return None
     from ..geometry.gridlayout import gridLayout
@@ -480,21 +481,21 @@ class EBSD:
         gL.name = name
     return gL
 
-  # EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one
   @classmethod
   def load(cls, fname, *args, **kwargs):
+    """EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one"""
     from ..io.load import loadEBSD
     return loadEBSD(fname, *args, **kwargs)
 
-  # the frame change the import applied to the Euler angles, the identity when none
   @property
   def EulerCorrection(self):
+    """the frame change the import applied to the Euler angles, the identity when none"""
     r = self.meta.get("EulerCorrection")
     return rotation.id if r is None else r
 
-  # the colour of the one phase of the map, read and set on its frame: ebsd['Diopside'].color
   @property
   def color(self):
+    """the colour of the one phase of the map, read and set on its frame: ebsd['Diopside'].color"""
     from .phaselist import colorTriplet, phaseColorNames
     return colorTriplet(phaseColorNames(self.CSList.frames)[self._onePhasePresent()])
 
@@ -509,8 +510,8 @@ class EBSD:
       raise ValueError(f"the map has {len(ids)} phases, so name one: ebsd['phase']")
     return int(ids[0])
 
-  # ebsd.export('map.ang'): the map written by the format the extension names
   def export(self, fname, *args, **kwargs):
+    """ebsd.export('map.ang'): the map written by the format the extension names"""
     from ..io.exportebsd import export
     return export(self, fname, *args, **kwargs)
 
@@ -559,6 +560,15 @@ class EBSD:
       lines.append(f"  data set: {self.meta.get('dataSet')} of {len(sets)}")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .traces import calcTraces
+    from .intragranular import (gradient, gradientX, gradientY, gradientZ, curvature, KAM, calcGROD, grainMean,
+                                spatialProfile, calcMisorientation, weightedBurgersVec)
+    from ..analysis.dislocations import calcGND
+    from ..analysis.denoising import smooth, fill, fillByGrainId, reduce, reduce as subsample, interp
+    from ..plotting.mapplot import plotEBSD as plot, quiverMap as quiver
+
 
 # a vector3d and a rotation on arrays as they are, without the cast of the constructors, so
 # that a map of millions of measurements is not copied and a float32 map stays float32
@@ -600,9 +610,9 @@ def _inPolygon(x, y, V, includeEdge=True):
   return (inside | onEdge) if includeEdge else (inside & ~onEdge)
 
 
-# EBSDsquare(rotations, phaseId, CSList): a map on a square grid, the rows of the array its
-# rows of pixels, as MATLAB's EBSDsquare builds a synthetic map
 def EBSDsquare(rotations, phaseId=None, CSList=None, dxy=(1.0, 1.0), scanUnit="um", frame=None, prop=None):
+  """EBSDsquare(rotations, phaseId, CSList): a map on a square grid, the rows of the array its
+  rows of pixels, as MATLAB's EBSDsquare builds a synthetic map"""
   from .gridify import gridify
   rot = rotations if isinstance(rotations, MtexArray) else rotation(rotations)
   ny, nx = rot.shape

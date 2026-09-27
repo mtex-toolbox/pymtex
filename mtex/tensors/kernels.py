@@ -78,9 +78,9 @@ def _eigh3Kernel():
   return _COMPILED["eigh3"]
 
 
-# the eigenvalues ascending and the eigenvectors as columns of symmetric 3 x 3 matrices over
-# any leading dims, as np.linalg.eigh
 def eigh3(E):
+  """the eigenvalues ascending and the eigenvectors as columns of symmetric 3 x 3 matrices over
+  any leading dims, as np.linalg.eigh"""
   E = np.asarray(E, dtype=float)
   loop = _eigh3Kernel() if backend() == "numba" else None
   if loop is None or E.ndim == 2:
@@ -135,9 +135,9 @@ def _turnKernel():
   return _COMPILED["turn"]
 
 
-# the rows of U, blocks of flattened tensors of ranks alpha starting at offsets, turned by the
-# rotation matrices Q on every index; U one row or n, Q one matrix or n; None without numba
 def turnBlocks(U, alpha, offsets, Q, chunk=64):
+  """the rows of U, blocks of flattened tensors of ranks alpha starting at offsets, turned by the
+  rotation matrices Q on every index; U one row or n, Q one matrix or n; None without numba"""
   loop = _turnKernel() if backend() == "numba" else None
   if loop is None:
     return None

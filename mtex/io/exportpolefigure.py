@@ -13,6 +13,7 @@ import numpy as np
 
 from ..functions.polefigure import PoleFigure
 from ..geometry.units import degree as _degree
+from ..geometry.install import install
 
 
 def exportPoleFigure(pf, fname, *args, degree=False):
@@ -30,6 +31,6 @@ def exportPoleFigure(pf, fname, *args, degree=False):
   return names
 
 
-PoleFigure.export = lambda pf, fname, *args, **kwargs: exportPoleFigure(pf, fname, *args, **kwargs)
+install(PoleFigure, exportPoleFigure, "export")
 
 __all__ = ["exportPoleFigure"]

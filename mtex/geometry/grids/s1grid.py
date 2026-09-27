@@ -26,12 +26,12 @@ class S1Grid:
   def period(self):
     return self.max - self.min if self.periodic else 0.0
 
-  # an angle moved into [min, min + period)
   def fold(self, x):
+    """an angle moved into [min, min + period)"""
     return x - np.floor((x - self.min) / self.period) * self.period if self.periodic else x
 
-  # the periodic distance of two angles
   def dist(self, x, y):
+    """the periodic distance of two angles"""
     d = np.abs(x - y)
     if not self.periodic:
       return d
@@ -39,9 +39,9 @@ class S1Grid:
     d = d - np.floor(d / p) * p
     return np.minimum(d, p - d)
 
-  # the index of the nearest point of an equispaced ladder, arithmetic; a ladder that is not
-  # equispaced falls back to the search
   def ladderIndex(self, x):
+    """the index of the nearest point of an equispaced ladder, arithmetic; a ladder that is not
+    equispaced falls back to the search"""
     n = len(self.points)
     if n == 1:
       return np.zeros(np.shape(x), dtype=int)
@@ -62,8 +62,8 @@ class S1Grid:
       return np.clip(np.floor((x - self.points[0]) / self.step + 1e-9).astype(int), -1, len(self.points) - 1)
     return np.searchsorted(self.points, x, side="right") - 1
 
-  # the index of the nearest point, for any array of angles
   def nearest(self, x):
+    """the index of the nearest point, for any array of angles"""
     n = len(self.points)
     if n == 0:
       raise ValueError("the grid is empty")
@@ -73,8 +73,8 @@ class S1Grid:
     d = self.dist(self.points[cands], x[None])
     return cands[np.argmin(d, axis=0), np.arange(x.size).reshape(x.shape)] if x.ndim else cands[np.argmin(d)]
 
-  # the indices of the points within eps of one angle, in order
   def neighbours(self, x, eps):
+    """the indices of the points within eps of one angle, in order"""
     n = len(self.points)
     if not self.periodic or 2 * eps >= self.period:
       if self.periodic:
@@ -87,8 +87,8 @@ class S1Grid:
       return np.arange(lo, hi + 1)
     return np.concatenate([np.arange(0, hi + 1), np.arange(max(lo, hi + 1), n)])
 
-  # the points selected by a mask, the range kept
   def subGrid(self, mask):
+    """the points selected by a mask, the range kept"""
     g = S1Grid.__new__(S1Grid)
     g.points = self.points[np.asarray(mask, dtype=bool)]
     g.min, g.max, g.periodic = self.min, self.max, self.periodic
@@ -109,8 +109,8 @@ def _uniformStep(p):
   return float(s)
 
 
-# a regular ladder: n points from a to b, the end excluded when periodic
 def ladder(a, b, n, periodic):
+  """a regular ladder: n points from a to b, the end excluded when periodic"""
   return np.linspace(a, b, n + 1)[:n] if periodic else np.linspace(a, b, n)
 
 

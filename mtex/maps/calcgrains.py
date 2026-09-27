@@ -28,6 +28,10 @@ from .segment import segment
 
 def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
                mcl=None, fmc=None, verbose=False, backend=None):
+  """the grains of a map, the pixels joined across every boundary the criterion keeps: a
+  misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
+  culls smaller grains, alpha bounds the decomposition, mcl and fmc select Markov
+  clustering and fast multiscale clustering. The map keeps the grain ids"""
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   if criterion is None and fmc is not None:
@@ -59,9 +63,9 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   return grains
 
 
-# a not indexed pixel inside a grain takes the phase of the grain and no rotation, as
-# MATLAB's [grains, ebsd] = calcGrains returns the map; the padding of a grid stays empty
 def absorbNotIndexed(ebsd, grains):
+  """a not indexed pixel inside a grain takes the phase of the grain and no rotation, as
+  MATLAB's [grains, ebsd] = calcGrains returns the map; the padding of a grid stays empty"""
   gid = ebsd.grainId.reshape(-1)
   absorbed = ~ebsd.isIndexed.reshape(-1) & (gid > 0) & ~ebsd.isPadding.reshape(-1)
   if not absorbed.any():
@@ -70,32 +74,32 @@ def absorbNotIndexed(ebsd, grains):
   ebsd.rotations.data.reshape(-1, 4)[absorbed] = np.nan
 
 
-# a pixel a previous reconstruction absorbed has a phase but no rotation; it is segmented
-# as the not indexed pixel it was, so that calcGrains on its own result gives the same grains
 def releaseAbsorbed(ebsd):
+  """a pixel a previous reconstruction absorbed has a phase but no rotation; it is segmented
+  as the not indexed pixel it was, so that calcGrains on its own result gives the same grains"""
   blank = ebsd.isIndexed.reshape(-1) & np.isnan(ebsd.rotations.data.reshape(-1, 4)[:, 0])
   ebsd.phaseId.reshape(-1)[blank] = 0
 
 
-# the pixels of indexed grains that came out below minPixel
 def undersized(seg, ebsd, minPixel):
+  """the pixels of indexed grains that came out below minPixel"""
   n = np.bincount(seg.grainId, minlength=seg.nGrains + 1)
   return (seg.grainId > 0) & ebsd.isIndexed.reshape(-1) & (n[seg.grainId] < minPixel)
 
 
-# the pixels of the grains the cull drops, marked as not indexed where they lie
 def markNotIndexed(ebsd, mask):
+  """the pixels of the grains the cull drops, marked as not indexed where they lie"""
   ebsd.phaseId.reshape(-1)[mask] = 0
 
 
-# give a grain to the pixels the closing left without a cell of their own
-#
-# A filled hole belongs to the cells that grew into it, so a pixel there lies in one grain,
-# in several, or on the boundary between them. Which cell covers a point is which site is
-# nearest to it, so the footprint of the pixel is sampled at its corners and the pixel
-# joins the grain only when every corner lands in it. Zero stays for a pixel a boundary
-# runs through.
 def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
+  """give a grain to the pixels the closing left without a cell of their own
+
+  A filled hole belongs to the cells that grew into it, so a pixel there lies in one grain,
+  in several, or on the boundary between them. Which cell covers a point is which site is
+  nearest to it, so the footprint of the pixel is sampled at its corners and the pixel
+  joins the grain only when every corner lands in it. Zero stays for a pixel a boundary
+  runs through."""
   out = grainId.copy()
   l = ebsd.lattice
   if l is None:
@@ -131,13 +135,13 @@ def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
   return out
 
 
-# the grain table: phase, size, mean orientation and orientation spread
-#
-# The mean is the quaternion mean of the pixels of a grain, each first brought to the
-# equivalent closest to the first one so that the symmetry does not tear the average
-# apart; the spread is the mean angle to that mean. Both run as compiled passes over all
-# the pixels, the NumPy form phase by phase their fallback and oracle.
 def grainTable(seg, ebsd, boundary=None, innerBoundary=None, backend=None):
+  """the grain table: phase, size, mean orientation and orientation spread
+
+  The mean is the quaternion mean of the pixels of a grain, each first brought to the
+  equivalent closest to the first one so that the symmetry does not tear the average
+  apart; the spread is the mean angle to that mean. Both run as compiled passes over all
+  the pixels, the NumPy form phase by phase their fallback and oracle."""
   n = seg.nGrains
   gid = seg.grainId
   ph = ebsd.phaseId.reshape(-1)

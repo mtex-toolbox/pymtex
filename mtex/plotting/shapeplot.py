@@ -102,10 +102,10 @@ def _draw(kind, target, polys, colors, edgeColor, lineWidth, alpha, label=None, 
 
 # ------------------------------------------------------------------ what colour a face is
 
-# the colour of every face of every shape, an (n, nF, 4) array: the colour of the mineral
-# or LightSkyBlue, one colour, one per face, one per shape, a value per face through the
-# colour map, or with colored a colour per form or the direction key of the normals
 def faceColors(cS, faceColor=None, colored=None, colormap="viridis"):
+  """the colour of every face of every shape, an (n, nF, 4) array: the colour of the mineral
+  or LightSkyBlue, one colour, one per face, one per shape, a value per face through the
+  colour map, or with colored a colour per form or the direction key of the normals"""
   from matplotlib.colors import Normalize, to_rgba
   n, nF = len(cS), cS.numFaces
   if colored is not None and colored is not False:

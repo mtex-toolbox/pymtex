@@ -382,8 +382,8 @@ def _best(fit, numFit, dims):
 
 # ------------------------------------------------------------------ Miller indices of an orientation
 
-# every index triple up to maxIndex, coprime, without (0, 0, 0)
 def allHKL(maxIndex):
+  """every index triple up to maxIndex, coprime, without (0, 0, 0)"""
   r = np.arange(-maxIndex, maxIndex + 1)
   h, k, l = (a.reshape(-1) for a in np.meshgrid(r, r, r, indexing="ij"))
   g = np.array([gcd(gcd(abs(int(a)), abs(int(b))), abs(int(c))) for a, b, c in zip(h, k, l)])

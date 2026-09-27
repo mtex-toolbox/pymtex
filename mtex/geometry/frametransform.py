@@ -16,9 +16,9 @@ from .symreduce import _conj
 from .vector3d import vector3d
 
 
-# the orientation two frames stand in by their axes: a point at v in frA sits at
-# align(frA, frB) * v in frB; the transition has to be a rotation
 def align(frA, frB, tolerance=1e-1):
+  """the orientation two frames stand in by their axes: a point at v in frA sits at
+  align(frA, frB) * v in frB; the transition has to be a rotation"""
   from .orientation import orientation
   M = frA.transformationMatrix(frB)
   dev = np.linalg.norm(np.eye(3) - M @ M.T)
@@ -27,17 +27,17 @@ def align(frA, frB, tolerance=1e-1):
   return orientation(rotation.byMatrix(M), frA.stripSym(), frB.stripSym())
 
 
-# the orientation implied by two frames rendering alike: a point at v renders at
-# inv(rot) * v in screen coordinates, so vB = rotB * inv(rotA) * vA
 def byScreenAlignment(frA, frB):
+  """the orientation implied by two frames rendering alike: a point at v renders at
+  inv(rot) * v in screen coordinates, so vB = rotB * inv(rotA) * vA"""
   from .orientation import orientation
   if frA.how2plot is None or frB.how2plot is None:
     raise ValueError("both frames need a plotting convention of their own; an empty one follows the session default")
   return orientation(frB.how2plot.rot * frA.how2plot.rot.inv(), frA.stripSym(), frB.stripSym())
 
 
-# the rotation taking coordinates in `from` to coordinates in `to`
 def frameTransition(fromFr, toFr, rule=None, tolerance=1e-1):
+  """the rotation taking coordinates in `from` to coordinates in `to`"""
   if rule is None or rule == "byAxes":
     return align(fromFr, toFr, tolerance)
   if rule == "byScreenAlignment":
@@ -47,8 +47,8 @@ def frameTransition(fromFr, toFr, rule=None, tolerance=1e-1):
   raise ValueError("the frame transition rule is 'byAxes', 'byScreenAlignment' or an orientation")
 
 
-# a direction restated in another frame, keeping its meaning
 def transformVector(v, to, rule=None, tolerance=1e-1):
+  """a direction restated in another frame, keeping its meaning"""
   if v.frame is to:
     return v
   t = frameTransition(v.frame, to, rule, tolerance)
@@ -59,10 +59,10 @@ def transformVector(v, to, rule=None, tolerance=1e-1):
   return out
 
 
-# an orientation restated with another crystal frame: o' = o R^-1 for the transition R from
-# the old crystal frame to the new one, so that o'(x_new) = o(x_old); both sides of a
-# misorientation when two frames are given
 def transformOrientation(o, to, toB=None, rule=None, tolerance=1e-1):
+  """an orientation restated with another crystal frame: o' = o R^-1 for the transition R from
+  the old crystal frame to the new one, so that o'(x_new) = o(x_old); both sides of a
+  misorientation when two frames are given"""
   if toB is not None:
     return transformOrientation(transformOrientation(o, to, rule=rule, tolerance=tolerance).inv(), toB, rule=rule, tolerance=tolerance).inv()
   if o.frameA is to:

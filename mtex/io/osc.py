@@ -38,9 +38,9 @@ def _u32(b, o):
   return int(np.frombuffer(b, dtype="<u4", count=1, offset=o)[0])
 
 
-# a phase record at offset o, or None where the bytes are not one: a name that is a name,
-# a code and a cell of positive lengths and angles each smaller than the sum of the other two
 def oscPhaseAt(b, o):
+  """a phase record at offset o, or None where the bytes are not one: a name that is a name,
+  a code and a cell of positive lengths and angles each smaller than the sum of the other two"""
   if o + OSC_PHASE_LENGTH > len(b) or o < 0:
     return None
   field = b[o:o + OSC_PHASE_NAME]
@@ -63,13 +63,13 @@ def oscPhaseAt(b, o):
     return None
 
 
-# the phases the header block describes
-#
-# The block is scanned for the places a symmetry code can sit, each tried as the code of a
-# record beginning 256 bytes before it; after a hit the scan steps past the record's fixed
-# part, without which a record matches again a few bytes along where its name begins with
-# blanks. What keeps a code from being found in the bytes of a reflection is oscPhaseAt.
 def oscPhases(b, first, last):
+  """the phases the header block describes
+
+  The block is scanned for the places a symmetry code can sit, each tried as the code of a
+  record beginning 256 bytes before it; after a hit the scan steps past the record's fixed
+  part, without which a record matches again a few bytes along where its name begins with
+  blanks. What keeps a code from being found in the bytes of a reflection is oscPhaseAt."""
   frames = []
   codes = sorted(TSL_LAUE)
   hits = []
@@ -90,10 +90,10 @@ def oscPhases(b, first, last):
   return phaseList(frames)
 
 
-# where the block of measurements begins, and the two step sizes it was measured on: a
-# length word may or may not sit between the closing marker and the data, and it is one
-# when it counts the floats that follow
 def oscDataStart(b, close, n):
+  """where the block of measurements begins, and the two step sizes it was measured on: a
+  length word may or may not sit between the closing marker and the data, and it is one
+  when it counts the floats that follow"""
   o = close + 8
   words = _u32(b, o)
   if round((words / 4 - 2) / 10 / n) == 1:
@@ -107,9 +107,9 @@ def oscDataStart(b, close, n):
   return o + 8, xstep, ystep
 
 
-# how many columns a record holds: nowhere in the file, so read off the map, the second pixel
-# of the first row sitting one step along x and none along y
 def oscColumnCount(b, start, xstep):
+  """how many columns a record holds: nowhere in the file, so read off the map, the second pixel
+  of the first row sitting one step along x and none along y"""
   for m in range(5, 31):
     x, y = _f32(b, start + 4 * (m + 3)), _f32(b, start + 4 * (m + 4))
     if abs(x - xstep) < 1e-4 and abs(y) < 1e-6:
@@ -117,8 +117,8 @@ def oscColumnCount(b, start, xstep):
   raise ValueError("no column count between 5 and 30 puts the second pixel one step along x")
 
 
-# what MATLAB reads out of the fixed places of the header
 def oscHeader(b, nx, ny, n, xstep, ystep):
+  """what MATLAB reads out of the fixed places of the header"""
   def chars(pos):
     stop = b.find(b"\x00", pos)
     return b[pos:stop if stop >= 0 else pos].decode("ascii", errors="replace").strip()

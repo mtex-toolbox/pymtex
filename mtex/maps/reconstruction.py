@@ -20,6 +20,7 @@
 # nothing.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from types import SimpleNamespace
 
 import numpy as np
@@ -40,9 +41,9 @@ def _ori(q, frameA, frameB):
   return orientation._fromRotation(np.asarray(q, dtype=float).reshape(-1, 4), (frameA, frameB))
 
 
-# the probability that a misfit of that angle still means one parent: the cumulative
-# Gaussian around the threshold over the width of the tolerance
 def probabilityOf(fit, threshold, tolerance):
+  """the probability that a misfit of that angle still means one parent: the cumulative
+  Gaussian around the threshold over the width of the tolerance"""
   return 1 - 0.5 * (1 + erf(2 * (np.asarray(fit, dtype=float) - threshold) / tolerance))
 
 
@@ -91,13 +92,13 @@ class voteTable:
     return f"voteTable ({len(self)} grains)\n  parentId: {self.parentId.shape}\n  {self.kind}: {self.value.shape}"
 
 
-# the votes of many (grain, variant, fit) rows turned into a table of n grains: each row is a
-# vote with its numFit best variants, the best first. The fits become probabilities, summed
-# per grain and variant and scaled by a high quantile of them and by the share of the grain;
-# with bestFit the best fit per variant is kept, with count the number of fits below the
-# threshold
 def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf,
                weights=None, bestFit=False, count=False):
+  """the votes of many (grain, variant, fit) rows turned into a table of n grains: each row is a
+  vote with its numFit best variants, the best first. The fits become probabilities, summed
+  per grain and variant and scaled by a high quantile of them and by the share of the grain;
+  with bestFit the best fit per variant is kept, with count the number of fits below the
+  threshold"""
   fit = np.asarray(fit, dtype=float).reshape(-1, numFit)
   grainInd = np.asarray(grainInd, dtype=np.int64).reshape(-1, numFit)
   parentId = np.asarray(parentId, dtype=np.int64).reshape(-1, numFit)
@@ -318,9 +319,9 @@ class parentGrainReconstructor:
   def childPhaseId(self):
     return self.grains.CSList.phaseId(self.csChild)
 
-  # the order the variants are numbered in, kept across a refit of the relationship
   @property
   def variantMap(self):
+    """the order the variants are numbered in, kept across a refit of the relationship"""
     n = self.p2c.variants().size
     return np.arange(1, n + 1) if self._variantMap is None or len(self._variantMap) != n else self._variantMap
 
@@ -339,9 +340,9 @@ class parentGrainReconstructor:
     out[ok] = back[vId[ok].astype(np.int64)]
     return out
 
-  # the child to child misorientations of the relationship, the identity included
   @property
   def c2c(self):
+    """the child to child misorientations of the relationship, the identity included"""
     V = self.p2c.variants().data.reshape(-1, 4)
     return _ori(qmul(self.p2c.data.reshape(1, 4), _conj(V)), self.csChild, self.csChild)
 
@@ -406,9 +407,9 @@ class parentGrainReconstructor:
   def bainId(self):
     return self._priorProp("bainId")
 
-  # the parent variant every transformed prior grain was reconstructed with
   @property
   def parentId(self):
+    """the parent variant every transformed prior grain was reconstructed with"""
     out = np.full(self.grainsPrior.size, np.nan)
     tr = np.flatnonzero(self.isTransformed)
     if len(tr):
@@ -977,6 +978,11 @@ class parentGrainReconstructor:
         qs = ", ".join(f"{_xnum(_quantile(val * scale, q))}{unit}" for q in (0.8, 0.6, 0.4, 0.2))
         lines += ["", f" votes: {len(val)} × 1", f"   {name}: {qs} (quintiles)"]
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .variantgraph import (calcGraph, clusterGraph, calcParentFromGraph, mergeByGraph, plotGraph, calcVariantGraph,
+                               clusterVariantGraph)
 
 
 __all__ = ["parentGrainReconstructor", "voteTable", "majorityVote"]

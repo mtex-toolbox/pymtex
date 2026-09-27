@@ -33,9 +33,9 @@ class variationalFilter(EBSDFilter):
   pass
 
 
-# the smoothing spline: the field of least |u - f|^2 + alpha |L u|^2, with L the Laplacian
-# of the neighbour graph; one linear system, no iteration
 class splineFilter(variationalFilter):
+  """the smoothing spline: the field of least |u - f|^2 + alpha |L u|^2, with L the Laplacian
+  of the neighbour graph; one linear system, no iteration"""
 
   def __init__(self, smoothingLength=None, alpha=None):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
@@ -45,12 +45,12 @@ class splineFilter(variationalFilter):
     return [("smoothing length", self.smoothingLength), ("alpha", self.alpha)]
 
 
-# the filter of Bergmann, Chan, Hielscher, Persch and Steidl: the data term and the
-# regularisation each quadratic or an absolute value, and an absolute value keeps a step
-# where a square blurs it. eps is the difference at which the penalty turns from a square
-# into a line, threshold the one above which two neighbours are not smoothed together at
-# all, a subgrain boundary the filter is to leave alone
 class halfQuadraticFilter(variationalFilter):
+  """the filter of Bergmann, Chan, Hielscher, Persch and Steidl: the data term and the
+  regularisation each quadratic or an absolute value, and an absolute value keeps a step
+  where a square blurs it. eps is the difference at which the penalty turns from a square
+  into a line, threshold the one above which two neighbours are not smoothed together at
+  all, a subgrain boundary the filter is to leave alone"""
 
   def __init__(self, smoothingLength=None, alpha=None, l1DataFit=True, l1TV=True, threshold=15 * degree, eps=1e-3, iterMax=100,
                tol=0.001 * degree):
@@ -64,17 +64,17 @@ class halfQuadraticFilter(variationalFilter):
             ("data term", "l1" if self.l1DataFit else "l2"), ("TV term", "l1" if self.l1TV else "l2")]
 
 
-# the same filter with both norms absolute, the default of the maps layer
 class l1TVFilter(halfQuadraticFilter):
+  """the same filter with both norms absolute, the default of the maps layer"""
 
   def __init__(self, smoothingLength=None, alpha=None, threshold=15 * degree, eps=1e-3, iterMax=100, tol=0.001 * degree):
     super().__init__(smoothingLength, alpha, True, True, threshold, eps, iterMax, tol)
 
 
-# the field split into two, u = u1 + u2, one penalised in its differences and one in its
-# Laplacian, which keeps both a step and a slope: the infimal convolution of first and
-# second order total variation
 class infimalConvolutionFilter(variationalFilter):
+  """the field split into two, u = u1 + u2, one penalised in its differences and one in its
+  Laplacian, which keeps both a step and a slope: the infimal convolution of first and
+  second order total variation"""
 
   def __init__(self, smoothingLength=None, alpha=None, beta=None, threshold=15 * degree, eps=1e-3, iterMax=20, tol=0.001 * degree):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
@@ -89,19 +89,19 @@ class infimalConvolutionFilter(variationalFilter):
 
 # ------------------------------------------------------------------ the weight of a length
 
-# the eigenvalue of the graph Laplacian at a plane wave of wavelength Lambda along the first
-# lattice direction, sum over the offsets of 1 - cos(2 pi a1 . A o / Lambda); nothing
-# shorter than two steps is sampled at all
 def graphEigenvalue(l, Lambda):
+  """the eigenvalue of the graph Laplacian at a plane wave of wavelength Lambda along the first
+  lattice direction, sum over the offsets of 1 - cos(2 pi a1 . A o / Lambda); nothing
+  shorter than two steps is sampled at all"""
   A = np.asarray(l.A, dtype=float)
   a1 = A[:, 0] / np.linalg.norm(A[:, 0])
   lam = max(float(Lambda), 2 * np.linalg.norm(A[:, 0]))
   return float(sum(1 - np.cos(2 * np.pi * (a1 @ (A @ np.asarray(o, dtype=float))) / lam) for o in l.stencil))
 
 
-# the weight of one filter on one lattice: what it was given, or what its smoothing length
-# comes to, the gain 1 / (1 + alpha lambda^p) being one half at alpha = lambda^-p
 def regularization(F, l, order, smoothingLength=None, alpha=None):
+  """the weight of one filter on one lattice: what it was given, or what its smoothing length
+  comes to, the gain 1 / (1 + alpha lambda^p) being one half at alpha = lambda^-p"""
   alpha = F.alpha if alpha is None else alpha
   if alpha is not None:
     return float(alpha)
@@ -113,9 +113,9 @@ def regularization(F, l, order, smoothingLength=None, alpha=None):
 
 # ------------------------------------------------------------------ the solver
 
-# the graph in the form the solver reads: the edges at every pixel in CSR form, with the
-# neighbour and the edge, both directions of every edge
 class graphCSR:
+  """the graph in the form the solver reads: the edges at every pixel in CSR form, with the
+  neighbour and the edge, both directions of every edge"""
 
   def __init__(self, edges, n):
     a, b = edges[:, 0], edges[:, 1]
@@ -127,8 +127,8 @@ class graphCSR:
     self.ptr = np.concatenate([[0], np.cumsum(np.bincount(frm, minlength=n))]).astype(np.int64)
     self.adj, self.eid = to[order].astype(np.int64), eid[order].astype(np.int64)
 
-  # the difference along the edges and the Laplacian, as sparse matrices
   def difference(self):
+    """the difference along the edges and the Laplacian, as sparse matrices"""
     from scipy.sparse import csr_matrix
     ne = len(self.edges)
     rows = np.repeat(np.arange(ne), 2)
@@ -140,15 +140,15 @@ class graphCSR:
     return (D.T @ D).tocsr()
 
 
-# iteratively reweighted least squares for the model over the whole graph: an absolute
-# value is minimised through the quadratic that touches it, and the surrogate is solved
-# exactly at every step, which is what half quadratic minimisation is. The weight is
-# eps / sqrt(t^2 + eps^2), one at a difference of zero and eps / |t| above, Huber's
-# penalty, so one alpha means one thing whichever of the two penalties is absolute. Where
-# the field is pinned the measured pixels are not unknowns at all; where it is not they
-# carry the data term; a pixel with no measurement is free and has none. The surrogate is
-# solved by the conjugate gradient kernel over the graph, or by SuperLU without numba
 def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, iterMax, tol, isData, pin, comp):
+  """iteratively reweighted least squares for the model over the whole graph: an absolute
+  value is minimised through the quadratic that touches it, and the surrogate is solved
+  exactly at every step, which is what half quadratic minimisation is. The weight is
+  eps / sqrt(t^2 + eps^2), one at a difference of zero and eps / |t| above, Huber's
+  penalty, so one alpha means one thing whichever of the two penalties is absolute. Where
+  the field is pinned the measured pixels are not unknowns at all; where it is not they
+  carry the data term; a pixel with no measurement is free and has none. The surrogate is
+  solved by the conjugate gradient kernel over the graph, or by SuperLU without numba"""
   n = G.n
   x = f.astype(float).copy()
   # a component stops on its own once nothing in it moves by more than tol, as it would
@@ -252,10 +252,10 @@ def _solveDirect(K, wd, wr, alpha, b, f, x, free, G):
   return y
 
 
-# the field over the whole graph under one filter: the edges of the map, the values f
-# (n, d), which pixels carry a measurement, whether they are pinned, and the component of
-# every pixel, zero for none
 def solveField(F, l, edges, f, isData, pin, comp):
+  """the field over the whole graph under one filter: the edges of the map, the values f
+  (n, d), which pixels carry a measurement, whether they are pinned, and the component of
+  every pixel, zero for none"""
   G = graphCSR(np.asarray(edges, dtype=np.int64).reshape(-1, 2), len(f))
   if isinstance(F, splineFilter):
     return irls(G, f, regularization(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, pin, comp)

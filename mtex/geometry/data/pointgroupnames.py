@@ -36,9 +36,9 @@ SPACE_GROUPS = [(1, "1"), (2, "-1"), (5, "2"), (9, "m"), (15, "2/m"), (24, "222"
   (199, "23"), (206, "m-3"), (214, "432"), (220, "-43m"), (230, "m-3m")]
 
 
-# the symbol a name stands for, findsymmetry: an exact name, then a space group symbol, then
-# a name contained in the string, later entries first
 def findPointGroup(name):
+  """the symbol a name stands for, findsymmetry: an exact name, then a space group symbol, then
+  a name contained in the string, later entries first"""
   name = str(name)
   for row in reversed(POINT_GROUP_NAMES):
     if name in row:
@@ -59,16 +59,16 @@ def isPointGroupName(name):
   return any(str(name) in row for row in POINT_GROUP_NAMES)
 
 
-# MTEX's numeric id of a symbol, 0 for an unnamed group
 def pointGroupId(symbol):
+  """MTEX's numeric id of a symbol, 0 for an unnamed group"""
   for k, row in enumerate(POINT_GROUP_NAMES):
     if row[0] == symbol:
       return k + 1
   return 0
 
 
-# a Hermann-Mauguin space group symbol reduced to its point group, hms2point
 def hm2point(s):
+  """a Hermann-Mauguin space group symbol reduced to its point group, hms2point"""
   s = str(s)
   if not s or s[0] not in "ABCFIPR":
     raise ValueError(f"'{s}' is not a space group symbol")
@@ -85,8 +85,8 @@ def hm2point(s):
   return s if s else "1"
 
 
-# '2', 'm', '2/m' with lattice angles: the unique axis is the one whose angle is not 90 degree
 def monoclinicSetting(name, abg):
+  """'2', 'm', '2/m' with lattice angles: the unique axis is the one whose angle is not 90 degree"""
   name = str(name)
   if name not in ("2", "m", "2/m"):
     return name

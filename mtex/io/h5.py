@@ -50,8 +50,8 @@ def hdf5Configs():
 
 # ------------------------------------------------------------------ the resolver
 
-# where an entry is searched: the key of its block, the data set, and the group holding it
 class H5Scope:
+  """where an entry is searched: the key of its block, the data set, and the group holding it"""
   def __init__(self, root, set=None, free=None):
     self.root, self.set, self.free = root, root if set is None else set, root if free is None else free
 
@@ -60,9 +60,9 @@ def relativeTo(path, scope):
   return path if scope == "/" else (path[len(scope):] if path.startswith(scope) else path)
 
 
-# the paths of a file that an entry matches, in the order the file lists them, matched case
-# insensitively as MTEX's regexpi does: Bruker writes `X SAMPLE` where the config says `X Sample`
 def h5Resolve(paths, entry, scope):
+  """the paths of a file that an entry matches, in the order the file lists them, matched case
+  insensitively as MTEX's regexpi does: Bruker writes `X SAMPLE` where the config says `X Sample`"""
   if not isinstance(entry, dict) or "value" not in entry:
     return []
   value = str(entry["value"])
@@ -80,8 +80,8 @@ def h5One(paths, entry, scope):
   return m[0] if m else None
 
 
-# a data set as the plain array, string or scalar it holds
 def h5Read(f, path):
+  """a data set as the plain array, string or scalar it holds"""
   d = f[path]
   if not hasattr(d, "shape"):
     return None
@@ -104,8 +104,8 @@ def _text(x):
   return str(x).strip()
 
 
-# the value of an entry: what the file holds at the path it names, or the constant it states
 def h5Value(f, paths, entry, scope):
+  """the value of an entry: what the file holds at the path it names, or the constant it states"""
   if not isinstance(entry, dict):
     return None
   if "data" in entry:
@@ -114,8 +114,8 @@ def h5Value(f, paths, entry, scope):
   return None if p is None else h5Read(f, p)
 
 
-# every group and data set of a file, depth first, and which of them are groups
 def h5Paths(f):
+  """every group and data set of a file, depth first, and which of them are groups"""
   paths, groups = [], set()
   def visit(name, obj):
     p = "/" + name
@@ -126,9 +126,9 @@ def h5Paths(f):
   return paths, groups
 
 
-# the vendor whose config claims the file: by the manufacturer key it states, or by the
-# extension where a config names one instead
 def h5Vendor(f, paths, fname):
+  """the vendor whose config claims the file: by the manufacturer key it states, or by the
+  extension where a config names one instead"""
   ext = os.path.splitext(fname)[1].lower()
   for name, conf in hdf5Configs().items():
     settings = conf["settings"]
@@ -142,9 +142,9 @@ def h5Vendor(f, paths, fname):
   return None
 
 
-# the data sets a file offers, in the preference order the config's alternatives state; a
-# match lying under another match is part of that one, so only the outermost are data sets
 def h5DataSets(paths, conf):
+  """the data sets a file offers, in the preference order the config's alternatives state; a
+  match lying under another match is part of that one, so only the outermost are data sets"""
   key = conf["ebsd"]["key"]
   out = []
   for alt in str(key["value"]).split("|"):
@@ -157,9 +157,9 @@ def h5DataSets(paths, conf):
 
 # ------------------------------------------------------------------ the phases
 
-# whether angles are written in degrees or in radians, which the vendors do not agree on and
-# no config states: a lattice angle above a full turn is degrees, as MTEX decides it too
 def angleScale(angles):
+  """whether angles are written in degrees or in radians, which the vendors do not agree on and
+  no config states: a lattice angle above a full turn is degrees, as MTEX decides it too"""
   return degree if np.any(np.asarray(angles, dtype=float) > 2 * np.pi) else 1.0
 
 
@@ -187,9 +187,9 @@ def h5LatticeValues(f, paths, entry, scope):
   return None if v is None else _floats(v)
 
 
-# the cell a config's lattice block names, whatever of the three shapes a vendor writes it in:
-# six named scalars, a triple of lengths beside a triple of angles, or one row of six
 def h5LatticeCell(f, paths, lat, scope):
+  """the cell a config's lattice block names, whatever of the three shapes a vendor writes it in:
+  six named scalars, a triple of lengths beside a triple of angles, or one row of six"""
   if not isinstance(lat, dict):
     return None
   if lat.get("type", "") == "all_together":
@@ -202,8 +202,8 @@ def h5LatticeCell(f, paths, lat, scope):
   return dim[:3], ang[:3]
 
 
-# the data sets a lattice was read from, for the writer
 def h5LatticePaths(paths, entry, scope):
+  """the data sets a lattice was read from, for the writer"""
   if not isinstance(entry, dict):
     return []
   if entry.get("type", "") != "separate":
@@ -232,9 +232,9 @@ def spaceGroupNumber(v):
     return None
 
 
-# the point group of a phase: the space group number where the file states one, the EDAX
-# codes where it states those, and the triclinic group where it states neither
 def h5PointGroup(f, paths, entry, scope, idEntry=None):
+  """the point group of a phase: the space group number where the file states one, the EDAX
+  codes where it states those, and the triclinic group where it states neither"""
   if isinstance(entry, dict) and entry.get("type", "") == "EDAX":
     code = h5Value(f, paths, entry.get("laue_code"), scope)
     if code is None:
@@ -249,8 +249,8 @@ def h5PointGroup(f, paths, entry, scope, idEntry=None):
   return n if n is not None and 1 <= n <= 230 else None
 
 
-# the alignments a vendor states, "X||a*, Z||c" or EDAX's "a || x, c* || z", as crystalFrame takes them
 def alignmentList(s):
+  """the alignments a vendor states, "X||a*, Z||c" or EDAX's "a || x, c* || z", as crystalFrame takes them"""
   out = []
   for t in str(s).split(","):
     t = t.strip()
@@ -266,8 +266,8 @@ def alignmentList(s):
   return out
 
 
-# the crystal frames of the phase groups a config's cs block names, and where each was read
 def h5Phases(f, paths, groups, conf, scope):
+  """the crystal frames of the phase groups a config's cs block names, and where each was read"""
   frames = [notIndexedFrame()]
   prov = []
   cs = conf["ebsd"].get("cs")
@@ -306,9 +306,9 @@ def h5Phases(f, paths, groups, conf, scope):
 
 # ------------------------------------------------------------------ the orientations and the phase column
 
-# the three angles a data set of them holds, written as 3 x n, n x 3 or laid out on the map
-# as ny x nx x 3, and whether it holds them component by component
 def eulerColumns(v):
+  """the three angles a data set of them holds, written as 3 x n, n x 3 or laid out on the map
+  as ny x nx x 3, and whether it holds them component by component"""
   m = np.asarray(v)
   if m.ndim > 2:
     m = m.reshape(-1, m.shape[-1]) if m.shape[-1] == 3 else m.reshape(m.shape[0], -1)
@@ -321,15 +321,15 @@ def eulerColumns(v):
   raise ValueError(f"a data set of Euler angles has three columns or three rows, not the shape {m.shape}")
 
 
-# how a vendor numbers its phases: a negative marker says it counts from zero with 255 for
-# not indexed, which is -1 in the byte column it writes it in; else the rule of the text formats
 def h5PhaseShift(values, nPhases):
+  """how a vendor numbers its phases: a negative marker says it counts from zero with 255 for
+  not indexed, which is -1 in the byte column it writes it in; else the rule of the text formats"""
   v = np.asarray(values)
   return 1 if v.size and v.min() < 0 else phaseShift(v, nPhases)
 
 
-# the compound data set a config reads whole as ebsd_data, its columns by field name
 def h5Table(f, paths, ebsd, scope):
+  """the compound data set a config reads whole as ebsd_data, its columns by field name"""
   entry = ebsd.get("ebsd_data")
   if entry is None:
     return None, None
@@ -352,9 +352,9 @@ def h5Loaded(entry, table):
   return table.get(loadedField(entry))
 
 
-# the rotations a table of 3 x 3 matrices holds, written column by column, and which of
-# them are no orientation at all: EDAX writes a matrix of zeros where a pattern failed
 def matrixRotations(m):
+  """the rotations a table of 3 x 3 matrices holds, written column by column, and which of
+  them are no orientation at all: EDAX writes a matrix of zeros where a pattern failed"""
   M = np.asarray(m, dtype=float).reshape(-1, 3, 3).transpose(0, 2, 1)
   none = ~M.reshape(len(M), -1).any(axis=1)
   M = M.copy()
@@ -371,9 +371,9 @@ def _unitScale(entry, values):
   return degree if "deg" in str(stated).lower() else 1.0
 
 
-# the surface the map was acquired on, where the config names it: three Euler angles from
-# that surface to the sample primary frame, CS1 to CS0, in degree
 def h5Surface(f, paths, conf, scope):
+  """the surface the map was acquired on, where the config names it: three Euler angles from
+  that surface to the sample primary frame, CS1 to CS0, in degree"""
   entry = conf["ebsd"].get("acquisition_surface")
   if not isinstance(entry, dict):
     return None
@@ -387,9 +387,9 @@ def h5Surface(f, paths, conf, scope):
   return tuple(float(x) for x in a * scale / degree)
 
 
-# the rotation the config says the map is turned by against its Euler angles: a constant,
-# the scan rotation the file writes, or a row of a table its own id picks
 def h5MapCorrection(f, paths, conf, scope):
+  """the rotation the config says the map is turned by against its Euler angles: a constant,
+  the scan rotation the file writes, or a row of a table its own id picks"""
   entry = conf["ebsd"].get("map_correction")
   if not isinstance(entry, dict):
     return rotation.id
@@ -429,8 +429,8 @@ def h5MapCorrection(f, paths, conf, scope):
 
 # ------------------------------------------------------------------ the header
 
-# the header group of a data set, read whole as nested dicts: every vendor calls it Header
 def h5Header(f, paths, groups, scope):
+  """the header group of a data set, read whole as nested dicts: every vendor calls it Header"""
   root = next((p for p in paths if p.startswith(scope.set + "/") and relativeTo(p, scope.set + "/").lower() == "header"), None)
   return {} if root is None else h5ReadGroup(f, [p for p in paths if p.startswith(root + "/")], groups, root)
 
@@ -458,10 +458,10 @@ IMAGE_MIN = 16              # pixels on a side, below which an array is no pictu
 IMAGE_CELLS = (("x cells", "y cells"), ("xcells", "ycells"), ("ncols", "nrows"), ("width", "height"))
 
 
-# the pictures a file holds, as an index and not as pixels: a vendor writes its electron
-# images beside the map, and one Oxford file carries a dozen of three megapixels each, so
-# what the map keeps is where they are and what shape they have. h5Image reads one.
 def h5ImageIndex(f, paths, groups, n=0):
+  """the pictures a file holds, as an index and not as pixels: a vendor writes its electron
+  images beside the map, and one Oxford file carries a dozen of three megapixels each, so
+  what the map keeps is where they are and what shape they have. h5Image reads one."""
   out = []
   for p in paths:
     if p in groups:

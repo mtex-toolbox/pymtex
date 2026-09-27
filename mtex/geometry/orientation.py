@@ -15,6 +15,7 @@
 # Products, symmetrisation and distances are the business of G5.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
@@ -108,10 +109,10 @@ class orientation(rotation):
     convention = args[0] if args else None
     return cls._fromRotation(euler2quat(a, b, c, convention), frames, antipodal)
 
-  # orientation.load(fname, cs, columnNames=['phi1', 'Phi', 'phi2']): the orientations of a
-  # text table; loadOrientation returns the other columns too
   @classmethod
   def load(cls, fname, *args, **kwargs):
+    """orientation.load(fname, cs, columnNames=['phi1', 'Phi', 'phi2']): the orientations of a
+    text table; loadOrientation returns the other columns too"""
     from ..io.orientations import loadOrientation
     return loadOrientation(fname, *args, **kwargs)[0]
 
@@ -138,10 +139,10 @@ class orientation(rotation):
   def byHomochoric(cls, v, *frames, antipodal=False):
     return cls._fromRotation(homochoric2quat(_xyz(v)), _splitFrames(frames)[1], antipodal)
 
-  # the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2; the frames
-  # of framed inputs are adopted, CS from u1 and SS from v1
   @classmethod
   def map(cls, u1, v1, *args, antipodal=False):
+    """the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2; the frames
+    of framed inputs are adopted, CS from u1 and SS from v1"""
     args, frames = _splitFrames(args)
     if not frames:
       frames = [f for f in (_frameOf(u1), _frameOf(v1)) if f is not None]
@@ -166,9 +167,9 @@ class orientation(rotation):
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.broadcast_to([1.0, 0.0, 0.0, 0.0], shape + (4,)).copy(), frames)
 
-  # orientation.eye(cs): MATLAB's other name of the identity
   @classmethod
   def eye(cls, *args):
+    """orientation.eye(cs): MATLAB's other name of the identity"""
     return cls.id(*args)
 
   @classmethod
@@ -176,26 +177,6 @@ class orientation(rotation):
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.full(shape + (4,), np.nan), frames)
-
-  # the standard orientations, by their Euler angles
-  cube = classmethod(lambda cls, *f: cls.byEuler(0, 0, 0, *f))
-  cubeND22 = classmethod(lambda cls, *f: cls.byEuler(22 * degree, 0, 0, *f))
-  cubeND45 = classmethod(lambda cls, *f: cls.byEuler(45 * degree, 0, 0, *f))
-  cubeRD = classmethod(lambda cls, *f: cls.byEuler(0, 22 * degree, 0, *f))
-  goss = classmethod(lambda cls, *f: cls.byEuler(0, 45 * degree, 0, *f))
-  invGoss = classmethod(lambda cls, *f: cls.byEuler(90 * degree, 45 * degree, 0, *f))
-  brass = classmethod(lambda cls, *f: cls.byEuler(35 * degree, 45 * degree, 0, *f))
-  brass2 = classmethod(lambda cls, *f: cls.byEuler(325 * degree, 45 * degree, 0, *f))
-  SR = classmethod(lambda cls, *f: cls.byEuler(53 * degree, 35 * degree, 63 * degree, *f))
-  SR2 = classmethod(lambda cls, *f: cls.byEuler(233 * degree, 35 * degree, 63 * degree, *f))
-  SR3 = classmethod(lambda cls, *f: cls.byEuler(307 * degree, 35 * degree, 27 * degree, *f))
-  SR4 = classmethod(lambda cls, *f: cls.byEuler(127 * degree, 35 * degree, 27 * degree, *f))
-  PLage = classmethod(lambda cls, *f: cls.byEuler(65 * degree, 45 * degree, 0, *f))
-  PLage2 = classmethod(lambda cls, *f: cls.byEuler(245 * degree, 45 * degree, 0, *f))
-  QLage = classmethod(lambda cls, *f: cls.byEuler(65 * degree, 20 * degree, 0, *f))
-  QLage2 = classmethod(lambda cls, *f: cls.byEuler(245 * degree, 20 * degree, 0, *f))
-  QLage3 = classmethod(lambda cls, *f: cls.byEuler(115 * degree, 160 * degree, 0, *f))
-  QLage4 = classmethod(lambda cls, *f: cls.byEuler(295 * degree, 160 * degree, 0, *f))
 
   # ------------------------------------------------------------------ the frames
 
@@ -231,8 +212,8 @@ class orientation(rotation):
       return other
     raise TypeError(f"expected an orientation, got {type(other).__name__}")
 
-  # the inverse maps the other way: the frames swap
   def inv(self):
+    """the inverse maps the other way: the frames swap"""
     return self._new(self.conj().data, frameA=self.frameB, frameB=self.frameA)
 
   # a plain rotation of the coefficients, the frames kept; products between frames are the
@@ -250,13 +231,13 @@ class orientation(rotation):
 
   # ------------------------------------------------------------------ symmetry-aware operations
 
-  # the symmetric equivalents l * o * r, shaped (numL * numR,) + shape
   def symmetrise(self, unique=False):
+    """the symmetric equivalents l * o * r, shaped (numL * numR,) + shape"""
     from .symmetryops import symmetriseOrientation
     return symmetriseOrientation(self, unique=unique)
 
-  # the reduced dot product and the disorientation angle, over the groups of both frames
   def dot(self, other, noSymmetry=False, noAntipodal=False):
+    """the reduced dot product and the disorientation angle, over the groups of both frames"""
     from .symmetryops import orientationDot
     if noSymmetry or not isinstance(other, orientation):
       return rotation.dot(self, other, noAntipodal=noAntipodal)
@@ -277,9 +258,9 @@ class orientation(rotation):
       return rotation.angle(self, other)
     return orientationAngle(self, other)
 
-  # the rotational axis, of the representative in the fundamental region; with a second
-  # orientation the axis of their disorientation in the specimen frame
   def axis(self, other=None, noSymmetry=False, antipodal=None):
+    """the rotational axis, of the representative in the fundamental region; with a second
+    orientation the axis of their disorientation in the specimen frame"""
     from .symmetryops import orientationAxis, pairAxis
     # axis(mori, 'max'): the axis of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
@@ -323,9 +304,9 @@ class orientation(rotation):
     o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
     return project2FundamentalRegionOrientation(o, ref)
 
-  # the tangent vector at the reference pointing to this orientation, the pair reduced by
-  # symmetry first so that its norm is angle(ori, ref)
   def log(self, ref=None, side="left", noSymmetry=False):
+    """the tangent vector at the reference pointing to this orientation, the pair reduced by
+    symmetry first so that its norm is angle(ori, ref)"""
     from .tangent import logOrientation
     return logOrientation(self, ref, side, noSymmetry)
 
@@ -333,13 +314,13 @@ class orientation(rotation):
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self)
 
-  # the Bunge Euler angles of the representative inside the Euler plotting box
   def project2EulerFR(self):
+    """the Bunge Euler angles of the representative inside the Euler plotting box"""
     from .orientationregion import project2EulerFR
     return project2EulerFR(self)
 
-  # the same orientation with another crystal frame, both frames of a misorientation
   def transformReferenceFrame(self, to, toB=None, rule=None, tolerance=1e-1):
+    """the same orientation with another crystal frame, both frames of a misorientation"""
     from .frametransform import transformOrientation
     if isinstance(toB, str) or hasattr(toB, "frameA"):
       rule, toB = toB, None
@@ -353,9 +334,9 @@ class orientation(rotation):
     from .standardorientations import variants
     return variants(self, second, ids, parent)
 
-  # the distinct relationships c p2c over the child group c: a child times them is every
-  # parent it can come from, MATLAB's parents
   def parents(self):
+    """the distinct relationships c p2c over the child group c: a child times them is every
+    parent it can come from, MATLAB's parents"""
     from .standardorientations import variants
     return variants(self, parent=True)
 
@@ -375,14 +356,6 @@ class orientation(rotation):
   def byScreenAlignment(cls, frA, frB):
     from .frametransform import byScreenAlignment
     return byScreenAlignment(frA, frB)
-
-  # the named components of rolling textures and the orientation relationships, orientation.brass(cs)
-  for _name in ("copper", "copper2", "cube", "cubeND22", "cubeND45", "cubeRD", "goss", "SR", "SR2", "SR3", "SR4", "brass", "brass2",
-                "PLage", "PLage2", "QLage", "QLage2", "QLage3", "QLage4", "invGoss",
-                "Bain", "KurdjumovSachs", "NishiyamaWassermann", "Pitsch", "GreningerTrojano", "Bagaryatsky", "Burgers",
-                "PitschSchrader", "Potter", "ShojiNishiyama"):
-    locals()[_name] = classmethod((lambda n: lambda cls, *f: getattr(__import__("mtex.geometry.standardorientations", fromlist=[n]), n)(*f))(_name))
-  del _name
 
   # ------------------------------------------------------------------ display
 
@@ -417,6 +390,83 @@ class orientation(rotation):
     elif 0 < self.size < 20:
       lines.append(self._eulerTable())
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from .standardorientations import (copper, copper2, Bain, KurdjumovSachs, NishiyamaWassermann, Pitsch,
+                                       GreningerTrojano, Bagaryatsky, Burgers, PitschSchrader, Potter, ShojiNishiyama)
+    from ..analysis.texture import calcTensor, calcLankford
+    from ..analysis.cluster import calcCluster
+    from ..plotting.sectionplot import plotSection
+    from ..plotting.polefigureplot import plotPDF, plotIPDF
+    from ..plotting.spaceplot import plot3d, scatterOrientations as scatter
+    copper = staticmethod(copper)
+    copper2 = staticmethod(copper2)
+    @staticmethod
+    def cube(cs, *ss) -> Any:
+      """the cube component, Bunge Euler angles (0°, 0°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def cubeND22(cs, *ss) -> Any:
+      """the cubeND22 component, Bunge Euler angles (22°, 0°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def cubeND45(cs, *ss) -> Any:
+      """the cubeND45 component, Bunge Euler angles (45°, 0°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def cubeRD(cs, *ss) -> Any:
+      """the cubeRD component, Bunge Euler angles (0°, 22°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def goss(cs, *ss) -> Any:
+      """the goss component, Bunge Euler angles (0°, 45°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def SR(cs, *ss) -> Any:
+      """the SR component, Bunge Euler angles (53°, 35°, 63°), in cs and the specimen frame"""
+    @staticmethod
+    def SR2(cs, *ss) -> Any:
+      """the SR2 component, Bunge Euler angles (233°, 35°, 63°), in cs and the specimen frame"""
+    @staticmethod
+    def SR3(cs, *ss) -> Any:
+      """the SR3 component, Bunge Euler angles (307°, 35°, 27°), in cs and the specimen frame"""
+    @staticmethod
+    def SR4(cs, *ss) -> Any:
+      """the SR4 component, Bunge Euler angles (127°, 35°, 27°), in cs and the specimen frame"""
+    @staticmethod
+    def brass(cs, *ss) -> Any:
+      """the brass component, Bunge Euler angles (35°, 45°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def brass2(cs, *ss) -> Any:
+      """the brass2 component, Bunge Euler angles (325°, 45°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def PLage(cs, *ss) -> Any:
+      """the PLage component, Bunge Euler angles (65°, 45°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def PLage2(cs, *ss) -> Any:
+      """the PLage2 component, Bunge Euler angles (245°, 45°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def QLage(cs, *ss) -> Any:
+      """the QLage component, Bunge Euler angles (65°, 20°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def QLage2(cs, *ss) -> Any:
+      """the QLage2 component, Bunge Euler angles (245°, 20°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def QLage3(cs, *ss) -> Any:
+      """the QLage3 component, Bunge Euler angles (115°, 160°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def QLage4(cs, *ss) -> Any:
+      """the QLage4 component, Bunge Euler angles (295°, 160°, 0°), in cs and the specimen frame"""
+    @staticmethod
+    def invGoss(cs, *ss) -> Any:
+      """the invGoss component, Bunge Euler angles (90°, 45°, 0°), in cs and the specimen frame"""
+    Bain = staticmethod(Bain)
+    KurdjumovSachs = staticmethod(KurdjumovSachs)
+    NishiyamaWassermann = staticmethod(NishiyamaWassermann)
+    Pitsch = staticmethod(Pitsch)
+    GreningerTrojano = staticmethod(GreningerTrojano)
+    Bagaryatsky = staticmethod(Bagaryatsky)
+    Burgers = staticmethod(Burgers)
+    PitschSchrader = staticmethod(PitschSchrader)
+    Potter = staticmethod(Potter)
+    ShojiNishiyama = staticmethod(ShojiNishiyama)
 
 
 # grain exchange needs the same frame handle on both sides (Julia ADR 0008)

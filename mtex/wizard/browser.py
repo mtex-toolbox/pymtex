@@ -22,11 +22,11 @@ STATUS_COLORS = {"idle": "#dbe9f6", "loading": "#fbe5b6", "loaded": "#d8efd3", "
 ROW_MARGIN = 3
 
 
-# a panel: a widget behind the grey frame the whole window is drawn in. It carries no
-# heading of its own - what each panel holds is said by what is in it, the file's own rows,
-# the columns of the phase table, the names of the data sets - and four headings over four
-# panels is a row of labels to read before the window can be.
 def framed(widget):
+  """a panel: a widget behind the grey frame the whole window is drawn in. It carries no
+  heading of its own - what each panel holds is said by what is in it, the file's own rows,
+  the columns of the phase table, the names of the data sets - and four headings over four
+  panels is a row of labels to read before the window can be."""
   box = QFrame()
   box.setFrameShape(QFrame.NoFrame)
   box.setStyleSheet(f"QFrame#panel {{ border: 1px solid {FRAME}; background: white; }}")
@@ -154,8 +154,8 @@ class EntriesModel(QAbstractListModel):
     self.endResetModel()
 
 
-# a row: an indent by its depth, a chevron for a folder, the name, the size in the small grey
 class EntryDelegate(QStyledItemDelegate):
+  """a row: an indent by its depth, a chevron for a folder, the name, the size in the small grey"""
 
   def __init__(self, small):
     super().__init__()
@@ -223,12 +223,12 @@ class FileList(QListView):
     else:
       cb.openEntry(self.st, row.path, self.worker)
 
-  # the double click read off the row under the cursor, not off Qt's doubleClicked: the first
-  # click of it has unfolded the folder, which resets the model, and Qt then no longer finds
-  # the row pressed and drops the signal. Unfolding adds rows below the folder only, so the
-  # row under the cursor is still the folder; the release that ends the double click is
-  # swallowed, since the rows under it are the new folder's
   def mouseDoubleClickEvent(self, event):
+    """the double click read off the row under the cursor, not off Qt's doubleClicked: the first
+    click of it has unfolded the folder, which resets the model, and Qt then no longer finds
+    the row pressed and drops the signal. Unfolding adds rows below the folder only, so the
+    row under the cursor is still the folder; the release that ends the double click is
+    swallowed, since the rows under it are the new folder's"""
     index = self.indexAt(event.position().toPoint())
     if event.button() == Qt.LeftButton and index.isValid():
       self.swallowRelease = True
@@ -237,8 +237,8 @@ class FileList(QListView):
       return
     super().mouseDoubleClickEvent(event)
 
-  # a platform that ends a double click without a release leaves nothing to swallow
   def mousePressEvent(self, event):
+    """a platform that ends a double click without a release leaves nothing to swallow"""
     self.swallowRelease = False
     super().mousePressEvent(event)
 
@@ -249,10 +249,10 @@ class FileList(QListView):
       return
     super().mouseReleaseEvent(event)
 
-  # a folder is walked into; a file is read unless it is the one selected already, which the
-  # first click of the double click has read - two quick clicks near one another come as a
-  # double click too, and the second must not be lost
   def onDoubleClick(self, index):
+    """a folder is walked into; a file is read unless it is the one selected already, which the
+    first click of the double click has read - two quick clicks near one another come as a
+    double click too, and the second must not be lost"""
     row = self.st.entries[index.row()]
     if row.isDir:
       cb.setFolder(self.st, row.path)
@@ -260,19 +260,19 @@ class FileList(QListView):
       self.setCurrentIndex(index)
       cb.openEntry(self.st, row.path, self.worker)
 
-  # the arrow keys describe the current row; Return opens it
   def currentChanged(self, current, previous):
+    """the arrow keys describe the current row; Return opens it"""
     super().currentChanged(current, previous)
     if current.isValid():
       row = self.st.entries[current.row()]
       if not row.isDir and self.st.selected != row.path:
         cb.selectEntry(self.st, row.path)
 
-  # Return walks into a folder and reads a map, as a double click does; Right unfolds a folder
-  # where it stands and on an open one steps to its first entry, Left folds it or steps to the
-  # folder a row was unfolded from; Backspace walks up, onto the folder it came out of; a
-  # letter goes to the first entry starting with it, the same letter again to the next
   def keyPressEvent(self, event):
+    """Return walks into a folder and reads a map, as a double click does; Right unfolds a folder
+    where it stands and on an open one steps to its first entry, Left folds it or steps to the
+    folder a row was unfolded from; Backspace walks up, onto the folder it came out of; a
+    letter goes to the first entry starting with it, the same letter again to the next"""
     key, index = event.key(), self.currentIndex()
     i = index.row() if index.isValid() else None
     row = self.st.entries[i] if i is not None else None
@@ -311,8 +311,8 @@ class FileList(QListView):
       return
     super().keyPressEvent(event)
 
-  # the current row, shown; the list is refilled on every fold, which forgets it
   def goTo(self, i):
+    """the current row, shown; the list is refilled on every fold, which forgets it"""
     if 0 <= i < self.model_.rowCount():
       index = self.model_.index(i, 0)
       self.setCurrentIndex(index)
@@ -407,14 +407,14 @@ class InfoTree(QTreeWidget):
     self.blockSignals(False)
     self.mark()
 
-  # a branch opened or shut stays so when the tree is filled again
   def remember(self, item, isOpen):
+    """a branch opened or shut stays so when the tree is filled again"""
     i = item.data(0, Qt.UserRole)
     if isinstance(i, int):
       (self.st.metaOpen.add if isOpen else self.st.metaOpen.discard)(i)
 
-  # the picture being looked at is the one selected in the tree
   def mark(self):
+    """the picture being looked at is the one selected in the tree"""
     for item in self.walk():
       i = item.data(0, Qt.UserRole)
       row = self.st.metaRows[i] if isinstance(i, int) and i < len(self.st.metaRows) else None
@@ -428,8 +428,8 @@ class InfoTree(QTreeWidget):
       yield child
       yield from self.walk(child)
 
-  # the rows of the file itself, name against value
   def fileRows(self):
+    """the rows of the file itself, name against value"""
     items = (self.topLevelItem(k) for k in range(self.topLevelItemCount()))
     return [(item.text(0), item.text(1)) for item in items if item.data(0, Qt.UserRole) == "file"]
 

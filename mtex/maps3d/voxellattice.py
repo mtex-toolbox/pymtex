@@ -25,30 +25,30 @@ class voxelLattice:
     self.D = np.asarray(D, dtype=float).reshape(3, 3)
     self.ijk = np.asarray(ijk, dtype=np.int64).reshape(-1, 3)
 
-  # the extent of the box of voxels the index spans
   @property
   def shape(self):
+    """the extent of the box of voxels the index spans"""
     return tuple(int(n) for n in self.ijk.max(axis=0) + 1) if len(self.ijk) else (0, 0, 0)
 
   @property
   def spacing(self):
     return np.linalg.norm(self.D, axis=1)
 
-  # the corners of the voxel about the origin
   @property
   def unitCell(self):
+    """the corners of the voxel about the origin"""
     return CORNERS @ self.D
 
   def subset(self, flat):
     return voxelLattice(self.origin, self.D, self.ijk[np.asarray(flat)])
 
-  # the positions of every voxel of the index, or of an array of indices
   def positions(self, ijk=None):
+    """the positions of every voxel of the index, or of an array of indices"""
     ijk = self.ijk if ijk is None else np.asarray(ijk)
     return self.origin + ijk @ self.D
 
-  # the real index of positions: integer on the voxel centres
   def index(self, P):
+    """the real index of positions: integer on the voxel centres"""
     return np.linalg.solve(self.D.T, (np.asarray(P, dtype=float).reshape(-1, 3) - self.origin).T).T
 
   @classmethod

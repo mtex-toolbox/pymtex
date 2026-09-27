@@ -99,9 +99,9 @@ class MtexArray:
   def flatten(self):
     return self.reshape(-1)
 
-  # the transpose of the leading axes; a single element and a list are their own
   @property
   def T(self):
+    """the transpose of the leading axes; a single element and a list are their own"""
     axes = tuple(range(self.ndim))[::-1] + (self.ndim,)
     return self._new(self.data.transpose(axes))
 
@@ -123,9 +123,9 @@ class MtexArray:
       attrs[name] = a
     return attrs
 
-  # the list of the operands, MATLAB's [a, b]; single elements are lists of one
   @classmethod
   def cat(cls, *arrays, axis=0):
+    """the list of the operands, MATLAB's [a, b]; single elements are lists of one"""
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
     first = arrays[0]
     attrs = first._join(first)

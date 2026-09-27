@@ -17,6 +17,7 @@
 # products name their class themselves.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import itertools
 import math
 
@@ -310,8 +311,8 @@ class tensor(MtexArray):
   def _contractedProduct(self, other):
     return colon(self, other)
 
-  # MATLAB's .*: the product of corresponding coefficients, the rank kept
   def times(self, other):
+    """MATLAB's .*: the product of corresponding coefficients, the rank kept"""
     if isinstance(other, tensor):
       self._sameFrame(other)
       if other.rank != self.rank:
@@ -351,8 +352,8 @@ class tensor(MtexArray):
       raise ValueError("the determinant is of a tensor of rank two")
     return np.linalg.det(self.M)
 
-  # the transpose swaps the indices of a rank two and the pairs of a rank four
   def transpose(self):
+    """the transpose swaps the indices of a rank two and the pairs of a rank four"""
     if self.rank == 2:
       return self._rebuild(_flatten(np.swapaxes(self.M, -1, -2), 2))
     if self.rank == 4:
@@ -367,8 +368,8 @@ class tensor(MtexArray):
 
   ctranspose = transpose
 
-  # the symmetric and the antisymmetric part, the mean over the permutations of the indices
   def sym(self):
+    """the symmetric and the antisymmetric part, the mean over the permutations of the indices"""
     if self.rank <= 1:
       return self
     M = self.M
@@ -384,9 +385,9 @@ class tensor(MtexArray):
       raise ValueError("the antisymmetric part is of a tensor of rank two")
     return self._rebuild(_flatten((self.M - np.swapaxes(self.M, -1, -2)) / 2, 2))
 
-  # the inverse: rank two by the matrix, rank four through the Voigt matrix, which swaps the
-  # convention and with it the class, a stiffness inverting to a compliance
   def inv(self):
+    """the inverse: rank two by the matrix, rank four through the Voigt matrix, which swaps the
+    convention and with it the class, a stiffness inverting to a compliance"""
     cls = self._inverseClass()
     if self.rank == 2:
       out = self._as(cls, _flatten(np.linalg.inv(self.M), 2))
@@ -403,9 +404,9 @@ class tensor(MtexArray):
   def _inverseClass(self):
     return type(self)
 
-  # the eigenvalues in ascending order and the eigenvectors as axes of the frame; a rank
-  # four tensor is diagonalised in its Voigt matrix
   def eig(self):
+    """the eigenvalues in ascending order and the eigenvectors as axes of the frame; a rank
+    four tensor is diagonalised in its Voigt matrix"""
     if self.rank == 2:
       M = self.M
       if self.isSymmetric:
@@ -449,11 +450,11 @@ class tensor(MtexArray):
     from scipy.linalg import sqrtm
     return self._matrixFunction(sqrtm)
 
-  # the singular value decomposition: of a rank two tensor the left singular vectors, the
-  # singular values from the largest and the right singular vectors, T v_k = s_k u_k; of a
-  # rank four one the rotation of the higher order SVD and the core, the tensor written in
-  # the basis of its mode singular vectors, and no V
   def svd(self):
+    """the singular value decomposition: of a rank two tensor the left singular vectors, the
+    singular values from the largest and the right singular vectors, T v_k = s_k u_k; of a
+    rank four one the rotation of the higher order SVD and the core, the tensor written in
+    the basis of its mode singular vectors, and no V"""
     if self.rank == 2:
       U, s, Vt = np.linalg.svd(self.M)
       u = vector3d(np.swapaxes(U, -1, -2), frame=self._frame)
@@ -466,9 +467,9 @@ class tensor(MtexArray):
       return rotation.byMatrix(U), self._rebuild(_applyMatrix(self.M, np.swapaxes(U, -1, -2), 4)), None
     raise ValueError("the singular value decomposition is of tensors of rank two or four")
 
-  # the polar decomposition T = R SR = SL R of a rank two tensor, R orthogonal, SL and SR
-  # symmetric
   def polar(self):
+    """the polar decomposition T = R SR = SL R of a rank two tensor, R orthogonal, SL and SR
+    symmetric"""
     if self.rank != 2:
       raise ValueError("the polar decomposition is of tensors of rank two")
     U, s, Vt = np.linalg.svd(self.M)
@@ -480,10 +481,10 @@ class tensor(MtexArray):
 
   # ------------------------------------------------------------------ the group action
 
-  # the tensor turned by a rotation, an orthogonal transform or an orientation; the frame
-  # keeps its group only under the group's own elements, and an orientation carries the
-  # tensor into its specimen frame, without the specimen group
   def rotate(self, r):
+    """the tensor turned by a rotation, an orthogonal transform or an orientation; the frame
+    keeps its group only under the group's own elements, and an orientation carries the
+    tensor into its specimen frame, without the specimen group"""
     if isinstance(r, orientation):
       t = fitFrame(self._frame, r.CS) if isinstance(self._frame, crystalFrame) else None
       q = r if t is None else rotation(r.data) * t
@@ -498,17 +499,17 @@ class tensor(MtexArray):
       raise TypeError("rotate takes a rotation, an orientation or a 3 x 3 matrix")
     return self._as(type(self), _applyMatrix(self.M, Q, self.rank), self._frame.stripSym())
 
-  # the same coefficients read in another frame, the numbers changed by the rigid part of
-  # the transition between the two bases
   def transformReferenceFrame(self, fr):
+    """the same coefficients read in another frame, the numbers changed by the rigid part of
+    the transition between the two bases"""
     ok, M = self._frame.isCompatible(fr)
     if not ok:
       raise ValueError("the two frames are not related by a rigid change of coordinates")
     U, _, Vt = np.linalg.svd(M)
     return self._as(type(self), _applyMatrix(self.M, U @ Vt, self.rank), fr)
 
-  # the mean over the group of the frame, and whether the tensor is invariant under it
   def symmetrise(self):
+    """the mean over the group of the frame, and whether the tensor is invariant under it"""
     Q = self._frame.rot.matrix()
     if len(Q) <= 1:
       return self
@@ -523,9 +524,9 @@ class tensor(MtexArray):
 
   # ------------------------------------------------------------------ magnitudes
 
-  # the tensor contracted with the unit direction on every index; without a direction the
-  # function on the sphere, a polynomial of the rank's degree
   def directionalMagnitude(self, v=None):
+    """the tensor contracted with the unit direction on every index; without a direction the
+    function on the sphere, a polynomial of the rank's degree"""
     if v is None:
       from ..functions.s2fun import S2FunHarmonic
       return S2FunHarmonic(lambda x: self.directionalMagnitude(x), self._frame, bandwidth=max(self.rank, 1), real=True,
@@ -545,8 +546,8 @@ class tensor(MtexArray):
 
   # ------------------------------------------------------------------ lists
 
-  # the mean over the list, weighted or not; with an ODF the texture average
   def mean(self, *args, weights=None, **kwargs):
+    """the mean over the list, weighted or not; with an ODF the texture average"""
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)
@@ -571,16 +572,16 @@ class tensor(MtexArray):
       t.density = float(d.mean() if weights is None else (np.asarray(weights, dtype=float).ravel() * d).sum() / np.sum(weights))
     return t
 
-  # the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)
   def sum(self, axis=None):
+    """the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)"""
     if axis is None:
       return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
     return self._as(type(self), self.data.sum(axis=axis % self.ndim))
 
-  # the list of tensors of different densities keeps one density per tensor, as MATLAB's
-  # [C1, C2] does, which is what a weighted mean averages
   @classmethod
   def cat(cls, *arrays, axis=0):
+    """the list of tensors of different densities keeps one density per tensor, as MATLAB's
+    [C1, C2] does, which is what a weighted mean averages"""
     dens = [a.density for a in arrays]
     if all(d is None for d in dens) or all(d is not None and np.array_equal(d, dens[0]) for d in dens):
       return super().cat(*arrays, axis=axis)
@@ -622,9 +623,9 @@ class tensor(MtexArray):
     rank = (cls._rank or 2) if rank is None else int(rank)
     return cls(np.zeros(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
 
-  # a random tensor with the symmetries its class and frame ask for
   @classmethod
   def rand(cls, *args, rank=None, rng=None, **kwargs):
+    """a random tensor with the symmetries its class and frame ask for"""
     rng = np.random.default_rng() if rng is None else rng
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
@@ -640,6 +641,12 @@ class tensor(MtexArray):
   def leviCivita(cls):
     i, j, k = np.indices((3, 3, 3))
     return tensor(((i - j) * (j - k) * (k - i) / 2).astype(float), rank=3)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..io.loadtensor import _load
+    from ..plotting.sphericalplot import plot
+    load = classmethod(_load)
 
 
 # a function of one square matrix over the matrices of a stack, a result real up to
@@ -763,8 +770,8 @@ def _letter(l):
   return LETTERS[abs(l) - 1 + (13 if l < 0 else 0)]
 
 
-# the double contraction A : B, the last two indices of A against the first two of B
 def colon(A, B):
+  """the double contraction A : B, the last two indices of A against the first two of B"""
   out = EinsteinSum(A, list(range(1, A.rank - 1)) + [-1, -2], B, [-1, -2] + [A.rank - 2 + k for k in range(1, B.rank - 1)])
   if isinstance(out, tensor):
     cls = A._productClass(B) if hasattr(A, "_productClass") else None
@@ -777,8 +784,8 @@ def colon(A, B):
 doubleContract = colon
 
 
-# the outer product of tensors or vectors
 def dyad(a, b=None, n=None):
+  """the outer product of tensors or vectors"""
   if b is None and n is None:
     return a if isinstance(a, tensor) else tensor(a)
   if isinstance(b, (int, np.integer)) and n is None:
@@ -820,6 +827,16 @@ class stiffnessTensor(tensor):
   def _productClass(self, other):
     return stressTensor if isinstance(other, strainTensor) else None
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from ..analysis.elasticity import (velocity, energyVector, YoungsModulus, linearCompressibility,
+                                       volumeCompressibility, shearModulus, PoissonRatio, bulkModulus,
+                                       HashinShtrikmanModulus, hashinShtrikmanBounds)
+    from ..plotting.tensorplot import plotSeismicVelocities
+    def ChristoffelTensor(self, *args, **kwargs) -> Any:
+      """ChristoffelTensor(C, n): E_ik = C_ijkl n_j n_l of a stiffness and a direction"""
+
 
 class complianceTensor(tensor):
   """the elastic compliance S = inv(C), its Voigt matrix carrying the factors of the double convention"""
@@ -835,20 +852,39 @@ class complianceTensor(tensor):
   def _productClass(self, other):
     return strainTensor if isinstance(other, stressTensor) else None
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from ..analysis.elasticity import (velocity, energyVector, YoungsModulus, linearCompressibility,
+                                       volumeCompressibility, shearModulus, PoissonRatio, bulkModulus,
+                                       HashinShtrikmanModulus, hashinShtrikmanBounds)
+    def ChristoffelTensor(self, *args, **kwargs) -> Any:
+      """ChristoffelTensor(C, n): E_ik = C_ijkl n_j n_l of a stiffness and a direction"""
+
 
 class stressTensor(tensor):
   _rank, _symmetricRank2 = 2, True
 
-  # the stress of a uniaxial tension along v
   @staticmethod
   def uniaxial(v, sigma=1.0):
+    """the stress of a uniaxial tension along v"""
     v = v if isinstance(v, vector3d) else vector3d(v)
     u = v.normalize().data
     return stressTensor(sigma * u[..., :, None] * u[..., None, :], v.frame if v.frame is not None else specimenFrame.default)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import meanStress, equivalentStress, calcShearStress, deviatoric as deviatoricStress
+
 
 class strainTensor(tensor):
   _rank, _double, _symmetricRank2 = 2, True, True
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import (deviatoric as deviatoricStrain, equivalentStrain, octahedralStrain, axisRatios,
+                                      maxStrain)
+    from ..analysis.taylor import calcTaylor
 
 
 class strainRateTensor(tensor):
@@ -858,9 +894,24 @@ class strainRateTensor(tensor):
 class deformationGradientTensor(tensor):
   _rank = 2
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import (_uniaxialDeformation, _simpleShearDeformation, _pureShearDeformation,
+                                      CauchyStrain, GreenStrain)
+    uniaxial = staticmethod(_uniaxialDeformation)
+    simpleShear = staticmethod(_simpleShearDeformation)
+    pureShear = staticmethod(_pureShearDeformation)
+
 
 class velocityGradientTensor(tensor):
   _rank = 2
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import (_uniaxialFlow, _simpleShearFlow, strainRate, spin, angularVelocityVector,
+                                      rotationRate, vorticity)
+    uniaxial = staticmethod(_uniaxialFlow)
+    simpleShear = staticmethod(_simpleShearFlow)
 
 
 class spinTensor(tensor):
@@ -877,17 +928,29 @@ class spinTensor(tensor):
         args = (v.frame,)
     super().__init__(M, *args, **kwargs)
 
-  # exp(S, ref, side): the rotation the axial vector points to at the reference
   def exp(self, ref=None, side=None):
+    """exp(S, ref, side): the rotation the axial vector points to at the reference"""
     return vector3d(self).exp(ref, side)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import spinVector as vector
 
 
 class curvatureTensor(tensor):
   _rank = 2
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import dislocationDensity
+
 
 class dislocationDensityTensor(tensor):
   _rank = 2
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.mechanics import curvature
 
 
 class ChristoffelTensor(tensor):
@@ -904,6 +967,10 @@ class ChristoffelTensor(tensor):
 
 class refractiveIndexTensor(tensor):
   _rank, _symmetricRank2 = 2, True
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..analysis.optics import refractiveIndex, birefringence, opticalAxis, spectralTransmission
 
 
 class SchmidTensor(tensor):

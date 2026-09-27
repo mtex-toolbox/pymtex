@@ -99,8 +99,8 @@ class mtexFigure:
     self.current = ax
     return ax
 
-  # the axes the next plot draws into: the pending one, else a new one
   def takeAxis(self):
+    """the axes the next plot draws into: the pending one, else a new one"""
     ax, self.pending = self.pending, None
     if ax is not None:
       # an axes nextAxis left blank shows its frame again, one drawn into keeps its look
@@ -110,9 +110,9 @@ class mtexFigure:
       self.current = ax
     return ax if ax is not None else self.nextAxis()
 
-  # MATLAB's mtexFig.gca: the axes drawn into last
   @property
   def gca(self):
+    """MATLAB's mtexFig.gca: the axes drawn into last"""
     return self.current if self.current in self.children else self.currentAxes
 
   @property
@@ -132,9 +132,9 @@ class mtexFigure:
 
   # ------------------------------------------------------------------ colour
 
-  # one colour range over every axes ('equal'), each axes its own ('tight'), or one given
-  # as (lo, hi)
   def setColorRange(self, colorRange="equal"):
+    """one colour range over every axes ('equal'), each axes its own ('tight'), or one given
+    as (lo, hi)"""
     ms = self._mappables()
     if isinstance(colorRange, str) and colorRange == "tight":
       return self._tightColorRange(ms)
@@ -180,8 +180,8 @@ class mtexFigure:
       self.colorbars = []
       self.colorbar(label=labels[0] if labels else "")
 
-  # MATLAB's set(gca, 'ColorScale', 'log'): the colours spread over the decades of the range
   def setColorScale(self, scale="linear"):
+    """MATLAB's set(gca, 'ColorScale', 'log'): the colours spread over the decades of the range"""
     from matplotlib.colors import LogNorm, Normalize
     for ax, m in self._mappables():
       lo, hi = m.get_clim()
@@ -196,8 +196,8 @@ class mtexFigure:
       self.colorbars = []
       self.colorbar(label=labels[0] if labels else "")
 
-  # a filled contour plot cuts its bands out of the map, so it is drawn again
   def setColormap(self, cmap, ax=None):
+    """a filled contour plot cuts its bands out of the map, so it is drawn again"""
     # one axes given keeps the map of the figure for the others
     if ax is None:
       self.colormap = cmap
@@ -210,9 +210,9 @@ class mtexFigure:
       else:
         refill(colormap=cmap)
 
-  # mtexColorbar: a bar per axes, or one for all when they share a range; a figure that
-  # has bars loses them instead, as MATLAB's toggle does
   def colorbar(self, label="", multiple=False, **kwargs):
+    """mtexColorbar: a bar per axes, or one for all when they share a range; a figure that
+    has bars loses them instead, as MATLAB's toggle does"""
     if self.colorbars:
       for cb in self.colorbars:
         _removeBar(cb)
@@ -259,15 +259,15 @@ class mtexFigure:
 
   # ------------------------------------------------------------------ pass through
 
-  # drawNow(figSize='normal'): the figure resized to a named size of its layout, then drawn
   def drawNow(self, figSize=None):
+    """drawNow(figSize='normal'): the figure resized to a named size of its layout, then drawn"""
     if figSize is not None:
       self.fig.set_size_inches(*figureSize(figSize, (min(3.2 * self.ncols, 16), min(3.2 * self.nrows, 12))))
     self.fig.canvas.draw_idle()
 
-  # a PNG is written at zlib level 1, not Pillow's 6: the same pixels, a file about a tenth
-  # larger, in half the time a large map took, most of which was the compression
   def savefig(self, *args, **kwargs):
+    """a PNG is written at zlib level 1, not Pillow's 6: the same pixels, a file about a tenth
+    larger, in half the time a large map took, most of which was the compression"""
     import os
     import matplotlib
     name = args[0] if args else kwargs.get("fname")
@@ -301,10 +301,10 @@ def _removeBar(cb):
       raise
 
 
-# the grid n axes are laid out in: the divisor of n nearest to the width of a slightly wide
-# picture, or the rounded width when no divisor comes close, so that a row is filled; or
-# the given number of columns
 def layoutFor(n, columns=None):
+  """the grid n axes are laid out in: the divisor of n nearest to the width of a slightly wide
+  picture, or the rounded width when no divisor comes close, so that a row is filled; or
+  the given number of columns"""
   n = max(int(n), 1)
   if columns:
     return math.ceil(n / int(columns)), int(columns)
@@ -320,9 +320,9 @@ def newMtexFigure(n=1, **kwargs):
   return mtexFigure(n, **kwargs)
 
 
-# nextAxis: the next plot goes into the next axes of the current figure; nextAxis(k) into
-# the k-th, nextAxis(i, j) into the one in row i and column j, counted from one as in MATLAB
 def nextAxis(k=None, j=None, fig=None):
+  """nextAxis: the next plot goes into the next axes of the current figure; nextAxis(k) into
+  the k-th, nextAxis(i, j) into the one in row i and column j, counted from one as in MATLAB"""
   fig = gcm() if fig is None else fig
   if fig is None:
     fig = mtexFigure()
@@ -343,8 +343,8 @@ def nextAxis(k=None, j=None, fig=None):
   return fig.pending
 
 
-# mtexTitle('text'): the title of the current axes, mtexTitle(ax, 'text') that of the axes given
 def mtexTitle(*args, fig=None, **kwargs):
+  """mtexTitle('text'): the title of the current axes, mtexTitle(ax, 'text') that of the axes given"""
   # MATLAB's FontSize
   if "FontSize" in kwargs:
     kwargs["fontsize"] = kwargs.pop("FontSize")
@@ -365,9 +365,9 @@ def mtexTitle(*args, fig=None, **kwargs):
     ax.set_title(text, **kwargs)
 
 
-# ylabel(ax, 'text') or ylabel('text'): a label left of the axes, written beside a
-# spherical chart, which has no axis lines to carry matplotlib's own label
 def ylabel(*args, fig=None, **kwargs):
+  """ylabel(ax, 'text') or ylabel('text'): a label left of the axes, written beside a
+  spherical chart, which has no axis lines to carry matplotlib's own label"""
   ax, text = args if len(args) == 2 else (None, args[0])
   if ax is None:
     fig = gcm() if fig is None else fig
@@ -380,9 +380,9 @@ def ylabel(*args, fig=None, **kwargs):
   return ax.text(-0.02, 0.5, text, transform=ax.transAxes, ha="right", va="center", rotation=90, **kwargs)
 
 
-# xlabel('text'): a label under the current axes, which a spherical chart draws without
-# axis lines, so matplotlib's own label would not show
 def xlabel(text, fig=None, **kwargs):
+  """xlabel('text'): a label under the current axes, which a spherical chart draws without
+  axis lines, so matplotlib's own label would not show"""
   fig = gcm() if fig is None else fig
   ax = None if fig is None else (fig.pending or fig.current or (fig.children[-1] if fig.children else None))
   if ax is None:
@@ -393,8 +393,8 @@ def xlabel(text, fig=None, **kwargs):
   return ax.text(0.5, -0.02, text, transform=ax.transAxes, ha="center", va="top", **kwargs)
 
 
-# the current mtexFigure, None before the first plot
 def gcm():
+  """the current mtexFigure, None before the first plot"""
   # a figure closed with plt.close is no longer current; a figure pyplot does not manage,
   # one embedded in a window, has no number and stays current
   if _current is not None:
@@ -405,8 +405,8 @@ def gcm():
   return _current
 
 
-# hold on: the next plot goes into the current axes
 def hold(on=True):
+  """hold on: the next plot goes into the current axes"""
   import matplotlib.pyplot as plt
   fig = gcm()
   # a plain figure the user opened after the last MTEX figure is adopted, else a new one
@@ -439,11 +439,11 @@ def mtexColorbar(fig=None, title=None, **kwargs):
   return [] if fig is None else fig.colorbar(**kwargs)
 
 
-# saveFigure('name.png'): the current figure written cropped to its content, the format by the
-# extension; a bitmap at 1.5 times the screen resolution, a map at 2.5 times and without
-# smoothing between its cells, so that no colour is invented between measurements
-# (MATLAB saveFigure); 'crop' and 'pdf' of MATLAB's TeX tools need nothing here
 def saveFigure(fname, fig=None, *args, **kwargs):
+  """saveFigure('name.png'): the current figure written cropped to its content, the format by the
+  extension; a bitmap at 1.5 times the screen resolution, a map at 2.5 times and without
+  smoothing between its cells, so that no colour is invented between measurements
+  (MATLAB saveFigure); 'crop' and 'pdf' of MATLAB's TeX tools need nothing here"""
   import os
   import matplotlib.pyplot as plt
   m = gcm() if fig is None else fig
@@ -463,8 +463,8 @@ def saveFigure(fname, fig=None, *args, **kwargs):
   figure.savefig(fname, **kwargs)
 
 
-# logAxis(ax, xLimits, yLimits): both axes logarithmic, a decade the same length on each
 def logAxis(ax=None, xLimits=None, yLimits=None):
+  """logAxis(ax, xLimits, yLimits): both axes logarithmic, a decade the same length on each"""
   import matplotlib.pyplot as plt
   ax = plt.gca() if ax is None else ax
   ax.set_xscale("log")
@@ -483,8 +483,8 @@ def setColorRange(colorRange="equal", fig=None):
     fig.setColorRange(colorRange)
 
 
-# setColorScale('log'): logarithmic colours on every plot of the figure, 'linear' back
 def setColorScale(scale="linear", fig=None):
+  """setColorScale('log'): logarithmic colours on every plot of the figure, 'linear' back"""
   fig = gcm() if fig is None else fig
   if fig is not None:
     fig.setColorScale(scale)
@@ -496,11 +496,11 @@ LEGEND_LOCATIONS = {"north": "upper center", "south": "lower center", "east": "c
                     "southwest": "lower left", "best": "best"}
 
 
-# legend(): one legend for the figure, from every artist a DisplayName named, on the last
-# chart, or beside the charts for MATLAB's outside locations (MATLAB legend('show'));
-# legend('a', 'b', ...) names the curves, bars and markers of the current axes in the order
-# they were drawn, as MATLAB's legend with labels does
 def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
+  """legend(): one legend for the figure, from every artist a DisplayName named, on the last
+  chart, or beside the charts for MATLAB's outside locations (MATLAB legend('show'));
+  legend('a', 'b', ...) names the curves, bars and markers of the current axes in the order
+  they were drawn, as MATLAB's legend with labels does"""
   import matplotlib.pyplot as plt
 
   from ..geometry.session import getMTEXpref
@@ -576,8 +576,8 @@ __all__ = ["saveFigure", "logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold"
            "setColorRange", "setColorScale"]
 
 
-# a list of functions is drawn by its first one, with MATLAB's warning
 def firstOfList(f):
+  """a list of functions is drawn by its first one, with MATLAB's warning"""
   if getattr(f, "shape", ()):
     import warnings
     warnings.warn("You try to plot a vector valued function. Plot the desired components manually. "

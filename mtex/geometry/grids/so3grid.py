@@ -39,9 +39,9 @@ class SO3Grid(orientation):
     self.res = float(resolution)
     self.center = rotation.id if center is None else center
 
-  # the ladder of every node as an S1Grid
   @property
   def gamma(self):
+    """the ladder of every node as an S1Grid"""
     return [S1Grid(self.gammaPoints[self.offset[k]:self.offset[k + 1]], min=self.gammaMin[k],
                    max=self.gammaMin[k] + self.gammaPeriod, periodic=True) for k in range(self.nnodes)]
 
@@ -74,8 +74,8 @@ class SO3Grid(orientation):
   def nZ(self):
     return int(np.round(2 * np.pi / self.alphaPeriod))
 
-  # the rotations selected by a mask; nodes that empty out are dropped
   def subGrid(self, mask):
+    """the rotations selected by a mask; nodes that empty out are dropped"""
     mask = np.asarray(mask)
     if mask.dtype != bool:
       m = np.zeros(self.size, dtype=bool)
@@ -99,18 +99,18 @@ class SO3Grid(orientation):
                        self.res, other * self.center)
     return orientation.__rmul__(self, other)
 
-  # the nearest grid rotation of every orientation, or the k nearest, or all within a
-  # radius, up to the symmetries of the grid's frames, through the quaternion k-d tree of
-  # orientationtree.py (MATLAB SO3Grid/find): cos(w/2) of the reduced misorientation angle w
-  # for the nearest, the angles for the k nearest and the radius
   def find(self, o, epsOrK=None):
+    """the nearest grid rotation of every orientation, or the k nearest, or all within a
+    radius, up to the symmetries of the grid's frames, through the quaternion k-d tree of
+    orientationtree.py (MATLAB SO3Grid/find): cos(w/2) of the reduced misorientation angle w
+    for the nearest, the angles for the k nearest and the radius"""
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
 
-  # every grid rotation within eps of each query, up to symmetry: the sparse incidence
-  # (nq x n) and the sparse cos(w/2) of the reduced angles; the structured search where the
-  # queries carry the grid's frames and numba is there, the tree otherwise
   def radius(self, o, eps):
+    """every grid rotation within eps of each query, up to symmetry: the sparse incidence
+    (nq x n) and the sparse cos(w/2) of the reduced angles; the structured search where the
+    queries carry the grid's frames and numba is there, the tree otherwise"""
     from ..kernels import backend
     from .orientationtree import orientationTree
     if backend() != "numba" or not isinstance(o, orientation) or o.frameA is not self.frameA or o.frameB is not self.frameB:
@@ -236,10 +236,10 @@ def _mergeClose(g, delta, candidates):
   return g.subGrid(~drop) if np.any(drop) else g
 
 
-# the Euler angle raster over the Euler box of the frames, MATLAB's regularSO3Grid: sections
-# of phi2 from zero below its bound, and on each the (Phi, phi1) grid with both ends of Phi
-# and phi1 from zero below its bound, all at the resolution
 def regularSO3Grid(CS, SS=None, resolution=5 * degree, sections=None):
+  """the Euler angle raster over the Euler box of the frames, MATLAB's regularSO3Grid: sections
+  of phi2 from zero below its bound, and on each the (Phi, phi1) grid with both ends of Phi
+  and phi1 from zero below its bound, all at the resolution"""
   from ..frames import specimenFrame
   from ..orientationregion import eulerRegion
   SS = specimenFrame.default if SS is None else SS

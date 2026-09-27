@@ -16,6 +16,7 @@
 # MATLAB; grains[k] is positional and selectByGrainId picks by id.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry._array import MtexArray
@@ -84,33 +85,33 @@ class grain2d(polygonSet):
       raise ValueError(f"the grains have {len(ids)} indexed phases, so name one: grains['phase']")
     return int(ids[0])
 
-  # the plotting convention of the specimen frame the grains are written in
   @property
   def how2plot(self):
+    """the plotting convention of the specimen frame the grains are written in"""
     from ..geometry.plottingconvention import plottingConvention
     pC = getattr(self.frame, "how2plot", None)
     return plottingConvention.default if pC is None else pC
 
-  # the phase number of every grain as the file numbered it
   @property
   def phase(self):
+    """the phase number of every grain as the file numbered it"""
     return self.phaseMap[self.phaseId]
 
   @property
   def CS(self):
     return self.CSList[self._onePhase()]
 
-  # the phase id of a frame, a mineral name or a number, MATLAB's cs2phaseId
   def cs2phaseId(self, cs):
+    """the phase id of a frame, a mineral name or a number, MATLAB's cs2phaseId"""
     return self.CSList.phaseId(cs)
 
   @property
   def mineral(self):
     return self.CS.mineral
 
-  # the mean orientations of the grains of the one indexed phase present
   @property
   def meanOrientation(self):
+    """the mean orientations of the grains of the one indexed phase present"""
     p = self._onePhase()
     return orientation._fromRotation(self.meanRotation.data[self.phaseId == p], (self.CSList[p], self.frame))
 
@@ -134,9 +135,9 @@ class grain2d(polygonSet):
   def plane(self):
     return self.boundary.plane
 
-  # the normal of the plane the map lies in, as a direction of the specimen
   @property
   def N(self):
+    """the normal of the plane the map lies in, as a direction of the specimen"""
     return vector3d(self.plane.normal, frame=self.frame, isNormalized=True)
 
   def __getattr__(self, name):
@@ -160,9 +161,9 @@ class grain2d(polygonSet):
   def __call__(self, x, y):
     return self[self.inpolygon([x, y])]
 
-  # a grain that sits inside the hole of another one: where the grain lies, not what it touches
   @property
   def isInclusion(self):
+    """a grain that sits inside the hole of another one: where the grain lies, not what it touches"""
     out = np.zeros(self.size, dtype=bool)
     V = self.V
     first = np.array([V[ls[0][0]] if ls else [np.nan, np.nan] for ls in self.loops]).reshape(-1, 2)
@@ -177,10 +178,10 @@ class grain2d(polygonSet):
 
   # ------------------------------------------------------------------ neighbours
 
-  # the pairs of ids of grains sharing a boundary, both in the selection, or either with
-  # full; as a symmetric sparse matrix indexed by id with matrix; with other grains the pairs
-  # of one of these and one of those
   def neighbors(self, full=False, matrix=False):
+    """the pairs of ids of grains sharing a boundary, both in the selection, or either with
+    full; as a symmetric sparse matrix indexed by id with matrix; with other grains the pairs
+    of one of these and one of those"""
     g = self.boundary.grainId
     a, b = g[:, 0], g[:, 1]
     # g1.neighbors(g2): the pairs with the first grain in g1 and the second in g2
@@ -207,16 +208,16 @@ class grain2d(polygonSet):
     counts = np.bincount(pairs.reshape(-1), minlength=int(self.id.max(initial=0)) + 1)
     return counts[self.id].astype(np.int32)
 
-  # a grain that touches the border of the map
   @property
   def isBoundary(self):
+    """a grain that touches the border of the map"""
     g = self.boundary.grainId
     rim = np.unique(np.concatenate([g[g[:, 0] == 0, 1], g[g[:, 1] == 0, 0]]))
     return np.isin(self.id, rim[rim > 0])
 
-  # the inner boundary of every grain: how many segments and how much length of the
-  # subgrain boundaries lie in it
   def subBoundarySize(self, sel=None):
+    """the inner boundary of every grain: how many segments and how much length of the
+    subgrain boundaries lie in it"""
     ib = self.innerBoundary
     sel = np.ones(len(ib), dtype=bool) if sel is None else sel
     counts = np.bincount(ib.grainId[sel, 0], minlength=int(self.id.max(initial=0)) + 1)
@@ -230,9 +231,9 @@ class grain2d(polygonSet):
 
   # ------------------------------------------------------------------ selection
 
-  # the unit of the map the grains were reconstructed from, as their boundary carries it
   @property
   def scanUnit(self):
+    """the unit of the map the grains were reconstructed from, as their boundary carries it"""
     return getattr(self.boundary, "scanUnit", "um")
 
   # grains[x, y]: the grain the position lies in, MATLAB's grains(x, y)
@@ -290,10 +291,10 @@ class grain2d(polygonSet):
                    innerBoundary=None if self.innerBoundary is None else self.innerBoundary.selectByGrainId(keep),
                    loops=None if self.loops is None else [self.loops[i] for i in ids], phaseMap=self.phaseMap)
 
-  # the positions of grain ids in this list
-  # the positions of grain ids in the list, in the shape of the ids: one for a number, a
-  # pair per boundary segment for gB.grainId
   def id2ind(self, ids):
+    """the positions of grain ids in this list
+    the positions of grain ids in the list, in the shape of the ids: one for a number, a
+    pair per boundary segment for gB.grainId"""
     pos = {int(g): k for k, g in enumerate(self.id)}
     a = np.asarray(ids)
     flat = a.reshape(-1)
@@ -302,9 +303,9 @@ class grain2d(polygonSet):
     out = np.array([pos[int(i)] for i in flat], dtype=int).reshape(a.shape)
     return int(out) if np.isscalar(ids) else out
 
-  # the grains of the phase of ori whose mean orientation lies within epsilon of it, or of
-  # a fibre
   def findByOrientation(self, ori, epsilon):
+    """the grains of the phase of ori whose mean orientation lies within epsilon of it, or of
+    a fibre"""
     from ..geometry.fibre import fibre
     cs = ori.CS
     ids = np.flatnonzero(self.phaseId == self.CSList.phaseId(cs))
@@ -312,8 +313,8 @@ class grain2d(polygonSet):
     d = ori.angle(o) if isinstance(ori, fibre) else o.angle(ori)
     return self._subset(ids[np.asarray(d).reshape(-1) <= epsilon])
 
-  # the grains named by id, in the order asked for
   def selectByGrainId(self, ids):
+    """the grains named by id, in the order asked for"""
     ids = np.atleast_1d(np.asarray(ids)).reshape(-1)
     pos = {int(g): k for k, g in enumerate(self.id)}
     if not all(int(i) in pos for i in ids):
@@ -330,17 +331,17 @@ class grain2d(polygonSet):
 
   # ------------------------------------------------------------------ merging
 
-  # join grains into one: by pairs of ids, by the segments of a boundary, by a graph of
-  # grains indexed by id, by a label per grain, or by a misorientation threshold across the
-  # shared boundaries; inclusions=True (or a mask) joins every inclusion below maxSize
-  # pixels to the grain around it, host a mask of the grains that may take one. The merge
-  # is a relabelling and nothing else: the boundary between two grains that became one
-  # moves to the inner boundary, the loops are traced again, the mean is the pixel-weighted
-  # mean of the parts. A phase boundary is merged only by an inclusion, and the merged
-  # grain is then the host's phase and orientation. The id of the parent of every grain is
-  # written into grains.parentId, the merged grains carry the ids of their parts as
-  # childId; testRun returns the parent ids alone
   def merge(self, pairs=None, threshold=None, inclusions=None, host=None, maxSize=np.inf, testRun=False):
+    """join grains into one: by pairs of ids, by the segments of a boundary, by a graph of
+    grains indexed by id, by a label per grain, or by a misorientation threshold across the
+    shared boundaries; inclusions=True (or a mask) joins every inclusion below maxSize
+    pixels to the grain around it, host a mask of the grains that may take one. The merge
+    is a relabelling and nothing else: the boundary between two grains that became one
+    moves to the inner boundary, the loops are traced again, the mean is the pixel-weighted
+    mean of the parts. A phase boundary is merged only by an inclusion, and the merged
+    grain is then the host's phase and orientation. The id of the parent of every grain is
+    written into grains.parentId, the merged grains carry the ids of their parts as
+    childId; testRun returns the parent ids alone"""
     if len(np.unique(self.id)) != self.size:
       raise ValueError("merging requires distinct grains")
     pos = self._positions()
@@ -434,10 +435,10 @@ class grain2d(polygonSet):
       return np.where(inside, pos[np.where(inside, ids, 0)], -1)
     return at(pairs[:, 0]), at(pairs[:, 1])
 
-  # the id of the grain whose hole the grain lies in, 0 for none: every grain bordering a
-  # hole of another, MATLAB's second output of isInclusion
   @property
   def inclusionHost(self):
+    """the id of the grain whose hole the grain lies in, 0 for none: every grain bordering a
+    hole of another, MATLAB's second output of isInclusion"""
     out = np.zeros(self.size, dtype=np.int32)
     gB = self.boundary
     pos = self._positions()
@@ -450,9 +451,9 @@ class grain2d(polygonSet):
       out[incl[incl >= 0]] = self.id[k]
     return out
 
-  # the grains with the phase of every boundary segment read off the grain it borders, as
-  # it has to be after the grains changed phase (MATLAB grains.update)
   def update(self):
+    """the grains with the phase of every boundary segment read off the grain it borders, as
+    it has to be after the grains changed phase (MATLAB grains.update)"""
     out = self.copy()
     pos = self._positions()
     for name in ("boundary", "innerBoundary"):
@@ -522,13 +523,23 @@ class grain2d(polygonSet):
         lines.append(f"  {self.id[k]:>8}{self.phaseId[k]:>8}{self.numPixel[k]:>8}{euler:>20}{self.GOS[k]:>12.3g}")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .boundaryresampling import (_reduceGrains as reduceBoundary, _simplifyGrains as simplifyBoundary,
+                                     _refineGrains as refineBoundary, sharedVertices)
+    from .smoothing import smoothBoundary
+    from .shape import _hullGrains as hull, characteristicShape
+    from .traces import calcTraces
+    from ..plotting.mapplot import plotGrains as plot, quiverMap as quiver
+    from ..plotting.grainplots import hist, histogram
+
 
 # ------------------------------------------------------------------ tracing
 
-# the loops of every grain, from the segments that have it on one side: a segment is taken
-# in the sense that keeps the grain on its left, so the loops come out closed and wound;
-# the compiled walk over all grains at once, or the Python walk grain by grain without it
 def tracePolygons(gB, ids):
+  """the loops of every grain, from the segments that have it on one side: a segment is taken
+  in the sense that keeps the grain on its left, so the loops come out closed and wound;
+  the compiled walk over all grains at once, or the Python walk grain by grain without it"""
   ids = np.asarray(ids, dtype=np.int64).reshape(-1)
   if backend() == "numba":
     traced = _tracePolygonsNumba(gB, ids)
@@ -564,9 +575,9 @@ def _tracePolygonsNumba(gB, ids):
   return [ordered[a:b] for a, b in zip(bounds[:-1], bounds[1:])]
 
 
-# close the directed edges into loops; where a grain touches itself the walk leaves a
-# vertex by the edge that turns most tightly clockwise, which keeps the face on the left
 def traceLoops(edges, V):
+  """close the directed edges into loops; where a grain touches itself the walk leaves a
+  vertex by the edge that turns most tightly clockwise, which keeps the face on the left"""
   loops = []
   if not edges:
     return loops
@@ -612,8 +623,8 @@ def _tightestTurn(edges, V, k, cand, used):
   return best
 
 
-# two boundaries laid end to end, on the same vertices
 def catBoundaries(a, b):
+  """two boundaries laid end to end, on the same vertices"""
   if a.V is not b.V and not np.array_equal(a.V, b.V):
     raise ValueError("the two boundaries do not share their vertices")
   return a._with(F=np.concatenate([a.F, b.F]), grainId=np.concatenate([a.grainId, b.grainId]), ebsdId=np.concatenate([a.ebsdId, b.ebsdId]),

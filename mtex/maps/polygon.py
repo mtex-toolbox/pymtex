@@ -14,6 +14,7 @@
 # list and a shape2d another.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import itertools
 
 import numpy as np
@@ -21,9 +22,9 @@ import numpy as np
 from ..geometry.vector3d import vector3d
 
 
-# the polygon (vs, gs) clipped against the half plane of the points at least as close to p
-# as to q; gs[i] is the generator of the edge vs[i] -> vs[i + 1]
 def clipHalfPlane(vs, gs, p, q, gen):
+  """the polygon (vs, gs) clipped against the half plane of the points at least as close to p
+  as to q; gs[i] is the generator of the edge vs[i] -> vs[i + 1]"""
   n = q - p
   c = (n @ q + n @ p) / 2
   m = len(vs)
@@ -45,14 +46,14 @@ def clipHalfPlane(vs, gs, p, q, gen):
   return ws, hs
 
 
-# the square of half width w centred on p, as the starting polygon of a clip
 def seedBox(p, w):
+  """the square of half width w centred on p, as the starting polygon of a clip"""
   p = np.asarray(p, dtype=float)
   return [p + d for d in (np.array([-w, -w]), np.array([w, -w]), np.array([w, w]), np.array([-w, w]))], [0, 0, 0, 0]
 
 
-# the Voronoi cell of p among the sites p + nb, as an (m, 2) array of corners, anticlockwise
 def voronoiCell(p, nb, w):
+  """the Voronoi cell of p among the sites p + nb, as an (m, 2) array of corners, anticlockwise"""
   p = np.asarray(p, dtype=float)
   vs, gs = seedBox(p, float(w))
   for k, d in enumerate(nb):
@@ -60,8 +61,8 @@ def voronoiCell(p, nb, w):
   return np.array(vs, dtype=float).reshape(-1, 2)
 
 
-# twice the signed area of a closed polygon, positive when it winds anticlockwise
 def signedArea2(vs):
+  """twice the signed area of a closed polygon, positive when it winds anticlockwise"""
   vs = np.asarray(vs, dtype=float)
   x, y = vs[:, 0], vs[:, 1]
   return float(np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y))
@@ -86,10 +87,10 @@ def _insideLoop(V, loop, q):
 
 # ------------------------------------------------------------------ a set of polygons
 
-# every loop of every outline as one edge list: the tails P, the heads Q, the outline each
-# edge belongs to and whether it lies on the outer loop; one pass over the loops, so that
-# every measure below is a bincount and not a loop over the outlines
 def loopEdges(V, loopsPerOutline):
+  """every loop of every outline as one edge list: the tails P, the heads Q, the outline each
+  edge belongs to and whether it lies on the outer loop; one pass over the loops, so that
+  every measure below is a bincount and not a loop over the outlines"""
   flat, start, lengths, owner, first = _flatLoops(loopsPerOutline)
   if not len(flat):
     return np.zeros((0, 2)), np.zeros((0, 2)), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool)
@@ -110,10 +111,10 @@ def _flatLoops(loopsPerOutline):
   return flat, np.cumsum(lengths) - lengths, lengths, owner, first
 
 
-# the sums over the edges of every outline, one row each: twice the area, the length of the
-# outer loop, the length of all loops, the first moments times six (x, y), the second times
-# twelve (y y, x x) and twenty four (x y), all about the origin
 def loopSums(V, loopsPerOutline, size):
+  """the sums over the edges of every outline, one row each: twice the area, the length of the
+  outer loop, the length of all loops, the first moments times six (x, y), the second times
+  twelve (y y, x x) and twenty four (x y), all about the origin"""
   from ..geometry.kernels import backend
   V = np.asarray(V, dtype=float)
   loop = None
@@ -134,15 +135,15 @@ def loopSums(V, loopsPerOutline, size):
   return np.stack([np.bincount(lab, c, size) for c in cols], axis=1).reshape(size, 8)
 
 
-# the measures of a list of outlines, read off loops, V, plane, frame and size of the class
-# that carries them. Every measure is a sum over the loops, and the loops carry their
-# winding, anticlockwise outside and clockwise around a hole, so a hole is subtracted by
-# itself and nothing has to know it is there
 class polygonSet:
+  """the measures of a list of outlines, read off loops, V, plane, frame and size of the class
+  that carries them. Every measure is a sum over the loops, and the loops carry their
+  winding, anticlockwise outside and clockwise around a hole, so a hole is subtracted by
+  itself and nothing has to know it is there"""
 
-  # the loops of one outline as one vertex list, each hole stitched to the outer loop by
-  # repeating its first vertex, the form a renderer or a point in polygon test wants
   def keyhole(self, k):
+    """the loops of one outline as one vertex list, each hole stitched to the outer loop by
+    repeating its first vertex, the form a renderer or a point in polygon test wants"""
     ls = self.loops[k]
     if not ls:
       return np.zeros(0, dtype=np.int32)
@@ -151,9 +152,9 @@ class polygonSet:
       out += list(h) + [h[0], ls[0][0]]
     return np.array(out, dtype=np.int32)
 
-  # the flattened polygon of every outline, MATLAB's poly
   @property
   def poly(self):
+    """the flattened polygon of every outline, MATLAB's poly"""
     return [self.keyhole(k) for k in range(self.size)]
 
   def _as2d(self, q):
@@ -161,9 +162,9 @@ class polygonSet:
     q = q.reshape(-1, q.shape[-1]) if q.ndim > 1 else q.reshape(1, -1)
     return q if q.shape[1] == 2 else self.plane.to2d(q)
 
-  # whether points lie inside the outlines: within the outer loop and outside the holes,
-  # as a (points, outlines) matrix
   def checkInside(self, xy):
+    """whether points lie inside the outlines: within the outer loop and outside the holes,
+    as a (points, outlines) matrix"""
     q = self._as2d(xy)
     out = np.zeros((len(q), self.size), dtype=bool)
     V = self.V
@@ -176,24 +177,24 @@ class polygonSet:
       out[:, k] = inside
     return out
 
-  # the positions of the outlines a point lies in
-  # the position of the outline holding each point, -1 for a point in none
   def findByLocation(self, xy):
+    """the positions of the outlines a point lies in
+    the position of the outline holding each point, -1 for a point in none"""
     hit = self.checkInside(xy)
     return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
 
   def inpolygon(self, xy):
     return np.flatnonzero(self.checkInside(xy).any(axis=0))
 
-  # the area an outline covers, its holes taken off
   @property
   def area(self):
+    """the area an outline covers, its holes taken off"""
     return loopSums(self.V, self.loops, self.size)[:, 0] / 2
 
-  # the length of the outer loop of an outline, as MATLAB's default; the loops around the
-  # inclusions come with perimeterWithInclusion
   @property
   def perimeter(self):
+    """the length of the outer loop of an outline, as MATLAB's default; the loops around the
+    inclusions come with perimeterWithInclusion"""
     return loopSums(self.V, self.loops, self.size)[:, 1]
 
   @property
@@ -204,9 +205,9 @@ class polygonSet:
   def boundarySize(self):
     return np.array([sum(len(l) for l in ls) for ls in self.loops], dtype=np.int32)
 
-  # the centroid of the area, holes taken off, as a framed point
   @property
   def centroid(self):
+    """the centroid of the area, holes taken off, as a framed point"""
     S = loopSums(self.V, self.loops, self.size)
     a, c = S[:, 0], S[:, 3:5]
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -221,9 +222,9 @@ class polygonSet:
   def equivalentPerimeter(self):
     return 2 * np.pi * self.equivalentRadius
 
-  # the largest distance between two vertices of the outer loop
   @property
   def diameter(self):
+    """the largest distance between two vertices of the outer loop"""
     out = np.zeros(self.size)
     for k, ls in enumerate(self.loops):
       if ls:
@@ -235,3 +236,8 @@ class polygonSet:
   @property
   def hasHole(self):
     return np.array([len(ls) > 1 for ls in self.loops], dtype=bool)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .shape import (principalComponents, fitEllipse, longAxis, shortAxis, aspectRatio, hullLoops, paris,
+                        shapeFactor, convexity, caliper, paror, surfor)

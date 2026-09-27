@@ -33,9 +33,9 @@ def _fft():
   return scipy.fft, threads()
 
 
-# the centres of a grid of tiles inside a region [left top width height], counted from one,
-# the outermost half a tile in from its edge; a tile that rounding pushes over it is dropped
 def xcfROIGrid(roiSize, numROI, region):
+  """the centres of a grid of tiles inside a region [left top width height], counted from one,
+  the outermost half a tile in from its edge; a tile that rounding pushes over it is dropped"""
   h = roiSize / 2
   if region[2] < roiSize or region[3] < roiSize:
     raise ValueError(f"a tile of {roiSize} pixels does not fit inside the {region[2]:g} x {region[3]:g} region the two "
@@ -52,9 +52,9 @@ def xcfROIGrid(roiSize, numROI, region):
   return cx.astype(np.int64), cy.astype(np.int64)
 
 
-# the band pass, in FFT order, and the raised cosine window of a tile; fPass is
-# [highCutOff highWidth lowCutOff lowWidth]
 def xcfFilters(roiSize, fPass):
+  """the band pass, in FFT order, and the raised cosine window of a tile; fPass is
+  [highCutOff highWidth lowCutOff lowWidth]"""
   lCut, lWidth = fPass[2], fPass[3] / 2
   hCut, hWidth = fPass[0], fPass[1] / 2
   if lCut < hCut:
@@ -118,9 +118,9 @@ def _tileSpectrum(tile, window, band, bandFilt, fft, workers):
   return spec, bad
 
 
-# the sub pixel shift of the tiles about (cx, cy) of B against A, in pixels, with the height
-# of their peaks; batched, the coarse correlation held near 128 MB
 def xcfCorrelate(A, B, cx, cy, roiSize, fPass, mesh, window, bandPass):
+  """the sub pixel shift of the tiles about (cx, cy) of B against A, in pixels, with the height
+  of their peaks; batched, the coarse correlation held near 128 MB"""
   fft, workers = _fft()
   coarse = min(48, mesh)
   rs = int(roiSize)

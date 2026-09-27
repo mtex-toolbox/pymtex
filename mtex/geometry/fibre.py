@@ -14,6 +14,7 @@
 # also a list of fibres.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from .display import sizeString
@@ -27,6 +28,7 @@ from .session import SESSION
 from .symreduce import reductionGroups
 from .units import degree
 from .vector3d import vector3d
+from .install import install
 
 TOLERANCE = 1e-8
 
@@ -95,13 +97,13 @@ class fibre:
   def antipodal(self):
     return self.h.antipodal
 
-  # the fibre is full when both ends coincide
   @property
   def isFull(self):
+    """the fibre is full when both ends coincide"""
     return rotation.angle(self.o1, self.o2) < 1e-10
 
-  # the angle turned about h from o1 to o2, the whole circle when full
   def arcAngle(self):
+    """the angle turned about h from o1 to o2, the whole circle when full"""
     return np.where(self.isFull, 2 * np.pi, rotation.angle(self.o1, self.o2))
 
   # ------------------------------------------------------------------ the list
@@ -140,8 +142,8 @@ class fibre:
 
   # ------------------------------------------------------------------ sampling
 
-  # the rotations along the fibre, points x shape, turning about h from o1 to o2
   def rotation(self, points=1000):
+    """the rotations along the fibre, points x shape, turning about h from o1 to o2"""
     omega = np.linspace(0, 1, points)[(slice(None),) + (None,) * self.ndim] * self.arcAngle()
     axis = np.broadcast_to(self.h.normalize().data, omega.shape + (3,))
     return rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))
@@ -158,9 +160,9 @@ class fibre:
     rs = _uniqueDirections(qrot(L, self.r.normalize().data[..., None, :]))
     return hs, rs
 
-  # the angle by which ori * h misses r, the least over both orbits, from the chord of the
-  # closest pair; with another fibre the largest distance of its points to this one
   def angle(self, ori, noSymmetry=False):
+    """the angle by which ori * h misses r, the least over both orbits, from the chord of the
+    closest pair; with another fibre the largest distance of its points to this one"""
     if isinstance(ori, fibre):
       return np.max(self.angle(ori.orientation(1000)))
     if self.size != 1:
@@ -182,8 +184,8 @@ class fibre:
 
   # ------------------------------------------------------------------ symmetry
 
-  # the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones
   def symmetrise(self, unique=False):
+    """the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones"""
     L, R = reductionGroups(self.o1)
     nL, nR = len(L), len(R)
     o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), _conj(R)[None, :, None, :])
@@ -231,14 +233,14 @@ class fibre:
     r = vector3d.rand(*shape, rng=rng)
     return cls(Miller(h, cs) if isinstance(cs, crystalFrame) else vector3d(h, frame=cs), vector3d(r, frame=ss))
 
-  # the fibre through a list of orientations: the plane of the two leading eigenvectors
-  # of their quaternion tensor, the orientations first moved to the representatives
-  # nearest their mean, or taken as stored with noSymmetry; with diagnostics the
-  # eigenvalues, ascending and summing to one, and the mean angle of the orientations to
-  # the fibre come too. This is the local fit of a concentrated cloud; the search through
-  # the pole figures of an ODF is the business of P2
   @classmethod
   def fit(cls, ori, *args, diagnostics=False, noSymmetry=False):
+    """the fibre through a list of orientations: the plane of the two leading eigenvectors
+    of their quaternion tensor, the orientations first moved to the representatives
+    nearest their mean, or taken as stored with noSymmetry; with diagnostics the
+    eigenvalues, ascending and summing to one, and the mean angle of the orientations to
+    the fibre come too. This is the local fit of a concentrated cloud; the search through
+    the pole figures of an ODF is the business of P2"""
     # 'local' names the one algorithm there is, the local quaternion tensor fit
     for a in args:
       if isinstance(a, str) and a == "noSymmetry":
@@ -280,6 +282,31 @@ class fibre:
     if not np.all(self.isFull):
       lines.append(f"  o1 → o2: {_eulerString(self.o1)} → {_eulerString(self.o2)}")
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @classmethod
+    def alpha(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def beta(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def gamma(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def eta(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def tau(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def epsilon(cls, *frames, full=False) -> Any:
+      ...
+    @classmethod
+    def theta(cls, *frames) -> Any:
+      ...
 
 
 # ------------------------------------------------------------------ helpers
@@ -338,7 +365,7 @@ def _named(name):
 
 
 for _name in NAMED_FIBRES:
-  setattr(fibre, _name, _named(_name))
+  install(fibre, _named(_name), _name)
 del _name
 
 
@@ -349,7 +376,7 @@ def _theta(cls, *frames):
   return cls(Miller(1, 0, 0, cs, "uvw"), vector3d(0, 0, 1, frame=ss))
 
 
-fibre.theta = classmethod(_theta)
+install(fibre, classmethod(_theta), "theta")
 
 
 __all__ = ["fibre"]

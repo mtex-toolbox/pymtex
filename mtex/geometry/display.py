@@ -2,13 +2,13 @@
 import numpy as np
 
 
-# a size as MATLAB writes it, 1 x 3, and 1 for a single element
 def sizeString(shape):
+  """a size as MATLAB writes it, 1 x 3, and 1 for a single element"""
   return " x ".join(str(n) for n in shape) if len(shape) else "1"
 
 
-# a number at three significant digits, integers without a decimal point, tiny as zero
 def numString(x, digits=3, tiny=1e-10, decimals=None):
+  """a number at three significant digits, integers without a decimal point, tiny as zero"""
   x = float(x)
   if x != x:
     return "NaN"
@@ -25,9 +25,9 @@ def numString(x, digits=3, tiny=1e-10, decimals=None):
   return f"{x:.{digits}g}"
 
 
-# a number as MATLAB's xnum2str writes it: the decimals follow the size, trailing zeros
-# and a trailing point dropped, 27532, 1.3, 0.25
 def xnum2str(x):
+  """a number as MATLAB's xnum2str writes it: the decimals follow the size, trailing zeros
+  and a trailing point dropped, 27532, 1.3, 0.25"""
   x = float(x)
   if x != x:
     return "NaN"
@@ -43,8 +43,8 @@ def xnum2str(x):
   return "0" if s == "-0" else s
 
 
-# columns under their labels, right aligned, two spaces of indent
 def table(labels, columns, digits=3, tiny=1e-10, decimals=None):
+  """columns under their labels, right aligned, two spaces of indent"""
   cells = [[numString(x, digits, tiny, decimals) for x in np.asarray(c).ravel()] for c in columns]
   widths = [max(len(l), *(len(s) for s in col)) for l, col in zip(labels, cells)]
   lines = ["  " + "  ".join(l.rjust(w) for l, w in zip(labels, widths))]
@@ -53,8 +53,8 @@ def table(labels, columns, digits=3, tiny=1e-10, decimals=None):
   return "\n".join(lines)
 
 
-# the header of a display: the class name and, when given, a note on the same line
 def header(obj, info=""):
+  """the header of a display: the class name and, when given, a note on the same line"""
   name = type(obj).__name__
   return f"{name} ({info})" if info else name
 

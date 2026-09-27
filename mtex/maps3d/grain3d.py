@@ -18,6 +18,7 @@
 # grains and of the faces, as MATLAB's subSet.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.orientation import orientation
@@ -40,11 +41,11 @@ class grain3d:
     self.prop = {} if prop is None else dict(prop)
     self.phaseMap = np.arange(len(CSList)) if phaseMap is None else np.asarray(phaseMap)
 
-  # the grains of vertices, faces and the incidence of grains and faces, as MATLAB's
-  # constructor: the face lies between the grain it is +1 for and the one it is -1 for, the
-  # misorientation from the mean rotations, the voxels unknown
   @staticmethod
   def fromFaces(V, F, I_GF, ori=None, CSList=None, phaseId=None, frame=None):
+    """the grains of vertices, faces and the incidence of grains and faces, as MATLAB's
+    constructor: the face lies between the grain it is +1 for and the one it is -1 for, the
+    misorientation from the mean rotations, the voxels unknown"""
     from scipy.sparse import csr_matrix
     from ..geometry.frames import specimenFrame
     from ..geometry.kernels import qmul
@@ -67,14 +68,14 @@ class grain3d:
     gB = grain3Boundary(V, F, gid, None, side, mori, cs, fr)
     return grain3d(np.arange(1, n + 1), ph, cs, np.ones(n), q, np.zeros(n), I, gB, fr)
 
-  # the faces turned consistently around every grain, the normals out of it, as MATLAB's orientFaces
   def orientFaces(self):
+    """the faces turned consistently around every grain, the normals out of it, as MATLAB's orientFaces"""
     from .orientfaces import orientFaces
     return orientFaces(self)
 
-  # grain3d.load('grains.dream3d'), grain3d.load('grains.tess', CS=cs)
   @staticmethod
   def load(fname, *args, **kwargs):
+    """grain3d.load('grains.dream3d'), grain3d.load('grains.tess', CS=cs)"""
     from ..io.loadgrains3d import loadGrains3d
     return loadGrains3d(fname, *args, **kwargs)
 
@@ -98,17 +99,17 @@ class grain3d:
   def mineralList(self):
     return self.CSList.mineralList
 
-  # the crystal frame of grains of one indexed phase
   @property
   def CS(self):
+    """the crystal frame of grains of one indexed phase"""
     ids = self.indexedPhaseId
     if len(ids) != 1:
       raise ValueError(f"the grains have {len(ids)} indexed phases, so name one: grains['phase']")
     return self.CSList[int(ids[0])]
 
-  # the colour of the phase of every grain, n x 3, as MATLAB's grains.color
   @property
   def color(self):
+    """the colour of the phase of every grain, n x 3, as MATLAB's grains.color"""
     from ..maps.phaselist import colorTriplet, phaseColorNames
     names = phaseColorNames(self.CSList.frames)
     rgb = np.array([colorTriplet(c) if c is not None else (1.0, 1.0, 1.0) for c in names], dtype=float)
@@ -122,10 +123,10 @@ class grain3d:
     q = self.meanRotation.data.reshape(-1, 4)
     return orientation(rotation._fromData(q), self.CSList[int(p[0])], self.frame.stripSym())
 
-  # new orientations, one per grain, their crystal frame the phase of every grain, the
-  # misorientations of the boundary recomputed, as MATLAB's grains.meanOrientation = ori
   @meanOrientation.setter
   def meanOrientation(self, ori):
+    """new orientations, one per grain, their crystal frame the phase of every grain, the
+    misorientations of the boundary recomputed, as MATLAB's grains.meanOrientation = ori"""
     from ..geometry.kernels import qmul
     from ..maps.phaselist import phaseList
     q = np.broadcast_to(ori.data.reshape(-1, 4), (len(self), 4)).copy()
@@ -157,8 +158,8 @@ class grain3d:
     return grain3d(self.id[rows], self.phaseId[rows], self.CSList, self.numPixel[rows], q, self.GOS[rows], I, boundary,
                    self.frame, prop, self.phaseMap)
 
-  # the position of grain ids
   def id2ind(self, ids):
+    """the position of grain ids"""
     ids = np.asarray(ids)
     pos = {g: k for k, g in enumerate(self.id)}
     try:
@@ -182,8 +183,8 @@ class grain3d:
     rows = np.arange(len(self))[key]
     return self._new(np.atleast_1d(rows))
 
-  # the grains turned about a centre: their faces and, unless keepEuler, their orientations
   def rotate(self, rot, keepXY=False, keepEuler=False, center=(0.0, 0.0, 0.0)):
+    """the grains turned about a centre: their faces and, unless keepEuler, their orientations"""
     R = rotation(rot.data if hasattr(rot, "data") else rot)
     q = self.meanRotation.data.reshape(-1, 4)
     if not keepEuler:
@@ -200,8 +201,8 @@ class grain3d:
   def __rmul__(self, rot):
     return self.rotate(rot) if isinstance(rot, rotation) else NotImplemented
 
-  # the faces of polygonal grains as triangles, the fan from the first corner of every face
   def triangulate(self):
+    """the faces of polygonal grains as triangles, the fan from the first corner of every face"""
     gB = self.boundary
     n = gB.numCorners - 2
     face = np.repeat(np.arange(len(gB)), n)
@@ -254,8 +255,8 @@ class grain3d:
   def surfaceArea(self):
     return abs(self.I_GF) @ self.boundary.area
 
-  # MATLAB's name for the surface area
   def surface(self):
+    """MATLAB's name for the surface area"""
     return self.surfaceArea
 
   @property
@@ -263,10 +264,10 @@ class grain3d:
     P = self.boundary.allV[self.boundary.idV]
     return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
 
-  # the largest distance between two vertices of every grain, on MATLAB's rounding to 1e-4
-  # the centre of the box of the vertices, as MATLAB's midPoint
   @property
   def midPoint(self):
+    """the largest distance between two vertices of every grain, on MATLAB's rounding to 1e-4
+    the centre of the box of the vertices, as MATLAB's midPoint"""
     V = self.boundary.V.data.reshape(-1, 3)
     return vector3d((V.min(axis=0) + V.max(axis=0)) / 2, frame=self.frame)
 
@@ -287,8 +288,8 @@ class grain3d:
   def _vertexIncidence(self):
     return ((abs(self.I_GF) > 0).astype(np.int64) @ self.boundary.I_VF.T.astype(np.int64)).tocsr() > 0
 
-  # the half axes of the ellipsoid of the same second moments and volume, the longest first
   def principalComponents(self):
+    """the half axes of the ellipsoid of the same second moments and volume, the longest first"""
     vol = self.volume
     c = self._centroid(vol)
 
@@ -314,9 +315,9 @@ class grain3d:
 
   # ------------------------------------------------------------------ neighbours
 
-  # the pairs of neighbouring grains, each sorted, among the grains of the set or with full
-  # all pairs any of them has
   def neighbors(self, full=False):
+    """the pairs of neighbouring grains, each sorted, among the grains of the set or with full
+    all pairs any of them has"""
     g = self.boundary.grainId
     g = np.unique(np.sort(g[np.all(g > 0, axis=1)], axis=1), axis=0)
     if full:
@@ -345,8 +346,8 @@ class grain3d:
 
   # ------------------------------------------------------------------ sections
 
-  # whether a plane runs through a grain: vertices of it on both sides
   def intersected(self, plane, P0=None):
+    """whether a plane runs through a grain: vertices of it on both sides"""
     from ..geometry.plane import plane3d
     if not isinstance(plane, plane3d):
       plane = plane3d(plane, P0 if P0 is not None else 0)
@@ -358,9 +359,9 @@ class grain3d:
       out[k] = dk.size > 0 and dk.max() > 0 and dk.min() < 0
     return out
 
-  # the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain
-  # every section came from
   def slice(self, plane, P0=None):
+    """the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain
+    every section came from"""
     from .section3d import sliceGrains
     return sliceGrains(self, plane, P0)
 
@@ -374,6 +375,11 @@ class grain3d:
     if self.prop:
       lines.append("  properties: " + ", ".join(sorted(self.prop)))
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.volumeplot import plotGrains3d as plot, quiver3dMap as quiver
+    from ..plotting.grainplots import histogram
 
 
 __all__ = ["grain3d"]

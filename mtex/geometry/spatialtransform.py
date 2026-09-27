@@ -40,9 +40,9 @@ def _moved(pos, x, y):
 
 # ------------------------------------------------------------------ the fits
 
-# the displacement, the weights and the positions a fit works from: a point in frame A, where
-# it went in frame B and how much it is worth; a missing or unweighted point is dropped
 def fitData(posA, posB, weights=None):
+  """the displacement, the weights and the positions a fit works from: a point in frame A, where
+  it went in frame B and how much it is worth; a missing or unweighted point is dropped"""
   if not (isinstance(posA, vector3d) and isinstance(posB, vector3d)):
     raise TypeError("a transform is fitted to two vector3d point sets")
   A, B = _xyz(posA), _xyz(posB)
@@ -59,10 +59,10 @@ def fitData(posA, posB, weights=None):
   return dx[keep], dy[keep], w[keep], x[keep], y[keep]
 
 
-# weighted least squares, reweighted against outliers with Tukey's bisquare at 95 percent
-# efficiency: the residuals corrected for leverage, one scale from their median absolute
-# deviation, and the least favourable weight of the right hand sides for every point
 def robustLsq(A, b, w, noRobust=False, iterMax=50):
+  """weighted least squares, reweighted against outliers with Tukey's bisquare at 95 percent
+  efficiency: the residuals corrected for leverage, one scale from their median absolute
+  deviation, and the least favourable weight of the right hand sides for every point"""
   b = np.asarray(b, dtype=float).reshape(len(A), -1)
   w = np.asarray(w, dtype=float).reshape(-1)
   sw = np.sqrt(w)[:, None]
@@ -88,8 +88,8 @@ def robustLsq(A, b, w, noRobust=False, iterMax=50):
   return p
 
 
-# the design matrix of a bivariate polynomial: [1 x y] or [1 x y x^2 xy y^2]
 def polyBasis(x, y, degree):
+  """the design matrix of a bivariate polynomial: [1 x y] or [1 x y x^2 xy y^2]"""
   x, y = np.asarray(x, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)
   if degree == 1:
     return np.stack([np.ones_like(x), x, y], axis=1)
@@ -158,14 +158,14 @@ class spatialTransform:
   def norm(self, pos):
     return self.displacement(pos).norm()
 
-  # the transform as a field of displacements at the given points
   def discretize(self, pos):
+    """the transform as a field of displacements at the given points"""
     p = vector3d(_xyz(pos))
     return spatialTransformField(p, self.displacement(p))
 
-  # one matrix for two transforms that each have one: affine where the product keeps the
-  # last row, projective otherwise
   def absorb(self, other):
+    """one matrix for two transforms that each have one: affine where the product keeps the
+    last row, projective otherwise"""
     if self.isid:
       return other
     if other.isid:
@@ -236,8 +236,8 @@ class spatialTransformShift(spatialTransform):
   def matrix(self):
     return self.M
 
-  # the scales, the rotation and the shear of the linear part, from its QR decomposition
   def parts(self):
+    """the scales, the rotation and the shear of the linear part, from its QR decomposition"""
     Q, R = np.linalg.qr(self.M[:2, :2])
     d = np.sign(np.diag(R))
     d[d == 0] = 1
@@ -312,10 +312,10 @@ class spatialTransformProjective(spatialTransform):
   def paramChar(self):
     return f"perspective ({self.H[2, 0]:.3g}, {self.H[2, 1]:.3g})"
 
-  # the specimen tilted by theta about an axis along x through centre, seen from the working
-  # distance wd: the far side shrinks and straight lines stay straight
   @staticmethod
   def byTilt(theta, wd, centre=None):
+    """the specimen tilted by theta about an axis along x through centre, seen from the working
+    distance wd: the far side shrinks and straight lines stay straight"""
     c = np.zeros(3) if centre is None else _xyz(centre)[0]
     if wd <= 0:
       raise ValueError(f"a working distance is positive, got {wd}")
@@ -323,12 +323,12 @@ class spatialTransformProjective(spatialTransform):
     s, k = np.sin(theta) / wd, np.cos(theta)
     return spatialTransformProjective([[1, -cx * s, cx * s * cy], [0, k - cy * s, cy * (1 + cy * s - k)], [0, -s, 1 + s * cy]])
 
-  # the homography of the direct linear transform, robustly reweighted. Both point sets are
-  # first moved to their centroid and scaled to a mean distance of sqrt(2), Hartley's
-  # normalisation: without it the algebraic residual weighs the points by their distance from
-  # the origin, and ten percent of outliers can hold the reweighting in a wrong basin
   @staticmethod
   def fit(posA, posB, weights=None, noRobust=False, iterMax=50):
+    """the homography of the direct linear transform, robustly reweighted. Both point sets are
+    first moved to their centroid and scaled to a mean distance of sqrt(2), Hartley's
+    normalisation: without it the algebraic residual weighs the points by their distance from
+    the origin, and ten percent of outliers can hold the reweighting in a wrong basin"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     if len(x) < 4:
       raise ValueError(f"a homography needs at least four points, got {len(x)}")
@@ -369,8 +369,8 @@ class spatialTransformPoly(spatialTransform):
   def isid(self):
     return np.linalg.norm(self.c) < 1e-12
 
-  # the affine map a degree 1 displacement is
   def shiftMatrix(self):
+    """the affine map a degree 1 displacement is"""
     if self.degree != 1:
       raise ValueError("only a degree 1 polynomial displacement is an affine map")
     c = self.c
@@ -443,9 +443,9 @@ class spatialTransformDrift(spatialTransform):
   def fitOptions(self):
     return {"slowScan": vector3d(self.slowScan)}
 
-  # a linear spline through the median displacement of every scan line
   @staticmethod
   def fit(posA, posB, weights=None, slowScan=None, extrapolate=False, **kwargs):
+    """a linear spline through the median displacement of every scan line"""
     dx, dy, _, x, y = fitData(posA, posB, weights)
     sc = np.array([0.0, 1.0, 0.0]) if slowScan is None else _xyz(slowScan)[0]
     sc = sc / np.linalg.norm(sc)
@@ -475,9 +475,9 @@ class spatialTransformField(spatialTransform):
     self.u = u.flatten() if u is not None else None
     self._interpolants = None
 
-  # linear over the triangulation of the points in coordinates of unit spread, the nearest
-  # point beyond it; MATLAB takes natural neighbours inside and linear extrapolation outside
   def eval(self, pos):
+    """linear over the triangulation of the points in coordinates of unit spread, the nearest
+    point beyond it; MATLAB takes natural neighbours inside and linear extrapolation outside"""
     if self.pos is None or self.pos.size == 0:
       return pos
     P = _xyz(pos)
@@ -566,8 +566,8 @@ class spatialTransformComposite(spatialTransform):
   def stageList(self):
     return list(self.stages)
 
-  # the stage s, counted from zero, fitted to a residual measured after the ones before it
   def fitStage(self, s, posA, posB, **kwargs):
+    """the stage s, counted from zero, fitted to a residual measured after the ones before it"""
     if not 0 <= s < len(self.stages):
       raise IndexError(f"this transform has {len(self.stages)} stages, asked for stage {s}")
     p = self.stages[s]
@@ -577,10 +577,10 @@ class spatialTransformComposite(spatialTransform):
     return out
 
 
-# specimen tilt, fitted in stages against a re-measured residual: a projective stage takes the
-# bulk, then an affine and a quadratic polynomial what is left; an unfitted stage is the
-# identity, so a partly fitted tilt evaluates as far as it has got
 class spatialTransformTilt(spatialTransformComposite):
+  """specimen tilt, fitted in stages against a re-measured residual: a projective stage takes the
+  bulk, then an affine and a quadratic polynomial what is left; an unfitted stage is the
+  identity, so a partly fitted tilt evaluates as far as it has got"""
 
   def __init__(self, *stages):
     if not stages:
@@ -601,8 +601,8 @@ class spatialTransformInverse(spatialTransform):
       raise TypeError("the inverse wraps a spatial transform")
     self.T, self.tol, self.iterMax = T, tol, iterMax
 
-  # the preimage by fixed point iteration: the position moved against the error its image makes
   def eval(self, pos):
+    """the preimage by fixed point iteration: the position moved against the error its image makes"""
     target = _xyz(pos)[:, :2]
     cur = pos
     finite = target[np.isfinite(target)]
@@ -640,8 +640,8 @@ class spatialTransformInverse(spatialTransform):
     return self.T.paramChar()
 
 
-# a list of transforms, one hop each, displayed as MATLAB's table of a spatialTransform array
 class spatialTransformList(list):
+  """a list of transforms, one hop each, displayed as MATLAB's table of a spatialTransform array"""
 
   def __getitem__(self, k):
     out = super().__getitem__(k)

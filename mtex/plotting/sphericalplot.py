@@ -124,8 +124,8 @@ class sphericalPlot:
       self.minData = np.nanmin([self.minData, vals.min()])
       self.maxData = np.nanmax([self.maxData, vals.max()])
 
-  # the data range in the corners, MATLAB's TL and BL annotations
   def annotateMinMax(self):
+    """the data range in the corners, MATLAB's TL and BL annotations"""
     if np.isnan(self.minData):
       return
     for y, name, val in ((1, "Max:", self.maxData), (0, "Min:", self.minData)):
@@ -204,9 +204,9 @@ def _targets(v, projKw, axesKw, whereKw, titles=None):
   return sPs
 
 
-# the charts drawn into the axes named by parent, one each, as MATLAB's subplot and
-# 'parent' arrange independent plots; the figure of those axes becomes the current one
 def intoParents(parent, charts, axesKw):
+  """the charts drawn into the axes named by parent, one each, as MATLAB's subplot and
+  'parent' arrange independent plots; the figure of those axes becomes the current one"""
   axes = list(parent) if isinstance(parent, (list, tuple)) else [parent]
   fig = gcm()
   if fig is None or fig.fig is not axes[0].figure:
@@ -543,9 +543,9 @@ def _isSO3Fun(f):
 FILL_FLAGS = ("contourf", "contour", "pcolor", "smooth")
 
 
-# the style flag of a filled plot, popped from the keywords; MATLAB's 'contourf', n or
-# 'contourf', levels also gives the number of contours or the levels themselves
 def fillFlag(kw, default=None):
+  """the style flag of a filled plot, popped from the keywords; MATLAB's 'contourf', n or
+  'contourf', levels also gives the number of contours or the levels themselves"""
   for f in FILL_FLAGS:
     x = kw.pop(f, None)
     if x is None or (isinstance(x, (bool, np.bool_)) and not x):
@@ -728,9 +728,9 @@ def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
   return hs
 
 
-# circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
-# chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)
 def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0, parent=None, **kw):
+  """circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
+  chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)"""
   vs = v if isinstance(v, vector3d) else vector3d(v)
   t = np.linspace(0, 2 * np.pi, 361)
   rings = []
@@ -1002,8 +1002,8 @@ def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
   return sP
 
 
-# annotate: markers on every axes of the current figure, black by default
 def annotate(v, *args, **kw):
+  """annotate: markers on every axes of the current figure, black by default"""
   kw.setdefault("MarkerFaceColor", "k")
   kw.setdefault("add2all", True)
   # an orientation is marked in the sections of the current figure when it has some, or by
@@ -1171,9 +1171,9 @@ def plotRegion(sR, color="k", linewidth=1.0, **kw):
 
 # ------------------------------------------------------------------ colour keys
 
-# a direction key drawn as the sector it colours, an inverse pole figure key as its direction
-# key: the key evaluated on the chart grid, as an rgb surface
 def plotKey(key, resolution=0.5 * degree, fundamentalRegion=True, **kw):
+  """a direction key drawn as the sector it colours, an inverse pole figure key as its direction
+  key: the key evaluated on the chart grid, as an rgb surface"""
   key = getattr(key, "dirMap", key)
   projKw, axesKw, whereKw = _split(kw)
   # complete colours the whole sphere, every direction by its equivalent in the sector
@@ -1336,9 +1336,9 @@ def plotPDF(odf, h, *args, superposition=None, **kw):
   return out
 
 
-# the pole figure axes remember their crystal direction, so that annotate(ori) can mark
-# the poles of an orientation on them; the last charts of the current figure, in order
 def tagPoleAxes(hs, numCharts):
+  """the pole figure axes remember their crystal direction, so that annotate(ori) can mark
+  the poles of an orientation on them; the last charts of the current figure, in order"""
   fig = gcm()
   if fig is None or numCharts == 0 or len(hs) == 0:
     return

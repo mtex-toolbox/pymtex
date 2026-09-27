@@ -10,6 +10,7 @@
 # SO3FunHarmonic(f, bandwidth=L), by quadrature of the values.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
@@ -23,11 +24,12 @@ from .rbf import SO3FunCBF, SO3FunRBF, _readFrames, _rotationsFor, uniformODF
 from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
+from ..geometry.install import install
 
 
-# what every representation on SO(3) without an exact harmonic form shares: evaluation in its
-# frames, the operations through the harmonic form, and sums as compositions
 class SO3FunGeneric:
+  """what every representation on SO(3) without an exact harmonic form shares: evaluation in its
+  frames, the operations through the harmonic form, and sums as compositions"""
   isReal = True
   antipodal = False
 
@@ -38,9 +40,9 @@ class SO3FunGeneric:
     L = self.bandwidth if bandwidth is None else int(bandwidth)
     return SO3FunHarmonic(lambda o: self.eval(o), self.CS, self.SS, bandwidth=L, real=self.isReal, antipodal=self.antipodal)
 
-  # the mean by the harmonic expansion, or with a resolution the average over an
-  # equispaced grid of it, as MATLAB's
   def mean(self, resolution=None):
+    """the mean by the harmonic expansion, or with a resolution the average over an
+    equispaced grid of it, as MATLAB's"""
     if resolution is None:
       return SO3FunHarmonic(self).mean()
     from ..geometry.grids.so3grid import equispacedSO3Grid
@@ -97,6 +99,40 @@ class SO3FunGeneric:
   def __truediv__(self, a):
     return self * (1 / a)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+                                  calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
+                                  calcError, centerSpecimen)
+    from .polefigure import calcPoleFigure
+    from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sectionplot import plotSection
+    def sqrt(self) -> Any:
+      ...
+    def exp(self) -> Any:
+      ...
+    def log(self) -> Any:
+      ...
+    def __pow__(self, p) -> Any:
+      ...
+    def sum(self) -> Any:
+      ...
+    @property
+    def SRight(self) -> Any:
+      ...
+    @SRight.setter
+    def SRight(self, value) -> None:
+      ...
+    @property
+    def SLeft(self) -> Any:
+      ...
+    @SLeft.setter
+    def SLeft(self, value) -> None:
+      ...
+
 
 # the callable averaged over the groups of the frames on every call, and the inverses under exchange
 def _symmetrisedSO3(fun, CS, SS, antipodal):
@@ -129,8 +165,8 @@ class SO3FunHandle(SO3FunGeneric):
     self.bandwidth = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
     self.antipodal, self.isReal = bool(antipodal), bool(real)
 
-  # the callable receives orientations in the frames of the function
   def eval(self, x):
+    """the callable receives orientations in the frames of the function"""
     r = _rotationsFor(self, x)
     o = r if isinstance(r, orientation) else orientation._fromRotation(r.data, (self.CS, self.SS), self.antipodal)
     v = np.asarray(self.fun(o))
@@ -153,10 +189,14 @@ class SO3FunHandle(SO3FunGeneric):
       lines.append("  antipodal: true")
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .polefigure import calcPoleFigure
 
-# a sum of functions of different representations: evaluation adds the values, the harmonic
-# form adds the harmonic forms
+
 class SO3FunComposition(SO3FunGeneric):
+  """a sum of functions of different representations: evaluation adds the values, the harmonic
+  form adds the harmonic forms"""
 
   def __init__(self, *terms):
     flat = []
@@ -203,9 +243,9 @@ class SO3FunComposition(SO3FunGeneric):
   def SS(self):
     return self._SS
 
-  # odf.SS = specimenFrame('222'): every component takes the symmetry
   @SS.setter
   def SS(self, fr):
+    """odf.SS = specimenFrame('222'): every component takes the symmetry"""
     for t in self.components:
       t.SS = fr
     self._SS = fr
@@ -215,6 +255,10 @@ class SO3FunComposition(SO3FunGeneric):
     for t in self.components:
       lines.append("  " + repr(t).replace("\n", "\n  "))
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .polefigure import calcPoleFigure
 
 
 # ------------------------------------------------------------------ the sphere
@@ -282,8 +326,8 @@ class S2FunHandle:
   def mean(self):
     return S2FunHarmonic(self).mean()
 
-  # the surface integral, MATLAB's sum
   def sum(self):
+    """the surface integral, MATLAB's sum"""
     return 4 * np.pi * self.mean()
 
   def norm(self):
@@ -352,6 +396,13 @@ class S2FunHandle:
     if self.antipodal:
       lines.append("  antipodal: true")
     return "\n".join(lines)
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plot, contourf, contour, pcolor
+    from ..plotting.spaceplot import plot3d
 
 
 # a ratio of two functions on the sphere stays direct, its polarity untouched
@@ -453,6 +504,13 @@ class S2FunSum:
       lines.append("  " + repr(t).replace("\n", "\n  "))
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from ..analysis.optimalsample import optimalSample
+    from ..plotting.sphericalplot import plot, contourf, contour, pcolor
+    from ..plotting.spaceplot import plot3d
+
 
 class S1FunHandle:
 
@@ -503,10 +561,10 @@ _POINTWISE = {"__abs__": lambda self: _pointwiseSO3(self, np.abs), "abs": lambda
 for _cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric):
   for _name, _f in _POINTWISE.items():
     if _name not in vars(_cls):
-      setattr(_cls, _name, _f)
+      install(_cls, _f, _name)
   # MATLAB's names of the crystal and the specimen frame; assigning one relabels the
   # function and leaves its values, symmetrise then projects
-  _cls.SRight = property(lambda self: self.CS, lambda self, fr: setattr(self, "CS", fr))
-  _cls.SLeft = property(lambda self: self.SS, lambda self, fr: setattr(self, "SS", fr))
+  install(_cls, property(lambda self: self.CS, lambda self, fr: setattr(self, "CS", fr)), "SRight")
+  install(_cls, property(lambda self: self.SS, lambda self, fr: setattr(self, "SS", fr)), "SLeft")
 
 __all__ = ["SO3FunHandle", "SO3FunComposition", "S2FunHandle", "S2FunSum", "S1FunHandle"]

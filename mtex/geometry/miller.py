@@ -30,6 +30,14 @@ _STYLE = {s.lower(): s for s in STYLES}
 
 
 def Miller(*args, antipodal=False, dispStyle=None):
+  """crystal directions and lattice plane normals, a vector3d in a crystal frame
+
+    Miller(h, k, l, cs)              plane normals, Miller(h, k, i, l, cs) with four indices
+    Miller(u, v, w, cs, 'uvw')       lattice directions, 'UVTW' with four indices
+    Miller([[1, 0, 0], ...], cs)     many at once, the indices along the last axis
+    Miller('{111}', cs)              (hkl) {hkl} [uvw] <uvw>, braces for the whole family
+    Miller(v, cs)                    a vector3d expressed in the crystal frame
+  """
   style = dispStyle
   for a in args:
     if isinstance(a, str) and a.lower() in _STYLE:
@@ -110,9 +118,9 @@ def _parse(s, cs):
 
 # ------------------------------------------------------------------ rounding
 
-# the smallest multiple whose indices are close to integers, up to maxHKL; UVTW is reduced
-# by its gcd, the smallest integer four index form
 def roundIndices(v, style=None, maxHKL=12):
+  """the smallest multiple whose indices are close to integers, up to maxHKL; UVTW is reduced
+  by its gcd, the smallest integer four index form"""
   # a direction without a lattice: its Cartesian coordinates to the nearest small integers
   if not v.isCrystalDirection:
     m = v.data.reshape(-1, 3)
@@ -159,8 +167,8 @@ def roundIndices(v, style=None, maxHKL=12):
 BAR = "̅"
 
 
-# indices as text: integers barred when negative under UTF-8, others at two decimals
 def indexString(idx, utf8):
+  """indices as text: integers barred when negative under UTF-8, others at two decimals"""
   parts = []
   for x in idx:
     isInt = abs(x - round(x)) < 1e-6
@@ -172,8 +180,8 @@ def indexString(idx, utf8):
   return sep.join(parts)
 
 
-# (hkl) and [uvw] for one plane or direction, {hkl} and <uvw> for the family a group makes
 def brackets(style, family):
+  """(hkl) and [uvw] for one plane or direction, {hkl} and <uvw> for the family a group makes"""
   if style in ("uvw", "UVTW"):
     return ("<", ">") if family else ("[", "]")
   if style in ("hkl", "hkil"):
@@ -181,9 +189,9 @@ def brackets(style, family):
   return ("", "")
 
 
-# the family brackets {hkl}, <uvw> for a direction in a frame with symmetry, the plain ones
-# (hkl), [uvw] when family is False, as a label on a plot names one direction
 def indexChar(v, style=None, utf8=None, family=None):
+  """the family brackets {hkl}, <uvw> for a direction in a frame with symmetry, the plain ones
+  (hkl), [uvw] when family is False, as a label on a plot names one direction"""
   # char(m, 'LaTex'): the indices as mathematics, a bar over the negative ones
   latex = isinstance(style, str) and style.lower() == "latex"
   utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8

@@ -10,6 +10,7 @@
 # group. A direction is projected into either by folding it with the group.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from .latticetype import latticeType
@@ -55,8 +56,8 @@ class sphericalRegion:
 
   # ------------------------------------------------------------------ membership
 
-  # whether directions lie in the region, up to a small tolerance at the boundary
   def checkInside(self, v, tolerance=1e-4):
+    """whether directions lie in the region, up to a small tolerance at the boundary"""
     xyz = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
     if len(self.N) == 0:
       return np.ones(xyz.shape[:-1], dtype=bool)
@@ -66,8 +67,8 @@ class sphericalRegion:
       inside |= np.all(-xyz @ self.N.T >= (self.alpha - tolerance) * n[..., None], axis=-1)
     return inside
 
-  # the fraction of the sphere the region covers, by a quadrature on a fine grid
   def volume(self, resolution=1 * degree):
+    """the fraction of the sphere the region covers, by a quadrature on a fine grid"""
     theta = np.arange(resolution / 2, np.pi, resolution)
     rho = np.arange(0, 2 * np.pi - resolution / 2, resolution)
     th, rh = np.meshgrid(theta, rho, indexing="ij")
@@ -75,10 +76,10 @@ class sphericalRegion:
     v = vector3d.byPolar(th, rh)
     return np.sum(w * self.checkInside(v)) / np.sum(w)
 
-  # the centre (MATLAB @sphericalRegion/center): the pole of a single circle, the bisector of
-  # the two boundaries furthest apart for a lune, the barycentre of the vertices of a
-  # triangle, and the area centroid of anything larger
   def center(self, resolution=1 * degree):
+    """the centre (MATLAB @sphericalRegion/center): the pole of a single circle, the bisector of
+    the two boundaries furthest apart for a lune, the barycentre of the vertices of a
+    triangle, and the area centroid of anything larger"""
     N = []
     for n in self.N:
       if not any(m @ n > 1 - 1e-9 for m in N):
@@ -104,8 +105,8 @@ class sphericalRegion:
 
   __hash__ = None
 
-  # the hemisphere seen from a direction added to the region
   def restrict2Upper(self, up=None):
+    """the hemisphere seen from a direction added to the region"""
     from .plottingconvention import plottingConvention
     up = zvector if up is None else up.outOfScreen if isinstance(up, plottingConvention) else up
     u = _unit(np.asarray(up.data if isinstance(up, vector3d) else up, dtype=float))
@@ -119,10 +120,10 @@ class sphericalRegion:
 
   # ------------------------------------------------------------------ the shape
 
-  # the polar intervals of the region along the meridian rho: every circle
-  # dot(v, n) >= alpha cuts the meridian in R cos(theta - phi) >= alpha, whose solutions
-  # are arcs; a cap taken away can leave the meridian in two pieces, so a list
   def thetaIntervals(self, rho):
+    """the polar intervals of the region along the meridian rho: every circle
+    dot(v, n) >= alpha cuts the meridian in R cos(theta - phi) >= alpha, whose solutions
+    are arcs; a cap taken away can leave the meridian in two pieces, so a list"""
     segs = [(0.0, float(np.pi))]
     for n, alpha in zip(self.N, self.alpha):
       a = n[0] * np.cos(rho) + n[1] * np.sin(rho)
@@ -151,8 +152,8 @@ class sphericalRegion:
     segs = self.thetaIntervals(rho)
     return None if not segs else (segs[0][0], segs[-1][1])
 
-  # the corners of the region: the intersections of its circles that lie inside
   def vertices(self, tolerance=1e-8):
+    """the corners of the region: the intersections of its circles that lie inside"""
     V = []
     n = len(self.N)
     for i in range(n - 1):
@@ -162,9 +163,9 @@ class sphericalRegion:
             V.append(v)
     return vector3d(np.array(V).reshape(-1, 3), isNormalized=True, frame=self.frame)
 
-  # the boundary as arcs, one vector3d per arc: each circle is cut at the corners on it and
-  # the pieces whose midpoint lies inside are kept
   def boundary(self, resolution=1 * degree):
+    """the boundary as arcs, one vector3d per arc: each circle is cut at the corners on it and
+    the pieces whose midpoint lies inside are kept"""
     V = self.vertices().data
     arcs = []
     for n, alpha in zip(self.N, self.alpha):
@@ -185,6 +186,10 @@ class sphericalRegion:
 
   def __repr__(self):
     return f"sphericalRegion\n  faces: {len(self.N)}\n  vertices: {0 if len(self.N) == 0 else self.vertices().size}"
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.sphericalplot import plotRegion as plot
 
 
 # the two points where the circles dot(v, n1) = a1 and dot(v, n2) = a2 meet
@@ -220,12 +225,12 @@ def _symmetryDirections(pg):
   return _symmetryDirections(pg.lattice, a, b, c)
 
 
-# the centre of the Dirichlet domain: the barycentre of the conventional sector - the
-# triangle c, a, tertiary for the tetragonal and hexagonal systems, [001], [101], [111]
-# for the cubic one - in the axes the group is written in; the sum of the axes otherwise.
-# A centre some element other than the identity fixes has a cell too large, as the axes of
-# a group turned against its own axes can give, so it is moved off every such element
 def sectorCenter(pg):
+  """the centre of the Dirichlet domain: the barycentre of the conventional sector - the
+  triangle c, a, tertiary for the tetragonal and hexagonal systems, [001], [101], [111]
+  for the cubic one - in the axes the group is written in; the sum of the axes otherwise.
+  A centre some element other than the identity fixes has a cell too large, as the axes of
+  a group turned against its own axes can give, so it is moved off every such element"""
   from .frames import referenceFrame
   if isinstance(pg, referenceFrame):
     fr = pg
@@ -288,9 +293,9 @@ def _essentialNormals(N, tol=1e-4):
   return np.array([n for n in N if sum(abs(n @ v) < tol for v in verts) >= 2])
 
 
-# the great circles bisecting the centre and its images: the Dirichlet domain, a fundamental
-# domain for every group whatever axes it is written in
 def dirichletSector(pg, center=None, frame=None, antipodal=False):
+  """the great circles bisecting the centre and its images: the Dirichlet domain, a fundamental
+  domain for every group whatever axes it is written in"""
   from .frames import referenceFrame
   if isinstance(pg, referenceFrame):
     frame = pg
@@ -316,11 +321,11 @@ def dirichletSector(pg, center=None, frame=None, antipodal=False):
   return sphericalRegion(N, np.zeros(len(N)), frame, antipodal)
 
 
-# the fundamental sector: the conventional one where it is a fundamental domain of the
-# group, which it is for every crystal frame; the Dirichlet domain for a group the rules of
-# the conventional sector do not fit, as the rotations two frames share, turned against
-# the axes they are written in; with a centre given, that centre's Dirichlet domain
 def fundamentalSector(pg, center=None, frame=None, antipodal=False, angle=None):
+  """the fundamental sector: the conventional one where it is a fundamental domain of the
+  group, which it is for every crystal frame; the Dirichlet domain for a group the rules of
+  the conventional sector do not fit, as the rotations two frames share, turned against
+  the axes they are written in; with a centre given, that centre's Dirichlet domain"""
   from .frames import referenceFrame
   if angle is not None:
     from .orientationregion import fundamentalRegion
@@ -372,11 +377,11 @@ def _fibonacciSphere(n):
   return np.stack([r * np.cos(rho), r * np.sin(rho), z], axis=1)
 
 
-# the conventional sector, the one MTEX draws: the hemisphere towards up when some element
-# sends up below it, a wedge about the c axis of the angle the order leaves, starting on a
-# mirror plane through the axis, else on a two-fold axis in the plane, else at the a axis,
-# and the standard triangles of the cubic groups
 def conventionalSector(pg, up=None, east=None, frame=None):
+  """the conventional sector, the one MTEX draws: the hemisphere towards up when some element
+  sends up below it, a wedge about the c axis of the angle the order leaves, starting on a
+  mirror plane through the axis, else on a two-fold axis in the plane, else at the a axis,
+  and the standard triangles of the cubic groups"""
   from .frames import referenceFrame
   if isinstance(pg, referenceFrame):
     frame = pg
@@ -483,9 +488,9 @@ def _wedgeStart(pg, rhoA):
   return rhoA - np.min(np.mod(rhoA - cand + 1e-9, np.pi) - 1e-9)
 
 
-# the image of a direction that lies in a region, under the group; the antipode of an axis
-# counts as an image; the direction itself when no image lies inside
 def projectIntoRegion(v, sR, pg=None):
+  """the image of a direction that lies in a region, under the group; the antipode of an axis
+  counts as an image; the direction itself when no image lies inside"""
   from .kernels import projectIntoSector
   pg = v.frame.sym if pg is None else pg
   xyz = v.data.reshape(-1, 3)

@@ -85,9 +85,9 @@ def loadCIF(fname):
   return crystalFrame(group, axes, [a * degree for a in angles], mineral=mineral or None)
 
 
-# a Bruker phase list: XML with one TEBSDExtPhaseEntry per phase, the space group by its
-# number, the cell under Cell/Dim and Cell/Angles, the colour as r,g,b
 def loadPHL(fname):
+  """a Bruker phase list: XML with one TEBSDExtPhaseEntry per phase, the space group by its
+  number, the cell under Cell/Dim and Cell/Angles, the colour as r,g,b"""
   import xml.etree.ElementTree as ET
   path = fname if os.path.isfile(fname) else os.path.join(mtexCifPath(), os.path.basename(fname))
   if not os.path.isfile(path):

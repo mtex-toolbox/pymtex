@@ -27,6 +27,7 @@ from ..geometry.symreduce import chordAngle
 from ..geometry.tangent import rotationVector
 from ..geometry.vector3d import vector3d
 from .ebsd import EBSD
+from ..geometry.install import install
 
 IDENTITY = np.array([[1.0, 0.0, 0.0, 0.0]])
 
@@ -37,23 +38,23 @@ def _conj(q):
 
 # ------------------------------------------------------------------ the neighbourhood
 
-# the lattice a map is measured on, or an error naming what is missing
 def mapLattice(ebsd):
+  """the lattice a map is measured on, or an error naming what is missing"""
   if ebsd.lattice is None:
     raise ValueError("the map is not on a lattice, so it has no neighbours")
   return ebsd.lattice
 
 
-# the measurement at every lattice index, -1 where the lattice carries none
 def latticeLookup(l):
+  """the measurement at every lattice index, -1 where the lattice carries none"""
   lk = np.full((int(l.ij[:, 0].max()) + 1, int(l.ij[:, 1].max()) + 1), -1, dtype=np.int64)
   lk[l.ij[:, 0], l.ij[:, 1]] = np.arange(len(l.ij))
   return lk
 
 
-# the measurement at every index shifted by an offset, -1 where the map has none, and
-# whether the shifted index is still inside the lattice
 def neighbourAt(lk, ij, off):
+  """the measurement at every index shifted by an offset, -1 where the map has none, and
+  whether the shifted index is still inside the lattice"""
   i, j = ij[:, 0] + off[0], ij[:, 1] + off[1]
   inside = (i >= 0) & (i < lk.shape[0]) & (j >= 0) & (j < lk.shape[1])
   nb = np.full(len(ij), -1, dtype=np.int64)
@@ -61,9 +62,9 @@ def neighbourAt(lk, ij, off):
   return nb, inside
 
 
-# what a comparison of two measurements needs, gathered once: a pair the orientation field
-# is continuous across is indexed on both sides, of one phase and of one grain
 class mapPairs:
+  """what a comparison of two measurements needs, gathered once: a pair the orientation field
+  is continuous across is indexed on both sides, of one phase and of one grain"""
 
   def __init__(self, ebsd):
     self.rot = np.ascontiguousarray(ebsd.rotations.data, dtype=float).reshape(-1, 4)
@@ -73,8 +74,8 @@ class mapPairs:
     self.G = {int(p): ebsd.CSList[int(p)].sym.properGroup().rotations().data.reshape(-1, 4).astype(float)
               for p in np.unique(self.phase) if ebsd.CSList.isIndexed(int(p))}
 
-  # the proper groups as one table indexed by phase, and their sizes
   def groupTable(self):
+    """the proper groups as one table indexed by phase, and their sizes"""
     top = int(self.phase.max(initial=0)) + 1
     width = max([len(G) for G in self.G.values()] + [1])
     Gall = np.zeros((top, width, 4))
@@ -84,8 +85,8 @@ class mapPairs:
       nG[p] = len(G)
     return Gall, nG
 
-  # what the kernels read: the grain ids, or a dummy where the map has none
   def arrays(self):
+    """what the kernels read: the grain ids, or a dummy where the map has none"""
     grain = np.zeros(len(self.rot), dtype=np.int64) if self.grain is None else np.ascontiguousarray(self.grain, dtype=np.int64)
     return np.ascontiguousarray(self.indexed), np.ascontiguousarray(self.phase, dtype=np.int64), grain, self.grain is not None
 
@@ -97,8 +98,8 @@ class mapPairs:
       ok &= self.grain[a] == self.grain[bb]
     return ok
 
-  # the image of the orientation of b closest to that of a, phase by phase
   def closest(self, a, b):
+    """the image of the orientation of b closest to that of a, phase by phase"""
     out = np.empty((len(a), 4))
     for p, G in self.G.items():
       sel = self.phase[a] == p
@@ -106,18 +107,18 @@ class mapPairs:
         out[sel] = closestImage(self.rot[a[sel]], self.rot[b[sel]], IDENTITY, G)[1]
     return out
 
-  # the left tangent vector pointing from a to b, in specimen coordinates
   def tangentTo(self, a, b):
+    """the left tangent vector pointing from a to b, in specimen coordinates"""
     return rotationVector(qmul(self.closest(a, b), _conj(self.rot[a])))
 
-  # the misorientation angle of a pair, from the chord to the closest element
   def misAngle(self, a, b):
+    """the misorientation angle of a pair, from the chord to the closest element"""
     return chordAngle(self.rot[a], self.closest(a, b))
 
 
-# the offsets reachable in that many steps over the stencil of the lattice, or within a
-# physical distance over as many steps as it takes to reach it
 def neighbourBall(l, order=None, radius=None):
+  """the offsets reachable in that many steps over the stencil of the lattice, or within a
+  physical distance over as many steps as it takes to reach it"""
   st = [tuple(int(x) for x in o) for o in l.stencil]
   if radius is not None:
     step = min(np.linalg.norm(l.A @ np.array(o, dtype=float)) for o in st)
@@ -143,14 +144,14 @@ def neighbourBall(l, order=None, radius=None):
 STENCILS = ("oneSided", "lattice", "full")
 
 
-# the derivative of the orientation along the two axes of the plane of the map, per unit
-# length, as a pair of framed vectors; or along a direction of the specimen, which has
-# none where it leaves the plane. The stencil says which neighbours it is taken from: the
-# one sided difference along the two lattice directions, stepping backwards only where the
-# map ends and NaN where the neighbour it asks for is missing inside the map; the whole
-# stencil of the lattice, the central difference in the interior; or the same with the
-# diagonals. A pixel whose neighbours do not span two directions has none, and is NaN
 def gradient(ebsd, direction=None, stencil="oneSided"):
+  """the derivative of the orientation along the two axes of the plane of the map, per unit
+  length, as a pair of framed vectors; or along a direction of the specimen, which has
+  none where it leaves the plane. The stencil says which neighbours it is taken from: the
+  one sided difference along the two lattice directions, stepping backwards only where the
+  map ends and NaN where the neighbour it asks for is missing inside the map; the whole
+  stencil of the lattice, the central difference in the interior; or the same with the
+  diagonals. A pixel whose neighbours do not span two directions has none, and is NaN"""
   if direction is not None:
     gx, gy = gradient(ebsd, stencil=stencil)
     pl = mapLattice(ebsd).plane
@@ -240,11 +241,11 @@ def gradientZ(ebsd, stencil="oneSided"):
 
 # ------------------------------------------------------------------ the curvature
 
-# the curvature tensor of every pixel, kappa = d omega / d x, in the specimen frame per scan
-# unit, its rows the components of the rotation vector and its columns the directions of the
-# specimen. A two dimensional map says nothing about how the orientation changes along its
-# normal, so every column the normal reaches is unknown and NaN
 def curvature(ebsd, stencil="oneSided"):
+  """the curvature tensor of every pixel, kappa = d omega / d x, in the specimen frame per scan
+  unit, its rows the components of the rotation vector and its columns the directions of the
+  specimen. A two dimensional map says nothing about how the orientation changes along its
+  normal, so every column the normal reaches is unknown and NaN"""
   from ..tensors.tensor import curvatureTensor
   gx, gy = gradient(ebsd, stencil=stencil)
   pl = mapLattice(ebsd).plane
@@ -255,13 +256,13 @@ def curvature(ebsd, stencil="oneSided"):
 
 # ------------------------------------------------------------------ the weighted Burgers vector
 
-# weightedBurgersVec(ebsd), weightedBurgersVec(ebsd, windowSize=2), weightedBurgersVec(ebsd,
-# 'gradient', stencil='full'): the net Burgers vector crossing the map per unit area, after
-# Wheeler et al. (2009), a vector per pixel in the specimen frame per scan unit. The integral
-# method sums the crystal coordinates of the specimen x and y axes around a square loop of
-# 2 windowSize + 1 pixels, on the gridded map, NaN where the loop leaves the grain or the
-# map; the gradient method is the column of Nye's tensor along the normal of the map
 def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=False):
+  """weightedBurgersVec(ebsd), weightedBurgersVec(ebsd, windowSize=2), weightedBurgersVec(ebsd,
+  'gradient', stencil='full'): the net Burgers vector crossing the map per unit area, after
+  Wheeler et al. (2009), a vector per pixel in the specimen frame per scan unit. The integral
+  method sums the crystal coordinates of the specimen x and y axes around a square loop of
+  2 windowSize + 1 pixels, on the gridded map, NaN where the loop leaves the grain or the
+  map; the gradient method is the column of Nye's tensor along the normal of the map"""
   from scipy.ndimage import correlate, maximum_filter, minimum_filter
   from ..analysis.mechanics import dislocationDensity
   if gradient or "gradient" in args:
@@ -295,12 +296,12 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
 
 # ------------------------------------------------------------------ KAM
 
-# the kernel average misorientation: the mean misorientation angle of a pixel to its
-# neighbours, NaN where it has none to compare with. The neighbours are the ones within
-# order steps over the lattice stencil, or within a physical radius; threshold drops a pair
-# above an angle, max takes the largest angle instead of the mean, and weights is a
-# function of the distance
 def KAM(ebsd, order=1, radius=None, threshold=np.inf, max=False, weights=None):
+  """the kernel average misorientation: the mean misorientation angle of a pixel to its
+  neighbours, NaN where it has none to compare with. The neighbours are the ones within
+  order steps over the lattice stencil, or within a physical radius; threshold drops a pair
+  above an angle, max takes the largest angle instead of the mean, and weights is a
+  function of the distance"""
   l = mapLattice(ebsd)
   offs = neighbourBall(l, order=order, radius=radius)
   w = np.ones(len(offs)) if weights is None else np.array([float(weights(np.linalg.norm(l.A @ o))) for o in offs])
@@ -345,11 +346,11 @@ def _kamNumpy(l, lk, m, offs, w, threshold, maximal):
 
 # ------------------------------------------------------------------ GROD and grain means
 
-# the grain reference orientation deviation, mis2mean: the misorientation of every pixel
-# from the mean orientation of its grain, or from a given reference. The reference is
-# taken over the symmetric equivalent closest to the pixel, so the deviation is the small
-# rotation it is meant to be
 def calcGROD(ebsd, grains=None, rotRef=None):
+  """the grain reference orientation deviation, mis2mean: the misorientation of every pixel
+  from the mean orientation of its grain, or from a given reference. The reference is
+  taken over the symmetric equivalent closest to the pixel, so the deviation is the small
+  rotation it is meant to be"""
   n = ebsd.size
   if rotRef is None:
     if grains is None:
@@ -385,10 +386,10 @@ def calcGROD(ebsd, grains=None, rotRef=None):
   return orientation._fromRotation(out.reshape(ebsd.shape + (4,)), (cs, cs))
 
 
-# the average of a property over each grain: one value per grain when the grains are
-# given, and the value of its own grain at every pixel when they are not; method is the
-# reduction, llim and ulim the range of values it is taken over
 def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf):
+  """the average of a property over each grain: one value per grain when the grains are
+  given, and the value of its own grain at every pixel when they are not; method is the
+  reduction, llim and ulim the range of values it is taken over"""
   if "grainId" not in ebsd.prop:
     raise ValueError("the map carries no grain id; reconstruct it with calcGrains(ebsd)")
   v = np.asarray(prop, dtype=float).reshape(-1)
@@ -411,11 +412,11 @@ def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf
 
 # ------------------------------------------------------------------ profiles and pairs
 
-# the measurements along a polyline, in the order they are met, and the distance along the
-# line of each of them, as MATLAB's pair; a pixel belongs to the line when it lies within
-# radius of it, half a step by default. The line is an (N, 2) array of x and y, or x and y
-# as two lists
 def spatialProfile(ebsd, lineXY, y=None, radius=None):
+  """the measurements along a polyline, in the order they are met, and the distance along the
+  line of each of them, as MATLAB's pair; a pixel belongs to the line when it lies within
+  radius of it, half a step by default. The line is an (N, 2) array of x and y, or x and y
+  as two lists"""
   if y is not None:
     lineXY = np.stack([np.asarray(lineXY, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)], axis=1)
   Q = np.asarray(lineXY.data if isinstance(lineXY, vector3d) else lineXY, dtype=float)
@@ -445,11 +446,11 @@ def spatialProfile(ebsd, lineXY, y=None, radius=None):
   return ebsd[np.array(idx, dtype=int)], np.array(dist)
 
 
-# uncorrelated misorientations: random pairs of measurements far enough apart that they say
-# nothing about one another, which is what an uncorrelated distribution is compared
-# against. Both maps must carry one indexed phase; the pair is written as a boundary
-# writes it, inv(o2) o1 carrying a direction of the first phase into the second
 def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rng=None):
+  """uncorrelated misorientations: random pairs of measurements far enough apart that they say
+  nothing about one another, which is what an uncorrelated distribution is compared
+  against. Both maps must carry one indexed phase; the pair is written as a boundary
+  writes it, inv(o2) o1 carrying a direction of the first phase into the second"""
   other = ebsd if other is None else other
   o1, o2 = ebsd.orientations, other.orientations
   P1, P2 = ebsd.pos.data.reshape(-1, 3)[ebsd.isIndexed.reshape(-1)], other.pos.data.reshape(-1, 3)[other.isIndexed.reshape(-1)]
@@ -465,6 +466,6 @@ def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rn
 
 for _name, _f in (("gradient", gradient), ("gradientX", gradientX), ("gradientY", gradientY), ("gradientZ", gradientZ), ("curvature", curvature),
                   ("KAM", KAM), ("calcGROD", calcGROD), ("grainMean", grainMean), ("spatialProfile", spatialProfile), ("calcMisorientation", calcMisorientation), ("weightedBurgersVec", weightedBurgersVec)):
-  setattr(EBSD, _name, _f)
+  install(EBSD, _f, _name)
 
 __all__ = ["neighbourBall"]

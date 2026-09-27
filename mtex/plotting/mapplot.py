@@ -62,10 +62,10 @@ class mapPlot:
     if title is not None:
       ax.set_title(title, fontsize=getMTEXpref("FontSize", 13))
 
-  # every drawing coloured by values, so that a colour map or range set afterwards reaches
-  # all of them, as MATLAB's does; the mappable is the last one, the colour bar's
   @property
   def mappable(self):
+    """every drawing coloured by values, so that a colour map or range set afterwards reaches
+    all of them, as MATLAB's does; the mappable is the last one, the colour bar's"""
     return self.mappables[-1] if getattr(self, "mappables", None) else None
 
   @mappable.setter
@@ -75,8 +75,8 @@ class mapPlot:
     if h is not None:
       self.mappables.append(h)
 
-  # which reference axis runs to the right and which up under the layout, by name and sign
   def screenAxisNames(self):
+    """which reference axis runs to the right and which up under the layout, by name and sign"""
     names = tuple(self.frame.axesNames) if self.frame is not None else ("X", "Y", "Z")
     e1, e2 = self.plane.e1, self.plane.e2
     axes = [np.array([a @ e1, a @ e2]) for a in np.eye(3)]
@@ -93,9 +93,9 @@ class mapPlot:
   def onScreen(self, xy):
     return np.asarray(xy, dtype=float) @ self.layout.T
 
-  # more data drawn into the map widen it, as hold on does in MATLAB, and the scale bar
-  # follows the new limits
   def extend(self, x):
+    """more data drawn into the map widen it, as hold on does in MATLAB, and the scale bar
+    follows the new limits"""
     xlo, xhi, ylo, yhi = mapExtent(x, self.layout)
     e = self.extent
     new = (min(e[0], xlo), max(e[1], xhi), min(e[2], ylo), max(e[3], yhi))
@@ -114,9 +114,9 @@ class mapPlot:
       self.scaleBarArtists = []
       scaleBarOn(self, None, **args)
 
-  # a zoom, by xlim and ylim or in a window, takes the scale bar into the new view, as MATLAB
-  # redraws its bar in the corner of what is shown
   def followView(self):
+    """a zoom, by xlim and ylim or in a window, takes the scale bar into the new view, as MATLAB
+    redraws its bar in the corner of what is shown"""
     if getattr(self, "_followsView", False):
       return
     self._followsView = True
@@ -182,9 +182,9 @@ def _splitMap(kw):
   return {k: kw.pop(k) for k in MAP_KEYS if k in kw}
 
 
-# MATLAB's option names that the map plots know under another spelling; the grains keep
-# translucent, MATLAB's alpha that follows the colour
 def mapAliases(kw, grains=False):
+  """MATLAB's option names that the map plots know under another spelling; the grains keep
+  translucent, MATLAB's alpha that follows the colour"""
   if grains and "transparent" in kw:
     kw["translucent"] = kw.pop("transparent")
   for old, new in (() if grains else (("translucent", "faceAlpha"), ("transparent", "faceAlpha"))) + (("displayName", "DisplayName"), ("lineColour", "lineColor"),
@@ -198,16 +198,16 @@ def mapAliases(kw, grains=False):
 
 # ------------------------------------------------------------------ what is coloured
 
-# the colour of every measurement or grain, and whether it is a scalar to be mapped:
-# the phase palette, an orientation list through the inverse pole figure key of its
-# phase, an orientation colour key, the name of a property, one value or one colour per
-# element, or one colour for all
-# the value or the colour of every element, or of the elements `at` alone: a picture shows
-# fewer measurements than a large map holds, and the colour of one it never shows is work
-# thrown away. A route that yields numbers ignores `at` and stays whole, since the colour
-# range is the map's and not the picture's; a route that yields colours returns one per
-# entry of `at`.
 def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
+  """the colour of every measurement or grain, and whether it is a scalar to be mapped:
+  the phase palette, an orientation list through the inverse pole figure key of its
+  phase, an orientation colour key, the name of a property, one value or one colour per
+  element, or one colour for all
+  the value or the colour of every element, or of the elements `at` alone: a picture shows
+  fewer measurements than a large map holds, and the colour of one it never shows is work
+  thrown away. A route that yields numbers ignores `at` and stays whole, since the colour
+  range is the map's and not the picture's; a route that yields colours returns one per
+  entry of `at`."""
   n = x.size
   ids = np.asarray(x.phaseId).reshape(-1)
   sel = slice(None) if at is None else np.asarray(at).reshape(-1)
@@ -554,10 +554,10 @@ def _translucency(values, scalar, s):
   return np.clip(s * (1 - np.min(v[:, :3], axis=1)), 0, 1)
 
 
-# an axis per grain as MATLAB draws it: a needle through the centroid, grey when it lies
-# in the plane of the map, its half pointing out of the screen black and the other white
-# when it does not, half a diameter long
 def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw):
+  """an axis per grain as MATLAB draws it: a needle through the centroid, grey when it lies
+  in the plane of the map, its half pointing out of the screen black and the other white
+  when it does not, half a diameter long"""
   from matplotlib.collections import LineCollection
   mapKw = _splitMap(kw)
   mP = _target(grains, mapKw)
@@ -697,9 +697,9 @@ def _onMap(x, y):
   return mP.ax, mP.onScreen(xy)
 
 
-# line(x, y, LineStyle=':', LineWidth=4, Color='w'): a polyline in the coordinates of the
-# current map, drawn under its layout, MATLAB's line
 def line(x, y, z=None, **kw):
+  """line(x, y, LineStyle=':', LineWidth=4, Color='w'): a polyline in the coordinates of the
+  current map, drawn under its layout, MATLAB's line"""
   # a line in space goes into a 3D scene
   if z is not None:
     from .volumeplot import line3
@@ -710,9 +710,9 @@ def line(x, y, z=None, **kw):
                  color=kw.pop("color", "k"), zorder=7, **kw)[0]
 
 
-# scatter(x, y, sz, c, 'filled'): markers at the coordinates of the current map, MATLAB's
-# scatter of two coordinate lists; NaN positions are left out
 def scatterXY(x, y, *args, **kw):
+  """scatter(x, y, sz, c, 'filled'): markers at the coordinates of the current map, MATLAB's
+  scatter of two coordinate lists; NaN positions are left out"""
   sizes = next((a for a in args if not isinstance(a, str)), 36)
   names = [a for a in args if isinstance(a, str)]
   filled = "filled" in names
@@ -734,8 +734,8 @@ def _joinLegend(mP, h):
 
 # ------------------------------------------------------------------ arrows on a map
 
-# text(ebsd, labels): a label at every measurement or grain of the current map, or a new one
 def textMap(x, labels, fontSize=None, color="k", **kw):
+  """text(ebsd, labels): a label at every measurement or grain of the current map, or a new one"""
   fig = gcm()
   if fig is not None and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
     mP = fig.children[-1]._mtexMapPlot
@@ -859,9 +859,9 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, DisplayName, 
 
 # ------------------------------------------------------------------ the scale bar and the legends
 
-# a scale bar in one corner of a map: a round length near a tenth of its width, over the
-# length it stands for, and above it the axes of the specimen frame as they lie in the picture
 def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, Length=None):
+  """a scale bar in one corner of a map: a round length near a tenth of its width, over the
+  length it stands for, and above it the axes of the specimen frame as they lie in the picture"""
   from matplotlib.patches import Polygon, Rectangle
   ax = mP.ax
   mP.scaleBarArgs = dict(location=location, fraction=fraction, refFrame=refFrame, color=color, background=background, alpha=alpha,
@@ -932,11 +932,11 @@ def phaseLegend(mP, x, loc="upper right"):
   return mP.ax.legend(handles=handles, loc=loc)
 
 
-# the inverse pole figure key of every indexed phase present, drawn beside the map
-# the step a key of that many pixels is meshed at: about two pixels to a quad over a sector
-# some ninety degrees across, never finer than a key drawn for a page nor coarser than the
-# eye would catch
 def keyResolution(px):
+  """the inverse pole figure key of every indexed phase present, drawn beside the map
+  the step a key of that many pixels is meshed at: about two pixels to a quad over a sector
+  some ninety degrees across, never finer than a key drawn for a page nor coarser than the
+  eye would catch"""
   return float(np.clip(180 * degree / max(px, 1.0), 0.5 * degree, 4 * degree))
 
 

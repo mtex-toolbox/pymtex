@@ -16,9 +16,9 @@ from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 
 
-# the operators an indexer could have applied: the cosets g psSym of the proper group G,
-# without the group itself and without a coset twice
 def pseudoOperators(psSym, tol=1e-4):
+  """the operators an indexer could have applied: the cosets g psSym of the proper group G,
+  without the group itself and without a coset twice"""
   G = psSym.CS.sym.properGroup().rotations().data.reshape(-1, 4)
   p = psSym.data.reshape(-1, 4)[0]
   kept = []
@@ -33,15 +33,15 @@ def pseudoOperators(psSym, tol=1e-4):
   return np.array(kept).reshape(-1, 4)
 
 
-# the map corrected for the pseudo symmetry psSym, a misorientation of one phase with itself:
-# the boundaries of that phase within delta of it are grouped into connected components, the
-# components longer than threshold times the diagonal of their bounding box and of more than
-# four segments are taken for indexing artefacts, the grains across them are merged, and
-# every measurement of a grain that absorbed another is moved to the operator that brings it
-# nearest the merged grain's mean orientation. As calcGrains, it alters the map it is given,
-# its rotations and grain ids, and grains gets the parentId of the merge; MATLAB's three
-# outputs are returned
 def cleanUpPseudoSym(ebsd, grains, psSym, delta=2 * degree, threshold=1.5):
+  """the map corrected for the pseudo symmetry psSym, a misorientation of one phase with itself:
+  the boundaries of that phase within delta of it are grouped into connected components, the
+  components longer than threshold times the diagonal of their bounding box and of more than
+  four segments are taken for indexing artefacts, the grains across them are merged, and
+  every measurement of a grain that absorbed another is moved to the operator that brings it
+  nearest the merged grain's mean orientation. As calcGrains, it alters the map it is given,
+  its rotations and grain ids, and grains gets the parentId of the merge; MATLAB's three
+  outputs are returned"""
   if not isinstance(psSym, orientation):
     raise ValueError("the pseudo symmetry must be an orientation: its crystal frame says which phase to correct")
   if psSym.CS is not psSym.SS:

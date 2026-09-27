@@ -179,8 +179,8 @@ def _unionFindLoop(parent, size, a, b):
     parent[k] = x
 
 
-# the component root of every node of a graph on n nodes, or None without numba
 def unionFind(n, a, b):
+  """the component root of every node of a graph on n nodes, or None without numba"""
   nb = _jit()
   if not nb:
     return None
@@ -289,9 +289,9 @@ def _weldLoop(xy, lo0, lo1, c, M, nT, group, first):
   return m
 
 
-# the groups and first points of meshVertices through the compiled weld, or None without numba;
-# the coarse grid has cells of about cell in the units of xy
 def weldNumba(xy, lo, c, cell):
+  """the groups and first points of meshVertices through the compiled weld, or None without numba;
+  the coarse grid has cells of about cell in the units of xy"""
   nb = _jit()
   if not nb:
     return None
@@ -329,8 +329,8 @@ def _compile():
   return _COMPILED["localVoronoi"]
 
 
-# the faces of every cell through the compiled loop, or None without numba
 def localVoronoiNumba(sites, levels, distortTol=0.05, chunkSize=4096):
+  """the faces of every cell through the compiled loop, or None without numba"""
   loop = _compile()
   if loop is None:
     return None
@@ -455,9 +455,9 @@ def _compactLoopsLoop(goff, nlg, nvg, loopOff, vertOff, vtmp, ltmp, atmp, loopV,
       larea[loopOff[g] + j] = atmp[s + j]
 
 
-# the loops of every grain through the compiled walk: the flat vertices, the loop offsets,
-# the grain and twice the signed area of every loop, in grain order; None without numba
 def traceLoopsNumba(V, ea, eb, goff):
+  """the loops of every grain through the compiled walk: the flat vertices, the loop offsets,
+  the grain and twice the signed area of every loop, in grain order; None without numba"""
   loops = _compileLoops()
   if loops is None:
     return None
@@ -513,8 +513,8 @@ def _compileSorts():
   return _COMPILED
 
 
-# the adjacency of chainOrder, or None without numba
 def adjacencyNumba(F, offset):
+  """the adjacency of chainOrder, or None without numba"""
   compiled = _compileSorts()
   if compiled is None:
     return None
@@ -523,8 +523,8 @@ def adjacencyNumba(F, offset):
   return at
 
 
-# the directed edges of the grains in ids sorted by grain with their offsets, or None without numba
 def edgesByGrainNumba(F, gid, posOf, nIds):
+  """the directed edges of the grains in ids sorted by grain with their offsets, or None without numba"""
   compiled = _compileSorts()
   if compiled is None:
     return None
@@ -1358,9 +1358,9 @@ def grainKernel(name):
   return _COMPILED[key]
 
 
-# the linear program of one problem through the compiled simplex, None without numba, and
-# None again where the program has no solution
 def linearProgramNumba(c, A, b, tol=1e-9, maxit=10000):
+  """the linear program of one problem through the compiled simplex, None without numba, and
+  None again where the program has no solution"""
   if _preparePixel() is None:
     return None
   x = np.empty(len(c))

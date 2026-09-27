@@ -78,17 +78,17 @@ class ipfColorKey(orientationColorKey):
     self.dirMap = HSVDirectionKey(self.CS1) if dirMap is None else dirMap
     self._grid = None
 
-  # the crystal directions along the specimen direction of every orientation
   def crystalDirection(self, ori):
+    """the crystal directions along the specimen direction of every orientation"""
     q = ori.data.reshape(-1, 4)
     d = self.ipfDirection.normalize().data.reshape(3)
     return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.CS1, isNormalized=True)
 
-  # MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
-  # colours then read off the node nearest each crystal direction without folding it into the
-  # sector. An unchanged HSV key takes the grid its crystal frame keeps for the session,
-  # any other key a grid of its own, rebuilt when the key has changed since
   def precompute(self, resolution=None):
+    """MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
+    colours then read off the node nearest each crystal direction without folding it into the
+    sector. An unchanged HSV key takes the grid its crystal frame keeps for the session,
+    any other key a grid of its own, rebuilt when the key has changed since"""
     resolution = COLOR_GRID_RESOLUTION if resolution is None else resolution
     state = _keyState(self.dirMap)
     if self._grid is not None and self._grid[0] == state and self._grid[1].resolution == resolution:
@@ -97,9 +97,9 @@ class ipfColorKey(orientationColorKey):
     self._grid = (state, keyColorGrid(self.CS1, resolution) if default else colorGrid(self.dirMap, resolution))
     return self
 
-  # an orientation that was never measured has no colour, and a map shows nothing for it.
-  # From GRID_FROM orientations on the key goes through its grid, which it builds once
   def orientation2color(self, ori):
+    """an orientation that was never measured has no colour, and a map shows nothing for it.
+    From GRID_FROM orientations on the key goes through its grid, which it builds once"""
     if self._grid is None and ori.size >= GRID_FROM:
       self.precompute()
     if self._grid is not None:
@@ -141,9 +141,9 @@ class ipfHSVKey(ipfColorKey):
     CS1 = _framesOf(x)[0]
     super().__init__(x, ipfDirection, HSVDirectionKey(CS1, **kwargs))
 
-  # the sharpness and the white centre live on the direction key and are set through it
   @property
   def maxAngle(self):
+    """the sharpness and the white centre live on the direction key and are set through it"""
     return self.dirMap.maxAngle
 
   @maxAngle.setter
@@ -359,9 +359,9 @@ class colorGrid:
   def __len__(self):
     return len(self.colors)
 
-  # a NaN or zero direction, the pole of an unmeasured orientation, has no grid node and is
-  # coloured white, as MTEX greys such a cell rather than failing the map
   def direction2color(self, h):
+    """a NaN or zero direction, the pole of an unmeasured orientation, has no grid node and is
+    coloured white, as MTEX greys such a cell rather than failing the map"""
     from .kernels import cubeMapIndex
     xyz = (h.data if isinstance(h, vector3d) else np.asarray(h, dtype=float)).reshape(-1, 3)
     ind = cubeMapIndex(xyz, self.n)
@@ -383,10 +383,10 @@ def _keyState(key):
           tuple(np.round(np.asarray(key.sR.N).reshape(-1), 12)))
 
 
-# the grid held by the frame's identity: frames are interned, so the same frame brings the
-# same grid, and the grid depends on the sector alone, not on the specimen direction an
-# inverse pole figure is taken of
 def keyColorGrid(cs, resolution=COLOR_GRID_RESOLUTION):
+  """the grid held by the frame's identity: frames are interned, so the same frame brings the
+  same grid, and the grid depends on the sector alone, not on the specimen direction an
+  inverse pole figure is taken of"""
   with _GRID_LOCK:
     cg = _GRIDS.get(id(cs))
     if cg is None or cg[0] is not cs or abs(cg[1].resolution - resolution) > 1e-6 * resolution:
@@ -395,11 +395,11 @@ def keyColorGrid(cs, resolution=COLOR_GRID_RESOLUTION):
     return cg[1]
 
 
-# the colour of every measurement of a map, or of every grain, each phase by its own inverse
-# pole figure key; what is not indexed takes the background colour. The map goes through the
-# grid of the key unless exact=True colours every measurement through the key itself; the
-# grid route is one compiled loop over the quaternions where numba is there
 def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, resolution=COLOR_GRID_RESOLUTION, at=None):
+  """the colour of every measurement of a map, or of every grain, each phase by its own inverse
+  pole figure key; what is not indexed takes the background colour. The map goes through the
+  grid of the key unless exact=True colours every measurement through the key itself; the
+  grid route is one compiled loop over the quaternions where numba is there"""
   from .kernels import ipfGridColors
   d = vector3d(zvector if ipfDirection is None else ipfDirection).normalize().data.reshape(3)
   rots = x.meanRotation if hasattr(x, "meanRotation") else x.rotations

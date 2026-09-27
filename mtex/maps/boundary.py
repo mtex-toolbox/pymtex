@@ -15,6 +15,7 @@
 # the chain. Outside the map a side carries the grain 0, the pixel -1 and the phase -1.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.display import xnum2str
@@ -78,9 +79,9 @@ class grainBoundary:
 
   # ------------------------------------------------------------------ geometry
 
-  # the vertices as framed points of the specimen, all of them and the ones in use
   @property
   def allV(self):
+    """the vertices as framed points of the specimen, all of them and the ones in use"""
     return vector3d(self.plane.from2d(self.V), frame=self.frame)
 
   @property
@@ -92,9 +93,9 @@ class grainBoundary:
   def _mid2d(self):
     return (self.V[self.F[:, 0]] + self.V[self.F[:, 1]]) / 2
 
-  # the midpoint of every segment, a direction of the map as MATLAB's is
   @property
   def midPoint(self):
+    """the midpoint of every segment, a direction of the map as MATLAB's is"""
     return vector3d(self.plane.from2d(self._mid2d), frame=self.frame)
 
   @property
@@ -104,16 +105,16 @@ class grainBoundary:
   def perimeter(self):
     return float(self.segLength.sum())
 
-  # the direction of the walk, as a framed axis of the specimen
   @property
   def direction(self):
+    """the direction of the walk, as a framed axis of the specimen"""
     d = self.plane.from2d(self.V[self.F[:, 1]]) - self.plane.from2d(self.V[self.F[:, 0]])
     return vector3d(d, frame=self.frame, antipodal=True)
 
-  # the misorientations of the boundary, which needs one pair of phases in one order
-  # throughout, with the grain exchange symmetry where both sides are one phase
   @property
   def misorientation(self):
+    """the misorientations of the boundary, which needs one pair of phases in one order
+    throughout, with the grain exchange symmetry where both sides are one phase"""
     if self.isempty:
       raise ValueError("an empty boundary has no misorientations")
     p1, p2 = int(self.phaseId[0, 0]), int(self.phaseId[0, 1])
@@ -131,9 +132,9 @@ class grainBoundary:
       self._memo["degree"] = np.bincount(self.F.reshape(-1), minlength=len(self.V)).astype(np.int32)
     return self._memo["degree"]
 
-  # a vertex where any number of segments other than two meet
   @property
   def isJunction(self):
+    """a vertex where any number of segments other than two meet"""
     deg = self.vertexDegree()
     return (deg != 2) & (deg > 0)
 
@@ -141,10 +142,10 @@ class grainBoundary:
   def junctionId(self):
     return np.flatnonzero(self.isJunction)
 
-  # the chain of every segment, from the walk order and the junctions: a chain breaks
-  # where the head of one segment is not the tail of the next, and at a junction
   @property
   def chainId(self):
+    """the chain of every segment, from the walk order and the junctions: a chain breaks
+    where the head of one segment is not the tail of the next, and at a junction"""
     if "chainId" not in self._memo:
       n = len(self)
       if n == 0:
@@ -170,9 +171,9 @@ class grainBoundary:
     cid = self.chainId
     return np.concatenate([cid[1:] != cid[:-1], [True]]) if len(cid) else np.zeros(0, dtype=bool)
 
-  # a chain that closes onto itself, so its walk returns to where it started
   @property
   def isClosed(self):
+    """a chain that closes onto itself, so its walk returns to where it started"""
     cid = self.chainId
     if len(cid) == 0:
       return np.zeros(0, dtype=bool)
@@ -180,9 +181,9 @@ class grainBoundary:
     closed = self.F[ends, 1] == self.F[starts, 0]
     return closed[cid - 1]
 
-  # the length along the chain up to the end of each segment
   @property
   def arcLength(self):
+    """the length along the chain up to the end of each segment"""
     L = self.segLength
     cid = self.chainId
     cum = np.cumsum(L)
@@ -195,9 +196,9 @@ class grainBoundary:
     cid = self.chainId
     return np.bincount(cid, weights=self.segLength)[cid]
 
-  # the vertices of every chain in walk order, the chains separated by -1
   @property
   def chainV(self):
+    """the vertices of every chain in walk order, the chains separated by -1"""
     out = []
     start = self.isChainStart
     for k in range(len(self)):
@@ -208,9 +209,9 @@ class grainBoundary:
       out.append(self.F[k, 1])
     return np.array(out, dtype=np.int32)
 
-  # the connected component each segment lies in, junctions included, and its size
   @property
   def componentId(self):
+    """the connected component each segment lies in, junctions included, and its size"""
     from .segment import components
     n = len(self)
     if n == 0:
@@ -230,10 +231,10 @@ class grainBoundary:
     cid = self.componentId
     return np.bincount(cid)[cid]
 
-  # the segment before and after each one along its chain: a closed chain wraps its two
-  # ends onto each other, an open one clamps them, so a filter along the chain does not
-  # spread the undefined end
   def chainNeighbors(self):
+    """the segment before and after each one along its chain: a closed chain wraps its two
+    ends onto each other, an open one clamps them, so a filter along the chain does not
+    spread the undefined end"""
     n = len(self)
     prev, nxt = np.arange(-1, n - 1), np.arange(1, n + 1)
     hasPrev, hasNext = np.ones(n, dtype=bool), np.ones(n, dtype=bool)
@@ -250,10 +251,10 @@ class grainBoundary:
 
   # ------------------------------------------------------------------ triple points
 
-  # the triple points of the network, of a selection those at a vertex of its segments, with
-  # boundaryId into the whole network, as MATLAB's
   @property
   def triplePoints(self):
+    """the triple points of the network, of a selection those at a vertex of its segments, with
+    boundaryId into the whole network, as MATLAB's"""
     if self._root is None:
       if "triplePoints" not in self._memo:
         self._memo["triplePoints"] = triplePoints(self)
@@ -278,8 +279,8 @@ class grainBoundary:
       gB._shape = sel.shape
     return gB
 
-  # the segments between the two phases named, in either order, or with one named on either side
   def hasPhase(self, a, b=None):
+    """the segments between the two phases named, in either order, or with one named on either side"""
     # 'indexed' are the segments between two indexed measurements, as MATLAB reads the name;
     # 'notIndexed' those with a not indexed side or none at all, the rim of the scan
     if isinstance(a, str) and b is None and a.lower() in ("indexed", "notindexed") \
@@ -292,10 +293,10 @@ class grainBoundary:
     q = self.CSList.phaseId(b)
     return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
-  # the segments with a grain of the list on either side, walked again: a junction of the
-  # whole boundary may have lost its third segment, so the chains of the subset are longer;
-  # for pairs of ids the segments between the two of a pair, with the row of its pair
   def selectByGrainId(self, ids):
+    """the segments with a grain of the list on either side, walked again: a junction of the
+    whole boundary may have lost its third segment, so the chains of the subset are longer;
+    for pairs of ids the segments between the two of a pair, with the row of its pair"""
     ids = np.asarray(ids)
     if ids.ndim == 2 and ids.shape[1] == 2:
       M = int(max(ids.max(initial=0), self.grainId.max(initial=0))) + 1
@@ -324,15 +325,15 @@ class grainBoundary:
     p = self.CSList.phaseId(a)
     return gB._flipSegments(gB.phaseId[:, 0] != p)
 
-  # swap the two sides of the segments marked, or of all of them, and walk the chains again
   def flip(self, ind=None):
+    """swap the two sides of the segments marked, or of all of them, and walk the chains again"""
     sel = np.ones(len(self), dtype=bool) if ind is None else np.zeros(len(self), dtype=bool)
     if ind is not None:
       sel[ind] = True
     return orderWalk(self._flipSegments(sel))
 
-  # the segments whose misorientation is the given one up to a threshold
   def isTwinning(self, mori, threshold=5 * degree):
+    """the segments whose misorientation is the given one up to a threshold"""
     ind = np.zeros(len(self), dtype=bool)
     p1, p2 = self.CSList.phaseId(mori.frameA), self.CSList.phaseId(mori.frameB)
     sel = np.flatnonzero(self.hasPhase(p1, p2))
@@ -345,10 +346,10 @@ class grainBoundary:
 
   # ------------------------------------------------------------------ along the chain
 
-  # the signed curvature of every segment: the Menger curvature through the midpoints of a
-  # segment and its two neighbours along the chain, smoothed by a binomial filter along
-  # it; positive where the boundary bulges into grainId[:, 1]
   def curvature(self, n=50):
+    """the signed curvature of every segment: the Menger curvature through the midpoints of a
+    segment and its two neighbours along the chain, smoothed by a binomial filter along
+    it; positive where the boundary bulges into grainId[:, 1]"""
     nF = len(self)
     T = self.V.dtype
     kappa = np.full(nF, np.nan, dtype=T)
@@ -368,9 +369,9 @@ class grainBoundary:
     kappa[ok] = k[ok]
     return kappa
 
-  # the direction of a segment averaged over 2n + 1 of them along the chain: the chord
-  # across a window, clamped at the end of an open chain and shorter than a closed one
   def calcMeanDirection(self, n=1):
+    """the direction of a segment averaged over 2n + 1 of them along the chain: the chord
+    across a window, clamped at the end of an open chain and shorter than a closed one"""
     nF = len(self)
     if nF == 0:
       return vector3d(np.zeros((0, 3)), frame=self.frame, antipodal=True)
@@ -386,8 +387,8 @@ class grainBoundary:
     d = self.plane.from2d(self.V[self.F[fwd, 1]]) - self.plane.from2d(self.V[self.F[back, 0]])
     return vector3d(d, frame=self.frame, antipodal=True)
 
-  # the angle of every segment to a direction, or to the segments of another boundary
   def angle(self, x):
+    """the angle of every segment to a direction, or to the segments of another boundary"""
     other = x.direction if isinstance(x, grainBoundary) else x
     return self.direction.angle(other, noSymmetry=True)
 
@@ -397,10 +398,10 @@ class grainBoundary:
     p = p.data if isinstance(p, vector3d) else np.asarray(p, dtype=float)
     return p if p.shape[-1] == 2 else self.plane.to2d(p)
 
-  # where the line from p to q crosses each segment, MATLAB's [x, y] = intersect(gB, xy1, xy2):
-  # the coordinates per segment, NaN where it is not crossed; segLength=True adds the
-  # intercepts between successive crossings along the line
   def intersect(self, p, q, segLength=False):
+    """where the line from p to q crosses each segment, MATLAB's [x, y] = intersect(gB, xy1, xy2):
+    the coordinates per segment, NaN where it is not crossed; segLength=True adds the
+    intercepts between successive crossings along the line"""
     a, b = self._as2d(p).reshape(2), self._as2d(q).reshape(2)
     ab = b - a
     v1, v2 = self.V[self.F[:, 0]], self.V[self.F[:, 1]]
@@ -418,8 +419,8 @@ class grainBoundary:
       return x, y
     return x, y, np.diff(np.sort(t[hit])) * np.linalg.norm(ab)
 
-  # the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]
   def inpolygon(self, region):
+    """the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]"""
     from .ebsd import _inPolygon
     region = np.asarray(region, dtype=float)
     mp = self._mid2d
@@ -448,6 +449,14 @@ class grainBoundary:
     lines += rows
     return "\n".join(lines)
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from .boundaryresampling import (reduceBoundary, reduceBoundary as reduce, simplifyBoundary,
+                                     simplifyBoundary as simplify, refineBoundary, refineBoundary as refine)
+    from .shape import characteristicShape, surfor
+    from ..analysis.gbnd import calcGBND
+    from ..plotting.mapplot import plotBoundary as plot, quiverMap as quiver
+
 
 # ------------------------------------------------------------------ triple points
 
@@ -474,8 +483,8 @@ class triplePointList:
   def allV(self):
     return vector3d(self.plane.from2d(self.V), frame=self.frame)
 
-  # the points with the phases named among their three grains, a name repeated asking for that many
   def hasPhase(self, *names):
+    """the points with the phases named among their three grains, a name repeated asking for that many"""
     ids = [self.CSList.phaseId(n) for n in names]
     out = np.ones(len(self), dtype=bool)
     for p in set(ids):
@@ -505,9 +514,9 @@ class triplePointList:
     return f"triplePointList ({self.frame.char()})\n  size: {len(self)}\n  points  mineral 1  mineral 2  mineral 3\n" + "\n".join(rows)
 
 
-# the vertices where exactly three segments of three grains meet, with the grains, the
-# segments and the angles the segments enclose
 def triplePoints(gB):
+  """the vertices where exactly three segments of three grains meet, with the grains, the
+  segments and the angles the segments enclose"""
   T = gB.V.dtype
   deg = gB.vertexDegree()
   v = gB.F.reshape(-1)
@@ -627,11 +636,11 @@ def _compiledChainOrder():
 
 # ------------------------------------------------------------------ construction
 
-# the boundary of a segmentation: the faces it marks as outer, or inner, in walk order.
-# The two sides are listed by phase and then by grain, so a pair of phases always appears
-# in the same order and the outside of the map comes first; the site of the first grain,
-# or the mirror of the other one where it is outside, says which side is left
 def buildBoundary(c, seg, ebsd, inner=False):
+  """the boundary of a segmentation: the faces it marks as outer, or inner, in walk order.
+  The two sides are listed by phase and then by grain, so a pair of phases always appears
+  in the same order and the outside of the map comes first; the site of the first grain,
+  or the mirror of the other one where it is outside, says which side is left"""
   keep = np.flatnonzero(seg.isInner if inner else seg.isOuter)
   sites = c.sites
   T = c.V.dtype
@@ -811,11 +820,11 @@ def _turnLoop(F1, perm, cid, starts, ends, flip, idx, F2):
       F2[i, 0], F2[i, 1] = F1[i, 0], F1[i, 1]
 
 
-# bring the segments into walk order and orient every chain so that the grain in
-# grainId[:, 0] lies to its left: the boundary already holds that invariant on every
-# segment, so a segment the walk enters from its head is turned round on both sides, and a
-# chain is turned by the majority
 def orderWalk(gB):
+  """bring the segments into walk order and orient every chain so that the grain in
+  grainId[:, 0] lies to its left: the boundary already holds that invariant on every
+  segment, so a segment the walk enters from its head is turned round on both sides, and a
+  chain is turned by the majority"""
   perm, entry = chainOrder(gB.F, len(gB.V))
   if len(perm) == 0:
     return gB
@@ -832,9 +841,9 @@ def orderWalk(gB):
   return reverseChains(out, cid, flip)
 
 
-# reverse the chains marked, in the order of their rows and within each segment, both
-# sides of every segment turned with it
 def reverseChains(gB, cid, flip):
+  """reverse the chains marked, in the order of their rows and within each segment, both
+  sides of every segment turned with it"""
   n = len(gB)
   # a row of a flipped chain [s, e) takes the row s + e - 1 - i, the others stay
   starts = np.flatnonzero(np.concatenate([[True], cid[1:] != cid[:-1]]))
