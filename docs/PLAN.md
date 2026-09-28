@@ -426,7 +426,7 @@ NumPy fallback without it, which passes the kernel tests as is) and `release.yml
 `v<version>` builds and publishes by PyPI's trusted publishing, the environment `pypi` to be set
 up on PyPI and GitHub). The wheel installs and runs on 3.12.
 
-Before 0.1.0 (the ordered steps and their state: `docs/plans/release.md`):
+Before 1.0.0 (the ordered steps and their state: `docs/plans/release.md`):
 
 - the tree committed, the suite green on the CI matrix, a TestPyPI upload;
 - the bug rows of `docs/findings.md` fixed or stated as known differences, the `calcGrains`

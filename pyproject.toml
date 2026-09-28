@@ -1,6 +1,6 @@
 [project]
 name = "mtex"
-version = "0.1.0"
+version = "1.0.0"
 description = "MTEX, the crystallographic texture analysis toolbox, in Python"
 readme = "README.md"
 license = "GPL-2.0-only"
@@ -8,7 +8,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Ralf Hielscher" }]
 keywords = ["texture", "crystallography", "EBSD", "orientation", "ODF", "pole figure", "materials science"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",

@@ -1,4 +1,4 @@
-# Roadmap to 0.1.0
+# Roadmap to 1.0.0
 
 The decisions are in `docs/PLAN.md` section 11: GPL-2.0, `mtex` on PyPI, Python 3.12 or later,
 the pages on mtex-toolbox.github.io beside MATLAB's. This note orders what is left, as of
@@ -18,7 +18,7 @@ the pages on mtex-toolbox.github.io beside MATLAB's. This note orders what is le
   `git push --force-with-lease=main:89f65f1 origin main` (the user runs this). The last CI run
   tested the old history, which still holds the piecewise steps (`test_s2piecewise` fails there).
 - Commit the halfwidth changes in the working tree.
-- `singular-functions` stays a branch and is not part of 0.1.0.
+- `singular-functions` stays a branch and is not part of 1.0.0.
 
 Done when `origin/main` is the release history and the working tree is clean.
 
@@ -121,8 +121,8 @@ Done when the Python pages are live beside MATLAB's, or ready to go live on the 
   `pip install mtex[all]` into a clean environment and run a smoke script: load
   `mtexdata('forsterite')`, run `calcGrains`, do a plot, and do `calcODF` on the Dubna pole
   figures.
-- Write the CHANGELOG entry for 0.1.0 and bump the version.
-- Tag `v0.1.0`. `release.yml` publishes it.
+- Write the CHANGELOG entry for 1.0.0 (the version is bumped, 2026-09-28).
+- Tag `v1.0.0`. `release.yml` publishes it.
 
 ## Order
 
