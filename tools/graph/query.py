@@ -9,6 +9,9 @@
 #   query.py gaps <prefix> [--port julia]     MATLAB functions under a folder without a Python (Julia) counterpart
 #   query.py questions [<text>]               the research questions the notes ask, filtered by text, file or a named node
 #   query.py layer <layer>                    a layer in MATLAB and both ports: counterparts, tests, notes, algorithms, per class
+#   query.py tests <node>                     the Python tests whose assertions check the node, then those only running it
+#   query.py overlap [<file|layer>]           pairs of tests in one file with the same subject and nearly the same coverage
+#   query.py untested [<layer>]               public Python functions and methods no test asserts on
 #
 # A node is its id (m:@rotation.calcDensity, py:mtex.functions.density.calcDensity, jl:calcDensity),
 # a name, "@Class.method", "Class.method" or a source file path. A name stands for the MATLAB and
@@ -280,6 +283,84 @@ def cmdLayer(G_, layer):
     print(f"  {c:24s} {len(ns):7d} {py:7d} {jl:7d} {tested:7d}  {'yes' if c in pyCls else '-'}")
 
 
+# what the Python tests assert on (their "asserts" edges) and what they run (the measured coverage)
+class Tests:
+  def __init__(self, G_):
+    self.G = G_
+    self.ids = sorted(i for i, n in G_.nodes.items() if n["port"] == "python" and n["kind"] == "test")
+    self.runs = defaultdict(set)
+    for node, ts in G_.g.get("coverage", {}).items():
+      for t in ts:
+        self.runs[t].add(node)
+    self.subject = {}
+    for t in self.ids:
+      direct = {e["dst"] for e in G_.out[t] if e["kind"] == "asserts"}
+      # a method name on an untyped receiver stands for the implementations the test ran, all of them unmeasured
+      self.subject[t] = {d for d in direct if G_.nodes.get(d, {}).get("kind") != "dispatch"} | \
+                        {e["dst"] for d in direct if G_.nodes.get(d, {}).get("kind") == "dispatch"
+                         for e in G_.out[d] if e["kind"] == "dispatch" and (e["dst"] in self.runs[t] or not self.runs[t])}
+    self.bySubject = defaultdict(set)
+    for t, s in self.subject.items():
+      for d in s:
+        self.bySubject[d].add(t)
+
+  def seconds(self, t):
+    return self.G.g.get("durations", {}).get(t)
+
+
+def jaccard(a, b):
+  return len(a & b) / len(a | b) if a | b else 1.0
+
+
+def cmdTests(G_, q):
+  T = Tests(G_)
+  for i in G_.resolve(q):
+    if G_.nodes[i]["port"] != "python":
+      continue
+    print(f"{i}  {G_.where(i)}")
+    asserting = sorted(T.bySubject.get(i, ()))
+    running = sorted(set(G_.g.get("coverage", {}).get(i, {})) - set(asserting))
+    print(f"  asserted on by ({len(asserting)}):")
+    for t in asserting:
+      print(f"    {t}  {T.seconds(t) or 0:.2f} s")
+    print(f"  run by ({len(running)}):")
+    show(G_, running, 20)
+
+
+def cmdOverlap(G_, where, minSubject=0.8, minRuns=0.9):
+  T = Tests(G_)
+  byFile = defaultdict(list)
+  for t in T.ids:
+    n = G_.nodes[t]
+    if not where or where in n["file"] or where == n.get("layer"):
+      byFile[n["file"]].append(t)
+  for f, ts in sorted(byFile.items()):
+    pairs = []
+    for k, a in enumerate(ts):
+      for b in ts[k + 1:]:
+        js, jr = jaccard(T.subject[a], T.subject[b]), jaccard(T.runs[a], T.runs[b])
+        if T.subject[a] and js >= minSubject and jr >= minRuns:
+          pairs.append((js + jr, a, b, js, jr))
+    if pairs:
+      print(f)
+      for _, a, b, js, jr in sorted(pairs, reverse=True):
+        print(f"  {a.split('.')[-1]}  ~  {b.split('.')[-1]}   subject {js:.2f}, runs {jr:.2f}")
+
+
+def cmdUntested(G_, layer):
+  T = Tests(G_)
+  byFile = defaultdict(list)
+  for i, n in G_.nodes.items():
+    if n["port"] == "python" and n["kind"] in ("function", "method") and n.get("file", "").startswith("mtex/") \
+       and not n["name"].startswith("_") and (not layer or n.get("layer") == layer) and i not in T.bySubject:
+      byFile[n["file"]].append((n["name"] if n["kind"] == "function" else f"{n['cls']}.{n['name']}",
+                                "run" if i in G_.g.get("coverage", {}) else "never run"))
+  total = sum(len(v) for v in byFile.values())
+  print(f"{total} public functions and methods no test asserts on")
+  for f, ns in sorted(byFile.items()):
+    print(f"  {f}: " + ", ".join(f"{a}{'' if r == 'run' else ' (never run)'}" for a, r in sorted(ns)))
+
+
 def main():
   ap = argparse.ArgumentParser()
   ap.add_argument("cmd")
@@ -310,6 +391,12 @@ def main():
     cmdLayer(G_, a.arg or "geometry")
   elif a.cmd == "questions":
     cmdQuestions(G_, a.arg)
+  elif a.cmd == "tests":
+    cmdTests(G_, a.arg)
+  elif a.cmd == "overlap":
+    cmdOverlap(G_, a.arg)
+  elif a.cmd == "untested":
+    cmdUntested(G_, a.arg)
   elif a.cmd == "gaps":
     cmdGaps(G_, a.arg or "", a.port)
   else:

@@ -47,7 +47,7 @@ def headerComment(src):
 class Module:
   def __init__(self, name, rel, tree, src, isPackage):
     self.name, self.rel, self.tree, self.src, self.isPackage = name, rel, tree, src, isPackage
-    self.defs, self.imports, self.stars = {}, {}, []
+    self.defs, self.imports, self.stars, self.verbs = {}, {}, [], {}
 
   def resolveRelative(self, level, mod):
     base = self.name.split(".")
@@ -77,6 +77,12 @@ def scan(root):
     for st in m.tree.body:
       if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         m.defs[st.name] = st
+      # a verb made by funcs._method: angle(o1, o2) is the method o1.angle(o2)
+      elif isinstance(st, ast.Assign) and isinstance(st.value, ast.Call) and ast.unparse(st.value.func) == "_method" \
+          and st.value.args and isinstance(st.value.args[0], ast.Constant):
+        for t in st.targets:
+          if isinstance(t, ast.Name):
+            m.verbs[t.id] = st.value.args[0].value
       elif isinstance(st, ast.ImportFrom):
         target = m.resolveRelative(st.level, st.module) if st.level else (st.module or "")
         for a in st.names:
@@ -107,6 +113,8 @@ class Graph:
     m = self.mods[modName]
     if name in m.defs:
       return ("def", modName, name)
+    if name in m.verbs:
+      return ("verb", m.verbs[name])
     if name in m.imports:
       target, attr = m.imports[name]
       if attr is None:
@@ -218,6 +226,55 @@ class Graph:
         self.edges[(did, mid)] = dict(src=did, dst=mid, kind="dispatch", resolution="dispatch")
     return did, "dispatch"
 
+  # the definitions the names and attributes under some nodes of a body reach: (node, resolution)
+  def refs(self, roots, mod, cid, local):
+    for root in roots:
+      for x in ast.walk(root):
+        if isinstance(x, ast.Name) and isinstance(x.ctx, ast.Load) and x.id not in local:
+          r = self.resolve(mod, x.id)
+          if r and r[0] == "verb":
+            if r[1] in self.methods:
+              yield self.dispatch(r[1])
+          else:
+            yield self.nodeOf(r), "import"
+        elif isinstance(x, ast.Attribute) and isinstance(x.ctx, ast.Load):
+          v = x.value
+          if isinstance(v, ast.Name) and v.id in ("self", "cls") and cid:
+            yield self.lookup(cid, x.attr), "class"
+          elif isinstance(v, ast.Name) and v.id not in local:
+            r = self.resolve(mod, v.id)
+            if r and r[0] == "module":
+              yield self.nodeOf(self.resolve(r[1], x.attr)), "module"
+            elif r and r[0] == "def" and isinstance(self.mods[r[1]].defs[r[2]], ast.ClassDef):
+              yield self.lookup(f"py:class:{r[1]}.{r[2]}", x.attr), "static"
+            elif x.attr in self.methods and not (r is None and v.id in self.mods[mod].imports):
+              yield self.dispatch(x.attr)
+          elif x.attr in self.methods and not x.attr.startswith("__"):
+            yield self.dispatch(x.attr)
+
+  # what a test asserts on: its assertions and the last assignment of each name they read
+  def subject(self, tree):
+    checks = []
+    for x in ast.walk(tree):
+      if isinstance(x, ast.Assert):
+        checks.append(x.test)
+      elif isinstance(x, ast.Call):
+        f = ast.unparse(x.func)
+        if "testing." in f or f.split(".")[-1] in ("close", "approx") or f.split(".")[-1].startswith("assert"):
+          checks += x.args
+      elif isinstance(x, ast.With) and any("raises" in ast.unparse(i.context_expr) or "warns" in ast.unparse(i.context_expr)
+                                           for i in x.items):
+        checks += x.body
+    assigned = {}
+    for x in ast.walk(tree):
+      if isinstance(x, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and x.value is not None:
+        for t in (x.targets if isinstance(x, ast.Assign) else [x.target]):
+          for nm in ast.walk(t):
+            if isinstance(nm, ast.Name):
+              assigned[nm.id] = x.value
+    read = {nm.id for c in checks for nm in ast.walk(c) if isinstance(nm, ast.Name) and isinstance(nm.ctx, ast.Load)}
+    return checks + [assigned[k] for k in read if k in assigned]
+
   def link(self):
     for nid, n in list(self.nodes.items()):
       tree = n.get("_ast")
@@ -226,24 +283,13 @@ class Graph:
       mod, cid = n["_mod"], n.get("_cls")
       local = {a.arg for a in ast.walk(tree) if isinstance(a, ast.arg)}
       local |= {t.id for t in ast.walk(tree) if isinstance(t, ast.Name) and isinstance(t.ctx, ast.Store)}
-      for x in ast.walk(tree):
-        if isinstance(x, ast.Name) and isinstance(x.ctx, ast.Load) and x.id not in local:
-          dst = self.nodeOf(self.resolve(mod, x.id))
-          self.addEdge(nid, dst, "import")
-        elif isinstance(x, ast.Attribute) and isinstance(x.ctx, ast.Load):
-          v = x.value
-          if isinstance(v, ast.Name) and v.id in ("self", "cls") and cid:
-            self.addEdge(nid, self.lookup(cid, x.attr), "class")
-          elif isinstance(v, ast.Name) and v.id not in local:
-            r = self.resolve(mod, v.id)
-            if r and r[0] == "module":
-              self.addEdge(nid, self.nodeOf(self.resolve(r[1], x.attr)), "module")
-            elif r and r[0] == "def" and isinstance(self.mods[r[1]].defs[r[2]], ast.ClassDef):
-              self.addEdge(nid, self.lookup(f"py:class:{r[1]}.{r[2]}", x.attr), "static")
-            elif x.attr in self.methods:
-              self.addEdge(nid, *self.dispatch(x.attr))
-          elif x.attr in self.methods and not x.attr.startswith("__"):
-            self.addEdge(nid, *self.dispatch(x.attr))
+      for dst, res in self.refs([tree], mod, cid, local):
+        self.addEdge(nid, dst, res)
+      # a test's subject: the definitions its assertions reach
+      if n["kind"] == "test":
+        for dst, res in self.refs(self.subject(tree), mod, cid, local):
+          if dst and dst.startswith(("py:mtex", "py:class:mtex", "py:dispatch:")):
+            self.edges[(nid, dst, "asserts")] = dict(src=nid, dst=dst, kind="asserts", resolution=res)
     for cid, c in self.classes.items():
       for mid in c["methods"].values():
         self.edges[(cid, mid)] = dict(src=cid, dst=mid, kind="member", resolution="exact")

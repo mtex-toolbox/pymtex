@@ -10,7 +10,8 @@
 # questions those notes ask (every subsection, or else every bullet, under a heading naming questions
 # or a research agenda), the algorithms the benchmarks declare (bench/*.py, ALGORITHM) with the
 # profiles their runs leave in bench/out/<algorithm>/ (the Julia halves bench/*_ops.jl included), and the coverage the test runs leave in
-# tools/graph/out/coverage_<port>.json.
+# tools/graph/out/coverage_<port>.json with the seconds each test took. A test's "asserts" edges name its subject,
+# what its assertions check (scan_python.py).
 from __future__ import annotations
 
 import argparse
@@ -406,7 +407,12 @@ def recordMapper(ix, matlabRoot):
     hit = [n for n in cands if n["name"] == sub] or [n for n in cands if n["kind"] != "local"]
     return hit[0]["id"] if hit else None
 
+  # a Python record by its qualified name, since a decorated function starts at its first decorator
   def mapP(rec, byFile=pFile):
+    if byFile is pFile and rec.get("name"):
+      hit = [n for n in byFile.get(rec["file"], []) if n["id"].endswith("." + rec["name"])]
+      if hit:
+        return hit[0]["id"]
     cands = [n for n in byFile.get(rec["file"], []) if n["line"] <= rec["line"]]
     return max(cands, key=lambda n: n["line"])["id"] if cands else None
 
@@ -454,6 +460,16 @@ def coverage(ix, matlabRoot):
   return cov
 
 
+# the seconds each test took in the coverage run (coverage_python.py), its parametrisations summed
+def durations():
+  path = os.path.join(OUT, "durations_python.json")
+  out = {}
+  for test, t in (json.load(open(path)).items() if os.path.exists(path) else ()):
+    tid = "py:" + re.sub(r"\[.*\]$", "", test).replace(".py::", ".").replace("/", ".").replace("::", ".")
+    out[tid] = out.get(tid, 0.0) + t
+  return out
+
+
 # whether a source the graph is built from changed after it: the two trees, the benchmarks and
 # their profiles, the coverage runs and the notes
 def stale(graph=os.path.join(OUT, "graph.json"), matlabRoot=None, memory=MEMORY):
@@ -472,6 +488,7 @@ def stale(graph=os.path.join(OUT, "graph.json"), matlabRoot=None, memory=MEMORY)
       if any(f.endswith(ext) and os.path.getmtime(os.path.join(dirpath, f)) > built for f in filenames):
         return True
   results = glob.glob(os.path.join(ROOT, "bench", "out", "*", "profile_*.json")) + glob.glob(os.path.join(OUT, "coverage_*.json"))
+  results += glob.glob(os.path.join(OUT, "durations_*.json"))
   return any(os.path.getmtime(f) > built for f in results)
 
 
@@ -506,7 +523,8 @@ def main(argv=None):
   prof = profiles(ix, os.path.join(ROOT, "bench", "out"), mRoot)
   cov = coverage(ix, mRoot)
   g = dict(built=time.strftime("%Y-%m-%d %H:%M"), matlabRoot=mRoot, pythonRoot=ROOT, juliaRoot=JULIA,
-           nodes=mn + pn + jn + nn + an, edges=me + pe + je + ce + ne + ae, profiles=prof, coverage=cov)
+           nodes=mn + pn + jn + nn + an, edges=me + pe + je + ce + ne + ae, profiles=prof, coverage=cov,
+           durations=durations())
   os.makedirs(OUT, exist_ok=True)
   json.dump(g, open(os.path.join(OUT, "graph.json"), "w"))
   kinds = {}

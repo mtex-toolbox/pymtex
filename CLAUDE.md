@@ -126,7 +126,9 @@ io, plotting) check this port against MATLAB on one input through `tools/graph/c
 `run`, `matlab` one op per bridge call, `julia` (the `bench/*_ops.jl` of the same name through
 `tools/graph/crosscheck.jl`, warmed up, sampled profiles), `compare`, each tolerance with its
 reason beside it.
-One test file per source file, named `tests/test_<file>.py`; `tests/test_semantics.py`
+One test file per source file, named `tests/test_<file>.py`, one statement per test (`docs/plans/tests.md`:
+the kinds kept, when a test goes; `query.py tests <node>`, `overlap`, `untested` read a test's subject, the
+functions its assertions check, and the coverage run's timings); `tests/test_semantics.py`
 holds one test per statement of the semantics document and must stay green. The Julia
 port runs with `julia --project=../mtexJulia/dev`; MATLAB through the bridge in
 `../master/docs/agents/matlab-bridge/` (`../master/CLAUDE.local.md` has the machine's
