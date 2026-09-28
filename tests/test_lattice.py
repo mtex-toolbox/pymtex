@@ -137,3 +137,15 @@ def test_display():
   l = lattice(latticePositions(HEXA, 6))
   s = repr(l)
   assert s.startswith("lattice (hex)") and "sites  : 36" in s and "spacing: 1" in s and "basis  : (1, 0), (0.5, 0.866)" in s
+
+
+# duplicate positions on an exact grid: the affine index is kept, the neighbour graph not searched
+def test_duplicates_on_an_exact_grid_keep_the_affine_index(monkeypatch):
+  import sys
+  L = sys.modules["mtex.maps.lattice"]
+  pos = latticePositions(np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]]), 20)
+  pos = np.concatenate([pos, np.repeat(pos[:1], 5, axis=0)])
+  monkeypatch.setattr(L, "growIndex", lambda *a: pytest.fail("the neighbour graph was searched"))
+  l = lattice(pos)
+  assert l.shape == "hex" and (l.ij[-5:] == l.ij[0]).all()
+  assert len(np.unique(l.ij[:-5], axis=0)) == len(pos) - 5

@@ -56,6 +56,23 @@ lattice inference of the maps layer, whose `hasCollision` goes through NumPy's h
 `unique` on 2.5 million keys where a `bincount` on the bounded linear index would take a
 few milliseconds - it is what any map without a usable header still pays.
 
+## A stopped scan (2026-09-28)
+
+`Scan1.osc` of the Rohrer data set, 1 229 173 hexagonal points of a scan stopped in its 615th
+row, took 17.5 s. The file keeps the count it announced and fills the 1750 pixels never
+measured with placeholders at (0, 0), all on the first pixel's site; the affine index refused
+the collision, the neighbour graph was grown in Python for 14 s, and the map stayed a list.
+Warm, one process:
+
+| part | before | after | what changed |
+|---|---:|---:|---|
+| the placeholders | - | 25 ms | dropped by `oscTrim` |
+| the lattice | 14 s, then 330 ms | 15 ms | a partial last row allowed in the row order; the row index one compiled pass (`gridKernel('rowOrder')`) that also shifts it; float32 rounding of the positions within the tolerance of the header steps, so the least squares confirmation is skipped; an exact affine fit with duplicates is kept rather than grown |
+| `byEuler` | 63 ms | 30 ms | `eulerQuat` over the cores |
+| `EBSD(...)` | 57 ms | 40 ms | the NaN test of the positions over the whole array first |
+| `gridify` | 200 ms | 90 ms | the scan cells once, in one compiled pass, with their extent; the cell indices of the array likewise; `np.take` for the padded copy |
+| `loadEBSD` | 17.5 s | 0.23 s | 0.5 s for the first call of a process |
+
 ## Why the parser is exact
 
 A field is an integer mantissa and a power of ten. Up to fifteen significant digits the

@@ -244,6 +244,7 @@ has to know.
 
 | Page | MATLAB | Python |
 |---|---|---|
+| EBSDImport (an .osc of a scan stopped early) | the records the file announces, the unmeasured ones at (0, 0) with the Euler angles 4π, kept as measurements on the first pixel | the trailing placeholders dropped (`oscTrim`), so the map is gridded; a 1.2 M point Rohrer scan reads in 2.5 s where the collision at the origin cost 17 s and left a list |
 | EBSD2ODF | `calcKernel(ebsd.orientations)` scores the pixels as independent draws and selects 2.7° | `ebsd.orientations` carries `notIID`, kept through indexing and products, and every `calcKernel` method refuses it; `'conservative'` and `'UCV'` take the map (or `groups=` the grain ids) and fold by grains (docs/plans/halfwidth.md, section 10); the page clears the mark on a copy to show the 2.7° |
 | VectorDefinition | `vector3d(M)` with a 3 x 3 matrix warns and reads by columns | reads by rows, one vector per row of three, as `byXYZ` and the `(..., 3)` layout do; no warning |
 | VectorDefinition | `size(v)` is `1 5` for five vectors, `v(2)` the second | `v.shape` is `(5,)`, `v[1]` the second, zero based |

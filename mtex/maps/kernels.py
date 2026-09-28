@@ -1372,4 +1372,105 @@ def linearProgramNumba(c, A, b, tol=1e-9, maxit=10000):
   return x if status == 0 else None
 
 
+# ------------------------------------------------------------------ the grid of a scan
+
+# the lattice index of every position of a scan written row by row, counts[r] positions in row r
+# with x running fastest, counted from the least one, and the largest distance of a position from
+# its site under the basis (a00, a01; 0, a11) from the first one; a hexagonal row r starts r // 2
+# steps back along a1. Returns the distance and the least index, the first position's negated
+def _rowOrderLoop(P, counts, hexagonal, sx, sy, a00, a01, a11, ij):
+  x0, y0 = P[0, 0], P[0, 1]
+  k = 0
+  resid = 0.0
+  i0, j0 = 0, 0
+  for r in range(counts.shape[0]):
+    for c in range(counts[r]):
+      i = c - r // 2 if hexagonal else c
+      j = r
+      if sx < 0:
+        i = -i - (j if hexagonal else 0)
+      if sy < 0:
+        j = -j
+      ij[k, 0] = i
+      ij[k, 1] = j
+      dx = abs(P[k, 0] - (x0 + a00 * i + a01 * j))
+      dy = abs(P[k, 1] - (y0 + a11 * j))
+      if dx > resid:
+        resid = dx
+      if dy > resid:
+        resid = dy
+      if i < i0:
+        i0 = i
+      if j < j0:
+        j0 = j
+      k += 1
+  for k in range(ij.shape[0]):
+    ij[k, 0] -= i0
+    ij[k, 1] -= j0
+  return resid, i0, j0
+
+
+# the column and the row of every lattice index under the scan's inverse basis (b00, b01; b10,
+# b11) and row shift s, rows counted from the least; returns the least row, the least column and
+# the largest column and row
+def _scanCellsLoop(ij, b00, b01, b10, b11, s, cells):
+  n = ij.shape[0]
+  r0 = 1 << 62
+  for k in range(n):
+    r = b10 * ij[k, 0] + b11 * ij[k, 1]
+    if r < r0:
+      r0 = r
+  c0, c1, r1 = 1 << 62, -(1 << 62), -(1 << 62)
+  for k in range(n):
+    m = b00 * ij[k, 0] + b01 * ij[k, 1]
+    r = b10 * ij[k, 0] + b11 * ij[k, 1]
+    c = m + np.int64(np.floor((r - r0) * s + 0.25))
+    cells[k, 0] = c
+    cells[k, 1] = r
+    if c < c0:
+      c0 = c
+    if c > c1:
+      c1 = c
+    if r > r1:
+      r1 = r
+  return r0, c0, c1, r1
+
+
+# the lattice index of every cell of a (rows, columns) array from the row r0 and the column c0 on,
+# under the scan's basis (b00, b01; b10, b11) and row shift s; returns the least index
+def _scanSitesLoop(nr, nc, r0, c0, b00, b01, b10, b11, s, ij):
+  i0, j0 = 1 << 62, 1 << 62
+  k = 0
+  for a in range(nr):
+    r = r0 + a
+    shift = np.int64(np.floor(a * s + 0.25))
+    for b in range(nc):
+      m = c0 + b - shift
+      i = b00 * m + b01 * r
+      j = b10 * m + b11 * r
+      ij[k, 0] = i
+      ij[k, 1] = j
+      if i < i0:
+        i0 = i
+      if j < j0:
+        j0 = j
+      k += 1
+  return i0, j0
+
+
+_GRID_LOOPS = {"rowOrder": _rowOrderLoop, "scanCells": _scanCellsLoop, "scanSites": _scanSitesLoop}
+
+
+def gridKernel(name):
+  """the compiled numba loop of the grid of a scan named (rowOrder, scanCells, scanSites), compiled
+  on first call; None without numba or where the preference 'kernels' asks for NumPy"""
+  from ..geometry.kernels import backend
+  if backend() != "numba":
+    return None
+  key = "grid:" + name
+  if key not in _COMPILED:
+    _COMPILED[key] = _jit().njit(cache=True)(_GRID_LOOPS[name])
+  return _COMPILED[key]
+
+
 __all__ = []

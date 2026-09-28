@@ -181,9 +181,9 @@ def qmul(p, q):
 
 # ------------------------------------------------------------------ Euler angles to quaternions
 
-# Rz(alpha) Ry(beta) Rz(gamma) as a quaternion, one row per triple
+# Rz(alpha) Ry(beta) Rz(gamma) as a quaternion, one row per triple, over the cores
 def _eulerQuatLoop(alpha, beta, gamma, out):
-  for i in range(alpha.shape[0]):
+  for i in prange(alpha.shape[0]):
     hP = beta[i] / 2
     hp = (alpha[i] + gamma[i]) / 2
     hm = (alpha[i] - gamma[i]) / 2
@@ -205,7 +205,7 @@ def eulerQuat(alpha, beta, gamma):
   b = np.ascontiguousarray(beta, dtype=np.float64).reshape(-1)
   g = np.ascontiguousarray(gamma, dtype=np.float64).reshape(-1)
   out = np.empty((a.shape[0], 4))
-  _loop("eulerQuat", _eulerQuatLoop)(a, b, g, out)
+  _parallel("eulerQuat", _eulerQuatLoop)(a, b, g, out)
   return out.reshape(shape + (4,))
 
 

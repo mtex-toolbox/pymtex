@@ -85,9 +85,10 @@ class EBSD:
     object.__setattr__(self, "_pad", pad if pad is not None and pad.any() else None)
     for k, v in (prop or {}).items():
       self._setProp(k, v)
-    # the nan positions are dropped, as MATLAB does
-    bad = np.isnan(xyz).any(axis=-1)
-    if bad.any():
+    # the nan positions are dropped, as MATLAB does; a test over the whole array first, since
+    # one along its short last axis costs ten times as much
+    if np.isnan(xyz).any():
+      bad = np.isnan(xyz).any(axis=-1)
       sub = self._subset(~bad)
       for name in FIELDS:
         object.__setattr__(self, name, getattr(sub, name))

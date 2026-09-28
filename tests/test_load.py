@@ -221,3 +221,32 @@ def test_the_numpy_backend_reads_the_same_map():
   assert np.array_equal(a.pos.data, b.pos.data)
   assert np.array_equal(a.rotations.data, b.rotations.data, equal_nan=True)
   assert np.array_equal(a.phaseId, b.phaseId) and np.array_equal(a.mad, b.mad)
+
+
+# a hexagonal scan of rows of 7 and 6 points that stopped four points into its eighth row
+def stoppedHexScan(x0=0.0, dtype=np.float64):
+  h = 0.5
+  rows = [[(x0 + h * (i + (r % 2) / 2), h * r * np.sqrt(3) / 2) for i in range(7 - r % 2)] for r in range(8)]
+  xy = np.array([p for row in rows for p in row][:-3], dtype=dtype)
+  return xy.astype(np.float64), h
+
+
+def test_a_stopped_hexagonal_scan_is_read_off_its_rows():
+  from mtex.io.load import gridLattice, scanGridFromPositions
+  xy, h = stoppedHexScan()
+  sg = scanGridFromPositions(xy[:, 0], xy[:, 1])
+  assert sg[:2] == (7, 8) and sg[4:] == (True, 6)
+  pos = np.column_stack([xy, np.zeros(len(xy))])
+  a = gridLattice(pos, *sg)
+  setMTEXpref("kernels", "numpy")
+  b = gridLattice(pos, *sg)
+  assert a is not None and np.array_equal(a.ij, b.ij) and np.allclose(a.A, b.A) and np.allclose(a.origin, b.origin)
+  assert a.ij.min() == 0 and np.max(np.abs(a.position(a.ij)[:, :2] - xy)) < 1e-12
+
+
+def test_single_precision_positions_far_out_keep_the_header_steps():
+  from mtex.io.load import gridLattice, scanGridFromPositions
+  xy, h = stoppedHexScan(x0=4000.0, dtype=np.float32)
+  sg = scanGridFromPositions(xy[:, 0], xy[:, 1], dx=h, dy=h * np.sqrt(3) / 2)
+  l = gridLattice(np.column_stack([xy, np.zeros(len(xy))]), *sg)
+  assert np.array_equal(l.A, [[h, h / 2], [0.0, h * np.sqrt(3) / 2]])

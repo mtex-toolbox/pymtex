@@ -175,3 +175,19 @@ def test_the_resampled_twins_map_as_MATLAB():
   assert g.shape == (108, 109) and g.isIndexed.sum() == 5713
   x, y = g.pos.data[..., 0], g.pos.data[..., 1]
   assert abs(x.min() + 20.7889) < 1e-4 and abs(x.max() - 70.4278) < 1e-4 and abs(y.min() + 25.0316) < 1e-4 and abs(y.max() - 66.1852) < 1e-4
+
+
+def test_a_stopped_hexagonal_scan_grids_alike_on_both_backends():
+  from mtex import setMTEXpref
+  h = 0.5
+  hpos = np.array([[h * (i + (r % 2) / 2), h * r * np.sqrt(3) / 2, 0.0] for r in range(6) for i in range(7 - r % 2)])[:-2]
+  pl = phaseList(crystalFrame("m-3m", mineral="test"))
+  n = len(hpos)
+  ebsd = EBSD(hpos, rotation.byAxisAngle(vector3d.Z, np.linspace(0, 1, n)), np.ones(n, dtype=int), pl, {"q": np.arange(n, dtype=float)})
+  a, ia = gridify(ebsd, return_index=True)
+  setMTEXpref("kernels", "numpy")
+  b, ib = gridify(ebsd, return_index=True)
+  assert a.shape == b.shape == (6, 7) and np.array_equal(ia, ib)
+  assert np.array_equal(a.pos.data, b.pos.data) and np.array_equal(a.rotations.data, b.rotations.data, equal_nan=True)
+  assert np.array_equal(a.lattice.ij, b.lattice.ij) and np.array_equal(a.isPadding, b.isPadding) and np.array_equal(a.q, b.q)
+  assert a.isPadding.sum() == 42 - n and np.array_equal(a.q.reshape(-1)[ia], np.arange(n))

@@ -6,7 +6,7 @@ import pytest
 import mtex
 from mtex import degree, loadEBSD, rotation
 from mtex.io.ang import eulerCorrectionRotation
-from mtex.io.osc import OSC_HEADER_CLOSE, OSC_HEADER_OPEN, loadEBSD_osc, oscPhaseAt, oscPhases
+from mtex.io.osc import OSC_HEADER_CLOSE, OSC_HEADER_OPEN, loadEBSD_osc, oscPhaseAt, oscPhases, oscTrim
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -98,3 +98,15 @@ def test_full_copper_matches_julia():
   assert abs(e.imagequality.mean() - 53823.96678839158) < 1e-6
   g = loadEBSD(os.path.join(DATA, "copper.osc"))
   assert g.shape == (136, 119) and g.lattice.A[0, 0] == 5.0
+
+
+# a scan stopped early: the announced count kept, the pixels never measured as placeholders
+def test_the_placeholders_of_a_stopped_scan_are_dropped():
+  M = np.zeros((6, 10), dtype=np.float32)
+  M[:, 3] = [0, 1, 2, 3, 0, 0]
+  M[:4, :3] = 0.5
+  M[4:, :3] = np.float32(4 * np.pi)
+  assert len(oscTrim(M)) == 4
+  # a placeholder inside the map, or a measured pixel at the origin, is kept
+  M[0, :3] = np.float32(4 * np.pi)
+  assert len(oscTrim(M)) == 4 and len(oscTrim(M[:4])) == 4

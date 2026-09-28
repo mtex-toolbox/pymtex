@@ -6,7 +6,8 @@
 # Eight 32 bit words open the file, of which the fifth to the seventh are the two cell
 # counts and the number of measurements. Two markers cut the header out of the rest,
 # B9 0B EF FF 01 00 00 00 opening it and ...02 00 00 00 closing it, and the measurements
-# follow the closing one as one block of 32 bit floats, a fixed number of columns per pixel.
+# follow the closing one as one block of 32 bit floats, a fixed number of columns per pixel;
+# a scan stopped early keeps the count and fills the rest with placeholders, which are dropped.
 # The header holds one record per phase: 256 bytes of name, the TSL symmetry code, the six
 # cell parameters, then its reflections, so a record is not a fixed length. MTEX finds the
 # records by the 485 phase names it keeps in osc_phases.txt; here a record is recognised by
@@ -117,6 +118,15 @@ def oscColumnCount(b, start, xstep):
   raise ValueError("no column count between 5 and 30 puts the second pixel one step along x")
 
 
+def oscTrim(M):
+  """the records without the placeholders a scan stopped early leaves at its end: the file keeps
+  the count it announced and fills the pixels never measured with the three Euler angles 4 pi at
+  the position (0, 0), all of which would sit on the first pixel's site"""
+  unmeasured = (M[:, 3] == 0) & (M[:, 4] == 0) & np.all(M[:, :3] == np.float32(4 * np.pi), axis=1)
+  kept = np.flatnonzero(~unmeasured)
+  return M[:kept[-1] + 1] if len(kept) else M[:0]
+
+
 def oscHeader(b, nx, ny, n, xstep, ystep):
   """what MATLAB reads out of the fixed places of the header"""
   def chars(pos):
@@ -151,7 +161,7 @@ def loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit
   m = oscColumnCount(b, start, xstep)
   if start + 4 * n * m > len(b):
     raise ValueError(f"{fname} ends before its {n} records of {m} columns do")
-  M = np.frombuffer(b, dtype="<f4", count=n * m, offset=start).reshape(n, m)
+  M = oscTrim(np.frombuffer(b, dtype="<f4", count=n * m, offset=start).reshape(n, m))
   names = OSC_COLUMNS[:m] + [f"extra{j}" for j in range(1, m - len(OSC_COLUMNS) + 1)]
   cols = {name: M[:, k] for k, name in enumerate(names)}
   for key in ("x", "y", "phi1", "phi", "phi2", "phase"):
@@ -167,7 +177,7 @@ def loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit
     eulerCorrection = eulerCorrectionRotation(setting)
   return ebsdFromColumns(cols["x"], cols["y"], cols["phi1"], cols["phi"], cols["phi2"], cols["phase"], phases, props,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta, unindexed=unindexed,
-                         unitCell=unitCell if xstep > 0 and ystep > 0 else None, scanGrid=_scanGrid(nx, ny, n, xstep, ystep, hex))
+                         unitCell=unitCell if xstep > 0 and ystep > 0 else None, scanGrid=_scanGrid(nx, ny, len(M), xstep, ystep, hex))
 
 
 # the grid the header words state; a hexagonal scan alternates nx and a shorter row

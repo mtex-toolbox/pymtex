@@ -337,8 +337,10 @@ def affineIndex(P, A0):
   ij, worst = roundOnto(P, p0, np.linalg.inv(A))
   if not 0 <= worst <= INDEX_TOL:
     return None
-  if hasCollision(ij):
+  if runaway(ij):
     return None
+  # two positions on one site of an exact fit are duplicates, which growing the index over the
+  # neighbour graph would place on the same site again; they are the caller's to report
   return ij, A, p0
 
 
@@ -368,21 +370,12 @@ def fitLattice(P, ij):
   return C[0], C[1:].T
 
 
-def hasCollision(ij):
-  """whether two positions were given the same site; a range far larger than the map is a fit
-  that has run away and counts as a collision"""
-  n = len(ij)
-  if n == 0:
+def runaway(ij):
+  """whether a fit has run away: its index spans a range far larger than the map"""
+  if len(ij) == 0:
     return False
-  lo, hi = ij.min(axis=0), ij.max(axis=0)
-  d = hi - lo + 1
-  if d[0] * d[1] > 16 * n:
-    return True
-  # a mark per cell of the bounded box, which is one pass; np.unique hashes and sorts
-  lin = (ij[:, 0] - lo[0]) + (ij[:, 1] - lo[1]) * d[0]
-  seen = np.zeros(int(d[0] * d[1]), dtype=bool)
-  seen[lin] = True
-  return int(seen.sum()) < n
+  d = ij.max(axis=0) - ij.min(axis=0) + 1
+  return d[0] * d[1] > 16 * len(ij)
 
 
 def growIndex(P, A):

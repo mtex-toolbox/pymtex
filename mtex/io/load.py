@@ -150,7 +150,8 @@ def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bun
   if scanGrid is None:
     scanGrid = scanGridFromPositions(pos[:, 0], pos[:, 1])
   lat = gridLattice(pos, *scanGrid) if scanGrid is not None else None
-  return EBSD(pos, rotation(q), ids, phases, dict(props), unitCell=unitCell, scanUnit=scanUnit, frame=frame,
+  # the rotations of Euler angles are unit already; another normalisation is a pass for nothing
+  return EBSD(pos, rotation._fromData(q), ids, phases, dict(props), unitCell=unitCell, scanUnit=scanUnit, frame=frame,
               meta=meta, phaseMap=phaseMap, lattice=lat)
 
 
@@ -159,7 +160,8 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
   fastest has its first row where y first changes, a square scan rows of one length, and a
   hexagonal scan rows of two lengths alternating with the second row half a step along;
   None where the positions are not written that way, which leaves the lattice to be
-  inferred. What comes out is only a statement to be verified against every position."""
+  inferred. A scan stopped early ends in a shorter row. What comes out is only a statement to
+  be verified against every position."""
   n = len(y)
   if n < 4:
     return None
@@ -187,12 +189,15 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
     return None
   dx, dy = float(dx), float(dy)
   shift = abs(x[starts[1]] - x[0])
-  if np.all(lengths == nx):
+  # a scan stopped early ends in a row shorter than the others
+  full, last = lengths[:-1], lengths[-1]
+  if np.all(full == nx) and last <= nx:
     if shift < 0.25 * abs(dx):
       return (nx, ny, dx, dy)
     return (nx, ny, dx, dy, True, nx) if abs(shift - abs(dx) / 2) < 0.25 * abs(dx) else None
   second = int(lengths[1])
-  if np.all(lengths[0::2] == nx) and np.all(lengths[1::2] == second) and abs(shift - abs(dx) / 2) < 0.25 * abs(dx):
+  if np.all(full[0::2] == nx) and np.all(full[1::2] == second) and last <= (nx, second)[(ny - 1) % 2] \
+      and abs(shift - abs(dx) / 2) < 0.25 * abs(dx):
     return (nx, ny, dx, dy, True, second)
   return None
 
@@ -200,7 +205,7 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
 def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
   """the lattice of the scan a header states, nx by ny cells of steps xs and ys written row by row
   with x running fastest, a hexagonal scan alternating nx and nxEven points per row with the
-  odd rows shifted by half a step; verified against the positions, and None where they
+  odd rows shifted by half a step, the last row shorter where the scan stopped early; verified against the positions, and None where they
   disagree, which leaves the lattice to be inferred from the positions as for any map
 
   What a header says about the scan is exact where the positions carry it rounded, and
@@ -222,44 +227,33 @@ def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
   for first, second in arrangements:
     got = _gridIndex(P, n, ny, first, second, xs, ys, hex)
     if got is not None:
-      A, ij = got
-      lo = ij.min(axis=0)
-      return lattice._build(plane, P[0] + A @ lo, A, ij - lo, "hex" if hex else "square")
+      A, ij, lo = got
+      return lattice._build(plane, P[0] + A @ lo, A, ij, "hex" if hex else "square")
   return None
 
 
-# the index of every position in file order on the stated grid and the basis, or None; a
-# scan written against an axis has a negative step, and the index runs the other way
+# the index of every position in file order on the stated grid, counted from the least one, the
+# basis and the least index, or None; a scan written against an axis has a negative step, and the
+# index runs the other way
 def _gridIndex(P, n, ny, nx, nxEven, xs, ys, hex):
-  k = np.arange(n)
   sx, sy = (-1 if xs < 0 else 1), (-1 if ys < 0 else 1)
   xs, ys = abs(xs), abs(ys)
-  if hex:
-    counts = np.where(np.arange(ny) % 2 == 0, nx, nxEven)
-    if counts.sum() != n:
-      return None
-    r = np.repeat(np.arange(ny), counts)
-    c = k - np.repeat(np.cumsum(counts) - counts, counts)
-    A = np.array([[xs, xs / 2], [0.0, ys]])
-    i, j = c - r // 2, r
-  else:
-    if nx * ny != n:
-      return None
-    A = np.array([[xs, 0.0], [0.0, ys]])
-    i, j = k % nx, k // nx
-  if sx < 0:
-    i = -i - (j if hex else 0)
-  if sy < 0:
-    j = -j
+  counts = np.where(np.arange(ny) % 2 == 0, nx, nxEven) if hex else np.full(ny, nx)
+  # a scan stopped early ends in a shorter last row
+  counts[-1] -= counts.sum() - n
+  if not 0 < counts[-1] <= (nx, nxEven if hex else nx)[(ny - 1) % 2]:
+    return None
+  A = np.array([[xs, xs / 2], [0.0, ys]]) if hex else np.array([[xs, 0.0], [0.0, ys]])
   # the header's steps where the positions are on them, else the basis fitted to the
   # positions where that agrees with the header to the rounding of a header, since the
   # positions are written rounded too, else the fit itself
   step = min(xs, ys)
-  x0, y0 = P[0]
-  fi, fj = i.astype(float), j.astype(float)
-  resid = max(np.abs(P[:, 0] - (x0 + A[0, 0] * fi + A[0, 1] * fj)).max(), np.abs(P[:, 1] - (y0 + A[1, 1] * fj)).max())
-  if not resid < 1e-4 * step:
-    M = np.stack([fi, fj], axis=1)
+  ij, lo, resid = _rowOrder(P, counts, hex, sx, sy, A)
+  # a file writing its positions as 32 bit floats rounds them to 2^-24 of their size, which far
+  # from the origin is more than a ten thousandth of a step
+  size = float(np.abs(P[0]).max()) + max(nx, nxEven if hex else nx) * xs + ny * ys
+  if not resid < 1e-4 * step + 2.0 ** -20 * size:
+    M = (ij + lo).astype(float)
     G = M.T @ M
     if np.linalg.cond(G) > 1e12:
       return None
@@ -269,7 +263,34 @@ def _gridIndex(P, n, ny, nx, nxEven, xs, ys, hex):
     resid = np.abs(P - P[0] - M @ A.T).max()
     if not resid < 0.1 * step:
       return None
-  return A, np.stack([i, j], axis=1)
+  return A, ij, lo
+
+
+# the lattice index of the positions written row by row, counts[r] in row r, counted from the
+# least one, the least index, and the largest distance of a position from its site under the
+# basis A from the first one
+def _rowOrder(P, counts, hex, sx, sy, A):
+  from ..maps.kernels import gridKernel
+  n = int(counts.sum())
+  loop = gridKernel("rowOrder")
+  if loop is not None:
+    ij = np.empty((n, 2), dtype=np.int64)
+    resid, i0, j0 = loop(np.ascontiguousarray(P, dtype=np.float64), counts.astype(np.int64), bool(hex), sx, sy, A[0, 0], A[0, 1], A[1, 1], ij)
+    return ij, np.array([i0, j0]), resid
+  k = np.arange(n)
+  r = np.repeat(np.arange(len(counts)), counts)
+  c = k - np.repeat(np.cumsum(counts) - counts, counts)
+  i, j = (c - r // 2, r) if hex else (c, r)
+  if sx < 0:
+    i = -i - (j if hex else 0)
+  if sy < 0:
+    j = -j
+  x0, y0 = P[0]
+  fi, fj = i.astype(float), j.astype(float)
+  resid = max(np.abs(P[:, 0] - (x0 + A[0, 0] * fi + A[0, 1] * fj)).max(), np.abs(P[:, 1] - (y0 + A[1, 1] * fj)).max())
+  ij = np.stack([i, j], axis=1)
+  lo = ij.min(axis=0)
+  return ij - lo, lo, resid
 
 
 def regularPoly(s, d, rot=0.0):

@@ -19,6 +19,7 @@ import warnings
 import numpy as np
 
 from ..geometry.gridlayout import gridLayout, layoutIndex
+from .kernels import gridKernel
 from .lattice import lattice, latticeBasis, mapPlane
 
 
@@ -44,6 +45,16 @@ class scanLayout:
     self.B = np.stack([cu, cv], axis=1).astype(np.int64)          # ij = B @ (m, n)
     self.Binv = np.rint(np.linalg.inv(self.B)).astype(np.int64)
     self.s = float(u @ v / (u @ u))
+    # the cells of the lattice's own positions, kept for scanCells
+    self._ij = l.ij
+    loop = gridKernel("scanCells") if len(l.ij) else None
+    if loop is not None:
+      cells = np.empty((len(l.ij), 2), dtype=np.int64)
+      n0, c0, c1, n1 = loop(np.ascontiguousarray(l.ij, dtype=np.int64), *self.Binv.reshape(-1), self.s, cells)
+      self.lo = np.array([c0, n0])
+      self.dims = (int(n1 - n0 + 1), int(c1 - c0 + 1))
+      self._cells = cells
+      return
     mn = l.ij @ self.Binv.T
     n0 = int(mn[:, 1].min()) if len(mn) else 0
     self.lo = np.array([0, n0])
@@ -51,6 +62,7 @@ class scanLayout:
     c0 = int(cells[:, 0].min()) if len(cells) else 0
     self.lo = np.array([c0, n0])
     self.dims = (int(cells[:, 1].max()) - n0 + 1, int(cells[:, 0].max()) - c0 + 1) if len(cells) else (0, 0)
+    self._cells = cells
 
   def scanCell(self, ij):
     """the column and the row of lattice indices (n, 2); a quarter of a cell decides which column
@@ -66,13 +78,19 @@ class scanLayout:
 
   def scanCells(self, ij):
     """the linear cell of every measurement, rows first"""
-    cells = self.scanCell(ij)
+    cells = self._cells if ij is self._ij else self.scanCell(ij)
     return (cells[:, 1] - self.lo[1]) * self.dims[1] + (cells[:, 0] - self.lo[0])
 
   def scanIndex(self):
-    """the lattice index of every cell of the array, in the array's order"""
+    """the lattice index of every cell of the array, in the array's order, and the least of them"""
+    loop = gridKernel("scanSites") if self.dims[0] * self.dims[1] else None
+    if loop is not None:
+      ij = np.empty((self.dims[0] * self.dims[1], 2), dtype=np.int64)
+      lo = loop(self.dims[0], self.dims[1], int(self.lo[1]), int(self.lo[0]), *self.B.reshape(-1), self.s, ij)
+      return ij, np.array(lo, dtype=np.int64)
     r, c = np.meshgrid(np.arange(self.dims[0]) + self.lo[1], np.arange(self.dims[1]) + self.lo[0], indexing="ij")
-    return self.scanSite(c.reshape(-1), r.reshape(-1))
+    ij = self.scanSite(c.reshape(-1), r.reshape(-1))
+    return ij, ij.min(axis=0)
 
 
 def gridify(ebsd, layout=None, unitCell=None, return_index=False):
@@ -151,8 +169,7 @@ def _gridify(ebsd):
   lay = scanLayout(l)
   dims = lay.dims
   cells = lay.scanCells(l.ij)
-  ij = lay.scanIndex()
-  lo = ij.min(axis=0)
+  ij, lo = lay.scanIndex()
   gl = lattice._build(l.plane, l.origin + l.A @ lo, l.A, ij - lo, l.shape)
   n = dims[0] * dims[1]
   if len(cells) == n and np.array_equal(cells, np.arange(n)):
@@ -170,21 +187,31 @@ def _gridify(ebsd):
     raise ValueError(f"measurements {dup[0]} and {dup[1]} sit in one cell of the grid, so gridding would drop one of them")
   lin[cells] = np.arange(len(cells))
   missing = lin < 0
-  k = np.where(missing, 0, lin)
-  pos = ebsd.pos.data.reshape(-1, 3)[k]
-  pos[missing] = gl.position(gl.ij[missing])
-  rot = ebsd.rotations.data.reshape(-1, 4)[k]
-  rot[missing] = np.nan
-  ph = ebsd.phaseId.reshape(-1)[k]
-  ph[missing] = 0
-  ids = ebsd.id.reshape(-1)[k]
-  ids[missing] = ebsd.id.max() + 1 + np.arange(missing.sum())
+  m = len(cells)
+  # a scan stopped early fills the first cells in order and leaves the rest of its last row: its
+  # arrays are copied as blocks, any other through the index
+  if m and cells[0] == 0 and cells[-1] == m - 1 and np.all(cells[1:] > cells[:-1]):
+    def place(src, fill):
+      out = np.empty((n,) + src.shape[1:], dtype=src.dtype)
+      out[:m] = src
+      out[m:] = fill
+      return out
+  else:
+    k = np.where(missing, 0, lin)
+
+    def place(src, fill):
+      out = np.take(src, k, axis=0)
+      out[missing] = fill
+      return out
+  nMissing = n - m
+  pos = place(ebsd.pos.data.reshape(-1, 3), gl.position(gl.ij[missing]))
+  rot = place(ebsd.rotations.data.reshape(-1, 4), np.nan)
+  ph = place(ebsd.phaseId.reshape(-1), 0)
+  ids = place(ebsd.id.reshape(-1), ebsd.id.max() + 1 + np.arange(nMissing))
   prop = {}
   for key, v in ebsd.prop.items():
     src = v.reshape((-1,) + v.shape[ebsd.ndim:])
-    out = src[k].copy()
-    out[missing] = 0
-    prop[key] = out.reshape(dims + src.shape[1:])
+    prop[key] = place(src, 0).reshape(dims + src.shape[1:])
   return EBSD(_vectors(pos.reshape(dims + (3,)), ebsd.frame), _rotations(rot.reshape(dims + (4,))), ph.reshape(dims),
               ebsd.CSList, prop, scanUnit=ebsd.scanUnit, frame=ebsd.frame, lattice=gl, meta=ebsd.meta, phaseMap=ebsd.phaseMap, id=ids.reshape(dims),
               isPadding=missing.reshape(dims)), cells
