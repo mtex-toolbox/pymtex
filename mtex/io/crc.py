@@ -151,7 +151,7 @@ def loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   for key in ("phi1", "phi", "phi2"):
     if key not in cols:
       raise ValueError(f"{cprPath} names no Euler angles among its fields")
-  props = {name: np.asarray(cols[name], dtype=np.float64) for name in names if name not in ("x", "y", "phi1", "phi", "phi2")}
+  props = {name: cols[name] for name in names if name not in ("x", "y", "phi1", "phi", "phi2")}
   meta = {"header": ini, "surface": crcAcquisition(ini)}
   if eulerCorrection is None:
     eulerCorrection = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")
@@ -159,7 +159,7 @@ def loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   return ebsdFromColumns(x, y, cols["phi1"], cols["phi"], cols["phi2"], rec["phase"], phases, props, shift=0,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta,
                          unitCell=regularPoly(4, [dx, dy]) if dx > 0 and dy > 0 else None,
-                         scanGrid=(nx, ny, dx, dy) if nx is not None and ny is not None else None)
+                         scanGrid=(nx, ny, dx, dy) if nx is not None and ny is not None else None, propType=np.float64)
 
 
 __all__ = ["loadEBSD_crc"]

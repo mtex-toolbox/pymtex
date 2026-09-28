@@ -159,6 +159,19 @@ def _relayout(grid, lin):
               id=flat(grid.id, 2), isPadding=flat(grid.isPadding, 2))
 
 
+def scanArray(l):
+  """the array a lattice is scanned into: its dims, the linear cell of every site of the lattice,
+  rows first, and the lattice of the array's cells in the array's order"""
+  lay = scanLayout(l)
+  cells = lay.scanCells(l.ij)
+  ij, lo = lay.scanIndex()
+  gl = lattice._build(l.plane, l.origin + l.A @ lo, l.A, ij - lo, l.shape)
+  # the padding sits on its sites, so the measurements' distance from theirs carries over
+  if getattr(l, "_residual", None) is not None:
+    gl._residual = l._residual
+  return lay.dims, cells, gl
+
+
 def _gridify(ebsd):
   from .ebsd import EBSD, _rotations, _vectors
   if ebsd.isGridded:
@@ -166,11 +179,7 @@ def _gridify(ebsd):
   l = ebsd.lattice
   if l is None:
     raise ValueError("the positions are not on a lattice, so the map cannot be gridded")
-  lay = scanLayout(l)
-  dims = lay.dims
-  cells = lay.scanCells(l.ij)
-  ij, lo = lay.scanIndex()
-  gl = lattice._build(l.plane, l.origin + l.A @ lo, l.A, ij - lo, l.shape)
+  dims, cells, gl = scanArray(l)
   n = dims[0] * dims[1]
   if len(cells) == n and np.array_equal(cells, np.arange(n)):
     pos = _vectors(ebsd.pos.data.reshape(dims + (3,)), ebsd.frame)

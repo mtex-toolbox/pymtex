@@ -261,3 +261,28 @@ def test_the_orientations_of_a_map_are_not_independent():
   ebsd = sampleMap()
   o = ebsd.orientations
   assert o.notIID and o[3:9].notIID and ebsd[10:20].orientations.notIID
+
+
+# the pairs of measurements a lattice makes neighbours, as a set
+def neighbourPairs(l):
+  lookup = {tuple(v): k for k, v in enumerate(l.ij)}
+  from mtex.maps.lattice import STENCIL
+  return {(k, lookup[tuple(v + o)]) for k, v in enumerate(l.ij) for o in STENCIL[l.shape] if tuple(v + o) in lookup}
+
+
+# a rigid motion carries the lattice along instead of inferring it again: every measurement on
+# its site, the same neighbours as an inferred lattice; a motion turning the map over infers
+def test_a_rigid_motion_carries_the_lattice():
+  from mtex.maps.lattice import lattice as latticeOf
+  h = 0.5
+  hpos = np.array([[h * (i + (r % 2) / 2), h * r * np.sqrt(3) / 2, 0.0] for r in range(6) for i in range(7)])
+  pl = phaseList(crystalFrame("m-3m", mineral="test"))
+  hexa = EBSD(hpos, rotation.byAxisAngle(vector3d.Z, np.zeros(len(hpos))), np.ones(len(hpos), dtype=int), pl)
+  for m in (sampleMap(), hexa, gridify(hexa)):
+    motions = [rotate(m, 30 * degree), rotate(m, rotation.byAxisAngle(vector3d(1, 1, 0), 20 * degree)), shift(m, vector3d(3, -1, 0.5)),
+               rotate(m, rotation.byAxisAngle(vector3d.X, 180 * degree))]
+    for moved in motions:
+      l = moved.lattice
+      P = moved.pos.data.reshape(-1, 3)
+      assert np.max(np.linalg.norm(l.position(l.ij) - P, axis=1)) < 1e-9
+      assert neighbourPairs(l) == neighbourPairs(latticeOf(P)) and l.shape == m.lattice.shape

@@ -154,6 +154,18 @@ def _qmulLoop(p, q, out):
     out[i, 3] = a3 * b0 - a2 * b1 + a1 * b2 + a0 * b3
 
 
+# one quaternion p times every row of q, over the cores: a correction applied to a whole map,
+# without copying p out to the map's length
+def _qmulLeftLoop(p, q, out):
+  a0, a1, a2, a3 = p[0], p[1], p[2], p[3]
+  for i in prange(q.shape[0]):
+    b0, b1, b2, b3 = q[i, 0], q[i, 1], q[i, 2], q[i, 3]
+    out[i, 0] = a0 * b0 - a1 * b1 - a2 * b2 - a3 * b3
+    out[i, 1] = a1 * b0 + a0 * b1 - a3 * b2 + a2 * b3
+    out[i, 2] = a2 * b0 + a3 * b1 + a0 * b2 - a1 * b3
+    out[i, 3] = a3 * b0 - a2 * b1 + a1 * b2 + a0 * b3
+
+
 def _qmulNumpy(p, q):
   a1, b1, c1, d1 = np.moveaxis(p, -1, 0)
   a2, b2, c2, d2 = np.moveaxis(q, -1, 0)
@@ -170,6 +182,11 @@ def qmul(p, q):
   if backend() == "numpy":
     return _qmulNumpy(p, q)
   dtype = _floatType(p, q)
+  if p.size == 4 and q.ndim >= 2 and q.size >= 1 << 16:
+    shape = q.shape
+    out = np.empty((q.size // 4, 4), dtype=dtype)
+    _parallel("qmulLeft", _qmulLeftLoop)(np.ascontiguousarray(p, dtype=dtype).reshape(4), np.ascontiguousarray(q, dtype=dtype).reshape(-1, 4), out)
+    return out.reshape(shape)
   p, q = np.broadcast_arrays(p, q)
   shape = p.shape
   p = np.ascontiguousarray(p, dtype=dtype).reshape(-1, 4)

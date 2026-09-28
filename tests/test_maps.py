@@ -170,3 +170,20 @@ def test_the_picture_of_an_aligned_lattice_is_the_nearest_site_of_every_pixel():
   px = np.stack(np.meshgrid(xlo + (np.arange(nx) + 0.5) * (xhi - xlo) / nx, ylo + (np.arange(ny) + 0.5) * (yhi - ylo) / ny), axis=-1).reshape(-1, 2)
   d = np.linalg.norm(px[:, None, :] - pos[None, :, :2], axis=-1)
   assert np.array_equal(index.reshape(-1), np.argmin(d, axis=1))
+
+
+# the compiled lookup of the picture against the array route, on square, hexagonal, holed,
+# padded and turned maps
+def test_the_compiled_picture_is_the_numpy_one():
+  from mtex import gridify, setMTEXpref
+  A = np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]])
+  hexa = gridMap(9, 7, 1.0, A)
+  maps = [gridMap(6, 5, 0.5), hexa, hexa[np.arange(63) % 5 != 2], gridify(hexa[np.arange(63) != 20]), gridMap(6, 5, 0.5).rotate(0.3)]
+  layouts = [None, np.array([[0.0, 1.0], [-1.0, 0.0]])]
+  compiled = [mapRaster(e, layout=L) for e in maps for L in layouts]
+  setMTEXpref("kernels", "numpy")
+  arrays = [mapRaster(e, layout=L) for e in maps for L in layouts]
+  for a, b in zip(compiled, arrays):
+    assert (a is None) == (b is None)
+    if a is not None:
+      assert np.allclose(a[0], b[0]) and np.allclose(a[1], b[1]) and np.array_equal(a[2], b[2])

@@ -1378,8 +1378,8 @@ def linearProgramNumba(c, A, b, tol=1e-9, maxit=10000):
 # with x running fastest, counted from the least one, and the largest distance of a position from
 # its site under the basis (a00, a01; 0, a11) from the first one; a hexagonal row r starts r // 2
 # steps back along a1. Returns the distance and the least index, the first position's negated
-def _rowOrderLoop(P, counts, hexagonal, sx, sy, a00, a01, a11, ij):
-  x0, y0 = P[0, 0], P[0, 1]
+def _rowOrderLoop(x, y, counts, hexagonal, sx, sy, a00, a01, a11, ij):
+  x0, y0 = x[0], y[0]
   k = 0
   resid = 0.0
   i0, j0 = 0, 0
@@ -1393,8 +1393,8 @@ def _rowOrderLoop(P, counts, hexagonal, sx, sy, a00, a01, a11, ij):
         j = -j
       ij[k, 0] = i
       ij[k, 1] = j
-      dx = abs(P[k, 0] - (x0 + a00 * i + a01 * j))
-      dy = abs(P[k, 1] - (y0 + a11 * j))
+      dx = abs(x[k] - (x0 + a00 * i + a01 * j))
+      dy = abs(y[k] - (y0 + a11 * j))
       if dx > resid:
         resid = dx
       if dy > resid:

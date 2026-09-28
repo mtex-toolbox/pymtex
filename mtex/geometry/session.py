@@ -20,6 +20,10 @@ _DEFAULT_PREFS = {
   "defaultSO3Bandwidth": 64,
   "FFTAccuracy": 1e-2,
   "displayRows": 20,
+  # whether NumPy asks the kernel for huge pages on its large arrays; on a machine whose memory is
+  # fragmented every page fault of such an array then waits for the kernel to compact memory,
+  # which makes fresh memory ten times slower to fill, so MTEX switches the request off
+  "hugePages": False,
 }
 
 
@@ -58,9 +62,20 @@ def setMTEXpref(name, value, save=False):
     setMTEXpref('kernels', 'numpy')
     setMTEXpref('displayRows', 40, save=True)"""
   SESSION.prefs[name] = value
+  if name == "hugePages":
+    applyHugePages()
   if save:
     from .settings import saveSetting
     saveSetting(name, value)
+
+
+def applyHugePages():
+  """hands the preference 'hugePages' to NumPy, which holds it for the whole process"""
+  try:
+    from numpy._core.multiarray import _set_madvise_hugepage
+  except ImportError:
+    return
+  _set_madvise_hugepage(bool(SESSION.prefs.get("hugePages", False)))
 
 
 def reset():
@@ -69,6 +84,7 @@ def reset():
   mint = SESSION.mintDefaultFrame
   SESSION.reset()
   SESSION.mintDefaultFrame = mint
+  applyHugePages()
 
 
 __all__ = ["getMTEXpref", "setMTEXpref", "reset"]

@@ -1,5 +1,6 @@
 # the compiled kernels of the drawing: the colour of every orientation of a map read off the
-# cube map of its key, and the polar coordinates of a sector fold that the key is built from,
+# cube map of its key, the polar coordinates of a sector fold that the key is built from, and the
+# measurement every pixel of a map picture shows,
 # each a loop compiled by numba on its first call. Where numba is not there, or the
 # preference 'kernels' asks for NumPy, the loop reports that it did nothing and the caller
 # takes its own array route, which is the oracle of the tests. The pattern is the
@@ -181,6 +182,55 @@ def polarRadius(N, xyz, c):
   out = np.empty(len(xyz))
   _parallel("polarRadius", _polarRadiusLoop)(N, xyz, c, out)
   return out
+
+
+# ------------------------------------------------------------------ the picture of a map
+
+# the measurement every pixel of a map picture shows, -1 for none: the lattice coordinates of the
+# pixel centre (x[c], y[r]) rounded where the lattice is aligned with the screen, else the nearest
+# of the four corners of the lattice parallelogram it lies in, looked up in the table of sites;
+# the padding of a grid shows nothing
+def _rasterLoop(x, y, o0, o1, Ainv, A, aligned, lin, pad, hasPad, index):
+  n0, n1 = lin.shape[0], lin.shape[1]
+  for r in prange(y.shape[0]):
+    qy = y[r] - o1
+    for c in range(x.shape[0]):
+      qx = x[c] - o0
+      u0 = qx * Ainv[0, 0] + qy * Ainv[0, 1]
+      u1 = qx * Ainv[1, 0] + qy * Ainv[1, 1]
+      a, b = np.rint(u0), np.rint(u1)
+      ia, ib = a, b
+      if not aligned:
+        sa = -1.0 if u0 < a else 1.0
+        sb = -1.0 if u1 < b else 1.0
+        best = np.inf
+        for db in range(2):
+          for da in range(2):
+            ca, cb = a + da * sa, b + db * sb
+            dx = ca * A[0, 0] + cb * A[0, 1] - qx
+            dy = ca * A[1, 0] + cb * A[1, 1] - qy
+            d2 = dx * dx + dy * dy
+            if d2 < best:
+              best, ia, ib = d2, ca, cb
+      k = -1
+      if 0 <= ia < n0 and 0 <= ib < n1:
+        k = lin[np.int64(ia), np.int64(ib)]
+        if k >= 0 and hasPad and pad[k]:
+          k = -1
+      index[r, c] = k
+
+
+def mapRasterIndex(x, y, o, Ainv, A, aligned, lin, pad):
+  """the measurement shown by every pixel of a map picture, or None on the NumPy backend"""
+  if backend() == "numpy":
+    return None
+  index = np.empty((len(y), len(x)), dtype=np.int32)
+  hasPad = pad is not None
+  padFlat = np.ascontiguousarray(pad, dtype=np.bool_).reshape(-1) if hasPad else np.zeros(1, dtype=np.bool_)
+  _parallel("mapRaster", _rasterLoop)(np.ascontiguousarray(x, dtype=np.float64), np.ascontiguousarray(y, dtype=np.float64),
+                                      float(o[0]), float(o[1]), np.ascontiguousarray(Ainv, dtype=np.float64),
+                                      np.ascontiguousarray(A, dtype=np.float64), bool(aligned), np.ascontiguousarray(lin), padFlat, hasPad, index)
+  return index
 
 
 __all__ = []

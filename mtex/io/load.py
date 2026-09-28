@@ -12,6 +12,7 @@
 # is applied, once. A complete scan comes back on its grid, as MATLAB returns it.
 from __future__ import annotations
 
+import contextvars
 import os
 import re
 import warnings
@@ -115,44 +116,111 @@ def unmeasuredRows(phi1, Phi, phi2, props):
 
 # ------------------------------------------------------------------ the map
 
+# whether loadEBSD wants the map on its grid: a loader then writes every column straight into
+# its place in the grid, and the list of the measurements is never built beside it
+_gridOnRead = contextvars.ContextVar("gridOnRead", default=False)
+
+
 def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bunge", eulerCorrection=None,
-                    scanUnit="um", frame=None, meta=None, shift=None, unindexed=None, unitCell=None, scanGrid=None):
+                    scanUnit="um", frame=None, meta=None, shift=None, unindexed=None, unitCell=None, scanGrid=None,
+                    propType=None):
   """the map from the columns every format has: a position, three Euler angles and a phase,
   with whatever else the file carries as properties
 
   phase is the file's own numbering; shift states it where the format fixes it and is read
   off the values otherwise. unindexed marks what the file says failed by other means, a
   negative confidence index or a pixel never measured. The rotation of a measurement of no
-  phase is nan."""
+  phase is nan. propType is the type the properties are stored in, the file's own if None."""
   phases = phases if isinstance(phases, phaseList) else phaseList(phases)
   n = len(phases)
   shift = phaseShift(phase, n - 1) if shift is None else shift
   ids = phaseColumn(phase, shift, n)
   if unindexed is not None:
     ids[np.asarray(unindexed, dtype=bool)] = 0
+  rot = eulerRotations(phi1, Phi, phi2, convention, ids)
+  if eulerCorrection is not None:
+    rot = eulerCorrection * rot
+    meta = dict(meta or {}, EulerCorrection=eulerCorrection)
+  # the rotations were just made, so their array is changed in place
+  q = np.asarray(rot.data, dtype=float)
+  indexed = np.array([f.isIndexed for f in phases.frames])[ids]
+  q[~indexed] = np.nan
+  x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+  # the file's own numbering of the phases, with what it writes for not indexed
+  phaseMap = np.arange(n) - shift
+  phaseMap[0] = -1 if shift else 0
+  lat = rowOrderLattice(x, y, scanGrid)
+  return mapFromColumns(x, y, q, ids, phases, props, lat, propType, unitCell=unitCell, scanUnit=scanUnit, frame=frame,
+                        meta=meta, phaseMap=phaseMap)
+
+
+def rowOrderLattice(x, y, scanGrid=None):
+  """the lattice of positions written row by row: the grid a header states where the positions
+  confirm it, else the one their order states, else None, which leaves it to be inferred"""
+  for grid in (scanGrid, "positions"):
+    if grid == "positions":
+      grid = scanGridFromPositions(x, y)
+    if grid is None:
+      continue
+    lat = gridLattice((x, y), *grid)
+    if lat is not None:
+      return lat
+  return None
+
+
+def eulerRotations(phi1, Phi, phi2, convention, ids):
+  """the rotations of the Euler angles; an angle that is not a number is no orientation, and its
+  measurement is given no phase in ids. The angles in double precision live only here"""
   phi1, Phi, phi2 = (np.asarray(a, dtype=float) for a in (phi1, Phi, phi2))
-  # an angle that is not a number is no orientation, and such a measurement is of no phase
   none = ~(np.isfinite(phi1) & np.isfinite(Phi) & np.isfinite(phi2))
   if none.any():
     ids[none] = 0
     phi1, Phi, phi2 = np.where(none, 0.0, phi1), np.where(none, 0.0, Phi), np.where(none, 0.0, phi2)
-  rot = rotation.byEuler(phi1, Phi, phi2, convention)
-  if eulerCorrection is not None:
-    rot = eulerCorrection * rot
-    meta = dict(meta or {}, EulerCorrection=eulerCorrection)
-  q = np.array(rot.data, dtype=float)
-  indexed = np.array([f.isIndexed for f in phases.frames])[ids]
-  q[~indexed] = np.nan
+  return rotation.byEuler(phi1, Phi, phi2, convention)
+
+
+def mapFromColumns(x, y, q, ids, phases, props, lat, propType=None, **kw):
+  """the map of the positions, the unit quaternions, the phase ids and the properties a file holds:
+  on its grid where loadEBSD asks for one and the lattice read off the file says where every
+  measurement goes, else the list"""
+  if lat is not None and _gridOnRead.get():
+    grid = _gridFromColumns(x, y, q, ids, phases, props, lat, propType, **kw)
+    if grid is not None:
+      return grid
   pos = np.column_stack([np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.zeros(len(ids))])
-  # the file's own numbering of the phases, with what it writes for not indexed
-  phaseMap = np.arange(n) - shift
-  phaseMap[0] = -1 if shift else 0
-  if scanGrid is None:
-    scanGrid = scanGridFromPositions(pos[:, 0], pos[:, 1])
-  lat = gridLattice(pos, *scanGrid) if scanGrid is not None else None
-  # the rotations of Euler angles are unit already; another normalisation is a pass for nothing
-  return EBSD(pos, rotation._fromData(q), ids, phases, dict(props), unitCell=unitCell, scanUnit=scanUnit, frame=frame,
-              meta=meta, phaseMap=phaseMap, lattice=lat)
+  props = {k: np.asarray(v, dtype=propType) for k, v in props.items()} if propType is not None else dict(props)
+  # the quaternions are unit already; another normalisation is a pass for nothing
+  return EBSD(pos, rotation._fromData(q), ids, phases, props, lattice=lat, **kw)
+
+
+# the map written straight onto the array its lattice is scanned into, as gridify would place the
+# list: a cell with no measurement is padding, at its ideal position, not indexed, with a NaN
+# rotation, zero properties and an id after the measurements'; None where the lattice does not
+# grid, which leaves the list and the reason to tryGridify
+def _gridFromColumns(x, y, q, ids, phases, props, lat, propType, unitCell=None, **kw):
+  from ..maps.ebsd import _rotations
+  from ..maps.gridify import scanArray
+  n = len(ids)
+  dims, cells, gl = scanArray(lat)
+  N = dims[0] * dims[1]
+  if N > 10 * max(1, n) or np.bincount(cells, minlength=N).max() > 1:
+    return None
+  missing = np.ones(N, dtype=bool)
+  missing[cells] = False
+
+  def place(src, fill, dtype=None):
+    src = np.asarray(src)
+    out = np.empty((N,) + src.shape[1:], dtype=src.dtype if dtype is None else dtype)
+    out[cells] = src
+    out[missing] = fill
+    return out.reshape(dims + src.shape[1:])
+
+  pos = np.empty((N, 3))
+  pos[cells, 0], pos[cells, 1], pos[cells, 2] = x, y, 0.0
+  pos[missing] = gl.position(gl.ij[missing])
+  return EBSD(pos.reshape(dims + (3,)), _rotations(place(q, np.nan)), place(ids, 0), phases,
+              {k: place(v, 0, propType) for k, v in props.items()}, lattice=gl, id=place(np.arange(n), n + np.arange(N - n)),
+              isPadding=missing.reshape(dims), **kw)
 
 
 def scanGridFromPositions(x, y, dx=None, dy=None):
@@ -205,37 +273,51 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
 def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
   """the lattice of the scan a header states, nx by ny cells of steps xs and ys written row by row
   with x running fastest, a hexagonal scan alternating nx and nxEven points per row with the
-  odd rows shifted by half a step, the last row shorter where the scan stopped early; verified against the positions, and None where they
-  disagree, which leaves the lattice to be inferred from the positions as for any map
+  odd rows shifted by half a step, the last row shorter where the scan stopped early; verified
+  against the positions, and None where they disagree, which leaves the lattice to be inferred
+  from the positions as for any map. pos is (n, 3), or the pair (x, y) of a map in the xy plane.
 
   What a header says about the scan is exact where the positions carry it rounded, and
   reading the index off the row order costs one pass where inferring it costs a fit."""
   from ..maps.lattice import lattice, mapPlane
-  P3 = np.asarray(pos, dtype=float).reshape(-1, 3)
-  n = len(P3)
+  if isinstance(pos, tuple):
+    x, y = (np.asarray(c, dtype=float).reshape(-1) for c in pos)
+    finite = np.isfinite(x).all() and np.isfinite(y).all()
+    # the plane is fitted on a sample of the positions, so the sample is all it is handed
+    S = np.round(np.linspace(0, len(x) - 1, min(len(x), 10000))).astype(int) if len(x) else np.zeros(0, dtype=int)
+    plane = mapPlane(np.column_stack([x[S], y[S], np.zeros(len(S))])) if len(x) >= 1 else None
+  else:
+    P3 = np.asarray(pos, dtype=float).reshape(-1, 3)
+    finite = np.isfinite(P3).all()
+    plane = mapPlane(P3) if len(P3) else None
+    # a map in the xy plane is its own plane coordinates; any other is projected
+    P = P3[:, :2] if not P3[:, 2].any() else plane.to2d(P3)
+    x, y = P[:, 0], P[:, 1]
+  n = len(x)
   nx, ny = int(nx), int(ny)
-  if n < 4 or nx < 1 or ny < 1 or xs == 0 or ys == 0 or not np.isfinite(P3).all():
+  if n < 4 or nx < 1 or ny < 1 or xs == 0 or ys == 0 or not finite:
     return None
-  # a map in the xy plane is its own plane coordinates; any other is projected
-  plane = mapPlane(P3)
-  P = P3[:, :2] if not P3[:, 2].any() else plane.to2d(P3)
   # a hexagonal scan alternates two row lengths, and which one the first row has is what
   # the positions say, so both arrangements are tried
   arrangements = [(nx, nx if nxEven is None else int(nxEven))] if hex else [(nx, nx)]
   if hex and arrangements[0][0] != arrangements[0][1]:
     arrangements.append(arrangements[0][::-1])
   for first, second in arrangements:
-    got = _gridIndex(P, n, ny, first, second, xs, ys, hex)
+    got = _gridIndex(x, y, n, ny, first, second, xs, ys, hex)
     if got is not None:
-      A, ij, lo = got
-      return lattice._build(plane, P[0] + A @ lo, A, ij, "hex" if hex else "square")
+      A, ij, lo, resid = got
+      l = lattice._build(plane, np.array([x[0], y[0]]) + A @ lo, A, ij, "hex" if hex else "square")
+      # the distance of the positions from their sites is known from the check, a bound on the
+      # Euclidean one, and the drawing need not measure it again
+      l._residual = float(np.sqrt(2) * resid / l.dxy)
+      return l
   return None
 
 
 # the index of every position in file order on the stated grid, counted from the least one, the
-# basis and the least index, or None; a scan written against an axis has a negative step, and the
+# basis, the least index and the largest distance along x or y from a site, or None; a scan written against an axis has a negative step, and the
 # index runs the other way
-def _gridIndex(P, n, ny, nx, nxEven, xs, ys, hex):
+def _gridIndex(x, y, n, ny, nx, nxEven, xs, ys, hex):
   sx, sy = (-1 if xs < 0 else 1), (-1 if ys < 0 else 1)
   xs, ys = abs(xs), abs(ys)
   counts = np.where(np.arange(ny) % 2 == 0, nx, nxEven) if hex else np.full(ny, nx)
@@ -248,34 +330,35 @@ def _gridIndex(P, n, ny, nx, nxEven, xs, ys, hex):
   # positions where that agrees with the header to the rounding of a header, since the
   # positions are written rounded too, else the fit itself
   step = min(xs, ys)
-  ij, lo, resid = _rowOrder(P, counts, hex, sx, sy, A)
+  ij, lo, resid = _rowOrder(x, y, counts, hex, sx, sy, A)
   # a file writing its positions as 32 bit floats rounds them to 2^-24 of their size, which far
   # from the origin is more than a ten thousandth of a step
-  size = float(np.abs(P[0]).max()) + max(nx, nxEven if hex else nx) * xs + ny * ys
+  size = max(abs(x[0]), abs(y[0])) + max(nx, nxEven if hex else nx) * xs + ny * ys
   if not resid < 1e-4 * step + 2.0 ** -20 * size:
     M = (ij + lo).astype(float)
     G = M.T @ M
     if np.linalg.cond(G) > 1e12:
       return None
+    P = np.column_stack([x, y])
     F = np.linalg.solve(G, M.T @ (P - P[0])).T
     if not np.allclose(F, A, rtol=1e-4, atol=1e-4 * step):
       A = F
     resid = np.abs(P - P[0] - M @ A.T).max()
     if not resid < 0.1 * step:
       return None
-  return A, ij, lo
+  return A, ij, lo, resid
 
 
 # the lattice index of the positions written row by row, counts[r] in row r, counted from the
 # least one, the least index, and the largest distance of a position from its site under the
 # basis A from the first one
-def _rowOrder(P, counts, hex, sx, sy, A):
+def _rowOrder(x, y, counts, hex, sx, sy, A):
   from ..maps.kernels import gridKernel
   n = int(counts.sum())
   loop = gridKernel("rowOrder")
   if loop is not None:
     ij = np.empty((n, 2), dtype=np.int64)
-    resid, i0, j0 = loop(np.ascontiguousarray(P, dtype=np.float64), counts.astype(np.int64), bool(hex), sx, sy, A[0, 0], A[0, 1], A[1, 1], ij)
+    resid, i0, j0 = loop(x, y, counts.astype(np.int64), bool(hex), sx, sy, A[0, 0], A[0, 1], A[1, 1], ij)
     return ij, np.array([i0, j0]), resid
   k = np.arange(n)
   r = np.repeat(np.arange(len(counts)), counts)
@@ -285,9 +368,8 @@ def _rowOrder(P, counts, hex, sx, sy, A):
     i = -i - (j if hex else 0)
   if sy < 0:
     j = -j
-  x0, y0 = P[0]
   fi, fj = i.astype(float), j.astype(float)
-  resid = max(np.abs(P[:, 0] - (x0 + A[0, 0] * fi + A[0, 1] * fj)).max(), np.abs(P[:, 1] - (y0 + A[1, 1] * fj)).max())
+  resid = max(np.abs(x - (x[0] + A[0, 0] * fi + A[0, 1] * fj)).max(), np.abs(y - (y[0] + A[1, 1] * fj)).max())
   ij = np.stack([i, j], axis=1)
   lo = ij.min(axis=0)
   return ij - lo, lo, resid
@@ -356,6 +438,23 @@ def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
     return [loadEBSD(f, CS, *args, interface=interface, noGrid=noGrid, **kwargs) for f in fname]
   fname = os.fspath(fname)
   ext = (os.path.splitext(fname)[1] if interface is None else interface).lower().lstrip(".")
+  grid = getMTEXpref("gridifyOnImport", True) and not noGrid
+  token = _gridOnRead.set(grid)
+  try:
+    ebsd = _read(fname, ext, CS, *args, **kwargs)
+  finally:
+    _gridOnRead.reset(token)
+  # the phases a vendor file declares, replaced by the list the caller states, as an import
+  # script does: one frame per phase of the file in its order, the not indexed one first
+  if CS is not None and ext in VENDOR_EXTENSIONS:
+    ebsd = withPhases(ebsd, CS)
+  if grid:
+    ebsd = tryGridify(ebsd)
+  return ebsd
+
+
+# the map of a file by the loader of its format
+def _read(fname, ext, CS, *args, **kwargs):
   if ext == "ang":
     from .ang import loadEBSD_ang
     ebsd = loadEBSD_ang(fname, *args, **kwargs)
@@ -374,12 +473,6 @@ def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
   else:
     from .generic import loadEBSD_generic
     ebsd = loadEBSD_generic(fname, CS, *args, **kwargs)
-  # the phases a vendor file declares, replaced by the list the caller states, as an import
-  # script does: one frame per phase of the file in its order, the not indexed one first
-  if CS is not None and ext in VENDOR_EXTENSIONS:
-    ebsd = withPhases(ebsd, CS)
-  if getMTEXpref("gridifyOnImport", True) and not noGrid:
-    ebsd = tryGridify(ebsd)
   return ebsd
 
 

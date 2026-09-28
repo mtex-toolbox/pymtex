@@ -53,15 +53,17 @@ class LoadBridge(QObject):
   """the receiver on the main thread: a signal connected to a plain callable runs on the
   emitting thread, so the commit goes through a slot of an object living here"""
 
-  def __init__(self, window, commit, thread):
+  def __init__(self, window, commit, thread, worker):
     super().__init__(window)
     self.window = window
     self.commit = commit
     self.thread = thread
+    self.worker = worker
 
   @Slot(object)
   def finish(self, result):
-    """stops the thread and commits the result on the main thread, a failure shown as the status"""
+    """stops the thread and commits the result on the main thread, a failure shown as the status;
+    the job's closures are let go then, since they hold the map it was for"""
     self.thread.quit()
     try:
       self.commit(result)
@@ -69,6 +71,9 @@ class LoadBridge(QObject):
       traceback.print_exc()
       self.window.st.status = ("failed", f"{e}")
       self.window.st.changed("status")
+    finally:
+      self.commit = None
+      self.worker.load = None
 
 
 class WizardWindow(QMainWindow):
@@ -132,12 +137,13 @@ class WizardWindow(QMainWindow):
     thread = QThread(self)
     w = LoadWorker(load)
     w.moveToThread(thread)
-    bridge = LoadBridge(self, commit, thread)
+    bridge = LoadBridge(self, commit, thread, w)
     thread.started.connect(w.run)
     w.done.connect(bridge.finish, Qt.QueuedConnection)
     thread.finished.connect(lambda: self.threads.remove(thread) if thread in self.threads else None)
     self.threads.append(thread)
-    self._keep = getattr(self, "_keep", []) + [w, bridge]
+    # the jobs are kept alive while their thread runs, and dropped once it has finished
+    self._keep = [job for job in getattr(self, "_keep", []) if not job[0].isFinished()] + [(thread, w, bridge)]
     thread.start()
 
   # ------------------------------------------------------------------ the strip

@@ -778,8 +778,7 @@ def loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUn
 
 # the same map from the rotations a file states directly, as quaternions rather than angles
 def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, frame, meta, unitCell, scanGrid):
-  from ..maps.ebsd import EBSD
-  from .load import gridLattice
+  from .load import mapFromColumns, rowOrderLattice
   ph = ph.copy()
   if unindexed is not None:
     ph[np.asarray(unindexed, dtype=bool)] = 0
@@ -787,13 +786,14 @@ def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, 
   if correction is not None:
     r = correction * r
     meta = dict(meta or {}, EulerCorrection=correction)
-  q = np.array(r.data, dtype=float)
+  # the rotations were just made, so their array is changed in place
+  q = np.asarray(r.data, dtype=float)
   indexed = np.array([fr.isIndexed for fr in phases.frames])[ph]
   q[~indexed] = np.nan
-  pos = np.column_stack([np.asarray(x, dtype=float), np.asarray(y, dtype=float), np.zeros(len(ph))])
-  lat = gridLattice(pos, *scanGrid) if scanGrid is not None else None
-  return EBSD(pos, rotation(q), ph, phases, dict(props), unitCell=unitCell, scanUnit=scanUnit, frame=frame, meta=meta,
-              phaseMap=np.arange(len(phases)), lattice=lat)
+  x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+  lat = rowOrderLattice(x, y, scanGrid)
+  return mapFromColumns(x, y, q, ph, phases, props, lat, unitCell=unitCell, scanUnit=scanUnit, frame=frame, meta=meta,
+                        phaseMap=np.arange(len(phases)))
 
 
 __all__ = ["loadEBSD_h5", "h5Image", "h5ImageIndex"]

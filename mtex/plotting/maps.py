@@ -141,6 +141,11 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   o = M @ l.origin
   x = xs[0] + (np.arange(nx) + 0.5) * dx
   y = ys[0] + (np.arange(ny) + 0.5) * dy
+  pad = getattr(ebsd, "_pad", None)
+  from .kernels import mapRasterIndex
+  index = mapRasterIndex(x, y, o, Ainv, A, aligned, lin, pad)
+  if index is not None:
+    return xs, ys, index
   if aligned:
     # the lattice coordinates of the pixel centres, one axis at a time, rounded
     ia = np.rint((x[None, :] - o[0]) * Ainv[0, 0] + (y[:, None] - o[1]) * Ainv[0, 1]).astype(np.int64)
@@ -166,7 +171,6 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   index = np.full((ny, nx), -1, dtype=np.int32)
   index[inside] = lin[ia[inside], ib[inside]]
   # the padding of a grid is no measurement and shows nothing
-  pad = getattr(ebsd, "_pad", None)
   if pad is not None:
     index[index >= 0] = np.where(pad.reshape(-1)[index[index >= 0]], -1, index[index >= 0])
   return xs, ys, index

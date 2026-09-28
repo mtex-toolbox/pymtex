@@ -73,6 +73,31 @@ Warm, one process:
 | `gridify` | 200 ms | 90 ms | the scan cells once, in one compiled pass, with their extent; the cell indices of the array likewise; `np.take` for the padded copy |
 | `loadEBSD` | 17.5 s | 0.23 s | 0.5 s for the first call of a process |
 
+In the import wizard the largest of the set, `Scan15.osc` (3.7 M points), then spent 2.5 s on
+the main thread after its load: `mapRaster` 1.25 s (the lattice residual measured again, 0.56 s,
+now carried from the loader's check; the hexagonal pixel lookup, now a compiled loop), the phase
+counts sorted fifteen times per commit, 0.37 s (now one `bincount` per map), and the pole
+figures, 0.43 s. It is 0.26 s of drawing and the pole figures now. The Euler correction no longer
+copies its one rotation out to the map's length (`qmul` with a constant left factor), 114 MB.
+The load peaks at about 1 GB for a map of 379 MB: the file, the list map, and the gridded copy
+made while the list is alive; on a machine that swaps this is what makes a load of 1.1 s take 2
+to 4 s.
+
+Then (2026-09-28, second pass):
+
+- The grid is written while the file is read. `loadEBSD` tells the loaders it wants one
+  (`_gridOnRead`); where the row order gives the lattice, `mapFromColumns` scatters every column
+  straight into its grid array, so the list map is never built. Bruker's wobbling positions
+  still infer and grid afterwards. Checked against the list gridded afterwards for every format.
+- A header grid the positions refute falls back to the row order before inference, and the
+  HDF5 path reads the row order too.
+- NumPy asks the kernel for huge pages on large arrays. On this machine, with fragmented
+  memory, every page fault then waited for compaction: a fresh 1 GB array took 2.4 s to fill,
+  0.24 s without the request. The preference `hugePages` (default False) switches the request
+  off at import. This, not the arithmetic, was most of the 2 to 7 s loads.
+- `Scan15.osc`, 3.7 M points: 0.82 s, a traced peak of 791 MB (was 997 MB), stable across runs.
+- In the wizard every file of the set is on screen within 1.2 s of being selected.
+
 ## Why the parser is exact
 
 A field is an integer mantissa and a power of ten. Up to fifteen significant digits the

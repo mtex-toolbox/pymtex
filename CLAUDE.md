@@ -54,6 +54,12 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   exception is `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)`: a grain's polygon puts
   the padding it holds inside the scan, so it is filled and stops being padding, as MATLAB's
   `fill(ebsd, grains, 'gridify')` fills the dropped sites of a sparse map.
+- `loadEBSD` builds the grid while it reads: where the row order (or a header the positions
+  confirm) gives the lattice, `mapFromColumns` in `io/load.py` writes every column into its grid
+  cell and the list is never built; it must stay equal to `gridify` of the list (a test per format).
+  A rigid `rotate` or `shift` carries the lattice (`lattice.moved`) instead of inferring it again.
+- The preference `hugePages` (default False) is NumPy's madvise of huge pages, process wide, set at
+  import: on fragmented memory it made fresh large arrays ten times slower to fill.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `calcGrains` alters the map it is given, as the Julia port does and MATLAB's

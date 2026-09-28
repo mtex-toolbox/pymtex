@@ -161,3 +161,17 @@ def test_the_pole_figures_are_drawn_ahead(loaded):
   cb.setMiller(st, 0, "110")
   canvas.draw_view()
   assert canvas.pfPicture[0] != key and canvas.pfPicture[0][2][0] == "110"
+
+
+# a density arriving off the pole figure tab waits for the cursor to rest before it is drawn
+def test_the_pole_figures_wait_for_a_rest(loaded):
+  st = loaded
+  canvas = ViewCanvas(st)
+  cb.pickTab(st, st.tabs.index("IPF Z"))
+  st.densities[cb.dominantPhase(st)] = object()
+  canvas.onDensity()
+  assert canvas.ahead.isActive() and canvas.pfPicture is None
+  remaining = canvas.ahead.remainingTime()
+  st.changed("selected")
+  assert canvas.ahead.isActive() and canvas.ahead.remainingTime() >= remaining
+  canvas.ahead.stop()

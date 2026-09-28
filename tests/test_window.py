@@ -91,3 +91,21 @@ def test_walking_with_the_arrow_keys_reads_the_file():
   assert order.index(w.browser.status) == order.index(files.parentWidget()) + 1
   w.close()
   app.processEvents()
+
+
+# a map read before is let go when the next one is committed: the finished jobs keep no closure
+def test_the_maps_read_before_are_let_go():
+  import gc
+  import weakref
+  app = application()
+  w = runWizard(FIXTURES, exec=False)
+  read = []
+  for name in ("Forsterite_cut.ctf", "ferrite_cut.ang", "olivine_cut.ang"):
+    cb.openEntry(w.st, os.path.join(FIXTURES, name), w.worker)
+    pump(app, lambda: w.st.status[0] in ("loaded", "failed") and os.path.basename(w.st.selected) == name)
+    read.append(weakref.ref(w.st.ebsd))
+  pump(app, lambda: not w.threads, timeout=30)
+  gc.collect()
+  assert read[0]() is None and read[1]() is None and read[2]() is w.st.ebsd
+  w.close()
+  app.processEvents()

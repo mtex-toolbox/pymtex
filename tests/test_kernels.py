@@ -43,6 +43,10 @@ def test_product_and_rotation_agree_with_numpy(numbaBackend):
   assert np.allclose(kernels.qmul(np.array([1, 0, 0, 0]), q), q)
   assert kernels.qmul(p.astype(np.float32), q.astype(np.float32)).dtype == np.float32
   assert kernels.qmul(np.empty((0, 4)), np.empty((0, 4))).shape == (0, 4)
+  # one quaternion times a map's worth, the constant left factor not copied out
+  big = rotation.rand(70000, rng=rng).data.reshape(700, 100, 4)
+  assert np.allclose(kernels.qmul(p[0], big), _qmulNumpy(p[0], big), atol=1e-15) and kernels.qmul(p[:1], big).shape == (700, 100, 4)
+  assert kernels.qmul(p[0].astype(np.float32), big.astype(np.float32)).dtype == np.float32
 
 
 def test_searches_agree_with_numpy(numbaBackend):

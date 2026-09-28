@@ -17,3 +17,13 @@ def test_all_preferences():
   # the dict is a copy: changing it leaves the session alone
   prefs["UTF8Output"] = False
   assert getMTEXpref("UTF8Output") is True
+
+
+# NumPy's request for huge pages follows the preference, off by default and after a reset
+def test_huge_pages_follow_the_preference():
+  from numpy._core.multiarray import _get_madvise_hugepage
+  assert getMTEXpref("hugePages") is False and _get_madvise_hugepage() is False
+  setMTEXpref("hugePages", True)
+  assert _get_madvise_hugepage() is True
+  mtex.reset()
+  assert _get_madvise_hugepage() is False

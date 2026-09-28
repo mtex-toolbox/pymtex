@@ -96,7 +96,7 @@ with the rest behind a leading ellipsis that lists them, each a target and each 
 110 px, so that the panel's width is the browser's and not the depth of the folder open; the tree of the
 folder, folders first, a folder unfolding where it stands on a click and walked into on a
 double click, the vendor extensions as the filter, the arrow keys moving the current row
-and the file the cursor stops on read, 300 ms after it stopped, a load under way dropped when it moves on to another file, Right unfolding a folder where it stands
+and the file the cursor stops on read, 300 ms after it stopped, a load under way dropped when it moves on to another file, its pole figures drawn ahead only after a rest of 700 ms, a finished job letting go of the map it held, Right unfolding a folder where it stands
 and stepping into it, Left stepping out and folding it, Backspace walking up onto the folder
 left, a letter going to the first entry starting with it and again to the next; below the tree a status band coloured by the state of the load, idle with the hint, amber while
 loading, green with the time when loaded, red with the message when failed; the data set list, shown only when the

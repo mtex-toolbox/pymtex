@@ -31,7 +31,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
 from .dynprop import dynProp
-from .lattice import lattice, latticeBasis
+from .lattice import lattice, latticeBasis, mapPlane
 from .phaselist import phaseList, phaseTable
 from ..geometry.display import aligned
 
@@ -353,7 +353,7 @@ class EBSD:
     prop = {k: v.reshape((-1,) + v.shape[self.ndim:])[flat].reshape(shape + v.shape[self.ndim:]) for k, v in self.prop.items()}
     l = self.lattice
     if l is not None:
-      l = l.subset(flat) if len(flat) and len(np.unique(flat)) == len(flat) else None
+      l = l.subset(flat) if len(flat) and _distinct(flat, self.size) else None
     pad = None if self._pad is None else self._pad.reshape(-1)[flat].reshape(shape)
     return EBSD(pos, rot, ph, self.CSList, prop, scanUnit=self.scanUnit, frame=self.frame, lattice=l, meta=self.meta, phaseMap=self.phaseMap,
                 id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
@@ -435,7 +435,9 @@ class EBSD:
       rot = rotation.byAxisAngle(vector3d.Z, rot)
     pos = self.pos.data if keepXY else qrot(rot.data, self.pos.data)
     r = self.rotations.data if keepEuler else qmul(rot.data, self.rotations.data)
-    return self._moved(pos, r)
+    if keepXY:
+      return self._moved(pos, r, self.lattice)
+    return self._moved(pos, r, motion=(rotation(rot).matrix().reshape(3, 3), np.zeros(3)) if rot.size == 1 else None)
 
   # MATLAB's rot * ebsd: the positions and the orientations turned together
   def __rmul__(self, rot):
@@ -444,7 +446,7 @@ class EBSD:
   def shift(self, v):
     """the map with every position moved by the vector v, the arrays not reordered"""
     v = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
-    return self._moved(self.pos.data + v, self.rotations.data)
+    return self._moved(self.pos.data + v, self.rotations.data, motion=(np.eye(3), v) if np.size(v) == 3 else None)
 
   def transform(self, f):
     """any map of the positions; the lattice is inferred again from where they land"""
@@ -452,9 +454,13 @@ class EBSD:
     pos = out.data if isinstance(out, vector3d) else np.asarray(out, dtype=float)
     return self._moved(pos, self.rotations.data)
 
-  def _moved(self, pos, rot):
+  # the map with its positions and rotations moved; a lattice given, or the old one carried
+  # through the rigid motion (R, v) the positions went, else one inferred from where they land
+  def _moved(self, pos, rot, lattice=None, motion=None):
+    if lattice is None and motion is not None and self.lattice is not None:
+      lattice = self.lattice.moved(*motion, mapPlane(pos.reshape(-1, 3)))
     return EBSD(_vectors(pos, self.frame), _rotations(rot), self.phaseId, self.CSList, self.prop,
-                scanUnit=self.scanUnit, meta=self.meta, phaseMap=self.phaseMap, id=self.id, isPadding=self._pad)
+                scanUnit=self.scanUnit, meta=self.meta, phaseMap=self.phaseMap, id=self.id, isPadding=self._pad, lattice=lattice)
 
   def extent(self):
     """the bounds of the measured positions, [xmin, xmax, ymin, ymax]; the padding of a grid is
@@ -612,6 +618,18 @@ def _rotations(q):
   r = object.__new__(rotation)
   r.data = np.asarray(q)
   return r
+
+
+# whether a list of positions into n measurements names none twice: one mark per measurement,
+# since hashing the list costs a hundred times as much
+def _distinct(flat, n):
+  if len(flat) > n:
+    return False
+  if len(flat) < 2 or np.all(flat[1:] > flat[:-1]):
+    return True
+  seen = np.zeros(n, dtype=bool)
+  seen[flat] = True
+  return int(np.count_nonzero(seen)) == len(flat)
 
 
 # the lattice of the positions, or None where they are not on one

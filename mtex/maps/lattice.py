@@ -148,10 +148,27 @@ class lattice:
     """the corners of the cell around a site, relative to it, anticlockwise, shape (k, 3)"""
     return self.plane.from2d(cellCorners(self.A, self.shape)) - self.plane.o
 
+  def moved(self, R, v, plane):
+    """the same lattice after the rigid motion x -> R x + v, in the plane the moved positions lie
+    in: the index kept, the basis and the origin turned in the plane; None where the motion turns
+    the plane over, since the basis would change its hand"""
+    R, v = np.asarray(R, dtype=float), np.asarray(v, dtype=float).reshape(3)
+    f1, f2 = R @ self.plane.e1, R @ self.plane.e2
+    L = np.array([[plane.e1 @ f1, plane.e1 @ f2], [plane.e2 @ f1, plane.e2 @ f2]])
+    if np.linalg.det(L) <= 0:
+      return None
+    c = plane.to2d((R @ self.plane.o + v)[None, :])[0]
+    T = self.A.dtype
+    l = self._build(plane, (L @ self.origin + c).astype(T), (L @ self.A).astype(T), self.ij, self.shape)
+    # a rigid motion keeps every distance, the positions' from their sites too
+    if getattr(self, "_residual", None) is not None:
+      l._residual = self._residual
+    return l
+
   def subset(self, ids):
     """the same lattice on a subset of its sites, the index counted from the least one kept"""
     ij = self.ij[ids]
-    lo = ij.min(axis=0)
+    lo = columnMin(ij)
     return self._build(self.plane, self.origin + self.A @ lo, self.A, ij - lo, self.shape)
 
   def __repr__(self):
@@ -294,6 +311,16 @@ def canonicalBasis(a1, a2, shape):
   cosines = np.round(left @ b1 / (np.linalg.norm(left, axis=1) * np.linalg.norm(b1)), 9)
   b2 = left[np.lexsort((-np.linalg.norm(left, axis=1), cosines))[-1]]
   return np.stack([b1, b2], axis=1)
+
+
+def columnMin(a, block=64):
+  """the least of every column of a tall (n, k) array: NumPy reduces a short axis strided and
+  slowly, a block of rows at a time is ten times faster"""
+  m = len(a) - len(a) % block
+  if m == 0:
+    return a.min(axis=0)
+  lo = a[:m].reshape(-1, block, a.shape[1]).min(axis=0).min(axis=0)
+  return np.minimum(lo, a[m:].min(axis=0)) if m < len(a) else lo
 
 
 def cellShapeOf(a1, a2):

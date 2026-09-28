@@ -250,3 +250,27 @@ def test_single_precision_positions_far_out_keep_the_header_steps():
   sg = scanGridFromPositions(xy[:, 0], xy[:, 1], dx=h, dy=h * np.sqrt(3) / 2)
   l = gridLattice(np.column_stack([xy, np.zeros(len(xy))]), *sg)
   assert np.array_equal(l.A, [[h, h / 2], [0.0, h * np.sqrt(3) / 2]])
+
+
+# the grid written while the file is read is the list gridded afterwards, for every format
+@pytest.mark.parametrize("name", ["copper_cut.osc", "ferrite_cut.ang", "Forsterite_cut.ctf", "generic_cut.txt", "martensite_cut.cpr",
+                                  "olivine_cut.ang", "h5/bruker_cut.h5", "h5/edax_cut.h5", "h5/oxford_cut.h5", "h5/oli_cut.h5oina"])
+def test_the_grid_built_while_reading_is_the_list_gridded(name):
+  from mtex import gridify
+  from mtex.io import load as L
+  if name.startswith("h5/"):
+    pytest.importorskip("h5py")
+  fname = os.path.join(FIXTURES, name)
+  kw = {"CS": ["notIndexed", crystalFrame("m-3m", mineral="Fe"), crystalFrame("m-3m", mineral="Mg")]} if name.endswith(".txt") else {}
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    a = loadEBSD(fname, **kw)
+    b = loadEBSD(fname, noGrid=True, **kw)
+  if not a.isGridded:
+    return
+  b = gridify(b)
+  assert a.shape == b.shape and a.CSList.mineralList == b.CSList.mineralList
+  assert np.array_equal(a.pos.data, b.pos.data) and np.array_equal(a.rotations.data, b.rotations.data, equal_nan=True)
+  assert np.array_equal(a.phaseId, b.phaseId) and np.array_equal(a.id, b.id) and np.array_equal(a.isPadding, b.isPadding)
+  assert set(a.prop) == set(b.prop) and all(np.array_equal(a.prop[k], b.prop[k], equal_nan=True) and a.prop[k].dtype == b.prop[k].dtype for k in a.prop)
+  assert np.array_equal(a.lattice.ij, b.lattice.ij) and np.array_equal(a.lattice.A, b.lattice.A) and np.array_equal(a.lattice.origin, b.lattice.origin)

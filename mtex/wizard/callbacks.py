@@ -523,11 +523,17 @@ PHASE_COLUMNS = ("plot", "phase", "mineral", "pixels", "percent", "symmetry", "a
 
 
 def phaseCounts(st):
-  """the number of pixels of every phase id of the loaded map, empty before one is loaded"""
+  """the number of pixels of every phase id of the loaded map, empty before one is loaded; the
+  table, the script and the pole figures ask for it many times per map, so it is counted once"""
   if st.ebsd is None:
     return {}
-  ids, counts = np.unique(st.ebsd.phaseId, return_counts=True)
-  return {int(i): int(c) for i, c in zip(ids, counts)}
+  ph = st.ebsd.phaseId
+  memo = getattr(st, "_phaseCounts", None)
+  if memo is None or memo[0] is not ph:
+    counts = np.bincount(ph.reshape(-1).astype(np.intp))
+    memo = (ph, {int(i): int(c) for i, c in enumerate(counts) if c})
+    st._phaseCounts = memo
+  return memo[1]
 
 
 def dominantPhase(st):

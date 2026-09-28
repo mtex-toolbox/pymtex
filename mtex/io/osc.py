@@ -167,7 +167,7 @@ def loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit
   for key in ("x", "y", "phi1", "phi", "phi2", "phase"):
     if key not in cols:
       raise ValueError(f"{fname} holds {m} columns, too few for a map")
-  props = {name: np.asarray(cols[name], dtype=np.float64) for name in names if name not in ("x", "y", "phi1", "phi", "phi2", "phase")}
+  props = {name: cols[name] for name in names if name not in ("x", "y", "phi1", "phi", "phi2", "phase")}
   # a pattern EDAX could not index carries a negative confidence index
   unindexed = cols["confidenceindex"] < 0 if "confidenceindex" in cols else None
   hex = abs(xstep - ystep) > 1e-6 * max(xstep, ystep)
@@ -177,7 +177,7 @@ def loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit
     eulerCorrection = eulerCorrectionRotation(setting)
   return ebsdFromColumns(cols["x"], cols["y"], cols["phi1"], cols["phi"], cols["phi2"], cols["phase"], phases, props,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta, unindexed=unindexed,
-                         unitCell=unitCell if xstep > 0 and ystep > 0 else None, scanGrid=_scanGrid(nx, ny, len(M), xstep, ystep, hex))
+                         unitCell=unitCell if xstep > 0 and ystep > 0 else None, scanGrid=_scanGrid(nx, ny, len(M), xstep, ystep, hex), propType=np.float64)
 
 
 # the grid the header words state; a hexagonal scan alternates nx and a shorter row

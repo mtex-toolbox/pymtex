@@ -22,6 +22,7 @@ from . import callbacks as cb
 from .pictogram import SIDE
 
 MAP_KINDS = ("phase", "ipf", "property")
+AHEAD_DELAY_MS = 700      # the rest on a file before its pole figures are drawn ahead
 MAX_PIXELS = 1_500_000    # of the picture the map is drawn as, whatever the canvas holds
 PF_RESOLUTION = 1.5 * np.pi / 180   # the pole figures' grid, fine enough to show no facets
 KEY_PIXELS = 300          # the side a key is drawn at, once, before it is a picture
@@ -145,6 +146,12 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.resized.setSingleShot(True)
     self.resized.setInterval(250)
     self.resized.timeout.connect(self.afterResize)
+    # the pole figures are drawn ahead only once the cursor has rested on a file, since the
+    # drawing holds the window for half a second
+    self.ahead = QTimer(self)
+    self.ahead.setSingleShot(True)
+    self.ahead.setInterval(AHEAD_DELAY_MS)
+    self.ahead.timeout.connect(self.drawAhead)
     self.drawnFor = None       # (map identity, map convention) the base picture stands for
     self.image = None
     self.colorbar = None
@@ -157,6 +164,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       st.on(name, self.scheduleDraw)
     st.on("phases", self.phasesChanged)
     st.on("densities", self.onDensity)
+    st.on("selected", self.restartAhead)
     self.mpl_connect("resize_event", lambda event: self.resized.start())
 
   # ------------------------------------------------------------------ the dispatch
@@ -368,12 +376,17 @@ class ViewCanvas(FigureCanvasQTAgg):
       self.density(k)
 
   def onDensity(self):
-    """a density arrived: the pole figures drawn, or drawn ahead on the next turn of the event
-    loop, after the map is on the screen, so that the tab opens on a finished picture"""
+    """a density arrived: the pole figures drawn, or drawn ahead once the cursor has rested on
+    the file, so that the tab opens on a finished picture"""
     if self.onPoleFigures():
       self.scheduleDraw()
     else:
-      QTimer.singleShot(0, self.drawAhead)
+      self.ahead.start()
+
+  def restartAhead(self):
+    """another file selected: the pole figures waiting to be drawn ahead wait again"""
+    if self.ahead.isActive():
+      self.ahead.start()
 
   def onPoleFigures(self):
     """whether the tab in force is the pole figure tab"""

@@ -234,7 +234,10 @@ class EBSD3(EBSD):
     if self.size == 0:
       return aligned(lines[0] + "\n  the volume is empty")
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
-    ids, counts = np.unique(self.phaseId[~self.isPadding], return_counts=True)
+    # a count per phase in one pass; np.unique would sort every voxel
+    perPhase = np.bincount(self.phaseId[~self.isPadding].astype(np.intp), minlength=1)
+    ids = np.flatnonzero(perPhase)
+    counts = perPhase[ids]
     share = [f"{c} ({float(f'{100 * c / self.size:.2g}'):g}%)" for c in counts]
     lines.append(phaseTable(self.CSList.frames, ids, share))
     if self.prop:
