@@ -172,8 +172,8 @@ def test_the_pole_figure_sets_read_with_their_recipes():
   s = mtexdata("steel", root=LOCAL, download=False)
   assert s.numPF == 3 and np.allclose(s.h.hkl, [[1, 1, 0], [2, 0, 0], [2, 1, 1]])
   # the steel specimen is turned by 90 degree about z
-  raw = mtexdata("steel", root=LOCAL, download=False)
-  assert np.allclose(s.allR[0].data, raw.allR[0].data)
+  raw = mtex.loadPoleFigure(mtexdatafile("steel", root=LOCAL, download=False), s.allH, interface="rw1")
+  assert np.allclose(s.allR[0].data, (mtex.rotation.byAxisAngle(mtex.zvector, 90 * degree) * raw.allR[0]).data)
   z = mtexdata("zncuti", root=LOCAL, download=False)
   assert z.numPF == 8 and z.CS.mineral == "Zn"
   assert mtexdata("aachenexp", root=LOCAL, download=False).numPF == 4

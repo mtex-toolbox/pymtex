@@ -32,7 +32,7 @@ def unit(x):
 
 
 @pytest.mark.parametrize("name", list(POLAR))
-def test_S5_polar_coordinates_of_a_sector(name):
+def test_polarCoordinates_areMTEXs(name):
   cf = crystalFrame(name)
   sR = conventionalSector(cf)
   c = unit(POLAR[name][0][0])
@@ -42,6 +42,13 @@ def test_S5_polar_coordinates_of_a_sector(name):
     assert abs(r[k] - wantR) < 1e-3
     d = np.degrees(rho[k]) - wantRho
     assert min(abs(np.mod(d, 360)), abs(np.mod(-d, 360))) < 2
+
+
+@pytest.mark.parametrize("name", list(POLAR))
+def test_polarCoordinates_radiusIsOneAtTheCentreAndZeroAtTheVertices(name):
+  cf = crystalFrame(name)
+  sR = conventionalSector(cf)
+  c = unit(POLAR[name][0][0])
   # the centre is the only place the radius reaches one, and the boundary the only zero
   assert np.isclose(polarCoordinates(sR, c, c, cf.how2plot.east)[0][0], 1)
   for v in sR.vertices().data:
@@ -49,39 +56,51 @@ def test_S5_polar_coordinates_of_a_sector(name):
 
 
 @pytest.mark.parametrize("name", ["m", "mm2", "mmm", "3m", "4mm", "4/mmm", "6mm", "-6m2", "6/mmm", "-43m", "m-3m"])
-def test_P5_groups_bounded_by_their_own_mirrors_need_no_fold(name):
+def test_sectorFolds_ofGroupsBoundedByTheirOwnMirrorsIsEmpty(name):
   pg = crystalFrame(name).sym
   assert sectorFolds(pg) == [] and hasSmoothKey(pg)
 
 
 @pytest.mark.parametrize("name", list(FOLDS))
-def test_P5_the_fold_MTEX_takes(name):
+def test_sectorFolds_isTheFoldMTEXTakes(name):
+  folds = sectorFolds(crystalFrame(name).sym)
+  assert len(folds) == 1 and abs(folds[0] @ unit(FOLDS[name])) > 0.99
+
+
+@pytest.mark.parametrize("name", list(FOLDS))
+def test_sectorFolds_foldIsAMirrorOfTheSectorButNotOfTheGroup(name):
   pg = crystalFrame(name).sym
   folds = sectorFolds(pg)
-  assert len(folds) == 1 and abs(folds[0] @ unit(FOLDS[name])) > 0.99
-  # the fold is a mirror of the sector but not of the group
   sR = conventionalSector(pg)
   assert foldsSector(folds[0], sR) and not _isin(reflection(vector3d(folds[0])), pg.rot.flatten())[0]
 
 
-def test_P5_the_keys_that_jump_and_the_trivial_group():
+def test_hasSmoothKey_isFalseWhereTheKeyJumps():
   assert not hasSmoothKey(crystalFrame("-3").sym) and not hasSmoothKey(crystalFrame("-4").sym)
   assert hasSmoothKey(crystalFrame("432").sym)
+
+
+def test_sectorFolds_ofTheWholeSphereIsTheEquatorOfTheConvention():
   # the whole sphere folds at the equator of the frame's plotting convention
   ss = specimenFrame("1")
   folds = sectorFolds(ss.sym, conventionalSector(ss))
   assert len(folds) == 1 and abs(folds[0] @ ss.how2plot.outOfScreen.data) > 1 - 1e-9
-  # the centre of a sector: a triangle's barycentre, a lune's bisector
+
+
+def test_regionCenter_ofATriangleIsItsBarycentre():
   c = regionCenter(conventionalSector(crystalFrame("m-3m")))
   assert np.allclose(c, unit(np.array([0, 0, 1.0]) + unit([1, 0, 1]) + unit([1, 1, 1])))
   sR = conventionalSector(crystalFrame("4/mmm"))
   assert np.allclose(regionCenter(sR), unit(np.sum(sR.vertices().data, axis=0)))
+
+
+def test_regionCenter_ofALuneIsItsBisector():
   lune = conventionalSector(crystalFrame("2/m"))
   assert lune.checkInside(regionCenter(lune)) and np.allclose(regionCenter(lune), unit(np.sum(lune.N, axis=0)))
 
 
 @pytest.mark.parametrize("name", ["m-3m", "-3m", "mmm", "2/m"])
-def test_the_compiled_polar_radius_is_the_array_one(name):
+def test_polarCoordinates_compiledRadiusIsTheNumpyOne(name):
   from mtex import setMTEXpref
   sR = conventionalSector(crystalFrame(name))
   c = regionCenter(sR).reshape(3)

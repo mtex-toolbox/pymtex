@@ -51,7 +51,7 @@ def test_every_phase_is_clustered_on_its_own():
 
 
 def test_the_seed_loop_and_its_fallback_agree():
-  e = blockMap(step=3 * degree, bend=0.2 * degree)
+  e = blockMap(nb=3, bs=12, step=3 * degree, bend=0.2 * degree)
   a = calcGrains(e.copy(), fmc=3).numPixel
   setMTEXpref("kernels", "numpy")
   b = calcGrains(e.copy(), fmc=3).numPixel

@@ -40,67 +40,110 @@ def gridMap(nx, ny, h):
               phaseList(crystalFrame("1"), CS), prop={"bc": np.arange(nx * ny, dtype=float)})
 
 
-def test_an_ebsd_map_by_phase_value_and_orientation(forsterite):
+def test_plot_ofAPhaseMapIsOnePolyCollectionWithItsLegend(forsterite):
   ebsd, _ = forsterite
   h = plot(ebsd, legend=True)
   fig = gcm()
-  mP = mapOf(ebsd)
   assert len(fig.children) == 1 and isinstance(h, matplotlib.collections.PolyCollection)
-  # the layout of the session's convention flips y, and the scale bar with its triad is drawn
-  assert np.array_equal(mP.layout, [[1, 0], [0, -1]]) and len(mP.scaleBarArtists) > 5
   assert fig.children[0].get_legend() is not None
-  # a value per measurement through the colour map, a colour bar, and the picture backend
+
+
+# the layout of the session's convention flips y, and the scale bar with its triad is drawn
+def test_plot_ofAMapFlipsYAndDrawsTheScaleBar(forsterite):
+  ebsd, _ = forsterite
+  plot(ebsd)
+  mP = mapOf(ebsd)
+  assert np.array_equal(mP.layout, [[1, 0], [0, -1]]) and len(mP.scaleBarArtists) > 5
+
+
+# a value per measurement through the colour map, a colour bar, and the picture backend
+def test_plot_ofValuesThroughImagescIsAPictureWithAColourBar(forsterite):
+  ebsd, _ = forsterite
   h = plot(ebsd, ebsd.bc, colorbar=True, backend="imagesc")
   assert isinstance(h, matplotlib.image.AxesImage) and len(gcm().colorbars) == 1
   assert mapOf(ebsd).mappable is h
-  # orientations through the inverse pole figure key of their phase, and the key legend
+
+
+# orientations through the inverse pole figure key of their phase, and the key legend
+def test_plot_ofOrientationsDrawsTheKeyLegend(forsterite):
+  ebsd, _ = forsterite
   h = plot(ebsd, "orientation", legend=True)
   assert isinstance(h, matplotlib.collections.PolyCollection) and len(mapOf(ebsd).ax.child_axes) >= 1
   fo = ebsd["Forsterite"]
   plot(fo, fo.orientations)
   plot(fo, ipfHSVKey(fo.CS, ipfDirection=xvector))
-  # rgb per measurement, one colour, and the points backend
+
+
+# rgb per measurement, one colour, and the points backend
+def test_plot_throughTheScatterBackendIsPointsWithoutAScaleBar(forsterite):
+  ebsd, _ = forsterite
   plot(ebsd, np.random.default_rng(1).random((ebsd.size, 3)))
   h = plot(ebsd, faceColor="black", backend="scatter", micronbar=False)
   assert isinstance(h, matplotlib.collections.PathCollection) and not hasattr(mapOf(ebsd), "scaleBarArtists")
-  with pytest.raises(ValueError):
-    plot(ebsd, np.zeros(5))
-  with pytest.raises(ValueError):
-    plot(ebsd, backend="volume")
   # the method is the function
   ebsd.plot(ebsd.bc)
 
 
-def test_the_picture_the_cells_and_the_layout():
+def test_plot_refusesValuesOfTheWrongLengthAndAnUnknownBackend(forsterite):
+  ebsd, _ = forsterite
+  with pytest.raises(ValueError):
+    plot(ebsd, np.zeros(5))
+  with pytest.raises(ValueError):
+    plot(ebsd, backend="volume")
+
+
+def test_plot_throughImagescIsOnePixelPerCellWithTitleAndCoordinates():
   ebsd = gridMap(6, 4, 0.5)
   h = plot(ebsd, "bc", backend="imagesc", coordinates=True, title="grid")
   mP = mapOf(ebsd)
   assert isinstance(h, matplotlib.image.AxesImage) and h.get_array().shape == (4, 6)
   assert mP.ax.get_title() == "grid" and mP.ax.get_xlabel().startswith("X") and mP.ax.get_ylabel().startswith("-Y")
-  # the map under another convention is turned, not resampled
+
+
+# the map under another convention is turned, not resampled
+def test_plot_underAnotherConventionTurnsThePicture():
+  ebsd = gridMap(6, 4, 0.5)
   h = plot(ebsd, "bc", backend="imagesc", how2plot="x↑→y")
   assert h.get_array().shape == (6, 4) and np.array_equal(mapOf(ebsd).layout, [[0, 1], [1, 0]])
-  # the cells with their edges, and one cell per measurement
+
+
+# the cells with their edges, and one cell per measurement
+def test_plot_throughThePatchBackendIsOneCellPerMeasurement():
+  ebsd = gridMap(6, 4, 0.5)
   h = plot(ebsd, backend="patch", edgeColor="k")
   assert len(h.get_paths()) == 24
-  # values by name and by array agree
+
+
+def test_mapValues_byNameAndByArrayAgree():
+  ebsd = gridMap(6, 4, 0.5)
   v1, s1 = mapValues(ebsd, "bc")
   v2, s2 = mapValues(ebsd, ebsd.bc)
   assert s1 and s2 and np.array_equal(v1, v2)
-  v3, s3 = mapValues(ebsd, None)
+
+
+def test_mapValues_ofNothingAreThePhaseColours():
+  v3, s3 = mapValues(gridMap(6, 4, 0.5), None)
   assert not s3 and v3.shape == (24, 3)
 
 
-def test_grains_boundaries_and_arrows(forsterite):
+def test_plot_ofGrainsIsAPathPerGrainWithBoundaryAndScaleBar(forsterite):
   ebsd, g = forsterite
   h = plot(g)
   assert isinstance(h, matplotlib.collections.PathCollection) and len(h.get_paths()) == g.size
   mP = mapOf(g)
   assert len(mP.ax.lines) >= 2                      # the boundary and the scale bar
+
+
+def test_plot_ofGrainValuesTakesAColourBar(forsterite):
+  ebsd, g = forsterite
   h = plot(g, g.GOS, colorbar=True, noBoundary=True)
   assert mapOf(g).mappable is h and len(gcm().colorbars) == 1
   plot(g["Forsterite"], g["Forsterite"].meanOrientation)
-  # the boundary drawn on a held map widens it and keeps the bar
+
+
+# the boundary drawn on a held map widens it and keeps the bar
+def test_plot_ofABoundaryOnAHeldMapWidensIt(forsterite):
+  ebsd, g = forsterite
   plot(g["Forsterite"])
   mP = mapOf(g)
   before = mP.extent
@@ -109,7 +152,11 @@ def test_grains_boundaries_and_arrows(forsterite):
   hold(False)
   assert mapOf(g) is mP and isinstance(h, matplotlib.lines.Line2D)
   assert mP.extent[1] - mP.extent[0] >= before[1] - before[0]
-  # a value per segment, and a colour per segment
+
+
+# a value per segment, and a colour per segment
+def test_plot_ofBoundaryValuesOrColoursIsALineCollection(forsterite):
+  ebsd, g = forsterite
   gB = g.boundary[g.boundary.hasPhase("Forsterite", "Forsterite")]
   angles = gB.misorientation.angle()
   plot(ebsd, ebsd.bc, colormap="gray")
@@ -121,20 +168,16 @@ def test_grains_boundaries_and_arrows(forsterite):
   assert isinstance(h, matplotlib.collections.LineCollection)
   with pytest.raises(ValueError):
     plot(gB, np.zeros(2))
-  # arrows: an axis per grain centred on it, a direction per measurement
+
+
+# arrows: an axis per grain centred on it, a direction per measurement
+def test_quiver_drawsAnAxisPerGrainAndADirectionPerMeasurement(forsterite):
+  ebsd, g = forsterite
   plot(g)
   hold(True)
   h = quiver(g, g.longAxis(), color="w")
   hold(False)
   assert isinstance(h, matplotlib.collections.LineCollection) and len(h.get_segments()) <= g.size
-  # two quivers without a colour take the first two of the colour order, as MATLAB's
-  plot(g)
-  hold(True)
-  h1 = quiver(g, g.longAxis(), displayName="long axis")
-  h2 = quiver(g, g.longAxis(), displayName="again")
-  hold(False)
-  c1, c2 = (matplotlib.colors.to_hex(h.get_edgecolor()[0] if len(h.get_edgecolor()) else h.get_color()) for h in (h1, h2))
-  assert c1 != c2 and c1 == matplotlib.colors.to_hex("C0") and h1.get_label() == "long axis"
   plot(ebsd)
   hold(True)
   h = quiver(ebsd, vector3d(np.ones((ebsd.size, 3))))
@@ -144,22 +187,35 @@ def test_grains_boundaries_and_arrows(forsterite):
     quiver(g, vector3d(np.ones((3, 3))))
 
 
-def test_an_unindexed_measurement_is_drawn_as_nothing_and_the_picture_colours_what_it_shows(forsterite):
-  import numpy as np
-  from mtex import plot
-  from mtex.plotting.mapplot import mapValues
+# two quivers without a colour take the first two of the colour order, as MATLAB's
+def test_quiver_withoutAColourTakesTheColourOrder(forsterite):
+  ebsd, g = forsterite
+  plot(g)
+  hold(True)
+  h1 = quiver(g, g.longAxis(), displayName="long axis")
+  h2 = quiver(g, g.longAxis(), displayName="again")
+  hold(False)
+  c1, c2 = (matplotlib.colors.to_hex(h.get_edgecolor()[0] if len(h.get_edgecolor()) else h.get_color()) for h in (h1, h2))
+  assert c1 != c2 and c1 == matplotlib.colors.to_hex("C0") and h1.get_label() == "long axis"
+
+
+# no pixel of the unindexed phase is painted, and none of them is opaque black
+def test_plot_throughImagescPaintsNoUnindexedPixel(forsterite):
   ebsd = forsterite[0]
   ids = np.asarray(ebsd.phaseId).reshape(-1)
   assert np.any(ids == 0) and not ebsd.CSList.isIndexed(0)
   h = plot(ebsd, "orientation", backend="imagesc")
   img = h.get_array()
   assert img.dtype == np.uint8
-  # no pixel of the unindexed phase is painted, and none of them is opaque black
   opaqueBlack = (img[..., 3] == 255) & np.all(img[..., :3] == 0, axis=-1)
   assert not np.any(opaqueBlack)
-  # the colours of the pixels alone, in the picture's order, are the colours of the map at
-  # those measurements
+
+
+# the colours of the pixels alone, in the picture's order, are the colours of the map at
+# those measurements
+def test_mapValues_atThePixelsAreTheColoursOfTheMapThere(forsterite):
   from mtex.plotting.maps import mapRaster
+  ebsd = forsterite[0]
   (_, _), (_, _), ind = mapRaster(ebsd, maxPixels=20_000)
   at = np.where(ind >= 0, ind, 0).reshape(-1)
   narrow, _ = mapValues(ebsd, "orientation", at=at)
@@ -168,32 +224,36 @@ def test_an_unindexed_measurement_is_drawn_as_nothing_and_the_picture_colours_wh
   assert np.array_equal(np.nan_to_num(narrow, nan=-1.0), np.nan_to_num(whole[at], nan=-1.0))
 
 
-def test_the_padding_of_a_grid_is_not_drawn():
-  from mtex import ipfColorKey
+# the picture and the limits span the measurements, and no pixel shows a padding cell
+def test_plot_ofAGridShowsNoPaddingInThePictureOrTheLimits():
   from mtex.plotting.maps import mapBox, mapRaster
   from test_gridify import turnedMap
   g = turnedMap().gridify()
-  # the picture and the limits span the measurements, and no pixel shows a padding cell
   box = mapBox(g)
   assert np.allclose([box[:, 0].min(), box[:, 0].max(), box[:, 1].min(), box[:, 1].max()], [0, 20, -10, 0])
   (_, _), (_, _), ind = mapRaster(g, maxPixels=20_000)
   assert not g.isPadding.reshape(-1)[ind[ind >= 0]].any()
-  # the cells and the points leave the padding and the colourless sites out
+
+
+# the cells and the points leave the padding and the colourless sites out
+@pytest.mark.parametrize("backend, count", [("patch", lambda h: len(h.get_paths())), ("scatter", lambda h: len(h.get_offsets()))])
+def test_plot_ofAGridLeavesPaddingAndColourlessSitesOut(backend, count):
+  from mtex import ipfColorKey
+  from test_gridify import turnedMap
+  g = turnedMap().gridify()
   rgb = ipfColorKey(g).orientation2color(g.orientations)
   assert np.isnan(rgb[g.isPadding]).all()
   measured = g.size - g.isPadding.sum()
-  for backend, count in (("patch", lambda h: len(h.get_paths())), ("scatter", lambda h: len(h.get_offsets()))):
-    plt.figure()
-    assert count(plot(g, rgb, backend=backend)) == measured - 1
-    assert count(plot(g, backend=backend)) == measured
+  plt.figure()
+  assert count(plot(g, rgb, backend=backend)) == measured - 1
+  assert count(plot(g, backend=backend)) == measured
 
 
-def test_boundary_needles_translucent_grains_and_legend_off(forsterite):
-  from mtex import legend
+# a boundary quiver is MATLAB's quiver3 of v and -v from every midpoint, the longest half
+# 0.9 f times the spacing of the points
+def test_quiver_ofBoundariesIsANeedleThroughEveryMidpoint(forsterite):
   ebsd, g = forsterite
   gB = g.boundary["Forsterite", "Forsterite"]
-  # a boundary quiver is MATLAB's quiver3 of v and -v from every midpoint, the longest half
-  # 0.9 f times the spacing of the points
   plot(g)
   hold(True)
   v = vector3d(np.tile([1.0, 0, 0], (len(gB), 1)))
@@ -207,11 +267,21 @@ def test_boundary_needles_translucent_grains_and_legend_off(forsterite):
   assert len(segs) == len(gB) and np.allclose(np.abs(segs[:, 0]), np.abs(c))
   assert np.allclose(np.linalg.norm(segs[:, 1] - segs[:, 0], axis=-1), 0.4 * 0.9 * spacing)
   assert h.get_zorder() > 1 and min(x.get_zorder() for x in gcm().children[-1].collections) < 1
-  # translucent fades a grain by its colour: pale grains let the map below show
+
+
+# translucent fades a grain by its colour: pale grains let the map below show
+def test_plot_translucentFadesAGrainByItsColour(forsterite):
+  ebsd, g = forsterite
   h = plot(g, translucent=1)
   rgb = np.asarray(h.get_facecolors())[:, :3]
   assert np.allclose(h.get_alpha(), 1 - rgb.min(axis=1))
-  # legend('off') removes the legend of the phase map
+
+
+# legend('off') removes the legend of the phase map
+def test_legend_offRemovesTheLegendOfThePhaseMap(forsterite):
+  from mtex import legend
+  ebsd, g = forsterite
+  plot(g)
   assert gcm().children[-1].get_legend() is not None
   legend("off")
   assert gcm().children[-1].get_legend() is None
@@ -313,9 +383,9 @@ def test_the_scale_bar_follows_a_zoom():
 
 
 # an image is drawn where it sits, under the convention of its frame: an image of its own
-# row 0 at the top, and a list one axes each, titled by name
-def test_an_image_is_drawn_on_the_specimen():
-  from mtex import mapImage, mapImageList
+# row 0 at the top
+def test_plot_ofAnImageDrawsItOnTheSpecimenRowZeroOnTop():
+  from mtex import mapImage
   img = np.arange(12.0).reshape(3, 4)
   mg = mapImage(img, dxy=0.5, origin=vector3d(1, 2, 0), name="bse")
   h = plot(mg)
@@ -324,11 +394,20 @@ def test_an_image_is_drawn_on_the_specimen():
   # row 0 at the top of the screen: the array is drawn flipped, origin lower
   assert np.array_equal(np.asarray(h.get_array())[::-1], img)
   assert ax.get_xlim() == (0.75, 2.75)
-  plt.close("all")
+
+
+# a list of images, one axes each, titled by name
+def test_plot_ofAnImageListIsOneAxesPerImageTitledByName():
+  from mtex import mapImage, mapImageList
+  mg = mapImage(np.arange(12.0).reshape(3, 4), dxy=0.5, origin=vector3d(1, 2, 0), name="bse")
   hs = plot(mapImageList([mg, mapImage(np.random.rand(3, 4, 3), name="rgb")]), layout=[1, 2])
   assert len(hs) == 2 and [a.get_title() for a in gcm().children] == ["bse", "rgb"]
   assert hs[1].get_array().shape == (3, 4, 4)
-  plt.close("all")
+
+
+def test_plot_ofAnImageWithEdgeKeepsItsShape():
+  from mtex import mapImage
+  mg = mapImage(np.arange(12.0).reshape(3, 4), dxy=0.5, origin=vector3d(1, 2, 0), name="bse")
   e = plot(mg, edge=True)
   assert e.get_array().shape == (3, 4)
 

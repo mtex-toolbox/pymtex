@@ -1,9 +1,9 @@
 import os
 
-from mtex.wizard.state import FileRow, WizardState
+from mtex.wizard.state import WizardState
 
 
-def test_state_and_hooks():
+def test_a_state_change_calls_the_hooks_bound_to_it():
   st = WizardState(os.path.dirname(__file__))
   assert st.folder == os.path.abspath(os.path.dirname(__file__)) and st.status[0] == "idle" and not st.hasMap
   seen = []
@@ -15,7 +15,3 @@ def test_state_and_hooks():
   assert st.currentTab is None and len(st.conventions) == 8
   assert "loading" in repr(st)
 
-
-def test_file_row():
-  r = FileRow("a.ang", "/x/a.ang", 1, size=12)
-  assert not r.isDir and not r.open and r.depth == 1

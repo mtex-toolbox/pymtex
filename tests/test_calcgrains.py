@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from mtex import (EBSD, phaseList, crystalFrame, orientation, rotation, vector3d, xvector, yvector, zvector, degree, angle,
-                  calcGrains, gbcAngle, gridify, transform)
+                  calcGrains, gbcAngle, gridify)
 from conftest import close
 
 CS = crystalFrame("m-3m", mineral="test")
@@ -113,17 +113,6 @@ def test_S9_a_filled_hole_is_absorbed_a_boundary_through_it_is_not():
   assert (e3.grainId == 0).sum() > 0 and np.all(e3.grainId[~e3.isIndexed] >= 0)
 
 
-def test_S10_the_rim_closes_as_the_inside_does():
-  # the edge of the map is not the edge of a hole: a cell on the rim is absorbed exactly
-  # when a cell in its place further in would be; both gaps here are one cell, so both go
-  e = blockMap(SQ3, 1, 7, notIndexed=((3, 3, 0.0), (0, 3, 0.0)))
-  ix = e[e.isIndexed]
-  assert len(ix) == 47
-  for alpha in (3.1, 20.0):
-    g = calcGrains(ix, angle=5 * degree, alpha=alpha)
-    assert len(g) == 1 and g.numPixel[0] == 47
-
-
 # ------------------------------------------------------------------ check_calcGrainsCases
 
 CS1 = crystalFrame("1", mineral="test")
@@ -152,24 +141,6 @@ def hexBlockGrid(blk, nb, oris):
   rot = oris[blockId.reshape(-1)]
   pos = np.stack([x.reshape(-1), y.reshape(-1), np.zeros(n * n)], axis=-1)
   return gridify(EBSD(pos, rot, np.ones(n * n, dtype=np.int8), phaseList(CS1)))
-
-
-def test_block_grids_with_holes_and_a_cropped_corner():
-  oris = rotation.byAxisAngle(zvector, np.arange(1, 17) * 7 * degree)
-  thr = 5 * degree
-  for build in (squareBlockGrid, hexBlockGrid):
-    e = build(6, 4, oris)
-    g0 = calcGrains(e.copy(), angle=thr)
-    assert g0.isIndexed.sum() == 16
-    # the grain count survives a trapezoidal distortion and a rotation of the map
-    x, y = e.x.reshape(-1), e.y.reshape(-1)
-    xc, yc, yh = (x.min() + x.max()) / 2, (y.min() + y.max()) / 2, (y.max() - y.min()) / 2
-    eT = transform(e, lambda p: vector3d(xc + (p.x - xc) * (1 + 0.02 * (p.y - yc) / yh), p.y, p.z))
-    gT = calcGrains(eT, angle=thr)
-    assert len(gT) == len(g0) and np.array_equal(np.sort(gT.numPixel), np.sort(g0.numPixel))
-    eR = e.rotate(27 * degree)
-    gR = calcGrains(eR, angle=thr)
-    assert len(gR) == len(g0) and np.array_equal(np.sort(gR.numPixel), np.sort(g0.numPixel))
 
 
 def test_a_diagonal_neighbour_does_not_save_an_undersized_grain():

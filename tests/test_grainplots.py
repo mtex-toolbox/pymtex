@@ -27,28 +27,48 @@ def grid():
   return calcGrains(EBSD(pos, rot, phase, phaseList(crystalFrame("1"), a, b)), angle=5 * degree)
 
 
-def test_area_weighted_histograms():
-  g = grid()
-  hs = hist(g)
+def test_hist_ofGrainsIsAreaWeightedPerPhase():
+  hs = hist(grid())
   ax = gcm().children[-1]
   assert len(hs) == 2 and ax.get_ylabel() == "relative area (%)" and ax.get_title() == "grain size distribution"
+
+
+def test_hist_ofGrainsAddsUpToTheWholeArea():
+  hs = hist(grid())
   # the bars of both phases add up to the whole analysed area
   total = sum(b.get_height() for h in hs for b in h)
   assert np.isclose(total, 100)
+
+
+def test_histogram_ofAPropertyAddsUpToTheWholeArea():
+  g = grid()
   hs = histogram(g, g.numPixel, 5)
   assert len(hs) == 2 and np.isclose(sum(b.get_height() for h in hs for b in h), 100)
-  hs = g.hist(nbins=4)
+
+
+def test_hist_takesTheNumberOfBins():
+  hs = grid().hist(nbins=4)
   assert len(hs[0]) == 3
 
 
-def test_ellipses_into_the_map():
+# the grains of the grid drawn with their ellipses on top
+def _ellipses():
   g = grid()
   plot(g)
   hold(True)
   c, a, b = g.fitEllipse()
   h = plotEllipse(c, a, b, lineColor="w", lineWidth=2)
   hold(False)
+  return g, h
+
+
+def test_plotEllipse_drawsOneEllipsePerGrain():
+  g, h = _ellipses()
   assert isinstance(h, LineCollection) and len(h.get_paths()) == g.size
+
+
+def test_plotEllipse_ofASquareGrainHasTheAreaOfTheGrain():
+  g, h = _ellipses()
   # the ellipse of a square grain has the area of the grain
   P = h.get_paths()[0].vertices
   area = 0.5 * abs(np.sum(P[:-1, 0] * P[1:, 1] - P[1:, 0] * P[:-1, 1]))

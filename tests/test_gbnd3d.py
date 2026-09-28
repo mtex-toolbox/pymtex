@@ -21,13 +21,33 @@ def test_the_normals_of_a_box():
   assert np.allclose(v[:3], v[0], rtol=1e-6) and v[3] < v[0]
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_as_MATLAB():
+needsDream3d = pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
+V = vector3d(np.array([[0, 0, 1], [1, 0, 0], [1, 1, 1], [0.3, 0.5, 0.8]]))
+
+
+# the IN100 grains and their boundaries between two grains of phase 1
+@pytest.fixture(scope="module")
+def in100():
   g = grain3d.load(DREAM3D)
-  gB = g.boundary[np.all(g.boundary.phaseId == 1, axis=1)]
-  v = vector3d(np.array([[0, 0, 1], [1, 0, 0], [1, 1, 1], [0.3, 0.5, 0.8]]))
-  assert np.allclose(np.real(calcGBND(gB).eval(v)), [1.739678, 1.364896, 0.935329, 1.158495], atol=1e-6)
+  return g, g.boundary[np.all(g.boundary.phaseId == 1, axis=1)]
+
+
+@needsDream3d
+def test_calcGBND_ofIN100InTheSpecimenAsMATLAB(in100):
+  g, gB = in100
+  assert np.allclose(np.real(calcGBND(gB).eval(V)), [1.739678, 1.364896, 0.935329, 1.158495], atol=1e-6)
+
+
+@needsDream3d
+def test_calcGBND_ofIN100InTheCrystalAsMATLAB(in100):
+  g, gB = in100
   cs = g.CSList[1]
-  assert np.allclose(np.real(calcGBND(gB, g).eval(Miller(v, cs))), [0.7411072, 0.7411072, 2.004266, 1.047731], atol=1e-6)
+  assert np.allclose(np.real(calcGBND(gB, g).eval(Miller(V, cs))), [0.7411072, 0.7411072, 2.004266, 1.047731], atol=1e-6)
+
+
+@needsDream3d
+def test_calcGBND_ofIN100AtOneMisorientationAsMATLAB(in100):
+  g, gB = in100
+  cs = g.CSList[1]
   m = orientation.byAxisAngle(vector3d(1, 1, 1), 60 * degree, cs, cs)
-  assert np.allclose(np.real(calcGBND(gB, g, m).eval(Miller(v, cs))), [0.1998865, 0.1998865, 19.09805, 4.144976], atol=1e-4)
+  assert np.allclose(np.real(calcGBND(gB, g, m).eval(Miller(V, cs))), [0.1998865, 0.1998865, 19.09805, 4.144976], atol=1e-4)

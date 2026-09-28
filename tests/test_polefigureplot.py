@@ -34,7 +34,19 @@ def sample():
   return cs, ss, odf, discreteSample(odf, 500, rng=np.random.default_rng(1))
 
 
-def test_the_pole_figures_of_a_list(sample):
+# the measured quartz pole figure and the ODF computed from it
+@pytest.fixture(scope="module")
+def quartz():
+  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
+  return pf, calcODF(pf)
+
+
+# the budget of markers of MATLAB: n orientations times the m elements of the specimen group
+def budget(ori, ss):
+  return min(500, 10000 // (ori.CS.numSym() * ori.SS.numSym())), ss.numSym()
+
+
+def test_plotPDF_onePanelPerDirectionWithOneMarkerPerOrbit(sample):
   cs, ss, odf, ori = sample
   hs = Miller([1, 1], [0, 1], [0, 1], cs)
   h = plotPDF(ori, hs)
@@ -43,59 +55,98 @@ def test_the_pole_figures_of_a_list(sample):
   assert len(fig.children) == 2 and [ax.get_title() for ax in fig.children] == ["{100}", "{111}"]
   assert all(len(sP.sR.N) == 3 for sP in plotsOf())
   # MATLAB's sample budget: 10000 markers over the elements of both groups
-  n = min(500, 10000 // (ori.CS.numSym() * ori.SS.numSym()))
-  m = ss.numSym()
+  n, m = budget(ori, ss)
   assert len(h[0].get_offsets()) == 3 * m * n and len(h[1].get_offsets()) == 4 * m * n
+
+
+def test_plotPDF_valuePerOrientationColoursEveryEquivalentInEitherOrder(sample):
+  cs, ss, odf, ori = sample
+  hs = Miller([1, 1], [0, 1], [0, 1], cs)
+  n, m = budget(ori, ss)
   # a value per orientation colours every equivalent, in either order of the arguments
   h = plotPDF(ori, np.degrees(ori.angle()), hs, colorbar=True)
   assert len(gcm().colorbars) == 1 and h[0].get_array().shape == (3 * m * n,)
   h2 = plotPDF(ori, hs, np.degrees(ori.angle()))
   assert np.allclose(h2[0].get_array(), h[0].get_array())
+
+
+def test_plotPDF_budgetThinsTheListBeforeTheEquivalents(sample):
+  cs, ss, odf, ori = sample
+  m = ss.numSym()
   # the budget thins a long list before its equivalents are formed
   h = plotPDF(ori, Miller(1, 2, 3, cs), points=100)
   assert len(h[0].get_offsets()) == 24 * m * 100
   h = plotPDF(ori, Miller(1, 2, 3, cs))
   assert len(h[0].get_offsets()) == 24 * m * (10000 // (ori.CS.numSym() * ori.SS.numSym()))
-  # the density of the poles instead of the markers, and the whole sphere
-  h = plotPDF(ori, hs, contourf=True)
+
+
+def test_plotPDF_contourfDrawsTheDensityOfThePoles(sample):
+  cs, ss, odf, ori = sample
+  # the density of the poles instead of the markers
+  h = plotPDF(ori, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True)
   assert all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
+
+
+def test_plotPDF_completeDrawsTheWholeSphere(sample):
+  cs, ss, odf, ori = sample
   plotPDF(ori, Miller(1, 0, 0, cs), complete=True, noTitle=True)
   assert len(plotsOf()[0].sR.N) == 1 and gcm().children[0].get_title() == ""
+
+
+def test_plotPDF_ofODFDrawsItsDensity(sample):
+  cs, ss, odf, ori = sample
+  hs = Miller([1, 1], [0, 1], [0, 1], cs)
   # the method, and an ODF still draws its density
   ori.plotPDF(hs, MarkerSize=3)
   plotPDF(odf, hs)
   assert all(isinstance(x, matplotlib.collections.QuadMesh) for x in [c for ax in gcm().children for c in ax.collections])
+
+
+def test_plotPDF_refusesValuesWithoutDirections(sample):
+  cs, ss, odf, ori = sample
   with pytest.raises(ValueError):
     plotPDF(ori, np.zeros(500))
 
 
-def test_the_inverse_pole_figures_of_a_list(sample):
+def test_plotIPDF_onePanelPerSpecimenDirection(sample):
   cs, ss, odf, ori = sample
   h = plotIPDF(ori, [xvector, zvector])
   fig = gcm()
   assert [ax.get_title() for ax in fig.children] == ["X", "Z"] and all(len(sP.sR.N) >= 3 for sP in plotsOf())
   # z is fixed by the specimen two-fold, x is not
   assert len(h[1].get_offsets()) == 500 and len(h[0].get_offsets()) == 500
-  h = plotIPDF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
+
+
+def test_plotIPDF_valuesTakeAColourbar(sample):
+  cs, ss, odf, ori = sample
+  plotIPDF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
   assert len(gcm().colorbars) == 1
   ori.plotIPDF(zvector, pcolor=True)
   plotIPDF(odf, zvector)
 
 
-def test_a_measured_pole_figure():
-  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
+def test_plot_measuredPoleFigureMarkersCarryTheIntensities(quartz):
+  pf, _ = quartz
   h = plot(pf)
   fig = gcm()
   assert len(fig.children) == 1 and fig.children[0].get_title() == plotText(pf.allH[0][0].char()) == "{10$\\bar{1}$0}"
   # the markers carry the intensities, and their size follows how many there are
   assert len(h[0].get_offsets()) == pf.allI[0].size and np.isclose(h[0].get_array().max(), pf.allI[0].max())
   assert h[0].get_sizes()[0] < 100
+
+
+def test_plot_measuredPoleFiguresEachOnItsOwnRange(quartz):
+  pf, _ = quartz
   # a data set in a row, each panel on its own range with its own bar
   pf2 = PoleFigure([pf.allH[0], pf.allH[0]], [pf.allR[0], pf.allR[0]], [pf.allI[0], 2 * pf.allI[0]], QUARTZ)
   h = plot(pf2, colorbar=True)
   assert len(gcm().children) == 2 and h[0].get_clim() != h[1].get_clim() and len(gcm().colorbars) == 2
   h = plot(pf2, colorRange=None)
   assert h[0].get_clim() == h[1].get_clim()
+
+
+def test_plot_measuredPoleFigureReadAsAFunction(quartz):
+  pf, _ = quartz
   # the pole figure read as a function
   h = pf.plot(smooth=True, minmax=True)
   assert isinstance(h[0], matplotlib.collections.QuadMesh)
@@ -103,22 +154,24 @@ def test_a_measured_pole_figure():
   assert isinstance(h[0], matplotlib.contour.QuadContourSet)
 
 
-def test_the_difference_plot():
-  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
-  odf = calcODF(pf)
+def test_plotDiff_RPErrorDropsSmallRecalculations(quartz):
+  pf, odf = quartz
   h = plotDiff(pf, odf, RP=True)
   assert len(gcm().children) == 1 and len(gcm().colorbars) == 1 and len(h[0].get_offsets()) <= pf.allI[0].size
   # the RP error drops the directions where the recalculation is small, the l1 error keeps them
   h2 = pf.plotDiff(odf, l1=True, colorbar=False)
   assert len(gcm().colorbars) == 0 and len(h2[0].get_offsets()) == pf.allI[0].size >= len(h[0].get_offsets())
+
+
+def test_plotDiff_defaultIsEveryDirectionInEitherOrder(quartz):
+  pf, odf = quartz
   # MATLAB's default is the regularised relative error at every direction, also as plotDiff(odf, pf)
   h3 = plotDiff(odf, pf, colorbar=False)
   assert len(h3[0].get_offsets()) == pf.allI[0].size
 
 
-def test_plots_into_axes_named_by_parent():
-  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
-  odf = calcODF(pf)
+def test_plots_into_axes_named_by_parent(quartz):
+  pf, odf = quartz
   plt.figure()
   axes = [plt.subplot(1, 3, k) for k in (1, 2, 3)]
   plot(pf, parent=axes[0])
@@ -129,7 +182,7 @@ def test_plots_into_axes_named_by_parent():
   assert len(gcm().colorbars) == 1
 
 
-def test_the_equal_range_of_measured_pole_figures():
-  pf = loadPoleFigure(os.path.join(FIXTURES, "Q(10-10)_amp.cnv"), QUARTZ)
+def test_the_equal_range_of_measured_pole_figures(quartz):
+  pf, _ = quartz
   h = plot(pf, colorRange='equal')
   assert h[0].get_clim() == (float(np.min(pf.allI[0])), float(np.max(pf.allI[0])))

@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 
-from mtex import crystalFrame, degree, inspectEBSD, loadEBSD, notIndexedFrame, phaseList, rotation, zvector
+from mtex import crystalFrame, degree, inspectEBSD, loadEBSD, notIndexedFrame, phaseList, rotation
 from mtex.io.importscript import buildImportWizardScript, frameKey, frameLiteral, loadCall, phasesDiffer, shortestFloat
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -60,12 +60,12 @@ def test_script_round_trip():
                                  vendorCorrection=info.eulerCorrection)
   ns = {}
   exec(text.replace("plot(ebsd", "(ebsd"), ns)
-  direct = loadEBSD(path, eulerCorrection=rotation.byAxisAngle(zvector, 0.0) * rotation.byEuler(np.pi, 0.0, 0.0, "Bunge") * rotation.id)
+  direct = loadEBSD(path)
   ebsd = ns["ebsd"]
   assert ebsd.size == direct.size and np.array_equal(ebsd.phaseId, direct.phaseId)
   assert np.allclose(ebsd.pos.data, direct.pos.data)
   # the correction written is the map frame against the Euler frame: ij against y↑→x is the half turn about x
-  assert float(ebsd.EulerCorrection.angle(rotation.byEuler(0.0, np.pi, 0.0, "Bunge"))) < 1e-12 or float(ebsd.EulerCorrection.angle()) > 3.1
+  assert float(ebsd.EulerCorrection.angle(rotation.byEuler(0.0, np.pi, 0.0, "Bunge"))) < 1e-12
 
 
 # an edited cell is reproduced in a fresh session, where the script's frames are registered

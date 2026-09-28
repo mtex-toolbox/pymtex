@@ -1,6 +1,6 @@
 import numpy as np
 
-from mtex import S2Triangulation, equispacedS2Grid, vector3d
+from mtex import S2Triangulation, degree, equispacedS2Grid, vector3d
 
 rng = np.random.default_rng(3)
 
@@ -31,13 +31,9 @@ def test_the_triangles_and_the_walk():
 
 
 def test_the_barycentric_matrix():
-  g = equispacedS2Grid(resolution=10 * degree_())
+  g = equispacedS2Grid(resolution=10 * degree)
   sT = S2Triangulation(g)
   B = sT.calcBario(sT.vertices)
   assert np.allclose(B.toarray(), np.eye(sT.vertices.size))
   assert np.allclose(sT.calcBario(vector3d.rand(50, rng=rng)).sum(axis=1), 1)
   assert sT.checkInside(sT.midPoints, np.arange(len(sT))).all()
-
-
-def degree_():
-  return np.pi / 180

@@ -1,5 +1,6 @@
 # M8: the one energy over the graph, the Julia D9b and the calibration of its length
 import numpy as np
+import pytest
 
 from mtex import degree, splineFilter, halfQuadraticFilter, l1TVFilter, infimalConvolutionFilter
 from mtex.analysis.variational import graphEigenvalue, regularization
@@ -16,21 +17,27 @@ def gain(e, s, n=41):
   return np.max(np.abs(angles(s)[mid])) / np.max(np.abs(angles(e)[mid]))
 
 
-def test_D9b_the_smoothing_length_is_the_wavelength_it_halves():
+@pytest.mark.parametrize("Lambda", [4.0, 8.0])
+@pytest.mark.parametrize("A", [np.eye(2), HEX], ids=["square", "hexagonal"])
+def test_splineFilter_halvesAWaveOfItsSmoothingLength(Lambda, A):
   # a plane wave of that wavelength comes out at half amplitude, which is what the length is
   # defined to mean, on either lattice and at either order of the penalty
-  for Lambda in (4.0, 8.0):
-    for A in (np.eye(2), HEX):
-      e = wave(Lambda, A)
-      assert abs(gain(e, e.smooth(splineFilter(Lambda))) - 0.5) < 5e-3
+  e = wave(Lambda, A)
+  assert abs(gain(e, e.smooth(splineFilter(Lambda))) - 0.5) < 5e-3
+
+
+def test_halfQuadraticFilter_halvesAWaveOfItsSmoothingLength():
   e = wave(8.0, np.eye(2))
   assert abs(gain(e, e.smooth(halfQuadraticFilter(8.0, l1DataFit=False, l1TV=False))) - 0.5) < 5e-3
+
+
+def test_splineFilter_letsALongerWaveThroughBetter():
   # and a longer wave survives a given filter better than a shorter one
   F = splineFilter()
   assert gain(wave(4.0, np.eye(2)), wave(4.0, np.eye(2)).smooth(F)) < gain(wave(12.0, np.eye(2)), wave(12.0, np.eye(2)).smooth(F))
 
 
-def test_the_weight_of_a_length():
+def test_regularization_isTheWeightOfALength():
   e = wave(8.0, np.eye(2))
   l = e.lattice
   # the eigenvalue of the square lattice at a wavelength of four steps: two offsets along the
@@ -38,6 +45,9 @@ def test_the_weight_of_a_length():
   assert close(graphEigenvalue(l, 4.0), 2.0) and close(graphEigenvalue(l, 1.0), graphEigenvalue(l, 2.0))
   assert close(regularization(splineFilter(4.0), l, 2), 0.25) and close(regularization(splineFilter(alpha=3), l, 2), 3)
   assert close(regularization(splineFilter(), l, 2), regularization(splineFilter(4.0), l, 2))
+
+
+def test_infimalConvolutionFilter_keepsASlope():
   # the infimal convolution keeps a slope where the first order filter alone flattens it
   ramp = angleMapD(lambda i, j: 0.3 * i, 15)
   ic = ramp.smooth(infimalConvolutionFilter(alpha=2.0, beta=2.0, threshold=np.pi))

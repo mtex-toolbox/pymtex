@@ -29,17 +29,30 @@ def test_the_default_kernel_inverts_the_integral_equation():
   assert psi.bandwidth == 62 and psi.antipodal
 
 
-def test_a_density_of_axes_in_the_crystal_frame(section):
+def test_calcGBND_isADensityOfAxesInTheCrystalFrame(section):
   ebsd, grains, gB = section
   f = calcGBND(gB, ebsd, halfwidth=10 * degree, nonneg=True)
   assert f.frame is gB.CSList[int(gB.phaseId[0, 0])] and f.antipodal
   assert np.isclose(f.mean(), 1, atol=1e-3)
+
+
+def test_calcGBND_withTheDefaultKernelHasMeanOne(section):
   # the default kernel, a density of mean one too
+  ebsd, _, gB = section
   assert np.isclose(calcGBND(gB, ebsd, halfwidth=10 * degree).mean(), 1, atol=1e-3)
+
+
+def test_calcGBND_fromTheGrainsHasMeanOne(section):
   # the grains give the orientations of their means, the same boundaries
+  _, grains, gB = section
   g = calcGBND(gB, grains, halfwidth=10 * degree, nonneg=True)
   assert np.isclose(g.mean(), 1, atol=1e-3)
+
+
+def test_calcGBND_isAMethodOfTheBoundaries(section):
   # the method form, MATLAB's gB.calcGBND(ebsd)
+  ebsd, _, gB = section
+  f = calcGBND(gB, ebsd, halfwidth=10 * degree, nonneg=True)
   assert np.allclose(gB.calcGBND(ebsd, halfwidth=10 * degree, nonneg=True)._fhat, f._fhat)
 
 

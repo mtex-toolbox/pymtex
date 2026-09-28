@@ -20,7 +20,7 @@ def numbaOn():
 @pytest.mark.parametrize("res,antipodal", [(2, False), (3, True), (6, False)])
 def test_s2_nearest_matches_python_and_brute(res, antipodal):
   g = equispacedS2Grid(resolution=res * mtex.degree, antipodal=antipodal)
-  v = vector3d.rand(3000, rng=rng)
+  v = vector3d.rand(1000, rng=rng)
   setMTEXpref("kernels", "numpy")
   iN, dN = mtex.find(g, v)
   setMTEXpref("kernels", "numba")

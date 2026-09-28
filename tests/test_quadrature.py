@@ -8,22 +8,32 @@ from mtex import (bandwidthFor, clenshawCurtis, crystalFrame, degreeBlock, deg2d
                   legendreP, orientation, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid, specimenFrame)
 
 
-def test_rules_on_the_line():
+def test_clenshawCurtis_integratesPolynomials():
   x, w = clenshawCurtis(9)
   assert np.isclose(np.sum(w), 2)
   assert np.isclose(np.sum(w * x ** 8), 2 / 9)
   assert abs(np.sum(w * x ** 7)) < 1e-14
+
+
+def test_gaussLegendre_integratesPolynomials():
   x, w = gaussLegendre(5)
   assert np.isclose(np.sum(w * x ** 8), 2 / 9) and np.isclose(np.sum(w), 2)
+
+
+def test_legendreP_isATableOfDegreesOverPoints():
+  x, w = gaussLegendre(5)
   P = legendreP(4, x)
   assert P.shape == (5, 5) and np.allclose(P[2], (3 * x * x - 1) / 2)
+
+
+def test_legendreP_isOrthogonalUnderBothRules():
   # orthogonality of the Legendre polynomials under both rules
   for x, w in (clenshawCurtis(11), gaussLegendre(6)):
     P = legendreP(5, x)
     assert np.allclose((P * w) @ P.T, np.diag(2 / (2 * np.arange(6) + 1)))
 
 
-def test_SO3_grid():
+def test_quadratureSO3Grid_integratesTheOrthonormalBasisExactly():
   for L in (3, 6):
     g = quadratureSO3Grid(L)
     rots, w = g.nodes(), g.weights
@@ -35,19 +45,35 @@ def test_SO3_grid():
     D = _WignerD(rots, bandwidth=2)
     B = np.concatenate([np.sqrt(2 * n + 1) * D[n].reshape(rots.size, -1).T for n in range(3)])
     assert np.allclose((B * w) @ B.conj().T, np.eye(deg2dim(3)))
+
+
+# the folded rule of a 4/mmm crystal and a 222 specimen at a bandwidth the folds divide
+def foldedGrid():
+  cs, ss = crystalFrame("4/mmm"), specimenFrame("222")
+  L = bandwidthFor(3, cs, ss)
+  return cs, ss, L, quadratureSO3Grid(L, cs, ss)
+
+
+def test_quadratureSO3Grid_ofFramesIsFoldedIntoOrientationsOfThoseFrames():
   # frames give folds, orientations in those frames and a bandwidth the folds divide
   cs, ss = crystalFrame("4/mmm"), specimenFrame("222")
   assert folds(cs, ss) == (4, 2)
   assert bandwidthFor(10, cs, ss) == 11 == bandwidthFor(10, 4, 2)
-  L = bandwidthFor(3, cs, ss)
+  cs, ss, L, g = foldedGrid()
   assert (2 * L + 2) % 4 == 0
-  g = quadratureSO3Grid(L, cs, ss)
   assert g.folds == (4, 2) and len(g.gamma) == (2 * L + 2) // 4 and len(g.alpha) == (2 * L + 2) // 2
   assert isinstance(g.nodes(), orientation) and g.nodes().CS is cs and g.nodes().SS is ss
   assert np.isclose(np.sum(g.weights), 1)
+  assert repr(g).startswith("quadratureSO3Grid (ClenshawCurtis)")
+
+
+def test_quadratureSO3Grid_refusesAFoldTheBandwidthDoesNotAdmit():
   with pytest.raises(ValueError):
     quadratureSO3Grid(10, rA=4)
-  assert repr(g).startswith("quadratureSO3Grid (ClenshawCurtis)")
+
+
+def test_quadratureSO3Grid_foldedAgreesWithTheFullRuleOnInvariantFunctions():
+  cs, ss, L, g = foldedGrid()
   # the folded rule agrees with the full rule on the invariant functions of degree 2
   P, Q = _WignerD(ss, bandwidth=2), _WignerD(cs, bandwidth=2)
   gram = []
@@ -59,7 +85,7 @@ def test_SO3_grid():
   assert np.allclose(gram[0], gram[1], atol=1e-12) and np.linalg.norm(gram[0]) > 1e-3
 
 
-def test_S2_grid():
+def test_quadratureS2Grid_integratesTheSphericalHarmonicsExactly():
   for L in (3, 10):
     for scheme in ("ClenshawCurtis", "GaussLegendre"):
       g = quadratureS2Grid(L, scheme)
@@ -71,7 +97,7 @@ def test_S2_grid():
       assert np.allclose((Y * w) @ Y.conj().T, np.eye(16))
 
 
-def test_S1_grid():
+def test_quadratureS1Grid_integratesTheFourierModesExactly():
   g = quadratureS1Grid(4)
   x, w = g.nodes(), g.weights
   assert len(g) == 10 and np.isclose(np.sum(w), 1)

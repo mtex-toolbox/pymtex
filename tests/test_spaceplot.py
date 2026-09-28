@@ -24,82 +24,146 @@ def axesOf():
   return gcm().children[-1]
 
 
-def test_directions_functions_and_fields_on_the_sphere():
-  ss = specimenFrame("1")
-  vs = vector3d(vector3d.rand(30, rng=rng), frame=ss)
-  h = plot3d(vs)
+# 30 random directions in a specimen without symmetry
+def randomDirections():
+  return vector3d(vector3d.rand(30, rng=np.random.default_rng(9)), frame=specimenFrame("1"))
+
+
+# a smooth positive function on the sphere
+def positiveFunction():
+  g = np.random.default_rng(10)
+  return S2FunHarmonic(g.standard_normal(49) + 1j * g.standard_normal(49), real=True) + 3
+
+
+# the axis field about z
+def axisField():
+  return S2AxisFieldHarmonic(lambda v: vector3d(v.cross(zvector).data, antipodal=True), bandwidth=12)
+
+
+def test_plot3d_ofDirectionsDrawsTheSphereTheGridAndTheAxesLabels():
+  h = plot3d(randomDirections())
   ax = axesOf()
   assert ax.name == "3d" and hasattr(ax, "_mtexSpacePlot") and len(h.get_offsets()) == 30
   # the sphere, the grid and the axes labels are there
   assert any(isinstance(c, Poly3DCollection) for c in ax.collections) and len(ax.lines) == 17
   assert {t.get_text() for t in ax.texts} == {"X", "Y", "Z"}
+
+
+def test_scatter3d_ofAxesDrawsBothEndsColouredWithABar():
   # axes are drawn at both ends, values through the colour map with a bar
   h = scatter3d(vector3d.rand(10, antipodal=True, rng=rng), rng.random(10), colorbar=True)
   assert len(h.get_offsets()) == 20 and len(gcm().fig.axes) == 2
-  vs.plot3d(label=[str(k) for k in range(30)], noLabel=True)
+
+
+def test_plot3d_writesALabelPerDirection():
+  randomDirections().plot3d(label=[str(k) for k in range(30)], noLabel=True)
   assert len(axesOf().texts) == 30
-  # a function colours the sphere at its faces, radial pushes it out
-  s = S2FunHarmonic(rng.standard_normal(49) + 1j * rng.standard_normal(49), real=True) + 3
-  h = plot3d(s, colorbar=True)
-  assert isinstance(h, Poly3DCollection) and h.get_array().size == len(h.get_paths()) if hasattr(h, "get_paths") else True
-  h = s.plot3d(radial=True, resolution=10 * degree)
+
+
+def test_plot3d_ofAFunctionColoursTheSphereAtItsFaces():
+  h = plot3d(positiveFunction(), colorbar=True)
+  assert isinstance(h, Poly3DCollection) and h.get_array().size == len(h.get_paths())
+
+
+def test_plot3d_radialPushesTheSphereOut():
+  h = positiveFunction().plot3d(radial=True, resolution=10 * degree)
   assert isinstance(h, Poly3DCollection) and axesOf().get_xlim()[1] > 1.3
-  # a field as arrows, an axis field as segments
-  h = plot3d(grad(s))
+
+
+def test_plot3d_ofAVectorFieldIsArrows():
+  h = plot3d(grad(positiveFunction()))
   assert isinstance(h, Line3DCollection)
-  A = S2AxisFieldHarmonic(lambda v: vector3d(v.cross(zvector).data, antipodal=True), bandwidth=12)
-  h = A.plot3d()
+
+
+def test_plot3d_ofAnAxisFieldIsSegments():
+  h = axisField().plot3d()
   assert isinstance(h, Line3DCollection)
-  # quiver3 of a field on the sphere draws onto a held sphere without a second one
-  plot3d(s)
+
+
+def test_quiver3_ofASphereFieldDrawsOntoAHeldSphereWithoutASecondOne():
+  plot3d(positiveFunction())
   n = len(axesOf().collections)
   hold(True)
-  h = quiver3(A, color="white")
+  h = quiver3(axisField(), color="white")
   hold(False)
   assert isinstance(h, Line3DCollection) and len(axesOf().collections) == n + 1
 
 
-def test_orientation_space():
+# the cubic orientation region against an orthorhombic specimen
+def cubicRegion():
+  return fundamentalRegion(crystalFrame("m-3m"), specimenFrame("222"))
+
+
+# 200 orientations about one peak
+@pytest.fixture(scope="module")
+def sample():
   cs, ss = crystalFrame("m-3m"), specimenFrame("222")
-  oR = fundamentalRegion(cs, ss)
+  odf = unimodalODF(orientation.byEuler(30 * degree, 50 * degree, 10 * degree, cs, ss), halfwidth=10 * degree)
+  return discreteSample(odf, 200, rng=np.random.default_rng(11))
+
+
+def test_plot_ofARegionFitsTheAxesToIt():
+  oR = cubicRegion()
   h = plot(oR)
   ax = axesOf()
   assert isinstance(h, Poly3DCollection) and ax.get_xlabel() == "x / °"
   # the axes are fitted to the region
   P = np.concatenate(oR.edges()) / degree
   assert ax.get_xlim()[1] >= P[:, 0].max() and ax.get_xlim()[0] <= P[:, 0].min() and len(ax.lines) > 10
-  # without the parallels and meridians only the edges of the region are lines; without the
-  # surface only they are drawn
+
+
+def test_plot_ofARegionWithoutLinesDrawsOnlyItsEdges():
+  oR = cubicRegion()
+  # without the parallels and meridians only the edges of the region are lines
   oR.plot(lines=False)
   assert len(axesOf().lines) == len(oR.edges()) > 0
+
+
+def test_plot_ofARegionWithoutSurfaceDrawsOnlyItsEdges():
+  oR = cubicRegion()
   hs = plot(oR, noSurface=True, boundaryColor='r')
   assert len(hs) == len(oR.edges()) and not axesOf().collections
-  # a misorientation region has walls from the identity
-  mR = fundamentalRegion(cs, cs)
-  plot(mR)
+
+
+def test_plot_ofAMisorientationRegionHasWallsFromTheIdentity():
+  cs = crystalFrame("m-3m")
+  plot(fundamentalRegion(cs, cs))
   assert len([c for c in axesOf().collections if isinstance(c, Poly3DCollection)]) > 1
-  # orientations as points in the region, in degrees, coloured by a value
-  odf = unimodalODF(orientation.byEuler(30 * degree, 50 * degree, 10 * degree, cs, ss), halfwidth=10 * degree)
-  ori = discreteSample(odf, 200, rng=rng)
+
+
+def test_scatter_ofOrientationsInAxisAngleLiesInTheRegionInDegrees(sample):
   # an orientation scatters in the Euler region by default, as MATLAB does; axis angle on request
-  h = scatter(ori, axisAngle=True)
+  h = scatter(sample, axisAngle=True)
   ax = axesOf()
   P = np.stack([np.asarray(a) for a in h._offsets3d], axis=1)
   assert P.shape == (200, 3) and np.all(np.linalg.norm(P, axis=1) <= 63) and ax.get_xlabel() == "x / °"
   assert any(isinstance(c, Poly3DCollection) for c in ax.collections)
-  h = ori.scatter(np.degrees(ori.angle()), colorbar=True, region=False, points=50)
+
+
+def test_scatter_ofOrientationsColouredByAValueThinnedWithoutRegion(sample):
+  h = sample.scatter(np.degrees(sample.angle()), colorbar=True, region=False, points=50)
   assert len(h._offsets3d[0]) == 50 and not any(isinstance(c, Poly3DCollection) for c in axesOf().collections)
-  # Euler and Rodrigues coordinates
-  h = scatter(ori, Euler=True)
+
+
+def test_scatter_ofOrientationsInEulerLiesInTheEulerBox(sample):
+  h = scatter(sample, Euler=True)
   ax = axesOf()
   P = np.stack([np.asarray(a) for a in h._offsets3d], axis=1)
   assert ax.get_xlabel() == "φ1 / °" and np.all(P[:, 1] <= 90 + 1e-6) and np.all(P[:, 2] <= 90 + 1e-6)
-  h = scatter(ori, Rodrigues=True)
+
+
+def test_scatter_ofOrientationsInRodrigues(sample):
+  scatter(sample, Rodrigues=True)
   assert axesOf().get_xlabel() == "r1"
-  # the representatives as stored, and a single orientation
-  h = scatter(ori, ignoreFundamentalRegion=True)
+
+
+def test_scatter_ignoreFundamentalRegionDrawsTheRepresentativesAsStored(sample):
+  h = scatter(sample, ignoreFundamentalRegion=True)
   assert len(h._offsets3d[0]) == 200
-  plot3d(ori[0])
+
+
+def test_plot3d_ofASingleOrientation(sample):
+  plot3d(sample[0])
   assert len(axesOf().collections) >= 1
 
 
@@ -120,7 +184,17 @@ def test_arrows_in_fresh_axes_look_down_on_the_screen_plane(convention, east, no
     ax = axesOf()
     e, n = screenOf(ax, east), screenOf(ax, north)
     assert e[0] > 0 and abs(e[1]) < 1e-3 * abs(e[0]) and n[1] > 0 and abs(n[0]) < 1e-3 * abs(n[1])
-    # a held plot keeps the camera, the limits take in the labels
+  finally:
+    pC.makeDefault()
+
+
+@pytest.mark.parametrize("convention", ["y↑→x", "x↑←y", "z↑→x"])
+def test_arrow3d_heldKeepsTheCameraAndTheLimitsTakeInTheLabels(convention):
+  pC = plottingConvention.default
+  try:
+    plottingConvention.default(convention)
+    arrow3d(vector3d(1, 1, 1), label="v")
+    ax = axesOf()
     hold(True)
     arrow3d(4 * vector3d.X, label="u")
     hold(False)
@@ -129,10 +203,14 @@ def test_arrows_in_fresh_axes_look_down_on_the_screen_plane(convention, east, no
     pC.makeDefault()
 
 
-def test_odf_isosurfaces_in_euler_and_axis_angle_space():
-  cs = crystalFrame("321")
-  center = orientation.byEuler(10 * degree, 20 * degree, 0, cs)
-  odf = unimodalODF(center, halfwidth=10 * degree)
+# a peak of a trigonal ODF off the origin
+def trigonalPeak():
+  center = orientation.byEuler(10 * degree, 20 * degree, 0, crystalFrame("321"))
+  return center, unimodalODF(center, halfwidth=10 * degree)
+
+
+def test_plot3d_ofAnOdfInEulerSpaceTakesTheColourMapAndTheBar():
+  _, odf = trigonalPeak()
   hs = plot3d(odf, 'Bunge')
   ax = axesOf()
   assert len(hs) > 3 and ax.get_xlabel() == "φ1 / °"
@@ -143,7 +221,10 @@ def test_odf_isosurfaces_in_euler_and_axis_angle_space():
   ax.figure.canvas.draw()
   assert not np.allclose(hs[-1].get_facecolor()[0], before)
   assert len(mtexColorbar(title='mrd')) == 1
-  # in axis angle space the highest surface wraps the representative of the centre
+
+
+def test_plot3d_ofAnOdfInAxisAngleSpaceWrapsTheCentreInTheHighestSurface():
+  center, odf = trigonalPeak()
   hs = plot3d(odf, 'axisAngle')
   assert axesOf().get_xlabel() == "x / °"
   peak = center.project2FundamentalRegion()
@@ -191,7 +272,11 @@ def test_held_orientation_sets_take_the_colour_order_as_open_circles():
   hold(False)
   assert np.allclose(h1.get_edgecolor()[0][:3], MTEX_COLORS[0]) and np.allclose(h2.get_edgecolor()[0][:3], MTEX_COLORS[1])
   assert h1.get_facecolor().size == 0 or np.all(h1.get_facecolor()[:, 3] == 0)
-  # annotate into the space the figure shows, in its own colour
+
+
+def test_annotate_goesIntoTheSpaceTheFigureShowsInItsOwnColour():
   from mtex import annotate
+  cs = crystalFrame("-3m")
+  scatter(discreteSample(unimodalODF(orientation.id(cs)), 20, rng=rng), 'axisAngle')
   h3 = annotate(orientation.id(cs), MarkerFaceColor='r')
   assert np.allclose(h3.get_facecolor()[0][:3], (1, 0, 0))

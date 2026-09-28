@@ -133,7 +133,7 @@ def test_map_plane_and_polygon():
   assert vs.shape == (6, 2) and close(signedArea2(vs) / 2, np.sqrt(3) / 2)
 
 
-def test_display():
+def test_the_display_names_shape_sites_spacing_and_basis():
   l = lattice(latticePositions(HEXA, 6))
   s = repr(l)
   assert s.startswith("lattice (hex)") and "sites  : 36" in s and "spacing: 1" in s and "basis  : (1, 0), (0.5, 0.866)" in s

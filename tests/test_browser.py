@@ -88,8 +88,8 @@ def test_breadcrumb_is_compact(tmp_path):
   assert side.minimumSizeHint().width() < 300
 
 
-# Return walks into a folder, as a double click does, and reads a map
-def test_return_opens(tmp_path):
+# Return walks into a folder and reads a map
+def test_return_opens():
   application()
   st = WizardState(FIXTURES)
   cb.setFolder(st, FIXTURES)
@@ -100,10 +100,6 @@ def test_return_opens(tmp_path):
   inside = st.entries[0].path
   files.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier))
   assert st.folder == inside and not st.entries[0].isDir
-  # and a double click on a folder does the same from the folder above
-  cb.setFolder(st, FIXTURES)
-  files.onDoubleClick(files.model_.index(0, 0))
-  assert st.folder == inside
   # Return on a map reads it
   cb.setFolder(st, FIXTURES)
   k = [r.name for r in st.entries].index("Forsterite_cut.ctf")

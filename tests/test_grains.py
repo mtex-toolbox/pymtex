@@ -40,41 +40,74 @@ def assertClosed(g):
   assert np.all(g.area > 0)
 
 
-def test_G1_loops_close_and_wind_by_the_walk_order():
-  V = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-  edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
-  ls = traceLoops(edges, V)
-  assert len(ls) == 1 and len(ls[0]) == 4 and signedArea2(V[ls[0]]) > 0
+SQUARE = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+SQUARE_EDGES = [(0, 1), (1, 2), (2, 3), (3, 0)]
+
+
+def test_traceLoops_loopsCloseAndWindByTheWalkOrder():
+  ls = traceLoops(SQUARE_EDGES, SQUARE)
+  assert len(ls) == 1 and len(ls[0]) == 4 and signedArea2(SQUARE[ls[0]]) > 0
   # the same square walked the other way is a hole
-  assert signedArea2(V[traceLoops([e[::-1] for e in edges], V)[0]]) < 0
-  assert traceLoops([], V) == []
+  assert signedArea2(SQUARE[traceLoops([e[::-1] for e in SQUARE_EDGES], SQUARE)[0]]) < 0
 
 
-def test_G2_a_block_map_has_the_polygons_it_must():
-  for A, cell in ((SQ5, 1.0), (HEX5, np.sqrt(3) / 2)):
-    g = calcGrains(mapOf(A, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
-    assert len(g) == 4 and all(len(ls) == 1 for ls in g.loops)
-    g.score = np.arange(1, 5)
-    assert np.array_equal(g[0:2].score, [1, 2])
-    with pytest.raises(ValueError):
-      g.score = [1]
-    assert close(g.area, 100 * cell) and close(g.area.sum(), 400 * cell)
-    assert np.all(g.perimeter > 0) and np.all(g.boundarySize > 0) and np.all(g.numNeighbors >= 2)
-    selected = g[[3, 1]]
-    assert np.array_equal(selected.numNeighbors, g.numNeighbors[[3, 1]]) and np.array_equal(selected.isBoundary, g.isBoundary[[3, 1]])
-    assert len(g[3].neighbors()) == 0 and len(g[3].neighbors(full=True)) == g.numNeighbors[3]
-    assert np.array_equal(selected.selectByGrainId([2, 4]).id, [2, 4])
-    with pytest.raises(ValueError):
-      selected.selectByGrainId(1)
-    adjacency = g.neighbors(matrix=True).toarray()
-    assert np.array_equal(adjacency, adjacency.T) and not adjacency.diagonal().any()
-    assert np.array_equal(adjacency.sum(axis=1), g.numNeighbors)
-    assert g.isBoundary.all() and not g.hasHole.any() and close(g.equivalentRadius, np.sqrt(g.area / np.pi))
-    assert g.poly[0][0] == g.poly[0][-1]
+def test_traceLoops_noEdgesGiveNoLoops():
+  assert traceLoops([], SQUARE) == []
 
 
-def test_G3_a_square_grains_measures_are_its_closed_forms():
-  g = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
+# the four 10 x 10 blocks of a 20 x 20 map on a lattice, and the area of its cell
+def fourBlocks(A):
+  return calcGrains(mapOf(A, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
+
+
+BLOCK_LATTICES = pytest.mark.parametrize("A, cell", ((SQ5, 1.0), (HEX5, np.sqrt(3) / 2)), ids=("square", "hex"))
+
+
+@BLOCK_LATTICES
+def test_calcGrains_blockMapHasOneSimplePolygonPerBlock(A, cell):
+  g = fourBlocks(A)
+  assert len(g) == 4 and all(len(ls) == 1 for ls in g.loops)
+  assert close(g.area, 100 * cell) and close(g.area.sum(), 400 * cell)
+  assert np.all(g.perimeter > 0) and np.all(g.boundarySize > 0) and np.all(g.numNeighbors >= 2)
+  assert g.isBoundary.all() and not g.hasHole.any() and close(g.equivalentRadius, np.sqrt(g.area / np.pi))
+  assert g.poly[0][0] == g.poly[0][-1]
+
+
+@BLOCK_LATTICES
+def test_grain2d_propertyHasOneValuePerGrain(A, cell):
+  g = fourBlocks(A)
+  g.score = np.arange(1, 5)
+  assert np.array_equal(g[0:2].score, [1, 2])
+  with pytest.raises(ValueError):
+    g.score = [1]
+
+
+@BLOCK_LATTICES
+def test_grain2d_selectionKeepsTheNeighboursOfTheMap(A, cell):
+  g = fourBlocks(A)
+  selected = g[[3, 1]]
+  assert np.array_equal(selected.numNeighbors, g.numNeighbors[[3, 1]]) and np.array_equal(selected.isBoundary, g.isBoundary[[3, 1]])
+  assert len(g[3].neighbors()) == 0 and len(g[3].neighbors(full=True)) == g.numNeighbors[3]
+
+
+@BLOCK_LATTICES
+def test_selectByGrainId_refusesIdsNotInTheSelection(A, cell):
+  selected = fourBlocks(A)[[3, 1]]
+  assert np.array_equal(selected.selectByGrainId([2, 4]).id, [2, 4])
+  with pytest.raises(ValueError):
+    selected.selectByGrainId(1)
+
+
+@BLOCK_LATTICES
+def test_neighbors_adjacencyMatrixIsSymmetricAndCountsTheNeighbours(A, cell):
+  g = fourBlocks(A)
+  adjacency = g.neighbors(matrix=True).toarray()
+  assert np.array_equal(adjacency, adjacency.T) and not adjacency.diagonal().any()
+  assert np.array_equal(adjacency.sum(axis=1), g.numNeighbors)
+
+
+def test_grain2d_squareGrainsMeasuresAreItsClosedForms():
+  g = fourBlocks(SQ5)
   assert close(g.area, 100) and close(g.perimeter, 40) and close(g.diameter, 10 * np.sqrt(2))
   assert close(g.equivalentPerimeter, 2 * np.pi * np.sqrt(100 / np.pi))
   c = g.centroid
@@ -82,7 +115,7 @@ def test_G3_a_square_grains_measures_are_its_closed_forms():
   assert sorted(map(tuple, np.round(c.data[:, :2], 6).tolist())) == [(4.5, 4.5), (4.5, 14.5), (14.5, 4.5), (14.5, 14.5)]
 
 
-def test_G4_an_inclusion_is_a_hole_in_the_grain_around_it():
+def test_calcGrains_inclusionIsAHoleInTheGrainAroundIt():
   g = calcGrains(inclusionMap(), angle=5 * degree)
   assert len(g) == 2
   big = int(np.argmax(g.numPixel))
@@ -95,7 +128,7 @@ def test_G4_an_inclusion_is_a_hole_in_the_grain_around_it():
   assert close(g.perimeter[big], 4 * 21) and close(g.perimeterWithInclusion[big], 4 * 21 + 4 * 5)
 
 
-def test_G5_a_point_is_inside_the_grain_that_covers_it():
+def test_checkInside_pointIsInsideTheGrainThatCoversIt():
   g = calcGrains(inclusionMap(), angle=5 * degree)
   big = int(np.argmax(g.numPixel))
   small = 1 - big
@@ -108,19 +141,23 @@ def test_G5_a_point_is_inside_the_grain_that_covers_it():
   assert g.checkInside(np.zeros((0, 2))).shape == (0, 2)
 
 
-def test_G6_a_subset_keeps_its_grains_and_their_boundary():
-  g = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
+def test_grain2d_subsetKeepsItsGrainsAndTheirBoundary():
+  g = fourBlocks(SQ5)
   sub = g[[0, 1]]
   assert len(sub) == 2 and np.array_equal(sub.id, g.id[[0, 1]]) and np.array_equal(g[0].id, g.id[:1])
   assert close(g[0].area, g.area[:1]) and close(sub.area, g.area[[0, 1]]) and len(sub.boundary) < len(g.boundary)
   assert np.all(np.isin(sub.boundary.grainId[:, 0], sub.id) | np.isin(sub.boundary.grainId[:, 1], sub.id))
+
+
+def test_grain2d_selectionByPhaseIdAndCondition():
+  g = fourBlocks(SQ5)
   assert len(g["test"]) == 4 and len(g["id", 2, 3]) == 2
   # phase names and a condition together, MATLAB's grains('test', grains.numPixel > 100)
   big = g["test", g.numPixel >= 100]
   assert np.array_equal(big.id, g.id[g.numPixel >= 100]) and len(g["test", np.zeros(len(g), dtype=bool)]) == 0
 
 
-def test_G7_the_keyhole_form_carries_the_holes():
+def test_keyhole_carriesTheHoles():
   g = calcGrains(inclusionMap(), angle=5 * degree)
   big = int(np.argmax(g.numPixel))
   kh = g.keyhole(big)
@@ -130,7 +167,7 @@ def test_G7_the_keyhole_form_carries_the_holes():
   assert np.array_equal(g.keyhole(small), np.concatenate([g.loops[small][0], g.loops[small][0][:1]]))
 
 
-def test_G8_merging_relabels_the_grains_and_keeps_the_area():
+def test_merge_relabelsTheGrainsAndKeepsTheArea():
   e = mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2)
   g = calcGrains(e, angle=5 * degree)
   a, b = g.neighbors()[0]
@@ -140,16 +177,31 @@ def test_G8_merging_relabels_the_grains_and_keeps_the_area():
   assert len(m) == 3 and pa == pb and len(np.unique(parent)) == 3
   assert set(m.childId[pa - 1]) == {a, b} and all(len(m.childId[k]) == np.sum(parent == m.id[k]) for k in range(len(m)))
   assert close(m.area.sum(), g.area.sum()) and m.numPixel.sum() == g.numPixel.sum()
-  assert np.array_equal(e[g.selectByGrainId([a, b])].grainId, e[np.isin(e.grainId, [a, b])].grainId)
-  assert len(e[g.selectByGrainId(a)]) == g.numPixel[a - 1] and e[g[np.zeros(4, dtype=bool)]].isempty
   assert close(m.area[pa - 1], g.area[a - 1] + g.area[b - 1]) and m.numPixel[pa - 1] == g.numPixel[a - 1] + g.numPixel[b - 1]
   # the boundary the two shared is inside the merged grain now
   assert len(m.boundary) < len(g.boundary) and len(m.innerBoundary) > len(g.innerBoundary)
   assert np.all(m.boundary.grainId[:, 0] != m.boundary.grainId[:, 1])
-  # a threshold above every misorientation joins the whole map, one below joins nothing
+
+
+def test_selectByGrainId_selectsTheMeasurementsOfTheGrains():
+  e = mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2)
+  g = calcGrains(e, angle=5 * degree)
+  a, b = g.neighbors()[0]
+  assert np.array_equal(e[g.selectByGrainId([a, b])].grainId, e[np.isin(e.grainId, [a, b])].grainId)
+  assert len(e[g.selectByGrainId(a)]) == g.numPixel[a - 1] and e[g[np.zeros(4, dtype=bool)]].isempty
+
+
+# a threshold above every misorientation joins the whole map, one below joins nothing
+def test_merge_thresholdAboveEveryMisorientationJoinsAllBelowJoinsNothing():
+  e = mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2)
+  g = calcGrains(e, angle=5 * degree)
   m2 = g.merge(threshold=90 * degree)
   assert len(m2) == 1 and close(m2.area.sum(), g.area.sum()) and m2.numPixel[0] == len(e)
   assert len(g.merge(threshold=1 * degree)) == len(g) and np.array_equal(g.parentId, g.id)
+
+
+def test_merge_ofASelectionStaysWithinIt():
+  g = fourBlocks(SQ5)
   selected = g[[3, 1]]
   merged = selected.merge([(4, 2)])
   assert len(merged) == 1 and np.array_equal(selected.parentId, [1, 1]) and close(merged.area, [selected.area.sum()])
@@ -159,9 +211,16 @@ def test_G8_merging_relabels_the_grains_and_keeps_the_area():
   assert np.array_equal(unchanged.id, selected.id) and close(unchanged.area, selected.area) and np.array_equal(selected.parentId, selected.id)
   assert unchanged.childId == [[4], [2]]
   assert close(selected.merge(selected.boundary).area, merged.area)
+
+
+def test_merge_refusesRepeatedGrains():
+  g = fourBlocks(SQ5)
   with pytest.raises(ValueError):
     g[[0, 0]].merge([(1, 1)])
-  # two interior grains merged carry no border and no outside
+
+
+# two interior grains merged carry no border and no outside
+def test_merge_ofInteriorGrainsHasNoOutside():
   inner = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 5 + 4 * (j // 5)), angle=5 * degree)
   ids = [inner(7, 7).id[0], inner(12, 7).id[0]]
   ins = inner.selectByGrainId(ids)
@@ -169,15 +228,18 @@ def test_G8_merging_relabels_the_grains_and_keeps_the_area():
   assert not mi.isBoundary[0] and not (mi.boundary.grainId == 0).any() and close(mi.area, [ins.area.sum()])
 
 
-def test_G8b_merging_by_labels_graphs_and_inclusions():
-  g = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2), angle=5 * degree)
-  # a label per grain, a graph of grains by id, and the labels alone with testRun
+# a label per grain, a graph of grains by id, and the labels alone with testRun
+def test_merge_byLabelsOrAGraphOfGrains():
+  g = fourBlocks(SQ5)
   m = g.merge(np.array([1, 1, 2, 2]))
   assert len(m) == 2 and np.array_equal(g.parentId, [1, 1, 2, 2])
   from scipy.sparse import csr_matrix
   A = csr_matrix((np.ones(1), ([0], [1])), shape=(4, 4))
   assert np.array_equal(g.merge(A, testRun=True), [1, 1, 2, 3]) and len(g.merge(A)) == 3
-  # an inclusion joins the grain around it, which keeps its phase and orientation
+
+
+# an inclusion joins the grain around it, which keeps its phase and orientation
+def test_merge_inclusionJoinsTheGrainAroundIt():
   gi = calcGrains(inclusionMap(), angle=5 * degree)
   big = int(np.argmax(gi.numPixel))
   host = gi.inclusionHost
@@ -188,7 +250,12 @@ def test_G8b_merging_by_labels_graphs_and_inclusions():
   mi = gi.merge(inclusions=True)
   assert len(mi) == 1 and mi.numPixel[0] == 21 * 21 and not mi.hasHole[0]
   assert np.allclose(np.abs(mi.meanRotation.data[0] @ gi.meanRotation.data[big]), 1)
-  # a grain turned into another phase takes its boundary along with update
+
+
+# a grain turned into another phase takes its boundary along with update
+def test_update_carriesAGrainsNewPhaseToItsBoundary():
+  gi = calcGrains(inclusionMap(), angle=5 * degree)
+  big = int(np.argmax(gi.numPixel))
   CS2 = crystalFrame("m-3m", mineral="other")
   two = gi.copy()
   object.__setattr__(two, "CSList", phaseList(CSG, CS2))
@@ -198,63 +265,99 @@ def test_G8b_merging_by_labels_graphs_and_inclusions():
 
 # ------------------------------------------------------------------ the areas M3 and M4 left open
 
-def test_S10_the_rim_closes_and_alpha_bounds_both():
+# the edge of the map is not the edge of a hole: the rim cell is absorbed as a cell in its
+# place further in would be, and the outline gives up a quarter of it
+@pytest.mark.parametrize("alpha", (3.1, 20.0))
+def test_calcGrains_rimCellIsAbsorbedWhateverAlpha(alpha):
   e = blockMap(SQ3, 1, 7, notIndexed=((3, 3, 0.0), (0, 3, 0.0)))
-  ix = e[e.isIndexed]
-  for alpha in (3.1, 20.0):
-    g = calcGrains(ix, angle=5 * degree, alpha=alpha)
-    # 49 cells of map less the quarter the outline gives up at the absorbed rim cell
-    assert len(g) == 1 and close(g.area.sum(), 48.75)
-  # a bay of radius 4 is wider than the disk, so its middle stays out of the map
+  g = calcGrains(e[e.isIndexed], angle=5 * degree, alpha=alpha)
+  assert len(g) == 1 and g.numPixel[0] == 47 and close(g.area.sum(), 48.75)
+
+
+# a bay of radius 4 is wider than the disk, so its middle stays out of the map
+def test_calcGrains_alphaLeavesABayWiderThanTheDiskOut():
   e2 = blockMap(SQ3, 1, 15, notIndexed=((7, 14, 4.0),))
   g2 = calcGrains(e2[e2.isIndexed], angle=5 * degree, alpha=3.1)
   assert g2.area.sum() < 225 - 8
 
 
-def test_calcGrains_commutes_with_a_transform_and_a_rotation():
-  oris = rotation.byAxisAngle(zvector, np.arange(1, 17) * 7 * degree)
-  thr = 5 * degree
-  for build in (squareBlockGrid, hexBlockGrid):
-    e = build(6, 4, oris)
-    g0 = calcGrains(e.copy(), angle=thr)
-    assertClosed(g0)
-    x, y = e.x.reshape(-1), e.y.reshape(-1)
-    xc, yc, yh = (x.min() + x.max()) / 2, (y.min() + y.max()) / 2, (y.max() - y.min()) / 2
-    scale = lambda p: 1 + 0.02 * (p.y - yc) / yh
-    eT = transform(e, lambda p: vector3d(xc + (p.x - xc) * scale(p), p.y, p.z))
-    gT = calcGrains(eT, angle=thr)
-    # the areas of the distorted map are those of the distorted polygons within 5e-3
-    V = g0.V
-    VT = np.stack([xc + (V[:, 0] - xc) * (1 + 0.02 * (V[:, 1] - yc) / yh), V[:, 1]], axis=1)
-    expected = np.array([sum(signedArea2(VT[l]) for l in ls) / 2 for ls in g0.loops])
-    assert len(gT) == len(g0) and np.max(np.abs(np.sort(gT.area) - np.sort(expected)) / np.sort(expected)) < 5e-3
-    gR = calcGrains(e.rotate(27 * degree), angle=thr)
-    assert len(gR) == len(g0) and np.max(np.abs(np.sort(gR.area) - np.sort(g0.area)) / np.sort(g0.area)) < 1e-3
+# a 6 x 6 block grid of 16 grains and its grains
+def blockGrains(build):
+  e = build(6, 4, rotation.byAxisAngle(zvector, np.arange(1, 17) * 7 * degree))
+  return e, calcGrains(e.copy(), angle=5 * degree)
 
 
-def test_every_polygon_is_a_closed_ring_of_positive_area():
+BLOCK_GRIDS = pytest.mark.parametrize("build", (squareBlockGrid, hexBlockGrid), ids=("square", "hex"))
+
+
+@BLOCK_GRIDS
+def test_calcGrains_blockGridGivesClosedPolygons(build):
+  e, g0 = blockGrains(build)
+  assert g0.isIndexed.sum() == 16
+  assertClosed(g0)
+
+
+@BLOCK_GRIDS
+def test_calcGrains_commutesWithATransform(build):
+  e, g0 = blockGrains(build)
+  x, y = e.x.reshape(-1), e.y.reshape(-1)
+  xc, yc, yh = (x.min() + x.max()) / 2, (y.min() + y.max()) / 2, (y.max() - y.min()) / 2
+  scale = lambda p: 1 + 0.02 * (p.y - yc) / yh
+  eT = transform(e, lambda p: vector3d(xc + (p.x - xc) * scale(p), p.y, p.z))
+  gT = calcGrains(eT, angle=5 * degree)
+  # the areas of the distorted map are those of the distorted polygons within 5e-3
+  V = g0.V
+  VT = np.stack([xc + (V[:, 0] - xc) * (1 + 0.02 * (V[:, 1] - yc) / yh), V[:, 1]], axis=1)
+  expected = np.array([sum(signedArea2(VT[l]) for l in ls) / 2 for ls in g0.loops])
+  assert len(gT) == len(g0) and np.array_equal(np.sort(gT.numPixel), np.sort(g0.numPixel))
+  assert np.max(np.abs(np.sort(gT.area) - np.sort(expected)) / np.sort(expected)) < 5e-3
+
+
+@BLOCK_GRIDS
+def test_calcGrains_commutesWithARotation(build):
+  e, g0 = blockGrains(build)
+  gR = calcGrains(e.rotate(27 * degree), angle=5 * degree)
+  assert len(gR) == len(g0) and np.array_equal(np.sort(gR.numPixel), np.sort(g0.numPixel))
+  assert np.max(np.abs(np.sort(gR.area) - np.sort(g0.area)) / np.sort(g0.area)) < 1e-3
+
+
+@pytest.mark.parametrize("rq", (False, True))
+def test_calcGrains_everyPolygonIsAClosedRingOfPositiveArea(rq):
   rng = np.random.default_rng(3)
   e = angleMap(rng.random((30, 30)) * 360)
   e = EBSD(e.pos, e.rotations, e.phaseId, phaseList(crystalFrame("432", mineral="test")))
-  for rq in (False, True):
-    g = calcGrains(e.copy(), angle=5 * degree, removeQuadruplePoints=rq)
-    assert len(g) >= 100
-    assertClosed(g)
-    assert close(g.area.sum(), 900)
-  # the quadruple point split leaves the area where it was
+  g = calcGrains(e, angle=5 * degree, removeQuadruplePoints=rq)
+  assert len(g) >= 100
+  assertClosed(g)
+  assert close(g.area.sum(), 900)
+
+
+# the quadruple point split leaves the area where it was
+def test_calcGrains_quadruplePointSplitKeepsTheArea():
   e = quadrants()
   g = calcGrains(e.copy(), angle=10 * degree)
   q = calcGrains(e.copy(), angle=10 * degree, removeQuadruplePoints=True)
   assert close(q.area.sum(), g.area.sum(), tol=1e-6) and close(q.area.sum(), 16) and all(ls for ls in q.loops)
 
 
-def test_the_compiled_and_the_python_tracing_agree():
-  # grains with holes, an inclusion and a grain touching itself around a hole of the map
+# grains with holes, an inclusion and a grain touching itself around a hole of the map
+def holedInclusionGrains():
   e = inclusionMap()
   ph = e.phaseId.copy()
   ph[[45, 46, 66, 200, 300, 301, 302]] = 0
-  e = EBSD(e.pos, e.rotations, ph, e.CSList)
-  g = calcGrains(e, angle=5 * degree)
+  return calcGrains(EBSD(e.pos, e.rotations, ph, e.CSList), angle=5 * degree)
+
+
+# enough grains for every thread of the parallel walk, some with holes
+def manyGrains():
+  return calcGrains(blockMap(SQ3, 12, 6, notIndexed=((8, 8, 1.5), (30, 30, 2.5), (50, 20, 1.0))), angle=5 * degree)
+
+
+@pytest.mark.parametrize("grains", [holedInclusionGrains, manyGrains])
+def test_tracePolygons_compiledIsThePythonOne(grains):
+  # the loops of the compiled walk are the rings of the Python walk in the same order,
+  # whichever vertex each starts at
+  g = grains()
   before = getMTEXpref("kernels", "numba")
   try:
     setMTEXpref("kernels", "numba")
@@ -263,15 +366,14 @@ def test_the_compiled_and_the_python_tracing_agree():
     b = tracePolygons(g.boundary, g.id)
   finally:
     setMTEXpref("kernels", before)
-  V = g.V
+  assert len(a) == len(b) == len(g)
   for la, lb in zip(a, b):
     assert len(la) == len(lb)
     for x, y in zip(la, lb):
-      # the same ring, whichever vertex it starts at
-      assert len(x) == len(y) and close(signedArea2(V[x]), signedArea2(V[y])) and set(x.tolist()) == set(y.tolist())
+      assert len(x) == len(y) and close(signedArea2(g.V[x]), signedArea2(g.V[y])) and set(x.tolist()) == set(y.tolist())
 
 
-def test_id2ind_keeps_the_shape_of_the_ids():
+def test_id2ind_keepsTheShapeOfTheIds():
   ebsd = blockMap(np.eye(2), 3, 4)
   grains = calcGrains(ebsd)
   ids = grains.boundary.grainId
@@ -280,7 +382,7 @@ def test_id2ind_keeps_the_shape_of_the_ids():
   assert isinstance(grains.id2ind(int(grains.id[0])), int)
 
 
-def test_the_compiled_edge_sort_is_the_stable_argsort():
+def test_edgesByGrainNumba_isTheStableArgsort():
   pytest.importorskip("numba")
   # the directed edges of every grain, the first sides before the second, each in row order
   from mtex.maps.kernels import edgesByGrainNumba
@@ -298,33 +400,10 @@ def test_the_compiled_edge_sort_is_the_stable_argsort():
   assert np.array_equal(goff, np.concatenate([[0], np.cumsum(np.bincount(k[keep], minlength=len(ids)))]))
 
 
-def test_the_parallel_tracing_of_many_grains_is_the_python_one():
-  # enough grains for every thread, some with holes: the loops of the parallel walk are the
-  # rings of the Python walk in the same order, whichever vertex each starts at
-  e = blockMap(SQ3, 12, 6, notIndexed=((8, 8, 1.5), (30, 30, 2.5), (50, 20, 1.0)))
-  g = calcGrains(e, angle=5 * degree)
-  before = getMTEXpref("kernels", "numba")
-  try:
-    setMTEXpref("kernels", "numba")
-    a = tracePolygons(g.boundary, g.id)
-    setMTEXpref("kernels", "numpy")
-    b = tracePolygons(g.boundary, g.id)
-  finally:
-    setMTEXpref("kernels", before)
-  assert len(a) == len(b) == len(g)
-  for la, lb in zip(a, b):
-    assert len(la) == len(lb)
-    for x, y in zip(la, lb):
-      assert len(x) == len(y) and close(signedArea2(g.V[x]), signedArea2(g.V[y])) and set(x.tolist()) == set(y.tolist())
-
-
-def test_the_compiled_and_the_python_loop_sums_agree():
-  # grains with holes and an inclusion: area, both perimeters, centroid and second moments
+# the loop sums of both backends over grains with holes and an inclusion: area, both perimeters,
+# centroid and second moments
+def loopSumsByBackend(g):
   from mtex.maps.polygon import loopSums
-  e = inclusionMap()
-  ph = e.phaseId.copy()
-  ph[[45, 46, 66, 200, 300, 301, 302]] = 0
-  g = calcGrains(EBSD(e.pos, e.rotations, ph, e.CSList), angle=5 * degree)
   before = getMTEXpref("kernels", "numba")
   try:
     out = {}
@@ -333,7 +412,22 @@ def test_the_compiled_and_the_python_loop_sums_agree():
       out[be] = loopSums(g.V, g.loops, g.size)
   finally:
     setMTEXpref("kernels", before)
+  return out
+
+
+def test_loopSums_compiledIsThePythonOne():
+  g = holedInclusionGrains()
+  out = loopSumsByBackend(g)
   assert out["numba"].shape == (g.size, 8) and np.allclose(out["numba"], out["numpy"], rtol=1e-13, atol=1e-12)
-  # a hole is taken off the area and left out of the outer perimeter only
+
+
+# a hole is taken off the area and left out of the outer perimeter only
+def test_loopSums_holeIsLeftOutOfTheOuterPerimeterOnly():
+  out = loopSumsByBackend(holedInclusionGrains())
   assert np.any(out["numba"][:, 2] > out["numba"][:, 1] + 1e-9)
+
+
+def test_loopSums_noLoopsSumToZero():
+  from mtex.maps.polygon import loopSums
+  g = holedInclusionGrains()
   assert np.array_equal(loopSums(g.V, [[] for _ in range(3)], 3), np.zeros((3, 8)))

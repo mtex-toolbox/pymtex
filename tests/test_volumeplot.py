@@ -38,16 +38,30 @@ def test_plot_of_grains_is_a_figure_holding_a_scene():
   fig = plot(g, g.meanOrientation, edgeAlpha=0.1, micronbar="off")
   assert fig is gcm() and len(gcs().items) == 1
   assert fig.fig._mtexScene is gcs() and fig.children[0].images
-  # hold adds to the scene, quiver draws shafts and heads
+
+
+# hold adds to the scene, quiver draws shafts and heads
+def test_hold_addsQuiverAndBoundariesToTheScene():
+  g = calcGrains(volume(), angle=10 * degree)
+  plot(g, g.meanOrientation, edgeAlpha=0.1, micronbar="off")
   hold(True)
   quiver(g, g.centroid * 0 + vector3d(0, 0, 1))
   plot(g.boundary, faceColor="red")
   hold(False)
   assert len(gcs().items) == 4
+
+
+def test_setCamera_redrawsTheSceneFromTheConvention():
+  g = calcGrains(volume(), angle=10 * degree)
+  fig = plot(g, g.meanOrientation, edgeAlpha=0.1, micronbar="off")
   v = fig.fig._mtexSceneVersion
   setCamera(plottingConvention(vector3d(0, 0, 1), vector3d(1, 0, 0)))
   assert fig.fig._mtexSceneVersion == v + 1 and np.allclose(gcs().camera()[0], [0, 0, 1])
-  # a new plot without hold is a new figure
+
+
+def test_plot_withoutHoldIsANewFigure():
+  g = calcGrains(volume(), angle=10 * degree)
+  fig = plot(g)
   plot(g)
   assert gcm() is not fig
 
@@ -106,7 +120,7 @@ def test_the_histogram_of_3d_grains_is_weighted_by_volume():
   assert np.allclose([b.get_height() for b in hs[0]], [0, 100]) and ax.get_ylabel() == "relative volume (%)"
 
 
-def test_scenes_in_a_layout_and_a_held_map_turned_into_a_scene():
+def test_scenes_goIntoTheAxesOfALayout():
   from mtex import newMtexFigure, nextAxis
   g = calcGrains(volume(), angle=10 * degree)
   g2 = g.slice(plane3d(vector3d(0, 0, 1), vector3d(1.5, 1, 0.5)))
@@ -115,7 +129,12 @@ def test_scenes_in_a_layout_and_a_held_map_turned_into_a_scene():
   nextAxis()
   plot(g)
   assert len(fig.children) == 2 and gcs() is not None and len(fig.fig._mtexScenes) == 1
-  # a grain set plotted over a held map: the map becomes a picture in the scene of the grains
+
+
+# a grain set plotted over a held map: the map becomes a picture in the scene of the grains
+def test_plot_ofGrainsOverAHeldMapTurnsTheMapIntoAPicture():
+  g = calcGrains(volume(), angle=10 * degree)
+  g2 = g.slice(plane3d(vector3d(0, 0, 1), vector3d(1.5, 1, 0.5)))
   plot(g2, micronbar="off")
   hold(True)
   plot(g, faceAlpha=0.5)

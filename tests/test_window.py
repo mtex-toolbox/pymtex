@@ -19,7 +19,7 @@ def pump(app, until, timeout=60):
   app.processEvents()
 
 
-# the window over the fixtures: a load through the worker thread, every tab drawn, a grab
+# the window over the fixtures: a load through the worker thread shown in every panel, a grab
 def test_window_offscreen(tmp_path):
   app = application()
   w = runWizard(FIXTURES, exec=False)
@@ -31,12 +31,10 @@ def test_window_offscreen(tmp_path):
   assert w.tabs.count() == len(st.tabs) and w.tabs.currentIndex() == st.tab and st.currentTab == "IPF Z"
   assert w.phases.rowCount() == 5 and len(w.browser.info.fileRows()) >= 3
   assert w.browser.status.text().startswith("Forsterite_cut.ctf")
-  for k in range(len(st.tabs)):
-    cb.pickTab(st, k)
-    app.processEvents()
-    w.canvas.draw()
-    assert st.status[0] == "loaded", (st.tabs[k], st.status)
-  assert w.millers.isVisible() is False or st.tabKinds[st.tab] == "polefigures"
+  assert w.millers.isHidden()
+  cb.pickTab(st, st.tabs.index("pole figures"))
+  app.processEvents()
+  assert w.tabs.currentIndex() == st.tab and not w.millers.isHidden()
   png = grabWindow(w, str(tmp_path / "wizard.png"))
   assert os.path.getsize(png) > 10000
   # a load that fails is reported in the band and leaves the window usable

@@ -26,3 +26,17 @@ def fresh_session():
 
 def close(a, b, tol=1e-12):
   return np.allclose(np.asarray(a), np.asarray(b), atol=tol, rtol=0)
+
+
+IN100 = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data", "EBSD", "SmallIN100_MeshStats.dream3d")
+
+
+# the IN100 volume of ../master/data and its grains at 10 degrees, as MATLAB's pages segment it,
+# built once per run; the tests only read them
+@pytest.fixture(scope="session")
+def in100():
+  if not os.path.exists(IN100):
+    pytest.skip("the IN100 volume of ../master/data")
+  from mtex import EBSD3, calcGrains, degree
+  ebsd = EBSD3.load(IN100)
+  return ebsd, calcGrains(ebsd, angle=10 * degree)

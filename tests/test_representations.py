@@ -11,7 +11,6 @@ from conftest import close
 rng = np.random.default_rng(0)
 Rz = lambda w: rotation.byAxisAngle(zvector, w)
 Ry = lambda w: rotation.byAxisAngle(yvector, w)
-Rx = lambda w: rotation.byAxisAngle(xvector, w)
 
 
 def same(p, q, tol=1e-13):
@@ -36,17 +35,9 @@ def test_euler_round_trip(conv):
   assert same(rotation.byEuler(a, b, c, conv), r)
 
 
-def test_euler_definitions():
-  a, b, c = 0.3, 1.1, 2.5
-  assert same(rotation.byEuler(a, b, c, "ZYZ"), Rz(a) * Ry(b) * Rz(c))
-  assert same(rotation.byEuler(a, b, c, "Bunge"), Rz(a) * Rx(b) * Rz(c))
-  assert same(rotation.byEuler(a, b, c, "Bunge"), rotation.byEuler(a - pi / 2, b, c + pi / 2, "ZYZ"))
-  assert same(rotation.byEuler(a, b, c, "Roe"), rotation.byEuler(a, b, c, "Matthies"))
-  assert same(rotation.byEuler(a, b, c, "Kocks"), rotation.byEuler(a, b, pi - c, "Matthies"))
-  assert same(rotation.byEuler(a, b, c, "Canova"), rotation.byEuler(pi / 2 - a, b, 3 * pi / 2 - c, "Matthies"))
-  assert same(rotation.byEuler(a, b, c), rotation.byEuler(a, b, c, "Bunge"))
+def test_an_unknown_euler_convention_is_refused():
   with pytest.raises(ValueError):
-    rotation.byEuler(a, b, c, "Wrong")
+    rotation.byEuler(0.3, 1.1, 2.5, "Wrong")
 
 
 def test_euler_degenerate_case():

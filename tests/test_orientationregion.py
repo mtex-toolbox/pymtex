@@ -64,33 +64,29 @@ def test_euler_region():
   assert np.allclose(eulerRegion(crystalFrame("-3")), (2 * pi, pi, 2 * pi / 3))
 
 
-def test_grain_exchange_halves_the_region_and_projection_lands_inside():
+def test_grain_exchange_halves_the_region():
   for g in ('mmm', 'm-3m', '-1', '6/mmm'):
     cs = crystalFrame(g)
     r = orientation.rand(40000, cs, cs, rng=np.random.default_rng(3))
     full = np.mean(fundamentalRegion(cs, cs).checkInside(r))
     half = np.mean(fundamentalRegion(cs, cs, antipodal=True).checkInside(r))
     assert abs(half / full - 0.5) < 0.05
-    m = orientation.rand(2000, cs, cs, rng=np.random.default_rng(4))
-    m.antipodal = True
-    p = m.project2FundamentalRegion()
-    assert np.all(fundamentalRegion(p).checkInside(p))
-    assert np.max(angle(p, m)) < 1e-9
 
 
-def test_the_axis_sector_holds_the_projection_for_every_group():
-  # -3 has a conventional sector no centre's Dirichlet domain is; a group turned against its
-  # axes has no conventional sector and takes the Dirichlet domain; with and without exchange
+# a group turned against its axes, which has no conventional sector and takes the Dirichlet domain
+def turned(g):
   from mtex.geometry.kernels import qmul
   r = rotation.byAxisAngle(vector3d(1, 2, 3), 37 * degree).data.reshape(4)
+  q = crystalFrame(g).sym.rot.data.reshape(-1, 5)[:, :4]
+  return crystalFrame(rotation._fromData(np.array([qmul(qmul(r, x), r * [1, -1, -1, -1]) for x in q])), noIntern=True)
 
-  def turned(g):
-    q = crystalFrame(g).sym.rot.data.reshape(-1, 5)[:, :4]
-    return crystalFrame(rotation._fromData(np.array([qmul(qmul(r, x), r * [1, -1, -1, -1]) for x in q])), noIntern=True)
 
-  for cs in (crystalFrame("-3"), crystalFrame("-3m"), crystalFrame("4/m"), turned("432"), turned("32")):
-    for antipodal in (False, True):
-      m = orientation.rand(2000, cs, cs, rng=np.random.default_rng(4))
-      m.antipodal = antipodal
-      p = m.project2FundamentalRegion()
-      assert np.all(fundamentalRegion(p).checkInside(p)) and np.max(angle(p, m)) < 1e-9
+# -3 has a conventional sector no centre's Dirichlet domain is; with and without exchange
+@pytest.mark.parametrize("antipodal", [False, True])
+@pytest.mark.parametrize("group", ["-1", "mmm", "4/m", "-3", "-3m", "6/mmm", "m-3m", "turned 432", "turned 32"])
+def test_the_projection_lands_in_the_region(group, antipodal):
+  cs = turned(group.split()[1]) if group.startswith("turned") else crystalFrame(group)
+  m = orientation.rand(2000, cs, cs, rng=np.random.default_rng(4))
+  m.antipodal = antipodal
+  p = m.project2FundamentalRegion()
+  assert np.all(fundamentalRegion(p).checkInside(p)) and np.max(angle(p, m)) < 1e-9

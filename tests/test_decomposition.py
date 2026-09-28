@@ -154,7 +154,9 @@ def test_the_compiled_loop_matches_the_numpy_form():
     kb = np.lexsort((b.cells[:, 1], b.cells[:, 0]))
     assert np.array_equal(a.cells[ka], b.cells[kb])
     assert np.allclose(np.sort(a.V, axis=0), np.sort(b.V, axis=0), atol=1e-9)
-  # a map that is not on a lattice cannot be decomposed
+
+
+def test_a_map_off_any_lattice_is_not_decomposed():
   n = 10
   line = EBSD(np.stack([np.arange(n) * 0.3, np.zeros(n), np.zeros(n)], axis=-1), rotation.rand(n), np.ones(n, dtype=int), [CSTEST])
   with pytest.raises(ValueError):
@@ -169,8 +171,7 @@ def test_the_compiled_weld_is_the_numpy_one():
   for A, holes, off in ((HEX2, ((15, 15, 1.5), (5, 22, 3.0)), 0.0), (SQ2, ((8, 8, 2.0),), 1e4)):
     e = shift(decompMap(A, 30, holes=holes), vector3d(off, -off, 0))
     l = e.lattice
-    c = decompose(e, backend="numpy")
-    cells, verts, _ = localVoronoi(c.sites, l.A, backend="numpy")
+    cells, verts, _ = localVoronoi(decompose(e).sites, l.A)
     verts = verts * (1 + 1e-15 * rng.standard_normal(verts.shape))
     tol = l.dxy / 100
     a, b = meshVertices(cells, verts, tol, backend="numpy"), meshVertices(cells, verts, tol, backend="numba")

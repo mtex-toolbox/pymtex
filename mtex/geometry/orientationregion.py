@@ -30,11 +30,22 @@ def commonRotations(L, R):
   return L[np.any(np.abs(L @ R.T) > 1 - 1e-8, axis=1)]
 
 
+# the sectors built so far, by the shared rotations and the exchange; every projection asks again
+_axisSectors = {}
+
+
 def commonAxisSector(common, antipodal=False):
   """the sector of the axes: the fundamental sector of the shared rotations, and a centre whose
   Dirichlet domain under them is that sector, the one the projection takes the conjugate
   nearest to; with grain exchange a misorientation is its inverse, the same angle about the
   opposite axis, so the sector is that of the shared rotations with the inversion"""
+  key = (np.round(np.asarray(common, dtype=float), 12).tobytes(), bool(antipodal))
+  if key not in _axisSectors:
+    _axisSectors[key] = _commonAxisSector(common, antipodal)
+  return _axisSectors[key]
+
+
+def _commonAxisSector(common, antipodal):
   if len(common) <= 1 and not antipodal:
     return None, np.array([0.0, 0.0, 1.0])
   pg = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))

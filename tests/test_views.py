@@ -43,16 +43,24 @@ def test_every_view_draws(loaded):
   assert np.any(np.asarray(colors)[..., 3] == 0)
 
 
-def test_miller_bar_and_metadata(loaded):
+# the Miller bar stands on the pole figure tab alone, and a direction typed into it reaches the state
+def test_miller_bar_shows_on_the_pole_figures_and_commits(loaded):
   st = loaded
   bar = MillerBar(st)
+  cb.pickTab(st, st.tabs.index("IPF Z"))
+  assert bar.isHidden()
   cb.pickTab(st, st.tabs.index("pole figures"))
-  assert bar.isVisibleTo(bar) is True or st.tabKinds[st.tab] == "polefigures"
+  assert not bar.isHidden()
   bar.fields[0].setText("110")
   bar.fields[0].editingFinished.emit()
   assert st.millers[0] == "110"
-  h = millerOf("1-10", st.ebsd.CSList.frames[1])
-  assert np.allclose(h.hkl, [1, -1, 0]) if hasattr(h, "hkl") else True
+
+
+# a direction is typed with its minus signs inside, and text that is none falls back to 100
+def test_millerOf_reads_the_typed_direction(loaded):
+  cs = loaded.ebsd.CSList.frames[1]
+  assert np.allclose(millerOf("1-10", cs).hkl, [1, -1, 0])
+  assert np.allclose(millerOf("x", cs).hkl, [1, 0, 0])
 
 
 # the key panel shows one phase's key at a fixed size, at first the phase with the most pixels,

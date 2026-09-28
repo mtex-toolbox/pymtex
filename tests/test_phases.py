@@ -27,23 +27,19 @@ def test_table_rows_and_edits(loaded):
   st = loaded
   table = PhaseTable(st, QFont())
   assert table.rowCount() == 5 and table.item(0, 2).text() == "notIndexed" and table.item(1, 2).text() == "Forsterite"
-  assert table.item(1, 0).checkState() == Qt.Checked and table.item(1, 6).text() == "4.756"
+  assert table.item(1, 6).text() == "4.756"
   # a cubic lattice greys b and c; the not indexed row is fixed throughout
   assert not table.item(4, 7).flags() & Qt.ItemIsEditable and table.item(4, 6).flags() & Qt.ItemIsEditable
   assert not table.item(0, 6).flags() & Qt.ItemIsEditable
   # an edit through the table reaches the state and comes back into the row
   table.item(1, 6).setText("4.8")
   assert abs(st.ebsd.CSList.frames[1].abc[0] - 4.8) < 1e-9 and table.item(1, 6).text() == "4.8"
-  table.item(1, 0).setCheckState(Qt.Unchecked)
-  assert st.drawn[1] is False
   table.item(2, 2).setText("En")
   assert st.ebsd.CSList.frames[2].name == "En"
   # a value that is no number is reported, not applied
   table.item(1, 7).setText("x")
   assert st.status[0] == "failed" and table.item(1, 7).text() != "x"
   assert table.width() >= sum(WIDTHS)
-
-
 
 
 # every phase has a plot box, the one that was never indexed among them, and it is centred

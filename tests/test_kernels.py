@@ -156,8 +156,6 @@ def test_euler_angles_agree_with_numpy(numbaBackend):
   rng = np.random.default_rng(3)
   a, b, g = (rng.uniform(-7, 7, size=(40, 60)) for _ in range(3))
   q = eulerQuat(a, b, g)
-  if q is None:
-    return
   setMTEXpref("kernels", "numpy")
   assert np.allclose(q, matthies2quat(a, b, g), atol=1e-15)
 

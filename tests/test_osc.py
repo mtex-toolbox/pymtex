@@ -28,7 +28,7 @@ def test_the_cut_matches_the_julia_reader():
   assert e.meta["header"]["nColumns"] == 118 and e.meta["header"]["nRows"] == 16 and e.meta["header"]["operator"] == "Administrator"
 
 
-def test_the_cut_reads_on_its_hexagonal_grid_from_the_header():
+def test_the_cut_reads_on_its_hexagonal_grid():
   e = loadEBSD(CUT)
   assert e.shape == (16, 119)
   assert e.lattice.shape == "hex"

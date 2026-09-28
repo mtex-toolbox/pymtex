@@ -18,65 +18,83 @@ def firstIndexedEuler(e):
   return k, np.array(e.rotations[k].Euler()) / degree
 
 
-def test_the_cut_reads_on_its_grid_by_either_name():
+def test_the_cut_reads_on_its_grid():
   e = loadEBSD(CUT)
   assert e.shape == (60, 707)
   assert e.lattice.shape == "square" and e.dPos == 0.5
+
+
+def test_the_pair_reads_the_same_by_either_name():
+  e = loadEBSD(CUT)
   f = loadEBSD(CUT.replace(".cpr", ".crc"))
   assert f.shape == e.shape and np.array_equal(e.phaseId, f.phaseId)
 
 
-def test_the_cut_matches_the_julia_reader():
+def test_the_cut_matches_the_julia_reader_in_its_phases():
   e = loadEBSD(CUT, noGrid=True)
   assert len(e) == 42420
   assert [int((e.phaseId == k).sum()) for k in range(3)] == [12238, 30182, 0]
   assert e.CSList.mineralList == ["notIndexed", "Iron bcc (old)", "Iron fcc"]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["m-3m", "m-3m"]
-  k, euler = firstIndexedEuler(e)
-  assert k == 1 and np.allclose(euler, [332.489218806, 44.301505127, 64.471699199], atol=1e-6)
-  assert np.allclose(e.pos.data[1], [0.5, 0, 0])
-  assert sorted(e.prop) == ["bands", "bc", "bs", "error", "mad", "reliabilityindex"]
-  assert abs(e.mad.mean() - 0.4562887121366055) < 1e-12
-  assert abs(e.bc.mean() - 90.66895332390382) < 1e-10
   assert list(e.phaseMap) == [0, 1, 2]
 
 
-def test_header_and_surface():
+def test_the_cut_matches_the_julia_reader_in_its_orientations_and_positions():
+  e = loadEBSD(CUT, noGrid=True)
+  k, euler = firstIndexedEuler(e)
+  assert k == 1 and np.allclose(euler, [332.489218806, 44.301505127, 64.471699199], atol=1e-6)
+  assert np.allclose(e.pos.data[1], [0.5, 0, 0])
+
+
+def test_the_cut_matches_the_julia_reader_in_its_properties():
+  e = loadEBSD(CUT, noGrid=True)
+  assert sorted(e.prop) == ["bands", "bc", "bs", "error", "mad", "reliabilityindex"]
+  assert abs(e.mad.mean() - 0.4562887121366055) < 1e-12
+  assert abs(e.bc.mean() - 90.66895332390382) < 1e-10
+
+
+def test_the_header_is_kept():
   e = loadEBSD(CUT, noGrid=True)
   h = e.meta["header"]
   assert h["job"]["xcells"] == 707 and h["job"]["griddistx"] == 0.5
   assert h["phase1"]["structurename"] == "Iron bcc (old)" and h["phase1"]["spacegroup"] == 229
-  assert e.meta["surface"] == (0.0, 0.0, 0.0)
   assert h["fields"]["count"] == 9
 
 
-def test_the_correction_is_half_a_turn_about_z_and_the_surface_is_not_applied():
+def test_the_acquisition_surface_is_kept():
+  e = loadEBSD(CUT, noGrid=True)
+  assert e.meta["surface"] == (0.0, 0.0, 0.0)
+
+
+def test_the_correction_is_half_a_turn_about_z():
   a = loadEBSD(CUT, noGrid=True)
   b = loadEBSD(CUT, eulerCorrection=rotation.id, noGrid=True)
   r = rotation.byEuler(np.pi, 0, 0)
   assert mtex.angle(a.rotations[1], r * b.rotations[1]) < 1e-12
 
 
-def test_readIni():
+def test_readIni_reads_the_sections_as_numbers():
   ini = readIni(CUT)
   assert ini["general"]["version"] == 5.0
   assert ini["acquisitionsurface"]["euler1"] == 0.0
   assert "" not in ini
 
 
-def test_crcNames_and_the_edx_windows():
+def test_crcNames_names_the_edx_windows_and_the_unknown_fields():
   ini = {"edxwindows": {"count": 2.0, "window1": "Fe Ka", "window2": "Mn Ka"}}
   assert crcNames(ini, [3, 4, 5, 101, 102, 103, 13]) == ["phi1", "phi", "phi2", "feka", "mnka", "unknown103", "unknown13"]
 
 
-def test_a_phase_without_a_lattice_is_not_indexed(tmp_path):
+def test_a_phase_without_a_lattice_is_not_indexed():
   ini = {"phases": {"count": 2.0}, "phase1": {"structurename": "Fe", "a": 2.87, "b": 2.87, "c": 2.87, "alpha": 90.0, "beta": 90.0, "gamma": 90.0, "lauegroup": 11.0},
          "phase2": {"structurename": "x"}}
   with pytest.warns(UserWarning, match="does not describe phase 2"):
     pl = cprPhases(ini, "x.cpr")
   assert len(pl) == 3 and pl[1].pointGroup == "m-3m" and not pl.frames[2].isIndexed
-  ini["phase1"]["lauegroup"] = "m-3m"
-  ini["phases"]["count"] = 1.0
+
+
+def test_cprPhases_takes_the_laue_group_as_a_symbol():
+  ini = {"phases": {"count": 1.0}, "phase1": {"structurename": "Fe", "a": 2.87, "b": 2.87, "c": 2.87, "alpha": 90.0, "beta": 90.0, "gamma": 90.0, "lauegroup": "m-3m"}}
   assert cprPhases(ini, "x.cpr")[1].pointGroup == "m-3m"
 
 

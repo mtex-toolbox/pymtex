@@ -1,13 +1,10 @@
 # grain3Boundary: the faces of the grains of a volume, their sides, normals, measures and
 # incidences, against MATLAB master (bench/matlab/probe_grain3d.m)
-import os
 
 import numpy as np
-import pytest
 
-from mtex import EBSD3, EBSD3square, calcGrains, crystalFrame, degree, phaseList, rotation, vector3d
+from mtex import EBSD3square, calcGrains, crystalFrame, degree, phaseList, rotation, vector3d
 
-DREAM3D = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data", "EBSD", "SmallIN100_MeshStats.dream3d")
 
 
 def boundary():
@@ -32,23 +29,31 @@ def test_the_faces_of_two_voxels():
   assert gB.hasPhase(1, 1).sum() == 2 and gB.hasGrain(1, 2).sum() == 2 and "grain3Boundary" in repr(gB)
 
 
-def test_edges_nodes_flip_and_selection():
+def test_the_edges_and_node_types_of_two_voxels():
   gB = boundary()
   E, F2E = gB.edges()
   assert E.shape == (31, 2) and F2E.shape == (22, 3)
   # every vertex is on the surface of the box and touches one or two grains
   assert set(np.unique(gB.nodeType())) == {11, 12}
+
+
+def test_flip_swaps_the_sides_and_inverts_the_misrotation():
+  gB = boundary()
   inner = np.flatnonzero(np.all(gB.grainId > 0, axis=1))
   f = gB.flip(inner)
   assert np.all(f.grainId[inner] == [2, 1]) and np.allclose(f.misrotation.data[inner][:, 1:], -gB.misrotation.data[inner][:, 1:])
   assert np.allclose(gB.flipN(inner).N.data[inner], [-1, 0, 0])
+
+
+def test_a_selection_keeps_the_ids_and_the_faces():
+  gB = boundary()
+  inner = np.flatnonzero(np.all(gB.grainId > 0, axis=1))
   s = gB[inner]
   assert len(s) == 2 and list(s.id) == list(inner + 1) and np.array_equal(s.F, gB.F[inner])
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_as_MATLAB_measures_it():
-  gB = calcGrains(EBSD3.load(DREAM3D), angle=10 * degree).boundary
+def test_IN100_as_MATLAB_measures_it(in100):
+  gB = in100[1].boundary
   assert np.allclose(gB.perimeter[:3], 0.85355339) and np.isclose(gB.perimeter.sum(), 639214.184468)
   assert list(np.bincount(gB.nodeType())) == [0, 0, 240232, 39657, 3513, 153, 4, 0, 0, 0, 0, 47124, 11815, 1036, 27]
   assert len(gB.edges()[0]) == 1092216

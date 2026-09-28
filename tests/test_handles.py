@@ -11,58 +11,104 @@ from mtex import (Miller, S1FunHandle, S1FunHarmonic, S2DeLaValleePoussinKernel,
 rng = np.random.default_rng(51)
 
 
-def test_H5a_SO3FunHandle():
+# check_radonOptions's handle: 1 + cos(angle), under 432 and 222, averaged over the groups when asked
+def cosHandle(symmetrise=False):
   cs, ss = crystalFrame("432"), specimenFrame("222")
-  # check_radonOptions's handle: 1 + cos(angle), averaged over the groups when asked
-  f = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16)
-  o = orientation(rotation.rand(7, rng=rng), cs, ss)
+  return SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=symmetrise)
+
+
+def test_SO3FunHandle_evaluatesItsFunction():
+  f = cosHandle()
+  o = orientation(rotation.rand(7, rng=rng), f.CS, f.SS)
   assert np.allclose(f(o), 1 + np.cos(angle(o, noSymmetry=True))) and f(o[0]) == f(o)[0] and f(o[0]) == f(rotation(o[0]))
+
+
+def test_SO3FunHandle_refusesAnotherFrame():
   # another frame is refused; the same frames without their groups are not another frame
+  f = cosHandle()
   with pytest.raises(ValueError):
-    f(orientation(rotation.rand(2, rng=rng), cs, specimenFrame.rolling))
-  g = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=True)
+    f(orientation(rotation.rand(2, rng=rng), f.CS, specimenFrame.rolling))
+
+
+def test_SO3FunHandle_symmetriseAveragesOverBothGroups():
+  g = cosHandle(symmetrise=True)
+  cs, ss = g.CS, g.SS
+  o = orientation(rotation.rand(7, rng=rng), cs, ss)
   E, S = cs.sym.rot.flatten().rot, ss.sym.rot.flatten().rot
   for i in range(E.size):
     for j in range(S.size):
       assert np.isclose(g(S[j] * rotation(o[0]) * E[i]), g(o[0]), rtol=1e-10)
+
+
+def test_SO3FunHandle_operationsGoThroughItsHarmonicForm():
   # the harmonic form and the operations through it
+  g = cosHandle(symmetrise=True)
   h = SO3FunHarmonic(g)
   assert h.bandwidth == 16 and h.isReal
   rs = rotation.rand(20, rng=rng)
   assert np.max(np.abs(h(rs) - g(rs))) < 1e-6 * np.max(np.abs(g(rs)))
-  assert isinstance(pdf(g, Miller(1, 0, 0, cs)), S2FunHarmonic)
+  assert isinstance(pdf(g, Miller(1, 0, 0, g.CS)), S2FunHarmonic)
   assert np.isclose(mean(g), mean(h))
   assert np.allclose((2 * g)(rs), 2 * g(rs))
   assert "SO3FunHandle" in repr(g)
+
+
+def test_SO3FunHandle_exchangeSymmetryAveragesWithTheInverses():
   # exchange symmetry averages with the inverses
+  cs = crystalFrame("432")
+  rs = rotation.rand(20, rng=rng)
   fx = SO3FunHandle(lambda o: o.a + o.b, cs, cs, antipodal=True, symmetrise=True)
   assert np.isclose(fx(rs[0]), fx(rs[0].inv()))
 
 
-def test_H5b_S2FunHandle_and_S1FunHandle():
+def test_S2FunHandle_evaluatesItsFunctionAndRefusesAnotherFrame():
   cs = crystalFrame("6/mmm")
   f = S2FunHandle(lambda v: v.z ** 2 + 0.3 * v.x, cs, bandwidth=16)
   vs = vector3d(vector3d.rand(6, rng=rng), frame=cs)
   assert np.allclose(f(vs), vs.z ** 2 + 0.3 * vs.x) and f(vs[0]) == f(vs)[0]
   with pytest.raises(ValueError):
     f(Miller(1, 0, 0, crystalFrame("m-3m")))
-  g = S2FunHandle(lambda v: v.z ** 2 + 0.3 * v.x, cs, bandwidth=16, symmetrise=True)
-  v0 = vector3d(vs[0].data)
-  E = cs.sym.rot.flatten()
+
+
+# the handle v.z^2 + 0.3 v.x under 6/mmm, symmetrised
+def symmetricS2Handle():
+  return S2FunHandle(lambda v: v.z ** 2 + 0.3 * v.x, crystalFrame("6/mmm"), bandwidth=16, symmetrise=True)
+
+
+def test_S2FunHandle_symmetriseIsInvariant():
+  g = symmetricS2Handle()
+  v0 = vector3d.rand(rng=rng)
+  E = g.frame.sym.rot.flatten()
   for i in range(E.size):
     assert np.isclose(g(E[i] * v0), g(v0))
+
+
+def test_S2FunHandle_antipodalIsEven():
   a = S2FunHandle(lambda v: v.z ** 2 + 0.3 * v.x, bandwidth=16, antipodal=True)
+  v0 = vector3d.rand(rng=rng)
   assert a.antipodal and np.isclose(a(v0), a(-v0)) and np.isclose(a(v0), v0.z ** 2)
+  assert S2FunHarmonic(a, bandwidth=8).antipodal
+
+
+def test_S2FunHandle_agreesWithItsHarmonicForm():
+  g = symmetricS2Handle()
   h = S2FunHarmonic(g, bandwidth=8)
   ds = vector3d.rand(20, rng=rng)
   assert np.max(np.abs(h(ds) - g(ds))) < 1e-7
-  assert S2FunHarmonic(a, bandwidth=8).antipodal
   assert np.isclose(mean(g), mean(h)) and np.allclose((2 * g)(ds), 2 * g(ds))
+
+
+def test_S1FunHandle_evaluatesItsFunction():
   s = S1FunHandle(lambda x: np.cos(2 * x) + 0.5 * np.sin(x) + 0.3, bandwidth=8)
   xs = np.linspace(0, 2 * pi, 13)
   assert np.allclose(s(xs), np.cos(2 * xs) + 0.5 * np.sin(xs) + 0.3)
-  S = S1FunHarmonic(s, bandwidth=4)
+
+
+def test_S1FunHarmonic_addsAndSubtractsScalars():
   # check_S1Fun
+  s = S1FunHandle(lambda x: np.cos(2 * x) + 0.5 * np.sin(x) + 0.3, bandwidth=8)
+  xs = np.linspace(0, 2 * pi, 13)
+  S = S1FunHarmonic(s, bandwidth=4)
   assert np.max(np.abs((S + 3)(xs) - (s(xs) + 3))) < 1e-10
   assert np.max(np.abs((3 + S)(xs) - (s(xs) + 3))) < 1e-10
   assert np.max(np.abs((S - 1.5)(xs) - (s(xs) - 1.5))) < 1e-10
@@ -70,38 +116,72 @@ def test_H5b_S2FunHandle_and_S1FunHandle():
   assert np.allclose((S1FunHarmonic([2.0]) + 5)(xs), 7.0)
 
 
-def test_H5c_sums():
+# a unimodal ODF, a fibre ODF and a symmetrised handle under 432 and 1
+def odfTerms():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   u = unimodalODF(orientation(rotation.rand(rng=rng), cs, ss))
   fb = fibreODF(fibre(orientation(rotation.rand(rng=rng), cs, ss), Miller(1, 1, 1, cs)))
   h = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=True)
+  return cs, ss, u, fb, h
+
+
+def test_SO3FunComposition_sumsItsTerms():
+  cs, ss, u, fb, h = odfTerms()
   s = 0.5 * u + 0.5 * fb
   assert isinstance(s, SO3FunComposition) and len(s.components) == 2 and np.isclose(mean(s), 1)
   rs = rotation.rand(10, rng=rng)
   assert np.allclose(s(rs), 0.5 * u(rs) + 0.5 * fb(rs))
   t = s + h - u
   assert isinstance(t, SO3FunComposition) and len(t.components) == 4 and np.allclose(t(rs), s(rs) + h(rs) - u(rs))
+  assert np.allclose((s + 2)(rs), s(rs) + 2) and np.isclose(mean(s + 2), 3)
+
+
+def test_abs_ofADifferenceIsAHandle():
   # the absolute value of a difference is a handle, MATLAB's mean(abs(f - g))
+  cs, ss, u, fb, h = odfTerms()
+  rs = rotation.rand(10, rng=rng)
   a = abs(h - u)
   assert isinstance(a, SO3FunHandle) and np.allclose(a(rs), np.abs(h(rs) - u(rs)))
-  assert np.allclose((s + 2)(rs), s(rs) + 2) and np.isclose(mean(s + 2), 3)
+
+
+def test_SO3FunComposition_agreesWithItsHarmonicForm():
+  cs, ss, u, fb, h = odfTerms()
+  s = 0.5 * u + 0.5 * fb
+  rs = rotation.rand(10, rng=rng)
   H = SO3FunHarmonic(s)
   assert H.isReal and H.CS is cs
   assert np.max(np.abs(H(rs) - s(rs))) < 3e-2 * np.max(s(rs))
+
+
+def test_pdf_ofACompositionIsAxisValuedForALaueCrystal():
   # check_radonOptions on the composition: the pole figure exists and is axis valued for a Laue crystal
+  cs, ss, u, fb, h = odfTerms()
+  s = 0.5 * u + 0.5 * fb
   assert isinstance(pdf(s, Miller(1, 0, 0, cs)), S2FunHarmonic)
   csL = crystalFrame("m-3m")
   sL = 0.5 * unimodalODF(orientation(rotation.rand(rng=rng), csL, ss)) + 0.5 * fibreODF(fibre(orientation(rotation.rand(rng=rng), csL, ss), Miller(1, 1, 1, csL)))
   assert pdf(sL, Miller(1, 0, 0, csL)).antipodal
   assert pdf(s, vector3d(1, 0, 0, antipodal=True)).antipodal
+
+
+def test_sum_ofRBFsWithOneKernelStaysAnRBF():
   # two RBFs with the same kernel stay one RBF, with different kernels a sum
+  cs, ss, u, fb, h = odfTerms()
+  csL = crystalFrame("m-3m")
   u2 = unimodalODF(orientation(rotation.rand(rng=rng), cs, ss))
   assert isinstance(u + u2, SO3FunRBF) and np.isclose(mean(u + u2), 2)
   assert isinstance(u + unimodalODF(orientation(rotation.rand(rng=rng), cs, ss), halfwidth=5 * degree), SO3FunComposition)
   with pytest.raises(ValueError):
     u + unimodalODF(orientation(rotation.rand(rng=rng), csL, ss))
+
+
+def test_sum_ofAHarmonicAndAKernelFormIsAComposition():
   # a harmonic function plus a kernel form is a composition too
+  cs, ss, u, fb, h = odfTerms()
   assert isinstance(SO3FunHarmonic(u) + fb, SO3FunComposition) and isinstance(fb + SO3FunHarmonic(u), SO3FunComposition)
+
+
+def test_rotate_carriesEveryKindOfTerm():
   # a turn of the specimen carries every kind of term with it, so the rotated function takes
   # at q g the value the original takes at g; a triclinic pair, so no group folds the two
   # sides differently
@@ -115,6 +195,9 @@ def test_H5c_sums():
     assert np.allclose(rf(orientation(q * rotation(gs), rf.CS, rf.SS)), f(gs))
     rr = rotate(f, q, "right")
     assert np.allclose(rr(orientation(rotation(gs) * q, rr.CS, rr.SS)), f(gs))
+
+
+def test_S2FunSum_sumsAndDividesItsTerms():
   # on the sphere
   a = S2FunHandle(lambda v: v.z ** 2, bandwidth=16)
   b = S2FunHarmonic(S2DeLaValleePoussinKernel(20))

@@ -3,7 +3,6 @@
 # orientation/variants, the static methods of orientation.m)
 from __future__ import annotations
 
-from math import gcd
 
 import numpy as np
 
@@ -282,35 +281,5 @@ for _f in (copper, copper2, *(globals()[n] for n in STANDARD_EULER), Bain, Kurdj
 del _f
 
 
-def CSL(sigma, cs):
-  """coincidence site lattice misorientations of a cubic lattice, from the definition (Grimmer,
-  Bollmann, Warrington 1974): a rotation whose quaternion has integer components with no
-  common divisor is a CSL misorientation, and Sigma is the sum of their squares with every
-  factor of two divided out; the classes of one Sigma come out in ascending angle"""
-  from .orientation import orientation
-  if sigma < 1 or sigma % 2 == 0:
-    raise ValueError(f"Sigma is an odd positive integer, not {sigma}")
-  if cs.sym.properGroup().numSym() != 24:
-    raise ValueError("the coincidence site lattices are those of a cubic lattice")
-  m = int(np.floor(np.sqrt(4 * sigma)))
-  found = []
-  for a in range(m + 1):
-    for b in range(m + 1):
-      for c in range(b + 1):
-        for d in range(c + 1):
-          n = a * a + b * b + c * c + d * d
-          if n == 0 or gcd(gcd(gcd(a, b), c), d) != 1:
-            continue
-          while n % 2 == 0:
-            n //= 2
-          if n != sigma:
-            continue
-          o = project2FundamentalRegionOrientation(orientation(a, b, c, d, cs, cs, antipodal=True))
-          if not any(f.angle(o) < 1e-8 for f in found):
-            found.append(o)
-  found.sort(key=lambda o: float(o.angle()))
-  return orientation.cat(*found) if found else orientation(cs, cs, antipodal=True)
-
-
 __all__ = ["byMiller", "Bain", "KurdjumovSachs", "NishiyamaWassermann", "Pitsch", "GreningerTrojano", "Bagaryatsky",
-           "Burgers", "PitschSchrader", "Potter", "ShojiNishiyama", "variants", "copper", "copper2", "CSL", "STANDARD_EULER"] + list(STANDARD_EULER)
+           "Burgers", "PitschSchrader", "Potter", "ShojiNishiyama", "variants", "copper", "copper2", "STANDARD_EULER"] + list(STANDARD_EULER)

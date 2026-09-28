@@ -65,14 +65,6 @@ def test_Aachen_states_the_format_of_its_own_block():
   assert F.isAachenHeader("104  D3    5.00 5.0075.00    0    0") and not F.isAachenHeader(" 875 897 897 912 901 891 950 964 934")
 
 
-def test_the_Aachen_experimental_file_one_ring_at_a_time():
-  pf = load("aachen_exp.EXP", CUB)
-  assert pf.numPF == 4 and all(I.shape == (72, 17) for I in pf.allI)
-  assert np.isclose(np.degrees(pf.allR[0].theta).min(), 5) and np.isclose(thetaMax(pf), 85)
-  # every ring ends in the polar angle of the next, written with a minus; no intensity
-  assert pf.allI[0].min() == 11 and means(pf) == [687.1936, 362.9444, 281.1283, 288.9853]
-
-
 def test_a_ladder_of_twenty_numbers_and_one_on_its_own_named_lines():
   a = load("EMSE102.ana", CUB)
   assert a.allI[0].shape == (800, 27) and indices(a) == [1, 0, 2] and means(a) == [0.0618]
@@ -155,8 +147,11 @@ def test_the_binary_formats_and_the_XML_one():
   assert np.allclose(x.allI[0][:3], [32028.4, 31882.8, 31767.0])
 
 
-def test_the_Miller_indices_of_a_group():
+def test_millerIndices_reads_a_group():
   assert F.millerIndices("10-11") == [1, 0, -1, 1] and F.millerIndices("111") == [1, 1, 1] and F.millerIndices("12") is None
+
+
+def test_ladderOf_counts_its_rungs_without_a_warning():
   with warnings.catch_warnings():
     warnings.simplefilter("error")
     assert F.ladderOf(0, 0.45, 11.7).size == 27

@@ -21,115 +21,196 @@ def isotropicStiffness(lam, mu, fr=None):
   return stiffnessTensor(V, fr)
 
 
-def test_T1_construction_classes_and_notation():
+def test_stiffnessTensor_carriesItsRankClassFrameAndUnit():
   cs = crystalFrame("m-3m")
   C = stiffnessTensor(CUBIC, cs)
   assert C.rank == 4 and isinstance(C, stiffnessTensor) and C.frame is cs and C.CS is cs and C.unit == "GPa"
+  assert stiffnessTensor(C.M, cs).isclose(C) and C.shape == () and C.size == 1
+
+
+def test_Voigt_and_Kelvin_roundTripTheCoefficients():
+  cs = crystalFrame("m-3m")
+  C = stiffnessTensor(CUBIC, cs)
   assert np.allclose(Voigt(C), CUBIC)                      # the round trip through the notation
   assert C.M[0, 0, 1, 1] == 134 and C.M[1, 2, 1, 2] == 116   # and the pair index
   assert np.isclose(Kelvin(C)[3, 3], 2 * 116)               # the Kelvin factor is sqrt(2) on each side
   assert stiffnessTensor(Kelvin(C), cs, Kelvin=True).isclose(C)
-  assert stiffnessTensor(C.M, cs).isclose(C) and C.shape == () and C.size == 1
+
+
+def test_Voigt_appliesTheFactorsOfTheClass():
   # the class carries the Voigt factors: a strain has 2 on its shear components, a stress none
   eps = strainTensor([[1.0, 0.2, 0], [0.2, 2, 0], [0, 0, 3]])
   assert np.allclose(Voigt(eps), [1, 2, 3, 0, 0, 0.4]) and eps.doubleConvention
   assert np.allclose(Voigt(stressTensor(eps.M)), [1, 2, 3, 0, 0, 0.2])
   assert eps.frame is specimenFrame.default and eps.isSymmetric and not eps.isSkewSymmetric
+
+
+def test_inv_ofAStiffnessIsACompliance():
   # a compliance is a stiffness inverted, and the class follows with its convention
+  cs = crystalFrame("m-3m")
+  C = stiffnessTensor(CUBIC, cs)
   S = inv(C)
   assert isinstance(S, complianceTensor) and S.doubleConvention and np.allclose(Voigt(S), np.linalg.inv(CUBIC))
   assert inv(S).isclose(C) and isinstance(inv(S), stiffnessTensor)
   assert np.allclose(Voigt(colon(C, S)), Voigt(stiffnessTensor.eye(cs)))
+
+
+def test_tensor_readsItsRankOffTheShapeOrTakesItAsGiven():
   # a plain tensor reads its rank off the shape or takes it as given
   assert tensor(np.ones((3, 3))).rank == 2 and tensor(np.ones((3, 3, 3))).rank == 3 and tensor(np.ones((5, 3, 3)), rank=2).shape == (5,)
   assert tensor(CUBIC, rank=4).rank == 4 and tensor(np.zeros((3, 6)), rank=3).rank == 3 and tensor(5.0, rank=0).rank == 0
   assert tensor(xvector).rank == 1 and tensor(rotation.rand(rng=rng)).rank == 2
   assert tensor(np.ones((2, 4, 3, 3)), rank=2).shape == (2, 4)
+
+
+def test_tensor_takesTheDoubleConventionAsKeywordOrFlag():
   # the plain tensor takes the double convention as a keyword or a flag
   P = np.array([[0, 0, 0, 0.17, 0, 0], [0, 0, 0, 0, 0.17, 0], [0, 0, 0, 0, 0, 5.17]]) * 1e-11
   P0 = tensor(P, rank=3, name="piezoelectric modulus")
   assert P0.rank == 3 and np.allclose(Voigt(P0), P) and np.isclose(P0.M[2, 0, 1], 5.17e-11) and P0.M[2, 0, 1] == P0.M[2, 1, 0]
   assert np.isclose(tensor(P, rank=3, doubleConvention=True).M[2, 0, 1], 5.17e-11 / 2) and tensor(P, "doubleConvention", rank=3).doubleConvention
+
+
+def test_tensor_rejectsWhatDoesNotFit():
   # what does not fit is rejected
+  cs = crystalFrame("m-3m")
   with pytest.raises(ValueError):
     tensor(np.ones((3, 4)), rank=2)
   with pytest.raises(ValueError):
     stiffnessTensor(np.ones((3, 3)), cs)
   with pytest.raises(ValueError):
     strainTensor(np.ones((3, 3)), cs) + strainTensor(np.ones((3, 3)), specimenFrame.default)
+
+
+def test_repr_namesTheNotationAndTheRank():
+  C = stiffnessTensor(CUBIC, crystalFrame("m-3m"))
+  eps = strainTensor([[1.0, 0.2, 0], [0.2, 2, 0], [0, 0, 3]])
   assert "Voigt" in repr(C) and "231" in repr(C) and "rank: 2" in repr(eps)
 
 
-def test_T2_the_Einstein_sum():
+def test_EinsteinSum_contractsArraysThatAreNot3x3():
   # check_EinsteinSum: a contraction over two indices, on arrays that are not 3 x 3
   A, B = rng.random((3, 5, 4)), rng.random((4, 3, 5))
   ref = np.einsum("jkl,lik->ij", A, B)
   assert np.allclose(EinsteinSum(A, [2, -1, -2], B, [-2, 1, -1]).M, ref)
   assert np.allclose(EinsteinSum(A, [1, 2, -1], B, [-1, 3, 4]), np.einsum("abl,lcd->abcd", A, B))   # not 3 x 3: an array
+
+
+def test_EinsteinSum_ofTwoVectorsIsTheOuterOrInnerProduct():
   # the outer product of two vectors
   v, w = vector3d.rand(rng=rng), vector3d.rand(rng=rng)
   assert np.allclose(EinsteinSum(v, [1], w, [2]).M, np.outer(v.data, w.data))
   assert np.allclose(dyad(v, w).M, np.outer(v.data, w.data)) and dyad(v, w).rank == 2
   assert np.allclose(dyad(xvector, 2).M, np.outer(xvector.data, xvector.data))
   assert np.isclose(EinsteinSum(v, [-1], w, [-1]), v.data @ w.data)
+
+
+def test_EinsteinSum_traceOverALabelRepeatedInOneOperand():
   # a label repeated inside one operand is a trace over those indices
   T = rng.random((3, 3, 3, 3))
   assert np.isclose(EinsteinSum(T, [-1, -2, -1, -2]), np.einsum("klkl", T))
   x = vector3d.rand(rng=rng)
   assert np.isclose(EinsteinSum(T, [-1, -2, -3, -3], x, [-1], x, [-2]), np.einsum("klmm,k,l", T, x.data, x.data))
+
+
+def test_EinsteinSum_keepsTheFrameAndDropsTheClass():
   # a tensor operand keeps its frame and loses its class: a contracted stiffness is none
   cs = crystalFrame("m-3m")
   C = isotropicStiffness(60, 40, cs)
   t = EinsteinSum(C, [1, 2, -1, -1])
   assert type(t) is tensor and t.frame is cs and t.rank == 2
+
+
+def test_colon_isTheDoubleContraction():
   # the double contraction, MATLAB's colon, and the products
+  cs = crystalFrame("m-3m")
+  C = isotropicStiffness(60, 40, cs)
   eps = strainTensor(np.diag([1.0, 0, -1]), cs)
   sigma = C * eps
   assert isinstance(sigma, stressTensor) and sigma.isclose(colon(C, eps)) and np.allclose(sigma.M, np.diag([80.0, 0, -80]))
   assert np.isclose(colon(sigma, eps), 160) and np.isclose(EinsteinSum(C, [-1, -2, -3, -4], eps, [-1, -2], eps, [-3, -4]), 160)
+
+
+def test_rankTwoArithmeticIsTheMatrixArithmetic():
   T1, T2 = tensor(rng.standard_normal((3, 3))), tensor(rng.standard_normal((3, 3)))
   assert np.allclose((T1 * T2).M, T1.M @ T2.M) and np.isclose(colon(T1, T2), trace(T1 * T2.T))
   assert np.allclose((T1 * xvector).data, T1.M[:, 0]) and np.isclose(T1.det(), np.linalg.det(T1.M))
   assert np.allclose((T1 + 2 * T2).M, T1.M + 2 * T2.M) and np.allclose((T1 - T2).M, T1.M - T2.M) and np.allclose((T1 / 2).M, T1.M / 2)
+
+
+def test_listsOfTensorsCombineElementwise():
   # lists of tensors combine elementwise over their leading dimensions
+  T1 = tensor(rng.standard_normal((3, 3)))
   Ts = tensor(rng.standard_normal((4, 3, 3)))
   assert (Ts * T1).shape == (4,) and np.allclose((Ts * T1)[2].M, Ts[2].M @ T1.M)
   assert EinsteinSum(Ts, [1, -1], xvector, [-1]).shape == (4,)
+
+
+def test_EinsteinSum_refusesMismatchedContractions():
+  A, B = rng.random((3, 5, 4)), rng.random((4, 3, 5))
+  C = isotropicStiffness(60, 40, crystalFrame("m-3m"))
   with pytest.raises(ValueError):
     EinsteinSum(A, [1, -1, -2], B, [-1, 2, -2])
   with pytest.raises(ValueError):
     C * C
 
 
-def test_T3_the_group_action():
-  cs, ss = crystalFrame("m-3m"), specimenFrame.default
-  C = isotropicStiffness(60, 40, cs)
+def test_rotate_leavesAnIsotropicTensorInvariant():
   # an isotropic tensor is invariant under every rotation
+  C = isotropicStiffness(60, 40, crystalFrame("m-3m"))
   r = rotation.rand(rng=rng)
   assert rotate(C, r).isclose(C, atol=1e-9)
+
+
+def test_rotate_leavesACubicTensorInvariantUnderItsGroupOnly():
   # a cubic one under its own group only, and it says so
+  cs = crystalFrame("m-3m")
+  r = rotation.rand(rng=rng)
   Cc = stiffnessTensor(CUBIC, cs)
   assert checkSymmetry(Cc)
   assert all(rotate(Cc, e).isclose(Cc, atol=1e-9) for e in cs.rotations())
   assert not rotate(Cc, r).isclose(Cc, atol=1e-6)
+
+
+def test_rotate_byANonSymmetryKeepsNoGroup():
   # a tensor turned by anything but an element of its group keeps no group
+  cs = crystalFrame("m-3m")
+  r = rotation.rand(rng=rng)
+  Cc = stiffnessTensor(CUBIC, cs)
   assert rotate(Cc, r).frame is not cs and rotate(Cc, r).frame.numSym() == 1
   assert rotate(Cc, cs.rotations()[1]).frame is cs
+
+
+def test_symmetrise_projectsOntoTheInvariantTensors():
   # symmetrise projects onto the invariant tensors, and what it returns is invariant
-  t = tensor(rng.standard_normal((3, 3)), cs)
+  t = tensor(rng.standard_normal((3, 3)), crystalFrame("m-3m"))
   assert checkSymmetry(symmetrise(t))
   assert np.allclose(symmetrise(t).M, trace(t) / 3 * np.eye(3))       # cubic: a multiple of delta
+
+
+def test_orientationTimesTensor_carriesItIntoTheSpecimenFrame():
   # an orientation carries the tensor into the specimen frame, without its group
+  cs, ss = crystalFrame("m-3m"), specimenFrame.default
+  Cc = stiffnessTensor(CUBIC, cs)
+  r = rotation.rand(rng=rng)
   o = orientation.rand(cs, specimenFrame("222"), rng=rng)
   Cr = o * Cc
   assert Cr.frame is ss and np.isclose(Cr.norm(), Cc.norm()) and rotate(Cc, o).isclose(Cr)
   assert (r * Cc).isclose(rotate(Cc, r))
+
+
+def test_orientationsTimesTensor_giveAnIndexableListAndItsMean():
   # a list of orientations gives a list of tensors, indexable and averaged
+  cs, ss = crystalFrame("m-3m"), specimenFrame.default
+  Cc = stiffnessTensor(CUBIC, cs)
   os = orientation.rand(5, cs, rng=rng)
   Cs = os * Cc
   assert Cs.shape == (5,) and Cs[3].isclose(os[3] * Cc) and isinstance(Cs, stiffnessTensor)
   assert mean(Cs).shape == () and mean(Cs, weights=[1, 0, 0, 0, 0]).isclose(Cs[0])
   assert mean(Cs).isclose(stiffnessTensor(Cs.M.mean(axis=0), ss))
+
+
+def test_transformReferenceFrame_readsTheCoefficientsInAnotherFrame():
   # the same coefficients read in another frame
   a = crystalFrame("2/m", [9.585, 8.776, 5.26], np.array([90, 105.86, 90]) * degree, "X||a*", "Z||c")
   b = crystalFrame("2/m", [9.75, 8.89, 5.25], np.array([90, 106, 90]) * degree, "X||a*", "Z||c")
@@ -140,58 +221,83 @@ def test_T3_the_group_action():
   assert D.frame is b and np.isclose(D.norm(), Cm.norm()) and transformReferenceFrame(D, a).isclose(Cm, atol=1e-9)
   with pytest.raises(ValueError):
     transformReferenceFrame(Cm, crystalFrame("-1", [1, 2, 3], np.array([40, 60, 80]) * degree))
+
+
+def test_directionalMagnitude_atDirectionsAndAsASphericalFunction():
   # the directional magnitude, at directions and as the function on the sphere
+  cs = crystalFrame("m-3m")
+  Cc = stiffnessTensor(CUBIC, cs)
+  Cs = orientation.rand(5, cs, rng=rng) * Cc
   assert np.isclose(directionalMagnitude(Cc, xvector), 231) and np.isclose(directionalMagnitude(Cc, vector3d(1, 1, 1)), 321)
   assert directionalMagnitude(Cc, vector3d.rand(4, rng=rng)).shape == (4,) and directionalMagnitude(Cs, zvector).shape == (5,)
   f = directionalMagnitude(Cc)
   assert f.bandwidth == 4 and f.antipodal and np.isclose(np.real(f(vector3d(1, 1, 1))), 321)
 
 
-def test_T9_factories():
+@pytest.mark.parametrize("K", [stiffnessTensor, complianceTensor])
+def test_rand_givesASymmetricPositiveDefiniteTensorOfItsFrame(K):
   # check_tensorFactories: rand gives a symmetric, positive definite tensor of the right rank
   cs = crystalFrame("m-3m")
-  for K in (stiffnessTensor, complianceTensor):
-    T = K.rand(cs, rng=rng)
-    assert T.rank == 4 and isinstance(T, K) and T.frame is cs
-    assert T.isSymmetric and np.all(T.eigvals() > 0)
-    assert checkSymmetry(T)                              # and it carries the symmetry of its frame
+  T = K.rand(cs, rng=rng)
+  assert T.rank == 4 and isinstance(T, K) and T.frame is cs
+  assert T.isSymmetric and np.all(T.eigvals() > 0)
+  assert checkSymmetry(T)                              # and it carries the symmetry of its frame
+
+
+def test_rand_givesTheRankAndShapeAskedFor():
   assert stressTensor.rand(rng=rng).rank == 2 and stressTensor.rand(rng=rng).isSymmetric
   assert tensor.rand(3, rng=rng).shape == (3,) and tensor.rand(2, 2, rank=4, rng=rng).shape == (2, 2)
+
+
+def test_eyeOnesZerosAndLeviCivita():
   # the identity tensors, ones, zeros and the Levi-Civita symbol
   assert np.allclose(tensor.eye().M, np.eye(3)) and np.allclose(Voigt(stiffnessTensor.eye()), np.diag([1, 1, 1, 0.5, 0.5, 0.5]))
   assert np.allclose(Voigt(tensor.eye(rank=4)), np.diag([1, 1, 1, 0.5, 0.5, 0.5]))
   assert np.all(tensor.ones(rank=2).M == 1) and np.all(tensor.zeros(2, rank=1).M == 0) and tensor.zeros(2, rank=1).shape == (2,)
   L = tensor.leviCivita
   assert L.rank == 3 and L.M[0, 1, 2] == 1 and L.M[1, 0, 2] == -1 and L.M[0, 0, 1] == 0
-  # the mean of a list, weighted or not, and the eigenvectors as axes of the frame
-  ts = tensor(rng.standard_normal((5, 3, 3)), cs)
-  assert mean(ts).isclose(tensor(ts.M.mean(axis=0), cs)) and mean(ts, weights=[1, 0, 0, 0, 0]).isclose(ts[0])
+
+
+def test_eig_givesTheEigenvectorsAsAxes():
+  # the eigenvectors as axes of the frame
   vals, vecs = eig(stressTensor(np.diag([3.0, 1, 2])))
   assert np.allclose(vals, [1, 2, 3]) and vecs.antipodal and np.isclose(abs(vecs[2].data[0]), 1)
-  vals4, _ = eig(stiffnessTensor(CUBIC, cs))
+  vals4, _ = eig(stiffnessTensor(CUBIC, crystalFrame("m-3m")))
   assert np.allclose(np.sort(vals4)[-1], 231 + 2 * 134)
+
+
+def test_stressTensor_uniaxialAlongADirection():
   # a uniaxial stress along a direction, in its frame
   s = stressTensor.uniaxial(zvector)
   assert isinstance(s, stressTensor) and np.allclose(s.M, np.diag([0, 0, 1.0]))
   assert np.allclose(stressTensor.uniaxial(vector3d(1, 1, 0), 2).M, np.array([[1, 1, 0], [1, 1, 0], [0, 0, 0]]))
 
 
-def test_T10_display_componentwise_product_and_vectors():
-  # a single tensor shows its coefficients at every rank, the specimen frame by its convention
+def test_the_display_shows_the_coefficients_at_every_rank():
+  # a single tensor shows its coefficients, the options it carries and the density to MATLAB's five digits
   t0 = repr(tensor(5, rank=0))
   assert "rank: 0" in t0 and t0.rstrip().endswith("5")
   assert repr(tensor([1, 2, 3], rank=1)).split()[-3:] == ["1", "2", "3"]
   d = tensor(np.array([[0, 0, 0, 0.1, 0, 0]] * 3), rank=3, doubleConvention=True, name="piezo")
   assert "doubleConvention: true" in repr(d) and "compact matrix form" in repr(d) and ": piezo" in repr(d) and "  name " in repr(d)
-  # MATLAB's .* multiplies corresponding coefficients and keeps the rank
+  assert "density: 3.3449" in repr(stiffnessTensor(np.eye(6), density=3.3448528380995057))
+
+
+def test_times_multiplies_corresponding_coefficients():
+  # MATLAB's .* keeps the rank and refuses tensors of different ranks
   A, B = tensor.rand(3, rank=2, rng=rng), tensor.rand(3, rank=2, rng=rng)
   assert times(A, B).rank == 2 and np.allclose(times(A, B).M, A.M * B.M)
   with pytest.raises(ValueError):
     times(A, tensor([1, 2, 3], rank=1))
-  # a rank one tensor and a vector convert into each other
+
+
+def test_a_rank_one_tensor_is_a_vector():
   v = vector3d(tensor(xvector))
   assert isinstance(v, vector3d) and np.allclose(v.data, [1, 0, 0])
-  # Hooke's law gives a stress without the density or the unit of the stiffness, as MATLAB's
+
+
+def test_Hookes_law_drops_the_density_and_the_unit():
+  # as MATLAB's: the stress carries neither the density nor the unit of the stiffness
   C = stiffnessTensor(CUBIC, density=3.3)
   sigma = C * strainTensor(np.diag([1.0, 0, -1]))
   assert sigma.density is None and sigma.unit is None
@@ -219,11 +325,6 @@ def test_a_weighted_list_mean_gives_MATLABs_three_outputs():
   assert np.allclose(mean(L, 'Hill', weights=[0.25, 0.75]).M, H.M)
 
 
-def test_the_display_rounds_the_density():
-  # MATLAB's five digits
-  assert "density: 3.3449" in repr(stiffnessTensor(np.eye(6), density=3.3448528380995057))
-
-
 def test_matrix_functions_of_rank_two_and_four():
   A = rng.normal(size=(4, 3, 3))
   T = tensor(A, rank=2)
@@ -242,15 +343,22 @@ def test_matrix_functions_of_rank_two_and_four():
     expm(tensor(np.ones(3), rank=1))
 
 
-def test_svd_and_polar_decomposition():
+def test_svd_givesDescendingSingularValues():
   A = rng.normal(size=(5, 3, 3))
   T = tensor(A, rank=2)
   u, s, v = svd(T)
   assert s.shape == (5, 3) and np.all(np.diff(s, axis=-1) <= 0)
   assert np.allclose(np.einsum("nij,nkj->nki", A, v.data), u.data * s[..., None])
-  R, SL, SR = polar(T)
+
+
+def test_polar_givesARotationAndTwoSymmetricStretches():
+  A = rng.normal(size=(5, 3, 3))
+  R, SL, SR = polar(tensor(A, rank=2))
   assert np.allclose((R * SR).M, A) and np.allclose((SL * R).M, A)
   assert SL.isSymmetric and SR.isSymmetric and np.allclose(R.M @ np.swapaxes(R.M, -1, -2), np.eye(3))
+
+
+def test_svd_ofRankFourTurnsTheCoreBackIntoTheTensor():
   # a rank four tensor: the rotation of its mode singular vectors turns the core back into it
   C = stiffnessTensor(CUBIC, crystalFrame("m-3m"))
   r, core, V = svd(C)

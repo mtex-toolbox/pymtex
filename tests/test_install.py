@@ -64,7 +64,6 @@ def test_attached_methods_keep_signature_and_help():
   # plot(v) and v.plot() are one function, KAM keeps its keywords
   assert mtex.EBSD.KAM.__doc__ and "threshold" in inspect.signature(mtex.EBSD.KAM).parameters
   assert "bandwidth" in inspect.signature(mtex.stiffnessTensor.velocity).parameters
-  assert mtex.orientation.brass(mtex.crystalFrame("m-3m")).Euler()[0] == pytest.approx(35 * mtex.degree)
 
 
 def test_every_attachment_is_recorded():

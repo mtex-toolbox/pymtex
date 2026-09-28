@@ -66,7 +66,8 @@ def test_gridify_refuses_what_it_cannot_grid():
   pos = ebsd.pos.data.copy()
   pos[5] = pos[6] + [0.01, 0, 0]
   twice = EBSD(pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList)
-  assert twice.lattice is None or pytest.raises(ValueError, gridify, twice)
+  with pytest.raises(ValueError):
+    gridify(twice)
 
 
 # the positions of mtexdata('sharp') in small: rows of step 2 along x, each shifted by half a

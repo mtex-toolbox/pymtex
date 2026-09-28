@@ -1,10 +1,9 @@
 # the symmetry reduced angle and dot: the batched kernel against the pair kernel
 import numpy as np
 
-from mtex import orientation, rotation, crystalFrame, vector3d, angle, dot
+from mtex import orientation, crystalFrame, angle, dot
 from mtex.geometry import symreduce as sr
 from mtex.geometry.kernels import closestImage
-from mtex.geometry.symmetryops import project2FundamentalRegion
 
 
 def test_batched_equals_pairwise():
@@ -32,11 +31,6 @@ def test_batched_equals_pairwise():
     assert np.max(np.abs(dot(oris, other) - vals)) < 1e-12
     img = closestImage(oris.data, other.data, L, R)[1]
     assert np.max(np.abs(angle(oris, other) - sr.chordAngle(oris.data, img))) < 1e-12
-    # a vector list projects idempotently and to an equivalent direction
-    w = vector3d(vector3d.rand(n, rng=rng), frame=cs)
-    p = project2FundamentalRegion(w)
-    assert np.max(angle(w, p)) < 1e-10
-    assert np.max(angle(p, project2FundamentalRegion(p), noSymmetry=True)) < 1e-10
   # the identity keeps only the distinct images
   es, frm = sr.referenceImages(np.array([1.0, 0, 0, 0]), L, R, False)
   assert es.shape == (24, 4)

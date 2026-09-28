@@ -19,7 +19,7 @@ def st():
   return s
 
 
-def test_browser(st):
+def test_a_folder_unfolds_and_the_crumbs_reach_the_root(st):
   names = [r.name for r in st.entries]
   assert names[0] == "h5" and st.entries[0].isDir and "martensite_cut.cpr" in names and "martensite_cut.crc" not in names
   cb.toggleFolder(st, 0)
@@ -113,7 +113,7 @@ def test_phase_edits(st):
   assert cb.snapLattice("2/m", [3, 4, 5], [90, 100, 90], "a") == ([3, 4, 5], [90.0, 100.0, 90.0])
 
 
-def test_outputs(st, tmp_path):
+def test_the_script_follows_the_phases_and_is_written(st, tmp_path):
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   text = cb.scriptOf(st)
   assert "EBSD.load(fname)" in text and "csList" not in text
@@ -179,10 +179,11 @@ def test_only_the_latest_import_is_taken():
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"), worker)
   cb.openEntry(st, os.path.join(FIXTURES, "olivine_cut.ang"), worker)
   (loadA, commitA), (loadB, commitB) = jobs
-  commitB(loadB())
+  b = loadB()
+  commitB(b)
   commitA(loadA())
   assert st.status[0] == "loaded" and st.status[1].startswith("olivine_cut.ang") and st.selected.endswith("olivine_cut.ang")
-  assert st.ebsd.size == loadB()[0].size
+  assert st.ebsd is b[0]
 
 
 def test_a_load_is_dropped_when_the_cursor_moves_on():

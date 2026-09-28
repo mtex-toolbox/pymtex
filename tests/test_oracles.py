@@ -1,9 +1,5 @@
-# the Euler conventions and products against SciPy
-#
-# The formulas of S9 and S10 are checked against SciPy without any MTEX class, so they
-# hold before G1; the MTEX objects are compared once they exist.
+# the Euler conventions, matrices, products and angles against SciPy
 import numpy as np
-import pytest
 from numpy import pi
 from scipy.spatial.transform import Rotation as SciRot
 
@@ -22,34 +18,6 @@ def abcd(sci):
 
 def same_rotation(q1, q2, tol=1e-12):
   return np.all(np.abs(np.abs(np.sum(q1 * q2, axis=-1)) - 1) < tol)
-
-
-def matthies_quat(a, b, g):
-  return np.column_stack([np.cos(b / 2) * np.cos((a + g) / 2), -np.sin(b / 2) * np.sin((a - g) / 2),
-                          np.sin(b / 2) * np.cos((a - g) / 2), np.cos(b / 2) * np.sin((a + g) / 2)])
-
-
-def test_S9_formula_is_scipy_intrinsic_ZYZ():
-  q = matthies_quat(*TRIPLES.T)
-  assert same_rotation(q, abcd(SciRot.from_euler("ZYZ", TRIPLES)))
-  assert not same_rotation(q, abcd(SciRot.from_euler("zyz", TRIPLES)))
-
-
-def test_S10_bunge_is_scipy_intrinsic_ZXZ():
-  a, b, g = TRIPLES.T
-  q = matthies_quat(a - pi / 2, b, g + pi / 2)
-  assert same_rotation(q, abcd(SciRot.from_euler("ZXZ", TRIPLES)))
-
-
-def test_S9_formula_is_the_active_product():
-  a, b, g = 0.3, 0.7, 1.1
-  Rz = lambda t: SciRot.from_rotvec([0, 0, t])
-  Ry = lambda t: SciRot.from_rotvec([0, t, 0])
-  q = matthies_quat(np.array([a]), np.array([b]), np.array([g]))
-  assert same_rotation(q, abcd(Rz(a) * Ry(b) * Rz(g)))
-
-
-# ------------------------------------------------------------------ against the MTEX objects
 
 
 def test_euler_against_scipy():

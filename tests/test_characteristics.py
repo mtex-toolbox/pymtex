@@ -1,5 +1,7 @@
 # the texture characteristics (docs/plans/functions.md F6: C1 to C7, check_calcComponents,
 # check_axisDistribution, and the definitions checked on functions with known answers)
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from numpy import pi
@@ -13,62 +15,116 @@ from mtex import (S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, 
 rng = np.random.default_rng(71)
 
 
-def test_C1_scalars():
+# a cubic unimodal ODF of halfwidth 15 degree, as kernel form and harmonic
+@pytest.fixture(scope="module")
+def cubic15():
   cs, ss = crystalFrame("m-3m"), specimenFrame("1")
-  u = uniformODF(cs, ss)
-  assert np.isclose(textureindex(u), 1) and abs(entropy(u)) < 1e-10
   odf = unimodalODF(orientation(rotation.rand(rng=rng), cs, ss), halfwidth=15 * degree)
-  H = SO3FunHarmonic(odf)
+  return SimpleNamespace(cs=cs, ss=ss, u=uniformODF(cs, ss), odf=odf, H=SO3FunHarmonic(odf))
+
+
+def test_textureindex_ofTheUniformODFIsOneItsEntropyZero(cubic15):
+  u = cubic15.u
+  assert np.isclose(textureindex(u), 1) and abs(entropy(u)) < 1e-10
+
+
+def test_textureindex_isTheSquaredNorm(cubic15):
+  H, odf = cubic15.H, cubic15.odf
   assert np.isclose(textureindex(H), norm(H) ** 2) and np.isclose(textureindex(odf), textureindex(H), rtol=1e-6)
+
+
+def test_entropy_ofADensityIsNegativeAndMinusTheIntegralOfFLogF(cubic15):
   # the entropy of a density is at most zero, and -int f log f by an independent rule
+  cs, ss, H = cubic15.cs, cubic15.ss, cubic15.H
   e = entropy(H)
   assert e < 0
   g = quadratureSO3Grid(bandwidthFor(80, cs, ss), cs, ss)
   v = H(g.nodes())
   assert np.isclose(e, -np.sum(g.weights * np.where(v > 0, v * np.log(np.where(v > 0, v, 1)), 0)), rtol=1e-3)
-  assert np.isclose(entropy(odf), e, rtol=1e-2) and np.isclose(H.entropy(), e)
-  # the volume of a ball around the mode of a sharp unimodal ODF is nearly one, of the
-  # uniform ODF the share of the ball
-  c = orientation(rotation.rand(rng=rng), cs, ss)
+  assert np.isclose(entropy(cubic15.odf), e, rtol=1e-2) and np.isclose(H.entropy(), e)
+
+
+def test_volume_ofABallAroundTheModeOfASharpODFIsNearlyOne(cubic15):
+  c = orientation(rotation.rand(rng=rng), cubic15.cs, cubic15.ss)
   sharp = unimodalODF(c, halfwidth=5 * degree)
   assert 0.95 < volume(sharp, c, 20 * degree) <= 1
+
+
+def test_volume_ofTheUniformODFIsTheShareOfTheBall(cubic15):
+  c = orientation(rotation.rand(rng=rng), cubic15.cs, cubic15.ss)
+  u = cubic15.u
   assert np.isclose(volume(u, c, 10 * degree), 24 * (10 * degree - np.sin(10 * degree)) / pi, rtol=1e-2)
   assert volume(u, c, 60 * degree) == 1
-  # the fibre volume of a fibre ODF around its own fibre
-  h, r = Miller(1, 1, 1, cs), vector3d.rand(rng=rng)
-  fodf = fibreODF(h, r, ss, halfwidth=5 * degree)
-  assert fibreVolume(fodf, h, r, 15 * degree) > 0.9
-  assert np.isclose(fibreVolume(u, h, r, 10 * degree), min(1, 8 * (1 - np.cos(10 * degree)) / 2), rtol=5e-2)
+
+
+def test_fibreVolume_ofAFibreODFAroundItsOwnFibreIsNearlyOne(cubic15):
+  h, r = Miller(1, 1, 1, cubic15.cs), vector3d.rand(rng=rng)
+  fodf = fibreODF(h, r, cubic15.ss, halfwidth=5 * degree)
+  assert fibreVolume(fodf, h, r, 15 * degree, resolution=2 * degree) > 0.9
+
+
+def test_fibreVolume_ofTheUniformODFIsTheShareOfTheTube(cubic15):
+  h, r = Miller(1, 1, 1, cubic15.cs), vector3d.rand(rng=rng)
+  assert np.isclose(fibreVolume(cubic15.u, h, r, 10 * degree), min(1, 8 * (1 - np.cos(10 * degree)) / 2), rtol=5e-2)
+
+
+def test_textureindex_onTheSphereIsTheSquaredNormAndTheEntropyNegative():
   s = S2FunHarmonic(S2DeLaValleePoussinKernel(halfwidth=20 * degree))
   assert np.isclose(textureindex(s), norm(s) ** 2) and entropy(s) < 0
+
+
+def test_entropy_ofTheUniformSphericalFunctionIsZero():
   assert abs(entropy(S2FunHarmonic([np.sqrt(4 * pi)]))) < 1e-10
 
 
-def test_C2_extrema():
+# two modes of weight 0.7 and 0.3 in 432
+@pytest.fixture(scope="module")
+def bimodal():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   c1, c2 = orientation(rotation.rand(rng=rng), cs, ss), orientation(rotation.rand(rng=rng), cs, ss)
   odf = 0.7 * unimodalODF(c1, halfwidth=8 * degree) + 0.3 * unimodalODF(c2, halfwidth=8 * degree)
-  # one maximum is a value and an orientation
+  return SimpleNamespace(c1=c1, c2=c2, odf=odf)
+
+
+def test_max_isOneValueAndOneOrientationAtTheHigherMode(bimodal):
+  odf, c1 = bimodal.odf, bimodal.c1
   v, o = max(odf)
   assert isinstance(v, float) and isinstance(o, orientation)
   assert angle(o, c1) < 0.5 * degree and np.isclose(v, odf(c1), rtol=1e-3)
   assert odf.max()[0] == v
-  # several are arrays, the highest first
-  v2, o2 = max(odf, numLocal=2)
-  assert len(v2) == 2 and v2[0] >= v2[1] and angle(o2[1], c2) < 0.5 * degree
-  H = SO3FunHarmonic(odf)
+
+
+def test_max_numLocalGivesArraysHighestFirst(bimodal):
+  v2, o2 = max(bimodal.odf, numLocal=2)
+  assert len(v2) == 2 and v2[0] >= v2[1] and angle(o2[1], bimodal.c2) < 0.5 * degree
+
+
+def test_max_ofTheHarmonicFormFindsTheSameMode(bimodal):
+  v, _ = max(bimodal.odf)
+  H = SO3FunHarmonic(bimodal.odf)
   vh, oh = max(H)
-  assert angle(oh, c1) < 0.5 * degree and np.isclose(vh, H(oh), rtol=1e-6) and np.isclose(vh, v, rtol=5e-2)
-  vm, om = min(odf)
-  assert vm < 1e-3 and np.isclose(vm, odf(om))
-  # on the sphere
+  assert angle(oh, bimodal.c1) < 0.5 * degree and np.isclose(vh, H(oh), rtol=1e-6) and np.isclose(vh, v, rtol=5e-2)
+
+
+def test_min_isAValueAndItsOrientation(bimodal):
+  vm, om = min(bimodal.odf)
+  assert vm < 1e-3 and np.isclose(vm, bimodal.odf(om))
+
+
+def test_max_onTheSphereFindsTheBinghamMode():
   s = S2FunHarmonic(rotate(S2FunBingham([-10.0, -4.0, 0.0]), rotation.byAxisAngle(yvector, 0.4)), bandwidth=30)
   vs, ps = max(s)
   assert angle(ps, rotation.byAxisAngle(yvector, 0.4) * zvector) < 0.3 * degree and np.isclose(vs, s(ps), rtol=1e-5)
+
+
+def test_max_ofASymmetricSphericalFunctionIsInItsFrame():
   cs6 = crystalFrame("6/mmm")
   sf = S2FunHarmonic(S2DeLaValleePoussinKernel(halfwidth=20 * degree), cs6)
   vf, pf = max(sf)
   assert pf.frame is cs6 and abs(vector3d(pf.data).dot(zvector)) > np.cos(0.3 * degree)
+
+
+def test_max_numLocalOfASymmetricFunctionGivesDistinctOrbits():
   # several maxima of a symmetric function are distinct orbits, not copies of one mode
   cs = crystalFrame("m-3m")
   adf = S2FunHarmonic(S2FunHandle(calcAxisDistribution(cs), cs, bandwidth=64, antipodal=True))
@@ -78,6 +134,9 @@ def test_C2_extrema():
     for j in range(i + 1, 2):
       assert angle(pa[i], pa[j]) > 2 * degree
   assert np.isclose(va[0], np.max(np.real(adf(equispacedS2Grid(resolution=0.5 * degree)))), rtol=1e-3)
+
+
+def test_max_andMin_ofPlainNumbersAreThoseOfPython():
   assert max([3, 1, 2]) == 3 and min(4, 2) == 2
 
 
@@ -122,26 +181,45 @@ def test_grid_basins_climb_to_peaks():
   assert np.argmax(v) in top
 
 
-def test_C3_components():
+# two cubic modes of weight 0.6 and 0.4 at known centres
+def _cubicModes(halfwidth):
   cs = crystalFrame("m-3m")
   c1, c2 = orientation(rotation.byEuler(0, 0, 0, "Bunge"), cs), orientation(rotation.byEuler(30 * degree, 40 * degree, 50 * degree, "Bunge"), cs)
-  odf = 0.6 * unimodalODF(c1, halfwidth=6 * degree) + 0.4 * unimodalODF(c2, halfwidth=6 * degree)
-  # seeded, with a radius
-  seed = orientation(rotation.rand(20, rng=rng), cs, c1.SS)
-  modes, weights, centerId = calcComponents(odf, seed=seed, radius=5 * degree, exact=True)
+  odf = 0.6 * unimodalODF(c1, halfwidth=halfwidth) + 0.4 * unimodalODF(c2, halfwidth=halfwidth)
+  return SimpleNamespace(cs=cs, c1=c1, c2=c2, odf=odf)
+
+
+def test_calcComponents_seededGivesOneCentreIdPerSeed():
+  t = _cubicModes(6 * degree)
+  seed = orientation(rotation.rand(20, rng=rng), t.cs, t.c1.SS)
+  modes, weights, centerId = calcComponents(t.odf, seed=seed, radius=5 * degree, exact=True)
   assert len(weights) == modes.size and np.all((0 <= centerId) & (centerId < modes.size)) and len(centerId) == seed.size
-  tm, tw, _ = calcComponents(odf, seed=seed, radius=1e-4 * degree, exact=True)
+
+
+def test_calcComponents_ofATinyRadiusCarryNoWeight():
+  t = _cubicModes(6 * degree)
+  seed = orientation(rotation.rand(20, rng=rng), t.cs, t.c1.SS)
+  tm, tw, _ = calcComponents(t.odf, seed=seed, radius=1e-4 * degree, exact=True)
   assert len(tw) == tm.size and np.sum(tw) < 1e-4
-  # the weights sum to one over the full radius
-  assert abs(np.sum(calcComponents(odf, radius=pi, exact=True)[1]) - 1) < 1e-10
-  # the known components: two modes at the centres with weights 0.6 and 0.4
-  odf7 = 0.6 * unimodalODF(c1, halfwidth=7 * degree) + 0.4 * unimodalODF(c2, halfwidth=7 * degree)
-  modes, weights, centerId = calcComponents(odf7)
+
+
+def test_calcComponents_weightsSumToOneOverTheFullRadius():
+  t = _cubicModes(6 * degree)
+  assert abs(np.sum(calcComponents(t.odf, radius=pi, exact=True)[1]) - 1) < 1e-10
+
+
+def test_calcComponents_findsTheKnownModesAndWeights():
+  # two modes at the centres with weights 0.6 and 0.4
+  t = _cubicModes(7 * degree)
+  modes, weights, centerId = calcComponents(t.odf)
   assert modes.size == 2
-  assert np.min(angle(modes, c1)) < 1 * degree and np.min(angle(modes, c2)) < 1 * degree
+  assert np.min(angle(modes, t.c1)) < 1 * degree and np.min(angle(modes, t.c2)) < 1 * degree
   assert np.max(np.abs(np.sort(weights)[::-1] - [0.6, 0.4])) < 0.02 and np.all(centerId >= 0)
-  # the centres of a radial basis function are its own seeds
-  rb = unimodalODF(orientation(rotation.cat(rotation(c1), rotation(c2)), cs), halfwidth=7 * degree, weights=[0.6, 0.4])
+
+
+def test_calcComponents_ofARadialBasisFunctionAreItsOwnCentres():
+  t = _cubicModes(7 * degree)
+  rb = unimodalODF(orientation(rotation.cat(rotation(t.c1), rotation(t.c2)), t.cs), halfwidth=7 * degree, weights=[0.6, 0.4])
   om, ow, _ = rb.calcComponents()
   assert om.size == 2 and np.max(np.abs(np.sort(ow)[::-1] - [0.6, 0.4])) < 0.02
 
@@ -157,101 +235,179 @@ def test_components_freeze_light_seeds_on_flat_stretches():
   assert len(w) == 2 and np.max(np.abs(w - we[:2])) < 0.005
 
 
-def test_C4_misorientations():
+def test_calcAngleDistribution_ofTwoSymmetriesHasMeanOne():
   cs = crystalFrame("mmm")
-  # the uniform angle distribution has mean one; Mackenzie's mean angle of the cubic one; the
-  # uniform ODF gives the same, a list of random misorientations a histogram of it in percent
   p, omega = calcAngleDistribution(cs, cs)
   assert np.isclose(np.mean(p), 1)
+
+
+def test_calcAngleDistribution_ofCubicSymmetryIsMackenzies():
+  # Mackenzie's maximum and mean angle of the cubic one
   pc, oc = calcAngleDistribution(crystalFrame("m-3m"), crystalFrame("m-3m"))
   assert np.isclose(oc[-1], 62.8 * degree, atol=0.01 * degree)
   assert np.isclose(np.sum(oc * pc) / np.sum(pc), 40.73 * degree, rtol=1e-2)
+
+
+def test_calcAngleDistribution_ofTheUniformODFIsTheUniformOne():
+  cs = crystalFrame("mmm")
+  p, omega = calcAngleDistribution(cs, cs)
   pf, of = calcAngleDistribution(uniformODF(cs, cs), resolution=2 * degree)
   assert np.allclose(of, omega) and np.mean(np.abs(pf - p)) < 0.01
+
+
+def test_calcAngleDistribution_ofRandomMisorientationsIsAHistogramInPercent():
+  cs = crystalFrame("mmm")
+  p, omega = calcAngleDistribution(cs, cs)
   h, mid = calcAngleDistribution(orientation.rand(20000, cs, cs, rng=rng))
   assert np.isclose(np.sum(h), 100) and np.mean(np.abs(h / 100 * len(h) - np.interp(mid, omega, p))) < 0.1
-  # the MDF of the uniform ODF is uniform, its M-index zero
-  assert calcMIndex(uniformODF(cs), resolution=2 * degree) < 2e-2
+
+
+def test_calcMIndex_ofTheUniformODFIsZero():
+  assert calcMIndex(uniformODF(crystalFrame("mmm")), resolution=2 * degree) < 2e-2
+
+
+def test_calcMDF_ofTheUniformODFIsUniform():
+  cs = crystalFrame("mmm")
   m = calcMDF(uniformODF(cs))
   assert m.antipodal and np.isclose(mean(m), 1) and m.CS is cs and m.SS is cs
   assert np.max(np.abs(m(rotation.rand(20, rng=rng)) - 1)) < 1e-6
-  # the MDF of a sharp unimodal ODF concentrates at the identity: a large M-index
-  odf = unimodalODF(orientation(rotation.rand(rng=rng), cs), halfwidth=5 * degree)
+
+
+def test_calcMDF_ofASharpODFConcentratesAtTheIdentity():
+  # a large M-index
+  odf = unimodalODF(orientation(rotation.rand(rng=rng), crystalFrame("mmm")), halfwidth=5 * degree)
   assert calcMIndex(odf, resolution=2 * degree) > 0.5
   m2 = calcMDF(odf, odf)
   assert m2(rotation.id) > 10 * m2(rotation.rand(rng=rng))
-  # two different ODFs give a misorientation distribution between the crystal frames
-  cs2 = crystalFrame("4/mmm")
+
+
+def test_calcMDF_ofTwoODFsLivesBetweenTheirCrystalFrames():
+  cs, cs2 = crystalFrame("mmm"), crystalFrame("4/mmm")
+  odf = unimodalODF(orientation(rotation.rand(rng=rng), cs), halfwidth=5 * degree)
   odf2 = unimodalODF(orientation(rotation.rand(rng=rng), cs2), halfwidth=15 * degree)
   m12 = calcMDF(odf, odf2)
   assert m12.CS is cs2 and m12.SS is cs and not m12.antipodal and np.isclose(mean(m12), 1)
 
 
-def test_C5_axis_distribution():
+# an orthorhombic misorientation ODF, part uniform, and its axis distribution over all angles
+@pytest.fixture(scope="module")
+def axes():
   cs = crystalFrame("mmm")
   h = vector3d(equispacedS2Grid(resolution=20 * degree, antipodal=True).data)
   odf = 0.4 * uniformODF(cs, cs, antipodal=True) + 0.6 * unimodalODF(orientation(rotation.byEuler(20 * degree, 30 * degree, 10 * degree, "Bunge"), cs, cs, antipodal=True), halfwidth=15 * degree)
-  whole = calcAxisDistribution(odf, h, resolution=2 * degree)
-  assert np.array_equal(whole, calcAxisDistribution(odf, h, resolution=2 * degree, minAngle=0, maxAngle=np.inf))
+  return SimpleNamespace(cs=cs, h=h, odf=odf, whole=calcAxisDistribution(odf, h, resolution=2 * degree))
+
+
+def test_calcAxisDistribution_defaultWindowIsAllAngles(axes):
+  assert np.array_equal(axes.whole, calcAxisDistribution(axes.odf, axes.h, resolution=2 * degree, minAngle=0, maxAngle=np.inf))
+
+
+def test_calcAxisDistribution_twoWindowsSplitTheWhole(axes):
+  odf, h, whole = axes.odf, axes.h, axes.whole
   lower = calcAxisDistribution(odf, h, resolution=2 * degree, maxAngle=60 * degree)
   upper = calcAxisDistribution(odf, h, resolution=2 * degree, minAngle=60 * degree)
   assert np.max(np.abs(lower + upper - whole)) / np.max(whole) < 5e-3
   tol = 1e-3 * np.max(whole)
   assert np.all(lower <= whole + tol) and np.all(upper <= whole + tol) and np.any(lower > tol) and np.any(upper > tol)
+
+
+def test_calcAxisDistribution_ofTheUniformODFAgreesWithAFineRule(axes):
   # the uniform ODF against the integral of the uniform density on a fine rule
-  u = uniformODF(cs, cs, antipodal=True)
+  h = axes.h
+  u = uniformODF(axes.cs, axes.cs, antipodal=True)
   fine = calcAxisDistribution(u, h, resolution=0.5 * degree)
   coarse = calcAxisDistribution(u, h, resolution=2 * degree)
   assert np.max(np.abs(coarse - fine)) / np.max(fine) < 3e-2
   win = calcAxisDistribution(u, h, resolution=2 * degree, minAngle=20 * degree, maxAngle=40 * degree)
   winf = calcAxisDistribution(u, h, resolution=0.5 * degree, minAngle=20 * degree, maxAngle=40 * degree)
   assert np.max(np.abs(win - winf)) / np.max(winf) < 3e-2
-  # the inverted window is empty
-  assert np.max(np.abs(calcAxisDistribution(odf, h, resolution=2 * degree, minAngle=40 * degree, maxAngle=20 * degree))) < 1e-10
-  # the axis distribution is a spherical function of mean one in the crystal frame
+
+
+def test_calcAxisDistribution_ofAnInvertedWindowIsEmpty(axes):
+  assert np.max(np.abs(calcAxisDistribution(axes.odf, axes.h, resolution=2 * degree, minAngle=40 * degree, maxAngle=20 * degree))) < 1e-10
+
+
+def test_calcAxisDistribution_isASphericalFunctionOfMeanOneInTheCrystalFrame(axes):
+  u = uniformODF(axes.cs, axes.cs, antipodal=True)
   adf = calcAxisDistribution(u, resolution=2.5 * degree, bandwidth=32)
-  assert adf.frame is cs and adf.antipodal and np.isclose(mean(adf), 1, rtol=2e-2)
+  assert adf.frame is axes.cs and adf.antipodal and np.isclose(mean(adf), 1, rtol=2e-2)
 
 
-def test_C6_sampling():
+# a 432 unimodal ODF of halfwidth 10 degree and 2000 orientations drawn from it
+@pytest.fixture(scope="module")
+def sampled():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   c = orientation(rotation.rand(rng=rng), cs, ss)
   odf = unimodalODF(c, halfwidth=10 * degree)
   o = discreteSample(odf, 2000, rng=rng)
-  assert isinstance(o, orientation) and o.size == 2000 and o.CS is cs
-  # the share of samples near the centre is the volume there, and the density estimated
-  # with the same kernel is the ODF convolved with it
-  share = volume(odf, c, 20 * degree)
-  assert abs(volume(o, c, 20 * degree) - share) < 0.05
-  est = calcDensity(o, halfwidth=10 * degree)
-  assert np.isclose(est(c), conv(odf, SO3DeLaValleePoussinKernel(halfwidth=10 * degree))(c), rtol=0.15)
-  # a composition of kernel forms and a harmonic function are sampled too
-  mix = 0.5 * odf + 0.5 * uniformODF(cs, ss)
+  return SimpleNamespace(cs=cs, ss=ss, c=c, odf=odf, o=o, share=volume(odf, c, 20 * degree))
+
+
+def test_discreteSample_ofAnODFIsOrientationsInItsFrame(sampled):
+  o = sampled.o
+  assert isinstance(o, orientation) and o.size == 2000 and o.CS is sampled.cs
+
+
+def test_discreteSample_shareNearTheCentreIsTheVolumeThere(sampled):
+  assert abs(volume(sampled.o, sampled.c, 20 * degree) - sampled.share) < 0.05
+
+
+def test_calcDensity_withTheSameKernelIsTheODFConvolvedWithIt(sampled):
+  c = sampled.c
+  est = calcDensity(sampled.o, halfwidth=10 * degree)
+  assert np.isclose(est(c), conv(sampled.odf, SO3DeLaValleePoussinKernel(halfwidth=10 * degree))(c), rtol=0.15)
+
+
+def test_discreteSample_ofACompositionOfKernelForms(sampled):
+  mix = 0.5 * sampled.odf + 0.5 * uniformODF(sampled.cs, sampled.ss)
   om = discreteSample(mix, 1000, rng=rng)
-  assert om.size == 1000 and abs(volume(om, c, 20 * degree) - 0.5 * share) < 0.06
-  oh = discreteSample(SO3FunHarmonic(odf), 1000, rng=rng, resolution=3 * degree)
-  assert abs(volume(oh, c, 20 * degree) - share) < 0.06
+  assert om.size == 1000 and abs(volume(om, sampled.c, 20 * degree) - 0.5 * sampled.share) < 0.06
+
+
+def test_discreteSample_ofAHarmonicFunction(sampled):
+  oh = discreteSample(SO3FunHarmonic(sampled.odf), 1000, rng=rng, resolution=3 * degree)
+  assert abs(volume(oh, sampled.c, 20 * degree) - sampled.share) < 0.06
+
+
+def test_discreteSample_onTheSphere():
   s = S2FunHarmonic(S2DeLaValleePoussinKernel(halfwidth=10 * degree))
   d = discreteSample(s, 1000, rng=rng)
   assert d.size == 1000 and np.count_nonzero(d.angle(zvector) < 20 * degree) > 900
   assert discreteSample(S2FunHarmonic(s, antipodal=True), 5, rng=rng).antipodal
-  # a symmetric density is sampled over the whole sphere, the sector nodes spread by the group
+
+
+def test_discreteSample_ofASymmetricDensityCoversTheWholeSphere():
+  # the sector nodes spread by the group
   adf = calcAxisDistribution(crystalFrame("m-3m"))
   da = discreteSample(adf, 4000, rng=rng)
   assert da.antipodal and np.count_nonzero(da.z < 0) > 100 and np.mean(np.real(adf(da))) > 1.05
 
 
-def test_C7_kernel_selection_and_specimen_centering():
+# 2000 orientations of a trigonal texture, half uniform
+@pytest.fixture(scope="module")
+def trigonalSample():
   cs = crystalFrame("321")
   model = 0.5 * uniformODF(cs) + 0.5 * unimodalODF(orientation(rotation.byEuler(35 * degree, 45 * degree, 0.0, "Bunge"), cs), halfwidth=10 * degree)
-  ori = discreteSample(model, 2000, rng=rng)
+  return SimpleNamespace(model=model, ori=discreteSample(model, 2000, rng=rng))
+
+
+def test_calcKernel_everyRuleGivesAUsableWidthTheCrossValidationTheNarrowest(trigonalSample):
+  ori = trigonalSample.ori
   hw = {m: calcKernel(ori, m, rng=rng).halfwidth() / degree for m in ("klcv", "ruleOfThumb", "magicRule")}
-  # every rule gives a usable width, the cross validation the narrowest
   assert all(2 <= v <= 40 for v in hw.values()) and hw["klcv"] <= hw["magicRule"]
-  assert calcError(calcDensity(ori, kernel=calcKernel(ori, rng=rng)), model) < 0.25
+
+
+def test_calcKernel_defaultGivesADensityCloseToTheModel(trigonalSample):
+  ori = trigonalSample.ori
+  assert calcError(calcDensity(ori, kernel=calcKernel(ori, rng=rng)), trigonalSample.model) < 0.25
+
+
+def test_calcKernel_rejectsAnUnknownRule(trigonalSample):
   with pytest.raises(ValueError):
-    calcKernel(ori, "nothing")
-  # an orthotropic texture mounted askew comes back
+    calcKernel(trigonalSample.ori, "nothing")
+
+
+def test_centerSpecimen_bringsBackAnOrthotropicTextureMountedAskew():
   cubic, ss = crystalFrame("m-3m"), specimenFrame("222")
   odf = unimodalODF(orientation(rotation.byEuler(np.array([135, 60]) * degree, np.array([45, 54.73]) * degree, np.array([120, 45]) * degree, "Bunge"), cubic, ss), halfwidth=12 * degree)
   mount = rotation.byEuler(15 * degree, 12 * degree, -5 * degree, "Bunge")

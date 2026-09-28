@@ -1,14 +1,11 @@
 # grain3d: the polyhedra of a volume, their measures, selections, rotation and neighbours,
 # against MATLAB master (bench/matlab/probe_grain3d.m)
-import os
 
 import numpy as np
-import pytest
 from scipy.sparse import csr_matrix
 
-from mtex import EBSD3, EBSD3square, calcGrains, crystalFrame, degree, grain3Boundary, grain3d, phaseList, rotation, vector3d
+from mtex import EBSD3square, calcGrains, crystalFrame, degree, grain3Boundary, grain3d, phaseList, rotation, vector3d
 
-DREAM3D = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data", "EBSD", "SmallIN100_MeshStats.dream3d")
 
 
 def grains():
@@ -44,12 +41,16 @@ def test_the_measures_of_two_boxes():
   assert "grain3d" in repr(g)
 
 
-def test_selections_and_rotation():
+def test_a_selection_keeps_its_faces_and_its_outer_neighbours():
   g = grains()
   one = g[1]
   assert list(one.id) == [2] and np.allclose(one.volume, 4) and len(one.boundary) == 32
   assert list(g["id", 2].id) == [2] and len(g["Iron"]) == 2 and len(g[g.numPixel > 5]) == 1
   assert one.neighbors().shape == (0, 2) and one.neighbors(full=True).tolist() == [[1, 2]]
+
+
+def test_rotate_turns_the_positions_and_the_orientations():
+  g = grains()
   r = g.rotate(rotation.byAxisAngle(vector3d(0, 0, 1), 90 * degree))
   assert np.allclose(r.volume, g.volume) and np.allclose(r.centroid.data[1], [-0.5, 2, 0.5])
   # the orientations turn with the grains, 90 degree about z being a symmetry of m-3m
@@ -71,9 +72,8 @@ def test_a_polygonal_grain():
   assert t.boundary.isTriangulated and len(t.boundary) == 12 and np.allclose(t.volume, 1) and np.all(t.boundary.id <= 6)
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_as_MATLAB_measures_it():
-  g = calcGrains(EBSD3.load(DREAM3D), angle=10 * degree)
+def test_IN100_as_MATLAB_measures_it(in100):
+  g = in100[1]
   assert np.allclose(g.diameter[:5], [0.4330127, 0.61237244, 0.4330127, 1.1726039, 1.9202864])
   a, b, c = g.principalComponents()
   assert np.allclose(a.norm()[:5], [0.15508762, 0.31017525, 0.15508762, 0.47510537, 0.75848807])

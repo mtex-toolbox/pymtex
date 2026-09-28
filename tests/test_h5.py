@@ -39,17 +39,28 @@ def test_edax_oh5():
   assert e.lattice.shape == "square" and e.dPos == 4.0
   assert set(e.prop) >= {"ci", "iq", "fit", "semsignal"}
   assert e.meta["header"]["Grid Type"] == "SqrGrid" and e.meta["header"]["nColumns"] == 305
+
+
+def test_edax_oh5_counts_a_single_phase_written_as_zero_from_zero():
+  e = loadEBSD(fixture("kamila_cut.oh5"))
   # one phase written as zero throughout is counted from zero, as in an .ang
   assert e.meta["h5"]["phase"]["shift"] == 1 and len(e.meta["h5"]["euler"]["paths"]) == 3
+
+
+def test_edax_oh5_takes_the_alignment_the_file_states():
+  e = loadEBSD(fixture("kamila_cut.oh5"))
   # X||a, the EDAX alignment the file states as "a || x, c* || z"
   assert abs(vector3d(e.CS.axes[0]).angle(mtex.xvector)) < 1e-12
 
 
-def test_edax_h5_hexagonal_with_unplaced_pixels():
+def test_edax_h5_list_with_unplaced_pixels():
   e = loadEBSD(fixture("edax_cut.h5"), noGrid=True)
   assert len(e) == 547 and e.meta["unplaced"] == 1
   assert counts(e) == [0, 547] and e.CS.pointGroup == "mmm"
   assert np.allclose(firstEuler(e)[1], [304.96433441, 57.7159131, 100.76364115], atol=1e-6)
+
+
+def test_edax_h5_grids_on_a_hexagonal_lattice():
   g = loadEBSD(fixture("edax_cut.h5"))
   assert g.shape == (2, 274) and g.lattice.shape == "hex"
 
@@ -60,13 +71,17 @@ def test_edaxh5_table_of_matrices():
   assert counts(e) == [0, 610]
   assert np.allclose(firstEuler(e)[1], [114.06853843, 175.36763636, 71.61957914], atol=1e-6)
   assert set(e.prop) >= {"ci", "iq", "fit", "custom"}
+
+
+def test_edaxh5_is_the_same_map_as_the_oh5():
+  e = loadEBSD(fixture("kamila_cut.edaxh5"))
   # the same map as the .oh5, pixel for pixel
   o = loadEBSD(fixture("kamila_cut.oh5"))
   assert mtex.angle(e.rotations.flatten()[:50], o.rotations.flatten()[:50]).max() < 1e-6
   assert np.array_equal(e.pos.data, o.pos.data)
 
 
-def test_oxford_h5oina_and_its_two_data_sets():
+def test_oxford_h5oina_reads_its_processed_data_set():
   e = loadEBSD(fixture("oli_cut.h5oina"))
   assert e.shape == (2, 186) and e.meta["vendor"] == "Oxford"
   assert e.meta["dataSets"] == ["/1/Data Processing", "/1/EBSD"] and e.meta["dataSet"] == "/1/Data Processing"
@@ -74,23 +89,33 @@ def test_oxford_h5oina_and_its_two_data_sets():
   assert np.allclose(firstEuler(e)[1], [299.86639619, 33.54831484, 155.24092444], atol=1e-6)
   assert e.meta["surface"] == (0.0, 0.0, 0.0)
   assert set(e.prop) == {"bands", "error", "meanangulardeviation"}
+
+
+def test_oxford_h5oina_data_set_is_chosen_by_name_or_number():
   raw = loadEBSD(fixture("oli_cut.h5oina"), dataSet="EBSD", noGrid=True)
   assert raw.meta["dataSet"] == "/1/EBSD" and len(raw) == 372
   byNumber = loadEBSD(fixture("oli_cut.h5oina"), dataSet=1, noGrid=True)
   assert byNumber.meta["dataSet"] == "/1/EBSD"
+
+
+def test_oxford_h5oina_an_unknown_data_set_is_an_error():
   with pytest.raises(ValueError, match="numbered 0 to 1"):
     loadEBSD(fixture("oli_cut.h5oina"), dataSet=2)
   with pytest.raises(ValueError, match="no data set"):
     loadEBSD(fixture("oli_cut.h5oina"), dataSet="Mars")
 
 
-def test_oxford_h5_with_eds_properties():
+def test_oxford_h5():
   e = loadEBSD(fixture("oxford_cut.h5"))
   assert e.shape == (2, 430)
   assert counts(e) == [61, 2, 796, 1]
   assert e.CSList.mineralList == ["notIndexed", "CoCr", "Co", "Cr"]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["4/mmm", "m-3m", "m-3m"]
   assert np.allclose(firstEuler(e)[1], [61.81563989, 46.57337631, 35.5493861], atol=1e-6)
+
+
+def test_oxford_h5_keeps_the_eds_columns_but_not_the_positions_as_properties():
+  e = loadEBSD(fixture("oxford_cut.h5"))
   assert "windowintegralcoka1" in e.prop and "bandcontrast" in e.prop
   assert "x" not in e.prop and "y" not in e.prop
 
@@ -125,6 +150,10 @@ def test_bruker_direct_positions():
   k, euler = firstEuler(e)
   assert k == 0 and np.allclose(euler, [294.0380859375, 159.52241516, 127.85329056], atol=1e-6)
   assert abs(e.pos.x[0] - 142.6921844) < 1e-6
+
+
+def test_bruker_takes_the_space_group_number_and_a_cell_in_one_row():
+  e = loadEBSD(fixture("bruker_cut.h5"), noGrid=True)
   # the space group number, not the symbol beside it, and a cell written as one row of six
   assert np.allclose(e.CSList[2].abc, e.CSList[2].abc[0])
   assert e.meta["h5"]["cs"][0]["cell"]
@@ -132,33 +161,22 @@ def test_bruker_direct_positions():
 
 # ------------------------------------------------------------------ the corrections
 
-def test_bruker_correction_is_half_a_turn_about_y_for_id_five():
-  a = loadEBSD(fixture("bruker_cut.h5"), noGrid=True)
-  b = loadEBSD(fixture("bruker_cut.h5"), eulerCorrection=rotation.id, noGrid=True)
-  r = rotation.byAxisAngle(vector3d(0, 1, 0), np.pi)
+# the correction each vendor layout applies: Bruker's half turn about y for id five, the EDAX
+# setting the file states (the half turn about (1,-1,0)), EMSphInx's the same, ThermoFisher none
+@pytest.mark.parametrize("name, correction", [
+  ("bruker_cut.h5", rotation.byAxisAngle(vector3d(0, 1, 0), np.pi)),
+  ("kamila_cut.oh5", rotation.byEuler(135 * degree, 180 * degree, 225 * degree)),
+  ("emsphinx_cut.h5", rotation.byEuler(135 * degree, 180 * degree, 225 * degree)),
+  ("thermofisher_cut.hdf5", rotation.id),
+])
+def test_the_vendor_correction(name, correction):
+  a = loadEBSD(fixture(name), noGrid=True)
+  b = loadEBSD(fixture(name), eulerCorrection=rotation.id, noGrid=True)
   k = np.flatnonzero(a.isIndexed)[:20]
-  assert mtex.angle(a.rotations[k], r * b.rotations[k]).max() < 1e-12
+  assert mtex.angle(a.rotations[k], correction * b.rotations[k]).max() < 1e-12
 
 
-def test_edax_correction_is_the_setting_the_file_states():
-  a = loadEBSD(fixture("kamila_cut.oh5"), noGrid=True)
-  b = loadEBSD(fixture("kamila_cut.oh5"), eulerCorrection=rotation.id, noGrid=True)
-  r = rotation.byEuler(135 * degree, 180 * degree, 225 * degree)
-  assert mtex.angle(a.rotations[:20], r * b.rotations[:20]).max() < 1e-12
-  assert mtex.angle(r, rotation.byAxisAngle(vector3d(1, -1, 0), np.pi)) < 1e-12
-
-
-def test_emsphinx_and_thermofisher_corrections():
-  a = loadEBSD(fixture("emsphinx_cut.h5"), noGrid=True)
-  b = loadEBSD(fixture("emsphinx_cut.h5"), eulerCorrection=rotation.id, noGrid=True)
-  r = rotation.byEuler(135 * degree, 180 * degree, 225 * degree)
-  assert mtex.angle(a.rotations[:20], r * b.rotations[:20]).max() < 1e-12
-  a = loadEBSD(fixture("thermofisher_cut.hdf5"), noGrid=True)
-  b = loadEBSD(fixture("thermofisher_cut.hdf5"), eulerCorrection=rotation.id, noGrid=True)
-  assert mtex.angle(a.rotations[:20], b.rotations[:20]).max() < 1e-12
-
-
-def test_oxford_scan_rotation_and_a_tilted_surface(tmp_path):
+def test_oxford_tilted_surface_is_undone_with_a_warning(tmp_path):
   import shutil
   p = tmp_path / "tilt.h5oina"
   shutil.copy(fixture("oli_cut.h5oina"), p)
@@ -171,6 +189,10 @@ def test_oxford_scan_rotation_and_a_tilted_surface(tmp_path):
   expected = rotation.byEuler(np.pi, 0, 0) * rotation.byEuler(0, 90 * degree, 0).inv() * raw.rotations[0]
   assert mtex.angle(e.rotations[0], expected) < 1e-6   # the file holds its angle as float32
   assert e.meta["surface"] == (0.0, 90.0, 0.0)
+
+
+def test_oxford_scan_rotation_the_file_states_is_applied():
+  raw = loadEBSD(fixture("oli_cut.h5oina"), eulerCorrection=rotation.id, noGrid=True)
   # the scan rotation the file states, in radians since it is below a full turn
   with h5py.File(fixture("oli_cut.h5oina")) as f:
     stated = float(np.asarray(f["1/EBSD/Header/Scanning Rotation Angle"][()]).reshape(-1)[0])
@@ -218,12 +240,18 @@ def test_eulerColumns_shapes():
     eulerColumns(np.zeros((5, 4)))
 
 
-def test_h5PhaseShift_and_spaceGroupNumber_and_alignments():
+def test_h5PhaseShift_reads_the_numbering_off_the_values():
   assert h5PhaseShift(np.array([0, 1, -1]), 2) == 1
   assert h5PhaseShift(np.array([0, 1, 2]), 2) == 0
   assert h5PhaseShift(np.array([0, 1]), 2) == 1
+
+
+def test_spaceGroupNumber_takes_a_number_not_a_symbol():
   assert spaceGroupNumber(np.array([225.0])) == 225 and spaceGroupNumber("F m#ovl3m") is None
   assert spaceGroupNumber(None) is None and spaceGroupNumber(194) == 194
+
+
+def test_alignmentList_reads_the_stated_alignment():
   assert alignmentList("a || x, c* || z") == ["X||a", "Z||c*"]
   assert alignmentList("X||a*, Z||c") == ["X||a*", "Z||c"]
   assert alignmentList("EDAX") == ["EDAX"] and alignmentList("") == []
@@ -261,8 +289,7 @@ def test_corpus_matches_julia(name, n, cnt, euler, prop, mean):
 
 # the pictures a file holds are indexed at the load and read when one is looked at: a
 # vendor writes a dozen electron images beside the map, and the map is not made of them
-def test_picture_index(tmp_path):
-  from mtex.io.h5 import h5Image, h5ImageIndex, h5Paths
+def picturesFile(tmp_path):
   path = tmp_path / "pictures.h5"
   with h5py.File(path, "w") as f:
     # a plane, a stack of one channel, a flat run the header counts, and a colour run
@@ -274,15 +301,35 @@ def test_picture_index(tmp_path):
     f["/a/Data/colour"] = np.zeros((30 * 40, 3), dtype=np.uint8)
     f["/a/Data/tooSmall"] = np.zeros((4, 4), dtype=np.uint8)
     f["/a/Data/notANumber"] = np.array([b"x" * 4096])
+  return path
+
+
+def pictureIndex(path):
+  from mtex.io.h5 import h5ImageIndex, h5Paths
   with h5py.File(path, "r") as f:
     paths, groups = h5Paths(f)
-    index = h5ImageIndex(f, paths, groups)
+    return h5ImageIndex(f, paths, groups)
+
+
+def test_h5ImageIndex_finds_planes_stacks_and_runs_of_the_header_shape(tmp_path):
+  index = pictureIndex(picturesFile(tmp_path))
   found = {e["name"].split("/")[-1]: tuple(e["shape"]) for e in index}
   assert found == {"plane": (30, 40), "stack": (30, 40), "flat": (30, 40), "colour": (30, 40, 3)}
+
+
+def test_h5ImageIndex_takes_the_maps_own_columns_for_no_pictures(tmp_path):
+  from mtex.io.h5 import h5ImageIndex, h5Paths
+  path = picturesFile(tmp_path)
   # and the map's own columns, which are flat runs of the same shape, are no pictures
   with h5py.File(path, "r") as f:
     paths, groups = h5Paths(f)
     assert not [e for e in h5ImageIndex(f, paths, groups, n=30 * 40)]
+
+
+def test_h5Image_reads_a_flat_run_and_a_colour_run_in_the_picture_shape(tmp_path):
+  from mtex.io.h5 import h5Image
+  path = picturesFile(tmp_path)
+  index = pictureIndex(path)
   entry = next(e for e in index if e["name"].endswith("flat"))
   a = h5Image(path, entry)
   assert a.shape == (30, 40) and a[0, 1] == 1
@@ -290,17 +337,21 @@ def test_picture_index(tmp_path):
   assert colour.shape == (30, 40, 3) and colour.dtype == np.uint8
 
 
-@pytest.mark.skipif(not os.path.isdir(CORPUS), reason="the vendor corpus is not on this machine")
-def test_pictures_of_the_vendors():
-  oxford = os.path.join(CORPUS, "Oxford", "AEVJ1_anon.h5oina")
-  if os.path.isfile(oxford):
-    ebsd = loadEBSD(oxford, silent=True)
-    names = [e["name"] for e in ebsd.meta["images"]]
-    assert len(names) == 12 and any("Electron Image/Data/SE" in n for n in names)
-    assert all(tuple(e["shape"])[:2] == (1536, 2048) or tuple(e["shape"])[:2] == (1539, 2048) for e in ebsd.meta["images"])
-    # the pixels are not in the map: the index says where they are
-    assert all(isinstance(e, dict) and "path" in e for e in ebsd.meta["images"])
-  bruker = os.path.join(CORPUS, "h5_bruker.h5")
-  if os.path.isfile(bruker):
-    ebsd = loadEBSD(bruker, silent=True)
-    assert any(e["name"].endswith("SEM Image") for e in ebsd.meta["images"])
+OXFORD_PICTURES = os.path.join(CORPUS, "Oxford", "AEVJ1_anon.h5oina")
+BRUKER_PICTURES = os.path.join(CORPUS, "h5_bruker.h5")
+
+
+@pytest.mark.skipif(not os.path.isfile(OXFORD_PICTURES), reason="the Oxford file of the vendor corpus is not on this machine")
+def test_pictures_of_an_oxford_file_are_indexed_not_read():
+  ebsd = loadEBSD(OXFORD_PICTURES, silent=True)
+  names = [e["name"] for e in ebsd.meta["images"]]
+  assert len(names) == 12 and any("Electron Image/Data/SE" in n for n in names)
+  assert all(tuple(e["shape"])[:2] == (1536, 2048) or tuple(e["shape"])[:2] == (1539, 2048) for e in ebsd.meta["images"])
+  # the pixels are not in the map: the index says where they are
+  assert all(isinstance(e, dict) and "path" in e for e in ebsd.meta["images"])
+
+
+@pytest.mark.skipif(not os.path.isfile(BRUKER_PICTURES), reason="the Bruker file of the vendor corpus is not on this machine")
+def test_pictures_of_a_bruker_file_are_indexed():
+  ebsd = loadEBSD(BRUKER_PICTURES, silent=True)
+  assert any(e["name"].endswith("SEM Image") for e in ebsd.meta["images"])

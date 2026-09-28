@@ -21,6 +21,10 @@ def test_forsterite_cut_reads_on_its_grid():
   e = loadEBSD(FORSTERITE)
   assert e.shape == (2, 732)
   assert e.lattice.shape == "square" and abs(e.dPos - 50) < 1e-9
+
+
+def test_forsterite_cut_reads_its_phases():
+  e = loadEBSD(FORSTERITE)
   assert e.CSList.mineralList == ["notIndexed", "Forsterite", "Enstatite", "Diopside", "Silicon"]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["mmm", "mmm", "12/m1", "m-3m"]
   assert [int((e.phaseId == k).sum()) for k in range(5)] == [301, 1029, 113, 21, 0]
@@ -39,11 +43,15 @@ def test_the_columns_are_named_by_the_file():
   assert e.bc[0] == 138 and e.bs[0] == 255 and e.mad[0] == 0.1
 
 
-def test_header_and_surface():
+def test_the_header_is_kept_without_its_phases():
   e = loadEBSD(FORSTERITE, noGrid=True)
   h = e.meta["header"]
   assert h["XCells"] == 732 and h["XStep"] == 50 and h["JobMode"] == "Grid" and h["Mag"] == 35
   assert "Phases" not in h
+
+
+def test_the_acquisition_surface_is_kept():
+  e = loadEBSD(FORSTERITE, noGrid=True)
   assert e.meta["surface"] == (0.0, 0.0, 0.0)
 
 
@@ -78,23 +86,30 @@ def test_a_tilted_surface_is_undone_with_a_warning(tmp_path):
   assert e.meta["surface"] == (0.0, 90.0, 0.0)
 
 
-def test_oxfordCorrection():
+def test_oxfordCorrection_isHalfATurnAboutZ_whateverTheFirstSurfaceAngle():
   assert mtex.angle(oxfordCorrection(None), rotation.byEuler(np.pi, 0, 0)) < 1e-12
   assert mtex.angle(oxfordCorrection((30.0, 0.0, 0.0)), rotation.byEuler(np.pi, 0, 0)) < 1e-12
+
+
+def test_oxfordCorrection_undoesTheSurfaceTilt():
   r = oxfordCorrection((0.0, 0.0, 45.0))
   assert mtex.angle(r, rotation.byEuler(np.pi, 0, 0) * rotation.byEuler(0, 0, 45 * degree).inv()) < 1e-12
 
 
-def test_ctfHeader_pairs():
+def test_ctfHeader_drops_the_note_of_an_odd_line():
   h = ctfHeader(["Channel Text File", "XCells\t3", "note\tMag\t35\tKV\t17"])
-  assert h == {"Channel_Text_File": "", "XCells": 3.0, "Mag": 35.0, "KV": 17.0} or h == {"XCells": 3.0, "Mag": 35.0, "KV": 17.0}
+  assert h == {"XCells": 3.0, "Mag": 35.0, "KV": 17.0}
 
 
-def test_not_a_channel_file(tmp_path):
+def test_not_a_channel_file_is_an_error(tmp_path):
   p = tmp_path / "x.ctf"
   p.write_text("hello\n")
   with pytest.raises(ValueError, match="Channel Text File"):
     loadEBSD(p)
+
+
+def test_a_channel_file_without_phases_is_an_error(tmp_path):
+  p = tmp_path / "x.ctf"
   p.write_text("Channel Text File\nXCells\t2\n")
   with pytest.raises(ValueError, match="declares no phases"):
     loadEBSD(p)

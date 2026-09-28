@@ -30,17 +30,25 @@ def test_the_gradients_and_the_curvature_of_a_bend():
   assert gnd.shape == (6, 5, 4) and np.all(np.isfinite(gnd)) and np.all(gnd > 0)
 
 
-def test_KAM_fill_and_a_profile():
+def test_KAM_averages_over_the_face_neighbours():
   e = bent()
   kam = e.KAM()
   # an inner voxel: two of its six neighbours turned by A
   assert np.isclose(kam[2, 2, 2], 2 * A / 6) and np.isclose(kam[0, 2, 2], A / 5)
   assert np.isclose(e.KAM(max=True)[2, 2, 2], A)
+
+
+def test_fill_closes_an_inner_hole_and_extrapolates_on_request():
+  e = bent()
   f = e.copy()
   f.phaseId[2, 2, 2] = 0
   f.phaseId[0, 0, 0] = 0
   g = f.fill()
   assert g.phaseId[2, 2, 2] == 1 and g.phaseId[0, 0, 0] == 0 and f.fill(extrapolate=True).phaseId[0, 0, 0] == 1
+
+
+def test_a_profile_along_x_steps_voxel_by_voxel():
+  e = bent()
   p, d = e.spatialProfile(np.array([[0.0, 1.0, 1.0], [5.0, 1.0, 1.0]]))
   assert p.size == 6 and np.allclose(d, np.arange(6)) and np.all(p.phaseId == 1)
 

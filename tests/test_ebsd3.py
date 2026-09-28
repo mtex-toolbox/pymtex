@@ -45,11 +45,15 @@ def test_gridify_puts_a_selection_back_with_padding():
   assert f.lattice.shape == (4, 5, 6) and np.allclose(f.gridify().rotations.data, e.rotations.data)
 
 
-def test_interp_and_slice():
+def test_interp_takes_the_nearest_voxel_and_nothing_outside():
   e = volume()
   s = e.interp(vector3d([[0.4, 1.1, 2.6], [9.0, 0, 0]]))
   assert s.size == 2 and s.phaseId[0] == 1 and s.phaseId[1] == 0
   assert np.allclose(s.rotations.data[0], e.rotations.data[1, 2, 3])
+
+
+def test_a_slice_through_a_layer_is_a_gridded_map():
+  e = volume()
   cut = e.slice(plane3d(vector3d(0, 0, 1), vector3d(0, 0, 2)))
   assert cut.isGridded and cut.ndim == 2
   assert cut.isIndexed.sum() == 20

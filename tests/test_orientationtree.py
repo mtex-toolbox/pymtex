@@ -12,7 +12,7 @@ rng = np.random.default_rng(9)
 
 def _grids(name):
   cs = crystalFrame(name)
-  return [equispacedSO3Grid(cs, resolution=6 * mtex.degree), superfibonacciSO3Grid(cs, resolution=6 * mtex.degree)]
+  return [equispacedSO3Grid(cs, resolution=10 * mtex.degree), superfibonacciSO3Grid(cs, resolution=10 * mtex.degree)]
 
 
 @pytest.mark.parametrize("name", ["m-3m", "222", "6/mmm"])

@@ -35,11 +35,18 @@ def sampleMap(n=12, phases=1, dtype=np.float64, A=np.eye(2)):
   return EBSD(pos, rot, ph, pl, {"mad": np.arange(1.0, n * n + 1)})
 
 
-def test_E1_the_table():
+def test_EBSD_describesItsTable():
   ebsd = sampleMap()
   assert len(ebsd) == 144 and ebsd.shape == (144,) and ebsd.size == 144 and not ebsd.isGridded
   assert ebsd.isIndexed.sum() == 139 and ebsd.frame is specimenFrame.default
   assert len(ebsd.CSList) == 2 and list(ebsd.indexedPhaseId) == [1] and ebsd.mineralList == ["notIndexed", "test"]
+  assert np.array_equal(ebsd.id, np.arange(144)) and np.array_equal(ebsd.phase, ebsd.phaseId) and np.array_equal(ebsd[5:9].id, [5, 6, 7, 8])
+  assert ebsd.x[13] == 1 and ebsd.y[13] == 1 and ebsd.xyz.shape == (144, 3)
+  assert ebsd.CS is ebsd.CSList[1] and ebsd.dtype == np.float64
+
+
+def test_EBSD_propertiesAreAttributesOfOneRowPerMeasurement():
+  ebsd = sampleMap()
   assert np.array_equal(ebsd.mad, np.arange(1.0, 145)) and np.array_equal(ebsd.prop["mad"], ebsd.mad)
   with pytest.raises(AttributeError):
     ebsd.bc
@@ -47,50 +54,76 @@ def test_E1_the_table():
   assert ebsd.bc[7] == 7 and "bc" in ebsd.prop
   with pytest.raises(ValueError):
     ebsd.ci = np.arange(10)
-  # a multi channel property keeps its columns
+
+
+def test_EBSD_multiChannelPropertyKeepsItsColumns():
+  ebsd = sampleMap()
   ebsd.fs = np.arange(144 * 5).reshape(144, 5)
   assert ebsd.fs.shape == (144, 5) and ebsd[ebsd.mad > 100].fs.shape == (44, 5)
-  assert np.array_equal(ebsd.id, np.arange(144)) and np.array_equal(ebsd.phase, ebsd.phaseId) and np.array_equal(ebsd[5:9].id, [5, 6, 7, 8])
-  assert ebsd.x[13] == 1 and ebsd.y[13] == 1 and ebsd.xyz.shape == (144, 3)
-  assert ebsd.CS is ebsd.CSList[1] and ebsd.dtype == np.float64
-  # the arguments have to agree
+
+
+def test_EBSD_refusesArgumentsThatDisagree():
+  ebsd = sampleMap()
   with pytest.raises(ValueError):
     EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId[:10], ebsd.CSList)
   with pytest.raises(ValueError):
     EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId + 5, ebsd.CSList)
-  # the MATLAB list with a named not indexed phase
+
+
+def test_EBSD_acceptsMatlabListWithNamedNotIndexedPhase():
+  ebsd = sampleMap()
   e = EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId, ["notIndexed", crystalFrame("m-3m", mineral="test")])
   assert e.CSList.mineralList == ["notIndexed", "test"]
 
 
-def test_E2_selection_returns_a_map():
+def test_EBSD_selectionByPhaseReturnsAMap():
   ebsd = sampleMap(phases=2)
   assert len(ebsd["test"]) == 118 and len(ebsd["other"]) == 21 and len(ebsd["notIndexed"]) == 5
   assert len(ebsd["indexed"]) == 139 and len(ebsd[ebsd.CSList[2]]) == 21
   with pytest.raises(ValueError):
     ebsd["quartz"]
-  # a single measurement is a map of one, with its phases and frame intact
+  selected = ebsd[["other", "test", "other"]]
+  assert np.array_equal(selected.mad, ebsd.mad[ebsd.isIndexed])
+  with pytest.raises(ValueError):
+    ebsd[["test", "missing"]]
+
+
+# a single measurement is a map of one, with its phases and frame intact
+def test_EBSD_singleMeasurementIsAMapOfOne():
+  ebsd = sampleMap(phases=2)
   one = ebsd[7]
   assert isinstance(one, EBSD) and len(one) == 1 and one.frame is ebsd.frame and len(one.CSList) == 3
-  # a mask selects, and the properties follow
+
+
+# a mask selects, and the properties follow
+def test_EBSD_selectionByIndexCarriesTheProperties():
+  ebsd = sampleMap(phases=2)
   sel = ebsd.mad > 100
   assert len(ebsd[sel]) == sel.sum() and np.array_equal(ebsd[sel].mad, ebsd.mad[sel])
+  assert ebsd[np.zeros(144, dtype=bool)].isempty and len(ebsd[1:10]) == 9 and len(ebsd[[3, 5]]) == 2
+
+
+def test_phaseList_indexedByMineralNameIgnoringCase():
+  ebsd = sampleMap(phases=2)
   assert ebsd.CSList["test"] is ebsd.CSList[1] and ebsd.CSList["NOTINDEXED"] is ebsd.CSList[0]
   with pytest.raises(ValueError):
     ebsd.CSList["missing"]
-  selected = ebsd[["other", "test", "other"]]
-  assert np.array_equal(selected.mad, ebsd.mad[ebsd.isIndexed])
-  assert ebsd[np.zeros(144, dtype=bool)].isempty and len(ebsd[1:10]) == 9 and len(ebsd[[3, 5]]) == 2
-  with pytest.raises(ValueError):
-    ebsd[["test", "missing"]]
-  # ebsd[i, j] means the pixel of a grid and is refused on a list
+
+
+# ebsd[i, j] means the pixel of a grid and is refused on a list
+def test_EBSD_pixelIndexRefusedOnAList():
+  ebsd = sampleMap(phases=2)
   with pytest.raises(IndexError):
     ebsd[2, 3]
+
+
+def test_EBSD_selectionByPositionAndId():
+  ebsd = sampleMap(phases=2)
   assert len(ebsd["xy", 2, 3]) == 1 and ebsd["xy", 2, 3].x[0] == 2 and ebsd["xy", 2, 3].y[0] == 3
   assert len(ebsd["id", 3]) == 1 and ebsd["id", 3].mad[0] == 4
 
 
-def test_E2a_regions_include_their_edges():
+def test_inpolygon_regionsIncludeTheirEdges():
   ebsd = sampleMap()
   mask = inpolygon(ebsd, [2, 3, 4, 2])
   assert mask.sum() == 15
@@ -104,44 +137,66 @@ def test_E2a_regions_include_their_edges():
   assert inpolygon(ebsd, [2, 3, 0, 0]).sum() == 1
   grid = gridify(ebsd)
   assert inpolygon(grid, [2, 3, 4, 2]).shape == grid.shape and inpolygon(grid, polygon).sum() == 15
-  for bad in ([0, 0, -1, 2], [0, np.nan, 1, 2], np.zeros((2, 2))):
-    with pytest.raises(ValueError):
-      inpolygon(ebsd, bad)
 
 
-def test_E3_orientations_are_framed_by_their_phase():
+@pytest.mark.parametrize("bad", ([0, 0, -1, 2], [0, np.nan, 1, 2], np.zeros((2, 2))))
+def test_inpolygon_refusesDegenerateRegions(bad):
+  with pytest.raises(ValueError):
+    inpolygon(sampleMap(), bad)
+
+
+def test_EBSD_orientationsAreFramedByTheirPhase():
   ebsd = sampleMap(phases=2)
   o = ebsd["test"].orientations
   assert len(o) == 118 and o.CS is ebsd.CSList[1] and o.SS is ebsd.frame
-  # with more than one indexed phase the map cannot answer without being asked which
+  assert len(ebsd["other"].orientations) == 21 and ebsd["other"].CS.mineral == "other"
+
+
+# with more than one indexed phase the map cannot answer without being asked which
+def test_EBSD_orientationsOfSeveralPhasesAreRefused():
+  ebsd = sampleMap(phases=2)
   with pytest.raises(ValueError):
     ebsd.orientations
   with pytest.raises(ValueError):
     ebsd.CS
-  assert len(ebsd["other"].orientations) == 21 and ebsd["other"].CS.mineral == "other"
 
 
-def test_E4_the_map_carries_its_lattice():
+def test_EBSD_carriesTheLatticeOfItsPositions():
   ebsd = sampleMap()
   assert ebsd.lattice.shape == "square" and ebsd.dPos == 1 and ebsd.unitCell.shape == (4,) and ebsd.unitCell.frame is ebsd.frame
   assert ebsd.N == zvector
   hexa = sampleMap(A=np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]]))
   assert hexa.lattice.shape == "hex" and hexa.unitCell.shape == (6,)
-  # a lattice survives a rigid motion of the map
+
+
+def test_EBSD_latticeSurvivesARigidMotion():
+  ebsd = sampleMap()
   r = ebsd.rotate(rotation.byAxisAngle(zvector, 30 * degree))
   assert r.lattice.shape == "square" and close(r.lattice.dxy, ebsd.lattice.dxy)
   s = shift(ebsd, vector3d(3.0, -2.0, 0.0))
   assert close(extent(s), extent(ebsd) + [3, 3, -2, -2]) and close(s.lattice.dxy, ebsd.lattice.dxy)
+
+
+def test_EBSD_selectionKeepsTheLatticeOfItsParent():
+  ebsd = sampleMap()
+  hexa = sampleMap(A=np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]]))
+  r = ebsd.rotate(rotation.byAxisAngle(zvector, 30 * degree))
   for parent in (ebsd, hexa, r):
     for ids in ([1], [1, 2, 3], [1, 3, 5]):
       selected = parent[ids]
       assert selected.lattice.shape == parent.lattice.shape and np.array_equal(selected.lattice.A, parent.lattice.A)
       assert close(selected.lattice.position(selected.lattice.ij), parent.pos.data[ids], tol=1e-9)
   assert ebsd[[1, 1]].lattice is None
-  # a unit cell given to the constructor is the basis the lattice is built on
+
+
+# a unit cell given to the constructor is the basis the lattice is built on
+def test_EBSD_givenUnitCellIsTheBasisOfTheLattice():
+  ebsd = sampleMap()
   e = EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList, unitCell=ebsd.unitCell)
   assert np.array_equal(e.lattice.ij, ebsd.lattice.ij)
-  # a scan line is not a lattice
+
+
+def test_EBSD_scanLineIsNotALattice():
   n = 24
   line = EBSD(np.stack([np.arange(n) * 0.3, np.zeros(n), np.zeros(n)], axis=-1), rotation.rand(n), np.ones(n, dtype=int), [crystalFrame("m-3m")])
   assert line.lattice is None and np.isnan(line.dPos)
@@ -151,7 +206,7 @@ def test_E4_the_map_carries_its_lattice():
 
 # moving a gridded map never reorders its arrays: the positions move and the layout turns with
 # them, where MATLAB stores a rotated map anew in its default layout (decided 2026-09-26)
-def test_E4b_moving_a_grid_keeps_its_memory_order():
+def test_EBSD_movingAGridKeepsItsMemoryOrder():
   from mtex import gridLayout, xvector, yvector
   grid = gridify(sampleMap())
   assert grid.layout == gridLayout.columnMajor()
@@ -164,7 +219,7 @@ def test_E4b_moving_a_grid_keeps_its_memory_order():
   assert gridify(rotate(grid, 90 * degree), gridLayout.columnMajor()).shape == grid.shape[::-1]
 
 
-def test_E4a_rotate_positions_and_orientations_separately():
+def test_rotate_turnsPositionsAndOrientationsSeparatelyOnRequest():
   ebsd = sampleMap()
   r = rotation.byAxisAngle(zvector, 30 * degree)
   positions, rotations = ebsd.pos.data.copy(), ebsd.rotations.data.copy()
@@ -176,15 +231,26 @@ def test_E4a_rotate_positions_and_orientations_separately():
   assert close(both.pos.data, (r * ebsd.pos).data) and close(both.rotations.data, (r * ebsd.rotations).data)
   assert np.array_equal(ebsd.pos.data, positions) and np.array_equal(ebsd.rotations.data, rotations)
   assert np.array_equal(onlyPositions.mad, ebsd.mad) and np.array_equal(onlyOrientations.mad, ebsd.mad)
-  # a number turns about z, as MATLAB reads it
-  assert close(ebsd.rotate(30 * degree).pos.data, both.pos.data)
-  # the function form dispatches to the method, MATLAB's flags as strings
-  assert close(rotate(ebsd, r).pos.data, both.pos.data)
-  # MATLAB's rot * ebsd turns both
-  assert close((r * ebsd).pos.data, both.pos.data) and close((r * ebsd).rotations.data, both.rotations.data)
-  assert np.array_equal(rotate(ebsd, r, 'keepEuler').rotations.data, rotations)
   with pytest.raises(ValueError):
     ebsd.rotate(r, keepXY=True, keepEuler=True)
+
+
+# a number turns about z, as MATLAB reads it
+def test_rotate_numberTurnsAboutZ():
+  ebsd = sampleMap()
+  both = ebsd.rotate(rotation.byAxisAngle(zvector, 30 * degree))
+  assert close(ebsd.rotate(30 * degree).pos.data, both.pos.data)
+
+
+# the function form dispatches to the method, MATLAB's flags as strings; MATLAB's rot * ebsd turns both
+def test_rotate_functionFormAndProductAreTheMethod():
+  ebsd = sampleMap()
+  r = rotation.byAxisAngle(zvector, 30 * degree)
+  rotations = ebsd.rotations.data.copy()
+  both = ebsd.rotate(r)
+  assert close(rotate(ebsd, r).pos.data, both.pos.data)
+  assert close((r * ebsd).pos.data, both.pos.data) and close((r * ebsd).rotations.data, both.rotations.data)
+  assert np.array_equal(rotate(ebsd, r, 'keepEuler').rotations.data, rotations)
 
 
 def test_transform_keeps_the_lattice_consistent():
@@ -208,11 +274,15 @@ def test_transform_keeps_the_lattice_consistent():
   assert close(abs(np.linalg.det(B)), abs(np.linalg.det(sh.lattice.A)), tol=1e-9)
 
 
-def test_E6_finding_measurements():
+def test_findByLocation_nearestAndWithinRadius():
   ebsd = sampleMap()
   assert findByLocation(ebsd, vector3d(3.0, 4.0, 0.0)).id[0] == 3 + 4 * 12
   assert len(findByLocation(ebsd, [3.0, 4.0], radius=1.1)) == 5
   assert len(findByLocation(ebsd, [[3.0, 4.0], [5.0, 5.0]])) == 2
+
+
+def test_findByOrientation_withinAngleOfAnOrientationOrAFibre():
+  ebsd = sampleMap()
   o = ebsd["test"].orientations[0]
   near = findByOrientation(ebsd, o, 3 * degree)
   assert len(near) > 0 and np.all(angle(near.orientations, o) <= 3 * degree) and near.isIndexed.all()
@@ -220,22 +290,35 @@ def test_E6_finding_measurements():
   assert len(findByOrientation(ebsd, f, 1 * degree)) == 139
 
 
-def test_copy_cat_and_display():
+def test_EBSD_copyOwnsItsPropertiesAndSharesThePhases():
   ebsd = sampleMap()
   c = ebsd.copy()
   c.mad[:] = 0
   assert ebsd.mad[0] == 1 and c.CSList is ebsd.CSList
+
+
+def test_EBSD_catJoinsMapsOfTheSamePhases():
+  ebsd = sampleMap()
   both = EBSD.cat(ebsd[:10], ebsd[10:20])
   assert len(both) == 20 and np.array_equal(both.mad, ebsd.mad[:20]) and both.lattice.shape == "square"
   with pytest.raises(ValueError):
     EBSD.cat(ebsd[:10], EBSD(ebsd.pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList))
+
+
+def test_EBSD_reprSummarisesTheMap():
+  ebsd = sampleMap()
   s = repr(ebsd)
   assert s.startswith("EBSD (") and "size: 144" in s and "test" in s and "properties    : mad" in s and "square lattice" in s
   assert "the map is empty" in repr(ebsd[np.zeros(144, dtype=bool)])
-  # a float32 map keeps its precision
+
+
+def test_EBSD_float32MapKeepsItsPrecision():
   e32 = sampleMap(dtype=np.float32)
   assert e32.dtype == np.float32 and e32.pos.data.dtype == np.float32 and e32.lattice.A.dtype == np.float32
-  # nan positions are dropped
+
+
+def test_EBSD_nanPositionsAreDropped():
+  ebsd = sampleMap()
   pos = ebsd.pos.data.copy()
   pos[3] = np.nan
   assert len(EBSD(pos, ebsd.rotations, ebsd.phaseId, ebsd.CSList, ebsd.prop)) == 143

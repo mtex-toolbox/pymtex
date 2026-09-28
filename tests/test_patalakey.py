@@ -20,7 +20,7 @@ PINNED = {
 
 
 @pytest.mark.parametrize("pg", list(PINNED))
-def test_the_colours_are_MATLABs(pg):
+def test_PatalaColorKey_coloursAreMATLABs(pg):
   q, rgb = PINNED[pg]
   cs = crystalFrame(pg)
   q = np.array(q)
@@ -29,12 +29,16 @@ def test_the_colours_are_MATLABs(pg):
   assert out.shape == (2, 3) and np.allclose(out, rgb, atol=1e-9)
 
 
-@pytest.mark.parametrize("pg", list(PINNED))
-def test_equivalent_misorientations_get_one_colour(pg):
+# two hundred random misorientations of a Laue group
+def _misorientations(pg):
   cs = crystalFrame(pg)
-  rng = np.random.default_rng(1)
-  q = rng.normal(size=(200, 4))
-  mori = orientation(rotation(q / np.linalg.norm(q, axis=1, keepdims=True)), cs, cs)
+  q = np.random.default_rng(1).normal(size=(200, 4))
+  return cs, orientation(rotation(q / np.linalg.norm(q, axis=1, keepdims=True)), cs, cs)
+
+
+@pytest.mark.parametrize("pg", list(PINNED))
+def test_PatalaColorKey_equivalentMisorientationsGetOneColour(pg):
+  cs, mori = _misorientations(pg)
   key = PatalaColorKey(cs)
   rgb = key.orientation2color(mori)
   G = cs.sym.properGroup().rotations()
@@ -43,10 +47,19 @@ def test_equivalent_misorientations_get_one_colour(pg):
   eq = orientation(rotation(g2) * rotation(mori.data) * rotation(g1), cs, cs)
   assert np.allclose(key.orientation2color(eq), rgb, atol=1e-9)
   assert np.allclose(key.orientation2color(orientation(rotation(mori.data).inv(), cs, cs)), rgb, atol=1e-9)
+
+
+@pytest.mark.parametrize("pg", list(PINNED))
+def test_PatalaColorKey_coloursLieInTheColourCube(pg):
+  cs, mori = _misorientations(pg)
+  rgb = PatalaColorKey(cs).orientation2color(mori)
   assert np.all((rgb >= 0) & (rgb <= 1))
 
 
-def test_only_the_five_Laue_groups():
+def test_PatalaColorKey_refusesAllButTheFiveLaueGroups():
   with pytest.raises(ValueError):
     PatalaColorKey(crystalFrame("-3m"))
+
+
+def test_PatalaColorKey_isAntipodal():
   assert PatalaColorKey(crystalFrame("m-3m")).antipodal

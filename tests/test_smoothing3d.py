@@ -1,14 +1,11 @@
 # the surfaces of 3D grains smoothed, reduced and refined, against MATLAB master
 # (bench/matlab/probe_smoothing3d.m)
-import os
 
 import numpy as np
-import pytest
 
-from mtex import EBSD3, EBSD3square, calcGrains, crystalFrame, degree, phaseList, reduceBoundary, refineBoundary, rotation
+from mtex import EBSD3square, calcGrains, crystalFrame, degree, phaseList, reduceBoundary, refineBoundary, rotation
 from mtex import smoothBoundary, taubinFilter, vector3d
 
-DREAM3D = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data", "EBSD", "SmallIN100_MeshStats.dream3d")
 
 
 # a 4 x 4 x 4 volume split into two grains along x
@@ -33,9 +30,8 @@ def test_a_plane_boundary_stays_where_it_is():
   assert np.allclose(reduceBoundary(g, quadric=True).volume, g.volume)
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_as_MATLAB_smooths_it():
-  g = calcGrains(EBSD3.load(DREAM3D), angle=10 * degree)
+def test_IN100_as_MATLAB_smooths_it(in100):
+  g = in100[1]
   r = g.reduceBoundary()
   assert len(r.F) == 282646 and len(r.boundary.idV) == 122476 and np.isclose(r.volume.sum(), 15625)
   assert (r.F[:2] + 1).tolist() == [[109575, 1, 109574], [109576, 109574, 1]]

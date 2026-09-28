@@ -5,7 +5,7 @@ import pytest
 from numpy import pi
 
 import mtex
-from mtex import (orientation, rotation, crystalFrame, specimenFrame, Miller, vector3d, xvector, zvector, degree,
+from mtex import (orientation, rotation, crystalFrame, specimenFrame, Miller, vector3d, degree,
                   symmetrise, multiplicity, angle, dot, unique, mean, inv, cat, axis)
 from conftest import close
 
@@ -141,8 +141,6 @@ def test_axis():
   o1, o2 = orientation.rand(cs, rng=rng), orientation.rand(cs, rng=rng)
   a = axis(o1, o2)
   assert a.frame is o2.SS and a.antipodal
-  best = min(symmetrise(inv(o2) * o1), key=lambda x: float(x.angle(noSymmetry=True)))
-  assert angle(a, o1 * (inv(o1) * o2 * best).axis(noSymmetry=True) if False else a) == 0
   assert axis(orientation.rand(5, cs, rng=rng), orientation.rand(5, cs, rng=rng)).shape == (5,)
   with pytest.raises(ValueError):
     axis(o1, orientation.rand(cs, specimenFrame.rolling, rng=rng))
@@ -160,7 +158,6 @@ def test_comparison_needs_fitting_frames():
 
 
 def test_the_axis_of_a_pair_turns_the_second_onto_the_first():
-  from mtex import axis, degree
   cs = crystalFrame('432')
   rng = np.random.default_rng(8)
   o1, o2 = orientation.rand(500, cs, rng=rng), orientation.rand(500, cs, rng=rng)

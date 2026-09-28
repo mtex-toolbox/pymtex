@@ -64,6 +64,8 @@ def test_S5_sign():
   eps = 1e-9
   tiny = m.rotation.byAxisAngle(m.vector3d.Z, eps)
   assert close(m.angle(tiny), eps, tol=1e-20)
+  nearHalfTurn = m.rotation.byAxisAngle(m.vector3d.Z, np.pi - eps)
+  assert close(m.angle(nearHalfTurn), np.pi - eps, tol=1e-15)
 
 
 def test_S6_axis_angle():
@@ -76,6 +78,9 @@ def test_S6_axis_angle():
   assert m.rotation.byAxisAngle(r.axis(), r.angle()) == r
   assert m.rotation.id.axis() == m.vector3d.X
   assert m.rotation.byAxisAngle(m.vector3d.Z, 90 * m.degree) * m.vector3d.X == m.vector3d.Y
+  # what MATLAB declares as a property is a property
+  assert close(m.rotation.byEuler(0.3, 0.2, 0.1).phi1, 0.3) and n.isNormalized is False
+  assert m.reflection(m.vector3d.Z).isImproper
 
 
 def test_S7_rodrigues():
@@ -255,6 +260,14 @@ def test_S21_products_of_orientations():
   assert mori.frameA is cs and mori.frameB is cs
   with pytest.raises(ValueError):
     o1 * o2
+  # a compatible crystal frame, the same lattice set up against other axes, is absorbed
+  ca = m.crystalFrame("2/m", [8.6, 13, 7.2], [90, 116, 90], alignment=["X||a"])
+  cb = m.crystalFrame("2/m", [8.6, 13, 7.2], [90, 116, 90], alignment=["X||a*"])
+  o = m.orientation.byEuler(A, B, C, ca, ss)
+  mori = m.orientation.byEuler(C, B, A, cb, cb)
+  p = o * mori
+  h = m.Miller(1, 2, 3, cb)
+  assert p.frameA is cb and p.frameB is ss and m.angle(p * h, o * m.transformReferenceFrame(mori * h, ca)) < 1e-12
 
 
 def test_S22_symmetry_sides():
@@ -265,7 +278,10 @@ def test_S22_symmetry_sides():
   assert s.size == cs.numProper() * ss.numProper()
   assert np.all(m.angle(s, o) < 1e-12)
   sc, ssym = cs.properGroup().rotations()[3], ss.properGroup().rotations()[1]
-  assert np.any(s == ssym * o * sc)
+  assert np.any(s == ssym * o * sc) and m.angle(ssym * o * sc, o) < 1e-12
+  # the specimen symmetry acts on the specimen directions, the crystal symmetry on the crystal ones
+  h = m.Miller(1, 2, 3, cs)
+  assert close((o * sc * h).xyz, (o * (sc * h)).xyz) and close((ssym * o * h).xyz, (ssym * (o * h)).xyz)
 
 
 def test_S23_misorientation():
@@ -303,6 +319,8 @@ def test_S25_frame_change_is_not_rotation():
   assert g.frame is cs2 and close(g.hkl, h.hkl) and not close(g.xyz, h.xyz)
   r = m.rotation.byAxisAngle(m.vector3d.Z, 0.3)
   assert m.rotate(h, r).frame is cs and not close(m.rotate(h, r).hkl, h.hkl)
+  o = m.orientation.byEuler(A, B, C, cs, m.specimenFrame.specimen)
+  assert (o * h).frame is o.frameB
 
 
 def test_S26_default_convention():
@@ -312,3 +330,9 @@ def test_S26_default_convention():
   assert m.specimenFrame.default.how2plot == m.plottingConvention.ij
   assert m.plottingConvention.ij.east == m.vector3d.X
   assert m.plottingConvention.ij.outOfScreen == -m.vector3d.Z
+  # a frame without a convention is drawn in the default of the moment it is drawn
+  from mtex.plotting.spherical import _conventionOf
+  fr = m.specimenFrame("222")
+  fr.how2plot = None
+  m.plottingConvention.default("y↑→x")
+  assert _conventionOf(fr) == m.plottingConvention("y↑→x")

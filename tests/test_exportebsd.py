@@ -120,6 +120,7 @@ def test_codes_numbers_and_the_scan():
 
 
 def test_the_two_formatters_agree():
+  pytest.importorskip("numba")
   rng = np.random.default_rng(2)
   c = np.column_stack([rng.uniform(-400, 400, 50), rng.integers(-3, 300, 50), rng.uniform(0, 1e6, 50), rng.uniform(-1, 1, 50)])
   c[3, 3] = np.nan
@@ -127,10 +128,10 @@ def test_the_two_formatters_agree():
   c[5, 3] = 0.0
   a = formatTableNumba(c, [5, -1, 1, 4], b"\t", True)
   b = formatTableNumpy(c, [5, -1, 1, 4], b"\t", True)
-  assert a is None or a == b
+  assert a == b
   a = formatTableNumba(c, [0, 2, -1, 6])
   b = formatTableNumpy(c, [0, 2, -1, 6])
-  assert a is None or a == b
+  assert a == b
 
 
 # ------------------------------------------------------------------ the HDF5 write-back

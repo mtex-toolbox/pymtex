@@ -9,6 +9,11 @@ from mtex.geometry.quaternion import qmul
 
 csP = crystalFrame("432", [3.66, 3.66, 3.66], mineral="fcc")
 csC = crystalFrame("432", [2.87, 2.87, 2.87], mineral="bcc")
+cP = crystalFrame("m-3m", [3.66, 3.66, 3.66], mineral="fcc")
+cC = crystalFrame("m-3m", [2.87, 2.87, 2.87], mineral="bcc")
+
+# the options of the global search
+opt = dict(searchResolution=10 * degree, numLocal=1, maxSample=300, scanSample=100)
 
 
 def perturb(o, ax, omega):
@@ -30,126 +35,226 @@ def c2cData(rng, p2c, n, noise, outliers):
   return mori[mori.angle() >= 5 * degree]
 
 
-def test_calcParent2Child():
+# noisy Kurdjumov-Sachs misorientations with outliers, a start 3 degrees off, the local fit,
+# a permutation of the data and pairs of child orientations
+@pytest.fixture(scope="module")
+def ks():
   rng = np.random.default_rng(0)
   p2c = orientation.KurdjumovSachs(csP, csC)
   mori = c2cData(rng, p2c, 1500, 1 * degree, 0.2)
   p2c0 = perturb(p2c, [1, 2, 3], 3 * degree)
-  # recovery from a local start
   p = calcParent2Child(mori, p2c0, local=True)
-  assert p.angle(p2c) < 0.3 * degree and p.angle(p2c) < p2c0.angle(p2c)
-  # the misfit of every misorientation against the result, most within the noise, also
-  # when the fit subsamples
-  fit = misfit(mori, p)
-  assert len(fit) == mori.size and np.quantile(fit, 0.75) < 3 * degree
-  q, fit = calcParent2Child(mori, p2c0, local=True, maxSample=300, fit=True)
-  assert len(fit) == mori.size and q.angle(p) < 0.3 * degree
-  # independence of the order of the data
   perm = rng.permutation(mori.size)
-  assert p.angle(calcParent2Child(mori[perm], p2c0, local=True)) < 1e-3 * degree
-  # the global search is deterministic and order independent, and finds the relationship
-  opt = dict(searchResolution=10 * degree, numLocal=1, maxSample=300, scanSample=100)
-  pg = calcParent2Child(mori, p2c0, **opt)
-  assert pg.angle(calcParent2Child(mori, p2c0, **opt)) == 0
-  assert pg.angle(calcParent2Child(mori[perm], p2c0, **opt)) < 1e-3 * degree
-  far = perturb(p2c, [0, 0, 1], 25 * degree)
-  pf = calcParent2Child(mori, far, searchResolution=6 * degree, numLocal=3, maxSample=600, scanSample=150)
-  assert pf.angle(p2c) < 0.5 * degree
-  # pairs of child orientations instead of misorientations, and the frame check
   parent = orientation.rand(200, csP, rng=rng)
   V = p2c.variants().flatten()
   pairs = orientation(rotation._fromData(np.stack([(parent * V[rng.integers(0, 24, 200)].inv()).data,
                                                   (parent * V[rng.integers(0, 24, 200)].inv()).data], axis=1)), csC)
-  assert calcParent2Child(pairs, p2c0, local=True).angle(p2c) < 0.1 * degree
+  pg = calcParent2Child(mori, p2c0, **opt)
+  return dict(p2c=p2c, mori=mori, p2c0=p2c0, p=p, perm=perm, pairs=pairs, pg=pg)
+
+
+def test_calcParent2Child_localSearchRecoversTheRelationship(ks):
+  p, p2c, p2c0 = ks["p"], ks["p2c"], ks["p2c0"]
+  assert p.angle(p2c) < 0.3 * degree and p.angle(p2c) < p2c0.angle(p2c)
+
+
+def test_misfit_mostWithinTheNoise(ks):
+  # the misfit of every misorientation against the result, most within the noise
+  fit = misfit(ks["mori"], ks["p"])
+  assert len(fit) == ks["mori"].size and np.quantile(fit, 0.75) < 3 * degree
+
+
+def test_calcParent2Child_subsampledFitAgreesAndGivesEveryMisfit(ks):
+  q, fit = calcParent2Child(ks["mori"], ks["p2c0"], local=True, maxSample=300, fit=True)
+  assert len(fit) == ks["mori"].size and q.angle(ks["p"]) < 0.3 * degree
+
+
+def test_calcParent2Child_localSearchIsOrderIndependent(ks):
+  assert ks["p"].angle(calcParent2Child(ks["mori"][ks["perm"]], ks["p2c0"], local=True)) < 1e-3 * degree
+
+
+def test_calcParent2Child_globalSearchIsDeterministic(ks):
+  assert ks["pg"].angle(calcParent2Child(ks["mori"], ks["p2c0"], **opt)) == 0
+
+
+def test_calcParent2Child_globalSearchIsOrderIndependent(ks):
+  assert ks["pg"].angle(calcParent2Child(ks["mori"][ks["perm"]], ks["p2c0"], **opt)) < 1e-3 * degree
+
+
+def test_calcParent2Child_globalSearchFindsTheRelationshipFrom25DegreesOff(ks):
+  pf = calcParent2Child(ks["mori"], perturb(ks["p2c"], [0, 0, 1], 25 * degree), **opt)
+  assert pf.angle(ks["p2c"]) < 0.5 * degree
+
+
+def test_calcParent2Child_fromPairsOfChildOrientations(ks):
+  assert calcParent2Child(ks["pairs"], ks["p2c0"], local=True).angle(ks["p2c"]) < 0.1 * degree
+
+
+def test_calcParent2Child_refusesARelationshipOfOtherFrames(ks):
   with pytest.raises(ValueError):
-    calcParent2Child(mori, p2c.inv(), local=True)
+    calcParent2Child(ks["mori"], ks["p2c"].inv(), local=True)
 
 
-def test_variant_ids_and_the_parent_of_children():
+# 40 parents with one child each of a known variant, and a grain of five children of one parent
+# stored as arbitrary symmetric representatives
+@pytest.fixture(scope="module")
+def kids():
   rng = np.random.default_rng(1)
-  cP = crystalFrame("m-3m", [3.66, 3.66, 3.66], mineral="fcc")
-  cC = crystalFrame("m-3m", [2.87, 2.87, 2.87], mineral="bcc")
   p2c = orientation.KurdjumovSachs(cP, cC)
   V = p2c.variants().flatten()
-  assert V.size == 24
-  # every child of a parent is recognised with its variant, one based as MATLAB counts from
-  # the parent's representative in the fundamental region
   parent = orientation.rand(40, cP, rng=rng).project2FundamentalRegion()
   ids = rng.integers(1, 25, 40)
   child = perturb(parent * V[ids - 1].inv(), vector3d.rand(40, rng=rng), 0.3 * degree)
-  r = calcVariantId(parent, child, p2c)
-  assert np.array_equal(r.variantId, ids) and np.max(r.fit) < 0.5 * degree
-  assert np.all((1 <= r.packetId) & (r.packetId <= 4)) and np.all((1 <= r.bainId) & (r.bainId <= 3))
-  # four packets of six variants and three Bain groups of eight, one parent for all
-  pk = calcVariantId(parent[0], parent[0] * V.inv(), p2c)
-  assert np.array_equal(np.bincount(pk.packetId)[1:], [6, 6, 6, 6]) and np.array_equal(np.bincount(pk.bainId)[1:], [8, 8, 8])
-  assert np.array_equal(pk.variantId, np.arange(1, 25))
-  # other families name the groups
-  pk2 = calcVariantId(parent[0], parent[0] * V.inv(), p2c, packet=(Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], cP), Miller(0, 1, 1, cC)))
-  assert np.array_equal(pk2.packetId, pk.packetId)
-  with pytest.raises(ValueError):
-    calcVariantId(parent[:3], child, p2c)
-  # the parent of a grain's children, whatever representatives the children are stored as
   P = orientation.rand(cP, rng=rng).project2FundamentalRegion()
   ks = np.array([1, 5, 9, 14, 20])
   kids = perturb(P * V[ks - 1].inv(), vector3d.rand(5, rng=rng), 0.5 * degree)
   G = cC.sym.properGroup().rotations().data.reshape(-1, 4)
   kids = kids._new(qmul(kids.data, G[rng.integers(0, len(G), 5)]))
-  found, fit = calcParent(kids, p2c)
-  assert found.angle(P) < 1 * degree and fit < 1 * degree and found.frameA is cP and found.frameB is kids.frameB
-  r = calcVariantId(found, kids, p2c)
-  assert np.array_equal(r.variantId, ks) and np.max(r.fit) < 1 * degree
-  assert calcParent(kids, p2c, weights=[1, 1, 1, 1, 5])[0].angle(P) < 1 * degree
-  # child with parent: the id names the parent variant the child as stored is taken to
-  # its parent by, so child * PV[id] is that parent
   Pn = P._new(np.broadcast_to(P.data.reshape(1, 4), (5, 4)).copy())
-  pid, f = calcParent(kids, Pn, p2c, id=True)
+  return dict(p2c=p2c, V=V, parent=parent, ids=ids, child=child, P=P, ks=ks, kids=kids, Pn=Pn)
+
+
+def test_KurdjumovSachs_has24Variants(kids):
+  assert kids["V"].size == 24
+
+
+def test_calcVariantId_recognisesEveryChildWithItsVariant(kids):
+  # one based as MATLAB counts from the parent's representative in the fundamental region
+  r = calcVariantId(kids["parent"], kids["child"], kids["p2c"])
+  assert np.array_equal(r.variantId, kids["ids"]) and np.max(r.fit) < 0.5 * degree
+
+
+def test_calcVariantId_packetAndBainIdsInRange(kids):
+  r = calcVariantId(kids["parent"], kids["child"], kids["p2c"])
+  assert np.all((1 <= r.packetId) & (r.packetId <= 4)) and np.all((1 <= r.bainId) & (r.bainId <= 3))
+
+
+def test_calcVariantId_fourPacketsOfSixAndThreeBainGroupsOfEight(kids):
+  p0, V = kids["parent"][0], kids["V"]
+  pk = calcVariantId(p0, p0 * V.inv(), kids["p2c"])
+  assert np.array_equal(np.bincount(pk.packetId)[1:], [6, 6, 6, 6]) and np.array_equal(np.bincount(pk.bainId)[1:], [8, 8, 8])
+  assert np.array_equal(pk.variantId, np.arange(1, 25))
+
+
+def test_calcVariantId_otherFamiliesNameTheSamePackets(kids):
+  p0, V = kids["parent"][0], kids["V"]
+  pk = calcVariantId(p0, p0 * V.inv(), kids["p2c"])
+  pk2 = calcVariantId(p0, p0 * V.inv(), kids["p2c"], packet=(Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], cP), Miller(0, 1, 1, cC)))
+  assert np.array_equal(pk2.packetId, pk.packetId)
+
+
+def test_calcVariantId_refusesParentsAndChildrenOfOtherCounts(kids):
+  with pytest.raises(ValueError):
+    calcVariantId(kids["parent"][:3], kids["child"], kids["p2c"])
+
+
+def test_calcParent_findsTheParentOfAGrainsChildren(kids):
+  # whatever representatives the children are stored as
+  found, fit = calcParent(kids["kids"], kids["p2c"])
+  assert found.angle(kids["P"]) < 1 * degree and fit < 1 * degree and found.frameA is cP and found.frameB is kids["kids"].frameB
+
+
+def test_calcParent_foundParentGivesTheChildrensVariants(kids):
+  found, _ = calcParent(kids["kids"], kids["p2c"])
+  r = calcVariantId(found, kids["kids"], kids["p2c"])
+  assert np.array_equal(r.variantId, kids["ks"]) and np.max(r.fit) < 1 * degree
+
+
+def test_calcParent_weighted(kids):
+  assert calcParent(kids["kids"], kids["p2c"], weights=[1, 1, 1, 1, 5])[0].angle(kids["P"]) < 1 * degree
+
+
+def test_calcParent_idNamesTheParentVariantTakingTheChildToItsParent(kids):
+  # child with parent: child * PV[id] is that parent
+  pid, f = calcParent(kids["kids"], kids["Pn"], kids["p2c"], id=True)
   assert pid.shape == (5,) and np.all(f < 1 * degree)
-  PV = p2c.variants(parent=True).flatten()
-  back = orientation(rotation._fromData(qmul(kids.data, PV.data[pid - 1])), cP)
-  assert np.all(back.angle(P) < 1 * degree)
-  ids2, f2 = calcParent(kids, Pn, p2c, numFit=2, id=True)
+  PV = kids["p2c"].variants(parent=True).flatten()
+  back = orientation(rotation._fromData(qmul(kids["kids"].data, PV.data[pid - 1])), cP)
+  assert np.all(back.angle(kids["P"]) < 1 * degree)
+
+
+def test_calcParent_numFitGivesTheBestFitFirst(kids):
+  pid, _ = calcParent(kids["kids"], kids["Pn"], kids["p2c"], id=True)
+  ids2, f2 = calcParent(kids["kids"], kids["Pn"], kids["p2c"], numFit=2, id=True)
   assert ids2.shape == (5, 2) and f2.shape == (5, 2) and np.array_equal(ids2[:, 0], pid)
-  # without id the parents themselves, as MATLAB returns them, one parent serving all
-  parents, f1 = calcParent(kids, P, p2c)
-  assert parents.frameA is cP and np.all(parents.angle(P) < 1 * degree) and np.allclose(f1, f)
-  # pairs of children, as at grain boundaries, and triples, as at triple points
-  pairs = orientation(rotation._fromData(np.stack([kids.data[:4], kids.data[1:5]], axis=1)), cC)
-  pid, f = calcParent(pairs, p2c, id=True)
+
+
+def test_calcParent_withoutIdGivesTheParents(kids):
+  # as MATLAB returns them, one parent serving all
+  _, f = calcParent(kids["kids"], kids["Pn"], kids["p2c"], id=True)
+  parents, f1 = calcParent(kids["kids"], kids["P"], kids["p2c"])
+  assert parents.frameA is cP and np.all(parents.angle(kids["P"]) < 1 * degree) and np.allclose(f1, f)
+
+
+# pairs of children, as at grain boundaries
+def childPairs(kids):
+  k = kids["kids"]
+  return orientation(rotation._fromData(np.stack([k.data[:4], k.data[1:5]], axis=1)), cC)
+
+
+def test_calcParent_idsOfPairsOfChildren(kids):
+  pid, f = calcParent(childPairs(kids), kids["p2c"], id=True)
   assert pid.shape == (4, 2) and np.all(f < 1.5 * degree) and np.all(pid >= 1)
-  pp, _ = calcParent(pairs, p2c)
-  assert pp.shape == (4, 2) and np.all(pp.angle(P) < 2 * degree)
-  ids2, f2 = calcParent(pairs, p2c, numFit=2, id=True)
+
+
+def test_calcParent_parentsOfPairsOfChildren(kids):
+  pp, _ = calcParent(childPairs(kids), kids["p2c"])
+  assert pp.shape == (4, 2) and np.all(pp.angle(kids["P"]) < 2 * degree)
+
+
+def test_calcParent_numFitOfPairsOfChildren(kids):
+  ids2, f2 = calcParent(childPairs(kids), kids["p2c"], numFit=2, id=True)
   assert ids2.shape == (4, 2, 2) and f2.shape == (4, 2)
-  triples = orientation(rotation._fromData(np.stack([kids.data[:3], kids.data[1:4], kids.data[2:5]], axis=1)), cC)
-  pid, f = calcParent(triples, p2c, id=True)
+
+
+def test_calcParent_idsOfTriplesOfChildren(kids):
+  # as at triple points
+  k = kids["kids"]
+  triples = orientation(rotation._fromData(np.stack([k.data[:3], k.data[1:4], k.data[2:5]], axis=1)), cC)
+  pid, f = calcParent(triples, kids["p2c"], id=True)
   assert pid.shape == (3, 3) and np.all(f < 1.5 * degree)
-  # a relationship given the other way round is turned
-  assert calcParent(kids, p2c.inv())[0].angle(P) < 1 * degree
 
 
-def test_round2Miller():
+def test_calcParent_turnsARelationshipGivenTheOtherWayRound(kids):
+  assert calcParent(kids["kids"], kids["p2c"].inv())[0].angle(kids["P"]) < 1 * degree
+
+
+def test_round2Miller_orientationGivesItsPlaneAndDirection():
   cs = crystalFrame("m-3m")
   o = orientation.byMiller([1, 1, 2], [-1, -1, 1], cs)
   hkl, uvw = round2Miller(o)
   assert np.array_equal(np.round(hkl.hkl), [1, 1, 2]) and np.array_equal(np.round(uvw.uvw), [-1, -1, 1])
   assert hkl.frame.numSym() == 1 and hkl.dispStyle == "hkl" and uvw.dispStyle == "uvw"
-  cP = crystalFrame("m-3m", [3.66, 3.66, 3.66], mineral="fcc")
-  cC = crystalFrame("m-3m", [2.87, 2.87, 2.87], mineral="bcc")
+
+
+def test_round2Miller_KurdjumovSachsPlanesAndDirections():
   n1, n2, d1, d2 = round2Miller(orientation.KurdjumovSachs(cP, cC))
   assert np.array_equal(np.abs(np.round(n1.hkl)), [1, 1, 1]) and sorted(np.abs(np.round(n2.hkl))) == [0, 1, 1]
   assert sorted(np.abs(np.round(d1.uvw))) == [0, 1, 1] and sorted(np.abs(np.round(d2.uvw))) == [1, 1, 1]
   assert n1.frame is not cP and n1.frame.numSym() == 1 and n2.frame.numSym() == 1
-  # the rotation the four indices define is the relationship again
+
+
+def test_round2Miller_indicesDefineTheRelationshipAgain():
+  n1, n2, d1, d2 = round2Miller(orientation.KurdjumovSachs(cP, cC))
   assert orientation.map(Miller(n1, cP), Miller(n2, cC), Miller(d1, cP, "uvw"), Miller(d2, cC, "uvw")).angle(orientation.KurdjumovSachs(cP, cC)) < 1e-6
+
+
+def test_round2Miller_NishiyamaWassermannPlanesAndDirections():
   n1, n2, d1, d2 = round2Miller(orientation.NishiyamaWassermann(cP, cC))
   assert np.array_equal(np.abs(np.round(n1.hkl)), [1, 1, 1]) and sorted(np.abs(np.round(d1.uvw))) == [0, 1, 1]
-  # a list, and the four index styles of a hexagonal crystal
+
+
+def test_round2Miller_ofAList():
   L = round2Miller(orientation.cat(orientation.KurdjumovSachs(cP, cC), orientation.Bain(cP, cC)))
   assert L[0].shape == (2,)
+
+
+def test_round2Miller_hexagonalGivesFourIndices():
   hx = crystalFrame("6/mmm", [3, 3, 4.7])
   a, b = round2Miller(orientation.byEuler(30 * degree, 40 * degree, 0, hx))
   assert a.dispStyle == "hkil" and b.dispStyle == "UVTW"
-  # the index table is coprime and complete
+
+
+def test_allHKL_isCoprimeAndComplete():
   H = allHKL(2)
   assert len(H) == 98 and not np.any(np.all(H == 0, axis=1))

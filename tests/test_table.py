@@ -6,11 +6,17 @@ import pytest
 from mtex.io.table import cprintf, coerceNumeric, headerDict, isNumericRow, leadingLines, linesFrom, readTable, validName
 
 
-def test_readTable_reads_tabs_carriage_returns_blank_lines_and_comments():
-  data = b"# a comment\n1\t2.5\r\n\n3 4e0\r\n# trailing\n"
-  M = readTable(data, comments="#")
-  assert M.shape == (2, 2)
-  assert np.array_equal(M, [[1, 2.5], [3, 4]])
+# tabs, carriage returns, blank lines and comments; a decimal comma decided once for the block;
+# a delimiter replaced before reading; one row still a table of two dimensions
+@pytest.mark.parametrize("data, kw, expected", [
+  (b"# a comment\n1\t2.5\r\n\n3 4e0\r\n# trailing\n", {"comments": "#"}, [[1, 2.5], [3, 4]]),
+  (b"1,5\t2\n3,25\t4\n", {}, [[1.5, 2], [3.25, 4]]),
+  (b"1;2.5\n3;4\n", {"delimiter": ";"}, [[1, 2.5], [3, 4]]),
+  (b"1 2 3\n", {}, [[1, 2, 3]]),
+], ids=["whitespace_and_comments", "decimal_comma", "delimiter", "one_row"])
+def test_readTable_reads_the_block(data, kw, expected):
+  M = readTable(data, **kw)
+  assert M.shape == np.shape(expected) and np.array_equal(M, expected)
 
 
 def test_readTable_starts_at_the_offset():
@@ -35,16 +41,6 @@ def test_linesFrom_reads_a_count_of_lines():
   assert linesFrom(data, 7, 5) == ([b"d"], 8)
 
 
-def test_decimal_comma_is_decided_once_for_the_block():
-  M = readTable(b"1,5\t2\n3,25\t4\n")
-  assert np.array_equal(M, [[1.5, 2], [3.25, 4]])
-
-
-def test_a_delimiter_is_replaced_before_reading():
-  M = readTable(b"1;2.5\n3;4\n", delimiter=";")
-  assert np.array_equal(M, [[1, 2.5], [3, 4]])
-
-
 @pytest.mark.parametrize("backend", ["numpy", "numba"])
 def test_a_row_of_the_wrong_width_names_itself(backend):
   from mtex import setMTEXpref
@@ -60,10 +56,6 @@ def test_a_row_of_the_wrong_width_names_itself(backend):
 def test_no_data_rows_is_an_error():
   with pytest.raises(ValueError, match="no data rows"):
     readTable(b"# only\n", comments="#")
-
-
-def test_one_row_is_a_two_dimensional_table():
-  assert readTable(b"1 2 3\n").shape == (1, 3)
 
 
 def test_headerDict_makes_valid_names_and_numbers():
@@ -87,26 +79,26 @@ def test_isNumericRow():
 
 
 def test_the_two_backends_read_the_same_numbers():
+  pytest.importorskip("numba")
   from mtex.io.kernels import parseBlockNumba, parseBlockNumpy
   block = b"# c\n1 2.5 -3e2\n+4.25E-1\t005\t.5\r\n\n 6. 700000000000000000000 1e-30\n0.000123456789012345 -0.0 9e22\n"
   a = parseBlockNumpy(block, False, b"#")
   b = parseBlockNumba(block, False, b"#")
-  if b is not None:
-    assert a.shape == b.shape == (4, 3)
-    assert np.array_equal(a, b)
+  assert a.shape == b.shape == (4, 3)
+  assert np.array_equal(a, b)
   # beyond fifteen digits the mantissa rounds once more, an ulp or two
   a = parseBlockNumpy(b"1234567890.12345678 0.1234567890123456789\n", False, None)
   b = parseBlockNumba(b"1234567890.12345678 0.1234567890123456789\n", False, None)
-  assert b is None or np.allclose(a, b, rtol=1e-15, atol=0)
+  assert np.allclose(a, b, rtol=1e-15, atol=0)
   with open(os.path.join(os.path.dirname(__file__), "fixtures", "ebsd", "Forsterite_cut.ctf"), "rb") as f:
     data = f.read()
   block = data.split(b"Phase\tX\tY\tBands\tError\tEuler1\tEuler2\tEuler3\tMAD\tBC\tBS\r\n", 1)[1]
   a = parseBlockNumpy(block, False, None)
   b = parseBlockNumba(block, False, None)
-  assert b is None or np.array_equal(a, b)
+  assert np.array_equal(a, b)
   a = parseBlockNumpy(block.replace(b".", b","), True, None)
   b = parseBlockNumba(block.replace(b".", b","), True, None)
-  assert b is None or np.array_equal(a, b)
+  assert np.array_equal(a, b)
 
 
 def test_cprintf_prints_one_width_for_all_columns(capsys):

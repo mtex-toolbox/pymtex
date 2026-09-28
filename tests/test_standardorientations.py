@@ -1,10 +1,9 @@
-# orientations from directions, the relationships, their variants, the coincidence site lattices
+# orientations from directions, the relationships and their variants
 import numpy as np
 import pytest
-from numpy import pi
 
 from mtex import (orientation, rotation, crystalFrame, specimenFrame, Miller, vector3d, xvector, zvector, degree,
-                  angle, symmetrise, variants, CSL, axis, inv)
+                  angle, symmetrise, variants)
 
 
 def test_by_miller_and_the_texture_components():
@@ -50,26 +49,3 @@ def test_relationships_and_variants():
   assert variants(m2h, orientation.rand(3, mag)).size == 24
   cs2 = crystalFrame("6/mmm", [2.95, 2.95, 4.68], mineral="beta")
   assert variants(orientation.Burgers(csG, cs2)).size == 12 and orientation.Burgers(cs2, csG).CS is cs2
-
-
-def test_coincidence_site_lattices():
-  cs = crystalFrame("m-3m", mineral="iron")
-  s3 = CSL(3, cs)
-  assert s3.size == 1 and abs(s3.angle() - 60 * degree) < 1e-10 and s3.antipodal
-  assert angle(axis(s3), vector3d(1, 1, 1, antipodal=True), noSymmetry=True) < 1e-10
-
-  def inFamily(o, h):
-    fam = symmetrise(Miller(*h, cs, "uvw"), unique=True)
-    return np.min(angle(vector3d(axis(o), antipodal=True), fam, noSymmetry=True)) < 1e-8
-
-  s5 = CSL(5, cs)
-  assert abs(s5.angle() - 2 * np.arctan(1 / 3)) < 1e-10 and inFamily(s5, (1, 0, 0))
-  s9 = CSL(9, cs)
-  assert abs(s9.angle() - 38.94 * degree) < 0.01 * degree and inFamily(s9, (1, 1, 0))
-  s13 = CSL(13, cs)
-  assert s13.size == 2 and abs(s13[0].angle() - 22.62 * degree) < 0.01 * degree and abs(s13[1].angle() - 27.80 * degree) < 0.01 * degree
-  assert abs(CSL(7, cs).angle() - 38.21 * degree) < 0.01 * degree and abs(CSL(11, cs).angle() - 50.48 * degree) < 0.01 * degree
-  with pytest.raises(ValueError):
-    CSL(4, cs)
-  with pytest.raises(ValueError):
-    CSL(3, crystalFrame("6/mmm"))

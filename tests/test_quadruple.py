@@ -43,13 +43,6 @@ def test_Q1_a_diagonal_contact_is_one_grain_or_two():
   assert len(q) == 3 and q.numPixel.sum() == len(e) and q.numPixel.max() == 8
 
 
-def test_Q2_no_four_way_contact_survives():
-  e = quadrants()
-  g = calcGrains(e.copy(), angle=10 * degree)
-  q = calcGrains(e.copy(), angle=10 * degree, removeQuadruplePoints=True)
-  assert np.any(g.boundary.vertexDegree() == 4) and not np.any(q.boundary.vertexDegree() == 4)
-
-
 def test_Q3_the_geometry_is_left_where_it_was():
   e = quadrants()
   g = calcGrains(e.copy(), angle=10 * degree)

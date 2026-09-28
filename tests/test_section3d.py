@@ -1,12 +1,9 @@
 # the sections of 3D grains with a plane, against MATLAB master (bench/matlab/probe_grain3d.m)
-import os
 
 import numpy as np
-import pytest
 
-from mtex import EBSD3, EBSD3square, calcGrains, crystalFrame, degree, phaseList, plane3d, rotation, vector3d
+from mtex import EBSD3square, calcGrains, crystalFrame, degree, phaseList, plane3d, rotation, vector3d
 
-DREAM3D = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data", "EBSD", "SmallIN100_MeshStats.dream3d")
 
 
 # a U of grain 1 around grain 2 in a 3 x 3 x 1 plate, grain 3 above: a section at mid height
@@ -59,9 +56,8 @@ def test_holes_and_pieces_touching_in_a_vertex():
   assert area[e.grainId[8, 0, 0]] == 2 and area[e.grainId[6, 5, 0]] == 2
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_sections():
-  g = calcGrains(EBSD3.load(DREAM3D), angle=10 * degree)
+def test_IN100_sections(in100):
+  g = in100[1]
   pl = plane3d(vector3d(0, 0, 1), vector3d(0, 0, -20))
   assert g.intersected(pl).sum() == 63
   s = g.slice(pl)

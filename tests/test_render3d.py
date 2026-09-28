@@ -40,7 +40,8 @@ def test_the_page_data_decode_to_the_scene():
   C = inflate(m["C"], np.uint8).reshape(-1, 3)
   assert len(T) == 2 and np.all(C == [255, 0, 0]) and len(inflate(m["E"], np.uint32)) == 8
   # the vertices about the centre of the scene
-  assert np.isclose(V.min(), -0.5) or V.min() < 0
+  lo, hi = s.bounds()
+  assert np.allclose(V + (lo + hi) / 2, [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], atol=1e-6)
   sl = d["items"][1]
   assert (sl["w"], sl["h"]) == (2, 3) and len(inflate(sl["rgba"], np.uint8)) == 2 * 3 * 4
   assert np.isclose(np.linalg.norm(d["out"]), 1)

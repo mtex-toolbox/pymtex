@@ -37,12 +37,14 @@ def test_the_grains_and_their_faces():
   assert np.allclose(g.surfaceArea.sum(), 2 * g.boundary.area[np.all(g.boundary.grainId > 0, axis=1)].sum() + g.boundary.area[g.boundary.grainId[:, 1] == 0].sum())
 
 
-def test_minPixel_and_a_selection():
+def test_minPixel_turns_a_lone_voxel_into_a_notIndexed_grain():
   e = twoGrains()
   g = calcGrains(e, angle=10 * degree, minPixel=2)
-  # the lone voxel becomes notIndexed and a grain of its own phase
   assert len(g) == 3 and e.phaseId[0, 0, 0] == 0 and g.phaseId[e.grainId[0, 0, 0] - 1] == 0
-  # a list with a hole: the missing voxel is padding, its faces are faces of the surface
+
+
+def test_a_list_with_a_hole_segments_around_the_padding():
+  # the missing voxel is padding, its faces are faces of the surface
   f = twoGrains()
   sub = f[np.arange(f.size) != 5]
   h = calcGrains(sub, angle=10 * degree)
@@ -50,10 +52,8 @@ def test_minPixel_and_a_selection():
   assert sub.grainId.shape == (23,) and np.all(sub.grainId > 0)
 
 
-@pytest.mark.skipif(not os.path.exists(DREAM3D), reason="the IN100 volume of ../master/data")
-def test_IN100_as_MATLAB_reconstructs_it():
-  e = EBSD3.load(DREAM3D)
-  g = calcGrains(e, angle=10 * degree)
+def test_IN100_as_MATLAB_reconstructs_it(in100):
+  e, g = in100
   assert len(g) == 751 and len(g.F) == 748886 and len(g.boundary.idV) == 343561
   assert list(g.numPixel[:10]) == [1, 2, 1, 14, 33, 32, 6, 32, 44, 7]
   assert (e.grainId[0, 0, 0], e.grainId[49, 29, 69]) == (142, 649)

@@ -4,7 +4,7 @@ from mtex import EBSD, crystalFrame, rotation, vector3d
 from mtex.maps.dynprop import dynProp
 
 
-def test_display():
+def test_the_display_lists_every_property_with_its_shape():
   p = dynProp(mad=np.zeros((2, 3)), axis=vector3d(np.ones((4, 3))))
   lines = repr(p).splitlines()
   assert lines == [" mad: [2×3 float64]", "axis: [4 vector3d]"]

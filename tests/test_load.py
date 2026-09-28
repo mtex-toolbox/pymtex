@@ -15,17 +15,17 @@ FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 
 # ------------------------------------------------------------------ the phase numbering
 
-def test_phaseShift_reads_the_numbering_off_the_values():
-  assert phaseShift([0, 1, 2, 1], 2) == 0        # one based, zero not indexed
-  assert phaseShift([0, 1, 0], 2) == 1           # zero based
-  assert phaseShift([1, 1, 2], 2) == 0
-  assert phaseShift([0, 0, 0], 1) == 1           # a single phase written as zero
-  assert phaseShift([], 2) == 0
-
-
-def test_phaseShift_ignores_negative_values():
-  assert phaseShift([-1, 0, 0], 1) == 1
-  assert phaseShift([-1, 1, 2, 3, 4], 4) == 0
+@pytest.mark.parametrize("values, n, shift", [
+  ([0, 1, 2, 1], 2, 0),          # one based, zero not indexed
+  ([0, 1, 0], 2, 1),             # zero based
+  ([1, 1, 2], 2, 0),
+  ([0, 0, 0], 1, 1),             # a single phase written as zero
+  ([], 2, 0),
+  ([-1, 0, 0], 1, 1),            # a negative value is no phase
+  ([-1, 1, 2, 3, 4], 4, 0),
+])
+def test_phaseShift_reads_the_numbering_off_the_values(values, n, shift):
+  assert phaseShift(values, n) == shift
 
 
 def test_phaseColumn_shifts_and_bounds():
@@ -35,14 +35,20 @@ def test_phaseColumn_shifts_and_bounds():
   assert list(phaseColumn([0, 1, 255], 1, 3)) == [1, 2, 0]
 
 
-def test_tslPointGroup():
+def test_tslPointGroup_reads_the_laue_class_number():
   assert tslPointGroup(43) == "m-3m"
   assert tslPointGroup("62") == "6/mmm"
   assert tslPointGroup(2) == "2/m"
   assert tslPointGroup("x") == "-1"
+
+
+def test_tslPointGroup_takes_the_point_group_of_its_laue_class():
   assert tslPointGroup(62, 126) == "6/mmm"
   assert tslPointGroup(43, "130") == "-43m"
   assert tslPointGroup(22, "Orthorhombic (D2h) [mmm]") == "mmm"
+
+
+def test_tslPointGroup_disbelieves_a_point_group_of_another_laue_class():
   # a point group of another Laue class is not believed
   assert tslPointGroup(62, 131) == "6/mmm"
   assert tslPointGroup(43, "999") == "m-3m"
@@ -58,11 +64,16 @@ def test_placedPhases_places_by_number_and_fills_the_gaps():
   assert len(placedPhases({})) == 1
 
 
-def test_unmeasuredRows():
+def test_unmeasuredRows_marks_the_rows_without_angles_or_signal():
   props = {"iq": np.array([0, 1, 0]), "ci": np.array([0, 0, 0])}
   z = np.array([0, 0, 0.0])
   mask = unmeasuredRows(z, z, np.array([0, 0, 0.5]), props)
   assert list(mask) == [True, False, False]
+
+
+def test_unmeasuredRows_is_none_without_a_signal_column_or_with_angles():
+  props = {"iq": np.array([0, 1, 0]), "ci": np.array([0, 0, 0])}
+  z = np.array([0, 0, 0.0])
   assert unmeasuredRows(z, z, z, {"sem": z}) is None
   assert unmeasuredRows(np.array([1, 1, 1.0]), z, z, props) is None
 
@@ -98,13 +109,19 @@ def test_ebsdFromColumns_applies_the_correction_once():
   assert mtex.angle(e[0].rotations, r * raw) < 1e-12
 
 
-def test_ebsdFromColumns_zero_based_and_unindexed():
+def test_ebsdFromColumns_zero_based_with_unindexed_rows():
   x, y = grid()
   cs = [crystalFrame("m-3m", mineral="Fe"), crystalFrame("mmm", mineral="Ol")]
   z = np.zeros(6)
   e = ebsdFromColumns(x, y, z, z, z, [0, 1, 0, 1, 255, 0], cs, {}, shift=1, unindexed=[False, False, True, False, False, False])
   assert list(e.phaseId) == [1, 2, 0, 2, 0, 1]
   assert list(e.phaseMap) == [-1, 0, 1]
+
+
+def test_ebsdFromColumns_one_based_keeps_the_ids():
+  x, y = grid()
+  cs = [crystalFrame("m-3m", mineral="Fe"), crystalFrame("mmm", mineral="Ol")]
+  z = np.zeros(6)
   e = ebsdFromColumns(x, y, z, z, z, [0, 1, 0, 1, 2, 0], cs, {}, shift=0)
   assert list(e.phaseId) == [0, 1, 0, 1, 2, 0]
   assert list(e.phaseMap) == [0, 1, 2]
@@ -126,9 +143,12 @@ def test_ebsdFromColumns_takes_the_unit_cell_hint():
   assert abs(e.dPos - 0.5) < 1e-12
 
 
-def test_regularPoly():
+def test_regularPoly_square_has_the_given_steps():
   sq = regularPoly(4, [1, 2])
   assert np.allclose(np.sort(np.abs(sq[:, 0])), 0.5) and np.allclose(np.abs(sq[:, 1]), 1)
+
+
+def test_regularPoly_hexagon_has_the_given_width_in_the_plane():
   hx = regularPoly(6, 1)
   assert abs(hx[:, 0].max() - hx[:, 0].min() - 1) < 1e-12
   assert np.allclose(hx[:, 2], 0)
@@ -143,23 +163,21 @@ def test_tryGridify_puts_a_complete_scan_on_its_grid():
     warnings.simplefilter("error")
     g = tryGridify(e)
   assert g.shape == (3, 4)
+
+
+def test_tryGridify_returns_a_gridded_map_as_it_is():
+  x, y = grid(4, 3)
+  e = ebsdFromColumns(x, y, np.zeros(12), np.zeros(12), np.zeros(12), np.ones(12), [crystalFrame("m-3m")], {})
+  g = tryGridify(e)
   assert tryGridify(g) is g
 
 
-def test_tryGridify_keeps_a_list_with_a_stray_position():
+# a stray position far out, or a second pixel on a lattice site
+@pytest.mark.parametrize("extra", [(1000.0, 1000.0), (1.0, 1.0)], ids=["stray", "collision"])
+def test_tryGridify_keeps_a_list_that_is_no_grid(extra):
   x, y = grid(4, 3)
-  x = np.append(x, 1000.0)
-  y = np.append(y, 1000.0)
-  e = ebsdFromColumns(x, y, np.zeros(13), np.zeros(13), np.zeros(13), np.ones(13), [crystalFrame("m-3m")], {})
-  with pytest.warns(UserWarning, match="not form a grid|not on a lattice"):
-    g = tryGridify(e)
-  assert g.ndim == 1
-
-
-def test_tryGridify_keeps_a_list_on_a_collision():
-  x, y = grid(4, 3)
-  x = np.append(x, 1.0)
-  y = np.append(y, 1.0)
+  x = np.append(x, extra[0])
+  y = np.append(y, extra[1])
   e = ebsdFromColumns(x, y, np.zeros(13), np.zeros(13), np.zeros(13), np.ones(13), [crystalFrame("m-3m")], {})
   with pytest.warns(UserWarning):
     g = tryGridify(e)
@@ -167,13 +185,6 @@ def test_tryGridify_keeps_a_list_on_a_collision():
 
 
 # ------------------------------------------------------------------ the entry point
-
-def test_loadEBSD_dispatches_on_the_extension():
-  e = loadEBSD(os.path.join(FIXTURES, "ferrite_cut.ang"))
-  assert e.ndim == 2
-  e = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"), noGrid=True)
-  assert e.ndim == 1 and len(e) == 1464
-
 
 def test_loadEBSD_interface_names_the_format(tmp_path):
   p = tmp_path / "renamed.dat"
@@ -188,6 +199,9 @@ def test_loadEBSD_a_phase_list_replaces_the_phases_of_a_vendor_file():
   # an import script states its own frames; they replace the file's, the not indexed one first
   e = loadEBSD(os.path.join(FIXTURES, "ferrite_cut.ang"), crystalFrame("m-3m", mineral="Iron bcc"))
   assert e.CSList.mineralList[1] == "Iron bcc" and not e.CSList.isIndexed(0)
+
+
+def test_loadEBSD_a_phase_list_of_other_length_is_an_error():
   with pytest.raises(ValueError, match="names"):
     loadEBSD(os.path.join(FIXTURES, "ferrite_cut.ang"), [crystalFrame("m-3m"), crystalFrame("6/mmm")])
 
@@ -233,15 +247,28 @@ def stoppedHexScan(x0=0.0, dtype=np.float64):
 
 
 def test_a_stopped_hexagonal_scan_is_read_off_its_rows():
-  from mtex.io.load import gridLattice, scanGridFromPositions
+  from mtex.io.load import scanGridFromPositions
   xy, h = stoppedHexScan()
   sg = scanGridFromPositions(xy[:, 0], xy[:, 1])
   assert sg[:2] == (7, 8) and sg[4:] == (True, 6)
+
+
+def test_gridLattice_compiled_matches_numpy_on_a_stopped_hexagonal_scan():
+  from mtex.io.load import gridLattice, scanGridFromPositions
+  xy, h = stoppedHexScan()
+  sg = scanGridFromPositions(xy[:, 0], xy[:, 1])
   pos = np.column_stack([xy, np.zeros(len(xy))])
   a = gridLattice(pos, *sg)
   setMTEXpref("kernels", "numpy")
   b = gridLattice(pos, *sg)
   assert a is not None and np.array_equal(a.ij, b.ij) and np.allclose(a.A, b.A) and np.allclose(a.origin, b.origin)
+
+
+def test_gridLattice_places_every_position_of_a_stopped_hexagonal_scan():
+  from mtex.io.load import gridLattice, scanGridFromPositions
+  xy, h = stoppedHexScan()
+  sg = scanGridFromPositions(xy[:, 0], xy[:, 1])
+  a = gridLattice(np.column_stack([xy, np.zeros(len(xy))]), *sg)
   assert a.ij.min() == 0 and np.max(np.abs(a.position(a.ij)[:, :2] - xy)) < 1e-12
 
 
