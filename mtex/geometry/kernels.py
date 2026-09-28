@@ -19,6 +19,8 @@ _parallelLock = threading.RLock()
 
 # workqueue has one process-wide queue: two Python threads must not launch it together.
 # compiled helpers called from inside a kernel stay unwrapped; its Python entry holds the lock.
+# under workqueue the result is a Python function, so only Python calls it, never another
+# compiled loop: that would compile on Linux (omp, tbb) and fail on macOS alone.
 def _parallelKernel(f, **options):
   nb = _jit()
   with _parallelLock:

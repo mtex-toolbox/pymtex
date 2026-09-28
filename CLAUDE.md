@@ -99,7 +99,10 @@ decomposition of the wave velocities and the turn of flattened tensors by many r
 embedding's images, `ori * T`) in `mtex/tensors/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
 physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft and
-`scipy.fft`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
+`scipy.fft`. A parallel loop called from Python is compiled by `_parallelKernel`
+(`geometry/kernels.py`), which under numba's `workqueue` layer (macOS) holds one lock around
+every launch; a parallel helper called from inside another compiled loop is a plain
+`nb.njit(parallel=True)`, never a `_parallelKernel`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
 `libnfft3_omp.so`) is an optional backend of the SO(3) adjoint through ctypes,
 `mtex/functions/nfft.py`, found by the preference `NFFTLibrary` or `MTEX_NFFT_LIBRARY`;
 finufft stays the dependency. Never import numba at module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
