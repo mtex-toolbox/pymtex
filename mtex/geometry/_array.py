@@ -75,6 +75,14 @@ class MtexArray:
     """the dtype of the coordinate array"""
     return self.data.dtype
 
+  # NumPy's view of a container is its coordinate array as stored, shape (..., k): xyz for
+  # vectors and Miller indices, quaternions for rotations and orientations
+  def __array__(self, dtype=None, copy=None):
+    if copy is False and dtype is not None and np.dtype(dtype) != self.data.dtype:
+      raise ValueError(f"the coordinates of a {type(self).__name__} are {self.data.dtype}, not {np.dtype(dtype)}, without a copy")
+    out = self.data if dtype is None else self.data.astype(dtype, copy=False)
+    return out.copy() if copy and out is self.data else out
+
   # the number of elements, MATLAB's numel, so that a single element has length one
   def __len__(self):
     return self.size

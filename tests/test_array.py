@@ -88,3 +88,14 @@ def test_new_rejects_unknown_attributes_and_astype_keeps_them():
   with pytest.raises(TypeError):
     p._new(p.data, frame=None)
   assert repr(p) == "Pair (2)" and repr(p[0]) == "Pair (1)" and repr(p.reshape(1, 2)) == "Pair (1 × 2)"
+
+
+def test_numpy_sees_the_coordinates_and_leaves_the_operators_to_the_container():
+  p = Pair(np.arange(6.0).reshape(3, 2))
+  assert np.asarray(p) is p.data
+  assert np.array_equal(np.array(p), p.data) and not np.shares_memory(np.array(p), p.data)
+  assert np.asarray(p, dtype=np.float32).dtype == np.float32
+  with pytest.raises(ValueError):
+    np.asarray(p, dtype=np.float32, copy=False)
+  with pytest.raises(TypeError):
+    np.ones(3) + p
