@@ -14,7 +14,7 @@ import io
 
 import numpy as np
 
-from ..geometry.kernels import _jit, backend
+from ..geometry.kernels import _jit, _parallelKernel, backend
 
 prange = range
 _COMPILED = {}
@@ -122,7 +122,7 @@ def _compile():
     return None
   if "parse" not in _COMPILED:
     globals()["prange"] = nb.prange
-    _COMPILED["parse"] = nb.njit(cache=True, parallel=True, nogil=True)(_parseLoop)
+    _COMPILED["parse"] = _parallelKernel(_parseLoop, nogil=True)
   return _COMPILED["parse"]
 
 
@@ -176,6 +176,21 @@ def parseBlockNumpy(block, comma, comments):
   try:
     M = np.loadtxt(io.BytesIO(block), comments=comments.decode() if comments else None, ndmin=2)
   except ValueError as e:
+    # report data rows from one on both backends; NumPy's conversion errors count from zero
+    width, row = None, 0
+    for line in block.splitlines():
+      line = line.split(comments, 1)[0] if comments else line
+      fields = line.split()
+      if not fields:
+        continue
+      row += 1
+      width = len(fields) if width is None else width
+      try:
+        [float(v) for v in fields]
+      except ValueError:
+        raise ValueError(f"row {row} of the numeric block is not numeric") from None
+      if len(fields) != width:
+        raise ValueError(f"row {row} has {len(fields)} columns, expected {width}") from None
     raise ValueError(f"the numeric block could not be read: {e}") from None
   if M.size == 0:
     raise ValueError("the file holds no data rows")
@@ -302,8 +317,8 @@ def _compileWriter():
     globals()["prange"] = nb.prange
     for name in ("_numberWidth", "_writeNumber"):
       globals()[name] = nb.njit(cache=True)(globals()[name])
-    _COMPILED["rowLengths"] = nb.njit(cache=True, parallel=True)(_rowLengths)
-    _COMPILED["writeRows"] = nb.njit(cache=True, parallel=True)(_writeRows)
+    _COMPILED["rowLengths"] = _parallelKernel(_rowLengths)
+    _COMPILED["writeRows"] = _parallelKernel(_writeRows)
   return _COMPILED["writeRows"]
 
 

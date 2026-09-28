@@ -286,7 +286,7 @@ class fibre:
     r = f.r.data.reshape(3)
     k = next((j for j in (2, 1, 0) if abs(r[j]) > 1e-9), 2)
     if r[k] < 0:
-      f = cls(o1, orientation._fromRotation(-vecs[:, -2], frames), full=True)
+      f.h = f.h._new(-f.h.data)
     if not diagnostics:
       return f
     return f, vals, float(np.nanmean(f.angle(ori)))

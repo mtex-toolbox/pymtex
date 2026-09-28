@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.display import aligned, frameLabel, textTable, xnum2str
-from ..geometry.kernels import backend, qmul, _jit
+from ..geometry.kernels import backend, qmul, _jit, _parallelKernel
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
@@ -773,7 +773,7 @@ def _compiled(name, f, parallel=False):
     return None
   if name not in _COMPILED:
     globals()["prange"] = nb.prange
-    _COMPILED[name] = nb.njit(cache=True, parallel=parallel)(f)
+    _COMPILED[name] = _parallelKernel(f) if parallel else nb.njit(cache=True)(f)
   return _COMPILED[name]
 
 

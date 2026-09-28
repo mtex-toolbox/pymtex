@@ -78,7 +78,7 @@ def test_edited_phase_reproduced_in_fresh_session(tmp_path):
   text = buildImportWizardScript(path, phases=phaseList(frames), headerPhases=info.phases, mapConvention="y↓→x")
   assert "crystalFrame('mmm', [4.8, 10.207, 5.98], [90, 90, 90], mineral='Forsterite')" in text
   script = tmp_path / "import_test.py"
-  script.write_text(text.replace("plot(ebsd", "(ebsd") + "\nprint(ebsd.CSList.frames[1].abc[0])\n")
+  script.write_text(text.replace("plot(ebsd", "(ebsd") + "\nprint(ebsd.CSList.frames[1].abc[0])\n", encoding="utf-8")
   out = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, cwd=ROOT)
   assert out.returncode == 0, out.stderr
   assert out.stdout.strip().endswith("4.8")

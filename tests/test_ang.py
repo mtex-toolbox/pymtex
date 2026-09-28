@@ -80,9 +80,10 @@ def test_olivine_grids_with_padding():
   e = loadEBSD(OLIVINE)
   assert e.shape == (4, 223)
   assert int((e.phaseId == 0).sum()) == 4 * 223 - 700
-  # the display leaves the padding out of the rows, its shares are of all cells to two
+  # the display leaves the padding out of the rows, its shares are of measured cells to two
   # significant digits, as MATLAB writes them
-  assert "652 (73%)" in repr(e) and "notIndexed" not in repr(e)
+  assert (~e.isPadding).sum() == 700
+  assert "652 (93%)" in repr(e) and "notIndexed" not in repr(e)
 
 
 def test_the_edax_alignment_is_x_parallel_a():

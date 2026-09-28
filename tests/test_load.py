@@ -219,7 +219,8 @@ def test_the_numpy_backend_reads_the_same_map():
   b = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   assert a.shape == b.shape
   assert np.array_equal(a.pos.data, b.pos.data)
-  assert np.array_equal(a.rotations.data, b.rotations.data, equal_nan=True)
+  # the trigonometry of the compiled and NumPy Euler conversions can differ by roundoff
+  assert np.allclose(a.rotations.data, b.rotations.data, rtol=0, atol=2e-15, equal_nan=True)
   assert np.array_equal(a.phaseId, b.phaseId) and np.array_equal(a.mad, b.mad)
 
 

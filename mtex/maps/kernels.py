@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _jit
+from ..geometry.kernels import _jit, _parallelKernel
 
 prange = range
 _COMPILED = {}
@@ -302,7 +302,7 @@ def weldNumba(xy, lo, c, cell):
       globals()[name] = _COMPILED[name]
     _COMPILED["_firstOnCell"] = nb.njit(cache=True, parallel=True)(_firstOnCell)
     globals()["_firstOnCell"] = _COMPILED["_firstOnCell"]
-    _COMPILED["weld"] = nb.njit(cache=True, parallel=True)(_weldLoop)
+    _COMPILED["weld"] = _parallelKernel(_weldLoop)
   xy = np.ascontiguousarray(xy, dtype=np.float64)
   group = np.empty(len(xy), np.int32)
   first = np.empty(len(xy), np.int32)
@@ -325,7 +325,7 @@ def _compile():
     for name in _HELPERS:
       _COMPILED[name] = nb.njit(cache=True)(globals()[name])
       globals()[name] = _COMPILED[name]
-    _COMPILED["localVoronoi"] = nb.njit(cache=True, parallel=True)(_localVoronoiLoop)
+    _COMPILED["localVoronoi"] = _parallelKernel(_localVoronoiLoop)
   return _COMPILED["localVoronoi"]
 
 
@@ -1196,7 +1196,7 @@ def _compileLoops():
   if nb is None:
     return None
   if "traceLoops" not in _COMPILED:
-    _COMPILED["traceLoops"] = (nb.njit(cache=True, parallel=True)(_traceGrainsLoop), nb.njit(cache=True, parallel=True)(_compactLoopsLoop))
+    _COMPILED["traceLoops"] = (_parallelKernel(_traceGrainsLoop), _parallelKernel(_compactLoopsLoop))
   return _COMPILED["traceLoops"]
 
 
@@ -1207,7 +1207,7 @@ def pixelKernel(name):
   if nb is None:
     return None
   if name not in _COMPILED:
-    _COMPILED[name] = nb.njit(cache=True, parallel=True)({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop}[name])
+    _COMPILED[name] = _parallelKernel({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop}[name])
   return _COMPILED[name]
 
 
@@ -1358,7 +1358,7 @@ def grainKernel(name):
   key = "grain:" + name
   if key not in _COMPILED:
     f, parallel = _GRAIN_LOOPS[name]
-    _COMPILED[key] = nb.njit(cache=True, parallel=parallel)(f)
+    _COMPILED[key] = _parallelKernel(f) if parallel else nb.njit(cache=True)(f)
   return _COMPILED[key]
 
 

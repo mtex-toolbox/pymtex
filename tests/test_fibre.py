@@ -150,6 +150,23 @@ def test_fit_recovers_a_fibre():
   assert angle(fibre.fit(o), fRec) < 1e-6
 
 
+@pytest.mark.parametrize("signs", [(1, 1), (-1, 1), (1, -1), (-1, -1)])
+def test_fit_hemisphere_does_not_depend_on_eigenvector_signs(monkeypatch, signs):
+  cs = crystalFrame("1")
+  f = fibre(Miller(1, 2, 3, cs), vector3d(0.2, 0.3, -1).normalize())
+  ori = f.orientation(100)
+  eigh = np.linalg.eigh
+
+  def signed(A):
+    vals, vecs = eigh(A)
+    vecs[:, -2:] *= signs
+    return vals, vecs
+
+  monkeypatch.setattr(np.linalg, "eigh", signed)
+  fitted = fibre.fit(ori, noSymmetry=True)
+  assert fitted.r.z > 0 and angle(fitted, f) < 1e-7
+
+
 def test_display():
   cs = crystalFrame("432")
   s = repr(fibre.alpha(cs))

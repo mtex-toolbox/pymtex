@@ -28,7 +28,16 @@ def test_browser(st):
   cb.toggleFolder(st, 0)
   assert not st.entries[0].open and len(st.entries) < n
   crumbs = cb.breadcrumbs(st)
-  assert crumbs[-1][1] == FIXTURES and crumbs[0][1] == os.sep
+  assert crumbs[-1][1] == FIXTURES and crumbs[0][1] == os.path.splitdrive(FIXTURES)[0] + os.sep
+
+
+@pytest.mark.parametrize("folder, root", [(r"C:\data\ebsd", "C:\\"), (r"\\server\share\ebsd", "\\\\server\\share\\")])
+def test_windows_breadcrumbs_keep_the_drive(monkeypatch, folder, root):
+  import ntpath
+  from types import SimpleNamespace
+  monkeypatch.setattr(cb, "os", SimpleNamespace(path=ntpath, sep="\\"))
+  crumbs = cb.breadcrumbs(SimpleNamespace(folder=folder))
+  assert crumbs[0] == (root, root) and crumbs[-1] == ("ebsd", folder)
 
 
 def test_describe_sets_the_two_frames(st):
@@ -112,7 +121,7 @@ def test_outputs(st, tmp_path):
   assert "csList" in cb.scriptOf(st) and "mineral='Fo'" in cb.scriptOf(st)
   assert os.path.basename(cb.defaultScriptPath(st)) == "import_Forsterite_cut.py"
   path = cb.writeScript(st, os.path.join(tmp_path, "mine.py"))
-  assert os.path.isfile(path) and open(path).read() == cb.scriptOf(st) and st.status[1].startswith("written")
+  assert os.path.isfile(path) and open(path, encoding="utf-8").read() == cb.scriptOf(st) and st.status[1].startswith("written")
 
 
 def test_data_sets(st):

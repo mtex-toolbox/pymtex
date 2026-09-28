@@ -64,8 +64,9 @@ def _sha256(path):
 # where a source file is, under the data path or its EBSD or PoleFigure folder, fetched and
 # checked where it is not there yet
 def _resolve(source, root, download):
-  full = os.path.join(root, source["path"])
-  short = os.path.join(root, source["path"].split("/", 1)[-1])
+  parts = source["path"].split("/")
+  full = os.path.join(root, *parts)
+  short = os.path.join(root, *parts[1:]) if len(parts) > 1 else full
   for p in (full, short):
     if os.path.isfile(p):
       return p

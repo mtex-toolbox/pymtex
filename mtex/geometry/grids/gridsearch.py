@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..kernels import _jit
+from ..kernels import _jit, _parallelKernel
 prange = range
 _COMPILED = {}
 
@@ -302,13 +302,13 @@ def _compileHelpers():
 def _compileS2():
   if "s2Nearest" not in _COMPILED:
     nb = _compileHelpers()
-    _COMPILED["s2Nearest"] = nb.njit(cache=True, parallel=True)(_s2NearestLoop)
+    _COMPILED["s2Nearest"] = _parallelKernel(_s2NearestLoop)
 
 
 def _compileSO3():
   if "so3Radius" not in _COMPILED:
     nb = _compileHelpers()
-    _COMPILED["so3Radius"] = nb.njit(cache=True, parallel=True)(_so3RadiusLoop)
+    _COMPILED["so3Radius"] = _parallelKernel(_so3RadiusLoop)
 
 
 __all__ = []

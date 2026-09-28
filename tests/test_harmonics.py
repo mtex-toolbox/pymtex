@@ -257,6 +257,7 @@ def test_sparse_projection_against_the_products():
 
 # the compiled Wigner-d table at any angle equals the recursion, the ends 0 and pi included
 def test_wignerd_table_against_the_recursion():
+  pytest.importorskip("numba")
   from mtex.functions.harmonics import wignerdDegrees
   from mtex.functions.kernels import wignerdTable
   for beta in (0.0, 0.4, np.pi / 2, 2.7, np.pi):

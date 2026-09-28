@@ -100,11 +100,13 @@ def letterRow(st, current, letter):
 
 def breadcrumbs(st):
   """the crumbs of the path, the root first, each with the folder it reaches"""
-  parts = st.folder.split(os.sep)
-  out, here = [], ""
-  for p in parts:
-    here = os.path.join(here, p) if here else (p or os.sep)
-    out.append((p or os.sep, here))
+  drive, tail = os.path.splitdrive(st.folder)
+  here = drive + os.sep
+  out = [(here, here)]
+  for p in tail.split(os.sep):
+    if p:
+      here = os.path.join(here, p)
+      out.append((p, here))
   return out
 
 

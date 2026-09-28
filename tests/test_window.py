@@ -5,10 +5,6 @@ import pytest
 
 pytest.importorskip("PySide6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-import matplotlib
-
-matplotlib.use("QtAgg")
-
 from mtex.wizard import callbacks as cb
 from mtex.wizard.window import application, grabWindow, runWizard
 

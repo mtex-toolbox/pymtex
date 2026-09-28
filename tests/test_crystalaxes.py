@@ -68,3 +68,13 @@ def test_kernels():
   dual = reciprocalAxes(axes)
   assert np.allclose(axes @ dual.T, np.eye(3))
   assert completeCell([2, 0, 0], [0, 0, 0]) == ((2, 2, 2), (pi / 2, pi / 2, pi / 2))
+
+
+@pytest.mark.parametrize("group", ["321", "6/mmm", "422", "m-3m"])
+def test_cell_constraints_allow_roundoff(group):
+  a = 2.950000047683716
+  cell = [np.nextafter(a, np.inf), a, a if group == "m-3m" else 4.686]
+  cs = crystalFrame(group, cell)
+  assert np.allclose(cs.abc, cell, rtol=1e-14, atol=0)
+  with pytest.raises(ValueError, match="must be equal"):
+    crystalFrame(group, [a * 1.001, a, cell[2]])

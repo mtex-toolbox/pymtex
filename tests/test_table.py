@@ -45,7 +45,10 @@ def test_a_delimiter_is_replaced_before_reading():
   assert np.array_equal(M, [[1, 2.5], [3, 4]])
 
 
-def test_a_row_of_the_wrong_width_names_itself():
+@pytest.mark.parametrize("backend", ["numpy", "numba"])
+def test_a_row_of_the_wrong_width_names_itself(backend):
+  from mtex import setMTEXpref
+  setMTEXpref("kernels", backend)
   with pytest.raises(ValueError, match="row 3"):
     readTable(b"1 2\n3 4\n5\n6 7\n")
   with pytest.raises(ValueError, match="row 2"):

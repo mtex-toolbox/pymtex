@@ -1,4 +1,9 @@
 # the compiled kernels agree with their NumPy forms, on every shape the port uses them with
+import os
+import subprocess
+import sys
+import textwrap
+
 import numpy as np
 import pytest
 
@@ -12,6 +17,41 @@ from mtex.geometry.symreduce import reductionGroups, referenceImages
 
 rng = np.random.default_rng(3)
 numba = pytest.importorskip("numba")
+
+
+# workqueue is the only threading backend available on some machines, including macOS
+def test_parallel_kernels_from_two_threads_with_workqueue():
+  code = textwrap.dedent('''
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    import numpy as np
+    import numba
+    from mtex.geometry.kernels import eulerQuat
+    from mtex.io.kernels import parseBlockNumba
+
+    angles = np.zeros(50000)
+    block = b"1 2 3\\n" * len(angles)
+    def rotations():
+      q = eulerQuat(angles, angles, angles)
+      assert np.all(q[:, 0] == 1) and np.all(q[:, 1:] == 0)
+    def table():
+      assert np.all(parseBlockNumba(block, False, None) == [1, 2, 3])
+    rotations()
+    table()
+    assert numba.threading_layer() == "workqueue"
+    barrier = Barrier(2)
+    def run(f):
+      for _ in range(12):
+        barrier.wait(timeout=30)
+        f()
+    with ThreadPoolExecutor(2) as pool:
+      futures = [pool.submit(run, f) for f in (rotations, table)]
+      for future in futures:
+        future.result(timeout=60)
+  ''')
+  env = dict(os.environ, NUMBA_THREADING_LAYER="workqueue", NUMBA_NUM_THREADS="2")
+  result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
+  assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.fixture

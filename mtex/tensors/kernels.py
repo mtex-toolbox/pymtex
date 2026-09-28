@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _jit, backend
+from ..geometry.kernels import _jit, _parallelKernel, backend
 
 prange = range
 _COMPILED = {}
@@ -74,7 +74,7 @@ def _eigh3Kernel():
     return None
   if "eigh3" not in _COMPILED:
     globals()["prange"] = nb.prange
-    _COMPILED["eigh3"] = nb.njit(cache=True, parallel=True)(_eigh3Loop)
+    _COMPILED["eigh3"] = _parallelKernel(_eigh3Loop)
   return _COMPILED["eigh3"]
 
 
@@ -131,7 +131,7 @@ def _turnKernel():
     return None
   if "turn" not in _COMPILED:
     globals()["prange"] = nb.prange
-    _COMPILED["turn"] = nb.njit(cache=True, parallel=True)(_turnLoop)
+    _COMPILED["turn"] = _parallelKernel(_turnLoop)
   return _COMPILED["turn"]
 
 

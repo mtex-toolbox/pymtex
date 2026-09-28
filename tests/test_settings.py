@@ -72,7 +72,7 @@ def test_a_broken_file_or_setting_warns_and_leaves_mtex_usable(tmp_path):
 def test_import_reads_the_users_file(tmp_path):
   f = tmp_path / "mtex_settings.json"
   f.write_text('{"plottingConvention": "y↑→x"}', encoding="utf-8")
-  env = dict(os.environ, MTEX_SETTINGS=str(f))
+  env = dict(os.environ, MTEX_SETTINGS=str(f), PYTHONIOENCODING="utf-8")
   out = subprocess.run([sys.executable, "-c", "import mtex; print(mtex.plottingConvention.default.char())"],
-                       env=env, capture_output=True, text=True, check=True).stdout
+                       env=env, capture_output=True, encoding="utf-8", check=True).stdout
   assert out.strip() == "y↑→x"

@@ -104,7 +104,8 @@ def test_rodrigues():
   rr = r[keep]
   assert same(rotation.byRodrigues(Rodrigues(rr)), rr)
   assert np.sum(keep) > 0.9 * r.size
-  assert np.all(Rodrigues(rr) == np.tan(rr.angle() / 2) * rr.axis())
+  # compare the coordinates relatively: Rodrigues vectors grow without bound near pi
+  assert np.allclose(Rodrigues(rr).data, (np.tan(rr.angle() / 2) * rr.axis()).data, rtol=2e-13, atol=1e-13)
   assert same(rotation.byRodrigues([0, 0, 1]), Rz(pi / 2))
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _jit, backend, threads
+from ..geometry.kernels import _jit, _parallelKernel, backend, threads
 
 _COMPILED = {}
 prange = range
@@ -23,7 +23,7 @@ def _parallel(name, f):
   if name not in _COMPILED:
     global prange
     prange = nb.prange
-    _COMPILED[name] = nb.njit(cache=True, parallel=True)(f)
+    _COMPILED[name] = _parallelKernel(f)
   nb.set_num_threads(min(threads(), nb.config.NUMBA_NUM_THREADS))
   return _COMPILED[name]
 

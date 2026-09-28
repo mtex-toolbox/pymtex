@@ -5,12 +5,33 @@
 # 'kernels' ('numba' or 'numpy') picks the backend
 from __future__ import annotations
 
+import functools
+import threading
+
 import numpy as np
 
 from .session import getMTEXpref
 
 _numba = None        # the module once imported, False when it is not installed
 _compiled = {}       # the loops by name, compiled on first use
+_parallelLock = threading.RLock()
+
+
+# workqueue has one process-wide queue: two Python threads must not launch it together.
+# compiled helpers called from inside a kernel stay unwrapped; its Python entry holds the lock.
+def _parallelKernel(f, **options):
+  nb = _jit()
+  with _parallelLock:
+    nb.get_num_threads()
+    kernel = nb.njit(cache=True, parallel=True, **options)(f)
+    if nb.threading_layer() != "workqueue":
+      return kernel
+
+  @functools.wraps(f)
+  def guarded(*args, **kwargs):
+    with _parallelLock:
+      return kernel(*args, **kwargs)
+  return guarded
 
 
 def _jit():
@@ -131,7 +152,7 @@ def _parallel(name, f):
   global prange
   prange = _numba.prange
   if name not in _compiled:
-    _compiled[name] = _numba.njit(cache=True, parallel=True, nogil=True)(f)
+    _compiled[name] = _parallelKernel(f, nogil=True)
   _numba.set_num_threads(min(threads(), _numba.config.NUMBA_NUM_THREADS))
   return _compiled[name]
 

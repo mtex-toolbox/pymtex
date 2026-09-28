@@ -9,6 +9,17 @@ from mtex import (EBSD, phaseList, lattice, latticeBasis, crystalFrame, specimen
 from conftest import close
 
 
+def test_polygon_edges_are_stable_under_roundoff():
+  from mtex.maps.ebsd import _inPolygon
+  square = np.array([[-1., -1.], [9., -1.], [9., 9.], [-1., 9.]])
+  edge = np.array([[9., -0.5], [-0.5, 9.], [9., 9.], [-1., -1.]])
+  for shift in (-2e-15, 0., 2e-15):
+    points = edge + shift
+    assert not _inPolygon(points[:, 0], points[:, 1], square, includeEdge=False).any()
+    assert _inPolygon(points[:, 0], points[:, 1], square).all()
+  assert _inPolygon([8.99, 9.01], [0., 0.], square, includeEdge=False).tolist() == [True, False]
+
+
 def sampleMap(n=12, phases=1, dtype=np.float64, A=np.eye(2)):
   cs = crystalFrame("m-3m", mineral="test")
   cs2 = crystalFrame("321", mineral="other")

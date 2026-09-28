@@ -648,11 +648,12 @@ def _inPolygon(x, y, V, includeEdge=True):
   inside = np.zeros(x.shape, dtype=bool)
   onEdge = np.zeros(x.shape, dtype=bool)
   n = len(V)
+  tol = 1e-12 * max(1.0, np.ptp(V, axis=0).max()) if n else 0.0
   for i in range(n):
     (ax, ay), (bx, by) = V[i], V[(i + 1) % n]
     cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax)
-    onEdge |= (np.abs(cross) <= 1e-12 * max(1.0, abs(bx - ax) + abs(by - ay))) & (np.minimum(ax, bx) <= x) & (x <= np.maximum(ax, bx)) \
-      & (np.minimum(ay, by) <= y) & (y <= np.maximum(ay, by))
+    onEdge |= (np.abs(cross) <= tol * max(1.0, abs(bx - ax) + abs(by - ay))) & (np.minimum(ax, bx) - tol <= x) & (x <= np.maximum(ax, bx) + tol) \
+      & (np.minimum(ay, by) - tol <= y) & (y <= np.maximum(ay, by) + tol)
     crosses = ((ay > y) != (by > y)) & (x < ax + (y - ay) * (bx - ax) / (by - ay + (by == ay)))
     inside ^= crosses
   return (inside | onEdge) if includeEdge else (inside & ~onEdge)

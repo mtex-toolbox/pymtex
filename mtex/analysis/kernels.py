@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import _parallelKernel
+
 prange = range
 _COMPILED = {}
 
@@ -112,7 +114,7 @@ def taylorKernel():
     globals()["prange"] = nb.prange
     globals()["_linearProgram"] = mk._COMPILED["_linearProgram"]
     globals()["_minimumNorm"] = nb.njit(cache=True)(_minimumNorm)
-    _COMPILED["taylor"] = nb.njit(cache=True, parallel=True)(_taylorLoop)
+    _COMPILED["taylor"] = _parallelKernel(_taylorLoop)
   return _COMPILED["taylor"]
 
 

@@ -281,6 +281,7 @@ def test_id2ind_keeps_the_shape_of_the_ids():
 
 
 def test_the_compiled_edge_sort_is_the_stable_argsort():
+  pytest.importorskip("numba")
   # the directed edges of every grain, the first sides before the second, each in row order
   from mtex.maps.kernels import edgesByGrainNumba
   g = calcGrains(inclusionMap(), angle=5 * degree)

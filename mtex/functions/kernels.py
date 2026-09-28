@@ -14,7 +14,7 @@ import math
 
 import numpy as np
 
-from ..geometry.kernels import _jit, _loop, backend, threads
+from ..geometry.kernels import _jit, _loop, _parallelKernel, backend, threads
 from ..geometry.representations import quat2euler
 from .harmonics import dim2deg
 
@@ -40,7 +40,7 @@ def _parallel(name, f):
   if name not in _COMPILED:
     global prange
     prange = nb.prange
-    _COMPILED[name] = nb.njit(cache=True, parallel=True, nogil=True)(f)
+    _COMPILED[name] = _parallelKernel(f, nogil=True)
   nb.set_num_threads(min(threads(), nb.config.NUMBA_NUM_THREADS))
   return _COMPILED[name]
 

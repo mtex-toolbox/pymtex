@@ -53,10 +53,10 @@ def checkCell(lattice, abc, abg, uniqueAxis=1):
     if not all(abs(abg[k] - np.pi / 2) < 1e-5 for k in range(3) if k != uniqueAxis):
       raise ValueError("for a monoclinic lattice the angles with the symmetry axis have to be 90 degree")
   elif lattice in (latticeType.trigonal, latticeType.hexagonal, latticeType.tetragonal):
-    if a != b:
+    if not np.isclose(a, b, rtol=1e-10, atol=0):
       raise ValueError(f"for a {lattice} lattice a and b must be equal")
   elif lattice in (latticeType.cubic, latticeType.icosahedral):
-    if not a == b == c:
+    if not np.allclose([a, b], c, rtol=1e-10, atol=0):
       raise ValueError(f"for a {lattice} lattice a, b and c must be equal")
 
 

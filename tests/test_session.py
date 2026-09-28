@@ -1,3 +1,5 @@
+import sys
+
 import mtex
 from mtex import getMTEXpref, setMTEXpref
 
@@ -24,6 +26,7 @@ def test_huge_pages_follow_the_preference():
   from numpy._core.multiarray import _get_madvise_hugepage
   assert getMTEXpref("hugePages") is False and _get_madvise_hugepage() is False
   setMTEXpref("hugePages", True)
-  assert _get_madvise_hugepage() is True
+  assert getMTEXpref("hugePages") is True
+  assert _get_madvise_hugepage() is sys.platform.startswith("linux")
   mtex.reset()
   assert _get_madvise_hugepage() is False
