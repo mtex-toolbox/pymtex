@@ -28,15 +28,10 @@ from .kernels import realizeSpherical
 from .transforms import isRealSpherical, sphericalSeries, sphericalSeriesAdjoint
 
 
-# the bandwidth a callable or scattered values are expanded to when none is asked for, what
-# MATLAB's S2FunHarmonic.quadrature gives, within the preference maxS2Bandwidth
-QUADRATURE_BANDWIDTH = 250
-
-
 def quadratureBandwidth():
-  """the bandwidth a callable or scattered values are expanded to when none is asked for, 250
-  within the preference maxS2Bandwidth"""
-  return min(QUADRATURE_BANDWIDTH, getMTEXpref("maxS2Bandwidth"))
+  """the bandwidth a callable or scattered values are expanded to when none is asked for, the
+  preference defaultS2Bandwidth"""
+  return int(getMTEXpref("defaultS2Bandwidth"))
 
 
 def _complexType(dtype):
@@ -166,7 +161,7 @@ class S2FunHarmonic:
   approximate = quadrature
 
   @classmethod
-  def adjointNFSFT(cls, nodes, values, *, bandwidth=128, weights=None):
+  def adjointNFSFT(cls, nodes, values, *, bandwidth=None, weights=None):
     """S2FunHarmonic.adjointNFSFT(v, values, bandwidth=32): the adjoint transform, the
     coefficients sum_j w_j y_j conj(Y(v_j)) with unit weights unless given, a grid's own on a grid"""
     values = np.asarray(values)
@@ -174,7 +169,8 @@ class S2FunHarmonic:
       L, w, v = nodes.bandwidth, nodes.weights if weights is None else weights, nodes
     else:
       v = (nodes if isinstance(nodes, vector3d) else vector3d(nodes)).flatten()
-      L, w = int(bandwidth), np.ones(v.size) if weights is None else np.broadcast_to(np.asarray(weights, dtype=float).ravel(), (v.size,))
+      L = quadratureBandwidth() if bandwidth is None else int(bandwidth)
+      w = np.ones(v.size) if weights is None else np.broadcast_to(np.asarray(weights, dtype=float).ravel(), (v.size,))
     fhat = _perColumn(lambda x: sphericalSeriesAdjoint(v, x, L, w), np.nan_to_num(values), len(v))
     return cls(fhat, v.frame, real=values.dtype.kind != "c", _internal=True)
 
@@ -414,20 +410,20 @@ class S2FunHarmonic:
     """the absolute value |f| as a handle, evaluated when asked"""
     return abs(self)
 
-  def sqrt(self):
-    """the square root of the function, expanded by quadrature"""
+  def sqrt(self, bandwidth=None):
+    """the square root of the function, expanded by quadrature, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def exp(self):
-    """the exponential of the function, expanded by quadrature"""
+  def exp(self, bandwidth=None):
+    """the exponential of the function, expanded by quadrature, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def log(self):
-    """the logarithm of the function, expanded by quadrature"""
+  def log(self, bandwidth=None):
+    """the logarithm of the function, expanded by quadrature, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   # ------------------------------------------------------------------ the moments
 

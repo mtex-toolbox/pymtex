@@ -64,7 +64,10 @@ setMTEXpref('UTF8Output', oldUTF8Output)
 # * `stopOnSymmetryMissmatch`, whether a symmetry mismatch stops with an error;
 # * `kernels`, `threads`, `NUFFT` and `NFFTLibrary`, the compiled loops, the number of
 #   threads and the optional third-party transform used for the harmonic transforms;
-# * `maxS2Bandwidth`, `maxSO3Bandwidth`, the largest harmonic degrees used by default.
+# * `defaultS2Bandwidth`, `defaultSO3Bandwidth`, the harmonic degree a callable or values at
+#   nodes are expanded to when no `bandwidth` is given;
+# * `maxS2Bandwidth`, `maxSO3Bandwidth`, the largest degree of a result whose degree is known,
+#   as the sum of the degrees in a product.
 #
 # ## Keep scripts reproducible
 #

@@ -236,20 +236,20 @@ class S1FunHarmonic:
     """the pointwise absolute value, a Fourier series of a smoothing bandwidth"""
     return abs(self)
 
-  def sqrt(self):
-    """the pointwise square root, a Fourier series of a smoothing bandwidth"""
+  def sqrt(self, bandwidth=None):
+    """the pointwise square root, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def exp(self):
-    """the pointwise exponential, a Fourier series of a smoothing bandwidth"""
+  def exp(self, bandwidth=None):
+    """the pointwise exponential, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def log(self):
-    """the pointwise logarithm, a Fourier series of a smoothing bandwidth"""
+  def log(self, bandwidth=None):
+    """the pointwise logarithm, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def mean(self):
     """the mean over the circle, the coefficient c_0"""

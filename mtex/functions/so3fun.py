@@ -199,7 +199,7 @@ class SO3FunHarmonic:
     if callable(nodes) and not isinstance(nodes, quaternion) and (values is None or isinstance(values, referenceFrame)):
       frames = frames if values is None else (values, *frames)
       return cls(nodes, *frames, bandwidth=bandwidth, real=real, antipodal=antipodal)
-    L = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+    L = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
     values = np.asarray(values)
     if isinstance(nodes, quadratureSO3Grid):
       # a grid brings its bandwidth, and values at its distinct nodes spread onto all of them
@@ -406,20 +406,20 @@ class SO3FunHarmonic:
     """the absolute value of the function, by quadrature at twice the bandwidth"""
     return abs(self)
 
-  def sqrt(self):
-    """the square root of the function, by quadrature at twice the bandwidth"""
+  def sqrt(self, bandwidth=None):
+    """the square root of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def exp(self):
-    """the exponential of the function, by quadrature at twice the bandwidth"""
+  def exp(self, bandwidth=None):
+    """the exponential of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
-  def log(self):
-    """the logarithm of the function, by quadrature at twice the bandwidth"""
+  def log(self, bandwidth=None):
+    """the logarithm of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
     from .funops import mapFun, smoothBandwidth
-    return mapFun(np.log, self, bandwidth=smoothBandwidth(self))
+    return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   # ------------------------------------------------------------------ the moments
 
@@ -585,7 +585,7 @@ def _kernelCoefficients(psi, bandwidth):
 # of the rule. The projection is block diagonal in the degree and commutes with the cut, so
 # the bandwidth asked for is taken before it runs
 def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal, scheme="ClenshawCurtis"):
-  L0 = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+  L0 = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
   L = bandwidthFor(L0, CS, SS)
   g = quadratureSO3Grid(L, scheme, CS, SS)
   values = np.asarray(fun(g.nodes()))

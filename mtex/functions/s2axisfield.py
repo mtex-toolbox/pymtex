@@ -79,7 +79,7 @@ class S2AxisFieldHandle(S2AxisField):
 
   def __init__(self, fun, frame=None, *, bandwidth=None):
     self.fun, self.frame = fun, frame
-    self.bandwidth = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
+    self.bandwidth = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
 
   def eval(self, x):
     """the axes of the field at the directions, antipodal vectors"""
@@ -113,12 +113,12 @@ class S2AxisFieldHarmonic(S2AxisField):
     elif isinstance(fhat, vector3d) and args and not isinstance(args[0], referenceFrame):
       pts, values = fhat, args[0]
       frame = pts.frame if frame is None else frame
-      L = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
+      L = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
       d = vector3d(pts.data.reshape(-1, 3)).normalize()
       w = np.full(d.size, 4 * np.pi / d.size) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(d, outerComponents(_values(values)), L, w)
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
-      L = getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth)
+      L = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
       g = quadratureS2Grid(L)
       v = g.nodes()
       values = _values(fhat(v if frame is None else vector3d(v, frame=frame)))

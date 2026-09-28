@@ -316,7 +316,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       if not isinstance(ref, orientation):
         ref = orientation._fromRotation(ref.data, (CS, SS))
       CS, SS, side = ref.CS, ref.SS, t.side
-      L = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+      L = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
       w = np.full(ref.size, 1 / ref.size) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(rotation(ref).flatten(), t.data.reshape(-1, 3), L, w)
     elif isinstance(fhat, orientation) and rest and not isinstance(rest[0], referenceFrame):
@@ -371,7 +371,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   # the rule in the frames of the field and returns vectors or tangent vectors
   @staticmethod
   def _byQuadrature(fun, CS, SS, side, bandwidth):
-    L0 = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+    L0 = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
     cA, cB = componentFrames(CS, SS, side)
     L = bandwidthFor(L0, cA, cB)
     g = quadratureSO3Grid(L, cA, cB)
@@ -665,7 +665,7 @@ class SO3VectorFieldHandle(SO3VectorField):
       fun, rest, side, bandwidth = (lambda o: v(o)), [v.CS, v.SS], v.tangentSpace, v.bandwidth
     self.CS, self.SS = _readFrames([a for a in rest if isinstance(a, referenceFrame)])
     self.fun, self.tangentSpace = fun, side
-    self.bandwidth = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+    self.bandwidth = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
 
   def eval(self, x):
     """the tangent vectors of the field at orientations, by the callable"""

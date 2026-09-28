@@ -179,7 +179,7 @@ class SO3FunHandle(SO3FunGeneric):
     if antipodal and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
     self.fun = _symmetrisedSO3(fun, self.CS, self.SS, antipodal) if symmetrise else fun
-    self.bandwidth = getMTEXpref("maxSO3Bandwidth") if bandwidth is None else int(bandwidth)
+    self.bandwidth = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
     self.antipodal, self.isReal = bool(antipodal), bool(real)
 
   def eval(self, x):

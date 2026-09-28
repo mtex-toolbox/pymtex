@@ -78,7 +78,7 @@ valueFunction = lambda v: dot(v, vector3d.X) ** 9
 
 # [S2FunHarmonic.quadrature](S2FunHarmonic.quadrature.html) evaluates this function on a
 # weighted spherical grid and computes its coefficients. Without an explicit `bandwidth`
-# option, it computes through the degree of the preference `maxS2Bandwidth`.
+# option, it computes through the degree of the preference `defaultS2Bandwidth`.
 
 S2F = S2FunHarmonic.quadrature(valueFunction)
 S2F
@@ -179,5 +179,4 @@ surf(S2FunHarmonic(np.eye(10)), layout=[2, 5], figSize='small')
 #
 # ## Technical Details
 #
-# A callable is expanded up to the preference `maxS2Bandwidth`, 512, where MATLAB's run of
-# this page reports 250.
+# A callable is expanded up to the preference `defaultS2Bandwidth`, 128.

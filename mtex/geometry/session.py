@@ -14,6 +14,10 @@ _DEFAULT_PREFS = {
   "maxS1Bandwidth": 1024,
   "maxS2Bandwidth": 512,
   "maxSO3Bandwidth": 64,
+  # the bandwidth a callable or scattered values are expanded to when none is given; the
+  # maxima above cap the results whose bandwidth is known, as the sum in a product
+  "defaultS2Bandwidth": 128,
+  "defaultSO3Bandwidth": 64,
   "FFTAccuracy": 1e-2,
   "displayRows": 20,
 }

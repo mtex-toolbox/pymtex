@@ -26,6 +26,7 @@ from ..geometry.kernels import blasThreads
 from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
+from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from ..functions.harmonics import invariantProjection, project
@@ -392,7 +393,7 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
       method = "steepestDescent"
   if not getattr(f, "isReal", True):
     raise ValueError("sampling requires a real density")
-  L = (128 if sphere else 32) if bandwidth is None else int(bandwidth)
+  L = (getMTEXpref("defaultS2Bandwidth") if sphere else 32) if bandwidth is None else int(bandwidth)
   maxIter = (1000 if sphere else 100) if maxIter is None else int(maxIter)
   tol = (0.01 * degree if sphere else 0.1 * degree) if tol is None else float(tol)
   warmUp = -(-maxIter // 5) if warmUp is None else int(warmUp)
