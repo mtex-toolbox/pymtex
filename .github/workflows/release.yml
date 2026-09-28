@@ -1,4 +1,4 @@
-# a tag v<version> builds the sdist and the wheel and publishes them on PyPI by trusted publishing
+# a tag v<version> tests its commit, then builds and publishes on PyPI by trusted publishing
 name: release
 
 on:
@@ -6,7 +6,12 @@ on:
     tags: ["v*"]
 
 jobs:
+  tests:
+    # A local reusable workflow runs from this tag's commit, including its checkout.
+    uses: ./.github/workflows/test.yml
+
   build:
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
