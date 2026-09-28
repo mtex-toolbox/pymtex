@@ -328,22 +328,63 @@ def calcError(f, g, mode="l1", resolution=5 * degree):
 # derivative free, so every representation works
 
 
-# greedy clusters by the symmetry reduced angle: each orientation joins the first cluster
-# whose representative is within the tolerance
-# the orientations grouped by the first of their number within the tolerance of them, the
-# angles of one against all the rest taken at once
-def _clusterOrientations(o, tol):
+# greedy clusters by the symmetry reduced angle: each orientation joins the cluster of the first
+# of their number within the tolerance of it; the neighbourhoods from one radius search of the
+# quaternion tree over the symmetric images, of the orientations among only when given (the
+# pairs of two others are taken as apart). An orientation without neighbours leads its own
+# cluster, so the loop runs over the others and the clusters are numbered by their leaders
+def _clusterOrientations(o, tol, among=None):
+  from scipy import sparse
+  from ..geometry.grids.orientationtree import OrientationTree
   o = o.flatten()
-  ids = np.full(o.size, -1, dtype=int)
-  k = 0
-  for i in range(o.size):
-    if ids[i] >= 0:
+  n = o.size
+  among = np.arange(n) if among is None else np.asarray(among, dtype=int)
+  I, _ = OrientationTree(o).radius(o[among], tol)
+  I = I.tocoo()
+  rows, cols = among[I.row], I.col
+  apart = rows != cols
+  A = sparse.csr_matrix((np.ones(int(apart.sum()), dtype=bool), (rows[apart], cols[apart])), shape=(n, n))
+  A = (A + A.T).tocsr()
+  indptr, indices = A.indptr, A.indices
+  leader = np.arange(n)
+  done = np.zeros(n, dtype=bool)
+  for i in np.flatnonzero(np.diff(indptr)):
+    if done[i]:
       continue
-    near = (o[i].angle(o) < tol) & (ids < 0)
-    ids[near] = k
-    ids[i] = k
-    k += 1
-  return ids
+    near = indices[indptr[i]:indptr[i + 1]]
+    near = near[~done[near]]
+    leader[near], done[near], done[i] = i, True, True
+  return np.unique(leader, return_inverse=True)[1]
+
+
+# the basins of a function on an SO(3) grid: every node points to its highest neighbour within
+# the angle, itself at a peak, the larger number deciding a tie so that no pointers cycle; the
+# pointers followed to their peaks by doubling
+def _gridBasins(grid, v, angle):
+  from ..geometry.grids.orientationtree import gridRadius
+  I, _ = gridRadius(grid, grid, angle)
+  n = grid.size
+  rank = np.empty(n, dtype=int)
+  rank[np.lexsort((np.arange(n), v))] = np.arange(n)
+  byRank = np.argsort(rank)
+  best = rank.copy()
+  rowOf = np.repeat(np.arange(n), np.diff(I.indptr))
+  np.maximum.at(best, rowOf, rank[I.indices])
+  up = byRank[best]
+  while True:
+    nxt = up[up]
+    if np.array_equal(nxt, up):
+      return up
+    up = nxt
+
+
+# the member of each cluster with the largest value, the first of their number on a tie
+def _bestOfClusters(ids, vals, nc):
+  order = np.lexsort((np.arange(len(ids)), -vals, ids))
+  first = np.concatenate([[True], ids[order][1:] != ids[order][:-1]])
+  rep = np.empty(nc, dtype=int)
+  rep[ids[order][first]] = order[first]
+  return rep
 
 
 # the seeds of the ascent: the nodes that beat every neighbour within the angle whose cosine
@@ -544,11 +585,16 @@ def min_(f, *args, numLocal=1, **kwargs):
 
 # ------------------------------------------------------------------ components
 # steepest ascent from seeds along the gradient with a fixed step ladder that halves when no
-# step improves, clusters merged within a tolerance, the weights of the seeds accumulated per mode
+# step improves, clusters merged within a tolerance, the weights of the seeds accumulated per mode.
+# Unless exact, a seed lighter than a mode that is kept and on a slope below FLAT_SLOPE of the
+# steepest at the start stops where it is: the ripples of a harmonic expansion are such seeds
+
+FLAT_SLOPE = 1e-3
 
 
-# the function whose gradient drives the ascent: a radial function with many centres through
-# its harmonic form, as its evaluation goes
+# the gradient that drives the ascent, as a function of orientations: a radial function with
+# many centres through its harmonic form, as its evaluation goes; the field of a harmonic
+# function built once
 def _gradientField(f):
   if isinstance(f, SO3FunRBF):
     from .rbf import HARMONIC_EVAL
@@ -556,8 +602,10 @@ def _gradientField(f):
     if f.center.size ** 2 * len(L) * len(R) > HARMONIC_EVAL and f.psi.bandwidth <= getMTEXpref("maxSO3Bandwidth"):
       if getattr(f, "_harmonicCache", None) is None:
         f._harmonicCache = f._harmonic()
-      return f._harmonicCache
-  return f if isinstance(f, (SO3FunHarmonic, SO3FunRBF, SO3FunCBF)) else SO3FunHarmonic(f)
+      return f._harmonicCache.grad()
+  if isinstance(f, (SO3FunRBF, SO3FunCBF)):
+    return f.grad
+  return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).grad()
 
 
 def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=100, radius=np.inf, exact=False, silent=False):
@@ -567,69 +615,78 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
 
     modes, weights, centerId = calcComponents(odf)
     modes, weights, centerId = calcComponents(odf, seed=ori, radius=10*degree, exact=True)"""
+  grid = None
   if seed is None and isinstance(f, SO3FunRBF):
     seed, weights = f.center, f.weights
   elif seed is None:
-    seed = equispacedSO3Grid(f.CS, f.SS, resolution=2.5 * degree)
+    grid = seed = equispacedSO3Grid(f.CS, f.SS, resolution=2.5 * degree)
   rots = rotation(seed).data.reshape(-1, 4)
   w = np.ones(len(rots)) if weights is None else np.asarray(weights, dtype=float).ravel()
   keep = w > 0
   rots, w = rots[keep], w[keep] / np.sum(w[keep])
   fg = _gradientField(f)
-  modes = rots.copy()
-  vals = np.real(f(_ori(modes, f))).ravel()
+  # which mode each seed has flowed into; seeds that meet are one mode from then on, so the
+  # working set shrinks as the ascent proceeds. The nodes of the grid climb to their peaks on
+  # the grid first, and only the peaks ascend
+  if grid is not None:
+    v = np.real(f(grid)).ravel()
+    peaks, labels = np.unique(_gridBasins(grid, v, 1.5 * grid.res), return_inverse=True)
+    modes, vals = rots[peaks], v[peaks]
+  else:
+    modes, labels = rots.copy(), np.arange(len(rots))
+    vals = np.real(f(_ori(modes, f))).ravel()
   steps = np.full(len(modes), 5 * degree)
   active = np.ones(len(modes), dtype=bool)
-  # which mode each seed has flowed into; seeds that meet are one mode from then on, so the
-  # working set shrinks as the ascent proceeds
-  labels = np.arange(len(modes))
+  steepest = None
   for _ in range(maxIter):
     idx = np.flatnonzero(active)
     if idx.size == 0:
       break
     o = _ori(modes[idx], f)
-    g = fg.grad(o)
+    g = fg(o)
     n = np.linalg.norm(g.data, axis=-1)
+    steepest = n.max() if steepest is None else steepest
+    if not exact:
+      flat = (np.bincount(labels, w, minlength=len(modes))[idx] < 0.01) & (n < FLAT_SLOPE * steepest)
+      if flat.any():
+        active[idx[flat]] = False
+        idx, o, g, n = idx[~flat], o[~flat], g[~flat], n[~flat]
+        if idx.size == 0:
+          break
     dirs = g.data / np.where(n > 0, n, 1.0)[:, None]
     trial1 = SO3TangentVector(vector3d((2 * steps[idx] / 3)[:, None] * dirs), o, "left").exp()
     trial2 = SO3TangentVector(vector3d(steps[idx][:, None] * dirs), o, "left").exp()
     v1, v2 = np.real(f(trial1)).ravel(), np.real(f(trial2)).ravel()
-    moved = False
     t1, t2 = rotation(trial1).data.reshape(-1, 4), rotation(trial2).data.reshape(-1, 4)
-    for m, i in enumerate(idx):
-      best = int(np.argmax([vals[i], v1[m], v2[m]]))
-      # on a tie in a flat region the gradient still says where the mass is
-      if best == 0 and v1[m] == vals[i] and v2[m] == vals[i] and n[m] > 0:
-        best = 2
-      if best == 0:
-        if steps[i] > 0.05 * degree:
-          steps[i] /= 2
-        else:
-          active[i] = False
-      else:
-        modes[i], vals[i] = (t1[m], v1[m]) if best == 1 else (t2[m], v2[m])
-        moved = True
-    if not moved and not np.any(active):
-      break
-    # join the modes that have come within the tolerance of each other
-    ids = _clusterOrientations(_ori(modes, f), tolerance)
+    best = np.argmax(np.stack([vals[idx], v1, v2]), axis=0)
+    # on a tie in a flat region the gradient still says where the mass is
+    best[(best == 0) & (v1 == vals[idx]) & (v2 == vals[idx]) & (n > 0)] = 2
+    stay = best == 0
+    halve = stay & (steps[idx] > 0.05 * degree)
+    steps[idx[halve]] /= 2
+    active[idx[stay & ~halve]] = False
+    for b, t, v in ((1, t1, v1), (2, t2, v2)):
+      go = best == b
+      modes[idx[go]], vals[idx[go]] = t[go], v[go]
+    if stay.all():
+      if not np.any(active):
+        break
+      continue
+    # join the modes that have come within the tolerance of each other: a pair that has not
+    # moved was looked at before
+    ids = _clusterOrientations(_ori(modes, f), tolerance, among=idx[~stay])
     nc = ids.max() + 1
     if nc < len(modes):
-      rep = np.array([int(np.flatnonzero(ids == k)[0]) for k in range(nc)])
-      keepActive = np.zeros(nc, dtype=bool)
+      rep = _bestOfClusters(ids, vals, nc)
+      keepActive = np.bincount(ids, weights=active, minlength=nc) > 0
       keepStep = np.zeros(nc)
-      for i, k in enumerate(ids):
-        if vals[i] > vals[rep[k]]:
-          rep[k] = i
-        keepActive[k] |= active[i]
-        keepStep[k] = max(keepStep[k], steps[i])
+      np.maximum.at(keepStep, ids, steps)
       labels = ids[labels]
       modes, vals, steps, active = modes[rep], vals[rep], keepStep, keepActive
   # clusters, the representative with the largest value, the weights within the radius
   ids = _clusterOrientations(_ori(modes, f), tolerance)
   nclust = ids.max() + 1
-  reps = [int(np.flatnonzero(ids == k)[np.argmax(vals[ids == k])]) for k in range(nclust)]
-  modeRots = modes[reps]
+  modeRots = modes[_bestOfClusters(ids, vals, nclust)]
   wsum = np.zeros(nclust)
   seedIds = ids[labels]
   if np.isinf(radius):

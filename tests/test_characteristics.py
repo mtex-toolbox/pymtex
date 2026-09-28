@@ -7,7 +7,7 @@ from numpy import pi
 from mtex import (S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
                   angle, bandwidthFor, calcAngleDistribution, calcAxisDistribution, calcComponents, calcDensity, calcError,
                   calcKernel, calcMDF, calcMIndex, centerSpecimen, conv, crystalFrame, degree, discreteSample, entropy,
-                  equispacedS2Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
+                  equispacedS2Grid, equispacedSO3Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
                   rotation, specimenFrame, textureindex, unimodalODF, uniformODF, vector3d, volume, yvector, zvector)
 
 rng = np.random.default_rng(71)
@@ -81,6 +81,47 @@ def test_C2_extrema():
   assert max([3, 1, 2]) == 3 and min(4, 2) == 2
 
 
+def test_clusters_are_the_greedy_ones():
+  from mtex.functions.characteristics import _clusterOrientations
+  cs = crystalFrame("622")
+  c = orientation(rotation.rand(6, rng=rng), cs)
+  o = orientation(rotation(c)[rng.integers(0, 6, 300)] * rotation.byAxisAngle(vector3d.rand(300, rng=rng), 3 * degree * rng.random(300)), cs)
+  tol = 4 * degree
+  ids = _clusterOrientations(o, tol)
+  # each orientation joins the cluster of the first of their number within the tolerance of it
+  ref, k = np.full(o.size, -1), 0
+  for i in range(o.size):
+    if ref[i] < 0:
+      near = (o[i].angle(o) < tol) & (ref < 0)
+      ref[near], ref[i], k = k, k, k + 1
+  assert np.array_equal(ids, ref)
+
+
+def test_clusters_among_the_moved_ones():
+  from mtex.functions.characteristics import _clusterOrientations
+  cs = crystalFrame("m-3m")
+  o = orientation(rotation.byEuler(0.2 * np.arange(12), 0.3, 0.1), cs)
+  moved = rotation.cat(rotation(o), rotation(o[3]) * rotation.byAxisAngle(zvector, 1 * degree))
+  o = orientation(moved, cs)
+  # the twelve are apart, the thirteenth moved next to the fourth
+  assert np.array_equal(_clusterOrientations(o, 2 * degree, among=[12]), _clusterOrientations(o, 2 * degree))
+  assert _clusterOrientations(o, 2 * degree, among=[12])[12] == 3
+
+
+def test_grid_basins_climb_to_peaks():
+  from mtex.functions.characteristics import _gridBasins
+  cs = crystalFrame("222")
+  odf = unimodalODF(orientation(rotation.rand(3, rng=rng), cs), halfwidth=10 * degree)
+  g = equispacedSO3Grid(cs, odf.SS, resolution=5 * degree)
+  v = np.real(odf(g)).ravel()
+  peak = _gridBasins(g, v, 1.5 * g.res)
+  # every node reaches a peak no lower than itself, a peak is its own peak and beats its neighbours
+  assert np.all(v[peak] >= v) and np.array_equal(peak[peak], peak)
+  top = np.unique(peak)
+  assert all(np.all(v[p] >= v[angle(g, g[p]) < 1.5 * g.res]) for p in top)
+  assert np.argmax(v) in top
+
+
 def test_C3_components():
   cs = crystalFrame("m-3m")
   c1, c2 = orientation(rotation.byEuler(0, 0, 0, "Bunge"), cs), orientation(rotation.byEuler(30 * degree, 40 * degree, 50 * degree, "Bunge"), cs)
@@ -103,6 +144,17 @@ def test_C3_components():
   rb = unimodalODF(orientation(rotation.cat(rotation(c1), rotation(c2)), cs), halfwidth=7 * degree, weights=[0.6, 0.4])
   om, ow, _ = rb.calcComponents()
   assert om.size == 2 and np.max(np.abs(np.sort(ow)[::-1] - [0.6, 0.4])) < 0.02
+
+
+def test_components_freeze_light_seeds_on_flat_stretches():
+  cs = crystalFrame("m-3m")
+  c1, c2 = orientation(rotation.byEuler(0, 0, 0, "Bunge"), cs), orientation(rotation.byEuler(30 * degree, 40 * degree, 50 * degree, "Bunge"), cs)
+  odf = 0.6 * unimodalODF(c1, halfwidth=7 * degree) + 0.4 * unimodalODF(c2, halfwidth=7 * degree)
+  seed = discreteSample(odf, 1000, rng=rng)
+  # the seeds stopped early carry little weight: the two modes keep theirs to a few tenths of a percent
+  _, w, _ = calcComponents(odf, seed=seed)
+  _, we, _ = calcComponents(odf, seed=seed, exact=True)
+  assert len(w) == 2 and np.max(np.abs(w - we[:2])) < 0.005
 
 
 def test_C4_misorientations():

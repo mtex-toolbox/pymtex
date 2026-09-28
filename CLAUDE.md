@@ -88,7 +88,7 @@ oracle; the maps layer keeps its own in `mtex/maps/kernels.py` (the clipping, th
 the loop tracing, the sums of the grain measures over the loops, the fused gradient, KAM and
 GROD over the lattice, the simplex of the dislocation fit), the planar hull in `mtex/geometry/hull.py`, the inverse pole figure
 colouring of a map in `mtex/plotting/kernels.py` and the NUFFT nodes and real defects of the
-harmonic transforms in `mtex/functions/kernels.py` and the batched symmetric 3 x 3 eigen
+harmonic transforms and the direct Wigner series below 100 nodes in `mtex/functions/kernels.py` and the batched symmetric 3 x 3 eigen
 decomposition of the wave velocities and the turn of flattened tensors by many rotations (the
 embedding's images, `ori * T`) in `mtex/tensors/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the

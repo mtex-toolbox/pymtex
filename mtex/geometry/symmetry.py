@@ -333,17 +333,22 @@ class symmetry:
     """the Hermann-Mauguin symbol of the Laue group, the smallest one containing this group"""
     return self.Laue().pointGroup
 
+  # a group is not changed once built, so the derived groups are built once, on first use
   def properGroup(self):
     """the proper rotation group of the Laue group: the rotation parts of all elements"""
     if self.isProper:
       return self
-    return symmetry._fromElements(_uniqueElements(self._withParity(False)), self.axes)
+    if self.__dict__.get("_properGroup") is None:
+      self._properGroup = symmetry._fromElements(_uniqueElements(self._withParity(False)), self.axes)
+    return self._properGroup
 
   def properSubGroup(self):
     """the subgroup of proper rotations"""
     if self.isProper:
       return self
-    return symmetry._fromElements(self.rot[~self.rot.isImproper], self.axes)
+    if self.__dict__.get("_properSubGroup") is None:
+      self._properSubGroup = symmetry._fromElements(self.rot[~self.rot.isImproper], self.axes)
+    return self._properSubGroup
 
   def disjoint(self, other):
     """the intersection of two groups, symmetry/disjoint"""

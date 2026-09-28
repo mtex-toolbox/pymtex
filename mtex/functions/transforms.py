@@ -27,15 +27,16 @@ from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.vector3d import vector3d
-from .kernels import (halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
+from .kernels import (wignerSeriesDirect, halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
                       sphericalForward, wignerAdjoint, wignerForward)
 from .nfft import NFFTPlan, nfftLibrary
 from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
-from .harmonics import wignerSeries as _wignerSeriesDirect
 from .quadrature import bandwidthFor, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
 from ..geometry.display import display, sizeString
 
 DIRECT_SUM_NODES = 50
+# the compiled direct series on SO(3) beats a plan up to here, in nodes, at any bandwidth from 32
+DIRECT_SERIES_NODES = 100
 # on the sphere a plan costs more than a trigonometric sum on the Fourier array up to here,
 # in nodes, or in nodes times the (2L+1)^2 terms of the sum; the sum is exact, the plan
 # only to its tolerance
@@ -715,7 +716,7 @@ def sphericalPlan(nodes, L, real=False):
 
 def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
   """the series at every rotation of a container or on a quadrature grid; the direct sum below
-  DIRECT_SUM_NODES nodes, and a grid that cannot hold the bandwidth is evaluated at its nodes"""
+  DIRECT_SERIES_NODES nodes (DIRECT_SUM_NODES without numba), and a grid that cannot hold the bandwidth is evaluated at its nodes"""
   fhat = np.asarray(fhat)
   L = dim2deg(fhat.shape[-1])
   real = isRealWigner(fhat) if real is None else real
@@ -723,8 +724,8 @@ def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
     if 0 < L <= rots.bandwidth:
       return wignerPlan(rots, L, real)(fhat)
     return wignerSeries(fhat, rots.nodes(), real, rots.folds)
-  if rots.size < DIRECT_SUM_NODES or L == 0:
-    f = _wignerSeriesDirect(fhat, rots)
+  if rots.size < (DIRECT_SERIES_NODES if backend() == "numba" else DIRECT_SUM_NODES) or L == 0:
+    f = wignerSeriesDirect(fhat, rots)
     f = np.real(f) if real else f
   else:
     f = SO3FourierPlan(rots, L, real, folds)(fhat).reshape(rots.shape)

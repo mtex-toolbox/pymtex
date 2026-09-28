@@ -365,6 +365,18 @@ def test_wigner_kernels_against_the_numpy_form():
         assert np.max(np.abs(wignerTransformAdjoint(H, L, real, fo) - A0)) < 1e-13 * max(1, np.max(np.abs(A0)))
 
 
+def test_direct_series_kernel_against_the_numpy_form():
+  from mtex.functions.kernels import wignerSeriesDirect
+  edges = rotation.cat(rotation.byEuler(0.3, 0, 0.2), rotation.byEuler(0.3, pi, 0.2), rotation.byEuler(0, 0, 0))
+  for L in (0, 1, 2, 5, 17, 40):
+    f = np.stack([randomWigner(L), randomWigner(L)])
+    for q in (rotation.rand(7, rng=rng).reshape(7, 1), rotation.rand(rng=rng), edges):
+      A = directWigner(f, q)
+      B = wignerSeriesDirect(f, q)
+      assert B.shape == A.shape and np.max(np.abs(B - A)) < 1e-12 * max(1, np.max(np.abs(A)))
+      assert np.allclose(wignerSeriesDirect(f[0], q), A[0], atol=1e-12 * max(1, np.max(np.abs(A))))
+
+
 # the adjoint is linear: complex values on a real plan are the sum of two real adjoints
 def test_complex_values_on_a_real_plan():
   rots, v = rotation.rand(400, rng=rng), vector3d.rand(400, rng=rng)

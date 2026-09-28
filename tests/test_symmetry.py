@@ -144,6 +144,8 @@ def test_relations_between_groups():
   assert union(o, symmetry("-1")) == m3m and union(c222, symmetry("4")).pointGroup == "422" and union(o, c222) is o
   assert Laue(o) == m3m and properGroup(m3m) == o and properSubGroup(symmetry("-43m")).pointGroup == "23"
   assert properSubGroup(symmetry("-4m2")).numSym() == 4 and properSubGroup(symmetry("-4m2")).lattice is latticeType.orthorhombic
+  # the derived groups are built once per group
+  assert m3m.properGroup() is m3m.properGroup() and m3m.properSubGroup() is m3m.properSubGroup() and o.properGroup() is o
   p, q = symmetry("432"), symmetry("622")
   rot1, d, rot2 = factor(p, q)
   assert _sameElements(_uniqueElements((rot1[:, None] * d[None, :]).flatten()), p.rot)

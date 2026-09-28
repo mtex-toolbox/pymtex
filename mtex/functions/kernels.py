@@ -834,6 +834,88 @@ def wignerdTable(beta, L):
   return T
 
 
+# ------------------------------------------------------------------ the direct Wigner series
+# sum_n sqrt(2n+1) sum_jk F_n[j, k] e^{-ij alpha} d_n[j, k](beta) e^{-ik gamma} at every node,
+# parallel over the nodes, each carrying the recursion of wignerdTable through the degrees in
+# three buffers; the rows of F are batches of coefficients, a block stored column by column
+
+
+def _wignerSeriesLoop(F, alpha, beta, gamma, L, out):
+  M = 2 * L + 1
+  for i in prange(beta.shape[0]):
+    x, s, c = math.cos(beta[i]), math.sin(beta[i] / 2), math.cos(beta[i] / 2)
+    ea = np.empty(M, dtype=np.complex128)
+    eg = np.empty(M, dtype=np.complex128)
+    for j in range(M):
+      ea[j] = complex(math.cos((j - L) * alpha[i]), -math.sin((j - L) * alpha[i]))
+      eg[j] = complex(math.cos((j - L) * gamma[i]), -math.sin((j - L) * gamma[i]))
+    d2, d1, d = np.empty(M * M), np.ones(M * M), np.empty(M * M)
+    Fr, sw, sv = np.empty(M), np.empty(M), np.empty(M)
+    acc = F[:, 0].copy()
+    er = np.empty(M, dtype=np.complex128)
+    for n in range(1, L + 1):
+      m = 2 * n + 1
+      o = n * (2 * n - 1) * (2 * n + 1) // 3
+      g = 1.0
+      for a in range(m):
+        if a > 0:
+          g *= math.sqrt((2 * n - a + 1) / a) * s
+        Fr[a] = g * c ** (2 * n - a)
+      for a in range(m):
+        b = m - 1 - a
+        d[a] = Fr[a]
+        d[(m - 1) * m + a] = Fr[b] if b % 2 == 0 else -Fr[b]
+        d[a * m + m - 1] = Fr[b]
+        d[a * m] = Fr[a] if a % 2 == 0 else -Fr[a]
+      if n == 1:
+        d[4] = x
+      else:
+        # the weights of the recursion factor into a row and a column part
+        mm = n - 1
+        a0, a1 = (mm + 1) * (2 * mm + 1), 1 / (mm * (mm + 1))
+        for r in range(1, m - 1):
+          k = r - n
+          sw[r] = 1 / math.sqrt((mm + 1) ** 2 - k * k)
+          sv[r] = math.sqrt((mm + 1) / mm * max(mm * mm - k * k, 0))
+        for r in range(1, m - 1):
+          j = r - n
+          for jj in range(1, m - 1):
+            k = jj - n
+            v = a0 * (x - j * k * a1) * d1[(r - 1) * (m - 2) + jj - 1]
+            if abs(j) <= mm - 1 and abs(k) <= mm - 1:
+              v -= sv[r] * sv[jj] * d2[(r - 2) * (m - 4) + jj - 2]
+            d[r * m + jj] = v * sw[r] * sw[jj]
+      for r in range(m):
+        er[r] = ea[L - n + r]
+      for q in range(F.shape[0]):
+        t = 0j
+        for jj in range(m):
+          u = 0j
+          for r in range(m):
+            u += F[q, o + jj * m + r] * (d[r * m + jj] * er[r])
+          t += u * eg[L - n + jj]
+        acc[q] += math.sqrt(m) * t
+      d2, d1, d = d1, d, d2
+    for q in range(F.shape[0]):
+      out[q, i] = acc[q]
+
+
+def wignerSeriesDirect(fhat, r):
+  """the Wigner series summed directly at every rotation of a container, compiled; leading batch
+  axes of the coefficients come first; the NumPy sum of harmonics.py the fallback and oracle"""
+  from .harmonics import wignerSeries
+  fhat = np.asarray(fhat)
+  L = dim2deg(fhat.shape[-1])
+  if backend() != "numba" or L == 0:
+    return wignerSeries(fhat, r)
+  alpha, beta, gamma = (np.ascontiguousarray(np.asarray(e, dtype=np.float64).ravel())
+                        for e in quat2euler(r.data.reshape(-1, 4), "Matthies"))
+  F = np.ascontiguousarray(fhat.reshape(-1, fhat.shape[-1]), dtype=np.complex128)
+  out = np.empty((F.shape[0], beta.size), dtype=np.complex128)
+  _parallel("wignerSeries", _wignerSeriesLoop)(F, alpha, beta, gamma, L, out)
+  return out.reshape(fhat.shape[:-1] + r.shape)
+
+
 # ------------------------------------------------------------------ sampling a radial basis function
 # one orientation per row of uniforms U: a centre by its weight or the uniform part (the last
 # entry of the cumulative weights), the angle by inverse transform of the kernel's density on
