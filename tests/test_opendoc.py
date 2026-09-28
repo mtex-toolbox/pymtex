@@ -1,10 +1,11 @@
 import ast
+import json
 import os
 
 import pytest
 
 from mtex import openDoc
-from mtex.io.opendoc import cellScript, docPages, pageCells, pagesDir
+from mtex.io.opendoc import asNotebook, cellScript, docPages, pageCells, pagesDir
 
 PAGE = """# # A page
 #
@@ -68,3 +69,16 @@ def test_a_page_is_written_once_and_kept(tmp_path):
   assert open(path).read() == "edited"
   openDoc("EBSDTutorial", folder=tmp_path, edit=False, overwrite=True)
   assert open(path).read() != "edited"
+
+
+def test_a_page_as_a_notebook(tmp_path):
+  nb = json.loads(asNotebook(PAGE, {"Other"}))
+  assert nb["nbformat"] == 4 and nb["cells"][0]["cell_type"] == "markdown"
+  assert "Other_py.html#part" in "".join(nb["cells"][0]["source"])
+  assert [c["cell_type"] for c in nb["cells"]] == [k if k == "code" else "markdown" for k, _ in pageCells(PAGE)]
+  path = openDoc("EBSDTutorial", folder=tmp_path, edit=False, notebook=True)
+  assert path == str(tmp_path / "EBSDTutorial.ipynb")
+  cells = json.load(open(path, encoding="utf-8"))["cells"]
+  for c in cells:
+    if c["cell_type"] == "code":
+      ast.parse("".join(c["source"]))

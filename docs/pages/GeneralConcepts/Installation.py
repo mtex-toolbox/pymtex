@@ -176,7 +176,9 @@
 # without `_py.html`: the page `.../EBSDTutorial_py.html` is `EBSDTutorial`. `openDoc()`
 # without a name lists every page by chapter, and `openDoc('Tutorials')` the pages of one
 # chapter. Instead of `openDoc` you can also click *download as script* at the top of a page
-# on the website and save the file into your project folder.
+# on the website and save the file into your project folder. If you prefer notebooks,
+# `openDoc('EBSDTutorial', notebook=True)` writes the page as `EBSDTutorial.ipynb` instead,
+# which VS Code, JupyterLab and Jupyter Notebook open with the results below each cell.
 #
 # If the file does not open by itself (on macOS VS Code needs *Shell Command: Install 'code'
 # command in PATH* from Ctrl+Shift+P for that), click it in the file list on the left.

@@ -1,10 +1,11 @@
 # the documentation pages as scripts to run section by section: openDoc('EBSDTutorial') writes
 # the page as a cell script, a "# %%" line before every section, into the current folder and
-# opens it in VS Code. The pages are the sources of the documentation, shipped in the wheel as
+# opens it in VS Code, or with notebook=True as a Jupyter notebook. The pages are the sources of the documentation, shipped in the wheel as
 # mtex/docpages and read from docs/pages in a checkout; a page is in the jupytext light format,
 # a paragraph of comment lines prose, a paragraph of code one cell, "# +" and "# -" around a
 # cell of several paragraphs.
 import difflib
+import json
 import os
 import re
 import shutil
@@ -74,6 +75,20 @@ def cellScript(src, names=()):
   return "\n\n".join(out) + "\n"
 
 
+def asNotebook(src, names=()):
+  """a page as a Jupyter notebook: every paragraph of prose a markdown cell, every code paragraph a cell"""
+  def cell(kind, text):
+    lines = text.split("\n")
+    source = [l + "\n" for l in lines[:-1]] + [lines[-1]]
+    if kind == "prose":
+      return {"cell_type": "markdown", "metadata": {}, "source": source}
+    return {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": source}
+  cells = [cell(k, webLinks(t, set(names)) if k == "prose" else t) for k, t in pageCells(src)]
+  meta = {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
+          "language_info": {"name": "python"}}
+  return json.dumps({"cells": cells, "metadata": meta, "nbformat": 4, "nbformat_minor": 5}, indent=1, ensure_ascii=False) + "\n"
+
+
 class docIndex(list):
   """the documentation pages, (chapter, page, title) in the order of the documentation"""
 
@@ -101,13 +116,14 @@ def docPages():
   return pages
 
 
-def openDoc(name=None, folder=None, overwrite=False, edit=True):
+def openDoc(name=None, folder=None, overwrite=False, edit=True, notebook=False):
   """a documentation page as a script to run section by section
 
   openDoc() lists the pages, openDoc('EBSDAnalysis') the pages of a chapter. openDoc('EBSDTutorial')
   writes the page as EBSDTutorial.py, a "# %%" line before every section, into the current folder
   (or folder=) and opens it in VS Code, unless edit=False; an existing file is kept unless
-  overwrite=True. Returns the path of the script.
+  overwrite=True. With notebook=True the page is written as the Jupyter notebook EBSDTutorial.ipynb
+  instead. Returns the path of the file.
   """
   pages = docPages()
   if name is None:
@@ -121,12 +137,12 @@ def openDoc(name=None, folder=None, overwrite=False, edit=True):
     hint = f"; did you mean {', '.join(close)}?" if close else "; openDoc() lists them"
     raise ValueError(f"no documentation page named {name!r}{hint}")
   chapter, page = byName[name.lower().removesuffix(".py")]
-  path = os.path.abspath(os.path.join(folder or os.getcwd(), page + ".py"))
+  path = os.path.abspath(os.path.join(folder or os.getcwd(), page + (".ipynb" if notebook else ".py")))
   if overwrite or not os.path.exists(path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     src = open(os.path.join(pagesDir(), chapter, page + ".py"), encoding="utf-8").read()
     with open(path, "w", encoding="utf-8") as fh:
-      fh.write(cellScript(src, [p for _, p, _ in pages]))
+      fh.write((asNotebook if notebook else cellScript)(src, [p for _, p, _ in pages]))
   if edit:
     code = shutil.which("code")
     if code:
