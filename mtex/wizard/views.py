@@ -151,9 +151,11 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.mappable = None
     self.legend = None
     self.coloured = None
+    self.shownFor = None       # the phases drawn when the picture was last coloured, per measurement
     self.pending = False
-    for name in ("ebsd", "drawn", "phases", "mapConvention", "millers", "image", "meta"):
+    for name in ("ebsd", "drawn", "mapConvention", "millers", "image", "meta"):
       st.on(name, self.scheduleDraw)
+    st.on("phases", self.phasesChanged)
     st.on("densities", self.onDensity)
     self.mpl_connect("resize_event", lambda event: self.resized.start())
 
@@ -164,6 +166,11 @@ class ViewCanvas(FigureCanvasQTAgg):
     if not self.pending:
       self.pending = True
       QMetaObject.invokeMethod(self, "flush", Qt.QueuedConnection)
+
+  def phasesChanged(self):
+    """an edited phase recolours the picture, whose tab and drawn phases are the same"""
+    self.coloured = None
+    self.scheduleDraw()
 
   @Slot()
   def flush(self):
@@ -223,7 +230,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       # the artist's own alpha would override the transparency of a phase not drawn
       self.image.set_alpha(None)
       self.ax = self.image.axes
-      self.raster, self.drawnFor, self.coloured = None, key, (kind, name)
+      self.raster, self.drawnFor, self.coloured, self.shownFor = None, key, (kind, name), shown
       # a property is the only colouring that is a number, and it states the range it was
       # drawn over, so the bar needs nothing read back; every other picture carries none
       norm = getattr(self.image, "norm", None)
@@ -234,7 +241,11 @@ class ViewCanvas(FigureCanvasQTAgg):
         self.draw_idle()
         self.prepareDensity()
         return
+    # the picture shows these colours already: a change that touched none of them draws nothing
+    elif self.coloured == (kind, name) and self.shownFor is not None and np.array_equal(self.shownFor, shown):
+      return
     self.recolour(kind, name, shown)
+    self.shownFor = shown
     self.draw_idle()
     self.prepareDensity()
 

@@ -11,12 +11,13 @@ import sys
 import traceback
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QSizePolicy, QSplitter, QTabBar, QVBoxLayout,
                                QWidget)
 
 from . import callbacks as cb
 from .browser import BrowserSide, framed
+from .desktop import APP_ID, installDesktopEntry
 from .phases import PhaseTable
 from .pictogram import CoordinatePanel
 from .scriptview import ScriptView
@@ -79,6 +80,7 @@ class WizardWindow(QMainWindow):
     self.st = st
     self.app = app or QApplication.instance()
     self.setWindowTitle("MTEX import wizard")
+    self.setWindowIcon(wizardIcon())
     self.resize(1600, 900)
     self.small = QFont(self.font())
     self.small.setPointSize(FONT_SMALL)
@@ -179,11 +181,22 @@ class WizardWindow(QMainWindow):
 
 # ------------------------------------------------------------------ running it
 
+def wizardIcon():
+  """the wizard's icon: a grain map in orientation colours with an import arrow"""
+  return QIcon(os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.svg"))
+
+
 def application():
   """the running QApplication, created on first call, with the wizard's font"""
   app = QApplication.instance()
   if app is None:
+    # the app id names the desktop entry a Wayland task manager takes the icon from; an offscreen
+    # run has no desktop to tell
+    QApplication.setDesktopFileName(APP_ID)
+    if "offscreen" not in os.environ.get("QT_QPA_PLATFORM", ""):
+      installDesktopEntry()
     app = QApplication(sys.argv[:1])
+    app.setWindowIcon(wizardIcon())
   app.setFont(QFont(app.font().family(), FONT_SIZE))
   return app
 

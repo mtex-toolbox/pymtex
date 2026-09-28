@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><clipPath id="tile"><rect x="1" y="1" width="62" height="62" rx="11"/></clipPath></defs>
+  <!-- a grain map in orientation colours -->
+  <g clip-path="url(#tile)" stroke="#1b1b1b" stroke-width="1.8" stroke-linejoin="round">
+    <polygon points="12.8,18.8 -20.0,-20.0 -8.5,-20.0 21.0,14.0" fill="#e5383b"/>
+    <polygon points="21.0,14.0 -8.5,-20.0 32.0,-20.0 75.0,-20.0 40.2,12.2 30.4,18.7" fill="#38b000"/>
+    <polygon points="57.8,24.7 40.2,12.2 75.0,-20.0 84.0,3.1 84.0,17.5" fill="#3a86ff"/>
+    <polygon points="12.8,18.8 11.0,33.0 18.5,38.0 31.5,30.0 30.4,18.7 21.0,14.0" fill="#ffbe0b"/>
+    <polygon points="30.4,18.7 40.2,12.2 57.8,24.7 41.6,36.8 31.5,30.0" fill="#8338ec"/>
+    <polygon points="18.5,38.0 19.3,46.5 -20.0,84.0 -20.0,71.8 11.0,33.0" fill="#ff7b00"/>
+    <polygon points="31.5,30.0 41.6,36.8 42.4,45.3 31.0,55.2 19.3,46.5 18.5,38.0" fill="#06d6a0"/>
+    <polygon points="42.4,45.3 53.0,51.2 84.0,17.5 57.8,24.7 41.6,36.8" fill="#ff006e"/>
+    <polygon points="31.0,55.2 31.0,84.0 28.1,84.0 -20.0,84.0 19.3,46.5" fill="#4cc9f0"/>
+    <polygon points="42.4,45.3 53.0,51.2 31.0,84.0 31.0,55.2" fill="#c9184a"/>
+    <polygon points="53.0,51.2 31.0,84.0 28.1,84.0 32.0,84.0 84.0,32.0 84.0,3.1 84.0,17.5" fill="#7209b7"/>
+    <polygon points="12.8,18.8 -20.0,-20.0 -20.0,32.0 -20.0,71.8 11.0,33.0" fill="#f9c74f"/>
+  </g>
+  <rect x="1" y="1" width="62" height="62" rx="11" fill="none" stroke="#1b1b1b" stroke-width="2"/>
+  <!-- the import badge: an arrow into a tray -->
+  <circle cx="44" cy="44" r="17" fill="#ffffff" stroke="#1b1b1b" stroke-width="2"/>
+  <path d="M44 32 V47 M37.5 40.5 L44 47 L50.5 40.5" fill="none" stroke="#1b1b1b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M35 49 V53 H53 V49" fill="none" stroke="#1b1b1b" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

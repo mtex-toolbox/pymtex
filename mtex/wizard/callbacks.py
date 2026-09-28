@@ -131,10 +131,14 @@ def selectEntry(st, path):
     st.changed("selected", "info", "status")
     return None
   st.eulerAxesNames = st.info.eulerAxesNames
-  st.mapConvention = closestConvention(plottingConvention.default.rot)[0]
+  # the map on the screen is still the last one read: it is drawn anew only when the convention
+  # it is drawn in really changes, not on every file the cursor passes
+  convention = closestConvention(plottingConvention.default.rot)[0]
+  moved = convention != st.mapConvention
+  st.mapConvention = convention
   st.eulerConvention = eulerConventionOf(st, st.info.eulerCorrection)
   st.status = ("idle", f"{st.info.name}: click to import" if st.ebsd is None or st.selected != _loadedPath(st) else f"{st.info.name} is loaded")
-  st.changed("selected", "info", "status", "mapConvention", "eulerConvention")
+  st.changed("selected", "info", "status", "eulerConvention", *(["mapConvention"] if moved else []))
   return st.info
 
 
@@ -143,6 +147,12 @@ def openEntry(st, path, worker=None):
   if selectEntry(st, path) is None:
     return
   startImport(st, worker)
+
+
+def leaveEntry(st):
+  """the cursor moved on to another file: the import under way is not taken when it finishes, so
+  that walking through a folder draws only the map it stops on"""
+  st.imports += 1
 
 
 def eulerConventionOf(st, correction):
@@ -168,17 +178,19 @@ def warmColours(st):
   if not frames:
     return None
 
-  def warm():
-    from ..plotting.orientationkeys import keyColorGrid
-    for f in frames:
-      try:
-        keyColorGrid(f)
-      except Exception:
-        return
-
-  thread = threading.Thread(target=warm, name="mtex-wizard-colours", daemon=True)
+  thread = threading.Thread(target=buildColourGrids, args=(frames,), name="mtex-wizard-colours", daemon=True)
   thread.start()
   return thread
+
+
+def buildColourGrids(frames):
+  """the inverse pole figure colour grid of every frame, each built once and kept"""
+  from ..plotting.orientationkeys import keyColorGrid
+  for f in frames:
+    try:
+      keyColorGrid(f)
+    except Exception:
+      return
 
 
 def startImport(st, worker=None):
@@ -199,7 +211,13 @@ def startImport(st, worker=None):
     from ..io.load import loadEBSD
     t = time.perf_counter()
     kw = {"dataSet": k, "silent": True} if several else {}
-    return loadEBSD(path, **kw), time.perf_counter() - t
+    ebsd = loadEBSD(path, **kw)
+    seconds = time.perf_counter() - t
+    # the colour grids of phases the header did not name built here too, not on the main thread
+    # when the map is first drawn
+    if worker is not None:
+      buildColourGrids(f for f in ebsd.CSList.frames if f.isIndexed)
+    return ebsd, seconds
 
   def commit(result):
     if number != st.imports:
@@ -653,5 +671,5 @@ def defaultScriptPath(st, folder=None):
   return os.path.join(folder or os.getcwd(), f"import_{stem}.py")
 
 
-__all__ = ["WizardState", "setFolder", "toggleFolder", "pickFile", "selectEntry", "openEntry", "startImport", "setDataSet",
+__all__ = ["WizardState", "setFolder", "toggleFolder", "pickFile", "selectEntry", "openEntry", "leaveEntry", "startImport", "setDataSet",
            "pickTab", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]

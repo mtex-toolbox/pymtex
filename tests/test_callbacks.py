@@ -174,3 +174,13 @@ def test_only_the_latest_import_is_taken():
   commitA(loadA())
   assert st.status[0] == "loaded" and st.status[1].startswith("olivine_cut.ang") and st.selected.endswith("olivine_cut.ang")
   assert st.ebsd.size == loadB()[0].size
+
+
+def test_a_load_is_dropped_when_the_cursor_moves_on():
+  st = WizardState(FIXTURES)
+  held = []
+  cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"), lambda load, commit: held.append((load, commit)))
+  cb.leaveEntry(st)
+  load, commit = held[0]
+  commit(load())
+  assert st.ebsd is None

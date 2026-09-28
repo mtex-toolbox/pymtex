@@ -1,4 +1,4 @@
-# the browser side of the import wizard: the path, the status band, the tree, the data
+# the browser side of the import wizard: the path, the tree, the status band, the data
 # sets, the file information with the metadata of the map (docs/plans/wizard.md W2)
 #
 # Every control reads the state and writes back through one callback; nothing here holds
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, QListView, QListWidget,
                                QMenu, QSizePolicy, QStyledItemDelegate, QToolButton, QTreeWidget,
@@ -208,6 +208,11 @@ def _kB(n):
   return f"{n / (1 << 10):.0f} kB"
 
 
+# the pause after the cursor stops on a file before it is read, so that walking over a folder
+# with the arrow keys reads only the file it ends on
+WALK_DELAY_MS = 300
+
+
 class FileList(QListView):
   """the folder as a tree: a click unfolds a folder or reads a map, a double click walks in"""
 
@@ -215,6 +220,10 @@ class FileList(QListView):
     super().__init__()
     self.st = st
     self.worker = worker
+    self.walkTimer = QTimer(self)
+    self.walkTimer.setSingleShot(True)
+    self.walkTimer.setInterval(WALK_DELAY_MS)
+    self.walkTimer.timeout.connect(self.readCurrent)
     self.model_ = EntriesModel(st)
     self.setModel(self.model_)
     self.setItemDelegate(EntryDelegate(small))
@@ -271,12 +280,21 @@ class FileList(QListView):
       cb.openEntry(self.st, row.path, self.worker)
 
   def currentChanged(self, current, previous):
-    """the arrow keys describe the current row; Return opens it"""
+    """the arrow keys read the file the cursor stops on; the one it leaves is not drawn"""
     super().currentChanged(current, previous)
-    if current.isValid():
+    if current.isValid() and current.row() < len(self.st.entries):
       row = self.st.entries[current.row()]
       if not row.isDir and self.st.selected != row.path:
-        cb.selectEntry(self.st, row.path)
+        cb.leaveEntry(self.st)
+    self.walkTimer.start()
+
+  def readCurrent(self):
+    """the file under the cursor read, unless it is the one read already"""
+    index = self.currentIndex()
+    if index.isValid() and index.row() < len(self.st.entries):
+      row = self.st.entries[index.row()]
+      if not row.isDir and self.st.selected != row.path:
+        cb.openEntry(self.st, row.path, self.worker)
 
   def keyPressEvent(self, event):
     """Return walks into a folder and reads a map, as a double click does; Right unfolds a folder
@@ -471,8 +489,8 @@ class BrowserSide(QWidget):
     self.dataSets = DataSetList(st, worker)
     self.info = InfoTree(st, small)
     lay.addWidget(self.breadcrumb)
-    lay.addWidget(self.status)
     lay.addWidget(framed(self.files), 3)
+    lay.addWidget(self.status)
     self.dataSetPanel = framed(self.dataSets)
     lay.addWidget(self.dataSetPanel)
     lay.addWidget(framed(self.info), 3)

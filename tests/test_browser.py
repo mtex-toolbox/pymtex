@@ -38,10 +38,13 @@ def test_browser_side():
   tops = [side.info.topLevelItem(k).text(0) for k in range(side.info.topLevelItemCount())]
   assert tops[:len(rows)] == list(rows) and tops[len(rows)] == "header"
   assert not side.dataSetPanel.isVisibleTo(side)
-  # the arrow keys describe the current row without reading it
+  # the cursor moved to a file reads it once it stops there, not at once
   k = [r.name for r in st.entries].index("olivine_cut.ang")
   files.setCurrentIndex(files.model_.index(k, 0))
-  assert st.info.name == "olivine_cut.ang" and st.ebsd.CSList.frames[1].name == "Forsterite"
+  assert files.walkTimer.isActive() and st.info.name == "Forsterite_cut.ctf"
+  files.walkTimer.stop()
+  files.readCurrent()
+  assert st.info.name == "olivine_cut.ang" and st.status[0] == "loaded" and st.selected == st.entries[k].path
 
 
 def test_data_set_list():
@@ -160,6 +163,7 @@ def test_keyboard_navigation():
   # a letter: the first name starting with it, the same letter again the next
   QTest.keyClick(files, "f")
   first = files.currentIndex().row()
+  files.readCurrent()
   assert st.entries[first].name.lower().startswith("f") and st.selected == st.entries[first].path
   QTest.keyClick(files, "F")
   second = files.currentIndex().row()

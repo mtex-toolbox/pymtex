@@ -59,3 +59,35 @@ def test_open_file_on_start():
   assert w.st.status[0] == "loaded" and w.st.folder == os.path.abspath(FIXTURES)
   w.close()
   app.processEvents()
+
+
+def test_the_window_has_the_wizard_icon():
+  application()
+  w = runWizard(FIXTURES, show=False, exec=False)
+  icon = w.windowIcon()
+  assert not icon.isNull()
+  assert not icon.pixmap(32, 32).toImage().isNull()
+  w.close()
+
+
+# the arrow keys read the file the cursor stops on, and the map shown is that file's
+def test_walking_with_the_arrow_keys_reads_the_file():
+  from PySide6.QtCore import Qt
+  from PySide6.QtTest import QTest
+  app = application()
+  w = runWizard(FIXTURES, exec=False)
+  files = w.browser.files
+  names = [r.path for r in w.st.entries]
+  maps = [i for i, r in enumerate(w.st.entries) if not r.isDir and r.path.endswith((".ang", ".ctf"))][:2]
+  files.goTo(maps[0])
+  pump(app, lambda: w.st.status[0] in ("loaded", "failed") and w.st.selected == names[maps[0]])
+  files.goTo(maps[1] - 1)
+  QTest.keyClick(files, Qt.Key_Down)
+  pump(app, lambda: w.st.status[0] in ("loaded", "failed") and w.st.selected == names[maps[1]])
+  assert w.st.status[0] == "loaded"
+  assert os.path.basename(names[maps[1]]) in w.st.status[1]
+  lay = w.browser.layout()
+  order = [lay.itemAt(k).widget() for k in range(lay.count())]
+  assert order.index(w.browser.status) == order.index(files.parentWidget()) + 1
+  w.close()
+  app.processEvents()
