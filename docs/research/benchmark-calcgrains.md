@@ -1,5 +1,11 @@
 # calcGrains against MATLAB and the Julia port
 
+**Historical results.** See [the September 28 release audit](calcgrains-release-audit.md)
+before using the tables below: the emsland vertex-weld issue is already fixed, the MATLAB
+forsterite input had an incorrect phase mapping (now fixed in the benchmark), and the two
+ports use different default angles. The audit contains current comparisons with explicit
+parameters and identifies the remaining minPixel defect.
+
 Run 2026-09-23, `bench/calcgrains.py`, `bench/calcgrains.jl` and `bench/matlab/bench_calcgrains.m`.
 Every map is read once, by this port's reader, and exported as its real measurements (the
 padding of a grid left out): position, phase and quaternion per measurement, the notIndexed

@@ -64,6 +64,12 @@ for k = 1:numel(lines)
 end
 pos = vector3d(A(1, :).', A(2, :).', zeros(size(A, 2), 1));
 rot = rotation(quaternion(A(4, :).', A(5, :).', A(6, :).', A(7, :).'));
-ebsd = EBSD(pos, rot, A(3, :).' + 1, CSList, struct());
+% The exported phases are indices, not vendor phase numbers. In particular,
+% forsterite includes an unused Silicon frame: inferring the phase map from
+% the phases present shifts every index and assigns the wrong crystal group.
+phaseId = A(3, :).' + 1;
+ebsd = EBSD(pos, rot, phaseId, CSList, struct(), 'phaseMap', 0:numel(CSList)-1);
+assert(isequal(ebsd.phaseId(:), phaseId));
+assert(isequal(ebsd.isIndexed(:), A(3, :).' > 0));
 ebsd = ebsd.gridify;
 end

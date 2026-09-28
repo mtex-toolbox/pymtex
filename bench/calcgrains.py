@@ -46,8 +46,7 @@ def exportMaps(names):
     keep = ~e.isPadding.reshape(-1)
     xy = e.pos.data.reshape(-1, 3)[keep, :2]
     ph = e.phaseId.reshape(-1)[keep].astype(float)
-    # a notIndexed measurement keeps its NaN rotation, as the readers write it: MATLAB's
-    # calcGrains reads the rotation there and fragments the map when it is a number
+    # preserve the reader's rotations, including NaNs on notIndexed measurements
     q = e.rotations.data.reshape(-1, 4)[keep]
     np.column_stack([xy, ph, q]).astype("<f8").tofile(os.path.join(OUT, f"{name}.bin"))
     lines = []

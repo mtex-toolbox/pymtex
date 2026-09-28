@@ -47,8 +47,15 @@ Done when every job of `test.yml` passes, including the NumPy-fallback job.
 
 ## R2. Known differences: fix or state
 
-The largest group of open rows in `docs/findings.md` shares one cause: the closing and the
-cull of `calcGrains` (M3).
+The largest group of open rows in `docs/findings.md` concerns `calcGrains` (M3).
+The [September 28 audit](../research/calcgrains-release-audit.md) separates a default-angle
+mismatch (Python 10 degrees, MATLAB 15), an incorrect MATLAB benchmark phase mapping (fixed),
+and remaining closing/culling differences. The table below records the original reports,
+not comparisons at identical parameters: csl agrees exactly when the angle is matched.
+
+Next: fix the confirmed final-pass `minPixel` defect (six undersized indexed grains on
+forsterite at minPixel=3), settle or document the default angle, then investigate the
+remaining closing and quadruple-point differences with explicit parameters.
 
 | Page | Here | MATLAB |
 |---|---|---|
@@ -97,6 +104,18 @@ Done when the Python pages are live beside MATLAB's, or ready to go live on the 
 
 ## R5. Package and publish
 
+- The tag's commit must pass the full test matrix and wheel smoke check before publishing.
+  Implemented locally: `release.yml` calls the reusable `test.yml`; release builds depend
+  on its success and publishing depends on the release build. Validate this gate on GitHub
+  before tagging the public release.
+- Packaging checked locally on Linux / Python 3.12: the sdist now includes `tools/staticapi.py`,
+  required by its shipped tests. `uv build` builds the wheel from that sdist.
+  `python tools/check_dist.py --dist dist --python 3.12` installs each artifact in a fresh
+  environment outside the checkout, checks core-only EBSD reconstruction, ODF calculation
+  and bundled tutorials, then adds the I/O/plot extras for HDF5 import and PNG output.
+  Both artifacts passed 16 static-API/documentation tests and collected 1330 tests.
+  The reusable CI workflow now runs these packaging checks on Linux, macOS and Windows;
+  the latter two remain to be verified on GitHub.
 - Set up the environment `pypi` for trusted publishing, on both PyPI and GitHub.
 - Upload a release candidate to TestPyPI. Then, on each of the three OSes, install it with
   `pip install mtex[all]` into a clean environment and run a smoke script: load
