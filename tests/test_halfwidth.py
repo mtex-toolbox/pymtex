@@ -170,3 +170,14 @@ def test_one_transform_gives_the_U_statistic():
     lowerBoundHalfwidth(E)
   with pytest.raises(ValueError, match="folds"):
     degreeEnergies(o, 5, folds=1, groups=np.repeat(np.arange(15), 10), rng=rng)
+
+
+def test_ucv_asks_for_a_higher_bandwidth_at_its_edge():
+  from mtex.functions.halfwidth import ucvAtEdge
+  cs = crystalFrame("m-3m")
+  ori = discreteSample(unimodalODF(orientation(rotation.rand(rng=rng), cs), halfwidth=5 * degree), 20000, rng=rng)
+  H = candidateHalfwidths("SO3")
+  # a sharp sample pushes UCV to the narrowest halfwidth bandwidth 16 resolves, not so at 128
+  assert ucvAtEdge(degreeEnergies(ori, 16, folds=1, rng=rng), H)
+  assert not ucvAtEdge(degreeEnergies(ori, 128, folds=1, rng=rng), H)
+  assert calcKernel(ori).halfwidth() < 3.9 * degree

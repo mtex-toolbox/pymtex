@@ -585,8 +585,8 @@ the floor widens UCV to 1.55 and 1.73: Bennett's bound on the largest term reads
 grain, whose weight is 7 to 17 times the mean for lognormal sizes. A Gaussian tail (no
 largest-term correction) gives 1.16 and 1.02, the 99 % quantile of the grain weights 1.47 and
 1.24. What the largest term measures is real, a single large grain raising its own spike at
-a small halfwidth, which the ISE hardly charges and the floor is meant to prevent; the choice
-is open (section 10).
+a small halfwidth, which the ISE hardly charges and the floor is meant to prevent; so Bennett's
+bound stays (section 10, item 7).
 
 Done 2026-09-27 (H5, first part): `calcKernel` defaults to `'UCV'` with the floor (`noiseFloor=True`,
 tauMax = 0.2), the new methods seeded so that a default call is reproducible; `calcDensity`
@@ -599,6 +599,19 @@ ODFTheory, EBSDOrientationAnalysis, MisorientationDistributionFunction, Transfor
 EllipseBasedParameters); OptimalKernel, VectorsDensityEstimation and EBSD2ODF show the
 selection. One observation: C2 moves with the random split into folds (5.52 against 4.07
 degrees on the 10000 orientations of OptimalKernel after the draws were reordered).
+
+The bandwidth of UCV on SO(3) (2026-09-27): at bandwidth 64 the narrowest resolved candidate is
+3.9 degrees, and on the cubic mixture UCV sits there from about 1e5 orientations on (2.5 at 96,
+1.8 at 128). `calcKernel` therefore starts at 64 and computes the energies once more at 128 when
+the choice sits on that edge (`ucvAtEdge`); 128 resolves every candidate down to 2 degrees. The
+energies at 128 cost 0.95 s at 1e6 and, once per session and group, 3.1 s for the projections.
+The z folds of the groups now shrink the lattice wherever the points are fewer than a quarter
+of its nodes, with 1.25 oversampling: finufft spreads onto a thin lattice at 2.0 oversampling
+on ten threads up to a hundred times slower (37 s against 0.4 s for 125000 points on the
+(17, 131, 131) lattice). Measured on the transform alone: 0.075 s against 0.171 s at 1e4 points
+and bandwidth 64, 0.70 against 1.10 s at 1e6 points and bandwidth 128; at 1e6 points and bandwidth
+64 folding would cost 0.73 against 0.34 s, where the rule does not fold. The folded energies agree
+to 7e-7.
 
 **H3, C4 and C5**: the diffusion plug-in (and the MATLAB `kde1d` fix recorded in
 docs/findings.md), full-data KLCV with leave-one-grain-out. Decided: which accurate method becomes
@@ -739,6 +752,10 @@ off a pole figure? Concerns `SO3Fun/slicedWasserstein.m`,
    carry `notIID`; the pages tell the user to pass the grain ids. Next: H3 (the diffusion
    plug-in, KLCV on all points with leave-one-grain-out), the bandwidth cap of UCV on SO(3),
    and MATLAB's `calcKernel`; the width of the selection with grain folds is under discussion.
+7. **The floor on grain maps (user, 2026-09-27).** With grain folds the noise floor keeps Bennett's
+   bound on the largest term, the largest grain: it prevents single grains from raising spikes of
+   their own, at 1.5 to 1.7 times the oracle's ISE on the simulated grain maps. For `'conservative'`
+   with grain folds the variance comes from the unbiased energies.
 
 ## 11. References
 

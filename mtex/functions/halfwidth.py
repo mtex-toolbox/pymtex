@@ -223,9 +223,16 @@ class degreeEnergies:
       return evenize(c) if self.antipodal else c
     from .harmonics import deg2dim, project
     from .so3fun import invertedCoefficients
+    from .quadrature import folds
+    from .transforms import foldedDims
     c = np.zeros(deg2dim(L + 1), dtype=complex)
     if len(w):
-      c = SO3FourierPlan(rotation._fromData(pts), L, real=True, eps=TRANSFORM_EPS).adjoint(np.ones(len(w)), w)
+      # the z folds of the groups shrink the lattice, which pays where the FFT outweighs the
+      # spreading, with fewer points than a quarter of the lattice; 1.25 oversampling, since
+      # finufft spreads a thin lattice at 2.0 on many threads up to a hundred times slower
+      fd = folds(self.CS, self.SS) if len(w) < np.prod(foldedDims(L, True, (1, 1))) / 4 else (1, 1)
+      up = 1.25 if fd != (1, 1) else None
+      c = SO3FourierPlan(rotation._fromData(pts), L, real=True, folds=fd, eps=TRANSFORM_EPS, upsampfac=up).adjoint(np.ones(len(w)), w)
     if self.nSym > 1:
       c = project(c, *self._projections)
     return (c + invertedCoefficients(c)) / 2 if self.antipodal else c
@@ -432,6 +439,14 @@ def ucvHalfwidth(E, halfwidths=None, returnCurve=False):
   return (h, hs, r) if returnCurve else h
 
 
+def ucvAtEdge(E, halfwidths=None):
+  """whether UCV chose the narrowest candidate the energies resolve while narrower ones exist:
+  then the bandwidth of the energies, not the data, set the choice"""
+  hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
+  ok = np.array([len(familyMultipliers(E.space, h)) - 1 <= E.L for h in hs])
+  return bool(np.any(ok) and not np.all(ok) and ucvHalfwidth(E, hs) <= np.min(hs[ok]))
+
+
 def bonferroniZ(alpha, L0):
   """the one-sided normal quantile for a simultaneous bound over the degrees 1..L0 (Bonferroni)"""
   from scipy.special import ndtri
@@ -517,6 +532,6 @@ def selectHalfwidth(E, method="UCV", halfwidths=None, noiseFloor=True, z=2.0, al
   return h
 
 
-__all__ = ["checkIndependent", "degreeEnergies", "selectHalfwidth", "ucvHalfwidth", "lowerBoundHalfwidth", "noiseFloorHalfwidth",
+__all__ = ["checkIndependent", "degreeEnergies", "selectHalfwidth", "ucvHalfwidth", "ucvAtEdge", "lowerBoundHalfwidth", "noiseFloorHalfwidth",
            "bennettDeviation", "footprints",
            "candidateHalfwidths", "kernelMultipliers", "riskCurve"]

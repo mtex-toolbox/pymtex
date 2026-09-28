@@ -797,7 +797,7 @@ def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, wei
   validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
   size and the symmetries alone; directions take the first two only. groups are the grain ids
   of pixels, which the energies fold by; a map brings its own"""
-  from .halfwidth import degreeEnergies, selectHalfwidth
+  from .halfwidth import degreeEnergies, selectHalfwidth, ucvAtEdge
   from .kernelfunctions import S2DeLaValleePoussinKernel
   if not isinstance(o, (quaternion, vector3d)) and hasattr(o, "orientations"):
     groups = o.prop.get("grainId") if groups is None and "grainId" in o.prop else groups
@@ -813,6 +813,10 @@ def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, wei
     # UCV needs no errors of the energies, so independent points take one transform
     folds = 1 if method == "UCV" and groups is None else 8
     E = degreeEnergies(o, L, weights=weights, groups=groups, folds=folds, rng=rng)
+    # on SO(3) UCV starts at bandwidth 64 and doubles once when its choice sits on the narrowest
+    # halfwidth that bandwidth resolves; 128 resolves every candidate
+    if method == "UCV" and bandwidth is None and not directions and ucvAtEdge(E, halfwidths):
+      E = degreeEnergies(o, 2 * L, weights=weights, groups=groups, folds=folds, rng=rng)
     h = selectHalfwidth(E, method, halfwidths, noiseFloor=noiseFloor)
     return S2DeLaValleePoussinKernel(halfwidth=h) if directions else SO3DeLaValleePoussinKernel(halfwidth=h)
   rng = np.random.default_rng() if rng is None else rng
