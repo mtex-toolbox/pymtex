@@ -1,11 +1,14 @@
-# the test suite on every push and pull request: three systems, the supported Pythons, the
-# compiled kernels, and once the NumPy fallback without numba
+# the test suite in two tiers, since a private repository pays macOS minutes tenfold and
+# Windows twofold: every push and pull request runs one Linux job; a release tag or a manual
+# run adds the other Pythons, Windows, one macOS job, the NumPy fallback and the distributions
 name: tests
 
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "bench/**", "tools/graph/**", "**.md", "**.ipynb"]
   pull_request:
+    paths-ignore: ["docs/**", "bench/**", "tools/graph/**", "**.md", "**.ipynb"]
   workflow_dispatch:
   workflow_call:
 
@@ -14,20 +17,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quick:
+    name: ubuntu-latest / Python 3.14 / numba,io,plot
+    if: github.ref_type != 'tag' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: install
+        run: python -m pip install ".[numba,io,plot]" pytest
+      - name: test
+        run: python -m pytest -q
+
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }} / ${{ matrix.extras }}
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 45
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.12", "3.13", "3.14"]
-        extras: ["numba,io,plot"]
         include:
-          - os: ubuntu-latest
-            python: "3.14"
-            extras: "io,plot"
+          - {os: ubuntu-latest, python: "3.12", extras: "numba,io,plot"}
+          - {os: ubuntu-latest, python: "3.13", extras: "numba,io,plot"}
+          - {os: ubuntu-latest, python: "3.14", extras: "numba,io,plot"}
+          - {os: ubuntu-latest, python: "3.14", extras: "io,plot"}
+          - {os: windows-latest, python: "3.12", extras: "numba,io,plot"}
+          - {os: windows-latest, python: "3.14", extras: "numba,io,plot"}
+          - {os: macos-latest, python: "3.14", extras: "numba,io,plot"}
     env:
       MPLBACKEND: Agg
     steps:
@@ -35,19 +58,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+          cache: pip
       - name: install
         run: python -m pip install ".[${{ matrix.extras }}]" pytest
       - name: test
         run: python -m pytest -q
 
   build:
-    name: distributions / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    name: distributions
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
