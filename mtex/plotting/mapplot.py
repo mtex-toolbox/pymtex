@@ -247,7 +247,7 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
     q = rots.data.reshape(-1, 4)[sel]
     for i in x.CSList.indexedPhaseId:
       fr = x.CSList[i]
-      same = fr is color.CS1 or fr.Laue() is color.CS1.Laue()
+      same = fr is color.frameA or fr.Laue() is color.frameA.Laue()
       sub = np.flatnonzero(ids[sel] == i)
       if same and len(sub):
         o = orientation._fromRotation(q[sub], (fr, x.frame))

@@ -42,7 +42,8 @@ def frameTransition(fromFr, toFr, rule=None, tol=1e-1):
     return align(fromFr, toFr, tol)
   if rule == "byScreenAlignment":
     return byScreenAlignment(fromFr, toFr)
-  if hasattr(rule, "frameA"):
+  from .orientation import orientation
+  if isinstance(rule, orientation):
     return rule
   raise ValueError("the frame transition rule is 'byAxes', 'byScreenAlignment' or an orientation")
 

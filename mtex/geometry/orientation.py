@@ -357,7 +357,7 @@ class orientation(rotation):
   def transformReferenceFrame(self, to, toB=None, rule=None, tol=1e-1):
     """the same orientation with another crystal frame, both frames of a misorientation"""
     from .frametransform import transformOrientation
-    if isinstance(toB, str) or hasattr(toB, "frameA"):
+    if isinstance(toB, (str, orientation)):
       rule, toB = toB, None
     return transformOrientation(self, to, toB, rule, tol)
 

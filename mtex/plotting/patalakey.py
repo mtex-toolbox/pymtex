@@ -174,22 +174,22 @@ class PatalaColorKey(orientationColorKey):
     rgb = key.orientation2color(mori)
   """
 
-  def __init__(self, x, CS2=None):
+  def __init__(self, x, frameB=None):
     if hasattr(x, "misorientation") and not isinstance(x, orientation):
       x = x.misorientation
-    super().__init__(x, CS2 if CS2 is not None or isinstance(x, orientation) else x)
+    super().__init__(x, frameB if frameB is not None or isinstance(x, orientation) else x)
     self.antipodal = True
-    if self.CS1.LaueName() not in COLORMAPS:
-      raise ValueError(f"the Patala colour key is not defined for the symmetry {self.CS1.sym.pointGroup}")
+    if self.frameA.LaueName() not in COLORMAPS:
+      raise ValueError(f"the Patala colour key is not defined for the symmetry {self.frameA.sym.pointGroup}")
 
   def orientation2color(self, mori):
     """the colours of misorientations, (..., 3) RGB: the Rodrigues vectors in the fundamental zone
     with grain exchange, the a axis along x, looked up in the map of the Laue group"""
     v = mori.projectIntoFundamentalRegion(antipodal=True).Rodrigues()
     # the zone as the maps expect it, the a axis along x
-    v = v.rotate(rotationAboutZ(-self.CS1.aAxis.rho))
+    v = v.rotate(rotationAboutZ(-self.frameA.aAxis.rho))
     p = np.array(v.data.reshape(-1, 3), dtype=float)
-    laue = self.CS1.LaueName()
+    laue = self.frameA.LaueName()
     rgb = COLORMAPS[laue](_foldDihedral(p, FOLD[laue]) if laue in FOLD else p)
     return rgb.reshape(mori.shape + (3,))
 

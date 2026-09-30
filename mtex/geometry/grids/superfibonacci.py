@@ -6,6 +6,7 @@
 # orientationtree.py, the same one every SO(3) grid uses.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 
 from ..orientation import orientation
@@ -68,6 +69,22 @@ class SO3FibonacciGrid(orientation):
 
   def __repr__(self):
     return display(header("SO3FibonacciGrid", self._frameSummary()), [("size", self.size), ("resolution", f"{self.res / degree:.4g}°")])
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
 
 
 def superfibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None):

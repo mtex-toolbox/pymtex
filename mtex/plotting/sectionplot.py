@@ -151,7 +151,7 @@ def plotSection(x, *args, **kw):
   from .mtexfigure import firstOfList
   if _isSO3Fun(x):
     x = firstOfList(x)
-  if args and isinstance(args[0], vector3d) and not hasattr(x, "frameA"):
+  if args and isinstance(args[0], vector3d) and not isinstance(x, orientation) and not _isSO3Fun(x):
     from .polarplot import plotSectionS2
     return plotSectionS2(x, *args, **kw)
   kw.pop("verbose", None)
@@ -176,14 +176,14 @@ def plotSection(x, *args, **kw):
   if isinstance(kind, ODFSections):
     oS = kind
   else:
-    CS1, CS2 = (x.CS, x.SS)
+    frameA, frameB = (x.CS, x.SS)
     # complete: the sections of the whole orientation space, the frames without their groups
     if kw.pop("complete", False):
-      CS1, CS2 = CS1.stripSym(), CS2.stripSym()
+      frameA, frameB = frameA.stripSym(), frameB.stripSym()
     # misorientations with grain exchange are drawn on the antipodal sections
-    if getattr(x, "antipodal", False) and CS1 is CS2:
+    if getattr(x, "antipodal", False) and frameA is frameB:
       kw.setdefault("antipodal", True)
-    oS = newODFSectionPlot(CS1, CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
+    oS = newODFSectionPlot(frameA, frameB, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)
   # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes
@@ -438,7 +438,7 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
   """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
   the sections of orientation space, MATLAB @orientationColorKey/plot"""
   kind = next((a for a in args if isinstance(a, (str, ODFSections))), None)
-  oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.CS1, key.CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
+  oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.frameA, key.frameB, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)
   projKw, axesKw, whereKw = _split(kw)

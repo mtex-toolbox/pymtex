@@ -16,6 +16,7 @@
 # J. Appl. Cryst. 41 (2008), 1024.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -34,6 +35,7 @@ from ..functions.rbf import SO3FunRBF, uniformODF
 from ..functions.s2fun import S2FunHarmonic
 from ..functions.transforms import S2FourierPlan
 from ..geometry.display import display, framesLabel, header
+from ..geometry.framepair import installFramePair
 
 
 # ------------------------------------------------------------------ the forward operator
@@ -363,6 +365,22 @@ class MLSSolver:
     return display(header("MLSSolver", framesLabel(self.pf.CS, self.pf.SS)),
                    [("pole figures", self.pf.numPF), ("kernel", self.psi), ("grid", f"{self.S3G.size} orientations")])
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
+
 
 def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5, maxIter=10, c0=None,
             ghostCorrection=True, quadratureWeights=False, intensityWeights=False, regularisation=0.0, verbose=False):
@@ -417,5 +435,8 @@ def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, ma
       print(f"  {k + 1:2d} : {grid.size:7d} | " + "  ".join(f"{x:.2f}" for x in e))
   return odf
 
+
+# the two frames under their names of the Julia port, frameA and frameB
+installFramePair(MLSSolver)
 
 __all__ = ["MLSSolver", "zeroRangeMethod", "calcODF", "calcODFIterative"]

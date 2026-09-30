@@ -167,7 +167,7 @@ def variants(p2c, second=None, ids=None, parent=False):
       keep = _distinctModulo(cand, "left")
     return cand[keep]
   # variants(p2c, odf): the child texture, by the function spaces above this layer
-  if not hasattr(second, "frameA") and hasattr(second, "eval"):
+  if not isinstance(second, orientation) and hasattr(second, "eval"):
     from ..functions.funops import transformODF
     return transformODF(second, p2c, ids)
   par = second.data.reshape(-1, 4)

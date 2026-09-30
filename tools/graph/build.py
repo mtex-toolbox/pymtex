@@ -117,6 +117,11 @@ transpose ctranspose permute squeeze ne isequal fullDouble""".split())
 # method names every function-like class has, no evidence two classes are one
 ARITHMETIC = set("""eval mtimes times plus minus uminus rdivide mrdivide power mpower inv mean plot rotate rotate_outer
 symmetrise norm dot conj real abs sum max min eq ne cat""".split())
+# the names docs/plans/syntax.md gave a better spelling than MATLAB's: the port answers to the old
+# name under the new one, SRight as frameA
+sys.path.insert(0, os.path.dirname(HERE))
+from syntaxcheck import NAMES as _SYNTAX_NAMES  # noqa: E402
+RENAMED = {old: new for old, new in _SYNTAX_NAMES.items() if new.isidentifier()}
 # the layer of a source file, one vocabulary for both ports
 MLAYER = {"geometry": "geometry", "SO3Fun": "functions", "S2Fun": "functions", "S1Fun": "functions",
           "EBSDAnalysis": "maps", "PoleFigureAnalysis": "analysis", "ODFAnalysis": "analysis", "TensorAnalysis": "tensors",
@@ -224,7 +229,7 @@ def runtimeCounterparts(ix, pyNodes, aliases):
       if m in PLUMBING or name in PLUMBING:
         continue
       # an _outer variant is the broadcasting call of its base, an operator its dunder
-      for cand in [name, name[:-6] if name.endswith("_outer") else None] + REVERSE_DUNDER.get(name, []):
+      for cand in [name, name[:-6] if name.endswith("_outer") else None, RENAMED.get(name)] + REVERSE_DUNDER.get(name, []):
         obj = inspect.getattr_static(cls, cand, None) if cand else None
         if obj is not None:
           edges.append(dict(src=nodeOf(obj, cid), dst=mid, kind="counterpart", resolution="runtime"))

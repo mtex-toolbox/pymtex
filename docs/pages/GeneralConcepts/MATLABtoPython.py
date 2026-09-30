@@ -199,6 +199,11 @@ hold(False)
 # | `project2FundamentalRegion(ori)` | `projectIntoFundamentalRegion(ori)` |
 # | `project2EulerFR(ori)` | `projectIntoEulerRegion(ori)` |
 # | `sR.restrict2Upper` | `sR.restrictToUpper` |
+# | `SO3F.SRight`, `SO3F.SLeft`, `oR.CS1`, `oR.CS2` | `SO3F.frameA`, `SO3F.frameB` (or `CS`, `SS`) |
+# | `plotx2north` | `plottingConvention.default(north=xvector)` |
+# | `quiver3(t)` | `quiver3d(t)` |
+# | `loadEBSD_ang(fname)` | `loadEBSD(fname)`, the format from the extension or `interface='ang'` |
+# | `export_VPSC(ori, fname)` | `export(ori, fname, interface='VPSC')` |
 #
 # ## Behaviour that differs on purpose
 #

@@ -24,12 +24,12 @@ from .directionkeys import HKLDirectionKey, HSVDirectionKey, TSLDirectionKey, hs
 from ..geometry.display import aligned, display, header
 
 
-def _framesOf(x, CS2=None):
+def _framesOf(x, frameB=None):
   if isinstance(x, orientation):
     return x.frameA, x.frameB, x.antipodal
   if hasattr(x, "CSList") and hasattr(x, "phaseId"):
     return x.CS, x.frame, False
-  return x, specimenFrame.default if CS2 is None else CS2, False
+  return x, specimenFrame.default if frameB is None else frameB, False
 
 
 def _conj(q):
@@ -40,28 +40,28 @@ class orientationColorKey:
   """a colour key turning orientations into colours
 
     rgb = key.orientation2color(ori)    an (..., 3) array in [0, 1]
-    key.CS1, key.CS2, key.antipodal
+    key.frameA, key.frameB, key.antipodal
   """
 
-  def __init__(self, x, CS2=None):
-    self.CS1, self.CS2, self.antipodal = _framesOf(x, CS2)
+  def __init__(self, x, frameB=None):
+    self.frameA, self.frameB, self.antipodal = _framesOf(x, frameB)
 
   @property
   def CS(self):
-    """the crystal frame of the key, CS1"""
-    return self.CS1
+    """the crystal frame of the key, frameA"""
+    return self.frameA
 
   @property
   def SS(self):
-    """the specimen frame of the key, CS2"""
-    return self.CS2
+    """the specimen frame of the key, frameB"""
+    return self.frameB
 
   def orientation2color(self, ori):
     """the colours of orientations, an (..., 3) array in [0, 1]; defined by every key"""
     raise NotImplementedError
 
   def __repr__(self):
-    return aligned(f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})")
+    return aligned(f"{type(self).__name__} ({self.frameA.char()} → {self.frameB.char()})")
 
 
 # ------------------------------------------------------------------ the inverse pole figure keys
@@ -79,14 +79,14 @@ class ipfColorKey(orientationColorKey):
   def __init__(self, x, ipfDirection=None, dirMap=None):
     super().__init__(x)
     self.ipfDirection = vector3d(zvector if ipfDirection is None else ipfDirection)
-    self.dirMap = HSVDirectionKey(self.CS1) if dirMap is None else dirMap
+    self.dirMap = HSVDirectionKey(self.frameA) if dirMap is None else dirMap
     self._grid = None
 
   def crystalDirection(self, ori):
     """the crystal directions along the specimen direction of every orientation"""
     q = ori.data.reshape(-1, 4)
     d = self.ipfDirection.normalize().data.reshape(3)
-    return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.CS1, isNormalized=True)
+    return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.frameA, isNormalized=True)
 
   def precompute(self, resolution=None):
     """MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
@@ -97,8 +97,8 @@ class ipfColorKey(orientationColorKey):
     state = _keyState(self.dirMap)
     if self._grid is not None and self._grid[0] == state and self._grid[1].resolution == resolution:
       return self
-    default = state is not None and state == _keyState(HSVDirectionKey(self.CS1))
-    self._grid = (state, keyColorGrid(self.CS1, resolution) if default else colorGrid(self.dirMap, resolution))
+    default = state is not None and state == _keyState(HSVDirectionKey(self.frameA))
+    self._grid = (state, keyColorGrid(self.frameA, resolution) if default else colorGrid(self.dirMap, resolution))
     return self
 
   def orientation2color(self, ori):
@@ -144,8 +144,8 @@ class ipfHSVKey(ipfColorKey):
   """
 
   def __init__(self, x, ipfDirection=None, **kwargs):
-    CS1 = _framesOf(x)[0]
-    super().__init__(x, ipfDirection, HSVDirectionKey(CS1, **kwargs))
+    frameA = _framesOf(x)[0]
+    super().__init__(x, ipfDirection, HSVDirectionKey(frameA, **kwargs))
 
   @property
   def maxAngle(self):
@@ -236,7 +236,7 @@ class axisAngleColorKey(orientationColorKey):
   """the rotation from a reference orientation as a colour: its axis in the specimen frame
   through the key of the whole sphere, its angle through the saturation (Thomsen et al.)
 
-    axisAngleColorKey(CS1, CS2, oriRef=..., maxAngle=..., thresholdAngle=...)
+    axisAngleColorKey(frameA, frameB, oriRef=..., maxAngle=..., thresholdAngle=...)
     rgb = key.orientation2color(ori)
     rgb = key.orientation2color(ori, oriRef)
 
@@ -244,13 +244,13 @@ class axisAngleColorKey(orientationColorKey):
   colour is NaN above thresholdAngle. Without a reference the identity is the reference.
   """
 
-  def __init__(self, x=None, CS2=None, oriRef=None, maxAngle=None, thresholdAngle=np.inf):
+  def __init__(self, x=None, frameB=None, oriRef=None, maxAngle=None, thresholdAngle=np.inf):
     # without a frame the key reads the axes in the specimen and needs no crystal
-    super().__init__(crystalFrame("1") if x is None else x, CS2)
+    super().__init__(crystalFrame("1") if x is None else x, frameB)
     self.oriRef = oriRef
     self.maxAngle = None if maxAngle is None else float(maxAngle)
     self.thresholdAngle = float(thresholdAngle)
-    self.dirMapping = HSVDirectionKey(self.CS2)
+    self.dirMapping = HSVDirectionKey(self.frameB)
 
   def orientation2color(self, ori, oriRef=None):
     """the colours of orientations: the axis of the rotation from the reference through the key of
@@ -284,9 +284,9 @@ class BungeColorKey(orientationColorKey):
     BungeColorKey(cs, ss)
   """
 
-  def __init__(self, x, CS2=None):
-    super().__init__(x, CS2)
-    self.phi1Range, self.PhiRange, self.phi2Range = eulerRegion(self.CS1, self.CS2)
+  def __init__(self, x, frameB=None):
+    super().__init__(x, frameB)
+    self.phi1Range, self.PhiRange, self.phi2Range = eulerRegion(self.frameA, self.frameB)
 
   def orientation2color(self, ori):
     """the colours of orientations, the Euler angles of the symmetric equivalent inside the Euler box

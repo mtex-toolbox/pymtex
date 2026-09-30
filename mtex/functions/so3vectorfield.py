@@ -17,6 +17,7 @@
 # the group of the tangent side stripped.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 
 import numpy as np
@@ -39,6 +40,7 @@ from .rbf import _conj, _qmul, _readFrames, _rotationsFor, supportCosine
 from .so3fun import SO3FunHarmonic, invertedCoefficients, realizeWigner
 from .transforms import DIRECT_SUM_NODES, SO3FourierPlan, wignerPlan, wignerSeries, wignerSeriesAdjoint
 from ..geometry.display import aligned
+from ..geometry.framepair import installFramePair
 
 SIDES = ("left", "right")
 
@@ -523,6 +525,22 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   def __repr__(self):
     return aligned(f"SO3VectorFieldHarmonic ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  bandwidth: {self.bandwidth}")
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
+
 
 def _reframe(v, CS, SS):
   return v._rebuild(v._fhat, CS=CS, SS=SS) if isinstance(v, SO3VectorFieldHarmonic) else v._reframe(CS, SS)
@@ -711,6 +729,22 @@ class SO3VectorFieldHandle(SO3VectorField):
   def __repr__(self):
     return aligned(f"SO3VectorFieldHandle ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  bandwidth hint: {self.bandwidth}")
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
+
 
 # ------------------------------------------------------------------ the radial basis field
 # F(R) = sum_j mean_{s,t} (s w_j) K(R, s c_j t) for a left field, the right group of the
@@ -857,6 +891,22 @@ class SO3VectorFieldRBF(SO3VectorField):
   def __repr__(self):
     return aligned(f"SO3VectorFieldRBF ({framesLabel(self.CS, self.SS)})\n  tangent space: {self.tangentSpace}\n  kernel: {self.psi}\n  center: {self.center.size} orientations")
 
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
+
 
 # every field converts through the harmonic one; the property the constructor reads
 for _cls in (SO3VectorFieldHandle, SO3VectorFieldRBF):
@@ -874,6 +924,9 @@ def interpolateField(t, **kwargs):
   fs = [interpolate(os, t.data.reshape(-1, 3)[:, i], **kwargs) for i in range(3)]
   return SO3VectorFieldHarmonic(fs, ref.CS, ref.SS, t.side)
 
+
+# the two frames under their names of the Julia port, frameA and frameB
+installFramePair((SO3VectorFieldHarmonic, SO3VectorFieldHandle, SO3VectorFieldRBF))
 
 __all__ = ["SO3VectorFieldHarmonic", "SO3VectorFieldHandle", "SO3VectorFieldRBF", "componentFrames", "component", "curl",
            "div", "antiderivative", "mapField", "differentiate", "equivariantProjection"]

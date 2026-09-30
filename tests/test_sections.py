@@ -46,7 +46,7 @@ def test_phi2Sections_carryTheAnglesLabelsAndFrames():
   oS = phi2Six()
   assert oS.numSections == 6 and np.allclose(oS.phi2, oS.values)
   assert oS.axisLabels == ("φ1", "Φ") and oS.sectionLabel(1) == "φ2 = 15°"
-  assert oS.CS is cs and oS.SS is ss and oS.CS1 is cs
+  assert oS.CS is cs and oS.SS is ss and oS.frameA is cs
 
 
 def test_phi2Sections_sectionData_placesTheEquivalentsAndGivesThemBack():
@@ -136,7 +136,7 @@ def test_pfSections_h2EntersOnlyThroughItsPartPerpendicularToH1():
   triv = specimenFrame("1")
   mono = pfSections(crystalFrame("2/m", [1.0, 2.0, 3.0], [90 * degree, 100 * degree, 90 * degree]), triv)
   assert abs(mono.h1.data @ mono.h2.data) < 1e-12
-  om = orientation.byEuler(20 * degree, 60 * degree, 40 * degree, mono.CS1, triv)
+  om = orientation.byEuler(20 * degree, 60 * degree, 40 * degree, mono.frameA, triv)
   vs, sec, _ = mono.sectionData(om)
   for i in range(len(sec)):
     assert mono.orientationsAt(sec[i], vs[i]).angle(om) <= mono.tol + 1e-9

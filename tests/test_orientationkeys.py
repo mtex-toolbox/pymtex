@@ -42,7 +42,7 @@ def _cubicKey():
 
 def test_ipfHSVKey_isAnIpfColorKeyOfTheFrameOverADirectionKey():
   cs, key, _ = _cubicKey()
-  assert key.CS1 is cs and key.CS is cs and isinstance(key, ipfColorKey) and isinstance(key.dirMap, HSVDirectionKey)
+  assert key.frameA is cs and key.CS is cs and isinstance(key, ipfColorKey) and isinstance(key.dirMap, HSVDirectionKey)
 
 
 def test_ipfHSVKey_equivalentOrientationsShareAColour():
@@ -169,7 +169,7 @@ def test_spectralTransmissionColorKey_isOfTheFrameAtNinetyDegrees():
   from mtex import spectralTransmissionColorKey
   cs, rI, _ = _refraction()
   key = spectralTransmissionColorKey(rI, 22800)
-  assert key.CS1 is cs and np.isclose(key.phi, 90 * degree)
+  assert key.frameA is cs and np.isclose(key.phi, 90 * degree)
 
 
 def test_spectralTransmissionColorKey_isTheTransmissionAlongZPolarisedAlongX():

@@ -27,6 +27,7 @@ from .representations import axis2quat, isnull
 from .session import SESSION
 from .vector3d import vector3d
 from .display import aligned
+from .framepair import installFramePair
 
 SIDES = ("left", "right")
 REFERENCE_TOLERANCE = 1e-8
@@ -375,7 +376,20 @@ class SO3TangentVector(vector3d):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
+    from typing import Any
     from ..plotting.spaceplot import quiver3d
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
 
 
 # ------------------------------------------------------------------ construction helpers
@@ -495,5 +509,8 @@ def right(t):
   """right(t) is t.right(): the tangent vectors on the right side"""
   return t.right()
 
+
+# the two frames under their names of the Julia port, frameA and frameB
+installFramePair(SO3TangentVector)
 
 __all__ = ["SO3TangentVector", "spinTensor", "left", "right", "geodesic"]

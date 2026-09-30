@@ -615,12 +615,12 @@ def plot(v, *args, **kw):
   if hasattr(v, "rank") and hasattr(v, "M"):
     return plot(v.directionalMagnitude(), *args, **kw)
   # plot(ori) on a held section plot: the orientations into their sections
-  if hasattr(v, "frameA") and hasattr(v, "frameB") and getattr(gcm(), "sections", None) is not None and (gcm().hold or kw.get("add2all")):
+  if isinstance(v, orientation) and getattr(gcm(), "sections", None) is not None and (gcm().hold or kw.get("add2all")):
     from .sectionplot import plotSection
     kw.pop("add2all", None)
     return plotSection(v, gcm().sections, onto=True, **kw)
   # plot(ori, add2all=True) on pole figures: the poles of the orientations on every one
-  if hasattr(v, "frameA") and hasattr(v, "frameB") and kw.get("add2all") and gcm() is not None and \
+  if isinstance(v, orientation) and kw.get("add2all") and gcm() is not None and \
       any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None for ax in gcm().children):
     # the markers shrink with the number of poles, as those of plotPF(ori, h) do
     from .poles import dynamicMarkerSize
@@ -644,7 +644,7 @@ def plot(v, *args, **kw):
     from .sectionplot import plotFibreSection
     return plotFibreSection(v, *args, **kw)
   from ..geometry.quaternion import quaternion
-  if isinstance(v, (fibre, quaternion)) or (hasattr(v, "frameA") and hasattr(v, "frameB")):
+  if isinstance(v, (fibre, quaternion)):
     from .spaceplot import plot3d
     return plot3d(v, *args, **kw)
   # a function on the circle and a characteristic shape are polar lines
@@ -1019,7 +1019,7 @@ def annotate(v, *args, **kw):
   kw.setdefault("add2all", True)
   # an orientation is marked in the sections of the current figure when it has some, or by
   # its poles on the pole figures the figure holds
-  if hasattr(v, "frameA") and hasattr(v, "frameB"):
+  if isinstance(v, orientation):
     if getattr(gcm(), "sections", None) is not None:
       from .sectionplot import annotateSection
       return annotateSection(v, *args, **kw)
@@ -1142,7 +1142,7 @@ def quiver(v, w=None, resolution=10 * degree, **kw):
   if _mapKind(v) is not None:
     from .mapplot import quiverMap
     return quiverMap(v, w, **kw)
-  if hasattr(v, "frameA") and hasattr(v, "frameB"):
+  if isinstance(v, orientation):
     from .sectionplot import quiverSection
     return quiverSection(v, w, **kw)
   projKw, axesKw, whereKw = _split(kw)

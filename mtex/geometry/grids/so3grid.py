@@ -10,6 +10,7 @@
 # on b, b', a - a' only (MATLAB SO3Grid.c), which makes the gamma search one-dimensional.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import numpy as np
 from scipy import sparse
 
@@ -142,6 +143,22 @@ class SO3Grid(orientation):
 
   def __repr__(self):
     return display(header("SO3Grid", self._frameSummary()), [("size", self.size), ("resolution", f"{self.res / degree:.4g}°")])
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from typing import Any
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
 
 
 # whether rotations are about z, and one rotation per coset of the rotations about z: right

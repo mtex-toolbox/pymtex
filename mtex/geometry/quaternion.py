@@ -634,7 +634,8 @@ class orthogonalTransform(MtexArray):
     return None, None
 
   def __mul__(self, other):
-    if hasattr(other, "frameA"):
+    from .orientation import orientation
+    if isinstance(other, orientation):
       raise TypeError("orthogonalTransform * orientation is not defined; orientations are proper")
     q, p = self._other(other)
     if q is not None:

@@ -82,13 +82,14 @@ class orientationRegion:
     self.axisCenter = np.array([0.0, 0.0, 1.0]) if axisCenter is None else axisCenter
 
   @property
-  def CS1(self):
-    """the first frame of the region, the crystal frame, MATLAB's oR.CS1"""
+  def CS(self):
+    """the first frame of the region, frameA: the crystal frame (MATLAB's orientationRegion.CS1)"""
     return self.frameA
 
   @property
-  def CS2(self):
-    """the second frame of the region, the specimen or second crystal frame, MATLAB's oR.CS2"""
+  def SS(self):
+    """the second frame of the region, frameB: the specimen or second crystal frame
+    (MATLAB's orientationRegion.CS2)"""
     return self.frameB
 
   def checkInside(self, o, tol=2e-3):

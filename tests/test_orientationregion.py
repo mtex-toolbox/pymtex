@@ -51,7 +51,7 @@ def test_max_angle_and_axis_sector():
   assert abs(fundamentalRegion(crystalFrame("1")).maxAngle() - pi) < 1e-12
   sR = cs.fundamentalSector(angle=60 * degree)
   assert len(sR.N) > len(cs.fundamentalSector().N) and np.all(np.isfinite(sR.alpha))
-  assert cs.fundamentalRegion(cs).CS1 is cs and cs.sym.fundamentalRegion(cs.sym).N.shape[1] == 4
+  assert cs.fundamentalRegion(cs).frameA is cs and cs.sym.fundamentalRegion(cs.sym).N.shape[1] == 4
   assert fundamentalRegion(cs, antipodal=True).antipodal and "faces" in repr(oR)
 
 

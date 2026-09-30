@@ -76,7 +76,7 @@ def _equivalents(ori):
 class ODFSections:
   """sections through orientation space
 
-    oS.CS1, oS.CS2       the two frames
+    oS.frameA, oS.frameB       the two frames
     oS.tol               the tolerance an orientation may deviate from a section
     oS.numSections       how many
     oS.sectionCharts(k)  the charts section k is drawn on
@@ -88,20 +88,20 @@ class ODFSections:
   axisLabels = None
   outerSector = None
 
-  def __init__(self, CS1, CS2, values, tol):
-    self.CS1, self.CS2 = CS1, CS2
+  def __init__(self, frameA, frameB, values, tol):
+    self.frameA, self.frameB = frameA, frameB
     self.values = np.asarray(values, dtype=float).reshape(-1)
     self.tol = sectionTolerance(self.values, tol)
 
   @property
   def CS(self):
-    """the first frame of the sections, CS1"""
-    return self.CS1
+    """the first frame of the sections, frameA"""
+    return self.frameA
 
   @property
   def SS(self):
-    """the second frame of the sections, CS2"""
-    return self.CS2
+    """the second frame of the sections, frameB"""
+    return self.frameB
 
   @property
   def numSections(self):
@@ -143,7 +143,7 @@ class ODFSections:
 
   def __repr__(self):
     vals = ", ".join(f"{v / degree:g}" for v in self.values)
-    return aligned(f"{type(self).__name__} ({self.CS1.char()} → {self.CS2.char()})\n  sections: {vals}°")
+    return aligned(f"{type(self).__name__} ({self.frameA.char()} → {self.frameB.char()})\n  sections: {vals}°")
 
 
 # ------------------------------------------------------------------ Euler angle sections
@@ -171,15 +171,15 @@ class eulerSections(ODFSections):
   convention = "Bunge"
   first = False
 
-  def __init__(self, CS1, CS2=None, sections=6, values=None, tol=5 * degree, maxPhi=None, maxAzimuth=None, **kwargs):
-    CS2 = specimenFrame.default if CS2 is None else CS2
+  def __init__(self, frameA, frameB=None, sections=6, values=None, tol=5 * degree, maxPhi=None, maxAzimuth=None, **kwargs):
+    frameB = specimenFrame.default if frameB is None else frameB
     values = kwargs.pop(self.angleName, values)
     if kwargs:
       raise TypeError(f"unknown option {next(iter(kwargs))}")
-    p1, pPhi, p2 = eulerRegion(CS1, CS2)
+    p1, pPhi, p2 = eulerRegion(frameA, frameB)
     self.period, azimuth = (p1, p2) if self.first else (p2, p1)
     self._tolerance = tol
-    super().__init__(CS1, CS2, sectionList(values, self.period, sections), tol)
+    super().__init__(frameA, frameB, sectionList(values, self.period, sections), tol)
     self.maxPhi = pPhi if maxPhi is None else maxPhi
     self.maxAzimuth = azimuth if maxAzimuth is None else maxAzimuth
     self.sR = eulerBox(self.maxPhi, self.maxAzimuth)
@@ -243,7 +243,7 @@ class eulerSections(ODFSections):
     s = np.full(vs.shape, self.values[k])
     theta, azim = vs.theta, vs.rho
     a, b, c = (s, theta, azim) if self.first else (azim, theta, s)
-    return orientation.byEuler(a, b, c, self.convention, self.CS1, self.CS2)
+    return orientation.byEuler(a, b, c, self.convention, self.frameA, self.frameB)
 
 
 class phi2Sections(eulerSections):
@@ -335,20 +335,20 @@ class pfSections(ODFSections):
 
   angleName = "omega"
 
-  def __init__(self, CS1, CS2=None, h1=None, h2=None, sections=6, values=None, tol=5 * degree, maxOmega=None, **kwargs):
-    CS2 = specimenFrame.default if CS2 is None else CS2
+  def __init__(self, frameA, frameB=None, h1=None, h2=None, sections=6, values=None, tol=5 * degree, maxOmega=None, **kwargs):
+    frameB = specimenFrame.default if frameB is None else frameB
     values = kwargs.pop(self.angleName, values)
     if kwargs:
       raise TypeError(f"unknown option {next(iter(kwargs))}")
-    crystal = isinstance(CS1, crystalFrame)
-    self._CS1, self._maxOmega, self._sections, self._tolerance = CS1, maxOmega, sections, tol
-    self._d1 = (CS1.cAxisRec if crystal else zvector) if h1 is None else h1
-    self._d2 = (CS1.aAxis if crystal else xvector) if h2 is None else h2
+    crystal = isinstance(frameA, crystalFrame)
+    self._CS1, self._maxOmega, self._sections, self._tolerance = frameA, maxOmega, sections, tol
+    self._d1 = (frameA.cAxisRec if crystal else zvector) if h1 is None else h1
+    self._d2 = (frameA.aAxis if crystal else xvector) if h2 is None else h2
     self._values = values
     self._setAxes()
-    super().__init__(CS1, CS2, self.values, self.tol)
-    self.pC = plottingConvention(CS2.how2plot) if CS2.how2plot is not None else plottingConvention.default
-    self.sR = conventionalSector(CS2)
+    super().__init__(frameA, frameB, self.values, self.tol)
+    self.pC = plottingConvention(frameB.how2plot) if frameB.how2plot is not None else plottingConvention.default
+    self.sR = conventionalSector(frameB)
 
   # h1 and h2 as unit vectors, the period of the twist from the fold of h1, and the section
   # values cut from it unless given; only the part of h2 perpendicular to h1 enters, since
@@ -424,7 +424,7 @@ class pfSections(ODFSections):
     """the chart section k is drawn on, the conventional sector of the specimen frame, the upper
     hemisphere when h1 has a symmetric equivalent opposite it"""
     h = self.h1.data
-    equivalentPoles = bool(np.any(qrot(self.CS1.sym.rot.flatten().data[:, :4], h[None]) @ h < -1 + 1e-10))
+    equivalentPoles = bool(np.any(qrot(self.frameA.sym.rot.flatten().data[:, :4], h[None]) @ h < -1 + 1e-10))
     return makeSphericalProjection(self.sR, how2plot=self.pC, upper=equivalentPoles)
 
   def sectionData(self, ori, withRotation=False):
@@ -436,7 +436,7 @@ class pfSections(ODFSections):
     omega = self.referenceField(v).angle(w, N=v)
     k = sectionIndex(omega, self.values, self.tol, self.period)
     keep = k >= 0
-    out = (vector3d(v.data[keep], frame=self.CS2, isNormalized=True), k[keep], src[keep])
+    out = (vector3d(v.data[keep], frame=self.frameB, isNormalized=True), k[keep], src[keep])
     return out + (q[keep],) if withRotation else out
 
   def sectionField(self, k, resolution=15 * degree):
@@ -453,7 +453,7 @@ class pfSections(ODFSections):
     tw = self.twisted(vs, self.values[k])
     q = rotation.map(np.tile(self.h1.data, (n, 1)), vs.data.reshape(n, 3),
                      np.tile(self.h2.data, (n, 1)), tw.data.reshape(n, 3)).data
-    return orientation._fromRotation(q.reshape(vs.shape + (4,)), (self.CS1, self.CS2))
+    return orientation._fromRotation(q.reshape(vs.shape + (4,)), (self.frameA, self.frameB))
 
 
 class sigmaSections(pfSections):
@@ -484,11 +484,11 @@ class axisAngleSections(ODFSections):
     axisAngleSections(cs1, cs2, sections=5, volumeScaling=False, antipodal=True)
   """
 
-  def __init__(self, CS1, CS2=None, sections=None, angles=None, values=None, tol=5 * degree, antipodal=False,
+  def __init__(self, frameA, frameB=None, sections=None, angles=None, values=None, tol=5 * degree, antipodal=False,
                volumeScaling=True, axisAngle=None):
-    CS2 = specimenFrame.default if CS2 is None else CS2
+    frameB = specimenFrame.default if frameB is None else frameB
     angles = axisAngle if axisAngle is not None else values if values is not None else angles
-    self.oR = fundamentalRegion(CS1, CS2, antipodal=antipodal)
+    self.oR = fundamentalRegion(frameA, frameB, antipodal=antipodal)
     maxAngle = self.oR.maxAngle()
     if sections is not None:
       edges = np.linspace(0, maxAngle, sections + 1)
@@ -498,21 +498,21 @@ class axisAngleSections(ODFSections):
       vals = vals[vals <= maxAngle]
     if len(vals) == 0:
       raise ValueError(f"no section angle below the largest angle of the region, {maxAngle / degree:.1f}°")
-    super().__init__(CS1, CS2, vals, tol)
+    super().__init__(frameA, frameB, vals, tol)
     # the axis is only defined modulo the rotations both groups share; the sections are drawn
     # on the conventional sector of those, in the convention of the frame the rotation maps
     # into, so that the sections sit the same way up as the pole figures
-    self.pC = plottingConvention(CS2.how2plot) if CS2.how2plot is not None else plottingConvention.default
+    self.pC = plottingConvention(frameB.how2plot) if frameB.how2plot is not None else plottingConvention.default
     # with grain exchange an axis and its opposite are one, the inverse misorientation
     common = self.oR.common
     if len(common) > 1 or antipodal:
       self.jointCS = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))
       if antipodal:
         self.jointCS = self.jointCS.Laue()
-      self.jointSector = conventionalSector(self.jointCS, up=self.pC.outOfScreen, east=self.pC.east, frame=CS1)
+      self.jointSector = conventionalSector(self.jointCS, up=self.pC.outOfScreen, east=self.pC.east, frame=frameA)
     else:
       self.jointCS = None
-      self.jointSector = sphericalRegion(frame=CS1)
+      self.jointSector = sphericalRegion(frame=frameA)
     self.axesSectors = [self.oR.axisSector(w, sector=self.jointSector) for w in self.values]
     self.volumeScaling = bool(volumeScaling)
 
@@ -546,14 +546,14 @@ class axisAngleSections(ODFSections):
     q = p.data.reshape(-1, 4)
     k = sectionIndex(quatAngle(q), self.values, self.tol, np.inf)
     keep = k >= 0
-    axes = vector3d(quatAxis(q[keep]), frame=self.CS1, isNormalized=True)
+    axes = vector3d(quatAxis(q[keep]), frame=self.frameA, isNormalized=True)
     if self.jointCS is not None and axes.size:
       axes = projectIntoRegion(axes, self.jointSector, self.jointCS)
     return axes, k[keep], np.flatnonzero(keep)
 
   def orientationsAt(self, k, vs):
     """the orientations at axes vs rotated by the angle of section k"""
-    return orientation.byAxisAngle(vector3d(vs.normalize().data), self.values[k], self.CS1, self.CS2)
+    return orientation.byAxisAngle(vector3d(vs.normalize().data), self.values[k], self.frameA, self.frameB)
 
 
 # ------------------------------------------------------------------ the chooser
@@ -564,14 +564,14 @@ SECTION_OPTIONS = ("sections", "tol", "phi1", "phi2", "alpha", "gamma", "sigma",
                    "volumeScaling", "maxPhi", "maxAzimuth", "maxOmega", "h1", "h2", "antipodal")
 
 
-def newODFSectionPlot(CS1, CS2=None, kind=None, **kwargs):
+def newODFSectionPlot(frameA, frameB=None, kind=None, **kwargs):
   """the sections a plot uses: phi2 sections against a specimen, axis angle sections between
   two crystals, or the kind named (MATLAB newODFSectionPlot)"""
-  CS2 = specimenFrame.default if CS2 is None else CS2
+  frameB = specimenFrame.default if frameB is None else frameB
   if isinstance(kind, ODFSections):
     return kind
   if kind is None:
-    kind = "phi2" if isinstance(CS1, specimenFrame) or isinstance(CS2, specimenFrame) else "axisAngle"
+    kind = "phi2" if isinstance(frameA, specimenFrame) or isinstance(frameB, specimenFrame) else "axisAngle"
   cls = SECTION_KINDS.get(str(kind).lower())
   if cls is None:
     raise ValueError(f"unknown section type '{kind}': phi1, phi2, alpha, gamma, sigma, pf or axisAngle")
@@ -579,7 +579,7 @@ def newODFSectionPlot(CS1, CS2=None, kind=None, **kwargs):
   if cls is not axisAngleSections:
     opts.pop("antipodal", None)
     opts.pop("volumeScaling", None)
-  return cls(CS1, CS2, **opts)
+  return cls(frameA, frameB, **opts)
 
 
 __all__ = ["ODFSections", "eulerSections", "phi1Sections", "phi2Sections", "alphaSections", "gammaSections", "pfSections",

@@ -23,6 +23,7 @@ from .handles import S2FunHandle, SO3FunGeneric
 from .rbf import _readFrames, _rotationsFor
 from .s2fun import S2FunHarmonic
 from ..geometry.display import aligned
+from ..geometry.framepair import installFramePair
 
 
 # the coefficients c_1 .. c_s of prod (x - kappa_i) = x^s + c_1 x^{s-1} + ... + c_s
@@ -254,11 +255,24 @@ class SO3FunBingham(SO3FunGeneric):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
+    from typing import Any
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
 
 
 # the four quaternion axes of a fibre: the quaternions along which h is sent to r, and
@@ -459,5 +473,8 @@ class S2FunBingham:
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
 
+
+# the two frames under their names of the Julia port, frameA and frameB
+installFramePair(SO3FunBingham)
 
 __all__ = ["mhyper", "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham"]

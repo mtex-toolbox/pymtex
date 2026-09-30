@@ -24,6 +24,7 @@ from .rbf import SO3FunCBF, SO3FunRBF, _readFrames, _rotationsFor, uniformODF
 from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
+from ..geometry.framepair import installFramePair
 from ..geometry.install import install
 from ..geometry.display import frameLabel, framesLabel
 from ..geometry.display import aligned
@@ -129,16 +130,16 @@ class SO3FunGeneric:
     def sum(self) -> Any:
       ...
     @property
-    def SRight(self) -> Any:
+    def frameA(self) -> Any:
       ...
-    @SRight.setter
-    def SRight(self, value) -> None:
+    @frameA.setter
+    def frameA(self, value) -> None:
       ...
     @property
-    def SLeft(self) -> Any:
+    def frameB(self) -> Any:
       ...
-    @SLeft.setter
-    def SLeft(self, value) -> None:
+    @frameB.setter
+    def frameB(self, value) -> None:
       ...
 
 
@@ -614,9 +615,8 @@ for _cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric):
   for _name, _f in _POINTWISE.items():
     if _name not in vars(_cls):
       install(_cls, _f, _name)
-  # MATLAB's names of the crystal and the specimen frame; assigning one relabels the
-  # function and leaves its values, symmetrise then projects
-  install(_cls, property(lambda self: self.CS, lambda self, fr: setattr(self, "CS", fr)), "SRight")
-  install(_cls, property(lambda self: self.SS, lambda self, fr: setattr(self, "SS", fr)), "SLeft")
+# the two frames under their names of the Julia port; assigning one relabels the function and
+# leaves its values, symmetrise then projects
+installFramePair((SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric))
 
 __all__ = ["SO3FunHandle", "SO3FunComposition", "S2FunHandle", "S2FunSum", "S1FunHandle"]

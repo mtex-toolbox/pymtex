@@ -381,16 +381,16 @@ class SO3FunRBF:
     def sum(self) -> Any:
       ...
     @property
-    def SRight(self) -> Any:
+    def frameA(self) -> Any:
       ...
-    @SRight.setter
-    def SRight(self, value) -> None:
+    @frameA.setter
+    def frameA(self, value) -> None:
       ...
     @property
-    def SLeft(self) -> Any:
+    def frameB(self) -> Any:
       ...
-    @SLeft.setter
-    def SLeft(self, value) -> None:
+    @frameB.setter
+    def frameB(self, value) -> None:
       ...
 
 
@@ -605,16 +605,16 @@ class SO3FunCBF:
     def sum(self) -> Any:
       ...
     @property
-    def SRight(self) -> Any:
+    def frameA(self) -> Any:
       ...
-    @SRight.setter
-    def SRight(self, value) -> None:
+    @frameA.setter
+    def frameA(self, value) -> None:
       ...
     @property
-    def SLeft(self) -> Any:
+    def frameB(self) -> Any:
       ...
-    @SLeft.setter
-    def SLeft(self, value) -> None:
+    @frameB.setter
+    def frameB(self, value) -> None:
       ...
 
 

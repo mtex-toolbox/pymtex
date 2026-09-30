@@ -29,6 +29,7 @@ from .symreduce import reductionGroups
 from .units import degree
 from .vector3d import vector3d
 from .install import install
+from .framepair import installFramePair
 
 TOLERANCE = 1e-8
 
@@ -327,6 +328,18 @@ class fibre:
     @classmethod
     def theta(cls, *frames) -> Any:
       ...
+    @property
+    def frameA(self) -> Any:
+      ...
+    @frameA.setter
+    def frameA(self, value) -> None:
+      ...
+    @property
+    def frameB(self) -> Any:
+      ...
+    @frameB.setter
+    def frameB(self, value) -> None:
+      ...
 
 
 # ------------------------------------------------------------------ helpers
@@ -398,5 +411,8 @@ def _theta(cls, *frames):
 
 install(fibre, classmethod(_theta), "theta")
 
+
+# the two frames under their names of the Julia port, frameA and frameB
+installFramePair(fibre)
 
 __all__ = ["fibre"]
