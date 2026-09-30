@@ -33,7 +33,7 @@
 from mtex import *
 
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('forsterite', silent=True)
+ebsd = mtexdata('forsterite', verbose=False)
 
 ebsd.prop
 # -

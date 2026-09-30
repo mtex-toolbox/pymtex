@@ -26,7 +26,7 @@ plottingConvention.default('y↑→x')
 # be divided into [grains](GrainReconstruction.html).
 
 # +
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 # use only proper symmetry operations, which are rotations
 ebsd['M'].CS = ebsd['M'].CS.properGroup()

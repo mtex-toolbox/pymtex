@@ -558,7 +558,7 @@ def h5Image(fname, entry):
 
 # ------------------------------------------------------------------ the map
 
-def loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUnit="um", silent=False):
+def loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUnit="um", verbose=True):
   """the map of an HDF5 file of one of the vendors hdf5_config describes
 
     loadEBSD_h5('map.h5oina')                       the vendor read off the file
@@ -590,7 +590,7 @@ def loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUn
       if chosen is None:
         raise ValueError(f"no data set of {fname} is called {dataSet!r}; they are {', '.join(sets)}")
     # a file of several maps says which it holds and which one is read
-    if len(sets) > 1 and not silent:
+    if len(sets) > 1 and verbose:
       print(f"  {name} file with {len(sets)} data sets:")
       for k, p in enumerate(sets):
         print(f"  {'▸' if p == chosen else ' '} [{k}] {p}")

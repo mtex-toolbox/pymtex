@@ -47,7 +47,7 @@ fname = mtexdatafile('odf')
 odfInterp = SO3Fun.load(fname, 'Bunge', 'interp', CS=cs, SS=ss, columnNames=['Euler 1', 'Euler 2', 'Euler 3', 'weights'])
 
 # plot the imported function
-plot(odfInterp, sections=6, silent=True)
+plot(odfInterp, sections=6, verbose=False)
 # -
 
 # The panels are sections through one three-dimensional function, not six separate pole

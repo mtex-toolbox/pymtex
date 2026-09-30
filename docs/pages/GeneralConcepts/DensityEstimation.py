@@ -218,7 +218,7 @@ plt.ylabel('y')
 # crystal must be rotated to match the other.
 
 # +
-ebsd = mtexdata('forsterite', silent=True)
+ebsd = mtexdata('forsterite', verbose=False)
 grains = calcGrains(ebsd)
 
 # Select boundaries between forsterite and enstatite grains.
@@ -295,7 +295,7 @@ hold(False)
 # orientation?"
 
 # +
-ebsd = mtexdata('titanium', silent=True)
+ebsd = mtexdata('titanium', verbose=False)
 grains = calcGrains(ebsd)
 indexedGrains = grains['indexed']
 

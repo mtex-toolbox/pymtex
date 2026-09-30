@@ -212,7 +212,7 @@ def startImport(st, worker=None):
   def load():
     from ..io.load import loadEBSD
     t = time.perf_counter()
-    kw = {"dataSet": k, "silent": True} if several else {}
+    kw = {"dataSet": k, "verbose": False} if several else {}
     ebsd = loadEBSD(path, **kw)
     seconds = time.perf_counter() - t
     # the colour grids of phases the header did not name built here too, not on the main thread

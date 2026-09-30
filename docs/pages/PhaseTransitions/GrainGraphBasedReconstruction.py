@@ -15,7 +15,7 @@ from scipy.sparse import triu
 from mtex import *
 
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('martensite', silent=True)
+ebsd = mtexdata('martensite', verbose=False)
 # -
 
 # ## Segment the child grains

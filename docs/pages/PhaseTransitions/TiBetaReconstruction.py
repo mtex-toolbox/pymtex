@@ -10,7 +10,7 @@ import numpy as np
 
 from mtex import *
 
-ebsd = mtexdata('alphaBetaTitanium', silent=True)
+ebsd = mtexdata('alphaBetaTitanium', verbose=False)
 
 # plot the measured alpha phase with inverse pole figure colours
 plot(ebsd['Ti (alpha)'], ebsd['Ti (alpha)'].orientations, figSize='large')

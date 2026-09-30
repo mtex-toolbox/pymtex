@@ -608,7 +608,7 @@ def _gradientField(f):
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).grad()
 
 
-def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, radius=np.inf, exact=False, silent=False):
+def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, radius=np.inf, exact=False, verbose=True):
   """the modal orientations of an SO(3) function by steepest ascent from seeds, their volumes and which
   mode each seed flowed into; modes within the tolerance merge, and modes of less than one percent
   are dropped unless exact=True; the seeds are the centres of a radial function or a 2.5 degree grid

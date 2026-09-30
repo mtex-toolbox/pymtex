@@ -66,13 +66,13 @@ class neper:
     except OSError:
       return False
 
-  def _run(self, args, silent=True, check=True):
+  def _run(self, args, verbose=False, check=True):
     os.makedirs(self.filePath, exist_ok=True)
     env = dict(os.environ, **{k: str(v) for k, v in self.env.items()})
     out = subprocess.run(args, env=env, capture_output=True, text=True)
     with open(os.path.join(self.filePath, "neper.log"), "a") as fh:
       fh.write(out.stdout + out.stderr)
-    if not silent:
+    if verbose:
       print(out.stdout)
     if check and out.returncode != 0:
       raise RuntimeError(f"neper failed: {out.stderr.strip()[-500:]}")
@@ -84,27 +84,27 @@ class neper:
       m += ",aspratio (" + ",".join(f"{a:g}" for a in np.atleast_1d(aspectRatio)) + ")"
     return m
 
-  def _tessellate(self, n, morpho, silent):
+  def _tessellate(self, n, morpho, verbose):
     base = os.path.join(self.filePath, self.fileName3d)
     args = [self.command, "-T", "-n", str(n), "-id", str(self.id), "-morpho", morpho, "-morphooptistop", f"iter={self.maxIter}",
             "-domain", str(self.geometry), "-o", base]
     if self.varNeperopts:
       args += str(self.varNeperopts).split()
-    self._run(args, silent)
+    self._run(args, not verbose)
     return base + ".tess"
 
-  def simulateGrains(self, ori, odf=None, silent=True, aspectRatio=None):
+  def simulateGrains(self, ori, odf=None, verbose=False, aspectRatio=None):
     """the grains of a tessellation with one grain per orientation, or n orientations of an ODF"""
     from .grain3d import grain3d
     if np.isscalar(ori):
       ori = odf.discreteSample(int(ori))
-    tess = self._tessellate(ori.size, self._morpho(aspectRatio), silent)
+    tess = self._tessellate(ori.size, self._morpho(aspectRatio), not verbose)
     grains = grain3d.load(tess, CS=ori.CS)
     grains.meanOrientation = ori.flatten()
     return grains
 
   # the lamellae of a tessellation: every cell cut into slabs normal to the directions given
-  def _lamellae(self, n, normals, width, silent, aspectRatio):
+  def _lamellae(self, n, normals, width, verbose, aspectRatio):
     lam = os.path.join(self.filePath, "lamnormals.txt")
     os.makedirs(self.filePath, exist_ok=True)
     xyz = normals.data.reshape(-1, 3)
@@ -113,7 +113,7 @@ class neper:
     morpho = self._morpho(aspectRatio) + f"::lamellar(w={width:g},v=msfile({lam}))"
     args = [self.command, "-T", "-n", f"{n}::from_morpho", "-id", str(self.id), "-morpho", morpho, "-morphooptistop",
             f"iter={self.maxIter}", "-domain", str(self.geometry), "-o", base]
-    self._run(args, silent)
+    self._run(args, not verbose)
     return base + ".tess"
 
   # how many cells every host was cut into: the cells come host by host, and the cells of a
@@ -137,7 +137,7 @@ class neper:
     counts[host] = len(grains) - start
     return counts
 
-  def simulateTwinGrains(self, numGrains, mori, odf, bndA, width=None, silent=True, aspectRatio=None, rng=None):
+  def simulateTwinGrains(self, numGrains, mori, odf, bndA, width=None, verbose=False, aspectRatio=None, rng=None):
     """twinned lamellae: every second lamella of a host turned by the twin misorientation"""
     from ..geometry.quaternion import rotation
     from .grain3d import grain3d
@@ -147,7 +147,7 @@ class neper:
     if width is None:
       size = _cubeSize(self.geometry)
       width = (np.prod(size) / numGrains) ** (1 / 3) / 4
-    grains = grain3d.load(self._lamellae(numGrains, nA, width, silent, aspectRatio))
+    grains = grain3d.load(self._lamellae(numGrains, nA, width, not verbose, aspectRatio))
     hostId = np.repeat(np.arange(numGrains), self._cellsPerHost(grains, nA, numGrains))
     from ..geometry.kernels import qmul
     q = ori.data.reshape(-1, 4)[hostId].copy()
@@ -158,7 +158,7 @@ class neper:
     grains.meanOrientation = o
     return grains
 
-  def simulateChildGrains(self, numParents, p2c, odfParent, habitPlane=None, width=0.015, silent=True, aspectRatio=None, rng=None):
+  def simulateChildGrains(self, numParents, p2c, odfParent, habitPlane=None, width=0.015, verbose=False, aspectRatio=None, rng=None):
     """child lamellae in parent grains: the children of a parent in variants that alternate"""
     from ..geometry.miller import Miller
     from ..geometry.quaternion import rotation
@@ -169,7 +169,7 @@ class neper:
     oriP = odfParent.discreteSample(numParents)
     h = Miller(1, 1, 1, p2c.CS) if habitPlane is None else habitPlane
     nA = oriP * h.normalize()
-    grains = grain3d.load(self._lamellae(numParents, nA, width, silent, aspectRatio))
+    grains = grain3d.load(self._lamellae(numParents, nA, width, not verbose, aspectRatio))
     pId = np.repeat(np.arange(numParents), self._cellsPerHost(grains, nA, numParents))
     N = p2c.size
     vId = np.zeros(len(grains), dtype=np.int64)

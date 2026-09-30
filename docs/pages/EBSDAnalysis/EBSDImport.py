@@ -120,7 +120,7 @@ fname = mtexdatafile('EMSphinx')
 EulerCorrection = rotation.map(xvector, xvector, zvector, -zvector)
 
 # create an EBSD variable containing the data
-ebsd = EBSD.load(fname, csList, dataSet=0, eulerCorrection=EulerCorrection, silent=True)
+ebsd = EBSD.load(fname, csList, dataSet=0, eulerCorrection=EulerCorrection, verbose=False)
 # -
 
 # The crystal-symmetry calls state both a point group and a crystal frame. For cobalt, the

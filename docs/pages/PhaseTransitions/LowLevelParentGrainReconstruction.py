@@ -14,7 +14,7 @@ import numpy as np
 
 from mtex import *
 
-ebsd = mtexdata('alphaBetaTitanium', silent=True)
+ebsd = mtexdata('alphaBetaTitanium', verbose=False)
 
 alphaName = 'Ti (alpha)'
 betaName = 'Ti (Beta)'

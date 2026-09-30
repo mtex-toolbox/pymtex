@@ -14,7 +14,7 @@ import numpy as np
 from mtex import *
 
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('martensite', silent=True)
+ebsd = mtexdata('martensite', verbose=False)
 # -
 
 # ## Segment the measured martensite

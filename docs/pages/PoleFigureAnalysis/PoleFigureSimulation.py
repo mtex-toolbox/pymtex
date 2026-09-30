@@ -42,7 +42,7 @@ model_odf = 0.5 * uniformODF(cs) + \
   0.05 * unimodalODF(mod1, halfwidth=15 * degree) + \
   0.3 * unimodalODF(mod2, halfwidth=25 * degree)
 
-plot(model_odf, 'sigma', sections=6, silent=True, minmax=True)
+plot(model_odf, 'sigma', sections=6, verbose=False, minmax=True)
 # -
 
 # The sigma sections separate the compact maxima of the two unimodal components from the
@@ -101,7 +101,7 @@ plot(pf)
 # +
 odf = calcODF(pf)
 
-plot(odf, 'sigma', sections=6, silent=True, minmax=True)
+plot(odf, 'sigma', sections=6, verbose=False, minmax=True)
 # -
 
 # Compared with the model sections above, the compact maxima and fibre bands are in the

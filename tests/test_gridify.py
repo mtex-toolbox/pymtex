@@ -171,7 +171,7 @@ LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "da
 @pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
 def test_the_resampled_twins_map_as_MATLAB():
   from mtex import degree, mtexdata, rotate
-  ebsd = mtexdata("twins", root=LOCAL, download=False, silent=True)
+  ebsd = mtexdata("twins", root=LOCAL, download=False, verbose=False)
   g = gridify(ebsd, unitCell=rotate(2 * ebsd.unitCell, 45 * degree))
   assert g.shape == (108, 109) and g.isIndexed.sum() == 5713
   x, y = g.pos.data[..., 0], g.pos.data[..., 1]

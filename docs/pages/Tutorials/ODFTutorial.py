@@ -26,7 +26,7 @@ from mtex import *
 
 # +
 # load the titanium example without displaying the EBSD summary
-ebsd = mtexdata('titanium', silent=True)
+ebsd = mtexdata('titanium', verbose=False)
 
 # select the indexed orientations
 titanium = ebsd['Titanium (Alpha)']
@@ -97,7 +97,7 @@ mtexColorbar(title='orientation density (mrd)')
 plottingConvention.default('y↑→x')
 
 # load the pole figure example
-pf = mtexdata('ptx', silent=True)
+pf = mtexdata('ptx', verbose=False)
 pf
 # -
 
@@ -117,7 +117,7 @@ mtexColorbar(title='measured intensity')
 # measurements. The `silent` flag hides the solver iteration table but leaves the returned
 # ODF summary visible.
 
-odfFromPoleFigures = calcODF(pf, silent=True)
+odfFromPoleFigures = calcODF(pf, verbose=False)
 odfFromPoleFigures
 
 # ## Reading the reconstructed ODF summary

@@ -76,7 +76,7 @@ def test_osc():
 def test_hdf5(name):
   pytest.importorskip("h5py")
   info = inspectEBSD(fixture(os.path.join("h5", name)))
-  ebsd = loadEBSD(fixture(os.path.join("h5", name)), silent=True)
+  ebsd = loadEBSD(fixture(os.path.join("h5", name)), verbose=False)
   assert [f.name for f in info.phases.frames] == [f.name for f in ebsd.CSList.frames]
   assert sorted(info.properties) == sorted(ebsd.prop)
   assert ["/" + s for s in info.dataSets] == ebsd.meta["dataSets"]

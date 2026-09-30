@@ -28,7 +28,7 @@ from mtex import *
 
 plottingConvention.default('y↓→x')
 
-ebsd = mtexdata('trueEbsdWCCoSmall', silent=True)
+ebsd = mtexdata('trueEbsdWCCoSmall', verbose=False)
 
 img = ebsd.meta['trueEbsdImgs']
 
@@ -162,7 +162,7 @@ ebsd.layout
 # the scan. Its rows run against x and its columns along y.
 
 # +
-ebsd = mtexdata('trueEbsdWCCoSmall', silent=True)
+ebsd = mtexdata('trueEbsdWCCoSmall', verbose=False)
 
 gL = gridLayout(-xvector, yvector)
 gL

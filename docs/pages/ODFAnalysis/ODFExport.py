@@ -36,7 +36,7 @@ model_odf = (0.5 * uniformODF(cs)
              + 0.05 * fibreODF(Miller(0, 0, 1, cs), zvector, halfwidth=10 * degree)
              + 0.05 * unimodalODF(mod1, halfwidth=15 * degree)
              + 0.3 * unimodalODF(mod2, halfwidth=25 * degree))
-plot(model_odf, sections=6, silent=True)
+plot(model_odf, sections=6, verbose=False)
 # -
 
 # The six sections show a smooth density with localized maxima and fibre ridges on a

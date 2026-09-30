@@ -36,7 +36,7 @@ def _lineAxes(kw):
 
 
 def _lineKw(kw):
-  kw.pop("silent", None)
+  kw.pop("verbose", None)
   for old, new in (("LineWidth", "linewidth"), ("lineWidth", "linewidth"), ("LineStyle", "linestyle"), ("lineStyle", "linestyle"),
                    ("Color", "color"), ("lineColor", "color"), ("DisplayName", "label"), ("Marker", "marker"), ("MarkerSize", "markersize")):
     if old in kw:

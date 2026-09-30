@@ -111,12 +111,12 @@ l1Corrected
 #
 # Without ghost correction:
 
-plot(rec, 'sigma', sections=9, silent=True)
+plot(rec, 'sigma', sections=9, verbose=False)
 
 # The component is broad and weak, and the surrounding density is raised. Now plot the
 # corrected reconstruction on the same type of sections.
 
-plot(recCor, 'sigma', sections=9, silent=True)
+plot(recCor, 'sigma', sections=9, verbose=False)
 
 # The corrected sections concentrate more density at the component and return the
 # surrounding background towards its true level.

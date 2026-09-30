@@ -24,7 +24,7 @@ plottingConvention.default('y↑→x')
 # phase-homogeneous, spatially connected region of EBSD pixels.
 
 # +
-ebsd = mtexdata('martensite', silent=True)
+ebsd = mtexdata('martensite', verbose=False)
 
 grains = calcGrains(ebsd, angle=3 * degree, minPixel=2, alpha=12)
 

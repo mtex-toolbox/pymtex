@@ -27,7 +27,7 @@ import numpy as np
 from mtex import *
 
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('forsterite', silent=True)
+ebsd = mtexdata('forsterite', verbose=False)
 
 grains = calcGrains(ebsd)
 # -

@@ -107,7 +107,7 @@ numNegative
 # corrected measurements. `silent=True` suppresses the solver iteration history, while the
 # returned object remains visible.
 
-odf = calcODF(pf, silent=True)
+odf = calcODF(pf, verbose=False)
 odf
 
 # The display identifies the result as an [SO3FunRBF](SO3FunRBF.SO3FunRBF.html). Radial

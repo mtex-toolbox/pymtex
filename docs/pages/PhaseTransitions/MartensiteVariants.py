@@ -24,7 +24,7 @@ from mtex import *
 plottingConvention.default('y↑→x')
 
 # import the EBSD data
-ebsd = mtexdata('emsland', silent=True)
+ebsd = mtexdata('emsland', verbose=False)
 
 # extract the crystal symmetries
 csBcc = ebsd['Fe'].CS

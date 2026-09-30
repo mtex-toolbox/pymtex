@@ -43,7 +43,7 @@ odf = 0.2 * unimodalODF(ori1) + 0.3 * unimodalODF(ori2) + 0.5 * fibreODF(f)
 # within a panel.
 
 # +
-plotSection(odf, 'phi2', sections=9, silent=True, layout=[5, 2], figSize='large')
+plotSection(odf, 'phi2', sections=9, verbose=False, layout=[5, 2], figSize='large')
 
 annotate(ori1, MarkerSize=15)
 annotate(ori2, Marker='v', MarkerSize=15)
@@ -66,7 +66,7 @@ plot(f, LineWidth=2, add2all=True)
 sectionAngles = np.array([25, 30, 35, 40]) * degree
 oS = phi2Sections(odf.CS, odf.SS, phi2=sectionAngles)
 
-plotSection(odf, oS, silent=True, figSize='large', layout=[2, 2])
+plotSection(odf, oS, verbose=False, figSize='large', layout=[2, 2])
 annotate(ori1, MarkerSize=15)
 annotate(ori2, Marker='v', MarkerSize=15)
 plot(f, LineWidth=2, add2all=True)
@@ -108,7 +108,7 @@ plot(f, LineWidth=2, add2all=True)
 # informal expression in the Bunge angles; the coordinate conventions and reference fields
 # matter.
 
-plotSection(odf, 'sigma', silent=True, figSize='large')
+plotSection(odf, 'sigma', verbose=False, figSize='large')
 
 # The same brass, copper, and fibre contributions are now arranged by the specimen
 # direction of the crystal axis $\vec c^*$ and by rotation about it. No density has been
@@ -121,7 +121,7 @@ plotSection(odf, 'sigma', silent=True, figSize='large')
 # Sections at constant first Bunge angle $\varphi_1$ put $\varphi_2$ and $\Phi$ within
 # each panel.
 
-plotSection(odf, 'phi1', sections=6, layout=[3, 2], silent=True, figSize='large')
+plotSection(odf, 'phi1', sections=6, layout=[3, 2], verbose=False, figSize='large')
 
 # Features that were split mainly along $\varphi_1$ in the default view now remain within
 # one panel, while features extended along $\varphi_1$ pass through several panels. This
@@ -129,7 +129,7 @@ plotSection(odf, 'phi1', sections=6, layout=[3, 2], silent=True, figSize='large'
 
 # Sections at constant $\gamma$ make the analogous choice in the Matthies convention.
 
-plotSection(odf, 'gamma', sections=6, layout=[3, 2], silent=True, figSize='large')
+plotSection(odf, 'gamma', sections=6, layout=[3, 2], verbose=False, figSize='large')
 
 # The panels again redistribute the same features. A useful family is the one that keeps
 # the feature of interest compact and makes its relevant specimen or crystal direction
@@ -179,7 +179,7 @@ eulerBounds = np.array([maxPhi1, maxPhi, maxPhi2]) / degree
 eulerBounds
 # -
 
-plotSection(odfOrtho, 'phi2', sections=6, layout=[3, 2], coordinates='off', xlabel='', ylabel='', silent=True, figSize='large')
+plotSection(odfOrtho, 'phi2', sections=6, layout=[3, 2], coordinates='off', xlabel='', ylabel='', verbose=False, figSize='large')
 
 # The displayed bounds are $90^\circ$ by $90^\circ$ by $90^\circ$. Accordingly, every
 # panel is square, whereas the panels above spanned $360^\circ$ in $\varphi_1$. Specimen

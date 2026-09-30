@@ -24,7 +24,7 @@ plottingConvention.default('y↑→x')
 
 # +
 pf = mtexdata('dubna')
-odf = calcODF(pf, zeroRange=True, silent=True)
+odf = calcODF(pf, zeroRange=True, verbose=False)
 
 plotSection(odf, 'sigma', sections=12, layout=[3, 4])
 mtexColorbar(title='mrd')
@@ -127,7 +127,7 @@ overlapTotal
 # are accumulated seed weights. They form a useful modal partition, but they are not
 # integrals over uniquely defined geometric boundaries.
 
-componentOri, componentFraction, _ = calcComponents(odf, silent=True)
+componentOri, componentFraction, _ = calcComponents(odf, verbose=False)
 componentPercent = 100 * componentFraction
 componentPercent
 

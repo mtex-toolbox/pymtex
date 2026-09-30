@@ -143,7 +143,7 @@ def knnRadius(X, k=10, sub=1500):
 # ------------------------------------------------------------------ the clusters of directions and orientations
 
 def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1.5, numCluster=None, maxAngle=None,
-                halfwidth=5 * degree, weights=None, resolution=2.5 * degree, silent=True):
+                halfwidth=5 * degree, weights=None, resolution=2.5 * degree, verbose=False):
   """the clusters of directions or orientations: one cluster id per element, counted from
   zero, and the centre of every cluster
 

@@ -57,7 +57,7 @@ def q(x):
   return np.array2string(np.array([_quantile(x, p) for p in (0.2, 0.4, 0.6, 0.8)]), precision=4)
 
 
-ebsd = mtexdata("martensite", silent=True)
+ebsd = mtexdata("martensite", verbose=False)
 out = {}
 step("calcGrains", lambda: out.update(grains=calcGrains(ebsd, angle=3 * degree, minPixel=2, alpha=12)), lambda: len(out["grains"]))
 job = parentGrainReconstructor(ebsd, out["grains"])

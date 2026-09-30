@@ -105,7 +105,7 @@ def mtexdatafile(name, root=None, download=True):
   return paths[0] if len(paths) == 1 else paths
 
 
-def mtexdata(name=None, root=None, download=True, silent=False):
+def mtexdata(name=None, root=None, download=True, verbose=True):
   """the sample data of the documentation
 
     mtexdata()                       the table of the data sets
@@ -242,7 +242,7 @@ def _emsphinx(path):
   # an in situ deformed austenitic steel indexed with EMSphInx; the file names no phase,
   # its master patterns were alpha and gamma iron plus alpha cobalt; of its four scans the
   # first is the sample map, read without the list of the others
-  e = loadEBSD(path, silent=True)
+  e = loadEBSD(path, verbose=False)
   for k, name in enumerate(("Iron bcc", "Iron fcc", "Cobalt")):
     e.CSList.frames[k + 1].mineral = name
   return e

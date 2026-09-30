@@ -343,7 +343,7 @@ BRUKER_PICTURES = os.path.join(CORPUS, "h5_bruker.h5")
 
 @pytest.mark.skipif(not os.path.isfile(OXFORD_PICTURES), reason="the Oxford file of the vendor corpus is not on this machine")
 def test_pictures_of_an_oxford_file_are_indexed_not_read():
-  ebsd = loadEBSD(OXFORD_PICTURES, silent=True)
+  ebsd = loadEBSD(OXFORD_PICTURES, verbose=False)
   names = [e["name"] for e in ebsd.meta["images"]]
   assert len(names) == 12 and any("Electron Image/Data/SE" in n for n in names)
   assert all(tuple(e["shape"])[:2] == (1536, 2048) or tuple(e["shape"])[:2] == (1539, 2048) for e in ebsd.meta["images"])
@@ -353,5 +353,5 @@ def test_pictures_of_an_oxford_file_are_indexed_not_read():
 
 @pytest.mark.skipif(not os.path.isfile(BRUKER_PICTURES), reason="the Bruker file of the vendor corpus is not on this machine")
 def test_pictures_of_a_bruker_file_are_indexed():
-  ebsd = loadEBSD(BRUKER_PICTURES, silent=True)
+  ebsd = loadEBSD(BRUKER_PICTURES, verbose=False)
   assert any(e["name"].endswith("SEM Image") for e in ebsd.meta["images"])

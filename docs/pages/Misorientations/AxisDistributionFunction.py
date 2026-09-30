@@ -62,7 +62,7 @@ uniformRange, uniformRatio
 
 # +
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 grains = calcGrains(ebsd['indexed'], angle=5 * degree)
 grains = smoothBoundary(grains, 5)

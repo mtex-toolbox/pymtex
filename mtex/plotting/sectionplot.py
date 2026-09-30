@@ -153,7 +153,7 @@ def plotSection(x, *args, **kw):
   if args and isinstance(args[0], vector3d) and not hasattr(x, "frameA"):
     from .polarplot import plotSectionS2
     return plotSectionS2(x, *args, **kw)
-  kw.pop("silent", None)
+  kw.pop("verbose", None)
   kind, shapes = None, None
   for i, a in enumerate(args):
     # MATLAB's style flags, plotSection(odf, 'phi2', angles, 'contourf')

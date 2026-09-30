@@ -21,7 +21,7 @@ from mtex import *
 plottingConvention.default('y↑→x')
 
 # load the magnesium example without displaying the full EBSD summary
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 # reconstruct grains using an explicit example threshold
 grains = calcGrains(ebsd, angle=15 * degree)

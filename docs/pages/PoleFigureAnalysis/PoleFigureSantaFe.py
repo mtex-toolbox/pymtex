@@ -133,17 +133,17 @@ plotPDF(rec, pf.h, antipodal=True)
 #
 # First plot the corrected reconstruction in Euler-angle sections.
 
-plot(rec, sections=18, contourf=True, FontSize=10, silent=True, figSize='large', minmax=True)
+plot(rec, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # The known model provides the reference.
 
-plot(odf, sections=18, contourf=True, FontSize=10, silent=True, figSize='large', minmax=True)
+plot(odf, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # Finally, plot the reconstruction without ghost correction.
 
-plot(rec2, sections=18, contourf=True, FontSize=10, silent=True, figSize='large', minmax=True)
+plot(rec2, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # The components occupy the right places in both reconstructions. Read the `minmax` labels

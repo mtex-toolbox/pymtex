@@ -215,8 +215,8 @@ class trueEbsd:
 
   # ------------------------------------------------------------------ the fit
 
-  def calcDistortion(self, *flags, fitErr=False, silent=False, retryMax=100):
-    """job.calcDistortion('fitErr'), job.calcDistortion(fitErr=True, silent=True, retryMax=3)
+  def calcDistortion(self, *flags, fitErr=False, verbose=True, retryMax=100):
+    """job.calcDistortion('fitErr'), job.calcDistortion(fitErr=True, verbose=False, retryMax=3)
 
     Every hop measured and fitted: the images cut into tiles and correlated, the stages of the
     hop's transform fitted one after another, each to what the one before left over, and job.T
@@ -228,7 +228,7 @@ class trueEbsd:
     retryMax attempts at most.
     """
     fitErr = fitErr or "fitErr" in flags
-    verbose = not (silent or "silent" in flags)
+    verbose = verbose and "silent" not in flags
     retryMax = max(int(retryMax), 1)
     nImg = len(self.resizedList)
     if nImg < 2:

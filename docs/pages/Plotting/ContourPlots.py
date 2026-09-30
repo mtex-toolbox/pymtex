@@ -97,7 +97,7 @@ plt.clabel(hContour[0], levels2label, fontsize=15)
 
 # +
 pf = mtexdata('dubna')
-odf = calcODF(pf, silent=True)
+odf = calcODF(pf, verbose=False)
 
 pf
 # -

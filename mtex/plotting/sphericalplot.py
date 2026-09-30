@@ -151,7 +151,7 @@ class sphericalPlot:
 
 def _split(kw):
   # MATLAB's 'silent' says nothing here, and its line keys are spelt lineWidth, lineColor
-  kw.pop("silent", None)
+  kw.pop("verbose", None)
   for old, new in (("LineWidth", "lineWidth"), ("LineColor", "lineColor"), ("LineStyle", "lineStyle"), ("linewidth", "lineWidth"),
                    ("linecolor", "lineColor"), ("linestyle", "lineStyle"), ("FontSize", "fontSize")):
     if old in kw:

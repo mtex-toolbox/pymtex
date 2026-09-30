@@ -46,7 +46,7 @@ odf
 # make the pole-density features anisotropic rather than round.
 
 h = Miller([[0, 0, 1], [1, 0, 0], [1, 1, 1]], cs)
-plotPDF(odf, h, antipodal=True, silent=True, layout=[1, 3])
+plotPDF(odf, h, antipodal=True, verbose=False, layout=[1, 3])
 
 # The same anisotropy appears in sections through orientation space. The peak changes
 # position between the six panels. Each panel cuts a different part of the
@@ -66,7 +66,7 @@ plot(odf, sections=6)
 # +
 odfTrue = fibreODF(fibre.rand(cs))
 
-plotPDF(odfTrue, h, antipodal=True, silent=True)
+plotPDF(odfTrue, h, antipodal=True, verbose=False)
 # -
 
 # Each pole figure contains the ring expected from a fibre texture. The ring position
@@ -88,7 +88,7 @@ odf
 
 # ---
 
-plotPDF(odf, h, antipodal=True, silent=True)
+plotPDF(odf, h, antipodal=True, verbose=False)
 
 # The fitted pole figures recover the rings of the original fibre ODF from the 2000
 # sampled orientations. Small irregularities in the point overlay are sampling variation;
@@ -123,7 +123,7 @@ odf = BinghamODF(20, oriRef)
 odf
 # -
 
-plot(odf, 'sigma', sections=6, silent=True, contourf=True)
+plot(odf, 'sigma', sections=6, verbose=False, contourf=True)
 
 # The filled contours form localized patches. Crystal symmetry repeats the same physical
 # peak; those repeated patches are not additional components.
@@ -140,7 +140,7 @@ odf
 
 # ---
 
-plot(odf, 'sigma', sections=6, silent=True)
+plot(odf, 'sigma', sections=6, verbose=False)
 
 # The high-density feature now continues through successive section panels instead of
 # closing around one orientation. That continuity is the visual signature of the fibre.
@@ -155,7 +155,7 @@ odf
 
 # ---
 
-plot(odf, 'sigma', sections=6, silent=True)
+plot(odf, 'sigma', sections=6, verbose=False)
 
 # This plot is not uniform: the density avoids the fourth quaternion axis and spreads its
 # maxima over a two-dimensional set. A uniform distribution requires all four parameters

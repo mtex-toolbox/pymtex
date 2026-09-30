@@ -41,7 +41,7 @@ from mtex import *
 
 # +
 plottingConvention.default('y↓→x')
-ebsd = mtexdata('EMSphinx', silent=True)
+ebsd = mtexdata('EMSphinx', verbose=False)
 
 ebsd = ebsd['Iron fcc']
 ebsd = ebsd[inpolygon(ebsd, [40, 30, 80, 60])]

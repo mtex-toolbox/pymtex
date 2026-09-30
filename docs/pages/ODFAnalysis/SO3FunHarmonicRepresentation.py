@@ -58,7 +58,7 @@ plottingConvention.default('y↑→x')
 # explains why it is used.
 
 pf = mtexdata('dubna')
-odf = calcODF(pf, resolution=5 * degree, zeroRange=True, silent=True)
+odf = calcODF(pf, resolution=5 * degree, zeroRange=True, verbose=False)
 
 # Converting any `SO3Fun` to `SO3FunHarmonic` computes a finite harmonic approximation.
 # Here the requested bandwidth is 32. The conversion keeps the crystal and specimen
@@ -118,7 +118,7 @@ minimumValue
 # positive ODF can likewise create small negative undershoots, just as a truncated
 # ordinary Fourier series can ring near a sharp edge.
 
-plot(fExample, 'sigma', sections=6, silent=True)
+plot(fExample, 'sigma', sections=6, verbose=False)
 mtexColorbar(title='function value')
 
 # The sigma sections show the full rotational function. The colorbar spans negative and

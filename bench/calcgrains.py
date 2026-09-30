@@ -42,7 +42,7 @@ def exportMaps(names):
   from mtex import loadEBSD, mtexdata
   os.makedirs(OUT, exist_ok=True)
   for name in names:
-    e = syntheticMap() if name == "synthetic" else loadEBSD(FILES[name]) if name in FILES else mtexdata(name, silent=True)
+    e = syntheticMap() if name == "synthetic" else loadEBSD(FILES[name]) if name in FILES else mtexdata(name, verbose=False)
     keep = ~e.isPadding.reshape(-1)
     xy = e.pos.data.reshape(-1, 3)[keep, :2]
     ph = e.phaseId.reshape(-1)[keep].astype(float)

@@ -80,7 +80,7 @@ plotAngleDistribution(crystalFrame('222'), crystalFrame('12/m1'), linewidth=2, f
 
 # +
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 grains = calcGrains(ebsd['indexed'], threshold=5 * degree)
 

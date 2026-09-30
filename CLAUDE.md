@@ -31,7 +31,8 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 - Boolean flags are keywords named positively (`thinning=False`, not MATLAB's `'nothinning'`);
   a positional string names something (`'uvw'`, `'ZYZ'`, `'X||a'`, `'{111}'`). The keywords
   are camelCase (`markerSize`, `displayName`, `lineWidth`), a tolerance is `tol`, an iteration
-  bound `maxIter`, the progress output `verbose` (default False), a symmetry `CS`/`SS`, and
+  bound `maxIter`, the progress output `verbose` (on by default only where MATLAB reports
+  unasked: `mtexdata`, the HDF5 reader, `calcComponents`, `calcDistortion`), a symmetry `CS`/`SS`, and
   British spellings (`symmetrise`, `regularisation`).
 - Everything on SO(3) carries the two frames it maps between as `frameA` (from, the crystal)
   and `frameB` (to, the specimen or the second crystal), as the Julia port; `CS` and `SS` are

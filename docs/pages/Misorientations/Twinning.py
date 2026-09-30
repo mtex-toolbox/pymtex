@@ -19,7 +19,7 @@ import numpy as np
 from mtex import *
 
 plottingConvention.default('y↑→x')
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 # use the crystal symmetry and lattice parameters stored with the data
 CS = ebsd['Magnesium'].CS

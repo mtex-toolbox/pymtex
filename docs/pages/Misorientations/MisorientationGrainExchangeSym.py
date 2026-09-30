@@ -106,7 +106,7 @@ hold(False)
 # automatically.
 
 # +
-ebsd = mtexdata('twins', silent=True)
+ebsd = mtexdata('twins', verbose=False)
 
 grains = calcGrains(ebsd, threshold=5 * degree, minPixel=5)
 
@@ -118,7 +118,7 @@ grains.boundary['Mag', 'Mag'].misorientation.antipodal
 # MTEX leaves the flag off.
 
 # +
-ebsd = mtexdata('forsterite', silent=True)
+ebsd = mtexdata('forsterite', verbose=False)
 
 grains = calcGrains(ebsd)
 

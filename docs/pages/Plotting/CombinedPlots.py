@@ -158,7 +158,7 @@ pf = mtexdata('dubna')
 
 # ---
 
-odf = calcODF(pf, silent=True)
+odf = calcODF(pf, verbose=False)
 
 # A measured, a recalculated, and a difference pole figure form the standard
 # comparison for judging a reconstruction. See

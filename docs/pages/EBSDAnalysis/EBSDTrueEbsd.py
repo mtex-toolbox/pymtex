@@ -30,7 +30,7 @@ from mtex import *
 
 plottingConvention.default('y↓→x')
 
-ebsd = mtexdata('trueEbsdWCCoSmall', silent=True)
+ebsd = mtexdata('trueEbsdWCCoSmall', verbose=False)
 
 ebsd.meta['trueEbsdImgs']
 

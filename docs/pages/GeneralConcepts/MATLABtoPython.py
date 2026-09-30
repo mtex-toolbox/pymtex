@@ -40,7 +40,7 @@ ebsd
 # The keywords are spelled one way throughout: in camelCase (`lineWidth`, `markerSize`,
 # `displayName`), a tolerance as `tol`, an iteration bound as `maxIter`, and a flag by what
 # it switches on, so that MATLAB's `'noSymmetry'` is `symmetry=False`. Progress output is
-# asked for by `verbose=True`, where MATLAB silences it by `'silent'`.
+# switched by `verbose`, where MATLAB silences it by `'silent'`: `mtexdata(..., verbose=False)`.
 #
 # A string that names something stays a string in the argument list: the kind of Miller
 # indices `'uvw'`, an Euler convention `'ZYZ'`, an alignment `'X||a'`.

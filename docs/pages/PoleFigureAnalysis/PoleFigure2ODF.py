@@ -48,7 +48,7 @@ plot(pf)
 
 # +
 tic = time.perf_counter()
-odf = calcODF(pf, silent=False)
+odf = calcODF(pf, verbose=True)
 defaultTime = time.perf_counter() - tic
 
 odf

@@ -152,7 +152,7 @@ plot(pf[0:4])
 # data inherit that alignment.
 
 # +
-odf = calcODF(pf, silent=True)
+odf = calcODF(pf, verbose=False)
 
 plotPDF(odf, pf.allH[0:4])
 # -

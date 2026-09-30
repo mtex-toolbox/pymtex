@@ -36,7 +36,7 @@ fibre_odf = 0.5 * uniformODF(cs) + 0.5 * fibreODF(fibre.rand(cs), halfwidth=20 *
 ori = fibre_odf.discreteSample(500)
 
 # plot the ODF in Bunge sections
-plot(fibre_odf, sections=6, silent=True)
+plot(fibre_odf, sections=6, verbose=False)
 mtexColorbar(title='mrd')
 
 # plot the sampled orientations on top
@@ -55,7 +55,7 @@ hold(False)
 
 # +
 # plot the ODF in sigma sections
-plot(fibre_odf, 'sigma', sections=6, silent=True, contour=True, linewidth=2)
+plot(fibre_odf, 'sigma', sections=6, verbose=False, contour=True, linewidth=2)
 
 # plot the sampled orientations in the same sections
 hold(True)
@@ -84,7 +84,7 @@ hold(False)
 # estimate an ODF with a narrow kernel
 odf_rec = calcDensity(ori, halfwidth=10 * degree)
 
-plot(odf_rec, 'sigma', silent=True)
+plot(odf_rec, 'sigma', verbose=False)
 mtexColorbar(title='mrd')
 
 errRandom10 = calcError(odf_rec, fibre_odf, 'L1')
@@ -99,7 +99,7 @@ print(f'L1 error, random sample, 10 degree: {errRandom10:.3f}')
 # reconstruct the same orientations with a wider kernel
 odf_rec = calcDensity(ori, halfwidth=20 * degree)
 
-plot(odf_rec, 'sigma', silent=True)
+plot(odf_rec, 'sigma', verbose=False)
 mtexColorbar(title='mrd')
 
 errRandom20 = calcError(odf_rec, fibre_odf, 'L1')
@@ -130,7 +130,7 @@ ori = fibre_odf.optimalSample(500)
 # +
 odf_rec = calcDensity(ori, halfwidth=10 * degree)
 
-plot(odf_rec, 'sigma', silent=True)
+plot(odf_rec, 'sigma', verbose=False)
 mtexColorbar(title='mrd')
 
 errOptimal10 = calcError(odf_rec, fibre_odf, 'L1')

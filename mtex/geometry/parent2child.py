@@ -36,8 +36,8 @@ from .display import aligned
 VariantIds = namedtuple("VariantIds", ["variantId", "packetId", "bainId", "fit"])
 
 
-def _vprint(silent, *args):
-  if not silent:
+def _vprint(verbose, *args):
+  if verbose:
     print(*args)
 
 
@@ -92,9 +92,9 @@ def _subSample(mori, n):
 
 
 # the fixed point iteration from one start, every step backtracked until it descends
-def _fitLocal(mori, p2c, h, tau, maxIteration, silent=True):
+def _fitLocal(mori, p2c, h, tau, maxIteration, verbose=False):
   s = _misfit(mori, p2c, h, tau)
-  _report(p2c, s["fit"], silent)
+  _report(p2c, s["fit"], not verbose)
   for _ in range(maxIteration):
     trial = _vote(mori, p2c, s)
     if trial is None:
@@ -110,21 +110,21 @@ def _fitLocal(mori, p2c, h, tau, maxIteration, silent=True):
       break
     moved = float(new.angle(p2c, symmetry=False))
     p2c, s = new, sNew
-    _report(p2c, s["fit"], silent)
+    _report(p2c, s["fit"], not verbose)
     if moved < 0.01 * degree:
       break
   return p2c, s
 
 
-def _report(p2c, fit, silent):
-  if not silent:
+def _report(p2c, fit, verbose):
+  if verbose:
     e = np.degrees(p2c.Euler()).reshape(-1)
     print(f"  ({e[0]:6.2f}°,{e[1]:6.2f}°,{e[2]:6.2f}°)  {np.degrees(np.arccos(1 - fit)):.4g}")
 
 
 # the seeds of the local fits: the relationships of a grid scored on a small subsample,
 # the best few far enough apart, the start given always among them
-def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, maxIteration, silent):
+def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, maxIteration, verbose):
   from .grids.so3grid import equispacedSO3Grid
   sub = _subSample(mori, scanSample)
   hSub = max(1, int(np.ceil(h / mori.size * sub.size)))
@@ -134,7 +134,7 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
   # a minimum over the variants
   S = p2c.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
   S = S[2 * np.arccos(np.clip(np.abs(S[:, 0]), 0, 1)) > 1e-3 * degree]
-  _vprint(silent, f"  scanning {g.size} orientations")
+  _vprint(not verbose, f"  scanning {g.size} orientations")
   fit = np.zeros(g.size)
   block = max(1, int(round(2e6 / (sub.size * len(S)))))
   for a in range(0, g.size, block):
@@ -172,7 +172,7 @@ def _cat(a, b):
 
 
 def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, maxIteration=30, maxSample=50000,
-                     searchResolution=4 * degree, scanSample=250, numLocal=5, silent=True, fit=False):
+                     searchResolution=4 * degree, scanSample=250, numLocal=5, verbose=False, fit=False):
   """calcParent2Child(c2c, p2c0), calcParent2Child(childOri, p2c0), calcParent2Child(c2c, p2c0, local=True)
 
   The parent to child orientation relationship fitted to child to child misorientations,
@@ -193,11 +193,11 @@ def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, max
   moriAll = mori
   mori = _subSample(mori, maxSample)
   h = int(np.ceil(quantile * mori.size))
-  _vprint(silent, " optimizing parent to child orientation relationship")
+  _vprint(not verbose, " optimizing parent to child orientation relationship")
   start = p2c
   if not local:
-    p2c = _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, maxIteration, silent)
-  p2c, s = _fitLocal(mori, p2c, h, tau, maxIteration, silent)
+    p2c = _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, maxIteration, not verbose)
+  p2c, s = _fitLocal(mori, p2c, h, tau, maxIteration, not verbose)
   # the candidates were refined on a subsample, so the start refined on all the data may
   # still reach a lower minimum; it stays a candidate
   if not local:

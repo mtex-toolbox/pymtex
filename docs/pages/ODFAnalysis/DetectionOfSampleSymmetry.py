@@ -45,7 +45,7 @@ odf = unimodalODF(ori, weights=c, halfwidth=12 * degree)
 
 # plot three pole figures
 h = cat(Miller(1, 1, 1, CS), Miller(2, 0, 0, CS), Miller(2, 2, 0, CS))
-plotPDF(odf, h, antipodal=True, silent=True, complete=True, upper=True)
+plotPDF(odf, h, antipodal=True, verbose=False, complete=True, upper=True)
 # -
 
 # Each pole figure is symmetric about its horizontal and vertical axes. This is the
@@ -75,7 +75,7 @@ ori = rot * ori
 odfEst = calcDensity(ori, halfwidth=10 * degree)
 
 # plot the tilted estimate
-plotPDF(odfEst, h, antipodal=True, silent=True)
+plotPDF(odfEst, h, antipodal=True, verbose=False)
 # -
 
 # The lobes no longer pair across the displayed horizontal and vertical axes. They still
@@ -95,7 +95,7 @@ plotPDF(odfEst, h, antipodal=True, silent=True)
 # +
 odfCorrected, rotCorrection = centerSpecimen(odfEst)[:2]
 
-plotPDF(odfCorrected, h, antipodal=True, silent=True)
+plotPDF(odfCorrected, h, antipodal=True, verbose=False)
 
 recoveryError = angle(rot, inv(rotCorrection)) / degree
 print(f'difference between applied and recovered rotation: {recoveryError:.3f} degree')
@@ -115,7 +115,7 @@ print(f'difference between applied and recovered rotation: {recoveryError:.3f} d
 fname = mtexdatafile('aachenexp')
 pf = PoleFigure.load(fname)
 
-plot(pf, silent=True)
+plot(pf, verbose=False)
 # -
 
 # The measured pole figures already suggest horizontal and vertical symmetry, but their
@@ -128,9 +128,9 @@ plot(pf, silent=True)
 # plot uses the same three pole families as the synthetic example.
 
 # +
-odfMeasured = calcODF(pf, silent=True)
+odfMeasured = calcODF(pf, verbose=False)
 
-plotPDF(odfMeasured, h, antipodal=True, silent=True, axisLabels=False, grid='on')
+plotPDF(odfMeasured, h, antipodal=True, verbose=False, axisLabels=False, grid='on')
 # -
 
 # The density maxima nearly reflect across the nominal specimen axes, with a small common

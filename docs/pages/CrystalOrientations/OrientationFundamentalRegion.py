@@ -104,7 +104,7 @@ hold(False)
 #
 # MTEX plots measured orientations in their fundamental region by default.
 
-ebsd = mtexdata('forsterite', silent=True)
+ebsd = mtexdata('forsterite', verbose=False)
 plot(ebsd['Fo'].orientations, 'axisAngle')
 
 # No point crosses the boundary because the plotting code selects an equivalent

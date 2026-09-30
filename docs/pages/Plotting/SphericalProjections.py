@@ -136,7 +136,7 @@ mtexTitle('equal angle')
 # the poles of the sphere become complete edges. This is the traditional
 # presentation for ODF sections.
 
-plotSection(SantaFe(), 'alpha', sections=18, projection='plain', contourf=True, FontSize=10, silent=True)
+plotSection(SantaFe(), 'alpha', sections=18, projection='plain', contourf=True, FontSize=10, verbose=False)
 mtexColorMap('white2black')
 
 # The rectangular axes make section coordinates easy to locate. The apparent

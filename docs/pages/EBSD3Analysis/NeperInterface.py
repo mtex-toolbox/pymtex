@@ -91,7 +91,7 @@ odf = SO3Fun.dubna()
 numGrains = 100
 
 if hasNeper:
-  grains = neper.simulateGrains(numGrains, odf, silent=True)
+  grains = neper.simulateGrains(numGrains, odf, verbose=False)
 else:
   tessFile = mtexdatafile('my100grains')[0]
   grains = grain3d.load(tessFile, CS=odf.CS)

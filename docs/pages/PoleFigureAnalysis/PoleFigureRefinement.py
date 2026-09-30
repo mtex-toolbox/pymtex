@@ -46,7 +46,7 @@ plotPDF(odf_naive, pf.allH)
 # nodes so that this comparison isolates the effect of the changing scale.
 
 # +
-odf_iter = calcODFIterative(pf, thinning=False, silent=False)
+odf_iter = calcODFIterative(pf, thinning=False, verbose=True)
 
 calcError(pf, odf_iter)
 # -
