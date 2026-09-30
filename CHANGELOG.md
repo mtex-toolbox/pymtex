@@ -1,23 +1,73 @@
-# Changelog
+# MTEX for Python release notes
 
-## 0.1.0 (unreleased)
+## 1.0.0 (unreleased)
 
-The first public release of MTEX for Python, a beta: the names follow MTEX for MATLAB, and the
-interface may still change before 1.0.
+### MTEX comes to Python
 
-* crystal geometry: vectors, rotations, point groups, crystal and specimen frames, Miller indices,
-  orientations and misorientations, fundamental regions, grids, fibres, planes, slip systems,
-  crystal shapes
-* EBSD maps: import of `.ang`, `.ctf`, `.cpr`/`.crc`, `.osc`, tables and the vendors' HDF5 files, and
-  export; grains and boundaries, their measures and shape parameters, intragranular quantities and
-  `calcGND`, denoising and filling, parent grain reconstruction, pseudo symmetry cleaning, simulated
-  maps, grid layouts and spatial transformations, TrueEBSD
-* maps of volumes: `EBSD3`, grains in 3D, the DREAM.3D and Neper readers
-* pole figures: import of the common formats, ODF reconstruction
-* functions on the circle, the sphere and the orientation space: harmonic expansions, radial basis
-  functions, density estimation with automatic halfwidths, Bingham distributions, texture
-  characteristics, vector and axis fields
-* tensors: elasticity, wave velocities, plasticity, the Taylor model, optics
-* plots: pole figures, inverse pole figures, ODF sections, colour keys, EBSD and grain maps, 3D scenes
-* `importWizard()`, a window for the import of EBSD data (experimental)
-* `mtexdata` for the sample data sets of the joint data repository
+MTEX 1.0 brings crystallographic texture analysis to Python scripts and Jupyter
+notebooks, with the familiar objects and function names of MTEX for MATLAB. It runs
+without a MATLAB installation.
+
+This first stable release has been cross-checked against the MATLAB toolbox and the
+Julia port. The comparisons also uncovered bugs in MATLAB, improving the toolbox
+alongside the Python implementation.
+
+### Faster grain reconstruction
+
+Grain reconstruction runs substantially faster in our benchmarks against MATLAB,
+reducing the wait when working with large EBSD maps and trying different reconstruction
+parameters. The accelerated routines are included when installing with `mtex[all]`.
+
+### A familiar working environment
+
+VS Code with the Python and Jupyter extensions provides an editor, an interactive
+command window, a variable explorer and plots. Create a Python environment (3.12 or
+later) in VS Code, then install MTEX and the notebook kernel in its terminal:
+
+```sh
+pip install "mtex[all]" ipykernel
+```
+
+Run script sections marked with `# %%` using Shift+Enter, much like sections in MATLAB.
+See [Working as in MATLAB: VS Code](README.md#working-as-in-matlab-vs-code) for the desktop
+equivalents, or [Installing MTEX for Python](https://mtex-toolbox.github.io/Installation_py.html)
+for setup on Windows, macOS and Linux.
+
+### Your MTEX workflow in Python
+
+Loading data, reconstructing grains and plotting results follow the familiar MTEX
+workflow. Import the commands once at the start of a script or notebook:
+
+```python
+from mtex import *
+
+ebsd = mtexdata('forsterite')
+grains = calcGrains(ebsd, angle=15 * degree, minPixel=5)
+plot(grains)
+```
+
+The new syntax writes `grainId` directly into `ebsd`. Phase selections use brackets,
+such as `ebsd['Forsterite']`, and options are written as keywords, such as `antipodal=True`.
+
+See [MTEX in MATLAB and in Python](https://mtex-toolbox.github.io/MATLABtoPython_py.html)
+for translating an existing analysis, including indexing and default settings.
+
+To import your own measurements, `importWizard()` opens a window where you can inspect
+the phases, reference frame and map. It generates the Python import script so that you
+can repeat the import in your analysis.
+
+### Tutorials that become your own scripts
+
+The documentation is included in the package. `openDoc` takes the place of opening an
+MTEX example in the MATLAB editor, with a choice of Python script or Jupyter notebook:
+
+```python
+openDoc('EBSDTutorial')
+openDoc('EBSDTutorial', notebook=True)
+```
+
+Run the tutorial section by section and adapt it to your measurements. In a notebook,
+the explanations, commands and resulting figures stay together in one document.
+Tutorial text is available offline; `mtexdata` downloads the sample data on first use.
+
+MTEX is free software under the GNU General Public License, version 2.
