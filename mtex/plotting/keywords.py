@@ -3,8 +3,8 @@
 # (LineWidth, linewidth, MarkerSize, markersize) are refused with the one to use, so that a keyword
 # is never quietly dropped or handed to matplotlib under another name
 STYLE_KEYS = ("color", "lineColor", "lineWidth", "lineStyle", "marker", "markerSize", "markerFaceColor", "markerEdgeColor",
-              "markerFaceAlpha", "markerEdgeAlpha", "displayName", "fontSize", "faceColor", "faceAlpha", "edgeColor",
-              "edgeAlpha", "backgroundColor", "textColor")
+              "markerAlpha", "markerFaceAlpha", "markerEdgeAlpha", "displayName", "fontSize", "fontWeight", "faceColor", "faceAlpha", "edgeColor", "edgeAlpha",
+              "backgroundColor", "textColor", "showText")
 
 # every other spelling of a style key, lower cased, and the key it spells
 _SPELLINGS = {k.lower(): k for k in STYLE_KEYS} | {"markercolor": "markerFaceColor", "linecolour": "lineColor",

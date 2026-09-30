@@ -66,14 +66,14 @@ plot(ori * cS, faceColor=[0.35, 0.6, 0.85])
 hold(True)
 arrow3d(0.9 * normalize(r), faceColor=[0.8, 0.15, 0.1])
 hold(False)
-text(-0.45, 0.45, 0.45, 'MTEX map', FontWeight='bold')
+text(-0.45, 0.45, 0.45, 'MTEX map', fontWeight='bold')
 
 nextAxis()
 plot(bungeRotation * cS, faceColor=[0.85, 0.45, 0.3])
 hold(True)
 arrow3d(0.9 * normalize(rBunge), faceColor=[0.8, 0.15, 0.1])
 hold(False)
-text(-0.45, 0.45, 0.45, 'Inverse map used forward', FontWeight='bold')
+text(-0.45, 0.45, 0.45, 'Inverse map used forward', fontWeight='bold')
 # -
 
 # ## The Reported Euler Angles Stay the Same

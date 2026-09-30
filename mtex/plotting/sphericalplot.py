@@ -244,7 +244,8 @@ def _plotOf(ax, v, projKw, axesKw):
 MARKER_NAMES = {"square": "s", "diamond": "D", "circle": "o", "triangle": "^", "pentagram": "p", "hexagram": "h", "plus": "+",
                 "cross": "x", "point": ".", "asterisk": "*"}
 MARKER_KEYS = {"markerSize": "size", "marker": "marker", "markerFaceColor": "color", "markerEdgeColor": "edgecolor",
-               "markerFaceAlpha": "alpha", "markerEdgeAlpha": "alpha", "alpha": "alpha", "color": "color"}
+               "markerAlpha": "alpha", "markerFaceAlpha": "alpha", "markerEdgeAlpha": "alpha", "alpha": "alpha",
+               "color": "color"}
 
 
 def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=None, zorder=6, **kw):
@@ -400,8 +401,8 @@ def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorR
   from matplotlib.colors import LogNorm, Normalize
   # MATLAB's 'logarithmic' colour scale
   log = kw.pop("logarithmic", log)
-  # MATLAB's 'ShowText', 'on' labels the contour lines
-  showText = kw.pop("ShowText", kw.pop("showText", None))
+  # showText, True or MATLAB's 'on', labels the contour lines
+  showText = kw.pop("showText", None)
   if showText is not None:
     contourLabels = showText.lower() == "on" if isinstance(showText, str) else bool(showText)
   # faceAlpha is the transparency of the surface

@@ -8,7 +8,7 @@
 # behind it. An alpha value of 0 is completely transparent. A value of 1 is
 # completely opaque. MTEX uses different option names for different objects:
 #
-# * `MarkerAlpha`, `MarkerFaceAlpha`, and `MarkerEdgeAlpha` control the
+# * `markerAlpha`, `markerFaceAlpha`, and `markerEdgeAlpha` control the
 #   markers in pole figures, inverse pole figures, and ODF sections.
 # * `faceAlpha` controls EBSD maps, grain maps, crystal shapes, and other
 #   surfaces.
@@ -42,11 +42,11 @@ h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], cs)
 
 plotPDF(ori, h, markerSize=5, all=True)
 
-# Set `MarkerAlpha` to make both the marker faces and edges almost
+# Set `markerAlpha` to make both the marker faces and edges almost
 # transparent. Repeated overlap stays dark, whereas isolated orientations
 # become faint. The result resembles a density plot.
 
-plotPDF(ori, h, MarkerAlpha=0.05, markerSize=5, all=True)
+plotPDF(ori, h, markerAlpha=0.05, markerSize=5, all=True)
 
 # Marker faces and edges can instead have separate alpha values. The edges
 # of overlapping markers accumulate faster than their faces. Keeping the

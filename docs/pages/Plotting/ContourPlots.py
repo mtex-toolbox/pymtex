@@ -92,7 +92,7 @@ plt.clabel(hContour[0], levels2label, fontsize=15)
 #
 # The same method applies to real pole figures. A multi-axis plotting command
 # returns several contour handles, so there is no single handle to pass to
-# `clabel`. `ShowText='on'` labels the drawn levels on every axis without
+# `clabel`. `showText='on'` labels the drawn levels on every axis without
 # requiring a loop over those handles.
 
 # +
@@ -115,7 +115,7 @@ mtexColorMap('LaboTeX')
 mtexColorbar()
 
 hold(True)
-plotPDF(odf, h, contour=np.arange(1, 16, 2), lineColor='black', lineWidth=2, ShowText='on')
+plotPDF(odf, h, contour=np.arange(1, 16, 2), lineColor='black', lineWidth=2, showText='on')
 hold(False)
 # -
 

@@ -156,7 +156,7 @@ circle(f.h.project2FundamentalRegion(), 15 * degree, lineWidth=2)
 # +
 fibrePercent = 100 * volume(ebsd['fo'].orientations, f, 15 * degree)
 hold(True)
-plotIPDF(ebsd['fo'].orientations, f.r, markerFaceColor='k', markerSize=10, points=1000, MarkerAlpha=0.2)
+plotIPDF(ebsd['fo'].orientations, f.r, markerFaceColor='k', markerSize=10, points=1000, markerAlpha=0.2)
 hold(False)
 fibrePercent
 # -
@@ -186,7 +186,7 @@ colorKey.color = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 0], [0, 1, 
 
 plot(colorKey)
 hold(True)
-plotIPDF(ebsd['fo'].orientations, colorKey.ipfDirection, markerFaceColor='none', markerEdgeColor='k', markerSize=5, points=5000, MarkerAlpha=0.2)
+plotIPDF(ebsd['fo'].orientations, colorKey.ipfDirection, markerFaceColor='none', markerEdgeColor='k', markerSize=5, points=5000, markerAlpha=0.2)
 hold(False)
 # -
 

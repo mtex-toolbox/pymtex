@@ -467,10 +467,10 @@ def quartzFibre():
 
 def test_plotPDF_contourfLevelsAreTheBands():
   odf, h = quartzFibre()
-  # 'contourf', levels: the bands at the levels, the colours spread over them, labelled with ShowText
+  # 'contourf', levels: the bands at the levels, the colours spread over them, labelled with showText
   plotPDF(odf, h, contourf=np.arange(0, 6), antipodal=True)
   assert np.allclose(gcm().children[0]._mtexSphericalPlot.mappable.levels, np.arange(0, 6))
-  plotPDF(odf, h, contour=[1, 3], antipodal=True, ShowText='on')
+  plotPDF(odf, h, contour=[1, 3], antipodal=True, showText='on')
   assert gcm().children[0]._mtexSphericalPlot.lines[0].labelTexts
 
 

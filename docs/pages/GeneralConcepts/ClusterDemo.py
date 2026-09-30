@@ -25,7 +25,7 @@ rng = np.random.default_rng(1)
 S2F = S2Fun.smiley() ** 2
 v = discreteSample(S2F, 10000, rng=rng)
 
-scatter(v, MarkerAlpha=0.2, markerSize=2)
+scatter(v, markerAlpha=0.2, markerSize=2)
 # -
 
 # ## Read the cluster result
@@ -41,7 +41,7 @@ scatter(v, MarkerAlpha=0.2, markerSize=2)
 # +
 cInd, center = calcCluster(v)
 
-plot(v, ind2color(cInd + 1), MarkerAlpha=0.2, markerSize=2)
+plot(v, ind2color(cInd + 1), markerAlpha=0.2, markerSize=2)
 annotate(center)
 # -
 
@@ -84,7 +84,7 @@ annotate(center)
 vSym.antipodal = True
 cInd, center = calcCluster(vSym)
 
-plot(vSym, ind2color(cInd + 1), MarkerAlpha=0.2, markerSize=2)
+plot(vSym, ind2color(cInd + 1), markerAlpha=0.2, markerSize=2)
 annotate(center)
 # -
 
@@ -118,7 +118,7 @@ ori = discreteSample(odf, 10000, rng=rng)
 
 plotSection(odf, contourf=True)
 mtexColorMap('white2black')
-plot(ori, add2all=True, markerSize=3, MarkerAlpha=0.25, all=True)
+plot(ori, add2all=True, markerSize=3, markerAlpha=0.25, all=True)
 
 # Notice the narrow concentration of points around the compact peak and the elongated
 # concentration along the fibre. These are the two structures the clustering step should
@@ -134,7 +134,7 @@ plot(ori, add2all=True, markerSize=3, MarkerAlpha=0.25, all=True)
 # +
 cId, center = calcCluster(ori, method='classix', radius=0.1, minPoints=100)
 
-plotSection(ori, ind2color(cId + 1), markerSize=3, MarkerAlpha=0.25, all=True)
+plotSection(ori, ind2color(cId + 1), markerSize=3, markerAlpha=0.25, all=True)
 annotate(center)
 # -
 
