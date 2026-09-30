@@ -185,7 +185,7 @@ class PatalaColorKey(orientationColorKey):
   def orientation2color(self, mori):
     """the colours of misorientations, (..., 3) RGB: the Rodrigues vectors in the fundamental zone
     with grain exchange, the a axis along x, looked up in the map of the Laue group"""
-    v = mori.project2FundamentalRegion(antipodal=True).Rodrigues()
+    v = mori.projectIntoFundamentalRegion(antipodal=True).Rodrigues()
     # the zone as the maps expect it, the a axis along x
     v = v.rotate(rotationAboutZ(-self.CS1.aAxis.rho))
     p = np.array(v.data.reshape(-1, 3), dtype=float)

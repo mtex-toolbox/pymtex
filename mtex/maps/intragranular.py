@@ -279,14 +279,14 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
   if ebsd.ndim != 2:
     raise ValueError("the integral method runs on the rows and columns of a map: gridify it first")
   # every orientation the equivalent nearest the last measured one of its grain, as MATLAB's
-  # project2FundamentalRegion of a map, so that the loop sums no jumps between equivalents
+  # projectIntoFundamentalRegion of a map, so that the loop sums no jumps between equivalents
   # a map without grains is one grain
   gid = np.asarray(ebsd.prop["grainId"]) if "grainId" in ebsd.prop else np.ones(ebsd.shape)
   gid = np.where(ebsd.isIndexed, gid, 0).reshape(-1).astype(np.int64)
   last = np.zeros(gid.max(initial=0) + 1, dtype=np.int64)
   np.maximum.at(last, gid, np.arange(gid.size))
   oris = ebsd.orientations
-  ori = oris.project2FundamentalRegion(oris.reshape(-1)[last[gid]].reshape(ebsd.shape))
+  ori = oris.projectIntoFundamentalRegion(oris.reshape(-1)[last[gid]].reshape(ebsd.shape))
   oriX, oriY = ((ori.inv() * vector3d(v, frame=ebsd.frame)).data for v in ([1.0, 0, 0], [0, 1.0, 0]))
   w = int(windowSize)
   fY = np.zeros((2 * w + 1, 2 * w + 1))

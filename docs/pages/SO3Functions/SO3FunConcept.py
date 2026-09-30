@@ -97,7 +97,7 @@ oriMax
 # region in orientation space.
 
 color = ind2color(np.tile(np.arange(1, oriMax.size + 1), (numSym(cs), 1)))
-plot(oriMax.symmetrise(), color, 'axisAngle', filled=True, markerSize=20, restrict2FundamentalRegion=True)
+plot(oriMax.symmetrise(), color, 'axisAngle', filled=True, markerSize=20, fundamentalRegion=True)
 
 # The six colours distinguish the six maxima. The markers lie on the outer vertices because
 # those points have the greatest possible distance from the identity after cubic symmetry

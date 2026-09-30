@@ -19,7 +19,7 @@ branch and whose inside is the Julia design on NumPy arrays, in float64 and floa
 - `symmetry` (the point group from its Hermann-Mauguin symbol), `crystalFrame`,
   `specimenFrame`, `notIndexedFrame` with the session register, `plottingConvention`;
 - `orientation` with `CS`/`SS`, misorientations with grain exchange, symmetry-reduced
-  `dot`, `angle`, `unique`, `mean`, `symmetrise`, `project2FundamentalRegion`,
+  `dot`, `angle`, `unique`, `mean`, `symmetrise`, `projectIntoFundamentalRegion`,
   `fundamentalRegion`, `transformReferenceFrame`, the standard orientations and
   orientation relationships, `variants`;
 - `sphericalRegion` and `fundamentalSector`, `orientationRegion`;
@@ -58,7 +58,7 @@ What the user sees, taken from MATLAB:
   since Python cannot call a method without them.
 - Verbs as functions and as methods: `angle(o1, o2)` and `o1.angle(o2)` are the same
   call; `dot`, `cross`, `norm`, `mean`, `unique`, `symmetrise`, `inv`, `log`, `exp`,
-  `Euler`, `matrix`, `axis`, `rotate`, `project2FundamentalRegion` all exist in both forms
+  `Euler`, `matrix`, `axis`, `rotate`, `projectIntoFundamentalRegion` all exist in both forms
   and are exported by `mtex`. The method is the implementation, the function a
   one-line wrapper.
 - The `_outer` names stay as conveniences (`dot_outer`, `angle_outer`), one line each
@@ -197,14 +197,14 @@ constructors, `CS`, `SS`, `frameA`, `frameB`, `inv` swapping the frames, `antipo
 `isMisorientation`, `rand`, display with the Euler table). Tests: `test_miller.py`
 (`check_Miller`), `test_orientation.py`, the containers part of `test_semantics.py`.
 
-**G5 - symmetry-aware operations. DONE 2026-09-21** (`symreduce.py` with the pair kernel vectorised over broadcast pairs, one matrix product per group element; `symmetryops.py` with `symmetrise`, `multiplicity`, the reduced `dot`, `angle`, `==`, `unique`, `mean`, `axis` and `project2FundamentalRegion` for directions and orientations; `sphericalregion.py`, `orientationregion.py`, `frametransform.py`, `standardorientations.py` with `byMiller`, the relationships, `variants` and `CSL`; every semantics statement S1 to S26 passes; 258 tests). Two traps met on the way: a base-class method that calls `self.dot` is intercepted by the subclass's symmetry-reduced version, so the chord angle reads the coefficients directly; and the orbit images keep the group axis next to the coordinates so that two lists of any shapes broadcast on their leading axes. `symreduce.py` (the one kernel `symReduce(q1, q2,
+**G5 - symmetry-aware operations. DONE 2026-09-21** (`symreduce.py` with the pair kernel vectorised over broadcast pairs, one matrix product per group element; `symmetryops.py` with `symmetrise`, `multiplicity`, the reduced `dot`, `angle`, `==`, `unique`, `mean`, `axis` and `projectIntoFundamentalRegion` for directions and orientations; `sphericalregion.py`, `orientationregion.py`, `frametransform.py`, `standardorientations.py` with `byMiller`, the relationships, `variants` and `CSL`; every semantics statement S1 to S26 passes; 258 tests). Two traps met on the way: a base-class method that calls `self.dot` is intercepted by the subclass's symmetry-reduced version, so the chord angle reads the coefficients directly; and the orbit images keep the group axis next to the coordinates so that two lists of any shapes broadcast on their leading axes. `symreduce.py` (the one kernel `symReduce(q1, q2,
 L, R, exchange)`, `symDots`, `symAngles`, `reductionGroups`); `products.py` (`fitFrame`,
 `dropGroup`, `o * o`, `rot * o`, `o * rot`, `o * v`, `rotate`); `symmetryops.py`
 (`symmetrise`, `multiplicity`, `dot`, `angle`, `==`, `unique`, `mean`, `find`);
 `sphericalregion.py` (`sphericalRegion`, `fundamentalSector` as the Dirichlet domain,
-`conventionalSector`, `project2FundamentalRegion` for vectors, `checkInside`, `vertices`,
+`conventionalSector`, `projectIntoFundamentalRegion` for vectors, `checkInside`, `vertices`,
 `boundary`, `thetaIntervals`); `orientationregion.py` (`orientationRegion`,
-`fundamentalRegion`, `project2FundamentalRegion`, `maxAngle`, `checkInside`);
+`fundamentalRegion`, `projectIntoFundamentalRegion`, `maxAngle`, `checkInside`);
 `frametransform.py` (`align`, `byScreenAlignment`, `transformReferenceFrame`);
 `standardorientations.py` (`byMiller`, `cube`, `goss`, `brass`, `copper` and the rest,
 the named orientation relationships, `variants`). Tests: `test_symmetryops.py`,
@@ -271,7 +271,7 @@ checks it.
   (`docs/research/benchmark-geometry.md`): `dot(ori, ref)` at 382 ns against Julia's 49
   and MATLAB's 115 with NumPy, 61 with the numba kernels of `kernels.py` taken the same
   day (D5). `symmetryops.py` took the list-of-references form of
-  `project2FundamentalRegion` for the benchmark. The nearest search of `S2Grid` and
+  `projectIntoFundamentalRegion` for the benchmark. The nearest search of `S2Grid` and
   `SO3Grid` was compiled the same day (`docs/research/benchmark-gridsearch.md`,
   `grids/gridsearch.py`): the structured ring search as one parallel numba loop, 730x and
   1000x the Python search. Then reconsidered for ODF reconstruction

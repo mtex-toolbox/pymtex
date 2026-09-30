@@ -20,7 +20,7 @@ from .symreduce import *  # noqa: F401,F403
 from .symmetryops import *  # noqa: F401,F403
 from .sphericalregion import sphericalRegion, dirichletSector, tilesSphere, sectorCenter, projectIntoRegion
 from .s2triangulation import S2Triangulation
-from .orientationregion import orientationRegion, eulerRegion, fundamentalRegionEuler, project2EulerFR, maxAngle
+from .orientationregion import orientationRegion, eulerRegion, fundamentalRegionEuler, projectIntoEulerRegion, maxAngle
 from .frametransform import align, byScreenAlignment
 from .standardorientations import variants, STANDARD_EULER
 from .csl import CSL
@@ -48,7 +48,7 @@ from .funcs import (angle, dot, cross, orthProj, norm, normalize, inv, mean, sum
                     axis, log, exp, isclose, homochoric, cubochoric, orth, perp, polar, det, conj, isnan, rotate, cat,
                     merge, Laue, properGroup, properSubGroup, disjoint, union, factor, nfold, numSym, numProper,
                     LaueName, sim, isAligned, isCompatible, transformationMatrix, alignment, stripSym, fullSym,
-                    dspacing, round, symmetrise, multiplicity, project2FundamentalRegion, transformReferenceFrame,
+                    dspacing, round, symmetrise, multiplicity, projectIntoFundamentalRegion, transformReferenceFrame,
                     fundamentalSector, conventionalSector, fundamentalRegion, checkInside, find, subGrid, discretize,
                     displacement, fitStage)
 
@@ -61,7 +61,7 @@ __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vect
            "specimenFrame", "notIndexedFrame", "alignmentSetups", "closestAlignment", "Miller", "orientation",
            "sphericalRegion", "fundamentalSector", "conventionalSector", "dirichletSector", "tilesSphere",
            "sectorCenter", "projectIntoRegion", "S2Triangulation", "orientationRegion", "fundamentalRegion",
-           "eulerRegion", "fundamentalRegionEuler", "project2EulerFR", "maxAngle", "align", "byScreenAlignment",
+           "eulerRegion", "fundamentalRegionEuler", "projectIntoEulerRegion", "maxAngle", "align", "byScreenAlignment",
            "variants", "STANDARD_EULER", "CSL", "SO3TangentVector", "spinTensor", "left", "right", "geodesic", "fibre",
            "convexHull", "convexHullLoops", "slipSystem", "dislocationSystem", "mPrime", "crystalShape", "innerFace",
            "CRYSTAL_SHAPES", "plane3d", "dist", "intersect", "lineIntersect", "calcParent2Child", "misfit",
@@ -76,7 +76,7 @@ __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vect
            "isclose", "homochoric", "cubochoric", "orth", "perp", "polar", "det", "conj", "isnan", "rotate", "cat",
            "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym",
            "numProper", "LaueName", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym",
-           "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion",
+           "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "projectIntoFundamentalRegion",
            "transformReferenceFrame", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]
 
 from typing import TYPE_CHECKING

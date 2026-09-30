@@ -32,7 +32,7 @@ ori1 = orientation.cube(cs, ss)
 ori2 = orientation.goss(cs, ss)
 
 # select the representative of Goss nearest to Cube
-ori2 = ori2.project2FundamentalRegion(ori1)
+ori2 = ori2.projectIntoFundamentalRegion(ori1)
 # -
 
 # ## A Fibre Segment Between Two Orientations
@@ -93,7 +93,7 @@ fullFibre
 # cut that circle into arcs.
 
 hold(True)
-plot(fullFibre, 'axisAngle', lineColor='gold', lineWidth=3, project2FundamentalRegion=True)
+plot(fullFibre, 'axisAngle', lineColor='gold', lineWidth=3, projectIntoFundamentalRegion=True)
 hold(False)
 
 # The gold curve continues the green segment to the faces of the cubic fundamental region.
@@ -163,7 +163,7 @@ cAxisFibre
 # The summary states that [001] is parallel to (0,0,1). The directions are shown in crystal
 # and specimen coordinates, respectively.
 
-plot(cAxisFibre, 'axisAngle', lineColor='gold', lineWidth=4, project2FundamentalRegion=True)
+plot(cAxisFibre, 'axisAngle', lineColor='gold', lineWidth=4, projectIntoFundamentalRegion=True)
 
 # The gold line is the symmetry-reduced image of every possible rotation about the aligned
 # c-axis. Its two boundary ends continue into one another, so it represents one full fibre
@@ -187,7 +187,7 @@ cube111Fibre
 # Its summary reports that [111] is parallel to (1,1,1). Cube maps this crystal direction
 # onto the same specimen direction.
 
-plot(cube111Fibre, 'axisAngle', lineColor='darkred', lineWidth=4, project2FundamentalRegion=True)
+plot(cube111Fibre, 'axisAngle', lineColor='darkred', lineWidth=4, projectIntoFundamentalRegion=True)
 
 # The dark-red curve passes through the Cube orientation at zero angle. Its ends meet the
 # boundary at symmetry-equivalent continuations of the curve.

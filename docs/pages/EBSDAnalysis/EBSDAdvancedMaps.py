@@ -146,7 +146,7 @@ plot(ebsd['fo'], colorKey.orientation2color(ebsd['fo'].orientations))
 # +
 plot(colorKey)
 
-circle(f.h.project2FundamentalRegion(), 15 * degree, lineWidth=2)
+circle(f.h.projectIntoFundamentalRegion(), 15 * degree, lineWidth=2)
 # -
 
 # The kernel halfwidth is 7.5°, where the blue saturation has fallen by half. The circle

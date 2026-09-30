@@ -76,7 +76,7 @@ def _vote(mori, p2c, s):
   votes = []
   for k in np.unique(s["variant"][s["ind"]]):
     sel = s["ind"] & (s["variant"] == k)
-    proj = mori[sel].project2FundamentalRegion(s["c2c"][k])
+    proj = mori[sel].projectIntoFundamentalRegion(s["c2c"][k])
     votes.append(qmul(proj.data.reshape(-1, 4), s["V"][k].data.reshape(1, 4)))
   if not votes:
     return None

@@ -175,7 +175,7 @@ GrainReconstructionMCL blocked. The chapter wrote `planarColorKey`, the polar pl
 `grainplots.py`, `logAxis`, the compass needles `plot(grains, v)`, `plotPF(fibre, h)`, `plot(fibre)`
 in Euler space, `annotate(v, plane=True)`, `export(ori)` and `export_VPSC` in
 `io/exportorientation.py`, `grains.N`, `grains.phase`, `id2ind`, `findByOrientation`,
-`ebsd.how2plot`, `ebsd.project2FundamentalRegion()`, `merge(grains, gB)`, `caliper` over a list
+`ebsd.how2plot`, `ebsd.projectIntoFundamentalRegion()`, `merge(grains, gB)`, `caliper` over a list
 of directions and `S1FunHarmonic.interpolate`; it found the bugs in `docs/findings.md` (the map
 plot ignoring `newMtexFigure` and `nextAxis`, a `region` without the layout, one gridspec per
 panel, the perimeter counting inclusions, the aliased S1 interpolation, the NaN fibre fit, the

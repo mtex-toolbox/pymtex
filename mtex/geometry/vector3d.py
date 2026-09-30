@@ -717,17 +717,18 @@ class vector3d(MtexArray):
     from .symmetryops import multiplicity
     return multiplicity(self, antipodal=antipodal)
 
-  def project2FundamentalRegion(self, center=None, antipodal=False):
+  def projectIntoFundamentalRegion(self, center=None, antipodal=False):
     """the directions folded into the fundamental sector of their frame, with antipodal=True into
     that of the Laue group; given a centre, the equivalent nearest it instead
+    (MATLAB's vector3d.project2FundamentalRegion, Miller.project2FundamentalRegion)
 
-      v.project2FundamentalRegion()
-      v.project2FundamentalRegion(center)"""
-    from .symmetryops import project2FundamentalRegion
+      v.projectIntoFundamentalRegion()
+      v.projectIntoFundamentalRegion(center)"""
+    from .symmetryops import projectIntoFundamentalRegion
     v = self
     if antipodal and self.isCrystalDirection:
       v = self._new(self.data, _frame=self._frame.Laue())
-    return project2FundamentalRegion(v, center)
+    return projectIntoFundamentalRegion(v, center)
 
   def find(self, w, epsOrK=None, antipodal=False):
     """the closest points of this list to others, the k closest, or all within a radius"""

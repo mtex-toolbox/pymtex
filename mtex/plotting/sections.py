@@ -542,7 +542,7 @@ class axisAngleSections(ODFSections):
   def sectionData(self, ori):
     """where orientations fall: the rotation axes of their projections into the fundamental region,
     the section of their angle and the index of the orientation"""
-    p = ori.flatten().project2FundamentalRegion()
+    p = ori.flatten().projectIntoFundamentalRegion()
     q = p.data.reshape(-1, 4)
     k = sectionIndex(quatAngle(q), self.values, self.tol, np.inf)
     keep = k >= 0

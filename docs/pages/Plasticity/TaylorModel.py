@@ -159,7 +159,7 @@ gammaMaxId = np.argmax(gammaGrain, axis=1)
 sSGrains = grains.meanOrientation * sS[gammaMaxId]
 
 hold(True)
-quiver(grains, sSGrains.b, autoScaleFactor=0.7, displayName='Burgers vector', project2plane=True)
+quiver(grains, sSGrains.b, autoScaleFactor=0.7, displayName='Burgers vector', projectIntoPlane=True)
 quiver(grains, sSGrains.trace(), autoScaleFactor=0.7, displayName='slip plane trace')
 hold(False)
 # -

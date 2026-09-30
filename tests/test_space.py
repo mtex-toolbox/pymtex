@@ -106,7 +106,7 @@ def test_axisAnglePoints_normIsTheAngleAndPointsLieInsideTheRegion():
   # orientations as points: the norm is the angle, and the points lie inside the region
   os_ = orientation(rotation.rand(40, rng=rng), cs, ss)
   pts = axisAnglePoints(os_)
-  inside = os_.project2FundamentalRegion()
+  inside = os_.projectIntoFundamentalRegion()
   assert pts.shape == (40, 3) and np.allclose(np.linalg.norm(pts, axis=1), inside.angle(symmetry=False))
   assert np.all(np.linalg.norm(pts, axis=1) <= maxAngles(oR, pts) + 1e-9)
   assert np.allclose(axisAnglePoints(orientation(rotation.id, cs, ss)), 0)

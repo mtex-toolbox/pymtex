@@ -32,7 +32,7 @@ ebsd = mtexdata('ferrite')
 
 # reconstruct grains; one grain id per measurement is stored with the map
 grains = calcGrains(ebsd, angle=7.5 * degree, minPixel=5)
-ebsd = ebsd.project2FundamentalRegion()
+ebsd = ebsd.projectIntoFundamentalRegion()
 
 # smooth only the outlines used in the figures, and keep the indexed grains
 grains = smoothBoundary(grains, 5)
@@ -295,7 +295,7 @@ cKey = HSVDirectionKey(ebsd.CS, antipodal=True)
 # plot the key and the accepted dispersion axes
 plot(cKey)
 hold(True)
-plot(project2FundamentalRegion(GAX_C[isFibre], antipodal=True), markerFaceColor='black')
+plot(projectIntoFundamentalRegion(GAX_C[isFibre], antipodal=True), markerFaceColor='black')
 hold(False)
 # -
 
@@ -423,6 +423,6 @@ hold(False)
 # `fibre.fit(ori, 'local', diagnostics=True)` returns MATLAB's triple; the eigenvalues are
 # `lam[0]` to `lam[3]`, so MATLAB's `lambda(2)` and `lambda(3)` read `lam[:, 1]` and
 # `lam[:, 2]` here. `calcGrains` writes the grain ids into the map and
-# `ebsd.project2FundamentalRegion()` returns a new map. The measurements the closing
+# `ebsd.projectIntoFundamentalRegion()` returns a new map. The measurements the closing
 # absorbed keep their `notIndexed` phase and carry no orientation, so the fit and the
 # distances skip them. MATLAB's `table` is a printed line.

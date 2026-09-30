@@ -4,7 +4,7 @@ import pytest
 from numpy import pi
 
 from mtex import (fibre, orientation, rotation, crystalFrame, specimenFrame, vector3d, Miller, zvector, degree,
-                  angle, symmetrise, multiplicity, project2FundamentalRegion, cat)
+                  angle, symmetrise, multiplicity, projectIntoFundamentalRegion, cat)
 from conftest import close
 
 
@@ -16,7 +16,7 @@ def rng():
 def gossBrass():
   cs = crystalFrame("432")
   oA = orientation.goss(cs)
-  oB = project2FundamentalRegion(orientation.brass(cs), oA)
+  oB = projectIntoFundamentalRegion(orientation.brass(cs), oA)
   return cs, oA, oB, fibre(oA, oB)
 
 

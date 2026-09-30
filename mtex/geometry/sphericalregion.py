@@ -107,8 +107,8 @@ class sphericalRegion:
 
   __hash__ = None
 
-  def restrict2Upper(self, up=None):
-    """the hemisphere seen from a direction added to the region"""
+  def restrictToUpper(self, up=None):
+    """the hemisphere seen from a direction added to the region (MATLAB's sphericalRegion.restrict2Upper)"""
     from .plottingconvention import plottingConvention
     up = zvector if up is None else up.outOfScreen if isinstance(up, plottingConvention) else up
     u = _unit(np.asarray(up.data if isinstance(up, vector3d) else up, dtype=float))
@@ -116,10 +116,11 @@ class sphericalRegion:
       return self
     return sphericalRegion(np.concatenate([u[None], self.N]), np.concatenate([[0.0], self.alpha]), self.frame, self.antipodal)
 
-  def restrict2Lower(self, up=None):
-    """the hemisphere opposite to a direction, z by default, added to the region"""
+  def restrictToLower(self, up=None):
+    """the hemisphere opposite to a direction, z by default, added to the region
+    (MATLAB's sphericalRegion.restrict2Lower)"""
     up = zvector if up is None else up
-    return self.restrict2Upper(-up if isinstance(up, vector3d) else -np.asarray(up, dtype=float))
+    return self.restrictToUpper(-up if isinstance(up, vector3d) else -np.asarray(up, dtype=float))
 
   # ------------------------------------------------------------------ the shape
 

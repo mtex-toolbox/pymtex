@@ -113,10 +113,10 @@ plot(ebsd['Fo'].orientations, 'axisAngle')
 # only the figure, not the data or the fundamental region.
 #
 # Apply the same selection explicitly with
-# [project2FundamentalRegion](orientation.project2FundamentalRegion.html). The method
+# [projectIntoFundamentalRegion](orientation.project2FundamentalRegion.html). The method
 # returns a new orientation array.
 
-ori = ebsd['Fo'].orientations.project2FundamentalRegion()
+ori = ebsd['Fo'].orientations.projectIntoFundamentalRegion()
 
 # ## Recentring the Region
 #
@@ -140,7 +140,7 @@ ori = ori[~ori.isnan()]
 center = largeGrain.meanOrientation
 
 # select representatives nearest to the grain mean
-ori = ori.project2FundamentalRegion(center)
+ori = ori.projectIntoFundamentalRegion(center)
 
 # retain those explicit representatives when plotting
 plot(ori, 'axisAngle', ignoreFundamentalRegion=True, all=True)

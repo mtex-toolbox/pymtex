@@ -31,11 +31,11 @@ rows = [
   ("dot(ori, ref)", lambda: mtex.dot(ori, ref), np.mean),
   ("dot(mori, mori2)", lambda: mtex.dot(mori, mori2), np.mean),
   ("dot(mori, mref)", lambda: mtex.dot(mori, mref), np.mean),
-  ("project2FR(m)", lambda: mtex.project2FundamentalRegion(m), lambda w: np.mean(w.data[:, 2])),
-  ("project2FR(ori, ref)", lambda: mtex.project2FundamentalRegion(ori, ref), lambda p: toRef(p, ref)),
-  ("project2FR(ori, ori2)", lambda: mtex.project2FundamentalRegion(ori, ori2), lambda p: toRef(p, ori2)),
-  ("project2FR(mori, mref)", lambda: mtex.project2FundamentalRegion(mori, mref), lambda p: toRef(p, mref)),
-  ("project2FR(mori, mori2)", lambda: mtex.project2FundamentalRegion(mori, mori2), lambda p: toRef(p, mori2)),
+  ("project2FR(m)", lambda: mtex.projectIntoFundamentalRegion(m), lambda w: np.mean(w.data[:, 2])),
+  ("project2FR(ori, ref)", lambda: mtex.projectIntoFundamentalRegion(ori, ref), lambda p: toRef(p, ref)),
+  ("project2FR(ori, ori2)", lambda: mtex.projectIntoFundamentalRegion(ori, ori2), lambda p: toRef(p, ori2)),
+  ("project2FR(mori, mref)", lambda: mtex.projectIntoFundamentalRegion(mori, mref), lambda p: toRef(p, mref)),
+  ("project2FR(mori, mori2)", lambda: mtex.projectIntoFundamentalRegion(mori, mori2), lambda p: toRef(p, mori2)),
 ]
 
 print(f"Python, N = {n}, m-3m and m-3m -> 6/mmm, best of 5")

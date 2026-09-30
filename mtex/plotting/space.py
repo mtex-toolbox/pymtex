@@ -70,7 +70,7 @@ def frameAxes(fr):
 def axisAnglePoints(o):
   """the orientations as points of axis angle space, each brought into the fundamental region
   of its frames first: axis times angle, in radians, shape (n, 3)"""
-  q = o.flatten().project2FundamentalRegion().data.reshape(-1, 4)
+  q = o.flatten().projectIntoFundamentalRegion().data.reshape(-1, 4)
   omega = quatAngle(q)
   return np.where(omega[:, None] < 1e-12, 0.0, omega[:, None] * quatAxis(q))
 

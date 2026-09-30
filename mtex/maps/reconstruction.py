@@ -213,7 +213,7 @@ def _projectToGrains(ebsd, grains):
     sel[sel] &= grains.phaseId[gp[sel]] == p
     if sel.any():
       o = _ori(rot[sel], out.CSList[int(p)], out.frame)
-      rot[sel] = o.project2FundamentalRegion(grains.meanRotation.data[gp[sel]]).data.reshape(-1, 4)
+      rot[sel] = o.projectIntoFundamentalRegion(grains.meanRotation.data[gp[sel]]).data.reshape(-1, 4)
   return out
 
 
@@ -540,7 +540,7 @@ class parentGrainReconstructor:
         ok |= conv
       for p in np.unique(gph[ok]):
         s = ok & (gph == p)
-        q[s] = _ori(q[s], g.CSList[int(p)], g.frame).project2FundamentalRegion(ref[s]).data.reshape(-1, 4)
+        q[s] = _ori(q[s], g.CSList[int(p)], g.frame).projectIntoFundamentalRegion(ref[s]).data.reshape(-1, 4)
       q = np.where(np.sum(q * ref, axis=1, keepdims=True) < 0, -q, q)
       np.add.at(acc, (r[ok], side[ok]), q[ok])
     out = [q1.copy(), q2.copy()]
@@ -891,7 +891,7 @@ class parentGrainReconstructor:
     fr = self.grains.frame
     vId, pId, _, fit = calcVariantId(_ori(pm, self.csParent, fr), _ori(child, self.csChild, fr), self.p2c)
     V = self.p2c.variants().data.reshape(-1, 4)
-    pfr = _ori(pm, self.csParent, fr).project2FundamentalRegion().data.reshape(-1, 4)
+    pfr = _ori(pm, self.csParent, fr).projectIntoFundamentalRegion().data.reshape(-1, 4)
     q = qmul(qmul(pfr, _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
     fit = np.asarray(fit, dtype=float)
     vId = self._mapVariants(vId)
@@ -922,7 +922,7 @@ class parentGrainReconstructor:
       full[tr] = val
       setattr(self.grainsPrior, name, full)
     V = self.p2c.variants().data.reshape(-1, 4)
-    q = qmul(qmul(parent.project2FundamentalRegion().data.reshape(-1, 4), _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    q = qmul(qmul(parent.projectIntoFundamentalRegion().data.reshape(-1, 4), _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
     self._setGrains(at, q, self.parentPhaseId)
 
   def parent2ChildInfo(self):

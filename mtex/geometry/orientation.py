@@ -328,13 +328,15 @@ class orientation(rotation):
     from .symmetryops import orientationMean
     return orientationMean(self, weights=weights, robust=robust, iterations=iterations)
 
-  def project2FundamentalRegion(self, ref=None, antipodal=False):
+  def projectIntoFundamentalRegion(self, ref=None, antipodal=False):
     """the symmetric equivalents in the fundamental region, or those closest to the reference
-    ref; antipodal=True adds the grain exchange of a misorientation"""
-    from .symmetryops import project2FundamentalRegionOrientation
+    ref; antipodal=True adds the grain exchange of a misorientation
+    (MATLAB's orientation.project2FundamentalRegion, quaternion.project2FundamentalRegion,
+    rotation.project2FundamentalRegion)"""
+    from .symmetryops import projectIntoFundamentalRegionOrientation
     # antipodal adds grain exchange to the reduction, MATLAB's 'antipodal'
     o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
-    return project2FundamentalRegionOrientation(o, ref)
+    return projectIntoFundamentalRegionOrientation(o, ref)
 
   def log(self, ref=None, side="left", symmetry=True):
     """the tangent vector at the reference pointing to this orientation, the pair reduced by
@@ -347,10 +349,10 @@ class orientation(rotation):
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self)
 
-  def project2EulerFR(self):
+  def projectIntoEulerRegion(self):
     """the Bunge Euler angles of the representative inside the Euler plotting box"""
-    from .orientationregion import project2EulerFR
-    return project2EulerFR(self)
+    from .orientationregion import projectIntoEulerRegion
+    return projectIntoEulerRegion(self)
 
   def transformReferenceFrame(self, to, toB=None, rule=None, tol=1e-1):
     """the same orientation with another crystal frame, both frames of a misorientation"""

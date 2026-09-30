@@ -6,7 +6,7 @@ from numpy import pi
 
 from mtex import (SO3TangentVector, orientation, rotation, crystalFrame, specimenFrame, vector3d, Miller,
                   xvector, degree, angle, log, exp, left, right, spinTensor, geodesic, inv, norm, cat, dot,
-                  project2FundamentalRegion)
+                  projectIntoFundamentalRegion)
 from conftest import close
 
 
@@ -124,7 +124,7 @@ def test_log_invertsExp():
 
 def refLog(ori, ref, side):
   # what log(ori, ref, side) is supposed to do, spelled out
-  o = rotation(ori.project2FundamentalRegion(ref))
+  o = rotation(ori.projectIntoFundamentalRegion(ref))
   m = inv(rotation(ref)) * o if side == "right" else o * inv(rotation(ref))
   return vector3d(log(m))
 
@@ -184,7 +184,7 @@ def test_log_without_reference_reduces_by_both_symmetries():
   cs, ss = crystalFrame("432"), specimenFrame("222")
   oriSS = orientation.rand(100, cs, ss, rng=rng())
   v = vector3d(log(oriSS))
-  vRef = vector3d(log(project2FundamentalRegion(oriSS), symmetry=False))
+  vRef = vector3d(log(projectIntoFundamentalRegion(oriSS), symmetry=False))
   assert np.max(norm(v - vRef)) < 1e-10
   assert log(oriSS).oriRef.CS is cs and log(oriSS).oriRef.SS is ss
 

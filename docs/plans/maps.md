@@ -102,7 +102,7 @@ class, one that changes a parameter of the same algorithm is a field.
 | `AbstractGBCriterion` subtypes | `grainBoundaryCriterion` subclasses | `connectivity` answers one, one half or zero per pair, the levels transformed once, the largest `abs(dot)` compared, never an angle in the loop |
 | `Grains <: AbstractVector{Grain}` | `grain2d`, indexable, iterable, `grains[i]` one grain | the loops, `inclusionId` derived |
 | `GrainBoundary` in walk order | `grainBoundary` | `grainId[:, 0]` on the left; chains and neighbours from `k ± 1` |
-| boundary misorientations `Orientations{...,true}` | `orientation` with `antipodal=True` within one phase | `angle` and `project2FundamentalRegion` right without a flag |
+| boundary misorientations `Orientations{...,true}` | `orientation` with `antipodal=True` within one phase | `angle` and `projectIntoFundamentalRegion` right without a flag |
 | `EBSDFilter`, `BoundaryFilter` subtypes | `EBSDFilter`, `boundaryFilter` subclasses | one graph model for the pixels, one network for the vertices |
 | `ParentGrainReconstructor` mutable | `parentGrainReconstructor`, a handle | the votes as a distribution |
 | `Int32` ids and faces, `Int8` phase ids | the same NumPy dtypes | a ten million pixel map is the design point |

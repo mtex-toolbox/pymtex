@@ -8,7 +8,7 @@
 # This page assumes the Miller notation from [Miller Indices](CrystalDirections.html) and
 # the equivalent-direction families from [Operations](CrystalOperations.html). The sector
 # is the domain of an [inverse pole figure](OrientationInversePoleFigure.html). It is also
-# the region into which `project2FundamentalRegion` maps crystal directions.
+# the region into which `projectIntoFundamentalRegion` maps crystal directions.
 
 from mtex import *
 
@@ -60,10 +60,10 @@ isInside
 # The false result means that $(231)$ is outside the chosen sector. It does not mean that
 # its symmetry-equivalent family is absent.
 #
-# [project2FundamentalRegion](vector3d.project2FundamentalRegion.html) selects an
+# [projectIntoFundamentalRegion](vector3d.project2FundamentalRegion.html) selects an
 # equivalent representative inside the sector.
 
-vFundamental = v.project2FundamentalRegion()
+vFundamental = v.projectIntoFundamentalRegion()
 vFundamental
 
 # The result is $(213)$, a symmetry-equivalent permutation of the indices. Both directions

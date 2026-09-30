@@ -54,7 +54,7 @@ r = vector3d(1, 0, 1)
 
 # map the specimen direction into the crystal frame
 h = inv(ebsd.orientations) * r
-h = project2FundamentalRegion(h)
+h = projectIntoFundamentalRegion(h)
 
 # use its azimuth in degrees as the colour value, between -180 and 180 as MATLAB counts it
 color = (h.rho / degree + 180) % 360 - 180

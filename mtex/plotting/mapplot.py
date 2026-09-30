@@ -750,7 +750,7 @@ def textMap(x, labels, fontSize=None, color="k", **kw):
   return [mP.ax.text(px, py, t, ha="center", va="center", fontsize=size, color=color, zorder=8, clip_on=True, **kw) for (px, py), t in zip(P, labels)]
 
 
-def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, project2plane=False,
+def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, projectIntoPlane=False,
               antipodal=False, **kw):
   """quiver(grains, v), quiver(ebsd, v), quiver(gB, v): an arrow per grain at its centroid,
   per measurement, per segment at its midpoint; an axis is centred, a direction starts there.
@@ -785,7 +785,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
   if kind == "grains" and scaling and scale is None:
     # without a colour the arrows of the grains take the next of the axes' colour order, as MATLAB's
     color = mP.ax._get_lines.get_next_color() if color is None else color
-    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, displayName, project2plane, **kw)
+    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, displayName, projectIntoPlane, **kw)
   lineWidth = 1.0 if lineWidth is None else lineWidth
   color = "k" if color is None else color
   u = np.stack([raw @ pl.e1, raw @ pl.e2], axis=-1)
@@ -836,13 +836,13 @@ def _quiverBoundary(mP, c, raw, f, color, lineWidth, displayName, **kw):
 # the arrows on grains as MATLAB draws them: a fifth of the diameter along the direction in
 # space, seen on the map, so that a steep direction is short; an axis both ways from the
 # centroid, a direction pointing into the map ending at the centroid; a dot at the centroid
-def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, project2plane, **kw):
+def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, projectIntoPlane, **kw):
   from matplotlib.collections import LineCollection
   pl = mP.plane
   nrm = np.linalg.norm(raw, axis=-1)
   ok = (nrm > 0) & np.all(np.isfinite(raw), axis=-1)
   d = raw[ok] / nrm[ok][:, None] * length[ok][:, None]
-  if project2plane:
+  if projectIntoPlane:
     d = d - (d @ pl.normal)[:, None] * pl.normal
   u, c = np.stack([d @ pl.e1, d @ pl.e2], axis=-1), c[ok]
   if antipodal:

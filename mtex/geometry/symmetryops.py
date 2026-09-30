@@ -1,6 +1,6 @@
 # symmetrisation and the comparisons that reduce over the group (MATLAB
 # @vector3d/symmetrise, dot, angle, unique, multiplicity; @orientation/symmetrise, dot,
-# angle, unique, mean, axis, project2FundamentalRegion)
+# angle, unique, mean, axis, projectIntoFundamentalRegion)
 #
 # A direction in a frame carrying a group stands for its whole orbit, an orientation for
 # its coset l * o * r; comparison reduces over the group, representation does not (MATLAB
@@ -108,7 +108,7 @@ def symAngle(a, b, antipodal=None):
   return np.arctan2(c, d).min(axis=-1)
 
 
-def project2FundamentalRegion(v, center=None):
+def projectIntoFundamentalRegion(v, center=None):
   """every direction of a list folded into the fundamental sector of its frame, the one an
   inverse pole figure shows; an axis into the sector of the Laue group. Given a centre, a
   direction goes to the equivalent nearest it instead: the element whose image of the
@@ -130,7 +130,7 @@ def symUnique(v, tol=1e-6, return_index=False, return_inverse=False):
   the centre first, so equivalent ones become the same vector even on the rim of a sector,
   where a fold into it could keep two of them"""
   from .sphericalregion import sectorCenter
-  rep = project2FundamentalRegion(v, center=sectorCenter(v.frame)).data.reshape(-1, 3) if reducesOverGroup(v) else v.data.reshape(-1, 3)
+  rep = projectIntoFundamentalRegion(v, center=sectorCenter(v.frame)).data.reshape(-1, 3) if reducesOverGroup(v) else v.data.reshape(-1, 3)
   n = np.linalg.norm(rep, axis=1)
   d = rep @ rep.T / np.outer(n, n)
   same = d > 1 - tol
@@ -155,7 +155,7 @@ def symMean(v, weights=None, iterations=3):
   m = v.flatten()[0]
   xs = v.flatten()
   for _ in range(iterations):
-    proj = project2FundamentalRegion(xs, center=m.normalize())
+    proj = projectIntoFundamentalRegion(xs, center=m.normalize())
     m = vector3d.mean(proj, weights=weights, symmetry=False)
   return v._new(m.data)
 
@@ -228,7 +228,7 @@ def orientationSelfAngle(o):
   return chordAngle(_ID, closestImage(_ID, o.data, L, R, o.antipodal)[1])
 
 
-def project2FundamentalRegionOrientation(o, ref=None):
+def projectIntoFundamentalRegionOrientation(o, ref=None):
   """every orientation moved to its equivalent closest to a reference - the identity when none
   is given - which is the representative in the fundamental region; around the identity the
   conjugates tie and the axis sector of the shared rotations decides. A list of references,
@@ -360,7 +360,7 @@ def orientationAxis(o, symmetry=True):
   fundamental region, or of the rotations as given with symmetry=False, in the frame axisFrame
   names"""
   from .representations import quatAxis
-  q = o.data if not symmetry else project2FundamentalRegionOrientation(o).data
+  q = o.data if not symmetry else projectIntoFundamentalRegionOrientation(o).data
   return vector3d(quatAxis(q), isNormalized=True, frame=axisFrame(o))
 
 

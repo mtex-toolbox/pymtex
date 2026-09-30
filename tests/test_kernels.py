@@ -142,9 +142,9 @@ def test_the_public_operations_agree_between_backends():
   for name in ("numpy", "numba"):
     setMTEXpref("kernels", name)
     out[name] = [(r * r).data, (r * v).data, mtex.dot(mo, mo2), mtex.dot(mo, mo[0]), mtex.angle(mo, mo2),
-                 mo.project2FundamentalRegion(mo2[0]).data, mo.project2FundamentalRegion(mo2).data, mtex.mean(mo).data,
-                 mo.project2FundamentalRegion().data, orientation(mo.data, cs, cs).project2FundamentalRegion().data,
-                 mtex.angle(mo), mtex.Miller(v, cs).project2FundamentalRegion().data]
+                 mo.projectIntoFundamentalRegion(mo2[0]).data, mo.projectIntoFundamentalRegion(mo2).data, mtex.mean(mo).data,
+                 mo.projectIntoFundamentalRegion().data, orientation(mo.data, cs, cs).projectIntoFundamentalRegion().data,
+                 mtex.angle(mo), mtex.Miller(v, cs).projectIntoFundamentalRegion().data]
   setMTEXpref("kernels", "numba")
   for a, b in zip(out["numpy"], out["numba"]):
     assert np.allclose(a, b, atol=1e-12)

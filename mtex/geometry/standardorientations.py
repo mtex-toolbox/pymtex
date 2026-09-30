@@ -11,7 +11,7 @@ from .install import install
 from .miller import Miller
 from .orientation import orientation
 from .quaternion import qmul, rotation
-from .symmetryops import project2FundamentalRegionOrientation, symmetrise
+from .symmetryops import projectIntoFundamentalRegionOrientation, symmetrise
 from .symreduce import _conj, reductionGroups, symReduce
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
@@ -177,7 +177,7 @@ def variants(p2c, second=None, ids=None, parent=False):
     q = qmul(par[:, None, :], PV[None, :, :]) if ids is None else qmul(par, PV)
     return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameA, second.frameB)
   # a variant id counts from the representative of the parent in the fundamental region
-  par = project2FundamentalRegionOrientation(second).data.reshape(-1, 4)
+  par = projectIntoFundamentalRegionOrientation(second).data.reshape(-1, 4)
   vs = variants(p2c)
   if ids is None:
     q = qmul(par[:, None, :], _conj(vs.data)[None, :, :])

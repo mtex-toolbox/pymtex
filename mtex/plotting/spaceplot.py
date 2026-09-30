@@ -447,11 +447,11 @@ def orientationPoints(o, coordinates="axisAngle", fundamentalRegion=True):
   degrees, Rodrigues vectors as they are"""
   if coordinates == "Euler":
     if fundamentalRegion:
-      a, b, c = o.flatten().project2EulerFR()
+      a, b, c = o.flatten().projectIntoEulerRegion()
       return np.stack([a, b, c], axis=1) / degree
     a, b, c = quat2euler(o.data.reshape(-1, 4), "Bunge")
     return np.stack([a, b, c], axis=1) / degree
-  q = (o.flatten().project2FundamentalRegion() if fundamentalRegion else o.flatten()).data.reshape(-1, 4)
+  q = (o.flatten().projectIntoFundamentalRegion() if fundamentalRegion else o.flatten()).data.reshape(-1, 4)
   if coordinates == "axisAngle":
     omega = quatAngle(q)
     return np.where(omega[:, None] < 1e-12, 0.0, omega[:, None] * quatAxis(q)) / degree
@@ -659,7 +659,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
   axesKw = _keys(kw)
   g = equispacedSO3Grid(F.CS, F.SS, resolution=res)
-  o = orientation._fromRotation(g.data.reshape(-1, 4), (F.CS, F.SS)).project2FundamentalRegion()
+  o = orientation._fromRotation(g.data.reshape(-1, 4), (F.CS, F.SS)).projectIntoFundamentalRegion()
   t = F.eval(o)
   fig = gcm()
   held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
@@ -758,8 +758,6 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   refuseVariants(kw)
   color = kw.pop("lineColor", color)
-  # MATLAB's name of the flag
-  fundamentalRegion = kw.pop("project2FundamentalRegion", fundamentalRegion)
   coordinates = "Rodrigues" if Rodrigues else "axisAngle" if axisAngle else "Euler"
   o = f.flatten().orientation(points) if f.ndim > 0 else f.orientation(points)
   reduced = fundamentalRegion and not ignoreFundamentalRegion and not complete

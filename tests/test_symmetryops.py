@@ -49,8 +49,8 @@ def test_vectorised_forms_agree_with_scalar():
   # a list of references projects every element to the equivalent closest to its own one
   refs = orientation(rotation.rand(20, rng=rng), cs, crystalFrame("6/mmm"))
   mos = orientation(rotation.rand(20, rng=rng), cs, crystalFrame("6/mmm"))
-  proj = mos.project2FundamentalRegion(refs)
-  assert close(proj.data, np.concatenate([mos[k].project2FundamentalRegion(refs[k]).data[None] for k in range(20)]))
+  proj = mos.projectIntoFundamentalRegion(refs)
+  assert close(proj.data, np.concatenate([mos[k].projectIntoFundamentalRegion(refs[k]).data[None] for k in range(20)]))
   assert close(angle(proj, refs, symmetry=False), angle(mos, refs))
 
 
@@ -125,7 +125,7 @@ def test_axis():
   plain = orientation(rots, q, q)
   ori = orientation(rots, q, ss)
   # the axis is that of the representative in the fundamental region, not of the value given
-  assert np.all(axis(mori) == axis(mori.project2FundamentalRegion(), symmetry=False))
+  assert np.all(axis(mori) == axis(mori.projectIntoFundamentalRegion(), symmetry=False))
   assert np.any(~(axis(mori) == axis(mori, symmetry=False)))
   assert np.all(axis(mori, symmetry=False) == rots.axis())
   # only the rotations both frames share reduce it, and grain exchange takes the sign
@@ -175,7 +175,7 @@ def test_folded_directions_lie_in_the_sector_exactly(backend, s, antipodal):
   sR = mtex.fundamentalSector(cs, antipodal=antipodal)
   mtex.setMTEXpref("kernels", backend)
   try:
-    p = mtex.project2FundamentalRegion(m).data.reshape(-1, 3)
+    p = mtex.projectIntoFundamentalRegion(m).data.reshape(-1, 3)
   finally:
     mtex.setMTEXpref("kernels", "numba")
   margin = np.min(p @ np.asarray(sR.N).T - sR.alpha, axis=1)

@@ -33,8 +33,8 @@ from mtex import *
 cs = crystalFrame('432')
 
 # select representatives in the fundamental region
-ori1 = project2FundamentalRegion(orientation.rand(20000, cs))
-ori2 = project2FundamentalRegion(orientation.rand(20000, cs))
+ori1 = projectIntoFundamentalRegion(orientation.rand(20000, cs))
+ori2 = projectIntoFundamentalRegion(orientation.rand(20000, cs))
 
 # intrinsic misorientation angle in degrees
 omega = angle(ori1, ori2) / degree
@@ -73,7 +73,7 @@ plt.title('two coordinate distances')
 # $(46^{\circ},0^{\circ},0^{\circ})$.
 
 # +
-ori = project2FundamentalRegion(orientation.byEuler(np.array([44, 46]) * degree, 0, 0, cs))
+ori = projectIntoFundamentalRegion(orientation.byEuler(np.array([44, 46]) * degree, 0, 0, cs))
 
 # average the selected Rodrigues representatives
 naiveMean = orientation.byRodrigues(mean(ori.Rodrigues()), cs)

@@ -286,7 +286,7 @@ def fundamentalRegionEuler(frA, frB=None):
   return eulerRegion(frA, frB)
 
 
-def project2EulerFR(o):
+def projectIntoEulerRegion(o):
   """the Bunge Euler angles of the representative of every orientation inside the Euler box
   of its frames, as MATLAB's project2EulerFR: three arrays in the shape of the list"""
   from .representations import quat2euler
@@ -347,4 +347,4 @@ def maxAngle(frA, frB=None, antipodal=False):
   return fundamentalRegion(frA, frB, antipodal=antipodal).maxAngle()
 
 
-__all__ = ["orientationRegion", "fundamentalRegion", "eulerRegion", "fundamentalRegionEuler", "project2EulerFR", "maxAngle"]
+__all__ = ["orientationRegion", "fundamentalRegion", "eulerRegion", "fundamentalRegionEuler", "projectIntoEulerRegion", "maxAngle"]

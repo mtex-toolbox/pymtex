@@ -323,7 +323,7 @@ def calcBinghamODF(o, weights=None, exact=False):
   kappa_i = -1/(2 lambda_i) shifted to a smallest value of zero, or exactly by Newton on the moments"""
   o = o if isinstance(o, orientation) else orientation(o)
   m = o.mean(weights=weights)
-  q = o.project2FundamentalRegion(m).data.reshape(-1, 4)
+  q = o.projectIntoFundamentalRegion(m).data.reshape(-1, 4)
   w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
   T = (q * w[:, None]).T @ q
   lam, A = np.linalg.eigh(T)

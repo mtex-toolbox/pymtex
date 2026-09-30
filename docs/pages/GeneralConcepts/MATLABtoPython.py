@@ -196,6 +196,9 @@ hold(False)
 # | `plotSpektra(odf)` | `plotSpectrum(odf)` |
 # | `textureindex(odf)` | `textureIndex(odf)` |
 # | `eS.addFeature_singleStep` | `eS.addFeature('singleStep')` |
+# | `project2FundamentalRegion(ori)` | `projectIntoFundamentalRegion(ori)` |
+# | `project2EulerFR(ori)` | `projectIntoEulerRegion(ori)` |
+# | `sR.restrict2Upper` | `sR.restrictToUpper` |
 #
 # ## Behaviour that differs on purpose
 #

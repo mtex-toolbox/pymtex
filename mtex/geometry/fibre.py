@@ -275,7 +275,7 @@ class fibre:
     o = ori.flatten()
     o = o[~np.isnan(o.data).any(axis=-1)]
     if symmetry:
-      o = o.project2FundamentalRegion(o.mean())
+      o = o.projectIntoFundamentalRegion(o.mean())
     q = o.data
     vals, vecs = np.linalg.eigh(q.T @ q / len(q))
     frames = (ori.frameA, ori.frameB)

@@ -16,16 +16,16 @@ branch through the bridge, `maxNumCompThreads` reporting 2.
 | `dot(ori, ref)` | 382 | 53 | 49 | 115 | 1.1 | 0.5 |
 | `dot(mori, mori2)` | 8507 | 858 | 1095 | 2999 | 0.8 | 0.3 |
 | `dot(mori, mref)` | 10067 | 688 | 1037 | 675 | 0.7 | 1.0 |
-| `project2FundamentalRegion(m)` Miller | 404 | 120 | 122 | 1447 | 1.0 | 0.1 |
-| `project2FundamentalRegion(ori, ref)` | 670 | 103 | 115 | 284 | 0.9 | 0.4 |
-| `project2FundamentalRegion(ori, ori2)` | 901 | 160 | 181 | 325 | 0.9 | 0.5 |
-| `project2FundamentalRegion(mori, mref)` | 9831 | 752 | 1112 | 1042 | 0.7 | 0.7 |
-| `project2FundamentalRegion(mori, mori2)` | 6686 | 884 | 1138 | 7711 | 0.8 | 0.1 |
+| `projectIntoFundamentalRegion(m)` Miller | 404 | 120 | 122 | 1447 | 1.0 | 0.1 |
+| `projectIntoFundamentalRegion(ori, ref)` | 670 | 103 | 115 | 284 | 0.9 | 0.4 |
+| `projectIntoFundamentalRegion(ori, ori2)` | 901 | 160 | 181 | 325 | 0.9 | 0.5 |
+| `projectIntoFundamentalRegion(mori, mref)` | 9831 | 752 | 1112 | 1042 | 0.7 | 0.7 |
+| `projectIntoFundamentalRegion(mori, mori2)` | 6686 | 884 | 1138 | 7711 | 0.8 | 0.1 |
 
 Milliseconds per million elements are nanoseconds per element. `ref` is one orientation,
 `ori2` a list of references, one per element; `m` are one million random crystal
 directions. The MATLAB `dot(mori, mori2)` row is the two-phase pair reduction of
-`orientation/dot`; the Julia `project2FundamentalRegion(ori, ori2)` row is composed in the
+`orientation/dot`; the Julia `projectIntoFundamentalRegion(ori, ori2)` row is composed in the
 script from the batched pair kernel, since the Julia API takes a single reference.
 
 Each script prints a check per row, the mean of the result. The pair rows agree across the
@@ -55,7 +55,7 @@ What the numbers say:
   2.7x Julia.
 - **Against MATLAB** the port is now faster or equal on every row; MATLAB's two threads and
   its exact single-reference form keep `dot(ori, ori2)` and `dot(mori, mref)` level.
-- Rows outside the table, same run: `project2FundamentalRegion(ori)` without a reference
+- Rows outside the table, same run: `projectIntoFundamentalRegion(ori)` without a reference
   99 ns, cubic to cubic 300 ns, `angle(ori, ori2)` 300 ns, `mean(ori)` 567 ns per element.
 
 How to run:

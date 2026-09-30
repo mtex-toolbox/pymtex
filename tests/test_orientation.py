@@ -380,12 +380,12 @@ def test_orientation_productsOfListsBroadcast():
   assert (inv(os[:, None]) * os[None, :]).shape == (5, 5)
 
 
-def test_project2FundamentalRegion_antipodal():
+def test_projectIntoFundamentalRegion_antipodal():
   # MATLAB's 'antipodal': the projection with grain exchange, the misorientation or its inverse
   cs = crystalFrame("m-3m")
   m = orientation.rand(50, cs, cs, rng=np.random.default_rng(1))
-  p = m.project2FundamentalRegion(antipodal=True)
-  q = orientation._fromRotation(m.data, (cs, cs), True).project2FundamentalRegion()
+  p = m.projectIntoFundamentalRegion(antipodal=True)
+  q = orientation._fromRotation(m.data, (cs, cs), True).projectIntoFundamentalRegion()
   assert same(p, q) and not m.antipodal
   # each projected one is the misorientation or its inverse up to symmetry
   assert np.all(np.minimum(angle(p, m), angle(p, inv(m))) < 1e-6)

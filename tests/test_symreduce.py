@@ -20,7 +20,7 @@ def test_batched_equals_pairwise():
     assert np.max(np.abs(sr.symDots(oris.data, ref.data, L, R) - sd)) < 1e-12
     assert np.max(np.abs(sr.symAngles(oris.data, ref.data, L, R) - sa)) < 1e-12
     # the projected representative is equivalent to its orientation and closest to the reference
-    p = oris.project2FundamentalRegion(ref)
+    p = oris.projectIntoFundamentalRegion(ref)
     assert np.max(np.abs(sr.chordAngle(p.data, ref.data) - sa)) < 1e-12
     assert np.min(sr.symReduce(oris.data, p.data, L, R)[0]) > 1 - 1e-10
     # list against list: the pair kernel and the scalar loop agree

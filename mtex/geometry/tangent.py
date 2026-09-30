@@ -458,7 +458,7 @@ def logOrientation(o, ref=None, side="left", symmetry=True):
       ref = orientation._fromRotation(ref.data, frames, ref.antipodal)
   else:
     ref = orientation._fromRotation(_reference(ref).data, (o.frameA, o.frameB))
-  q = o.data if not symmetry else o.project2FundamentalRegion(ref).data
+  q = o.data if not symmetry else o.projectIntoFundamentalRegion(ref).data
   m = qmul(q, _conj(ref.data)) if side == "left" else qmul(_conj(ref.data), q)
   return SO3TangentVector(vector3d(rotationVector(m)), ref, side)
 

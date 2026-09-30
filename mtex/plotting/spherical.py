@@ -114,7 +114,7 @@ class sphericalProjection:
 
   def withRegion(self, sR):
     """the same chart showing another region, for an outline drawn behind the data"""
-    sR = sR.restrict2Upper(self.pC) if self.upper else sR.restrict2Lower(self.pC.outOfScreen)
+    sR = sR.restrictToUpper(self.pC) if self.upper else sR.restrictToLower(self.pC.outOfScreen)
     return type(self)(sR, self.pC, self.antipodal, self.upper)
 
   def chartRegion(self):
@@ -449,10 +449,10 @@ def _charts(cls, sR, pC, antipodal, upper, lower, complete):
   upperOnly = upper or (not complete and not lower and (isUpper(sR, pC) or antipodal))
   lowerOnly = lower or (not complete and not upperOnly and isLower(sR, pC))
   if upperOnly:
-    return [cls(sR.restrict2Upper(pC), pC, antipodal, True)]
+    return [cls(sR.restrictToUpper(pC), pC, antipodal, True)]
   if lowerOnly:
-    return [cls(sR.restrict2Lower(pC.outOfScreen), pC, antipodal, False)]
-  return [cls(sR.restrict2Upper(pC), pC, antipodal, True), cls(sR.restrict2Lower(pC.outOfScreen), pC, antipodal, False)]
+    return [cls(sR.restrictToLower(pC.outOfScreen), pC, antipodal, False)]
+  return [cls(sR.restrictToUpper(pC), pC, antipodal, True), cls(sR.restrictToLower(pC.outOfScreen), pC, antipodal, False)]
 
 
 # the region the data of a plot covers, and whether the data are axes: the whole sphere of

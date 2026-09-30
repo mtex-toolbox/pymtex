@@ -19,15 +19,15 @@ def test_projection_reproduces_the_disorientation_angle(pair):
   q1, q2 = rotation.rand(N, rng=rng), rotation.rand(N, rng=rng)
   o1, o2 = orientation(q1, cs1), orientation(q2, cs2)
   mori = orientation(q1.inv() * q2, cs2, cs1)
-  omega = mori.project2FundamentalRegion().angle(symmetry=False)
+  omega = mori.projectIntoFundamentalRegion().angle(symmetry=False)
   omega2 = angle(o1, o2)
   assert np.max(np.abs(omega - omega2)) < 1e-10
   plain = (q1.inv() * q2).angle()
   assert np.all(omega <= plain + 1e-10)
   if cs1.numProper() * cs2.numProper() > 1:
     assert np.any(omega < plain - 1e-6)
-  assert np.all(fundamentalRegion(cs2, cs1).checkInside(mori.project2FundamentalRegion()))
-  assert np.all(mori.fundamentalRegion().checkInside(mori.project2FundamentalRegion()))
+  assert np.all(fundamentalRegion(cs2, cs1).checkInside(mori.projectIntoFundamentalRegion()))
+  assert np.all(mori.fundamentalRegion().checkInside(mori.projectIntoFundamentalRegion()))
 
 
 @pytest.mark.parametrize("pair", [("m-3m", "1"), ("mmm", "1"), ("6/mmm", "222"), ("2/m", "1"), ("m-3m", "m-3m"), ("-3m", "-3m")])
@@ -40,7 +40,7 @@ def test_the_region_holds_one_orientation_per_coset(pair):
   L, R = reductionGroups(orientation(rotation(), cs, ss))
   frac = np.sum(oR.checkInside(q, tol=0)) / q.size
   assert abs(frac * len(L) * len(R) - 1) < 0.1
-  assert np.all(oR.checkInside(orientation(q[:2000], cs, ss).project2FundamentalRegion()))
+  assert np.all(oR.checkInside(orientation(q[:2000], cs, ss).projectIntoFundamentalRegion()))
 
 
 def test_max_angle_and_axis_sector():
@@ -88,5 +88,5 @@ def test_the_projection_lands_in_the_region(group, antipodal):
   cs = turned(group.split()[1]) if group.startswith("turned") else crystalFrame(group)
   m = orientation.rand(2000, cs, cs, rng=np.random.default_rng(4))
   m.antipodal = antipodal
-  p = m.project2FundamentalRegion()
+  p = m.projectIntoFundamentalRegion()
   assert np.all(fundamentalRegion(p).checkInside(p)) and np.max(angle(p, m)) < 1e-9

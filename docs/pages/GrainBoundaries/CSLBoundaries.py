@@ -247,10 +247,10 @@ plot(oR)
 rng = np.random.default_rng(0)
 mori = discreteSample(gB.misorientation, 500, rng=rng)
 hold(True)
-plot(mori.project2FundamentalRegion())
+plot(mori.projectIntoFundamentalRegion())
 
 # mark the ideal Sigma 3 misorientation
-plot(csl3.project2FundamentalRegion(antipodal=True), markerFaceColor='r', displayName='CSL 3', markerSize=20)
+plot(csl3.projectIntoFundamentalRegion(antipodal=True), markerFaceColor='r', displayName='CSL 3', markerSize=20)
 hold(False)
 # -
 

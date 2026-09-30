@@ -28,7 +28,7 @@ oriA = orientation.goss(cs)
 oriB = orientation.brass(cs)
 
 # select the equivalent of oriB nearest to oriA
-oriB = oriB.project2FundamentalRegion(oriA)
+oriB = oriB.projectIntoFundamentalRegion(oriA)
 
 # construct the shortest segment between the two representatives
 f = fibre(oriA, oriB)

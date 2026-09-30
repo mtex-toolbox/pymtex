@@ -227,7 +227,7 @@ def test_plot3d_ofAnOdfInAxisAngleSpaceWrapsTheCentreInTheHighestSurface():
   center, odf = trigonalPeak()
   hs = plot3d(odf, 'axisAngle')
   assert axesOf().get_xlabel() == "x / °"
-  peak = center.project2FundamentalRegion()
+  peak = center.projectIntoFundamentalRegion()
   r = peak.axis().data.reshape(3) * peak.angle() / degree
   T = np.asarray(hs[-1]._faces).reshape(-1, 3)
   assert np.all(np.linalg.norm(T - r, axis=1) < 15)

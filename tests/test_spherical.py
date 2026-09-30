@@ -100,7 +100,7 @@ def test_makeSphericalProjection_hemisphereOrAntipodalIsOneChart():
   assert len(makeSphericalProjection(sphere, antipodal=True, complete=True)) == 2
   ca = makeSphericalProjection(sphere, antipodal=True)[0]
   assert np.allclose(ca.project(v), ca.project(-v))
-  assert len(makeSphericalProjection(sphere.restrict2Upper(pC))) == 1
+  assert len(makeSphericalProjection(sphere.restrictToUpper(pC))) == 1
   assert len(makeSphericalProjection(sphere, projection="plain")) == 1
   assert len(makeSphericalProjection(sphere, upper=True, lower=True)) == 2
   assert len(makeSphericalProjection(sphere, antipodal=True, upper=True, lower=True)) == 2
@@ -110,7 +110,7 @@ def test_isUpper_isLower_ofHemisphereAndSphere():
   ss = specimenFrame("222")
   pC = ss.how2plot
   sphere = sphericalRegion(frame=ss)
-  assert isUpper(sphere.restrict2Upper(pC), pC) and not isLower(sphere.restrict2Upper(pC), pC)
+  assert isUpper(sphere.restrictToUpper(pC), pC) and not isLower(sphere.restrictToUpper(pC), pC)
   assert not isUpper(sphere, pC) and not isLower(sphere, pC)
 
 
@@ -124,7 +124,7 @@ def test_makeSphericalProjection_crystalSectorIsOneChart():
   # a sector of a crystal frame is one chart, and its region is the sector
   cs, sR, _ = cubicChart()
   cc = makeSphericalProjection(sR)
-  assert len(cc) == 1 and np.allclose(cc[0].sR.N, sR.restrict2Upper(cs.how2plot).N)
+  assert len(cc) == 1 and np.allclose(cc[0].sR.N, sR.restrictToUpper(cs.how2plot).N)
   vs = vector3d(vector3d.rand(3, rng=rng), frame=cs)
   assert np.allclose(makeSphericalProjection(vs, fundamentalRegion=True)[0].sR.N, cc[0].sR.N)
 
@@ -133,7 +133,7 @@ def test_makeSphericalProjection_symmetricFunctionOnSectorFrameFreeOnSphere():
   # a symmetric function is drawn on its sector, a frame-free one on the sphere
   cs, sR, _ = cubicChart()
   f = S2FunHarmonic(rng.standard_normal(16) + 1j * rng.standard_normal(16), cs, real=True)
-  assert np.allclose(makeSphericalProjection(f)[0].sR.N, sR.restrict2Upper(cs.how2plot).N)
+  assert np.allclose(makeSphericalProjection(f)[0].sR.N, sR.restrictToUpper(cs.how2plot).N)
   g = S2FunHarmonic(rng.standard_normal(16) + 1j * rng.standard_normal(16), real=True)
   assert len(makeSphericalProjection(g)) == 2 and len(makeSphericalProjection(g)[0].sR.N) == 1
 
@@ -150,7 +150,7 @@ def test_rhoRange_cubicSectorIs45DegreeWedge():
   lo, hi = rhoRange(c.chartRegion())
   assert abs(hi - lo - 45 * degree) < 1e-6
   assert rhoRange(sphericalRegion()) == (0.0, 2 * pi)
-  assert rhoRange(sphericalRegion().restrict2Upper(zvector)) == (0.0, 2 * pi)
+  assert rhoRange(sphericalRegion().restrictToUpper(zvector)) == (0.0, 2 * pi)
 
 
 def test_grid_ofSectorLiesInside():

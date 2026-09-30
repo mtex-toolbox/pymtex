@@ -177,12 +177,12 @@ eulerBounds
 # times the volume needed for one representative, which explains the repeated
 # appearances in the first figure.
 #
-# Given an arbitrary orientation, [project2EulerFR](orientation.project2EulerFR.html)
+# Given an arbitrary orientation, [projectIntoEulerRegion](orientation.project2EulerFR.html)
 # selects a symmetry-equivalent representative inside this Euler box.
 
 # +
 ori = orientation.rand(csCubic, ssOrtho)
-phi1, Phi, phi2 = ori.project2EulerFR()
+phi1, Phi, phi2 = ori.projectIntoEulerRegion()
 projectedEuler = np.array([phi1, Phi, phi2]) / degree
 projectedEuler
 # -
@@ -215,4 +215,4 @@ projectedEuler
 # ## Technical Details
 #
 # `fundamentalRegionEuler` returns the three bounds in radians, as MATLAB's three outputs
-# do, and `project2EulerFR` the three Euler angles.
+# do, and `projectIntoEulerRegion` the three Euler angles.

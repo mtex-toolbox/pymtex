@@ -36,7 +36,7 @@ frame pair is needed, the same seed everywhere so the inputs agree. Best of thre
 | `angle(ori, ref)` symmetry reduced, one reference | `angle(os, ref)` | `angle(os, ref)` | `angle(ori, ref)` |
 | `angle(ori1, ori2)` symmetry reduced, pairs | `angle(o1, o2)` | `angle(o1, o2)` | `angle(o1, o2)` |
 | `dot_outer` 1e4 x 1e3 | `dot(o1[:, None], o2[None, :])` | `dot.(o1, permutedims(o2))` | `dot_outer(o1, o2)` |
-| `project2FundamentalRegion(ori)` | | | |
+| `projectIntoFundamentalRegion(ori)` | | | |
 | `symmetrise(ori)` 1e5 | | | |
 | `unique(ori)` 1e5 | | | |
 | `mean(ori)` | | | |

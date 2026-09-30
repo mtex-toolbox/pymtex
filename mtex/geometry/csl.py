@@ -24,7 +24,7 @@ import numpy as np
 from .frames import CENTERING_BASES
 from .orientation import orientation
 from .quaternion import rotation
-from .symmetryops import project2FundamentalRegionOrientation
+from .symmetryops import projectIntoFundamentalRegionOrientation
 
 
 # the lattice vectors, as integer coordinates, whose length is r within a relative misfit: for
@@ -173,7 +173,7 @@ def CSL(sigma, CS, *args, delta=0):
     R, X = _coincidences(A, ops, s)
     if not len(R):
       continue
-    o = project2FundamentalRegionOrientation(orientation(rotation.byMatrix(R), CS, CS, antipodal=True))
+    o = projectIntoFundamentalRegionOrientation(orientation(rotation.byMatrix(R), CS, CS, antipodal=True))
     # one per class: the symmetric equivalents left after the projection are dropped
     keep, left = [], np.arange(o.size)
     while len(left):

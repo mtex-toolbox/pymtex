@@ -93,10 +93,10 @@ mori
 rawRepresentativeAngle = angle(mori, symmetry=False) / degree
 rawRepresentativeAngle
 
-# [project2FundamentalRegion](orientation.project2FundamentalRegion.html) chooses the
+# [projectIntoFundamentalRegion](orientation.project2FundamentalRegion.html) chooses the
 # representative in the fundamental region, where each physical relationship appears once.
 
-disori = project2FundamentalRegion(mori)
+disori = projectIntoFundamentalRegion(mori)
 fundamentalRegionAngle = angle(disori, symmetry=False) / degree
 fundamentalRegionAngle
 

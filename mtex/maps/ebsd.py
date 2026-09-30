@@ -163,9 +163,9 @@ class EBSD:
     """the phase numbers of the file, the phase ids translated through phaseMap"""
     return self.phaseMap[self.phaseId]
 
-  def project2FundamentalRegion(self):
+  def projectIntoFundamentalRegion(self):
     """the map with every orientation replaced by its representative in the fundamental
-    region of its phase"""
+    region of its phase (MATLAB's EBSD.project2FundamentalRegion)"""
     out = self.copy()
     rot = out.rotations.data.reshape(-1, 4)
     for p in self.indexedPhaseId:
@@ -173,7 +173,7 @@ class EBSD:
       if not np.any(sel):
         continue
       o = orientation._fromRotation(rot[sel], (self.CSList[int(p)], self.frame))
-      rot[sel] = o.project2FundamentalRegion().data.reshape(-1, 4)
+      rot[sel] = o.projectIntoFundamentalRegion().data.reshape(-1, 4)
     return out
 
   @property

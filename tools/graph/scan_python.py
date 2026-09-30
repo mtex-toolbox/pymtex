@@ -11,7 +11,8 @@ import os
 import re
 
 ROOTS = ("mtex", "tests", "bench")
-MATLAB_REF = re.compile(r"MATLAB[ '’s]*((?:@?[A-Za-z]\w*(?:[/.]\w+)?(?:,\s*|\s+and\s+|\s*))+)")
+# MATLAB, MATLAB's: the possessive is its own token, so that "MATLAB's sphericalRegion" keeps the s
+MATLAB_REF = re.compile(r"MATLAB(?:['’]s)?\s+((?:@?[A-Za-z]\w*(?:[/.]\w+)?(?:,\s*|\s+and\s+|\s*))+)")
 
 
 def moduleName(rel):

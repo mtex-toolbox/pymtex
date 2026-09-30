@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (sphericalRegion, fundamentalSector, conventionalSector, projectIntoRegion, project2FundamentalRegion,
+from mtex import (sphericalRegion, fundamentalSector, conventionalSector, projectIntoRegion, projectIntoFundamentalRegion,
                   crystalFrame, symmetry, rotation, vector3d, xvector, zvector, degree, angle, cat)
 from mtex.geometry.kernels import qmul
 from mtex.geometry.sphericalregion import sectorCenter, dirichletSector, tilesSphere
@@ -19,17 +19,17 @@ GROUPS = ["1", "-1", "2", "m", "2/m", "222", "mm2", "mmm", "4", "-4", "4/m", "42
 def projected(s):
   cs = crystalFrame(s)
   vs = vector3d(vector3d.rand(2000, rng=np.random.default_rng(5)), frame=cs)
-  return cs, vs, project2FundamentalRegion(vs)
+  return cs, vs, projectIntoFundamentalRegion(vs)
 
 
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
-def test_project2FundamentalRegion_keepsTheDirectionUpToSymmetry(s):
+def test_projectIntoFundamentalRegion_keepsTheDirectionUpToSymmetry(s):
   _, vs, p = projected(s)
   assert np.all(angle(p[:200], vs[:200]) < 1e-10)
 
 
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
-def test_project2FundamentalRegion_landsInTheSector(s):
+def test_projectIntoFundamentalRegion_landsInTheSector(s):
   cs, _, p = projected(s)
   assert np.all(fundamentalSector(cs).checkInside(p))
 
@@ -41,9 +41,9 @@ def test_fundamentalSector_volumeIsOneOverTheOrder(s):
 
 
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
-def test_project2FundamentalRegion_isIdempotent(s):
+def test_projectIntoFundamentalRegion_isIdempotent(s):
   _, _, p = projected(s)
-  assert np.max(angle(p, project2FundamentalRegion(p), symmetry=False)) < 1e-10
+  assert np.max(angle(p, projectIntoFundamentalRegion(p), symmetry=False)) < 1e-10
 
 
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
@@ -130,7 +130,7 @@ def test_sphericalRegion_cap():
 def test_sphericalRegion_namedRegionsAndRestrict2Upper():
   h = sphericalRegion(zvector)
   assert sphericalRegion("upper") == h and sphericalRegion().checkInside(vector3d.rand(5, rng=np.random.default_rng(5))).all()
-  assert sphericalRegion().restrict2Upper() == h and sphericalRegion("lower").restrict2Upper().volume() < 1e-3
+  assert sphericalRegion().restrictToUpper() == h and sphericalRegion("lower").restrictToUpper().volume() < 1e-3
 
 
 def test_sphericalRegion_byVertices():
@@ -184,10 +184,10 @@ def test_projectIntoRegion_ofLowSymmetryFramesLandsInTheSector():
       assert np.all(sector.checkInside(projectIntoRegion(vector3d(samples, frame=fr), sector)))
 
 
-def test_project2FundamentalRegion_ofLowSymmetryFramesLandsInTheSector():
+def test_projectIntoFundamentalRegion_ofLowSymmetryFramesLandsInTheSector():
   for fr in lowFrames():
     vs = vector3d(samples, frame=fr)
-    assert np.all(fundamentalSector(fr).checkInside(project2FundamentalRegion(vs)))
+    assert np.all(fundamentalSector(fr).checkInside(projectIntoFundamentalRegion(vs)))
 
 
 @pytest.mark.parametrize("name, angles", (("211", [105, 90, 90]), ("121", [90, 110, 90]), ("112", [90, 90, 115]),
@@ -226,11 +226,11 @@ def test_fundamentalSector_ofACrystalFrameIsTheConventionalOne(s, antipodal):
   assert fundamentalSector(cs, antipodal=antipodal).N.shape == conv.N.shape and np.allclose(fundamentalSector(cs, antipodal=antipodal).N, conv.N)
 
 
-def test_project2FundamentalRegion_calciteBelowTheEquatorGoesToMATLABsEquivalent():
+def test_projectIntoFundamentalRegion_calciteBelowTheEquatorGoesToMATLABsEquivalent():
   # a calcite direction just below the equator goes to MATLAB's equivalent above it, azimuth -22 degrees,
   # not the one at -38 degrees below it, which a Dirichlet domain about an off-centre point keeps
   cs = crystalFrame("-3m", [5, 5, 17], mineral="calcite")
-  p = project2FundamentalRegion(vector3d(1.11272303, -0.86934213, -0.07804949, frame=cs))
+  p = projectIntoFundamentalRegion(vector3d(1.11272303, -0.86934213, -0.07804949, frame=cs))
   assert np.allclose(p.data, [1.309234, -0.528975, 0.078049], atol=1e-6)
 
 
