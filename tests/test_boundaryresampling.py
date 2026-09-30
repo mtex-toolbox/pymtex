@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from mtex import EBSD, phaseList, crystalFrame, rotation, zvector, degree, calcGrains, setMTEXpref, getMTEXpref
+from mtex import EBSD, phaseList, crystalFrame, rotation, zvector, degree, calcGrains, setMTEXpref, getMTEXpref, reduce
 from mtex import reduceBoundary, simplifyBoundary, refineBoundary
 from mtex.maps.boundaryresampling import keepShapeChains, sharedVertices, NO_PIXEL
 from mtex.maps.polygon import signedArea2
@@ -27,7 +27,7 @@ def test_B14_coarsening_keeps_every_nth_vertex_and_the_topology_with_it():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   assert len(gB) == 120
   for n in (2, 5):
-    r = gB.reduceBoundary(n)
+    r = gB.reduce(n)
     assert len(r) == 120 // n
     # merging segments rather than dropping them keeps the length exactly, since every
     # chain of this map is straight
@@ -40,25 +40,25 @@ def test_B14_coarsening_keeps_every_nth_vertex_and_the_topology_with_it():
     assert np.all(r.F[1:, 0][same] == r.F[:-1, 1][same])
     # a segment that swallowed a run runs between no one pair of pixels
     assert np.all(r.ebsdId == NO_PIXEL)
-  assert gB.reduceBoundary(1) is gB and reduceBoundary(gB, 2).size == 60 and gB.reduce(2).size == 60
+  assert gB.reduce(1) is gB and reduce(gB, 2).size == 60
 
 
 def test_B15_simplifying_removes_the_staircase_and_nothing_else():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   # four border sides with a corner in the middle of each, and four arms
-  s = gB.simplifyBoundary()
+  s = gB.simplify()
   assert len(s) == 12 and close(s.perimeter(), 120) and s.triplePoints.isempty
   # a single grain, whose corners are no junctions of its own boundary: the pair of grains
   # changes there, which is what keeps the vertex
-  s1 = gB.selectByGrainId([1]).simplifyBoundary()
+  s1 = gB.selectByGrainId([1]).simplify()
   assert len(s1) == 4 and close(s1.segLength, 10)
   # a tolerance of nothing coarsens nothing
-  assert gB.simplifyBoundary(0) is gB and simplifyBoundary(gB).size == 12 and gB.simplify().size == 12
+  assert gB.simplify(0) is gB and gB.simplify().size == 12
   # a digital circle becomes a polygon of a sixth of the segments: a regular n-gon of radius
   # R stays within R(1 - cos(pi/n)) of its circle, so nine sides already meet the tolerance
   # and the staircase asks for a few more
   cir = diskCircle(12, 57)[0]
-  sc = cir.simplifyBoundary()
+  sc = cir.simplify()
   assert 10 <= len(sc) <= 20
   # and the area it encloses moves by less than the tolerance times the perimeter
   assert abs(closedArea(sc) - 441) < 12
@@ -81,7 +81,7 @@ def test_the_numba_and_the_numpy_simplification_agree():
 
 def test_B16_refining_resamples_at_a_constant_spacing():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
-  r = gB.refineBoundary(0.5)
+  r = gB.refine(0.5)
   assert len(r) == 240 and close(r.segLength, 0.5) and close(r.perimeter(), 120)
   assert r.chainId.max() == 8 and r.triplePoints.isempty
   # the vertices that may not move are still there, the new ones appended
@@ -94,12 +94,12 @@ def test_B16_refining_resamples_at_a_constant_spacing():
   assert np.all(r.ebsdId[r.grainId.min(axis=1) > 0] >= 0)
   # the samples lie on the old boundary, so a closed chain keeps its area
   cir = diskCircle(12, 57)[0]
-  rc = cir.refineBoundary(0.5)
+  rc = cir.refine(0.5)
   assert len(rc) == 2 * len(cir) and close(closedArea(rc), closedArea(cir))
   # the default spacing is half the median segment
-  assert len(cir.refineBoundary()) == len(rc) and len(refineBoundary(cir, 0.5)) == len(rc) and len(cir.refine(0.5)) == len(rc)
+  assert len(cir.refine()) == len(rc)
   # a spacing longer than a piece leaves one segment per piece
-  assert len(gB.refineBoundary(100)) == 8
+  assert len(gB.refine(100)) == 8
 
 
 def test_B17_a_grain_list_coarsens_both_of_its_boundaries_at_once():

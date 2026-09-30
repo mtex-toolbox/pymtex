@@ -38,7 +38,7 @@ class referenceFrame:
   """a reference frame, the coordinate system data is expressed in: an identity (a name, a
   mineral), a basis, the point group the data is invariant under and the default plotting
   convention; a handle compared by identity, registered and sealed by the session"""
-  tolAligned = 5e-2      # the same frame: eqTol
+  tolAligned = 5e-2      # the same frame: isclose
   tolCompatible = 1e-1   # a transformable frame: isCompatible
 
   def __init__(self, basis=None, name="", axesNames=("X", "Y", "Z"), how2plot=None, sym=None, color=None):
@@ -342,14 +342,14 @@ class referenceFrame:
     MM = M @ M.T
     return bool(np.linalg.norm(MM - np.eye(3)) / np.linalg.norm(MM) < tol), M
 
-  def eqTol(self, other):
+  def isclose(self, other):
     """whether two frames may be treated as one: the same class of group and aligned bases,
-    and for crystal frames the same mineral"""
+    and for crystal frames the same mineral (MATLAB's eqTol)"""
     if self is other:
       return True
     if type(self) is not type(other):
       return False
-    return self._eqTolPair(other)
+    return self._isclosePair(other)
 
   def sim(self, other):
     """whether two frames describe the same symmetry, without requiring aligned bases"""
@@ -738,7 +738,7 @@ class crystalFrame(referenceFrame):
         A = A[[int(np.argmin(np.abs(la - lb[k]))) for k in range(3)]]
     return np.linalg.inv(B) @ A
 
-  def _eqTolPair(self, other):
+  def _isclosePair(self, other):
     return self.name.lower() == other.name.lower() and self._sameGroup(other) and self.isAligned(other)
 
   def _simPair(self, other):
@@ -911,7 +911,7 @@ class specimenFrame(referenceFrame):
     fork._how2plot = plottingConvention(pC)
     return referenceFrame.intern(fork)
 
-  def _eqTolPair(self, other):
+  def _isclosePair(self, other):
     return self.Laue().id == other.Laue().id and self.isAligned(other)
 
   def _simPair(self, other):
@@ -971,10 +971,10 @@ class notIndexedFrame(referenceFrame):
   def __init__(self, name="notIndexed", color=None):
     super().__init__(None, name, ("X", "Y", "Z"), None, None, np.array([np.nan, np.nan, np.nan]) if color is None else color)
 
-  def _eqTolPair(self, other):
+  def _isclosePair(self, other):
     return self.name.lower() == other.name.lower()
 
-  _simPair = _eqTolPair
+  _simPair = _isclosePair
 
   def sibling(self, s):
     """the frame itself: a not indexed frame has no group to change"""

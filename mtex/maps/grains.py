@@ -554,7 +554,7 @@ class grain2d(polygonSet):
     from .shape import _hullGrains as hull, characteristicShape
     from .traces import calcTraces
     from ..plotting.mapplot import plotGrains as plot, quiverMap as quiver
-    from ..plotting.grainplots import hist, histogram
+    from ..plotting.grainplots import histogram
 
 
 # ------------------------------------------------------------------ tracing

@@ -153,7 +153,7 @@ r1 == r2
 # The result is false because no operation of `321` makes that mapping. Treating the
 # normals as axes makes their signs irrelevant.
 
-eq(r1, r2, antipodal=True)
+isclose(r1, r2, antipodal=True)
 
 # The second result is true. This distinction matters whenever directed crystal vectors,
 # plane axes and Friedel-equivalent reflections appear in the same calculation.

@@ -8,7 +8,7 @@ from numpy import pi
 import mtex
 from mtex import (crystalFrame, specimenFrame, notIndexedFrame, referenceFrame, plottingConvention, vector3d,
                   xvector, yvector, zvector, rotation, degree, Laue, properGroup, stripSym, fullSym, isAligned,
-                  transformationMatrix, isCompatible, eqTol, sim, numSym, plotx2east, plotx2north, symmetry,
+                  transformationMatrix, isCompatible, isclose, sim, numSym, plotx2east, plotx2north, symmetry,
                   alignmentSetups, closestAlignment)
 from mtex.geometry.session import SESSION
 
@@ -213,42 +213,42 @@ def test_crystalFrame_reprShowsTheAlignment():
 
 def test_eqTol_andSim_ofSpecimenFrames():
   triclinic1, ortho, ortho2 = specimenFrame("1"), specimenFrame("mmm"), specimenFrame("mmm")
-  assert eqTol(triclinic1, triclinic1) and eqTol(ortho, ortho2) and sim(ortho, ortho2)
-  assert not eqTol(triclinic1, ortho) and not sim(triclinic1, ortho) and not eqTol(ortho, triclinic1)
+  assert isclose(triclinic1, triclinic1) and isclose(ortho, ortho2) and sim(ortho, ortho2)
+  assert not isclose(triclinic1, ortho) and not sim(triclinic1, ortho) and not isclose(ortho, triclinic1)
 
 
 def test_eqTol_ofCrystalGroups():
   cs = crystalFrame("432")
-  assert eqTol(cs, cs) and not eqTol(cs, crystalFrame("222"))
+  assert isclose(cs, cs) and not isclose(cs, crystalFrame("222"))
 
 
 def test_eqTol_twoMineralsSharingALatticeAreTwoPhases():
   ni = crystalFrame("m-3m", [3.52, 3.52, 3.52], mineral="Nickel")
   fe = crystalFrame("m-3m", [3.52, 3.52, 3.52], mineral="Iron fcc")
-  assert not eqTol(ni, fe) and not sim(ni, fe) and eqTol(ni, crystalFrame("m-3m", [3.52, 3.52, 3.52], mineral="Nickel"))
+  assert not isclose(ni, fe) and not sim(ni, fe) and isclose(ni, crystalFrame("m-3m", [3.52, 3.52, 3.52], mineral="Nickel"))
 
 
 def test_eqTol_wantsAlignedBasesSimOnlyTheCell():
   q1 = crystalFrame("321", [4.9, 4.9, 5.4], mineral="Quartz")
   q2 = crystalFrame("321", [4.9, 4.9, 5.4], mineral="Quartz", alignment=["X||a"])
-  assert not eqTol(q1, q2) and sim(q1, q2)
+  assert not isclose(q1, q2) and sim(q1, q2)
   assert not isAligned(q1, q2) and isAligned(q1, Laue(q1))
 
 
 def test_eqTol_properGroupAndItsLaueGroup():
-  assert eqTol(crystalFrame("432", [2, 2, 2], mineral="X"), crystalFrame("m-3m", [2, 2, 2], mineral="X"))
+  assert isclose(crystalFrame("432", [2, 2, 2], mineral="X"), crystalFrame("m-3m", [2, 2, 2], mineral="X"))
 
 
 def test_eqTol_crystalAgainstSpecimenFrame():
   cs = crystalFrame("432")
   with pytest.warns(UserWarning):
     ss432 = specimenFrame("432")
-  assert not eqTol(cs, ss432) and not sim(cs, specimenFrame("mmm"))
+  assert not isclose(cs, ss432) and not sim(cs, specimenFrame("mmm"))
 
 
 def test_notIndexedFrame_isOneFrameWithoutSymmetry():
   n1, n2 = notIndexedFrame(), notIndexedFrame("NotIndexed")
-  assert eqTol(n1, n2) and sim(n1, n2) and not n1.isIndexed and n1.numSym() == 1 and n1.sibling(symmetry("mmm")) is n1
+  assert isclose(n1, n2) and sim(n1, n2) and not n1.isIndexed and n1.numSym() == 1 and n1.sibling(symmetry("mmm")) is n1
 
 
 def test_specimenFrame_rolling():

@@ -281,5 +281,6 @@ for _f in (copper, copper2, *(globals()[n] for n in STANDARD_EULER), Bain, Kurdj
 del _f
 
 
-__all__ = ["byMiller", "Bain", "KurdjumovSachs", "NishiyamaWassermann", "Pitsch", "GreningerTrojano", "Bagaryatsky",
-           "Burgers", "PitschSchrader", "Potter", "ShojiNishiyama", "variants", "copper", "copper2", "STANDARD_EULER"] + list(STANDARD_EULER)
+# the standard orientations and the orientation relationships are reached as orientation.copper(cs),
+# orientation.KurdjumovSachs(csP, csC); the module itself exports what has no class to hang on
+__all__ = ["variants", "STANDARD_EULER"]

@@ -272,7 +272,7 @@ def _fibreAxes(h, r):
 
 
 def BinghamODF(kappa, A=None, *frames, **kwargs):
-  """BinghamODF(kappa, U), BinghamODF(kappa, cs), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.eye, cs)
+  """BinghamODF(kappa, U), BinghamODF(kappa, cs), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.id, cs)
 
   A Bingham distribution from four concentrations and four orthogonal quaternion axes, the
   axes as a 4x4 matrix, four orientations, or one orientation standing for the identity

@@ -30,6 +30,10 @@ KEYWORDS = {
   "regularization": "regularisation", "fak": "factor", "nbins": "bins",
 }
 
+# strings that are no MTEX keywords: MATLAB's positional flags, which keep MATLAB's spelling, and
+# matplotlib's spelling of what the plots hand to it
+FLAG_STRINGS = {"cs", "ss", "Length", "silent", "noSymmetry", "linewidth"}
+
 # the public names the plan removes or renames, and what takes their place
 NAMES = {
   "plotPDF": "plotPF", "plotIPDF": "plotIPF", "plotPoleFigure": "plotPF", "calcPDF": "radon", "pdf": "radon",
@@ -79,7 +83,8 @@ def keywordsLeft():
       params = inspect.signature(f).parameters if callable(f) and name else {}
     except (TypeError, ValueError):
       continue
-    out += [(f"{cls + '.' if cls else ''}{name}", p) for p in params if p in KEYWORDS and p != "self"]
+    out += [(f"{cls + '.' if cls else ''}{name}", p) for p, v in params.items()
+            if p in KEYWORDS and v.kind not in (v.VAR_POSITIONAL, v.VAR_KEYWORD)]
   # the keys the plotting and the loaders read out of **kw
   for dirpath, _, files in os.walk(os.path.join(ROOT, "mtex")):
     for fn in files:
@@ -88,7 +93,7 @@ def keywordsLeft():
       path = os.path.join(dirpath, fn)
       for node in ast.walk(ast.parse(open(path, encoding="utf-8").read())):
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in KEYWORDS \
-           and node.value not in ("cs", "ss", "Length", "silent"):
+           and node.value not in FLAG_STRINGS:
           out.append((os.path.relpath(path, ROOT) + f":{node.lineno}", node.value))
   return out
 

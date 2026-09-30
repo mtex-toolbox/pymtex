@@ -1,8 +1,8 @@
 # histograms of grains and ellipses on a map (MATLAB @grain2d/hist, @grain2d/histogram,
 # plotEllipse)
 #
-#   hist(grains), hist(grains, prop, nbins)        bars of the relative area per phase, side by side
-#   histogram(grains), histogram(grains, prop)     the same as overlaid histograms
+#   histogram(grains), histogram(grains, prop, bins)   the relative area per phase, overlaid
+#   histogram(grains, grouped=True)                     the bars of the phases side by side
 #   plotEllipse(c, a, b, lineColor=, lineWidth=)   the fitted ellipses drawn into the held map
 #
 # A grain histogram is area weighted: every bar is the share of the analysed area the
@@ -56,32 +56,11 @@ def _axes(parent=None):
   return mtexFigure(1, figSize=(5.5, 4.0)).nextAxis()
 
 
-def hist(grains, prop=None, nbins=15, **kw):
-  """hist(grains), hist(grains, prop, nbins): the area weighted distribution of a grain
-  property, the default the area itself, as bars per indexed phase side by side"""
-  bins, ids, shares = _areaShares(grains, prop, nbins)
-  ax = _axes(kw.pop("parent", None))
-  centre = 0.5 * (bins[:-1] + bins[1:])
-  width = np.diff(bins) / (len(ids) + 0.5)
-  palette = phasePalette(grains.CSList)
-  hs = []
-  for k, p in enumerate(ids):
-    hs.append(ax.bar(centre + (k - (len(ids) - 1) / 2) * width, 100 * shares[:, k], width=width, color=palette[int(p)],
-                     label=grains.CSList[int(p)].mineral, **kw))
-  ax.set_xlim(bins[0], bins[-1])
-  size = getMTEXpref("FontSize", 13)
-  if prop is None:
-    ax.set_title("grain size distribution", fontsize=size)
-    ax.set_xlabel("grain area", fontsize=size)
-  ax.set_ylabel("relative area (%)", fontsize=size)
-  ax.legend()
-  return hs
-
-
 def histogram(x, *args, **kw):
   """histogram(grains), histogram(grains, prop, bins): the area weighted distribution of a
-  grain property as one histogram per indexed phase, drawn over each other;
-  histogram(v, numBin, weights=w): the rose diagram of directions"""
+  grain property as one histogram per indexed phase, drawn over each other, or with
+  grouped=True side by side (MATLAB's hist); histogram(v, numBin, weights=w): the rose
+  diagram of directions"""
   if isinstance(x, vector3d):
     from .polarplot import histogram as rose
     return rose(x, *args, **kw)
@@ -94,14 +73,22 @@ def histogram(x, *args, **kw):
   return _grainHistogram(x, *args, **kw)
 
 
-def _grainHistogram(grains, prop=None, bins=15, **kw):
+def _grainHistogram(grains, prop=None, bins=15, grouped=False, **kw):
   bins, ids, shares = _areaShares(grains, prop, bins)
   ax = _axes(kw.pop("parent", None))
   palette = phasePalette(grains.CSList)
   hs = []
+  # grouped: the bars of the phases side by side in each class, else overlaid
+  width = np.diff(bins) / (len(ids) + 0.5)
+  centre = 0.5 * (bins[:-1] + bins[1:])
+  alpha = kw.pop("alpha", 1.0 if grouped else 0.6)
   for k, p in enumerate(ids):
-    hs.append(ax.bar(bins[:-1], 100 * shares[:, k], width=np.diff(bins), align="edge", color=palette[int(p)], alpha=kw.pop("alpha", 0.6),
-                     edgecolor=palette[int(p)], label=grains.CSList[int(p)].mineral, **kw))
+    if grouped:
+      hs.append(ax.bar(centre + (k - (len(ids) - 1) / 2) * width, 100 * shares[:, k], width=width, color=palette[int(p)],
+                       alpha=alpha, label=grains.CSList[int(p)].mineral, **kw))
+    else:
+      hs.append(ax.bar(bins[:-1], 100 * shares[:, k], width=np.diff(bins), align="edge", color=palette[int(p)], alpha=alpha,
+                       edgecolor=palette[int(p)], label=grains.CSList[int(p)].mineral, **kw))
   ax.set_xlim(bins[0], bins[-1])
   size = getMTEXpref("FontSize", 13)
   measure = _measure(grains)[0]
@@ -136,4 +123,4 @@ def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw):
   return h
 
 
-__all__ = ["hist", "histogram", "plotEllipse"]
+__all__ = ["histogram", "plotEllipse"]

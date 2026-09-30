@@ -1,7 +1,17 @@
 # Subplan - the Python syntax where MATLAB's is a workaround
 
 Status: written 2026-09-30 on the branch `syntax-review`, with the user's decisions of the
-same day; R0 built. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This
+same day; R0, R1 and R2 built. Choices made on the way: MATLAB's `hist` is
+`histogram(grains, grouped=True)`; `eqTol` of frames is `isclose(frA, frB)`; the flat `byMiller` went
+with the standard orientations (`orientation.byMiller`); `antipodal` is one tri-state (None
+from the objects, True forces, False forbids) where MATLAB has `antipodal` and `noAntipodal`;
+`noLabel` is `axisLabels=False`, since `label` names the text of the points; `noP2C` is
+`useP2C=False`; `smoothBoundary(simplify=False, refine=False)` and `calcODFIterative(thinning=0)`
+absorb their `no*` flags; `plotSection(..., field=False)` replaces `noGrid`; `polar=False` the
+`notPolar` of the circle plots; `verbose` keeps MATLAB's default where MATLAB reports unasked.
+The plot keywords are checked in `mtex/plotting/keywords.py`, a variant raising TypeError.
+`m:@rotation.alpha` left the graph's counterparts: it was a false link, from a docstring citing
+MATLAB's alpha of the grain maps. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This
 plan replaces it for the names below: where MATLAB's name is a misnomer, a duplicate, a MATLAB
 workaround or a typo, the Python name is the better one, and MATLAB's name goes. Every other
 name stays MATLAB's.

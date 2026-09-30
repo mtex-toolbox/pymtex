@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 
-from mtex import EBSD, calcGrains, crystalFrame, degree, gcm, hist, histogram, hold, phaseList, plot, plotEllipse, rotation, zvector
+from mtex import EBSD, calcGrains, crystalFrame, degree, gcm, histogram, hold, phaseList, plot, plotEllipse, rotation, zvector
 
 
 @pytest.fixture(autouse=True)
@@ -27,14 +27,14 @@ def grid():
   return calcGrains(EBSD(pos, rot, phase, phaseList(crystalFrame("1"), a, b)), angle=5 * degree)
 
 
-def test_hist_ofGrainsIsAreaWeightedPerPhase():
-  hs = hist(grid())
+def test_grouped_histogram_ofGrainsIsAreaWeightedPerPhase():
+  hs = histogram(grid(), grouped=True)
   ax = gcm().children[-1]
-  assert len(hs) == 2 and ax.get_ylabel() == "relative area (%)" and ax.get_title() == "grain size distribution"
+  assert len(hs) == 2 and ax.get_ylabel() == "relative area (%)"
 
 
-def test_hist_ofGrainsAddsUpToTheWholeArea():
-  hs = hist(grid())
+def test_grouped_histogram_ofGrainsAddsUpToTheWholeArea():
+  hs = histogram(grid(), grouped=True)
   # the bars of both phases add up to the whole analysed area
   total = sum(b.get_height() for h in hs for b in h)
   assert np.isclose(total, 100)
@@ -46,8 +46,8 @@ def test_histogram_ofAPropertyAddsUpToTheWholeArea():
   assert len(hs) == 2 and np.isclose(sum(b.get_height() for h in hs for b in h), 100)
 
 
-def test_hist_takesTheNumberOfBins():
-  hs = grid().hist(nbins=4)
+def test_histogram_takesTheNumberOfBins():
+  hs = grid().histogram(bins=4, grouped=True)
   assert len(hs[0]) == 3
 
 

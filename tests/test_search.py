@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from mtex import orientation, rotation, crystalFrame, specimenFrame, vector3d, degree, angle, find, eqTol, inv
+from mtex import orientation, rotation, crystalFrame, specimenFrame, vector3d, degree, angle, find, isclose, inv
 
 rng = np.random.default_rng(0)
 N, M, tol = 120, 10, 1e-9
@@ -49,7 +49,7 @@ def test_find_special_cases():
   cs, ss = crystalFrame("321"), specimenFrame("mmm")
   v = orientation.rand(N, cs, ss, rng=rng)
   w = orientation(orientation.rand(M, cs, ss, rng=rng), crystalFrame("321", intern=False), specimenFrame("mmm", intern=False))
-  assert v.CS is not w.CS and eqTol(v.CS, w.CS)
+  assert v.CS is not w.CS and isclose(v.CS, w.CS)
   ind, d = find(v, w, 3)
   checkK(v, w, angle(w[:, None], v[None, :]), 3)
   with pytest.raises(ValueError):

@@ -32,7 +32,7 @@ plottingConvention.default('y↑→x')
 cs = crystalFrame('1')
 
 kappa = [100, 90, 80, 0]
-U = orientation.eye(cs)
+U = orientation.id(cs)
 
 odf = BinghamODF(kappa, U)
 odf
@@ -150,7 +150,7 @@ plot(odf, 'sigma', sections=6, verbose=False)
 # Three equal nonzero parameters give the spherical case. The omitted fourth value is
 # padded with zero, so this call uses `[10, 10, 10, 0]`.
 
-odf = BinghamODF([10, 10, 10], quaternion.eye, cs)
+odf = BinghamODF([10, 10, 10], quaternion.id, cs)
 odf
 
 # ---
@@ -172,7 +172,7 @@ plot(odf, 'sigma', sections=6, verbose=False)
 # Reconstruct the general example so the following output has deliberately unequal
 # parameters.
 
-odf = BinghamODF([100, 90, 80, 0], orientation.eye(cs))
+odf = BinghamODF([100, 90, 80, 0], orientation.id(cs))
 odf.axes
 
 # The four displayed orientations are one orthogonal basis of quaternion space. Their row

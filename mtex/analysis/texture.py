@@ -152,7 +152,7 @@ def _sameCrystal(a, b):
   if not (isinstance(a, crystalFrame) and isinstance(b, crystalFrame)):
     return False
   try:
-    if a.eqTol(b):
+    if a.isclose(b):
       return True
   except Exception:
     pass

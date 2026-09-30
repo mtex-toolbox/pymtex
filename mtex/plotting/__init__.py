@@ -34,7 +34,7 @@ from .shapeplot import plotInnerFace, plotInnerDirection, plotSlipSystem, faceCo
 from .tensorplot import plotSeismicVelocities, plotRGB
 from .planarkey import planarColorKey
 from .polarplot import setView, polarAxes
-from .grainplots import hist, histogram, plotEllipse
+from .grainplots import histogram, plotEllipse
 from .kernelplot import plotSO3Kernel, plotSpectrum
 from .distributionplot import plotAngleDistribution, plotAxisDistribution
 from .scene3d import (scene3d, mesh3d, slices3d, picture3d, lines3d, arrows3d, points3d, ellipsoids3d, grainMesh,
@@ -67,10 +67,10 @@ __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistP
            "maxAngles", "regionSurface", "regionWalls", "regionLines", "visibleFaces", "shapeOutlines", "shapesOnMap",
            "plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera", "plotInnerFace",
            "plotInnerDirection", "plotSlipSystem", "faceColors", "plotPlane", "plotSeismicVelocities", "plotRGB",
-           "planarColorKey", "setView", "polarAxes", "hist", "histogram", "plotEllipse", "plotSO3Kernel",
-           "plotSpectrum", "plotAngleDistribution", "plotAxisDistribution", "scene3d", "mesh3d", "slices3d",
-           "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices",
-           "hasPyVista", "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML", "plotGrains3d",
+           "planarColorKey", "setView", "polarAxes", "histogram", "plotEllipse", "plotSO3Kernel", "plotSpectrum",
+           "plotAngleDistribution", "plotAxisDistribution", "scene3d", "mesh3d", "slices3d", "picture3d", "lines3d",
+           "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices", "hasPyVista",
+           "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML", "plotGrains3d",
            "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture",
            "quiver3dMap", "quiverVectors", "plotEllipsoid", "plotPoints3d", "scatter3"]
 
@@ -149,7 +149,6 @@ def _install():
   from . import grainplots as gp
   install(shape2d, pp.plotShape, "plot")
   install(S1FunHarmonic, pp.plotS1, "plot")
-  install(grain2d, gp.hist)
   install((grain2d, vector3d), gp.histogram)
   install(plane3d, shp.plotPlane, "plot")
   for f in (shp.plotInnerFace, shp.plotInnerDirection, shp.plotSlipSystem):

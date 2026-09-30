@@ -2,7 +2,7 @@
 # the grains (MATLAB @grainBoundary/reduce, simplify, refine and @grain2d/reduceBoundary,
 # simplifyBoundary, refineBoundary; Julia boundaryresampling.jl)
 #
-#   gB.reduceBoundary(n), gB.simplifyBoundary(epsilon), gB.refineBoundary(delta)
+#   gB.reduce(n), gB.simplify(epsilon), gB.refine(delta)
 #   grains.reduceBoundary(n), grains.simplifyBoundary(epsilon), grains.refineBoundary(delta)
 #
 # Coarsening is one merge step with two policies: mustKeep states which heads may never be
@@ -131,7 +131,7 @@ def _finish(gB, keep, keepGrains):
 
 def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
   """keep every n-th vertex along each chain, whatever the shape: it thins a straight run and
-  a corner alike, so prefer simplifyBoundary, which spends its vertices where the shape
+  a corner alike, so prefer simplify, which spends its vertices where the shape
   needs them"""
   if gB.isempty or n <= 1:
     return gB
@@ -392,8 +392,8 @@ def _simplifyGrains(grains, epsilon=None):
   return _coarsenGrains(simplifyBoundary, grains, epsilon)
 
 
+# on a boundary the word says nothing: gB.reduce, gB.simplify, gB.refine
 for _f in (reduceBoundary, simplifyBoundary, refineBoundary):
-  install(grainBoundary, _f)
   install(grainBoundary, _f, _f.__name__.removesuffix("Boundary"))
 install(grain2d, _reduceGrains, "reduceBoundary")
 install(grain2d, _simplifyGrains, "simplifyBoundary")

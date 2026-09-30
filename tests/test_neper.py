@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from mtex import KurdjumovSachs, crystalFrame, degree, neper, orientation, uniformODF
+from mtex import crystalFrame, degree, neper, orientation, uniformODF
 
 np_ = neper.init()
 pytestmark = pytest.mark.skipif(not np_.available(), reason="neper does not run here")

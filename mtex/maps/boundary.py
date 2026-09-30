@@ -469,8 +469,7 @@ class grainBoundary:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .boundaryresampling import (reduceBoundary, reduceBoundary as reduce, simplifyBoundary,
-                                     simplifyBoundary as simplify, refineBoundary, refineBoundary as refine)
+    from .boundaryresampling import reduceBoundary as reduce, simplifyBoundary as simplify, refineBoundary as refine
     from .shape import characteristicShape, surfor
     from ..analysis.gbnd import calcGBND
     from ..plotting.mapplot import plotBoundary as plot, quiverMap as quiver

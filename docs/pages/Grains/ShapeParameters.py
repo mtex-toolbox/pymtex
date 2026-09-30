@@ -97,10 +97,10 @@ plt.ylabel('number of grains')
 # area, so numerous small grains dominate even when they occupy little of the section.
 #
 # Weighting each grain by its area asks a different question: what fraction of the
-# observed section belongs to grains in each size class? `hist(grains)` draws grouped
-# bars, one colour per indexed phase.
+# observed section belongs to grains in each size class? `histogram(grains, grouped=True)`
+# draws grouped bars, one colour per indexed phase.
 
-hist(grains)
+histogram(grains, grouped=True)
 
 # The small-grain bar is much less dominant after area weighting. Each bar height is now
 # a percentage of the analysed section rather than a grain count. `histogram(grains)`

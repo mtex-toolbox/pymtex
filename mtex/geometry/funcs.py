@@ -56,7 +56,6 @@ nfold = _method("nfold")
 numSym = _method("numSym")
 numProper = _method("numProper")
 LaueName = _method("LaueName")
-eqTol = _method("eqTol")
 sim = _method("sim")
 isAligned = _method("isAligned")
 isCompatible = _method("isCompatible")
@@ -100,7 +99,7 @@ subGrid = _method("subGrid")
 
 
 exp = _method("exp", np.exp)
-eq = _method("eq", np.equal)
+isclose = _method("isclose", np.isclose)
 merge = _method("merge")
 
 
@@ -116,5 +115,5 @@ def rotate(v, rot, *args, **kwargs):
 
 
 __all__ = ["angle", "dot", "cross", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler",
-           "Rodrigues", "axis", "log", "exp", "eq", "homochoric", "cubochoric", "orth", "perp", "polar",
-           "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "eqTol", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "fundamentalSector", "conventionalSector", "fundamentalRegion", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]
+           "Rodrigues", "axis", "log", "exp", "isclose", "homochoric", "cubochoric", "orth", "perp", "polar",
+           "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "fundamentalSector", "conventionalSector", "fundamentalRegion", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]

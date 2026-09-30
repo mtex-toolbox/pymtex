@@ -30,7 +30,7 @@ def find(v, w, epsOrK=None, antipodal=False):
     ind, d = find(v, w)
     ind, d = find(v, w, k)              k an integer
     I, D = find(v, w, 5*degree)         a radius, a float"""
-  if isinstance(v, orientation) and isinstance(w, orientation) and not v.CS.eqTol(w.CS):
+  if isinstance(v, orientation) and isinstance(w, orientation) and not v.CS.isclose(w.CS):
     raise ValueError(f"cannot search orientations of {v.CS.char()} among orientations of {w.CS.char()}")
   d = _distances(v, w, antipodal)
   M, N = d.shape

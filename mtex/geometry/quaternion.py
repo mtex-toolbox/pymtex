@@ -66,12 +66,7 @@ class quaternion(MtexArray):
 
   @classproperty
   def id(cls):
-    """the identity, 1 + 0i + 0j + 0k"""
-    return cls(1.0, 0.0, 0.0, 0.0)
-
-  @classproperty
-  def eye(cls):
-    """quaternion.eye: MATLAB's other name of the identity"""
+    """the identity, 1 + 0i + 0j + 0k (MATLAB's id and eye)"""
     return cls(1.0, 0.0, 0.0, 0.0)
 
   @classmethod

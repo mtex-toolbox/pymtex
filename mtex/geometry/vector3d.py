@@ -680,10 +680,9 @@ class vector3d(MtexArray):
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
 
-  def eq(self, other, antipodal=False, tol=None):
-    """rotating keeps the frame; an orientation lands in its target frame; a number turns
-    about z
-    eq(v, w, antipodal=True): equal up to symmetry, and up to sign when antipodal"""
+  def isclose(self, other, antipodal=False, tol=None):
+    """isclose(v, w), isclose(v, w, antipodal=True, tol=): equal up to symmetry within the
+    tolerance, and up to sign when antipodal (MATLAB's eq)"""
     if antipodal:
       a = self._new(self.data, antipodal=True)
       return a.__eq__(other) if tol is None else a.__eq__(other, tol)

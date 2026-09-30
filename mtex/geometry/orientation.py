@@ -184,15 +184,10 @@ class orientation(rotation):
 
   @classmethod
   def id(cls, *args):
-    """the identical orientations between the frames given, of the shape given"""
+    """the identical orientations between the frames given, of the shape given (MATLAB's id and eye)"""
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.broadcast_to([1.0, 0.0, 0.0, 0.0], shape + (4,)).copy(), frames)
-
-  @classmethod
-  def eye(cls, *args):
-    """orientation.eye(cs): MATLAB's other name of the identity"""
-    return cls.id(*args)
 
   @classmethod
   def nan(cls, *args):
