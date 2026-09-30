@@ -59,7 +59,7 @@ def webLinks(text, names):
   def page(m):
     target, anchor = m.group(1), m.group(2) or ""
     return f"]({SITE}{target}{'_py' if target in names else ''}.html{anchor})"
-  text = re.sub(r"(?<=!\[)([^\]]*)\]\(([^):/]+\.(?:png|jpg|svg))\)", lambda m: f"{m.group(1)}]({SITE}images/python/{m.group(2)})", text)
+  text = re.sub(r"(?<=!\[)([^\]]*)\]\(([^):/]+\.(?:png|jpg|svg))\)", lambda m: f"{m.group(1)}]({SITE}figures/python/{m.group(2)})", text)
   return re.sub(r"\]\(([A-Za-z0-9_.]+)\.html(#[^)]*)?\)", page, text)
 
 

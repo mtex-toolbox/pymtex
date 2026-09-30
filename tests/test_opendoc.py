@@ -34,7 +34,7 @@ def test_the_cell_script_marks_every_section_and_links_the_website():
   s = cellScript(PAGE, {"Other"})
   assert s.count("# %% [markdown]") == 2 and s.count("# %%\n") == 2
   assert "(https://mtex-toolbox.github.io/Other_py.html#part)" in s
-  assert "(https://mtex-toolbox.github.io/images/python/picture.png)" in s
+  assert "(https://mtex-toolbox.github.io/figures/python/picture.png)" in s
   assert "(https://mtex-toolbox.github.io/Other.html#part)" in cellScript(PAGE)
   ast.parse(s)
 

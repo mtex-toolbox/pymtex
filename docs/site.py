@@ -1,8 +1,9 @@
 # the built pages into the MTEX website, the Jekyll site of mtex-toolbox.github.io: every
 # docs/build/<Page>.md becomes pages/documentation_python/<Page>.md with its front matter,
-# the permalink <Page>_py.html beside MATLAB's <Page>.html, its figures in images/python/,
-# the page as a cell script in python_scripts/ and one entry in _data/python_pages.yml, the
-# table the site's MATLAB | Python switch reads.
+# the permalink <Page>_py.html beside MATLAB's <Page>.html, its figures in figures/python/
+# (the site's checkout of mtex-toolbox/figures, served at /figures/), the page as a cell
+# script in python_scripts/ and one entry in _data/python_pages.yml, the table the site's
+# MATLAB | Python switch reads.
 # Run docs/make.py first. Usage:
 #   .venv/bin/python docs/site.py ../web              every built page
 #   .venv/bin/python docs/site.py ../web CrystalShapes ...
@@ -21,6 +22,8 @@ pagesDir = os.path.join(root, "docs", "pages")
 buildDir = os.path.join(root, "docs", "build")
 statusFile = os.path.join(root, "docs", "plans", "remaining-pages.md")
 EDIT = "https://github.com/mtex-toolbox/pymtex/blob/main/docs/pages/{}/{}.py"
+# where the figures are served, relative to a page at the site root
+FIG = "figures/python"
 
 # what a page that is not checked against MATLAB tells its reader
 NOTES = {
@@ -95,15 +98,15 @@ def figure(line, name):
   gen = re.compile(rf"{re.escape(name)}-\d+(?:-\d+)?\.png")
   m = re.fullmatch(r"\[!\[\]\(([^)]+)\)\]\(([^)]+)\)", line)
   if m and gen.fullmatch(m.group(1)):
-    return (f'<center class="mtex-figure"><a href="images/python/{m.group(2)}">'
-            f'<img class="inline" src="images/python/{m.group(1)}"></a></center>'), [m.group(1), m.group(2)]
+    return (f'<center class="mtex-figure"><a href="{FIG}/{m.group(2)}">'
+            f'<img class="inline" src="{FIG}/{m.group(1)}"></a></center>'), [m.group(1), m.group(2)]
   m = re.fullmatch(r"!\[([^\]]*)\]\(([^)]+)\)", line)
   if m and gen.fullmatch(m.group(2)):
-    return f'<center class="mtex-figure"><img class="inline" src="images/python/{m.group(2)}"></center>', [m.group(2)]
+    return f'<center class="mtex-figure"><img class="inline" src="{FIG}/{m.group(2)}"></center>', [m.group(2)]
   used = re.findall(r"\]\(([^)/:]+\.(?:png|jpg|svg|html))\)", line)
   used = [u for u in used if u.endswith((".png", ".jpg", ".svg")) or u.startswith(name + "-")]
   for u in used:
-    line = line.replace(f"]({u})", f"](images/python/{u})")
+    line = line.replace(f"]({u})", f"]({FIG}/{u})")
   return line, used
 
 
@@ -150,8 +153,8 @@ def white(im):
   return x[..., :3] * a + 255 * (1 - a)
 
 
-# a file into images/python, written only when its bytes differ, so that a rebuild leaves
-# the history of an unchanged figure alone
+# a file into figures/python, written only when its bytes differ, so that a rebuild leaves
+# an unchanged figure alone and the site's figure diff shows only real changes
 def place(src, dst):
   data = quantise(src) if src.endswith(".png") else open(src, "rb").read()
   if os.path.exists(dst) and open(dst, "rb").read() == data:
@@ -185,7 +188,12 @@ def export(site, names):
     print(f"skipped {n}: the page stopped")
   python = set(ok)
   pageOut = os.path.join(site, "pages", "documentation_python")
-  imageOut = os.path.join(site, "images", "python")
+  # the figures go into the site's checkout of mtex-toolbox/figures, which the site's
+  # tools/deploy-figures.sh publishes
+  if not os.path.isdir(os.path.join(site, "figures", ".git")):
+    sys.exit(f"{site}/figures is not a checkout of mtex-toolbox/figures; clone it there first:\n"
+             f"  git clone git@github.com:mtex-toolbox/figures.git {site}/figures")
+  imageOut = os.path.join(site, *FIG.split("/"))
   os.makedirs(pageOut, exist_ok=True)
   os.makedirs(imageOut, exist_ok=True)
   scriptOut = os.path.join(site, "python_scripts")

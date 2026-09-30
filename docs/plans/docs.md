@@ -214,8 +214,9 @@ section; the site's navigation and search stay MATLAB's and are rewritten in Pyt
 hand-off plan for the site's side is the doc "MATLAB | Python switch for the MTEX
 documentation"; this side is `docs/site.py ../web` after `docs/make.py`, writing
 `pages/documentation_python/<Page>.md` with Jekyll front matter, the figures into
-`images/python/` as 256 colours where that is invisible and lossless otherwise (137 MB, the
-3D pages 21 MB of it), and `_data/python_pages.yml` from the table of `remaining-pages.md`;
+`figures/python/` (the site's checkout of `mtex-toolbox/figures`, served at `/figures/` and
+published by the site's `tools/deploy-figures.sh`) as 256 colours where that is invisible and
+lossless otherwise (137 MB, the 3D pages 21 MB of it), and `_data/python_pages.yml` from the table of `remaining-pages.md`;
 checked by a Jekyll build of a copy of the site, which also showed that the site's
 `head.html` must load MathJax for `$$`, a Markdown page's `page.content` being its source. The function reference from the docstrings comes later, on the same
 scheme.
