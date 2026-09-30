@@ -80,9 +80,8 @@ def test_plotSection_takesAStyleFlagAfterTheAngles():
   assert len(h) == 2 and all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
 
 
-def test_plotSection_noGridLeavesOutTheReferenceFieldOfSigmaSections():
-  # noGrid leaves out the reference field of the sigma sections, as MATLAB's
-  plotSection(peakODF(), "sigma", sections=2, resolution=10 * degree, noGrid=True)
+def test_plotSection_withoutFieldLeavesOutTheReferenceFieldOfSigmaSections():
+  plotSection(peakODF(), "sigma", sections=2, resolution=10 * degree, field=False)
   assert all(len(ax.collections) == 1 for ax in gcm().children if hasattr(ax, "_mtexSphericalPlot"))
 
 

@@ -20,7 +20,7 @@
 # Where a MATLAB name is a misnomer, a duplicate, a workaround for a limit of MATLAB or a
 # typo, Python has a better one and only that: `plotPF` for `plotPDF`, which draws no density
 # when given orientations, keywords written positively as `thinning=False` for the flag
-# `'nothinning'`, one spelling `tol=` for a tolerance. The page
+# `'nothinning'`, and one spelling `tol=` for a tolerance. The page
 # [MTEX in MATLAB and in Python](MATLABtoPython.html) lists them.
 #
 # Everything below the names is ordinary Python: NumPy arrays, keyword arguments, exceptions,

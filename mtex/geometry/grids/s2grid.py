@@ -214,7 +214,7 @@ def _dots(g, a, b):
 # ------------------------------------------------------------------ the equispaced grid
 
 def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, maxTheta=None, minRho=0.0, maxRho=2 * np.pi,
-                     antipodal=False, hemisphere="complete", noCenter=False, rhoPeriod=2 * np.pi, region=None, frame=None):
+                     antipodal=False, hemisphere="complete", center=True, rhoPeriod=2 * np.pi, region=None, frame=None):
   """a grid of nearly equidistant directions: rings of polar angle `resolution` apart, each
   holding sin(theta) times the equator count of azimuths, odd rings offset by half a step
 
@@ -238,11 +238,11 @@ def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, 
   tmax = maxTheta if maxTheta is not None else np.pi / 2 if hemisphere == "upper" or cut else np.pi
   tmin = max(minTheta, np.pi / 2) if hemisphere == "lower" else minTheta
   dth, drh = tmax - tmin, maxRho - minRho
-  res = resolution if points is None else _resolutionFor(points, tmin, tmax, drh, noCenter)
+  res = resolution if points is None else _resolutionFor(points, tmin, tmax, drh, center)
   # the ring spacing divides the polar range
   res = 2 * tmax / max(np.round(2 * tmax / res), 1)
-  ntheta = max(int(np.round(2 * dth / res + noCenter)) // 2, 1)
-  theta = tmin + (np.arange(ntheta) + 0.5) * res if noCenter else tmin + np.arange(ntheta + 1) * res
+  ntheta = max(int(np.round(2 * dth / res + (not center))) // 2, 1)
+  theta = tmin + (np.arange(ntheta) + 0.5) * res if not center else tmin + np.arange(ntheta + 1) * res
   rho = []
   for j, t in enumerate(theta):
     odd = j % 2 == 1
@@ -262,12 +262,12 @@ def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, 
 
 
 # the resolution giving about n points: the area over n, refined by counting
-def _resolutionFor(n, tmin, tmax, drh, noCenter):
+def _resolutionFor(n, tmin, tmax, drh, center):
   area = drh * (np.cos(tmin) - np.cos(tmax))
   res = np.sqrt(area / n)
 
   def thetas(r):
-    return tmin + (np.arange(int(np.round(2 * (tmax - tmin) / r + 1)) // 2) + 0.5) * r if noCenter else tmin + np.arange(int(np.round(2 * (tmax - tmin) / r)) // 2 + 1) * r
+    return tmin + (np.arange(int(np.round(2 * (tmax - tmin) / r + 1)) // 2) + 0.5) * r if not center else tmin + np.arange(int(np.round(2 * (tmax - tmin) / r)) // 2 + 1) * r
 
   for _ in range(4):
     ts = thetas(res)

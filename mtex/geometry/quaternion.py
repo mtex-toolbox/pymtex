@@ -203,7 +203,7 @@ class quaternion(MtexArray):
     """the quaternions divided by their norm"""
     return self._new(self.data / self.norm()[..., None])
 
-  def dot(self, other, noAntipodal=False):
+  def dot(self, other, antipodal=True):
     """the inner product of the coefficients"""
     return np.sum(self.data * self._coerce(other).data, axis=-1)
 
@@ -496,12 +496,12 @@ class rotation(quaternion):
     """the inverse rotation, the conjugate quaternion"""
     return self.conj()
 
-  def dot(self, other, noAntipodal=False):
+  def dot(self, other, antipodal=True):
     """the inner product up to sign, since q and -q are one rotation"""
     d = np.sum(self.data * self._coerce(other).data, axis=-1)
     if isinstance(other, orthogonalTransform):
       d = d * ~other.isImproper
-    return d if noAntipodal else np.abs(d)
+    return d if not antipodal else np.abs(d)
 
   def _coerce(self, other):
     if isinstance(other, quaternion):
@@ -676,12 +676,12 @@ class orthogonalTransform(MtexArray):
     """the Euler angles of the rotational part, in the convention named or the session's"""
     return quat2euler(self.data[..., :4], convention)
 
-  def dot(self, other, noAntipodal=False):
+  def dot(self, other, antipodal=True):
     """the inner product of the rotational parts up to sign, zero between transforms of different
-    parity; noAntipodal=True keeps the sign"""
+    parity; antipodal=False keeps the sign"""
     q, p = self._other(other)
     d = np.sum(self.data[..., :4] * q, axis=-1) * (self.parity == p)
-    return d if noAntipodal else np.abs(d)
+    return d if not antipodal else np.abs(d)
 
   def __eq__(self, other, tol=5e-4):
     q, p = self._other(other)

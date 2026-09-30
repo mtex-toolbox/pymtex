@@ -239,7 +239,7 @@ class gbcCustom(grainBoundaryCriterion):
     v = self.values
     if isinstance(v, MtexArray):
       flat = v.flatten()
-      d = flat[i].angle(flat[j], antipodal=self.antipodal) if isinstance(v, vector3d) else flat[i].angle(flat[j])
+      d = flat[i].angle(flat[j], antipodal=self.antipodal or None) if isinstance(v, vector3d) else flat[i].angle(flat[j])
     else:
       v = np.asarray(v).reshape(ebsd.size, -1)
       d = np.linalg.norm(v[i] - v[j], axis=1)

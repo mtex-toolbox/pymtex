@@ -47,7 +47,7 @@ def _vprint(silent, *args):
 def _childToChild(p2c):
   V = p2c.variants().flatten()
   c2c = orientation(rotation._fromData(qmul(p2c.data[None], V.inv().data)), p2c.frameB, p2c.frameB)
-  keep = c2c.angle(noSymmetry=True) > 1e-3 * degree
+  keep = c2c.angle(symmetry=False) > 1e-3 * degree
   return V[keep], c2c[keep]
 
 
@@ -87,7 +87,7 @@ def _vote(mori, p2c, s):
 def _subSample(mori, n):
   if mori.size <= n:
     return mori
-  order = np.argsort(mori.angle(noSymmetry=True), kind="stable")
+  order = np.argsort(mori.angle(symmetry=False), kind="stable")
   return mori[order[np.unique(np.round(np.linspace(0, mori.size - 1, n)).astype(int))]]
 
 
@@ -108,7 +108,7 @@ def _fitLocal(mori, p2c, h, tau, maxIteration, silent=True):
       step /= 2
     if sNew["fit"] > ok:
       break
-    moved = float(new.angle(p2c, noSymmetry=True))
+    moved = float(new.angle(p2c, symmetry=False))
     p2c, s = new, sNew
     _report(p2c, s["fit"], silent)
     if moved < 0.01 * degree:
@@ -422,18 +422,18 @@ def round2Miller(mori, penalty=0.002, maxIndex=None, nextFit=1):
   n2 = mori * n1
   rn2 = _roundSet(n2, "hkl", maxIndex)
   hkl2 = rn2.hkl.reshape(-1, 3)
-  omegaH = rn2.angle(n2, noSymmetry=True) + (H[:, 0] ** 2 + H[:, 1] ** 2 + 0.995 * H[:, 2] ** 2 + hkl2 ** 2 @ [1, 1, 0.995]
+  omegaH = rn2.angle(n2, symmetry=False) + (H[:, 0] ** 2 + H[:, 1] ** 2 + 0.995 * H[:, 2] ** 2 + hkl2 ** 2 @ [1, 1, 0.995]
                                              + 0.01 * np.sum(hkl2 < -0.1, axis=1)) * penalty
   # all directions, the same way
   d1 = Miller(H, cs, "uvw")
   d2 = mori * d1
   rd2 = _roundSet(d2, "uvw", maxIndex)
   uvw2 = rd2.uvw.reshape(-1, 3)
-  omegaD = rd2.angle(d2, noSymmetry=True) + (1.05 * np.sum(H ** 2, axis=1) + np.sum(uvw2 ** 2, axis=1)
+  omegaD = rd2.angle(d2, symmetry=False) + (1.05 * np.sum(H ** 2, axis=1) + np.sum(uvw2 ** 2, axis=1)
                                              + 0.01 * np.sum(uvw2 < -0.1, axis=1)) * penalty
   # directions have to lie in the planes, before and after
-  ortho1 = np.abs(np.pi / 2 - n1.reshape(-1, 1).angle(d1.reshape(1, -1), noSymmetry=True)) > 1e-5
-  ortho2 = np.abs(np.pi / 2 - rn2.reshape(-1, 1).angle(rd2.reshape(1, -1), noSymmetry=True)) > 1e-5
+  ortho1 = np.abs(np.pi / 2 - n1.reshape(-1, 1).angle(d1.reshape(1, -1), symmetry=False)) > 1e-5
+  ortho2 = np.abs(np.pi / 2 - rn2.reshape(-1, 1).angle(rd2.reshape(1, -1), symmetry=False)) > 1e-5
   fit = omegaH[:, None] + omegaD[None, :] + 100 * ortho1 + 100 * ortho2
   order = np.argsort(fit.reshape(-1), kind="stable")
   ih, idx = np.unravel_index(order[nextFit - 1], fit.shape)
@@ -455,7 +455,7 @@ class millerRelation(tuple):
   def __repr__(self):
     from .orientation import orientation
     n1, n2, d1, d2 = self
-    fit = orientation.map(n1, n2, d1, d2).angle(self.mori.reshape(()), noSymmetry=False) / degree
+    fit = orientation.map(n1, n2, d1, d2).angle(self.mori.reshape(()), symmetry=True) / degree
     planes, dirs = f"{n1.char()} || {n2.char()}", f"{d1.char()} || {d2.char()}"
     return (aligned(f"{'plane parallel':>{len(planes)}}   {'direction parallel':>{len(dirs)}}     fit\n"
             f"{planes}   {dirs}  {round(float(fit), 2):>4g}°"))

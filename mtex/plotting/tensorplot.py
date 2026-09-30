@@ -68,7 +68,7 @@ def plotSeismicVelocities(C, symmetriseMinMax=False, MarkerSize=10, lower=False,
   fig = mtexFigure(6, layout=(2, 3), figSize=kw.pop("figSize", (12, 7.5)))
   for k, (f, title, label, pol) in enumerate(panels):
     nextAxis(fig=fig)
-    plot(f, contourf=True, complete=True, noLabel=True, **hemisphere, **kw)
+    plot(f, contourf=True, complete=True, axisLabels=False, **hemisphere, **kw)
     (hi, pHi), (lo, pLo) = _extrema(f)
     hold(True)
     if pol is not None:

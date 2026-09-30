@@ -188,11 +188,11 @@ hold(False)
 # The same axis in this frame is the crystal axis carried over by the orientation of the
 # measurement.
 #
-# The option `noSymmetry` is essential. The axis must be the representative that belongs
+# The option `symmetry=False` is essential. The axis must be the representative that belongs
 # to this orientation, not a symmetric equivalent.
 
 # +
-axSpecimen = ebsd.orientations * grod.axis(noSymmetry=True)
+axSpecimen = ebsd.orientations * grod.axis(symmetry=False)
 
 h = plot(axSpecimen, contourf=True, halfwidth=2.5 * degree)
 mtexColorbar(title='distribution of misorientation axes in mrd')

@@ -156,7 +156,7 @@ how2plot.east = vector3d(9, 3, 3)
 how2plot.outOfScreen = vector3d(6, 10, 9)
 
 plt.close('all')
-plotPDF(odf, Miller(1, 1, 0, odf.CS), '3d', how2plot, grid=True, grid_res=10 * degree, noTitle=True)
+plotPDF(odf, Miller(1, 1, 0, odf.CS), '3d', how2plot, grid=True, grid_res=10 * degree, title=False)
 mtexColorMap('LaboTeX')
 # -
 

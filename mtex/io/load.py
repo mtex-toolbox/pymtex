@@ -3,7 +3,7 @@
 #   ebsd = loadEBSD('map.ang')                      the format from the extension
 #   ebsd = loadEBSD('map.ctf', eulerCorrection=r)   a convention the vendor states, overridden
 #   ebsd = loadEBSD('map.txt', CS=[cs], columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3'])
-#   ebsd = loadEBSD('map.ang', noGrid=True)         the list as the file holds it
+#   ebsd = loadEBSD('map.ang', grid=False)          the list as the file holds it
 #
 # The format is the extension: MTEX tries every installed loader in turn and keeps the
 # first that does not throw, which turns a malformed file into a wrong format rather
@@ -421,7 +421,7 @@ def tryGridify(ebsd):
 VENDOR_EXTENSIONS = {"ang", "ctf", "cpr", "crc", "osc", "h5", "hdf5", "h5oina", "oh5", "edaxh5", "dream3d"}
 
 
-def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
+def loadEBSD(fname, CS=None, *args, interface=None, grid=True, **kwargs):
   """the map a file holds, read by its extension
 
     loadEBSD('map.ang'), loadEBSD('map.ctf')          the vendor formats declare their phases
@@ -431,15 +431,15 @@ def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
 
   Every keyword of the format's loader passes through: eulerCorrection, setting for an EDAX
   file, columnNames, columns, radians, delimiter, header for a table. A complete scan comes
-  back on its grid; noGrid=True keeps the list, and so does a scan whose measurements do not
+  back on its grid; grid=False keeps the list, and so does a scan whose measurements do not
   form a grid, which says why.
   """
   if isinstance(fname, (list, tuple)):
-    return [loadEBSD(f, CS, *args, interface=interface, noGrid=noGrid, **kwargs) for f in fname]
+    return [loadEBSD(f, CS, *args, interface=interface, grid=grid, **kwargs) for f in fname]
   fname = os.fspath(fname)
   ext = (os.path.splitext(fname)[1] if interface is None else interface).lower().lstrip(".")
-  grid = getMTEXpref("gridifyOnImport", True) and not noGrid
-  token = _gridOnRead.set(grid)
+  onGrid = getMTEXpref("gridifyOnImport", True) and grid
+  token = _gridOnRead.set(onGrid)
   try:
     ebsd = _read(fname, ext, CS, *args, **kwargs)
   finally:
@@ -448,7 +448,7 @@ def loadEBSD(fname, CS=None, *args, interface=None, noGrid=False, **kwargs):
   # script does: one frame per phase of the file in its order, the not indexed one first
   if CS is not None and ext in VENDOR_EXTENSIONS:
     ebsd = withPhases(ebsd, CS)
-  if grid:
+  if onGrid:
     ebsd = tryGridify(ebsd)
   return ebsd
 

@@ -29,7 +29,7 @@ from .spherical import hasSymmetry, makeSphericalProjection, plainProjection
 from ..geometry.display import header
 
 PROJECTION_KEYS = ("projection", "upper", "lower", "complete", "antipodal", "how2plot", "fundamentalRegion")
-AXES_KEYS = ("grid", "grid_res", "noLabel", "fontSize")
+AXES_KEYS = ("grid", "grid_res", "axisLabels", "fontSize")
 WHERE_KEYS = ("parent", "add2all", "figSize", "layout", "marginx", "marginy")
 MARKER_COLOR = (0.0, 0.447, 0.741)
 BOUNDARY_COLOR = (0.35, 0.35, 0.35)
@@ -58,7 +58,7 @@ class sphericalPlot:
     sP.proj, sP.sR, sP.antipodal, sP.bounds, sP.minData, sP.maxData, sP.mappable
   """
 
-  def __init__(self, ax, proj, grid=False, grid_res=30 * degree, noLabel=False, fontSize=None, title=None):
+  def __init__(self, ax, proj, grid=False, grid_res=30 * degree, axisLabels=True, fontSize=None, title=None):
     self.ax, self.proj = ax, proj
     self.fontSize = getMTEXpref("FontSize", 13) if fontSize is None else fontSize
     self.minData, self.maxData = np.nan, np.nan
@@ -85,7 +85,7 @@ class sphericalPlot:
         self.grid += ax.plot(x, y, color=GRID_COLOR, linewidth=0.5, zorder=4)
     for x, y in proj.boundary():
       self.boundary += ax.plot(x, y, color=BOUNDARY_COLOR, linewidth=1.5, zorder=5)
-    if not noLabel:
+    if axisLabels:
       self._drawLabels(outside)
     if title is not None:
       ax.set_title(plotText(title), fontsize=self.fontSize)
@@ -928,7 +928,7 @@ def plotHKL(CS, complete=False, **kw):
   from ..geometry.miller import Miller
   hkl = ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (0, 1, 1), (1, 0, 1), (1, 1, 1), (-1, -1, 0), (-1, -1, 1))
   ms = Miller(np.array(hkl, dtype=float), CS).unique()
-  opts = dict(symmetrised=True, labeled=True, MarkerEdgeColor="k", grid=True, backgroundColor="w", noLabel=True)
+  opts = dict(symmetrised=True, labeled=True, MarkerEdgeColor="k", grid=True, backgroundColor="w", axisLabels=False)
   if not complete:
     opts["upper"] = True
   opts.update(kw)
@@ -967,7 +967,7 @@ def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
       uaxes.append(a if a[2] >= 0 else -a)
   projKw, axesKw, whereKw = _split(kw)
   projKw.update(upper=True, complete=True)
-  axesKw.setdefault("noLabel", True)
+  axesKw.setdefault("axisLabels", False)
   anchor = vector3d(0, 0, 1, frame=fr)
   sP = _targets(anchor, projKw, axesKw, whereKw)[0]
   ax = sP.ax
@@ -1244,13 +1244,13 @@ def _directionTitle(r):
 # a row of functions on the sphere with one colour range: the pole figures and the inverse
 # pole figures of an ODF
 def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", colorbar=False, minmax=False,
-             noTitle=False, **kw):
+             title=True, **kw):
   flag = fillFlag(kw, None)
   style = ("pcolor" if flag in (None, "smooth") else flag) if style is None else style
   projKw, axesKw, whereKw = _split(kw)
   complete = projKw.pop("complete", False)
   charts, halves = [], []
-  for f, title in zip(fs, titles):
+  for f, name in zip(fs, titles):
     if complete:
       v = sphericalRegion(frame=getattr(f, "frame", None))
       pk = dict(projKw, complete=True, antipodal=projKw.get("antipodal", bool(getattr(f, "antipodal", False))),
@@ -1260,7 +1260,7 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
     # a sphere drawn as two hemispheres is titled once and each half says which it is
     projs = makeSphericalProjection(v, **pk)
     for i, p in enumerate(projs):
-      charts.append((f, p, None if noTitle or i else title))
+      charts.append((f, p, None if not title or i else name))
       halves.append(len(projs) == 2)
   # a held figure of as many charts takes the surface on top of what it has; the axes
   # nextAxis prepared takes the first chart and the axes after it the others, as a row of
@@ -1321,7 +1321,7 @@ def plotPDF(odf, h, *args, superposition=None, **kw):
   # plotPDF(odf, h, '3d'): the pole figure on the sphere in space
   if kw.pop("3d", False):
     from .spaceplot import plotFunction3d
-    kw.pop("noTitle", None)
+    kw.pop("title", None)
     return [plotFunction3d(odf.pdf(x), **kw) for x in hs]
   if superposition is not None:
     from ..functions.density import calcPDF

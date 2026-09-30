@@ -8,7 +8,7 @@ from mtex.geometry.csl import _rationalBasis, _shell
 
 def inFamily(o, CS, *hkl):
   fam = symmetrise(Miller(*hkl, CS, "uvw"), unique=True)
-  return np.min(angle(vector3d(axis(o), antipodal=True), fam, noSymmetry=True)) < 1e-8
+  return np.min(angle(vector3d(axis(o), antipodal=True), fam, symmetry=False)) < 1e-8
 
 
 # the index of L n ML in L, counted over the residues modulo sigma

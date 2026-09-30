@@ -579,7 +579,7 @@ class parentGrainReconstructor:
       return np.zeros(0), np.zeros((0, 2), dtype=np.int64)
     return np.concatenate(fits), np.concatenate(pairs)
 
-  def calcParent2Child(self, p2c0=None, p2c=False, c2c=False, threshold=None, quantile=None, noP2C=False, **fitOptions):
+  def calcParent2Child(self, p2c0=None, p2c=False, c2c=False, threshold=None, quantile=None, useP2C=True, **fitOptions):
     """job.calcParent2Child(): the relationship refined on the boundaries of the map.
 
     Where the parent phase covers more than one percent of the map, the misorientations of
@@ -603,7 +603,7 @@ class parentGrainReconstructor:
         ind = omega < min(thr, _quantile(omega, quant))
         guess = mori[ind].mean()
       p2cData, nP2C = guess, len(pr)
-    if (noOpt and guess.angle(noSymmetry=False) > 5 * degree) or c2c:
+    if (noOpt and guess.angle(symmetry=True) > 5 * degree) or c2c:
       pr, o1, o2 = self._pairs("c2c")
       mori = (o1.inv() * o2).flatten()
       mori = mori[np.asarray(mori.angle()).reshape(-1) >= 5 * degree]
@@ -614,7 +614,7 @@ class parentGrainReconstructor:
       if quantile is not None:
         kw["quantile"] = quantile
       new = calcParent2Child(mori, start, **kw)
-      if p2cData is not None and not noP2C:
+      if p2cData is not None and useP2C:
         both = _ori(np.stack([new.data.reshape(4), p2cData.data.reshape(4)]), new.frameA, new.frameB)
         new = both.mean(weights=[len(pr), nP2C])
     else:

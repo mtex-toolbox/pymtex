@@ -49,7 +49,7 @@ def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   # the normalisation against the complete elliptic integral of the second kind, MATLAB's ellip2ke
   c = (np.pi / 2) / quad(lambda t: float(Psi.eval(t)) * ellipe(1 - t * t), 0, 1, limit=200)[0]
   Psi = S2KernelHandle(lambda t, fun=Psi.fun: c * fun(t)) if isinstance(Psi, S2KernelHandle) else S2Kernel(c * Psi.A)
-  psi = lambda v: Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, noSymmetry=True))
+  psi = lambda v: Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, symmetry=False))
   return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
 
 

@@ -179,7 +179,7 @@ class fibre:
     rs = _uniqueDirections(qrot(L, self.r.normalize().data[..., None, :]))
     return hs, rs
 
-  def angle(self, ori, noSymmetry=False):
+  def angle(self, ori, symmetry=True):
     """the angle by which ori * h misses r, the least over both orbits, from the chord of the
     closest pair; with another fibre the largest distance of its points to this one"""
     if isinstance(ori, fibre):
@@ -189,7 +189,7 @@ class fibre:
     if isinstance(ori, orientation):
       SESSION.joinFrames(ori.frameA, self.CS)
       SESSION.joinFrames(ori.frameB, self.SS)
-    if noSymmetry:
+    if not symmetry:
       hs, rs = self.h.normalize().data.reshape(1, 3), self.r.normalize().data.reshape(1, 3)
     else:
       hs, rs = self._orbits()
@@ -259,22 +259,22 @@ class fibre:
     return cls(Miller(h, cs) if isinstance(cs, crystalFrame) else vector3d(h, frame=cs), vector3d(r, frame=ss))
 
   @classmethod
-  def fit(cls, ori, *args, diagnostics=False, noSymmetry=False):
+  def fit(cls, ori, *args, diagnostics=False, symmetry=True):
     """the fibre through a list of orientations: the plane of the two leading eigenvectors
     of their quaternion tensor, the orientations first moved to the representatives
-    nearest their mean, or taken as stored with noSymmetry; with diagnostics the
+    nearest their mean, or taken as stored with symmetry=False; with diagnostics the
     eigenvalues, ascending and summing to one, and the mean angle of the orientations to
     the fibre come too. This is the local fit of a concentrated cloud; the search through
     the pole figures of an ODF is the business of P2"""
     # 'local' names the one algorithm there is, the local quaternion tensor fit
     for a in args:
       if isinstance(a, str) and a == "noSymmetry":
-        noSymmetry = True
+        symmetry = False
       elif not (isinstance(a, str) and a == "local"):
         raise ValueError(f"fibre.fit does not understand {a!r}")
     o = ori.flatten()
     o = o[~np.isnan(o.data).any(axis=-1)]
-    if not noSymmetry:
+    if symmetry:
       o = o.project2FundamentalRegion(o.mean())
     q = o.data
     vals, vecs = np.linalg.eigh(q.T @ q / len(q))

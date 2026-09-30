@@ -19,7 +19,7 @@ def test_projection_reproduces_the_disorientation_angle(pair):
   q1, q2 = rotation.rand(N, rng=rng), rotation.rand(N, rng=rng)
   o1, o2 = orientation(q1, cs1), orientation(q2, cs2)
   mori = orientation(q1.inv() * q2, cs2, cs1)
-  omega = mori.project2FundamentalRegion().angle(noSymmetry=True)
+  omega = mori.project2FundamentalRegion().angle(symmetry=False)
   omega2 = angle(o1, o2)
   assert np.max(np.abs(omega - omega2)) < 1e-10
   plain = (q1.inv() * q2).angle()
@@ -78,7 +78,7 @@ def turned(g):
   from mtex.geometry.kernels import qmul
   r = rotation.byAxisAngle(vector3d(1, 2, 3), 37 * degree).data.reshape(4)
   q = crystalFrame(g).sym.rot.data.reshape(-1, 5)[:, :4]
-  return crystalFrame(rotation._fromData(np.array([qmul(qmul(r, x), r * [1, -1, -1, -1]) for x in q])), noIntern=True)
+  return crystalFrame(rotation._fromData(np.array([qmul(qmul(r, x), r * [1, -1, -1, -1]) for x in q])), intern=False)
 
 
 # -3 has a conventional sector no centre's Dirichlet domain is; with and without exchange

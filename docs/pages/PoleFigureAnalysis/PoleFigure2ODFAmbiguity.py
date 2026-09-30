@@ -322,7 +322,7 @@ odf_rec1 = calcODF(pf)
 
 # Reconstruct once more without ghost correction.
 
-odf_rec2 = calcODF(pf, noGhostCorrection=True)
+odf_rec2 = calcODF(pf, ghostCorrection=False)
 
 # Along the alpha fibre the corrected reconstruction recovers `odf1` closely, while the
 # uncorrected one lands between `odf1` and `odf2` - a peak that is too low sitting on a
@@ -382,7 +382,7 @@ plot(pf, MarkerSize=5)
 rec = calcODF(pf)
 
 # one without ghost correction
-rec2 = calcODF(pf, noGhostCorrection=True)
+rec2 = calcODF(pf, ghostCorrection=False)
 # -
 
 # Both reproduce the measured pole figures. This is the crux of the whole page: agreeing

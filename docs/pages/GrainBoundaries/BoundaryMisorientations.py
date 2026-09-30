@@ -42,7 +42,7 @@ minPixel = 10
 grains = calcGrains(ebsd, angle=segAngle, minPixel=minPixel)
 
 # preserve the segment-to-pixel relation needed below
-grains = smoothBoundary(grains, 4, noSimplify=True, noRefine=True)
+grains = smoothBoundary(grains, 4, simplify=False, refine=False)
 
 # draw the forsterite grains and the complete boundary network
 plot(grains['Fo'], faceColor=[0.75, 0.82, 0.90], micronbar='off', figSize='large')
@@ -55,7 +55,7 @@ hold(False)
 # the black lines are all boundary segments in the cropped map. The analysis below uses
 # only boundaries between two forsterite grains.
 #
-# The [smoothBoundary](grain2d.smoothBoundary.html) flags `noSimplify` and `noRefine` are
+# The [smoothBoundary](grain2d.smoothBoundary.html) flags `simplify=False` and `refine=False` are
 # important here. Simplification and refinement change which segments lie between specific
 # pixel pairs. Their `ebsdId` values can then no longer supply the two orientations used
 # below.

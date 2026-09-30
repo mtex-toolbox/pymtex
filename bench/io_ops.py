@@ -61,7 +61,7 @@ def run(ops):
     return np.concatenate([np.column_stack([np.asarray(r.data, float).reshape(-1, 3), np.asarray(i, float).reshape(-1)])
                            for r, i in zip(p.allR, p.allI)])
 
-  table = {op: (lambda f=f: loadEBSD(f, noGrid=True), rows) for op, f in FILES.items()}
+  table = {op: (lambda f=f: loadEBSD(f, grid=False), rows) for op, f in FILES.items()}
   table["load_dubna"] = (lambda: loadPoleFigure(dubnaFiles(), cs, superposition=[1, 1, [0.52, 1.23], 1, 1, 1, 1]), pf)
   crosscheck.run(OUT, ALGORITHM, table, ops, reps={"load_1C_1": 1})
 

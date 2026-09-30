@@ -97,7 +97,7 @@ mtexTitle('Values as radius and colour')
 # camera is unchanged, so this shape can be compared directly with the previous
 # three-dimensional view.
 #
-# The `noScaling` flag skips the default rescaling. In that case the radial distance is the
+# The `scaling=False` flag skips the default rescaling. In that case the radial distance is the
 # absolute function value, which is useful only when the original magnitude makes a readable
 # surface.
 #

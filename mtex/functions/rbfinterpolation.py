@@ -130,7 +130,7 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   # a density of one column is MATLAB's unimodalODF of the weights, which drops the centres
   # of negligible weight and scales to mean one
   if density and w.ndim == 1:
-    f = unimodalODF(centres, psi, weights=w, nothinning=exact)
+    f = unimodalODF(centres, psi, weights=w, thinning=not (exact))
   else:
     f = SO3FunRBF(centres, psi, w if w.ndim > 1 else w.ravel())
     # the mean asked for, one for a density, by scaling the weights

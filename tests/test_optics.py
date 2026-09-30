@@ -29,7 +29,7 @@ def test_opticalAxis_ofABiaxialCrystalAreTwoWithoutBirefringence():
   rI = olivineIndex()
   axes = opticalAxis(rI)
   assert axes.size == 2 and axes.antipodal and np.allclose(birefringence(rI, axes)[0], 0, atol=1e-12)
-  assert np.isclose(axes[0].angle(axes[1], noSymmetry=True), 2 * np.arctan(np.sqrt((1.651 - 1.635) / (1.670 - 1.651))), atol=1e-9)
+  assert np.isclose(axes[0].angle(axes[1], symmetry=False), 2 * np.arctan(np.sqrt((1.651 - 1.635) / (1.670 - 1.651))), atol=1e-9)
 
 
 def test_opticalAxis_ofAUniaxialCrystalIsTheDistinguishedAxis():
@@ -43,7 +43,7 @@ def test_birefringence_atAListOfDirectionsAndOnTheSphere():
   rI = olivineIndex()
   vs = vector3d.rand(5, rng=rng)
   dns, fasts, slows = birefringence(rI, vs)
-  assert dns.shape == (5,) and fasts.shape == (5,) and np.allclose(fasts.dot(vs, noSymmetry=True), 0, atol=1e-12) and np.allclose(fasts.dot(slows, noSymmetry=True), 0, atol=1e-12)
+  assert dns.shape == (5,) and fasts.shape == (5,) and np.allclose(fasts.dot(vs, symmetry=False), 0, atol=1e-12) and np.allclose(fasts.dot(slows, symmetry=False), 0, atol=1e-12)
   dF, fF, sF = birefringence(rI)
   v = Miller(1, 1, 1, OLIVINE)
   assert np.isclose(np.real(dF(v)), birefringence(rI, v)[0]) and np.isclose(abs(fF(v).dot(birefringence(rI, v)[1])), 1)

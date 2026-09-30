@@ -79,10 +79,10 @@ mtexColorbar(title='longitudinal coefficient (pC/N)')
 # ## A radial surface
 #
 # [surf](S2Fun.surf.html) can use the absolute response as distance from the origin and
-# the colour as its sign. The `noScaling` option keeps the physical zero and the original
+# the colour as its sign. The `scaling=False` option keeps the physical zero and the original
 # pC/N values.
 
-surf(q, noScaling=True)
+surf(q, scaling=False)
 mtexColorbar(title='longitudinal coefficient (pC/N)')
 
 # The six lobes have the same radial magnitude in antipodal pairs, while their colours

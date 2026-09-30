@@ -144,7 +144,7 @@ Omega
 # The divergence of $\Omega$ measures whether the orientation flow expands or contracts
 # locally. Arrows show the direction of that flow.
 
-plotSection(div(Omega), 'sigma', noGrid=True)
+plotSection(div(Omega), 'sigma', field=False)
 mtexColorMap('blue2red')
 mtexColorbar()
 hold(True)

@@ -265,31 +265,31 @@ class orientation(rotation):
     from .symmetryops import symmetriseOrientation
     return symmetriseOrientation(self, unique=unique)
 
-  def dot(self, other, noSymmetry=False, noAntipodal=False):
+  def dot(self, other, symmetry=True, antipodal=True):
     """the reduced dot product and the disorientation angle, over the groups of both frames"""
     from .symmetryops import orientationDot
-    if noSymmetry or not isinstance(other, orientation):
-      return rotation.dot(self, other, noAntipodal=noAntipodal)
+    if not symmetry or not isinstance(other, orientation):
+      return rotation.dot(self, other, antipodal=antipodal)
     return orientationDot(self, other)
 
-  def angle(self, other=None, noSymmetry=False):
+  def angle(self, other=None, symmetry=True):
     """the rotational angle up to symmetry, of the orientation or of the misorientation to other;
-    noSymmetry=True the plain angle, other='max' the angle of the equivalent that turns the most"""
+    symmetry=False the plain angle, other='max' the angle of the equivalent that turns the most"""
     from .symmetryops import orientationAngle, orientationSelfAngle
     # angle(mori, 'max'): the angle of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
       if other.lower() != "max":
         raise ValueError("the only representative angle takes is 'max'")
-      return _largestImage(self).angle(noSymmetry=True)
+      return _largestImage(self).angle(symmetry=False)
     if other is None:
-      return rotation.angle(self) if noSymmetry else orientationSelfAngle(self)
+      return rotation.angle(self) if not symmetry else orientationSelfAngle(self)
     if hasattr(other, "o1"):
-      return other.angle(self, noSymmetry=noSymmetry)
-    if noSymmetry or not isinstance(other, orientation):
+      return other.angle(self, symmetry=symmetry)
+    if not symmetry or not isinstance(other, orientation):
       return rotation.angle(self, other)
     return orientationAngle(self, other)
 
-  def axis(self, other=None, noSymmetry=False, antipodal=None):
+  def axis(self, other=None, symmetry=True, antipodal=None):
     """the rotational axis, of the representative in the fundamental region; with a second
     orientation the axis of their disorientation in the specimen frame"""
     from .symmetryops import orientationAxis, pairAxis
@@ -297,7 +297,7 @@ class orientation(rotation):
     if isinstance(other, str):
       if other.lower() != "max":
         raise ValueError("the only representative axis takes is 'max'")
-      v = _largestImage(self).axis(noSymmetry=True)
+      v = _largestImage(self).axis(symmetry=False)
       v.frame = self.frameA
       return v
     if other is not None:
@@ -305,7 +305,7 @@ class orientation(rotation):
       if antipodal is not None:
         v.antipodal = bool(antipodal)
       return v
-    v = orientationAxis(self, noSymmetry=noSymmetry)
+    v = orientationAxis(self, symmetry=symmetry)
     if antipodal is not None:
       v.antipodal = bool(antipodal)
     return v
@@ -321,11 +321,11 @@ class orientation(rotation):
   def __ne__(self, other):
     return ~(self == other)
 
-  def unique(self, tol=1e-3, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
+  def unique(self, tol=1e-3, symmetry=True, stable=False, return_index=False, return_inverse=False):
     """the orientations with the equivalents within the tolerance removed, the first kept;
     optionally the indices of the kept ones and the index of each into them"""
     from .symmetryops import orientationUnique
-    return orientationUnique(self, tol, noSymmetry, return_index, return_inverse)
+    return orientationUnique(self, tol, symmetry, return_index, return_inverse)
 
   def mean(self, weights=None, robust=False, iterations=3):
     """the mean orientation, every element moved to the equivalent closest to the running mean
@@ -341,11 +341,11 @@ class orientation(rotation):
     o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
     return project2FundamentalRegionOrientation(o, ref)
 
-  def log(self, ref=None, side="left", noSymmetry=False):
+  def log(self, ref=None, side="left", symmetry=True):
     """the tangent vector at the reference pointing to this orientation, the pair reduced by
     symmetry first so that its norm is angle(ori, ref)"""
     from .tangent import logOrientation
-    return logOrientation(self, ref, side, noSymmetry)
+    return logOrientation(self, ref, side, symmetry)
 
   def fundamentalRegion(self):
     """the fundamental region of the orientations, the orientationRegion of the groups of CS and SS"""
@@ -430,7 +430,7 @@ class orientation(rotation):
     from .parent2child import round2Miller
     n1, n2, d1, d2 = round2Miller(self.reshape(()), maxIndex=5)
     exact = orientation.map(n1, n2, d1, d2)
-    if exact.angle(self.reshape(()), noSymmetry=False) >= 1e-3 * degree:
+    if exact.angle(self.reshape(()), symmetry=True) >= 1e-3 * degree:
       return None
     return f"{n1.char()} || {n2.char()}   {d1.char()} || {d2.char()}"
 

@@ -74,7 +74,7 @@ def test_edited_phase_reproduced_in_fresh_session(tmp_path):
   path = os.path.join(FIXTURES, "Forsterite_cut.ctf")
   info = inspectEBSD(path)
   frames = list(info.phases.frames)
-  frames[1] = crystalFrame("mmm", [4.8, 10.207, 5.98], mineral="Forsterite", noIntern=True)
+  frames[1] = crystalFrame("mmm", [4.8, 10.207, 5.98], mineral="Forsterite", intern=False)
   text = buildImportWizardScript(path, phases=phaseList(frames), headerPhases=info.phases, mapConvention="y↓→x")
   assert "crystalFrame('mmm', [4.8, 10.207, 5.98], [90, 90, 90], mineral='Forsterite')" in text
   script = tmp_path / "import_test.py"

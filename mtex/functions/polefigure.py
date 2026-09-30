@@ -389,7 +389,7 @@ class PoleFigure:
       c += pf.c
     i = 1
     while i < len(allH):
-      match = [j for j in range(i) if allH[j].size == allH[i].size and np.max(allH[j].angle(allH[i], noSymmetry=True)) < 1e-4]
+      match = [j for j in range(i) if allH[j].size == allH[i].size and np.max(allH[j].angle(allH[i], symmetry=False)) < 1e-4]
       if match:
         j = match[0]
         allR[j] = vector3d.cat(allR[j].flatten(), allR[i].flatten())

@@ -35,7 +35,7 @@ def calcGBND(gB, *args, **kwargs):
   return _calcGBND3d(gB, *args, **kwargs)
 
 
-def _calcGBND3d(gB, grains=None, moriRef=None, halfwidth=10 * degree, noSymmetry=False, total=False, **kwargs):
+def _calcGBND3d(gB, grains=None, moriRef=None, halfwidth=10 * degree, symmetry=True, total=False, **kwargs):
   from ..functions.density import calcDensity
   from ..geometry.miller import Miller
   # a face of no area has no normal and no weight
@@ -53,7 +53,7 @@ def _calcGBND3d(gB, grains=None, moriRef=None, halfwidth=10 * degree, noSymmetry
     N = _inverseRotate(q, gB.N.data[f])
     cs = grains.CSList[p]
     return calcDensity(Miller(vector3d(N, antipodal=True), cs), weights=gB.area[f], halfwidth=halfwidth, antipodal=True, **kwargs)
-  return _gbcd(gB, grains, moriRef, halfwidth, noSymmetry, total, **kwargs)
+  return _gbcd(gB, grains, moriRef, halfwidth, symmetry, total, **kwargs)
 
 
 # the vectors v turned by the inverses of the rotations q, row by row
@@ -62,7 +62,7 @@ def _inverseRotate(q, v):
   return (rotation._fromData(q * np.array([1, -1, -1, -1])) * vector3d(v)).data.reshape(-1, 3)
 
 
-def _gbcd(gB, grains, moriRef, hw, noSymmetry, total, **kwargs):
+def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
   from ..functions.density import calcDensity
   from ..functions.kernelfunctions import SO3DeLaValleePoussinKernel
   from ..geometry.miller import Miller
@@ -100,7 +100,7 @@ def _gbcd(gB, grains, moriRef, hw, noSymmetry, total, **kwargs):
     N = np.concatenate([N, _inverseRotate(qmul(o2[inc], s2), gB.N.data[inc])])
     w = np.concatenate([w, w])
   f = calcDensity(Miller(vector3d(N, antipodal=True), cs1.stripSym()), weights=w, halfwidth=hw, antipodal=True, **kwargs)
-  if not noSymmetry:
+  if symmetry:
     f = f.symmetrise(rotation._fromData(_stabiliser(G1, G2, r)))
   if total:
     f = f * (w.sum() / gB.area.sum() / len(w))

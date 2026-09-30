@@ -81,7 +81,7 @@ def test_plot_ofS1FunIsPolarAndHolds():
   plot(f, DisplayName="again")
   hold(False)
   assert len(axesOf().lines) == 2
-  plot(f, notPolar=True)
+  plot(f, polar=False)
   assert axesOf().name != "polar"
 
 

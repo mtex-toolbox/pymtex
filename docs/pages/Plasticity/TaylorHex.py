@@ -146,10 +146,10 @@ newMtexFigure(layout=[3, 3])
 plotPDF(odf, h, 'contourf', 'complete', 'upper', 'grid', grid_res=30 * degree)
 
 nextAxis()
-plotPDF(oriCold, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, noLabel=True, noTitle=True)
+plotPDF(oriCold, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, axisLabels=False, title=False)
 
 nextAxis()
-plotPDF(oriWarm, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, noLabel=True, noTitle=True)
+plotPDF(oriWarm, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, axisLabels=False, title=False)
 mtexColorbar()
 # -
 

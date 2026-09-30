@@ -191,7 +191,7 @@ def test_loadEBSD_interface_names_the_format(tmp_path):
   shutil.copy(os.path.join(FIXTURES, "ferrite_cut.ang"), p)
   e = loadEBSD(p, interface="ang")
   assert e.CSList.mineralList[1] == "Ferrite"
-  e = loadEBSD(str(p), interface=".ang", noGrid=True)
+  e = loadEBSD(str(p), interface=".ang", grid=False)
   assert len(e) == 467
 
 
@@ -212,12 +212,12 @@ def test_loadEBSD_a_table_needs_phases():
 
 
 def test_loadEBSD_a_list_of_files():
-  maps = loadEBSD([os.path.join(FIXTURES, "ferrite_cut.ang"), os.path.join(FIXTURES, "olivine_cut.ang")], noGrid=True)
+  maps = loadEBSD([os.path.join(FIXTURES, "ferrite_cut.ang"), os.path.join(FIXTURES, "olivine_cut.ang")], grid=False)
   assert [len(m) for m in maps] == [467, 700]
 
 
 def test_EBSD_load_is_the_same_verb():
-  e = EBSD.load(os.path.join(FIXTURES, "ferrite_cut.ang"), noGrid=True)
+  e = EBSD.load(os.path.join(FIXTURES, "ferrite_cut.ang"), grid=False)
   assert len(e) == 467 and e.ndim == 1
 
 
@@ -293,7 +293,7 @@ def test_the_grid_built_while_reading_is_the_list_gridded(name):
   with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     a = loadEBSD(fname, **kw)
-    b = loadEBSD(fname, noGrid=True, **kw)
+    b = loadEBSD(fname, grid=False, **kw)
   if not a.isGridded:
     return
   b = gridify(b)

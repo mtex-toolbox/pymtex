@@ -64,11 +64,11 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=3)
 # one specific pair of pixels.
 #
 # [smoothBoundary](grain2d.smoothBoundary.html) normally simplifies and resamples the
-# segment list. The options `noSimplify` and `noRefine` smooth the vertex positions
+# segment list. The options `simplify=False` and `refine=False` smooth the vertex positions
 # without changing that list.
 
 # +
-grains = smoothBoundary(grains, 10, noSimplify=True, noRefine=True)
+grains = smoothBoundary(grains, 10, simplify=False, refine=False)
 CS = grains.CS
 
 # compute IPF colours explicitly to keep the published output quiet
@@ -125,12 +125,12 @@ gbnd2 = calcGBND(gB[~cond], ebsd, halfwidth=5 * degree, nonneg=True)
 tp = Miller(1, 0, -1, 2, CS, 'hkil')
 
 # use one colour range so weak structure is not visually amplified
-contourf(gbnd1, colorRange=[0.5, 1.5], complete=True, upper=True, noLabel=True)
+contourf(gbnd1, colorRange=[0.5, 1.5], complete=True, upper=True, axisLabels=False)
 mtexTitle(r'GBND for $\omega > 80^{\circ}$')
 mtexColorMap('parula')
 annotate(symmetrise(tp), labeled=True, backgroundColor='w')
 nextAxis()
-contourf(gbnd2, colorRange=[0.5, 1.5], complete=True, upper=True, noLabel=True)
+contourf(gbnd2, colorRange=[0.5, 1.5], complete=True, upper=True, axisLabels=False)
 mtexTitle(r'GBND for $\omega < 80^{\circ}$')
 mtexColorMap('parula')
 mtexColorbar()
@@ -189,7 +189,7 @@ mtexColorbar()
 # +
 twinPeak, twinPeakPosition = gbcd.max()
 twinGBCDSummary = {'peakDensity': twinPeak,
-                   'distanceToTwinPlaneDegree': np.min(twinPeakPosition.angle(symmetrise(tp), noSymmetry=True)) / degree}
+                   'distanceToTwinPlaneDegree': np.min(twinPeakPosition.angle(symmetrise(tp), symmetry=False)) / degree}
 twinGBCDSummary
 # -
 

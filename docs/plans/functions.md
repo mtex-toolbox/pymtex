@@ -385,8 +385,8 @@ Where Python differs from Julia:
 - **Names are MATLAB's**: `calcQuadratureWeights`, `zeroRangeMethod` with
   `checkZeroRange`, `MLSSolver` with `init`, `initIter`, `doIter`, `calcODF`, `union` for
   Julia's `merge`, `SchulzDefocusingKernel`; the flags `zeroRange=True`,
-  `noGhostCorrection=True`, `quadratureWeights=True`, `intensityWeights=True`,
-  `nothinning=True`, `silent=True`; the error modes as positional strings,
+  `ghostCorrection=False`, `quadratureWeights=True`, `intensityWeights=True`,
+  `thinning=False`, `silent=True`; the error modes as positional strings,
   `calcError(pf, odf, 'RP')`. Structure coefficients default to `1/n` per superposed
   direction (Julia's rule, MATLAB's `calcPoleFigure`), so a superposed pole figure is a
   pole density.
@@ -439,7 +439,7 @@ Where Python differs from Julia:
 | `calcPoleFigure(odf,{h1,[h2,h3]},r)` | `calcPoleFigure(odf, [h1, h23], r)` with `h23` a two-element Miller |
 | `calcError(pf,rec,'RP')`, `'l1'`, `'l2'` | `calcError(pf, rec, 'RP')`; the default is the damped relative error |
 | `max(pf,0)`, `min(pf)`, `mean(pf)` | `max(pf, 0)`, `min(pf)`, `mean(pf)`; one value per pole figure |
-| `calcODF(pf,'zeroRange','noGhostCorrection')` | `calcODF(pf, zeroRange=True, noGhostCorrection=True)` |
+| `calcODF(pf,'zeroRange','noGhostCorrection')` | `calcODF(pf, zeroRange=True, ghostCorrection=False)` |
 | `[odf,alpha] = calcODF(pf)` | `odf = calcODF(pf)`; `MLSSolver(pf).calcODF()` then `solver.alpha` |
 | `calcQuadratureWeights(r)` | `calcQuadratureWeights(r, method='voronoi'/'harmonic')` |
 | `[v,vNew] = refine(v)` | `v, vNew = refine(v)` |

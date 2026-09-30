@@ -77,7 +77,7 @@ def test_the_fits_recover_the_transforms_and_resist_outliers():
   bad.data.reshape(-1, 3)[::10] += [30, -40, 0]
   assert np.max(norm(spatialTransformProjective.fit(p, bad) * p - q)) < 1e-8
   # the plain least squares is pulled away by the outliers
-  assert np.max(norm(spatialTransformProjective.fit(p, bad, noRobust=True) * p - q)) > 1
+  assert np.max(norm(spatialTransformProjective.fit(p, bad, robust=False) * p - q)) > 1
   S0 = spatialTransformShift([[1.02, 0.03, 2], [-0.01, 0.98, -1], [0, 0, 1]])
   assert np.allclose(spatialTransformShift.fit(p, S0 * p).M, S0.M)
   assert np.allclose(spatialTransformRigid.fit(p, p + vector3d(2, -1, 0)).u.data, [2, -1, 0])
@@ -86,7 +86,7 @@ def test_the_fits_recover_the_transforms_and_resist_outliers():
   # a weight of zero leaves a point out
   w = np.ones(p.size)
   w[::10] = 0
-  assert np.max(norm(spatialTransformProjective.fit(p, bad, weights=w, noRobust=True) * p - q)) < 1e-8
+  assert np.max(norm(spatialTransformProjective.fit(p, bad, weights=w, robust=False) * p - q)) < 1e-8
   with pytest.raises(ValueError):
     spatialTransformProjective.fit(p[:3], q[:3])
 

@@ -56,7 +56,7 @@ def test_scatter3d_ofAxesDrawsBothEndsColouredWithABar():
 
 
 def test_plot3d_writesALabelPerDirection():
-  randomDirections().plot3d(label=[str(k) for k in range(30)], noLabel=True)
+  randomDirections().plot3d(label=[str(k) for k in range(30)], axisLabels=False)
   assert len(axesOf().texts) == 30
 
 
@@ -121,7 +121,7 @@ def test_plot_ofARegionWithoutLinesDrawsOnlyItsEdges():
 
 def test_plot_ofARegionWithoutSurfaceDrawsOnlyItsEdges():
   oR = cubicRegion()
-  hs = plot(oR, noSurface=True, boundaryColor='r')
+  hs = plot(oR, surface=False, boundaryColor='r')
   assert len(hs) == len(oR.edges()) and not axesOf().collections
 
 

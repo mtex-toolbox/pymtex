@@ -48,7 +48,7 @@ def test_find_orientations(case):
 def test_find_special_cases():
   cs, ss = crystalFrame("321"), specimenFrame("mmm")
   v = orientation.rand(N, cs, ss, rng=rng)
-  w = orientation(orientation.rand(M, cs, ss, rng=rng), crystalFrame("321", noIntern=True), specimenFrame("mmm", noIntern=True))
+  w = orientation(orientation.rand(M, cs, ss, rng=rng), crystalFrame("321", intern=False), specimenFrame("mmm", intern=False))
   assert v.CS is not w.CS and eqTol(v.CS, w.CS)
   ind, d = find(v, w, 3)
   checkK(v, w, angle(w[:, None], v[None, :]), 3)

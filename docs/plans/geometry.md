@@ -74,7 +74,7 @@ What the user sees, taken from Python because MATLAB has no counterpart:
 | `[v1, v2]`, `[v1; v2]`, `cat(dim, ...)` | `cat(v1, v2)`, `cat(v1, v2, axis=0)` |
 | `v'`, `reshape(v, ...)`, `repmat` | `v.T`, `v.reshape(...)`, NumPy broadcasting |
 | `a * b`, `a .* b` | `a * b`; broadcasting covers elementwise, outer and scalar cases |
-| `dot(m1, m2, 'noSymmetry')`, `symmetrise(m, 'unique')` | `dot(m1, m2, noSymmetry=True)`, `symmetrise(m, unique=True)` |
+| `dot(m1, m2, 'noSymmetry')`, `symmetrise(m, 'unique')` | `dot(m1, m2, symmetry=False)`, `symmetrise(m, unique=True)` |
 | `vector3d(x, y, z, 'antipodal')` | `vector3d(x, y, z, antipodal=True)` |
 | `crystalFrame('m-3m', [4 4 4], 'mineral', 'Fo')` | `crystalFrame('m-3m', [4, 4, 4], mineral='Fo')` |
 | `getMTEXpref('EulerAngleConvention')` | `getMTEXpref('EulerAngleConvention')`, unchanged |

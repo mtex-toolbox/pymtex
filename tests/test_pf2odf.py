@@ -129,7 +129,7 @@ def test_calcODF_ghostCorrectionTakesOutTheUniformPortion():
   pfs = odf.calcPoleFigure(Miller([1, 1, 1], [0, 1, 1], [0, 1, 0], cs), r)
   g = equispacedSO3Grid(cs, ss, resolution=7.5 * degree)
   rec = calcODF(pfs, resolution=10 * degree)
-  ghosts = calcODF(pfs, resolution=10 * degree, noGhostCorrection=True)
+  ghosts = calcODF(pfs, resolution=10 * degree, ghostCorrection=False)
   # the uniform portion the data allows is found and taken out of the components
   assert 0.35 < rec.c0 < 0.6 and ghosts.c0 == 0
   # and the ODF is closer to the truth for it
@@ -223,4 +223,4 @@ def test_calcODFIterative_fitsAtLeastAsWellAsOneSolve(regular):
   it = calcODFIterative(pfs, resolution=10 * degree, maxSteps=3)
   assert np.mean(calcError(pfs, it)) <= 1.5 * np.mean(calcError(pfs, plain))
   assert calcError(it, odf) < 0.2
-  assert isinstance(calcODFIterative(pfs, resolution=15 * degree, maxSteps=2, nothinning=True), SO3FunRBF)
+  assert isinstance(calcODFIterative(pfs, resolution=15 * degree, maxSteps=2, thinning=False), SO3FunRBF)

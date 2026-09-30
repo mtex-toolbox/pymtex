@@ -4,7 +4,7 @@
 #
 # A direction in a frame carrying a group stands for its whole orbit, an orientation for
 # its coset l * o * r; comparison reduces over the group, representation does not (MATLAB
-# ADR 0008 rule 10). noSymmetry=True is the opt-out at the call site. Only a crystal
+# ADR 0008 rule 10). symmetry=False is the opt-out at the call site. Only a crystal
 # frame's group enters vector comparison: a specimen frame's group is a claim about
 # functions, never about directions.
 from __future__ import annotations
@@ -37,10 +37,11 @@ def _images(frame, xyz):
   return qrot(o[:, :4], xyz[..., None, :]) * o[:, 4:5]
 
 
-def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tol=1e-6):
+def symmetrise(v, unique=False, antipodal=None, tol=1e-6):
   """the orbit of a crystal direction under the group of its frame, every element once
-  (shape numSym x size); antipodal adds the negatives unless the group holds the inversion
-  or the vector is an axis; unique keeps the distinct images of one direction only"""
+  (shape numSym x size); antipodal=True adds the negatives unless the group holds the
+  inversion or the vector is an axis; unique keeps the distinct images of one direction only,
+  up to sign for an axis unless antipodal=False"""
   # symmetrise(v, cs): the coordinates of v read in the frame given, as MATLAB's
   from .frames import referenceFrame
   if isinstance(unique, referenceFrame):
@@ -57,7 +58,7 @@ def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tol=1e-6):
   if v.ndim > 0 and v.size > 1:
     raise ValueError("unique symmetrisation gives orbits of different sizes; symmetrise the elements one by one")
   xyz = imgs.reshape(-1, 3)
-  asAxes = (v.antipodal or antipodal) and not noAntipodal
+  asAxes = v.antipodal if antipodal is None else antipodal
   n = np.linalg.norm(xyz, axis=1)
   d = xyz @ xyz.T / np.outer(n, n)
   same = (np.abs(d) if asAxes else d) > 1 - tol
@@ -68,9 +69,9 @@ def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tol=1e-6):
   return v._new(xyz[keep])
 
 
-def multiplicity(v, antipodal=None, noAntipodal=False):
+def multiplicity(v, antipodal=None):
   """the number of distinct directions equivalent to each element, of axes under antipodal"""
-  return np.array([symmetrise(x, unique=True, antipodal=antipodal, noAntipodal=noAntipodal).size for x in v.flatten()]).reshape(v.shape)
+  return np.array([symmetrise(x, unique=True, antipodal=antipodal).size for x in v.flatten()]).reshape(v.shape)
 
 
 # the side that reduces, and the other one's coordinates
@@ -82,19 +83,19 @@ def _symSide(a, b):
   return None, None
 
 
-def symDot(a, b, min=False, all=False, antipodal=False):
+def symDot(a, b, min=False, all=False, antipodal=None):
   """the inner product reduced over the group of the side that carries one: the maximum over
   the orbit, or the minimum, or all of them"""
   sym, other = _symSide(a, b)
   if sym is None:
     return None
   ds = np.sum(_images(sym.frame, sym.data) * other.data[..., None, :], axis=-1)
-  if antipodal or a.antipodal or b.antipodal:
+  if (a.antipodal or b.antipodal) if antipodal is None else antipodal:
     ds = np.abs(ds)
   return np.moveaxis(ds, -1, 0) if all else ds.min(axis=-1) if min else ds.max(axis=-1)
 
 
-def symAngle(a, b, antipodal=False):
+def symAngle(a, b, antipodal=None):
   """the angle to the closest symmetric equivalent, through atan2 for accuracy"""
   sym, other = _symSide(a, b)
   if sym is None:
@@ -102,7 +103,7 @@ def symAngle(a, b, antipodal=False):
   imgs = _images(sym.frame, sym.data)
   d = np.sum(imgs * other.data[..., None, :], axis=-1)
   c = np.linalg.norm(np.cross(imgs, other.data[..., None, :]), axis=-1)
-  if antipodal or a.antipodal or b.antipodal:
+  if (a.antipodal or b.antipodal) if antipodal is None else antipodal:
     d = np.abs(d)
   return np.arctan2(c, d).min(axis=-1)
 
@@ -155,7 +156,7 @@ def symMean(v, weights=None, iterations=3):
   xs = v.flatten()
   for _ in range(iterations):
     proj = project2FundamentalRegion(xs, center=m.normalize())
-    m = vector3d.mean(proj, weights=weights, noSymmetry=True)
+    m = vector3d.mean(proj, weights=weights, symmetry=False)
   return v._new(m.data)
 
 
@@ -278,10 +279,10 @@ def _exchangeIntoSector(p, common):
 # region, then unique on those
 # the pairs of orientations within the tolerance, over all their symmetric images, as a
 # sparse matrix from the radius search of a quaternion tree
-def _neighbours(o, tol, noSymmetry):
+def _neighbours(o, tol, symmetry):
   from scipy import sparse
   n = o.size
-  if noSymmetry:
+  if not symmetry:
     from scipy.spatial import cKDTree
     q = o.data.reshape(-1, 4)
     hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tol / 4), workers=-1)
@@ -293,15 +294,15 @@ def _neighbours(o, tol, noSymmetry):
   return OrientationTree(flat).radius(flat, tol)[0].tocsr()
 
 
-def orientationUnique(o, tol=1e-3, noSymmetry=False, return_index=False, return_inverse=False):
+def orientationUnique(o, tol=1e-3, symmetry=True, return_index=False, return_inverse=False):
   """the orientations with the duplicates within the tolerance removed, symmetric equivalents
-  counting as one unless noSymmetry=True; the first of each kept, in order, with the indices
+  counting as one unless symmetry=False; the first of each kept, in order, with the indices
   of the kept and the index of every orientation into them when asked
 
     u = orientationUnique(ori, tol=1*degree)
     u, iv, iu = orientationUnique(ori, return_index=True, return_inverse=True)"""
   n = o.size
-  same = _neighbours(o, tol, noSymmetry)
+  same = _neighbours(o, tol, symmetry)
   keep = np.ones(n, dtype=bool)
   first = np.arange(n)
   # every orientation not yet taken absorbs the later ones within the tolerance
@@ -354,12 +355,12 @@ def axisFrame(o):
   return (o.frameA if o.isMisorientation else o.frameB).sibling(g)
 
 
-def orientationAxis(o, noSymmetry=False):
+def orientationAxis(o, symmetry=True):
   """the rotational axes of orientations or misorientations, those of the representatives in the
-  fundamental region, or of the rotations as given with noSymmetry=True, in the frame axisFrame
+  fundamental region, or of the rotations as given with symmetry=False, in the frame axisFrame
   names"""
   from .representations import quatAxis
-  q = o.data if noSymmetry else project2FundamentalRegionOrientation(o).data
+  q = o.data if not symmetry else project2FundamentalRegionOrientation(o).data
   return vector3d(quatAxis(q), isNormalized=True, frame=axisFrame(o))
 
 

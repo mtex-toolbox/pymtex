@@ -96,7 +96,7 @@ partName = ['first component', 'second component', 'sum']
 mtexFig = newMtexFigure(layout=[2, 3])
 for i in range(h.size):
   for j in range(len(odfParts)):
-    plotPDF(odfParts[j], h[i], antipodal=True, noTitle=True)
+    plotPDF(odfParts[j], h[i], antipodal=True, title=False)
     mtexTitle(partName[j])
     if i < h.size - 1 or j < len(odfParts) - 1:
       nextAxis()

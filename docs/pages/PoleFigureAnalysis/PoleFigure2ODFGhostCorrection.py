@@ -62,9 +62,9 @@ plot(pf)
 
 # ## Reconstruct with and without correction
 #
-# The `noGhostCorrection` flag disables the default correction.
+# The `ghostCorrection=False` flag disables the default correction.
 
-rec = calcODF(pf, noGhostCorrection=True)
+rec = calcODF(pf, ghostCorrection=False)
 
 # Omitting that flag gives the corrected reconstruction.
 

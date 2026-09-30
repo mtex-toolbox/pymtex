@@ -104,13 +104,12 @@ def histogram(v, numBin=None, weights=None, antipodal=None, **kw):
 
 # ------------------------------------------------------------------ functions on the circle
 
-def plotS1(sF, *args, lineWidth=1.0, DisplayName=None, color=None, notPolar=False, how2plot=None, **kw):
-  """plot(sF1): a function on the circle as a polar line, or over the angle with notPolar;
+def plotS1(sF, *args, lineWidth=1.0, DisplayName=None, color=None, polar=True, how2plot=None, **kw):
+  """plot(sF1): a function on the circle as a polar line, or over the angle with polar=False;
   a positional MATLAB line style, plot(sF1, '--'), as matplotlib's format"""
   import matplotlib.pyplot as plt
   lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
   DisplayName = kw.pop("displayName", DisplayName)
-  notPolar = kw.pop("noPolar", notPolar)
   fmt = [a for a in args if isinstance(a, str)]
   omega = np.linspace(0, 2 * np.pi, 361)
   d = np.real(np.asarray(sF(omega), dtype=complex)).reshape(-1)
@@ -120,7 +119,7 @@ def plotS1(sF, *args, lineWidth=1.0, DisplayName=None, color=None, notPolar=Fals
   if plt.get_fignums() and (fig is None or plt.gcf() is not fig.fig or (plt.gcf().axes and plt.gca() not in fig.children)):
     user = plt.gca() if plt.gcf().axes else None
   parent = kw.pop("parent", None) or user
-  if notPolar:
+  if not polar:
     ax = parent or (fig.children[-1] if fig is not None and fig.hold and fig.children else mtexFigure(1).nextAxis())
     h = ax.plot(omega, d, *fmt, linewidth=lineWidth, label=DisplayName, color=color, **kw)
     ax.set_xlim(0, 2 * np.pi)

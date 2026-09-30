@@ -5,7 +5,7 @@ from mtex import degree
 warnings.simplefilter("ignore")
 fname, out = sys.argv[1], sys.argv[2]
 t = time.perf_counter()
-e = mtex.loadEBSD(fname, noGrid=True)
+e = mtex.loadEBSD(fname, grid=False)
 s = {"time": time.perf_counter() - t, "n": len(e), "phaseMap": e.phaseMap.tolist(), "counts": [int((e.phaseId == k).sum()) for k in range(len(e.CSList))],
      "minerals": e.CSList.mineralList, "pointGroups": [getattr(c, "pointGroup", "") for c in e.CSList],
      "abc": [np.concatenate([c.abc, c.abg / degree]).tolist() if hasattr(c, "abc") else [] for c in e.CSList]}

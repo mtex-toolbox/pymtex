@@ -240,7 +240,7 @@ def _layout(job, numV):
 
 
 def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p=False, c2c=False, mergeSimilar=False,
-                     noDiagonal=False):
+                     diagonal=True):
   """job.calcVariantGraph(threshold=3.5*degree, tol=1.5*degree): job.graph, the variant
   graph: a node per child grain and parent variant and one per parent grain, and an edge
   where two neighbours agree - child to child over every pair of variants, parent to child
@@ -255,7 +255,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
   pos = g._positions()
   noOpt = not (p2c or p2p or c2c)
   from scipy.sparse import identity, csr_matrix
-  G = csr_matrix((nVG, nVG)) if noDiagonal else identity(nVG, format="csr")
+  G = csr_matrix((nVG, nVG)) if not diagonal else identity(nVG, format="csr")
 
   def both(r, c, v):
     return _sparse(np.r_[r, c], np.r_[c, r], np.r_[v, v], nVG)
@@ -302,7 +302,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
     from scipy.sparse import diags
     D = diags(d)
     G = (D @ G @ D).tocsr()
-  if not noDiagonal:
+  if diagonal:
     lone = np.asarray((G > 0).sum(axis=0)).reshape(-1) == 1
     from scipy.sparse import diags
     G = (diags((~lone).astype(float)) @ G).tocsr()
@@ -311,7 +311,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
 
 
 def clusterVariantGraph(job, inflationPower=1.05, numIter=10, cutOff=1e-4, minCluster=4, includeSimilar=False, mergeSimilar=False,
-                        noPseudoDiagonal=False, sym=False, keepGraph=False, **graphOptions):
+                        pseudoDiagonal=True, sym=False, keepGraph=False, **graphOptions):
   """job.clusterVariantGraph(includeSimilar=True): the variant graph (calcVariantGraph
   first when there is none) clustered by MCL - expansion, inflation by inflationPower,
   pruning below cutOff, the rows of every grain normalised together - over numIter steps;
@@ -345,7 +345,7 @@ def clusterVariantGraph(job, inflationPower=1.05, numIter=10, cutOff=1e-4, minCl
   A = normalize(A)
   for _ in range(numIter):
     A = (A @ A).tocsr()
-    if noPseudoDiagonal:
+    if not pseudoDiagonal:
       A = dropPseudoDiagonal(A)
     A.data = A.data ** inflationPower
     A.data[A.data <= cutOff] = 0

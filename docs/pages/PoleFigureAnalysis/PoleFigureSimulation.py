@@ -134,7 +134,7 @@ print(f'L1 reconstruction error: {modelError:.4f}')
 e = np.zeros((pf.numPF, 2))
 for i in range(pf.numPF):
 
-  odf = calcODF(pf[:i + 1], noGhostCorrection=True)
+  odf = calcODF(pf[:i + 1], ghostCorrection=False)
   e[i, 0] = calcError(odf, model_odf, resolution=2.5 * degree)
   odf = calcODF(pf[:i + 1])
   e[i, 1] = calcError(odf, model_odf, resolution=2.5 * degree)

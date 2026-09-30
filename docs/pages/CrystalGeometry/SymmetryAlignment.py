@@ -32,11 +32,11 @@ cs = crystalFrame('12/m1', [4, 5, 6], np.array([90, 100, 90]) * degree, mineral=
 cs
 
 # The summary reports `X||a*, Y||b, Z||c`. The direct axis $\vec a$ is $10^\circ$ from
-# $\vec x$, while the reciprocal axis $\vec a^*$ is parallel to it. The `noSymmetry`
+# $\vec x$, while the reciprocal axis $\vec a^*$ is parallel to it. The `symmetry=False`
 # option asks for these geometric angles without replacing either direction by a
 # symmetry-equivalent one.
 
-axisAngles = np.array([angle(cs.aAxis, vector3d.X, noSymmetry=True), angle(cs.aAxisRec, vector3d.X, noSymmetry=True)]) / degree
+axisAngles = np.array([angle(cs.aAxis, vector3d.X, symmetry=False), angle(cs.aAxisRec, vector3d.X, symmetry=False)]) / degree
 axisAngles
 
 # A different Cartesian embedding is requested by naming the parallel axes in the

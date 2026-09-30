@@ -409,7 +409,7 @@ class grainBoundary:
   def angle(self, x):
     """the angle of every segment to a direction, or to the segments of another boundary"""
     other = x.direction if isinstance(x, grainBoundary) else x
-    return self.direction.angle(other, noSymmetry=True)
+    return self.direction.angle(other, symmetry=False)
 
   # ------------------------------------------------------------------ the line and the polygon
 

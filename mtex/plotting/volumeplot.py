@@ -77,7 +77,7 @@ def plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
   return _draw(volumeSlices(ebsd, color, at=at, **kw), how2plot, figSize, ebsd.frame)
 
 
-def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, noScaling=False, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
+def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
   """quiver(grains, dir), quiver(gB, dir): arrows at the centroids of 3D grains or of their
   boundary faces, as MATLAB's; a grain's arrow as long as the direction, a face's a fifth of
   the face's diameter, both times autoScaleFactor"""
@@ -86,9 +86,9 @@ def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, noScaling=Fals
   color = kw.pop("Color", color)
   P = np.asarray(x.centroid.data).reshape(-1, 3)
   D = np.asarray(d.data if hasattr(d, "data") else d, dtype=float).reshape(-1, 3)
-  if isinstance(x, grain3Boundary) and not noScaling:
+  if isinstance(x, grain3Boundary) and scaling:
     D = 0.2 * np.asarray(x.diameter).reshape(-1, 1) * D / np.linalg.norm(D, axis=1, keepdims=True)
-  D = D * (autoScaleFactor if not noScaling else 0.25)
+  D = D * (autoScaleFactor if scaling else 0.25)
   anti = bool(getattr(d, "antipodal", False)) if antipodal is None else antipodal
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=anti), how2plot, figSize, x.frame)
 

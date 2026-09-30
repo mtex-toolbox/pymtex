@@ -150,7 +150,7 @@ def test_angle_betweenRotationsFromTheDot():
 
 def test_dot_ignoresTheSignUnlessNoAntipodal():
   r1 = rotation.rand(10, rng=rng())
-  assert close(dot(r1, rotation._fromData(-r1.data)), 1) and close(dot(r1, rotation._fromData(-r1.data), noAntipodal=True), -1)
+  assert close(dot(r1, rotation._fromData(-r1.data)), 1) and close(dot(r1, rotation._fromData(-r1.data), antipodal=False), -1)
 
 
 def test_angle_smallAngleStaysAccurate():

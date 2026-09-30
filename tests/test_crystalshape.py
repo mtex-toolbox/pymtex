@@ -34,7 +34,7 @@ def test_crystalShape_cubeMeasures():
 
 def test_crystalShape_faceCentresLieOnTheirPlanes():
   c = cube()
-  assert np.allclose(c.faceNormal().dot(c.faceCenter, noSymmetry=True), 1 / (2 * np.sqrt(3)))
+  assert np.allclose(c.faceNormal().dot(c.faceCenter, symmetry=False), 1 / (2 * np.sqrt(3)))
 
 
 def test_crystalShape_edgesAreTheSidesOfTheCube():

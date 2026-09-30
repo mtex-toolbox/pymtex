@@ -197,7 +197,7 @@ classes `vector3d`, `rotation`, `orientation`, `crystalFrame`, `S2Grid`; verbs
 `rotation.byEuler`, `orientation.byMiller`; properties `ori.CS`, `m.hkl`, `rot.angle`.
 Verbs exist as methods and as module functions of the same name, so `angle(o1, o2)` and
 `o1.angle(o2)` are one call. Boolean flags become keyword arguments with their MTEX
-names (`noSymmetry=True`); a positional string that names a convention, a basis, a group
+names (`symmetry=False`); a positional string that names a convention, a basis, a group
 or an alignment stays positional (`'uvw'`, `'ZYZ'`, `'X||a'`). The `_outer` names stay as
 one-line conveniences over broadcasting. Angles in radians with the `degree` constant;
 no unit library on the hot path. A snake_case alias layer can be added later at no cost.

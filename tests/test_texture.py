@@ -150,7 +150,7 @@ def test_doEulerStep_movesOrientationsByTheAngleOfAConstantSpin():
   omega, spin = constantSpin(cs, ss)
   os = orientation.rand(20, cs, ss, rng=rng)
   moved = doEulerStep(spin, os, 4)
-  assert moved.shape == os.shape and np.allclose(moved.angle(os, noSymmetry=True), omega, atol=1e-9)
+  assert moved.shape == os.shape and np.allclose(moved.angle(os, symmetry=False), omega, atol=1e-9)
   assert np.allclose(rotation(moved.data).data, (rotation.byAxisAngle(zvector, omega) * rotation(os.data)).data, atol=1e-9)
 
 

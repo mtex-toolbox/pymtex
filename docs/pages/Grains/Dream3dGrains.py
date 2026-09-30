@@ -72,7 +72,7 @@ setCamera(plottingConvention.default3D)
 # share the spatial reference frame of the mesh vertices. They describe boundary-plane
 # directions, not the misorientation across a face.
 #
-# Pass `noOrientFaces=True` to `grain3d.load` only when the raw stored winding is
+# Pass `orientFaces=False` to `grain3d.load` only when the raw stored winding is
 # required. With raw winding, normal directions and signed volumes are not meaningful. The
 # `boundary.grainId` order has no geometric direction either.
 

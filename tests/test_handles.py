@@ -14,13 +14,13 @@ rng = np.random.default_rng(51)
 # check_radonOptions's handle: 1 + cos(angle), under 432 and 222, averaged over the groups when asked
 def cosHandle(symmetrise=False):
   cs, ss = crystalFrame("432"), specimenFrame("222")
-  return SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=symmetrise)
+  return SO3FunHandle(lambda o: 1 + np.cos(angle(o, symmetry=False)), cs, ss, bandwidth=16, symmetrise=symmetrise)
 
 
 def test_SO3FunHandle_evaluatesItsFunction():
   f = cosHandle()
   o = orientation(rotation.rand(7, rng=rng), f.CS, f.SS)
-  assert np.allclose(f(o), 1 + np.cos(angle(o, noSymmetry=True))) and f(o[0]) == f(o)[0] and f(o[0]) == f(rotation(o[0]))
+  assert np.allclose(f(o), 1 + np.cos(angle(o, symmetry=False))) and f(o[0]) == f(o)[0] and f(o[0]) == f(rotation(o[0]))
 
 
 def test_SO3FunHandle_refusesAnotherFrame():
@@ -121,7 +121,7 @@ def odfTerms():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   u = unimodalODF(orientation(rotation.rand(rng=rng), cs, ss))
   fb = fibreODF(fibre(orientation(rotation.rand(rng=rng), cs, ss), Miller(1, 1, 1, cs)))
-  h = SO3FunHandle(lambda o: 1 + np.cos(angle(o, noSymmetry=True)), cs, ss, bandwidth=16, symmetrise=True)
+  h = SO3FunHandle(lambda o: 1 + np.cos(angle(o, symmetry=False)), cs, ss, bandwidth=16, symmetrise=True)
   return cs, ss, u, fb, h
 
 

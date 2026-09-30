@@ -224,7 +224,7 @@ its reshape of the fits is broken in MATLAB), the `includeTwins` option of the c
   per pixel `variantId`, `packetId`, `fit`), `calcVariants`, `parent2ChildInfo`;
   `calcGraph`, `clusterGraph` over `mclComponents`, `calcParentFromGraph`, `mergeByGraph`,
   `plotGraph`, `calcVariantGraph`, `clusterVariantGraph` (`includeSimilar`, `mergeSimilar`,
-  `noPseudoDiagonal`, `sym`, `keepGraph`).
+  `pseudoDiagonal=False`, `sym`, `keepGraph`).
 - `grain2d.merge` takes a label per grain, a graph of grains, `inclusions`/`host`/`maxSize`
   (an inclusion merges across a phase boundary and the grain keeps the host's phase and
   orientation, MATLAB's `'inclusion'` rule) and `testRun`; `grains.inclusionHost` is

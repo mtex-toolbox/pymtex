@@ -117,10 +117,10 @@ norm(m)
 
 # The value 7.5563 is in the same units as `cs.abc`. Multiplying all indices by two leaves
 # the geometric direction unchanged, up to numerical rounding, but doubles the vector
-# length. The option `noSymmetry` compares the two vectors as written rather than
+# length. The option `symmetry=False` compares the two vectors as written rather than
 # searching their symmetry-equivalent directions.
 
-angle(m, Miller(2, 0, 2, cs, 'uvw'), noSymmetry=True) / degree
+angle(m, Miller(2, 0, 2, cs, 'uvw'), symmetry=False) / degree
 
 # ---
 

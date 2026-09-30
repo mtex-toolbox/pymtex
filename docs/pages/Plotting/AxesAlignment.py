@@ -121,9 +121,9 @@ plottingConvention.default('y↑→x')
 #
 #     setMTEXpref('pfAnnotations', lambda *args, **kw: None)
 #
-# For one plot, `noLabel` suppresses the frame annotation instead.
+# For one plot, `axisLabels=False` suppresses the frame annotation instead.
 
-plot(v1, upper=True, label='v_1', noLabel=True)
+plot(v1, upper=True, label='v_1', axisLabels=False)
 
 # The vector label remains, but the reference-frame axis labels are absent.
 #

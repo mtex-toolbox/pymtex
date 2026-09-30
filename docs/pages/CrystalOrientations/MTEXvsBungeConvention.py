@@ -143,7 +143,7 @@ mori_Bunge = ori1_Bunge * inv(ori2_Bunge)
 # ignores crystal symmetry, so a symmetry-equivalent but different rotation could not
 # masquerade as equality.
 
-misorientationResidual = angle(mori, mori_Bunge, noSymmetry=True) / degree
+misorientationResidual = angle(mori, mori_Bunge, symmetry=False) / degree
 misorientationResidual
 
 # The tiny residual is floating-point roundoff. The misorientation map is therefore

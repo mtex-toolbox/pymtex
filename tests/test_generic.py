@@ -22,7 +22,7 @@ def firstEuler(e):
 
 
 def test_the_columns_are_read_off_the_header_line():
-  e = loadEBSD(GENERIC, phases(), noGrid=True)
+  e = loadEBSD(GENERIC, phases(), grid=False)
   assert len(e) == 900
   assert e.CSList.mineralList == ["notIndexed", "Fe", "Mg"]
   assert set(e.prop) == {"index", "mad", "bc", "bs", "bands", "error", "reliabilityindex"}
@@ -38,17 +38,17 @@ def test_the_map_grids():
 
 def test_CS_as_one_frame_or_a_phaseList():
   cs = crystalFrame("m-3m", mineral="Fe")
-  e = loadEBSD(GENERIC, cs, noGrid=True)
+  e = loadEBSD(GENERIC, cs, grid=False)
   assert e.CSList.mineralList == ["notIndexed", "Fe"]
-  assert int((e.phaseId == 1).sum()) == int((loadEBSD(GENERIC, phases(), noGrid=True).phaseId == 1).sum())
-  e = loadEBSD(GENERIC, mtex.phaseList(phases()), noGrid=True)
+  assert int((e.phaseId == 1).sum()) == int((loadEBSD(GENERIC, phases(), grid=False).phaseId == 1).sum())
+  e = loadEBSD(GENERIC, mtex.phaseList(phases()), grid=False)
   assert len(e.CSList) == 3
 
 
 def test_columnNames_given(tmp_path):
   p = tmp_path / "t.txt"
   p.write_text("0 0 10 20 30 1 0.5\n1 0 10 20 30 2 0.7\n0 1 10 20 30 0 0.1\n1 1 10 20 30 1 0.2\n")
-  e = loadEBSD(p, phases(), columnNames=["x", "y", "Euler 1", "Euler 2", "Euler 3", "phase", "mad"], noGrid=True)
+  e = loadEBSD(p, phases(), columnNames=["x", "y", "Euler 1", "Euler 2", "Euler 3", "phase", "mad"], grid=False)
   assert len(e) == 4
   assert set(e.prop) == {"mad"}
   assert list(e.phaseId) == [1, 2, 0, 1]
@@ -58,7 +58,7 @@ def test_columnNames_given(tmp_path):
 def test_columns_select_and_reorder(tmp_path):
   p = tmp_path / "t.txt"
   p.write_text("9 1 0 0 10 20 30\n9 1 1 0 10 20 30\n")
-  e = loadEBSD(p, phases(), columnNames=["phase", "x", "y", "phi1", "Phi", "phi2"], columns=[1, 2, 3, 4, 5, 6], noGrid=True)
+  e = loadEBSD(p, phases(), columnNames=["phase", "x", "y", "phi1", "Phi", "phi2"], columns=[1, 2, 3, 4, 5, 6], grid=False)
   assert list(e.pos.x) == [0, 1]
   assert list(e.phaseId) == [1, 1]
 
@@ -66,16 +66,16 @@ def test_columns_select_and_reorder(tmp_path):
 def test_radians_and_the_convention(tmp_path):
   p = tmp_path / "t.txt"
   p.write_text("x y alpha beta gamma\n0 0 0.1 0.2 0.3\n1 0 0.1 0.2 0.3\n")
-  e = loadEBSD(p, crystalFrame("m-3m"), "ABG", radians=True, noGrid=True)
+  e = loadEBSD(p, crystalFrame("m-3m"), "ABG", radians=True, grid=False)
   assert mtex.angle(e[0].rotations, rotation.byEuler(0.1, 0.2, 0.3, "Matthies")) < 1e-12
-  e = loadEBSD(p, crystalFrame("m-3m"), noGrid=True)
+  e = loadEBSD(p, crystalFrame("m-3m"), grid=False)
   assert mtex.angle(e[0].rotations, rotation.byEuler(0.1 * degree, 0.2 * degree, 0.3 * degree)) < 1e-12
 
 
 def test_no_phase_column_is_one_phase(tmp_path):
   p = tmp_path / "t.txt"
   p.write_text("x,y,phi1,Phi,phi2\n0,0,1,2,3\n1,0,1,2,3\n")
-  e = loadEBSD(p, phases(), delimiter=",", noGrid=True)
+  e = loadEBSD(p, phases(), delimiter=",", grid=False)
   assert list(e.phaseId) == [1, 1]
   assert list(e.phase) == [1, 1]
 
@@ -83,7 +83,7 @@ def test_no_phase_column_is_one_phase(tmp_path):
 def test_header_count_and_delimiter(tmp_path):
   p = tmp_path / "t.txt"
   p.write_text("a b c\nd e f\n0;0;1;2;3;1\n1;0;1;2;3;1\n")
-  e = loadEBSD(p, phases(), header=2, delimiter=";", columnNames=["x", "y", "Euler1", "Euler2", "Euler3", "phase"], noGrid=True)
+  e = loadEBSD(p, phases(), header=2, delimiter=";", columnNames=["x", "y", "Euler1", "Euler2", "Euler3", "phase"], grid=False)
   assert len(e) == 2
 
 
@@ -126,7 +126,7 @@ def test_tableColumns():
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "85_829grad_07_09_06.txt")), reason="the MTEX data folder is not here")
 def test_full_generic_matches_mtex():
-  e = loadEBSD(os.path.join(DATA, "85_829grad_07_09_06.txt"), phases(), noGrid=True)
+  e = loadEBSD(os.path.join(DATA, "85_829grad_07_09_06.txt"), phases(), grid=False)
   assert len(e) == 60775
   assert [int((e.phaseId == k).sum()) for k in range(3)] == [11411, 48184, 1180]
   assert np.allclose(firstEuler(e), [234.12, 20.846, 25.195], atol=1e-6)

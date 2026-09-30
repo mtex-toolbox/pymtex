@@ -120,7 +120,7 @@ c2c
 # conjugated by `p2c`. Conjugation leaves the rotation angles unchanged. Without child
 # symmetry reduction, a cubic parent supplies only 0, 90, 120, and 180 degree rotations.
 
-np.unique(np.round(angle(c2c, noSymmetry=True) / degree))
+np.unique(np.round(angle(c2c, symmetry=False) / degree))
 
 # Only the rotation axes depend on the OR. Child symmetry reduces each misorientation to its
 # disorientation, which spreads those four angles into the longer list below. The list belongs

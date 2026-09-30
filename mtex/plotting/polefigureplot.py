@@ -71,17 +71,17 @@ def _spread(values, ps):
 # sector of the frame the directions live in, or the density of the directions, or the
 # interpolant of the values, when a style asks for a surface
 def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRange=None, MarkerSize=None, halfwidth=5 * degree,
-             noTitle=False, minmax=False, **kw):
+             title=True, minmax=False, **kw):
   if style != "scatter":
     from ..functions.density import calcDensity, interpolate
     fs = [calcDensity(vs, halfwidth=halfwidth) if vals is None else interpolate(vs, np.asarray(vals, dtype=float).reshape(-1))
           for vs, vals in zip(vss, valuess or [None] * len(vss))]
     return _plotRow(fs, titles, style=style, colorbar=colorbar, colorRange="individual" if colorRange is None else colorRange,
-                    noTitle=noTitle, minmax=minmax, **kw)
+                    title=title, minmax=minmax, **kw)
   projKw, axesKw, whereKw = _split(kw)
   complete = projKw.pop("complete", False)
   charts = []
-  for vs, title in zip(vss, titles):
+  for vs, name in zip(vss, titles):
     ax = projKw.get("antipodal", vs.antipodal)
     region = sphericalRegion(frame=vs.frame) if complete else plotRegion(vs.frame, fundamentalRegion=True, antipodal=ax,
                                                                              how2plot=projKw.get("how2plot"))
@@ -89,7 +89,7 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
     projs = makeSphericalProjection(region, **pk)
     # a sphere drawn as two hemispheres is titled once and each half says which it is
     for i, p in enumerate(projs):
-      charts.append((vs, region, p, None if noTitle or i else title, len(projs) == 2))
+      charts.append((vs, region, p, None if not title or i else name, len(projs) == 2))
   # a held figure of as many charts takes the markers on top of what it has
   fig = gcm()
   if whereKw.get("parent") is not None:

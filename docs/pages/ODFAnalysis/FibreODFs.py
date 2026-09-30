@@ -117,7 +117,7 @@ for hw in halfwidths:
 # +
 mtexFig = newMtexFigure(layout=[1, 3], figSize='large')
 for i, hw in enumerate(halfwidths):
-  plotPDF(odfByHalfwidth[i], f.h, contourf=True, noTitle=True)
+  plotPDF(odfByHalfwidth[i], f.h, contourf=True, title=False)
   mtexTitle(f'${hw / degree:g}^{{\\circ}}$')
   if i < len(halfwidths) - 1:
     nextAxis()

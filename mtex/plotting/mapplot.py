@@ -474,7 +474,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
 
 @_liftable
 def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None, refFrame=True,
-               location=None, ipfDirection=None, noBoundary=False, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, DisplayName=None,
+               location=None, ipfDirection=None, boundary=True, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, DisplayName=None,
                translucent=None, **kw):
   """plot(grains), plot(grains, property), plot(grains, grains.meanOrientation)
 
@@ -532,7 +532,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   ax.add_collection(h)
   if DisplayName is not None:
     h.set_label(DisplayName)
-  if not noBoundary and grains.boundary is not None:
+  if boundary and grains.boundary is not None:
     # the boundary takes the line colour, else the face colour, else black, as MATLAB passes
     # its options on; faces of no colour keep a black outline
     if lineColor is None:
@@ -753,7 +753,7 @@ def textMap(x, labels, fontSize=None, color="k", **kw):
   return [mP.ax.text(px, py, t, ha="center", va="center", fontsize=size, color=color, zorder=8, clip_on=True, **kw) for (px, py), t in zip(P, labels)]
 
 
-def quiverMap(x, v, scale=None, color=None, lineWidth=None, noScaling=False, DisplayName=None, autoScaleFactor=None, project2plane=False,
+def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, DisplayName=None, autoScaleFactor=None, project2plane=False,
               antipodal=False, **kw):
   """quiver(grains, v), quiver(ebsd, v), quiver(gB, v): an arrow per grain at its centroid,
   per measurement, per segment at its midpoint; an axis is centred, a direction starts there.
@@ -783,10 +783,10 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, noScaling=False, Dis
   if autoScaleFactor is not None:
     default = default * float(autoScaleFactor)
   c = pl.to2d(c.data.reshape(-1, 3)) if isinstance(c, vector3d) else np.asarray(c, dtype=float).reshape(-1, 2)
-  if kind == "boundary" and not noScaling and scale is None:
+  if kind == "boundary" and scaling and scale is None:
     return _quiverBoundary(mP, c, raw, 0.15 if autoScaleFactor is None else float(autoScaleFactor), color or "k",
                            2.0 if lineWidth is None else lineWidth, DisplayName, **kw)
-  if kind == "grains" and not noScaling and scale is None:
+  if kind == "grains" and scaling and scale is None:
     # without a colour the arrows of the grains take the next of the axes' colour order, as MATLAB's
     color = mP.ax._get_lines.get_next_color() if color is None else color
     return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, DisplayName, project2plane, **kw)
@@ -795,7 +795,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, noScaling=False, Dis
   u = np.stack([raw @ pl.e1, raw @ pl.e2], axis=-1)
   n = np.linalg.norm(u, axis=-1)
   ok = (n > 0) & np.all(np.isfinite(raw), axis=-1)
-  length = n[ok] if noScaling else default[ok] if scale is None else scale * n[ok]
+  length = n[ok] if not scaling else default[ok] if scale is None else scale * n[ok]
   u = u[ok] / n[ok][:, None] * length[:, None]
   c = c[ok]
   # an axis, or MATLAB's 'antipodal', is a line centred on its point

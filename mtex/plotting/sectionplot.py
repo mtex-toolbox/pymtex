@@ -63,13 +63,13 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
     fig = mtexFigure(n * wide, columns=ncols, figSize=figSize)
   fig.sections = oS
   outer = oS.outerSector
-  noLabel = axesKw.pop("noLabel", labels is not None or outer is not None)
+  axisLabels = axesKw.pop("axisLabels", labels is None and outer is None)
   plots = []
   for k in range(n):
     cell = []
     for j, proj in enumerate(charts[k]):
       ax = fig.nextAxis() if ax is None or (k, j) != (0, 0) else ax
-      sP = sphericalPlot(ax, proj, noLabel=noLabel, title=oS.sectionLabel(k) if j == 0 else None, **axesKw)
+      sP = sphericalPlot(ax, proj, axisLabels=axisLabels, title=oS.sectionLabel(k) if j == 0 else None, **axesKw)
       if labels is not None:
         ax.set_xlabel(labels[0], fontsize=sP.fontSize)
         ax.set_ylabel(labels[1], fontsize=sP.fontSize)
@@ -185,11 +185,8 @@ def plotSection(x, *args, **kw):
     oS = newODFSectionPlot(CS1, CS2, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)
-  # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes;
-  # noGrid leaves out the reference field a pole figure section counts from, as MATLAB's
+  # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes
   decor = {k: kw.pop(k) for k in ("coordinates", "xlabel", "ylabel") if k in kw}
-  if kw.pop("noGrid", False) and _isSO3Fun(x):
-    kw["field"] = False
   if _isSO3Fun(x):
     hs = _plotSectionFun(x, oS, **kw)
   elif shapes is not None:

@@ -40,8 +40,8 @@ angle(mori, inv(mori)) / degree
 # two markers below consequently occupy opposite points on the upper and lower hemispheres.
 
 # +
-axMori = axis(mori, noSymmetry=True)
-axInverse = axis(inv(mori), noSymmetry=True)
+axMori = axis(mori, symmetry=False)
+axInverse = axis(inv(mori), symmetry=False)
 
 plot(axMori, complete=True, MarkerSize=12, DisplayName='m', grid=True)
 hold(True)
@@ -88,9 +88,9 @@ numEquivalentUnordered
 orderedRegion = fundamentalRegion(cs, cs)
 exchangeRegion = fundamentalRegion(cs, cs, antipodal=True)
 
-plot(orderedRegion, boundaryColor=[0.2, 0.4, 0.8], noSurface=True, figSize='small')
+plot(orderedRegion, boundaryColor=[0.2, 0.4, 0.8], surface=False, figSize='small')
 hold(True)
-plot(exchangeRegion, boundaryColor=[0.85, 0.3, 0.1], noSurface=True)
+plot(exchangeRegion, boundaryColor=[0.85, 0.3, 0.1], surface=False)
 hold(False)
 # -
 

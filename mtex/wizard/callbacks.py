@@ -594,7 +594,7 @@ def editPhase(st, phaseId, column, value):
     new = crystalFrame(symbol, abc, np.array(abg) * degree, *alignment, mineral=mineral, color=color)
     if np.max(np.abs(new.abc - abc)) > 1e-6 * max(abc) or np.max(np.abs(new.abg / degree - abg)) > 1e-6 \
         or closestAlignment(new) != list(alignment):
-      new = crystalFrame(symbol, abc, np.array(abg) * degree, *alignment, mineral=mineral, color=color, noIntern=True)
+      new = crystalFrame(symbol, abc, np.array(abg) * degree, *alignment, mineral=mineral, color=color, intern=False)
   frames = list(st.ebsd.CSList.frames)
   frames[phaseId] = new
   st.ebsd.CSList = phaseList(frames)

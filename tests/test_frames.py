@@ -40,7 +40,7 @@ def test_crystalFrame_nameCellOrGroupSplitsTheFrame():
 
 def test_crystalFrame_noInternMakesAFreshFrame():
   cs = aluminium()
-  assert crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium", noIntern=True) is not cs
+  assert crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium", intern=False) is not cs
 
 
 def test_crystalFrame_colourIsNotInTheKey():
@@ -90,7 +90,7 @@ def test_register_holdsOneFramePerKey():
   crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Nickel")
   crystalFrame("m-3m", [8.1, 8.1, 8.1], mineral="Aluminium")
   aluminium432()
-  crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium", noIntern=True)
+  crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium", intern=False)
   crystalFrame("mmm", [4.8, 10, 6], mineral="Forsterite", color="green")
   crystalFrame("mmm", [4.8, 10, 6], mineral="Forsterite")
   assert len(SESSION.frames) == 5
@@ -263,7 +263,7 @@ def test_specimenFrame_specimenAndMeasurementAxes():
 
 def test_specimenFrame_constructorMakesAFreshFrame():
   # the constructor makes a fresh frame, the factories return the registered one
-  assert specimenFrame("rolling") is not specimenFrame.rolling and specimenFrame("rolling", noIntern=True).name == "rolling"
+  assert specimenFrame("rolling") is not specimenFrame.rolling and specimenFrame("rolling", intern=False).name == "rolling"
 
 
 def test_specimenFrame_defaultIsTheSpecimenFrameDrawnAsSEMImages():

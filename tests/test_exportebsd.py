@@ -61,12 +61,12 @@ def test_across_formats_and_only_the_phases_present_are_declared(tmp_path):
 
 
 def test_the_correction_is_undone(tmp_path):
-  e = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"), noGrid=True)
+  e = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"), grid=False)
   export(e, tmp_path / "a.ctf", eulerCorrection=rotation.id)
-  raw = loadEBSD(tmp_path / "a.ctf", eulerCorrection=rotation.id, noGrid=True)
+  raw = loadEBSD(tmp_path / "a.ctf", eulerCorrection=rotation.id, grid=False)
   same(e, raw, 1e-5)
   export(e, tmp_path / "b.ang", setting=0)
-  raw = loadEBSD(tmp_path / "b.ang", setting=0, noGrid=True)
+  raw = loadEBSD(tmp_path / "b.ang", setting=0, grid=False)
   same(e, raw, 2e-5)
 
 
@@ -75,10 +75,10 @@ def test_a_tilted_surface_goes_back_into_the_header(tmp_path):
     data = f.read()
   (tmp_path / "tilt.ctf").write_bytes(data.replace(b"AcqE2\t0", b"AcqE2\t90"))
   with pytest.warns(UserWarning):
-    e = loadEBSD(tmp_path / "tilt.ctf", noGrid=True)
+    e = loadEBSD(tmp_path / "tilt.ctf", grid=False)
   export(e, tmp_path / "back.ctf")
   with pytest.warns(UserWarning):
-    b = loadEBSD(tmp_path / "back.ctf", noGrid=True)
+    b = loadEBSD(tmp_path / "back.ctf", grid=False)
   assert b.meta["surface"] == (0.0, 90.0, 0.0)
   same(e, b, 1e-5)
 
@@ -139,7 +139,7 @@ def test_the_two_formatters_agree():
 @pytest.mark.parametrize("name", sorted(os.path.basename(f) for f in glob.glob(os.path.join(FIXTURES, "h5", "*"))))
 def test_h5_round_trip_with_a_changed_map(tmp_path, name):
   pytest.importorskip("h5py")
-  e = loadEBSD(os.path.join(FIXTURES, "h5", name), noGrid=True)
+  e = loadEBSD(os.path.join(FIXTURES, "h5", name), grid=False)
   m = e.rotate(rotation.byAxisAngle(vector3d(1, 2, 3), 0.3), keepXY=True)
   key = next(iter(m.prop)) if m.prop else None
   if key is not None:
@@ -148,7 +148,7 @@ def test_h5_round_trip_with_a_changed_map(tmp_path, name):
   m.CSList.frames[int(m.CSList.indexedPhaseId[0])].mineral = "Renamed"
   out = tmp_path / name
   export(m, out)
-  b = loadEBSD(out, noGrid=True)
+  b = loadEBSD(out, grid=False)
   assert len(b) == len(m)
   same(m, b, 1e-6)
   # a fixed length name field cuts a longer name short, with a warning
@@ -175,7 +175,7 @@ def test_h5_export_needs_the_record_and_the_rows(tmp_path):
   e = loadEBSD(os.path.join(FIXTURES, "ferrite_cut.ang"))
   with pytest.raises(ValueError, match="no record"):
     export(e, tmp_path / "x.h5")
-  h = loadEBSD(os.path.join(FIXTURES, "h5", "kamila_cut.oh5"), noGrid=True)
+  h = loadEBSD(os.path.join(FIXTURES, "h5", "kamila_cut.oh5"), grid=False)
   with pytest.raises(ValueError, match="lost or gained"):
     export(h[:100], tmp_path / "x.oh5")
   with pytest.raises(ValueError, match="itself"):
@@ -184,7 +184,7 @@ def test_h5_export_needs_the_record_and_the_rows(tmp_path):
     export(h, tmp_path / "x.oh5", reference=tmp_path / "missing.oh5")
   # another file of the same layout as the reference
   export(h, tmp_path / "y.oh5", reference=os.path.join(FIXTURES, "h5", "kamila_cut.oh5"))
-  same(h, loadEBSD(tmp_path / "y.oh5", noGrid=True), 1e-6)
+  same(h, loadEBSD(tmp_path / "y.oh5", grid=False), 1e-6)
 
 
 def test_h5PhaseColumn():

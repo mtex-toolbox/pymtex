@@ -132,16 +132,16 @@ symmetryAwareAngles
 # Switching symmetry off compares the stored rotations directly. It gives six different
 # angles, whose minimum is the repeated value above.
 
-rawAngles = angle(probe, referenceEquivalents, noSymmetry=True) / degree
+rawAngles = angle(probe, referenceEquivalents, symmetry=False) / degree
 rawAngles
 
-# The `noSymmetry=True` flag is implemented by [angle](orientation.angle.html),
+# The `symmetry=False` flag is implemented by [angle](orientation.angle.html),
 # [dot](orientation.dot.html), and [unique](orientation.unique.html), among other
 # orientation methods. Reach for it when an angle or dot product comes out smaller than
 # expected. Leave it alone otherwise, because the symmetry-aware answer is normally the
 # physically meaningful one.
 #
-# Do not pass `noSymmetry=True` to [calcCluster](orientation.calcCluster.html). That
+# Do not pass `symmetry=False` to [calcCluster](orientation.calcCluster.html). That
 # method does not define the flag, and an unknown option can be ignored silently.
 
 # ## Technical Details

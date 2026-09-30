@@ -60,7 +60,7 @@ def test_frame_change_is_not_rotation():
   assert np.linalg.norm(m2.data - Miller(1, 2, 3, cs2).data) < 1e-10
   assert transformReferenceFrame(Miller(1, 2, 3, cs1, "uvw"), cs2).dispStyle == "uvw"
   o = orientation.align(cs1, cs2)
-  assert o.CS is cs1.stripSym() and o.SS is cs2.stripSym() and angle(o * m, m2, noSymmetry=True) < 1e-10
+  assert o.CS is cs1.stripSym() and o.SS is cs2.stripSym() and angle(o * m, m2, symmetry=False) < 1e-10
   with pytest.raises(ValueError):
     orientation.align(cs1, crystalFrame("m-3m", [4, 4, 4]))
   ori = orientation.byEuler(30 * degree, 50 * degree, 120 * degree, cs1)
@@ -71,7 +71,7 @@ def test_frame_change_is_not_rotation():
   mori2 = transformReferenceFrame(mori, cs2, cs2)
   assert mori2.CS is cs2 and mori2.SS is cs2
   h = Miller(1, 2, 3, cs1)
-  assert angle(transformReferenceFrame(mori * h, cs2), mori2 * transformReferenceFrame(h, cs2), noSymmetry=True) < 1e-10
+  assert angle(transformReferenceFrame(mori * h, cs2), mori2 * transformReferenceFrame(h, cs2), symmetry=False) < 1e-10
   assert rotate(m, rotation.byAxisAngle(zvector, 0.3)).frame is cs1
   # byScreenAlignment and the explicit rule agree
   fa = specimenFrame("transitionA", axesNames=("A", "B", "C"), how2plot="y↑→x")

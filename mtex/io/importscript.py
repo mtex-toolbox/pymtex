@@ -102,7 +102,7 @@ def frameLiteral(f):
   args = [repr(f.pointGroup), abc, abg]
   # the setup is written where it is not the one the constructor would choose by itself
   setup = closestAlignment(f)
-  if setup != closestAlignment(crystalFrame(f.pointGroup, f.abc, f.abg, noIntern=True, check=False)):
+  if setup != closestAlignment(crystalFrame(f.pointGroup, f.abc, f.abg, intern=False, check=False)):
     args += [repr(s) for s in setup]
   args.append(f"mineral={f.name!r}")
   c = _color(f)

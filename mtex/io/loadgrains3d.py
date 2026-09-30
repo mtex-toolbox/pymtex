@@ -24,9 +24,9 @@ from .load3d import DREAM3D_SYMMETRY
 NEPER_SYMMETRY = {"triclinic": "1", "cubic": "m-3m", "hexagonal": "6/mmm", "-1": "1"}
 
 
-def loadGrains3d(fname, *args, interface=None, CS=None, noOrientFaces=False, **kwargs):
+def loadGrains3d(fname, *args, interface=None, CS=None, orientFaces=True, **kwargs):
   """the 3D grains of a file, MATLAB's grain3d.load: the surface mesh of a DREAM.3D file or the
-  polyhedra of a 3D Neper tessellation; the faces are oriented unless noOrientFaces=True
+  polyhedra of a 3D Neper tessellation; the faces are oriented unless orientFaces=False
 
     loadGrains3d('grains.dream3d')
     loadGrains3d('grains.tess', CS=cs)"""
@@ -41,11 +41,11 @@ def loadGrains3d(fname, *args, interface=None, CS=None, noOrientFaces=False, **k
     cs = cs if isinstance(cs, phaseList) else phaseList([cs])
     return grain3d.fromFaces(t.V, t.F, t.I_GF, t.ori, cs, np.ones(t.I_GF.shape[0], dtype=np.int8))
   if interface == "dream3d":
-    return loadGrains_Dream3d(fname, CS=CS, noOrientFaces=noOrientFaces)
+    return loadGrains_Dream3d(fname, CS=CS, orientFaces=orientFaces)
   raise ValueError(f"no grain interface for {fname}")
 
 
-def loadGrains_Dream3d(fname, CS=None, noOrientFaces=False):
+def loadGrains_Dream3d(fname, CS=None, orientFaces=True):
   """the 3D grains of the surface mesh of a DREAM.3D file, the rotations those of the voxels, where
   MATLAB's reader turns every grain away from them; the faces oriented unless noOrientFaces=True"""
   import h5py
@@ -76,7 +76,7 @@ def loadGrains_Dream3d(fname, CS=None, noOrientFaces=False):
   vals = np.concatenate([np.ones(int(neg.sum())), -np.ones(int(pos.sum()))])
   I = csr_matrix((vals, (rows, cols)), shape=(n, len(F)))
   grains = grain3d.fromFaces(V, F, I, q, CS, phases[active].astype(np.int8))
-  return grains if noOrientFaces else grains.orientFaces()
+  return grains if not orientFaces else grains.orientFaces()
 
 
 def loadNeperTess(fname):

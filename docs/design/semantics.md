@@ -130,7 +130,7 @@ frameB`) also over `inv(mori)`.
 
 **S24. A crystal direction reduces over the group of its frame.** `dot(m1, m2)`,
 `angle`, `==`, `unique` compare `m1` against every `s * m2` for `s` in the group of the
-frame, unless `noSymmetry=True`. A specimen frame's group does not enter vector
+frame, unless `symmetry=False`. A specimen frame's group does not enter vector
 comparison.
 
 **S25. Frame change is not rotation.** `transformReferenceFrame(x, fr)` re-expresses `x`

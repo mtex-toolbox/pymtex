@@ -43,7 +43,7 @@ from ..geometry.display import display, framesLabel, header
 def _symmetrisedDirections(h, c, antipodal):
   hs, refl = [], []
   for k in range(h.size):
-    imgs = h[k].symmetrise(unique=True, antipodal=antipodal)
+    imgs = h[k].symmetrise(unique=True, antipodal=antipodal or None)
     hs.append(imgs.data.reshape(-1, 3))
     refl.append(np.full(imgs.size, c[k] / imgs.size))
   return np.concatenate(hs), np.concatenate(refl)
@@ -159,7 +159,7 @@ class MLSSolver:
   """
 
   def __init__(self, pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5,
-               maxIter=10, c0=None, noGhostCorrection=False, quadratureWeights=False, intensityWeights=False,
+               maxIter=10, c0=None, ghostCorrection=True, quadratureWeights=False, intensityWeights=False,
                regularisation=0.0, silent=True):
     # the intensities non negative, a pole figure ten times below the largest lifted
     data = pf.max(0)
@@ -176,7 +176,7 @@ class MLSSolver:
     self.minIter, self.maxIter = int(minIter), max(int(maxIter), int(minIter))
     self.c = None if c0 is None else np.asarray(c0, dtype=float).ravel()
     self.c0 = 0.0
-    self.ghostCorrection = not noGhostCorrection
+    self.ghostCorrection = ghostCorrection
     self.silent = silent
     if quadratureWeights and self.pf.SS.numProper() == 1:
       self.weights = [calcQuadratureWeights(r).ravel() for r in self.pf.allR]
@@ -334,7 +334,7 @@ class MLSSolver:
       return uniformODF(self.CS, self.SS)
     return SO3FunRBF(self.S3G, self.psi, (1 - self.c0) * self.c / np.sum(self.c) / self.psi.mean(), self.c0)
 
-  def calcODF(self, minIter=None, maxIter=None, noGhostCorrection=None, silent=None):
+  def calcODF(self, minIter=None, maxIter=None, ghostCorrection=None, silent=None):
     """the reconstruction, with the uniform portion the data allows fixed by the ghost
     correction and put into the constant instead of the components"""
     if minIter is not None:
@@ -343,7 +343,7 @@ class MLSSolver:
       self.maxIter = max(int(maxIter), self.minIter)
     if silent is not None:
       self.silent = silent
-    ghost = self.ghostCorrection if noGhostCorrection is None else not noGhostCorrection
+    ghost = self.ghostCorrection if ghostCorrection is None else ghostCorrection
     self.init()
     self.iterate()
     n = len(self.ops)
@@ -365,26 +365,26 @@ class MLSSolver:
 
 
 def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5, maxIter=10, c0=None,
-            noGhostCorrection=False, quadratureWeights=False, intensityWeights=False, regularisation=0.0, silent=True):
+            ghostCorrection=True, quadratureWeights=False, intensityWeights=False, regularisation=0.0, silent=True):
   """an ODF reconstructed from pole figure intensities, an SO3FunRBF
 
     calcODF(pf)
     calcODF(pf, halfwidth=5*degree, resolution=5*degree)
     calcODF(pf, zeroRange=True)                     drop the orientations the data says are empty
-    calcODF(pf, noGhostCorrection=True)             keep the uniform portion in the components
+    calcODF(pf, ghostCorrection=False)             keep the uniform portion in the components
   """
   solvers = [a for a in args if isinstance(a, MLSSolver)]
   if solvers:
     return solvers[0].calcODF()
   return MLSSolver(pf, *args, resolution=resolution, halfwidth=halfwidth, kernel=kernel, S3G=S3G, zeroRange=zeroRange,
-                   minIter=minIter, maxIter=maxIter, c0=c0, noGhostCorrection=noGhostCorrection,
+                   minIter=minIter, maxIter=maxIter, c0=c0, ghostCorrection=ghostCorrection,
                    quadratureWeights=quadratureWeights, intensityWeights=intensityWeights,
                    regularisation=regularisation, silent=silent).calcODF()
 
 
 # ------------------------------------------------------------------ successive refinement
 
-def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, maxSteps=5, thinning=0.025, nothinning=False,
+def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, maxSteps=5, thinning=0.025,
                      silent=True, **kwargs):
   """the reconstruction refined successively (MATLAB calcODFIterative): a ladder of kernel
   halfwidths from sqrt(e)^(steps-1) times the target down to the target, those above 45
@@ -406,7 +406,7 @@ def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, ma
     grid = equispacedSO3Grid(pf.CS, pf.SS, resolution=r)
     c = np.maximum(np.real(odf(grid)), 0)
     c = c / np.sum(c)
-    if thinning > 0 and not nothinning:
+    if thinning:
       keep = c > min(1.0, thinning) / c.size
       grid = grid.subGrid(keep)
       c = c[keep]

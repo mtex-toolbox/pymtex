@@ -12,7 +12,7 @@ hexFrames = [crystalFrame("6/mmm", [3, 3, 5]), crystalFrame("-3m", [4.9, 4.9, 5.
 
 
 def parallel(a, b):
-  return bool(np.all(1 - np.abs(a.normalize().dot(b.normalize(), noAntipodal=True)) < 1e-10))
+  return bool(np.all(1 - np.abs(a.normalize().dot(b.normalize(), antipodal=False)) < 1e-10))
 
 
 def hexagonal():

@@ -83,7 +83,7 @@ rPlane = ori * Miller(0, 1, 1, cs, 'hkl')
 rDirection = ori * Miller(1, 0, 0, cs, 'uvw')
 
 plot(cat(rPlane, rDirection), upper=True, grid=True, MarkerSize=10,
-     label=['(011)', '[100]'], backgroundColor='w', noLabel=True)
+     label=['(011)', '[100]'], backgroundColor='w', axisLabels=False)
 
 # Notice that the $(011)$ pole is at the centre, the specimen Z direction, while $[100]$
 # is on the specimen X axis at the rim.
@@ -127,7 +127,7 @@ len(ori.symmetrise())
 # The equivalence of the 24 settings is why the angle between two orientations is the
 # smallest angle over all equivalent pairs. The dedicated
 # [Symmetry](OrientationSymmetry.html) page develops this rule and explains when to use
-# the `noSymmetry=True` option.
+# the `symmetry=False` option.
 
 # ## Specimen Symmetry
 #

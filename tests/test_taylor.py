@@ -162,8 +162,8 @@ def test_exp_ofTheSpinTurnsTheCrystalByItsAngle():
   # the spin turns the crystal: exp(ori, -W) moves by the angle of the spin vector
   cs, ss, sS, o, eps, single = fccAtOneOrientation()
   moved = o.exp(-single.W)
-  assert np.isclose(o.angle(moved, noSymmetry=True), single.W.vector().norm(), atol=1e-8)
-  assert (o * (-single.W).exp()).angle(moved, noSymmetry=True) < 1e-10 and isinstance((-single.W).exp(), rotation)
+  assert np.isclose(o.angle(moved, symmetry=False), single.W.vector().norm(), atol=1e-8)
+  assert (o * (-single.W).exp()).angle(moved, symmetry=False) < 1e-10 and isinstance((-single.W).exp(), rotation)
 
 
 def test_calcTaylor_refusesAStrainOfAnotherCrystal():

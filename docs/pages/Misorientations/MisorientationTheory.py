@@ -74,8 +74,8 @@ symmetryAwareRange
 # Every symmetry-aware comparison therefore returns the same value. If symmetry is ignored,
 # the same representatives span many rotation angles.
 
-rawAngleRange = np.hstack([np.min(angle(ori1, ori2Equivalent, noSymmetry=True)),
-                          np.max(angle(ori1, ori2Equivalent, noSymmetry=True))]) / degree
+rawAngleRange = np.hstack([np.min(angle(ori1, ori2Equivalent, symmetry=False)),
+                          np.max(angle(ori1, ori2Equivalent, symmetry=False))]) / degree
 rawAngleRange
 
 # ## The Directed Misorientation
@@ -90,14 +90,14 @@ mori
 # The displayed object is one representative of all equivalent rotations. Its raw angle is
 # not necessarily the disorientation angle.
 
-rawRepresentativeAngle = angle(mori, noSymmetry=True) / degree
+rawRepresentativeAngle = angle(mori, symmetry=False) / degree
 rawRepresentativeAngle
 
 # [project2FundamentalRegion](orientation.project2FundamentalRegion.html) chooses the
 # representative in the fundamental region, where each physical relationship appears once.
 
 disori = project2FundamentalRegion(mori)
-fundamentalRegionAngle = angle(disori, noSymmetry=True) / degree
+fundamentalRegionAngle = angle(disori, symmetry=False) / degree
 fundamentalRegionAngle
 
 # The raw representative is about $107.9^\circ$, whereas the representative in the
@@ -123,13 +123,13 @@ m = Miller([[1, -1, 0, 0], [1, 1, -2, 0], [-1, 0, 1, 1], [0, 0, 0, 1]], CS)
 
 # plot the major planes of grain 2 in the frame of grain 1
 for im in range(len(m)):
-  plot(mori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), noLabel=True, upper=True,
+  plot(mori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), axisLabels=False, upper=True,
        textBelowMarker=True)
   hold(True)
 hold(False)
 
 # label the corresponding planes of grain 1
-mm = round(unique(mori * m.symmetrise(), noSymmetry=True), maxHKL=6)
+mm = round(unique(mori * m.symmetrise(), symmetry=False), maxHKL=6)
 annotate(mm, labeled=True, MarkerSize=5, textBelowMarker=True)
 
 legend(location='southoutside', FontSize=13, numColumns=4)
@@ -176,12 +176,12 @@ coincidenceAngle
 # +
 # plot the approximation in place of the measured misorientation
 for im in range(len(m)):
-  plot(coincidenceMori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), noLabel=True, upper=True)
+  plot(coincidenceMori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), axisLabels=False, upper=True)
   hold(True)
 hold(False)
 
 # label the corresponding planes in the other crystal
-mm = round(unique(coincidenceMori * m.symmetrise(), noSymmetry=True), maxHKL=6)
+mm = round(unique(coincidenceMori * m.symmetrise(), symmetry=False), maxHKL=6)
 annotate(mm, labeled=True, MarkerSize=5)
 
 legend(location='southoutside', FontSize=13, numColumns=4)

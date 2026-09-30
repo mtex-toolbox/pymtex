@@ -4,7 +4,7 @@ Run 2026-09-21 on one machine, twelve cores, both sides warm and run one after t
 Python 3.12, NumPy 2, numba, h5py, `bench/load_text.py`; Julia 1.12.7 with twelve threads,
 `julia -t auto --project=dev` on the `mtexJulia` loaders (`bench/load_text.jl`). The Julia
 numbers are what its own `loadEBSD` takes here today, not the numbers of its plan. `list`
-is the map as the file holds it (`noGrid=True`, `grid = false`), `grid` the map on its
+is the map as the file holds it (`grid=False`, `grid = false`), `grid` the map on its
 raster, which is what both return by default. Best of three, at the end of I4.
 
 | file | rows | Python list | Python grid | Julia list | Julia grid |
@@ -127,7 +127,7 @@ Every EBSD file of `../mtex-paper`, 22 files, 59.3 million measurements: twenty 
 of 2.5 to 3.3 million points, an Oxford `.cpr`/`.crc` pair of 3 million and a Bruker
 HDF5 map. Read by MTEX on the `frameSymmetry` branch through its bridge (`EBSD.load(f,
 'noGrid')`, R2024b, master removed from the path since its `@Miller` shadows the
-branch's) and by the port (`loadEBSD(f, noGrid=True)`), one bridge call per file, and
+branch's) and by the port (`loadEBSD(f, grid=False)`), one bridge call per file, and
 compared on the number of points, the phase counts, the mineral names and point groups,
 the cells, the first indexed measurement with its Euler angles and position, the mean
 rotation matrix over the indexed points, the extent and the mean of every property

@@ -298,7 +298,7 @@ def test_plotPDF_secondRowContinuesALayoutFromNextAxis(cubicODF):
   lay = gcm()
   plotPDF(odf, hs)
   nextAxis()
-  plotPDF(odf, hs, noTitle=True)
+  plotPDF(odf, hs, title=False)
   assert gcm() is lay and len(lay.children) == 6 and all(hasattr(ax, "_mtexSphericalPlot") for ax in lay.children)
 
 
@@ -345,7 +345,7 @@ def test_plotPDF_ofODFTakesMATLABPositionalFlags(cubicODF):
 
 def test_plotPDF_ofODFContourfNoTitleABarPerPanel(cubicODF):
   cs, odf, _ = cubicODF
-  h = plotPDF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True, noTitle=True)
+  h = plotPDF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True, title=False)
   fig = gcm()
   assert len(fig.children) == 2 and fig.children[0].get_title() == "" and len(fig.colorbars) == 2
   assert all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
@@ -494,7 +494,7 @@ def test_plotPDF_3dIsTheSphereInSpace():
   # '3d': the pole figure on the sphere in space, seen along the convention given
   pC = plottingConvention()
   pC.east, pC.outOfScreen = vector3d(9, 3, 3), vector3d(6, 10, 9)
-  plotPDF(odf, h, '3d', pC, grid=True, grid_res=10 * degree, noTitle=True)
+  plotPDF(odf, h, '3d', pC, grid=True, grid_res=10 * degree, title=False)
   assert gcm().children[0].name == '3d'
 
 
@@ -509,7 +509,7 @@ def test_plotHKL_labelsTheCubicPlanes():
 def test_plot_symmetrisedLabeledNamesTheEquivalentInsideAnAntipodalSector():
   # an equivalent inside the sector is labelled rather than the antipode of one
   cs = crystalFrame("-3m")
-  plotIPDF(unimodalODF(orientation.id(cs)), xvector, noLabel=True)
+  plotIPDF(unimodalODF(orientation.id(cs)), xvector, axisLabels=False)
   hold(True)
   plot(Miller(0, 0, 0, 1, cs), symmetrised=True, labeled=True)
   hold(False)

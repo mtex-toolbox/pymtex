@@ -50,7 +50,7 @@ plt.subplot(1, 2, 1, projection='polar')
 plot(S1F, linewidth=2)
 mtexTitle('Polar Plot')
 plt.subplot(1, 2, 2)
-plot(S1F, linewidth=2, notPolar=True)
+plot(S1F, linewidth=2, polar=False)
 mtexTitle('Cartesian Plot')
 
 # ## Read the two views
@@ -84,7 +84,7 @@ plt.subplot(1, 2, 1, projection='polar')
 plot(S1FCoeff, linewidth=2)
 mtexTitle('Polar Plot')
 plt.subplot(1, 2, 2)
-plot(S1FCoeff, linewidth=2, notPolar=True)
+plot(S1FCoeff, linewidth=2, polar=False)
 mtexTitle('Cartesian Plot')
 
 # ## Read the coefficient example
@@ -161,7 +161,7 @@ sampleResidual
 plt.figure()
 plt.plot(rho, values, 'x', label='samples')
 hold(True)
-plot(S1FI, linewidth=2, noPolar=True, displayName='periodic fit')
+plot(S1FI, linewidth=2, polar=False, displayName='periodic fit')
 hold(False)
 legend()
 

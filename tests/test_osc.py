@@ -14,7 +14,7 @@ CUT = os.path.join(FIXTURES, "copper_cut.osc")
 
 
 def test_the_cut_matches_the_julia_reader():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   assert len(e) == 1880
   assert e.CSList.mineralList == ["notIndexed", "Copper"]
   assert e.CS.pointGroup == "m-3m" and np.allclose(e.CS.abc, 3.61)
@@ -38,10 +38,10 @@ def test_the_cut_reads_on_its_hexagonal_grid():
 
 
 def test_the_setting_and_the_correction():
-  a = loadEBSD(CUT, noGrid=True)
-  b = loadEBSD(CUT, setting=0, noGrid=True)
+  a = loadEBSD(CUT, grid=False)
+  b = loadEBSD(CUT, setting=0, grid=False)
   assert mtex.angle(a.rotations[0], eulerCorrectionRotation(2) * b.rotations[0]) < 1e-12
-  c = loadEBSD(CUT, eulerCorrection=rotation.id, noGrid=True)
+  c = loadEBSD(CUT, eulerCorrection=rotation.id, grid=False)
   assert mtex.angle(b.rotations[0], c.rotations[0]) < 1e-12
 
 
@@ -78,7 +78,7 @@ def test_short_and_markerless_files_are_errors(tmp_path):
 def test_a_negative_confidence_index_is_not_indexed(tmp_path):
   with open(CUT, "rb") as f:
     b = bytearray(f.read())
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   # the confidence index of the first record sits at column 7
   from mtex.io.osc import oscColumnCount, oscDataStart
   start, xstep, _ = oscDataStart(bytes(b), b.find(OSC_HEADER_CLOSE), 1880)
@@ -86,7 +86,7 @@ def test_a_negative_confidence_index_is_not_indexed(tmp_path):
   b[start + 4 * 6:start + 4 * 7] = np.array([-1], dtype="<f4").tobytes()
   p = tmp_path / "ci.osc"
   p.write_bytes(bytes(b))
-  f = loadEBSD(p, noGrid=True)
+  f = loadEBSD(p, grid=False)
   assert int(f.isIndexed.sum()) == 1879 and not f.isIndexed[0]
   assert m == 14
 

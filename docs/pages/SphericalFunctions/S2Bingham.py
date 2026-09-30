@@ -65,7 +65,7 @@ for k2 in kappa:
   for k1 in kappa:
     if k1 >= k2:
       bFun = S2FunBingham([-k1, -k2, 0])
-      plot(bFun, colorRange=[0, 25], noLabel=True)
+      plot(bFun, colorRange=[0, 25], axisLabels=False)
       mtexTitle(f'$\\kappa_1=${k1}  $\\kappa_2=${k2}', FontSize=12)
     if k1 < kappa[-1] or k2 < kappa[-1]:
       nextAxis()

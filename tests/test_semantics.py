@@ -303,7 +303,7 @@ def test_S24_crystal_direction_reduces_over_its_group():
   cs = m.crystalFrame("m-3m", [4, 4, 4])
   m1, m2 = m.Miller(1, 0, 0, cs), m.Miller(0, 1, 0, cs)
   assert m1 == m2 and close(m.dot(m1, m2), m1.norm() ** 2) and close(m.angle(m1, m2), 0)
-  assert close(m.dot(m1, m2, noSymmetry=True), 0)
+  assert close(m.dot(m1, m2, symmetry=False), 0)
   ss = m.specimenFrame("222")
   v1, v2 = m.vector3d(1, 0, 0), m.vector3d(0, 1, 0)
   v1.frame, v2.frame = ss, ss

@@ -77,5 +77,5 @@ def test_load_ofTheDream3dMeshGivesTheMeanOfTheVoxels(dreamGrains):
 
 @needsDream3d
 def test_load_noOrientFacesLeavesNegativeVolumes():
-  raw = grain3d.load(DREAM3D, noOrientFaces=True)
+  raw = grain3d.load(DREAM3D, orientFaces=False)
   assert not np.all(raw.volume > 0)

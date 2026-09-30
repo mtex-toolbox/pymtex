@@ -42,11 +42,11 @@ plotPDF(odf_naive, pf.allH)
 # for the finer stages.
 #
 # This scale progression acts as a regularisation strategy for irregularly sampled data.
-# It does not replace ghost correction. The `nothinning` flag retains low-weight grid
+# It does not replace ghost correction. The `thinning=False` flag retains low-weight grid
 # nodes so that this comparison isolates the effect of the changing scale.
 
 # +
-odf_iter = calcODFIterative(pf, nothinning=True, silent=False)
+odf_iter = calcODFIterative(pf, thinning=False, silent=False)
 
 calcError(pf, odf_iter)
 # -

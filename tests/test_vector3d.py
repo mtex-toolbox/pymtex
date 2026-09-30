@@ -150,7 +150,7 @@ def test_angle_andDot_ofAntipodalVectors():
   u = vector3d(1, 0, 0)
   a = vector3d(1, 0, 0, antipodal=True)
   assert close(angle(a, vector3d(-1, 0.1, 0)), np.arctan2(0.1, 1)) and angle(a, vector3d(-1, 0.1, 0)) <= pi / 2
-  assert close(dot(a, vector3d(-1, 0, 0)), 1) and close(dot(a, vector3d(-1, 0, 0), noAntipodal=True), -1)
+  assert close(dot(a, vector3d(-1, 0, 0)), 1) and close(dot(a, vector3d(-1, 0, 0), antipodal=False), -1)
   assert close(dot(u, vector3d(-1, 0, 0), antipodal=True), 1)
 
 
@@ -250,7 +250,7 @@ def test_unique_withAndWithoutAntipodal():
   assert v.unique().shape == (3,)
   assert v.unique(antipodal=True).shape == (2,)
   a = vector3d(v, antipodal=True)
-  assert a.unique().shape == (2,) and a.unique(noAntipodal=True).shape == (3,)
+  assert a.unique().shape == (2,) and a.unique(antipodal=False).shape == (3,)
 
 
 def test_unique_indexAndInverse():

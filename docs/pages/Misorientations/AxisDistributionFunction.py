@@ -131,7 +131,7 @@ mtexColorbar()
 # boundaries smoothed without those two stages, as the help of `smoothBoundary` advises.
 
 # +
-gBp = smoothBoundary(calcGrains(ebsd['indexed'], angle=5 * degree), 5, noSimplify=True, noRefine=True)
+gBp = smoothBoundary(calcGrains(ebsd['indexed'], angle=5 * degree), 5, simplify=False, refine=False)
 gBp = gBp.boundary['Magnesium', 'Magnesium']
 ori1 = ebsd['id', gBp.ebsdId[:, 0]].orientations
 ori2 = ebsd['id', gBp.ebsdId[:, 1]].orientations

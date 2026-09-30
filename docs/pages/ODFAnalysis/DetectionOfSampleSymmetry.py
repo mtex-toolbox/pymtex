@@ -130,7 +130,7 @@ plot(pf, silent=True)
 # +
 odfMeasured = calcODF(pf, silent=True)
 
-plotPDF(odfMeasured, h, antipodal=True, silent=True, noLabel=True, grid='on')
+plotPDF(odfMeasured, h, antipodal=True, silent=True, axisLabels=False, grid='on')
 # -
 
 # The density maxima nearly reflect across the nominal specimen axes, with a small common

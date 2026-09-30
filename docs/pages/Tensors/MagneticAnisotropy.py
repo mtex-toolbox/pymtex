@@ -97,9 +97,9 @@ for k in range(len(fieldAngle)):
   fieldCrystal = inv(ori) * fieldSpecimen
 
   # direction cosines with the three cubic easy axes
-  alpha1 = dot(h100, fieldCrystal, noSymmetry=True)
-  alpha2 = dot(h010, fieldCrystal, noSymmetry=True)
-  alpha3 = dot(h001, fieldCrystal, noSymmetry=True)
+  alpha1 = dot(h100, fieldCrystal, symmetry=False)
+  alpha2 = dot(h010, fieldCrystal, symmetry=False)
+  alpha3 = dot(h001, fieldCrystal, symmetry=False)
 
   # first-order cubic magnetocrystalline anisotropy energy density
   anisotropyEnergy[k, :] = K1 * (alpha1**2 * alpha2**2 + alpha2**2 * alpha3**2 + alpha1**2 * alpha3**2)
@@ -150,7 +150,7 @@ plt.grid(True)
 # TD. The lower panel is the inverse of the upper trend because the empirical relation is
 # linear in mean energy.
 
-# ## Why noSymmetry is required
+# ## Why symmetry=False is required
 #
 # The first-order energy density for a cubic crystal is
 #
@@ -160,7 +160,7 @@ plt.grid(True)
 # magnetization and the three crystal axes. The expression is invariant when cubic
 # symmetry permutes or reverses those axes.
 #
-# The three cosines still have to be evaluated separately. Without `noSymmetry`,
+# The three cosines still have to be evaluated separately. Without `symmetry=False`,
 # [dot](vector3d.dot.html) compares a direction with symmetrically equivalent Miller
 # directions and returns the best match. That would replace the three components
 # required by the equation with three symmetry-reduced comparisons.

@@ -42,9 +42,9 @@ the Julia objects:
 | `makeSphericalProjection(v, 'upper')`, `'projection','stereo'`, `'complete'`, `'antipodal'` | `makeSphericalProjection(v, projection='stereo', upper=True, complete=True, antipodal=True)` returning a list | Julia's `charts`: one chart, or an upper and a lower one when the region reaches into both hemispheres |
 | `@sphericalPlot`, one per axes: `proj`, `boundary`, `grid`, `labels`, `bounds`, `minData`, `maxData` | `sphericalPlot(ax, proj)`, the same fields, kept on the axes as `ax._mtexSphericalPlot` | the chart grid follows the boundary; `chartGrid`, `chartBoundary`, `chartGridLines`, `chartLimits`, `chartLabels` are methods of the projection |
 | `mtexFigure`, `newMtexFigure`, `gcm`, `nextAxis`, `drawNow`, `mtexColorbar` | `mtexFigure` over `matplotlib.figure.Figure` with `nextAxis()`, `children`, `colorbar()`; `newMtexFigure`, `gcm`, `mtexColorbar` | Makie's `GridLayout` did this; here a thin class since matplotlib has no layout of that kind |
-| `plot(v)`, `scatter(v)`, `plot(v,'contourf')`, `contourf(v)`, `plot(v,data)`, `plot(v,rgb)`, `text(v, labels)`, `quiver(v, w)` | the same functions in `mtex.plotting` and methods on `vector3d`; flags are keywords: `contourf=True`, `upper=True`, `antipodal=True`, `fundamentalRegion=True`, `symmetrised=True`, `complete=True`, `minmax=True`, `grid=True`, `noLabel=True` | `dynamicMarkerSize`, one rule for the marker size |
+| `plot(v)`, `scatter(v)`, `plot(v,'contourf')`, `contourf(v)`, `plot(v,data)`, `plot(v,rgb)`, `text(v, labels)`, `quiver(v, w)` | the same functions in `mtex.plotting` and methods on `vector3d`; flags are keywords: `contourf=True`, `upper=True`, `antipodal=True`, `fundamentalRegion=True`, `symmetrised=True`, `complete=True`, `minmax=True`, `grid=True`, `axisLabels=False` | `dynamicMarkerSize`, one rule for the marker size |
 | `plot(sF)`, `contourf(sF)`, `contour(sF)`, `pcolor(sF)` | the same, functions and methods of `S2FunHarmonic` | the function is evaluated on the chart grid; the contour lines and bands on the curvilinear grid |
-| `plotPDF(odf, h)`, `plotIPDF(odf, r)`, `'resolution'`, `'antipodal'`, `'complete'`, `'noTitle'` | `plotPDF(odf, h, resolution=..., antipodal=True, complete=True, noTitle=True)`, methods of the SO(3) functions | one colour range over the row, the specimen sector of a symmetric pole figure |
+| `plotPDF(odf, h)`, `plotIPDF(odf, r)`, `'resolution'`, `'antipodal'`, `'complete'`, `'noTitle'` | `plotPDF(odf, h, resolution=..., antipodal=True, complete=True, title=False)`, methods of the SO(3) functions | one colour range over the row, the specimen sector of a symmetric pole figure |
 | `plot(sR)`, `plot(cs.fundamentalSector())` | the same, a method of `sphericalRegion` | |
 | `'MarkerSize'`, `'MarkerFaceColor'`, `'MarkerEdgeColor'`, `'Marker'`, `'MarkerColor'` | the same keywords, translated to matplotlib; lowercase matplotlib keywords pass through | |
 | `mtexColorMap WhiteJet`, `LaboTeX`, `blue2red`, `white2black` | `mtexColorMap('WhiteJet')` on the current figure, `colormap='WhiteJet'` on a plot | colour maps are stops; matplotlib builds the gradient |
@@ -227,7 +227,7 @@ the distinct equivalents, an axis and its antipode counted once, axes where the 
 cannot tell `h` from `-h` (`_antipodalPole` of P2), `orbit` for any frame with a group, and
 `dynamicMarkerSize`, fifty times the mean spacing of the markers on a hemisphere.
 `polefigureplot.py`: `plotPDF(ori, h)`, `plotPDF(ori, data, h)`, `plotPDF(ori, h, points=100,
-contourf=True, antipodal=True, complete=True, noTitle=True)`, `plotIPDF(ori, r)`, one marker per
+contourf=True, antipodal=True, complete=True, title=False)`, `plotIPDF(ori, r)`, one marker per
 orbit projected into the sector of the frame, the budget of MTEX (ten thousand markers per pole
 figure, a hundred thousand per inverse pole figure) spent before the equivalents are formed by a
 deterministic thinning; the styles draw `calcDensity` of the poles or `interpolate` of the
@@ -242,7 +242,7 @@ are installed on `orientation`, `plot`/`plotDiff` on `PoleFigure`. On the way: `
 a chart is no longer labelled, since the label hid the data of a pole figure. Tests
 `tests/test_poles.py` (Julia's S6 counts) and `tests/test_polefigureplot.py` on the Dubna
 fixture; rendered `bench/plots.py` 44 to 49, the Dubna set from the local sample data. Left out:
-`plotPDF!` adding poles to an existing pole figure plot beyond `hold`, the `noSymmetry` flag,
+`plotPDF!` adding poles to an existing pole figure plot beyond `hold`, the `symmetry=False` flag,
 `superposition` for a list.
 
 ## 5. Keyword table
@@ -262,7 +262,7 @@ fixture; rendered `bench/plots.py` 44 to 49, the Dubna set from the local sample
 | `colorbar` | draw one beside the plot | `False` |
 | `minmax` | annotate the data range | `False` |
 | `grid`, `grid_res` | the meridians and small circles | `False`, `30*degree` |
-| `noLabel`, `noTitle` | leave out the frame labels, the titles | `False` |
+| `axisLabels=False`, `title=False` | leave out the frame labels, the titles | `False` |
 | `label` | text at every marker | none |
 | `MarkerSize`, `Marker`, `MarkerFaceColor`, `MarkerEdgeColor`, `MarkerColor` | as MATLAB | 11 points, `'o'` |
 | `parent`, `add2all` | where to draw | the current figure |

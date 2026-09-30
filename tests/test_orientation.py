@@ -73,7 +73,7 @@ def test_orientation_antipodalWithinOneFrame():
 
 def test_orientation_antipodalRefusedBetweenOtherFrames():
   cs = al()
-  for frames in ((cs, ss222()), (cs, ti()), (cs, crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Al", noIntern=True))):
+  for frames in ((cs, ss222()), (cs, ti()), (cs, crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Al", intern=False))):
     with pytest.raises(ValueError):
       orientation(rotation.rand(), *frames, antipodal=True)
 

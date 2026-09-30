@@ -14,7 +14,7 @@ rng = np.random.default_rng(0)
 
 def bruteAngle(w, v):
   # the smallest angle from w to any equivalent of v, or of its inverse under exchange
-  return np.array([[np.min(w[i].angle(symmetrise(v[j]), noSymmetry=True)) for j in range(v.size)] for i in range(w.size)])
+  return np.array([[np.min(w[i].angle(symmetrise(v[j]), symmetry=False)) for j in range(v.size)] for i in range(w.size)])
 
 
 @pytest.mark.parametrize("s", ["321", "m-3m", "1", "622"])
@@ -42,16 +42,16 @@ def test_vectorised_forms_agree_with_scalar():
   assert close(angle(os, ref), [angle(o, ref) for o in os])
   assert close(angle(ref, os), angle(os, ref))
   assert close(angle(os, os), np.zeros(20), tol=1e-6)
-  assert close(dot(os, ref, noSymmetry=True), np.abs(np.sum(os.data * ref.data, axis=-1)))
-  assert close(dot(os, ref), [dot(o, ref) for o in os]) and np.all(dot(os, ref) >= dot(os, ref, noSymmetry=True) - 1e-12)
-  assert close(angle(os), [angle(o) for o in os]) and np.all(angle(os) <= angle(os, noSymmetry=True) + 1e-12)
+  assert close(dot(os, ref, symmetry=False), np.abs(np.sum(os.data * ref.data, axis=-1)))
+  assert close(dot(os, ref), [dot(o, ref) for o in os]) and np.all(dot(os, ref) >= dot(os, ref, symmetry=False) - 1e-12)
+  assert close(angle(os), [angle(o) for o in os]) and np.all(angle(os) <= angle(os, symmetry=False) + 1e-12)
   assert close(2 * np.arccos(np.minimum(dot(os, ref), 1)), angle(os, ref), tol=1e-6)
   # a list of references projects every element to the equivalent closest to its own one
   refs = orientation(rotation.rand(20, rng=rng), cs, crystalFrame("6/mmm"))
   mos = orientation(rotation.rand(20, rng=rng), cs, crystalFrame("6/mmm"))
   proj = mos.project2FundamentalRegion(refs)
   assert close(proj.data, np.concatenate([mos[k].project2FundamentalRegion(refs[k]).data[None] for k in range(20)]))
-  assert close(angle(proj, refs, noSymmetry=True), angle(mos, refs))
+  assert close(angle(proj, refs, symmetry=False), angle(mos, refs))
 
 
 def test_symmetrise_multiplicity_unique_mean_of_directions():
@@ -69,8 +69,8 @@ def test_symmetrise_multiplicity_unique_mean_of_directions():
   # equivalent directions compare equal, and unique keeps one of each family
   assert Miller(1, 0, 0, csC) == Miller(0, 1, 0, csC) and Miller(1, 0, 0, csC) != Miller(1, 1, 0, csC)
   assert angle(Miller(1, 0, 0, csC), Miller(0, -1, 0, csC)) < 1e-10
-  assert close(angle(Miller(1, 0, 0, csC), Miller(0, -1, 0, csC), noSymmetry=True), pi / 2)
-  assert close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC)), 3) and close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC), noSymmetry=True), 1)
+  assert close(angle(Miller(1, 0, 0, csC), Miller(0, -1, 0, csC), symmetry=False), pi / 2)
+  assert close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC)), 3) and close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC), symmetry=False), 1)
   assert close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC), min=True), -3)
   assert dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC), all=True).shape == (48,)
   assert unique(cat(symmetrise(Miller(1, 1, 0, csC)), symmetrise(Miller(1, 0, 0, csC)))).size == 2
@@ -103,7 +103,7 @@ def test_orientation_unique_and_mean():
   o = orientation(rotation.rand(rng=rng), csC)
   eq = symmetrise(o)
   assert unique(eq).size == 1 and unique(cat(eq, orientation(rotation.rand(rng=rng), csC))).size == 2
-  assert unique(eq, noSymmetry=True).size == 24
+  assert unique(eq, symmetry=False).size == 24
   u, iv, iu = unique(cat(o, o, orientation(rotation.rand(rng=rng), csC)), return_index=True, return_inverse=True)
   assert u.size == 2 and iv.tolist() == [0, 2] and iu.tolist() == [0, 0, 1]
   small = rotation.byAxisAngle(vector3d.rand(200, rng=rng), 0.1 * rng.random(200))
@@ -125,9 +125,9 @@ def test_axis():
   plain = orientation(rots, q, q)
   ori = orientation(rots, q, ss)
   # the axis is that of the representative in the fundamental region, not of the value given
-  assert np.all(axis(mori) == axis(mori.project2FundamentalRegion(), noSymmetry=True))
-  assert np.any(~(axis(mori) == axis(mori, noSymmetry=True)))
-  assert np.all(axis(mori, noSymmetry=True) == rots.axis())
+  assert np.all(axis(mori) == axis(mori.project2FundamentalRegion(), symmetry=False))
+  assert np.any(~(axis(mori) == axis(mori, symmetry=False)))
+  assert np.all(axis(mori, symmetry=False) == rots.axis())
   # only the rotations both frames share reduce it, and grain exchange takes the sign
   assert axis(mori).frame.sym == q.sym.properGroup().Laue() and axis(mori).frame.isLaue
   assert axis(plain).frame.sym == q.sym.properGroup() and not axis(plain).frame.isLaue
@@ -182,4 +182,4 @@ def test_folded_directions_lie_in_the_sector_exactly(backend, s, antipodal):
   if sR.antipodal:
     margin = np.maximum(margin, np.min(-p @ np.asarray(sR.N).T - sR.alpha, axis=1))
   assert margin.min() > -1e-12
-  assert np.max(np.abs(angle(Miller(vector3d(p), cs), m, noSymmetry=False))) < 1e-8
+  assert np.max(np.abs(angle(Miller(vector3d(p), cs), m, symmetry=True))) < 1e-8

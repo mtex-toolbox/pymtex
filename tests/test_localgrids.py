@@ -18,7 +18,7 @@ def ball():
 
 def test_localOrientationGrid_liesInTheBall(ball):
   c, full, _ = ball
-  assert np.all(angle(full, c, noSymmetry=True) <= 60 * degree + 1e-10)
+  assert np.all(angle(full, c, symmetry=False) <= 60 * degree + 1e-10)
 
 
 def test_localOrientationGrid_symmetryKeepsFewerDistinctNodes(ball):

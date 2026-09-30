@@ -123,7 +123,7 @@ ebsd
 # positions are too irregular to span a sensible raster. You may request a list
 # independently of the data, either for one import,
 #
-#     ebsd = EBSD.load(fname, noGrid=True)
+#     ebsd = EBSD.load(fname, grid=False)
 #
 # or for the whole session.
 #
@@ -414,7 +414,7 @@ plot(ebsdDistorted['Di'], ebsdDistorted['Di'].orientations, edgeColor='black')
 
 # grain reconstruction consequently sees the distorted map as the same neighbourhood graph
 grains = calcGrains(ebsdDistorted, minPixel=3)
-grains = smoothBoundary(grains, noSimplify=True)
+grains = smoothBoundary(grains, simplify=False)
 
 plot(grains.boundary, lineWidth=2)
 hold(False)

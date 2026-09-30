@@ -7,7 +7,7 @@
 # By default, `angle`, `dot` and `eq` compare a vector with the symmetry orbit of the
 # other vector. In contrast, constructions such as `cross` act on the indexed vectors
 # actually supplied. This page shows when to keep the default and when to request
-# `noSymmetry`.
+# `symmetry=False`.
 #
 # Read [Miller Indices](CrystalDirections.html) and
 # [Lattice Metric and Plane Geometry](LatticeMetric.html) first if direct and reciprocal
@@ -35,11 +35,11 @@ plottingConvention.default('y↑→x')
 # +
 pattern = mtexdata('quartzPattern')
 
-plot(pattern, resolution=0.25 * degree, complete=True, upper=True, noLabel=True)
+plot(pattern, resolution=0.25 * degree, complete=True, upper=True, axisLabels=False)
 mtexColorMap('black2white')
 ax1 = gcm().children[-1]
 nextAxis()
-plot(pattern.radon(), resolution=0.25 * degree, complete=True, upper=True, noLabel=True)
+plot(pattern.radon(), resolution=0.25 * degree, complete=True, upper=True, axisLabels=False)
 mtexColorMap('black2white')
 ax2 = gcm().children[-1]
 # -
@@ -107,7 +107,7 @@ plot(z, **opt, markerEdgeColor='yellow', symmetrised=True)
 # call keeps one entry per symmetry operation and may contain repeated vectors. Use
 # `unique` when the number of distinct members is the question.
 
-directedNormalCount = len(symmetrise(r, unique=True, noAntipodal=True))
+directedNormalCount = len(symmetrise(r, unique=True, antipodal=False))
 directedNormalCount
 
 # The first count keeps opposite normals distinct. The `antipodal` option instead treats
@@ -124,7 +124,7 @@ planeAxisCount
 #
 # The [multiplicity](vector3d.multiplicity.html) is the number of distinct directed
 # vectors in a symmetry orbit. It is the count returned by
-# `symmetrise(..., unique=True, noAntipodal=True)`. A direction on a symmetry axis has
+# `symmetrise(..., unique=True, antipodal=False)`. A direction on a symmetry axis has
 # lower multiplicity because some operations leave it fixed.
 #
 # For diffraction with Friedel equivalence, opposite reflection normals contribute
@@ -165,19 +165,19 @@ eq(r1, r2, antipodal=True)
 #
 # $$hu+kv+lw=0.$$
 #
-# Incidence concerns the two indices that were written. Use `noSymmetry` so that `dot`
+# Incidence concerns the two indices that were written. Use `symmetry=False` so that `dot`
 # does not substitute a symmetry-equivalent vector.
 
 csOrtho = crystalFrame('mmm', [4, 5, 6])
 plane = Miller(1, 1, 0, csOrtho, 'hkl')
 directionInPlane = Miller(1, -1, 0, csOrtho, 'uvw')
 
-dot(plane, directionInPlane, noSymmetry=True)
+dot(plane, directionInPlane, symmetry=False)
 
 # Zero confirms that $[1\bar{1}0]$ lies in $(110)$. In contrast, the result for $[100]$
 # is 1, so that direction does not lie in the plane.
 
-dot(plane, Miller(1, 0, 0, csOrtho, 'uvw'), noSymmetry=True)
+dot(plane, Miller(1, 0, 0, csOrtho, 'uvw'), symmetry=False)
 
 # This Cartesian dot-product test also works with four-index trigonal and hexagonal
 # notation. There is no need to translate the indices manually.
@@ -242,14 +242,14 @@ axisAngle
 # The result is numerically close to zero. To compare only the two Cartesian vectors as
 # written, ignore crystal symmetry.
 
-geometricAngle = angle(r1, r2, noSymmetry=True) / degree
+geometricAngle = angle(r1, r2, symmetry=False) / degree
 geometricAngle
 
 # The geometric angle is $180^\circ$ because the normals are exactly opposite. Thus the
 # same two index sets give a $60^\circ$ point-group angle, a near-zero plane-axis angle
 # and a $180^\circ$ geometric angle.
 #
-# The option `noSymmetry` is available to many commands that accept crystal directions or
+# The option `symmetry=False` is available to many commands that accept crystal directions or
 # orientations. Use it when the indexed vectors themselves, rather than their symmetry
 # classes, are the subject.
 

@@ -54,7 +54,7 @@ setCamera(how2plot)
 # direction is outward for each grain. This makes signed volumes and `boundary.grainId`
 # directly usable. Request the raw DREAM.3D winding only when that order is itself needed.
 
-grainsRaw = grain3d.load(fname, noOrientFaces=True)
+grainsRaw = grain3d.load(fname, orientFaces=False)
 
 # The first value below counts negative raw volumes; the second checks the oriented import.
 # Negative values diagnose inconsistent orientation of the enclosing faces; they are not

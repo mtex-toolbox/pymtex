@@ -35,10 +35,10 @@ directAxes
 # Talc is triclinic, so the axes are not mutually perpendicular. The angle between
 # $\vec a$ and $\vec c$ is the unit-cell angle $\beta=98.9^\circ$.
 
-metricAngleAC = angle(directAxes[0], directAxes[2], noSymmetry=True) / degree
+metricAngleAC = angle(directAxes[0], directAxes[2], symmetry=False) / degree
 metricAngleAC
 
-# The `noSymmetry` option is essential when reading a metric angle. Without it, `angle`
+# The `symmetry=False` option is essential when reading a metric angle. Without it, `angle`
 # compares symmetry-equivalent directions. Inversion would replace $\vec c$ by $-\vec c$
 # here and return $81.1^\circ$.
 
@@ -104,7 +104,7 @@ hold(False)
 # The objects above carry the same three numbers but use different bases. Their geometric
 # angle is
 
-directReciprocalAngle = angle(m, n, noSymmetry=True) / degree
+directReciprocalAngle = angle(m, n, symmetry=False) / degree
 directReciprocalAngle
 
 # The result is about $31.7^\circ$. Direct and reciprocal axes are parallel in every

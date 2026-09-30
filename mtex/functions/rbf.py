@@ -654,9 +654,9 @@ def _densityKernel(space, kernel, halfwidth):
   return SO3DeLaValleePoussinKernel(halfwidth=hw) if space == "SO3" else S2DeLaValleePoussinKernel(halfwidth=hw)
 
 
-def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, nothinning=False):
+def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, thinning=True):
   """a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
-  dropped unless nothinning"""
+  dropped unless thinning=False"""
   if isinstance(center, (referenceFrame, SO3Kernel)):
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
@@ -671,7 +671,7 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, n
   w = np.full(n, 1 / (n * psi.mean())) if weights is None else np.asarray(weights, dtype=float).reshape(-1) / (np.sum(weights) * psi.mean())
   # the centres whose share of the weight stays below a hundredth of a kernel's peak over
   # their number are dropped, as MATLAB thins
-  if not nothinning and weights is not None:
+  if thinning and weights is not None:
     keep = w / np.sum(w) > 1e-2 / np.real(psi.eval(1.0)) / n
     if not np.all(keep):
       center, w = center.flatten()[np.flatnonzero(keep)], w[keep]

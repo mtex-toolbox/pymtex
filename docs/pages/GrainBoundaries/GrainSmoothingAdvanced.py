@@ -86,7 +86,7 @@ print(f'resampling at {d:.2f} {grains.scanUnit} puts them back: {len(grainsSimpl
 # meeting segments is not two. Junctions remain fixed by default.
 
 # +
-grainsSmooth = smoothBoundary(grainsRefined, 5, noSimplify=True, noRefine=True)
+grainsSmooth = smoothBoundary(grainsRefined, 5, simplify=False, refine=False)
 
 plot(grains.boundary, linewidth=5, linecolor='YellowGreen', micronbar='off', region=[313, 353, 140, 156])
 hold(True)
@@ -112,8 +112,8 @@ print(f'resampling at {2 * d:.2f} {grains.scanUnit} instead leaves {len(grainsCo
 #
 # Simplification and resampling change the number of boundary segments. A resampled
 # segment no longer lies between one specific pair of EBSD measurements, so its row of
-# `gB.ebsdId` no longer identifies the pixels on its two sides. Use `noSimplify` and
-# `noRefine` when an analysis needs that per-segment association.
+# `gB.ebsdId` no longer identifies the pixels on its two sides. Use `simplify=False` and
+# `refine=False` when an analysis needs that per-segment association.
 #
 # Smoothing also changes lengths, areas, directions, and curvatures. It is a measurement
 # choice, not merely a plotting choice. Record the filter and its settings when comparing

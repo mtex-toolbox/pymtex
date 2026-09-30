@@ -180,12 +180,12 @@ plotPDF(odf, h, antipodal=True)
 # [Inverse Pole Figures of an ODF](ODFInversePoleFigure.html) page explains this
 # complementary view.
 
-plotIPDF(odf, cat(vector3d.Y, -vector3d.Y), complete=True, noLabel=True)
+plotIPDF(odf, cat(vector3d.Y, -vector3d.Y), complete=True, axisLabels=False)
 
 # The complete inverse pole figures for Y and -Y differ. Without an antipodal assumption,
 # reversing the specimen direction changes the question.
 
-plotIPDF(odf, vector3d.Y, antipodal=True, complete=True, noLabel=True)
+plotIPDF(odf, vector3d.Y, antipodal=True, complete=True, axisLabels=False)
 
 # The complete antipodal plot repeats the same crystal-direction pattern on opposite sides
 # of the sphere.

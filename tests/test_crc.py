@@ -31,7 +31,7 @@ def test_the_pair_reads_the_same_by_either_name():
 
 
 def test_the_cut_matches_the_julia_reader_in_its_phases():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   assert len(e) == 42420
   assert [int((e.phaseId == k).sum()) for k in range(3)] == [12238, 30182, 0]
   assert e.CSList.mineralList == ["notIndexed", "Iron bcc (old)", "Iron fcc"]
@@ -40,21 +40,21 @@ def test_the_cut_matches_the_julia_reader_in_its_phases():
 
 
 def test_the_cut_matches_the_julia_reader_in_its_orientations_and_positions():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   k, euler = firstIndexedEuler(e)
   assert k == 1 and np.allclose(euler, [332.489218806, 44.301505127, 64.471699199], atol=1e-6)
   assert np.allclose(e.pos.data[1], [0.5, 0, 0])
 
 
 def test_the_cut_matches_the_julia_reader_in_its_properties():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   assert sorted(e.prop) == ["bands", "bc", "bs", "error", "mad", "reliabilityindex"]
   assert abs(e.mad.mean() - 0.4562887121366055) < 1e-12
   assert abs(e.bc.mean() - 90.66895332390382) < 1e-10
 
 
 def test_the_header_is_kept():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   h = e.meta["header"]
   assert h["job"]["xcells"] == 707 and h["job"]["griddistx"] == 0.5
   assert h["phase1"]["structurename"] == "Iron bcc (old)" and h["phase1"]["spacegroup"] == 229
@@ -62,13 +62,13 @@ def test_the_header_is_kept():
 
 
 def test_the_acquisition_surface_is_kept():
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   assert e.meta["surface"] == (0.0, 0.0, 0.0)
 
 
 def test_the_correction_is_half_a_turn_about_z():
-  a = loadEBSD(CUT, noGrid=True)
-  b = loadEBSD(CUT, eulerCorrection=rotation.id, noGrid=True)
+  a = loadEBSD(CUT, grid=False)
+  b = loadEBSD(CUT, eulerCorrection=rotation.id, grid=False)
   r = rotation.byEuler(np.pi, 0, 0)
   assert mtex.angle(a.rotations[1], r * b.rotations[1]) < 1e-12
 
@@ -123,11 +123,11 @@ def test_explicit_positions_are_read_from_the_record(tmp_path):
   cpr = cpr.replace("Field1=3\nField2=4\nField3=5\nField4=6\nField5=7\nField6=8\nField7=10\nField8=11\nField9=12\nCount=9",
                     "Field1=1\nField2=2\nField3=3\nField4=4\nField5=5\nCount=5")
   assert "Count=5" in cpr
-  e = loadEBSD(CUT, noGrid=True)
+  e = loadEBSD(CUT, grid=False)
   rec = np.zeros(len(e), dtype=[("p", "i1"), ("x", "<f4"), ("y", "<f4"), ("a", "<f4"), ("b", "<f4"), ("c", "<f4")])
   rec["p"] = e.phaseId
   rec["x"], rec["y"] = e.pos.x * 2, e.pos.y * 2
-  raw = loadEBSD(CUT, eulerCorrection=rotation.id, noGrid=True)
+  raw = loadEBSD(CUT, eulerCorrection=rotation.id, grid=False)
   rec["a"], rec["b"], rec["c"] = (np.nan_to_num(v) for v in raw.rotations.Euler())
   (tmp_path / "xy.cpr").write_text(cpr)
   rec.tofile(tmp_path / "xy.crc")

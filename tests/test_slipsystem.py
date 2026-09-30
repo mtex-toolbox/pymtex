@@ -37,7 +37,7 @@ def test_slip_systems_of_a_family_and_their_Schmid_factors():
   assert M.shape == () and M.rank == 2 and abs(np.trace(M.M)) < 1e-12 and close(s.SchmidTensor().M, M.M)
   assert type(s.SchmidTensor()).__name__ == "velocityGradientTensor" and s.symmetrise().SchmidTensor().shape == (24,)
   # paired entry by entry, a single system against a list broadcast
-  assert close(s.mPrime(s), 1) and s.residualBurgersVector(s)[0] == 0 and s.mPrime(s.symmetrise()).shape == (24,) and abs(s.trace()[0].dot(s.n[0], noSymmetry=True)) < 1e-10
+  assert close(s.mPrime(s), 1) and s.residualBurgersVector(s)[0] == 0 and s.mPrime(s.symmetrise()).shape == (24,) and abs(s.trace()[0].dot(s.n[0], symmetry=False)) < 1e-10
   assert s.trace().antipodal and close(s.trace(zvector).norm(), 1)
   # MATLAB's display, the indices of b and n beside the CRSS
   assert repr(slipSystem.fcc(cs, CRSS=2)).splitlines()[1:] == ["  u  v   w  | h  k  l  CRSS", "  0  1  -1    1  1  1     2"]

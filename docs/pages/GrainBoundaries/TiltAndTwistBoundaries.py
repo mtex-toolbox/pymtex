@@ -33,7 +33,7 @@ ebsd = mtexdata('forsterite')
 #
 # A raw boundary follows the square measurement grid, so its trace points mostly along the
 # grid axes. Smoothing removes that staircase before the trace direction is interpreted.
-# The flags `noSimplify` and `noRefine` retain every segment and its link to the two
+# The flags `simplify=False` and `refine=False` retain every segment and its link to the two
 # neighboring measurements through `ebsdId`.
 
 # +
@@ -41,7 +41,7 @@ ebsd = mtexdata('forsterite')
 grains = calcGrains(ebsd, threshold=[1 * degree, 15 * degree], minPixel=5)
 
 # smooth traces without breaking the segment-to-pixel relation
-grains = smoothBoundary(grains, 5, noSimplify=True, noRefine=True)
+grains = smoothBoundary(grains, 5, simplify=False, refine=False)
 
 # set up the IPF colouring
 cKey = ipfColorKey(ebsd['fo'].CS.properGroup())

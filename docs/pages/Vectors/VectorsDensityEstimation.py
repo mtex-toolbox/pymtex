@@ -321,7 +321,7 @@ plot(ipdf, contourf=True)
 mtexColorbar()
 
 # The coloured sector contains the complete inverse pole density without repeating
-# symmetry-related directions. The `noSymmetry` option disables crystal symmetrization
+# symmetry-related directions. The `symmetry=False` option disables crystal symmetrization
 # when that is deliberately required.
 
 # ## Choosing a Different Kernel

@@ -184,7 +184,7 @@ def test_log_without_reference_reduces_by_both_symmetries():
   cs, ss = crystalFrame("432"), specimenFrame("222")
   oriSS = orientation.rand(100, cs, ss, rng=rng())
   v = vector3d(log(oriSS))
-  vRef = vector3d(log(project2FundamentalRegion(oriSS), noSymmetry=True))
+  vRef = vector3d(log(project2FundamentalRegion(oriSS), symmetry=False))
   assert np.max(norm(v - vRef)) < 1e-10
   assert log(oriSS).oriRef.CS is cs and log(oriSS).oriRef.SS is ss
 
@@ -242,7 +242,7 @@ def test_noSymmetry_takes_the_representatives():
   ref = orientation.rand(20, cs, rng=rng())
   ori = orientation(rotation(ref) * cs.properGroup().rotations()[7], cs)
   assert np.max(norm(log(ori, ref))) < 1e-10
-  assert np.min(norm(log(ori, ref, noSymmetry=True))) > 10 * degree
+  assert np.min(norm(log(ori, ref, symmetry=False))) > 10 * degree
 
 
 # ------------------------------------------------------------------ algebra and lists
@@ -275,7 +275,7 @@ def test_dot_crossAndAngle_ofTangentVectorsOnOneSide():
   _, _, _, t, u, _ = atOneReference()
   assert close(dot(t, u), np.sum(t.data * left(u).data, axis=-1))
   assert isinstance(t.cross(u), SO3TangentVector) and close(t.cross(u).data, np.cross(t.data, left(u).data))
-  assert close(angle(t, u), vector3d(t).angle(vector3d(left(u)), noSymmetry=True))
+  assert close(angle(t, u), vector3d(t).angle(vector3d(left(u)), symmetry=False))
 
 
 def test_SO3TangentVector_equalityAcrossSides():

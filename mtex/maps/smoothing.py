@@ -3,7 +3,7 @@
 #
 #   grains.smoothBoundary(), grains.smoothBoundary(iter), grains.smoothBoundary(taubinFilter())
 #   grains.smoothBoundary(curvatureFilter(3)), grains.smoothBoundary(huberFilter(3, threshold=3 * degree))
-#   grains.smoothBoundary(iter, noSimplify=True, noRefine=True, moveTriplePoints=True, moveOuterBoundary=True)
+#   grains.smoothBoundary(iter, simplify=False, refine=False, moveTriplePoints=True, moveOuterBoundary=True)
 #   F.smooth(V, net, h), boundaryNetwork(gB, ib)
 #
 # A measured boundary is the staircase of the pixel grid: every segment runs along one of
@@ -273,7 +273,7 @@ class huberFilter(boundaryFilter):
 
 # ------------------------------------------------------------------ the three steps
 
-def smoothBoundary(grains, iter=1, simplify=None, refine=None, noSimplify=False, noRefine=False, moveTriplePoints=False,
+def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=False,
                    moveOuterBoundary=False):
   """turn the staircase of a measured boundary into a smooth curve. The simplification and the
   resampling both take their length from the median segment of the boundary as it came out
@@ -288,9 +288,9 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, noSimplify=False,
   d0 = float(np.median(grains.boundary.segLength))
   if not (np.isfinite(d0) and d0 > 0):
     return grains
-  if not noSimplify and simplify is not False:
+  if simplify is not False:
     grains = _coarsenGrains(simplifyBoundary, grains, d0 / np.sqrt(2) if simplify is None else simplify)
-  if not noRefine and refine is not False:
+  if refine is not False:
     grains = _refineGrains(grains, d0 if refine is None else refine)
   net = boundaryNetwork(grains.boundary, grains.innerBoundary, moveTriplePoints=moveTriplePoints, moveOuterBoundary=moveOuterBoundary)
   h = float(np.median(grains.boundary.segLength))

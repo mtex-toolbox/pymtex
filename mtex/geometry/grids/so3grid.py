@@ -192,8 +192,8 @@ def _buildSO3Grid(CS, SS, L, R, res):
   ap, gp = 2 * np.pi / nZL, 2 * np.pi / nZR
   oR = fundamentalRegion(CS, SS)
   bmax = np.pi if len(oR.N) == 0 else min(np.pi, oR.maxAngle() + 3 * res)
-  noCenter = int(np.round(2 * np.pi / res)) % 2 == 0
-  ab = equispacedS2Grid(resolution=res, maxTheta=bmax, minRho=0, maxRho=ap, rhoPeriod=ap, noCenter=noCenter)
+  center = int(np.round(2 * np.pi / res)) % 2 != 0
+  ab = equispacedS2Grid(resolution=res, maxTheta=bmax, minRho=0, maxRho=ap, rhoPeriod=ap, center=center)
   beta, alpha, _ = ab.polar()
   ng = max(int(np.round(gp / res)), 1)
   resg = gp / ng

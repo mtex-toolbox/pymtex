@@ -270,7 +270,7 @@ def test_calcMeanDirection_ignoresTheStaircase():
   d1 = tangent(cir.direction)
   d1 /= np.linalg.norm(d1, axis=1, keepdims=True)
   assert np.max(np.abs(np.sum(radial * d1, axis=1))) > 0.99
-  assert np.all(cir.calcMeanDirection(0).angle(cir.direction, noSymmetry=True) < 1e-12)
+  assert np.all(cir.calcMeanDirection(0).angle(cir.direction, symmetry=False) < 1e-12)
   assert cir.calcMeanDirection(5).frame is cir.frame
 
 

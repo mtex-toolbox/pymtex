@@ -76,7 +76,7 @@ plot(directions, MarkerSize=3, upper=True)
 # spreads, so colour every cloud by its mean angular deviation.
 
 # +
-poleDispersion = np.nanmean(angle(mean(directions, axis=0), directions, noSymmetry=True), axis=0)
+poleDispersion = np.nanmean(angle(mean(directions, axis=0), directions, symmetry=False), axis=0)
 
 plot(directions, np.tile(poleDispersion, (len(ori), 1)) / degree, MarkerSize=3)
 mtexColorbar(title='average pole dispersion in degree')

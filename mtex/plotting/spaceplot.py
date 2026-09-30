@@ -129,7 +129,7 @@ def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, az
 
 # the sphere with its grid and the axes of the frame, the ground every plot in space stands
 # on; with values the sphere is coloured at its faces, with radial pushed out by them
-def _sphere(sP, resolution=5 * degree, values=None, colormap="WhiteJet", colorRange=None, radial=False, grid=True, noLabel=False,
+def _sphere(sP, resolution=5 * degree, values=None, colormap="WhiteJet", colorRange=None, radial=False, grid=True, axisLabels=True,
             grid_res=30 * degree, alpha=1.0):
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   V, F = sphereMesh(resolution)
@@ -154,7 +154,7 @@ def _sphere(sP, resolution=5 * degree, values=None, colormap="WhiteJet", colorRa
   if grid:
     for l in sphereGridLines(grid_res):
       sP.ax.plot(1.003 * l[:, 0], 1.003 * l[:, 1], 1.003 * l[:, 2], color=GRID3_COLOR, linewidth=0.6)
-  if not noLabel:
+  if axisLabels:
     for d, name in frameAxes(sP.frame):
       sP.ax.text(*(1.15 * d), name, ha="center", va="center", fontsize=getMTEXpref("FontSize", 13))
   return poly
@@ -205,14 +205,14 @@ def plot3d(x, *args, **kw):
   return scatter3d(x, *args, **kw)
 
 
-def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet", colorRange=None, grid=True, noLabel=False,
+def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet", colorRange=None, grid=True, axisLabels=True,
               label=None, colorbar=False, **kw):
   """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
   v = v if isinstance(v, vector3d) else vector3d(v)
   axesKw = _keys(kw)
   sP = _spaceAxes(v.frame, **axesKw)
   if not sP.ax.collections:
-    _sphere(sP, grid=grid, noLabel=noLabel)
+    _sphere(sP, grid=grid, axisLabels=axisLabels)
   P = 1.01 * v.normalize().data.reshape(-1, 3)
   if v.antipodal:
     P = np.concatenate([P, -P])
@@ -236,7 +236,7 @@ def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet
 
 
 def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=None, colorbar=False, radial=False, grid=False,
-                   noLabel=None, grid_res=30 * degree, how2plot=None, **kw):
+                   axisLabels=None, grid_res=30 * degree, how2plot=None, **kw):
   """plot3d(sF, radial=True): a function as the sphere coloured, or pushed out by its values,
   seen as the 3D plotting convention says, with the axes of its frame as arrows"""
   axesKw = _keys(kw)
@@ -245,9 +245,9 @@ def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=N
   vals = np.real(np.asarray(f(vector3d(V, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1)
   limits = max(1e-12, 1.1 * np.max(np.abs(vals))) if radial else 1.12
   sP = _spaceAxes(fr, limits=limits, **axesKw)
-  h = _sphere(sP, resolution, vals, colormap, colorRange, radial, grid=grid, noLabel=True, grid_res=grid_res)
+  h = _sphere(sP, resolution, vals, colormap, colorRange, radial, grid=grid, axisLabels=False, grid_res=grid_res)
   # the axes of the frame as arrows standing on the sphere, as MATLAB draws them
-  if not (radial if noLabel is None else noLabel):
+  if (not radial) if axisLabels is None else axisLabels:
     for d, name in frameAxes(fr):
       _axisArrow(sP.ax, d, name)
   # the camera of the convention given, else of the default 3D one
@@ -279,7 +279,7 @@ def _axisArrow(ax, d, name, length=0.15):
   ax._mtexAxisArrows = getattr(ax, "_mtexAxisArrows", []) + [(d, length, (body, label))]
 
 
-def surf(sF, layout=None, figSize=None, noScaling=False, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
+def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
          **kw):
   """surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
   complex one; a list of functions one panel each; a single real function is first scaled
@@ -292,7 +292,7 @@ def surf(sF, layout=None, figSize=None, noScaling=False, colormap="parula", reso
   V, F = sphereMesh(resolution)
   fr = getattr(sF, "frame", None)
   values = [np.real(np.asarray(f(vector3d(V, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1) for f in fs]
-  if len(fs) == 1 and getattr(sF, "isReal", True) and not noScaling:
+  if len(fs) == 1 and getattr(sF, "isReal", True) and scaling:
     a, b = values[0].min(), values[0].max()
     if b > a:
       values[0] = (values[0] - np.mean(values[0])) / (b - a) + 1
@@ -326,7 +326,7 @@ def surf(sF, layout=None, figSize=None, noScaling=False, colormap="parula", reso
   return hs if len(hs) > 1 else hs[0]
 
 
-def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, noLabel=True, **kw):
+def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, axisLabels=False, **kw):
   """plot3d(vF): a vector or axis field as arrows on the sphere in space"""
   from ..geometry.grids.s2grid import equispacedS2Grid
   axesKw = _keys(kw)
@@ -337,7 +337,7 @@ def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, n
   # a held plot draws the field onto the sphere already there; a new one is seen as the 3D
   # convention says
   if not held:
-    _sphere(sP, grid=grid, noLabel=noLabel)
+    _sphere(sP, grid=grid, axisLabels=axisLabels)
     if "azimuth" not in axesKw and "elevation" not in axesKw:
       from ..geometry.plottingconvention import plottingConvention
       _camera(sP.ax, plottingConvention.default3D)
@@ -381,8 +381,8 @@ def _ball(sP, radius=180.0):
 
 
 def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
-                 noSurface=False, **kw):
-  """plot(oR), plot(oR, boundaryColor='r', noSurface=True): the fundamental region in axis
+                 surface=True, **kw):
+  """plot(oR), plot(oR, boundaryColor='r', surface=False): the fundamental region in axis
   angle space, in degrees, its surface with the parallels and meridians on it and its edges"""
   axesKw = _keys(kw)
   limit = 1.15 * oR.maxAngle() / degree
@@ -393,7 +393,7 @@ def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, line
   if not hasattr(sP, "coordinates"):
     sP.coordinates, sP.reduced = "axisAngle", True
   _regionLabels(sP.ax)
-  h = _region(sP, oR, resolution, color, alpha, lines, lineColor, boundaryColor, noSurface)
+  h = _region(sP, oR, resolution, color, alpha, lines, lineColor, boundaryColor, surface)
   # a new plot looks at the region, as MATLAB fits its axes to it
   if not held:
     _fitRegion(sP, oR)
@@ -419,11 +419,11 @@ def _fitRegion(sP, oR, points=None):
 
 
 def _region(sP, oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
-            noSurface=False):
+            surface=True):
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   # the edges where two faces of the region meet, as MATLAB outlines it
   hs = [sP.ax.plot(*(e / degree).T, color=boundaryColor, linewidth=1.5, zorder=3)[0] for e in oR.edges()]
-  if noSurface:
+  if not surface:
     return hs
   P, F = regionSurface(oR, resolution)
   P = P / degree
@@ -504,7 +504,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
 
   Orientations as points in axis angle space, in Rodrigues space or in Euler angle space,
   brought into the fundamental region unless ignoreFundamentalRegion, with the boundary of
-  the region behind them in axis angle space unless 'noBoundary'; the space named by a
+  the region behind them in axis angle space unless region=False; the space named by a
   positional string as MATLAB names it, 'Bunge' being 'Euler'. A bare rotation has no
   region: the whole Euler box, the ball of axis angle space.
   """

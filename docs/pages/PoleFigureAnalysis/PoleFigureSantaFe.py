@@ -72,7 +72,7 @@ mtexColorMap('LaboTeX')
 # [ODF Estimation](PoleFigure2ODF.html) explains the iteration history.
 
 rec = calcODF(pf)
-rec2 = calcODF(pf, noGhostCorrection=True)
+rec2 = calcODF(pf, ghostCorrection=False)
 
 # ## Compare fit with recovery
 #

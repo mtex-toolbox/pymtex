@@ -196,7 +196,7 @@ AVs = 200 * (vs1 - vs2) / (vs1 + vs2)
 
 newMtexFigure(layout=[1, 3])
 
-plot(vp, upper=True, noLabel=True, complete=True)
+plot(vp, upper=True, axisLabels=False, complete=True)
 hold(True)
 plot(maxPos, Marker='s', MarkerSize=10, MarkerFaceColor='k', MarkerEdgeColor='w')
 plot(minPos, Marker='o', MarkerSize=10, MarkerFaceColor='w', MarkerEdgeColor='k')
@@ -204,11 +204,11 @@ hold(False)
 mtexTitle('P-wave speed')
 
 nextAxis()
-plot(AVs, upper=True, noLabel=True, complete=True)
+plot(AVs, upper=True, axisLabels=False, complete=True)
 mtexTitle('S-wave anisotropy')
 
 nextAxis()
-plot(vp / vs1, complete=True, upper=True, noLabel=True)
+plot(vp / vs1, complete=True, upper=True, axisLabels=False)
 mtexTitle('Vp/Vs1')
 
 mtexColorMap('blue2red')

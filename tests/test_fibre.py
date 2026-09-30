@@ -84,7 +84,7 @@ def test_angle_ofTheCubeToTheFibreIs45Degrees():
   full = fibre(oA, oB, full=True)
   assert close(angle(full, orientation.cube(cs)), 45 * degree) and close(angle(orientation.cube(cs), full), 45 * degree)
   assert close(angle(full, orientation(cs.properGroup().rotations()[5], cs)), 45 * degree)
-  assert angle(full, orientation.cube(cs), noSymmetry=True) > 45 * degree - 1e-10
+  assert angle(full, orientation.cube(cs), symmetry=False) > 45 * degree - 1e-10
 
 
 # a random fibre of 432 and 222 and 20 random orientations
@@ -228,7 +228,7 @@ def sampledFibre(g):
 def test_fit_recoversAFibreFromOneCircle():
   # the representatives as sampled lie on one circle, which the raw tensor sees
   cs, ss, f, ori = sampledFibre(rng())
-  fRec, lam, delta = fibre.fit(ori, diagnostics=True, noSymmetry=True)
+  fRec, lam, delta = fibre.fit(ori, diagnostics=True, symmetry=False)
   assert fRec.isFull and fRec.CS is cs and fRec.SS is ss and angle(fRec, f) < 1 * degree and delta < 2 * degree
   assert lam.shape == (4,) and close(np.sum(lam), 1) and lam[-2] > 100 * lam[-3]
 
@@ -239,7 +239,7 @@ def test_fit_putsRInTheUpperHemisphere():
   _, _, _, ori = sampledFibre(g)
   for k in range(4):
     sub = ori[g.permutation(500)[:200]]
-    r = fibre.fit(sub, noSymmetry=True).r.data.reshape(3)
+    r = fibre.fit(sub, symmetry=False).r.data.reshape(3)
     assert r[2] > 0 or (abs(r[2]) < 1e-9 and r[1] > 0)
 
 
@@ -288,7 +288,7 @@ def test_fit_hemisphere_does_not_depend_on_eigenvector_signs(monkeypatch, signs)
     return vals, vecs
 
   monkeypatch.setattr(np.linalg, "eigh", signed)
-  fitted = fibre.fit(ori, noSymmetry=True)
+  fitted = fibre.fit(ori, symmetry=False)
   assert fitted.r.z > 0 and angle(fitted, f) < 1e-7
 
 

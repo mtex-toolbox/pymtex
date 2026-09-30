@@ -54,7 +54,7 @@ def test_edax_oh5_takes_the_alignment_the_file_states():
 
 
 def test_edax_h5_list_with_unplaced_pixels():
-  e = loadEBSD(fixture("edax_cut.h5"), noGrid=True)
+  e = loadEBSD(fixture("edax_cut.h5"), grid=False)
   assert len(e) == 547 and e.meta["unplaced"] == 1
   assert counts(e) == [0, 547] and e.CS.pointGroup == "mmm"
   assert np.allclose(firstEuler(e)[1], [304.96433441, 57.7159131, 100.76364115], atol=1e-6)
@@ -92,9 +92,9 @@ def test_oxford_h5oina_reads_its_processed_data_set():
 
 
 def test_oxford_h5oina_data_set_is_chosen_by_name_or_number():
-  raw = loadEBSD(fixture("oli_cut.h5oina"), dataSet="EBSD", noGrid=True)
+  raw = loadEBSD(fixture("oli_cut.h5oina"), dataSet="EBSD", grid=False)
   assert raw.meta["dataSet"] == "/1/EBSD" and len(raw) == 372
-  byNumber = loadEBSD(fixture("oli_cut.h5oina"), dataSet=1, noGrid=True)
+  byNumber = loadEBSD(fixture("oli_cut.h5oina"), dataSet=1, grid=False)
   assert byNumber.meta["dataSet"] == "/1/EBSD"
 
 
@@ -142,7 +142,7 @@ def test_emsphinx_zero_based_phases():
 
 
 def test_bruker_direct_positions():
-  e = loadEBSD(fixture("bruker_cut.h5"), noGrid=True)
+  e = loadEBSD(fixture("bruker_cut.h5"), grid=False)
   assert len(e) == 2000 and e.meta["vendor"] == "Bruker"
   assert counts(e) == [225, 1689, 86]
   assert e.CSList.mineralList == ["notIndexed", "Zirconium - alpha", "Zirconium"]
@@ -153,7 +153,7 @@ def test_bruker_direct_positions():
 
 
 def test_bruker_takes_the_space_group_number_and_a_cell_in_one_row():
-  e = loadEBSD(fixture("bruker_cut.h5"), noGrid=True)
+  e = loadEBSD(fixture("bruker_cut.h5"), grid=False)
   # the space group number, not the symbol beside it, and a cell written as one row of six
   assert np.allclose(e.CSList[2].abc, e.CSList[2].abc[0])
   assert e.meta["h5"]["cs"][0]["cell"]
@@ -170,8 +170,8 @@ def test_bruker_takes_the_space_group_number_and_a_cell_in_one_row():
   ("thermofisher_cut.hdf5", rotation.id),
 ])
 def test_the_vendor_correction(name, correction):
-  a = loadEBSD(fixture(name), noGrid=True)
-  b = loadEBSD(fixture(name), eulerCorrection=rotation.id, noGrid=True)
+  a = loadEBSD(fixture(name), grid=False)
+  b = loadEBSD(fixture(name), eulerCorrection=rotation.id, grid=False)
   k = np.flatnonzero(a.isIndexed)[:20]
   assert mtex.angle(a.rotations[k], correction * b.rotations[k]).max() < 1e-12
 
@@ -184,19 +184,19 @@ def test_oxford_tilted_surface_is_undone_with_a_warning(tmp_path):
     f["1/EBSD/Header/Scanning Rotation Angle"][()] = np.pi
     f["1/EBSD/Header/Specimen Orientation Euler"][()] = np.array([0, 90, 0], dtype=np.float32)
   with pytest.warns(UserWarning, match="acquisition surface"):
-    e = loadEBSD(p, noGrid=True)
-  raw = loadEBSD(p, eulerCorrection=rotation.id, noGrid=True)
+    e = loadEBSD(p, grid=False)
+  raw = loadEBSD(p, eulerCorrection=rotation.id, grid=False)
   expected = rotation.byEuler(np.pi, 0, 0) * rotation.byEuler(0, 90 * degree, 0).inv() * raw.rotations[0]
   assert mtex.angle(e.rotations[0], expected) < 1e-6   # the file holds its angle as float32
   assert e.meta["surface"] == (0.0, 90.0, 0.0)
 
 
 def test_oxford_scan_rotation_the_file_states_is_applied():
-  raw = loadEBSD(fixture("oli_cut.h5oina"), eulerCorrection=rotation.id, noGrid=True)
+  raw = loadEBSD(fixture("oli_cut.h5oina"), eulerCorrection=rotation.id, grid=False)
   # the scan rotation the file states, in radians since it is below a full turn
   with h5py.File(fixture("oli_cut.h5oina")) as f:
     stated = float(np.asarray(f["1/EBSD/Header/Scanning Rotation Angle"][()]).reshape(-1)[0])
-  plain = loadEBSD(fixture("oli_cut.h5oina"), noGrid=True)
+  plain = loadEBSD(fixture("oli_cut.h5oina"), grid=False)
   assert mtex.angle(plain.rotations[0], rotation.byAxisAngle(vector3d(0, 0, 1), stated) * raw.rotations[0]) < 1e-6
 
 

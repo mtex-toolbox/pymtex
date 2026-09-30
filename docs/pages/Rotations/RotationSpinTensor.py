@@ -201,7 +201,7 @@ orientationRoundTripError
 
 # [orientation.log](orientation.log.html) first chooses the shortest symmetry-equivalent
 # change. This makes the tangent describe the two crystal orientations rather than their
-# stored representatives. Pass `noSymmetry=True` only when the unreduced rotation
+# stored representatives. Pass `symmetry=False` only when the unreduced rotation
 # representatives are the intended objects.
 
 # ## The Maths Behind Left and Right Coordinates

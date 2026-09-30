@@ -54,7 +54,7 @@ def test_SM2_the_three_steps_leave_a_straight_boundary_where_it_is():
   net = boundaryNetwork(h.boundary, h.innerBoundary)
   assert np.array_equal(h.boundary.V[net.used[net.fixed]], h0.boundary.V[net.used[net.fixed]])
   # simplifying and resampling are the first two steps and can be left out
-  assert len(g.smoothBoundary(1, noSimplify=True, noRefine=True).boundary) == len(g.boundary)
+  assert len(g.smoothBoundary(1, simplify=False, refine=False).boundary) == len(g.boundary)
   assert len(g.smoothBoundary(1, simplify=False, refine=False).boundary) == len(g.boundary)
   assert len(g.smoothBoundary(1).boundary) == 120     # simplified, then resampled at the pixel
   assert len(g.smoothBoundary(1, refine=0.5).boundary) == 240

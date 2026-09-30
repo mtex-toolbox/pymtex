@@ -34,7 +34,7 @@ class plane3d:
     n = N.norm()
     self.N = N.normalize()
     if isinstance(d, vector3d):
-      self.d = np.asarray(self.N.dot(d, noSymmetry=True), dtype=float)
+      self.d = np.asarray(self.N.dot(d, symmetry=False), dtype=float)
     else:
       self.d = np.asarray(np.broadcast_to(np.asarray(d, dtype=float) / n, N.shape), dtype=float).copy()
 
@@ -92,11 +92,11 @@ class plane3d:
     """the signed distance of points to the plane, or the distance of two parallel planes,
     NaN where the planes meet"""
     if isinstance(v, plane3d):
-      lam = self.N.dot(v.N, noSymmetry=True)
+      lam = self.N.dot(v.N, symmetry=False)
       lam = np.where(np.abs(np.abs(lam) - 1) < tol, lam, np.nan)
       return self.d - v.d * lam
     v = v if isinstance(v, vector3d) else vector3d(v)
-    return self.N.dot(v, noSymmetry=True) - self.d
+    return self.N.dot(v, symmetry=False) - self.d
 
   def project(self, v):
     """the orthogonal projection of points onto the plane"""
@@ -164,7 +164,7 @@ def lineIntersect(a, b, n, d, tol=1e-13):
   N = n if isinstance(n, vector3d) else vector3d(n)
   l = B - A
   with np.errstate(divide="ignore", invalid="ignore"):
-    lam = (np.asarray(d, dtype=float) - A.dot(N, noSymmetry=True)) / l.dot(N, noSymmetry=True)
+    lam = (np.asarray(d, dtype=float) - A.dot(N, symmetry=False)) / l.dot(N, symmetry=False)
   lam = np.where((lam < -tol) | (lam > 1 + tol), np.nan, lam)
   return A + l * lam
 

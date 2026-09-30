@@ -60,7 +60,7 @@ def fitData(posA, posB, weights=None):
   return dx[keep], dy[keep], w[keep], x[keep], y[keep]
 
 
-def robustLsq(A, b, w, noRobust=False, maxIter=50):
+def robustLsq(A, b, w, robust=True, maxIter=50):
   """weighted least squares, reweighted against outliers with Tukey's bisquare at 95 percent
   efficiency: the residuals corrected for leverage, one scale from their median absolute
   deviation, and the least favourable weight of the right hand sides for every point"""
@@ -68,7 +68,7 @@ def robustLsq(A, b, w, noRobust=False, maxIter=50):
   w = np.asarray(w, dtype=float).reshape(-1)
   sw = np.sqrt(w)[:, None]
   p = np.linalg.lstsq(A * sw, b * sw, rcond=None)[0]
-  if noRobust:
+  if not robust:
     return p
   tune = 4.685
   Q = np.linalg.qr(A * sw)[0]
@@ -290,7 +290,7 @@ class spatialTransformShift(spatialTransform):
   def fit(posA, posB, weights=None, **kwargs):
     """the affine map fitted to point pairs by weighted least squares, the positions posA in frame A
     and where they went, posB"""
-    return spatialTransformPoly.fit(posA, posB, weights=weights, degree=1, noRobust=True).shiftMatrix()
+    return spatialTransformPoly.fit(posA, posB, weights=weights, degree=1, robust=False).shiftMatrix()
 
 
 class spatialTransformRigid(spatialTransformShift):
@@ -379,7 +379,7 @@ class spatialTransformProjective(spatialTransform):
     return spatialTransformProjective([[1, -cx * s, cx * s * cy], [0, k - cy * s, cy * (1 + cy * s - k)], [0, -s, 1 + s * cy]])
 
   @staticmethod
-  def fit(posA, posB, weights=None, noRobust=False, maxIter=50):
+  def fit(posA, posB, weights=None, robust=True, maxIter=50):
     """the homography of the direct linear transform, robustly reweighted. Both point sets are
     first moved to their centroid and scaled to a mean distance of sqrt(2), Hartley's
     normalisation: without it the algebraic residual weighs the points by their distance from
@@ -398,7 +398,7 @@ class spatialTransformProjective(spatialTransform):
     o, z = np.ones_like(x), np.zeros_like(x)
     A = np.concatenate([np.stack([xa, ya, o, z, z, z, -xa * xb, -ya * xb], axis=1),
                         np.stack([z, z, z, xa, ya, o, -xa * yb, -ya * yb], axis=1)])
-    h = robustLsq(A, np.concatenate([xb, yb]), np.concatenate([w, w]), noRobust, maxIter)
+    h = robustLsq(A, np.concatenate([xb, yb]), np.concatenate([w, w]), robust, maxIter)
     return spatialTransformProjective(np.linalg.inv(Nb) @ np.append(h.reshape(-1), 1).reshape(3, 3) @ Na)
 
 
@@ -452,14 +452,14 @@ class spatialTransformPoly(spatialTransform):
     return {"degree": self.degree}
 
   @staticmethod
-  def fit(posA, posB, weights=None, degree=1, noRobust=False, maxIter=50):
+  def fit(posA, posB, weights=None, degree=1, robust=True, maxIter=50):
     """the polynomial displacement fitted to point pairs by least squares, reweighted against outliers
-    with Tukey's bisquare unless noRobust=True"""
+    with Tukey's bisquare unless robust=False"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     B = polyBasis(x, y, degree)
     if B.shape[0] < B.shape[1]:
       raise ValueError(f"a degree {degree} polynomial needs at least {B.shape[1]} points, got {B.shape[0]}")
-    return spatialTransformPoly(robustLsq(B, np.stack([dx, dy], axis=1), w, noRobust, maxIter), degree)
+    return spatialTransformPoly(robustLsq(B, np.stack([dx, dy], axis=1), w, robust, maxIter), degree)
 
 
 class spatialTransformDrift(spatialTransform):

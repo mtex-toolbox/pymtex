@@ -84,7 +84,7 @@ plt.gca().set_axis_off()
 
 ipfKey = ipfHSVKey(cs)
 
-plot(ipfKey, complete=True, upper=True, resolution=0.5 * degree, noLabel=True)
+plot(ipfKey, complete=True, upper=True, resolution=0.5 * degree, axisLabels=False)
 hold(True)
 plot(cs, symbolSize=0.6)
 hold(False)
@@ -133,7 +133,7 @@ plot(cs, symbolSize=0.6, mirrorLineWidth=2)
 # produced by combining inversion with twofold rotations.
 
 ipfKey = ipfHSVKey(cs)
-plot(ipfKey, complete=True, resolution=0.5 * degree, noLabel=True)
+plot(ipfKey, complete=True, resolution=0.5 * degree, axisLabels=False)
 
 # The upper- and lower-hemisphere panels now carry the same colour pattern. Inversion
 # identifies every direction with its opposite, as explained in

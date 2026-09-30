@@ -513,22 +513,23 @@ class vector3d(MtexArray):
 
   # ------------------------------------------------------------------ products and angles
 
-  def dot(self, other, antipodal=False, noAntipodal=False, noSymmetry=False, min=False, all=False, outer=False):
-    """the inner product; an axis on either side reads it up to sign; a crystal direction
-    reduces over the group of its frame unless noSymmetry says otherwise; outer=True pairs
+  def dot(self, other, antipodal=None, symmetry=True, min=False, all=False, outer=False):
+    """the inner product; an axis on either side reads it up to sign, antipodal=True always,
+    antipodal=False never; a crystal direction reduces over the group of its frame unless
+    symmetry=False says otherwise; outer=True pairs
     every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's dot_outer)"""
     other = self._coerce(other)
     if outer:
       a, b = self._outerPair(other)
-      return a.dot(b, antipodal=antipodal, noAntipodal=noAntipodal, noSymmetry=noSymmetry, min=min, all=all)
+      return a.dot(b, antipodal=antipodal, symmetry=symmetry, min=min, all=all)
     _joinFrames(self._frame, other._frame)
-    if not noSymmetry:
+    if symmetry:
       from .symmetryops import symDot
-      d = symDot(self, other, min=min, all=all, antipodal=antipodal and not noAntipodal)
+      d = symDot(self, other, min=min, all=all, antipodal=antipodal)
       if d is not None:
         return d
     d = np.sum(self.data * other.data, axis=-1)
-    if (antipodal or self.antipodal or other.antipodal) and not noAntipodal:
+    if (self.antipodal or other.antipodal) if antipodal is None else antipodal:
       d = np.abs(d)
     return d
 
@@ -544,27 +545,28 @@ class vector3d(MtexArray):
     """the length of the vectors"""
     return np.linalg.norm(self.data, axis=-1)
 
-  def angle(self, other, N=None, antipodal=False, noSymmetry=False, outer=False):
-    """the angle between two vectors, through atan2 for full accuracy near 0 and pi; with a
+  def angle(self, other, N=None, antipodal=None, symmetry=True, outer=False):
+    """the angle between two vectors, through atan2 for full accuracy near 0 and pi; an axis
+    on either side reads it up to sign, antipodal=True always, antipodal=False never; with a
     normal N the angle in that plane, counterclockwise from self to other; outer=True pairs
     every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's angle_outer)"""
     other = self._coerce(other)
     if outer:
       a, b = self._outerPair(other)
-      return a.angle(b, N=N, antipodal=antipodal, noSymmetry=noSymmetry)
+      return a.angle(b, N=N, antipodal=antipodal, symmetry=symmetry)
     _joinFrames(self._frame, other._frame)
-    if not noSymmetry and N is None:
+    if symmetry and N is None:
       from .symmetryops import symAngle
       a = symAngle(self, other, antipodal=antipodal)
       if a is not None:
         return a
-    isAntipodal = antipodal or self.antipodal or other.antipodal
+    isAntipodal = (self.antipodal or other.antipodal) if antipodal is None else antipodal
     if N is not None:
       n = N.normalize()
-      w1 = (self - n * self.dot(n, noAntipodal=True)).normalize()
-      w2 = (other - n * other.dot(n, noAntipodal=True)).normalize()
-      a = w1.angle(w2, noSymmetry=True)
-      a = np.where(n.dot(w1.cross(w2), noAntipodal=True) < 0, 2 * np.pi - a, a)
+      w1 = (self - n * self.dot(n, antipodal=False)).normalize()
+      w2 = (other - n * other.dot(n, antipodal=False)).normalize()
+      a = w1.angle(w2, symmetry=False)
+      a = np.where(n.dot(w1.cross(w2), antipodal=False) < 0, 2 * np.pi - a, a)
       return np.mod(a, np.pi) if isAntipodal else a
     d = np.sum(self.data * other.data, axis=-1)
     c = np.linalg.norm(np.cross(self.data, other.data), axis=-1)
@@ -577,7 +579,7 @@ class vector3d(MtexArray):
   def orthProj(self, N):
     """the component orthogonal to a normal N, vector3d/orthProj"""
     n = self._coerce(N).normalize()
-    return self - n * self.dot(n, noAntipodal=True, noSymmetry=True)
+    return self - n * self.dot(n, antipodal=False, symmetry=False)
 
   # two vectors are equal when they point the same way, up to the group of a crystal
   # frame, vector3d/eq
@@ -638,10 +640,10 @@ class vector3d(MtexArray):
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._new(np.sum(self.data, axis=axis), **self._joined(None))
 
-  def mean(self, weights=None, antipodal=False, robust=False, axis=None, noSymmetry=False):
+  def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True):
     """the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
     largest principal axis of the moment matrix"""
-    if not noSymmetry and self.isCrystalDirection and self._frame.numSym() > 1 and self.size > 1:
+    if symmetry and self.isCrystalDirection and self._frame.numSym() > 1 and self.size > 1:
       from .symmetryops import symMean
       return symMean(self, weights=weights)
     if robust and self.size > 4:
@@ -660,14 +662,15 @@ class vector3d(MtexArray):
       return self._new(np.sum(self.data * w[..., None], axis=axis), **self._joined(None)).normalize()
     return self._new(np.nanmean(self.data, axis=axis), **self._joined(None))
 
-  def unique(self, tol=1e-6, antipodal=False, noAntipodal=False, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
-    """the disjoint list of vectors up to a tolerance, vector3d/unique; under a group the
-    directions are projected to the fundamental sector first"""
-    if not noSymmetry and self.isCrystalDirection and self._frame.numSym() > 1:
+  def unique(self, tol=1e-6, antipodal=None, symmetry=True, stable=False, return_index=False, return_inverse=False):
+    """the disjoint list of vectors up to a tolerance, vector3d/unique, up to sign for axes,
+    antipodal=True always, antipodal=False never; under a group the directions are projected
+    to the fundamental sector first"""
+    if symmetry and self.isCrystalDirection and self._frame.numSym() > 1:
       from .symmetryops import symUnique
       return symUnique(self, tol, return_index, return_inverse)
     xyz = self.data.reshape(-1, 3)
-    if (antipodal or self.antipodal) and not noAntipodal:
+    if self.antipodal if antipodal is None else antipodal:
       x, y, z = xyz.T
       key = np.stack([x * x, y * y, z * z, x * y, x * z, y * z], axis=-1)
     else:
@@ -703,17 +706,17 @@ class vector3d(MtexArray):
     from .tangent import expVector
     return expVector(self, ref, side)
 
-  def symmetrise(self, unique=False, antipodal=None, noAntipodal=False):
+  def symmetrise(self, unique=False, antipodal=None):
     """the symmetrically equivalent directions, the number of distinct ones, and the
     representative in the fundamental sector of the frame"""
     from .symmetryops import symmetrise
-    return symmetrise(self, unique=unique, antipodal=antipodal, noAntipodal=noAntipodal)
+    return symmetrise(self, unique=unique, antipodal=antipodal)
 
-  def multiplicity(self, antipodal=None, noAntipodal=False):
+  def multiplicity(self, antipodal=None):
     """the number of distinct directions symmetrically equivalent to each vector, of axes under
     antipodal"""
     from .symmetryops import multiplicity
-    return multiplicity(self, antipodal=antipodal, noAntipodal=noAntipodal)
+    return multiplicity(self, antipodal=antipodal)
 
   def project2FundamentalRegion(self, center=None, antipodal=False):
     """the directions folded into the fundamental sector of their frame, with antipodal=True into
@@ -742,7 +745,7 @@ class vector3d(MtexArray):
     det(a, b, c) the triple product; det(v) of three vectors the determinant of their matrix"""
     if b is None:
       return np.linalg.det(self.data.reshape(3, 3))
-    return self.dot(b.cross(c), noAntipodal=True)
+    return self.dot(b.cross(c), antipodal=False)
 
   # ------------------------------------------------------------------ display
 

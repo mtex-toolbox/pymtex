@@ -542,7 +542,7 @@ class crystalFrame(referenceFrame):
   """
 
   def __init__(self, *args, mineral=None, name=None, color=None, alignment=(), rotAxes=None, pointId=None, LaueId=None,
-               laueId=None, spaceId=None, how2plot=None, noIntern=False, density=None, axesNames=("a", "b", "c"),
+               laueId=None, spaceId=None, how2plot=None, intern=True, density=None, axesNames=("a", "b", "c"),
                check=True, centering=None):
     args = list(args)
     # crystalFrame(LaueId=7): the Laue class by its number
@@ -610,7 +610,7 @@ class crystalFrame(referenceFrame):
       self._centering = centering
     if self.how2plot is None:
       self.how2plot = _crystalConvention(self)
-    self._registered = None if noIntern else _registerKeepingColor(self, color)
+    self._registered = None if not intern else _registerKeepingColor(self, color)
 
   @classmethod
   def load(cls, fname):
@@ -824,12 +824,12 @@ class specimenFrame(referenceFrame):
   about a direction (MATLAB ADR 0008 rule 10).
   """
 
-  def __init__(self, name=None, *args, axesNames=("X", "Y", "Z"), how2plot=None, noIntern=False, basis=None):
+  def __init__(self, name=None, *args, axesNames=("X", "Y", "Z"), how2plot=None, intern=True, basis=None):
     if isinstance(name, str) and how2plot is None and args and isinstance(args[0], plottingConvention):
       how2plot = args[0]
     if isinstance(name, str) and not isPointGroupName(name):
       super().__init__(basis, name, axesNames, how2plot, None, None)
-      self._registered = None if noIntern else self
+      self._registered = None if not intern else self
       return
     super().__init__(basis, "", axesNames, how2plot, None, None)
     self._registered = self
@@ -1036,7 +1036,7 @@ def closestAlignment(CS):
   best, at = None, None
   for setup in ALIGNMENT_SETUPS:
     try:
-      fr = crystalFrame(CS.pointGroup, CS.abc, CS.abg, *setup, noIntern=True, check=False)
+      fr = crystalFrame(CS.pointGroup, CS.abc, CS.abg, *setup, intern=False, check=False)
     except Exception:
       continue
     d = float(np.max(np.abs(_unitRows(fr._basis) - n)))

@@ -42,11 +42,11 @@ grains = calcGrains(ebsd, angle=10 * degree, minPixel=3)
 # This page uses `ebsdId` to inspect the pixel pair beside each segment. Boundary
 # simplification and refinement change the segment count, and a resampled segment no
 # longer lies between one specific pixel pair. The
-# [smoothBoundary](grain2d.smoothBoundary.html) options `noSimplify` and `noRefine`
+# [smoothBoundary](grain2d.smoothBoundary.html) options `simplify=False` and `refine=False`
 # preserve that relation while smoothing.
 
 # +
-grains = grains.smoothBoundary(5, noSimplify=True, noRefine=True)
+grains = grains.smoothBoundary(5, simplify=False, refine=False)
 
 # draw the grains and overlay the complete boundary network
 plot(grains, faceColor=[0.9, 0.9, 0.9], micronbar='off')

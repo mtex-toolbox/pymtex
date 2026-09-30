@@ -143,7 +143,7 @@ def _xnovoPhases(f):
 # a stack of 2D maps at the heights z, by default 0, 1, 2, ..., as MATLAB's EBSD3.load(files, '3d', Z)
 def _stack(files, z, *args, **kwargs):
   from .load import loadEBSD
-  maps = [loadEBSD(f, *args, noGrid=True, **kwargs) for f in files]
+  maps = [loadEBSD(f, *args, grid=False, **kwargs) for f in files]
   z = np.arange(len(files), dtype=float) if z is None else np.asarray(z, dtype=float).reshape(-1)
   if len(z) != len(maps):
     raise ValueError("one height per file")

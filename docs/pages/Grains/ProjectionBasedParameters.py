@@ -83,8 +83,8 @@ caliperExtrema
 plot(grains[ind], micronbar=False, legend=False)
 
 hold(True)
-quiver(grains[ind], grains[ind].caliper('longest'), noScaling=True)
-quiver(grains[ind], grains[ind].caliper('shortest'), noScaling=True)
+quiver(grains[ind], grains[ind].caliper('longest'), scaling=False)
+quiver(grains[ind], grains[ind].caliper('shortest'), scaling=False)
 hold(False)
 # -
 

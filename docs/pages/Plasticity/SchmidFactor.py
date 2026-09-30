@@ -54,7 +54,7 @@ hold(False)
 # The sign selects the shear sense; activation comparisons usually use
 # $|m|$ when opposite Burgers-vector signs are identified.
 
-m = np.cos(angle(r, sS.n, noSymmetry=True)) * np.cos(angle(r, sS.b, noSymmetry=True))
+m = np.cos(angle(r, sS.n, symmetry=False)) * np.cos(angle(r, sS.b, symmetry=False))
 m
 
 # The [`SchmidFactor`](slipSystem.SchmidFactor.html) method performs the same

@@ -15,7 +15,7 @@ def bruteDots(g, v):
 
 
 grids = [equispacedS2Grid(resolution=5 * degree), equispacedS2Grid(resolution=5 * degree, antipodal=True),
-         equispacedS2Grid(resolution=4 * degree, hemisphere="upper", noCenter=True), equispacedS2Grid(points=1000)]
+         equispacedS2Grid(resolution=4 * degree, hemisphere="upper", center=False), equispacedS2Grid(points=1000)]
 gridIds = ["5", "5antipodal", "4upper", "1000points"]
 
 

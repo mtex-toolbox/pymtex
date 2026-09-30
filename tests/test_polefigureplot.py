@@ -89,7 +89,7 @@ def test_plotPDF_contourfDrawsTheDensityOfThePoles(sample):
 
 def test_plotPDF_completeDrawsTheWholeSphere(sample):
   cs, ss, odf, ori = sample
-  plotPDF(ori, Miller(1, 0, 0, cs), complete=True, noTitle=True)
+  plotPDF(ori, Miller(1, 0, 0, cs), complete=True, title=False)
   assert len(plotsOf()[0].sR.N) == 1 and gcm().children[0].get_title() == ""
 
 

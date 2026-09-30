@@ -51,7 +51,7 @@ scatter(rot, 'axisAngle')
 # Rodrigues--Frank coordinates keep the direction $\vec n$ but change the distance from
 # the origin to $\tan(\omega/2)$.
 
-scatter(rot, 'Rodrigues', 'noBoundary')
+scatter(rot, 'Rodrigues', region=False)
 
 # Rotations near $180^\circ$ now lie far from the centre, so they stretch the plot and
 # compress the appearance of the remaining cloud. Half turns themselves are at infinity.

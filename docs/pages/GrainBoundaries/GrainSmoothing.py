@@ -203,7 +203,7 @@ legend()
 # off.
 
 # +
-grainsPlain = smoothBoundary(grains, 5, noSimplify=True, noRefine=True)
+grainsPlain = smoothBoundary(grains, 5, simplify=False, refine=False)
 
 print(f'boundary segments: {len(grains.boundary)} measured, {len(grainsSmooth.boundary)} after smoothing, '
       f'{len(grainsPlain.boundary)} with both steps off')

@@ -136,7 +136,7 @@ def test_plot_ofGrainsIsAPathPerGrainWithBoundaryAndScaleBar(forsterite):
 
 def test_plot_ofGrainValuesTakesAColourBar(forsterite):
   ebsd, g = forsterite
-  h = plot(g, g.GOS, colorbar=True, noBoundary=True)
+  h = plot(g, g.GOS, colorbar=True, boundary=False)
   assert mapOf(g).mappable is h and len(gcm().colorbars) == 1
   plot(g["Forsterite"], g["Forsterite"].meanOrientation)
 

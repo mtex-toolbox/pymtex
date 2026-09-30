@@ -132,7 +132,7 @@ plot(oriRotated, MarkerSize=6, MarkerColor='r', MarkerEdgeColor='k', add2all=Tru
 # while `labeled` writes the indices beside them.
 
 # +
-plotIPDF(odf, xvector, noLabel=True)
+plotIPDF(odf, xvector, axisLabels=False)
 mtexColorMap('white2black')
 
 hold(True)   # keep plot

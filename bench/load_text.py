@@ -22,7 +22,7 @@ for f in FILES:
   best = [9e9, 9e9]
   for _ in range(3):
     t = time.perf_counter()
-    e = mtex.loadEBSD(f, noGrid=True)
+    e = mtex.loadEBSD(f, grid=False)
     best[0] = min(best[0], time.perf_counter() - t)
     t = time.perf_counter()
     mtex.loadEBSD(f)

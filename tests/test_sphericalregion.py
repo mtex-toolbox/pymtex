@@ -43,7 +43,7 @@ def test_fundamentalSector_volumeIsOneOverTheOrder(s):
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
 def test_project2FundamentalRegion_isIdempotent(s):
   _, _, p = projected(s)
-  assert np.max(angle(p, project2FundamentalRegion(p), noSymmetry=True)) < 1e-10
+  assert np.max(angle(p, project2FundamentalRegion(p), symmetry=False)) < 1e-10
 
 
 @pytest.mark.parametrize("s", LAUE_AND_MORE)
@@ -169,7 +169,7 @@ turn = rotation.byAxisAngle(vector3d(1, 2, 3), 37 * degree)
 def lowFrames():
   for symbol, angles in (("-1", [80, 95, 110]), ("2/m11", [105, 90, 90]), ("12/m1", [90, 110, 90]), ("112/m", [90, 90, 115])):
     for r in (None, turn):
-      yield crystalFrame(symbol, [2, 3, 4], np.array(angles) * degree, rotAxes=r, noIntern=True)
+      yield crystalFrame(symbol, [2, 3, 4], np.array(angles) * degree, rotAxes=r, intern=False)
 
 
 def test_sectors_ofLowSymmetryFramesHaveTheVolume():
@@ -193,7 +193,7 @@ def test_project2FundamentalRegion_ofLowSymmetryFramesLandsInTheSector():
 @pytest.mark.parametrize("name, angles", (("211", [105, 90, 90]), ("121", [90, 110, 90]), ("112", [90, 90, 115]),
                                           ("m11", [105, 90, 90]), ("1m1", [90, 110, 90]), ("11m", [90, 90, 115])))
 def test_conventionalSector_ofATurnedMonoclinicFrameTilesTheSphere(name, angles):
-  fr = crystalFrame(name, [2, 3, 4], np.array(angles) * degree, rotAxes=turn, noIntern=True)
+  fr = crystalFrame(name, [2, 3, 4], np.array(angles) * degree, rotAxes=turn, intern=False)
   sector = conventionalSector(fr)
   assert abs(sector.volume(resolution=2 * degree) * fr.numSym() - 1) < 0.03
   els = fr.rot
