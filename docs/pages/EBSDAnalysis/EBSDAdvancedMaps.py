@@ -156,7 +156,7 @@ circle(f.h.project2FundamentalRegion(), 15 * degree, lineWidth=2)
 # +
 fibrePercent = 100 * volume(ebsd['fo'].orientations, f, 15 * degree)
 hold(True)
-plotIPDF(ebsd['fo'].orientations, f.r, MarkerColor='k', MarkerSize=10, points=1000, MarkerAlpha=0.2)
+plotIPDF(ebsd['fo'].orientations, f.r, markerFaceColor='k', markerSize=10, points=1000, MarkerAlpha=0.2)
 hold(False)
 fibrePercent
 # -
@@ -186,7 +186,7 @@ colorKey.color = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 0], [0, 1, 
 
 plot(colorKey)
 hold(True)
-plotIPDF(ebsd['fo'].orientations, colorKey.ipfDirection, MarkerFaceColor='none', MarkerEdgeColor='k', MarkerSize=5, points=5000, MarkerAlpha=0.2)
+plotIPDF(ebsd['fo'].orientations, colorKey.ipfDirection, markerFaceColor='none', markerEdgeColor='k', markerSize=5, points=5000, MarkerAlpha=0.2)
 hold(False)
 # -
 
@@ -205,7 +205,7 @@ plot(ebsd['fo'], colorKey.orientation2color(ebsd['fo'].orientations))
 #
 # A highlighted component is easier to place when the microstructure remains visible
 # underneath it. Draw band contrast first, then add the spot colours with the
-# [FaceAlpha](EBSD.plot.html) option.
+# [faceAlpha](EBSD.plot.html) option.
 
 # +
 plot(ebsd, ebsd.bc, micronbar=False)
@@ -218,7 +218,7 @@ colorKey.color = [0, 0, 1]
 colorKey.psi = S2DeLaValleePoussinKernel(halfwidth=7.5 * degree)
 
 hold(True)
-plot(ebsd['fo'], colorKey.orientation2color(ebsd['fo'].orientations), FaceAlpha=0.5)
+plot(ebsd['fo'], colorKey.orientation2color(ebsd['fo'].orientations), faceAlpha=0.5)
 hold(False)
 # -
 

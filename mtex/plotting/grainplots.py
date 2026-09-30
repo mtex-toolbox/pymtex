@@ -112,7 +112,7 @@ def _grainHistogram(grains, prop=None, bins=15, **kw):
   return hs
 
 
-def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, DisplayName=None, **kw):
+def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw):
   """plotEllipse(c, a, b): the ellipses with the centres c and the half axes a and b drawn
   into the held map"""
   from matplotlib.collections import LineCollection
@@ -131,7 +131,7 @@ def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, DisplayName=None, **kw):
     raise ValueError("plotEllipse draws into a map: plot the grains first and hold")
   flat = [mP.plane.to2d(p) @ mP.layout.T for p in P]
   colors = lineColor if isinstance(lineColor, str) else np.asarray(lineColor, dtype=float)
-  h = LineCollection(flat, colors=colors, linewidths=lineWidth, zorder=5, label=DisplayName, **kw)
+  h = LineCollection(flat, colors=colors, linewidths=lineWidth, zorder=5, label=displayName, **kw)
   mP.ax.add_collection(h)
   return h
 

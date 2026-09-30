@@ -31,7 +31,7 @@ cS
 
 # ---
 
-plot(cS, FaceAlpha=0.2)
+plot(cS, faceAlpha=0.2)
 
 # The display reports 12 vertices and 8 faces. The translucent drawing shows the six
 # prism faces between the two basal faces.
@@ -54,10 +54,10 @@ sS
 
 # ---
 
-plot(cS, FaceAlpha=0.2)
+plot(cS, faceAlpha=0.2)
 hold(True)
-plot(cS, sS[1], FaceColor='blue')
-plot(cS, sS[0], FaceColor='red')
+plot(cS, sS[1], faceColor='blue')
+plot(cS, sS[0], faceColor='red')
 hold(False)
 
 # The blue and red patches are two different pyramidal planes. Their arrows make the
@@ -83,7 +83,7 @@ ori = ebsd['xy', 500, 500].orientations
 
 # rotate, scale, and place one shape above that position
 hold(True)
-plot(500, 500, 50, ori * cS * 100, FaceAlpha=0.5, LineWidth=2)
+plot(500, 500, 50, ori * cS * 100, faceAlpha=0.5, lineWidth=2)
 hold(False)
 # -
 
@@ -107,7 +107,7 @@ grains = smoothBoundary(grains, 5)
 # colour grains by the specimen direction of the crystal c-axis
 cKey = ipfColorKey(grains)
 color = cKey.orientation2color(grains.meanOrientation)
-plot(grains, color, FaceAlpha=0.5, LineWidth=2)
+plot(grains, color, faceAlpha=0.5, lineWidth=2)
 
 # retain grains with more than 50 measurements
 isBig = grains.numPixel > 50
@@ -117,7 +117,7 @@ cSGrains = grains[isBig].meanOrientation * cS * 0.7 * np.sqrt(grains[isBig].area
 
 # place the shapes at the grain centroids
 hold(True)
-plot(grains[isBig].centroid + cSGrains, FaceColor=color[isBig], FaceAlpha=0.7)
+plot(grains[isBig].centroid + cSGrains, faceColor=color[isBig], faceAlpha=0.7)
 hold(False)
 # -
 
@@ -137,11 +137,11 @@ hold(False)
 
 # +
 # plot the grain map
-plot(grains, color, FaceAlpha=0.5, LineWidth=2)
+plot(grains, color, faceAlpha=0.5, lineWidth=2)
 
 # overlay one oriented crystal shape on each retained grain
 hold(True)
-plot(grains[isBig], 0.7 * cS, FaceColor=color[isBig], LineWidth=2, FaceAlpha=0.7)
+plot(grains[isBig], 0.7 * cS, faceColor=color[isBig], lineWidth=2, faceAlpha=0.7)
 hold(False)
 # -
 
@@ -161,9 +161,9 @@ twinning = orientation.map(Miller(0, 1, -1, -2, ebsd.CS), Miller(0, -1, 1, -2, e
                            Miller(2, -1, -1, 0, ebsd.CS), Miller(2, -1, -1, 0, ebsd.CS))
 
 # draw the parent and twin shapes together
-plot(cS, FaceAlpha=0.5)
+plot(cS, faceAlpha=0.5)
 hold(True)
-plot(twinning * cS * 0.9, FaceColor='orange')
+plot(twinning * cS * 0.9, faceColor='orange')
 hold(False)
 plt.gca().view_init(elev=20, azim=45)
 # -
@@ -299,7 +299,7 @@ plot(cS, colored=True)
 
 plot(cS)
 hold(True)
-plot(cS[Miller(0, -1, 1, 0, cs)], FaceColor='DarkRed')
+plot(cS[Miller(0, -1, 1, 0, cs)], faceColor='DarkRed')
 hold(False)
 
 # The dark-red patch isolates one prism face while the rest of the habit remains

@@ -43,9 +43,9 @@ angle(mori, inv(mori)) / degree
 axMori = axis(mori, symmetry=False)
 axInverse = axis(inv(mori), symmetry=False)
 
-plot(axMori, complete=True, MarkerSize=12, DisplayName='m', grid=True)
+plot(axMori, complete=True, markerSize=12, displayName='m', grid=True)
 hold(True)
-plot(axInverse, complete=True, MarkerSize=12, DisplayName='inverse(m)')
+plot(axInverse, complete=True, markerSize=12, displayName='inverse(m)')
 hold(False)
 legend(location='southeast')
 # -

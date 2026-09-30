@@ -21,7 +21,7 @@ def test_plot_ofHeldKernelsGoesIntoTheUsersFigure():
   plt.figure()
   hold(True)
   for psi in (SO3DeLaValleePoussinKernel(halfwidth=20 * degree), SO3DirichletKernel(3)):
-    plot(psi, DisplayName="k")
+    plot(psi, displayName="k")
   hold(False)
   assert len(plt.get_fignums()) == 1 and len(plt.gca().lines) == 2 and plt.gca().lines[0].get_label() == "k"
 

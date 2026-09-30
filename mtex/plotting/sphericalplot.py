@@ -24,6 +24,7 @@ from ..geometry.sphericalregion import projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from .colormaps import contourLevels, mtexColormap
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .spherical import hasSymmetry, makeSphericalProjection, plainProjection
 from ..geometry.display import header
@@ -150,12 +151,9 @@ class sphericalPlot:
 # ------------------------------------------------------------------ where a plot goes
 
 def _split(kw):
-  # MATLAB's 'silent' says nothing here, and its line keys are spelt lineWidth, lineColor
+  # verbose says nothing here
   kw.pop("verbose", None)
-  for old, new in (("LineWidth", "lineWidth"), ("LineColor", "lineColor"), ("LineStyle", "lineStyle"), ("linewidth", "lineWidth"),
-                   ("linecolor", "lineColor"), ("linestyle", "lineStyle"), ("FontSize", "fontSize")):
-    if old in kw:
-      kw[new] = kw.pop(old)
+  refuseVariants(kw)
   projKw = {k: kw.pop(k) for k in PROJECTION_KEYS if k in kw}
   axesKw = {k: kw.pop(k) for k in AXES_KEYS if k in kw}
   whereKw = {k: kw.pop(k) for k in WHERE_KEYS if k in kw}
@@ -245,11 +243,8 @@ def _plotOf(ax, v, projKw, axesKw):
 
 MARKER_NAMES = {"square": "s", "diamond": "D", "circle": "o", "triangle": "^", "pentagram": "p", "hexagram": "h", "plus": "+",
                 "cross": "x", "point": ".", "asterisk": "*"}
-MARKER_KEYS = {"MarkerSize": "size", "Marker": "marker", "MarkerFaceColor": "color", "MarkerColor": "color",
-               "MarkerEdgeAlpha": "alpha", "MarkerFaceAlpha": "alpha", "MarkerAlpha": "alpha", "alpha": "alpha",
-               "MarkerEdgeColor": "edgecolor", "color": "color", "markersize": "size", "marker": "marker",
-               "markerEdgeColor": "edgecolor", "markerFaceColor": "color", "markerColor": "color", "markeredgecolor": "edgecolor",
-               "markerfacecolor": "color", "markerSize": "size", "Markersize": "size"}
+MARKER_KEYS = {"markerSize": "size", "marker": "marker", "markerFaceColor": "color", "markerEdgeColor": "edgecolor",
+               "markerFaceAlpha": "alpha", "markerEdgeAlpha": "alpha", "alpha": "alpha", "color": "color"}
 
 
 def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=None, zorder=6, **kw):
@@ -259,14 +254,14 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
   # labeled writes each direction's own name, backgroundColor boxes the text, textAboveMarker lifts it
   if kw.pop("labeled", False) and label is None:
     label = [_nameOf(v.flatten()[i]) for i in range(v.size)]
-  background = kw.pop("backgroundColor", kw.pop("backgroundcolor", kw.pop("BackgroundColor", None)))
+  background = kw.pop("backgroundColor", None)
   # the text goes below the marker unless textAboveMarker, MATLAB's textBelowMarker being that default
   above = kw.pop("textAboveMarker", False) and not kw.pop("textBelowMarker", False)
   kw.pop("textBelowMarker", None)
-  # MATLAB's textColor colours the labels; beside a MarkerFaceColor, color is the text's too
-  textColor = kw.pop("textColor", kw.pop("fontColor", kw.pop("Color", None)))
+  # textColor colours the labels; beside a markerFaceColor, color is the text's too
+  textColor = kw.pop("textColor", None)
   labelFontSize = kw.pop("labelFontSize", None)
-  if textColor is None and label is not None and "color" in kw and ("MarkerFaceColor" in kw or "MarkerColor" in kw):
+  if textColor is None and label is not None and "color" in kw and "markerFaceColor" in kw:
     textColor = kw.pop("color")
   # the markers shrink with the spacing of many directions, as MATLAB's do; the spacing is
   # that of as many directions spread evenly
@@ -275,7 +270,7 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
   if not sizeGiven and v.size > 4:
     size = min(size, 50 * max(np.sqrt(4 * np.pi / v.size / (1 + v.antipodal)), 0.5 * degree))
   opts = {"size": size, "marker": "o", "color": MARKER_COLOR, "edgecolor": "k"}
-  # an open marker, MarkerFaceColor 'none', still takes the colour of the order, on its edge
+  # an open marker, markerFaceColor 'none', still takes the colour of the order, on its edge
   faceNone = any(name == "color" and isinstance(kw.get(key), str) and kw[key].lower() == "none" for key, name in MARKER_KEYS.items())
   edgeGiven = any(key in kw for key, name in MARKER_KEYS.items() if name == "edgecolor")
   ownColor = any(key in kw for key, name in MARKER_KEYS.items() if name == "color") and not faceNone
@@ -298,9 +293,9 @@ def _markers(sP, v, data=None, label=None, rgb=None, colormap=None, colorRange=N
     opts["edgecolor"] = "face"
   # MATLAB's marker names; a line width is the width of the marker edge
   opts["marker"] = MARKER_NAMES.get(str(opts["marker"]).lower(), opts["marker"])
-  edgeWidth = kw.pop("lineWidth", kw.pop("linewidth", kw.pop("LineWidth", None)))
-  # MATLAB's DisplayName names the markers in a legend
-  legendName = kw.pop("DisplayName", kw.pop("displayName", None))
+  edgeWidth = kw.pop("lineWidth", None)
+  # displayName names the markers in a legend
+  legendName = kw.pop("displayName", None)
   # an axis on the rim of a hemisphere chart is marked at both ends; values stay one per point
   if v.antipodal and v.size and data is None and rgb is None:
     rim = np.abs((sP.proj.pC.rot.inv() * v).z.reshape(-1)) < 1e-6
@@ -409,10 +404,9 @@ def _filled(sP, X, Y, values, style="pcolor", contours=10, colormap=None, colorR
   showText = kw.pop("ShowText", kw.pop("showText", None))
   if showText is not None:
     contourLabels = showText.lower() == "on" if isinstance(showText, str) else bool(showText)
-  # MATLAB's faceAlpha is the transparency of the surface
-  for name in ("faceAlpha", "FaceAlpha"):
-    if name in kw:
-      kw["alpha"] = kw.pop(name)
+  # faceAlpha is the transparency of the surface
+  if "faceAlpha" in kw:
+    kw["alpha"] = kw.pop("faceAlpha")
   # the colour map is fixed when the surface is drawn, a later preference leaves it alone
   colormap = mtexColormap(colormap)
   # the bands of a contour plot are cut for one range and one colour map, so a change of
@@ -630,7 +624,7 @@ def plot(v, *args, **kw):
     # the markers shrink with the number of poles, as those of plotPDF(ori, h) do
     from .poles import dynamicMarkerSize
     if not any(k in kw for k, name in MARKER_KEYS.items() if name == "size"):
-      kw["MarkerSize"] = dynamicMarkerSize(v.size * max(v.CS.numSym() // 2, 1))
+      kw["markerSize"] = dynamicMarkerSize(v.size * max(v.CS.numSym() // 2, 1))
     return _annotatePoles(v, **kw)
   # plot(f, add2all=True) on pole figures: the poles of the fibre as curves on every one
   from ..geometry.fibre import fibre
@@ -738,7 +732,7 @@ def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
   return hs
 
 
-def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0, parent=None, **kw):
+def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw):
   """circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
   chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)"""
   vs = v if isinstance(v, vector3d) else vector3d(v)
@@ -749,10 +743,10 @@ def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, Edg
     u = n.orth()
     w = n.cross(u).normalize()
     rings.append(np.cos(radius) * n.data.reshape(1, 3) + np.sin(radius) * (np.cos(t)[:, None] * u.data.reshape(1, 3) + np.sin(t)[:, None] * w.data.reshape(1, 3)))
-  return _curves(rings, vs.frame, vs.antipodal, add2all, lineColor, lineWidth, EdgeAlpha, parent, "circle", **kw)
+  return _curves(rings, vs.frame, vs.antipodal, add2all, lineColor, lineWidth, edgeAlpha, parent, "circle", **kw)
 
 
-def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0, parent=None, **kw):
+def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw):
   """ellipse(rot, a, b): the ellipse of semi-axes a and b, in radians, about rot * z, its
   axes along rot * x and rot * y, onto the spherical plots of the figure"""
   from ..geometry.quaternion import rotation
@@ -765,17 +759,17 @@ def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, EdgeAlpha=1.0
     theta = ai * bi / np.sqrt((ai * np.cos(rho)) ** 2 + (bi * np.sin(rho)) ** 2)
     c = rotation(r.data.reshape(4)) * vector3d.byPolar(theta, rho)
     rings.append(c.data.reshape(-1, 3))
-  return _curves(rings, None, False, add2all, lineColor, lineWidth, EdgeAlpha, parent, "ellipse", **kw)
+  return _curves(rings, None, False, add2all, lineColor, lineWidth, edgeAlpha, parent, "ellipse", **kw)
 
 
 # rings of directions as lines on the spherical plots: the one drawn last, every one with
 # add2all, or those named
-def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, EdgeAlpha, parent, name, **kw):
-  lineColor = kw.pop("color", kw.pop("linecolor", kw.pop("LineColor", kw.pop("lineColor", lineColor))))
-  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
+def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, edgeAlpha, parent, name, **kw):
+  refuseVariants(kw)
+  lineColor = kw.pop("color", kw.pop("lineColor", lineColor))
   kw.pop("doNotDraw", None)
-  # MATLAB's DisplayName names the first curve on each axes in a legend
-  legendName = kw.pop("DisplayName", kw.pop("displayName", None))
+  # displayName names the first curve on each axes in a legend
+  legendName = kw.pop("displayName", None)
   fig = gcm()
   if parent is not None:
     axes = list(parent) if isinstance(parent, (list, tuple)) else [parent]
@@ -796,16 +790,17 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, EdgeAlpha, p
       jump = np.flatnonzero(np.hypot(np.diff(x), np.diff(y)) > 0.25 * np.nanmax(np.hypot(x, y)))
       x, y = np.insert(x, jump + 1, np.nan), np.insert(y, jump + 1, np.nan)
       named = legendName is not None and ring is rings[0]
-      hs.append(ax.plot(x, y, color=lineColor, linewidth=lineWidth, alpha=EdgeAlpha, zorder=7, label=legendName if named else "_nolegend_", **kw))
+      hs.append(ax.plot(x, y, color=lineColor, linewidth=lineWidth, alpha=edgeAlpha, zorder=7, label=legendName if named else "_nolegend_", **kw))
   return hs
 
 
 # plot(psi): a spherical kernel over the angle in degrees, into the held axes or a new figure
 def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw):
   """plot(psi): a kernel on the sphere against the angle, over -180 to 180 degree with symmetric"""
-  from .kernelplot import _lineAxes, _lineKw
+  from .kernelplot import _lineAxes
+  from .keywords import lineKeywords
   ax = _lineAxes(kw)
-  kw = _lineKw(kw)
+  kw = lineKeywords(kw)
   kw.setdefault("linewidth", 1.5)
   omega = np.linspace(-maxAngle if symmetric else 0, maxAngle, 1441 if symmetric else 721)
   h = ax.plot(omega / degree, np.real(psi.eval(np.cos(omega))), **kw)
@@ -877,7 +872,7 @@ def text(v, labels=None, *more, **kw):
   if _mapKind(v) is not None:
     from .mapplot import textMap
     return textMap(v, labels, **kw)
-  kw.setdefault("MarkerSize", 0)
+  kw.setdefault("markerSize", 0)
   # text is added to the charts of the current figure, as MATLAB's text adds to its axes,
   # or to the one nextAxis chose in a held figure
   fig = gcm()
@@ -893,10 +888,10 @@ def _textAt(xyz, s, **kw):
   import matplotlib.pyplot as plt
   fig = gcm()
   ax = fig.children[-1] if fig is not None and fig.children else plt.gca()
-  # MATLAB's property names, capitalised or not
-  names = {"fontweight": "fontweight", "fontsize": "fontsize", "color": "color", "horizontalalignment": "ha",
-           "verticalalignment": "va", "backgroundcolor": "backgroundcolor"}
-  kw = {names.get(k.lower(), k): val for k, val in kw.items()}
+  # the properties of the text in matplotlib's spelling
+  names = {"fontWeight": "fontweight", "fontSize": "fontsize", "horizontalAlignment": "ha", "verticalAlignment": "va",
+           "backgroundColor": "backgroundcolor"}
+  kw = {names.get(k, k): val for k, val in refuseVariants(kw).items()}
   return ax.text(*[float(c) for c in xyz], s, **kw)
 
 
@@ -928,7 +923,7 @@ def plotHKL(CS, complete=False, **kw):
   from ..geometry.miller import Miller
   hkl = ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (0, 1, 1), (1, 0, 1), (1, 1, 1), (-1, -1, 0), (-1, -1, 1))
   ms = Miller(np.array(hkl, dtype=float), CS).unique()
-  opts = dict(symmetrised=True, labeled=True, MarkerEdgeColor="k", grid=True, backgroundColor="w", axisLabels=False)
+  opts = dict(symmetrised=True, labeled=True, markerEdgeColor="k", grid=True, backgroundColor="w", axisLabels=False)
   if not complete:
     opts["upper"] = True
   opts.update(kw)
@@ -1019,7 +1014,7 @@ def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
 
 def annotate(v, *args, **kw):
   """annotate: markers on every axes of the current figure, black by default"""
-  kw.setdefault("MarkerFaceColor", "k")
+  kw.setdefault("markerFaceColor", "k")
   kw.setdefault("add2all", True)
   # an orientation is marked in the sections of the current figure when it has some, or by
   # its poles on the pole figures the figure holds
@@ -1170,17 +1165,17 @@ def quiver(v, w=None, resolution=10 * degree, **kw):
   return [_arrows(sP, v.flatten(), w.flatten(), resolution=resolution, axisField=w.antipodal, **kw) for sP in sPs]
 
 
-def plotRegion(sR, color="k", linewidth=1.0, **kw):
+def plotRegion(sR, color="k", lineWidth=1.0, **kw):
   """plot(sR): the outline of a spherical region"""
-  linewidth = kw.pop("lineWidth", kw.pop("LineWidth", linewidth))
-  color = kw.pop("lineColor", kw.pop("LineColor", kw.pop("linecolor", color)))
+  refuseVariants(kw)
+  color = kw.pop("lineColor", color)
   projKw, axesKw, whereKw = _split(kw)
   sPs = _targets(sR, projKw, axesKw, whereKw)
   hs = []
   for sP in sPs:
     for arc in sR.boundary(0.5 * degree):
       x, y = sP.proj.project(arc)
-      hs += sP.ax.plot(x, y, color=color, linewidth=linewidth, zorder=8, **kw)
+      hs += sP.ax.plot(x, y, color=color, linewidth=lineWidth, zorder=8, **kw)
   return hs
 
 
@@ -1371,7 +1366,7 @@ def _annotatePoles(ori, **kw):
   from .poles import poles
   fig = gcm()
   kw.pop("add2all", None)
-  kw.setdefault("MarkerSize", 8)
+  kw.setdefault("markerSize", 8)
   hs = []
   for ax in fig.children:
     sP = getattr(ax, "_mtexSphericalPlot", None)
@@ -1396,7 +1391,7 @@ def _annotatePoles(ori, **kw):
 def _fibrePoles(f, points=1000, lineColor="k", lineWidth=1.5, **kw):
   from .poles import poles
   kw.pop("add2all", None)
-  label = kw.pop("DisplayName", kw.pop("displayName", None))
+  label = kw.pop("displayName", None)
   ori = f.orientation(points).flatten()
   hs = []
   for ax in gcm().children:

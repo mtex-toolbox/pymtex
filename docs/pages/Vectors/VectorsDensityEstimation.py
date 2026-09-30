@@ -39,7 +39,7 @@ numCAxes
 # +
 cAxes.antipodal = True
 
-plot(cAxes, upper=True, MarkerFaceColor='none', MarkerEdgeAlpha=0.01, MarkerSize=4)
+plot(cAxes, upper=True, markerFaceColor='none', markerEdgeAlpha=0.01, markerSize=4)
 # -
 
 # The projected sphere is almost covered by markers. Some concentrations are visible, but
@@ -70,7 +70,7 @@ contourf(pdf)
 mtexColorMap('LaboTeX')
 
 hold(True)
-plot(cAxes, upper=True, MarkerFaceColor='none', MarkerEdgeColor='k', MarkerEdgeAlpha=0.01, MarkerSize=4)
+plot(cAxes, upper=True, markerFaceColor='none', markerEdgeColor='k', markerEdgeAlpha=0.01, markerSize=4)
 hold(False)
 # -
 
@@ -290,7 +290,7 @@ vRand = discreteSample(pdf, 500)
 
 plot(pdf, upper=True)
 hold(True)
-plot(vRand, MarkerFaceColor='k', MarkerSize=4)
+plot(vRand, markerFaceColor='k', markerSize=4)
 hold(False)
 # -
 
@@ -338,9 +338,9 @@ mtexColorbar()
 psi1 = S2DeLaValleePoussinKernel(halfwidth=10 * degree)
 psi2 = S2DirichletKernel(12)
 
-plot(psi1, linewidth=2)
+plot(psi1, lineWidth=2)
 hold(True)
-plot(psi2, linewidth=2)
+plot(psi2, lineWidth=2)
 hold(False)
 plt.xlim(0, 60)
 plt.legend(['de la Vallee Poussin', 'Dirichlet'])

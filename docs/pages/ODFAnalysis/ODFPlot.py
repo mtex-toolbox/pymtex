@@ -136,7 +136,7 @@ mtexColorbar(title='mrd')
 # select a fibre of interest
 f = fibre(Miller(1, 2, -3, 2, cs), vector3d(2, 1, 1))
 
-plot(odf, f, LineWidth=2, figSize='small')
+plot(odf, f, lineWidth=2, figSize='small')
 # -
 
 # The curve contains two pronounced peaks separated by low-density intervals. The

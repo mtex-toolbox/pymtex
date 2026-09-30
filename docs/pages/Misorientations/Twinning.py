@@ -55,9 +55,9 @@ round2Miller(twinning)
 # +
 cS = crystalShape.hex(CS)
 
-plot(cS, FaceColor='LightSkyBlue', FaceAlpha=0.55, figSize='large')
+plot(cS, faceColor='LightSkyBlue', faceAlpha=0.55, figSize='large')
 hold(True)
-plot(0.9 * (twinning * cS), FaceColor='orange', FaceAlpha=0.55)
+plot(0.9 * (twinning * cS), faceColor='orange', faceAlpha=0.55)
 hold(False)
 plt.gca().view_init(elev=20, azim=35 - 90)
 # -
@@ -159,7 +159,7 @@ candidateTracePercent
 
 plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
 hold(True)
-plot(gB[isCandidate], linecolor='w', linewidth=3)
+plot(gB[isCandidate], lineColor='w', lineWidth=3)
 hold(False)
 
 # The white traces follow the thin lamellae in the orientation map. This spatial agreement

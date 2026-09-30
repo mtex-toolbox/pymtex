@@ -46,7 +46,7 @@ foColor = ipfKey.orientation2color(ebsd['Fo'].orientations)
 plot(ebsd['Fo'], foColor)
 
 hold(True)
-plot(grains.boundary, linewidth=1.5)
+plot(grains.boundary, lineWidth=1.5)
 hold(False)
 # -
 
@@ -124,8 +124,8 @@ plot(ebsdS['Fo'], foColor)
 
 # overlay all boundaries and highlight the matching ones
 hold(True)
-plot(grains.boundary, linewidth=1.5)
-plot(gB, linewidth=3, lineColor='r')
+plot(grains.boundary, lineWidth=1.5)
+plot(gB, lineWidth=3, lineColor='r')
 hold(False)
 
 # the boundary overlay covers the whole map, so keep the view on the region
@@ -220,7 +220,7 @@ foColor = ipfKey.orientation2color(ebsdS['Fo'].orientations)
 plot(ebsdS['Fo'], foColor)
 
 hold(True)
-plot(grainsC.boundary, linewidth=1.5)
+plot(grainsC.boundary, lineWidth=1.5)
 hold(False)
 
 plt.xlim(region[0], region[0] + region[2])

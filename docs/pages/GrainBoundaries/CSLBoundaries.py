@@ -67,7 +67,7 @@ setColorRange([.5, 5])
 
 # make the orientation layer translucent
 hold(True)
-plot(grains, grains.meanOrientation, ipfDirection=zvector, FaceAlpha=0.4, linewidth=3)
+plot(grains, grains.meanOrientation, ipfDirection=zvector, faceAlpha=0.4, lineWidth=3)
 hold(False)
 # -
 
@@ -102,7 +102,7 @@ sigma3SegmentPercent
 
 # overlay the Sigma 3 segments on the existing plot
 hold(True)
-plot(gB3, lineColor='gold', linewidth=3, DisplayName='CSL 3')
+plot(gB3, lineColor='gold', lineWidth=3, displayName='CSL 3')
 hold(False)
 
 # ## How much of the network is Sigma 3
@@ -137,7 +137,7 @@ numberOfSelectedTriplePoints
 # -
 
 hold(True)
-plot(grains.triplePoints[tPid], color='red', linewidth=2, MarkerSize=8)
+plot(grains.triplePoints[tPid], color='red', lineWidth=2, markerSize=8)
 hold(False)
 
 # ## What the selected triple points mean
@@ -163,7 +163,7 @@ numberOfGrainsBeforeAndAfter
 
 # overlay the merged-grain boundaries on the previous plot
 hold(True)
-plot(mergedGrains.boundary, linecolor='w', linewidth=3)
+plot(mergedGrains.boundary, lineColor='w', lineWidth=3)
 hold(False)
 
 # ## What merging changes
@@ -192,10 +192,10 @@ lowSigmaSegmentCounts
 # -
 
 hold(True)
-plot(gB5, lineColor='b', linewidth=2, DisplayName='CSL 5')
-plot(gB7, lineColor='g', linewidth=2, DisplayName='CSL 7')
-plot(gB9, lineColor='m', linewidth=2, DisplayName='CSL 9')
-plot(gB11, lineColor='c', linewidth=2, DisplayName='CSL 11')
+plot(gB5, lineColor='b', lineWidth=2, displayName='CSL 5')
+plot(gB7, lineColor='g', lineWidth=2, displayName='CSL 7')
+plot(gB9, lineColor='m', lineWidth=2, displayName='CSL 9')
+plot(gB11, lineColor='c', lineWidth=2, displayName='CSL 11')
 hold(False)
 
 # ## What the other relationships contribute
@@ -250,7 +250,7 @@ hold(True)
 plot(mori.project2FundamentalRegion())
 
 # mark the ideal Sigma 3 misorientation
-plot(csl3.project2FundamentalRegion(antipodal=True), MarkerColor='r', DisplayName='CSL 3', MarkerSize=20)
+plot(csl3.project2FundamentalRegion(antipodal=True), markerFaceColor='r', displayName='CSL 3', markerSize=20)
 hold(False)
 # -
 
@@ -282,10 +282,10 @@ mdf
 # +
 plot(mdf, 'axisAngle', np.arange(25, 61, 5) * degree, colorRange=[0, 15])
 
-annotate(CSL(3, ebsd.CS), label='$CSL_3$', backgroundcolor='w')
-annotate(CSL(5, ebsd.CS), label='$CSL_5$', backgroundcolor='w')
-annotate(CSL(7, ebsd.CS), label='$CSL_7$', backgroundcolor='w')
-annotate(CSL(9, ebsd.CS), label='$CSL_9$', backgroundcolor='w')
+annotate(CSL(3, ebsd.CS), label='$CSL_3$', backgroundColor='w')
+annotate(CSL(5, ebsd.CS), label='$CSL_5$', backgroundColor='w')
+annotate(CSL(7, ebsd.CS), label='$CSL_7$', backgroundColor='w')
+annotate(CSL(9, ebsd.CS), label='$CSL_9$', backgroundColor='w')
 # -
 
 # ## Locate the density maximum

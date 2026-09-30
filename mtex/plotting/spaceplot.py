@@ -17,6 +17,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .colormaps import mtexColormap
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
 from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
@@ -205,7 +206,7 @@ def plot3d(x, *args, **kw):
   return scatter3d(x, *args, **kw)
 
 
-def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet", colorRange=None, grid=True, axisLabels=True,
+def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="WhiteJet", colorRange=None, grid=True, axisLabels=True,
               label=None, colorbar=False, **kw):
   """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
   v = v if isinstance(v, vector3d) else vector3d(v)
@@ -217,13 +218,13 @@ def scatter3d(v, data=None, MarkerSize=6, color=MARKER_COLOR, colormap="WhiteJet
   if v.antipodal:
     P = np.concatenate([P, -P])
   if data is None:
-    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], s=MarkerSize ** 2, c=[color] if isinstance(color, tuple) else color, edgecolors="k",
+    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], s=markerSize ** 2, c=[color] if isinstance(color, tuple) else color, edgecolors="k",
                       linewidths=0.4, depthshade=False, **kw)
   else:
     vals = np.asarray(data, dtype=float).reshape(-1)
     vals = np.concatenate([vals, vals]) if v.antipodal else vals
     lo, hi = _rangeOf([vals]) if colorRange is None else colorRange
-    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], s=MarkerSize ** 2, c=vals, cmap=mtexColormap(colormap), vmin=lo, vmax=hi,
+    h = sP.ax.scatter(P[:, 0], P[:, 1], P[:, 2], s=markerSize ** 2, c=vals, cmap=mtexColormap(colormap), vmin=lo, vmax=hi,
                       edgecolors="k", linewidths=0.4, depthshade=False, **kw)
     sP.mappable = h
     if colorbar:
@@ -283,11 +284,11 @@ def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolut
          **kw):
   """surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
   complex one; a list of functions one panel each; a single real function is first scaled
-  to (f - mean) / (max - min) + 1 unless noScaling, as MATLAB's surf does"""
+  to (f - mean) / (max - min) + 1 unless scaling=False, as MATLAB's surf does"""
   from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .mtexfigure import figureSize
-  edgeColor = kw.pop("EdgeColor", edgeColor)
+  refuseVariants(kw)
   fs = [sF] if not getattr(sF, "shape", ()) else [sF[k] for k in np.ndindex(sF.shape)]
   V, F = sphereMesh(resolution)
   fr = getattr(sF, "frame", None)
@@ -459,16 +460,14 @@ def orientationPoints(o, coordinates="axisAngle", fundamentalRegion=True):
   raise ValueError("coordinates are 'axisAngle', 'Euler' or 'Rodrigues'")
 
 
-# MATLAB's marker options on a scatter in space
-def _markerStyle(kw, color, MarkerSize):
-  for k in ("MarkerFaceColor", "MarkerColor", "markerfacecolor"):
-    if k in kw:
-      color = kw.pop(k)
-  edge = kw.pop("MarkerEdgeColor", kw.pop("markeredgecolor", None))
-  lw = kw.pop("linewidth", kw.pop("LineWidth", None))
-  MarkerSize = kw.pop("markersize", MarkerSize)
-  style = {"s": MarkerSize ** 2, "depthshade": False, "zorder": 5}
-  name = kw.pop("DisplayName", kw.pop("displayName", None))
+# the marker options of a scatter in space
+def _markerStyle(kw, color, markerSize):
+  refuseVariants(kw)
+  color = kw.pop("markerFaceColor", color)
+  edge = kw.pop("markerEdgeColor", None)
+  lw = kw.pop("lineWidth", None)
+  style = {"s": markerSize ** 2, "depthshade": False, "zorder": 5}
+  name = kw.pop("displayName", None)
   if name is not None:
     style["label"] = name
   if edge is not None:
@@ -497,7 +496,7 @@ def _spaceFlags(args, Euler, axisAngle, Rodrigues):
 
 
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
-                        ignoreFundamentalRegion=False, points=None, MarkerSize=5, color=MARKER_COLOR, colormap="WhiteJet",
+                        ignoreFundamentalRegion=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="WhiteJet",
                         colorRange=None, colorbar=False, all=False, **kw):
   """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
   scatter(ori, all=True)
@@ -511,7 +510,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   data, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   region = region and noRegion is None and not complete
   ignoreFundamentalRegion = ignoreFundamentalRegion or complete
-  color, style = _markerStyle(kw, color, MarkerSize)
+  color, style = _markerStyle(kw, color, markerSize)
   axesKw = _keys(kw)
   # an orientation with its frames scatters in the Euler region by default, a misorientation
   # and a bare rotation in axis angle space, into held axes in their coordinates, as MATLAB
@@ -623,7 +622,7 @@ def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fals
     return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw)
   color = "b" if color is None else color
   _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
-  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  refuseVariants(kw)
   axesKw = _keys(kw)
   ref = t.oriRef
   isOri = hasattr(ref, "CS")
@@ -636,7 +635,7 @@ def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fals
     coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
     reduced = isOri
     o = ref if ref.ndim else ref.reshape(1)
-    scatterOrientations(o, coordinates, MarkerSize=0.1, **axesKw)
+    scatterOrientations(o, coordinates, markerSize=0.1, **axesKw)
     sP = gcm().children[-1]._mtexSpacePlot
   scale = 1.0 if normalize else float(np.max(t.norm()))
   t = t.normalize() if normalize else t / max(scale, 1e-12)
@@ -655,7 +654,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   from ..geometry.orientation import orientation
   color = "b" if color is None else color
   res = kw.pop("resolution", 10 * degree)
-  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  refuseVariants(kw)
   _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
   axesKw = _keys(kw)
@@ -665,7 +664,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   fig = gcm()
   held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
   if not held:
-    scatterOrientations(o, coordinates, MarkerSize=0.1, **axesKw)
+    scatterOrientations(o, coordinates, markerSize=0.1, **axesKw)
   sP = gcm().children[-1]._mtexSpacePlot
   coordinates = getattr(sP, "coordinates", coordinates)
   lengths = np.asarray(t.norm(), dtype=float).reshape(-1)
@@ -690,7 +689,7 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .sphericalplot import _nameOf
   v = v if isinstance(v, vector3d) else vector3d(v)
-  faceColor = kw.pop("FaceColor", faceColor)
+  refuseVariants(kw)
   if labeled and label is None:
     label = [_nameOf(v.flatten()[i]) for i in range(v.size)]
   axesKw = _keys(kw)
@@ -757,8 +756,8 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   """plot(f): a fibre as its curve through orientation space, in the coordinates of the held
   axes or Euler angles, as MATLAB draws it"""
   _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
-  color = kw.pop("lineColor", kw.pop("LineColor", color))
-  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
+  refuseVariants(kw)
+  color = kw.pop("lineColor", color)
   # MATLAB's name of the flag
   fundamentalRegion = kw.pop("project2FundamentalRegion", fundamentalRegion)
   coordinates = "Rodrigues" if Rodrigues else "axisAngle" if axisAngle else "Euler"
@@ -793,7 +792,7 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   jump = np.linalg.norm(np.diff(P, axis=0), axis=1) > 5 * np.nanmedian(np.linalg.norm(np.diff(P, axis=0), axis=1))
   Q = P.copy()
   Q[1:][jump] = np.nan
-  label = kw.pop("DisplayName", kw.pop("displayName", None))
+  label = kw.pop("displayName", None)
   return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
 
 

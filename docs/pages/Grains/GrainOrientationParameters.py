@@ -175,7 +175,7 @@ setColorRange([0, 3])
 # +
 # visualize the selected grain orientations in a pole figure
 h = Miller(1, 0, 0, ebsd.CS)
-plotPDF(ori, h, MarkerSize=2, all=True)
+plotPDF(ori, h, markerSize=2, all=True)
 
 # fit a fibre to those orientations
 f, lam, fit = fibre.fit(ori, 'local', diagnostics=True)
@@ -200,7 +200,7 @@ axisCrystal
 # therefore scatter less than the other directions in the pole figure.
 
 hold(True)
-plot(ori * f.h, MarkerSize=2, all=True, MarkerFaceColor='k', antipodal=True)
+plot(ori * f.h, markerSize=2, all=True, markerFaceColor='k', antipodal=True)
 hold(False)
 
 # The black points form a compact cluster where the other poles form streaks. This is a
@@ -295,7 +295,7 @@ cKey = HSVDirectionKey(ebsd.CS, antipodal=True)
 # plot the key and the accepted dispersion axes
 plot(cKey)
 hold(True)
-plot(project2FundamentalRegion(GAX_C[isFibre], antipodal=True), MarkerFaceColor='black')
+plot(project2FundamentalRegion(GAX_C[isFibre], antipodal=True), markerFaceColor='black')
 hold(False)
 # -
 
@@ -339,7 +339,7 @@ hold(False)
 # normal follows the shortening direction. These are kinematic interpretations of an
 # aggregate, not identities that every deformed grain must obey.
 
-plot(GAX_S[isFibre], antipodal=True, MarkerSize=4)
+plot(GAX_S[isFibre], antipodal=True, markerSize=4)
 
 # The scatter plot is the direct evidence. Contours make a preferred population easier to
 # judge, but only after axes without a fibre-like orientation cloud have been removed.

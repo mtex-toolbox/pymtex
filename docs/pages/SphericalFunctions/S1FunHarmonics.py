@@ -47,10 +47,10 @@ S1F
 
 plt.figure()
 plt.subplot(1, 2, 1, projection='polar')
-plot(S1F, linewidth=2)
+plot(S1F, lineWidth=2)
 mtexTitle('Polar Plot')
 plt.subplot(1, 2, 2)
-plot(S1F, linewidth=2, polar=False)
+plot(S1F, lineWidth=2, polar=False)
 mtexTitle('Cartesian Plot')
 
 # ## Read the two views
@@ -81,10 +81,10 @@ coefficientMean
 
 plt.figure()
 plt.subplot(1, 2, 1, projection='polar')
-plot(S1FCoeff, linewidth=2)
+plot(S1FCoeff, lineWidth=2)
 mtexTitle('Polar Plot')
 plt.subplot(1, 2, 2)
-plot(S1FCoeff, linewidth=2, polar=False)
+plot(S1FCoeff, lineWidth=2, polar=False)
 mtexTitle('Cartesian Plot')
 
 # ## Read the coefficient example
@@ -120,9 +120,9 @@ maxApproximationError
 
 # ---
 
-plot(S1F, linewidth=2)
+plot(S1F, lineWidth=2)
 hold(True)
-plot(S1FH, '--', linewidth=2)
+plot(S1FH, '--', lineWidth=2)
 hold(False)
 legend('S1FunHandle', 'S1FunHarmonic')
 
@@ -161,7 +161,7 @@ sampleResidual
 plt.figure()
 plt.plot(rho, values, 'x', label='samples')
 hold(True)
-plot(S1FI, linewidth=2, polar=False, displayName='periodic fit')
+plot(S1FI, lineWidth=2, polar=False, displayName='periodic fit')
 hold(False)
 legend()
 
@@ -187,9 +187,9 @@ f = S1FunHarmonic(f, bandwidth=64)
 
 fSmooth = f.smooth(halfwidth=8 * degree)
 
-plot(f, linewidth=2, displayName='original')
+plot(f, lineWidth=2, displayName='original')
 hold(True)
-plot(fSmooth, linewidth=2, displayName='smoothed')
+plot(fSmooth, lineWidth=2, displayName='smoothed')
 hold(False)
 legend()
 # -
@@ -248,7 +248,7 @@ densityMean
 
 # ---
 
-plot(fun, linewidth=2)
+plot(fun, lineWidth=2)
 
 # ## Read the angular density
 #

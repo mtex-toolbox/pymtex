@@ -46,7 +46,7 @@ xy1 = [10, 10]   # start point
 xy2 = [41, 41]   # end point
 
 hold(True)
-line([xy1[0], xy2[0]], [xy1[1], xy2[1]], LineStyle=':', LineWidth=4, Color='w')
+line([xy1[0], xy2[0]], [xy1[1], xy2[1]], lineStyle=':', lineWidth=4, color='w')
 hold(False)
 # -
 

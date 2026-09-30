@@ -40,7 +40,7 @@ vRnd = discreteSample(sF, 1000)
 
 contourf(sF)
 hold(True)
-scatter(vRnd, MarkerSize=4, MarkerFaceColor='k', MarkerEdgeColor='k')
+scatter(vRnd, markerSize=4, markerFaceColor='k', markerEdgeColor='k')
 hold(False)
 # -
 
@@ -59,7 +59,7 @@ vOpt = optimalSample(sF, 1000, bandwidth=128)
 
 contourf(sF)
 hold(True)
-scatter(vOpt, MarkerSize=4, MarkerFaceColor='k', MarkerEdgeColor='k')
+scatter(vOpt, markerSize=4, markerFaceColor='k', markerEdgeColor='k')
 hold(False)
 # -
 
@@ -89,7 +89,7 @@ np.array([np.min(c), np.max(c), np.sum(c)])
 
 contourf(sF)
 hold(True)
-scatter(vWgt, MarkerSize=40 * c / np.mean(c), MarkerFaceColor='k', MarkerEdgeColor='k')
+scatter(vWgt, markerSize=40 * c / np.mean(c), markerFaceColor='k', markerEdgeColor='k')
 hold(False)
 
 # Notice that the directions remain well distributed, but their shares are no longer equal.

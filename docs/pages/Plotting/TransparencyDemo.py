@@ -40,13 +40,13 @@ h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], cs)
 # solid blobs. Neither the number of points nor the shape of each maximum is
 # easy to judge.
 
-plotPDF(ori, h, MarkerSize=5, all=True)
+plotPDF(ori, h, markerSize=5, all=True)
 
 # Set `MarkerAlpha` to make both the marker faces and edges almost
 # transparent. Repeated overlap stays dark, whereas isolated orientations
 # become faint. The result resembles a density plot.
 
-plotPDF(ori, h, MarkerAlpha=0.05, MarkerSize=5, all=True)
+plotPDF(ori, h, MarkerAlpha=0.05, markerSize=5, all=True)
 
 # Marker faces and edges can instead have separate alpha values. The edges
 # of overlapping markers accumulate faster than their faces. Keeping the
@@ -54,7 +54,7 @@ plotPDF(ori, h, MarkerAlpha=0.05, MarkerSize=5, all=True)
 # maximum completely. In the fringes the rings resolve; the cores of the
 # strongest maxima still saturate.
 
-plotPDF(ori, h, MarkerFaceAlpha=0.01, MarkerEdgeAlpha=0.05, MarkerSize=10, all=True)
+plotPDF(ori, h, markerFaceAlpha=0.01, markerEdgeAlpha=0.05, markerSize=10, all=True)
 
 # Transparency gives only a visual approximation of point density. Compute a
 # kernel density estimate when the density itself matters. The final plot

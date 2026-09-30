@@ -98,7 +98,7 @@ gB_MgMg
 misorientationAngle = gB_MgMg.misorientation.angle() / degree
 
 # colour every selected segment by that angle
-plot(gB_MgMg, misorientationAngle, linewidth=2)
+plot(gB_MgMg, misorientationAngle, lineWidth=2)
 mtexColorbar(title='minimum misorientation angle (degree)')
 # -
 

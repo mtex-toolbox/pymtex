@@ -70,7 +70,7 @@ def _spread(values, ps):
 # a row of lists of directions, each with a value per direction or none: markers on the
 # sector of the frame the directions live in, or the density of the directions, or the
 # interpolant of the values, when a style asks for a surface
-def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRange=None, MarkerSize=None, halfwidth=5 * degree,
+def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRange=None, markerSize=None, halfwidth=5 * degree,
              title=True, minmax=False, **kw):
   if style != "scatter":
     from ..functions.density import calcDensity, interpolate
@@ -128,11 +128,11 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
     rgb = vals if vals is not None and np.ndim(vals) == 2 and np.shape(vals)[-1] == 3 else None
     vals = None if rgb is not None else vals
     cr = ranges.setdefault(k, _rangeOf([np.asarray(vals, dtype=float)])) if individual and vals is not None else colorRange
-    size = MarkerSize if MarkerSize is not None else dynamicMarkerSize(w.size)
+    size = markerSize if markerSize is not None else dynamicMarkerSize(w.size)
     # a size per orientation is repeated over its equivalents, as a value is
     if np.ndim(size) > 0 and np.size(size) != w.size and np.size(size) > 0:
       size = np.repeat(np.asarray(size, dtype=float).reshape(-1), max(w.size // np.size(size), 1))
-    hs.append(_markers(sP, w, vals, rgb=rgb, colorRange=None if vals is None else cr, MarkerSize=size, **kw))
+    hs.append(_markers(sP, w, vals, rgb=rgb, colorRange=None if vals is None else cr, markerSize=size, **kw))
     if minmax:
       sP.annotateMinMax()
   if colorbar and any(v is not None for v in valuess):
@@ -164,12 +164,11 @@ def _fibreAsCurve(o, points, all, kw):
   from ..geometry.fibre import fibre
   if not isinstance(o, fibre):
     return o, points, all
-  color = kw.pop("lineColor", kw.pop("LineColor", "k"))
+  color = kw.pop("lineColor", "k")
   kw.pop("lineWidth", None)
-  kw.pop("LineWidth", None)
-  kw.setdefault("MarkerSize", 1.5)
-  kw.setdefault("MarkerFaceColor", color)
-  kw.setdefault("MarkerEdgeColor", color)
+  kw.setdefault("markerSize", 1.5)
+  kw.setdefault("markerFaceColor", color)
+  kw.setdefault("markerEdgeColor", color)
   o = o.flatten().orientation(points or 1000) if hasattr(o, "flatten") else o.orientation(points or 1000)
   return o, None, True
 
@@ -183,7 +182,7 @@ def _positionalStyle(o, args, kw):
       kw[a] = True
     elif isinstance(a, (tuple, list, np.ndarray)) and len(a) == 3 and all(isinstance(x, (int, float, np.number)) for x in a) \
         and np.size(o) != 3:
-      kw.setdefault("MarkerFaceColor", np.asarray(a, dtype=float))
+      kw.setdefault("markerFaceColor", np.asarray(a, dtype=float))
     else:
       out.append(a)
   return tuple(out)

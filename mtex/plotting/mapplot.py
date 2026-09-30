@@ -19,6 +19,7 @@ from ..geometry.vector3d import vector3d, zvector
 from .colormaps import mtexColormap
 from .maps import (CELLS_MAX, boundaryPolyline, boundarySegments, frameOnScreen, grainPolygons, mapCells, mapExtent, mapLayout,
                    mapPoints, mapRaster, phasePalette, planeOf, scaleBar, triadGeometry)
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .orientationkeys import ipfColorKey, ipfColors, orientationColorKey
 from ..geometry.display import display, frameLabel, header
@@ -189,16 +190,14 @@ def _splitMap(kw):
 
 
 def mapAliases(kw, grains=False):
-  """MATLAB's option names that the map plots know under another spelling; the grains keep
-  translucent, MATLAB's alpha that follows the colour"""
+  """the style keywords of a map plot, checked for their spelling; MATLAB's transparent is
+  the face alpha of a map, and the grains keep translucent, MATLAB's alpha that follows the colour"""
+  refuseVariants(kw)
   if grains and "transparent" in kw:
     kw["translucent"] = kw.pop("transparent")
-  for old, new in (() if grains else (("translucent", "faceAlpha"), ("transparent", "faceAlpha"))) + (("displayName", "DisplayName"), ("lineColour", "lineColor"),
-                   ("markerSize", "MarkerSize"), ("markersize", "MarkerSize"), ("linewidth", "lineWidth"),
-                   ("linecolor", "lineColor"), ("LineWidth", "lineWidth"), ("LineColor", "lineColor"), ("FaceColor", "faceColor"), ("MarkerEdgeColor", "markerEdgeColor"), ("MarkerColor", "markerColor"), ("MarkerFaceColor", "markerColor"),
-                   ("facecolor", "faceColor"), ("micronBar", "micronbar"), ("MicronBar", "micronbar")):
+  for old in (() if grains else ("translucent", "transparent")):
     if old in kw:
-      kw[new] = kw.pop(old)
+      kw["faceAlpha"] = kw.pop(old)
   return kw
 
 
@@ -322,8 +321,8 @@ def _liftable(f):
 
 @_liftable
 def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None,
-             refFrame=True, location=None, ipfDirection=None, maxPixels=None, edgeColor=None, lineWidth=0.5, alpha=1.0, legend=None, DisplayName=None,
-             MarkerSize=4, **kw):
+             refFrame=True, location=None, ipfDirection=None, maxPixels=None, edgeColor=None, lineWidth=0.5, alpha=1.0, legend=None, displayName=None,
+             markerSize=4, **kw):
   """plot(ebsd), plot(ebsd, values), plot(ebsd, ori), plot(ebsd, rgb), plot(ebsd, faceColor='black')
 
   A spatial EBSD map coloured by phase, by a value per measurement, by orientations through
@@ -335,9 +334,9 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
   if isinstance(color, crystalShape):
     from .shapeplot import plotShapesOnMap
     return plotShapesOnMap(ebsd, color, faceColor=faceColor, faceAlpha=kw.pop("faceAlpha", alpha), edgeColor=kw.pop("edgeColor", edgeColor or "k"),
-                           lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, DisplayName=DisplayName, **kw)
+                           lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, displayName=displayName, **kw)
   location = kw.pop("Location", location)
-  alpha = kw.pop("FaceAlpha", kw.pop("faceAlpha", alpha))
+  alpha = kw.pop("faceAlpha", alpha)
   # one transparency for all or one per measurement, a site without a value opaque to nothing
   a = np.nan_to_num(np.asarray(alpha, dtype=float), nan=0.0)
   alpha = float(a) if a.ndim == 0 else np.clip(a.reshape(-1), 0, 1)
@@ -414,11 +413,11 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
       P, values = P[keep], values[keep]
       alpha = alpha if np.ndim(alpha) == 0 else np.asarray(alpha).reshape(-1)[keep]
     if scalar:
-      h = ax.scatter(P[:, 0], P[:, 1], c=values, cmap=cmap, norm=norm, s=MarkerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
+      h = ax.scatter(P[:, 0], P[:, 1], c=values, cmap=cmap, norm=norm, s=markerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
     else:
-      h = ax.scatter(P[:, 0], P[:, 1], c=values, s=MarkerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
-  if DisplayName is not None:
-    h.set_label(DisplayName)
+      h = ax.scatter(P[:, 0], P[:, 1], c=values, s=markerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
+  if displayName is not None:
+    h.set_label(displayName)
   if scalar:
     mP.mappable = h
     if colorbar:
@@ -474,7 +473,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
 
 @_liftable
 def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None, refFrame=True,
-               location=None, ipfDirection=None, boundary=True, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, DisplayName=None,
+               location=None, ipfDirection=None, boundary=True, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, displayName=None,
                translucent=None, **kw):
   """plot(grains), plot(grains, property), plot(grains, grains.meanOrientation)
 
@@ -484,9 +483,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   s (1 - min(r, g, b)) for a colour, s v / max(v) for a value, so pale grains let the map
   below show.
   """
-  # MATLAB's capitalised spellings
-  alpha = kw.pop("FaceAlpha", kw.pop("faceAlpha", alpha))
-  lineWidth = kw.pop("LineWidth", lineWidth)
+  alpha = kw.pop("faceAlpha", alpha)
   from matplotlib.path import Path
   # plot(grains, v): an axis per grain as a compass needle at its centroid
   if isinstance(color, vector3d):
@@ -495,7 +492,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   if isinstance(color, crystalShape):
     from .shapeplot import plotShapesOnMap
     return plotShapesOnMap(grains, color, faceColor=faceColor, faceAlpha=kw.pop("faceAlpha", alpha), edgeColor=kw.pop("edgeColor", lineColor or "k"),
-                           lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, DisplayName=DisplayName, **kw)
+                           lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, displayName=displayName, **kw)
   location = kw.pop("Location", location)
   mapKw = _splitMap(kw)
   mP = _target(grains, mapKw)
@@ -530,8 +527,8 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   if translucent is not None:
     h.set_alpha(_translucency(values[at], scalar, float(translucent)))
   ax.add_collection(h)
-  if DisplayName is not None:
-    h.set_label(DisplayName)
+  if displayName is not None:
+    h.set_label(displayName)
   if boundary and grains.boundary is not None:
     # the boundary takes the line colour, else the face colour, else black, as MATLAB passes
     # its options on; faces of no colour keep a black outline
@@ -545,10 +542,10 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   if named:
     legend = False
   _finish(mP, grains, micronbar, refFrame, legend, color, location)
-  if named and DisplayName is not None:
+  if named and displayName is not None:
     from matplotlib.colors import to_rgb
     from matplotlib.patches import Patch
-    mP.ax.legend(handles=[Patch(facecolor=to_rgb(faceColor), edgecolor="k", label=DisplayName)], loc="upper right")
+    mP.ax.legend(handles=[Patch(facecolor=to_rgb(faceColor), edgecolor="k", label=displayName)], loc="upper right")
   return h
 
 
@@ -600,7 +597,7 @@ def _boundaryLines(mP, gB, color, lineWidth, zorder=3, **kw):
 
 @_liftable
 def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis", colorRange=None, colorbar=False, edgeAlpha=1.0,
-                 micronbar=None, refFrame=True, DisplayName=None, **kw):
+                 micronbar=None, refFrame=True, displayName=None, **kw):
   """plot(gB), plot(gB, values), plot(gB, rgb), plot(gB, lineColor='r', lineWidth=2)
 
   The grain boundary segments: as joined chains in one colour, or segment by segment with
@@ -608,7 +605,7 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
   """
   from matplotlib.collections import LineCollection
   # a boundary is lines: MATLAB's edge colour is their colour
-  lineColor = kw.pop("edgecolor", kw.pop("EdgeColor", kw.pop("edgeColor", lineColor)))
+  lineColor = kw.pop("edgeColor", lineColor)
   mapKw = _splitMap(kw)
   mP = _target(gB, mapKw)
   ax = mP.ax
@@ -649,39 +646,39 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
       raise ValueError(f"one value or one colour per segment is needed, {n} of them")
     if h is not None:
       ax.add_collection(h)
-  if DisplayName is not None and h is not None:
-    h.set_label(DisplayName)
+  if displayName is not None and h is not None:
+    h.set_label(displayName)
   # a boundary carries no phase legend of its own
   _finish(mP, gB, micronbar, refFrame, False, None)
   return h
 
 
 
-def plotTriplePoints(tP, color=None, markerColor=None, markerEdgeColor=None, MarkerSize=6, lineWidth=1.0, colormap="viridis",
-                     colorRange=None, colorbar=False, micronbar=None, refFrame=True, DisplayName=None, **kw):
+def plotTriplePoints(tP, color=None, markerFaceColor=None, markerEdgeColor=None, markerSize=6, lineWidth=1.0, colormap="viridis",
+                     colorRange=None, colorbar=False, micronbar=None, refFrame=True, displayName=None, **kw):
   """plot(tP), plot(tP, values): the triple points of a boundary network as circles, filled
   by a value where one is given"""
   mapKw = _splitMap(kw)
   mP = _target(tP, mapKw)
   P = mP.onScreen(np.asarray(tP.V).reshape(-1, 2))
   edge = markerEdgeColor if markerEdgeColor is not None else (color if color is not None and isinstance(color, str) else "k")
-  size = float(MarkerSize) ** 2
+  size = float(markerSize) ** 2
   # no points draw nothing, an empty scatter would stretch the limits to the origin
   if len(P) == 0:
     h = None
   elif color is None or isinstance(color, str):
-    face = markerColor if markerColor is not None else "none"
+    face = markerFaceColor if markerFaceColor is not None else "none"
     h = mP.ax.scatter(P[:, 0], P[:, 1], s=size, facecolors=face, edgecolors=edge, linewidths=lineWidth, zorder=6,
-                      label=DisplayName, **kw)
+                      label=displayName, **kw)
   else:
     arr = np.asarray(color, dtype=float).reshape(-1)
     h = mP.ax.scatter(P[:, 0], P[:, 1], s=size, c=arr, cmap=mtexColormap(colormap), norm=_norm(arr, colorRange),
-                      edgecolors=edge, linewidths=lineWidth, zorder=6, label=DisplayName, **kw)
+                      edgecolors=edge, linewidths=lineWidth, zorder=6, label=displayName, **kw)
     mP.mappable = h
     if colorbar:
       gcm().colorbar()
   _finish(mP, tP, micronbar, refFrame, False, None)
-  if h is not None and DisplayName is not None:
+  if h is not None and displayName is not None:
     _joinLegend(mP, h)
   return h
 
@@ -704,13 +701,13 @@ def _onMap(x, y):
 
 
 def line(x, y, z=None, **kw):
-  """line(x, y, LineStyle=':', LineWidth=4, Color='w'): a polyline in the coordinates of the
+  """line(x, y, lineStyle=':', lineWidth=4, color='w'): a polyline in the coordinates of the
   current map, drawn under its layout, MATLAB's line"""
   # a line in space goes into a 3D scene
   if z is not None:
     from .volumeplot import line3
     return line3(x, y, z, **kw)
-  kw = {k.lower(): v for k, v in kw.items()}
+  kw = {k.lower(): v for k, v in refuseVariants(kw).items()}
   ax, P = _onMap(x, y)
   return ax.plot(P[:, 0], P[:, 1], linestyle=kw.pop("linestyle", "-"), linewidth=kw.pop("linewidth", 0.5),
                  color=kw.pop("color", "k"), zorder=7, **kw)[0]
@@ -753,7 +750,7 @@ def textMap(x, labels, fontSize=None, color="k", **kw):
   return [mP.ax.text(px, py, t, ha="center", va="center", fontsize=size, color=color, zorder=8, clip_on=True, **kw) for (px, py), t in zip(P, labels)]
 
 
-def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, DisplayName=None, autoScaleFactor=None, project2plane=False,
+def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, project2plane=False,
               antipodal=False, **kw):
   """quiver(grains, v), quiver(ebsd, v), quiver(gB, v): an arrow per grain at its centroid,
   per measurement, per segment at its midpoint; an axis is centred, a direction starts there.
@@ -761,8 +758,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, Displa
   three median segment lengths of a boundary; scale draws it scale times its in-plane length.
   """
   from matplotlib.collections import LineCollection
-  # MATLAB's options ignore case: displayName names the arrows as DisplayName does
-  DisplayName = kw.pop("displayName", DisplayName)
+  refuseVariants(kw)
   mapKw = _splitMap(kw)
   mP = _target(x, mapKw)
   v = v if isinstance(v, vector3d) else vector3d(v)
@@ -785,11 +781,11 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, Displa
   c = pl.to2d(c.data.reshape(-1, 3)) if isinstance(c, vector3d) else np.asarray(c, dtype=float).reshape(-1, 2)
   if kind == "boundary" and scaling and scale is None:
     return _quiverBoundary(mP, c, raw, 0.15 if autoScaleFactor is None else float(autoScaleFactor), color or "k",
-                           2.0 if lineWidth is None else lineWidth, DisplayName, **kw)
+                           2.0 if lineWidth is None else lineWidth, displayName, **kw)
   if kind == "grains" and scaling and scale is None:
     # without a colour the arrows of the grains take the next of the axes' colour order, as MATLAB's
     color = mP.ax._get_lines.get_next_color() if color is None else color
-    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, DisplayName, project2plane, **kw)
+    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, displayName, project2plane, **kw)
   lineWidth = 1.0 if lineWidth is None else lineWidth
   color = "k" if color is None else color
   u = np.stack([raw @ pl.e1, raw @ pl.e2], axis=-1)
@@ -805,14 +801,14 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, Displa
     mP.ax.add_collection(h)
     return h
   p, d = mP.onScreen(c), u @ mP.layout.T
-  return mP.ax.quiver(p[:, 0], p[:, 1], d[:, 0], d[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.003, label=DisplayName,
+  return mP.ax.quiver(p[:, 0], p[:, 1], d[:, 0], d[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.003, label=displayName,
                       zorder=4, **kw)
 
 
 # the needles on a boundary as MATLAB draws them: quiver3 of v and -v from every midpoint,
 # without heads, autoscaled as quiver3 does, f 0.9 times the mean spacing of the points
 # for the longest vector in space, so that a steep one is short on the map
-def _quiverBoundary(mP, c, raw, f, color, lineWidth, DisplayName, **kw):
+def _quiverBoundary(mP, c, raw, f, color, lineWidth, displayName, **kw):
   from matplotlib.collections import LineCollection
   pl = mP.plane
   ok = np.all(np.isfinite(raw), axis=-1)
@@ -832,7 +828,7 @@ def _quiverBoundary(mP, c, raw, f, color, lineWidth, DisplayName, **kw):
   up = np.stack([mP.onScreen(c), mP.onScreen(c + u)], axis=1)
   down = np.stack([mP.onScreen(c), mP.onScreen(c - u)], axis=1)
   mP.ax.add_collection(LineCollection(down, colors=color, linewidths=lineWidth, zorder=0.5, **kw))
-  h = LineCollection(up, colors=color, linewidths=lineWidth, zorder=4, label=DisplayName, **kw)
+  h = LineCollection(up, colors=color, linewidths=lineWidth, zorder=4, label=displayName, **kw)
   mP.ax.add_collection(h)
   return h
 
@@ -840,7 +836,7 @@ def _quiverBoundary(mP, c, raw, f, color, lineWidth, DisplayName, **kw):
 # the arrows on grains as MATLAB draws them: a fifth of the diameter along the direction in
 # space, seen on the map, so that a steep direction is short; an axis both ways from the
 # centroid, a direction pointing into the map ending at the centroid; a dot at the centroid
-def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, DisplayName, project2plane, **kw):
+def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, project2plane, **kw):
   from matplotlib.collections import LineCollection
   pl = mP.plane
   nrm = np.linalg.norm(raw, axis=-1)
@@ -851,34 +847,34 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, DisplayName, 
   u, c = np.stack([d @ pl.e1, d @ pl.e2], axis=-1), c[ok]
   if antipodal:
     segs = np.stack([mP.onScreen(c - u), mP.onScreen(c + u)], axis=1)
-    h = LineCollection(segs, colors=color, linewidths=lineWidth, zorder=4, label=DisplayName, **kw)
+    h = LineCollection(segs, colors=color, linewidths=lineWidth, zorder=4, label=displayName, **kw)
     mP.ax.add_collection(h)
   else:
     outOfScreen = pl.normal * (-1 if np.linalg.det(mP.layout) < 0 else 1)
     start = c - u * (d @ outOfScreen < 0)[:, None]
     p, q = mP.onScreen(start), u @ mP.layout.T
     h = mP.ax.quiver(p[:, 0], p[:, 1], q[:, 0], q[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.0015 * lineWidth,
-                     label=DisplayName, zorder=4, **kw)
+                     label=displayName, zorder=4, **kw)
   mP.ax.scatter(*mP.onScreen(c).T, s=4 * lineWidth ** 2, color=color, zorder=5)
   return h
 
 
 # ------------------------------------------------------------------ the scale bar and the legends
 
-def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, Length=None):
+def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, length=None):
   """a scale bar in one corner of a map: a round length near a tenth of its width, over the
   length it stands for, and above it the axes of the specimen frame as they lie in the picture"""
   from matplotlib.patches import Polygon, Rectangle
   ax = mP.ax
   mP.scaleBarArgs = dict(location=location, fraction=fraction, refFrame=refFrame, color=color, background=background, alpha=alpha,
-                         Length=Length)
+                         length=length)
   artists = []
   xlo, xhi, ylo, yhi = mP.extent
-  if Length is None:
-    length, label = scaleBar(xhi - xlo, mP.unit, fraction)
+  if length is None:
+    barLength, label = scaleBar(xhi - xlo, mP.unit, fraction)
   else:
-    length, label = float(Length), f"{Length:g} {'µm' if mP.unit == 'um' else mP.unit}"
-  if not length > 0:
+    barLength, label = float(length), f"{length:g} {'µm' if mP.unit == 'um' else mP.unit}"
+  if not barLength > 0:
     return None
   w, h = xhi - xlo, yhi - ylo
   t = 0.035 * min(w, h)
@@ -886,7 +882,7 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   names = tuple(mP.frame.axesNames) if mP.frame is not None else ("X", "Y", "Z")
   triad = triadGeometry(frameOnScreen(mP.plane, mP.layout), list(names), t) if refFrame else None
   tw, th = (0.0, 0.0) if triad is None else (triad[3][1] - triad[3][0], triad[3][3] - triad[3][2])
-  boxw = max(length, 0.6 * t * len(label), tw) + 2 * gap
+  boxw = max(barLength, 0.6 * t * len(label), tw) + 2 * gap
   boxh = 3.5 * gap + t + th if refFrame else 3 * gap + t
   boxx = xhi - gap - boxw if location in ("se", "ne") else xlo + gap
   boxy = yhi - gap - boxh if location in ("nw", "ne") else ylo + gap
@@ -894,8 +890,8 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   fontsize = _pointsPerUnit(ax) * 0.9 * t
   artists.append(ax.add_patch(Rectangle((boxx, boxy), boxw, boxh, facecolor=background, alpha=alpha, edgecolor=color, linewidth=0.8,
                                         zorder=10)))
-  x0 = boxx + (boxw - length) / 2
-  artists += ax.plot([x0, x0 + length], [boxy + 1.5 * gap] * 2, color=color, linewidth=max(1.0, 0.12 * t * _pointsPerUnit(ax)),
+  x0 = boxx + (boxw - barLength) / 2
+  artists += ax.plot([x0, x0 + barLength], [boxy + 1.5 * gap] * 2, color=color, linewidth=max(1.0, 0.12 * t * _pointsPerUnit(ax)),
                      zorder=11, solid_capstyle="butt")
   artists.append(ax.text(boxx + boxw / 2, boxy + 2.5 * gap, label, color=color, fontsize=fontsize, ha="center", va="bottom", zorder=11))
   if triad is not None:

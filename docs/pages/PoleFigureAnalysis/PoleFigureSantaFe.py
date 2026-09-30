@@ -57,7 +57,7 @@ pf = calcPoleFigure(odf, h, r)
 # +
 pf = noisepf(pf, 100)
 
-plot(pf, MarkerSize=5)
+plot(pf, markerSize=5)
 mtexColorMap('LaboTeX')
 # -
 
@@ -133,17 +133,17 @@ plotPDF(rec, pf.h, antipodal=True)
 #
 # First plot the corrected reconstruction in Euler-angle sections.
 
-plot(rec, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
+plot(rec, sections=18, contourf=True, fontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # The known model provides the reference.
 
-plot(odf, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
+plot(odf, sections=18, contourf=True, fontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # Finally, plot the reconstruction without ghost correction.
 
-plot(rec2, sections=18, contourf=True, FontSize=10, verbose=False, figSize='large', minmax=True)
+plot(rec2, sections=18, contourf=True, fontSize=10, verbose=False, figSize='large', minmax=True)
 mtexColorMap('white2black')
 
 # The components occupy the right places in both reconstructions. Read the `minmax` labels
@@ -160,10 +160,10 @@ mtexColorMap('white2black')
 
 # +
 plt.close('all')
-plotSpectrum(odf, bandwidth=32, linewidth=2, figSize='small')
+plotSpectrum(odf, bandwidth=32, lineWidth=2, figSize='small')
 hold(True)
-plotSpectrum(rec, bandwidth=32, linewidth=2)
-plotSpectrum(rec2, bandwidth=32, linewidth=2)
+plotSpectrum(rec, bandwidth=32, lineWidth=2)
+plotSpectrum(rec2, bandwidth=32, lineWidth=2)
 plt.legend(['true ODF', 'with ghost correction', 'without ghost correction'])
 hold(False)
 # -

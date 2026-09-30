@@ -50,9 +50,9 @@ scatter(ori)
 # spherical projection. The marker is controlled by MATLAB's scatter property
 # names, which the port translates to matplotlib:
 #
-# `Marker`, `MarkerSize`, `MarkerFaceColor`, `MarkerEdgeColor`
+# `marker`, `markerSize`, `markerFaceColor`, `markerEdgeColor`
 
-plot(zvector, Marker='p', MarkerSize=15, MarkerFaceColor='red', MarkerEdgeColor='black')
+plot(zvector, marker='p', markerSize=15, markerFaceColor='red', markerEdgeColor='black')
 
 # The pentagon marks the specimen z direction. Changing its shape and
 # colours changes only the annotation, not the direction it represents.
@@ -61,7 +61,7 @@ plot(zvector, Marker='p', MarkerSize=15, MarkerFaceColor='red', MarkerEdgeColor=
 #
 # `label`, `Color`, `BackgroundColor`, `FontSize`
 
-plot(Miller([[1, 1, 1], [-1, 1, 1]], cs), label=['X', 'Y'], Color='blue', BackgroundColor='yellow', FontSize=20, grid=True)
+plot(Miller([[1, 1, 1], [-1, 1, 1]], cs), label=['X', 'Y'], color='blue', backgroundColor='yellow', fontSize=20, grid=True)
 
 # The two labels identify the projected crystal directions; the grid makes
 # their positions on the sphere readable.
@@ -129,7 +129,7 @@ plotPDF(odf, Miller(1, 0, 0, cs), antipodal=True, resolution=10 * degree)
 # +
 f = fibre(Miller(1, 0, 0, cs), xvector)
 
-plot(odf, f, linewidth=2, linestyle='-.', figSize='small')
+plot(odf, f, lineWidth=2, lineStyle='-.', figSize='small')
 # -
 
 # The horizontal coordinate follows the fibre and the vertical coordinate

@@ -23,7 +23,7 @@ psi
 
 # ---
 
-surf(psi, resolution=2 * degree, EdgeColor='none')
+surf(psi, resolution=2 * degree, edgeColor='none')
 hold(True)
 arrow3d(2.4 * zvector, labeled=True, arrowWidth=0.01)
 hold(False)
@@ -34,7 +34,7 @@ plt.gca().set_axis_off()
 #
 # A meridian profile makes the angular dependence easier to read.
 
-plot(psi, linewidth=2, symmetric=True)
+plot(psi, lineWidth=2, symmetric=True)
 
 # The mirrored curve shows the same radial profile on either side of the north pole. The
 # halfwidth is a half-maximum location, not a hard cutoff: this kernel remains positive
@@ -86,15 +86,15 @@ print(f'kappa(15 deg) = {psi15.kappa:.2f}; kappa(20 deg) = {psi20.kappa:.2f}')
 # +
 plt.figure()
 plt.subplot(1, 2, 1)
-plot(psi15, linewidth=2, symmetric=True)
+plot(psi15, lineWidth=2, symmetric=True)
 hold(True)
-plot(psi20, linewidth=2, symmetric=True)
+plot(psi20, lineWidth=2, symmetric=True)
 hold(False)
 legend('halfwidth = 15°', 'halfwidth = 20°')
 plt.subplot(1, 2, 2)
-plotSpectrum(psi15, linewidth=2)
+plotSpectrum(psi15, lineWidth=2)
 hold(True)
-plotSpectrum(psi20, linewidth=2)
+plotSpectrum(psi20, lineWidth=2)
 hold(False)
 legend('halfwidth = 15°', 'halfwidth = 20°')
 # -
@@ -120,15 +120,15 @@ dirichlet5
 
 plt.figure()
 plt.subplot(1, 2, 1)
-plot(dirichlet10, linewidth=2, symmetric=True)
+plot(dirichlet10, lineWidth=2, symmetric=True)
 hold(True)
-plot(dirichlet5, linewidth=2, symmetric=True)
+plot(dirichlet5, lineWidth=2, symmetric=True)
 hold(False)
 legend('bandwidth = 10', 'bandwidth = 5')
 plt.subplot(1, 2, 2)
-plotSpectrum(dirichlet10, linewidth=2)
+plotSpectrum(dirichlet10, lineWidth=2)
 hold(True)
-plotSpectrum(dirichlet5, linewidth=2)
+plotSpectrum(dirichlet5, lineWidth=2)
 hold(False)
 legend('bandwidth = 10', 'bandwidth = 5')
 
@@ -154,15 +154,15 @@ bump50
 
 plt.figure()
 plt.subplot(1, 2, 1)
-plot(bump30, linewidth=2, symmetric=True)
+plot(bump30, lineWidth=2, symmetric=True)
 hold(True)
-plot(bump50, linewidth=2, symmetric=True)
+plot(bump50, lineWidth=2, symmetric=True)
 hold(False)
 legend('halfwidth = 30°', 'halfwidth = 50°')
 plt.subplot(1, 2, 2)
-plotSpectrum(bump30, linewidth=2)
+plotSpectrum(bump30, lineWidth=2)
 hold(True)
-plotSpectrum(bump50, linewidth=2)
+plotSpectrum(bump50, lineWidth=2)
 hold(False)
 legend('halfwidth = 30°', 'halfwidth = 50°')
 

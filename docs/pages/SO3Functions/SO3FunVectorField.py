@@ -38,7 +38,7 @@ G.eval(ori)
 
 plot(odf, 'sigma')
 hold('on')
-plot(G, linewidth=1.5, color='black', resolution=7.5 * degree)
+plot(G, lineWidth=1.5, color='black', resolution=7.5 * degree)
 hold('off')
 
 # The arrows point uphill towards the nearest local maximum. Their lengths increase where the
@@ -178,7 +178,7 @@ round(VF.eval(orientation.byAxisAngle(vector3d(1, 2, 3), 10 * degree, cs, cs)))
 # Every arrow points away from the identity at the origin, as a field of axis times angle
 # must.
 
-quiver3(VF, 'axisAngle', resolution=7.5 * degree, color='black', linewidth=2)
+quiver3(VF, 'axisAngle', resolution=7.5 * degree, color='black', lineWidth=2)
 
 # ## Convert a field to harmonic form
 #

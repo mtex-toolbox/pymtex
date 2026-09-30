@@ -129,16 +129,16 @@ plot(recCor, 'sigma', sections=9, verbose=False)
 
 plt.close('all')
 f = fibre(Miller(0, 1, 0, cs), yvector)
-plot(odf, f, linewidth=2, figSize='small')
+plot(odf, f, lineWidth=2, figSize='small')
 hold(True)
 
 # Add the reconstruction without correction.
 
-plot(rec, f, linewidth=2)
+plot(rec, f, lineWidth=2)
 
 # Finally add the corrected reconstruction as a dashed curve.
 
-plot(recCor, f, linestyle='--', linewidth=2)
+plot(recCor, f, lineStyle='--', lineWidth=2)
 hold(False)
 plt.legend(['true ODF', 'without ghost correction', 'with ghost correction'])
 
@@ -188,17 +188,17 @@ l2Corrected
 # A harmonic spectrum groups coefficient magnitudes by degree. Plot the true ODF first.
 
 plt.close('all')
-plotSpectrum(odf, linewidth=2, figSize='small')
+plotSpectrum(odf, lineWidth=2, figSize='small')
 hold(True)
 
 # Add the uncorrected reconstruction. Its zig-zag is the key feature: odd degrees are
 # pulled towards zero while the even degrees remain close to the truth.
 
-plotSpectrum(rec, linewidth=2)
+plotSpectrum(rec, lineWidth=2)
 
 # The corrected reconstruction follows the true spectrum smoothly.
 
-plotSpectrum(recCor, linewidth=2)
+plotSpectrum(recCor, lineWidth=2)
 plt.legend(['true ODF', 'without ghost correction', 'with ghost correction'])
 # next plot command overwrites plot window
 hold(False)

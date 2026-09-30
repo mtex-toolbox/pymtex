@@ -11,6 +11,7 @@ import math
 
 import numpy as np
 from ..geometry.display import display, header
+from .keywords import refuseVariants
 
 _current = None
 
@@ -357,9 +358,8 @@ def nextAxis(k=None, j=None, fig=None):
 
 def mtexTitle(*args, fig=None, **kwargs):
   """mtexTitle('text'): the title of the current axes, mtexTitle(ax, 'text') that of the axes given"""
-  # MATLAB's FontSize
-  if "FontSize" in kwargs:
-    kwargs["fontsize"] = kwargs.pop("FontSize")
+  if "fontSize" in refuseVariants(kwargs):
+    kwargs["fontsize"] = kwargs.pop("fontSize")
   # mtexTitle(ax, 'text'): the title of the axes named
   if len(args) == 2:
     ax, text = args
@@ -520,7 +520,7 @@ LEGEND_LOCATIONS = {"north": "upper center", "south": "lower center", "east": "c
 
 
 def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
-  """legend(): one legend for the figure, from every artist a DisplayName named, on the last
+  """legend(): one legend for the figure, from every artist a displayName named, on the last
   chart, or beside the charts for MATLAB's outside locations (MATLAB legend('show'));
   legend('a', 'b', ...) names the curves, bars and markers of the current axes in the order
   they were drawn, as MATLAB's legend with labels does"""
@@ -554,12 +554,7 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
           seen.add(l)
           handles.append(h)
           labels.append(l)
-  # MATLAB's capitalised spellings
-  location = kw.pop("Location", location)
-  numColumns = kw.pop("NumColumns", numColumns)
-  fontSize = kw.pop("FontSize", fontSize)
-  # MATLAB's Interpreter: matplotlib reads the $...$ of a label as mathematics anyway
-  kw.pop("Interpreter", None)
+  refuseVariants(kw)
   kw.setdefault("ncols", int(numColumns))
   kw.setdefault("fontsize", getMTEXpref("FontSize", 13) if fontSize is None else fontSize)
   where = str(kw.pop("location", location)).lower()

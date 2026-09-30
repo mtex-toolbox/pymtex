@@ -23,7 +23,7 @@ corners = Miller([[0, 0, 1], [1, 0, 1], [1, 1, 1]], cs, 'uvw')
 plot(cs)
 hold(True)
 plot(cs.fundamentalSector(), color='red')
-plot(corners, labeled=True, MarkerFaceColor='white', backgroundColor='w')
+plot(corners, labeled=True, markerFaceColor='white', backgroundColor='w')
 hold(False)
 
 # The black symbols and lines show the symmetry elements. The red boundary encloses the
@@ -74,7 +74,7 @@ vFundamental
 
 hold(True)
 plot(v)
-plot(vFundamental, MarkerFaceColor='red')
+plot(vFundamental, markerFaceColor='red')
 hold(False)
 
 # The original marker lies outside the red triangle, while the filled red marker lies

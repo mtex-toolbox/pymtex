@@ -45,9 +45,9 @@ odf = 0.2 * unimodalODF(ori1) + 0.3 * unimodalODF(ori2) + 0.5 * fibreODF(f)
 # +
 plotSection(odf, 'phi2', sections=9, verbose=False, layout=[5, 2], figSize='large')
 
-annotate(ori1, MarkerSize=15)
-annotate(ori2, Marker='v', MarkerSize=15)
-plot(f, LineWidth=2, add2all=True)
+annotate(ori1, markerSize=15)
+annotate(ori2, marker='v', markerSize=15)
+plot(f, lineWidth=2, add2all=True)
 # -
 
 # The square and triangle locate the brass and copper component centres. The line follows
@@ -67,9 +67,9 @@ sectionAngles = np.array([25, 30, 35, 40]) * degree
 oS = phi2Sections(odf.CS, odf.SS, phi2=sectionAngles)
 
 plotSection(odf, oS, verbose=False, figSize='large', layout=[2, 2])
-annotate(ori1, MarkerSize=15)
-annotate(ori2, Marker='v', MarkerSize=15)
-plot(f, LineWidth=2, add2all=True)
+annotate(ori1, markerSize=15)
+annotate(ori2, marker='v', markerSize=15)
+plot(f, lineWidth=2, add2all=True)
 # -
 
 # This restricted gallery resolves how the beta fibre passes through a narrow interval

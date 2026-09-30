@@ -138,7 +138,7 @@ v
 
 v = vector3d.rand(100)
 
-plot(v, upper=True, grid=True, MarkerSize=4)
+plot(v, upper=True, grid=True, markerSize=4)
 
 # The plot handles the complete array in one call. Only directions on the upper hemisphere
 # appear because of `upper`; the option does not identify a direction with its negative.

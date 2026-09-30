@@ -97,7 +97,7 @@ def test_plotPDF_ofODFDrawsItsDensity(sample):
   cs, ss, odf, ori = sample
   hs = Miller([1, 1], [0, 1], [0, 1], cs)
   # the method, and an ODF still draws its density
-  ori.plotPDF(hs, MarkerSize=3)
+  ori.plotPDF(hs, markerSize=3)
   plotPDF(odf, hs)
   assert all(isinstance(x, matplotlib.collections.QuadMesh) for x in [c for ax in gcm().children for c in ax.collections])
 

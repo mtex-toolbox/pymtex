@@ -295,7 +295,7 @@ def test_triple_points_join_the_legend_and_none_leave_the_limits(forsterite):
   mP = mapOf(g)
   n = len(mP.ax.get_legend().get_texts())
   limits = mP.ax.get_xlim(), mP.ax.get_ylim()
-  plot(g.triplePoints[:3], DisplayName="three", color="r")
+  plot(g.triplePoints[:3], displayName="three", color="r")
   plot(g.triplePoints[np.zeros(len(g.triplePoints), dtype=bool)], color="m")
   hold(False)
   assert [t.get_text() for t in mP.ax.get_legend().get_texts()][-1] == "three" and len(mP.ax.get_legend().get_texts()) == n + 1
@@ -315,7 +315,7 @@ def test_grains_of_one_face_colour_name_no_phases(forsterite):
   ebsd, g = forsterite
   plot(g, faceColor=[0.8, 0.8, 0.8])
   assert mapOf(g).ax.get_legend() is None
-  plot(g[0], faceColor=[0.2, 0.8, 0.8], DisplayName="largest grain")
+  plot(g[0], faceColor=[0.2, 0.8, 0.8], displayName="largest grain")
   assert [t.get_text() for t in mapOf(g[0]).ax.get_legend().get_texts()] == ["largest grain"]
 
 

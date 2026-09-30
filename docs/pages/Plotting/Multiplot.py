@@ -14,7 +14,7 @@ from mtex import *
 
 mtexFig = newMtexFigure(layout=[2, 3], figSize='normal')
 plottingConvention.default('y↑→x')
-plot(vector3d(1, 1, 1), upper=True, MarkerSize=8)
+plot(vector3d(1, 1, 1), upper=True, markerSize=8)
 # -
 
 # The first direction occupies the upper-left position of the fixed grid.
@@ -27,7 +27,7 @@ plot(vector3d(1, 1, 1), upper=True, MarkerSize=8)
 # +
 nextAxis()
 
-plot(vector3d(-1, 1, 1), upper=True, MarkerSize=8)
+plot(vector3d(-1, 1, 1), upper=True, markerSize=8)
 # -
 
 # The second direction appears beside the first one in the upper row.
@@ -58,7 +58,7 @@ plot(vector3d.rand(200), upper=True)
 nextAxis(2, 3)
 
 hold(True)
-plot(vector3d(1, -1, 1), upper=True, MarkerSize=8)
+plot(vector3d(1, -1, 1), upper=True, markerSize=8)
 hold(False)
 # -
 

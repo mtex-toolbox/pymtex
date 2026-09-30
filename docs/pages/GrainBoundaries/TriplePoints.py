@@ -65,7 +65,7 @@ tP['Forsterite', 'Forsterite']
 # three adjacent grains are diopside.
 
 hold(True)
-plot(tP['Diopside', 'Diopside', 'Diopside'], DisplayName='Di-Di-Di', color='darkred', lineWidth=2)
+plot(tP['Diopside', 'Diopside', 'Diopside'], displayName='Di-Di-Di', color='darkred', lineWidth=2)
 hold(False)
 
 # The dark-red circles are a subset of the blue points. Their locations show where the
@@ -82,7 +82,7 @@ largestIndex = int(np.argmax(grains.area))
 
 # extract and plot the triple points of that grain
 tP_largest = grains[largestIndex].triplePoints
-plot(grains[largestIndex], faceColor=[0.2, 0.8, 0.8], DisplayName='largest grain')
+plot(grains[largestIndex], faceColor=[0.2, 0.8, 0.8], displayName='largest grain')
 hold(True)
 plot(grains.boundary)
 plot(tP_largest, color='r', lineWidth=2)
@@ -166,7 +166,7 @@ sumMisAngle = np.sum(mori.angle(), axis=1)
 
 plot(grains, figSize='large')
 hold(True)
-plot(tP_Fo, sumMisAngle / degree, markerEdgeColor='w', MarkerSize=8)
+plot(tP_Fo, sumMisAngle / degree, markerEdgeColor='w', markerSize=8)
 hold(False)
 mtexColorMap('blue2red')
 setColorRange([80, 180])
@@ -191,7 +191,7 @@ angleSpread = (np.max(tP.angles, axis=1) - np.min(tP.angles, axis=1)) / degree
 
 plot(grains, figSize='large')
 hold(True)
-plot(tP, angleSpread, markerEdgeColor='w', MarkerSize=8)
+plot(tP, angleSpread, markerEdgeColor='w', markerSize=8)
 hold(False)
 mtexColorMap('LaboTeX')
 setColorRange([0, 180])

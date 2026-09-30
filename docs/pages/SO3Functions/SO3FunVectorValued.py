@@ -194,7 +194,7 @@ SO3F1.reshape(2, 1) * SO3F4
 # component. The four curves show that components of one function array may have different
 # distributions over harmonic degree.
 
-plotSpectrum(SO3F3, linewidth=2, figSize='small')
+plotSpectrum(SO3F3, lineWidth=2, figSize='small')
 
 # An orientation-space section plot displays only the first component of a vector-valued
 # function, with a warning. Select and prepare a component explicitly when another component
@@ -216,7 +216,7 @@ with warnings.catch_warnings():
 # three-dimensional plots, `plotFibre` draws every component along the selected beta fibre.
 # Here it draws the real parts, so the four curves can be compared at the same orientations.
 
-plotFibre(SO3F3, fibre.beta(), linewidth=2)
+plotFibre(SO3F3, fibre.beta(), lineWidth=2)
 
 # ## References
 #

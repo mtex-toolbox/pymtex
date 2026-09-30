@@ -68,7 +68,7 @@ rOrth = perp(r)
 rOrth
 # -
 
-plot(rOrth, add2all=True, Marker='square', MarkerColor='DarkRed')
+plot(rOrth, add2all=True, marker='square', markerFaceColor='DarkRed')
 
 # The displayed result is an antipodal axis: either sign is the same normal to the girdle
 # plane. The square marks it in all three pole figures. It lies away from the $(100)$
@@ -80,7 +80,7 @@ plot(rOrth, add2all=True, Marker='square', MarkerColor='DarkRed')
 # angle about `rOrth` is therefore 80°.
 
 nextAxis(1)
-circle(rOrth, 80 * degree, lineColor='darkred', lineWidth=5, EdgeAlpha=0.5)
+circle(rOrth, 80 * degree, lineColor='darkred', lineWidth=5, edgeAlpha=0.5)
 
 # Count the measurements inside that band. Because `rOrth` is antipodal, its angular
 # distance ranges from 0° to 90°.

@@ -2,6 +2,7 @@
 import numpy as np
 
 from ..geometry.units import degree
+from .keywords import lineKeywords
 from .mtexfigure import gcm, mtexFigure
 
 
@@ -15,12 +16,11 @@ def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw):
     ax = mtexFigure(figSize=kw.pop("figSize", None)).nextAxis()
   o = f.orientation(points)
   omega = np.linspace(0, 2 * np.pi, o.size)
-  lineWidth = kw.pop("LineWidth", kw.pop("linewidth", lineWidth))
   # a fibre of other frames is followed by its rotations, as MATLAB does
   if getattr(o, "CS", None) is not odf.CS or getattr(o, "SS", None) is not odf.SS:
     from ..geometry.quaternion import rotation
     o = rotation(o.data)
-  h = ax.plot(omega / degree, np.real(odf.eval(o)), linewidth=lineWidth, **kw)
+  h = ax.plot(omega / degree, np.real(odf.eval(o)), linewidth=lineWidth, **lineKeywords(kw))
   ax.set_xlim(0, 360)
   ax.set_xlabel("angle along the fibre in degree")
   ax.set_ylabel("mrd")

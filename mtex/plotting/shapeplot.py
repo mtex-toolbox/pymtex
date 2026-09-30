@@ -14,6 +14,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
 from .colormaps import mtexColormap
+from .keywords import refuseVariants
 from .mtexfigure import gcm
 from .space import shapeOutlines, shapesOnMap
 from .spaceplot import _spaceAxes
@@ -165,7 +166,7 @@ def _parse(args):
 
 
 def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.8, colored=None, colormap="viridis",
-              DisplayName=None, **kw):
+              displayName=None, **kw):
   """plot(cS), plot(cS, faceColor='red', faceAlpha=0.5), plot(cS, colored=True), plot(cS, colored=key),
   plot(x, y, cS), plot(x, y, z, cS), plot(xy, cS), plot(cS, N), plot(cS, sS)
 
@@ -174,21 +175,17 @@ def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.
   direction key of the normals. With a plane normal the section through the centre, with
   a slip system its plane and its direction inside the shape.
   """
-  # MATLAB's capitalised spellings
-  faceColor = kw.pop("FaceColor", faceColor)
-  faceAlpha = kw.pop("FaceAlpha", faceAlpha)
-  edgeColor = kw.pop("EdgeColor", edgeColor)
-  lineWidth = kw.pop("LineWidth", lineWidth)
+  refuseVariants(kw)
   cS, rest = _parse(args)
   if rest and isinstance(rest[0], slipSystem):
     # a slip plane is translucent unless told otherwise, as MATLAB's plotSlipSystem
     return plotSlipSystem(cS, rest[0], faceColor=faceColor if faceColor is not None else "red",
                           faceAlpha=0.5 if faceAlpha is None else faceAlpha, edgeColor=edgeColor,
-                          lineWidth=lineWidth, DisplayName=DisplayName, **kw)
+                          lineWidth=lineWidth, displayName=displayName, **kw)
   faceAlpha = 1.0 if faceAlpha is None else faceAlpha
   if rest and isinstance(rest[0], vector3d):
     return plotInnerFace(cS, rest[0], faceColor=faceColor if faceColor is not None else "blue", faceAlpha=faceAlpha, edgeColor=edgeColor,
-                         lineWidth=lineWidth, DisplayName=DisplayName, **kw)
+                         lineWidth=lineWidth, displayName=displayName, **kw)
   colors = faceColors(cS, faceColor, colored, colormap)
   kind, target = _target(cS, kw)
   V = cS.V.data.reshape(len(cS), cS.numVertices, 3)
@@ -198,7 +195,7 @@ def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.
     colors = colors[shape, face]
   else:
     polys, colors = _facePolygons(cS, V), colors.reshape(-1, 4)
-  h = _draw(kind, target, polys, colors, edgeColor, lineWidth, faceAlpha, DisplayName)
+  h = _draw(kind, target, polys, colors, edgeColor, lineWidth, faceAlpha, displayName)
   if colored is not None and colored is not False:
     _formLegend(target.ax, cS, faceColors(cS, faceColor, colored, colormap))
   return h
@@ -211,7 +208,7 @@ def _facePolygons(cS, V):
 
 # ------------------------------------------------------------------ inside the shape
 
-def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, DisplayName=None, **kw):
+def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, displayName=None, **kw):
   """plotInnerFace(cS, N): the section of the shape by the lattice plane N through its centre"""
   from matplotlib.colors import to_rgba
   N = N if isinstance(N, vector3d) else vector3d(N)
@@ -223,7 +220,7 @@ def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWid
       polys.append(pts)
   if not polys:
     return None
-  return _draw(kind, target, polys, [to_rgba(faceColor)] * len(polys), edgeColor, lineWidth, faceAlpha, DisplayName)
+  return _draw(kind, target, polys, [to_rgba(faceColor)] * len(polys), edgeColor, lineWidth, faceAlpha, displayName)
 
 
 # an arrow from the centre of the shape along d, up to where d leaves the shape
@@ -241,20 +238,20 @@ def _arrow(kind, target, cS, d, color, lineWidth, label=None):
   return h
 
 
-def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, DisplayName=None, **kw):
+def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, displayName=None, **kw):
   """plotInnerDirection(cS, d): the crystal direction d as an arrow inside the shape"""
   d = d if isinstance(d, vector3d) else vector3d(d)
   kind, target = _target(cS, kw)
   lw = lineWidth if arrowWidth is None else 40 * arrowWidth
-  hs = [_arrow(kind, target, cS, v, faceColor, lw, DisplayName) for v in (d.flatten() if d.ndim > 0 else [d])]
+  hs = [_arrow(kind, target, cS, v, faceColor, lw, displayName) for v in (d.flatten() if d.ndim > 0 else [d])]
   return hs[0] if len(hs) == 1 else hs
 
 
-def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, DisplayName=None, label=None, **kw):
+def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, label=None, **kw):
   """plotSlipSystem(cS, sS), plot(cS, sS, label='b'): the slip plane through the centre of the
   shape with the slip direction as an arrow in it, the arrow named at its tip"""
   kind, target = _target(cS, kw)
-  h = plotInnerFace(cS, sS.n, faceColor=faceColor, faceAlpha=faceAlpha, edgeColor=edgeColor, lineWidth=lineWidth, DisplayName=DisplayName,
+  h = plotInnerFace(cS, sS.n, faceColor=faceColor, faceAlpha=faceAlpha, edgeColor=edgeColor, lineWidth=lineWidth, displayName=displayName,
                     parent=target.ax)
   for k in range(len(sS)):
     _arrow(kind, target, cS, sS.b[k], faceColor, 2.0)
@@ -267,7 +264,7 @@ def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWi
 
 # ------------------------------------------------------------------ planes
 
-def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8, DisplayName=None, **kw):
+def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, **kw):
   """plot(plane): planes in space, each clipped by the bounds of the axes"""
   from matplotlib.colors import to_rgba
   kind, target = _target(plane, kw)
@@ -289,7 +286,7 @@ def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8
   if not polys:
     return None
   colors = np.array([to_rgba(c) for c in colors])
-  h = _draw(kind, target, polys, colors, edgeColor, lineWidth, faceAlpha, DisplayName)
+  h = _draw(kind, target, polys, colors, edgeColor, lineWidth, faceAlpha, displayName)
   # the plane fills the box it was cut by, so the box stays
   ax.set_xlim(lo[0], hi[0])
   ax.set_ylim(lo[1], hi[1])
@@ -300,7 +297,7 @@ def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8
 # ------------------------------------------------------------------ into a map
 
 def plotShapesOnMap(grains, cS, faceColor=None, faceAlpha=1.0, edgeColor="k", lineWidth=0.5, colored=None, colormap="viridis",
-                    scale=1.0, micronbar=None, refFrame=True, DisplayName=None, **kw):
+                    scale=1.0, micronbar=None, refFrame=True, displayName=None, **kw):
   """plot(grains, cS), plot(ebsd, cS): the crystal shape of every grain of the shape's phase
   drawn into the map, rotated by its mean orientation, scaled by the square root of its
   area, at its centroid, its front faces as polygons; on an EBSD map one shape per
@@ -317,7 +314,7 @@ def plotShapesOnMap(grains, cS, faceColor=None, faceAlpha=1.0, edgeColor="k", li
   colors = faceColors(s, fc, colored, colormap)
   polys, shape, face = shapeOutlines(s, mP.plane, mP.layout)
   polys = [mP.plane.from2d(p @ np.linalg.inv(mP.layout).T) for p in polys]
-  h = _draw("map", mP, polys, colors[shape, face], edgeColor, lineWidth, faceAlpha, DisplayName)
+  h = _draw("map", mP, polys, colors[shape, face], edgeColor, lineWidth, faceAlpha, displayName)
   if colored is not None and colored is not False:
     _formLegend(mP.ax, s, colors)
   _finish(mP, grains, micronbar, refFrame, False, None)

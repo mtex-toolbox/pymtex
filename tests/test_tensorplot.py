@@ -68,7 +68,7 @@ def test_plotSeismicVelocities_drawsMarkersAndSixColourBars():
 def test_plotSeismicVelocities_asMethodTakesTheLowerHemisphereAndSymmetrisedExtrema():
   C = stiffnessTensor(M, CS, density=3.355)
   # the method is the function, on the lower hemisphere with the extrema symmetrised
-  C.plotSeismicVelocities(lower=True, symmetriseMinMax=True, MarkerSize=6)
+  C.plotSeismicVelocities(lower=True, symmetriseMinMax=True, markerSize=6)
   assert len(gcm().children) == 6
 
 

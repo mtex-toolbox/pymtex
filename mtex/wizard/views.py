@@ -470,7 +470,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       corr = st.ebsd.EulerCorrection
       for v, n in zip((xvector, yvector, zvector), names):
         try:
-          annotate(corr * v, label=n, MarkerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
+          annotate(corr * v, label=n, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
         except Exception:
           pass
       fig.canvas.draw()

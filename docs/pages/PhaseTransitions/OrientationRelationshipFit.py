@@ -137,7 +137,7 @@ np.unique(np.round(angle(c2c) / degree, 2))
 plot(mori.axis(), 'contourf', 'fundamentalRegion', halfwidth=5 * degree)
 hold(True)
 isInformative = angle(c2c) > 1e-3 * degree
-plot(c2c[isInformative].axis(), Marker='s', MarkerFaceColor='none', MarkerEdgeColor='k', MarkerSize=8)
+plot(c2c[isInformative].axis(), marker='s', markerFaceColor='none', markerEdgeColor='k', markerSize=8)
 hold(False)
 
 # Notice that the black squares lie on the main measured axis clusters. Fitting an OR is

@@ -58,7 +58,7 @@ gB_Fo = grains.boundary['Fo', 'Fo']
 plot(grains, translucent=1, micronbar='off')
 legend('off')
 hold(True)
-plot(gB_Fo, gB_Fo.misorientation.angle() / degree, linewidth=4)
+plot(gB_Fo, gB_Fo.misorientation.angle() / degree, lineWidth=4)
 hold(False)
 mtexColorbar(title='misorientation angle (°)')
 # -
@@ -92,8 +92,8 @@ axisColor = axisKey.direction2color(axesCrystal)
 plot(grains, translucent=1, micronbar='off')
 legend('off')
 hold(True)
-plot(gB_Fo, lineColor='black', linewidth=6)
-plot(gB_Fo, axisColor, linewidth=4)
+plot(gB_Fo, lineColor='black', lineWidth=6)
+plot(gB_Fo, axisColor, lineWidth=4)
 hold(False)
 # -
 
@@ -102,7 +102,7 @@ hold(False)
 
 plot(axisKey)
 hold(True)
-plot(axesCrystal, MarkerFaceAlpha=0.1, MarkerEdgeAlpha=0.3, MarkerColor='black')
+plot(axesCrystal, markerFaceAlpha=0.1, markerEdgeAlpha=0.3, markerFaceColor='black')
 hold(False)
 
 # The black points show which part of the key the measured axes use. Their clusters reveal
@@ -122,7 +122,7 @@ hold(False)
 plot(grains, translucent=1, micronbar='off')
 legend('off')
 hold(True)
-plot(gB_Fo, axisColor, linewidth=4)
+plot(gB_Fo, axisColor, lineWidth=4)
 
 # boundary segments are in walk order, so sample every fifth one
 gB_sample = gB_Fo[::5]
@@ -164,8 +164,8 @@ foKey = axisAngleColorKey(gB_Fo.misorientation.CS, gB_Fo.misorientation.SS)
 foColor = foKey.orientation2color(gB_Fo.misorientation)
 
 hold(True)
-plot(gB_Fo, lineColor='black', linewidth=7)
-plot(gB_Fo, foColor, linewidth=4)
+plot(gB_Fo, lineColor='black', lineWidth=7)
+plot(gB_Fo, foColor, lineWidth=4)
 hold(False)
 # -
 
@@ -178,7 +178,7 @@ hold(False)
 # on top.
 
 plot(foKey, 'axisAngle', sections=12, layout=[3, 4], figSize='large')
-plot(gB_Fo.misorientation, MarkerFaceColor='none', add2all=True, MarkerSize=4)
+plot(gB_Fo.misorientation, markerFaceColor='none', add2all=True, markerSize=4)
 
 # The forsterite misorientations fill the large-angle sections and leave the small-angle
 # sections nearly empty. A preferred boundary relationship would instead appear as points
@@ -210,7 +210,7 @@ plot(grains, grains.meanOrientation, faceAlpha=0.4)
 # colour the boundaries by their full misorientation
 ironKey = axisAngleColorKey(gB.misorientation.CS, gB.misorientation.SS)
 ironColor = ironKey.orientation2color(gB.misorientation)
-plot(gB, ironColor, linewidth=4)
+plot(gB, ironColor, lineWidth=4)
 hold(False)
 # -
 
@@ -224,7 +224,7 @@ plot(ironKey, 'axisAngle', axisAngle=np.arange(5, 61, 5) * degree, layout=[4, 3]
 
 moriSample = discreteSample(gB.misorientation, 300, withoutReplacement=True)
 
-plot(moriSample, add2all=True, MarkerFaceColor='none', MarkerEdgeColor='w')
+plot(moriSample, add2all=True, markerFaceColor='none', markerEdgeColor='w')
 # -
 
 # The sections confirm the clustering: 300 measured misorientations occupy a few small

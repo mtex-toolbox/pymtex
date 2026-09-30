@@ -73,7 +73,7 @@ tripleFitQuantiles = np.nanquantile(tripleFit[:, 0] / degree, [0.25, 0.5, 0.75])
 print(tripleFitQuantiles)
 
 hold(True)
-plot(tP, tripleFit[:, 0] / degree, MarkerEdgeColor='k', MarkerSize=10, region=region)
+plot(tP, tripleFit[:, 0] / degree, markerEdgeColor='k', markerSize=10, region=region)
 setColorRange([0, 5])
 mtexColorMap('LaboTeX')
 mtexColorbar(title='best fit (degrees)')
@@ -99,7 +99,7 @@ numConsistentTriplePoints = np.count_nonzero(consistentTP)
 print(numConsistentTriplePoints)
 
 hold(True)
-plot(tP[consistentTP], MarkerEdgeColor='r', MarkerSize=10, MarkerFaceColor='none', lineWidth=2, region=region)
+plot(tP[consistentTP], markerEdgeColor='r', markerSize=10, markerFaceColor='none', lineWidth=2, region=region)
 hold(False)
 # -
 

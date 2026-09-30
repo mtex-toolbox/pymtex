@@ -47,7 +47,7 @@ plot(copper, ipfKey.orientation2color(ori))
 # Drawing one marker per measurement shows the data and nothing but the data.
 
 h = cat(Miller(1, 0, 0, ori.CS), Miller(1, 1, 0, ori.CS), Miller(1, 1, 1, ori.CS))
-plotPDF(ori, h, antipodal=True, MarkerSize=2)
+plotPDF(ori, h, antipodal=True, markerSize=2)
 
 # MTEX drew 208 of the 16116 orientations at random, since every one of them contributes
 # several symmetrically equivalent poles and the full list would be an opaque blot. The
@@ -157,7 +157,7 @@ grainCount
 # +
 plotSection(odfSharp, 'sigma', sections=6, contourf=True)
 hold(True)
-plotSection(copperGrains.meanOrientation, 'sigma', sections=6, MarkerSize=3, all=True, MarkerFaceColor='none', MarkerEdgeColor='k')
+plotSection(copperGrains.meanOrientation, 'sigma', sections=6, markerSize=3, all=True, markerFaceColor='none', markerEdgeColor='k')
 hold(False)
 # -
 

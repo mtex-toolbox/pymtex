@@ -22,6 +22,7 @@ from ..geometry.plottingconvention import plottingConvention
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 
 
@@ -104,12 +105,11 @@ def histogram(v, numBin=None, weights=None, antipodal=None, **kw):
 
 # ------------------------------------------------------------------ functions on the circle
 
-def plotS1(sF, *args, lineWidth=1.0, DisplayName=None, color=None, polar=True, how2plot=None, **kw):
+def plotS1(sF, *args, lineWidth=1.0, displayName=None, color=None, polar=True, how2plot=None, **kw):
   """plot(sF1): a function on the circle as a polar line, or over the angle with polar=False;
   a positional MATLAB line style, plot(sF1, '--'), as matplotlib's format"""
   import matplotlib.pyplot as plt
-  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
-  DisplayName = kw.pop("displayName", DisplayName)
+  refuseVariants(kw)
   fmt = [a for a in args if isinstance(a, str)]
   omega = np.linspace(0, 2 * np.pi, 361)
   d = np.real(np.asarray(sF(omega), dtype=complex)).reshape(-1)
@@ -121,11 +121,11 @@ def plotS1(sF, *args, lineWidth=1.0, DisplayName=None, color=None, polar=True, h
   parent = kw.pop("parent", None) or user
   if not polar:
     ax = parent or (fig.children[-1] if fig is not None and fig.hold and fig.children else mtexFigure(1).nextAxis())
-    h = ax.plot(omega, d, *fmt, linewidth=lineWidth, label=DisplayName, color=color, **kw)
+    h = ax.plot(omega, d, *fmt, linewidth=lineWidth, label=displayName, color=color, **kw)
     ax.set_xlim(0, 2 * np.pi)
     return h[0]
   ax = polarAxes(parent if parent is not None and parent.name == "polar" else None)
-  h = ax.plot(omega, d, *fmt, linewidth=lineWidth, label=DisplayName, color=color, **kw)
+  h = ax.plot(omega, d, *fmt, linewidth=lineWidth, label=displayName, color=color, **kw)
   ax.set_rmin(0)
   setView(how2plot, ax)
   return h[0]
@@ -145,14 +145,14 @@ def _sectionCircle(sec, eta=np.pi / 2, omega=None):
   return omega, ring
 
 
-def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, DisplayName=None, color=None, how2plot=None, polarplot=False,
+def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, displayName=None, color=None, how2plot=None, polarplot=False,
                   **kw):
   """plotSection(sF, sec): a function on the sphere along the circle normal to sec, the ring
   pushed out to the values and seen down sec; polarplot=True as a polar line over the angle"""
   omega, ring = _sectionCircle(sec, eta, omega)
   fr = getattr(sF, "frame", None)
   d = np.real(np.asarray(sF(vector3d(ring, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1)
-  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
+  refuseVariants(kw)
   pC = getattr(sF, "how2plot", None) if how2plot is None else how2plot
   pC = plottingConvention(plottingConvention.default if pC is None else pC)
   if polarplot:
@@ -175,7 +175,7 @@ def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, DisplayName
     from .colormaps import mtexColormap
     pts = np.stack([x, y], axis=-1)
     h = LineCollection(np.stack([pts[:-1], pts[1:]], axis=1), linewidths=lineWidth, cmap=mtexColormap(kw.pop("colormap", None)),
-                       label=DisplayName, capstyle="round", **kw)
+                       label=displayName, capstyle="round", **kw)
     h.set_array((d[:-1] + d[1:]) / 2)
     ax.add_collection(h)
     ax._mtexLinePlot = SimpleNamespace(mappable=h)
@@ -189,7 +189,7 @@ def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, DisplayName
     h.callbacks.connect("changed", lambda m: _followRing(ax, m))
     ax.autoscale_view()
   else:
-    h = ax.plot(x, y, linewidth=lineWidth, label=DisplayName, color=color, **kw)[0]
+    h = ax.plot(x, y, linewidth=lineWidth, label=displayName, color=color, **kw)[0]
   if polarplot:
     ax.set_rmin(0)
     setView(pC, ax)
@@ -210,7 +210,7 @@ def _followRing(ax, m):
 
 
 def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoScaleFactor=0.9, normalized=False,
-                    DisplayName=None, how2plot=None, **kw):
+                    displayName=None, how2plot=None, **kw):
   """quiverSection(sF, vF, sec): the vectors of vF along the circle normal to sec, drawn at
   the ring of plotSection(sF, sec) and seen down sec; axes as segments without heads"""
   kw.pop("doNotDraw", None)
@@ -229,7 +229,7 @@ def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoS
   spacing = np.sqrt(np.sum(((P.max(axis=0) - P.min(axis=0)) / n) ** 2))
   longest = np.max(np.linalg.norm(V, axis=1)) / spacing if spacing > 0 else 0
   V = V * (autoScaleFactor / longest if longest > 0 else autoScaleFactor)
-  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
+  refuseVariants(kw)
   pC = getattr(sF, "how2plot", None) if how2plot is None else how2plot
   pC = plottingConvention(plottingConvention.default if pC is None else pC)
   s = vector3d((sec.data if isinstance(sec, vector3d) else np.asarray(sec, dtype=float)).reshape(3))
@@ -243,10 +243,10 @@ def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoS
   if antipodal:
     headless = dict(headwidth=0, headlength=0, headaxislength=0)
     hs.append(ax.quiver(x, y, -u, -w, label="_nolegend_", **opt, **headless))
-    hs.append(ax.quiver(x, y, u, w, label=DisplayName, **opt, **headless))
+    hs.append(ax.quiver(x, y, u, w, label=displayName, **opt, **headless))
   else:
     # short heads, MATLAB's MaxHeadSize of a fifth of the arrow
-    hs.append(ax.quiver(x, y, u, w, label=DisplayName, headwidth=2.5, headlength=3, headaxislength=2.7, **opt))
+    hs.append(ax.quiver(x, y, u, w, label=displayName, headwidth=2.5, headlength=3, headaxislength=2.7, **opt))
   ax.autoscale_view()
   return hs
 
@@ -269,7 +269,7 @@ def _sectionAxes(parent=None):
 
 # ------------------------------------------------------------------ shapes
 
-def plotShape(shape, lineWidth=1.0, DisplayName=None, color=None, normalize=False, plain=False, how2plot=None, **kw):
+def plotShape(shape, lineWidth=1.0, displayName=None, color=None, normalize=False, plain=False, how2plot=None, **kw):
   """plot(shape): the outline of a characteristic shape in polar coordinates about its centre"""
   V = np.asarray(shape.V, dtype=float).reshape(-1, 2)
   V = V - V.mean(axis=0)
@@ -279,7 +279,7 @@ def plotShape(shape, lineWidth=1.0, DisplayName=None, color=None, normalize=Fals
   theta = np.arctan2(V[:, 1], V[:, 0])
   rho = np.linalg.norm(V, axis=1)
   ax = polarAxes(kw.pop("parent", None))
-  h = ax.plot(theta, rho, linewidth=lineWidth, label=DisplayName, color=color, **kw)
+  h = ax.plot(theta, rho, linewidth=lineWidth, label=displayName, color=color, **kw)
   ax.set_rmin(0)
   if plain:
     ax.grid(False)

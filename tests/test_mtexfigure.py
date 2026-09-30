@@ -242,7 +242,7 @@ def test_legend_aSecondReplacesTheFirst():
   agg()
   import matplotlib.pyplot as plt
   from mtex import legend, plot, vector3d
-  plot(vector3d.X, upper=True, DisplayName='x')
+  plot(vector3d.X, upper=True, displayName='x')
   legend('show')
   legend('show', location='eastoutside', title='T')
   f = plt.gcf()

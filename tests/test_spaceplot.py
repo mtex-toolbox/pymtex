@@ -278,5 +278,5 @@ def test_annotate_goesIntoTheSpaceTheFigureShowsInItsOwnColour():
   from mtex import annotate
   cs = crystalFrame("-3m")
   scatter(discreteSample(unimodalODF(orientation.id(cs)), 20, rng=rng), 'axisAngle')
-  h3 = annotate(orientation.id(cs), MarkerFaceColor='r')
+  h3 = annotate(orientation.id(cs), markerFaceColor='r')
   assert np.allclose(h3.get_facecolor()[0][:3], (1, 0, 0))

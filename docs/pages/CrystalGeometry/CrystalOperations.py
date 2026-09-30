@@ -66,7 +66,7 @@ circle(m, parent=ax1, color='lightBlue')
 circle(r, parent=ax1, color='red')
 circle(z, parent=ax1, color='yellow')
 
-opt = dict(marker='s', MarkerFaceColor='none', parent=ax2, labeled=True, backgroundColor='w', linewidth=2)
+opt = dict(marker='s', markerFaceColor='none', parent=ax2, labeled=True, backgroundColor='w', lineWidth=2)
 plot(m, **opt, markerEdgeColor='lightBlue')
 plot(r, **opt, markerEdgeColor='red')
 plot(z, **opt, markerEdgeColor='yellow')
@@ -192,7 +192,7 @@ d1
 
 # ---
 
-plot(d1, marker='s', parent=ax1, MarkerFaceColor='lightgreen', labeled=True, backgroundColor='w')
+plot(d1, marker='s', parent=ax1, markerFaceColor='lightgreen', labeled=True, backgroundColor='w')
 circle(d1, parent=ax2, lineColor='lightgreen')
 
 # The output uses `UVTW` because a cross product of two reciprocal normals is a
@@ -207,7 +207,7 @@ d2
 
 # ---
 
-plot(d2, marker='s', parent=ax1, MarkerFaceColor='orange', labeled=True, backgroundColor='w')
+plot(d2, marker='s', parent=ax1, markerFaceColor='orange', labeled=True, backgroundColor='w')
 circle(d2, parent=ax2, lineColor='orange')
 
 # Conversely, two direct-lattice directions span a plane. Their cross product is
@@ -219,7 +219,7 @@ n
 # ---
 
 circle(n, parent=ax1, lineColor='white')
-plot(n, **opt, MarkerEdgeColor='white')
+plot(n, **opt, markerEdgeColor='white')
 
 # The white band contains `d1` and `d2` in the pattern. In the Radon plot, the white
 # normal lies where the green and orange great circles intersect.
@@ -275,14 +275,14 @@ specimenDirection
 # ---
 
 hold(True)
-plot(specimenDirection, marker='s', MarkerFaceColor='lightgreen', label=d1.char(family=False), backgroundColor='w')
+plot(specimenDirection, marker='s', markerFaceColor='lightgreen', label=d1.char(family=False), backgroundColor='w')
 hold(False)
 
 # Applying the orientation to the full symmetry orbit marks every specimen direction in
 # which this crystal family points.
 
 hold(True)
-plot(ori * d1.symmetrise(), marker='s', MarkerFaceColor='lightgreen', label=d1.char(family=False), backgroundColor='w')
+plot(ori * d1.symmetrise(), marker='s', markerFaceColor='lightgreen', label=d1.char(family=False), backgroundColor='w')
 hold(False)
 
 # That set is the [pole figure](OrientationPoleFigure.html) of this one orientation for

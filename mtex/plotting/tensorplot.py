@@ -35,7 +35,7 @@ def _anisotropy(hi, lo):
   return 200 * (hi - lo) / (hi + lo)
 
 
-def plotSeismicVelocities(C, symmetriseMinMax=False, MarkerSize=10, lower=False, colormap="red2blue", density=None, **kw):
+def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False, colormap="red2blue", density=None, **kw):
   """plotSeismicVelocities(C): the overview of the wave velocities of a stiffness tensor
 
   Six charts in two rows: Vp, the S-wave anisotropy, Vs1 with its polarisation, Vs2 with
@@ -63,8 +63,8 @@ def plotSeismicVelocities(C, symmetriseMinMax=False, MarkerSize=10, lower=False,
             (fun(lambda w: w.vp / w.vs1), "Vp/Vs1", "Vp/Vs1 Anisotropy", None),
             (fun(lambda w: w.vp / w.vs2), "Vp/Vs2", "Vp/Vs2 Anisotropy", None)]
   hemisphere = {"lower": True} if lower else {"upper": True}
-  black = dict(Marker="s", MarkerSize=MarkerSize, MarkerEdgeColor="white", MarkerFaceColor="black")
-  white = dict(Marker="o", MarkerSize=MarkerSize, MarkerEdgeColor="black", MarkerFaceColor="white")
+  black = dict(marker="s", markerSize=markerSize, markerEdgeColor="white", markerFaceColor="black")
+  white = dict(marker="o", markerSize=markerSize, markerEdgeColor="black", markerFaceColor="white")
   fig = mtexFigure(6, layout=(2, 3), figSize=kw.pop("figSize", (12, 7.5)))
   for k, (f, title, label, pol) in enumerate(panels):
     nextAxis(fig=fig)

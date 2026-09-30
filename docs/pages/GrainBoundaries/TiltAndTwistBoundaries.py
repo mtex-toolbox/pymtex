@@ -133,7 +133,7 @@ axS
 # -
 
 # plot the specimen-frame axes
-plot(axS, MarkerAlpha=0.2, MarkerSize=2, figSize='small')
+plot(axS, MarkerAlpha=0.2, markerSize=2, figSize='small')
 
 # The flag `antipodal` is essential because the sides of a boundary have no intrinsic
 # order. Swapping them inverts the misorientation and reverses its axis, but the physical

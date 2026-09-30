@@ -31,9 +31,9 @@ odf = SantaFe()
 h = Miller(1, 0, 0, odf.CS)
 
 newMtexFigure(layout=[1, 2])
-plotPDF(odf, h, resolution=10 * degree, contour=True, linewidth=2)
+plotPDF(odf, h, resolution=10 * degree, contour=True, lineWidth=2)
 nextAxis()
-plotPDF(odf, h, resolution=2.5 * degree, contour=True, linewidth=2)
+plotPDF(odf, h, resolution=2.5 * degree, contour=True, lineWidth=2)
 # -
 
 # Both plots show the same three maxima. On the left, the 10 degree contour lines are visibly

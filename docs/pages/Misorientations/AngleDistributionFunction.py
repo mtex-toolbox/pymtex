@@ -54,12 +54,12 @@ cubicMaxAngle
 # Fewer symmetry operations leave a larger fundamental region and therefore permit larger
 # distinct disorientation angles.
 
-plotAngleDistribution(crystalFrame('1'), linewidth=2, figSize='small')
+plotAngleDistribution(crystalFrame('1'), lineWidth=2, figSize='small')
 hold(True)
-plotAngleDistribution(crystalFrame('622'), linewidth=2)
-plotAngleDistribution(crystalFrame('432'), linewidth=2)
+plotAngleDistribution(crystalFrame('622'), lineWidth=2)
+plotAngleDistribution(crystalFrame('432'), lineWidth=2)
 hold(False)
-legend('1', '622', '432', Location='northwest')
+legend('1', '622', '432', location='northwest')
 
 # The triclinic curve extends furthest, while the hexagonal and cubic curves end
 # progressively earlier. Their shapes differ as well. A measured curve must therefore be
@@ -68,7 +68,7 @@ legend('1', '622', '432', Location='northwest')
 # A misorientation between two different phases has one crystal symmetry on each side. Pass
 # both symmetry objects so that MTEX constructs their joint fundamental region.
 
-plotAngleDistribution(crystalFrame('222'), crystalFrame('12/m1'), linewidth=2, figSize='small')
+plotAngleDistribution(crystalFrame('222'), crystalFrame('12/m1'), lineWidth=2, figSize='small')
 
 # This curve is the random reference for an orthorhombic-to-monoclinic relationship. Its
 # range and shape are set jointly by the two phases, not by either phase alone.
@@ -100,7 +100,7 @@ mori
 
 plotAngleDistribution(mori, figSize='small')
 hold(True)
-plotAngleDistribution(mori.CS, mori.SS, linewidth=2)
+plotAngleDistribution(mori.CS, mori.SS, lineWidth=2)
 hold(False)
 legend('boundary misorientations', 'random orientations')
 
@@ -143,8 +143,8 @@ mdf = calcMDF(SO3FunHarmonic(odf))
 
 plotAngleDistribution(mori, figSize='small')
 hold(True)
-plotAngleDistribution(mdf, linewidth=2)
-plotAngleDistribution(mori.CS, mori.SS, linewidth=2)
+plotAngleDistribution(mdf, lineWidth=2)
+plotAngleDistribution(mori.CS, mori.SS, lineWidth=2)
 hold(False)
 legend('boundary', 'uncorrelated texture', 'random orientations')
 

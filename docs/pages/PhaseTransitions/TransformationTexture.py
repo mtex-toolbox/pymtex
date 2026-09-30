@@ -52,9 +52,9 @@ numChildVariants
 hC = Miller([[1, 1, 1], [1, 1, 0]], csC)
 hP = Miller([[1, 1, 0], [1, 0, 0]], csP)
 
-plotPDF(oriB, hC, MarkerSize=5, markerColor='black', figSize='medium')
+plotPDF(oriB, hC, markerSize=5, markerFaceColor='black', figSize='medium')
 
-opt = dict(MarkerFaceColor='none', MarkerEdgeColor='darkred', lineWidth=3)
+opt = dict(markerFaceColor='none', markerEdgeColor='darkred', lineWidth=3)
 for k in (1, 2):
   nextAxis(k)
   hold(True)

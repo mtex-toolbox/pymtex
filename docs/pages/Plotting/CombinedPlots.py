@@ -78,9 +78,9 @@ hold(False)  # next plot command deletes all plots
 # define that symmetry. Added data must conform to those axes.
 
 h = [Miller(0, 0, 0, 1, cs), Miller(1, 0, -1, 0, cs)]
-plotPDF(ori, h, antipodal=True, MarkerSize=4)
+plotPDF(ori, h, antipodal=True, markerSize=4)
 hold(True)
-plotPDF(oriRotated, h, MarkerSize=4)
+plotPDF(oriRotated, h, markerSize=4)
 hold(False)
 
 # Both pole-figure panels contain the two orientation sets. Here `plotPDF`
@@ -97,9 +97,9 @@ hold(False)
 plotPDF(odf, h, antipodal=True, contourf=True, grid=True)
 mtexColorMap('white2black')
 
-plot(ori, DisplayName='original', MarkerSize=5, MarkerColor='b', MarkerEdgeColor='w', add2all=True)
+plot(ori, displayName='original', markerSize=5, markerFaceColor='b', markerEdgeColor='w', add2all=True)
 
-plot(oriRotated, DisplayName='rotated', MarkerSize=5, MarkerColor='r', MarkerEdgeColor='k', add2all=True)
+plot(oriRotated, displayName='rotated', markerSize=5, markerFaceColor='r', markerEdgeColor='k', add2all=True)
 
 legend('show', location='northeast')
 # -
@@ -114,8 +114,8 @@ legend('show', location='northeast')
 
 plotSection(odf, 'sigma', sections=8, contourf=True)
 mtexColorMap('white2black')
-plot(ori, MarkerSize=6, MarkerColor='b', MarkerEdgeColor='w', add2all=True)
-plot(oriRotated, MarkerSize=6, MarkerColor='r', MarkerEdgeColor='k', add2all=True)
+plot(ori, markerSize=6, markerFaceColor='b', markerEdgeColor='w', add2all=True)
+plot(oriRotated, markerSize=6, markerFaceColor='r', markerEdgeColor='k', add2all=True)
 
 # Both sets place markers in every section, so the section a marker lands in
 # does not by itself separate the two. What distinguishes them is where they

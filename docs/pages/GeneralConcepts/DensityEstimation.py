@@ -226,7 +226,7 @@ gB = grains.boundary['Forsterite', 'Enstatite']
 # the axes are taken with respect to the forsterite frame, the first of the misorientation
 misAxes = gB.misorientation.axis()
 
-plot(misAxes, fundamentalRegion=True, MarkerFaceAlpha=0.1)
+plot(misAxes, fundamentalRegion=True, markerFaceAlpha=0.1)
 # -
 
 # Symmetry maps equivalent axes into the same fundamental region. The points cluster instead
@@ -240,7 +240,7 @@ contourf(axisDensity)
 mtexColorMap('LaboTeX')
 mtexColorbar()
 hold(True)
-plot(misAxes, MarkerEdgeAlpha=0.25, MarkerFaceColor='none', MarkerEdgeColor='k')
+plot(misAxes, markerEdgeAlpha=0.25, markerFaceColor='none', markerEdgeColor='k')
 hold(False)
 # -
 
@@ -257,7 +257,7 @@ contourf(axisDensity5)
 mtexColorMap('LaboTeX')
 mtexColorbar()
 hold(True)
-plot(misAxes, MarkerEdgeAlpha=0.25, MarkerFaceColor='none', MarkerEdgeColor='k')
+plot(misAxes, markerEdgeAlpha=0.25, markerFaceColor='none', markerEdgeColor='k')
 hold(False)
 # -
 
@@ -279,7 +279,7 @@ odf
 plotSection(odf, contourf=True)
 mtexColorMap('LaboTeX')
 hold(True)
-plot(forsteriteOri, MarkerEdgeAlpha=0.25, MarkerFaceColor='none', MarkerEdgeColor='k', MarkerSize=10)
+plot(forsteriteOri, markerEdgeAlpha=0.25, markerFaceColor='none', markerEdgeColor='k', markerSize=10)
 hold(False)
 
 # Each section cuts through the continuous ODF. The black measurements concentrate around the

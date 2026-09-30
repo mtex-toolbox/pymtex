@@ -39,10 +39,10 @@ mtexColorbar(title='intensity')
 # panels.
 #
 # MTEX estimates a marker size from the angular spacing and the figure size. The
-# `MarkerSize` option replaces that estimate when it hides gaps or makes neighbouring
+# `markerSize` option replaces that estimate when it hides gaps or makes neighbouring
 # circles overlap.
 
-plot(pf, MarkerSize=2)
+plot(pf, markerSize=2)
 mtexColorMap('parula')
 mtexColorbar(title='intensity')
 

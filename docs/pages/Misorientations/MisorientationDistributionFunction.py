@@ -181,7 +181,7 @@ plotAngleDistribution(mdf_from_odfs, figSize='small')
 hold(True)
 plotAngleDistribution(ebsd['fo'].CS, ebsd['en'].CS)
 hold(False)
-legend('uncorrelated texture', 'uniform orientations', Location='best')
+legend('uncorrelated texture', 'uniform orientations', location='best')
 
 # The orange curve is the texture-free baseline, not a horizontal line. The numbers behind
 # the curves come from [calcAngleDistribution(mdf)](SO3Fun.calcAngleDistribution.html) and

@@ -71,9 +71,9 @@ scatter(rot, 'Rodrigues', region=False)
 threshold = 60 * degree
 small = rot[rot.angle() < threshold]
 
-scatter(rot, 'axisAngle', MarkerFaceColor=[.7, .7, .7], MarkerSize=4)
+scatter(rot, 'axisAngle', markerFaceColor=[.7, .7, .7], markerSize=4)
 hold(True)
-scatter(small, 'axisAngle', MarkerFaceColor='r')
+scatter(small, 'axisAngle', markerFaceColor='r')
 hold(False)
 
 # The red points form a ball around the identity. Count them and report the fraction

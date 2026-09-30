@@ -152,7 +152,7 @@ print(f'mounting correction: {angle(rotCorrection) / degree:.3f} degree')
 print(f'axis offsets from nominal RD, TD, ND: {angle(rdAxis, vector3d.X, antipodal=True) / degree:.3f}, '
       f'{angle(tdAxis, vector3d.Y, antipodal=True) / degree:.3f}, {angle(ndAxis, vector3d.Z, antipodal=True) / degree:.3f} degree')
 
-annotate(cat(rdAxis, tdAxis, ndAxis), label=['RD', 'TD', 'ND'], backgroundcolor='w', MarkerSize=8)
+annotate(cat(rdAxis, tdAxis, ndAxis), label=['RD', 'TD', 'ND'], backgroundColor='w', markerSize=8)
 # -
 
 # The annotations show the fitted RD, TD, and ND on the uncorrected pole figures. The

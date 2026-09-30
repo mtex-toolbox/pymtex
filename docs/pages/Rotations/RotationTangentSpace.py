@@ -62,10 +62,10 @@ vLeft
 #
 # A tangent vector is drawn as an arrow attached to its base point.
 
-plot(R, 'axisAngle', MarkerColor='red')
+plot(R, 'axisAngle', markerFaceColor='red')
 plt.gca().set_axis_off()
 hold(True)
-quiver3(vLeft, LineWidth=3, maxHeadSize=4)
+quiver3(vLeft, lineWidth=3, maxHeadSize=4)
 hold(False)
 
 # The red marker is the base rotation $R$. The blue arrow is a local direction at that

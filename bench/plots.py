@@ -29,9 +29,9 @@ def save(name):
 vs = vector3d(vector3d.rand(40, rng=rng), frame=ss)
 plot(vs, grid=True)
 save("01_scatter.png")
-plot(vector3d.rand(40, antipodal=True, rng=rng), MarkerSize=8, MarkerFaceColor="red")
+plot(vector3d.rand(40, antipodal=True, rng=rng), markerSize=8, markerFaceColor="red")
 save("02_axes.png")
-plot(vs, projection="stereo", upper=True, label=[str(i) for i in range(1, 41)], MarkerSize=6)
+plot(vs, projection="stereo", upper=True, label=[str(i) for i in range(1, 41)], markerSize=6)
 save("03_stereo.png")
 
 # 2 crystal directions, symmetrised, and in the fundamental sector

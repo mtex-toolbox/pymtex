@@ -111,7 +111,7 @@ plt.legend(['point-to-origin', 'point-to-point'])
 # the markers by distance retains their order along the line.
 
 # +
-plotIPDF(oriLine, profileDist, cat(xvector, yvector, zvector), MarkerSize=20, antipodal=True)
+plotIPDF(oriLine, profileDist, cat(xvector, yvector, zvector), markerSize=20, antipodal=True)
 mtexColorbar(title=f'distance along profile ({ebsdLine.scanUnit})')
 # -
 

@@ -198,8 +198,8 @@ newMtexFigure(layout=[1, 3])
 
 plot(vp, upper=True, axisLabels=False, complete=True)
 hold(True)
-plot(maxPos, Marker='s', MarkerSize=10, MarkerFaceColor='k', MarkerEdgeColor='w')
-plot(minPos, Marker='o', MarkerSize=10, MarkerFaceColor='w', MarkerEdgeColor='k')
+plot(maxPos, marker='s', markerSize=10, markerFaceColor='k', markerEdgeColor='w')
+plot(minPos, marker='o', markerSize=10, markerFaceColor='w', markerEdgeColor='k')
 hold(False)
 mtexTitle('P-wave speed')
 
@@ -318,26 +318,26 @@ VeField
 planeNormal = vector3d.X
 
 # common section and arrow options
-optSec = dict(color='interp', linewidth=6)
-optQuiver = dict(linewidth=2, autoScaleFactor=0.35)
-optQuiverProp = dict(color='k', linewidth=2, autoScaleFactor=0.25)
+optSec = dict(color='interp', lineWidth=6)
+optQuiver = dict(lineWidth=2, autoScaleFactor=0.35)
+optQuiverProp = dict(color='k', lineWidth=2, autoScaleFactor=0.25)
 prop = S2VectorFieldHarmonic.normal()
 
 newMtexFigure(layout=[1, 2])
 
 # phase velocities
-plotSection(vp, planeNormal, **optSec, DisplayName='Vp')
+plotSection(vp, planeNormal, **optSec, displayName='Vp')
 hold(True)
-plotSection(vs1, planeNormal, **optSec, DisplayName='Vs1')
-plotSection(vs2, planeNormal, **optSec, DisplayName='Vs2')
+plotSection(vs1, planeNormal, **optSec, displayName='Vs1')
+plotSection(vs2, planeNormal, **optSec, displayName='Vs2')
 
 # polarisation directions
-quiverSection(vp, pp, planeNormal, color='c', **optQuiver, DisplayName='pp')
-quiverSection(vs1, ps1, planeNormal, color='g', **optQuiver, DisplayName='ps1')
-quiverSection(vs2, ps2, planeNormal, color='m', **optQuiver, DisplayName='ps2')
+quiverSection(vp, pp, planeNormal, color='c', **optQuiver, displayName='pp')
+quiverSection(vs1, ps1, planeNormal, color='g', **optQuiver, displayName='ps1')
+quiverSection(vs2, ps2, planeNormal, color='m', **optQuiver, displayName='ps2')
 
 # propagation directions as reference
-quiverSection(vp, prop, planeNormal, **optQuiverProp, DisplayName='n')
+quiverSection(vp, prop, planeNormal, **optQuiverProp, displayName='n')
 quiverSection(vs1, prop, planeNormal, **optQuiverProp)
 quiverSection(vs2, prop, planeNormal, **optQuiverProp)
 hold(False)
@@ -346,22 +346,22 @@ mtexTitle('Phase velocity surface')
 nextAxis()
 
 # slowness surfaces
-plotSection(1 / vp, planeNormal, **optSec, DisplayName='Vp')
+plotSection(1 / vp, planeNormal, **optSec, displayName='Vp')
 hold(True)
-plotSection(1 / vs1, planeNormal, **optSec, DisplayName='Vs1')
-plotSection(1 / vs2, planeNormal, **optSec, DisplayName='Vs2')
+plotSection(1 / vs1, planeNormal, **optSec, displayName='Vs1')
+plotSection(1 / vs2, planeNormal, **optSec, displayName='Vs2')
 
 # polarisation directions
-quiverSection(1 / vp, pp, planeNormal, color='c', **optQuiver, DisplayName='pp')
-quiverSection(1 / vs1, ps1, planeNormal, color='g', **optQuiver, DisplayName='ps1')
-quiverSection(1 / vs2, ps2, planeNormal, color='m', **optQuiver, DisplayName='ps2')
+quiverSection(1 / vp, pp, planeNormal, color='c', **optQuiver, displayName='pp')
+quiverSection(1 / vs1, ps1, planeNormal, color='g', **optQuiver, displayName='ps1')
+quiverSection(1 / vs2, ps2, planeNormal, color='m', **optQuiver, displayName='ps2')
 
 # propagation directions as reference
-quiverSection(1 / vp, prop, planeNormal, **optQuiverProp, DisplayName='n')
+quiverSection(1 / vp, prop, planeNormal, **optQuiverProp, displayName='n')
 quiverSection(1 / vs1, prop, planeNormal, **optQuiverProp)
 quiverSection(1 / vs2, prop, planeNormal, **optQuiverProp)
 hold(False)
-legend('Vp', 'Vs1', 'Vs2', 'pp', 'ps1', 'ps2', 'n', Location='eastOutside')
+legend('Vp', 'Vs1', 'Vs2', 'pp', 'ps1', 'ps2', 'n', location='eastOutside')
 mtexTitle('Slowness surface')
 
 mtexColorMap('blue2red')

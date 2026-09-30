@@ -61,7 +61,7 @@ def test_plot_markersInsideTheirChartAndChartsShareTheList():
 
 def test_plot_axesOnOneChartWithMATLABMarkerOptions():
   # axes take one chart, and the marker options are MATLAB's
-  h = plot(vector3d.rand(40, antipodal=True, rng=rng), MarkerSize=6, MarkerFaceColor="red")
+  h = plot(vector3d.rand(40, antipodal=True, rng=rng), markerSize=6, markerFaceColor="red")
   assert len(gcm().children) == 1 and h[0].get_sizes()[0] == 36
   assert np.allclose(h[0].get_facecolor()[0][:3], (1, 0, 0))
 
@@ -419,7 +419,7 @@ def test_text_goes_where_nextAxis_points_in_a_held_figure():
 
 def test_many_open_markers_keep_their_edge():
   plt.close("all")
-  plot(vector3d.rand(12000, rng=rng), MarkerFaceColor='none', MarkerEdgeColor='k')
+  plot(vector3d.rand(12000, rng=rng), markerFaceColor='none', markerEdgeColor='k')
   c = plt.gcf().axes[0].collections[-1]
   assert len(c.get_edgecolor()) and np.allclose(c.get_edgecolor()[0][:3], 0)
   plt.close("all")
@@ -436,9 +436,9 @@ def test_annotate_orientationMarksEveryInversePoleFigure():
   cs, mod, odf = trigonalODF()
   # annotate(ori) marks an inverse pole figure at the crystal direction along its r, in the sector
   plotIPDF(odf, [xvector, zvector], antipodal=True)
-  hs = annotate(mod, marker='s', MarkerFaceColor='r', label='A', color='w')
+  hs = annotate(mod, marker='s', markerFaceColor='r', label='A', color='w')
   assert len(hs) == 2 and all(h is not None and len(h.get_offsets()) == 1 for h in hs)
-  # beside a MarkerFaceColor, color is the colour of the text
+  # beside a markerFaceColor, color is the colour of the text
   assert any(t.get_text() == 'A' and matplotlib.colors.to_hex(t.get_color()) == '#ffffff' for t in gcm().children[0].texts)
 
 
@@ -447,7 +447,7 @@ def test_plot_fibreAdd2allNamedOnceInTheLegend():
   cs, mod, odf = trigonalODF()
   # a fibre with add2all is drawn on every pole figure as curves, named once per axes
   plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
-  plot(fibre(Miller(1, 1, -2, 1, cs), vector3d.Y), color='red', add2all=True, DisplayName='fibre')
+  plot(fibre(Miller(1, 1, -2, 1, cs), vector3d.Y), color='red', add2all=True, displayName='fibre')
   leg = legend('show')
   assert [t.get_text() for t in leg.get_texts()] == ['fibre']
 
@@ -519,7 +519,7 @@ def test_plot_symmetrisedLabeledNamesTheEquivalentInsideAnAntipodalSector():
 # a label on a marker of size zero, text alone, stands on its point; beside a marker below it
 def test_text_alone_stands_on_its_point():
   plot(vector3d.rand(5, rng=rng), upper=True)
-  annotate(yvector, label="Y1", MarkerSize=0, backgroundColor="w", color="red")
+  annotate(yvector, label="Y1", markerSize=0, backgroundColor="w", color="red")
   annotate(xvector, label="X1")
   alone = next(t for t in gcm().children[0].texts if t.get_text() == "Y1")
   marked = next(t for t in gcm().children[0].texts if t.get_text() == "X1")

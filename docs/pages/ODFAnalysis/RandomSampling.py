@@ -41,7 +41,7 @@ mtexColorbar(title='mrd')
 
 # plot the sampled orientations on top
 hold(True)
-plot(ori, MarkerFaceColor='none', all=True, MarkerEdgeColor='k', MarkerSize=4)
+plot(ori, markerFaceColor='none', all=True, markerEdgeColor='k', markerSize=4)
 hold(False)
 # -
 
@@ -55,11 +55,11 @@ hold(False)
 
 # +
 # plot the ODF in sigma sections
-plot(fibre_odf, 'sigma', sections=6, verbose=False, contour=True, linewidth=2)
+plot(fibre_odf, 'sigma', sections=6, verbose=False, contour=True, lineWidth=2)
 
 # plot the sampled orientations in the same sections
 hold(True)
-plot(ori, MarkerFaceColor='none', all=True, MarkerEdgeColor='k', MarkerSize=4)
+plot(ori, markerFaceColor='none', all=True, markerEdgeColor='k', markerSize=4)
 hold(False)
 # -
 

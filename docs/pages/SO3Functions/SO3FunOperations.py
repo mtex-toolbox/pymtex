@@ -200,7 +200,7 @@ G
 
 plot(SO3F1, 'sigma', sections=4)
 hold(True)
-plot(G, color='black', linewidth=1, resolution=5 * degree)
+plot(G, color='black', lineWidth=1, resolution=5 * degree)
 hold(False)
 
 # The section plot lays down a grey arrow field of its own, and the gradient is drawn in

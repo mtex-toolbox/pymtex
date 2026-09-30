@@ -72,7 +72,7 @@ mtexColorbar()               # create one colourbar for the figure
 # direction expressed in the specimen frame. The text passed through `label`
 # is arbitrary; here it names the vector drawn at $(1,1,1)$.
 
-annotate(vector3d(1, 1, 1), label=['(111)'], BackgroundColor='w')
+annotate(vector3d(1, 1, 1), label=['(111)'], backgroundColor='w')
 
 # In an inverse pole figure, a crystal direction is the natural annotation.
 # It is a direction expressed in the crystal frame. The `all` option draws
@@ -83,7 +83,7 @@ annotate(vector3d(1, 1, 1), label=['(111)'], BackgroundColor='w')
 plotIPDF(odf, [xvector, zvector], antipodal=True, marginx=10)
 mtexColorMap('white2black')
 
-annotate(Miller([[2, -1, -1, 0], [2, -1, -1, 1]], cs), all=True, labeled=True, BackgroundColor='yellow')
+annotate(Miller([[2, -1, -1, 0], [2, -1, -1, 1]], cs), all=True, labeled=True, backgroundColor='yellow')
 # -
 
 # The axes of an inverse pole figure are the fundamental sector of the
@@ -98,9 +98,9 @@ annotate(Miller([[2, -1, -1, 0], [2, -1, -1, 1]], cs), all=True, labeled=True, B
 # +
 plotIPDF(odf, [xvector, zvector], antipodal=True)
 mtexColorMap('white2black')
-annotate(mod1, marker='s', MarkerSize=6, MarkerFaceColor='r', label='A', color='w')
+annotate(mod1, marker='s', markerSize=6, markerFaceColor='r', label='A', color='w')
 
-annotate(mod2, marker='s', MarkerSize=6, MarkerFaceColor='g', label='B')
+annotate(mod2, marker='s', markerSize=6, markerFaceColor='g', label='B')
 
 gcm().drawNow(figSize='normal')
 # -
@@ -114,9 +114,9 @@ gcm().drawNow(figSize='normal')
 # +
 plotSection(odf, 'sigma')
 mtexColorMap('white2black')
-annotate(mod1, label='A', textColor='r', MarkerSize=15, MarkerEdgeColor='r', MarkerFaceColor='none')
+annotate(mod1, label='A', textColor='r', markerSize=15, markerEdgeColor='r', markerFaceColor='none')
 
-annotate(mod2, label='B', textColor='b', MarkerSize=15, MarkerEdgeColor='b', MarkerFaceColor='none')
+annotate(mod2, label='B', textColor='b', markerSize=15, markerEdgeColor='b', markerFaceColor='none')
 # -
 
 # The outlined labels identify the two component positions without covering
@@ -126,23 +126,23 @@ annotate(mod2, label='B', textColor='b', MarkerSize=15, MarkerEdgeColor='b', Mar
 
 ori = odf.discreteSample(200)
 scatter(ori)
-annotate(mod1, MarkerSize=10, MarkerEdgeColor='r', MarkerFaceColor='r')
-annotate(mod2, MarkerSize=10, MarkerEdgeColor='g', MarkerFaceColor='g')
+annotate(mod1, markerSize=10, markerEdgeColor='r', markerFaceColor='r')
+annotate(mod2, markerSize=10, markerEdgeColor='g', markerFaceColor='g')
 
 # ## Legends
 #
 # A colourbar explains numerical values encoded by colour. A legend instead
 # identifies plotted objects by a label and symbol. Anything plotted with a
-# `DisplayName` enters the legend, while everything else stays out. In a
-# multi-plot figure, combine `DisplayName` with `add2all`. The object and
+# `displayName` enters the legend, while everything else stays out. In a
+# multi-plot figure, combine `displayName` with `add2all`. The object and
 # its legend entry then appear on every panel.
 
 # +
 plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
-plot(ori, MarkerFaceColor='k', MarkerEdgeColor='black', add2all=True, DisplayName='randomSample')
+plot(ori, markerFaceColor='k', markerEdgeColor='black', add2all=True, displayName='randomSample')
 
 f = fibre(Miller(1, 1, -2, 1, cs), vector3d.Y)
-plot(f, color='red', linewidth=2, add2all=True, DisplayName='fibre')
+plot(f, color='red', lineWidth=2, add2all=True, displayName='fibre')
 
 legend('show')
 # -
@@ -156,10 +156,10 @@ legend('show')
 
 # +
 plt.close('all')
-plotSpectrum(FourierODF(odf, 32), DisplayName='Two-component ODF', figSize='small')
+plotSpectrum(FourierODF(odf, 32), displayName='Two-component ODF', figSize='small')
 hold(True)
 fodf = fibreODF(Miller(1, 0, 0, cs), zvector)
-plotSpectrum(FourierODF(fodf, 32), DisplayName='Fibre ODF')
+plotSpectrum(FourierODF(fodf, 32), displayName='Fibre ODF')
 hold(False)
 legend('show')
 # -

@@ -54,7 +54,7 @@ symmetryCopyCount
 # Plot the copies in the [fundamental sector](FundamentalSector.html), the part of the
 # sphere that retains one representative from each equivalent family.
 
-plot(hSym, fundamentalRegion=True, MarkerFaceColor='red')
+plot(hSym, fundamentalRegion=True, markerFaceColor='red')
 
 # Notice one marker rather than six. Symmetry reduction maps all six copies onto the same
 # position in the sector. They describe one crystal direction family, not six

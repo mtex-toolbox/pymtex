@@ -41,7 +41,7 @@ ipfKey.ipfDirection = yvector
 
 plot(ebsd, ipfKey.orientation2color(ebsd.orientations), refFrame='on', figSize='medium')
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
@@ -61,7 +61,7 @@ axisKey.oriRef = grains['id', ebsd['indexed'].grainId].meanOrientation
 
 plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronBar='off', figSize='medium')
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
@@ -76,7 +76,7 @@ ebsd = smooth(ebsd, F, fill=grains)
 axisKey.oriRef = grains['id', ebsd['indexed'].grainId].meanOrientation
 plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronBar='off', figSize='medium')
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
@@ -114,7 +114,7 @@ mtexColorbar()
 setColorScale('log')
 setColorRange([1e11, 5e14])
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
@@ -158,7 +158,7 @@ for i in range(3):
     nextAxis(i + 1, j + 1)
     plot(ebsd, kappaMeasured.M[..., i, j], micronBar='off')
     hold(True)
-    plot(grains.boundary, linewidth=2)
+    plot(grains.boundary, lineWidth=2)
     hold(False)
 setColorRange([-0.005, 0.005])
 # -
@@ -257,7 +257,7 @@ for i in range(3):
     nextAxis(i + 1, j + 1)
     plot(ebsd, kappaFitted.M[..., i, j], micronBar='off')
     hold(True)
-    plot(grains.boundary, linewidth=2)
+    plot(grains.boundary, lineWidth=2)
     hold(False)
 setColorRange([-0.005, 0.005])
 # -
@@ -285,7 +285,7 @@ mtexColorbar()
 setColorScale('log')
 setColorRange([1e11, 5e14])
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 

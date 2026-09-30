@@ -131,9 +131,9 @@ foGrains = grains['Fo']
 # measurements and the orange markers represent grain means.
 
 # +
-plotIPDF(ori, xvector, points=1000, MarkerSize=3, MarkerColor='blue')
+plotIPDF(ori, xvector, points=1000, markerSize=3, markerFaceColor='blue')
 hold(True)
-plotIPDF(foGrains.meanOrientation, xvector, points=1000, MarkerSize=3, MarkerColor='orange')
+plotIPDF(foGrains.meanOrientation, xvector, points=1000, markerSize=3, markerFaceColor='orange')
 hold(False)
 # -
 
@@ -157,7 +157,7 @@ hold(False)
 
 # +
 h = cat(Miller(1, 0, 0, ori.CS), Miller(1, 1, 0, ori.CS))
-plotPDF(ori, ebsd['Fo'].mad, h, antipodal=True, MarkerSize=4)
+plotPDF(ori, ebsd['Fo'].mad, h, antipodal=True, markerSize=4)
 mtexColorbar(title='mean angular deviation (degree)')
 # -
 
@@ -169,7 +169,7 @@ mtexColorbar(title='mean angular deviation (degree)')
 # grain area so that the wide size range remains visible.
 
 # +
-plotSection(foGrains.meanOrientation, np.log(foGrains.area), 'sigma', sections=9, MarkerSize=10, all=True)
+plotSection(foGrains.meanOrientation, np.log(foGrains.area), 'sigma', sections=9, markerSize=10, all=True)
 mtexColorbar(title='log(grain area)')
 # -
 

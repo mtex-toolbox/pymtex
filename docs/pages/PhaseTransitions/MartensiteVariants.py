@@ -44,7 +44,7 @@ grains = smoothBoundary(grains, 4)
 plot(ebsd['Fe'], ebsd['Fe'].orientations)
 hold(True)
 plot(grains.boundary, lineWidth=2, lineColor='gray')
-plot(grains['Aus'], FaceColor='blue', DisplayName='Austenite')
+plot(grains['Aus'], faceColor='blue', displayName='Austenite')
 hold(False)
 
 # Notice the small amount and size of the remaining fcc phase. Increasing nickel content
@@ -82,19 +82,19 @@ childOri = grains['Fe'].meanOrientation
 hBcc = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], csBcc)
 hFcc = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], csAus)
 
-plotPDF(childOri, hBcc, MarkerSize=5, MarkerFaceAlpha=0.05, MarkerEdgeAlpha=0.1, points=500)
+plotPDF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 
 nextAxis(1)
 hold(True)
-plot(parentOri * hFcc[0].symmetrise(), MarkerFaceColor='r')
+plot(parentOri * hFcc[0].symmetrise(), markerFaceColor='r')
 xlabel('(100)', color='red')
 
 nextAxis(2)
-plot(parentOri * hFcc[2].symmetrise(), MarkerFaceColor='r')
+plot(parentOri * hFcc[2].symmetrise(), markerFaceColor='r')
 xlabel('(111)', color='red')
 
 nextAxis(3)
-plot(parentOri * hFcc[1].symmetrise(), MarkerFaceColor='r')
+plot(parentOri * hFcc[1].symmetrise(), markerFaceColor='r')
 xlabel('(110)', color='red')
 hold(False)
 gcm().drawNow()
@@ -120,7 +120,7 @@ gcm().drawNow()
 KS = orientation.map(Miller(1, 1, 1, csAus), Miller(0, 1, 1, csBcc), Miller(-1, 0, 1, csAus), Miller(-1, -1, 1, csBcc))
 print(KS)
 
-plotPDF(variants(KS, parentOri), 'add2all', MarkerFaceColor='none', MarkerEdgeColor='k', linewidth=2)
+plotPDF(variants(KS, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 # -
 
 # The black rings are the ideal KS child variants predicted from the retained parent. Their
@@ -146,9 +146,9 @@ fitKS
 p2cMean = mean(mori, robust=True)
 print(p2cMean)
 
-plotPDF(childOri, hBcc, MarkerSize=5, MarkerFaceAlpha=0.05, MarkerEdgeAlpha=0.1, points=500)
+plotPDF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 hold(True)
-plotPDF(variants(p2cMean, parentOri), 'add2all', MarkerFaceColor='none', MarkerEdgeColor='k', linewidth=2)
+plotPDF(variants(p2cMean, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 hold(False)
 
 fitMean = np.mean(angle(mori, p2cMean)) / degree
@@ -207,7 +207,7 @@ variantId, packetId, bainId, _ = calcVariantId(parentOri, childOri, p2cIter)
 # the individual coloured points difficult to distinguish.
 
 variantColor = ind2color(variantId, 'ordered')
-plotPDF(childOri, variantColor, hBcc, MarkerSize=5)
+plotPDF(childOri, variantColor, hBcc, markerSize=5)
 
 # The axis-angle plot separates the clusters. Each compact colour cluster is a group of
 # measured child grains assigned to one variant ID.
@@ -225,11 +225,11 @@ plot(childOri, variantColor, 'axisAngle')
 
 # +
 packetColor = ind2color(packetId)
-plotPDF(childOri, packetColor, hBcc, MarkerSize=5, points=1000)
+plotPDF(childOri, packetColor, hBcc, markerSize=5, points=1000)
 
 nextAxis(1)
 hold(True)
-opt = dict(MarkerFaceColor='none', MarkerEdgeColor='k', linewidth=3)
+opt = dict(markerFaceColor='none', markerEdgeColor='k', lineWidth=3)
 plot(parentOri * hFcc[0].symmetrise(), **opt)
 xlabel('(100)', color='red')
 
@@ -266,7 +266,7 @@ plot(grains['Fe'], packetColor)
 
 # +
 bainColor = ind2color(bainId)
-plotPDF(childOri, bainColor, hBcc, MarkerSize=5, points=1000)
+plotPDF(childOri, bainColor, hBcc, markerSize=5, points=1000)
 
 nextAxis(1)
 hold(True)

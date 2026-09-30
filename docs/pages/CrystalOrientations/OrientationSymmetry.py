@@ -91,7 +91,7 @@ cubicCount
 
 h = Miller(1, 0, 0, cs)
 
-plotPDF(ori, h, complete=True, MarkerSize=10, figSize='small')
+plotPDF(ori, h, complete=True, markerSize=10, figSize='small')
 
 # Notice six poles in each hemisphere. The sixfold crystal symmetry creates the
 # crystallographically equivalent direction family, and the twofold specimen symmetry

@@ -67,7 +67,7 @@ gB_MgMg
 #
 # Colour each segment by its disorientation angle.
 
-plot(gB_MgMg, gB_MgMg.misorientation.angle() / degree, linewidth=2)
+plot(gB_MgMg, gB_MgMg.misorientation.angle() / degree, lineWidth=2)
 mtexColorbar(title='misorientation angle in degree')
 
 # The connected yellow traces near 86 degrees outline most of the narrow lamellae. Cooler
@@ -170,7 +170,7 @@ candidateTracePercent
 
 plot(grains, grainColor)
 hold(True)
-plot(twinBoundary, linecolor='w', linewidth=4, displayName='candidate twin boundary')
+plot(twinBoundary, lineColor='w', lineWidth=4, displayName='candidate twin boundary')
 hold(False)
 
 # The white traces follow the lamellae seen in the first figure. This spatial agreement

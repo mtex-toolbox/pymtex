@@ -69,7 +69,7 @@ s2G = Miller(s2G, ebsd['f'].CS)
 ori = ebsd[grainSelected].orientations
 directions = ori.reshape(-1, 1) * s2G.reshape(1, -1)
 
-plot(directions, MarkerSize=3, upper=True)
+plot(directions, markerSize=3, upper=True)
 # -
 
 # At this scale the clouds all look alike. What separates them is how far each one
@@ -78,7 +78,7 @@ plot(directions, MarkerSize=3, upper=True)
 # +
 poleDispersion = np.nanmean(angle(mean(directions, axis=0), directions, symmetry=False), axis=0)
 
-plot(directions, np.tile(poleDispersion, (len(ori), 1)) / degree, MarkerSize=3)
+plot(directions, np.tile(poleDispersion, (len(ori), 1)) / degree, markerSize=3)
 mtexColorbar(title='average pole dispersion in degree')
 # -
 
@@ -121,7 +121,7 @@ fib.r
 
 # +
 hold(True)
-annotate(fib.r, MarkerFaceColor='r')
+annotate(fib.r, markerFaceColor='r')
 annotate(fib.r, plane=True, lineStyle='-.', lineWidth=2, lineColor='r')
 hold(False)
 
@@ -239,7 +239,7 @@ maxSpecimenDensity, peakSpecimenAxis = specimenDensity.max()
 
 plot(axisSpecimen[isFibre], contourf=True, antipodal=True, upper=True, halfwidth=15 * degree)
 hold(True)
-plot(axisSpecimen[isFibre], antipodal=True, upper=True, MarkerSize=4)
+plot(axisSpecimen[isFibre], antipodal=True, upper=True, markerSize=4)
 hold(False)
 mtexColorbar()
 

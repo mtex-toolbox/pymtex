@@ -78,7 +78,7 @@ def test_plot_ofS1FunIsPolarAndHolds():
   h = plot(f, lineWidth=2)
   assert axesOf().name == "polar" and h.get_linewidth() == 2
   hold(True)
-  plot(f, DisplayName="again")
+  plot(f, displayName="again")
   hold(False)
   assert len(axesOf().lines) == 2
   plot(f, polar=False)
@@ -100,7 +100,7 @@ def test_plotSection_ofS2FunPeaksWhereItShould():
 
 def test_plotSection_colorInterpColoursTheLineByItsValues():
   # MATLAB's color 'interp' colours the line by its values, which the colour bar reads
-  h = plotSection(peakAtX(), vector3d.Z, color="interp", linewidth=5)
+  h = plotSection(peakAtX(), vector3d.Z, color="interp", lineWidth=5)
   assert np.isclose(h.get_array().max(), 2, atol=0.05) and h.get_linewidth()[0] == 5
   assert gcm()._mappables()[-1][1] is h
 
@@ -117,14 +117,14 @@ def ringsWithArrows():
   s1 = S2FunHarmonic(lambda v: 2 + v.x ** 2, bandwidth=8)
   s2 = S2FunHarmonic(lambda v: 1 + 0 * v.x, bandwidth=2)
   newMtexFigure(layout=[1, 2])
-  a = plotSection(s1, vector3d.Z, color="interp", DisplayName="outer")
+  a = plotSection(s1, vector3d.Z, color="interp", displayName="outer")
   hold(True)
-  b = plotSection(s2, vector3d.Z, color="interp", DisplayName="inner")
+  b = plotSection(s2, vector3d.Z, color="interp", displayName="inner")
   # the normals as arrows at the outer ring, of MATLAB's autoscaled length
-  q = quiverSection(s1, S2VectorFieldHarmonic.normal(), vector3d.Z, color="k", autoScaleFactor=0.5, DisplayName="n")
+  q = quiverSection(s1, S2VectorFieldHarmonic.normal(), vector3d.Z, color="k", autoScaleFactor=0.5, displayName="n")
   # an axis field as segments both ways, the reverse half left out of the legend
   axes = lambda v: vector3d(v.data, antipodal=True)
-  qa = quiverSection(s2, axes, vector3d.Z, color="m", DisplayName="p")
+  qa = quiverSection(s2, axes, vector3d.Z, color="m", displayName="p")
   hold(False)
   return s1, a, b, q, qa
 
@@ -177,7 +177,7 @@ def test_a_characteristic_shape():
   rot = rotation.byAxisAngle(zvector, (i // 4) * 30 * degree)
   g = calcGrains(EBSD(pos, rot, np.full(nx * ny, 1, dtype=np.int8), phaseList(fr)), angle=5 * degree)
   s = characteristicShape(g.boundary)
-  h = plot(s, lineWidth=2, DisplayName="cubes")
+  h = plot(s, lineWidth=2, displayName="cubes")
   assert axesOf().name == "polar" and h.get_label() == "cubes"
   plot(s, normalize=True, plain=True)
   assert len(axesOf().get_yticks()) == 0

@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.units import degree
+from .keywords import lineKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure
 
 
@@ -35,19 +36,10 @@ def _lineAxes(kw):
   return mtexFigure(figSize=figureSize(figSize, (6.0, 4.0))).nextAxis()
 
 
-def _lineKw(kw):
-  kw.pop("verbose", None)
-  for old, new in (("LineWidth", "linewidth"), ("lineWidth", "linewidth"), ("LineStyle", "linestyle"), ("lineStyle", "linestyle"),
-                   ("Color", "color"), ("lineColor", "color"), ("DisplayName", "label"), ("Marker", "marker"), ("MarkerSize", "markersize")):
-    if old in kw:
-      kw[new] = kw.pop(old)
-  return kw
-
-
 def plotSO3Kernel(psi, **kw):
   """plot(psi): the value of a kernel on SO(3) against the rotation angle, -180 to 180 degree"""
   ax = _lineAxes(kw)
-  kw = _lineKw(kw)
+  kw = lineKeywords(kw)
   kw.setdefault("linewidth", 2)
   omega = np.linspace(-np.pi, np.pi, 1000)
   h = ax.plot(omega / degree, np.real(psi.eval(np.cos(omega / 2))), **kw)
@@ -69,11 +61,12 @@ def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw):
       hs.append(plotSpectrum(f, bandwidth, logarithmic, **{k: v for k, v in kw.items() if k != "figSize"}))
     hold(False)
     return hs
-  fontSize = kw.pop("FontSize", kw.pop("fontSize", None))
+  refuseVariants(kw)
+  fontSize = kw.pop("fontSize", None)
   ax = _lineAxes(kw)
-  kw = _lineKw(kw)
+  kw = lineKeywords(kw)
   h = _spektra(ax, x, bandwidth, logarithmic, kw)
-  # MATLAB's FontSize: the labels and the ticks
+  # the font size of the labels and the ticks
   if fontSize is not None:
     ax.tick_params(labelsize=fontSize)
     ax.xaxis.label.set_size(fontSize)

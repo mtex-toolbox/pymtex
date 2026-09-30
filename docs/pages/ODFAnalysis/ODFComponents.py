@@ -51,7 +51,7 @@ peakOri
 # percentage of material. The black marker sits in the brightest region of the section
 # plot.
 
-annotate(peakOri, MarkerFaceColor='black')
+annotate(peakOri, markerFaceColor='black')
 
 # ## Local Modes
 #
@@ -63,7 +63,7 @@ localValue, localOri = max(odf, numLocal=3)
 localValue
 # -
 
-annotate(localOri[1:], MarkerFaceColor='red')
+annotate(localOri[1:], markerFaceColor='red')
 
 # The three modes reach 110, 47, and 32 mrd. The black marker is the global mode and the
 # red markers are the next two. Each lies in a bright neighbourhood; the markers locate
@@ -144,7 +144,7 @@ retainedPercent
 # maxima located by `max`, while the fourth circle appears because the earlier call
 # requested only three local maxima.
 
-annotate(componentOri, MarkerFaceColor='none', MarkerEdgeColor='white', LineWidth=2, MarkerSize=15, Marker='o')
+annotate(componentOri, markerFaceColor='none', markerEdgeColor='white', lineWidth=2, markerSize=15, marker='o')
 
 # ## Further Reading
 #

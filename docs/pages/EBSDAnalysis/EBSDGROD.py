@@ -225,7 +225,7 @@ omega = np.minimum(grod.angle() / degree / 7.5, 1)
 color = colorKey.direction2color(axSpecimen)
 
 # plot the data
-plot(ebsd, color, micronbar=False, FaceAlpha=omega)
+plot(ebsd, color, micronbar=False, faceAlpha=omega)
 
 hold(True)
 plot(grains.boundary, lineWidth=2)

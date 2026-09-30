@@ -129,7 +129,7 @@ truncatedBandwidth
 
 # ---
 
-plotSpectrum(S2F, linewidth=2, figSize='small')
+plotSpectrum(S2F, lineWidth=2, figSize='small')
 
 # ## Read the truncated spectrum
 #

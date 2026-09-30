@@ -76,7 +76,7 @@ plotPDF(odfTrue, h, antipodal=True, verbose=False)
 # [discreteSample](SO3Fun.discreteSample.html).
 
 ori = discreteSample(odfTrue, 2000)
-plot(ori, add2all=True, MarkerEdgeColor='k', MarkerSize=5, MarkerFaceColor='none', MarkerEdgeAlpha=0.2)
+plot(ori, add2all=True, markerEdgeColor='k', markerSize=5, markerFaceColor='none', markerEdgeAlpha=0.2)
 
 # The black points fluctuate about the pole-density rings. They are a finite random
 # sample, not a second texture component.

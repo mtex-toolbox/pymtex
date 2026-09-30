@@ -5,6 +5,7 @@
 import numpy as np
 
 from ..geometry.session import getMTEXpref
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .render3d import drawMatplotlib, hasPyVista, renderImage, writeHTML
 from .scene3d import arrows3d, boundaryMesh, ellipsoids3d, lines3d, points3d, grainMesh, picture3d, scene3d, volumeSlices
@@ -32,15 +33,11 @@ def plot3dMap(x, *args, **kw):
   return plotGrains3d(x, *args, **kw)
 
 
-# MATLAB's spellings of the options
+# the options of a 3D plot, their spelling checked
 def _options(kw):
-  for old, new in (("FaceColor", "faceColor"), ("facecolor", "faceColor"), ("FaceAlpha", "faceAlpha"), ("facealpha", "faceAlpha"),
-                   ("EdgeAlpha", "edgeAlpha"), ("edgealpha", "edgeAlpha"), ("EdgeColor", "edgeColor"), ("edgecolor", "edgeColor"),
-                   ("LineWidth", "lineWidth"), ("linewidth", "lineWidth"), ("LineStyle", "lineStyle"), ("linestyle", "lineStyle")):
-    if old in kw:
-      kw[new] = kw.pop(old)
+  refuseVariants(kw)
   # the scale bar and the side of a boundary plot mean nothing in 3D
-  for k in ("micronbar", "micronBar", "MicronBar", "upper", "lower"):
+  for k in ("micronbar", "upper", "lower"):
     kw.pop(k, None)
   if kw.pop("lineStyle", None) == "none":
     kw["edgeColor"] = None
@@ -83,7 +80,6 @@ def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, 
   the face's diameter, both times autoScaleFactor"""
   from ..maps3d.grain3boundary import grain3Boundary
   kw = _options(kw)
-  color = kw.pop("Color", color)
   P = np.asarray(x.centroid.data).reshape(-1, 3)
   D = np.asarray(d.data if hasattr(d, "data") else d, dtype=float).reshape(-1, 3)
   if isinstance(x, grain3Boundary) and scaling:
@@ -97,7 +93,6 @@ def quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, ho
   """quiver3(v, d): arrows at the positions v along d times arrowSize in a 3D scene, as
   MATLAB's vector3d/quiver3; an antipodal d points both ways without heads"""
   kw = _options(kw)
-  color = kw.pop("Color", color)
   P = np.asarray(v.data).reshape(-1, 3)
   D = arrowSize * np.asarray(d.data, dtype=float).reshape(-1, 3)
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=bool(getattr(d, "antipodal", False))), how2plot, figSize, v.frame)
@@ -118,25 +113,23 @@ COLOR_ORDER = [(0.0, 0.447, 0.741), (0.85, 0.325, 0.098), (0.929, 0.694, 0.125),
                (0.301, 0.745, 0.933), (0.635, 0.078, 0.184)]
 
 
-def plotPoints3d(v, color=None, MarkerSize=6.0, **kw):
+def plotPoints3d(v, color=None, markerSize=6.0, **kw):
   """plot(v) into a held 3D scene: the vectors as markers at their positions, each set in the
   next colour of MATLAB's colour order"""
   kw = _options(kw)
   s = gcs()
   if color is None:
-    color = kw.pop("MarkerFaceColor", kw.pop("MarkerColor", None))
+    color = kw.pop("markerFaceColor", None)
   if color is None:
     k = sum(isinstance(it, points3d) for it in s.items) if s is not None else 0
     color = COLOR_ORDER[k % len(COLOR_ORDER)]
-  size = kw.pop("markerSize", kw.pop("MarkerSize", MarkerSize))
+  size = markerSize
   return _draw(points3d(np.asarray(v.data).reshape(-1, 3), color, size), None, None, v.frame)
 
 
 def line3(x, y, z, color="k", lineWidth=0.5, **kw):
   """line(x, y, z): a polyline in a 3D scene, NaN separating its pieces, as MATLAB's line"""
-  kw = {k.lower(): v for k, v in kw.items()}
-  color = kw.pop("color", color)
-  lineWidth = kw.pop("linewidth", lineWidth)
+  refuseVariants(kw)
   P = np.column_stack([np.asarray(c, dtype=float).reshape(-1) for c in (x, y, z)])
   ok = np.all(np.isfinite(P), axis=1)
   seg = ok[:-1] & ok[1:]
@@ -147,8 +140,7 @@ def line3(x, y, z, color="k", lineWidth=0.5, **kw):
 def scatter3(x, y, z, s=36, c=None, *args, **kw):
   """scatter3(x, y, z, s, c): markers of area s in a 3D scene, in one colour or one each, as
   MATLAB's scatter3; 'filled' is accepted and markers are always filled"""
-  kw = {k.lower(): v for k, v in kw.items()}
-  c = kw.pop("color", c)
+  c = refuseVariants(kw).pop("color", c)
   P = np.column_stack([np.asarray(v, dtype=float).reshape(-1) for v in (x, y, z)])
   size = float(np.sqrt(np.mean(s)))
   if c is None:

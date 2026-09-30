@@ -148,7 +148,7 @@ plotSection(div(Omega), 'sigma', field=False)
 mtexColorMap('blue2red')
 mtexColorbar()
 hold(True)
-plot(Omega, add2all=True, linewidth=1, color='k')
+plot(Omega, add2all=True, lineWidth=1, color='k')
 hold(False)
 
 # Negative blue regions gain orientation density, while positive red regions lose it. The

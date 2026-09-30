@@ -45,7 +45,7 @@ CS = grains.CS
 plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
 
 hold(True)
-plot(grains[[42, 46]].boundary, edgecolor='w', linewidth=2)
+plot(grains[[42, 46]].boundary, edgeColor='w', lineWidth=2)
 hold(False)
 
 text(grains[[42, 46]], ['1', '2'])
@@ -123,16 +123,16 @@ m = Miller([[1, -1, 0, 0], [1, 1, -2, 0], [-1, 0, 1, 1], [0, 0, 0, 1]], CS)
 
 # plot the major planes of grain 2 in the frame of grain 1
 for im in range(len(m)):
-  plot(mori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), axisLabels=False, upper=True,
+  plot(mori * m[im].symmetrise(), markerSize=10, displayName=m[im].char('LaTex'), axisLabels=False, upper=True,
        textBelowMarker=True)
   hold(True)
 hold(False)
 
 # label the corresponding planes of grain 1
 mm = round(unique(mori * m.symmetrise(), symmetry=False), maxHKL=6)
-annotate(mm, labeled=True, MarkerSize=5, textBelowMarker=True)
+annotate(mm, labeled=True, markerSize=5, textBelowMarker=True)
 
-legend(location='southoutside', FontSize=13, numColumns=4)
+legend(location='southoutside', fontSize=13, numColumns=4)
 # -
 
 # Two pairs lie almost on top of each other: $\{11\bar20\}$ on $\{11\bar20\}$ and
@@ -176,15 +176,15 @@ coincidenceAngle
 # +
 # plot the approximation in place of the measured misorientation
 for im in range(len(m)):
-  plot(coincidenceMori * m[im].symmetrise(), MarkerSize=10, DisplayName=m[im].char('LaTex'), axisLabels=False, upper=True)
+  plot(coincidenceMori * m[im].symmetrise(), markerSize=10, displayName=m[im].char('LaTex'), axisLabels=False, upper=True)
   hold(True)
 hold(False)
 
 # label the corresponding planes in the other crystal
 mm = round(unique(coincidenceMori * m.symmetrise(), symmetry=False), maxHKL=6)
-annotate(mm, labeled=True, MarkerSize=5)
+annotate(mm, labeled=True, markerSize=5)
 
-legend(location='southoutside', FontSize=13, numColumns=4)
+legend(location='southoutside', fontSize=13, numColumns=4)
 # -
 
 # ## The Magnesium Extension Twin
@@ -235,7 +235,7 @@ isTwinning = angle(gB.misorientation, twinning) < 5 * degree
 # plot the grains and highlight candidate twin boundaries
 plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
 hold(True)
-plot(gB[isTwinning], edgecolor='w', linewidth=2)
+plot(gB[isTwinning], edgeColor='w', lineWidth=2)
 hold(False)
 # -
 

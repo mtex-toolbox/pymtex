@@ -115,7 +115,7 @@ mtexColorbar(title='directional magnitude')
 p = vector3d.Z
 nu = C.PoissonRatio(p)
 
-plotSection(nu, p, color='interp', linewidth=5)
+plotSection(nu, p, color='interp', lineWidth=5)
 plt.axis('off')
 mtexColorbar(title="Poisson's ratio")
 # -

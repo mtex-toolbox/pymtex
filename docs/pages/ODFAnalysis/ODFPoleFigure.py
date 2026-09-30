@@ -129,7 +129,7 @@ pdfPeak = calcPDF(odf, h[2])
 _, rPeak = max(pdfPeak)
 f = fibre(h[2], rPeak)
 
-plotFibre(odf, f, LineWidth=2, figSize='small')
+plotFibre(odf, f, lineWidth=2, figSize='small')
 # -
 
 # The line is the ODF density itself, not another projection. Its peaks locate the

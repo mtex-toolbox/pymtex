@@ -16,6 +16,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import fundamentalRegion
 from ..geometry.units import degree
+from .keywords import lineKeywords
 from .mtexfigure import figureSize, gcm, mtexFigure
 
 
@@ -30,13 +31,11 @@ def _lineAxes(figSize):
   return fig.nextAxis(), True
 
 
-def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBins=None, percent=False, DisplayName=None,
+def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBins=None, percent=False, displayName=None,
                           **kw):
   """plotAngleDistribution(mori), plotAngleDistribution(cs1, cs2), plotAngleDistribution(mdf)"""
   from ..functions.characteristics import calcAngleDistribution
-  for old, new in (("LineWidth", "linewidth"), ("lineWidth", "linewidth"), ("Color", "color")):
-    if old in kw:
-      kw[new] = kw.pop(old)
+  kw = lineKeywords(kw)
   ax, isNew = _lineAxes(figSize)
   bars = getattr(ax, "_mtexAngleBins", None)
   # bars and lines take the colours of MTEX's order one after the other, as in MATLAB
@@ -57,7 +56,7 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
       bins = bars
     d, _ = np.histogram(omega, bins)
     mid = (bins[:-1] + bins[1:]) / 2
-    label = DisplayName if DisplayName is not None else f"{obj.CS.mineral}-{obj.SS.mineral}"
+    label = displayName if displayName is not None else f"{obj.CS.mineral}-{obj.SS.mineral}"
     kw.setdefault("edgecolor", "k")
     kw.setdefault("linewidth", 0.5)
     h = ax.bar(mid / degree, 100 * d / np.sum(d), width=(bins[1] - bins[0]) / degree, label=label, **kw)
@@ -74,7 +73,7 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
     factor = 100 / (len(bars) - 1) if bars is not None else 100 if percent else 1
     unit = "%" if bars is not None or percent else "mrd"
     kw.setdefault("linewidth", 2)
-    h = ax.plot(omega / degree, factor * np.maximum(0, density), label=DisplayName, **kw)[0]
+    h = ax.plot(omega / degree, factor * np.maximum(0, density), label=displayName, **kw)[0]
   if isNew:
     ax.set_xlabel("Misorientation angle (degrees)")
     ax.set_ylabel(f"Frequency ({unit})")

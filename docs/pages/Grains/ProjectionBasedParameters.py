@@ -130,9 +130,9 @@ cMinPerp = testgrains.caliper('shortestPerp')
 # compare the three candidate long directions
 plot(testgrains, micronbar=False, lineWidth=2)
 hold(True)
-quiver(testgrains, cMax, DisplayName='longest caliper', lineWidth=3)
-quiver(testgrains, testgrains.longAxis(), DisplayName='long axis', lineWidth=3)
-quiver(testgrains, cMinPerp, DisplayName='perp. to shortest', lineWidth=3)
+quiver(testgrains, cMax, displayName='longest caliper', lineWidth=3)
+quiver(testgrains, testgrains.longAxis(), displayName='long axis', lineWidth=3)
+quiver(testgrains, cMinPerp, displayName='perp. to shortest', lineWidth=3)
 hold(False)
 plt.legend(loc='center right')
 # -
@@ -323,12 +323,12 @@ for name, mn, d in zip(pairName, surforMinimum, surforLongDirection):
 
 # +
 shapeF = characteristicShape(grains.boundary['Fo', 'Fo'])
-plot(shapeF, normalize=True, lineWidth=2, plain=True, DisplayName='Fo-Fo')
+plot(shapeF, normalize=True, lineWidth=2, plain=True, displayName='Fo-Fo')
 hold(True)
 shapeE = characteristicShape(grains.boundary['En', 'En'])
-plot(shapeE, normalize=True, lineWidth=2, plain=True, DisplayName='En-En')
+plot(shapeE, normalize=True, lineWidth=2, plain=True, displayName='En-En')
 shapeEF = characteristicShape(grains.boundary['En', 'Fo'])
-plot(shapeEF, normalize=True, lineWidth=2, plain=True, DisplayName='En-Fo')
+plot(shapeEF, normalize=True, lineWidth=2, plain=True, displayName='En-Fo')
 hold(False)
 
 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.02), ncols=3)

@@ -82,7 +82,7 @@ ori
 rPlane = ori * Miller(0, 1, 1, cs, 'hkl')
 rDirection = ori * Miller(1, 0, 0, cs, 'uvw')
 
-plot(cat(rPlane, rDirection), upper=True, grid=True, MarkerSize=10,
+plot(cat(rPlane, rDirection), upper=True, grid=True, markerSize=10,
      label=['(011)', '[100]'], backgroundColor='w', axisLabels=False)
 
 # Notice that the $(011)$ pole is at the centre, the specimen Z direction, while $[100]$

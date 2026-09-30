@@ -139,7 +139,7 @@ def test_plotSection_ofOrientationsOnAxisAngleSectionsWithAllOrThinned():
   # every orientation with all, once each on axis angle sections: those within the tolerance
   # of a section, and of them those whose axis the sector of the section still allows
   oS = axisAngleSections(cs, ss, sections=4)
-  h = plotSection(ori, oS, all=True, MarkerSize=2)
+  h = plotSection(ori, oS, all=True, markerSize=2)
   n = sum(len(x.get_offsets()) for x in h)
   assert 100 < n <= len(oS.sectionData(ori)[0]) <= 300
   h = plotSection(ori, oS, points=50)

@@ -59,10 +59,10 @@ cs
 cs_x2a = crystalFrame('321', [1.7, 1.7, 1.4], 'X||a', 'Z||c')
 
 plot(cs_x2a)
-annotate(cs_x2a.aAxis, MarkerFaceColor='r', label='a', backgroundColor='w')
-annotate(cs_x2a.bAxis, MarkerFaceColor='r', label='b', backgroundColor='w')
-annotate(-vector3d.Y, MarkerFaceColor='green', label='-y', backgroundColor='w')
-annotate(-vector3d.X, MarkerFaceColor='green', label='-x', backgroundColor='w')
+annotate(cs_x2a.aAxis, markerFaceColor='r', label='a', backgroundColor='w')
+annotate(cs_x2a.bAxis, markerFaceColor='r', label='b', backgroundColor='w')
+annotate(-vector3d.Y, markerFaceColor='green', label='-y', backgroundColor='w')
+annotate(-vector3d.X, markerFaceColor='green', label='-x', backgroundColor='w')
 
 # In this first plot, the red $\vec a$ marker lies at the right, opposite the green
 # $-\vec x$ marker at the left. This is the $X\parallel a$ alignment.
@@ -70,10 +70,10 @@ annotate(-vector3d.X, MarkerFaceColor='green', label='-x', backgroundColor='w')
 cs_y2a = crystalFrame('321', [1.7, 1.7, 1.4], 'Y||a', 'Z||c')
 
 plot(cs_y2a)
-annotate(cs_y2a.aAxis, MarkerFaceColor='r', label='a', backgroundColor='w')
-annotate(cs_y2a.bAxis, MarkerFaceColor='r', label='b', backgroundColor='w')
-annotate(-vector3d.Y, MarkerFaceColor='green', label='-y', backgroundColor='w')
-annotate(-vector3d.X, MarkerFaceColor='green', label='-x', backgroundColor='w')
+annotate(cs_y2a.aAxis, markerFaceColor='r', label='a', backgroundColor='w')
+annotate(cs_y2a.bAxis, markerFaceColor='r', label='b', backgroundColor='w')
+annotate(-vector3d.Y, markerFaceColor='green', label='-y', backgroundColor='w')
+annotate(-vector3d.X, markerFaceColor='green', label='-x', backgroundColor='w')
 
 # The red lattice-axis markers stay in the same screen positions, but the green Cartesian
 # markers move. Each crystal frame supplies a plotting convention that lays out a crystal
@@ -97,10 +97,10 @@ frameOffset
 cs_y2a.how2plot.east = cs_y2a.bAxis
 
 plot(cs_y2a)
-annotate(cs_y2a.aAxis, MarkerFaceColor='r', label='a', backgroundColor='w')
-annotate(cs_y2a.bAxis, MarkerFaceColor='r', label='b', backgroundColor='w')
-annotate(-vector3d.Y, MarkerFaceColor='green', label='-y', backgroundColor='w')
-annotate(-vector3d.X, MarkerFaceColor='green', label='-x', backgroundColor='w')
+annotate(cs_y2a.aAxis, markerFaceColor='r', label='a', backgroundColor='w')
+annotate(cs_y2a.bAxis, markerFaceColor='r', label='b', backgroundColor='w')
+annotate(-vector3d.Y, markerFaceColor='green', label='-y', backgroundColor='w')
+annotate(-vector3d.X, markerFaceColor='green', label='-x', backgroundColor='w')
 
 # The $\vec b$ marker now points east and the $\vec a$ marker has moved. Only the screen
 # layout changed; the $90^\circ$ frame offset above remains the same.
@@ -143,10 +143,10 @@ ori_y2a = orientation.byEuler(0, 0, 0, 'Bunge', cs_y2a)
 
 # +
 newMtexFigure(innerPlotSpacing=20)
-plotPDF(ori_x2a, Miller(1, 0, 0, cs_x2a), MarkerSize=20)
+plotPDF(ori_x2a, Miller(1, 0, 0, cs_x2a), markerSize=20)
 
 nextAxis()
-plotPDF(ori_y2a, Miller(1, 0, 0, cs_y2a), MarkerSize=20)
+plotPDF(ori_y2a, Miller(1, 0, 0, cs_y2a), markerSize=20)
 # -
 
 # The same indexed pole produces a pattern turned by $30^\circ$. This is the

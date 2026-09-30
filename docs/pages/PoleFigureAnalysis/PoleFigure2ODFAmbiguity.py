@@ -158,9 +158,9 @@ ori1 = orientation.byEuler(30 * degree, 60 * degree, 10 * degree, cs)
 ori2 = orientation.byEuler(30 * degree, 60 * degree, 100 * degree, cs)
 
 h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 2, 3]], cs)
-plotPDF(ori1, h, MarkerSize=12)
+plotPDF(ori1, h, markerSize=12)
 hold(True)
-plotPDF(ori2, h, MarkerSize=8)
+plotPDF(ori2, h, markerSize=8)
 hold(False)
 # -
 
@@ -169,9 +169,9 @@ hold(False)
 #
 # Now impose antipodal symmetry, as ordinary diffraction does.
 
-plotPDF(ori1, h, MarkerSize=12, antipodal=True)
+plotPDF(ori1, h, markerSize=12, antipodal=True)
 hold(True)
-plotPDF(ori2, h, MarkerSize=8, antipodal=True)
+plotPDF(ori2, h, markerSize=8, antipodal=True)
 hold(False)
 
 # Every small marker now lies inside a large marker. The measurement cannot distinguish
@@ -186,9 +186,9 @@ ori1.CS = ori1.CS.Laue()
 ori2.CS = ori2.CS.Laue()
 h.CS = h.CS.Laue()
 
-plotPDF(ori1, h, MarkerSize=12)
+plotPDF(ori1, h, markerSize=12)
 hold(True)
-plotPDF(ori2, h, MarkerSize=8)
+plotPDF(ori2, h, markerSize=8)
 hold(False)
 # -
 
@@ -235,7 +235,7 @@ plotPDF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs))
 # nothing here.
 
 plt.close('all')
-plotSpectrum(odf1, linewidth=2, figSize='small')
+plotSpectrum(odf1, lineWidth=2, figSize='small')
 
 # The spectrum falls rapidly towards zero by degree 10.
 #
@@ -247,7 +247,7 @@ A = np.arange(1, 12) % 2
 odf2 = conv(odf1, A)
 
 hold(True)
-plotSpectrum(odf2, linewidth=2, figSize='small')
+plotSpectrum(odf2, lineWidth=2, figSize='small')
 
 hold(False)
 plt.legend(['odf1', 'odf2'])
@@ -339,11 +339,11 @@ plt.legend(['odf rec1', 'odf rec2'])
 # Without correction, the recovered odd-degree coefficients are far too small.
 
 plt.close('all')
-plotSpectrum(odf1, linewidth=2, bandwidth=10, figSize='small')
+plotSpectrum(odf1, lineWidth=2, bandwidth=10, figSize='small')
 hold(True)
-plotSpectrum(odf2, linewidth=2)
-plotSpectrum(odf_rec1, linewidth=2)
-plotSpectrum(odf_rec2, linewidth=2)
+plotSpectrum(odf2, lineWidth=2)
+plotSpectrum(odf_rec1, lineWidth=2)
+plotSpectrum(odf_rec2, lineWidth=2)
 hold(False)
 plt.legend(['odf1', 'odf2', 'odf rec1', 'odf rec2'])
 
@@ -369,7 +369,7 @@ h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1], [2, 1, 1]], odf.CS)
 pf = calcPoleFigure(SantaFe(), h)
 
 # plot them
-plot(pf, MarkerSize=5)
+plot(pf, markerSize=5)
 # -
 
 # The four pole figures contain the projections that both reconstructions below must
@@ -416,16 +416,16 @@ mtexColorMap('white2black')
 # +
 plt.close('all')
 # the harmonic coefficients of the sample ODF
-plotSpectrum(SantaFe(), bandwidth=32, linewidth=2, MarkerSize=10, figSize='small')
+plotSpectrum(SantaFe(), bandwidth=32, lineWidth=2, markerSize=10, figSize='small')
 
 # keep plot for adding the next plots
 hold(True)
 
 # the harmonic coefficients of the reconstruction with ghost correction:
-plotSpectrum(rec, bandwidth=32, linewidth=2, MarkerSize=10)
+plotSpectrum(rec, bandwidth=32, lineWidth=2, markerSize=10)
 
 # the harmonic coefficients of the reconstruction without ghost correction:
-plotSpectrum(rec2, bandwidth=32, linewidth=2, MarkerSize=10)
+plotSpectrum(rec2, bandwidth=32, lineWidth=2, markerSize=10)
 
 plt.legend(['true ODF', 'with ghost correction', 'without ghost correction'])
 # next plot command overwrites plot

@@ -120,7 +120,7 @@ plotPDF(odf_true, h)
 # +
 r = equispacedS2Grid(resolution=15 * degree, maxTheta=80 * degree)
 
-plot(r, MarkerSize=12, upper=True)
+plot(r, markerSize=12, upper=True)
 # -
 
 # The points cover the accessible cap uniformly. The gaps between them are deliberately

@@ -66,7 +66,7 @@ for k2 in kappa:
     if k1 >= k2:
       bFun = S2FunBingham([-k1, -k2, 0])
       plot(bFun, colorRange=[0, 25], axisLabels=False)
-      mtexTitle(f'$\\kappa_1=${k1}  $\\kappa_2=${k2}', FontSize=12)
+      mtexTitle(f'$\\kappa_1=${k1}  $\\kappa_2=${k2}', fontSize=12)
     if k1 < kappa[-1] or k2 < kappa[-1]:
       nextAxis()
 setColorRange('equal')
@@ -91,7 +91,7 @@ sampleSize
 
 plot(bingFun)
 hold(True)
-plot(v, MarkerEdgeColor='k', MarkerFaceColor='gray', MarkerFaceAlpha=0.5)
+plot(v, markerEdgeColor='k', markerFaceColor='gray', markerFaceAlpha=0.5)
 hold(False)
 
 # The directions cluster around both antipodal maxima and spread farther along the broad
@@ -118,13 +118,13 @@ semiAxesDegrees
 # +
 plot(bingFunEst)
 hold(True)
-plot(v, MarkerEdgeColor='k', MarkerFaceColor='gray', MarkerFaceAlpha=0.5)
+plot(v, markerEdgeColor='k', markerFaceColor='gray', markerFaceAlpha=0.5)
 
 # mark one representative of the fitted modal axis
-annotate(bingFunEst.a[2], MarkerFaceColor='red', MarkerSize=10)
+annotate(bingFunEst.a[2], markerFaceColor='red', markerSize=10)
 
 # add the default p = 0.95 confidence ellipse
-ellipse(rot, ab[0], ab[1], linewidth=3, lineColor='k')
+ellipse(rot, ab[0], ab[1], lineWidth=3, lineColor='k')
 hold(False)
 # -
 

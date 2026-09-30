@@ -58,7 +58,7 @@ for name, hw in zip(kernelName, halfwidthInDegree):
 plt.figure(figsize=(10, 4.5), layout='constrained')
 hold(True)
 for kernel, name in zip(psi, kernelName):
-  plot(kernel, DisplayName=name)
+  plot(kernel, displayName=name)
 hold(False)
 plt.xlabel('angle from centre in degree')
 plt.ylabel('kernel value')
@@ -89,7 +89,7 @@ dirichletMinimum
 plt.figure(figsize=(10, 4.5), layout='constrained')
 hold(True)
 for kernel, name in zip(psi, kernelName):
-  plot(kernel.radon(), symmetric=True, DisplayName=name, linewidth=2)
+  plot(kernel.radon(), symmetric=True, displayName=name, lineWidth=2)
 hold(False)
 plt.ylim(-5, 20)
 plt.xlabel('angular distance in degree')
@@ -112,7 +112,7 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.figure(figsize=(7, 4.5), layout='constrained')
 hold(True)
 for kernel, name in zip(psi, kernelName):
-  plotSpectrum(kernel, bandwidth=32, linewidth=2, DisplayName=name)
+  plotSpectrum(kernel, bandwidth=32, lineWidth=2, displayName=name)
 hold(False)
 plt.xlabel('harmonic degree')
 plt.ylabel('radial coefficient')

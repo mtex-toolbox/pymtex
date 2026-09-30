@@ -107,7 +107,7 @@ mtexTitle('Values as radius and colour')
 # plane. The normal vector `N` selects that plane.
 
 N = zvector
-plotSection(sF2, N, color='interp', linewidth=10)
+plotSection(sF2, N, color='interp', lineWidth=10)
 mtexColorMap('spring')
 mtexTitle('Section in the xy plane')
 
@@ -119,7 +119,7 @@ mtexTitle('Section in the xy plane')
 # [plotSpectrum](S2FunHarmonic.plotSpektra.html) groups the spherical harmonic coefficients
 # by degree. This view describes frequency content rather than position on the sphere.
 
-plotSpectrum(sF1, FontSize=15, linewidth=2, figSize='small')
+plotSpectrum(sF1, fontSize=15, lineWidth=2, figSize='small')
 plt.xlim(0, 40)
 
 # Low degrees describe broad variation. The non-zero coefficients at higher degrees supply

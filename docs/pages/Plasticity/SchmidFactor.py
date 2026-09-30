@@ -31,9 +31,9 @@ cS = crystalShape.cube(cs)
 plot(cS, faceAlpha=0.5)
 hold(True)
 plot(cS, sS, faceColor='blue', label='b')
-arrow3d(0.4 * normalize(sS.n), faceColor='black', linewidth=2, label='n')
+arrow3d(0.4 * normalize(sS.n), faceColor='black', lineWidth=2, label='n')
 plottingConvention.default3D.setView()
-arrow3d(0.4 * normalize(r), faceColor='red', linewidth=2, label='r')
+arrow3d(0.4 * normalize(r), faceColor='red', lineWidth=2, label='r')
 hold(False)
 # -
 
@@ -124,7 +124,7 @@ for k in range(len(sSAll)):
   hold(True)
   plot(cS, sSAll[k], faceColor='blue')
   plottingConvention.default3D.setView()
-  arrow3d(0.4 * normalize(r), faceColor='red', linewidth=3)
+  arrow3d(0.4 * normalize(r), faceColor='red', lineWidth=3)
   hold(False)
 # -
 
@@ -213,7 +213,7 @@ grains = smoothBoundary(grains, 5)
 
 plot(ebsd, ebsd.orientations, micronbar='off')
 hold(True)
-plot(grains.boundary, linewidth=2)
+plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
@@ -238,7 +238,7 @@ sigma = stressTensor.uniaxial(vector3d.Z)
 SFSpecimen = sSLocal.SchmidFactor(sigma)
 SFMax, active = SFSpecimen.max(axis=1), SFSpecimen.argmax(axis=1)
 
-plot(grains, SFMax, micronbar='off', linewidth=2)
+plot(grains, SFMax, micronbar='off', lineWidth=2)
 mtexColorbar('southoutside')
 
 sigma
@@ -276,7 +276,7 @@ np.abs(SFCrystal - SFSpecimen).max()
 
 # +
 SFMax, active = SFCrystal.max(axis=1), SFCrystal.argmax(axis=1)
-plot(grains, SFMax, micronbar='off', linewidth=2)
+plot(grains, SFMax, micronbar='off', lineWidth=2)
 mtexColorbar('southoutside')
 
 sSActive = grains.meanOrientation * sS[active]

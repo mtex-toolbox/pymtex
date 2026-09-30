@@ -78,7 +78,7 @@ cK = HSVDirectionKey(wbvIntegral)
 alphaIntegral = np.minimum(np.nan_to_num(wbvIntegral.norm()) / 0.22, 1)
 
 newMtexFigure(layout=[1, 3], figSize='large')
-plot(ebsd, cK.direction2color(wbvIntegral), FaceAlpha=alphaIntegral)
+plot(ebsd, cK.direction2color(wbvIntegral), faceAlpha=alphaIntegral)
 mtexTitle('WBV in specimen coordinates')
 nextAxis()
 plot(cK, figSize='tiny')
@@ -99,9 +99,9 @@ mtexTitle('directional color key')
 cond = wbvIntegral.norm() > np.nanquantile(wbvIntegral.norm(), 0.85)
 
 newMtexFigure(layout=[1, 3], figSize='large')
-plot(ebsd, cK.direction2color(wbvIntegral), FaceAlpha=alphaIntegral)
+plot(ebsd, cK.direction2color(wbvIntegral), faceAlpha=alphaIntegral)
 hold(True)
-quiver(ebsd[cond], wbvIntegral[cond], color='k', autoScaleFactor=2, antipodal=True, linewidth=0.5)
+quiver(ebsd[cond], wbvIntegral[cond], color='k', autoScaleFactor=2, antipodal=True, lineWidth=0.5)
 hold(False)
 mtexTitle('strongest WBVs in specimen coordinates')
 nextAxis()
@@ -124,14 +124,14 @@ wbvCrystal = inv(ebsd.orientations) * wbvIntegral
 cKCrystal = HSVDirectionKey(wbvCrystal)
 
 newMtexFigure(layout=[1, 2])
-plot(ebsd, cKCrystal.direction2color(wbvCrystal), FaceAlpha=alphaIntegral)
+plot(ebsd, cKCrystal.direction2color(wbvCrystal), faceAlpha=alphaIntegral)
 mtexTitle('WBV in crystal coordinates')
 nextAxis()
 plot(cKCrystal)
 mtexTitle('directional color key')
 hold(True)
 plot(wbvCrystal, weights=wbvCrystal.norm(), contour=True, contours=np.arange(0.2, 2.01, 0.1), lineColor='k',
-     contourLabels=True, linewidth=2)
+     contourLabels=True, lineWidth=2)
 hold(False)
 # -
 
@@ -197,7 +197,7 @@ wbvGradientDefault = weightedBurgersVec(ebsd, 'gradient')
 
 cKGradient = HSVDirectionKey(wbvGradientDefault)
 plot(ebsd, cKGradient.direction2color(wbvGradientDefault),
-     FaceAlpha=np.minimum(np.nan_to_num(wbvGradientDefault.norm()) / 0.2, 1))
+     faceAlpha=np.minimum(np.nan_to_num(wbvGradientDefault.norm()) / 0.2, 1))
 mtexTitle('gradient WBV in specimen coordinates')
 nextAxis(1, 2)
 plot(wbvGradientDefault, weights=wbvGradientDefault.norm(), antipodal=True, contourf=True)

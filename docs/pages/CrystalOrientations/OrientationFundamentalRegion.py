@@ -41,7 +41,7 @@ plot(oR_all)
 
 rotZ = orientation.byAxisAngle(vector3d.Z, 180 * degree, cs)
 hold(True)
-plot(rotZ, MarkerColor='b', MarkerSize=10)
+plot(rotZ, markerFaceColor='b', markerSize=10)
 hold(False)
 
 # Add families about the x and y axes in steps of $30^\circ$.
@@ -51,8 +51,8 @@ rotX = orientation.byAxisAngle(vector3d.X, np.arange(-180, 181, 30) * degree, cs
 rotY = orientation.byAxisAngle(vector3d.Y, np.arange(-180, 181, 30) * degree, cs)
 
 hold(True)
-plot(rotX, MarkerColor='r', MarkerSize=10)
-plot(rotY, MarkerColor='g', MarkerSize=10)
+plot(rotX, markerFaceColor='r', markerSize=10)
+plot(rotY, markerFaceColor='g', markerSize=10)
 hold(False)
 # -
 
@@ -63,10 +63,10 @@ hold(False)
 #
 # Sections of constant rotation angle are a flat view of the same geometry.
 
-plotSection(rotZ, 'axisAngle', np.arange(30, 181, 30) * degree, MarkerColor='b')
+plotSection(rotZ, 'axisAngle', np.arange(30, 181, 30) * degree, markerFaceColor='b')
 hold(True)
-plot(rotX, MarkerColor='g', add2all=True)
-plot(rotY, MarkerColor='r', add2all=True)
+plot(rotX, markerFaceColor='g', add2all=True)
+plot(rotY, markerFaceColor='r', add2all=True)
 hold(False)
 
 # Notice that each x- and y-axis family passes through the same point at zero angle. At
@@ -145,7 +145,7 @@ ori = ori.project2FundamentalRegion(center)
 # retain those explicit representatives when plotting
 plot(ori, 'axisAngle', ignoreFundamentalRegion=True, all=True)
 hold(True)
-plot(center, MarkerFaceColor='r', MarkerSize=20)
+plot(center, markerFaceColor='r', markerSize=20)
 hold(False)
 
 # maximum angular distance from the mean, in degrees

@@ -46,7 +46,7 @@ equiGrid
 # $5^\circ$ resolution. An axis--angle plot shows the nodes throughout the cubic
 # fundamental region.
 
-plot(equiGrid, 'axisAngle', all=True, MarkerSize=2)
+plot(equiGrid, 'axisAngle', all=True, markerSize=2)
 
 # The point cloud has no large empty patch or concentrated band. Its visual density still
 # changes under axis--angle coordinates, so this plot alone cannot establish equal volume
@@ -64,7 +64,7 @@ gridCounts
 # The two entries are 4923 and 24624. Thus the regular grid has five times as many
 # orientations at the same nominal resolution.
 
-plot(regularGrid, 'axisAngle', all=True, MarkerSize=1)
+plot(regularGrid, 'axisAngle', all=True, markerSize=1)
 
 # Lines and dense bands remain visible after transformation from Euler angles to
 # axis--angle coordinates. They are the signature of regular coordinate steps, not extra
@@ -147,9 +147,9 @@ localCount, maxLocalAngle
 # shell is $8.75^\circ$ from the centre, half a resolution step inside the requested
 # $10^\circ$ radius.
 
-plot(localGrid, angle(localGrid, center) / degree, 'axisAngle', all=True, MarkerSize=4)
+plot(localGrid, angle(localGrid, center) / degree, 'axisAngle', all=True, markerSize=4)
 hold(True)
-plot(center, MarkerFaceColor='r', MarkerSize=10)
+plot(center, markerFaceColor='r', markerSize=10)
 hold(False)
 mtexColorbar(title='angle to centre in degree')
 

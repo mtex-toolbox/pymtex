@@ -168,7 +168,7 @@ for i in range(3):
 
 plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations)
 hold(True)
-plot(grains.boundary, linewidth=1.5)
+plot(grains.boundary, lineWidth=1.5)
 hold(False)
 
 # ## Names that changed

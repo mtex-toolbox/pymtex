@@ -13,6 +13,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
 from .sphericalplot import (FILL_FLAGS, fillFlag, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
@@ -230,7 +231,7 @@ def annotateSection(ori, *args, **kw):
   oS = _currentSections()
   kw.pop("add2all", None)
   values = next((a for a in args if not isinstance(a, str)), None)
-  kw.setdefault("MarkerSize", 8)
+  kw.setdefault("markerSize", 8)
   return _plotSectionOri(ori, oS, values=values, all=True, onto=True, **kw)
 
 
@@ -238,12 +239,11 @@ def plotFibreSection(f, points=1000, lineColor="k", **kw):
   """plot(f) on a section plot: the fibre as a chain of dots through the sections"""
   oS = _currentSections()
   kw.pop("add2all", None)
-  for k in ("lineWidth", "LineWidth", "linewidth"):
-    kw.pop(k, None)
+  kw.pop("lineWidth", None)
   ori = f.flatten().orientation(points) if hasattr(f, "flatten") else f.orientation(points)
-  kw.setdefault("MarkerSize", 1.5)
-  kw.setdefault("MarkerFaceColor", lineColor)
-  kw.setdefault("MarkerEdgeColor", lineColor)
+  kw.setdefault("markerSize", 1.5)
+  kw.setdefault("markerFaceColor", lineColor)
+  kw.setdefault("markerEdgeColor", lineColor)
   return _plotSectionOri(ori, oS, all=True, onto=True, **kw)
 
 
@@ -254,7 +254,7 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
   from ..geometry.quaternion import quaternion
   if not isinstance(ori, quaternion):
     from .polarplot import quiverSectionS2
-    return quiverSectionS2(ori, w, *args, color=color, lineWidth=kw.pop("linewidth", lineWidth), **kw)
+    return quiverSectionS2(ori, w, *args, color=color, lineWidth=lineWidth, **kw)
   oS = _currentSections()
   projKw, axesKw, whereKw = _split(kw)
   lineWidth = kw.pop("lineWidth", lineWidth)
@@ -279,7 +279,7 @@ def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degre
   from ..geometry.grids.s2grid import equispacedS2Grid
   from ..geometry.kernels import qmul
   from .sections import eulerSections, pfSections
-  lineWidth = kw.pop("linewidth", kw.pop("LineWidth", lineWidth))
+  refuseVariants(kw)
   oS = next((a for a in args if isinstance(a, ODFSections)), None)
   held = gcm()
   if oS is None:
@@ -404,7 +404,7 @@ def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, c
 
 
 def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=None, points=2000, all=False,
-                    field=True, MarkerSize=4, onto=False, add2all=False, **kw):
+                    field=True, markerSize=4, onto=False, add2all=False, **kw):
   projKw, axesKw, whereKw = _split(kw)
   ori, values = _thinned(ori, values, points, all)
   # add2all draws into the sections already there, as MATLAB's flag does
@@ -423,9 +423,9 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
     vals = None if values is None else values[src[ind]]
     for sP in cell:
       if rgb:
-        hs.append(_markers(sP, dirs, rgb=vals, MarkerSize=MarkerSize, **kw))
+        hs.append(_markers(sP, dirs, rgb=vals, markerSize=markerSize, **kw))
       else:
-        hs.append(_markers(sP, dirs, vals, colorRange=colorRange, MarkerSize=MarkerSize, **kw))
+        hs.append(_markers(sP, dirs, vals, colorRange=colorRange, markerSize=markerSize, **kw))
   if colorbar and values is not None and not rgb:
     fig.colorbar()
   return hs

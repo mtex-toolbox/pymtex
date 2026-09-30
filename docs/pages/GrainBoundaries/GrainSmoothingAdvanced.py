@@ -29,7 +29,7 @@ colorKey = ipfColorKey(indexed)
 ipfColors = colorKey.orientation2color(indexed.orientations)
 plot(indexed, ipfColors, micronbar='off', region=[313, 353, 140, 156])
 hold(True)
-plot(grains.boundary['indexed'], linewidth=5, linecolor='YellowGreen')
+plot(grains.boundary['indexed'], lineWidth=5, lineColor='YellowGreen')
 hold(False)
 # -
 
@@ -50,9 +50,9 @@ hold(False)
 # +
 grainsSimple = simplifyBoundary(grains, d / np.sqrt(2))
 
-plot(grains.boundary, linewidth=5, linecolor='YellowGreen', micronbar='off', region=[313, 353, 140, 156])
+plot(grains.boundary, lineWidth=5, lineColor='YellowGreen', micronbar='off', region=[313, 353, 140, 156])
 hold(True)
-plot(grainsSimple.boundary, linewidth=2, linecolor='Fuchsia')
+plot(grainsSimple.boundary, lineWidth=2, lineColor='Fuchsia')
 hold(False)
 # -
 
@@ -88,9 +88,9 @@ print(f'resampling at {d:.2f} {grains.scanUnit} puts them back: {len(grainsSimpl
 # +
 grainsSmooth = smoothBoundary(grainsRefined, 5, simplify=False, refine=False)
 
-plot(grains.boundary, linewidth=5, linecolor='YellowGreen', micronbar='off', region=[313, 353, 140, 156])
+plot(grains.boundary, lineWidth=5, lineColor='YellowGreen', micronbar='off', region=[313, 353, 140, 156])
 hold(True)
-plot(grainsSmooth.boundary, linewidth=2, linecolor='Fuchsia')
+plot(grainsSmooth.boundary, lineWidth=2, lineColor='Fuchsia')
 hold(False)
 # -
 
@@ -188,11 +188,11 @@ A = grains.area
 gid = int(np.argmin(np.abs(A - 30)))
 c = grains[gid].centroid
 
-plot(grains.boundary, linewidth=4, linecolor='LightGray', micronbar='off',
+plot(grains.boundary, lineWidth=4, lineColor='LightGray', micronbar='off',
      region=[c.x[0] - 12, c.x[0] + 12, c.y[0] - 12, c.y[0] + 12])
 hold(True)
-plot(smoothBoundary(grains, 25).boundary, linewidth=2.5, linecolor='Fuchsia')
-plot(smoothBoundary(grains, taubinFilter(25)).boundary, linewidth=2.5, linecolor='DodgerBlue')
+plot(smoothBoundary(grains, 25).boundary, lineWidth=2.5, lineColor='Fuchsia')
+plot(smoothBoundary(grains, taubinFilter(25)).boundary, lineWidth=2.5, lineColor='DodgerBlue')
 hold(False)
 # -
 
@@ -261,11 +261,11 @@ iterations = [1, 5, 10, 25]
 color = plt.get_cmap('copper')(np.linspace(0, 1, len(iterations) + 1))
 direction = []
 
-plot(grains.boundary, linewidth=1, linecolor='LightGray', micronbar='off', region=[313, 353, 140, 156])
+plot(grains.boundary, lineWidth=1, lineColor='LightGray', micronbar='off', region=[313, 353, 140, 156])
 for i, n in enumerate(iterations):
   gs = smoothBoundary(grains, n, moveTriplePoints=True)
   hold(True)
-  plot(gs.boundary['i', 'i'], linewidth=2, linecolor=color[i])
+  plot(gs.boundary['i', 'i'], lineWidth=2, lineColor=color[i])
   direction.append(gs.boundary['i', 'i'].direction)
 hold(False)
 mtexTitle('1, 5, 10, and 25 iterations: dark to light')

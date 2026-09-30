@@ -56,19 +56,19 @@ oriChild
 
 # +
 # (110) / (0001) pole figure
-plotPDF(oriParent, Miller(1, 1, 0, csBeta), MarkerSize=20, MarkerFaceColor='none', linewidth=4, layout=[1, 2])
+plotPDF(oriParent, Miller(1, 1, 0, csBeta), markerSize=20, markerFaceColor='none', lineWidth=4, layout=[1, 2])
 hold(True)
-plot(oriChild.symmetrise() * Miller(0, 0, 0, 1, csAlpha), MarkerSize=12)
+plot(oriChild.symmetrise() * Miller(0, 0, 0, 1, csAlpha), markerSize=12)
 xlabel(Miller(0, 0, 0, 1, csAlpha).char(), color=ind2color(2))
 hold(False)
 
 # [111] / [2-1-10] pole figure
 nextAxis(2)
-plotPDF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', MarkerSize=20, MarkerFaceColor='none', linewidth=4)
+plotPDF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', markerSize=20, markerFaceColor='none', lineWidth=4)
 
 dAlpha = Miller(2, -1, -1, 0, csAlpha, 'uvw')
 hold(True)
-plot(oriChild.symmetrise() * dAlpha, MarkerSize=12)
+plot(oriChild.symmetrise() * dAlpha, markerSize=12)
 xlabel(dAlpha.char(), color=ind2color(2))
 hold(False)
 gcm().drawNow()
@@ -116,7 +116,7 @@ plotIPDF(oriChild, vector3d.Z)
 oriChild = variants(beta2alpha, oriParent)
 
 for i in range(1, 13):
-  plotIPDF(oriChild[i - 1], ind2color(i), vector3d.Z, label=i, MarkerEdgeColor='k')
+  plotIPDF(oriChild[i - 1], ind2color(i), vector3d.Z, label=i, markerEdgeColor='k')
   hold(True)
 hold(False)
 # -

@@ -255,10 +255,10 @@ gbfun_fofo = calcDensity(grains.boundary['fo', 'fo'].direction.rho, weights=grai
 gbfun_foen = calcDensity(grains.boundary['fo', 'en'].direction.rho, weights=grains.boundary['fo', 'en'].segLength, periodic=True, antipodal=True)
 gbfun_enen = calcDensity(grains.boundary['en', 'en'].direction.rho, weights=grains.boundary['en', 'en'].segLength, periodic=True, antipodal=True)
 
-plot(gbfun_fofo, DisplayName='Forsterite-Forsterite', lineWidth=2)
+plot(gbfun_fofo, displayName='Forsterite-Forsterite', lineWidth=2)
 hold(True)
-plot(gbfun_foen, DisplayName='Forsterite-Enstatite', lineWidth=2)
-plot(gbfun_enen, DisplayName='Enstatite-Enstatite', lineWidth=2)
+plot(gbfun_foen, displayName='Forsterite-Enstatite', lineWidth=2)
+plot(gbfun_enen, displayName='Enstatite-Enstatite', lineWidth=2)
 hold(False)
 
 plt.legend(loc='center left', bbox_to_anchor=(1.1, 0.5))

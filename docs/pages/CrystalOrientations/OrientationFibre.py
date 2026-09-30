@@ -56,12 +56,12 @@ segmentFibre
 #
 # The default three-dimensional orientation plot uses Bunge Euler coordinates.
 
-plot(segmentFibre, DisplayName='Fibre segment', lineWidth=4, lineColor='green')
+plot(segmentFibre, displayName='Fibre segment', lineWidth=4, lineColor='green')
 hold(True)
-plot(ori1, DisplayName='Cube', MarkerSize=12, MarkerFaceColor='darkred', MarkerEdgeColor='k')
-plot(ori2, DisplayName='Goss', MarkerSize=12, MarkerFaceColor='blue', MarkerEdgeColor='k')
+plot(ori1, displayName='Cube', markerSize=12, markerFaceColor='darkred', markerEdgeColor='k')
+plot(ori2, displayName='Goss', markerSize=12, markerFaceColor='blue', markerEdgeColor='k')
 hold(False)
-legend(Location='northwest')
+legend(location='northwest')
 
 # The green line runs from the dark-red Cube marker to the blue Goss marker. It looks
 # straight because only $\Phi$ changes for this pair. In general, a shortest angular path
@@ -71,8 +71,8 @@ legend(Location='northwest')
 
 plot(segmentFibre, 'axisAngle', lineColor='green', lineWidth=6)
 hold(True)
-plot(ori1, 'axisAngle', MarkerFaceColor='darkred', MarkerSize=15)
-plot(ori2, 'axisAngle', MarkerFaceColor='blue', MarkerSize=15)
+plot(ori1, 'axisAngle', markerFaceColor='darkred', markerSize=15)
+plot(ori2, 'axisAngle', markerFaceColor='blue', markerSize=15)
 hold(False)
 
 # This is the same orientation-space segment in different coordinates. The endpoints and
@@ -209,16 +209,16 @@ beta = fibre.beta(cs, ss)
 # Plot the conventional endpoint segment returned by each constructor. Passing
 # `full=True` would extend that segment around its entire direction-pair circle.
 
-plot(fibre.alpha(cs, ss), lineWidth=3, lineColor=ind2color(1), DisplayName='alpha')
+plot(fibre.alpha(cs, ss), lineWidth=3, lineColor=ind2color(1), displayName='alpha')
 hold(True)
-plot(fibre.beta(cs, ss), lineWidth=3, lineColor=ind2color(2), DisplayName='beta')
-plot(fibre.gamma(cs, ss), lineWidth=3, lineColor=ind2color(3), DisplayName='gamma')
-plot(fibre.epsilon(cs, ss), lineWidth=3, lineColor=ind2color(4), DisplayName='epsilon')
-plot(fibre.eta(cs, ss), lineWidth=3, lineColor=ind2color(5), DisplayName='eta')
-plot(fibre.tau(cs, ss), lineWidth=3, lineColor=ind2color(6), DisplayName='tau')
-plot(fibre.theta(cs, ss), lineWidth=3, lineColor=ind2color(7), DisplayName='theta')
+plot(fibre.beta(cs, ss), lineWidth=3, lineColor=ind2color(2), displayName='beta')
+plot(fibre.gamma(cs, ss), lineWidth=3, lineColor=ind2color(3), displayName='gamma')
+plot(fibre.epsilon(cs, ss), lineWidth=3, lineColor=ind2color(4), displayName='epsilon')
+plot(fibre.eta(cs, ss), lineWidth=3, lineColor=ind2color(5), displayName='eta')
+plot(fibre.tau(cs, ss), lineWidth=3, lineColor=ind2color(6), displayName='tau')
+plot(fibre.theta(cs, ss), lineWidth=3, lineColor=ind2color(7), displayName='theta')
 hold(False)
-legend(Location='best')
+legend(location='best')
 
 # The coloured curves occupy different routes through Euler space and meet at some shared
 # ideal components. Each colour marks only the conventional named segment, not every point

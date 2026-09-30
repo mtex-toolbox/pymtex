@@ -53,7 +53,7 @@ preferredOrientation
 # on pole figures calculated from the measured ODF.
 
 plotPDF(odfMeasured, pf.allH, antipodal=True, superposition=pf.c)
-annotate(preferredOrientation, marker='s', MarkerFaceColor='black')
+annotate(preferredOrientation, marker='s', markerFaceColor='black')
 mtexColorbar(title='mrd')
 
 # In this example the markers lie in the strongest pole-density regions. That agreement is

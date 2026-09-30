@@ -64,7 +64,7 @@ print(numChildTriplePoints)
 
 plot(grains.boundary, lineColor=[0.55, 0.55, 0.55], region=[600, 700, 500, 600], figSize='large')
 hold(True)
-plot(childTriplePoints, color='red', MarkerSize=5, region=[600, 700, 500, 600])
+plot(childTriplePoints, color='red', markerSize=5, region=[600, 700, 500, 600])
 hold(False)
 # -
 

@@ -271,7 +271,7 @@ hold(False)
 
 # +
 selectedChildOri = ebsd[boundaryParentEBSD.grainId == selectedParentId].orientations
-plotPDF(selectedChildOri, Miller(0, 0, 1, csBCC), MarkerSize=3)
+plotPDF(selectedChildOri, Miller(0, 0, 1, csBCC), markerSize=3)
 
 hold(True)
 selectedParentOri = selectedParent.meanOrientation
@@ -371,7 +371,7 @@ print(tripleFitQuantiles)
 plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
 hold(True)
 plot(grains.boundary, lineWidth=2)
-plot(tP, tripleFit / degree, MarkerEdgeColor='k', MarkerSize=8)
+plot(tP, tripleFit / degree, markerEdgeColor='k', markerSize=8)
 hold(False)
 
 setColorRange([0, 5])

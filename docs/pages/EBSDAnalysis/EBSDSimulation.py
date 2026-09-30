@@ -127,7 +127,7 @@ print(f'Inner boundary: {len(boundaryAngle)} segments; mean {boundaryAngle.mean(
 nextAxis()
 plot(grains)
 hold(True)
-plot(stepBoundary, boundaryAngle, linewidth=3)
+plot(stepBoundary, boundaryAngle, lineWidth=3)
 hold(False)
 setColorRange([2.75, 3.25])
 mtexColorbar(title='boundary angle in degree')
