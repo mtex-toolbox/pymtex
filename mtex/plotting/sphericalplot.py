@@ -644,7 +644,8 @@ def plot(v, *args, **kw):
     from .sectionplot import plotFibreSection
     return plotFibreSection(v, *args, **kw)
   from ..geometry.quaternion import quaternion
-  if isinstance(v, (fibre, quaternion)):
+  from ..geometry.orientationregion import orientationRegion
+  if isinstance(v, (fibre, quaternion, orientationRegion)):
     from .spaceplot import plot3d
     return plot3d(v, *args, **kw)
   # a function on the circle and a characteristic shape are polar lines
