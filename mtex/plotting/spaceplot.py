@@ -17,7 +17,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .colormaps import mtexColormap
-from .keywords import refuseVariants
+from .keywords import patchKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
 from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
@@ -730,7 +730,7 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
     faces += [[c1[i], c1[j[i]], c2[j[i]], c2[i]] for i in k]
     faces += [[c2[i], c2[j[i]], tip] for i in k]
     faces.append(list(c0[::-1]))
-  poly = Poly3DCollection(faces, facecolors=to_rgba(faceColor), shade=True, **kw)
+  poly = Poly3DCollection(faces, facecolors=to_rgba(faceColor), shade=True, **patchKeywords(kw))
   if edgeColor != "none":
     poly.set_edgecolor(edgeColor)
   sP.ax.add_collection3d(poly)

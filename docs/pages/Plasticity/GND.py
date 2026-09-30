@@ -59,7 +59,7 @@ hold(False)
 axisKey = axisAngleColorKey(ebsd)
 axisKey.oriRef = grains['id', ebsd['indexed'].grainId].meanOrientation
 
-plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronBar='off', figSize='medium')
+plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronbar='off', figSize='medium')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -74,7 +74,7 @@ F = halfQuadraticFilter()
 ebsd = smooth(ebsd, F, fill=grains)
 
 axisKey.oriRef = grains['id', ebsd['indexed'].grainId].meanOrientation
-plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronBar='off', figSize='medium')
+plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronbar='off', figSize='medium')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -156,7 +156,7 @@ newMtexFigure(layout=[3, 3], figSize='large')
 for i in range(3):
   for j in range(3):
     nextAxis(i + 1, j + 1)
-    plot(ebsd, kappaMeasured.M[..., i, j], micronBar='off')
+    plot(ebsd, kappaMeasured.M[..., i, j], micronbar='off')
     hold(True)
     plot(grains.boundary, lineWidth=2)
     hold(False)
@@ -255,7 +255,7 @@ newMtexFigure(layout=[3, 3], figSize='large')
 for i in range(3):
   for j in range(3):
     nextAxis(i + 1, j + 1)
-    plot(ebsd, kappaFitted.M[..., i, j], micronBar='off')
+    plot(ebsd, kappaFitted.M[..., i, j], micronbar='off')
     hold(True)
     plot(grains.boundary, lineWidth=2)
     hold(False)

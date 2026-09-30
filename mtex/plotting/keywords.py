@@ -28,3 +28,14 @@ def lineKeywords(kw):
   """the keywords of a line for matplotlib, their MTEX spelling checked first"""
   refuseVariants(kw)
   return {_LINE.get(k, k): v for k, v in kw.items()}
+
+
+# the properties of a patch or a collection in matplotlib's spelling
+_PATCH = {"lineWidth": "linewidth", "lineStyle": "linestyle", "lineColor": "edgecolor", "edgeColor": "edgecolor",
+          "faceColor": "facecolor", "displayName": "label"}
+
+
+def patchKeywords(kw):
+  """the keywords of a patch or a collection for matplotlib, their MTEX spelling checked first"""
+  refuseVariants(kw)
+  return {_PATCH.get(k, k): v for k, v in kw.items()}

@@ -1,7 +1,7 @@
 # the one spelling of the style keywords of the plots (mtex/plotting/keywords.py)
 import pytest
 
-from mtex.plotting.keywords import lineKeywords, refuseVariants
+from mtex.plotting.keywords import lineKeywords, patchKeywords, refuseVariants
 
 
 def test_a_style_keyword_in_MTEX_spelling_passes():
@@ -25,3 +25,7 @@ def test_MTEX_marker_color_is_the_marker_face_color():
 
 def test_lineKeywords_hands_the_properties_of_a_line_to_matplotlib():
   assert lineKeywords({"lineWidth": 2, "displayName": "a", "color": "k"}) == {"linewidth": 2, "label": "a", "color": "k"}
+
+
+def test_patchKeywords_hands_the_properties_of_a_patch_to_matplotlib():
+  assert patchKeywords({"lineWidth": 2, "faceColor": "r"}) == {"linewidth": 2, "facecolor": "r"}
