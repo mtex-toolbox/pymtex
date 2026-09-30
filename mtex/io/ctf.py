@@ -1,7 +1,7 @@
 # the Oxford/Channel .ctf text format (MATLAB loadEBSD_ctf, Julia ctf.jl)
 #
-#   ebsd = loadEBSD_ctf('map.ctf')                      a half turn about z, the tilt of the surface undone
-#   ebsd = loadEBSD_ctf('map.ctf', eulerCorrection=r)   the alignment stated outright
+#   ebsd = loadEBSD('map.ctf')                      a half turn about z, the tilt of the surface undone
+#   ebsd = loadEBSD('map.ctf', eulerCorrection=r)   the alignment stated outright
 #
 # A header of tab separated key and value lines, a "Phases n" line followed by one line per
 # phase, then a line naming the columns and the numeric table. Unlike an .ang the columns
@@ -75,15 +75,14 @@ def oxfordCorrection(acq):
   return half
 
 
-def loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
-  """the Oxford/Channel map of a .ctf file
-
-    loadEBSD_ctf('map.ctf')                        the Euler angles half a turn about z from the map
-    loadEBSD_ctf('map.ctf', eulerCorrection=rot)   the alignment stated outright
-
-  A stated acquisition surface with a tilt is undone before the half turn, with a warning;
-  the surface is kept in ebsd.meta['surface'].
-  """
+# the Oxford/Channel map of a .ctf file
+#
+#   loadEBSD('map.ctf')                        the Euler angles half a turn about z from the map
+#   loadEBSD('map.ctf', eulerCorrection=rot)   the alignment stated outright
+#
+# A stated acquisition surface with a tilt is undone before the half turn, with a warning;
+# the surface is kept in ebsd.meta['surface'].
+def _loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   data = readFile(fname)
   if b"Channel Text File" not in data[:200].split(b"\n")[0]:
     raise ValueError(f"{fname} does not begin with the Channel Text File marker")
@@ -128,4 +127,4 @@ def loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
                          meta=meta, shift=0, unitCell=unitCell, scanGrid=scanGrid)
 
 
-__all__ = ["loadEBSD_ctf"]
+__all__ = []

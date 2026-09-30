@@ -1,8 +1,8 @@
 # a table whose columns the caller names, or the file itself (MATLAB loadEBSD_generic, Julia loadEBSDTable)
 #
-#   ebsd = loadEBSD_generic('map.txt', CS, columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3', 'phase'])
-#   ebsd = loadEBSD_generic('map.txt', CS)                 the columns named by the line above the numbers
-#   ebsd = loadEBSD_generic('map.txt', CS, 'ABG', radians=True, columns=[1, 2, 4, 5, 6, 3])
+#   ebsd = loadEBSD('map.txt', CS, columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3', 'phase'])
+#   ebsd = loadEBSD('map.txt', CS)                 the columns named by the line above the numbers
+#   ebsd = loadEBSD('map.txt', CS, 'ABG', radians=True, columns=[1, 2, 4, 5, 6, 3])
 #
 # The names x, y, phase and the three Euler angles are the map; every other name is a
 # property under that name, lowercased. MTEX opens the import wizard where no names are
@@ -42,21 +42,20 @@ def tableColumns(head):
   return names if "x" in names and "y" in names else None
 
 
-def loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
-                     eulerCorrection=None, frame=None, scanUnit="um", replaceExpr=None):
-  """the map a column oriented text file holds
-
-    loadEBSD_generic('map.txt', CS, columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3', 'phase'])
-    loadEBSD_generic('map.txt', CS)                           the names read off the line above the block
-    loadEBSD_generic('map.txt', CS, 'ABG', radians=True)      the Euler convention, the unit
-    loadEBSD_generic('map.txt', CS, columns=[0, 1, 4, 5, 6])  the columns named, counted from zero
-
-  CS is a crystalFrame or the list a phase number selects, the not indexed one first; a file
-  with no phase column holds one phase. header is the number of lines above the block,
-  delimiter what separates the numbers where it is not blank space, replaceExpr a list of
-  (text, replacement) pairs applied to the file first, for a file that spells a missing
-  value in words.
-  """
+# the map a column oriented text file holds
+#
+#   loadEBSD('map.txt', CS, columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3', 'phase'])
+#   loadEBSD('map.txt', CS)                           the names read off the line above the block
+#   loadEBSD('map.txt', CS, 'ABG', radians=True)      the Euler convention, the unit
+#   loadEBSD('map.txt', CS, columns=[0, 1, 4, 5, 6])  the columns named, counted from zero
+#
+# CS is a crystalFrame or the list a phase number selects, the not indexed one first; a file
+# with no phase column holds one phase. header is the number of lines above the block,
+# delimiter what separates the numbers where it is not blank space, replaceExpr a list of
+# (text, replacement) pairs applied to the file first, for a file that spells a missing
+# value in words.
+def _loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
+                      eulerCorrection=None, frame=None, scanUnit="um", replaceExpr=None):
   if CS is None:
     raise ValueError("a table states no crystal frame; pass the phases as loadEBSD(path, cs) or loadEBSD(path, [cs1, cs2])")
   phases = CS if isinstance(CS, phaseList) else phaseList([CS] if isinstance(CS, referenceFrame) else list(CS))
@@ -65,7 +64,7 @@ def loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=F
     if isinstance(a, str):
       convention = a
     else:
-      raise TypeError(f"loadEBSD_generic does not understand the argument {a!r}")
+      raise TypeError(f"_loadEBSD_generic does not understand the argument {a!r}")
   data = readFile(fname)
   for old, new in (replaceExpr or []):
     data = data.replace(old.encode(), new.encode())
@@ -100,4 +99,4 @@ def loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=F
                          shift=0 if "phase" not in at else None)
 
 
-__all__ = ["loadEBSD_generic"]
+__all__ = []

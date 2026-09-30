@@ -5,7 +5,7 @@ import pytest
 
 import mtex
 from mtex import crystalFrame, degree, loadEBSD, rotation, vector3d
-from mtex.io.ang import angHeader, angIsACOM, angIsEMSphInx, angMineral, angPhases, eulerCorrectionRotation, loadEBSD_ang
+from mtex.io.ang import angHeader, angIsACOM, angIsEMSphInx, angMineral, angPhases, eulerCorrectionRotation, _loadEBSD_ang
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -187,7 +187,7 @@ def test_a_header_without_phase_numbers(tmp_path):
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "ferrite.ang")), reason="the MTEX data folder is not here")
 def test_full_ferrite_matches_mtex():
-  e = loadEBSD_ang(os.path.join(DATA, "ferrite.ang"))
+  e = _loadEBSD_ang(os.path.join(DATA, "ferrite.ang"))
   assert len(e) == 63045
   assert int(e.isIndexed.sum()) == 63044
   assert np.allclose(firstEuler(e), [27.6983, 113.4183, 92.6414], atol=1e-3)

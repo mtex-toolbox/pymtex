@@ -155,15 +155,15 @@ mtexColorbar()
 # and then the generic reader. Its reference page is version-specific. So are the reader
 # functions in `mtex/io/loadpolefigure.py`.
 #
-# A format-specific reader is an ordinary function named `loadPoleFigure_name` that
+# A format-specific reader is an ordinary function, `_loadPoleFigure_name` by the convention of that module, that
 # returns a `PoleFigure` object. Register it in the loader table of that module and call
 #
 #     pf = PoleFigure.load(fname, ..., interface='name')
 #
-# during development. The [loadPoleFigure_dubna](loadPoleFigure_dubna.html) reader is a
-# compact format-specific template. The
-# [loadPoleFigure_generic](loadPoleFigure_generic.html) reader is the corresponding
-# generic template.
+# during development. The [Dubna reader](loadPoleFigure_dubna.html) in
+# `mtex/io/loadpolefigure.py` is a compact format-specific template, the
+# [generic reader](loadPoleFigure_generic.html) beside it the corresponding generic
+# template.
 
 # ## Before reconstructing an ODF
 #

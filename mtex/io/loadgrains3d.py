@@ -6,7 +6,7 @@
 #
 # DREAM.3D writes its feature quaternions as (x, y, z, w) of the passive rotation: the rotation
 # of a grain is (w, -x, -y, -z), as the Euler angles of its voxels give it. MATLAB's
-# loadGrains_Dream3d reads them as (w, x, y, z) in the order (x, y, z, w) and so turns every
+# _loadGrains_Dream3d reads them as (w, x, y, z) in the order (x, y, z, w) and so turns every
 # grain away from its voxels; this reader takes the voxels' side.
 from __future__ import annotations
 
@@ -41,13 +41,13 @@ def loadGrains3d(fname, *args, interface=None, CS=None, orientFaces=True, **kwar
     cs = cs if isinstance(cs, phaseList) else phaseList([cs])
     return grain3d.fromFaces(t.V, t.F, t.I_GF, t.ori, cs, np.ones(t.I_GF.shape[0], dtype=np.int8))
   if interface == "dream3d":
-    return loadGrains_Dream3d(fname, CS=CS, orientFaces=orientFaces)
+    return _loadGrains_Dream3d(fname, CS=CS, orientFaces=orientFaces)
   raise ValueError(f"no grain interface for {fname}")
 
 
-def loadGrains_Dream3d(fname, CS=None, orientFaces=True):
-  """the 3D grains of the surface mesh of a DREAM.3D file, the rotations those of the voxels, where
-  MATLAB's reader turns every grain away from them; the faces oriented unless noOrientFaces=True"""
+# the 3D grains of the surface mesh of a DREAM.3D file, the rotations those of the voxels, where
+# MATLAB's reader turns every grain away from them; the faces oriented unless noOrientFaces=True
+def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
   import h5py
   from scipy.sparse import csr_matrix
   from ..maps3d.grain3d import grain3d
@@ -156,4 +156,4 @@ def loadNeperTess(fname):
   return out
 
 
-__all__ = ["loadGrains3d", "loadGrains_Dream3d", "loadNeperTess"]
+__all__ = ["loadGrains3d", "loadNeperTess"]

@@ -1,9 +1,9 @@
 # the EDAX/TSL .ang text format (MATLAB loadEBSD_ang, Julia ang.jl)
 #
-#   ebsd = loadEBSD_ang('map.ang')                 the Euler angles aligned by setting 2
-#   ebsd = loadEBSD_ang('map.ang', setting=3)      one of the four EDAX alignments, 0 none
-#   ebsd = loadEBSD_ang('map.ang', EMSphInx=True)  the phase column counted from zero
-#   ebsd = loadEBSD_ang('acom.ang')                a TEM ACOM map: setting 4, positions in nm
+#   ebsd = loadEBSD('map.ang')                 the Euler angles aligned by setting 2
+#   ebsd = loadEBSD('map.ang', setting=3)      one of the four EDAX alignments, 0 none
+#   ebsd = loadEBSD('map.ang', EMSphInx=True)  the phase column counted from zero
+#   ebsd = loadEBSD('acom.ang')                a TEM ACOM map: setting 4, positions in nm
 #
 # A header of lines beginning with '#', one block per phase, then a numeric table whose
 # first eight columns are fixed by the format, phi1 PHI phi2 x y IQ CI phase, and whose
@@ -119,20 +119,19 @@ def angHeader(header):
   return headerDict(pairs)
 
 
-def loadEBSD_ang(fname, *, eulerCorrection=None, setting=None, columnNames=None, frame=None, scanUnit=None,
-                 EDAX=False, EMSphInx=False):
-  """the EDAX/TSL map of an .ang file
-
-    loadEBSD_ang('map.ang')                        setting 2, a half turn about (1, -1, 0)
-    loadEBSD_ang('map.ang', setting=0)             the Euler angles as the file states them
-    loadEBSD_ang('map.ang', eulerCorrection=rot)   the alignment stated outright
-    loadEBSD_ang('map.ang', scanUnit='nm')         the unit of the positions, um by default
-
-  EDAX and EMSphInx write the same layout and number the phase column differently; the header
-  is fingerprinted, and EDAX=True or EMSphInx=True overrules the guess. The ACOM export of a
-  TEM map is fingerprinted too and read with setting 4 and the positions in nm, unless the
-  call states them.
-  """
+# the EDAX/TSL map of an .ang file
+#
+#   loadEBSD('map.ang')                        setting 2, a half turn about (1, -1, 0)
+#   loadEBSD('map.ang', setting=0)             the Euler angles as the file states them
+#   loadEBSD('map.ang', eulerCorrection=rot)   the alignment stated outright
+#   loadEBSD('map.ang', scanUnit='nm')         the unit of the positions, um by default
+#
+# EDAX and EMSphInx write the same layout and number the phase column differently; the header
+# is fingerprinted, and EDAX=True or EMSphInx=True overrules the guess. The ACOM export of a
+# TEM map is fingerprinted too and read with setting 4 and the positions in nm, unless the
+# call states them.
+def _loadEBSD_ang(fname, *, eulerCorrection=None, setting=None, columnNames=None, frame=None, scanUnit=None,
+                  EDAX=False, EMSphInx=False):
   data = readFile(fname)
   head, offset = leadingLines(data, lambda l: not l.startswith(b"#"))
   header = [text(l) for l in head]
@@ -187,4 +186,4 @@ def _cellHint(header):
   return regularPoly(4, [xs, ys])
 
 
-__all__ = ["loadEBSD_ang"]
+__all__ = []

@@ -2,7 +2,7 @@
 #
 #   export(ori, fname), export(ori, fname, 'Bunge'), export(ori, fname, S, 'Bunge')
 #   export(ori, fname, quaternion=True), export(ori, fname, radians=True)
-#   export_VPSC(ori, fname, 'Bunge', weights=w)
+#   export(ori, fname, 'Bunge', interface='VPSC', weights=w)
 #
 # A table with one row per orientation: the Euler angles in degrees under their names,
 # or the four quaternion components, and one more column per entry of a dictionary of
@@ -37,9 +37,14 @@ def _columns(ori, args, radians, quaternion):
   return (e if radians else e / degree), EULER_NAMES[conv]
 
 
-def exportOrientation(ori, fname, *args, radians=False, quaternion=False):
+def exportOrientation(ori, fname, *args, radians=False, quaternion=False, interface=None, weights=None):
   """export(ori, fname, 'Bunge'): the Euler angles of the orientations in degrees as a table,
-  with a dictionary among the arguments as further columns"""
+  with a dictionary among the arguments as further columns; export(ori, fname, 'Bunge',
+  interface='VPSC', weights=w) the VPSC texture file (MATLAB's export_VPSC)"""
+  if interface == "VPSC":
+    return _export_VPSC(ori, fname, *args, weights=weights, radians=radians)
+  if interface is not None:
+    raise ValueError(f"the interface of an orientation export is None or 'VPSC', not {interface!r}")
   d, names = _columns(ori.flatten(), args, radians, quaternion)
   names = list(names)
   for a in args:
@@ -54,9 +59,9 @@ def exportOrientation(ori, fname, *args, radians=False, quaternion=False):
 VPSC_LETTER = {"Bunge": "B", "Kocks": "K", "Roe": "R"}
 
 
-def export_VPSC(ori, fname, *args, weights=None, radians=False):
-  """export_VPSC(ori, fname, 'Bunge', weights=w): the VPSC texture file of the orientations,
-  the weights normalised to sum to one"""
+# _export_VPSC(ori, fname, 'Bunge', weights=w): the VPSC texture file of the orientations,
+# the weights normalised to sum to one
+def _export_VPSC(ori, fname, *args, weights=None, radians=False):
   o = ori.flatten()
   d, _ = _columns(o, args, radians, False)
   w = np.ones(o.size) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
@@ -67,4 +72,4 @@ def export_VPSC(ori, fname, *args, weights=None, radians=False):
       f.write(f"{row[0]:7.2f} {row[1]:7.2f} {row[2]:7.2f} {wk:11.7f}\n")
 
 
-__all__ = ["exportOrientation", "export_VPSC"]
+__all__ = ["exportOrientation"]

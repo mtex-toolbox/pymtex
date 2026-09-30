@@ -6,7 +6,7 @@ import pytest
 import mtex
 from mtex import degree, loadEBSD, rotation
 from mtex.io.ang import eulerCorrectionRotation
-from mtex.io.osc import OSC_HEADER_CLOSE, OSC_HEADER_OPEN, loadEBSD_osc, oscPhaseAt, oscPhases, oscTrim
+from mtex.io.osc import OSC_HEADER_CLOSE, OSC_HEADER_OPEN, _loadEBSD_osc, oscPhaseAt, oscPhases, oscTrim
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -93,7 +93,7 @@ def test_a_negative_confidence_index_is_not_indexed(tmp_path):
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "copper.osc")), reason="the MTEX data folder is not here")
 def test_full_copper_matches_julia():
-  e = loadEBSD_osc(os.path.join(DATA, "copper.osc"))
+  e = _loadEBSD_osc(os.path.join(DATA, "copper.osc"))
   assert len(e) == 16116 and int(e.isIndexed.sum()) == 16116
   assert abs(e.imagequality.mean() - 53823.96678839158) < 1e-6
   g = loadEBSD(os.path.join(DATA, "copper.osc"))

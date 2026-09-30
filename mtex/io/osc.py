@@ -1,7 +1,7 @@
 # the EDAX/TSL binary map (MATLAB loadEBSD_osc, Julia osc.jl)
 #
-#   ebsd = loadEBSD_osc('map.osc')                the Euler angles aligned by setting 2
-#   ebsd = loadEBSD_osc('map.osc', setting=0)     the angles as the file states them
+#   ebsd = loadEBSD('map.osc')                the Euler angles aligned by setting 2
+#   ebsd = loadEBSD('map.osc', setting=0)     the angles as the file states them
 #
 # Eight 32 bit words open the file, of which the fifth to the seventh are the two cell
 # counts and the number of measurements. Two markers cut the header out of the rest,
@@ -139,12 +139,11 @@ def oscHeader(b, nx, ny, n, xstep, ystep):
   return header
 
 
-def loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit="um"):
-  """the EDAX/TSL binary map of an .osc file
-
-    loadEBSD_osc('map.osc')                        setting 2, a half turn about (1, -1, 0)
-    loadEBSD_osc('map.osc', eulerCorrection=rot)   the alignment stated outright
-  """
+# the EDAX/TSL binary map of an .osc file
+#
+# loadEBSD('map.osc')                        setting 2, a half turn about (1, -1, 0)
+# loadEBSD('map.osc', eulerCorrection=rot)   the alignment stated outright
+def _loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit="um"):
   b = readFile(fname)
   if len(b) <= 32:
     raise ValueError(f"{fname} is too short to be an .osc")
@@ -193,4 +192,4 @@ def _scanGrid(nx, ny, n, xstep, ystep, hex):
   return (nx, ny, xstep, ystep, True, rest // even) if rest % even == 0 and rest // even > 0 else None
 
 
-__all__ = ["loadEBSD_osc"]
+__all__ = []

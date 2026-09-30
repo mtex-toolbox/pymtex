@@ -456,23 +456,23 @@ def loadEBSD(fname, CS=None, *args, interface=None, grid=True, **kwargs):
 # the map of a file by the loader of its format
 def _read(fname, ext, CS, *args, **kwargs):
   if ext == "ang":
-    from .ang import loadEBSD_ang
-    ebsd = loadEBSD_ang(fname, *args, **kwargs)
+    from .ang import _loadEBSD_ang
+    ebsd = _loadEBSD_ang(fname, *args, **kwargs)
   elif ext == "ctf":
-    from .ctf import loadEBSD_ctf
-    ebsd = loadEBSD_ctf(fname, *args, **kwargs)
+    from .ctf import _loadEBSD_ctf
+    ebsd = _loadEBSD_ctf(fname, *args, **kwargs)
   elif ext in ("cpr", "crc"):
-    from .crc import loadEBSD_crc
-    ebsd = loadEBSD_crc(fname, *args, **kwargs)
+    from .crc import _loadEBSD_crc
+    ebsd = _loadEBSD_crc(fname, *args, **kwargs)
   elif ext == "osc":
-    from .osc import loadEBSD_osc
-    ebsd = loadEBSD_osc(fname, *args, **kwargs)
+    from .osc import _loadEBSD_osc
+    ebsd = _loadEBSD_osc(fname, *args, **kwargs)
   elif ext in ("h5", "hdf5", "h5oina", "oh5", "edaxh5", "dream3d"):
-    from .h5 import loadEBSD_h5
-    ebsd = loadEBSD_h5(fname, *args, **kwargs)
+    from .h5 import _loadEBSD_h5
+    ebsd = _loadEBSD_h5(fname, *args, **kwargs)
   else:
-    from .generic import loadEBSD_generic
-    ebsd = loadEBSD_generic(fname, CS, *args, **kwargs)
+    from .generic import _loadEBSD_generic
+    ebsd = _loadEBSD_generic(fname, CS, *args, **kwargs)
   return ebsd
 
 

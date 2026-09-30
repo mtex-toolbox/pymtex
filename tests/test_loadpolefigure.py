@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from mtex import Miller, PoleFigure, crystalFrame, degree, loadPoleFigure, mean, specimenFrame
-from mtex.io.loadpolefigure import DubnaGrid, loadPoleFigure_generic, string2Miller
+from mtex.io.loadpolefigure import DubnaGrid, _loadPoleFigure_generic, string2Miller
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "polefigure")
 LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "PoleFigure")
@@ -122,8 +122,8 @@ def test_the_generic_columns():
   # the generic columns of the Seifert file, the polar angle in degrees; the block found
   # by itself or the header lines counted
   fname = os.path.join(LOCAL, "nja", "seifert-111.nja")
-  g = loadPoleFigure_generic(fname, crystalFrame("m-3m"), columnNames=["polar angle", "azimuth angle", "intensity"])
-  assert loadPoleFigure_generic(fname, header=20, columnNames=["theta", "rho", "intensity"]).allI[0].size == 2121
+  g = _loadPoleFigure_generic(fname, crystalFrame("m-3m"), columnNames=["polar angle", "azimuth angle", "intensity"])
+  assert _loadPoleFigure_generic(fname, header=20, columnNames=["theta", "rho", "intensity"]).allI[0].size == 2121
   assert g.numPF == 1 and g.allI[0].size == 2121 and np.allclose(g.allH[0].hkl, [1, 1, 1])
   assert np.isclose(g.allI[0][0], 74.9) and np.isclose(g.allR[0].theta.max(), 70 * degree)
   assert loadPoleFigure(fname, Miller(1, 1, 1, crystalFrame("m-3m")), header=21, columnNames=["polar angle", "azimuth angle", "intensity"], columns=[0, 1, 2]).allI[0].size == 2120

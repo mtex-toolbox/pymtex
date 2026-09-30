@@ -35,13 +35,13 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
   ext = os.path.splitext(fname)[1].lower().lstrip(".")
   import h5py
   if interface == "dream3d" or (interface is None and ext == "dream3d"):
-    return loadEBSD_dream3d(fname, CS=CS)
+    return _loadEBSD_dream3d(fname, CS=CS)
   if interface == "xnovo" or interface is None and ext in ("h5", "hdf5"):
     with h5py.File(fname, "r") as f:
       if "LabDCT" in f:
-        return loadEBSD_xnovo(fname, CS=CS)
+        return _loadEBSD_xnovo(fname, CS=CS)
       if "DataStructure" in f:
-        return loadEBSD_dream3d(fname, CS=CS)
+        return _loadEBSD_dream3d(fname, CS=CS)
   raise ValueError(f"{fname} is not a volume this port reads: DREAM.3D, xnovo, or a list of 2D maps")
 
 
@@ -51,9 +51,9 @@ def _xyz(a):
   return np.ascontiguousarray(np.swapaxes(a, 0, 2))
 
 
-def loadEBSD_dream3d(fname, CS=None):
-  """the 3D EBSD map of the image geometry of a DREAM.3D file: the Euler angles, the phases with the
-  mask, every further scalar cell array as a property, the feature ids as grainId"""
+# the 3D EBSD map of the image geometry of a DREAM.3D file: the Euler angles, the phases with the
+# mask, every further scalar cell array as a property, the feature ids as grainId
+def _loadEBSD_dream3d(fname, CS=None):
   import h5py
   root = "DataStructure/DataContainer"
   with h5py.File(fname, "r") as f:
@@ -82,9 +82,9 @@ def loadEBSD_dream3d(fname, CS=None):
   return EBSD3square(rot, phases, cs, spacing, origin=origin, prop=prop)
 
 
-def loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
-  """the 3D EBSD map of the LabDCT volume of an xnovo HDF5 file, the orientations from Rodrigues
-  vectors, quaternions or Euler angles, the completeness and grain ids as properties, in mm"""
+# the 3D EBSD map of the LabDCT volume of an xnovo HDF5 file, the orientations from Rodrigues
+# vectors, quaternions or Euler angles, the completeness and grain ids as properties, in mm
+def _loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
   import h5py
   with h5py.File(fname, "r") as f:
     g = f[map]
@@ -155,4 +155,4 @@ def _stack(files, z, *args, **kwargs):
   return EBSD3(pos, rotation(rot), ph, first.CSList, prop, scanUnit=first.scanUnit, frame=first.frame)
 
 
-__all__ = ["loadEBSD3", "loadEBSD_dream3d", "loadEBSD_xnovo"]
+__all__ = ["loadEBSD3"]

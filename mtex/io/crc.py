@@ -1,7 +1,7 @@
 # the Oxford/Channel binary pair (MATLAB loadEBSD_crc, Julia crc.jl)
 #
-#   ebsd = loadEBSD_crc('map.cpr')     either name of the pair reads it
-#   ebsd = loadEBSD_crc('map.crc')
+#   ebsd = loadEBSD('map.cpr')     either name of the pair reads it
+#   ebsd = loadEBSD('map.crc')
 #
 # A .crc is one fixed size record per pixel and its .cpr sibling is the INI file that says
 # what a record holds: [Fields] names the columns by the number Channel gives them, the
@@ -100,15 +100,14 @@ def crcAcquisition(ini):
   return None if any(v is None for v in e) else tuple(e)
 
 
-def loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
-  """the Oxford/Channel map of a .cpr and .crc pair, by either name
-
-    loadEBSD_crc('map.cpr')                        the Euler angles half a turn about z from the map
-    loadEBSD_crc('map.crc', eulerCorrection=rot)   the alignment stated outright
-
-  The header is kept in ebsd.meta['header'] as the sections of the .cpr, the acquisition
-  surface in ebsd.meta['surface'].
-  """
+# the Oxford/Channel map of a .cpr and .crc pair, by either name
+#
+#   loadEBSD('map.cpr')                        the Euler angles half a turn about z from the map
+#   loadEBSD('map.crc', eulerCorrection=rot)   the alignment stated outright
+#
+# The header is kept in ebsd.meta['header'] as the sections of the .cpr, the acquisition
+# surface in ebsd.meta['surface'].
+def _loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   base = os.path.splitext(os.fspath(fname))[0]
   cprPath, crcPath = base + ".cpr", base + ".crc"
   if not os.path.isfile(cprPath):
@@ -162,4 +161,4 @@ def loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
                          scanGrid=(nx, ny, dx, dy) if nx is not None and ny is not None else None, propType=np.float64)
 
 
-__all__ = ["loadEBSD_crc"]
+__all__ = []

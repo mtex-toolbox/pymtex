@@ -1,7 +1,7 @@
 # measured pole figures written as text tables (MATLAB @PoleFigure/export): one file per
 # pole figure, named by the base name and the crystal directions of the entry, a row per
 # specimen direction of its polar angle, its azimuth and the intensity, the angles in
-# radians unless asked for degrees; the columns loadPoleFigure_generic reads back
+# radians unless asked for degrees; the columns loadPoleFigure reads back
 #
 #   export(pf, 'dubna')                 dubna_{101̅0}.txt, ...
 #   export(pf, 'dubna', 'degree')       the angles in degrees, export(pf, 'dubna', degree=True) too

@@ -8,7 +8,7 @@
 # The generic file has three header lines naming the symmetries, one naming the columns,
 # and one row per grid node: the Euler angles in degrees and the value. The MTEX file
 # lists the uniform, fibre and radial components with their kernels and weights; a
-# harmonic component is noted as not written. The VPSC file is the one of export_VPSC
+# harmonic component is noted as not written. The VPSC file is the one of export(ori, fname, interface='VPSC')
 # over a sample drawn from the function.
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import numpy as np
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import eulerRegion
 from ..geometry.units import degree
-from .exportorientation import EULER_NAMES, export_VPSC
+from .exportorientation import EULER_NAMES, _export_VPSC
 
 INTERFACES = ("generic", "mtex", "VPSC")
 
@@ -48,12 +48,12 @@ def _header(f, odf):
   f.write(f'% specimen symmetry: "{odf.SS.char()}"\n')
 
 
-def exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, **kwargs):
-  """writes the values of an ODF to a text file, on a regular Euler grid of the given resolution or
-  on an SO3Grid passed, one row of Euler angles and value per node, in degrees unless radians=True
-
-    exportODF_generic(odf, 'odf.txt', 'Bunge', resolution=10*degree)
-    exportODF_generic(odf, 'odf.txt', S3G, 'ZYZ')"""
+# writes the values of an ODF to a text file, on a regular Euler grid of the given resolution or
+# on an SO3Grid passed, one row of Euler angles and value per node, in degrees unless radians=True
+#
+#   _exportODF_generic(odf, 'odf.txt', 'Bunge', resolution=10*degree)
+#   _exportODF_generic(odf, 'odf.txt', S3G, 'ZYZ')
+def _exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, **kwargs):
   from ..geometry.grids.so3grid import SO3Grid
   convention = _convention(args)
   grid = next((a for a in args if isinstance(a, SO3Grid)), None)
@@ -75,9 +75,9 @@ def exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, *
       f.write(f"{row[0]:.5f} {row[1]:.5f} {row[2]:.5f} {val:.5f}\n")
 
 
-def exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
-  """writes the components of an ODF to a human readable file: the uniform part, the fibres and the
-  radial centres with their kernels and weights; a harmonic component is noted as not written"""
+# writes the components of an ODF to a human readable file: the uniform part, the fibres and the
+# radial centres with their kernels and weights; a harmonic component is noted as not written
+def _exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
   from ..functions.handles import SO3FunComposition
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
   from ..functions.so3fun import SO3FunHarmonic
@@ -107,11 +107,11 @@ def exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
           f.write(f"{row[0]:.5f} {row[1]:.5f} {row[2]:.5f} {w:.5f}\n")
 
 
-def exportODF_VPSC(odf, fname, *args, points=10000, **kwargs):
-  """writes a sample of points orientations drawn from an ODF as a VPSC texture file"""
+# writes a sample of points orientations drawn from an ODF as a VPSC texture file
+def _exportODF_VPSC(odf, fname, *args, points=10000, **kwargs):
   from ..functions.characteristics import discreteSample
   ori = discreteSample(odf, points)
-  export_VPSC(ori, fname, *[a for a in args if isinstance(a, str) and a in EULER_NAMES])
+  _export_VPSC(ori, fname, *[a for a in args if isinstance(a, str) and a in EULER_NAMES])
 
 
 def exportODF(odf, fname, *args, interface=None, **kwargs):
@@ -121,7 +121,7 @@ def exportODF(odf, fname, *args, interface=None, **kwargs):
   if interface not in INTERFACES:
     raise ValueError(f"unknown export interface {interface!r}; available are " + ", ".join(INTERFACES))
   args = tuple(a for a in args if not (isinstance(a, str) and a in INTERFACES))
-  return {"generic": exportODF_generic, "mtex": exportODF_mtex, "VPSC": exportODF_VPSC}[interface](odf, fname, *args, **kwargs)
+  return {"generic": _exportODF_generic, "mtex": _exportODF_mtex, "VPSC": _exportODF_VPSC}[interface](odf, fname, *args, **kwargs)
 
 
-__all__ = ["exportODF", "exportODF_generic", "exportODF_mtex", "exportODF_VPSC"]
+__all__ = ["exportODF"]

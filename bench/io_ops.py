@@ -27,7 +27,7 @@ FILES = {"load_ctf": os.path.join(DATA, "EBSD", "Forsterite.ctf"), "load_ang": o
 ALGORITHM = [
   {"name": "EBSD import",
    "entry": {"matlab": ["@EBSD.load", "loadEBSD_ang", "loadEBSD_ctf"],
-             "python": ["mtex.io.load.loadEBSD", "mtex.io.ang.loadEBSD_ang", "mtex.io.ctf.loadEBSD_ctf"],
+             "python": ["mtex.io.load.loadEBSD", "mtex.io.ang._loadEBSD_ang", "mtex.io.ctf._loadEBSD_ctf"],
              "julia": ["loadEBSD", "loadAng", "loadCtf"]},
    "cases": {"load_ctf": "EBSD.load of Forsterite.ctf, every measurement",
              "load_ang": "EBSD.load of ferrite.ang, hexagonal grid",

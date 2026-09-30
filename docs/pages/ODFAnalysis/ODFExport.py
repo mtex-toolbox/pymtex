@@ -193,6 +193,6 @@ os.remove(vpscName)
 #
 # MATLAB's `.mat` working copy is Python's `pickle`; a pickled frame comes back as the
 # session's own handle, so the loaded function lives in the same frames as the original.
-# The three writers are `exportODF_generic`, `exportODF_mtex` and `exportODF_VPSC` in
-# `mtex/io/exportodf.py`, chosen by the flag or the `interface` keyword. The VPSC sample
+# The three writers, `'generic'`, `'mtex'` and `'VPSC'`, are in `mtex/io/exportodf.py`,
+# chosen by the flag or the `interface` keyword. The VPSC sample
 # is a random draw, so its rows differ from MATLAB's.

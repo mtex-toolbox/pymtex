@@ -251,9 +251,9 @@ def _emsphinx(path):
 # the olivine texture history of a VPSC run as the page reads it: one ODF of halfwidth 10
 # degrees per strain step; the slip activity is the second file of mtexdatafile('vpsc')
 def _vpsc(files):
-  from .loadodf import loadODF_VPSC
+  from .loadodf import _loadODF_VPSC
   cs = crystalFrame("222", [4.762, 10.225, 5.994], mineral="olivine")
-  return loadODF_VPSC(files[0], halfwidth=10 * degree, CS=cs)
+  return _loadODF_VPSC(files[0], halfwidth=10 * degree, CS=cs)
 
 
 # the pole figure sets: the crystal frame of the page, the directions the file names do

@@ -5,7 +5,7 @@ import pytest
 
 import mtex
 from mtex import degree, loadEBSD, rotation, vector3d
-from mtex.io.h5 import (H5Scope, alignmentList, eulerColumns, h5PhaseShift, h5Resolve, hdf5Configs, loadEBSD_h5,
+from mtex.io.h5 import (H5Scope, alignmentList, eulerColumns, h5PhaseShift, h5Resolve, hdf5Configs, _loadEBSD_h5,
                         matrixRotations, spaceGroupNumber)
 
 h5py = pytest.importorskip("h5py")
@@ -279,7 +279,7 @@ def test_matrixRotations_are_column_major_and_zeros_are_none():
   ("EDAX/KamilaTi.edaxh5", 70760, [0, 70760], [114.06853843, 175.36763636, 71.61957914], "fit", 1.2239011302977851),
 ])
 def test_corpus_matches_julia(name, n, cnt, euler, prop, mean):
-  e = loadEBSD_h5(os.path.join(CORPUS, name))
+  e = _loadEBSD_h5(os.path.join(CORPUS, name))
   assert len(e) == n and counts(e) == cnt
   k, eu = firstEuler(e)
   assert k == 0 and np.allclose(eu, euler, atol=1e-6)

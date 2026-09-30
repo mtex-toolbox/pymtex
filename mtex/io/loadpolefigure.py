@@ -1,5 +1,5 @@
 # reading pole figures from the files the diffractometers write (MATLAB PoleFigure.load,
-# interfaces/loadPoleFigure_*.m; docs/plans/io.md I6)
+# loadPoleFigure_generic, interfaces/loadPoleFigure_*.m; docs/plans/io.md I6)
 #
 #   pf = loadPoleFigure('Q(10-10)_amp.cnv', cs)                 the format read off the file
 #   pf = loadPoleFigure([f1, f2], [h1, h23], cs, superposition=[1, [0.52, 1.23]])
@@ -275,14 +275,13 @@ _COLUMNS = {"polar angle": "theta", "polarangle": "theta", "theta": "theta", "co
             "intensity": "intensity", "intensities": "intensity", "counts": "intensity", "x": "x", "y": "y", "z": "z"}
 
 
-def loadPoleFigure_generic(fname, *args, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
-                           superposition=None, complete=False):
-  """a text file of one pole figure: rows of polar angle, azimuth and intensity, or of x, y,
-  z and intensity, the columns named by columnNames and picked by columns, counted from
-  zero; a block of more than fifteen columns is read as intensities on a regular grid
-
-    loadPoleFigure_generic('seifert-111.nja', cs, header=21, columnNames=['polar angle', 'azimuth angle', 'intensity'])
-  """
+# a text file of one pole figure: rows of polar angle, azimuth and intensity, or of x, y,
+# z and intensity, the columns named by columnNames and picked by columns, counted from
+# zero; a block of more than fifteen columns is read as intensities on a regular grid
+#
+#   loadPoleFigure('seifert-111.nja', cs, header=21, columnNames=['polar angle', 'azimuth angle', 'intensity'])
+def _loadPoleFigure_generic(fname, *args, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
+                            superposition=None, complete=False):
   cs, ss = _frames(args)
   h = next((a for a in args if isinstance(a, vector3d)), None)
   data = readFile(fname)
@@ -456,7 +455,7 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
   for k, f in enumerate(fnames):
     name = "generic" if interface is None and TABLE_KEYS & kwargs.keys() else chooseFormat(f, interface)
     if name in (None, "generic"):
-      parts.append(loadPoleFigure_generic(f, *frames, **kwargs))
+      parts.append(_loadPoleFigure_generic(f, *frames, **kwargs))
       continue
     # the directions the caller names go to a reader whose file names none
     hk = None if not hs else hs[0] if len(fnames) == 1 else list(hs[0])[k]
@@ -476,4 +475,4 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
 
 install(PoleFigure, staticmethod(loadPoleFigure), "load")
 
-__all__ = ["loadPoleFigure", "loadPoleFigure_generic", "string2Miller", "DubnaGrid"]
+__all__ = ["loadPoleFigure", "string2Miller", "DubnaGrid"]

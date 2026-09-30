@@ -152,7 +152,7 @@ with open(orientationFile) as f:
 
 # ## Export a VPSC texture
 #
-# `export_VPSC` writes the weighted texture format used by the VPSC crystal-plasticity
+# `export` with `interface='VPSC'` writes the weighted texture format used by the VPSC crystal-plasticity
 # code. It accepts Bunge, Kocks, or Roe Euler angles and normalises the supplied weights
 # to sum to one.
 #
@@ -162,7 +162,7 @@ with open(orientationFile) as f:
 
 # +
 vpscFile = os.path.join(tempfile.gettempdir(), 'grains.tex')
-export_VPSC(grains.meanOrientation, vpscFile, 'Bunge', weights=grains.area)
+export(grains.meanOrientation, vpscFile, 'Bunge', interface='VPSC', weights=grains.area)
 
 vpscData = np.loadtxt(vpscFile, skiprows=4)
 writtenWeightSum = np.sum(vpscData[:, 3])

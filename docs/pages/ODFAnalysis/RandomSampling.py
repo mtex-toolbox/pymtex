@@ -321,7 +321,7 @@ for m in M:
 # A sampled orientation list can be exported as [Euler angles](RotationDefinition.html)
 # with [export](quaternion.export.html). Crystal-plasticity programs often require a
 # particular convention and a weight in every row. Use
-# [export_VPSC](orientation.export_VPSC.html) for the VPSC format.
+# [export](orientation.export_VPSC.html) with `interface='VPSC'` for the VPSC format.
 #
 # The broader choice between exact ODF storage, tabulated function values, and weighted
 # orientation lists is covered in [ODF Export](ODFExport.html).

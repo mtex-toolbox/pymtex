@@ -106,7 +106,7 @@ with open(fname) as f:
 #
 # ## The VPSC Format
 #
-# [export_VPSC](orientation.export_VPSC.html) writes individual orientations in the
+# [export](orientation.export_VPSC.html) with `interface='VPSC'` writes individual orientations in the
 # texture format expected by the VPSC crystal plasticity code. It writes three Euler
 # angles and one relative volume fraction per row.
 #
@@ -115,7 +115,7 @@ with open(fname) as f:
 # `R` together with the number of rows.
 
 fnameVPSC = os.path.join(tempfile.gettempdir(), 'orientations_vpsc.txt')
-export_VPSC(ori, fnameVPSC)
+export(ori, fnameVPSC, interface='VPSC')
 with open(fnameVPSC) as f:
   for k in range(6):
     print(f.readline(), end='')
@@ -131,7 +131,7 @@ with open(fnameVPSC) as f:
 
 # +
 weights = np.arange(1, numOrientations + 1).reshape(ori.shape)
-export_VPSC(ori, fnameVPSC, weights=weights)
+export(ori, fnameVPSC, interface='VPSC', weights=weights)
 with open(fnameVPSC) as f:
   for k in range(6):
     print(f.readline(), end='')

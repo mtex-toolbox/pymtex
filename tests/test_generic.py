@@ -5,7 +5,7 @@ import pytest
 
 import mtex
 from mtex import crystalFrame, degree, loadEBSD, rotation
-from mtex.io.generic import loadEBSD_generic, tableColumns
+from mtex.io.generic import _loadEBSD_generic, tableColumns
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -112,9 +112,9 @@ def test_no_numbers_no_phases_bad_argument(tmp_path):
   with pytest.raises(ValueError, match="row of numbers"):
     loadEBSD(p, phases())
   with pytest.raises(ValueError, match="crystal frame"):
-    loadEBSD_generic(GENERIC, None)
+    _loadEBSD_generic(GENERIC, None)
   with pytest.raises(TypeError):
-    loadEBSD_generic(GENERIC, phases(), 3)
+    _loadEBSD_generic(GENERIC, phases(), 3)
 
 
 def test_tableColumns():

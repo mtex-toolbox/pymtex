@@ -6,7 +6,7 @@ import pytest
 
 import mtex
 from mtex import degree, loadEBSD, rotation
-from mtex.io.crc import cprPhases, crcNames, loadEBSD_crc, readIni
+from mtex.io.crc import cprPhases, crcNames, _loadEBSD_crc, readIni
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -139,7 +139,7 @@ def test_explicit_positions_are_read_from_the_record(tmp_path):
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "martensite.cpr")), reason="the MTEX data folder is not here")
 def test_full_martensite_matches_julia():
-  e = loadEBSD_crc(os.path.join(DATA, "martensite.cpr"))
+  e = _loadEBSD_crc(os.path.join(DATA, "martensite.cpr"))
   assert len(e) == 343602
   assert [int((e.phaseId == k).sum()) for k in range(3)] == [92415, 251187, 0]
   assert abs(e.mad.mean() - 0.47057671893357395) < 1e-12

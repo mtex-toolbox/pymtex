@@ -1,7 +1,7 @@
 # the HDF5 maps of the vendors (MATLAB loadEBSD_h5 with interfaces/hdf5_config/*.json, Julia h5.jl)
 #
-#   ebsd = loadEBSD_h5('map.h5oina')                 the vendor read off the file
-#   ebsd = loadEBSD_h5('map.oh5', dataSet=1)          one of the maps a file holds, by number or name
+#   ebsd = loadEBSD('map.h5oina')                 the vendor read off the file
+#   ebsd = loadEBSD('map.oh5', dataSet=1)          one of the maps a file holds, by number or name
 #
 # The layout of a vendor's tree is a config and not code: hdf5_config/<vendor>.json says
 # where the manufacturer key, the data sets, the positions, the phases, the Euler angles
@@ -558,16 +558,15 @@ def h5Image(fname, entry):
 
 # ------------------------------------------------------------------ the map
 
-def loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUnit="um", verbose=True):
-  """the map of an HDF5 file of one of the vendors hdf5_config describes
-
-    loadEBSD_h5('map.h5oina')                       the vendor read off the file
-    loadEBSD_h5('map.oh5', dataSet=1)               a map by its number, counted from zero
-    loadEBSD_h5('map.oh5', dataSet='OIM Map 2')     a map by part of its name
-
-  The maps a file holds are listed in ebsd.meta['dataSets']; the header group of the one read
-  is ebsd.meta['header'], and ebsd.meta['h5'] records where every value came from.
-  """
+# the map of an HDF5 file of one of the vendors hdf5_config describes
+#
+#   loadEBSD('map.h5oina')                       the vendor read off the file
+#   loadEBSD('map.oh5', dataSet=1)               a map by its number, counted from zero
+#   loadEBSD('map.oh5', dataSet='OIM Map 2')     a map by part of its name
+#
+# The maps a file holds are listed in ebsd.meta['dataSets']; the header group of the one read
+# is ebsd.meta['header'], and ebsd.meta['h5'] records where every value came from.
+def _loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanUnit="um", verbose=True):
   import h5py
   fname = os.fspath(fname)
   with h5py.File(fname, "r") as f:
@@ -796,4 +795,4 @@ def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, 
                         phaseMap=np.arange(len(phases)))
 
 
-__all__ = ["loadEBSD_h5", "h5Image", "h5ImageIndex"]
+__all__ = ["h5Image", "h5ImageIndex"]

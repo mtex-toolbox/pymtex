@@ -53,15 +53,15 @@ def _frames(args, CS, SS):
   return CS, specimenFrame.default if SS is None else SS
 
 
-def loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=None, radians=False, halfwidth=None, resolution=None,
-                    **kwargs):
-  """the ODF of a table of Euler angles and one more column: 'interp' fits a function through the
-  values there, 'density' centres kernels of those masses, else varying values mean 'interp';
-  the angles are degrees when one exceeds 15 unless radians=True
-
-    loadODF_generic(fname, CS=cs, SS=ss)
-    loadODF_generic(fname, cs, 'density', halfwidth=10*degree)
-    loadODF_generic(fname, cs, 'Bunge', columnNames=['phi1', 'Phi', 'phi2', 'weights'])"""
+# the ODF of a table of Euler angles and one more column: 'interp' fits a function through the
+# values there, 'density' centres kernels of those masses, else varying values mean 'interp';
+# the angles are degrees when one exceeds 15 unless radians=True
+#
+#   _loadODF_generic(fname, CS=cs, SS=ss)
+#   _loadODF_generic(fname, cs, 'density', halfwidth=10*degree)
+#   _loadODF_generic(fname, cs, 'Bunge', columnNames=['phi1', 'Phi', 'phi2', 'weights'])
+def _loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=None, radians=False, halfwidth=None, resolution=None,
+                     **kwargs):
   CS, SS = _frames(args, CS, SS)
   if CS is None:
     raise ValueError("no crystal symmetry specified: SO3Fun.load(fname, CS=cs, ...)")
@@ -99,10 +99,10 @@ def loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=No
 VPSC_CONVENTIONS = {"B": "Bunge", "K": "Kocks", "R": "Roe"}
 
 
-def loadODF_VPSC(fname, *args, CS=None, **kwargs):
-  """the ODF of a VPSC texture file, one density per block of weighted orientations, a list for
-  several; the strain and the ellipsoid of each block kept in odf.opt, the crystal frame cubic
-  unless given"""
+# the ODF of a VPSC texture file, one density per block of weighted orientations, a list for
+# several; the strain and the ellipsoid of each block kept in odf.opt, the crystal frame cubic
+# unless given
+def _loadODF_VPSC(fname, *args, CS=None, **kwargs):
   from ..functions.density import calcDensity
   CS, SS = _frames(args, CS, None)
   CS = crystalFrame("432") if CS is None else CS
@@ -140,8 +140,8 @@ def loadODF(fname, *args, interface=None, **kwargs):
       head = [next(f, "") for _ in range(4)]
     interface = "VPSC" if re.match(r"^\s*[BbKkRr]\s+\d+\s*$", head[3]) else "generic"
   if interface == "VPSC":
-    return loadODF_VPSC(fname, *args, **kwargs)
-  return loadODF_generic(fname, *args, **kwargs)
+    return _loadODF_VPSC(fname, *args, **kwargs)
+  return _loadODF_generic(fname, *args, **kwargs)
 
 
-__all__ = ["loadODF", "loadODF_generic", "loadODF_VPSC"]
+__all__ = ["loadODF"]

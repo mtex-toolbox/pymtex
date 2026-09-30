@@ -171,20 +171,20 @@ def export(ebsd, fname, *args, **kwargs):
     return exportVector3d(ebsd, fname, *args, **kwargs)
   ext = os.path.splitext(fname)[1].lower()
   if ext == ".ang":
-    return exportEBSD_ang(ebsd, fname, *args, **kwargs)
+    return _exportEBSD_ang(ebsd, fname, *args, **kwargs)
   if ext == ".ctf":
-    return exportEBSD_ctf(ebsd, fname, *args, **kwargs)
+    return _exportEBSD_ctf(ebsd, fname, *args, **kwargs)
   if ext in (".h5", ".hdf5", ".h5oina", ".oh5", ".edaxh5", ".dream3d"):
-    return exportEBSD_h5(ebsd, fname, *args, **kwargs)
+    return _exportEBSD_h5(ebsd, fname, *args, **kwargs)
   if ext in (".cpr", ".crc"):
     raise NotImplementedError("the Oxford binary pair is not written; write a .ctf")
-  return exportEBSD_txt(ebsd, fname, *args, **kwargs)
+  return _exportEBSD_txt(ebsd, fname, *args, **kwargs)
 
 
 # ------------------------------------------------------------------ the text formats
 
-def exportEBSD_ang(ebsd, fname, *, eulerCorrection=None, setting=2):
-  """write a map as an EDAX/TSL .ang file, the correction of the setting undone"""
+# write a map as an EDAX/TSL .ang file, the correction of the setting undone
+def _exportEBSD_ang(ebsd, fname, *, eulerCorrection=None, setting=2):
   if eulerCorrection is None:
     eulerCorrection = eulerCorrectionRotation(setting)
   phi1, Phi, phi2 = _eulerColumns(ebsd, eulerCorrection, 1.0)
@@ -223,8 +223,8 @@ def exportEBSD_ang(ebsd, fname, *, eulerCorrection=None, setting=2):
   return fname
 
 
-def exportEBSD_ctf(ebsd, fname, *, eulerCorrection=None):
-  """write a map as an Oxford/Channel .ctf file, the half turn about z and the tilt of a stated surface undone"""
+# write a map as an Oxford/Channel .ctf file, the half turn about z and the tilt of a stated surface undone
+def _exportEBSD_ctf(ebsd, fname, *, eulerCorrection=None):
   acq = tuple(_headerNumber(ebsd, (k,), 0.0) for k in ("acqe1", "acqe2", "acqe3"))
   if eulerCorrection is None:
     eulerCorrection = oxfordCorrection(acq)
@@ -257,12 +257,11 @@ def exportEBSD_ctf(ebsd, fname, *, eulerCorrection=None):
   return fname
 
 
-def exportEBSD_txt(ebsd, fname, *args, radians=False, eulerCorrection=None):
-  """write a map as a table with a line of column names: x y, the Euler angles, the phase, the properties
-
-  The phase column counts the phases present from one, zero for not indexed, so the table
-  reads back with those phases as its CS list.
-  """
+# write a map as a table with a line of column names: x y, the Euler angles, the phase, the properties
+#
+# The phase column counts the phases present from one, zero for not indexed, so the table
+# reads back with those phases as its CS list.
+def _exportEBSD_txt(ebsd, fname, *args, radians=False, eulerCorrection=None):
   convention = "Bunge"
   for a in args:
     if isinstance(a, str):
@@ -364,15 +363,14 @@ def h5PhaseColumn(ids, dtype, zeroBased, shift):
   return out
 
 
-def exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
-  """write the map into a copy of the file it was read from, or of reference
-
-    export(ebsd, 'denoised.h5oina')                            the file the map came from is copied
-    export(ebsd, 'denoised.h5oina', reference='map.h5oina')    another file of the same layout
-
-  Only the data sets the import resolved are written; a map that lost or gained measurements
-  since it was read is written to .ang or .ctf instead.
-  """
+# write the map into a copy of the file it was read from, or of reference
+#
+#   export(ebsd, 'denoised.h5oina')                            the file the map came from is copied
+#   export(ebsd, 'denoised.h5oina', reference='map.h5oina')    another file of the same layout
+#
+# Only the data sets the import resolved are written; a map that lost or gained measurements
+# since it was read is written to .ang or .ctf instead.
+def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
   import h5py
   rec = ebsd.meta.get("h5")
   if rec is None:
@@ -491,4 +489,4 @@ def exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
   return fname
 
 
-__all__ = ["export", "exportEBSD_ang", "exportEBSD_ctf", "exportEBSD_h5", "exportEBSD_txt"]
+__all__ = ["export"]

@@ -5,7 +5,7 @@ import pytest
 
 import mtex
 from mtex import degree, loadEBSD, rotation
-from mtex.io.ctf import ctfHeader, loadEBSD_ctf, oxfordCorrection
+from mtex.io.ctf import ctfHeader, _loadEBSD_ctf, oxfordCorrection
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
@@ -126,7 +126,7 @@ def test_a_phase_without_a_laue_class_falls_back_to_the_space_group(tmp_path):
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "Forsterite.ctf")), reason="the MTEX data folder is not here")
 def test_full_forsterite_matches_mtex():
-  e = loadEBSD_ctf(os.path.join(DATA, "Forsterite.ctf"))
+  e = _loadEBSD_ctf(os.path.join(DATA, "Forsterite.ctf"))
   assert len(e) == 245952
   assert [int((e.phaseId == k).sum()) for k in range(5)] == [58485, 152345, 26058, 9064, 0]
   assert np.allclose(firstEuler(e), [264.675, 137.65, 113.67], atol=1e-3)
