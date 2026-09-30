@@ -102,7 +102,7 @@ def Miller(*args, antipodal=False, dispStyle=None):
 
 # '(hkl)', '{hkl}', '[uvw]', '<uvw>': the bracket says direct or reciprocal, and whether the
 # direction stands for itself or for its whole family
-def _parse(s, cs):
+def _parse(s, CS):
   m = re.match(r"^\s*([(\[{<⟨])\s*([-\d,\s]+)\s*([)\]}>⟩])\s*$", s)
   if m is None:
     raise ValueError(f"cannot read '{s}' as Miller indices, write (hkl), {{hkl}}, [uvw] or <uvw>")
@@ -113,7 +113,7 @@ def _parse(s, cs):
   direct = open_ in ("[", "<", "⟨")
   single = open_ in ("(", "[")
   style = ("UVTW" if len(idx) == 4 else "uvw") if direct else ("hkil" if len(idx) == 4 else "hkl")
-  return Miller(*idx, cs, style), single
+  return Miller(*idx, CS, style), single
 
 
 # ------------------------------------------------------------------ rounding

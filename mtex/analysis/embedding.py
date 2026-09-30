@@ -37,8 +37,8 @@ _SPECS = {}
 # ------------------------------------------------------------------ the recipe of a crystal frame
 
 # the vectors and powers of the embedding, by the structure of the group
-def _terms(cs):
-  pg = cs.Laue().properGroup()
+def _terms(CS):
+  pg = CS.Laue().properGroup()
   axes, mult = pg.elements()
   axes = axes.data.reshape(-1, 3) if axes.size else np.zeros((0, 3))
   mult = np.asarray(mult)
@@ -63,7 +63,7 @@ def _terms(cs):
   if dihedral:
     l1 = axes[perp[0]] / np.linalg.norm(axes[perp[0]])
   else:
-    a = cs.aAxis.data.reshape(3)
+    a = CS.aAxis.data.reshape(3)
     l1 = a - (a @ c) * c
     l1 = l1 / np.linalg.norm(l1)
   return [l1, c], [n, 2 if dihedral else 1], _weights(n, dihedral)
@@ -185,9 +185,9 @@ class embeddingSpec:
   """the recipe of the embedding of a crystal frame: the identity image and the orthonormal
   basis of the space it moves in, built once per frame"""
 
-  def __init__(self, cs):
-    ls, alpha, weights = _terms(cs)
-    rots = rotation(cs.Laue().properGroup().rotations().data.reshape(-1, 4)).matrix()
+  def __init__(self, CS):
+    ls, alpha, weights = _terms(CS)
+    rots = rotation(CS.Laue().properGroup().rotations().data.reshape(-1, 4)).matrix()
     terms = []
     for l, a, w in zip(ls, alpha, weights):
       u = sum(_powerTensor(Q @ l, a) for Q in rots) / len(rots)
@@ -195,7 +195,7 @@ class embeddingSpec:
       if z is not None:
         u = u - (z @ u) / (z @ z) * z                      # the mean over SO(3)
       terms.append(w * u)
-    self.frame, self.alpha, self.weights = cs, list(alpha), list(weights)
+    self.frame, self.alpha, self.weights = CS, list(alpha), list(weights)
     self.offsets = np.concatenate([[0], np.cumsum([len(t) for t in terms])]).astype(int)
     self.u0 = np.concatenate(terms)
     self.basis = _orbitBasis(self.u0, self.alpha, self.offsets)
@@ -217,12 +217,12 @@ class embeddingSpec:
     return display(header("embeddingSpec", frameLabel(self.frame)), [("terms", len(self.alpha)), ("dimension", len(self.u0))])
 
 
-def _spec(cs):
-  if not isinstance(cs, crystalFrame):
+def _spec(CS):
+  if not isinstance(CS, crystalFrame):
     raise ValueError("the embedding is defined for a crystal frame")
-  key = id(cs)
+  key = id(CS)
   if key not in _SPECS:
-    _SPECS[key] = embeddingSpec(cs)
+    _SPECS[key] = embeddingSpec(CS)
   return _SPECS[key]
 
 
@@ -402,9 +402,9 @@ class embedding:
 
 
 # a handful of orientations to start from, the coarsest grid the group allows
-def _seedRotations(cs):
+def _seedRotations(CS):
   from ..geometry.grids.so3grid import equispacedSO3Grid
-  return equispacedSO3Grid(cs, points=20).data.reshape(-1, 4)
+  return equispacedSO3Grid(CS, points=20).data.reshape(-1, 4)
 
 
 def double(e, full=False):

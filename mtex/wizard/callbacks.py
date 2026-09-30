@@ -625,13 +625,13 @@ def snapLattice(symbol, abc, abg, driver=None):
   return abc, abg
 
 
-def freeCells(cs):
+def freeCells(CS):
   """which cells of a row the lattice leaves free"""
-  if not cs.isIndexed:
+  if not CS.isIndexed:
     return {c: False for c in PHASE_COLUMNS}
   from ..geometry.frames import _uniqueMonoclinicAxis
-  lat = cs.lattice
-  unique = _uniqueMonoclinicAxis(cs.pointGroup)
+  lat = CS.lattice
+  unique = _uniqueMonoclinicAxis(CS.pointGroup)
   lengths, angles = lat.freeLengths, lat.freeAngles(unique if unique is not None else 1)
   return {"a": lengths[0], "b": lengths[1], "c": lengths[2], "alpha": angles[0], "beta": angles[1], "gamma": angles[2]}
 

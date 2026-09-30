@@ -229,8 +229,8 @@ def _asDirections(h):
   return v.data.reshape(-1, 3), v.shape
 
 
-def _sym(cs):
-  return cs.sym if isinstance(cs, referenceFrame) else cs
+def _sym(CS):
+  return CS.sym if isinstance(CS, referenceFrame) else CS
 
 
 class directionColorKey:
@@ -241,10 +241,10 @@ class directionColorKey:
     key.plot()                       the key drawn on its sector
   """
 
-  def __init__(self, cs):
-    self.CS = cs
-    self.sym = _sym(cs)
-    self.sR = conventionalSector(cs)
+  def __init__(self, CS):
+    self.CS = CS
+    self.sym = _sym(CS)
+    self.sR = conventionalSector(CS)
 
   @property
   def keySector(self):
@@ -280,26 +280,26 @@ class HSVDirectionKey(directionColorKey):
   yellow, and the key comes closer to MTEX's and less even.
   """
 
-  def __init__(self, cs=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
+  def __init__(self, CS=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
                grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False, hueLightness=0.0):
     # HSVDirectionKey() colours the whole sphere of the specimen; antipodal=True the key of axes
     from ..geometry.frames import specimenFrame
     from ..geometry.vector3d import vector3d as _v
     # HSVDirectionKey(v): the key of the frame the directions live in, MATLAB's call
-    if isinstance(cs, _v):
-      antipodal = antipodal or cs.antipodal
-      cs = specimenFrame.default if cs.frame is None else cs.frame
-    cs = specimenFrame.default if cs is None else cs
-    if antipodal and hasattr(cs, "Laue"):
-      cs = cs.Laue()
-    super().__init__(cs)
+    if isinstance(CS, _v):
+      antipodal = antipodal or CS.antipodal
+      CS = specimenFrame.default if CS.frame is None else CS.frame
+    CS = specimenFrame.default if CS is None else CS
+    if antipodal and hasattr(CS, "Laue"):
+      CS = CS.Laue()
+    super().__init__(CS)
     sector = self.sR if sR is None else sR
     N = uniqueNormals(sector)
     self.folds = sectorFolds(self.sym, sector)
     self.sR = sphericalRegion(np.array(N).reshape(-1, 3), np.zeros(len(N)), frame=sector.frame)
     self.reduced = sphericalRegion(np.array(N + self.folds).reshape(-1, 3), np.zeros(len(N) + len(self.folds)), frame=sector.frame)
     self.whiteCenter = vector3d(regionCenter(self.reduced) if whiteCenter is None else _unit(_asDirections(whiteCenter)[0][0]), isNormalized=True)
-    pC = cs.how2plot if isinstance(cs, referenceFrame) and cs.how2plot is not None else plottingConvention.default
+    pC = CS.how2plot if isinstance(CS, referenceFrame) and CS.how2plot is not None else plottingConvention.default
     self.reference = pC.east
     self.maxAngle = float(maxAngle)
     self.colorStretching, self.grayValue, self.grayGradient = colorStretching, grayValue, grayGradient
@@ -356,8 +356,8 @@ class TSLDirectionKey(directionColorKey):
   centre, unfolded and without the hue correction; HKL blends the three primaries linearly
   over the polar angle and the azimuth of the sector"""
 
-  def __init__(self, cs):
-    super().__init__(cs.Laue() if isinstance(cs, referenceFrame) else cs.Laue())
+  def __init__(self, CS):
+    super().__init__(CS.Laue() if isinstance(CS, referenceFrame) else CS.Laue())
     V = self.sR.vertices().data.reshape(-1, 3)
     self.center = regionCenter(self.sR)
     self.reference = V[0] if len(V) else np.array([1.0, 0.0, 0.0])
@@ -384,8 +384,8 @@ class HKLDirectionKey(directionColorKey):
 
     key = HKLDirectionKey(cs)"""
 
-  def __init__(self, cs):
-    super().__init__(cs.Laue())
+  def __init__(self, CS):
+    super().__init__(CS.Laue())
     V = self.sR.vertices().data.reshape(-1, 3)
     theta = np.arccos(np.clip(V[:, 2], -1, 1)) if len(V) else np.zeros(0)
     rho = np.array([np.arctan2(v[1], v[0]) for v in V if abs(v[2]) < 1 - 1e-6])
@@ -425,12 +425,12 @@ class spotDirectionKey(directionColorKey):
     spotDirectionKey(cs, center=Miller(1, 1, 1, cs), color=(0, 0, 1), psi=S2DeLaValleePoussinKernel(halfwidth=7.5*degree))
   """
 
-  def __init__(self, cs, center=None, color=(1.0, 0.0, 0.0), psi=None):
-    super().__init__(cs)
+  def __init__(self, CS, center=None, color=(1.0, 0.0, 0.0), psi=None):
+    super().__init__(CS)
     from ..functions.kernelfunctions import S2DeLaValleePoussinKernel
     self.psi = S2DeLaValleePoussinKernel(halfwidth=10 * degree) if psi is None else psi
     self.color = np.asarray(color, dtype=float).reshape(-1, 3)
-    self.frame = cs if isinstance(cs, referenceFrame) else None
+    self.frame = CS if isinstance(CS, referenceFrame) else None
     self.center = vector3d(0, 0, 1) if center is None else center
     if center is not None and len(self.color) != len(self.equivalents):
       raise ValueError("one colour per centre")

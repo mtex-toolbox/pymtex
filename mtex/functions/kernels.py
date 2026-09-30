@@ -929,8 +929,8 @@ def _qmul4(a0, a1, a2, a3, b0, b1, b2, b3):
           a2 * b0 + a3 * b1 + a0 * b2 - a1 * b3, a3 * b0 - a2 * b1 + a1 * b2 + a0 * b3)
 
 
-def _rbfSampleLoop(out, U, cs, cumP, omega, cdf, L, R, antipodal):
-  nc, nw = cs.shape[0], omega.shape[0]
+def _rbfSampleLoop(out, U, CS, cumP, omega, cdf, L, R, antipodal):
+  nc, nw = CS.shape[0], omega.shape[0]
   for i in prange(out.shape[0]):
     u = U[i]
     k = np.searchsorted(cumP, u[0], side="right")
@@ -938,7 +938,7 @@ def _rbfSampleLoop(out, U, cs, cumP, omega, cdf, L, R, antipodal):
       w = omega[min(np.searchsorted(cdf, u[1]), nw - 1)]
       z, phi = 2 * u[2] - 1, 2 * math.pi * u[3]
       s, r = math.sin(w / 2), math.sqrt(max(0.0, 1 - z * z))
-      q = _qmul4(cs[k, 0], cs[k, 1], cs[k, 2], cs[k, 3], math.cos(w / 2), s * r * math.cos(phi), s * r * math.sin(phi), s * z)
+      q = _qmul4(CS[k, 0], CS[k, 1], CS[k, 2], CS[k, 3], math.cos(w / 2), s * r * math.cos(phi), s * r * math.sin(phi), s * z)
     else:
       a, b = math.sqrt(1 - u[1]), math.sqrt(u[1])
       q = (a * math.sin(2 * math.pi * u[2]), a * math.cos(2 * math.pi * u[2]), b * math.sin(2 * math.pi * u[3]), b * math.cos(2 * math.pi * u[3]))
@@ -956,13 +956,13 @@ def _rbfSampleLoop(out, U, cs, cumP, omega, cdf, L, R, antipodal):
 SAMPLE_CHUNK = 1 << 20
 
 
-def rbfSample(n, rng, cs, probs, omega, cdf, L, R, antipodal):
+def rbfSample(n, rng, CS, probs, omega, cdf, L, R, antipodal):
   """n random quaternions from a radial basis function: a centre by its weight or the uniform part,
   the angle from the kernel's distribution, a uniform axis and a random symmetry on both sides"""
   out = np.empty((n, 4))
   cumP = np.cumsum(probs / probs.sum())
   loop = _parallel("rbfSample", _rbfSampleLoop)
-  args = (np.ascontiguousarray(cs, dtype=float), cumP, omega, cdf, np.ascontiguousarray(L, dtype=float),
+  args = (np.ascontiguousarray(CS, dtype=float), cumP, omega, cdf, np.ascontiguousarray(L, dtype=float),
           np.ascontiguousarray(R, dtype=float), bool(antipodal))
   for a in range(0, n, SAMPLE_CHUNK):
     b = min(n, a + SAMPLE_CHUNK)

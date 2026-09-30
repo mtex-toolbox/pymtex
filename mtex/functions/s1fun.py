@@ -77,7 +77,7 @@ class S1FunHarmonic:
     return f
 
   @classmethod
-  def interpolate(cls, x, values, bandwidth=None, weights=None, regularization=1e-5, SobolevIndex=2, tol=1e-6, maxIter=100):
+  def interpolate(cls, x, values, bandwidth=None, weights=None, regularisation=1e-5, SobolevIndex=2, tol=1e-6, maxIter=100):
     """the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
     quadrature; others merged where they coincide and fitted by least squares at the
     bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR"""
@@ -101,7 +101,7 @@ class S1FunHarmonic:
     L = min(int(np.floor(n / 4 + 0.5)), getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)
     from .density import _lsqr
     sw = np.sqrt(w)
-    reg = math.sqrt(regularization) * np.abs(np.arange(-L, L + 1)) ** SobolevIndex
+    reg = math.sqrt(regularisation) * np.abs(np.arange(-L, L + 1)) ** SobolevIndex
     A = lambda c: np.concatenate([sw * fourierSeries(c[::-1], x, real=False), reg * c])
     At = lambda z: fourierSeriesAdjoint(x, sw * z[:n], L, np.ones(n))[::-1] + reg * z[n:]
     b = np.concatenate([sw * values, np.zeros(2 * L + 1)]).astype(complex)

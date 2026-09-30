@@ -18,9 +18,9 @@ def l2(v):
   return float(np.linalg.norm(v._fhat))
 
 
-def randomField(L, cs, ss, real=True, gen=rng):
+def randomField(L, CS, SS, real=True, gen=rng):
   c = gen.standard_normal(deg2dim(L + 1)) + 1j * gen.standard_normal(deg2dim(L + 1))
-  return SO3FunHarmonic(c, cs, ss, real=real)
+  return SO3FunHarmonic(c, CS, SS, real=real)
 
 
 def relerr(a, b):
@@ -41,8 +41,8 @@ def gradientField():
 
 
 # a random field of -3m and 222 of bandwidth 6, not a gradient
-def randomVectorField(cs, ss, L=6):
-  return SO3VectorFieldHarmonic(rng.standard_normal((deg2dim(L + 1), 3)) + 1j * rng.standard_normal((deg2dim(L + 1), 3)), cs, ss)
+def randomVectorField(CS, SS, L=6):
+  return SO3VectorFieldHarmonic(rng.standard_normal((deg2dim(L + 1), 3)) + 1j * rng.standard_normal((deg2dim(L + 1), 3)), CS, SS)
 
 
 def test_differentiate_isTheAngularMomentumMatrixOnEitherSide():
@@ -231,11 +231,11 @@ def test_rotate_byANormaliserKeepsTheGroup():
 
 
 # the bandwidth of the quadrature rule for the gradient field and its nodes
-def quadratureNodes(cs, ss, g):
+def quadratureNodes(CS, SS, g):
   cA, cB = g.componentFrames()
   L = bandwidthFor(g.bandwidth, cA, cB)
   rule = quadratureSO3Grid(L, cA, cB)
-  return L, rule, orientation(rotation(rule.nodes()), cs, ss)
+  return L, rule, orientation(rotation(rule.nodes()), CS, SS)
 
 
 def test_SO3VectorFieldHarmonic_fromSamplesOnTheQuadratureRule(gradientField):

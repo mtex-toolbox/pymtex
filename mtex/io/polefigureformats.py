@@ -38,8 +38,8 @@ def _float(s):
 
 
 # the frame the directions are written in: the caller's, else the file's, else cubic
-def _frame(cs, fromFile=None):
-  return cs if cs is not None else fromFile if fromFile is not None else crystalFrame("m-3m")
+def _frame(CS, fromFile=None):
+  return CS if CS is not None else fromFile if fromFile is not None else crystalFrame("m-3m")
 
 
 def millerIndices(s):
@@ -55,24 +55,24 @@ def millerIndices(s):
   return idx if len(idx) in (3, 4) else None
 
 
-def millerFromGroup(s, cs):
+def millerFromGroup(s, CS):
   """the Miller indices a field of a pole figure header writes, in the frame cs"""
   idx = millerIndices(s)
   if idx is None:
     raise ValueError(f"cannot read {s.strip()!r} as Miller indices")
-  return Miller(*idx, cs)
+  return Miller(*idx, CS)
 
 
 # the crystal direction a file name carries, the caller's where given
-def _fromName(path, cs, h=None):
+def _fromName(path, CS, h=None):
   from .loadpolefigure import string2Miller
-  return h if h is not None else string2Miller(os.path.basename(path), cs)
+  return h if h is not None else string2Miller(os.path.basename(path), CS)
 
 
 # the k-th of the directions the caller named for a file of npf pole figures
-def _directionOf(h, k, npf, path, cs):
+def _directionOf(h, k, npf, path, CS):
   if h is None:
-    return _fromName(path, cs)
+    return _fromName(path, CS)
   hs = _entries(h)
   if npf == 1 and len(hs) == 1:
     return hs[0]
@@ -232,7 +232,7 @@ def latticeFromSymbol(s):
 
 # ------------------------------------------------------------------ ana
 
-def readAna(lines, path, cs, h=None):
+def readAna(lines, path, CS, h=None):
   """a comment and twenty numbers that give the two ladders"""
   head, i = numberBlock(lines, 1, 20)
   n = int(round(head[0]))
@@ -240,18 +240,18 @@ def readAna(lines, path, cs, h=None):
   if r.size != n:
     raise ValueError(f"the header announces {n} values on a grid of {r.size}")
   I, _ = numberBlock(lines, i, n)
-  cs = _frame(cs)
-  return [_fromName(path, cs, h)], [r], [onGrid(I, r)], cs
+  CS = _frame(CS)
+  return [_fromName(path, CS, h)], [r], [onGrid(I, r)], CS
 
 
 # ------------------------------------------------------------------ popla
 
-def readPopla(lines, path, cs, h=None):
+def readPopla(lines, path, CS, h=None):
   """a comment, a header of five character fields, then counts in four character ones; two
   flags of the header say whether a ladder starts at a cell centre or an edge, and the
   scale is a divisor. Its rings close, 18, 18, 18 and 19 values, so a block is read to its
   blank line and the header's count kept"""
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, rs, Is = [], [], []
   i = 0
   while i + 1 < len(lines) and lines[i + 1].strip():
@@ -263,26 +263,26 @@ def readPopla(lines, path, cs, h=None):
     rho = ladderOf(dr / 2 if flag(1) == 0 else 0.0, dr, rmax - dr / (2 if flag(1) == 0 else 1))
     r = regularGrid(theta, rho)
     I, i = fixedBlock(lines, i + 2, r.size, 4, 18, toBlank=True)
-    hs.append(millerFromGroup(s[:5], cs))
+    hs.append(millerFromGroup(s[:5], CS))
     rs.append(r)
     Is.append(onGrid(I / scale, r))
   if not hs:
     raise ValueError(f"{path} holds no Popla header")
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
 # ------------------------------------------------------------------ LaboTEX
 
-def readLabotex(lines, path, cs, h=None):
+def readLabotex(lines, path, CS, h=None):
   """a structure code with the cell, one header line per pole figure with its own ladders,
   then the blocks in the same order"""
   c, _ = numberBlock(lines, 3, 7)
-  cs = _frame(cs, structureFrame(int(round(c[0])), c[1:4], c[4:7]))
+  CS = _frame(CS, structureFrame(int(round(c[0])), c[1:4], c[4:7]))
   npf = int(round(numberBlock(lines, 4, 1)[0][0]))
   heads = []
   for n in range(npf):
     hr, _ = numberBlock(lines, 6 + n, 11)
-    heads.append((Miller(hr[8], hr[9], hr[10], cs), regularGrid(ladderOf(hr[1], hr[3], hr[2]), ladderOf(hr[4], hr[6], hr[5]))))
+    heads.append((Miller(hr[8], hr[9], hr[10], CS), regularGrid(ladderOf(hr[1], hr[3], hr[2]), ladderOf(hr[4], hr[6], hr[5]))))
   i = 6 + npf
   hs, rs, Is = [], [], []
   for hkl, r in heads:
@@ -290,7 +290,7 @@ def readLabotex(lines, path, cs, h=None):
     hs.append(hkl)
     rs.append(r)
     Is.append(onGrid(I, r))
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
 # ------------------------------------------------------------------ Aachen
@@ -317,7 +317,7 @@ def isAachenHeader(l):
   return 0.5 < dt < 20 and 0.5 < dr < 20 and 10 <= tmax <= 90
 
 
-def readAachen(lines, path, cs, h=None):
+def readAachen(lines, path, CS, h=None):
   """the pole figures of an Aachen file, one per header, each block to the next header scaled by the
   factor it states: the lists of directions, grids and intensities and the crystal frame"""
   heads = [i for i, l in enumerate(lines) if isAachenHeader(l)]
@@ -329,7 +329,7 @@ def readAachen(lines, path, cs, h=None):
     s = lines[i]
     m = AACHEN_FORMAT.search(s[35:])
     count, width = (int(m.group(1)), int(m.group(2))) if m else (18, 4)
-    fr = _frame(cs, latticeFromSymbol(s[5:10]))
+    fr = _frame(CS, latticeFromSymbol(s[5:10]))
     dt, dr, tmax = float(s[10:15]), float(s[15:20]), float(s[20:25])
     iwin, isim = int(s[25:30]), int(s[30:35])
     rmax = {0: 360.0, 2: 180.0, 4: 90.0}.get(isim)
@@ -347,7 +347,7 @@ def readAachen(lines, path, cs, h=None):
 
 # ------------------------------------------------------------------ Philips
 
-def readPhilips(lines, path, cs, h=None):
+def readPhilips(lines, path, CS, h=None):
   """the two ladders on their own named lines, the block a table whose first column is the
   azimuth it stands for; the azimuth ladder closes the turn, so its last point is the first"""
   def ladder(name):
@@ -366,16 +366,16 @@ def readPhilips(lines, path, cs, h=None):
   I = np.stack(cols[1:], axis=1)
   if I.shape != r.shape:
     raise ValueError(f"the table is {I.shape} where the grid is {r.shape}")
-  cs = _frame(cs)
-  return [_fromName(path, cs, h)], [r], [I], cs
+  CS = _frame(CS)
+  return [_fromName(path, CS, h)], [r], [I], CS
 
 
 # ------------------------------------------------------------------ the grid a constant or a count of the header
 
-def readPlf(lines, path, cs, h=None):
+def readPlf(lines, path, CS, h=None):
   """Queens plf: a fixed 90 by 17 grid to 80°, one hkl line and one block per pole figure"""
   r = regularS2Grid(points=(90, 17), maxTheta=80 * degree, antipodal=True)
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, Is = [], []
   i = 0
   while i < len(lines):
@@ -384,17 +384,17 @@ def readPlf(lines, path, cs, h=None):
       i += 1
       continue
     I, i = numberBlock(lines, i + 1, r.size)
-    hs.append(Miller(*idx, cs))
+    hs.append(Miller(*idx, CS))
     Is.append(onGrid(I, r))
   if not hs:
     raise ValueError(f"{path} holds no hkl line")
-  return hs, [r] * len(hs), Is, cs
+  return hs, [r] * len(hs), Is, CS
 
 
-def readIbm(lines, path, cs, h=None):
+def readIbm(lines, path, CS, h=None):
   """IBM: a header line per pole figure with its indices and ring counts, and the polar angle
   the scan reached on the line after it, where MATLAB spreads the rings over the sphere"""
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, rs, Is = [], [], []
   i = 0
   while i < len(lines):
@@ -407,17 +407,17 @@ def readIbm(lines, path, cs, h=None):
     if m is None:
       raise ValueError(f"{path} states no WKO line for the pole figure of line {i + 1}")
     r = regularS2Grid(points=(nr, steps + 1), maxTheta=float(m.group(1)) * degree, antipodal=True)
-    hkl = millerFromGroup(firstToken(lines[i]), cs)
+    hkl = millerFromGroup(firstToken(lines[i]), CS)
     I, i = numberBlock(lines, i + 2, r.size)
     hs.append(hkl)
     rs.append(r)
     Is.append(onGrid(I, r))
   if not hs:
     raise ValueError(f"{path} holds no IBM header")
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
-def readOut1(lines, path, cs, h=None):
+def readOut1(lines, path, CS, h=None):
   """GADDS out1: a two column table of several pole figures on one fixed grid, a point not
   measured written with a negative intensity; the file names no reflections, so the caller
   has to, where MATLAB fills in a list of eight it keeps in the reader"""
@@ -441,26 +441,26 @@ def readOut1(lines, path, cs, h=None):
     keep = v >= 0
     rs.append(r[keep])
     Is.append(v[keep])
-  return hs, rs, Is, _frame(cs)
+  return hs, rs, Is, _frame(CS)
 
 
-def readSlc(lines, path, cs, h=None):
+def readSlc(lines, path, CS, h=None):
   """slc: a table whose first column is the azimuth in tens of degrees and whose others are
   the polar ladder, from the pole down to the other pole"""
   cols = readColumns([l.replace("FRAME", " ") for l in lines])
   if len(cols) <= 2:
     raise ValueError(f"{path} holds {len(cols)} columns")
   r = regularS2Grid(theta=np.linspace(np.pi / 2, -np.pi / 2, len(cols) - 1), rho=cols[0] * 10 * degree, antipodal=True)
-  cs = _frame(cs)
-  return [_fromName(path, cs, h)], [r], [np.stack(cols[1:], axis=1)], cs
+  CS = _frame(CS)
+  return [_fromName(path, CS, h)], [r], [np.stack(cols[1:], axis=1)], CS
 
 
-def readBeartex(lines, path, cs, h=None):
+def readBeartex(lines, path, CS, h=None):
   """BearTex: seven header lines per pole figure, the cell and the two structure codes on the
   sixth and the indices with the polar range of the scan on the seventh; the block holds
   the whole 5° grid and the header says which rings were measured"""
   hs, rs, Is = [], [], []
-  fr = cs
+  fr = CS
   grid = ringOrder(regularS2Grid(points=(72, 19), antipodal=True))
   i = 0
   while i + 6 < len(lines):
@@ -490,7 +490,7 @@ XRD_TOKENS = ((r"\*MEAS_SCAN_START\s*\"(\S*)\"", r"\*MEAS_SCAN_STEP\s*\"(\S*)\""
               (r"\*START\s*=\s*(\S*)", r"\*STEP\s*=\s*(\S*)", r"\*STOP\s*=\s*(\S*)", r"\*PF_AANGLE\s*=\s*(\S*)"))
 
 
-def readXrd(lines, path, cs, h=None):
+def readXrd(lines, path, CS, h=None):
   """the pole figure of an xrd file, its grid from the scan and tilt tokens of the header in either
   spelling of the vendors: the lists of direction, grid and intensities and the crystal frame"""
   def values(token):
@@ -506,23 +506,23 @@ def readXrd(lines, path, cs, h=None):
       d = d[1::3]
     if len(d) < r.size:
       raise ValueError(f"{path} holds {len(d)} values on a grid of {r.size}")
-    cs = _frame(cs)
-    return [_fromName(path, cs, h)], [r], [onGrid(d[:r.size], r)], cs
+    CS = _frame(CS)
+    return [_fromName(path, CS, h)], [r], [onGrid(d[:r.size], r)], CS
   raise ValueError(f"{path} carries neither spelling of the scan tokens")
 
 
 # ------------------------------------------------------------------ the sections a marker opens
 
-def readSiemens(lines, path, cs, h=None):
+def readSiemens(lines, path, CS, h=None):
   """Siemens D5000: `*Pole figure:` opens one and names its indices, `*Khi` opens a ring at its
   polar angle, and the background lines after it are subtracted from that ring. The counts
   sit in eight character fields, and a five digit one fills its field, so a line is cut
   into its fields rather than split at the blanks"""
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, rs, Is = [], [], []
   for sec in markerSections(lines, lambda l: "*Pole figure:" in l):
     first = lines[sec[0]]
-    hkl = millerFromGroup(first[first.index("*Pole figure:") + 13:].strip(), cs)
+    hkl = millerFromGroup(first[first.index("*Pole figure:") + 13:].strip(), CS)
     theta, I, bg = [], [], []
     for k in sec[1:]:
       l = lines[k]
@@ -551,19 +551,19 @@ def readSiemens(lines, path, cs, h=None):
     Is.append(onGrid(I, r))
   if not hs:
     raise ValueError(f"{path} holds no '*Pole figure:' line")
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
-def readJuelich(lines, path, cs, h=None):
+def readJuelich(lines, path, CS, h=None):
   """Jülich: two header lines, then the polar angle, the azimuth and the count"""
   cols = readColumns(lines)
   if len(cols) < 3:
     raise ValueError(f"a Jülich file holds three columns, this one {len(cols)}")
-  cs = _frame(cs)
-  return [_directionOf(h, 0, 1, path, cs)], [polarList(cols[0], cols[1])], [cols[2]], cs
+  CS = _frame(CS)
+  return [_directionOf(h, 0, 1, path, CS)], [polarList(cols[0], cols[1])], [cols[2]], CS
 
 
-def readGeesthacht(lines, path, cs, h=None):
+def readGeesthacht(lines, path, CS, h=None):
   """Geesthacht: a `$` commented header and one row per measured direction, its second column
   the scan the row belongs to and its fourth the elevation above the equator; the last field
   is the time the point was counted, written 00:07.76. The rows of one scan are one pole figure"""
@@ -573,10 +573,10 @@ def readGeesthacht(lines, path, cs, h=None):
   scan, elevation, rho, I = cols[1], cols[3], cols[4], cols[5]
   bounds = np.concatenate([[0], np.flatnonzero(np.diff(scan) != 0) + 1, [scan.size]])
   npf = len(bounds) - 1
-  cs = _frame(cs)
+  CS = _frame(CS)
   sl = [slice(bounds[k], bounds[k + 1]) for k in range(npf)]
-  return ([_directionOf(h, k, npf, path, cs) for k in range(npf)], [polarList(90 - elevation[s], rho[s]) for s in sl],
-          [I[s] for s in sl], cs)
+  return ([_directionOf(h, k, npf, path, CS) for k in range(npf)], [polarList(90 - elevation[s], rho[s]) for s in sl],
+          [I[s] for s in sl], CS)
 
 
 def _keyValue(s):
@@ -584,7 +584,7 @@ def _keyValue(s):
   return k.strip(), v.strip()
 
 
-def readNja(lines, path, cs, h=None):
+def readNja(lines, path, CS, h=None):
   """Seifert nja: an `&KEY=value` header that names the reflection and the ladders, and the
   block the `#Values` line opens, the two angles, the count and its background. MATLAB reads
   the indices from token positions and the block from a fixed line, which drops its first
@@ -603,23 +603,23 @@ def readNja(lines, path, cs, h=None):
     raise ValueError(f"an nja block holds four columns, this one {len(cols)}")
   if "NOVALUES" in keys and cols[0].size != int(keys["NOVALUES"]):
     raise ValueError(f"{path} announces {keys['NOVALUES']} values and holds {cols[0].size}")
-  cs = _frame(cs)
+  CS = _frame(CS)
   if h is not None:
     hkl = h
   elif all(k in keys for k in ("H", "K", "L")):
-    hkl = Miller(*(float(keys[k]) for k in ("H", "K", "L")), cs)
+    hkl = Miller(*(float(keys[k]) for k in ("H", "K", "L")), CS)
   else:
-    hkl = _fromName(path, cs)
-  return [hkl], [polarList(cols[0], cols[1])], [cols[2]], cs
+    hkl = _fromName(path, CS)
+  return [hkl], [polarList(cols[0], cols[1])], [cols[2]], CS
 
 
-def readPwd(lines, path, cs, h=None):
+def readPwd(lines, path, CS, h=None):
   """a Siemens defocussing curve: `R111` opens the curve of that reflection, whose rows hold
   the polar angle, the intensity and the background under it, one azimuth"""
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, rs, Is = [], [], []
   for sec in markerSections(lines, lambda l: re.match(r"^\s*R\s*[0-9\-]+\s*$", l) is not None):
-    hkl = millerFromGroup(lines[sec[0]].strip()[1:].strip(), cs)
+    hkl = millerFromGroup(lines[sec[0]].strip()[1:].strip(), CS)
     rows = [v for v in (numbersOf([lines[k]]) for k in sec[1:] if isNumericRow(lines[k])) if len(v) >= 3]
     if not rows:
       continue
@@ -629,32 +629,32 @@ def readPwd(lines, path, cs, h=None):
     Is.append(np.array([v[1] - v[2] for v in rows]))
   if not hs:
     raise ValueError(f"{path} holds no reflection line")
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
-def readRigaku(lines, path, cs, h=None):
+def readRigaku(lines, path, CS, h=None):
   """Rigaku 3DExplore: a header of `#` lines and the elevation above the equator, the azimuth
   and the count"""
   cols = readColumns(lines)
   if len(cols) < 3:
     raise ValueError(f"a Rigaku table holds three columns, this one {len(cols)}")
-  cs = _frame(cs)
-  return [_directionOf(h, 0, 1, path, cs)], [polarList(90 - cols[0], cols[1])], [cols[2]], cs
+  CS = _frame(CS)
+  return [_directionOf(h, 0, 1, path, CS)], [polarList(90 - cols[0], cols[1])], [cols[2]], CS
 
 
-def readRigakuDat(lines, path, cs, h=None):
+def readRigakuDat(lines, path, CS, h=None):
   """Rigaku raster: a direction written as its two components in the plane, in degrees off the
   pole, so the polar angle is their distance from it and the azimuth their angle"""
   cols = readColumns(lines)
   if len(cols) < 4:
     raise ValueError(f"a Rigaku raster holds four columns, this one {len(cols)}")
   x, y = cols[0], cols[1]
-  cs = _frame(cs)
+  CS = _frame(CS)
   r = vector3d.byPolar(np.hypot(x, y) * degree, np.arctan2(y, x), antipodal=True)
-  return [_directionOf(h, 0, 1, path, cs)], [r], [cols[3]], cs
+  return [_directionOf(h, 0, 1, path, CS)], [r], [cols[3]], CS
 
 
-def readRigakuTxt(lines, path, cs, h=None, theta=None):
+def readRigakuTxt(lines, path, CS, h=None, theta=None):
   """Rigaku text: one section per ring, each stating the azimuth ladder it was scanned on. The
   polar ladder is nowhere in the file: MATLAB takes the azimuth step for it and counts the
   rings down from the last, reaching past the pole; the same count without that step off
@@ -688,8 +688,8 @@ def readRigakuTxt(lines, path, cs, h=None, theta=None):
   if theta is None and max(th) < 45:
     warnings.warn(f"{path} states no polar ladder, and the azimuth step puts its {len(secs)} rings {step}° apart, reaching "
                   f"{max(th)}°; pass theta=... where the scan covered another range", stacklevel=3)
-  cs = _frame(cs)
-  return [_directionOf(h, 0, 1, path, cs)], [polarList(th, rho)], [np.array(I)], cs
+  CS = _frame(CS)
+  return [_directionOf(h, 0, 1, path, CS)], [polarList(th, rho)], [np.array(I)], CS
 
 
 # ------------------------------------------------------------------ the binary ones and the XML one
@@ -702,7 +702,7 @@ def gaddsRecord(raw, record):
   return raw[a + 8:a + 80].decode("latin-1").strip()
 
 
-def readGpol(lines, path, cs, h=None, raw=None):
+def readGpol(lines, path, CS, h=None, raw=None):
   """GADDS gpol: an image of the pole figure in a stereographic projection, one pixel per
   measured direction and zero where nothing was, the counts that do not fit a pixel listed
   after the image as sixteen character records of nine digits of count and seven of position"""
@@ -734,8 +734,8 @@ def readGpol(lines, path, cs, h=None, raw=None):
   i1, i2 = rr + 1.0, c + 1.0
   theta = 2 * np.arctan(np.hypot(i1 - ncols / 2 - 0.5, i2 - rows / 2 - 0.5) / (rows / 2 - 1))
   rho = -np.arctan2(i2 - rows / 2 - 0.5, i1 - ncols / 2 - 0.5)
-  cs = _frame(cs)
-  return [_directionOf(h, 0, 1, path, cs)], [vector3d.byPolar(theta, rho, antipodal=True)], [MT[c, rr]], cs
+  CS = _frame(CS)
+  return [_directionOf(h, 0, 1, path, CS)], [vector3d.byPolar(theta, rho, antipodal=True)], [MT[c, rr]], CS
 
 
 # the elements of one tag, as the attributes of the opening tag and the text between the two
@@ -773,7 +773,7 @@ def _xmlPositions(scan):
   return out
 
 
-def readXrdml(lines, path, cs, h=None, raw=None):
+def readXrdml(lines, path, CS, h=None, raw=None):
   """the PANalytical XML: one scan per ring, the direction of a point the goniometer put
   together out of the four angles the scan states, Rz(phi) Ry(psi) Rx(omega + (pi - 2theta) / 2)
   applied to y; read with a tag scanner, since the file is machine written and regular"""
@@ -781,7 +781,7 @@ def readXrdml(lines, path, cs, h=None, raw=None):
   measurements = _xmlElements(txt, "xrdMeasurement")
   if not measurements:
     raise ValueError(f"{path} holds no xrdMeasurement")
-  cs = _frame(cs)
+  CS = _frame(CS)
   hs, rs, Is = [], [], []
   for k, (_, measurement) in enumerate(measurements):
     xyz, I, hkl = [], [], None
@@ -805,15 +805,15 @@ def readXrdml(lines, path, cs, h=None, raw=None):
       if hkl is None and refl:
         idx = [_xmlText(refl[0][1], n) for n in ("h", "k", "l")]
         if all(x is not None for x in idx):
-          hkl = Miller(*(float(x) for x in idx), cs)
+          hkl = Miller(*(float(x) for x in idx), CS)
     if not I:
       continue
-    hs.append(_directionOf(h, k, len(measurements), path, cs) if h is not None else hkl if hkl is not None else _fromName(path, cs))
+    hs.append(_directionOf(h, k, len(measurements), path, CS) if h is not None else hkl if hkl is not None else _fromName(path, CS))
     rs.append(vector3d(np.concatenate(xyz), antipodal=True))
     Is.append(np.concatenate(I))
   if not hs:
     raise ValueError(f"{path} holds no scan with intensities")
-  return hs, rs, Is, cs
+  return hs, rs, Is, CS
 
 
 __all__ = []

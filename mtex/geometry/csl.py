@@ -140,7 +140,7 @@ def _coincidences(A, ops, sigma, delta=1e-9):
   return R[ok], X
 
 
-def CSL(sigma, cs, *args, delta=0):
+def CSL(sigma, CS, *args, delta=0):
   """the coincidence site lattice misorientations of order sigma - an integer or a list of them -
   of the lattice of the crystal frame cs, as misorientations from cs to cs with grain exchange,
   ascending in sigma and then in angle: CSL(3, cs) is the twin of a cubic lattice. Any lattice
@@ -156,24 +156,24 @@ def CSL(sigma, cs, *args, delta=0):
   sigmas = [int(s) for s in np.atleast_1d(sigma)]
   if any(s < 1 for s in sigmas):
     raise ValueError(f"Sigma is a positive integer, not {sigma}")
-  centering = next((a for a in args if isinstance(a, str)), cs.centering)
+  centering = next((a for a in args if isinstance(a, str)), CS.centering)
   if centering not in CENTERING_BASES:
     raise ValueError(f"the centring of a lattice is one of {', '.join(CENTERING_BASES)}, not {centering!r}")
-  T = np.asarray(CENTERING_BASES["P" if centering == "R" and abs(cs.abg[2] - 2 * np.pi / 3) > 1e-6 else centering])
-  A = (T @ cs.axes.data).T
+  T = np.asarray(CENTERING_BASES["P" if centering == "R" and abs(CS.abg[2] - 2 * np.pi / 3) > 1e-6 else centering])
+  A = (T @ CS.axes.data).T
   if delta > 0:
     A = _rationalBasis(A, delta)
   # the point group acts on the primitive cell by integer matrices, or the centring does not fit it
-  ops = np.linalg.solve(A, cs.properGroup().rot.matrix() @ A)
+  ops = np.linalg.solve(A, CS.properGroup().rot.matrix() @ A)
   if not np.allclose(ops, np.rint(ops), atol=1e-6):
-    raise ValueError(f"the point group {cs.sym.char()} does not keep a lattice centred {centering} in these axes")
+    raise ValueError(f"the point group {CS.sym.char()} does not keep a lattice centred {centering} in these axes")
   ops = np.rint(ops).astype(int)
   found, order = [], []
   for s in sorted(set(sigmas)):
     R, X = _coincidences(A, ops, s)
     if not len(R):
       continue
-    o = project2FundamentalRegionOrientation(orientation(rotation.byMatrix(R), cs, cs, antipodal=True))
+    o = project2FundamentalRegionOrientation(orientation(rotation.byMatrix(R), CS, CS, antipodal=True))
     # one per class: the symmetric equivalents left after the projection are dropped
     keep, left = [], np.arange(o.size)
     while len(left):
@@ -186,7 +186,7 @@ def CSL(sigma, cs, *args, delta=0):
       found.append(o[k])
       order.append((s, float(o[k].angle())))
   if not found:
-    return orientation(rotation(np.zeros((0, 4))), cs, cs, antipodal=True)
+    return orientation(rotation(np.zeros((0, 4))), CS, CS, antipodal=True)
   return orientation.cat(*[found[k] for k in sorted(range(len(found)), key=order.__getitem__)])
 
 

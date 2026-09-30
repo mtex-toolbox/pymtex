@@ -113,9 +113,9 @@ class grain2d(polygonSet):
     """the crystal frame of the one indexed phase of the grains, an error where there are several"""
     return self.CSList[self._onePhase()]
 
-  def cs2phaseId(self, cs):
+  def cs2phaseId(self, CS):
     """the phase id of a frame, a mineral name or a number, MATLAB's cs2phaseId"""
-    return self.CSList.phaseId(cs)
+    return self.CSList.phaseId(CS)
 
   @property
   def mineral(self):

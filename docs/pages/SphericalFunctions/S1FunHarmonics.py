@@ -168,8 +168,8 @@ legend()
 # ## Read the sampled-data fit
 #
 # The curve joins the angular trend and closes periodically between $2\pi$ and zero. The
-# default regularization leaves a maximum residual of about $3.4\cdot10^{-4}$ at these
-# samples. Set bandwidth and regularization deliberately when the data contain noise or
+# default regularisation leaves a maximum residual of about $3.4\cdot10^{-4}$ at these
+# samples. Set bandwidth and regularisation deliberately when the data contain noise or
 # sharp changes.
 #
 # ## Smooth small-scale oscillations

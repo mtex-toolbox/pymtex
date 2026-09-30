@@ -42,8 +42,8 @@ def quartz():
 
 
 # the budget of markers of MATLAB: n orientations times the m elements of the specimen group
-def budget(ori, ss):
-  return min(500, 10000 // (ori.CS.numSym() * ori.SS.numSym())), ss.numSym()
+def budget(ori, SS):
+  return min(500, 10000 // (ori.CS.numSym() * ori.SS.numSym())), SS.numSym()
 
 
 def test_plotPDF_onePanelPerDirectionWithOneMarkerPerOrbit(sample):

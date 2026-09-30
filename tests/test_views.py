@@ -133,7 +133,7 @@ def test_a_key_of_both_hemispheres(monkeypatch):
   from mtex import crystalFrame
   drawn = []
   real = views._hemispherePicture
-  monkeypatch.setattr(views, "_hemispherePicture", lambda key, cs, px, side, **kw: drawn.append(dict(side)) or real(key, cs, px, side, **kw))
+  monkeypatch.setattr(views, "_hemispherePicture", lambda key, CS, px, side, **kw: drawn.append(dict(side)) or real(key, CS, px, side, **kw))
   views.keyPicture(crystalFrame("mm2"), px=120)
   assert drawn == [{"upper": True}, {"lower": True}]
   drawn.clear()

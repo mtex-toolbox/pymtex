@@ -33,9 +33,9 @@ def want(tag):
   return not only or tag in only
 
 
-def randomODF(L, cs, ss):
+def randomODF(L, CS, SS):
   fhat = rng.standard_normal(deg2dim(L + 1)) + 1j * rng.standard_normal(deg2dim(L + 1))
-  return SO3FunHarmonic(fhat, cs, ss, real=True)
+  return SO3FunHarmonic(fhat, CS, SS, real=True)
 
 
 tri = crystalFrame("1")

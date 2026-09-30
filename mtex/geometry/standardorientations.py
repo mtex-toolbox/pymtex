@@ -223,17 +223,17 @@ def _distinctModulo(cand, side):
   return keep
 
 
-def copper(cs, *ss):
+def copper(CS, *ss):
   """(112)[-1-11] is Bunge (90, 35, 45), (112)[11-1] its twin (270, 35, 45)"""
-  return byMiller([1, 1, 2], [-1, -1, 1], cs, *ss)
+  return byMiller([1, 1, 2], [-1, -1, 1], CS, *ss)
 
 
-def copper2(cs, *ss):
+def copper2(CS, *ss):
   """the second copper component, (112)[11-1], Bunge (270, 35, 45) degrees, in cs and the
   specimen frame
 
     ori = orientation.copper2(cs)"""
-  return byMiller([1, 1, 2], [1, 1, -1], cs, *ss)
+  return byMiller([1, 1, 2], [1, 1, -1], CS, *ss)
 
 
 # the other named components of rolling textures, by their Bunge Euler angles in degrees
@@ -244,11 +244,11 @@ STANDARD_EULER = {"cube": (0, 0, 0), "cubeND22": (22, 0, 0), "cubeND45": (45, 0,
 
 
 def _byEulerDegrees(name):
-  def build(cs, *ss):
+  def build(CS, *ss):
     from .orientation import orientation
     from .units import degree
     a, b, c = STANDARD_EULER[name]
-    return orientation.byEuler(a * degree, b * degree, c * degree, cs, *ss)
+    return orientation.byEuler(a * degree, b * degree, c * degree, CS, *ss)
   build.__name__ = name
   build.__doc__ = "the {} component, Bunge Euler angles ({}°, {}°, {}°), in cs and the specimen frame".format(name, *STANDARD_EULER[name])
   return build

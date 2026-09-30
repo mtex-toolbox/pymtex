@@ -226,15 +226,15 @@ def _familyId(p2c, h1, h2):
   return np.argmax(d, axis=1) + 1
 
 
-def packetPlanes(cs):
+def packetPlanes(CS):
   """the four {111} planes of the parent phase cs that the packets of the variants are sorted by"""
-  return Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], cs)
+  return Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], CS)
 
 
-def bainPlanes(cs):
+def bainPlanes(CS):
   """the three {100} directions of the parent phase cs that the Bain groups of the variants are
   sorted by"""
-  return Miller([[0, 0, 1], [1, 0, 0], [0, 1, 0]], cs)
+  return Miller([[0, 0, 1], [1, 0, 0], [0, 1, 0]], CS)
 
 
 def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):

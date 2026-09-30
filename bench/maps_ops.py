@@ -253,10 +253,10 @@ def compare():
   load = lambda f: np.fromfile(f, "<f8").reshape(-1, 6) if os.path.exists(f) else None
 
   # the pixels both have, at one position and finite in both
-  def apart(a, b, cs):
+  def apart(a, b, CS):
     d, j = cKDTree(b[:, :2]).query(a[:, :2])
     ok = (d < 1e-6) & np.isfinite(a[:, 2]) & np.isfinite(b[j, 2])
-    return np.degrees(np.asarray(angle(orientation(rotation(a[ok, 2:]), cs), orientation(rotation(b[j[ok], 2:]), cs))))
+    return np.degrees(np.asarray(angle(orientation(rotation(a[ok, 2:]), CS), orientation(rotation(b[j[ok], 2:]), CS))))
 
   print(f"\n{'denoising':22s} {'moved the measured map, median degree':>40s}   ports apart: median / max degree, share > 0.1, pixels compared")
   for op in DENOISE:

@@ -921,13 +921,13 @@ def _planeCircles(v, lineStyle="-", lineWidth=1.0, lineColor="k", **kw):
 # of n corners for an n-fold rotation axis, a lens for a twofold, a hollow one for a
 # rotoinversion axis, a great circle for a mirror plane, a hollow circle for the inversion
 # (MATLAB @referenceFrame/plot)
-def plotHKL(cs, complete=False, **kw):
+def plotHKL(CS, complete=False, **kw):
   """plotHKL(cs): the low index directions <100>, <110>, <111> of a crystal with all their
   symmetric equivalents, labelled, on the upper hemisphere unless complete (MATLAB
   crystalFrame/plotHKL)"""
   from ..geometry.miller import Miller
   hkl = ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (0, 1, 1), (1, 0, 1), (1, 1, 1), (-1, -1, 0), (-1, -1, 1))
-  ms = Miller(np.array(hkl, dtype=float), cs).unique()
+  ms = Miller(np.array(hkl, dtype=float), CS).unique()
   opts = dict(symmetrised=True, labeled=True, MarkerEdgeColor="k", grid=True, backgroundColor="w", noLabel=True)
   if not complete:
     opts["upper"] = True

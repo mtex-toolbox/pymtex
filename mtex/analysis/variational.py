@@ -104,7 +104,7 @@ def graphEigenvalue(l, Lambda):
   return float(sum(1 - np.cos(2 * np.pi * (a1 @ (A @ np.asarray(o, dtype=float))) / lam) for o in l.stencil))
 
 
-def regularization(F, l, order, smoothingLength=None, alpha=None):
+def regularisation(F, l, order, smoothingLength=None, alpha=None):
   """the weight of one filter on one lattice: what it was given, or what its smoothing length
   comes to, the gain 1 / (1 + alpha lambda^p) being one half at alpha = lambda^-p"""
   alpha = F.alpha if alpha is None else alpha
@@ -264,13 +264,13 @@ def solveField(F, l, edges, f, isData, pin, comp):
   every pixel, zero for none"""
   G = graphCSR(np.asarray(edges, dtype=np.int64).reshape(-1, 2), len(f))
   if isinstance(F, splineFilter):
-    return irls(G, f, regularization(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, pin, comp)
+    return irls(G, f, regularisation(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, pin, comp)
   if isinstance(F, halfQuadraticFilter):
-    return irls(G, f, regularization(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.maxIter, F.tol, isData, pin, comp)
+    return irls(G, f, regularisation(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.maxIter, F.tol, isData, pin, comp)
   if isinstance(F, infimalConvolutionFilter):
     # the two fields minimised in turn, one over the differences and one over the Laplacian
-    alpha = regularization(F, l, 1)
-    beta = regularization(F, l, 2, alpha=F.beta)
+    alpha = regularisation(F, l, 1)
+    beta = regularisation(F, l, 2, alpha=F.beta)
     u1, u2 = np.zeros(f.shape), np.zeros(f.shape)
     for _ in range(F.maxIter):
       p = irls(G, f - u2, alpha, 1, False, True, F.threshold, F.eps, 20, F.tol, isData, pin, comp)

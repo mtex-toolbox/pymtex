@@ -55,7 +55,7 @@ def guiFont(dpi):
   return rc, pixels * 72 / dpi
 
 
-def keyPicture(cs, px=KEY_PIXELS):
+def keyPicture(CS, px=KEY_PIXELS):
   """a key is a picture of its phase and of nothing else: it does not change with the map, the
   tab or the size of the window, and matplotlib re-renders a mesh of tens of thousands of
   quads on every draw. So each is drawn once into a figure of its own and shown as an image
@@ -66,23 +66,23 @@ def keyPicture(cs, px=KEY_PIXELS):
   square best."""
   from ..plotting.directionkeys import HSVDirectionKey
   from ..plotting.spherical import makeSphericalProjection
-  hit = KEY_CACHE.get((id(cs), px))
-  if hit is not None and hit[0] is cs:
+  hit = KEY_CACHE.get((id(CS), px))
+  if hit is not None and hit[0] is CS:
     return hit[1]
-  key = HSVDirectionKey(cs)
-  n = len(makeSphericalProjection(key.keySector, how2plot=cs.how2plot))
+  key = HSVDirectionKey(CS)
+  n = len(makeSphericalProjection(key.keySector, how2plot=CS.how2plot))
   if n == 1:
-    picture = _hemispherePicture(key, cs, px, {})
+    picture = _hemispherePicture(key, CS, px, {})
   else:
     # the two are shrunk to share the square, so their labels are drawn larger
-    parts = [_hemispherePicture(key, cs, px, {side: True}, fontScale=1.5, label=True) for side in ("upper", "lower")]
+    parts = [_hemispherePicture(key, CS, px, {side: True}, fontScale=1.5, label=True) for side in ("upper", "lower")]
     picture = _arrange(parts, gap=max(2, px // 30))
-  KEY_CACHE[(id(cs), px)] = (cs, picture)
+  KEY_CACHE[(id(CS), px)] = (CS, picture)
   return picture
 
 
 # one chart of a key as a picture cut to what it draws
-def _hemispherePicture(key, cs, px, side, fontScale=1.0, label=False):
+def _hemispherePicture(key, CS, px, side, fontScale=1.0, label=False):
   import io
   import matplotlib
   import matplotlib.figure
@@ -97,7 +97,7 @@ def _hemispherePicture(key, cs, px, side, fontScale=1.0, label=False):
     fig.patch.set_alpha(0)
     ax = fig.add_axes([0.02, 0.02, 0.96, 0.96])
     ax.patch.set_alpha(0)
-    plotKey(key, resolution=keyResolution(px), parent=ax, how2plot=cs.how2plot, fontSize=16 * fontScale * px / KEY_PIXELS, **side)
+    plotKey(key, resolution=keyResolution(px), parent=ax, how2plot=CS.how2plot, fontSize=16 * fontScale * px / KEY_PIXELS, **side)
     # the hemisphere named above all the chart draws, where no label of the key can stand
     if label:
       box = fig.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans).transformed(fig.transFigure.inverted())
@@ -504,13 +504,13 @@ def _range(values):
   return (float(np.min(v[finite])), float(np.max(v[finite]))) if finite.any() else (0.0, 1.0)
 
 
-def millerOf(text, cs):
+def millerOf(text, CS):
   """a Miller index typed as '100', '1-10' or '0001', on the frame's lattice"""
   try:
     digits = [int(c) if c.isdigit() else -int(c[1]) for c in _tokens(text)]
-    return Miller(*digits, cs)
+    return Miller(*digits, CS)
   except Exception:
-    return Miller(1, 0, 0, cs)
+    return Miller(1, 0, 0, CS)
 
 
 def _tokens(text):

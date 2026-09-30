@@ -24,8 +24,8 @@ def ss222():
   return specimenFrame("222")
 
 
-def eulerOri(cs=None, ss=None):
-  return orientation.byEuler(10 * degree, 20 * degree, 30 * degree, cs or al(), ss or ss222())
+def eulerOri(CS=None, SS=None):
+  return orientation.byEuler(10 * degree, 20 * degree, 30 * degree, CS or al(), SS or ss222())
 
 
 # ten random orientations of aluminium and the rotations they were built from
@@ -80,7 +80,7 @@ def test_orientation_antipodalRefusedBetweenOtherFrames():
 
 def test_orientation_relabellingRestatesTheFramesWithoutMoving():
   ss, cs2 = ss222(), ti()
-  o = eulerOri(ss=ss)
+  o = eulerOri(SS=ss)
   r = orientation(o, cs2)
   assert r.CS is cs2 and r.SS is ss and same(r, o)
 
@@ -278,8 +278,8 @@ def test_orientation_float32():
   assert orientation(rots.astype(np.float32), cs).dtype == np.float32
 
 
-def productOri(cs=None, ss=None):
-  return orientation.byEuler(0.3, 0.7, 1.1, cs or al(), ss or ss222())
+def productOri(CS=None, SS=None):
+  return orientation.byEuler(0.3, 0.7, 1.1, CS or al(), SS or ss222())
 
 
 def test_orientation_timesMillerIsASpecimenDirection():
@@ -300,7 +300,7 @@ def test_inv_timesASpecimenDirectionIsMiller():
 
 def test_orientation_timesAFrameFreeVector():
   ss = ss222()
-  assert (productOri(ss=ss) * vector3d(1, 2, 3)).frame is ss
+  assert (productOri(SS=ss) * vector3d(1, 2, 3)).frame is ss
 
 
 def test_orientation_refusesVectorsOfOtherFrames():
@@ -359,7 +359,7 @@ def test_orientation_timesAScalarIsAQuaternion():
 def test_orientation_alignedCrystalFrameFits():
   ss = ss222()
   cs2 = crystalFrame("432", [4.05, 4.05, 4.05], mineral="Al")
-  assert (productOri(ss=ss) * Miller(1, 0, 0, cs2)).frame is ss
+  assert (productOri(SS=ss) * Miller(1, 0, 0, cs2)).frame is ss
 
 
 def test_orientation_compatibleCrystalFrameIsAbsorbed():

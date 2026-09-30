@@ -210,7 +210,7 @@ mtexColorbar(title='misorientation angle in degree')
 # [Operations on Rotational Functions](SO3FunOperations.html). For the inverse problem
 # that produced the measured ODF above, continue with
 # [Reconstructing an ODF](PoleFigure2ODF.html). Approximation from scattered values,
-# including regularization and overfitting, is covered in
+# including regularisation and overfitting, is covered in
 # [Harmonic Approximation from Discrete Data](HarmonicApproximationTheory.html). The next
 # page in this chapter, [Importing an ODF](ODFImport.html), explains how MTEX
 # reconstructs function objects from common file representations.

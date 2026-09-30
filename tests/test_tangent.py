@@ -406,8 +406,8 @@ def test_rotation_onTheWrongSideRefuses():
 v90 = vector3d(0, 0, pi / 2)
 
 
-def crystalTangent(cs):
-  return Miller(1, 1, 1, cs, "uvw").normalize() * (30 * degree)
+def crystalTangent(CS):
+  return Miller(1, 1, 1, CS, "uvw").normalize() * (30 * degree)
 
 
 def test_exp_ofAPlainVectorIsARotation():

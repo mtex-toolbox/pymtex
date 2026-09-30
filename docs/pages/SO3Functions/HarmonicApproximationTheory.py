@@ -3,7 +3,7 @@
 # [Approximating Orientation-Dependent Functions from Discrete Data](SO3FunApproximationTheory.html)
 # defines the approximation problem and compares the available models. This page assumes
 # that a harmonic model is appropriate and shows how to control its bandwidth,
-# regularization, sample weights, and iterative solver.
+# regularisation, sample weights, and iterative solver.
 #
 # Harmonic approximation is particularly useful for a general physical response that is not
 # a density function. It also handles large numbers of sample orientations without placing
@@ -39,10 +39,10 @@ plotSection(ori, val, 'sigma', all=True)
 # bandwidth is the largest harmonic degree in the fitted series. A low bandwidth limits the
 # number of unknown coefficients and therefore limits how quickly the function can vary.
 #
-# Set `regularization` to zero temporarily so that the effect of bandwidth is visible on
+# Set `regularisation` to zero temporarily so that the effect of bandwidth is visible on
 # its own.
 
-SO3F1 = interp(ori, val, 'harmonic', regularization=0, bandwidth=17)
+SO3F1 = interp(ori, val, 'harmonic', regularisation=0, bandwidth=17)
 SO3F1
 
 # ---
@@ -72,7 +72,7 @@ plot(SO3F1, 'sigma')
 # system underdetermined. It is the opposite of oversampling: oversampling means having more
 # independent samples than unknowns.
 
-SO3F2 = interp(ori, val, 'harmonic', regularization=0, bandwidth=32)
+SO3F2 = interp(ori, val, 'harmonic', regularisation=0, bandwidth=32)
 SO3F2
 
 # ---
@@ -108,9 +108,9 @@ legend('Bandwidth 17', 'Bandwidth 32')
 # high-degree tail matches the oscillations in the preceding section plot and is a
 # practical overfitting diagnostic.
 #
-# ## Add regularization
+# ## Add regularisation
 #
-# Tikhonov regularization penalizes high-degree coefficient energy. It lets you retain a
+# Tikhonov regularisation penalizes high-degree coefficient energy. It lets you retain a
 # bandwidth high enough for sharp real features while making oscillatory solutions more
 # expensive.
 #
@@ -119,7 +119,7 @@ legend('Bandwidth 17', 'Bandwidth 32')
 # here as an explicit smoothing choice, not as the current default. A suitable value depends
 # on the data and should be checked rather than accepted automatically.
 
-SO3F3 = interp(ori, val, 'harmonic', bandwidth=32, regularization=5e-7)
+SO3F3 = interp(ori, val, 'harmonic', bandwidth=32, regularisation=5e-7)
 relativeErrorReg = norm(SO3F3.eval(ori) - val) / norm(val)
 relativeErrorReg
 
@@ -132,7 +132,7 @@ plot(SO3F3, 'sigma')
 # residual is only the data term; it is not the complete regularized objective minimized by
 # LSQR.
 #
-# ## Sweep the regularization parameter
+# ## Sweep the regularisation parameter
 #
 # A very large $\lambda$ drives the fitted function towards zero. A very small value
 # approaches the unregularized, oscillatory solution. The sweep below spans both failures so
@@ -140,7 +140,7 @@ plot(SO3F3, 'sigma')
 
 # +
 reg = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12, 1e-13, 1e-14]
-SO3F4 = [interp(ori, val, 'harmonic', bandwidth=32, regularization=r) for r in reg]
+SO3F4 = [interp(ori, val, 'harmonic', bandwidth=32, regularisation=r) for r in reg]
 
 newMtexFigure(layout=[5, 6])
 for i, r in enumerate(reg):
@@ -166,7 +166,7 @@ ind = [2, 4, 8, 12]
 plotSpectrum([SO3F4[i] for i in ind], figSize='small')
 legend('λ = 10⁻²', 'λ = 10⁻⁴', 'λ = 10⁻⁸', 'λ = 10⁻¹²')
 
-# Strong regularization removes almost all high-degree energy. As $\lambda$ decreases, the
+# Strong regularisation removes almost all high-degree energy. As $\lambda$ decreases, the
 # tail rises. Choose a value before the tail becomes dominated by high-degree energy, then
 # confirm the choice against held-out data or independent physical expectations.
 #
@@ -176,7 +176,7 @@ legend('λ = 10⁻²', 'λ = 10⁻⁴', 'λ = 10⁻⁸', 'λ = 10⁻¹²')
 # index penalizes high degrees less strongly. The value of $\lambda$ must therefore be
 # reconsidered whenever $s$ changes.
 
-SO3F5 = interp(ori, val, 'harmonic', bandwidth=32, regularization=0.001, SobolevIndex=1)
+SO3F5 = interp(ori, val, 'harmonic', bandwidth=32, regularisation=0.001, SobolevIndex=1)
 SO3F5
 
 # ---
@@ -251,11 +251,11 @@ print(f'tight tol: flag {p2[0]}, relative residual {p2[1]:.6g}, iterations {p2[2
 # \hat f_n^{k,l} D_n^{k,l}(x). $$
 #
 # The coefficient vector $\mathbf{\hat f}$ is chosen to minimize the data residual at the
-# $M$ sample pairs $(x_m,v_m)$. Without regularization, the problem is
+# $M$ sample pairs $(x_m,v_m)$. Without regularisation, the problem is
 #
 # $$ \min_f \sum_{m=1}^M \lvert f(x_m)-v_m \rvert^2. $$
 #
-# With Tikhonov regularization, MTEX minimizes
+# With Tikhonov regularisation, MTEX minimizes
 #
 # $$ \min_f \left[\sum_{m=1}^M \lvert f(x_m)-v_m \rvert^2
 # + \lambda \lVert f\rVert_{H^s}^2\right], $$

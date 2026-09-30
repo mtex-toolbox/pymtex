@@ -304,10 +304,10 @@ class parentGrainReconstructor:
     return self._p2c.frameA if self._p2c is not None else self._csParent
 
   @csParent.setter
-  def csParent(self, cs):
+  def csParent(self, CS):
     """sets the parent phase, the frame added to the phase lists"""
-    self._csParent = cs
-    self._register(cs)
+    self._csParent = CS
+    self._register(CS)
 
   @property
   def csChild(self):
@@ -315,10 +315,10 @@ class parentGrainReconstructor:
     return self._p2c.frameB if self._p2c is not None else self._csChild
 
   @csChild.setter
-  def csChild(self, cs):
+  def csChild(self, CS):
     """sets the child phase, the frame added to the phase lists"""
-    self._csChild = cs
-    self._register(cs)
+    self._csChild = CS
+    self._register(CS)
 
   @property
   def parentPhaseId(self):

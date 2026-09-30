@@ -22,9 +22,9 @@ plottingConvention.default('y↑→x')
 
 
 # the model ODF of the page, defined here so that the first plot can be read as an unknown texture
-def secretODF(cs):
-  ori = cat(orientation.byEuler(60 * degree, 0 * degree, 0 * degree, cs), orientation.byEuler(70 * degree, 30 * degree, 0 * degree, cs),
-            orientation.byEuler(80 * degree, 60 * degree, 0 * degree, cs), orientation.byEuler(90 * degree, 90 * degree, 0 * degree, cs))
+def secretODF(CS):
+  ori = cat(orientation.byEuler(60 * degree, 0 * degree, 0 * degree, CS), orientation.byEuler(70 * degree, 30 * degree, 0 * degree, CS),
+            orientation.byEuler(80 * degree, 60 * degree, 0 * degree, CS), orientation.byEuler(90 * degree, 90 * degree, 0 * degree, CS))
   return unimodalODF(ori)
 
 

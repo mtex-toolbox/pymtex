@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from mtex import degree, splineFilter, halfQuadraticFilter, l1TVFilter, infimalConvolutionFilter
-from mtex.analysis.variational import graphEigenvalue, regularization
+from mtex.analysis.variational import graphEigenvalue, regularisation
 from conftest import close
 from test_denoising import angleMapD, angles, HEX
 
@@ -43,8 +43,8 @@ def test_regularization_isTheWeightOfALength():
   # the eigenvalue of the square lattice at a wavelength of four steps: two offsets along the
   # wave at 1 - cos(pi / 2) and two across it at zero
   assert close(graphEigenvalue(l, 4.0), 2.0) and close(graphEigenvalue(l, 1.0), graphEigenvalue(l, 2.0))
-  assert close(regularization(splineFilter(4.0), l, 2), 0.25) and close(regularization(splineFilter(alpha=3), l, 2), 3)
-  assert close(regularization(splineFilter(), l, 2), regularization(splineFilter(4.0), l, 2))
+  assert close(regularisation(splineFilter(4.0), l, 2), 0.25) and close(regularisation(splineFilter(alpha=3), l, 2), 3)
+  assert close(regularisation(splineFilter(), l, 2), regularisation(splineFilter(4.0), l, 2))
 
 
 def test_infimalConvolutionFilter_keepsASlope():

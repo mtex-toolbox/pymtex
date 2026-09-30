@@ -427,15 +427,15 @@ def _keyState(key):
           tuple(np.round(np.asarray(key.sR.N).reshape(-1), 12)))
 
 
-def keyColorGrid(cs, resolution=COLOR_GRID_RESOLUTION):
+def keyColorGrid(CS, resolution=COLOR_GRID_RESOLUTION):
   """the grid held by the frame's identity: frames are interned, so the same frame brings the
   same grid, and the grid depends on the sector alone, not on the specimen direction an
   inverse pole figure is taken of"""
   with _GRID_LOCK:
-    cg = _GRIDS.get(id(cs))
-    if cg is None or cg[0] is not cs or abs(cg[1].resolution - resolution) > 1e-6 * resolution:
-      cg = (cs, colorGrid(HSVDirectionKey(cs), resolution))
-      _GRIDS[id(cs)] = cg
+    cg = _GRIDS.get(id(CS))
+    if cg is None or cg[0] is not CS or abs(cg[1].resolution - resolution) > 1e-6 * resolution:
+      cg = (CS, colorGrid(HSVDirectionKey(CS), resolution))
+      _GRIDS[id(CS)] = cg
     return cg[1]
 
 

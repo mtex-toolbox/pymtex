@@ -6,8 +6,8 @@ from mtex import CSL, Miller, angle, axis, crystalFrame, degree, symmetrise, vec
 from mtex.geometry.csl import _rationalBasis, _shell
 
 
-def inFamily(o, cs, *hkl):
-  fam = symmetrise(Miller(*hkl, cs, "uvw"), unique=True)
+def inFamily(o, CS, *hkl):
+  fam = symmetrise(Miller(*hkl, CS, "uvw"), unique=True)
   return np.min(angle(vector3d(axis(o), antipodal=True), fam, noSymmetry=True)) < 1e-8
 
 

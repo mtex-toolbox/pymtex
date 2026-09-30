@@ -41,7 +41,7 @@ plotSection(ori, S['values'], 'sigma', all=True)
 #
 # Approximation finds a function that agrees reasonably well with the data. Interpolation is
 # the special case in which it agrees exactly at the sample orientations. Noise, incomplete
-# sampling, or regularization often makes approximation the more useful goal.
+# sampling, or regularisation often makes approximation the more useful goal.
 #
 # [interp](rotation.interp.html) provides three approximation schemes:
 #
@@ -61,7 +61,7 @@ plotSection(ori, S['values'], 'sigma', all=True)
 #
 # The flag `'harmonic'` selects a harmonic expansion. Internally, `interp` calls
 # [SO3FunHarmonic.interpolate](SO3FunHarmonic.interpolate.html). The default fit includes
-# regularization, which suppresses rapidly varying harmonic coefficients.
+# regularisation, which suppresses rapidly varying harmonic coefficients.
 
 SO3FReg = interp(ori, S['values'], 'harmonic')
 SO3FReg
@@ -76,13 +76,13 @@ relativeErrorReg
 plot(SO3FReg, 'sigma')
 
 # Compare this plot with the discrete samples. The strongest regions remain in the same
-# sections, while regularization rounds their peaks and prevents the fit from following
+# sections, while regularisation rounds their peaks and prevents the fit from following
 # every local variation.
 #
-# The default regularization parameter is $\lambda=10^{-8}$. Setting it to zero switches
-# regularization off and asks the harmonic model to follow the samples more closely.
+# The default regularisation parameter is $\lambda=10^{-8}$. Setting it to zero switches
+# regularisation off and asks the harmonic model to follow the samples more closely.
 
-SO3FUnreg = interp(ori, S['values'], 'harmonic', regularization=0)
+SO3FUnreg = interp(ori, S['values'], 'harmonic', regularisation=0)
 SO3FUnreg
 
 # ---
@@ -98,12 +98,12 @@ plot(SO3FUnreg, 'sigma')
 # create narrow peaks and ripples between the samples. Do not interpret an unconverged
 # residual as the optimum. Even after convergence, a smaller residual is not by itself
 # evidence for a better model. The [next page](HarmonicApproximationTheory.html) explains
-# how to choose regularization and check solver convergence.
+# how to choose regularisation and check solver convergence.
 #
-# Reducing the harmonic bandwidth is another form of regularization. The bandwidth is the
+# Reducing the harmonic bandwidth is another form of regularisation. The bandwidth is the
 # largest harmonic degree retained by the series.
 
-SO3FLow = interp(ori, S['values'], 'harmonic', regularization=0, bandwidth=16)
+SO3FLow = interp(ori, S['values'], 'harmonic', regularisation=0, bandwidth=16)
 SO3FLow
 
 # ---
@@ -297,7 +297,7 @@ plot(FK, 'sigma')
 # ## Next
 #
 # Continue with [Harmonic Interpolation](HarmonicApproximationTheory.html) to tune
-# bandwidth, regularization, weights, and stopping criteria. Then use
+# bandwidth, regularisation, weights, and stopping criteria. Then use
 # [RBF-Kernel Interpolation](RBFApproximationTheory.html) to choose a kernel grid,
 # halfwidth, density constraint, and least-squares solver.
 #

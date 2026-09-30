@@ -55,7 +55,7 @@ def _sameFrame(a, b, what):
     raise ValueError(f"{what} are given in different frames")
 
 
-def _familyOf(family, cs, CRSS=1):
+def _familyOf(family, CS, CRSS=1):
   if family == "hcp":
     names = sorted(k for k in SLIP_FAMILIES if k not in ("primitiveCubic", "fcc", "bcc"))
     raise ValueError("there is no hcp default: choose among " + ", ".join(names) + " and give each its CRSS")
@@ -64,7 +64,7 @@ def _familyOf(family, cs, CRSS=1):
   bs, ns = zip(*SLIP_FAMILIES[family])
   direct = "uvw" if len(bs[0]) == 3 else "UVTW"
   recip = "hkl" if len(ns[0]) == 3 else "hkil"
-  return slipSystem(Miller(np.array(bs, dtype=float), cs, direct), Miller(np.array(ns, dtype=float), cs, recip), CRSS)
+  return slipSystem(Miller(np.array(bs, dtype=float), CS, direct), Miller(np.array(ns, dtype=float), CS, recip), CRSS)
 
 
 # ------------------------------------------------------------------ slip systems
@@ -262,80 +262,80 @@ class slipSystem:
   # ------------------------------------------------------------------ the families
 
   @staticmethod
-  def primitiveCubic(cs, CRSS=1):
+  def primitiveCubic(CS, CRSS=1):
     """the slip system <100>{010} of a primitive cubic crystal"""
-    return _familyOf("primitiveCubic", cs, CRSS)
+    return _familyOf("primitiveCubic", CS, CRSS)
 
   @staticmethod
-  def fcc(cs, CRSS=1):
+  def fcc(CS, CRSS=1):
     """the slip system <01-1>{111} of a face-centred cubic crystal"""
-    return _familyOf("fcc", cs, CRSS)
+    return _familyOf("fcc", CS, CRSS)
 
   @staticmethod
-  def bcc(cs, CRSS=1):
+  def bcc(CS, CRSS=1):
     """the slip systems <1-11>{011}, <-111>{211} and <-111>{321} of a body-centred cubic crystal"""
-    return _familyOf("bcc", cs, CRSS)
+    return _familyOf("bcc", CS, CRSS)
 
   @staticmethod
-  def hcp(cs=None, CRSS=1):
+  def hcp(CS=None, CRSS=1):
     """there is no hcp default: raises an error naming the hexagonal families to choose from
     (basal, prismaticA, pyramidalCA, twinT1, ...) with their CRSS"""
-    return _familyOf("hcp", cs, CRSS)
+    return _familyOf("hcp", CS, CRSS)
 
   @staticmethod
-  def basal(cs, CRSS=1):
+  def basal(CS, CRSS=1):
     """the basal slip system <11-20>(0001) of a hexagonal crystal"""
-    return _familyOf("basal", cs, CRSS)
+    return _familyOf("basal", CS, CRSS)
 
   @staticmethod
-  def prismaticA(cs, CRSS=1):
+  def prismaticA(CS, CRSS=1):
     """the prismatic a slip system <2-1-10>{01-10} of a hexagonal crystal"""
-    return _familyOf("prismaticA", cs, CRSS)
+    return _familyOf("prismaticA", CS, CRSS)
 
   @staticmethod
-  def prismatic2A(cs, CRSS=1):
+  def prismatic2A(CS, CRSS=1):
     """the second prismatic a slip system <01-10>{2-1-10} of a hexagonal crystal"""
-    return _familyOf("prismatic2A", cs, CRSS)
+    return _familyOf("prismatic2A", CS, CRSS)
 
   @staticmethod
-  def pyramidalA(cs, CRSS=1):
+  def pyramidalA(CS, CRSS=1):
     """the pyramidal a slip system <2-1-10>{01-11} of a hexagonal crystal"""
-    return _familyOf("pyramidalA", cs, CRSS)
+    return _familyOf("pyramidalA", CS, CRSS)
 
   @staticmethod
-  def pyramidalCA(cs, CRSS=1):
+  def pyramidalCA(CS, CRSS=1):
     """the pyramidal c+a slip system <2-1-13>{-1101} of a hexagonal crystal"""
-    return _familyOf("pyramidalCA", cs, CRSS)
+    return _familyOf("pyramidalCA", CS, CRSS)
 
   @staticmethod
-  def pyramidal2CA(cs, CRSS=1):
+  def pyramidal2CA(CS, CRSS=1):
     """the second order pyramidal c+a slip system <2-1-13>{-2112} of a hexagonal crystal"""
-    return _familyOf("pyramidal2CA", cs, CRSS)
+    return _familyOf("pyramidal2CA", CS, CRSS)
 
   @staticmethod
-  def twinT1(cs, CRSS=1):
+  def twinT1(CS, CRSS=1):
     """the tensile twin T1 <1-101>{-1102} of a hexagonal crystal"""
-    return _familyOf("twinT1", cs, CRSS)
+    return _familyOf("twinT1", CS, CRSS)
 
   @staticmethod
-  def twinT2(cs, CRSS=1):
+  def twinT2(CS, CRSS=1):
     """the tensile twin T2 <2-1-16>{-2111} of a hexagonal crystal"""
-    return _familyOf("twinT2", cs, CRSS)
+    return _familyOf("twinT2", CS, CRSS)
 
   @staticmethod
-  def twinC1(cs, CRSS=1):
+  def twinC1(CS, CRSS=1):
     """the compressive twin C1 <-110-2>{-1101} of a hexagonal crystal"""
-    return _familyOf("twinC1", cs, CRSS)
+    return _familyOf("twinC1", CS, CRSS)
 
   @staticmethod
-  def twinC2(cs, CRSS=1):
+  def twinC2(CS, CRSS=1):
     """the compressive twin C2 <2-1-1-3>{2-1-12} of a hexagonal crystal"""
-    return _familyOf("twinC2", cs, CRSS)
+    return _familyOf("twinC2", CS, CRSS)
 
 
-def burgersLength(cs):
+def burgersLength(CS):
   """the Burgers vector of a slip system in lattice units"""
-  lat = cs.lattice
+  lat = CS.lattice
   if lat.isTriHex:
     return 1 / 3
   if lat.name == "cubic":
@@ -460,19 +460,19 @@ class dislocationSystem:
     return aligned("\n".join(lines))
 
   @staticmethod
-  def fcc(cs):
+  def fcc(CS):
     """the edge and screw dislocations of the symmetrised face-centred cubic slip systems"""
-    return dislocationSystem(slipSystem.fcc(cs).symmetrise(antipodal=True))
+    return dislocationSystem(slipSystem.fcc(CS).symmetrise(antipodal=True))
 
   @staticmethod
-  def bcc(cs):
+  def bcc(CS):
     """the edge and screw dislocations of the symmetrised body-centred cubic slip systems"""
-    return dislocationSystem(slipSystem.bcc(cs).symmetrise(antipodal=True))
+    return dislocationSystem(slipSystem.bcc(CS).symmetrise(antipodal=True))
 
   @staticmethod
-  def hcp(cs=None):
+  def hcp(CS=None):
     """there is no hcp default: raises an error naming the hexagonal families to choose from"""
-    return _familyOf("hcp", cs)
+    return _familyOf("hcp", CS)
 
 
 def mPrime(sS1, sS2):

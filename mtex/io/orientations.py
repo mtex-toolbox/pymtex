@@ -30,7 +30,7 @@ def _canonical(name):
   return re.sub(r"\s+", " ", str(name).strip().lower())
 
 
-def loadOrientation(fname, cs=None, ss=None, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
+def loadOrientation(fname, CS=None, SS=None, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
                     passive=False):
   """the orientations a text table holds, and the other columns it names
 
@@ -41,8 +41,8 @@ def loadOrientation(fname, cs=None, ss=None, columnNames=None, columns=None, rad
   """
   # no crystal frame named: the triclinic one, as MATLAB's; a .csv file separates by commas
   from ..geometry.frames import crystalFrame
-  cs = crystalFrame("1") if cs is None else cs
-  ss = specimenFrame.default if ss is None else ss
+  CS = crystalFrame("1") if CS is None else CS
+  SS = specimenFrame.default if SS is None else SS
   if delimiter is None and str(fname).lower().endswith(".csv"):
     delimiter = ","
   data = readFile(fname)
@@ -66,17 +66,17 @@ def loadOrientation(fname, cs=None, ss=None, columnNames=None, columns=None, rad
   for cols, convention in EULER_COLUMNS.items():
     if all(c in at for c in cols):
       s = 1.0 if radians else degree
-      ori = orientation.byEuler(at[cols[0]] * s, at[cols[1]] * s, at[cols[2]] * s, convention, cs, ss)
+      ori = orientation.byEuler(at[cols[0]] * s, at[cols[1]] * s, at[cols[2]] * s, convention, CS, SS)
       used = cols
       break
   else:
     if all(c in at for c in QUATERNION_COLUMNS):
-      ori = orientation(np.stack([at[c] for c in QUATERNION_COLUMNS], axis=-1), cs, ss)
+      ori = orientation(np.stack([at[c] for c in QUATERNION_COLUMNS], axis=-1), CS, SS)
       used = QUATERNION_COLUMNS
     else:
       raise ValueError("the columns name no orientation: phi1, Phi, phi2; alpha, beta, gamma; or Quat real, Quat i, Quat j, Quat k")
   if passive:
-    ori = orientation(ori.inv(), cs, ss)
+    ori = orientation(ori.inv(), CS, SS)
   S = {re.sub(r"\s+", "", _canonical(n)): at[_canonical(n)] for n in names if _canonical(n) not in used}
   return ori, S
 

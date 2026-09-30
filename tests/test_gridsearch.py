@@ -49,10 +49,10 @@ def sameAsTree(g, q, eps):
   assert abs(C1 - C0).max() < 1e-12 and I1.has_sorted_indices
 
 
-@pytest.mark.parametrize("cs,ss,res,eps", [("m-3m", None, 5, 20), ("6/mmm", None, 5, 10), ("-1", None, 10, 15),
+@pytest.mark.parametrize("CS,SS,res,eps", [("m-3m", None, 5, 20), ("6/mmm", None, 5, 10), ("-1", None, 10, 15),
                                            ("mmm", "mmm", 5, 10), ("432", "222", 5, 10), ("-3m", None, 5, 12), ("4/m", None, 5, 30)])
-def test_so3_radius_matches_the_tree(cs, ss, res, eps):
-  g = mtex.equispacedSO3Grid(mtex.crystalFrame(cs), None if ss is None else mtex.specimenFrame(ss), resolution=res * mtex.degree)
+def test_so3_radius_matches_the_tree(CS, SS, res, eps):
+  g = mtex.equispacedSO3Grid(mtex.crystalFrame(CS), None if SS is None else mtex.specimenFrame(SS), resolution=res * mtex.degree)
   sameAsTree(g, mtex.orientation(mtex.rotation.rand(200, rng=rng), g.frameA, g.frameB), eps * mtex.degree)
 
 

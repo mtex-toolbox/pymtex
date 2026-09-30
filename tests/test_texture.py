@@ -129,9 +129,9 @@ def olivineShear():
 
 
 # a constant rotation velocity about z of 20 degrees
-def constantSpin(cs, ss):
+def constantSpin(CS, SS):
   omega = 20 * degree
-  return omega, SO3VectorFieldHandle(lambda o: vector3d(np.tile([0.0, 0.0, omega], (o.size, 1)).reshape(*o.shape, 3)), cs, ss, "left")
+  return omega, SO3VectorFieldHandle(lambda o: vector3d(np.tile([0.0, 0.0, omega], (o.size, 1)).reshape(*o.shape, 3)), CS, SS, "left")
 
 
 def test_SO3FunSBF_isAPositiveDensity():

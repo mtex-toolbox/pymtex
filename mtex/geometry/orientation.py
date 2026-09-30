@@ -459,58 +459,58 @@ class orientation(rotation):
     copper = staticmethod(copper)
     copper2 = staticmethod(copper2)
     @staticmethod
-    def cube(cs, *ss) -> Any:
+    def cube(CS, *ss) -> Any:
       """the cube component, Bunge Euler angles (0°, 0°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def cubeND22(cs, *ss) -> Any:
+    def cubeND22(CS, *ss) -> Any:
       """the cubeND22 component, Bunge Euler angles (22°, 0°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def cubeND45(cs, *ss) -> Any:
+    def cubeND45(CS, *ss) -> Any:
       """the cubeND45 component, Bunge Euler angles (45°, 0°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def cubeRD(cs, *ss) -> Any:
+    def cubeRD(CS, *ss) -> Any:
       """the cubeRD component, Bunge Euler angles (0°, 22°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def goss(cs, *ss) -> Any:
+    def goss(CS, *ss) -> Any:
       """the goss component, Bunge Euler angles (0°, 45°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def SR(cs, *ss) -> Any:
+    def SR(CS, *ss) -> Any:
       """the SR component, Bunge Euler angles (53°, 35°, 63°), in cs and the specimen frame"""
     @staticmethod
-    def SR2(cs, *ss) -> Any:
+    def SR2(CS, *ss) -> Any:
       """the SR2 component, Bunge Euler angles (233°, 35°, 63°), in cs and the specimen frame"""
     @staticmethod
-    def SR3(cs, *ss) -> Any:
+    def SR3(CS, *ss) -> Any:
       """the SR3 component, Bunge Euler angles (307°, 35°, 27°), in cs and the specimen frame"""
     @staticmethod
-    def SR4(cs, *ss) -> Any:
+    def SR4(CS, *ss) -> Any:
       """the SR4 component, Bunge Euler angles (127°, 35°, 27°), in cs and the specimen frame"""
     @staticmethod
-    def brass(cs, *ss) -> Any:
+    def brass(CS, *ss) -> Any:
       """the brass component, Bunge Euler angles (35°, 45°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def brass2(cs, *ss) -> Any:
+    def brass2(CS, *ss) -> Any:
       """the brass2 component, Bunge Euler angles (325°, 45°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def PLage(cs, *ss) -> Any:
+    def PLage(CS, *ss) -> Any:
       """the PLage component, Bunge Euler angles (65°, 45°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def PLage2(cs, *ss) -> Any:
+    def PLage2(CS, *ss) -> Any:
       """the PLage2 component, Bunge Euler angles (245°, 45°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def QLage(cs, *ss) -> Any:
+    def QLage(CS, *ss) -> Any:
       """the QLage component, Bunge Euler angles (65°, 20°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def QLage2(cs, *ss) -> Any:
+    def QLage2(CS, *ss) -> Any:
       """the QLage2 component, Bunge Euler angles (245°, 20°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def QLage3(cs, *ss) -> Any:
+    def QLage3(CS, *ss) -> Any:
       """the QLage3 component, Bunge Euler angles (115°, 160°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def QLage4(cs, *ss) -> Any:
+    def QLage4(CS, *ss) -> Any:
       """the QLage4 component, Bunge Euler angles (295°, 160°, 0°), in cs and the specimen frame"""
     @staticmethod
-    def invGoss(cs, *ss) -> Any:
+    def invGoss(CS, *ss) -> Any:
       """the invGoss component, Bunge Euler angles (90°, 45°, 0°), in cs and the specimen frame"""
     Bain = staticmethod(Bain)
     KurdjumovSachs = staticmethod(KurdjumovSachs)

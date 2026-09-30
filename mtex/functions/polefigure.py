@@ -41,25 +41,25 @@ ERROR_MODES = ("relative", "RP", "l1", "l2")
 # ------------------------------------------------------------------ the directions
 
 # crystal directions as a flat list in a crystal frame, the frame given taking over
-def _millerList(h, cs):
+def _millerList(h, CS):
   v = h if isinstance(h, vector3d) else vector3d(h)
   v = v.flatten()
-  if cs is not None:
+  if CS is not None:
     v = vector3d(v)
     if v.isCrystalDirection:
-      v.CS = cs
+      v.CS = CS
     else:
-      v.frame = cs
+      v.frame = CS
   if not v.isCrystalDirection:
     raise ValueError("the pole figure directions have to be given in a crystal frame")
   return v
 
 
 # specimen directions as axes unless complete, in a specimen frame, keeping their shape
-def _specimenDirections(r, complete, ss):
+def _specimenDirections(r, complete, SS):
   v = vector3d(r) if isinstance(r, vector3d) else vector3d(np.asarray(r, dtype=float))
-  if ss is not None:
-    v.frame = ss
+  if SS is not None:
+    v.frame = SS
   elif v.frame is None:
     v.frame = specimenFrame.default
   if isinstance(v.frame, crystalFrame):

@@ -74,10 +74,10 @@ def test_relative_imports():
 
 
 def test_a_stub_keeps_literal_defaults_and_the_docstring():
-  def make(cs=None, simple=False, *, eps=1e-3, grid=object()):
+  def make(CS=None, simple=False, *, eps=1e-3, grid=object()):
     """the crystal shape"""
   lines = sa.stub("quartz", make, "staticmethod", "    ")
-  assert lines == ["    @staticmethod", "    def quartz(cs=None, simple=False, *, eps=0.001, grid: Any = ...) -> Any:",
+  assert lines == ["    @staticmethod", "    def quartz(CS=None, simple=False, *, eps=0.001, grid: Any = ...) -> Any:",
                    '      """the crystal shape"""']
 
 

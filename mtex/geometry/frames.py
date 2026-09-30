@@ -1026,17 +1026,17 @@ def alignmentSetups():
 _CLOSEST_ALIGNMENT = {}
 
 
-def closestAlignment(cs):
+def closestAlignment(CS):
   """the alignment setup a crystal frame is reported in: of the twelve setups the one whose frame
   lies nearest its basis"""
-  key = (cs.pointGroup, np.round(cs._basis, 9).tobytes())
+  key = (CS.pointGroup, np.round(CS._basis, 9).tobytes())
   if key in _CLOSEST_ALIGNMENT:
     return list(_CLOSEST_ALIGNMENT[key])
-  n = _unitRows(cs._basis)
+  n = _unitRows(CS._basis)
   best, at = None, None
   for setup in ALIGNMENT_SETUPS:
     try:
-      fr = crystalFrame(cs.pointGroup, cs.abc, cs.abg, *setup, noIntern=True, check=False)
+      fr = crystalFrame(CS.pointGroup, CS.abc, CS.abg, *setup, noIntern=True, check=False)
     except Exception:
       continue
     d = float(np.max(np.abs(_unitRows(fr._basis) - n)))

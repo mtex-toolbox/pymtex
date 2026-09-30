@@ -32,10 +32,10 @@ from ..geometry.install import install
 
 # ------------------------------------------------------------------ the reflection in a name
 
-def string2Miller(s, cs=None):
+def string2Miller(s, CS=None):
   """the Miller indices a file name or a header line spells: four digits with optional signs,
   else three; every such group of the name is one direction, several a superposition"""
-  cs = crystalFrame("m-3m") if cs is None else cs
+  CS = crystalFrame("m-3m") if CS is None else CS
   s = os.path.basename(str(s))
   # four indices with signs first, then three without a sign, then three with
   for n, signed in ((4, True), (3, False), (3, True)):
@@ -47,8 +47,8 @@ def string2Miller(s, cs=None):
       if len(digits) == n and (n == 3 or sum(digits[:3]) == 0):
         found.append(digits)
     if found:
-      return vector3d.cat(*[Miller(*d, cs) for d in found]) if len(found) > 1 else Miller(*found[0], cs)
-  return Miller(1, 0, 0, cs)
+      return vector3d.cat(*[Miller(*d, CS) for d in found]) if len(found) > 1 else Miller(*found[0], CS)
+  return Miller(1, 0, 0, CS)
 
 
 def _frames(args):
@@ -359,17 +359,17 @@ SIGNATURES = {
 
 # a reader of the vendor module as one of the table: the pole figures of one file
 def _vendor(read, binary=False):
-  def load(fname, lines, cs, ss, h=None, **kwargs):
+  def load(fname, lines, CS, SS, h=None, **kwargs):
     extra = {"raw": readFile(fname)} if binary else {}
-    hs, rs, Is, fr = read(lines, fname, cs, h=h, **extra, **kwargs)
-    return PoleFigure(hs, rs, Is, *(f for f in (fr, ss) if f is not None))
+    hs, rs, Is, fr = read(lines, fname, CS, h=h, **extra, **kwargs)
+    return PoleFigure(hs, rs, Is, *(f for f in (fr, SS) if f is not None))
   return load
 
 
 # a reader of this module as one of the table
 def _own(read):
-  def load(fname, lines, cs, ss, h=None, **kwargs):
-    return read(fname, *(f for f in (cs, ss) if f is not None), **kwargs)
+  def load(fname, lines, CS, SS, h=None, **kwargs):
+    return read(fname, *(f for f in (CS, SS) if f is not None), **kwargs)
   return load
 
 

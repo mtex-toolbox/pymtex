@@ -374,164 +374,164 @@ class crystalShape:
   # ------------------------------------------------------------------ the simple shapes
 
   @staticmethod
-  def cube(cs):
+  def cube(CS):
     """a cube, the faces {100}"""
-    return crystalShape(Miller(1, 0, 0, cs))
+    return crystalShape(Miller(1, 0, 0, CS))
 
   @staticmethod
-  def hex(cs):
+  def hex(CS):
     """a hexagonal prism, the faces {10-10} and (0002)"""
-    return crystalShape(Miller([[1, 0, 0], [0, 0, 2]], cs))
+    return crystalShape(Miller([[1, 0, 0], [0, 0, 2]], CS))
 
   @staticmethod
-  def tetr(cs):
+  def tetr(CS):
     """a tetragonal prism, the faces {100} and {001}"""
-    return crystalShape(Miller([[1, 0, 0], [0, 0, 1]], cs))
+    return crystalShape(Miller([[1, 0, 0], [0, 0, 1]], CS))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from typing import Any
     from ..plotting.shapeplot import plotShape as plot, plotInnerFace, plotInnerDirection, plotSlipSystem
     @staticmethod
-    def albite(cs=None, simple=False) -> Any:
+    def albite(CS=None, simple=False) -> Any:
       """the albite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def amphibole(cs=None, simple=False) -> Any:
+    def amphibole(CS=None, simple=False) -> Any:
       """the amphibole crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def analcime(cs=None, simple=False) -> Any:
+    def analcime(CS=None, simple=False) -> Any:
       """the analcime crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def andalusite(cs=None, simple=False) -> Any:
+    def andalusite(CS=None, simple=False) -> Any:
       """the andalusite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def anorthite(cs=None, simple=False) -> Any:
+    def anorthite(CS=None, simple=False) -> Any:
       """the anorthite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def antigorite(cs=None, simple=False) -> Any:
+    def antigorite(CS=None, simple=False) -> Any:
       """the antigorite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def apatite(cs=None, simple=False) -> Any:
+    def apatite(CS=None, simple=False) -> Any:
       """the apatite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def aragonite(cs=None, simple=False) -> Any:
+    def aragonite(CS=None, simple=False) -> Any:
       """the aragonite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def augite(cs=None, simple=False) -> Any:
+    def augite(CS=None, simple=False) -> Any:
       """the augite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def biotite(cs=None, simple=False) -> Any:
+    def biotite(CS=None, simple=False) -> Any:
       """the biotite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def brucite(cs=None, simple=False) -> Any:
+    def brucite(CS=None, simple=False) -> Any:
       """the brucite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def calcite(cs=None, simple=False) -> Any:
+    def calcite(CS=None, simple=False) -> Any:
       """the calcite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def chromite(cs=None, simple=False) -> Any:
+    def chromite(CS=None, simple=False) -> Any:
       """the chromite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def clinochlore(cs=None, simple=False) -> Any:
+    def clinochlore(CS=None, simple=False) -> Any:
       """the clinochlore crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def cordierite(cs=None, simple=False) -> Any:
+    def cordierite(CS=None, simple=False) -> Any:
       """the cordierite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def corundum(cs=None, simple=False) -> Any:
+    def corundum(CS=None, simple=False) -> Any:
       """the corundum crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def diamond(cs=None, simple=False) -> Any:
+    def diamond(CS=None, simple=False) -> Any:
       """the diamond crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def diopside(cs=None, simple=False) -> Any:
+    def diopside(CS=None, simple=False) -> Any:
       """the diopside crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def dolomite(cs=None, simple=False) -> Any:
+    def dolomite(CS=None, simple=False) -> Any:
       """the dolomite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def enstatite(cs=None, simple=False) -> Any:
+    def enstatite(CS=None, simple=False) -> Any:
       """the enstatite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def epidote(cs=None, simple=False) -> Any:
+    def epidote(CS=None, simple=False) -> Any:
       """the epidote crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def fluorite(cs=None, simple=False) -> Any:
+    def fluorite(CS=None, simple=False) -> Any:
       """the fluorite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def fluoriteComplex(cs=None, simple=False) -> Any:
+    def fluoriteComplex(CS=None, simple=False) -> Any:
       """the fluorite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def forsterite(cs=None, simple=False) -> Any:
+    def forsterite(CS=None, simple=False) -> Any:
       """the forsterite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def garnet(cs=None, simple=False) -> Any:
+    def garnet(CS=None, simple=False) -> Any:
       """the garnet crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def gypsum(cs=None, simple=False) -> Any:
+    def gypsum(CS=None, simple=False) -> Any:
       """the gypsum crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def halite(cs=None, simple=False) -> Any:
+    def halite(CS=None, simple=False) -> Any:
       """the halite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def ice_VI(cs=None, simple=False) -> Any:
+    def ice_VI(CS=None, simple=False) -> Any:
       """the ice VI crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def ilmenite(cs=None, simple=False) -> Any:
+    def ilmenite(CS=None, simple=False) -> Any:
       """the ilmenite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def kyanite(cs=None, simple=False) -> Any:
+    def kyanite(CS=None, simple=False) -> Any:
       """the kyanite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def magnesite(cs=None, simple=False) -> Any:
+    def magnesite(CS=None, simple=False) -> Any:
       """the magnesite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def magnetite(cs=None, simple=False) -> Any:
+    def magnetite(CS=None, simple=False) -> Any:
       """the magnetite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def microcline(cs=None, simple=False) -> Any:
+    def microcline(CS=None, simple=False) -> Any:
       """the microcline crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def monazite(cs=None, simple=False) -> Any:
+    def monazite(CS=None, simple=False) -> Any:
       """the monazite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def muscovite(cs=None, simple=False) -> Any:
+    def muscovite(CS=None, simple=False) -> Any:
       """the muscovite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def olivine(cs=None, simple=False) -> Any:
+    def olivine(CS=None, simple=False) -> Any:
       """the olivine crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def orthoclase(cs=None, simple=False) -> Any:
+    def orthoclase(CS=None, simple=False) -> Any:
       """the orthoclase crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def plagioclase(cs=None, simple=False) -> Any:
+    def plagioclase(CS=None, simple=False) -> Any:
       """the Plagioclase crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def quartz(cs=None, simple=False) -> Any:
+    def quartz(CS=None, simple=False) -> Any:
       """the Quartz crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def rutile(cs=None, simple=False) -> Any:
+    def rutile(CS=None, simple=False) -> Any:
       """the rutile crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def spinel(cs=None, simple=False) -> Any:
+    def spinel(CS=None, simple=False) -> Any:
       """the spinel crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def staurolite(cs=None, simple=False) -> Any:
+    def staurolite(CS=None, simple=False) -> Any:
       """the staurolite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def titanite(cs=None, simple=False) -> Any:
+    def titanite(CS=None, simple=False) -> Any:
       """the titanite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def topaz(cs=None, simple=False) -> Any:
+    def topaz(CS=None, simple=False) -> Any:
       """the topaz crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def tourmaline(cs=None, simple=False) -> Any:
+    def tourmaline(CS=None, simple=False) -> Any:
       """the tourmaline crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def zircon(cs=None, simple=False) -> Any:
+    def zircon(CS=None, simple=False) -> Any:
       """the zircon crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def zoisite(cs=None, simple=False) -> Any:
+    def zoisite(CS=None, simple=False) -> Any:
       """the zoisite crystal shape of the catalogue, in cs when given"""
 
 
@@ -541,7 +541,7 @@ def _catalogueFrame(e):
   return crystalFrame(e["symbol"], list(e["abc"]), np.asarray(e["abg"], dtype=float) * degree, *e["alignment"], mineral=e["mineral"])
 
 
-def catalogueShape(name, cs=None, simple=False):
+def catalogueShape(name, CS=None, simple=False):
   """a shape of the catalogue: its Miller indices in the given frame, which has to be of
   the catalogue's Laue class, or in the catalogue's own"""
   suffix = "_simple" if simple else ""
@@ -551,11 +551,11 @@ def catalogueShape(name, cs=None, simple=False):
     raise ValueError(f"no crystal shape named {name!r}" + (" with a simple variant" if simple else "") + f"; the catalogue has {names}")
   e = CRYSTAL_SHAPES[key]
   own = _catalogueFrame(e)
-  if cs is None:
-    cs = own
-  elif cs.Laue().id != own.Laue().id:
-    raise ValueError(f"the catalogue's {name} is of Laue class {own.LaueName()}, the frame given of class {cs.LaueName()}")
-  N = Miller(np.array(e["normals"], dtype=float), cs)
+  if CS is None:
+    CS = own
+  elif CS.Laue().id != own.Laue().id:
+    raise ValueError(f"the catalogue's {name} is of Laue class {own.LaueName()}, the frame given of class {CS.LaueName()}")
+  N = Miller(np.array(e["normals"], dtype=float), CS)
   if "distances" in e:
     return crystalShape(N / np.asarray(e["distances"], dtype=float))
   return crystalShape(N, e["habitus"], e["extension"])
@@ -564,10 +564,10 @@ def catalogueShape(name, cs=None, simple=False):
 # crystalShape.quartz(), crystalShape.olivine(cs), crystalShape.garnet(simple=True): every
 # mineral of the catalogue as a constructor
 def _catalogueConstructor(name):
-  def make(cs=None, simple=False):
-    if isinstance(cs, str):
-      cs, simple = None, cs.lower() == "simple"
-    return catalogueShape(name, cs, simple)
+  def make(CS=None, simple=False):
+    if isinstance(CS, str):
+      CS, simple = None, CS.lower() == "simple"
+    return catalogueShape(name, CS, simple)
   make.__name__ = name
   make.__doc__ = f"the {CRYSTAL_SHAPES[name]['mineral']} crystal shape of the catalogue, in cs when given"
   return staticmethod(make)

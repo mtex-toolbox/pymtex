@@ -206,9 +206,9 @@ def test_sectorCenter_ofTheCubicTriangle():
 
 
 # the conventional sector of a frame's group, or of its Laue group, in the frame's plotting convention
-def conventionalOfFrame(cs, antipodal):
-  grp = cs.sym.Laue() if antipodal else cs.sym
-  return grp, conventionalSector(grp, up=cs.how2plot.outOfScreen, east=cs.how2plot.east)
+def conventionalOfFrame(CS, antipodal):
+  grp = CS.sym.Laue() if antipodal else CS.sym
+  return grp, conventionalSector(grp, up=CS.how2plot.outOfScreen, east=CS.how2plot.east)
 
 
 @pytest.mark.parametrize("antipodal", [False, True])

@@ -142,13 +142,13 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   return f
 
 
-def interpSO3(nodes, values=None, *flags, regularization=None, SobolevIndex=None, **kwargs):
+def interpSO3(nodes, values=None, *flags, regularisation=None, SobolevIndex=None, **kwargs):
   """MATLAB's rotation/interp: the harmonic fit, the Bingham distribution of the weighted
   orientations, or the sum of kernels, with MATLAB's names of the options"""
   if "harmonic" in flags:
     from .density import interpolate
-    if regularization is not None:
-      kwargs["lambda_"] = regularization
+    if regularisation is not None:
+      kwargs["lambda_"] = regularisation
     if SobolevIndex is not None:
       kwargs["s"] = SobolevIndex
     return interpolate(nodes, values, **kwargs)
