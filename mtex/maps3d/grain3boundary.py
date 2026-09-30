@@ -273,7 +273,7 @@ class grain3Boundary:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from ..plotting.volumeplot import plotBoundary3d as plot, quiver3dMap as quiver
+    from ..plotting.volumeplot import _plotBoundary3d as plot, _quiver3dMap as quiver
 
 
 __all__ = ["grain3Boundary"]

@@ -123,8 +123,8 @@ mtexColorMap('parula')
 mtexColorbar()
 
 hold(True)
-quiver3(pMinField, color='white')
-quiver3(pMaxField)
+quiver3d(pMinField, color='white')
+quiver3d(pMaxField)
 hold(False)
 # -
 

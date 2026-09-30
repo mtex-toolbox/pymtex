@@ -375,7 +375,7 @@ class SO3TangentVector(vector3d):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from ..plotting.spaceplot import quiver3
+    from ..plotting.spaceplot import quiver3d
 
 
 # ------------------------------------------------------------------ construction helpers

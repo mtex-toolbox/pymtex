@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: E402,F401
 from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection  # noqa: E402
 
 from mtex import (S2AxisFieldHarmonic, S2FunHarmonic, arrow3d, crystalFrame, hold, mtexColorMap, mtexColorbar, degree, discreteSample, fundamentalRegion, gcm, grad, orientation,
-                  plot, plot3d, plottingConvention, quiver3, rotation, scatter, scatter3d, specimenFrame, unimodalODF, vector3d, zvector)
+                  plot, plot3d, plottingConvention, quiver3d, rotation, scatter, scatter3d, specimenFrame, unimodalODF, vector3d, zvector)
 
 rng = np.random.default_rng(9)
 
@@ -80,11 +80,11 @@ def test_plot3d_ofAnAxisFieldIsSegments():
   assert isinstance(h, Line3DCollection)
 
 
-def test_quiver3_ofASphereFieldDrawsOntoAHeldSphereWithoutASecondOne():
+def test_quiver3d_ofASphereFieldDrawsOntoAHeldSphereWithoutASecondOne():
   plot3d(positiveFunction())
   n = len(axesOf().collections)
   hold(True)
-  h = quiver3(axisField(), color="white")
+  h = quiver3d(axisField(), color="white")
   hold(False)
   assert isinstance(h, Line3DCollection) and len(axesOf().collections) == n + 1
 
@@ -245,12 +245,12 @@ def test_scatter_of_misorientations_fits_the_region():
 
 # a field on SO(3): one arrow per grid point of the fundamental region, pointing where the
 # field moves the orientation, the longest nine tenths of the grid spacing
-def test_quiver3_of_an_SO3_vector_field():
+def test_quiver3d_of_an_SO3_vector_field():
   import matplotlib.pyplot as plt
-  from mtex import SO3VectorFieldHandle, crystalFrame, degree, quiver3
+  from mtex import SO3VectorFieldHandle, crystalFrame, degree, quiver3d
   cs = crystalFrame("432")
   VF = SO3VectorFieldHandle(lambda m: m.axis() * m.angle(), cs, cs)
-  h = quiver3(VF, 'axisAngle', resolution=10 * degree)
+  h = quiver3d(VF, 'axisAngle', resolution=10 * degree)
   # matplotlib keeps three segments per arrow, the shaft from the tip to the tail first
   segs = np.asarray(h._segments3d)[0::3]
   assert len(segs) > 10

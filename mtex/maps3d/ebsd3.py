@@ -258,7 +258,7 @@ class EBSD3(EBSD):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from .intragranular3d import gradientX, gradientY, gradientZ, curvature, KAM, fill, spatialProfile, gradientDim
-    from ..plotting.volumeplot import plotEBSD3 as plot
+    from ..plotting.volumeplot import _plotEBSD3 as plot
 
 
 def EBSD3square(rotations, phaseId=None, CSList=None, dxyz=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), scanUnit="um", frame=None,

@@ -9,6 +9,12 @@ from the objects, True forces, False forbids) where MATLAB has `antipodal` and `
 `useP2C=False`; `smoothBoundary(simplify=False, refine=False)` and `calcODFIterative(thinning=0)`
 absorb their `no*` flags; `plotSection(..., field=False)` replaces `noGrid`; `polar=False` the
 `notPolar` of the circle plots; `verbose` keeps MATLAB's default where MATLAB reports unasked.
+R3 to R5 built too. In R5 `quiver3` became `quiver3d`, beside `plot3d`, `scatter3d` and `arrow3d`,
+since it draws into space what `quiver` draws on a chart, and is no duplicate; `scatter3(x, y, z)`
+is `plot(v)` into a held scene; `plotEllipsoid` stays, having no object to dispatch on; the
+per-format readers and writers are `_loadEBSD_ang` and so on; `exportOrientation` takes
+`interface='VPSC'`; `plottingConvention.default(north=xvector)` changes one direction. The
+graph's citation pattern read `MATLAB's s...` wrongly and is fixed.
 The plot keywords are checked in `mtex/plotting/keywords.py`, a variant raising TypeError.
 `m:@rotation.alpha` left the graph's counterparts: it was a false link, from a docstring citing
 MATLAB's alpha of the grain maps. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This

@@ -190,7 +190,7 @@ def plot3d(x, *args, **kw):
   if isinstance(x, orientationRegion):
     return plotRegion3d(x, **kw)
   if isinstance(x, SO3TangentVector):
-    return quiver3(x, *args, **kw)
+    return quiver3d(x, *args, **kw)
   if isinstance(x, quaternion):
     return scatterOrientations(x, *args, **kw)
   from ..geometry.fibre import fibre
@@ -200,7 +200,7 @@ def plot3d(x, *args, **kw):
     from .mtexfigure import firstOfList
     return plotODF3d(firstOfList(x), *args, **kw)
   if _isField(x):
-    return quiver3d(x, **kw)
+    return _quiverField3d(x, **kw)
   if _isFunction(x):
     return plotFunction3d(x, **kw)
   return scatter3d(x, *args, **kw)
@@ -327,7 +327,7 @@ def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolut
   return hs if len(hs) > 1 else hs[0]
 
 
-def quiver3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, axisLabels=False, **kw):
+def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, axisLabels=False, **kw):
   """plot3d(vF): a vector or axis field as arrows on the sphere in space"""
   from ..geometry.grids.s2grid import equispacedS2Grid
   axesKw = _keys(kw)
@@ -605,19 +605,21 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   return h
 
 
-def quiver3(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
-  """quiver3(t): a tangent vector as an arrow at its reference in orientation space, in the
+def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+  """quiver3d(t): a tangent vector as an arrow at its reference in orientation space, in the
   coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
-  to the longest of the list, points to, as MATLAB draws it"""
+  to the longest of the list, points to, as MATLAB draws it; quiver3d(vF) a field on the
+  sphere as arrows in space; quiver3d(v, d) arrows at the positions v along d in a 3D scene
+  (MATLAB's quiver3)"""
   # arrows at positions in space go into a 3D scene
   if isinstance(t, vector3d) and args and isinstance(args[0], vector3d):
-    from .volumeplot import quiverVectors
+    from .volumeplot import _quiverVectors
     if color is not None:
       kw["color"] = color
-    return quiverVectors(t, args[0], lineWidth=lineWidth if lineWidth != 1.5 else 2.0, **kw)
+    return _quiverVectors(t, args[0], lineWidth=lineWidth if lineWidth != 1.5 else 2.0, **kw)
   # a field on the sphere is drawn as arrows on the sphere in space
   if _isField(t):
-    return quiver3d(t, color="k" if color is None else color, **kw)
+    return _quiverField3d(t, color="k" if color is None else color, **kw)
   if type(t).__name__.startswith("SO3VectorField"):
     return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw)
   color = "b" if color is None else color
@@ -870,4 +872,4 @@ def fundamentalRegion_(o):
   return fundamentalRegion(o.CS, o.SS, antipodal=o.antipodal)
 
 
-__all__ = ["plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera"]
+__all__ = ["plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3d", "surf", "setCamera"]

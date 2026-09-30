@@ -414,7 +414,7 @@ class grain3d:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from ..plotting.volumeplot import plotGrains3d as plot, quiver3dMap as quiver
+    from ..plotting.volumeplot import _plotGrains3d as plot, _quiver3dMap as quiver
     from ..plotting.grainplots import histogram
 
 

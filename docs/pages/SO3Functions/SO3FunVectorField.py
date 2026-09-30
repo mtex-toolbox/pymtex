@@ -178,7 +178,7 @@ round(VF.eval(orientation.byAxisAngle(vector3d(1, 2, 3), 10 * degree, cs, cs)))
 # Every arrow points away from the identity at the origin, as a field of axis times angle
 # must.
 
-quiver3(VF, 'axisAngle', resolution=7.5 * degree, color='black', lineWidth=2)
+quiver3d(VF, 'axisAngle', resolution=7.5 * degree, color='black', lineWidth=2)
 
 # ## Convert a field to harmonic form
 #

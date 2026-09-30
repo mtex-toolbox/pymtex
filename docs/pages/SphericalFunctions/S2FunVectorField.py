@@ -144,10 +144,10 @@ plot(sVF2, upper=True, resolution=15 * degree)
 # Arrows are shortest near specimen Z and lengthen towards the equator. Their length shows
 # the field magnitude, while their arrowhead shows the sense of each vector.
 #
-# [quiver3](S2VectorField.quiver3.html) attaches the same arrows to a three-dimensional
+# [quiver3d](S2VectorField.quiver3.html) attaches the same arrows to a three-dimensional
 # sphere.
 
-quiver3(sVF2, resolution=15 * degree)
+quiver3d(sVF2, resolution=15 * degree)
 
 # The sphere shows the input directions, not a surface that constrains the output. Arrows
 # can therefore point away from the tangent plane. This is the visual distinction between a

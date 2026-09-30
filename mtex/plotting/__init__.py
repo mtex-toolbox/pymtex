@@ -29,7 +29,7 @@ from .poles import poles, inversePoles, dynamicMarkerSize
 from .polefigureplot import plotPF, plotIPF, plotDiff
 from .space import (sphereMesh, sphereGridLines, smallCircle, frameAxes, axisAnglePoints, maxAngles, regionSurface,
                     regionWalls, regionLines, visibleFaces, shapeOutlines, shapesOnMap)
-from .spaceplot import plot3d, scatter3d, spacePlot, arrow3d, quiver3, surf, setCamera
+from .spaceplot import plot3d, scatter3d, spacePlot, arrow3d, quiver3d, surf, setCamera
 from .shapeplot import plotInnerFace, plotInnerDirection, plotSlipSystem, faceColors, plotPlane
 from .tensorplot import plotSeismicVelocities, plotRGB
 from .planarkey import planarColorKey
@@ -40,8 +40,7 @@ from .distributionplot import plotAngleDistribution, plotAxisDistribution
 from .scene3d import (scene3d, mesh3d, slices3d, picture3d, lines3d, arrows3d, points3d, ellipsoids3d, grainMesh,
                       boundaryMesh, volumeSlices)
 from .render3d import hasPyVista, pyvistaPlotter, renderImage, drawMatplotlib, writeHTML, sceneHTML
-from .volumeplot import (plotGrains3d, plotBoundary3d, plotEBSD3, show3d, exportHTML, is3dMap, plot3dMap, gcs,
-                         mapPicture, quiver3dMap, quiverVectors, plotEllipsoid, plotPoints3d, scatter3)
+from .volumeplot import show3d, exportHTML, is3dMap, gcs, mapPicture, plotEllipsoid
 
 __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistProjection", "orthographicProjection",
            "gnomonicProjection", "plainProjection", "makeSphericalProjection", "plotRegion", "plotSector", "rhoRange",
@@ -65,14 +64,13 @@ __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistP
            "keyLegend", "keyResolution", "mapValues", "mapAliases", "poles", "inversePoles", "dynamicMarkerSize",
            "plotDiff", "sphereMesh", "sphereGridLines", "smallCircle", "frameAxes", "axisAnglePoints", "maxAngles",
            "regionSurface", "regionWalls", "regionLines", "visibleFaces", "shapeOutlines", "shapesOnMap", "plot3d",
-           "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera", "plotInnerFace", "plotInnerDirection",
+           "scatter3d", "spacePlot", "arrow3d", "quiver3d", "surf", "setCamera", "plotInnerFace", "plotInnerDirection",
            "plotSlipSystem", "faceColors", "plotPlane", "plotSeismicVelocities", "plotRGB", "planarColorKey", "setView",
            "polarAxes", "histogram", "plotEllipse", "plotSO3Kernel", "plotSpectrum", "plotAngleDistribution",
            "plotAxisDistribution", "scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d",
            "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices", "hasPyVista", "pyvistaPlotter", "renderImage",
-           "drawMatplotlib", "writeHTML", "sceneHTML", "plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d",
-           "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture", "quiver3dMap", "quiverVectors", "plotEllipsoid",
-           "plotPoints3d", "scatter3"]
+           "drawMatplotlib", "writeHTML", "sceneHTML", "show3d", "exportHTML", "is3dMap", "gcs", "mapPicture",
+           "plotEllipsoid"]
 
 
 # plot(v) and v.plot() are one call: the commands installed on the classes they draw
@@ -136,7 +134,7 @@ def _install():
   from ..geometry.frames import referenceFrame
   install(referenceFrame, sp.plotSymmetry, "plot")
   install(referenceFrame, sp.plotHKL)
-  install(SO3TangentVector, spp.quiver3)
+  install(SO3TangentVector, spp.quiver3d)
   for name in ("plot", "plot3d"):
     install(orientationRegion, spp.plotRegion3d, name)
   install(crystalShape, shp.plotShape, "plot")
@@ -159,10 +157,10 @@ def _install():
   from ..maps3d.grain3boundary import grain3Boundary
   from ..maps3d.grain3d import grain3d
   from . import volumeplot as vp
-  install(EBSD3, vp.plotEBSD3, "plot")
-  install(grain3d, vp.plotGrains3d, "plot")
-  install(grain3Boundary, vp.plotBoundary3d, "plot")
-  install((grain3d, grain3Boundary), vp.quiver3dMap, "quiver")
+  install(EBSD3, vp._plotEBSD3, "plot")
+  install(grain3d, vp._plotGrains3d, "plot")
+  install(grain3Boundary, vp._plotBoundary3d, "plot")
+  install((grain3d, grain3Boundary), vp._quiver3dMap, "quiver")
   install(grain3d, gp.histogram)
 
 

@@ -59,7 +59,7 @@ outwardNormal = grain.I_GF[:, faceIndex].toarray().reshape(-1) * face.N
 
 plot(grain, faceAlpha=0.65, edgeAlpha=0.25)
 hold(True)
-quiver3(faceCentroid, outwardNormal, arrowSize=0.15, color=[0.7, 0, 0])
+quiver3d(faceCentroid, outwardNormal, arrowSize=0.15, color=[0.7, 0, 0])
 hold(False)
 setCamera(plottingConvention.default3D)
 # -

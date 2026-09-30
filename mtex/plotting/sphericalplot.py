@@ -571,12 +571,12 @@ def plot(v, *args, **kw):
   """
   if isinstance(v, sphericalRegion):
     return plotRegion(v, **kw)
-  from .volumeplot import gcs, is3dMap, plot3dMap, plotPoints3d
+  from .volumeplot import gcs, is3dMap, _plot3dMap, _plotPoints3d
   if is3dMap(v):
-    return plot3dMap(v, *args, **kw)
+    return _plot3dMap(v, *args, **kw)
   # positions plotted into a held 3D scene are markers there
   if isinstance(v, vector3d) and not args and gcm() is not None and gcm().hold and gcs() is not None:
-    return plotPoints3d(v, **kw)
+    return _plotPoints3d(v, **kw)
   from ..geometry.frames import referenceFrame
   if isinstance(v, referenceFrame):
     return plotSymmetry(v, *args, **kw)
@@ -1136,9 +1136,9 @@ smooth = pcolor
 def quiver(v, w=None, resolution=10 * degree, **kw):
   """quiver(v, w), quiver(vF), quiver(ori, w): arrows at directions, a vector or axis field,
   or arrows at orientations in the sections of the current figure"""
-  from .volumeplot import is3dMap, quiver3dMap
+  from .volumeplot import is3dMap, _quiver3dMap
   if is3dMap(v):
-    return quiver3dMap(v, w, **kw)
+    return _quiver3dMap(v, w, **kw)
   if _mapKind(v) is not None:
     from .mapplot import quiverMap
     return quiverMap(v, w, **kw)

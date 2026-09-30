@@ -806,7 +806,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
 
 
 # the needles on a boundary as MATLAB draws them: quiver3 of v and -v from every midpoint,
-# without heads, autoscaled as quiver3 does, f 0.9 times the mean spacing of the points
+# without heads, autoscaled as quiver3d does, f 0.9 times the mean spacing of the points
 # for the longest vector in space, so that a steep one is short on the map
 def _quiverBoundary(mP, c, raw, f, color, lineWidth, displayName, **kw):
   from matplotlib.collections import LineCollection

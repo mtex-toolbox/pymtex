@@ -127,7 +127,7 @@ class lines3d:
 
 def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSize=0.25, sides=12):
   """arrows from P along D as their shafts and cones for their heads, a quarter of their length
-  long, as quiver3 draws them; antipodal arrows point both ways and have no heads"""
+  long, as quiver3d draws them; antipodal arrows point both ways and have no heads"""
   P, D = np.asarray(P, dtype=float).reshape(-1, 3), np.asarray(D, dtype=float).reshape(-1, 3)
   c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
   c = np.tile(c.reshape(3), (len(P), 1)) if c.size == 3 else c.reshape(-1, 3)

@@ -10,7 +10,7 @@ from .mtexfigure import gcm, mtexFigure
 from .render3d import drawMatplotlib, hasPyVista, renderImage, writeHTML
 from .scene3d import arrows3d, boundaryMesh, ellipsoids3d, lines3d, points3d, grainMesh, picture3d, scene3d, volumeSlices
 
-__all__ = ["plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture", "quiver3dMap", "quiverVectors", "plotEllipsoid", "plotPoints3d", "scatter3"]
+__all__ = ["show3d", "exportHTML", "is3dMap", "gcs", "mapPicture", "plotEllipsoid"]
 
 
 def is3dMap(x):
@@ -21,16 +21,16 @@ def is3dMap(x):
   return isinstance(x, (grain3d, grain3Boundary, EBSD3))
 
 
-def plot3dMap(x, *args, **kw):
+def _plot3dMap(x, *args, **kw):
   """plot(x, ...) for a map of a volume: the EBSD3 map, the grain3Boundary or the 3D grains drawn
   as a scene3d"""
   from ..maps3d.ebsd3 import EBSD3
   from ..maps3d.grain3boundary import grain3Boundary
   if isinstance(x, EBSD3):
-    return plotEBSD3(x, *args, **kw)
+    return _plotEBSD3(x, *args, **kw)
   if isinstance(x, grain3Boundary):
-    return plotBoundary3d(x, *args, **kw)
-  return plotGrains3d(x, *args, **kw)
+    return _plotBoundary3d(x, *args, **kw)
+  return _plotGrains3d(x, *args, **kw)
 
 
 # the options of a 3D plot, their spelling checked
@@ -44,7 +44,7 @@ def _options(kw):
   return kw
 
 
-def plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
+def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
   """plot(grains), plot(grains, values), plot(grains, ori), plot(grains, faceColor=...)
 
   The outer faces of 3D grains coloured by phase, by a value or an orientation per grain, or
@@ -57,14 +57,14 @@ def plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
   return _draw(grainMesh(grains, color, **kw), how2plot, figSize, grains.frame)
 
 
-def plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw):
+def _plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw):
   """plot(gB), plot(gB, values), plot(gB, faceColor=...): the faces of a 3D grain boundary"""
   kw = _options(kw)
   kw.setdefault("colormap", "parula")
   return _draw(boundaryMesh(gB, color, **kw), how2plot, figSize, gB.frame)
 
 
-def plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
+def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
   """plot(ebsd), plot(ebsd, values), plot(ebsd, ori): three orthogonal slices through the
   voxels of a volume, as MATLAB's EBSD3/plot shows it in slice planes; at=(i, j, k) the voxel
   index of the three slices, None for a slice left out, the middle by default"""
@@ -74,7 +74,7 @@ def plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
   return _draw(volumeSlices(ebsd, color, at=at, **kw), how2plot, figSize, ebsd.frame)
 
 
-def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
+def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
   """quiver(grains, dir), quiver(gB, dir): arrows at the centroids of 3D grains or of their
   boundary faces, as MATLAB's; a grain's arrow as long as the direction, a face's a fifth of
   the face's diameter, both times autoScaleFactor"""
@@ -89,8 +89,8 @@ def quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, 
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=anti), how2plot, figSize, x.frame)
 
 
-def quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, how2plot=None, figSize=None, **kw):
-  """quiver3(v, d): arrows at the positions v along d times arrowSize in a 3D scene, as
+def _quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, how2plot=None, figSize=None, **kw):
+  """quiver3d(v, d): arrows at the positions v along d times arrowSize in a 3D scene, as
   MATLAB's vector3d/quiver3; an antipodal d points both ways without heads"""
   kw = _options(kw)
   P = np.asarray(v.data).reshape(-1, 3)
@@ -113,7 +113,7 @@ COLOR_ORDER = [(0.0, 0.447, 0.741), (0.85, 0.325, 0.098), (0.929, 0.694, 0.125),
                (0.301, 0.745, 0.933), (0.635, 0.078, 0.184)]
 
 
-def plotPoints3d(v, color=None, markerSize=6.0, **kw):
+def _plotPoints3d(v, color=None, markerSize=6.0, **kw):
   """plot(v) into a held 3D scene: the vectors as markers at their positions, each set in the
   next colour of MATLAB's colour order"""
   kw = _options(kw)
@@ -137,8 +137,8 @@ def line3(x, y, z, color="k", lineWidth=0.5, **kw):
   return _draw(lines3d(segments, color, lineWidth), None, None, None)
 
 
-def scatter3(x, y, z, s=36, c=None, *args, **kw):
-  """scatter3(x, y, z, s, c): markers of area s in a 3D scene, in one colour or one each, as
+def _scatter3(x, y, z, s=36, c=None, *args, **kw):
+  """_scatter3(x, y, z, s, c): markers of area s in a 3D scene, in one colour or one each, as
   MATLAB's scatter3; 'filled' is accepted and markers are always filled"""
   c = refuseVariants(kw).pop("color", c)
   P = np.column_stack([np.asarray(v, dtype=float).reshape(-1) for v in (x, y, z)])

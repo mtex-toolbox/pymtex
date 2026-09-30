@@ -101,7 +101,7 @@ plot(gBid, faceColor=[0.85, 0.85, 0.85], edgeAlpha=0.1, micronbar='off')
 hold(True)
 line(X, Y, Z, color='r', lineWidth=1.5)
 isQuad = (t % 10 >= 4) & onGrain
-scatter3(V[isQuad, 0], V[isQuad, 1], V[isQuad, 2], 30, 'b', 'filled')
+plot(vector3d(V[isQuad]), color='b', markerSize=5.5)
 hold(False)
 setCamera(how2plot)
 # -

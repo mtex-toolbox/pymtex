@@ -49,8 +49,8 @@ NAMES = {
   "plotx2south": "plottingConvention.default", "plotx2west": "plottingConvention.default",
   "plotzIntoPlane": "plottingConvention.default", "plotzOutOfPlane": "plottingConvention.default",
   "plotEBSD3": "plot", "plotGrains3d": "plot", "plotBoundary3d": "plot", "plot3dMap": "plot",
-  "quiver3dMap": "quiver", "quiverVectors": "quiver", "plotPoints3d": "scatter", "plotEllipsoid": "plot",
-  "scatter3": "scatter", "quiver3": "quiver", "export_VPSC": "export", "loadGrains_Dream3d": "loadGrains3d",
+  "quiver3dMap": "quiver", "quiverVectors": "quiver3d", "plotPoints3d": "plot",
+  "scatter3": "plot", "quiver3": "quiver3d", "export_VPSC": "export", "loadGrains_Dream3d": "loadGrains3d",
 }
 # the per-format loaders and exporters, private after R5
 PREFIXES = ("loadEBSD_", "exportEBSD_", "loadODF_", "exportODF_", "loadPoleFigure_")
