@@ -50,15 +50,15 @@ c
 
 # ---
 
-resultLeftSymmetry = c.SLeft
+resultLeftSymmetry = c.frameB
 resultLeftSymmetry
 
 # ---
 
-resultRightSymmetry = c.SRight
+resultRightSymmetry = c.frameA
 resultRightSymmetry
 
-# Here `f.SRight` and `g.SLeft` are both the identity specimen symmetry. The result therefore
+# Here `f.frameA` and `g.frameB` are both the identity specimen symmetry. The result therefore
 # keeps the `222` left symmetry of `f` and the quartz right symmetry of `g`.
 #
 # Check one value against direct numerical integration. The `SO3Fun` mean uses normalized
@@ -104,7 +104,7 @@ cRight
 # +
 rRight = orientation.rand(cRight.CS, cRight.SS, rng=rng)
 rightConvolutionValue = cRight.eval(rRight)
-qRight = orientation.rand(100000, fRight.SRight.stripSym(), fRight.SLeft.stripSym(), rng=rng)
+qRight = orientation.rand(100000, fRight.frameA.stripSym(), fRight.frameB.stripSym(), rng=rng)
 rightSamples = fRight.eval(qRight) * g.eval(rRight * inv(qRight))
 rightIntegralEstimate = np.mean(rightSamples)
 rightStandardError = np.std(rightSamples, ddof=1) / np.sqrt(rightSamples.size)
@@ -163,7 +163,7 @@ plot(sphereCorrelation, 'sigma')
 # right symmetry.
 
 rotF = SO3FunHarmonic.example()
-sphereH = S2FunHarmonic(S2Fun.smiley(), rotF.SLeft)
+sphereH = S2FunHarmonic(S2Fun.smiley(), rotF.frameB)
 directionF = conv(rotF, sphereH)
 directionF
 
@@ -174,7 +174,7 @@ vCrystal = Miller(1, 0, 0, directionF.frame)
 directionValue = directionF.eval(vCrystal)
 
 rng = np.random.default_rng(7)
-qDirection = orientation.rand(100000, rotF.CS.stripSym(), rotF.SLeft, rng=rng)
+qDirection = orientation.rand(100000, rotF.CS.stripSym(), rotF.frameB, rng=rng)
 directionSamples = rotF.eval(qDirection) * sphereH.eval(qDirection * vCrystal)
 directionIntegralEstimate = np.mean(directionSamples)
 directionStandardError = np.std(directionSamples, ddof=1) / np.sqrt(directionSamples.size)
@@ -213,7 +213,7 @@ vSpecimen = xvector
 inverseActionValue = directionInv.eval(vSpecimen)
 
 rng = np.random.default_rng(5)
-qInverse = orientation.rand(100000, rotF.CS.stripSym(), rotF.SLeft, rng=rng)
+qInverse = orientation.rand(100000, rotF.CS.stripSym(), rotF.frameB, rng=rng)
 inverseSamples = rotF.eval(qInverse) * sphereHInv.eval(inv(qInverse) * vSpecimen)
 inverseIntegralEstimate = np.mean(inverseSamples)
 inverseStandardError = np.std(inverseSamples, ddof=1) / np.sqrt(inverseSamples.size)

@@ -1,7 +1,7 @@
 # Subplan - the Python syntax where MATLAB's is a workaround
 
 Status: written 2026-09-30 on the branch `syntax-review`, with the user's decisions of the
-same day; R0 to R6 built, R7's full test suite green (3919 tests), the page build pending. Choices made on the way: MATLAB's `hist` is
+same day; R0 to R7 built: the full test suite green (3919 tests) and all 238 doc pages built. Choices made on the way: MATLAB's `hist` is
 `histogram(grains, grouped=True)`; `eqTol` of frames is `isclose(frA, frB)`; the flat `byMiller` went
 with the standard orientations (`orientation.byMiller`); `antipodal` is one tri-state (None
 from the objects, True forces, False forbids) where MATLAB has `antipodal` and `noAntipodal`;

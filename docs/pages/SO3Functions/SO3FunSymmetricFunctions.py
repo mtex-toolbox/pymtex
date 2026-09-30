@@ -1,7 +1,8 @@
 # # Symmetry of Orientation-Dependent Functions
 #
 # A rotational function can repeat under symmetry operations on either side of its argument.
-# Every `SO3Fun` therefore stores a right symmetry `SRight` and a left symmetry `SLeft`. For
+# Every `SO3Fun` therefore stores the frame `frameA` of its right symmetry and the frame `frameB`
+# of its left symmetry, MATLAB's `SRight` and `SLeft`. For
 # an orientation distribution function (ODF), the right side is the crystal symmetry and the
 # left side is the specimen symmetry.
 #
@@ -21,20 +22,20 @@ SO3F
 
 # ---
 
-cs = SO3F.SRight
+cs = SO3F.frameA
 cs
 
 # ---
 
-ss = SO3F.SLeft
+ss = SO3F.frameB
 ss
 
-# `CS` and `SS` are convenient aliases for `SRight` and `SLeft`. The Dubna ODF has quartz
+# `CS` and `SS` are convenient aliases for `frameA` and `frameB`. The Dubna ODF has quartz
 # crystal symmetry `321` on the right and no specimen symmetry on the left.
 #
 # ## Left and right actions
 #
-# If $s_L$ belongs to `SLeft` and $s_R$ belongs to `SRight`, a symmetric function satisfies
+# If $s_L$ belongs to `frameB` and $s_R$ belongs to `frameA`, a symmetric function satisfies
 #
 # $$ f(s_L R s_R)=f(R). $$
 #
@@ -89,7 +90,7 @@ plot(SO3F, 'sigma')
 # following is meaningful:
 #
 # ```python
-# SO3F.SLeft = crystalFrame('432')
+# SO3F.frameB = crystalFrame('432')
 # ```
 #
 # Applying that line to the Dubna ODF would change its physical meaning. It would no longer
@@ -108,7 +109,7 @@ SO3F2.isReal = True
 coefficientsBefore = SO3F2.fhat
 
 twoFold = crystalFrame('2')
-SO3F2.SRight = twoFold
+SO3F2.frameA = twoFold
 
 coefficientChangeAfterRelabelling = np.linalg.norm(SO3F2.fhat - coefficientsBefore)
 coefficientChangeAfterRelabelling
@@ -118,7 +119,7 @@ coefficientChangeAfterRelabelling
 # Test the claimed invariance at a random orientation and its twofold orbit.
 
 # +
-probe = orientation.rand(twoFold, SO3F2.SLeft, rng=rng)
+probe = orientation.rand(twoFold, SO3F2.frameB, rng=rng)
 probeOrbit = probe.symmetrise()
 valuesBeforeProjection = SO3F2.eval(probeOrbit)
 orbitSpreadBeforeProjection = np.max(np.abs(valuesBeforeProjection - valuesBeforeProjection.flat[0]))
@@ -167,7 +168,7 @@ plot(SO3F2Sym, 'complete')
 # complementary ways.
 #
 # Harmonic invariance is encoded directly in the Fourier coefficients. Changing only
-# `SRight` or `SLeft` does not encode it; applying `symmetrise` does.
+# `frameA` or `frameB` does not encode it; applying `symmetrise` does.
 #
 # ## Convert another representation before projection
 #
