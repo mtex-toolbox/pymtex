@@ -707,11 +707,11 @@ def _reducedCosts(T, basis, cost, ncols):
 
 # the simplex iteration over the first ncols columns with Bland's rule: 0 optimal, 1
 # unbounded, 2 the iteration limit
-def _simplexSolve(T, basis, ncols, tol, maxit):
+def _simplexSolve(T, basis, ncols, tol, maxIter):
   m = basis.shape[0]
   last = T.shape[0] - 1
   rhs = T.shape[1] - 1
-  for _ in range(maxit):
+  for _ in range(maxIter):
     c = -1
     for j in range(ncols):
       if T[last, j] < -tol:
@@ -735,7 +735,7 @@ def _simplexSolve(T, basis, ncols, tol, maxit):
 # min c x under A x = b, x >= 0, by the two phase simplex on a dense tableau: the rows are
 # scaled and signed so the artificial basis is feasible, phase one drives the artificials
 # out, phase two runs on the original columns. Returns 0 with x written, or a code
-def _linearProgram(A, b, c, tol, maxit, x):
+def _linearProgram(A, b, c, tol, maxIter, x):
   m, n = A.shape
   T = np.zeros((m + 1, n + m + 1))
   basis = np.empty(m, dtype=np.int64)
@@ -756,7 +756,7 @@ def _linearProgram(A, b, c, tol, maxit, x):
   for j in range(n, n + m):
     cost[j] = 1.0
   _reducedCosts(T, basis, cost, n + m)
-  status = _simplexSolve(T, basis, n + m, tol, maxit)
+  status = _simplexSolve(T, basis, n + m, tol, maxIter)
   if status != 0:
     return 3
   infeas = 0.0
@@ -793,7 +793,7 @@ def _linearProgram(A, b, c, tol, maxit, x):
   for j in range(n):
     cost2[j] = c[j] / scale
   _reducedCosts(T, basis, cost2, n)
-  status = _simplexSolve(T, basis, n, tol, maxit)
+  status = _simplexSolve(T, basis, n, tol, maxIter)
   if status != 0:
     return 5
   for j in range(n):
@@ -808,7 +808,7 @@ def _linearProgram(A, b, c, tol, maxit, x):
 # all pixels or one per pixel, the curvature of each system on the known components as the
 # columns of the program, both signs of every system, the line energies as the cost; a pixel
 # with an unknown curvature or systems is left NaN
-def _gndLoop(kappa, known, b, l, u, tol, maxit, gnd, rho):
+def _gndLoop(kappa, known, b, l, u, tol, maxIter, gnd, rho):
   n = kappa.shape[0]
   ns = b.shape[1]
   m = known.shape[0]
@@ -847,7 +847,7 @@ def _gndLoop(kappa, known, b, l, u, tol, maxit, gnd, rho):
       cvec[j] = u[kb, j]
       cvec[ns + j] = u[kb, j]
     x = np.empty(2 * ns)
-    if _linearProgram(A, bvec, cvec, tol, maxit, x) != 0:
+    if _linearProgram(A, bvec, cvec, tol, maxIter, x) != 0:
       continue
     total = 0.0
     for j in range(ns):
@@ -972,9 +972,9 @@ def _applyOperator(x, wd, wr, alpha, order, ptr, adj, eid, free, active, y, tmp2
 
 # the conjugate gradient on the operator above from the start x, the fixed pixels held at
 # their values and taken off the free ones through the residual, Jacobi preconditioned, in
-# three passes over the map per step; stops at a relative residual of tol or after maxit
+# three passes over the map per step; stops at a relative residual of tol or after maxIter
 # steps. Returns the steps taken
-def _cgLoop(x, b, wd, wr, alpha, order, ptr, adj, eid, free, active, tol, maxit, work):
+def _cgLoop(x, b, wd, wr, alpha, order, ptr, adj, eid, free, active, tol, maxIter, work):
   n, d = x.shape
   y, tmp2, r, z, p = work[0], work[1], work[2], work[3], work[4]
   # the diagonal of the operator, for the preconditioner
@@ -1014,7 +1014,7 @@ def _cgLoop(x, b, wd, wr, alpha, order, ptr, adj, eid, free, active, tol, maxit,
   if bnorm == 0.0:
     bnorm = 1.0
   it = 0
-  while it < maxit and np.sqrt(rnorm) > tol * bnorm:
+  while it < maxIter and np.sqrt(rnorm) > tol * bnorm:
     pAp = _applyOperator(p, wd, wr, alpha, order, ptr, adj, eid, free, active, y, tmp2)
     if pAp <= 0.0:
       break
@@ -1362,13 +1362,13 @@ def grainKernel(name):
   return _COMPILED[key]
 
 
-def linearProgramNumba(c, A, b, tol=1e-9, maxit=10000):
+def linearProgramNumba(c, A, b, tol=1e-9, maxIter=10000):
   """the linear program of one problem through the compiled simplex, None without numba, and
   None again where the program has no solution"""
   if _preparePixel() is None:
     return None
   x = np.empty(len(c))
-  status = _linearProgram(np.ascontiguousarray(A, dtype=float), np.ascontiguousarray(b, dtype=float), np.ascontiguousarray(c, dtype=float), tol, maxit, x)
+  status = _linearProgram(np.ascontiguousarray(A, dtype=float), np.ascontiguousarray(b, dtype=float), np.ascontiguousarray(c, dtype=float), tol, maxIter, x)
   return x if status == 0 else None
 
 

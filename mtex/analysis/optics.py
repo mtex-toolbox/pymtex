@@ -80,16 +80,16 @@ def _axes(data, frame):
   return v
 
 
-def opticalAxis(rI, tolerance=1e-8):
+def opticalAxis(rI, tol=1e-8):
   """the optical axes of a refractive index tensor: the directions along which the two
   indices coincide, one for a uniaxial and two for a biaxial crystal"""
   n, V = rI.eig()
   e = V.data
-  if abs(n[0] - n[2]) < tolerance:
+  if abs(n[0] - n[2]) < tol:
     return _axes(np.zeros((0, 3)), rI.frame)
-  if abs(n[0] - n[1]) < tolerance:
+  if abs(n[0] - n[1]) < tol:
     return _axes(e[2], rI.frame)
-  if abs(n[1] - n[2]) < tolerance:
+  if abs(n[1] - n[2]) < tol:
     return _axes(e[0], rI.frame)
   a = math.sqrt((n[2] - n[1]) / (n[2] - n[0]))
   b = math.sqrt((n[1] - n[0]) / (n[2] - n[0]))

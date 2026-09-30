@@ -68,7 +68,7 @@ def _solve(T, basis, columns, tol, budget):
     it += 1
 
 
-def linearProgram(c, A, b, tol=1e-9, maxit=10000, diagnostics=False):
+def linearProgram(c, A, b, tol=1e-9, maxIter=10000, diagnostics=False):
   """the minimiser of c.x under A x = b, x >= 0, by a scaled two-phase simplex with Bland's
   rule; None when the program is infeasible, unbounded or out of iterations, or with
   diagnostics=True the result with its status, pivot count and relative residual"""
@@ -76,8 +76,8 @@ def linearProgram(c, A, b, tol=1e-9, maxit=10000, diagnostics=False):
   m, n = A.shape
   if c.size != n or b.size != m:
     raise ValueError("incompatible dimensions of the linear program")
-  if not (np.isfinite(tol) and tol > 0 and maxit >= 0):
-    raise ValueError("tol has to be positive and maxit nonnegative")
+  if not (np.isfinite(tol) and tol > 0 and maxIter >= 0):
+    raise ValueError("tol has to be positive and maxIter nonnegative")
   if not (np.all(np.isfinite(A)) and np.all(np.isfinite(b)) and np.all(np.isfinite(c))):
     raise ValueError("the data of a linear program have to be finite")
   finish = lambda status, it, x=None, res=np.inf: LinearProgramResult(x, status, it, res) if diagnostics else x
@@ -90,7 +90,7 @@ def linearProgram(c, A, b, tol=1e-9, maxit=10000, diagnostics=False):
   T[np.arange(m), n + np.arange(m)] = 1
   basis = np.arange(n, n + m)
   _cost(T, basis, np.concatenate([np.zeros(n), np.ones(m)]))
-  status, it = _solve(T, basis, n + m, tol, maxit)
+  status, it = _solve(T, basis, n + m, tol, maxIter)
   if status != "optimal":
     return finish(status, it)
   if np.sum(T[:-1, -1][basis > n - 1]) > 10 * tol:
@@ -104,7 +104,7 @@ def linearProgram(c, A, b, tol=1e-9, maxit=10000, diagnostics=False):
         T = np.delete(T, i, axis=0)
         basis = np.delete(basis, i)
         continue
-      if it >= maxit:
+      if it >= maxIter:
         return finish("iteration_limit", it)
       _pivot(T, basis, i, candidates[0])
       it += 1
@@ -113,7 +113,7 @@ def linearProgram(c, A, b, tol=1e-9, maxit=10000, diagnostics=False):
   T = T[:, list(range(n)) + [T.shape[1] - 1]]
   cscale = max(float(np.max(np.abs(c), initial=0.0)), np.finfo(float).eps)
   _cost(T, basis, c / cscale)
-  status, steps = _solve(T, basis, n, tol, maxit - it)
+  status, steps = _solve(T, basis, n, tol, maxIter - it)
   it += steps
   if status != "optimal":
     return finish(status, it)

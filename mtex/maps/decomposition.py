@@ -365,7 +365,7 @@ def _gridKey(u):
   return key[:, 0] * (key[:, 1].max(initial=0) - key[:, 1].min(initial=0) + 1) + key[:, 1]
 
 
-def decompose(ebsd, alpha=3.1, tolerance=None, backend=None):
+def decompose(ebsd, alpha=3.1, tol=None, backend=None):
   """the decomposition of a map: the closing, the sites and their cells
 
     alpha - the closing radius in multiples of the spacing; a region narrower than 2 alpha
@@ -380,8 +380,7 @@ def decompose(ebsd, alpha=3.1, tolerance=None, backend=None):
   cells, verts, unbounded = localVoronoi(sites, l.A, alpha, backend=backend)
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")
-  tol = l.dxy / 100 if tolerance is None else tolerance
-  V, F, cells = meshVertices(cells, verts, tol, backend=backend)
+  V, F, cells = meshVertices(cells, verts, l.dxy / 100 if tol is None else tol, backend=backend)
   return cellComplex(V, F, cells, sites, l.A, l.plane, l.shape)
 
 

@@ -58,15 +58,15 @@ class sphericalRegion:
 
   # ------------------------------------------------------------------ membership
 
-  def checkInside(self, v, tolerance=1e-4):
+  def checkInside(self, v, tol=1e-4):
     """whether directions lie in the region, up to a small tolerance at the boundary"""
     xyz = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
     if len(self.N) == 0:
       return np.ones(xyz.shape[:-1], dtype=bool)
     n = np.linalg.norm(xyz, axis=-1)
-    inside = np.all(xyz @ self.N.T >= (self.alpha - tolerance) * n[..., None], axis=-1)
+    inside = np.all(xyz @ self.N.T >= (self.alpha - tol) * n[..., None], axis=-1)
     if self.antipodal or (isinstance(v, vector3d) and v.antipodal):
-      inside |= np.all(-xyz @ self.N.T >= (self.alpha - tolerance) * n[..., None], axis=-1)
+      inside |= np.all(-xyz @ self.N.T >= (self.alpha - tol) * n[..., None], axis=-1)
     return inside
 
   def volume(self, resolution=1 * degree):
@@ -156,14 +156,14 @@ class sphericalRegion:
     segs = self.thetaIntervals(rho)
     return None if not segs else (segs[0][0], segs[-1][1])
 
-  def vertices(self, tolerance=1e-8):
+  def vertices(self, tol=1e-8):
     """the corners of the region: the intersections of its circles that lie inside"""
     V = []
     n = len(self.N)
     for i in range(n - 1):
       for j in range(i + 1, n):
         for v in _circleIntersection(self.N[i], self.alpha[i], self.N[j], self.alpha[j]):
-          if self.checkInside(v, tolerance) and not any(u @ v > 1 - 1e-9 for u in V):
+          if self.checkInside(v, tol) and not any(u @ v > 1 - 1e-9 for u in V):
             V.append(v)
     return vector3d(np.array(V).reshape(-1, 3), isNormalized=True, frame=self.frame)
 

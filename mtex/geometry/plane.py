@@ -88,12 +88,12 @@ class plane3d:
 
   # ------------------------------------------------------------------ distances
 
-  def dist(self, v, tolerance=1e-8):
+  def dist(self, v, tol=1e-8):
     """the signed distance of points to the plane, or the distance of two parallel planes,
     NaN where the planes meet"""
     if isinstance(v, plane3d):
       lam = self.N.dot(v.N, noSymmetry=True)
-      lam = np.where(np.abs(np.abs(lam) - 1) < tolerance, lam, np.nan)
+      lam = np.where(np.abs(np.abs(lam) - 1) < tol, lam, np.nan)
       return self.d - v.d * lam
     v = v if isinstance(v, vector3d) else vector3d(v)
     return self.N.dot(v, noSymmetry=True) - self.d
@@ -103,11 +103,11 @@ class plane3d:
     v = v if isinstance(v, vector3d) else vector3d(v)
     return v - self.N * self.dist(v)
 
-  def intersect(self, v1, v2=None, tolerance=1e-13):
+  def intersect(self, v1, v2=None, tol=1e-13):
     """where the segments from v1 to v2 cross the plane, NaN where they do not"""
     if v2 is None:
       v1, v2 = v1[..., 0], v1[..., 1]
-    return lineIntersect(v1, v2, self.N, self.d, tolerance)
+    return lineIntersect(v1, v2, self.N, self.d, tol)
 
   def clip(self, lo, hi):
     """the polygon the plane cuts out of the box from lo to hi, its corners in order around
@@ -157,7 +157,7 @@ class plane3d:
     from ..plotting.shapeplot import plotPlane as plot
 
 
-def lineIntersect(a, b, n, d, tolerance=1e-13):
+def lineIntersect(a, b, n, d, tol=1e-13):
   """where the segments from a to b cross the planes <n, v> = d, NaN where they do not"""
   A = a if isinstance(a, vector3d) else vector3d(a)
   B = b if isinstance(b, vector3d) else vector3d(b)
@@ -165,7 +165,7 @@ def lineIntersect(a, b, n, d, tolerance=1e-13):
   l = B - A
   with np.errstate(divide="ignore", invalid="ignore"):
     lam = (np.asarray(d, dtype=float) - A.dot(N, noSymmetry=True)) / l.dot(N, noSymmetry=True)
-  lam = np.where((lam < -tolerance) | (lam > 1 + tolerance), np.nan, lam)
+  lam = np.where((lam < -tol) | (lam > 1 + tol), np.nan, lam)
   return A + l * lam
 
 

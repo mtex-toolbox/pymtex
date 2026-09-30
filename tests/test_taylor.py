@@ -25,7 +25,7 @@ def test_linearProgram_diagnosticsSayWhyThereIsNoSolution():
   assert linearProgram([1.0, 1], [[1.0, 1], [1, 1]], [1.0, 2]) is None
   assert linearProgram([1.0], np.ones((2, 1)), [1.0, 2.0], diagnostics=True).status == "infeasible"
   assert linearProgram([-1.0], np.zeros((1, 1)), [0.0], diagnostics=True).status == "unbounded"
-  assert linearProgram([2.0, 1.0], np.ones((1, 2)), [1.0], maxit=1, diagnostics=True).status == "iteration_limit"
+  assert linearProgram([2.0, 1.0], np.ones((1, 2)), [1.0], maxIter=1, diagnostics=True).status == "iteration_limit"
 
 
 def test_linearProgram_solvesRedundantAndBadlyScaledRows():

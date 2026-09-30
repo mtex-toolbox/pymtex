@@ -77,7 +77,7 @@ def test_MCL_splits_two_cliques():
 def test_the_grain_graph_route(plain):
   e, g = plain
   job = parentGrainReconstructor(e, g, P2C)
-  job.calcGraph(threshold=2.5 * degree, tolerance=2.5 * degree)
+  job.calcGraph(threshold=2.5 * degree, tol=2.5 * degree)
   assert job.graph.shape == (6, 6) and job.hasGraph and "graph:" in repr(job)
   job.clusterGraph(inflationPower=1.6)
   job.calcParentFromGraph()
@@ -88,7 +88,7 @@ def test_the_grain_graph_route(plain):
   assert len(job.grains) == 2 and np.max(fitsParent(job.grains)) < 2 * degree
   # a graph merged directly into parent grains
   job = parentGrainReconstructor(e, g, P2C)
-  job.calcGraph(threshold=2.5 * degree, tolerance=2.5 * degree)
+  job.calcGraph(threshold=2.5 * degree, tol=2.5 * degree)
   job.clusterGraph()
   job.mergeByGraph()
   assert len(job.grains) == 2 and np.all(job.isParent) and np.max(fitsParent(job.grains)) < 2 * degree

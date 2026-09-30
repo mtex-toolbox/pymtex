@@ -42,10 +42,10 @@ def _ori(q, frameA, frameB):
   return orientation._fromRotation(np.asarray(q, dtype=float).reshape(-1, 4), (frameA, frameB))
 
 
-def probabilityOf(fit, threshold, tolerance):
+def probabilityOf(fit, threshold, tol):
   """the probability that a misfit of that angle still means one parent: the cumulative
   Gaussian around the threshold over the width of the tolerance"""
-  return 1 - 0.5 * (1 + erf(2 * (np.asarray(fit, dtype=float) - threshold) / tolerance))
+  return 1 - 0.5 * (1 + erf(2 * (np.asarray(fit, dtype=float) - threshold) / tol))
 
 
 # MTEX's quantile, which shadows MATLAB's: the round(n q)-th of the n sorted values without
@@ -94,7 +94,7 @@ class voteTable:
     return aligned(f"voteTable ({len(self)} grains)\n  parentId: {self.parentId.shape}\n  {self.kind}: {self.value.shape}")
 
 
-def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf,
+def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tol=None, minFit=np.inf, maxFit=-np.inf,
                weights=None, bestFit=False, count=False):
   """the votes of many (grain, variant, fit) rows turned into a table of n grains: each row is a
   vote with its numFit best variants, the best first. The fits become probabilities, summed
@@ -122,8 +122,8 @@ def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tolerance=N
     np.add.at(M, (g, v), f < threshold)
     M[M.sum(axis=1) == 0] = np.nan
   else:
-    tolerance = threshold if tolerance is None else tolerance
-    prob = probabilityOf(f, threshold, tolerance)
+    tol = threshold if tol is None else tol
+    prob = probabilityOf(f, threshold, tol)
     prob[prob < 1e-2] = 0
     if weights is not None and np.size(weights) > 1:
       prob = prob * np.asarray(weights, dtype=float).reshape(-1, numFit)[keep].reshape(-1)
@@ -641,7 +641,7 @@ class parentGrainReconstructor:
 
   # ------------------------------------------------------------------ the votes
 
-  def calcGBVotes(self, ind=None, p2c=False, c2c=False, reconsiderAll=False, numFit=2, threshold=None, tolerance=None,
+  def calcGBVotes(self, ind=None, p2c=False, c2c=False, reconsiderAll=False, numFit=2, threshold=None, tol=None,
                   minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False, curvatureFactor=None):
     """job.calcGBVotes(): the votes the grain boundaries cast into job.votes.
 
@@ -655,7 +655,7 @@ class parentGrainReconstructor:
     neighbour stays undecided then, and curvatureFactor weighs a boundary by its curvature.
     ind restricts reconsiderAll to prior grains of those positions and returns the table.
     """
-    opts = dict(threshold=threshold, tolerance=tolerance, minFit=minFit, maxFit=maxFit, bestFit=bestFit, count=count)
+    opts = dict(threshold=threshold, tol=tol, minFit=minFit, maxFit=maxFit, bestFit=bestFit, count=count)
     if reconsiderAll:
       votes = self._reconsiderVotes(ind, curvatureFactor, opts)
       if ind is not None:
@@ -738,7 +738,7 @@ class parentGrainReconstructor:
       out[k] = 1 + _quantile(kappa[row == k], 0.75)
     return np.nan_to_num(out, nan=1.0)
 
-  def calcTPVotes(self, numFit=2, threshold=None, tolerance=None, minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False):
+  def calcTPVotes(self, numFit=2, threshold=None, tol=None, minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False):
     """job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree): the votes the triple points of
     three child grains cast, each corner for the variant of the parent that fits all three;
     minFit asks the best fit of a triple point to be below it, maxFit the second best above"""
@@ -758,7 +758,7 @@ class parentGrainReconstructor:
     else:
       ids = grain = np.zeros((0, numFit), dtype=np.int64)
       fit = np.zeros((0, numFit))
-    self.votes = accumVotes(grain, ids, fit, g.size, numFit=numFit, threshold=threshold, tolerance=tolerance, minFit=minFit,
+    self.votes = accumVotes(grain, ids, fit, g.size, numFit=numFit, threshold=threshold, tol=tol, minFit=minFit,
                             maxFit=maxFit, bestFit=bestFit, count=count)
 
   def calcParentFromVote(self, minProb=0, minDelta=None, minFit=5 * degree, minAlpha=None, minCount=0, maxCount=None):

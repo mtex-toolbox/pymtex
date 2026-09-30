@@ -43,14 +43,14 @@ def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
   return np.real(psi.eval(t)).reshape(len(q), len(a), len(c), len(b)).mean(axis=(1, 3))
 
 
-def mlsq(A, y, c0, itermax=100, tol=1e-3):
+def mlsq(A, y, c0, maxIter=100, tol=1e-3):
   """MATLAB's mlsq: least squares over weights of the sign of the start, the steepest descent
   direction scaled by the weights so that none crosses zero"""
   chat = np.real(np.asarray(c0, dtype=float))
   r = A @ chat - y
   oldErr = np.inf
   k = 0
-  for k in range(1, itermax + 1):
+  for k in range(1, maxIter + 1):
     gradient = A.T @ r
     lam = np.real(gradient - gradient @ chat)
     ctilde = lam * chat
@@ -79,7 +79,7 @@ def voronoiVolumes(nodes, resolution=2.5 * degree):
 
 
 # the weights of one column of values
-def _spatial(M, y, density, mean, maxit, tol, nodes):
+def _spatial(M, y, density, mean, maxIter, tol, nodes):
   eps = np.max(y) * 1e-3
   signed = np.all(y > -eps) or np.all(y < eps)
   method = "lsqr"
@@ -93,7 +93,7 @@ def _spatial(M, y, density, mean, maxit, tol, nodes):
     method = "mlsq"
   if method == "lsqr":
     from .lsqr import lsqr
-    x, _, _, it = lsqr(lambda c: M @ c, lambda r: M.T @ r, y, M.shape[1], tol=tol, maxit=30 if maxit is None else maxit)
+    x, _, _, it = lsqr(lambda c: M @ c, lambda r: M.T @ r, y, M.shape[1], tol=tol, maxIter=30 if maxIter is None else maxIter)
     return x, it, mean
   c0 = M.T @ y
   if density:
@@ -102,12 +102,12 @@ def _spatial(M, y, density, mean, maxit, tol, nodes):
     small = np.abs(c0) <= eps
     c0 = np.where(small, np.sign(c0) * eps, c0)
   c0 = (1.0 if mean is None else mean) * c0 / np.sum(c0)
-  chat, it = mlsq(M, y, c0, 100 if maxit is None else maxit, tol)
+  chat, it = mlsq(M, y, c0, 100 if maxIter is None else maxIter, tol)
   return chat, it, mean
 
 
 def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=None, SO3Grid=None, density=False,
-                   mean=None, exact=False, tol=1e-3, maxit=None, withIterations=False):
+                   mean=None, exact=False, tol=1e-3, maxIter=None, withIterations=False):
   """the sum of radial kernels through values at orientations, MATLAB's SO3FunRBF.interpolate"""
   from ..geometry.grids.so3grid import equispacedSO3Grid
   from .rbf import SO3FunRBF, unimodalODF
@@ -122,7 +122,7 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   y = np.real(np.asarray(values, dtype=float)).reshape(nodes.size, -1)
   cols, its = [], []
   for k in range(y.shape[1]):
-    chat, it, _ = _spatial(M, y[:, k], density, mean, maxit, tol, nodes)
+    chat, it, _ = _spatial(M, y[:, k], density, mean, maxIter, tol, nodes)
     cols.append(chat)
     its.append(it)
   w = np.stack(cols, axis=-1).reshape((centres.size,) + np.asarray(values).shape[1:])

@@ -260,7 +260,7 @@ class SO3VectorField:
 
       F.antiderivative()
       F.antiderivative(conservative=True)
-      F.antiderivative(tolerance=1e-3)"""
+      F.antiderivative(tol=1e-3)"""
     return antiderivative(self, x, **kwargs)
 
   def __neg__(self):
@@ -561,7 +561,7 @@ def curl(v, x=None):
   return c if x is None else c(x)
 
 
-def antiderivative(v, x=None, conservative=False, tolerance=1e-4):
+def antiderivative(v, x=None, conservative=False, tol=1e-4):
   """the function of mean zero whose gradient the field is, Laplace^-1 div F; the field is
   checked to be a gradient unless told it is"""
   v = SO3VectorFieldHarmonic(v)
@@ -571,7 +571,7 @@ def antiderivative(v, x=None, conservative=False, tolerance=1e-4):
   for n in range(1, d.bandwidth + 1):
     degreeBlock(fhat, n)[...] /= -(n * (n + 1))
   f = d._rebuild(fhat)
-  if not conservative and np.linalg.norm(differentiate(f._fhat, v.tangentSpace) - v._fhat) > tolerance * max(np.linalg.norm(v._fhat), np.finfo(float).eps):
+  if not conservative and np.linalg.norm(differentiate(f._fhat, v.tangentSpace) - v._fhat) > tol * max(np.linalg.norm(v._fhat), np.finfo(float).eps):
     raise ValueError("the field is not conservative: it is not the gradient of a function")
   return f if x is None else f(x)
 

@@ -104,7 +104,7 @@ def test_MLSSolver_exposesItsState(reconstruction):
   s = MLSSolver(pfs, resolution=10 * degree)
   s.calcODF()
   assert s.alpha.size == 3 and s.c.size == s.S3G.size and s.odf.center.size == s.S3G.size
-  assert np.all(calcError(pfs, pfs.calcODF(resolution=10 * degree, iterMax=8)) < 0.03)
+  assert np.all(calcError(pfs, pfs.calcODF(resolution=10 * degree, maxIter=8)) < 0.03)
 
 
 def test_calcODF_withSpecimenSymmetryAndSuperposedPoleFigures():

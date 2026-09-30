@@ -137,7 +137,7 @@ mtexColorbar(title='intensity')
 # A 10 degree orientation grid and at most six solver iterations provide a quick
 # consistency check.
 
-recCoarse = calcODF(pf, resolution=10 * degree, iterMax=6, silent=False)
+recCoarse = calcODF(pf, resolution=10 * degree, maxIter=6, silent=False)
 recCoarse
 
 # The first check is always the recalculated pole figures against the measured ones above.

@@ -22,7 +22,7 @@ def test_mlsq_keepsTheWeightsPositiveAndFits():
   A = np.abs(rng.standard_normal((60, 20)))
   c = np.abs(rng.standard_normal(20))
   y = A @ c
-  chat, it = mlsq(A, y, np.full(20, np.sum(c) / 20), itermax=500, tol=1e-12)
+  chat, it = mlsq(A, y, np.full(20, np.sum(c) / 20), maxIter=500, tol=1e-12)
   assert np.all(chat > 0) and np.linalg.norm(A @ chat - y) < 0.05 * np.linalg.norm(y)
 
 
@@ -60,6 +60,6 @@ def test_SO3FunRBF_interpolateReportsTheIterationsOfLsqr():
 def test_SO3FunRBF_interpolateExactFitsEveryNode():
   nodes = orientation(rotation.rand(300, rng=rng), cs)
   y = rng.standard_normal(300)
-  g = SO3FunRBF.interpolate(nodes, y, exact=True, halfwidth=5 * degree, tol=1e-12, maxit=500)
+  g = SO3FunRBF.interpolate(nodes, y, exact=True, halfwidth=5 * degree, tol=1e-12, maxIter=500)
   assert g.center.size == 300
   assert np.linalg.norm(np.real(g.eval(nodes)) - y) < 1e-3 * np.linalg.norm(y)

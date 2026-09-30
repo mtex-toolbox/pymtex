@@ -399,12 +399,12 @@ def projectionClass(name):
 
 # ------------------------------------------------------------------ which charts a plot needs
 
-def withinHemisphere(sR, up, tolerance=1e-6):
+def withinHemisphere(sR, up, tol=1e-6):
   """does the region lie within the hemisphere towards up, the boundary allowed on the equator"""
   u = _asVectors(up)
-  if sR.checkInside(-u, tolerance=-tolerance) or len(sR.N) == 0:
+  if sR.checkInside(-u, tol=-tol) or len(sR.N) == 0:
     return False
-  return all(np.all(arc.data @ u.data.reshape(3) >= -tolerance) for arc in sR.boundary(2 * degree))
+  return all(np.all(arc.data @ u.data.reshape(3) >= -tol) for arc in sR.boundary(2 * degree))
 
 
 def isUpper(sR, pC):
@@ -507,7 +507,7 @@ def rhoRange(sR):
   the complement of the widest gap between the azimuths of its boundary"""
   if len(sR.N) == 0:
     return 0.0, 2 * np.pi
-  if sR.checkInside(zvector, tolerance=-1e-8) or sR.checkInside(-zvector, tolerance=-1e-8):
+  if sR.checkInside(zvector, tol=-1e-8) or sR.checkInside(-zvector, tol=-1e-8):
     return 0.0, 2 * np.pi
   pts = [arc.data for arc in sR.boundary(0.5 * degree)]
   if not pts:

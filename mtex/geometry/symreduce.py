@@ -43,9 +43,9 @@ def reductionGroupsPair(a, b):
   return La, uniqueRotations(prod)
 
 
-def uniqueRotations(q, tolerance=1e-6):
+def uniqueRotations(q, tol=1e-6):
   """distinct rotations up to sign and a tolerance, pairwise, the first of each kept"""
-  same = np.abs(q @ q.T) > 1 - tolerance
+  same = np.abs(q @ q.T) > 1 - tol
   keep = np.ones(len(q), dtype=bool)
   for k in range(len(q)):
     if keep[k]:

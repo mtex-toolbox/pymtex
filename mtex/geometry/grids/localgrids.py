@@ -67,7 +67,7 @@ def localOrientationGrid(*args, maxAngle=None, resolution=5 * degree, center=Non
   stab = chordAngle(allCopies, c) < 1e-8
   stabCopies = qmul(qmul(L[:, None, :], c2[None, None, :]), R[None, :, :]).reshape(-1, 4)[stab]
   keep = _keepInBall(chordAngle, q, c, copies, c2, stabCopies)
-  return ori[keep].unique(tolerance=res / 100, noSymmetry=True)
+  return ori[keep].unique(tol=res / 100, noSymmetry=True)
 
 
 # a point x is kept when c is its closest copy among copies, and c2 its closest among the
@@ -108,7 +108,7 @@ def localS2Grid(center, maxTheta=None, resolution=5 * degree, respectSymmetry=Tr
   stab = images @ c > 1 - 1e-8
   stabCopies = (qrot(els[:, :4], c2[None]) * els[:, 4:5])[stab]
   keep = _keepInBall(_vecAngle, pts, c, copies, c2, stabCopies)
-  return vector3d(pts[keep], frame=fr).unique(tolerance=resolution / 100, noSymmetry=True)
+  return vector3d(pts[keep], frame=fr).unique(tol=resolution / 100, noSymmetry=True)
 
 
 __all__ = ["localOrientationGrid", "localS2Grid"]

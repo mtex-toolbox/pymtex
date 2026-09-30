@@ -162,7 +162,7 @@ def test_equality_within_tolerance():
   r = rotation.rand(rng=rng())
   assert r == r * rotation.byAxisAngle(xvector, 1e-4)
   assert r != r * rotation.byAxisAngle(xvector, 1e-2)
-  assert r.__eq__(r * rotation.byAxisAngle(xvector, 1e-2), tolerance=0.1)
+  assert r.__eq__(r * rotation.byAxisAngle(xvector, 1e-2), tol=0.1)
 
 
 def ra():

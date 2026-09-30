@@ -97,7 +97,7 @@ changeFromKS
 # transition-width parameter.
 
 # +
-job.calcGraph(threshold=2.5 * degree, tolerance=2.5 * degree)
+job.calcGraph(threshold=2.5 * degree, tol=2.5 * degree)
 print(job)
 
 graphWeights = triu(job.graph, 1).data

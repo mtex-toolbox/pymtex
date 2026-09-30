@@ -222,10 +222,10 @@ class quaternion(MtexArray):
     return vector3d(quatAxis(self.data), isNormalized=True)
 
   # two quaternions are equal within an angular tolerance
-  def __eq__(self, other, tolerance=5e-4):
+  def __eq__(self, other, tol=5e-4):
     if not isinstance(other, quaternion):
       return NotImplemented
-    return self.dot(other) > np.cos(tolerance)
+    return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
     return ~(self == other)
@@ -302,11 +302,11 @@ class quaternion(MtexArray):
       return np.stack([a * a, b * b, c * c, d * d, a * b, a * c, a * d, b * c, b * d, c * d], axis=-1)
     return abcd
 
-  def unique(self, tolerance=1e-3, antipodal=False, stable=False, return_index=False, return_inverse=False):
+  def unique(self, tol=1e-3, antipodal=False, stable=False, return_index=False, return_inverse=False):
     """the quaternions with those equal up to the tolerance in the coefficients removed; antipodal=True
     takes q and -q as one; optionally the indices of the kept ones and the index of each into them"""
     from .vector3d import _uniqueRows
-    iv, iu = _uniqueRows(self._uniqueKey(antipodal), tolerance, stable)
+    iv, iu = _uniqueRows(self._uniqueKey(antipodal), tol, stable)
     u = self._new(self.data.reshape(-1, self._ncoord)[iv])
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
@@ -510,12 +510,12 @@ class rotation(quaternion):
       return other
     raise TypeError(f"expected a rotation, got {type(other).__name__}")
 
-  def __eq__(self, other, tolerance=5e-4):
+  def __eq__(self, other, tol=5e-4):
     if isinstance(other, orthogonalTransform):
       return orthogonalTransform(self, False) == other
     if not isinstance(other, quaternion):
       return NotImplemented
-    return self.dot(other) > np.cos(tolerance)
+    return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
     return ~(self == other)
@@ -683,21 +683,21 @@ class orthogonalTransform(MtexArray):
     d = np.sum(self.data[..., :4] * q, axis=-1) * (self.parity == p)
     return d if noAntipodal else np.abs(d)
 
-  def __eq__(self, other, tolerance=5e-4):
+  def __eq__(self, other, tol=5e-4):
     q, p = self._other(other)
     if q is None:
       return NotImplemented
-    return self.dot(other) > np.cos(tolerance)
+    return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
     return ~(self == other)
 
-  def unique(self, tolerance=1e-3, stable=False, return_index=False, return_inverse=False):
+  def unique(self, tol=1e-3, stable=False, return_index=False, return_inverse=False):
     """the transforms with those equal up to the tolerance removed, a rotation and its negative one;
     optionally the indices of the kept ones and the index of each into them"""
     from .vector3d import _uniqueRows
     key = np.concatenate([self.rot._uniqueKey(True), self.parity.reshape(-1, 1)], axis=-1)
-    iv, iu = _uniqueRows(key, tolerance, stable)
+    iv, iu = _uniqueRows(key, tol, stable)
     u = self._new(self.data.reshape(-1, 5)[iv])
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u

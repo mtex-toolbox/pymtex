@@ -2,9 +2,9 @@
 # calcParentFromGraph, mergeByGraph, calcVariantGraph, clusterVariantGraph; Julia
 # reconstruction.jl)
 #
-#   job.calcGraph(threshold=2.5*degree, tolerance=2.5*degree); job.clusterGraph(inflationPower=1.6)
+#   job.calcGraph(threshold=2.5*degree, tol=2.5*degree); job.clusterGraph(inflationPower=1.6)
 #   job.calcParentFromGraph(), job.mergeByGraph(threshold=5*degree), job.plotGraph()
-#   job.calcVariantGraph(threshold=3.5*degree, tolerance=1.5*degree); job.clusterVariantGraph(includeSimilar=True)
+#   job.calcVariantGraph(threshold=3.5*degree, tol=1.5*degree); job.clusterVariantGraph(includeSimilar=True)
 #
 # The grain graph has a node per grain and an edge where two neighbours fit the
 # relationship; its clusters by MCL are the parent grains. The variant graph of
@@ -31,12 +31,12 @@ def _sparse(r, c, v, n):
 
 # ------------------------------------------------------------------ the grain graph
 
-def calcGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=False, c2c=False):
-  """job.calcGraph(threshold=2.5*degree, tolerance=2.5*degree): job.graph, a node per grain
+def calcGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, c2c=False):
+  """job.calcGraph(threshold=2.5*degree, tol=2.5*degree): job.graph, a node per grain
   and between neighbours the probability that the misfit of their boundary to the
   relationship still means one parent"""
   fit, pairs = job.calcGBFit(p2c=p2c, c2c=c2c)
-  prob = probabilityOf(fit, threshold, tolerance)
+  prob = probabilityOf(fit, threshold, tol)
   pos = job.grains._positions()
   a, b = pos[pairs[:, 0]], pos[pairs[:, 1]]
   G = _sparse(a, b, prob, job.grains.size)
@@ -239,9 +239,9 @@ def _layout(job, numV):
   return width, first[:-1], int(first[-1])
 
 
-def calcVariantGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=False, p2p=False, c2c=False, mergeSimilar=False,
+def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p=False, c2c=False, mergeSimilar=False,
                      noDiagonal=False):
-  """job.calcVariantGraph(threshold=3.5*degree, tolerance=1.5*degree): job.graph, the variant
+  """job.calcVariantGraph(threshold=3.5*degree, tol=1.5*degree): job.graph, the variant
   graph: a node per child grain and parent variant and one per parent grain, and an edge
   where two neighbours agree - child to child over every pair of variants, parent to child
   over the variants that fit the parent, parent to parent over their orientations - with
@@ -263,7 +263,7 @@ def calcVariantGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=Fals
   if len(job.parentGrains) and (p2p or noOpt):
     pr, o1, o2 = job._pairs("p2p")
     if len(pr):
-      prob = probabilityOf(np.asarray(o1.angle(o2)).reshape(-1), threshold, tolerance)
+      prob = probabilityOf(np.asarray(o1.angle(o2)).reshape(-1), threshold, tol)
       ok = prob > 0.1
       G = G.maximum(both(first[pos[pr[ok, 0]]], first[pos[pr[ok, 1]]], prob[ok]))
   if len(job.parentGrains) and (p2c or noOpt):
@@ -271,7 +271,7 @@ def calcVariantGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=Fals
     if len(pr):
       iP, iC = first[pos[pr[:, 0]]], first[pos[pr[:, 1]]]
       cand = _ori(qmul(oC.data.reshape(-1, 1, 4), PV[None]).reshape(-1, 4), job.csParent, g.frame).reshape(-1, numV)
-      prob = probabilityOf(np.asarray(cand.angle(oP.reshape(-1, 1))).reshape(-1, numV), threshold, tolerance)
+      prob = probabilityOf(np.asarray(cand.angle(oP.reshape(-1, 1))).reshape(-1, numV), threshold, tol)
       for k in range(numV):
         ok = prob[:, k] > 0.1
         G = G.maximum(both(iP[ok], iC[ok] + friend[k], prob[ok, k]))
@@ -280,7 +280,7 @@ def calcVariantGraph(job, threshold=2 * degree, tolerance=1.5 * degree, p2c=Fals
     if len(pr):
       i1, i2 = first[pos[pr[:, 0]]], first[pos[pr[:, 1]]]
       m = qmul(_conj(o1.data.reshape(-1, 4)), o2.data.reshape(-1, 4))
-      prob = probabilityOf(variantAngles(m, PV, job.csParent.sym.properGroup().rotations().data.reshape(-1, 4)), threshold, tolerance)
+      prob = probabilityOf(variantAngles(m, PV, job.csParent.sym.properGroup().rotations().data.reshape(-1, 4)), threshold, tol)
       p, k1, k2 = np.nonzero(prob > 0.1)
       v = prob[p, k1, k2]
       # the variants merged into one node add up, as MATLAB's sparse does

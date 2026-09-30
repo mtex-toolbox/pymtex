@@ -317,7 +317,7 @@ for i, v in enumerate(direction):
 # quadratic below `threshold` and linear above it. A least-squares penalty spreads a large
 # turn over many vertices and rounds a corner. A linear, $\ell^1$-like penalty
 # concentrates the turn into fewer vertices and preserves the corner. MTEX solves this
-# problem by iteratively reweighted least squares until it converges. The `iterMax`
+# problem by iteratively reweighted least squares until it converges. The `maxIter`
 # property is a safety limit, not a smoothing control.
 
 # ## Further reading

@@ -146,20 +146,20 @@ def _sobolevWeightsS2(L, s):
   return np.concatenate([np.full(2 * l + 1, (1 + l * (l + 1)) ** s) for l in range(L + 1)])
 
 
-def _lsqr(A, At, b, n, maxit, tol):
-  return _lsqrFull(A, At, b, n, maxit, tol)[0]
+def _lsqr(A, At, b, n, maxIter, tol):
+  return _lsqrFull(A, At, b, n, maxIter, tol)[0]
 
 
 # the solution, scipy's stop reason, the iterations and the residual norm; the operators are
 # transforms and the iteration's norms and products of vectors run on BLAS, whose waiting
 # threads would take the transforms' cores (docs/research/threads.md)
-def _lsqrFull(A, At, b, n, maxit, tol):
+def _lsqrFull(A, At, b, n, maxIter, tol):
   from .lsqr import lsqr
   with blasThreads(1):
-    return lsqr(A, At, np.asarray(b, dtype=complex), n, tol=tol, maxit=maxit)
+    return lsqr(A, At, np.asarray(b, dtype=complex), n, tol=tol, maxIter=maxIter)
 
 
-def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxit=100, tol=None,
+def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxIter=100, tol=None,
                 withParameters=False):
   """the function of least squares through values at nodes, on SO(3) for orientations, on the
   sphere for directions, a vector field for vector values, fitted by LSQR with a Sobolev
@@ -171,10 +171,10 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   from ..geometry.tangent import SO3TangentVector
   if isinstance(nodes, SO3TangentVector):
     from .so3vectorfield import interpolateField
-    return interpolateField(nodes, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+    return interpolateField(nodes, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
   if isinstance(nodes, vector3d) and isinstance(values, vector3d):
     from .s2vectorfield import interpolateField
-    return interpolateField(nodes, values, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+    return interpolateField(nodes, values, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
   y = np.asarray(values).ravel()
   real = y.dtype.kind != "c"
   # MATLAB's tolerance of LSQR: 1e-3 on SO(3), 1e-6 on the sphere
@@ -183,7 +183,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     # values with component axes after the node axis: one fit per component, a list of functions
     vals = np.asarray(values)
     cols = vals.reshape(nodes.size, -1)
-    fits = [interpolate(nodes, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+    fits = [interpolate(nodes, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
             for k in range(cols.shape[1])]
     L = max(f.bandwidth for f in fits)
     fhat = np.stack([f.truncate(L)._fhat for f in fits]).reshape(vals.shape[1:] + (fits[0].truncate(L)._fhat.shape[-1],))
@@ -191,7 +191,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   if isinstance(nodes, quaternion):
     o = nodes if isinstance(nodes, orientation) else orientation(nodes)
     # nodes closer than 0.02 are one node carrying the mean of their values, as MATLAB's
-    o, iu = o.flatten().unique(tolerance=0.02, return_inverse=True)
+    o, iu = o.flatten().unique(tol=0.02, return_inverse=True)
     count = np.bincount(iu, minlength=o.size)
     y = (np.bincount(iu, y.real, o.size) + 1j * np.bincount(iu, y.imag, o.size) if not real else np.bincount(iu, y, o.size)) / count
     if weights is not None and not isinstance(weights, str):
@@ -224,7 +224,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     A = lambda x: (v := sym(x), np.concatenate([sw * p(v), reg * v]))[1]
     At = lambda z: sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
     b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
-    x, flag, relres, itn = _lsqrFull(A, At, b, deg2dim(L + 1), maxit, tol)
+    x, flag, relres, itn = _lsqrFull(A, At, b, deg2dim(L + 1), maxIter, tol)
     f = SO3FunHarmonic(sym(x), o.CS, o.SS, real=real, antipodal=o.antipodal, _internal=True)
     if withParameters:
       # MATLAB's lsqr parameters: the flag, 1 when the iterations ran out, the relative
@@ -237,7 +237,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   if values.size != v.size:
     rest = values.shape[1:]
     cols = values.reshape(v.size, -1)
-    fits = [interpolate(v, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxit=maxit, tol=tol)
+    fits = [interpolate(v, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
             for k in range(cols.shape[1])]
     fhat = np.stack([f._fhat for f in fits]).reshape(rest + fits[0]._fhat.shape)
     return S2FunHarmonic(fhat, v.frame, real=all(f.isReal for f in fits), antipodal=v.antipodal, _internal=True)
@@ -259,7 +259,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   A = lambda x: np.concatenate([sw * p(np.asarray(x, dtype=complex)), reg * x])
   At = lambda z: p.adjoint(sw * z[:v.size], np.ones(v.size)) + reg * z[v.size:]
   b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
-  fhat = _lsqr(A, At, b, (L + 1) ** 2, maxit, tol)
+  fhat = _lsqr(A, At, b, (L + 1) ** 2, maxIter, tol)
   return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
 
 

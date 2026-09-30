@@ -151,7 +151,7 @@ plot(SO3FDensity, 'sigma')
 # nonnegative. The printed minimum and mean check the two density constraints directly. The
 # residual can be larger than for an unconstrained fit because those constraints remove
 # otherwise admissible solutions. If the iteration limit was reached, the coefficients may
-# not yet be optimal. Adjust `maxit` or `tol` before making a quantitative comparison.
+# not yet be optimal. Adjust `maxIter` or `tol` before making a quantitative comparison.
 #
 # The key smoothing parameter is the kernel halfwidth. A larger halfwidth blends information
 # over a wider angular neighbourhood. A very small halfwidth can overfit the samples.

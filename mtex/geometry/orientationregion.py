@@ -91,15 +91,15 @@ class orientationRegion:
     """the second frame of the region, the specimen or second crystal frame, MATLAB's oR.CS2"""
     return self.frameB
 
-  def checkInside(self, o, tolerance=2e-3):
+  def checkInside(self, o, tol=2e-3):
     """whether orientations lie inside the region, up to the tolerance, as a boolean array"""
     q = o.data if isinstance(o, MtexArray) else np.asarray(o, dtype=float)
-    t = tolerance / 2
+    t = tol / 2
     d = q @ self.N.T
     inside = np.all(d <= t, axis=-1) | np.all(d >= -t, axis=-1)
     if self.sector is not None:
       ax = quatAxis(q)
-      inside &= (quatAngle(q) < 1e-8) | self.sector.checkInside(ax, tolerance)
+      inside &= (quatAngle(q) < 1e-8) | self.sector.checkInside(ax, tol)
     return inside
 
   def axisSector(self, omega, sector="own"):

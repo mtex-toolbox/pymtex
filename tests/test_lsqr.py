@@ -9,7 +9,7 @@ rng = np.random.default_rng(5)
 def test_lsqr_findsTheLeastSquaresSolutionOfAComplexSystem():
   M = rng.standard_normal((200, 50)) + 1j * rng.standard_normal((200, 50))
   b = rng.standard_normal(200)
-  x, flag, relres, it = lsqr(lambda v: M @ v, lambda u: M.conj().T @ u, b, 50, tol=1e-12, maxit=500)
+  x, flag, relres, it = lsqr(lambda v: M @ v, lambda u: M.conj().T @ u, b, 50, tol=1e-12, maxIter=500)
   xs = np.linalg.lstsq(M, b, rcond=None)[0]
   assert flag == 0 and it < 500
   assert np.linalg.norm(x - xs) < 1e-9 * np.linalg.norm(xs)
@@ -19,7 +19,7 @@ def test_lsqr_findsTheLeastSquaresSolutionOfAComplexSystem():
 def test_lsqr_findsTheMinimumNormSolutionOfAnUnderdeterminedSystem():
   M = rng.standard_normal((30, 80))
   b = rng.standard_normal(30)
-  x, flag, relres, _ = lsqr(lambda v: M @ v, lambda u: M.T @ u, b, 80, tol=1e-14, maxit=500)
+  x, flag, relres, _ = lsqr(lambda v: M @ v, lambda u: M.T @ u, b, 80, tol=1e-14, maxIter=500)
   assert flag == 0 and relres < 1e-13
   assert np.allclose(x, np.linalg.pinv(M) @ b)
 
@@ -27,7 +27,7 @@ def test_lsqr_findsTheMinimumNormSolutionOfAnUnderdeterminedSystem():
 def test_lsqr_flagsIterationsRunOut():
   M = rng.standard_normal((100, 60))
   b = rng.standard_normal(100)
-  x, flag, relres, it = lsqr(lambda v: M @ v, lambda u: M.T @ u, b, 60, tol=1e-15, maxit=3)
+  x, flag, relres, it = lsqr(lambda v: M @ v, lambda u: M.T @ u, b, 60, tol=1e-15, maxIter=3)
   assert flag == 1 and it == 3 and 0 < relres < 1
 
 

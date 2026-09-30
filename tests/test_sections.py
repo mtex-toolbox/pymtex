@@ -166,8 +166,8 @@ def test_axisSector_isTheAxesOfTheRegionAtThatAngle():
         continue
       sR = oR.axisSector(w)
       v = vector3d.rand(200, rng=rng)
-      inRegion = oR.checkInside(rotation.byAxisAngle(v, w), tolerance=1e-8)
-      assert np.array_equal(inRegion, sR.checkInside(v, tolerance=1e-8))
+      inRegion = oR.checkInside(rotation.byAxisAngle(v, w), tol=1e-8)
+      assert np.array_equal(inRegion, sR.checkInside(v, tol=1e-8))
     assert oR.axisSector(0).volume(2 * degree) >= oR.axisSector(wmax).volume(2 * degree)
 
 
@@ -181,7 +181,7 @@ def test_thetaIntervals_ofAnAxisAngleChartCoverTheRegion():
   oS = axisAngleSections(crystalFrame("m-3m"), specimenFrame("222"), angles=[50 * degree])
   sR = oS.sectionCharts(0)[0].sR
   for v in vector3d.rand(300, rng=rng):
-    if not sR.checkInside(v, tolerance=-1e-6):
+    if not sR.checkInside(v, tol=-1e-6):
       continue
     assert any(lo - 1e-6 <= v.theta <= hi + 1e-6 for lo, hi in sR.thetaIntervals(float(v.rho)))
 

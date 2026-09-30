@@ -77,7 +77,7 @@ class S1FunHarmonic:
     return f
 
   @classmethod
-  def interpolate(cls, x, values, bandwidth=None, weights=None, regularization=1e-5, SobolevIndex=2, tol=1e-6, maxit=100):
+  def interpolate(cls, x, values, bandwidth=None, weights=None, regularization=1e-5, SobolevIndex=2, tol=1e-6, maxIter=100):
     """the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
     quadrature; others merged where they coincide and fitted by least squares at the
     bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR"""
@@ -105,7 +105,7 @@ class S1FunHarmonic:
     A = lambda c: np.concatenate([sw * fourierSeries(c[::-1], x, real=False), reg * c])
     At = lambda z: fourierSeriesAdjoint(x, sw * z[:n], L, np.ones(n))[::-1] + reg * z[n:]
     b = np.concatenate([sw * values, np.zeros(2 * L + 1)]).astype(complex)
-    return cls(_lsqr(A, At, b, 2 * L + 1, maxit, tol), real=not np.iscomplexobj(values))
+    return cls(_lsqr(A, At, b, 2 * L + 1, maxIter, tol), real=not np.iscomplexobj(values))
 
   @classmethod
   def quadrature(cls, x, values=None, *, bandwidth=None, weights=None, real=None):

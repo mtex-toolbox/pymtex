@@ -171,15 +171,15 @@ class eulerSections(ODFSections):
   convention = "Bunge"
   first = False
 
-  def __init__(self, CS1, CS2=None, sections=6, values=None, tolerance=5 * degree, maxPhi=None, maxAzimuth=None, **kwargs):
+  def __init__(self, CS1, CS2=None, sections=6, values=None, tol=5 * degree, maxPhi=None, maxAzimuth=None, **kwargs):
     CS2 = specimenFrame.default if CS2 is None else CS2
     values = kwargs.pop(self.angleName, values)
     if kwargs:
       raise TypeError(f"unknown option {next(iter(kwargs))}")
     p1, pPhi, p2 = eulerRegion(CS1, CS2)
     self.period, azimuth = (p1, p2) if self.first else (p2, p1)
-    self._tolerance = tolerance
-    super().__init__(CS1, CS2, sectionList(values, self.period, sections), tolerance)
+    self._tolerance = tol
+    super().__init__(CS1, CS2, sectionList(values, self.period, sections), tol)
     self.maxPhi = pPhi if maxPhi is None else maxPhi
     self.maxAzimuth = azimuth if maxAzimuth is None else maxAzimuth
     self.sR = eulerBox(self.maxPhi, self.maxAzimuth)
@@ -335,13 +335,13 @@ class pfSections(ODFSections):
 
   angleName = "omega"
 
-  def __init__(self, CS1, CS2=None, h1=None, h2=None, sections=6, values=None, tolerance=5 * degree, maxOmega=None, **kwargs):
+  def __init__(self, CS1, CS2=None, h1=None, h2=None, sections=6, values=None, tol=5 * degree, maxOmega=None, **kwargs):
     CS2 = specimenFrame.default if CS2 is None else CS2
     values = kwargs.pop(self.angleName, values)
     if kwargs:
       raise TypeError(f"unknown option {next(iter(kwargs))}")
     crystal = isinstance(CS1, crystalFrame)
-    self._CS1, self._maxOmega, self._sections, self._tolerance = CS1, maxOmega, sections, tolerance
+    self._CS1, self._maxOmega, self._sections, self._tolerance = CS1, maxOmega, sections, tol
     self._d1 = (CS1.cAxisRec if crystal else zvector) if h1 is None else h1
     self._d2 = (CS1.aAxis if crystal else xvector) if h2 is None else h2
     self._values = values
@@ -484,7 +484,7 @@ class axisAngleSections(ODFSections):
     axisAngleSections(cs1, cs2, sections=5, volumeScaling=False, antipodal=True)
   """
 
-  def __init__(self, CS1, CS2=None, sections=None, angles=None, values=None, tolerance=5 * degree, antipodal=False,
+  def __init__(self, CS1, CS2=None, sections=None, angles=None, values=None, tol=5 * degree, antipodal=False,
                volumeScaling=True, axisAngle=None):
     CS2 = specimenFrame.default if CS2 is None else CS2
     angles = axisAngle if axisAngle is not None else values if values is not None else angles
@@ -498,7 +498,7 @@ class axisAngleSections(ODFSections):
       vals = vals[vals <= maxAngle]
     if len(vals) == 0:
       raise ValueError(f"no section angle below the largest angle of the region, {maxAngle / degree:.1f}°")
-    super().__init__(CS1, CS2, vals, tolerance)
+    super().__init__(CS1, CS2, vals, tol)
     # the axis is only defined modulo the rotations both groups share; the sections are drawn
     # on the conventional sector of those, in the convention of the frame the rotation maps
     # into, so that the sections sit the same way up as the pole figures
@@ -560,7 +560,7 @@ class axisAngleSections(ODFSections):
 
 SECTION_KINDS = {"phi2": phi2Sections, "phi1": phi1Sections, "gamma": gammaSections, "alpha": alphaSections,
                  "sigma": sigmaSections, "omega": sigmaSections, "pf": pfSections, "axisangle": axisAngleSections}
-SECTION_OPTIONS = ("sections", "tolerance", "phi1", "phi2", "alpha", "gamma", "sigma", "omega", "angles", "axisAngle",
+SECTION_OPTIONS = ("sections", "tol", "phi1", "phi2", "alpha", "gamma", "sigma", "omega", "angles", "axisAngle",
                    "volumeScaling", "maxPhi", "maxAzimuth", "maxOmega", "h1", "h2", "antipodal")
 
 

@@ -1,7 +1,7 @@
 # LSQR of Paige and Saunders with MATLAB's stopping rules, the least squares solver of the
 # harmonic and the radial fits
 #
-#   x, flag, relres, iterations = lsqr(A, At, b, n, tol=1e-6, maxit=20)
+#   x, flag, relres, iterations = lsqr(A, At, b, n, tol=1e-6, maxIter=20)
 #
 # A and At apply the matrix and its adjoint. The iteration stops when the residual has
 # fallen to tol times the right hand side, or the residual of the normal equations to tol
@@ -14,12 +14,12 @@ import math
 import numpy as np
 
 
-def lsqr(A, At, b, n, tol=1e-6, maxit=20):
+def lsqr(A, At, b, n, tol=1e-6, maxIter=20):
   """the least squares solution of A x = b by LSQR of Paige and Saunders with MATLAB's stopping
   rules, A and At applying the matrix and its adjoint, n the length of x: the tuple
   (x, flag, relres, iterations), flag 1 when the iterations ran out
 
-    x, flag, relres, it = lsqr(A, At, b, n, tol=1e-6, maxit=20)"""
+    x, flag, relres, it = lsqr(A, At, b, n, tol=1e-6, maxIter=20)"""
   b = np.asarray(b)
   normb = float(np.linalg.norm(b))
   # the bidiagonalisation of Golub and Kahan, started at b
@@ -37,7 +37,7 @@ def lsqr(A, At, b, n, tol=1e-6, maxit=20):
   phibar, rhobar = beta, alpha
   normA = 0.0
   normr = beta
-  for k in range(1, int(maxit) + 1):
+  for k in range(1, int(maxIter) + 1):
     u = np.asarray(A(v)) - alpha * u
     beta = float(np.linalg.norm(u))
     if beta > 0:
@@ -62,7 +62,7 @@ def lsqr(A, At, b, n, tol=1e-6, maxit=20):
     normAr = abs(phibar * alpha * c)
     if normr <= tol * normb or (normr > 0 and normAr / (normA * normr) <= tol) or normr == 0:
       return x, 0, normr / normb, k
-  return x, 1, normr / normb, int(maxit)
+  return x, 1, normr / normb, int(maxIter)
 
 
 __all__ = ["lsqr"]

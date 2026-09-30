@@ -38,9 +38,9 @@ CANONICAL_AXES = np.eye(3)
 
 # the elements of a list that are not repeats of an earlier one, up to an angle and with
 # the same parity; pairwise, since a group is small and rounding keys can split a pair
-def _uniqueElements(o, tolerance=1e-6):
+def _uniqueElements(o, tol=1e-6):
   q, p = o.data.reshape(-1, 5)[:, :4], o.data.reshape(-1, 5)[:, 4]
-  same = (np.abs(q @ q.T) > 1 - tolerance) & (p[:, None] == p[None, :])
+  same = (np.abs(q @ q.T) > 1 - tol) & (p[:, None] == p[None, :])
   keep = np.ones(len(q), dtype=bool)
   for k in range(len(q)):
     if keep[k]:
@@ -49,24 +49,24 @@ def _uniqueElements(o, tolerance=1e-6):
 
 
 # whether each element of a is in the list b
-def _isin(a, b, tolerance=1e-6):
+def _isin(a, b, tol=1e-6):
   qa, pa = a.data.reshape(-1, 5)[:, :4], a.data.reshape(-1, 5)[:, 4]
   qb, pb = b.data.reshape(-1, 5)[:, :4], b.data.reshape(-1, 5)[:, 4]
-  return np.any((np.abs(qa @ qb.T) > 1 - tolerance) & (pa[:, None] == pb[None, :]), axis=1)
+  return np.any((np.abs(qa @ qb.T) > 1 - tol) & (pa[:, None] == pb[None, :]), axis=1)
 
 
-def _sameElements(a, b, tolerance=1e-6):
-  return a.size == b.size and bool(np.all(_isin(a, b, tolerance)))
+def _sameElements(a, b, tol=1e-6):
+  return a.size == b.size and bool(np.all(_isin(a, b, tol)))
 
 
-def closure(gens, tolerance=1e-6):
+def closure(gens, tol=1e-6):
   """the closure of a list of elements under multiplication: the set grows by its products
   with the generators until it stops, which for a finite group is the group"""
   gens = gens if isinstance(gens, orthogonalTransform) else orthogonalTransform.cat(*gens) if gens else orthogonalTransform()
-  gens = _uniqueElements(orthogonalTransform.cat(orthogonalTransform.id, gens), tolerance)
+  gens = _uniqueElements(orthogonalTransform.cat(orthogonalTransform.id, gens), tol)
   els = gens
   while True:
-    grown = _uniqueElements(orthogonalTransform.cat(els, (els[:, None] * gens[None, :]).flatten()), tolerance)
+    grown = _uniqueElements(orthogonalTransform.cat(els, (els[:, None] * gens[None, :]).flatten()), tol)
     if grown.size == els.size:
       return grown
     if grown.size >= 200:
@@ -166,7 +166,7 @@ class symmetry:
       return
     if isinstance(name, (rotation, orthogonalTransform)):
       self.axes = _asAxes(axes)
-      self.rot = closure(orthogonalTransform(name), tolerance=1e-2)
+      self.rot = closure(orthogonalTransform(name), tol=1e-2)
       self._symbol = identifyGroup(self.rot, self.axes)
       return
     if pointId is not None:
@@ -269,7 +269,7 @@ class symmetry:
     if axes.size == 0:
       return vector3d(), np.zeros(0, dtype=int)
     axes.antipodal = True
-    u, iu = axes.unique(tolerance=1e-3, return_inverse=True)
+    u, iu = axes.unique(tol=1e-3, return_inverse=True)
     mult = np.array([np.max(mult[iu == k]) for k in range(u.size)])
     axes = vector3d.cat(u, -u)
     mult = np.concatenate([mult, mult])

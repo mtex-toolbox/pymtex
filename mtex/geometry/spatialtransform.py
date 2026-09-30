@@ -60,7 +60,7 @@ def fitData(posA, posB, weights=None):
   return dx[keep], dy[keep], w[keep], x[keep], y[keep]
 
 
-def robustLsq(A, b, w, noRobust=False, iterMax=50):
+def robustLsq(A, b, w, noRobust=False, maxIter=50):
   """weighted least squares, reweighted against outliers with Tukey's bisquare at 95 percent
   efficiency: the residuals corrected for leverage, one scale from their median absolute
   deviation, and the least favourable weight of the right hand sides for every point"""
@@ -74,7 +74,7 @@ def robustLsq(A, b, w, noRobust=False, iterMax=50):
   Q = np.linalg.qr(A * sw)[0]
   h = np.minimum(np.sum(Q ** 2, axis=1), 1 - np.finfo(float).eps)
   adj = 1 / np.sqrt(1 - h)[:, None]
-  for _ in range(iterMax):
+  for _ in range(maxIter):
     r = (b - A @ p) * adj
     s = np.median(np.abs(r - np.median(r, axis=0)), axis=0) / 0.6745
     s = np.maximum(s, np.finfo(float).eps)
@@ -379,7 +379,7 @@ class spatialTransformProjective(spatialTransform):
     return spatialTransformProjective([[1, -cx * s, cx * s * cy], [0, k - cy * s, cy * (1 + cy * s - k)], [0, -s, 1 + s * cy]])
 
   @staticmethod
-  def fit(posA, posB, weights=None, noRobust=False, iterMax=50):
+  def fit(posA, posB, weights=None, noRobust=False, maxIter=50):
     """the homography of the direct linear transform, robustly reweighted. Both point sets are
     first moved to their centroid and scaled to a mean distance of sqrt(2), Hartley's
     normalisation: without it the algebraic residual weighs the points by their distance from
@@ -398,7 +398,7 @@ class spatialTransformProjective(spatialTransform):
     o, z = np.ones_like(x), np.zeros_like(x)
     A = np.concatenate([np.stack([xa, ya, o, z, z, z, -xa * xb, -ya * xb], axis=1),
                         np.stack([z, z, z, xa, ya, o, -xa * yb, -ya * yb], axis=1)])
-    h = robustLsq(A, np.concatenate([xb, yb]), np.concatenate([w, w]), noRobust, iterMax)
+    h = robustLsq(A, np.concatenate([xb, yb]), np.concatenate([w, w]), noRobust, maxIter)
     return spatialTransformProjective(np.linalg.inv(Nb) @ np.append(h.reshape(-1), 1).reshape(3, 3) @ Na)
 
 
@@ -452,14 +452,14 @@ class spatialTransformPoly(spatialTransform):
     return {"degree": self.degree}
 
   @staticmethod
-  def fit(posA, posB, weights=None, degree=1, noRobust=False, iterMax=50):
+  def fit(posA, posB, weights=None, degree=1, noRobust=False, maxIter=50):
     """the polynomial displacement fitted to point pairs by least squares, reweighted against outliers
     with Tukey's bisquare unless noRobust=True"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     B = polyBasis(x, y, degree)
     if B.shape[0] < B.shape[1]:
       raise ValueError(f"a degree {degree} polynomial needs at least {B.shape[1]} points, got {B.shape[0]}")
-    return spatialTransformPoly(robustLsq(B, np.stack([dx, dy], axis=1), w, noRobust, iterMax), degree)
+    return spatialTransformPoly(robustLsq(B, np.stack([dx, dy], axis=1), w, noRobust, maxIter), degree)
 
 
 class spatialTransformDrift(spatialTransform):
@@ -702,12 +702,12 @@ class spatialTransformInverse(spatialTransform):
   """the inverse of a transform that knows none in closed form, each preimage found by fixed point
   iteration to the tolerance tol relative to the extent of the positions
 
-    Tinv = spatialTransformInverse(T, tol=1e-10, iterMax=100)"""
+    Tinv = spatialTransformInverse(T, tol=1e-10, maxIter=100)"""
 
-  def __init__(self, T, tol=1e-10, iterMax=100):
+  def __init__(self, T, tol=1e-10, maxIter=100):
     if not isinstance(T, spatialTransform):
       raise TypeError("the inverse wraps a spatial transform")
-    self.T, self.tol, self.iterMax = T, tol, iterMax
+    self.T, self.tol, self.maxIter = T, tol, maxIter
 
   def eval(self, pos):
     """the preimage by fixed point iteration: the position moved against the error its image makes"""
@@ -717,7 +717,7 @@ class spatialTransformInverse(spatialTransform):
     scale = max(1.0, np.abs(finite).max()) if finite.size else 1.0
     prev = np.inf
     resid = np.inf
-    for k in range(1, self.iterMax + 1):
+    for k in range(1, self.maxIter + 1):
       e = _xyz(self.T.eval(cur))[:, :2] - target
       P = _xyz(cur)
       cur = _moved(cur, P[:, 0] - e[:, 0], P[:, 1] - e[:, 1])

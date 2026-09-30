@@ -50,12 +50,12 @@ def regionCenter(sR, resolution=1 * degree):
   return sR.center(resolution).data.reshape(3)
 
 
-def foldsSector(n, sR, tolerance=1e-6):
+def foldsSector(n, sR, tol=1e-6):
   """the reflection in a plane is a symmetry of the sector when it maps its boundary planes
   onto themselves"""
   n = _unit(n)
   N = uniqueNormals(sR)
-  return all(any((m - 2 * (m @ n) * n) @ k > 1 - tolerance for k in N) for m in N)
+  return all(any((m - 2 * (m @ n) * n) @ k > 1 - tol for k in N) for m in N)
 
 
 def foldCandidates(sR, center):
@@ -112,7 +112,7 @@ def orientFold(n, pg):
   return n
 
 
-def sectorFolds(pg, sR=None, tolerance=1e-6):
+def sectorFolds(pg, sR=None, tol=1e-6):
   """the folds of a group's sector, in the order they are applied. Every fold halves the
   sector and flips the half between the white centre and the black one; the loop stops when
   every boundary plane is a mirror of the group the folds have generated. The groups -1, -3
@@ -132,7 +132,7 @@ def sectorFolds(pg, sR=None, tolerance=1e-6):
     n = None
     fallback = None
     for c in foldCandidates(region, regionCenter(region)):
-      if _isMirror(c, els) or not foldsSector(c, region, tolerance):
+      if _isMirror(c, els) or not foldsSector(c, region, tol):
         continue
       # it must halve the group, and of the planes that do, the one whose closure is a
       # reflection group is the fold: that is what separates the vertical mirror of 4 from

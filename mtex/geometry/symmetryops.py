@@ -37,7 +37,7 @@ def _images(frame, xyz):
   return qrot(o[:, :4], xyz[..., None, :]) * o[:, 4:5]
 
 
-def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tolerance=1e-6):
+def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tol=1e-6):
   """the orbit of a crystal direction under the group of its frame, every element once
   (shape numSym x size); antipodal adds the negatives unless the group holds the inversion
   or the vector is an axis; unique keeps the distinct images of one direction only"""
@@ -60,7 +60,7 @@ def symmetrise(v, unique=False, antipodal=None, noAntipodal=False, tolerance=1e-
   asAxes = (v.antipodal or antipodal) and not noAntipodal
   n = np.linalg.norm(xyz, axis=1)
   d = xyz @ xyz.T / np.outer(n, n)
-  same = (np.abs(d) if asAxes else d) > 1 - tolerance
+  same = (np.abs(d) if asAxes else d) > 1 - tol
   keep = np.ones(len(xyz), dtype=bool)
   for k in range(len(xyz)):
     if keep[k]:
@@ -124,7 +124,7 @@ def project2FundamentalRegion(v, center=None):
   return v._new(projectDirections(v.data, imgs, o[:, :4], o[:, 4]))
 
 
-def symUnique(v, tolerance=1e-6, return_index=False, return_inverse=False):
+def symUnique(v, tol=1e-6, return_index=False, return_inverse=False):
   """the distinct directions of a list up to the group: each is moved to its equivalent nearest
   the centre first, so equivalent ones become the same vector even on the rim of a sector,
   where a fold into it could keep two of them"""
@@ -132,7 +132,7 @@ def symUnique(v, tolerance=1e-6, return_index=False, return_inverse=False):
   rep = project2FundamentalRegion(v, center=sectorCenter(v.frame)).data.reshape(-1, 3) if reducesOverGroup(v) else v.data.reshape(-1, 3)
   n = np.linalg.norm(rep, axis=1)
   d = rep @ rep.T / np.outer(n, n)
-  same = d > 1 - tolerance
+  same = d > 1 - tol
   keep = np.ones(len(rep), dtype=bool)
   first = np.arange(len(rep))
   for k in range(len(rep)):
@@ -278,30 +278,30 @@ def _exchangeIntoSector(p, common):
 # region, then unique on those
 # the pairs of orientations within the tolerance, over all their symmetric images, as a
 # sparse matrix from the radius search of a quaternion tree
-def _neighbours(o, tolerance, noSymmetry):
+def _neighbours(o, tol, noSymmetry):
   from scipy import sparse
   n = o.size
   if noSymmetry:
     from scipy.spatial import cKDTree
     q = o.data.reshape(-1, 4)
-    hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tolerance / 4), workers=-1)
+    hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tol / 4), workers=-1)
     rows = np.repeat(np.arange(n), [len(h) for h in hits])
     cols = np.concatenate([np.asarray(h, dtype=int) for h in hits]) % n
     return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=(n, n))
   from .grids.orientationtree import OrientationTree
   flat = o.flatten()
-  return OrientationTree(flat).radius(flat, tolerance)[0].tocsr()
+  return OrientationTree(flat).radius(flat, tol)[0].tocsr()
 
 
-def orientationUnique(o, tolerance=1e-3, noSymmetry=False, return_index=False, return_inverse=False):
+def orientationUnique(o, tol=1e-3, noSymmetry=False, return_index=False, return_inverse=False):
   """the orientations with the duplicates within the tolerance removed, symmetric equivalents
   counting as one unless noSymmetry=True; the first of each kept, in order, with the indices
   of the kept and the index of every orientation into them when asked
 
-    u = orientationUnique(ori, tolerance=1*degree)
+    u = orientationUnique(ori, tol=1*degree)
     u, iv, iu = orientationUnique(ori, return_index=True, return_inverse=True)"""
   n = o.size
-  same = _neighbours(o, tolerance, noSymmetry)
+  same = _neighbours(o, tol, noSymmetry)
   keep = np.ones(n, dtype=bool)
   first = np.arange(n)
   # every orientation not yet taken absorbs the later ones within the tolerance

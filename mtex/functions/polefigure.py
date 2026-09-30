@@ -351,7 +351,7 @@ class PoleFigure:
 
   # ------------------------------------------------------------------ the point sets
 
-  def unique(self, tolerance=1e-6):
+  def unique(self, tol=1e-6):
     """equivalent specimen directions under the specimen group carry the same pole density,
     so they are merged and their intensities averaged"""
     sym = self.SS.properGroup().rotations()
@@ -362,7 +362,7 @@ class PoleFigure:
       xyz = r.flatten().normalize().data
       imgs = (rotation(sym.data.reshape(-1, 1, 4)) * vector3d(xyz)).data     # (|G|, n, 3)
       d = np.einsum("gnk,mk->gnm", imgs, xyz)
-      same = (np.abs(d) if r.antipodal else d) > 1 - tolerance
+      same = (np.abs(d) if r.antipodal else d) > 1 - tol
       same = np.any(same, axis=0)
       pos = np.full(len(xyz), -1)
       keep = []

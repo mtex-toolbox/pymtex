@@ -228,12 +228,12 @@ class huberFilter(boundaryFilter):
   penalty of the curvature filter rounds every corner; the Huber one is quadratic below a
   threshold and linear above it, so a vertex that turns by more than the threshold is paid
   for once rather than by its square. It is solved by reweighting the same system until
-  nothing moves; iterMax is a safety limit, not a tuning knob"""
+  nothing moves; maxIter is a safety limit, not a tuning knob"""
 
-  def __init__(self, smoothingLength=None, threshold=5 * degree, alpha=None, iterMax=50, tol=1e-4):
+  def __init__(self, smoothingLength=None, threshold=5 * degree, alpha=None, maxIter=50, tol=1e-4):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.threshold, self.alpha = float(threshold), None if alpha is None else float(alpha)
-    self.iterMax, self.tol = int(iterMax), float(tol)
+    self.maxIter, self.tol = int(maxIter), float(tol)
 
   def weight(self, h):
     """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
@@ -256,7 +256,7 @@ class huberFilter(boundaryFilter):
     delta = h * self.threshold / 2
     w = np.ones(n)
     out = V
-    for k in range(self.iterMax):
+    for k in range(self.maxIter):
       new = self.solveDirichlet(Id + alpha * (L.T @ diags(w) @ L), V, net.fixed)
       step = float(np.max(np.linalg.norm(new - out, axis=1), initial=0.0))
       out = new
@@ -268,7 +268,7 @@ class huberFilter(boundaryFilter):
 
   def _items(self):
     return [("smoothing length", self.smoothingLength), ("threshold", f"{self.threshold / degree:g}°"), ("alpha", self.alpha),
-            ("iterations", self.iterMax)]
+            ("iterations", self.maxIter)]
 
 
 # ------------------------------------------------------------------ the three steps

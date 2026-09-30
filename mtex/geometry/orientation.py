@@ -311,21 +311,21 @@ class orientation(rotation):
     return v
 
   # equal up to symmetry and a tolerance in the angle, between the same frames
-  def __eq__(self, other, tolerance=5e-4):
+  def __eq__(self, other, tol=5e-4):
     if not isinstance(other, orientation):
-      return rotation.__eq__(self, other, tolerance)
+      return rotation.__eq__(self, other, tol)
     if self.frameA is not other.frameA or self.frameB is not other.frameB or self.antipodal != other.antipodal:
       return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
-    return self.dot(other) > np.cos(tolerance)
+    return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
     return ~(self == other)
 
-  def unique(self, tolerance=1e-3, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
+  def unique(self, tol=1e-3, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
     """the orientations with the equivalents within the tolerance removed, the first kept;
     optionally the indices of the kept ones and the index of each into them"""
     from .symmetryops import orientationUnique
-    return orientationUnique(self, tolerance, noSymmetry, return_index, return_inverse)
+    return orientationUnique(self, tol, noSymmetry, return_index, return_inverse)
 
   def mean(self, weights=None, robust=False, iterations=3):
     """the mean orientation, every element moved to the equivalent closest to the running mean
@@ -357,12 +357,12 @@ class orientation(rotation):
     from .orientationregion import project2EulerFR
     return project2EulerFR(self)
 
-  def transformReferenceFrame(self, to, toB=None, rule=None, tolerance=1e-1):
+  def transformReferenceFrame(self, to, toB=None, rule=None, tol=1e-1):
     """the same orientation with another crystal frame, both frames of a misorientation"""
     from .frametransform import transformOrientation
     if isinstance(toB, str) or hasattr(toB, "frameA"):
       rule, toB = toB, None
-    return transformOrientation(self, to, toB, rule, tolerance)
+    return transformOrientation(self, to, toB, rule, tol)
 
   def find(self, w, epsOrK=None):
     """the orientations of ori nearest to w up to symmetry: the pair (ind, d) of the nearest, the k
@@ -404,11 +404,11 @@ class orientation(rotation):
     return byMiller(hkl, uvw, *frames)
 
   @classmethod
-  def align(cls, frA, frB, tolerance=1e-1):
+  def align(cls, frA, frB, tol=1e-1):
     """the orientation two frames stand in by their axes: a point at v in frA sits at
     orientation.align(frA, frB) * v in frB; the transition has to be a rotation"""
     from .frametransform import align
-    return align(frA, frB, tolerance)
+    return align(frA, frB, tol)
 
   @classmethod
   def byScreenAlignment(cls, frA, frB):

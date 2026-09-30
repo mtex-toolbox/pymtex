@@ -18,7 +18,7 @@ from ..geometry.vector3d import vector3d
 from ..functions.funops import _antipodalPole
 
 
-def orbit(xyz, fr, antipodal=False, tolerance=1e-6):
+def orbit(xyz, fr, antipodal=False, tol=1e-6):
   """the distinct images of one direction under the group of a frame, an axis and its
   antipode counted once, as an (m, 3) array"""
   x = np.asarray(xyz, dtype=float).reshape(3)
@@ -28,7 +28,7 @@ def orbit(xyz, fr, antipodal=False, tolerance=1e-6):
   els = fr.sym.rot.flatten().data
   imgs = qrot(els[:, :4], x[None]) * els[:, 4:5]
   d = imgs @ imgs.T
-  same = (np.abs(d) if antipodal else d) > 1 - tolerance
+  same = (np.abs(d) if antipodal else d) > 1 - tol
   keep = np.ones(len(imgs), dtype=bool)
   for k in range(len(imgs)):
     if keep[k]:

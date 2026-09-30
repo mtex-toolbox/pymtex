@@ -1,7 +1,7 @@
 # the interface to Neper, the tessellation program (MATLAB @neper, ../master)
 #
 #   np = neper.init()                             the one interface, with its settings
-#   np.geometry = 'cube(100,100,100)'; np.morpho = 'graingrowth'; np.iterMax = 1000
+#   np.geometry = 'cube(100,100,100)'; np.morpho = 'graingrowth'; np.maxIter = 1000
 #   grains = np.simulateGrains(ori)               one grain per orientation
 #   grains = np.simulateGrains(1000, odf)         the orientations sampled from an ODF
 #   grains = np.simulateTwinGrains(n, mori, odf, bndA, width=w)   lamellae with twins
@@ -35,7 +35,7 @@ class neper:
     self.id = 1
     self.geometry = "cube(1,1,1)"
     self.morpho = "graingrowth"
-    self.iterMax = 1000
+    self.maxIter = 1000
     self.varNeperopts = ""
     self.fileName2d = "2dslice"
     self.fileName3d = "allgrains"
@@ -86,7 +86,7 @@ class neper:
 
   def _tessellate(self, n, morpho, silent):
     base = os.path.join(self.filePath, self.fileName3d)
-    args = [self.command, "-T", "-n", str(n), "-id", str(self.id), "-morpho", morpho, "-morphooptistop", f"iter={self.iterMax}",
+    args = [self.command, "-T", "-n", str(n), "-id", str(self.id), "-morpho", morpho, "-morphooptistop", f"iter={self.maxIter}",
             "-domain", str(self.geometry), "-o", base]
     if self.varNeperopts:
       args += str(self.varNeperopts).split()
@@ -112,7 +112,7 @@ class neper:
     base = os.path.join(self.filePath, self.fileName3d)
     morpho = self._morpho(aspectRatio) + f"::lamellar(w={width:g},v=msfile({lam}))"
     args = [self.command, "-T", "-n", f"{n}::from_morpho", "-id", str(self.id), "-morpho", morpho, "-morphooptistop",
-            f"iter={self.iterMax}", "-domain", str(self.geometry), "-o", base]
+            f"iter={self.maxIter}", "-domain", str(self.geometry), "-o", base]
     self._run(args, silent)
     return base + ".tess"
 

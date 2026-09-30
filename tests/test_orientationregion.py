@@ -38,7 +38,7 @@ def test_the_region_holds_one_orientation_per_coset(pair):
   ss = crystalFrame(b, [3, 3, 3], mineral="other") if b == a else specimenFrame(b)
   oR = fundamentalRegion(cs, ss)
   L, R = reductionGroups(orientation(rotation(), cs, ss))
-  frac = np.sum(oR.checkInside(q, tolerance=0)) / q.size
+  frac = np.sum(oR.checkInside(q, tol=0)) / q.size
   assert abs(frac * len(L) * len(R) - 1) < 0.1
   assert np.all(oR.checkInside(orientation(q[:2000], cs, ss).project2FundamentalRegion()))
 

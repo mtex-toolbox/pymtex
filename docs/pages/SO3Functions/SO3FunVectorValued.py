@@ -63,11 +63,11 @@ nodes = orientation(rotation(nodes), SO3Fun.dubna().CS, nodes.SS)
 # call. The result is an array of two harmonic functions. Here the bandwidth is 48 and LSQR
 # is limited to 10 iterations.
 
-SO3F1 = SO3FunHarmonic.interpolate(nodes, y, maxit=10, bandwidth=48)
+SO3F1 = SO3FunHarmonic.interpolate(nodes, y, maxIter=10, bandwidth=48)
 SO3F1
 
 # The deliberately short iteration limit leaves the fit short of its optimum. Increase
-# `maxit` when convergence, rather than a compact teaching run, is required.
+# `maxIter` when convergence, rather than a compact teaching run, is required.
 #
 # Evaluating four orientations demonstrates the layout directly: four rows are nodes and two
 # columns are components.

@@ -4,7 +4,7 @@
 #
 #   textureIndex(odf), entropy(odf), volume(odf, center, radius), fibreVolume(odf, h, r, radius)
 #   values, modes = max(odf, numLocal=, resolution=, accuracy=);  min(odf)
-#   modes, weights, centerId = calcComponents(odf, seed=, weights=, tolerance=, radius=, exact=)
+#   modes, weights, centerId = calcComponents(odf, seed=, weights=, tol=, radius=, exact=)
 #   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | cs1, cs2 | mori), calcAxisDistribution(odf, v)
 #   calcMIndex(odf), discreteSample(odf, n, rng=), discreteSample(fun, n, range=), calcError(odf1, odf2, 'l2'), calcKernel(ori | v | ebsd, 'UCV')
 from __future__ import annotations
@@ -608,7 +608,7 @@ def _gradientField(f):
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).grad()
 
 
-def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=100, radius=np.inf, exact=False, silent=False):
+def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, radius=np.inf, exact=False, silent=False):
   """the modal orientations of an SO(3) function by steepest ascent from seeds, their volumes and which
   mode each seed flowed into; modes within the tolerance merge, and modes of less than one percent
   are dropped unless exact=True; the seeds are the centres of a radial function or a 2.5 degree grid
@@ -674,7 +674,7 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
       continue
     # join the modes that have come within the tolerance of each other: a pair that has not
     # moved was looked at before
-    ids = _clusterOrientations(_ori(modes, f), tolerance, among=idx[~stay])
+    ids = _clusterOrientations(_ori(modes, f), tol, among=idx[~stay])
     nc = ids.max() + 1
     if nc < len(modes):
       rep = _bestOfClusters(ids, vals, nc)
@@ -684,7 +684,7 @@ def calcComponents(f, seed=None, weights=None, tolerance=1.5 * degree, maxIter=1
       labels = ids[labels]
       modes, vals, steps, active = modes[rep], vals[rep], keepStep, keepActive
   # clusters, the representative with the largest value, the weights within the radius
-  ids = _clusterOrientations(_ori(modes, f), tolerance)
+  ids = _clusterOrientations(_ori(modes, f), tol)
   nclust = ids.max() + 1
   modeRots = modes[_bestOfClusters(ids, vals, nclust)]
   wsum = np.zeros(nclust)

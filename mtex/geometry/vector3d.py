@@ -660,31 +660,31 @@ class vector3d(MtexArray):
       return self._new(np.sum(self.data * w[..., None], axis=axis), **self._joined(None)).normalize()
     return self._new(np.nanmean(self.data, axis=axis), **self._joined(None))
 
-  def unique(self, tolerance=1e-6, antipodal=False, noAntipodal=False, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
+  def unique(self, tol=1e-6, antipodal=False, noAntipodal=False, noSymmetry=False, stable=False, return_index=False, return_inverse=False):
     """the disjoint list of vectors up to a tolerance, vector3d/unique; under a group the
     directions are projected to the fundamental sector first"""
     if not noSymmetry and self.isCrystalDirection and self._frame.numSym() > 1:
       from .symmetryops import symUnique
-      return symUnique(self, tolerance, return_index, return_inverse)
+      return symUnique(self, tol, return_index, return_inverse)
     xyz = self.data.reshape(-1, 3)
     if (antipodal or self.antipodal) and not noAntipodal:
       x, y, z = xyz.T
       key = np.stack([x * x, y * y, z * z, x * y, x * z, y * z], axis=-1)
     else:
       key = xyz
-    iv, iu = _uniqueRows(key, tolerance, stable)
+    iv, iu = _uniqueRows(key, tol, stable)
     u = self._new(xyz[iv])
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
 
-  def eq(self, other, antipodal=False, tolerance=None):
+  def eq(self, other, antipodal=False, tol=None):
     """rotating keeps the frame; an orientation lands in its target frame; a number turns
     about z
     eq(v, w, antipodal=True): equal up to symmetry, and up to sign when antipodal"""
     if antipodal:
       a = self._new(self.data, antipodal=True)
-      return a.__eq__(other) if tolerance is None else a.__eq__(other, tolerance)
-    return self.__eq__(other) if tolerance is None else self.__eq__(other, tolerance)
+      return a.__eq__(other) if tol is None else a.__eq__(other, tol)
+    return self.__eq__(other) if tol is None else self.__eq__(other, tol)
 
   def rotate(self, rot):
     """the vectors turned by a rotation, rot * v; a number is an angle about z"""
@@ -732,10 +732,10 @@ class vector3d(MtexArray):
     from .grids.search import find
     return find(self, w, epsOrK, antipodal)
 
-  def transformReferenceFrame(self, to, rule=None, tolerance=1e-1):
+  def transformReferenceFrame(self, to, rule=None, tol=1e-1):
     """the same direction written in another frame"""
     from .frametransform import transformVector
-    return transformVector(self, to, rule, tolerance)
+    return transformVector(self, to, rule, tol)
 
   def det(self, b=None, c=None):
     """the triple product, vector3d/det
@@ -777,8 +777,8 @@ class vector3d(MtexArray):
 
 
 # rows equal up to a tolerance: the first index of each and the inverse map
-def _uniqueRows(key, tolerance, stable):
-  rounded = np.round(key / tolerance)
+def _uniqueRows(key, tol, stable):
+  rounded = np.round(key / tol)
   _, iv, iu = np.unique(rounded, axis=0, return_index=True, return_inverse=True)
   iu = iu.reshape(-1)
   if stable:

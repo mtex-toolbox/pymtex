@@ -41,7 +41,7 @@ cs = crystalFrame('m-3m')
 reference = uniformODF(cs)
 grid = equispacedS2Grid(resolution=30 * degree, antipodal=True)
 pf = reference.calcPoleFigure(Miller(1, 0, 0, cs), grid)
-odf = calcODF(pf, resolution=30 * degree, iterMax=3)
+odf = calcODF(pf, resolution=30 * degree, maxIter=3)
 assert np.all(np.isfinite(odf.calcPoleFigure(Miller(1, 0, 0, cs), grid).intensities))
 
 assert Path(pagesDir()).resolve().is_relative_to(installed.parent)

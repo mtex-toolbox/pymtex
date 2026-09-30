@@ -256,7 +256,7 @@ def test_makeSphericalProjection_perPlotConventionSelectsDrawableSector():
     V, X, Y = charts[0].grid(10 * degree)
     assert V.size > 20 and np.all(np.isfinite(X)) and np.all(np.isfinite(Y))
     # the chart is antipodal, so the grid lies in the sector or in its antipode
-    assert np.all(region.checkInside(V, tolerance=1e-8) | region.checkInside(-V, tolerance=1e-8))
+    assert np.all(region.checkInside(V, tol=1e-8) | region.checkInside(-V, tol=1e-8))
   assert cs.how2plot == original
 
 

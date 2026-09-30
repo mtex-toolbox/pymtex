@@ -275,7 +275,7 @@ minimumExactValue
 # ## Choose a least-squares solver
 #
 # The harmonic page introduces LSQR stopping conditions. RBF interpolation uses `tol` and
-# `maxit` in the same spirit, but its defaults depend on the solver: unconstrained `'lsqr'`
+# `maxIter` in the same spirit, but its defaults depend on the solver: unconstrained `'lsqr'`
 # uses at most 30 iterations, whereas density-constrained `'mlsq'` uses at most 100. Both
 # default to `tol=1e-3`.
 #
@@ -293,12 +293,12 @@ f1, iter1 = SO3FunRBF.interpolate(ori, val, withIterations=True)
 residualNorm1 = norm(f1.eval(ori) - val)
 print(f'default: iterations {iter1}, residual norm {residualNorm1:.6g}')
 
-f2, iter2 = SO3FunRBF.interpolate(ori, val, tol=1e-15, maxit=100, withIterations=True)
+f2, iter2 = SO3FunRBF.interpolate(ori, val, tol=1e-15, maxIter=100, withIterations=True)
 residualNorm2 = norm(f2.eval(ori) - val)
 print(f'tight tol: iterations {iter2}, residual norm {residualNorm2:.6g}')
 # -
 
-# If the second run reaches 100 iterations, it has stopped at `maxit` rather than satisfying
+# If the second run reaches 100 iterations, it has stopped at `maxIter` rather than satisfying
 # the very small tolerance. Increase the limit only when the additional accuracy matters to
 # validation or interpretation.
 #

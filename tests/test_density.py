@@ -111,7 +111,7 @@ def mmmSamples():
   cs, ss = crystalFrame("mmm"), specimenFrame("1")
   f = SO3FunHarmonic(rng.standard_normal(deg2dim(6)) + 1j * rng.standard_normal(deg2dim(6)), cs, ss, real=True)
   # nodes closer than 0.02 are merged, so exact samples are taken at distinct ones
-  o = orientation(rotation.rand(3000, rng=rng), cs, ss).unique(tolerance=0.02)
+  o = orientation(rotation.rand(3000, rng=rng), cs, ss).unique(tol=0.02)
   return cs, ss, f, o
 
 

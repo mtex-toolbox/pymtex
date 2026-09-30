@@ -103,7 +103,7 @@ def test_thetaInterval_agreesWithCheckInside():
     iv = sR.thetaInterval(rho)
     # off the poles: the pole is a corner of the triangle, a single point of every meridian
     theta = np.linspace(0.5 * degree, pi - 0.5 * degree, 91)
-    inside = sR.checkInside(vector3d.byPolar(theta, rho), tolerance=0)
+    inside = sR.checkInside(vector3d.byPolar(theta, rho), tol=0)
     expected = np.zeros(91, dtype=bool) if iv is None else (iv[0] - 1e-9 <= theta) & (theta <= iv[1] + 1e-9)
     assert np.all(inside == expected)
 
@@ -112,7 +112,7 @@ def test_boundary_arcsLieInTheRegionAndEndAtVertices():
   sR = fundamentalSector(crystalFrame("m-3m"))
   V = sR.vertices()
   arcs = sR.boundary(resolution=2 * degree)
-  assert len(arcs) == 3 and all(np.all(sR.checkInside(a, tolerance=1e-8)) for a in arcs)
+  assert len(arcs) == 3 and all(np.all(sR.checkInside(a, tol=1e-8)) for a in arcs)
   assert all(np.any(angle(V, a[0]) < 1e-8) and np.any(angle(V, a[-1]) < 1e-8) for a in arcs)
 
 
@@ -198,7 +198,7 @@ def test_conventionalSector_ofATurnedMonoclinicFrameTilesTheSphere(name, angles)
   assert abs(sector.volume(resolution=2 * degree) * fr.numSym() - 1) < 0.03
   els = fr.rot
   for v in samples[:20]:
-    assert np.sum(sector.checkInside(els * v, tolerance=1e-9)) == 1
+    assert np.sum(sector.checkInside(els * v, tol=1e-9)) == 1
 
 
 def test_sectorCenter_ofTheCubicTriangle():

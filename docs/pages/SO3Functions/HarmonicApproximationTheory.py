@@ -217,7 +217,7 @@ mtexColorbar()
 #
 # ## Control LSQR convergence
 #
-# LSQR stops when it reaches its tolerance `tol` or iteration limit `maxit`. Their defaults
+# LSQR stops when it reaches its tolerance `tol` or iteration limit `maxIter`. Their defaults
 # are `1e-3` and `100`. A smaller tolerance requests a more accurate iterative solution, but
 # the iteration limit may stop the solver first. Premature stopping can itself have a
 # regularizing effect, so it must not be confused with convergence.
@@ -235,7 +235,7 @@ print(f'tight tol: flag {p2[0]}, relative residual {p2[1]:.6g}, iterations {p2[2
 # -
 
 # Compare the flags before comparing the residuals. If the tight-tolerance run stops at 100
-# iterations, increase `maxit` deliberately and check whether the fit and validation error
+# iterations, increase `maxIter` deliberately and check whether the fit and validation error
 # materially change.
 #
 # Earlier code on this page printed `norm(f.eval(ori)-val)+5e-7*norm(f,2)` as the "energy

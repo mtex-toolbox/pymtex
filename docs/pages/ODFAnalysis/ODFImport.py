@@ -90,7 +90,7 @@ print(f'interpolation             : mean {mean(odfInterp):.3f}, texture index {n
 #
 # For this file, MATLAB's default least-squares solver reports that it reached its
 # iteration limit. The returned function is normalized, but that warning means
-# convergence has not been established. Do not silence it. The options `tol` and `maxit`
+# convergence has not been established. Do not silence it. The options `tol` and `maxIter`
 # control termination, and the fitted values must be checked against the source table
 # when interpolation accuracy matters.
 

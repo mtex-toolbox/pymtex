@@ -202,7 +202,7 @@ oracles, run through the bridge where a number must be pinned.
 | `SO3FunComposition(F1, F2)`, `F1 + F2` | `SO3FunComposition`, what `+` returns when coefficients cannot be added; `S2FunSum` on the sphere (no MATLAB class) |
 | `BinghamODF(kappa, ori)`, `SO3FunBingham(kappa, A, cs)`, `calcBinghamODF(ori)` | the same; `calcBinghamODF(ori, exact=True)` Newton on the moments; `S2FunBingham(Z, a, cs)`, `S2FunBingham.fit(v)`; `mhyper(kappa)` the exact constant |
 | `[v, pos] = max(SO3F, 'numLocal', k)`, `min` | `v, pos = max(odf, numLocal=k, resolution=, accuracy=)`, `odf.max()`; the module `max`/`min` fall through to the builtins on anything else |
-| `[modes, weights, centerId] = calcComponents(SO3F, 'seed', ori)` | `modes, weights, centerId = calcComponents(odf, seed=ori, radius=, tolerance=, exact=)`, `centerId` -1 for a dropped seed |
+| `[modes, weights, centerId] = calcComponents(SO3F, 'seed', ori)` | `modes, weights, centerId = calcComponents(odf, seed=ori, radius=, tol=, exact=)`, `centerId` -1 for a dropped seed |
 | `volume(odf, center, radius)`, `fibreVolume(odf, h, r, radius)`, `entropy`, `textureIndex` | the same names, also on the sphere where they apply, and as methods |
 | `calcMDF(odf1, odf2, 'bandwidth', L)`, `calcAngleDistribution(odf | cs)`, `calcAxisDistribution(odf, v)`, `calcMIndex` | the same; the angle distribution returns `(omega, density)`, the axis distribution a spherical function or values |
 | `discreteSample(odf, n)`, `calcKernel(ori)`, `calcError(odf1, odf2)`, `centerSpecimen(odf)` | `discreteSample(odf, n, rng=)`, `calcKernel(ori, 'klcv')`, `calcError(odf1, odf2, 'l2')`, `centerSpecimen(odf)` returning `(odf, rot, v1, v2)` |

@@ -158,8 +158,8 @@ class MLSSolver:
     solver.alpha                     the scaling of each pole figure
   """
 
-  def __init__(self, pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, iterMin=5,
-               iterMax=10, c0=None, noGhostCorrection=False, quadratureWeights=False, intensityWeights=False,
+  def __init__(self, pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5,
+               maxIter=10, c0=None, noGhostCorrection=False, quadratureWeights=False, intensityWeights=False,
                regularisation=0.0, silent=True):
     # the intensities non negative, a pole figure ten times below the largest lifted
     data = pf.max(0)
@@ -173,7 +173,7 @@ class MLSSolver:
     hw = getattr(self.S3G, "resolution", res) if halfwidth is None else halfwidth
     self.psi = kernels[0] if kernels else SO3DeLaValleePoussinKernel(halfwidth=hw) if kernel is None else kernel
     self.zrm = zeroRange if isinstance(zeroRange, zeroRangeMethod) else zeroRangeMethod(self.pf) if zeroRange else None
-    self.iterMin, self.iterMax = int(iterMin), max(int(iterMax), int(iterMin))
+    self.minIter, self.maxIter = int(minIter), max(int(maxIter), int(minIter))
     self.c = None if c0 is None else np.asarray(c0, dtype=float).ravel()
     self.c0 = 0.0
     self.ghostCorrection = not noGhostCorrection
@@ -317,12 +317,12 @@ class MLSSolver:
     e, last = self.residual()
     if not self.silent:
       print("   0 | " + "  ".join(f"{x:.2f}" for x in e))
-    for it in range(1, self.iterMax + 1):
+    for it in range(1, self.maxIter + 1):
       self.doIter()
       e, err = self.residual()
       if not self.silent:
         print(f"  {it:2d} | " + "  ".join(f"{x:.2f}" for x in e))
-      if (last - err) / err < 0.05 and it > self.iterMin:
+      if (last - err) / err < 0.05 and it > self.minIter:
         break
       last = err
     return self
@@ -334,13 +334,13 @@ class MLSSolver:
       return uniformODF(self.CS, self.SS)
     return SO3FunRBF(self.S3G, self.psi, (1 - self.c0) * self.c / np.sum(self.c) / self.psi.mean(), self.c0)
 
-  def calcODF(self, iterMin=None, iterMax=None, noGhostCorrection=None, silent=None):
+  def calcODF(self, minIter=None, maxIter=None, noGhostCorrection=None, silent=None):
     """the reconstruction, with the uniform portion the data allows fixed by the ghost
     correction and put into the constant instead of the components"""
-    if iterMin is not None:
-      self.iterMin = int(iterMin)
-    if iterMax is not None:
-      self.iterMax = max(int(iterMax), self.iterMin)
+    if minIter is not None:
+      self.minIter = int(minIter)
+    if maxIter is not None:
+      self.maxIter = max(int(maxIter), self.minIter)
     if silent is not None:
       self.silent = silent
     ghost = self.ghostCorrection if noGhostCorrection is None else not noGhostCorrection
@@ -364,7 +364,7 @@ class MLSSolver:
                    [("pole figures", self.pf.numPF), ("kernel", self.psi), ("grid", f"{self.S3G.size} orientations")])
 
 
-def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, iterMin=5, iterMax=10, c0=None,
+def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5, maxIter=10, c0=None,
             noGhostCorrection=False, quadratureWeights=False, intensityWeights=False, regularisation=0.0, silent=True):
   """an ODF reconstructed from pole figure intensities, an SO3FunRBF
 
@@ -377,7 +377,7 @@ def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, z
   if solvers:
     return solvers[0].calcODF()
   return MLSSolver(pf, *args, resolution=resolution, halfwidth=halfwidth, kernel=kernel, S3G=S3G, zeroRange=zeroRange,
-                   iterMin=iterMin, iterMax=iterMax, c0=c0, noGhostCorrection=noGhostCorrection,
+                   minIter=minIter, maxIter=maxIter, c0=c0, noGhostCorrection=noGhostCorrection,
                    quadratureWeights=quadratureWeights, intensityWeights=intensityWeights,
                    regularisation=regularisation, silent=silent).calcODF()
 

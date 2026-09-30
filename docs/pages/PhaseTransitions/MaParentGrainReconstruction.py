@@ -127,7 +127,7 @@ hold(False)
 # `tolerance` a Gaussian standard deviation, but the implementation uses it directly as the
 # transition-width parameter.
 
-job.calcVariantGraph(threshold=3.5 * degree, tolerance=3.5 * degree)
+job.calcVariantGraph(threshold=3.5 * degree, tol=3.5 * degree)
 job
 
 # Earlier versions also passed `'tortuosity'` here. `calcVariantGraph` has no such option, so
@@ -138,9 +138,9 @@ job
 # them in a second pass:
 #
 # ```python
-# job.calcVariantGraph(threshold=2.5 * degree, tolerance=2.5 * degree, mergeSimilar=True)
+# job.calcVariantGraph(threshold=2.5 * degree, tol=2.5 * degree, mergeSimilar=True)
 # job.clusterVariantGraph()
-# job.calcVariantGraph(threshold=2.5 * degree, tolerance=2.5 * degree)
+# job.calcVariantGraph(threshold=2.5 * degree, tol=2.5 * degree)
 # ```
 #
 # This two-pass route trades variant resolution in the first graph for lower cost. The present
@@ -199,7 +199,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 # earlier assignment to be replaced.
 
 # +
-job.calcGBVotes(p2c=True, reconsiderAll=True, threshold=4 * degree, tolerance=1.5 * degree)
+job.calcGBVotes(p2c=True, reconsiderAll=True, threshold=4 * degree, tol=1.5 * degree)
 print(job)
 
 job.calcParentFromVote()

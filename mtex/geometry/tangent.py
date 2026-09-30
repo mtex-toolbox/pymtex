@@ -314,12 +314,12 @@ class SO3TangentVector(vector3d):
     return np.arctan2(c, d)
 
   # equal vectors at the same reference, up to a tolerance in the components
-  def __eq__(self, other, tolerance=1e-6):
+  def __eq__(self, other, tol=1e-6):
     if not isinstance(other, SO3TangentVector):
       return NotImplemented
     same = _sameReference(self.oriRef, other.oriRef)
     other = other.toSide(self.side)
-    return np.logical_and(same, np.linalg.norm(self.data - other.data, axis=-1) < tolerance)
+    return np.logical_and(same, np.linalg.norm(self.data - other.data, axis=-1) < tol)
 
   def __ne__(self, other):
     eq = self.__eq__(other)
@@ -349,11 +349,11 @@ class SO3TangentVector(vector3d):
     w = np.asarray(weights, dtype=float)
     return self._rebuild(np.sum(self.data * w[..., None], axis=axis) / np.sum(w, axis=axis), ref)
 
-  def unique(self, tolerance=1e-6, return_index=False, return_inverse=False, **kwargs):
+  def unique(self, tol=1e-6, return_index=False, return_inverse=False, **kwargs):
     """the distinct tangent vectors at one shared reference up to a tolerance, in order of first
     appearance; with return_index and return_inverse the index maps as well"""
     ref = self._oneReference()
-    out = vector3d(self.data).unique(tolerance=tolerance, stable=True, return_index=True, return_inverse=True)
+    out = vector3d(self.data).unique(tol=tol, stable=True, return_index=True, return_inverse=True)
     u = self._rebuild(out[0].data, ref)
     out = (u,) + ((out[1],) if return_index else ()) + ((out[2],) if return_inverse else ())
     return out if len(out) > 1 else u

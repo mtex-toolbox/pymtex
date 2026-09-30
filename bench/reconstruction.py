@@ -69,10 +69,10 @@ if "--matlab-p2c" in sys.argv:
 else:
   step("calcParent2Child", job.calcParent2Child, lambda: f"{float(job.p2c.angle(KS)) / degree:.4f}")
 print(f"{'fit':20s} {'':8s}  {q(job.calcGBFit()[0] / degree)}")
-step("calcVariantGraph", lambda: job.calcVariantGraph(threshold=3.5 * degree, tolerance=1.5 * degree), lambda: job.graph.nnz)
+step("calcVariantGraph", lambda: job.calcVariantGraph(threshold=3.5 * degree, tol=1.5 * degree), lambda: job.graph.nnz)
 step("clusterVariantGraph", lambda: job.clusterVariantGraph(includeSimilar=True), lambda: q(job.votes.prob[:, 0]))
 step("calcParentFromVote", lambda: job.calcParentFromVote(minProb=0.5), lambda: np.count_nonzero(job.isParent))
-step("growth", lambda: (job.calcGBVotes(p2c=True, reconsiderAll=True, threshold=4 * degree, tolerance=1.5 * degree), job.calcParentFromVote()),
+step("growth", lambda: (job.calcGBVotes(p2c=True, reconsiderAll=True, threshold=4 * degree, tol=1.5 * degree), job.calcParentFromVote()),
      lambda: np.count_nonzero(job.isParent))
 step("mergeSimilar", lambda: job.mergeSimilar(threshold=7.5 * degree), lambda: len(job.grains))
 step("mergeInclusions", lambda: job.mergeInclusions(maxSize=50), lambda: f"{len(job.grains)} {np.count_nonzero(job.isParent)}")
@@ -86,6 +86,6 @@ if "--routes" in sys.argv:
   job.p2c = orientation(rotation._fromData(np.array([0.9183690176, -0.01211658611, 0.3880635769, 0.07653885347])), job.csParent, job.csChild)
   step("calcGBVotes", job.calcGBVotes, lambda: q(job.votes.prob[:, 0]))
   step("calcTPVotes", job.calcTPVotes, lambda: q(job.votes.prob[:, 0]))
-  step("calcGraph", lambda: job.calcGraph(threshold=2.5 * degree, tolerance=2.5 * degree), lambda: job.graph.nnz)
+  step("calcGraph", lambda: job.calcGraph(threshold=2.5 * degree, tol=2.5 * degree), lambda: job.graph.nnz)
   step("clusterGraph", job.clusterGraph)
   step("calcParentFromGraph", job.calcParentFromGraph, lambda: np.count_nonzero(job.isParent))

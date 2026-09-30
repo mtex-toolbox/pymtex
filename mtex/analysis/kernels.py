@@ -67,7 +67,7 @@ def _minimumNorm(BT, rhs, x, tol):
 # the factor, the shears and the spin of every strain E[k] in the crystal frame: A holds
 # the five independent strain components of each system, crss the cost, spins the
 # antisymmetric part of each dyad
-def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxit, M, X, W, status):
+def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxIter, M, X, W, status):
   n, k = E.shape[0], A.shape[1]
   cnorm = np.sqrt(crss @ crss)
   BT = np.empty((k, 6))
@@ -85,7 +85,7 @@ def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxit, M, X, W
       status[p] = 0
       continue
     y = np.array([e[0, 0], e[1, 0], e[2, 0], e[1, 1], e[2, 1]]) / scale
-    s = _linearProgram(A, y, crss, tol, maxit, x)
+    s = _linearProgram(A, y, crss, tol, maxIter, x)
     if s == 0 and minimumNorm:
       rhs = np.empty(6)
       rhs[:5] = y

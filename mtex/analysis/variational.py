@@ -57,12 +57,12 @@ class halfQuadraticFilter(variationalFilter):
   into a line, threshold the one above which two neighbours are not smoothed together at
   all, a subgrain boundary the filter is to leave alone"""
 
-  def __init__(self, smoothingLength=None, alpha=None, l1DataFit=True, l1TV=True, threshold=15 * degree, eps=1e-3, iterMax=100,
+  def __init__(self, smoothingLength=None, alpha=None, l1DataFit=True, l1TV=True, threshold=15 * degree, eps=1e-3, maxIter=100,
                tol=0.001 * degree):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.alpha = None if alpha is None else float(alpha)
     self.l1DataFit, self.l1TV = bool(l1DataFit), bool(l1TV)
-    self.threshold, self.eps, self.iterMax, self.tol = float(threshold), float(eps), int(iterMax), float(tol)
+    self.threshold, self.eps, self.maxIter, self.tol = float(threshold), float(eps), int(maxIter), float(tol)
 
   def _items(self):
     return [("smoothing length", self.smoothingLength), ("alpha", self.alpha), ("threshold", f"{self.threshold / degree:g}°"),
@@ -72,8 +72,8 @@ class halfQuadraticFilter(variationalFilter):
 class l1TVFilter(halfQuadraticFilter):
   """the same filter with both norms absolute, the default of the maps layer"""
 
-  def __init__(self, smoothingLength=None, alpha=None, threshold=15 * degree, eps=1e-3, iterMax=100, tol=0.001 * degree):
-    super().__init__(smoothingLength, alpha, True, True, threshold, eps, iterMax, tol)
+  def __init__(self, smoothingLength=None, alpha=None, threshold=15 * degree, eps=1e-3, maxIter=100, tol=0.001 * degree):
+    super().__init__(smoothingLength, alpha, True, True, threshold, eps, maxIter, tol)
 
 
 class infimalConvolutionFilter(variationalFilter):
@@ -81,15 +81,15 @@ class infimalConvolutionFilter(variationalFilter):
   Laplacian, which keeps both a step and a slope: the infimal convolution of first and
   second order total variation"""
 
-  def __init__(self, smoothingLength=None, alpha=None, beta=None, threshold=15 * degree, eps=1e-3, iterMax=20, tol=0.001 * degree):
+  def __init__(self, smoothingLength=None, alpha=None, beta=None, threshold=15 * degree, eps=1e-3, maxIter=20, tol=0.001 * degree):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.alpha = None if alpha is None else float(alpha)
     self.beta = None if beta is None else float(beta)
-    self.threshold, self.eps, self.iterMax, self.tol = float(threshold), float(eps), int(iterMax), float(tol)
+    self.threshold, self.eps, self.maxIter, self.tol = float(threshold), float(eps), int(maxIter), float(tol)
 
   def _items(self):
     return [("smoothing length", self.smoothingLength), ("alpha", self.alpha), ("beta", self.beta), ("threshold", f"{self.threshold / degree:g}°"),
-            ("iterations", self.iterMax)]
+            ("iterations", self.maxIter)]
 
 
 # ------------------------------------------------------------------ the weight of a length
@@ -146,7 +146,7 @@ class graphCSR:
     return (D.T @ D).tocsr()
 
 
-def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, iterMax, tol, isData, pin, comp):
+def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData, pin, comp):
   """iteratively reweighted least squares for the model over the whole graph: an absolute
   value is minimised through the quadratic that touches it, and the surrogate is solved
   exactly at every step, which is what half quadratic minimisation is. The weight is
@@ -177,7 +177,7 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, iterMax, tol, isData
     work = np.zeros((5,) + x.shape)
     t = np.zeros(len(edges) if order == 1 else n)
     wr, wd, b = np.zeros(len(t)), np.zeros(n), np.zeros(x.shape)
-  for _ in range(iterMax):
+  for _ in range(maxIter):
     idx = np.flatnonzero(free)
     prev = x[idx]
     if cg is not None:
@@ -266,13 +266,13 @@ def solveField(F, l, edges, f, isData, pin, comp):
   if isinstance(F, splineFilter):
     return irls(G, f, regularization(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, pin, comp)
   if isinstance(F, halfQuadraticFilter):
-    return irls(G, f, regularization(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.iterMax, F.tol, isData, pin, comp)
+    return irls(G, f, regularization(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.maxIter, F.tol, isData, pin, comp)
   if isinstance(F, infimalConvolutionFilter):
     # the two fields minimised in turn, one over the differences and one over the Laplacian
     alpha = regularization(F, l, 1)
     beta = regularization(F, l, 2, alpha=F.beta)
     u1, u2 = np.zeros(f.shape), np.zeros(f.shape)
-    for _ in range(F.iterMax):
+    for _ in range(F.maxIter):
       p = irls(G, f - u2, alpha, 1, False, True, F.threshold, F.eps, 20, F.tol, isData, pin, comp)
       q = irls(G, f - p, beta, 2, False, True, F.threshold, F.eps, 20, F.tol, isData, pin, comp)
       delta = max(np.max(np.abs(p - u1)), np.max(np.abs(q - u2)))

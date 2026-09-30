@@ -93,7 +93,7 @@ def loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=No
     return calcDensity(ori, weights=w, halfwidth=halfwidth, **({} if resolution is None else {"resolution": resolution}))
   print("  Interpolating the ODF. This might take some time...")
   from ..functions.density import interpolate
-  return interpolate(ori, w, **{k: v for k, v in kwargs.items() if k in ("bandwidth", "lambda_", "maxit", "tol")})
+  return interpolate(ori, w, **{k: v for k, v in kwargs.items() if k in ("bandwidth", "lambda_", "maxIter", "tol")})
 
 
 VPSC_CONVENTIONS = {"B": "Bunge", "K": "Kocks", "R": "Roe"}

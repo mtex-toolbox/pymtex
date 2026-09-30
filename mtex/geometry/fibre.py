@@ -226,7 +226,7 @@ class fibre:
 
   # two fibres are equal when their frames are the same and h and r agree up to the symmetry
   # of their frames, both flipped counting as well; a segment is not the full fibre
-  def __eq__(self, other, tolerance=1e-6):
+  def __eq__(self, other, tol=1e-6):
     if not isinstance(other, fibre):
       return NotImplemented
     if self.CS is not other.CS or self.SS is not other.SS:
@@ -234,8 +234,8 @@ class fibre:
     L, R = reductionGroups(self.o1)
     hd = np.sum(qrot(R, self.h.normalize().data[..., None, :]) * other.h.normalize().data[..., None, :], axis=-1)
     rd = np.sum(qrot(L, self.r.normalize().data[..., None, :]) * other.r.normalize().data[..., None, :], axis=-1)
-    same = np.any(hd > 1 - tolerance, axis=-1) & np.any(rd > 1 - tolerance, axis=-1)
-    flipped = np.any(hd < tolerance - 1, axis=-1) & np.any(rd < tolerance - 1, axis=-1)
+    same = np.any(hd > 1 - tol, axis=-1) & np.any(rd > 1 - tol, axis=-1)
+    flipped = np.any(hd < tol - 1, axis=-1) & np.any(rd < tol - 1, axis=-1)
     return (same | flipped) & (self.isFull == other.isFull)
 
   def __ne__(self, other):
@@ -340,22 +340,22 @@ def _axisBetween(o1, o2):
 
 
 # the distinct unit vectors of an orbit, shape (n, 3)
-def _uniqueDirections(xyz, tolerance=TOLERANCE):
+def _uniqueDirections(xyz, tol=TOLERANCE):
   xyz = xyz.reshape(-1, 3)
   keep = np.ones(len(xyz), dtype=bool)
   for k in range(len(xyz)):
     if keep[k]:
-      keep[k + 1:] &= xyz[k + 1:] @ xyz[k] < 1 - tolerance
+      keep[k + 1:] &= xyz[k + 1:] @ xyz[k] < 1 - tol
   return xyz[keep]
 
 
 # the first of every set of equal fibres: h and r agree, or both flip sign
-def _distinct(h, r, tolerance=TOLERANCE):
+def _distinct(h, r, tol=TOLERANCE):
   keep = np.ones(len(h), dtype=bool)
   for k in range(len(h)):
     if keep[k]:
       hd, rd = h[k + 1:] @ h[k], r[k + 1:] @ r[k]
-      keep[k + 1:] &= ~((hd > 1 - tolerance) & (rd > 1 - tolerance) | (hd < tolerance - 1) & (rd < tolerance - 1))
+      keep[k + 1:] &= ~((hd > 1 - tol) & (rd > 1 - tol) | (hd < tol - 1) & (rd < tol - 1))
   return keep
 
 

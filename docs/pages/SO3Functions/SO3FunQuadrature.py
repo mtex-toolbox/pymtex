@@ -210,7 +210,7 @@ schemeDifference
 # harmonic system is better suited to low bandwidth because its matrix grows quickly with the
 # number of Fourier coefficients. Select it with `SO3FunRBF(odfHarmonic, harmonic=True)`.
 #
-# Both `lsqr` and `mlsq` stop according to `tol` and `maxit`. Their default tolerance is
+# Both `lsqr` and `mlsq` stop according to `tol` and `maxIter`. Their default tolerance is
 # `1e-3`. Unconstrained `lsqr` uses at most 30 iterations, whereas `mlsq` uses at most 100.
 # Tighten these settings only when a validation error or a physical conclusion requires it.
 #
