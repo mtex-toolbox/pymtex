@@ -17,14 +17,25 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   group elements by position, the symmetry reduction is one kernel.
 - When they disagree on a name the user sees, MATLAB wins; on a representation or an
   algorithm, Julia wins. **Never transcribe code from either**; design from them.
+- The exception is `docs/plans/syntax.md`: where MATLAB's name is a misnomer, a duplicate, a
+  MATLAB workaround or a typo, the Python name listed there replaces it, with no alias. The
+  definition cites MATLAB's name in its docstring as `MATLAB's plotPDF` (no backticks, the form
+  `tools/graph/scan_python.py` reads), so the graph keeps the counterpart;
+  `tools/syntaxcheck.py` lists the old spellings left, `--graph` the counterparts lost.
 
 ## Spellings decided
 
 - What MATLAB declares as a property, and every `is*` predicate, is a Python property
   (`v.antipodal`, `ori.CS`, `cs.isLaue`). What MATLAB implements as a method is a method
   with parentheses (`rot.angle()`, `cs.numSym()`) and also a module function (`angle(r)`).
-- Boolean flags are keywords with their MTEX names (`noSymmetry=True`); a positional string
-  names something (`'uvw'`, `'ZYZ'`, `'X||a'`, `'{111}'`).
+- Boolean flags are keywords named positively (`thinning=False`, not MATLAB's `'nothinning'`);
+  a positional string names something (`'uvw'`, `'ZYZ'`, `'X||a'`, `'{111}'`). The keywords
+  are camelCase (`markerSize`, `displayName`, `lineWidth`), a tolerance is `tol`, an iteration
+  bound `maxIter`, the progress output `verbose` (default False), a symmetry `CS`/`SS`, and
+  British spellings (`symmetrise`, `regularisation`).
+- Everything on SO(3) carries the two frames it maps between as `frameA` (from, the crystal)
+  and `frameB` (to, the specimen or the second crystal), as the Julia port; `CS` and `SS` are
+  convenience properties over them.
 - Julia's type parameters are fields here: `antipodal`, `isNormalized`, `dispStyle`,
   `ori.antipodal`; frame kinds and properness stay classes (`rotation` has no `i`,
   `orthogonalTransform` holds the parity as a fifth coordinate).

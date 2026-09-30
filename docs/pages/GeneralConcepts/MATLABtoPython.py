@@ -34,7 +34,13 @@ ebsd
 # |---|---|
 # | `calcGrains(ebsd, 'angle', 10*degree)` | `calcGrains(ebsd, angle=10*degree)` |
 # | `Miller(1,0,0, cs, 'antipodal')` | `Miller(1, 0, 0, cs, antipodal=True)` |
-# | `plot(grains, 'linewidth', 2)` | `plot(grains, linewidth=2)` |
+# | `plot(grains, 'linewidth', 2)` | `plot(grains, lineWidth=2)` |
+# | `calcODF(pf, 'noGhostCorrection')` | `calcODF(pf, ghostCorrection=False)` |
+#
+# The keywords are spelled one way throughout: in camelCase (`lineWidth`, `markerSize`,
+# `displayName`), a tolerance as `tol`, an iteration bound as `maxIter`, and a flag by what
+# it switches on, so that MATLAB's `'noSymmetry'` is `symmetry=False`. Progress output is
+# asked for by `verbose=True`, where MATLAB silences it by `'silent'`.
 #
 # A string that names something stays a string in the argument list: the kind of Miller
 # indices `'uvw'`, an Euler convention `'ZYZ'`, an alignment `'X||a'`.
@@ -168,7 +174,9 @@ hold(False)
 # ## Names that changed
 #
 # A few classes carry the names of the coming MATLAB release, where the MATLAB pages of
-# MTEX 6 still use the old ones. They take the same arguments.
+# MTEX 6 still use the old ones, and a few commands have a better name in Python than in
+# MATLAB: a misnomer, a duplicate or a workaround for a limit of MATLAB. They take the same
+# arguments.
 #
 # | MATLAB MTEX 6 | Python |
 # |---|---|

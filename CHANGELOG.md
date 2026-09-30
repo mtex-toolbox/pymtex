@@ -6,7 +6,10 @@
 
 MTEX 1.0 brings crystallographic texture analysis to Python scripts and Jupyter
 notebooks, with the familiar objects and function names of MTEX for MATLAB. It runs
-without a MATLAB installation.
+without a MATLAB installation. Where a MATLAB name was a misnomer or a workaround, Python
+uses a clearer one, such as `plotPF` for `plotPDF` and `thinning=False` for `'nothinning'`;
+[MTEX in MATLAB and in Python](https://mtex-toolbox.github.io/MATLABtoPython_py.html)
+lists them.
 
 This first stable release has been cross-checked against the MATLAB toolbox and the
 Julia port. The comparisons also uncovered bugs in MATLAB, improving the toolbox

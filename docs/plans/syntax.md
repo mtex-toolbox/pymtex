@@ -1,16 +1,18 @@
 # Subplan - the Python syntax where MATLAB's is a workaround
 
-Status: written 2026-09-30 on the branch `syntax-review`, the decisions the user's (2026-09-30);
-nothing built. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This
+Status: written 2026-09-30 on the branch `syntax-review`, with the user's decisions of the
+same day; R0 built. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This
 plan replaces it for the names below: where MATLAB's name is a misnomer, a duplicate, a MATLAB
 workaround or a typo, the Python name is the better one, and MATLAB's name goes. Every other
 name stays MATLAB's.
 
 ## 1. Rules
 
-- **Hard rename.** The old name is removed, no alias and no deprecation period; the port is at
-  1.0.0 and has few users yet. The release after the branch is 2.0.0 (semantic versioning) and
-  the CHANGELOG lists every rename as a table old -> new.
+- **Hard rename, before 1.0.0.** The old name is removed, with no alias and no deprecation
+  period. 1.0.0 is not tagged yet (the CHANGELOG says unreleased), so the renames go into the
+  first release and break no user. The CHANGELOG's 1.0.0 notes say where the names depart
+  from MATLAB. The page `MATLABtoPython` lists every rename in its table "Names that changed",
+  filled step by step, and `PythonDevelopers` states the rule.
 - **MATLAB's name stays findable.** A renamed public definition cites its MATLAB name in its
   docstring in the form the graph reads, `MATLAB's plotPDF` without backticks
   (`MATLAB_REF` in `tools/graph/scan_python.py`), so the counterpart edge survives as
@@ -124,7 +126,7 @@ resolves.
 | progress | `silent=` | `verbose=` (default False), with the sense inverted |
 | plotting | `MarkerSize`, `DisplayName`, `EdgeAlpha`, `Length`, `linewidth` | `markerSize`, `displayName`, `edgeAlpha`, `length`, `lineWidth` |
 | symmetry | `cs=`, `ss=` as the plain symmetry keyword | `CS=`, `SS=`; role names (`csParent=`, `csChild=`) stay |
-| flags | `nothinning`, `noGhostCorrection`, `noScaling`, `noBoundary`, `noOrientFaces`, `noCenter`, `noLabel`, `noGrid` | `thinning=False`, `ghostCorrection=False`, `scaling=False`, `boundary=False`, `orientFaces=False`, `center=False`, `label=False`, `grid=False` |
+| flags | every `no*` keyword: `noSymmetry` (46 in mtex), `noAntipodal` (20), `noLabel`, `noIntern`, `noRobust`, `noOrientFaces`, `noGrid`, `noGhostCorrection`, `noTitle`, `noSurface`, `noScaling`, `noSimplify`, `noRefine`, `noCenter`, `noPseudoDiagonal`, `noP2C`, `noDiagonal`, `noBoundary`, `nothinning` | the positive name `=False`: `symmetry=False`, `antipodal=False`, ...; where the positive name is already a keyword (`antipodal`, `label`, `title`), the two merge, `False` meaning off |
 | spelling | `regularization` | `regularisation`, British as `symmetrise` |
 
 MATLAB's flags as strings (`'noBoundary'` positional, `CLAUDE.md` on `rotate(ebsd, r,
@@ -139,8 +141,10 @@ grouped by these themes. It checks what is left after each step and becomes a te
 
 Each step is one commit on `syntax-review`, with the graph rebuilt and the gaps compared.
 
-- **R0** The rules: `CLAUDE.md`, the keyword script, the rename table in `CHANGELOG.md`, and
-  the `gaps` baseline saved in `bench/out/syntax-gaps-before.txt`.
+- **R0** The rules: `CLAUDE.md`, `tools/syntaxcheck.py` (the old spellings left; `--graph`
+  compares the graph's counterparts with the baseline `bench/out/syntax-counterparts-before.txt`,
+  2485 MATLAB nodes on 2026-09-30), the pages `PythonDevelopers` and `MATLABtoPython`, and the
+  CHANGELOG.
 - **R1** Defects and keywords (sections 2.5 and 3). This is the largest step by occurrences;
   do it one theme per commit.
 - **R2** Duplicates (section 2.2).
@@ -148,9 +152,8 @@ Each step is one commit on `syntax-review`, with the graph rebuilt and the gaps 
 - **R4** Projections (section 2.3).
 - **R5** Workarounds (section 2.6).
 - **R6** Frames (section 2.4).
-- **R7** Merge: the full test suite (asked for here), all doc pages rebuilt, `query.py gaps`
-  against the baseline, and a version bump to 2.0.0. Update the MATLAB | Python hand-off doc of
-  the site.
+- **R7** Merge: the full test suite (asked for here), all doc pages rebuilt, `syntaxcheck.py`
+  empty and `--graph` losing nothing, and the MATLAB | Python hand-off doc of the site updated.
 
 ## 5. Open questions
 

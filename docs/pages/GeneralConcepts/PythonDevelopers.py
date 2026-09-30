@@ -7,7 +7,7 @@
 #
 # ## Why the names follow MATLAB
 #
-# MTEX has been a MATLAB toolbox for twenty years. Its commands (`calcGrains`, `plotPDF`,
+# MTEX has been a MATLAB toolbox for twenty years. Its commands (`calcGrains`, `plotPF`,
 # `symmetrise`), its classes (`vector3d`, `orientation`, `crystalFrame`) and its options
 # (`minPixel`, `antipodal`) are the vocabulary of its documentation, of the papers that use
 # it and of the forum answers. The Python port keeps that vocabulary, so every page of this
@@ -16,6 +16,12 @@
 # differs from PEP 8: commands and properties are in camelCase, and most classes start with
 # a lower case letter. Libraries that mirror an established system do the same, PySide's
 # `setWindowTitle` or SimpleITK's `ReadImage`.
+#
+# Where a MATLAB name is a misnomer, a duplicate, a workaround for a limit of MATLAB or a
+# typo, Python has a better one and only that: `plotPF` for `plotPDF`, which draws no density
+# when given orientations, keywords written positively as `thinning=False` for the flag
+# `'nothinning'`, one spelling `tol=` for a tolerance. The page
+# [MTEX in MATLAB and in Python](MATLABtoPython.html) lists them.
 #
 # Everything below the names is ordinary Python: NumPy arrays, keyword arguments, exceptions,
 # docstrings and matplotlib figures.
@@ -161,6 +167,6 @@ right.set_xlabel('pixels per grain')
 
 # ## Stability
 #
-# The port is young. The names of commands, classes and options follow MATLAB MTEX and will
-# stay; internals, everything whose name starts with an underscore and the modules not
-# re-exported by `mtex`, can change between releases.
+# The names of commands, classes and options are fixed from 1.0 on; internals, everything
+# whose name starts with an underscore and the modules not re-exported by `mtex`, can change
+# between releases.
