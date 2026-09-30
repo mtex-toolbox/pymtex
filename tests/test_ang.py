@@ -5,12 +5,13 @@ import pytest
 
 import mtex
 from mtex import crystalFrame, degree, loadEBSD, rotation, vector3d
-from mtex.io.ang import angHeader, angIsEMSphInx, angPhases, eulerCorrectionRotation, loadEBSD_ang
+from mtex.io.ang import angHeader, angIsACOM, angIsEMSphInx, angMineral, angPhases, eulerCorrectionRotation, loadEBSD_ang
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data", "EBSD")
 FERRITE = os.path.join(FIXTURES, "ferrite_cut.ang")
 OLIVINE = os.path.join(FIXTURES, "olivine_cut.ang")
+ACOM = os.path.join(FIXTURES, "acom_cut.ang")
 
 
 def firstEuler(e):
@@ -148,6 +149,32 @@ def test_angIsEMSphInx_needs_all_three_marks():
 def test_angHeader_leaves_out_the_phase_blocks():
   header = ["# x-star 0.5", "# Phase 1", "# MaterialName Fe", "# Symmetry 43", "# hklFamilies 1 1 1", "# GRID: SqrGrid", "# XSTEP: 2"]
   assert angHeader(header) == {"x_star": 0.5, "GRID": "SqrGrid", "XSTEP": 2.0}
+
+
+def test_an_acom_map_is_read_with_setting_4_in_nm():
+  e = loadEBSD(ACOM)
+  assert e.shape == (3, 4) and e.lattice.dxy == 5
+  assert e.scanUnit == "nm"
+  assert e.CSList.mineralList == ["notIndexed", "Copper"]
+  assert float(e.EulerCorrection.angle(eulerCorrectionRotation(4))) < 1e-12
+  # what the call states wins
+  e = loadEBSD(ACOM, setting=2, scanUnit="um")
+  assert e.scanUnit == "um"
+  assert float(e.EulerCorrection.angle(eulerCorrectionRotation(2))) < 1e-12
+
+
+def test_angIsACOM():
+  assert angIsACOM(["# File created from ACOM RES results"])
+  assert angIsACOM(["# 1354.res", "# TEM data"])
+  assert not angIsACOM(["# TEM_PIXperUM 1.000000", "# MaterialName Fe"])
+  with open(FERRITE) as f:
+    assert not angIsACOM([l for l in f if l.startswith("#")])
+
+
+def test_angMineral_takes_the_quoted_name():
+  assert angMineral("5000216  'Copper'  'Copper'") == "Copper"
+  assert angMineral("Ferrite") == "Ferrite"
+  assert angMineral(None) is None
 
 
 def test_a_header_without_phase_numbers(tmp_path):

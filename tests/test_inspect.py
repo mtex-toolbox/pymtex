@@ -29,6 +29,14 @@ def test_text_and_binary_formats(name):
   assert info.date is not None
 
 
+def test_acom_ang():
+  info = inspectEBSD(fixture("acom_cut.ang"))
+  ebsd = loadEBSD(fixture("acom_cut.ang"))
+  assert info.vendor == "ACOM"
+  assert [f.name for f in info.phases.frames] == [f.name for f in ebsd.CSList.frames]
+  assert float(ebsd.EulerCorrection.angle(info.eulerCorrection)) < 1e-12
+
+
 def test_hexagonal_ang():
   info = inspectEBSD(fixture("ferrite_cut.ang"))
   assert info.hex and info.grid == (234, 270) and info.points == 63045

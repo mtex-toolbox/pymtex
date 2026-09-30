@@ -3,6 +3,7 @@
 #   ebsd = loadEBSD_ang('map.ang')                 the Euler angles aligned by setting 2
 #   ebsd = loadEBSD_ang('map.ang', setting=3)      one of the four EDAX alignments, 0 none
 #   ebsd = loadEBSD_ang('map.ang', EMSphInx=True)  the phase column counted from zero
+#   ebsd = loadEBSD_ang('acom.ang')                a TEM ACOM map: setting 4, positions in nm
 #
 # A header of lines beginning with '#', one block per phase, then a numeric table whose
 # first eight columns are fixed by the format, phi1 PHI phi2 x y IQ CI phase, and whose
@@ -59,7 +60,7 @@ def angPhases(header):
     stop = starts[k + 1] if k + 1 < len(starts) else len(header)
     block = header[s:stop]
     num = int(re.match(r"^#\s*Phase\s+(\d+)", header[s]).group(1)) if numbered else k + 1
-    name = _token(block, "materialname")
+    name = angMineral(_token(block, "materialname"))
     names.append(name or "")
     families.append(_token(block, "numberfamilies"))
     name = re.sub(r"\s+", " ", name).strip() if name else f"phase {num}"
@@ -68,6 +69,21 @@ def angPhases(header):
     cell = [float(v) for v in abc.split()] if abc else [1, 1, 1, 90, 90, 90]
     found[num] = crystalFrame(pg, cell[:3], np.array(cell[3:6]) * degree, "EDAX", mineral=name)
   return placedPhases(found), names, families
+
+
+def angMineral(value):
+  """the mineral a MaterialName line names: the first quoted name where the line quotes one,
+  as the ACOM export writes a database number and the name twice, 5000216 'Copper' 'Copper'"""
+  if value is None:
+    return None
+  m = re.search(r"'([^']+)'", value)
+  return m.group(1).strip() if m else value
+
+
+def angIsACOM(header):
+  """whether the header is the ACOM export of a TEM orientation map, NanoMEGAS's ASTAR, which
+  writes the positions in nm and the Euler angles in the frame of EDAX's setting 4"""
+  return any(re.match(r"^#.*\b(ACOM|TEM data)\b", l) for l in header)
 
 
 def angIsEMSphInx(header, names, families):
@@ -103,16 +119,19 @@ def angHeader(header):
   return headerDict(pairs)
 
 
-def loadEBSD_ang(fname, *, eulerCorrection=None, setting=2, columnNames=None, frame=None, scanUnit="um",
+def loadEBSD_ang(fname, *, eulerCorrection=None, setting=None, columnNames=None, frame=None, scanUnit=None,
                  EDAX=False, EMSphInx=False):
   """the EDAX/TSL map of an .ang file
 
     loadEBSD_ang('map.ang')                        setting 2, a half turn about (1, -1, 0)
     loadEBSD_ang('map.ang', setting=0)             the Euler angles as the file states them
     loadEBSD_ang('map.ang', eulerCorrection=rot)   the alignment stated outright
+    loadEBSD_ang('map.ang', scanUnit='nm')         the unit of the positions, um by default
 
   EDAX and EMSphInx write the same layout and number the phase column differently; the header
-  is fingerprinted, and EDAX=True or EMSphInx=True overrules the guess.
+  is fingerprinted, and EDAX=True or EMSphInx=True overrules the guess. The ACOM export of a
+  TEM map is fingerprinted too and read with setting 4 and the positions in nm, unless the
+  call states them.
   """
   data = readFile(fname)
   head, offset = leadingLines(data, lambda l: not l.startswith(b"#"))
@@ -138,8 +157,11 @@ def loadEBSD_ang(fname, *, eulerCorrection=None, setting=2, columnNames=None, fr
   else:
     unindexed = at["ci"] < 0 if "ci" in at else None
   meta = {"header": angHeader(header)}
+  acom = angIsACOM(header)
   if eulerCorrection is None:
-    eulerCorrection = eulerCorrectionRotation(setting)
+    eulerCorrection = eulerCorrectionRotation(setting if setting is not None else 4 if acom else 2)
+  if scanUnit is None:
+    scanUnit = "nm" if acom else "um"
   return ebsdFromColumns(at["x"], at["y"], at["phi1"], at["phi"], at["phi2"], at["phase"], phases, props,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta,
                          shift=1 if emsphinx else None, unindexed=unindexed, unitCell=_cellHint(meta["header"]),

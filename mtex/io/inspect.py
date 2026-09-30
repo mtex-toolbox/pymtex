@@ -164,12 +164,13 @@ def _headLines(path, stop):
 
 
 def _inspectAng(path):
-  from .ang import angHeader, angIsEMSphInx, angPhases
+  from .ang import angHeader, angIsACOM, angIsEMSphInx, angPhases
   from .table import linesFrom, text
   head, offset, buf = _headLines(path, lambda l: not l.startswith(b"#"))
   header = [text(l) for l in head]
   phases, names, families = angPhases(header)
-  vendor = "EMSphInx" if angIsEMSphInx(header, names, families) else "EDAX"
+  acom = angIsACOM(header)
+  vendor = "ACOM" if acom else "EMSphInx" if angIsEMSphInx(header, names, families) else "EDAX"
   h = angHeader(header)
   (first,), _ = linesFrom(buf, offset, 1)
   m = len(text(first).split())
@@ -189,7 +190,7 @@ def _inspectAng(path):
   if isinstance(xs, float) and isinstance(ys, float):
     info.step = (xs, ys)
   from .ang import eulerCorrectionRotation
-  info.eulerCorrection = eulerCorrectionRotation(2)
+  info.eulerCorrection = eulerCorrectionRotation(4 if acom else 2)
   return info
 
 
