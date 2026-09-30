@@ -82,7 +82,7 @@ childOri = grains['Fe'].meanOrientation
 hBcc = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], csBcc)
 hFcc = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], csAus)
 
-plotPDF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
+plotPF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 
 nextAxis(1)
 hold(True)
@@ -120,7 +120,7 @@ gcm().drawNow()
 KS = orientation.map(Miller(1, 1, 1, csAus), Miller(0, 1, 1, csBcc), Miller(-1, 0, 1, csAus), Miller(-1, -1, 1, csBcc))
 print(KS)
 
-plotPDF(variants(KS, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
+plotPF(variants(KS, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 # -
 
 # The black rings are the ideal KS child variants predicted from the retained parent. Their
@@ -146,9 +146,9 @@ fitKS
 p2cMean = mean(mori, robust=True)
 print(p2cMean)
 
-plotPDF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
+plotPF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 hold(True)
-plotPDF(variants(p2cMean, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
+plotPF(variants(p2cMean, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 hold(False)
 
 fitMean = np.mean(angle(mori, p2cMean)) / degree
@@ -207,7 +207,7 @@ variantId, packetId, bainId, _ = calcVariantId(parentOri, childOri, p2cIter)
 # the individual coloured points difficult to distinguish.
 
 variantColor = ind2color(variantId, 'ordered')
-plotPDF(childOri, variantColor, hBcc, markerSize=5)
+plotPF(childOri, variantColor, hBcc, markerSize=5)
 
 # The axis-angle plot separates the clusters. Each compact colour cluster is a group of
 # measured child grains assigned to one variant ID.
@@ -225,7 +225,7 @@ plot(childOri, variantColor, 'axisAngle')
 
 # +
 packetColor = ind2color(packetId)
-plotPDF(childOri, packetColor, hBcc, markerSize=5, points=1000)
+plotPF(childOri, packetColor, hBcc, markerSize=5, points=1000)
 
 nextAxis(1)
 hold(True)
@@ -266,7 +266,7 @@ plot(grains['Fe'], packetColor)
 
 # +
 bainColor = ind2color(bainId)
-plotPDF(childOri, bainColor, hBcc, markerSize=5, points=1000)
+plotPF(childOri, bainColor, hBcc, markerSize=5, points=1000)
 
 nextAxis(1)
 hold(True)

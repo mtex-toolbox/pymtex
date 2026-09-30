@@ -484,30 +484,26 @@ class SO3FunHarmonic:
     from .funops import laplace
     return laplace(self)
 
-  def pdf(self, h):
-    """the pole figure of the crystal direction h, a function on the sphere in the specimen frame"""
-    from .funops import pdf
-    return pdf(self, h)
+  # the pole figure of one crystal direction, a function on the sphere in the specimen frame
+  def _poleFigure(self, h, bandwidth=None):
+    from .funops import _harmonicPoleFigure
+    return _harmonicPoleFigure(self, h)
 
-  def ipdf(self, r):
-    """the inverse pole figure of the specimen direction r, a function on the sphere in the crystal frame"""
-    from .funops import ipdf
-    return ipdf(self, r)
+  # the inverse pole figure of one specimen direction, a function on the sphere in the crystal frame
+  def _inversePoleFigure(self, r, bandwidth=None):
+    from .funops import _harmonicInversePoleFigure
+    return _harmonicInversePoleFigure(self, r)
 
-  def radon(self, h=None, r=None):
-    """the Radon transform: the pole figure of h, the inverse pole figure of r, or with both the values
+  def radon(self, h=None, r=None, superposition=None):
+    """the Radon transform: the pole figure of h, the inverse pole figure of r, or with both the
+    values; several h superposed, weighted by superposition (MATLAB's pdf, ipdf and calcPDF)
 
       f.radon(h)
       f.radon(r=r)
-      f.radon(h, r)"""
+      f.radon(h, r)
+      f.radon([h1, h2], superposition=[0.4, 0.6])"""
     from .funops import radon
-    return radon(self, h, r)
-
-  def calcPDF(self, h, r=None, superposition=None):
-    """the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or at
-    the specimen directions r"""
-    from .density import calcPDF
-    return calcPDF(self, h, r, superposition=superposition)
+    return radon(self, h, r, superposition)
 
   @classmethod
   def interpolate(cls, nodes, values, **kwargs):
@@ -541,7 +537,7 @@ class SO3FunHarmonic:
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
-    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     @property
     def SRight(self) -> Any:

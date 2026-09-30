@@ -146,7 +146,7 @@ hold(False)
 
 # +
 h = Miller([1, 0, 0], [0, 1, 0], [0, 0, 1], ebsd['O'].CS)
-plotPDF(ebsd['O'].orientations, h, contourf=True)
+plotPF(ebsd['O'].orientations, h, contourf=True)
 # -
 
 # Pole figures describe directions in the specimen, so MTEX draws them in the same frame

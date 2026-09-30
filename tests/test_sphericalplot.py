@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from mtex import (Miller, S2FunHarmonic, S2VectorFieldHarmonic, annotate, cat, contour, contourf, crystalFrame, degree, fundamentalSector, gcm, grad, hold, newMtexFigure, nextAxis,
-                  orientation, pcolor, plot, plotIPDF, plotPDF, quiver, scatter, specimenFrame, sphericalRegion, text,
+                  orientation, pcolor, plot, plotIPF, plotPF, quiver, scatter, specimenFrame, sphericalRegion, text,
                   unimodalODF, vector3d, xvector, yvector, zvector)
 from mtex.functions.s2axisfield import S2AxisFieldHandle
 from mtex.plotting.sphericalplot import sphericalPlot
@@ -281,9 +281,9 @@ def cubicODF():
   return cs, odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs)
 
 
-def test_plotPDF_ofODFTitledPanelsEachOnItsOwnRange(cubicODF):
+def test_plotPF_ofODFTitledPanelsEachOnItsOwnRange(cubicODF):
   cs, odf, hs = cubicODF
-  h = plotPDF(odf, hs)
+  h = plotPF(odf, hs)
   fig = gcm()
   assert len(fig.children) == 3 and [ax.get_title() for ax in fig.children] == ["{100}", "{110}", "{111}"]
   clims = {x.get_clim() for x in h}
@@ -291,14 +291,14 @@ def test_plotPDF_ofODFTitledPanelsEachOnItsOwnRange(cubicODF):
   assert len(clims) == 3
 
 
-def test_plotPDF_secondRowContinuesALayoutFromNextAxis(cubicODF):
+def test_plotPF_secondRowContinuesALayoutFromNextAxis(cubicODF):
   cs, odf, hs = cubicODF
   # a second row continues a newMtexFigure layout from the axes nextAxis points to
   newMtexFigure(layout=[2, 3])
   lay = gcm()
-  plotPDF(odf, hs)
+  plotPF(odf, hs)
   nextAxis()
-  plotPDF(odf, hs, title=False)
+  plotPF(odf, hs, title=False)
   assert gcm() is lay and len(lay.children) == 6 and all(hasattr(ax, "_mtexSphericalPlot") for ax in lay.children)
 
 
@@ -306,7 +306,7 @@ def test_setColorRange_equalRecoloursBandsAndKeepsLevels(cubicODF):
   from mtex import setColorRange
   cs, odf, hs = cubicODF
   # a shared colour range recolours the contour bands and keeps each panel's levels, as MATLAB's
-  hs = plotPDF(odf, hs, 'contourf')
+  hs = plotPF(odf, hs, 'contourf')
   before = [tuple(np.round(h.levels, 9)) for h in hs]
   setColorRange('equal')
   after = [tuple(np.round(ax._mtexSphericalPlot.mappable.levels, 9)) for ax in gcm().children]
@@ -316,7 +316,7 @@ def test_setColorRange_equalRecoloursBandsAndKeepsLevels(cubicODF):
 def test_mtexColorbar_oneBarForCommonRangeAndYlabelBesideAChart(cubicODF):
   from mtex import mtexColorbar, setColorRange, ylabel
   cs, odf, hs = cubicODF
-  plotPDF(odf, hs, 'contourf')
+  plotPF(odf, hs, 'contourf')
   setColorRange('equal')
   # one bar for the common range, and a label beside a chart, MATLAB's ylabel(ax, ...)
   assert len(mtexColorbar()) == 1
@@ -324,10 +324,10 @@ def test_mtexColorbar_oneBarForCommonRangeAndYlabelBesideAChart(cubicODF):
   assert any(t.get_text() == 'row one' for t in gcm().children[0].texts)
 
 
-def test_plotPDF_colorRangeEqualIsOneRangeOnTheSpecimenSector(cubicODF):
+def test_plotPF_colorRangeEqualIsOneRangeOnTheSpecimenSector(cubicODF):
   cs, odf, hs = cubicODF
   # one range over the row when asked
-  h = plotPDF(odf, hs, colorRange='equal')
+  h = plotPF(odf, hs, colorRange='equal')
   clims = {x.get_clim() for x in h}
   fig = gcm()
   assert len(clims) == 1 and fig.colorRange == next(iter(clims))
@@ -336,36 +336,36 @@ def test_plotPDF_colorRangeEqualIsOneRangeOnTheSpecimenSector(cubicODF):
   assert all(sP.proj.antipodal for sP in plotsOf(fig))
 
 
-def test_plotPDF_ofODFTakesMATLABPositionalFlags(cubicODF):
+def test_plotPF_ofODFTakesMATLABPositionalFlags(cubicODF):
   cs, odf, _ = cubicODF
   # MATLAB's positional flags
-  h = plotPDF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
+  h = plotPF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
   assert isinstance(h[0], matplotlib.contour.QuadContourSet)
 
 
-def test_plotPDF_ofODFContourfNoTitleABarPerPanel(cubicODF):
+def test_plotPF_ofODFContourfNoTitleABarPerPanel(cubicODF):
   cs, odf, _ = cubicODF
-  h = plotPDF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True, title=False)
+  h = plotPF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True, title=False)
   fig = gcm()
   assert len(fig.children) == 2 and fig.children[0].get_title() == "" and len(fig.colorbars) == 2
   assert all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
 
 
-def test_plotPDF_completeDrawsBothHemispheresOfAnAntipodalPoleFigure(cubicODF):
+def test_plotPF_completeDrawsBothHemispheresOfAnAntipodalPoleFigure(cubicODF):
   cs, odf, _ = cubicODF
   # complete asks for both hemispheres even of an antipodal pole figure, as MATLAB draws it
-  odf.plotPDF(Miller(1, 0, 0, cs), complete=True)
+  odf.plotPF(Miller(1, 0, 0, cs), complete=True)
   assert len(gcm().children) == 2 and all(len(sP.sR.N) == 1 for sP in plotsOf(gcm()))
 
 
-def test_plotIPDF_ofODFTitledBySpecimenDirectionsOnTheCrystalSector(cubicODF):
+def test_plotIPF_ofODFTitledBySpecimenDirectionsOnTheCrystalSector(cubicODF):
   cs, odf, _ = cubicODF
   # the inverse pole figures, titled by the specimen directions, on the crystal sector
-  plotIPDF(odf, [xvector, yvector, zvector])
+  plotIPF(odf, [xvector, yvector, zvector])
   fig = gcm()
   assert [ax.get_title() for ax in fig.children] == ["X", "Y", "Z"]
   assert all(len(sP.sR.N) >= 3 for sP in plotsOf(fig))
-  odf.plotIPDF(zvector, colorbar=True)
+  odf.plotIPF(zvector, colorbar=True)
   assert len(gcm().children) == 1
 
 
@@ -435,7 +435,7 @@ def trigonalODF():
 def test_annotate_orientationMarksEveryInversePoleFigure():
   cs, mod, odf = trigonalODF()
   # annotate(ori) marks an inverse pole figure at the crystal direction along its r, in the sector
-  plotIPDF(odf, [xvector, zvector], antipodal=True)
+  plotIPF(odf, [xvector, zvector], antipodal=True)
   hs = annotate(mod, marker='s', markerFaceColor='r', label='A', color='w')
   assert len(hs) == 2 and all(h is not None and len(h.get_offsets()) == 1 for h in hs)
   # beside a markerFaceColor, color is the colour of the text
@@ -446,7 +446,7 @@ def test_plot_fibreAdd2allNamedOnceInTheLegend():
   from mtex import fibre, legend
   cs, mod, odf = trigonalODF()
   # a fibre with add2all is drawn on every pole figure as curves, named once per axes
-  plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
+  plotPF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
   plot(fibre(Miller(1, 1, -2, 1, cs), vector3d.Y), color='red', add2all=True, displayName='fibre')
   leg = legend('show')
   assert [t.get_text() for t in leg.get_texts()] == ['fibre']
@@ -465,36 +465,36 @@ def quartzFibre():
   return fibreODF(Miller(1, 1, 0, cs), zvector), Miller(1, 1, 0, cs)
 
 
-def test_plotPDF_contourfLevelsAreTheBands():
+def test_plotPF_contourfLevelsAreTheBands():
   odf, h = quartzFibre()
   # 'contourf', levels: the bands at the levels, the colours spread over them, labelled with showText
-  plotPDF(odf, h, contourf=np.arange(0, 6), antipodal=True)
+  plotPF(odf, h, contourf=np.arange(0, 6), antipodal=True)
   assert np.allclose(gcm().children[0]._mtexSphericalPlot.mappable.levels, np.arange(0, 6))
-  plotPDF(odf, h, contour=[1, 3], antipodal=True, showText='on')
+  plotPF(odf, h, contour=[1, 3], antipodal=True, showText='on')
   assert gcm().children[0]._mtexSphericalPlot.lines[0].labelTexts
 
 
-def test_plotPDF_logarithmicIsALogNorm():
+def test_plotPF_logarithmicIsALogNorm():
   odf, h = quartzFibre()
   # 'logarithmic' is a logarithmic colour scale
-  plotPDF(odf, h, antipodal=True, logarithmic=True)
+  plotPF(odf, h, antipodal=True, logarithmic=True)
   assert isinstance(gcm().children[0]._mtexSphericalPlot.mappable.norm, matplotlib.colors.LogNorm)
 
 
-def test_plotPDF_antipodalOfPolarCrystalSuperposesBothHemispheres():
+def test_plotPF_antipodalOfPolarCrystalSuperposesBothHemispheres():
   odf, h = quartzFibre()
   # an antipodal pole figure of a polar crystal superposes both hemispheres: 15.3 = 30.6 / 2
-  plotPDF(odf, h, antipodal=True)
+  plotPF(odf, h, antipodal=True)
   assert abs(gcm().children[0]._mtexSphericalPlot.maxData - 15.3) < 0.2
 
 
-def test_plotPDF_3dIsTheSphereInSpace():
+def test_plotPF_3dIsTheSphereInSpace():
   from mtex import plottingConvention
   odf, h = quartzFibre()
   # '3d': the pole figure on the sphere in space, seen along the convention given
   pC = plottingConvention()
   pC.east, pC.outOfScreen = vector3d(9, 3, 3), vector3d(6, 10, 9)
-  plotPDF(odf, h, '3d', pC, grid=True, grid_res=10 * degree, title=False)
+  plotPF(odf, h, '3d', pC, grid=True, grid_res=10 * degree, title=False)
   assert gcm().children[0].name == '3d'
 
 
@@ -509,7 +509,7 @@ def test_plotHKL_labelsTheCubicPlanes():
 def test_plot_symmetrisedLabeledNamesTheEquivalentInsideAnAntipodalSector():
   # an equivalent inside the sector is labelled rather than the antipode of one
   cs = crystalFrame("-3m")
-  plotIPDF(unimodalODF(orientation.id(cs)), xvector, axisLabels=False)
+  plotIPF(unimodalODF(orientation.id(cs)), xvector, axisLabels=False)
   hold(True)
   plot(Miller(0, 0, 0, 1, cs), symmetrised=True, labeled=True)
   hold(False)

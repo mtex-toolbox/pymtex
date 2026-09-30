@@ -34,12 +34,12 @@ the mouse.
 on (its section 2), with the reasons that made it hard there absent here. PySide6 ships the
 tree view, the table view with editable delegates, the splitter, the tab bar and a file
 system model, so no piece of chrome is written by hand; matplotlib ships a Qt canvas, so
-the views are the package's own `plot(ebsd, ...)`, `plotPDF` and `plot(image)` drawn into
+the views are the package's own `plot(ebsd, ...)`, `plotPF` and `plot(image)` drawn into
 supplied axes. A widgets window lays itself out and grabs itself as a picture under
 `QT_QPA_PLATFORM=offscreen`, which the QML and Makie pairing never could, so the window is
 checked by a script and not only by opening it. PySide6 is the `wizard` extra of
 `pyproject.toml` beside `plot`, imported only inside the wizard, and a session without it is
-told which package to install in the words `plotPDF` uses for matplotlib.
+told which package to install in the words `plotPF` uses for matplotlib.
 
 **The core is headless.** Everything the wizard settles is an argument of `loadEBSD`: the
 data set, the phases, the Euler correction, the scan unit. The state is those arguments plus
@@ -249,7 +249,7 @@ own alpha is cleared first or it overrides the transparency of a phase not drawn
 **W4 - the views. DONE 2026-09-22.** `views.py`: `ViewCanvas` over one matplotlib figure,
 the map drawn once per import and map convention through `plotEBSD` and recoloured through
 the raster index, a property with a colour bar, the pole figures of the dominant drawn phase
-from the binned density through the package's `plotPDF` with the Euler frame's axes as red
+from the binned density through the package's `plotPF` with the Euler frame's axes as red
 marks, the three crystal directions as fields over the canvas (`MillerBar`) shown on that
 tab alone, the images the metadata holds, the metadata as `MetaTree` with the top level
 open. The strip: phase, IPF X, IPF Y, IPF Z, one tab per property, pole figures, images

@@ -163,13 +163,13 @@ center = orientation.byEuler(20 * degree, 30 * degree, 0, 'ZYZ', CS)
 odf = unimodalODF(center)
 h = Miller(1, 2, 2, CS)
 
-plotPDF(odf, cat(h, -h))
+plotPF(odf, cat(h, -h))
 # -
 
 # The two pole figures have different intensity patterns. The ODF distinguishes the
 # $(122)$ plane normal from its opposite for this non-Laue point group.
 
-plotPDF(odf, h, antipodal=True)
+plotPF(odf, h, antipodal=True)
 
 # With antipodal symmetry imposed, MTEX draws only the upper hemisphere. The omitted lower
 # hemisphere is now a point-reflected copy.
@@ -180,12 +180,12 @@ plotPDF(odf, h, antipodal=True)
 # [Inverse Pole Figures of an ODF](ODFInversePoleFigure.html) page explains this
 # complementary view.
 
-plotIPDF(odf, cat(vector3d.Y, -vector3d.Y), complete=True, axisLabels=False)
+plotIPF(odf, cat(vector3d.Y, -vector3d.Y), complete=True, axisLabels=False)
 
 # The complete inverse pole figures for Y and -Y differ. Without an antipodal assumption,
 # reversing the specimen direction changes the question.
 
-plotIPDF(odf, vector3d.Y, antipodal=True, complete=True, axisLabels=False)
+plotIPF(odf, vector3d.Y, antipodal=True, complete=True, axisLabels=False)
 
 # The complete antipodal plot repeats the same crystal-direction pattern on opposite sides
 # of the sphere.
@@ -196,12 +196,12 @@ plotIPDF(odf, vector3d.Y, antipodal=True, complete=True, axisLabels=False)
 # [fundamental sector](FundamentalSector.html). This is the patch of the sphere that
 # crystal symmetry leaves inequivalent.
 
-plotIPDF(odf, vector3d.Y)
+plotIPF(odf, vector3d.Y)
 
 # Without antipodal symmetry, MTEX must retain the larger fundamental sector of point group
 # `321`.
 
-plotIPDF(odf, vector3d.Y, antipodal=True)
+plotIPF(odf, vector3d.Y, antipodal=True)
 
 # Identifying opposite directions reduces the region further. Every omitted crystal
 # direction is equivalent to one inside the smaller plotted sector.

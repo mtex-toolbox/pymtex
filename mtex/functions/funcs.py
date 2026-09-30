@@ -7,15 +7,13 @@ import numpy as np
 from ..geometry.funcs import _method
 from .characteristics import max_, min_
 from .so3vectorfield import antiderivative, component, curl, div
-from .density import calcDensity, calcPDF, interpolate
+from .density import calcDensity, interpolate
 from .funops import mapFun
 
 conv = _method("conv")
 radon = _method("radon")
 grad = _method("grad")
 laplace = _method("laplace")
-pdf = _method("pdf")
-ipdf = _method("ipdf")
 invRadon = _method("invRadon")
 halfwidth = _method("halfwidth")
 calcFourier = _method("calcFourier")
@@ -27,5 +25,5 @@ diff = _method("diff")
 max = max_
 min = min_
 
-__all__ = ["conv", "radon", "grad", "laplace", "pdf", "ipdf", "invRadon", "mapFun", "halfwidth", "calcFourier",
-           "truncate", "withExchange", "even", "sqrt", "calcPDF", "diff", "calcDensity", "interpolate", "max", "min", "curl", "div", "antiderivative", "component"]
+__all__ = ["conv", "radon", "grad", "laplace", "invRadon", "mapFun", "halfwidth", "calcFourier",
+           "truncate", "withExchange", "even", "sqrt", "diff", "calcDensity", "interpolate", "max", "min", "curl", "div", "antiderivative", "component"]

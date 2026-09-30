@@ -36,7 +36,7 @@ odf = fibreODF(Miller(1, 1, 0, cs), zvector)
 # opposite half. The `minmax` option labels the extrema; it does not choose
 # the hemispheres.
 
-plotPDF(odf, Miller(1, 1, 0, cs), minmax=True)
+plotPF(odf, Miller(1, 1, 0, cs), minmax=True)
 
 # The two panels differ because triclinic specimen symmetry does not identify
 # their directions. The labels report the largest and smallest plotted
@@ -45,7 +45,7 @@ plotPDF(odf, Miller(1, 1, 0, cs), minmax=True)
 # The `upper` and `lower` flags ask for one hemisphere alone. Here only
 # the lower hemisphere remains.
 
-plotPDF(odf, Miller(1, 1, 0, cs), lower=True)
+plotPF(odf, Miller(1, 1, 0, cs), lower=True)
 mtexColorbar()
 
 # The remaining panel is the lower half selected by the current plotting
@@ -59,7 +59,7 @@ mtexColorbar()
 # opposite and produces this view. Any figure compared with measured
 # pole-figure data must use it.
 
-plotPDF(odf, Miller(1, 1, 0, cs), antipodal=True)
+plotPF(odf, Miller(1, 1, 0, cs), antipodal=True)
 mtexColorbar()
 
 # ## Alignment on screen
@@ -74,7 +74,7 @@ mtexColorbar()
 # +
 how2plot = plottingConvention('z↑→y')
 
-plotPDF(odf, Miller(1, 0, 0, cs), 'antipodal', how2plot)
+plotPF(odf, Miller(1, 0, 0, cs), 'antipodal', how2plot)
 # -
 
 # A pole figure lives on the specimen sphere, so these are specimen axes:
@@ -89,7 +89,7 @@ plotPDF(odf, Miller(1, 0, 0, cs), 'antipodal', how2plot)
 # impression of how much of the sphere a feature covers, which is why it is
 # the default. The names `'earea'` and `'schmidt'` request it explicitly.
 
-plotPDF(odf, Miller(1, 0, 0, cs), antipodal=True, projection='earea')
+plotPF(odf, Miller(1, 0, 0, cs), antipodal=True, projection='earea')
 
 # Use this projection when the area occupied by a density feature matters.
 # Shape and radial distance are still distorted, because preserving area does
@@ -156,7 +156,7 @@ how2plot.east = vector3d(9, 3, 3)
 how2plot.outOfScreen = vector3d(6, 10, 9)
 
 plt.close('all')
-plotPDF(odf, Miller(1, 1, 0, odf.CS), '3d', how2plot, grid=True, grid_res=10 * degree, title=False)
+plotPF(odf, Miller(1, 1, 0, odf.CS), '3d', how2plot, grid=True, grid_res=10 * degree, title=False)
 mtexColorMap('LaboTeX')
 # -
 

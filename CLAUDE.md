@@ -205,8 +205,8 @@ go inside the functions that use them. P5 plotting (`docs/plans/plotting.md`) is
 (`sphericalProjection` with `eareaProjection`, `eangleProjection`, ..., `makeSphericalProjection`,
 the grid that follows the boundary, the labels from the frame), `colormaps.py`, `mtexfigure.py`
 (`mtexFigure`, `gcm`, `hold`, `mtexColorbar`) and the matplotlib drawing in `sphericalplot.py`
-(`plot`, `scatter`, `text`, `annotate`, `contourf`, `contour`, `pcolor`, `quiver`, `plotPDF`,
-`plotIPDF`, installed as methods on `vector3d`, the S2 functions and fields, the SO(3)
+(`plot`, `scatter`, `text`, `annotate`, `contourf`, `contour`, `pcolor`, `quiver`, `plotPF`,
+`plotIPF`, installed as methods on `vector3d`, the S2 functions and fields, the SO(3)
 functions and `sphericalRegion`); matplotlib is the `plot` extra and is imported only inside
 the drawing functions. S2, the ODF sections, is done too: `sections.py` (`phi2Sections`,
 `sigmaSections`, `axisAngleSections`, ..., `newODFSectionPlot`; a section is a chart) and
@@ -219,7 +219,7 @@ and grain maps, too: `maps.py` (`mapLayout`, `mapRaster`, `mapCells`, `scaleBar`
 and `mapplot.py` (`plot(ebsd | grains | gB, ...)`, `quiver`, the scale bar with the triad, the
 legends). `bench/plots.py` writes the rendered checks to `bench/out`, the maps from the
 Forsterite map of `../frameSymmetry/data/EBSD`. S6 too: `poles.py` (`poles`, `inversePoles`)
-and `polefigureplot.py` (`plotPDF(ori, h)`, `plotIPDF(ori, r)`, `plot(pf)`, `plotDiff(pf, odf)`).
+and `polefigureplot.py` (`plotPF(ori, h)`, `plotIPF(ori, r)`, `plot(pf)`, `plotDiff(pf, odf)`).
 S5 too: `space.py` and `spaceplot.py` (`plot3d`, `scatter3d`, `plot(oR)`, `scatter(ori)` in axis
 angle, Euler or Rodrigues space) on matplotlib's 3D axes, and `shapeplot.py` (`plot(cS)`, `plot(cS, sS)`,
 `plotInnerFace`, `plotInnerDirection`, `plot(grains, cS)`) over G7's `crystalshape.py` (`crystalShape` with the

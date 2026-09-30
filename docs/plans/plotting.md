@@ -2,8 +2,8 @@
 
 Status: written 2026-09-22; S1 to S6 built the same day, the crystal shapes of S5 the day after. Syntax reference: `../frameSymmetry/plotting`
 with its `CLAUDE.md`, the `plot`, `scatter`, `contourf`, `contour`, `pcolor`, `quiver`, `text`
-methods of `@vector3d`, `@S2Fun`, `@S2VectorField`, `@sphericalRegion`, `plotPDF` and
-`plotIPDF` of `@SO3Fun`, `sphericalPlot.m`, `makeSphericalProjection.m` and the
+methods of `@vector3d`, `@S2Fun`, `@S2VectorField`, `@sphericalRegion`, `plotPF` and
+`plotIPF` of `@SO3Fun`, `sphericalPlot.m`, `makeSphericalProjection.m` and the
 `sphericalProjections/` classes. Design reference: `../mtexJulia/lib/MTEXPlotting/src/` and the
 Makie extension `../mtexJulia/ext/MTEXMakieExt/`, with `docs/plans/plotting.md` there, S1 to
 S6 done. Tests: `../mtexJulia/test/spherical.jl` P1 to P4, `test/odfsections.jl`,
@@ -44,7 +44,7 @@ the Julia objects:
 | `mtexFigure`, `newMtexFigure`, `gcm`, `nextAxis`, `drawNow`, `mtexColorbar` | `mtexFigure` over `matplotlib.figure.Figure` with `nextAxis()`, `children`, `colorbar()`; `newMtexFigure`, `gcm`, `mtexColorbar` | Makie's `GridLayout` did this; here a thin class since matplotlib has no layout of that kind |
 | `plot(v)`, `scatter(v)`, `plot(v,'contourf')`, `contourf(v)`, `plot(v,data)`, `plot(v,rgb)`, `text(v, labels)`, `quiver(v, w)` | the same functions in `mtex.plotting` and methods on `vector3d`; flags are keywords: `contourf=True`, `upper=True`, `antipodal=True`, `fundamentalRegion=True`, `symmetrised=True`, `complete=True`, `minmax=True`, `grid=True`, `axisLabels=False` | `dynamicMarkerSize`, one rule for the marker size |
 | `plot(sF)`, `contourf(sF)`, `contour(sF)`, `pcolor(sF)` | the same, functions and methods of `S2FunHarmonic` | the function is evaluated on the chart grid; the contour lines and bands on the curvilinear grid |
-| `plotPDF(odf, h)`, `plotIPDF(odf, r)`, `'resolution'`, `'antipodal'`, `'complete'`, `'noTitle'` | `plotPDF(odf, h, resolution=..., antipodal=True, complete=True, title=False)`, methods of the SO(3) functions | one colour range over the row, the specimen sector of a symmetric pole figure |
+| `plotPF(odf, h)`, `plotIPF(odf, r)`, `'resolution'`, `'antipodal'`, `'complete'`, `'noTitle'` | `plotPF(odf, h, resolution=..., antipodal=True, complete=True, title=False)`, methods of the SO(3) functions | one colour range over the row, the specimen sector of a symmetric pole figure |
 | `plot(sR)`, `plot(cs.fundamentalSector())` | the same, a method of `sphericalRegion` | |
 | `'MarkerSize'`, `'MarkerFaceColor'`, `'MarkerEdgeColor'`, `'Marker'`, `'MarkerColor'` | the same keywords, translated to matplotlib; lowercase matplotlib keywords pass through | |
 | `mtexColorMap WhiteJet`, `LaboTeX`, `blue2red`, `white2black` | `mtexColorMap('WhiteJet')` on the current figure, `colormap='WhiteJet'` on a plot | colour maps are stops; matplotlib builds the gradient |
@@ -105,7 +105,7 @@ once. `WhiteJet` is the default of every filled plot.
 the grid, boundary, grid lines, limits and labels; `colormaps.py` with `contourLevels`;
 `mtexfigure.py` with `mtexFigure`, `newMtexFigure`, `gcm`, `hold`, `mtexColorbar`,
 `mtexColorMap`; `sphericalplot.py` with `sphericalPlot`, `plot`, `scatter`, `contourf`,
-`contour`, `pcolor`, `smooth`, `quiver`, `text`, `annotate`, `plotPDF`, `plotIPDF` and the
+`contour`, `pcolor`, `smooth`, `quiver`, `text`, `annotate`, `plotPF`, `plotIPF` and the
 methods they install on `vector3d`, `S2FunHarmonic`, the SO(3) functions, the fields and
 `sphericalRegion`. Tests `tests/test_spherical.py` (the geometry, the numbers of Julia's P1 to
 P4) and `tests/test_sphericalplot.py` (the drawing on the Agg backend: artists, limits,
@@ -226,8 +226,8 @@ lives there too: the polygon the plane cuts from the bounds of the 3D axes, as M
 the distinct equivalents, an axis and its antipode counted once, axes where the pole figure
 cannot tell `h` from `-h` (`_antipodalPole` of P2), `orbit` for any frame with a group, and
 `dynamicMarkerSize`, fifty times the mean spacing of the markers on a hemisphere.
-`polefigureplot.py`: `plotPDF(ori, h)`, `plotPDF(ori, data, h)`, `plotPDF(ori, h, points=100,
-contourf=True, antipodal=True, complete=True, title=False)`, `plotIPDF(ori, r)`, one marker per
+`polefigureplot.py`: `plotPF(ori, h)`, `plotPF(ori, data, h)`, `plotPF(ori, h, points=100,
+contourf=True, antipodal=True, complete=True, title=False)`, `plotIPF(ori, r)`, one marker per
 orbit projected into the sector of the frame, the budget of MTEX (ten thousand markers per pole
 figure, a hundred thousand per inverse pole figure) spent before the equivalents are formed by a
 deterministic thinning; the styles draw `calcDensity` of the poles or `interpolate` of the
@@ -235,14 +235,14 @@ values. `plot(pf)` draws a measured pole figure as its specimen directions colou
 one panel per pole figure titled by its Miller strings joined with ` + `, each on its own colour
 range (`colorRange='individual'`) since the counts of two measurements are not comparable;
 `smooth`, `contourf`, `contour` draw `S2FunHarmonic(pf.select(i))`. `plotDiff(pf, odf | pf2,
-'RP' | l1=True | l2=True)` draws `calcErrorPF`. `plotPDF` and `plotIPDF` of an ODF stay in
-`sphericalplot.py`; the new module dispatches on the first argument, and `plotPDF`/`plotIPDF`
+'RP' | l1=True | l2=True)` draws `calcErrorPF`. `plotPF` and `plotIPF` of an ODF stay in
+`sphericalplot.py`; the new module dispatches on the first argument, and `plotPF`/`plotIPF`
 are installed on `orientation`, `plot`/`plotDiff` on `PoleFigure`. On the way: `_plotRow` takes
 `colorRange='individual'`, a marker below four points loses its edge, and the axis at the pole of
 a chart is no longer labelled, since the label hid the data of a pole figure. Tests
 `tests/test_poles.py` (Julia's S6 counts) and `tests/test_polefigureplot.py` on the Dubna
 fixture; rendered `bench/plots.py` 44 to 49, the Dubna set from the local sample data. Left out:
-`plotPDF!` adding poles to an existing pole figure plot beyond `hold`, the `symmetry=False` flag,
+`plotPF!` adding poles to an existing pole figure plot beyond `hold`, the `symmetry=False` flag,
 `superposition` for a list.
 
 ## 5. Keyword table
@@ -279,7 +279,7 @@ fixture; rendered `bench/plots.py` 44 to 49, the Dubna set from the local sample
 - `tests/test_sphericalplot.py`: on the Agg backend, `plot(v)` makes two axes for a list on
   both hemispheres and one with `upper=True`, the markers lie inside the chart limits, `plot(v,
   data)` sets the colour range, `contourf(sF)` and `pcolor(sF)` produce a filled artist per
-  axes, the colour bar, `plotPDF` makes one axes per Miller index with one colour range,
+  axes, the colour bar, `plotPF` makes one axes per Miller index with one colour range,
   `plot(sR)` draws the outline, `hold` adds to the current axes.
 - The rendered checks of `bench/plots.py`, compared by eye with `../mtexJulia/dev/out`.
 

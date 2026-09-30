@@ -145,7 +145,7 @@ recCoarse
 # two unresolved reflections with their imported structure coefficients instead of drawing
 # them as separate pole figures.
 
-plotPDF(recCoarse, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(recCoarse, pf.allH, antipodal=True, superposition=pf.c)
 mtexColorbar(title='mrd')
 
 # The broad maxima occupy the same regions as in the measured panels and have the same

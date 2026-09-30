@@ -40,7 +40,7 @@ ori
 # itself. Here the $(0001)$ and $(10\bar{1}0)$ poles should show the texture carried by
 # the imported orientations.
 
-plotPDF(ori, Miller([[0, 0, 0, 1], [1, 0, -1, 0]], cs))
+plotPF(ori, Miller([[0, 0, 0, 1], [1, 0, -1, 0]], cs))
 
 # Notice that the $(0001)$ poles concentrate around ND, whereas many $(10\bar{1}0)$ poles
 # lie closer to the rim. The imported population is therefore textured rather than

@@ -4,10 +4,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (Miller, S1FejerKernel, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHarmonic, SO3DeLaValleePoussinKernel,
-                  SO3FunHarmonic, SO3TangentVector, conv, crystalFrame, deg2dim, degreeBlock, dot, grad, invRadon, ipdf,
-                  laplace, norm, orientation, pdf, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation,
-                  specimenFrame, vector3d, xvector, yvector, zvector)
+from mtex import (conv, crystalFrame, deg2dim, degreeBlock, dot, grad, invRadon, laplace, Miller, norm, orientation, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation, S1FejerKernel, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic, SO3TangentVector, specimenFrame, vector3d, xvector, yvector, zvector)
 
 rng = np.random.default_rng(36)
 
@@ -198,47 +195,47 @@ def cubicFunction():
   return cs, ss, SO3FunHarmonic(randomCoefficients(deg2dim(6)), cs, ss, real=True) + 3
 
 
-def test_pdf_isTheMeanOverTheFibre():
+def test_poleFigure_isTheMeanOverTheFibre():
   cs, ss, f = cubicFunction()
   h = Miller(1, 2, 0, cs)
-  P = pdf(f, h)
+  P = radon(f, h)
   # a two-fold axis of 432 sends (120) to (-1-20), so this pole figure is axis valued; one
   # of a trigonal crystal is not
   assert P.frame is ss and P.isReal and P.antipodal
-  assert not pdf(SO3FunHarmonic(randomCoefficients(deg2dim(4)), crystalFrame("3"), ss, real=True), Miller(1, 2, 0, crystalFrame("3"))).antipodal
+  assert not radon(SO3FunHarmonic(randomCoefficients(deg2dim(4)), crystalFrame("3"), ss, real=True), Miller(1, 2, 0, crystalFrame("3"))).antipodal
   for r in vector3d.rand(4, rng=rng):
     assert np.isclose(P(r), fibreMean(f, vector3d(h.data), r), rtol=1e-8)
     assert np.isclose(radon(f, h, r), P(r))
-  assert f.calcPDF(h).isclose(P)
+  assert f.radon(h).isclose(P)
 
 
-def test_ipdf_isTheMeanOverTheFibre():
+def test_inversePoleFigure_isTheMeanOverTheFibre():
   cs, ss, f = cubicFunction()
   r = vector3d.rand(rng=rng)
-  I = ipdf(f, r)
+  I = radon(f, r=r)
   assert I.frame is cs
   for hh in vector3d.rand(4, rng=rng):
     assert np.isclose(I(hh), fibreMean(f, hh, r), rtol=1e-8)
   assert f.radon(r=r).isclose(I)
 
 
-def test_pdf_ofTheUniformFunctionIsOneAndOfALaueCrystalIsAxisValued():
+def test_poleFigure_ofTheUniformFunctionIsOneAndOfALaueCrystalIsAxisValued():
   # the uniform function has pole figure one; a Laue crystal gives an axis valued pole figure
   cs, ss, f = cubicFunction()
   h = Miller(1, 2, 0, cs)
   r = vector3d.rand(rng=rng)
   u = SO3FunHarmonic([1.0], cs, ss)
-  assert np.isclose(pdf(u, h)(r), 1)
+  assert np.isclose(radon(u, h)(r), 1)
   fL = SO3FunHarmonic(randomCoefficients(deg2dim(6)), crystalFrame("m-3m"), ss, real=True)
-  PL = pdf(fL, Miller(1, 1, 0, crystalFrame("m-3m")))
+  PL = radon(fL, Miller(1, 1, 0, crystalFrame("m-3m")))
   assert PL.antipodal and np.isclose(PL(r), PL(-r))
-  assert pdf(f, vector3d(1, 0, 0, antipodal=True)).antipodal
+  assert radon(f, vector3d(1, 0, 0, antipodal=True)).antipodal
 
 
-def test_pdf_refusesMillerOfAnotherFrame():
+def test_poleFigure_refusesMillerOfAnotherFrame():
   cs, ss, f = cubicFunction()
   with pytest.raises(ValueError):
-    pdf(f, Miller(1, 0, 0, crystalFrame("m-3m")))
+    radon(f, Miller(1, 0, 0, crystalFrame("m-3m")))
 
 
 def test_radon_onTheSphereIsTheMeanOverTheGreatCircleAndInverts():

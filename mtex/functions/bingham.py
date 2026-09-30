@@ -202,10 +202,10 @@ class SO3FunBingham(SO3FunGeneric):
       raise ValueError(f"the side is 'left' or 'right', not {side!r}")
     return SO3FunBingham(self.kappa, moved.data.T, CS, SS, weight=self.weight, antipodal=self.antipodal and CS is SS)
 
-  def pdf(self, h, bandwidth=None):
-    """the pole figure by Kunze and Schaeben: on the fibre q(phi) = cos(phi/2) q1 + sin(phi/2) q2
-    with q1 h = r and q2 = q1 (h, pi), the exponent is a + b cos phi + c sin phi and the mean
-    over the fibre is exp(a) I0(sqrt(b^2 + c^2))"""
+  # the pole figure of one crystal direction by Kunze and Schaeben: on the fibre q(phi) =
+  # cos(phi/2) q1 + sin(phi/2) q2 with q1 h = r and q2 = q1 (h, pi), the exponent is a + b cos phi
+  # + c sin phi and the mean over the fibre is exp(a) I0(sqrt(b^2 + c^2))
+  def _poleFigure(self, h, bandwidth=None):
     from scipy.special import ive
     h = h if isinstance(h, vector3d) else vector3d(h)
     if h.size != 1:
@@ -234,6 +234,18 @@ class SO3FunBingham(SO3FunGeneric):
     L = min(64, getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
     return S2FunHarmonic(S2FunHandle(value, self.SS, bandwidth=L, antipodal=_antipodalPole(h, self.CS)))
 
+
+  # the inverse pole figure of one specimen direction, through the harmonic form
+  def _inversePoleFigure(self, r, bandwidth=None):
+    from .so3fun import SO3FunHarmonic
+    return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
+
+  def radon(self, h=None, r=None, superposition=None, bandwidth=None):
+    """the Radon transform: radon(h) the pole figure, in closed form, radon(r=r) the inverse pole
+    figure, radon(h, r) the values; several h superposed, weighted by superposition
+    (MATLAB's pdf, ipdf and calcPDF)"""
+    from .funops import radon
+    return radon(self, h, r, superposition, bandwidth)
   def __repr__(self):
     lines = [f"SO3FunBingham ({framesLabel(self.CS, self.SS)})", f"  kappa: {np.array2string(self.kappa, precision=3)}", f"  weight: {self.weight:.4g}"]
     if self.antipodal:
@@ -245,7 +257,7 @@ class SO3FunBingham(SO3FunGeneric):
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
-    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
 
 

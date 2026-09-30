@@ -157,7 +157,7 @@ hold(False)
 #
 # A [pole figure](OrientationPoleFigure.html) asks where a chosen crystal direction points
 # in the specimen for every measured orientation. The command is
-# [plotPDF](orientation.plotPDF.html). Here the three crystallographic axes are plotted as
+# [plotPF](orientation.plotPDF.html). Here the three crystallographic axes are plotted as
 # filled density contours.
 
 # +
@@ -165,7 +165,7 @@ hold(False)
 h = Miller([1, 0, 0], [0, 1, 0], [0, 0, 1], ebsd['Forsterite'].CS)
 
 # plot their specimen-direction distributions
-plotPDF(ebsd['Forsterite'].orientations, h, 'contourf')
+plotPF(ebsd['Forsterite'].orientations, h, 'contourf')
 mtexColorbar()
 # -
 
@@ -182,14 +182,14 @@ mtexColorbar()
 #
 # An [inverse pole figure](OrientationInversePoleFigure.html) asks the complementary
 # question: which crystal direction points along a chosen specimen direction? The command
-# is [plotIPDF](orientation.plotIPDF.html).
+# is [plotIPF](orientation.plotIPDF.html).
 
 # +
 # select the specimen axes
 r = vector3d.cat(vector3d.X, vector3d.Y, vector3d.Z)
 
 # plot their crystal-direction distributions
-plotIPDF(ebsd['Forsterite'].orientations, r, 'contourf')
+plotIPF(ebsd['Forsterite'].orientations, r, 'contourf')
 mtexColorbar()
 # -
 

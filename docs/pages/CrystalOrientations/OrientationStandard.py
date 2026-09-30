@@ -157,7 +157,7 @@ h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1], [3, 1, 1]], cs)
 
 # +
 for i in range(len(components)):
-  plotPDF(components[i], h, markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotPF(components[i], h, markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='northeast', numColumns=2)
@@ -175,7 +175,7 @@ r = cat(vector3d.X, vector3d.Y, vector3d.Z)
 
 # +
 for i in range(len(components)):
-  plotIPDF(components[i], r, markerSize=(12 - i - 1) ** 1.5, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotIPF(components[i], r, markerSize=(12 - i - 1) ** 1.5, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='northeast', numColumns=2)
@@ -196,9 +196,9 @@ odf = unimodalODF(components[2], halfwidth=7.5 * degree)
 odf
 
 # +
-plotPDF(odf, h)
+plotPF(odf, h)
 hold(True)
-plotPDF(odf, h, contour=True, lineColor='k', lineWidth=2)
+plotPF(odf, h, contour=True, lineColor='k', lineWidth=2)
 hold(False)
 # -
 
@@ -211,9 +211,9 @@ hold(False)
 # The same spread appears around the Cube directions in the inverse pole figures.
 
 # +
-plotIPDF(odf, r)
+plotIPF(odf, r)
 hold(True)
-plotIPDF(odf, r, contour=True, lineColor='k', lineWidth=2)
+plotIPF(odf, r, contour=True, lineColor='k', lineWidth=2)
 hold(False)
 # -
 

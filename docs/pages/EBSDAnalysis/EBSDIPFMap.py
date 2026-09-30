@@ -104,7 +104,7 @@ plot(ipfKey, complete=True, upper=True)
 # placed at the crystal direction parallel to the normal, and marker area is scaled by
 # grain area.
 
-plotIPDF(bigGrains['olivine'].meanOrientation, colors, vector3d.Z, markerSize=0.05 * bigGrains['olivine'].area, markerEdgeColor='k')
+plotIPF(bigGrains['olivine'].meanOrientation, colors, vector3d.Z, markerSize=0.05 * bigGrains['olivine'].area, markerEdgeColor='k')
 
 # The markers cover the sector rather than clustering in one corner. These large grains
 # therefore have no single strongly preferred crystal axis along the specimen normal.

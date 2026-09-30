@@ -95,7 +95,7 @@ plot(regularGrid, 'axisAngle', all=True, markerSize=1)
 h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], cs)
 equiOdf = unimodalODF(equiGrid, halfwidth=10 * degree)
 
-plotPDF(equiOdf, h)
+plotPF(equiOdf, h)
 setColorRange([0.7, 2.7])
 mtexColorbar()
 # -
@@ -108,7 +108,7 @@ mtexColorbar()
 # +
 regularOdf = unimodalODF(regularGrid, halfwidth=10 * degree)
 
-plotPDF(regularOdf, h)
+plotPF(regularOdf, h)
 setColorRange([0.7, 2.7])
 mtexColorbar()
 # -

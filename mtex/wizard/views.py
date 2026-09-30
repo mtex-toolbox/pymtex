@@ -342,7 +342,7 @@ class ViewCanvas(FigureCanvasQTAgg):
   # ------------------------------------------------------------------ the pole figures
 
   # the pole figures of the dominant drawn phase from its binned density, through the
-  # package's own plotPDF; the axes of the Euler frame drawn in red on every chart so that a
+  # package's own plotPF; the axes of the Euler frame drawn in red on every chart so that a
   # wrong Euler convention is visible
   # ------------------------------------------------------------------ the pole figures
 
@@ -443,7 +443,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     import matplotlib.figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from ..plotting.mtexfigure import mtexFigure
-    from ..plotting.sphericalplot import annotate, plotPDF
+    from ..plotting.sphericalplot import annotate, plotPF
     st = self.st
     _, k, millers, names, w, h = key
     cs = st.ebsd.CSList.frames[k]
@@ -456,7 +456,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       frac = min(1.0, (0.92 * w / len(hs) + 90) / max(h, 1))
       fig.get_layout_engine().set(rect=(0, (1 - frac) / 2, 1, frac))
       mtexFigure(len(hs), figure=fig)
-      plotPDF(st.densities[k], hs, colorbar=False, resolution=PF_RESOLUTION, fontSize=size + 1)
+      plotPF(st.densities[k], hs, colorbar=False, resolution=PF_RESOLUTION, fontSize=size + 1)
       for ax in list(fig.axes):
         sP = getattr(ax, "_mtexSphericalPlot", None)
         if sP is None:

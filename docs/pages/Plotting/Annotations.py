@@ -35,7 +35,7 @@ mod2 = orientation.byEuler(310 * degree, 70 * degree, 40 * degree, cs)
 odf = 0.7 * unimodalODF(mod1) + 0.3 * unimodalODF(mod2)
 
 # plot two pole figures
-plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
+plotPF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
 
 # add a colourbar to each pole figure
 mtexColorbar()
@@ -80,7 +80,7 @@ annotate(vector3d(1, 1, 1), label=['(111)'], backgroundColor='w')
 # Miller indices beside those markers.
 
 # +
-plotIPDF(odf, [xvector, zvector], antipodal=True, marginx=10)
+plotIPF(odf, [xvector, zvector], antipodal=True, marginx=10)
 mtexColorMap('white2black')
 
 annotate(Miller([[2, -1, -1, 0], [2, -1, -1, 1]], cs), all=True, labeled=True, backgroundColor='yellow')
@@ -96,7 +96,7 @@ annotate(Miller([[2, -1, -1, 0], [2, -1, -1, 1]], cs), all=True, labeled=True, b
 # figure marks the two components used to construct the model ODF.
 
 # +
-plotIPDF(odf, [xvector, zvector], antipodal=True)
+plotIPF(odf, [xvector, zvector], antipodal=True)
 mtexColorMap('white2black')
 annotate(mod1, marker='s', markerSize=6, markerFaceColor='r', label='A', color='w')
 
@@ -138,7 +138,7 @@ annotate(mod2, markerSize=10, markerEdgeColor='g', markerFaceColor='g')
 # its legend entry then appear on every panel.
 
 # +
-plotPDF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
+plotPF(odf, Miller([[1, 0, 0], [1, 1, 1]], cs))
 plot(ori, markerFaceColor='k', markerEdgeColor='black', add2all=True, displayName='randomSample')
 
 f = fibre(Miller(1, 1, -2, 1, cs), vector3d.Y)
@@ -174,7 +174,7 @@ legend('show')
 # lets angles be read from the figure. The `grid` flag switches it on, and
 # `grid_res` sets the angular spacing.
 
-plotPDF(odf, [Miller(1, 0, 0, cs), Miller(0, 0, 1, cs)], grid=True, grid_res=15 * degree, antipodal=True)
+plotPF(odf, [Miller(1, 0, 0, cs), Miller(0, 0, 1, cs)], grid=True, grid_res=15 * degree, antipodal=True)
 mtexColorMap('white2black')
 
 # At 15 degrees the lines are close enough for approximate measurements and

@@ -37,7 +37,7 @@ grains = calcGrains(ebsd['indexed'], angle=10 * degree, minPixel=5)
 # the orientation density of forsterite and its pole figures
 ori = ebsd['Forsterite'].orientations
 odf = calcDensity(ori, halfwidth=10 * degree)
-plotPDF(odf, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ori.CS))
+plotPF(odf, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ori.CS))
 ```
 
 `mtexdata` downloads the sample data sets on first use from

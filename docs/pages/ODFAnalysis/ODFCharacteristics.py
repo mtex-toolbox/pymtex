@@ -52,7 +52,7 @@ preferredOrientation
 # The printed peak value is in mrd. The square markers show the poles of its orientation
 # on pole figures calculated from the measured ODF.
 
-plotPDF(odfMeasured, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(odfMeasured, pf.allH, antipodal=True, superposition=pf.c)
 annotate(preferredOrientation, marker='s', markerFaceColor='black')
 mtexColorbar(title='mrd')
 

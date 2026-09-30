@@ -125,7 +125,7 @@ mtexColorbar(title='function value')
 # positive values, which is the visible consequence of choosing coefficients without
 # enforcing ODF positivity.
 
-plotPDF(fExample, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True)
+plotPF(fExample, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True)
 
 # These pole figures are projections of the same coefficient series. A plausible-looking
 # projection is not evidence that the function itself is a valid ODF; the reality,

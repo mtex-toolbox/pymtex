@@ -449,7 +449,7 @@ class orientation(rotation):
     from ..analysis.texture import calcTensor, calcLankford
     from ..analysis.cluster import calcCluster
     from ..plotting.sectionplot import plotSection
-    from ..plotting.polefigureplot import plotPDF, plotIPDF
+    from ..plotting.polefigureplot import plotPF, plotIPF
     from ..plotting.spaceplot import plot3d, scatterOrientations as scatter
     copper = staticmethod(copper)
     copper2 = staticmethod(copper2)

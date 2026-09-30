@@ -103,11 +103,11 @@ hold(False)
 # ## Fibres in Pole Figures
 #
 # Everything that can be plotted for orientations can also be plotted for fibres.
-# [plotPDF](fibre.plotPDF.html) maps the fibre into [pole figures](OrientationPoleFigure.html),
+# [plotPF](fibre.plotPDF.html) maps the fibre into [pole figures](OrientationPoleFigure.html),
 # where one orientation becomes a point and a fibre becomes a curve.
 
 h = Miller([[1, 1, 0], [1, 1, 1]], cs)
-plotPDF(fullFibre, h, lineWidth=3, lineColor='orange')
+plotPF(fullFibre, h, lineWidth=3, lineColor='orange')
 
 # Each panel contains one trace from the representative fibre. A trace may meet a
 # projection boundary, but it still represents one continuous set of orientations.
@@ -126,17 +126,17 @@ symmetryCopyCount
 # Plotting them adds the orange traces that were absent from the representative-only pole
 # figures.
 
-plotPDF(symFibre, Miller([[1, 1, 0], [2, 1, 0], [1, 1, 1]], cs), lineWidth=3, lineColor='orange')
+plotPF(symFibre, Miller([[1, 1, 0], [2, 1, 0], [1, 1, 1]], cs), lineWidth=3, lineColor='orange')
 
 # ## Fibres in Inverse Pole Figures
 #
-# [plotIPDF](fibre.plotIPDF.html) maps the fibre into
+# [plotIPF](fibre.plotIPDF.html) maps the fibre into
 # [inverse pole figures](OrientationInversePoleFigure.html). It fixes specimen directions
 # and draws the crystal directions found along the fibre. By default it restricts them to
 # the fundamental sector.
 
 r = vector3d([[1, 1, 0], [2, 1, 0], [1, 1, 1]])
-plotIPDF(symFibre, r, lineWidth=3, lineColor='orange')
+plotIPF(symFibre, r, lineWidth=3, lineColor='orange')
 
 # Each panel folds the symmetry copies into one fundamental sector. The orange curve is
 # therefore the family of crystal directions that can lie along the specimen direction
@@ -146,7 +146,7 @@ plotIPDF(symFibre, r, lineWidth=3, lineColor='orange')
 #
 # The option `complete` removes the fundamental-sector restriction.
 
-plotIPDF(symFibre, vector3d.Z, complete=True, lineWidth=3, lineColor='orange')
+plotIPF(symFibre, vector3d.Z, complete=True, lineWidth=3, lineColor='orange')
 
 # The complete plot repeats the curve across the full crystal-direction sphere. Those
 # repeated traces are symmetry equivalents, not additional input fibres.

@@ -196,7 +196,7 @@ def plot3d(x, *args, **kw):
   from ..geometry.fibre import fibre
   if isinstance(x, fibre):
     return plotFibre3d(x, *args, **kw)
-  if hasattr(x, "pdf") and hasattr(x, "CS") and hasattr(x, "SS"):
+  if hasattr(x, "_poleFigure") and hasattr(x, "CS") and hasattr(x, "SS"):
     from .mtexfigure import firstOfList
     return plotODF3d(firstOfList(x), *args, **kw)
   if _isField(x):

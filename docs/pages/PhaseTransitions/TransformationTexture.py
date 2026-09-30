@@ -52,7 +52,7 @@ numChildVariants
 hC = Miller([[1, 1, 1], [1, 1, 0]], csC)
 hP = Miller([[1, 1, 0], [1, 0, 0]], csP)
 
-plotPDF(oriB, hC, markerSize=5, markerFaceColor='black', figSize='medium')
+plotPF(oriB, hC, markerSize=5, markerFaceColor='black', figSize='medium')
 
 opt = dict(markerFaceColor='none', markerEdgeColor='darkred', lineWidth=3)
 for k in (1, 2):
@@ -77,7 +77,7 @@ gcm().drawNow()
 odfA = unimodalODF(oriA, halfwidth=5 * degree)
 print(odfA)
 
-plotPDF(odfA, hP, figSize='medium')
+plotPF(odfA, hP, figSize='medium')
 mtexColorbar(title='mrd')
 # -
 
@@ -103,7 +103,7 @@ numSimulatedChildren
 odfBSim = calcDensity(oriBSim, halfwidth=10 * degree)
 print(odfBSim)
 
-plotPDF(odfBSim, hC, 'contourf', figSize='medium')
+plotPF(odfBSim, hC, 'contourf', figSize='medium')
 mtexColorbar(title='mrd')
 # -
 
@@ -121,7 +121,7 @@ mtexColorbar(title='mrd')
 odfB = variants(p2c, odfA)
 print(odfB)
 
-plotPDF(odfB, hC, 'contourf', figSize='medium')
+plotPF(odfB, hC, 'contourf', figSize='medium')
 mtexColorbar(title='mrd')
 # -
 
@@ -162,7 +162,7 @@ oriBSelected = variants(p2c, oriASim, selectedVariantId)
 odfBSelected = calcDensity(oriBSelected, halfwidth=10 * degree)
 print(odfBSelected)
 
-plotPDF(odfBSelected, hC, 'contourf', figSize='medium')
+plotPF(odfBSelected, hC, 'contourf', figSize='medium')
 mtexColorbar(title='mrd')
 # -
 

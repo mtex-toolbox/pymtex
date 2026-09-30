@@ -131,7 +131,7 @@ variantName = ['tabulated values', 'density, 5 degrees', 'density, 10 degrees', 
 
 mtexFig = newMtexFigure(layout=[1, 4], figSize='large')
 for i in range(len(odfVariants)):
-  plotPDF(odfVariants[i], h, antipodal=True, contourf=True, title=False)
+  plotPF(odfVariants[i], h, antipodal=True, contourf=True, title=False)
   mtexTitle(variantName[i])
   if i < len(odfVariants) - 1:
     nextAxis()

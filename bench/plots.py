@@ -9,7 +9,7 @@ import numpy as np
 matplotlib.use("Agg")
 
 from mtex import (Miller, S2AxisFieldHarmonic, S2FunHarmonic, contour, contourf, crystalFrame, degree, discreteSample,
-                  fundamentalRegion, fundamentalSector, gcm, grad, hold, ipfHSVKey, orientation, plot, plot3d, plotIPDF, plotPDF,
+                  fundamentalRegion, fundamentalSector, gcm, grad, hold, ipfHSVKey, orientation, plot, plot3d, plotIPF, plotPF,
                   plotSection, scatter, sigmaSections, specimenFrame, text, unimodalODF, vector3d, xvector, yvector, zvector,
                   HSVDirectionKey, TSLDirectionKey, HKLDirectionKey)
 
@@ -65,16 +65,16 @@ save("11_density.png")
 # 5 pole figures and inverse pole figures of an ODF
 odf = (unimodalODF(orientation.byEuler(30 * degree, 50 * degree, 10 * degree, cs, ss), halfwidth=15 * degree)
        + 0.5 * unimodalODF(orientation.byEuler(100 * degree, 20 * degree, 60 * degree, cs, ss), halfwidth=15 * degree))
-plotPDF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs))
+plotPF(odf, Miller([1, 1, 1], [0, 1, 1], [0, 0, 1], cs))
 save("12_pdf.png")
-plotPDF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True)
+plotPF(odf, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True, contours=8, colorbar=True)
 save("13_pdf_contourf.png")
-plotIPDF(odf, [xvector, yvector, zvector])
+plotIPF(odf, [xvector, yvector, zvector])
 save("14_ipdf.png")
 odfTri = unimodalODF(orientation.byEuler(30 * degree, 50 * degree, 10 * degree, tri, specimenFrame("1")), halfwidth=15 * degree)
-plotIPDF(odfTri, zvector, contourf=True)
+plotIPF(odfTri, zvector, contourf=True)
 save("15_ipdf_trigonal.png")
-plotPDF(odfTri, [Miller(0, 0, 0, 1, tri), Miller(1, 0, -1, 0, tri)], complete=True)
+plotPF(odfTri, [Miller(0, 0, 0, 1, tri), Miller(1, 0, -1, 0, tri)], complete=True)
 save("16_pdf_trigonal.png")
 
 # 6 a vector field and an axis field
@@ -121,11 +121,11 @@ ipfHSVKey(specimenFrame("1")).plot()
 save("29_key_specimen.png")
 # 9 pole figures of a list of orientations, and the Dubna measurements
 ori = discreteSample(odf, 3000, rng=np.random.default_rng(1))
-plotPDF(ori, Miller([1, 1], [0, 1], [0, 1], cs))
+plotPF(ori, Miller([1, 1], [0, 1], [0, 1], cs))
 save("44_pdf_points.png")
-plotPDF(ori, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True)
+plotPF(ori, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True)
 save("45_pdf_density.png")
-plotIPDF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
+plotIPF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
 save("46_ipdf_values.png")
 dubna = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data")
 if os.path.exists(os.path.join(dubna, "PoleFigure", "dubna")):

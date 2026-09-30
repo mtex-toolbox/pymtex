@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from mtex import Miller, degree, loadEBSD
-from mtex.functions.density import calcDensity, calcPDF
+from mtex.functions.density import calcDensity
+from mtex import radon
 from mtex.wizard.binning import binOrientations, binnedDensity
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -34,7 +35,7 @@ def test_binOrientations_keepsMoreInAFinerCell(o):
 def test_binnedDensity_peaksWhereTheFullOneDoes(o):
   binned, full = binnedDensity(o, 4 * degree), calcDensity(o, halfwidth=10 * degree, harmonic=True)
   h = Miller(1, 0, 0, o.CS)
-  p1, p2 = calcPDF(binned, h, None), calcPDF(full, h, None)
+  p1, p2 = radon(binned, h), radon(full, h)
   assert abs(float(p1.max()[0]) - float(p2.max()[0])) < 0.1 * float(p2.max()[0])
 
 
@@ -53,7 +54,7 @@ def previews(ebsd):
   full, sub = previewDensity(ebsd, k), previewDensity(ebsd, k, maxPoints=n // 3)
   again = previewDensity(ebsd, k, maxPoints=n // 3)
   h = Miller(1, 0, 0, ebsd.CSList.frames[k])
-  return tuple(calcPDF(f, h, None) for f in (full, sub, again))
+  return tuple(radon(f, h) for f in (full, sub, again))
 
 
 # the preview density from at most so many measurements still peaks where the density of all

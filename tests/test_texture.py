@@ -4,10 +4,7 @@
 import numpy as np
 import pytest
 
-from mtex import (Miller, SO3FunHandle, SO3FunHarmonic, SO3FunSBF, SO3VectorFieldHandle, Voigt, bulkModulus, calcKearnsFactor,
-                  calcLankford, calcTensor, crystalFrame, degree, doEulerStep, mean, orientation, pdf, rotate, rotation,
-                  slipSystem, specimenFrame, stiffnessTensor, strainRateTensor, uniformODF, unimodalODF, vector3d, xvector,
-                  yvector, zvector)
+from mtex import (bulkModulus, calcKearnsFactor, calcLankford, calcTensor, crystalFrame, degree, doEulerStep, mean, Miller, orientation, radon, rotate, rotation, slipSystem, SO3FunHandle, SO3FunHarmonic, SO3FunSBF, SO3VectorFieldHandle, specimenFrame, stiffnessTensor, strainRateTensor, uniformODF, unimodalODF, vector3d, Voigt, xvector, yvector, zvector)
 from mtex.analysis.elasticity import isotropicShearModulus
 
 rng = np.random.default_rng(30)
@@ -118,7 +115,7 @@ def test_calcKearnsFactor_ofACAxisFibreSumsToOneOverTheAxes():
   odf = unimodalODF(orientation.id(cs, ss), halfwidth=10 * degree)
   assert calcKearnsFactor(odf, h) > 0.9
   assert np.isclose(sum(calcKearnsFactor(odf, h, v) for v in (xvector, yvector, zvector)), 1)
-  assert np.isclose(calcKearnsFactor(pdf(odf, h), zvector), calcKearnsFactor(odf, h)) and np.isclose(odf.calcKearnsFactor(h), calcKearnsFactor(odf, h))
+  assert np.isclose(calcKearnsFactor(radon(odf, h), zvector), calcKearnsFactor(odf, h)) and np.isclose(odf.calcKearnsFactor(h), calcKearnsFactor(odf, h))
 
 
 def olivineShear():

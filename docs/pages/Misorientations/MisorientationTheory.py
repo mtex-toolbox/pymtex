@@ -311,7 +311,7 @@ childVariants
 # parent grain may therefore contain several child orientations related by the same
 # parent-to-child relationship.
 
-plotPDF(childVariants, Miller([[1, 0, -1, 0], [1, 1, -2, 0], [0, 0, 0, 1]], CS_Hem))
+plotPF(childVariants, Miller([[1, 0, -1, 0], [1, 1, -2, 0], [0, 0, 0, 1]], CS_Hem))
 
 # ## The Maths Behind the Transform
 #

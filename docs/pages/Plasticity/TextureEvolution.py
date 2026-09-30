@@ -113,7 +113,7 @@ for k in range(1, numIter + 1):
 previousFrame = specimenFrame.default
 specimenFrame.rolling.makeDefault()
 
-plotPDF(ori, Miller([[0, 0, 1], [1, 1, 1]], cs), 'contourf')
+plotPF(ori, Miller([[0, 0, 1], [1, 1, 1]], cs), 'contourf')
 mtexColorbar()
 # -
 

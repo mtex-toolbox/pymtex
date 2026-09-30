@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from mtex import (Miller, PoleFigure, calcODF, crystalFrame, degree, discreteSample, gcm, loadPoleFigure, orientation, plot,
-                  plotDiff, plotIPDF, plotPDF, rotation, specimenFrame, unimodalODF, vector3d, xvector, zvector)
+                  plotDiff, plotIPF, plotPF, rotation, specimenFrame, unimodalODF, vector3d, xvector, zvector)
 from mtex.plotting.sphericalplot import plotText
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "polefigure")
@@ -46,10 +46,10 @@ def budget(ori, SS):
   return min(500, 10000 // (ori.CS.numSym() * ori.SS.numSym())), SS.numSym()
 
 
-def test_plotPDF_onePanelPerDirectionWithOneMarkerPerOrbit(sample):
+def test_plotPF_onePanelPerDirectionWithOneMarkerPerOrbit(sample):
   cs, ss, odf, ori = sample
   hs = Miller([1, 1], [0, 1], [0, 1], cs)
-  h = plotPDF(ori, hs)
+  h = plotPF(ori, hs)
   fig = gcm()
   # one panel per crystal direction on the specimen sector, titled, one marker per orbit
   assert len(fig.children) == 2 and [ax.get_title() for ax in fig.children] == ["{100}", "{111}"]
@@ -59,70 +59,70 @@ def test_plotPDF_onePanelPerDirectionWithOneMarkerPerOrbit(sample):
   assert len(h[0].get_offsets()) == 3 * m * n and len(h[1].get_offsets()) == 4 * m * n
 
 
-def test_plotPDF_valuePerOrientationColoursEveryEquivalentInEitherOrder(sample):
+def test_plotPF_valuePerOrientationColoursEveryEquivalentInEitherOrder(sample):
   cs, ss, odf, ori = sample
   hs = Miller([1, 1], [0, 1], [0, 1], cs)
   n, m = budget(ori, ss)
   # a value per orientation colours every equivalent, in either order of the arguments
-  h = plotPDF(ori, np.degrees(ori.angle()), hs, colorbar=True)
+  h = plotPF(ori, np.degrees(ori.angle()), hs, colorbar=True)
   assert len(gcm().colorbars) == 1 and h[0].get_array().shape == (3 * m * n,)
-  h2 = plotPDF(ori, hs, np.degrees(ori.angle()))
+  h2 = plotPF(ori, hs, np.degrees(ori.angle()))
   assert np.allclose(h2[0].get_array(), h[0].get_array())
 
 
-def test_plotPDF_budgetThinsTheListBeforeTheEquivalents(sample):
+def test_plotPF_budgetThinsTheListBeforeTheEquivalents(sample):
   cs, ss, odf, ori = sample
   m = ss.numSym()
   # the budget thins a long list before its equivalents are formed
-  h = plotPDF(ori, Miller(1, 2, 3, cs), points=100)
+  h = plotPF(ori, Miller(1, 2, 3, cs), points=100)
   assert len(h[0].get_offsets()) == 24 * m * 100
-  h = plotPDF(ori, Miller(1, 2, 3, cs))
+  h = plotPF(ori, Miller(1, 2, 3, cs))
   assert len(h[0].get_offsets()) == 24 * m * (10000 // (ori.CS.numSym() * ori.SS.numSym()))
 
 
-def test_plotPDF_contourfDrawsTheDensityOfThePoles(sample):
+def test_plotPF_contourfDrawsTheDensityOfThePoles(sample):
   cs, ss, odf, ori = sample
   # the density of the poles instead of the markers
-  h = plotPDF(ori, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True)
+  h = plotPF(ori, Miller([1, 1], [0, 1], [0, 1], cs), contourf=True)
   assert all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
 
 
-def test_plotPDF_completeDrawsTheWholeSphere(sample):
+def test_plotPF_completeDrawsTheWholeSphere(sample):
   cs, ss, odf, ori = sample
-  plotPDF(ori, Miller(1, 0, 0, cs), complete=True, title=False)
+  plotPF(ori, Miller(1, 0, 0, cs), complete=True, title=False)
   assert len(plotsOf()[0].sR.N) == 1 and gcm().children[0].get_title() == ""
 
 
-def test_plotPDF_ofODFDrawsItsDensity(sample):
+def test_plotPF_ofODFDrawsItsDensity(sample):
   cs, ss, odf, ori = sample
   hs = Miller([1, 1], [0, 1], [0, 1], cs)
   # the method, and an ODF still draws its density
-  ori.plotPDF(hs, markerSize=3)
-  plotPDF(odf, hs)
+  ori.plotPF(hs, markerSize=3)
+  plotPF(odf, hs)
   assert all(isinstance(x, matplotlib.collections.QuadMesh) for x in [c for ax in gcm().children for c in ax.collections])
 
 
-def test_plotPDF_refusesValuesWithoutDirections(sample):
+def test_plotPF_refusesValuesWithoutDirections(sample):
   cs, ss, odf, ori = sample
   with pytest.raises(ValueError):
-    plotPDF(ori, np.zeros(500))
+    plotPF(ori, np.zeros(500))
 
 
-def test_plotIPDF_onePanelPerSpecimenDirection(sample):
+def test_plotIPF_onePanelPerSpecimenDirection(sample):
   cs, ss, odf, ori = sample
-  h = plotIPDF(ori, [xvector, zvector])
+  h = plotIPF(ori, [xvector, zvector])
   fig = gcm()
   assert [ax.get_title() for ax in fig.children] == ["X", "Z"] and all(len(sP.sR.N) >= 3 for sP in plotsOf())
   # z is fixed by the specimen two-fold, x is not
   assert len(h[1].get_offsets()) == 500 and len(h[0].get_offsets()) == 500
 
 
-def test_plotIPDF_valuesTakeAColourbar(sample):
+def test_plotIPF_valuesTakeAColourbar(sample):
   cs, ss, odf, ori = sample
-  plotIPDF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
+  plotIPF(ori, np.degrees(ori.angle()), [xvector, zvector], colorbar=True)
   assert len(gcm().colorbars) == 1
-  ori.plotIPDF(zvector, pcolor=True)
-  plotIPDF(odf, zvector)
+  ori.plotIPF(zvector, pcolor=True)
+  plotIPF(odf, zvector)
 
 
 def test_plot_measuredPoleFigureMarkersCarryTheIntensities(quartz):
@@ -175,7 +175,7 @@ def test_plots_into_axes_named_by_parent(quartz):
   plt.figure()
   axes = [plt.subplot(1, 3, k) for k in (1, 2, 3)]
   plot(pf, parent=axes[0])
-  plotPDF(odf, pf.allH[0], antipodal=True, parent=axes[1])
+  plotPF(odf, pf.allH[0], antipodal=True, parent=axes[1])
   plotDiff(odf, pf, parent=axes[2])
   # one figure, each panel in the axes it was given, a bar only beside the difference
   assert plt.get_fignums() == [plt.gcf().number] and all(hasattr(ax, "_mtexSphericalPlot") for ax in axes)

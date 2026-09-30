@@ -26,7 +26,7 @@ from .maps import (mapLayout, mapRaster, mapCells, mapPoints, mapExtent, boundar
 from .mapplot import (line, scatterXY, mapPlot, plotEBSD, plotGrains, plotBoundary, plotTriplePoints, quiverMap,
                       scaleBarOn, phaseLegend, keyLegend, keyResolution, mapValues, mapAliases)
 from .poles import poles, inversePoles, dynamicMarkerSize
-from .polefigureplot import plotPDF, plotIPDF, plotPoleFigure, plotDiff
+from .polefigureplot import plotPF, plotIPF, plotDiff
 from .space import (sphereMesh, sphereGridLines, smallCircle, frameAxes, axisAnglePoints, maxAngles, regionSurface,
                     regionWalls, regionLines, visibleFaces, shapeOutlines, shapesOnMap)
 from .spaceplot import plot3d, scatter3d, spacePlot, arrow3d, quiver3, surf, setCamera
@@ -50,8 +50,8 @@ __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistP
            "black2whiteColorMap", "WhiteJetColorMap", "vega20", "saveFigure", "logAxis", "mtexFigure", "newMtexFigure",
            "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar", "setColorRange",
            "setColorScale", "plotHKL", "plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate",
-           "contourf", "contour", "pcolor", "quiver", "plotKernel", "circle", "ellipse", "plotPDF", "plotIPDF",
-           "plotKey", "ODFSections", "eulerSections", "phi1Sections", "phi2Sections", "alphaSections", "gammaSections",
+           "contourf", "contour", "pcolor", "quiver", "plotKernel", "circle", "ellipse", "plotPF", "plotIPF", "plotKey",
+           "ODFSections", "eulerSections", "phi1Sections", "phi2Sections", "alphaSections", "gammaSections",
            "pfSections", "sigmaSections", "axisAngleSections", "newODFSectionPlot", "sectionIndex", "sectionTolerance",
            "plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection",
            "quiverSectionField", "plotFibre", "regionCenter", "sectorFolds", "hasSmoothKey", "polarCoordinates",
@@ -63,16 +63,16 @@ __all__ = ["sphericalProjection", "eareaProjection", "eangleProjection", "edistP
            "switchUnit", "triadGeometry", "frameOnScreen", "phaseColor", "phasePalette", "line", "scatterXY", "mapPlot",
            "plotEBSD", "plotGrains", "plotBoundary", "plotTriplePoints", "quiverMap", "scaleBarOn", "phaseLegend",
            "keyLegend", "keyResolution", "mapValues", "mapAliases", "poles", "inversePoles", "dynamicMarkerSize",
-           "plotPoleFigure", "plotDiff", "sphereMesh", "sphereGridLines", "smallCircle", "frameAxes", "axisAnglePoints",
-           "maxAngles", "regionSurface", "regionWalls", "regionLines", "visibleFaces", "shapeOutlines", "shapesOnMap",
-           "plot3d", "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera", "plotInnerFace",
-           "plotInnerDirection", "plotSlipSystem", "faceColors", "plotPlane", "plotSeismicVelocities", "plotRGB",
-           "planarColorKey", "setView", "polarAxes", "histogram", "plotEllipse", "plotSO3Kernel", "plotSpectrum",
-           "plotAngleDistribution", "plotAxisDistribution", "scene3d", "mesh3d", "slices3d", "picture3d", "lines3d",
-           "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices", "hasPyVista",
-           "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML", "plotGrains3d",
-           "plotBoundary3d", "plotEBSD3", "show3d", "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture",
-           "quiver3dMap", "quiverVectors", "plotEllipsoid", "plotPoints3d", "scatter3"]
+           "plotDiff", "sphereMesh", "sphereGridLines", "smallCircle", "frameAxes", "axisAnglePoints", "maxAngles",
+           "regionSurface", "regionWalls", "regionLines", "visibleFaces", "shapeOutlines", "shapesOnMap", "plot3d",
+           "scatter3d", "spacePlot", "arrow3d", "quiver3", "surf", "setCamera", "plotInnerFace", "plotInnerDirection",
+           "plotSlipSystem", "faceColors", "plotPlane", "plotSeismicVelocities", "plotRGB", "planarColorKey", "setView",
+           "polarAxes", "histogram", "plotEllipse", "plotSO3Kernel", "plotSpectrum", "plotAngleDistribution",
+           "plotAxisDistribution", "scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d",
+           "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices", "hasPyVista", "pyvistaPlotter", "renderImage",
+           "drawMatplotlib", "writeHTML", "sceneHTML", "plotGrains3d", "plotBoundary3d", "plotEBSD3", "show3d",
+           "exportHTML", "is3dMap", "plot3dMap", "gcs", "mapPicture", "quiver3dMap", "quiverVectors", "plotEllipsoid",
+           "plotPoints3d", "scatter3"]
 
 
 # plot(v) and v.plot() are one call: the commands installed on the classes they draw
@@ -111,7 +111,7 @@ def _install():
     install((S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri), f)
   for f in (sp.plot, sp.quiver):
     install((S2VectorField, S2AxisField), f)
-  for f in (sp.plotPDF, sp.plotIPDF, plotSection):
+  for f in (sp.plotPF, sp.plotIPF, plotSection):
     install((SO3FunHarmonic, SO3FunGeneric, SO3FunBingham, SO3FunRBF, SO3FunCBF), f)
   install(orientation, plotSection)
   install(sphericalRegion, sp.plotRegion, "plot")
@@ -119,9 +119,9 @@ def _install():
   for cls, f in ((EBSD, mp.plotEBSD), (grain2d, mp.plotGrains), (grainBoundary, mp.plotBoundary)):
     install(cls, sp.plot, declare=f)
   install((EBSD, grain2d, grainBoundary), sp.quiver, declare=mp.quiverMap)
-  for f in (pfp.plotPDF, pfp.plotIPDF):
+  for f in (pfp.plotPF, pfp.plotIPF):
     install(orientation, f)
-  install(PoleFigure, pfp.plotPoleFigure, "plot")
+  install(PoleFigure, pfp._plotPoleFigure, "plot")
   install(tensor, sp.plot)
   install(stiffnessTensor, tp.plotSeismicVelocities)
   install(PoleFigure, pfp.plotDiff)

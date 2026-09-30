@@ -143,10 +143,10 @@ ori_y2a = orientation.byEuler(0, 0, 0, 'Bunge', cs_y2a)
 
 # +
 newMtexFigure(innerPlotSpacing=20)
-plotPDF(ori_x2a, Miller(1, 0, 0, cs_x2a), markerSize=20)
+plotPF(ori_x2a, Miller(1, 0, 0, cs_x2a), markerSize=20)
 
 nextAxis()
-plotPDF(ori_y2a, Miller(1, 0, 0, cs_y2a), markerSize=20)
+plotPF(ori_y2a, Miller(1, 0, 0, cs_y2a), markerSize=20)
 # -
 
 # The same indexed pole produces a pattern turned by $30^\circ$. This is the

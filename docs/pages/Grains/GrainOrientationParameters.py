@@ -175,14 +175,14 @@ setColorRange([0, 3])
 # +
 # visualize the selected grain orientations in a pole figure
 h = Miller(1, 0, 0, ebsd.CS)
-plotPDF(ori, h, markerSize=2, all=True)
+plotPF(ori, h, markerSize=2, all=True)
 
 # fit a fibre to those orientations
 f, lam, fit = fibre.fit(ori, 'local', diagnostics=True)
 
 # add the fibre to the pole figure
 hold(True)
-plotPDF(f.symmetrise(), h, lineColor='orange', lineWidth=2)
+plotPF(f.symmetrise(), h, lineColor='orange', lineWidth=2)
 hold(False)
 # -
 

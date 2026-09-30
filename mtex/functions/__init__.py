@@ -35,9 +35,8 @@ from .characteristics import (textureIndex, entropy, volume, fibreVolume, calcMD
                               calcAxisDistribution, calcComponents, discreteSample, calcKernel, centerSpecimen)
 from .polefigure import (PoleFigure, calcPoleFigure, calcQuadratureWeights, calcNormalization, calcErrorPF, calcError,
                          correct, noisepf, isOutlier, refine, SchulzDefocusingKernel)
-from .funcs import (conv, radon, grad, laplace, pdf, ipdf, invRadon, mapFun, halfwidth, calcFourier, truncate,
-                    withExchange, even, sqrt, calcPDF, diff, calcDensity, interpolate, max, min, curl, div,
-                    antiderivative, component)
+from .funcs import (conv, radon, grad, laplace, invRadon, mapFun, halfwidth, calcFourier, truncate, withExchange, even,
+                    sqrt, diff, calcDensity, interpolate, max, min, curl, div, antiderivative, component)
 from .so3funclass import SO3Fun
 from .s2funclass import S2Fun
 
@@ -59,14 +58,13 @@ __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wigne
            "S2FunTri", "S1FunHarmonic", "silvermanWidth", "mapFun", "transformODF", "SO3FunRBF", "SO3FunCBF",
            "uniformODF", "unimodalODF", "fibreODF", "FourierODF", "supportCosine", "SantaFe", "interpolateRBF",
            "summationMatrix", "mlsq", "interpSO3", "Gaussian", "griddedDensity", "kde1d", "kdeN", "calcDensity",
-           "calcPDF", "interpolate", "SO3FunHandle", "SO3FunComposition", "S2FunHandle", "S2FunSum", "S1FunHandle",
-           "mhyper", "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham", "SO3VectorFieldHarmonic",
+           "interpolate", "SO3FunHandle", "SO3FunComposition", "S2FunHandle", "S2FunSum", "S1FunHandle", "mhyper",
+           "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham", "SO3VectorFieldHarmonic",
            "SO3VectorFieldHandle", "SO3VectorFieldRBF", "componentFrames", "component", "curl", "div", "antiderivative",
            "mapField", "differentiate", "equivariantProjection", "S2VectorFieldHarmonic", "S2VectorFieldHandle",
            "thetaVector", "rhoVector", "angularDerivatives", "S2AxisFieldHarmonic", "S2AxisFieldHandle", "textureIndex",
            "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex", "calcAxisDistribution",
            "calcError", "calcComponents", "discreteSample", "calcKernel", "centerSpecimen", "PoleFigure",
            "calcPoleFigure", "calcQuadratureWeights", "calcNormalization", "calcErrorPF", "correct", "noisepf",
-           "isOutlier", "refine", "SchulzDefocusingKernel", "conv", "radon", "grad", "laplace", "pdf", "ipdf",
-           "invRadon", "halfwidth", "calcFourier", "truncate", "withExchange", "even", "sqrt", "diff", "max", "min",
-           "SO3Fun", "S2Fun"]
+           "isOutlier", "refine", "SchulzDefocusingKernel", "conv", "radon", "grad", "laplace", "invRadon", "halfwidth",
+           "calcFourier", "truncate", "withExchange", "even", "sqrt", "diff", "max", "min", "SO3Fun", "S2Fun"]

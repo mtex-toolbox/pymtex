@@ -18,7 +18,7 @@
 # `setWindowTitle` or SimpleITK's `ReadImage`.
 #
 # Where a MATLAB name is a misnomer, a duplicate, a workaround for a limit of MATLAB or a
-# typo, Python has a better one and only that: `plotPF` for `plotPDF`, which draws no density
+# typo, Python has a better one and only that: `plotPF` for `plotPF`, which draws no density
 # when given orientations, keywords written positively as `thinning=False` for the flag
 # `'nothinning'`, and one spelling `tol=` for a tolerance. The page
 # [MTEX in MATLAB and in Python](MATLABtoPython.html) lists them.

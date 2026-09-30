@@ -105,7 +105,7 @@ plot(ebsdF, ebsdF.orientations, figSize='small')
 # figure. Three pole figures at `'normal'` therefore give three panels the
 # size of a single normal-sized plot.
 
-plotPDF(ebsdF.orientations, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ebsdF.CS), contourf=True, figSize='normal')
+plotPF(ebsdF.orientations, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ebsdF.CS), contourf=True, figSize='normal')
 mtexColorbar()
 
 # The figure is three times as wide as a single pole figure, while each panel

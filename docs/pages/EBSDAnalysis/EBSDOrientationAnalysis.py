@@ -41,7 +41,7 @@ plot(ebsd)
 # crystal symmetry of the forsterite phase
 cs = ebsd['Forsterite'].CS
 h = cat(Miller(1, 0, 0, cs), Miller(0, 1, 0, cs), Miller(0, 0, 1, cs))
-plotPDF(ebsd['Forsterite'].orientations, h, antipodal=True, smooth=True)
+plotPF(ebsd['Forsterite'].orientations, h, antipodal=True, smooth=True)
 # -
 
 # The $(100)$ density forms a *girdle*, a band along a great circle, rather than one
@@ -102,7 +102,7 @@ girdleFraction
 # The inverse pole figure of `rOrth` asks which crystal direction points along that
 # specimen axis.
 
-plotIPDF(ori, rOrth, smooth=True)
+plotIPF(ori, rOrth, smooth=True)
 mtexColorbar()
 
 # The density piles up near $(010)$, so the candidate fibre maps the crystal $b$ axis

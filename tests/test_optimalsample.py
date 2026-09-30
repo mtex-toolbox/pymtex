@@ -24,7 +24,7 @@ def densities():
 @pytest.fixture(scope="module", params=[0, 1], ids=["S2", "SO3"])
 def start(request):
   f = densities()[request.param]
-  sphere = not hasattr(f, "pdf")
+  sphere = not hasattr(f, "_poleFigure")
   xs = vector3d.rand(12, rng=rng).data if sphere else rotation.rand(12, rng=rng).data
   p = _Problem(f, xs, 4)
   c = np.full(12, 1 / 12)

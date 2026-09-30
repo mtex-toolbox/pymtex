@@ -80,7 +80,7 @@ fig = newMtexFigure(layout=[4, 3], figSize='huge')
 
 for n in range(4):
   nextAxis()
-  plotPDF(odf[n], h, 'lower', 'contourf')
+  plotPF(odf[n], h, 'lower', 'contourf')
   ylabel(fig.children[-3], f'ε = {odf[n].opt.strain:g}')
 setColorRange('equal')
 mtexColorbar()

@@ -47,7 +47,7 @@ plot(copper, ipfKey.orientation2color(ori))
 # Drawing one marker per measurement shows the data and nothing but the data.
 
 h = cat(Miller(1, 0, 0, ori.CS), Miller(1, 1, 0, ori.CS), Miller(1, 1, 1, ori.CS))
-plotPDF(ori, h, antipodal=True, markerSize=2)
+plotPF(ori, h, antipodal=True, markerSize=2)
 
 # MTEX drew 208 of the 16116 orientations at random, since every one of them contributes
 # several symmetrically equivalent poles and the full list would be an opaque blot. The
@@ -72,7 +72,7 @@ plotSection(ori, 'sigma', sections=6, points=2000)
 # Adding the option `contourf` replaces the markers by filled contours with a colour bar,
 # so the plot finally carries numbers.
 
-plotPDF(ori, h, antipodal=True, contourf=True)
+plotPF(ori, h, antipodal=True, contourf=True)
 mtexColorbar(title='mrd')
 
 # The unit is *multiples of a random distribution* (mrd). A uniform texture is 1 mrd
@@ -87,7 +87,7 @@ mtexColorbar(title='mrd')
 # its *halfwidth*, the angular distance at which it falls to half its peak value. Left
 # unspecified, the contoured pole figure uses 5 degrees. Ask for 15 degrees instead.
 
-plotPDF(ori, h, antipodal=True, contourf=True, halfwidth=15 * degree)
+plotPF(ori, h, antipodal=True, contourf=True, halfwidth=15 * degree)
 mtexColorbar(title='mrd')
 
 # Nothing about the specimen changed between the two figures, and nothing about the

@@ -44,7 +44,7 @@ OptimalSampleResult = namedtuple("OptimalSampleResult", ["nodes", "weights", "di
 
 
 def _isSO3(f):
-  return hasattr(f, "pdf") and hasattr(f, "CS") and hasattr(f, "SS")
+  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS")
 
 
 # ------------------------------------------------------------------ the problem

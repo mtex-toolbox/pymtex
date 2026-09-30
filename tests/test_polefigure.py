@@ -6,10 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from mtex import (Miller, PoleFigure, S2FunHarmonic, SchulzDefocusingKernel, calcError, calcErrorPF, calcNormalization,
-                  calcPoleFigure, calcQuadratureWeights, correct, crystalFrame, degree, equispacedS2Grid, isOutlier, max, mean, min,
-                  noisepf, orientation, pdf, refine, regularS2Grid, rotation, specimenFrame, unimodalODF, uniformODF, union,
-                  unique, vector3d, zvector)
+from mtex import (calcError, calcErrorPF, calcNormalization, calcPoleFigure, calcQuadratureWeights, correct, crystalFrame, degree, equispacedS2Grid, isOutlier, max, mean, Miller, min, noisepf, orientation, PoleFigure, radon, refine, regularS2Grid, rotation, S2FunHarmonic, SchulzDefocusingKernel, specimenFrame, uniformODF, unimodalODF, union, unique, vector3d, zvector)
 from mtex.functions.polefigure import _poleDensity
 
 rng = np.random.default_rng(3)
@@ -183,7 +180,7 @@ def test_calcPoleFigure_plainPoleFigureIsItsPoleDensityOnTheGridAskedFor(trigona
 def test_calcPoleFigure_measurementSeesTheEvenPart(trigonal):
   # the pole figure of r and of -r agree
   t = trigonal
-  P = pdf(t.odf, t.h[0])
+  P = radon(t.odf, t.h[0])
   vs = vector3d.rand(20, rng=rng)
   assert not P.antipodal
   assert np.allclose(_poleDensity(t.odf, t.h[0], vector3d(vs, antipodal=True)), np.real(P(vs) + P(-vs)) / 2)

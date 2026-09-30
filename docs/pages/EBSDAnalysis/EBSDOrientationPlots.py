@@ -48,10 +48,10 @@ ori
 #
 # A pole figure fixes a crystal direction and asks where it points in the specimen. Each
 # sampled orientation maps the $(100)$ pole into the specimen frame.
-# [plotPDF](orientation.plotPDF.html) also accounts for the crystallographically
+# [plotPF](orientation.plotPDF.html) also accounts for the crystallographically
 # equivalent poles.
 
-plotPDF(ori, Miller(1, 0, 0, ori.CS))
+plotPF(ori, Miller(1, 0, 0, ori.CS))
 
 # The poles form a broad girdle through specimen Y and Z, while the rim near specimen X
 # is sparse. The forsterite $a$ axes therefore lie preferentially in the specimen Y--Z
@@ -66,11 +66,11 @@ plotPDF(ori, Miller(1, 0, 0, ori.CS))
 # ## Inverse pole figures
 #
 # An inverse pole figure fixes a specimen direction and asks which crystal direction
-# points along it. [plotIPDF](orientation.plotIPDF.html) draws the answer in a
+# points along it. [plotIPF](orientation.plotIPDF.html) draws the answer in a
 # fundamental sector, which contains one representative of each family of
 # crystal-symmetry-equivalent directions.
 
-plotIPDF(ori, xvector)
+plotIPF(ori, xvector)
 
 # The points crowd towards $[010]$ and thin out towards $[100]$. This is the previous
 # figure read from the other end: specimen X is rarely the forsterite $a$ axis. Like a
@@ -131,9 +131,9 @@ foGrains = grains['Fo']
 # measurements and the orange markers represent grain means.
 
 # +
-plotIPDF(ori, xvector, points=1000, markerSize=3, markerFaceColor='blue')
+plotIPF(ori, xvector, points=1000, markerSize=3, markerFaceColor='blue')
 hold(True)
-plotIPDF(foGrains.meanOrientation, xvector, points=1000, markerSize=3, markerFaceColor='orange')
+plotIPF(foGrains.meanOrientation, xvector, points=1000, markerSize=3, markerFaceColor='orange')
 hold(False)
 # -
 
@@ -157,7 +157,7 @@ hold(False)
 
 # +
 h = cat(Miller(1, 0, 0, ori.CS), Miller(1, 1, 0, ori.CS))
-plotPDF(ori, ebsd['Fo'].mad, h, antipodal=True, markerSize=4)
+plotPF(ori, ebsd['Fo'].mad, h, antipodal=True, markerSize=4)
 mtexColorbar(title='mean angular deviation (degree)')
 # -
 

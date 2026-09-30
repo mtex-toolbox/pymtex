@@ -6,7 +6,7 @@
 #
 # In texture analysis, the corresponding operation turns an ODF into a
 # [pole figure](PoleFigureSimulation.html). This page first develops the transform for an
-# ordinary spherical function. See [calcPDF](SO3Fun.calcPDF.html) for the
+# ordinary spherical function. See [radon](SO3Fun.calcPDF.html) for the
 # orientation-space version.
 #
 # ## From a peak to a ring

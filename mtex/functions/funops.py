@@ -273,7 +273,7 @@ def laplace(f):
 # ------------------------------------------------------------------ the Radon transform
 # the mean of f over the fibre {R : R h = r},
 #   Rf(h, r) = sum_l (4pi/sqrt(2l+1)) sum_{k,m} fhat_l^{km} conj(Y_l^k(r)) Y_l^m(h)
-# pdf(f, h) is the function of r in the specimen frame, the pole figure of h; ipdf(f, r) the
+# radon(f, h) is the function of r in the specimen frame, the pole figure of h; radon(f, r=r) the
 # function of h in the crystal frame. A pole figure of a Laue crystal or of an axis is axis valued
 
 
@@ -299,9 +299,9 @@ def _oneVector(h, frame, what):
   return v
 
 
-def pdf(f, h):
-  """the pole figure of the crystal direction h, a function on the sphere in the specimen frame: the
-  mean of f over the orientations sending h to each direction; axis valued where h and -h coincide"""
+# the pole figure of one crystal direction h, a function on the sphere in the specimen frame: the
+# mean of f over the orientations sending h to each direction; axis valued where h and -h coincide
+def _harmonicPoleFigure(f, h):
   h = _oneVector(h, f.CS, "crystal direction")
   L = f.bandwidth
   fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
@@ -314,9 +314,9 @@ def pdf(f, h):
   return S2FunHarmonic(fhat, f.SS, real=f.isReal, antipodal=_antipodalPole(h, f.CS), symmetrise=False, _internal=True)
 
 
-def ipdf(f, r):
-  """the inverse pole figure of the specimen direction r, a function on the sphere in the crystal
-  frame: the mean of f over the orientations sending each crystal direction to r"""
+# the inverse pole figure of one specimen direction r, a function on the sphere in the crystal
+# frame: the mean of f over the orientations sending each crystal direction to r
+def _harmonicInversePoleFigure(f, r):
   r = _oneVector(r, f.SS, "specimen direction")
   L = f.bandwidth
   fhat = np.zeros((L + 1) ** 2, dtype=f._fhat.dtype)
@@ -328,8 +328,11 @@ def ipdf(f, r):
   return S2FunHarmonic(fhat, f.CS, real=f.isReal, antipodal=_antipodalPole(r, f.SS), symmetrise=False, _internal=True)
 
 
-def radon(f, h=None, r=None):
-  """radon(f, h) the pole figure, radon(f, r=r) the inverse pole figure, radon(f, h, r) the values;
+def radon(f, h=None, r=None, superposition=None, bandwidth=None):
+  """radon(f, h) the pole figure, radon(f, r=r) the inverse pole figure, radon(f, h, r) the pole
+  figure at the specimen directions r; several crystal directions h give their superposed pole
+  figure, weighted by superposition, equally unless given (MATLAB's pdf, ipdf and calcPDF);
+  bandwidth that of the harmonic form a function without one is expanded to;
   on the sphere the Funk transform, the mean over the great circle orthogonal to v,
   shat_l <- P_l(0) shat_l
   radon(sF): the mean over the great circle perpendicular to every direction; radon(sF,
@@ -342,11 +345,21 @@ def radon(f, h=None, r=None):
                          symmetrise=False, _internal=True)
   if h is None and r is None:
     raise TypeError("radon needs the crystal direction h, the specimen direction r, or both")
-  if r is None:
-    return pdf(f, h)
-  if h is None:
-    return ipdf(f, r)
-  return pdf(f, h)(r)
+  if h is None or (not isinstance(h, vector3d) and len(h) == 0):
+    return f._inversePoleFigure(r if isinstance(r, vector3d) else vector3d(r), bandwidth)
+  if isinstance(h, (list, tuple)):
+    hs = [x if isinstance(x, vector3d) else vector3d(x) for x in h]
+  else:
+    h = h if isinstance(h, vector3d) else vector3d(h)
+    hs = [h[i] for i in range(h.size)] if h.size > 1 else [h]
+  if superposition is None and len(hs) == 1:
+    P = f._poleFigure(hs[0], bandwidth)
+  else:
+    c = np.full(len(hs), 1 / len(hs)) if superposition is None else np.asarray(superposition, dtype=float).reshape(-1)
+    if len(c) != len(hs):
+      raise ValueError("one superposition coefficient per crystal direction")
+    P = sum(ci * f._poleFigure(hi, bandwidth) for ci, hi in zip(c, hs))
+  return P if r is None else P(r)
 
 
 def invRadon(s):

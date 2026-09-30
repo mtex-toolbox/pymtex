@@ -83,7 +83,7 @@ plot(pf)
 # can be given explicitly. Here they run from 0 to 4 in steps of 0.5
 # multiples of a uniform orientation distribution:
 
-plotPDF(odf, Miller(1, 0, 0, cs), contour=np.arange(0, 4.5, 0.5), antipodal=True)
+plotPF(odf, Miller(1, 0, 0, cs), contour=np.arange(0, 4.5, 0.5), antipodal=True)
 
 # The nested lines locate the peak without implying intermediate colour
 # bands. Fixing the same levels in several figures makes their shapes and
@@ -96,21 +96,21 @@ plotPDF(odf, Miller(1, 0, 0, cs), contour=np.arange(0, 4.5, 0.5), antipodal=True
 # easy to scan, but they quantize the function: every value in one band gets
 # the same colour, so a gentle gradient becomes a staircase.
 
-plotPDF(odf, Miller(1, 0, 0, cs), contourf=True, antipodal=True)
+plotPF(odf, Miller(1, 0, 0, cs), contourf=True, antipodal=True)
 
 # Compared with the line contours, the peak occupies a more obvious area.
 # Its internal variation is hidden inside the filled bands.
 #
 # ## Smooth plots
 #
-# Smooth shading is the default when a function is plotted, as `plotPDF` does
+# Smooth shading is the default when a function is plotted, as `plotPF` does
 # for an ODF here. Measured `PoleFigure` data is drawn as a scatter instead,
 # which is what the figure above shows. Smooth shading assigns a colour at
 # every evaluation point, without contour boundaries.
 # `resolution` controls the angular spacing of that evaluation grid; it
 # does not increase the resolution of measured data.
 
-plotPDF(odf, Miller(1, 0, 0, cs), antipodal=True, resolution=10 * degree)
+plotPF(odf, Miller(1, 0, 0, cs), antipodal=True, resolution=10 * degree)
 
 # The colour now changes continuously across the peak, while the coarse
 # evaluation grid limits the detail. Compare this with the pole-figure

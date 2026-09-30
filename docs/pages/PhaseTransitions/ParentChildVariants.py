@@ -56,7 +56,7 @@ oriChild
 
 # +
 # (110) / (0001) pole figure
-plotPDF(oriParent, Miller(1, 1, 0, csBeta), markerSize=20, markerFaceColor='none', lineWidth=4, layout=[1, 2])
+plotPF(oriParent, Miller(1, 1, 0, csBeta), markerSize=20, markerFaceColor='none', lineWidth=4, layout=[1, 2])
 hold(True)
 plot(oriChild.symmetrise() * Miller(0, 0, 0, 1, csAlpha), markerSize=12)
 xlabel(Miller(0, 0, 0, 1, csAlpha).char(), color=ind2color(2))
@@ -64,7 +64,7 @@ hold(False)
 
 # [111] / [2-1-10] pole figure
 nextAxis(2)
-plotPDF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', markerSize=20, markerFaceColor='none', lineWidth=4)
+plotPF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', markerSize=20, markerFaceColor='none', lineWidth=4)
 
 dAlpha = Miller(2, -1, -1, 0, csAlpha, 'uvw')
 hold(True)
@@ -107,7 +107,7 @@ oriChild.size
 # The inverse pole figure places both members of each pair at the same location. The 24
 # computations therefore appear as only 12 distinct points.
 
-plotIPDF(oriChild, vector3d.Z)
+plotIPF(oriChild, vector3d.Z)
 
 # [`variants`](orientation.variants.html) removes the symmetry-equivalent duplicates
 # directly. It returns the 12 child variants for this OR.
@@ -116,7 +116,7 @@ plotIPDF(oriChild, vector3d.Z)
 oriChild = variants(beta2alpha, oriParent)
 
 for i in range(1, 13):
-  plotIPDF(oriChild[i - 1], ind2color(i), vector3d.Z, label=i, markerEdgeColor='k')
+  plotIPF(oriChild[i - 1], ind2color(i), vector3d.Z, label=i, markerEdgeColor='k')
   hold(True)
 hold(False)
 # -
@@ -143,7 +143,7 @@ beta2alpha = beta2alpha * orientation.byAxisAngle(vector3d(1, 2, 3), 2 * degree,
 
 oriChildPerturbed = variants(beta2alpha, oriParent)
 print(oriChildPerturbed.size)
-plotIPDF(oriChildPerturbed, vector3d.Z)
+plotIPF(oriChildPerturbed, vector3d.Z)
 
 # ## Identify an observed variant
 #

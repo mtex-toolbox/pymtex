@@ -62,10 +62,10 @@ plot(hSym, fundamentalRegion=True, markerFaceColor='red')
 #
 # ## The Shortcut
 #
-# [plotIPDF](orientation.plotIPDF.html) performs the inverse map, symmetrisation,
+# [plotIPF](orientation.plotIPDF.html) performs the inverse map, symmetrisation,
 # reduction, and projection for several specimen directions at once.
 
-plotIPDF(ori, [vector3d.X, vector3d.Y, vector3d.Z])
+plotIPF(ori, [vector3d.X, vector3d.Y, vector3d.Z])
 
 # The three sectors correspond to specimen X, Y, and Z. Each marker shows which crystal
 # direction lies along the axis named above its panel.
@@ -88,7 +88,7 @@ populationSize
 
 # ---
 
-plotIPDF(oriPopulation, [vector3d.X, vector3d.Y, vector3d.Z], contourf=True)
+plotIPF(oriPopulation, [vector3d.X, vector3d.Y, vector3d.Z], contourf=True)
 mtexColorbar()
 
 # Each panel now contains one concentrated lobe rather than one marker. Its position
@@ -99,10 +99,10 @@ mtexColorbar()
 #
 # ## Seeing the Symmetry Copies
 #
-# By default `plotIPDF` draws only the fundamental sector. The option `complete` ignores
+# By default `plotIPF` draws only the fundamental sector. The option `complete` ignores
 # that reduction, while `upper` restricts the result to the upper hemisphere.
 
-plotIPDF(oriPopulation, r, contourf=True, complete=True, upper=True)
+plotIPF(oriPopulation, r, contourf=True, complete=True, upper=True)
 mtexColorbar()
 
 # Notice that the one Z-direction lobe is repeated three times on this upper hemisphere.
@@ -115,7 +115,7 @@ mtexColorbar()
 # its opposite. This is a modelling choice, not another operation of point group 321. See
 # [Axes and Antipodal Symmetry](VectorsAxes.html).
 #
-# If an orientation carries a nontrivial specimen symmetry, `plotIPDF` also applies it to
+# If an orientation carries a nontrivial specimen symmetry, `plotIPF` also applies it to
 # the fixed specimen direction. Crystal symmetry acts after the inverse map in the crystal
 # frame. Specimen symmetry acts before it in the specimen frame. See
 # [Specimen Symmetry](SpecimenSymmetry.html).
@@ -132,7 +132,7 @@ mtexColorbar()
 # Let $\mathbf{O}$ map crystal coordinates into specimen coordinates. Let $\mathbf{C}$ be
 # a crystal-symmetry operation, $\mathbf{P}$ a specimen-symmetry operation, and
 # $\mathbf{r}$ the fixed specimen direction. Every crystal direction represented by
-# `plotIPDF` has the form
+# `plotIPF` has the form
 #
 # $$ \mathbf{h} = \mathbf{C}\,\mathbf{O}^{-1}\mathbf{P}\,\mathbf{r},
 #    \qquad \mathbf{C} \in \mathrm{S}_{\mathrm{c}}, \quad

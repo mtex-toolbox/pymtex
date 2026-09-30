@@ -59,7 +59,7 @@ h = project2FundamentalRegion(h)
 # use its azimuth in degrees as the colour value, between -180 and 180 as MATLAB counts it
 color = (h.rho / degree + 180) % 360 - 180
 
-plotIPDF(ebsd.orientations, color, r, markerSize=3, grid=True, all=True)
+plotIPF(ebsd.orientations, color, r, markerSize=3, grid=True, all=True)
 mtexColorbar()
 # -
 
@@ -140,7 +140,7 @@ plot(ebsd, ipfKey.orientation2color(ebsd.orientations))
 plot(ipfKey, resolution=0.25 * degree)
 
 hold(True)
-plotIPDF(ebsd['indexed'].orientations, ipfKey.ipfDirection, points=10, markerSize=1, markerFaceColor='w', markerEdgeColor='w')
+plotIPF(ebsd['indexed'].orientations, ipfKey.ipfDirection, points=10, markerSize=1, markerFaceColor='w', markerEdgeColor='w')
 hold(False)
 # -
 

@@ -138,7 +138,7 @@ poleFigureODFMaximum
 
 # +
 # plot pole figures recalculated from the ODF
-plotPDF(odfFromPoleFigures, pf.allH)
+plotPF(odfFromPoleFigures, pf.allH)
 mtexColorbar(title='recalculated intensity')
 # -
 

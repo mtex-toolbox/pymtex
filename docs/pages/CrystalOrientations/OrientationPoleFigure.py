@@ -54,10 +54,10 @@ plot(r)
 #
 # ## The Shortcut
 #
-# [plotPDF](orientation.plotPDF.html) performs the symmetrisation, coordinate map, and
+# [plotPF](orientation.plotPDF.html) performs the symmetrisation, coordinate map, and
 # projection for several poles at once.
 
-plotPDF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS))
+plotPF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS))
 
 # The first two pole figures need only one hemisphere, while the third needs both. MTEX
 # makes that decision from symmetry. It uses one hemisphere when `h` and `-h` are
@@ -74,7 +74,7 @@ plotPDF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS))
 # Friedel pair. See [Axes and Antipodal Symmetry](VectorsAxes.html).
 #
 # This orientation has the default identity specimen symmetry. If an orientation carries a
-# nontrivial specimen symmetry, `plotPDF` also repeats the poles by that symmetry in the
+# nontrivial specimen symmetry, `plotPF` also repeats the poles by that symmetry in the
 # specimen frame. Crystal symmetry acts before the orientation map; specimen symmetry acts
 # after it. See [Specimen Symmetry](SpecimenSymmetry.html).
 #
@@ -93,7 +93,7 @@ plotPDF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS))
 # The option `contourf` replaces the discrete markers with a kernel density estimate on
 # the sphere.
 
-plotPDF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS), contourf=True)
+plotPF(ori, Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], ori.CS), contourf=True)
 mtexColorbar()
 
 # For this single orientation the contours merely spread each discrete pole into a small
@@ -109,7 +109,7 @@ mtexColorbar()
 #
 # Let $\mathbf{O}$ map crystal coordinates to specimen coordinates. Let $\mathbf{C}$ be a
 # crystal-symmetry operation and $\mathbf{P}$ a specimen-symmetry operation. Every pole
-# drawn by `plotPDF` has the form
+# drawn by `plotPF` has the form
 #
 # $$ \mathbf{r} = \mathbf{P}\,\mathbf{O}\,\mathbf{C}\,\mathbf{h},
 #    \qquad \mathbf{C} \in \mathrm{S}_{\mathrm{c}}, \quad

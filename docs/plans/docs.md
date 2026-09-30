@@ -102,7 +102,7 @@ wrote `vector3d.load`, `export(v)`, `HEALPixS2Grid`, `mtexTitle`, `nextAxis`, th
 option, the kernel plot, the S2 `volume`, `angle_outer`, `dot_outer`, `orthProj` and the
 phase abbreviation `ebsd['Fo']`, all in `docs/findings.md`. Crystal shapes and the
 3D plots of the shapes chapter are G7 and S5 work and are the first gaps the pages meet;
-`plotPDF(ori, h)` and `plotIPDF(ori, r)` of the orientation pages are S6 without the
+`plotPF(ori, h)` and `plotIPF(ori, r)` of the orientation pages are S6 without the
 measured pole figure. Rotations DONE 2026-09-22, all 8 checked: the chapter wrote `arrow3d`, `quiver3(t)`,
 `scatter(rot)` of bare rotations with MATLAB's marker options, the flags of `plot(f)`,
 `orientation(f, points=n)`, `rotation.fit(method='kabsch')`, `spinTensor(S)` and `vector3d(S)`,
@@ -172,7 +172,7 @@ HullBasedParameters on the port's own fifteen test shapes), Dream3dGrains and
 GrainReconstructionMCL blocked. The chapter wrote `planarColorKey`, the polar plots of
 `plotting/polarplot.py` (`histogram(v)` rose diagrams, `plot(S1Fun)`, `plotSection(S2Fun, sec)`,
 `plot(shape2d)`, `setView`), `hist(grains)`, `histogram(grains)` and `plotEllipse` in
-`grainplots.py`, `logAxis`, the compass needles `plot(grains, v)`, `plotPDF(fibre, h)`, `plot(fibre)`
+`grainplots.py`, `logAxis`, the compass needles `plot(grains, v)`, `plotPF(fibre, h)`, `plot(fibre)`
 in Euler space, `annotate(v, plane=True)`, `export(ori)` and `export_VPSC` in
 `io/exportorientation.py`, `grains.N`, `grains.phase`, `id2ind`, `findByOrientation`,
 `ebsd.how2plot`, `ebsd.project2FundamentalRegion()`, `merge(grains, gB)`, `caliper` over a list
@@ -192,7 +192,7 @@ bands are cut out of the map for one range, so a change of either draws the plot
 which corrected the contour figures of VectorsDensityEstimation, FibreODFs and ODFImport
 too), `mtexColorbar` adding a bar where MATLAB's toggles, the RP threshold of `calcError`
 left at the regularised measure's 0.5 instead of MTEX's 1, which ordered the two ghost
-correction reconstructions the wrong way round, `plotPDF(odf, pf.allH)` failing on a
+correction reconstructions the wrong way round, `plotPF(odf, pf.allH)` failing on a
 superposed entry, and the ` + ` written between
 the directions of such an entry, all in `docs/findings.md`. Three differences survive and
 the pages say so: the Geesthacht normalisation, where MATLAB's two scans carry different

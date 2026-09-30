@@ -23,7 +23,7 @@ OUTER_COLOR = (0.75, 0.75, 0.75)
 
 
 def _isSO3Fun(f):
-  return hasattr(f, "pdf") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, orientation)
+  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, orientation)
 
 
 # one cell per section, in a grid of the given width; the axis angle sections rescale

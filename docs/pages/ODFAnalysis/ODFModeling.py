@@ -77,7 +77,7 @@ odfMax
 
 # ---
 
-plotPDF(odf1, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
+plotPF(odf1, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
 mtexColorbar(title='mrd')
 
 # The localized spots are projections of one preferred orientation and its
@@ -102,7 +102,7 @@ mean(odf)
 # coefficients still describe the fractions assigned to the two terms. They are not
 # volumes of disjoint regions drawn around the maxima.
 
-plotPDF(odf, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
+plotPF(odf, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
 mtexColorbar(title='mrd')
 
 # The uniform term contributes a 0.73 mrd background, while the unimodal term produces the
@@ -118,7 +118,7 @@ mtexColorbar(title='mrd')
 # +
 odfRot = rotate(odf, rotation.byAxisAngle(vector3d.Z, 30 * degree))
 
-plotPDF(odfRot, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
+plotPF(odfRot, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True, colorRange='equal')
 mtexColorbar(title='mrd')
 # -
 

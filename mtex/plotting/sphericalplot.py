@@ -1,7 +1,7 @@
 # the matplotlib drawing of spherical plots: the axes with its boundary, grid and labels,
 # markers, filled functions, arrows, outlines, pole figures (MATLAB @sphericalPlot,
-# @vector3d/plot, scatter, text, quiver, @S2Fun/plot, contourf, pcolor, @SO3Fun/plotPDF,
-# plotIPDF; docs/plans/plotting.md S1)
+# @vector3d/plot, scatter, text, quiver, @S2Fun/plot, contourf, pcolor, @SO3Fun/plotPF,
+# plotIPF; docs/plans/plotting.md S1)
 #
 # Every function here asks spherical.py for the geometry - which charts, the projected
 # points, the grid, the boundary, the labels - and hands matplotlib the plane coordinates.
@@ -542,7 +542,7 @@ def _isAxisField(f):
 
 
 def _isSO3Fun(f):
-  return hasattr(f, "pdf") and hasattr(f, "CS") and hasattr(f, "SS")
+  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS")
 
 
 FILL_FLAGS = ("contourf", "contour", "pcolor", "smooth")
@@ -604,8 +604,8 @@ def plot(v, *args, **kw):
     from .sectionplot import plotSection
     return plotSection(v, *args, **kw)
   if hasattr(v, "allH") and hasattr(v, "allR"):
-    from .polefigureplot import plotPoleFigure
-    return plotPoleFigure(v, *args, **kw)
+    from .polefigureplot import _plotPoleFigure
+    return _plotPoleFigure(v, *args, **kw)
   # three functions as the colour channels of one surface
   from .tensorplot import isRGB, plotRGB
   if isRGB(v):
@@ -622,7 +622,7 @@ def plot(v, *args, **kw):
   # plot(ori, add2all=True) on pole figures: the poles of the orientations on every one
   if hasattr(v, "frameA") and hasattr(v, "frameB") and kw.get("add2all") and gcm() is not None and \
       any(getattr(getattr(ax, "_mtexSphericalPlot", None), "h", None) is not None for ax in gcm().children):
-    # the markers shrink with the number of poles, as those of plotPDF(ori, h) do
+    # the markers shrink with the number of poles, as those of plotPF(ori, h) do
     from .poles import dynamicMarkerSize
     if not any(k in kw for k, name in MARKER_KEYS.items() if name == "size"):
       kw["markerSize"] = dynamicMarkerSize(v.size * max(v.CS.numSym() // 2, 1))
@@ -1305,8 +1305,8 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
   return hs
 
 
-def plotPDF(odf, h, *args, superposition=None, **kw):
-  """plotPDF(odf, h): the pole figures of an ODF, one axes per crystal direction"""
+def plotPF(odf, h, *args, superposition=None, **kw):
+  """plotPF(odf, h): the pole figures of an ODF, one axes per crystal direction (MATLAB's plotPDF)"""
   # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf'), and a convention
   kw.update({a: True for a in args if isinstance(a, str)})
   from ..geometry.plottingconvention import plottingConvention
@@ -1314,27 +1314,25 @@ def plotPDF(odf, h, *args, superposition=None, **kw):
     if isinstance(a, plottingConvention):
       kw["how2plot"] = a
   hs = _asList(h)
-  # plotPDF(odf, h, '3d'): the pole figure on the sphere in space
+  # plotPF(odf, h, '3d'): the pole figure on the sphere in space
   if kw.pop("3d", False):
     from .spaceplot import plotFunction3d
     kw.pop("title", None)
-    return [plotFunction3d(odf.pdf(x), **kw) for x in hs]
+    return [plotFunction3d(odf.radon(x), **kw) for x in hs]
   if superposition is not None:
-    from ..functions.density import calcPDF
     # one superposed pole figure per entry when the coefficients come as a list of arrays,
-    # plotPDF(odf, pf.allH, superposition=pf.c), else one of all the directions
+    # plotPF(odf, pf.allH, superposition=pf.c), else one of all the directions
     cs = superposition if isinstance(superposition, (list, tuple)) else [superposition]
     if isinstance(h, (list, tuple)) and len(cs) == len(h) and all(np.size(c) == x.size for c, x in zip(cs, hs)):
-      fs = [calcPDF(odf, x, superposition=c) for x, c in zip(hs, cs)]
+      fs = [odf.radon(x, superposition=c) for x, c in zip(hs, cs)]
       titles = [x.char() for x in hs]
       poles = hs
     else:
-      fs = [calcPDF(odf, hs, superposition=superposition)]
+      fs = [odf.radon(hs, superposition=superposition)]
       titles = ["".join(x.char() for x in hs)]
       poles = [hs]
   else:
-    from ..functions.density import calcPDF
-    fs = [odf.pdf(x) if x.size == 1 else calcPDF(odf, x) for x in hs]
+    fs = [odf.radon(x) for x in hs]
     # an antipodal pole figure superposes both hemispheres, as a measurement does
     if kw.get("antipodal"):
       fs = [f.even() if not getattr(f, "antipodal", True) and hasattr(f, "even") else f for f in fs]
@@ -1411,10 +1409,10 @@ def _fibrePoles(f, points=1000, lineColor="k", lineWidth=1.5, **kw):
   return hs
 
 
-def plotIPDF(odf, r, *args, **kw):
-  """plotIPDF(odf, r): the inverse pole figures of an ODF, one axes per specimen direction"""
+def plotIPF(odf, r, *args, **kw):
+  """plotIPF(odf, r): the inverse pole figures of an ODF, one axes per specimen direction (MATLAB's plotIPDF)"""
   rs = _asList(r)
-  fs = [odf.ipdf(x) for x in rs]
+  fs = [odf.radon(r=x) for x in rs]
   out = _plotRow(fs, [_directionTitle(x) for x in rs], **kw)
   # the axes remember their specimen direction, so that annotate(ori) can mark it
   fig = gcm()
@@ -1426,4 +1424,4 @@ def plotIPDF(odf, r, *args, **kw):
 
 
 __all__ = ["plotHKL", "plotSymmetry", "sphericalPlot", "plot", "scatter", "text", "annotate", "contourf", "contour", "pcolor", "quiver", "plotRegion", "plotKernel", "circle", "ellipse",
-           "plotPDF", "plotIPDF", "plotKey"]
+           "plotPF", "plotIPF", "plotKey"]

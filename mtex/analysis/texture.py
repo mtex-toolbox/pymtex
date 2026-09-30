@@ -53,7 +53,7 @@ def _weights(w, n):
 
 
 def _isSO3Fun(f):
-  return hasattr(f, "pdf") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, quaternion)
+  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, quaternion)
 
 
 def _isMap(x):
@@ -215,7 +215,7 @@ def calcKearnsFactor(f, h=None, N=None):
   integral of the pole figure of h against (r . N)^2"""
   from ..functions.quadrature import quadratureS2Grid
   if _isSO3Fun(f):
-    pdf = f.pdf(h)
+    pdf = f.radon(h)
   else:
     pdf, N = f, h if N is None else N
   n = (vector3d(0, 0, 1) if N is None else vector3d(N)).normalize().data.reshape(3)

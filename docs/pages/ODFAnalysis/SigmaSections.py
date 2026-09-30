@@ -154,7 +154,7 @@ plotSection(odf, oS, figSize='large')
 # This reading predicts a c-axis girdle from Z to X and a complementary a-axis girdle.
 # The two pole figures confirm those paths.
 
-plotPDF(odf, cat(cs.cAxis, cs.aAxis))
+plotPF(odf, cat(cs.cAxis, cs.aAxis))
 
 # The pole figures show the predicted girdles, but they give only the axis directions and
 # not the rotation about them. A pole figure integrates the ODF along an
@@ -167,7 +167,7 @@ plotPDF(odf, cat(cs.cAxis, cs.aAxis))
 # $60^{\circ}$ and $90^{\circ}$ from specimen Z. The last one lies on the rim and is
 # drawn at both ends of it.
 
-plotPDF(odf, Miller(0, 0, 0, 1, cs))
+plotPF(odf, Miller(0, 0, 0, 1, cs))
 
 # The pole figure stops there. The earlier sigma plot puts each of the four maxima into a
 # different panel, so each of them carries a different rotation about its c-axis.

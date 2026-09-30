@@ -54,11 +54,11 @@ odf = SO3FunHarmonic(odf, bandwidth=32)
 
 # ## Plotting Specimen Directions
 #
-# [plotIPDF](SO3Fun.plotIPDF.html) works like `plotPDF`, except that its input directions
+# [plotIPF](SO3Fun.plotIPDF.html) works like `plotPF`, except that its input directions
 # belong to the specimen frame. The coordinates inside each panel are crystal directions.
 # This frame reversal is the point of an inverse pole figure.
 
-plotIPDF(odf, cat(vector3d.X, vector3d.Z))
+plotIPF(odf, cat(vector3d.X, vector3d.Z))
 mtexColorMap('LaboTeX')
 mtexColorbar(title='mrd')
 
@@ -69,12 +69,12 @@ mtexColorbar(title='mrd')
 
 # ## Values Rather Than Colours
 #
-# [calcPDF](SO3Fun.calcPDF.html) with an empty crystal-direction argument returns an
+# [radon](SO3Fun.calcPDF.html) with only a specimen direction, `r=`, returns an
 # inverse pole density function. Its printed summary identifies the returned
 # spherical-function representation and crystal symmetry.
 
-ipdfX = calcPDF(odf, None, vector3d.X)
-ipdfZ = calcPDF(odf, None, vector3d.Z)
+ipdfX = radon(odf, r=vector3d.X)
+ipdfZ = radon(odf, r=vector3d.Z)
 ipdfX
 
 # ---
@@ -95,7 +95,7 @@ densitySummary
 # is a modelling choice, not a display option. Use it only when the measurement or model
 # cannot distinguish the directions.
 
-plotIPDF(odf, cat(vector3d.X, vector3d.Z), antipodal=True)
+plotIPF(odf, cat(vector3d.X, vector3d.Z), antipodal=True)
 mtexColorMap('LaboTeX')
 
 # Notice both changes: the sector is smaller, and its colours can differ because
@@ -108,7 +108,7 @@ mtexColorMap('LaboTeX')
 # expands those copies, while `upper` retains only the upper hemisphere. Neither flag
 # changes the density.
 
-plotIPDF(odf, cat(vector3d.X, vector3d.Z), complete=True, upper=True)
+plotIPF(odf, cat(vector3d.X, vector3d.Z), complete=True, upper=True)
 mtexColorMap('LaboTeX')
 
 # The threefold symmetry of point group 32 is now visible as three repeats around the
@@ -120,7 +120,7 @@ mtexColorMap('LaboTeX')
 # Keep the same complete upper hemisphere and impose antipodal symmetry. This isolates
 # the change in density from the change in plotted region.
 
-plotIPDF(odf, cat(vector3d.X, vector3d.Z), complete=True, antipodal=True, upper=True)
+plotIPF(odf, cat(vector3d.X, vector3d.Z), complete=True, antipodal=True, upper=True)
 mtexColorMap('LaboTeX')
 
 # The X plot gains three faint rim lobes from directions whose opposites were in the

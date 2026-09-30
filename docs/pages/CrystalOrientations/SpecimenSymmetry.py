@@ -68,7 +68,7 @@ odf = unimodalODF(orientation.byEuler(30 * degree, 50 * degree, 10 * degree, cs)
 # the comparison below, because a plot with nontrivial specimen symmetry otherwise defaults
 # to its specimen fundamental sector.
 
-plotPDF(odf, Miller(1, 0, -1, 0, cs), contourf=True, complete=True, upper=True)
+plotPF(odf, Miller(1, 0, -1, 0, cs), contourf=True, complete=True, upper=True)
 mtexColorbar()
 
 # The peaks are equivalent crystal poles. Notice that their pattern is not forced to be
@@ -87,7 +87,7 @@ odf.SS = specimenFrame('mmm')
 
 # ---
 
-plotPDF(odf, Miller(1, 0, -1, 0, cs), contourf=True, complete=True, upper=True)
+plotPF(odf, Miller(1, 0, -1, 0, cs), contourf=True, complete=True, upper=True)
 mtexColorbar()
 
 # The second pole figure is symmetric about the horizontal and vertical specimen axes. The

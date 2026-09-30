@@ -81,7 +81,7 @@ ridgeValueRange
 # the crystallographic Radon transform.
 
 h = cat(f.h, Miller(1, 0, 0, cs), Miller(1, 1, 1, cs))
-plotPDF(odf, h, contourf=True)
+plotPF(odf, h, contourf=True)
 mtexColorbar(title='mrd')
 
 # For the ideal fibre, its defining direction collapses to the specimen direction `f.r`
@@ -117,7 +117,7 @@ for hw in halfwidths:
 # +
 mtexFig = newMtexFigure(layout=[1, 3], figSize='large')
 for i, hw in enumerate(halfwidths):
-  plotPDF(odfByHalfwidth[i], f.h, contourf=True, title=False)
+  plotPF(odfByHalfwidth[i], f.h, contourf=True, title=False)
   mtexTitle(f'${hw / degree:g}^{{\\circ}}$')
   if i < len(halfwidths) - 1:
     nextAxis()

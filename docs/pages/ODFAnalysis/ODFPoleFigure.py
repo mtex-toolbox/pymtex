@@ -52,11 +52,11 @@ odf = 0.2 * unimodalODF(mod1) + 0.3 * unimodalODF(mod2) + 0.5 * fibreODF(Miller(
 h = Miller([[1, 0, -1, 0], [0, 0, 0, 1], [1, 1, -2, 1]], cs)
 # -
 
-# [plotPDF](SO3Fun.plotPDF.html) fixes each crystal direction in `h` and draws its pole
+# [plotPF](SO3Fun.plotPDF.html) fixes each crystal direction in `h` and draws its pole
 # density over specimen directions. The panels use the
 # [default spherical projection](SphericalProjections.html).
 
-plotPDF(odf, h)
+plotPF(odf, h)
 mtexColorMap('LaboTeX')
 
 # The two single-orientation components make localized spots. The fibre component makes a
@@ -72,7 +72,7 @@ mtexColorMap('LaboTeX')
 # displayed region; it does not symmetrize the pole density or restore information lost
 # by the projection.
 
-plotPDF(odf, h, complete=True)
+plotPF(odf, h, complete=True)
 mtexColorMap('LaboTeX')
 
 # The upper and lower hemispheres agree in exactly three situations:
@@ -90,7 +90,7 @@ mtexColorMap('LaboTeX')
 # The `antipodal` flag averages opposite directions. With `complete` retained below, both
 # equal halves remain visible for comparison.
 
-plotPDF(odf, h[2], antipodal=True, complete=True)
+plotPF(odf, h[2], antipodal=True, complete=True)
 mtexColorMap('LaboTeX')
 
 # Opposite points in the two discs now have the same colour. Drawing both discs does not
@@ -98,15 +98,15 @@ mtexColorMap('LaboTeX')
 
 # ## Values Rather Than Pictures
 #
-# [calcPDF](SO3Fun.calcPDF.html) with only a crystal direction returns a spherical
+# [radon](SO3Fun.calcPDF.html) with only a crystal direction returns a spherical
 # function. Passing a specimen direction as well evaluates that function at one point.
 
-pdf = calcPDF(odf, Miller(1, 0, 0, cs))
+pdf = radon(odf, Miller(1, 0, 0, cs))
 pdf
 
 # ---
 
-densityAtX = calcPDF(odf, Miller(1, 0, 0, cs), vector3d.X)
+densityAtX = radon(odf, Miller(1, 0, 0, cs), vector3d.X)
 densityAtX
 
 # The printed summary identifies `pdf` as a spherical function. Its value along specimen
@@ -125,7 +125,7 @@ meanDensity
 # corresponding fibre with [plotFibre](SO3Fun.plotFibre.html).
 
 # +
-pdfPeak = calcPDF(odf, h[2])
+pdfPeak = radon(odf, h[2])
 _, rPeak = max(pdfPeak)
 f = fibre(h[2], rPeak)
 

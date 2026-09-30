@@ -124,7 +124,7 @@ odf
 # Recalculate the four measured pole figures from the ODF and compare them with the
 # corrected data above.
 
-plotPDF(odf, pf.allH)
+plotPF(odf, pf.allH)
 
 # The recalculated panels are smooth fields rather than discrete dots. Compare their broad
 # high- and low-intensity regions with the measurements above; the reconstruction should

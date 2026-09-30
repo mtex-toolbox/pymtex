@@ -3,9 +3,7 @@ import numpy as np
 import pytest
 from math import factorial
 
-from mtex import (Miller, S2FunBingham, S2FunHarmonic, SO3FunBingham, SO3FunHarmonic, angle, calcBinghamODF, crystalFrame,
-                  degree, mean, orientation, pdf, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation, specimenFrame,
-                  vector3d, xvector, yvector, zvector)
+from mtex import (angle, calcBinghamODF, crystalFrame, degree, mean, Miller, orientation, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation, S2FunBingham, S2FunHarmonic, SO3FunBingham, SO3FunHarmonic, specimenFrame, vector3d, xvector, yvector, zvector)
 from mtex.functions.bingham import _logMhyperGradient, mhyper
 
 rng = np.random.default_rng(61)
@@ -98,10 +96,10 @@ def test_SO3FunBingham_poleFigureByTheFibreFormulaAgreesWithTheHarmonicRoute(sym
   # check_radonOptions: the pole figure by the fibre formula agrees with the harmonic route
   cs, ss, A, Q, fs, H = symmetricBingham
   h = Miller(1, 0, 0, cs)
-  P = pdf(fs, h)
+  P = radon(fs, h)
   vs = vector3d.rand(20, rng=rng)
-  assert np.max(np.abs(P(vs) - pdf(H, h)(vs))) < 1e-2 * np.max(P(vs))
-  assert fs.pdf(h, bandwidth=4).bandwidth <= 4
+  assert np.max(np.abs(P(vs) - radon(H, h)(vs))) < 1e-2 * np.max(P(vs))
+  assert fs.radon(h, bandwidth=4).bandwidth <= 4
   assert np.isclose(radon(fs, h, vs[0]), P(vs[0]))
 
 

@@ -91,11 +91,11 @@ cubicCount
 
 h = Miller(1, 0, 0, cs)
 
-plotPDF(ori, h, complete=True, markerSize=10, figSize='small')
+plotPF(ori, h, complete=True, markerSize=10, figSize='small')
 
 # Notice six poles in each hemisphere. The sixfold crystal symmetry creates the
 # crystallographically equivalent direction family, and the twofold specimen symmetry
-# repeats that family in the specimen frame. Without `complete=True`, `plotPDF` exploits
+# repeats that family in the specimen frame. Without `complete=True`, `plotPF` exploits
 # both antipodal equivalence and specimen symmetry and shows only the non-redundant part
 # of this example.
 #

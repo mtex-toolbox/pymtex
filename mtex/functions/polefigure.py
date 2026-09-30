@@ -559,7 +559,7 @@ class PoleFigure:
   if TYPE_CHECKING:
     from ..io.loadpolefigure import loadPoleFigure
     from ..io.exportpolefigure import exportPoleFigure as export
-    from ..plotting.polefigureplot import plotPoleFigure as plot, plotDiff
+    from ..plotting.polefigureplot import _plotPoleFigure as plot, plotDiff
     load = staticmethod(loadPoleFigure)
 
 
@@ -612,7 +612,7 @@ def calcError(a, b, *args, **kwargs):
 # the pole density of one crystal direction on the specimen directions, the even part
 # where the directions are axes
 def _poleDensity(odf, h, r):
-  P = odf.pdf(h)
+  P = odf.radon(h)
   if r.antipodal and not P.antipodal:
     P = P.even()
   return np.real(P(vector3d(r.flatten().data))).reshape(r.shape)

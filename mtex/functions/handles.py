@@ -64,23 +64,20 @@ class SO3FunGeneric:
     """the pointwise absolute value, a handle evaluated when asked"""
     return abs(self)
 
-  def pdf(self, h, bandwidth=None):
-    """the pole figure of the crystal direction h, through the harmonic form of the bandwidth"""
-    return SO3FunHarmonic(self, bandwidth=bandwidth).pdf(h)
+  # the pole figure of one crystal direction, through the harmonic form of the bandwidth
+  def _poleFigure(self, h, bandwidth=None):
+    return SO3FunHarmonic(self, bandwidth=bandwidth)._poleFigure(h)
 
-  def ipdf(self, r, bandwidth=None):
-    """the inverse pole figure of the specimen direction r, through the harmonic form of the bandwidth"""
-    return SO3FunHarmonic(self, bandwidth=bandwidth).ipdf(r)
+  # the inverse pole figure of one specimen direction, through the harmonic form of the bandwidth
+  def _inversePoleFigure(self, r, bandwidth=None):
+    return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
 
-  def radon(self, h=None, r=None):
-    """the Radon transform through the harmonic form: radon(h) the pole figure, radon(r=r) the
-    inverse pole figure, radon(h, r) the values"""
-    return SO3FunHarmonic(self).radon(h, r)
-
-  def calcPDF(self, h, r=None, superposition=None):
-    """the pole figure of superposed crystal directions, as a function or at specimen directions r"""
-    from .density import calcPDF
-    return calcPDF(self, h, r, superposition=superposition)
+  def radon(self, h=None, r=None, superposition=None, bandwidth=None):
+    """the Radon transform through the harmonic form of the bandwidth: radon(h) the pole figure,
+    radon(r=r) the inverse pole figure, radon(h, r) the values; several h superposed, weighted
+    by superposition (MATLAB's pdf, ipdf and calcPDF)"""
+    from .funops import radon
+    return radon(self, h, r, superposition, bandwidth)
 
   def conv(self, psi):
     """the convolution with the kernel psi, through the harmonic form"""
@@ -119,7 +116,7 @@ class SO3FunGeneric:
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
-    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def sqrt(self) -> Any:
       ...

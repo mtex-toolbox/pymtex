@@ -271,7 +271,7 @@ hold(False)
 
 # +
 selectedChildOri = ebsd[boundaryParentEBSD.grainId == selectedParentId].orientations
-plotPDF(selectedChildOri, Miller(0, 0, 1, csBCC), markerSize=3)
+plotPF(selectedChildOri, Miller(0, 0, 1, csBCC), markerSize=3)
 
 hold(True)
 selectedParentOri = selectedParent.meanOrientation
@@ -279,7 +279,7 @@ plot(selectedParentOri.symmetrise() * Miller(0, 0, 1, csFCC), markerSize=10, mar
      markerEdgeColor='black', lineWidth=2)
 
 selectedChildVariants = variants(fcc2bcc, selectedParentOri)
-plotPDF(selectedChildVariants, markerFaceColor='none', lineWidth=2, markerEdgeColor='orange')
+plotPF(selectedChildVariants, markerFaceColor='none', lineWidth=2, markerEdgeColor='orange')
 hold(False)
 # -
 

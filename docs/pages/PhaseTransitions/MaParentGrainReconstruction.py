@@ -305,14 +305,14 @@ parentOri = grainSelected.meanOrientation
 variantId, packetId, _, _ = calcVariantId(parentOri, childOri, job.p2c)
 
 color = ind2color(packetId)
-plotPDF(childOri, color, Miller(0, 0, 1, childOri.CS), markerSize=2, all=True)
+plotPF(childOri, color, Miller(0, 0, 1, childOri.CS), markerSize=2, all=True)
 
 hold(True)
 plot(parentOri.symmetrise() * Miller(0, 0, 1, parentOri.CS), markerSize=10, marker='s', markerFaceColor='w', markerEdgeColor='k',
      lineWidth=2)
 
 childVariants = variants(job.p2c, parentOri)
-plotPDF(childVariants, markerFaceColor='none', lineWidth=1.5, markerEdgeColor='k')
+plotPF(childVariants, markerFaceColor='none', lineWidth=1.5, markerEdgeColor='k')
 hold(False)
 # -
 

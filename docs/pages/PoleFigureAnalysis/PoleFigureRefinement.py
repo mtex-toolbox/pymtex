@@ -34,7 +34,7 @@ calcError(pf, odf_naive)
 # The seven values are the fit errors for the seven measured pole figures. Their
 # recalculated pole figures are the visual baseline for the iterative result below.
 
-plotPDF(odf_naive, pf.allH)
+plotPF(odf_naive, pf.allH)
 
 # The iterative reconstruction starts from a uniform ODF. It solves first with a wide
 # kernel, transfers those weights to a finer grid, narrows the kernel, and solves again.
@@ -54,7 +54,7 @@ calcError(pf, odf_iter)
 # One fit error is reported per pole figure. All seven are smaller than those from the
 # ordinary reconstruction, in places by nearly a factor of two.
 
-plotPDF(odf_iter, pf.allH)
+plotPF(odf_iter, pf.allH)
 
 # The peak positions in the two galleries are similar. The error values show that their
 # intensities are not, so a visual match alone is not enough to compare reconstructions.
@@ -106,7 +106,7 @@ odf_true = .6 * unimodalODF(q, cs, ss, halfwidth=5 * degree) + .4 * unimodalODF(
 # +
 h = Miller([[1, 1, 1], [1, 0, 0], [1, 1, 0]], cs)
 
-plotPDF(odf_true, h)
+plotPF(odf_true, h)
 # -
 
 # The compact maxima reflect the 4 and 5 degree component halfwidths. They are the

@@ -74,18 +74,18 @@ hold(False)  # next plot command deletes all plots
 # ## The Same Data in Pole Figures
 #
 # Project the same comparison along two crystal directions. The second
-# `plotPDF` does not repeat the `antipodal` flag. The existing axes already
+# `plotPF` does not repeat the `antipodal` flag. The existing axes already
 # define that symmetry. Added data must conform to those axes.
 
 h = [Miller(0, 0, 0, 1, cs), Miller(1, 0, -1, 0, cs)]
-plotPDF(ori, h, antipodal=True, markerSize=4)
+plotPF(ori, h, antipodal=True, markerSize=4)
 hold(True)
-plotPDF(oriRotated, h, markerSize=4)
+plotPF(oriRotated, h, markerSize=4)
 hold(False)
 
-# Both pole-figure panels contain the two orientation sets. Here `plotPDF`
+# Both pole-figure panels contain the two orientation sets. Here `plotPF`
 # sees the two crystal directions. It adds the second set to both matching
-# axes. That multi-axis behaviour belongs to `plotPDF`, not to `hold` itself.
+# axes. That multi-axis behaviour belongs to `plotPF`, not to `hold` itself.
 #
 # ## Adding to Every Axis at Once
 #
@@ -94,7 +94,7 @@ hold(False)
 # axis is the `add2all` flag.
 
 # +
-plotPDF(odf, h, antipodal=True, contourf=True, grid=True)
+plotPF(odf, h, antipodal=True, contourf=True, grid=True)
 mtexColorMap('white2black')
 
 plot(ori, displayName='original', markerSize=5, markerFaceColor='b', markerEdgeColor='w', add2all=True)
@@ -132,7 +132,7 @@ plot(oriRotated, markerSize=6, markerFaceColor='r', markerEdgeColor='k', add2all
 # while `labeled` writes the indices beside them.
 
 # +
-plotIPDF(odf, xvector, axisLabels=False)
+plotIPF(odf, xvector, axisLabels=False)
 mtexColorMap('white2black')
 
 hold(True)   # keep plot
@@ -177,7 +177,7 @@ plot(pf[0], parent=axesPos)
 axesPos = plt.subplot(1, 3, 2)
 
 # plot the recalculated pole figure at this position
-plotPDF(odf, pf.allH[0], antipodal=True, parent=axesPos)
+plotPF(odf, pf.allH[0], antipodal=True, parent=axesPos)
 
 # set position 3 in a 1x3 matrix as the current plotting position
 axesPos = plt.subplot(1, 3, 3)

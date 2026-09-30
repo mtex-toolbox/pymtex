@@ -4,9 +4,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (Miller, S1FunHandle, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHandle, S2FunHarmonic, S2FunSum,
-                  SO3FunComposition, SO3FunHandle, SO3FunHarmonic, SO3FunRBF, angle, crystalFrame, degree, fibre, fibreODF,
-                  mean, orientation, pdf, rotate, rotation, specimenFrame, unimodalODF, vector3d, zvector)
+from mtex import (angle, crystalFrame, degree, fibre, fibreODF, mean, Miller, orientation, radon, rotate, rotation, S1FunHandle, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHandle, S2FunHarmonic, S2FunSum, SO3FunComposition, SO3FunHandle, SO3FunHarmonic, SO3FunRBF, specimenFrame, unimodalODF, vector3d, zvector)
 
 rng = np.random.default_rng(51)
 
@@ -47,7 +45,7 @@ def test_SO3FunHandle_operationsGoThroughItsHarmonicForm():
   assert h.bandwidth == 16 and h.isReal
   rs = rotation.rand(20, rng=rng)
   assert np.max(np.abs(h(rs) - g(rs))) < 1e-6 * np.max(np.abs(g(rs)))
-  assert isinstance(pdf(g, Miller(1, 0, 0, g.CS)), S2FunHarmonic)
+  assert isinstance(radon(g, Miller(1, 0, 0, g.CS)), S2FunHarmonic)
   assert np.isclose(mean(g), mean(h))
   assert np.allclose((2 * g)(rs), 2 * g(rs))
   assert "SO3FunHandle" in repr(g)
@@ -153,15 +151,15 @@ def test_SO3FunComposition_agreesWithItsHarmonicForm():
   assert np.max(np.abs(H(rs) - s(rs))) < 3e-2 * np.max(s(rs))
 
 
-def test_pdf_ofACompositionIsAxisValuedForALaueCrystal():
+def test_poleFigure_ofACompositionIsAxisValuedForALaueCrystal():
   # check_radonOptions on the composition: the pole figure exists and is axis valued for a Laue crystal
   cs, ss, u, fb, h = odfTerms()
   s = 0.5 * u + 0.5 * fb
-  assert isinstance(pdf(s, Miller(1, 0, 0, cs)), S2FunHarmonic)
+  assert isinstance(radon(s, Miller(1, 0, 0, cs)), S2FunHarmonic)
   csL = crystalFrame("m-3m")
   sL = 0.5 * unimodalODF(orientation(rotation.rand(rng=rng), csL, ss)) + 0.5 * fibreODF(fibre(orientation(rotation.rand(rng=rng), csL, ss), Miller(1, 1, 1, csL)))
-  assert pdf(sL, Miller(1, 0, 0, csL)).antipodal
-  assert pdf(s, vector3d(1, 0, 0, antipodal=True)).antipodal
+  assert radon(sL, Miller(1, 0, 0, csL)).antipodal
+  assert radon(s, vector3d(1, 0, 0, antipodal=True)).antipodal
 
 
 def test_sum_ofRBFsWithOneKernelStaysAnRBF():

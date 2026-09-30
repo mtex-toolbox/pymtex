@@ -1,5 +1,5 @@
 # the poles of a list of orientations, without graphics (MATLAB @orientation/plotPDF,
-# plotIPDF; docs/plans/plotting.md S6)
+# plotIPF; docs/plans/plotting.md S6)
 #
 # The pole figure of a list of orientations is the list of its poles: an orientation takes
 # the crystal direction h to the specimen direction o * h, and its symmetric equivalents

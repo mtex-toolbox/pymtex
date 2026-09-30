@@ -110,12 +110,12 @@ odf
 
 # +
 h = pf[3:5].h
-plotPDF(odf, h)
+plotPF(odf, h)
 mtexColorMap('LaboTeX')
 mtexColorbar()
 
 hold(True)
-plotPDF(odf, h, contour=np.arange(1, 16, 2), lineColor='black', lineWidth=2, showText='on')
+plotPF(odf, h, contour=np.arange(1, 16, 2), lineColor='black', lineWidth=2, showText='on')
 hold(False)
 # -
 

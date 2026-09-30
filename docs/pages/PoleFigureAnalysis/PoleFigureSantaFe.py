@@ -123,7 +123,7 @@ plotDiff(pf, rec)
 # The pole figures recalculated from the corrected ODF reproduce the broad maxima in the
 # noisy simulation.
 
-plotPDF(rec, pf.h, antipodal=True)
+plotPF(rec, pf.h, antipodal=True)
 
 # Their smoothness is expected: the reconstruction uses finite-width kernels and is not
 # intended to reproduce every random fluctuation. This agreement is necessary, but the

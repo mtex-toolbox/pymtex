@@ -1,7 +1,7 @@
 # # MTEX in MATLAB and in Python
 #
 # MTEX for Python keeps the names of MATLAB MTEX: the classes (`vector3d`, `orientation`,
-# `EBSD`, `grain2d`), the commands (`calcGrains`, `calcDensity`, `plotPDF`) and their
+# `EBSD`, `grain2d`), the commands (`calcGrains`, `calcDensity`, `plotPF`) and their
 # options. A MATLAB script translates line by line, and most lines change only in their
 # punctuation. This page lists what does change, the rules of the Python language first and
 # then the few places where MTEX itself behaves differently.
@@ -185,6 +185,17 @@ hold(False)
 # | `ebsd.opt` | `ebsd.meta` |
 # | `loadEBSD(fname)` | `loadEBSD(fname)` or `EBSD.load(fname)` |
 # | `import_wizard` | `importWizard()`, or `mtex-wizard` in a terminal |
+# | `plotPDF(odf, h)`, `plotPDF(ori, h)` | `plotPF(odf, h)`, `plotPF(ori, h)` |
+# | `plotIPDF(odf, r)`, `plotIPDF(ori, r)` | `plotIPF(odf, r)`, `plotIPF(ori, r)` |
+# | `calcPDF(odf, h, r)`, `odf.pdf(h)` | `odf.radon(h, r)`, `odf.radon(h)` |
+# | `odf.ipdf(r)` | `odf.radon(r=r)` |
+# | `hist(grains)` | `histogram(grains, grouped=True)` |
+# | `angle_outer(v1, v2)`, `dot_outer(v1, v2)` | `angle(v1, v2, outer=True)`, `dot(v1, v2, outer=True)` |
+# | `eq(v1, v2)`, `eqTol(cs1, cs2)` | `isclose(v1, v2)`, `isclose(cs1, cs2)` |
+# | `orientation.eye(cs)` | `orientation.id(cs)` |
+# | `plotSpektra(odf)` | `plotSpectrum(odf)` |
+# | `textureindex(odf)` | `textureIndex(odf)` |
+# | `eS.addFeature_singleStep` | `eS.addFeature('singleStep')` |
 #
 # ## Behaviour that differs on purpose
 #

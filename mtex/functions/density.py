@@ -1,5 +1,5 @@
-# the density estimates on SO(3), the sphere and the circle, the superposed pole figures and
-# the least squares approximation from samples (MATLAB calcDensity, calcPDF, interpolate;
+# the density estimates on SO(3), the sphere and the circle and the least squares approximation
+# from samples (MATLAB calcDensity, interpolate;
 # docs/plans/functions.md F4)
 #
 #   calcDensity(ori | ebsd, halfwidth=, kernel=, weights=, groups=, harmonic=None, bandwidth=)
@@ -7,7 +7,6 @@
 #   without a halfwidth or kernel the halfwidth is selected, calcKernel(x, 'UCV')
 #   calcDensity(rho, periodic=True, sigma=, kernel=, weights=, antipodal=)
 #   calcDensity(x, range=, bandwidth=, weights=)    real valued data, one sample per row
-#   calcPDF(odf, h, r, superposition=)
 #   interpolate(ori | v, values, bandwidth=, lambda_=, s=, weights=)
 from __future__ import annotations
 
@@ -113,24 +112,6 @@ def _selectedKernel(x, weights, groups):
     return calcKernel(x, "UCV", weights=weights, groups=groups)
   except ValueError:
     return _densityKernel(space, None, None)
-
-
-def calcPDF(f, h, r=None, superposition=None):
-  """the pole figure of superposed crystal directions, sum_k c_k pdf(f, h_k), as a function or
-  at specimen directions r"""
-  # calcPDF(odf, None, r): the inverse pole density function of the specimen direction r
-  if h is None or (not isinstance(h, vector3d) and len(h) == 0):
-    return f.ipdf(r if isinstance(r, vector3d) else vector3d(r))
-  if isinstance(h, (list, tuple)):
-    hs = [x if isinstance(x, vector3d) else vector3d(x) for x in h]
-  else:
-    h = h if isinstance(h, vector3d) else vector3d(h)
-    hs = [h[i] for i in range(h.size)] if h.size > 1 else [h]
-  c = np.full(len(hs), 1 / len(hs)) if superposition is None else np.asarray(superposition, dtype=float).reshape(-1)
-  if len(c) != len(hs):
-    raise ValueError("one superposition coefficient per crystal direction")
-  P = sum(ci * f.pdf(hi) for ci, hi in zip(c, hs))
-  return P if r is None else P(r)
 
 
 # ------------------------------------------------------------------ least squares from samples
@@ -313,4 +294,4 @@ def interpS2(v, y, *args, **kwargs):
   return sF.eval(vi) if vi is not None else sF
 
 
-__all__ = ["calcDensity", "calcPDF", "interpolate"]
+__all__ = ["calcDensity", "interpolate"]

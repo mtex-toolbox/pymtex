@@ -1,5 +1,5 @@
 # the pole figures of orientation lists and of measured pole figures (MATLAB
-# @orientation/plotPDF, plotIPDF, @PoleFigure/plot, plotDiff; docs/plans/plotting.md S6)
+# @orientation/plotPF, plotIPF, @PoleFigure/plot, plotDiff; docs/plans/plotting.md S6)
 #
 # A row of panels, one per crystal or specimen direction: the poles of a list as markers on
 # the sector of their frame, coloured by a value per orientation when given, or the density
@@ -144,7 +144,7 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
   return hs
 
 
-# the directions and the data of plotPDF(ori, h), plotPDF(ori, data, h) and plotPDF(ori, h,
+# the directions and the data of plotPF(ori, h), plotPF(ori, data, h) and plotPF(ori, h,
 # data): a direction is a vector3d or a list of them, everything else is data
 def _pickData(o, args):
   h, data = None, None
@@ -188,18 +188,22 @@ def _positionalStyle(o, args, kw):
   return tuple(out)
 
 
-def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
-  """plotPDF(ori, h), plotPDF(ori, data, h), plotPDF(ori, h, points=100, contourf=True, antipodal=True)
+def plotPF(o, *args, points=None, all=False, superposition=None, **kw):
+  """plotPF(ori, h), plotPF(ori, data, h), plotPF(ori, h, points=100, contourf=True, antipodal=True),
+  plotPF(odf, h), plotPF(pf)
 
   The pole figures of a list of orientations: every orientation applied to every equivalent
   of h, as markers on the specimen sector, coloured by a value per orientation when given;
-  a style draws the density of the poles instead. An ODF draws its pole density functions.
+  a style draws the density of the poles instead. An ODF draws its pole figures, a measured
+  PoleFigure itself (MATLAB's plotPDF).
   """
+  if hasattr(o, "allH"):
+    return _plotPoleFigure(o, *args, **kw)
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
-    return sphericalplot.plotPDF(o, *args, superposition=superposition, **kw)
+    return sphericalplot.plotPF(o, *args, superposition=superposition, **kw)
   args = _positionalStyle(o, args, kw)
-  # plotPDF(ori, 'add2all') without directions, or into held pole figures: the poles of the
+  # plotPF(ori, 'add2all') without directions, or into held pole figures: the poles of the
   # directions they already show
   fig = sphericalplot.gcm()
   if (kw.get("add2all") or (fig is not None and fig.hold)) and not any(isinstance(a, vector3d) or (isinstance(a, (list, tuple)) and a and isinstance(a[0], vector3d)) for a in args):
@@ -221,12 +225,13 @@ def plotPDF(o, *args, points=None, all=False, superposition=None, **kw):
   return out
 
 
-def plotIPDF(o, *args, points=None, all=False, **kw):
-  """plotIPDF(ori, r), plotIPDF(ori, data, r): the inverse pole figures of a list of orientations,
-  the crystal directions along r as markers on the crystal sector"""
+def plotIPF(o, *args, points=None, all=False, **kw):
+  """plotIPF(ori, r), plotIPF(ori, data, r), plotIPF(odf, r): the inverse pole figures of a list
+  of orientations, the crystal directions along r as markers on the crystal sector, or of an ODF
+  (MATLAB's plotIPDF)"""
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
-    return sphericalplot.plotIPDF(o, *args, **kw)
+    return sphericalplot.plotIPF(o, *args, **kw)
   r, data = _pickData(o, _positionalStyle(o, args, kw))
   rs = _asList(r)
   flag = fillFlag(kw, None)
@@ -246,9 +251,9 @@ def _pfTitle(pf, i):
   return pf.allH[i].char()
 
 
-def plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
-  """plot(pf), plot(pf, contourf=True), plot(pf, minmax=True): a measured pole figure, or a
-  data set of them in a row, the specimen directions as markers coloured by intensity"""
+def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
+  """plot(pf), plot(pf, contourf=True), plot(pf, minmax=True): a measured pole figure, or a data
+  set of them in a row, the specimen directions as markers coloured by intensity"""
   from ..functions.s2fun import S2FunHarmonic
   flag = fillFlag(kw, None)
   titles = [_pfTitle(pf, i) for i in range(pf.numPF)]
@@ -277,7 +282,7 @@ def plotDiff(pf, other, mode="relative", epsilon=None, **kw):
       mode = m
   d = calcErrorPF(pf, other, mode, epsilon)
   kw.setdefault("colorbar", True)
-  return plotPoleFigure(d, **kw)
+  return _plotPoleFigure(d, **kw)
 
 
-__all__ = ["plotPDF", "plotIPDF", "plotPoleFigure", "plotDiff"]
+__all__ = ["plotPF", "plotIPF", "plotDiff"]

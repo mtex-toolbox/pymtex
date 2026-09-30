@@ -154,7 +154,7 @@ plot(pf[0:4])
 # +
 odf = calcODF(pf, verbose=False)
 
-plotPDF(odf, pf.allH[0:4])
+plotPF(odf, pf.allH[0:4])
 # -
 
 # The reconstructed ODF produces pole figures with the same axis placement

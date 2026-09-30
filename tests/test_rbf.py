@@ -3,9 +3,7 @@
 import numpy as np
 import pytest
 
-from mtex import (FourierODF, Miller, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, SO3FunCBF, SO3FunHarmonic, SO3FunRBF,
-                  calcPDF, crystalFrame, degree, fibre, fibreODF, grad, ipdf, mean, orientation, pdf, radon, rotation,
-                  specimenFrame, uniformODF, unimodalODF, vector3d, xvector, yvector, zvector)
+from mtex import (crystalFrame, degree, fibre, fibreODF, FourierODF, grad, mean, Miller, orientation, radon, rotation, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, SO3FunCBF, SO3FunHarmonic, SO3FunRBF, specimenFrame, uniformODF, unimodalODF, vector3d, xvector, yvector, zvector)
 from mtex.geometry.symreduce import reductionGroups
 
 rng = np.random.default_rng(41)
@@ -182,53 +180,51 @@ def cubicPoleFigure():
   cs, ss = crystalFrame("432"), specimenFrame("1")
   odf = unimodalODF(orientation(rotation.rand(rng=rng), cs, ss), halfwidth=15 * degree)
   h = Miller(1, 0, 0, cs)
-  return cs, ss, odf, h, pdf(odf, h), vector3d.rand(20, rng=rng)
+  return cs, ss, odf, h, radon(odf, h), vector3d.rand(20, rng=rng)
 
 
-def test_pdf_ofAUnimodalODFAgreesWithTheHarmonicRouteAndIsAxisValued():
+def test_poleFigure_ofAUnimodalODFAgreesWithTheHarmonicRouteAndIsAxisValued():
   cs, ss, odf, h, P, vs = cubicPoleFigure()
-  Ph = pdf(SO3FunHarmonic(odf), h)
+  Ph = radon(SO3FunHarmonic(odf), h)
   assert np.max(np.abs(P(vs) - Ph(vs))) < 2e-2 * np.max(P(vs))
   assert P.antipodal and P.frame is ss   # a two-fold axis of 432 sends (100) to (-100)
-  assert pdf(unimodalODF(orientation(rotation.rand(rng=rng), crystalFrame("m-3m"), ss)), Miller(1, 0, 0, crystalFrame("m-3m"))).antipodal
-  assert odf.pdf(h, bandwidth=4).bandwidth <= 4
+  assert radon(unimodalODF(orientation(rotation.rand(rng=rng), crystalFrame("m-3m"), ss)), Miller(1, 0, 0, crystalFrame("m-3m"))).antipodal
+  assert odf.radon(h, bandwidth=4).bandwidth <= 4
 
 
-def test_pdf_ofTheUniformODFIsOne():
+def test_poleFigure_ofTheUniformODFIsOne():
   # the pole figure is the S2 kernel at the images of h, and the uniform ODF gives one
   cs, ss, odf, h, P, vs = cubicPoleFigure()
-  assert np.allclose(pdf(uniformODF(cs, ss), h)(vs), 1)
+  assert np.allclose(radon(uniformODF(cs, ss), h)(vs), 1)
 
 
-def test_ipdf_radonAndTheMeanOfAPoleFigure():
+def test_inversePoleFigure_radonAndTheMeanOfAPoleFigure():
   # ipdf, radon and the mean of a pole figure
   cs, ss, odf, h, P, vs = cubicPoleFigure()
-  I = ipdf(odf, vs[0])
+  I = radon(odf, r=vs[0])
   assert I.frame is cs and np.isclose(mean(P), 1) and np.isclose(mean(I), 1)
   assert np.isclose(radon(odf, h, vs[0]), P(vs[0]))
 
 
-def test_calcPDF_superposesThePoleFiguresOfAList():
+def test_radon_superposesThePoleFiguresOfAList():
   # check_calcPoleFigureSuperposition
   cs3 = crystalFrame("321")
   vs = vector3d.rand(20, rng=rng)
   odf3 = unimodalODF(orientation(rotation.rand(rng=rng), cs3), halfwidth=15 * degree)
   hs = Miller(vector3d.cat(Miller(1, 0, 0, cs3), Miller(0, 0, 1, cs3)), cs3)
-  ref = 0.5 * pdf(odf3, hs[0])(vs) + 0.5 * pdf(odf3, hs[1])(vs)
-  assert np.max(np.abs(calcPDF(odf3, hs, vs) - ref)) < 1e-10
-  ref2 = 0.52 * pdf(odf3, hs[0])(vs) + 1.23 * pdf(odf3, hs[1])(vs)
-  assert np.max(np.abs(calcPDF(odf3, hs, vs, superposition=[0.52, 1.23]) - ref2)) < 1e-10
-  assert np.allclose(calcPDF(odf3, hs[0], vs), pdf(odf3, hs[0])(vs))
-  assert np.max(np.abs(calcPDF(odf3, hs, superposition=[0.52, 1.23])(vs) - ref2)) < 1e-10
-  assert np.max(np.abs(calcPDF(SO3FunHarmonic(odf3), hs, vs, superposition=[0.52, 1.23]) - ref2)) < 2e-2 * np.max(ref2)
+  ref = 0.5 * radon(odf3, hs[0])(vs) + 0.5 * radon(odf3, hs[1])(vs)
+  assert np.max(np.abs(radon(odf3, hs, vs) - ref)) < 1e-10
+  ref2 = 0.52 * radon(odf3, hs[0])(vs) + 1.23 * radon(odf3, hs[1])(vs)
+  assert np.max(np.abs(radon(odf3, hs, vs, superposition=[0.52, 1.23]) - ref2)) < 1e-10
+  assert np.allclose(radon(odf3, hs[0], vs), radon(odf3, hs[0])(vs))
+  assert np.max(np.abs(radon(odf3, hs, superposition=[0.52, 1.23])(vs) - ref2)) < 1e-10
+  assert np.max(np.abs(radon(SO3FunHarmonic(odf3), hs, vs, superposition=[0.52, 1.23]) - ref2)) < 2e-2 * np.max(ref2)
   with pytest.raises(ValueError):
-    calcPDF(odf3, hs, vs, superposition=[1.0])
-  with pytest.raises(ValueError):
-    pdf(odf3, hs)
+    radon(odf3, hs, vs, superposition=[1.0])
 
 
-def test_pdf_ofAFibreODFGoesThroughItsHarmonicForm():
+def test_poleFigure_ofAFibreODFGoesThroughItsHarmonicForm():
   # the fibre ODF goes through its harmonic form
   cs, ss, odf, h, P, vs = cubicPoleFigure()
   fodf = fibreODF(Miller(1, 1, 1, cs), zvector, ss)
-  assert np.allclose(pdf(fodf, h)(vs), pdf(SO3FunHarmonic(fodf), h)(vs))
+  assert np.allclose(radon(fodf, h)(vs), radon(SO3FunHarmonic(fodf), h)(vs))

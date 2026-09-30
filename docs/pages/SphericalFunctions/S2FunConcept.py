@@ -19,7 +19,7 @@ from mtex import *
 odf = SantaFe()
 
 # the (100) pole density function
-pdf = odf.calcPDF(Miller(1, 0, 0, odf.CS))
+pdf = odf.radon(Miller(1, 0, 0, odf.CS))
 # -
 
 # The resulting object represents the function itself, not a grid of stored values. It can

@@ -101,11 +101,11 @@ mtexColorbar(title='intensity')  # add a single colorbar
 
 odf = calcODF(pf)
 
-# [plotPDF](SO3Fun.plotPDF.html) recalculates the same three pole figures. Diffraction
+# [plotPF](SO3Fun.plotPDF.html) recalculates the same three pole figures. Diffraction
 # identifies a plane normal with its opposite, so `antipodal` folds the two directions
 # into the same hemisphere.
 
-plotPDF(odf, pf.h, antipodal=True)
+plotPF(odf, pf.h, antipodal=True)
 mtexColorMap('parula')
 setColorRange('equal')
 mtexColorbar(title='mrd')

@@ -65,7 +65,7 @@ odf
 # The first validation is visual. Recalculate exactly the lattice planes and
 # superpositions that were measured.
 
-plotPDF(odf, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(odf, pf.allH, antipodal=True, superposition=pf.c)
 
 # The maxima appear in the same regions and reach comparable intensities. The recalculated
 # pole figures are smoother because the finite-width kernels do not reproduce every
@@ -119,7 +119,7 @@ plotDiff(pf, odf)
 _, oriPref = max(odf)
 odfModel = unimodalODF(oriPref, halfwidth=15 * degree)
 
-plotPDF(odfModel, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(odfModel, pf.allH, antipodal=True, superposition=pf.c)
 
 odfDifference = calcError(odfModel, odf)
 odfDifference
@@ -147,7 +147,7 @@ tic = time.perf_counter()
 odfCoarse = calcODF(pf, resolution=15 * degree)
 coarseTime = time.perf_counter() - tic
 
-plotPDF(odfCoarse, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(odfCoarse, pf.allH, antipodal=True, superposition=pf.c)
 
 defaultPeak = max(odf)[0]
 coarsePeak = max(odfCoarse)[0]
@@ -179,7 +179,7 @@ tic = time.perf_counter()
 odfZero = calcODF(pf, zeroRange=True)
 zeroTime = time.perf_counter() - tic
 
-plotPDF(odfZero, pf.allH, antipodal=True, superposition=pf.c)
+plotPF(odfZero, pf.allH, antipodal=True, superposition=pf.c)
 
 zeroPeak = max(odfZero)[0]
 meanZeroRP = np.mean(calcError(pf, odfZero, 'RP'))

@@ -75,10 +75,10 @@ mtexColorMap('LaboTeX')
 
 # +
 h = Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1], [1, 2, 0]], cs)
-plotPDF(odf1, h, contourf=True)
+plotPF(odf1, h, contourf=True)
 mtexColorMap('LaboTeX')
 
-plotPDF(odf2, h, contourf=True)
+plotPF(odf2, h, contourf=True)
 mtexColorMap('LaboTeX')
 # -
 
@@ -158,9 +158,9 @@ ori1 = orientation.byEuler(30 * degree, 60 * degree, 10 * degree, cs)
 ori2 = orientation.byEuler(30 * degree, 60 * degree, 100 * degree, cs)
 
 h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 2, 3]], cs)
-plotPDF(ori1, h, markerSize=12)
+plotPF(ori1, h, markerSize=12)
 hold(True)
-plotPDF(ori2, h, markerSize=8)
+plotPF(ori2, h, markerSize=8)
 hold(False)
 # -
 
@@ -169,9 +169,9 @@ hold(False)
 #
 # Now impose antipodal symmetry, as ordinary diffraction does.
 
-plotPDF(ori1, h, markerSize=12, antipodal=True)
+plotPF(ori1, h, markerSize=12, antipodal=True)
 hold(True)
-plotPDF(ori2, h, markerSize=8, antipodal=True)
+plotPF(ori2, h, markerSize=8, antipodal=True)
 hold(False)
 
 # Every small marker now lies inside a large marker. The measurement cannot distinguish
@@ -186,9 +186,9 @@ ori1.CS = ori1.CS.Laue()
 ori2.CS = ori2.CS.Laue()
 h.CS = h.CS.Laue()
 
-plotPDF(ori1, h, markerSize=12)
+plotPF(ori1, h, markerSize=12)
 hold(True)
-plotPDF(ori2, h, markerSize=8)
+plotPF(ori2, h, markerSize=8)
 hold(False)
 # -
 
@@ -215,7 +215,7 @@ cs = crystalFrame('-1')
 
 odf1 = 2 / 3 * uniformODF(cs) + 1 / 3 * unimodalODF(orientation.id(cs), halfwidth=30 * degree)
 
-plotPDF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs), antipodal=True)
+plotPF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs), antipodal=True)
 # -
 
 # The three pole figures contain broad, weak maxima. They are the complete diffraction
@@ -226,7 +226,7 @@ plotPDF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs), antipodal=True)
 # +
 odf1 = SO3FunHarmonic(odf1, bandwidth=10)
 
-plotPDF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs))
+plotPF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs))
 # -
 
 # The pole figures are unchanged by converting the representation.
@@ -256,7 +256,7 @@ plt.legend(['odf1', 'odf2'])
 # The second spectrum agrees at every even degree and is zero at every odd degree.
 # Nevertheless, all pole figures of `odf2` are identical to those of `odf1`:
 
-plotPDF(odf2, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs), antipodal=True)
+plotPF(odf2, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs), antipodal=True)
 
 # The odd order coefficients simply do not appear in a pole figure. Nothing in the data
 # distinguishes the two functions, and they are not the same function - along the alpha
@@ -388,12 +388,12 @@ rec2 = calcODF(pf, ghostCorrection=False)
 # Both reproduce the measured pole figures. This is the crux of the whole page: agreeing
 # with the data is not evidence of being right.
 
-plotPDF(rec, pf.h, antipodal=True, complete=True)
+plotPF(rec, pf.h, antipodal=True, complete=True)
 mtexColorMap('parula')
 
 # ---
 
-plotPDF(rec2, pf.h, antipodal=True, complete=True)
+plotPF(rec2, pf.h, antipodal=True, complete=True)
 mtexColorMap('parula')
 
 # The same maxima and contour shapes appear in both sets of recalculated pole figures.

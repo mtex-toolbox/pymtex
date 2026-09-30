@@ -231,9 +231,9 @@ class SO3FunRBF:
       np.add.at(out, start + i, -f0[:, None] * p[:, 1:])
     return SO3TangentVector(vector3d(out.reshape(*r.shape, 3)), x, side)
 
-  def pdf(self, h, bandwidth=None):
-    """the pole figure: the Radon transform of the kernel centred at the images of h under the
-    centres and the crystal rotations, projected by the specimen frame"""
+  # the pole figure of one crystal direction: the Radon transform of the kernel centred at the
+  # images of h under the centres and the crystal rotations, projected by the specimen frame
+  def _poleFigure(self, h, bandwidth=None):
     h = h if isinstance(h, vector3d) else vector3d(h)
     if h.size != 1:
       raise ValueError("one crystal direction at a time")
@@ -254,28 +254,20 @@ class SO3FunRBF:
     s = S2FunHarmonic.quadrature(vector3d(pts.data.reshape(-1, 3), frame=self.SS), np.ones(pts.size), bandwidth=L, weights=4 * np.pi * w, real=True, antipodal=ant)
     return conv(s, self.psi.radon()) + self.c0
 
-  def ipdf(self, r, bandwidth=None):
-    """the inverse pole figure at the specimen direction r, the pole figure of the inverse function"""
-    return self.inv().pdf(r, bandwidth)
+  # the inverse pole figure of one specimen direction, the pole figure of the inverse function
+  def _inversePoleFigure(self, r, bandwidth=None):
+    return self.inv()._poleFigure(r, bandwidth)
 
-  def radon(self, h=None, r=None):
+  def radon(self, h=None, r=None, superposition=None, bandwidth=None):
     """the Radon transform: with h the pole figure, with r the inverse pole figure, with both the
-    pole figure of h evaluated at r
+    pole figure of h evaluated at r; several h superposed, weighted by superposition
+    (MATLAB's pdf, ipdf and calcPDF); bandwidth that of the pole figure, the kernel's unless given
 
       SO3F.radon(h)
       SO3F.radon(r=r)
       SO3F.radon(h, r)"""
-    if r is None:
-      return self.pdf(h)
-    if h is None:
-      return self.ipdf(r)
-    return self.pdf(h)(r)
-
-  def calcPDF(self, h, r=None, superposition=None):
-    """the pole figures of the function at the crystal directions h, with r their values at the
-    specimen directions r; superposition weighs several h into one pole figure"""
-    from .density import calcPDF
-    return calcPDF(self, h, r, superposition=superposition)
+    from .funops import radon
+    return radon(self, h, r, superposition, bandwidth)
 
   def inv(self):
     """the inverse function f(g^-1), the centres inverted, crystal and specimen sides exchanged"""
@@ -372,7 +364,7 @@ class SO3FunRBF:
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
-    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
       ...
@@ -529,24 +521,20 @@ class SO3FunCBF:
       return SO3FunCBF(vector3d((rot.inv() * self.h).data, frame=_rotatedFrame(self.CS, rot)), self.r, self.weights, self.psi, self.SS)
     raise ValueError(f"the side is 'left' or 'right', not {side!r}")
 
-  def pdf(self, h, bandwidth=None):
-    """the pole figure at the crystal direction h, from the harmonic expansion"""
-    return SO3FunHarmonic(self, bandwidth=bandwidth).pdf(h)
+  # the pole figure of one crystal direction, from the harmonic expansion
+  def _poleFigure(self, h, bandwidth=None):
+    return SO3FunHarmonic(self, bandwidth=bandwidth)._poleFigure(h)
 
-  def ipdf(self, r, bandwidth=None):
-    """the inverse pole figure at the specimen direction r, from the harmonic expansion"""
-    return SO3FunHarmonic(self, bandwidth=bandwidth).ipdf(r)
+  # the inverse pole figure of one specimen direction, from the harmonic expansion
+  def _inversePoleFigure(self, r, bandwidth=None):
+    return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
 
-  def radon(self, h=None, r=None):
-    """the Radon transform through the harmonic expansion: with h the pole figure, with r the inverse
-    pole figure, with both the values"""
-    return SO3FunHarmonic(self).radon(h, r)
-
-  def calcPDF(self, h, r=None, superposition=None):
-    """the pole figures of the function at the crystal directions h, with r their values at the
-    specimen directions r; superposition weighs several h into one pole figure"""
-    from .density import calcPDF
-    return calcPDF(self, h, r, superposition=superposition)
+  def radon(self, h=None, r=None, superposition=None, bandwidth=None):
+    """the Radon transform through the harmonic expansion of the bandwidth: with h the pole
+    figure, with r the inverse pole figure, with both the values; several h superposed, weighted
+    by superposition (MATLAB's pdf, ipdf and calcPDF)"""
+    from .funops import radon
+    return radon(self, h, r, superposition, bandwidth)
 
   def conv(self, psi):
     """the convolution with a kernel psi, through the harmonic expansion"""
@@ -600,7 +588,7 @@ class SO3FunCBF:
     from .polefigure import calcPoleFigure
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
-    from ..plotting.sphericalplot import plotPDF, plotIPDF
+    from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
       ...

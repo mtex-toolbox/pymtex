@@ -46,7 +46,7 @@ odf
 # make the pole-density features anisotropic rather than round.
 
 h = Miller([[0, 0, 1], [1, 0, 0], [1, 1, 1]], cs)
-plotPDF(odf, h, antipodal=True, verbose=False, layout=[1, 3])
+plotPF(odf, h, antipodal=True, verbose=False, layout=[1, 3])
 
 # The same anisotropy appears in sections through orientation space. The peak changes
 # position between the six panels. Each panel cuts a different part of the
@@ -66,7 +66,7 @@ plot(odf, sections=6)
 # +
 odfTrue = fibreODF(fibre.rand(cs))
 
-plotPDF(odfTrue, h, antipodal=True, verbose=False)
+plotPF(odfTrue, h, antipodal=True, verbose=False)
 # -
 
 # Each pole figure contains the ring expected from a fibre texture. The ring position
@@ -88,7 +88,7 @@ odf
 
 # ---
 
-plotPDF(odf, h, antipodal=True, verbose=False)
+plotPF(odf, h, antipodal=True, verbose=False)
 
 # The fitted pole figures recover the rings of the original fibre ODF from the 2000
 # sampled orientations. Small irregularities in the point overlay are sampling variation;

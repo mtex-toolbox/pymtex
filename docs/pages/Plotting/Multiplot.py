@@ -4,7 +4,7 @@
 # It keeps their sizes and spacing consistent. It also
 # coordinates figure-wide tools such as colour ranges and colorbars.
 #
-# Commands such as `plotPDF` over several lattice planes, or `plot` of an
+# Commands such as `plotPF` over several lattice planes, or `plot` of an
 # ODF in sections, create this kind of figure automatically. To build one
 # by hand, `newMtexFigure` creates the figure and its layout. The two
 # entries of `layout` are the number of rows and columns.

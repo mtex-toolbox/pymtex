@@ -64,7 +64,7 @@ modelInputs
 # lies along RD. The pole figure shows where the cubic $\{100\}$ easy directions occur in
 # the specimen. Its colour scale is in multiples of a random distribution (mrd).
 
-plotPDF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
+plotPF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
 mtexColorbar(title='pole density (mrd)')
 
 # One $\{100\}$ pole lies at RD, and appears at both the left and the right edge because
