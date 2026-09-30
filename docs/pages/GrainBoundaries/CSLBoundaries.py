@@ -209,6 +209,28 @@ hold(False)
 # prominence of $\Sigma 9$ is not accidental: when two different $\Sigma 3$ twin variants
 # meet, their composition can be a $\Sigma 9$ relationship.
 
+# ## The coincidences belong to the lattice
+#
+# [`CSL`](CSL.html) accepts a list of $\Sigma$ values and returns their misorientations
+# ordered by $\Sigma$ and, within one $\Sigma$, by angle.
+
+np.asarray(CSL([3, 5, 7, 9, 11], ebsd.CS).angle()) / degree
+
+# Which rotations are coincidences, and their $\Sigma$, depend on the Bravais lattice, not
+# on the point group. The three cubic lattices, primitive, body-centred and face-centred,
+# share their coincidences, so the list above holds for bcc iron as well as for fcc copper
+# or nickel. A centred lattice of lower symmetry has coincidences of its own. A crystal frame
+# built from a space group symbol, such as `crystalFrame('R-3m', ...)`, or read from a CIF
+# file keeps the centring of its lattice, and `CSL` searches the lattice it describes.
+
+bccIron = crystalFrame('Im-3m', ebsd.CS.abc, mineral='bcc iron')
+bccIron.centering, np.allclose(np.asarray(CSL([3, 5, 7, 9, 11], bccIron).angle()),
+                               np.asarray(CSL([3, 5, 7, 9, 11], ebsd.CS).angle()))
+
+# The lattice need not be cubic. A hexagonal lattice with a rational $c^2/a^2$ has exact
+# coincidences, and the option `delta` finds the near coincidences of any other lattice, as
+# the [Twinning](Twinning.html) page shows for magnesium.
+
 # ## The misorientations in their fundamental region
 #
 # The preceding tests compare each segment with one ideal relationship. A complementary

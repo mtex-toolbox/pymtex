@@ -84,6 +84,28 @@ twinAngles
 # [Axis Distribution](AxisDistributionFunction.html) develops this distinction for
 # populations of misorientations.
 #
+# ## The Twin as a Near Coincidence
+#
+# A coincidence site lattice (CSL) misorientation takes $\Sigma$ times every lattice vector
+# onto a lattice vector, so that one lattice site in $\Sigma$ is shared by both crystals.
+# Which rotations do this is a property of the lattice alone. For magnesium,
+# $c^2/a^2 = 2.636$ is not a ratio of small integers, and the exact coincidences up to
+# $\Sigma 19$ are only the rotations about $[0001]$: $\Sigma 7$, $\Sigma 13$ and $\Sigma 19$.
+
+np.asarray(CSL(range(1, 20), CS).angle()) / degree
+
+# The option `delta` allows a relative misfit of the lattice. Within two percent the metric
+# is replaced by the ideal ratio $c^2/a^2 = 8/3$, and the coincidences of that lattice are
+# the near coincidences of magnesium. Among them is $\Sigma 17a$, $86.63^\circ$ about
+# $\langle 2\bar1\bar10\rangle$, a third of a degree from the extension twin.
+
+csl17 = CSL(17, CS, delta=0.02)
+np.hstack([angle(csl17), angle(csl17, twinning)]) / degree
+
+# This is why the extension twin is described as a near $\Sigma 17a$ boundary. The CSL
+# names the nearby coincidence, but the twin law itself, $86.3^\circ$, is fixed by the
+# twinning elements and the real lattice.
+#
 # ## Comparing the Twin Law with Measured Boundaries
 #
 # A grain is a phase-homogeneous, spatially connected region of EBSD pixels produced by
