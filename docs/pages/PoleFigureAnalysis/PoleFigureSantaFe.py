@@ -155,15 +155,15 @@ mtexColorMap('white2black')
 
 # ## Read the harmonic spectrum
 #
-# [plotSpektra](SO3Fun.plotSpektra.html) groups the magnitude of the harmonic coefficients
+# [plotSpectrum](SO3Fun.plotSpektra.html) groups the magnitude of the harmonic coefficients
 # by degree. This is the most direct view of the even--odd defect.
 
 # +
 plt.close('all')
-plotSpektra(odf, bandwidth=32, linewidth=2, figSize='small')
+plotSpectrum(odf, bandwidth=32, linewidth=2, figSize='small')
 hold(True)
-plotSpektra(rec, bandwidth=32, linewidth=2)
-plotSpektra(rec2, bandwidth=32, linewidth=2)
+plotSpectrum(rec, bandwidth=32, linewidth=2)
+plotSpectrum(rec2, bandwidth=32, linewidth=2)
 plt.legend(['true ODF', 'with ghost correction', 'without ghost correction'])
 hold(False)
 # -

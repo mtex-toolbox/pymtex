@@ -77,7 +77,7 @@ plot(eS.EBSDsim, ipfKey.orientation2color(eS.EBSDsim.orientations))
 eS.noiseFun = 'logn'
 eS.noiseMax = 2 * degree
 eS.rng = np.random.default_rng(1)
-eS.addnoise()
+eS.addNoise()
 
 noiseAngle = angle(eS.ori0, eS.EBSDsim.orientations) / degree
 print(f'Noise deviation: median {np.median(noiseAngle):.2f} degree; 90th percentile '
@@ -94,12 +94,12 @@ mtexColorbar(title='deviation from ori0 in degree')
 # ## A known low-angle boundary
 #
 # A step feature is specified by a misorientation axis in the specimen frame and a total
-# misorientation angle. `addFeature_singleStep` rotates one stepped domain relative to the
+# misorientation angle. `addFeature('singleStep')` rotates one stepped domain relative to the
 # other.
 
 eS.axS = yvector
-eS.mori_angle = 3 * degree
-eS.addFeature_singleStep()
+eS.moriAngle = 3 * degree
+eS.addFeature('singleStep')
 
 # Feature methods modify the orientations already in `eS.EBSDsim`. They therefore
 # accumulate: this 3° step is added to the noisy map rather than to a fresh uniform map.
@@ -152,15 +152,15 @@ mtexColorbar(title='boundary angle in degree')
 #
 # `makeMap` discards the accumulated features and restores a uniform field. For a
 # gradient, `gradDir` gives the direction of increase in the specimen frame. Here
-# `mori_angle` is the angle increment per spatial grid step, not the total angle used by
+# `moriAngle` is the angle increment per spatial grid step, not the total angle used by
 # the step feature.
 
 # +
 eS.makeMap()
 eS.axS = yvector
 eS.gradDir = xvector
-eS.mori_angle = 0.03 * degree
-eS.addFeature_simpleGradient()
+eS.moriAngle = 0.03 * degree
+eS.addFeature('simpleGradient')
 
 gradientAngle = angle(eS.ori0, eS.EBSDsim.orientations) / degree
 print(f'Gradient deviation: {gradientAngle.min():.2f} to {gradientAngle.max():.2f} degree')
@@ -173,8 +173,8 @@ mtexColorbar(title='deviation from ori0 in degree')
 # default unit step, each column adds 0.03° about `yvector`. The first column is already one
 # increment from `ori0` because the default map coordinates start at one.
 #
-# Further gradients can be superposed by changing `axS`, `gradDir`, or `mori_angle` and
-# calling `addFeature_simpleGradient` again. In contrast, `addFeature_circularSubgrain`
-# applies `mori_angle` as one total rotation. It changes the orientations inside a circular
+# Further gradients can be superposed by changing `axS`, `gradDir`, or `moriAngle` and
+# calling `addFeature('simpleGradient')` again. In contrast, `addFeature('circularSubgrain')`
+# applies `moriAngle` as one total rotation. It changes the orientations inside a circular
 # domain. Assign an existing map to `eS.EBSDsim` to start from measured or separately
 # generated data.

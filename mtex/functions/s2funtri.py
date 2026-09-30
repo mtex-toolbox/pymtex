@@ -74,7 +74,7 @@ class S2FunTri:
     ok = ~np.isnan(W).any(axis=1)
     f = np.full((len(W), self.values.shape[1]), np.nan, dtype=self.values.dtype if self.values.dtype.kind == "c" else float)
     if ok.any():
-      f[ok] = self.tri.calcBario(vector3d(W[ok])) @ self.values
+      f[ok] = self.tri.barycentric(vector3d(W[ok])) @ self.values
     return f.reshape(shape) if self.values.shape[1] == 1 else f.reshape(shape + (-1,))
 
   def __call__(self, v):
@@ -135,7 +135,7 @@ class S2FunTri:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
 
 

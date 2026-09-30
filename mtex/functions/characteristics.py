@@ -2,7 +2,7 @@
 # fibreVolume, max, min, calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution,
 # calcMIndex, discreteSample, calcError, calcKernel, centerSpecimen; docs/plans/functions.md F6)
 #
-#   textureindex(odf), entropy(odf), volume(odf, center, radius), fibreVolume(odf, h, r, radius)
+#   textureIndex(odf), entropy(odf), volume(odf, center, radius), fibreVolume(odf, h, r, radius)
 #   values, modes = max(odf, numLocal=, resolution=, accuracy=);  min(odf)
 #   modes, weights, centerId = calcComponents(odf, seed=, weights=, tolerance=, radius=, exact=)
 #   calcMDF(odf1, odf2, bandwidth=), calcAngleDistribution(odf | cs1, cs2 | mori), calcAxisDistribution(odf, v)
@@ -57,7 +57,7 @@ def _ori(r, f):
 # ------------------------------------------------------------------ scalars
 
 
-def textureindex(f):
+def textureIndex(f):
   """the texture index of a function on SO(3) or on the sphere, the squared L2 norm of its harmonic
   expansion"""
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if _isSO3(f) else S2FunHarmonic(f).norm() ** 2
@@ -925,10 +925,10 @@ def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose
 
 install(SO3_KINDS + S2_KINDS, max_, "max")
 install(SO3_KINDS + S2_KINDS, min_, "min")
-for _f in (entropy, textureindex, discreteSample):
+for _f in (entropy, textureIndex, discreteSample):
   install(SO3_KINDS + S2_KINDS, _f)
 for _f in (volume, fibreVolume, calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex, calcError, centerSpecimen):
   install(SO3_KINDS, _f)
 
-__all__ = ["textureindex", "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex",
+__all__ = ["textureIndex", "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex",
            "calcAxisDistribution", "calcError", "calcComponents", "discreteSample", "calcKernel", "centerSpecimen"]

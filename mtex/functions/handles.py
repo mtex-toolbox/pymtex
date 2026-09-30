@@ -113,7 +113,7 @@ class SO3FunGeneric:
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from typing import Any
-    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+    from .characteristics import (max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume, fibreVolume,
                                   calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
                                   calcError, centerSpecimen)
     from .polefigure import calcPoleFigure
@@ -438,7 +438,7 @@ class S2FunHandle:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
@@ -555,7 +555,7 @@ class S2FunSum:
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureindex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d

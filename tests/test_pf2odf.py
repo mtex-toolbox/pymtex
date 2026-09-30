@@ -6,7 +6,7 @@ import pytest
 
 from mtex import (MLSSolver, Miller, SO3DeLaValleePoussinKernel, SO3FunRBF, calcError, calcNormalization, calcODF,
                   calcODFIterative, crystalFrame, degree, equispacedS2Grid, equispacedSO3Grid, mean, orientation, regularS2Grid,
-                  rotation, specimenFrame, textureindex, uniformODF, unimodalODF, zeroRangeMethod)
+                  rotation, specimenFrame, textureIndex, uniformODF, unimodalODF, zeroRangeMethod)
 from mtex.analysis.pf2odf import PoleFigureOperator
 from mtex.functions.polefigure import _poleDensity
 
@@ -206,7 +206,7 @@ def test_calcODF_regularisationSmooths(regular):
   # the regularisation smooths: the texture index drops and the fit stays reasonable
   odf, pfs, plain = regular
   smooth = calcODF(pfs, resolution=10 * degree, regularisation=1e-3)
-  assert textureindex(smooth) < textureindex(plain)
+  assert textureIndex(smooth) < textureIndex(plain)
   assert np.all(calcError(pfs, smooth) < 0.15)
 
 

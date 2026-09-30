@@ -87,7 +87,7 @@ cellVolume
 # The output is 223.5856 in the cube of the lattice-parameter unit. The defining duality
 # is seen directly in the matrix of pairwise dot products.
 
-dot_outer(directBasis, reciprocalBasis)
+dot(directBasis, reciprocalBasis, outer=True)
 
 # The result is the identity matrix. Reciprocal axes have inverse-length units, and MTEX
 # uses the crystallographic convention without a factor $2\pi$. Direct and reciprocal axes
@@ -169,7 +169,7 @@ dspacing(hCubic)
 #
 # MTEX obtains it directly from the basis vectors.
 
-metricMatrix = dot_outer(directBasis, directBasis)
+metricMatrix = dot(directBasis, directBasis, outer=True)
 metricMatrix
 
 # The diagonal entries are $a^2$, $b^2$, and $c^2$. The off-diagonal entries contain the
@@ -222,5 +222,5 @@ metricMatrix
 #
 # `cs.axes` and `cs.axesDual` are three vectors in the crystal frame's Cartesian
 # coordinates, derived from the stored basis; `det(v)` of three vectors is the
-# determinant of their matrix and `dot_outer` the matrix of pairwise products, as NumPy
+# determinant of their matrix and `dot(..., outer=True)` the matrix of pairwise products, as NumPy
 # arrays.

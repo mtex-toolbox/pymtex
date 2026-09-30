@@ -188,17 +188,17 @@ l2Corrected
 # A harmonic spectrum groups coefficient magnitudes by degree. Plot the true ODF first.
 
 plt.close('all')
-plotSpektra(odf, linewidth=2, figSize='small')
+plotSpectrum(odf, linewidth=2, figSize='small')
 hold(True)
 
 # Add the uncorrected reconstruction. Its zig-zag is the key feature: odd degrees are
 # pulled towards zero while the even degrees remain close to the truth.
 
-plotSpektra(rec, linewidth=2)
+plotSpectrum(rec, linewidth=2)
 
 # The corrected reconstruction follows the true spectrum smoothly.
 
-plotSpektra(recCor, linewidth=2)
+plotSpectrum(recCor, linewidth=2)
 plt.legend(['true ODF', 'without ghost correction', 'with ghost correction'])
 # next plot command overwrites plot window
 hold(False)

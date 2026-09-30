@@ -73,7 +73,7 @@ class boundaryNetwork:
     """the number of neighbours of every vertex of the network"""
     return np.diff(self.ptr)
 
-  def nNeighbors(self, i):
+  def numNeighbors(self, i):
     """the number of neighbours of vertex i"""
     return int(self.ptr[i + 1] - self.ptr[i])
 

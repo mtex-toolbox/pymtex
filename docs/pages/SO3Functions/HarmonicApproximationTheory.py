@@ -96,11 +96,11 @@ plot(SO3F2, 'sigma')
 #
 # ## Read the spectrum
 #
-# [plotSpektra](SO3Fun.plotSpektra.html) summarizes the coefficient energy at each harmonic
+# [plotSpectrum](SO3Fun.plotSpektra.html) summarizes the coefficient energy at each harmonic
 # degree. It reveals high-frequency content that can be difficult to distinguish in a
 # section plot.
 
-plotSpektra([SO3F1, SO3F2], figSize='small')
+plotSpectrum([SO3F1, SO3F2], figSize='small')
 legend('Bandwidth 17', 'Bandwidth 32')
 
 # The bandwidth-17 spectrum stops before the high degrees are available. For bandwidth 32,
@@ -163,7 +163,7 @@ mtexColorbar()
 # represent $\lambda=10^{-2}$, $10^{-4}$, $10^{-8}$, and $10^{-12}$.
 
 ind = [2, 4, 8, 12]
-plotSpektra([SO3F4[i] for i in ind], figSize='small')
+plotSpectrum([SO3F4[i] for i in ind], figSize='small')
 legend('λ = 10⁻²', 'λ = 10⁻⁴', 'λ = 10⁻⁸', 'λ = 10⁻¹²')
 
 # Strong regularization removes almost all high-degree energy. As $\lambda$ decreases, the

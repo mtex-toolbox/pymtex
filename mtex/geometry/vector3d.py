@@ -513,10 +513,14 @@ class vector3d(MtexArray):
 
   # ------------------------------------------------------------------ products and angles
 
-  def dot(self, other, antipodal=False, noAntipodal=False, noSymmetry=False, min=False, all=False):
+  def dot(self, other, antipodal=False, noAntipodal=False, noSymmetry=False, min=False, all=False, outer=False):
     """the inner product; an axis on either side reads it up to sign; a crystal direction
-    reduces over the group of its frame unless noSymmetry says otherwise"""
+    reduces over the group of its frame unless noSymmetry says otherwise; outer=True pairs
+    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's dot_outer)"""
     other = self._coerce(other)
+    if outer:
+      a, b = self._outerPair(other)
+      return a.dot(b, antipodal=antipodal, noAntipodal=noAntipodal, noSymmetry=noSymmetry, min=min, all=all)
     _joinFrames(self._frame, other._frame)
     if not noSymmetry:
       from .symmetryops import symDot
@@ -540,10 +544,14 @@ class vector3d(MtexArray):
     """the length of the vectors"""
     return np.linalg.norm(self.data, axis=-1)
 
-  def angle(self, other, N=None, antipodal=False, noSymmetry=False):
+  def angle(self, other, N=None, antipodal=False, noSymmetry=False, outer=False):
     """the angle between two vectors, through atan2 for full accuracy near 0 and pi; with a
-    normal N the angle in that plane, counterclockwise from self to other"""
+    normal N the angle in that plane, counterclockwise from self to other; outer=True pairs
+    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's angle_outer)"""
     other = self._coerce(other)
+    if outer:
+      a, b = self._outerPair(other)
+      return a.angle(b, N=N, antipodal=antipodal, noSymmetry=noSymmetry)
     _joinFrames(self._frame, other._frame)
     if not noSymmetry and N is None:
       from .symmetryops import symAngle
@@ -562,21 +570,9 @@ class vector3d(MtexArray):
     c = np.linalg.norm(np.cross(self.data, other.data), axis=-1)
     return np.arctan2(c, np.abs(d) if isAntipodal else d)
 
-  def angle_outer(self, other, **kwargs):
-    """every pair: the angles and the inner products of the entries of self against the
-    entries of other, an array of shape self.shape + other.shape"""
-    other = self._coerce(other)
-    a = self.reshape(self.shape + (1,) * other.ndim)
-    b = other.reshape((1,) * self.ndim + other.shape)
-    return a.angle(b, **kwargs)
-
-  def dot_outer(self, other, **kwargs):
-    """the inner products of every entry of self with every entry of other, an array of shape
-    self.shape + other.shape; keywords go to dot"""
-    other = self._coerce(other)
-    a = self.reshape(self.shape + (1,) * other.ndim)
-    b = other.reshape((1,) * self.ndim + other.shape)
-    return a.dot(b, **kwargs)
+  # self and other broadcast against each other: self's axes first, then other's
+  def _outerPair(self, other):
+    return self.reshape(self.shape + (1,) * other.ndim), other.reshape((1,) * self.ndim + other.shape)
 
   def orthProj(self, N):
     """the component orthogonal to a normal N, vector3d/orthProj"""

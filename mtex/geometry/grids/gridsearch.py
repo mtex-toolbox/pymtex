@@ -252,7 +252,7 @@ def flatSO3(g):
   ringOff = np.ascontiguousarray(ab.offset, dtype=np.int64)
   ringMin = np.array([float(r.min) for r in ab.rhoGrid])
   ap = float(g.alphaPeriod)
-  ringAlpha, ringNode = np.empty(g.nnodes), np.empty(g.nnodes, dtype=np.int64)
+  ringAlpha, ringNode = np.empty(g.numNodes), np.empty(g.numNodes, dtype=np.int64)
   for r in range(len(ab.rhoGrid)):
     k0, k1 = ringOff[r], ringOff[r + 1]
     a = g.alpha[k0:k1] - np.floor((g.alpha[k0:k1] - ringMin[r]) / ap) * ap

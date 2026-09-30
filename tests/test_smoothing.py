@@ -28,7 +28,7 @@ def test_SM1_the_network_is_what_may_move_and_what_may_not():
   net = boundaryNetwork(g.boundary, g.innerBoundary)
   # every vertex of the boundary, and nothing else out of the pool of the map
   assert len(net) == len(np.unique(g.boundary.F)) and len(net) < len(g.boundary.V)
-  assert np.all(net.degree >= 2) and all(net.nNeighbors(i) == len(net.neighbors(i)) for i in range(len(net)))
+  assert np.all(net.degree >= 2) and all(net.numNeighbors(i) == len(net.neighbors(i)) for i in range(len(net)))
   # the border of the map is held, and so are the junctions; what is left to move is the
   # cross between the blocks, its four ends and its centre apart
   assert np.count_nonzero(~net.fixed) == 36

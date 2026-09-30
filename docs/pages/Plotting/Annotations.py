@@ -156,10 +156,10 @@ legend('show')
 
 # +
 plt.close('all')
-plotSpektra(FourierODF(odf, 32), DisplayName='Two-component ODF', figSize='small')
+plotSpectrum(FourierODF(odf, 32), DisplayName='Two-component ODF', figSize='small')
 hold(True)
 fodf = fibreODF(Miller(1, 0, 0, cs), zvector)
-plotSpektra(FourierODF(fodf, 32), DisplayName='Fibre ODF')
+plotSpectrum(FourierODF(fodf, 32), DisplayName='Fibre ODF')
 hold(False)
 legend('show')
 # -

@@ -85,7 +85,7 @@ def test_equispacedS2Grid_antipodalHasHalfTheNodesAndCovers(g5):
 def test_subGrid_byMaskIsAGridThatSearches(g5):
   mask = g5.z > 0.2
   s = g5.subGrid(mask)
-  assert isinstance(s, S2Grid) and s.size == np.sum(mask) and s.nrings < g5.nrings
+  assert isinstance(s, S2Grid) and s.size == np.sum(mask) and s.numRings < g5.numRings
   assert all(abs(bruteDots(s, v)[s.find(v)[0]] - np.max(bruteDots(s, v))) < 1e-12 for v in vs[:50])
 
 

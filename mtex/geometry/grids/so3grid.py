@@ -50,7 +50,7 @@ class SO3Grid(orientation):
   def gamma(self):
     """the ladder of every node as an S1Grid"""
     return [S1Grid(self.gammaPoints[self.offset[k]:self.offset[k + 1]], min=self.gammaMin[k],
-                   max=self.gammaMin[k] + self.gammaPeriod, periodic=True) for k in range(self.nnodes)]
+                   max=self.gammaMin[k] + self.gammaPeriod, periodic=True) for k in range(self.numNodes)]
 
   # anything derived from the grid is a plain orientation list
   def _new(self, data, **attrs):
@@ -68,7 +68,7 @@ class SO3Grid(orientation):
     return self.res
 
   @property
-  def nnodes(self):
+  def numNodes(self):
     """the number of nodes of the S2 grid of (alpha, beta), each carrying a ladder of gamma"""
     return len(self.alpha)
 
@@ -93,7 +93,7 @@ class SO3Grid(orientation):
       m = np.zeros(self.size, dtype=bool)
       m[mask] = True
       mask = m
-    counts = np.add.reduceat(mask, self.offset[:-1]) if self.size else np.zeros(self.nnodes, dtype=np.int64)
+    counts = np.add.reduceat(mask, self.offset[:-1]) if self.size else np.zeros(self.numNodes, dtype=np.int64)
     keep = counts > 0
     offset = np.concatenate([[0], np.cumsum(counts[keep])])
     return SO3Grid(rotation._fromData(self.data[mask]), self.frameA, self.frameB, self.alphabeta.subGrid(keep),

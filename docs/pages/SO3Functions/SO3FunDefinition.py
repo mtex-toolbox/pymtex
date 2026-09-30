@@ -80,7 +80,7 @@ mtexColorbar()
 # The power spectrum shows how much squared coefficient magnitude belongs to each harmonic
 # degree.
 
-plotSpektra(SO3FHarmonic, linewidth=2, figSize='small')
+plotSpectrum(SO3FHarmonic, linewidth=2, figSize='small')
 
 # The plotted spectrum stops at degree 16 because higher coefficients were not retained. Its
 # decay indicates how strongly the finer angular scales contribute to this approximation. See

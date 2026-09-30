@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import vector3d, xvector, yvector, zvector, rotation, degree, angle, dot, cross, norm, cat, angle_outer, dot_outer, orthProj
+from mtex import vector3d, xvector, yvector, zvector, rotation, degree, angle, dot, cross, norm, cat, orthProj
 from conftest import close
 
 
@@ -291,12 +291,12 @@ def test_repr_listsFewVectorsAndSizesMany():
   assert "x  y  z" not in repr(vector3d.rand(30, rng=g))
 
 
-def test_dot_outer_andAngle_outer():
+def test_outer_dot_and_angle_pair_every_entry():
   a = cat(xvector, yvector)
   b = cat(xvector, yvector, zvector)
-  D = dot_outer(a, b)
+  D = dot(a, b, outer=True)
   assert D.shape == (2, 3) and np.allclose(D, [[1, 0, 0], [0, 1, 0]])
-  A = angle_outer(a, b) / degree
+  A = angle(a, b, outer=True) / degree
   assert np.allclose(A, [[0, 90, 90], [90, 0, 90]])
 
 

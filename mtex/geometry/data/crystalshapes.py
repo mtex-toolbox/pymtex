@@ -76,7 +76,7 @@ CRYSTAL_SHAPES = {
   "fluorite": dict(symbol="m-3m", abc=(1, 1, 1), abg=(90, 90, 90), alignment=(), mineral="fluorite",
     normals=[(1, 1, 1)],
     distances=[1]),
-  "fluorite_complex": dict(symbol="m-3m", abc=(1, 1, 1), abg=(90, 90, 90), alignment=(), mineral="fluorite",
+  "fluoriteComplex": dict(symbol="m-3m", abc=(1, 1, 1), abg=(90, 90, 90), alignment=(), mineral="fluorite",
     normals=[(1, 0, 0), (1, 1, 0)],
     distances=[1, 1.75]),
   "forsterite": dict(symbol="mmm", abc=(0.466, 1, 0.586), abg=(90, 90, 90), alignment=(), mineral="forsterite",

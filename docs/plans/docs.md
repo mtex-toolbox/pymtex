@@ -143,7 +143,7 @@ part refusing to join a radial function, `calcComponents` half an hour on the Du
 and a dozen plotting slips (the layout of sections, the lowest contour band, a prepared
 figure ignored, `hold` beside a plain figure); it wrote `crystalFrame.load` for CIF files,
 the named rolling components and fibres, `plot(oS)`, `quiver`, shapes, `annotate` and
-fibres into section plots, `plot(psi)` and `plotSpektra`, the ODF file interfaces
+fibres into section plots, `plot(psi)` and `plotSpectrum`, the ODF file interfaces
 (`export(odf, ...)`, `SO3Fun.load`, pickling with interned frames), `fundamentalRegionEuler`,
 `project2EulerFR`, `calcPDF(odf, None, r)`, `BinghamODF` in MATLAB's forms, the crystal
 axes as Millers, MATLAB's named figure sizes and the `silent` flag, all in

@@ -118,7 +118,7 @@ def test_mergeSimilar_joinsTheGrainsOfOneParent(plain):
   job.calcParentFromVote(minProb=0.3)
   job.mergeSimilar()
   assert len(job.grains) == 2 and np.max(fitsParent(job.grains)) < 2 * degree
-  assert np.all(job.isTransformed) and np.array_equal(np.sort(job.numChilds), [3, 3])
+  assert np.all(job.isTransformed) and np.array_equal(np.sort(job.numChildren), [3, 3])
   assert np.array_equal(np.sort(job.grains.clusterSize), [3, 3]) and np.all(job.isMerged)
 
 

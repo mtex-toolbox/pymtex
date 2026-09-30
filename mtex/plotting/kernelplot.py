@@ -2,8 +2,8 @@
 # (MATLAB @SO3Kernel/plot, @SO3Kernel/plotSpektra, @S2Kernel/plotSpektra, @SO3Fun/plotSpektra)
 #
 #   plot(psi)                          psi(omega) over -180 to 180 degree
-#   plotSpektra(psi, bandwidth=32)     the Chebyshev coefficients A_l / (2l + 1) per degree
-#   plotSpektra(odf, bandwidth=32)     the harmonic power per degree of an SO3Fun
+#   plotSpectrum(psi, bandwidth=32)     the Chebyshev coefficients A_l / (2l + 1) per degree
+#   plotSpectrum(odf, bandwidth=32)     the harmonic power per degree of an SO3Fun
 from __future__ import annotations
 
 import numpy as np
@@ -56,17 +56,17 @@ def plotSO3Kernel(psi, **kw):
   return h
 
 
-def plotSpektra(x, bandwidth=None, logarithmic=False, **kw):
-  """plotSpektra(psi), plotSpektra(odf): the Chebyshev coefficients of a kernel, or the harmonic
-  power of a function, per degree"""
+def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw):
+  """plotSpectrum(psi), plotSpectrum(odf): the Chebyshev coefficients of a kernel, or the harmonic
+  power of a function, per degree (MATLAB's plotSpektra)"""
   from ..functions.kernelfunctions import S2Kernel, SO3Kernel
   # a list of functions, MATLAB's [f, g]: one line each in the same axes
   if isinstance(x, (list, tuple)):
     from .mtexfigure import hold
-    hs = [plotSpektra(x[0], bandwidth, logarithmic, **kw)]
+    hs = [plotSpectrum(x[0], bandwidth, logarithmic, **kw)]
     hold(True)
     for f in x[1:]:
-      hs.append(plotSpektra(f, bandwidth, logarithmic, **{k: v for k, v in kw.items() if k != "figSize"}))
+      hs.append(plotSpectrum(f, bandwidth, logarithmic, **{k: v for k, v in kw.items() if k != "figSize"}))
     hold(False)
     return hs
   fontSize = kw.pop("FontSize", kw.pop("fontSize", None))
@@ -118,4 +118,4 @@ def _spektra(ax, x, bandwidth, logarithmic, kw):
   return h
 
 
-__all__ = ["plotSO3Kernel", "plotSpektra"]
+__all__ = ["plotSO3Kernel", "plotSpectrum"]

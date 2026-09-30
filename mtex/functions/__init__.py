@@ -31,7 +31,7 @@ from .so3vectorfield import (SO3VectorFieldHarmonic, SO3VectorFieldHandle, SO3Ve
                              differentiate, equivariantProjection)
 from .s2vectorfield import S2VectorFieldHarmonic, S2VectorFieldHandle, thetaVector, rhoVector, angularDerivatives
 from .s2axisfield import S2AxisFieldHarmonic, S2AxisFieldHandle
-from .characteristics import (textureindex, entropy, volume, fibreVolume, calcMDF, calcAngleDistribution, calcMIndex,
+from .characteristics import (textureIndex, entropy, volume, fibreVolume, calcMDF, calcAngleDistribution, calcMIndex,
                               calcAxisDistribution, calcComponents, discreteSample, calcKernel, centerSpecimen)
 from .polefigure import (PoleFigure, calcPoleFigure, calcQuadratureWeights, calcNormalization, calcErrorPF, calcError,
                          correct, noisepf, isOutlier, refine, SchulzDefocusingKernel)
@@ -63,7 +63,7 @@ __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wigne
            "mhyper", "SO3FunBingham", "BinghamODF", "calcBinghamODF", "S2FunBingham", "SO3VectorFieldHarmonic",
            "SO3VectorFieldHandle", "SO3VectorFieldRBF", "componentFrames", "component", "curl", "div", "antiderivative",
            "mapField", "differentiate", "equivariantProjection", "S2VectorFieldHarmonic", "S2VectorFieldHandle",
-           "thetaVector", "rhoVector", "angularDerivatives", "S2AxisFieldHarmonic", "S2AxisFieldHandle", "textureindex",
+           "thetaVector", "rhoVector", "angularDerivatives", "S2AxisFieldHarmonic", "S2AxisFieldHandle", "textureIndex",
            "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex", "calcAxisDistribution",
            "calcError", "calcComponents", "discreteSample", "calcKernel", "centerSpecimen", "PoleFigure",
            "calcPoleFigure", "calcQuadratureWeights", "calcNormalization", "calcErrorPF", "correct", "noisepf",

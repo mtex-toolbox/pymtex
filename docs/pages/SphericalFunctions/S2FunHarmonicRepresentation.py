@@ -101,10 +101,10 @@ mtexColorbar()
 #
 # ## Inspect the harmonic spectrum
 #
-# [plotSpektra](S2FunHarmonic.plotSpektra.html) groups coefficients by degree. At degree
+# [plotSpectrum](S2FunHarmonic.plotSpektra.html) groups coefficients by degree. At degree
 # $m$, it plots $\left(\sum_{k=-m}^{m}|\hat f_m^k|^2\right)^{1/2}$.
 
-plotSpektra(S2F, figSize='small')
+plotSpectrum(S2F, figSize='small')
 
 # ## Read the spectrum
 #
@@ -129,7 +129,7 @@ truncatedBandwidth
 
 # ---
 
-plotSpektra(S2F, linewidth=2, figSize='small')
+plotSpectrum(S2F, linewidth=2, figSize='small')
 
 # ## Read the truncated spectrum
 #

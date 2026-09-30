@@ -49,7 +49,7 @@ class S2Grid(vector3d):
     return self.res
 
   @property
-  def nrings(self):
+  def numRings(self):
     """the number of rings, polar angles, of the grid"""
     return len(self.thetaGrid)
 
@@ -79,8 +79,8 @@ class S2Grid(vector3d):
       m = np.zeros(self.size, dtype=bool)
       m[mask] = True
       mask = m
-    keep = [bool(np.any(mask[self.ring(k)])) for k in range(self.nrings)]
-    rho = [self.rhoGrid[k].subGrid(mask[self.ring(k)]) for k in range(self.nrings) if keep[k]]
+    keep = [bool(np.any(mask[self.ring(k)])) for k in range(self.numRings)]
+    rho = [self.rhoGrid[k].subGrid(mask[self.ring(k)]) for k in range(self.numRings) if keep[k]]
     g = S2Grid(self.thetaGrid.subGrid(keep), rho, self.frame, self.res, self.antipodal)
     g.dispStyle = self.dispStyle
     return g

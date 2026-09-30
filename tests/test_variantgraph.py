@@ -92,7 +92,7 @@ def test_the_grain_graph_route(plain):
   job.clusterGraph()
   job.mergeByGraph()
   assert len(job.grains) == 2 and np.all(job.isParent) and np.max(fitsParent(job.grains)) < 2 * degree
-  assert np.all(job.isTransformed) and np.array_equal(np.sort(job.numChilds), [3, 3])
+  assert np.all(job.isTransformed) and np.array_equal(np.sort(job.numChildren), [3, 3])
 
 
 def test_the_compiled_variant_angles_against_their_oracles():

@@ -423,16 +423,16 @@ def fillByGrainId(ebsd, grains):
   return out
 
 
-def reduce(ebsd, fak=2):
+def reduce(ebsd, factor=2):
   """every n-th measurement along each lattice direction, which is the map at a coarser step"""
-  if fak < 1:
+  if factor < 1:
     raise ValueError("the factor of a reduction is at least one")
   l = mapLattice(ebsd)
-  out = ebsd[np.flatnonzero((l.ij[:, 0] % fak == 0) & (l.ij[:, 1] % fak == 0))]
-  # the sublattice is the same kind of lattice fak times coarser
+  out = ebsd[np.flatnonzero((l.ij[:, 0] % factor == 0) & (l.ij[:, 1] % factor == 0))]
+  # the sublattice is the same kind of lattice factor times coarser
   l2 = out.lattice
   if l2 is not None:
-    object.__setattr__(out, "lattice", lattice._build(l2.plane, l2.origin, l2.A * fak, l2.ij // fak, l2.shape))
+    object.__setattr__(out, "lattice", lattice._build(l2.plane, l2.origin, l2.A * factor, l2.ij // factor, l2.shape))
   return out
 
 

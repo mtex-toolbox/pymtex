@@ -133,11 +133,11 @@ plotPDF(fExample, cat(Miller(1, 0, 0, cs), Miller(1, 1, 0, cs)), antipodal=True)
 
 # ## Reading a Spectrum
 #
-# [plotSpektra](SO3Fun.plotSpektra.html) groups the coefficients by degree. At each degree
+# [plotSpectrum](SO3Fun.plotSpektra.html) groups the coefficients by degree. At each degree
 # it plots the square root of their summed squared magnitudes, not the individual
 # coefficients.
 
-plotSpektra(f, figSize='small')
+plotSpectrum(f, figSize='small')
 
 # Read the curve from left to right as the amount of progressively finer angular
 # structure. Fast decay means that a lower bandwidth may preserve the function well. A
@@ -175,7 +175,7 @@ maxApproximationError
 # but not differentiable there, so its coefficients decay slowly and the finite cutoff is
 # felt away from the cusps as well.
 
-plotSpektra(fAngleHarm, figSize='small')
+plotSpectrum(fAngleHarm, figSize='small')
 
 # Unlike the reconstructed ODF spectrum, this spectrum retains appreciable power near the
 # cutoff. That slow decay is the spectral signature of the nonsmooth angle function. In

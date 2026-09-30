@@ -112,7 +112,7 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.figure(figsize=(7, 4.5), layout='constrained')
 hold(True)
 for kernel, name in zip(psi, kernelName):
-  plotSpektra(kernel, bandwidth=32, linewidth=2, DisplayName=name)
+  plotSpectrum(kernel, bandwidth=32, linewidth=2, DisplayName=name)
 hold(False)
 plt.xlabel('harmonic degree')
 plt.ylabel('radial coefficient')

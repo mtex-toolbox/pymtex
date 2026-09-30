@@ -417,12 +417,12 @@ class PoleFigure:
 
   findOutlier = isOutlier
 
-  def noisepf(self, fak=1, background=0, nonnegative=False, rng=None):
-    """Poisson counts of fak * I + background, the background subtracted again"""
+  def noisepf(self, factor=1, background=0, nonnegative=False, rng=None):
+    """Poisson counts of factor * I + background, the background subtracted again"""
     rng = np.random.default_rng() if rng is None else rng
-    fak = self._operands(fak)
+    factor = self._operands(factor)
     allI = []
-    for I, f in zip(self.allI, fak):
+    for I, f in zip(self.allI, factor):
       counts = rng.poisson(np.maximum(f * I + background, 0)) - background
       allI.append(np.maximum(counts, 0) if nonnegative else counts.astype(float))
     return self._rebuild(allI)
@@ -576,10 +576,10 @@ def correct(pf, **kwargs):
   return pf.correct(**kwargs)
 
 
-def noisepf(pf, fak=1, background=0, nonnegative=False, rng=None):
-  """noisepf(pf, ...) is pf.noisepf(...): Poisson counts of fak * I + background, the background
+def noisepf(pf, factor=1, background=0, nonnegative=False, rng=None):
+  """noisepf(pf, ...) is pf.noisepf(...): Poisson counts of factor * I + background, the background
   subtracted again"""
-  return pf.noisepf(fak, background, nonnegative, rng)
+  return pf.noisepf(factor, background, nonnegative, rng)
 
 
 def isOutlier(pf, alpha=2):

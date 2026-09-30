@@ -190,11 +190,11 @@ SO3F1.reshape(2, 1) * SO3F4
 
 # ## Inspect all components
 #
-# [plotSpektra](SO3Fun.plotSpektra.html) draws the harmonic power spectrum of every
+# [plotSpectrum](SO3Fun.plotSpektra.html) draws the harmonic power spectrum of every
 # component. The four curves show that components of one function array may have different
 # distributions over harmonic degree.
 
-plotSpektra(SO3F3, linewidth=2, figSize='small')
+plotSpectrum(SO3F3, linewidth=2, figSize='small')
 
 # An orientation-space section plot displays only the first component of a vector-valued
 # function, with a warning. Select and prepare a component explicitly when another component

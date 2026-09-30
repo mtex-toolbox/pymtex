@@ -4,7 +4,7 @@
 #   sT = S2Triangulation(v)            the triangles over the directions v
 #   sT.T                               the triangles, three vertex indices each, counterclockwise from outside
 #   sT.neighbours                      the triangle opposite each of the three vertices
-#   B = sT.calcBario(w)                the barycentric coordinates of w, a sparse matrix, rows w, columns vertices
+#   B = sT.barycentric(w)                the barycentric coordinates of w, a sparse matrix, rows w, columns vertices
 #
 # The directions must surround the origin, as a set covering the sphere does. A direction
 # lies in the triangle whose cone holds it; its coordinates are those of the triangle's
@@ -24,7 +24,7 @@ class S2Triangulation:
   surround the origin
 
     sT = S2Triangulation(v)
-    B = sT.calcBario(w)"""
+    B = sT.barycentric(w)"""
 
   def __init__(self, vertices):
     from scipy.spatial import ConvexHull, cKDTree
@@ -70,9 +70,9 @@ class S2Triangulation:
     lam = np.maximum(lam, 0)
     return t, lam / lam.sum(axis=1, keepdims=True)
 
-  def calcBario(self, v):
+  def barycentric(self, v):
     """the barycentric coordinates of directions in the triangulation, a sparse matrix with a row per
-    direction and a column per vertex"""
+    direction and a column per vertex (MATLAB's calcBario)"""
     from scipy.sparse import csr_matrix
     t, lam = self.locate(v)
     n = len(t)

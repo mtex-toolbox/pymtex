@@ -63,8 +63,10 @@ class Index:
     if cls in seen or cls not in self.mMethods and cls not in self.mClass:
       return None
     seen.add(cls)
-    if name in self.mMethods.get(cls, {}):
-      return self.mMethods[cls][name]
+    # a property is found by its getter too, get.numChilds by numChilds
+    for n in (name, "get." + name):
+      if n in self.mMethods.get(cls, {}):
+        return self.mMethods[cls][n]
     for s in self.mClass.get(cls, {}).get("supers", []):
       r = self.mLookup(s, name, seen)
       if r:

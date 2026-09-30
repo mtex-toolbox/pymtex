@@ -235,7 +235,7 @@ plotPDF(odf1, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], cs))
 # nothing here.
 
 plt.close('all')
-plotSpektra(odf1, linewidth=2, figSize='small')
+plotSpectrum(odf1, linewidth=2, figSize='small')
 
 # The spectrum falls rapidly towards zero by degree 10.
 #
@@ -247,7 +247,7 @@ A = np.arange(1, 12) % 2
 odf2 = conv(odf1, A)
 
 hold(True)
-plotSpektra(odf2, linewidth=2, figSize='small')
+plotSpectrum(odf2, linewidth=2, figSize='small')
 
 hold(False)
 plt.legend(['odf1', 'odf2'])
@@ -339,11 +339,11 @@ plt.legend(['odf rec1', 'odf rec2'])
 # Without correction, the recovered odd-degree coefficients are far too small.
 
 plt.close('all')
-plotSpektra(odf1, linewidth=2, bandwidth=10, figSize='small')
+plotSpectrum(odf1, linewidth=2, bandwidth=10, figSize='small')
 hold(True)
-plotSpektra(odf2, linewidth=2)
-plotSpektra(odf_rec1, linewidth=2)
-plotSpektra(odf_rec2, linewidth=2)
+plotSpectrum(odf2, linewidth=2)
+plotSpectrum(odf_rec1, linewidth=2)
+plotSpectrum(odf_rec2, linewidth=2)
 hold(False)
 plt.legend(['odf1', 'odf2', 'odf rec1', 'odf rec2'])
 
@@ -416,16 +416,16 @@ mtexColorMap('white2black')
 # +
 plt.close('all')
 # the harmonic coefficients of the sample ODF
-plotSpektra(SantaFe(), bandwidth=32, linewidth=2, MarkerSize=10, figSize='small')
+plotSpectrum(SantaFe(), bandwidth=32, linewidth=2, MarkerSize=10, figSize='small')
 
 # keep plot for adding the next plots
 hold(True)
 
 # the harmonic coefficients of the reconstruction with ghost correction:
-plotSpektra(rec, bandwidth=32, linewidth=2, MarkerSize=10)
+plotSpectrum(rec, bandwidth=32, linewidth=2, MarkerSize=10)
 
 # the harmonic coefficients of the reconstruction without ghost correction:
-plotSpektra(rec2, bandwidth=32, linewidth=2, MarkerSize=10)
+plotSpectrum(rec2, bandwidth=32, linewidth=2, MarkerSize=10)
 
 plt.legend(['true ODF', 'with ghost correction', 'without ghost correction'])
 # next plot command overwrites plot

@@ -250,7 +250,7 @@ kernelCommutationError
 
 # ---
 
-plotSpektra([smoothSource, smoothF], figSize='small')
+plotSpectrum([smoothSource, smoothF], figSize='small')
 legend('before convolution', 'after convolution')
 
 # The convolved spectrum lies below the original at higher harmonic degrees. Those degrees

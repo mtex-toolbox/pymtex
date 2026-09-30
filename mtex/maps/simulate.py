@@ -6,10 +6,10 @@
 #   eS.xdim, eS.ydim, eS.stepSize         the map over 1:stepSize:xdim by 1:stepSize:ydim
 #   eS.CS, eS.ori0                        the crystal frame and the orientation of every measurement
 #   eS.makeMap()                          the map of ori0, eS.EBSDsim
-#   eS.addnoise()                         noise of eS.noiseFun ('uniform', 'logn') up to eS.noiseMax
-#   eS.addFeature_singleStep()            a step of eS.mori_angle about eS.axS
-#   eS.addFeature_simpleGradient()        a gradient of eS.mori_angle per step along eS.gradDir
-#   eS.addFeature_circularSubgrain()      a disc turned by eS.mori_angle about eS.axS
+#   eS.addNoise()                         noise of eS.noiseFun ('uniform', 'logn') up to eS.noiseMax
+#   eS.addFeature('singleStep')           a step of eS.moriAngle about eS.axS
+#   eS.addFeature('simpleGradient')       a gradient of eS.moriAngle per step along eS.gradDir
+#   eS.addFeature('circularSubgrain')     a disc turned by eS.moriAngle about eS.axS
 from __future__ import annotations
 
 import numpy as np
@@ -42,8 +42,8 @@ class simulateEBSD:
 
     eS = simulateEBSD()
     eS.makeMap()
-    eS.addFeature_simpleGradient()
-    eS.addnoise()"""
+    eS.addFeature('simpleGradient')
+    eS.addNoise()"""
 
   def __init__(self):
     self.xdim = 100
@@ -55,7 +55,7 @@ class simulateEBSD:
     self.EBSDsim = None
     self.axS = vector3d(0.0, 1.0, 0.0)
     self.gradDir = vector3d(1.0, 0.0, 0.0)
-    self.mori_angle = 0.0017
+    self.moriAngle = 0.0017
     self.ori0 = orientation.id(crystalFrame("1", mineral="kryptonite"))
     # the generator of the noise; None draws a fresh one, as MATLAB's rand does
     self.rng = None
@@ -65,7 +65,7 @@ class simulateEBSD:
     rows = [("xdim", f"{self.xdim:g}"), ("ydim", f"{self.ydim:g}"), ("stepSize", f"{self.stepSize:g}"),
             ("CS", f"{self.CS.pointGroup} ({self.CS.mineral})"), ("noiseFun", repr(self.noiseFun)),
             ("noiseMax", f"{self.noiseMax / degree:g}°"), ("axS", fmt(self.axS)), ("gradDir", fmt(self.gradDir)),
-            ("mori_angle", f"{self.mori_angle / degree:g}°"),
+            ("moriAngle", f"{self.moriAngle / degree:g}°"),
             ("EBSDsim", "none yet" if self.EBSDsim is None else f"{self.EBSDsim.size} measurements")]
     w = max(len(k) for k, _ in rows)
     return aligned("simulateEBSD\n" + "\n".join(f"  {k:<{w}}  {v}" for k, v in rows))
@@ -100,9 +100,9 @@ class simulateEBSD:
     self.domainID = None
     return self
 
-  def addnoise(self):
+  def addNoise(self):
     """every orientation turned on the specimen side about a random axis by a random angle:
-    uniform up to noiseMax, or lognormal scaled so that the largest is noiseMax"""
+    uniform up to noiseMax, or lognormal scaled so that the largest is noiseMax (MATLAB's addnoise)"""
     e = self.EBSDsim
     n = e.size
     rng = np.random.default_rng() if self.rng is None else self.rng
@@ -120,29 +120,40 @@ class simulateEBSD:
   def _axis(self):
     return np.asarray(self.axS.normalize().data, dtype=float).reshape(3)
 
-  def addFeature_singleStep(self):
-    """the orientations of the right third and the upper half of the middle third turned by
-    mori_angle about axS: a known low angle boundary along the edge of that domain"""
+  def addFeature(self, kind):
+    """a known feature added to the map: 'singleStep', a domain turned by moriAngle about axS;
+    'simpleGradient', a turn growing by moriAngle per step along gradDir; 'circularSubgrain', a
+    disc turned by moriAngle about axS (MATLAB's addFeature_singleStep, addFeature_simpleGradient,
+    addFeature_circularSubgrain and updateOri)"""
+    features = {"singleStep": self._singleStep, "simpleGradient": self._simpleGradient,
+                "circularSubgrain": self._circularSubgrain}
+    if kind not in features:
+      raise ValueError(f"the feature is one of {', '.join(map(repr, features))}, not {kind!r}")
+    return features[kind]()
+
+  # the orientations of the right third and the upper half of the middle third turned by
+  # moriAngle about axS: a known low angle boundary along the edge of that domain
+  def _singleStep(self):
     X, Y = self.xdim, self.ydim
     poly = np.array([[X / 3, 0], [X / 3, Y / 2], [2 * X / 3, Y / 2], [2 * X / 3, Y], [X, Y], [X, 0]], dtype=float)
     self.domainID = self.EBSDsim.inpolygon(poly)
-    _turn(self.EBSDsim, self.domainID, self._axis() * self.mori_angle)
+    _turn(self.EBSDsim, self.domainID, self._axis() * self.moriAngle)
     return self
 
-  def addFeature_circularSubgrain(self):
-    """the orientations of a disc at the centre, of a quarter of the smaller extent, turned by
-    mori_angle about axS"""
+  # the orientations of a disc at the centre, of a quarter of the smaller extent, turned by
+  # moriAngle about axS
+  def _circularSubgrain(self):
     c = np.array([self.xdim / 2, self.ydim / 2])
     r = c.min() / 2
     t = np.linspace(0, 2 * np.pi, 360)
     self.domainID = self.EBSDsim.inpolygon(np.stack([np.cos(t) * r, np.sin(t) * r], axis=1) + c)
-    _turn(self.EBSDsim, self.domainID, self._axis() * self.mori_angle)
+    _turn(self.EBSDsim, self.domainID, self._axis() * self.moriAngle)
     return self
 
-  def addFeature_simpleGradient(self):
-    """every orientation turned about axS by mori_angle for every step of its position along
-    gradDir, the direction squared componentwise as MATLAB's updateOri takes it; an axis
-    given as a crystal direction is carried into the specimen by every orientation"""
+  # every orientation turned about axS by moriAngle for every step of its position along
+  # gradDir, the direction squared componentwise as MATLAB's updateOri takes it; an axis
+  # given as a crystal direction is carried into the specimen by every orientation
+  def _simpleGradient(self):
     e = self.EBSDsim
     q = e.rotations.data.reshape(-1, 4)
     if isinstance(getattr(self.axS, "frame", None), crystalFrame):
@@ -152,7 +163,7 @@ class simulateEBSD:
     g = np.asarray(self.gradDir.normalize().data, dtype=float).reshape(3)
     P = e.pos.data.reshape(-1, 3) / e.dPos
     step = np.linalg.norm(P * g ** 2, axis=1)
-    _turn(e, np.ones(len(q), dtype=bool), -step[:, None] * ax * self.mori_angle)
+    _turn(e, np.ones(len(q), dtype=bool), -step[:, None] * ax * self.moriAngle)
     return self
 
 

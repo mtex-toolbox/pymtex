@@ -67,7 +67,7 @@ job
 # * `job.grains` and `job.ebsd` expose the current grains and reconstructed EBSD data.
 # * `job.mergeId` maps each input grain `job.grainsPrior[ind]` to the current grain with the
 #   id `job.mergeId[ind]`.
-# * `job.numChilds` counts the input grains represented by each current grain.
+# * `job.numChildren` counts the input grains represented by each current grain.
 # * `job.parentGrains` and `job.childGrains` select the current parent and child grains.
 # * `job.isTransformed` marks input child grains assigned a parent orientation.
 # * `job.isMerged` marks input grains that have been combined into a current grain.

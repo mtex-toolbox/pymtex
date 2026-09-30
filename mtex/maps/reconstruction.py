@@ -364,14 +364,15 @@ class parentGrainReconstructor:
     return self.grains._positions()[np.asarray(ids, dtype=np.int64)]
 
   @property
-  def numChilds(self):
-    """the number of prior child grains merged into each grain of the current stage"""
+  def numChildren(self):
+    """the number of prior child grains merged into each grain of the current stage (MATLAB's
+    parentGrainReconstructor.numChilds)"""
     return np.bincount(self._pos(self.mergeId), minlength=self.grains.size)
 
   @property
   def isMerged(self):
     """which prior grains have been merged with others into a parent grain"""
-    return self.numChilds[self._pos(self.mergeId)] > 1
+    return self.numChildren[self._pos(self.mergeId)] > 1
 
   @property
   def isTransformed(self):

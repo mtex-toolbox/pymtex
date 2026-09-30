@@ -208,7 +208,7 @@ its reshape of the fits is broken in MATLAB), the `includeTwins` option of the c
   guessed as MATLAB guesses them (the most frequent indexed phase the child, the rarest the
   parent, even at zero pixels), the map projected next to the grain means, the parent frame
   appended to the phase lists of the job's copies; the MATLAB properties (`csParent`,
-  `csChild`, `parentPhaseId`, `childPhaseId`, `numChilds`, `isChild`, `isParent`,
+  `csChild`, `parentPhaseId`, `childPhaseId`, `numChildren`, `isChild`, `isParent`,
   `isTransformed`, `isMerged`, `parentGrains`, `childGrains`, `transformedGrains`, `ebsd`,
   `parentEBSD`, `variantId`, `packetId`, `bainId`, `parentId`, `variantMap`, `c2c`) and its
   display with the fit quintiles and the closest ideal OR.

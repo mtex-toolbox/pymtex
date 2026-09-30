@@ -10,7 +10,7 @@ from mtex import (S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, 
                   angle, bandwidthFor, calcAngleDistribution, calcAxisDistribution, calcComponents, calcDensity, calcError,
                   calcKernel, calcMDF, calcMIndex, centerSpecimen, conv, crystalFrame, degree, discreteSample, entropy,
                   equispacedS2Grid, equispacedSO3Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
-                  rotation, specimenFrame, textureindex, unimodalODF, uniformODF, vector3d, volume, yvector, zvector)
+                  rotation, specimenFrame, textureIndex, unimodalODF, uniformODF, vector3d, volume, yvector, zvector)
 
 rng = np.random.default_rng(71)
 
@@ -25,12 +25,12 @@ def cubic15():
 
 def test_textureindex_ofTheUniformODFIsOneItsEntropyZero(cubic15):
   u = cubic15.u
-  assert np.isclose(textureindex(u), 1) and abs(entropy(u)) < 1e-10
+  assert np.isclose(textureIndex(u), 1) and abs(entropy(u)) < 1e-10
 
 
 def test_textureindex_isTheSquaredNorm(cubic15):
   H, odf = cubic15.H, cubic15.odf
-  assert np.isclose(textureindex(H), norm(H) ** 2) and np.isclose(textureindex(odf), textureindex(H), rtol=1e-6)
+  assert np.isclose(textureIndex(H), norm(H) ** 2) and np.isclose(textureIndex(odf), textureIndex(H), rtol=1e-6)
 
 
 def test_entropy_ofADensityIsNegativeAndMinusTheIntegralOfFLogF(cubic15):
@@ -70,7 +70,7 @@ def test_fibreVolume_ofTheUniformODFIsTheShareOfTheTube(cubic15):
 
 def test_textureindex_onTheSphereIsTheSquaredNormAndTheEntropyNegative():
   s = S2FunHarmonic(S2DeLaValleePoussinKernel(halfwidth=20 * degree))
-  assert np.isclose(textureindex(s), norm(s) ** 2) and entropy(s) < 0
+  assert np.isclose(textureIndex(s), norm(s) ** 2) and entropy(s) < 0
 
 
 def test_entropy_ofTheUniformSphericalFunctionIsZero():

@@ -459,7 +459,7 @@ class crystalShape:
     def fluorite(cs=None, simple=False) -> Any:
       """the fluorite crystal shape of the catalogue, in cs when given"""
     @staticmethod
-    def fluorite_complex(cs=None, simple=False) -> Any:
+    def fluoriteComplex(cs=None, simple=False) -> Any:
       """the fluorite crystal shape of the catalogue, in cs when given"""
     @staticmethod
     def forsterite(cs=None, simple=False) -> Any:

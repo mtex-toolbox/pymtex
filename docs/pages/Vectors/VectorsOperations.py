@@ -91,9 +91,9 @@ w = w + v
 w
 
 # When both inputs are lists of the same size, binary operations pair their entries by
-# position. Use [angle_outer](vector3d.angle_outer.html) or
-# [dot_outer](vector3d.dot_outer.html) to compare every entry of one list with every entry
-# of another.
+# position. The keyword `outer=True` of [angle](vector3d.angle_outer.html) and
+# [dot](vector3d.dot_outer.html) compares every entry of one list with every entry of
+# another.
 
 # ## Selecting from a List
 #
@@ -151,9 +151,9 @@ meanResultantLength
 # | | |
 # |---|---|
 # | [angle(v1,v2)](vector3d.angle.html) | pointwise angle between vectors |
-# | [angle_outer(v1,v2)](vector3d.angle_outer.html) | all pairwise angles |
+# | [angle(v1,v2,outer=True)](vector3d.angle_outer.html) | all pairwise angles |
 # | [dot(v1,v2)](vector3d.dot.html) | pointwise inner product |
-# | [dot_outer(v1,v2)](vector3d.dot_outer.html) | all pairwise inner products |
+# | [dot(v1,v2,outer=True)](vector3d.dot_outer.html) | all pairwise inner products |
 # | [cross(v1,v2)](vector3d.cross.html) | pointwise cross product |
 # | [a*v](vector3d.mtimes.html) | multiplication by a scalar |
 # | [a*v](vector3d.times.html) | componentwise scaling by an array of the same size |

@@ -42,8 +42,6 @@ cubochoric = _method("cubochoric")
 orth = _method("orth")
 perp = _method("perp")
 polar = _method("polar")
-angle_outer = _method("angle_outer")
-dot_outer = _method("dot_outer")
 orthProj = _method("orthProj")
 det = _method("det", np.linalg.det)
 conj = _method("conj", np.conj)
@@ -117,6 +115,6 @@ def rotate(v, rot, *args, **kwargs):
   return v.rotate(rot, *args, **flags, **kwargs) if hasattr(v, "rotate") else rot * v
 
 
-__all__ = ["angle", "dot", "cross", "angle_outer", "dot_outer", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler",
+__all__ = ["angle", "dot", "cross", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler",
            "Rodrigues", "axis", "log", "exp", "eq", "homochoric", "cubochoric", "orth", "perp", "polar",
            "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "eqTol", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "project2FundamentalRegion", "transformReferenceFrame", "fundamentalSector", "conventionalSector", "fundamentalRegion", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]

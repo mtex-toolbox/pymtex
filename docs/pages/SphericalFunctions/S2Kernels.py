@@ -92,9 +92,9 @@ plot(psi20, linewidth=2, symmetric=True)
 hold(False)
 legend('halfwidth = 15°', 'halfwidth = 20°')
 plt.subplot(1, 2, 2)
-plotSpektra(psi15, linewidth=2)
+plotSpectrum(psi15, linewidth=2)
 hold(True)
-plotSpektra(psi20, linewidth=2)
+plotSpectrum(psi20, linewidth=2)
 hold(False)
 legend('halfwidth = 15°', 'halfwidth = 20°')
 # -
@@ -126,9 +126,9 @@ plot(dirichlet5, linewidth=2, symmetric=True)
 hold(False)
 legend('bandwidth = 10', 'bandwidth = 5')
 plt.subplot(1, 2, 2)
-plotSpektra(dirichlet10, linewidth=2)
+plotSpectrum(dirichlet10, linewidth=2)
 hold(True)
-plotSpektra(dirichlet5, linewidth=2)
+plotSpectrum(dirichlet5, linewidth=2)
 hold(False)
 legend('bandwidth = 10', 'bandwidth = 5')
 
@@ -160,9 +160,9 @@ plot(bump50, linewidth=2, symmetric=True)
 hold(False)
 legend('halfwidth = 30°', 'halfwidth = 50°')
 plt.subplot(1, 2, 2)
-plotSpektra(bump30, linewidth=2)
+plotSpectrum(bump30, linewidth=2)
 hold(True)
-plotSpektra(bump50, linewidth=2)
+plotSpectrum(bump50, linewidth=2)
 hold(False)
 legend('halfwidth = 30°', 'halfwidth = 50°')
 
@@ -190,7 +190,7 @@ legend('halfwidth = 30°', 'halfwidth = 50°')
 # A general `S2FunHarmonic` has $2n+1$ spherical harmonic coefficients at degree $n$.
 # Radial symmetry leaves only the zonal coefficient. An [S2Kernel](S2Kernel.S2Kernel.html)
 # stores the scaled coefficients $(2n+1)\widehat\psi_n$ in its `A` property. The
-# [plotSpektra](S2Kernel.plotSpektra.html) method divides by $2n+1$ and plots
+# [plotSpectrum](S2Kernel.plotSpektra.html) method divides by $2n+1$ and plots
 # $\widehat\psi_n$.
 #
 # This degree-by-degree representation makes radial convolution cheap. The

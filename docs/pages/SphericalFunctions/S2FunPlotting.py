@@ -116,10 +116,10 @@ mtexTitle('Section in the xy plane')
 #
 # ## Harmonic spectrum
 #
-# [plotSpektra](S2FunHarmonic.plotSpektra.html) groups the spherical harmonic coefficients
+# [plotSpectrum](S2FunHarmonic.plotSpektra.html) groups the spherical harmonic coefficients
 # by degree. This view describes frequency content rather than position on the sphere.
 
-plotSpektra(sF1, FontSize=15, linewidth=2, figSize='small')
+plotSpectrum(sF1, FontSize=15, linewidth=2, figSize='small')
 plt.xlim(0, 40)
 
 # Low degrees describe broad variation. The non-zero coefficients at higher degrees supply

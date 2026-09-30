@@ -535,7 +535,7 @@ class SO3FunHarmonic:
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from typing import Any
-    from .characteristics import (max_ as max, min_ as min, entropy, textureindex, discreteSample, volume, fibreVolume,
+    from .characteristics import (max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume, fibreVolume,
                                   calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
                                   calcError, centerSpecimen)
     from .polefigure import calcPoleFigure
