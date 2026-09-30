@@ -1,7 +1,7 @@
 # Subplan - the Python syntax where MATLAB's is a workaround
 
 Status: written 2026-09-30 on the branch `syntax-review`, with the user's decisions of the
-same day; R0, R1 and R2 built. Choices made on the way: MATLAB's `hist` is
+same day; R0 to R6 built, R7's full test suite green (3919 tests), the page build pending. Choices made on the way: MATLAB's `hist` is
 `histogram(grains, grouped=True)`; `eqTol` of frames is `isclose(frA, frB)`; the flat `byMiller` went
 with the standard orientations (`orientation.byMiller`); `antipodal` is one tri-state (None
 from the objects, True forces, False forbids) where MATLAB has `antipodal` and `noAntipodal`;
@@ -14,7 +14,11 @@ since it draws into space what `quiver` draws on a chart, and is no duplicate; `
 is `plot(v)` into a held scene; `plotEllipsoid` stays, having no object to dispatch on; the
 per-format readers and writers are `_loadEBSD_ang` and so on; `exportOrientation` takes
 `interface='VPSC'`; `plottingConvention.default(north=xvector)` changes one direction. The
-graph's citation pattern read `MATLAB's s...` wrongly and is fixed.
+graph's citation pattern read `MATLAB's s...` wrongly and is fixed. In R6 `frameA` and `frameB`
+are properties over the stored `CS` and `SS` of the functions, fields, fibres and the solver
+(`geometry/framepair.py`); the orientations, the grids, the regions, the sections and the colour
+keys store the pair themselves. The graph maps MATLAB's old names to the new ones through
+`RENAMED` in `tools/graph/build.py`, read from `tools/syntaxcheck.py`.
 The plot keywords are checked in `mtex/plotting/keywords.py`, a variant raising TypeError.
 `m:@rotation.alpha` left the graph's counterparts: it was a false link, from a docstring citing
 MATLAB's alpha of the grain maps. Until now the rule was "on a name the user sees, MATLAB wins" (`CLAUDE.md`). This
