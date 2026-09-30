@@ -5,8 +5,7 @@ from .session import getMTEXpref, setMTEXpref, reset
 from .vector3d import vector3d, isCrystalDirection
 from .quaternion import quaternion, rotation, orthogonalTransform, reflection
 from .homochoric import homochoricRadius, cubo2homo, homo2cubo
-from .plottingconvention import (AXIS_CONVENTIONS, conventionNames, closestConvention, plottingConvention, plotx2east,
-                                 plotx2north, plotx2west, plotx2south, plotzOutOfPlane, plotzIntoPlane)
+from .plottingconvention import AXIS_CONVENTIONS, conventionNames, closestConvention, plottingConvention
 from .gridlayout import gridLayout, layoutIndex
 from .latticetype import latticeType
 from .symmetry import (symmetry, findPointGroup, isPointGroupName, hm2point, monoclinicSetting, spaceGroupToPointGroup,
@@ -54,29 +53,28 @@ from .funcs import (angle, dot, cross, orthProj, norm, normalize, inv, mean, sum
 
 __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vector3d", "isCrystalDirection",
            "quaternion", "rotation", "orthogonalTransform", "reflection", "homochoricRadius", "cubo2homo", "homo2cubo",
-           "AXIS_CONVENTIONS", "conventionNames", "closestConvention", "plottingConvention", "plotx2east",
-           "plotx2north", "plotx2west", "plotx2south", "plotzOutOfPlane", "plotzIntoPlane", "gridLayout", "layoutIndex",
-           "latticeType", "symmetry", "findPointGroup", "isPointGroupName", "hm2point", "monoclinicSetting",
-           "spaceGroupToPointGroup", "identifyGroup", "crystalAxes", "reciprocalAxes", "referenceFrame", "crystalFrame",
-           "specimenFrame", "notIndexedFrame", "alignmentSetups", "closestAlignment", "Miller", "orientation",
-           "sphericalRegion", "fundamentalSector", "conventionalSector", "dirichletSector", "tilesSphere",
-           "sectorCenter", "projectIntoRegion", "S2Triangulation", "orientationRegion", "fundamentalRegion",
-           "eulerRegion", "fundamentalRegionEuler", "projectIntoEulerRegion", "maxAngle", "align", "byScreenAlignment",
-           "variants", "STANDARD_EULER", "CSL", "SO3TangentVector", "spinTensor", "left", "right", "geodesic", "fibre",
-           "convexHull", "convexHullLoops", "slipSystem", "dislocationSystem", "mPrime", "crystalShape", "innerFace",
-           "CRYSTAL_SHAPES", "plane3d", "dist", "intersect", "lineIntersect", "calcParent2Child", "misfit",
-           "calcVariantId", "calcParent", "round2Miller", "allHKL", "packetPlanes", "bainPlanes", "S1Grid", "S2Grid",
-           "equispacedS2Grid", "regularS2Grid", "fibonacciS2Grid", "HEALPixS2Grid", "SO3Grid", "equispacedSO3Grid",
-           "regularSO3Grid", "SO3FibonacciGrid", "superfibonacciSO3Grid", "localOrientationGrid", "localS2Grid",
-           "spatialTransformList", "spatialTransform", "spatialTransformId", "spatialTransformShift",
-           "spatialTransformRigid", "spatialTransformProjective", "spatialTransformPoly", "spatialTransformDrift",
-           "spatialTransformField", "spatialTransformHandle", "spatialTransformComposite", "spatialTransformTilt",
-           "spatialTransformInverse", "settingsFile", "loadSettings", "angle", "dot", "cross", "orthProj", "norm",
-           "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler", "Rodrigues", "axis", "log", "exp",
-           "isclose", "homochoric", "cubochoric", "orth", "perp", "polar", "det", "conj", "isnan", "rotate", "cat",
-           "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym",
-           "numProper", "LaueName", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym",
-           "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "projectIntoFundamentalRegion",
+           "AXIS_CONVENTIONS", "conventionNames", "closestConvention", "plottingConvention", "gridLayout",
+           "layoutIndex", "latticeType", "symmetry", "findPointGroup", "isPointGroupName", "hm2point",
+           "monoclinicSetting", "spaceGroupToPointGroup", "identifyGroup", "crystalAxes", "reciprocalAxes",
+           "referenceFrame", "crystalFrame", "specimenFrame", "notIndexedFrame", "alignmentSetups", "closestAlignment",
+           "Miller", "orientation", "sphericalRegion", "fundamentalSector", "conventionalSector", "dirichletSector",
+           "tilesSphere", "sectorCenter", "projectIntoRegion", "S2Triangulation", "orientationRegion",
+           "fundamentalRegion", "eulerRegion", "fundamentalRegionEuler", "projectIntoEulerRegion", "maxAngle", "align",
+           "byScreenAlignment", "variants", "STANDARD_EULER", "CSL", "SO3TangentVector", "spinTensor", "left", "right",
+           "geodesic", "fibre", "convexHull", "convexHullLoops", "slipSystem", "dislocationSystem", "mPrime",
+           "crystalShape", "innerFace", "CRYSTAL_SHAPES", "plane3d", "dist", "intersect", "lineIntersect",
+           "calcParent2Child", "misfit", "calcVariantId", "calcParent", "round2Miller", "allHKL", "packetPlanes",
+           "bainPlanes", "S1Grid", "S2Grid", "equispacedS2Grid", "regularS2Grid", "fibonacciS2Grid", "HEALPixS2Grid",
+           "SO3Grid", "equispacedSO3Grid", "regularSO3Grid", "SO3FibonacciGrid", "superfibonacciSO3Grid",
+           "localOrientationGrid", "localS2Grid", "spatialTransformList", "spatialTransform", "spatialTransformId",
+           "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective", "spatialTransformPoly",
+           "spatialTransformDrift", "spatialTransformField", "spatialTransformHandle", "spatialTransformComposite",
+           "spatialTransformTilt", "spatialTransformInverse", "settingsFile", "loadSettings", "angle", "dot", "cross",
+           "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler", "Rodrigues",
+           "axis", "log", "exp", "isclose", "homochoric", "cubochoric", "orth", "perp", "polar", "det", "conj", "isnan",
+           "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold",
+           "numSym", "numProper", "LaueName", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment",
+           "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "projectIntoFundamentalRegion",
            "transformReferenceFrame", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]
 
 from typing import TYPE_CHECKING

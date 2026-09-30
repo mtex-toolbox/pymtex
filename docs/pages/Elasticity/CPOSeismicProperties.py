@@ -46,7 +46,7 @@ ebsd = rotation.byAxisAngle(zvector, -90 * degree) * ebsd
 # the session-wide plotting convention, so the map, pole figures, and tensor
 # plots below all use the same screen directions.
 
-plotx2north()
+plottingConvention.default(north=xvector)
 plot(ebsd, refFrame=True)
 
 # The reference-frame arrows are the check on this operation. Read them

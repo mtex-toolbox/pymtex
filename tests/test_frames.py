@@ -8,7 +8,7 @@ from numpy import pi
 import mtex
 from mtex import (crystalFrame, specimenFrame, notIndexedFrame, referenceFrame, plottingConvention, vector3d,
                   xvector, yvector, zvector, rotation, degree, Laue, properGroup, stripSym, fullSym, isAligned,
-                  transformationMatrix, isCompatible, isclose, sim, numSym, plotx2east, plotx2north, symmetry,
+                  transformationMatrix, isCompatible, isclose, sim, numSym, symmetry,
                   alignmentSetups, closestAlignment)
 from mtex.geometry.session import SESSION
 
@@ -307,8 +307,8 @@ def test_makeDefault_replacesTheDefaultFramesConvention():
   assert ssF.how2plot == pC and d.numSym() == 1
 
 
-def test_plotx2east_setsTheDefaultConvention():
-  plotx2east()
+def test_default_setsTheEastDirectionOfTheDefaultConvention():
+  plottingConvention.default(east=xvector)
   assert plottingConvention.default.east == xvector
 
 
@@ -357,11 +357,11 @@ def test_Laue_sharesTheConvention():
   assert cs.how2plot == csBefore
 
 
-def test_plotx2north_changesTheDefaultFramesConvention():
+def test_default_changesTheDefaultFramesConvention():
   dflt = specimenFrame.default.how2plot
   ssd = specimenFrame("1")
   assert ssd is specimenFrame.default
-  plotx2north()
+  plottingConvention.default(north=xvector)
   assert plottingConvention.default != dflt and ssd.how2plot == plottingConvention.default
 
 

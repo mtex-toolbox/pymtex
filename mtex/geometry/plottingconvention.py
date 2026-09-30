@@ -69,7 +69,9 @@ class plottingConvention:
   @classproperty
   def default(cls):
     """the session default is the convention of the default specimen frame, so that everything
-    holding that frame follows a change of it"""
+    holding that frame follows a change of it; plottingConvention.default('y↑→x') sets it,
+    plottingConvention.default(north=xvector) changes one direction and keeps the others
+    (MATLAB's plotx2east, plotx2north, plotx2west, plotx2south, plotzOutOfPlane and plotzIntoPlane)"""
     return _sessionDefault(_defaultFrame().how2plot)
 
   def makeDefault(self, save=False):
@@ -273,8 +275,18 @@ def closestConvention(rot):
 # convention sets it, plottingConvention.default('y↑→x'), as MATLAB reads it
 class _sessionDefault(plottingConvention):
 
-  def __call__(self, outOfScreen, east=None, save=False):
-    plottingConvention(outOfScreen, east).makeDefault(save=save)
+  # default('y↑→x'), default(zvector, xvector): a convention made the default; default(north=
+  # xvector), default(intoScreen=zvector): the default with those directions changed, the rest
+  # kept (MATLAB's plotx2north, plotzIntoPlane)
+  def __call__(self, outOfScreen=None, east=None, save=False, **directions):
+    if isinstance(outOfScreen, (str, plottingConvention)) or (outOfScreen is not None and east is not None):
+      plottingConvention(outOfScreen, east).makeDefault(save=save)
+      return
+    pC = plottingConvention(self)
+    given = dict(directions, **{k: v for k, v in (("outOfScreen", outOfScreen), ("east", east)) if v is not None})
+    for name, v in given.items():
+      setattr(pC, name, v)
+    pC.makeDefault(save=save)
 
   def __repr__(self):
     return aligned(plottingConvention.__repr__(plottingConvention(self)))
@@ -289,41 +301,4 @@ def _defaultFrame():
   return SESSION.defaultFrame
 
 
-def _setDefault(**directions):
-  pC = plottingConvention(plottingConvention.default)
-  for name, v in directions.items():
-    setattr(pC, name, v)
-  pC.makeDefault()
-
-
-def plotx2east():
-  """lets the x axis of the session default convention point east"""
-  _setDefault(east=xvector)
-
-
-def plotx2north():
-  """lets the x axis of the session default convention point north"""
-  _setDefault(north=xvector)
-
-
-def plotx2west():
-  """lets the x axis of the session default convention point west"""
-  _setDefault(west=xvector)
-
-
-def plotx2south():
-  """lets the x axis of the session default convention point south"""
-  _setDefault(south=xvector)
-
-
-def plotzOutOfPlane():
-  """lets the z axis of the session default convention point out of the screen"""
-  _setDefault(outOfScreen=zvector)
-
-
-def plotzIntoPlane():
-  """lets the z axis of the session default convention point into the screen"""
-  _setDefault(intoScreen=zvector)
-
-
-__all__ = ["AXIS_CONVENTIONS", "conventionNames", "closestConvention", "plottingConvention", "plotx2east", "plotx2north", "plotx2west", "plotx2south", "plotzOutOfPlane", "plotzIntoPlane"]
+__all__ = ["AXIS_CONVENTIONS", "conventionNames", "closestConvention", "plottingConvention"]

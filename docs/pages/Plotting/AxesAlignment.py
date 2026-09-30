@@ -48,9 +48,10 @@ plottingConvention.default('y←↑x')
 plot(v1, label='v_1', figSize='small')
 
 # Now y points west and x points north, so the marker and annotations turn
-# together. The commands [plotx2east](plotx2east.html),
-# [plotx2north](plotx2north.html) and
-# [plotzIntoPlane](plotzIntoPlane.html) set common session conventions.
+# together. A single direction can be set on its own, the others kept:
+# `plottingConvention.default(north=xvector)` lets x point north, as MATLAB's
+# [plotx2north](plotx2north.html) does, and `plottingConvention.default(intoScreen=zvector)`
+# turns z into the screen.
 
 plottingConvention.default('y↑→x')
 

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import mtex
-from mtex import plottingConvention, vector3d, xvector, yvector, zvector, rotation, plotx2east, plotx2north, plotzIntoPlane, setMTEXpref
+from mtex import plottingConvention, vector3d, xvector, yvector, zvector, rotation, setMTEXpref
 
 
 def test_pictogram_and_parsing():
@@ -54,11 +54,11 @@ def test_rejected_strings():
 
 def test_session_default():
   assert plottingConvention.default == plottingConvention.ij
-  plotx2north()
+  plottingConvention.default(north=xvector)
   assert plottingConvention.default.north == xvector
-  plotzIntoPlane()
+  plottingConvention.default(intoScreen=zvector)
   assert plottingConvention.default.intoScreen == zvector
-  plotx2east()
+  plottingConvention.default(east=xvector)
   assert plottingConvention.default == plottingConvention("y↓→x")
   pC = plottingConvention("y↑→x")
   pC.makeDefault()
