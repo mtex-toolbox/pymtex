@@ -33,6 +33,15 @@ def test_mhyper_isTheMeanOfTheExponentialOverSO3AndTheSphere():
   assert np.isclose(mhyper(Z), np.sum(s.weights * np.exp((v ** 2) @ Z)) / (4 * np.pi), rtol=1e-8)
 
 
+def test_mhyper_ofStronglyNegativeConcentrationsKeepsItsDigits():
+  # the alternating series lost every digit here: -797.5 for 0.0463
+  t, w = np.polynomial.legendre.leggauss(400)
+  phi = np.linspace(0, 2 * np.pi, 800, endpoint=False)
+  x, y = np.sqrt(1 - t[:, None] ** 2) * np.cos(phi), np.sqrt(1 - t[:, None] ** 2) * np.sin(phi)
+  mean = np.sum(w[:, None] * np.exp(-50 * x ** 2 - 3 * y ** 2)) / (2 * len(phi))
+  assert np.isclose(mhyper([-50, -3, 0]), mean, rtol=1e-10)
+
+
 def test_mhyper_shiftMultipliesByItsExponentialAndMomentsSumToOne():
   kappa = np.array([5.0, 2.0, 1.0, 0.0])
   assert np.isclose(mhyper(kappa + 2), np.exp(2) * mhyper(kappa))

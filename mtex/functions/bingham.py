@@ -40,6 +40,9 @@ def mhyper(kappa):
   s = len(kappa)
   if s < 2:
     raise ValueError("the argument has at least two entries")
+  # the mean moves by exp(c) with kappa + c: the series runs on non-negative entries, whose terms do not cancel
+  c = float(np.min(kappa))
+  kappa = kappa - c
   p = _charpolyCoefficients(kappa)[::-1]
   beta1 = s / 2
   d = np.ones(s) / beta1
@@ -52,12 +55,12 @@ def mhyper(kappa):
     d /= beta1 + i
   circ = np.arange(1, s + 1) % s
   kp = np.arange(-s, 0) / 2 * p
-  while np.linalg.norm(d) > np.finfo(float).eps:
+  while np.linalg.norm(d) > np.finfo(float).eps * y:
     i += 1
     d[0] = np.sum(-(kp / i + p) * d)
     y += d[0]
     d = d[circ] / (beta1 + i)
-  return float(y)
+  return float(math.exp(c) * y)
 
 
 # d log 1F1 / d kappa_i by central differences, the moments E[x_i^2] of the distribution
