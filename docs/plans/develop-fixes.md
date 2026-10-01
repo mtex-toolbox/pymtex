@@ -46,7 +46,7 @@ the interfaces (7-9, 14, 28), the maps (10-12, 15) and the volumes (22-26), then
 
 ## Status
 
-Decisions taken 2026-10-01. The function spaces are done on develop (2026-10-01, unpushed), each
+Decisions taken 2026-10-01. The function spaces, the geometry and the pole figures are done on develop (2026-10-01, unpushed), each
 checked through the bridge session `mtexdev` against the port or an analytic value:
 
 | # | Commit | Note |
@@ -59,8 +59,11 @@ checked through the bridge session `mtexdev` against the port or an analytic val
 | 19 | `6688a5124` | the DensityEstimation page's 0.004 is now a bandwidth, as in the port |
 | 27 | `f8bdade28` | LSCV did not run at all: `eodf.components` of the old ODF class |
 | 2 | `3098c17f3` | the options reached the LSQR operators as one nested cell, so no option had an effect |
+| 5 | `630909039` | the PoleFigureRefinement page's numbers rerun: 327 directions, errors 0.20 and 0.067 |
+| 6 | `bd97d9a4d` | Geesthacht after `correct`: both flags set, 2.27 mrd |
+| 16 | `6b10822f6` | the row-wise sample recovered to 1e-14 (7193 off before) |
 
 Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
 which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function).
 
-Next: the geometry and pole figures (5, 6, 16).
+Next: the interfaces (7-9, 14, 28).
