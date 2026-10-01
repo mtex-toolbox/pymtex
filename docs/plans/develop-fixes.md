@@ -46,7 +46,7 @@ the interfaces (7-9, 14, 28), the maps (10-12, 15) and the volumes (22-26), then
 
 ## Status
 
-Decisions taken 2026-10-01. The function spaces, the geometry and the pole figures are done on develop (2026-10-01, unpushed), each
+Decisions taken 2026-10-01. The function spaces, the geometry, the pole figures and the interfaces are done on develop (2026-10-01, unpushed), each
 checked through the bridge session `mtexdev` against the port or an analytic value:
 
 | # | Commit | Note |
@@ -62,8 +62,15 @@ checked through the bridge session `mtexdev` against the port or an analytic val
 | 5 | `630909039` | the PoleFigureRefinement page's numbers rerun: 327 directions, errors 0.20 and 0.067 |
 | 6 | `bd97d9a4d` | Geesthacht after `correct`: both flags set, 2.27 mrd |
 | 16 | `6b10822f6` | the row-wise sample recovered to 1e-14 (7193 off before) |
+| 7 | `3564bc50b` | degrees unless `'radians'` (user, 2026-10-01), as the port; the OrientationImport page drops its three limitations |
+| 8 | `15a0101ce`, `02b0d42cf` | both exporters write in the reader's frame (EDAX's for `.ang`, the default for `.ctf`); the port had the same defect, fixed `dba5b7e`; also `loadEBSD_ctf`'s space group fallback passed the string `',abc(:)'` as the lattice |
+| 9 | `ea4bd3d70` | the TensorImport page no longer passes the density by hand for want of it |
+| 14 | `c7e82623e` | checked on a copy of copper.osc with its last 100 records blanked |
+| 28 | `2f63839b9` | the polar angle is \|khi\|, the reflection a Miller passed in or guessed from the name with a warning |
 
 Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
-which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function).
+which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function); `export(copper, '.ctf')`
+of the hexagonal grid `.osc` map loses 67 pixels and moves positions by up to 5 um; no reader on
+develop claims `data/PoleFigure/Rigaku.DAT`.
 
-Next: the interfaces (7-9, 14, 28).
+Next: the maps (10-12, 15).
