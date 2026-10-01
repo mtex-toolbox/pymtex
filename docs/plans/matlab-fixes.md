@@ -32,7 +32,7 @@ few inputs.
 
 ## Status
 
-Decisions taken 2026-10-01. Built: 5, 8, 6, 7, 11, 3 with 2, 10, 9, 1 and 13; 12 in progress.
+Decisions taken 2026-10-01. Built: all eleven, 5, 8, 6, 7, 11, 3 with 2, 10, 9, 1, 13 and 12.
 
 Item 1 against MATLAB develop: the sectors of all 36 point group symbols in three alignments
 agree with MATLAB's in 105 of 108 cases (49 before), and the HSV key colours agree in every
@@ -44,3 +44,12 @@ and `docs/findings.md` records it. Repeated sector planes (222, -4) are given on
 Item 13: `fibonacciSO3Grid` gives MATLAB develop's node counts (4994 at 5 degrees, 5034 for
 points=5000, 619 at 10 degrees) and its nodes; antipodal=True keeps 2499 where MATLAB keeps 2503,
 four nodes on the boundary of the region that the two inside tests round apart.
+
+Item 12: `discrepancy`, `sphericalDiscrepancy` and `rotationalDiscrepancy` (`mtex/functions/discrepancy.py`)
+with D_2, D_cap / D_ball, L2 and the kernel objective on S2 and SO(3), every call form, methods
+on vectors, rotations and the function classes. Against MATLAB develop: to 1e-12 and better where
+MATLAB's transforms are exact; with atoms on SO(3) MATLAB's adjoint transforms are off by 3e-8 and
+3e-6 against a direct sum, which the port takes. The default D_ball centres differ (the port's and
+MATLAB's equispaced 72 rotations are not the same), so that lower bound differs slightly. MATLAB's
+checkStandardDiscrepancies still expects an error for unequal masses that develop's code no longer
+raises; the port follows the code.

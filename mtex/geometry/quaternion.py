@@ -525,6 +525,7 @@ class rotation(quaternion):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
+    from ..functions.discrepancy import discrepancy
     from ..plotting.spaceplot import plot3d, scatterOrientations as scatter
 
 

@@ -39,6 +39,7 @@ from .funcs import (conv, radon, grad, laplace, invRadon, mapFun, halfwidth, cal
                     sqrt, diff, calcDensity, interpolate, max, min, curl, div, antiderivative, component)
 from .so3funclass import SO3Fun
 from .s2funclass import S2Fun
+from .discrepancy import discrepancy, sphericalDiscrepancy, rotationalDiscrepancy
 
 __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wignerdDegrees", "WignerD", "wignerSeries",
            "InvariantProjection", "invariantProjection", "project", "projectLeft", "projectRight", "normalizedLegendre",
@@ -67,4 +68,5 @@ __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wigne
            "calcError", "calcComponents", "discreteSample", "calcKernel", "centerSpecimen", "PoleFigure",
            "calcPoleFigure", "calcQuadratureWeights", "calcNormalization", "calcErrorPF", "correct", "noisepf",
            "isOutlier", "refine", "SchulzDefocusingKernel", "conv", "radon", "grad", "laplace", "invRadon", "halfwidth",
-           "calcFourier", "truncate", "withExchange", "even", "sqrt", "diff", "max", "min", "SO3Fun", "S2Fun"]
+           "calcFourier", "truncate", "withExchange", "even", "sqrt", "diff", "max", "min", "SO3Fun", "S2Fun",
+           "discrepancy", "sphericalDiscrepancy", "rotationalDiscrepancy"]

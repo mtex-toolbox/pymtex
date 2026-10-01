@@ -773,6 +773,7 @@ class vector3d(MtexArray):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from ..functions.polefigure import calcQuadratureWeights, refine
+    from ..functions.discrepancy import discrepancy
     from ..analysis.cluster import calcCluster
     from ..plotting.sphericalplot import plot, scatter, text, contourf, contour, pcolor, quiver, pcolor as smooth
     from ..plotting.spaceplot import plot3d, scatter3d, arrow3d

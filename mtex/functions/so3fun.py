@@ -535,6 +535,7 @@ class SO3FunHarmonic:
                                   calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
                                   calcError, centerSpecimen)
     from .polefigure import calcPoleFigure
+    from .discrepancy import discrepancy
     from ..analysis.texture import calcTensor, calcLankford, calcKearnsFactor
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF

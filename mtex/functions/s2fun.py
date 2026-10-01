@@ -525,6 +525,7 @@ class S2FunHarmonic:
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .discrepancy import discrepancy
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
