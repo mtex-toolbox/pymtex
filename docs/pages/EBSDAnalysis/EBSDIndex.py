@@ -146,12 +146,23 @@ text(ebsd, labels)
 # Offset rows make a neighbour step depend on whether the row is even or odd. Cube
 # coordinates replace row and column by three redundant indices, making the six neighbour
 # steps identical everywhere on the grid. They are cell addresses for algorithms, not
-# specimen coordinates. MATLAB's `hex2cube` and `cube2hex` convert between the two
-# systems; they are not ported yet. Every cube triple satisfies $x + y + z = 0$, and a
-# step to any of the six neighbours adds one to one coordinate and subtracts one from
-# another, leaving the third unchanged.
+# specimen coordinates.
+#
+# `hex2cube` and `cube2hex` convert between the two systems.
 # [Hexagonal Grids](https://www.redblobgames.com/grids/hexagons/) explains the geometric
 # construction and further algorithms.
+
+# +
+plot(ebsd, ebsd.orientations, ipfDirection=zvector, edgeColor='k', micronbar=False, backend='patch')
+plt.axis('off')
+
+x, y, z = ebsd.hex2cube(i, j)
+labels = [f'({a},{b},{c})' for a, b, c in zip(*(np.rint(v).astype(int).ravel() for v in (x, y, z)))]
+text(ebsd, labels, fontSize=6)
+# -
+
+# Every displayed triple satisfies $x + y + z = 0$. A step to any of the six neighbours
+# adds one to one coordinate and subtracts one from another, leaving the third unchanged.
 
 # ## Further reading
 #

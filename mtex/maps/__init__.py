@@ -24,6 +24,7 @@ from .simulate import simulateEBSD
 from .mapimage import mapImage, mapImageList, rescale, imboxfilt, edgeMap
 from .registration import xcfShift, pairShifts
 from .trueebsd import trueEbsd
+from .hexgrid import hex2cube, cube2hex
 from .funcs import (gridify, extent, shift, transform, findByLocation, findByOrientation, inpolygon, reduceBoundary,
                     flip, simplifyBoundary, refineBoundary, smoothBoundary, principalComponents, fitEllipse, longAxis,
                     shortAxis, aspectRatio, paris, shapeFactor, convexity, caliper, paror, surfor, characteristicShape,
@@ -38,10 +39,10 @@ __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane"
            "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "shape2d", "polygonMoments",
            "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable", "majorityVote", "mclComponents",
            "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale", "imboxfilt", "edgeMap",
-           "xcfShift", "pairShifts", "trueEbsd", "extent", "shift", "transform", "findByLocation", "findByOrientation",
-           "inpolygon", "reduceBoundary", "flip", "simplifyBoundary", "refineBoundary", "smoothBoundary",
-           "principalComponents", "fitEllipse", "longAxis", "shortAxis", "aspectRatio", "paris", "shapeFactor",
-           "convexity", "caliper", "paror", "surfor", "characteristicShape", "hull", "gradient", "gradientX",
-           "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean", "spatialProfile",
-           "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId", "reduce",
-           "subsample", "interp", "pos2ind", "pixelSizeMatch", "calcDistortion", "undistort", "setOptions"]
+           "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift", "transform",
+           "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary",
+           "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis",
+           "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape",
+           "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean",
+           "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId",
+           "reduce", "subsample", "interp", "pos2ind", "pixelSizeMatch", "calcDistortion", "undistort", "setOptions"]

@@ -601,6 +601,7 @@ class EBSD:
     from .traces import calcTraces
     from .intragranular import (gradient, gradientX, gradientY, gradientZ, curvature, KAM, calcGROD, grainMean,
                                 spatialProfile, calcMisorientation, weightedBurgersVec)
+    from .hexgrid import hex2cube, cube2hex
     from ..analysis.dislocations import calcGND
     from ..analysis.denoising import smooth, fill, fillByGrainId, reduce, reduce as subsample, interp
     from ..plotting.mapplot import plotEBSD as plot, quiverMap as quiver
