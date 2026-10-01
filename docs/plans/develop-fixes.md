@@ -46,4 +46,21 @@ the interfaces (7-9, 14, 28), the maps (10-12, 15) and the volumes (22-26), then
 
 ## Status
 
-Decisions taken 2026-10-01; nothing built yet.
+Decisions taken 2026-10-01. The function spaces are done on develop (2026-10-01, unpushed), each
+checked through the bridge session `mtexdev` against the port or an analytic value:
+
+| # | Commit | Note |
+|---|---|---|
+| 1 | `7eac7a837` | also: the rotation took v to the pole instead of the pole to v |
+| 3 | `f99d91d63` | the base `S2Kernel.halfwidth` takes the first half-maximum crossing |
+| 4 | `3e082fb74`, `9dd0427a5` | `mhyper` cancelled for negative arguments (the port too, fixed `d6d7b5d`); `fit` set N to the constant and projected on the rows of `a.xyz`; the fit uses `mhyper`'s moments, no MEX |
+| 17 | `29cd16be0` | |
+| 18 | `c5fb52d5f` | also the undefined default of `'weights'` |
+| 19 | `6688a5124` | the DensityEstimation page's 0.004 is now a bandwidth, as in the port |
+| 27 | `f8bdade28` | LSCV did not run at all: `eodf.components` of the old ODF class |
+| 2 | `3098c17f3` | the options reached the LSQR operators as one nested cell, so no option had an effect |
+
+Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
+which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function).
+
+Next: the geometry and pole figures (5, 6, 16).
