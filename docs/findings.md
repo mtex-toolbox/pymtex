@@ -333,8 +333,8 @@ has to know.
 | TensorVisualisation | blue2red | a little darker in the middle of each branch |
 | TensorVisualisation | `[V, D] = eig(T)` | `D, V = eig(T)`, the values first |
 | SphericalHarmonics, SO3FunHarmonicRepresentation | the coefficients `fhat` are in MTEX's basis, no Condon-Shortley phase, `Y_l^{-m} = conj(Y_l^m)` | the same since 2026-09-23: the port computes in the Condon-Shortley basis of `docs/design/harmonics.md` and converts at the boundary, `sphericalY` returns MTEX's values |
-| S2FunOperations | `S2FunHarmonic.unimodal` reuses the degree variable in its normalisation: mean 0.1629, 9.72 at the centre, 0.30 at 34 degrees | a density of mean one, 97.85 at the centre, so the page's maximum and minima differ; a MATLAB bug |
-| S2FunOperations | the page says the gradient of the smiley at X is 0.0012 | MATLAB's run gives 1.8e-4, the port 1.6e-4, both aliasing of the quadrature on a flat stretch; from MATLAB's coefficients the port reproduces MATLAB's |
+| S2FunOperations | `S2FunHarmonic.unimodal` reuses the degree variable in its normalisation: mean 0.1629, 9.72 at the centre, 0.30 at 34 degrees | a density of mean one, 97.85 at the centre, so the page's maximum and minima differ; a MATLAB bug, fixed on develop 2026-10-01 (the page's numbers too) |
+| S2FunOperations | the page says the gradient of the smiley at X is 0.0012 | MATLAB's run gives 1.8e-4 (develop 0.0012), the port 1.6e-4, both aliasing of the quadrature on a flat stretch; from MATLAB's coefficients the port reproduces MATLAB's; develop's page now calls it a residue (2026-10-01) |
 | S2FunHarmonicRepresentation, S2FunOperations | a callable is expanded to degree 250 | the same, `quadratureBandwidth()` |
 | S2FunQuadrature | at bandwidth 1 the error of `v_x v_y` is 0.6667, aliasing of MATLAB's coarse grid | 0.5, the exact projection |
 | S2FunSampling | `[v, c] = optimalSample(...)` | `optimalSample(..., optimizeWeights=True)` |
