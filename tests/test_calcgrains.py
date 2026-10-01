@@ -1,4 +1,6 @@
 # M3: calcGrains, the Julia S4 to S10 and the parts of check_calcGrainsCases that need no polygons
+import os
+
 import numpy as np
 import pytest
 
@@ -7,6 +9,7 @@ from mtex import (EBSD, phaseList, crystalFrame, orientation, rotation, vector3d
 from conftest import close
 
 CS = crystalFrame("m-3m", mineral="test")
+LOCAL = os.path.join(os.path.dirname(__file__), "..", "..", "frameSymmetry", "data")
 SQ3 = np.eye(2)
 HEX3 = np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]])
 
@@ -219,3 +222,32 @@ def test_the_compiled_grain_table_is_the_numpy_one():
   ma, mb = a.meanRotation.data.reshape(-1, 4), b.meanRotation.data.reshape(-1, 4)
   assert np.array_equal(np.isnan(ma), np.isnan(mb)) and np.nanmax(np.abs(ma - mb)) < 1e-12
   assert np.max(np.abs(np.asarray(a.GOS) - np.asarray(b.GOS))) < 1e-12 and np.asarray(a.GOS).max() > 0
+
+
+def test_the_default_angle_is_matlabs_15_degrees():
+  from mtex.io.sampledata import testGrainsMap as grainsMap
+  assert np.isclose(gbcAngle().threshold, 15 * degree)
+  a, b = grainsMap(), grainsMap()
+  assert np.array_equal(calcGrains(a).id, calcGrains(b, angle=15 * degree).id) and np.array_equal(a.grainId, b.grainId)
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
+def test_the_default_reconstruction_of_csl_is_matlabs():
+  # MATLAB's calcGrains(ebsd) on the csl map, 15 degrees: 885 grains (calcgrains-release-audit.md)
+  from mtex import mtexdata
+  ebsd = mtexdata("csl", root=LOCAL, download=False)
+  assert len(calcGrains(ebsd)) == 885
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
+def test_no_indexed_grain_below_minPixel_survives_the_second_pass():
+  # the second segmentation cut a 239 pixel grain of small into a one pixel fragment; it
+  # becomes not indexed where it lies, as MATLAB's enforceMinPixel, on a turned map as well
+  from mtex import mtexdata
+  ebsd = mtexdata("small", root=LOCAL, download=False)
+  for e in (ebsd.copy(), ebsd.copy().rotate(rotation.byAxisAngle(zvector, 30 * degree))):
+    g = calcGrains(e, angle=15 * degree, minPixel=3)
+    assert not np.any(g.isIndexed & (g.numPixel < 3))
+    frag = ~np.asarray(g.isIndexed).reshape(-1) & (np.asarray(g.numPixel).reshape(-1) < 3)
+    assert frag.any() and np.all(np.isnan(g.meanRotation.data.reshape(-1, 4)[frag, 0]))
+    assert np.all(~e.isIndexed.reshape(-1)[np.isin(e.grainId.reshape(-1), g.id[frag])])

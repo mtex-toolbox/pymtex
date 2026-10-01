@@ -26,9 +26,8 @@ The CSL discrepancy is entirely the default threshold. The other two rows retain
 smaller difference after matching it. MATLAB at 10 degrees returns 80 triple points
 for the small-map recipe, so there is still a topology difference there.
 
-Before release, either align the public defaults with MATLAB or explicitly document
-the 10-degree default. Use explicit angles in cross-port comparisons in either case.
-This investigation does not change the library defaults.
+The defaults were aligned with MATLAB on 2026-10-01: 15 degrees in Python and in Julia.
+Cross-port comparisons still state their angles.
 
 ## Correct the benchmark input before comparing algorithms
 
@@ -113,7 +112,11 @@ grains = calcGrains(ebsd, angle=15 * degree, minPixel=3)
 print(grains.numPixel[grains.isIndexed & (grains.numPixel < 3)])  # [1]
 ```
 
-This is the first algorithm defect to fix. Add a regression that verifies the final
+Fixed 2026-10-01 in both ports by MATLAB's policy: the fragments become notIndexed where
+they lie (`test_no_indexed_grain_below_minPixel_survives_the_second_pass`, and its Julia
+twin in `test/calcgrains.jl`).
+
+This was the first algorithm defect to fix. Add a regression that verifies the final
 indexed-grain sizes after culling changes connectivity, including on a transformed map.
 Decide whether to classify the final fragments as notIndexed, as MATLAB does, or repeat
 the geometry reconstruction; those policies produce different boundaries. MATLAB's source

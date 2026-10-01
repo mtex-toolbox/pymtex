@@ -91,6 +91,10 @@ def _bestDot(fr, q1, q2):
 
 # ------------------------------------------------------------------ the angle criterion
 
+# the threshold a grain reconstruction takes when none is given, MATLAB's
+DEFAULT_ANGLE = 15 * degree
+
+
 class gbcAngle(grainBoundaryCriterion):
   """the criterion of a threshold on the misorientation angle: one angle, or a high and a low
   angle threshold, the pair counting as the share of the levels it stays below; byPhase gives
@@ -100,7 +104,7 @@ class gbcAngle(grainBoundaryCriterion):
     gbcAngle([10*degree, 2*degree])
     gbcAngle(10*degree, byPhase={'Forsterite': 15*degree})"""
 
-  def __init__(self, threshold=10 * degree, byPhase=None):
+  def __init__(self, threshold=DEFAULT_ANGLE, byPhase=None):
     self.threshold = threshold
     self.byPhase = byPhase
 

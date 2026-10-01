@@ -53,9 +53,13 @@ mismatch (Python 10 degrees, MATLAB 15), an incorrect MATLAB benchmark phase map
 and remaining closing/culling differences. The table below records the original reports,
 not comparisons at identical parameters: csl agrees exactly when the angle is matched.
 
-Next: fix the confirmed final-pass `minPixel` defect (six undersized indexed grains on
-forsterite at minPixel=3), settle or document the default angle, then investigate the
-remaining closing and quadruple-point differences with explicit parameters.
+Done 2026-10-01, in Python and in the Julia port: the default angle is MATLAB's 15 degrees
+(`DEFAULT_ANGLE` beside `gbcAngle`), and a fragment the second segmentation leaves below
+`minPixel` becomes notIndexed where it lies, its geometry kept, as MATLAB's
+`enforceMinPixel`; csl's default reconstruction gives MATLAB's 885 grains, small and
+forsterite keep no indexed grain below minPixel=3. The doc pages that call `calcGrains`
+without an angle (about 30 in each port) are to be rebuilt. Next: the remaining closing and
+quadruple-point differences with explicit parameters.
 
 | Page | Here | MATLAB |
 |---|---|---|

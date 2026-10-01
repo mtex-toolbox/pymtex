@@ -1,5 +1,6 @@
 # grain reconstruction (MATLAB EBSD/calcGrains, Julia calcgrains.jl)
 #
+#   grains = calcGrains(ebsd)                       15 degrees, as MATLAB
 #   grains = calcGrains(ebsd, angle=10 * degree)
 #   grains = calcGrains(ebsd, angle=[10 * degree, 2 * degree], minPixel=5, alpha=3.1)
 #   grains = calcGrains(ebsd, criterion=gbcSoft(10 * degree))
@@ -16,9 +17,8 @@ import numpy as np
 
 from ..geometry.kernels import backend as kernelBackend
 from ..geometry.symreduce import chordAngle, closestImage
-from ..geometry.units import degree
 from .boundary import buildBoundary
-from .criteria import gbcAngle, grainBoundaryCriterion
+from .criteria import DEFAULT_ANGLE, gbcAngle, grainBoundaryCriterion
 from .decomposition import NO_PIXEL, decompose
 from .fmc import gbcFMC
 from .grains import grain2d
@@ -26,7 +26,7 @@ from .quadruple import splitQuadruplePoints
 from .segment import segment
 
 
-def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
                mcl=None, fmc=None, verbose=False, backend=None):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
@@ -53,6 +53,10 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
     if not under.any():
       break
     markNotIndexed(ebsd, under)
+  # the second pass can cut a grain the cull kept into fragments below minPixel; they become
+  # not indexed where they lie, their geometry kept, as MATLAB's enforceMinPixel
+  if minPixel > 1:
+    markNotIndexed(ebsd, undersized(seg, ebsd, minPixel))
   # the diagonal ambiguity is decided on the map the grains are built from, so the split
   # runs after the cull and before anything reads the boundary
   if removeQuadruplePoints:

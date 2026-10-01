@@ -16,17 +16,16 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from ..geometry.kernels import qmul
-from ..geometry.units import degree
 from ..maps.calcgrains import _grainTableNumba, _grainTableNumpy
 from ..maps.calcgrains import calcGrains as _calcGrains2d
-from ..maps.criteria import gbcAngle, grainBoundaryCriterion
+from ..maps.criteria import DEFAULT_ANGLE, gbcAngle, grainBoundaryCriterion
 from ..maps.segment import components
 from .ebsd3 import EBSD3
 from .grain3boundary import grain3Boundary
 from .grain3d import grain3d
 
 
-def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
                mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
@@ -35,7 +34,7 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   volumes grainId, the grains its file stored. The map keeps the grain ids"""
   # calcGrains(ebsd, 'grainId'): MATLAB's flag
   if isinstance(angle, str) and angle == "grainId":
-    angle, grainId = 10 * degree, True
+    angle, grainId = DEFAULT_ANGLE, True
   if not isinstance(ebsd, EBSD3):
     if grainId:
       raise TypeError("grainId takes the grains a file of volumes stored; a map of the plane has none")
@@ -47,7 +46,7 @@ def calcGrains(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel
   return _calcGrains3d(ebsd, angle, threshold, criterion, minPixel, grainId)
 
 
-def _calcGrains3d(ebsd, angle=10 * degree, threshold=None, criterion=None, minPixel=1, grainId=False):
+def _calcGrains3d(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, grainId=False):
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
