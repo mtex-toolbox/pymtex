@@ -252,7 +252,7 @@ mtexColorbar(title='paris')
 # +
 # reconstruct all indexed grains in the full data set once
 ebsd = mtexdata('forsterite')
-rawGrains = calcGrains(ebsd['indexed'])
+rawGrains = calcGrains(ebsd)
 rawGrains = rawGrains[~rawGrains.isBoundary]
 
 # use five smoothing iterations for the main estimate

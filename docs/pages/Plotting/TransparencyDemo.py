@@ -116,7 +116,7 @@ plot(ebsdF, ebsdF.orientations, faceAlpha=alpha, figSize='large')
 # synonym for `faceAlpha`.
 
 # +
-grains = calcGrains(ebsd['indexed'], angle=10 * degree)
+grains = calcGrains(ebsd, angle=10 * degree)
 grains = smoothBoundary(grains, 5)
 
 plot(ebsd, ebsd.bc)

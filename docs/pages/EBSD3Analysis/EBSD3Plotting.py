@@ -195,7 +195,7 @@ mtexTitle('Quartz: IPF along specimen z')
 # boundaries drawn over the phase map.
 
 # +
-grains = calcGrains(ebsdZ['indexed'])
+grains = calcGrains(ebsdZ)
 
 plot(ebsdZ, micronbar='off')
 hold(True)

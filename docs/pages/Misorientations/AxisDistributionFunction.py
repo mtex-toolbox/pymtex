@@ -64,7 +64,7 @@ uniformRange, uniformRatio
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins', verbose=False)
 
-grains = calcGrains(ebsd['indexed'], angle=5 * degree)
+grains = calcGrains(ebsd, angle=5 * degree)
 grains = smoothBoundary(grains, 5)
 
 # retain boundaries between magnesium grains
@@ -131,7 +131,7 @@ mtexColorbar()
 # boundaries smoothed without those two stages, as the help of `smoothBoundary` advises.
 
 # +
-gBp = smoothBoundary(calcGrains(ebsd['indexed'], angle=5 * degree), 5, simplify=False, refine=False)
+gBp = smoothBoundary(calcGrains(ebsd, angle=5 * degree), 5, simplify=False, refine=False)
 gBp = gBp.boundary['Magnesium', 'Magnesium']
 ori1 = ebsd['id', gBp.ebsdId[:, 0]].orientations
 ori2 = ebsd['id', gBp.ebsdId[:, 1]].orientations

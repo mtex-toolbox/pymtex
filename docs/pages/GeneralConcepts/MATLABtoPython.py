@@ -68,7 +68,7 @@ ebsd
 # A string that names something stays a string in the argument list: the kind of Miller
 # indices `'uvw'`, an Euler convention `'ZYZ'`, an alignment `'X||a'`.
 
-grains = calcGrains(ebsd['indexed'], angle=10 * degree, minPixel=5)
+grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
 cs = ebsd['Forsterite'].CS
 Miller(1, 0, 0, cs, 'uvw')
 
@@ -117,13 +117,12 @@ ori.angle() / degree
 # A command with several outputs returns them together, and they are unpacked by commas
 # instead of square brackets: MATLAB's `[ind, d] = find(...)` is `ind, d = find(...)`.
 #
-# `calcGrains` is the exception. In MATLAB it returns the grain ids of the pixels as a second
-# output, `[grains, ebsd.grainId] = calcGrains(ebsd)`. In Python it writes them into the map
-# it is given, so `grains = calcGrains(ebsd)` suffices:
+# `calcGrains` is the exception. MATLAB also returns the updated map,
+# `[grains, ebsd] = calcGrains(ebsd)`. Python writes the grain ids into the input map,
+# so `grains = calcGrains(ebsd)` suffices:
 
-indexed = ebsd['indexed']
-grains = calcGrains(indexed, angle=10 * degree, minPixel=5)
-indexed.grainId[0:5]
+grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
+ebsd.grainId[0:5]
 
 # Because the map is changed, compare two reconstructions on copies:
 # `calcGrains(ebsd.copy(), ...)`.
@@ -240,7 +239,7 @@ hold(False)
 # * **Unknown options.** `calcGrains` and most computing commands refuse a misspelt keyword;
 #   the plotting commands pass unknown ones on to matplotlib.
 
-print(ebsd.shape, indexed.shape)
+print(ebsd.shape, ebsd['indexed'].shape)
 
 # ## Where to find help
 #

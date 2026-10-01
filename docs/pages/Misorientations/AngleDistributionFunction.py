@@ -82,7 +82,7 @@ plotAngleDistribution(crystalFrame('222'), crystalFrame('12/m1'), lineWidth=2, f
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins', verbose=False)
 
-grains = calcGrains(ebsd['indexed'], threshold=5 * degree)
+grains = calcGrains(ebsd, threshold=5 * degree)
 
 # misorientations of all magnesium--magnesium boundary segments
 mori = grains.boundary['Magnesium', 'Magnesium'].misorientation

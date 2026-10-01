@@ -23,7 +23,7 @@ from mtex import *
 plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')
 
-grainsRaw = calcGrains(ebsd['indexed'], angle=10 * degree)
+grainsRaw = calcGrains(ebsd, angle=10 * degree)
 
 # remove grains with ten or fewer measurements
 grainsRaw = grainsRaw[grainsRaw.numPixel > 10]

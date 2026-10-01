@@ -133,12 +133,11 @@ for k in range(len(hw)):
 # ## Weighting Changes the Question
 #
 # A grain is a phase-homogeneous, spatially connected region of EBSD pixels produced by
-# segmentation. Reconstruct the indexed map with an example 10 degree misorientation
+# segmentation. Reconstruct the map with an example 10 degree misorientation
 # threshold, then keep the Forsterite grains.
 
 # +
-ebsdIndexed = ebsd['indexed']
-grains = calcGrains(ebsdIndexed, angle=10 * degree)
+grains = calcGrains(ebsd, angle=10 * degree)
 grains = grains['Fo']
 
 # one c-axis per grain
@@ -148,7 +147,7 @@ numGrainAxes = len(cAxesGrains)
 numGrainAxes
 # -
 
-# The reconstruction gives 1151 Forsterite grain axes instead of 152345 pixel axes.
+# The reconstruction gives 1152 Forsterite grain axes instead of 152345 pixel axes.
 # Giving each grain one vote describes the distribution of grains. Weighting by sectional
 # grain area describes the mapped material area, which is the question answered by equal
 # pixel weights on this regular scan.
@@ -190,15 +189,17 @@ mtexFig.drawNow()
 #
 # Both rules take the observations as independent unless told otherwise. Pixel axes are
 # not, and directions do not carry that knowledge, so pass the grain id of every pixel.
-# `calcGrains` left the ids on `ebsdIndexed`, in the order of the Forsterite pixels of
-# `cAxes`.
+# `calcGrains` left the ids on `ebsd`. Recompute the pixel axes after reconstruction
+# so they follow any pixels relabelled as not indexed.
 
 # +
 rng = np.random.default_rng(0)
-pixelGrainId = ebsdIndexed['Fo'].grainId
+pixelAxes = ebsd['Fo'].orientations * ebsd['Fo'].CS.cAxis
+pixelAxes.antipodal = True
+pixelGrainId = ebsd['Fo'].grainId
 
-psiAsIndependent = calcKernel(cAxes, 'UCV', rng=rng)
-psiPixels = calcKernel(cAxes, 'UCV', groups=pixelGrainId, rng=rng)
+psiAsIndependent = calcKernel(pixelAxes, 'UCV', rng=rng)
+psiPixels = calcKernel(pixelAxes, 'UCV', groups=pixelGrainId, rng=rng)
 psiGrainArea = calcKernel(cAxesGrains, 'UCV', weights=grains.area, rng=rng)
 psiGrains = calcKernel(cAxesGrains, 'UCV', rng=rng)
 
@@ -207,7 +208,7 @@ for name, psi in [('pixels as independent', psiAsIndependent), ('pixels with gra
   print(f'{name:24s} {psi.halfwidth() / degree:5.3g} degree')
 # -
 
-# Taken as independent, the 152345 pixel axes drive the selection to the narrowest
+# Taken as independent, the pixel axes drive the selection to the narrowest
 # candidate, 1 degree: neighbouring pixels repeat one axis, and the rule reads the
 # repetition as a sharp density. Even the noise floor cannot help, since with that many
 # observations it expects hardly any noise. With the grain ids it asks for 21 degrees,
@@ -215,14 +216,13 @@ for name, psi in [('pixels as independent', psiAsIndependent), ('pixels with gra
 # mapped area.
 #
 # One vote per grain asks for 2.5 degrees, the narrowest kernel the noise floor admits for
-# 1151 axes. Of the 1151 grains 531 are single pixels, mostly fragments beside a grain of
-# nearly the same orientation, so the grain axes repeat each other as well: 1675 pairs of
-# them lie within 1 degree, several times what independent axes would give. The area
-# weight gives those fragments almost no say.
+# 1152 axes. Many grains are single pixels, mostly fragments beside a grain of nearly
+# the same orientation, so the grain axes repeat each other as well. The area weight
+# gives those fragments almost no say.
 #
 # The conservative rule on the pixels with their grain ids:
 
-psiConservative = calcKernel(cAxes, 'conservative', groups=pixelGrainId, rng=rng)
+psiConservative = calcKernel(pixelAxes, 'conservative', groups=pixelGrainId, rng=rng)
 psiConservative.halfwidth() / degree
 
 # It asks for 24 degrees, a little wider than UCV's 21, as it should: it takes the energies
