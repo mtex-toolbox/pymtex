@@ -79,7 +79,8 @@ def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
   omega = np.asarray(orientation(rotation._fromData(m), cs1, cs2).angle(moriRef)).reshape(-1)
   inc = omega < 2 * hw
   area = gB.area[inc]
-  w = area * np.asarray(psi.eval(np.cos(omega[inc]))).reshape(-1)
+  # the kernel takes the cosine of half the angle
+  w = area * np.asarray(psi.eval(np.cos(omega[inc] / 2))).reshape(-1)
   # the pair of symmetries that brings every misorientation closest to moriRef
   G1 = cs1.sym.properGroup().rotations().data.reshape(-1, 4)
   G2 = cs2.sym.properGroup().rotations().data.reshape(-1, 4)

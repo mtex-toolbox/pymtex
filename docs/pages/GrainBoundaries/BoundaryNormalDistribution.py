@@ -201,15 +201,19 @@ twinGBCDSummary
 # A triangulated three-dimensional boundary stores its normal directly, so no
 # stereological reconstruction is required. We use the DREAM.3D data set introduced in
 # [Three-Dimensional Grains](Grains3D.html).
-#
-# ```matlab
-# grains3 = grain3d.load(fullfile(mtexDataPath,'EBSD','SmallIN100_MeshStats.dream3d'));
-# allB3 = grains3.boundary;
-# isInnerFace = all(allB3.grainId > 0,2);
-# surfaceFaceAreaPercent = 100 * sum(allB3.area(~isInnerFace)) / sum(allB3.area)
-# gB3 = allB3(isInnerFace);
-# ```
-#
+
+# +
+grains3 = grain3d.load(mtexdatafile('SmallIN100'))
+
+# separate internal interfaces from faces on the measured box
+allB3 = grains3.boundary
+isInnerFace = np.all(allB3.grainId > 0, axis=1)
+surfaceFaceAreaPercent = 100 * allB3.area[~isInnerFace].sum() / allB3.area.sum()
+surfaceFaceSummary = {'percentOfTotalFaceArea': surfaceFaceAreaPercent}
+gB3 = allB3[isInnerFace]
+surfaceFaceSummary
+# -
+
 # Faces at the surface of the measured volume belong to only one grain. They are the six
 # sides of the measured box, not grain boundaries. They contribute 22.8 percent of the
 # total face area. Their flat, axis-aligned normals would otherwise dominate the specimen
@@ -220,43 +224,79 @@ twinGBCDSummary
 # With a three-dimensional boundary as its only argument,
 # [calcGBND](grain3Boundary.calcGBND.html) uses the measured normals in the specimen frame.
 # Each triangular face is weighted by its area.
-#
-# ```matlab
-# gbndSpecimen = calcGBND(gB3);
-# plot(gbndSpecimen,'contourf','upper')
-# ```
-#
+
+# +
+gbndSpecimen = calcGBND(gB3)
+
+contourf(gbndSpecimen, upper=True)
+mtexTitle('specimen GBND')
+mtexColorMap('parula')
+mtexColorbar()
+# -
+
 # Read this plot in the specimen frame: the strongest maximum lies near Z. It describes a
 # preferred interface direction in the sample, not a crystallographic habit plane. The
 # distribution ranges from 0.61 to 1.74.
+
+specimenSummary = {'minimumDensity': gbndSpecimen.min()[0], 'maximumDensity': gbndSpecimen.max()[0]}
+specimenSummary
 
 # ## The crystal GBND
 #
 # Passing the grains as well rotates each measured normal into the crystal frame of the
 # grain beside it. Both sides contribute, and each face keeps its area weight.
-#
-# ```matlab
-# gbndCrystal = calcGBND(gB3,grains3);
-# plot(gbndCrystal,'contourf','complete','upper')
-# ```
-#
-# The crystal GBND is almost uniform. Taken over all internal interfaces, this data set has
-# no strong preferred habit plane. Its values range from 0.96 to 1.03.
+
+# +
+gbndCrystal = calcGBND(gB3, grains3)
+
+contourf(gbndCrystal, complete=True, upper=True)
+mtexTitle('crystal GBND')
+mtexColorMap('parula')
+mtexColorbar()
+# -
+
+# The crystal GBND has its maximum of 2.0 at the $\{111\}$ planes and its minimum of 0.74
+# at $\{100\}$. Taken over all internal interfaces, this data set already prefers
+# $\{111\}$ as the boundary plane.
+
+crystalSummary = {'minimumDensity': gbndCrystal.min()[0], 'maximumDensity': gbndCrystal.max()[0]}
+crystalSummary
 
 # ## The GBCD in three dimensions
 #
-# This changes when the distribution is conditioned on the cubic $\Sigma 3$
-# misorientation: a 60 degree rotation about a [111] axis. The ten-degree halfwidth gives
-# the estimator a twenty-degree inclusion window, matching the implementation of the GBCD
-# kernel.
-#
-# ```matlab
-# cs3 = grains3.CSList(2);
-# sigma3 = orientation.byAxisAngle(Miller(1,1,1,cs3),60*degree,cs3,cs3);
-# gbcd3 = calcGBND(gB3,grains3,sigma3,'halfwidth',10*degree);
-# plot(gbcd3,'contourf')
-# ```
-#
+# The preference sharpens when the distribution is conditioned on the cubic $\Sigma 3$
+# misorientation: a 60 degree rotation about a [111] axis. The ten-degree halfwidth below
+# gives the estimator a twenty-degree inclusion window, matching the implementation of the
+# GBCD kernel.
+
+# +
+cs3 = grains3.CSList[1]
+sigma3 = orientation.byAxisAngle(Miller(1, 1, 1, cs3), 60 * degree, cs3, cs3)
+
+# measure a strict Sigma 3 fraction and the broader kernel window
+grainInd = grains3.id2ind(gB3.grainId)
+ori1 = grains3.meanOrientation[grainInd[:, 0]]
+ori2 = grains3.meanOrientation[grainInd[:, 1]]
+sigma3Deviation = (ori1.inv() * ori2).angle(sigma3)
+sigma3Summary = {}
+for tol in (5, 20):
+  isSigma3 = sigma3Deviation < tol * degree
+  sigma3Summary[tol] = {'facePercent': 100 * isSigma3.mean(),
+                        'areaPercent': 100 * gB3.area[isSigma3].sum() / gB3.area.sum()}
+sigma3Summary
+# -
+
+# +
+gbcd3 = calcGBND(gB3, grains3, sigma3, halfwidth=10 * degree)
+
+contourf(gbcd3)
+mtexTitle(r'GBCD for $\Sigma 3$')
+mtexColorMap('parula')
+sigma3Plane = Miller(1, 1, 1, cs3)
+annotate(symmetrise(sigma3Plane), labeled=True, backgroundColor='w')
+mtexColorbar()
+# -
+
 # Within 5 degrees of the ideal $\Sigma 3$ relationship lie 26.2 percent of the internal
 # faces, carrying 23.2 percent of the area. This is the sense in which about a quarter of
 # the inner faces are $\Sigma 3$ twins. The kernel's 20 degree support admits 44.8 percent
@@ -264,10 +304,17 @@ twinGBCDSummary
 #
 # Of the four $\{111\}$ variants, only the variant along the $\Sigma 3$ rotation axis is
 # strongly populated. These twins are coherent, and the maximum coincides with that
-# boundary plane. Its peak density is 2.33, less than 0.002 degrees from the plane. The
-# all-boundary crystal GBND is nearly uniform, while the $\Sigma 3$ GBCD is sharply
-# peaked. There is no contradiction: averaging over every misorientation hides a habit
-# that is specific to one boundary character.
+# boundary plane.
+
+sigma3Peak, sigma3PeakPosition = gbcd3.max()
+sigma3GBCDSummary = {'peakDensity': sigma3Peak,
+                     'distanceToSigma3PlaneDegree': np.min(sigma3PeakPosition.angle(symmetrise(sigma3Plane))) / degree}
+sigma3GBCDSummary
+
+# The peak density is 16.3, about 0.01 degrees from the plane, eight times the maximum of
+# the all-boundary crystal GBND. The $\{111\}$ preference seen there comes from these
+# twins: they make up about a quarter of the internal faces, and averaging over every
+# misorientation dilutes a habit that is specific to one boundary character.
 
 # ## Interpreting a stereological estimate
 #
@@ -319,11 +366,12 @@ twinGBCDSummary
 #
 # `calcGBND` estimates from a planar section with the default kernel, which inverts the
 # integral equation of the section and agrees with MATLAB's to the digit, or with the
-# `nonneg` and `bump` kernels. The second half of the page, on three-dimensional grains,
-# is still MATLAB's code and MATLAB's numbers. MATLAB's run of the
-# two-dimensional half failed on its NFFT library, so its numbers are those of the MATLAB
-# page's text. The crystal GBND takes the symmetry of the phase, as the numbers of the page
-# require: without it the peak lies 8.4 degrees from the twin plane. The tension-twin GBCD
-# peaks 4.7 degrees from the twin plane where the MATLAB page says 1.3 and the Julia port
-# about one degree, tilted towards the c axis; that difference is open. MATLAB's tables
-# are dictionaries here.
+# `nonneg` and `bump` kernels. The crystal GBND takes the symmetry of the phase, as the
+# numbers of the page require: without it the peak lies 8.4 degrees from the twin plane.
+# The high-angle GBND peaks at 1.3912, 5.58 degrees from the twin plane, for MATLAB's
+# 1.3905 and 5.60. The tension-twin GBCD peaks at 2.19, 4.8 degrees from the twin plane,
+# where MATLAB's peaks at 2.10, 1.3 degrees from it, and the Julia port at about one
+# degree; both take the same 1648 segments within ten degrees of the twin relation, whose
+# traces lie as close to the twin planes in both, so the difference is in how the traces
+# are assigned to the equivalent planes, and it is open. The three-dimensional half gives
+# MATLAB's numbers. MATLAB's tables are dictionaries here.

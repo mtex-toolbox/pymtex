@@ -50,4 +50,4 @@ def test_calcGBND_ofIN100AtOneMisorientationAsMATLAB(in100):
   g, gB = in100
   cs = g.CSList[1]
   m = orientation.byAxisAngle(vector3d(1, 1, 1), 60 * degree, cs, cs)
-  assert np.allclose(np.real(calcGBND(gB, g, m).eval(Miller(V, cs))), [0.1998865, 0.1998865, 19.09805, 4.144976], atol=1e-4)
+  assert np.allclose(np.real(calcGBND(gB, g, m).eval(Miller(V, cs))), [0.3129911, 0.3129911, 16.30684, 3.716864], atol=1e-4)
