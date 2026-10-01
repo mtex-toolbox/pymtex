@@ -106,18 +106,18 @@ inv(mori)
 # ## By grain
 #
 # A boundary list is also available from the grains it belongs to. This is how to ask for
-# the boundary of one grain or of a grain selection. Here `grains[72]` means the 73rd
-# grain in the current list, not necessarily a grain whose ID is 73;
+# the boundary of one grain or of a grain selection. Here `grains[70]` means the 71st
+# grain in the current list, not necessarily a grain whose ID is 71;
 # [Selecting Grains](SelectingGrains.html) explains the distinction between list position
 # and grain ID.
 
-grains[72].boundary
+grains[70].boundary
 
 # ---
 
 plot(ebsd)
 hold(True)
-plot(grains[72].boundary, lineWidth=4, lineColor='DarkBlue')
+plot(grains[70].boundary, lineWidth=4, lineColor='DarkBlue')
 hold(False)
 
 # The dark-blue outline includes every phase pair on the boundary of this grain. The
@@ -205,4 +205,4 @@ hold(False)
 # `[grains, ebsd] = calcGrains(ebsd, ...)` is one assignment here; as there, a not indexed
 # measurement inside a grain takes its phase without an orientation. The grains are
 # numbered along x first where MATLAB numbers them along y first, so MATLAB's `grains(47)`,
-# the diopside grain with 23 forsterite and 7 enstatite segments, is `grains[72]` here.
+# the diopside grain with 23 forsterite and 7 enstatite segments, is `grains[70]` here.

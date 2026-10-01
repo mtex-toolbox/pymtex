@@ -239,8 +239,8 @@ mtexColorbar()
 # ## Technical Details
 #
 # A tuple of phase names in brackets selects triple points, MATLAB's
-# `tP('Forsterite','Forsterite')`. The port finds 78 triple points where MATLAB finds 70,
-# 19 of them between three forsterite grains for MATLAB's 14, and 220 forsterite
-# boundary segments become 248: the not indexed third of this map is closed by the
-# neighbouring grains differently, and `alpha` does not change the closing here, as
-# [Grain Reconstruction](GrainReconstruction.html) says.
+# `tP('Forsterite','Forsterite')`. At MATLAB's default of 15 degrees the port finds 68
+# triple points where MATLAB finds 70, the 14 between three forsterite grains as MATLAB's,
+# and 217 forsterite boundary segments for MATLAB's 220: the not indexed third of this map
+# is closed by the neighbouring grains a little differently, and `alpha` does not change
+# the closing here, as [Grain Reconstruction](GrainReconstruction.html) says.
