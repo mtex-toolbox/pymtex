@@ -177,3 +177,14 @@ def test_the_pole_figure_sets_read_with_their_recipes():
   z = mtexdata("zncuti", root=LOCAL, download=False)
   assert z.numPF == 8 and z.CS.mineral == "Zn"
   assert mtexdata("aachenexp", root=LOCAL, download=False).numPF == 4
+
+
+# the coefficients of the quartz pattern are written in MATLAB's frame of the file, the a axis along x
+def test_the_quartz_pattern_is_read_with_a_along_x():
+  from mtex import Miller, vector3d
+  try:
+    pattern = mtexdata("quartzPattern", download=False, verbose=False)
+  except (FileNotFoundError, OSError):
+    pytest.skip("quartzPattern.mat is not downloaded")
+  a = vector3d(Miller(1, 0, 0, pattern.CS, "uvw")).normalize().data.reshape(3)
+  assert np.allclose(a, [1, 0, 0], atol=1e-9)

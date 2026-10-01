@@ -343,10 +343,9 @@ np.array([d1.theta, d1.rho]) / degree
 
 # ## Technical Details
 #
-# The quartz master pattern is MATLAB's `quartzPattern.mat`, a v7.3 object file the
-# frameSymmetry branch of MATLAB itself no longer loads; the sample data set
-# `quartzPattern` reads its harmonic coefficients with h5py into the quartz frame, so the
-# figures of this page have no MATLAB counterpart. `vector3d(m)` keeps the crystal frame
+# The quartz master pattern is MATLAB's `quartzPattern.mat`, a v7.3 object file; the
+# sample data set `quartzPattern` reads its harmonic coefficients with h5py into the frame
+# they are written in, point group 321 with the a axis along x. `vector3d(m)` keeps the crystal frame
 # here, the frame-free vector is built from the components. MATLAB's `polar(d1)` without
 # an output prints the two angles in degrees; here they are the properties `theta` and
 # `rho`.

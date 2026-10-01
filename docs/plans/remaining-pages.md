@@ -21,7 +21,7 @@ session state, plots in one's own axes).
 
 | Chapter | Total | Checked | Adapted | Partial | Written | Blocked | Pending |
 |---|---|---|---|---|---|---|---|
-| CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
+| CrystalGeometry | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | EBSD3Analysis | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | EBSDAnalysis | 26 | 21 | 2 | 1 | 2 | 0 | 0 |
@@ -41,12 +41,12 @@ session state, plots in one's own axes).
 | Tensors | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | Tutorials | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | Vectors | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| **All** | 235 | 223 | 6 | 3 | 3 | 0 | 0 |
+| **All** | 235 | 224 | 6 | 3 | 2 | 0 | 0 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|
 | CrystalGeometry/CrystalDirections | CrystalDirections | Checked 2026-09-22; 98.9, 31.6762, [541] and every display to the digit, four figures as MATLAB's; wrote `labeled`, `backgroundColor`, `textAboveMarker`, `plane=True`, a held plot going to both hemisphere charts; found `char` writing family brackets on a single direction | Checked |
-| CrystalGeometry/CrystalOperations | CrystalOperations | Written 2026-09-22; 6 and 3, [6 12 8], the logicals, the zone law, 60, 0 and 180 as on the page; the quartz Kikuchi pattern is `mtexdata('quartzPattern')`, read from MATLAB's v7.3 object file with h5py, which the frameSymmetry MATLAB cannot load, so the nine figures have no MATLAB run; wrote `circle` with `parent`, `color` and lists, `eq(antipodal=True)`, `ori * S2Fun`, MATLAB's lower-case marker keys; `vector3d(m)` keeps the frame, the page builds the frame-free vector from the components | Checked |
+| CrystalGeometry/CrystalOperations | CrystalOperations | Checked 2026-10-01 against MATLAB develop, which loads `quartzPattern.mat`; 6 and 3, [6 12 8], the logicals, the zone law, 60, 0 and 180 as on the page; the nine figures as MATLAB's once the pattern is read into its own frame, X||a (it was read as X||a*, turned by 30 degrees); wrote `circle` with `parent`, `color` and lists, `eq(antipodal=True)`, `ori * S2Fun`, MATLAB's lower-case marker keys; `vector3d(m)` keeps the frame, the page builds the frame-free vector from the components | Checked |
 | CrystalGeometry/CrystalReferenceSystem | CrystalReferenceSystem | Checked 2026-09-22; 90, 30 with MATLAB's message, (270, 0, 0), the albite displays; six figures as MATLAB's; wrote `plot(cs)` for the symmetry elements, `arrow3d(labeled=True)`, `innerPlotSpacing`, `plotPDF` into a prepared figure; found the angle between orientations in differently aligned frames silently unreconciled and the poles on the equator dropped by the upper chart, both fixed | Checked |
 | CrystalGeometry/CrystalShapeSmorf | CrystalShapeSmorf | Checked 2026-09-22; the table 0.13897, 0.019766, 0.1384, 0.1346, 0.033199, 0.043238 and the form areas to the digit, the shape as MATLAB's | Checked |
 | CrystalGeometry/CrystalShapes | CrystalShapes | Checked 2026-09-22; 12 vertices and 8 faces, (8, 12), the slip systems, the twin and the habit sequence as MATLAB's, seventeen figures; `cS.V` displays Miller indices where MATLAB prints components; wrote MATLAB's `FaceAlpha`, `FaceColor`, `LineWidth` on shapes and grain maps, `slipSystem.cat` with an axis | Checked |

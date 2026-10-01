@@ -458,15 +458,16 @@ def _quartzPiezo(path):
 
 
 # the simulated spherical Kikuchi master pattern of quartz: a MATLAB v7.3 object file whose
-# one large array is the harmonic coefficients, read with h5py into the quartz frame
+# one large array is the harmonic coefficients, read with h5py into the frame they are written
+# in, the quartz cell of the file with the a axis along x
 def _quartzPattern(path):
   import h5py
   from ..functions.s2fun import S2FunHarmonic
-  from .cif import loadCIF
   with h5py.File(path, "r") as f:
     arrays = [np.array(v).ravel() for v in f["#refs#"].values() if isinstance(v, h5py.Dataset) and v.dtype.kind == "f"]
   fhat = max(arrays, key=len)
-  return S2FunHarmonic(fhat, frame=loadCIF("quartz"))
+  cs = crystalFrame("321", [4.914, 4.914, 5.406], "X||a", "Z||c", mineral="Quartz")
+  return S2FunHarmonic(fhat, frame=cs)
 
 
 _dataset("quartzPiezo", "tensor", "the piezoelectric modulus of right-handed quartz (Frondel 1962)", "quartzpiezo",
