@@ -180,7 +180,7 @@ for hw in np.logspace(-1, 1.75, 40) * degree:
 
   psi = SO3DeLaValleePoussinKernel(halfwidth=hw)
   odf = unimodalODF(orientation.rand(cs), psi)
-  ori = discreteSample(odf, round(1000 * (hw * 6) ** 3))
+  ori = discreteSample(odf, max(1000, round(1000 * (hw * 6) ** 3)))
 
   n.append(norm(mean(embedding(ori)), normalized=True))
   sigma.append(std(ori))
