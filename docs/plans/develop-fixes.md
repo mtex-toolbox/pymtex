@@ -46,7 +46,7 @@ the interfaces (7-9, 14, 28), the maps (10-12, 15) and the volumes (22-26), then
 
 ## Status
 
-Decisions taken 2026-10-01. The function spaces, the geometry, the pole figures, the interfaces and the 2D maps are done on develop (2026-10-01, unpushed), each
+Decisions taken 2026-10-01. All 27 decided fixes are done on develop (2026-10-01, unpushed), each
 checked through the bridge session `mtexdev` against the port or an analytic value:
 
 | # | Commit | Note |
@@ -71,10 +71,18 @@ checked through the bridge session `mtexdev` against the port or an analytic val
 | 11 | `2ee5f6ff3` | every merge clears votes and graph, as `revert` did; the martensite scenario now asks for new votes instead of an index error |
 | 12 | `e633e0c04` | the stale pair becomes 0, the outer boundary's no-pixel; `calcGBND` uses the segments with a pair; two smoothing pages reworded |
 | 15 | `0bfe3b64e` | gridded and list copper maps now interpolate alike (68 sites differed) |
+| 22 | `28832ceeb` | triangulated and polygon grains agree to 3e-12 |
+| 23 | `c75c71c2b` | the grains scanned one by one, as the port; 4 hosts give [49 57 74 97] where the window gave [50 0 0 0] and failed |
+| 24 | `7fc28c74f` | `EBSD3square/curvature`, the dyads of the three gradients; calcGND runs |
+| 25 | `f47dcd3a5` | all four on the lattice of `gridify`; `reduce` had returned the volume unchanged, `fillByGrainId` indexed by an undefined `ci` (its 2D twin `@EBSD/fillByGrainId.m:37` still does) |
+| 26 | `51b3d87d2` | faces with new sides take them with phases and misorientation; the pair read as grain ids, not positions |
+| 13 | `73ea397a2` | develop's gradient at X is 0.0012 (frameSymmetry 1.8e-4), aliasing; the page calls it a residue, and its extrema follow fix 1 |
+| 20 | `4d8a4ab9e` | develop gave NaN points, no error; a floor of 1000 samples, the port's page too (`0312e72`) |
 
 Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
 which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function); `export(copper, '.ctf')`
 of the hexagonal grid `.osc` map loses 67 pixels and moves positions by up to 5 um; no reader on
-develop claims `data/PoleFigure/Rigaku.DAT`.
+develop claims `data/PoleFigure/Rigaku.DAT`; `data/Neper/my100grains.tess`, which three 3D pages load, is not on
+develop (only `data/Neeper/My100grains.stpoly`); `@EBSD/fillByGrainId.m:37` indexes by an undefined `ci`.
 
-Next: the volumes (22-26), then the pages (13, 20).
+Left: 21 (FMC), decided for later. Nothing pushed.
