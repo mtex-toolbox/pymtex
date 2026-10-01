@@ -46,7 +46,7 @@ the interfaces (7-9, 14, 28), the maps (10-12, 15) and the volumes (22-26), then
 
 ## Status
 
-Decisions taken 2026-10-01. The function spaces, the geometry, the pole figures and the interfaces are done on develop (2026-10-01, unpushed), each
+Decisions taken 2026-10-01. The function spaces, the geometry, the pole figures, the interfaces and the 2D maps are done on develop (2026-10-01, unpushed), each
 checked through the bridge session `mtexdev` against the port or an analytic value:
 
 | # | Commit | Note |
@@ -67,10 +67,14 @@ checked through the bridge session `mtexdev` against the port or an analytic val
 | 9 | `ea4bd3d70` | the TensorImport page no longer passes the density by hand for want of it |
 | 14 | `c7e82623e` | checked on a copy of copper.osc with its last 100 records blanked |
 | 28 | `2f63839b9` | the polar angle is \|khi\|, the reflection a Miller passed in or guessed from the name with a warning |
+| 10 | `b89c258aa` | the cache is keyed by the MTEX version and the default plotting convention; a switch costs one rebuild |
+| 11 | `2ee5f6ff3` | every merge clears votes and graph, as `revert` did; the martensite scenario now asks for new votes instead of an index error |
+| 12 | `e633e0c04` | the stale pair becomes 0, the outer boundary's no-pixel; `calcGBND` uses the segments with a pair; two smoothing pages reworded |
+| 15 | `0bfe3b64e` | gridded and list copper maps now interpolate alike (68 sites differed) |
 
 Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
 which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function); `export(copper, '.ctf')`
 of the hexagonal grid `.osc` map loses 67 pixels and moves positions by up to 5 um; no reader on
 develop claims `data/PoleFigure/Rigaku.DAT`.
 
-Next: the maps (10-12, 15).
+Next: the volumes (22-26), then the pages (13, 20).
