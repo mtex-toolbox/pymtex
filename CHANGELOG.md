@@ -13,7 +13,9 @@ lists them.
 
 This first stable release has been cross-checked against the MATLAB toolbox and the
 Julia port. The comparisons also uncovered bugs in MATLAB, improving the toolbox
-alongside the Python implementation.
+alongside the Python implementation, and they caught defects of the port itself before
+the release, such as a 30 degree turn of hexagonal maps converted between `.ctf` and
+`.ang`.
 
 ### Faster grain reconstruction
 
