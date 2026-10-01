@@ -82,7 +82,7 @@ checked through the bridge session `mtexdev` against the port or an analytic val
 Found on the way, not fixed: `interpolate` merges nodes within 0.02 rad and averages their values,
 which bounds the fit (0.005 on 20000 random nodes of a bandwidth 16 function); `export(copper, '.ctf')`
 of the hexagonal grid `.osc` map loses 67 pixels and moves positions by up to 5 um; no reader on
-develop claims `data/PoleFigure/Rigaku.DAT`; `data/Neper/my100grains.tess`, which three 3D pages load, is not on
-develop (only `data/Neeper/My100grains.stpoly`); `@EBSD/fillByGrainId.m:37` indexes by an undefined `ci`.
+develop claims `data/PoleFigure/Rigaku.DAT`; `data/Neper/my100grains.tess`, which three 3D pages load, was not on
+develop (tracked since `abac772d9`, the stray `data/Neeper` removed); `@EBSD/fillByGrainId.m:37` indexes by an undefined `ci`.
 
 Left: 21 (FMC), decided for later. Nothing pushed.
