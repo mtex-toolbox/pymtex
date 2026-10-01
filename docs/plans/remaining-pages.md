@@ -24,10 +24,10 @@ session state, plots in one's own axes).
 | CrystalGeometry | 10 | 9 | 0 | 0 | 1 | 0 | 0 |
 | CrystalOrientations | 16 | 16 | 0 | 0 | 0 | 0 | 0 |
 | EBSD3Analysis | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| EBSDAnalysis | 26 | 20 | 2 | 2 | 2 | 0 | 0 |
+| EBSDAnalysis | 26 | 21 | 2 | 1 | 2 | 0 | 0 |
 | Elasticity | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | GeneralConcepts | 12 | 9 | 3 | 0 | 0 | 0 | 0 |
-| GrainBoundaries | 15 | 12 | 0 | 3 | 0 | 0 | 0 |
+| GrainBoundaries | 15 | 13 | 0 | 2 | 0 | 0 | 0 |
 | Grains | 15 | 14 | 1 | 0 | 0 | 0 | 0 |
 | Misorientations | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
 | ODFAnalysis | 18 | 18 | 0 | 0 | 0 | 0 | 0 |
@@ -41,7 +41,7 @@ session state, plots in one's own axes).
 | Tensors | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | Tutorials | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | Vectors | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| **All** | 235 | 221 | 6 | 5 | 3 | 0 | 0 |
+| **All** | 235 | 223 | 6 | 3 | 3 | 0 | 0 |
 
 | MATLAB source | Page | Status | Julia (hint) |
 |---|---|---|---|
@@ -90,7 +90,7 @@ session state, plots in one's own axes).
 | EBSDAnalysis/EBSDIPFMap | EBSDIPFMap | Written 2026-09-22: the shapes on the map, the keys, the sized inverse pole figure and the two hemispheres of the trigonal TSL key build; the three dimensional key, the spheres on the grains and `colorPostRotation` are prose, the key plots ignore `complete`; the MATLAB run of the script exceeds five minutes and waits Checked |
 | EBSDAnalysis/EBSDPerceptualKey | — | Adapted 2026-09-24; a page of the port alone, no MATLAB script: `ipfHSVKey(..., perceptual=True, hueLightness=...)`, the twins map under the default, perceptual and hue-following keys, the spread table measured on the keys | — |
 | EBSDAnalysis/EBSDImport | EBSDImport | Checked 2026-09-22; the inventory display with the data set list, the phase map and the orientation map as MATLAB's; needed a phase list on a vendor import, the data set listing, `ebsd.meta` and the default phase colours in the display; the wizard section shows `importWizard()` and the offscreen grab of the window | Checked |
-| EBSDAnalysis/EBSDIndex | EBSDIndex | Partial 2026-09-22; the 98 measurements, the 7 x 14 grid, the 'xy' lookup with its row display as MATLAB's; the list order is row-major and zero-based, said in the page; `hex2cube` waits, so the cube coordinates are prose; needed `text(ebsd, labels)` and figures kept across cells | Checked |
+| EBSDAnalysis/EBSDIndex | EBSDIndex | Checked 2026-10-01; the 98 measurements, the 7 x 14 grid, the 'xy' lookup with its row display as MATLAB's; the list order is row-major and zero-based, said in the page; `hex2cube` and `cube2hex` (`maps/hexgrid.py`) give MATLAB's cube coordinates of the titanium block, the labelled map as MATLAB's | Checked |
 | EBSDAnalysis/EBSDInter | EBSDInter | Checked 2026-09-26; `interp` at a point and the `'xy'` lookup with the zero angle between them, the hexagonal block, as MATLAB's; the resampling on a doubled cell turned by 45 degrees 108 x 109 with 5713 of 11772 cells indexed, the ferrite on a square cell of `dPos`/2 808 x 809, both site for site as MATLAB's; wrote `gridify(ebsd, unitCell=)` and `dPos` as MATLAB's shortest cell edge; found the `'xy'` lookup and a flat mask failing on a gridded map | Checked |
 | EBSDAnalysis/EBSDInterfaceHDF5 | EBSDInterfaceHDF5 | Adapted 2026-09-22; the same six JSON configurations, the inventories of the EMSphInx file as MATLAB's from a full import, `headerOnly` and the debug trace not ported, `ebsd.opt` is `ebsd.meta` Adapted |
 | EBSDAnalysis/EBSDKAM | EBSDKAM | Written 2026-09-22; the medians 0.60, 0.59 and 0.81 as on MATLAB's page, the denoised one 0.20 for 0.27 by the filter's default length, the neighbourhood diagrams built from scratch; the MATLAB run of the script exceeds five minutes and waits Checked |
@@ -126,7 +126,7 @@ session state, plots in one's own axes).
 | GrainBoundaries/BoundaryIntersections | BoundaryIntersections | Checked 2026-09-23; 18, 43.8406 and 2.4356 to the digit, the figure as MATLAB's; wrote MATLAB's `[x, y] = gB.intersect(xy1, xy2)` with `segLength=True`, `line(x, y)` and `scatter(x, y, sz, c, 'filled')` on a map | Checked |
 | GrainBoundaries/BoundaryMisorientations | BoundaryMisorientations | Checked 2026-09-23; the median 0.6 degrees, 8 of 126 and 1 of 960 for 8 of 127 and 1 of 955, three figures as MATLAB's; wrote `newMtexFigure` taking its map's shape, outlines taking `FaceColor` | Checked |
 | GrainBoundaries/BoundaryNormalDistribution | BoundaryNormalDistribution | Partial 2026-09-23; the default kernel by inversion added 2026-09-27, MATLAB's to the digit; the 2D half: the peak 1.3912 at 5.58 degrees and the range 0.859 to 1.085 as the text; MATLAB's run lost the 2D cells to the NFFT MEX; the 3D half (`grain3d`, DREAM.3D) is prose; wrote `calcGBND` and `calcGBNDKernel` (`analysis/gbnd.py`); the GBCD peaks 4.8 degrees from the twin plane where the text says 1.3 | Checked |
-| GrainBoundaries/BoundaryPlots | BoundaryPlots | Partial 2026-09-23; the angles 15.9 to 108.8 with median 56.4 as MATLAB's, the angle, axis, key, quiver and iron maps as MATLAB's, nine figures; `PatalaColorKey` is not ported, the whole-misorientation maps use `axisAngleColorKey`; wrote `translucent` for grains, `legend('off')`, the boundary quiver as MATLAB's `quiver3` needles; found −∞ values drawn as nothing, fixed | Checked |
+| GrainBoundaries/BoundaryPlots | BoundaryPlots | Checked 2026-10-01; the angles 15.9 to 108.8 with median 56.4 as MATLAB's, the angle, axis, key, quiver and iron maps as MATLAB's, nine figures; `PatalaColorKey` colours both boundary maps as MATLAB's, and its sections are the quarters grain exchange leaves, as MATLAB's (an antipodal key now draws antipodal sections); wrote `translucent` for grains, `legend('off')`, the boundary quiver as MATLAB's `quiver3` needles; found −∞ values drawn as nothing, fixed | Checked |
 | GrainBoundaries/BoundaryProperties | BoundaryProperties | Checked 2026-09-23; 0.5282, 84.2556, 43.2195, 0.1054 and 721.70 for 0.5280, 84.2547, 43.2434, 0.1053 and 722.25, the twin table 1648 and 54 and the straightness table to the digit, nine figures as MATLAB's; the inclusion's first misorientation is the inverse, the sides ordered by grain id; wrote `xnum2str` | Checked |
 | GrainBoundaries/BoundarySelect | BoundarySelect | Checked 2026-10-01 at MATLAB's default 15 degrees; the boundary table within the segmentation (1174 for 1178 Fo–Fo, 471 for 478 above 60 degrees), grain 47's boundary (23 segments 1077 µm, 7 segments 311 µm) as MATLAB's, six figures; MATLAB's `grains(47)` is `grains[70]`, the numbering along x; `innerBoundary` 1 segment for 11 by `minPixel`; found notIndexed pixels inside a grain keeping phase 0 where MATLAB gives them the grain's phase, fixed in `calcGrains`, and the outside labelled `outside`, fixed | Checked |
 | GrainBoundaries/CSLBoundaries | CSLBoundaries | Checked 2026-10-01 at MATLAB's default 15 degrees; Σ3 42.59 percent for 42.68 on 17566 segments for 17569, the 83 triple points as MATLAB's, 885 grains as MATLAB's merged to 418 for 415, the Σ5/7/9/11 counts 26, 30, 502, 179 for 26, 41, 504, 187, the volumes 40.72 and 2.05 for 40.76 and 2.07, the maps and the region as MATLAB's; the MDF peak 53.6 at 60 degrees about ⟨111⟩ checked against the prose, MATLAB's run losing its MDF cells to a MEX load failure; the differences follow the closing of `calcGrains`; wrote `project2FundamentalRegion(antipodal=True)` | Checked |

@@ -151,16 +151,22 @@ hold(False)
 
 # ## Colouring the whole misorientation
 #
-# Angle and axis together are three parameters.
-# [axisAngleColorKey](axisAngleColorKey.axisAngleColorKey.html) maps all three to a single
-# RGB colour: the axis through the direction key of the whole sphere and the angle through
-# the saturation.
+# Angle and axis together are three parameters. The
+# [PatalaColorKey](PatalaColorKey.PatalaColorKey.html) maps all three to a single RGB colour
+# using the construction of S. Patala, J. K. Mason and C. A. Schuh,
+# [Improved representations of misorientation information for grain boundary science and
+# engineering](https://doi.org/10.1016/j.pmatsci.2012.04.002), Prog. Mater. Sci. 57,
+# 1383-1425, 2012.
+#
+# The key includes grain-exchange symmetry: viewing a same-phase boundary from the other side
+# gives the inverse misorientation but not a different boundary. Its implementation is
+# available for the Laue groups `m-3m`, `m-3`, `mmm`, `4/mmm` and `6/mmm`.
 
 # +
 plot(grains, micronbar='off')
 legend('off')
 
-foKey = axisAngleColorKey(gB_Fo.misorientation.CS, gB_Fo.misorientation.SS)
+foKey = PatalaColorKey(gB_Fo)
 foColor = foKey.orientation2color(gB_Fo.misorientation)
 
 hold(True)
@@ -177,7 +183,7 @@ hold(False)
 # sections, each at a fixed misorientation angle, and draws the measured misorientations
 # on top.
 
-plot(foKey, 'axisAngle', sections=12, layout=[3, 4], figSize='large')
+plot(foKey, layout=[3, 4], figSize='large')
 plot(gB_Fo.misorientation, markerFaceColor='none', add2all=True, markerSize=4)
 
 # The forsterite misorientations fill the large-angle sections and leave the small-angle
@@ -208,14 +214,14 @@ hold(True)
 plot(grains, grains.meanOrientation, faceAlpha=0.4)
 
 # colour the boundaries by their full misorientation
-ironKey = axisAngleColorKey(gB.misorientation.CS, gB.misorientation.SS)
+ironKey = PatalaColorKey(gB)
 ironColor = ironKey.orientation2color(gB.misorientation)
 plot(gB, ironColor, lineWidth=4)
 hold(False)
 # -
 
 # Whole boundaries now repeat one colour instead of changing continually along their
-# length. One colour recurs across the map, so many boundaries share one misorientation.
+# length. Dark blue recurs across the map, so many boundaries share one misorientation.
 # These are special boundaries, and [CSL Boundaries](CSLBoundaries.html) identifies their
 # relationships.
 
@@ -234,9 +240,9 @@ plot(moriSample, add2all=True, markerFaceColor='none', markerEdgeColor='w')
 
 # ## What the colours do not describe
 #
-# The colour contains the full three-parameter misorientation, not the full grain-boundary
-# character. Two further parameters specify the boundary-plane orientation. A
-# two-dimensional EBSD map measures only the plane trace and cannot recover its
+# The Patala colour contains the full three-parameter misorientation, not the full
+# grain-boundary character. Two further parameters specify the boundary-plane orientation.
+# A two-dimensional EBSD map measures only the plane trace and cannot recover its
 # inclination from one boundary.
 #
 # The same colour therefore does not by itself imply the same boundary energy, structure
@@ -254,19 +260,14 @@ plot(moriSample, add2all=True, markerFaceColor='none', markerEdgeColor='w')
 #   from the two boundary-plane parameters.
 # * S. Patala, J. K. Mason and C. A. Schuh,
 #   [Improved representations of misorientation information for grain boundary science and engineering](https://doi.org/10.1016/j.pmatsci.2012.04.002),
-#   Prog. Mater. Sci. 57, 1383-1425, 2012, constructs the colour key MATLAB MTEX uses for
-#   a complete misorientation.
+#   Prog. Mater. Sci. 57, 1383-1425, 2012, constructs the colour key used here for a
+#   complete misorientation.
 # * F. Bachmann, R. Hielscher and H. Schaeben,
 #   [Grain detection from 2d and 3d EBSD data - Specification of the MTEX algorithm](https://doi.org/10.1016/j.ultramic.2011.08.002),
 #   Ultramicroscopy 111, 1720-1733, 2011, explains how EBSD measurements become grains and
 #   boundary segments.
 
 # ## Technical Details
-#
-# MATLAB colours a complete misorientation with `PatalaColorKey`, which is not ported; the
-# page uses `axisAngleColorKey` instead. Both spend one colour on each misorientation, so
-# the reading of the two figures is the same, but the colours themselves differ and the
-# Patala key's grain-exchange construction is not reproduced.
 #
 # `ebsd['id', M]` returns one measurement per entry of the matrix `M`, in its shape, so
 # the two columns of `ebsdId` give the two orientation lists. `axis(o1, o2)` is their

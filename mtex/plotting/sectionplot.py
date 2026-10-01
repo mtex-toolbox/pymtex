@@ -438,6 +438,9 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
   """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
   the sections of orientation space, MATLAB @orientationColorKey/plot"""
   kind = next((a for a in args if isinstance(a, (str, ODFSections))), None)
+  # an antipodal key, one with grain exchange, is drawn over the region that symmetry halves
+  if getattr(key, "antipodal", False):
+    kw.setdefault("antipodal", True)
   oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.frameA, key.frameB, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
   for k in SECTION_OPTIONS:
     kw.pop(k, None)

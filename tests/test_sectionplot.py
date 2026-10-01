@@ -181,3 +181,11 @@ def test_plotSection_coloursOrientationsByRgb():
 def test_plotSection_dropsOrientationsNeverMeasured(capsys):
   plotSection(partlyMeasured())
   assert "out of 2990 given" in capsys.readouterr().out
+
+
+# a key with grain exchange is drawn over the sections that symmetry halves, MATLAB's plot(oM)
+def test_plot_ofAnAntipodalKeyUsesAntipodalSections():
+  from mtex import PatalaColorKey, plot
+  cs = crystalFrame('mmm', [4.8, 10.2, 6.0])
+  plot(PatalaColorKey(cs, cs), sections=4)
+  assert gcm().sections.jointCS.isLaue
