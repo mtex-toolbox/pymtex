@@ -129,9 +129,30 @@ def exportPhaseNumbers(ebsd):
   return numbers[ids], indexed
 
 
+# the rotations in the crystal frames the reader builds: a file states a phase's point group and
+# lattice, not the alignment of its Euclidean axes, which the reader fixes (EDAX's for .ang, the
+# default for .ctf)
+def _inFileFrames(ebsd, r, alignment):
+  from ..geometry.orientation import orientation
+  ids = ebsd.phaseId.reshape(-1)
+  q = r.data.copy()
+  for j in np.unique(ids):
+    if not ebsd.CSList.isIndexed(int(j)):
+      continue
+    fr = ebsd.CSList.frames[int(j)]
+    fileFrame = crystalFrame(fr.pointGroup, fr.abc, fr.abg, *alignment, mineral=fr.mineral)
+    if np.allclose(fr.transformationMatrix(fileFrame), np.eye(3), atol=1e-10):
+      continue
+    sel = ids == j
+    o = orientation(q[sel], fr)
+    q[sel] = o.transformReferenceFrame(fileFrame).data.reshape(-1, 4)
+  return rotation(q)
+
+
 # the Bunge angles the file gets: the correction taken out, zeros where a pixel has none
-def _eulerColumns(ebsd, eulerCorrection, scale):
+def _eulerColumns(ebsd, eulerCorrection, scale, alignment=()):
   r = rotation(ebsd.rotations.data.reshape(-1, 4))
+  r = _inFileFrames(ebsd, r, alignment)
   if eulerCorrection is not None:
     r = eulerCorrection.inv() * r
   a, b, c = (np.asarray(v, dtype=float) for v in r.Euler("Bunge"))
@@ -187,7 +208,7 @@ def export(ebsd, fname, *args, **kwargs):
 def _exportEBSD_ang(ebsd, fname, *, eulerCorrection=None, setting=2):
   if eulerCorrection is None:
     eulerCorrection = eulerCorrectionRotation(setting)
-  phi1, Phi, phi2 = _eulerColumns(ebsd, eulerCorrection, 1.0)
+  phi1, Phi, phi2 = _eulerColumns(ebsd, eulerCorrection, 1.0, ('EDAX',))
   pos = ebsd.pos.data.reshape(-1, 3)
   numbers, indexed = exportPhaseNumbers(ebsd)
   iq = propertyColumn(ebsd, ("iq", "imagequality", "bc", "bandcontrast", "radonquality"), 0)

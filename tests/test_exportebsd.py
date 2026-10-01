@@ -60,6 +60,17 @@ def test_across_formats_and_only_the_phases_present_are_declared(tmp_path):
   same(e, c, 2e-5)
 
 
+def test_a_hexagonal_phase_keeps_its_orientations_across_formats(tmp_path):
+  # .ctf builds X||a, .ang EDAX's X||a*: the angles written are the reader's, not 30 degrees off
+  text = open(os.path.join(FIXTURES, "Forsterite_cut.ctf"), encoding="latin-1").read()
+  text = text.replace("4.756;10.207;5.98\t90;90;90\tForsterite\t3", "3.209;3.209;5.21\t90;90;120\tMagnesium\t9")
+  (tmp_path / "mg.ctf").write_text(text, encoding="latin-1")
+  e = loadEBSD(tmp_path / "mg.ctf")
+  export(e, tmp_path / "mg.ang")
+  b = loadEBSD(tmp_path / "mg.ang")
+  assert b["Magnesium"].orientations.angle(e["Magnesium"].orientations).max() < 2e-5
+
+
 def test_the_correction_is_undone(tmp_path):
   e = loadEBSD(os.path.join(FIXTURES, "Forsterite_cut.ctf"), grid=False)
   export(e, tmp_path / "a.ctf", eulerCorrection=rotation.id)

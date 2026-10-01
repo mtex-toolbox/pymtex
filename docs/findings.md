@@ -264,7 +264,7 @@ has to know.
 | EBSDAdvancedMaps | `mean(ori, 'robust')` of the forsterite orientations puts 12.1 percent of them within 20 degrees | 13.8 percent: the robust means differ, the port trimming at 2.5 times the 80th percentile |
 | EBSDSharpPlot | the padding of a gridded map has the phase NaN, `isnan(ebsd.phaseId)` finds it | the padding is notIndexed, phase 0, and marked in `ebsd.isPadding`, since a phase id indexes the phase list |
 | EBSDSharpPlot | `h.rho` in (-180, 180] degrees | in [0, 360); the page maps it back for MATLAB's numbers |
-| EBSDExport | the `.ctf` and `.ang` readers keep each file's own crystal axis alignment, so a converted map comes back 30 degrees off | the readers align the crystal frame with the file, the round trip closes at 0.0006 degree |
+| EBSDExport | the `.ctf` and `.ang` readers keep each file's own crystal axis alignment, so a converted map comes back 30 degrees off | the exporters write the angles in the frame the reader builds (EDAX's for `.ang`, the default for `.ctf`), the round trip closes at 0.0006 degree; fixed 2026-10-01, the earlier check compared bare rotations and missed it |
 | EBSDIPFMap | `'MarkerSize', 0.05*area` scales the marker area | a marker size is a diameter in points, `s = size**2`, so a page takes the square root of MATLAB's number |
 | EBSDIPFMap | `ebsd('olivine').CS = cs` assigns the frame of the variable | `ebsd['olivine'].CS = cs` replaces it in the phase list every map of the session shares, as with the colour |
 | EBSDDenoising | `grains(ebsd.grainId)` indexes the grains by id, ids being positions | `grains.selectByGrainId(ebsd.grainId)`, the ids counting from one and the positions from zero |
