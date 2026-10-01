@@ -36,7 +36,7 @@ from .grids.s2grid import S2Grid, equispacedS2Grid, regularS2Grid
 from .grids.fibonacci import fibonacciS2Grid
 from .grids.healpix import HEALPixS2Grid
 from .grids.so3grid import SO3Grid, equispacedSO3Grid, regularSO3Grid
-from .grids.superfibonacci import SO3FibonacciGrid, superfibonacciSO3Grid
+from .grids.superfibonacci import SO3FibonacciGrid, superfibonacciSO3Grid, fibonacciSO3Grid
 from .grids.localgrids import localOrientationGrid, localS2Grid
 from .spatialtransform import (spatialTransformList, spatialTransform, spatialTransformId, spatialTransformShift,
                                spatialTransformRigid, spatialTransformProjective, spatialTransformPoly,
@@ -66,16 +66,17 @@ __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vect
            "calcParent2Child", "misfit", "calcVariantId", "calcParent", "round2Miller", "allHKL", "packetPlanes",
            "bainPlanes", "S1Grid", "S2Grid", "equispacedS2Grid", "regularS2Grid", "fibonacciS2Grid", "HEALPixS2Grid",
            "SO3Grid", "equispacedSO3Grid", "regularSO3Grid", "SO3FibonacciGrid", "superfibonacciSO3Grid",
-           "localOrientationGrid", "localS2Grid", "spatialTransformList", "spatialTransform", "spatialTransformId",
-           "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective", "spatialTransformPoly",
-           "spatialTransformDrift", "spatialTransformField", "spatialTransformHandle", "spatialTransformComposite",
-           "spatialTransformTilt", "spatialTransformInverse", "settingsFile", "loadSettings", "angle", "dot", "cross",
-           "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler", "Rodrigues",
-           "axis", "log", "exp", "isclose", "homochoric", "cubochoric", "orth", "perp", "polar", "det", "conj", "isnan",
-           "rotate", "cat", "merge", "Laue", "properGroup", "properSubGroup", "disjoint", "union", "factor", "nfold",
-           "numSym", "numProper", "LaueName", "sim", "isAligned", "isCompatible", "transformationMatrix", "alignment",
-           "stripSym", "fullSym", "dspacing", "round", "symmetrise", "multiplicity", "projectIntoFundamentalRegion",
-           "transformReferenceFrame", "checkInside", "find", "subGrid", "discretize", "displacement", "fitStage"]
+           "fibonacciSO3Grid", "localOrientationGrid", "localS2Grid", "spatialTransformList", "spatialTransform",
+           "spatialTransformId", "spatialTransformShift", "spatialTransformRigid", "spatialTransformProjective",
+           "spatialTransformPoly", "spatialTransformDrift", "spatialTransformField", "spatialTransformHandle",
+           "spatialTransformComposite", "spatialTransformTilt", "spatialTransformInverse", "settingsFile",
+           "loadSettings", "angle", "dot", "cross", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std",
+           "unique", "matrix", "Euler", "Rodrigues", "axis", "log", "exp", "isclose", "homochoric", "cubochoric",
+           "orth", "perp", "polar", "det", "conj", "isnan", "rotate", "cat", "merge", "Laue", "properGroup",
+           "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "sim",
+           "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round",
+           "symmetrise", "multiplicity", "projectIntoFundamentalRegion", "transformReferenceFrame", "checkInside",
+           "find", "subGrid", "discretize", "displacement", "fitStage"]
 
 from typing import TYPE_CHECKING
 

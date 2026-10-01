@@ -225,7 +225,8 @@ class gbcEqual(grainBoundaryCriterion):
 
 class gbcCustom(grainBoundaryCriterion):
   """a criterion given as a function of the map and the two measurement indices, or as a
-  per-pixel property with the largest difference that still counts as one grain"""
+  per-pixel property, its values or the name of a property of the map, with the largest
+  difference that still counts as one grain, gbcCustom('grainId', 0.5)"""
 
   def __init__(self, values, threshold=None, antipodal=False):
     if callable(values):
@@ -240,7 +241,7 @@ class gbcCustom(grainBoundaryCriterion):
     i, j, _, rot = _pairs(ebsd, i, j)
     if self.f is not None:
       return np.asarray(self.f(ebsd, i, j), dtype=rot.dtype).reshape(len(i))
-    v = self.values
+    v = ebsd.prop[self.values] if isinstance(self.values, str) else self.values
     if isinstance(v, MtexArray):
       flat = v.flatten()
       d = flat[i].angle(flat[j], antipodal=self.antipodal or None) if isinstance(v, vector3d) else flat[i].angle(flat[j])

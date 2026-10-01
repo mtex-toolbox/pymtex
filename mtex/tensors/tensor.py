@@ -762,6 +762,11 @@ def EinsteinSum(*args):
   if len(args) % 2:
     raise ValueError("every operand needs an index vector")
   ops, ids = args[0::2], [list(np.atleast_1d(i).astype(int)) for i in args[1::2]]
+  # a summed index pairs two indices, MATLAB's check
+  for l in sorted({l for idx in ids for l in idx if l < 0}, reverse=True):
+    n = sum(idx.count(l) for idx in ids)
+    if n != 2:
+      raise ValueError(f"the summed index {l} appears {n} times; a summed index appears exactly twice")
   arrays, subs, frame = [], [], None
   labels = {}
   for op, idx in zip(ops, ids):

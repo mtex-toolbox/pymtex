@@ -203,6 +203,17 @@ def mapAliases(kw, grains=False):
 
 # ------------------------------------------------------------------ what is coloured
 
+def colorRequest(color, faceColor=None, ipfDirection=None):
+  """the colouring a plot asks for: an ipfDirection alone asks for the orientations in the
+  inverse pole figure key along it, as MATLAB's plot(ebsd, 'ipfDirection', d); MATLAB's flags
+  'ipfx', 'ipfy', 'ipfz' are spelled ipfDirection=xvector, ... here"""
+  if isinstance(color, str) and color.lower() in ("ipfx", "ipfy", "ipfz"):
+    raise ValueError(f"'{color}' is written plot(..., ipfDirection={color[-1].lower()}vector)")
+  if color is None and faceColor is None and ipfDirection is not None:
+    return "orientation"
+  return color
+
+
 def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   """the colour of every measurement or grain, and whether it is a scalar to be mapped:
   the phase palette, an orientation list through the inverse pole figure key of its
@@ -213,6 +224,7 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   thrown away. A route that yields numbers ignores `at` and stays whole, since the colour
   range is the map's and not the picture's; a route that yields colours returns one per
   entry of `at`."""
+  color = colorRequest(color, faceColor, ipfDirection)
   n = x.size
   ids = np.asarray(x.phaseId).reshape(-1)
   sel = slice(None) if at is None else np.asarray(at).reshape(-1)
@@ -330,6 +342,7 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
   colour. backend is 'imagesc' for the picture a rigid lattice is, 'patch' for one cell per
   measurement, 'scatter' for the measurements alone; by default the first the map allows.
   """
+  color = colorRequest(color, faceColor, ipfDirection)
   # plot(ebsd, cS): the crystal shape at every measurement of its phase
   if isinstance(color, crystalShape):
     from .shapeplot import plotShapesOnMap
@@ -422,7 +435,7 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     mP.mappable = h
     if colorbar:
       gcm().colorbar(label=color if isinstance(color, str) else "")
-  _finish(mP, ebsd, micronbar, refFrame, legend, color, location)
+  _finish(mP, ebsd, micronbar, refFrame, legend, color, location, ipfDirection)
   return h
 
 
@@ -444,7 +457,7 @@ def _pixelCap(ax):
   return int(max(4 * w * h, 250_000))
 
 
-def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
+def _finish(mP, x, micronbar, refFrame, legend, color, location=None, ipfDirection=None):
   # a plot into a held map adds no second scale bar
   # MATLAB's 'micronbar', 'off'
   if isinstance(micronbar, str):
@@ -466,7 +479,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None):
     if color is None or (isinstance(color, str) and color == "phase"):
       phaseLegend(mP, x)
     elif (isinstance(color, str) and color == "orientation") or isinstance(color, ipfColorKey):
-      keyLegend(mP, x, ipfDirection=color.ipfDirection if isinstance(color, ipfColorKey) else zvector)
+      keyLegend(mP, x, ipfDirection=color.ipfDirection if isinstance(color, ipfColorKey) else ipfDirection if ipfDirection is not None else zvector)
 
 
 # ------------------------------------------------------------------ the grains and the boundary
@@ -484,6 +497,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   below show.
   """
   alpha = kw.pop("faceAlpha", alpha)
+  color = colorRequest(color, faceColor, ipfDirection)
   from matplotlib.path import Path
   # plot(grains, v): an axis per grain as a compass needle at its centroid
   if isinstance(color, vector3d):
@@ -541,7 +555,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   named = legend is None and faceColor is not None
   if named:
     legend = False
-  _finish(mP, grains, micronbar, refFrame, legend, color, location)
+  _finish(mP, grains, micronbar, refFrame, legend, color, location, ipfDirection)
   if named and displayName is not None:
     from matplotlib.colors import to_rgb
     from matplotlib.patches import Patch

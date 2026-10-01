@@ -27,6 +27,29 @@ def blockMap(A, nb, bs, notIndexed=(), step=7 * degree, dtype=np.float64):
   return EBSD(pos, rot, ph, phaseList(CS))
 
 
+def test_grains_from_the_grain_ids_stored_with_a_planar_map():
+  # one orientation everywhere, so only the stored ids part the grains; an id of 0 is no grain
+  from mtex import gbcCustom
+  for flag in ({"grainId": True}, {"angle": "grainId"}, {"criterion": None}):
+    e = blockMap(SQ3, 2, 5, step=0)
+    i = np.arange(len(e)) % 10
+    e.prop["grainId"] = np.where(i < 5, 1, 2).astype(float)
+    e.prop["grainId"][0] = 0
+    if "criterion" in flag:
+      g = calcGrains(e, gbcCustom("grainId", 0.5))
+    else:
+      g = calcGrains(e, **flag)
+    indexed = g[g.phaseId > 0]
+    # the criterion alone only compares the ids, so the pixel of id 0 is a grain of its own
+    assert sorted(indexed.numPixel.tolist()) == ([49, 50] if "criterion" not in flag else [1, 49, 50])
+    assert calcGrains(blockMap(SQ3, 2, 5, step=0)).size == 1
+
+
+def test_grain_ids_must_be_stored():
+  with pytest.raises(ValueError, match="grainId"):
+    calcGrains(blockMap(SQ3, 2, 5), grainId=True)
+
+
 def test_S4_grains_of_a_block_map():
   for A in (SQ3, HEX3):
     e = blockMap(A, 4, 5)

@@ -266,3 +266,44 @@ def test_marginx_sets_the_space_around_the_axes():
   fig = mtexFigure(2, marginx=48)
   assert np.isclose(fig.fig.get_layout_engine().get()["w_pad"], 0.5)
   plt.close("all")
+
+
+def test_nextAxis_ofAnOccupiedCellRepaintsItAndHoldOverlays():
+  # MATLAB #2615: nextAxis(k) picks the cell the next plot paints, the layout kept
+  agg()
+  import matplotlib.pyplot as plt
+  from mtex import hold, newMtexFigure, nextAxis, plot, vector3d
+  rng = np.random.default_rng(2)
+  # the markers are made when the figure is drawn
+  def points(ax):
+    ax.figure.canvas.draw()
+    return sum(len(c.get_offsets()) for c in ax.collections)
+  # directions of the upper hemisphere, all of them drawn: z points into the screen in the
+  # default convention, so they are those of negative z
+  up = lambda n: vector3d(rng.normal(size=n), rng.normal(size=n), -np.abs(rng.normal(size=n))).normalize()
+  fig = newMtexFigure()
+  plot(up(30), upper=True)
+  nextAxis()
+  plot(up(20), upper=True)
+  nextAxis(1)
+  plot(up(5), upper=True)
+  assert len(fig.children) == 2 and points(fig.children[0]) == 5 and points(fig.children[1]) == 20
+  # the repainted cell draws its own frame again
+  assert fig.children[0]._mtexSphericalPlot is not None
+  # hold overlays what the cell holds
+  nextAxis(2)
+  hold(True)
+  plot(up(3), upper=True)
+  hold(False)
+  assert points(fig.children[1]) == 23
+  plt.close("all")
+
+
+def test_mtexColorbar_givesABarPerColormapAlthoughTheRangesAgree():
+  # MATLAB #2614: a shared bar needs a shared colour map
+  import matplotlib.pyplot as plt
+  from mtex import mtexColorbar, setColorRange
+  fig = hotAndCool()
+  setColorRange("equal")
+  assert len(mtexColorbar()) == 2
+  plt.close("all")

@@ -648,7 +648,9 @@ def _inPolygon(x, y, V, includeEdge=True):
   inside = np.zeros(x.shape, dtype=bool)
   onEdge = np.zeros(x.shape, dtype=bool)
   n = len(V)
-  tol = 1e-12 * max(1.0, np.ptp(V, axis=0).max()) if n else 0.0
+  # the extent sets the tolerance, at least eight ulps of the largest coordinate, so that a
+  # polygon far from the origin, a map in nm say, still has an edge (MATLAB's insidepoly)
+  tol = max(1e-12 * max(1.0, np.ptp(V, axis=0).max()), 8 * np.finfo(float).eps * np.abs(V).max()) if n else 0.0
   for i in range(n):
     (ax, ay), (bx, by) = V[i], V[(i + 1) % n]
     cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax)

@@ -20,6 +20,17 @@ def test_polygon_edges_are_stable_under_roundoff():
   assert _inPolygon([8.99, 9.01], [0., 0.], square, includeEdge=False).tolist() == [True, False]
 
 
+def test_polygon_edges_far_from_the_origin():
+  # a triangle at about 1e6, a map in nm: every point on its slanted edge is on the edge
+  from mtex.maps.ebsd import _inPolygon
+  o = np.array([1.234567e6, 7.654321e5])
+  tri = o + np.array([[0., 0.], [0.3, 0.], [0., 0.3]])
+  t = np.linspace(0.05, 0.95, 400)
+  pts = tri[1] + t[:, None] * (tri[2] - tri[1])
+  assert _inPolygon(pts[:, 0], pts[:, 1], tri).all()
+  assert not _inPolygon(pts[:, 0], pts[:, 1], tri, includeEdge=False).any()
+
+
 def sampleMap(n=12, phases=1, dtype=np.float64, A=np.eye(2)):
   cs = crystalFrame("m-3m", mineral="test")
   cs2 = crystalFrame("321", mineral="other")

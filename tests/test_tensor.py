@@ -155,6 +155,16 @@ def test_EinsteinSum_refusesMismatchedContractions():
     C * C
 
 
+def test_EinsteinSum_refusesASummedIndexNotUsedTwice():
+  # MATLAB's check: a summed index pairs exactly two indices
+  v = tensor(np.array([1.0, 2.0, 3.0]), rank=1)
+  with pytest.raises(ValueError, match="appears 1 times"):
+    EinsteinSum(v, [-1])
+  with pytest.raises(ValueError, match="appears 3 times"):
+    EinsteinSum(v, [-1], v, [-1], v, [-1])
+  assert EinsteinSum(v, [-1], v, [-1]) == 14.0
+
+
 def test_rotate_leavesAnIsotropicTensorInvariant():
   # an isotropic tensor is invariant under every rotation
   C = isotropicStiffness(60, 40, crystalFrame("m-3m"))

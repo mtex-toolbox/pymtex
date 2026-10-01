@@ -65,6 +65,16 @@ def test_a_phase_record_is_recognised_by_being_one():
   assert oscPhases(block, 0, len(block)).mineralList == ["notIndexed", "Copperoid", "Silverish"]
 
 
+def test_a_symmetry_code_may_be_a_point_group_id():
+  # EDAX writes 1 to 43 as a Laue code or 100 to 131 as a point group id (MATLAB #2621)
+  cell = np.array([3.6, 3.6, 3.6, 90, 90, 90], dtype="<f4").tobytes()
+  rec = lambda name, code: name.ljust(256, b"\x00") + code.to_bytes(4, "little") + cell + b"\x00" * 4
+  assert oscPhaseAt(rec(b"Copper", 131), 0).pointGroup == "m-3m"
+  assert oscPhaseAt(rec(b"Gold", 129), 0).pointGroup == "432"
+  block = rec(b"Copper", 131) + b"\x01\x02" * 50 + rec(b"Nickel", 43)
+  assert oscPhases(block, 0, len(block)).mineralList == ["notIndexed", "Copper", "Nickel"]
+
+
 def test_short_and_markerless_files_are_errors(tmp_path):
   p = tmp_path / "x.osc"
   p.write_bytes(b"\x00" * 10)

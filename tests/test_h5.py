@@ -126,7 +126,9 @@ def test_thermofisher_stack_layout():
   assert counts(e) == [0, 56, 0, 6]
   assert e.CSList.mineralList == ["notIndexed", "Titanium", "Titanium-beta", "Vanadium"]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["6/mmm", "m-3m", "m-3m"]
-  assert np.allclose(firstEuler(e)[1], [149.03730774, 142.57176208, 24.79652023], atol=1e-6)
+  # the file's (149.04, 142.57, 24.80) after the half turn about y between the pixel and the
+  # Euler x axes, MATLAB's map correction
+  assert np.allclose(firstEuler(e)[1], [210.96269226, 37.42823792, 204.79652023], atol=1e-6)
   # the file writes metres and says nothing about it, as MTEX reads it too
   assert abs(e.dPos - 1.5e-7) < 1e-12
 
@@ -162,12 +164,13 @@ def test_bruker_takes_the_space_group_number_and_a_cell_in_one_row():
 # ------------------------------------------------------------------ the corrections
 
 # the correction each vendor layout applies: Bruker's half turn about y for id five, the EDAX
-# setting the file states (the half turn about (1,-1,0)), EMSphInx's the same, ThermoFisher none
+# setting the file states (the half turn about (1,-1,0)), EMSphInx's the same, ThermoFisher the
+# half turn about y between its pixel and its Euler x axes (xTalView manual, MATLAB 9a51196b2)
 @pytest.mark.parametrize("name, correction", [
   ("bruker_cut.h5", rotation.byAxisAngle(vector3d(0, 1, 0), np.pi)),
   ("kamila_cut.oh5", rotation.byEuler(135 * degree, 180 * degree, 225 * degree)),
   ("emsphinx_cut.h5", rotation.byEuler(135 * degree, 180 * degree, 225 * degree)),
-  ("thermofisher_cut.hdf5", rotation.id),
+  ("thermofisher_cut.hdf5", rotation.byEuler(90 * degree, 180 * degree, 270 * degree)),
 ])
 def test_the_vendor_correction(name, correction):
   a = loadEBSD(fixture(name), grid=False)

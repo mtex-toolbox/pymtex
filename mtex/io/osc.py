@@ -20,7 +20,7 @@ from ..geometry.frames import crystalFrame
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
 from .ang import eulerCorrectionRotation
-from .load import TSL_LAUE, ebsdFromColumns, regularPoly
+from .load import EDAX_POINT_GROUPS, TSL_LAUE, ebsdFromColumns, regularPoly
 from .table import readFile
 
 OSC_HEADER_OPEN = b"\xb9\x0b\xef\xff\x01\x00\x00\x00"
@@ -55,9 +55,11 @@ def oscPhaseAt(b, o):
     return None
   if not all(angles[k] < sum(angles) - angles[k] for k in range(3)):
     return None
-  # the code is a Laue code where the table knows it; a phase whose code is not there keeps
-  # its cell and loses its symmetry rather than being given one it does not have
-  symbol = TSL_LAUE.get(_u32(b, o + OSC_PHASE_NAME), "1")
+  # EDAX writes the symmetry as a TSL Laue code, 1 to 43, or as a point group id, 100 to 131;
+  # a phase whose code is in neither table keeps its cell and loses its symmetry rather than
+  # being given one it does not have
+  code = _u32(b, o + OSC_PHASE_NAME)
+  symbol = TSL_LAUE.get(code) or (EDAX_POINT_GROUPS[code - 100] if 100 <= code < 100 + len(EDAX_POINT_GROUPS) else "1")
   try:
     return crystalFrame(symbol, cell, np.array(angles) * degree, "EDAX", mineral=name)
   except Exception:
@@ -72,7 +74,7 @@ def oscPhases(b, first, last):
   part, without which a record matches again a few bytes along where its name begins with
   blanks. What keeps a code from being found in the bytes of a reflection is oscPhaseAt."""
   frames = []
-  codes = sorted(TSL_LAUE)
+  codes = sorted(TSL_LAUE) + list(range(100, 100 + len(EDAX_POINT_GROUPS)))
   hits = []
   for code in codes:
     pat = int(code).to_bytes(4, "little")

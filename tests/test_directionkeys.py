@@ -223,3 +223,19 @@ def test_HSVDirectionKey_perceptualCubicCornersAreRedGreenBlue(hueLightness):
   corners = key.direction2color(vector3d([[0, 0, 1], [1, 0, 1], [1, 1, 1]]))
   assert list(np.argmax(corners, axis=-1)) == [0, 1, 2]
   assert np.all((corners >= 0) & (corners <= 1))
+
+
+@pytest.mark.parametrize("name", ["-3m", "32", "6/mmm", "4/mmm", "m-3m", "mmm", "-43m"])
+def test_HSVDirectionKey_coloursACrystalDirectionWhateverTheAlignment(name):
+  # the key is a function of the crystal direction: turning the lattice against the axes,
+  # c* off z, changes no colour (MATLAB a3e47891a)
+  rng2 = np.random.default_rng(3)
+  hkl = rng2.integers(-3, 4, size=(40, 3))
+  hkl = hkl[np.any(hkl != 0, axis=1)]
+  abc = [5, 6, 7] if name == "mmm" else [5, 5, 5] if name in ("m-3m", "-43m") else [5, 5, 7]
+  ref = crystalFrame(name, abc, "X||a", "Z||c*")
+  c0 = HSVDirectionKey(ref).direction2color(Miller(hkl, ref))
+  for al in [("X||b*", "Z||a"), ("X||b", "Z||a*")]:
+    cs = crystalFrame(name, abc, *al)
+    # a direction on a boundary of the sector, as [-2 -1 0] of -43m, keeps its hue to rounding
+    assert np.allclose(HSVDirectionKey(cs).direction2color(Miller(hkl, cs)), c0, atol=1e-3)

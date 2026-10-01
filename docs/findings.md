@@ -365,6 +365,7 @@ has to know.
 | RotationTangentSpace, RotationSpinTensor, SO3FunVectorField | `SO3TangentVector (crystal)` | `SO3TangentVector (right, y↑→x)`: the side and the frame |
 | TaylorModel, TextureEvolution, DislocationSystems | a crystal frame without a mineral is written `crystal` | its point group, `1`, `432`, as a crystal frame names itself everywhere else |
 | ODFCharacteristics, SO3FunOperations and the other pages on `mtexdata('dubna')` | the orientations print `Quartz → y↓→x` although the page set `plottingConvention.default('y↑→x')` before loading | `Quartz → y↑→x`; MATLAB's pole figures keep a convention from before the call, cached data perhaps; open, on the MATLAB side |
+| IPF keys of 321 | the fundamental sector of 321 starts 30 degrees below a, between two two-fold axes, and the key colours it with two reflectors of its own table | the sector starts at the two-fold axis along a, the rule the port derives for every group; the colours are MATLAB's to rounding in every alignment (the fold the port derives on its sector gives MATLAB's colouring), only the outline drawn for the sector is turned by 30 degrees; MATLAB's own sector would need MATLAB's reflector table to colour alike |
 
 ## Practicalities
 

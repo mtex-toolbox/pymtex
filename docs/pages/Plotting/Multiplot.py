@@ -48,22 +48,19 @@ plot(vector3d.rand(200), upper=True)
 #
 # ## Return to an occupied axis
 #
-# Calling `nextAxis` for an occupied position selects that axis again, but
-# selecting is not the same as overlaying. With the hold state off, the next
-# plot command starts a fresh layout and discards the whole gallery rather
-# than repainting one cell. Use `hold(True)` to draw into
-# the selected axis and keep the arrangement.
+# Calling `nextAxis` for an occupied position selects that axis again. The
+# next plot command repaints that one cell and leaves the rest of the
+# arrangement untouched. Add `hold(True)` to draw on top of what the cell
+# already holds.
 
 # +
 nextAxis(2, 3)
 
-hold(True)
 plot(vector3d(1, -1, 1), upper=True, markerSize=8)
-hold(False)
 # -
 
-# The single direction now sits on top of the random cloud, and the 2-by-3
-# arrangement is unchanged.
+# The single direction has taken the place of the random cloud, and the
+# 2-by-3 arrangement is unchanged.
 # Keep `upper` when revisiting an upper-hemisphere axis. A full-sphere plot
 # needs separate upper- and lower-hemisphere axes. It therefore changes the
 # arrangement rather than converting this one axis in place.
@@ -72,14 +69,12 @@ hold(False)
 #
 # The axes need not contain the same kind of object. Here the lower-left
 # axis shows the symmetry elements of a cubic crystal beside spherical
-# plots of directions. It needs `hold(True)` for the same reason as above.
+# plots of directions.
 
 # +
 nextAxis(2, 1)
 
-hold(True)
 plot(crystalFrame('432'))
-hold(False)
 # -
 
 # Across the staged figures, every occupied axis keeps the same size while

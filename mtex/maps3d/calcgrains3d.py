@@ -31,14 +31,13 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
   culls smaller grains. A map of the plane also takes alpha, the bound of its decomposition,
   removeQuadruplePoints, mcl and fmc for Markov and fast multiscale clustering; a map of
-  volumes grainId, the grains its file stored. The map keeps the grain ids"""
+  volumes grainId, the grains its file stored, a map of the plane too. The map keeps the grain ids"""
   # calcGrains(ebsd, 'grainId'): MATLAB's flag
   if isinstance(angle, str) and angle == "grainId":
     angle, grainId = DEFAULT_ANGLE, True
   if not isinstance(ebsd, EBSD3):
-    if grainId:
-      raise TypeError("grainId takes the grains a file of volumes stored; a map of the plane has none")
-    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, removeQuadruplePoints, mcl, fmc, verbose, backend)
+    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, removeQuadruplePoints, mcl, fmc, verbose, backend,
+                         grainId)
   planar = {"alpha": alpha != 3.1, "removeQuadruplePoints": removeQuadruplePoints, "mcl": mcl is not None,
             "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
   if any(planar.values()):

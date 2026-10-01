@@ -109,4 +109,26 @@ def superfibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None):
   return SO3FibonacciGrid(rotation._fromData(q), CS, SS, res)
 
 
-__all__ = ["SO3FibonacciGrid", "superfibonacciSO3Grid"]
+def fibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None, antipodal=False):
+  """MATLAB's fibonacciSO3Grid: the super-Fibonacci spiral of round(8 pi^2 / resolution^3) nodes
+  over SO(3), one node per resolution^3 of its volume, trimmed to the fundamental region; points
+  sets the resolution from the volume fraction of the region instead, antipodal=True halves it
+
+    S3G = fibonacciSO3Grid(cs)
+    S3G = fibonacciSO3Grid(cs, ss, points=10000)
+    S3G = fibonacciSO3Grid(cs, ss, resolution=2.5*degree)"""
+  from ..frames import specimenFrame
+  from ..orientationregion import fundamentalRegion
+  SS = specimenFrame.default if SS is None else SS
+  # the volume fraction of the fundamental region, as in find
+  V = 1 / CS.properGroup().numSym() / SS.properGroup().numSym() / (1 + bool(antipodal))
+  if points is not None:
+    resolution = (8 * np.pi ** 2 * V / points) ** (1 / 3)
+  q = _superfib(max(int(round(8 * np.pi ** 2 / float(resolution) ** 3)), 1))
+  q = q[fundamentalRegion(CS, SS, antipodal=antipodal).checkInside(q)]
+  g = SO3FibonacciGrid(rotation._fromData(q), CS, SS, resolution)
+  g.antipodal = bool(antipodal)
+  return g
+
+
+__all__ = ["SO3FibonacciGrid", "superfibonacciSO3Grid", "fibonacciSO3Grid"]

@@ -18,7 +18,7 @@ import numpy as np
 from ..geometry.kernels import backend as kernelBackend
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
-from .criteria import DEFAULT_ANGLE, gbcAngle, grainBoundaryCriterion
+from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import NO_PIXEL, decompose
 from .fmc import gbcFMC
 from .grains import grain2d
@@ -27,13 +27,22 @@ from .segment import segment
 
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, fmc=None, verbose=False, backend=None):
+               mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
   culls smaller grains, alpha bounds the decomposition, mcl and fmc select Markov
-  clustering and fast multiscale clustering. The map keeps the grain ids"""
+  clustering and fast multiscale clustering, grainId=True joins the pixels of one grain id
+  stored with the map, ebsd.prop['grainId']. The map keeps the grain ids"""
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
+  if grainId:
+    stored = ebsd.prop.get("grainId")
+    if stored is None:
+      raise ValueError("calcGrains(ebsd, grainId=True) needs the grain ids stored with the map, ebsd.prop['grainId']")
+    stored = np.asarray(stored).reshape(ebsd.shape).copy()
+    # a stored id of 0 is no grain, as it is in the output
+    ebsd.phaseId[stored == 0] = 0
+    criterion = gbcEqual(stored)
   if criterion is None and fmc is not None:
     criterion = gbcFMC(fmc, verbose=verbose)
   crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)

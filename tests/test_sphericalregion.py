@@ -274,3 +274,18 @@ def test_an_icosahedral_group_from_rounded_axes_has_its_sector():
     cs = crystalFrame.byElements(els)
     sR = conventionalSector(cs)
     assert len(sR.N) == faces and tilesSphere(sR, cs.sym) and sR.checkInside(sectorCenter(cs.sym))
+
+
+GROUPS = ["2", "m", "2/m", "222", "mm2", "mmm", "4", "-4", "4/m", "422", "4mm", "-42m", "4/mmm", "3", "-3", "32", "3m",
+          "-3m", "6", "-6", "6/m", "622", "6mm", "-6m2", "6/mmm", "23", "m-3", "432", "-43m", "m-3m"]
+
+
+@pytest.mark.parametrize("alignment", [("X||a", "Z||c*"), ("X||b*", "Z||a"), ("X||b", "Z||a*"), ("X||a*", "Z||b")])
+def test_the_conventional_sector_is_built_about_c_star(alignment):
+  # MATLAB a3e47891a: the wedge and the cubic planes turned to c* and a, so a lattice whose
+  # c* is off z keeps the conventional sector instead of falling back to a Dirichlet domain
+  from mtex import crystalFrame
+  for g in GROUPS:
+    abc = [5, 6, 7] if g in ("2", "m", "2/m", "222", "mm2", "mmm") else [5, 5, 5] if g in ("23", "m-3", "432", "-43m", "m-3m") else [5, 5, 7]
+    cs = crystalFrame(g, abc, *alignment)
+    assert tilesSphere(conventionalSector(cs), cs.sym), g

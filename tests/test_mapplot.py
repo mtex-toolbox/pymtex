@@ -426,3 +426,26 @@ def test_the_key_legend_draws_both_hemispheres():
   upper, lower = axes[0]._mtexSphericalPlot, axes[1]._mtexSphericalPlot
   assert upper.proj.upper and not lower.proj.upper
   assert axes[0].get_position().y0 > axes[1].get_position().y1
+
+
+def test_an_ipf_direction_alone_colours_by_orientation(forsterite):
+  # MATLAB's plot(ebsd, 'ipfDirection', d): the orientations along d, not the phases
+  ebsd, grains = forsterite
+  rgbOri, _ = mapValues(ebsd, "orientation", ipfDirection=xvector)
+  rgbDir, scalar = mapValues(ebsd, None, ipfDirection=xvector)
+  rgbPhase, _ = mapValues(ebsd, None)
+  assert not scalar and np.allclose(rgbDir, rgbOri, equal_nan=True) and not np.allclose(rgbDir, rgbPhase, equal_nan=True)
+  assert np.allclose(mapValues(grains, None, ipfDirection=xvector)[0], mapValues(grains, "orientation", ipfDirection=xvector)[0],
+                     equal_nan=True)
+  # the map carries no phase legend then
+  plot(ebsd, ipfDirection=xvector)
+  assert gcm().children[-1].get_legend() is None
+  # a face colour still wins over the direction
+  rgbFace, _ = mapValues(ebsd, None, faceColor="red", ipfDirection=xvector)
+  assert np.allclose(rgbFace, [1, 0, 0])
+
+
+def test_matlab_ipf_flags_point_to_the_keyword(forsterite):
+  ebsd, _ = forsterite
+  with pytest.raises(ValueError, match="ipfDirection=zvector"):
+    plot(ebsd, "ipfz")

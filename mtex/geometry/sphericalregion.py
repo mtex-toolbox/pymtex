@@ -407,6 +407,9 @@ def conventionalSector(pg, up=None, east=None, frame=None):
     return _monoclinicSector(pg, u, east, frame)
   if lat is latticeType.icosahedral and pg.numProper() == 60:
     return dirichletSector(pg, frame=frame)
+  # the sector is built about c* with a at azimuth zero, the conventional alignment, and
+  # turned to wherever the lattice points (MATLAB a3e47891a)
+  R = _latticeTurn(pg)
   if lat is latticeType.cubic:
     if n == 48:
       planes = [(1, -1, 0), (-1, 0, 1), (0, 1, 0)]
@@ -416,17 +419,21 @@ def conventionalSector(pg, up=None, east=None, frame=None):
       planes = [(1, -1, 0), (1, 1, 0), (-1, 0, 1)]
     else:
       planes = [(1, 1, 0), (1, -1, 0), (0, 1, 1), (0, -1, 1)]
-    return sphericalRegion(np.array(planes, dtype=float), frame=frame)
+    return sphericalRegion(np.array(planes, dtype=float) @ R.T, frame=frame)
   N = []
   els = _elements(pg)
-  if np.any(_apply(els, u) @ u < -1e-6):
+  # an element that turns the out-of-screen axis around sends everything to its hemisphere
+  if np.any(_apply(els, u) @ u < -1 + 1e-7):
     N.append(u)
   if n > 1 + len(N):
     drho = 2 * np.pi * (1 + len(N)) / n
-    rho0 = _wedgeStart(pg, vector3d(pg.axes[0]).rho)
-    N.append(np.array([np.cos(rho0 + np.pi / 2), np.sin(rho0 + np.pi / 2), 0.0]))
-    N.append(np.array([np.cos(rho0 + drho - np.pi / 2), np.sin(rho0 + drho - np.pi / 2), 0.0]))
+    rho0 = _wedgeStart(pg, R)
+    wedge = np.array([[np.cos(rho0 + np.pi / 2), np.sin(rho0 + np.pi / 2), 0.0],
+                      [np.cos(rho0 + drho - np.pi / 2), np.sin(rho0 + drho - np.pi / 2), 0.0]])
+    N += list(wedge @ R.T)
   N = np.array(N).reshape(-1, 3)
+  # a plane given twice bounds once, as the hemisphere of 222 and -4 is also a wedge plane
+  N = N[[k for k in range(len(N)) if not any(np.allclose(N[k], N[j], atol=1e-9) for j in range(k))]]
   # an orthorhombic sector with a mirror opens east on the chart, so the plotting
   # convention turns it, as the monoclinic one is turned
   if lat is latticeType.orthorhombic and not pg.isProper:
@@ -480,20 +487,32 @@ def _monoclinicSector(pg, up, east, frame):
   return sphericalRegion(np.stack([normal, a]), frame=frame)
 
 
-# the azimuth the wedge starts at: the mirror plane through the axis, else the two-fold axis
-# in the plane, at or just below the a axis; the a axis itself without either
-def _wedgeStart(pg, rhoA):
+# the turn taking z to c* and x to a, so that the conventional sector built about z with a
+# at azimuth zero sits on the lattice, MATLAB's rotation.map(z, c*, x, a); the identity for a
+# group on the canonical axes
+def _latticeTurn(pg):
+  a = _unit(np.asarray(pg.axes[0], dtype=float))
+  c = _unit(np.cross(a, np.asarray(pg.axes[1], dtype=float)))
+  x = _unit(a - (a @ c) * c)
+  return np.stack([x, np.cross(c, x), c], axis=1)
+
+
+# the azimuth the wedge starts at, in the turned position R gives: the mirror plane through
+# the axis, else the two-fold axis in the plane, at or just below the a axis at azimuth
+# zero; the a axis itself without either
+def _wedgeStart(pg, R):
   o = pg.rot
   sel = (np.abs(o.angle() - np.pi) < 1e-6)
-  ax = o[sel].axis()
-  inPlane = np.abs(ax.z) < 1e-6
+  ax = o[sel].axis().data.reshape(-1, 3) @ R
+  inPlane = np.abs(ax[:, 2]) < 1e-6
   improper = o[sel].isImproper
-  planes = ax.rho[inPlane & improper] + np.pi / 2
-  axes = ax.rho[inPlane & ~improper]
+  rho = np.arctan2(ax[:, 1], ax[:, 0])
+  planes = rho[inPlane & improper] + np.pi / 2
+  axes = rho[inPlane & ~improper]
   cand = planes if len(planes) else axes
   if len(cand) == 0:
-    return rhoA
-  return rhoA - np.min(np.mod(rhoA - cand + 1e-9, np.pi) - 1e-9)
+    return 0.0
+  return -np.min(np.mod(-cand + 1e-9, np.pi) - 1e-9)
 
 
 def projectIntoRegion(v, sR, pg=None):

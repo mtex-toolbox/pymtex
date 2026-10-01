@@ -50,7 +50,7 @@ class mtexFigure:
     mtexFigure(n)             a new figure laid out for n axes
     fig.nextAxis()            the next axes of the layout
     fig.children              the axes made so far
-    fig.colorbar()            a colour bar per axes, or one when the ranges are equal
+    fig.colorbar()            a colour bar per axes, or one when ranges and colour maps agree
   """
 
   def __init__(self, n=1, figSize=None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None,
@@ -108,10 +108,18 @@ class mtexFigure:
     """the axes the next plot draws into: the pending one, else a new one"""
     ax, self.pending = self.pending, None
     if ax is not None:
-      # an axes nextAxis left blank shows its frame again, one drawn into keeps its look
+      # an axes nextAxis left blank shows its frame again
       if getattr(ax, "_mtexBlank", False):
         ax.set_axis_on()
         ax._mtexBlank = False
+      # one drawn into is emptied for the next plot unless hold keeps it, as MATLAB's
+      # nextAxis(k) picks the cell the next plot paints (#2615); the records of the old plot
+      # go with it, so that the new one draws its own frame, grid and labels
+      elif not self.hold:
+        ax.cla()
+        for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot"):
+          if hasattr(ax, holder):
+            delattr(ax, holder)
       self.current = ax
     return ax if ax is not None else self.nextAxis()
 
@@ -217,8 +225,8 @@ class mtexFigure:
         refill(colormap=cmap)
 
   def colorbar(self, label="", multiple=False, **kwargs):
-    """mtexColorbar: a bar per axes, or one for all when they share a range; a figure that
-    has bars loses them instead, as MATLAB's toggle does"""
+    """mtexColorbar: a bar per axes, or one for all when they share a range and a colour map; a
+    figure that has bars loses them instead, as MATLAB's toggle does"""
     if self.colorbars:
       for cb in self.colorbars:
         _removeBar(cb)
@@ -244,9 +252,12 @@ class mtexFigure:
       bars = [self.fig.colorbar(_barOf(m), ax=ax, shrink=0.7, label=l, **kwargs) for (ax, m), l in zip(ms, label)]
       self.colorbars += bars
       return bars
+    # a shared bar needs a shared colour map as well as a shared range, else it describes only
+    # one of the axes (MATLAB #2614)
+    oneMap = len({m.get_cmap().name for _, m in ms}) == 1
     # one bar for the common range setColorRange gave, whose contour plots keep their own levels
     common = getattr(self, "colorRange", None)
-    if common is not None and not multiple and len(ms) > 1 and all(getattr(m, "levels", None) is not None for _, m in ms):
+    if common is not None and not multiple and oneMap and len(ms) > 1 and all(getattr(m, "levels", None) is not None for _, m in ms):
       import matplotlib.cm
       from matplotlib.colors import Normalize
       from .colormaps import mtexColormap
@@ -255,7 +266,7 @@ class mtexFigure:
       self.colorbars.append(cb)
       return [cb]
     clims = {tuple(np.round(m.get_clim(), 12)) for _, m in ms}
-    if len(clims) == 1 and len(ms) > 1 and not multiple:
+    if len(clims) == 1 and len(ms) > 1 and not multiple and oneMap:
       cb = self.fig.colorbar(_barOf(ms[-1][1]), ax=[ax for ax, _ in ms], shrink=0.7, label=label, **kwargs)
       self.colorbars.append(cb)
       return [cb]
