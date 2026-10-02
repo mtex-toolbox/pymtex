@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -30,6 +31,9 @@ from .quaternion import orthogonalTransform, reflection, rotation
 from .session import getMTEXpref
 from .units import degree
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector
+
+if TYPE_CHECKING:
+  from .vocabulary import PointGroupName
 
 CANONICAL_AXES = np.eye(3)
 
@@ -160,7 +164,7 @@ class symmetry:
     pg = symmetry(pointId=32)
     pg = symmetry(spaceId=225)"""
 
-  def __init__(self, name=None, axes=None, *, pointId=None, laueId=None, spaceId=None, abg=None):
+  def __init__(self, name: PointGroupName | Any = None, axes=None, *, pointId=None, laueId=None, spaceId=None, abg=None):
     if isinstance(name, symmetry):
       self._symbol, self.rot, self.axes = name._symbol, name.rot, name.axes
       return

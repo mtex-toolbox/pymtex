@@ -9,6 +9,7 @@
 # sphericalPlot per axes owns the projection, the boundary, the grid and the labels, and
 # is kept on the axes so that a second plot into it reuses them.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import re
 
@@ -28,6 +29,11 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .spherical import hasSymmetry, makeSphericalProjection, plainProjection
 from ..geometry.display import header
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 PROJECTION_KEYS = ("projection", "upper", "lower", "complete", "antipodal", "how2plot", "fundamentalRegion")
 AXES_KEYS = ("grid", "grid_res", "axisLabels", "fontSize")
@@ -561,7 +567,7 @@ def fillFlag(kw, default=None):
   return default
 
 
-def plot(v, *args, **kw):
+def plot(v, *args, **kw: Unpack[PlotKeywords]):
   """plot(v), plot(v, data), plot(v, rgb), plot(v, w), plot(sF), plot(vF), plot(sR)
 
   Directions as markers; with data coloured by it, with rgb in those colours, with a second
@@ -734,7 +740,7 @@ def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
   return hs
 
 
-def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw):
+def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw: Unpack[PlotKeywords]):
   """circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
   chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)"""
   vs = v if isinstance(v, vector3d) else vector3d(v)
@@ -748,7 +754,7 @@ def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edg
   return _curves(rings, vs.frame, vs.antipodal, add2all, lineColor, lineWidth, edgeAlpha, parent, "circle", **kw)
 
 
-def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw):
+def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw: Unpack[PlotKeywords]):
   """ellipse(rot, a, b): the ellipse of semi-axes a and b, in radians, about rot * z, its
   axes along rot * x and rot * y, onto the spherical plots of the figure"""
   from ..geometry.quaternion import rotation
@@ -797,7 +803,7 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, edgeAlpha, p
 
 
 # plot(psi): a spherical kernel over the angle in degrees, into the held axes or a new figure
-def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw):
+def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw: Unpack[PlotKeywords]):
   """plot(psi): a kernel on the sphere against the angle, over -180 to 180 degree with symmetric"""
   from .kernelplot import _lineAxes
   from .keywords import lineKeywords
@@ -811,7 +817,7 @@ def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw):
   return h
 
 
-def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, **kw):
+def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, **kw: Unpack[PlotKeywords]):
   """scatter(v), scatter(v, data), scatter(v, label=texts): directions as markers; scatter(ori)
   puts orientations into axis angle space; scatter(x, y, sz, c, 'filled') of two coordinate
   lists marks points on the current map"""
@@ -863,7 +869,7 @@ def _insideFirst(v, sR):
   return v.flatten()[np.flatnonzero(~drop)]
 
 
-def text(v, labels=None, *more, **kw):
+def text(v, labels=None, *more, **kw: Unpack[PlotKeywords]):
   """text(v, labels): text at directions, text(v, labeled=True) each direction's own name;
   text(ebsd, labels): labels on the map; text(x, y, s) and text(x, y, z, s): text at a point
   of the current axes, as MATLAB's text"""
@@ -918,7 +924,7 @@ def _planeCircles(v, lineStyle="-", lineWidth=1.0, lineColor="k", **kw):
 # of n corners for an n-fold rotation axis, a lens for a twofold, a hollow one for a
 # rotoinversion axis, a great circle for a mirror plane, a hollow circle for the inversion
 # (MATLAB @referenceFrame/plot)
-def plotHKL(CS, complete=False, **kw):
+def plotHKL(CS, complete=False, **kw: Unpack[PlotKeywords]):
   """plotHKL(cs): the low index directions <100>, <110>, <111> of a crystal with all their
   symmetric equivalents, labelled, on the upper hemisphere unless complete (MATLAB
   crystalFrame/plotHKL)"""
@@ -940,7 +946,7 @@ def plotHKL(CS, complete=False, **kw):
   return hs
 
 
-def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
+def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw: Unpack[PlotKeywords]):
   """the elements of the point group of a frame drawn on the upper hemisphere: the mirror planes as
   great circles, the rotation and rotoinversion axes as polygons of their order; plot(cs)
 
@@ -1014,7 +1020,7 @@ def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw):
   return sP
 
 
-def annotate(v, *args, **kw):
+def annotate(v, *args, **kw: Unpack[PlotKeywords]):
   """annotate: markers on every axes of the current figure, black by default"""
   kw.setdefault("markerFaceColor", "k")
   kw.setdefault("add2all", True)
@@ -1116,17 +1122,17 @@ def _rangeOf(values):
   return (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
 
 
-def contourf(x, *args, **kw):
+def contourf(x, *args, **kw: Unpack[PlotKeywords]):
   """contourf(sF), contourf(v), contourf(v, data): filled contours"""
   return plot(x, *args, contourf=True, **kw)
 
 
-def contour(x, *args, **kw):
+def contour(x, *args, **kw: Unpack[PlotKeywords]):
   """contour(sF), contour(v), contour(v, data): contour lines"""
   return plot(x, *args, contour=True, **kw)
 
 
-def pcolor(x, *args, **kw):
+def pcolor(x, *args, **kw: Unpack[PlotKeywords]):
   """pcolor(sF), pcolor(v), pcolor(v, data): a coloured surface"""
   return plot(x, *args, pcolor=True, **kw)
 
@@ -1134,7 +1140,7 @@ def pcolor(x, *args, **kw):
 smooth = pcolor
 
 
-def quiver(v, w=None, resolution=10 * degree, **kw):
+def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
   """quiver(v, w), quiver(vF), quiver(ori, w): arrows at directions, a vector or axis field,
   or arrows at orientations in the sections of the current figure"""
   from .volumeplot import is3dMap, _quiver3dMap
@@ -1167,7 +1173,7 @@ def quiver(v, w=None, resolution=10 * degree, **kw):
   return [_arrows(sP, v.flatten(), w.flatten(), resolution=resolution, axisField=w.antipodal, **kw) for sP in sPs]
 
 
-def plotRegion(sR, color="k", lineWidth=1.0, **kw):
+def plotRegion(sR, color="k", lineWidth=1.0, **kw: Unpack[PlotKeywords]):
   """plot(sR): the outline of a spherical region"""
   refuseVariants(kw)
   color = kw.pop("lineColor", color)
@@ -1183,7 +1189,7 @@ def plotRegion(sR, color="k", lineWidth=1.0, **kw):
 
 # ------------------------------------------------------------------ colour keys
 
-def plotKey(key, resolution=0.5 * degree, fundamentalRegion=True, **kw):
+def plotKey(key, resolution=0.5 * degree, fundamentalRegion=True, **kw: Unpack[PlotKeywords]):
   """a direction key drawn as the sector it colours, an inverse pole figure key as its direction
   key: the key evaluated on the chart grid, as an rgb surface"""
   key = getattr(key, "dirMap", key)
@@ -1306,7 +1312,7 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
   return hs
 
 
-def plotPF(odf, h, *args, superposition=None, **kw):
+def plotPF(odf, h, *args, superposition=None, **kw: Unpack[PlotKeywords]):
   """plotPF(odf, h): the pole figures of an ODF, one axes per crystal direction (MATLAB's plotPDF)"""
   # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf'), and a convention
   kw.update({a: True for a in args if isinstance(a, str)})
@@ -1410,7 +1416,7 @@ def _fibrePoles(f, points=1000, lineColor="k", lineWidth=1.5, **kw):
   return hs
 
 
-def plotIPF(odf, r, *args, **kw):
+def plotIPF(odf, r, *args, **kw: Unpack[PlotKeywords]):
   """plotIPF(odf, r): the inverse pole figures of an ODF, one axes per specimen direction (MATLAB's plotIPDF)"""
   rs = _asList(r)
   fs = [odf.radon(r=x) for x in rs]

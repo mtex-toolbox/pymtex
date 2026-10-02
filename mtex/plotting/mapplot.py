@@ -7,6 +7,7 @@
 # under the layout of the plotting convention, and keeps a mapPlot on the axes so that a
 # boundary drawn afterwards lands on the map it belongs to.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -23,6 +24,11 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .orientationkeys import ipfColorKey, ipfColors, orientationColorKey
 from ..geometry.display import display, frameLabel, header
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 MAP_KEYS = ("how2plot", "coordinates", "title", "region", "parent", "figSize", "unit")
 
@@ -334,7 +340,7 @@ def _liftable(f):
 @_liftable
 def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None,
              refFrame=True, location=None, ipfDirection=None, maxPixels=None, edgeColor=None, lineWidth=0.5, alpha=1.0, legend=None, displayName=None,
-             markerSize=4, **kw):
+             markerSize=4, **kw: Unpack[PlotKeywords]):
   """plot(ebsd), plot(ebsd, values), plot(ebsd, ori), plot(ebsd, rgb), plot(ebsd, faceColor='black')
 
   A spatial EBSD map coloured by phase, by a value per measurement, by orientations through
@@ -487,7 +493,7 @@ def _finish(mP, x, micronbar, refFrame, legend, color, location=None, ipfDirecti
 @_liftable
 def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None, refFrame=True,
                location=None, ipfDirection=None, boundary=True, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, displayName=None,
-               translucent=None, **kw):
+               translucent=None, **kw: Unpack[PlotKeywords]):
   """plot(grains), plot(grains, property), plot(grains, grains.meanOrientation)
 
   The grains drawn as the polygons the boundary encloses, coloured by phase, by a value per
@@ -571,7 +577,7 @@ def _translucency(values, scalar, s):
   return np.clip(s * (1 - np.min(v[:, :3], axis=1)), 0, 1)
 
 
-def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw):
+def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw: Unpack[PlotKeywords]):
   """an axis per grain as MATLAB draws it: a needle through the centroid, grey when it lies
   in the plane of the map, its half pointing out of the screen black and the other white
   when it does not, half a diameter long"""
@@ -611,7 +617,7 @@ def _boundaryLines(mP, gB, color, lineWidth, zorder=3, **kw):
 
 @_liftable
 def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis", colorRange=None, colorbar=False, edgeAlpha=1.0,
-                 micronbar=None, refFrame=True, displayName=None, **kw):
+                 micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
   """plot(gB), plot(gB, values), plot(gB, rgb), plot(gB, lineColor='r', lineWidth=2)
 
   The grain boundary segments: as joined chains in one colour, or segment by segment with
@@ -669,7 +675,7 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
 
 
 def plotTriplePoints(tP, color=None, markerFaceColor=None, markerEdgeColor=None, markerSize=6, lineWidth=1.0, colormap="viridis",
-                     colorRange=None, colorbar=False, micronbar=None, refFrame=True, displayName=None, **kw):
+                     colorRange=None, colorbar=False, micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
   """plot(tP), plot(tP, values): the triple points of a boundary network as circles, filled
   by a value where one is given"""
   mapKw = _splitMap(kw)
@@ -714,7 +720,7 @@ def _onMap(x, y):
   return mP.ax, mP.onScreen(xy)
 
 
-def line(x, y, z=None, **kw):
+def line(x, y, z=None, **kw: Unpack[PlotKeywords]):
   """line(x, y, lineStyle=':', lineWidth=4, color='w'): a polyline in the coordinates of the
   current map, drawn under its layout, MATLAB's line"""
   # a line in space goes into a 3D scene
@@ -727,7 +733,7 @@ def line(x, y, z=None, **kw):
                  color=kw.pop("color", "k"), zorder=7, **kw)[0]
 
 
-def scatterXY(x, y, *args, **kw):
+def scatterXY(x, y, *args, **kw: Unpack[PlotKeywords]):
   """scatter(x, y, sz, c, 'filled'): markers at the coordinates of the current map, MATLAB's
   scatter of two coordinate lists; NaN positions are left out"""
   sizes = next((a for a in args if not isinstance(a, str)), 36)
@@ -751,7 +757,7 @@ def _joinLegend(mP, h):
 
 # ------------------------------------------------------------------ arrows on a map
 
-def textMap(x, labels, fontSize=None, color="k", **kw):
+def textMap(x, labels, fontSize=None, color="k", **kw: Unpack[PlotKeywords]):
   """text(ebsd, labels): a label at every measurement or grain of the current map, or a new one"""
   fig = gcm()
   if fig is not None and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
@@ -765,7 +771,7 @@ def textMap(x, labels, fontSize=None, color="k", **kw):
 
 
 def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, projectIntoPlane=False,
-              antipodal=False, **kw):
+              antipodal=False, **kw: Unpack[PlotKeywords]):
   """quiver(grains, v), quiver(ebsd, v), quiver(gB, v): an arrow per grain at its centroid,
   per measurement, per segment at its midpoint; an axis is centred, a direction starts there.
   By default an arrow is a fifth of the grain's diameter, one and a half spacings of a map,
@@ -1007,7 +1013,7 @@ def _imageOutline(mg):
   return SimpleNamespace(V=C[:, :2], F=np.array([[0, 1], [1, 3], [3, 2], [2, 0]]), plane=mapPlane(C), frame=mg.frame, scanUnit=mg.scanUnit)
 
 
-def plotMapImage(mg, channel=None, edge=False, micronbar=None, refFrame=True, colormap=None, layout=None, figSize=None, **kw):
+def plotMapImage(mg, channel=None, edge=False, micronbar=None, refFrame=True, colormap=None, layout=None, figSize=None, **kw: Unpack[PlotKeywords]):
   """plot(mg), plot(imgList), plot(imgList, edge=True), plot(mg, channel=1)
 
   An image drawn where it sits on the specimen, in the screen orientation of its frame; a list

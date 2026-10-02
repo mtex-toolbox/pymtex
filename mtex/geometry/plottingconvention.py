@@ -13,13 +13,16 @@
 #   plottingConvention.default      the session default, which makeDefault sets
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from .quaternion import rotation
 from .session import SESSION, getMTEXpref
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector
 from .display import aligned
+
+if TYPE_CHECKING:
+  from .vocabulary import ConventionName
 
 ARROWS_UTF8 = ("←", "→", "↑", "↓", "⊗", "⊙")
 ARROWS_ASCII = ("<-", "->", "^", "v", "(x)", "(.)")
@@ -33,7 +36,7 @@ class plottingConvention:
     pC = plottingConvention('y↑→x')      each axis next to the screen direction it points to
     pC = plottingConvention.ij          x east, y south, z into the screen"""
 
-  def __init__(self, outOfScreen=None, east=None):
+  def __init__(self, outOfScreen: ConventionName | Any = None, east=None):
     if isinstance(outOfScreen, plottingConvention):
       self.rot = outOfScreen.rot
     elif isinstance(outOfScreen, str):
@@ -278,7 +281,7 @@ class _sessionDefault(plottingConvention):
   # default('y↑→x'), default(zvector, xvector): a convention made the default; default(north=
   # xvector), default(intoScreen=zvector): the default with those directions changed, the rest
   # kept (MATLAB's plotx2north, plotzIntoPlane)
-  def __call__(self, outOfScreen=None, east=None, save=False, **directions):
+  def __call__(self, outOfScreen: ConventionName | Any = None, east=None, save=False, **directions):
     if isinstance(outOfScreen, (str, plottingConvention)) or (outOfScreen is not None and east is not None):
       plottingConvention(outOfScreen, east).makeDefault(save=save)
       return

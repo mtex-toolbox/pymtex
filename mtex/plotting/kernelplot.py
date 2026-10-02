@@ -5,12 +5,18 @@
 #   plotSpectrum(psi, bandwidth=32)     the Chebyshev coefficients A_l / (2l + 1) per degree
 #   plotSpectrum(odf, bandwidth=32)     the harmonic power per degree of an SO3Fun
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from ..geometry.units import degree
 from .keywords import lineKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 # the axes a line plot goes into: the current one when held, else a new figure
@@ -36,7 +42,7 @@ def _lineAxes(kw):
   return mtexFigure(figSize=figureSize(figSize, (6.0, 4.0))).nextAxis()
 
 
-def plotSO3Kernel(psi, **kw):
+def plotSO3Kernel(psi, **kw: Unpack[PlotKeywords]):
   """plot(psi): the value of a kernel on SO(3) against the rotation angle, -180 to 180 degree"""
   ax = _lineAxes(kw)
   kw = lineKeywords(kw)
@@ -48,7 +54,7 @@ def plotSO3Kernel(psi, **kw):
   return h
 
 
-def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw):
+def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw: Unpack[PlotKeywords]):
   """plotSpectrum(psi), plotSpectrum(odf): the Chebyshev coefficients of a kernel, or the harmonic
   power of a function, per degree (MATLAB's plotSpektra)"""
   from ..functions.kernelfunctions import S2Kernel, SO3Kernel

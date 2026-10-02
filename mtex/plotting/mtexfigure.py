@@ -8,10 +8,14 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 from ..geometry.display import display, header
 from .keywords import refuseVariants
+
+if TYPE_CHECKING:
+  from .vocabulary import FigureSizeName
 
 _current = None
 
@@ -53,7 +57,7 @@ class mtexFigure:
     fig.colorbar()            a colour bar per axes, or one when ranges and colour maps agree
   """
 
-  def __init__(self, n=1, figSize=None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None,
+  def __init__(self, n=1, figSize: FigureSizeName | Any = None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None,
                marginx=None, marginy=None):
     global _current
     import matplotlib.pyplot as plt
@@ -509,7 +513,7 @@ def logAxis(ax=None, xLimits=None, yLimits=None):
   return ax
 
 
-def setColorRange(colorRange="equal", fig=None):
+def setColorRange(colorRange: Literal["equal", "tight"] | Any = "equal", fig=None):
   """one colour range over every axes of the current figure ('equal'), each its own ('tight') or
   the one given as (lo, hi)
 

@@ -10,6 +10,9 @@
 #
 # A line drawn into a held histogram is scaled from multiples of the uniform density to the
 # percent of a bin, so the two can be compared, as MATLAB does.
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from ..geometry.frames import referenceFrame
@@ -18,6 +21,11 @@ from ..geometry.orientationregion import fundamentalRegion
 from ..geometry.units import degree
 from .keywords import lineKeywords
 from .mtexfigure import figureSize, gcm, mtexFigure
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 # the axes a distribution goes into: the current ones when held, else a new figure
@@ -32,7 +40,7 @@ def _lineAxes(figSize):
 
 
 def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBins=None, percent=False, displayName=None,
-                          **kw):
+                          **kw: Unpack[PlotKeywords]):
   """plotAngleDistribution(mori), plotAngleDistribution(cs1, cs2), plotAngleDistribution(mdf)"""
   from ..functions.characteristics import calcAngleDistribution
   kw = lineKeywords(kw)
@@ -80,7 +88,7 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
   return h
 
 
-def plotAxisDistribution(obj, *args, halfwidth=None, weights=None, antipodal=False, **kw):
+def plotAxisDistribution(obj, *args, halfwidth=None, weights=None, antipodal=False, **kw: Unpack[PlotKeywords]):
   """plotAxisDistribution(mori), plotAxisDistribution(ori1, ori2), plotAxisDistribution(cs1, cs2),
   plotAxisDistribution(mdf): the rotation axes on the sector of the symmetry the frames share"""
   from ..functions.characteristics import calcAxisDistribution

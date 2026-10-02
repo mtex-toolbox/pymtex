@@ -13,7 +13,7 @@
 # join in G4.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 import numpy as np
 
 from ._array import MtexArray
@@ -21,12 +21,15 @@ from .display import display, header, sizeString, table, takeRows
 from .representations import isnull, orthKernel
 
 
-class classproperty:
+_T = TypeVar("_T")
+
+
+class classproperty(Generic[_T]):
   """a property of the class itself, vector3d.X"""
-  def __init__(self, f):
+  def __init__(self, f: Callable[[Any], _T]):
     self.f = f
 
-  def __get__(self, obj, cls):
+  def __get__(self, obj, cls) -> _T:
     return self.f(cls)
 
 

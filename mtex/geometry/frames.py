@@ -16,7 +16,7 @@
 # datasets holding it. Name, colour and the plotting convention stay open, as in MATLAB.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import warnings
 
 import numpy as np
@@ -31,6 +31,9 @@ from .symmetry import spaceGroupToPointGroup, symmetry
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector
 from .display import aligned
 
+if TYPE_CHECKING:
+  from .vocabulary import AlignmentName, ColorName, ConventionName, PointGroupName
+
 CANONICAL_BASIS = np.eye(3)
 
 
@@ -41,7 +44,8 @@ class referenceFrame:
   tolAligned = 5e-2      # the same frame: isclose
   tolCompatible = 1e-1   # a transformable frame: isCompatible
 
-  def __init__(self, basis=None, name="", axesNames=("X", "Y", "Z"), how2plot=None, sym=None, color=None):
+  def __init__(self, basis=None, name="", axesNames=("X", "Y", "Z"), how2plot: ConventionName | Any = None, sym=None,
+               color: ColorName | Any = None):
     self._sealed = False
     self._basis = CANONICAL_BASIS.copy() if basis is None else _basisArray(basis)
     self._axesNames = tuple(str(n) for n in axesNames)
@@ -541,8 +545,9 @@ class crystalFrame(referenceFrame):
   or R, which the keyword centering= also sets.
   """
 
-  def __init__(self, *args, mineral=None, name=None, color=None, alignment=(), rotAxes=None, pointId=None, LaueId=None,
-               laueId=None, spaceId=None, how2plot=None, intern=True, density=None, axesNames=("a", "b", "c"),
+  def __init__(self, *args: PointGroupName | AlignmentName | Any, mineral=None, name=None, color: ColorName | Any = None,
+               alignment: AlignmentName | Any = (), rotAxes=None, pointId=None, LaueId=None, laueId=None, spaceId=None,
+               how2plot: ConventionName | Any = None, intern=True, density=None, axesNames=("a", "b", "c"),
                check=True, centering=None):
     args = list(args)
     # crystalFrame(LaueId=7): the Laue class by its number
@@ -824,7 +829,8 @@ class specimenFrame(referenceFrame):
   about a direction (MATLAB ADR 0008 rule 10).
   """
 
-  def __init__(self, name=None, *args, axesNames=("X", "Y", "Z"), how2plot=None, intern=True, basis=None):
+  def __init__(self, name: PointGroupName | Any = None, *args, axesNames=("X", "Y", "Z"), how2plot: ConventionName | Any = None,
+               intern=True, basis=None):
     if isinstance(name, str) and how2plot is None and args and isinstance(args[0], plottingConvention):
       how2plot = args[0]
     if isinstance(name, str) and not isPointGroupName(name):
@@ -968,7 +974,7 @@ class notIndexedFrame(referenceFrame):
   """the frame of the measurements that could not be indexed, a phase of a map without basis,
   group or colour"""
 
-  def __init__(self, name="notIndexed", color=None):
+  def __init__(self, name="notIndexed", color: ColorName | Any = None):
     super().__init__(None, name, ("X", "Y", "Z"), None, None, np.array([np.nan, np.nan, np.nan]) if color is None else color)
 
   def _isclosePair(self, other):

@@ -9,6 +9,7 @@
 # property is periodic, and the second property the saturation, from white or black at the
 # low end of its range to the full colour at the high end.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,6 +18,11 @@ from ..geometry.units import degree
 from .colormaps import mtexColormap
 from .mtexfigure import gcm, mtexFigure
 from ..geometry.display import aligned
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 class planarColorKey:
@@ -94,7 +100,7 @@ class planarColorKey:
     return aligned("\n".join(lines))
 
 
-def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw):
+def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw: Unpack[PlotKeywords]):
   """the key as an image, hue along x and saturation along y; with the data the axes carry
   their ranges and labels"""
   fig = gcm()

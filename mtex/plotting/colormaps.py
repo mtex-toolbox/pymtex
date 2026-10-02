@@ -1,7 +1,13 @@
 # MTEX's colour maps as stops, and the contour levels (MATLAB plotting/colormaps, mtexColorMap)
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
+
+if TYPE_CHECKING:
+  from ..geometry.vocabulary import ColorName
+  from .vocabulary import ColormapName
 
 # the stops (r, g, b) with their positions in [0, 1]
 WHITE_JET_STOPS = ([(1.0, 1.0, 1.0), (0.0, 0.0, 0.7), (0.0, 0.85, 0.65), (1.0, 1.0, 0.0), (1.0, 0.0, 0.0), (0.5, 0.0, 0.0)],
@@ -60,7 +66,7 @@ def mtexColormap(name=None):
   return matplotlib.colormaps[key]
 
 
-def mtexColorMap(name="WhiteJet", fig=None):
+def mtexColorMap(name: ColormapName | Any = "WhiteJet", fig=None):
   """mtexColorMap WhiteJet: the colour map of the current figure, or of one figure"""
   from .mtexfigure import gcm
   # mtexColorMap(ax, name): the map of one axes of the current figure
@@ -89,7 +95,7 @@ def mtexColorMap(name="WhiteJet", fig=None):
   return cmap
 
 
-def str2rgb(name):
+def str2rgb(name: ColorName | Any):
   """str2rgb('salmon'): the RGB triplet of a colour name, MATLAB tools/str2rgb"""
   from matplotlib.colors import to_rgb
   return np.array(to_rgb(name), dtype=float)
@@ -105,7 +111,7 @@ def contourLevels(lo, hi, n=10, log=False):
   return np.linspace(lo, hi, n)
 
 
-def num2rgb(values, colormap="WhiteJet", range=None):
+def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None):
   """num2rgb(values, map, range=[lo, hi]): the colours a colour map gives those numbers,
   MATLAB's num2rgb; the range defaults to the extent of the values"""
   v = np.asarray(values, dtype=float).reshape(-1)

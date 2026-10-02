@@ -1,12 +1,20 @@
 # the values of an ODF along a fibre, against the angle along it (MATLAB @SO3Fun/plotFibre)
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from ..geometry.units import degree
 from .keywords import lineKeywords
 from .mtexfigure import gcm, mtexFigure
 
+if TYPE_CHECKING:
+  from typing import Unpack
 
-def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw):
+  from .keywords import PlotKeywords
+
+
+def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw: Unpack[PlotKeywords]):
   """plotFibre(odf, f): the ODF along the fibre f, as a line over the angle along the fibre; a
   list of functions one line each"""
   fig = gcm()

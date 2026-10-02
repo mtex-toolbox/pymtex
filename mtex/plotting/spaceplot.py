@@ -5,6 +5,7 @@
 # the surface of an orientation region in axis angle space, the points orientations are.
 # matplotlib's 3D axes is the camera; it is imported inside the functions.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -22,6 +23,11 @@ from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
 from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
 from ..geometry.display import frameLabel, header
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 SPHERE_COLOR = (0.93, 0.93, 0.93)
 GRID3_COLOR = (0.75, 0.75, 0.75)
@@ -179,7 +185,7 @@ def _keys(kw):
   return axesKw
 
 
-def plot3d(x, *args, **kw):
+def plot3d(x, *args, **kw: Unpack[PlotKeywords]):
   """plot3d(v), plot3d(v, data), plot3d(sF), plot3d(vF), plot3d(oR), plot3d(ori), plot3d(odf)
 
   Directions as markers on the sphere in space, a function as the sphere coloured, a field
@@ -207,7 +213,7 @@ def plot3d(x, *args, **kw):
 
 
 def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="viridis", colorRange=None, grid=True, axisLabels=True,
-              label=None, colorbar=False, **kw):
+              label=None, colorbar=False, **kw: Unpack[PlotKeywords]):
   """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
   v = v if isinstance(v, vector3d) else vector3d(v)
   axesKw = _keys(kw)
@@ -237,7 +243,7 @@ def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="viridis"
 
 
 def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=None, colorbar=False, radial=False, grid=False,
-                   axisLabels=None, grid_res=30 * degree, how2plot=None, **kw):
+                   axisLabels=None, grid_res=30 * degree, how2plot=None, **kw: Unpack[PlotKeywords]):
   """plot3d(sF, radial=True): a function as the sphere coloured, or pushed out by its values,
   seen as the 3D plotting convention says, with the axes of its frame as arrows"""
   axesKw = _keys(kw)
@@ -281,7 +287,7 @@ def _axisArrow(ax, d, name, length=0.15):
 
 
 def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
-         **kw):
+         **kw: Unpack[PlotKeywords]):
   """surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
   complex one; a list of functions one panel each; a single real function is first scaled
   to (f - mean) / (max - min) + 1 unless scaling=False, as MATLAB's surf does"""
@@ -382,7 +388,7 @@ def _ball(sP, radius=180.0):
 
 
 def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
-                 surface=True, **kw):
+                 surface=True, **kw: Unpack[PlotKeywords]):
   """plot(oR), plot(oR, boundaryColor='r', surface=False): the fundamental region in axis
   angle space, in degrees, its surface with the parallels and meridians on it and its edges"""
   axesKw = _keys(kw)
@@ -497,7 +503,7 @@ def _spaceFlags(args, Euler, axisAngle, Rodrigues):
 
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
                         ignoreFundamentalRegion=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="viridis",
-                        colorRange=None, colorbar=False, all=False, **kw):
+                        colorRange=None, colorbar=False, all=False, **kw: Unpack[PlotKeywords]):
   """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
   scatter(ori, all=True)
 
@@ -605,7 +611,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   return h
 
 
-def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw):
+def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw: Unpack[PlotKeywords]):
   """quiver3d(t): a tangent vector as an arrow at its reference in orientation space, in the
   coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
   to the longest of the list, points to, as MATLAB draws it; quiver3d(vF) a field on the
@@ -684,7 +690,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
                       arrow_length_ratio=0.3, **kw)
 
 
-def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", labeled=False, label=None, **kw):
+def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", labeled=False, label=None, **kw: Unpack[PlotKeywords]):
   """arrow3d(v): solid arrows from the origin, or from anchor, to the tips v, into the held
   axes or a new figure in space, the axes widened to hold them (MATLAB @vector3d/arrow3d)"""
   from matplotlib.colors import to_rgba
@@ -754,7 +760,7 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
 
 
 def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=False, Euler=False, fundamentalRegion=True,
-                ignoreFundamentalRegion=False, region=True, points=1000, **kw):
+                ignoreFundamentalRegion=False, region=True, points=1000, **kw: Unpack[PlotKeywords]):
   """plot(f): a fibre as its curve through orientation space, in the coordinates of the held
   axes or Euler angles, as MATLAB draws it"""
   _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
@@ -796,7 +802,7 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
 
 
-def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, **kw):
+def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, **kw: Unpack[PlotKeywords]):
   """plot3d(odf), plot3d(odf, 'axisAngle'): the isosurfaces of an ODF at surf3 levels from zero
   to its maximum, over the Euler box of its frames or inside its fundamental region in axis
   angle space, the higher the less transparent (MATLAB @SO3Fun/plot3d)"""

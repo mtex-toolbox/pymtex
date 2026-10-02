@@ -278,4 +278,10 @@ elsewhere only through `install(classes, f, name, declare=)` (`geometry/install.
 `setattr` or a lambda. The editor reads the package without running it, so
 `.venv/bin/python tools/staticapi.py` writes out what the run assembles: the layers' explicit
 imports, the attached methods declared under `TYPE_CHECKING` in each class body, comments above
-public definitions moved into docstrings. `tests/test_staticapi.py` fails until it has run.
+public definitions moved into docstrings, and the `vocabulary.py` of geometry, io and plotting: the
+strings an argument takes (point groups, conventions, colours, sample data, ...) as `Literal` types
+generated from the tables they come from, which an editor completes inside the quotes. A string
+argument is annotated `PointGroupName | Any`, so nothing valid is refused; the plots' `**kw` are
+`Unpack[PlotKeywords]` (`plotting/keywords.py`, `extra_items=Any`); `mtexdata` has overloads giving
+the class of each data set. Pylance and basedpyright complete these, Jedi does not.
+`tests/test_staticapi.py` fails until it has run.

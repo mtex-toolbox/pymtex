@@ -6,6 +6,7 @@
 # functions on the sphere as the colour channels of one surface, which is how the
 # interference colours of a refractive index tensor are shown.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,6 +18,11 @@ from ..geometry.vector3d import vector3d
 from .colormaps import mtexColorMap
 from .mtexfigure import hold, mtexColorbar, mtexFigure, mtexTitle, nextAxis
 from .sphericalplot import _rgbMesh, _blocks, _split, _targets, _valuesOn, plot, quiver
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 # the largest and the smallest value of a function on the sphere and where they are taken,
@@ -35,7 +41,7 @@ def _anisotropy(hi, lo):
   return 200 * (hi - lo) / (hi + lo)
 
 
-def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False, colormap="red2blue", density=None, **kw):
+def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False, colormap="red2blue", density=None, **kw: Unpack[PlotKeywords]):
   """plotSeismicVelocities(C): the overview of the wave velocities of a stiffness tensor
 
   Six charts in two rows: Vp, the S-wave anisotropy, Vs1 with its polarisation, Vs2 with
@@ -88,7 +94,7 @@ def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False,
 
 # ------------------------------------------------------------------ rgb
 
-def plotRGB(channels, resolution=0.5 * degree, **kw):
+def plotRGB(channels, resolution=0.5 * degree, **kw: Unpack[PlotKeywords]):
   """plot((r, g, b), rgb=True): three functions on the sphere as the colour channels of one
   surface, their values clipped to [0, 1]"""
   r, g, b = channels

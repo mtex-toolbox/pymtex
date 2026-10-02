@@ -10,7 +10,7 @@
 # container. Products do not renormalise; construction from user input does.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ._array import MtexArray
@@ -23,6 +23,9 @@ from .kernels import qmul, qrot
 from .units import degree
 from .vector3d import classproperty, vector3d
 from .display import aligned
+
+if TYPE_CHECKING:
+  from .vocabulary import EulerConventionName
 
 
 def _readCoefficients(cls, args, n):
@@ -231,7 +234,7 @@ class quaternion(MtexArray):
 
   # ------------------------------------------------------------------ representations
 
-  def Euler(self, convention=None):
+  def Euler(self, convention: EulerConventionName | Any = None):
     """the Euler angles (alpha, beta, gamma) in the convention named, the session's by default
 
       phi1, Phi, phi2 = rot.Euler()
@@ -408,7 +411,7 @@ class rotation(quaternion):
     return orthogonalTransform(cls.id, True)
 
   @classmethod
-  def byEuler(cls, a, b=None, c=None, convention=None):
+  def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
     """the rotations of the Euler angles, Bunge's ZXZ convention unless a convention is named
 
       rotation.byEuler(phi1, Phi, phi2)
@@ -574,7 +577,7 @@ class orthogonalTransform(MtexArray):
     return cls(rotation._fromData(q), improper)
 
   @classmethod
-  def byEuler(cls, a, b=None, c=None, convention=None):
+  def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
     """the proper transforms of the Euler angles, Bunge's ZXZ convention unless one is named"""
     return cls(rotation.byEuler(a, b, c, convention), False)
 
@@ -669,7 +672,7 @@ class orthogonalTransform(MtexArray):
     """the rotational axis of the rotational part"""
     return self.rot.axis()
 
-  def Euler(self, convention=None):
+  def Euler(self, convention: EulerConventionName | Any = None):
     """the Euler angles of the rotational part, in the convention named or the session's"""
     return quat2euler(self.data[..., :4], convention)
 

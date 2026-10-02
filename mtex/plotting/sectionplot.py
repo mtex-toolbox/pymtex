@@ -5,6 +5,7 @@
 # the charts out, evaluates a function or places a list of orientations on them, and draws
 # with the machinery of sphericalplot.py.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,6 +18,11 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
 from .sphericalplot import (FILL_FLAGS, fillFlag, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 FIELD_COLOR = (0.72, 0.72, 0.72)
 OUTER_COLOR = (0.75, 0.75, 0.75)
@@ -138,7 +144,7 @@ def _thinned(ori, values, points, all_):
   return ori[idx], None if values is None else values[idx]
 
 
-def plotSection(x, *args, **kw):
+def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
   """plotSection(odf), plotSection(odf, 'sigma'), plotSection(ori, oS, sections=9)
 
   An SO3Fun or a list of orientations sliced into sections. Without a section object the
@@ -219,14 +225,14 @@ def _currentSections():
   return oS
 
 
-def plotSections(oS, columns=0, field=True, **kw):
+def plotSections(oS, columns=0, field=True, **kw: Unpack[PlotKeywords]):
   """plot(oS): the charts of a section plot with the reference field of every section"""
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
   return fig
 
 
-def annotateSection(ori, *args, **kw):
+def annotateSection(ori, *args, **kw: Unpack[PlotKeywords]):
   """annotate(ori) on a section plot: every orientation marked in the section it lies in"""
   oS = _currentSections()
   kw.pop("add2all", None)
@@ -235,7 +241,7 @@ def annotateSection(ori, *args, **kw):
   return _plotSectionOri(ori, oS, values=values, all=True, onto=True, **kw)
 
 
-def plotFibreSection(f, points=1000, lineColor="k", **kw):
+def plotFibreSection(f, points=1000, lineColor="k", **kw: Unpack[PlotKeywords]):
   """plot(f) on a section plot: the fibre as a chain of dots through the sections"""
   oS = _currentSections()
   kw.pop("add2all", None)
@@ -247,7 +253,7 @@ def plotFibreSection(f, points=1000, lineColor="k", **kw):
   return _plotSectionOri(ori, oS, all=True, onto=True, **kw)
 
 
-def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw):
+def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
   """quiver(ori, w) on a section plot: an arrow along w at every orientation, w a specimen
   direction per orientation; quiverSection(sF, vF, sec) the vector field along the polar
   section of a function on the sphere"""
@@ -272,7 +278,7 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
   return hs
 
 
-def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw):
+def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
   """plot(WFun) of a vector field on SO(3): in every section an arrow where a small turn
   about the field's axis moves the orientation within the section, its length the size of
   the field; into the sections of a held figure, or new phi2 sections"""
@@ -434,7 +440,7 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
 __all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection", "quiverSectionField"]
 
 
-def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False, **kw):
+def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False, **kw: Unpack[PlotKeywords]):
   """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
   the sections of orientation space, MATLAB @orientationColorKey/plot"""
   kind = next((a for a in args if isinstance(a, (str, ODFSections))), None)

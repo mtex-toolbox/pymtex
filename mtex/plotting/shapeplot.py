@@ -6,6 +6,7 @@
 # says which faces those are and where they lie. matplotlib is imported inside the
 # functions.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,6 +19,11 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm
 from .space import shapeOutlines, shapesOnMap
 from .spaceplot import _spaceAxes
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 # MTEX's colour of a crystal without a mineral colour, LightSkyBlue
 SHAPE_COLOR = (0.53, 0.81, 0.98)
@@ -166,7 +172,7 @@ def _parse(args):
 
 
 def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.8, colored=None, colormap="viridis",
-              displayName=None, **kw):
+              displayName=None, **kw: Unpack[PlotKeywords]):
   """plot(cS), plot(cS, faceColor='red', faceAlpha=0.5), plot(cS, colored=True), plot(cS, colored=key),
   plot(x, y, cS), plot(x, y, z, cS), plot(xy, cS), plot(cS, N), plot(cS, sS)
 
@@ -208,7 +214,7 @@ def _facePolygons(cS, V):
 
 # ------------------------------------------------------------------ inside the shape
 
-def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, displayName=None, **kw):
+def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, displayName=None, **kw: Unpack[PlotKeywords]):
   """plotInnerFace(cS, N): the section of the shape by the lattice plane N through its centre"""
   from matplotlib.colors import to_rgba
   N = N if isinstance(N, vector3d) else vector3d(N)
@@ -238,7 +244,7 @@ def _arrow(kind, target, cS, d, color, lineWidth, label=None):
   return h
 
 
-def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, displayName=None, **kw):
+def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, displayName=None, **kw: Unpack[PlotKeywords]):
   """plotInnerDirection(cS, d): the crystal direction d as an arrow inside the shape"""
   d = d if isinstance(d, vector3d) else vector3d(d)
   kind, target = _target(cS, kw)
@@ -247,7 +253,7 @@ def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, 
   return hs[0] if len(hs) == 1 else hs
 
 
-def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, label=None, **kw):
+def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, label=None, **kw: Unpack[PlotKeywords]):
   """plotSlipSystem(cS, sS), plot(cS, sS, label='b'): the slip plane through the centre of the
   shape with the slip direction as an arrow in it, the arrow named at its tip"""
   kind, target = _target(cS, kw)
@@ -264,7 +270,7 @@ def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWi
 
 # ------------------------------------------------------------------ planes
 
-def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, **kw):
+def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, **kw: Unpack[PlotKeywords]):
   """plot(plane): planes in space, each clipped by the bounds of the axes"""
   from matplotlib.colors import to_rgba
   kind, target = _target(plane, kw)
@@ -297,7 +303,7 @@ def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8
 # ------------------------------------------------------------------ into a map
 
 def plotShapesOnMap(grains, cS, faceColor=None, faceAlpha=1.0, edgeColor="k", lineWidth=0.5, colored=None, colormap="viridis",
-                    scale=1.0, micronbar=None, refFrame=True, displayName=None, **kw):
+                    scale=1.0, micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
   """plot(grains, cS), plot(ebsd, cS): the crystal shape of every grain of the shape's phase
   drawn into the map, rotated by its mean orientation, scaled by the square root of its
   area, at its centroid, its front faces as polygons; on an EBSD map one shape per

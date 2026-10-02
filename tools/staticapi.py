@@ -5,6 +5,7 @@
 #   inits         every layer's __init__.py imports its modules' __all__ by name
 #   declarations  a class body declares, under TYPE_CHECKING, the methods attached to it
 #   docstrings    the comment above a public def or class becomes its docstring
+#   vocabularies  the strings an argument takes, as Literal types the editor completes in quotes
 #
 #   .venv/bin/python tools/staticapi.py          rewrite the files
 #   .venv/bin/python tools/staticapi.py --check  list what is out of date, as the test does
@@ -14,6 +15,7 @@ import ast
 import functools
 import importlib
 import inspect
+import json
 import os
 import re
 import sys
@@ -379,9 +381,118 @@ def packageFiles():
         yield path, rel.removesuffix(".__init__")
 
 
+# ------------------------------------------------------------------ vocabularies
+
+# the point groups by every name the constructor takes, Hermann-Mauguin, Schoenflies, aliases
+def _pointGroupNames():
+  from mtex.geometry.data.pointgroupnames import POINT_GROUP_NAMES
+  return [n for names in POINT_GROUP_NAMES for n in names]
+
+
+def _alignmentNames():
+  from mtex.geometry.crystalaxes import ALIGNMENT_VENDORS
+  return [f"{X}||{a}" for X in "XYZ" for a in ("a", "b", "c", "a*", "b*", "c*", "m")] + list(ALIGNMENT_VENDORS)
+
+
+# the Euler conventions as MATLAB writes them: Bunge, ZXZ, Matthies, ZYZ, ABG, nfft, ...
+def _eulerNames():
+  from mtex.geometry.representations import EULER_CONVENTIONS
+  return [c if k == c.lower() else k.upper() if len(k) == 3 else k for k, c in EULER_CONVENTIONS.items()]
+
+
+def _conventionNames():
+  from mtex.geometry.plottingconvention import AXIS_CONVENTIONS
+  return list(AXIS_CONVENTIONS)
+
+
+def _colorNames():
+  from matplotlib.colors import BASE_COLORS, CSS4_COLORS
+  return list(CSS4_COLORS) + list(BASE_COLORS)
+
+
+def _sampleDataNames():
+  from mtex.io.sampledata import DATASETS
+  return [d["name"] for d in DATASETS]
+
+
+# the data sets of one type, those mtexdata returns as an object of that class
+def _sampleDataOfType(kind):
+  from mtex.io.sampledata import DATASETS
+  return lambda: [d["name"] for d in DATASETS if d["type"] == kind]
+
+
+def _sampleFileNames():
+  from mtex.io.sampledata import MANIFEST
+  return _sampleDataNames() + list(MANIFEST["datasets"])
+
+
+# MTEX's maps, then matplotlib's without their reversed copies
+def _colormapNames():
+  import matplotlib
+  from mtex.plotting.colormaps import NAMES
+  return list(NAMES.values()) + sorted((n for n in matplotlib.colormaps if not n.endswith("_r")), key=str.lower)
+
+
+def _markerNames():
+  from mtex.plotting.sphericalplot import MARKER_NAMES
+  return list(MARKER_NAMES) + list(MARKER_NAMES.values()) + ["d", "v", "<", ">", "none"]
+
+
+def _projectionNames():
+  from mtex.plotting.spherical import PROJECTIONS
+  return list(PROJECTIONS)
+
+
+def _figureSizeNames():
+  from mtex.plotting.mtexfigure import FIGURE_SIZES
+  return list(FIGURE_SIZES)
+
+
+# the generated modules: the layer, and each alias with its comment and the table it reads
+VOCABULARIES = {
+  "geometry": [
+    ("PointGroupName", "the point groups crystalFrame and symmetry take", _pointGroupNames),
+    ("AlignmentName", "the alignments of the Cartesian axes to the lattice crystalFrame takes", _alignmentNames),
+    ("EulerConventionName", "the Euler angle conventions", _eulerNames),
+    ("ConventionName", "the eight plotting conventions with both screen axes along reference axes", _conventionNames),
+    ("ColorName", "the colour names, matplotlib's", _colorNames),
+  ],
+  "io": [
+    ("SampleDataName", "the data sets mtexdata reads", _sampleDataNames),
+    ("SampleFileName", "the data sets mtexdatafile fetches, those of the data repository included", _sampleFileNames),
+    ("SampleEBSDName", "the maps among them", _sampleDataOfType("EBSD")),
+    ("SampleGrainsName", "the grains among them", _sampleDataOfType("grain2d")),
+    ("SamplePoleFigureName", "the pole figures among them", _sampleDataOfType("PoleFigure")),
+    ("SampleEBSD3Name", "the maps of volumes among them", _sampleDataOfType("EBSD3")),
+    ("SampleSO3FunName", "the ODFs among them", _sampleDataOfType("SO3Fun")),
+    ("SampleS2FunName", "the spherical functions among them", _sampleDataOfType("S2Fun")),
+    ("SampleTensorName", "the tensors among them", _sampleDataOfType("tensor")),
+  ],
+  "plotting": [
+    ("ColormapName", "the colour maps, MTEX's and matplotlib's", _colormapNames),
+    ("MarkerName", "the markers, by MATLAB's names and matplotlib's letters", _markerNames),
+    ("ProjectionName", "the spherical projections", _projectionNames),
+    ("FigureSizeName", "the figure sizes by name", _figureSizeNames),
+  ],
+}
+
+
+# a layer's vocabulary module: one Literal alias per vocabulary, its values in order, each once
+def vocabularySource(layer):
+  out = [f"# the strings the {layer} layer's arguments take, as Literal types an editor completes in quotes;",
+         "# written by tools/staticapi.py from the tables they name, never by hand",
+         "from typing import Literal"]
+  for alias, comment, values in VOCABULARIES[layer]:
+    names = list(dict.fromkeys(values()))
+    out += ["", f"# {comment}"]
+    out += wrapped(f"{alias} = Literal[", [json.dumps(n, ensure_ascii=False) for n in names], "]")
+  out += ["", "__all__ = []"]
+  return os.path.join(PACKAGE, layer, "vocabulary.py"), "\n".join(out) + "\n"
+
+
 # ------------------------------------------------------------------ the run
 
-# every file the three steps would change, with its new content
+# every file the four steps would change, with its new content
 def changes():
   sys.path.insert(0, ROOT)
   out = {}
@@ -397,9 +508,12 @@ def changes():
   installed = installedFunctions()
   for path, module in packageFiles():
     out[path] = docstringSource(out.get(path) or read(path), module, installed)
+  for layer in VOCABULARIES:
+    path, src = vocabularySource(layer)
+    out[path] = src
   for p, s in out.items():
     compile(s, p, "exec")
-  return {p: s for p, s in out.items() if s != read(p)}
+  return {p: s for p, s in out.items() if not os.path.isfile(p) or s != read(p)}
 
 
 # the public class attributes set at run time that neither the class body nor install() declares

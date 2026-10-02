@@ -7,6 +7,7 @@
 # specimen directions coloured by intensity, each panel on its own colour range, since the
 # counts of two measurements are not comparable.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -19,6 +20,11 @@ from .poles import dynamicMarkerSize, inversePoles, poles
 from .spherical import hasSymmetry, makeSphericalProjection, plotRegion
 from .sphericalplot import fillFlag, intoParents, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
 from . import sphericalplot
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 def _asList(h):
@@ -188,7 +194,7 @@ def _positionalStyle(o, args, kw):
   return tuple(out)
 
 
-def plotPF(o, *args, points=None, all=False, superposition=None, **kw):
+def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[PlotKeywords]):
   """plotPF(ori, h), plotPF(ori, data, h), plotPF(ori, h, points=100, contourf=True, antipodal=True),
   plotPF(odf, h), plotPF(pf)
 
@@ -225,7 +231,7 @@ def plotPF(o, *args, points=None, all=False, superposition=None, **kw):
   return out
 
 
-def plotIPF(o, *args, points=None, all=False, **kw):
+def plotIPF(o, *args, points=None, all=False, **kw: Unpack[PlotKeywords]):
   """plotIPF(ori, r), plotIPF(ori, data, r), plotIPF(odf, r): the inverse pole figures of a list
   of orientations, the crystal directions along r as markers on the crystal sector, or of an ODF
   (MATLAB's plotIPDF)"""
@@ -251,7 +257,7 @@ def _pfTitle(pf, i):
   return pf.allH[i].char()
 
 
-def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
+def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw: Unpack[PlotKeywords]):
   """plot(pf), plot(pf, contourf=True), plot(pf, minmax=True): a measured pole figure, or a data
   set of them in a row, the specimen directions as markers coloured by intensity"""
   from ..functions.s2fun import S2FunHarmonic
@@ -265,7 +271,7 @@ def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw):
   return _dataRow(rs, titles, [pf.allI[i].ravel() for i in range(pf.numPF)], colorRange=colorRange, **kw)
 
 
-def plotDiff(pf, other, mode="relative", epsilon=None, **kw):
+def plotDiff(pf, other, mode="relative", epsilon=None, **kw: Unpack[PlotKeywords]):
   """plotDiff(pf, odf), plotDiff(pf, pf2, 'l1'): the difference between a measured pole figure
   and a recalculated one, or two measurements, as a pole figure of the error; plotDiff(odf, pf)
   the same, plotDiff(odf1, odf2) the sections of their difference"""

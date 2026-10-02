@@ -14,6 +14,7 @@
 # setView does; a section is the curve in space seen down its normal, in a plain axes.
 # matplotlib is imported inside the functions.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -24,6 +25,11 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 def polarAxes(parent=None):
@@ -79,7 +85,7 @@ def setView(pC=None, ax=None):
 
 # ------------------------------------------------------------------ rose diagrams
 
-def histogram(v, numBin=None, weights=None, antipodal=None, **kw):
+def histogram(v, numBin=None, weights=None, antipodal=None, **kw: Unpack[PlotKeywords]):
   """histogram(v), histogram(v, numBin, weights=w): the rose diagram of the azimuths of
   directions; an axis counts at its azimuth and opposite"""
   v = v if isinstance(v, vector3d) else vector3d(v)
@@ -105,7 +111,7 @@ def histogram(v, numBin=None, weights=None, antipodal=None, **kw):
 
 # ------------------------------------------------------------------ functions on the circle
 
-def plotS1(sF, *args, lineWidth=1.0, displayName=None, color=None, polar=True, how2plot=None, **kw):
+def plotS1(sF, *args, lineWidth=1.0, displayName=None, color=None, polar=True, how2plot=None, **kw: Unpack[PlotKeywords]):
   """plot(sF1): a function on the circle as a polar line, or over the angle with polar=False;
   a positional MATLAB line style, plot(sF1, '--'), as matplotlib's format"""
   import matplotlib.pyplot as plt
@@ -146,7 +152,7 @@ def _sectionCircle(sec, eta=np.pi / 2, omega=None):
 
 
 def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, displayName=None, color=None, how2plot=None, polarplot=False,
-                  **kw):
+                  **kw: Unpack[PlotKeywords]):
   """plotSection(sF, sec): a function on the sphere along the circle normal to sec, the ring
   pushed out to the values and seen down sec; polarplot=True as a polar line over the angle"""
   omega, ring = _sectionCircle(sec, eta, omega)
@@ -210,7 +216,7 @@ def _followRing(ax, m):
 
 
 def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoScaleFactor=0.9, normalized=False,
-                    displayName=None, how2plot=None, **kw):
+                    displayName=None, how2plot=None, **kw: Unpack[PlotKeywords]):
   """quiverSection(sF, vF, sec): the vectors of vF along the circle normal to sec, drawn at
   the ring of plotSection(sF, sec) and seen down sec; axes as segments without heads"""
   kw.pop("doNotDraw", None)
@@ -269,7 +275,7 @@ def _sectionAxes(parent=None):
 
 # ------------------------------------------------------------------ shapes
 
-def plotShape(shape, lineWidth=1.0, displayName=None, color=None, normalize=False, plain=False, how2plot=None, **kw):
+def plotShape(shape, lineWidth=1.0, displayName=None, color=None, normalize=False, plain=False, how2plot=None, **kw: Unpack[PlotKeywords]):
   """plot(shape): the outline of a characteristic shape in polar coordinates about its centre"""
   V = np.asarray(shape.V, dtype=float).reshape(-1, 2)
   V = V - V.mean(axis=0)

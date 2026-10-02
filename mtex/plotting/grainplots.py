@@ -9,6 +9,7 @@
 # grains of one phase in that class hold, in percent, so many small grains do not dominate
 # it. matplotlib is imported inside the functions.
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -16,6 +17,11 @@ from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d
 from .maps import phaseColor, phasePalette
 from .mtexfigure import gcm, mtexFigure
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 
 # the bins and the share of the area of every phase in each, one column per indexed phase
@@ -56,7 +62,7 @@ def _axes(parent=None):
   return mtexFigure(1, figSize=(5.5, 4.0)).nextAxis()
 
 
-def histogram(x, *args, **kw):
+def histogram(x, *args, **kw: Unpack[PlotKeywords]):
   """histogram(grains), histogram(grains, prop, bins): the area weighted distribution of a
   grain property as one histogram per indexed phase, drawn over each other, or with
   grouped=True side by side (MATLAB's hist); histogram(v, numBin, weights=w): the rose
@@ -99,7 +105,7 @@ def _grainHistogram(grains, prop=None, bins=15, grouped=False, **kw):
   return hs
 
 
-def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw):
+def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw: Unpack[PlotKeywords]):
   """plotEllipse(c, a, b): the ellipses with the centres c and the half axes a and b drawn
   into the held map"""
   from matplotlib.collections import LineCollection

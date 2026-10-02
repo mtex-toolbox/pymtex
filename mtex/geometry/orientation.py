@@ -15,7 +15,7 @@
 # Products, symmetrisation and distances are the business of G5.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ._array import MtexArray
@@ -27,6 +27,9 @@ from .representations import axis2quat, euler2quat, eulerTriple, fitKernel, map1
 from .session import SESSION
 from .units import degree
 from .vector3d import classproperty, vector3d
+
+if TYPE_CHECKING:
+  from .vocabulary import EulerConventionName
 
 
 # the frames among the arguments, positionally: the first is CS, the second SS
@@ -109,7 +112,7 @@ class orientation(rotation):
     return obj
 
   @classmethod
-  def byEuler(cls, a, b=None, c=None, *args, antipodal=False):
+  def byEuler(cls, a, b=None, c=None, *args: EulerConventionName | Any, antipodal=False):
     """the orientations of the Euler angles, Bunge's ZXZ convention unless a convention is named
 
       orientation.byEuler(phi1, Phi, phi2, cs, ss)

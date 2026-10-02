@@ -2,6 +2,9 @@
 # its axes as the picture PyVista renders offscreen, so that hold, setCamera and the colour bar
 # act on it as on any MTEX figure; show3d opens it in a window, exportHTML writes it as an
 # interactive page. Without PyVista the scene is drawn on matplotlib's 3D axes.
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from ..geometry.session import getMTEXpref
@@ -9,6 +12,11 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .render3d import drawMatplotlib, hasPyVista, renderImage, writeHTML
 from .scene3d import arrows3d, boundaryMesh, ellipsoids3d, lines3d, points3d, grainMesh, picture3d, scene3d, volumeSlices
+
+if TYPE_CHECKING:
+  from typing import Unpack
+
+  from .keywords import PlotKeywords
 
 __all__ = ["show3d", "exportHTML", "is3dMap", "gcs", "mapPicture", "plotEllipsoid"]
 
@@ -44,7 +52,7 @@ def _options(kw):
   return kw
 
 
-def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
+def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
   """plot(grains), plot(grains, values), plot(grains, ori), plot(grains, faceColor=...)
 
   The outer faces of 3D grains coloured by phase, by a value or an orientation per grain, or
@@ -57,14 +65,14 @@ def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw):
   return _draw(grainMesh(grains, color, **kw), how2plot, figSize, grains.frame)
 
 
-def _plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw):
+def _plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
   """plot(gB), plot(gB, values), plot(gB, faceColor=...): the faces of a 3D grain boundary"""
   kw = _options(kw)
   kw.setdefault("colormap", "parula")
   return _draw(boundaryMesh(gB, color, **kw), how2plot, figSize, gB.frame)
 
 
-def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
+def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw: Unpack[PlotKeywords]):
   """plot(ebsd), plot(ebsd, values), plot(ebsd, ori): three orthogonal slices through the
   voxels of a volume, as MATLAB's EBSD3/plot shows it in slice planes; at=(i, j, k) the voxel
   index of the three slices, None for a slice left out, the middle by default"""
@@ -74,7 +82,7 @@ def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw):
   return _draw(volumeSlices(ebsd, color, at=at, **kw), how2plot, figSize, ebsd.frame)
 
 
-def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw):
+def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
   """quiver(grains, dir), quiver(gB, dir): arrows at the centroids of 3D grains or of their
   boundary faces, as MATLAB's; a grain's arrow as long as the direction, a face's a fifth of
   the face's diameter, both times autoScaleFactor"""
@@ -98,7 +106,7 @@ def _quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, h
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=bool(getattr(d, "antipodal", False))), how2plot, figSize, v.frame)
 
 
-def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2plot=None, figSize=None, **kw):
+def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
   """plotEllipsoid(centre, a, b, c, faceColor=rgb): ellipsoids with the half axes a, b, c,
   one colour for all or one per ellipsoid, as MATLAB's"""
   kw = _options(kw)
@@ -127,7 +135,7 @@ def _plotPoints3d(v, color=None, markerSize=6.0, **kw):
   return _draw(points3d(np.asarray(v.data).reshape(-1, 3), color, size), None, None, v.frame)
 
 
-def line3(x, y, z, color="k", lineWidth=0.5, **kw):
+def line3(x, y, z, color="k", lineWidth=0.5, **kw: Unpack[PlotKeywords]):
   """line(x, y, z): a polyline in a 3D scene, NaN separating its pieces, as MATLAB's line"""
   refuseVariants(kw)
   P = np.column_stack([np.asarray(c, dtype=float).reshape(-1) for c in (x, y, z)])

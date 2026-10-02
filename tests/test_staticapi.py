@@ -90,3 +90,8 @@ def test_wrapped_lines_stay_within_the_width(width, monkeypatch):
   monkeypatch.setattr(sa, "WIDTH", width)
   lines = sa.wrapped("from .x import (", [f"name{k}" for k in range(20)], ")")
   assert all(len(line) <= width for line in lines) and lines[-1].endswith(")")
+
+
+def test_a_vocabulary_is_the_table_it_reads_as_a_literal():
+  _, src = sa.vocabularySource("plotting")
+  assert 'FigureSizeName = Literal["tiny", "small", "medium", "normal", "large", "huge"]' in src

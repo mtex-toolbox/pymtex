@@ -17,6 +17,7 @@ import json
 import os
 import urllib.request
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
@@ -29,6 +30,17 @@ from .load import loadEBSD
 from .orientations import loadOrientation
 from .vectors import loadVector3d
 from ..geometry.display import aligned
+
+if TYPE_CHECKING:
+  from ..functions.polefigure import PoleFigure
+  from ..functions.s2funclass import S2Fun
+  from ..functions.so3funclass import SO3Fun
+  from ..maps.ebsd import EBSD
+  from ..maps.grains import grain2d
+  from ..maps3d.ebsd3 import EBSD3
+  from ..tensors.tensor import tensor
+  from .vocabulary import (SampleDataName, SampleEBSD3Name, SampleEBSDName, SampleFileName, SampleGrainsName,
+                           SamplePoleFigureName, SampleS2FunName, SampleSO3FunName, SampleTensorName)
 
 with open(os.path.join(os.path.dirname(__file__), "sampledata.json")) as _f:
   MANIFEST = json.load(_f)
@@ -89,7 +101,7 @@ def _find(name):
   raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
 
 
-def mtexdatafile(name, root=None, download=True):
+def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
   """the file of a sample data set, or its files, fetched on first use
 
   Besides the data sets mtexdata reads, every data set of the data repository has its
@@ -104,6 +116,42 @@ def mtexdatafile(name, root=None, download=True):
   paths = [_resolve(s, root, download) for s in SOURCES.get(artifact, [])]
   return paths[0] if len(paths) == 1 else paths
 
+
+# the class of what a data set is read as, for the editor
+@overload
+def mtexdata(name: None = None, root=None, download=True, verbose=True) -> SampleTable: ...
+
+
+@overload
+def mtexdata(name: SampleEBSDName, root=None, download=True, verbose=True) -> EBSD: ...
+
+
+@overload
+def mtexdata(name: SampleGrainsName, root=None, download=True, verbose=True) -> grain2d: ...
+
+
+@overload
+def mtexdata(name: SamplePoleFigureName, root=None, download=True, verbose=True) -> PoleFigure: ...
+
+
+@overload
+def mtexdata(name: SampleEBSD3Name, root=None, download=True, verbose=True) -> EBSD3: ...
+
+
+@overload
+def mtexdata(name: SampleSO3FunName, root=None, download=True, verbose=True) -> SO3Fun: ...
+
+
+@overload
+def mtexdata(name: SampleS2FunName, root=None, download=True, verbose=True) -> S2Fun: ...
+
+
+@overload
+def mtexdata(name: SampleTensorName, root=None, download=True, verbose=True) -> tensor: ...
+
+
+@overload
+def mtexdata(name: SampleDataName | Any, root=None, download=True, verbose=True) -> Any: ...
 
 def mtexdata(name=None, root=None, download=True, verbose=True):
   """the sample data of the documentation
