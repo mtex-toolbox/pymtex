@@ -149,3 +149,67 @@ def turnBlocks(U, alpha, offsets, Q, chunk=64):
 
 
 __all__ = []
+
+
+
+# the inverse of every rank four tensor through its Voigt matrix, rows of 81 coordinates in and
+# out, M[i, j, k, l] at 9 (3 i + j) + 3 k + l: the 36 entries gathered with the factors wIn on
+# both sides (flat holds the pair 3 i + j of each Voigt index), Gauss-Jordan with partial
+# pivoting, the inverse spread over the pair symmetry (voigt holds the Voigt index of each of
+# the nine pairs) with the factors wOut taken out
+def _voigtInverseLoop(D, flat, voigt, wIn, wOut, out):
+  n = D.shape[0]
+  for k in prange(n):
+    a = np.empty((6, 12))
+    for p in range(6):
+      for q in range(6):
+        a[p, q] = D[k, 9 * flat[p] + flat[q]] * wIn[p] * wIn[q]
+        a[p, 6 + q] = 1.0 if p == q else 0.0
+    for c in range(6):
+      piv = c
+      for r in range(c + 1, 6):
+        if abs(a[r, c]) > abs(a[piv, c]):
+          piv = r
+      if piv != c:
+        for j in range(12):
+          a[c, j], a[piv, j] = a[piv, j], a[c, j]
+      d = a[c, c]
+      for j in range(12):
+        a[c, j] /= d
+      for r in range(6):
+        if r != c:
+          f = a[r, c]
+          if f != 0.0:
+            for j in range(12):
+              a[r, j] -= f * a[c, j]
+    for i in range(9):
+      p = voigt[i]
+      for j in range(9):
+        q = voigt[j]
+        out[k, 9 * i + j] = a[p, 6 + q] / (wOut[p] * wOut[q])
+
+
+def _voigtInverseKernel():
+  nb = _jit()
+  if not nb:
+    return None
+  if "voigtInverse" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["voigtInverse"] = _parallelKernel(_voigtInverseLoop)
+  return _COMPILED["voigtInverse"]
+
+
+def voigtInverse(D, voigtPairs, wIn, wOut):
+  """the inverses of rank four tensors, rows of 81 coordinates, through their Voigt matrices of the
+  index pairs voigtPairs with the off diagonal factors wIn and wOut; None without numba"""
+  loop = _voigtInverseKernel() if backend() == "numba" else None
+  if loop is None:
+    return None
+  flat = np.array([3 * a + b for a, b in voigtPairs], dtype=np.int64)
+  voigt = np.empty(9, dtype=np.int64)
+  for p, (a, b) in enumerate(voigtPairs):
+    voigt[3 * a + b] = voigt[3 * b + a] = p
+  D = np.ascontiguousarray(D, dtype=float).reshape(-1, 81)
+  out = np.empty_like(D)
+  loop(D, flat, voigt, np.asarray(wIn, dtype=float), np.asarray(wOut, dtype=float), out)
+  return out

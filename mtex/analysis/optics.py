@@ -43,11 +43,13 @@ def _birefringence(rI, U):
   p1 = vector3d(U).orth().normalize().data
   p2 = np.cross(U, p1)
   p2 = p2 / np.linalg.norm(p2, axis=-1, keepdims=True)
-  P = np.stack([p1, p2], axis=-2)                       # (n, 2, 3)
-  B = (P @ (M[0] if len(M) == 1 else M)) @ np.swapaxes(P, -1, -2)
+  # the tensor on the two axes, M p1 and M p2 as two products of n rows: one tensor by one
+  # matrix product, a list of them row by row
+  Mp1, Mp2 = (p1 @ M[0].T, p2 @ M[0].T) if len(M) == 1 else (np.einsum("nij,nj->ni", M, p1), np.einsum("nij,nj->ni", M, p2))
   # the eigen decomposition of the symmetric 2 x 2 in closed form: the difference of the
   # indices without cancellation, the axes by the angle of the larger one
-  a, c, b = B[:, 0, 0], B[:, 1, 1], (B[:, 0, 1] + B[:, 1, 0]) / 2
+  a, c = np.einsum("ni,ni->n", p1, Mp1), np.einsum("ni,ni->n", p2, Mp2)
+  b = (np.einsum("ni,ni->n", p1, Mp2) + np.einsum("ni,ni->n", p2, Mp1)) / 2
   delta = 2 * np.hypot((a - c) / 2, b)
   mid = (a + c) / 2
   theta = np.arctan2(2 * b, a - c)[:, None] / 2

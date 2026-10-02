@@ -408,6 +408,10 @@ def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
   if n != ebsd.size:
     raise ValueError(f"the map holds {ebsd.size} measurements and the record {n} rows of {ref}; a map that lost or "
                      "gained measurements is written to .ang or .ctf")
+  # an old file is removed rather than truncated: ext4 writes a truncated and rewritten file
+  # through to the disk when it is closed, 0.9 s for 160 MB
+  if os.path.lexists(fname):
+    os.remove(fname)
   shutil.copyfile(ref, fname)
   os.chmod(fname, 0o644)
   written = []

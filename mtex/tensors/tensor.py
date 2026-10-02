@@ -30,7 +30,7 @@ from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.vector3d import classproperty, vector3d
-from .kernels import turnBlocks
+from .kernels import turnBlocks, voigtInverse
 
 # the pair index of the Voigt notation: 11 22 33 23 13 12
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
@@ -399,9 +399,12 @@ class tensor(MtexArray):
     if self.rank == 2:
       out = self._as(cls, _flatten(np.linalg.inv(self.M), 2))
     elif self.rank == 4:
-      V = np.linalg.inv(Voigt(self))
       double = cls._double if cls is not tensor else not self.doubleConvention
-      out = self._as(cls, _flatten(_fromVoigt(V, 4, _voigtWeights(double)), 4))
+      # one compiled loop over the tensors gathers, inverts and spreads; NumPy's three passes without numba
+      D = voigtInverse(self.data, VOIGT, _voigtWeights(self.doubleConvention), _voigtWeights(double)) if self.size > 1 else None
+      if D is None:
+        D = _flatten(_fromVoigt(np.linalg.inv(Voigt(self)), 4, _voigtWeights(double)), 4)
+      out = self._as(cls, D.reshape(self.data.shape))
       out.doubleConvention = double
     else:
       raise ValueError("the inverse is of a tensor of rank two or four")

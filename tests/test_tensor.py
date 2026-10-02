@@ -6,7 +6,7 @@ import pytest
 import scipy.linalg
 
 from mtex import (EinsteinSum, Kelvin, Voigt, cat, checkSymmetry, colon, complianceTensor, crystalFrame, degree, directionalMagnitude,
-                  dyad, eig, expm, inv, logm, mean, orientation, polar, rotate, rotation, specimenFrame, sqrtm, stiffnessTensor, strainTensor,
+                  dyad, eig, expm, inv, logm, mean, orientation, polar, rotate, rotation, setMTEXpref, specimenFrame, sqrtm, stiffnessTensor, strainTensor,
                   stressTensor, svd, symmetrise, tensor, times, trace, transformReferenceFrame, vector3d, xvector, zvector)
 
 rng = np.random.default_rng(20)
@@ -53,6 +53,20 @@ def test_inv_ofAStiffnessIsACompliance():
   assert isinstance(S, complianceTensor) and S.doubleConvention and np.allclose(Voigt(S), np.linalg.inv(CUBIC))
   assert inv(S).isclose(C) and isinstance(inv(S), stiffnessTensor)
   assert np.allclose(Voigt(colon(C, S)), Voigt(stiffnessTensor.eye(cs)))
+
+
+def test_inv_ofManyTensorsIsCompiledAsNumpysVoigtInverse():
+  # the compiled loop over the tensors against NumPy's three passes, both ways of the convention
+  cs = crystalFrame("mmm", [4.7646, 10.2296, 5.9942])
+  A = rng.random((6, 6))
+  R = orientation.rand(50, cs, rng=rng) * stiffnessTensor(10 * (A + A.T) + 200 * np.eye(6), cs)
+  S, T = inv(R), inv(inv(R))
+  setMTEXpref("kernels", "numpy")
+  try:
+    Sn, Tn = inv(R), inv(inv(R))
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(S.data, Sn.data, rtol=1e-12, atol=0) and np.allclose(T.data, Tn.data, rtol=1e-12, atol=1e-12)
 
 
 def test_tensor_readsItsRankOffTheShapeOrTakesItAsGiven():
