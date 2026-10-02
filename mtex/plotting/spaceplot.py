@@ -206,7 +206,7 @@ def plot3d(x, *args, **kw):
   return scatter3d(x, *args, **kw)
 
 
-def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="WhiteJet", colorRange=None, grid=True, axisLabels=True,
+def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="viridis", colorRange=None, grid=True, axisLabels=True,
               label=None, colorbar=False, **kw):
   """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
   v = v if isinstance(v, vector3d) else vector3d(v)
@@ -496,7 +496,7 @@ def _spaceFlags(args, Euler, axisAngle, Rodrigues):
 
 
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
-                        ignoreFundamentalRegion=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="WhiteJet",
+                        ignoreFundamentalRegion=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="viridis",
                         colorRange=None, colorbar=False, all=False, **kw):
   """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
   scatter(ori, all=True)

@@ -6,7 +6,7 @@ matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from mtex import (Miller, S2FunHarmonic, S2VectorFieldHarmonic, annotate, cat, contour, contourf, crystalFrame, degree, fundamentalSector, gcm, grad, hold, newMtexFigure, nextAxis,
+from mtex import (Miller, S2FunHarmonic, S2VectorFieldHarmonic, annotate, cat, circle, contour, contourf, crystalFrame, degree, fundamentalSector, gcm, grad, hold, newMtexFigure, nextAxis,
                   orientation, pcolor, plot, plotIPF, plotPF, quiver, scatter, specimenFrame, sphericalRegion, text,
                   unimodalODF, vector3d, xvector, yvector, zvector)
 from mtex.functions.s2axisfield import S2AxisFieldHandle
@@ -415,6 +415,18 @@ def test_text_goes_where_nextAxis_points_in_a_held_figure():
   assert [len([t for t in ax.texts if t.get_text() == "a"]) for ax in gcm().children] == [0, 1, 0]
   text(xvector, ["b"])
   assert all(any(t.get_text() == "b" for t in ax.texts) for ax in gcm().children)
+
+
+def test_circle_annotates_the_plot_nextAxis_picks_without_hold():
+  # a curve is an annotation: the cell nextAxis(k) picks keeps its plot, as MATLAB's circle
+  newMtexFigure(layout=[1, 2])
+  plot(vector3d.rand(20, rng=rng), upper=True)
+  nextAxis()
+  plot(vector3d.rand(20, rng=rng), upper=True)
+  nextAxis(1)
+  circle(zvector, 30 * degree)
+  ax = gcm().children[0]
+  assert hasattr(ax, "_mtexSphericalPlot") and len(ax.collections) > 0 and len(ax.lines) > 0
 
 
 def test_many_open_markers_keep_their_edge():

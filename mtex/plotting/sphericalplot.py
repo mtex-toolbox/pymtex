@@ -780,8 +780,8 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, edgeAlpha, p
   elif add2all:
     axes = [ax for ax in fig.children if hasattr(ax, "_mtexSphericalPlot")]
   else:
-    ax = fig.takeAxis() if fig.pending is not None else fig.children[-1]
-    axes = [ax]
+    # a curve annotates the plot nextAxis(k) picked, which stays as it is
+    axes = [fig.takeAxis(keep=True) if fig.pending is not None else fig.children[-1]]
   hs = []
   for ring in rings:
     for ax in axes:

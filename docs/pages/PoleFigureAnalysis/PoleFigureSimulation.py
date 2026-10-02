@@ -84,7 +84,7 @@ pf
 # points but their relative size smaller.
 
 # +
-pf = noisepf(pf, 1000)
+pf = noisepf(pf, 1000, rng=np.random.default_rng(1))
 
 plot(pf)
 # -
@@ -158,12 +158,12 @@ plt.legend(['Without ghost correction', 'With ghost correction'])
 # -
 
 # Both curves fall steeply from one pole figure to four: the error with ghost correction
-# drops from 0.299 to 0.110. They then flatten, with a bump when the fifth pole figure is
+# drops from 0.300 to 0.112. They then flatten, with a bump when the fifth pole figure is
 # added. In this experiment, four pole figures capture most of the recoverable
 # information, and which four are chosen matters more than simply increasing their
 # number.
 #
-# The corrected curve is lower at every count, though not by much: 0.083 against 0.102 at
+# The corrected curve is lower at every count, though not by much: 0.082 against 0.103 at
 # seven pole figures, and almost no difference at one. Ghost correction addresses a
 # specific defect by estimating the uniform portion. This model has a large uniform
 # portion by construction; see [The Ghost Effect](PoleFigure2ODFAmbiguity.html) for why
@@ -210,6 +210,6 @@ plt.legend(['Without ghost correction', 'With ghost correction'])
 
 # ## Technical Details
 #
-# The slice `pf[:i + 1]` is MATLAB's `pf({1:i})`. The Poisson draw of `noisepf` is not
-# seeded, as MATLAB's is not, so the errors of the table vary in the third digit between
-# builds. MATLAB's `table` is a printed loop.
+# The slice `pf[:i + 1]` is MATLAB's `pf({1:i})`. The Poisson draw of `noisepf` is
+# seeded so that the page shows the same numbers on every build; MATLAB's is not, so the
+# errors of its table differ from these in the third digit. MATLAB's `table` is a printed loop.

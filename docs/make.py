@@ -124,6 +124,8 @@ def build(page):
       count = (sum(len(ax.get_children()) for ax in fig.axes),
                tuple((getattr(ax, "elev", None), getattr(ax, "azim", None), getattr(ax, "roll", None), ax.axison) for ax in fig.axes),
                getattr(fig, "_mtexSceneVersion", None),
+               # a panel nextAxis(k) repainted, which may hold as many artists as before
+               getattr(fig, "_mtexRepaints", 0),
                # a colour bar moved elsewhere, as mtexColorbar('southoutside') after one on the right,
                # or over another range, as after setColorRange
                tuple((ax._colorbar.orientation, tuple(round(float(x), 9) for x in ax.get_xlim() + ax.get_ylim()))

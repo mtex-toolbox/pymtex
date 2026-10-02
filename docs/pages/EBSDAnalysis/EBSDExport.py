@@ -78,10 +78,11 @@ roundTripError
 # Euler-angle and map reference frames is consistent. The original CTF phase uses X
 # parallel to a-star and Y parallel to b, whereas an ANG file supplies X parallel to a
 # and Y parallel to b-star: the two files do not carry the same hexagonal crystal frame.
-# The readers keep each file's own alignment, the comparison warns that the two frames
-# differ, and the `roundTripError` of $30^\circ$ exposes that loss. A successful import and equal
-# measurement counts are still not enough to validate a converted map: compare the
-# crystal reference frames of the two phases as well.
+# The readers keep each file's own alignment, and the comparison warns that the two frames
+# differ. The exporter writes the Euler angles in the frame the ANG reader builds, so the
+# `roundTripError` is round-off, where MATLAB's page reports $30^\circ$ for the same
+# conversion. A successful import and equal measurement counts are still not enough to
+# validate a converted map: compare the crystal reference frames of the two phases as well.
 
 os.remove(exportFile)
 

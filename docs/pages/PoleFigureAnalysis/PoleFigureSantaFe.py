@@ -55,7 +55,7 @@ pf = calcPoleFigure(odf, h, r)
 # scale, not the same mean at every point. No background is added.
 
 # +
-pf = noisepf(pf, 100)
+pf = noisepf(pf, 100, rng=np.random.default_rng(1))
 
 plot(pf, markerSize=5)
 mtexColorMap('LaboTeX')
@@ -199,5 +199,5 @@ hold(False)
 #
 # `min(odf)` and `max(odf)` return the pair of the extreme value and the orientation where
 # it is reached, so the table reads their first element. MATLAB's `table` is a printed
-# loop. The Poisson draw of `noisepf` is not seeded, as MATLAB's is not, so the errors
-# vary in the third digit between builds.
+# loop. The Poisson draw of `noisepf` is seeded so that the page shows the same numbers on
+# every build; MATLAB's is not, so its errors differ from these in the third digit.

@@ -129,7 +129,7 @@ odfFromPoleFigures
 poleFigureODFMaximum, _ = max(odfFromPoleFigures, numLocal=1)
 poleFigureODFMaximum
 
-# The maximum is 17.8 mrd, so this reconstructed texture is sharper than the titanium
+# The maximum is about 17 mrd, so this reconstructed texture is sharper than the titanium
 # estimate under their respective smoothing choices. Peak height alone should not be used
 # to compare specimens unless the estimation and reconstruction settings are also
 # comparable.
@@ -262,7 +262,7 @@ mtexColorbar(title='orientation density (mrd)')
 # maximum 9.0003 mrd, and the same sigma sections. The ptx reconstruction places its kernels
 # on 29818 orientations where MATLAB's equispaced grid has 29772. The solver stops after six
 # iterations under MATLAB's stopping rule, and its maximum, 17.21 mrd, is 3 percent below
-# MATLAB's 17.72 (the text quotes 17.8). The maximum is sensitive to the stopping point:
+# MATLAB's 17.72 (MATLAB's text quotes 17.8). The maximum is sensitive to the stopping point:
 # five iterations give 12.8 mrd and seven give 23.8. The recalculated pole figures agree by
 # eye. The model ODF, its display, its maximum 11.4879 (MATLAB 11.4878) and its sections
 # agree.

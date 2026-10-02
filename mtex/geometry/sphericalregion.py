@@ -419,7 +419,7 @@ def conventionalSector(pg, up=None, east=None, frame=None):
       planes = [(1, -1, 0), (1, 1, 0), (-1, 0, 1)]
     else:
       planes = [(1, 1, 0), (1, -1, 0), (0, 1, 1), (0, -1, 1)]
-    return sphericalRegion(np.array(planes, dtype=float) @ R.T, frame=frame)
+    return sphericalRegion(_snap(np.array(planes, dtype=float) @ R.T), frame=frame)
   N = []
   els = _elements(pg)
   # an element that turns the out-of-screen axis around sends everything to its hemisphere
@@ -431,7 +431,7 @@ def conventionalSector(pg, up=None, east=None, frame=None):
     wedge = np.array([[np.cos(rho0 + np.pi / 2), np.sin(rho0 + np.pi / 2), 0.0],
                       [np.cos(rho0 + drho - np.pi / 2), np.sin(rho0 + drho - np.pi / 2), 0.0]])
     N += list(wedge @ R.T)
-  N = np.array(N).reshape(-1, 3)
+  N = _snap(np.array(N).reshape(-1, 3))
   # a plane given twice bounds once, as the hemisphere of 222 and -4 is also a wedge plane
   N = N[[k for k in range(len(N)) if not any(np.allclose(N[k], N[j], atol=1e-9) for j in range(k))]]
   # an orthorhombic sector with a mirror opens east on the chart, so the plotting
@@ -439,6 +439,12 @@ def conventionalSector(pg, up=None, east=None, frame=None):
   if lat is latticeType.orthorhombic and not pg.isProper:
     N = _openEast(N, u, _unit(east))
   return sphericalRegion(N, frame=frame)
+
+
+# the round-off of the turn to the lattice set to zero, so that a normal along an axis has
+# exact zeros
+def _snap(N):
+  return np.where(np.abs(N) < 1e-12, 0.0, N)
 
 
 # the normals lying in the plane of the chart, flipped so that the sector they bound opens

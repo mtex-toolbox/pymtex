@@ -104,8 +104,9 @@ class mtexFigure:
     self.current = ax
     return ax
 
-  def takeAxis(self):
-    """the axes the next plot draws into: the pending one, else a new one"""
+  def takeAxis(self, keep=False):
+    """the axes the next plot draws into: the pending one, else a new one; keep=True leaves a
+    pending one as it is, for an annotation onto the plot it holds"""
     ax, self.pending = self.pending, None
     if ax is not None:
       # an axes nextAxis left blank shows its frame again
@@ -115,8 +116,10 @@ class mtexFigure:
       # one drawn into is emptied for the next plot unless hold keeps it, as MATLAB's
       # nextAxis(k) picks the cell the next plot paints (#2615); the records of the old plot
       # go with it, so that the new one draws its own frame, grid and labels
-      elif not self.hold:
+      elif not self.hold and not keep:
         ax.cla()
+        # a repaint the count of artists may not show, for whoever snapshots the figure
+        self.fig._mtexRepaints = getattr(self.fig, "_mtexRepaints", 0) + 1
         for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot"):
           if hasattr(ax, holder):
             delattr(ax, holder)
