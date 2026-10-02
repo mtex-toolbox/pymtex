@@ -26,7 +26,7 @@ import numpy as np
 from .frames import crystalFrame, specimenFrame
 from .miller import Miller
 from .orientation import orientation
-from .kernels import bestDot, threads, variantAngles
+from .kernels import bestDot, closestAngle, closestImage, threads, variantAngles
 from .quaternion import qmul, quaternion, rotation
 from .symmetryops import projectIntoFundamentalRegionOrientation
 from .symreduce import chordAngle, reductionGroups, symReduce
@@ -370,16 +370,83 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
   w = np.ones(childOri.size) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   w = w / np.sum(w)
   seed = childOri[int(np.argmax(w))]
-  candidates = orientation(rotation._fromData(qmul(seed.data.reshape(1, 4), PV.data.reshape(-1, 4))), p2c.frameA, childOri.frameB)
+  cand = qmul(seed.data.reshape(1, 4), PV.data.reshape(-1, 4))
+  # every candidate parent at once: the parent variant of every child nearest it, the parents
+  # these give, their mean and how far they lie from it; the first best candidate wins
+  n, cq, pv = childOri.size, childOri.data.reshape(-1, 4), PV.data.reshape(-1, 4)
+  if not np.isfinite(cq).all():
+    return _parentOfManyLoop(childOri, cand, PV, p2c, w, id)
+  child = childOri._new(np.tile(cq, (numV, 1)))
+  ids, _ = calcParent(child, orientation(rotation._fromData(np.repeat(cand, n, axis=0)), p2c.frameA, childOri.frameB), p2c, id=True)
+  ids = np.asarray(ids).reshape(numV, n)
+  P = qmul(np.tile(cq, (numV, 1)), pv[ids.reshape(-1) - 1])
+  L, R = reductionGroups(orientation(rotation._fromData(P[:1]), p2c.frameA, childOri.frameB))
+  m = _orientationMeans(P.reshape(numV, n, 4), w, L, R)
+  f = np.sum(closestAngle(P, np.repeat(m, n, axis=0), L, R).reshape(numV, n) * w, axis=1)
+  if not np.isfinite(f).any():
+    return None, np.inf
+  k = int(np.argmin(np.where(np.isnan(f), np.inf, f)))
+  return (ids[k] if id else orientation(rotation._fromData(m[k]), p2c.frameA, childOri.frameB)), float(f[k])
+
+
+# the candidates one at a time, for children of which some have no orientation
+def _parentOfManyLoop(childOri, cand, PV, p2c, w, id):
   best, bestFit, bestIds = None, np.inf, None
-  for k in range(numV):
-    ids, _ = calcParent(childOri, candidates[k], p2c, id=True)
+  for k in range(len(cand)):
+    ids, _ = calcParent(childOri, orientation(rotation._fromData(cand[k]), p2c.frameA, childOri.frameB), p2c, id=True)
     pOri = orientation(rotation._fromData(qmul(childOri.data.reshape(-1, 4), PV.data.reshape(-1, 4)[ids - 1])), p2c.frameA, childOri.frameB)
     m = pOri.mean(weights=w, robust=True)
     f = float(np.sum(pOri.angle(m) * w))
     if f < bestFit:
       best, bestFit, bestIds = m, f, ids
   return (bestIds if id else best), bestFit
+
+
+# the mean orientation of every list of a stack (K, n, 4), as orientationMean with weights and
+# robust: three times every element moved to its equivalent closest to the running mean and the
+# robust quaternion mean taken
+def _orientationMeans(Q, w, L, R, iterations=3):
+  K, n = Q.shape[:2]
+  m = Q[:, 0].copy()
+  for _ in range(iterations):
+    moved = closestImage(np.repeat(m, n, axis=0), Q.reshape(-1, 4), L, R, False)[1].reshape(K, n, 4)
+    m = _robustMeans(moved, w)
+  return m
+
+
+# the quantile of every row without its NaN entries, as np.nanquantile row by row: the rows of
+# as many entries together over their sorted values, NaN sorting last
+def _rowQuantile(x, q):
+  s, cnt = np.sort(x, axis=1), np.sum(~np.isnan(x), axis=1)
+  out = np.full(len(x), np.nan)
+  for c in np.unique(cnt[cnt > 0]):
+    r = cnt == c
+    out[r] = np.quantile(s[r, :c], q, axis=1)
+  return out
+
+
+# the robust weighted mean of every list of a stack, as quaternion.mean(robust=True): the
+# principal eigenvector of the moment matrix, then the elements beyond 2.5 times the 0.8
+# quantile of their angles to it dropped and the mean taken again, while more than four remain
+def _robustMeans(q, w):
+  K, n = q.shape[:2]
+  keep = np.ones((K, n), dtype=bool)
+  active = np.ones(K, dtype=bool)
+  m = np.empty((K, 4))
+  while active.any():
+    a = np.flatnonzero(active)
+    qa, ka = q[a], keep[a]
+    T = np.einsum("kni,knj->kij", qa * np.where(ka, w, 0.0)[..., None], qa)
+    m[a] = np.linalg.eigh(T)[1][..., -1]
+    d = np.sum(qa * m[a][:, None], axis=-1)
+    h = np.linalg.norm(m[a][:, None] - np.where(d < 0, -1.0, 1.0)[..., None] * qa, axis=-1)
+    omega = 4 * np.arcsin(np.minimum(h / 2, 1.0))
+    cut = 2.5 * _rowQuantile(np.where(ka, omega, np.nan), 0.8)
+    drop = ka & ~(omega <= cut[:, None])
+    stop = (ka.sum(axis=1) <= 4) | ~drop.any(axis=1)
+    keep[a[~stop]] &= ~drop[~stop]
+    active[a[stop]] = False
+  return m
 
 
 # the ids as they are, or the parents they name: every child times its parent variant

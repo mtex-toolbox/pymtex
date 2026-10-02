@@ -28,7 +28,7 @@ from ..geometry.symreduce import closestImage
 from ..geometry.vector3d import vector3d
 from .dynprop import dynProp
 from .phaselist import phaseTable
-from .polygon import polygonSet, signedArea2, _insideLoop
+from .polygon import polygonSet, signedArea2, _flatLoops, _insideLoop
 from ..geometry.display import aligned, frameLabel
 
 FIELDS = ("id", "phaseId", "CSList", "numPixel", "meanRotation", "GOS", "frame", "prop", "boundary", "innerBoundary", "loops", "phaseMap")
@@ -420,7 +420,9 @@ class grain2d(polygonSet):
       out.childId = [[int(i)] for i in self.id]
       out.prop.pop("parentId", None)
       return out
-    members = [np.flatnonzero(parent == p) for p in range(1, n + 1)]
+    order = np.argsort(parent, kind="stable")
+    bounds = np.searchsorted(parent[order], np.arange(1, n + 2))
+    members = [order[bounds[p]:bounds[p + 1]] for p in range(n)]
     T = self.meanRotation.data.dtype
     phaseId = np.array([self.phaseId[m[0]] for m in members], dtype=np.int8)
     numPixel = np.array([self.numPixel[m].sum() for m in members], dtype=np.int32)
@@ -470,15 +472,27 @@ class grain2d(polygonSet):
     """the id of the grain whose hole the grain lies in, 0 for none: every grain bordering a
     hole of another, MATLAB's second output of isInclusion"""
     out = np.zeros(self.size, dtype=np.int32)
-    gB = self.boundary
-    pos = self._positions()
-    for k in np.flatnonzero(self.hasHole):
-      holeV = np.concatenate(self.loops[k][1:])
-      onHole = np.all(np.isin(gB.F, holeV), axis=1) & np.any(gB.grainId == self.id[k], axis=1)
-      incl = np.unique(gB.grainId[onHole])
-      incl = incl[(incl != self.id[k]) & (incl > 0) & (incl < len(pos))]
-      incl = pos[incl]
-      out[incl[incl >= 0]] = self.id[k]
+    flat, _, lengths, owner, first = _flatLoops(self.loops)
+    onHole = np.repeat(~first, lengths)
+    if not onHole.any():
+      return out
+    # a segment on a hole of the grain beside it: both vertices among the hole vertices of that
+    # grain, (grain, vertex) as one key; the last grain in the list wins where two would
+    gB, pos = self.boundary, self._positions()
+    NV = int(max(flat.max(initial=0), gB.F.max(initial=0))) + 1
+    keys = np.unique(np.repeat(owner, lengths)[onHole] * NV + flat[onHole])
+    gid = gB.grainId
+    inside = (gid > 0) & (gid < len(pos))
+    at = np.where(inside, pos[np.where(inside, gid, 0)], -1)
+    host = np.full(self.size, -1, dtype=np.int64)
+    for side in (0, 1):
+      k = at[:, side]
+      on = k >= 0
+      on[on] = np.isin(k[on] * NV + gB.F[on, 0], keys) & np.isin(k[on] * NV + gB.F[on, 1], keys)
+      other = at[on, 1 - side]
+      ok = (other >= 0) & (other != k[on])
+      np.maximum.at(host, other[ok], k[on][ok])
+    out[host >= 0] = self.id[host[host >= 0]]
     return out
 
   def update(self):
@@ -518,12 +532,13 @@ class grain2d(polygonSet):
   # inside one now; neighbours outside the selection keep ids above the merged ones
   def _relabelBoundary(self, parent, n):
     gB, ib = self.boundary, self.innerBoundary
-    labels = {int(g): int(parent[k]) for k, g in enumerate(self.id)}
+    # the new label of every id as a table: the parents, the ids outside after them in order
     seen = np.unique(np.concatenate([gB.grainId.reshape(-1), ib.grainId.reshape(-1)]))
-    external = [int(x) for x in seen if x > 0 and int(x) not in labels]
-    for k, x in enumerate(external):
-      labels[x] = n + k + 1
-    relabel = np.vectorize(lambda x: 0 if x == 0 else labels[int(x)], otypes=[np.int32])
+    table = np.zeros(int(max(seen.max(initial=0), self.id.max(initial=0))) + 1, dtype=np.int32)
+    table[self.id] = parent
+    external = seen[(seen > 0) & ~np.isin(seen, self.id)]
+    table[external] = n + 1 + np.arange(len(external))
+    relabel = lambda g: table[g].astype(np.int32)
     gid = relabel(gB.grainId) if len(gB) else gB.grainId
     outer = gid[:, 0] != gid[:, 1]
     sub = lambda sel: gB._with(F=gB.F[sel], grainId=gid[sel], ebsdId=gB.ebsdId[sel], phaseId=gB.phaseId[sel], misrotation=gB.misrotation.data[sel])

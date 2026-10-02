@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 
 from mtex import Miller, calcParent, calcParent2Child, calcVariantId, crystalFrame, degree, orientation, rotation, round2Miller, vector3d
-from mtex.geometry.parent2child import _best, _childToChild, _nearestC2C, _nearestVariant, allHKL, misfit
+from mtex.geometry.parent2child import (_best, _childToChild, _nearestC2C, _nearestVariant, _parentOfManyLoop, _robustMeans, _rowQuantile,
+                                         allHKL, misfit)
+from mtex.geometry.quaternion import quaternion
 from mtex.geometry.quaternion import qmul
 
 csP = crystalFrame("432", [3.66, 3.66, 3.66], mineral="fcc")
@@ -179,6 +181,34 @@ def test_calcParent_foundParentGivesTheChildrensVariants(kids):
   found, _ = calcParent(kids["kids"], kids["p2c"])
   r = calcVariantId(found, kids["kids"], kids["p2c"])
   assert np.array_equal(r.variantId, kids["ks"]) and np.max(r.fit) < 1 * degree
+
+
+def test_calcParent_ofManyChildrenTriesTheCandidatesAsOneAtATime(kids):
+  p2c, kids5 = kids["p2c"], kids["kids"]
+  PV = p2c.variants(parent=True).flatten()
+  w = np.array([1.0, 2, 1, 3, 1]) / 8
+  cand = qmul(kids5.data.reshape(-1, 4)[3:4], PV.data.reshape(-1, 4))
+  ids, f = calcParent(kids5, p2c, weights=w, id=True)
+  ids0, f0 = _parentOfManyLoop(kids5, cand, PV, p2c, w, True)
+  assert np.array_equal(ids, ids0) and abs(f - f0) < 1e-12
+
+
+def test_robustMeans_isTheRobustMeanOfEveryList():
+  rng = np.random.default_rng(7)
+  q = rng.standard_normal((6, 9, 4)) * [1, 0.05, 0.05, 0.05] + [3, 0, 0, 0]
+  q[:, :2] = rng.standard_normal((6, 2, 4))
+  q /= np.linalg.norm(q, axis=-1, keepdims=True)
+  w = rng.random(9)
+  m = _robustMeans(q, w)
+  ref = np.stack([quaternion(q[k]).mean(weights=w, robust=True).data for k in range(6)])
+  assert np.allclose(np.abs(np.sum(m * ref, axis=1)), 1, atol=1e-12)
+
+
+def test_rowQuantile_isTheNanQuantileOfEveryRow():
+  x = np.random.default_rng(8).random((40, 7))
+  x[np.random.default_rng(9).random((40, 7)) < 0.3] = np.nan
+  x[0] = np.nan
+  assert np.array_equal(_rowQuantile(x, 0.8), np.array([np.nanquantile(r, 0.8) if np.isfinite(r).any() else np.nan for r in x]), equal_nan=True)
 
 
 def test_calcParent_weighted(kids):

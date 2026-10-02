@@ -72,6 +72,18 @@ phases), 249 785 grains, 5 993 805 graph nodes; the results the same before and 
   steps on ten threads. A hash accumulator in place of the dense one changed nothing, so it
   is not the cache; the work is what MCL with the cutoff 1e-4 asks.
 
+## The merges and the grain graph route
+
+`mergeInclusions` on the large map took 6.3 s in `inclusionHost`, one scan of all boundary
+segments per grain with a hole; one test of (grain, vertex) keys over the segments, the last
+grain winning as in the loop, takes 0.7 s. `merge` gathers the members of every merged grain by
+one stable sort and relabels the boundary through a table instead of `np.vectorize`.
+`calcParentFromGraph` (martensite, MATLAB's relationship) tried the 24 candidate parents of
+every cluster one at a time through the orientation means; they go as one stack now, the
+robust means batched (`_robustMeans`, the quantile per row by `_rowQuantile` instead of
+`np.nanquantile`'s loop): 9.4 s to 3.6 s on a loaded machine, the parents identical, the fits
+within 1.2e-15.
+
 ## The clustering's parameters, kept
 
 The expansion of `clusterVariantGraph` is the work MCL asks, so a faster clustering changes
@@ -93,13 +105,11 @@ MATLAB's (2026-10-02).
 
 ## Open questions
 
-- `calcParentFromGraph` spends what is left in the 24 candidate parents of every cluster,
-  each with a robust `mean` and an `angle` of a few orientations: Python overhead per call,
-  which one compiled loop over the clusters would remove.
+- `calcParentFromGraph` spends what is left, about 5 ms per cluster, in the batched means of
+  one cluster at a time; the clusters of one size could go together.
 - The vote of `calcParent2Child` at a c_k with a stabilizer: two equivalents of a
   misorientation lie equally near it and give different votes, the image order and rounding
   of `projectToRef` choose; the other choice ends 0.08 degree away, 0.0024 degree from
   MATLAB's, at an objective 0.07 percent higher. A vote averaged over the tied equivalents
   would not depend on the choice.
-- `mergeInclusions` on the large map, 6 s in `inclusionHost`, a Python loop of reductions.
 - `calcParentFromGraph` in MATLAB is untimed (the probe runs it only with `full` set).

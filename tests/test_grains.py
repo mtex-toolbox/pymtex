@@ -252,6 +252,20 @@ def test_merge_inclusionJoinsTheGrainAroundIt():
   assert np.allclose(np.abs(mi.meanRotation.data[0] @ gi.meanRotation.data[big]), 1)
 
 
+# two inclusions in one grain and a third inside the first: each the grain whose hole it borders
+def test_inclusionHost_ofNestedInclusionsIsTheGrainAroundEach():
+  def blocks(i, j):
+    b = np.zeros_like(i)
+    b[(4 <= i) & (i <= 12) & (4 <= j) & (j <= 12)] = 1
+    b[(7 <= i) & (i <= 9) & (7 <= j) & (j <= 9)] = 2
+    b[(16 <= i) & (i <= 20) & (16 <= j) & (j <= 20)] = 3
+    return b
+  g = calcGrains(mapOf(SQ5, 25, blocks), angle=5 * degree)
+  at = {int(round(float(r) / (20 * degree))): k for k, r in enumerate(g.meanRotation.angle())}
+  host = g.inclusionHost
+  assert host[at[0]] == 0 and host[at[1]] == g.id[at[0]] and host[at[3]] == g.id[at[0]] and host[at[2]] == g.id[at[1]]
+
+
 # a grain turned into another phase takes its boundary along with update
 def test_update_carriesAGrainsNewPhaseToItsBoundary():
   gi = calcGrains(inclusionMap(), angle=5 * degree)
