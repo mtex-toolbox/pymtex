@@ -110,11 +110,17 @@ harmonic transforms and the direct Wigner series below 100 nodes in `mtex/functi
 decomposition of the wave velocities and the turn of flattened tensors by many rotations (the
 embedding's images, `ori * T`) in `mtex/tensors/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
-physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft and
-`scipy.fft`. A parallel loop called from Python is compiled by `_parallelKernel`
-(`geometry/kernels.py`), which under numba's `workqueue` layer (macOS) holds one lock around
+physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft,
+`scipy.fft`, the k-d tree searches and every loaded OpenBLAS (`applyThreads`, at import and on
+`setMTEXpref('threads')`; OpenBLAS starts on every logical core). A parallel loop called from Python is compiled by `_parallelKernel`
+(`geometry/kernels.py`), which sets numba's thread count on every launch, since numba holds it
+per Python thread, and under numba's `workqueue` layer (macOS) holds one lock around
 every launch; a parallel helper called from inside another compiled loop is a plain
-`nb.njit(parallel=True)`, never a `_parallelKernel`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
+`nb.njit(parallel=True)`, never a `_parallelKernel`. The image searches of the symmetry
+reduction (`symReduce`, `closestImage`, `bestDot`, `projectToRef`, `projectDirections`,
+`variantAngles`) stay serial loops and split their rows over a thread pool above
+`PARALLEL_WORK` (`_overRows`), bit for bit the serial result: a `prange` twin would share the
+serial loop's disk cache, which numba keys by bytecode and signature, not by `parallel=True`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
 `libnfft3_omp.so`) is an optional backend of the SO(3) adjoint through ctypes,
 `mtex/functions/nfft.py`, found by the preference `NFFTLibrary` or `MTEX_NFFT_LIBRARY`;
 finufft stays the dependency. Never import numba at module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion

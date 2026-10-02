@@ -64,6 +64,9 @@ def setMTEXpref(name, value, save=False):
   SESSION.prefs[name] = value
   if name == "hugePages":
     applyHugePages()
+  if name == "threads":
+    from .kernels import applyThreads
+    applyThreads()
   if save:
     from .settings import saveSetting
     saveSetting(name, value)
@@ -85,6 +88,8 @@ def reset():
   SESSION.reset()
   SESSION.mintDefaultFrame = mint
   applyHugePages()
+  from .kernels import applyThreads
+  applyThreads()
 
 
 __all__ = ["getMTEXpref", "setMTEXpref", "reset"]

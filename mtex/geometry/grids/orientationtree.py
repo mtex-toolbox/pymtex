@@ -14,6 +14,7 @@ import numpy as np
 from scipy import sparse
 from scipy.spatial import cKDTree
 
+from ..kernels import threads
 from ..symmetryops import symmetriseOrientation
 
 
@@ -57,7 +58,7 @@ class OrientationTree:
     delta = 2.5 * self.res
     while True:
       rows = np.repeat(todo, S)
-      dist, ii = self.tree.query(flat[rows], k=1, distance_upper_bound=2 * np.sin(delta / 4), workers=-1)
+      dist, ii = self.tree.query(flat[rows], k=1, distance_upper_bound=2 * np.sin(delta / 4), workers=threads())
       dist = dist.reshape(-1, S)
       ii = (ii % self.n).reshape(-1, S)
       k = np.argmin(dist, axis=1)
@@ -85,7 +86,7 @@ class OrientationTree:
     while True:
       rows = np.repeat(todo, S)
       dist, ii = self.tree.query(flat[rows], k=min(k, 2 * self.n),
-                                 distance_upper_bound=2 * np.sin(min(delta, np.pi) / 4), workers=-1)
+                                 distance_upper_bound=2 * np.sin(min(delta, np.pi) / 4), workers=threads())
       dist = np.atleast_2d(dist.reshape(int(todo.sum()), -1))
       gg = (np.atleast_2d(ii.reshape(int(todo.sum()), -1)) % self.n)
       where = np.flatnonzero(todo)
@@ -120,7 +121,7 @@ class OrientationTree:
     imgs = self._images(o)
     nq, S = imgs.shape[0], imgs.shape[1]
     flat = imgs.reshape(-1, 4)
-    hits = self.tree.query_ball_point(flat, r, workers=-1)
+    hits = self.tree.query_ball_point(flat, r, workers=threads())
     # the hit lists flattened without a Python loop: their lengths, then their items chained
     lens = np.fromiter(map(len, hits), dtype=np.intp, count=len(hits))
     if not lens.any():

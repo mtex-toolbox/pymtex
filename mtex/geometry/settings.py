@@ -68,6 +68,8 @@ def loadSettings(path=None):
       warnings.warn(f"the setting {name} = {value!r} is left out: {e}", stacklevel=2)
   from .session import applyHugePages
   applyHugePages()
+  from .kernels import applyThreads
+  applyThreads()
   return data
 
 

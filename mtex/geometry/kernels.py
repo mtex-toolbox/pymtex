@@ -17,31 +17,37 @@ _compiled = {}       # the loops by name, compiled on first use
 _parallelLock = threading.RLock()
 
 
-# workqueue has one process-wide queue: two Python threads must not launch it together.
-# compiled helpers called from inside a kernel stay unwrapped; its Python entry holds the lock.
-# under workqueue the result is a Python function, so only Python calls it, never another
-# compiled loop: that would compile on Linux (omp, tbb) and fail on macOS alone.
+# a parallel loop run from Python on the threads of the preference: numba holds its thread
+# count per Python thread, and a thread starts at all logical cores, so every launch sets it.
+# workqueue has one process-wide queue: two Python threads must not launch it together, so
+# there the launch also holds the lock. Compiled helpers called from inside a kernel stay
+# unwrapped; the result is a Python function, so only Python calls it, never another compiled loop
 def _parallelKernel(f, **options):
   nb = _jit()
   with _parallelLock:
     nb.get_num_threads()
     kernel = nb.njit(cache=True, parallel=True, **options)(f)
-    if nb.threading_layer() != "workqueue":
-      return kernel
+    queue = nb.threading_layer() == "workqueue"
 
   @functools.wraps(f)
-  def guarded(*args, **kwargs):
+  def launch(*args, **kwargs):
+    nb.set_num_threads(min(threads(), nb.config.NUMBA_NUM_THREADS))
+    if not queue:
+      return kernel(*args, **kwargs)
     with _parallelLock:
       return kernel(*args, **kwargs)
-  return guarded
+  return launch
 
 
+# numba once imported, its thread count for the importing thread set to the preference, which the
+# loops compiled with parallel=True outside _parallelKernel take
 def _jit():
   global _numba
   if _numba is None:
     try:
       import numba
       _numba = numba
+      numba.set_num_threads(min(threads(), numba.config.NUMBA_NUM_THREADS))
     except ImportError:
       _numba = False
   return _numba
@@ -102,7 +108,8 @@ _BLAS_GETTERS = ("scipy_openblas_get_num_threads64_", "scipy_openblas_get_num_th
 def _openblasLibraries():
   import ctypes
   try:
-    paths = {line.split()[-1] for line in open("/proc/self/maps") if "openblas" in line and ".so" in line}
+    with open("/proc/self/maps") as maps:
+      paths = {line.split()[-1] for line in maps if "openblas" in line and ".so" in line}
   except OSError:
     return []
   libs = []
@@ -116,6 +123,16 @@ def _openblasLibraries():
     if setter is not None and getter is not None:
       libs.append((getter, setter))
   return libs
+
+
+def applyThreads():
+  """sets every OpenBLAS the process has loaded, and numba once imported, to the threads of the
+  preference; OpenBLAS starts on every logical core, which oversubscribes the physical ones"""
+  n = threads()
+  for _, setter in _openblasLibraries():
+    setter(n)
+  if _numba:
+    _numba.set_num_threads(min(n, _numba.config.NUMBA_NUM_THREADS))
 
 
 class blasThreads:
@@ -155,8 +172,35 @@ def _parallel(name, f):
   prange = _numba.prange
   if name not in _compiled:
     _compiled[name] = _parallelKernel(f, nogil=True)
-  _numba.set_num_threads(min(threads(), _numba.config.NUMBA_NUM_THREADS))
   return _compiled[name]
+
+
+# a serial loop over row chunks, one per thread of the preference: the loops release the GIL and
+# compute every row alone, so the result is the serial one. call(a, b) runs rows a:b; work is
+# rows times (images + ROW_COST), a row costing about as much as 16 image dots besides them;
+# below PARALLEL_WORK, about 0.6 ms of one core, it runs as one, since the pool costs 0.2 ms.
+# A twin compiled with prange would share the serial loop's disk cache, which numba keys by
+# bytecode and signature, not by parallel=True
+PARALLEL_WORK, ROW_COST = 1 << 19, 16
+_pool, _poolSize = None, 0
+
+
+def _overRows(n, work, call):
+  t = min(threads(), n)
+  if t < 2 or work < PARALLEL_WORK:
+    call(0, n)
+    return
+  global _pool, _poolSize
+  with _parallelLock:
+    if _poolSize != t:
+      from concurrent.futures import ThreadPoolExecutor
+      if _pool is not None:
+        _pool.shutdown()
+      _pool, _poolSize = ThreadPoolExecutor(t, thread_name_prefix="mtex-kernel"), t
+    pool = _pool
+  bounds = np.linspace(0, n, t + 1).astype(np.int64)
+  for f in [pool.submit(call, bounds[k], bounds[k + 1]) for k in range(len(bounds) - 1)]:
+    f.result()
 
 
 # the floating type two operands share, float64 for anything else
@@ -320,7 +364,8 @@ def bestDot(qs, es):
   qs = np.ascontiguousarray(qs, dtype=np.float64).reshape(-1, 4)
   es = np.ascontiguousarray(es, dtype=np.float64)
   val, idx = np.empty(len(qs)), np.empty(len(qs), dtype=np.int64)
-  _loop("bestDot", _bestDotLoop)(qs, es, val, idx)
+  k = _loop("bestDot", _bestDotLoop)
+  _overRows(len(qs), len(qs) * (len(es) + ROW_COST), lambda a, b: k(qs[a:b], es, val[a:b], idx[a:b]))
   return val.reshape(shape), idx.reshape(shape)
 
 
@@ -363,7 +408,8 @@ def variantAngles(m, PV, G):
   G = np.ascontiguousarray(G, dtype=np.float64).reshape(-1, 4)
   out = np.empty((len(m), len(PV), len(PV)))
   if backend() == "numba":
-    _loop("variantAngles", _variantAngleLoop)(m, PV, G, out)
+    k = _loop("variantAngles", _variantAngleLoop)
+    _overRows(len(m), len(m) * (len(PV) ** 2 * len(G) + ROW_COST), lambda a, b: k(m[a:b], PV, G, out[a:b]))
     return out
   left = PV * np.array([1.0, -1, -1, -1])
   for s in range(0, len(m), 256):
@@ -442,7 +488,9 @@ def symReduce(q1, q2, L, R, exchange=False):
   else:
     n = len(q1)
     vals, li, rj, usedInv = np.empty(n), np.empty(n, dtype=np.int64), np.empty(n, dtype=np.int64), np.empty(n, dtype=bool)
-    _loop("symReduce", _symReduceLoop)(q1, q2, L, R, bool(exchange), vals, li, rj, usedInv)
+    k, ex = _loop("symReduce", _symReduceLoop), bool(exchange)
+    _overRows(n, n * (len(L) * len(R) * (2 if ex else 1) + ROW_COST),
+              lambda a, b: k(q1[a:b], q2[a:b], L, R, ex, vals[a:b], li[a:b], rj[a:b], usedInv[a:b]))
   return vals.reshape(shape), li.reshape(shape), rj.reshape(shape), usedInv.reshape(shape)
 
 
@@ -512,7 +560,9 @@ def closestImage(q1, q2, L, R, exchange=False):
     vals, out = _closestImageNumpy(q1, q2, L, R, exchange)
   else:
     vals, out = np.empty(len(q1)), np.empty_like(q1)
-    _loop("closestImage", _closestImageLoop)(q1, q2, L, R, bool(exchange), vals, out)
+    k, ex = _loop("closestImage", _closestImageLoop), bool(exchange)
+    _overRows(len(q1), len(q1) * (len(L) * len(R) * (2 if ex else 1) + ROW_COST),
+              lambda a, b: k(q1[a:b], q2[a:b], L, R, ex, vals[a:b], out[a:b]))
   return vals.reshape(shape), out.reshape(shape + (4,))
 
 
@@ -604,7 +654,9 @@ def projectToRef(qs, es, frm, L, R, ref, common=None, cimgs=None):
     out = _projectToRefNumpy(qs, es, frm, L, R, ref, common, cimgs)
   else:
     out = np.empty_like(qs)
-    _loop("projectToRef", _projectToRefLoop)(qs, es, frm, L, R, ref, common, cimgs, out)
+    k = _loop("projectToRef", _projectToRefLoop)
+    _overRows(len(qs), len(qs) * (len(es) + len(cimgs) + ROW_COST),
+              lambda a, b: k(qs[a:b], es, frm, L, R, ref, common, cimgs, out[a:b]))
   return out.reshape(shape + (4,))
 
 
@@ -732,7 +784,8 @@ def projectDirections(xyz, imgs, q, parity):
     out = _projectDirectionsNumpy(xyz, imgs, q, parity)
   else:
     out = np.empty_like(xyz)
-    _loop("projectDirections", _projectDirectionsLoop)(xyz, imgs, q, parity, out)
+    k = _loop("projectDirections", _projectDirectionsLoop)
+    _overRows(len(xyz), len(xyz) * (len(imgs) + ROW_COST), lambda a, b: k(xyz[a:b], imgs, q, parity, out[a:b]))
   return out.reshape(shape + (3,))
 
 

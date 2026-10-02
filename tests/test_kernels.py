@@ -123,6 +123,25 @@ def test_searches_agree_with_numpy(numbaBackend):
       assert np.allclose(got, want, atol=1e-13)
 
 
+# the searches split over the threads give the serial result to the bit
+def test_searches_over_threads_equal_the_serial_loop(numbaBackend, monkeypatch):
+  cs, hx = crystalFrame("m-3m"), crystalFrame("6/mmm")
+  o1, o2 = orientation.rand(3000, cs, hx, rng=rng), orientation.rand(3000, cs, hx, rng=rng)
+  L, R = reductionGroups(o1)
+  es, frm = referenceImages(o2[0].data, L, R, False)
+  v = vector3d.rand(3000, rng=rng).data
+  o = cs.rot.data.reshape(-1, 5)
+  imgs = kernels.qrot(o[:, :4], np.array([[0.3, 0.2, 0.9]])) * o[:, 4:5]
+  calls = lambda: [*kernels.symReduce(o1.data, o2.data, L, R), *kernels.closestImage(o1.data, o2.data, L, R),
+                   *kernels.bestDot(o1.data, es), kernels.projectToRef(o1.data, es, frm, L, R, o2[0].data),
+                   kernels.projectDirections(v, imgs, o[:, :4], o[:, 4]), kernels.variantAngles(o1.data[:50], L[:6], R)]
+  monkeypatch.setattr(kernels, "PARALLEL_WORK", 1 << 62)
+  serial = calls()
+  monkeypatch.setattr(kernels, "PARALLEL_WORK", 0)
+  monkeypatch.setattr(kernels, "threads", lambda: 4)
+  assert all(np.array_equal(a, b) for a, b in zip(calls(), serial))
+
+
 def test_direction_projection_agrees_with_numpy(numbaBackend):
   for name in ("m-3m", "-3m", "4/m", "-6m2"):
     fr = crystalFrame(name)

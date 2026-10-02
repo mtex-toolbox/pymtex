@@ -16,7 +16,7 @@ from ._array import MtexArray
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
 
 from .quaternion import qmul, qrot
-from .kernels import closestImage, projectDirections, projectToRef
+from .kernels import closestImage, projectDirections, projectToRef, threads
 from .symreduce import (_conj, bestDot, chordAngle, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
                         symReduce, uniqueRotations)
 from .vector3d import _isCrystalFrame, vector3d
@@ -285,7 +285,7 @@ def _neighbours(o, tol, symmetry):
   if not symmetry:
     from scipy.spatial import cKDTree
     q = o.data.reshape(-1, 4)
-    hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tol / 4), workers=-1)
+    hits = cKDTree(np.vstack([q, -q])).query_ball_point(q, 2 * np.sin(tol / 4), workers=threads())
     rows = np.repeat(np.arange(n), [len(h) for h in hits])
     cols = np.concatenate([np.asarray(h, dtype=int) for h in hits]) % n
     return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=(n, n))
