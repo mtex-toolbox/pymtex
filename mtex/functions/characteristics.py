@@ -18,7 +18,7 @@ import numpy as np
 from ..geometry._array import MtexArray
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame
-from ..geometry.kernels import backend
+from ..geometry.kernels import backend, qmul
 from ..geometry.grids.localgrids import localOrientationGrid, localS2Grid
 from ..geometry.grids.fibonacci import fibonacciS2Grid
 from ..geometry.grids.s2grid import equispacedS2Grid
@@ -431,13 +431,13 @@ def _localMaximaSO3(f, numLocal=1, resolution=5 * degree, accuracy=0.25 * degree
   res = resolution
   while res > accuracy:
     res /= 1.25
-    shifts = rotation(localOrientationGrid(f.CS, f.SS, maxAngle=2 * res, resolution=res / 2, respectSymmetry=False))
-    for k in range(len(modes)):
-      trial = shifts * rotation(modes[k])
-      tv = np.real(f(_ori(trial, f))).ravel()
-      i = int(np.argmax(tv))
-      if tv[i] > vals[k]:
-        modes[k], vals[k] = trial.data.reshape(-1, 4)[i], tv[i]
+    shifts = rotation(localOrientationGrid(f.CS, f.SS, maxAngle=2 * res, resolution=res / 2, respectSymmetry=False)).data.reshape(-1, 4)
+    # the shifted grids of every mode in one evaluation, a row per mode
+    trial = qmul(shifts[None, :, :], modes[:, None, :])
+    tv = np.real(f(_ori(trial.reshape(-1, 4), f))).reshape(len(modes), -1)
+    i = np.argmax(tv, axis=1)
+    better = tv[np.arange(len(modes)), i] > vals
+    modes[better], vals[better] = trial[better, i[better]], tv[better, i[better]]
   o = _ori(modes, f)
   ids = _clusterOrientations(o, 1.5 * resolution)
   reps = [int(np.flatnonzero(ids == k)[np.argmax(vals[ids == k])]) for k in np.unique(ids)]
@@ -608,6 +608,62 @@ def _gradientField(f):
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).grad()
 
 
+# the step ladder from the modes along the gradient field fg, the modes that meet joined; labels
+# say which mode each seed has flowed into
+def _ascend(f, fg, modes, vals, labels, w, steps, exact, tol, maxIter):
+  active = np.ones(len(modes), dtype=bool)
+  steepest = None
+  for _ in range(maxIter):
+    idx = np.flatnonzero(active)
+    if idx.size == 0:
+      break
+    o = _ori(modes[idx], f)
+    g = fg(o)
+    n = np.linalg.norm(g.data, axis=-1)
+    steepest = n.max() if steepest is None else steepest
+    if not exact:
+      flat = (np.bincount(labels, w, minlength=len(modes))[idx] < 0.01) & (n < FLAT_SLOPE * steepest)
+      if flat.any():
+        active[idx[flat]] = False
+        idx, o, g, n = idx[~flat], o[~flat], g[~flat], n[~flat]
+        if idx.size == 0:
+          break
+    dirs = g.data / np.where(n > 0, n, 1.0)[:, None]
+    trial1 = SO3TangentVector(vector3d((2 * steps[idx] / 3)[:, None] * dirs), o, "left").exp()
+    trial2 = SO3TangentVector(vector3d(steps[idx][:, None] * dirs), o, "left").exp()
+    t1, t2 = rotation(trial1).data.reshape(-1, 4), rotation(trial2).data.reshape(-1, 4)
+    # the modes and both trials in one evaluation: a large one goes through the harmonic form
+    # and a small one is summed, and a step must be judged by values of one kind
+    v0, v1, v2 = np.split(np.real(f(_ori(np.concatenate([modes[idx], t1, t2]), f))).ravel(), 3)
+    vals[idx] = v0
+    best = np.argmax(np.stack([vals[idx], v1, v2]), axis=0)
+    # on a tie in a flat region the gradient still says where the mass is
+    best[(best == 0) & (v1 == vals[idx]) & (v2 == vals[idx]) & (n > 0)] = 2
+    stay = best == 0
+    halve = stay & (steps[idx] > 0.05 * degree)
+    steps[idx[halve]] /= 2
+    active[idx[stay & ~halve]] = False
+    for b, t, v in ((1, t1, v1), (2, t2, v2)):
+      go = best == b
+      modes[idx[go]], vals[idx[go]] = t[go], v[go]
+    if stay.all():
+      if not np.any(active):
+        break
+      continue
+    # join the modes that have come within the tolerance of each other: a pair that has not
+    # moved was looked at before
+    ids = _clusterOrientations(_ori(modes, f), tol, among=idx[~stay])
+    nc = ids.max() + 1
+    if nc < len(modes):
+      rep = _bestOfClusters(ids, vals, nc)
+      keepActive = np.bincount(ids, weights=active, minlength=nc) > 0
+      keepStep = np.zeros(nc)
+      np.maximum.at(keepStep, ids, steps)
+      labels = ids[labels]
+      modes, vals, steps, active = modes[rep], vals[rep], keepStep, keepActive
+  return modes, vals, labels
+
+
 def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, radius=np.inf, exact=False, verbose=True):
   """the modal orientations of an SO(3) function by steepest ascent from seeds, their volumes and which
   mode each seed flowed into; modes within the tolerance merge, and modes of less than one percent
@@ -635,54 +691,11 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
   else:
     modes, labels = rots.copy(), np.arange(len(rots))
     vals = np.real(f(_ori(modes, f))).ravel()
-  steps = np.full(len(modes), 5 * degree)
-  active = np.ones(len(modes), dtype=bool)
-  steepest = None
-  for _ in range(maxIter):
-    idx = np.flatnonzero(active)
-    if idx.size == 0:
-      break
-    o = _ori(modes[idx], f)
-    g = fg(o)
-    n = np.linalg.norm(g.data, axis=-1)
-    steepest = n.max() if steepest is None else steepest
-    if not exact:
-      flat = (np.bincount(labels, w, minlength=len(modes))[idx] < 0.01) & (n < FLAT_SLOPE * steepest)
-      if flat.any():
-        active[idx[flat]] = False
-        idx, o, g, n = idx[~flat], o[~flat], g[~flat], n[~flat]
-        if idx.size == 0:
-          break
-    dirs = g.data / np.where(n > 0, n, 1.0)[:, None]
-    trial1 = SO3TangentVector(vector3d((2 * steps[idx] / 3)[:, None] * dirs), o, "left").exp()
-    trial2 = SO3TangentVector(vector3d(steps[idx][:, None] * dirs), o, "left").exp()
-    v1, v2 = np.real(f(trial1)).ravel(), np.real(f(trial2)).ravel()
-    t1, t2 = rotation(trial1).data.reshape(-1, 4), rotation(trial2).data.reshape(-1, 4)
-    best = np.argmax(np.stack([vals[idx], v1, v2]), axis=0)
-    # on a tie in a flat region the gradient still says where the mass is
-    best[(best == 0) & (v1 == vals[idx]) & (v2 == vals[idx]) & (n > 0)] = 2
-    stay = best == 0
-    halve = stay & (steps[idx] > 0.05 * degree)
-    steps[idx[halve]] /= 2
-    active[idx[stay & ~halve]] = False
-    for b, t, v in ((1, t1, v1), (2, t2, v2)):
-      go = best == b
-      modes[idx[go]], vals[idx[go]] = t[go], v[go]
-    if stay.all():
-      if not np.any(active):
-        break
-      continue
-    # join the modes that have come within the tolerance of each other: a pair that has not
-    # moved was looked at before
-    ids = _clusterOrientations(_ori(modes, f), tol, among=idx[~stay])
-    nc = ids.max() + 1
-    if nc < len(modes):
-      rep = _bestOfClusters(ids, vals, nc)
-      keepActive = np.bincount(ids, weights=active, minlength=nc) > 0
-      keepStep = np.zeros(nc)
-      np.maximum.at(keepStep, ids, steps)
-      labels = ids[labels]
-      modes, vals, steps, active = modes[rep], vals[rep], keepStep, keepActive
+  modes, vals, labels = _ascend(f, fg, modes, vals, labels, w, np.full(len(modes), 5 * degree), exact, tol, maxIter)
+  # a radial or fibre function ascended on its harmonic form climbs on to its peaks on its own
+  # gradient: near a peak the truncated gradient points off the ridge and the ladder stops short
+  if isinstance(f, (SO3FunRBF, SO3FunCBF)) and fg != f.grad:
+    modes, vals, labels = _ascend(f, f.grad, modes, vals, labels, w, np.full(len(modes), 0.5 * degree), True, tol, maxIter)
   # clusters, the representative with the largest value, the weights within the radius
   ids = _clusterOrientations(_ori(modes, f), tol)
   nclust = ids.max() + 1

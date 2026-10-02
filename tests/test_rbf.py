@@ -71,6 +71,34 @@ def test_unimodalODF_exchangeSymmetryAveragesWithTheInverses():
   assert SO3FunHarmonic(fx).antipodal
 
 
+def test_unimodalODF_antipodalWithUnequalWeightsKeepsEachWeightOnItsInverse():
+  # each centre and its inverse carry the centre's weight, over the equivalents of both
+  cs = crystalFrame("m-3m")
+  o = orientation(rotation.rand(4, rng=rng), cs, cs, antipodal=True)
+  psi = SO3DeLaValleePoussinKernel(halfwidth=15 * degree)
+  f = SO3FunRBF(o, psi, [1.0, 2.0, 3.0, 4.0])
+  L, R = reductionGroups(o)
+  L, R = rotation(L), rotation(R)
+  r = rotation.rand(rng=rng)
+  direct = sum(w * psi(L[j] * c * R[i], r) for w, k in zip(f.weights, range(4)) for c in (o[k], o[k].inv())
+               for i in range(R.size) for j in range(L.size)) / (2 * L.size * R.size)
+  # the sum leaves out the terms below 1e-9 of the kernel's peak
+  assert np.isclose(f(r), direct, rtol=1e-8)
+
+
+def test_eval_ofManyCentresSearchesTheirTreeAsTheBlocksSum(monkeypatch):
+  # the tree of the centres, its hits in small batches, against the sum by blocks
+  from mtex.functions import rbf
+  cs = crystalFrame("m-3m")
+  f = SO3FunRBF(orientation(rotation.rand(300, rng=rng), cs, cs, antipodal=True), SO3DeLaValleePoussinKernel(halfwidth=5 * degree),
+                rng.random(300))
+  r = rotation.rand(60, rng=rng)
+  blocks = f(r)
+  monkeypatch.setattr(rbf, "BLOCK", 1000)
+  monkeypatch.setattr(rbf, "HITS", 50)
+  assert np.allclose(f(r), blocks, rtol=1e-12, atol=1e-12)
+
+
 def test_unimodalODF_takesAKernelPositionalTheIdentityAsDefaultAndTheAlgebra():
   # a kernel positional, the identity as the default centre, the algebra
   cs, ss, o, f = unimodal()

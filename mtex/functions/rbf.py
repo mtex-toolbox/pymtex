@@ -11,12 +11,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import itertools
 import math
 
 import numpy as np
 
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
+from ..geometry.kernels import threads
 from ..geometry.miller import Miller
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
@@ -38,6 +40,9 @@ from ..geometry.display import aligned
 CHUNK = 1024
 # above this many kernel terms an evaluation goes through the harmonic form
 HARMONIC_EVAL = 2_000_000
+# the largest block of dots the direct sum forms, and the most hits one tree search returns
+BLOCK = 1 << 22
+HITS = 1 << 23
 
 
 def _qmul(p, q):
@@ -67,6 +72,55 @@ def supportCosine(psi, tol=1e-9):
   tail = np.cumsum(~small[::-1])[::-1] == 0
   i = np.flatnonzero(tail)
   return math.cos(omega[i[0]] / 2) if i.size else -1.0
+
+
+# the kernel sum by blocks of queries and of expanded centres, each block at most BLOCK dots
+def _blockSum(q, cs, w, psi, cut):
+  out = np.zeros(len(q))
+  rows = max(1, min(CHUNK, BLOCK // max(len(cs), 1)))
+  cols = max(1, BLOCK // rows)
+  for i in range(0, len(q), rows):
+    for j in range(0, len(cs), cols):
+      D = np.abs(q[i:i + rows] @ cs[j:j + cols].T)
+      mask = D > cut
+      values = np.zeros(D.shape)
+      values[mask] = psi(np.minimum(D[mask], 1.0))
+      out[i:i + rows] += values @ w[j:j + cols]
+  return out
+
+
+# the kernel sum through a k-d tree of the centres, for a support below 120 degree: every
+# symmetric image l q r of a query (and its conjugate for antipodal centres) is searched, each
+# hit one term, so that the copies of the centres are never formed. The tree holds c and -c,
+# and a ball of chord below 1 holds one of the two. The hits are counted first, so that one
+# search returns at most HITS of them
+def _treeSum(q, c, w, L, R, antipodal, psi, cut):
+  from scipy.spatial import cKDTree
+  tree = cKDTree(np.vstack([c, -c]))
+  radius = math.sqrt(2 - 2 * cut)
+  n, m = len(c), len(L) * len(R) * (2 if antipodal else 1)
+  out = np.zeros(len(q))
+  for start in range(0, len(q), CHUNK):
+    qb = q[start:start + CHUNK]
+    imgs = _qmul(_qmul(L[:, None, None, :], qb[None, :, None, :]), R[None, None, :, :]).transpose(1, 0, 2, 3)
+    imgs = imgs.reshape(len(qb), -1, 4)
+    if antipodal:
+      imgs = np.concatenate([imgs, _conj(imgs)], axis=1)
+    flat = imgs.reshape(-1, 4)
+    counts = tree.query_ball_point(flat, radius, return_length=True, workers=threads())
+    # batches of images whose hits fit in one search
+    ends = np.searchsorted(np.cumsum(counts), np.arange(1, counts.sum() // HITS + 2) * HITS, side="right")
+    bounds = np.unique(np.concatenate([[0], np.minimum(np.maximum(ends, 1), len(flat)), [len(flat)]]))
+    for a, b in zip(bounds[:-1], bounds[1:]):
+      hits = tree.query_ball_point(flat[a:b], radius, workers=threads())
+      lens = np.fromiter(map(len, hits), dtype=np.intp, count=len(hits))
+      cols = np.fromiter(itertools.chain.from_iterable(hits), dtype=np.intp, count=int(lens.sum())) % n
+      k = a + np.repeat(np.arange(len(hits)), lens)
+      d = np.abs(np.einsum("ij,ij->i", flat[k], c[cols]))
+      keep = d > cut
+      values = psi(np.minimum(d[keep], 1.0)) * w[cols[keep]]
+      out[start:start + len(qb)] += np.bincount(k[keep] // imgs.shape[1], weights=values, minlength=len(qb))
+  return out / m
 
 
 # one frame, with or without its group: a symmetric function is also asked at the
@@ -150,7 +204,7 @@ class SO3FunRBF:
       c = np.concatenate([c, _conj(c)])
     q = _qmul(_qmul(L[:, None, None, :], c[None, :, None, :]), R[None, None, :, :])
     m = len(L) * len(R) * (2 if self.antipodal else 1)
-    w = np.repeat(self.weights, 2) if self.antipodal else self.weights
+    w = np.concatenate([self.weights, self.weights]) if self.antipodal else self.weights
     return q.transpose(1, 0, 2, 3).reshape(-1, 4), np.repeat(w, len(L) * len(R)) / m
 
   def __call__(self, x):
@@ -166,16 +220,15 @@ class SO3FunRBF:
       if getattr(self, "_harmonicCache", None) is None:
         self._harmonicCache = self._harmonic()
       return np.real(self._harmonicCache.eval(r)).reshape(r.shape)
-    cs, w = self._expandedCentres()
     cut = supportCosine(self.psi)
-    out = np.full(len(q), self.c0)
-    for start in range(0, len(q), CHUNK):
-      D = np.abs(q[start:start + CHUNK] @ cs.T)
-      mask = D > cut
-      values = np.zeros(D.shape)
-      values[mask] = self.psi(np.minimum(D[mask], 1.0))
-      out[start:start + CHUNK] += values @ w
-    return out.reshape(r.shape)
+    m = len(L) * len(R) * (2 if self.antipodal else 1)
+    # many terms of a local kernel through the tree of the centres, the rest by blocks
+    if cut > 0.5 and self.center.size * m * len(q) > BLOCK:
+      out = _treeSum(q, self.center.data.reshape(-1, 4), self.weights.reshape(-1), L, R, self.antipodal, self.psi, cut)
+    else:
+      cs, w = self._expandedCentres()
+      out = _blockSum(q, cs, w, self.psi, cut)
+    return (self.c0 + out).reshape(r.shape)
 
   # the harmonic form: the point measure of the centres convolved with the kernel,
   # projected; the transform runs at the narrower of the two bandwidths, and the mean is
@@ -249,7 +302,7 @@ class SO3FunRBF:
     if self.antipodal:
       c = np.concatenate([c, _conj(c)])
     pts = rotation(c[:, None, :]) * hs
-    w = np.repeat(self.weights, 2) / 2 if self.antipodal else self.weights
+    w = np.concatenate([self.weights, self.weights]) / 2 if self.antipodal else self.weights
     w = np.repeat(w, hs.size) / hs.size
     s = S2FunHarmonic.quadrature(vector3d(pts.data.reshape(-1, 3), frame=self.SS), np.ones(pts.size), bandwidth=L, weights=4 * np.pi * w, real=True, antipodal=ant)
     return conv(s, self.psi.radon()) + self.c0
