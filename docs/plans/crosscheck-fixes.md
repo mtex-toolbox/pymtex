@@ -1,0 +1,107 @@
+# What the cross-port benchmarks found, port by port
+
+Status: written 2026-10-02 from the runs of every cross benchmark (`bench/*_ops.py`, `density`,
+`dubna_density`, `calcgrains` and the standalone ones) against MATLAB `../master` at
+feature/fastHarmonicTransforms (34df8425a) and the Julia port at `main`, with the cores each case
+kept busy (`tools/graph/query.py parallel`). The Python findings are issue #1 of
+mtex-toolbox/pymtex. The MATLAB fixes go into develop through the worktree `~/mtex/mtexDevelop`,
+as `develop-fixes.md` does; the Julia ones into `../mtexJulia`. Every number below is a
+`compare` line or a `parallel` row of that run.
+
+## How a direction is chosen
+
+A result that depends on what it should not (the order of a search, the size of a batch), a
+crash, or a value that contradicts the function's own definition is a defect and is fixed in the
+port that has it. Where the ports differ by a convention, the design decides as CLAUDE.md says:
+the Julia port on the algorithm, MATLAB on the name and on the semantics already decided there.
+Nearness to MATLAB is no measure where no true answer exists (which pixels a grain absorbs);
+an open convention is the user's to decide.
+
+## 0. Which port is wrong
+
+Python and Julia agree in these and MATLAB does not, or a port has no half to break the tie. Each
+is settled by a reference computation (an analytic case, a brute force sum) before anything is
+fixed; the outcome decides the port. They are the open questions at the end.
+
+## 1. Python
+
+Correctness:
+
+| # | what | where | state |
+|---|---|---|---|
+| P1 | `SO3FunRBF.eval` asks for 447 GiB when a sum of 1e7 centres is too narrow for the harmonic form: `CHUNK` bounds the evaluation points, not the centres | `mtex/functions/rbf.py` | done: a kernel of support below 120 degree sums through a k-d tree of the centres (`_treeSum`), the rest by blocks of at most 2^22 dots (`_blockSum`); the Dubna run peaks at 4.8 GB. It found that an antipodal function with unequal weights put each weight on another centre's inverse (eval and the pole figure), fixed. `dubna_density` now passes 10 degree, MATLAB's default, since this port's `calcDensity` selects a halfwidth: 1.2e-2 from MATLAB |
+| P2 | `calcComponents` stops two modes short on a flat ridge (0.4 and 1.75 degree from Julia's, gradient 31.7); a mode under 1 % is not merged as Julia merges it | `mtex/functions/characteristics.py` | done: a step was judged against a value of the other kind (a large evaluation goes through the harmonic form, a small one is summed), so each iteration evaluates the modes and both trials in one call; a radial or fibre function ascended on its harmonic gradient climbs on to its peaks on its own gradient (`_ascend` twice). The values agree with Julia's to 3e-4 of 470, one mode sits 0.86 degree along a ridge that flat; 1.4 s against 0.76. The mode under 1 % stays: the flat-slope rule stops its seed by design (`test_components_freeze_light_seeds_on_flat_stretches`) |
+| P3 | `smooth(ebsd, splineFilter, fill=True)` differs from Julia's by up to 3.85 degree on 5 % of the ferrite pixels; the unfilled filter agrees to 7.7e-8 | `mtex/maps/smoothing.py`, the filters in `mtex/analysis/variational.py` | no fault here: the two ports smooth different maps. After `calcGrains` this port keeps the 1671 notIndexed pixels a grain absorbed, with its phase and a NaN rotation, as MATLAB does (`absorbNotIndexed`), so `ebsd['indexed']` holds them and the fill solves for them with their neighbours; Julia's `ebsd[isIndexed(ebsd)]` leaves them out. The pixels that differ lie 1 step from an absorbed one (at most 3), the ones that agree 5. J6 |
+| P4 | `calcGrains` on Forsterite a, b, d: the grain counts agree with Julia, 613 to 838 pixels sit in another grain; copper b has 389 grains against 388 | `mtex/maps/calcgrains.py` | diagnosed, the rule to decide: all 838 are notIndexed pixels whose absorption differs, and every one has a nudged corner as near to two sites (on a square lattice beside a hole the corner lies on the edge of two cells), which `absorbInteriorPixels` in both ports breaks by the order of its search. An order-free rule is the fix, in both ports alike; which one is a convention (a tie counts for neither grain or for both). Tried here: "for neither" moves this port to 729 pixels from MATLAB on Forsterite and 297 on Emsland (Julia 977 and 967), "for both" to 2174; reverted until decided; issue #2 |
+| P5 | `smoothBoundary(grains, 5)`: the perimeters 1.3e-3 off MATLAB, the tolerance 1e-3 | `mtex/maps/smoothing.py` | no fault here by the rule above: the difference is the simplification (with `simplify=False` all 143 grains agree with MATLAB to 1.8e-6, without the resampling 25 still differ), and there this port follows Julia, the two agreeing but on the 2 grains where Julia is off (J2). MATLAB's simplification is unchanged since August (its 2026-10-01 commit only zeroes the pixel pair of a merged segment); the difference is the open item of BoundaryTutorial in `docs/findings.md` (3363 segments against 3359). Left to decide: whether the definition of the simplification (every vertex dropped within the tolerance of the kept chain) settles which of the two is right |
+
+Speed:
+
+| # | what | numbers | state |
+|---|---|---|---|
+| P6 | `max(odf)` of 300 centres | 2.2 to 4.7 s, MATLAB 0.88 s, Julia 0.19 s | done: the refinement evaluates the shifted grids of every mode in one call per level (14 calls, not 141), which the harmonic form serves; 0.23 s, the maximum 1.2e-5 below the direct search's, the position 3.5e-3 from MATLAB's (the accuracy 0.25 degree) |
+| P7 | libraries outside numba spread over all logical cores: up to 30 cores busy at `threads()` = 16 (`youngs`, `velocity`, `mean_m3m`, `odf_max`, `halfwidth_s2_*`) | `parallel` | done: OpenBLAS (NumPy's and SciPy's) starts on every logical core and is now set to the preference at import, on `setMTEXpref('threads')` and on `reset()` (`applyThreads`); numba holds its count per Python thread, so every `_parallelKernel` launch sets it, where the tensors, maps and io kernels set none; the k-d tree searches take `threads()` for `workers=-1`. `youngs` and `schmid` 16 cores, `mean_m3m` 73 to 27 ms, `velocity` 14 to 9 ms; `velocity` and `rbf_harmonic` still read 26 to 29, OpenBLAS's threads spinning after a product while numba's run |
+| P8 | one core where the work is parallel: `inv` of tensors, `trueebsd_undistort`, `export_h5`, `birefringence` (3 cores) | `parallel` | done: `inv` of rank four tensors is one compiled loop over them (gather, Gauss-Jordan, spread; `voigtInverse` in `mtex/tensors/kernels.py`), 141 to 12 ms, NumPy's three passes the fallback and oracle; `export_h5` spent 0.9 of its 1.1 s closing the copy, since ext4 writes a truncated and rewritten file through to the disk, and removes an old file first now, 206 ms (Julia 376, MATLAB 1104, which likely meets the same); `birefringence` restricts the tensor by two matrix products of n rows instead of batched 2 x 3 products, 32 to 22 ms, the rest elementwise passes; `trueebsd_undistort` stays, 106 ms in many small passes and below MATLAB's 157 |
+| P9 | the image searches of the symmetry reduction on one core | 10 to 13 times faster on the thread pool, bit for bit | done, `_overRows` in `mtex/geometry/kernels.py` |
+
+To decide: `loadEBSD(..., dataSet=)` counts from 0 (`mtex/io/h5.py`), MATLAB and Julia from 1.
+
+## 2. MATLAB
+
+| # | what | where |
+|---|---|---|
+| M1 | `calcComponents` leaves its loop when no mode gains at the current step, while that step is still 3.3 degree: 22 modes, some 1 to 16 degree off the peaks, where the ports find 16 | `SO3Fun/@SO3Fun/calcComponents.m` |
+| M2 | the EDAX reader turns an all-zero orientation matrix (a failed pattern) into a rotation and keeps the pixel indexed: 383 pixels of `h5_edax_2datasets` | `interfaces/loadEBSD_h5.m` |
+| M3 | the 3D KAM adds 1e-5 to every angle so that a zero misorientation is kept in the sparse matrix; the 2D KAM may do the same | `EBSDAnalysis/@EBSD3/KAM.m` |
+| M4 | `optimalSample` returns 216 nodes for 200 and 288 for 300, the size of the equispaced grid it starts from | `@SO3Fun/optimalSample.m`, `@S2Fun/optimalSample.m` |
+| M5 | `calcGND` 8.1 s and `calcTaylor` 9.9 s, `taylor_fun` 19 s, nearly all in `linprog`'s interior point solver on one core; the ports' simplex takes milliseconds | `@curvatureTensor/fitDislocationSystems.m`, `calcTaylor.m` |
+| M6 | the kernel sum of an RBF ODF 3.1 s against 7 ms; projecting directions into the sector 755 ms against 7 ms | `@SO3FunRBF/eval.m`, `@vector3d/project2FundamentalRegion.m` |
+
+## 3. Julia
+
+| # | what | numbers |
+|---|---|---|
+| J1 | the kernel sum of an RBF ODF 0.39 off its harmonic form (MATLAB too; Python agrees to 3e-13) | `functions_ops`, the slow variant |
+| J2 | `perimeter` 0.13 and `smoothBoundary` 0.12 off MATLAB, where Python agrees to 1.7e-6 and 1.3e-3 | `maps_ops` |
+| J3 | `velocity` 22 s against 14 ms, `grod` 5.8 s against 60 ms | `tensors_ops`, `maps_ops` |
+| J4 | `calcCluster` of 1e5 directions 13 s against 1.4 s, `classix` of 1e6 points 4.1 s against 0.5 s, `taylor_fun` 6.0 s against 0.57 s, `calcComponents` 5.0 s against 0.76 s, the SO(3) grid 4.2 s against 0.15 s | `cluster.py`, `analysis_ops`, `tensors_ops`, `gridsearch.py` |
+| J6 | after `calcGrains!` the notIndexed pixels a grain absorbs are not in `isIndexed` (58921 of the ferrite map's pixels against 60592 in this port and MATLAB), so `smooth(..., fill = true)` has no hole to fill there and differs from both next to them | `maps_ops`, `smooth_fill_*` |
+| J5 | few of 32 threads busy: L1TV and half quadratic denoising 2 to 5 cores, `project_6mmm` 2.2, and the image searches one core, where the Python thread pool gave 10 to 13 times | `parallel` |
+
+## 4. The benchmarks
+
+- The MATLAB halves of `calcgrains` and `mapplot` still use the bridge of `../frameSymmetry`;
+  they move to `../master`'s, and `geometry.m` and `gridsearch.m` go (written for frameSymmetry, replaced by `geometry_ops`).
+- Halves still missing: Julia for density estimation, `calcODF` and `trueEbsd`; MATLAB
+  (profiled) and Julia for the parent grain reconstruction.
+- Algorithms still missing: the S2 grid `find`, `doEulerStep`, the pole figure and contour
+  plots, the grain area, centroid and moments, the text import with lattice detection.
+- `dubna_density` writes its Python density values once P1 is fixed.
+
+## Order
+
+P1; the open questions; M1 and M2; J3; then the speed items by their gain; then section 4.
+
+## Open questions
+
+### Who is right on the mean and spline filters
+
+`meanFilter` and `splineFilter` (unfilled) agree between Python and Julia to 1e-8 and are more
+than 0.1 degree from MATLAB on 43 to 64 % of the pixels, up to 9.4 degree; `l1TVFilter` and
+`halfQuadraticFilter` agree with MATLAB to 1e-6 degree. Either MATLAB changed its neighbourhood
+or weights on develop, or both ports kept an older one.
+
+### Who is right on the 6/mmm colour key
+
+`ipfHSVKey` colours of 6/mmm are 5.3e-2 to 7.5e-2 from MATLAB's in both ports, m-3m within
+tolerance: a change of the 6/mmm key on develop, or a key both ports share.
+
+### Why MATLAB finds 22 grains fewer on 1C_1
+
+`calcGrains` of the 2.5 million pixel steel map gives 118930 grains in both ports and 118908 in
+MATLAB, the centroids 1.3e-4 apart; MATLAB's boundary vertices sit up to 1e-6 off the lattice.
+
+### Which calcODF and calcDensity are right on the large inputs
+
+`calcODF` of the Dubna pole figures is 1.5e-2 from MATLAB's, `calcDensity` of 1e6 orientations
+7.1e-3 (1e4 agree to 4e-8); Julia has no half for either, which would break the tie.
