@@ -566,6 +566,41 @@ def closestImage(q1, q2, L, R, exchange=False):
   return vals.reshape(shape), out.reshape(shape + (4,))
 
 
+# the chord |p - q| = 2 sin(w/4) of every pair turned into the angle w, accurate over the whole
+# range, of q signed towards p already; the arithmetic of symreduce.chordAngle
+def _chordAngleLoop(p, q, out):
+  for i in range(p.shape[0]):
+    d0, d1, d2, d3 = p[i, 0] - q[i, 0], p[i, 1] - q[i, 1], p[i, 2] - q[i, 2], p[i, 3] - q[i, 3]
+    h = np.sqrt(d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3) / 2
+    if h > 1.0:
+      h = 1.0
+    out[i] = 4 * np.arcsin(h)
+
+
+def closestAngle(q1, q2, L, R, exchange=False):
+  """the disorientation angle of every pair through the image of q2 closest to q1, as
+  chordAngle(q1, closestImage(q1, q2, L, R)[1]) without the images leaving the kernel"""
+  if backend() == "numpy":
+    from .symreduce import chordAngle
+    q1, q2 = np.broadcast_arrays(q1, q2)
+    return chordAngle(q1, closestImage(q1, q2, L, R, exchange)[1])
+  q1, q2 = np.broadcast_arrays(q1, q2)
+  shape = q1.shape[:-1]
+  q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
+  q2 = np.ascontiguousarray(q2, dtype=np.float64).reshape(-1, 4)
+  L, R = np.ascontiguousarray(L, dtype=np.float64), np.ascontiguousarray(R, dtype=np.float64)
+  ang = np.empty(len(q1))
+  k, c, ex = _loop("closestImage", _closestImageLoop), _loop("chordAngle", _chordAngleLoop), bool(exchange)
+
+  def call(a, b):
+    vals, img = np.empty(b - a), np.empty((b - a, 4))
+    k(q1[a:b], q2[a:b], L, R, ex, vals, img)
+    c(q1[a:b], img, ang[a:b])
+
+  _overRows(len(q1), len(q1) * (len(L) * len(R) * (2 if ex else 1) + ROW_COST), call)
+  return ang.reshape(shape)
+
+
 # ------------------------------------------------------------------ the projection onto one reference
 
 # every rotation moved to its equivalent closest to one reference: the image e of the

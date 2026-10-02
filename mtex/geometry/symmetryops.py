@@ -16,8 +16,8 @@ from ._array import MtexArray
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
 
 from .quaternion import qmul, qrot
-from .kernels import closestImage, projectDirections, projectToRef, threads
-from .symreduce import (_conj, bestDot, chordAngle, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
+from .kernels import closestAngle, closestImage, projectDirections, projectToRef, threads
+from .symreduce import (_conj, bestDot, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
                         symReduce, uniqueRotations)
 from .vector3d import _isCrystalFrame, vector3d
 
@@ -217,15 +217,14 @@ def orientationAngle(a, b):
   """the disorientation angle of pairs, through the closest equivalent for accuracy near zero"""
   a, b = fitOrientations(a, b)
   L, R = reductionGroupsPair(a, b)
-  q1, q2 = np.broadcast_arrays(a.data, b.data)
-  return chordAngle(q1, closestImage(q1, q2, L, R, _exchange(a, b))[1])
+  return closestAngle(a.data, b.data, L, R, _exchange(a, b))
 
 
 def orientationSelfAngle(o):
   """the rotational angle of an orientation reduced over its own groups: the smallest angle
   among its equivalents, the distance to the identity"""
   L, R = reductionGroups(o)
-  return chordAngle(_ID, closestImage(_ID, o.data, L, R, o.antipodal)[1])
+  return closestAngle(_ID, o.data, L, R, o.antipodal)
 
 
 def projectIntoFundamentalRegionOrientation(o, ref=None):

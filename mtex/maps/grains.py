@@ -210,9 +210,16 @@ class grain2d(polygonSet):
       bwd = ab & np.isin(b, self.id) & np.isin(a, other)
       return np.unique(np.concatenate([g[fwd], g[bwd][:, ::-1]]), axis=0)
     ok = (a > 0) & (b > 0) & (a != b)
-    ina, inb = np.isin(a, self.id), np.isin(b, self.id)
+    # the selection as a table over the ids, the pairs as one key each: the unique keys are
+    # the unique sorted rows in their order
+    M = int(max(g.max(initial=0), self.id.max(initial=0))) + 1
+    sel = np.zeros(M, dtype=bool)
+    sel[self.id] = True
+    ina, inb = sel[a], sel[b]
     ok &= (ina | inb) if full else (ina & inb)
-    pairs = np.unique(np.sort(g[ok], axis=1), axis=0)
+    lo, hi = np.minimum(a[ok], b[ok]).astype(np.int64), np.maximum(a[ok], b[ok]).astype(np.int64)
+    key = np.unique(lo * M + hi)
+    pairs = np.stack([key // M, key % M], axis=1).astype(g.dtype)
     if not matrix:
       return pairs
     from scipy.sparse import coo_matrix

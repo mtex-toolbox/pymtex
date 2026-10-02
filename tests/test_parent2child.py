@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from mtex import Miller, calcParent, calcParent2Child, calcVariantId, crystalFrame, degree, orientation, rotation, round2Miller, vector3d
-from mtex.geometry.parent2child import _best, _childToChild, _nearestC2C, allHKL, misfit
+from mtex.geometry.parent2child import _best, _childToChild, _nearestC2C, _nearestVariant, allHKL, misfit
 from mtex.geometry.quaternion import qmul
 
 csP = crystalFrame("432", [3.66, 3.66, 3.66], mineral="fcc")
@@ -136,6 +136,13 @@ def test_calcVariantId_recognisesEveryChildWithItsVariant(kids):
   # one based as MATLAB counts from the parent's representative in the fundamental region
   r = calcVariantId(kids["parent"], kids["child"], kids["p2c"])
   assert np.array_equal(r.variantId, kids["ids"]) and np.max(r.fit) < 0.5 * degree
+
+
+def test_calcVariantId_nearestVariantIsTheArgminOverTheTableOfAngles(kids):
+  p2c, parent, child = kids["p2c"], kids["parent"], kids["child"]
+  a = p2c.variants(parent).reshape(child.size, -1).angle(child.reshape(-1, 1))
+  k, fit = _nearestVariant(parent, child, p2c)
+  assert np.array_equal(k, np.argmin(a, axis=1)) and np.allclose(fit, np.min(a, axis=1), atol=1e-12)
 
 
 def test_calcVariantId_packetAndBainIdsInRange(kids):

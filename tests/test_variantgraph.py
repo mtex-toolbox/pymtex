@@ -87,6 +87,22 @@ def test_mclExpand_isScipysProductInflatedAndPrunedBitForBit():
   assert np.array_equal(E.indptr, S.indptr) and np.array_equal(E.indices, S.indices) and np.array_equal(E.data, S.data)
 
 
+def test_variantPairs_areTheDenseTableAboveOneTenthInChunks():
+  from mtex.geometry.kernels import variantAngles
+  from mtex.geometry.quaternion import qmul
+  from mtex.maps.reconstruction import probabilityOf
+  from mtex.maps.variantgraph import _variantPairs
+  rng = np.random.default_rng(6)
+  PV = P2C.variants(parent=True).data.reshape(-1, 4)
+  G = P2C.CS.sym.properGroup().rotations().data.reshape(-1, 4)
+  V = P2C.variants().data.reshape(-1, 4)
+  m = qmul(V[rng.integers(0, 24, 300)] * [1, -1, -1, -1], V[rng.integers(0, 24, 300)])
+  prob = probabilityOf(variantAngles(m, PV, G), 3.5 * degree, 3.5 * degree)
+  p, k1, k2 = np.nonzero(prob > 0.1)
+  got = _variantPairs(m, PV, G, 3.5 * degree, 3.5 * degree, chunk=64)
+  assert all(np.array_equal(x, y) for x, y in zip(got, (p, k1, k2, prob[p, k1, k2])))
+
+
 def test_the_grain_graph_route(plain):
   e, g = plain
   job = parentGrainReconstructor(e, g, P2C)

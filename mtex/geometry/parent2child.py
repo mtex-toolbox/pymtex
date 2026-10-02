@@ -26,9 +26,10 @@ import numpy as np
 from .frames import crystalFrame, specimenFrame
 from .miller import Miller
 from .orientation import orientation
-from .kernels import threads, variantAngles
+from .kernels import bestDot, threads, variantAngles
 from .quaternion import qmul, quaternion, rotation
-from .symreduce import reductionGroups, symReduce
+from .symmetryops import projectIntoFundamentalRegionOrientation
+from .symreduce import chordAngle, reductionGroups, symReduce
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
 from .display import aligned
@@ -254,6 +255,25 @@ def bainPlanes(CS):
   return Miller([[0, 0, 1], [1, 0, 0], [0, 1, 0]], CS)
 
 
+# the variant of every child nearest it and the angle: the child c of the parent P is closest
+# to the variant k where m = inv(P) c is closest to an image inv(V_k) inv(r) over the child
+# group, the chord being the same; the images in the order of the variants, so that the first
+# variant wins a tie as the argmin over the variants did. A specimen group or another child
+# frame takes the table of all the angles
+def _nearestVariant(parentOri, childOri, p2c):
+  L, R = reductionGroups(childOri)
+  if len(L) > 1 or childOri.antipodal or childOri.frameA is not p2c.frameB or childOri.frameB is not parentOri.frameB:
+    a = p2c.variants(parentOri).reshape(childOri.size, -1).angle(childOri.reshape(-1, 1))
+    variantId = np.argmin(a, axis=1)
+    return variantId, a[np.arange(len(a)), variantId]
+  par = projectIntoFundamentalRegionOrientation(parentOri).data.reshape(-1, 4)
+  m = qmul(_conj(par), childOri.data.reshape(-1, 4))
+  V = p2c.variants().data.reshape(-1, 4)
+  es = qmul(_conj(V)[:, None], _conj(R)[None, :]).reshape(-1, 4)
+  k = bestDot(m, es)[1]
+  return k // len(R), chordAngle(m, es[k])
+
+
 def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):
   """variantId, packetId, bainId, fit = calcVariantId(parentOri, childOri, p2c)
 
@@ -269,10 +289,7 @@ def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):
     parentOri = parentOri._new(np.broadcast_to(parentOri.data.reshape(1, 4), (childOri.size, 4)).copy())
   if parentOri.size != childOri.size:
     raise ValueError("one parent per child orientation")
-  cv = p2c.variants(parentOri)
-  a = cv.reshape(childOri.size, -1).angle(childOri.reshape(-1, 1))
-  variantId = np.argmin(a, axis=1)
-  fit = a[np.arange(len(a)), variantId]
+  variantId, fit = _nearestVariant(parentOri, childOri, p2c)
   h1, h2 = packet if packet is not None else (packetPlanes(p2c.frameA), Miller(1, 0, 1, p2c.frameB))
   packetId = _familyId(p2c, h1, h2)[variantId]
   h1, h2 = bain if bain is not None else (bainPlanes(p2c.frameA), Miller(1, 0, 0, p2c.frameB))

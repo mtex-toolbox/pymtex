@@ -10,6 +10,7 @@ import pytest
 import mtex
 from mtex import crystalFrame, orientation, rotation, setMTEXpref, vector3d
 from mtex.geometry import kernels
+from mtex.geometry.symreduce import chordAngle
 from mtex.geometry.kernels import (_bestDotNumpy, _closestImageNumpy, _projectDirectionsNumpy, _projectToRefNumpy, _qmulNumpy,
                                    _qrotNumpy, _symReduceNumpy)
 from mtex.geometry.orientationregion import commonAxisCenter, commonRotations
@@ -201,3 +202,14 @@ def test_region_membership_agrees_with_numpy(numbaBackend):
   keep, near = kernels.regionMembership(q, NB, 4, 1e-3, 0.03)
   k0, n0 = _regionMembershipNumpy(q, NB, 4, 1e-3, 0.03)
   assert np.array_equal(keep, k0) and np.array_equal(near, n0) and keep.any() and near.any() and not near.all()
+
+
+def test_closestAngle_isTheChordAngleOfTheClosestImage():
+  rng = np.random.default_rng(5)
+  q1, q2 = rng.standard_normal((2, 3000, 4))
+  q1, q2 = q1 / np.linalg.norm(q1, axis=1, keepdims=True), q2 / np.linalg.norm(q2, axis=1, keepdims=True)
+  q1[:3] = np.nan
+  L = crystalFrame("432").rotations().data.reshape(-1, 4)
+  R = crystalFrame("622").rotations().data.reshape(-1, 4)
+  ref = chordAngle(q1, kernels.closestImage(q1, q2, L, R, True)[1])
+  assert np.array_equal(kernels.closestAngle(q1, q2, L, R, True), ref, equal_nan=True)

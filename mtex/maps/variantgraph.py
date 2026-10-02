@@ -234,6 +234,23 @@ def _variantAngles(job, PV):
   return np.asarray(o.reshape(-1, 1).angle(o.reshape(1, -1)))
 
 
+# the variant pairs (k1, k2) of every child to child misorientation whose probability exceeds
+# 0.1, with it, in chunks of misorientations: the table of the variant angles of one chunk at a
+# time, the probability only of the angles below the one where it is 0.1, with a margin
+def _variantPairs(m, PV, G, threshold, tol, chunk=1 << 15):
+  from scipy.special import erfinv
+  limit = threshold + tol / 2 * float(erfinv(0.8)) + 1e-9
+  out = [], [], [], []
+  for s0 in range(0, len(m), chunk):
+    a = variantAngles(m[s0:s0 + chunk], PV, G)
+    p, k1, k2 = np.nonzero(a < limit)
+    v = probabilityOf(a[p, k1, k2], threshold, tol)
+    ok = v > 0.1
+    for lst, x in zip(out, (p[ok] + s0, k1[ok], k2[ok], v[ok])):
+      lst.append(x)
+  return tuple(np.concatenate(x) if x else np.zeros(0, dtype=int) for x in out)
+
+
 def _layout(job, numV):
   width = numV * job.isChild + job.isParent
   first = np.concatenate([[0], np.cumsum(width)])
@@ -281,9 +298,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
     if len(pr):
       i1, i2 = first[pos[pr[:, 0]]], first[pos[pr[:, 1]]]
       m = qmul(_conj(o1.data.reshape(-1, 4)), o2.data.reshape(-1, 4))
-      prob = probabilityOf(variantAngles(m, PV, job.csParent.sym.properGroup().rotations().data.reshape(-1, 4)), threshold, tol)
-      p, k1, k2 = np.nonzero(prob > 0.1)
-      v = prob[p, k1, k2]
+      p, k1, k2, v = _variantPairs(m, PV, job.csParent.sym.properGroup().rotations().data.reshape(-1, 4), threshold, tol)
       # the variants merged into one node add up, as MATLAB's sparse does
       G = G.maximum(both(i1[p] + friend[k1], i2[p] + friend[k2], v))
   if job.votes is not None and len(job.votes) == g.size:

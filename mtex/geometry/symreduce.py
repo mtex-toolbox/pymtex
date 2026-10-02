@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .kernels import bestDot, closestImage, symReduce
+from .kernels import bestDot, closestAngle, closestImage, symReduce
 from .quaternion import qmul
 
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
@@ -98,8 +98,7 @@ def symAngles(qs, ref, L, R, exchange=False):
 
 def symPairAngles(q1, q2, L, R, exchange=False):
   """the disorientation angle of each pair, through the closest image for accuracy near zero"""
-  q1, q2 = np.broadcast_arrays(q1, q2)
-  return chordAngle(q1, closestImage(q1, q2, L, R, exchange)[1])
+  return closestAngle(q1, q2, L, R, exchange)
 
 
 def closestToRef(qs, ref, L, R, exchange=False):
