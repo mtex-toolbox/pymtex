@@ -69,6 +69,14 @@ def test_inv_ofManyTensorsIsCompiledAsNumpysVoigtInverse():
   assert np.allclose(S.data, Sn.data, rtol=1e-12, atol=0) and np.allclose(T.data, Tn.data, rtol=1e-12, atol=1e-12)
 
 
+def test_inv_ofManySingularTensorsRaisesAsOfOne():
+  # a singular Voigt matrix is refused in a list as it is alone
+  M = np.zeros((6, 6))
+  M[:3, :3] = 1.0
+  with pytest.raises(np.linalg.LinAlgError):
+    inv(stiffnessTensor(np.stack([np.eye(6), M])))
+
+
 def test_tensor_readsItsRankOffTheShapeOrTakesItAsGiven():
   # a plain tensor reads its rank off the shape or takes it as given
   assert tensor(np.ones((3, 3))).rank == 2 and tensor(np.ones((3, 3, 3))).rank == 3 and tensor(np.ones((5, 3, 3)), rank=2).shape == (5,)

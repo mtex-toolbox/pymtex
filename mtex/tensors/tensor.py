@@ -400,7 +400,8 @@ class tensor(MtexArray):
       out = self._as(cls, _flatten(np.linalg.inv(self.M), 2))
     elif self.rank == 4:
       double = cls._double if cls is not tensor else not self.doubleConvention
-      # one compiled loop over the tensors gathers, inverts and spreads; NumPy's three passes without numba
+      # one compiled loop over the tensors gathers, inverts and spreads; NumPy's three passes without
+      # numba or for a singular one, which they refuse
       D = voigtInverse(self.data, VOIGT, _voigtWeights(self.doubleConvention), _voigtWeights(double)) if self.size > 1 else None
       if D is None:
         D = _flatten(_fromVoigt(np.linalg.inv(Voigt(self)), 4, _voigtWeights(double)), 4)

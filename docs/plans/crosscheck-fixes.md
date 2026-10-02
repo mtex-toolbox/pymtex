@@ -4,7 +4,7 @@ Status: written 2026-10-02 from the runs of every cross benchmark (`bench/*_ops.
 `dubna_density`, `calcgrains` and the standalone ones) against MATLAB `../master` at
 feature/fastHarmonicTransforms (34df8425a) and the Julia port at `main`, with the cores each case
 kept busy (`tools/graph/query.py parallel`). The Python findings are issue #1 of
-mtex-toolbox/pymtex. The MATLAB fixes go into develop through the worktree `~/mtex/mtexDevelop`,
+mtex-toolbox/pymtex. The MATLAB fixes go into develop, checked out in `../master`,
 as `develop-fixes.md` does; the Julia ones into `../mtexJulia`. Every number below is a
 `compare` line or a `parallel` row of that run.
 
