@@ -156,7 +156,7 @@ densityRange
 peakCountPerHalfTurn = len(find_peaks(fibreDensity, prominence=1)[0]) / 2
 peakCountPerHalfTurn
 
-# A fibre texture would give a flat line. This one swings between 5.5 and 19.6 multiples
+# A fibre texture would give a flat line. This one swings between 5.4 and 19.4 multiples
 # of a uniform distribution, a factor of three and a half. Three peaks rise by at least
 # 1 mrd in every half turn. Together with the 28% fibre fraction, this settles the
 # question: the map does not show a fibre texture. It contains a few strong components
@@ -193,6 +193,14 @@ plot(odf, 'sigma')
 # * [ISO 24173:2024](https://www.iso.org/standard/82749.html), _Microbeam analysis -
 #   Guidelines for orientation measurement using electron backscatter diffraction_, gives
 #   guidance for reliable and reproducible EBSD orientation measurements.
+#
+# ## Technical Details
+#
+# The ODF of more than $2L^3$ orientations, $L$ the bandwidth of its kernel, is computed
+# from the orientations rounded onto a grid, where MATLAB's threshold is $10L^3$. The
+# 152345 orientations of this map lie between the two, so MATLAB sums them exactly and its
+# fibre profile runs between 5.52 and 19.64 mrd, about 3 percent higher at the minimum;
+# the peaks and the conclusion are the same.
 
 # ## Next
 #
