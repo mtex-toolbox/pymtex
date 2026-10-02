@@ -26,9 +26,9 @@ import numpy as np
 from .frames import crystalFrame, specimenFrame
 from .miller import Miller
 from .orientation import orientation
-from .kernels import variantAngles
+from .kernels import threads, variantAngles
 from .quaternion import qmul, quaternion, rotation
-from .symreduce import reductionGroups
+from .symreduce import reductionGroups, symReduce
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
 from .display import aligned
@@ -51,9 +51,28 @@ def _childToChild(p2c):
   return V[keep], c2c[keep]
 
 
-# the angle of every row to every column, both lists reduced over their groups
-def _angleOuter(a, b):
-  return a.reshape(a.size, 1).angle(b.reshape(1, b.size))
+# the nearest c_k of every misorientation and the angle to it, reduced over the groups: the
+# images l c_k r in a k-d tree over the double cover, whose Euclidean distance is the chord
+# 2 sin(w/4); the c_k equivalent under the groups share their images, and the first of them
+# names them. A non finite misorientation gets the first and no angle
+def _nearestC2C(mori, c2c):
+  from scipy.spatial import cKDTree
+  L, R = reductionGroups(c2c)
+  ex = mori.antipodal or c2c.antipodal
+  c = c2c.data.reshape(-1, 4)
+  first = np.argmax(symReduce(c[:, None], c[None, :], L, R, ex)[0] > 1 - 1e-9, axis=1)
+  reps = np.flatnonzero(first == np.arange(len(c)))
+  refs = np.concatenate([c[reps], _conj(c[reps])]) if ex else c[reps]
+  es = qmul(qmul(L[:, None, None], refs[None, :, None]), R[None, None, :])
+  label = np.broadcast_to(np.tile(reps, 2 if ex else 1)[None, :, None], es.shape[:-1]).reshape(-1)
+  es = es.reshape(-1, 4)
+  q = mori.data.reshape(-1, 4)
+  ok = np.isfinite(q).all(axis=1)
+  d, i = cKDTree(np.concatenate([es, -es])).query(q[ok], workers=threads())
+  variant, omega = np.zeros(len(q), dtype=np.int64), np.full(len(q), np.nan)
+  variant[ok] = label[i % len(es)]
+  omega[ok] = 4 * np.arcsin(np.minimum(d / 2, 1.0))
+  return variant, omega
 
 
 # the residual of every misorientation: the nearest c_k, its angle, the chordal residual
@@ -61,9 +80,7 @@ def _angleOuter(a, b):
 # independent; a non finite angle counts as the worst residual
 def _misfit(mori, p2c, h, tau):
   V, c2c = _childToChild(p2c)
-  a = _angleOuter(mori, c2c)
-  variant = np.argmin(np.where(np.isfinite(a), a, np.inf), axis=1)
-  omega = a[np.arange(len(a)), variant]
+  variant, omega = _nearestC2C(mori, c2c)
   r = np.where(np.isfinite(omega), np.minimum(1 - np.cos(omega), tau), tau)
   rs = np.sort(r)
   ind = r <= rs[min(h, len(rs)) - 1]
@@ -371,15 +388,22 @@ def _stripChild(o):
 
 # the best fits of every row as one based ids into the variant table, and the values; a row
 # of several variants is laid out with the first running fastest, which is how MATLAB
-# breaks ties between fits
+# breaks ties between fits. The best few of finite rows are taken one at a time, the first
+# minimum on a tie as in the stable sort, which a row of thousands of variant triples does not need
 def _best(fit, numFit, dims):
   if numFit == 1:
     k = np.argmin(fit, axis=1)
     value = fit[np.arange(len(fit)), k]
+  elif numFit >= fit.shape[1] or not np.isfinite(fit).all():
+    k = np.argsort(fit, axis=1, kind="stable")[:, :numFit]
+    value = np.take_along_axis(fit, k, axis=1)
   else:
-    order = np.argsort(fit, axis=1, kind="stable")[:, :numFit]
-    value = np.take_along_axis(fit, order, axis=1)
-    k = order
+    rest, rows, ks = fit.copy(), np.arange(len(fit)), []
+    for _ in range(numFit):
+      ks.append(np.argmin(rest, axis=1))
+      rest[rows, ks[-1]] = np.inf
+    k = np.stack(ks, axis=1)
+    value = np.take_along_axis(fit, k, axis=1)
   ids = np.stack(np.unravel_index(k, dims, order="F"), axis=-1) + 1
   return (ids[..., 0] if len(dims) == 1 else ids), value
 

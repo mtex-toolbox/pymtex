@@ -240,15 +240,20 @@ class symmetry:
     """the number of proper rotations of the group"""
     return int(np.sum(~self.rot.isImproper))
 
+  # a group is not changed once built, so what it is is read once, on first use
   @property
   def isProper(self):
     """whether the group holds proper rotations only"""
-    return not np.any(self.rot.isImproper)
+    if "_isProper" not in self.__dict__:
+      self._isProper = not np.any(self.rot.isImproper)
+    return self._isProper
 
   @property
   def isLaue(self):
     """whether the group contains the inversion"""
-    return rotation.inversion in self
+    if "_isLaue" not in self.__dict__:
+      self._isLaue = rotation.inversion in self
+    return self._isLaue
 
   # an element is in the group when the group holds it up to a small angle with its parity
   def __contains__(self, e):

@@ -215,9 +215,18 @@ class referenceFrame:
     """this frame with another group in it, from the register"""
     if s == self.sym:
       return self
+    # a named group is the same group by its symbol, so the register answers once for it and a
+    # registered frame
+    key = (self, s._symbol) if s._symbol and self._sealed else None
+    hit = SESSION.siblings.get(key)
+    if hit is not None:
+      return hit
     fr = self.clone()
     fr._sym = s
-    return referenceFrame.intern(fr)
+    fr = referenceFrame.intern(fr)
+    if key is not None:
+      SESSION.siblings[key] = fr
+    return fr
 
   def clone(self):
     """an unsealed copy of the frame, not registered"""
@@ -229,7 +238,7 @@ class referenceFrame:
 
   def stripSym(self):
     """the sibling frame carrying the trivial group"""
-    return self.sibling(symmetry())
+    return self.sibling(_trivialGroup())
 
   def Laue(self):
     """the sibling frame carrying the Laue group, the group with the inversion added"""
@@ -406,6 +415,7 @@ class referenceFrame:
     """empties the frame register, the named frames and the default frame of the session"""
     SESSION.frames.clear()
     SESSION.namedFrames.clear()
+    SESSION.siblings.clear()
     SESSION.defaultFrame = None
 
   # ------------------------------------------------------------------ display
@@ -476,6 +486,16 @@ def _rebuildFrame(cls, state):
   if r is fr:
     fr.__dict__["_registered"] = fr
   return r
+
+
+# the trivial group, built once: a group is not changed once built
+_TRIVIAL = []
+
+
+def _trivialGroup():
+  if not _TRIVIAL:
+    _TRIVIAL.append(symmetry())
+  return _TRIVIAL[0]
 
 
 # two frames are the same entity, the register key of ADR 0008: kind, name, group, cell

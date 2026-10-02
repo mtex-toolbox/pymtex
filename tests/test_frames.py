@@ -327,6 +327,13 @@ def test_reset_restoresThePristineState():
   assert specimenFrame.rolling is not sF and specimenFrame.rolling.how2plot == plottingConvention("y←↑x")
 
 
+def test_stripSym_afterAResetComesFromTheNewRegister():
+  stripSym(crystalFrame("432", [3.6, 3.6, 3.6], mineral="gamma"))
+  mtex.reset()
+  t = stripSym(crystalFrame("432", [3.6, 3.6, 3.6], mineral="gamma"))
+  assert any(r is t for r in mtex.geometry.session.SESSION.frames)
+
+
 def test_specimenFrame_refusesACrystalFrame():
   with pytest.raises(ValueError):
     specimenFrame(crystalFrame("m-3m"))

@@ -1458,6 +1458,76 @@ def _scanSitesLoop(nr, nc, r0, c0, b00, b01, b10, b11, s, ij):
   return i0, j0
 
 
+# ------------------------------------------------------------------ the expansion of the clustering
+
+# rows a:b of the Markov clustering step A A, every entry raised to the power p and dropped at
+# or below cut: the products summed in a dense accumulator in the order of the rows of A, the
+# columns of a row written in the reverse order they were first touched, which is the order
+# and the sums of scipy's product; the buffers grow by doubling
+def _mclExpandLoop(ptr, idx, val, a, b, p, cut):
+  n = ptr.shape[0] - 1
+  acc = np.zeros(n)
+  seen = np.full(n, -1, dtype=np.int64)
+  cols = np.empty(n, dtype=np.int64)
+  rowNnz = np.zeros(b - a, dtype=np.int64)
+  cap = max(16, 4 * (ptr[b] - ptr[a]))
+  outIdx = np.empty(cap, dtype=np.int32)
+  outVal = np.empty(cap)
+  m = 0
+  for i in range(a, b):
+    length = 0
+    for jj in range(ptr[i], ptr[i + 1]):
+      j, v = idx[jj], val[jj]
+      for kk in range(ptr[j], ptr[j + 1]):
+        k = idx[kk]
+        if seen[k] != i:
+          seen[k] = i
+          cols[length] = k
+          length += 1
+          acc[k] = 0.0
+        acc[k] += v * val[kk]
+    if m + length > cap:
+      cap = max(2 * cap, m + length)
+      grownIdx, grownVal = np.empty(cap, dtype=np.int32), np.empty(cap)
+      grownIdx[:m], grownVal[:m] = outIdx[:m], outVal[:m]
+      outIdx, outVal = grownIdx, grownVal
+    start = m
+    for t in range(length - 1, -1, -1):
+      k = cols[t]
+      w = acc[k] ** p
+      if w > cut and w != 0.0:
+        outIdx[m] = k
+        outVal[m] = w
+        m += 1
+    rowNnz[i - a] = m - start
+  return rowNnz, outIdx[:m], outVal[:m]
+
+
+def mclExpandNumba(A, p, cut):
+  """the expansion and inflation of a Markov clustering step, A A with every entry raised to the
+  power p and those at or below cut dropped, as a CSR matrix over the threads of the preference;
+  None without numba"""
+  from scipy import sparse
+
+  from ..geometry.kernels import ROW_COST, _overRows, backend
+  if backend() != "numba":
+    return None
+  if "mclExpand" not in _COMPILED:
+    _COMPILED["mclExpand"] = _jit().njit(cache=True, nogil=True)(_mclExpandLoop)
+  loop = _COMPILED["mclExpand"]
+  A = A.tocsr()
+  n = A.shape[0]
+  ptr = np.ascontiguousarray(A.indptr, dtype=np.int64)
+  idx = np.ascontiguousarray(A.indices, dtype=np.int64)
+  val = np.ascontiguousarray(A.data, dtype=np.float64)
+  parts = {}
+  _overRows(n, n * ROW_COST + A.nnz * ROW_COST, lambda a, b: parts.__setitem__(a, loop(ptr, idx, val, a, b, float(p), float(cut))))
+  parts = [parts[a] for a in sorted(parts)]
+  rowNnz = np.concatenate([q[0] for q in parts])
+  indptr = np.concatenate([[0], np.cumsum(rowNnz)])
+  return sparse.csr_matrix((np.concatenate([q[2] for q in parts]), np.concatenate([q[1] for q in parts]), indptr), shape=A.shape)
+
+
 _GRID_LOOPS = {"rowOrder": _rowOrderLoop, "scanCells": _scanCellsLoop, "scanSites": _scanSitesLoop}
 
 

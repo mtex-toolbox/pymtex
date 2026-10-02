@@ -39,6 +39,7 @@ class Session:
     frame minted again on first use; data objects keep the handles they hold"""
     self.prefs = dict(_DEFAULT_PREFS)
     self.frames = []            # the register, one handle per key
+    self.siblings = {}          # the register's answer for a frame and a named group
     self.namedFrames = {}       # the named specimen frames, by name
     self.defaultFrame = None    # the specimen frame supplying the default plotting convention
     self.mintDefaultFrame = None   # set by frames.py: how a fresh default frame is made

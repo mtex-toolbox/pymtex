@@ -24,7 +24,7 @@ in the other notes of this directory.
 | text import, lattice detection | numba row parser in `io/kernels.py` | done (`benchmark-io.md`) |
 | decomposition clipping, segmentation, boundary tracing, KAM, GROD, GND simplex | numba in `maps/kernels.py` | done (`benchmark-decomposition.md`, `benchmark-maps.md`) |
 | variational denoising | numba loops | done, not timed against Julia |
-| parent grain reconstruction | the vote table and the variant graph (`maps/reconstruction.py`, `maps/variantgraph.py`) | untimed |
+| parent grain reconstruction | the vote table and the variant graph (`maps/reconstruction.py`, `maps/variantgraph.py`), the misfit by a k-d tree, the MCL expansion in `maps/kernels.py` | every step ahead of MATLAB, 3 to 9 times (`benchmark-reconstruction.md`) |
 | plotting: IPF colours, map raster, PNG | the grid route as a numba kernel in `plotting/kernels.py`, the aligned raster by rounding, the byte image capped at the axes' pixels | at Julia's time for the colours, plot within two of Julia, ten times ahead of MATLAB (`benchmark-mapplot.md`) |
 | plotting: spherical contours, pole figures | matplotlib | untimed |
 
@@ -45,7 +45,7 @@ in the other notes of this directory.
 - [ ] `calcCluster(..., method='hierarchical')` above 1000 orientations without the grid
   binning, through the k-d tree.
 - [ ] the parent grain reconstruction of M9 with its variant graph search, timed against
-  Julia.
+  Julia; against MATLAB done 2026-10-02 (`benchmark-reconstruction.md`).
 - [x] the map plot in three steps measured in `benchmark-mapplot.md`, done 2026-09-22, 2.6 s
   to 0.86 s on four million points: the grid route of `ipfColors` as one numba kernel over
   the quaternions (1.05 s to 0.2 s); the picture of an aligned lattice read off the lattice

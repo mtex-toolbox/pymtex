@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from mtex import Miller, calcParent, calcParent2Child, calcVariantId, crystalFrame, degree, orientation, rotation, round2Miller, vector3d
-from mtex.geometry.parent2child import allHKL, misfit
+from mtex.geometry.parent2child import _best, _childToChild, _nearestC2C, allHKL, misfit
 from mtex.geometry.quaternion import qmul
 
 csP = crystalFrame("432", [3.66, 3.66, 3.66], mineral="fcc")
@@ -62,6 +62,20 @@ def test_misfit_mostWithinTheNoise(ks):
   # the misfit of every misorientation against the result, most within the noise
   fit = misfit(ks["mori"], ks["p"])
   assert len(fit) == ks["mori"].size and np.quantile(fit, 0.75) < 3 * degree
+
+
+def test_misfit_isTheSmallestReducedAngleToAChildToChildMisorientation(ks):
+  _, c2c = _childToChild(ks["p"])
+  a = np.asarray(ks["mori"].reshape(-1, 1).angle(c2c.reshape(1, -1)))
+  variant, omega = _nearestC2C(ks["mori"], c2c)
+  assert np.allclose(omega, a.min(axis=1), atol=1e-12) and np.allclose(a[np.arange(len(a)), variant], omega, atol=1e-12)
+
+
+def test_best_takesTheBestFewInTheOrderOfTheStableSort():
+  fit = np.random.default_rng(3).integers(0, 5, (50, 30)).astype(float)
+  ids, value = _best(fit, 3, (30,))
+  order = np.argsort(fit, axis=1, kind="stable")[:, :3]
+  assert np.array_equal(ids, order + 1) and np.array_equal(value, np.take_along_axis(fit, order, axis=1))
 
 
 def test_calcParent2Child_subsampledFitAgreesAndGivesEveryMisfit(ks):

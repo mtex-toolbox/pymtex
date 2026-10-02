@@ -6,6 +6,7 @@ import pytest
 from scipy.sparse import csr_matrix
 
 from mtex import calcGrains, degree, parentGrainReconstructor
+from mtex.maps.kernels import mclExpandNumba
 from mtex.maps.variantgraph import mclComponents
 from test_reconstruction import P2C, fitsParent, martensiteMap
 
@@ -72,6 +73,18 @@ def test_MCL_splits_two_cliques():
   A[2, 3] = A[3, 2] = 0.05
   M = mclComponents(csr_matrix(A), 1.6).toarray()
   assert np.all(M[:3, 3:] < 1e-3) and np.all(M[3:, :3] < 1e-3)
+
+
+def test_mclExpand_isScipysProductInflatedAndPrunedBitForBit():
+  rng = np.random.default_rng(4)
+  n, m = 3000, 20000
+  A = csr_matrix((rng.random(m) * 0.3, (rng.integers(0, n, m), rng.integers(0, n, m) // 3)), shape=(n, n))
+  S = (A @ A).tocsr()
+  S.data = S.data ** 1.05
+  S.data[S.data <= 1e-4] = 0
+  S.eliminate_zeros()
+  E = mclExpandNumba(A, 1.05, 1e-4)
+  assert np.array_equal(E.indptr, S.indptr) and np.array_equal(E.indices, S.indices) and np.array_equal(E.data, S.data)
 
 
 def test_the_grain_graph_route(plain):

@@ -20,6 +20,7 @@ from ..geometry.kernels import variantAngles
 from ..geometry.parent2child import calcParent
 from ..geometry.quaternion import qmul
 from ..geometry.units import degree
+from .kernels import mclExpandNumba
 from .reconstruction import _ori, _quantile, parentGrainReconstructor, probabilityOf, voteTable
 from ..geometry.install import install
 
@@ -342,14 +343,22 @@ def clusterVariantGraph(job, inflationPower=1.05, numIter=10, cutOff=1e-4, minCl
     A.eliminate_zeros()
     return A
 
-  A = normalize(A)
-  for _ in range(numIter):
+  # the expansion A A with the inflation and the pruning, compiled, or by scipy
+  def expand(A):
+    E = mclExpandNumba(A, inflationPower, cutOff)
+    if E is not None:
+      return E
     A = (A @ A).tocsr()
-    if not pseudoDiagonal:
-      A = dropPseudoDiagonal(A)
     A.data = A.data ** inflationPower
     A.data[A.data <= cutOff] = 0
     A.eliminate_zeros()
+    return A
+
+  A = normalize(A)
+  for _ in range(numIter):
+    A = expand(A)
+    if not pseudoDiagonal:
+      A = dropPseudoDiagonal(A)
     if sym:
       A = normalize(A.T.multiply(A).sqrt().tocsr())
     A = normalize(A)

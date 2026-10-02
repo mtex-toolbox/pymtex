@@ -155,17 +155,7 @@ def variants(p2c, second=None, ids=None, parent=False):
   if isinstance(ids, str):
     parent, ids = ids == "parent", None
   if second is None:
-    if parent:
-      G = mtexEnumeration(p2c.frameB.sym)
-      cand = p2c._new(qmul(G, p2c.data[None]))
-      keep = _distinctModulo(cand, "right")
-    else:
-      G = mtexEnumeration(p2c.frameA.sym)
-      if len(G) == 24:
-        G = G[KS_ORDER - 1]
-      cand = p2c._new(qmul(p2c.data[None], G))
-      keep = _distinctModulo(cand, "left")
-    return cand[keep]
+    return p2c._new(_variantData(p2c, parent).copy())
   # variants(p2c, odf): the child texture, by the function spaces above this layer
   if not isinstance(second, orientation) and hasattr(second, "eval"):
     from ..functions.funops import transformODF
@@ -211,16 +201,42 @@ def mtexEnumeration(sym):
   return G
 
 
+# the variants of a relationship by its rotation, its frames and the side, computed once: a
+# reconstruction asks for them once per grain
+_VARIANTS = {}
+
+
+def _variantData(p2c, parent):
+  key = (p2c.data.tobytes(), p2c.frameA, p2c.frameB, bool(parent))
+  if key not in _VARIANTS:
+    if len(_VARIANTS) >= 64:
+      _VARIANTS.clear()
+    if parent:
+      G = mtexEnumeration(p2c.frameB.sym)
+      cand = p2c._new(qmul(G, p2c.data[None]))
+      keep = _distinctModulo(cand, "right")
+    else:
+      G = mtexEnumeration(p2c.frameA.sym)
+      if len(G) == 24:
+        G = G[KS_ORDER - 1]
+      cand = p2c._new(qmul(p2c.data[None], G))
+      keep = _distinctModulo(cand, "left")
+    _VARIANTS[key] = cand.data[keep]
+  return _VARIANTS[key]
+
+
+# the candidates distinct modulo the group of one side, the first of every class kept
 def _distinctModulo(cand, side):
   L, R = reductionGroups(cand)
   one = np.array([[1.0, 0, 0, 0]])
   L, R = (L, one) if side == "left" else (one, R)
-  q = cand.data
-  keep = []
+  q = cand.data.reshape(-1, 4)
+  same = symReduce(q[:, None], q[None, :], L, R)[0] > 1 - 1e-4
+  keep = np.ones(len(q), dtype=bool)
   for k in range(len(q)):
-    if not any(symReduce(q[j], q[k], L, R)[0] > 1 - 1e-4 for j in keep):
-      keep.append(k)
-  return keep
+    if keep[k]:
+      keep[k + 1:] &= ~same[k, k + 1:]
+  return np.flatnonzero(keep)
 
 
 def copper(CS, *ss):

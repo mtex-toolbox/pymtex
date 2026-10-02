@@ -49,3 +49,10 @@ def test_relationships_and_variants():
   assert variants(m2h, orientation.rand(3, mag)).size == 24
   cs2 = crystalFrame("6/mmm", [2.95, 2.95, 4.68], mineral="beta")
   assert variants(orientation.Burgers(csG, cs2)).size == 12 and orientation.Burgers(cs2, csG).CS is cs2
+
+
+def test_variants_areANewListEveryCall():
+  p2c = orientation.KurdjumovSachs(crystalFrame("432", [3.6, 3.6, 3.6]), crystalFrame("432", [2.87, 2.87, 2.87]))
+  V = p2c.variants()
+  V.data[:] = 0
+  assert np.allclose(np.linalg.norm(p2c.variants().data, axis=-1), 1)
