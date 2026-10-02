@@ -22,7 +22,11 @@ names = {'calcgrains_1C_1','calcgrains','perimeter','aspect','smooth_boundary','
 T = [names.', cellfun(@(n) @() operation(n), names, 'UniformOutput', false).', ...
   cellfun(@(n) @(res) rows(n, res), names, 'UniformOutput', false).'];
 algos = {'grain segmentation','grain shape','boundary smoothing','intragranular misorientation','orientation denoising','map registration'};
-crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5 5 5 6 6])), K, {'calcgrains','trueebsd_distortion'}, ...
+% the grains and the distortion job run as well only when an operation asked for needs them
+always = {};
+if any(ismember(ops, {'perimeter','aspect','smooth_boundary','kam','grod'})), always{end+1} = 'calcgrains'; end
+if any(strcmp(ops, 'trueebsd_undistort')), always{end+1} = 'trueebsd_distortion'; end
+crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 5 5 5 5 5 6 6])), K, always, ...
   containers.Map({'calcgrains_1C_1','trueebsd_distortion','smooth_l1tv_twins','smooth_l1tv_ferrite','smooth_hq_twins','smooth_hq_ferrite'}, {1, 1, 1, 1, 1, 1}));
 
   function res = operation(name)

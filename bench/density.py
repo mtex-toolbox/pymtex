@@ -14,7 +14,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import time
 
 import numpy as np
 
@@ -99,18 +98,13 @@ def run(cases):
       at = vector3d(A, antipodal=True)
       f = lambda: calcDensity(x, halfwidth=hw * degree)
     f()
-    best = min(timed(f) for _ in range(3))
+    (_, best, _), cores = profiling.best(profiling.timed(f) for _ in range(3))
     F, wall, recs = profiling.profileCall(f)
-    profiling.write(os.path.join(OUT, f"profile_python_{case}.json"), ALGORITHM["name"], "python", case, best, recs)
+    profiling.write(os.path.join(OUT, f"profile_python_{case}.json"), ALGORITHM["name"], "python", case, best, recs, cores,
+                    profiling.threads())
     np.asarray(F.eval(at), dtype=float).reshape(-1).astype("<f8").tofile(os.path.join(OUT, f"python_{case}_values.bin"))
     open(os.path.join(OUT, f"python_{case}.txt"), "w").write(f"{best}\n")
     print(f"{case}: {1e3 * best:.1f} ms, profiled {1e3 * wall:.1f} ms")
-
-
-def timed(f):
-  t = time.perf_counter()
-  f()
-  return time.perf_counter() - t
 
 
 # MATLAB through the bridge of ../master, one case per call

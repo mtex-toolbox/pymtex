@@ -16,14 +16,15 @@ end
 f = @() calcDensity(x,'halfwidth',hw*degree);
 
 f();
-t = inf;
+t = inf; c = cputime; t0 = tic;
 for r = 1:3
   tic; f(); t = min(t,toc);
 end
+cores = (cputime - c) / toc(t0);
 profile clear; profile on;
 F = f();
 profile off;
-profileDump(fullfile(out,['profile_matlab_' caseName '.json']),'density estimation','matlab',caseName,t);
+profileDump(fullfile(out,['profile_matlab_' caseName '.json']),'density estimation','matlab',caseName,t,cores);
 
 v = F.eval(at);
 fid = fopen(fullfile(out,['matlab_' caseName '_values.bin']),'w'); fwrite(fid,double(v(:)),'double'); fclose(fid);

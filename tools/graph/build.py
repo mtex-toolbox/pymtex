@@ -447,7 +447,7 @@ def profiles(ix, benchOut, matlabRoot):
         if ck != key:
           a["children"][ck] = a["children"].get(ck, 0.0) + t
     out.append(dict(algorithm=p["algorithm"], port=p["port"], case=p["case"], wall=p["wall"],
-                    file=os.path.relpath(path, ROOT), functions=agg))
+                    cores=p.get("cores"), threads=p.get("threads"), file=os.path.relpath(path, ROOT), functions=agg))
   return out
 
 

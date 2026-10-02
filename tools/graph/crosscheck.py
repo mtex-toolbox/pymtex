@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import time
 
 import numpy as np
 
@@ -22,12 +21,6 @@ JULIA = [os.path.expanduser("~/.juliaup/bin/julia"), "--project=" + os.path.join
 PORTS = ("python", "matlab", "julia")
 
 
-def timed(f):
-  t = time.perf_counter()
-  out = f()
-  return out, time.perf_counter() - t
-
-
 # table: op -> (call, results as rows); ops run in table order, the ones not asked for only when
 # a later one needs them (always); reps a number or one per op, after one warm up run as the
 # Julia half does, so that no port's time holds compilation or the loading of a cache
@@ -38,12 +31,13 @@ def run(out, algorithms, table, ops, reps=5, always=()):
       continue
     n = reps.get(op, 5) if isinstance(reps, dict) else reps
     f()
-    res, best = min((timed(f) for _ in range(n)), key=lambda r: r[1])
+    (res, best, _), cores = profiling.best(profiling.timed(f) for _ in range(n))
     _, _, recs = profiling.profileCall(f)
-    profiling.write(os.path.join(out, f"profile_python_{op}.json"), algo[op], "python", op, best, recs)
+    profiling.write(os.path.join(out, f"profile_python_{op}.json"), algo[op], "python", op, best, recs, cores,
+                    profiling.threads())
     open(os.path.join(out, f"python_{op}.txt"), "w").write(f"{best}\n")
     np.asarray(result(res), dtype=float).astype("<f8").tofile(os.path.join(out, f"python_{op}.bin"))
-    print(f"{op:20s} {1e3 * best:9.1f} ms", flush=True)
+    print(f"{op:20s} {1e3 * best:9.1f} ms {cores:5.1f} cores", flush=True)
 
 
 def matlab(script, *args, timeout=290):

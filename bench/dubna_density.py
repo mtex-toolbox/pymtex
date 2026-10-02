@@ -18,7 +18,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 
 import numpy as np
 
@@ -55,30 +54,26 @@ def export():
   (q / np.linalg.norm(q, axis=1, keepdims=True)).astype("<f8").tofile(os.path.join(OUT, "at.bin"))
 
 
-def timed(f):
-  t = time.perf_counter()
-  out = f()
-  return out, time.perf_counter() - t
-
-
 def run(steps):
   import profiling
-  from mtex import calcDensity, mtexdata, orientation, rotation
+  from mtex import calcDensity, degree, mtexdata, orientation, rotation
   from mtex.analysis.pf2odf import calcODF
   A = np.fromfile(os.path.join(OUT, "at.bin"), "<f8").reshape(-1, 4)
   pf = mtexdata("dubna")
   rng = np.random.default_rng(0)
+  # MATLAB's calcDensity takes 10 degree without a halfwidth, this port's selects one
   calls = {"calcODF": lambda s: calcODF(pf), "discreteSample": lambda s: s["odf"].discreteSample(10**7, rng=rng),
-           "calcDensity": lambda s: calcDensity(s["ori"])}
+           "calcDensity": lambda s: calcDensity(s["ori"], halfwidth=10 * degree)}
   state = {}
   for step in STEPS:
     f = lambda: calls[step](state)
     if step in steps:
       if step == "calcODF":
         f()
-      out, best = min((timed(f) for _ in range(REPS[step])), key=lambda r: r[1])
+      (out, best, _), cores = profiling.best(profiling.timed(f) for _ in range(REPS[step]))
       _, wall, recs = profiling.profileCall(f)
-      profiling.write(os.path.join(OUT, f"profile_python_{step}.json"), STEPS[step], "python", "dubna", best, recs)
+      profiling.write(os.path.join(OUT, f"profile_python_{step}.json"), STEPS[step], "python", "dubna", best, recs, cores,
+                      profiling.threads())
       open(os.path.join(OUT, f"python_{step}.txt"), "w").write(f"{best}\n")
       print(f"{step:16s} {best:6.2f} s, profiled {wall:6.2f} s", flush=True)
     else:

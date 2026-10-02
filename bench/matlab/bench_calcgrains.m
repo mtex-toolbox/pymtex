@@ -60,7 +60,7 @@ for k = 1:numel(lines)
   f = strsplit(lines{k}, sprintf('\t'), 'CollapseDelimiters', false);
   al = {};
   if numel(f) > 4 && ~isempty(f{5}), al = strsplit(f{5}, ','); end
-  CSList{end+1} = crystalFrame(f{2}, str2num(f{3}), str2num(f{4})*degree, al{:}, 'mineral', f{1}); %#ok<ST2NM,AGROW>
+  CSList{end+1} = crystalSymmetry(f{2}, str2num(f{3}), str2num(f{4})*degree, al{:}, 'mineral', f{1}); %#ok<ST2NM,AGROW>
 end
 pos = vector3d(A(1, :).', A(2, :).', zeros(size(A, 2), 1));
 rot = rotation(quaternion(A(4, :).', A(5, :).', A(6, :).', A(7, :).'));

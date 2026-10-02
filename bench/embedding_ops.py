@@ -70,7 +70,7 @@ def run(ops):
     cs = crystalFrame(sym)
     O, P, C = (orientation(rotation(load(x)), cs) for x in "OPC")
 
-    def embed(O=O, CS=CS):
+    def embed(O=O, CS=cs):
       e = embedding(O)
       return (e - embedding(O[0])).norm() / embedding(orientation.id(CS)).norm()
 

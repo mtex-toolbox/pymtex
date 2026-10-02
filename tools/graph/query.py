@@ -6,6 +6,8 @@
 #   query.py callees <node> [-d 2]
 #   query.py impact <node|file>               transitive callers in every code base, the tests and algorithms that reach it
 #   query.py algo [<name>]                    an algorithm's entry points and where its time goes, port by port
+#   query.py parallel [<name>]                the cores each case kept busy, port by port: CPU over wall time, and
+#                                             that over the threads the port was given
 #   query.py gaps <prefix> [--port julia]     MATLAB functions under a folder without a Python (Julia) counterpart
 #   query.py questions [<text>]               the research questions the notes ask, filtered by text, file or a named node
 #   query.py layer <layer>                    a layer in MATLAB and both ports: counterparts, tests, notes, algorithms, per class
@@ -209,7 +211,7 @@ def cmdAlgo(G_, name):
       print(f"\n  case {case}: {a.get('cases', {}).get(case, '')}")
       byPort = {p["port"]: p for p in profs if p["case"] == case}
       for port, p in sorted(byPort.items()):
-        print(f"    {port}: wall {fmt(p['wall']).strip()}")
+        print(f"    {port}: wall {fmt(p['wall']).strip()}{busy(p)}")
         rows = sorted(p["functions"].items(), key=lambda kv: -kv[1]["self"])
         tot = sum(v["self"] for v in p["functions"].values()) or 1
         for fid, v in rows[:a.get("stages", 10)]:
@@ -217,6 +219,37 @@ def cmdAlgo(G_, name):
           print(f"      {fmt(v['self'])} self {100 * v['self'] / tot:5.1f} %  {fmt(v['total'])} total  "
                 f"{v['calls']:7d} calls  {fid}" + (f"  ~ {cp[0]}" if cp else ""))
     print()
+
+
+# the cores the timed runs kept busy, when the port measured them
+def cores(p):
+  return p.get("cores")
+
+
+def busy(p):
+  c = cores(p)
+  return "" if c is None else f", {c:.1f} cores busy of {p.get('threads') or '?'} threads"
+
+
+def cmdParallel(G_, name):
+  profs = [p for p in G_.g["profiles"] if not name or name in p["algorithm"]]
+  ports = ("python", "matlab", "julia")
+  print(f"{'case':24s}" + "".join(f"{p:>22s}" for p in ports) + "    wall, cores busy, efficiency")
+  for algo in sorted({p["algorithm"] for p in profs}):
+    print(algo)
+    for case in sorted({p["case"] for p in profs if p["algorithm"] == algo}):
+      byPort = {p["port"]: p for p in profs if p["algorithm"] == algo and p["case"] == case}
+      line = f"  {case:22s}"
+      for port in ports:
+        p, c = byPort.get(port), cores(byPort[port]) if port in byPort else None
+        if p is None:
+          line += f"{'-':>22s}"
+        elif c is None:
+          line += f"{fmt(p['wall']).strip():>10s}{'?':>12s}"
+        else:
+          eff = f"{100 * c / p['threads']:3.0f}%" if p.get("threads") else "   ?"
+          line += f"{fmt(p['wall']).strip():>10s} {c:5.1f} {eff:>5s}"
+      print(line)
 
 
 # the MATLAB functions decided not to be ported (docs/PLAN.md section 2), which are no gap
@@ -387,6 +420,8 @@ def main():
     cmdImpact(G_, a.arg, a.dispatch)
   elif a.cmd == "algo":
     cmdAlgo(G_, a.arg)
+  elif a.cmd == "parallel":
+    cmdParallel(G_, a.arg)
   elif a.cmd == "layer":
     cmdLayer(G_, a.arg or "geometry")
   elif a.cmd == "questions":

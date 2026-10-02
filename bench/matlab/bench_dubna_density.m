@@ -16,14 +16,15 @@ end
 names = struct('calcODF','pole figure inversion','discreteSample','discrete sampling','calcDensity','density estimation');
 
 if timeIt
-  t = inf;
+  t = inf; c = cputime; t0 = tic;
   for r = 1:reps
     tic; res = f(); t = min(t,toc);
   end
+  cores = (cputime - c) / toc(t0);
   profile clear; profile on;
   f();
   profile off;
-  profileDump(fullfile(out,['profile_matlab_' step '.json']),names.(step),'matlab','dubna',t);
+  profileDump(fullfile(out,['profile_matlab_' step '.json']),names.(step),'matlab','dubna',t,cores);
   fid = fopen(fullfile(out,['matlab_' step '.txt']),'w'); fprintf(fid,'%.9g\n',t); fclose(fid);
   fprintf('%-16s %6.2f s\n',step,t);
 else

@@ -1,8 +1,12 @@
 # a profile of one call in the record format build.py maps onto the graph; profileDump.m writes
 # the same records from MATLAB's profiler
 #
-#   {"algorithm", "port", "case", "wall", "functions": [{"file", "line", "name", "self", "total",
-#    "calls", "children": [[index, total], ...]}]}
+#   {"algorithm", "port", "case", "wall", "cores", "threads", "functions": [{"file", "line", "name", "self",
+#    "total", "calls", "children": [[index, total], ...]}]}
+#
+# wall is the best timed run; cores the CPU time of the process over all timed runs, every thread's
+# counted, over their wall time, so that a clock coarser than one run still reads; threads the
+# threads the port was given
 from __future__ import annotations
 
 import cProfile
@@ -10,6 +14,19 @@ import json
 import os
 import pstats
 import time
+
+
+# one call: its result, its wall time and the CPU time the process spent over it
+def timed(f):
+  c, t = time.process_time(), time.perf_counter()
+  out = f()
+  return out, time.perf_counter() - t, time.process_time() - c
+
+
+# the threads this port runs its parallel kernels, finufft and scipy.fft with
+def threads():
+  from mtex.geometry.kernels import threads
+  return threads()
 
 
 def profileCall(f):
@@ -31,6 +48,14 @@ def profileCall(f):
   return result, wall, recs
 
 
-def write(path, algorithm, port, case, wall, recs):
+# the best of the timed runs (result, wall, cpu) and the cores they kept busy together
+def best(runs):
+  runs = list(runs)
+  wall, cpu = sum(r[1] for r in runs), sum(r[2] for r in runs)
+  return min(runs, key=lambda r: r[1]), cpu / wall if wall > 0 else None
+
+
+def write(path, algorithm, port, case, wall, recs, cores=None, threads=None):
   os.makedirs(os.path.dirname(path), exist_ok=True)
-  json.dump(dict(algorithm=algorithm, port=port, case=case, wall=wall, functions=recs), open(path, "w"))
+  json.dump(dict(algorithm=algorithm, port=port, case=case, wall=wall, cores=cores, threads=threads, functions=recs),
+            open(path, "w"))

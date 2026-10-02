@@ -80,6 +80,17 @@ function profileCall(f; seconds = 1.0)
 end
 
 # ----
+# the CPU time of the process, every thread's counted
+
+const CLOCK_PROCESS_CPUTIME_ID = Sys.isapple() ? Int32(12) : Int32(2)
+
+function cpuTime()
+  ts = Ref((0, 0))
+  ccall(:clock_gettime, Cint, (Int32, Ptr{Tuple{Int,Int}}), CLOCK_PROCESS_CPUTIME_ID, ts)
+  ts[][1] + 1e-9 * ts[][2]
+end
+
+# ----
 # the JSON of a profile, written without a package
 
 json(x::AbstractString) = "\"" * escape_string(x) * "\""
@@ -88,9 +99,12 @@ json(x::Symbol) = json(string(x))
 json(x::AbstractVector) = "[" * join(json.(x), ",") * "]"
 json(x::AbstractDict) = "{" * join((json(k) * ":" * json(v) for (k, v) in x), ",") * "}"
 
-function writeProfile(path, algorithm, case, wall, recs)
+# cores: the CPU time of the timed runs over their wall time
+function writeProfile(path, algorithm, case, wall, recs; cores = nothing, threads = Threads.nthreads())
   mkpath(dirname(path))
-  write(path, json(Dict(:algorithm => algorithm, :port => "julia", :case => case, :wall => wall, :functions => recs)))
+  d = Dict{Symbol,Any}(:algorithm => algorithm, :port => "julia", :case => case, :wall => wall, :threads => threads, :functions => recs)
+  cores === nothing || (d[:cores] = cores)
+  write(path, json(d))
 end
 
 # ----
@@ -115,15 +129,19 @@ function crossrun(out, algo, table, ops; reps = 5, always = ())
     op in ops || op in always || continue
     n = reps isa AbstractDict ? get(reps, op, 5) : reps
     f()
-    best, res = Inf, nothing
+    best, res, cpu, wall = Inf, nothing, 0.0, 0.0
     for _ in 1:n
+      c = cpuTime()
       t = @elapsed r = f()
+      cpu += cpuTime() - c
+      wall += t
       t < best && ((best, res) = (t, r))
     end
-    writeProfile(joinpath(out, "profile_julia_$op.json"), algo[op], op, best, profileCall(f; seconds = max(1.0, best)))
+    cores = cpu / wall
+    writeProfile(joinpath(out, "profile_julia_$op.json"), algo[op], op, best, profileCall(f; seconds = max(1.0, best)); cores)
     write(joinpath(out, "julia_$op.txt"), "$best\n")
     write(joinpath(out, "julia_$op.bin"), rows(result(res)))
-    @printf("%-20s %9.1f ms\n", op, 1e3best)
+    @printf("%-20s %9.1f ms %5.1f cores\n", op, 1e3best, cores)
     flush(stdout)
   end
 end

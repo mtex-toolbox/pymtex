@@ -116,21 +116,17 @@ def writeResult(port, name, case, t, g, e):
   np.column_stack([xy, gid]).astype("<f8").tofile(os.path.join(OUT, f"{port}_{name}_{case}.bin"))
 
 
-# MATLAB through the bridge of the frameSymmetry checkout, one map and case per call, so that
-# no call comes near the five minutes a bridge call may take
+# MATLAB through the bridge of ../master, one map and case per call, so that no call comes near
+# the five minutes a bridge call may take
 def runMatlab(names):
   import subprocess
   mtexRoot = os.path.dirname(os.path.dirname(HERE))
-  bridge = os.path.join(mtexRoot, "frameSymmetry", "docs", "agents", "matlab-bridge")
-  master = os.path.join(mtexRoot, "master")
-  pre = (f"warning('off', 'MATLAB:rmpath:DirNotFound'); rmpath(genpath('{master}')); "
-         f"warning('on', 'MATLAB:rmpath:DirNotFound'); clear classes; rehash; addpath('{os.path.join(HERE, 'matlab')}');")
-  env = dict(os.environ, SESSION_NAME="mtexfs")
+  bridge = os.path.join(mtexRoot, "master", "docs", "agents", "matlab-bridge")
   for name in names:
     for case in CASES_OF[name]:
-      cmd = f"{pre} bench_calcgrains('{OUT}', '{name}', '{case}');"
+      cmd = f"addpath('{os.path.join(HERE, 'matlab')}'); bench_calcgrains('{OUT}', '{name}', '{case}');"
       r = subprocess.run([os.path.join(bridge, ".venv", "bin", "python"), os.path.join(bridge, "matlab_run.py"), cmd],
-                         capture_output=True, text=True, env=env, timeout=300)
+                         capture_output=True, text=True, timeout=300)
       print(r.stdout.strip().splitlines()[-1] if r.returncode == 0 and r.stdout.strip() else f"{name} {case} FAILED\n{r.stdout[-1500:]}{r.stderr[-1500:]}")
 
 
