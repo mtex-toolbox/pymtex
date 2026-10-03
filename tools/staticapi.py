@@ -4,7 +4,8 @@
 #
 #   inits         every layer's __init__.py imports its modules' __all__ by name
 #   declarations  a class body declares, under TYPE_CHECKING, the methods attached to it
-#   docstrings    the comment above a public def or class becomes its docstring
+#   docstrings    the comment above a public def or class becomes its docstring, the heading
+#                 comment of a public package its module docstring, which hover shows
 #   vocabularies  the strings an argument takes, as Literal types the editor completes in quotes
 #
 #   .venv/bin/python tools/staticapi.py          rewrite the files
@@ -114,6 +115,8 @@ def initSource(layer):
     if not line.startswith("#"):
       break
     head.append(line)
+  if ast.get_docstring(tree) is not None:
+    head = lines[:tree.body[0].end_lineno]
   # the statements the imports replace: the loop, __all__, importlib and the imports
   generated = [n for n in tree.body if isinstance(n, (ast.For, ast.ImportFrom, ast.Import))
                or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "__all__" for t in n.targets))]
@@ -372,6 +375,26 @@ def _moveComment(lines, node):
   return lines
 
 
+# a package's source with its heading comment moved into the module docstring
+def packageDocSource(src):
+  tree = ast.parse(src)
+  if ast.get_docstring(tree) is not None:
+    return src
+  lines = src.split("\n")
+  k = 0
+  while k < len(lines) and lines[k].startswith("#") and not lines[k].startswith("#!"):
+    k += 1
+  doc = "\n".join(c[1:].removeprefix(" ") for c in lines[:k]).strip()
+  if not doc or '"""' in doc or doc.endswith('"') or any(_isBanner(c) for c in lines[:k]):
+    return src
+  return "\n".join(docLines(doc, "") + lines[k:])
+
+
+# a package the user imports: mtex and its subpackages, none private
+def isPublicPackage(path, module):
+  return path.endswith("__init__.py") and not any(p.startswith("_") for p in module.split("."))
+
+
 def packageFiles():
   for d, _, files in os.walk(PACKAGE):
     for f in sorted(files):
@@ -507,7 +530,8 @@ def changes():
     out[path] = src
   installed = installedFunctions()
   for path, module in packageFiles():
-    out[path] = docstringSource(out.get(path) or read(path), module, installed)
+    src = docstringSource(out.get(path) or read(path), module, installed)
+    out[path] = packageDocSource(src) if isPublicPackage(path, module) else src
   for layer in VOCABULARIES:
     path, src = vocabularySource(layer)
     out[path] = src

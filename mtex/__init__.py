@@ -1,4 +1,34 @@
-# MTEX: the crystallographic texture analysis toolbox
+"""MTEX: the crystallographic texture analysis toolbox
+
+The Python port of MTEX: crystal symmetry and orientations, EBSD maps, grains and their
+boundaries, pole figures, orientation distribution functions and tensors, in one flat
+namespace, with MATLAB's names
+
+  from mtex import *
+  cs = crystalFrame('m-3m')
+  ori = orientation.byEuler(30*degree, 50*degree, 10*degree, cs)
+  ebsd = mtexdata('forsterite')
+  grains = calcGrains(ebsd('indexed'))
+
+The namespace is assembled from the layers, each importing only those above it
+
+  mtex.geometry   vectors, rotations, orientations, point groups, frames, Miller indices, grids
+  mtex.functions  harmonics, kernels, functions on S2 and SO(3), ODFs, pole figures
+  mtex.tensors    the tensor container, its algebra and the physical tensors
+  mtex.maps       EBSD maps, grains, grain boundaries, parent grain reconstruction
+  mtex.maps3d     maps of volumes: EBSD3, 3D grains and boundaries
+  mtex.analysis   what iterates or optimises: pole figure inversion, elasticity, Taylor, ...
+  mtex.io         loadEBSD, loadPoleFigure, export, mtexdata, openDoc
+  mtex.plotting   plot, plotPF, plotIPF, plotSection, the colour keys (matplotlib, the plot extra)
+
+Help
+
+  help(orientation)                 what a class or function is and takes
+  openDoc('GrainReconstruction')  a documentation page as a script to run
+  mtexdata()                        the sample data sets
+
+The documentation is at https://mtex-toolbox.github.io
+"""
 from importlib.metadata import PackageNotFoundError as _PackageNotFoundError, version as _version
 
 # the version of the installed distribution

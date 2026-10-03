@@ -1,4 +1,4 @@
-# the interfaces: reading and writing the vendor formats
+"""the interfaces: reading and writing the vendor formats"""
 from .load import loadEBSD
 from .inspect import EBSDFileInfo, inspectEBSD, ebsdFiles, isEBSDFile
 from .importscript import buildImportWizardScript, loadCall

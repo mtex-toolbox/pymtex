@@ -1,4 +1,4 @@
-# the function layer: harmonics, kernels, transforms, functions on S1, S2 and SO(3), pole figures
+"""the function layer: harmonics, kernels, transforms, functions on S1, S2 and SO(3), pole figures"""
 from .harmonics import (deg2dim, dim2deg, degreeRange, degreeBlock, wignerd, wignerdDegrees, WignerD,
                         InvariantProjection, invariantProjection, project, projectLeft, projectRight,
                         normalizedLegendre, sphericalY, clebschGordan, wigner3j, clebschGordanTensor)

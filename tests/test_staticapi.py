@@ -95,3 +95,9 @@ def test_wrapped_lines_stay_within_the_width(width, monkeypatch):
 def test_a_vocabulary_is_the_table_it_reads_as_a_literal():
   _, src = sa.vocabularySource("plotting")
   assert 'FigureSizeName = Literal["tiny", "small", "medium", "normal", "large", "huge"]' in src
+
+
+def test_a_package_heading_comment_becomes_its_docstring():
+  out = sa.packageDocSource("# the layer: vectors\n#\n#   v = f()\nfrom .a import f\n")
+  assert out == '"""the layer: vectors\n\n  v = f()"""\nfrom .a import f\n'
+  assert sa.packageDocSource(out) == out

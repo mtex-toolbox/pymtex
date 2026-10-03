@@ -1,4 +1,4 @@
-# the maps of volumes: EBSD3, the voxel lattice, and later the grains and boundaries in 3D
+"""the maps of volumes: EBSD3, the voxel lattice, and later the grains and boundaries in 3D"""
 from .voxellattice import voxelLattice
 from .ebsd3 import EBSD3, EBSD3square
 from .grain3boundary import grain3Boundary

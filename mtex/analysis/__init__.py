@@ -1,5 +1,5 @@
-# the analysis layer: the algorithms that iterate or optimise over the cores, from the
-# pole figure inversion to the denoising of a map
+"""the analysis layer: the algorithms that iterate or optimise over the cores, from the
+pole figure inversion to the denoising of a map"""
 from .elasticity import (velocity, energyVector, YoungsModulus, linearCompressibility, volumeCompressibility,
                          shearModulus, PoissonRatio, bulkModulus, isotropicShearModulus, HashinShtrikmanModulus,
                          hashinShtrikmanBounds)

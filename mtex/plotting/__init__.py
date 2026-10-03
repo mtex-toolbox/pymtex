@@ -1,5 +1,5 @@
-# the plotting layer: the geometry of a plot in NumPy, matplotlib imported only when a plot
-# is drawn; the plot commands are functions here and methods on the objects they draw
+"""the plotting layer: the geometry of a plot in NumPy, matplotlib imported only when a plot
+is drawn; the plot commands are functions here and methods on the objects they draw"""
 from .spherical import (sphericalProjection, eareaProjection, eangleProjection, edistProjection, orthographicProjection,
                         gnomonicProjection, plainProjection, makeSphericalProjection, plotSector, rhoRange, isUpper,
                         isLower, millerLabel, plotS2Grid)

@@ -1,4 +1,4 @@
-# the geometry layer: vectors, rotations, orientations, symmetry, frames, grids
+"""the geometry layer: vectors, rotations, orientations, symmetry, frames, grids"""
 import importlib as _importlib
 from .units import degree, mtexdegchar
 from .session import getMTEXpref, setMTEXpref, reset

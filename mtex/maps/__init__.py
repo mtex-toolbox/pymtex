@@ -1,4 +1,4 @@
-# the maps layer: EBSD maps, their lattice, grains and boundaries
+"""the maps layer: EBSD maps, their lattice, grains and boundaries"""
 from .phaselist import phaseList, phaseColorNames, colorTriplet
 from .lattice import lattice, mapPlane, latticeBasis
 from .polygon import *  # noqa: F401,F403
