@@ -93,6 +93,15 @@ class phaseList:
       raise ValueError(f"no phase called {key!r}; the map has " + ", ".join(repr(f.mineral) for f in self.frames))
     raise TypeError(f"a phase is named by its mineral, its frame or its number, not by a {type(key).__name__}")
 
+  def selectionNames(self, pairs=False):
+    """the names a selection ebsd['...'] takes: the minerals, 'indexed' and 'notIndexed'; with
+    pairs=True also every pair of minerals, gB['Forsterite', 'Enstatite']"""
+    minerals = list(dict.fromkeys(f.mineral for f in self.frames if f.isIndexed))
+    others = list(dict.fromkeys(f.mineral for f in self.frames if not f.isIndexed))
+    names = minerals + ["indexed"] + others
+    names += ["notIndexed"] if "notindexed" not in [m.lower() for m in names] else []
+    return names + ([(a, b) for a in minerals for b in minerals] if pairs else [])
+
   def __contains__(self, key):
     try:
       self.phaseId(key)

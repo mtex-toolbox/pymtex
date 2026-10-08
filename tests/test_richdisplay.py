@@ -42,7 +42,8 @@ def test_registration_needs_ipython():
   # outside IPython nothing happens, inside the two formatters know the classes
   registerDisplays()
   globalipapp = pytest.importorskip("IPython.testing.globalipapp")
-  ip = globalipapp.start_ipython()
+  globalipapp.start_ipython()
+  ip = globalipapp.get_ipython()
   registerDisplays()
   html = ip.display_formatter.formatters["text/html"]
   assert html.lookup_by_type(orientation) is reprHTML

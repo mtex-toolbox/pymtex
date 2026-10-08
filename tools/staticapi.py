@@ -433,6 +433,13 @@ def _colorNames():
   return list(CSS4_COLORS) + list(BASE_COLORS)
 
 
+# the documentation pages openDoc writes, in the order of the documentation, then the chapters it lists
+def _docPageNames():
+  from mtex.io.opendoc import CHAPTERS, docPages
+  pages = docPages()
+  return [p for _, p, _ in pages] + [c for c in CHAPTERS if c in {c for c, _, _ in pages}]
+
+
 def _sampleDataNames():
   from mtex.io.sampledata import DATASETS
   return [d["name"] for d in DATASETS]
@@ -490,6 +497,7 @@ VOCABULARIES = {
     ("SampleSO3FunName", "the ODFs among them", _sampleDataOfType("SO3Fun")),
     ("SampleS2FunName", "the spherical functions among them", _sampleDataOfType("S2Fun")),
     ("SampleTensorName", "the tensors among them", _sampleDataOfType("tensor")),
+    ("DocPageName", "the documentation pages openDoc writes and the chapters it lists", _docPageNames),
   ],
   "plotting": [
     ("ColormapName", "the colour maps, MTEX's and matplotlib's", _colormapNames),

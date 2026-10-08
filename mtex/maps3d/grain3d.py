@@ -180,6 +180,10 @@ class grain3d:
     except KeyError:
       raise ValueError("no grain of that id") from None
 
+  # the names grains['...'] takes, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames()
+
   def __getitem__(self, key):
     if isinstance(key, str):
       key = [key]

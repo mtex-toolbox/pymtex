@@ -265,6 +265,10 @@ class grain2d(polygonSet):
     """the unit of the map the grains were reconstructed from, as their boundary carries it"""
     return getattr(self.boundary, "scanUnit", "um")
 
+  # the names grains['...'] takes, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames()
+
   # grains[x, y]: the grain the position lies in, MATLAB's grains(x, y)
   def __getitem__(self, key):
     if isinstance(key, tuple) and len(key) == 2 and all(isinstance(k, (int, float, np.integer, np.floating)) for k in key) \

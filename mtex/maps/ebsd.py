@@ -272,6 +272,10 @@ class EBSD:
 
   # ------------------------------------------------------------------ selection
 
+  # the names ebsd['...'] takes, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames()
+
   def __getitem__(self, key):
     if isinstance(key, str):
       return self._subset(self._phaseMask([key]))

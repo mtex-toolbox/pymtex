@@ -102,6 +102,10 @@ class grain3Boundary:
 
   # faces by position or mask, or by the phases on their sides: 'indexed' the faces between
   # two indexed grains, a mineral the faces with it on one side, two minerals those between them
+  # the names gB['...'] and gB['...', '...'] take, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames(pairs=True)
+
   def __getitem__(self, sel):
     if isinstance(sel, str) or (isinstance(sel, tuple) and sel and isinstance(sel[0], str)):
       return self[self.hasPhase(*((sel,) if isinstance(sel, str) else sel))]

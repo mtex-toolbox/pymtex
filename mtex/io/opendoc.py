@@ -4,13 +4,20 @@
 # mtex/docpages and read from docs/pages in a checkout; a page is in the jupytext light format,
 # a paragraph of comment lines prose, a paragraph of code one cell, "# +" and "# -" around a
 # cell of several paragraphs.
+from __future__ import annotations
+
 import difflib
 import json
 import os
 import re
 import shutil
 import subprocess
+from typing import TYPE_CHECKING, Any
+
 from ..geometry.display import aligned
+
+if TYPE_CHECKING:
+  from .vocabulary import DocPageName
 
 SITE = "https://mtex-toolbox.github.io/"
 
@@ -116,7 +123,7 @@ def docPages():
   return pages
 
 
-def openDoc(name=None, folder=None, overwrite=False, edit=True, notebook=False):
+def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=True, notebook=False):
   """a documentation page as a script to run section by section
 
   openDoc() lists the pages, openDoc('EBSDAnalysis') the pages of a chapter. openDoc('EBSDTutorial')

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+import functools
 import warnings
 
 import numpy as np
@@ -966,6 +967,8 @@ def withGroup(fr, group):
 def _answerRegistered(cls):
   new = cls.__new__
 
+  # the signature help() and the completion read is that of __init__
+  @functools.wraps(cls.__init__, assigned=())
   def __new__(klass, *args, **kwargs):
     obj = object.__new__(klass)
     obj.__init__(*args, **kwargs)
@@ -976,8 +979,10 @@ def _answerRegistered(cls):
   return cls
 
 
-# an __init__ that runs only when __new__ has not already run it
+# an __init__ that runs only when __new__ has not already run it, with the signature and help of
+# the one it wraps
 def _once(init):
+  @functools.wraps(init)
   def __init__(self, *args, **kwargs):
     if getattr(self, "_registered", "unset") == "unset":
       init(self, *args, **kwargs)

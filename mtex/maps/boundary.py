@@ -284,6 +284,10 @@ class grainBoundary:
   # ------------------------------------------------------------------ subsets
 
   # a subset of the segments; the vertex list is shared and never rewritten
+  # the names gB['...'] and gB['...', '...'] take, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames(pairs=True)
+
   def __getitem__(self, key):
     if isinstance(key, str) or hasattr(key, "sym"):
       return self._withFirstPhase(self[self.hasPhase(key)], key)
@@ -519,6 +523,10 @@ class triplePointList:
   # tP('Iron bcc', 'Iron bcc', 'Iron bcc'): the points of those phases, MATLAB's call form
   def __call__(self, *names):
     return self[self.hasPhase(*names)]
+
+  # the names tP['...'] and tP['...', '...'] take, which IPython completes inside the brackets
+  def _ipython_key_completions_(self):
+    return self.CSList.selectionNames(pairs=True)
 
   def __getitem__(self, key):
     if isinstance(key, str):

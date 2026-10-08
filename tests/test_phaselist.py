@@ -34,3 +34,13 @@ def test_a_phase_is_named_by_its_mineral_its_frame_or_its_number():
   assert [f for f in pl] == pl.CSList
   s = repr(pl)
   assert "Iron" in s and "m-3m" in s and "Mineral" in s
+
+
+def test_the_selection_names_are_the_minerals_then_indexed_and_not_indexed():
+  pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Titanium"))
+  assert pl.selectionNames() == ["Iron", "Titanium", "indexed", "notIndexed"]
+
+
+def test_the_selection_names_of_a_boundary_add_every_pair_of_minerals():
+  pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Titanium"))
+  assert pl.selectionNames(pairs=True)[4:] == [("Iron", "Iron"), ("Iron", "Titanium"), ("Titanium", "Iron"), ("Titanium", "Titanium")]
