@@ -559,6 +559,23 @@ def _closestTo(q0, q1, q2, q3, p0, p1, p2, p3, G, nG):
   return c0, c1, c2, c3
 
 
+# the angle from p to the closest image q g of q: <q g, p> = <g, m> for m = inv(q) p, so one
+# product and a dot per element find it, and the chord |m -/+ g| measures it, accurate near zero
+def _closestAngle(q0, q1, q2, q3, p0, p1, p2, p3, G, nG):
+  m0 = q0 * p0 + q1 * p1 + q2 * p2 + q3 * p3
+  m1 = q0 * p1 - q1 * p0 - q2 * p3 + q3 * p2
+  m2 = q0 * p2 + q1 * p3 - q2 * p0 - q3 * p1
+  m3 = q0 * p3 - q1 * p2 + q2 * p1 - q3 * p0
+  best, d, k = -1.0, 0.0, 0
+  for gi in range(nG):
+    t = m0 * G[gi, 0] + m1 * G[gi, 1] + m2 * G[gi, 2] + m3 * G[gi, 3]
+    if abs(t) > best:
+      best, d, k = abs(t), t, gi
+  s = -1.0 if d < 0 else 1.0
+  h0, h1, h2, h3 = m0 - s * G[k, 0], m1 - s * G[k, 1], m2 - s * G[k, 2], m3 - s * G[k, 3]
+  return 4 * np.arcsin(min(np.sqrt(h0 * h0 + h1 * h1 + h2 * h2 + h3 * h3) / 2, 1.0))
+
+
 # the neighbour of k at the offset (oi, oj) of the lattice, -1 where the map has none
 def _neighbour(lk, ij, k, oi, oj):
   i, j = ij[k, 0] + oi, ij[k, 1] + oj
@@ -645,9 +662,7 @@ def _kamLoop(rot, indexed, phase, grain, hasGrain, lk, ij, offs, w, threshold, m
         nb = _neighbour(lk, ij, k, offs[o, 0], offs[o, 1])
         if not _comparable(indexed, phase, grain, hasGrain, k, nb):
           continue
-        c0, c1, c2, c3 = _closestTo(rot[nb, 0], rot[nb, 1], rot[nb, 2], rot[nb, 3], q0, q1, q2, q3, Gall[p], nG[p])
-        h = np.sqrt((q0 - c0) ** 2 + (q1 - c1) ** 2 + (q2 - c2) ** 2 + (q3 - c3) ** 2)
-        ang = 4 * np.arcsin(min(h / 2, 1.0))
+        ang = _closestAngle(rot[nb, 0], rot[nb, 1], rot[nb, 2], rot[nb, 3], q0, q1, q2, q3, Gall[p], nG[p])
         if ang > threshold:
           continue
         found = True
@@ -1272,7 +1287,7 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
       out[k] = g
 
 
-_PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+_PIXEL_HELPERS = ("_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
@@ -1302,6 +1317,45 @@ def _compileLoops():
   return _COMPILED["traceLoops"]
 
 
+# the curvature tensor of every pixel from the two derivatives in the plane, kappa = gx e1^T +
+# gy e2^T, a column NaN where unknown marks it, each entry written once
+def _planeTensorLoop(gx, gy, e1, e2, unknown, out):
+  for k in prange(gx.shape[0]):
+    for i in range(3):
+      for j in range(3):
+        out[k, i, j] = np.nan if unknown[j] else gx[k, i] * e1[j] + gy[k, i] * e2[j]
+
+
+# the extremal widths of every hull, its vertices H[offsets[k]:offsets[k + 1]] in order: the
+# narrowest over the normals of its edges, the widest between two of its vertices, each the
+# first in the order of the edges and the points on a tie; an outline of one vertex keeps zeros
+def _extremalWidthLoop(H, offsets, shortest, longest):
+  for k in prange(len(offsets) - 1):
+    a, L = offsets[k], offsets[k + 1] - offsets[k]
+    best = np.inf
+    for i in range(L):
+      ex, ey = H[a + (i + 1) % L, 0] - H[a + i, 0], H[a + (i + 1) % L, 1] - H[a + i, 1]
+      el = np.sqrt(ex * ex + ey * ey)
+      if el == 0:
+        continue
+      nx, ny = -ey / el, ex / el
+      lo, hi = np.inf, -np.inf
+      for j in range(L):
+        p = H[a + j, 0] * nx + H[a + j, 1] * ny
+        lo, hi = min(lo, p), max(hi, p)
+      if hi - lo < best:
+        best = hi - lo
+        shortest[k, 0], shortest[k, 1] = best * nx, best * ny
+    far = -1.0
+    for i in range(L):
+      for j in range(L):
+        dx, dy = H[a + j, 0] - H[a + i, 0], H[a + j, 1] - H[a + i, 1]
+        d = dx * dx + dy * dy
+        if d > far:
+          far = d
+          longest[k, 0], longest[k, 1] = dx, dy
+
+
 def pixelKernel(name):
   """the compiled numba loop of the map's pixels named (gradient, kam, gnd, grod, window, ...),
   compiled on first call; None without numba"""
@@ -1309,7 +1363,8 @@ def pixelKernel(name):
   if nb is None:
     return None
   if name not in _COMPILED:
-    _COMPILED[name] = _parallelKernel({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop}[name])
+    _COMPILED[name] = _parallelKernel({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop, "planeTensor": _planeTensorLoop,
+                                         "extremalWidths": _extremalWidthLoop}[name])
   return _COMPILED[name]
 
 

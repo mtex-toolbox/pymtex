@@ -46,9 +46,15 @@ def mapLattice(ebsd):
 
 
 def latticeLookup(l):
-  """the measurement at every lattice index, -1 where the lattice carries none"""
+  """the measurement at every lattice index, -1 where the lattice carries none; built once per
+  index array, which a lattice never changes, and read only"""
+  cached = getattr(l, "_lookup", None)
+  if cached is not None and cached[0] is l.ij:
+    return cached[1]
   lk = np.full((int(l.ij[:, 0].max()) + 1, int(l.ij[:, 1].max()) + 1), -1, dtype=np.int64)
   lk[l.ij[:, 0], l.ij[:, 1]] = np.arange(len(l.ij))
+  lk.flags.writeable = False
+  l._lookup = (l.ij, lk)
   return lk
 
 
@@ -68,7 +74,8 @@ class mapPairs:
 
   def __init__(self, ebsd):
     self.rot = np.ascontiguousarray(ebsd.rotations.data, dtype=float).reshape(-1, 4)
-    self.indexed = ebsd.isIndexed.reshape(-1) & ~np.any(np.isnan(self.rot), axis=1)
+    # a NaN rotation is NaN in every coordinate, so the first tells
+    self.indexed = ebsd.isIndexed.reshape(-1) & ~np.isnan(self.rot[:, 0])
     self.phase = ebsd.phaseId.reshape(-1)
     self.grain = ebsd.prop["grainId"].reshape(-1) if "grainId" in ebsd.prop else None
     self.G = {int(p): ebsd.CSList[int(p)].sym.properGroup().rotations().data.reshape(-1, 4).astype(float)
@@ -257,8 +264,18 @@ def curvature(ebsd, stencil="oneSided"):
   from ..tensors.tensor import curvatureTensor
   gx, gy = gradient(ebsd, stencil=stencil)
   pl = mapLattice(ebsd).plane
-  M = gx.data[..., :, None] * pl.e1[None, :] + gy.data[..., :, None] * pl.e2[None, :]
-  M[..., :, np.abs(pl.normal) > 1e-10] = np.nan
+  unknown = np.abs(pl.normal) > 1e-10
+  a, b = np.ascontiguousarray(gx.data, dtype=float), np.ascontiguousarray(gy.data, dtype=float)
+  loop = None
+  if backend() == "numba":
+    from .kernels import pixelKernel
+    loop = pixelKernel("planeTensor")
+  if loop is not None:
+    M = np.empty(a.shape + (3,))
+    loop(a.reshape(-1, 3), b.reshape(-1, 3), np.asarray(pl.e1, dtype=float), np.asarray(pl.e2, dtype=float), unknown, M.reshape(-1, 3, 3))
+  else:
+    M = a[..., :, None] * pl.e1[None, :] + b[..., :, None] * pl.e2[None, :]
+    M[..., :, unknown] = np.nan
   return curvatureTensor(M, ebsd.frame, unit=f"1/{ebsd.scanUnit}")
 
 
@@ -369,8 +386,9 @@ def calcGROD(ebsd, grains=None, rotRef=None):
     byId[grains.id] = np.arange(len(grains))
     gid = ebsd.prop["grainId"].reshape(-1).astype(np.int64)
     pos = np.where((gid > 0) & (gid < len(byId)), byId[np.clip(gid, 0, len(byId) - 1)], -1)
-    ref = np.full((n, 4), np.nan)
-    ref[pos >= 0] = grains.meanRotation.data.reshape(-1, 4)[pos[pos >= 0]]
+    # one gather from the mean rotations behind a NaN row, which a pixel without a grain takes
+    means = np.vstack([np.full((1, 4), np.nan), grains.meanRotation.data.reshape(-1, 4)])
+    ref = np.take(means, pos + 1, axis=0)
   else:
     ref = np.broadcast_to(np.asarray(rotRef.data if isinstance(rotRef, rotation) else rotRef, dtype=float).reshape(-1, 4), (n, 4))
   ids = ebsd.indexedPhaseId
@@ -379,7 +397,8 @@ def calcGROD(ebsd, grains=None, rotRef=None):
   cs = ebsd.CSList[int(ids[0])]
   G = cs.sym.properGroup().rotations().data.reshape(-1, 4).astype(float)
   rot = np.ascontiguousarray(ebsd.rotations.data, dtype=float).reshape(-1, 4)
-  ind = ebsd.isIndexed.reshape(-1) & ~np.any(np.isnan(ref), axis=1)
+  # a NaN rotation is NaN in every coordinate, so the first tells
+  ind = ebsd.isIndexed.reshape(-1) & ~np.isnan(ref[:, 0])
   out = None
   if backend() == "numba":
     from .kernels import pixelKernel
@@ -460,16 +479,27 @@ def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rn
   against. Both maps must carry one indexed phase; the pair is written as a boundary
   writes it, inv(o2) o1 carrying a direction of the first phase into the second"""
   other = ebsd if other is None else other
-  o1, o2 = ebsd.orientations, other.orientations
-  P1, P2 = ebsd.pos.data.reshape(-1, 3)[ebsd.isIndexed.reshape(-1)], other.pos.data.reshape(-1, 3)[other.isIndexed.reshape(-1)]
+  # the pixels of the one indexed phase of each map, of which only the drawn ones are read
+  p1 = ebsd._onePhase()
+  idx1 = np.flatnonzero(ebsd.phaseId.reshape(-1) == p1)
+  p2, idx2 = (p1, idx1) if other is ebsd else (other._onePhase(), None)
+  idx2 = np.flatnonzero(other.phaseId.reshape(-1) == p2) if idx2 is None else idx2
+  P1, P2 = ebsd.pos.data.reshape(-1, 3), other.pos.data.reshape(-1, 3)
   rng = np.random.default_rng(rng) if not isinstance(rng, np.random.Generator) else rng
   # far enough apart is a hundredth of the map by default, as in MTEX
-  d0 = np.linalg.norm(P1.max(axis=0) - P1.min(axis=0)) / 100 if minDistance is None else float(minDistance)
-  i1, i2 = rng.integers(0, len(o1), sampleSize), rng.integers(0, len(o2), sampleSize)
+  if minDistance is None:
+    # column by column: NumPy's reduction over the long axis of an (n, 3) array is twenty times slower
+    cols = [P1[:, k] if len(idx1) == len(P1) else P1[idx1, k] for k in range(3)]
+    d0 = np.linalg.norm([c.max() - c.min() for c in cols]) / 100
+  else:
+    d0 = float(minDistance)
+  i1, i2 = idx1[rng.integers(0, len(idx1), sampleSize)], idx2[rng.integers(0, len(idx2), sampleSize)]
   keep = np.linalg.norm(P1[i1] - P2[i2], axis=1) > d0
+  i1, i2 = i1[keep], i2[keep]
   # inv(o1) * o2 as MATLAB's o1 .\ o2: the second crystal's coordinates into the first's
-  q = qmul(_conj(o1.data.reshape(-1, 4)[i1[keep]]), o2.data.reshape(-1, 4)[i2[keep]])
-  return orientation._fromRotation(q, (o2.frameA, o1.frameA), antipodal=o1.frameA is o2.frameA)
+  q = qmul(_conj(ebsd.rotations.data.reshape(-1, 4)[i1].astype(float)), other.rotations.data.reshape(-1, 4)[i2].astype(float))
+  cs1, cs2 = ebsd.CSList[p1], other.CSList[p2]
+  return orientation._fromRotation(q, (cs2, cs1), antipodal=cs1 is cs2)
 
 
 for _name, _f in (("gradient", gradient), ("gradientX", gradientX), ("gradientY", gradientY), ("gradientZ", gradientZ), ("curvature", curvature),

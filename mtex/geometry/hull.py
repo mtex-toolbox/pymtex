@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .kernels import _jit, backend
+from .kernels import _jit, _parallelKernel, backend
 
+prange = range
 _COMPILED = {}
 
 
@@ -51,19 +52,19 @@ def _chainLoop(P, order, out):
   return m
 
 
-# the hulls of the loops flat[offsets[c]:offsets[c + 1]] of indices into V, written one after
-# the other into out with their offsets in outOff: every loop sorted by x then y through two
-# stable sorts, then the two chains
-def _hullLoopsLoop(V, flat, offsets, out, outOff):
-  tot = 0
-  for c in range(offsets.shape[0] - 1):
+# the hulls of the loops flat[offsets[c]:offsets[c + 1]] of indices into V, each written into
+# its own slot out[2 offsets[c]:2 offsets[c + 1]], as many as a hull of the loop can have, with
+# its length in counts, so that the loops run in parallel: every loop sorted by x then y
+# through two stable sorts, then the two chains
+def _hullLoopsLoop(V, flat, offsets, out, counts):
+  for c in prange(offsets.shape[0] - 1):
     s, e = offsets[c], offsets[c + 1]
     n = e - s
-    outOff[c] = tot
+    at = 2 * s
     if n <= 2:
       for i in range(n):
-        out[tot + i] = flat[s + i]
-      tot += n
+        out[at + i] = flat[s + i]
+      counts[c] = n
       continue
     idx = flat[s:e]
     ys = np.empty(n)
@@ -74,10 +75,7 @@ def _hullLoopsLoop(V, flat, offsets, out, outOff):
     for i in range(n):
       xs[i] = V[byY[i], 0]
     order = byY[np.argsort(xs, kind="mergesort")]
-    m = _chainLoop(V, order, out[tot:tot + 2 * n])
-    tot += m
-  outOff[offsets.shape[0] - 1] = tot
-  return tot
+    counts[c] = _chainLoop(V, order, out[at:at + 2 * n])
 
 
 def convexHullLoops(V, loops):
@@ -91,9 +89,9 @@ def convexHullLoops(V, loops):
   if loop is None:
     return [np.asarray(l)[convexHull(V[np.asarray(l)])] if len(l) else np.zeros(0, dtype=np.int64) for l in loops]
   out = np.empty(2 * len(flat) + 1, dtype=np.int64)
-  outOff = np.empty(len(loops) + 1, dtype=np.int64)
-  loop(V, flat, offsets, out, outOff)
-  return [out[outOff[c]:outOff[c + 1]] for c in range(len(loops))]
+  counts = np.empty(len(loops), dtype=np.int64)
+  loop(V, flat, offsets, out, counts)
+  return [out[2 * offsets[c]:2 * offsets[c] + counts[c]] for c in range(len(loops))]
 
 
 def _compiledChain():
@@ -110,7 +108,8 @@ def _compiledLoops():
   if "loops" not in _COMPILED:
     nb = _jit()
     globals()["_chainLoop"] = _compiledChain()
-    _COMPILED["loops"] = nb.njit(cache=True)(_hullLoopsLoop)
+    globals()["prange"] = nb.prange
+    _COMPILED["loops"] = _parallelKernel(_hullLoopsLoop)
   return _COMPILED["loops"]
 
 

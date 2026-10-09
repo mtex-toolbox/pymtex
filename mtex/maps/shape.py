@@ -22,6 +22,7 @@ import numpy as np
 
 from ..geometry.frames import specimenFrame
 from ..geometry.hull import convexHullLoops
+from ..geometry.kernels import backend as kernelBackend
 from ..geometry.vector3d import vector3d
 from .boundary import OUTSIDE, grainBoundary, orderWalk
 from .decomposition import NO_PIXEL
@@ -183,6 +184,14 @@ def _extremalWidths(self):
   T = len(H)
   if T == 0:
     return shortest, longest
+  # one compiled loop over the outlines, the pairs below its NumPy form
+  loop = None
+  if kernelBackend() == "numba":
+    from .kernels import pixelKernel
+    loop = pixelKernel("extremalWidths")
+  if loop is not None:
+    loop(np.ascontiguousarray(H[:, :2], dtype=float), np.ascontiguousarray(offsets, dtype=np.int64), shortest, longest)
+    return shortest, longest
   starts = offsets[:-1]
   lab = np.repeat(np.arange(self.size), lengths)
   # the edges of every hull, cyclic within the outline, and their unit normals
@@ -260,10 +269,14 @@ def paror(self, omega=None):
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   H, offsets, lengths = _flatHull(self)
-  pr = H @ D.T
+  # the projections a row per direction, so that every outline's run of them is contiguous
+  pr = np.ascontiguousarray((H @ D.T).T)
   ok = lengths > 0
-  out = np.sum(np.maximum.reduceat(pr, offsets[:-1][ok], axis=0) - np.minimum.reduceat(pr, offsets[:-1][ok], axis=0), axis=0) if ok.any() else np.zeros(len(omega))
+  out = np.sum(np.maximum.reduceat(pr, offsets[:-1][ok], axis=1) - np.minimum.reduceat(pr, offsets[:-1][ok], axis=1), axis=1) if ok.any() else np.zeros(len(omega))
   return out / out.max()
+
+
+SURFOR_BLOCK = 4096
 
 
 def surfor(x, omega=None):
@@ -274,7 +287,10 @@ def surfor(x, omega=None):
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   seg = gB.V[gB.F[:, 1]] - gB.V[gB.F[:, 0]]
-  out = np.abs(seg[:, :1] * D[:, 0] + seg[:, 1:] * D[:, 1]).sum(axis=0)
+  # the projections by blocks of segments, each a matrix product that stays in the cache
+  out = np.zeros(len(D))
+  for k in range(0, len(seg), SURFOR_BLOCK):
+    out += np.abs(seg[k:k + SURFOR_BLOCK, :2] @ D.T).sum(axis=0)
   return out / out.max()
 
 
