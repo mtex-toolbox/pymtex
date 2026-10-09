@@ -80,3 +80,15 @@ cold: the spherical transform of L = 40 takes 37 us on the threads against 131 o
 of 1600 nodes 22 against 86. The bound is 1 << 14 now, between the two; the small transforms of
 optimalSample (bandwidth 16, a few hundred nodes, works of 4913 and 12000) stay on one thread on
 both machines, and optimal_s2 measures the same at any bound from 0 to 1 << 16 here (220 ms).
+
+## Open: finufft's threads at middle sizes, and heapBlocks under threads, 2026-10-09
+
+Measured on bayes while another user's MATLAB held cores (load 8.5), so not decided. The rule
+`NUFFT_SINGLE_THREAD_WORK` (nodes x modes < 2e8 on one thread) looked wrong both ways: 1e5 nodes
+on 17 x 33^2 took 60 ms on sixteen threads against 37 on one, 100 nodes on 65 x 129^2 37 ms on
+one against 23; the adjoint (type 1) on sixteen threads showed a fixed 10 to 25 ms. In a fresh
+process, finufft alone, sixteen threads took 2.3 ms for 1e5 nodes on 65 x 65 against 5.4 on one.
+And heapBlocks, which takes finufft's large blocks from the main heap, may serialise the threads'
+own allocations of their spreading boxes on its lock: under the load, 16 threads took 27 ms with
+it against 14.5 without for that transform, 150 against 244 for another. Both to measure again on
+a quiet machine, with the 1 and 16 thread plans in separate processes.

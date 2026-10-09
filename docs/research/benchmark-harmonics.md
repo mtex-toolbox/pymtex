@@ -403,3 +403,12 @@ What changed (`bench/harmonics_user.py`, ms, before / after):
   (2 psi - alpha, pi - beta, gamma + pi), on the grid where 2 psi is a multiple of its step, which
   some axis of every such group is. MATLAB's distinct nodes (`fullGrid`, `_unique` here) take
   27 s to find at L = 128 by comparing every image; the mirror needs no search.
+
+## The circle, 2026-10-09
+
+`fourierSeries` summed directly up to 2e6 terms (nodes times 2L+1), the bound of the sphere's
+trigonometric sum, and its adjoint below 50 nodes. The direct sum costs about 27 ns a term and a
+plan 0.45 ms whatever the size, so both cross at about 2e4 terms (`DIRECT_SUM_WORK_S1`): the
+evaluation at 1000 nodes and L = 64 4.8 -> 0.5 ms, at L = 1024 the sum would have taken 49 ms
+against the plan's 0.56. The S1 grids themselves cost nothing that matters: `S1Grid.nearest` of
+1e6 angles 41 to 158 ms, `SO3Grid.gamma` of the 2.5 degree grid 17 ms.
