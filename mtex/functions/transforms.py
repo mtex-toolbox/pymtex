@@ -42,8 +42,12 @@ DIRECT_SERIES_NODES = 100
 # only to its tolerance
 DIRECT_TRIG_NODES_S2 = 400
 DIRECT_TRIG_WORK_S2 = 2e6
-# on the circle the direct sum costs about 27 ns a term, nodes times 2L+1, and a plan 0.45 ms
+# on the circle the direct sum in NumPy costs about 27 ns a term, nodes times 2L+1, and a plan
+# 0.45 ms; the compiled sum by Horner's scheme 0.15 ns a term on the threads, so that it wins up to
+# the degree DIRECT_DEGREE_S1 at any number of nodes (1e6 nodes at L = 64: 22 ms against 41) and
+# up to DIRECT_WORK_S1 terms above it (1e4 nodes at L = 256: 0.76 ms against 0.89)
 DIRECT_SUM_WORK_S1 = 2e4
+DIRECT_DEGREE_S1, DIRECT_WORK_S1 = 64, 4e6
 NUFFT_EPS = 1e-8          # finufft's tolerance in double precision
 NUFFT_EPS_SINGLE = 1e-5   # and in single, where 1e-8 is out of reach
 
@@ -933,7 +937,10 @@ def fourierSeries(chat, x, real=None):
     x = x.nodes()
   x = np.asarray(x)
   # the direct sum is exact, the plan only to its tolerance; the sum is cheaper for few terms
-  if x.size * (2 * L + 1) < DIRECT_SUM_WORK_S1:
+  if backend() == "numba" and _directS1(x.size, L):
+    from .kernels import fourierSum
+    f = fourierSum(chat, x)
+  elif backend() != "numba" and x.size * (2 * L + 1) < DIRECT_SUM_WORK_S1:
     f = np.exp(1j * np.outer(x.ravel(), np.arange(-L, L + 1))) @ chat
   else:
     f = S1FourierPlan(x, L)(chat)
@@ -951,9 +958,17 @@ def fourierSeriesAdjoint(x, values, L, weights=None):
   x = np.asarray(x).ravel()
   values = np.asarray(values).ravel()
   weights = np.full(x.size, 1 / x.size) if weights is None else np.asarray(weights).ravel()
-  if x.size * (2 * L + 1) < DIRECT_SUM_WORK_S1:
+  if backend() == "numba" and _directS1(x.size, L):
+    from .kernels import fourierAdjointSum
+    return fourierAdjointSum(weights * values, x, L)
+  if backend() != "numba" and x.size * (2 * L + 1) < DIRECT_SUM_WORK_S1:
     return np.exp(-1j * np.outer(np.arange(-L, L + 1), x)) @ (weights * values)
   return S1FourierPlan(x, L).adjoint(values, weights)
+
+
+# whether the compiled direct sum on the circle beats a plan
+def _directS1(nodes, L):
+  return L <= DIRECT_DEGREE_S1 or nodes * (2 * L + 1) <= DIRECT_WORK_S1
 
 
 __all__ = ["halfPiDegrees", "foldedDims", "usableFolds", "wignerTransform", "wignerTransformAdjoint",

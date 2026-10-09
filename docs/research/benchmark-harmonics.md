@@ -459,3 +459,23 @@ unimodal ODFs build in 1 to 24 ms warm (144 and 608 ms were their first calls, c
   takes 0.17 ms against 2.1 at L = 64 and 0.55 against 7 at L = 256 for ten directions, and wins
   with the transform included. The thresholds between the trigonometric sum and the plan are left
   for a quiet machine, their differences being within the load's noise.
+
+## The evaluation of the S1 functions, 2026-10-09
+
+`S1FunHarmonic.eval` is `fourierSeries`, which summed in NumPy below 2e4 terms and otherwise took a
+finufft plan; a small bandwidth landed on the plan's single thread, so 1e6 angles at L = 16 took
+59 ms against 16 at L = 1024. The series is now summed by Horner's scheme in z = e^{ix} as one
+compiled loop (`fourierSum`, functions/kernels.py), stable on the unit circle (1.6e-13 at L = 1024),
+and the adjoint by the powers of e^{-ix} with a block of coefficients per thread
+(`fourierAdjointSum`); both win at any number of angles up to L = 64 and up to 4e6 terms above it.
+ms, complex / real coefficients, under load 8:
+
+| | 10 | 1e3 | 1e4 | 1e6 |
+|---|---:|---:|---:|---:|
+| L = 16, before | 0.01 | 0.50 | 0.93 | 59 |
+| L = 16, after | 0.02 | 0.02 | 0.09 | 8.1 |
+| L = 64, before | 0.03 | 0.54 | 0.91 | 52 |
+| L = 64, after | 0.02 | 0.04 | 0.24 | 22 |
+| L = 1024, before / after | 0.52 / 0.03 | 0.63 / 0.32 | 0.95 / 1.07 | 16 / 17 |
+
+The S1 kernels evaluate their closed forms or series in NumPy, 10 to 101 ms at 1e6 angles; left.

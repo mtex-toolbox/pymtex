@@ -13,6 +13,7 @@
 #   cellKernelSum(Q, m, cells, r, n, w, cut, ...)      a closed-form kernel summed over them, fused
 #   fibreSum(q, P, w, kappa)                          a fibre ODF of the de la Vallee Poussin kernel
 #   binghamSum(q, M, kappa)                           a Bingham distribution over its symmetric axes
+#   fourierSum(c, x), fourierAdjointSum(u, x, L)      the Fourier series on the circle and its adjoint, directly
 from __future__ import annotations
 
 import math
@@ -361,6 +362,51 @@ def binghamSum(q, M, kappa):
   out = np.empty(len(q))
   _parallel("binghamSum", _binghamSumLoop)(q, np.ascontiguousarray(M, dtype=np.float64), np.ascontiguousarray(kappa, dtype=np.float64), out)
   return out
+
+
+# ------------------------------------------------------------------ the Fourier series on the circle
+# sum_{k=-L}^{L} c_k e^{ikx} = e^{-iLx} sum_j c_{j-L} z^j with z = e^{ix}, by Horner's scheme, stable
+# on the unit circle; the adjoint sum_j u_j e^{-ikx_j} by the powers of e^{-ix} from e^{iLx}, the
+# nodes dealt out in blocks, each block its own coefficients, summed after
+def _fourierSumLoop(c, x, out):
+  n = c.shape[0]
+  L = (n - 1) // 2
+  for i in prange(x.shape[0]):
+    z = complex(np.cos(x[i]), np.sin(x[i]))
+    acc = c[n - 1]
+    for j in range(n - 2, -1, -1):
+      acc = acc * z + c[j]
+    out[i] = acc * complex(np.cos(L * x[i]), -np.sin(L * x[i]))
+
+
+def _fourierAdjointLoop(u, x, L, blocks, acc):
+  m = x.shape[0]
+  for b in prange(blocks):
+    for i in range(b * m // blocks, (b + 1) * m // blocks):
+      z = complex(np.cos(x[i]), -np.sin(x[i]))
+      p = u[i] * complex(np.cos(L * x[i]), np.sin(L * x[i]))
+      for k in range(2 * L + 1):
+        acc[b, k] += p
+        p *= z
+
+
+def fourierSum(c, x):
+  """the Fourier series sum_k c_k e^{ikx}, the coefficients c_{-L} .. c_L, at the angles x, as one
+  compiled loop over them"""
+  x = np.ascontiguousarray(x, dtype=np.float64).reshape(-1)
+  out = np.empty(len(x), dtype=complex)
+  _parallel("fourierSum", _fourierSumLoop)(np.ascontiguousarray(c, dtype=complex), x, out)
+  return out
+
+
+def fourierAdjointSum(u, x, L):
+  """the coefficients sum_j u_j e^{-ikx_j}, k = -L .. L, as one compiled loop over the angles"""
+  x = np.ascontiguousarray(x, dtype=np.float64).reshape(-1)
+  from ..geometry.kernels import threads
+  blocks = max(1, min(4 * threads(), len(x) // 64))
+  acc = np.zeros((blocks, 2 * L + 1), dtype=complex)
+  _parallel("fourierAdjoint", _fourierAdjointLoop)(np.ascontiguousarray(u, dtype=complex).reshape(-1), x, np.int64(L), np.int64(blocks), acc)
+  return acc.sum(axis=0)
 
 
 # ------------------------------------------------------------------ real valued coefficients

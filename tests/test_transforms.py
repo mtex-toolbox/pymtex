@@ -675,3 +675,13 @@ def test_wignerTransformAdjoint_readsAWrappedPolarAxis(kernels):
   W = np.zeros(H.shape[:2] + (4 * L,), dtype=complex)
   W[..., :L + 1], W[..., -L:] = H[..., L:], H[..., :L]
   assert np.allclose(wignerTransformAdjoint(W, L, True, centre=0), wignerTransformAdjoint(H, L, True), atol=1e-13)
+
+
+# the series on the circle and its adjoint as compiled direct sums, by Horner's scheme and the
+# powers of e^{-ix}, are the sums of the exponentials
+def test_fourierSum_andItsAdjointAreTheExponentialSums():
+  from mtex.functions.kernels import fourierAdjointSum, fourierSum
+  L, x = 50, rng.uniform(0, 2 * np.pi, 700)
+  c, u = rng.standard_normal(2 * L + 1) + 1j * rng.standard_normal(2 * L + 1), rng.standard_normal(700) + 1j * rng.standard_normal(700)
+  E = np.exp(1j * np.outer(x, np.arange(-L, L + 1)))
+  assert relerr(fourierSum(c, x), E @ c) < 1e-13 and relerr(fourierAdjointSum(u, x, L), np.conj(E).T @ u) < 1e-13
