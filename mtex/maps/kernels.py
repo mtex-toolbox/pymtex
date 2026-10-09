@@ -804,14 +804,15 @@ def _linearProgram(A, b, c, tol, maxIter, x):
   return 0
 
 
-# M z = r for a symmetric positive semidefinite M by Cholesky, the diagonal raised by 1e-13 of
-# its largest entry, so that dependent rows of a program leave it solvable
+# M z = r for a symmetric positive semidefinite M by Cholesky, the diagonal raised by 1e-16 of
+# its largest entry, so that dependent rows of a program leave it solvable; more would shift
+# the steps of the badly conditioned last iterations off the constraints
 def _choleskySolve(M, r):
   m = M.shape[0]
   jitter = 0.0
   for i in range(m):
     jitter = max(jitter, M[i, i])
-  jitter = 1e-13 * jitter if jitter > 0 else 1e-300
+  jitter = 1e-16 * jitter if jitter > 0 else 1e-300
   L = np.zeros((m, m))
   for i in range(m):
     for j in range(i + 1):
@@ -831,26 +832,6 @@ def _choleskySolve(M, r):
       t -= L[k, i] * z[k]
     z[i] = t / L[i, i]
   return z
-
-
-# x moved by the least correction that solves A x = b on its support, the entries above 1e-6 of
-# the largest, the rest kept: True where the result is feasible to rounding and nonnegative
-def _supportCorrection(A, b, x):
-  m, n = A.shape
-  top = 0.0
-  for j in range(n):
-    top = max(top, x[j])
-  S = np.flatnonzero(x > 1e-6 * top)
-  AS = A[:, S]
-  r = b - A @ x
-  z = _choleskySolve(AS @ AS.T, r)
-  y = x.copy()
-  y[S] += AS.T @ z
-  r = b - A @ y
-  if np.min(y[S]) < 0 or np.sqrt(r @ r) > 1e-12 * (1 + np.sqrt(b @ b)):
-    return False
-  x[:] = y
-  return True
 
 
 # min c x under A x = b, x >= 0, at the analytic centre of the optimal face, the solution a
@@ -886,12 +867,7 @@ def _centreProgram(A, b, c, tol, maxIter, x):
       nd += t * t
       gap += x[j] * s[j]
       cx += c[j] * x[j]
-    dualDone = np.sqrt(nd) <= tol * (1 + nc) and gap <= tol * (1 + abs(cx))
-    if dualDone and np.sqrt(np_) <= tol * (1 + nb):
-      return 0
-    # near the end the normal equations lose the primal residual, which the steps, cut short by
-    # the shears close to zero, no longer remove: the least correction on the support restores it
-    if dualDone and _supportCorrection(A, b, x):
+    if np.sqrt(np_) <= tol * (1 + nb) and np.sqrt(nd) <= tol * (1 + nc) and gap <= tol * (1 + abs(cx)):
       return 0
     # the Newton step towards the central path at 0.3 mu, by the normal equations
     target = 0.3 * gap / n
@@ -1297,7 +1273,7 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
 
 
 _PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
-                  "_choleskySolve", "_supportCorrection", "_centreProgram")
+                  "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
 

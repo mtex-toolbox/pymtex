@@ -130,9 +130,10 @@ What the MATLAB fixes on develop (1dc5807b1..b23d9cc59) showed, and what the use
   simplex returns a vertex: the Taylor factors agree, the slip rates and the spin do not. This
   port follows MATLAB's centre, and the Julia port is to. Done: `linprogCentre` (taylor.py, NumPy,
   batched) and `_centreProgram` (maps/kernels.py, compiled, used by the Taylor and the GND loop)
-  stop on the duality gap and, where the normal equations lose the primal residual near the end,
-  correct x on its support; `spinSelection='centre'` is the default, 'basic' and 'minimumNorm'
-  remain. Uniaxial [001] in fcc: the 8 active systems at 0.3062 each (MATLAB's 16 x 0.1531 count
+  stop on the duality gap, as MATLAB's does since 78bcc0897, and raise the diagonal of the normal
+  equations by only 1e-16 (1e-13 shifted the badly conditioned last steps off the constraints,
+  1 strain of the 1e4 and 13 of 1e5 random ones never converged); `spinSelection='centre'` is
+  the default, 'basic' and 'minimumNorm' remain. The factors agree with MATLAB's to 7.8e-12. Uniaxial [001] in fcc: the 8 active systems at 0.3062 each (MATLAB's 16 x 0.1531 count
   each signed system twice). taylor 17.5 ms (MATLAB 74), taylor_fun 152 ms (184), gnd 56 ms (705).
 - **The benchmarks.** `bench_maps_ops.m` maps 'hq' to `l1TVFilter`, which is right: MATLAB's
   `halfQuadraticFilter` is an obsolete subclass of it. MATLAB's EDAX reader, 3D KAM,

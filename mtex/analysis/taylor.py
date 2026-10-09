@@ -157,21 +157,14 @@ def linprogCentre(c, A, y, tol=1e-9, maxIter=100):
     gap = np.sum(x * s, axis=1)
     mu = gap / n
     # the duality gap is the error of the objective
-    dualDone = (np.linalg.norm(rd, axis=1) <= tol * (1 + nc)) & (gap <= tol * (1 + np.abs(np.sum(c * x, axis=1))))
-    done = dualDone & (np.linalg.norm(rp, axis=1) <= tol * (1 + ny))
-    # near the end the normal equations lose the primal residual, which the steps, cut short by
-    # the entries close to zero, no longer remove: the least correction on the support restores it
-    for k in np.flatnonzero(dualDone & ~done):
-      S = x[k] > 1e-6 * np.max(x[k])
-      z = x[k].copy()
-      z[S] += A[k][:, S].T @ np.linalg.lstsq(A[k][:, S] @ A[k][:, S].T, rp[k], rcond=None)[0]
-      if np.min(z[S]) >= 0 and np.linalg.norm(y[k] - A[k] @ z) <= 1e-12 * (1 + ny[k]):
-        x[k], done[k] = z, True
+    done = (np.linalg.norm(rp, axis=1) <= tol * (1 + ny)) & (np.linalg.norm(rd, axis=1) <= tol * (1 + nc)) & \
+           (gap <= tol * (1 + np.abs(np.sum(c * x, axis=1))))
     if done.all():
       break
     rc = 0.3 * mu[:, None] - x * s
     M = (A * (x / s)[:, None, :]) @ At
-    M += 1e-13 * np.max(np.diagonal(M, axis1=1, axis2=2), axis=1)[:, None, None] * np.eye(m)
+    # 1e-16 of the diagonal keeps dependent rows solvable; more shifts the last steps off the constraints
+    M += 1e-16 * np.max(np.diagonal(M, axis1=1, axis2=2), axis=1)[:, None, None] * np.eye(m)
     dlam = np.linalg.solve(M, (rp - mul(A, (rc - x * rd) / s))[..., None])[..., 0]
     ds = rd - mul(At, dlam)
     dx = (rc - x * ds) / s
