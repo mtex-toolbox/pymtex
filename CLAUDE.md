@@ -75,6 +75,9 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   blocks of their size in `/proc/buddyinfo` hold a quarter of the available memory (`_hugePagesHelp`
   in `geometry/session.py`). On fragmented memory they made fresh large arrays ten times slower to
   fill, on free memory they fill one of 46 MB in 7 ms instead of 24.
+- finufft allocates its oversampled grid in every execute, which glibc maps fresh above 32 MB, so
+  every call faulted it in again (120 of 230 ms at L = 128); its executes run inside `heapBlocks()`
+  (`geometry/kernels.py`), where large blocks come from the heap, whose top keeps up to 1 GB.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `calcGrains` alters the map it is given, as the Julia port does and MATLAB's

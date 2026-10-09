@@ -585,7 +585,9 @@ def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal, scheme="ClenshawCurti
   L0 = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
   L = bandwidthFor(L0, CS, SS)
   g = quadratureSO3Grid(L, scheme, CS, SS)
-  values = np.asarray(fun(g.nodes()))
+  # where a 2-fold axis maps half the grid onto the other, the callable sees that half only
+  half = g.halfNodes()
+  values = np.asarray(fun(g.nodes()) if half is None else g.fromHalf(fun(half)))
   n = len(g)
   # a function of several values, one row per node: a list of functions, one per column
   shape = values.shape[1:] if values.size != n else ()

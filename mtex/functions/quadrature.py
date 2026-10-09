@@ -134,7 +134,10 @@ class quadratureSO3Grid:
 
   def nodes(self):
     """the nodes as orientations in the frames of the grid, beta fastest, then alpha, then gamma"""
-    g, a, b = np.meshgrid(self.gamma, self.alpha, self.beta, indexing="ij")
+    return self._nodes(self.beta)
+
+  def _nodes(self, beta):
+    g, a, b = np.meshgrid(self.gamma, self.alpha, beta, indexing="ij")
     r = rotation.byEuler(a.ravel(), b.ravel(), g.ravel(), "Matthies")
     return r if self.CS is None else orientation(r, self.CS, self.SS if self.SS is not None else specimenFrame.default)
 
@@ -197,6 +200,52 @@ class quadratureSO3Grid:
     if values.shape[0] == len(index) and len(index) != len(self):
       return values[inverse]
     return values
+
+  # a 2-fold axis perpendicular to z at the angle psi from x maps the grid onto itself: on the
+  # crystal side (alpha, beta, gamma) -> (alpha + pi, pi - beta, -gamma - 2 psi), on the specimen
+  # side -> (2 psi - alpha, pi - beta, gamma + pi), both nodes of the grid where 2 psi is a multiple
+  # of its step. The image of the nodes beta < pi/2 is then the rest of the grid but the equator,
+  # so a function invariant under the groups need only be evaluated on the half beta <= pi/2.
+  # The index maps of the gamma and the alpha axis, or None
+  def _mirror(self):
+    if not hasattr(self, "_mirrorMaps"):
+      self._mirrorMaps = None
+      m = 2 * self.bandwidth + 2
+      Ng, Na, _ = self.shape
+      sides = (("crystal", self.CS), ("specimen", self.SS if self.SS is not None else specimenFrame.default))
+      for side, frame in (sides if self.CS is not None else ()):
+        q = frame.sym.properGroup().rotations().data.reshape(-1, 4)
+        for s in sorted({round(float(np.arctan2(x[2], x[1]) % np.pi) * m / np.pi, 6) for x in q if abs(x[0]) < 1e-9 and abs(x[3]) < 1e-9}):
+          if s == int(s):
+            c, a, s = np.arange(Ng), np.arange(Na), int(s)
+            if side == "crystal":
+              self._mirrorMaps = ((-c - s) % Ng, (a + m // 2) % Na)
+            else:
+              self._mirrorMaps = ((c + m // 2) % Ng, (s - a) % Na)
+            return self._mirrorMaps
+    return self._mirrorMaps
+
+  def halfNodes(self):
+    """the nodes beta <= pi/2 as orientations, where a 2-fold axis perpendicular to z on either side
+    maps them onto the rest of the grid; fromHalf spreads the values of an invariant function there
+    onto all nodes. None where the groups have no such axis"""
+    if self._mirror() is None:
+      return None
+    nb = len(self.beta)
+    return self._nodes(self.beta[:(nb + 1) // 2])
+
+  def fromHalf(self, values):
+    """values at halfNodes() spread onto all nodes, in the order of nodes(); the nodes beta > pi/2
+    take the values of their images under the 2-fold axis"""
+    cmap, amap = self._mirror()
+    Ng, Na, nb = self.shape
+    h = (nb + 1) // 2
+    values = np.asarray(values)
+    V = values.reshape((Ng, Na, h) + values.shape[1:])
+    full = np.empty((Ng, Na, nb) + values.shape[1:], dtype=values.dtype)
+    full[:, :, :h] = V
+    full[:, :, h:] = V[cmap][:, amap][:, :, nb - h - 1::-1]
+    return full.reshape((len(self),) + values.shape[1:])
 
   def __repr__(self):
     return aligned(f"quadratureSO3Grid ({self.scheme})\n  bandwidth: {self.bandwidth}\n  nodes: {len(self)}\n  folds: {self.folds}")

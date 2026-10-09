@@ -447,9 +447,10 @@ def _wignerForwardLoop(G, fhat, T, L, real, rA, rB, order):
 
 
 # fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk} d_n^{jl} h[l, k, -j], the pairs j, -j folded
-# first into U[j] = h[-j] + (-1)^{k+l} h[j]; a real function is given for l >= 0 and the
-# columns -l follow from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl})
-def _wignerAdjointLoop(fhat, H, T, L, real, rA, rB, order):
+# first into U[j] = h[-j] + (-1)^{k+l} h[j], h[j] at the index c + j of the last axis, which
+# wraps around for c = 0; a real function is given for l >= 0 and the columns -l follow from
+# fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl})
+def _wignerAdjointLoop(fhat, H, T, L, real, rA, rB, order, c):
   La, Kb = L // rA, L // rB
   nk = 2 * Kb + 1
   for t in prange(order.shape[0]):
@@ -460,9 +461,9 @@ def _wignerAdjointLoop(fhat, H, T, L, real, rA, rB, order):
     U = np.empty((L + 1, nk), dtype=H.dtype)
     for kp in range(-Kb, Kb + 1):
       mirror = 1.0 if (kp * rB + l) % 2 == 0 else -1.0
-      U[0, kp + Kb] = H[il, kp + Kb, L]
+      U[0, kp + Kb] = H[il, kp + Kb, c]
       for j in range(1, L + 1):
-        U[j, kp + Kb] = H[il, kp + Kb, L - j] + mirror * H[il, kp + Kb, L + j]
+        U[j, kp + Kb] = H[il, kp + Kb, c - j] + mirror * H[il, kp + Kb, c + j]
     acc = np.empty(nk, dtype=H.dtype)
     for n in range(al, L + 1):
       m, w, o = 2 * n + 1, n + 1, n * (n + 1) * (2 * n + 1) // 6
@@ -497,11 +498,13 @@ def wignerForward(G, fhat, T, L, real, folds):
   _parallel("wignerForward", _wignerForwardLoop)(G, fhat, T, L, bool(real), int(rA), int(rB), planeOrder(real, L // rA))
 
 
-def wignerAdjoint(fhat, H, T, L, real, folds):
+def wignerAdjoint(fhat, H, T, L, real, folds, centre=None):
   """the compiled adjoint Wigner transform from the Fourier grid H into the coefficients fhat, from
-  the quadrant table of d(pi/2), parallel over the planes l, the z folds of both sides applied"""
+  the quadrant table of d(pi/2), parallel over the planes l, the z folds of both sides applied; the
+  order j = 0 at the index centre of the last axis, L unless given, 0 for an axis that wraps"""
   rA, rB = folds
-  _parallel("wignerAdjoint", _wignerAdjointLoop)(fhat, H, T, L, bool(real), int(rA), int(rB), planeOrder(real, L // rA))
+  c = L if centre is None else int(centre)
+  _parallel("wignerAdjoint", _wignerAdjointLoop)(fhat, H, T, L, bool(real), int(rA), int(rB), planeOrder(real, L // rA), c)
 
 
 # ------------------------------------------------------------------ the spherical transforms

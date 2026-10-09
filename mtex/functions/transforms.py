@@ -22,7 +22,7 @@ import math
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.kernels import backend, passiveOpenMP, threads
+from ..geometry.kernels import backend, heapBlocks, passiveOpenMP, threads
 from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
@@ -147,12 +147,12 @@ def _wignerForwardNumpy(G, C, d, n, off, real, rA, rB, Kb, La):
     np.einsum("jk,jl,kl->lkj", d[n:, kp * rB + n], d[n:, lp * rA + n], Csub)
 
 
-# one degree block out of the array, the sum over j of d d h[-j]
-def _wignerAdjointNumpy(F, H, d, n, off, real, rA, rB, Kb, La):
+# one degree block out of the array, the sum over j of d d h[-j], h[j] at the index c + j
+def _wignerAdjointNumpy(F, H, d, n, c, real, rA, rB, Kb, La):
   la, kb = n // rA, n // rB
   lp = np.arange(0 if real else -la, la + 1)
   kp = np.arange(-kb, kb + 1)
-  Hsub = H[np.ix_(lp if real else lp + La, kp + Kb, np.arange(off + 2 * n, off - 1, -1))]
+  Hsub = H[np.ix_(lp if real else lp + La, kp + Kb, np.arange(c + n, c - n - 1, -1))]
   F[np.ix_(kp * rB + n, lp * rA + n)] = np.einsum("jk,jl,lkj->kl", d[:, kp * rB + n], d[:, lp * rA + n], Hsub)
 
 
@@ -190,24 +190,27 @@ def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
   return G
 
 
-def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None):
+def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None, centre=None):
   """the adjoint: fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk} d_n^{jl} h[l, k, -j] for
   h = sum_m w_m v_m e^{i(k alpha + j beta + l gamma)}; for real values only l >= 0 is given and
   the rest follows from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA
-  and k by rB, since the projection of H5 zeroes the rest anyway"""
+  and k by rB, since the projection of H5 zeroes the rest anyway. The order j = 0 sits at the
+  index centre of the last axis, L unless given, 0 for the output of an FFT, whose negative
+  orders wrap around"""
+  centre = L if centre is None else int(centre)
   cdtype = H.dtype
   rdtype = np.dtype(cdtype).type(0).real.dtype
   fhat = np.zeros(deg2dim(L + 1), dtype=cdtype)
   # the compiled loop reads a view in any axis order, the NFFT's lattice as it is
   if backend() == "numba" and degrees is None:
-    wignerAdjoint(fhat, H, halfPiQuadrants(L, rdtype), L, real, folds)
+    wignerAdjoint(fhat, H, halfPiQuadrants(L, rdtype), L, real, folds, centre)
     return fhat
   H = np.ascontiguousarray(H)
   rA, rB = folds
   La, Kb = L // rA, L // rB
   for n, dn in (halfPiDegrees(L, rdtype) if degrees is None else degrees):
     F = np.zeros((2 * n + 1, 2 * n + 1), dtype=cdtype)
-    _wignerAdjointNumpy(F, H, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, L - n, real, rA, rB, Kb, La)
+    _wignerAdjointNumpy(F, H, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, centre, real, rA, rB, Kb, La)
     F *= _blockPhase(n, False, rdtype)
     if real:
       k = np.arange(-n, n + 1)
@@ -311,16 +314,26 @@ def _euler(rots):
 # follow setNodes; a node that is not finite evaluates to NaN and adds nothing to an adjoint
 class _FourierPlan:
 
+  # the axes of the adjoint's finufft plan, a permutation of those of the array: finufft deals its
+  # sorted nodes out to the threads in slabs of its slowest axis, the first, and every slab is
+  # spread into a box of the full other axes and the slab widened by the kernel. A short first
+  # axis makes the boxes of all threads cover the grid several times over
+  _adjointAxes = None
+
   def _init(self, n, dtype, dims, eps, upsampfac):
     self.dims, self.dtype = dims, _complexType(dtype)
     self.eps = _eps(eps, dtype)
     self.opts, self._plans = _options(n, dims, self.eps, upsampfac), {}
 
+  # the dimensions and the nodes of the finufft plan of a kind
+  def _axes(self, kind, x):
+    return x if kind == 2 or self._adjointAxes is None else tuple(x[i] for i in self._adjointAxes)
+
   def _plan(self, kind):
     p = self._plans.get(kind)
     if p is None:
-      p = _finufft().Plan(kind, self.dims, eps=self.eps, isign=-1 if kind == 2 else 1, dtype=self.dtype.name, **self.opts)
-      p.setpts(*self.nodes)
+      p = _finufft().Plan(kind, self._axes(kind, self.dims), eps=self.eps, isign=-1 if kind == 2 else 1, dtype=self.dtype.name, **self.opts)
+      p.setpts(*self._axes(kind, self.nodes))
       self._plans[kind] = p
     return p
 
@@ -338,8 +351,8 @@ class _FourierPlan:
     self.nodes, self.phase, self.bad = nodes, phase, bad
     # the finufft plans move their points, an NFFT plan is built again
     self._plans = {kind: p for kind, p in self._plans.items() if isinstance(kind, int)}
-    for p in self._plans.values():
-      p.setpts(*nodes)
+    for kind, p in self._plans.items():
+      p.setpts(*self._axes(kind, nodes))
 
   # the shift of the half array of a real function onto the centred index set of finufft
   @property
@@ -350,7 +363,8 @@ class _FourierPlan:
     return len(self.phase)
 
   def _evaluate(self, G):
-    f = self.forward.execute(G)
+    with heapBlocks():
+      f = self.forward.execute(G)
     f = 2 * np.real(self.phase * f) if self.real else f
     if self.bad is not None:
       f[self.bad] = np.nan
@@ -360,7 +374,9 @@ class _FourierPlan:
     u = np.asarray(weights).ravel() * values * np.conj(self.phase)
     if self.bad is not None:
       u[self.bad] = 0
-    return self.backward.execute(np.ascontiguousarray(u, dtype=self.dtype))
+    with heapBlocks():
+      H = self.backward.execute(np.ascontiguousarray(u, dtype=self.dtype))
+    return H if self._adjointAxes is None else H.transpose(np.argsort(self._adjointAxes))
 
   # the NFFT of ../nfft (mtex/functions/nfft.py) where its library is there, at the default
   # tolerance its windows reach: every transform under the preference NUFFT = 'nfft', none
@@ -413,6 +429,9 @@ class SO3FourierPlan(_FourierPlan):
   in the forward its coefficients outside them are zero, in the adjoint the projection of H5
   is about to zero them. Both directions then run on the reduced index set, where the two
   periodic axes of the array shrink by the folds and the nodes are stretched"""
+
+  # the adjoint on the axes (k, j, l): the halved or folded axis l is the short one
+  _adjointAxes = (1, 2, 0)
 
   def __init__(self, rots, L, real=True, folds=(1, 1), eps=None, upsampfac=None):
     q = _quaternions(rots)
@@ -632,19 +651,20 @@ class SO3GridPlan:
     C[self._l] = Z
     return fft.fft(C, axis=0, workers=w).ravel()
 
-  def adjoint(self, values, weights):
-    """the SO(3) coefficients from weighted values on the grid, the FFTs taken backwards"""
+  def adjoint(self, values, weights=None):
+    """the SO(3) coefficients from weighted values on the grid, the FFTs taken backwards; without
+    weights those of the grid's rule"""
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
     fft, w, L = _fft(), threads(), self.L
-    x = (np.asarray(weights).ravel() * values).reshape(self.shape)
+    x = values.reshape(self.shape) * (self.grid.wbeta if weights is None else np.asarray(weights).reshape(self.shape))
     if real:
       Z = np.conj(fft.rfft(x, axis=0, workers=w)[:L // self.folds[0] + 1])
     else:
       Z = fft.ifft(x, axis=0, norm="forward", workers=w)[self._l]
     W = fft.ifft(Z, axis=1, norm="forward", workers=w)[:, self._k]
     X = fft.ifft(W, n=self.polar, axis=2, norm="forward", workers=w)
-    return wignerTransformAdjoint(_unwrapPolar(X, L), L, real, self.folds)
+    return wignerTransformAdjoint(X, L, real, self.folds, centre=0)
 
   def __repr__(self):
     return display("SO3GridPlan", [("bandwidth", self.L), ("grid", sizeString(self.shape)), ("real", self.real)])
@@ -739,10 +759,11 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
   quadrature grid brings the weights of its rule"""
   values = np.asarray(values).ravel()
   if isinstance(rots, quadratureSO3Grid):
-    weights = rots.weights if weights is None else weights
     if 0 < L <= rots.bandwidth:
-      return wignerPlan(rots, L, values.dtype.kind != "c").adjoint(values, weights)
-    return wignerSeriesAdjoint(rots.nodes(), values, L, weights, rots.folds)
+      plan = wignerPlan(rots, L, values.dtype.kind != "c")
+      # the Clenshaw-Curtis plan weighs by its rule itself, without spreading the weights out
+      return plan.adjoint(values, rots.weights if weights is None and not isinstance(plan, SO3GridPlan) else weights)
+    return wignerSeriesAdjoint(rots.nodes(), values, L, rots.weights if weights is None else weights, rots.folds)
   n = rots.size
   weights = np.full(n, 1 / n) if weights is None else np.asarray(weights).ravel()
   if n < DIRECT_SUM_NODES or L == 0:

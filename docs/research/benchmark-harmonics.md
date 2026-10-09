@@ -346,3 +346,60 @@ The grid wins from about 0.2 L^3 on; its error falls with N / L^3 and grows as t
 narrows below what L = 64 resolves. 2 L^3 keeps the error under one percent but for kernels
 cut by the bandwidth cap; `exact=True` takes finufft at any size.
 
+
+## The symmetries the transforms use, and three costs outside the transforms, 2026-10-09
+
+Which symmetries each port uses in the evaluation and the quadrature of the harmonic functions:
+
+| symmetry | Python | Julia | MATLAB |
+|---|---|---|---|
+| real values, half the array (SO(3) and S2, both routes) | yes | yes | yes |
+| the rotations about z of both groups, the array shrunk by the folds | grid and finufft | grid and NFFT | grid; the NFFT array is full |
+| a 2-fold axis perpendicular to z in the coefficient transform | no | no | yes (`wignerTrafo`, `sym`) |
+| a callable on the grid evaluated at the distinct nodes only | half the grid, by the 2-fold | no | yes (`iuniqueGrid`) |
+| exchange symmetry f(g) = f(g^-1), S2 antipodal, S2 rotations about z | no | no | no |
+
+Left out, measured: the perpendicular 2-fold in the coefficient transform saves at most half of
+7.6 ms in an evaluation of 200 ms at L = 128 (m-3m, 1e6 nodes), where finufft's interpolation
+takes 120 ms with its kernel 14 points wide in 3D at the tolerance 1e-8, which no symmetry
+narrows; the exchange symmetry turns alpha into gamma and shrinks no array; the S2 transforms
+take 27 ms at 1e6 nodes and L = 128. The other elements of the cubic groups (the 3-folds) map no
+node of the Euler lattice onto a node. MATLAB's NFFT runs at m = 4, sigma = 2, the same accuracy
+as finufft's 1e-8; a lower tolerance is a choice of accuracy, 1e-6 would take 25 to 30 % off.
+
+What changed (`bench/harmonics_user.py`, ms, before / after):
+
+| case | before | after |
+|---|---:|---:|
+| SO3 eval L=128 1e4, 1 / m-3m | 253 / 80 | 147 / 51 |
+| SO3 eval L=128 1e6, 1 / m-3m | 363 / 218 | 263 / 192 |
+| SO3 quadrature L=128 1e4, 1 / m-3m | 301 / 192 | 207 / 93 |
+| SO3 quadrature L=128 1e6, 1 / m-3m | 497 / 290 | 366 / 222 |
+| SO3 quadrature L=64 1e6, 1 / m-3m | 220 / 130 | 180 / 95 |
+| SO3 grid quadrature L=127 1/1, 432/1, L=128 622/222 | 281 / 85 / 48 | 197 / 70 / 35 |
+| SO3FunHarmonic of a callable, m-3m, L = 128 | 300 | 218 |
+
+- **finufft allocates its oversampled grid in every execute** and frees it after; glibc maps a
+  block that large fresh and unmaps it on free, so every call faulted the whole grid in again:
+  66 thousand pages, 272 MB, 120 of the 230 ms of an evaluation at 1e4 nodes on the lattice of
+  L = 128. `heapBlocks()` (geometry/kernels.py) takes such blocks from the heap during an
+  execute, whose top keeps up to 1 GB after a free, so the next call finds the pages mapped;
+  outside it large blocks are mapped as before, so an array freed below a small one is still
+  given back. Reusing finufft plans across calls gains nothing: the buffer is per execute.
+- **The adjoint's finufft plan has the short axis last**: finufft deals its sorted nodes to the
+  threads in slabs of its slowest axis and spreads every slab into a box of the other axes,
+  widened by the kernel; with the halved and folded axis l first (48 points for m-3m) the boxes
+  covered the grid several times over, 151 against 83 ms at 1e4 nodes. The plan of type 1 runs on
+  (k, j, l), which the adjoint Wigner transform reads as a view; the evaluation (type 2) gains
+  6 to 9 ms by the same and keeps its order. On S2 the present order is the faster one.
+- **The grid adjoint reads the polar FFT in place**: the kernel takes the index of the order
+  j = 0 (`centre=0`, negative orders wrap around), which spares the concatenation (30 ms at
+  L = 127), and the plan weighs by the rule's beta weights broadcast instead of a weight per node
+  spread out (28 ms). Conjugating while the coefficients are copied, to spare the forward's pass
+  over its array, measured no gain and was left.
+- **A callable sees half the grid** where a 2-fold axis perpendicular to z maps the nodes beta <
+  pi/2 onto the rest (`quadratureSO3Grid.halfNodes`, `fromHalf`): on the crystal side at the angle
+  psi from x (alpha, beta, gamma) -> (alpha + pi, pi - beta, -gamma - 2 psi), on the specimen side
+  (2 psi - alpha, pi - beta, gamma + pi), on the grid where 2 psi is a multiple of its step, which
+  some axis of every such group is. MATLAB's distinct nodes (`fullGrid`, `_unique` here) take
+  27 s to find at L = 128 by comparing every image; the mirror needs no search.

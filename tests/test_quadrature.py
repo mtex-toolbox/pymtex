@@ -4,7 +4,7 @@ import pytest
 from numpy import pi
 
 from mtex.functions.harmonics import _WignerD
-from mtex import (bandwidthFor, clenshawCurtis, crystalFrame, degreeBlock, deg2dim, folds, gaussLegendre,
+from mtex import (angle, bandwidthFor, clenshawCurtis, crystalFrame, degreeBlock, deg2dim, folds, gaussLegendre,
                   legendreP, orientation, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid, specimenFrame)
 
 
@@ -84,6 +84,19 @@ def test_quadratureSO3Grid_foldedAgreesWithTheFullRuleOnInvariantFunctions():
     gram.append((B * w) @ B.conj().T)
   assert np.allclose(gram[0], gram[1], atol=1e-12) and np.linalg.norm(gram[0]) > 1e-3
 
+
+
+# a 2-fold axis perpendicular to z on either side maps the nodes beta <= pi/2 onto the rest, so
+# the values of an invariant function there give all of them; a group without one has no half
+@pytest.mark.parametrize("cs, ss, scheme", [("432", "1", "ClenshawCurtis"), ("321", "1", "GaussLegendre"),
+                                            ("1", "mmm", "ClenshawCurtis"), ("2/m", "1", "GaussLegendre")])
+def test_quadratureSO3Grid_halfNodesGiveAllValuesOfAnInvariantFunction(cs, ss, scheme):
+  CS, SS = crystalFrame(cs), specimenFrame(ss) if ss != "1" else specimenFrame.default
+  g = quadratureSO3Grid(bandwidthFor(9, CS, SS), scheme, CS, SS)
+  centre = orientation.rand(1, CS, SS)
+  f = lambda o: np.cos(angle(o, centre))
+  assert np.allclose(g.fromHalf(f(g.halfNodes())), f(g.nodes()), atol=1e-13)
+  assert quadratureSO3Grid(bandwidthFor(9, crystalFrame("4")), crystalFrame("4")).halfNodes() is None
 
 def test_quadratureS2Grid_integratesTheSphericalHarmonicsExactly():
   for L in (3, 10):

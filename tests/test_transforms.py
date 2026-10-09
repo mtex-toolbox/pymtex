@@ -665,3 +665,13 @@ def test_wignerSeriesAdjointGridded_againstTheExactAdjoint():
       k = np.arange(-n, n + 1)
       degreeBlock(mask, n)[...] = (k[:, None] % fo[1] == 0) & (k[None, :] % fo[0] == 0)
     assert relerr(got[mask], exact[mask]) < 0.02
+
+
+# the adjoint reads the order j at the index centre + j, so the output of an FFT, whose negative
+# orders wrap around, needs no unwrapping
+def test_wignerTransformAdjoint_readsAWrappedPolarAxis(kernels):
+  L = 6
+  H = rng.standard_normal(foldedDims(L, True, (1, 1))) + 1j * rng.standard_normal(foldedDims(L, True, (1, 1)))
+  W = np.zeros(H.shape[:2] + (4 * L,), dtype=complex)
+  W[..., :L + 1], W[..., -L:] = H[..., L:], H[..., :L]
+  assert np.allclose(wignerTransformAdjoint(W, L, True, centre=0), wignerTransformAdjoint(H, L, True), atol=1e-13)

@@ -167,6 +167,63 @@ class blasThreads:
     return False
 
 
+# glibc's malloc maps a block above its mmap threshold fresh and unmaps it on free, so a library
+# that allocates its work array in every call, as finufft its oversampled grid in every execute,
+# faults the array in again page by page: 272 MB, 120 of 230 ms of a transform at L = 128. Inside
+# heapBlocks such a block comes from the top of the heap, which keeps what is freed there up to
+# HEAP_KEEP bytes, so the next call finds its pages mapped; outside it a large block is mapped as
+# before, so a large array freed below a small one is still given back. The thresholds are set
+# once: the mmap threshold at glibc's own ceiling, where its dynamic threshold ends up anyway and
+# which setting the trim threshold would freeze at 128 kB. Nothing happens without glibc's mallopt
+M_TRIM_THRESHOLD, M_MMAP_THRESHOLD, M_MMAP_MAX = -1, -3, -4
+MMAP_THRESHOLD_MAX, MMAP_MAX_DEFAULT = 32 << 20, 65536
+HEAP_KEEP = 1 << 30
+_heap = {"mallopt": False, "depth": 0}
+_heapLock = threading.Lock()
+
+
+def _mallopt():
+  if _heap["mallopt"] is False:
+    import ctypes
+    import sys
+    f = None
+    if sys.platform.startswith("linux"):
+      try:
+        f = ctypes.CDLL("libc.so.6").mallopt
+      except (OSError, AttributeError):
+        f = None
+    if f is not None:
+      f(M_MMAP_THRESHOLD, MMAP_THRESHOLD_MAX)
+      f(M_TRIM_THRESHOLD, HEAP_KEEP)
+    _heap["mallopt"] = f
+  return _heap["mallopt"]
+
+
+class heapBlocks:
+  """a context in which glibc's malloc takes large blocks from the heap, where their pages stay
+  mapped for the next call, instead of mapping them fresh; for a library that allocates its work
+  array in every call, as finufft does
+
+    with heapBlocks():
+      plan.execute(x)"""
+
+  def __enter__(self):
+    with _heapLock:
+      f = _mallopt()
+      if f is not None and _heap["depth"] == 0:
+        f(M_MMAP_MAX, 0)
+      _heap["depth"] += 1
+    return self
+
+  def __exit__(self, *exc):
+    with _heapLock:
+      _heap["depth"] -= 1
+      f = _heap["mallopt"]
+      if f is not None and _heap["depth"] == 0:
+        f(M_MMAP_MAX, MMAP_MAX_DEFAULT)
+    return False
+
+
 def _loop(name, f):
   if name not in _compiled:
     _compiled[name] = _numba.njit(cache=True, nogil=True)(f)

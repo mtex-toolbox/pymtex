@@ -201,6 +201,20 @@ def test_blas_threads_are_set_and_restored():
   assert [g() for g, _ in libs] == before
 
 
+
+# inside heapBlocks a large block freed is taken again from the heap with its pages mapped
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="glibc's mallopt")
+def test_heapBlocks_keepsTheFreedPagesOfALargeBlock():
+  import resource
+  from mtex.geometry.kernels import heapBlocks
+  def faults():
+    with heapBlocks():
+      before = resource.getrusage(resource.RUSAGE_SELF).ru_minflt
+      np.ones(64 << 17)
+      return resource.getrusage(resource.RUSAGE_SELF).ru_minflt - before
+  faults()
+  assert faults() < 100
+
 def test_region_membership_agrees_with_numpy(numbaBackend):
   # the planes of a fundamental region turned by the rotations about z, as the SO(3) grid tests
   from mtex import fundamentalRegion

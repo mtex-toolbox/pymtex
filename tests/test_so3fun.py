@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from mtex import (SO3DeLaValleePoussinKernel, SO3FunHarmonic, crystalFrame, deg2dim, degree, dot, isRealWigner, mean, norm,
+from mtex import (SO3DeLaValleePoussinKernel, SO3FunHarmonic, angle, bandwidthFor, crystalFrame, deg2dim, degree, dot, isRealWigner, mean, norm,
                   orientation, quadratureSO3Grid, rotation, specimenFrame, symmetrise, inv)
 
 rng = np.random.default_rng(31)
@@ -89,6 +89,19 @@ def test_SO3FunHarmonic_fromACallableOrSamplesOnTheQuadratureNodes():
   assert h2.isclose(f, 1e-6)
   assert SO3FunHarmonic.quadrature(q, f(q), bandwidth=f.bandwidth).isclose(f, 1e-6)
 
+
+
+# where a 2-fold axis perpendicular to z maps half the quadrature grid onto the other, a callable
+# is evaluated on that half only, and the expansion is the same
+def test_SO3FunHarmonic_ofACallableEvaluatesHalfTheGrid():
+  cs = crystalFrame("432")
+  centre = orientation.rand(1, cs)
+  seen = []
+  f = lambda o: seen.append(o.size) or np.exp(-np.cos(angle(o, centre)))
+  h = SO3FunHarmonic(f, cs, bandwidth=16)
+  g = quadratureSO3Grid(bandwidthFor(16, cs), cs)
+  assert seen == [g.halfNodes().size] and 2 * seen[0] < len(g) + 2 * g.shape[0] * g.shape[1]
+  assert np.allclose(h.fhat, SO3FunHarmonic.quadrature(g, f(g.nodes()), bandwidth=16).fhat, atol=1e-12)
 
 def test_SO3FunHarmonic_truncateAndBandwidthSetTheBandwidth():
   _, f, cs, ss = kernelFunction()
