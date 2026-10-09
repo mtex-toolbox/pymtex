@@ -20,10 +20,11 @@ _DEFAULT_PREFS = {
   "defaultSO3Bandwidth": 64,
   "FFTAccuracy": 1e-2,
   "displayRows": 20,
-  # whether NumPy asks the kernel for huge pages on its large arrays; on a machine whose memory is
-  # fragmented every page fault of such an array then waits for the kernel to compact memory,
-  # which makes fresh memory ten times slower to fill, so MTEX switches the request off
-  "hugePages": False,
+  # whether NumPy asks the kernel for huge pages on its large arrays: True, False, or 'auto', which
+  # asks where the kernel offers them and holds enough free memory in blocks of their size. Where
+  # memory is fragmented, every page fault of such an array waits for the kernel to compact it,
+  # ten times slower to fill; where it is not, a fresh 46 MB array fills in 7 ms instead of 24
+  "hugePages": "auto",
 }
 
 
@@ -73,13 +74,52 @@ def setMTEXpref(name, value, save=False):
     saveSetting(name, value)
 
 
+# 'auto' asks for huge pages where the free memory in blocks of their size is at least this
+# share of the available memory, and at least HUGE_MINIMUM bytes
+HUGE_SHARE, HUGE_MINIMUM = 0.25, 1 << 30
+
+
+def _readText(path):
+  try:
+    with open(path) as f:
+      return f.read()
+  except OSError:
+    return None
+
+
+# whether huge pages fill fresh memory faster here, from the kernel's setting (the bracketed word
+# of transparent_hugepage/enabled), the free blocks of every order in /proc/buddyinfo and
+# /proc/meminfo; no on a system without them, and where the free blocks of a huge page's size
+# hold too little of the memory available, since then every fault waits for compaction
+def _hugePagesHelp(enabled=None, buddyinfo=None, meminfo=None):
+  enabled = _readText("/sys/kernel/mm/transparent_hugepage/enabled") if enabled is None else enabled
+  buddyinfo = _readText("/proc/buddyinfo") if buddyinfo is None else buddyinfo
+  meminfo = _readText("/proc/meminfo") if meminfo is None else meminfo
+  if not enabled or "[never]" in enabled or not buddyinfo or not meminfo:
+    return False
+  mem = {}
+  for line in meminfo.splitlines():
+    parts = line.replace(":", " ").split()
+    if len(parts) >= 2 and parts[1].isdigit():
+      mem[parts[0]] = int(parts[1]) * 1024
+  page, huge, avail = 4096, mem.get("Hugepagesize", 2 << 20), mem.get("MemAvailable", 0)
+  order = max(0, int(huge // page).bit_length() - 1)
+  free = 0
+  for line in buddyinfo.splitlines():
+    counts = line.split()[4:]
+    free += sum(int(c) * (page << k) for k, c in enumerate(counts) if k >= order and c.isdigit())
+  return free >= max(HUGE_SHARE * avail, HUGE_MINIMUM)
+
+
 def applyHugePages():
-  """hands the preference 'hugePages' to NumPy, which holds it for the whole process"""
+  """hands the preference 'hugePages' to NumPy, which holds it for the whole process; 'auto'
+  decides by the memory this machine has free in blocks of a huge page's size"""
   try:
     from numpy._core.multiarray import _set_madvise_hugepage
   except ImportError:
     return
-  _set_madvise_hugepage(bool(SESSION.prefs.get("hugePages", False)))
+  want = SESSION.prefs.get("hugePages", "auto")
+  _set_madvise_hugepage(_hugePagesHelp() if want == "auto" else bool(want))
 
 
 def reset():

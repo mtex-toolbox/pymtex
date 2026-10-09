@@ -70,8 +70,11 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   confirm) gives the lattice, `mapFromColumns` in `io/load.py` writes every column into its grid
   cell and the list is never built; it must stay equal to `gridify` of the list (a test per format).
   A rigid `rotate` or `shift` carries the lattice (`lattice.moved`) instead of inferring it again.
-- The preference `hugePages` (default False) is NumPy's madvise of huge pages, process wide, set at
-  import: on fragmented memory it made fresh large arrays ten times slower to fill.
+- The preference `hugePages` is NumPy's madvise of huge pages, process wide, set at import: True,
+  False, or `'auto'` (the default), which asks for them where the kernel offers them and the free
+  blocks of their size in `/proc/buddyinfo` hold a quarter of the available memory (`_hugePagesHelp`
+  in `geometry/session.py`). On fragmented memory they made fresh large arrays ten times slower to
+  fill, on free memory they fill one of 46 MB in 7 ms instead of 24.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `calcGrains` alters the map it is given, as the Julia port does and MATLAB's
