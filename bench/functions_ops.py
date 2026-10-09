@@ -10,7 +10,8 @@
 # The input in bench/out/functions: 1000 centres C (m-3m) with weights w of a de la Vallee Poussin
 # ODF of halfwidth 10 degree, 1e5 orientations O and directions V to evaluate at and fit to, and
 # the smooth values a^2 - b c on O and exp(z) + x y on V. rbf_direct evaluates the ODF at the first
-# 1e4 of O by its kernel sum, the slow variant so3_eval is checked against in every port.
+# 1e4 of O, MATLAB and Julia by the kernel sum, this port by its harmonic form, since the sum has
+# more terms than HARMONIC_EVAL; the slow variant so3_eval is checked against in every port.
 from __future__ import annotations
 
 import os
@@ -38,10 +39,13 @@ ALGORITHM = [
    "entry": {"matlab": ["@SO3FunRBF.eval", "@SO3FunRBF.calcFourier"],
              "python": ["mtex.functions.rbf.SO3FunRBF.eval", "mtex.functions.rbf.SO3FunRBF._harmonic"],
              "julia": ["SO3FunRBF", "SO3FunHarmonic"]},
-   "cases": {"rbf_direct": "the ODF of 1000 centres at 1e4 orientations by its kernel sum",
+   "cases": {"rbf_direct": "odf(ori), the ODF of 1000 centres at 1e4 orientations: the kernel sum in MATLAB and Julia, "
+                           "in this port its harmonic form, cut at bandwidth 25, since the sum has more terms than HARMONIC_EVAL",
              "rbf_harmonic": "SO3FunHarmonic(odf), bandwidth 64"},
-   # MATLAB's kernel sum is 0.39 off its own harmonic form, which agrees with this port's to 1e-9;
-   # this port's kernel sum and harmonic form agree to 3e-13
+   # MATLAB and Julia sum the kernels exactly and agree to 3e-6; this port evaluates the harmonic
+   # form there (decided 2026-10-09), which the cut at the kernel's accuracy bandwidth leaves about
+   # 5e-4 of the maximum from the sum; the 3e-13 of the slow variant's check here compares the
+   # harmonic form with itself
    "tolerance": {"rbf_direct": 1e-3, "rbf_harmonic": 1e-6}},
   {"name": "least squares approximation",
    "entry": {"matlab": ["@SO3FunHarmonic.interpolate", "@S2FunHarmonic.interpolate"],
@@ -109,9 +113,15 @@ def run(ops):
                        lambda F: vals(F, V[:10**4])),
   }
   crosscheck.run(OUT, ALGORITHM, table, ops, reps=3, always=("rbf_harmonic", "s2_quadrature"))
-  # the slow variant: the harmonic form against the kernel sum, in this port
-  d = np.max(np.abs(np.real(s["F"].eval(ori[:10**4])) - np.real(odf.eval(ori[:10**4]))))
-  print(f"harmonic form against the kernel sum: {d:.1e}")
+  # the slow variant: the harmonic form against the exact kernel sum, summed through the tree of
+  # the centres, in this port
+  from mtex.functions import rbf
+  from mtex.geometry.symreduce import reductionGroups
+  L, R = reductionGroups(odf.center)
+  q = rotation(ori[:10**4]).data.reshape(-1, 4)
+  exact = odf.c0 + rbf._treeSum(q, odf.center.data.reshape(-1, 4), odf.weights, L, R, odf.antipodal, odf.psi, rbf.supportCosine(odf.psi))
+  d = np.max(np.abs(np.real(s["F"].eval(ori[:10**4])).ravel() - exact)) / np.max(exact)
+  print(f"harmonic form against the exact kernel sum, relative to its maximum: {d:.1e}")
 
 
 def deviation(op, a, b):

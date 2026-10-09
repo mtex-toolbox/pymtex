@@ -105,8 +105,8 @@ def matlab(ops):
 
 # rows matched by their positions to the nearest within 1e-6; the voxels by their phase, which must
 # agree, and the angle between their rotations where both are indexed; the grains by their voxel
-# counts, which must agree, and their volumes relative to the largest; the KAM, less MATLAB's offset,
-# relative to the largest
+# counts, which must agree, and their volumes relative to the largest; the KAM relative to the
+# largest
 def deviation(op, a, b):
   from scipy.spatial import cKDTree
   d, j = cKDTree(b[:, :3]).query(a[:, :3])
@@ -127,8 +127,6 @@ def deviation(op, a, b):
       print(f"  {op}: {int((va[:, 1] != vb[:, 1]).sum())} grains of another voxel count")
       return float("nan")
     return float(np.max(np.abs(va[:, 0] - vb[:, 0])) / np.max(np.abs(vb[:, 0])))
-  # MATLAB adds 1e-5 to every angle it averages, to keep a zero in its sparse matrix
-  vb = vb - 1e-5
   if (np.isnan(va) != np.isnan(vb)).any():
     print(f"  {op}: NaN in {int(np.isnan(va).sum())} Python and {int(np.isnan(vb).sum())} MATLAB rows")
   both = ~(np.isnan(va) | np.isnan(vb))

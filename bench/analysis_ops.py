@@ -84,9 +84,11 @@ ALGORITHM = [
   {"name": "discrete sampling",
    "entry": {"matlab": ["@S2Fun.optimalSample", "@SO3Fun.optimalSample"], "python": ["mtex.analysis.optimalsample.optimalSample"],
              "julia": ["optimalSample"]},
-   "cases": {"optimal_s2": "optimalSample(1 + 0.6 z, 300, 'bandwidth', 16): the moments of the nodes",
-             "optimal_so3": "optimalSample(odf, 200, 'bandwidth', 16) of a 20 degree unimodal ODF in 1: the moments of the nodes"},
-   # both are approximations of one density, apart by what each misses of it
+   "cases": {"optimal_s2": "optimalSample(1 + 0.6 z, 300, 'bandwidth', 16): the discrepancy J of the nodes",
+             "optimal_so3": "optimalSample(odf, 200, 'bandwidth', 16) of a 20 degree unimodal ODF in 1: the discrepancy J of the nodes"},
+   # the ports' L-BFGS reach equally good minima by different paths, so the nodes agree only as a
+   # set; J of each port's nodes, by this port's objective, against MATLAB's relative to J of the
+   # target alone
    "tolerance": 2e-2},
   # the Julia port selects no halfwidth
   {"name": "halfwidth selection",
@@ -213,25 +215,18 @@ def run(ops):
   crosscheck.run(OUT, ALGORITHM, table, ops, reps=reps | {op: 3 for op in COLS if op not in reps})
 
 
-# the power of every degree 1 to 16 of equally weighted directions: the mean of P_l over all
-# pairs, 4 pi / (2l + 1) times the squared norm of the degree's moments, free of any basis
-def _moments(v, L=16):
-  from scipy.special import eval_legendre
-  G = np.clip(v @ v.T, -1, 1)
-  return np.array([np.mean(eval_legendre(l, G)) for l in range(1, L + 1)])
-
-
-# the same of equally weighted rotations: the mean character sin((2l+1) w/2) / sin(w/2) over all
-# pairs, the squared norm of the mean Wigner block of degree l, over 2l + 1
-def _momentsSO3(q, L=16):
-  c = np.clip(np.abs(q @ q.T), 0, 1)
-  w = 2 * np.arccos(c)
-  s = np.sin(w / 2)
-  out = []
-  for l in range(1, L + 1):
-    chi = np.where(s > 1e-8, np.sin((2 * l + 1) * w / 2) / np.where(s > 1e-8, s, 1), 2 * l + 1)
-    out.append(np.mean(chi) / (2 * l + 1))
-  return np.array(out)
+# the discrepancy J of equally weighted nodes against the target, by this port's objective, so that
+# every port's nodes are measured alike, and the J of no nodes at all, the size of the target
+def _discrepancy(op, x):
+  from mtex import S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunRBF, crystalFrame, degree, orientation, rotation
+  from mtex.analysis.optimalsample import _Problem
+  if op == "optimal_s2":
+    f = S2FunHarmonic(np.array(DENSITY, dtype=complex))
+  else:
+    f = SO3FunRBF(orientation(rotation.byEuler(10 * degree, 20 * degree, 30 * degree), crystalFrame("1")),
+                  SO3DeLaValleePoussinKernel(halfwidth=20 * degree), np.ones(1))
+  p = _Problem(f, x, 16)
+  return p.residual(x, np.full(len(x), 1 / len(x)))[0], p.objective(p.target._fhat)
 
 
 # the angles between two lists of orientations of one symmetry, every pair
@@ -270,10 +265,10 @@ def deviation(op, a, b):
     return _matched(np.arccos(np.clip(u(a[:, :3]) @ u(b[:, :3]).T, -1, 1)), a, b, 3, b[:, 3].sum(), op)
   if op == "cluster_orientations":
     return _matched(_angles(a[:, :4], b[:, :4], "432"), a, b, 4, b[:, 4].sum(), op)
-  if op == "optimal_s2":
-    return float(np.max(np.abs(_moments(a) - _moments(b))))
-  if op == "optimal_so3":
-    return float(np.max(np.abs(_momentsSO3(a) - _momentsSO3(b))))
+  if op in ("optimal_s2", "optimal_so3"):
+    (ja, j0), (jb, _) = _discrepancy(op, a), _discrepancy(op, b)
+    print(f"  {op}: J {ja:.3e} against MATLAB's {jb:.3e}, of the target's {j0:.3e}")
+    return float(abs(ja - jb) / j0)
   if op.startswith("halfwidth"):
     return float(abs(a[0, 0] - b[0, 0]) / b[0, 0])
   if op == "gnd":
