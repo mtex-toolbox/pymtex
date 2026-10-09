@@ -269,8 +269,17 @@ def paror(self, omega=None):
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   H, offsets, lengths = _flatHull(self)
+  # one compiled pass per direction, the matrix of the projections below its NumPy form
+  loop = None
+  if kernelBackend() == "numba":
+    from .kernels import grainKernel
+    loop = grainKernel("projectionLength")
+  if loop is not None:
+    out = np.empty(len(omega))
+    loop(np.ascontiguousarray(H[:, :2], dtype=float), offsets.astype(np.int64), D, out)
+    return out / out.max()
   # the projections a row per direction, so that every outline's run of them is contiguous
-  pr = np.ascontiguousarray((H @ D.T).T)
+  pr = D @ H[:, :2].T
   ok = lengths > 0
   out = np.sum(np.maximum.reduceat(pr, offsets[:-1][ok], axis=1) - np.minimum.reduceat(pr, offsets[:-1][ok], axis=1), axis=1) if ok.any() else np.zeros(len(omega))
   return out / out.max()

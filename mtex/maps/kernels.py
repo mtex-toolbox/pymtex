@@ -1501,9 +1501,29 @@ def _loopSumsLoop(V, flat, start, length, owner, first, out):
       out[k, 7] += (px * qy + 2 * px * py + 2 * qx * qy + qx * py) * w
 
 
+# the widths of the point runs H[offsets[k]:offsets[k + 1]] seen from every direction of D,
+# summed over the runs: a direction is one pass over the points, no projection is stored
+def _projectionLengthLoop(H, offsets, D, out):
+  for w in prange(D.shape[0]):
+    dx, dy = D[w, 0], D[w, 1]
+    acc = 0.0
+    for k in range(offsets.shape[0] - 1):
+      s, e = offsets[k], offsets[k + 1]
+      if e > s:
+        lo = hi = H[s, 0] * dx + H[s, 1] * dy
+        for i in range(s + 1, e):
+          p = H[i, 0] * dx + H[i, 1] * dy
+          if p < lo:
+            lo = p
+          elif p > hi:
+            hi = p
+        acc += hi - lo
+    out[w] = acc
+
+
 _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_toReferenceLoop, True),
                 "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False),
-                "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False)}
+                "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False), "projectionLength": (_projectionLengthLoop, True)}
 
 
 def grainKernel(name):

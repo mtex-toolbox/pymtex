@@ -171,3 +171,15 @@ def test_the_extremal_widths_over_all_grains_are_those_of_each():
     d = np.linalg.norm(H[:, None, :] - H[None, :, :], axis=-1)
     assert close(np.linalg.norm(long[k]), d.max(), 1e-9)
     assert close(abs(short[k] @ n[np.argmin(w)]), w.min(), 1e-9)
+
+
+def test_paror_theCompiledPassIsTheMatrixOfTheProjections():
+  from mtex import setMTEXpref
+  g = rect()[0]
+  compiled = g.paror()
+  setMTEXpref("kernels", "numpy")
+  try:
+    oracle = g.paror()
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(compiled, oracle, rtol=0, atol=1e-13)
