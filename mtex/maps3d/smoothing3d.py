@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..maps.smoothing import boundaryFilter, boundaryNetwork, laplaceFilter
 
 
@@ -70,7 +71,7 @@ def _reduceBoundary3d(grains, n=2, cell=None, quadric=False):
   V = gB.allV
   E, _ = gB.edges()
   h = n * float(np.min(np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1))) if cell is None else float(cell)
-  lo, hi = V.min(axis=0), V.max(axis=0)
+  lo, hi = columnMin(V), columnMax(V)
   onLo, onHi = np.abs(V - lo) < 1e-6 * h, np.abs(V - hi) < 1e-6 * h
   I_VG = gB.I_VG.tocsr()
   I_VG.sort_indices()

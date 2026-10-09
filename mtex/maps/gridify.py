@@ -18,6 +18,7 @@ import warnings
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.gridlayout import gridLayout, layoutIndex
 from .kernels import gridKernel
 from .lattice import lattice, latticeBasis, mapPlane
@@ -90,7 +91,7 @@ class scanLayout:
       return ij, np.array(lo, dtype=np.int64)
     r, c = np.meshgrid(np.arange(self.dims[0]) + self.lo[1], np.arange(self.dims[1]) + self.lo[0], indexing="ij")
     ij = self.scanSite(c.reshape(-1), r.reshape(-1))
-    return ij, ij.min(axis=0)
+    return ij, columnMin(ij)
 
 
 def gridify(ebsd, layout=None, unitCell=None, return_index=False):
@@ -266,7 +267,7 @@ def resample(ebsd, unitCell, layout=None, return_index=False):
   Ainv = np.linalg.inv(A)
   IJ = (np.array([[x0, y0], [x1, y0], [x0, y1], [x1, y1]], dtype=T) - c0) @ Ainv.T
   # the sites that cover the extent; one within a thousandth of a cell of it adds nothing
-  lo, hi = np.floor(IJ.min(axis=0) + 1e-3).astype(np.int64), np.ceil(IJ.max(axis=0) - 1e-3).astype(np.int64)
+  lo, hi = np.floor(columnMin(IJ) + 1e-3).astype(np.int64), np.ceil(columnMax(IJ) - 1e-3).astype(np.int64)
   dims = (int(hi[0] - lo[0] + 1), int(hi[1] - lo[1] + 1))
   ii, jj = np.meshgrid(np.arange(lo[0], hi[0] + 1), np.arange(lo[1], hi[1] + 1), indexing="ij")
   ij = np.stack([ii.reshape(-1), jj.reshape(-1)], axis=1)

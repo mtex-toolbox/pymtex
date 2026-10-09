@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.funcs import angle
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.session import getMTEXpref
@@ -232,7 +233,7 @@ def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoS
   P = d[:, None] * ring
   # MATLAB's quiver3 scale: the longest arrow autoScaleFactor times the mean spacing
   n = np.sqrt(len(P))
-  spacing = np.sqrt(np.sum(((P.max(axis=0) - P.min(axis=0)) / n) ** 2))
+  spacing = np.sqrt(np.sum(((columnMax(P) - columnMin(P)) / n) ** 2))
   longest = np.max(np.linalg.norm(V, axis=1)) / spacing if spacing > 0 else 0
   V = V * (autoScaleFactor / longest if longest > 0 else autoScaleFactor)
   refuseVariants(kw)

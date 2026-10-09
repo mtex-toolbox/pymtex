@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.plane import plane3d
 from ..geometry.vector3d import vector3d
 from ..maps.ebsd import EBSD, _rotations, _vectors
@@ -220,7 +221,7 @@ class EBSD3(EBSD):
     v = np.cross(N, u)
     step = self.dPos
     uv = (corners - p0) @ np.stack([u, v], axis=1) / step
-    lo, hi = np.floor(uv.min(axis=0)) - 1, np.ceil(uv.max(axis=0)) + 1
+    lo, hi = np.floor(columnMin(uv)) - 1, np.ceil(columnMax(uv)) + 1
     a, b = np.arange(lo[0], hi[0] + 1), np.arange(lo[1], hi[1] + 1)
     grid = p0 + step * (a[None, :, None] * u + b[:, None, None] * v)
     return self.interp(grid)

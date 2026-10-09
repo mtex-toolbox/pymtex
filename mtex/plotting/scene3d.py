@@ -2,6 +2,8 @@
 # with a colour per face, orthogonal slices of a voxel volume, and the camera of a plotting
 # convention. PyVista, matplotlib and the HTML writer of render3d.py draw a scene.
 import numpy as np
+
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.display import display, sizeString
 
 __all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices"]
@@ -49,7 +51,7 @@ class mesh3d:
 
   def bounds(self):
     """the corners (lo, hi) of the box around the vertices"""
-    return self.V.min(axis=0), self.V.max(axis=0)
+    return columnMin(self.V), columnMax(self.V)
 
   def __repr__(self):
     return display("mesh3d", [("faces", len(self)), ("vertices", len(self.V))])
@@ -84,7 +86,7 @@ class slices3d:
     n = np.array(self.visible.shape)
     box = np.array([[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)]) * n - 0.5
     P = self.origin + box @ self.D
-    return P.min(axis=0), P.max(axis=0)
+    return columnMin(P), columnMax(P)
 
   def __repr__(self):
     return display("slices3d", [("voxels", sizeString(self.visible.shape)), ("at", ", ".join(str(a) for a in self.at))])
@@ -119,7 +121,7 @@ class lines3d:
   def bounds(self):
     """the corners (lo, hi) of the box around the segments"""
     P = self.segments.reshape(-1, 3)
-    return P.min(axis=0), P.max(axis=0)
+    return columnMin(P), columnMax(P)
 
   def __repr__(self):
     return display("lines3d", [("segments", len(self.segments)), ("lineWidth", f"{self.lineWidth:g}")])
@@ -170,7 +172,7 @@ class points3d:
 
   def bounds(self):
     """the corners (lo, hi) of the box around the markers"""
-    return self.P.min(axis=0), self.P.max(axis=0)
+    return columnMin(self.P), columnMax(self.P)
 
   def __repr__(self):
     return display("points3d", [("points", len(self.P)), ("markerSize", f"{self.markerSize:g}")])

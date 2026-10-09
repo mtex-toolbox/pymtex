@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .ebsd import EBSD
@@ -25,7 +26,7 @@ from ..geometry.install import install
 def _clusters(clusterId, n, weights):
   cid = np.ones((n, 1), dtype=np.int64) if clusterId is None else np.asarray(clusterId).reshape(n, -1)
   cid = np.where(np.isfinite(cid), cid, 0).astype(np.int64)
-  sz = tuple(int(m) for m in np.maximum(cid.max(axis=0), 0))
+  sz = tuple(int(m) for m in np.maximum(columnMax(cid), 0))
   cSize = np.zeros(sz)
   ok = np.all(cid > 0, axis=1)
   np.add.at(cSize, tuple((cid[ok] - 1).T), weights[ok])
@@ -69,7 +70,7 @@ def _ebsdTraces(ebsd, clusterId=None, method="Radon", minClusterSize=100, cutOff
 def _radonTrace(P, l, cutOff):
   h = l.dxy
   sub = np.array([[a, b] for a in (-0.25, 0.25) for b in (-0.25, 0.25)]) @ l.A.T
-  X = ((P[:, None, :] + sub[None, :, :]).reshape(-1, 2) - (P.min(axis=0) + P.max(axis=0)) / 2) / h
+  X = ((P[:, None, :] + sub[None, :, :]).reshape(-1, 2) - (columnMin(P) + columnMax(P)) / 2) / h
   rLast = int(np.ceil(np.max(np.linalg.norm(X, axis=1)))) + 1
   theta = np.arange(180) * degree
   s = X @ np.stack([np.cos(theta), np.sin(theta)]) + rLast
@@ -90,8 +91,8 @@ def _radonTrace(P, l, cutOff):
 # the second moments of the Fourier transform of the cluster image within half the inner
 # radius; the energy lies across the lamellae, so the trace is the axis of the smaller moment
 def _fourierTrace(ij, A):
-  lo = ij.min(axis=0)
-  shape = tuple(ij.max(axis=0) - lo + 1)
+  lo = columnMin(ij)
+  shape = tuple(columnMax(ij) - lo + 1)
   X = np.zeros(shape)
   X[tuple((ij - lo).T)] = 1
   Y = np.abs(np.fft.fftshift(np.fft.fft2(X - X.mean())))

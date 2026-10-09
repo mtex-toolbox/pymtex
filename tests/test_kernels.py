@@ -223,3 +223,12 @@ def test_closestAngle_isTheChordAngleOfTheClosestImage():
   R = crystalFrame("622").rotations().data.reshape(-1, 4)
   ref = chordAngle(q1, kernels.closestImage(q1, q2, L, R, True)[1])
   assert np.array_equal(kernels.closestAngle(q1, q2, L, R, True), ref, equal_nan=True)
+
+
+def test_columnMinMax_areNumpysReductionsOverTheLongAxis():
+  # by blocks of rows, for any length, NaN propagated, integers and more axes as well
+  a = rng.standard_normal((1000003, 3))
+  a[17, 1] = np.nan
+  b = rng.integers(-5, 5, (130, 2, 2)).astype(np.int32)
+  assert all(np.array_equal(kernels.columnMin(x), x.min(axis=0), equal_nan=True) and
+             np.array_equal(kernels.columnMax(x), x.max(axis=0), equal_nan=True) for x in (a, a[:5], b))

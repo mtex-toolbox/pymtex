@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from ..maps.lattice import cellCorners, mapPlane
@@ -73,7 +74,7 @@ def mapBox(x):
 def _columnBounds(P, block=64):
   n = len(P) - len(P) % block
   if n == 0:
-    return P.min(axis=0), P.max(axis=0)
+    return columnMin(P), columnMax(P)
   head = P[:n].reshape(-1, block, P.shape[1])
   lo, hi = head.min(axis=0).min(axis=0), head.max(axis=0).max(axis=0)
   if n < len(P):

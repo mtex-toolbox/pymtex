@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import eulerRegion, fundamentalRegion, orientationRegion
 from ..geometry.quaternion import quaternion
@@ -324,7 +325,7 @@ def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolut
     poly.set_array(faceValues)
     sP.mappable = poly
     sP.ax.add_collection3d(poly)
-    lo, hi = R.min(axis=0), R.max(axis=0)
+    lo, hi = columnMin(R), columnMax(R)
     sP.ax.set_xlim(lo[0], hi[0])
     sP.ax.set_ylim(lo[1], hi[1])
     sP.ax.set_zlim(lo[2], hi[2])
@@ -416,7 +417,7 @@ def _fitRegion(sP, oR, points=None):
   P = np.concatenate(edges) / degree
   if points is not None and len(points):
     P = np.concatenate([P, points])
-  lo, hi = P.min(axis=0), P.max(axis=0)
+  lo, hi = columnMin(P), columnMax(P)
   pad = 0.05 * float(np.max(hi - lo))
   lo, hi = lo - pad, hi + pad
   sP.ax.set_xlim(lo[0], hi[0])
@@ -567,7 +568,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
       bound = max(bound, oR.maxAngle() / degree if region else 180.0)
     sP = _spaceAxes(frame, limits=1.1 * bound, decorated=True, **axesKw)
     if zoom and not held and len(finite):
-      lo, hi = finite.min(axis=0), finite.max(axis=0)
+      lo, hi = columnMin(finite), columnMax(finite)
       pad = 0.05 * max(float(np.max(hi - lo)), 1e-9)
       sP.ax.set_xlim(lo[0] - pad, hi[0] + pad)
       sP.ax.set_ylim(lo[1] - pad, hi[1] + pad)

@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import numpy as np
+
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.display import aligned
 
 # a quarter cell: half of what it takes to round onto the neighbouring voxel
@@ -34,7 +36,7 @@ class voxelLattice:
   @property
   def shape(self):
     """the extent of the box of voxels the index spans"""
-    return tuple(int(n) for n in self.ijk.max(axis=0) + 1) if len(self.ijk) else (0, 0, 0)
+    return tuple(int(n) for n in columnMax(self.ijk) + 1) if len(self.ijk) else (0, 0, 0)
 
   @property
   def spacing(self):
@@ -71,7 +73,7 @@ class voxelLattice:
     ijk = np.rint(t)
     if np.max(np.abs(t - ijk)) > INDEX_TOL:
       raise ValueError("the positions are not on one lattice of voxels")
-    lo = ijk.min(axis=0)
+    lo = columnMin(ijk)
     ijk = (ijk - lo).astype(np.int64)
     if len(np.unique(ijk @ np.array([1, 1 << 20, 1 << 40], dtype=np.int64))) != len(ijk):
       raise ValueError("two positions fall onto one voxel, so they are not on a lattice")

@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
@@ -294,7 +295,7 @@ class grain3d:
     """the largest distance between two vertices of every grain, on MATLAB's rounding to 1e-4
     the centre of the box of the vertices, as MATLAB's midPoint"""
     V = self.boundary.V.data.reshape(-1, 3)
-    return vector3d((V.min(axis=0) + V.max(axis=0)) / 2, frame=self.frame)
+    return vector3d((columnMin(V) + columnMax(V)) / 2, frame=self.frame)
 
   @property
   def diameter(self):

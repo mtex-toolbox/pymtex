@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from .polygon import signedArea2, voronoiCell
 from ..geometry.display import display, header, numString
 
@@ -112,7 +113,7 @@ class lattice:
     else:
       A0, shape = np.asarray(basis[0], dtype=P.dtype), basis[1]
     ij, A, p0 = assignIndex(P, A0)
-    lo = ij.min(axis=0)
+    lo = columnMin(ij)
     self.ij = (ij - lo).astype(np.int32)
     self.A = A.astype(P.dtype)
     self.origin = (p0 + A @ lo).astype(P.dtype)
@@ -211,7 +212,7 @@ def centrePatch(P, m):
   n = len(P)
   if n <= m:
     return P
-  lo, hi = P.min(axis=0), P.max(axis=0)
+  lo, hi = columnMin(P), columnMax(P)
   c = (lo + hi) / 2
   span = np.maximum(hi - lo, np.finfo(P.dtype).eps)
   r = np.sqrt(span[0] * span[1] * m / n) / 2
@@ -233,7 +234,7 @@ def inferBasis(P):
   if len(P) < 3:
     raise ValueError("a lattice needs at least three positions")
   Q = centrePatch(P, 2000)
-  lo, hi = Q.min(axis=0), Q.max(axis=0)
+  lo, hi = columnMin(Q), columnMax(Q)
   span = np.maximum(hi - lo, np.finfo(Q.dtype).eps)
   d0 = max(np.sqrt(span[0] * span[1] / len(Q)), np.finfo(Q.dtype).eps)
   from scipy.spatial import cKDTree
@@ -311,16 +312,6 @@ def canonicalBasis(a1, a2, shape):
   cosines = np.round(left @ b1 / (np.linalg.norm(left, axis=1) * np.linalg.norm(b1)), 9)
   b2 = left[np.lexsort((-np.linalg.norm(left, axis=1), cosines))[-1]]
   return np.stack([b1, b2], axis=1)
-
-
-def columnMin(a, block=64):
-  """the least of every column of a tall (n, k) array: NumPy reduces a short axis strided and
-  slowly, a block of rows at a time is ten times faster"""
-  m = len(a) - len(a) % block
-  if m == 0:
-    return a.min(axis=0)
-  lo = a[:m].reshape(-1, block, a.shape[1]).min(axis=0).min(axis=0)
-  return np.minimum(lo, a[m:].min(axis=0)) if m < len(a) else lo
 
 
 def cellShapeOf(a1, a2):
@@ -401,7 +392,7 @@ def runaway(ij):
   """whether a fit has run away: its index spans a range far larger than the map"""
   if len(ij) == 0:
     return False
-  d = ij.max(axis=0) - ij.min(axis=0) + 1
+  d = columnMax(ij) - columnMin(ij) + 1
   return d[0] * d[1] > 16 * len(ij)
 
 

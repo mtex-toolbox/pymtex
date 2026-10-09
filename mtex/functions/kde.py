@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 
 import numpy as np
+
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.display import aligned
 
 
@@ -58,7 +60,7 @@ def calcDensityReal(x, range=None, bandwidth=None, weights=None, rng=None):
     bw, density, mesh = kde1d(x, 2 ** 14, lo, hi, weights=weights, bandwidth=bandwidth)
     return griddedDensity([mesh], density, bw)
   d = x.shape[1]
-  r = np.vstack([np.min(x, axis=0), np.max(x, axis=0)]) if range is None else np.asarray(range, dtype=float).reshape(2, d)
+  r = np.vstack([columnMin(x), columnMax(x)]) if range is None else np.asarray(range, dtype=float).reshape(2, d)
   N = round(1000000 ** (1 / d))
   axes = [np.linspace(r[0, k], r[1, k], N) for k in np.arange(d)]
   mesh = np.meshgrid(*axes, indexing="ij")
@@ -181,7 +183,7 @@ def kdeN(X, grid, gam=None, rng=None):
   X = np.asarray(X, dtype=float)
   X = X[~np.any(np.isnan(X), axis=1)]
   n, d = X.shape
-  lo, hi = X.min(axis=0), X.max(axis=0)
+  lo, hi = columnMin(X), columnMax(X)
   s = hi - lo
   lo, hi = lo - s / 10, hi + s / 10
   s = hi - lo

@@ -203,6 +203,27 @@ def _overRows(n, work, call):
     f.result()
 
 
+# the least and the largest of every column of a tall (n, k) array: NumPy reduces the long axis
+# of a narrow array strided and twenty times slower than a block of rows at a time
+def _columnReduce(a, op, block=64):
+  a = np.asarray(a)
+  m = len(a) - len(a) % block
+  if m == 0:
+    return op.reduce(a, axis=0)
+  r = op.reduce(op.reduce(a[:m].reshape(-1, block, *a.shape[1:]), axis=0), axis=0)
+  return op(r, op.reduce(a[m:], axis=0)) if m < len(a) else r
+
+
+def columnMin(a, block=64):
+  """the least of every column of a tall (n, k) array, as a.min(axis=0) but a block of rows at a time"""
+  return _columnReduce(a, np.minimum, block)
+
+
+def columnMax(a, block=64):
+  """the largest of every column of a tall (n, k) array, as a.max(axis=0) but a block of rows at a time"""
+  return _columnReduce(a, np.maximum, block)
+
+
 # the floating type two operands share, float64 for anything else
 def _floatType(*arrays):
   dtypes = {a.dtype for a in arrays}

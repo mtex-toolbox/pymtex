@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..geometry.kernels import columnMax, columnMin
 from ..geometry.crystalshape import crystalShape
 from ..geometry.session import getMTEXpref
 from ..geometry.slipsystem import slipSystem
@@ -52,7 +53,7 @@ def _target(cS, kw):
 # the axes fitted around what is drawn, at equal scale, widened when it held something
 def _fit(sP, P, held):
   P = np.asarray(P, dtype=float).reshape(-1, 3)
-  lo, hi = P.min(axis=0), P.max(axis=0)
+  lo, hi = columnMin(P), columnMax(P)
   pad = 0.05 * max(float(np.max(hi - lo)), 1e-12)
   lo, hi = lo - pad, hi + pad
   if held:
