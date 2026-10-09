@@ -6,6 +6,7 @@ pytest.importorskip("PySide6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFont, QKeyEvent
+from PySide6.QtWidgets import QFileDialog
 
 from mtex.wizard import callbacks as cb
 from mtex.wizard.browser import CRUMBS, CRUMB_WIDTH, BrowserSide, STATUS_COLORS
@@ -86,6 +87,35 @@ def test_breadcrumb_is_compact(tmp_path):
   assert texts[-1].endswith("…") or "…" in texts[-1]
   assert side.breadcrumb.minimumSizeHint().width() < bound
   assert side.minimumSizeHint().width() < 300
+
+
+# the folder button before the path opens the system dialog on the folder shown and lists what it returns
+def test_folder_button_browses(tmp_path, monkeypatch):
+  application()
+  st = WizardState(FIXTURES)
+  side = BrowserSide(st, QFont())
+  asked = []
+  monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda parent, title, start: asked.append(start) or str(tmp_path))
+  side.breadcrumb.browse.click()
+  assert (asked, st.folder) == ([os.path.abspath(FIXTURES)], str(tmp_path))
+
+
+# a dialog closed without a choice leaves the folder
+def test_folder_dialog_cancelled(monkeypatch):
+  application()
+  st = WizardState(FIXTURES)
+  side = BrowserSide(st, QFont())
+  monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *a: "")
+  side.breadcrumb.browse.click()
+  assert st.folder == os.path.abspath(FIXTURES)
+
+
+# the folder button is as high as the crumbs it stands before
+def test_folder_button_height():
+  application()
+  side = BrowserSide(WizardState(FIXTURES), QFont())
+  crumb = side.breadcrumb.lay.itemAt(0).widget()
+  assert side.breadcrumb.browse.sizeHint().height() == crumb.sizeHint().height()
 
 
 # Return walks into a folder and reads a map

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette
-from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, QListView, QListWidget,
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QPointF, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
+from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QLabel, QListView, QListWidget,
                                QMenu, QSizePolicy, QStyledItemDelegate, QToolButton, QTreeWidget,
                                QTreeWidgetItem, QVBoxLayout, QWidget)
 
@@ -18,6 +18,7 @@ from . import callbacks as cb
 FRAME = "#c8c8c8"
 CRUMBS = 3          # the folders of the path drawn, the rest behind the ellipsis
 CRUMB_WIDTH = 110   # the widest a folder name is drawn before it is elided
+CRUMB_GREY = "#888" # the separators of the path and the folder before it
 STATUS_COLORS = {"idle": "#dbe9f6", "loading": "#fbe5b6", "loaded": "#d8efd3", "failed": "#f4c7c3"}
 ROW_MARGIN = 3
 
@@ -40,6 +41,28 @@ def framed(widget):
 
 # ------------------------------------------------------------------ the path
 
+def folderIcon(side, ratio=1.0):
+  """a folder drawn as its outline in the grey of the separators, so that it reads as part of
+  the path and not as a coloured picture of the desktop's theme before it"""
+  pix = QPixmap(round(side * ratio), round(side * ratio))
+  pix.setDevicePixelRatio(ratio)
+  pix.fill(Qt.transparent)
+  painter = QPainter(pix)
+  painter.setRenderHint(QPainter.Antialiasing)
+  pen = QPen(QColor(CRUMB_GREY), max(1.0, side / 13))
+  pen.setJoinStyle(Qt.RoundJoin)
+  painter.setPen(pen)
+  # the tab on the upper left, the body below it, in units of the side
+  outline = [(0.10, 0.80), (0.10, 0.20), (0.40, 0.20), (0.50, 0.33), (0.90, 0.33), (0.90, 0.80)]
+  path = QPainterPath(QPointF(*outline[0]) * side)
+  for p in outline[1:]:
+    path.lineTo(QPointF(*p) * side)
+  path.closeSubpath()
+  painter.drawPath(path)
+  painter.end()
+  return QIcon(pix)
+
+
 class Breadcrumb(QWidget):
   """the folder as the end of its path, every folder on it a target
 
@@ -53,11 +76,37 @@ class Breadcrumb(QWidget):
     self.st = st
     # the row is given whatever width the panel has rather than claiming its contents'
     self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-    self.lay = QHBoxLayout(self)
-    self.lay.setContentsMargins(4, 2, 4, 2)
+    row = QHBoxLayout(self)
+    row.setContentsMargins(4, 2, 4, 2)
+    row.setSpacing(2)
+    self.browse = self._browse()
+    row.addWidget(self.browse)
+    # the crumbs are a row of their own, rebuilt with every folder, the button before them stays
+    self.lay = QHBoxLayout()
+    self.lay.setContentsMargins(0, 0, 0, 0)
     self.lay.setSpacing(0)
+    row.addLayout(self.lay, 1)
     st.on("folder", self.refresh)
     self.refresh()
+
+  def chooseFolder(self):
+    """the folder picked in the dialog of the system, which reaches other drives and network
+    shares; MATLAB's BrowseFolderButton of the import wizard"""
+    folder = QFileDialog.getExistingDirectory(self.window(), "Select the data folder", self.st.folder)
+    if folder:
+      cb.setFolder(self.st, folder)
+
+  # the button of the dialog: a folder in outline, as high as a crumb and raised as one
+  def _browse(self):
+    b = QToolButton()
+    b.setAutoRaise(True)
+    b.setCursor(Qt.PointingHandCursor)
+    b.setToolTip("Choose a folder")
+    side = QFontMetrics(b.font()).height()
+    b.setIcon(folderIcon(side, self.devicePixelRatioF()))
+    b.setIconSize(QSize(side, side))
+    b.clicked.connect(self.chooseFolder)
+    return b
 
   def refresh(self):
     """the path redrawn from the folder of the state"""
@@ -105,7 +154,7 @@ class Breadcrumb(QWidget):
 
   def _separator(self):
     sep = QLabel("/")
-    sep.setStyleSheet("color: #888")
+    sep.setStyleSheet(f"color: {CRUMB_GREY}")
     return sep
 
 

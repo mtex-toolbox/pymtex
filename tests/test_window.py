@@ -55,6 +55,13 @@ def test_open_file_on_start():
   app.processEvents()
 
 
+# the window opens with the keyboard focus on the list of the files, not on the folder button
+def test_the_file_list_has_the_focus_on_start():
+  application()
+  w = runWizard(FIXTURES, exec=False)
+  assert w.focusWidget() is w.browser.files
+
+
 def test_the_window_has_the_wizard_icon():
   application()
   w = runWizard(FIXTURES, show=False, exec=False)

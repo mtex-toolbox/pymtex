@@ -129,6 +129,8 @@ class WizardWindow(QMainWindow):
     st.on("tabs", self.refreshTabs)
     st.on("tab", self.showTab)
     self.refreshTabs()
+    # the window opens with the keys on the list of the files, to walk it with the arrows
+    self.browser.files.setFocus()
 
   # ------------------------------------------------------------------ the load
 

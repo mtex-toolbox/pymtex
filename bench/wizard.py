@@ -13,6 +13,8 @@ if "--show" not in sys.argv:
 import matplotlib
 matplotlib.use("QtAgg")
 
+from PySide6.QtGui import QCursor
+
 from mtex.wizard import callbacks as cb
 from mtex.wizard.window import application, grabWindow, runWizard
 
@@ -35,6 +37,8 @@ if __name__ == "__main__":
     runWizard(dataDir)
     sys.exit(0)
   os.makedirs(outDir, exist_ok=True)
+  # the offscreen pointer rests in the window's corner, on the folder button, which it would raise
+  QCursor.setPos(-100, -100)
   w = runWizard(dataDir, exec=False)
   st = w.st
   app.processEvents()
