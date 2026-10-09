@@ -251,3 +251,18 @@ def test_discreteSample_withCrystalSymmetryGivesSymmetricCopies():
   f = BinghamODF([0, 0, 0, 30], crystalFrame('432'))
   o = discreteSample(f, 1000, rng=rng)
   assert o.CS is crystalFrame('432') and np.all(np.isfinite(o.data))
+
+
+# the sum over the symmetric copies of the axes runs as one compiled loop, with the values of the
+# NumPy form
+def test_SO3FunBingham_compiledSumAgreesWithNumpy():
+  from mtex import setMTEXpref
+  f = SO3FunBingham(np.array([0.0, -4, -6, -12]), np.eye(4), crystalFrame("m-3m"))
+  q = orientation.rand(500, crystalFrame("m-3m"), rng=rng)
+  a = f.eval(q)
+  setMTEXpref("kernels", "numpy")
+  try:
+    b = f.eval(q)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(a, b, rtol=1e-13)

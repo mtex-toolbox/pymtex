@@ -22,6 +22,7 @@ from ..geometry.kernels import threads
 from ..geometry.miller import Miller
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
+from ..geometry.representations import quat2mat
 from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.tangent import SO3TangentVector
@@ -40,9 +41,11 @@ from ..geometry.display import aligned
 CHUNK = 1024
 # above this many kernel terms an evaluation goes through the harmonic form
 HARMONIC_EVAL = 2_000_000
-# the largest block of dots the direct sum forms, and the most hits one tree search returns
+# the largest block of dots the direct sum forms, and the most pairs one batch of the cell list holds
 BLOCK = 1 << 22
 HITS = 1 << 23
+# the query images paired with the centres in one call
+IMAGES = 1 << 18
 
 
 def _qmul(p, q):
@@ -89,37 +92,41 @@ def _blockSum(q, cs, w, psi, cut):
   return out
 
 
-# the kernel sum through a k-d tree of the centres, for a support below 120 degree: every
-# symmetric image l q r of a query (and its conjugate for antipodal centres) is searched, each
-# hit one term, so that the copies of the centres are never formed. The tree holds c and -c,
-# and a ball of chord below 1 holds one of the two. The hits are counted first, so that one
-# search returns at most HITS of them
-def _treeSum(q, c, w, L, R, antipodal, psi, cut):
-  from scipy.spatial import cKDTree
-  tree = cKDTree(np.vstack([c, -c]))
+# the kernel sum over the pairs of a cell list of the centres, for a support below 120 degree:
+# every symmetric image l q r of a query (and its conjugate for antipodal centres) is paired with
+# the centres within the support's chord, each pair one term, so that the copies of the centres
+# are never formed. The list holds c and -c, and a ball of chord below 1 holds one of the two.
+# A kernel of a closed form is summed in the compiled loop, any other over pairs in batches of HITS
+def _cellSum(q, c, w, L, R, antipodal, psi, cut):
+  from ..geometry.kernels import backend
+  from .kernelfunctions import _dlvpConstant, _vmfConstant
+  from .kernels import cellKernelSum, cellList, cellPairs
   radius = math.sqrt(2 - 2 * cut)
+  # the two families with a closed form are summed inside the compiled loop
+  fused = None
+  if backend() == "numba" and type(psi) is SO3DeLaValleePoussinKernel:
+    fused = (0, _dlvpConstant(psi.kappa), psi.kappa)
+  elif backend() == "numba" and type(psi) is SO3vonMisesFisherKernel:
+    fused = (1, _vmfConstant(psi.kappa), psi.kappa)
+  cells = cellList(np.vstack([c, -c]), radius)
   n, m = len(c), len(L) * len(R) * (2 if antipodal else 1)
   out = np.zeros(len(q))
-  for start in range(0, len(q), CHUNK):
-    qb = q[start:start + CHUNK]
+  step = max(1, IMAGES // m)
+  for start in range(0, len(q), step):
+    qb = q[start:start + step]
     imgs = _qmul(_qmul(L[:, None, None, :], qb[None, :, None, :]), R[None, None, :, :]).transpose(1, 0, 2, 3)
     imgs = imgs.reshape(len(qb), -1, 4)
     if antipodal:
       imgs = np.concatenate([imgs, _conj(imgs)], axis=1)
-    flat = imgs.reshape(-1, 4)
-    counts = tree.query_ball_point(flat, radius, return_length=True, workers=threads())
-    # batches of images whose hits fit in one search
-    ends = np.searchsorted(np.cumsum(counts), np.arange(1, counts.sum() // HITS + 2) * HITS, side="right")
-    bounds = np.unique(np.concatenate([[0], np.minimum(np.maximum(ends, 1), len(flat)), [len(flat)]]))
-    for a, b in zip(bounds[:-1], bounds[1:]):
-      hits = tree.query_ball_point(flat[a:b], radius, workers=threads())
-      lens = np.fromiter(map(len, hits), dtype=np.intp, count=len(hits))
-      cols = np.fromiter(itertools.chain.from_iterable(hits), dtype=np.intp, count=int(lens.sum())) % n
-      k = a + np.repeat(np.arange(len(hits)), lens)
-      d = np.abs(np.einsum("ij,ij->i", flat[k], c[cols]))
+    if fused is not None:
+      out[start:start + len(qb)] = cellKernelSum(imgs, imgs.shape[1], cells, radius, n, w, cut, *fused)
+      continue
+    for rows, cols, dots in cellPairs(imgs.reshape(-1, 4), cells, radius, HITS):
+      cols = cols % n
+      d = np.abs(dots)
       keep = d > cut
       values = psi(np.minimum(d[keep], 1.0)) * w[cols[keep]]
-      out[start:start + len(qb)] += np.bincount(k[keep] // imgs.shape[1], weights=values, minlength=len(qb))
+      out[start:start + len(qb)] += np.bincount(rows[keep] // imgs.shape[1], weights=values, minlength=len(qb))
   return out / m
 
 
@@ -222,9 +229,9 @@ class SO3FunRBF:
       return np.real(self._harmonicCache.eval(r)).reshape(r.shape)
     cut = supportCosine(self.psi)
     m = len(L) * len(R) * (2 if self.antipodal else 1)
-    # many terms of a local kernel through the tree of the centres, the rest by blocks
+    # many terms of a local kernel through the cell list of the centres, the rest by blocks
     if cut > 0.5 and self.center.size * m * len(q) > BLOCK:
-      out = _treeSum(q, self.center.data.reshape(-1, 4), self.weights.reshape(-1), L, R, self.antipodal, self.psi, cut)
+      out = _cellSum(q, self.center.data.reshape(-1, 4), self.weights.reshape(-1), L, R, self.antipodal, self.psi, cut)
     else:
       cs, w = self._expandedCentres()
       out = _blockSum(q, cs, w, self.psi, cut)
@@ -519,13 +526,20 @@ class SO3FunCBF:
     """the values at rotations or orientations, the kernel sum over the fibres and their symmetric
     equivalents"""
     r = _rotationsFor(self, x)
-    q = rotation(r.data.reshape(-1, 4))
+    q = r.data.reshape(-1, 4)
     H, Rv, w = self._expandedFibres()
-    out = np.empty(q.size)
-    for start in range(0, q.size, CHUNK):
-      gh = (q[start:start + CHUNK][:, None] * vector3d(H)[None, :]).data
-      t = np.clip(np.sum(gh * Rv[None, :, :], axis=-1), -1, 1)
-      out[start:start + CHUNK] = self.psi(t) @ w
+    # <g h, r> = sum_ij M(g)_ij r_i h_j: the arguments of every fibre at a block of rotations are
+    # one product of their matrices with the outer products r h
+    P = (Rv[:, :, None] * H[:, None, :]).reshape(-1, 9).T
+    from ..geometry.kernels import backend
+    if backend() == "numba" and type(self.psi) is S2DeLaValleePoussinKernel:
+      from .kernels import fibreSum
+      return fibreSum(q, P, w, self.psi.kappa).reshape(r.shape)
+    out = np.empty(len(q))
+    step = max(1, BLOCK // max(len(w), 1))
+    for start in range(0, len(q), step):
+      t = np.clip(quat2mat(q[start:start + step]).reshape(-1, 9) @ P, -1, 1)
+      out[start:start + step] = self.psi(t) @ w
     return out.reshape(r.shape)
 
   # fhat_l^{ka} = A_l 4pi/(2l+1)^{3/2} Y_l^k(r) conj(Y_l^a(h)), from the addition theorem and H4, projected

@@ -412,3 +412,32 @@ plan 0.45 ms whatever the size, so both cross at about 2e4 terms (`DIRECT_SUM_WO
 evaluation at 1000 nodes and L = 64 4.8 -> 0.5 ms, at L = 1024 the sum would have taken 49 ms
 against the plan's 0.56. The S1 grids themselves cost nothing that matters: `S1Grid.nearest` of
 1e6 angles 41 to 158 ms, `SO3Grid.gamma` of the 2.5 degree grid 17 ms.
+
+## The evaluation of the SO(3) functions that are not harmonic, 2026-10-09
+
+m-3m, ms, before / after, at 1e4 and 1e6 orientations; measured under another user's load (5 to 9),
+so the absolute times are high, the ratios not.
+
+| function | 1e4 | 1e6 |
+|---|---:|---:|
+| `SO3FunRBF`, 1e4 centres, de la Vallee Poussin of 3 degree | 679 / 30 | 86 s / 2.8 s |
+| `fibreODF` (`SO3FunCBF`), 10 degree | 17.3 / 1.0 | 1849 / 75 |
+| `BinghamODF` | 3.0 / 1.3 | 293 / 27 |
+
+The others were not the cost: an RBF of a kernel above the cell sum's 120 degree support, or of
+many terms, goes through its harmonic form (65 to 87 ms at 1e6), a handle 23 ms, the uniform 1 ms.
+
+- **A narrow kernel's sum went through a k-d tree** whose radius search returns a Python list per
+  query image (24 per query for m-3m): 240 thousand lists for 1e4 queries, flattened by `fromiter`,
+  with the threads of the search started per call. A 4D cell list over the centres (c and -c, cubes
+  of side at least the support's chord, `cellList` in functions/kernels.py) gives each image its
+  partners in the 3^4 cubes about it. The de la Vallee Poussin and the von Mises-Fisher kernel are
+  summed inside the loop (`cellKernelSum`), any other kernel over the pairs it returns in batches
+  (`cellPairs`), equal to 5.7e-14. The bandwidth of a 3 degree kernel is above maxSO3Bandwidth, so
+  the harmonic form, which would take some 300 ms at 1e6, is not taken: the preference decides.
+- **The fibre ODF** rotated its fibre vectors through container objects in chunks of 1024: the
+  arguments <g h, r> are the products of the rotation matrices with the outer products r h, and
+  for the de la Vallee Poussin kernel on the sphere the whole sum is one compiled loop
+  (`fibreSum`); any other kernel takes the products and its own evaluation.
+- **The Bingham distribution** summed its symmetric copies one NumPy pass each; one compiled loop
+  over the rotations sums them all (`binghamSum`).

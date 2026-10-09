@@ -180,9 +180,14 @@ class SO3FunBingham(SO3FunGeneric):
     r = _rotationsFor(self, x)
     q = r.data.reshape(-1, 4)
     copies = self._symmetricAxes()
-    acc = np.zeros(len(q))
-    for M in copies:
-      acc += np.exp(((q @ M) ** 2) @ self.kappa)
+    from ..geometry.kernels import backend
+    if backend() == "numba":
+      from .kernels import binghamSum
+      acc = binghamSum(q, copies, self.kappa)
+    else:
+      acc = np.zeros(len(q))
+      for M in copies:
+        acc += np.exp(((q @ M) ** 2) @ self.kappa)
     return (self.weight / self.C0 * acc / len(copies)).reshape(r.shape)
 
   def __mul__(self, a):

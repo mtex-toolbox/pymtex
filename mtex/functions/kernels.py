@@ -9,6 +9,10 @@
 #   realDefectWigner(fhat, tol), realDefectSpherical   is a coefficient vector real valued
 #   realizeWigner(fhat), realizeSpherical(fhat)        the real part's coefficients, in place
 #   q = gridQuaternions(alpha, beta, gamma)            the quaternions of a product grid of Matthies angles
+#   cells = cellList(P, r); cellPairs(Q, cells, r)     the pairs of 4D points within a chord, in batches
+#   cellKernelSum(Q, m, cells, r, n, w, cut, ...)      a closed-form kernel summed over them, fused
+#   fibreSum(q, P, w, kappa)                          a fibre ODF of the de la Vallee Poussin kernel
+#   binghamSum(q, M, kappa)                           a Bingham distribution over its symmetric axes
 from __future__ import annotations
 
 import math
@@ -186,6 +190,177 @@ def gridQuaternions(alpha, beta, gamma):
   q = np.empty((len(gamma) * len(alpha) * len(beta), 4))
   _parallel("gridQuaternions", _gridQuaternionsLoop)(alpha, beta, gamma, q)
   return q
+
+
+# ------------------------------------------------------------------ pairs within a chord in 4D
+# the points within a chord radius of each query through a cell list: the points sorted by their
+# cube of side h >= radius in [-1, 1]^4, so that a query's partners lie in the 3^4 cubes about its
+# own. The pairs are counted first (fill False), then written from each query's offset (fill True)
+CELL_AXIS = 40
+
+
+def _cellPairsLoop(Q, i0, i1, P, start, nc, h, r2, fill, counts, offs, rows, cols, dots):
+  for i in prange(i0, i1):
+    x0, x1, x2, x3 = Q[i, 0], Q[i, 1], Q[i, 2], Q[i, 3]
+    k0, k1 = min(int((x0 + 1) / h), nc - 1), min(int((x1 + 1) / h), nc - 1)
+    k2, k3 = min(int((x2 + 1) / h), nc - 1), min(int((x3 + 1) / h), nc - 1)
+    t = offs[i] if fill else 0
+    for a in range(max(k0 - 1, 0), min(k0 + 2, nc)):
+      for b in range(max(k1 - 1, 0), min(k1 + 2, nc)):
+        for c in range(max(k2 - 1, 0), min(k2 + 2, nc)):
+          base = ((a * nc + b) * nc + c) * nc
+          for d in range(max(k3 - 1, 0), min(k3 + 2, nc)):
+            for j in range(start[base + d], start[base + d + 1]):
+              e0, e1, e2, e3 = x0 - P[j, 0], x1 - P[j, 1], x2 - P[j, 2], x3 - P[j, 3]
+              if e0 * e0 + e1 * e1 + e2 * e2 + e3 * e3 <= r2:
+                if fill:
+                  rows[t], cols[t] = i, j
+                  dots[t] = x0 * P[j, 0] + x1 * P[j, 1] + x2 * P[j, 2] + x3 * P[j, 3]
+                t += 1
+    if not fill:
+      counts[i] = t
+
+
+def cellList(P, radius):
+  """the cell list of points in [-1, 1]^4 for searches within a chord radius: the points sorted by
+  cell, their original indices, the start of every cell, the cells per axis and their side"""
+  P = np.ascontiguousarray(P, dtype=np.float64).reshape(-1, 4)
+  nc = max(1, min(int(2 / max(radius, 1e-12)), CELL_AXIS))
+  h = 2.0 / nc
+  k = np.minimum(((P + 1) / h).astype(np.int64), nc - 1)
+  cell = ((k[:, 0] * nc + k[:, 1]) * nc + k[:, 2]) * nc + k[:, 3]
+  order = np.argsort(cell, kind="stable")
+  start = np.searchsorted(cell[order], np.arange(nc ** 4 + 1)).astype(np.int64)
+  return np.ascontiguousarray(P[order]), order, start, nc, h
+
+
+def _cellPairsNumpy(Q, cells, radius, maxPairs):
+  P, order = cells[0], cells[1]
+  lo = 1 - radius * radius / 2
+  rows_ = max(1, maxPairs // max(len(P), 1))
+  for i in range(0, len(Q), rows_):
+    D = Q[i:i + rows_] @ P.T
+    r, c = np.nonzero(D >= lo)
+    yield r + i, order[c], D[r, c]
+
+
+def cellPairs(Q, cells, radius, maxPairs=1 << 23):
+  """batches (rows, cols, dots) of the pairs of queries Q (m, 4) and the points of a cell list
+  within the chord radius, at most maxPairs pairs a batch unless one query holds more; cols are
+  the points' original indices, dots the dot products"""
+  Q = np.ascontiguousarray(Q, dtype=np.float64).reshape(-1, 4)
+  if backend() == "numpy":
+    yield from _cellPairsNumpy(Q, cells, radius, maxPairs)
+    return
+  P, order, start, nc, h = cells
+  loop = _parallel("cellPairs", _cellPairsLoop)
+  counts, none = np.zeros(len(Q), dtype=np.int64), np.zeros(0, dtype=np.int64)
+  r2 = float(radius * radius)
+  loop(Q, np.int64(0), np.int64(len(Q)), P, start, np.int64(nc), float(h), r2, False, counts, none, none, none, np.zeros(0))
+  ends = np.cumsum(counts)
+  i0 = 0
+  while i0 < len(Q):
+    base = ends[i0 - 1] if i0 else 0
+    i1 = max(int(np.searchsorted(ends, base + maxPairs, side="right")), i0 + 1)
+    offs = np.zeros(len(Q), dtype=np.int64)
+    offs[i0:i1] = ends[i0:i1] - counts[i0:i1] - base
+    n = int(ends[i1 - 1] - base)
+    rows, cols, dots = np.empty(n, dtype=np.int64), np.empty(n, dtype=np.int64), np.empty(n)
+    loop(Q, np.int64(i0), np.int64(i1), P, start, np.int64(nc), float(h), r2, True, counts, offs, rows, cols, dots)
+    yield rows, order[cols], dots
+    i0 = i1
+
+
+# the kernel sum of the de la Vallee Poussin (family 0, C |t|^2kappa) or the von Mises-Fisher kernel
+# (family 1, C exp(kappa (2 t^2 - 2))) over the points within the chord of each query's m images,
+# in the same cells, every term added where it is found: no pairs are kept
+def _cellKernelSumLoop(Q, m, P, order, n, start, nc, h, r2, w, cut, family, C, kappa, out):
+  for i in prange(Q.shape[0] // m):
+    acc = 0.0
+    for k in range(i * m, (i + 1) * m):
+      x0, x1, x2, x3 = Q[k, 0], Q[k, 1], Q[k, 2], Q[k, 3]
+      k0, k1 = min(int((x0 + 1) / h), nc - 1), min(int((x1 + 1) / h), nc - 1)
+      k2, k3 = min(int((x2 + 1) / h), nc - 1), min(int((x3 + 1) / h), nc - 1)
+      for a in range(max(k0 - 1, 0), min(k0 + 2, nc)):
+        for b in range(max(k1 - 1, 0), min(k1 + 2, nc)):
+          for c in range(max(k2 - 1, 0), min(k2 + 2, nc)):
+            base = ((a * nc + b) * nc + c) * nc
+            for d in range(max(k3 - 1, 0), min(k3 + 2, nc)):
+              for j in range(start[base + d], start[base + d + 1]):
+                e0, e1, e2, e3 = x0 - P[j, 0], x1 - P[j, 1], x2 - P[j, 2], x3 - P[j, 3]
+                if e0 * e0 + e1 * e1 + e2 * e2 + e3 * e3 <= r2:
+                  t = abs(x0 * P[j, 0] + x1 * P[j, 1] + x2 * P[j, 2] + x3 * P[j, 3])
+                  if t > cut:
+                    t = min(t, 1.0)
+                    v = C * np.exp(2 * kappa * np.log(t)) if family == 0 else C * np.exp(kappa * (2 * t * t - 2))
+                    acc += v * w[order[j] % n]
+    out[i] = acc
+
+
+def cellKernelSum(Q, m, cells, radius, n, w, cut, family, C, kappa):
+  """the sum of w psi(|<q, p>|) over the points p of a cell list within the chord radius of the m
+  images of every query, Q holding them query after query; psi of a family with a closed form,
+  0 the de la Vallee Poussin C |t|^2kappa, 1 the von Mises-Fisher C exp(kappa (2 t^2 - 2)), the
+  points' weights w by their original index modulo n"""
+  P, order, start, nc, h = cells
+  Q = np.ascontiguousarray(Q, dtype=np.float64).reshape(-1, 4)
+  out = np.empty(len(Q) // m)
+  _parallel("cellKernelSum", _cellKernelSumLoop)(Q, np.int64(m), P, order, np.int64(n), start, np.int64(nc), float(h),
+                                                 float(radius * radius), np.ascontiguousarray(w, dtype=np.float64),
+                                                 float(cut), np.int64(family), float(C), float(kappa), out)
+  return out
+
+
+# ------------------------------------------------------------------ the sum of a fibre ODF
+# sum_k w_k (1 + kappa) ((1 + t_k) / 2)^kappa with t_k = <g h_k, r_k> = sum_ij M(g)_ij P[ij, k], the
+# de la Vallee Poussin kernel on the sphere over the fibre pairs, the matrix of every rotation
+# formed in the loop
+def _fibreSumLoop(q, P, w, kappa, out):
+  for i in prange(q.shape[0]):
+    a, b, c, d = q[i, 0], q[i, 1], q[i, 2], q[i, 3]
+    m0, m1, m2 = 2 * b * b + 2 * a * a - 1, 2 * b * c - 2 * a * d, 2 * b * d + 2 * a * c
+    m3, m4, m5 = 2 * c * b + 2 * a * d, 2 * c * c + 2 * a * a - 1, 2 * c * d - 2 * a * b
+    m6, m7, m8 = 2 * d * b - 2 * a * c, 2 * d * c + 2 * a * b, 2 * d * d + 2 * a * a - 1
+    acc = 0.0
+    for k in range(P.shape[1]):
+      t = (m0 * P[0, k] + m1 * P[1, k] + m2 * P[2, k] + m3 * P[3, k] + m4 * P[4, k] + m5 * P[5, k]
+           + m6 * P[6, k] + m7 * P[7, k] + m8 * P[8, k])
+      t = min(max(t, -1.0), 1.0)
+      if t > -1.0:
+        acc += w[k] * np.exp(kappa * np.log((1 + t) / 2))
+    out[i] = (1 + kappa) * acc
+
+
+def fibreSum(q, P, w, kappa):
+  """the de la Vallee Poussin kernel of parameter kappa on the sphere summed over the fibre pairs
+  at the rotations q (n, 4): P (9, k) the outer products r h of the pairs, w their weights"""
+  q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
+  out = np.empty(len(q))
+  _parallel("fibreSum", _fibreSumLoop)(q, np.ascontiguousarray(P, dtype=np.float64), np.ascontiguousarray(w, dtype=np.float64),
+                                       float(kappa), out)
+  return out
+
+
+# ------------------------------------------------------------------ the sum of a Bingham distribution
+# sum over the symmetric copies M of the axes of exp(sum_j kappa_j (q . M[:, j])^2) at each rotation
+def _binghamSumLoop(q, M, kappa, out):
+  for i in prange(q.shape[0]):
+    acc = 0.0
+    for c in range(M.shape[0]):
+      e = 0.0
+      for j in range(4):
+        d = q[i, 0] * M[c, 0, j] + q[i, 1] * M[c, 1, j] + q[i, 2] * M[c, 2, j] + q[i, 3] * M[c, 3, j]
+        e += kappa[j] * d * d
+      acc += np.exp(e)
+    out[i] = acc
+
+
+def binghamSum(q, M, kappa):
+  """the sum over the axes M (k, 4, 4) of exp(sum_j kappa_j (q . M[:, :, j])^2) at the rotations q (n, 4)"""
+  q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
+  out = np.empty(len(q))
+  _parallel("binghamSum", _binghamSumLoop)(q, np.ascontiguousarray(M, dtype=np.float64), np.ascontiguousarray(kappa, dtype=np.float64), out)
+  return out
 
 
 # ------------------------------------------------------------------ real valued coefficients

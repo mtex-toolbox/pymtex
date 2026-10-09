@@ -256,3 +256,37 @@ def test_poleFigure_ofAFibreODFGoesThroughItsHarmonicForm():
   cs, ss, odf, h, P, vs = cubicPoleFigure()
   fodf = fibreODF(Miller(1, 1, 1, cs), zvector, ss)
   assert np.allclose(radon(fodf, h)(vs), radon(SO3FunHarmonic(fodf), h)(vs))
+
+
+# a narrow kernel is summed over the centres within its support through a cell list: the sum of
+# its definition over every centre and every symmetric copy, for the two families summed in the
+# compiled loop and for one summed over the pairs, antipodal centres included
+@pytest.mark.parametrize("kernel", ["dlvp", "vmf", "bump"])
+@pytest.mark.parametrize("antipodal", [False, True])
+def test_SO3FunRBF_narrowKernelIsTheSumOfItsDefinition(kernel, antipodal):
+  from mtex import SO3BumpKernel, SO3vonMisesFisherKernel
+  import mtex.functions.rbf as rbf
+  cs = crystalFrame("432")
+  ss = cs if antipodal else specimenFrame.default
+  psi = {"dlvp": SO3DeLaValleePoussinKernel(halfwidth=4 * degree), "vmf": SO3vonMisesFisherKernel(halfwidth=4 * degree),
+         "bump": SO3BumpKernel(halfwidth=4 * degree)}[kernel]
+  c, q = orientation.rand(300, cs, ss, rng=rng), orientation.rand(40, cs, ss, rng=rng)
+  c.antipodal = antipodal
+  w = rng.random(c.size)
+  L, R = reductionGroups(c)
+  cut = rbf.supportCosine(psi)
+  got = rbf._cellSum(q.data.reshape(-1, 4), c.data.reshape(-1, 4), w, L, R, antipodal, psi, cut)
+  cs_, ww = SO3FunRBF(c, psi, w)._expandedCentres()
+  assert np.allclose(got, rbf._blockSum(q.data.reshape(-1, 4), cs_, ww, psi, cut), rtol=1e-10, atol=1e-12)
+
+
+# the fibre ODF of the de la Vallee Poussin kernel is summed in a compiled loop, with the values of
+# the kernel at the arguments of every fibre pair
+def test_SO3FunCBF_compiledSumIsTheKernelAtEveryFibrePair():
+  from mtex.geometry.representations import quat2mat
+  cs = crystalFrame("m-3m")
+  f = fibreODF(fibre(Miller(1, 1, 0, cs), vector3d(1, 2, 3)), halfwidth=8 * degree)
+  q = orientation.rand(200, cs, rng=rng)
+  H, Rv, w = f._expandedFibres()
+  t = np.einsum("nij,ki,kj->nk", quat2mat(q.data.reshape(-1, 4)), Rv, H)
+  assert np.allclose(f.eval(q), f.psi(np.clip(t, -1, 1)) @ w, rtol=1e-12)
