@@ -100,19 +100,48 @@ unchanged.
 
 P1; the open questions; M1 and M2; J3; then the speed items by their gain; then section 4.
 
+## Decided, 2026-10-09
+
+What the MATLAB fixes on develop (1dc5807b1..b23d9cc59) showed, and what the user decided:
+
+- **The mean and spline filters.** MATLAB's `meanFilter` left the pixel's own weight out of its
+  normaliser, clamped at the border and ignored `weights`; fixed, it is the ports' normalised
+  window mean (the four-neighbour cross by default) and agrees with this port to 5e-6 degree on
+  twins and 1e-5 on ferrite. Closed. The spline filters differ by design: MATLAB smooths by
+  `smoothn` (a robust DCT spline, its alpha by GCV on the largest grain and reused), the ports by
+  a graph Laplacian with a smoothing length (`docs/findings.md`). Closed as a convention.
+- **The 6/mmm colour key.** MATLAB's 5e-2 was its own bug (the centre of the sector not
+  normalised in `polarCoordinates`); what is left is this port's: `equaliseAzimuth` pins the
+  vertices to a 1000-step grid, so a vertex of 6/mmm lands at 2.0036 thirds. Done: the vertex
+  azimuths are knots of the grid, the turn integrated by the trapezoid rule, every arc between two
+  vertices a third, so the vertices land on the thirds to 3e-15; the exact IPF colours are now
+  4.8e-4 (m-3m) and 4.7e-4 (6/mmm) from MATLAB's, from 1.8e-2 and 5.3e-2, and the reference table of
+  `tests/test_directionkeys.py` holds MATLAB's colours of today. A direction on the boundary of the
+  -43m sector ([-3 -1 0]) takes either side's colour, 2e-3 apart at any grid: open. The Julia
+  port, 2.1e-2 in 6/mmm, needs the same.
+- **The kernel sum of an RBF ODF (P10).** The harmonic switch of `SO3FunRBF.eval` stays, also
+  where the kernel's bandwidth is cut; the benchmark says that it measures the harmonic form, and its
+  check compares the harmonic form with the exact kernel sum (4.9e-4 of the maximum). Done.
+- **optimalSample.** From the ports' starting sequences MATLAB's L-BFGS reaches an equally good
+  minimum by another path (J 0.1454 against 0.1436), so the benchmark compares the objective J,
+  this port's for every port's nodes, relative to the target's: 2.7e-7 (S2) and 2.0e-7 (SO(3)). Done.
+- **calcTaylor and calcGND.** MATLAB returns the analytic centre of the optimal face of each
+  linear programme (`linprogCentre`), the symmetric and unique slip rates, where the ports'
+  simplex returns a vertex: the Taylor factors agree, the slip rates and the spin do not. This
+  port follows MATLAB's centre, and the Julia port is to. Done: `linprogCentre` (taylor.py, NumPy,
+  batched) and `_centreProgram` (maps/kernels.py, compiled, used by the Taylor and the GND loop)
+  stop on the duality gap and, where the normal equations lose the primal residual near the end,
+  correct x on its support; `spinSelection='centre'` is the default, 'basic' and 'minimumNorm'
+  remain. Uniaxial [001] in fcc: the 8 active systems at 0.3062 each (MATLAB's 16 x 0.1531 count
+  each signed system twice). taylor 17.5 ms (MATLAB 74), taylor_fun 152 ms (184), gnd 56 ms (705).
+- **The benchmarks.** `bench_maps_ops.m` maps 'hq' to `l1TVFilter`, which is right: MATLAB's
+  `halfQuadraticFilter` is an obsolete subclass of it. MATLAB's EDAX reader, 3D KAM,
+  calcComponents and meanFilter changed, and the comparison anew shows them agreeing: load_h5_edax
+  7.3e-8, kam3d 6.8e-7 (the offset the comparison took off MATLAB's KAM is gone), the mean filter
+  6e-12 on twins and 8e-10 on ferrite. calcComponents keeps 4.5e-2 against MATLAB's 16 modes, the
+  flat ridge where every port's mode lies elsewhere.
+
 ## Open questions
-
-### Who is right on the mean and spline filters
-
-`meanFilter` and `splineFilter` (unfilled) agree between Python and Julia to 1e-8 and are more
-than 0.1 degree from MATLAB on 43 to 64 % of the pixels, up to 9.4 degree; `l1TVFilter` and
-`halfQuadraticFilter` agree with MATLAB to 1e-6 degree. Either MATLAB changed its neighbourhood
-or weights on develop, or both ports kept an older one.
-
-### Who is right on the 6/mmm colour key
-
-`ipfHSVKey` colours of 6/mmm are 5.3e-2 to 7.5e-2 from MATLAB's in both ports, m-3m within
-tolerance: a change of the 6/mmm key on develop, or a key both ports share.
 
 ### Why MATLAB finds 22 grains fewer on 1C_1
 
