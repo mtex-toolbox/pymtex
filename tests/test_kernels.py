@@ -124,6 +124,16 @@ def test_searches_agree_with_numpy(numbaBackend):
       assert np.allclose(got, want, atol=1e-13)
 
 
+def test_nearestAngle_isTheChordToTheBestImageAsNumpys(numbaBackend):
+  # the fused loop against NumPy's search and chord, near zero too
+  cs = crystalFrame("m-3m")
+  o = orientation.rand(500, cs, cs, rng=rng)
+  L, R = reductionGroups(o)
+  es, _ = referenceImages(np.array([1.0, 0, 0, 0]), L, R, False)
+  q = np.concatenate([o.data, es[:3] * (1 - 1e-12)])
+  assert np.allclose(kernels.nearestAngle(q, es), kernels._nearestAngleNumpy(q, es), rtol=0, atol=1e-14)
+
+
 # the searches split over the threads give the serial result to the bit
 def test_searches_over_threads_equal_the_serial_loop(numbaBackend, monkeypatch):
   cs, hx = crystalFrame("m-3m"), crystalFrame("6/mmm")

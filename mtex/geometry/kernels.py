@@ -369,6 +369,42 @@ def bestDot(qs, es):
   return val.reshape(shape), idx.reshape(shape)
 
 
+# the angle from every q to the nearest of the images e, by the chord |q -/+ e| = 2 sin(w/4) to
+# the image of the best |<q, e>|, which stays accurate where the angle is small
+def _nearestAngleLoop(qs, es, out):
+  for i in range(qs.shape[0]):
+    q0, q1, q2, q3 = qs[i, 0], qs[i, 1], qs[i, 2], qs[i, 3]
+    best, d, k = -1.0, 0.0, 0
+    for j in range(es.shape[0]):
+      t = q0 * es[j, 0] + q1 * es[j, 1] + q2 * es[j, 2] + q3 * es[j, 3]
+      if abs(t) > best:
+        best, d, k = abs(t), t, j
+    s = -1.0 if d < 0 else 1.0
+    h0, h1, h2, h3 = q0 - s * es[k, 0], q1 - s * es[k, 1], q2 - s * es[k, 2], q3 - s * es[k, 3]
+    out[i] = 4 * np.arcsin(min(np.sqrt(h0 * h0 + h1 * h1 + h2 * h2 + h3 * h3) / 2, 1.0))
+
+
+def _nearestAngleNumpy(qs, es):
+  _, k = _bestDotNumpy(qs, es)
+  e = es[k]
+  s = np.where(np.sum(qs * e, axis=-1) < 0, -1.0, 1.0)[..., None]
+  return 4 * np.arcsin(np.minimum(np.linalg.norm(qs - s * e, axis=-1) / 2, 1.0))
+
+
+def nearestAngle(qs, es):
+  """the angle from every q of a list to the nearest of the images e, the first on a tie, by the
+  chord to it, accurate where the angle is small"""
+  shape = qs.shape[:-1]
+  qs = np.ascontiguousarray(qs, dtype=np.float64).reshape(-1, 4)
+  es = np.ascontiguousarray(es, dtype=np.float64)
+  if backend() == "numpy":
+    return _nearestAngleNumpy(qs, es).reshape(shape)
+  out = np.empty(len(qs))
+  k = _loop("nearestAngle", _nearestAngleLoop)
+  _overRows(len(qs), len(qs) * (len(es) + ROW_COST), lambda a, b: k(qs[a:b], es, out[a:b]))
+  return out.reshape(shape)
+
+
 # the angle between the parent candidates o1 PV_k and o2 PV_l of every pair of children, from
 # their misorientation m = inv(o1) o2 alone: PV_k^-1 m PV_l reduced over the parent group G
 def _variantAngleLoop(m, PV, G, out):
