@@ -50,9 +50,10 @@ ALGORITHM = [
    "entry": {"matlab": ["@strainTensor.calcTaylor"], "python": ["mtex.analysis.taylor.calcTaylor"], "julia": ["calcTaylor"]},
    "cases": {"taylor": "calcTaylor(inv(ori) * eps, sS), the factor of 1e4 orientations",
              "taylor_fun": "calcTaylor(eps, sS), the factor as an SO3Fun, at 1e4 orientations"},
-   # MATLAB's linprog stops at its optimality tolerance; the harmonic factor is a fit to a kink
-   # function, the two ports on different quadrature grids
-   "tolerance": {"taylor": 1e-8, "taylor_fun": 1e-2}},
+   # MATLAB's linprogCentre stops at mu <= 1e-9, so its factor lies up to n mu, 2.4e-8 for the 24
+   # systems, above the optimum, where this port stops on the duality gap; the harmonic factor
+   # is a fit to a kink function, the two ports on different quadrature grids
+   "tolerance": {"taylor": 1e-7, "taylor_fun": 1e-2}},
 ]
 N, NT = 10**5, 10**4
 COLS = {"rotate": 81, "inv": 81, "average_ori": 81, "average_odf": 81, "velocity": 3}

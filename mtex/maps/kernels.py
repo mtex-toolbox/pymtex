@@ -804,10 +804,135 @@ def _linearProgram(A, b, c, tol, maxIter, x):
   return 0
 
 
+# M z = r for a symmetric positive semidefinite M by Cholesky, the diagonal raised by 1e-13 of
+# its largest entry, so that dependent rows of a program leave it solvable
+def _choleskySolve(M, r):
+  m = M.shape[0]
+  jitter = 0.0
+  for i in range(m):
+    jitter = max(jitter, M[i, i])
+  jitter = 1e-13 * jitter if jitter > 0 else 1e-300
+  L = np.zeros((m, m))
+  for i in range(m):
+    for j in range(i + 1):
+      t = M[i, j] + (jitter if i == j else 0.0)
+      for k in range(j):
+        t -= L[i, k] * L[j, k]
+      L[i, j] = np.sqrt(max(t, jitter)) if i == j else t / L[j, j]
+  z = np.empty(m)
+  for i in range(m):
+    t = r[i]
+    for k in range(i):
+      t -= L[i, k] * z[k]
+    z[i] = t / L[i, i]
+  for i in range(m - 1, -1, -1):
+    t = z[i]
+    for k in range(i + 1, m):
+      t -= L[k, i] * z[k]
+    z[i] = t / L[i, i]
+  return z
+
+
+# x moved by the least correction that solves A x = b on its support, the entries above 1e-6 of
+# the largest, the rest kept: True where the result is feasible to rounding and nonnegative
+def _supportCorrection(A, b, x):
+  m, n = A.shape
+  top = 0.0
+  for j in range(n):
+    top = max(top, x[j])
+  S = np.flatnonzero(x > 1e-6 * top)
+  AS = A[:, S]
+  r = b - A @ x
+  z = _choleskySolve(AS @ AS.T, r)
+  y = x.copy()
+  y[S] += AS.T @ z
+  r = b - A @ y
+  if np.min(y[S]) < 0 or np.sqrt(r @ r) > 1e-12 * (1 + np.sqrt(b @ b)):
+    return False
+  x[:] = y
+  return True
+
+
+# min c x under A x = b, x >= 0, at the analytic centre of the optimal face, the solution a
+# symmetric program keeps symmetric, by the primal dual path following method: Newton steps
+# towards the central path at 0.3 mu, kept inside the positive orthant, the normal
+# equations A diag(x / s) A^T by Cholesky. Returns 0 with x written, 1 where the residuals and
+# the duality gap x.s, the error of the objective, do not fall below tol relative to the data
+# within maxIter
+def _centreProgram(A, b, c, tol, maxIter, x):
+  m, n = A.shape
+  s, dx, ds, d, w = np.ones(n), np.empty(n), np.empty(n), np.empty(n), np.empty(n)
+  lam, dlam, rp, rhs = np.zeros(m), np.empty(m), np.empty(m), np.empty(m)
+  rd = np.empty(n)
+  M = np.empty((m, m))
+  for j in range(n):
+    x[j] = 1.0
+  nb = np.sqrt(b @ b)
+  nc = np.sqrt(c @ c)
+  for _ in range(maxIter):
+    # the residuals, the duality gap and the objective
+    np_, nd, gap, cx = 0.0, 0.0, 0.0, 0.0
+    for i in range(m):
+      t = b[i]
+      for j in range(n):
+        t -= A[i, j] * x[j]
+      rp[i] = t
+      np_ += t * t
+    for j in range(n):
+      t = c[j] - s[j]
+      for i in range(m):
+        t -= A[i, j] * lam[i]
+      rd[j] = t
+      nd += t * t
+      gap += x[j] * s[j]
+      cx += c[j] * x[j]
+    dualDone = np.sqrt(nd) <= tol * (1 + nc) and gap <= tol * (1 + abs(cx))
+    if dualDone and np.sqrt(np_) <= tol * (1 + nb):
+      return 0
+    # near the end the normal equations lose the primal residual, which the steps, cut short by
+    # the shears close to zero, no longer remove: the least correction on the support restores it
+    if dualDone and _supportCorrection(A, b, x):
+      return 0
+    # the Newton step towards the central path at 0.3 mu, by the normal equations
+    target = 0.3 * gap / n
+    for j in range(n):
+      d[j] = x[j] / s[j]
+      w[j] = (target - x[j] * s[j] - x[j] * rd[j]) / s[j]
+    for i in range(m):
+      t = rp[i]
+      for j in range(n):
+        t -= A[i, j] * w[j]
+      rhs[i] = t
+      for k in range(i + 1):
+        t = 0.0
+        for j in range(n):
+          t += A[i, j] * d[j] * A[k, j]
+        M[i, k] = t
+        M[k, i] = t
+    dlam[:] = _choleskySolve(M, rhs)
+    ap, ad = 1.0, 1.0
+    for j in range(n):
+      t = rd[j]
+      for i in range(m):
+        t -= A[i, j] * dlam[i]
+      ds[j] = t
+      dx[j] = (target - x[j] * s[j] - x[j] * t) / s[j]
+      if dx[j] < 0:
+        ap = min(ap, -0.95 * x[j] / dx[j])
+      if ds[j] < 0:
+        ad = min(ad, -0.95 * s[j] / ds[j])
+    for j in range(n):
+      x[j] += ap * dx[j]
+      s[j] += ad * ds[j]
+    for i in range(m):
+      lam[i] += ad * dlam[i]
+  return 1
+
+
 # the dislocation fit of every pixel: the systems in the frame of the curvature, one set for
 # all pixels or one per pixel, the curvature of each system on the known components as the
-# columns of the program, both signs of every system, the line energies as the cost; a pixel
-# with an unknown curvature or systems is left NaN
+# columns of the program, both signs of every system, the line energies as the cost, solved at
+# the centre of its optimal face; a pixel with an unknown curvature or systems is left NaN
 def _gndLoop(kappa, known, b, l, u, tol, maxIter, gnd, rho):
   n = kappa.shape[0]
   ns = b.shape[1]
@@ -847,7 +972,7 @@ def _gndLoop(kappa, known, b, l, u, tol, maxIter, gnd, rho):
       cvec[j] = u[kb, j]
       cvec[ns + j] = u[kb, j]
     x = np.empty(2 * ns)
-    if _linearProgram(A, bvec, cvec, tol, maxIter, x) != 0:
+    if _centreProgram(A, bvec, cvec, tol, maxIter, x) != 0:
       continue
     total = 0.0
     for j in range(ns):
@@ -1171,7 +1296,8 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
       out[k] = g
 
 
-_PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram")
+_PIXEL_HELPERS = ("_range", "_closestTo", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+                  "_choleskySolve", "_supportCorrection", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
 

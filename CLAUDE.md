@@ -123,7 +123,10 @@ reduction (`symReduce`, `closestImage`, `bestDot`, `projectToRef`, `projectDirec
 serial loop's disk cache, which numba keys by bytecode and signature, not by `parallel=True`. The NFFT of `../nfft` (branch feature/mtex-kernels, built with CMake as
 `libnfft3_omp.so`) is an optional backend of the SO(3) adjoint through ctypes,
 `mtex/functions/nfft.py`, found by the preference `NFFTLibrary` or `MTEX_NFFT_LIBRARY`;
-finufft stays the dependency. Never import numba at module level. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
+finufft stays the dependency. Never import numba at module level. numba's disk cache keeps a loop
+compiled against the helpers it called, so a change to a helper of another file (`_centreProgram`
+of `maps/kernels.py`, which `analysis/kernels.py` calls) reaches the loop only once its cache files
+(`__pycache__/kernels*.nbi`, `.nbc`) are removed. The SO(3) grids (`SO3Grid`, `SO3FibonacciGrid`) search through a quaternion
 k-d tree, `mtex/geometry/grids/orientationtree.py`, for nearest, k-nearest and radius; the
 radius search, what ODF reconstruction needs, is on `SO3Grid` the structured search of
 `mtex/geometry/grids/gridsearch.py` (one image per coset of the rotations about z, the rings,

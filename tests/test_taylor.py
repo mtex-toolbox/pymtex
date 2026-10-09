@@ -79,7 +79,10 @@ def test_calcTaylor_ofTheCubeInTensionIs2_45():
   # the cube orientation of an fcc crystal in tension has the Taylor factor 2.45
   cs, sS, m, eps = fccTension()
   M, b, W = calcTaylor(eps, sS)
-  assert np.isclose(M, 2.449, atol=5e-3) and np.count_nonzero(b > 1e-9) <= 5
+  # the centre of the optimal face shares the shear equally over the active systems, a vertex of it does not
+  active = b[b > 1e-6]
+  assert np.isclose(M, 2.449, atol=5e-3) and np.allclose(active, active[0], rtol=1e-6)
+  assert np.count_nonzero(calcTaylor(eps, sS, spinSelection="basic").b > 1e-9) <= 5
   assert np.isclose(calcTaylor(eps, m).M, M) and np.isclose(calcTaylor(eps, sS, plasticWork=True).M, M)
   assert np.isclose(calcTaylor(eps, sS, "plasticWork").M, M)
 
@@ -238,3 +241,18 @@ def test_calcTaylor_compiledSolveLeavesTheDegenerateVertex():
   E -= np.trace(E) / 3 * np.eye(3)
   single = calcTaylor(strainTensor(np.stack([E, E]), cs), sS, spinSelection="minimumNorm")
   assert np.isclose(single.M[0], 2.17502016, atol=1e-6)
+
+
+def test_calcTaylor_theCompiledCentreIsLinprogCentres():
+  # the analytic centre of every optimal face from the compiled loop and from NumPy's batch
+  from mtex import setMTEXpref
+  cs = crystalFrame("m-3m")
+  model = TaylorModel(slipSystem.fcc(cs))
+  E = inv(orientation.rand(500, cs, rng=rng)) * strainTensor(np.diag([1, -0.5, -0.5]))
+  M, b, W = calcTaylor(E, model)
+  setMTEXpref("kernels", "numpy")
+  try:
+    Mn, bn, Wn = calcTaylor(E, model)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(M, Mn, rtol=1e-9) and np.allclose(b, bn, atol=1e-6) and np.allclose(W.M, Wn.M, atol=1e-6)

@@ -4,11 +4,15 @@
 #   M, b, W = calcTaylor(eps, sS)                       a strain in the crystal frame, or a list of them
 #   M, b, W = calcTaylor(inv(ori) * eps, sS, plasticWork=True)
 #   MFun, _, WFun = calcTaylor(eps, sS)                 a strain in the specimen frame: functions of the orientation
-#   x = linearProgram(c, A, b)                          min c.x with A x = b, x >= 0
+#   x = linearProgram(c, A, b)                          min c.x with A x = b, x >= 0, a vertex
+#   x = linprogCentre(c, A, y)                          the same at the analytic centre, many at once
 #
 # The Taylor factor is the least sum of shears (or of plastic work) on the slip systems
-# that accommodates the strain: a linear program in the shears, solved by a two-phase
-# simplex with Bland's rule. The plastic spin is the antisymmetric part of the slip.
+# that accommodates the strain: a linear program in the shears. Its optimal face is mostly
+# more than a point, so the shears are its analytic centre, the symmetric and unique ones, as
+# MATLAB's linprogCentre gives them; a vertex of it by a two-phase simplex with Bland's rule,
+# or the shears of least norm on it, on request. The plastic spin is the antisymmetric part
+# of the slip.
 from __future__ import annotations
 
 from collections import namedtuple
@@ -28,6 +32,8 @@ from ..geometry.display import aligned, frameLabel
 
 LinearProgramResult = namedtuple("LinearProgramResult", ["solution", "status", "iterations", "residual"])
 TaylorResult = namedtuple("TaylorResult", ["M", "b", "W"])
+# the selections of the shears on the optimal face, in the order the compiled loop numbers them
+SELECTIONS = ("basic", "minimumNorm", "centre")
 
 
 # ------------------------------------------------------------------ the simplex
@@ -125,15 +131,67 @@ def linearProgram(c, A, b, tol=1e-9, maxIter=10000, diagnostics=False):
   return finish("optimal", it, x, residual)
 
 
+# ------------------------------------------------------------------ the analytic centre
+
+def linprogCentre(c, A, y, tol=1e-9, maxIter=100):
+  """the solutions of many linear programs min c.x under A x = y, x >= 0 at once, each the
+  analytic centre of its optimal face, which is symmetric where the program is (a simplex
+  gives any vertex), NaN where one does not converge (MATLAB's linprogCentre). c is (n,) or
+  (N, n), A (m, n) or (N, m, n), y (m,) or (N, m); a primal dual path following method, its
+  Newton steps towards the central path at 0.3 mu"""
+  y = np.asarray(y, dtype=float)
+  single = y.ndim == 1
+  y = y.reshape(-1, y.shape[-1])
+  N, m = y.shape
+  A = np.broadcast_to(np.asarray(A, dtype=float), (N,) + np.shape(A)[-2:])
+  n = A.shape[-1]
+  c = np.broadcast_to(np.asarray(c, dtype=float), (N, n))
+  At = np.swapaxes(A, 1, 2)
+  mul = lambda B, v: np.einsum("kij,kj->ki", B, v)
+  x, s, lam = np.ones((N, n)), np.ones((N, n)), np.zeros((N, m))
+  ny, nc = np.linalg.norm(y, axis=1), np.linalg.norm(c, axis=1)
+  done = np.zeros(N, dtype=bool)
+  for _ in range(maxIter):
+    rp = y - mul(A, x)
+    rd = c - mul(At, lam) - s
+    gap = np.sum(x * s, axis=1)
+    mu = gap / n
+    # the duality gap is the error of the objective
+    dualDone = (np.linalg.norm(rd, axis=1) <= tol * (1 + nc)) & (gap <= tol * (1 + np.abs(np.sum(c * x, axis=1))))
+    done = dualDone & (np.linalg.norm(rp, axis=1) <= tol * (1 + ny))
+    # near the end the normal equations lose the primal residual, which the steps, cut short by
+    # the entries close to zero, no longer remove: the least correction on the support restores it
+    for k in np.flatnonzero(dualDone & ~done):
+      S = x[k] > 1e-6 * np.max(x[k])
+      z = x[k].copy()
+      z[S] += A[k][:, S].T @ np.linalg.lstsq(A[k][:, S] @ A[k][:, S].T, rp[k], rcond=None)[0]
+      if np.min(z[S]) >= 0 and np.linalg.norm(y[k] - A[k] @ z) <= 1e-12 * (1 + ny[k]):
+        x[k], done[k] = z, True
+    if done.all():
+      break
+    rc = 0.3 * mu[:, None] - x * s
+    M = (A * (x / s)[:, None, :]) @ At
+    M += 1e-13 * np.max(np.diagonal(M, axis1=1, axis2=2), axis=1)[:, None, None] * np.eye(m)
+    dlam = np.linalg.solve(M, (rp - mul(A, (rc - x * rd) / s))[..., None])[..., 0]
+    ds = rd - mul(At, dlam)
+    dx = (rc - x * ds) / s
+    dx[done], ds[done], dlam[done] = 0, 0, 0
+    ap = np.minimum(1, 0.95 / np.maximum(np.max(-dx / x, axis=1), 1e-300))
+    ad = np.minimum(1, 0.95 / np.maximum(np.max(-ds / s, axis=1), 1e-300))
+    x, s, lam = x + ap[:, None] * dx, s + ad[:, None] * ds, lam + ad[:, None] * dlam
+  x[~done] = np.nan
+  return x[0] if single else x
+
+
 # ------------------------------------------------------------------ the model
 
 class TaylorModel:
   """the slip systems prepared for the Taylor solve: the distinct signed systems with their
   critical resolved shear stresses, the strain each shear produces and its spin;
-  spinSelection 'basic' takes the simplex vertex, 'minimumNorm' the shears of least norm
-  on the work-optimal face"""
+  spinSelection 'centre' takes the analytic centre of the optimal face, as MATLAB does,
+  'basic' a vertex of it by the simplex, 'minimumNorm' the shears of least norm on it"""
 
-  def __init__(self, sS, spinSelection="basic"):
+  def __init__(self, sS, spinSelection="centre"):
     if isinstance(sS, TaylorModel):
       self.__dict__.update(sS.__dict__)
       self.spinSelection = spinSelection
@@ -145,8 +203,8 @@ class TaylorModel:
       raise ValueError("the slip systems of a Taylor model live in a crystal frame")
     if not np.all(np.isfinite(sS.CRSS)) or np.any(sS.CRSS <= 0):
       raise ValueError("every critical resolved shear stress has to be finite and positive")
-    if spinSelection not in ("basic", "minimumNorm"):
-      raise ValueError("spinSelection is 'basic' or 'minimumNorm'")
+    if spinSelection not in SELECTIONS:
+      raise ValueError("spinSelection is 'centre', 'basic' or 'minimumNorm'")
     full = sS.symmetrise()
     D = full._dyads()
     keys = np.concatenate([np.round(D.reshape(len(full), 9) * 1e10), full.CRSS[:, None]], axis=1)
@@ -219,10 +277,16 @@ def _taylorCrystal(E, model, plasticWork=False, spinSelection=None):
     return 0.0, np.zeros(len(model)), np.zeros((3, 3))
   En = E / scale
   y = np.array([En[0, 0], En[1, 0], En[2, 0], En[1, 1], En[2, 1]])
-  result = linearProgram(model.crss, model.A, y, diagnostics=True)
-  if result.status != "optimal":
-    raise ValueError(f"the Taylor solve failed: {result.status}")
-  x = result.solution
+  if spinSelection == "centre":
+    x = linprogCentre(model.crss, model.A, y)
+    if np.any(np.isnan(x)):
+      raise ValueError("the Taylor solve failed: the interior point method did not converge")
+    x = np.maximum(x, 0)
+  else:
+    result = linearProgram(model.crss, model.A, y, diagnostics=True)
+    if result.status != "optimal":
+      raise ValueError(f"the Taylor solve failed: {result.status}")
+    x = result.solution
   if spinSelection == "minimumNorm":
     x = _minimumNormShears(model.A, model.crss, y, x)
   factor = float(model.crss @ x) if plasticWork else float(np.sum(x))
@@ -244,7 +308,7 @@ def _taylorMany(E, model, plasticWork, spinSelection):
       M[j], b[j], W[j] = _taylorCrystal(E[j], model, plasticWork, spinSelection)
     return M, b, W
   status = np.zeros(n, dtype=np.int64)
-  loop(E, np.ascontiguousarray(model.A), model.crss, np.ascontiguousarray(model.spins), spinSelection == "minimumNorm",
+  loop(E, np.ascontiguousarray(model.A), model.crss, np.ascontiguousarray(model.spins), SELECTIONS.index(spinSelection),
        plasticWork, 1e-9, 10000, M, b, W, status)
   if np.any(status != 0):
     raise ValueError(f"the Taylor solve failed for {np.count_nonzero(status)} of {n} strains")
@@ -259,9 +323,10 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
     MFun, _, WFun = calcTaylor(eps, sS)               eps in the specimen frame: the factor as an SO3Fun and
                                                       the spin as a vector field of the orientation
 
-  plasticWork=True takes the work instead of the sum of the shears; spinSelection
-  'minimumNorm' picks the shears of least norm on the optimal face, which makes the spin
-  unique. The spin is a spinTensor in the crystal frame, so ori.exp(-W) turns the crystal.
+  plasticWork=True takes the work instead of the sum of the shears. The shears are the
+  analytic centre of the optimal face, which makes them and the spin unique and symmetric, as
+  MATLAB's; spinSelection 'basic' takes a vertex of the face, 'minimumNorm' the shears of least
+  norm on it. The spin is a spinTensor in the crystal frame, so ori.exp(-W) turns the crystal.
   """
   if any(isinstance(a, str) and a.lower() == "plasticwork" for a in args):
     plasticWork = True
@@ -277,7 +342,7 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
     if eps.ndim == 0:
       return TaylorResult(float(M[0]), b[0], spinTensor(W[0], fr))
     return TaylorResult(M.reshape(eps.shape), b.reshape(eps.shape + (len(model),)), spinTensor(W.reshape(eps.shape + (3, 3)), fr))
-  return _taylorField(eps, model, plasticWork, "minimumNorm" if spinSelection is None else spinSelection, bandwidth, smoothing)
+  return _taylorField(eps, model, plasticWork, model.spinSelection if spinSelection is None else spinSelection, bandwidth, smoothing)
 
 
 # the factor and the spin over all orientations, as harmonic functions fitted on a
@@ -331,4 +396,4 @@ def _spinExp(W, ref=None, side=None):
 
 _install()
 
-__all__ = ["calcTaylor", "linearProgram", "TaylorModel"]
+__all__ = ["calcTaylor", "linearProgram", "linprogCentre", "TaylorModel"]

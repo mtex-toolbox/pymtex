@@ -1,6 +1,7 @@
 # the compiled kernels of the analysis layer: the Taylor solve of many strains as one
-# parallel loop, each strain's linear program through the dense simplex of the maps layer
-# and, for a unique spin, the shears of least norm on the optimal face. The NumPy forms in
+# parallel loop, each strain's linear program at the analytic centre of its optimal face, or at
+# a vertex by the dense simplex of the maps layer and, for a unique spin there, the shears of
+# least norm on the optimal face. The NumPy forms in
 # taylor.py are the fallback without numba and the oracle of the tests.
 from __future__ import annotations
 
@@ -66,8 +67,9 @@ def _minimumNorm(BT, rhs, x, tol):
 
 # the factor, the shears and the spin of every strain E[k] in the crystal frame: A holds
 # the five independent strain components of each system, crss the cost, spins the
-# antisymmetric part of each dyad
-def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxIter, M, X, W, status):
+# antisymmetric part of each dyad; selection 0 a vertex of the optimal face, 1 the shears of
+# least norm on it, 2 its analytic centre
+def _taylorLoop(E, A, crss, spins, selection, plasticWork, tol, maxIter, M, X, W, status):
   n, k = E.shape[0], A.shape[1]
   cnorm = np.sqrt(crss @ crss)
   BT = np.empty((k, 6))
@@ -85,8 +87,8 @@ def _taylorLoop(E, A, crss, spins, minimumNorm, plasticWork, tol, maxIter, M, X,
       status[p] = 0
       continue
     y = np.array([e[0, 0], e[1, 0], e[2, 0], e[1, 1], e[2, 1]]) / scale
-    s = _linearProgram(A, y, crss, tol, maxIter, x)
-    if s == 0 and minimumNorm:
+    s = _centreProgram(A, y, crss, tol, maxIter, x) if selection == 2 else _linearProgram(A, y, crss, tol, maxIter, x)
+    if s == 0 and selection == 1:
       rhs = np.empty(6)
       rhs[:5] = y
       rhs[5] = (crss @ x) / cnorm
@@ -113,6 +115,7 @@ def taylorKernel():
   if "taylor" not in _COMPILED:
     globals()["prange"] = nb.prange
     globals()["_linearProgram"] = mk._COMPILED["_linearProgram"]
+    globals()["_centreProgram"] = mk._COMPILED["_centreProgram"]
     globals()["_minimumNorm"] = nb.njit(cache=True)(_minimumNorm)
     _COMPILED["taylor"] = _parallelKernel(_taylorLoop)
   return _COMPILED["taylor"]

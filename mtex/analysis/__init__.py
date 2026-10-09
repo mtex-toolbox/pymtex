@@ -8,7 +8,7 @@ from .mechanics import (meanStress, deviatoric, deviatoricStress, deviatoricStra
                         GreenStrain, strainRate, spin, angularVelocityVector, rotationRate, vorticity, spinTensorOf,
                         dislocationDensity)
 from .optics import refractiveIndex, birefringence, opticalAxis, spectralTransmission
-from .taylor import calcTaylor, linearProgram, TaylorModel
+from .taylor import calcTaylor, linearProgram, linprogCentre, TaylorModel
 from .texture import calcTensor, calcLankford, calcKearnsFactor, SO3FunSBF, doEulerStep
 from .pf2odf import MLSSolver, zeroRangeMethod, calcODF, calcODFIterative
 from .embedding import embedding, embeddingSpec, double, setDouble
@@ -26,8 +26,8 @@ __all__ = ["velocity", "energyVector", "YoungsModulus", "linearCompressibility",
            "equivalentStress", "equivalentStrain", "octahedralStrain", "axisRatios", "maxStrain", "calcShearStress",
            "SchmidFactor", "CauchyStrain", "GreenStrain", "strainRate", "spin", "angularVelocityVector", "rotationRate",
            "vorticity", "spinTensorOf", "dislocationDensity", "refractiveIndex", "birefringence", "opticalAxis",
-           "spectralTransmission", "calcTaylor", "linearProgram", "TaylorModel", "calcTensor", "calcLankford",
-           "calcKearnsFactor", "SO3FunSBF", "doEulerStep", "MLSSolver", "zeroRangeMethod", "calcODF",
+           "spectralTransmission", "calcTaylor", "linearProgram", "linprogCentre", "TaylorModel", "calcTensor",
+           "calcLankford", "calcKearnsFactor", "SO3FunSBF", "doEulerStep", "MLSSolver", "zeroRangeMethod", "calcODF",
            "calcODFIterative", "embedding", "embeddingSpec", "double", "setDouble", "optimalSample",
            "OptimalSampleResult", "calcCluster", "classix", "knnRadius", "EBSDFilter", "splineFilter",
            "halfQuadraticFilter", "l1TVFilter", "infimalConvolutionFilter", "fitDislocationSystems", "meanFilter",
