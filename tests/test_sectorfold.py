@@ -114,3 +114,13 @@ def test_polarCoordinates_compiledRadiusIsTheNumpyOne(name):
     finally:
       setMTEXpref("kernels", "numba")
   assert np.allclose(out["numba"], out["numpy"], atol=1e-12)
+
+
+def test_polarCoordinates_putTheVerticesOfATriangleOnThirdsOfTheTurn():
+  # the vertices are knots of the equalisation, so they land on 0, 1 and 2 thirds exactly
+  from mtex.plotting.directionkeys import HSVDirectionKey
+  for pg in ("m-3m", "6/mmm", "mmm", "-3m", "-3"):
+    sR = HSVDirectionKey(crystalFrame(pg)).sR
+    _, rho = polarCoordinates(sR, sR.vertices(), regionCenter(sR))
+    t = np.mod(np.asarray(rho).ravel() / (2 * np.pi / 3), 3)
+    assert np.max(np.min(np.abs(t[:, None] - np.arange(4)), axis=1)) < 1e-12

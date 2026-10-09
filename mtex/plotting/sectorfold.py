@@ -231,35 +231,30 @@ def equaliseAzimuth(sR, c, rx, rho, steps=1000):
     return np.mod(rho, np.pi) * 2
   if len(V) == 0:
     return rho
-  # the distance to the boundary as the azimuth turns
-  phi = np.linspace(0, 2 * np.pi, steps + 1)[:-1]
+  # the distance to the boundary as the azimuth turns, the vertices' azimuths knots of the grid
+  at = np.mod(azimuthAbout(c, rx, V), 2 * np.pi)
+  phi = np.unique(np.concatenate([np.linspace(0, 2 * np.pi, steps + 1), at]))
   n1 = _unit(np.cross(rx, c))
   n = (rotation.byAxisAngle(vector3d(c), phi) * vector3d(n1)).data.reshape(-1, 3)
-  omega = np.full(steps, np.pi)
+  omega = np.full(len(phi), np.pi)
   for m in sR.N:
     cr = np.cross(m, n)
     ncr = np.linalg.norm(cr, axis=-1)
     ok = ncr > 1e-12
     omega[ok] = np.minimum(omega[ok], _angle(cr[ok] / ncr[ok][:, None], c))
-  # a triangle's three arcs each take a third of the turn, so its vertices are pinned. Two
-  # cut points make the three arcs, the third running over the wrap; a vertex sitting on
-  # rho = 0 is that wrap and cuts nothing
+  # the turn's share of every interval between two knots, by the trapezoid rule
+  seg = (omega[:-1] + omega[1:]) / 2 * np.diff(phi)
+  # a triangle's three arcs each take a third of the turn, so its vertices are pinned: an
+  # interval belongs to the arc of the vertices passed before it, counted modulo three, so the
+  # arc over rho = 0 is one arc whether or not a vertex sits there
   if len(V) == 3:
-    at = np.sort(azimuthAbout(c, rx, V))
-    cuts = [int(np.floor(a / (2 * np.pi) * steps)) for a in at]
-    if cuts[0] < 9:
-      cuts = cuts[1:]
-    if len(cuts) >= 2:
-      for lo, hi in ((0, cuts[0]), (cuts[0], cuts[1]), (cuts[1], steps)):
-        if lo < hi:
-          w = np.sum(omega[lo:hi])
-          if w > 0:
-            omega[lo:hi] /= 3 * w
-  cum = np.concatenate([[0.0], np.cumsum(omega / np.sum(omega))]) * 2 * np.pi
-  t = np.mod(rho, 2 * np.pi) / (2 * np.pi) * steps
-  i = np.clip(np.floor(t).astype(int), 0, steps - 1)
-  f = t - i
-  return cum[i] + f * (cum[i + 1] - cum[i])
+    arc = np.cumsum(np.isin(phi[:-1], at)) % 3
+    for k in range(3):
+      w = np.sum(seg[arc == k])
+      if w > 0:
+        seg[arc == k] /= 3 * w
+  cum = np.concatenate([[0.0], np.cumsum(seg)]) / np.sum(seg) * 2 * np.pi
+  return np.interp(np.mod(rho, 2 * np.pi), phi, cum)
 
 
 def innerAngle(sR, v):

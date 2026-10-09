@@ -9,20 +9,20 @@ from mtex.plotting.directionkeys import hsl2hsv, hsv2rgb, oklab2rgb, rgb2hsv, rg
 
 rng = np.random.default_rng(2)
 
-# the residual sits at the corners of the sector, where the azimuth is equalised on a grid
-# of a thousand steps on both sides, so the tolerance is ten of 255 and not one
+# MATLAB's colours since both pin a triangle's vertices as exact knots of the equalised azimuth
+# (MATLAB b23d9cc59); the rest of the grid differs, which leaves up to 5e-4 at the corners
 COLORS = {
-  "m-3m": [((0.4786, 0.2151, 0.8513), (0.9000, 0.9000, 0.9000)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
-           ((0.5774, 0.5774, 0.5774), (0.0071, 0.0000, 1.0000)), ((0.7071, 0.0, 0.7071), (0.0019, 1.0000, 0.0000)),
-           ((0.2673, 0.5345, 0.8018), (0.7560, 0.8785, 0.9195)), ((-0.2673, 0.8018, 0.5345), (0.7560, 0.8785, 0.9195)),
-           ((0.3651, -0.1826, 0.9129), (0.9220, 0.7363, 0.7938)), ((0.1098, 0.1098, 0.9879), (1.0000, 0.0000, 0.3325))],
-  "-3m": [((0.75, -0.4330, 0.5), (0.9037, 1.0000, 0.0000)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
-          ((0.5, -0.8660, 0.0), (0.0455, 0.0000, 1.0000)), ((1.0, 0.0, 0.0), (0.0455, 0.0000, 1.0000)),
-          ((0.2673, 0.5345, 0.8018), (0.7815, 0.0473, 0.4971)), ((-0.2673, 0.8018, 0.5345), (0.9180, 0.7675, 0.8896)),
-          ((0.3651, -0.1826, 0.9129), (0.9876, 0.4841, 0.1332)), ((0.1098, 0.1098, 0.9879), (0.7887, 0.0532, 0.0456))],
-  "622": [((0.8660, 0.0, 0.5), (0.9139, 0.0000, 1.0000)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
-          ((0.8660, -0.5, 0.0), (0.0224, 1.0000, 0.0000)), ((0.8660, 0.5, 0.0), (0.0224, 1.0000, 0.0000)),
-          ((0.2673, 0.5345, 0.8018), (0.7815, 0.0473, 0.4971))]}
+  "m-3m": [((0.4786, 0.2151, 0.8513), (0.9000, 0.9000, 0.8999)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
+           ((0.5774, 0.5774, 0.5774), (0.0039, 0.0000, 1.0000)), ((0.7071, 0.0, 0.7071), (0.0000, 1.0000, 0.0071)),
+           ((0.2673, 0.5345, 0.8018), (0.7561, 0.8786, 0.9195)), ((-0.2673, 0.8018, 0.5345), (0.7561, 0.8786, 0.9195)),
+           ((0.3651, -0.1826, 0.9129), (0.9220, 0.7361, 0.7942)), ((0.1098, 0.1098, 0.9879), (1.0000, 0.0000, 0.3349))],
+  "-3m": [((0.75, -0.4330, 0.5), (0.8999, 1.0000, 0.0001)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
+          ((0.5, -0.8660, 0.0), (0.0038, 0.0000, 1.0000)), ((1.0, 0.0, 0.0), (0.0039, 0.0000, 1.0000)),
+          ((0.2673, 0.5345, 0.8018), (0.7817, 0.0472, 0.5031)), ((-0.2673, 0.8018, 0.5345), (0.9180, 0.7675, 0.8908)),
+          ((0.3651, -0.1826, 0.9129), (0.9876, 0.4845, 0.1330)), ((0.1098, 0.1098, 0.9879), (0.7886, 0.0532, 0.0456))],
+  "622": [((0.8660, 0.0, 0.5), (0.9035, 0.0000, 1.0000)), ((0.0, 0.0, 1.0), (1.0000, 0.0103, 0.0000)),
+          ((0.8660, -0.5, 0.0), (0.0000, 1.0000, 0.0072)), ((0.8660, 0.5, 0.0), (0.0000, 1.0000, 0.0072)),
+          ((0.2673, 0.5345, 0.8018), (0.7817, 0.0472, 0.5031))]}
 
 # the white centres MTEX's HSVDirectionKey reports; the port keeps the same half for all but
 # 2, 2/m and 23, where MTEX's half is an artefact of the sign its table gives the sector
@@ -37,7 +37,7 @@ MIRRORED = ("2", "2/m", "23")
 def test_HSVDirectionKey_coloursAreMTEXs(name):
   key = HSVDirectionKey(crystalFrame(name))
   for p, want in COLORS[name]:
-    assert np.max(np.abs(key.direction2color(vector3d(*p)) - want)) < 10 / 255
+    assert np.max(np.abs(key.direction2color(vector3d(*p)) - want)) < 2e-3
 
 
 def test_HSVDirectionKey_equivalentDirectionsShareAColour():
@@ -237,5 +237,6 @@ def test_HSVDirectionKey_coloursACrystalDirectionWhateverTheAlignment(name):
   c0 = HSVDirectionKey(ref).direction2color(Miller(hkl, ref))
   for al in [("X||b*", "Z||a"), ("X||b", "Z||a*")]:
     cs = crystalFrame(name, abc, *al)
-    # a direction on a boundary of the sector, as [-2 -1 0] of -43m, keeps its hue to rounding
-    assert np.allclose(HSVDirectionKey(cs).direction2color(Miller(hkl, cs)), c0, atol=1e-3)
+    # a direction on a boundary of the sector, as [-3 -1 0] of -43m, is folded to either side of it,
+    # where the key differs by 2e-3 in one channel at any resolution of the equalisation
+    assert np.allclose(HSVDirectionKey(cs).direction2color(Miller(hkl, cs)), c0, atol=3e-3)
