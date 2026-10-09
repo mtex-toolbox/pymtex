@@ -62,19 +62,21 @@ def _eps(eps, dtype):
 
 # the options of a plan: one thread below a work of nodes times modes, where finufft's
 # thread start-up costs more than the transform (30 ms against 2 ms on 100 nodes at
-# bandwidth 32), else the threads of the preference; the oversampling factor by the density
-# of the nodes, MATLAB's nfftParameters rule measured on finufft: 1.25 where the nodes are
-# fewer than a quarter of the lattice and the FFT dominates, 2 where the spreading does or
-# where the tolerance is below what the narrow oversampling reaches
+# bandwidth 32), else the threads of the preference; the oversampling factor finufft's own
+# choice unless a caller names one: over nodes from 1e4 to 1e7 and lattices from 17 x 129^2 to
+# 129 x 257^2 it is within the noise of the better of 1.25 and 2 but for one case 20 % off,
+# where a rule by the density of the nodes, 1.25 below a quarter of the lattice, took the
+# slower one up to three times over (1e6 nodes on the 4-fold lattice of m-3m: 296 ms, 356 at
+# 1.25, 795 at 2)
 NUFFT_SINGLE_THREAD_WORK = 2e8
-NUFFT_LOW_UPSAMPLING_EPS = 1e-9
 
 
 def _options(nodes, dims, eps, upsampfac=None):
   size = int(np.prod(dims))
-  if upsampfac is None:
-    upsampfac = 1.25 if nodes < size / 4 and eps >= NUFFT_LOW_UPSAMPLING_EPS else 2.0
-  return {"nthreads": 1 if nodes * size < NUFFT_SINGLE_THREAD_WORK else threads(), "upsampfac": float(upsampfac)}
+  opts = {"nthreads": 1 if nodes * size < NUFFT_SINGLE_THREAD_WORK else threads()}
+  if upsampfac is not None:
+    opts["upsampfac"] = float(upsampfac)
+  return opts
 
 
 # ------------------------------------------------------------------ the Wigner-d matrices at pi/2
