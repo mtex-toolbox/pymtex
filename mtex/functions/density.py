@@ -88,12 +88,14 @@ def _calcDensityS2(v, kernel=None, halfwidth=None, weights=None, groups=None, ba
       _selectedKernel(vector3d(v.data, frame=v.frame, antipodal=antipodal), weights, groups)
   d = v.data.reshape(-1, 3)
   w = np.ones(len(d)) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
-  keep = ~np.any(np.isnan(d), axis=1)
-  d, w = d[keep], w[keep]
+  # the lengths, NaN where a coordinate is, so that one pass drops those and normalises the rest
+  r = np.sqrt(np.einsum("ij,ij->i", d, d))
+  keep = ~np.isnan(r)
+  d, w, r = d[keep], w[keep], r[keep]
   if len(d) == 0:
     return S2FunHarmonic([math.sqrt(4 * np.pi)], v.frame, real=True, antipodal=antipodal, _internal=True)
   L = min(getMTEXpref("maxS2Bandwidth") if bandwidth is None else int(bandwidth), psi.bandwidth)
-  pts = vector3d(d, frame=v.frame, antipodal=antipodal).normalize()
+  pts = vector3d(d / r[:, None], frame=v.frame, antipodal=antipodal)
   s = S2FunHarmonic.quadrature(pts, np.ones(len(d)), bandwidth=L, weights=4 * np.pi * w / np.sum(w), real=True, antipodal=antipodal)
   return conv(s, psi)
 

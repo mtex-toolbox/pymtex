@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 import mtex
-from mtex import (S2FunHarmonic, SO3FunHarmonic, crystalFrame, deg2dim, orientation, quadratureS2Grid,
+from mtex import (S2FunHarmonic, SO3FunHarmonic, crystalFrame, deg2dim, degree, orientation, quadratureS2Grid,
                   quadratureSO3Grid, rotation, specimenFrame, vector3d)
 from mtex.functions.quadrature import bandwidthFor
 from mtex.functions.transforms import isRealWigner, sphericalTransform, sphericalTransformAdjoint
@@ -108,4 +108,5 @@ if want("s2"):
   sF = S2FunHarmonic(rng.standard_normal(129 ** 2) + 0j, crystalFrame("m-3m"))
   report("S2 symmetrise m-3m L=128", timeit(lambda: sF.symmetrise()))
   v = vector3d.rand(10**5, rng=rng)
-  report("S2 calcDensity 1e5", timeit(lambda: v.calcDensity(), 2))
+  # MATLAB's calcDensity takes 10 degree without a halfwidth, this port's selects one
+  report("S2 calcDensity 1e5", timeit(lambda: v.calcDensity(halfwidth=10 * degree), 2))
