@@ -232,3 +232,10 @@ def test_columnMinMax_areNumpysReductionsOverTheLongAxis():
   b = rng.integers(-5, 5, (130, 2, 2)).astype(np.int32)
   assert all(np.array_equal(kernels.columnMin(x), x.min(axis=0), equal_nan=True) and
              np.array_equal(kernels.columnMax(x), x.max(axis=0), equal_nan=True) for x in (a, a[:5], b))
+
+
+def test_copyInto_copiesLargeArraysOverTheCoresAndTheRestAsAssignment():
+  # a large contiguous pair over the cores, a strided one by the assignment
+  a = rng.standard_normal(3 * kernels.COPY_PARALLEL) + 1j
+  b, c = np.empty_like(a), np.empty((5, 2))
+  assert np.array_equal(kernels.copyInto(b, a), a) and np.array_equal(kernels.copyInto(c, np.arange(20.0).reshape(5, 4)[:, ::2]), np.arange(20.0).reshape(5, 4)[:, ::2])

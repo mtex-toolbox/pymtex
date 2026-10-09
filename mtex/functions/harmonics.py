@@ -362,9 +362,10 @@ def project(fhat, P, Q, out=None):
   """the coefficients projected by P on the left and Q on the right, in place or into out, the
   source then only read: the compiled projection over the nonzeros where numba is there, the
   matrix products of _projectBlock otherwise and as its oracle"""
+  from ..geometry.kernels import copyInto
   from .kernels import projectBlocks, projectsSparse
   if out is not None and (projectsSparse(fhat, P, Q) or out.dtype != fhat.dtype):
-    out[...] = fhat
+    copyInto(out, fhat)
     fhat, out = out, None
   if out is None and projectBlocks(fhat, P, Q):
     return fhat

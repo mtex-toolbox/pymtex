@@ -203,6 +203,30 @@ def _overRows(n, work, call):
     f.result()
 
 
+# a copy of a large array over the cores: a fresh array is mapped page by page on its first
+# write, and one thread faulting in 46 MB takes 25 ms where sixteen take 8
+def _copyLoop(src, dst, chunk):
+  n = src.shape[0]
+  for c in prange((n + chunk - 1) // chunk):
+    for i in range(c * chunk, min(n, (c + 1) * chunk)):
+      dst[i] = src[i]
+
+
+COPY_PARALLEL = 1 << 20
+
+
+def copyInto(dst, src):
+  """dst[...] = src, over the cores for a large contiguous pair of one type and shape, which is
+  where a fresh destination's first write costs"""
+  src = np.asarray(src)
+  if backend() == "numba" and src.size >= COPY_PARALLEL and dst.shape == src.shape and dst.dtype == src.dtype and \
+     dst.flags.c_contiguous and src.flags.c_contiguous:
+    _parallel("copy", _copyLoop)(src.reshape(-1), dst.reshape(-1), 1 << 16)
+  else:
+    dst[...] = src
+  return dst
+
+
 # the least and the largest of every column of a tall (n, k) array: NumPy reduces the long axis
 # of a narrow array strided and twenty times slower than a block of rows at a time
 def _columnReduce(a, op, block=64):
