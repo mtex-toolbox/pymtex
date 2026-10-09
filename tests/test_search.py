@@ -104,3 +104,26 @@ def test_find_amongManyOrientationsAgreesWithTheDistanceMatrix(antipodal, monkey
   got = [find(v, w), find(v, w, 3), find(v, w, 8 * degree)]
   assert all(np.array_equal(a[0], b[0]) and np.allclose(a[1], b[1], atol=1e-10) for a, b in zip(ref[:2], got[:2]))
   assert (ref[2][0] != got[2][0]).nnz == 0 and abs(ref[2][1] - got[2][1]).max() < 1e-10
+
+
+# among many directions the search goes through a k-d tree over the points, with the answers of
+# the matrix of every distance, antipodal ones counted once
+@pytest.mark.parametrize("antipodal", [False, True])
+def test_find_amongManyDirectionsAgreesWithTheDistanceMatrix(antipodal, monkeypatch):
+  import mtex.geometry.grids.search as search
+  v, w = vector3d.rand(3000), vector3d.rand(64)
+  v.antipodal = antipodal
+  monkeypatch.setattr(search, "TREE_QUERIES", 10**9)
+  ref = [find(v, w), find(v, w, 3), find(v, w, 8 * degree)]
+  monkeypatch.setattr(search, "TREE_QUERIES", 32)
+  got = [find(v, w), find(v, w, 3), find(v, w, 8 * degree)]
+  assert all(np.array_equal(a[0], b[0]) and np.allclose(a[1], b[1], atol=1e-10) for a, b in zip(ref[:2], got[:2]))
+  assert (ref[2][0] != got[2][0]).nnz == 0 and abs(ref[2][1] - got[2][1]).max() < 1e-10
+
+
+# an antipodal list is searched up to sign without being told, as MATLAB's find reads v.antipodal
+def test_find_inAnAntipodalListReadsDirectionsUpToSign():
+  v = vector3d.rand(20)
+  v.antipodal = True
+  ind, d = find(v, -v)
+  assert np.array_equal(ind, np.arange(20)) and np.allclose(d, 0)

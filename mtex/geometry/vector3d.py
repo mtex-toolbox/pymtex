@@ -733,8 +733,9 @@ class vector3d(MtexArray):
       v = self._new(self.data, _frame=self._frame.Laue())
     return projectIntoFundamentalRegion(v, center)
 
-  def find(self, w, epsOrK=None, antipodal=False):
-    """the closest points of this list to others, the k closest, or all within a radius"""
+  def find(self, w, epsOrK=None, antipodal=None):
+    """the closest points of this list to others, the k closest, or all within a radius; up to sign
+    where either is antipodal, antipodal=True always, False never"""
     from .grids.search import find
     return find(self, w, epsOrK, antipodal)
 

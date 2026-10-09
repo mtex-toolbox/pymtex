@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy import sparse
 
 from ..units import degree
 from ..vector3d import vector3d
@@ -186,18 +185,8 @@ class S2Grid(vector3d):
       ind = s2Nearest(self, xyz, backend()).reshape(v.shape)
       d = np.arctan2(np.linalg.norm(np.cross(self.data[ind], xyz.reshape(v.shape + (3,))), axis=-1), _dots(self, self.data[ind], xyz.reshape(v.shape + (3,))))
       return ind, d
-    rows, cols, vals = [], [], []
-    for r, x in enumerate(xyz):
-      ind = self.neighbourIndices(x, eps)
-      rows.append(np.full(len(ind), r))
-      cols.append(ind)
-      d = _dots(self, self.data[ind], x)
-      vals.append(np.arctan2(np.linalg.norm(np.cross(self.data[ind], x), axis=-1), d))
-    rows, cols, vals = (np.concatenate(a) if a else np.zeros(0) for a in (rows, cols, vals))
-    shape = (len(xyz), self.size)
-    I = sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape)
-    D = sparse.csr_matrix((vals, (rows, cols)), shape=shape)
-    return I, D
+    from .search import s2Tree
+    return s2Tree(self).radius(xyz, eps)
 
   def __repr__(self):
     lens = [len(r) for r in self.rhoGrid]

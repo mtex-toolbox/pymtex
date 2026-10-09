@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy import sparse
 
 from ..units import degree
 from ..vector3d import vector3d
@@ -57,47 +56,19 @@ class fibonacciS2Grid(vector3d):
     band = self._zBand(d[2], 2 * np.sin(eps / 2))
     return band[self.data[band] @ d >= np.cos(eps)]
 
-  # the nearest point: the best of a band as wide as the spacing, widened until the band
-  # contains every point closer than the best found
-  def _nearestIndex(self, xyz):
-    d = xyz / np.linalg.norm(xyz)
-    eps = 2 * self.resolution
-    while True:
-      band = self._zBand(d[2], 2 * np.sin(eps / 2))
-      if len(band):
-        dots = self.data[band] @ d
-        best, bd = band[np.argmax(dots)], np.max(dots)
-        omega = np.arccos(np.clip(bd, -1, 1))
-        if omega <= eps:
-          return int(best)
-        eps = omega
-      else:
-        eps *= 2
-      if eps >= np.pi:
-        return int(np.argmax(self.data @ d))
-
   def find(self, v, eps=None):
     """the nearest grid point of every direction and its angle, or with eps the sparse matrices of
     the points within eps and their angles
 
       ind, d = S2G.find(v)
       I, d = S2G.find(v, eps)"""
+    from .search import s2Tree
     v = v if isinstance(v, vector3d) else vector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:
-      ind = np.array([self._nearestIndex(x) for x in xyz], dtype=int).reshape(v.shape)
-      p = self.data[ind]
-      x = xyz.reshape(v.shape + (3,))
-      return ind, np.arctan2(np.linalg.norm(np.cross(p, x), axis=-1), np.sum(p * x, axis=-1))
-    rows, cols, vals = [], [], []
-    for r, x in enumerate(xyz):
-      ind = self.neighbourIndices(x, eps)
-      rows.append(np.full(len(ind), r))
-      cols.append(ind)
-      vals.append(np.arctan2(np.linalg.norm(np.cross(self.data[ind], x), axis=-1), self.data[ind] @ x))
-    rows, cols, vals = (np.concatenate(a) if a else np.zeros(0) for a in (rows, cols, vals))
-    shape = (len(xyz), self.size)
-    return sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape), sparse.csr_matrix((vals, (rows, cols)), shape=shape)
+      ind, d = s2Tree(self).nearest(xyz)
+      return ind.reshape(v.shape), d.reshape(v.shape)
+    return s2Tree(self).radius(xyz, eps)
 
   def __repr__(self):
     return display("fibonacciS2Grid", [("points", self.size), ("resolution", f"{self.resolution / degree:.4g}°")])

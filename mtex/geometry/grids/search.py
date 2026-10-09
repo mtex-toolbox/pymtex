@@ -14,7 +14,7 @@ from ..orientation import orientation
 from ..vector3d import vector3d
 
 
-def _distances(v, w, antipodal=False):
+def _distances(v, w, antipodal=None):
   if isinstance(v, orientation):
     if not isinstance(w, orientation):
       w = orientation(w, v.frameA, v.frameB)
@@ -49,18 +49,96 @@ def _findByTree(v, w, epsOrK):
   return I, C
 
 
-def find(v, w, epsOrK=None, antipodal=False):
+# directions among many: a k-d tree over the points, where the Euclidean nearest is the angular
+# nearest and the angle eps the chord 2 sin(eps/2); an antipodal search holds every point twice,
+# as v and -v. Of a grid the tree is kept on it. Crystal directions measure by their symmetry and
+# keep the matrix of every distance
+class S2Tree:
+  """the k-d tree of a set of directions, the nearest, k nearest and radius search as find gives them"""
+
+  def __init__(self, xyz, antipodal=False):
+    from scipy.spatial import cKDTree
+    self.pts = np.ascontiguousarray(xyz, dtype=float).reshape(-1, 3)
+    self.n, self.antipodal = len(self.pts), bool(antipodal)
+    self.tree = cKDTree(np.vstack([self.pts, -self.pts]) if self.antipodal else self.pts)
+
+  # the angles between points and directions, accurate for small angles
+  def _angles(self, p, x):
+    d = np.sum(p * x, axis=-1)
+    return np.arctan2(np.linalg.norm(np.cross(p, x), axis=-1), np.abs(d) if self.antipodal else d)
+
+  def nearest(self, xyz, k=None):
+    """the index of the nearest point, or of the k nearest, and the angles"""
+    from ..kernels import threads
+    x = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
+    kk = 1 if k is None else (2 * k if self.antipodal else k)
+    _, ind = self.tree.query(x, k=kk, workers=threads())
+    ind = np.asarray(ind).reshape(len(x), -1) % self.n
+    if self.antipodal and k is not None:
+      # v and -v of one point both among the 2k: the first k distinct points, in order
+      out = np.empty((len(x), k), dtype=np.int64)
+      for r in range(len(x)):
+        out[r] = list(dict.fromkeys(ind[r].tolist()))[:k]
+      ind = out
+    ind = ind[:, 0] if k is None else ind
+    return ind, self._angles(self.pts[ind], x[:, None, :] if k is not None else x)
+
+  def radius(self, xyz, eps):
+    """the sparse incidence (directions x points) of the points within eps and the sparse angles"""
+    from ..kernels import threads
+    x = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
+    hits = self.tree.query_ball_point(x, 2 * np.sin(min(eps, np.pi) / 2) * (1 + 1e-12), workers=threads())
+    counts = np.array([len(h) for h in hits], dtype=np.int64)
+    rows = np.repeat(np.arange(len(x)), counts)
+    cols = np.concatenate(hits).astype(np.int64) % self.n if counts.sum() else np.zeros(0, dtype=np.int64)
+    if self.antipodal and len(cols):
+      # a point within eps by v and by -v is one hit
+      pair = np.unique(rows * self.n + cols)
+      rows, cols = pair // self.n, pair % self.n
+    vals = self._angles(self.pts[cols], x[rows])
+    keep = vals <= eps
+    rows, cols, vals = rows[keep], cols[keep], vals[keep]
+    shape = (len(x), self.n)
+    return (sparse.csr_matrix((np.ones(len(rows), dtype=bool), (rows, cols)), shape=shape),
+            sparse.csr_matrix((vals, (rows, cols)), shape=shape))
+
+
+def s2Tree(grid):
+  """the tree of a set of directions, kept on a grid and built on first search"""
+  tree = getattr(grid, "_s2tree", None)
+  if tree is None:
+    tree = S2Tree(grid.data, grid.antipodal)
+    try:
+      grid._s2tree = tree
+    except AttributeError:
+      pass
+  return tree
+
+
+def find(v, w, epsOrK=None, antipodal=None):
   """the nearest neighbours in a plain list of directions or orientations by the symmetry-aware
   angle: the closest element of v to each w, the k closest, or all within a radius as two sparse
   matrices (len(w) x len(v)) of hits and angles
 
     ind, d = find(v, w)
     ind, d = find(v, w, k)              k an integer
-    I, D = find(v, w, 5*degree)         a radius, a float"""
+    I, D = find(v, w, 5*degree)         a radius, a float
+
+  directions are read up to sign where either list is antipodal, antipodal=True always, False never"""
   if isinstance(v, orientation) and isinstance(w, orientation) and not v.CS.isclose(w.CS):
     raise ValueError(f"cannot search orientations of {v.CS.char()} among orientations of {w.CS.char()}")
   if isinstance(v, orientation) and w.size >= TREE_QUERIES and v.size * w.size >= TREE_PAIRS:
     return _findByTree(v, w, epsOrK)
+  if isinstance(v, vector3d) and not v.isCrystalDirection and w.size >= TREE_QUERIES and v.size * w.size >= TREE_PAIRS:
+    w = w if isinstance(w, vector3d) else vector3d(w)
+    tree = S2Tree(v.flatten().data, (v.antipodal or w.antipodal) if antipodal is None else antipodal)
+    xyz = w.flatten().data.reshape(-1, 3)
+    if epsOrK is None:
+      ind, d = tree.nearest(xyz)
+      return ind.reshape(w.shape), d.reshape(w.shape)
+    if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
+      return tree.nearest(xyz, int(epsOrK))
+    return tree.radius(xyz, float(epsOrK))
   d = _distances(v, w, antipodal)
   M, N = d.shape
   if epsOrK is None:

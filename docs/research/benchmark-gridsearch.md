@@ -141,3 +141,30 @@ geometry crosscheck is its `persistent` cache answering the same arguments, not 
 - Measured and left: `subGrid` of the 1 degree grid (11 ms, NumPy's boolean indexing of 624
   thousand quaternions), the tree's radius search on the Fibonacci grid (44 ms against the
   structured 4.9 on the equispaced grid of the same size).
+
+## The S2 grids, 2026-10-09
+
+ms, warm, 1e4 queries for the nearest, 2000 queries within three times the resolution for the
+radius, before / after; the builds were not the cost (0.2 to 14 ms up to half a degree).
+
+| grid at 2.5 degree | nearest | radius |
+|---|---:|---:|
+| `equispacedS2Grid` (6600 points; antipodal 3300) | 0.8 / 0.8 | 398 / 14.7 (487 / 17.0) |
+| `fibonacciS2Grid` (6477) | 192 / 2.3 | 113 / 11.4 |
+| `regularS2Grid`, a plain list (10512) | 7020 / 4.0 | 1408 / 23.3 |
+| `HEALPixS2Grid`, a plain list (12288) | 8059 / 4.3 | 1638 / 24.5 |
+
+At half a degree (82 to 260 thousand points) the radius search takes 10 to 66 ms and the nearest
+1 to 51 ms, the tree of a plain list built in every call.
+
+- **One k-d tree over the points serves every set of directions** (`S2Tree` in
+  `grids/search.py`): on the unit sphere the Euclidean nearest point is the angular nearest and
+  the angle eps the chord 2 sin(eps/2); an antipodal set holds every point as v and -v, a point
+  hit both ways counted once. A grid keeps its tree; a plain list builds one from 32 queries and
+  1e5 pairs on. The radius search of the ring grid and both searches of the Fibonacci grid went
+  query by query through Python; the nearest search of the ring grid stays its compiled ring
+  search. Crystal directions measure by their symmetry and keep the matrix of every distance.
+- **A defect on the way**: `find` passed antipodal=False to `angle` unless told otherwise, which
+  reads as "never", so an antipodal list was searched as if it were not. It reads the flags of
+  both lists now (antipodal=None), True and False forcing either way, as MATLAB's find reads
+  v.antipodal.
