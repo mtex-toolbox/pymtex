@@ -309,3 +309,15 @@ def test_fill_within_the_grains_fills_their_padding_too():
   assert np.all(hit[np.arange(len(k)), grains.id2ind(f.grainId.reshape(-1)[k])])
   # the grains are the second argument or the keyword, and the filter may come first
   assert np.array_equal(fill(g, splineFilter(), grains=grains).grainId, f.grainId)
+
+
+# a map read at scattered positions is a list of them, read on a grid it has the grid's lattice;
+# a map with no pixel to fill is returned as it is
+def test_interp_atScatteredPositionsHasNoLatticeAndFillOfACompleteMapIsTheMap():
+  e, _, _ = stepMap()
+  rng = np.random.default_rng(9)
+  assert e.interp(rng.random(500) * 5, rng.random(500) * 5).lattice is None
+  i, j = np.meshgrid(np.arange(0, 5, 0.5), np.arange(0, 5, 0.5))
+  assert e.interp(i.ravel(), j.ravel()).lattice is not None
+  f = e.fill()
+  assert f is not e and np.array_equal(f.rotations.data, e.rotations.data)

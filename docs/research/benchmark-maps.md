@@ -89,3 +89,23 @@ benchmark led to.
   being the known item of `benchmark-decomposition.md`. The caliper and the hull measures
   at two to three times, a few milliseconds of NumPy on the pairs. `calcMisorientation`
   at three times on fifty milliseconds. None of these is a kernel's worth.
+
+## The routes the benchmark does not time, 2026-10-09
+
+`bench/maps.py` at 1000 x 1000 (1523 grains) under another user's load of 10: every verb in line
+with the 600 x 600 table above scaled by the pixels. Beside it, at the same map: the orientations
+8 ms, the inverse pole figure key 6 ms, the axis angle key 354 ms (ten NumPy passes, none
+dominant; left), the inner boundaries selected 9 ms, their misorientation angles 6 ms, the grain
+areas, perimeters and boundary lengths 3 to 5 ms, `reduce` 14 ms, `gridify` 19 ms, `rotate` 14 ms,
+`calcDensity` of the million orientations 63 ms. The Bunge key takes 3.75 s and is left: almost
+nobody uses it.
+
+- **`interp` at 1e5 scattered positions 1744 -> 407 ms**: the map it returns tried to infer a
+  lattice of the positions, failed the affine fit and grew an index over the neighbour graph in
+  Python, 1.2 s, ending in a "hex lattice" with two points in one cell. `assignIndex` now asks
+  first whether the neighbouring steps of a central patch are whole cells (`onLattice`: 85 % within
+  0.4 of a cell; the tests' lattice distorted by 0.6 cells keeps 97 %, scattered points 67 %) and
+  refuses scattered points, which then have no lattice; a grid of positions keeps its own.
+- **`fill` of a map with nothing to fill 302 -> 12 ms**, and `fill(ebsd, grains)` 249 -> 38 ms:
+  without an unmeasured pixel, and with grains without padding as well, the copy is returned
+  before the smoothing graph is built.

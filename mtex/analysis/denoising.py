@@ -322,6 +322,11 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
   if grains is not None and "grainId" not in ebsd.prop:
     raise ValueError("filling within grains needs the grain ids of the map; reconstruct them with calcGrains(ebsd)")
   out = ebsd.copy()
+  # a map whose every pixel but the padding is measured has nothing to fill, and with grains only
+  # the padding their polygons hold, so nothing where there is none
+  pad = out.isPadding.reshape(-1)
+  if np.all(np.asarray(out.isIndexed).reshape(-1) | pad) and (grains is None or not pad.any()):
+    return out
   comp, edges, isData, source = smoothingGraph(out, fill=True if grains is None else grains, extrapolate=extrapolate)
   if np.any((comp > 0) & ~isData):
     u, ref = tangentField(out, comp, isData)

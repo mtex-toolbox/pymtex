@@ -149,3 +149,11 @@ def test_duplicates_on_an_exact_grid_keep_the_affine_index(monkeypatch):
   l = lattice(pos)
   assert l.shape == "hex" and (l.ij[-5:] == l.ij[0]).all()
   assert len(np.unique(l.ij[:-5], axis=0)) == len(pos) - 5
+
+
+# scattered points lie on no lattice: fewer than nine in ten of their neighbouring steps are whole
+# cells, where growing an index over them would put two in one cell
+def test_scattered_points_are_refused_before_an_index_is_grown():
+  rng = np.random.default_rng(5)
+  with pytest.raises(ValueError):
+    lattice(np.c_[rng.random((3000, 2)) * 100, np.zeros(3000)])

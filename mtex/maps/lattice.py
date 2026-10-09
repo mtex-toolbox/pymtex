@@ -340,7 +340,28 @@ def assignIndex(P, A0):
   fit = affineIndex(P, A0)
   if fit is not None:
     return fit
+  if not onLattice(P, A0):
+    raise ValueError("the positions lie on no lattice")
   return growIndex(P, A0), np.asarray(A0, dtype=P.dtype), P[0]
+
+
+# the share of neighbouring pairs in a central patch whose difference is a whole number of cells
+# within 0.4 of a cell, the test before growIndex, which would grow an index over any points, two
+# of them in one cell where they are no lattice: a lattice distorted smoothly keeps it near one
+# (0.97 under the distortion of 0.6 cells of the tests), scattered points at two thirds by chance
+ON_LATTICE_TOL, ON_LATTICE_SHARE = 0.4, 0.85
+
+
+def onLattice(P, A):
+  """whether the positions are a lattice of the basis A locally, judged on a central patch"""
+  from scipy.spatial import cKDTree
+  Q = centrePatch(P, 2000)
+  r = 1.4 * max(np.linalg.norm(A[:, 0]), np.linalg.norm(A[:, 1]))
+  pairs = cKDTree(Q).query_pairs(r, output_type="ndarray")
+  if len(pairs) == 0:
+    return False
+  steps = (Q[pairs[:, 1]] - Q[pairs[:, 0]]) @ np.linalg.inv(A).T
+  return float(np.mean(np.abs(steps - np.rint(steps)).max(axis=1) < ON_LATTICE_TOL)) >= ON_LATTICE_SHARE
 
 
 def affineIndex(P, A0):
