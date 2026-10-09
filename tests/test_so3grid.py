@@ -122,3 +122,14 @@ def test_equispacedSO3Grid_smallBallAroundTheIdentityIsNoGrid():
 def test_SO3Grid_reprShowsTheResolution():
   g = equispacedSO3Grid(cs, resolution=10 * degree)
   assert "resolution: 10°" in repr(g)
+
+
+# the grid of the same frames and resolution is built once and handed out as a copy with its own
+# coordinates
+def test_equispacedSO3Grid_again_isACopyOfTheGridBuilt():
+  cs = crystalFrame("432")
+  g1 = equispacedSO3Grid(cs, resolution=7 * degree)
+  g2 = equispacedSO3Grid(cs, resolution=7 * degree)
+  assert g1 is not g2 and g1.data is not g2.data and np.array_equal(g1.data, g2.data)
+  g1.data[0] = 0
+  assert not np.array_equal(equispacedSO3Grid(cs, resolution=7 * degree).data[0], g1.data[0])

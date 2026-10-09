@@ -69,3 +69,14 @@ Time the transform inside the loop and alone, on the same plan and the same inpu
 wrapper around `execute` that records both); if the loop is slower with no other difference,
 another pool holds the cores. `/proc/self/maps` lists the runtimes a process has loaded
 (`openblas`, `gomp`, `tbb`).
+
+## The bound of a single thread on two machines, 2026-10-09
+
+`SINGLE_THREAD_WORK` in `functions/kernels.py` sends a compiled loop to one thread below a work
+in inner steps: the spherical transform and its adjoint ((L+1)^3) and `s2Nodes` (40 per node).
+It was set to 1 << 16 from the laptop's break-even (twelve threads). On sixteen cores the threads
+break even at about 5000 to 15000, also with 20 ms idle between the calls, where they start
+cold: the spherical transform of L = 40 takes 37 us on the threads against 131 on one, s2Nodes
+of 1600 nodes 22 against 86. The bound is 1 << 14 now, between the two; the small transforms of
+optimalSample (bandwidth 16, a few hundred nodes, works of 4913 and 12000) stay on one thread on
+both machines, and optimal_s2 measures the same at any bound from 0 to 1 << 16 here (220 ms).

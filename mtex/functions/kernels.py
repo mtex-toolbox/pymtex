@@ -34,8 +34,11 @@ def _compileHelpers():
 
 
 # the work, in steps of an inner loop, below which a loop runs faster on one thread than the
-# threads take to start: about 0.2 ms of one core
-SINGLE_THREAD_WORK = 1 << 16
+# threads take to start. The break-even depends on the machine: about 1 << 16 on a laptop of
+# twelve threads, 5000 to 15000 on sixteen cores, there also after 20 ms idle, where the threads
+# run a spherical transform of L = 40 in 37 us against 131 on one; the bound sits between, the
+# small transforms of optimalSample (bandwidth 16, a few hundred nodes) on one thread on both
+SINGLE_THREAD_WORK = 1 << 14
 
 
 # a loop compiled over the cores, run on the threads of the preference, on one thread where

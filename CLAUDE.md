@@ -78,6 +78,9 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 - finufft allocates its oversampled grid in every execute, which glibc maps fresh above 32 MB, so
   every call faulted it in again (120 of 230 ms at L = 128); its executes run inside `heapBlocks()`
   (`geometry/kernels.py`), where large blocks come from the heap, whose top keeps up to 1 GB.
+- `equispacedSO3Grid` keeps the last four grids it built (by frames and resolution, up to 2e6 nodes),
+  as MATLAB keeps its last, and hands out copies with their own coordinates, the ladders shared:
+  code must not change a grid's ladders in place.
 - `calcGrains` gives the notIndexed pixels a grain absorbs the grain's phase and a NaN rotation,
   as MATLAB's returned map does (`absorbNotIndexed`), the padding left out.
 - `calcGrains` alters the map it is given, as the Julia port does and MATLAB's

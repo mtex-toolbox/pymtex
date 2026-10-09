@@ -15,6 +15,7 @@ import itertools
 import numpy as np
 
 from ._array import MtexArray
+from .kernels import regionMembership
 
 from .quaternion import qmul, rotation
 from .representations import quatAngle, quatAxis
@@ -96,11 +97,9 @@ class orientationRegion:
     """whether orientations lie inside the region, up to the tolerance, as a boolean array"""
     q = o.data if isinstance(o, MtexArray) else np.asarray(o, dtype=float)
     t = tol / 2
-    d = q @ self.N.T
-    inside = np.all(d <= t, axis=-1) | np.all(d >= -t, axis=-1)
+    inside = regionMembership(q, self.N, 1, t, 0.0)[0].reshape(q.shape[:-1])
     if self.sector is not None:
-      ax = quatAxis(q)
-      inside &= (quatAngle(q) < 1e-8) | self.sector.checkInside(ax, tol)
+      inside &= (quatAngle(q) < 1e-8) | self.sector.checkInside(quatAxis(q), tol)
     return inside
 
   def axisSector(self, omega, sector="own"):

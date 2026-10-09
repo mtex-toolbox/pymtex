@@ -215,6 +215,11 @@ def test_heapBlocks_keepsTheFreedPagesOfALargeBlock():
   faults()
   assert faults() < 100
 
+
+def test_superfib_agrees_with_numpy(numbaBackend):
+  from mtex.geometry.kernels import _superfibNumpy, superfib
+  assert np.array_equal(superfib(1001, np.sqrt(2), 1.533751168755204), _superfibNumpy(1001, np.sqrt(2), 1.533751168755204))
+
 def test_region_membership_agrees_with_numpy(numbaBackend):
   # the planes of a fundamental region turned by the rotations about z, as the SO(3) grid tests
   from mtex import fundamentalRegion

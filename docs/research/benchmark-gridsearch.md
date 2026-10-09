@@ -104,3 +104,40 @@ All three return the same ~114 neighbours per query. What the numbers say:
   loop. Closing the gap means moving the union-and-sparse-build into a compiled kernel (as
   the pointwise kernels were), or keeping the ring search for radius while the tree serves
   nearest - which brings back the ring machinery this note retired.
+
+## The builds and the searches of every orientation grid, 2026-10-09
+
+m-3m, ms, warm, before / after. MATLAB's 1.25 ms for `equispacedSO3Grid(m-3m, 2.5 degree)` in the
+geometry crosscheck is its `persistent` cache answering the same arguments, not a build.
+
+| | before | after |
+|---|---:|---:|
+| `equispacedSO3Grid`, 2.5 degree (39242 nodes), again | 12.5 | 0.14 |
+| `equispacedSO3Grid`, 1 degree (623685 nodes), first / again | 170 / 162 | 72 / 1.9 |
+| radius search of 24761 queries at 0.5 degree on the 1 degree grid (its merge) | 57.6 | 7.5 |
+| `fibonacciSO3Grid`, 2.5 degree | 122 | 12.7 |
+| `superfibonacciSO3Grid`, 2.5 degree | 68 | 7.1 |
+| `find(regularSO3Grid(2.5 degree), 1000 orientations)` | 4148 | 97 |
+| `find` of 1000 among 1e5 orientations | 2170 | 54 |
+
+- **The structured radius search filled a grid-sized array per chunk of 16 queries**: `best`, one
+  cos(w/2) per grid point, and the list of points touched, 5 MB each on the 1 degree grid, 1548
+  chunks in each of the two passes, about 15 GB written for 28 thousand pairs. Each thread now has
+  its rows, allocated once per call inside `heapBlocks` and set to -1 by the thread on its first
+  chunk; every query restores what it touched, so both passes share them (numba's
+  `get_thread_id`, below the thread count the launch sets).
+- **The last four grids built are kept** by their frames and resolution, as MATLAB keeps its last
+  one, and handed out as copies with their own coordinates; above 2e6 nodes none is kept.
+  `max(odf)`, calcODF, the cluster search and the plots ask for the same grid again and again.
+- **`find` in a plain orientation list** built the matrix of every distance, 22 ns a pair and the
+  memory of all of them (1e4 queries among the 192 thousand orientations of a 2.5 degree regular
+  grid: 15 GB). From 32 queries and 1e5 pairs on it goes through the quaternion tree of the grids
+  over the list, which gives the same indices and angles; an antipodal list makes the queries
+  antipodal, since the tree takes the flag from the images of the queries.
+- **The Fibonacci grids** generated about a million spiral points in NumPy and tested them with
+  NumPy against the region: the spiral is one compiled parallel loop now (`superfib`), and
+  `orientationRegion.checkInside` takes the compiled `regionMembership` of the equispaced grid
+  for its planes, the axis sector, where there is one, tested after.
+- Measured and left: `subGrid` of the 1 degree grid (11 ms, NumPy's boolean indexing of 624
+  thousand quaternions), the tree's radius search on the Fibonacci grid (44 ms against the
+  structured 4.9 on the equispaced grid of the same size).

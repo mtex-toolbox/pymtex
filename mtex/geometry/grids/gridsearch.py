@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..kernels import _jit, _parallelKernel
+from ..kernels import _jit, _parallelKernel, heapBlocks, threads
 prange = range
+get_thread_id = None
 _COMPILED = {}
 
 
@@ -214,13 +215,19 @@ def _imageNeighbours(al, be, ga, ringBeta, ringOff, ringAlpha, ringNode, ringMin
 
 
 # every query's grid points within eps, up to symmetry: the counts first (fill False), then
-# the sorted columns and cos(w/2) into the rows indptr gives (fill True)
+# the sorted columns and cos(w/2) into the rows indptr gives (fill True). A thread keeps its
+# cos(w/2) per grid point and the points it touched in its own rows of bests and touches, set
+# to -1 on its first chunk and left so by every query, so both passes share them
 def _so3RadiusLoop(Q, Lr, Rr, ringBeta, ringOff, ringAlpha, ringNode, ringMin, nodeCb, nodeSb, gOff, gPts, gMin, gp, ap,
-                   nZL, eps, chunk, fill, counts, indptr, cols, vals):
-  nq, nb, n = Q.shape[0], Q.shape[1], gPts.shape[0]
+                   nZL, eps, chunk, fill, counts, indptr, cols, vals, bests, touches, ready):
+  nq, nb = Q.shape[0], Q.shape[1]
   for c in prange((nq + chunk - 1) // chunk):
-    best = np.full(n, -1.0)
-    touched = np.empty(n, dtype=np.int64)
+    # one row per thread of the launch, which so3Radius counts as the launch sets them
+    tid = get_thread_id() % ready.shape[0]
+    best, touched = bests[tid], touches[tid]
+    if not ready[tid]:
+      best[:] = -1.0
+      ready[tid] = True
     for i in range(c * chunk, min(nq, (c + 1) * chunk)):
       t = 0
       for b in range(nb):
@@ -274,11 +281,15 @@ def so3Radius(flat, Q, Lr, Rr, nZL, eps, chunk=16):
   counts = np.zeros(nq, dtype=np.int64)
   indptr = np.zeros(nq + 1, dtype=np.int64)
   empty = np.zeros(0, dtype=np.int64), np.zeros(0)
+  # the rows of the threads, uninitialised: a thread fills its own on first use
+  nt, n = min(threads(), _jit().config.NUMBA_NUM_THREADS), len(flat[8])
+  with heapBlocks():
+    rows = np.empty((nt, n)), np.empty((nt, n), dtype=np.int64), np.zeros(nt, dtype=np.bool_)
   loop = _COMPILED["so3Radius"]
-  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), False, counts, indptr, *empty)
+  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), False, counts, indptr, *empty, *rows)
   indptr[1:] = np.cumsum(counts)
   cols, vals = np.empty(indptr[-1], dtype=np.int64), np.empty(indptr[-1])
-  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), True, counts, indptr, cols, vals)
+  loop(Q, Lr, Rr, *args, np.int64(nZL), float(eps), np.int64(chunk), True, counts, indptr, cols, vals, *rows)
   return indptr, cols, vals
 
 
@@ -292,6 +303,7 @@ _HELPERS = ("_firstGE", "_nearestJ", "_ringBest", "_firstGT", "_window", "_qm", 
 def _compileHelpers():
   nb = _jit()
   globals()["prange"] = nb.prange
+  globals()["get_thread_id"] = nb.get_thread_id
   for name in _HELPERS:
     if name not in _COMPILED:
       _COMPILED[name] = nb.njit(cache=True)(globals()[name])

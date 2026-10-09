@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..kernels import superfib
 from ..orientation import orientation
 from ..quaternion import rotation
 from ..units import degree
@@ -23,12 +24,7 @@ _COVER = 119088 * (3.62 * degree) ** 3
 
 # n low-discrepancy unit quaternions on SO(3)
 def _superfib(n):
-  s = np.arange(n) + 0.5
-  t = s / n
-  d = 2 * np.pi * s
-  r, R = np.sqrt(t), np.sqrt(1 - t)
-  a, b = d / _PHI, d / _PSI
-  return np.stack([r * np.sin(a), r * np.cos(a), R * np.sin(b), R * np.cos(b)], axis=-1)
+  return superfib(int(n), _PHI, _PSI)
 
 
 class SO3FibonacciGrid(orientation):

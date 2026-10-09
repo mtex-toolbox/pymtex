@@ -999,6 +999,32 @@ def _regionMembershipNumpy(q, N, nBlocks, t, band):
   return inside.any(axis=1), (inside & np.any(np.abs(D) <= band, axis=2)).any(axis=1)
 
 
+# the super-Fibonacci spiral of n unit quaternions, s = i + 1/2: (sqrt(s/n) sin(2 pi s/phi),
+# sqrt(s/n) cos(2 pi s/phi), sqrt(1 - s/n) sin(2 pi s/psi), sqrt(1 - s/n) cos(2 pi s/psi))
+def _superfibLoop(n, phi, psi, q):
+  for i in prange(n):
+    s = i + 0.5
+    r, R = np.sqrt(s / n), np.sqrt(1 - s / n)
+    a, b = 2 * np.pi * s / phi, 2 * np.pi * s / psi
+    q[i, 0], q[i, 1], q[i, 2], q[i, 3] = r * np.sin(a), r * np.cos(a), R * np.sin(b), R * np.cos(b)
+
+
+def _superfibNumpy(n, phi, psi):
+  s = np.arange(n) + 0.5
+  r, R = np.sqrt(s / n), np.sqrt(1 - s / n)
+  a, b = 2 * np.pi * s / phi, 2 * np.pi * s / psi
+  return np.stack([r * np.sin(a), r * np.cos(a), R * np.sin(b), R * np.cos(b)], axis=-1)
+
+
+def superfib(n, phi, psi):
+  """the n unit quaternions of the super-Fibonacci spiral with the constants phi and psi"""
+  if backend() == "numpy":
+    return _superfibNumpy(n, phi, psi)
+  q = np.empty((n, 4))
+  _parallel("superfib", _superfibLoop)(np.int64(n), float(phi), float(psi), q)
+  return q
+
+
 def regionMembership(q, N, nBlocks, t, band):
   """whether each quaternion lies in one of nBlocks regions, N their planes block after block,
   and whether it lies within band of a plane of a region holding it"""

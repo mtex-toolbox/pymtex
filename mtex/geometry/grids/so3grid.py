@@ -10,6 +10,7 @@
 # on b, b', a - a' only (MATLAB SO3Grid.c), which makes the gamma search one-dimensional.
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 import numpy as np
 from scipy import sparse
@@ -203,7 +204,30 @@ def equispacedSO3Grid(CS, SS=None, resolution=5 * degree, points=None, maxAngle=
   return g
 
 
+# the last grids built, by their frames and resolution, as MATLAB keeps its last one: max(odf),
+# calcODF and the plots ask for the same grid again and again. A caller gets a copy with its own
+# coordinates, the ladders shared, which nothing changes in place; a grid above GRID_CACHE_NODES
+# is not kept
+_GRIDS = {}
+GRID_CACHE_SIZE, GRID_CACHE_NODES = 4, 2_000_000
+
+
 def _buildSO3Grid(CS, SS, L, R, res):
+  key = (CS, SS, round(float(res), 12))
+  g = _GRIDS.pop(key, None)
+  if g is None:
+    g = _newSO3Grid(CS, SS, L, R, res)
+    if g.size > GRID_CACHE_NODES:
+      return g
+  _GRIDS[key] = g
+  while len(_GRIDS) > GRID_CACHE_SIZE:
+    _GRIDS.pop(next(iter(_GRIDS)))
+  out = copy.copy(g)
+  out.data = g.data.copy()
+  return out
+
+
+def _newSO3Grid(CS, SS, L, R, res):
   from ..orientationregion import fundamentalRegion
   nZL, nZR = int(np.sum(_isAboutZ(L))), int(np.sum(_isAboutZ(R)))
   ap, gp = 2 * np.pi / nZL, 2 * np.pi / nZR

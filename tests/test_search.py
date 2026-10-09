@@ -88,3 +88,19 @@ def test_find_vectors():
   assert I.shape == (M, N) and np.all(I.toarray() == (dRef <= 20 * degree))
   dA = angle(w[:, None], v[None, :], antipodal=True)
   assert np.allclose(find(v, w, antipodal=True)[1], np.min(dA, axis=1))
+
+
+# among many orientations the search goes through the quaternion tree, with the answers of the
+# matrix of every distance, an antipodal list making the queries antipodal too
+@pytest.mark.parametrize("antipodal", [False, True])
+def test_find_amongManyOrientationsAgreesWithTheDistanceMatrix(antipodal, monkeypatch):
+  import mtex.geometry.grids.search as search
+  cs = crystalFrame("m-3m")
+  v, w = orientation.rand(3000, cs, cs, rng=rng), orientation.rand(64, cs, cs, rng=rng)
+  v.antipodal = antipodal
+  monkeypatch.setattr(search, "TREE_QUERIES", 10**9)
+  ref = [find(v, w), find(v, w, 3), find(v, w, 8 * degree)]
+  monkeypatch.setattr(search, "TREE_QUERIES", 32)
+  got = [find(v, w), find(v, w, 3), find(v, w, 8 * degree)]
+  assert all(np.array_equal(a[0], b[0]) and np.allclose(a[1], b[1], atol=1e-10) for a, b in zip(ref[:2], got[:2]))
+  assert (ref[2][0] != got[2][0]).nnz == 0 and abs(ref[2][1] - got[2][1]).max() < 1e-10
