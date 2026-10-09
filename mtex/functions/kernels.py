@@ -8,6 +8,7 @@
 #                                                      mask of the nodes not finite, or None
 #   realDefectWigner(fhat, tol), realDefectSpherical   is a coefficient vector real valued
 #   realizeWigner(fhat), realizeSpherical(fhat)        the real part's coefficients, in place
+#   q = gridQuaternions(alpha, beta, gamma)            the quaternions of a product grid of Matthies angles
 from __future__ import annotations
 
 import math
@@ -149,6 +150,42 @@ def s2Nodes(xyz, shift=0):
   args = (v, int(shift), x, y, phase)
   bad = _parallel("s2Nodes", _s2NodesLoop, 40 * len(v))(*args) if backend() == "numba" else _s2NodesNumpy(*args)
   return x, y, phase, _badNodes(v, bad)
+
+
+# ------------------------------------------------------------------ the nodes of a quadrature grid
+# the quaternions of the Matthies angles (alpha_a, beta_b, gamma_c) of a product grid, gamma slowest
+# and beta fastest: the angles are separable, so cos and sin of (alpha +- gamma)/2 and of beta/2
+# come from tables, (cos(b/2) cos(s), -sin(b/2) sin(d), sin(b/2) cos(d), cos(b/2) sin(s)) with
+# s = (alpha + gamma)/2 and d = (alpha - gamma)/2
+def _gridQuaternionsLoop(alpha, beta, gamma, q):
+  na, nb = alpha.shape[0], beta.shape[0]
+  for c in prange(gamma.shape[0]):
+    for a in range(na):
+      s, d = (alpha[a] + gamma[c]) / 2, (alpha[a] - gamma[c]) / 2
+      cs, ss, cd, sd = np.cos(s), np.sin(s), np.cos(d), np.sin(d)
+      o = (c * na + a) * nb
+      for b in range(nb):
+        cb, sb = np.cos(beta[b] / 2), np.sin(beta[b] / 2)
+        q[o + b, 0], q[o + b, 1], q[o + b, 2], q[o + b, 3] = cb * cs, -sb * sd, sb * cd, cb * ss
+
+
+def _gridQuaternionsNumpy(alpha, beta, gamma):
+  s, d = (alpha[None, :] + gamma[:, None]) / 2, (alpha[None, :] - gamma[:, None]) / 2
+  cb, sb = np.cos(beta / 2), np.sin(beta / 2)
+  q = np.empty((len(gamma), len(alpha), len(beta), 4))
+  q[..., 0], q[..., 1] = np.cos(s)[:, :, None] * cb, -np.sin(d)[:, :, None] * sb
+  q[..., 2], q[..., 3] = np.cos(d)[:, :, None] * sb, np.sin(s)[:, :, None] * cb
+  return q.reshape(-1, 4)
+
+
+def gridQuaternions(alpha, beta, gamma):
+  """the quaternions of the product grid of Matthies angles, gamma slowest, beta fastest"""
+  alpha, beta, gamma = (np.ascontiguousarray(x, dtype=np.float64) for x in (alpha, beta, gamma))
+  if backend() == "numpy":
+    return _gridQuaternionsNumpy(alpha, beta, gamma)
+  q = np.empty((len(gamma) * len(alpha) * len(beta), 4))
+  _parallel("gridQuaternions", _gridQuaternionsLoop)(alpha, beta, gamma, q)
+  return q
 
 
 # ------------------------------------------------------------------ real valued coefficients

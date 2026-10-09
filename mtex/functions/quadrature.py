@@ -137,9 +137,14 @@ class quadratureSO3Grid:
     return self._nodes(self.beta)
 
   def _nodes(self, beta):
-    g, a, b = np.meshgrid(self.gamma, self.alpha, beta, indexing="ij")
-    r = rotation.byEuler(a.ravel(), b.ravel(), g.ravel(), "Matthies")
-    return r if self.CS is None else orientation(r, self.CS, self.SS if self.SS is not None else specimenFrame.default)
+    from ..geometry.kernels import heapBlocks
+    from .kernels import gridQuaternions
+    # the array of every call the same size: from the heap, its pages mapped from the last one
+    with heapBlocks():
+      q = gridQuaternions(self.alpha, beta, self.gamma)
+    if self.CS is None:
+      return rotation._fromData(q)
+    return orientation._fromRotation(q, (self.CS, self.SS if self.SS is not None else specimenFrame.default))
 
   @property
   def weights(self):

@@ -98,6 +98,21 @@ def test_quadratureSO3Grid_halfNodesGiveAllValuesOfAnInvariantFunction(cs, ss, s
   assert np.allclose(g.fromHalf(f(g.halfNodes())), f(g.nodes()), atol=1e-13)
   assert quadratureSO3Grid(bandwidthFor(9, crystalFrame("4")), crystalFrame("4")).halfNodes() is None
 
+
+# the nodes are the orientations of the product of the Matthies angles, gamma slowest, beta fastest,
+# from the compiled loop and from its NumPy form alike
+@pytest.mark.parametrize("kernels", ["numba", "numpy"])
+def test_quadratureSO3Grid_nodesAreTheOrientationsOfItsEulerAngles(kernels):
+  from mtex import rotation, setMTEXpref
+  g = quadratureSO3Grid(bandwidthFor(7, crystalFrame("432")), crystalFrame("432"))
+  c, a, b = np.meshgrid(g.gamma, g.alpha, g.beta, indexing="ij")
+  setMTEXpref("kernels", kernels)
+  try:
+    q = g.nodes().data
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(q, rotation.byEuler(a.ravel(), b.ravel(), c.ravel(), "Matthies").data, atol=1e-15)
+
 def test_quadratureS2Grid_integratesTheSphericalHarmonicsExactly():
   for L in (3, 10):
     for scheme in ("ClenshawCurtis", "GaussLegendre"):
