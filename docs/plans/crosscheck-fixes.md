@@ -44,6 +44,13 @@ Speed:
 | P8 | one core where the work is parallel: `inv` of tensors, `trueebsd_undistort`, `export_h5`, `birefringence` (3 cores) | `parallel` | done: `inv` of rank four tensors is one compiled loop over them (gather, Gauss-Jordan, spread; `voigtInverse` in `mtex/tensors/kernels.py`), 141 to 12 ms, NumPy's three passes the fallback and oracle; `export_h5` spent 0.9 of its 1.1 s closing the copy, since ext4 writes a truncated and rewritten file through to the disk, and removes an old file first now, 206 ms (Julia 376, MATLAB 1104, which likely meets the same); `birefringence` restricts the tensor by two matrix products of n rows instead of batched 2 x 3 products, 32 to 22 ms, the rest elementwise passes; `trueebsd_undistort` stays, 106 ms in many small passes and below MATLAB's 157 |
 | P9 | the image searches of the symmetry reduction on one core | 10 to 13 times faster on the thread pool, bit for bit | done, `_overRows` in `mtex/geometry/kernels.py` |
 
+Found by the Julia fixes (section 3):
+
+| # | what | where | state |
+|---|---|---|---|
+| P10 | the kernel sum of an RBF ODF (`rbf_direct`) is 0.39 of 787 off MATLAB's and Julia's, which agree to 3e-6, and equal to the harmonic form cut at the kernel's bandwidth (25 for 10 degree) to 3e-13: the sum is of the kernel cut at its accuracy cutoff, not of the kernel. J1 | `mtex/functions/rbf.py`, the kernel evaluation | open |
+| P11 | a closed boundary chain is simplified from its first kept vertex or where the walk entered it, so the result depends on the walk: Julia's simplified digital circle measured 80.1 to 87.4 by the start. Julia now begins every ring at its lowest vertex (J2) | `mtex/maps/boundaryresampling.py`, `orderWalk` | open |
+
 To decide: `loadEBSD(..., dataSet=)` counts from 0 (`mtex/io/h5.py`), MATLAB and Julia from 1.
 
 ## 2. MATLAB
@@ -56,17 +63,22 @@ To decide: `loadEBSD(..., dataSet=)` counts from 0 (`mtex/io/h5.py`), MATLAB and
 | M4 | `optimalSample` returns 216 nodes for 200 and 288 for 300, the size of the equispaced grid it starts from | `@SO3Fun/optimalSample.m`, `@S2Fun/optimalSample.m` |
 | M5 | `calcGND` 8.1 s and `calcTaylor` 9.9 s, `taylor_fun` 19 s, nearly all in `linprog`'s interior point solver on one core; the ports' simplex takes milliseconds | `@curvatureTensor/fitDislocationSystems.m`, `calcTaylor.m` |
 | M6 | the kernel sum of an RBF ODF 3.1 s against 7 ms; projecting directions into the sector 755 ms against 7 ms | `@SO3FunRBF/eval.m`, `@vector3d/project2FundamentalRegion.m` |
+| M7 | `SO3FunHarmonic` of an RBF ODF caps the bandwidth asked for at the kernel's accuracy cutoff, 25 for a 10 degree de la Vallee Poussin kernel whose coefficients run to degree 91, so its harmonic form is 0.39 of 787 off its kernel sum whatever bandwidth is asked for (J1) | `@SO3FunRBF/SO3FunHarmonic.m` |
+| M8 | `grainBoundary/simplify` cuts a closed chain at the vertex its walk began with, so the simplified ring depends on the walk (P11, J2) | `@grainBoundary/simplify.m` |
 
 ## 3. Julia
 
-| # | what | numbers |
-|---|---|---|
-| J1 | the kernel sum of an RBF ODF 0.39 off its harmonic form (MATLAB too; Python agrees to 3e-13) | `functions_ops`, the slow variant |
-| J2 | `perimeter` 0.13 and `smoothBoundary` 0.12 off MATLAB, where Python agrees to 1.7e-6 and 1.3e-3 | `maps_ops` |
-| J3 | `velocity` 22 s against 14 ms, `grod` 5.8 s against 60 ms | `tensors_ops`, `maps_ops` |
-| J4 | `calcCluster` of 1e5 directions 13 s against 1.4 s, `classix` of 1e6 points 4.1 s against 0.5 s, `taylor_fun` 6.0 s against 0.57 s, `calcComponents` 5.0 s against 0.76 s, the SO(3) grid 4.2 s against 0.15 s | `cluster.py`, `analysis_ops`, `tensors_ops`, `gridsearch.py` |
-| J6 | after `calcGrains!` the notIndexed pixels a grain absorbs are not in `isIndexed` (58921 of the ferrite map's pixels against 60592 in this port and MATLAB), so `smooth(..., fill = true)` has no hole to fill there and differs from both next to them | `maps_ops`, `smooth_fill_*` |
-| J5 | few of 32 threads busy: L1TV and half quadratic denoising 2 to 5 cores, `project_6mmm` 2.2, and the image searches one core, where the Python thread pool gave 10 to 13 times | `parallel` |
+Fixed on `main` 2026-10-09 (08ded6e, e0f15ff, 633e276, 2544ed5), the values of every sped up case
+unchanged.
+
+| # | what | numbers | state |
+|---|---|---|---|
+| J1 | the kernel sum of an RBF ODF 0.39 off its harmonic form (MATLAB too; Python agrees to 3e-13) | `functions_ops`, the slow variant | done: the kernel sum was right and the harmonic form wrong. `SO3FunHarmonic` of an RBF or fibre ODF capped the bandwidth asked for at the kernel's accuracy cutoff (25), on the premise that the kernel has no degrees above it; it now caps at `degreeLimit`, the degree where the coefficients vanish, finite only for polynomial kernels. At bandwidth 64 the two agree to 1.3e-4, the transform's accuracy. Python's 3e-13 is its own defect, P10; MATLAB's cap is M7 |
+| J2 | `perimeter` 0.13 and `smoothBoundary` 0.12 off MATLAB, where Python agrees to 1.7e-6 and 1.3e-3 | `maps_ops` | done: `perimeter` counted the holes, 228 for MATLAB's 170 on the grain around an inclusion; it is the outer loop now, as MATLAB's, with `withInclusions = true` for the holes. The inclusion itself was simplified from wherever the walk entered its ring; `orderWalk` begins every ring at its lowest vertex, so the cut no longer depends on the walk (Python P11, MATLAB M8). This exposed `isInclusion` testing a vertex on the hole's boundary, fixed. Not rerun against MATLAB; the remaining grains are P5's open simplification question |
+| J3 | `velocity` 22 s against 14 ms, `grod` 5.8 s against 60 ms | `tensors_ops`, `maps_ops` | done: `velocity` 0.16 s, the Christoffel tensor a direct contraction and its eigen static (was a generic `EinsteinSum` and LAPACK per direction); `grod` 0.09 s, `angle` of a list reduces over groups built once, where every element rebuilt the proper point group from its symbol |
+| J4 | `calcCluster` of 1e5 directions 13 s against 1.4 s, `classix` of 1e6 points 4.1 s against 0.5 s, `taylor_fun` 6.0 s against 0.57 s, `calcComponents` 5.0 s against 0.76 s, the SO(3) grid 4.2 s against 0.15 s | `cluster.py`, `analysis_ops`, `tensors_ops`, `gridsearch.py` | done but the grid: `calcCluster` 0.60 s (`knnRadius` allocated per distance, `classix` ran on a matrix a comprehension boxed); `classix` 7.2 to 0.71 s on the bench's points at `minPts = 1e4`; `calcComponents` 0.25 s, the groups derived from a named point group now built once per symbol and axes; `taylor_fun` 0.36 s, the node solves threaded and the minimum norm shears solved by a static Cholesky where a condition bound allows, so the threads no longer queue on LAPACK. The grid is no defect: `gridsearch.jl` times the first call, 99 % compilation; built again it takes 22 ms (section 4) |
+| J6 | after `calcGrains!` the notIndexed pixels a grain absorbs are not in `isIndexed` (58921 of the ferrite map's pixels against 60592 in this port and MATLAB), so `smooth(..., fill = true)` has no hole to fill there and differs from both next to them | `maps_ops`, `smooth_fill_*` | done: an absorbed pixel takes its grain's phase and a NaN rotation, as MATLAB's `calcGrains`; not rerun |
+| J5 | few of 32 threads busy: L1TV and half quadratic denoising 2 to 5 cores, `project_6mmm` 2.2, and the image searches one core, where the Python thread pool gave 10 to 13 times | `parallel` | open |
 
 ## 4. The benchmarks
 
@@ -77,6 +89,10 @@ To decide: `loadEBSD(..., dataSet=)` counts from 0 (`mtex/io/h5.py`), MATLAB and
 - Algorithms still missing: the S2 grid `find`, `doEulerStep`, the pole figure and contour
   plots, the grain area, centroid and moments, the text import with lattice detection.
 - `dubna_density` writes its Python density values once P1 is fixed.
+- `gridsearch.jl` times the first build of the grid, which is compilation; it warms up first
+  as `crossrun` does.
+- `maps_ops`, `functions_ops`, `tensors_ops`, `analysis_ops` and `cluster` are to be rerun for
+  the Julia fixes; the numbers in section 3 are from the scripts' inputs in this port alone.
 
 ## Order
 
