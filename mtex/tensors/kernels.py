@@ -1,9 +1,10 @@
 # the compiled kernels of the tensors layer: the eigen decomposition of many symmetric 3 x 3
 # matrices, the Christoffel matrices of the wave velocities, as one parallel loop of cyclic
 # Jacobi rotations, and the rotation of flattened tensors on every index, a tensor turned by
-# many orientations and the images of the orientation embedding. NumPy's eigh, the Kronecker
-# products of tensor.py and the batched products of analysis/embedding.py are the fallbacks
-# without numba and the oracles of the tests.
+# many orientations and the images of the orientation embedding, and the contraction of one
+# tensor with many directions on every index. NumPy's eigh, the Kronecker products of
+# tensor.py and the batched products of analysis/embedding.py are the fallbacks without
+# numba and the oracles of the tests.
 from __future__ import annotations
 
 import numpy as np
@@ -218,3 +219,61 @@ def voigtInverse(D, voigtPairs, wIn, wOut):
 
 
 __all__ = []
+
+
+# a tensor of rank R contracted with u on every index is a homogeneous polynomial of degree R
+# in u: the 3^R coordinates fold onto the (R + 1)(R + 2) / 2 monomials x^i y^j z^k, and the
+# value at a direction of any length is that of the vector over its norm to the power R, so
+# nothing is normalised beforehand
+_MONOMIALS = {}
+
+
+def monomials(R):
+  """the monomial each flat coordinate of a rank R tensor belongs to, and the exponents (i, j, k)"""
+  if R not in _MONOMIALS:
+    digits = np.stack(np.unravel_index(np.arange(3 ** R), (3,) * R), axis=-1)
+    expo = np.stack([np.sum(digits == a, axis=-1) for a in range(3)], axis=-1)
+    expo, ids = np.unique(expo, axis=0, return_inverse=True)
+    _MONOMIALS[R] = ids.ravel(), np.ascontiguousarray(expo, dtype=np.int64)
+  return _MONOMIALS[R]
+
+
+def _polynomialLoop(v, expo, coef, R, out, chunk):
+  n = v.shape[0]
+  for c in prange((n + chunk - 1) // chunk):
+    p = np.ones((3, R + 1))
+    for q in range(c * chunk, min(n, (c + 1) * chunk)):
+      r2 = v[q, 0] * v[q, 0] + v[q, 1] * v[q, 1] + v[q, 2] * v[q, 2]
+      scale = 1 / np.sqrt(r2)
+      for a in range(3):
+        x = v[q, a] * scale
+        for r in range(1, R + 1):
+          p[a, r] = p[a, r - 1] * x
+      acc = 0.0
+      for m in range(coef.shape[0]):
+        acc += coef[m] * p[0, expo[m, 0]] * p[1, expo[m, 1]] * p[2, expo[m, 2]]
+      out[q] = acc
+
+
+def _polynomialKernel():
+  nb = _jit()
+  if not nb:
+    return None
+  if "polynomial" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["polynomial"] = _parallelKernel(_polynomialLoop)
+  return _COMPILED["polynomial"]
+
+
+def directionalPolynomial(M, v, chunk=1024):
+  """the real tensor with the 3^R flat coordinates M contracted on every index with the unit
+  vectors along the rows of v, which need not be normalised; None without numba"""
+  loop = _polynomialKernel() if backend() == "numba" else None
+  if loop is None:
+    return None
+  M = np.asarray(M, dtype=np.float64).ravel()
+  R = round(np.log(M.size) / np.log(3))
+  ids, expo = monomials(R)
+  out = np.empty(len(v))
+  loop(np.ascontiguousarray(v, dtype=np.float64), expo, np.bincount(ids, M, len(expo)), np.int64(R), out, np.int64(chunk))
+  return out

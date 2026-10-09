@@ -33,15 +33,22 @@ def _compileHelpers():
     _COMPILED["helpers"] = True
 
 
-# a loop compiled over the cores, run on the threads of the preference
-def _parallel(name, f):
+# the work, in steps of an inner loop, below which a loop runs faster on one thread than the
+# threads take to start: about 0.2 ms of one core
+SINGLE_THREAD_WORK = 1 << 16
+
+
+# a loop compiled over the cores, run on the threads of the preference, on one thread where
+# its work is below SINGLE_THREAD_WORK
+def _parallel(name, f, work=None):
   nb = _jit()
   _compileHelpers()
   if name not in _COMPILED:
     global prange
     prange = nb.prange
     _COMPILED[name] = _parallelKernel(f, nogil=True)
-  return _COMPILED[name]
+  kernel = _COMPILED[name]
+  return kernel.single if work is not None and work < SINGLE_THREAD_WORK else kernel
 
 
 def _complexType(dtype):
@@ -137,7 +144,7 @@ def s2Nodes(xyz, shift=0):
   x, y = (np.empty(len(v), dtype=v.dtype) for _ in range(2))
   phase = np.empty(len(v), dtype=_complexType(v.dtype))
   args = (v, int(shift), x, y, phase)
-  bad = _parallel("s2Nodes", _s2NodesLoop)(*args) if backend() == "numba" else _s2NodesNumpy(*args)
+  bad = _parallel("s2Nodes", _s2NodesLoop, 40 * len(v))(*args) if backend() == "numba" else _s2NodesNumpy(*args)
   return x, y, phase, _badNodes(v, bad)
 
 
@@ -694,7 +701,7 @@ def sphericalForward(fhat, L, real, cdtype):
   orders and the rows of d(pi/2), parallel over the orders"""
   X, Y, R0 = rowTables(L, np.dtype(cdtype).type(0).real.dtype)
   G = np.empty((L + 1 if real else 2 * L + 1, 2 * L + 1), dtype=cdtype)
-  _parallel("sphericalForward", _sphericalForwardLoop)(G, fhat, X, Y, R0, L, bool(real), orderOrder(L))
+  _parallel("sphericalForward", _sphericalForwardLoop, (L + 1) ** 3)(G, fhat, X, Y, R0, L, bool(real), orderOrder(L))
   return G
 
 
@@ -703,7 +710,7 @@ def sphericalAdjoint(H, L, real):
   bandwidth L, parallel over the orders"""
   X, Y, R0 = rowTables(L, H.real.dtype)
   fhat = np.empty((L + 1) ** 2, dtype=H.dtype)
-  _parallel("sphericalAdjoint", _sphericalAdjointLoop)(fhat, H, X, Y, R0, L, bool(real), orderOrder(L))
+  _parallel("sphericalAdjoint", _sphericalAdjointLoop, (L + 1) ** 3)(fhat, H, X, Y, R0, L, bool(real), orderOrder(L))
   return fhat
 
 

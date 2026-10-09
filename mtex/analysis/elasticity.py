@@ -50,10 +50,15 @@ def _stiffness(T):
 
 # a direction in the frame of the tensor, as a unit vector; a bare vector is taken as is
 def _unit(T, v):
+  return _inFrame(T, v).normalize()
+
+
+# the direction as a vector, refused when it is written in another frame than the tensor
+def _inFrame(T, v):
   v = v if isinstance(v, vector3d) else vector3d(v)
   if v.frame is not None and v.frame is not T.frame and not (type(v.frame) is type(T.frame) and v.frame.isAligned(T.frame)):
     raise ValueError("the direction is written in another frame than the tensor")
-  return v.normalize()
+  return v
 
 
 def _pick(bounds, which):
@@ -182,8 +187,8 @@ def YoungsModulus(T, v=None):
   S = _compliance(T)
   if v is None:
     return _sphericalFunction(lambda x: YoungsModulus(S, x), S)
-  u = _unit(S, v)
-  return 1 / S.directionalMagnitude(u)
+  # the magnitude takes the direction of any length
+  return 1 / S.directionalMagnitude(_inFrame(S, v))
 
 
 def linearCompressibility(T, v=None):

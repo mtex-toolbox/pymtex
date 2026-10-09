@@ -181,22 +181,22 @@ def _step(p, xs, d, alpha):
   return out
 
 
-# the vector w carried along the step: unchanged in the global coordinates of the rotation
-# group, parallel transported along the geodesic on the sphere
-def _transport(p, w, xs, d, alpha):
-  out = w.copy()
+# the vectors ws carried along the step, all at once: unchanged in the global coordinates of
+# the rotation group, parallel transported along the geodesic on the sphere
+def _transport(p, ws, xs, d, alpha):
+  out = np.array(ws)
   if not p.sphere:
-    return out
+    return list(out)
   M = len(xs)
-  W = out[:3 * M].reshape(M, 3)
+  W = out[:, :3 * M].reshape(len(out), M, 3)
   V = d[:3 * M].reshape(M, 3)
-  speed = np.linalg.norm(V, axis=1)
-  j = np.flatnonzero(speed > 0)
-  u = V[j] / speed[j, None]
-  t = alpha * speed[j, None]
-  a = np.sum(W[j] * u, axis=1, keepdims=True)
-  W[j] = W[j] - a * (np.sin(t) * xs[j] + 2 * np.sin(t / 2) ** 2 * u)
-  return out
+  speed = np.sqrt(np.einsum("mj,mj->m", V, V))[:, None]
+  # a node at rest keeps its vectors: its direction is zero
+  u = np.divide(V, speed, out=np.zeros_like(V), where=speed > 0)
+  t = alpha * speed
+  turn = np.sin(t) * xs + 2 * np.sin(t / 2) ** 2 * u
+  W -= np.einsum("kmj,mj->km", W, u)[:, :, None] * turn
+  return list(out)
 
 
 # the L-BFGS two loop recursion
@@ -323,10 +323,9 @@ def _optimize(p, xs, c, optimizeWeights, maxIter, tol, memory, warmUp, tolWeight
       break
     gn = p.gradient(xn, cn, dn, weights=joint and active)
     if memory > 0:
-      s = _transport(p, alpha * d, xs, d, alpha)
-      y = gn - _transport(p, g, xs, d, alpha)
-      S = [_transport(p, sk, xs, d, alpha) for sk in S]
-      Y = [_transport(p, yk, xs, d, alpha) for yk in Y]
+      s, tg, *old = _transport(p, [alpha * d, g, *S, *Y], xs, d, alpha)
+      y = gn - tg
+      S, Y = old[:len(S)], old[len(S):]
       if s @ y > 1e-12 * np.linalg.norm(s) * np.linalg.norm(y):
         S.append(s)
         Y.append(y)

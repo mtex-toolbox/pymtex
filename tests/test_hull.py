@@ -53,3 +53,18 @@ def test_the_hulls_of_many_loops_are_the_hulls_of_each():
   for l, x, y in zip(loops, a, b):
     assert np.array_equal(x, y) and np.array_equal(x, l[convexHull(V[l])])
   assert convexHullLoops(V, []) == []
+
+
+def test_the_cell_areas_are_those_of_the_spherical_voronoi_diagram():
+  from scipy.spatial import SphericalVoronoi
+  from mtex.geometry.hull import _cellAreas
+  u = np.random.default_rng(7).normal(size=(3000, 3))
+  u[:1000, 2] = np.abs(u[:1000, 2]) * 5                                  # a dense cap and a sparse rest
+  u /= np.linalg.norm(u, axis=1)[:, None]
+  assert np.allclose(_cellAreas(u), SphericalVoronoi(u).calculate_areas(), rtol=0, atol=1e-12)
+
+
+def test_the_cell_areas_sum_to_the_sphere():
+  from mtex.geometry.hull import _cellAreas
+  u = np.random.default_rng(8).normal(size=(500, 3))
+  assert np.isclose(np.sum(_cellAreas(u / np.linalg.norm(u, axis=1)[:, None])), 4 * np.pi, rtol=1e-13)

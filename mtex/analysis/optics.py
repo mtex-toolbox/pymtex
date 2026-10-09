@@ -40,6 +40,12 @@ def _birefringence(rI, U):
   M = rI.M.reshape(-1, 3, 3)
   n = max(len(U), len(M))
   U = np.broadcast_to(U, (n, 3))
+  # real tensors at many directions in one compiled pass
+  if n >= 64 and M.dtype.kind == "f":
+    from .kernels import birefringenceKernel
+    out = birefringenceKernel(U, M)
+    if out is not None:
+      return out
   p1 = vector3d(U).orth().normalize().data
   p2 = np.cross(U, p1)
   p2 = p2 / np.linalg.norm(p2, axis=-1, keepdims=True)

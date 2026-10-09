@@ -21,7 +21,9 @@ _parallelLock = threading.RLock()
 # count per Python thread, and a thread starts at all logical cores, so every launch sets it.
 # workqueue has one process-wide queue: two Python threads must not launch it together, so
 # there the launch also holds the lock. Compiled helpers called from inside a kernel stay
-# unwrapped; the result is a Python function, so only Python calls it, never another compiled loop
+# unwrapped; the result is a Python function, so only Python calls it, never another compiled loop.
+# launch.single runs the same compiled loop on one thread, for a call whose work is less than
+# the start of the threads
 def _parallelKernel(f, **options):
   nb = _jit()
   with _parallelLock:
@@ -29,13 +31,21 @@ def _parallelKernel(f, **options):
     kernel = nb.njit(cache=True, parallel=True, **options)(f)
     queue = nb.threading_layer() == "workqueue"
 
-  @functools.wraps(f)
-  def launch(*args, **kwargs):
-    nb.set_num_threads(min(threads(), nb.config.NUMBA_NUM_THREADS))
+  def run(n, args, kwargs):
+    nb.set_num_threads(n)
     if not queue:
       return kernel(*args, **kwargs)
     with _parallelLock:
       return kernel(*args, **kwargs)
+
+  @functools.wraps(f)
+  def launch(*args, **kwargs):
+    return run(min(threads(), nb.config.NUMBA_NUM_THREADS), args, kwargs)
+
+  @functools.wraps(f)
+  def single(*args, **kwargs):
+    return run(1, args, kwargs)
+  launch.single = single
   return launch
 
 

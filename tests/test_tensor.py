@@ -266,6 +266,19 @@ def test_directionalMagnitude_atDirectionsAndAsASphericalFunction():
   assert f.bandwidth == 4 and f.antipodal and np.isclose(np.real(f(vector3d(1, 1, 1))), 321)
 
 
+@pytest.mark.parametrize("R", [1, 2, 3, 4, 5])
+def test_directionalMagnitude_ofManyDirectionsIsTheCompiledPolynomial(R):
+  # one tensor at many directions of any length runs the compiled polynomial, the NumPy contraction its oracle
+  T, v = tensor(rng.standard_normal((3,) * R), rank=R), vector3d(3 * rng.standard_normal((500, 3)))
+  compiled = directionalMagnitude(T, v)
+  setMTEXpref("kernels", "numpy")
+  try:
+    oracle = directionalMagnitude(T, v)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.allclose(compiled, oracle, rtol=0, atol=1e-13)
+
+
 @pytest.mark.parametrize("K", [stiffnessTensor, complianceTensor])
 def test_rand_givesASymmetricPositiveDefiniteTensorOfItsFrame(K):
   # check_tensorFactories: rand gives a symmetric, positive definite tensor of the right rank

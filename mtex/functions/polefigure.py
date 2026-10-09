@@ -723,7 +723,7 @@ def calcQuadratureWeights(v, method="voronoi"):
 # the areas of the spherical Voronoi cells, an axis list doubled and halved, duplicates
 # sharing a cell, no cell above twice the 80 % quantile
 def _voronoiWeights(v):
-  from scipy.spatial import SphericalVoronoi
+  from ..geometry.hull import _cellAreas
   xyz = v.flatten().normalize().data
   if v.antipodal:
     xyz = np.concatenate([xyz, -xyz])
@@ -733,8 +733,7 @@ def _voronoiWeights(v):
   if len(u) < 4:
     return None
   try:
-    sv = SphericalVoronoi(u, radius=1.0)
-    area = sv.calculate_areas()
+    area = _cellAreas(u)
   except Exception:
     return None
   counts = np.bincount(inv, minlength=len(u))

@@ -1,13 +1,14 @@
 # the compiled kernels of the analysis layer: the Taylor solve of many strains as one
 # parallel loop, each strain's linear program at the analytic centre of its optimal face, or at
 # a vertex by the dense simplex of the maps layer and, for a unique spin there, the shears of
-# least norm on the optimal face. The NumPy forms in
-# taylor.py are the fallback without numba and the oracle of the tests.
+# least norm on the optimal face, and the two refractive indices and polarisations of light
+# along many directions. The NumPy forms in taylor.py and optics.py are the fallback without
+# numba and the oracle of the tests.
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _parallelKernel
+from ..geometry.kernels import _jit, _parallelKernel, backend
 
 prange = range
 _COMPILED = {}
@@ -119,6 +120,53 @@ def taylorKernel():
     globals()["_minimumNorm"] = nb.njit(cache=True)(_minimumNorm)
     _COMPILED["taylor"] = _parallelKernel(_taylorLoop)
   return _COMPILED["taylor"]
+
+
+# the refractive index tensor restricted to the plane normal to each unit direction of U: the
+# axes p1 = (-y, x, 0) of vector3d/orth and p2 = u x p1, the symmetric 2 x 2 matrix on them,
+# its eigen decomposition in closed form. M holds one tensor, broadcast, or one per direction
+def _birefringenceLoop(U, M, delta, fast, slow, n1, n2):
+  many = np.int64(M.shape[0] > 1)
+  for q in prange(U.shape[0]):
+    k = many * q
+    ux, uy, uz = U[q, 0], U[q, 1], U[q, 2]
+    y = -1.0 if abs(ux) <= 1e-10 else uy
+    r = np.sqrt(y * y + ux * ux)
+    p = np.empty((2, 3))
+    p[0, 0], p[0, 1], p[0, 2] = -y / r, ux / r, 0.0
+    cx, cy, cz = uy * p[0, 2] - uz * p[0, 1], uz * p[0, 0] - ux * p[0, 2], ux * p[0, 1] - uy * p[0, 0]
+    r = np.sqrt(cx * cx + cy * cy + cz * cz)
+    p[1, 0], p[1, 1], p[1, 2] = cx / r, cy / r, cz / r
+    a = b = c = 0.0
+    for i in range(3):
+      for j in range(3):
+        a += p[0, i] * M[k, i, j] * p[0, j]
+        c += p[1, i] * M[k, i, j] * p[1, j]
+        b += (p[0, i] * M[k, i, j] * p[1, j] + p[1, i] * M[k, i, j] * p[0, j]) / 2
+    d = 2 * np.hypot((a - c) / 2, b)
+    mid = (a + c) / 2
+    theta = np.arctan2(2 * b, a - c) / 2
+    co, si = np.cos(theta), np.sin(theta)
+    for i in range(3):
+      slow[q, i] = co * p[0, i] + si * p[1, i]
+      fast[q, i] = -si * p[0, i] + co * p[1, i]
+    delta[q], n1[q], n2[q] = d, mid - d / 2, mid + d / 2
+
+
+def birefringenceKernel(U, M):
+  """the index difference, the fast and the slow axis and the two indices of light along the n unit
+  directions U through the tensors M, one or n; None without numba"""
+  nb = _jit() if backend() == "numba" else None
+  if not nb:
+    return None
+  if "birefringence" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["birefringence"] = _parallelKernel(_birefringenceLoop)
+  n = len(U)
+  delta, n1, n2 = (np.empty(n) for _ in range(3))
+  fast, slow = np.empty((n, 3)), np.empty((n, 3))
+  _COMPILED["birefringence"](np.ascontiguousarray(U, dtype=np.float64), np.ascontiguousarray(M, dtype=np.float64), delta, fast, slow, n1, n2)
+  return delta, fast, slow, n1, n2
 
 
 __all__ = []

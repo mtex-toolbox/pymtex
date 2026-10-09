@@ -7,8 +7,13 @@
 # right and the upper one right to left, a point popped whenever it would make a right turn
 # or none, so collinear points and repeated points never become corners. No dependency and
 # no degenerate case to handle; the chain is a numba loop with the Python loop as fallback
-# and oracle, since a grain list asks for one hull per grain. The hull of points in space,
-# which the Voronoi diagram of the sphere and the pole figures need, joins this file with P2.
+# and oracle, since a grain list asks for one hull per grain.
+#
+#   _cellAreas(u)              the areas of the spherical Voronoi cells of unit vectors
+#
+# The hull of points on the sphere is their Delaunay triangulation (Qhull through SciPy), and
+# a cell is cut by the triangles at its point into kites: the point, the midpoints of the two
+# edges and the circumcentre. Their signed areas add up to the cell, so no cell is assembled.
 from __future__ import annotations
 
 import numpy as np
@@ -114,3 +119,36 @@ def _compiledLoops():
 
 
 __all__ = ["convexHull", "convexHullLoops"]
+
+
+# the signed area of the spherical triangles a, b, c, by the formula of van Oosterom and Strackee
+def _triangleArea(a, b, c):
+  dot = lambda x, y: np.einsum("ij,ij->i", x, y)
+  return 2 * np.arctan2(dot(a, np.cross(b, c)), 1 + dot(a, b) + dot(b, c) + dot(c, a))
+
+
+# the areas of the spherical Voronoi cells of distinct unit vectors (n, 3), which sum to the
+# sphere; SciPy's SphericalVoronoi(u).calculate_areas() is the oracle. Qhull raises on fewer
+# than four points and on points in a plane
+def _cellAreas(u):
+  from scipy.spatial import ConvexHull
+  u = np.asarray(u, dtype=float).reshape(-1, 3)
+  T = ConvexHull(u).simplices
+  # every triangle anticlockwise seen from outside, its circumcentre the outer normal
+  a, b, c = u[T[:, 0]], u[T[:, 1]], u[T[:, 2]]
+  o = np.cross(b - a, c - a)
+  flip = np.einsum("ij,ij->i", o, a) < 0
+  T = np.where(flip[:, None], T[:, [0, 2, 1]], T)
+  o[flip] *= -1
+  o /= np.sqrt(np.einsum("ij,ij->i", o, o))[:, None]
+  P = [u[T[:, i]] for i in range(3)]
+  # the midpoints of the edges opposite to each corner
+  mid = []
+  for i in range(3):
+    m = P[(i + 1) % 3] + P[(i + 2) % 3]
+    mid.append(m / np.sqrt(np.einsum("ij,ij->i", m, m))[:, None])
+  area = np.zeros(len(u))
+  for i in range(3):
+    kite = _triangleArea(P[i], mid[(i + 2) % 3], o) + _triangleArea(P[i], o, mid[(i + 1) % 3])
+    area += np.bincount(T[:, i], kite, len(u))
+  return area

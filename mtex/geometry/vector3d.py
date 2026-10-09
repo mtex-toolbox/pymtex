@@ -429,13 +429,13 @@ class vector3d(MtexArray):
       return 2 * np.pi
     if n > 50000:
       return float(np.sqrt(40000 / n / (1 + self.antipodal)) * np.pi / 180)
-    from scipy.spatial import SphericalVoronoi
+    from .hull import _cellAreas
     xyz = self.flatten().normalize().data
     if self.antipodal:
       xyz = np.concatenate([xyz, -xyz])
     u = np.unique(np.round(xyz / 1e-6) * 1e-6, axis=0)
     try:
-      area = SphericalVoronoi(u, radius=1.0).calculate_areas()
+      area = _cellAreas(u)
     except Exception:
       return 2 * np.pi
     return float(np.sqrt(np.median(area)))

@@ -111,14 +111,18 @@ GROD over the lattice, the simplex of the dislocation fit), the planar hull in `
 colouring of a map in `mtex/plotting/kernels.py` and the NUFFT nodes and real defects of the
 harmonic transforms and the direct Wigner series below 100 nodes in `mtex/functions/kernels.py` and the batched symmetric 3 x 3 eigen
 decomposition of the wave velocities and the turn of flattened tensors by many rotations (the
-embedding's images, `ori * T`) in `mtex/tensors/kernels.py`, on the same pattern;
+embedding's images, `ori * T`) and one tensor contracted with many directions as its polynomial
+(`directionalPolynomial`) in `mtex/tensors/kernels.py`, the birefringence of many directions in
+`mtex/analysis/kernels.py`, on the same pattern;
 `setMTEXpref('kernels', 'numpy')` selects the fallback, the preference `threads` (default the
 physical cores, `threads()` in `geometry/kernels.py`) the threads of numba, finufft,
 `scipy.fft`, the k-d tree searches and every loaded OpenBLAS (`applyThreads`, at import and on
 `setMTEXpref('threads')`; OpenBLAS starts on every logical core). A parallel loop called from Python is compiled by `_parallelKernel`
 (`geometry/kernels.py`), which sets numba's thread count on every launch, since numba holds it
 per Python thread, and under numba's `workqueue` layer (macOS) holds one lock around
-every launch; a parallel helper called from inside another compiled loop is a plain
+every launch, and whose `launch.single` runs the same compiled loop on one thread, for a call
+whose work is less than the start of the threads (`SINGLE_THREAD_WORK` in `functions/kernels.py`);
+a parallel helper called from inside another compiled loop is a plain
 `nb.njit(parallel=True)`, never a `_parallelKernel`. The image searches of the symmetry
 reduction (`symReduce`, `closestImage`, `bestDot`, `projectToRef`, `projectDirections`,
 `variantAngles`) stay serial loops and split their rows over a thread pool above

@@ -104,3 +104,19 @@ def test_a_list_of_tensors_pairs_with_the_directions():
 def test_opticalAxis_showsItsCoordinates():
   # the optical axes show their coordinates
   assert opticalAxis(olivineIndex()).dispStyle == "xyz"
+
+
+def test_birefringence_ofManyDirectionsIsTheCompiledLoop():
+  # the compiled pass over the directions against the NumPy form, with directions in the plane x = 0 and along z
+  from mtex import setMTEXpref
+  from mtex.analysis.optics import _birefringence
+  U = rng.standard_normal((300, 3))
+  U[:5, 0], U[5] = 0, (0, 0, 1)
+  U /= np.linalg.norm(U, axis=1)[:, None]
+  compiled = _birefringence(olivineIndex(), U)
+  setMTEXpref("kernels", "numpy")
+  try:
+    oracle = _birefringence(olivineIndex(), U)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert all(np.allclose(a, b, rtol=0, atol=1e-11) for a, b in zip(compiled, oracle))

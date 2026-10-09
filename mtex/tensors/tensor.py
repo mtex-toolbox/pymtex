@@ -30,7 +30,7 @@ from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.vector3d import classproperty, vector3d
-from .kernels import turnBlocks, voigtInverse
+from .kernels import directionalPolynomial, turnBlocks, voigtInverse
 
 # the pair index of the Voigt notation: 11 22 33 23 13 12
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
@@ -554,10 +554,15 @@ class tensor(MtexArray):
     v = v if isinstance(v, vector3d) else vector3d(v)
     if v.frame is not None and v.frame is not self._frame and not v.frame.isAligned(self._frame):
       raise ValueError("the direction is written in another frame than the tensor")
-    u = v.normalize().data
     R = self.rank
     if R == 0:
       return np.broadcast_to(self.M, np.broadcast_shapes(self.shape, v.shape)).copy()
+    # one real tensor at many directions is its polynomial, in one compiled pass
+    if self.ndim == 0 and v.size >= 64 and self.data.dtype.kind == "f" and v.data.dtype.kind == "f":
+      out = directionalPolynomial(self.data, v.data.reshape(-1, 3))
+      if out is not None:
+        return out.reshape(v.shape)
+    u = v.normalize().data
     a, b = (R + 1) // 2, R // 2
     M2 = self.M.reshape(self.shape + (3 ** a, 3 ** b))
     Ua = _vecPower(u, a)
