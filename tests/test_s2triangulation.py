@@ -37,3 +37,18 @@ def test_the_barycentric_matrix():
   assert np.allclose(B.toarray(), np.eye(sT.vertices.size))
   assert np.allclose(sT.barycentric(vector3d.rand(50, rng=rng)).sum(axis=1), 1)
   assert sT.checkInside(sT.midPoints, np.arange(len(sT))).all()
+
+
+# the walk to a direction's triangle runs as one compiled loop, with the triangles and coordinates
+# of the NumPy walk
+def test_locate_compiledWalkAgreesWithNumpy():
+  from mtex import S2Triangulation, setMTEXpref, vector3d
+  sT = S2Triangulation(vector3d.rand(2000))
+  w = vector3d.rand(5000)
+  t, lam = sT.locate(w)
+  setMTEXpref("kernels", "numpy")
+  try:
+    t0, lam0 = sT.locate(w)
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.array_equal(t, t0) and np.allclose(lam, lam0, atol=1e-13)

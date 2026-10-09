@@ -74,7 +74,10 @@ class S2FunTri:
     ok = ~np.isnan(W).any(axis=1)
     f = np.full((len(W), self.values.shape[1]), np.nan, dtype=self.values.dtype if self.values.dtype.kind == "c" else float)
     if ok.any():
-      f[ok] = self.tri.barycentric(vector3d(W[ok])) @ self.values
+      # the barycentric mean of the values at the corners of each direction's triangle
+      t, lam = self.tri.locate(vector3d(W[ok]))
+      corners = self.tri.T[t]
+      f[ok] = sum(lam[:, k, None] * self.values[corners[:, k]] for k in range(3))
     return f.reshape(shape) if self.values.shape[1] == 1 else f.reshape(shape + (-1,))
 
   def __call__(self, v):

@@ -1025,6 +1025,39 @@ def superfib(n, phi, psi):
   return q
 
 
+# the walk of a direction through a triangulation of the sphere: from a start triangle to the
+# neighbour opposite the vertex whose coordinate is negative, until none is; the coordinates are
+# those in the basis of the triangle's vertices, inv the inverses of their matrices
+def _triangleWalkLoop(W, t, inv, nb, maxSteps, lam):
+  for i in prange(W.shape[0]):
+    x, y, z = W[i, 0], W[i, 1], W[i, 2]
+    k = t[i]
+    for _ in range(maxSteps):
+      l0 = inv[k, 0, 0] * x + inv[k, 0, 1] * y + inv[k, 0, 2] * z
+      l1 = inv[k, 1, 0] * x + inv[k, 1, 1] * y + inv[k, 1, 2] * z
+      l2 = inv[k, 2, 0] * x + inv[k, 2, 1] * y + inv[k, 2, 2] * z
+      lo = min(l0, l1, l2)
+      if lo >= -1e-12:
+        break
+      k = nb[k, 0] if l0 == lo else (nb[k, 1] if l1 == lo else nb[k, 2])
+    l0, l1, l2 = max(l0, 0.0), max(l1, 0.0), max(l2, 0.0)
+    s = l0 + l1 + l2
+    t[i] = k
+    lam[i, 0], lam[i, 1], lam[i, 2] = l0 / s, l1 / s, l2 / s
+
+
+def triangleWalk(W, t, inv, nb):
+  """the triangle of a triangulation of the sphere every direction W (n, 3) lies in, walked to from
+  the start triangles t, and the normalised barycentric coordinates there; inv (m, 3, 3) the
+  inverses of the triangles' vertex matrices, nb (m, 3) the neighbour opposite each vertex"""
+  W = np.ascontiguousarray(W, dtype=np.float64).reshape(-1, 3)
+  t = np.array(t, dtype=np.int64).reshape(-1)
+  lam = np.empty((len(W), 3))
+  _parallel("triangleWalk", _triangleWalkLoop)(W, t, np.ascontiguousarray(inv, dtype=np.float64),
+                                               np.ascontiguousarray(nb, dtype=np.int64), np.int64(len(nb)), lam)
+  return t, lam
+
+
 def regionMembership(q, N, nBlocks, t, band):
   """whether each quaternion lies in one of nBlocks regions, N their planes block after block,
   and whether it lies within band of a plane of a region holding it"""

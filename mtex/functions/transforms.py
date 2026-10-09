@@ -882,8 +882,8 @@ def _sphericalSeriesTrig(fhat, v, real):
 
 
 def sphericalSeries(fhat, v, real=None):
-  """the spherical harmonic series fhat at directions or on a quadrature grid, the direct sum, the
-  trigonometric sum or the NUFFT by the number of nodes"""
+  """the spherical harmonic series fhat at directions or on a quadrature grid, the trigonometric sum
+  or the NUFFT by the number of nodes"""
   fhat = np.asarray(fhat)
   L = math.isqrt(fhat.shape[-1]) - 1
   real = isRealSpherical(fhat) if real is None else real
@@ -892,9 +892,10 @@ def sphericalSeries(fhat, v, real=None):
       return sphericalPlan(v, L, real)(fhat)
     return sphericalSeries(fhat, v.nodes(), real)
   v = v if isinstance(v, vector3d) else vector3d(v)
-  if v.size < DIRECT_SUM_NODES or L == 0:
-    f = _sphericalSeriesDirect(fhat, v)
-    f = np.real(f) if real else f
+  # the trigonometric sum over the transformed coefficients, kept for the next call, is ten times
+  # faster than the sum of the harmonics at a few nodes too (L = 256, ten nodes: 0.55 ms against 7)
+  if L == 0:
+    f = np.real(_sphericalSeriesDirect(fhat, v)) if real else _sphericalSeriesDirect(fhat, v)
   elif v.size < DIRECT_TRIG_NODES_S2 or v.size * (2 * L + 1) ** 2 < DIRECT_TRIG_WORK_S2:
     f = _sphericalSeriesTrig(fhat, v, real)
   else:

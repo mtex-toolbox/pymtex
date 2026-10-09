@@ -441,3 +441,21 @@ many terms, goes through its harmonic form (65 to 87 ms at 1e6), a handle 23 ms,
   (`fibreSum`); any other kernel takes the products and its own evaluation.
 - **The Bingham distribution** summed its symmetric copies one NumPy pass each; one compiled loop
   over the rotations sums them all (`binghamSum`).
+
+## The evaluation of the S2 functions, 2026-10-09
+
+Measured under another user's load (6 to 9). Harmonic functions evaluate in 31 to 46 ms at 1e6
+directions and 2 to 10 ms at 1e4, the pole figures and inverse pole figures of the RBF, fibre and
+unimodal ODFs build in 1 to 24 ms warm (144 and 608 ms were their first calls, compiling),
+`S2FunBingham` takes 16 ms and a handle 1.3 ms at 1e6. Two routes were not where they should be:
+
+- **`S2FunTri`, 1e6 directions 774 -> 148 ms**: the k-d tree query for the start triangle ran on one
+  thread (507 ms, 53 on the threads), the walk to the triangle was a NumPy loop of passes over the
+  directions still walking, and the evaluation built a sparse matrix of the coordinates to multiply
+  it once. The walk is one compiled loop (`triangleWalk` in geometry/kernels.py, the NumPy walk the
+  fallback, the same triangles), the value the barycentric mean of the three corners.
+- **`sphericalSeries` below 50 directions** summed the harmonics directly: the trigonometric sum
+  over the transformed coefficients, which keeps the transform of the last coefficient vectors,
+  takes 0.17 ms against 2.1 at L = 64 and 0.55 against 7 at L = 256 for ten directions, and wins
+  with the transform included. The thresholds between the trigonometric sum and the plan are left
+  for a quiet machine, their differences being within the load's noise.
