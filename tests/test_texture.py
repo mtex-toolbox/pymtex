@@ -161,3 +161,32 @@ def test_doEulerStep_turnsTheDensityWithTheOrientations():
   assert stepped.bandwidth == 12 and np.isclose(mean(stepped), 1, atol=1e-6)
   test = orientation.rand(200, cs, ss, rng=rng)
   assert np.linalg.norm(np.real(stepped(test)) - np.real(turned(test))) < 0.15 * np.linalg.norm(np.real(turned(test)))
+
+
+# the mean over a list of orientations sums the tensor turned by each without forming them, with
+# the values, class and frame of the mean of the turned tensors
+def test_calcTensor_ofOrientationsIsTheMeanOfTheTurnedTensors():
+  cs = crystalFrame("6/mmm")
+  C = stiffnessTensor(np.eye(6) * 50 + np.abs(rng.standard_normal((6, 6))), cs, density=2.5)
+  o, w = orientation.rand(400, cs, rng=rng), rng.random(400)
+  got, ref = calcTensor(o, C, weights=w), (o * C).mean(weights=w / w.sum())
+  assert np.allclose(got.M, ref.M, rtol=1e-12) and type(got) is type(ref) and got.frame is ref.frame and got.density == ref.density
+
+
+# over a map the Reuss average is the inverse of the mean of the turned inverses, one inversion a
+# phase; the Voigt average the mean of the turned tensors, weighted by the pixels of each phase
+def test_calcTensor_ofAMapAveragesThePhasesTurnedTensors():
+  from mtex import EBSD, phaseList
+  a, b = crystalFrame("m-3m"), crystalFrame("6/mmm")
+  i, j = np.meshgrid(np.arange(20), np.arange(20), indexing="xy")
+  pos = np.stack([i.ravel(), j.ravel(), np.zeros(400)], axis=-1).astype(float)
+  ebsd = EBSD(pos, rotation.rand(400, rng=rng), np.where(i.ravel() < 10, 1, 2).astype(np.int8), phaseList(a, b))
+  Ca = stiffnessTensor(np.eye(6) * 50 + np.abs(rng.standard_normal((6, 6))), a)
+  Cb = stiffnessTensor(np.eye(6) * 80 + np.abs(rng.standard_normal((6, 6))), b)
+  V, R, _ = calcTensor(ebsd, Ca, Cb, "all")
+  oa = orientation(rotation(ebsd.rotations.data[np.asarray(ebsd.phaseId) == 1]), a)
+  ob = orientation(rotation(ebsd.rotations.data[np.asarray(ebsd.phaseId) == 2]), b)
+  turned = np.concatenate([(oa * Ca).data.reshape(200, -1), (ob * Cb).data.reshape(200, -1)])
+  inverted = np.concatenate([(oa * Ca).inv().data.reshape(200, -1), (ob * Cb).inv().data.reshape(200, -1)])
+  assert np.allclose(V.M.ravel(), turned.mean(axis=0), rtol=1e-12)
+  assert np.allclose(R.inv().M.ravel(), inverted.mean(axis=0), rtol=1e-10)

@@ -517,6 +517,17 @@ class tensor(MtexArray):
       raise TypeError("rotate takes a rotation, an orientation or a 3 x 3 matrix")
     return self._as(type(self), _applyMatrix(self.M, Q, self.rank), self._frame.stripSym())
 
+  def _turnedMean(self, o, w):
+    """the weighted mean of the tensor turned by the orientations o, the frames as rotate gives them,
+    without forming the turned tensors; None where the compiled loop does not serve"""
+    if self.ndim or np.iscomplexobj(self.M) or not isinstance(o, orientation):
+      return None
+    from .kernels import turnSum
+    t = fitFrame(self._frame, o.CS) if isinstance(self._frame, crystalFrame) else None
+    q = o.data.reshape(-1, 4) if t is None else (rotation(o.data) * t).data.reshape(-1, 4)
+    out = turnSum(self.M, self.rank, q, w)
+    return None if out is None else self._as(type(self), out / np.sum(w), o.SS.stripSym())
+
   def transformReferenceFrame(self, fr):
     """the same coefficients read in another frame, the numbers changed by the rigid part of
     the transition between the two bases"""
@@ -584,13 +595,12 @@ class tensor(MtexArray):
     if self.ndim == 0:
       return self
     flat = self.data.reshape(-1, self._ncoord)
-    if weights is None:
-      out = flat.mean(axis=0)
-    else:
-      w = np.asarray(weights, dtype=float).ravel()
-      if w.size != flat.shape[0]:
-        raise ValueError("one weight per tensor")
-      out = (w[:, None] * flat).sum(axis=0) / np.sum(w)
+    # the mean of the rows as one product with the weights: NumPy reduces the long axis of a tall
+    # array many times slower (1e6 tensors of rank four 149 ms)
+    w = np.full(flat.shape[0], 1.0) if weights is None else np.asarray(weights, dtype=float).ravel()
+    if w.size != flat.shape[0]:
+      raise ValueError("one weight per tensor")
+    out = (w @ flat) / np.sum(w)
     t = self._as(type(self), out)
     if self.density is not None and np.ndim(self.density):
       d = np.asarray(self.density, dtype=float).ravel()
@@ -797,6 +807,9 @@ def EinsteinSum(*args):
     arrays.append(A)
     subs.append(("..." if lead or isinstance(op, (tensor, vector3d, quaternion)) else "") + "".join(_letter(l) for l in idx))
   free = sorted(l for l in labels if l > 0)
+  fast = _multilinearSum(ops, ids, arrays, free)
+  if fast is not None:
+    return fast
   out = "..." + "".join(_letter(l) for l in free)
   result = np.einsum(",".join(subs) + "->" + out, *arrays)
   if not free:
@@ -807,6 +820,38 @@ def EinsteinSum(*args):
   if frame is not None:
     t._frame = frame
   return t
+
+
+# one real tensor of its own contracted on every index with lists of vectors of one shape, a trace
+# in it taken first: the compiled multilinear form, MATLAB's shear modulus or Poisson ratio at
+# many directions, where einsum's broadcasting loop took 350 ms for 1e6 of them; None otherwise
+def _multilinearSum(ops, ids, arrays, free):
+  if free or not isinstance(ops[0], tensor) or arrays[0].ndim != ops[0].rank or np.iscomplexobj(arrays[0]):
+    return None
+  vecs = ops[1:]
+  if not vecs or not all(isinstance(v, vector3d) for v in vecs) or len({v.data.shape for v in vecs}) != 1:
+    return None
+  if any(len(i) != 1 for i in ids[1:]):
+    return None
+  idx = ids[0]
+  # the labels the tensor holds twice are its traces
+  traces = [l for l in set(idx) if idx.count(l) == 2]
+  rest = [l for l in idx if l not in traces]
+  if sorted(rest) != sorted(i[0] for i in ids[1:]):
+    return None
+  M = arrays[0]
+  if traces:
+    M = np.einsum("".join(_letter(l) for l in idx) + "->" + "".join(_letter(l) for l in rest), M)
+  if not rest:
+    return None
+  vec = {i[0]: v for i, v in zip(ids[1:], vecs)}
+  from .kernels import multilinear
+  shape = vecs[0].data.shape[:-1]
+  out = multilinear(M, np.stack([vec[l].data.reshape(-1, 3) for l in rest]))
+  if out is None:
+    return None
+  out = out.reshape(shape)
+  return out if out.ndim else float(out)
 
 
 def _letter(l):

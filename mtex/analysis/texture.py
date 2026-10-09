@@ -87,7 +87,8 @@ def calcTensor(x, *args, average="Voigt", weights=None):
     return (calcTensor(x, T, "Voigt", weights=weights) + calcTensor(x, T, "Reuss", weights=weights)) / 2
   if isinstance(x, orientation):
     w = _weights(weights, x.size)
-    return (x.flatten() * T).mean(weights=w)
+    fast = T._turnedMean(x.flatten(), np.asarray(w, dtype=float).ravel())
+    return fast if fast is not None else (x.flatten() * T).mean(weights=w)
   if _isSO3Fun(x):
     return _calcTensorODF(x, T)
   raise TypeError("calcTensor averages over an ODF, a list of orientations or a map")
@@ -110,39 +111,45 @@ def _calcTensorODF(f, T):
 # a map: every indexed phase takes the tensor of its crystal, matched by frame, mineral and
 # Laue class, the tensors rotated by the measurements and averaged with the densities
 def _calcTensorMap(ebsd, tensors, which, weights):
-  from ..geometry.symmetry import symmetry
   phaseId = np.asarray(ebsd.phaseId)
   rots = ebsd.rotations
   indexed = np.asarray(ebsd.isIndexed) if hasattr(ebsd, "isIndexed") else phaseId > 0
   ss = getattr(rots, "frame", None)
   ss = specimenFrame.default if not isinstance(ss, referenceFrame) else ss
-  parts, dens, ws = [], [], []
   w = None if weights is None else np.asarray(weights, dtype=float).ravel()
+  phases = []
   for p in np.unique(phaseId[indexed]):
     cs = ebsd.CSList[int(p)]
     T = next((t for t in tensors if _sameCrystal(t.frame, cs)), None)
     if T is None:
       raise ValueError(f"no tensor for the phase {getattr(cs, 'mineral', cs.char())}")
     mask = phaseId == p
-    o = orientation(rotation(rots.data[mask]), cs, ss)
-    parts.append((o * T).data.reshape(o.size, -1))
-    dens.append(np.full(o.size, np.nan if T.density is None else T.density))
-    ws.append(np.full(o.size, 1.0) if w is None else w[mask])
-  data, dens, ws = np.concatenate(parts), np.concatenate(dens), np.concatenate(ws)
-  Ts = tensors[0]._as(type(tensors[0]), data, ss)
-  Ts.density = None
-  wn = _weights(ws, len(ws))
-  voigt = Ts.mean(weights=wn)
-  if np.all(np.isfinite(dens)):
-    voigt.density = float(wn @ dens)
+    phases.append((T, orientation(rotation(rots.data[mask]), cs, ss), np.full(int(mask.sum()), 1.0) if w is None else w[mask]))
+  ws = np.concatenate([x[2] for x in phases])
+  _weights(ws, len(ws))
+  total = np.sum(ws)
+  # the weighted sums of the tensors turned by every phase's orientations, and of their inverses,
+  # since the inverse of a turned tensor is the turned inverse: no tensor of a pixel is formed
+  # and none is inverted
+  def turned(inverse):
+    acc = 0.0
+    for T, o, wp in phases:
+      Tp = T.inv() if inverse else T
+      m = Tp._turnedMean(o, wp)
+      acc = acc + (m.M.ravel() if m is not None else (o * Tp).data.reshape(o.size, -1).T @ (wp / np.sum(wp))) * np.sum(wp)
+    return tensors[0]._as(type(tensors[0]), acc / total, ss)
+  dens = np.concatenate([np.full(o.size, np.nan if T.density is None else T.density) for T, o, _ in phases])
+  density = float(ws @ dens / total) if np.all(np.isfinite(dens)) else None
+  voigt = turned(False)
+  voigt.density = density
   if which == "Voigt":
     return voigt
-  reuss = Ts.inv().mean(weights=wn).inv()
-  reuss.density = voigt.density
+  reuss = turned(True).inv()
+  reuss.density = density
   if which == "Reuss":
     return reuss
   hill = (voigt + reuss) / 2
-  hill.density = voigt.density
+  hill.density = density
   return hill if which == "Hill" else (voigt, reuss, hill)
 
 

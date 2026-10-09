@@ -126,3 +126,15 @@ def test_fit():
   assert angle(r, rec) < 2 * degree
   assert same(rotation.fit(u, r * u), r, 1e-12)
   assert angle(rotation.fit(u, v, weights=np.ones(50)), rec) < 1e-10
+
+
+# the matrices of many quaternions come from one compiled loop, with the values of the NumPy form
+def test_quat2mat_ofManyQuaternionsAgreesWithNumpy():
+  from mtex.geometry.representations import QUAT2MAT_COMPILED, quat2mat
+  q = rotation.rand(QUAT2MAT_COMPILED + 5).data.reshape(-1, 4)
+  M = quat2mat(q)
+  setMTEXpref("kernels", "numpy")
+  try:
+    assert np.array_equal(M, quat2mat(q))
+  finally:
+    setMTEXpref("kernels", "numba")

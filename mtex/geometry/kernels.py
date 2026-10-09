@@ -1058,6 +1058,23 @@ def triangleWalk(W, t, inv, nb):
   return t, lam
 
 
+# the rotation matrices of quaternions, one 3 x 3 block written per row
+def _quatMatricesLoop(q, M):
+  for i in prange(q.shape[0]):
+    a, b, c, d = q[i, 0], q[i, 1], q[i, 2], q[i, 3]
+    M[i, 0, 0], M[i, 0, 1], M[i, 0, 2] = 2 * b * b + 2 * a * a - 1, 2 * b * c - 2 * a * d, 2 * b * d + 2 * a * c
+    M[i, 1, 0], M[i, 1, 1], M[i, 1, 2] = 2 * c * b + 2 * a * d, 2 * c * c + 2 * a * a - 1, 2 * c * d - 2 * a * b
+    M[i, 2, 0], M[i, 2, 1], M[i, 2, 2] = 2 * d * b - 2 * a * c, 2 * d * c + 2 * a * b, 2 * d * d + 2 * a * a - 1
+
+
+def quatMatrices(q):
+  """the rotation matrices of the rows of q (n, 4), as one compiled loop"""
+  q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
+  M = np.empty((len(q), 3, 3))
+  _parallel("quatMatrices", _quatMatricesLoop)(q, M)
+  return M
+
+
 def regionMembership(q, N, nBlocks, t, band):
   """whether each quaternion lies in one of nBlocks regions, N their planes block after block,
   and whether it lies within band of a plane of a region holding it"""

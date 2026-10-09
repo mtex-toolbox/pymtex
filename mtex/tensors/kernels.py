@@ -2,7 +2,8 @@
 # matrices, the Christoffel matrices of the wave velocities, as one parallel loop of cyclic
 # Jacobi rotations, and the rotation of flattened tensors on every index, a tensor turned by
 # many orientations and the images of the orientation embedding, and the contraction of one
-# tensor with many directions on every index. NumPy's eigh, the Kronecker products of
+# tensor with many directions on every index, each index with its own, and the sum of one tensor
+# turned by many rotations. NumPy's eigh, the Kronecker products of
 # tensor.py and the batched products of analysis/embedding.py are the fallbacks without
 # numba and the oracles of the tests.
 from __future__ import annotations
@@ -277,3 +278,90 @@ def directionalPolynomial(M, v, chunk=1024):
   out = np.empty(len(v))
   loop(np.ascontiguousarray(v, dtype=np.float64), expo, np.bincount(ids, M, len(expo)), np.int64(R), out, np.int64(chunk))
   return out
+
+
+# a tensor of rank R contracted on every index with its own vector at each row: the sum over the
+# nonzero flat coordinates of M times the components the digits of the coordinate pick, the last
+# digit from the last vector
+def _multilinearLoop(M, nz, V, out):
+  R, n = V.shape[0], V.shape[1]
+  for q in prange(n):
+    acc = 0.0
+    for t in range(nz.shape[0]):
+      m = nz[t]
+      p = M[m]
+      for k in range(R - 1, -1, -1):
+        p *= V[k, q, m % 3]
+        m //= 3
+      acc += p
+    out[q] = acc
+
+
+def _multilinearKernel():
+  nb = _jit()
+  if not nb:
+    return None
+  if "multilinear" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["multilinear"] = _parallelKernel(_multilinearLoop)
+  return _COMPILED["multilinear"]
+
+
+def multilinear(M, V):
+  """the real tensor with the 3^R flat coordinates M contracted on index k with the rows of V[k],
+  V of shape (R, n, 3): M_{i1..iR} V[0]_{i1} .. V[R-1]_{iR} at every row; None without numba"""
+  loop = _multilinearKernel() if backend() == "numba" else None
+  if loop is None:
+    return None
+  M = np.ascontiguousarray(M, dtype=np.float64).ravel()
+  V = np.ascontiguousarray(V, dtype=np.float64)
+  out = np.empty(V.shape[1])
+  loop(M, np.flatnonzero(M).astype(np.int64), V, out)
+  return out
+
+
+# the weighted sum of one flattened tensor of rank R turned by every quaternion, the matrix formed
+# in the loop and the tensor turned index by index as in _turnLoop, each block of quaternions
+# adding into its own row of acc: no turned tensor is kept
+def _turnSumLoop(U, R, q, w, blocks, acc):
+  n, D = q.shape[0], U.shape[0]
+  for c in prange(blocks):
+    a = np.empty(D)
+    b = np.empty(D)
+    for k in range(c * n // blocks, (c + 1) * n // blocks):
+      qa, qb, qc, qd = q[k, 0], q[k, 1], q[k, 2], q[k, 3]
+      q00, q01, q02 = 2 * qb * qb + 2 * qa * qa - 1, 2 * qb * qc - 2 * qa * qd, 2 * qb * qd + 2 * qa * qc
+      q10, q11, q12 = 2 * qc * qb + 2 * qa * qd, 2 * qc * qc + 2 * qa * qa - 1, 2 * qc * qd - 2 * qa * qb
+      q20, q21, q22 = 2 * qd * qb - 2 * qa * qc, 2 * qd * qc + 2 * qa * qb, 2 * qd * qd + 2 * qa * qa - 1
+      for i in range(D):
+        a[i] = U[i]
+      s = 1
+      for _ in range(R):
+        for base in range(0, D, 3 * s):
+          for i in range(base, base + s):
+            x, y, z = a[i], a[i + s], a[i + 2 * s]
+            b[i] = q00 * x + q01 * y + q02 * z
+            b[i + s] = q10 * x + q11 * y + q12 * z
+            b[i + 2 * s] = q20 * x + q21 * y + q22 * z
+        a, b = b, a
+        s *= 3
+      for i in range(D):
+        acc[c, i] += w[k] * a[i]
+
+
+def turnSum(U, R, q, w):
+  """sum_k w_k of the flattened real tensor U of rank R turned by the quaternion q_k on every index,
+  without forming the turned tensors; None without numba"""
+  nb = _jit() if backend() == "numba" else None
+  if not nb:
+    return None
+  if "turnSum" not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED["turnSum"] = _parallelKernel(_turnSumLoop)
+  from ..geometry.kernels import threads
+  q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
+  blocks = max(1, min(4 * threads(), len(q) // 256))
+  acc = np.zeros((blocks, 3 ** R))
+  _COMPILED["turnSum"](np.ascontiguousarray(U, dtype=np.float64).ravel(), np.int64(R), q, np.ascontiguousarray(w, dtype=np.float64),
+                       np.int64(blocks), acc)
+  return acc.sum(axis=0)

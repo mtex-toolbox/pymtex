@@ -164,8 +164,17 @@ def rodrigues2quat(xyz):
 
 # ------------------------------------------------------------------ matrices
 
+# above this many quaternions the matrices come from the compiled loop of kernels.py
+QUAT2MAT_COMPILED = 1 << 14
+
+
 def quat2mat(q):
   """the rotation matrices of quaternion coefficients, shape (..., 3, 3)"""
+  q = np.asarray(q)
+  if q.size >= 4 * QUAT2MAT_COMPILED and q.dtype == np.float64:
+    from .kernels import backend, quatMatrices
+    if backend() == "numba":
+      return quatMatrices(q).reshape(q.shape[:-1] + (3, 3))
   a, b, c, d = np.moveaxis(q, -1, 0)
   M = np.empty(q.shape[:-1] + (3, 3), dtype=q.dtype)
   M[..., 0, 0] = 2 * b * b + 2 * a * a - 1

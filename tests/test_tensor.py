@@ -429,3 +429,21 @@ def test_the_compiled_turn_agrees_with_the_kronecker_products():
         assert a.shape == b.shape == (50, 3 ** rank) and np.allclose(a, b, atol=1e-12)
   finally:
     setMTEXpref("kernels", before)
+
+
+# one tensor contracted on every index with lists of vectors, a trace in it taken first, is the
+# compiled multilinear form, with einsum's values whatever the order of the labels
+@pytest.mark.parametrize("labels", [[-1, -2, -3, -4], [-3, -1, -4, -2], [-1, -2, -5, -5]])
+def test_EinsteinSum_ofOneTensorWithVectorsIsEinsums(labels):
+  import sys
+  module = sys.modules["mtex.tensors.tensor"]
+  T = tensor(rng.standard_normal((3, 3, 3, 3)), rank=4)
+  a, b = vector3d.rand(200), vector3d.rand(200)
+  ops = [a, [-1], b, [-2]] + ([a, [-3], b, [-4]] if -3 in labels else [])
+  got = EinsteinSum(T, labels, *ops)
+  old, module._multilinearSum = module._multilinearSum, lambda *x: None
+  try:
+    ref = EinsteinSum(T, labels, *ops)
+  finally:
+    module._multilinearSum = old
+  assert np.allclose(got, ref, rtol=1e-13, atol=1e-13)
