@@ -327,15 +327,18 @@ def invariantProjection(g, L, dtype=np.float64, proper=False):
   return InvariantProjection(held[1].fold, held[1].blocks[:L + 1], held[1])
 
 
-# B <- P_n B, B <- B Q_n and B <- P_n B Q_n on one degree block, in place: what the
-# projection kills is written zero and what it ignores is never read
-def _projectBlock(B, P, Q, n):
+# P_n B, B Q_n and P_n B Q_n of one degree block written into O, which may be B itself:
+# what the projection kills is written zero and what it ignores is never read
+def _projectBlock(B, P, Q, n, O=None):
+  O = B if O is None else O
   if P is not None and P.isIdentity:
     P = None
   if Q is not None and Q.isIdentity:
     Q = None
   if P is None and Q is None:
-    return B
+    if O is not B:
+      O[...] = B
+    return O
   rows = slice(None) if P is None or P.fold == 1 else P.support(n)
   cols = slice(None) if Q is None or Q.fold == 1 else Q.support(n)
   C = B[rows][:, cols]
@@ -344,23 +347,41 @@ def _projectBlock(B, P, Q, n):
   if Q is not None:
     C = C @ Q.blocks[n]
   if isinstance(rows, slice) and isinstance(cols, slice):
-    B[...] = C
+    O[...] = C
+    return O
+  O[...] = 0
+  # a slice and an index array write as one, ten times faster than the outer index of two arrays
+  if isinstance(rows, slice) or isinstance(cols, slice):
+    O[rows, cols] = C
   else:
-    B[...] = 0
-    B[np.ix_(np.arange(B.shape[0])[rows], np.arange(B.shape[1])[cols])] = C
-  return B
+    O[np.ix_(rows, cols)] = C
+  return O
 
 
-def project(fhat, P, Q):
-  """the compiled projection over the nonzeros where numba is there, the matrix products of
-  _projectBlock otherwise and as its oracle"""
-  from .kernels import projectBlocks
-  if projectBlocks(fhat, P, Q):
+def project(fhat, P, Q, out=None):
+  """the coefficients projected by P on the left and Q on the right, in place or into out, the
+  source then only read: the compiled projection over the nonzeros where numba is there, the
+  matrix products of _projectBlock otherwise and as its oracle"""
+  from .kernels import projectBlocks, projectsSparse
+  if out is not None and (projectsSparse(fhat, P, Q) or out.dtype != fhat.dtype):
+    out[...] = fhat
+    fhat, out = out, None
+  if out is None and projectBlocks(fhat, P, Q):
     return fhat
-  for row in np.asarray(fhat).reshape(-1, fhat.shape[-1]) if fhat.ndim > 1 else (fhat,):
-    for n in range(dim2deg(fhat.shape[-1]) + 1):
-      _projectBlock(degreeBlock(row, n), P, Q, n)
-  return fhat
+  from ..geometry.kernels import _overRows, threads
+  target = fhat if out is None else out
+  rows = zip(np.asarray(fhat).reshape(-1, fhat.shape[-1]), np.asarray(target).reshape(-1, fhat.shape[-1])) if fhat.ndim > 1 else ((fhat, target),)
+  L = dim2deg(fhat.shape[-1])
+  # the degrees over the threads, dealt out in turn since the high ones carry the work; the
+  # blocks are disjoint and the products of BLAS release the lock
+  t = max(1, min(threads(), L + 1))
+  order = np.concatenate([np.arange(c, L + 1, t) for c in range(t)])
+  for src, dst in rows:
+    def call(a, b, src=src, dst=dst):
+      for n in order[a:b]:
+        _projectBlock(degreeBlock(src, n), P, Q, n, degreeBlock(dst, n))
+    _overRows(L + 1, fhat.shape[-1], call)
+  return target
 
 
 def projectLeft(fhat, P):

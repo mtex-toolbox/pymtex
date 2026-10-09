@@ -314,7 +314,7 @@ class SO3FunHarmonic:
       return self._each(lambda f: f.symmetrise())
     L = self.bandwidth
     P, Q = invariantProjection(self.SS, L, self._fhat.real.dtype), invariantProjection(self.CS, L, self._fhat.real.dtype)
-    fhat = project(self._fhat.copy(), P, Q)
+    fhat = project(self._fhat, P, Q, out=np.empty_like(self._fhat))
     if self.antipodal:
       fhat = (fhat + invertedCoefficients(fhat)) / 2
     return self._rebuild(fhat)

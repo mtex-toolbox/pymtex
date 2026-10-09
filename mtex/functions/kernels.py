@@ -748,26 +748,33 @@ def _projectLoop(F, L, order, Pptr, Pr, Pc, Pv, rP, Qptr, Qr, Qc, Qv, rQ, left, 
 _EMPTY = (np.zeros(1, np.int64), np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0, complex))
 
 
+def projectsSparse(fhat, P, Q):
+  """whether projectBlocks takes the coefficients, in place: numba there, a contiguous complex
+  array, and the blocks sparse enough for the loop over their nonzeros"""
+  left = P is not None and not P.isIdentity
+  right = Q is not None and not Q.isIdentity
+  if not (left or right) or backend() != "numba" or fhat.dtype != np.complex128 or not fhat.flags.c_contiguous:
+    return False
+  L = dim2deg(fhat.shape[-1])
+  if (left and len(P.blocks) < L + 1) or (right and len(Q.blocks) < L + 1):
+    return False
+  # dense blocks, the cubic groups', are faster as the matrix products of BLAS
+  return not ((left and _density(P, P.nonzeros(), L) > PROJECT_SPARSE) or (right and _density(Q, Q.nonzeros(), L) > PROJECT_SPARSE))
+
+
 def projectBlocks(fhat, P, Q):
   """True when done: numba there and a complex array of coefficients rows"""
   left = P is not None and not P.isIdentity
   right = Q is not None and not Q.isIdentity
   if not (left or right):
     return True
-  if backend() != "numba" or fhat.dtype != np.complex128:
+  if not projectsSparse(fhat, P, Q):
     return False
   # a contiguous array reshapes to a view, which the loop writes through
-  if not fhat.flags.c_contiguous:
-    return False
   F = fhat.reshape(-1, fhat.shape[-1])
   L = dim2deg(F.shape[1])
-  if (left and len(P.blocks) < L + 1) or (right and len(Q.blocks) < L + 1):
-    return False
   Pn = P.nonzeros() if left else _EMPTY
   Qn = Q.nonzeros() if right else _EMPTY
-  # dense blocks, the cubic groups', are faster as the matrix products of BLAS
-  if (left and _density(P, Pn, L) > PROJECT_SPARSE) or (right and _density(Q, Qn, L) > PROJECT_SPARSE):
-    return False
   _parallel("project", _projectLoop)(F, L, np.arange(L + 1)[::-1].copy(), *Pn, P.fold if left else 1,
                                      *Qn, Q.fold if right else 1, left, right)
   return True
