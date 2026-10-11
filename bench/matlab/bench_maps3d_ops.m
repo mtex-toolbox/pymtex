@@ -3,8 +3,9 @@ function bench_maps3d_ops(out, ops, K, in100, xnovo)
 
 stride = struct('in100', 7, 'xnovo', 3);
 ebsd = []; sim = [];
-if any(endsWith(ops, 'in100')), ebsd = EBSD3.load(in100); end
-if any(strcmp(ops, 'calcgrains3d_sim')), sim = EBSD3.load(xnovo); end
+% a version without the 3D readers leaves the ops that use them out
+if any(endsWith(ops, 'in100')), try, ebsd = EBSD3.load(in100); catch, end, end
+if any(strcmp(ops, 'calcgrains3d_sim')), try, sim = EBSD3.load(xnovo); catch, end, end
 
 % nested functions, since an anonymous one would keep the empty map it was made with
 names = {'load_dream3d','load_xnovo','calcgrains3d_in100','calcgrains3d_sim','kam3d_in100'};

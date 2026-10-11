@@ -26,11 +26,17 @@ ho = orientation(q(HO), cub);
 copts = struct('merge_scale', 1.5, 'merge_tiny_groups', 1, 'use_mex', 0);
 dc06 = []; tw = []; gB = [];
 % dc06 as the GND page loads it
-if any(strcmp(ops,'gnd')), dc06 = EBSD.load(fullfile(mtexDataPath,'EBSD','DC06_2uniax.ang'),'setting',2); end
+% the files of one data directory for every version; a version without what a setup needs
+% leaves the ops that use it out
+data = fullfile(getenv('HOME'), '.mtex', 'data');
+if any(strcmp(ops,'gnd')), try, dc06 = EBSD.load(fullfile(data,'EBSD','DC06_2uniax.ang'),'setting',2); catch, end, end
 if any(strcmp(ops,'gbnd'))
-  tw = mtexdata('twins','silent');
-  grains = calcGrains(tw, 'angle', 5*degree, 'minPixel', 3);
-  gB = grains.boundary('indexed');
+  try
+    tw = mtexdata('twins','silent');
+    grains = calcGrains(tw, 'angle', 5*degree, 'minPixel', 3);
+    gB = grains.boundary('indexed');
+  catch
+  end
 end
 
 col = @(x) double(x(:));

@@ -113,13 +113,8 @@ def run(ops):
                        lambda F: vals(F, V[:10**4])),
   }
   crosscheck.run(OUT, ALGORITHM, table, ops, reps=3, always=("rbf_harmonic", "s2_quadrature"))
-  # the slow variant: the harmonic form against the exact kernel sum, summed through the tree of
-  # the centres, in this port
-  from mtex.functions import rbf
-  from mtex.geometry.symreduce import reductionGroups
-  L, R = reductionGroups(odf.center)
-  q = rotation(ori[:10**4]).data.reshape(-1, 4)
-  exact = odf.c0 + rbf._treeSum(q, odf.center.data.reshape(-1, 4), odf.weights, L, R, odf.antipodal, odf.psi, rbf.supportCosine(odf.psi))
+  # the harmonic form against the exact kernel sum of the radial basis functions
+  exact = np.real(odf.eval(ori[:10**4])).ravel()
   d = np.max(np.abs(np.real(s["F"].eval(ori[:10**4])).ravel() - exact)) / np.max(exact)
   print(f"harmonic form against the exact kernel sum, relative to its maximum: {d:.1e}")
 

@@ -1,7 +1,8 @@
 % the operations of bench/io_ops.py in MATLAB
 function bench_io_ops(out, ops, K)
 
-data = fullfile(mtex_path, 'data');
+% the files of one data directory for every MTEX version, whose own may not hold them
+data = fullfile(getenv('HOME'), 'mtex', 'frameSymmetry', 'data');
 files = struct('load_ctf', fullfile(data,'EBSD','Forsterite.ctf'), 'load_ang', fullfile(data,'EBSD','ferrite.ang'), ...
   'load_osc', fullfile(data,'EBSD','olivineopticalmap.ang'), 'load_1C_1', '/home/hielscher/mtex/data/1C_1.ctf', ...
   'load_ang_SAM', '/home/hielscher/mtex/data/SAM-1-X-clean.ang', 'load_ang_PAGR', '/home/hielscher/mtex/data/PAGR.ang');
@@ -14,7 +15,7 @@ cs = crystalSymmetry('321', [4.916 4.916 5.4054], 'mineral', 'Quartz');
 % the map the export writes, read and turned only when the export is asked for
 turned = [];
 if any(strcmp('export_h5', ops))
-  turned = rotate(EBSD.load(copper29), rotation.byAxisAngle(vector3d(1,1,1), 10*degree), 'keepXY');
+  try, turned = rotate(EBSD.load(copper29), rotation.byAxisAngle(vector3d(1,1,1), 10*degree), 'keepXY'); catch, end
 end
 written = fullfile(out, 'matlab_export_h5.h5oina');
 

@@ -186,7 +186,7 @@ def distortion(s):
   job = trueEbsd(imgList, hops())
   job.resizedList = resized
   job.setOptions(numROI=16)
-  job.calcDistortion("fitErr", verbose=False)
+  job.calcDistortion(fitErr=True, verbose=False)
   s["job"] = job
   return job
 

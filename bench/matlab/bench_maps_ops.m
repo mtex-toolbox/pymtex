@@ -3,15 +3,21 @@ function bench_maps_ops(out, ops, K, large)
 
 A = reshape(fread(fopen(fullfile(out,'map.bin')),'double'),3,[]).'; fclose('all');
 cs = crystalSymmetry('m-3m','mineral','test');
-ebsd = EBSD(vector3d(A(:,1),A(:,2),0), rotation.byAxisAngle(zvector,A(:,3)), ones(size(A,1),1), {cs}, struct());
-xy = [ebsd.pos.x(:) ebsd.pos.y(:)];
+% the positions came first in the constructor from MTEX 6 on, in the properties before
+try
+  ebsd = EBSD(vector3d(A(:,1),A(:,2),0), rotation.byAxisAngle(zvector,A(:,3)), ones(size(A,1),1), {cs}, struct());
+catch
+  ebsd = EBSD(rotation.byAxisAngle(zvector,A(:,3)), ones(size(A,1),1), {cs}, struct('x', A(:,1), 'y', A(:,2)));
+end
+try, xy = [ebsd.pos.x(:) ebsd.pos.y(:)]; catch, xy = [ebsd.prop.x(:) ebsd.prop.y(:)]; end
 grains = []; c = []; big = []; job = []; page = [];
-if any(strcmp(ops,'calcgrains_1C_1')), big = loadNeutral(large); end
-if any(startsWith(ops,'trueebsd')), page = trueEbsdPage; end
+if any(strcmp(ops,'calcgrains_1C_1')), try, big = loadNeutral(large); catch, end, end
+% a version without what a setup needs leaves the ops that use it out
+if any(startsWith(ops,'trueebsd')), try, page = trueEbsdPage; catch, end, end
 % the measured maps as the EBSDDenoising page prepares them
 measured = struct;
 for m = {'twins','ferrite'}
-  if any(endsWith(ops, m{1})), measured.(m{1}) = prepare(m{1}); end
+  if any(endsWith(ops, m{1})), try, measured.(m{1}) = prepare(m{1}); catch, end, end
 end
 
 % nested functions, since an anonymous one would keep the empty grains it was made with
@@ -36,12 +42,16 @@ crosscheckRun(out, T, ops, containers.Map(names, algos([1 1 2 2 3 4 4 5 5 5 5 5 
         a = g.area;
         res = [g.centroid.x(:) g.centroid.y(:) a(:)];
       case 'calcgrains'
-        [grains, ebsd] = calcGrains(ebsd, 'angle', 5*degree);
+        % the second output is the map in the newer versions, its grain ids in the older
+        [grains, second] = calcGrains(ebsd, 'angle', 5*degree);
+        if isa(second, 'EBSD'), ebsd = second; else, ebsd.grainId = second; end
         c = [grains.centroid.x(:) grains.centroid.y(:)];
         res = grains;
       case 'perimeter', res = grains.perimeter;
       case 'aspect', res = grains.aspectRatio;
-      case 'smooth_boundary', res = smoothBoundary(grains, 5);
+      case 'smooth_boundary'
+        % smooth(grains, n) before smoothBoundary was its name
+        if exist('smoothBoundary', 'file') || ismethod(grains, 'smoothBoundary'), res = smoothBoundary(grains, 5); else, res = smooth(grains, 5); end
       case 'kam', res = ebsd.KAM;
       case 'grod', res = angle(ebsd.calcGROD(grains));
       % a fresh job on the matched grid, since calcDistortion alters the one it runs on

@@ -19,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 BRIDGE = os.path.join(os.path.dirname(ROOT), "master", "docs", "agents", "matlab-bridge")
 JULIA = [os.path.expanduser("~/.juliaup/bin/julia"), "--project=" + os.path.join(os.path.dirname(ROOT), "mtexJulia", "dev"), "-t", "auto"]
 PORTS = ("python", "matlab", "julia")
+MATLAB = os.environ.get("MATLAB", "/opt/matlab-2024b/bin/matlab")
 
 
 # table: op -> (call, results as rows); ops run in table order, the ones not asked for only when
@@ -40,11 +41,19 @@ def run(out, algorithms, table, ops, reps=5, always=()):
     print(f"{op:20s} {1e3 * best:9.1f} ms {cores:5.1f} cores", flush=True)
 
 
+# the MATLAB half through the bridge; with MTEX_BATCH_ROOT set, in a MATLAB of its own on the MTEX
+# there, its version's operations that fail left out, as bench/mtex_versions.py compares versions
 def matlab(script, *args, timeout=290):
   cmd = (f"addpath('{os.path.join(ROOT, 'bench', 'matlab')}'); addpath('{HERE}'); "
          f"{script}({', '.join(args)});")
-  r = subprocess.run([os.path.join(BRIDGE, ".venv", "bin", "python"), os.path.join(BRIDGE, "matlab_run.py"), cmd],
-                     timeout=timeout)
+  root = os.environ.get("MTEX_BATCH_ROOT")
+  if root:
+    tolerant = os.path.join(ROOT, "bench", "matlab", "versions")
+    cmd = f"cd('{root}'); startup_mtex; cd('{ROOT}'); " + cmd.replace(f"{script}(", f"addpath('{tolerant}'); {script}(", 1)
+    r = subprocess.run([MATLAB, "-batch", cmd])
+  else:
+    r = subprocess.run([os.path.join(BRIDGE, ".venv", "bin", "python"), os.path.join(BRIDGE, "matlab_run.py"), cmd],
+                       timeout=timeout)
   if r.returncode:
     sys.exit(f"MATLAB failed in {script}")
 
