@@ -170,25 +170,25 @@ MTEX_COLORS = np.array([
   (0.0, 0.669291, 0.571429)])
 
 
-# ind2color(i): the i-th colour of MTEX's colour order, MATLAB's counting from one
-# ind2color(i): the colour of index i of the order, one RGB row per index of an array, NaN
-# where the index is 0 or NaN; 'ordered' takes MATLAB's order in which neighbouring ids get
-# related colours, a matrix of colours an order of its own
+# ind2color(i): the colour of index i of MTEX's colour order, counted from 0 where MATLAB counts
+# from 1, one RGB row per index of an array, NaN where the index is negative or NaN; 'ordered'
+# takes MATLAB's order in which neighbouring ids get related colours, a matrix of colours an
+# order of its own
 ORDERED = np.array([1, 6, 19, 12, 20, 22, 3, 11, 18, 16, 23, 8, 7, 2, 14, 15, 9, 5, 21, 4, 24, 13, 10, 17]) - 1
 
 
 def ind2color(i, cmap=None):
-  """the colour of the id i in MTEX's colour order, ids counting from one as MATLAB's; an RGB row
-  per id of an array, NaN where the id is 0 or NaN
+  """the colour of the index i in MTEX's colour order, counting from 0 (MATLAB counts from 1); an
+  RGB row per index of an array, NaN where the index is negative or NaN
 
     ind2color(i)
     ind2color(ids, 'ordered')     the order in which neighbouring ids get related colours
     ind2color(ids, cmap)          a matrix of colours as the order"""
   colors = MTEX_COLORS[ORDERED] if isinstance(cmap, str) and cmap == "ordered" else MTEX_COLORS if cmap is None else np.asarray(cmap, dtype=float)
   if np.ndim(i) == 0:
-    return colors[(int(i) - 1) % len(colors)].copy()
+    return colors[int(i) % len(colors)].copy()
   ind = np.asarray(i, dtype=float).reshape(-1)
   out = np.full((len(ind), 3), np.nan)
-  ok = np.isfinite(ind) & (ind > 0)
-  out[ok] = colors[(ind[ok].astype(int) - 1) % len(colors)]
+  ok = np.isfinite(ind) & (ind >= 0)
+  out[ok] = colors[ind[ok].astype(int) % len(colors)]
   return out

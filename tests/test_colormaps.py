@@ -86,3 +86,11 @@ def test_mtexColorMap_setsTheMapOfAPlainFigureButNotItsFixedColours():
   assert filled.get_cmap().name == mtexColormap("LaboTeX").name
   assert np.allclose(lines.get_edgecolor()[0][:3], 0)
   plt.close("all")
+
+
+# the colour order is indexed from 0 (MATLAB from 1), a negative or NaN index has no colour
+def test_ind2color_countsFromZero():
+  from mtex.plotting.colormaps import MTEX_COLORS, ind2color
+  assert np.array_equal(ind2color(0), MTEX_COLORS[0]) and np.array_equal(ind2color(len(MTEX_COLORS)), MTEX_COLORS[0])
+  c = ind2color(np.array([0, 1, -1, np.nan]))
+  assert np.array_equal(c[:2], MTEX_COLORS[:2]) and np.isnan(c[2:]).all()

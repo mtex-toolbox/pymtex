@@ -228,7 +228,7 @@ print(f'halfwidth for optimalSample: {np.exp(pHwOpt[1]):.1f} degree * M^{pHwOpt[
 # +
 Mf = np.logspace(np.log10(M[0]), np.log10(M[-1]), 100)
 evalLaw = lambda p, x: np.exp(np.polyval(p, np.log(x)))
-cRand, cOpt = ind2color(1), ind2color(2)
+cRand, cOpt = ind2color(0), ind2color(1)
 
 # an ordinary matplotlib figure of its own
 plt.figure()

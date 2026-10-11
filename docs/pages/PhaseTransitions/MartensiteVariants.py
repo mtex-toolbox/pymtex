@@ -84,16 +84,16 @@ hFcc = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1]], csAus)
 
 plotPF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 
-nextAxis(1)
+nextAxis(0)
 hold(True)
 plot(parentOri * hFcc[0].symmetrise(), markerFaceColor='r')
 xlabel('(100)', color='red')
 
-nextAxis(2)
+nextAxis(1)
 plot(parentOri * hFcc[2].symmetrise(), markerFaceColor='r')
 xlabel('(111)', color='red')
 
-nextAxis(3)
+nextAxis(2)
 plot(parentOri * hFcc[1].symmetrise(), markerFaceColor='r')
 xlabel('(110)', color='red')
 hold(False)
@@ -206,7 +206,7 @@ variantId, packetId, bainId, _ = calcVariantId(parentOri, childOri, p2cIter)
 # Ordered colours give nearby variant IDs related colours. In the pole figures, overlap makes
 # the individual coloured points difficult to distinguish.
 
-variantColor = ind2color(variantId, 'ordered')
+variantColor = ind2color(variantId - 1, 'ordered')
 plotPF(childOri, variantColor, hBcc, markerSize=5)
 
 # The axis-angle plot separates the clusters. Each compact colour cluster is a group of
@@ -224,20 +224,20 @@ plot(childOri, variantColor, 'axisAngle')
 # ID identifies that group.
 
 # +
-packetColor = ind2color(packetId)
+packetColor = ind2color(packetId - 1)
 plotPF(childOri, packetColor, hBcc, markerSize=5, points=1000)
 
-nextAxis(1)
+nextAxis(0)
 hold(True)
 opt = dict(markerFaceColor='none', markerEdgeColor='k', lineWidth=3)
 plot(parentOri * hFcc[0].symmetrise(), **opt)
 xlabel('(100)', color='red')
 
-nextAxis(2)
+nextAxis(1)
 plot(parentOri * hFcc[2].symmetrise(), **opt)
 xlabel('(111)', color='red')
 
-nextAxis(3)
+nextAxis(2)
 plot(parentOri * hFcc[1].symmetrise(), **opt)
 xlabel('(110)', color='red')
 hold(False)
@@ -265,19 +265,19 @@ plot(grains['Fe'], packetColor)
 # levels of one hierarchy.
 
 # +
-bainColor = ind2color(bainId)
+bainColor = ind2color(bainId - 1)
 plotPF(childOri, bainColor, hBcc, markerSize=5, points=1000)
 
-nextAxis(1)
+nextAxis(0)
 hold(True)
 plot(parentOri * hFcc[0].symmetrise(), **opt)
 xlabel('(100)', color='red')
 
-nextAxis(2)
+nextAxis(1)
 plot(parentOri * hFcc[2].symmetrise(), **opt)
 xlabel('(111)', color='red')
 
-nextAxis(3)
+nextAxis(2)
 plot(parentOri * hFcc[1].symmetrise(), **opt)
 xlabel('(110)', color='red')
 hold(False)

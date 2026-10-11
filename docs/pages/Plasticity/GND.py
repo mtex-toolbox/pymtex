@@ -155,7 +155,7 @@ kappa12.shape
 newMtexFigure(layout=[3, 3], figSize='large')
 for i in range(3):
   for j in range(3):
-    nextAxis(i + 1, j + 1)
+    nextAxis(i, j)
     plot(ebsd, kappaMeasured.M[..., i, j], micronbar='off')
     hold(True)
     plot(grains.boundary, lineWidth=2)
@@ -254,7 +254,7 @@ kappaFitted[2, 1]
 newMtexFigure(layout=[3, 3], figSize='large')
 for i in range(3):
   for j in range(3):
-    nextAxis(i + 1, j + 1)
+    nextAxis(i, j)
     plot(ebsd, kappaFitted.M[..., i, j], micronbar='off')
     hold(True)
     plot(grains.boundary, lineWidth=2)

@@ -254,7 +254,7 @@ def test_nextAxis_leavesTheAxesItMakesOnTheWayBlank():
   from mtex import gcm, newMtexFigure, nextAxis, plot, vector3d
   newMtexFigure(layout=[1, 3])
   plot(vector3d.X, upper=True)
-  nextAxis(1, 3)
+  nextAxis(0, 2)
   assert not gcm().children[1].axison
 
 
@@ -285,13 +285,13 @@ def test_nextAxis_ofAnOccupiedCellRepaintsItAndHoldOverlays():
   plot(up(30), upper=True)
   nextAxis()
   plot(up(20), upper=True)
-  nextAxis(1)
+  nextAxis(0)
   plot(up(5), upper=True)
   assert len(fig.children) == 2 and points(fig.children[0]) == 5 and points(fig.children[1]) == 20
   # the repainted cell draws its own frame again
   assert fig.children[0]._mtexSphericalPlot is not None
   # hold overlays what the cell holds
-  nextAxis(2)
+  nextAxis(1)
   hold(True)
   plot(up(3), upper=True)
   hold(False)

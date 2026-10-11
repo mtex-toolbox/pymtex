@@ -408,7 +408,7 @@ def test_text_goes_where_nextAxis_points_in_a_held_figure():
     if k:
       nextAxis()
     plot(S2FunHarmonic(lambda v: v.z ** 2, bandwidth=4), upper=True)
-  nextAxis(1, 2)
+  nextAxis(0, 1)
   hold(True)
   text(xvector, ["a"])
   hold(False)
@@ -423,7 +423,7 @@ def test_circle_annotates_the_plot_nextAxis_picks_without_hold():
   plot(vector3d.rand(20, rng=rng), upper=True)
   nextAxis()
   plot(vector3d.rand(20, rng=rng), upper=True)
-  nextAxis(1)
+  nextAxis(0)
   circle(zvector, 30 * degree)
   ax = gcm().children[0]
   assert hasattr(ax, "_mtexSphericalPlot") and len(ax.collections) > 0 and len(ax.lines) > 0

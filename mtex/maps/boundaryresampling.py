@@ -136,7 +136,7 @@ def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
   if gB.isempty or n <= 1:
     return gB
   starts = np.flatnonzero(gB.isChainStart)
-  pos = np.arange(len(gB)) - starts[gB.chainId - 1] + 1
+  pos = np.arange(len(gB)) - starts[gB.chainId] + 1
   keep = mustKeep(gB, protect) | (pos % n == 0)
   return _finish(gB, keep, keepGrains)
 

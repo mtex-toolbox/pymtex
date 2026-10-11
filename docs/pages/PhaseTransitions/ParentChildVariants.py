@@ -59,17 +59,17 @@ oriChild
 plotPF(oriParent, Miller(1, 1, 0, csBeta), markerSize=20, markerFaceColor='none', lineWidth=4, layout=[1, 2])
 hold(True)
 plot(oriChild.symmetrise() * Miller(0, 0, 0, 1, csAlpha), markerSize=12)
-xlabel(Miller(0, 0, 0, 1, csAlpha).char(), color=ind2color(2))
+xlabel(Miller(0, 0, 0, 1, csAlpha).char(), color=ind2color(1))
 hold(False)
 
 # [111] / [2-1-10] pole figure
-nextAxis(2)
+nextAxis(1)
 plotPF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', markerSize=20, markerFaceColor='none', lineWidth=4)
 
 dAlpha = Miller(2, -1, -1, 0, csAlpha, 'uvw')
 hold(True)
 plot(oriChild.symmetrise() * dAlpha, markerSize=12)
-xlabel(dAlpha.char(), color=ind2color(2))
+xlabel(dAlpha.char(), color=ind2color(1))
 hold(False)
 gcm().drawNow()
 # -
@@ -116,7 +116,7 @@ plotIPF(oriChild, vector3d.Z)
 oriChild = variants(beta2alpha, oriParent)
 
 for i in range(1, 13):
-  plotIPF(oriChild[i - 1], ind2color(i), vector3d.Z, label=i, markerEdgeColor='k')
+  plotIPF(oriChild[i - 1], ind2color(i - 1), vector3d.Z, label=i, markerEdgeColor='k')
   hold(True)
 hold(False)
 # -

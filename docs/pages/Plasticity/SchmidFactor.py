@@ -118,7 +118,7 @@ sSAll
 newMtexFigure(layout=[3, 4])
 for k in range(len(sSAll)):
   # the panels are filled column by column
-  nextAxis(k % 3 + 1, k // 3 + 1)
+  nextAxis(k % 3, k // 3)
   plot(cS, faceAlpha=0.5)
   mtexTitle(f'{k + 1}: ' + sSAll[k].char('latex'))
   hold(True)

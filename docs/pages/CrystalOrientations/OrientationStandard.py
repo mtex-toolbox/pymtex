@@ -103,7 +103,7 @@ bestDifference
 
 # +
 for i in range(len(components)):
-  plot(components[i], 'bunge', markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plot(components[i], 'bunge', markerSize=10, markerFaceColor=ind2color(i), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='southoutside', numColumns=3)
@@ -121,7 +121,7 @@ legend(location='southoutside', numColumns=3)
 
 # +
 for i in range(len(components)):
-  plotSection(components[i], add2all=True, markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotSection(components[i], add2all=True, markerSize=10, markerFaceColor=ind2color(i), displayName=legendNames[i])
 
 legend(location='southeast')
 # -
@@ -138,7 +138,7 @@ legend(location='southeast')
 
 # +
 for i in range(len(components)):
-  plot(components[i], 'axisAngle', markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plot(components[i], 'axisAngle', markerSize=10, markerFaceColor=ind2color(i), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='southoutside', numColumns=3)
@@ -157,7 +157,7 @@ h = Miller([[1, 0, 0], [1, 1, 0], [1, 1, 1], [3, 1, 1]], cs)
 
 # +
 for i in range(len(components)):
-  plotPF(components[i], h, markerSize=10, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotPF(components[i], h, markerSize=10, markerFaceColor=ind2color(i), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='northeast', numColumns=2)
@@ -175,7 +175,7 @@ r = cat(vector3d.X, vector3d.Y, vector3d.Z)
 
 # +
 for i in range(len(components)):
-  plotIPF(components[i], r, markerSize=(12 - i - 1) ** 1.5, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotIPF(components[i], r, markerSize=(12 - i - 1) ** 1.5, markerFaceColor=ind2color(i), displayName=legendNames[i])
   hold(True)
 hold(False)
 legend(location='northeast', numColumns=2)
@@ -231,7 +231,7 @@ hold(True)
 plotSection(odf, contour=True, lineColor='k', lineWidth=2)
 
 for i in range(len(components)):
-  plotSection(components[i], markerSize=10, filled=True, markerFaceColor=ind2color(i + 1), displayName=legendNames[i])
+  plotSection(components[i], markerSize=10, filled=True, markerFaceColor=ind2color(i), displayName=legendNames[i])
 
 hold(False)
 # -

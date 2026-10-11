@@ -11,6 +11,10 @@ phase, and pushes once at the end.
 - **Public indices count from zero.** `nextAxis`, `ind2color`, the boundary chain ids (`chainId`,
   `entry`, `kOf`), `loadODF`'s column numbers and every other public index that is one-based as in
   MATLAB. The docstring names MATLAB's one-based meaning where a MATLAB user would look for it.
+  Labels stay as they are: grain ids (0 is no grain), variant and packet numbers in MTEX's
+  numbering, the phase numbers a vendor file writes. One exception kept: the tile centres of
+  `xcfROIGrid` follow MATLAB's pixel arithmetic, so that the `trueEbsd` registration stays
+  MATLAB's tile for tile, as it was checked.
 - **Keywords only for flags.** A string that duplicates a keyword (`'antipodal'` beside
   `antipodal=True`, `'complete'`, `'smooth'`, ...) goes; a positional string stays only where it
   names something (`'uvw'`, `'ZYZ'`, `'X||a'`, `'Reuss'`, a phase name), as CLAUDE.md says.

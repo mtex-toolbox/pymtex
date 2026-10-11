@@ -148,19 +148,19 @@ hold(False)
 # +
 newMtexFigure(layout=[2, 4])
 wbvDenoised = weightedBurgersVec(ebsd)
-nextAxis(1, 1)
+nextAxis(0, 0)
 plot(ebsd, wbvDenoised.norm())
 mtexTitle('denoised / box = 3')
-nextAxis(2, 1)
+nextAxis(1, 0)
 plot(wbvDenoised, weights=wbvDenoised.norm(), contourf=True, antipodal=True)
 mtexTitle('direction distribution')
 
 for ws in [1, 2, 3]:
   wbvWindow = weightedBurgersVec(ebsdNoisy, windowSize=ws)
-  nextAxis(1, ws + 1)
+  nextAxis(0, ws)
   plot(ebsdNoisy, wbvWindow.norm())
   mtexTitle(f'noisy / box = {2 * ws + 1}')
-  nextAxis(2, ws + 1)
+  nextAxis(1, ws)
   plot(wbvWindow, weights=wbvWindow.norm(), contourf=True, antipodal=True)
   mtexTitle('direction distribution')
 
@@ -199,7 +199,7 @@ cKGradient = HSVDirectionKey(wbvGradientDefault)
 plot(ebsd, cKGradient.direction2color(wbvGradientDefault),
      faceAlpha=np.minimum(np.nan_to_num(wbvGradientDefault.norm()) / 0.2, 1))
 mtexTitle('gradient WBV in specimen coordinates')
-nextAxis(1, 2)
+nextAxis(0, 1)
 plot(wbvGradientDefault, weights=wbvGradientDefault.norm(), antipodal=True, contourf=True)
 mtexTitle('direction distribution')
 # -
@@ -236,10 +236,10 @@ wbvGradient = [weightedBurgersVec(ebsd, 'gradient', stencil=s) for s in stencils
 
 newMtexFigure(layout=[2, 3])
 for k, s in enumerate(stencils):
-  nextAxis(1, k + 1)
+  nextAxis(0, k)
   plot(ebsd, wbvGradient[k].norm(), micronbar='off')
   mtexTitle(f'WBV norm / {s}')
-  nextAxis(2, k + 1)
+  nextAxis(1, k)
   plot(wbvGradient[k], weights=wbvGradient[k].norm(), contourf=True, antipodal=True)
   mtexTitle('direction distribution')
 mtexColorbar()

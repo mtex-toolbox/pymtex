@@ -158,8 +158,9 @@ class grainBoundary:
 
   @property
   def chainId(self):
-    """the chain of every segment, from the walk order and the junctions: a chain breaks
-    where the head of one segment is not the tail of the next, and at a junction"""
+    """the chain of every segment, counted from 0, from the walk order and the junctions: a chain
+    breaks where the head of one segment is not the tail of the next, and at a junction (MATLAB
+    counts the chains from 1)"""
     if "chainId" not in self._memo:
       n = len(self)
       if n == 0:
@@ -167,7 +168,7 @@ class grainBoundary:
       else:
         jct = self.isJunction
         brk = (self.F[1:, 0] != self.F[:-1, 1]) | jct[self.F[1:, 0]]
-        self._memo["chainId"] = np.concatenate([[1], 1 + np.cumsum(brk)]).astype(np.int32)
+        self._memo["chainId"] = np.concatenate([[0], np.cumsum(brk)]).astype(np.int32)
     return self._memo["chainId"]
 
   @property
@@ -196,7 +197,7 @@ class grainBoundary:
       return np.zeros(0, dtype=bool)
     starts, ends = np.flatnonzero(self.isChainStart), np.flatnonzero(self.isChainEnd)
     closed = self.F[ends, 1] == self.F[starts, 0]
-    return closed[cid - 1]
+    return closed[cid]
 
   @property
   def arcLength(self):
@@ -206,7 +207,7 @@ class grainBoundary:
     cum = np.cumsum(L)
     starts = np.flatnonzero(self.isChainStart)
     before = np.concatenate([[0.0], cum])[starts]
-    return cum - before[cid - 1]
+    return cum - before[cid]
 
   @property
   def chainLength(self):
@@ -401,7 +402,7 @@ class grainBoundary:
     cid = self.chainId
     first, last = np.flatnonzero(self.isChainStart), np.flatnonzero(self.isChainEnd)
     closed = self.isClosed
-    a, b = first[cid - 1], last[cid - 1]
+    a, b = first[cid], last[cid]
     length = b - a + 1
     i = np.arange(nF)
     m = np.maximum(0, np.minimum(n, (length - 2) // 2))
@@ -458,7 +459,7 @@ class grainBoundary:
     lines = [f"grainBoundary ({frameLabel(self.frame)})"]
     if self.isempty:
       return aligned(lines[0] + "\n  the boundary is empty")
-    lines.append(f"  size: {len(self)} segments, {int(self.chainId.max())} chains")
+    lines.append(f"  size: {len(self)} segments, {int(self.chainId.max()) + 1} chains")
     key = np.sort(self.phaseId, axis=1)
     pairs, inverse = np.unique(key, axis=0, return_inverse=True)
     L = np.bincount(inverse.reshape(-1), weights=self.segLength)
@@ -808,7 +809,7 @@ def _walkOrder(F, V, leftOf):
   head = entry[perm] == 1
   F1 = np.where(head[:, None], F[perm], F[perm][:, ::-1])
   jct = (deg != 2) & (deg > 0)
-  cid = np.concatenate([[1], 1 + np.cumsum((F1[1:, 0] != F1[:-1, 1]) | jct[F1[1:, 0]])])
+  cid = np.concatenate([[0], np.cumsum((F1[1:, 0] != F1[:-1, 1]) | jct[F1[1:, 0]])])
   starts = np.flatnonzero(np.concatenate([[True], cid[1:] != cid[:-1]]))
   v1 = V[F1[starts, 0]]
   d = V[F1[starts, 1]] - v1
@@ -819,7 +820,7 @@ def _walkOrder(F, V, leftOf):
   ends = np.concatenate([starts[1:], [len(F1)]])
   run = np.repeat(np.arange(len(starts)), ends - starts)
   order = np.arange(len(F1))
-  rows = flip[cid - 1]
+  rows = flip[cid]
   order[rows] = (starts + ends - 1)[run[rows]] - order[rows]
   F2 = F1[order]
   F2[rows] = F2[rows][:, ::-1]
@@ -830,7 +831,7 @@ def _walkOrder(F, V, leftOf):
 # row: a chain breaks where the head of one segment is not the tail of the next, and at a
 # junction, a vertex where other than two segments meet
 def _orientLoop(F, perm, entry, deg, F1, cid):
-  c = 0
+  c = -1
   for i in range(perm.shape[0]):
     k = perm[i]
     if entry[k] == 1:
@@ -847,7 +848,7 @@ def _orientLoop(F, perm, entry, deg, F1, cid):
 # s + e - 1 - i with its segment reversed
 def _turnLoop(F1, perm, cid, starts, ends, flip, idx, F2):
   for i in prange(F1.shape[0]):
-    c = cid[i] - 1
+    c = cid[i]
     if flip[c]:
       j = starts[c] + ends[c] - 1 - i
       idx[i] = perm[j]
@@ -870,8 +871,8 @@ def orderWalk(gB):
   out = gB._with(F=F, grainId=gB.grainId[perm], ebsdId=gB.ebsdId[perm], phaseId=gB.phaseId[perm], misrotation=gB.misrotation.data[perm])
   out = out._flipSegments(~head)._with(F=F)
   cid = out.chainId
-  kept = np.bincount(cid, weights=head)[1:]
-  total = np.bincount(cid)[1:]
+  kept = np.bincount(cid, weights=head)
+  total = np.bincount(cid)
   flip = 2 * kept < total
   if not flip.any():
     return out
@@ -887,7 +888,7 @@ def reverseChains(gB, cid, flip):
   ends = np.concatenate([starts[1:], [n]])
   run = np.repeat(np.arange(len(starts)), ends - starts)
   order = np.arange(n)
-  rows = flip[cid - 1]
+  rows = flip[cid]
   order[rows] = (starts + ends - 1)[run[rows]] - order[rows]
   F = gB.F[order]
   F[rows] = F[rows][:, ::-1]

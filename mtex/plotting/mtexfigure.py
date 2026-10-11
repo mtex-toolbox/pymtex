@@ -353,24 +353,25 @@ def newMtexFigure(n=1, **kwargs):
 
 def nextAxis(k=None, j=None, fig=None):
   """nextAxis: the next plot goes into the next axes of the current figure; nextAxis(k) into
-  the k-th, nextAxis(i, j) into the one in row i and column j, counted from one as in MATLAB"""
+  the axes k, nextAxis(i, j) into the one in row i and column j, all counted from 0 (MATLAB
+  counts them from 1)"""
   fig = gcm() if fig is None else fig
   if fig is None:
     fig = mtexFigure()
   if j is not None:
-    k = (int(k) - 1) * fig.ncols + int(j)
+    k = int(k) * fig.ncols + int(j)
   # an axes prepared stays blank until a plot takes it, as MATLAB leaves an unused cell
   if k is None:
     fig.pending = fig.nextAxis()
     fig.pending.set_axis_off()
     fig.pending._mtexBlank = True
-  # the axes up to the k-th that do not exist yet are made, blank
+  # the axes up to k that do not exist yet are made, blank
   else:
-    while len(fig.children) < int(k):
+    while len(fig.children) <= int(k):
       ax = fig.nextAxis()
       ax.set_axis_off()
       ax._mtexBlank = True
-    fig.pending = fig.children[int(k) - 1]
+    fig.pending = fig.children[int(k)]
   return fig.pending
 
 

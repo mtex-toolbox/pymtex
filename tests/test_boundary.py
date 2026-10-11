@@ -102,9 +102,9 @@ def test_grainBoundary_walkOrderIsAnInvariant(A):
   # inside a chain, the head of one segment is the tail of the next, and no chain runs through a junction
   assert np.all(gB.F[1:, 0][same] == gB.F[:-1, 1][same])
   assert not np.any(gB.isJunction[gB.F[1:, 0][same]])
-  assert gB.isChainStart.sum() == cid.max() == gB.isChainEnd.sum()
+  assert gB.isChainStart.sum() == cid.max() + 1 == gB.isChainEnd.sum()
   cs = gB.chainSize
-  assert all(cs[k] == np.sum(cid == cid[k]) for k in range(len(cid))) and np.sum(np.bincount(cid)[1:]) == len(gB)
+  assert all(cs[k] == np.sum(cid == cid[k]) for k in range(len(cid))) and np.sum(np.bincount(cid)) == len(gB)
 
 
 def test_grainBoundary_firstGrainLiesLeftOfTheWalk():
@@ -121,7 +121,7 @@ def test_grainBoundary_blockMapHasTheBoundariesItMust():
   # four grains of 10 x 10 on a 20 x 20 map: the outer border is 80 long and cut at four
   # triple points, the inner cross 40 and cut at the quadruple point
   gB = blockBoundary()
-  assert close(gB.perimeter(), 120) and gB.chainId.max() == 8
+  assert close(gB.perimeter(), 120) and gB.chainId.max() == 7
   assert sorted(set(gB.chainSize.tolist())) == [10, 20] and gB.isJunction.sum() == 5
   tp = gB.triplePoints
   assert tp.isempty and tp.grainId.shape == (0, 3)
@@ -151,7 +151,7 @@ def test_grainBoundary_arcLengthRestartsWithEveryChain():
   a = gB.arcLength
   assert close(a[gB.isChainStart], gB.segLength[gB.isChainStart]) and close(a[gB.isChainEnd], gB.chainSize[gB.isChainEnd])
   assert close(gB.chainLength, gB.chainSize)
-  assert np.sum(gB.chainV == -1) == gB.chainId.max() - 1
+  assert np.sum(gB.chainV == -1) == gB.chainId.max()
 
 
 def test_grainBoundary_misorientationCarriesTheExchangeSymmetry():
@@ -254,7 +254,7 @@ def test_curvature_ofARightAngle():
 
 def test_curvature_isNanAtTheEndsOfAnOpenChain():
   gB = blockBoundary()
-  open1 = gB[gB.chainId == 1]
+  open1 = gB[gB.chainId == 0]
   assert not open1.isClosed.any() and np.array_equal(np.flatnonzero(np.isnan(open1.curvature())), [0, len(open1) - 1])
 
 
@@ -303,7 +303,7 @@ def test_orderWalk_ofAnOrderedBoundaryChangesNothing():
 def test_chainNeighbors_areTheRowsOfTheChain():
   gB = blockBoundary()
   prev, nxt, hasPrev, hasNext = gB.chainNeighbors()
-  assert (~hasPrev).sum() == (~hasNext).sum() == gB.chainId.max()
+  assert (~hasPrev).sum() == (~hasNext).sum() == gB.chainId.max() + 1
   cid = gB.chainId
   assert np.all(prev[1:][cid[1:] == cid[:-1]] == np.arange(1, len(gB))[cid[1:] == cid[:-1]] - 1)
 

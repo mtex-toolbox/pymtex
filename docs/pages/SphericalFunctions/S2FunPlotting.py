@@ -49,7 +49,7 @@ mtexColorbar(title='function value')
 newMtexFigure(layout=[1, 2])
 contour(sF1, upper=True)
 mtexTitle('Contour lines')
-nextAxis(1, 2)
+nextAxis(0, 1)
 contourf(sF1, upper=True)
 mtexTitle('Filled contours')
 

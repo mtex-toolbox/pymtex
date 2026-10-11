@@ -70,7 +70,8 @@ def _loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=N
     names = ["Euler 1", "Euler 2", "Euler 3", "weights"][:d.shape[1]]
   else:
     names = list(columnNames)
-  cols = list(range(len(names))) if columns is None else [int(c) - 1 for c in columns]
+  # the columns count from 0, where MATLAB's loadODF counts them from 1
+  cols = list(range(len(names))) if columns is None else [int(c) for c in columns]
   angleCols, weightCol = [None] * 3, None
   for name, c in zip(names, cols):
     key = name.strip().lower()

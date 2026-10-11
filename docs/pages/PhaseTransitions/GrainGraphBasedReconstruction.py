@@ -251,7 +251,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 # +
 job.calcVariants()
 
-packetColor = ind2color(job.transformedGrains.packetId)
+packetColor = ind2color(job.transformedGrains.packetId - 1)
 plot(job.transformedGrains, packetColor, faceAlpha=0.5)
 
 hold(True)

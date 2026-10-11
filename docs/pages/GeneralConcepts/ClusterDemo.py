@@ -41,7 +41,7 @@ scatter(v, markerAlpha=0.2, markerSize=2)
 # +
 cInd, center = calcCluster(v)
 
-plot(v, ind2color(cInd + 1), markerAlpha=0.2, markerSize=2)
+plot(v, ind2color(cInd), markerAlpha=0.2, markerSize=2)
 annotate(center)
 # -
 
@@ -72,7 +72,7 @@ vSym = cat(v, -v)
 
 cInd, center = calcCluster(vSym)
 
-plot(vSym, ind2color(cInd + 1))
+plot(vSym, ind2color(cInd))
 annotate(center)
 # -
 
@@ -84,7 +84,7 @@ annotate(center)
 vSym.antipodal = True
 cInd, center = calcCluster(vSym)
 
-plot(vSym, ind2color(cInd + 1), markerAlpha=0.2, markerSize=2)
+plot(vSym, ind2color(cInd), markerAlpha=0.2, markerSize=2)
 annotate(center)
 # -
 
@@ -134,7 +134,7 @@ plot(ori, add2all=True, markerSize=3, markerAlpha=0.25, all=True)
 # +
 cId, center = calcCluster(ori, method='classix', radius=0.1, minPoints=100)
 
-plotSection(ori, ind2color(cId + 1), markerSize=3, markerAlpha=0.25, all=True)
+plotSection(ori, ind2color(cId), markerSize=3, markerAlpha=0.25, all=True)
 annotate(center)
 # -
 

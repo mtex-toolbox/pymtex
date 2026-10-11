@@ -152,7 +152,7 @@ C_cpx = transformReferenceFrame(C_cpx, ebsd['Diopside'].CS)
 plotSeismicVelocities(C_Fo)
 
 # Add crystal-axis labels to the S-wave anisotropy panel.
-nextAxis(1, 2)
+nextAxis(0, 1)
 hold(True)
 text(Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], CS_Tensor_Fo), ['[100]', '[010]', '[001]'], backgroundColor='w')
 hold(False)

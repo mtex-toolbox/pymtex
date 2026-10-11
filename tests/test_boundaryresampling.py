@@ -33,7 +33,7 @@ def test_B14_coarsening_keeps_every_nth_vertex_and_the_topology_with_it():
     # chain of this map is straight
     assert close(r.perimeter(), 120)
     # the junctions stay where they are, so the network is the same one
-    assert r.chainId.max() == 8 and r.triplePoints.isempty
+    assert r.chainId.max() == 7 and r.triplePoints.isempty
     assert set(r.F.reshape(-1)) <= set(gB.F.reshape(-1))
     cid = r.chainId
     same = cid[1:] == cid[:-1]
@@ -83,13 +83,13 @@ def test_B16_refining_resamples_at_a_constant_spacing():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   r = gB.refine(0.5)
   assert len(r) == 240 and close(r.segLength, 0.5) and close(r.perimeter(), 120)
-  assert r.chainId.max() == 8 and r.triplePoints.isempty
+  assert r.chainId.max() == 7 and r.triplePoints.isempty
   # the vertices that may not move are still there, the new ones appended
   assert set(gB.F[gB.isChainEnd, 1]) <= set(r.F.reshape(-1))
   assert np.array_equal(r.V[:len(gB.V)], gB.V)
   # a piece is resampled between the vertices it may not move, so a chain of ten unit
   # segments becomes twenty of a half, wherever the sample falls
-  assert all(np.count_nonzero(r.chainId == c) in (20, 40) for c in range(1, 9))
+  assert all(np.count_nonzero(r.chainId == c) in (20, 40) for c in range(8))
   # a half pixel piece lies within one original segment and keeps its pair of pixels
   assert np.all(r.ebsdId[r.grainId.min(axis=1) > 0] >= 0)
   # the samples lie on the old boundary, so a closed chain keeps its area

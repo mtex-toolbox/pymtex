@@ -38,7 +38,7 @@ plot(vector3d(-1, 1, 1), upper=True, markerSize=8)
 # to fill the layout in any order and to leave positions empty.
 
 # +
-nextAxis(2, 3)
+nextAxis(1, 2)
 
 plot(vector3d.rand(200), upper=True)
 # -
@@ -54,7 +54,7 @@ plot(vector3d.rand(200), upper=True)
 # already holds.
 
 # +
-nextAxis(2, 3)
+nextAxis(1, 2)
 
 plot(vector3d(1, -1, 1), upper=True, markerSize=8)
 # -
@@ -72,7 +72,7 @@ plot(vector3d(1, -1, 1), upper=True, markerSize=8)
 # plots of directions.
 
 # +
-nextAxis(2, 1)
+nextAxis(1, 0)
 
 plot(crystalFrame('432'))
 # -

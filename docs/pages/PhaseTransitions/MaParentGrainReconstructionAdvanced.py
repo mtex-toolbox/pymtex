@@ -245,7 +245,7 @@ plot(boundaryParentGrains['Iron fcc'], boundaryParentGrains['Iron fcc'].meanOrie
 # +
 variantId, packetId, _, _ = calcVariantId(componentOri[childComponentId - 1], childOri, fcc2bcc)
 
-packetColor = ind2color(packetId)
+packetColor = ind2color(packetId - 1)
 plot(childGrains, packetColor, figSize='large')
 
 hold(True)

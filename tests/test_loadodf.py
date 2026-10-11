@@ -60,3 +60,13 @@ def test_vpsc_output_block_keepsItsHeaderAndColumns_inOpt(tmp_path):
   odf = SO3Fun.load(fname, cs, halfwidth=10 * degree)
   assert odf.opt.strain == 0.25 and np.allclose(odf.opt.strainEllipsoid, [1.123, 1.127, 0.75])
   assert np.allclose(odf.opt.strainEllipsoidAngles, [-180, 90, -180]) and odf.opt.data.shape == (4, 2)
+
+
+# the columns of a table are counted from 0 (MATLAB counts them from 1): naming them in another
+# order reads the same function
+def test_generic_table_columnsCountFromZero(tmp_path):
+  cs, odf, fname = exportedTable(tmp_path)
+  a = SO3Fun.load(fname, "Bunge", "density", CS=cs, halfwidth=15 * degree, columnNames=COLUMNS)
+  b = SO3Fun.load(fname, "Bunge", "density", CS=cs, halfwidth=15 * degree, columnNames=COLUMNS[::-1], columns=[3, 2, 1, 0])
+  o = orientation.byEuler(30 * degree, 45 * degree, 60 * degree, cs)
+  assert abs(a.eval(o) - b.eval(o)) < 1e-9

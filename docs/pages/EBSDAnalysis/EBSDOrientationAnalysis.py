@@ -79,7 +79,7 @@ plot(rOrth, add2all=True, marker='square', markerFaceColor='DarkRed')
 # Draw the edge of the band whose points lie within 10° of the great circle. Its opening
 # angle about `rOrth` is therefore 80°.
 
-nextAxis(1)
+nextAxis(0)
 circle(rOrth, 80 * degree, lineColor='darkred', lineWidth=5, edgeAlpha=0.5)
 
 # Count the measurements inside that band. Because `rOrth` is antipodal, its angular

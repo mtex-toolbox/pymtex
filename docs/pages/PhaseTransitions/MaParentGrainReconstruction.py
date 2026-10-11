@@ -255,7 +255,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 # +
 job.calcVariants()
 
-color = ind2color(job.transformedGrains.packetId)
+color = ind2color(job.transformedGrains.packetId - 1)
 plot(job.transformedGrains, color, faceAlpha=0.5)
 
 hold(True)
@@ -304,7 +304,7 @@ childOri = job.ebsdPrior[childGrains].orientations
 parentOri = grainSelected.meanOrientation
 variantId, packetId, _, _ = calcVariantId(parentOri, childOri, job.p2c)
 
-color = ind2color(packetId)
+color = ind2color(packetId - 1)
 plotPF(childOri, color, Miller(0, 0, 1, childOri.CS), markerSize=2, all=True)
 
 hold(True)

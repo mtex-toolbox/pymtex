@@ -209,14 +209,14 @@ beta = fibre.beta(cs, ss)
 # Plot the conventional endpoint segment returned by each constructor. Passing
 # `full=True` would extend that segment around its entire direction-pair circle.
 
-plot(fibre.alpha(cs, ss), lineWidth=3, lineColor=ind2color(1), displayName='alpha')
+plot(fibre.alpha(cs, ss), lineWidth=3, lineColor=ind2color(0), displayName='alpha')
 hold(True)
-plot(fibre.beta(cs, ss), lineWidth=3, lineColor=ind2color(2), displayName='beta')
-plot(fibre.gamma(cs, ss), lineWidth=3, lineColor=ind2color(3), displayName='gamma')
-plot(fibre.epsilon(cs, ss), lineWidth=3, lineColor=ind2color(4), displayName='epsilon')
-plot(fibre.eta(cs, ss), lineWidth=3, lineColor=ind2color(5), displayName='eta')
-plot(fibre.tau(cs, ss), lineWidth=3, lineColor=ind2color(6), displayName='tau')
-plot(fibre.theta(cs, ss), lineWidth=3, lineColor=ind2color(7), displayName='theta')
+plot(fibre.beta(cs, ss), lineWidth=3, lineColor=ind2color(1), displayName='beta')
+plot(fibre.gamma(cs, ss), lineWidth=3, lineColor=ind2color(2), displayName='gamma')
+plot(fibre.epsilon(cs, ss), lineWidth=3, lineColor=ind2color(3), displayName='epsilon')
+plot(fibre.eta(cs, ss), lineWidth=3, lineColor=ind2color(4), displayName='eta')
+plot(fibre.tau(cs, ss), lineWidth=3, lineColor=ind2color(5), displayName='tau')
+plot(fibre.theta(cs, ss), lineWidth=3, lineColor=ind2color(6), displayName='theta')
 hold(False)
 legend(location='best')
 
