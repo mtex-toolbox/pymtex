@@ -11,6 +11,7 @@ import os
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..functions.polefigure import PoleFigure
 from ..geometry.units import degree as _degree
 from ..geometry.install import install
@@ -19,8 +20,7 @@ from ..geometry.install import install
 def exportPoleFigure(pf, fname, *args, degree=False):
   """write every pole figure of a data set to its own three column table; returns the file names"""
   fname = os.fspath(fname)
-  if any(isinstance(a, str) and a.lower() == "degree" for a in args):
-    degree = True
+  refuseFlags(args, "export")
   s = 1 / _degree if degree else 1.0
   names = []
   for h, r, I in zip(pf.allH, pf.allR, pf.allI):

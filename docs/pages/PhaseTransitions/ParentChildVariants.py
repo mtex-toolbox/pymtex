@@ -64,7 +64,7 @@ hold(False)
 
 # [111] / [2-1-10] pole figure
 nextAxis(1)
-plotPF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), 'upper', markerSize=20, markerFaceColor='none', lineWidth=4)
+plotPF(oriParent, Miller(1, 1, 1, csBeta, 'uvw'), upper=True, markerSize=20, markerFaceColor='none', lineWidth=4)
 
 dAlpha = Miller(2, -1, -1, 0, csAlpha, 'uvw')
 hold(True)

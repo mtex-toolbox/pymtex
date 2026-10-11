@@ -23,6 +23,7 @@ import math
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry._array import MtexArray
 from ..geometry.display import display, frameLabel, header, numString, sizeString, table
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
@@ -130,10 +131,8 @@ class tensor(MtexArray):
     for a in rest:
       if a is None:
         continue
-      if isinstance(a, str) and a.lower() == "doubleconvention":
-        doubleConvention = True
-      else:
-        raise TypeError(f"tensor does not understand the argument {a!r}")
+      refuseFlags((a,), "tensor")
+      raise TypeError(f"tensor does not understand the argument {a!r}")
     if isinstance(M, tensor):
       rank = M.rank if rank is None else rank
       if self._rank is not None and rank != self._rank:

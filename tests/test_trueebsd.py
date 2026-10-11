@@ -42,7 +42,7 @@ def test_the_fitted_hops_recover_the_imposed_transforms():
   job = trueEbsd(chain(), [spatialTransformShift(), spatialTransformProjective()])
   job.pixelSizeMatch()
   job.setOptions(numROI=8, registerOn="raw")
-  job.calcDistortion("fitErr", verbose=False)
+  job.calcDistortion(fitErr=True, verbose=False)
   assert isinstance(job.T[0], spatialTransformShift) and isinstance(job.T[1], spatialTransformProjective)
   p = vector3d(np.column_stack([rng.uniform(-90, 90, 50), rng.uniform(-70, 70, 50), np.zeros(50)]))
   for T, M in zip(job.T, (A, H)):
@@ -109,7 +109,7 @@ def test_the_wc_co_sequence_as_matlab_runs_it():
   job = trueEbsd(imgList, T)
   job.pixelSizeMatch()
   job.setOptions(numROI=16)
-  job.calcDistortion("fitErr", verbose=False)
+  job.calcDistortion(fitErr=True, verbose=False)
   job.undistort()
   px = job.resizedList[0].dx
   assert [int(round(float(np.max(job.opt[n]["roiSize"])) / px)) for n in range(4)] == [64, 64, 64, 64]

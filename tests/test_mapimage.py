@@ -184,7 +184,7 @@ def fsdList():
 
 def test_transformReferenceFrame_byScreenAlignmentStatesTheImagesInTheFrameOfTheMap():
   L = fsdList()
-  t = transformReferenceFrame(L, SCREEN_FRAME, "byScreenAlignment")
+  t = transformReferenceFrame(L, SCREEN_FRAME, byScreenAlignment=True)
   assert t[0].frame is SCREEN_FRAME
   # the picture is the same way up on screen, x up and y to the right, so the array is unmoved
   assert np.array_equal(t[0].img, L[0].img)
@@ -193,12 +193,12 @@ def test_transformReferenceFrame_byScreenAlignmentStatesTheImagesInTheFrameOfThe
 
 def test_transformReferenceFrame_byScreenAlignmentNeedsAFrame():
   with pytest.raises(ValueError):
-    transformReferenceFrame(fsdList(), gridLayout.rowMajor(), "byScreenAlignment")
+    transformReferenceFrame(fsdList(), gridLayout.rowMajor(), byScreenAlignment=True)
 
 
 def test_transformReferenceFrame_byTheScreenAlignmentOrientationIsByScreenAlignment():
   L = fsdList()
-  t = transformReferenceFrame(L, SCREEN_FRAME, "byScreenAlignment")
+  t = transformReferenceFrame(L, SCREEN_FRAME, byScreenAlignment=True)
   o = orientation.byScreenAlignment(L[0].frame, SCREEN_FRAME)
   assert np.array_equal(transformReferenceFrame(L, SCREEN_FRAME, o)[0].img, t[0].img)
 

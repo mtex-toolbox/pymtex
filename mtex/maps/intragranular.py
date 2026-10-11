@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.kernels import backend, closestImage, qmul
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -290,7 +291,8 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
   map; the gradient method is the column of Nye's tensor along the normal of the map"""
   from scipy.ndimage import correlate, maximum_filter, minimum_filter
   from ..analysis.mechanics import dislocationDensity
-  if gradient or "gradient" in args:
+  refuseFlags(args, "weightedBurgersVec")
+  if gradient:
     alpha = dislocationDensity(curvature(ebsd, stencil=stencil))
     return vector3d(alpha.M[..., :, 2], frame=ebsd.frame)
   if ebsd.ndim != 2:

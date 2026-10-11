@@ -129,7 +129,7 @@ minimumHarmonicValue
 # [SO3FunRBF.interpolate](SO3FunRBF.interpolate.html). The `'density'` flag constrains the
 # weights so that the result is nonnegative and then normalizes its mean to 1.
 
-SO3FDensity = interp(ori, S['values'], 'density')
+SO3FDensity = interp(ori, S['values'], density=True)
 relativeErrorDensity = norm(SO3FDensity.eval(ori) - S['values']) / norm(S['values'])
 relativeErrorDensity
 
@@ -157,7 +157,7 @@ plot(SO3FDensity, 'sigma')
 # over a wider angular neighbourhood. A very small halfwidth can overfit the samples.
 
 psi = SO3DeLaValleePoussinKernel(halfwidth=2.5 * degree)
-SO3FNarrow = interp(ori, S['values'], 'density', kernel=psi, resolution=5 * degree)
+SO3FNarrow = interp(ori, S['values'], density=True, kernel=psi, resolution=5 * degree)
 plot(SO3FNarrow, 'sigma')
 
 # The centre spacing remains 5 degrees, so the change from the default fit comes from the

@@ -23,6 +23,7 @@ from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from ..geometry.display import aligned
+from ..geometry.arguments import refuseFlags
 
 
 class sphericalProjection:
@@ -582,8 +583,7 @@ def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=
   at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
   lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid"""
   from ..geometry.frames import referenceFrame
-  flags = {a.lower() for a in args if isinstance(a, str)}
-  upper, lower, complete = upper or "upper" in flags, lower or "lower" in flags, complete or "complete" in flags
+  refuseFlags(args, "plotS2Grid")
   sR = next((a for a in args if isinstance(a, sphericalRegion)), None)
   fr = next((a for a in args if isinstance(a, referenceFrame)), None)
   sR = sR if sR is not None else sphericalRegion(frame=fr)

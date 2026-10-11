@@ -134,7 +134,7 @@ np.unique(np.round(angle(c2c) / degree, 2))
 # The coloured density shows axes of the measured child-to-child misorientations. Black
 # squares mark axes predicted by the fitted OR.
 
-plot(mori.axis(), 'contourf', 'fundamentalRegion', halfwidth=5 * degree)
+plot(mori.axis(), contourf=True, fundamentalRegion=True, halfwidth=5 * degree)
 hold(True)
 isInformative = angle(c2c) > 1e-3 * degree
 plot(c2c[isInformative].axis(), marker='s', markerFaceColor='none', markerEdgeColor='k', markerSize=8)

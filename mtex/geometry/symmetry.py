@@ -411,7 +411,7 @@ class symmetry:
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
-  def fundamentalRegion(self, other=None, antipodal=False):
+  def fundamentalRegion(self, other=None, *, antipodal=False):
     """the fundamental region of orientations of this group and another one, the Dirichlet domain
     of the identity"""
     from .orientationregion import fundamentalRegion

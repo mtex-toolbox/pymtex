@@ -14,6 +14,7 @@ import re
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text, writeTable
@@ -91,18 +92,17 @@ def _headerNames(head):
   return names if any(_canonical(n) in COORDINATES for n in names) else None
 
 
-def exportVector3d(v, fname, *args, radians=False):
+def exportVector3d(v, fname, *args, polar=False, radians=False):
   """write directions as a text table with a line of column names
 
     exportVector3d(v, 'vectors.txt')                    the Cartesian components, at their length
-    exportVector3d(v, 'vectors.txt', 'polar')           polar angle and azimuth, in degrees unless radians=True
+    exportVector3d(v, 'vectors.txt', polar=True)        polar angle and azimuth, in degrees unless radians=True
     exportVector3d(v, 'vectors.txt', {'weight': w})     one more column per named value
   """
-  polar, extra = False, {}
+  refuseFlags(args, "export")
+  extra = {}
   for a in args:
-    if isinstance(a, str) and a.lower() == "polar":
-      polar = True
-    elif isinstance(a, dict):
+    if isinstance(a, dict):
       extra.update(a)
     else:
       raise TypeError(f"export does not understand the argument {a!r}")

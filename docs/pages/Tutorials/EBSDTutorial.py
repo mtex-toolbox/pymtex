@@ -165,7 +165,7 @@ hold(False)
 h = Miller([1, 0, 0], [0, 1, 0], [0, 0, 1], ebsd['Forsterite'].CS)
 
 # plot their specimen-direction distributions
-plotPF(ebsd['Forsterite'].orientations, h, 'contourf')
+plotPF(ebsd['Forsterite'].orientations, h, contourf=True)
 mtexColorbar()
 # -
 
@@ -189,7 +189,7 @@ mtexColorbar()
 r = vector3d.cat(vector3d.X, vector3d.Y, vector3d.Z)
 
 # plot their crystal-direction distributions
-plotIPF(ebsd['Forsterite'].orientations, r, 'contourf')
+plotIPF(ebsd['Forsterite'].orientations, r, contourf=True)
 mtexColorbar()
 # -
 

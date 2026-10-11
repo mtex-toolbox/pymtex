@@ -23,6 +23,7 @@ from ..geometry.orientation import orientation
 from ..geometry.plane import plane3d
 from ..geometry.sphericalregion import projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
+from ..geometry.arguments import refuseFlags
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
 from .colormaps import contourLevels, mtexColormap
 from .keywords import refuseVariants
@@ -668,7 +669,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
   from ..maps.mapimage import mapImage
   if isinstance(v, mapImage) or (isinstance(v, (list, tuple)) and v and all(isinstance(m, mapImage) for m in v)):
     from .mapplot import plotMapImage
-    kw.update({a: True for a in args if isinstance(a, str)})
+    refuseFlags(args, "plot")
     return plotMapImage(v, **kw)
   kind = _mapKind(v)
   if kind is not None:
@@ -683,8 +684,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
     from .sectionplot import quiverSectionField
     return quiverSectionField(v, *args, **kw)
   if _isFunction(v):
-    # MATLAB's positional flags, plot(sF, 'complete', 'smooth', 'upper', 'lower')
-    kw.update({a: True for a in args if isinstance(a, str)})
+    refuseFlags(args, "plot")
     style = fillFlag(kw, "pcolor")
     # a list of functions: one panel for each, each on its own colour range
     if getattr(v, "shape", ()):
@@ -705,10 +705,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
     from .shapeplot import plotShape
     return plotShape(v, *args, **kw)
   v = v if isinstance(v, vector3d) else vector3d(v)
-  # MATLAB's positional flags, plot(v, 'contourf', 'fundamentalRegion')
-  for a in [a for a in args if isinstance(a, str)]:
-    kw[a] = True
-  args = tuple(a for a in args if not isinstance(a, str))
+  refuseFlags(args, "plot")
   if kw.pop("plane", False):
     return _planeCircles(v, **kw)
   if args and isinstance(args[0], vector3d):
@@ -1314,15 +1311,14 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
 
 def plotPF(odf, h, *args, superposition=None, **kw: Unpack[PlotKeywords]):
   """plotPF(odf, h): the pole figures of an ODF, one axes per crystal direction (MATLAB's plotPDF)"""
-  # MATLAB's positional flags, plotPDF(odf, h, 'antipodal', 'contourf'), and a convention
-  kw.update({a: True for a in args if isinstance(a, str)})
+  refuseFlags(args, "plotPF", names=("3d",))
   from ..geometry.plottingconvention import plottingConvention
   for a in args:
     if isinstance(a, plottingConvention):
       kw["how2plot"] = a
   hs = _asList(h)
   # plotPF(odf, h, '3d'): the pole figure on the sphere in space
-  if kw.pop("3d", False):
+  if "3d" in args:
     from .spaceplot import plotFunction3d
     kw.pop("title", None)
     return [plotFunction3d(odf.radon(x), **kw) for x in hs]

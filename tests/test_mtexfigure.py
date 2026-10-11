@@ -214,7 +214,7 @@ def hotAndCool():
   fig = newMtexFigure()
   for cm in ("hot", "cool"):
     nextAxis()
-    plot(v, 'smooth', upper=True)
+    plot(v, smooth=True, upper=True)
     # mtexColorMap(ax, name) colours only that axes; fig.gca is the axes drawn into last
     mtexColorMap(fig.gca, cm)
   return fig

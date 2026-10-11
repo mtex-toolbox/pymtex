@@ -21,6 +21,7 @@ import warnings
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.spatialtransform import (spatialTransform, spatialTransformComposite, spatialTransformDrift, spatialTransformId,
                                         spatialTransformList)
 from ..geometry.vector3d import vector3d
@@ -227,8 +228,7 @@ class trueEbsd:
     registration worked, and a hop leaving over 2 pixels is redone with the tiles doubled,
     retryMax attempts at most.
     """
-    fitErr = fitErr or "fitErr" in flags
-    verbose = verbose and "silent" not in flags
+    refuseFlags(flags, "calcDistortion")
     retryMax = max(int(retryMax), 1)
     nImg = len(self.resizedList)
     if nImg < 2:

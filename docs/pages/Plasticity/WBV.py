@@ -193,7 +193,7 @@ mtexColorbar()
 # not represented by the current extraction.
 
 # +
-wbvGradientDefault = weightedBurgersVec(ebsd, 'gradient')
+wbvGradientDefault = weightedBurgersVec(ebsd, gradient=True)
 
 cKGradient = HSVDirectionKey(wbvGradientDefault)
 plot(ebsd, cKGradient.direction2color(wbvGradientDefault),
@@ -232,7 +232,7 @@ mtexTitle('direction distribution')
 
 # +
 stencils = ['oneSided', '1hop', 'full']
-wbvGradient = [weightedBurgersVec(ebsd, 'gradient', stencil=s) for s in stencils]
+wbvGradient = [weightedBurgersVec(ebsd, gradient=True, stencil=s) for s in stencils]
 
 newMtexFigure(layout=[2, 3])
 for k, s in enumerate(stencils):

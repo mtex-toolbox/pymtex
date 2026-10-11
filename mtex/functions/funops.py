@@ -7,6 +7,7 @@ import math
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry._array import MtexArray
 
 from ..geometry.orientation import orientation
@@ -97,14 +98,15 @@ def _oneRotation(r):
 def rotate(f, r, *args, side="left", **kwargs):
   """the function turned by a rotation: an SO(3) function from the left (the specimen side) or with
   side='right' from the right, a spherical or circular function by the rotation; a container or
-  a map turns by its own method, MATLAB's flags given as strings
+  a map turns by its own method, its flags as keywords
 
     rotate(odf, r)
-    rotate(odf, r, side='right')
-    rotate(ebsd, r, 'keepEuler')"""
-  # a container or a map turns by its own method, MATLAB's flags as keywords: rotate(ebsd, r, 'keepEuler')
+    rotate(odf, r, 'right')
+    rotate(ebsd, r, keepEuler=True)"""
+  refuseFlags(args, "rotate", names=("left", "right"))
+  # a container or a map turns by its own method
   if isinstance(f, MtexArray) or type(f).__module__.startswith("mtex.maps"):
-    return f.rotate(r, **{a: True for a in args if isinstance(a, str)}, **kwargs)
+    return f.rotate(r, **kwargs)
   if args:
     side = args[0]
   side = _side(side)
@@ -178,9 +180,11 @@ def transformODF(odfP, p2c, vSel=None):
   return SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
 
 
-def conv(f, g, *flags):
-  """conv(f, g, 'inv'): the convolution of the inverse of f with g, MATLAB's flag"""
-  if "inv" in flags:
+def conv(f, g, *args, inverse=False):
+  """conv(f, g): the convolution of f with g; with inverse=True of the inverse of f with g, MATLAB's
+  conv(f, g, 'inv')"""
+  refuseFlags(args, "conv")
+  if inverse:
     return conv(f.inv(), g)
   if isinstance(f, (SO3Kernel, S2Kernel, S1Kernel)) and not isinstance(g, (SO3Kernel, S2Kernel, S1Kernel)):
     return conv(g, f)

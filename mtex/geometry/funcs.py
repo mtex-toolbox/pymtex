@@ -7,6 +7,7 @@ import builtins
 import numpy as np
 
 from ._array import MtexArray, cat
+from .arguments import refuseFlags
 
 
 def _method(name, fallback=None):
@@ -104,14 +105,17 @@ merge = _method("merge")
 
 
 def rotate(v, rot, *args, **kwargs):
-  """rotate(x, rot) is x.rotate(rot), or rot * x for an object without that method; MATLAB's flag
-  strings become keywords, 'left' and 'right' the side
+  """rotate(x, rot) is x.rotate(rot), or rot * x for an object without that method; 'left' and
+  'right' name the side, a flag is a keyword
 
-    rotate(ebsd, rot, 'keepEuler')"""
-  # MATLAB's flags as keywords, rotate(ebsd, r, 'keepEuler'); 'left' and 'right' name the side
-  flags = dict(("side", a) if a in ("left", "right") else (a, True) for a in args if isinstance(a, str))
+    rotate(ebsd, rot, keepEuler=True)
+    rotate(odf, rot, 'right')"""
+  refuseFlags(args, "rotate", names=("left", "right"))
+  side = next((a for a in args if isinstance(a, str)), None)
   args = tuple(a for a in args if not isinstance(a, str))
-  return v.rotate(rot, *args, **flags, **kwargs) if hasattr(v, "rotate") else rot * v
+  if side is not None:
+    kwargs["side"] = side
+  return v.rotate(rot, *args, **kwargs) if hasattr(v, "rotate") else rot * v
 
 
 __all__ = ["angle", "dot", "cross", "orthProj", "norm", "normalize", "inv", "mean", "sum", "std", "unique", "matrix", "Euler",

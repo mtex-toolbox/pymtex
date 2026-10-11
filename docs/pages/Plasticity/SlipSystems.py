@@ -67,7 +67,7 @@ hold(False)
 # The option `'antipodal'` identifies opposite Burgers-vector signs, because
 # they describe the two shear senses of the same geometric system.
 
-sSBasalSym = sSBasal.symmetrise('antipodal')
+sSBasalSym = sSBasal.symmetrise(antipodal=True)
 sSBasalSym
 
 # Alpha-titanium has three such basal systems. The norm of each Burgers

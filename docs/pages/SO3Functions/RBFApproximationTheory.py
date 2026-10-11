@@ -47,7 +47,7 @@ plotSection(ori, val, 'sigma', all=True)
 # least squares, `'mlsq'`. This solver constrains the kernel weights to be nonnegative, and
 # MTEX normalizes the fitted function to mean 1.
 
-SO3FDensity = interp(ori, val, 'density')
+SO3FDensity = interp(ori, val, density=True)
 SO3FDensity
 
 # ---
@@ -118,7 +118,7 @@ mtexColorbar()
 # That coupling changes both the kernel shape and the number of unknown weights. Specify
 # `resolution` separately when the aim is to isolate the effect of halfwidth.
 
-SO3FNarrow = interp(ori, val, 'density', halfwidth=2 * degree, resolution=5 * degree)
+SO3FNarrow = interp(ori, val, density=True, halfwidth=2 * degree, resolution=5 * degree)
 SO3FNarrow
 
 # ---
@@ -130,7 +130,7 @@ plot(SO3FNarrow, 'sigma')
 # start with a halfwidth at least as large as the resolution of the data, then validate that
 # choice.
 
-SO3FSmooth = interp(ori, val, 'density', halfwidth=10 * degree, resolution=5 * degree)
+SO3FSmooth = interp(ori, val, density=True, halfwidth=10 * degree, resolution=5 * degree)
 SO3FSmooth
 
 # ---
@@ -150,7 +150,7 @@ S3G
 
 # ---
 
-SO3FGrid = interp(ori, val, 'density', SO3Grid=S3G)
+SO3FGrid = interp(ori, val, density=True, SO3Grid=S3G)
 SO3FGrid
 
 # ---
@@ -171,7 +171,7 @@ plot(SO3FGrid, 'sigma')
 hw = np.array([20, 15, 12.5, 10, 7.5, 5, 2.5])
 err = np.zeros(len(hw))
 for k in range(len(hw)):
-  SO3Fhw = interp(ori, val, 'density', halfwidth=hw[k] * degree, resolution=5 * degree)
+  SO3Fhw = interp(ori, val, density=True, halfwidth=hw[k] * degree, resolution=5 * degree)
   err[k] = norm(SO3Fhw.eval(ori) - S['values']) / norm(S['values'])
 
 plt.figure(figsize=(6, 3.5))
@@ -198,7 +198,7 @@ bestRecoveryError
 
 # ---
 
-SO3FBest = interp(ori, val, 'density', halfwidth=bestHalfwidth * degree, resolution=5 * degree)
+SO3FBest = interp(ori, val, density=True, halfwidth=bestHalfwidth * degree, resolution=5 * degree)
 plot(SO3FBest, 'sigma')
 
 # The selected fit retains the broad regions while suppressing much of the added noise. A
@@ -220,7 +220,7 @@ psi
 
 # ---
 
-SO3FAbel = interp(ori, val, 'density', kernel=psi, resolution=5 * degree)
+SO3FAbel = interp(ori, val, density=True, kernel=psi, resolution=5 * degree)
 plot(SO3FAbel, 'sigma')
 
 # The Abel-Poisson fit places its peaks in the same broad regions, but its tails and peak

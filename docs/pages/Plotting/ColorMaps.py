@@ -153,7 +153,7 @@ v = vector3d.rand(100)
 
 for cm in ['hot', 'cool', 'parula']:
   nextAxis()
-  plot(v, 'smooth', grid=True, grid_res=90 * degree, upper=True)
+  plot(v, smooth=True, grid=True, grid_res=90 * degree, upper=True)
 
   mtexColorMap(mtexFig.gca, cm)
   mtexTitle(cm)

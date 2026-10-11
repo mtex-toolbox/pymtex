@@ -217,7 +217,7 @@ def test_contourf_symmetricS2FunOnItsSectorCompleteOnTheSphere():
 
 def test_plot_S2FunTakesMATLABPositionalFlags():
   # MATLAB's positional flags, both hemispheres named
-  plot(trigonalS2Fun(), 'complete', 'smooth', 'upper', 'lower')
+  plot(trigonalS2Fun(), complete=True, smooth=True, upper=True, lower=True)
   assert len(gcm().children) == 2
 
 
@@ -306,7 +306,7 @@ def test_setColorRange_equalRecoloursBandsAndKeepsLevels(cubicODF):
   from mtex import setColorRange
   cs, odf, hs = cubicODF
   # a shared colour range recolours the contour bands and keeps each panel's levels, as MATLAB's
-  hs = plotPF(odf, hs, 'contourf')
+  hs = plotPF(odf, hs, contourf=True)
   before = [tuple(np.round(h.levels, 9)) for h in hs]
   setColorRange('equal')
   after = [tuple(np.round(ax._mtexSphericalPlot.mappable.levels, 9)) for ax in gcm().children]
@@ -316,7 +316,7 @@ def test_setColorRange_equalRecoloursBandsAndKeepsLevels(cubicODF):
 def test_mtexColorbar_oneBarForCommonRangeAndYlabelBesideAChart(cubicODF):
   from mtex import mtexColorbar, setColorRange, ylabel
   cs, odf, hs = cubicODF
-  plotPF(odf, hs, 'contourf')
+  plotPF(odf, hs, contourf=True)
   setColorRange('equal')
   # one bar for the common range, and a label beside a chart, MATLAB's ylabel(ax, ...)
   assert len(mtexColorbar()) == 1
@@ -339,7 +339,7 @@ def test_plotPF_colorRangeEqualIsOneRangeOnTheSpecimenSector(cubicODF):
 def test_plotPF_ofODFTakesMATLABPositionalFlags(cubicODF):
   cs, odf, _ = cubicODF
   # MATLAB's positional flags
-  h = plotPF(odf, Miller(1, 0, 0, cs), 'antipodal', 'contourf')
+  h = plotPF(odf, Miller(1, 0, 0, cs), antipodal=True, contourf=True)
   assert isinstance(h[0], matplotlib.contour.QuadContourSet)
 
 

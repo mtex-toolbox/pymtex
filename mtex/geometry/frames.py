@@ -326,7 +326,7 @@ class referenceFrame:
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
-  def fundamentalRegion(self, other=None, antipodal=False):
+  def fundamentalRegion(self, other=None, *, antipodal=False):
     """the fundamental region in orientation space of this group, or of the pair with another frame
 
       oR = cs.fundamentalRegion()

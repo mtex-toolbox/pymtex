@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.crystalshape import crystalShape
 from ..geometry.orientation import orientation
 from ..geometry.plottingconvention import plottingConvention
@@ -733,13 +734,14 @@ def line(x, y, z=None, **kw: Unpack[PlotKeywords]):
                  color=kw.pop("color", "k"), zorder=7, **kw)[0]
 
 
-def scatterXY(x, y, *args, **kw: Unpack[PlotKeywords]):
-  """scatter(x, y, sz, c, 'filled'): markers at the coordinates of the current map, MATLAB's
-  scatter of two coordinate lists; NaN positions are left out"""
+def scatterXY(x, y, *args, filled=False, **kw: Unpack[PlotKeywords]):
+  """scatter(x, y, sz, c, filled=True): markers at the coordinates of the current map, MATLAB's
+  scatter of two coordinate lists; a string names the colour; NaN positions are left out"""
+  if "filled" in args:
+    refuseFlags(("filled",), "scatter")
   sizes = next((a for a in args if not isinstance(a, str)), 36)
   names = [a for a in args if isinstance(a, str)]
-  filled = "filled" in names
-  color = kw.pop("color", next((a for a in names if a != "filled"), "b"))
+  color = kw.pop("color", next(iter(names), "b"))
   ax, P = _onMap(x, y)
   keep = np.all(np.isfinite(P), axis=1)
   return ax.scatter(P[keep, 0], P[keep, 1], s=sizes, c=color if filled else "none", edgecolors=color, zorder=7, **kw)

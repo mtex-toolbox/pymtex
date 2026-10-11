@@ -63,7 +63,7 @@ x, y = gB.intersect(xy1, xy2)
 isIntersection = ~np.isnan(x)
 
 hold(True)
-scatter(x[isIntersection], y[isIntersection], 36, 'b', 'filled')
+scatter(x[isIntersection], y[isIntersection], 36, 'b', filled=True)
 hold(False)
 # -
 

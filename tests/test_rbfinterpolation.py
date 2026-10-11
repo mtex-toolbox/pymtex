@@ -30,7 +30,7 @@ def test_mlsq_keepsTheWeightsPositiveAndFits():
 def densityFit():
   odf = unimodalODF(orientation(rotation.rand(rng=rng), cs), halfwidth=15 * degree)
   nodes = orientation(rotation.rand(2000, rng=rng), cs)
-  return odf, interp(nodes, odf.eval(nodes), 'density', halfwidth=15 * degree)
+  return odf, interp(nodes, odf.eval(nodes), density=True, halfwidth=15 * degree)
 
 
 def test_interp_densityIsPositiveOfMeanOne():

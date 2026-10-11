@@ -242,7 +242,7 @@ class orientationRegion:
     from ..plotting.spaceplot import plotRegion3d as plot, plotRegion3d as plot3d
 
 
-def fundamentalRegion(frA, frB=None, antipodal=False):
+def fundamentalRegion(frA, frB=None, *, antipodal=False):
   """the fundamental region of a pair of groups: the Dirichlet domain of the identity under
   l * q * r, |<q, 1>| >= |<q, s>| for every product s = l r. For s of angle w about the
   axis a this is the pair of half-spaces (q_v . a) cos(w/4) <= q_0 sin(w/4) and the same

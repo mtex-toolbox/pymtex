@@ -167,7 +167,7 @@ plot(job.resizedList, edge=True)
 # their shift is taken as zero. The displayed `difference` for that hop is the raw image
 # difference, not a fitted residual and not a correction to apply.
 
-job.calcDistortion('fitErr')
+job.calcDistortion(fitErr=True)
 
 # Afterwards `job.T` holds the *fitted* transforms rather than the prototypes it started
 # from.

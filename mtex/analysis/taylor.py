@@ -19,6 +19,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.frames import crystalFrame, referenceFrame
 from ..geometry.kernels import backend
 from ..geometry.orientation import orientation
@@ -321,8 +322,7 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
   MATLAB's; spinSelection 'basic' takes a vertex of the face, 'minimumNorm' the shears of least
   norm on it. The spin is a spinTensor in the crystal frame, so ori.exp(-W) turns the crystal.
   """
-  if any(isinstance(a, str) and a.lower() == "plasticwork" for a in args):
-    plasticWork = True
+  refuseFlags(args, "calcTaylor")
   model = sS if isinstance(sS, TaylorModel) else TaylorModel(sS)
   if not isinstance(eps, strainTensor):
     raise TypeError("calcTaylor needs a strainTensor")

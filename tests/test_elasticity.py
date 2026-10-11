@@ -142,7 +142,7 @@ def test_velocity_harmonicExpandsToBandwidth48():
   Co = olivine()
   n = vector3d.byPolar(45 * degree, 20 * degree)
   _, _, _, ppn, _, _ = velocity(Co, n)
-  h = velocity(Co, 'harmonic')
+  h = velocity(Co, harmonic=True)
   assert h.vp.bandwidth == 48 and h.pp.bandwidth == 48
   assert np.isclose(h.vp.eval(xvector), velocity(Co, xvector).vp, atol=1e-6) and np.isclose(h.vs2.eval(n), velocity(Co, n).vs2, atol=1e-4)
   assert abs(np.dot(h.pp.eval(n).data.ravel(), ppn.data.ravel())) > 1 - 1e-6

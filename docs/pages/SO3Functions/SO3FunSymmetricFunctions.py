@@ -161,7 +161,7 @@ plot(SO3F2Sym)
 # loses their differences, so the original nonsymmetric function cannot be recovered from
 # `SO3F2Sym`.
 
-plot(SO3F2Sym, 'complete')
+plot(SO3F2Sym, complete=True)
 
 # In the complete plot, every twofold-related position now carries the same value. This
 # visual repetition and the small printed orbit spread test the same property in

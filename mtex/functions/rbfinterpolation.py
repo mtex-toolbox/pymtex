@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.orientation import orientation
 from ..geometry.symreduce import reductionGroups
 from ..geometry.units import degree
@@ -143,8 +144,9 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
 
 
 def interpSO3(nodes, values=None, *flags, regularisation=None, SobolevIndex=None, **kwargs):
-  """MATLAB's rotation/interp: the harmonic fit, the Bingham distribution of the weighted
-  orientations, or the sum of kernels, with MATLAB's names of the options"""
+  """MATLAB's rotation/interp: the harmonic fit ('harmonic'), the Bingham distribution of the
+  weighted orientations ('bingham'), or the sum of kernels, density=True and exact=True as there"""
+  refuseFlags(flags, "interp", names=("harmonic", "bingham"))
   if "harmonic" in flags:
     from .density import interpolate
     if regularisation is not None:
@@ -155,8 +157,7 @@ def interpSO3(nodes, values=None, *flags, regularisation=None, SobolevIndex=None
   if "bingham" in flags:
     from .bingham import calcBinghamODF
     return calcBinghamODF(nodes, weights=values)
-  return interpolateRBF(nodes, values, density="density" in flags or kwargs.pop("density", False),
-                        exact="exact" in flags or kwargs.pop("exact", False), **kwargs)
+  return interpolateRBF(nodes, values, density=kwargs.pop("density", False), exact=kwargs.pop("exact", False), **kwargs)
 
 
 __all__ = ["interpolateRBF", "summationMatrix", "mlsq", "interpSO3"]

@@ -83,7 +83,7 @@ def test_optimalSample_givesTheCountAskedFor(start):
   assert optimalSample(f, 17, bandwidth=2, maxIter=0).size == 17
   assert optimalSample(f, xs[0], bandwidth=2, maxIter=2).size == 1
   assert optimalSample(f, 60, bandwidth=0, maxIter=2, diagnostics=True).converged
-  assert optimalSample(f, xs, "steepestDescent", bandwidth=4, maxIter=2, diagnostics=True).discrepancy <= value
+  assert optimalSample(f, xs, method='steepestDescent', bandwidth=4, maxIter=2, diagnostics=True).discrepancy <= value
 
 
 def test_optimalSample_refusesWhatItCannotSample(start):

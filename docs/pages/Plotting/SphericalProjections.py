@@ -74,7 +74,7 @@ mtexColorbar()
 # +
 how2plot = plottingConvention('z↑→y')
 
-plotPF(odf, Miller(1, 0, 0, cs), 'antipodal', how2plot)
+plotPF(odf, Miller(1, 0, 0, cs), how2plot, antipodal=True)
 # -
 
 # A pole figure lives on the specimen sphere, so these are specimen axes:

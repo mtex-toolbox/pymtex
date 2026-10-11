@@ -20,6 +20,7 @@ from .poles import dynamicMarkerSize, inversePoles, poles
 from .spherical import hasSymmetry, makeSphericalProjection, plotRegion
 from .sphericalplot import fillFlag, intoParents, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
 from . import sphericalplot
+from ..geometry.arguments import refuseFlags
 
 if TYPE_CHECKING:
   from typing import Unpack
@@ -183,10 +184,9 @@ def _fibreAsCurve(o, points, all, kw):
 # triple beside anything but three orientations the marker colour
 def _positionalStyle(o, args, kw):
   out = []
+  refuseFlags(args, "plot")
   for a in args:
-    if isinstance(a, str):
-      kw[a] = True
-    elif isinstance(a, (tuple, list, np.ndarray)) and len(a) == 3 and all(isinstance(x, (int, float, np.number)) for x in a) \
+    if isinstance(a, (tuple, list, np.ndarray)) and len(a) == 3 and all(isinstance(x, (int, float, np.number)) for x in a) \
         and np.size(o) != 3:
       kw.setdefault("markerFaceColor", np.asarray(a, dtype=float))
     else:

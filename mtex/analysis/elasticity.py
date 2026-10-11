@@ -20,6 +20,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.frames import referenceFrame
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor
@@ -121,7 +122,7 @@ def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
   C = _stiffness(C)
   if isinstance(n, str):
     n, args = None, (n,) + args
-  harmonic = harmonic or "harmonic" in args
+  refuseFlags(args, "velocity")
   numbers = [a for a in args if not isinstance(a, str)]
   rho = numbers[0] if numbers and density is None else C.density if density is None else density
   if rho is None:

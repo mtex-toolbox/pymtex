@@ -103,7 +103,7 @@ numSimulatedChildren
 odfBSim = calcDensity(oriBSim, halfwidth=10 * degree)
 print(odfBSim)
 
-plotPF(odfBSim, hC, 'contourf', figSize='medium')
+plotPF(odfBSim, hC, contourf=True, figSize='medium')
 mtexColorbar(title='mrd')
 # -
 
@@ -121,7 +121,7 @@ mtexColorbar(title='mrd')
 odfB = variants(p2c, odfA)
 print(odfB)
 
-plotPF(odfB, hC, 'contourf', figSize='medium')
+plotPF(odfB, hC, contourf=True, figSize='medium')
 mtexColorbar(title='mrd')
 # -
 
@@ -162,7 +162,7 @@ oriBSelected = variants(p2c, oriASim, selectedVariantId)
 odfBSelected = calcDensity(oriBSelected, halfwidth=10 * degree)
 print(odfBSelected)
 
-plotPF(odfBSelected, hC, 'contourf', figSize='medium')
+plotPF(odfBSelected, hC, contourf=True, figSize='medium')
 mtexColorbar(title='mrd')
 # -
 

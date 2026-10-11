@@ -108,7 +108,7 @@ sS.SchmidFactor(sigma)
 # representative. The `'antipodal'` option identifies opposite Burgers
 # vectors as the two shear senses of the same geometric system.
 
-sSAll = sS.symmetrise('antipodal')
+sSAll = sS.symmetrise(antipodal=True)
 sSAll
 
 # The twelve panels show the twelve geometric fcc systems for the fixed red
@@ -152,7 +152,7 @@ tauRelative = sSAll.SchmidFactor(r, relative=True)
 # `tau` correspond to directions and columns correspond to slip systems.
 
 # +
-rGrid = plotS2Grid('upper', cs, resolution=0.5 * degree)
+rGrid = plotS2Grid(cs, upper=True, resolution=0.5 * degree)
 tau = sSAll.SchmidFactor(rGrid)
 tauMax, id = np.abs(tau).max(axis=-1), np.abs(tau).argmax(axis=-1) + 1
 
@@ -187,7 +187,7 @@ hold(False)
 
 # +
 tauFun = sSAll.SchmidFactor()
-contourf(max(abs(tauFun), axis=0), 'upper')
+contourf(max(abs(tauFun), axis=0), upper=True)
 mtexColorbar()
 
 tauFun

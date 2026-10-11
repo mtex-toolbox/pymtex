@@ -105,7 +105,7 @@ plot(sSGrain.b)
 # The point cloud is not uniform. More selected directions lie near the
 # east--west axis than near the north--south axis.
 
-plot(sSGrain.b, 'contourf')
+plot(sSGrain.b, contourf=True)
 
 # The contour plot summarizes the same points as a density. Its east--west
 # maximum makes the preferred trend easier to see, while the point plot
@@ -183,7 +183,7 @@ moriGrid = sP.makeGrid()
 sSBasalReference = slipSystem.basal(ebsd.CS)
 mPGrid = mPrime(sSBasalReference, moriGrid.reshape(-1, 1) * sSBasalReference.symmetrise()).max(axis=1)
 
-sP.plot(mPGrid, 'smooth')
+sP.plot(mPGrid, smooth=True)
 mtexColorbar()
 # -
 

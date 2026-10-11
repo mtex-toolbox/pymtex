@@ -76,7 +76,7 @@ def test_plot_ofAnSO3VectorFieldDrawsArrowsIntoHeldSections(kind):
 
 def test_plotSection_takesAStyleFlagAfterTheAngles():
   # a style flag after the angles, as MATLAB's plotSection(odf, 'phi2', angles, 'contourf')
-  h = plotSection(peakODF(), 'phi2', np.array([0, 45]) * degree, 'contourf', resolution=10 * degree)
+  h = plotSection(peakODF(), 'phi2', np.array([0, 45]) * degree, contourf=True, resolution=10 * degree)
   assert len(h) == 2 and all(isinstance(x, matplotlib.contour.QuadContourSet) for x in h)
 
 

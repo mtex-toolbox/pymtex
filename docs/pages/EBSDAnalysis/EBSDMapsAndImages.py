@@ -122,7 +122,7 @@ plot(imgList, layout=[1, 3])
 # [transformReferenceFrame](mapImage.transformReferenceFrame.html) then re-expresses every
 # entry in the map frame.
 
-imgList = transformReferenceFrame(imgList, ebsdFrame, 'byScreenAlignment')
+imgList = transformReferenceFrame(imgList, ebsdFrame, byScreenAlignment=True)
 imgList
 
 # The new table shows one common frame and the corresponding layouts. This operation only

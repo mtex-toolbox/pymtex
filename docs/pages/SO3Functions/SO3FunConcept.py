@@ -67,7 +67,7 @@ mtexColorbar()
 # The same function is especially simple in axis--angle coordinates. Each section fixes the
 # rotational angle and varies the rotational axis.
 
-plotSection(SO3F, 'axisAngle', np.arange(15, 61, 15) * degree, 'pcolor')
+plotSection(SO3F, 'axisAngle', np.arange(15, 61, 15) * degree, pcolor=True)
 mtexColorbar()
 mtexColorMap('parula')
 

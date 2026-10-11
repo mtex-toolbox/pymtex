@@ -22,6 +22,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.kernels import blasThreads
 from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
@@ -387,9 +388,7 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
     optimalSample(f, nodes, method='steepestDescent', maxIter=1000, tol=0.05*degree, minWeight=1e-4)
   """
   sphere = not _isSO3(f)
-  for a in args:
-    if isinstance(a, str) and a.lower() == "steepestdescent":
-      method = "steepestDescent"
+  refuseFlags(args, "optimalSample")
   if not getattr(f, "isReal", True):
     raise ValueError("sampling requires a real density")
   L = (getMTEXpref("defaultS2Bandwidth") if sphere else 32) if bandwidth is None else int(bandwidth)

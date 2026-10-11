@@ -73,7 +73,7 @@ mCompression
 # shows where this representative receives positive and negative resolved shear.
 
 SFTwin = sSTwin.SchmidFactor()
-plot(SFTwin, 'upper')
+plot(SFTwin, upper=True)
 mtexColorbar()
 
 # Warm and cool lobes have equal shape but opposite sign. Directions on a zero contour do

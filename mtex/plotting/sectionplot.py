@@ -18,6 +18,7 @@ from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
 from .sphericalplot import (FILL_FLAGS, fillFlag, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
+from ..geometry.arguments import refuseFlags
 
 if TYPE_CHECKING:
   from typing import Unpack
@@ -163,11 +164,8 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
   kw.pop("verbose", None)
   kind, shapes = None, None
   for i, a in enumerate(args):
-    # MATLAB's style flags, plotSection(odf, 'phi2', angles, 'contourf')
-    if isinstance(a, str) and a in FILL_FLAGS:
-      kw[a] = True
-    elif isinstance(a, str) and a == "complete":
-      kw["complete"] = True
+    if isinstance(a, str) and (a in FILL_FLAGS or a == "complete"):
+      refuseFlags((a,), "plotSection")
     elif isinstance(a, (str, ODFSections)):
       kind = a
     elif i > 0 and isinstance(args[i - 1], str) and args[i - 1].lower() in ("phi1", "phi2", "alpha", "gamma", "sigma", "omega", "axisangle"):

@@ -113,7 +113,7 @@ for k in range(1, numIter + 1):
 previousFrame = specimenFrame.default
 specimenFrame.rolling.makeDefault()
 
-plotPF(ori, Miller([[0, 0, 1], [1, 1, 1]], cs), 'contourf')
+plotPF(ori, Miller([[0, 0, 1], [1, 1, 1]], cs), contourf=True)
 mtexColorbar()
 # -
 
@@ -144,7 +144,7 @@ for s, t in zip([0, 20, 40, 60], textureIndex):
 
 # +
 odf = odfAtStep
-plotSection(odf, 'phi2', np.array([0, 45, 65]) * degree, 'contourf')
+plotSection(odf, 'phi2', np.array([0, 45, 65]) * degree, contourf=True)
 mtexColorbar()
 
 # restore the incoming session frame after the published figures are made

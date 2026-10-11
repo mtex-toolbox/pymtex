@@ -84,7 +84,7 @@ def test_calcTaylor_ofTheCubeInTensionIs2_45():
   assert np.isclose(M, 2.449, atol=5e-3) and np.allclose(active, active[0], rtol=1e-6)
   assert np.count_nonzero(calcTaylor(eps, sS, spinSelection="basic").b > 1e-9) <= 5
   assert np.isclose(calcTaylor(eps, m).M, M) and np.isclose(calcTaylor(eps, sS, plasticWork=True).M, M)
-  assert np.isclose(calcTaylor(eps, sS, "plasticWork").M, M)
+  assert np.isclose(calcTaylor(eps, sS, plasticWork=True).M, M)
 
 
 def test_calcTaylor_shearsReproduceTheStrain():

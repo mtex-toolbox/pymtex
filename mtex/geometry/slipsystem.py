@@ -142,7 +142,7 @@ class slipSystem:
     """the frame the slip directions and plane normals are written in"""
     return self.b.frame
 
-  def symmetrise(self, antipodal=False, return_index=False):
+  def symmetrise(self, *, antipodal=False, return_index=False):
     """the systems of every family: the pairs of the orbits that stay orthogonal, both signs of
     the Burgers vector unless antipodal"""
     # return_index also gives the system every equivalent comes from, MATLAB's slipId

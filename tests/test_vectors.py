@@ -25,10 +25,10 @@ def test_round_trip_with_a_column(tmp_path):
   assert open(f).read().split("\n")[0].split() == ["x", "y", "z"]
   w = vector3d.load(f, columnNames=["x", "y", "z"])
   assert np.max(angle(v, w)) / degree < 1e-4
-  export(v, f, "polar")
+  export(v, f, polar=True)
   w = vector3d.load(f, columnNames=["polar angle", "azimuth angle"])
   assert np.max(angle(v, w)) / degree < 1e-4
-  export(v, f, "polar", radians=True)
+  export(v, f, polar=True, radians=True)
   w = vector3d.load(f, columnNames=["polar angle", "azimuth angle"], radians=True)
   # six significant digits of a radian are coarser than of a degree
   assert np.max(angle(v, w)) / degree < 1e-3

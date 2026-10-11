@@ -76,7 +76,7 @@ mori = grains.boundary['Fo', 'Fo'].misorientation
 mori = mori[(mori.angle() > 55 * degree) & (mori.angle() < 65 * degree)]
 
 # plot the distribution of rotational axes
-plot(mori.axis(), 'contourf', 'fundamentalRegion', halfwidth=5 * degree)
+plot(mori.axis(), contourf=True, fundamentalRegion=True, halfwidth=5 * degree)
 mtexColorbar()
 # -
 

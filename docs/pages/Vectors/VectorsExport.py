@@ -44,7 +44,7 @@ print(open(fname).read())
 # This representation contains directions only. It does not include vector length, so use
 # Cartesian coordinates when magnitudes matter.
 
-export(v, fname, 'polar')
+export(v, fname, polar=True)
 print(open(fname).read())
 
 # The two headings remain `polar angle` and `azimuth angle` for either angular unit. Record

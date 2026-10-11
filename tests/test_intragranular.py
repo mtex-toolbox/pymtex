@@ -358,7 +358,7 @@ def test_gradientKAMAndGROD_numbaIsTheNumpyOne():
 # the gradient method is the normal column of Nye's tensor of the curvature
 def test_weightedBurgersVec_gradientIsTheNormalColumnOfNyesTensor():
   e = linearMap(np.eye(2), 8)
-  W = e.weightedBurgersVec("gradient")
+  W = e.weightedBurgersVec(gradient=True)
   alpha = e.curvature().dislocationDensity()
   assert W.shape == e.shape and np.allclose(W.data, alpha.M[..., :, 2], equal_nan=True)
   assert e.weightedBurgersVec(gradient=True, stencil="1hop").shape == e.shape

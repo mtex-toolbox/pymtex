@@ -268,5 +268,5 @@ def test_values_on_the_nodes_of_makeGrid():
   sP = axisAngleSections(cs, cs)
   ori = sP.makeGrid(resolution=10 * degree)
   assert isinstance(ori, orientation) and ori.ndim == 1
-  hs = sP.plot(ori.angle(), "smooth")
+  hs = sP.plot(ori.angle(), smooth=True)
   assert any(h is not None for h in hs)

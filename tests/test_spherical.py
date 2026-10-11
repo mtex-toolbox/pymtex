@@ -288,7 +288,7 @@ def test_plotS2Grid_and_values_drawn_on_it():
   matplotlib.use("Agg")
   from mtex import contourf, plotS2Grid
   cs = crystalFrame("m-3m")
-  g = plotS2Grid("upper", cs, resolution=5 * degree)
+  g = plotS2Grid(cs, upper=True, resolution=5 * degree)
   assert g.ndim == 2 and g.frame is cs and np.nanmin(g.z) > -1e-9
   hs = contourf(g, g.z)
   assert len(hs) == 1 and hs[0] is not None

@@ -240,7 +240,7 @@ bccIron.centering, np.allclose(np.asarray(CSL([3, 5, 7, 9, 11], bccIron).angle()
 
 # +
 # compute and plot the boundary of the fundamental region
-oR = fundamentalRegion(ebsd.CS, ebsd.CS, 'antipodal')
+oR = fundamentalRegion(ebsd.CS, ebsd.CS, antipodal=True)
 plot(oR)
 
 # plot a reproducible sample of 500 boundary misorientations

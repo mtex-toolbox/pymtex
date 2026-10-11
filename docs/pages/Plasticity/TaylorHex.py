@@ -46,7 +46,7 @@ odf = FourierODF(odf)
 # here, so opposite directions are drawn as the same pole.
 
 h = Miller([[0, 0, 0, 1], [1, 0, -1, 0], [1, 0, -1, 1]], cs)
-plotPF(odf, h, 'contourf', 'complete', 'upper')
+plotPF(odf, h, contourf=True, complete=True, upper=True)
 mtexColorbar()
 
 # The basal poles form one maximum at ND. The prismatic poles form a ring because the
@@ -143,13 +143,13 @@ meanRotation
 
 # +
 newMtexFigure(layout=[3, 3])
-plotPF(odf, h, 'contourf', 'complete', 'upper', 'grid', grid_res=30 * degree)
+plotPF(odf, h, contourf=True, complete=True, upper=True, grid=True, grid_res=30 * degree)
 
 nextAxis()
-plotPF(oriCold, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, axisLabels=False, title=False)
+plotPF(oriCold, h, contourf=True, upper=True, complete=True, grid=True, grid_res=30 * degree, axisLabels=False, title=False)
 
 nextAxis()
-plotPF(oriWarm, h, 'contourf', 'upper', 'complete', 'grid', grid_res=30 * degree, axisLabels=False, title=False)
+plotPF(oriWarm, h, contourf=True, upper=True, complete=True, grid=True, grid_res=30 * degree, axisLabels=False, title=False)
 mtexColorbar()
 # -
 

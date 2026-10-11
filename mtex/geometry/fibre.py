@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .arguments import refuseFlags
 from .display import display, header, sizeString
 from .frames import crystalFrame, referenceFrame, specimenFrame
 from .kernels import qmul, qrot
@@ -276,10 +277,9 @@ class fibre:
     the fibre come too. This is the local fit of a concentrated cloud; the search through
     the pole figures of an ODF is the business of P2"""
     # 'local' names the one algorithm there is, the local quaternion tensor fit
+    refuseFlags(args, "fibre.fit", names=("local",))
     for a in args:
-      if isinstance(a, str) and a == "noSymmetry":
-        symmetry = False
-      elif not (isinstance(a, str) and a == "local"):
+      if not isinstance(a, str):
         raise ValueError(f"fibre.fit does not understand {a!r}")
     o = ori.flatten()
     o = o[~np.isnan(o.data).any(axis=-1)]

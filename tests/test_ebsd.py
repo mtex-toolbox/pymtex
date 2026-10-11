@@ -261,7 +261,7 @@ def test_rotate_functionFormAndProductAreTheMethod():
   both = ebsd.rotate(r)
   assert close(rotate(ebsd, r).pos.data, both.pos.data)
   assert close((r * ebsd).pos.data, both.pos.data) and close((r * ebsd).rotations.data, both.rotations.data)
-  assert np.array_equal(rotate(ebsd, r, 'keepEuler').rotations.data, rotations)
+  assert np.array_equal(rotate(ebsd, r, keepEuler=True).rotations.data, rotations)
 
 
 def test_transform_keeps_the_lattice_consistent():

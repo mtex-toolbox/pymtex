@@ -90,7 +90,7 @@ def test_tensor_takesTheDoubleConventionAsKeywordOrFlag():
   P = np.array([[0, 0, 0, 0.17, 0, 0], [0, 0, 0, 0, 0.17, 0], [0, 0, 0, 0, 0, 5.17]]) * 1e-11
   P0 = tensor(P, rank=3, name="piezoelectric modulus")
   assert P0.rank == 3 and np.allclose(Voigt(P0), P) and np.isclose(P0.M[2, 0, 1], 5.17e-11) and P0.M[2, 0, 1] == P0.M[2, 1, 0]
-  assert np.isclose(tensor(P, rank=3, doubleConvention=True).M[2, 0, 1], 5.17e-11 / 2) and tensor(P, "doubleConvention", rank=3).doubleConvention
+  assert np.isclose(tensor(P, rank=3, doubleConvention=True).M[2, 0, 1], 5.17e-11 / 2) and tensor(P, doubleConvention=True, rank=3).doubleConvention
 
 
 def test_tensor_rejectsWhatDoesNotFit():

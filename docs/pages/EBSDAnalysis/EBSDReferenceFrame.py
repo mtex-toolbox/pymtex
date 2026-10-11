@@ -168,7 +168,7 @@ plotPF(ebsd['O'].orientations, h, contourf=True)
 
 # +
 rot = rotation.byAxisAngle(yvector, 180 * degree)
-ebsd_rot = rotate(ebsd, rot, 'keepEuler')
+ebsd_rot = rotate(ebsd, rot, keepEuler=True)
 
 # reconstruct grains
 grains = calcGrains(ebsd_rot)
@@ -196,7 +196,7 @@ hold(False)
 # The opposite operation keeps the coordinates and turns only the orientations.
 
 # +
-ebsd_rot = rotate(ebsd, rot, 'keepXY')
+ebsd_rot = rotate(ebsd, rot, keepXY=True)
 
 # reconstruct grains
 grains = calcGrains(ebsd_rot)

@@ -192,8 +192,8 @@ grainsAboutCenter = rotate(grains, rot, center=rotationCenter)
 # For example, the first command below turns the vertices while retaining the orientation
 # values. The second changes the orientations while retaining the vertices.
 
-geometryOnly = rotate(grains, rot, 'keepEuler')
-orientationOnly = rotate(grains, rot, 'keepXY')
+geometryOnly = rotate(grains, rot, keepEuler=True)
+orientationOnly = rotate(grains, rot, keepXY=True)
 
 # These flags are useful when geometry and orientation require separate corrections. They
 # do not represent a rigid rotation of the whole specimen. The `center` option affects only

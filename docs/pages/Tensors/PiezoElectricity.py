@@ -70,7 +70,7 @@ mtexColorbar(title='longitudinal coefficient (pC/N)')
 # A rank three directional response is odd: $q(-n)=-q(n)$. Plotting both hemispheres
 # makes that sign reversal explicit.
 
-plot(P, 'complete', 'smooth', 'upper', 'lower')
+plot(P, complete=True, smooth=True, upper=True, lower=True)
 mtexColorbar(title='longitudinal coefficient (pC/N)')
 
 # The same threefold pattern occurs on the two hemispheres with red and blue exchanged at
@@ -136,7 +136,7 @@ orientationCount
 apparentMean = ori.calcTensor(P)
 qApparent = apparentMean.directionalMagnitude()
 
-plot(apparentMean, 'complete', 'smooth', 'upper', 'lower')
+plot(apparentMean, complete=True, smooth=True, upper=True, lower=True)
 mtexColorbar(title='apparent longitudinal coefficient (pC/N)')
 
 # rows: the single crystal and the all right-handed average, columns: minimum, maximum

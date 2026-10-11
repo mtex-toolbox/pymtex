@@ -15,6 +15,7 @@ import warnings
 
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.frames import crystalFrame
 from ..geometry.kernels import blasThreads
 from ..geometry.orientation import orientation
@@ -246,15 +247,18 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
 
 
-def interpS2(v, y, *args, **kwargs):
+def interpS2(v, y, *args, symmetry=True, **kwargs):
   """interp(v, y, 'linear'): a function through values at directions, by the method named,
-  MATLAB's vector3d/interp; with directions vi after the values, its values there"""
+  MATLAB's vector3d/interp; with directions vi after the values, its values there; symmetry=False
+  interpolates a function of a crystal frame without its group"""
   from .handles import S2FunHandle
   from .s2funtri import S2FunTri
   vi = next((a for a in args if isinstance(a, vector3d)), None)
+  methods = ("linear", "nearest", "harmonic", "spline", "inverseDistance")
+  refuseFlags(args, "interp", names=methods)
   flags = {a for a in args if isinstance(a, str)}
-  symmetric = getattr(v.frame, "sym", None) is not None and v.frame.sym.rotations().size > 1
-  if symmetric and not flags & {"linear", "nearest", "inverseDistance", "noSymmetry"}:
+  symmetric = symmetry and getattr(v.frame, "sym", None) is not None and v.frame.sym.rotations().size > 1
+  if symmetric and not flags & {"linear", "nearest", "inverseDistance"}:
     flags.add("harmonic")
   if vi is not None and "linear" not in flags and not flags & {"harmonic", "nearest", "inverseDistance"}:
     flags.add("spline")

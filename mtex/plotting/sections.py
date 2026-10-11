@@ -35,6 +35,7 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, zvector
 from .spherical import makeSphericalProjection
 from ..geometry.display import aligned
+from ..geometry.arguments import refuseFlags
 
 GREEK = {"phi1": "φ1", "Phi": "Φ", "phi2": "φ2", "alpha": "α", "beta": "β", "gamma": "γ", "sigma": "σ", "omega": "ω"}
 
@@ -137,7 +138,7 @@ class ODFSections:
         raise ValueError("values are drawn on the nodes of makeGrid: call oS.makeGrid() first")
       resolution, counts = self.plotGrid
       values = iter(np.split(np.asarray(x, dtype=float).reshape(-1), np.cumsum([c for c in counts if c])[:-1]))
-      kwargs.update({a: True for a in args if isinstance(a, str)})
+      refuseFlags(args, "plot")
       return _plotSectionFun(lambda ori: next(values), self, resolution=resolution, **kwargs)
     return plotSection(x, self, *args, **kwargs)
 

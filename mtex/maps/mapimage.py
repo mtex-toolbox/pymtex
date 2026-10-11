@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..geometry.arguments import refuseFlags
 from ..geometry.frames import specimenFrame
 from ..geometry.gridlayout import gridLayout, layoutIndex
 from ..geometry.plottingconvention import plottingConvention
@@ -492,7 +493,8 @@ def transformReferenceFrame(mg, target, *args, byScreenAlignment=False):
   if isinstance(target, mapImage):
     target = target.layout
   ori = next((a for a in args if isinstance(a, rotation)), None)
-  byPlot = byScreenAlignment or any(isinstance(a, str) and a == "byScreenAlignment" for a in args)
+  refuseFlags(args, "transformReferenceFrame")
+  byPlot = byScreenAlignment
   isLayout = isinstance(target, gridLayout)
   if isLayout and (ori is not None or byPlot):
     raise ValueError("a gridLayout only says which way round the array is stored; give a reference frame as the "

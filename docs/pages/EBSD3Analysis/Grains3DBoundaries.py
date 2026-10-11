@@ -125,7 +125,7 @@ print(np.column_stack([np.flatnonzero(n), n[n > 0]]))
 grainsS = smoothBoundary(reduceBoundary(grains, 2, quadric=True), taubinFilter(20))
 gBS = grainsS.boundary['indexed']
 
-plot(calcGBND(gBS), 'upper')
+plot(calcGBND(gBS), upper=True)
 mtexColorbar()
 # -
 

@@ -120,7 +120,7 @@ gcm().drawNow()
 KS = orientation.map(Miller(1, 1, 1, csAus), Miller(0, 1, 1, csBcc), Miller(-1, 0, 1, csAus), Miller(-1, -1, 1, csBcc))
 print(KS)
 
-plotPF(variants(KS, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
+plotPF(variants(KS, parentOri), add2all=True, markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 # -
 
 # The black rings are the ideal KS child variants predicted from the retained parent. Their
@@ -148,7 +148,7 @@ print(p2cMean)
 
 plotPF(childOri, hBcc, markerSize=5, markerFaceAlpha=0.05, markerEdgeAlpha=0.1, points=500)
 hold(True)
-plotPF(variants(p2cMean, parentOri), 'add2all', markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
+plotPF(variants(p2cMean, parentOri), add2all=True, markerFaceColor='none', markerEdgeColor='k', lineWidth=2)
 hold(False)
 
 fitMean = np.mean(angle(mori, p2cMean)) / degree
