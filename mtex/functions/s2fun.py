@@ -16,15 +16,18 @@ from typing import TYPE_CHECKING
 import math
 
 import numpy as np
+from numpy.lib.array_utils import normalize_axis_index
 
+from .harmonicarithmetic import harmonicArithmetic
+from .s2funclass import S2Fun
 from ..geometry.frames import referenceFrame
 from ..geometry.quaternion import rotation
 from ..geometry.session import SESSION, getMTEXpref
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .harmonics import _WignerD, _projectBlock, invariantProjection, mtexCoefficientsS2
 from .kernelfunctions import S2Kernel
 from .quadrature import quadratureS2Grid
-from .kernels import realizeSpherical
+from .kernels import realizeSpherical, _complexType
 from .transforms import isRealSpherical, sphericalSeries, sphericalSeriesAdjoint
 
 
@@ -32,10 +35,6 @@ def quadratureBandwidth():
   """the bandwidth a callable or scattered values are expanded to when none is asked for, the
   preference defaultS2Bandwidth"""
   return int(getMTEXpref("defaultS2Bandwidth"))
-
-
-def _complexType(dtype):
-  return np.result_type(np.dtype(dtype), 1j)
 
 
 def evenize(fhat):
@@ -77,7 +76,7 @@ def projectSpherical(fhat, pg):
   return fhat
 
 
-class S2FunHarmonic:
+class S2FunHarmonic(S2Fun, harmonicArithmetic):
   """a function on the sphere by its spherical harmonic coefficients, or a list of such functions;
   symmetrised by the group of its frame, even when antipodal
 
@@ -149,7 +148,7 @@ class S2FunHarmonic:
       n, adjoint = len(nodes), lambda x: sphericalSeriesAdjoint(nodes, x, L, weights)
     else:
       L = quadratureBandwidth() if bandwidth is None else int(bandwidth)
-      v = nodes if isinstance(nodes, vector3d) else vector3d(nodes)
+      v = asVector3d(nodes)
       frame = v.frame if frame is None else frame
       antipodal = v.antipodal if antipodal is None else antipodal
       w = np.full(v.size, 4 * np.pi / v.size) if weights is None else np.asarray(weights).ravel()
@@ -168,7 +167,7 @@ class S2FunHarmonic:
     if isinstance(nodes, quadratureS2Grid):
       L, w, v = nodes.bandwidth, nodes.weights if weights is None else weights, nodes
     else:
-      v = (nodes if isinstance(nodes, vector3d) else vector3d(nodes)).flatten()
+      v = asVector3d(nodes).flatten()
       L = quadratureBandwidth() if bandwidth is None else int(bandwidth)
       w = np.ones(v.size) if weights is None else np.broadcast_to(np.asarray(weights, dtype=float).ravel(), (v.size,))
     fhat = _perColumn(lambda x: sphericalSeriesAdjoint(v, x, L, w), np.nan_to_num(values), len(v))
@@ -179,7 +178,6 @@ class S2FunHarmonic:
   @staticmethod
   def unimodal(*args, **kwargs):
     """S2FunHarmonic.unimodal(v, halfwidth=w): MATLAB's other name of S2Fun.unimodal"""
-    from .s2funclass import S2Fun
     return S2Fun.unimodal(*args, **kwargs)
 
   @classmethod
@@ -288,7 +286,7 @@ class S2FunHarmonic:
 
   # bare vectors, or framed ones in the frame of the function or one sharing its basis
   def _vectorsFor(self, x):
-    v = x if isinstance(x, vector3d) else vector3d(x)
+    v = asVector3d(x)
     if self.frame is not None and v.frame is not None and v.frame is not self.frame:
       try:
         SESSION.joinFrames(v.frame, self.frame)
@@ -369,12 +367,6 @@ class S2FunHarmonic:
   def __neg__(self):
     return self._rebuild(-self._fhat)
 
-  def __sub__(self, g):
-    return self + (-g)
-
-  def __rsub__(self, a):
-    return (-self) + a
-
   def __mul__(self, a):
     if isinstance(a, S2FunHarmonic):
       from .funops import mapFun
@@ -382,21 +374,6 @@ class S2FunHarmonic:
     if isinstance(a, (int, float, complex, np.number)):
       return S2FunHarmonic(a * self._fhat, self.frame, real=self.isReal and np.isreal(a), antipodal=self.antipodal, symmetrise=False, _internal=True)
     return NotImplemented
-
-  def __truediv__(self, a):
-    if isinstance(a, S2FunHarmonic):
-      from .funops import mapFun, smoothBandwidth
-      return mapFun(np.divide, self, a, bandwidth=smoothBandwidth(self, a))
-    return self * (1 / a)
-
-  def __rtruediv__(self, a):
-    from .funops import mapFun, smoothBandwidth
-    return mapFun(lambda x: a / x, self, bandwidth=smoothBandwidth(self))
-
-  def __pow__(self, p):
-    from .funops import mapFun, smoothBandwidth
-    L = min(p * self.bandwidth, 2048) if isinstance(p, (int, np.integer)) and p >= 0 else smoothBandwidth(self)
-    return mapFun(lambda x: x ** p, self, bandwidth=L)
 
   # |f| as a handle, evaluated when asked, as MATLAB's abs of a spherical function
   def __abs__(self):
@@ -429,7 +406,7 @@ class S2FunHarmonic:
     """the mean over the sphere, int f dS / 4 pi, one per function; with an axis the mean
     function along that axis of a list"""
     if axis is not None:
-      return self._rebuild(np.mean(self._fhat, axis=_leadingAxis(axis, self.shape)))
+      return self._rebuild(np.mean(self._fhat, axis=normalize_axis_index(axis, len(self.shape))))
     x = self._fhat[..., 0] / math.sqrt(4 * math.pi)
     x = x.real if self.isReal else x
     return x[()] if x.ndim == 0 else x
@@ -438,7 +415,7 @@ class S2FunHarmonic:
     """the integral over the sphere, int f dS, S2Fun/sum; with an axis the sum of the functions
     along that axis of a list"""
     if axis is not None:
-      return self._rebuild(np.sum(self._fhat, axis=_leadingAxis(axis, self.shape)))
+      return self._rebuild(np.sum(self._fhat, axis=normalize_axis_index(axis, len(self.shape))))
     return 4 * math.pi * self.mean()
 
   def norm(self, s=None):
@@ -462,8 +439,9 @@ class S2FunHarmonic:
   # the pointwise minimum or maximum of the functions of a list along an axis, MATLAB's
   # min(sF, [], d), by quadrature; min(sF, axis=d) and max reach it through characteristics
   def _reduce(self, op, axis):
-    ax = _leadingAxis(axis, self.shape)
-    fun = lambda v: op(self.eval(v), axis=np.ndim(v.data) - 1 + ax)
+    ax = normalize_axis_index(axis, len(self.shape))
+    def fun(v):
+      return op(self.eval(v), axis=np.ndim(v.data) - 1 + ax)
     return S2FunHarmonic(fun, self.frame, bandwidth=self.bandwidth, real=self.isReal, antipodal=self.antipodal)
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
@@ -483,8 +461,8 @@ class S2FunHarmonic:
 
   def rotate(self, rot):
     """the function rotated, f(rot^-1 v); rot * f is the same"""
-    from .funops import rotate
-    return rotate(self, rot)
+    from .funops import _rotateS2
+    return _rotateS2(self, rot)
 
   def conv(self, g):
     """the convolution with a kernel or another function on the sphere; with a function on the
@@ -537,12 +515,6 @@ def _cut(fhat, L):
 
 
 # the axis of the list an axis argument names, negative ones counted from the end
-def _leadingAxis(axis, shape):
-  if not shape:
-    raise ValueError("a single function has no axis to reduce")
-  return int(axis) % len(shape)
-
-
 # the adjoint transform column by column of values shaped (nodes, list...), the list shape
 # in front of the coefficients
 def _perColumn(adjoint, values, n):

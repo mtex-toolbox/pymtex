@@ -13,14 +13,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .so3funclass import SO3Fun
+from .s2funclass import S2Fun
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.symreduce import reductionGroups
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .funops import conv
-from .rbf import SO3FunCBF, SO3FunRBF, _readFrames, _rotationsFor, uniformODF
+from .rbf import SO3FunCBF, SO3FunRBF, _framesAmong, _rotationsFor, uniformODF
 from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
@@ -30,7 +32,7 @@ from ..geometry.display import frameLabel, framesLabel
 from ..geometry.display import aligned
 
 
-class SO3FunGeneric:
+class SO3FunGeneric(SO3Fun):
   """what every representation on SO(3) without an exact harmonic form shares: evaluation in its
   frames, the operations through the harmonic form, and sums as compositions"""
   isReal = True
@@ -174,7 +176,7 @@ class SO3FunHandle(SO3FunGeneric):
     if isinstance(fun, (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF)):
       f = fun
       fun, frames = (lambda o: f(o)), (f.CS, f.SS)
-    self.CS, self.SS = _readFrames(frames)
+    self.CS, self.SS = _framesAmong(frames)
     if antipodal and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
     self.fun = _symmetrisedSO3(fun, self.CS, self.SS, antipodal) if symmetrise else fun
@@ -304,7 +306,7 @@ def _symmetrisedS2(fun, frame, antipodal):
   return averaged
 
 
-class S2FunHandle:
+class S2FunHandle(S2Fun):
   """a function on the sphere given by a callable that receives directions
 
     S2FunHandle(fun, frame)
@@ -332,7 +334,7 @@ class S2FunHandle:
     return self.frame
 
   def _vectorsFor(self, x):
-    v = x if isinstance(x, vector3d) else vector3d(x)
+    v = asVector3d(x)
     if self.frame is not None and v.frame is not None and v.frame is not self.frame:
       try:
         SESSION.joinFrames(v.frame, self.frame)
@@ -452,7 +454,7 @@ def _directRatio(f, g):
   return S2FunHandle(lambda v: f(v) / g(v), f.frame, bandwidth=max(f.bandwidth, g.bandwidth), antipodal=f.antipodal and g.antipodal, real=f.isReal and g.isReal, symmetrise=False)
 
 
-class S2FunSum:
+class S2FunSum(S2Fun):
   """a sum of functions on the sphere of different representations: evaluation adds the values,
   the harmonic form adds the harmonic forms; what + returns when coefficients cannot be added"""
 

@@ -18,6 +18,7 @@ import warnings
 
 import numpy as np
 
+from ..functions.polefigure import PoleFigure
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
 from ..geometry.representations import EULER_LABELS, eulerConvention
@@ -169,20 +170,20 @@ def export(ebsd, fname, *args, **kwargs):
     export(ebsd, 'map.h5oina')                into a copy of the file the map came from
     export(ebsd, 'map.txt', 'ABG', radians=True)   a table of x y, the Euler angles, the phase and the properties
     export(v, 'vectors.txt')                  a list of directions as a table, see exportVector3d
-    export(pf, 'dubna', 'degree')             a pole figure data set, one table per pole figure
+    export(pf, 'dubna', degree=True)          a pole figure data set, one table per pole figure
   """
   # an orientation list is a table of its angles
-  from ..geometry.orientation import orientation
   from ..geometry.quaternion import quaternion
-  if isinstance(ebsd, quaternion) or isinstance(ebsd, orientation):
+  if isinstance(ebsd, quaternion):
     from .exportorientation import exportOrientation
     return exportOrientation(ebsd, fname, *args, **kwargs)
   # a function on SO(3) goes to its own writers
-  if hasattr(ebsd, "eval") and hasattr(ebsd, "CS") and hasattr(ebsd, "SS"):
+  from ..functions.so3funclass import SO3Fun
+  if isinstance(ebsd, SO3Fun):
     from .exportodf import exportODF
     return exportODF(ebsd, fname, *args, **kwargs)
   # a pole figure data set goes to one table per pole figure
-  if hasattr(ebsd, "allH") and hasattr(ebsd, "allR"):
+  if isinstance(ebsd, PoleFigure):
     from .exportpolefigure import exportPoleFigure
     return exportPoleFigure(ebsd, fname, *args, **kwargs)
   fname = os.fspath(fname)

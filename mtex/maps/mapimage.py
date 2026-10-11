@@ -330,7 +330,8 @@ class mapImageList(list):
              m.name, _ebsdStr(m.ebsd)) for n, m in enumerate(self)]
     labels = ("", "image", "pixel", "frame", "layout", "name", "EBSD")
     w = [max(len(labels[j]), *(len(r[j]) for r in rows)) for j in range(len(labels))]
-    line = lambda r: "  " + "  ".join(x.ljust(n) for x, n in zip(r, w)).rstrip()
+    def line(r):
+      return "  " + "  ".join(x.ljust(n) for x, n in zip(r, w)).rstrip()
     pC = self[0].how2plot
     same = pC is not None and all(m.how2plot is not None and m.how2plot == pC for m in self)
     head = f"mapImage ({pC.char()})" if same else "mapImage"

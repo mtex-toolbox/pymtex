@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..functions.so3vectorfield import SO3VectorField
+from ..functions.so3funclass import SO3Fun
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import eulerRegion, fundamentalRegion, orientationRegion
@@ -17,7 +19,8 @@ from ..geometry.tangent import SO3TangentVector
 from ..geometry.representations import quat2euler, quatAngle, quatAxis
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
+from ..geometry.arguments import refuseFlags
 from .colormaps import mtexColormap
 from .keywords import patchKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure, nextAxis
@@ -101,8 +104,7 @@ def _spaceAxes(frame, limits=1.3, decorated=False, figSize=None, parent=None, az
     fig = gcm()
     # a held plot draws into the axes drawn into last, which nextAxis need not have made last
     if fig is not None and fig.hold and fig.children:
-      cur = getattr(fig, "current", None)
-      cur = cur if cur in fig.children else fig.children[-1]
+      cur = fig._axesDrawnInto()
       if hasattr(cur, "_mtexSpacePlot"):
         return cur._mtexSpacePlot
     # the axes nextAxis prepared, or the first of a fresh newMtexFigure, becomes a 3D axes
@@ -203,7 +205,7 @@ def plot3d(x, *args, **kw: Unpack[PlotKeywords]):
   from ..geometry.fibre import fibre
   if isinstance(x, fibre):
     return plotFibre3d(x, *args, **kw)
-  if hasattr(x, "_poleFigure") and hasattr(x, "CS") and hasattr(x, "SS"):
+  if isinstance(x, SO3Fun):
     from .mtexfigure import firstOfList
     return plotODF3d(firstOfList(x), *args, **kw)
   if _isField(x):
@@ -216,7 +218,7 @@ def plot3d(x, *args, **kw: Unpack[PlotKeywords]):
 def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="viridis", colorRange=None, grid=True, axisLabels=True,
               label=None, colorbar=False, **kw: Unpack[PlotKeywords]):
   """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   axesKw = _keys(kw)
   sP = _spaceAxes(v.frame, **axesKw)
   if not sP.ax.collections:
@@ -484,26 +486,22 @@ def _markerStyle(kw, color, markerSize):
 
 
 # the flags of the coordinates of orientation space, as MATLAB names them
+# the values and the space a positional string names, MATLAB's 'Bunge' being 'Euler'
 def _spaceFlags(args, Euler, axisAngle, Rodrigues):
-  data, region, complete = None, None, False
+  spaces = {"euler": "Euler", "bunge": "Euler", "axisangle": "axisAngle", "rodrigues": "Rodrigues"}
+  data = None
   for a in args:
-    if isinstance(a, str):
-      flags = {"euler": "Euler", "bunge": "Euler", "axisangle": "axisAngle", "rodrigues": "Rodrigues"}
-      if a.lower() in flags:
-        Euler, axisAngle, Rodrigues = (flags[a.lower()] == x for x in ("Euler", "axisAngle", "Rodrigues"))
-      elif a.lower() == "noboundary":
-        region = False
-      elif a.lower() == "complete":
-        complete = True
-      elif a.lower() != "filled":
-        raise ValueError("the space is 'axisAngle', 'Euler', 'Bunge' or 'Rodrigues'")
-    else:
+    if not isinstance(a, str):
       data = a
-  return data, Euler, axisAngle, Rodrigues, region, complete
+    elif a.lower() in spaces:
+      Euler, axisAngle, Rodrigues = (spaces[a.lower()] == x for x in ("Euler", "axisAngle", "Rodrigues"))
+    else:
+      refuseFlags([a], "the space plots", names=())
+  return data, Euler, axisAngle, Rodrigues
 
 
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
-                        ignoreFundamentalRegion=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="viridis",
+                        ignoreFundamentalRegion=False, complete=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="viridis",
                         colorRange=None, colorbar=False, all=False, **kw: Unpack[PlotKeywords]):
   """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
   scatter(ori, all=True)
@@ -514,8 +512,8 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   positional string as MATLAB names it, 'Bunge' being 'Euler'. A bare rotation has no
   region: the whole Euler box, the ball of axis angle space.
   """
-  data, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
-  region = region and noRegion is None and not complete
+  data, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  boundary, region = region, region and not complete
   ignoreFundamentalRegion = ignoreFundamentalRegion or complete
   color, style = _markerStyle(kw, color, markerSize)
   axesKw = _keys(kw)
@@ -580,7 +578,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
         _region(sP, oR)
         if not held:
           _fitRegion(sP, oR, finite)
-      elif not reduced and noRegion is None and not zoom:
+      elif not reduced and boundary and not zoom:
         _ball(sP)
     else:
       sP.ax.set_xlabel("r1")
@@ -627,10 +625,10 @@ def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fal
   # a field on the sphere is drawn as arrows on the sphere in space
   if _isField(t):
     return _quiverField3d(t, color="k" if color is None else color, **kw)
-  if type(t).__name__.startswith("SO3VectorField"):
+  if isinstance(t, SO3VectorField):
     return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw)
   color = "b" if color is None else color
-  _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   refuseVariants(kw)
   axesKw = _keys(kw)
   ref = t.oriRef
@@ -664,7 +662,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   color = "b" if color is None else color
   res = kw.pop("resolution", 10 * degree)
   refuseVariants(kw)
-  _, Euler, axisAngle, Rodrigues, _, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
   axesKw = _keys(kw)
   g = equispacedSO3Grid(F.CS, F.SS, resolution=res)
@@ -697,7 +695,7 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   from matplotlib.colors import to_rgba
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .sphericalplot import _nameOf
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   refuseVariants(kw)
   if labeled and label is None:
     label = [_nameOf(v.flatten()[i]) for i in range(v.size)]
@@ -761,10 +759,10 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
 
 
 def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=False, Euler=False, fundamentalRegion=True,
-                ignoreFundamentalRegion=False, region=True, points=1000, **kw: Unpack[PlotKeywords]):
+                ignoreFundamentalRegion=False, region=True, complete=False, points=1000, **kw: Unpack[PlotKeywords]):
   """plot(f): a fibre as its curve through orientation space, in the coordinates of the held
   axes or Euler angles, as MATLAB draws it"""
-  _, Euler, axisAngle, Rodrigues, noRegion, complete = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   refuseVariants(kw)
   color = kw.pop("lineColor", color)
   coordinates = "Rodrigues" if Rodrigues else "axisAngle" if axisAngle else "Euler"
@@ -788,7 +786,7 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
     sP = _spaceAxes(o.CS, limits=1.1 * bound, decorated=True, **axesKw)
     if coordinates == "axisAngle":
       _regionLabels(sP.ax)
-      if region and noRegion is None:
+      if region:
         _region(sP, oR) if reduced else _ball(sP)
     else:
       sP.ax.set_xlabel("r1")
@@ -803,7 +801,7 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   return sP.ax.plot(Q[:, 0], Q[:, 1], Q[:, 2], linewidth=lineWidth, color=color, label=label, **kw)[0]
 
 
-def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, **kw: Unpack[PlotKeywords]):
+def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", axisAngle=False, Rodrigues=False, Euler=False, region=True, **kw: Unpack[PlotKeywords]):
   """plot3d(odf), plot3d(odf, 'axisAngle'): the isosurfaces of an ODF at surf3 levels from zero
   to its maximum, over the Euler box of its frames or inside its fundamental region in axis
   angle space, the higher the less transparent (MATLAB @SO3Fun/plot3d)"""
@@ -811,7 +809,7 @@ def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", ax
   from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .space import isosurface
-  _, Euler, axisAngle, Rodrigues, noRegion, _ = _spaceFlags(args, Euler, axisAngle, Rodrigues)
+  _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   if Rodrigues:
     raise ValueError("the isosurfaces of an ODF are drawn in Euler angle or axis angle space")
   axesKw = _keys(kw)
@@ -831,7 +829,7 @@ def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", ax
     V = V.reshape(omega.shape)
     sP = _spaceAxes(odf.CS, limits=1.1 * w / degree, decorated=True, **axesKw)
     _regionLabels(sP.ax)
-    if noRegion is None:
+    if region:
       _region(sP, oR)
     sP.coordinates = "axisAngle"
   else:

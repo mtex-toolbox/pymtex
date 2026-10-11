@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.kernels import qmul
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
@@ -59,7 +60,7 @@ def _calcGBND3d(gB, grains=None, moriRef=None, halfwidth=10 * degree, symmetry=T
 # the vectors v turned by the inverses of the rotations q, row by row
 def _inverseRotate(q, v):
   from ..geometry.quaternion import rotation
-  return (rotation._fromData(q * np.array([1, -1, -1, -1])) * vector3d(v)).data.reshape(-1, 3)
+  return (rotation._fromData(qconj(q)) * vector3d(v)).data.reshape(-1, 3)
 
 
 def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
@@ -75,7 +76,7 @@ def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
   gB = gB[np.flatnonzero(sel)]
   qg = grains.meanRotation.data.reshape(-1, 4)
   o1, o2 = qg[grains.id2ind(gB.grainId[:, 0])], qg[grains.id2ind(gB.grainId[:, 1])]
-  m = qmul(o1 * np.array([1, -1, -1, -1]), o2)
+  m = qmul(qconj(o1), o2)
   omega = np.asarray(orientation(rotation._fromData(m), cs1, cs2).angle(moriRef)).reshape(-1)
   inc = omega < 2 * hw
   area = gB.area[inc]
@@ -90,7 +91,7 @@ def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
   s1 = np.zeros((len(mi), 4))
   s2 = np.zeros((len(mi), 4))
   for a in G1:
-    left = qmul(np.broadcast_to(a * np.array([1, -1, -1, -1]), mi.shape), mi)
+    left = qmul(np.broadcast_to(qconj(a), mi.shape), mi)
     for b in G2:
       c = np.abs(qmul(left, np.broadcast_to(b, mi.shape)) @ r)
       better = c > best
@@ -113,7 +114,7 @@ def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
 def _stabiliser(G1, G2, r):
   keep = []
   for a in G1:
-    left = qmul(a * np.array([1, -1, -1, -1]), r)
+    left = qmul(qconj(a), r)
     if np.any(np.abs(qmul(np.broadcast_to(left, G2.shape), G2) @ r) > 1 - 1e-9):
       keep.append(a)
   return np.array(keep)

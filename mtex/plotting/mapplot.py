@@ -17,7 +17,7 @@ from ..geometry.orientation import orientation
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, zvector
+from ..geometry.vector3d import vector3d, zvector, asVector3d
 from .colormaps import mtexColormap
 from .maps import (CELLS_MAX, boundaryPolyline, boundarySegments, frameOnScreen, grainPolygons, mapCells, mapExtent, mapLayout,
                    mapPoints, mapRaster, phasePalette, planeOf, scaleBar, triadGeometry)
@@ -783,7 +783,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
   refuseVariants(kw)
   mapKw = _splitMap(kw)
   mP = _target(x, mapKw)
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   raw = v.data.reshape(-1, 3)
   kind = _kind(x)
   if raw.shape[0] != x.size:
@@ -999,10 +999,6 @@ def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
   return axes
 
 
-__all__ = ["line", "scatterXY", "mapPlot", "plotEBSD", "plotGrains", "plotBoundary", "plotTriplePoints", "quiverMap", "scaleBarOn", "phaseLegend", "keyLegend",
-           "keyResolution", "mapValues", "mapAliases"]
-
-
 # ------------------------------------------------------------------ images on the specimen
 
 # the outline of an image, what a map plot needs to place it: its corners a half pixel out,
@@ -1092,3 +1088,7 @@ def plotMapImage(mg, channel=None, edge=False, micronbar=None, refFrame=True, co
     mP.mappable = h
   _finish(mP, x, micronbar, refFrame, False, "image")
   return h
+
+
+__all__ = ["line", "scatterXY", "mapPlot", "plotEBSD", "plotGrains", "plotBoundary", "plotTriplePoints", "quiverMap", "scaleBarOn", "phaseLegend", "keyLegend",
+           "keyResolution", "mapValues", "mapAliases"]

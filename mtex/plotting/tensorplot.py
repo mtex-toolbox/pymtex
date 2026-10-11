@@ -32,7 +32,8 @@ def _extrema(f, resolution=1 * degree):
   V = vector3d(g.data.reshape(-1, 3), frame=getattr(f, "frame", None), isNormalized=True)
   vals = np.real(np.asarray(f(V), dtype=complex)).reshape(-1)
   hi, lo = int(np.nanargmax(vals)), int(np.nanargmin(vals))
-  at = lambda k: vector3d(V.data[k], frame=V.frame, antipodal=bool(getattr(f, "antipodal", False)))
+  def at(k):
+    return vector3d(V.data[k], frame=V.frame, antipodal=bool(getattr(f, "antipodal", False)))
   return (float(vals[hi]), at(hi)), (float(vals[lo]), at(lo))
 
 
@@ -60,8 +61,10 @@ def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False,
       cache[key] = velocity(C, vector3d(v.data), density=density)
     return cache[key]
 
-  fun = lambda g: S2FunHandle(lambda v: np.asarray(g(vel(v))).reshape(v.shape), C.frame, antipodal=True, bandwidth=32)
-  field = lambda k: S2AxisFieldHandle(lambda v: vel(v)[k].data, C.frame, bandwidth=32)
+  def fun(g):
+    return S2FunHandle(lambda v: np.asarray(g(vel(v))).reshape(v.shape), C.frame, antipodal=True, bandwidth=32)
+  def field(k):
+    return S2AxisFieldHandle(lambda v: vel(v)[k].data, C.frame, bandwidth=32)
   panels = [(fun(lambda w: w.vp), "Vp (km/s)", "Vp Anisotropy", None),
             (fun(lambda w: 200 * (w.vs1 - w.vs2) / (w.vs1 + w.vs2)), "S-wave anisotropy (%)", "Max Vs Anisotropy", None),
             (fun(lambda w: w.vs1), "Vs1 (km/s)", "Vs1 Anisotropy", field(4)),

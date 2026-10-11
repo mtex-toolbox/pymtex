@@ -71,7 +71,8 @@ def matthies2quat(alpha, beta, gamma):
 def eulerTriple(a, b, c, rest):
   """byEuler(E, ...) with E an (..., 3) array of triples, as MATLAB's byEuler([phi1 Phi phi2]):
   the three angles and the arguments after them"""
-  isAngle = lambda x: isinstance(x, (int, float, np.number, np.ndarray, list, tuple))
+  def isAngle(x):
+    return isinstance(x, (int, float, np.number, np.ndarray, list, tuple))
   if b is not None and isAngle(b):
     return a, b, c, rest
   E = np.asarray(a, dtype=float)
@@ -202,7 +203,8 @@ def mat2quat(M):
   k = np.argmax(absQ, axis=-1)
   q = np.take_along_axis(absQ, k[..., None], axis=-1)[..., 0]
   q4 = 4 * q
-  m = lambda i, j: M[..., i, j]
+  def m(i, j):
+    return M[..., i, j]
   cand = np.stack([
     np.stack([q, (m(1, 2) - m(2, 1)) / q4, (m(2, 0) - m(0, 2)) / q4, (m(0, 1) - m(1, 0)) / q4], axis=-1),
     np.stack([(m(0, 1) - m(1, 0)) / q4, (m(2, 0) + m(0, 2)) / q4, (m(2, 1) + m(1, 2)) / q4, q], axis=-1),
@@ -217,21 +219,23 @@ def mat2quat(M):
 
 # ------------------------------------------------------------------ pairs of directions
 
-def _unit(v):
-  v = np.asarray(v, dtype=float)
-  return v / np.linalg.norm(v, axis=-1, keepdims=True)
+def unitRows(a):
+  """the vectors along the last axis scaled to unit length, a zero vector left zero"""
+  a = np.asarray(a, dtype=float)
+  n = np.linalg.norm(a, axis=-1, keepdims=True)
+  return a / np.where(n == 0, 1, n)
 
 
 def orthKernel(xyz):
   """an arbitrary orthogonal direction, vector3d/orth: (x,y,z) -> (-y,x,0), (0,y,z) -> (1,0,0)"""
   xyz = np.asarray(xyz, dtype=float)
   y = np.where(isnull(xyz[..., 0]), -1.0, xyz[..., 1])
-  return _unit(np.stack([-y, xyz[..., 0], np.zeros_like(y)], axis=-1))
+  return unitRows(np.stack([-y, xyz[..., 0], np.zeros_like(y)], axis=-1))
 
 
 def map1Kernel(u, v):
   """the smallest rotation with r * u parallel to v, hr2quat"""
-  u, v = _unit(u), _unit(v)
+  u, v = unitRows(u), unitRows(v)
   n = np.cross(u, v)
   nn = np.linalg.norm(n, axis=-1)
   ax = np.where(isnull(nn)[..., None], orthKernel(u), n / np.where(isnull(nn), 1.0, nn)[..., None])
@@ -241,15 +245,16 @@ def map1Kernel(u, v):
 
 def map2Kernel(u1, v1, u2, v2):
   """the rotation with r * u1 parallel to v1 and r * u2 parallel to v2, rotation/map"""
-  u1, v1, u2, v2 = (_unit(x) for x in (u1, v1, u2, v2))
-  ang = lambda a, b: np.arctan2(np.linalg.norm(np.cross(a, b), axis=-1), np.sum(a * b, axis=-1))
+  u1, v1, u2, v2 = (unitRows(x) for x in (u1, v1, u2, v2))
+  def ang(a, b):
+    return np.arctan2(np.linalg.norm(np.cross(a, b), axis=-1), np.sum(a * b, axis=-1))
   delta = np.abs(ang(u1, u2) - ang(v1, v2))
   if np.any(delta >= 1e-3):
     raise ValueError(f"inconsistent pairs of vectors: the angles between u1, u2 and v1, v2 differ by {np.max(delta) * 180 / np.pi:.3g}°")
   if np.any(np.abs(np.sum(u1 * u2, axis=-1)) > 1 - np.finfo(float).eps):
     raise ValueError("the two directions must not be colinear")
-  u3, v3 = _unit(np.cross(u1, u2)), _unit(np.cross(v1, v2))
-  u2t, v2t = _unit(np.cross(u3, u1)), _unit(np.cross(v3, v1))
+  u3, v3 = unitRows(np.cross(u1, u2)), unitRows(np.cross(v1, v2))
+  u2t, v2t = unitRows(np.cross(u3, u1)), unitRows(np.cross(v3, v1))
   M = v1[..., :, None] * u1[..., None, :] + v2t[..., :, None] * u2t[..., None, :] + v3[..., :, None] * u3[..., None, :]
   return mat2quat(M)
 
@@ -257,7 +262,7 @@ def map2Kernel(u1, v1, u2, v2):
 def fitKernel(u, v, weights=None, method="horn"):
   """the rotation best mapping the list u onto the list v, rotation/fit: Horn's quaternion
   method, or Kabsch's singular value decomposition of the cross covariance"""
-  u, v = _unit(u).reshape(-1, 3), _unit(v).reshape(-1, 3)
+  u, v = unitRows(u).reshape(-1, 3), unitRows(v).reshape(-1, 3)
   if weights is not None:
     u = u * np.asarray(weights, dtype=float).reshape(-1, 1)
   M = u.T @ v

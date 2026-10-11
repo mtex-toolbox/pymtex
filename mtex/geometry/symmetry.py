@@ -31,7 +31,7 @@ from .latticetype import latticeType
 from .quaternion import orthogonalTransform, reflection, rotation
 from .session import getMTEXpref
 from .units import degree
-from .vector3d import classproperty, vector3d, xvector, yvector, zvector
+from .vector3d import classproperty, vector3d, xvector, yvector, zvector, asVector3d
 
 if TYPE_CHECKING:
   from .vocabulary import PointGroupName
@@ -109,7 +109,8 @@ def _symbolSystem(positions):
 # primary, 45 degree for a square and -30 degree for a hexagonal net (a - b in hexagonal
 # axes), so it is right in any axes
 def _symmetryDirections(system, a, b, c):
-  turned = lambda theta: rotation.byAxisAngle(c, theta) * a
+  def turned(theta):
+    return rotation.byAxisAngle(c, theta) * a
   if system is latticeType.cubic:
     return (a, a + b + c, a + b)
   if system is latticeType.tetragonal:
@@ -297,7 +298,7 @@ class symmetry:
     """the maximal n-fold of the group, and about given axes, symmetry/nfold"""
     if axis is None:
       return self._maxOrder()
-    axis = axis if isinstance(axis, vector3d) else vector3d(axis)
+    axis = asVector3d(axis)
     return np.array([self._maxOrder(lambda r: r.axis().angle(v, antipodal=True) < 1e-5) for v in axis.flatten()]).reshape(axis.shape)
 
   @property

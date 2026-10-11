@@ -310,11 +310,11 @@ class grain2d(polygonSet):
     q[ind] = np.broadcast_to(ori.data.reshape(-1, 4), (len(ind), 4))
     ph = self.phaseId.copy()
     ph[ind] = self.CSList.phaseId(ori.CS)
-    object.__setattr__(self, "meanRotation", self.meanRotation._new(q))
-    object.__setattr__(self, "phaseId", ph)
+    self.meanRotation = self.meanRotation._new(q)
+    self.phaseId = ph
     new = self.update()
-    object.__setattr__(self, "boundary", new.boundary)
-    object.__setattr__(self, "innerBoundary", new.innerBoundary)
+    self.boundary = new.boundary
+    self.innerBoundary = new.innerBoundary
 
   def _phaseMask(self, names):
     mask = np.zeros(self.size, dtype=bool)
@@ -521,7 +521,7 @@ class grain2d(polygonSet):
       inside = (gid > 0) & (gid < len(pos))
       p = np.where(inside, pos[np.where(inside, gid, 0)], -1)
       ph = np.where(p >= 0, self.phaseId[np.maximum(p, 0)], gB.phaseId).astype(np.int8)
-      object.__setattr__(out, name, gB._with(phaseId=ph, CSList=self.CSList))
+      setattr(out, name, gB._with(phaseId=ph, CSList=self.CSList))
     return out
 
   # the pairs of neighbours of one indexed phase whose mean orientations are within the threshold
@@ -551,10 +551,12 @@ class grain2d(polygonSet):
     table[self.id] = parent
     external = seen[(seen > 0) & ~np.isin(seen, self.id)]
     table[external] = n + 1 + np.arange(len(external))
-    relabel = lambda g: table[g].astype(np.int32)
+    def relabel(g):
+      return table[g].astype(np.int32)
     gid = relabel(gB.grainId) if len(gB) else gB.grainId
     outer = gid[:, 0] != gid[:, 1]
-    sub = lambda sel: gB._with(F=gB.F[sel], grainId=gid[sel], ebsdId=gB.ebsdId[sel], phaseId=gB.phaseId[sel], misrotation=gB.misrotation.data[sel])
+    def sub(sel):
+      return gB._with(F=gB.F[sel], grainId=gid[sel], ebsdId=gB.ebsdId[sel], phaseId=gB.phaseId[sel], misrotation=gB.misrotation.data[sel])
     oldInner = ib._with(grainId=relabel(ib.grainId) if len(ib) else ib.grainId)
     return sub(outer), catBoundaries(sub(~outer), oldInner)
 

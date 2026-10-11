@@ -20,7 +20,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.tangent import spinTensor
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .funops import _rotatedFrame
 from .harmonics import mtexCoefficientsS2, _WignerD
 from .quadrature import quadratureS2Grid
@@ -56,7 +56,7 @@ def _values(x):
 
 # bare vectors, or framed ones in the frame of the field or one sharing its basis
 def _vectorsFor(f, x):
-  v = x if isinstance(x, vector3d) else vector3d(x)
+  v = asVector3d(x)
   if f.frame is not None and v.frame is not None and v.frame is not f.frame:
     try:
       SESSION.joinFrames(v.frame, f.frame)
@@ -310,7 +310,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     """the inner product with a constant vector, exact, a function without the group"""
     if isinstance(x, S2VectorField):
       return S2VectorField.dot(self, x)
-    x = x if isinstance(x, vector3d) else vector3d(x)
+    x = asVector3d(x)
     if x.frame is not None and self.frame is not None and x.frame is not self.frame:
       raise ValueError("the vector lives in another frame than the field")
     return S2FunHarmonic(self._fhat @ x.data.reshape(3), None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
@@ -319,7 +319,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     """F x x = -[x]_x F, on the rows of the coefficients F [x]_x"""
     if isinstance(x, S2VectorField):
       return S2VectorField.cross(self, x)
-    x = x if isinstance(x, vector3d) else vector3d(x)
+    x = asVector3d(x)
     return self._rebuild(self._fhat @ spinTensor(x.data.reshape(3)))
 
   def rotate(self, r):
@@ -477,14 +477,14 @@ class S2VectorFieldHandle(S2VectorField):
 def thetaVector(v):
   """the unit vectors of the polar coordinates at a direction: along the polar angle and
   along the azimuth"""
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   t, r = v.theta, v.rho
   return vector3d(np.cos(r) * np.cos(t), np.sin(r) * np.cos(t), -np.sin(t), frame=v.frame)
 
 
 def rhoVector(v):
   """the unit vector along the azimuth at a direction, the second vector of the polar basis"""
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   r = v.rho
   return vector3d(-np.sin(r), np.cos(r), np.zeros_like(r), frame=v.frame)
 

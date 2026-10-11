@@ -30,7 +30,7 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
-from ..geometry.vector3d import classproperty, vector3d
+from ..geometry.vector3d import classproperty, vector3d, asVector3d
 from .kernels import directionalPolynomial, turnBlocks, voigtInverse
 
 # the pair index of the Voigt notation: 11 22 33 23 13 12
@@ -561,7 +561,7 @@ class tensor(MtexArray):
       from ..functions.s2fun import S2FunHarmonic
       return S2FunHarmonic(lambda x: self.directionalMagnitude(x), self._frame, bandwidth=max(self.rank, 1), real=True,
                            antipodal=self.rank % 2 == 0)
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     if v.frame is not None and v.frame is not self._frame and not v.frame.isAligned(self._frame):
       raise ValueError("the direction is written in another frame than the tensor")
     R = self.rank
@@ -959,7 +959,7 @@ class stressTensor(tensor):
   @staticmethod
   def uniaxial(v, sigma=1.0):
     """the stress of a uniaxial tension along v"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     u = v.normalize().data
     return stressTensor(sigma * u[..., :, None] * u[..., None, :], v.frame if v.frame is not None else specimenFrame.default)
 

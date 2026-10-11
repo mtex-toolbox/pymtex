@@ -25,7 +25,8 @@ def sphereMesh(resolution=5 * degree):
   ring = np.stack([np.sin(theta) * np.cos(rho), np.sin(theta) * np.sin(rho), np.cos(theta) * np.ones_like(rho)], axis=-1).reshape(-1, 3)
   V = np.concatenate([[[0.0, 0.0, 1.0]], ring, [[0.0, 0.0, -1.0]]])
   south = len(V) - 1
-  at = lambda i, j: 1 + i * nRho + np.mod(j, nRho)
+  def at(i, j):
+    return 1 + i * nRho + np.mod(j, nRho)
   j = np.arange(nRho)
   faces = [np.stack([np.zeros(nRho, dtype=int), at(0, j), at(0, j + 1)], axis=1),
            np.stack([np.full(nRho, south), at(nTheta - 2, j + 1), at(nTheta - 2, j)], axis=1)]

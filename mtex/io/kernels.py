@@ -207,9 +207,6 @@ def parseBlock(block, comma=False, comments=None):
   return parseBlockNumpy(block, comma, comments)
 
 
-__all__ = []
-
-
 # ------------------------------------------------------------------ writing a numeric block
 
 # the bytes of one row of numbers: every column to a fixed number of decimals, or as an
@@ -361,3 +358,6 @@ def formatTable(cols, decimals, sep=b" ", crlf=False):
     if b is not None:
       return b
   return formatTableNumpy(cols, decimals, sep, crlf)
+
+
+__all__ = []

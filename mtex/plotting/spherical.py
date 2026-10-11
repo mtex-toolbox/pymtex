@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.frames import referenceFrame
 from ..geometry.frames import crystalFrame
 from ..geometry.miller import brackets, indexString
 from ..geometry.plottingconvention import plottingConvention
@@ -21,7 +22,7 @@ from ..geometry.quaternion import rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
 from ..geometry.display import aligned
 from ..geometry.arguments import refuseFlags
 
@@ -79,7 +80,7 @@ class sphericalProjection:
   def polarIn(self, v):
     """the polar coordinates of directions in the frame of the convention, folded into the
     hemisphere of the chart; NaN outside the region"""
-    v = _asVectors(v).normalize()
+    v = asVector3d(v).normalize()
     w = self.pC.rot.inv() * v
     if self.antipodal:
       flip = w.z < -1e-10 if self.upper else w.z > 1e-10
@@ -98,7 +99,7 @@ class sphericalProjection:
 
   def projectUnchecked(self, v):
     """the plane coordinates of directions known to lie in the chart"""
-    w = self.pC.rot.inv() * _asVectors(v)
+    w = self.pC.rot.inv() * asVector3d(v)
     theta, rho = w.theta, w.rho
     theta = theta if self.upper else np.pi - theta
     r = self.radius(theta)
@@ -332,7 +333,7 @@ class plainProjection(sphericalProjection):
 
   def polarIn(self, v):
     """the polar coordinates of directions in their own frame, NaN outside the region"""
-    v = _asVectors(v).normalize()
+    v = asVector3d(v).normalize()
     inside = self.sR.checkInside(v)
     nan = np.where(inside, 0.0, np.nan)
     return v.theta + nan, v.rho + nan
@@ -344,7 +345,7 @@ class plainProjection(sphericalProjection):
 
   def projectUnchecked(self, v):
     """the plane coordinates (rho, theta) in degrees of directions known to lie in the chart"""
-    v = _asVectors(v)
+    v = asVector3d(v)
     return np.mod(v.rho, 2 * np.pi) / degree, v.theta / degree
 
   def iproject(self, x, y):
@@ -402,7 +403,7 @@ def projectionClass(name):
 
 def withinHemisphere(sR, up, tol=1e-6):
   """does the region lie within the hemisphere towards up, the boundary allowed on the equator"""
-  u = _asVectors(up)
+  u = asVector3d(up)
   if sR.checkInside(-u, tol=-tol) or len(sR.N) == 0:
     return False
   return all(np.all(arc.data @ u.data.reshape(3) >= -tol) for arc in sR.boundary(2 * degree))
@@ -465,7 +466,7 @@ def _regionFor(v, antipodal, how2plot, fundamentalRegion):
     return sphericalRegion(frame=None), how2plot, False
   if isinstance(v, vector3d):
     fr, ax = v.frame, v.antipodal
-  elif hasattr(v, "sym") and hasattr(v, "how2plot"):
+  elif isinstance(v, referenceFrame):
     fr, ax, fundamentalRegion = v, False, True
   else:
     fr, ax, fundamentalRegion = getattr(v, "frame", None), bool(getattr(v, "antipodal", False)), hasSymmetry(getattr(v, "frame", None)) if not fundamentalRegion else True
@@ -558,10 +559,6 @@ def _equivalentVertices(fr, sR):
 
 
 # ------------------------------------------------------------------ helpers
-
-def _asVectors(v):
-  return v if isinstance(v, vector3d) else vector3d(v)
-
 
 def _conventionOf(fr):
   pC = None if fr is None else fr.how2plot

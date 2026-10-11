@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..geometry._array import MtexArray
 from ..geometry.session import getMTEXpref
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
@@ -17,9 +18,6 @@ if TYPE_CHECKING:
   from typing import Unpack
 
   from .keywords import PlotKeywords
-
-__all__ = ["show3d", "exportHTML", "is3dMap", "gcs", "mapPicture", "plotEllipsoid"]
-
 
 def is3dMap(x):
   """whether x is a map of a volume: 3D grains, their boundary or an EBSD3 map"""
@@ -89,7 +87,7 @@ def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True,
   from ..maps3d.grain3boundary import grain3Boundary
   kw = _options(kw)
   P = np.asarray(x.centroid.data).reshape(-1, 3)
-  D = np.asarray(d.data if hasattr(d, "data") else d, dtype=float).reshape(-1, 3)
+  D = np.asarray(d.data if isinstance(d, MtexArray) else d, dtype=float).reshape(-1, 3)
   if isinstance(x, grain3Boundary) and scaling:
     D = 0.2 * np.asarray(x.diameter).reshape(-1, 1) * D / np.linalg.norm(D, axis=1, keepdims=True)
   D = D * (autoScaleFactor if scaling else 0.25)
@@ -111,7 +109,8 @@ def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2pl
   one colour for all or one per ellipsoid, as MATLAB's"""
   kw = _options(kw)
   faceColor = kw.pop("faceColor", faceColor)
-  data = lambda v: np.asarray(v.data if hasattr(v, "data") else v, dtype=float)
+  def data(v):
+    return np.asarray(v.data if isinstance(v, MtexArray) else v, dtype=float)
   fr = getattr(center, "frame", None)
   return _draw(ellipsoids3d(data(center), data(a), data(b), data(c), faceColor, kw.pop("edgeAlpha", edgeAlpha)), how2plot, figSize, fr)
 
@@ -162,10 +161,7 @@ def _scatter3(x, y, z, s=36, c=None, *args, **kw):
 
 # the axes a figure draws into now: the one drawn into last
 def _currentAxes(fig):
-  if fig is None or not fig.children:
-    return None
-  cur = getattr(fig, "current", None)
-  return cur if cur in fig.children else fig.children[-1]
+  return None if fig is None else fig._axesDrawnInto()
 
 
 def gcs(fig=None):
@@ -410,3 +406,6 @@ def exportHTML(fname, fig=None, title="MTEX 3D plot"):
   if s is None:
     raise ValueError("the current figure holds no 3D scene")
   return writeHTML(s, fname, title)
+
+
+__all__ = ["show3d", "exportHTML", "is3dMap", "gcs", "mapPicture", "plotEllipsoid"]

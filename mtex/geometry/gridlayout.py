@@ -74,7 +74,8 @@ class gridLayout:
     return isinstance(other, gridLayout) and np.allclose(self.row.data, other.row.data) and np.allclose(self.col.data, other.col.data)
 
   def __repr__(self):
-    fmt = lambda v: "(" + ", ".join(f"{x:g}" for x in np.round(v.data.reshape(3), 4) + 0.0) + ")"
+    def fmt(v):
+      return "(" + ", ".join(f"{x:g}" for x in np.round(v.data.reshape(3), 4) + 0.0) + ")"
     return display(header("gridLayout", self.name), [("row", fmt(self.row)), ("col", fmt(self.col))])
 
 

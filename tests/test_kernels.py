@@ -260,3 +260,10 @@ def test_copyInto_copiesLargeArraysOverTheCoresAndTheRestAsAssignment():
   a = rng.standard_normal(3 * kernels.COPY_PARALLEL) + 1j
   b, c = np.empty_like(a), np.empty((5, 2))
   assert np.array_equal(kernels.copyInto(b, a), a) and np.array_equal(kernels.copyInto(c, np.arange(20.0).reshape(5, 4)[:, ::2]), np.arange(20.0).reshape(5, 4)[:, ::2])
+
+
+def test_qconj_isTheInverseOfUnitQuaternionsInTheirDtype():
+  r = rotation.rand(5)
+  q = r.data.astype(np.float32)
+  assert kernels.qconj(q).dtype == np.float32
+  assert np.allclose(kernels.qmul(kernels.qconj(r.data), r.data), [1, 0, 0, 0])

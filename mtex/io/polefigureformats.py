@@ -256,8 +256,10 @@ def readPopla(lines, path, CS, h=None):
   i = 0
   while i + 1 < len(lines) and lines[i + 1].strip():
     s = lines[i + 1]
-    field = lambda k: float(s[5 * k:5 * k + 5])
-    flag = lambda k: int(s[25 + 2 * k:27 + 2 * k])
+    def field(k):
+      return float(s[5 * k:5 * k + 5])
+    def flag(k):
+      return int(s[25 + 2 * k:27 + 2 * k])
     dt, tmax, dr, rmax, scale = field(1), field(2), field(3), field(4), field(7)
     theta = ladderOf(dt / 2 if flag(0) == 0 else 0.0, dt, tmax)
     rho = ladderOf(dr / 2 if flag(1) == 0 else 0.0, dr, rmax - dr / (2 if flag(1) == 0 else 1))
@@ -794,7 +796,8 @@ def readXrdml(lines, path, CS, h=None, raw=None):
       if t is not None:
         v = v / float(t)
       pos = _xmlPositions(scan)
-      ladder = lambda name: np.linspace(pos[name][0], pos[name][1], v.size) if name in pos else np.zeros(v.size)
+      def ladder(name):
+        return np.linspace(pos[name][0], pos[name][1], v.size) if name in pos else np.zeros(v.size)
       t2, om, ph = ladder("2Theta"), ladder("Omega"), ladder("Phi")
       ps = ladder("Psi") if "Psi" in pos else ladder("Chi")
       a = om + (np.pi - t2) / 2

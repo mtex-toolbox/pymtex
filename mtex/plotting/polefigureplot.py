@@ -11,10 +11,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..functions.polefigure import PoleFigure
 from ..geometry.orientation import orientation
 from ..geometry.sphericalregion import projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .mtexfigure import gcm, mtexFigure
 from .poles import dynamicMarkerSize, inversePoles, poles
 from .spherical import hasSymmetry, makeSphericalProjection, plotRegion
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 def _asList(h):
   if isinstance(h, vector3d):
     return [h[i] for i in range(h.size)] if h.size > 1 else [h]
-  return [x if isinstance(x, vector3d) else vector3d(x) for x in h]
+  return [asVector3d(x) for x in h]
 
 
 # a long list is thinned before it is drawn, deterministically, as MTEX thins it too
@@ -203,7 +204,7 @@ def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[Pl
   a style draws the density of the poles instead. An ODF draws its pole figures, a measured
   PoleFigure itself (MATLAB's plotPDF).
   """
-  if hasattr(o, "allH"):
+  if isinstance(o, PoleFigure):
     return _plotPoleFigure(o, *args, **kw)
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
@@ -277,8 +278,8 @@ def plotDiff(pf, other, mode="relative", epsilon=None, **kw: Unpack[PlotKeywords
   the same, plotDiff(odf1, odf2) the sections of their difference"""
   from ..functions.polefigure import calcErrorPF
   # plotDiff(odf, pf): the same error, plotDiff(odf1, odf2) the sections of the difference
-  if not hasattr(pf, "allH"):
-    if not hasattr(other, "allH"):
+  if not isinstance(pf, PoleFigure):
+    if not isinstance(other, PoleFigure):
       from .sectionplot import plotSection
       return plotSection(pf - other, **kw)
     pf, other = other, pf

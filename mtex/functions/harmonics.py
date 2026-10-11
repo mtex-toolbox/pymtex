@@ -20,7 +20,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.symmetry import symmetry
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import display, header
 
 # ------------------------------------------------------------------ H1 layout
@@ -438,7 +438,7 @@ def normalizedLegendre(l, x):
 # the spherical harmonics Y_l^m, m = -l..l, in front of the container shape, with the
 # Condon-Shortley phase the internal coefficients are taken in
 def _sphericalY(l, v):
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   theta, rho = v.theta, v.rho
   P = normalizedLegendre(l, np.cos(theta))
   Y = np.empty((2 * l + 1, *v.shape), dtype=np.result_type(P.dtype, 1j))

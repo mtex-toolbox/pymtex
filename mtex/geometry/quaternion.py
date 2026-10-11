@@ -19,7 +19,7 @@ from .representations import (EULER_LABELS, axis2quat, eulerConvention, euler2qu
                               map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
                               quatAngle, quatAxis, rodrigues2quat)
 from .homochoric import cubo2homo, homo2cubo, homochoric2quat, quat2homochoric
-from .kernels import qmul, qrot
+from .kernels import qconj, qmul, qrot
 from .units import degree
 from .vector3d import classproperty, vector3d
 from .display import aligned
@@ -187,7 +187,7 @@ class quaternion(MtexArray):
 
   def conj(self):
     """the conjugate quaternion a - b i - c j - d k, of a rotation its inverse"""
-    return self._new(self.data * [1, -1, -1, -1])
+    return self._new(qconj(self.data))
 
   def inv(self):
     """the inverse quaternion, the conjugate over the squared norm"""

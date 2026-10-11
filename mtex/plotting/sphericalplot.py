@@ -15,6 +15,11 @@ import re
 
 import numpy as np
 
+from ..functions.polefigure import PoleFigure
+from ..functions.s2axisfield import S2AxisField
+from ..functions.s2vectorfield import S2VectorField
+from ..functions.so3vectorfield import SO3VectorField
+from ..functions.so3funclass import SO3Fun
 from ..geometry.frames import crystalFrame
 from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.session import getMTEXpref
@@ -24,7 +29,8 @@ from ..geometry.plane import plane3d
 from ..geometry.sphericalregion import projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
 from ..geometry.arguments import refuseFlags
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
+from ..tensors.tensor import tensor
 from .colormaps import contourLevels, mtexColormap
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
@@ -536,7 +542,7 @@ def _isFunction(f):
 
 
 def _isField(f):
-  return type(f).__name__.startswith(("S2VectorField", "S2AxisField"))
+  return isinstance(f, (S2VectorField, S2AxisField))
 
 
 def _mapKind(x):
@@ -545,11 +551,7 @@ def _mapKind(x):
 
 
 def _isAxisField(f):
-  return type(f).__name__.startswith("S2AxisField")
-
-
-def _isSO3Fun(f):
-  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS")
+  return isinstance(f, S2AxisField)
 
 
 FILL_FLAGS = ("contourf", "contour", "pcolor", "smooth")
@@ -603,14 +605,14 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
     from .sectionplot import plotKeySections
     return plotKeySections(v, *args, **kw)
   # an ODF draws its sections, or its values along a fibre
-  if _isSO3Fun(v):
+  if isinstance(v, SO3Fun):
     from ..geometry.fibre import fibre
     if args and isinstance(args[0], fibre):
       from .fibreplot import plotFibre
       return plotFibre(v, *args, **kw)
     from .sectionplot import plotSection
     return plotSection(v, *args, **kw)
-  if hasattr(v, "allH") and hasattr(v, "allR"):
+  if isinstance(v, PoleFigure):
     from .polefigureplot import _plotPoleFigure
     return _plotPoleFigure(v, *args, **kw)
   # three functions as the colour channels of one surface
@@ -619,7 +621,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
     kw.pop("rgb", None)
     return plotRGB(v, *[a for a in args if not (isinstance(a, str) and a == "rgb")], **kw)
   # a tensor is drawn as its directional magnitude
-  if hasattr(v, "rank") and hasattr(v, "M"):
+  if isinstance(v, tensor):
     return plot(v.directionalMagnitude(), *args, **kw)
   # plot(ori) on a held section plot: the orientations into their sections
   if isinstance(v, orientation) and getattr(gcm(), "sections", None) is not None and (gcm().hold or kw.get("add2all")):
@@ -680,7 +682,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
   if _isField(v):
     return quiver(v, *args, **kw)
   # a vector field on SO(3) as arrows in the sections of orientation space
-  if type(v).__name__.startswith("SO3VectorField"):
+  if isinstance(v, SO3VectorField):
     from .sectionplot import quiverSectionField
     return quiverSectionField(v, *args, **kw)
   if _isFunction(v):
@@ -693,8 +695,8 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
       return _plotRow(fs, [None] * len(fs), style="pcolor" if style == "smooth" else style, **kw)
     return _plotFunction(v, style="pcolor" if style == "smooth" else style, **kw)
   # a key of two properties as its image
-  if hasattr(v, "property2color"):
-    from .planarkey import plotPlanarKey
+  from .planarkey import planarColorKey, plotPlanarKey
+  if isinstance(v, planarColorKey):
     return plotPlanarKey(v, *args, **kw)
   # a plane in space, clipped by the axes
   if isinstance(v, plane3d):
@@ -704,7 +706,7 @@ def plot(v, *args, **kw: Unpack[PlotKeywords]):
   if any(isinstance(a, crystalShape) for a in (v,) + args):
     from .shapeplot import plotShape
     return plotShape(v, *args, **kw)
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   refuseFlags(args, "plot")
   if kw.pop("plane", False):
     return _planeCircles(v, **kw)
@@ -740,7 +742,7 @@ def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
 def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw: Unpack[PlotKeywords]):
   """circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
   chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)"""
-  vs = v if isinstance(v, vector3d) else vector3d(v)
+  vs = asVector3d(v)
   t = np.linspace(0, 2 * np.pi, 361)
   rings = []
   for k in range(vs.size):
@@ -827,7 +829,7 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
   if isinstance(v, quaternion):
     from .spaceplot import scatterOrientations
     return scatterOrientations(v, data, **kw)
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   projKw, axesKw, whereKw = _split(kw)
   # beside labels MATLAB's FontSize is the size of their text, not of the chart's
   if ("label" in kw or kw.get("labeled")) and "fontSize" in axesKw:
@@ -903,7 +905,7 @@ def _textAt(xyz, s, **kw):
 # the great circles normal to directions, as lines through the charts
 def _planeCircles(v, lineStyle="-", lineWidth=1.0, lineColor="k", **kw):
   from .space import smallCircle
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   projKw, axesKw, whereKw = _split(kw)
   whereKw.setdefault("add2all", True)
   sPs = _targets(v, projKw, axesKw, whereKw)
@@ -1061,7 +1063,7 @@ def annotate(v, *args, **kw: Unpack[PlotKeywords]):
     from .sectionplot import plotKeySections
     return plotKeySections(v, *args, **kw)
   # an ODF draws its sections, or its values along a fibre
-  if _isSO3Fun(v):
+  if isinstance(v, SO3Fun):
     from ..geometry.fibre import fibre
     if args and isinstance(args[0], fibre):
       from .fibreplot import plotFibre
@@ -1164,8 +1166,8 @@ def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
       W = f(framed)
       hs.append(_arrows(sP, V.flatten(), vector3d(W.data.reshape(-1, 3)), resolution=resolution, axisField=_isAxisField(f), **kw))
     return hs
-  v = v if isinstance(v, vector3d) else vector3d(v)
-  w = w if isinstance(w, vector3d) else vector3d(w)
+  v = asVector3d(v)
+  w = asVector3d(w)
   sPs = _targets(v, projKw, axesKw, whereKw)
   return [_arrows(sP, v.flatten(), w.flatten(), resolution=resolution, axisField=w.antipodal, **kw) for sP in sPs]
 
@@ -1223,7 +1225,7 @@ def _rgbMesh(ax, X, Y, rgb):
 def _asList(h):
   if isinstance(h, vector3d):
     return [h[i] for i in range(h.size)] if h.size > 1 else [h]
-  return [x if isinstance(x, vector3d) else vector3d(x) for x in h]
+  return [asVector3d(x) for x in h]
 
 
 # the name of a specimen direction: an axis name of its frame, else its coordinates

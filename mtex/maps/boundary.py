@@ -18,6 +18,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..geometry.frames import referenceFrame
+from ..geometry.kernels import qconj
 from ..geometry.display import aligned, frameLabel, textTable, xnum2str
 from ..geometry.kernels import backend, qmul, _jit, _parallelKernel
 from ..geometry.orientation import orientation
@@ -31,9 +33,6 @@ OUTSIDE = -1
 _COMPILED = {}
 prange = range
 
-
-def _conj(q):
-  return q * np.array([1, -1, -1, -1], dtype=q.dtype)
 
 
 def _cross2(a, b):
@@ -295,7 +294,7 @@ class grainBoundary:
     return self.CSList.selectionNames(pairs=True)
 
   def __getitem__(self, key):
-    if isinstance(key, str) or hasattr(key, "sym"):
+    if isinstance(key, (str, referenceFrame)):
       return self._withFirstPhase(self[self.hasPhase(key)], key)
     if isinstance(key, tuple) and len(key) == 2 and (isinstance(key[0], str) or hasattr(key[0], "sym")):
       return self._withFirstPhase(self[self.hasPhase(*key)], key[0])
@@ -329,7 +328,8 @@ class grainBoundary:
     ids = np.asarray(ids)
     if ids.ndim == 2 and ids.shape[1] == 2:
       M = int(max(ids.max(initial=0), self.grainId.max(initial=0))) + 1
-      key = lambda g: np.minimum(g[:, 0], g[:, 1]).astype(np.int64) * M + np.maximum(g[:, 0], g[:, 1])
+      def key(g):
+        return np.minimum(g[:, 0], g[:, 1]).astype(np.int64) * M + np.maximum(g[:, 0], g[:, 1])
       pk = key(ids)
       order = np.argsort(pk)
       gB = orderWalk(self[np.isin(key(self.grainId), pk)])
@@ -342,7 +342,7 @@ class grainBoundary:
     F, gid, eid, pid, mis = self.F.copy(), self.grainId.copy(), self.ebsdId.copy(), self.phaseId.copy(), self.misrotation.data.copy()
     for a in (F, gid, eid, pid):
       a[sel] = a[sel][:, ::-1]
-    mis[sel] = _conj(mis[sel])
+    mis[sel] = qconj(mis[sel])
     return self._with(F=F, grainId=gid, ebsdId=eid, phaseId=pid, misrotation=mis)
 
   # the named phase put on the first side throughout
@@ -470,7 +470,8 @@ class grainBoundary:
     L = np.bincount(inverse.reshape(-1), weights=self.segLength)
     counts = np.bincount(inverse.reshape(-1))
     # the side outside the map is notIndexed, as MATLAB names it
-    name = lambda p: "notIndexed" if p < 0 else self.CSList[int(p)].mineral
+    def name(p):
+      return "notIndexed" if p < 0 else self.CSList[int(p)].mineral
     # the length rounded in the scan unit, as MATLAB writes it
     unit = "µm" if self.scanUnit == "um" else self.scanUnit
     cells = [[str(c) for c in counts], [f"{xnum2str(l)} {unit}" for l in L], [name(p[0]) for p in pairs], [name(p[1]) for p in pairs]]
@@ -548,7 +549,8 @@ class triplePointList:
       return aligned(f"triplePointList ({frameLabel(self.frame)})\n  no triple points")
     key = np.sort(self.phaseId, axis=1)
     trip, counts = np.unique(key, axis=0, return_counts=True)
-    name = lambda p: "outside" if p < 0 else self.CSList[int(p)].mineral
+    def name(p):
+      return "outside" if p < 0 else self.CSList[int(p)].mineral
     cells = [[str(c) for c in counts]] + [[name(t[j]) for t in trip] for j in range(3)]
     return (f"triplePointList ({frameLabel(self.frame)})\n  size: {len(self)}\n"
             + textTable(["points", "mineral 1", "mineral 2", "mineral 3"], cells))
@@ -750,7 +752,7 @@ def _misrotations(rot, p1, p2, T):
     return mori
   both = (p1 >= 0) & (p2 >= 0)
   mori[:] = np.nan
-  mori[both] = qmul(_conj(rot[p2[both]]), rot[p1[both]])
+  mori[both] = qmul(qconj(rot[p2[both]]), rot[p1[both]])
   return mori
 
 

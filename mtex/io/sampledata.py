@@ -196,7 +196,8 @@ class SampleTable:
   def __repr__(self):
     labels = ("name", "type", "description", "files")
     widths = [max(len(labels[j]), *(len(r[j]) for r in self.rows)) for j in range(4)]
-    line = lambda r: "  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))
+    def line(r):
+      return "  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))
     return aligned("available sample data\n" + "\n".join([line(labels)] + [line(r) for r in self.rows]))
 
 
@@ -410,7 +411,8 @@ def testGrainsMap():
   n1, n2 = 160, 120
   x, y = np.meshgrid(np.arange(n1, dtype=float), np.arange(n2, dtype=float))
   x, y = x.ravel(), y.ravel()
-  disc = lambda cx, cy, r: (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2
+  def disc(cx, cy, r):
+    return (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2
 
   def rect(cx, cy, w, h, t=0.0):
     u = np.cos(t) * (x - cx) + np.sin(t) * (y - cy)
@@ -489,9 +491,6 @@ _dataset("xnovo", "EBSD3", "a simulated multiphase xnovo volume, a cylinder of n
 _dataset("SmallIN100", "EBSD3", "the IN100 nickel superalloy volume of DREAM.3D with its grain mesh", "smallin100", _volume)
 _dataset("odf", "SO3Fun", "an ODF tabulated on a Bunge Euler grid, read as values", "odf", _odf)
 
-__all__ = ["mtexdata", "mtexdatafile", "mtexDataPath"]
-
-
 # the room pressure stiffness of San Carlos olivine (Abramson et al. 1997) in its source setting
 def _olivine1997(path):
   from ..tensors.tensor import stiffnessTensor
@@ -522,3 +521,6 @@ _dataset("quartzPiezo", "tensor", "the piezoelectric modulus of right-handed qua
          _quartzPiezo)
 _dataset("olivine1997", "tensor", "the stiffness tensor of San Carlos olivine at room pressure", "olivine1997", _olivine1997)
 _dataset("quartzPattern", "S2Fun", "a spherical Kikuchi master pattern of quartz", "quartzpattern", _quartzPattern)
+
+
+__all__ = ["mtexdata", "mtexdatafile", "mtexDataPath"]

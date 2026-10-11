@@ -149,7 +149,8 @@ def _polarRadiusLoop(N, xyz, c, out):
 
 
 def _polarRadiusNumpy(N, xyz, c):
-  angle = lambda u, v: np.arctan2(np.linalg.norm(np.cross(u, v), axis=-1), np.sum(u * v, axis=-1))
+  def angle(u, v):
+    return np.arctan2(np.linalg.norm(np.cross(u, v), axis=-1), np.sum(u * v, axis=-1))
   w = np.cross(xyz, c)
   nw = np.linalg.norm(w, axis=-1)
   atCenter = nw < 1e-10

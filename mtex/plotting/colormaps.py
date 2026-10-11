@@ -153,10 +153,6 @@ def vega20(n=20):
   return VEGA20[np.arange(n) % len(VEGA20)]
 
 
-__all__ = ["mtexColorMap", "contourLevels", "str2rgb", "ind2color", "num2rgb", "blue2redColorMap", "red2blueColorMap", "LaboTeXColorMap",
-           "white2blackColorMap", "black2whiteColorMap", "WhiteJetColorMap", "vega20"]
-
-
 # the colour order MTEX sets as its preference, plotting/plotting_tools/colors.mat: the
 # seven of MATLAB's default order, then the lighter half of vega20 and six darker ones
 MTEX_COLORS = np.array([
@@ -192,3 +188,7 @@ def ind2color(i, cmap=None):
   ok = np.isfinite(ind) & (ind >= 0)
   out[ok] = colors[ind[ok].astype(int) % len(colors)]
   return out
+
+
+__all__ = ["mtexColorMap", "contourLevels", "str2rgb", "ind2color", "num2rgb", "blue2redColorMap", "red2blueColorMap", "LaboTeXColorMap",
+           "white2blackColorMap", "black2whiteColorMap", "WhiteJetColorMap", "vega20"]

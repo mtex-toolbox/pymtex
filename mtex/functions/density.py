@@ -21,7 +21,7 @@ from ..geometry.kernels import blasThreads
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .funops import conv
 from .harmonics import deg2dim, dim2deg, invariantProjection, project
 from .kde import calcDensityReal
@@ -205,8 +205,10 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
       v = project(np.array(x, dtype=complex), P, Q)
       return (v + invertedCoefficients(v)) / 2 if o.antipodal else v
 
-    A = lambda x: (v := sym(x), np.concatenate([sw * p(v), reg * v]))[1]
-    At = lambda z: sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
+    def A(x):
+      return (v := sym(x), np.concatenate([sw * p(v), reg * v]))[1]
+    def At(z):
+      return sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
     b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
     x, flag, relres, itn = _lsqrFull(A, At, b, deg2dim(L + 1), maxIter, tol)
     f = SO3FunHarmonic(sym(x), o.CS, o.SS, real=real, antipodal=o.antipodal, _internal=True)
@@ -215,7 +217,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
       # residual and the number of iterations
       return f, (flag, relres, itn)
     return f
-  v = (nodes if isinstance(nodes, vector3d) else vector3d(nodes)).flatten().normalize()
+  v = asVector3d(nodes).flatten().normalize()
   # values with component axes after the node axis: one fit per component, a list of functions
   values = np.asarray(values)
   if values.size != v.size:
@@ -240,8 +242,10 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   sw = np.sqrt(w)
   p = S2FourierPlan(v, L)
   reg = math.sqrt(lam) * np.sqrt(_sobolevWeightsS2(L, s))
-  A = lambda x: np.concatenate([sw * p(np.asarray(x, dtype=complex)), reg * x])
-  At = lambda z: p.adjoint(sw * z[:v.size], np.ones(v.size)) + reg * z[v.size:]
+  def A(x):
+    return np.concatenate([sw * p(np.asarray(x, dtype=complex)), reg * x])
+  def At(z):
+    return p.adjoint(sw * z[:v.size], np.ones(v.size)) + reg * z[v.size:]
   b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
   fhat = _lsqr(A, At, b, (L + 1) ** 2, maxIter, tol)
   return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)

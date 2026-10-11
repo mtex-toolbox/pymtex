@@ -12,6 +12,7 @@ import threading
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.kernels import qrot
 from ..geometry.orientation import orientation
@@ -31,9 +32,6 @@ def _framesOf(x, frameB=None):
     return x.CS, x.frame, False
   return x, specimenFrame.default if frameB is None else frameB, False
 
-
-def _conj(q):
-  return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
 class orientationColorKey:
@@ -86,7 +84,7 @@ class ipfColorKey(orientationColorKey):
     """the crystal directions along the specimen direction of every orientation"""
     q = ori.data.reshape(-1, 4)
     d = self.ipfDirection.normalize().data.reshape(3)
-    return vector3d(qrot(_conj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.frameA, isNormalized=True)
+    return vector3d(qrot(qconj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.frameA, isNormalized=True)
 
   def precompute(self, resolution=None):
     """MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
@@ -432,11 +430,10 @@ def keyColorGrid(CS, resolution=COLOR_GRID_RESOLUTION):
   same grid, and the grid depends on the sector alone, not on the specimen direction an
   inverse pole figure is taken of"""
   with _GRID_LOCK:
-    cg = _GRIDS.get(id(CS))
-    if cg is None or cg[0] is not CS or abs(cg[1].resolution - resolution) > 1e-6 * resolution:
-      cg = (CS, colorGrid(HSVDirectionKey(CS), resolution))
-      _GRIDS[id(CS)] = cg
-    return cg[1]
+    cg = _GRIDS.get(CS)
+    if cg is None or abs(cg.resolution - resolution) > 1e-6 * resolution:
+      cg = _GRIDS[CS] = colorGrid(HSVDirectionKey(CS), resolution)
+    return cg
 
 
 def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, resolution=COLOR_GRID_RESOLUTION, at=None):
@@ -463,7 +460,7 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
     cs = x.CSList[i]
     key = HSVDirectionKey(cs) if exact else keyColorGrid(cs, resolution)
     if exact or not ipfGridColors(q, sub, d, key.n, key.colors, out):
-      dirs = qrot(_conj(q[sub]), np.tile(d, (len(sub), 1)))
+      dirs = qrot(qconj(q[sub]), np.tile(d, (len(sub), 1)))
       out[sub] = key.direction2color(vector3d(dirs, frame=cs)).reshape(-1, 3)
   return out if at is not None else out.reshape(rots.shape + (3,))
 

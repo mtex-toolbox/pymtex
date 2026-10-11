@@ -13,7 +13,7 @@ import numpy as np
 
 from ..geometry.frames import referenceFrame
 from ..geometry.session import getMTEXpref
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .funops import mapFun, smoothBandwidth
 from .harmonics import mtexCoefficientsS2, _WignerD
 from .quadrature import quadratureS2Grid
@@ -194,7 +194,7 @@ class S2AxisFieldHarmonic(S2AxisField):
       xs = self._framed(g.nodes())
       values = np.abs(np.sum(_values(self(xs)) * _values(x(xs)), axis=-1))
       return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), self.frame, real=True, symmetrise=False, _internal=True)
-    x = x if isinstance(x, vector3d) else vector3d(x)
+    x = asVector3d(x)
     if x.frame is not None and self.frame is not None and x.frame is not self.frame:
       raise ValueError("the axis lives in another frame than the field")
     y = x.data.reshape(3)

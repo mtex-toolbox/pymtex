@@ -105,3 +105,42 @@ the refactor must not have changed what a page shows.
   from `quadrature.clenshawCurtis`. Measured and left: `findByLocation` (a tree costs 300 ms to
   build on 1e6 positions against 10 ms per scanned query), `vector3d`'s `_isFrame` (a fraction of
   2.4 us), the plot of grains (26 ms of its own), the reconstruction loops (checked against MATLAB).
+- Phase 4, the shared helpers: `qconj` in `geometry/kernels.py` replaces the twelve `_conj` and the
+  inline `[1, -1, -1, -1]`; `asVector3d` in `vector3d.py` the 85 coercions; `unitRows` in
+  `representations.py` the nine row normalisations (a zero row stays zero); one `_complexType` in
+  `functions/kernels.py`; the lenient frame reader of `rbf.py` is `_framesAmong`, and the two
+  `_leadingAxis` are NumPy's `normalize_axis_index`. Left: a helper for `.data.reshape(-1, 3)`,
+  which is plain NumPy and reads as well; `xyz` stays MATLAB's (..., 3) property.
+- Phase 5, types: `SO3Fun` and `S2Fun` are the base classes of every representation, so the
+  `_isSO3Fun`/`_isS2Fun` probes are `isinstance`; the pole figure, tensor, field and planar key
+  probes of the plots and exporters likewise, and a frame is tested as `referenceFrame` (the probe
+  `hasattr(x, "sym")` took a tensor, whose `sym` is its symmetric part, for a frame). Left:
+  `vector3d._isFrame` and `_isConvention`, which cannot import the classes (frames import
+  vector3d); the map probes of `texture.py` and `orientationkeys.py`, which mean any container
+  with phases (EBSD, grains, phaseList).
+- Phase 6, dispatch: `funops.rotate` folded into the methods it served, the public `rotate` the one
+  dispatcher; the space plots take `complete=` and `region=` as keywords (the strings 'complete'
+  and 'noBoundary' were flags phase 2 missed); `export` tests its kinds by class. Left: the ladder
+  of `plot`, which is ordered by the state of the figure as much as by type, and `conv`, which
+  dispatches on both arguments.
+- Phase 7, records: `scanGrid` (`io/load.py`), `flatSO3Grid` (`gridsearch.py`), parent2child's
+  `_Misfit`; `mtexFigure.sections` set in `__init__`, the axes drawn into last one method,
+  `_axesDrawnInto`, beside the `gca` property.
+- Phase 8: no `object.__setattr__` outside a class; the rebuilds of a map change most fields at
+  once, so no `_with` was added.
+- Phase 9: the search tables of `SO3Grid` are a `cached_property`; the colour grid cache is keyed by
+  the frame itself, which hashes by identity.
+- Phase 10, twins: `harmonicArithmetic` (`functions/harmonicarithmetic.py`) holds the operators the
+  three harmonic classes shared; `max_`/`min_` one `_extremum`; the two discrepancies share
+  `_difference`; `VENDOR_FORMATS` in `io/load.py` is the one table of the vendor formats, which
+  `inspectEBSD` reads too. Left: the maps kernels, which compile through the two registries
+  `pixelKernel` and `grainKernel` already.
+- Phase 11: `h5Reader` (`io/h5.py`) carries the file, its paths, the config, the data set and the
+  scope; `_loadEBSD_h5` and `inspectEBSD` read through it, which removed `inspect.py`'s copies of
+  the property scan and of the correction rule. Checked equal to the previous reader on nine
+  vendor files (Oxford, EDAX, EMSphInx, Bruker), every field of the map and of `meta`.
+- Phase 12: the 71 assigned lambdas are `def`s, six dead assignments gone, `__all__` last in every
+  module but the packages, `degreeEnergies` an S2 and an SO(3) class (bit for bit the previous
+  results). Left: keywords named like builtins (`all=`, `max=`, `iter=`, `range=`, `id=`), which
+  are MATLAB's option names and shadow nothing a body calls; `pathlib` for `os.path`, a change of
+  no gain.

@@ -42,7 +42,8 @@ def _terms(CS):
   axes, mult = pg.elements()
   axes = axes.data.reshape(-1, 3) if axes.size else np.zeros((0, 3))
   mult = np.asarray(mult)
-  z = lambda m: axes[np.flatnonzero(mult == m)[0]] / np.linalg.norm(axes[np.flatnonzero(mult == m)[0]])
+  def z(m):
+    return axes[np.flatnonzero(mult == m)[0]] / np.linalg.norm(axes[np.flatnonzero(mult == m)[0]])
   if pg.lattice == latticeType.cubic:
     return ([z(4)], [4], [3 / (2 * math.sqrt(2))]) if 4 in mult else ([z(3)], [3], [3 / (2 * math.sqrt(2))])
   n = int(np.max(mult)) if mult.size else 1

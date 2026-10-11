@@ -19,7 +19,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
-from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly
+from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly, scanGrid
 from .table import coerceNumeric, readFile, text
 
 # the columns Channel numbers, and the width of each in bytes
@@ -158,7 +158,7 @@ def _loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   return ebsdFromColumns(x, y, cols["phi1"], cols["phi"], cols["phi2"], rec["phase"], phases, props, shift=0,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta,
                          unitCell=regularPoly(4, [dx, dy]) if dx > 0 and dy > 0 else None,
-                         scanGrid=(nx, ny, dx, dy) if nx is not None and ny is not None else None, propType=np.float64)
+                         scanGrid=scanGrid(nx, ny, dx, dy) if nx is not None and ny is not None else None, propType=np.float64)
 
 
 __all__ = []

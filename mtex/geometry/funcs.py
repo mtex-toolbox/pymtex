@@ -94,7 +94,8 @@ def sum(x, *args, **kwargs):
   return builtins.sum(x, *args)
 
 
-checkInside = lambda region, x, **kw: region.checkInside(x, **kw)
+def checkInside(region, x, **kw):
+  return region.checkInside(x, **kw)
 find = _method("find", np.flatnonzero)
 subGrid = _method("subGrid")
 

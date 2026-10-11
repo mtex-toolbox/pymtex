@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from .kernels import qconj
 from ._array import MtexArray
 
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
 
 from .quaternion import qmul, qrot
 from .kernels import closestAngle, closestImage, nearestAngle, projectDirections, projectToRef, threads
-from .symreduce import (_conj, bestDot, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
+from .symreduce import (bestDot, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
                         symReduce, uniqueRotations)
 from .vector3d import _isCrystalFrame, vector3d
 
@@ -174,7 +175,7 @@ def symmetriseOrientation(o, unique=False):
   es = qmul(qmul(L[:, None, None, :], q[None, None, ...]), R[None, :, None, :])   # (|L|, |R|, n, 4)
   es = es.reshape(-1, *q.shape)
   if o.antipodal:
-    ei = qmul(qmul(L[:, None, None, :], _conj(q)[None, None, ...]), R[None, :, None, :]).reshape(-1, *q.shape)
+    ei = qmul(qmul(L[:, None, None, :], qconj(q)[None, None, ...]), R[None, :, None, :]).reshape(-1, *q.shape)
     es = np.concatenate([es, ei])
   if unique:
     return o._new(uniqueRotations(es.reshape(-1, 4)))
@@ -263,8 +264,8 @@ def _exchangeIntoSector(p, common):
   q = p.reshape(-1, 4)
   cands = []
   for c in (common if len(common) else np.array([[1.0, 0, 0, 0]])):
-    ci = c * [1, -1, -1, -1]
-    for x in (q, q * [1, -1, -1, -1]):
+    ci = qconj(c)
+    for x in (q, qconj(q)):
       cands.append(qmul(qmul(ci, x), c))
   cands = np.stack(cands, axis=1)
   cands *= np.where(cands[..., :1] < 0, -1.0, 1.0)
@@ -375,10 +376,10 @@ def pairAxis(o1, o2):
   if o1.frameB is not o2.frameB:
     raise ValueError("the two lists are not in the same specimen frame")
   fit = fitFrame(o2.frameA, o1.frameA)
-  b = o2.data if fit is None else qmul(o2.data, _conj(fit.data))
+  b = o2.data if fit is None else qmul(o2.data, qconj(fit.data))
   G = o1.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
   a, b = np.broadcast_arrays(o1.data, b)
-  cand = qmul(qmul(a[..., None, :], G), _conj(b)[..., None, :])      # (..., |G|, 4)
+  cand = qmul(qmul(a[..., None, :], G), qconj(b)[..., None, :])      # (..., |G|, 4)
   k = np.argmax(np.abs(cand[..., 0]), axis=-1)
   best = np.take_along_axis(cand, k[..., None, None], axis=-2)[..., 0, :]
   # q and -q are one rotation; the axis is that of the one with a positive scalar part

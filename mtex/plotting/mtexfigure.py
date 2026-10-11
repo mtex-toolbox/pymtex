@@ -82,9 +82,17 @@ class mtexFigure:
     # the axes nextAxis made that no plot has drawn into yet, and the one drawn into last
     self.pending = None
     self.current = figure.gca() if figure is not None and figure.axes else None
+    # the sections of an ODF section plot, which later plots draw into
+    self.sections = None
     _current = self
 
   # ------------------------------------------------------------------ the axes
+
+  # the axes drawn into last, which nextAxis need not have made last; None in an empty figure
+  def _axesDrawnInto(self):
+    if not self.children:
+      return None
+    return self.current if self.current in self.children else self.children[-1]
 
   def nextAxis(self):
     """a new axes in the next cell of the layout, the layout and the figure grown when it is full"""
@@ -133,7 +141,8 @@ class mtexFigure:
   @property
   def gca(self):
     """MATLAB's mtexFig.gca: the axes drawn into last"""
-    return self.current if self.current in self.children else self.currentAxes
+    ax = self._axesDrawnInto()
+    return ax if ax is not None else self.nextAxis()
 
   @property
   def currentAxes(self):
@@ -391,9 +400,7 @@ def mtexTitle(*args, fig=None, **kwargs):
     return plt.gca().set_title(text, **kwargs)
   fig = m
   if fig is not None and fig.children:
-    # the axes drawn into last, which nextAxis need not have made last
-    ax = fig.current if getattr(fig, "current", None) in fig.children else fig.children[-1]
-    ax.set_title(text, **kwargs)
+    fig._axesDrawnInto().set_title(text, **kwargs)
 
 
 def ylabel(*args, fig=None, **kwargs):
@@ -609,10 +616,6 @@ def _sameSize(leg, size=36.0):
   return leg
 
 
-__all__ = ["saveFigure", "logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar",
-           "setColorRange", "setColorScale"]
-
-
 def firstOfList(f):
   """a list of functions is drawn by its first one, with MATLAB's warning"""
   if getattr(f, "shape", ()):
@@ -621,3 +624,7 @@ def firstOfList(f):
                   "In the following the first component is plotted.")
     return f[(0,) * len(f.shape)]
   return f
+
+
+__all__ = ["saveFigure", "logAxis", "mtexFigure", "newMtexFigure", "gcm", "hold", "legend", "nextAxis", "mtexTitle", "xlabel", "ylabel", "mtexColorbar",
+           "setColorRange", "setColorScale"]

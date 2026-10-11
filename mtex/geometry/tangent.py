@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .kernels import qconj
 from ._array import MtexArray
 from .kernels import qmul, qrot
 from .orientation import orientation
@@ -38,9 +39,6 @@ def _side(side):
     raise ValueError(f"the side of a tangent space is 'left' or 'right', not {side!r}")
   return side
 
-
-def _conj(q):
-  return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
 def rotationVector(q):
@@ -225,7 +223,7 @@ class SO3TangentVector(vector3d):
     """the vectors on the right side, turned by the inverse reference where they are on the left"""
     if self.side == "right":
       return self
-    return self._rebuild(qrot(_conj(self.oriRef.data), self.data), side="right")
+    return self._rebuild(qrot(qconj(self.oriRef.data), self.data), side="right")
 
   def toSide(self, side):
     """the vectors on the side asked for, 'left' or 'right'"""
@@ -276,7 +274,7 @@ class SO3TangentVector(vector3d):
     if isinstance(other, quaternion):
       if self.side != "right":
         raise TypeError("a rotation acts on a left tangent vector from the left and on a right one from the right; use left(t) or right(t)")
-      return self._rebuild(qrot(_conj(other.data), self.data), self.oriRef * other)
+      return self._rebuild(qrot(qconj(other.data), self.data), self.oriRef * other)
     if isinstance(other, MtexArray):
       raise TypeError("tangent vectors are scaled by numbers and summed with tangent vectors; there is no other product")
     return self._rebuild(self.data * np.asarray(other, dtype=float)[..., None])
@@ -462,7 +460,7 @@ def logRotation(q, ref=None, side="left"):
   if ref is None:
     return SO3TangentVector(vector3d(rotationVector(q.data)), rotation.id, side)
   ref = _reference(ref)
-  m = qmul(q.data, _conj(ref.data)) if side == "left" else qmul(_conj(ref.data), q.data)
+  m = qmul(q.data, qconj(ref.data)) if side == "left" else qmul(qconj(ref.data), q.data)
   return SO3TangentVector(vector3d(rotationVector(m)), ref, side)
 
 
@@ -479,7 +477,7 @@ def logOrientation(o, ref=None, side="left", symmetry=True):
   else:
     ref = orientation._fromRotation(_reference(ref).data, (o.frameA, o.frameB))
   q = o.data if not symmetry else o.projectIntoFundamentalRegion(ref).data
-  m = qmul(q, _conj(ref.data)) if side == "left" else qmul(_conj(ref.data), q)
+  m = qmul(q, qconj(ref.data)) if side == "left" else qmul(qconj(ref.data), q)
   return SO3TangentVector(vector3d(rotationVector(m)), ref, side)
 
 

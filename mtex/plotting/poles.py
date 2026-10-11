@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.frames import crystalFrame
 from ..geometry.kernels import qrot
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..functions.funops import _antipodalPole
 
 
@@ -37,7 +38,7 @@ def orbit(xyz, fr, antipodal=False, tol=1e-6):
 
 
 def _oneDirection(h, fr, what):
-  v = h if isinstance(h, vector3d) else vector3d(h)
+  v = asVector3d(h)
   if v.size != 1:
     raise ValueError(f"one {what} at a time")
   # the frame of the orientations, a crystal frame compatible with it, or none at all
@@ -46,9 +47,6 @@ def _oneDirection(h, fr, what):
       raise ValueError(f"the {what} lives in another frame than the orientations")
   return v
 
-
-def _conj(q):
-  return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
 def poles(o, h, antipodal=False):
@@ -72,7 +70,7 @@ def inversePoles(o, r, antipodal=False):
   r = _oneDirection(r, o.SS, "specimen direction")
   ax = antipodal or _antipodalPole(vector3d(r.data, frame=o.SS, antipodal=r.antipodal), o.SS)
   eq = orbit(r.data, o.SS, ax)
-  q = _conj(o.data.reshape(-1, 4))
+  q = qconj(o.data.reshape(-1, 4))
   hs = qrot(q[:, None, :], eq[None, :, :])
   return vector3d(hs.reshape(o.shape + (len(eq), 3)), frame=o.CS, antipodal=ax, isNormalized=True)
 

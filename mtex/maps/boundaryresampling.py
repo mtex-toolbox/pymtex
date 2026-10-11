@@ -309,7 +309,8 @@ def refineBoundary(gB, delta=None, protect=None):
   tEnd = total[cOf] * kOf / m[cOf]
   gStart = Lc[iStart][cOf]
   eps = total[cOf] * 1e-9
-  locate = lambda g: _locate(g, Lc, iStart[cOf], iEnd[cOf])
+  def locate(g):
+    return _locate(g, Lc, iStart[cOf], iEnd[cOf])
   src = locate(gStart + (tPrev + tEnd) / 2)[0]
   within = (locate(gStart + tPrev + eps)[0] == src) & (locate(gStart + tEnd - eps)[0] == src)
   # every new segment contributes its head, except the last one of a piece

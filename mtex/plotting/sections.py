@@ -32,7 +32,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
 from ..geometry.symmetry import symmetry
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, zvector
+from ..geometry.vector3d import vector3d, xvector, zvector, asVector3d
 from .spherical import makeSphericalProjection
 from ..geometry.display import aligned
 from ..geometry.arguments import refuseFlags
@@ -408,7 +408,7 @@ class pfSections(ODFSections):
 
   def referenceField(self, r):
     """the field the twist is measured against, at directions of the specimen frame"""
-    r = r if isinstance(r, vector3d) else vector3d(r)
+    r = asVector3d(r)
     xyz = r.normalize().data.reshape(-1, 3)
     up, east = self.pC.outOfScreen.data, self.pC.east.data
     q = rotation.map(np.tile(up, (len(xyz), 1)), xyz).data
@@ -417,7 +417,7 @@ class pfSections(ODFSections):
   def twisted(self, r, omega):
     """the field turned about the direction by the angle of the section, where ori * h2 has to
     point for the orientation to belong there"""
-    r = r if isinstance(r, vector3d) else vector3d(r)
+    r = asVector3d(r)
     q = rotation.byAxisAngle(vector3d(r.normalize().data), omega).data
     return vector3d(qrot(q, self.referenceField(r).data), isNormalized=True)
 

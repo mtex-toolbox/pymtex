@@ -17,20 +17,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.representations import unitRows
 from ..geometry.kernels import backend
 from ..maps.ebsd import EBSD
 from ..geometry.install import install
 
 
-def _unit(a):
-  n = np.linalg.norm(a, axis=-1, keepdims=True)
-  return a / np.where(n == 0, 1, n)
-
-
 def systemCurvature(b, l):
   """the curvature tensor of one dislocation system: the dislocation density tensor of a
   system is b (x) l^ and Nye's relation turns it into the curvature"""
-  b, l = np.asarray(b, dtype=float), _unit(np.asarray(l, dtype=float))
+  b, l = np.asarray(b, dtype=float), unitRows(np.asarray(l, dtype=float))
   return l[..., :, None] * b[..., None, :] - (np.sum(b * l, axis=-1) / 2)[..., None, None] * np.eye(3)
 
 
@@ -65,7 +61,7 @@ def fitDislocationSystems(kappa, dS):
   K = np.ascontiguousarray(M.reshape(-1, 9))
   ns = dS.shape[-1]
   b = np.ascontiguousarray(dS.b.data.reshape(-1, ns, 3), dtype=float)
-  l = np.ascontiguousarray(_unit(dS.l.data).reshape(-1, ns, 3))
+  l = np.ascontiguousarray(unitRows(dS.l.data).reshape(-1, ns, 3))
   u = np.ascontiguousarray(np.broadcast_to(dS.u, dS.shape).reshape(-1, ns), dtype=float)
   known = np.flatnonzero(~np.isnan(K[0])) if len(K) else np.zeros(0, dtype=int)
   gnd, rho = np.full(len(K), np.nan), np.full((len(K), ns), np.nan)

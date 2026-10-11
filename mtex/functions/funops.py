@@ -8,12 +8,11 @@ import math
 import numpy as np
 
 from ..geometry.arguments import refuseFlags
-from ..geometry._array import MtexArray
 
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.representations import quat2euler
 from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .kernelfunctions import S1Kernel, S2Kernel, SO3Kernel
@@ -21,7 +20,7 @@ from .quadrature import bandwidthFor, legendreP, quadratureS2Grid, quadratureSO3
 from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic
 from .so3fun import SO3FunHarmonic
-from .transforms import wignerSeries, wignerSeriesAdjoint, sphericalSeriesAdjoint
+from .transforms import wignerSeriesAdjoint, sphericalSeriesAdjoint
 
 
 def _side(side):
@@ -95,25 +94,9 @@ def _oneRotation(r):
   return rotation(r.data.reshape(4))
 
 
-def rotate(f, r, *args, side="left", **kwargs):
-  """the function turned by a rotation: an SO(3) function from the left (the specimen side) or with
-  side='right' from the right, a spherical or circular function by the rotation; a container or
-  a map turns by its own method, its flags as keywords
-
-    rotate(odf, r)
-    rotate(odf, r, 'right')
-    rotate(ebsd, r, keepEuler=True)"""
-  refuseFlags(args, "rotate", names=("left", "right"))
-  # a container or a map turns by its own method
-  if isinstance(f, MtexArray) or type(f).__module__.startswith("mtex.maps"):
-    return f.rotate(r, **kwargs)
-  if args:
-    side = args[0]
-  side = _side(side)
-  if isinstance(f, S1FunHarmonic):
-    return f.rotate(r)
-  if isinstance(f, S2FunHarmonic):
-    return _rotateS2(f, r)
+# an SO(3) function turned from the left (the specimen side) or the right (the crystal side); an
+# orientation turns it into the other frame of the orientation
+def _rotateSO3(f, r, side):
   if isinstance(r, orientation):
     o = r
     rot = _oneRotation(rotation(o))
@@ -225,7 +208,8 @@ def conv(f, g, *args, inverse=False):
         # the normalised measure of the sphere, 1 / (4 pi) of its area, as MATLAB's
         degreeBlock(fhat, l)[...] = np.outer(np.where(k % 2, -1.0, 1.0) * t, s) / math.sqrt(2 * l + 1) / (4 * math.pi)
       from ..geometry.frames import specimenFrame
-      frameOf = lambda x: specimenFrame.default if x.frame is None else x.frame
+      def frameOf(x):
+        return specimenFrame.default if x.frame is None else x.frame
       return SO3FunHarmonic(fhat, frameOf(f), frameOf(g), real=f.isReal and g.isReal, symmetrise=False, _internal=True)
     if isinstance(g, (S2Kernel, SO3Kernel)):
       L = min(f.bandwidth, g.bandwidth)
@@ -295,7 +279,7 @@ def _antipodalPole(h, fr):
 
 
 def _oneVector(h, frame, what):
-  v = h if isinstance(h, vector3d) else vector3d(h)
+  v = asVector3d(h)
   if v.size != 1:
     raise ValueError(f"one {what} at a time")
   if v.frame is not None and frame is not None and v.frame is not frame:
@@ -350,11 +334,11 @@ def radon(f, h=None, r=None, superposition=None, bandwidth=None):
   if h is None and r is None:
     raise TypeError("radon needs the crystal direction h, the specimen direction r, or both")
   if h is None or (not isinstance(h, vector3d) and len(h) == 0):
-    return f._inversePoleFigure(r if isinstance(r, vector3d) else vector3d(r), bandwidth)
+    return f._inversePoleFigure(asVector3d(r), bandwidth)
   if isinstance(h, (list, tuple)):
-    hs = [x if isinstance(x, vector3d) else vector3d(x) for x in h]
+    hs = [asVector3d(x) for x in h]
   else:
-    h = h if isinstance(h, vector3d) else vector3d(h)
+    h = asVector3d(h)
     hs = [h[i] for i in range(h.size)] if h.size > 1 else [h]
   if superposition is None and len(hs) == 1:
     P = f._poleFigure(hs[0], bandwidth)

@@ -116,7 +116,7 @@ plt.gca().set_axis_off()
 
 # ## The Complete Axis--Angle Domain
 #
-# The option `'complete'` removes the reduction by crystal symmetry.
+# The option `complete=True` removes the reduction by crystal symmetry.
 
 plot(fullFibre, 'axisAngle', complete=True, lineWidth=3, lineColor='red')
 plt.gca().set_axis_off()

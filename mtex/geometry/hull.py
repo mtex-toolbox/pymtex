@@ -118,12 +118,10 @@ def _compiledLoops():
   return _COMPILED["loops"]
 
 
-__all__ = ["convexHull", "convexHullLoops"]
-
-
 # the signed area of the spherical triangles a, b, c, by the formula of van Oosterom and Strackee
 def _triangleArea(a, b, c):
-  dot = lambda x, y: np.einsum("ij,ij->i", x, y)
+  def dot(x, y):
+    return np.einsum("ij,ij->i", x, y)
   return 2 * np.arctan2(dot(a, np.cross(b, c)), 1 + dot(a, b) + dot(b, c) + dot(c, a))
 
 
@@ -152,3 +150,6 @@ def _cellAreas(u):
     kite = _triangleArea(P[i], mid[(i + 2) % 3], o) + _triangleArea(P[i], o, mid[(i + 1) % 3])
     area += np.bincount(T[:, i], kite, len(u))
   return area
+
+
+__all__ = ["convexHull", "convexHullLoops"]

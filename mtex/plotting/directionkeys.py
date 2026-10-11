@@ -17,8 +17,9 @@ from ..geometry.kernels import qrot
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector
-from .sectorfold import _angle, _unit, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, uniqueNormals
+from ..geometry.vector3d import vector3d, xvector, asVector3d
+from ..geometry.representations import unitRows
+from .sectorfold import _angle, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, uniqueNormals
 from ..geometry.display import aligned
 
 # ------------------------------------------------------------------ colour arithmetic
@@ -225,7 +226,7 @@ def perceptualSphereColor(radius, rho, gray=None, hueLightness=0.0):
 # ------------------------------------------------------------------ the keys
 
 def _asDirections(h):
-  v = h if isinstance(h, vector3d) else vector3d(h)
+  v = asVector3d(h)
   return v.data.reshape(-1, 3), v.shape
 
 
@@ -298,7 +299,7 @@ class HSVDirectionKey(directionColorKey):
     self.folds = sectorFolds(self.sym, sector)
     self.sR = sphericalRegion(np.array(N).reshape(-1, 3), np.zeros(len(N)), frame=sector.frame)
     self.reduced = sphericalRegion(np.array(N + self.folds).reshape(-1, 3), np.zeros(len(N) + len(self.folds)), frame=sector.frame)
-    self.whiteCenter = vector3d(regionCenter(self.reduced) if whiteCenter is None else _unit(_asDirections(whiteCenter)[0][0]), isNormalized=True)
+    self.whiteCenter = vector3d(regionCenter(self.reduced) if whiteCenter is None else unitRows(_asDirections(whiteCenter)[0][0]), isNormalized=True)
     pC = CS.how2plot if isinstance(CS, referenceFrame) and CS.how2plot is not None else plottingConvention.default
     self.reference = pC.east
     self.maxAngle = float(maxAngle)

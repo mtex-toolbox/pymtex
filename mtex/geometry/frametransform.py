@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from .kernels import qconj
 from .frames import crystalFrame
 from .quaternion import qmul, qrot, rotation
-from .symreduce import _conj
 from .vector3d import vector3d
 
 
@@ -69,7 +69,7 @@ def transformOrientation(o, to, toB=None, rule=None, tol=1e-1):
   if o.frameA is to:
     return o
   t = frameTransition(o.frameA, to, rule, tol)
-  return o._new(qmul(o.data, _conj(t.data)), frameA=to)
+  return o._new(qmul(o.data, qconj(t.data)), frameA=to)
 
 
 __all__ = ["align", "byScreenAlignment"]

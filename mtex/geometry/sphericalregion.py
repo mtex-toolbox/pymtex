@@ -13,16 +13,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .representations import unitRows
 from .latticetype import latticeType
 from .quaternion import orthogonalTransform, qrot, rotation
 from .symmetry import symmetry
 from .units import degree
 from .vector3d import vector3d, xvector, yvector, zvector
 from .display import display
-
-
-def _unit(v):
-  return v / np.linalg.norm(v, axis=-1, keepdims=True)
 
 
 class sphericalRegion:
@@ -44,7 +41,7 @@ class sphericalRegion:
     if N is None:
       self.N = np.zeros((0, 3))
     else:
-      self.N = _unit(np.asarray(N.data if isinstance(N, vector3d) else N, dtype=float).reshape(-1, 3))
+      self.N = unitRows(np.asarray(N.data if isinstance(N, vector3d) else N, dtype=float).reshape(-1, 3))
     self.alpha = np.zeros(len(self.N)) if alpha is None else np.broadcast_to(np.asarray(alpha, dtype=float), (len(self.N),)).copy()
     self.frame = frame
     self.antipodal = antipodal
@@ -87,19 +84,19 @@ class sphericalRegion:
       if not any(m @ n > 1 - 1e-9 for m in N):
         N.append(n)
     if len(N) < 2:
-      return vector3d(np.array([0.0, 0.0, 1.0]) if not N else _unit(N[0]), isNormalized=True, frame=self.frame)
+      return vector3d(np.array([0.0, 0.0, 1.0]) if not N else unitRows(N[0]), isNormalized=True, frame=self.frame)
     V = self.vertices().data.reshape(-1, 3)
     if len(V) < 3:
       pairs = [(i, j) for i in range(len(N) - 1) for j in range(i + 1, len(N))]
       i, j = max(pairs, key=lambda ij: np.arccos(np.clip(N[ij[0]] @ N[ij[1]], -1, 1)))
-      return vector3d(_unit(N[i] + N[j]), isNormalized=True, frame=self.frame)
+      return vector3d(unitRows(N[i] + N[j]), isNormalized=True, frame=self.frame)
     if len(V) < 4:
-      return vector3d(_unit(np.sum(V, axis=0)), isNormalized=True, frame=self.frame)
+      return vector3d(unitRows(np.sum(V, axis=0)), isNormalized=True, frame=self.frame)
     from .grids.s2grid import equispacedS2Grid
     g = equispacedS2Grid(resolution=resolution)
     inside = g.data[self.checkInside(g)]
     c = np.sum(inside, axis=0) if len(inside) else np.zeros(3)
-    return vector3d(np.array([0.0, 0.0, 1.0]) if np.linalg.norm(c) < 1e-4 else _unit(c), isNormalized=True, frame=self.frame)
+    return vector3d(np.array([0.0, 0.0, 1.0]) if np.linalg.norm(c) < 1e-4 else unitRows(c), isNormalized=True, frame=self.frame)
 
   def __eq__(self, other):
     return (isinstance(other, sphericalRegion) and self.N.shape == other.N.shape
@@ -111,7 +108,7 @@ class sphericalRegion:
     """the hemisphere seen from a direction added to the region (MATLAB's sphericalRegion.restrict2Upper)"""
     from .plottingconvention import plottingConvention
     up = zvector if up is None else up.outOfScreen if isinstance(up, plottingConvention) else up
-    u = _unit(np.asarray(up.data if isinstance(up, vector3d) else up, dtype=float))
+    u = unitRows(np.asarray(up.data if isinstance(up, vector3d) else up, dtype=float))
     if np.any((self.N @ u > 1 - 1e-10) & (self.alpha >= 0)):
       return self
     return sphericalRegion(np.concatenate([u[None], self.N]), np.concatenate([[0.0], self.alpha]), self.frame, self.antipodal)
@@ -179,7 +176,8 @@ class sphericalRegion:
         continue
       u = vector3d(n).orth().data
       w = np.cross(n, u)
-      point = lambda t: _unit(alpha * n + r * (np.cos(t)[..., None] * u + np.sin(t)[..., None] * w))
+      def point(t):
+        return unitRows(alpha * n + r * (np.cos(t)[..., None] * u + np.sin(t)[..., None] * w))
       ts = sorted(np.arctan2(v @ w, v @ u) for v in V if abs(v @ n - alpha) < 1e-8)
       pieces = [(0.0, 2 * np.pi)] if not ts else [(ts[k], ts[k + 1] if k + 1 < len(ts) else ts[0] + 2 * np.pi) for k in range(len(ts))]
       for t0, t1 in pieces:
@@ -211,7 +209,7 @@ def _circleIntersection(n1, a1, n2, a2):
   w = np.cross(n1, n2)
   c = np.sqrt(max(c2, 0.0))
   base = a * n1 + b * n2
-  return [_unit(base)] if c < 1e-10 else [_unit(base + c * w), _unit(base - c * w)]
+  return [unitRows(base)] if c < 1e-10 else [unitRows(base + c * w), unitRows(base - c * w)]
 
 
 # ------------------------------------------------------------------ the fundamental sector
@@ -243,11 +241,11 @@ def sectorCenter(pg):
     if fr.lattice in (latticeType.triclinic, latticeType.monoclinic):
       N = conventionalSector(fr).N
       if len(N):
-        return _offFixed(fr.sym, _unit(np.sum(N, axis=0)))
+        return _offFixed(fr.sym, unitRows(np.sum(N, axis=0)))
     pg = fr.sym
   a, b, c = (np.asarray(pg.axes[k], dtype=float) for k in range(3))
   if pg.lattice is latticeType.cubic:
-    return _offFixed(pg, _unit(_unit(c) + _unit(a + c) + _unit(a + b + c)))
+    return _offFixed(pg, unitRows(unitRows(c) + unitRows(a + c) + unitRows(a + b + c)))
   if pg.lattice is latticeType.icosahedral and pg.numProper() == 60:
     # the centre of the Moebius triangle between neighbouring five-, three- and twofold
     # axes, the kite of two such triangles for the proper group, whatever the alignment
@@ -255,15 +253,16 @@ def sectorCenter(pg):
     omega, axes = R.angle(), R.axis().data
     # a group generated from rounded axes closes only approximately, so the orders are read
     # with a tolerance far below the gap between them
-    fold = lambda order: axes[np.abs(omega - 2 * np.pi / order) < 1e-3]
+    def fold(order):
+      return axes[np.abs(omega - 2 * np.pi / order) < 1e-3]
     f = fold(5)[0]
     t = max(fold(3), key=lambda x: abs(x @ f)) * np.sign(fold(3)[np.argmax(np.abs(fold(3) @ f))] @ f)
     t = t if t @ f > 0 else -t
     w = max(fold(2), key=lambda x: abs(x @ f) + abs(x @ t))
     w = w if w @ (f + t) > 0 else -w
-    return vector3d(_unit(f + t + w if pg.isLaue else f + t), isNormalized=True)
+    return vector3d(unitRows(f + t + w if pg.isLaue else f + t), isNormalized=True)
   dirs = _symmetryDirections(pg)
-  return _offFixed(pg, _unit(np.sum([d.normalize().data for d in dirs], axis=0)))
+  return _offFixed(pg, unitRows(np.sum([d.normalize().data for d in dirs], axis=0)))
 
 
 # a centre no element but the identity fixes: the direction itself, or the first of a fixed
@@ -271,7 +270,7 @@ def sectorCenter(pg):
 def _offFixed(pg, c):
   els = _elements(pg)
   for k in range(12):
-    d = c if k == 0 else _unit(c + 0.1 * k * _unit(np.array([1.0, 2.0 ** 0.5, 3.0 ** 0.5])) * (-1) ** k)
+    d = c if k == 0 else unitRows(c + 0.1 * k * unitRows(np.array([1.0, 2.0 ** 0.5, 3.0 ** 0.5])) * (-1) ** k)
     if np.linalg.norm(d) > 0 and np.sum(np.linalg.norm(_apply(els, d) - d, axis=1) < 1e-8) <= 1:
       return vector3d(d, isNormalized=True)
   return vector3d(c, isNormalized=True)
@@ -284,14 +283,15 @@ def _essentialNormals(N, tol=1e-4):
     return N
   # a group generated from rounded axes meets at its corners only to about 1e-5, so a corner
   # is taken to that tolerance, far below the distance between the corners of any sector
-  inside = lambda v: np.all(N @ v >= -tol)
+  def inside(v):
+    return np.all(N @ v >= -tol)
   verts = []
   for i in range(len(N) - 1):
     for j in range(i + 1, len(N)):
       w = np.cross(N[i], N[j])
       if np.linalg.norm(w) < 1e-10:
         continue
-      for v in (_unit(w), -_unit(w)):
+      for v in (unitRows(w), -unitRows(w)):
         if inside(v) and not any(u @ v > 1 - tol ** 2 for u in verts):
           verts.append(v)
   if not verts:
@@ -315,12 +315,12 @@ def dirichletSector(pg, center=None, frame=None, antipodal=False):
   # centre of the proper subgroup's sector serves, its Dirichlet cell under the whole group
   if center is None and (not np.all(np.isfinite(c)) or np.linalg.norm(c) < 1e-8):
     c = sectorCenter(pg.properSubGroup()).data
-  c = _unit(c.reshape(3))
+  c = unitRows(c.reshape(3))
   els = _elements(pg)
   d = c[None] - _apply(els, c)
   keep = np.linalg.norm(d, axis=1) >= 1e-10
   N = []
-  for n in _unit(d[keep]):
+  for n in unitRows(d[keep]):
     if not any(m @ n > 1 - 1e-10 for m in N):
       N.append(n)
   N = _essentialNormals(np.array(N).reshape(-1, 3))
@@ -398,7 +398,7 @@ def conventionalSector(pg, up=None, east=None, frame=None):
     east = pC.east if east is None else east
     pg = pg.sym
   n = pg.numSym()
-  u = _unit(np.asarray(up.data if isinstance(up, vector3d) else zvector.data if up is None else up, dtype=float))
+  u = unitRows(np.asarray(up.data if isinstance(up, vector3d) else zvector.data if up is None else up, dtype=float))
   east = np.asarray(pg.axes[1], dtype=float) if east is None else (east.data if isinstance(east, vector3d) else np.asarray(east, dtype=float))
   lat = pg.lattice
   if lat is latticeType.triclinic:
@@ -437,7 +437,7 @@ def conventionalSector(pg, up=None, east=None, frame=None):
   # an orthorhombic sector with a mirror opens east on the chart, so the plotting
   # convention turns it, as the monoclinic one is turned
   if lat is latticeType.orthorhombic and not pg.isProper:
-    N = _openEast(N, u, _unit(east))
+    N = _openEast(N, u, unitRows(east))
   return sphericalRegion(N, frame=frame)
 
 
@@ -465,7 +465,7 @@ def _monoclinicSector(pg, up, east, frame):
   o = pg.rot
   two = o[np.abs(o.angle() - np.pi) < 1e-8][0]
   a = two.axis().data
-  k = int(np.argmax([abs(a @ _unit(np.asarray(pg.axes[j], dtype=float))) for j in range(3)]))
+  k = int(np.argmax([abs(a @ unitRows(np.asarray(pg.axes[j], dtype=float))) for j in range(3)]))
   if a @ pg.axes[k] < 0:
     a = -a
   if pg.numSym() == 2 and not pg.isProper:
@@ -480,7 +480,7 @@ def _monoclinicSector(pg, up, east, frame):
       if np.linalg.norm(np.cross(a, v)) > 1e-8:
         p = np.cross(a, v)
         break
-  normal = _unit(p)
+  normal = unitRows(p)
   if pg.isProper:
     return sphericalRegion(normal[None], frame=frame)
   if abs(a @ up) > 1e-8:
@@ -497,9 +497,9 @@ def _monoclinicSector(pg, up, east, frame):
 # at azimuth zero sits on the lattice, MATLAB's rotation.map(z, c*, x, a); the identity for a
 # group on the canonical axes
 def _latticeTurn(pg):
-  a = _unit(np.asarray(pg.axes[0], dtype=float))
-  c = _unit(np.cross(a, np.asarray(pg.axes[1], dtype=float)))
-  x = _unit(a - (a @ c) * c)
+  a = unitRows(np.asarray(pg.axes[0], dtype=float))
+  c = unitRows(np.cross(a, np.asarray(pg.axes[1], dtype=float)))
+  x = unitRows(a - (a @ c) * c)
   return np.stack([x, np.cross(c, x), c], axis=1)
 
 

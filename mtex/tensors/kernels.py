@@ -219,9 +219,6 @@ def voigtInverse(D, voigtPairs, wIn, wOut):
   return None if singular.any() else out
 
 
-__all__ = []
-
-
 # a tensor of rank R contracted with u on every index is a homogeneous polynomial of degree R
 # in u: the 3^R coordinates fold onto the (R + 1)(R + 2) / 2 monomials x^i y^j z^k, and the
 # value at a direction of any length is that of the vector over its norm to the power R, so
@@ -365,3 +362,6 @@ def turnSum(U, R, q, w):
   _COMPILED["turnSum"](np.ascontiguousarray(U, dtype=np.float64).ravel(), np.int64(R), q, np.ascontiguousarray(w, dtype=np.float64),
                        np.int64(blocks), acc)
   return acc.sum(axis=0)
+
+
+__all__ = []

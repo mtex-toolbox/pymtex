@@ -19,7 +19,7 @@ from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-from .load import ebsdFromColumns, placedPhases, regularPoly, tslPointGroup, unmeasuredRows
+from .load import ebsdFromColumns, placedPhases, regularPoly, tslPointGroup, unmeasuredRows, scanGrid
 from .table import headerDict, leadingLines, readFile, readTable, text
 
 # the keys of a phase block, which the header dict leaves out
@@ -173,7 +173,7 @@ def _scanGrid(header):
   if not all(isinstance(v, float) for v in (xs, ys, nOdd, nEven, nRows)):
     return None
   hex = str(header.get("GRID", "")).lower() == "hexgrid"
-  return (nOdd, nRows, xs, ys, hex, nEven)
+  return scanGrid(nOdd, nRows, xs, ys, hex, nEven)
 
 
 # the cell the header states, preferred over the estimate from the positions

@@ -224,3 +224,11 @@ def test_ucv_asks_for_a_higher_bandwidth_at_its_edge():
   assert ucvAtEdge(degreeEnergies(ori, 16, folds=1, rng=rng), H)
   assert not ucvAtEdge(degreeEnergies(ori, 128, folds=1, rng=rng), H)
   assert calcKernel(ori).halfwidth() < 3.9 * degree
+
+
+def test_degreeEnergies_isTheClassOfItsSpace():
+  from mtex.functions.halfwidth import S2DegreeEnergies, SO3DegreeEnergies, degreeEnergies
+  cs = crystalFrame("432")
+  E = degreeEnergies(orientation.rand(50, cs), 4, folds=1, rng=np.random.default_rng(0))
+  F = degreeEnergies(vector3d.rand(50), 4, folds=1, rng=np.random.default_rng(0))
+  assert isinstance(E, SO3DegreeEnergies) and isinstance(F, S2DegreeEnergies) and F.space == "S2"

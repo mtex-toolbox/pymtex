@@ -18,7 +18,10 @@ from typing import TYPE_CHECKING
 import math
 
 import numpy as np
+from numpy.lib.array_utils import normalize_axis_index
 
+from .harmonicarithmetic import harmonicArithmetic
+from .so3funclass import SO3Fun
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion
@@ -27,13 +30,9 @@ from ..geometry.display import framesLabel
 from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
-from .kernels import realizeWigner
+from .kernels import realizeWigner, _complexType
 from .transforms import isRealWigner, wignerSeries, wignerSeriesAdjoint
 from ..geometry.display import aligned
-
-
-def _complexType(dtype):
-  return np.result_type(np.dtype(dtype), 1j)
 
 
 def invertedCoefficients(fhat):
@@ -58,6 +57,7 @@ def conjugateCoefficients(fhat):
   return out
 
 
+# the crystal and the specimen frame, the only arguments after the coefficients
 def _readFrames(args):
   frames = [a for a in args if isinstance(a, referenceFrame)]
   if len(frames) != len(args) or len(frames) > 2:
@@ -67,7 +67,7 @@ def _readFrames(args):
   return CS, SS
 
 
-class SO3FunHarmonic:
+class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   """a function on SO(3) as a series of Wigner functions, symmetric under its crystal and specimen
   frame: from MTEX's coefficients fhat, another SO(3) function, a kernel or a callable (by
   quadrature); a list of functions carries its shape in front of the coefficients
@@ -221,7 +221,6 @@ class SO3FunHarmonic:
   @staticmethod
   def example():
     """the harmonic expansion of the Dubna ODF, MTEX's example function"""
-    from .so3funclass import SO3Fun
     return SO3FunHarmonic(SO3Fun.dubna())
 
   # ------------------------------------------------------------------ properties
@@ -367,12 +366,6 @@ class SO3FunHarmonic:
   def __neg__(self):
     return self._rebuild(-self._fhat)
 
-  def __sub__(self, g):
-    return self + (-g)
-
-  def __rsub__(self, a):
-    return (-self) + a
-
   def __mul__(self, a):
     if isinstance(a, SO3FunHarmonic):
       from .funops import mapFun
@@ -382,21 +375,6 @@ class SO3FunHarmonic:
     return NotImplemented
 
   __rmul__ = __mul__
-
-  def __truediv__(self, a):
-    if isinstance(a, SO3FunHarmonic):
-      from .funops import mapFun, smoothBandwidth
-      return mapFun(np.divide, self, a, bandwidth=smoothBandwidth(self, a))
-    return self * (1 / a)
-
-  def __rtruediv__(self, a):
-    from .funops import mapFun, smoothBandwidth
-    return mapFun(lambda x: a / x, self, bandwidth=smoothBandwidth(self))
-
-  def __pow__(self, p):
-    from .funops import mapFun, smoothBandwidth
-    L = min(p * self.bandwidth, 2048) if isinstance(p, (int, np.integer)) and p >= 0 else smoothBandwidth(self)
-    return mapFun(lambda x: x ** p, self, bandwidth=L)
 
   def __abs__(self):
     from .funops import mapFun, smoothBandwidth
@@ -427,7 +405,7 @@ class SO3FunHarmonic:
     """the mean of every function; with an axis, MATLAB's mean(SO3F, d), the function that is the
     mean along that axis of the list"""
     if axis is not None:
-      return self._rebuild(self._fhat.mean(axis=_leadingAxis(axis, self.shape)))
+      return self._rebuild(self._fhat.mean(axis=normalize_axis_index(axis, len(self.shape))))
     m = self._fhat[..., 0]
     m = m.real if self.isReal else m
     return m[()] if not self.shape else m
@@ -435,7 +413,7 @@ class SO3FunHarmonic:
   def sum(self, axis=None):
     """the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list"""
     if axis is not None:
-      return self._rebuild(self._fhat.sum(axis=_leadingAxis(axis, self.shape)))
+      return self._rebuild(self._fhat.sum(axis=normalize_axis_index(axis, len(self.shape))))
     return 8 * np.pi ** 2 * self.mean()
 
   def norm(self, s=None):
@@ -464,14 +442,14 @@ class SO3FunHarmonic:
   def rotate(self, rot, side="left"):
     """the function turned by a rotation, from the left or with side='right' from the right, as
     rotate(f, rot, side)"""
-    from .funops import rotate
-    return rotate(self, rot, side)
+    from .funops import _rotateSO3, _side
+    return _rotateSO3(self, rot, _side(side))
 
-  def conv(self, g, *flags):
+  def conv(self, g, *, inverse=False):
     """the convolution with another SO(3) function, a kernel, a function on the sphere or a vector of
-    multipliers per degree, as conv(f, g); conv(f, g, 'inv') convolves the inverse of f"""
+    multipliers per degree, as conv(f, g); with inverse=True of the inverse of f"""
     from .funops import conv
-    return conv(self, g, *flags)
+    return conv(self, g, inverse=inverse)
 
   def grad(self, x=None, side="left"):
     """the gradient, a harmonic vector field on SO(3), left or with side='right' right; with x its
@@ -540,6 +518,8 @@ class SO3FunHarmonic:
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    def __pow__(self, p) -> Any:
+      ...
     @property
     def frameA(self) -> Any:
       ...
@@ -563,11 +543,6 @@ def _cut(fhat, L):
 
 
 # MATLAB's dimension of a list counted from zero, the coefficient axis behind it
-def _leadingAxis(axis, shape):
-  axis = int(axis)
-  return axis + len(shape) if axis < 0 else axis
-
-
 # a radial kernel centred at the identity: fhat_n^{kk} = A_n / sqrt(2n+1)
 def _kernelCoefficients(psi, bandwidth):
   L = psi.bandwidth if bandwidth is None else int(bandwidth)

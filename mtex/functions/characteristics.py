@@ -29,25 +29,24 @@ from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
 from .bingham import S2FunBingham, SO3FunBingham, binghamSample
 from .kernels import rbfSample
 from .funops import conv
-from .handles import S2FunHandle, S2FunSum, SO3FunComposition, SO3FunGeneric, SO3FunHandle
+from .handles import S1FunHandle, S2FunHandle, S2FunSum, SO3FunComposition, SO3FunGeneric, SO3FunHandle
 from .kernelfunctions import SO3DeLaValleePoussinKernel
 from .quadrature import bandwidthFor, quadratureS2Grid, quadratureSO3Grid
 from .rbf import SO3FunCBF, SO3FunRBF, _rotationsFor, uniformODF
+from .s1fun import S1FunHarmonic
 from .s2fun import S2FunHarmonic
+from .s2funclass import S2Fun
 from .s2funtri import S2FunTri
 from .so3fun import SO3FunHarmonic
+from .so3funclass import SO3Fun
 from ..geometry.install import install
 
 SO3_KINDS = (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric)
 S2_KINDS = (S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri)
-
-
-def _isSO3(f):
-  return isinstance(f, SO3_KINDS)
 
 
 def _ori(r, f):
@@ -60,12 +59,12 @@ def _ori(r, f):
 def textureIndex(f):
   """the texture index of a function on SO(3) or on the sphere, the squared L2 norm of its harmonic
   expansion"""
-  return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if _isSO3(f) else S2FunHarmonic(f).norm() ** 2
+  return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if isinstance(f, SO3Fun) else S2FunHarmonic(f).norm() ** 2
 
 
 def entropy(f, bandwidth=None):
   """-int f log f by the exact rule at a raised bandwidth, since f log f is not bandlimited"""
-  if _isSO3(f):
+  if isinstance(f, SO3Fun):
     L0 = max(2 * f.bandwidth, 64) if bandwidth is None else int(bandwidth)
     L = bandwidthFor(min(L0, 2 * getMTEXpref("maxSO3Bandwidth")), f.CS, f.SS)
     g = quadratureSO3Grid(L, f.CS, f.SS)
@@ -89,7 +88,7 @@ def volume(f, center, radius, resolution=None):
     return fibreVolume(f, center, radius)
   if center.size > 1:
     return np.array([volume(f, center[i], radius, resolution) for i in range(center.size)]).reshape(center.shape)
-  if isinstance(f, S2_KINDS):
+  if isinstance(f, S2Fun):
     return _volumeS2(f, center, radius, resolution)
   _rotationsFor(f, center)
   res = min(1.25 * degree, radius / 30) if resolution is None else resolution
@@ -293,10 +292,10 @@ def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
     v = None if isinstance(v, referenceFrame) else v
     value = _uniformAxisDensity(fundamentalRegion(CS, SS))
     if v is not None:
-      return value(v if isinstance(v, vector3d) else vector3d(v))
+      return value(asVector3d(v))
     return S2FunHandle(value, CS if CS is SS else None, antipodal=True)
   if v is not None:
-    return _axisDensity(f, **kwargs)(v if isinstance(v, vector3d) else vector3d(v))
+    return _axisDensity(f, **kwargs)(asVector3d(v))
   # the axes live in the first crystal frame, symmetric under the rotations the two frames
   # share, and antipodal only with grain exchange
   antipodal = bool(getattr(f, "antipodal", False))
@@ -409,14 +408,15 @@ def _bestSeeds(cand, v, numLocal, c, copies=None):
 # the copies of the grid nodes under the group elements, one array per element
 def _copiesSO3(cand, f):
   # the proper rotations of the groups: an improper element maps no rotation onto the grid
-  proper = lambda fr: (fr.properGroup() if hasattr(fr, "properGroup") else fr).sym.rot.flatten()
+  def proper(fr):
+    return (fr.properGroup() if hasattr(fr, "properGroup") else fr).sym.rot.flatten()
   Ls, Rs = proper(f.CS), proper(f.SS)
   q = rotation(cand)
   return [(rotation(Ls[i]) * q * rotation(Rs[j])).data.reshape(-1, 4) for i in range(Ls.size) for j in range(Rs.size)]
 
 
 def _copiesS2(cand, fr):
-  if fr is None or not hasattr(fr, "sym"):
+  if not isinstance(fr, referenceFrame):
     return None
   els = fr.sym.rot.flatten()
   return [(els[i] * vector3d(cand)).data.reshape(-1, 3) for i in range(els.size)]
@@ -489,7 +489,7 @@ def _localMaximaS2(f, numLocal=1, resolution=2.5 * degree, accuracy=0.05 * degre
 # max(f, g), min(f, 1): the pointwise extremum of two functions, or of a function and a number,
 # expanded by quadrature at the larger bandwidth, antipodal when both are
 def _pointwiseS2(op, f, g):
-  isFun = isinstance(g, S2_KINDS)
+  isFun = isinstance(g, S2Fun)
   L = max(f.bandwidth, g.bandwidth) if isFun else f.bandwidth
   fun = (lambda v: op(np.real(f(v)), np.real(g(v)))) if isFun else (lambda v: op(np.real(f(v)), g))
   antipodal = f.antipodal and (g.antipodal if isFun else True)
@@ -499,7 +499,7 @@ def _pointwiseS2(op, f, g):
 # the pointwise extremum of two functions on SO(3), or of one and a number, a handle
 # evaluated when asked, as MATLAB's
 def _pointwiseSO3(op, f, g):
-  isFun = _isSO3(g)
+  isFun = isinstance(g, SO3Fun)
   fun = (lambda o: op(np.real(f.eval(o)), np.real(g.eval(o)))) if isFun else (lambda o: op(np.real(f.eval(o)), g))
   L = max(f.bandwidth, g.bandwidth) if isFun else f.bandwidth
   return SO3FunHandle(fun, f.CS, f.SS, bandwidth=L)
@@ -533,28 +533,7 @@ def max_(f, *args, numLocal=1, **kwargs):
     value, ori = max(odf)
     values, oris = max(odf, numLocal=5, resolution=5*degree, accuracy=0.25*degree)
     f = max(odf1, odf2)"""
-  # a pole figure clips or reports its intensities
-  if hasattr(f, "allI"):
-    return f.max(*args)
-  # a list of functions reduced along an axis, MATLAB's max(sF, [], d)
-  if kwargs.get("axis") is not None and isinstance(f, S2FunHarmonic):
-    return f._reduce(np.max, kwargs["axis"])
-  if kwargs.get("axis") is not None and isinstance(f, S2FunHandle):
-    return _reduceHandle(f, np.max, kwargs["axis"])
-  # the pointwise maximum with another function or a number
-  if args and isinstance(f, S2_KINDS) and (isinstance(args[0], S2_KINDS) or np.isscalar(args[0])):
-    return _pointwiseS2(np.maximum, f, args[0])
-  if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
-    return _pointwiseSO3(np.maximum, f, args[0])
-  if isinstance(f, SO3FunHarmonic) and f.shape:
-    return _listExtremaSO3(f, np.max, max_, numLocal, kwargs)
-  # a function on the circle knows its own extrema
-  if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
-    return f.max(**kwargs)
-  if not (_isSO3(f) or isinstance(f, S2_KINDS)):
-    return max(f, *args, **kwargs)
-  v, p = (_localMaximaSO3 if _isSO3(f) else _localMaximaS2)(f, numLocal=numLocal, **kwargs)
-  return (float(v[0]), p[0]) if numLocal == 1 else (v, p)
+  return _extremum(f, args, numLocal, kwargs, largest=True)
 
 
 def min_(f, *args, numLocal=1, **kwargs):
@@ -563,24 +542,36 @@ def min_(f, *args, numLocal=1, **kwargs):
 
     value, ori = min(odf)
     f = min(odf, 0)"""
+  return _extremum(f, args, numLocal, kwargs, largest=False)
+
+
+# the largest or the smallest values, by the kind of f: a pole figure's own, along an axis of a
+# list, pointwise with a second function or a number, per function of a list, a function on the
+# circle's own, or the local extrema searched from a grid; a minimum is the maximum of -f
+def _extremum(f, args, numLocal, kwargs, largest):
+  name, reduce, pointwise = ("max", np.max, np.maximum) if largest else ("min", np.min, np.minimum)
   if hasattr(f, "allI"):
-    return f.min(*args)
-  if kwargs.get("axis") is not None and isinstance(f, S2FunHarmonic):
-    return f._reduce(np.min, kwargs["axis"])
-  if kwargs.get("axis") is not None and isinstance(f, S2FunHandle):
-    return _reduceHandle(f, np.min, kwargs["axis"])
-  if args and isinstance(f, S2_KINDS) and (isinstance(args[0], S2_KINDS) or np.isscalar(args[0])):
-    return _pointwiseS2(np.minimum, f, args[0])
-  if args and _isSO3(f) and (_isSO3(args[0]) or np.isscalar(args[0])):
-    return _pointwiseSO3(np.minimum, f, args[0])
+    return getattr(f, name)(*args)
+  axis = kwargs.get("axis")
+  if axis is not None and isinstance(f, S2FunHarmonic):
+    return f._reduce(reduce, axis)
+  if axis is not None and isinstance(f, S2FunHandle):
+    return _reduceHandle(f, reduce, axis)
+  if args and isinstance(f, S2Fun) and (isinstance(args[0], S2Fun) or np.isscalar(args[0])):
+    return _pointwiseS2(pointwise, f, args[0])
+  if args and isinstance(f, SO3Fun) and (isinstance(args[0], SO3Fun) or np.isscalar(args[0])):
+    return _pointwiseSO3(pointwise, f, args[0])
   if isinstance(f, SO3FunHarmonic) and f.shape:
-    return _listExtremaSO3(f, np.min, min_, numLocal, kwargs)
-  if hasattr(f, "_harmonicS1") or type(f).__name__ == "S1FunHarmonic":
-    return f.min(**kwargs)
-  if not (_isSO3(f) or isinstance(f, S2_KINDS)):
-    return min(f, *args, **kwargs)
-  v, p = max_(-1 * f, numLocal=numLocal, **kwargs)
-  return -v, p
+    return _listExtremaSO3(f, reduce, max_ if largest else min_, numLocal, kwargs)
+  if isinstance(f, (S1FunHarmonic, S1FunHandle)):
+    return getattr(f, name)(**kwargs)
+  if not isinstance(f, (SO3Fun, S2Fun)):
+    return (max if largest else min)(f, *args, **kwargs)
+  if not largest:
+    v, p = _extremum(-1 * f, (), numLocal, kwargs, largest=True)
+    return -v, p
+  v, p = (_localMaximaSO3 if isinstance(f, SO3Fun) else _localMaximaS2)(f, numLocal=numLocal, **kwargs)
+  return (float(v[0]), p[0]) if numLocal == 1 else (v, p)
 
 
 # ------------------------------------------------------------------ components
@@ -740,7 +731,7 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     flat = f.flatten()
     k = rng.choice(flat.size, size=min(n, flat.size) if withoutReplacement else n, replace=not withoutReplacement)
     return flat[k]
-  if isinstance(f, S2_KINDS):
+  if isinstance(f, S2Fun):
     return _discreteSampleS2(f, n, 1 * degree if resolution is None else resolution, rng)
   if isinstance(f, SO3FunComposition) and all(isinstance(t, SO3FunRBF) for t in f.components):
     m = np.array([t.mean() for t in f.components])
@@ -921,7 +912,8 @@ def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose
   v2 = best(fan(np.arange(-5, 5.5, 0.5) * degree))
   # the rotation carrying the two axes onto the specimen axes nearest to them
   axes = np.concatenate([np.eye(3), -np.eye(3)])
-  closest = lambda u: axes[int(np.argmax(axes @ u))]
+  def closest(u):
+    return axes[int(np.argmax(axes @ u))]
   u1, u2 = v1.data.reshape(3), v2.data.reshape(3)
   a1, a2 = closest(u1), closest(u2)
   w2 = u2 - np.dot(u2, u1) * u1

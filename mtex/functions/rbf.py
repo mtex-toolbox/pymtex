@@ -16,6 +16,8 @@ import math
 
 import numpy as np
 
+from .so3funclass import SO3Fun
+from ..geometry.kernels import qconj
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.kernels import threads
@@ -27,7 +29,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import fields, framesLabel, numString
 from .funops import _antipodalPole, _rotatedFrame, conv
 from .harmonics import deg2dim, degreeBlock, _sphericalY
@@ -54,9 +56,6 @@ def _qmul(p, q):
   return np.stack([a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2, b1 * a2 + a1 * b2 - d1 * c2 + c1 * d2,
                    c1 * a2 + d1 * b2 + a1 * c2 - b1 * d2, d1 * a2 - c1 * b2 + b1 * c2 + a1 * d2], axis=-1)
 
-
-def _conj(q):
-  return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
 def supportCosine(psi, tol=1e-9):
@@ -117,7 +116,7 @@ def _cellSum(q, c, w, L, R, antipodal, psi, cut):
     imgs = _qmul(_qmul(L[:, None, None, :], qb[None, :, None, :]), R[None, None, :, :]).transpose(1, 0, 2, 3)
     imgs = imgs.reshape(len(qb), -1, 4)
     if antipodal:
-      imgs = np.concatenate([imgs, _conj(imgs)], axis=1)
+      imgs = np.concatenate([imgs, qconj(imgs)], axis=1)
     if fused is not None:
       out[start:start + len(qb)] = cellKernelSum(imgs, imgs.shape[1], cells, radius, n, w, cut, *fused)
       continue
@@ -149,7 +148,7 @@ def _rotationsFor(f, x):
   raise TypeError("a function on SO(3) is evaluated at rotations or orientations")
 
 
-class SO3FunRBF:
+class SO3FunRBF(SO3Fun):
   """a function on SO(3) as a sum of radial kernels psi at centre orientations with weights, plus a
   constant c0; the weights default to a mean of one
 
@@ -252,7 +251,7 @@ class SO3FunRBF:
     L, R = reductionGroups(self.center)
     c = self.center.data.reshape(-1, 4)
     if self.antipodal:
-      c = np.concatenate([c, _conj(c)])
+      c = np.concatenate([c, qconj(c)])
     q = _qmul(_qmul(L[:, None, None, :], c[None, :, None, :]), R[None, None, :, :])
     m = len(L) * len(R) * (2 if self.antipodal else 1)
     w = np.concatenate([self.weights, self.weights]) if self.antipodal else self.weights
@@ -324,7 +323,7 @@ class SO3FunRBF:
       none = ~np.any(mask, axis=1)
       mask[none, np.argmax(D[none], axis=1)] = True
       i, j = np.nonzero(mask)
-      qi = _conj(qb[i])
+      qi = qconj(qb[i])
       p = _qmul(cs[j], qi) if side == "left" else _qmul(qi, cs[j])
       n = np.linalg.norm(p[:, 1:], axis=1)
       ok = n > 1e-12
@@ -336,7 +335,7 @@ class SO3FunRBF:
   # the pole figure of one crystal direction: the Radon transform of the kernel centred at the
   # images of h under the centres and the crystal rotations, projected by the specimen frame
   def _poleFigure(self, h, bandwidth=None):
-    h = h if isinstance(h, vector3d) else vector3d(h)
+    h = asVector3d(h)
     if h.size != 1:
       raise ValueError("one crystal direction at a time")
     if h.frame is not None and h.frame is not self.CS:
@@ -349,7 +348,7 @@ class SO3FunRBF:
     hs = rotation(R) * vector3d(h.normalize().data.reshape(3))
     c = self.center.data.reshape(-1, 4)
     if self.antipodal:
-      c = np.concatenate([c, _conj(c)])
+      c = np.concatenate([c, qconj(c)])
     pts = rotation(c[:, None, :]) * hs
     w = np.concatenate([self.weights, self.weights]) / 2 if self.antipodal else self.weights
     w = np.repeat(w, hs.size) / hs.size
@@ -500,7 +499,7 @@ class SO3FunRBF:
 # ------------------------------------------------------------------ fibre components
 
 
-class SO3FunCBF:
+class SO3FunCBF(SO3Fun):
   """a fibre ODF, a sum over fibres h || r of an S2 kernel psi of the angle between g h and r, with
   weights normalised to a mean of one by default
 
@@ -516,8 +515,8 @@ class SO3FunCBF:
       weights, psi = (None, r) if isinstance(r, S2Kernel) else (r, weights)
       h, r = vector3d(f.h.data, frame=f.CS), f.r
       SS = f.SS if SS is None else SS
-    h = h if isinstance(h, vector3d) else vector3d(h)
-    r = r if isinstance(r, vector3d) else vector3d(r)
+    h = asVector3d(h)
+    r = asVector3d(r)
     self.CS = h.frame if h.frame is not None else crystalFrame("1")
     self.SS = SS if SS is not None else r.frame if r.frame is not None else specimenFrame.default
     self.h = vector3d(h.normalize().data.reshape(-1, 3))
@@ -555,7 +554,7 @@ class SO3FunCBF:
 
   def _pairs(self, L, R):
     hs = (rotation(R)[None, :] * self.h[:, None]).data.reshape(-1, 3)
-    rs = (rotation(_conj(L))[None, :] * self.r[:, None]).data.reshape(-1, 3)
+    rs = (rotation(qconj(L))[None, :] * self.r[:, None]).data.reshape(-1, 3)
     m = len(L) * len(R)
     H = np.repeat(hs.reshape(self.h.size, 1, len(R), 3), len(L), axis=1).reshape(-1, 3)
     Rv = np.repeat(rs.reshape(self.h.size, len(L), 1, 3), len(R), axis=2).reshape(-1, 3)
@@ -732,7 +731,8 @@ class SO3FunCBF:
 # ------------------------------------------------------------------ the named ODFs
 
 
-def _readFrames(args):
+# the crystal and the specimen frame among the arguments, the others passed over
+def _framesAmong(args):
   frames = [a for a in args if isinstance(a, referenceFrame)]
   return (frames[0] if frames else crystalFrame("1")), (frames[1] if len(frames) > 1 else specimenFrame.default)
 
@@ -742,7 +742,7 @@ def uniformODF(*frames, antipodal=False):
 
     uniformODF(cs, ss)
     uniformODF(cs, ss, antipodal=True)"""
-  CS, SS = _readFrames(frames)
+  CS, SS = _framesAmong(frames)
   return SO3FunRBF(orientation(rotation.nan(0), CS, SS, antipodal=antipodal), SO3DeLaValleePoussinKernel(halfwidth=10 * degree), np.zeros(0), 1.0)
 
 
@@ -760,7 +760,7 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, t
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
   kernel = kernels[0] if kernels else kernel
-  CS, SS = _readFrames([a for a in args if isinstance(a, referenceFrame)])
+  CS, SS = _framesAmong([a for a in args if isinstance(a, referenceFrame)])
   if center is None:
     center = orientation(rotation.id, CS, SS)
   elif not isinstance(center, orientation):

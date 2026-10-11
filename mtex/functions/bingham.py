@@ -11,16 +11,17 @@ import math
 
 import numpy as np
 
+from .s2funclass import S2Fun
 from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import frameLabel, framesLabel
 from .funops import _antipodalPole, _rotatedFrame
 from .handles import S2FunHandle, SO3FunGeneric
-from .rbf import _readFrames, _rotationsFor
+from .rbf import _framesAmong, _rotationsFor
 from .s2fun import S2FunHarmonic
 from ..geometry.display import aligned
 from ..geometry.framepair import installFramePair
@@ -135,7 +136,7 @@ class SO3FunBingham(SO3FunGeneric):
   def __init__(self, kappa, A, *frames, weight=1.0, antipodal=False):
     A, framesOf, exchange = _axesMatrix(A)
     frames = frames if frames or framesOf is None else framesOf
-    self.CS, self.SS = _readFrames(frames)
+    self.CS, self.SS = _framesAmong(frames)
     self.kappa = np.asarray(kappa, dtype=float).ravel()
     if len(self.kappa) != 4 or A.shape != (4, 4):
       raise ValueError("four concentrations and a 4x4 matrix of axes")
@@ -216,7 +217,7 @@ class SO3FunBingham(SO3FunGeneric):
   # + c sin phi and the mean over the fibre is exp(a) I0(sqrt(b^2 + c^2))
   def _poleFigure(self, h, bandwidth=None):
     from scipy.special import ive
-    h = h if isinstance(h, vector3d) else vector3d(h)
+    h = asVector3d(h)
     if h.size != 1:
       raise ValueError("one crystal direction at a time")
     if h.frame is not None and h.frame is not self.CS:
@@ -362,7 +363,7 @@ def calcBinghamODF(o, weights=None, exact=False):
 # ------------------------------------------------------------------ the sphere
 
 
-class S2FunBingham:
+class S2FunBingham(S2Fun):
   """the Bingham distribution on the sphere: the density exp(v' a diag(Z) a' v) of the axes v, with
   three shape parameters Z and three orthonormal principal axes a, symmetrised over a frame
 
@@ -417,7 +418,7 @@ class S2FunBingham:
 
   def eval(self, x):
     """the values of the density at directions, the mean over the symmetric copies of its axes"""
-    v = x if isinstance(x, vector3d) else vector3d(x)
+    v = asVector3d(x)
     d = v.normalize().data.reshape(-1, 3)
     copies = self._symmetricAxes()
     acc = np.zeros(len(d))
@@ -441,7 +442,7 @@ class S2FunBingham:
     third axis, as in MTEX; confidenceEllipse=True returns with it the semi-axes ab, in
     radians, and the rotation rot of the confidence ellipse at the level p of the modal axis
     (Tanaka 1999), for ellipse(rot, ab[0], ab[1])"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     d = v.normalize().data.reshape(-1, 3)
     w = np.full(len(d), 1 / len(d)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)
     S = (d * w[:, None]).T @ d

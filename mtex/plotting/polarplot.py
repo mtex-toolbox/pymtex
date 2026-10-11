@@ -23,7 +23,7 @@ from ..geometry.funcs import angle
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 
@@ -69,7 +69,7 @@ def setView(pC=None, ax=None):
   pC = plottingConvention.default if pC is None else plottingConvention(pC) if not isinstance(pC, plottingConvention) else pC
   if ax is None:
     fig = gcm()
-    ax = None if fig is None or not fig.children else fig.current if getattr(fig, "current", None) in fig.children else fig.children[-1]
+    ax = None if fig is None else fig._axesDrawnInto()
   if ax is not None and ax.name == "3d":
     from .spaceplot import _camera
     _camera(ax, pC)
@@ -89,7 +89,7 @@ def setView(pC=None, ax=None):
 def histogram(v, numBin=None, weights=None, antipodal=None, **kw: Unpack[PlotKeywords]):
   """histogram(v), histogram(v, numBin, weights=w): the rose diagram of the azimuths of
   directions; an axis counts at its azimuth and opposite"""
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   rho = np.asarray(v.rho, dtype=float).reshape(-1)
   w = None if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   if antipodal or (antipodal is None and v.antipodal):

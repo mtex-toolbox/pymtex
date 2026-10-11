@@ -10,14 +10,12 @@ from __future__ import annotations
 
 import numpy as np
 
+from .kernels import qconj
 from .kernels import bestDot, closestAngle, closestImage, symReduce
 from .quaternion import qmul
 
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
 
-
-def _conj(q):
-  return q * [1, -1, -1, -1]
 
 
 def reductionGroups(o):
@@ -39,7 +37,7 @@ def reductionGroupsPair(a, b):
   if a.frameA is b.frameA:
     return La, Ra
   Lb, Rb = reductionGroups(b)
-  prod = qmul(Rb[:, None, :], _conj(Ra)[None, :, :]).reshape(-1, 4)
+  prod = qmul(Rb[:, None, :], qconj(Ra)[None, :, :]).reshape(-1, 4)
   return La, uniqueRotations(prod)
 
 
@@ -64,7 +62,7 @@ def referenceImages(ref, L, R, exchange=False):
   """the images l ref r of a reference, those of its inverse appended under grain exchange,
   each with the (l, r, usedInverse) it came from; for the identity the products l r
   coincide in whole cosets, so only the distinct images are kept"""
-  refs = [ref] + ([_conj(ref)] if exchange else [])
+  refs = [ref] + ([qconj(ref)] if exchange else [])
   es, frm = [], []
   for useInv, q in enumerate(refs):
     e = qmul(qmul(L[:, None, :], q[None, None, :]), R[None, :, :])        # (|L|, |R|, 4)

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import warnings
 
 import numpy as np
 
@@ -28,7 +29,7 @@ from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from ..maps.phaselist import phaseList
 from .ang import eulerCorrectionRotation
-from .load import TSL_LAUE, ebsdFromColumns, phaseColumn, phaseShift, regularPoly, tslPointGroup, unmeasuredRows
+from .load import ebsdFromColumns, phaseColumn, phaseShift, regularPoly, scanGrid, tslPointGroup, unmeasuredRows
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "hdf5_config")
 # what EDAX writes into the coordinates of a pixel it did not measure
@@ -78,12 +79,6 @@ def h5Resolve(paths, entry, scope):
   return [p for p in paths if p.startswith(prefix) and rx.search(relativeTo(p, under) if relative else p)]
 
 
-def h5One(paths, entry, scope):
-  """the first path of the file an entry of a config matches, None if none does"""
-  m = h5Resolve(paths, entry, scope)
-  return m[0] if m else None
-
-
 def h5Read(f, path):
   """a data set as the plain array, string or scalar it holds"""
   d = f[path]
@@ -108,16 +103,6 @@ def _text(x):
   return str(x).strip()
 
 
-def h5Value(f, paths, entry, scope):
-  """the value of an entry: what the file holds at the path it names, or the constant it states"""
-  if not isinstance(entry, dict):
-    return None
-  if "data" in entry:
-    return entry["data"]
-  p = h5One(paths, entry, scope)
-  return None if p is None else h5Read(f, p)
-
-
 def h5Paths(f):
   """every group and data set of a file, depth first, and which of them are groups"""
   paths, groups = [], set()
@@ -130,36 +115,25 @@ def h5Paths(f):
   return paths, groups
 
 
-def h5Vendor(f, paths, fname):
-  """the vendor whose config claims the file: by the manufacturer key it states, or by the
-  extension where a config names one instead"""
-  ext = os.path.splitext(fname)[1].lower()
-  for name, conf in hdf5Configs().items():
-    settings = conf["settings"]
-    key = h5Value(f, paths, settings["key_path"], H5Scope("/"))
-    wanted = settings["manufacturer_keys"]["data"]
-    wanted = [wanted] if isinstance(wanted, str) else list(wanted)
-    keyText = "" if key is None else (" ".join(key) if isinstance(key, list) else str(key)).lower()
-    for k in wanted:
-      if (k.lower() == ext) if k.startswith(".") else (bool(keyText) and k.lower() in keyText):
-        return name, conf
-  return None
+def h5ReadGroup(f, paths, groups, group):
+  """a group of the file read whole as nested dicts, data sets above the header size limit left out"""
+  out = {}
+  for p in paths:
+    rel = relativeTo(p, group + "/")
+    if not p.startswith(group + "/") or "/" in rel:
+      continue
+    if p in groups:
+      out[rel] = h5ReadGroup(f, paths, groups, p)
+    else:
+      try:
+        if f[p].size <= H5_HEADER_LIMIT:
+          out[rel] = h5Read(f, p)
+      except Exception:
+        pass
+  return out
 
 
-def h5DataSets(paths, conf):
-  """the data sets a file offers, in the preference order the config's alternatives state; a
-  match lying under another match is part of that one, so only the outermost are data sets"""
-  key = conf["ebsd"]["key"]
-  out = []
-  for alt in str(key["value"]).split("|"):
-    for p in h5Resolve(paths, {"mode": key.get("mode", "search_root"), "value": alt}, H5Scope("/")):
-      if p not in out:
-        out.append(p)
-  outer = [p for p in out if not any(p.startswith(q + "/") for q in out)]
-  return outer or out
-
-
-# ------------------------------------------------------------------ the phases
+# ------------------------------------------------------------------ the values
 
 def angleScale(angles):
   """whether angles are written in degrees or in radians, which the vendors do not agree on and
@@ -174,58 +148,6 @@ def _floats(v):
   return a
 
 
-def h5LatticeValues(f, paths, entry, scope):
-  """the numbers of a lattice entry of a config, from one data set or from separate scalars,
-  None where one is missing"""
-  if not isinstance(entry, dict):
-    return None
-  if entry.get("type", "") == "separate":
-    out = []
-    for k in sorted(entry):
-      if k == "type":
-        continue
-      v = h5Value(f, paths, entry[k], scope)
-      if v is None:
-        return None
-      out.append(float(_floats(v)[0]))
-    return np.array(out)
-  v = h5Value(f, paths, entry, scope)
-  return None if v is None else _floats(v)
-
-
-def h5LatticeCell(f, paths, lat, scope):
-  """the cell a config's lattice block names, whatever of the three shapes a vendor writes it in:
-  six named scalars, a triple of lengths beside a triple of angles, or one row of six"""
-  if not isinstance(lat, dict):
-    return None
-  if lat.get("type", "") == "all_together":
-    v = h5LatticeValues(f, paths, lat, scope)
-    return None if v is None or len(v) < 6 else (v[:3], v[3:6])
-  dim = h5LatticeValues(f, paths, lat.get("dim"), scope)
-  ang = h5LatticeValues(f, paths, lat.get("angle"), scope)
-  if dim is None or ang is None or len(dim) < 3 or len(ang) < 3:
-    return None
-  return dim[:3], ang[:3]
-
-
-def h5LatticePaths(paths, entry, scope):
-  """the data sets a lattice was read from, for the writer"""
-  if not isinstance(entry, dict):
-    return []
-  if entry.get("type", "") != "separate":
-    p = h5One(paths, entry, scope)
-    return [] if p is None else [p]
-  out = []
-  for k in sorted(entry):
-    if k == "type":
-      continue
-    p = h5One(paths, entry[k], scope)
-    if p is None:
-      return []
-    out.append(p)
-  return out
-
-
 def spaceGroupNumber(v):
   """the space group number a header value holds, None where it is no number"""
   if v is None:
@@ -237,23 +159,6 @@ def spaceGroupNumber(v):
     return int(round(float(x)))
   except (TypeError, ValueError):
     return None
-
-
-def h5PointGroup(f, paths, entry, scope, idEntry=None):
-  """the point group of a phase: the space group number where the file states one, the EDAX
-  codes where it states those, and the triclinic group where it states neither"""
-  if isinstance(entry, dict) and entry.get("type", "") == "EDAX":
-    code = h5Value(f, paths, entry.get("laue_code"), scope)
-    if code is None:
-      return "1"
-    pg = h5Value(f, paths, entry.get("point_group_id"), scope) if "point_group_id" in entry else None
-    if pg is None or pg == "":
-      pg = h5Value(f, paths, entry.get("point_group_name"), scope) if "point_group_name" in entry else None
-    return tslPointGroup(_floats(code)[0] if not isinstance(code, str) else code, pg if pg not in ("", None) else None)
-  n = spaceGroupNumber(h5Value(f, paths, entry, scope))
-  if n is None:
-    n = spaceGroupNumber(h5Value(f, paths, idEntry, scope))
-  return n if n is not None and 1 <= n <= 230 else None
 
 
 def alignmentList(s):
@@ -272,46 +177,6 @@ def alignmentList(s):
     out.append(t)
   return out
 
-
-def h5Phases(f, paths, groups, conf, scope):
-  """the crystal frames of the phase groups a config's cs block names, and where each was read"""
-  frames = [notIndexedFrame()]
-  prov = []
-  cs = conf["ebsd"].get("cs")
-  if cs is None:
-    return phaseList(frames), prov
-  root = h5One(paths, cs["key"], scope)
-  if root is None:
-    return phaseList(frames), prov
-  depth = root.count("/") + 1
-  d = cs["default"]
-  for g in [p for p in paths if p.startswith(root + "/") and p.count("/") == depth and p in groups]:
-    inner = H5Scope(g, scope.set, scope.free)
-    name = h5Value(f, paths, d.get("name"), inner)
-    lat = d.get("lattice", {})
-    cell = h5LatticeCell(f, paths, lat, inner)
-    if cell is None:
-      frames.append(notIndexedFrame())
-      continue
-    dim, ang = cell
-    symbol = h5PointGroup(f, paths, d.get("space_group"), inner, d.get("space_group_id"))
-    reference = d.get("reference_frame", {})
-    setup = h5Value(f, paths, reference, inner)
-    if setup is None:
-      setup = reference.get("fallback", "")
-    mineral = "" if name is None else (" ".join(name) if isinstance(name, list) else str(name)).strip()
-    args = [symbol] if isinstance(symbol, str) else []
-    kw = {} if isinstance(symbol, str) else ({"spaceId": symbol} if symbol else {})
-    if not args and not kw:
-      args = ["-1"]
-    frames.append(crystalFrame(*args, dim, angleScale(ang) * ang, *alignmentList(setup), mineral=mineral, **kw))
-    whole = h5LatticePaths(paths, lat, inner) if lat.get("type", "") == "all_together" else []
-    prov.append({"name": h5One(paths, d.get("name"), inner), "cell": whole, "dim": h5LatticePaths(paths, lat.get("dim"), inner),
-                 "angle": h5LatticePaths(paths, lat.get("angle"), inner), "angleScale": angleScale(ang)})
-  return phaseList(frames), prov
-
-
-# ------------------------------------------------------------------ the orientations and the phase column
 
 def eulerColumns(v):
   """the three angles a data set of them holds, written as 3 x n, n x 3 or laid out on the map
@@ -333,20 +198,6 @@ def h5PhaseShift(values, nPhases):
   not indexed, which is -1 in the byte column it writes it in; else the rule of the text formats"""
   v = np.asarray(values)
   return 1 if v.size and v.min() < 0 else phaseShift(v, nPhases)
-
-
-def h5Table(f, paths, ebsd, scope):
-  """the compound data set a config reads whole as ebsd_data, its columns by field name"""
-  entry = ebsd.get("ebsd_data")
-  if entry is None:
-    return None, None
-  p = h5One(paths, entry, scope)
-  if p is None:
-    return None, None
-  rows = f[p][()]
-  if not isinstance(rows, np.ndarray) or rows.dtype.names is None or rows.size == 0:
-    return None, p
-  return {k: rows[k] for k in rows.dtype.names}, p
 
 
 def loadedField(entry):
@@ -371,95 +222,11 @@ def matrixRotations(m):
   return rotation.byMatrix(M), none
 
 
-# ------------------------------------------------------------------ the correction
-
 def _unitScale(entry, values):
   stated = entry.get("format", {}).get("data") if isinstance(entry, dict) else None
   if stated is None:
     return angleScale(values)
   return degree if "deg" in str(stated).lower() else 1.0
-
-
-def h5Surface(f, paths, conf, scope):
-  """the surface the map was acquired on, where the config names it: three Euler angles from
-  that surface to the sample primary frame, CS1 to CS0, in degree"""
-  entry = conf["ebsd"].get("acquisition_surface")
-  if not isinstance(entry, dict):
-    return None
-  v = h5Value(f, paths, entry, scope)
-  if v is None:
-    return None
-  a = _floats(v)
-  if len(a) != 3:
-    return None
-  scale = _unitScale(entry, a)
-  return tuple(float(x) for x in a * scale / degree)
-
-
-def h5MapCorrection(f, paths, conf, scope):
-  """the rotation the config says the map is turned by against its Euler angles: a constant,
-  the scan rotation the file writes, or a row of a table its own id picks"""
-  entry = conf["ebsd"].get("map_correction")
-  if not isinstance(entry, dict):
-    return rotation.id
-  kind = entry.get("type", "default")
-  bunge = lambda a: rotation.byEuler(a[0], a[1], a[2], "Bunge")
-  if kind == "rotation":
-    a = _floats(entry["data"])
-    return bunge(a * _unitScale(entry, a))
-  if kind == "scanRotation":
-    v = h5Value(f, paths, entry, scope)
-    a = float(entry.get("fallback", 0.0)) if v is None else float(_floats(v)[0])
-    if np.isnan(a):
-      a = 0.0
-    return rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
-  if kind == "by_id":
-    rows = entry.get("correct_data", {}).get("data")
-    if rows is None:
-      return rotation.id
-    idv = h5Value(f, paths, entry.get("id"), scope)
-    # the id names the row it stands for, counting from one as the table is written; a
-    # vendor that states no setting writes one outside the table, EDAX -1
-    k = 0 if idv is None else int(round(float(_floats(idv)[0])))
-    if not 1 <= k <= len(rows):
-      return rotation.id
-    row = rows[k - 1]
-    if not isinstance(row, (list, tuple)):
-      # a table of one column holds the angle about y
-      return rotation.byAxisAngle(vector3d(0, 1, 0), float(row) * _unitScale(entry, [row]))
-    a = _floats(row)
-    return bunge(a * _unitScale(entry, a)) if len(a) >= 3 else rotation.id
-  v = h5Value(f, paths, entry, scope)
-  if v is None:
-    return rotation.id
-  a = _floats(v)
-  return bunge(a * _unitScale(entry, a)) if len(a) >= 3 else rotation.id
-
-
-# ------------------------------------------------------------------ the header
-
-def h5Header(f, paths, groups, scope):
-  """the header group of a data set, read whole as nested dicts: every vendor calls it Header"""
-  root = next((p for p in paths if p.startswith(scope.set + "/") and relativeTo(p, scope.set + "/").lower() == "header"), None)
-  return {} if root is None else h5ReadGroup(f, [p for p in paths if p.startswith(root + "/")], groups, root)
-
-
-def h5ReadGroup(f, paths, groups, group):
-  """a group of the file read whole as nested dicts, data sets above the header size limit left out"""
-  out = {}
-  for p in paths:
-    rel = relativeTo(p, group + "/")
-    if not p.startswith(group + "/") or "/" in rel:
-      continue
-    if p in groups:
-      out[rel] = h5ReadGroup(f, paths, groups, p)
-    else:
-      try:
-        if f[p].size <= H5_HEADER_LIMIT:
-          out[rel] = h5Read(f, p)
-      except Exception:
-        pass
-  return out
 
 
 # ------------------------------------------------------------------ the pictures
@@ -556,6 +323,322 @@ def h5Image(fname, entry):
   return a
 
 
+# ------------------------------------------------------------------ the reader
+
+class h5Reader:
+  """an open HDF5 file read by the config of its vendor: its paths and groups listed once, the
+  data set chosen, the scope the config's entries are searched in, and the data sets read so far"""
+
+  def __init__(self, f, fname):
+    self.f, self.fname = f, os.fspath(fname)
+    self.paths, self.groups = h5Paths(f)
+    self.scope = H5Scope("/")
+    self.used = set()
+    vendor = self._vendor()
+    if vendor is None:
+      raise ValueError(f"{self.fname} names no manufacturer any config claims; the configs are {', '.join(sorted(hdf5Configs()))}")
+    self.name, self.conf = vendor
+    self.ebsd = self.conf["ebsd"]
+    self.sets = self._dataSets()
+    if not self.sets:
+      raise ValueError(f"{self.fname} holds no data set the {self.name} config recognises")
+    self.chosen = None
+
+  # ---------------------------------------------------------------- the resolver
+
+  def one(self, entry, scope=None):
+    """the first path an entry of the config matches, None if none does"""
+    m = h5Resolve(self.paths, entry, self.scope if scope is None else scope)
+    return m[0] if m else None
+
+  def remember(self, entry):
+    """the path an entry matches, recorded as read by the config, so that it is no property"""
+    p = self.one(entry)
+    if p is not None:
+      self.used.add(p)
+    return p
+
+  def value(self, entry, scope=None):
+    """the value of an entry: what the file holds at the path it names, or the constant it states"""
+    if not isinstance(entry, dict):
+      return None
+    if "data" in entry:
+      return entry["data"]
+    p = self.one(entry, scope)
+    return None if p is None else h5Read(self.f, p)
+
+  def number(self, entry, default=None):
+    """the first number an entry holds, the default where it holds none"""
+    v = self.value(entry)
+    return default if v is None else float(_floats(v)[0])
+
+  # the vendor whose config claims the file: by the manufacturer key it states, or by the
+  # extension where a config names one instead
+  def _vendor(self):
+    ext = os.path.splitext(self.fname)[1].lower()
+    for name, conf in hdf5Configs().items():
+      settings = conf["settings"]
+      key = self.value(settings["key_path"])
+      wanted = settings["manufacturer_keys"]["data"]
+      wanted = [wanted] if isinstance(wanted, str) else list(wanted)
+      keyText = "" if key is None else (" ".join(key) if isinstance(key, list) else str(key)).lower()
+      for k in wanted:
+        if (k.lower() == ext) if k.startswith(".") else (bool(keyText) and k.lower() in keyText):
+          return name, conf
+    return None
+
+  # the data sets the file offers, in the preference order the config's alternatives state; a
+  # match lying under another match is part of that one, so only the outermost are data sets
+  def _dataSets(self):
+    key = self.ebsd["key"]
+    out = []
+    for alt in str(key["value"]).split("|"):
+      for p in h5Resolve(self.paths, {"mode": key.get("mode", "search_root"), "value": alt}, H5Scope("/")):
+        if p not in out:
+          out.append(p)
+    outer = [p for p in out if not any(p.startswith(q + "/") for q in out)]
+    return outer or out
+
+  def choose(self, dataSet=None, verbose=False):
+    """the data set read, by its number counted from zero or by part of its name, the first by
+    default; its entries are searched from then on below it"""
+    sets, fname = self.sets, self.fname
+    if dataSet is None:
+      chosen = sets[0]
+    elif isinstance(dataSet, (int, np.integer)):
+      if not 0 <= dataSet < len(sets):
+        raise ValueError(f"{fname} holds {len(sets)} data sets, numbered 0 to {len(sets) - 1}")
+      chosen = sets[dataSet]
+    else:
+      chosen = next((p for p in sets if str(dataSet) in p), None)
+      if chosen is None:
+        raise ValueError(f"no data set of {fname} is called {dataSet!r}; they are {', '.join(sets)}")
+    # a file of several maps says which it holds and which one is read
+    if len(sets) > 1 and verbose:
+      print(f"  {self.name} file with {len(sets)} data sets:")
+      for k, p in enumerate(sets):
+        print(f"  {'▸' if p == chosen else ' '} [{k}] {p}")
+      print(f"  pick one by EBSD.load(fname, dataSet={len(sets) - 1}) or dataSet={sets[-1].split('/')[-2]!r}")
+    self.chosen = chosen
+    self.scope = H5Scope(chosen, chosen, chosen.rsplit("/", 1)[0] or "/")
+    return chosen
+
+  # ---------------------------------------------------------------- the phases
+
+  # the numbers of a lattice entry, from one data set or from separate scalars, None where one
+  # is missing
+  def _latticeValues(self, entry, scope):
+    if not isinstance(entry, dict):
+      return None
+    if entry.get("type", "") == "separate":
+      out = []
+      for k in sorted(entry):
+        if k == "type":
+          continue
+        v = self.value(entry[k], scope)
+        if v is None:
+          return None
+        out.append(float(_floats(v)[0]))
+      return np.array(out)
+    v = self.value(entry, scope)
+    return None if v is None else _floats(v)
+
+  # the cell a lattice block names, whatever of the three shapes a vendor writes it in: six
+  # named scalars, a triple of lengths beside a triple of angles, or one row of six
+  def _latticeCell(self, lat, scope):
+    if not isinstance(lat, dict):
+      return None
+    if lat.get("type", "") == "all_together":
+      v = self._latticeValues(lat, scope)
+      return None if v is None or len(v) < 6 else (v[:3], v[3:6])
+    dim = self._latticeValues(lat.get("dim"), scope)
+    ang = self._latticeValues(lat.get("angle"), scope)
+    if dim is None or ang is None or len(dim) < 3 or len(ang) < 3:
+      return None
+    return dim[:3], ang[:3]
+
+  # the data sets a lattice was read from, for the writer
+  def _latticePaths(self, entry, scope):
+    if not isinstance(entry, dict):
+      return []
+    if entry.get("type", "") != "separate":
+      p = self.one(entry, scope)
+      return [] if p is None else [p]
+    out = []
+    for k in sorted(entry):
+      if k == "type":
+        continue
+      p = self.one(entry[k], scope)
+      if p is None:
+        return []
+      out.append(p)
+    return out
+
+  # the point group of a phase: the space group number where the file states one, the EDAX
+  # codes where it states those, and the triclinic group where it states neither
+  def _pointGroup(self, entry, scope, idEntry=None):
+    if isinstance(entry, dict) and entry.get("type", "") == "EDAX":
+      code = self.value(entry.get("laue_code"), scope)
+      if code is None:
+        return "1"
+      pg = self.value(entry.get("point_group_id"), scope) if "point_group_id" in entry else None
+      if pg is None or pg == "":
+        pg = self.value(entry.get("point_group_name"), scope) if "point_group_name" in entry else None
+      return tslPointGroup(_floats(code)[0] if not isinstance(code, str) else code, pg if pg not in ("", None) else None)
+    n = spaceGroupNumber(self.value(entry, scope))
+    if n is None:
+      n = spaceGroupNumber(self.value(idEntry, scope))
+    return n if n is not None and 1 <= n <= 230 else None
+
+  def phases(self):
+    """the crystal frames of the phase groups the config's cs block names, and where each was read"""
+    frames = [notIndexedFrame()]
+    prov = []
+    cs = self.ebsd.get("cs")
+    root = None if cs is None else self.one(cs["key"])
+    if root is None:
+      return phaseList(frames), prov
+    depth = root.count("/") + 1
+    d = cs["default"]
+    for g in [p for p in self.paths if p.startswith(root + "/") and p.count("/") == depth and p in self.groups]:
+      inner = H5Scope(g, self.scope.set, self.scope.free)
+      name = self.value(d.get("name"), inner)
+      lat = d.get("lattice", {})
+      cell = self._latticeCell(lat, inner)
+      if cell is None:
+        frames.append(notIndexedFrame())
+        continue
+      dim, ang = cell
+      symbol = self._pointGroup(d.get("space_group"), inner, d.get("space_group_id"))
+      reference = d.get("reference_frame", {})
+      setup = self.value(reference, inner)
+      if setup is None:
+        setup = reference.get("fallback", "")
+      mineral = "" if name is None else (" ".join(name) if isinstance(name, list) else str(name)).strip()
+      args = [symbol] if isinstance(symbol, str) else []
+      kw = {} if isinstance(symbol, str) else ({"spaceId": symbol} if symbol else {})
+      if not args and not kw:
+        args = ["-1"]
+      frames.append(crystalFrame(*args, dim, angleScale(ang) * ang, *alignmentList(setup), mineral=mineral, **kw))
+      whole = self._latticePaths(lat, inner) if lat.get("type", "") == "all_together" else []
+      prov.append({"name": self.one(d.get("name"), inner), "cell": whole, "dim": self._latticePaths(lat.get("dim"), inner),
+                   "angle": self._latticePaths(lat.get("angle"), inner), "angleScale": angleScale(ang)})
+    return phaseList(frames), prov
+
+  # ---------------------------------------------------------------- the columns
+
+  def table(self):
+    """the compound data set the config reads whole as ebsd_data, its columns by field name, and its path"""
+    entry = self.ebsd.get("ebsd_data")
+    p = None if entry is None else self.one(entry)
+    if p is None:
+      return None, None
+    rows = self.f[p][()]
+    if not isinstance(rows, np.ndarray) or rows.dtype.names is None or rows.size == 0:
+      return None, p
+    return {k: rows[k] for k in rows.dtype.names}, p
+
+  def additions(self, n):
+    """the data sets of n values the config's additions groups hold beyond what it reads itself,
+    by the key of the property each becomes; a file holds patterns beside its map, so the shape
+    decides what is one value per pixel"""
+    out = {}
+    add = self.conf.get("additions")
+    if not isinstance(add, dict):
+      return out
+    excluded = [re.compile(str(e)) for e in add.get("exclude", {}).get("data", [])]
+    for g in (add["group"] if isinstance(add["group"], list) else [add["group"]]):
+      root = self.one(g)
+      if root is None:
+        continue
+      for p in self.paths:
+        if not p.startswith(root + "/") or p in self.used or p in self.groups:
+          continue
+        field = relativeTo(p, root + "/")
+        if any(e.search(field) for e in excluded):
+          continue
+        d = self.f[p]
+        if d.size != n or d.dtype.kind not in "iufb":
+          continue
+        out.setdefault(field.replace(" ", "").replace("/", "").lower(), p)
+    return out
+
+  # ---------------------------------------------------------------- the correction
+
+  def surface(self):
+    """the surface the map was acquired on, where the config names it: three Euler angles from
+    that surface to the sample primary frame, CS1 to CS0, in degree"""
+    entry = self.ebsd.get("acquisition_surface")
+    v = self.value(entry) if isinstance(entry, dict) else None
+    if v is None:
+      return None
+    a = _floats(v)
+    if len(a) != 3:
+      return None
+    return tuple(float(x) for x in a * _unitScale(entry, a) / degree)
+
+  def mapCorrection(self):
+    """the rotation the config says the map is turned by against its Euler angles: a constant,
+    the scan rotation the file writes, or a row of a table its own id picks"""
+    entry = self.ebsd.get("map_correction")
+    if not isinstance(entry, dict):
+      return rotation.id
+    kind = entry.get("type", "default")
+    if kind == "rotation":
+      return _bunge(entry, _floats(entry["data"]))
+    if kind == "scanRotation":
+      a = self.number(entry, float(entry.get("fallback", 0.0)))
+      a = 0.0 if np.isnan(a) else a
+      return rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
+    if kind == "by_id":
+      rows = entry.get("correct_data", {}).get("data")
+      if rows is None:
+        return rotation.id
+      # the id names the row it stands for, counting from one as the table is written; a
+      # vendor that states no setting writes one outside the table, EDAX -1
+      k = int(round(self.number(entry.get("id"), 0.0)))
+      if not 1 <= k <= len(rows):
+        return rotation.id
+      row = rows[k - 1]
+      if not isinstance(row, (list, tuple)):
+        # a table of one column holds the angle about y
+        return rotation.byAxisAngle(vector3d(0, 1, 0), float(row) * _unitScale(entry, [row]))
+      return _bunge(entry, _floats(row))
+    v = self.value(entry)
+    return rotation.id if v is None else _bunge(entry, _floats(v))
+
+  def correction(self, warn=False):
+    """the rotation the Euler angles are corrected by: the config's map correction, after the
+    tilt of the acquisition surface where the file refers its angles to CS0, as a .ctf; an EDAX
+    file that states no alignment is read as its .ang files are"""
+    correction = self.mapCorrection()
+    surface = self.surface()
+    if surface is not None and (abs(surface[1]) > 1e-6 or abs(surface[2]) > 1e-6):
+      correction = correction * rotation.byEuler(0.0, surface[1] * degree, surface[2] * degree, "Bunge").inv()
+      if warn:
+        warnings.warn(f"{self.fname} states an acquisition surface of {surface} degree; its tilt is undone, since the file "
+                      "refers its angles to CS0 and the map lies in CS1. Pass eulerCorrection to state the alignment yourself.",
+                      stacklevel=3)
+    if self.name.startswith("EDAX") and correction.angle() < 1e-9:
+      correction = eulerCorrectionRotation(2)
+    return correction
+
+  def header(self):
+    """the header group of the data set, read whole as nested dicts: every vendor calls it Header"""
+    s = self.scope.set
+    root = next((p for p in self.paths if p.startswith(s + "/") and relativeTo(p, s + "/").lower() == "header"), None)
+    return {} if root is None else h5ReadGroup(self.f, [p for p in self.paths if p.startswith(root + "/")], self.groups, root)
+
+
+# a rotation of three Euler angles in the unit the entry states or the values suggest; the
+# identity for fewer than three
+def _bunge(entry, a):
+  if len(a) < 3:
+    return rotation.id
+  a = a * _unitScale(entry, a)
+  return rotation.byEuler(a[0], a[1], a[2], "Bunge")
+
+
 # ------------------------------------------------------------------ the map
 
 # the map of an HDF5 file of one of the vendors hdf5_config describes
@@ -570,152 +653,34 @@ def _loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanU
   import h5py
   fname = os.fspath(fname)
   with h5py.File(fname, "r") as f:
-    paths, groups = h5Paths(f)
-    vendor = h5Vendor(f, paths, fname)
-    if vendor is None:
-      raise ValueError(f"{fname} names no manufacturer any config claims; the configs are {', '.join(sorted(hdf5Configs()))}")
-    name, conf = vendor
-    sets = h5DataSets(paths, conf)
-    if not sets:
-      raise ValueError(f"{fname} holds no data set the {name} config recognises")
-    if dataSet is None:
-      chosen = sets[0]
-    elif isinstance(dataSet, (int, np.integer)):
-      if not 0 <= dataSet < len(sets):
-        raise ValueError(f"{fname} holds {len(sets)} data sets, numbered 0 to {len(sets) - 1}")
-      chosen = sets[dataSet]
-    else:
-      chosen = next((p for p in sets if str(dataSet) in p), None)
-      if chosen is None:
-        raise ValueError(f"no data set of {fname} is called {dataSet!r}; they are {', '.join(sets)}")
-    # a file of several maps says which it holds and which one is read
-    if len(sets) > 1 and verbose:
-      print(f"  {name} file with {len(sets)} data sets:")
-      for k, p in enumerate(sets):
-        print(f"  {'▸' if p == chosen else ' '} [{k}] {p}")
-      print(f"  pick one by EBSD.load(fname, dataSet={len(sets) - 1}) or dataSet={sets[-1].split('/')[-2]!r}")
-    parent = chosen.rsplit("/", 1)[0] or "/"
-    scope = H5Scope(chosen, chosen, parent)
-    ebsd = conf["ebsd"]
-    used = set()
-
-    def remember(entry):
-      p = h5One(paths, entry, scope)
-      if p is not None:
-        used.add(p)
-      return p
-
-    # the orientations, from one data set of three angles, from three of one, or from a
-    # table of matrices; euler and euler_stack differ in the shape of the data set alone
-    table, tablePath = h5Table(f, paths, ebsd, scope)
+    r = h5Reader(f, fname)
+    r.choose(dataSet, verbose)
+    ebsd = r.ebsd
+    table, tablePath = r.table()
     if tablePath is not None:
-      used.add(tablePath)
+      r.used.add(tablePath)
     rot = ebsd["rotation"]
-    byMatrix = rot.get("type", "euler") == "byMatrix"
-    eu = {} if byMatrix else rot.get(rot.get("type", "euler"), rot.get("euler", {}))
-    scale = degree if "deg" in str(eu.get("format", {}).get("data", "radian")).lower() else 1.0
-    eulerPaths, componentsFirst, rots, noRotation = [], True, None, None
-    if byMatrix:
-      m = h5Loaded(rot, table)
-      if m is None:
-        raise ValueError(f"{fname} holds no orientation matrices where the {name} config looks")
-      rots, noRotation = matrixRotations(m)
-      phi1 = Phi = phi2 = None
-      n = len(noRotation)
-    elif "phi" in eu:
-      p = remember(eu["phi"])
-      if p is not None:
-        eulerPaths.append(p)
-      v = h5Value(f, paths, eu["phi"], scope)
-      if v is None:
-        raise ValueError(f"{fname} holds no Euler angles where the {name} config looks")
-      componentsFirst, (phi1, Phi, phi2) = eulerColumns(v)
-      n = len(phi1)
-    else:
-      cols = []
-      for k in ("phi1", "Phi", "phi2"):
-        p = remember(eu[k])
-        if p is not None:
-          eulerPaths.append(p)
-        v = h5Value(f, paths, eu[k], scope)
-        if v is None:
-          raise ValueError(f"{fname} holds no Euler angles where the {name} config looks")
-        cols.append(np.asarray(v, dtype=float).reshape(-1))
-      phi1, Phi, phi2 = cols
-      n = len(phi1)
-
-    # the positions, either measured or implied by the step sizes and the grid
-    pos = ebsd["position"]
-    scanGrid = None
-    if pos.get("type", "direct") == "direct":
-      remember(pos["direct"]["x"])
-      remember(pos["direct"]["y"])
-      x, y = h5Value(f, paths, pos["direct"]["x"], scope), h5Value(f, paths, pos["direct"]["y"], scope)
-      if x is None or y is None:
-        raise ValueError(f"{fname} holds no positions the {name} config finds")
-      x, y = np.asarray(x, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)
-    else:
-      ind = pos["indirect"]
-      dx = h5Value(f, paths, ind["step_size_x"], scope)
-      dx = 1.0 if dx is None else float(_floats(dx)[0])
-      dy = h5Value(f, paths, ind["step_size_y"], scope)
-      dy = dx if dy is None else float(_floats(dy)[0])
-      nx = h5Value(f, paths, ind["grid_size_x"], scope)
-      nx = 0 if nx is None else int(_floats(nx)[0])
-      ny = h5Value(f, paths, ind.get("grid_size_y"), scope)
-      if nx <= 0:
-        raise ValueError(f"{fname} states no grid to place its measurements on")
-      k = np.arange(n)
-      x, y = dx * (k % nx), dy * (k // nx)
-      if ny is not None and dx > 0 and dy > 0:
-        scanGrid = (nx, int(_floats(ny)[0]), dx, dy)
-    unitCell = None
-    uc = ebsd.get("unitCell")
-    if isinstance(uc, dict) and uc.get("type") == "fromStep":
-      sx, sy = h5Value(f, paths, uc["step_size_x"], scope), h5Value(f, paths, uc["step_size_y"], scope)
-      if sx is not None and sy is not None:
-        sx, sy = float(_floats(sx)[0]), float(_floats(sy)[0])
-        if sx > 0 and sy > 0:
-          unitCell = regularPoly(4, [sx, sy])
-    elif scanGrid is not None:
-      unitCell = regularPoly(4, [scanGrid[2], scanGrid[3]])
+    o = _orientations(r, rot, table)
+    n = o["n"]
+    x, y, grid = _positions(r, n)
+    unitCell = _unitCell(r, grid)
 
     # the phases, numbered from one unless the vendor counts from zero, and a number outside
     # the list a pixel that was not indexed
-    phases, csProvenance = h5Phases(f, paths, groups, conf, scope)
-    phasePath = remember(ebsd["phase"])
+    phases, csProvenance = r.phases()
+    phasePath = r.remember(ebsd["phase"])
     raw = h5Loaded(ebsd["phase"], table)
     if raw is None:
-      raw = h5Value(f, paths, ebsd["phase"], scope)
+      raw = r.value(ebsd["phase"])
     raw = np.zeros(n, dtype=np.int64) if raw is None else np.asarray(raw).reshape(-1)
     zeroBased = ebsd["phase"].get("type", "default") == "zeroBased"
     shift = 1 if zeroBased else h5PhaseShift(raw, len(phases) - 1)
     ph = phaseColumn(raw, shift, len(phases))
 
-    # every per pixel data set the config does not read itself becomes a property; the shape
-    # decides what is one value per pixel, since a file holds patterns beside its map
-    props, propPaths = {}, {}
-    add = conf.get("additions")
-    if isinstance(add, dict):
-      excluded = [re.compile(str(e)) for e in add.get("exclude", {}).get("data", [])]
-      for g in (add["group"] if isinstance(add["group"], list) else [add["group"]]):
-        root = h5One(paths, g, scope)
-        if root is None:
-          continue
-        for p in paths:
-          if not p.startswith(root + "/") or p in used or p in groups:
-            continue
-          field = relativeTo(p, root + "/")
-          if any(e.search(field) for e in excluded):
-            continue
-          d = f[p]
-          if d.size != n or d.dtype.kind not in "iufb":
-            continue
-          key = field.replace(" ", "").replace("/", "").lower()
-          if key in props:
-            continue
-          props[key] = d[()].reshape(-1)
-          propPaths[key] = p
+    # every per pixel data set the config does not read itself becomes a property, and every
+    # field of a table but the orientations and the phases
+    propPaths = r.additions(n)
+    props = {k: f[p][()].reshape(-1) for k, p in propPaths.items()}
     tableFields = {}
     if table is not None:
       taken = (loadedField(rot), loadedField(ebsd["phase"]))
@@ -731,52 +696,103 @@ def _loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanU
     if not placed.all():
       keep = np.flatnonzero(placed)
       x, y, ph = x[keep], y[keep], ph[keep]
-      if byMatrix:
-        rots, noRotation = rots[keep], noRotation[keep]
-      else:
-        phi1, Phi, phi2 = phi1[keep], Phi[keep], phi2[keep]
+      for k in ("rots", "noRotation", "phi1", "Phi", "phi2"):
+        if o[k] is not None:
+          o[k] = o[k][keep]
       props = {k: v[keep] for k, v in props.items()}
-      scanGrid = None
+      grid = None
 
-    surface = h5Surface(f, paths, conf, scope)
-    if eulerCorrection is None:
-      correction = h5MapCorrection(f, paths, conf, scope)
-      # a file that refers its angles to CS0 has the tilt of its surface undone first, as a .ctf
-      if surface is not None and (abs(surface[1]) > 1e-6 or abs(surface[2]) > 1e-6):
-        correction = correction * rotation.byEuler(0.0, surface[1] * degree, surface[2] * degree, "Bunge").inv()
-        import warnings
-        warnings.warn(f"{fname} states an acquisition surface of {surface} degree; its tilt is undone, since the file "
-                      "refers its angles to CS0 and the map lies in CS1. Pass eulerCorrection to state the alignment yourself.",
-                      stacklevel=2)
-      # an EDAX file that states no alignment is read as its .ang files are
-      if name.startswith("EDAX") and correction.angle() < 1e-9:
-        correction = eulerCorrectionRotation(2)
-    else:
-      correction = eulerCorrection
+    surface = r.surface()
+    correction = r.correction(warn=True) if eulerCorrection is None else eulerCorrection
+    byMatrix = o["rots"] is not None
     record = {"file": os.path.abspath(fname), "rows": keep, "fileLength": n,
-              "euler": {"paths": eulerPaths, "componentsFirst": componentsFirst, "scale": scale},
+              "euler": {"paths": o["paths"], "componentsFirst": o["componentsFirst"], "scale": o["scale"]},
               "phase": {"path": phasePath, "shift": shift, "zeroBased": zeroBased},
               "cs": csProvenance, "props": propPaths, "correction": correction,
               # a map packed into one record per measurement: the table, and the fields of it
               "table": None if tablePath is None else {"path": tablePath, "matrixField": loadedField(rot) if byMatrix else None,
                                                        "phaseField": loadedField(ebsd["phase"]) if h5Loaded(ebsd["phase"], table) is not None else None,
                                                        "propFields": tableFields}}
-    meta = {"vendor": name, "dataSet": chosen, "dataSets": sets, "unplaced": 0 if keep is None else n - len(keep),
-            "header": h5Header(f, paths, groups, scope), "surface": surface, "images": h5ImageIndex(f, paths, groups, n),
-            "h5": record}
+    meta = {"vendor": r.name, "dataSet": r.chosen, "dataSets": r.sets, "unplaced": 0 if keep is None else n - len(keep),
+            "header": r.header(), "surface": surface, "images": h5ImageIndex(f, r.paths, r.groups, n), "h5": record}
+    # the matrices are rotations already: the map is built from their quaternions
     if byMatrix:
-      q = np.array(rots.data, dtype=float)
-      # the matrices are rotations already; ebsdFromColumns takes Euler angles, so they go in as Matthies angles of the identity
-      # is not possible: the map is built here from the quaternions instead
-      return _fromRotations(x, y, q, ph, phases, props, noRotation, correction, scanUnit, frame, meta, unitCell, scanGrid)
-    e1, e2, e3 = phi1 * scale, Phi * scale, phi2 * scale
-    unindexed = unmeasuredRows(e1, e2, e3, props) if name == "EMSphInx" else None
+      return _fromRotations(x, y, np.array(o["rots"].data, dtype=float), ph, phases, props, o["noRotation"], correction, scanUnit,
+                            frame, meta, unitCell, grid)
+    scale = o["scale"]
+    e1, e2, e3 = o["phi1"] * scale, o["Phi"] * scale, o["phi2"] * scale
+    unindexed = unmeasuredRows(e1, e2, e3, props) if r.name == "EMSphInx" else None
     return ebsdFromColumns(x, y, e1, e2, e3, ph, phases, props, shift=0, unindexed=unindexed, eulerCorrection=correction,
-                           scanUnit=scanUnit, frame=frame, meta=meta, unitCell=unitCell, scanGrid=scanGrid)
+                           scanUnit=scanUnit, frame=frame, meta=meta, unitCell=unitCell, scanGrid=grid)
+
+
+# the orientations, from one data set of three angles, from three of one, or from a table of
+# matrices; euler and euler_stack differ in the shape of the data set alone
+def _orientations(r, rot, table):
+  byMatrix = rot.get("type", "euler") == "byMatrix"
+  eu = {} if byMatrix else rot.get(rot.get("type", "euler"), rot.get("euler", {}))
+  out = dict(paths=[], componentsFirst=True, rots=None, noRotation=None, phi1=None, Phi=None, phi2=None,
+             scale=degree if "deg" in str(eu.get("format", {}).get("data", "radian")).lower() else 1.0)
+  missing = f"{r.fname} holds no Euler angles where the {r.name} config looks"
+  if byMatrix:
+    m = h5Loaded(rot, table)
+    if m is None:
+      raise ValueError(f"{r.fname} holds no orientation matrices where the {r.name} config looks")
+    out["rots"], out["noRotation"] = matrixRotations(m)
+    out["n"] = len(out["noRotation"])
+    return out
+  entries = [eu["phi"]] if "phi" in eu else [eu[k] for k in ("phi1", "Phi", "phi2")]
+  values = []
+  for e in entries:
+    p = r.remember(e)
+    if p is not None:
+      out["paths"].append(p)
+    v = r.value(e)
+    if v is None:
+      raise ValueError(missing)
+    values.append(v)
+  if "phi" in eu:
+    out["componentsFirst"], (out["phi1"], out["Phi"], out["phi2"]) = eulerColumns(values[0])
+  else:
+    out["phi1"], out["Phi"], out["phi2"] = (np.asarray(v, dtype=float).reshape(-1) for v in values)
+  out["n"] = len(out["phi1"])
+  return out
+
+
+# the positions, either measured or implied by the step sizes and the grid, and the grid a
+# header states
+def _positions(r, n):
+  pos = r.ebsd["position"]
+  if pos.get("type", "direct") == "direct":
+    r.remember(pos["direct"]["x"])
+    r.remember(pos["direct"]["y"])
+    x, y = r.value(pos["direct"]["x"]), r.value(pos["direct"]["y"])
+    if x is None or y is None:
+      raise ValueError(f"{r.fname} holds no positions the {r.name} config finds")
+    return np.asarray(x, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1), None
+  ind = pos["indirect"]
+  dx = r.number(ind["step_size_x"], 1.0)
+  dy = r.number(ind["step_size_y"], dx)
+  nx = int(r.number(ind["grid_size_x"], 0))
+  ny = r.value(ind.get("grid_size_y"))
+  if nx <= 0:
+    raise ValueError(f"{r.fname} states no grid to place its measurements on")
+  k = np.arange(n)
+  grid = scanGrid(nx, int(_floats(ny)[0]), dx, dy) if ny is not None and dx > 0 and dy > 0 else None
+  return dx * (k % nx), dy * (k // nx), grid
+
+
+# the cell of a measurement: from the steps the config names, else from the grid's
+def _unitCell(r, grid):
+  uc = r.ebsd.get("unitCell")
+  if isinstance(uc, dict) and uc.get("type") == "fromStep":
+    sx, sy = r.number(uc["step_size_x"]), r.number(uc["step_size_y"])
+    return regularPoly(4, [sx, sy]) if sx is not None and sy is not None and sx > 0 and sy > 0 else None
+  return None if grid is None else regularPoly(4, [grid.dx, grid.dy])
 
 
 # the same map from the rotations a file states directly, as quaternions rather than angles
-def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, frame, meta, unitCell, scanGrid):
+def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, frame, meta, unitCell, grid):
   from .load import mapFromColumns, rowOrderLattice
   ph = ph.copy()
   if unindexed is not None:
@@ -790,7 +806,7 @@ def _fromRotations(x, y, q, ph, phases, props, unindexed, correction, scanUnit, 
   indexed = np.array([fr.isIndexed for fr in phases.frames])[ph]
   q[~indexed] = np.nan
   x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
-  lat = rowOrderLattice(x, y, scanGrid)
+  lat = rowOrderLattice(x, y, grid)
   return mapFromColumns(x, y, q, ph, phases, props, lat, unitCell=unitCell, scanUnit=scanUnit, frame=frame, meta=meta,
                         phaseMap=np.arange(len(phases)))
 

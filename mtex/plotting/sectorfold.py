@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.representations import unitRows
 from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.quaternion import orthogonalTransform, reflection, rotation
@@ -21,11 +22,6 @@ from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.symmetry import _isin, closure
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-
-
-def _unit(v):
-  v = np.asarray(v, dtype=float)
-  return v / np.linalg.norm(v)
 
 
 def _angle(u, v):
@@ -53,7 +49,7 @@ def regionCenter(sR, resolution=1 * degree):
 def foldsSector(n, sR, tol=1e-6):
   """the reflection in a plane is a symmetry of the sector when it maps its boundary planes
   onto themselves"""
-  n = _unit(n)
+  n = unitRows(n)
   N = uniqueNormals(sR)
   return all(any((m - 2 * (m @ n) * n) @ k > 1 - tol for k in N) for m in N)
 
@@ -62,21 +58,21 @@ def foldCandidates(sR, center):
   """the candidate mirrors of a sector: a reflection symmetry of a spherical polygon runs
   through two of its characteristic points, its vertices, the middles of its edges, the
   poles of its boundaries and its centre, so every plane through two of them is tried"""
-  P = [_unit(center)] + [_unit(n) for n in uniqueNormals(sR)] + [np.eye(3)[k] for k in range(3)]
+  P = [unitRows(center)] + [unitRows(n) for n in uniqueNormals(sR)] + [np.eye(3)[k] for k in range(3)]
   V = [v for v in sR.vertices().data.reshape(-1, 3)]
   P += V
   for i in range(len(V)):
     for j in range(i + 1, len(V)):
       w = V[i] + V[j]
       if np.linalg.norm(w) > 1e-9:
-        P.append(_unit(w))
+        P.append(unitRows(w))
   N = []
   for i in range(len(P)):
     for j in range(i + 1, len(P)):
       w = np.cross(P[i], P[j])
       if np.linalg.norm(w) < 1e-8:
         continue
-      n = _unit(w)
+      n = unitRows(w)
       if not any(abs(m @ n) > 1 - 1e-9 for m in N):
         N.append(n)
   return N
@@ -106,7 +102,7 @@ def orientFold(n, pg):
   domains of the reflection group: MTEX keeps the half the frame's east lies in, and where
   east lies in the plane itself the north and then the pole decide"""
   for d in (np.asarray(pg.axes[k], dtype=float) for k in range(3)):
-    x = n @ _unit(d)
+    x = n @ unitRows(d)
     if abs(x) > 1e-6:
       return n if x > 0 else -n
   return n
@@ -178,9 +174,9 @@ def polarCoordinates(sR, v, center, ref=None, equalise=True):
   from a reference direction and then equalised, so that a wide part of the sector takes as
   much of the turn as a narrow one and the vertices sit at equal angles"""
   xyz = (v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)).reshape(-1, 3)
-  c = _unit(center.data.reshape(3) if isinstance(center, vector3d) else center)
+  c = unitRows(center.data.reshape(3) if isinstance(center, vector3d) else center)
   ref = np.array([1.0, 0.0, 0.0]) if ref is None else (ref.data.reshape(3) if isinstance(ref, vector3d) else np.asarray(ref, dtype=float))
-  N = [_unit(n) for n in sR.N]
+  N = [unitRows(n) for n in sR.N]
   r = polarRadius(N, xyz, c)
   # rho = 0 is taken from the pole of the drawing, and only where the centre is that pole
   # does the reference direction take over
@@ -205,7 +201,7 @@ def polarRadius(N, xyz, c):
 def tangentAt(c, ref):
   """the component of a direction perpendicular to the centre, the reference for rho = 0"""
   t = ref - (ref @ c) * c
-  return _unit(t) if np.linalg.norm(t) > 1e-10 else vector3d(c).orth().data.reshape(3)
+  return unitRows(t) if np.linalg.norm(t) > 1e-10 else vector3d(c).orth().data.reshape(3)
 
 
 def azimuthAbout(c, rx, xyz):
@@ -234,7 +230,7 @@ def equaliseAzimuth(sR, c, rx, rho, steps=1000):
   # the distance to the boundary as the azimuth turns, the vertices' azimuths knots of the grid
   at = np.mod(azimuthAbout(c, rx, V), 2 * np.pi)
   phi = np.unique(np.concatenate([np.linspace(0, 2 * np.pi, steps + 1), at]))
-  n1 = _unit(np.cross(rx, c))
+  n1 = unitRows(np.cross(rx, c))
   n = (rotation.byAxisAngle(vector3d(c), phi) * vector3d(n1)).data.reshape(-1, 3)
   omega = np.full(len(phi), np.pi)
   for m in sR.N:

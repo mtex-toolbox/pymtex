@@ -397,7 +397,8 @@ class trueEbsd:
                    self._hopStr(k, "shifts"), self._hopStr(k, "fitError")))
     labels = ("", "name", "image", "distortion", "shift, px", "residual, px")
     w = [max(len(labels[j]), *(len(r[j]) for r in rows)) for j in range(len(labels))]
-    line = lambda r: "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
+    def line(r):
+      return "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
     out = [head, "", line(labels)] + [line(r) for r in rows]
     if self.resizedList:
       d = self.resizedList[0]

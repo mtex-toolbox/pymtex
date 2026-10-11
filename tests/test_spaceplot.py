@@ -280,3 +280,14 @@ def test_annotate_goesIntoTheSpaceTheFigureShowsInItsOwnColour():
   scatter(discreteSample(unimodalODF(orientation.id(cs)), 20, rng=rng), 'axisAngle')
   h3 = annotate(orientation.id(cs), markerFaceColor='r')
   assert np.allclose(h3.get_facecolor()[0][:3], (1, 0, 0))
+
+
+def test_spaceFlags_refuseAFlagStringNamingTheKeyword():
+  ori = orientation.rand(3, crystalFrame("m-3m"))
+  with pytest.raises(TypeError, match="complete=True"):
+    scatter(ori, "complete")
+
+
+def test_scatterOrientations_takesCompleteAsAKeyword():
+  ori = orientation.rand(3, crystalFrame("m-3m"))
+  assert scatter(ori, "axisAngle", complete=True) is not None

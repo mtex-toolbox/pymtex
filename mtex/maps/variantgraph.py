@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.kernels import variantAngles
 from ..geometry.parent2child import calcParent
 from ..geometry.quaternion import qmul
@@ -217,9 +218,6 @@ def plotGraph(job, **kwargs):
 
 # ------------------------------------------------------------------ the variant graph
 
-def _conj(q):
-  return q * np.array([1.0, -1, -1, -1])
-
 
 # the parent variants with a variant within 8 degrees of an earlier one pointed at it
 def _bestFriends(job, PV, tol=8 * degree):
@@ -297,7 +295,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
     pr, o1, o2 = job._pairs("c2c")
     if len(pr):
       i1, i2 = first[pos[pr[:, 0]]], first[pos[pr[:, 1]]]
-      m = qmul(_conj(o1.data.reshape(-1, 4)), o2.data.reshape(-1, 4))
+      m = qmul(qconj(o1.data.reshape(-1, 4)), o2.data.reshape(-1, 4))
       p, k1, k2, v = _variantPairs(m, PV, job.csParent.sym.properGroup().rotations().data.reshape(-1, 4), threshold, tol)
       # the variants merged into one node add up, as MATLAB's sparse does
       G = G.maximum(both(i1[p] + friend[k1], i2[p] + friend[k2], v))

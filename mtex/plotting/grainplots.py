@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry.session import getMTEXpref
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .maps import phaseColor, phasePalette
 from .mtexfigure import gcm, mtexFigure
 
@@ -110,7 +110,7 @@ def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw: U
   into the held map"""
   from matplotlib.collections import LineCollection
   from .mapplot import _target
-  c, a, b = (v if isinstance(v, vector3d) else vector3d(v) for v in (c, a, b))
+  c, a, b = (asVector3d(v) for v in (c, a, b))
   phi = np.linspace(0, 2 * np.pi, 100)
   C, A, B = (v.data.reshape(-1, 3) for v in (c, a, b))
   P = C[:, None, :] + A[:, None, :] * np.cos(phi)[None, :, None] + B[:, None, :] * np.sin(phi)[None, :, None]

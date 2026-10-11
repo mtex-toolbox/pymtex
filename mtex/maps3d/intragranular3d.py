@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
@@ -104,7 +105,7 @@ def KAM(ebsd, order=1, threshold=None, max=False):
     src = tuple(slice(max_(0, -k), s - max_(0, k)) for k, s in zip(o, g.shape))
     dst = tuple(slice(max_(0, k), s - max_(0, -k)) for k, s in zip(o, g.shape))
     a, b = q[src], q[dst]
-    m = qmul(a * np.array([1, -1, -1, -1]), b)
+    m = qmul(qconj(a), b)
     c = np.max(np.abs(m.reshape(-1, 4) @ G.T), axis=1).reshape(m.shape[:-1])
     w = 2 * np.arccos(np.clip(c, -1, 1))
     use = ok[src] & ok[dst]

@@ -31,6 +31,8 @@ import types
 
 import numpy as np
 
+from .so3funclass import SO3Fun
+from .s2funclass import S2Fun
 from ..geometry.install import install
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -54,14 +56,6 @@ _SO3_METRICS = {"d_ball": "D_ball", "dball": "D_ball", "d_2": "D_2", "d2": "D_2"
 
 
 # ------------------------------------------------------------------ the inputs
-
-
-def _isS2Fun(a):
-  return isinstance(a, S2_KINDS)
-
-
-def _isSO3Fun(a):
-  return isinstance(a, SO3_KINDS)
 
 
 def _metricName(metric, table, space):
@@ -162,7 +156,7 @@ def _withInfo(res, info, wanted):
 def _s2Representation(a, L, mass, weights):
   """the signed harmonic density h, the atoms x and their masses c, and whether nothing was lost"""
   h, x, c = np.zeros((L + 1) ** 2, dtype=complex), np.zeros((0, 3)), np.zeros(0)
-  if _isS2Fun(a):
+  if isinstance(a, S2Fun):
     exact = isinstance(a, S2FunHarmonic) and a.bandwidth <= L
     f = S2FunHarmonic(a, bandwidth=L)
     if not f.isReal:
@@ -238,7 +232,8 @@ def _maximumCap(fhat, x, c, L, numCenters, numHeights, centers):
     neg = -q[order]
     return s[np.searchsorted(neg, -t, "right")], s[np.searchsorted(neg, -t, "left")]
 
-  heights = lambda m: np.clip(x @ m.T, -1, 1).T
+  def heights(m):
+    return np.clip(x @ m.T, -1, 1).T
   return _search(centers, values, heights, grid, c, continuous, masses)
 
 
@@ -267,33 +262,35 @@ def _search(centers, values, heights, grid, c, continuous, masses):
   return best
 
 
+# the two sides at one bandwidth, a function's own where the other is a point set: the
+# difference of their harmonic parts and their atoms with signed weights; each function keeps its
+# integral, a point set takes its partner's
+def _difference(a, b, family, defaultBandwidth, represent, bandwidth, weights, weights2):
+  isFun = isinstance(a, family), isinstance(b, family)
+  if isFun[0] != isFun[1]:
+    L = defaultBandwidth(a if isFun[0] else b)
+  else:
+    L = max(defaultBandwidth(a), defaultBandwidth(b))
+  L = _bandwidth(L if bandwidth is None else bandwidth)
+  massA = _mass(a) if isFun[0] else None
+  massB = _mass(b) if isFun[1] else None
+  massA = _sampleMass(massB) if massA is None else massA
+  massB = _sampleMass(massA) if massB is None else massB
+  hA, xA, cA, exactA = represent(a, L, massA, weights)
+  hB, xB, cB, exactB = represent(b, L, massB, weights2 if not any(isFun) else weights)
+  return L, hA - hB, np.concatenate([xA, xB]), np.concatenate([cA, -cB]), exactA and exactB
+
+
 def sphericalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, bandwidth=None, degreeWeights=None,
                          numCenters=2049, numHeights=257, centers=None, squared=False, info=False):
   """the discrepancy of two spherical densities or weighted point sets, D_2, D_cap or L2 (E_L);
   the shared form of S2Fun/discrepancy and vector3d/discrepancy, info=True adds the details"""
   metric = _metricName(metric, _S2_METRICS, "spherical")
-  if not ((_isS2Fun(a) or isinstance(a, vector3d)) and (_isS2Fun(b) or isinstance(b, vector3d))):
+  if not ((isinstance(a, S2Fun) or isinstance(a, vector3d)) and (isinstance(b, S2Fun) or isinstance(b, vector3d))):
     raise TypeError("inputs must be S2Fun or vector3d")
-  defaultBw = lambda f: f.bandwidth if isinstance(f, S2FunHarmonic) else 128
-  if _isS2Fun(a) and isinstance(b, vector3d):
-    L = defaultBw(a)
-  elif _isS2Fun(b) and isinstance(a, vector3d):
-    L = defaultBw(b)
-  else:
-    L = max(defaultBw(a), defaultBw(b))
-  L = _bandwidth(L if bandwidth is None else bandwidth)
-
-  # each function keeps its integral, a point set takes its partner's
-  massA = _mass(a) if _isS2Fun(a) else None
-  massB = _mass(b) if _isS2Fun(b) else None
-  massA = _sampleMass(massB) if massA is None else massA
-  massB = _sampleMass(massA) if massB is None else massB
-
-  hA, xA, cA, exactA = _s2Representation(a, L, massA, weights)
-  second = weights2 if isinstance(a, vector3d) and isinstance(b, vector3d) else weights
-  hB, xB, cB, exactB = _s2Representation(b, L, massB, second)
-  fhat, x, c = hA - hB, np.concatenate([xA, xB]), np.concatenate([cA, -cB])
-  out = dict(method="", isExact=exactA and exactB, bandwidth=L)
+  L, fhat, x, c, exact = _difference(a, b, S2Fun, lambda f: f.bandwidth if isinstance(f, S2FunHarmonic) else 128, _s2Representation,
+                                     bandwidth, weights, weights2)
+  out = dict(method="", isExact=exact, bandwidth=L)
 
   if metric == "D_cap":
     best = _maximumCap(fhat, x, c, L, numCenters, numHeights, centers)
@@ -351,9 +348,9 @@ def _s2SampleMoments(v, c, L):
 
 def _legacyS2(a, b, weights=None, weights2=None, bandwidth=None):
   """the squared truncated kernel objective of S2Fun/optimalSample"""
-  if isinstance(a, vector3d) and _isS2Fun(b):
+  if isinstance(a, vector3d) and isinstance(b, S2Fun):
     return _legacyS2(b, a, weights=weights, bandwidth=bandwidth)
-  if not ((_isS2Fun(a) or isinstance(a, vector3d)) and (_isS2Fun(b) or isinstance(b, vector3d))):
+  if not ((isinstance(a, S2Fun) or isinstance(a, vector3d)) and (isinstance(b, S2Fun) or isinstance(b, vector3d))):
     raise TypeError("the second input must be an S2Fun or a vector3d point set")
   if isinstance(a, vector3d):
     L = _bandwidth(128 if bandwidth is None else bandwidth)
@@ -365,10 +362,10 @@ def _legacyS2(a, b, weights=None, weights2=None, bandwidth=None):
     w = _s2KernelWeights(L, False)
     return float(np.sum(np.abs(w * diff) ** 2))
   L = a.bandwidth if isinstance(a, S2FunHarmonic) else 128
-  if _isS2Fun(b):
+  if isinstance(b, S2Fun):
     L = max(L, b.bandwidth if isinstance(b, S2FunHarmonic) else 128)
   L = _bandwidth(L if bandwidth is None else bandwidth)
-  if _isS2Fun(b):
+  if isinstance(b, S2Fun):
     # a quadrature integral is checked to the tolerance of its grid, before the projection
     m1, m2 = _mass(a), _mass(b)
     if not abs(m1 - m2) <= 1e-6 * max(abs(m1), abs(m2)):
@@ -376,7 +373,7 @@ def _legacyS2(a, b, weights=None, weights2=None, bandwidth=None):
                        f"{m2:g} - scale one of them, or use a metric that keeps the mass")
   f = S2FunHarmonic(a, bandwidth=L)
   fhat = _cut(f._fhat, (L + 1) ** 2)
-  if _isS2Fun(b):
+  if isinstance(b, S2Fun):
     g = S2FunHarmonic(b, bandwidth=L)
     antipodal = f.antipodal and g.antipodal
     diff = _cut(g._fhat, (L + 1) ** 2) - fhat
@@ -397,7 +394,7 @@ def _so3Representation(a, L, mass, weights):
   """the signed harmonic density h in the basis orthonormal for the Haar measure of mass 8 pi^2,
   sqrt(8 pi^2) times MTEX's, the atoms as quaternions and their masses, and whether it is exact"""
   h, x, c = np.zeros(deg2dim(L + 1), dtype=complex), np.zeros((0, 4)), np.zeros(0)
-  if _isSO3Fun(a):
+  if isinstance(a, SO3Fun):
     exact = isinstance(a, SO3FunHarmonic) and a.bandwidth <= L
     f = SO3FunHarmonic(a, bandwidth=L)
     if not f.isReal:
@@ -479,7 +476,8 @@ def _maximumBall(fhat, x, c, L, numCenters, numRadii, centers):
     qs = q[order]
     return p[np.searchsorted(qs, t, "right")], p[np.searchsorted(qs, t, "left")]
 
-  heights = lambda m: 2 * np.arccos(np.clip(np.abs(m @ x.T), 0, 1))
+  def heights(m):
+    return 2 * np.arccos(np.clip(np.abs(m @ x.T), 0, 1))
   return _search(centers, values, heights, grid, c, continuous, masses)
 
 
@@ -488,28 +486,11 @@ def rotationalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ba
   """the discrepancy of two rotational densities or weighted orientation sets, D_2, D_ball or
   L2 (E_L); the shared form of SO3Fun/discrepancy and rotation/discrepancy, info=True adds the details"""
   metric = _metricName(metric, _SO3_METRICS, "rotational")
-  if not ((_isSO3Fun(a) or isinstance(a, rotation)) and (_isSO3Fun(b) or isinstance(b, rotation))):
+  if not ((isinstance(a, SO3Fun) or isinstance(a, rotation)) and (isinstance(b, SO3Fun) or isinstance(b, rotation))):
     raise TypeError("inputs must be SO3Fun or rotation")
-  defaultBw = lambda f: f.bandwidth if isinstance(f, SO3FunHarmonic) else 64
-  if _isSO3Fun(a) and isinstance(b, rotation):
-    L = defaultBw(a)
-  elif _isSO3Fun(b) and isinstance(a, rotation):
-    L = defaultBw(b)
-  else:
-    L = max(defaultBw(a), defaultBw(b))
-  L = _bandwidth(L if bandwidth is None else bandwidth)
-
-  # each function keeps its integral, an orientation set takes its partner's
-  massA = _mass(a) if _isSO3Fun(a) else None
-  massB = _mass(b) if _isSO3Fun(b) else None
-  massA = _sampleMass(massB) if massA is None else massA
-  massB = _sampleMass(massA) if massB is None else massB
-
-  hA, xA, cA, exactA = _so3Representation(a, L, massA, weights)
-  second = weights2 if isinstance(a, rotation) and isinstance(b, rotation) else weights
-  hB, xB, cB, exactB = _so3Representation(b, L, massB, second)
-  fhat, x, c = hA - hB, np.concatenate([xA, xB]), np.concatenate([cA, -cB])
-  out = dict(method="", isExact=exactA and exactB, bandwidth=L)
+  L, fhat, x, c, exact = _difference(a, b, SO3Fun, lambda f: f.bandwidth if isinstance(f, SO3FunHarmonic) else 64, _so3Representation,
+                                     bandwidth, weights, weights2)
+  out = dict(method="", isExact=exact, bandwidth=L)
 
   if metric == "D_ball":
     best = _maximumBall(fhat, x, c, L, numCenters, numRadii, centers)
@@ -569,9 +550,9 @@ def _so3SampleMoments(r, c, L, CS=None, SS=None, antipodal=False):
 
 def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
   """the squared truncated kernel objective of SO3Fun/optimalSample"""
-  if isinstance(a, rotation) and _isSO3Fun(b):
+  if isinstance(a, rotation) and isinstance(b, SO3Fun):
     return _legacySO3(b, a, weights=weights, bandwidth=bandwidth)
-  if not ((_isSO3Fun(a) or isinstance(a, rotation)) and (_isSO3Fun(b) or isinstance(b, rotation))):
+  if not ((isinstance(a, SO3Fun) or isinstance(a, rotation)) and (isinstance(b, SO3Fun) or isinstance(b, rotation))):
     raise TypeError("the second input must be an SO3Fun or a rotation set")
   if isinstance(a, rotation):
     L = _bandwidth(32 if bandwidth is None else bandwidth)
@@ -579,14 +560,15 @@ def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
       raise ValueError("orientation sets must not be empty")
     c, d = _sampleWeights(a.size, weights), _sampleWeights(b.size, weights2)
     # two probability densities share the constant coefficient
-    frames = lambda r: (r.CS, r.SS, r.antipodal) if isinstance(r, orientation) else (None, None, False)
+    def frames(r):
+      return (r.CS, r.SS, r.antipodal) if isinstance(r, orientation) else (None, None, False)
     diff = (_so3SampleMoments(b, d, L, *frames(b)) - _so3SampleMoments(a, c, L, *frames(a))) / (math.sqrt(8) * np.pi)
     return float(np.sum(np.abs(_so3KernelWeights(L) * diff) ** 2))
   L = a.bandwidth if isinstance(a, SO3FunHarmonic) else 32
-  if _isSO3Fun(b):
+  if isinstance(b, SO3Fun):
     L = max(L, b.bandwidth if isinstance(b, SO3FunHarmonic) else 32)
   L = _bandwidth(L if bandwidth is None else bandwidth)
-  if _isSO3Fun(b):
+  if isinstance(b, SO3Fun):
     # a quadrature integral is checked to the tolerance of its grid, before the projection
     m1, m2 = _mass(a), _mass(b)
     if not abs(m1 - m2) <= 1e-6 * max(abs(m1), abs(m2)):
@@ -594,7 +576,7 @@ def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
                        f"{m2:g} - scale one of them, or use a metric that keeps the mass")
   f = SO3FunHarmonic(a, bandwidth=L)
   fhat = _cut(f._fhat, deg2dim(L + 1))
-  if _isSO3Fun(b):
+  if isinstance(b, SO3Fun):
     diff = math.sqrt(8) * np.pi * (_cut(SO3FunHarmonic(b, bandwidth=L)._fhat, deg2dim(L + 1)) - fhat)
   else:
     if b.size == 0:
@@ -619,8 +601,8 @@ def discrepancy(a, b, metric="D_2", **kwargs):
     discrepancy(f, v, metric='L2', bandwidth=32, degreeWeights=w)   'E_L' the same
     discrepancy(f, v, squared=True), discrepancy(f, v, info=True) -> (d, info)
     discrepancy(f, v, metric='kernel')                   the squared objective of optimalSample"""
-  spherical = any(_isS2Fun(x) or isinstance(x, vector3d) for x in (a, b))
-  if spherical and any(_isSO3Fun(x) or isinstance(x, rotation) for x in (a, b)):
+  spherical = any(isinstance(x, S2Fun) or isinstance(x, vector3d) for x in (a, b))
+  if spherical and any(isinstance(x, SO3Fun) or isinstance(x, rotation) for x in (a, b)):
     raise TypeError("a measure on the sphere cannot be compared with one on SO(3)")
   if isinstance(metric, str) and metric.lower() == "kernel":
     wanted = kwargs.pop("info", False)

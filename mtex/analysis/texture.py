@@ -17,6 +17,7 @@ import math
 
 import numpy as np
 
+from ..functions.so3funclass import SO3Fun
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
@@ -52,10 +53,6 @@ def _weights(w, n):
   return w / np.sum(w)
 
 
-def _isSO3Fun(f):
-  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, quaternion)
-
-
 def _isMap(x):
   return hasattr(x, "phaseId") and hasattr(x, "CSList") and hasattr(x, "rotations")
 
@@ -89,7 +86,7 @@ def calcTensor(x, *args, average="Voigt", weights=None):
     w = _weights(weights, x.size)
     fast = T._turnedMean(x.flatten(), np.asarray(w, dtype=float).ravel())
     return fast if fast is not None else (x.flatten() * T).mean(weights=w)
-  if _isSO3Fun(x):
+  if isinstance(x, SO3Fun):
     return _calcTensorODF(x, T)
   raise TypeError("calcTensor averages over an ODF, a list of orientations or a map")
 
@@ -202,7 +199,7 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
         E = r @ e @ r.T
         # the strain in every crystal frame, Q^T E Q, solved in one call
         M[l, k] = _taylorMany(np.einsum("nji,jk,nkl->nil", Q, E, Q), model, True, model.spinSelection)[0] @ w
-  elif _isSO3Fun(x):
+  elif isinstance(x, SO3Fun):
     from ..functions.so3fun import SO3FunHarmonic
     turned = [SO3FunHarmonic(x.rotate(rotation.byAxisAngle(vector3d(nd), t)), bandwidth=bandwidth) for t in th]
     fr = x.SS
@@ -222,7 +219,7 @@ def calcKearnsFactor(f, h=None, N=None):
   """the Kearns factor, the mean squared alignment of a crystal direction with N: the
   integral of the pole figure of h against (r . N)^2"""
   from ..functions.quadrature import quadratureS2Grid
-  if _isSO3Fun(f):
+  if isinstance(f, SO3Fun):
     pdf = f.radon(h)
   else:
     pdf, N = f, h if N is None else N
@@ -328,7 +325,7 @@ def doEulerStep(spin, x, n=1, bandwidth=None):
     for _ in range(n):
       o = (spin(o) / n).exp()
     return o
-  if not _isSO3Fun(x):
+  if not isinstance(x, SO3Fun):
     raise TypeError("doEulerStep moves orientations or a density")
   from ..functions.so3fun import SO3FunHarmonic
   p = _TextureTransport(spin, x, bandwidth)

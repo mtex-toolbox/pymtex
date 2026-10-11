@@ -572,7 +572,8 @@ class EBSD:
         row.append(f"{v:.4g}" if np.issubdtype(np.asarray(v).dtype, np.floating) else str(v))
       rows.append(row)
     widths = [max(len(l), *(len(r[j]) for r in rows)) for j, l in enumerate(labels)]
-    line = lambda r: "  " + "  ".join(x.rjust(w) for x, w in zip(r, widths))
+    def line(r):
+      return "  " + "  ".join(x.rjust(w) for x, w in zip(r, widths))
     return "\n".join([line(labels)] + [line(r) for r in rows])
 
   def __repr__(self):

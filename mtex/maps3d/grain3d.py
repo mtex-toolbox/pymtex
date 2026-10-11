@@ -21,6 +21,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from ..geometry._array import MtexArray
+from ..geometry.kernels import qconj
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
@@ -63,14 +65,14 @@ class grain3d:
     n, m = I.shape
     cs = CSList if isinstance(CSList, phaseList) else phaseList(CSList if CSList is not None else ["notIndexed"])
     ph = np.full(n, 1 if len(cs) > 1 else 0, dtype=np.int8) if phaseId is None else np.asarray(phaseId, dtype=np.int8).reshape(-1)
-    q = np.full((n, 4), np.nan) if ori is None else np.asarray(ori.data if hasattr(ori, "data") else ori, dtype=float).reshape(-1, 4)
+    q = np.full((n, 4), np.nan) if ori is None else np.asarray(ori.data if isinstance(ori, MtexArray) else ori, dtype=float).reshape(-1, 4)
     C = I.tocoo()
     gid = np.zeros((m, 2), dtype=np.int64)
     gid[C.col[C.data > 0], 0] = C.row[C.data > 0] + 1
     gid[C.col[C.data < 0], 1] = C.row[C.data < 0] + 1
     both = np.all(gid > 0, axis=1)
     mori = np.full((m, 4), np.nan)
-    mori[both] = qmul(q[gid[both, 1] - 1] * np.array([1, -1, -1, -1]), q[gid[both, 0] - 1])
+    mori[both] = qmul(qconj(q[gid[both, 1] - 1]), q[gid[both, 0] - 1])
     side = np.where(gid > 0, ph[np.maximum(gid, 1) - 1], -1)
     fr = specimenFrame.default if frame is None else frame
     gB = grain3Boundary(V, F, gid, None, side, mori, cs, fr)
@@ -155,7 +157,7 @@ class grain3d:
     pos = np.zeros(int(g.max(initial=0)) + 1, dtype=np.int64)
     pos[self.id] = np.arange(len(self))
     mori = np.full((len(gB), 4), np.nan)
-    mori[both] = qmul(q[pos[g[both, 1]]] * np.array([1, -1, -1, -1]), q[pos[g[both, 0]]])
+    mori[both] = qmul(qconj(q[pos[g[both, 1]]]), q[pos[g[both, 0]]])
     gB.misrotation = rotation._fromData(mori)
     gB.phaseId = np.where(g > 0, p, -1).astype(np.int8)
     gB.CSList = self.CSList
@@ -199,7 +201,7 @@ class grain3d:
 
   def rotate(self, rot, keepXY=False, keepEuler=False, center=(0.0, 0.0, 0.0)):
     """the grains turned about a centre: their faces and, unless keepEuler, their orientations"""
-    R = rotation(rot.data if hasattr(rot, "data") else rot)
+    R = rotation(rot.data if isinstance(rot, MtexArray) else rot)
     q = self.meanRotation.data.reshape(-1, 4)
     if not keepEuler:
       from ..geometry.kernels import qmul

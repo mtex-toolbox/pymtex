@@ -174,7 +174,8 @@ class _Kernel:
 # the parameter of a one parameter family with a given halfwidth, by bisection on the
 # halfwidth, which is monotone in the parameter within the bracket
 def _parameterForHalfwidth(K, hw, lo, hi, iterations=60):
-  f = lambda p: K(p).halfwidth() - hw
+  def f(p):
+    return K(p).halfwidth() - hw
   flo = f(lo)
   for _ in range(iterations):
     mid = (lo + hi) / 2

@@ -802,6 +802,11 @@ def _uniqueRows(key, tol, stable):
   return iv, iu
 
 
+def asVector3d(v):
+  """v itself if it is a vector3d (a Miller included), else the vector3d of its coordinates"""
+  return v if isinstance(v, vector3d) else vector3d(v)
+
+
 # a reference frame and a plotting convention, recognised without importing their files,
 # which import this one
 def _isFrame(x):
@@ -858,10 +863,12 @@ if TYPE_CHECKING:
 
 
 
-__all__ = ["vector3d", "isCrystalDirection"]
 __lazy__ = ["xvector", "yvector", "zvector"]
 
 
 def isCrystalDirection(v):
   """whether v is a vector given in a crystal frame"""
   return isinstance(v, vector3d) and v.isCrystalDirection
+
+
+__all__ = ["vector3d", "isCrystalDirection"]

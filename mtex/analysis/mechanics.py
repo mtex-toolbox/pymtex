@@ -17,7 +17,7 @@ import numpy as np
 from ..geometry.frames import specimenFrame
 from ..geometry.quaternion import rotation
 from ..geometry.slipsystem import slipSystem
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..tensors.tensor import (EinsteinSum, SchmidTensor, colon, curvatureTensor, deformationGradientTensor,
                      dislocationDensityTensor, spinTensor, strainRateTensor, strainTensor, stressTensor, tensor,
                      velocityGradientTensor)
@@ -29,7 +29,7 @@ def _frameOf(v):
 
 
 def _unit(v):
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   return v.normalize().data
 
 

@@ -34,7 +34,7 @@ class EBSD3(EBSD):
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, scanUnit="um", frame=None, lattice=None, meta=None,
                phaseMap=None, id=None, isPadding=None, D=None):
-    object.__setattr__(self, "lattice", None)
+    self.lattice = None
     super().__init__(pos, rotations, phaseId, CSList, prop, scanUnit=scanUnit, frame=frame, lattice=False, meta=meta,
                      phaseMap=phaseMap, id=id, isPadding=isPadding)
     if lattice is None and self.size >= 4:
@@ -42,7 +42,7 @@ class EBSD3(EBSD):
         lattice = voxelLattice.fromPositions(self.pos.data, D)
       except ValueError:
         lattice = None
-    object.__setattr__(self, "lattice", lattice or None)
+    self.lattice = lattice or None
 
   # ------------------------------------------------------------------ the lattice
 

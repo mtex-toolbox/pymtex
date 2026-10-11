@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import numpy as np
 
+from .representations import unitRows
 from .frames import crystalFrame
 from .display import display, header, numString, sizeString, table, takeRows
 from .miller import Miller
 from .symmetryops import symmetrise as _symmetrise
-from .vector3d import vector3d
+from .vector3d import vector3d, asVector3d
 from .display import aligned
 
 # the families: slip directions and plane normals, three or four indices
@@ -38,11 +39,6 @@ SLIP_FAMILIES = {
   "twinC1": [((-1, 1, 0, -2), (-1, 1, 0, 1))],
   "twinC2": [((2, -1, -1, -3), (2, -1, -1, 2))],
 }
-
-
-def _unit(a):
-  n = np.linalg.norm(a, axis=-1, keepdims=True)
-  return a / np.where(n == 0, 1, n)
 
 
 def _asList(v):
@@ -82,7 +78,7 @@ class slipSystem:
     b, n = _asList(b), _asList(n)
     _sameFrame(b, n, "the slip direction and the plane normal")
     bd, nd = np.broadcast_arrays(b.data, n.data)
-    if np.any(np.abs(np.sum(_unit(bd) * _unit(nd), axis=-1)) > 1e-5):
+    if np.any(np.abs(np.sum(unitRows(bd) * unitRows(nd), axis=-1)) > 1e-5):
       raise ValueError("the slip direction and the plane normal are not orthogonal")
     self.b, self.n = vector3d(bd.copy(), frame=n.frame), vector3d(nd.copy(), frame=n.frame)
     self.b.dispStyle, self.n.dispStyle = b.dispStyle, n.dispStyle
@@ -154,7 +150,7 @@ class slipSystem:
       if not antipodal:
         mm = np.concatenate([mm, -mm])
       nn = _symmetrise(self.n[k], unique=True, antipodal=True).data.reshape(-1, 3)
-      ok = np.abs(_unit(mm) @ _unit(nn).T) < 1e-7
+      ok = np.abs(unitRows(mm) @ unitRows(nn).T) < 1e-7
       r, c = np.nonzero(ok)
       bs.append(mm[r])
       ns.append(nn[c])
@@ -169,10 +165,10 @@ class slipSystem:
     """the Schmid factor cos(phi) cos(lambda) of tension directions in the coordinates the
     systems are written in, MATLAB's (directions, systems) matrix: the directions keep their
     shape, a single one gives one factor per system"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     _sameFrame(self.b, v, "the slip systems and the tension direction")
-    r = _unit(v.data.reshape(-1, 3))
-    m = (r @ _unit(self.b.data).T) * (r @ _unit(self.n.data).T)
+    r = unitRows(v.data.reshape(-1, 3))
+    m = (r @ unitRows(self.b.data).T) * (r @ unitRows(self.n.data).T)
     if relative:
       m = m / self.CRSS
     if v.size == 1:
@@ -181,7 +177,7 @@ class slipSystem:
 
   # the dyad b n^T of the normalised vectors, one (3, 3) matrix per system
   def _dyads(self):
-    return _unit(self.b.data)[..., :, None] * _unit(self.n.data)[..., None, :]
+    return unitRows(self.b.data)[..., :, None] * unitRows(self.n.data)[..., None, :]
 
   def deformationTensor(self):
     """the dyad as a tensor in the frame of the systems, a single one for a single system; the
@@ -199,7 +195,7 @@ class slipSystem:
   def mPrime(self, other):
     """the Luster-Morris parameter |(n1 . n2)(b1 . b2)| and the residual Burgers vector of paired
     systems, entry by entry as NumPy broadcasts, MATLAB's element by element"""
-    return np.abs(np.sum(_unit(self.b.data) * _unit(other.b.data), axis=-1) * np.sum(_unit(self.n.data) * _unit(other.n.data), axis=-1))
+    return np.abs(np.sum(unitRows(self.b.data) * unitRows(other.b.data), axis=-1) * np.sum(unitRows(self.n.data) * unitRows(other.n.data), axis=-1))
 
   def residualBurgersVector(self, other):
     """the length of the difference of the Burgers vectors of paired systems, entry by entry"""
@@ -370,7 +366,7 @@ class dislocationSystem:
       b, l = _asList(b), _asList(l)
       _sameFrame(b, l, "the Burgers vector and the line vector")
       bd, ld = np.broadcast_arrays(b.data, l.data)
-      cosang = np.abs(np.sum(_unit(bd) * _unit(ld), axis=-1))
+      cosang = np.abs(np.sum(unitRows(bd) * unitRows(ld), axis=-1))
       if np.any((cosang > 1e-5) & (cosang < 1 - 1e-5)):
         raise ValueError("the line vector is neither orthogonal nor parallel to the Burgers vector")
       b, l = vector3d(bd, frame=b.frame), vector3d(ld, frame=b.frame, antipodal=True)
@@ -415,7 +411,7 @@ class dislocationSystem:
   @property
   def isEdge(self):
     """which systems are edge dislocations, the line vector orthogonal to the Burgers vector"""
-    return np.abs(np.sum(_unit(self.b.data) * _unit(self.l.data), axis=-1)) < 1e-5
+    return np.abs(np.sum(unitRows(self.b.data) * unitRows(self.l.data), axis=-1)) < 1e-5
 
   @property
   def isScrew(self):
@@ -425,7 +421,7 @@ class dislocationSystem:
   def tensor(self):
     """the dislocation density tensor of every system, b (x) l^, in the length unit of the axes"""
     from ..tensors.tensor import dislocationDensityTensor
-    M = self.b.data[..., :, None] * _unit(self.l.data)[..., None, :]
+    M = self.b.data[..., :, None] * unitRows(self.l.data)[..., None, :]
     return dislocationDensityTensor(M[0] if self.size == 1 else M, self.frame, unit="au")
 
   def rotate(self, rot):
@@ -444,7 +440,8 @@ class dislocationSystem:
     lines = ["dislocationSystem"]
     if self.CS is not None:
       lines.append(("  mineral: " if self.CS.mineral else "  symmetry: ") + self.CS.char())
-    names = lambda v, sel: ["[" + "  ".join(numString(x) for x in row) + "]" for row in np.round(v.coordinates[sel], 4)]
+    def names(v, sel):
+      return ["[" + "  ".join(numString(x) for x in row) + "]" for row in np.round(v.coordinates[sel], 4)]
     for label, sel, withLine in (("edge dislocations : ", self.isEdge, True), ("screw dislocations: ", self.isScrew, False)):
       if not np.any(sel):
         continue

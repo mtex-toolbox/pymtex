@@ -16,6 +16,7 @@ import contextvars
 import os
 import re
 import warnings
+from typing import NamedTuple
 
 import numpy as np
 
@@ -223,6 +224,18 @@ def _gridFromColumns(x, y, q, ids, phases, props, lat, propType, unitCell=None, 
               isPadding=missing.reshape(dims), **kw)
 
 
+class scanGrid(NamedTuple):
+  """the grid a scan is written in, row by row with x fastest: nx by ny cells of steps dx and dy, a
+  hexagonal scan alternating nx and nxEven points per row; the arguments of gridLattice after the
+  positions"""
+  nx: int
+  ny: int
+  dx: float
+  dy: float
+  hex: bool = False
+  nxEven: int | None = None
+
+
 def scanGridFromPositions(x, y, dx=None, dy=None):
   """the scan the row order of the positions states: a file written row by row with x running
   fastest has its first row where y first changes, a square scan rows of one length, and a
@@ -261,12 +274,12 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
   full, last = lengths[:-1], lengths[-1]
   if np.all(full == nx) and last <= nx:
     if shift < 0.25 * abs(dx):
-      return (nx, ny, dx, dy)
-    return (nx, ny, dx, dy, True, nx) if abs(shift - abs(dx) / 2) < 0.25 * abs(dx) else None
+      return scanGrid(nx, ny, dx, dy)
+    return scanGrid(nx, ny, dx, dy, True, nx) if abs(shift - abs(dx) / 2) < 0.25 * abs(dx) else None
   second = int(lengths[1])
   if np.all(full[0::2] == nx) and np.all(full[1::2] == second) and last <= (nx, second)[(ny - 1) % 2] \
       and abs(shift - abs(dx) / 2) < 0.25 * abs(dx):
-    return (nx, ny, dx, dy, True, second)
+    return scanGrid(nx, ny, dx, dy, True, second)
   return None
 
 
@@ -418,7 +431,9 @@ def tryGridify(ebsd):
 
 # ------------------------------------------------------------------ the entry point
 
-VENDOR_EXTENSIONS = {"ang", "ctf", "cpr", "crc", "osc", "h5", "hdf5", "h5oina", "oh5", "edaxh5", "dream3d"}
+# the vendor formats by extension, each the name of the module that reads it
+VENDOR_FORMATS = {"ang": "ang", "ctf": "ctf", "cpr": "crc", "crc": "crc", "osc": "osc",
+                  **dict.fromkeys(("h5", "hdf5", "hdf", "h5oina", "oh5", "edaxh5", "dream3d"), "h5")}
 
 
 def loadEBSD(fname, CS=None, *args, interface=None, grid=True, **kwargs):
@@ -446,7 +461,7 @@ def loadEBSD(fname, CS=None, *args, interface=None, grid=True, **kwargs):
     _gridOnRead.reset(token)
   # the phases a vendor file declares, replaced by the list the caller states, as an import
   # script does: one frame per phase of the file in its order, the not indexed one first
-  if CS is not None and ext in VENDOR_EXTENSIONS:
+  if CS is not None and ext in VENDOR_FORMATS:
     ebsd = withPhases(ebsd, CS)
   if onGrid:
     ebsd = tryGridify(ebsd)
@@ -455,25 +470,24 @@ def loadEBSD(fname, CS=None, *args, interface=None, grid=True, **kwargs):
 
 # the map of a file by the loader of its format
 def _read(fname, ext, CS, *args, **kwargs):
-  if ext == "ang":
+  fmt = VENDOR_FORMATS.get(ext)
+  if fmt == "ang":
     from .ang import _loadEBSD_ang
-    ebsd = _loadEBSD_ang(fname, *args, **kwargs)
-  elif ext == "ctf":
+    return _loadEBSD_ang(fname, *args, **kwargs)
+  if fmt == "ctf":
     from .ctf import _loadEBSD_ctf
-    ebsd = _loadEBSD_ctf(fname, *args, **kwargs)
-  elif ext in ("cpr", "crc"):
+    return _loadEBSD_ctf(fname, *args, **kwargs)
+  if fmt == "crc":
     from .crc import _loadEBSD_crc
-    ebsd = _loadEBSD_crc(fname, *args, **kwargs)
-  elif ext == "osc":
+    return _loadEBSD_crc(fname, *args, **kwargs)
+  if fmt == "osc":
     from .osc import _loadEBSD_osc
-    ebsd = _loadEBSD_osc(fname, *args, **kwargs)
-  elif ext in ("h5", "hdf5", "h5oina", "oh5", "edaxh5", "dream3d"):
+    return _loadEBSD_osc(fname, *args, **kwargs)
+  if fmt == "h5":
     from .h5 import _loadEBSD_h5
-    ebsd = _loadEBSD_h5(fname, *args, **kwargs)
-  else:
-    from .generic import _loadEBSD_generic
-    ebsd = _loadEBSD_generic(fname, CS, *args, **kwargs)
-  return ebsd
+    return _loadEBSD_h5(fname, *args, **kwargs)
+  from .generic import _loadEBSD_generic
+  return _loadEBSD_generic(fname, CS, *args, **kwargs)
 
 
 def withPhases(ebsd, CS):

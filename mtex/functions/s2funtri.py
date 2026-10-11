@@ -13,13 +13,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .s2funclass import S2Fun
 from ..geometry.s2triangulation import S2Triangulation
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import aligned
 
 
-class S2FunTri:
+class S2FunTri(S2Fun):
   """a function on the sphere by its values at the vertices of a spherical triangulation, linear
   in between; a direction given twice takes the mean of its values
 
@@ -68,7 +69,7 @@ class S2FunTri:
   def eval(self, v):
     """the values at the directions v, the barycentric mean of the values at the corners of the
     triangle each lies in; NaN at a NaN direction"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     shape = v.shape
     W = v.data.reshape(-1, 3)
     ok = ~np.isnan(W).any(axis=1)

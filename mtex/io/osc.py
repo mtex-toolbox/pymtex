@@ -20,7 +20,7 @@ from ..geometry.frames import crystalFrame
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
 from .ang import eulerCorrectionRotation
-from .load import EDAX_POINT_GROUPS, TSL_LAUE, ebsdFromColumns, regularPoly
+from .load import EDAX_POINT_GROUPS, TSL_LAUE, ebsdFromColumns, regularPoly, scanGrid
 from .table import readFile
 
 OSC_HEADER_OPEN = b"\xb9\x0b\xef\xff\x01\x00\x00\x00"
@@ -186,12 +186,12 @@ def _scanGrid(nx, ny, n, xstep, ystep, hex):
   if nx < 1 or ny < 1 or xstep <= 0 or ystep <= 0:
     return None
   if not hex:
-    return (nx, ny, xstep, ystep)
+    return scanGrid(nx, ny, xstep, ystep)
   odd, even = (ny + 1) // 2, ny // 2
   if even == 0:
-    return (nx, ny, xstep, ystep, True, nx) if nx * odd == n else None
+    return scanGrid(nx, ny, xstep, ystep, True, nx) if nx * odd == n else None
   rest = n - odd * nx
-  return (nx, ny, xstep, ystep, True, rest // even) if rest % even == 0 and rest // even > 0 else None
+  return scanGrid(nx, ny, xstep, ystep, True, rest // even) if rest % even == 0 and rest // even > 0 else None
 
 
 __all__ = []

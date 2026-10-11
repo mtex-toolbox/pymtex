@@ -11,7 +11,7 @@ import numpy as np
 from scipy import sparse
 
 from ..orientation import orientation
-from ..vector3d import vector3d
+from ..vector3d import vector3d, asVector3d
 
 
 def _distances(v, w, antipodal=None):
@@ -130,7 +130,7 @@ def find(v, w, epsOrK=None, antipodal=None):
   if isinstance(v, orientation) and w.size >= TREE_QUERIES and v.size * w.size >= TREE_PAIRS:
     return _findByTree(v, w, epsOrK)
   if isinstance(v, vector3d) and not v.isCrystalDirection and w.size >= TREE_QUERIES and v.size * w.size >= TREE_PAIRS:
-    w = w if isinstance(w, vector3d) else vector3d(w)
+    w = asVector3d(w)
     tree = S2Tree(v.flatten().data, (v.antipodal or w.antipodal) if antipodal is None else antipodal)
     xyz = w.flatten().data.reshape(-1, 3)
     if epsOrK is None:

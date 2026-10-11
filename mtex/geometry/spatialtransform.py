@@ -776,7 +776,8 @@ class spatialTransformList(list):
         rows += [(str(n) if k == 0 else "", T.shortChar() if k == 0 else "", S.shortChar(), S.paramChar()) for k, S in enumerate(stages)]
     labels = ("", "model", "stage", "parameters")
     w = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(4)]
-    line = lambda r: "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
+    def line(r):
+      return "  " + "  ".join(x.ljust(q) for x, q in zip(r, w)).rstrip()
     return aligned("\n".join([f"spatialTransform\n size: 1 × {len(self)}", "", line(labels)] + [line(r) for r in rows]))
 
 

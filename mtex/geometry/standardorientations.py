@@ -6,13 +6,15 @@ from __future__ import annotations
 
 import numpy as np
 
+from .frames import referenceFrame
+from .kernels import qconj
 from .frames import crystalFrame, specimenFrame
 from .install import install
 from .miller import Miller
 from .orientation import orientation
 from .quaternion import qmul, rotation
 from .symmetryops import projectIntoFundamentalRegionOrientation, symmetrise
-from .symreduce import _conj, reductionGroups, symReduce
+from .symreduce import reductionGroups, symReduce
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
 
@@ -32,7 +34,7 @@ def byMiller(hkl, uvw, *frames):
   symmetric equivalent of uvw closest to perpendicular to hkl; among those equally close
   the one closest to uvw itself, so the choice does not depend on the element order"""
   from .orientation import orientation
-  frames = [f for f in frames if hasattr(f, "sym")]
+  frames = [f for f in frames if isinstance(f, referenceFrame)]
   if not isinstance(hkl, vector3d):
     cs = frames.pop(0)
     hkl, uvw = Miller(*np.asarray(hkl, dtype=float), cs), Miller(*np.asarray(uvw, dtype=float), cs, "uvw")
@@ -170,10 +172,10 @@ def variants(p2c, second=None, ids=None, parent=False):
   par = projectIntoFundamentalRegionOrientation(second).data.reshape(-1, 4)
   vs = variants(p2c)
   if ids is None:
-    q = qmul(par[:, None, :], _conj(vs.data)[None, :, :])
+    q = qmul(par[:, None, :], qconj(vs.data)[None, :, :])
     return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameB, second.frameB)
   ids = np.asarray(ids).reshape(-1) - 1
-  return orientation(rotation._fromData(qmul(par, _conj(vs.data[ids]))), p2c.frameB, second.frameB)
+  return orientation(rotation._fromData(qmul(par, qconj(vs.data[ids]))), p2c.frameB, second.frameB)
 
 
 # MTEX's numbering of the 24 child variants of a cubic parent, Morito's for Kurdjumov-Sachs

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry._array import MtexArray
 from ..geometry.kernels import backend as kernelBackend, qmul
 from ..geometry.units import degree
@@ -85,7 +86,7 @@ def phaseGroups(CSList, dtype=np.float64):
 # the largest |<q_i, q_j g>| over the proper group of a frame, for pairs of rotations
 def _bestDot(fr, q1, q2):
   G = fr.sym.properGroup().rotations().data.reshape(-1, 4).astype(q1.dtype)
-  m = qmul(q2 * np.array([1, -1, -1, -1], dtype=q1.dtype), q1)
+  m = qmul(qconj(q2), q1)
   return np.max(np.abs(m @ G.T), axis=1)
 
 

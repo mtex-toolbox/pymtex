@@ -6,9 +6,6 @@ import numpy as np
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.display import display, sizeString
 
-__all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices"]
-
-
 class mesh3d:
   """polygons over vertices: V (n, 3), the faces as ptr/idx (face k is idx[ptr[k]:ptr[k+1]]),
   a colour per face (m, 3) in [0, 1] or one colour for all, the face and edge transparency"""
@@ -187,7 +184,8 @@ def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12)
   st, ct, sr, cr = (f.reshape(-1) for f in (np.sin(theta), np.cos(theta), np.sin(rho), np.cos(rho)))
   V = C[:, None] + Cc[:, None] * (st * cr)[None, :, None] + B[:, None] * (st * sr)[None, :, None] + A[:, None] * ct[None, :, None]
   i, j = np.meshgrid(np.arange(n), np.arange(m), indexing="ij")
-  node = lambda i, j: (i % n) * (m + 1) + j
+  def node(i, j):
+    return (i % n) * (m + 1) + j
   quad = np.stack([node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)], axis=-1).reshape(-1, 4)
   F = (quad[None] + (m + 1) * n * np.arange(k)[:, None, None]).reshape(-1, 4)
   col = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
@@ -334,3 +332,6 @@ def _subFaces(gB, faces):
   start = np.repeat(gB._ptr[faces], counts)
   j = np.arange(ptr[-1]) - np.repeat(ptr[:-1], counts)
   return ptr, gB._idx[start + j]
+
+
+__all__ = ["scene3d", "mesh3d", "slices3d", "picture3d", "lines3d", "arrows3d", "points3d", "ellipsoids3d", "grainMesh", "boundaryMesh", "volumeSlices"]

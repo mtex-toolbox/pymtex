@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..units import degree
-from ..vector3d import vector3d
+from ..vector3d import vector3d, asVector3d
 from ..display import display
 
 
@@ -52,7 +52,7 @@ class fibonacciS2Grid(vector3d):
 
   def neighbourIndices(self, v, eps):
     """the indices of the grid points within the angle eps of the direction v"""
-    d = (v if isinstance(v, vector3d) else vector3d(v)).normalize().data
+    d = asVector3d(v).normalize().data
     band = self._zBand(d[2], 2 * np.sin(eps / 2))
     return band[self.data[band] @ d >= np.cos(eps)]
 
@@ -63,7 +63,7 @@ class fibonacciS2Grid(vector3d):
       ind, d = S2G.find(v)
       I, d = S2G.find(v, eps)"""
     from .search import s2Tree
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:
       ind, d = s2Tree(self).nearest(xyz)

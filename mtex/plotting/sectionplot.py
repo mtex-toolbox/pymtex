@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..functions.so3funclass import SO3Fun
 from ..geometry.crystalshape import crystalShape
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
@@ -27,10 +28,6 @@ if TYPE_CHECKING:
 
 FIELD_COLOR = (0.72, 0.72, 0.72)
 OUTER_COLOR = (0.75, 0.75, 0.75)
-
-
-def _isSO3Fun(f):
-  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS") and not isinstance(f, orientation)
 
 
 # one cell per section, in a grid of the given width; the axis angle sections rescale
@@ -156,9 +153,9 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
   # a function on the sphere along a circle: the polar section
   from ..geometry.vector3d import vector3d
   from .mtexfigure import firstOfList
-  if _isSO3Fun(x):
+  if isinstance(x, SO3Fun):
     x = firstOfList(x)
-  if args and isinstance(args[0], vector3d) and not isinstance(x, orientation) and not _isSO3Fun(x):
+  if args and isinstance(args[0], vector3d) and not isinstance(x, orientation) and not isinstance(x, SO3Fun):
     from .polarplot import plotSectionS2
     return plotSectionS2(x, *args, **kw)
   kw.pop("verbose", None)
@@ -192,7 +189,7 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
     kw.pop(k, None)
   # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes
   decor = {k: kw.pop(k) for k in ("coordinates", "xlabel", "ylabel") if k in kw}
-  if _isSO3Fun(x):
+  if isinstance(x, SO3Fun):
     hs = _plotSectionFun(x, oS, **kw)
   elif shapes is not None:
     hs = _plotSectionShapes(x, shapes, oS, **kw)
@@ -264,7 +261,7 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
   lineWidth = kw.pop("lineWidth", lineWidth)
   fig, plots = _sectionAxes(oS, 0, axesKw, whereKw, onto=True)
   vs, sec, src = oS.sectionData(ori)
-  w = w if isinstance(w, vector3d) else vector3d(w)
+  w = asVector3d(w)
   ws = vector3d(np.broadcast_to(w.data.reshape(-1, 3), (ori.size, 3)) if w.size == 1 else w.data.reshape(-1, 3))
   hs = []
   for k, cell in enumerate(plots):
@@ -287,7 +284,7 @@ def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degre
   oS = next((a for a in args if isinstance(a, ODFSections)), None)
   held = gcm()
   if oS is None:
-    oS = getattr(held, "sections", None) if held is not None and held.hold else None
+    oS = held.sections if held is not None and held.hold else None
   if oS is None:
     oS = newODFSectionPlot(F.CS, F.SS, next((a for a in args if isinstance(a, str)), None))
   if not isinstance(oS, (eulerSections, pfSections)):
@@ -435,9 +432,6 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
   return hs
 
 
-__all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection", "quiverSectionField"]
-
-
 def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False, **kw: Unpack[PlotKeywords]):
   """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
   the sections of orientation space, MATLAB @orientationColorKey/plot"""
@@ -469,3 +463,6 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
         for j0, j1 in _blocks(X):
           hs.append(sP.ax.pcolormesh(X[:, j0:j1], Y[:, j0:j1], rgba[:, j0:j1], shading="nearest", zorder=2))
   return hs
+
+
+__all__ = ["plotKeySections", "plotSection", "plotSections", "annotateSection", "plotFibreSection", "quiverSection", "quiverSectionField"]

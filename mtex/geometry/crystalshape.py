@@ -21,23 +21,19 @@ from itertools import combinations
 
 import numpy as np
 
+from .representations import unitRows
 from ._array import MtexArray
 from .data.crystalshapes import CRYSTAL_SHAPES
 from .frames import crystalFrame
 from .miller import Miller
 from .symmetryops import _images
-from .vector3d import vector3d
+from .vector3d import vector3d, asVector3d
 from .install import install
 
 # a face lies where dot(v, n) = 1, up to this
 FACE_TOL = 1e-8
 # a face is selected by a normal within this angle of its own
 SELECT_ANGLE = np.pi / 180
-
-
-def _unit(a):
-  n = np.linalg.norm(a, axis=-1, keepdims=True)
-  return a / np.where(n == 0, 1, n)
 
 
 # the first of every cluster of rows closer than tol
@@ -100,7 +96,7 @@ class crystalShape:
   __array_ufunc__ = None
 
   def __init__(self, N, habitus=0, extension=(1, 1, 1)):
-    N = N if isinstance(N, vector3d) else vector3d(N)
+    N = asVector3d(N)
     if not N.isCrystalDirection:
       raise ValueError("the face normals of a crystal shape are Miller indices")
     self.N = N.flatten()
@@ -125,7 +121,7 @@ class crystalShape:
     V = V / (2 * np.max(np.linalg.norm(V, axis=1)))
     self.V = vector3d(V, frame=self.N.frame, dispStyle="xyz")
     self.F = _padFaces(faces)
-    self._faceN0 = _unit(normals[bounding])
+    self._faceN0 = unitRows(normals[bounding])
     self._form = form[bounding]
 
   # the same shape over other vertices, or other faces
@@ -173,8 +169,8 @@ class crystalShape:
   def subSet(self, NSelect):
     """the faces whose outward normal is within a degree of one of the given normals, in
     crystal coordinates as the shape was built"""
-    NSelect = NSelect if isinstance(NSelect, vector3d) else vector3d(NSelect)
-    sel = _unit(NSelect.data.reshape(-1, 3))
+    NSelect = asVector3d(NSelect)
+    sel = unitRows(NSelect.data.reshape(-1, 3))
     ind = np.any(self._faceN0 @ sel.T > np.cos(SELECT_ANGLE), axis=1)
     if not np.any(ind):
       raise ValueError("no face of the shape has one of the given normals")
@@ -228,7 +224,7 @@ class crystalShape:
 
   def faceNormal(self):
     """the outward unit normal of every face, where the shape stands"""
-    return vector3d(self._single(_unit(self._faceVectors())), **self._attrs())
+    return vector3d(self._single(unitRows(self._faceVectors())), **self._attrs())
 
   @property
   def faceArea(self):
@@ -249,7 +245,7 @@ class crystalShape:
     c = V.mean(axis=1)[:, None, :]
     fv = self._faceVectors()
     fc = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
-    return self._single(np.sum(np.sum((fc - c) * _unit(fv), axis=-1) * np.linalg.norm(fv, axis=-1), axis=1) / 3)
+    return self._single(np.sum(np.sum((fc - c) * unitRows(fv), axis=-1) * np.linalg.norm(fv, axis=-1), axis=1) / 3)
 
   @property
   def diameter(self):

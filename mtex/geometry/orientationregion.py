@@ -309,7 +309,8 @@ def projectIntoEulerRegion(o):
 def _zFolds(frA, frB):
   from .orientation import orientation
   L, R = reductionGroups(orientation(rotation(), frA, frB))
-  aboutZ = lambda q: np.sum((quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[:, 2]) > 1 - 1e-8))
+  def aboutZ(q):
+    return np.sum((quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[:, 2]) > 1 - 1e-8))
   return 2 * np.pi / aboutZ(L), 2 * np.pi / aboutZ(R), L, R
 
 
@@ -332,7 +333,8 @@ def eulerRegion(frA, frB=None):
   psi1, psi2 = perp(R), perp(L)
   if len(psi1) == 0 and len(psi2) == 0:
     return (maxPhi1, float(np.pi), maxPhi2)
-  folds = lambda ps, Lp: np.any(np.abs(np.remainder(2 * ps + Lp / 2, Lp) - Lp / 2) < 1e-8)
+  def folds(ps, Lp):
+    return np.any(np.abs(np.remainder(2 * ps + Lp / 2, Lp) - Lp / 2) < 1e-8)
   if len(psi1) and len(psi2):
     if folds(psi2, maxPhi1):
       maxPhi1 /= 2

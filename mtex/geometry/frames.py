@@ -22,6 +22,7 @@ import warnings
 
 import numpy as np
 
+from .representations import unitRows
 from .crystalaxes import alignment as _alignment, crystalAxes, isAlignment, reciprocalAxes
 from .data.pointgroupnames import LAUE_CLASSES, POINT_GROUP_NAMES, findPointGroup, hm2point, isPointGroupName, monoclinicSetting
 from .display import display, header, numString
@@ -345,8 +346,8 @@ class referenceFrame:
     """the transition matrix taking coordinates in this frame to coordinates in the other,
     on normalised bases: with the unit axes as rows, inv(B) A is the rotation between the
     two settings of one lattice"""
-    A = _unitRows(self._basis)
-    B = _unitRows(other._basis)
+    A = unitRows(self._basis)
+    B = unitRows(other._basis)
     return np.linalg.inv(B) @ A
 
   def isCompatible(self, other, tol=None):
@@ -428,7 +429,7 @@ class referenceFrame:
       return ""
     if self._axesNames == ("X", "Y", "Z"):
       return pC.char()
-    dirs = vector3d(_unitRows(self._basis))
+    dirs = vector3d(unitRows(self._basis))
     iN, ud = _matchSigned(pC.north, dirs)
     iE, lr = _matchSigned(pC.east, dirs)
     if iN is None or iE is None:
@@ -463,10 +464,6 @@ def _basisArray(v):
   if isinstance(v, vector3d):
     return v.data.reshape(3, 3).copy()
   return np.asarray(v, dtype=float).reshape(3, 3).copy()
-
-
-def _unitRows(M):
-  return M / np.linalg.norm(M, axis=1, keepdims=True)
 
 
 # which of the directions a vector is, and with which sign
@@ -756,8 +753,8 @@ class crystalFrame(referenceFrame):
   def transformationMatrix(self, other):
     """between crystal frames the axes are first re-paired by nearest length when the cells
     disagree, which is how the monoclinic settings 121 and 112 relate"""
-    A = _unitRows(self._basis)
-    B = _unitRows(other._basis)
+    A = unitRows(self._basis)
+    B = unitRows(other._basis)
     if isinstance(other, crystalFrame):
       la, lb = self.abc, other.abc
       if not np.all(np.abs(la - lb) / np.sum(la) < 0.01):
@@ -776,7 +773,7 @@ class crystalFrame(referenceFrame):
     pC = self.how2plot if pC is None else pC
     if pC is None:
       return ""
-    dirs = vector3d(np.concatenate([_unitRows(self._basis), _unitRows(reciprocalAxes(self._basis))]))
+    dirs = vector3d(np.concatenate([unitRows(self._basis), unitRows(reciprocalAxes(self._basis))]))
     names = list(self._axesNames) + [n + "*" for n in self._axesNames]
     out, east = _matchAxis(pC.outOfScreen, dirs, names), _matchAxis(pC.east, dirs, names)
     if not out or not east:
@@ -965,8 +962,6 @@ def withGroup(fr, group):
 
 # the constructors answer with the registered instance: the object built is discarded
 def _answerRegistered(cls):
-  new = cls.__new__
-
   # the signature help() and the completion read is that of __init__
   @functools.wraps(cls.__init__, assigned=())
   def __new__(klass, *args, **kwargs):
@@ -1063,14 +1058,14 @@ def closestAlignment(CS):
   key = (CS.pointGroup, np.round(CS._basis, 9).tobytes())
   if key in _CLOSEST_ALIGNMENT:
     return list(_CLOSEST_ALIGNMENT[key])
-  n = _unitRows(CS._basis)
+  n = unitRows(CS._basis)
   best, at = None, None
   for setup in ALIGNMENT_SETUPS:
     try:
       fr = crystalFrame(CS.pointGroup, CS.abc, CS.abg, *setup, intern=False, check=False)
     except Exception:
       continue
-    d = float(np.max(np.abs(_unitRows(fr._basis) - n)))
+    d = float(np.max(np.abs(unitRows(fr._basis) - n)))
     if best is None or d < best - 1e-9:
       best, at = d, list(setup)
   _CLOSEST_ALIGNMENT[key] = tuple(at) if at is not None else None

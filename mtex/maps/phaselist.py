@@ -169,7 +169,8 @@ def phaseTable(frames, ids, counts=None, countLabel="Orientations"):
     rows.append(row)
   labels = ["Phase"] + ([countLabel] if counts is not None else []) + ["Mineral", "Color", "Symmetry", "Crystal reference frame"]
   widths = [max(len(labels[j]), *(len(r[j]) for r in rows)) if rows else len(labels[j]) for j in range(len(labels))]
-  line = lambda r: ("  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))).rstrip()
+  def line(r):
+    return ("  " + "  ".join(str(x).ljust(w) for x, w in zip(r, widths))).rstrip()
   return "\n".join([line(labels)] + [line(r) for r in rows])
 
 

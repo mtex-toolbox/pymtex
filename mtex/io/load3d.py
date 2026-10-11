@@ -116,7 +116,7 @@ def _loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
     cs = ["notIndexed", CS] if isinstance(CS, crystalFrame) else CS if CS is not None else _xnovoPhases(f)
   origin = center - (np.array(shape) - 1) * spacing / 2
   e = EBSD3square(rot, phase, cs if isinstance(cs, phaseList) else phaseList(cs), spacing, origin=origin, prop=prop)
-  object.__setattr__(e, "scanUnit", "mm")
+  e.scanUnit = "mm"
   return e
 
 

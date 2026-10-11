@@ -71,7 +71,7 @@ def orientFaces(grains):
   gB = gB.flip(np.flatnonzero(swapped))
   other = np.flatnonzero(changed & ~swapped)
   if len(other):
-    from ..geometry.kernels import qmul
+    from ..geometry.kernels import qconj, qmul
     pos = np.zeros(int(max(grains.id.max(initial=0), new.max(initial=0))) + 1, dtype=np.int64)
     pos[grains.id] = np.arange(len(grains))
     g = new[other]
@@ -82,7 +82,7 @@ def orientFaces(grains):
     mori = gB.misrotation.data.reshape(-1, 4)
     both = np.all(g > 0, axis=1)
     mori[other] = np.nan
-    mori[other[both]] = qmul(q[pos[g[both, 1]]] * np.array([1, -1, -1, -1]), q[pos[g[both, 0]]])
+    mori[other[both]] = qmul(qconj(q[pos[g[both, 1]]]), q[pos[g[both, 0]]])
   return grains._new(np.arange(len(grains)), I, gB)
 
 

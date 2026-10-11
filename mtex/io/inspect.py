@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -21,8 +20,9 @@ from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
 from ..geometry.display import aligned
+from .load import VENDOR_FORMATS
 
-EBSD_EXTENSIONS = (".ang", ".ctf", ".cpr", ".crc", ".osc", ".h5", ".h5oina", ".oh5", ".edaxh5", ".hdf5", ".hdf")
+EBSD_EXTENSIONS = tuple("." + ext for ext in VENDOR_FORMATS)
 CHUNK = 1 << 18
 HEAD_LIMIT = 1 << 26
 
@@ -128,16 +128,16 @@ def inspectEBSD(path):
     inspectEBSD('map.h5oina')  and the data sets a project file holds
   """
   path = os.fspath(path)
-  ext = os.path.splitext(path)[1].lower()
-  if ext == ".ang":
+  fmt = VENDOR_FORMATS.get(os.path.splitext(path)[1].lower().lstrip("."))
+  if fmt == "ang":
     info = _inspectAng(path)
-  elif ext == ".ctf":
+  elif fmt == "ctf":
     info = _inspectCtf(path)
-  elif ext in (".cpr", ".crc"):
+  elif fmt == "crc":
     info = _inspectCpr(path)
-  elif ext == ".osc":
+  elif fmt == "osc":
     info = _inspectOsc(path)
-  elif ext in (".h5", ".h5oina", ".oh5", ".edaxh5", ".hdf5", ".hdf"):
+  elif fmt == "h5":
     info = _inspectH5(path)
   else:
     raise ValueError(f"{path} has no extension of an EBSD file; they are {', '.join(EBSD_EXTENSIONS)}")
@@ -285,96 +285,57 @@ def _inspectOsc(path):
 
 def _inspectH5(path):
   import h5py
-  from .h5 import (H5Scope, _floats, h5DataSets, h5Header, h5MapCorrection, h5One, h5Paths, h5Phases, h5Surface,
-                   h5Value, h5Vendor, hdf5Configs, loadedField, relativeTo)
-  from .ang import eulerCorrectionRotation
+  from .h5 import _floats, h5Reader, loadedField
   with h5py.File(path, "r") as f:
-    paths, groups = h5Paths(f)
-    vendor = h5Vendor(f, paths, path)
-    if vendor is None:
-      raise ValueError(f"{path} names no manufacturer any config claims; the configs are {', '.join(sorted(hdf5Configs()))}")
-    name, conf = vendor
-    sets = h5DataSets(paths, conf)
-    if not sets:
-      raise ValueError(f"{path} holds no data set the {name} config recognises")
-    chosen = sets[0]
-    scope = H5Scope(chosen, chosen, chosen.rsplit("/", 1)[0] or "/")
-    ebsd = conf["ebsd"]
-    phases, _ = h5Phases(f, paths, groups, conf, scope)
-    header = h5Header(f, paths, groups, scope)
-    info = EBSDFileInfo(path, os.path.splitext(path)[1].lstrip("."), name, 0, _headerDate(header), phases, header=header)
-    info.dataSets = [p.strip("/") for p in sets]
+    r = h5Reader(f, path)
+    r.choose()
+    ebsd, groups = r.ebsd, r.groups
+    phases, _ = r.phases()
+    header = r.header()
+    info = EBSDFileInfo(path, os.path.splitext(path)[1].lstrip("."), r.name, 0, _headerDate(header), phases, header=header)
+    info.dataSets = [p.strip("/") for p in r.sets]
     # the count off the shape of a data set, the grid off the header, the step off the config;
     # what the loader reads as the map is not a property
     pos = ebsd["position"]
     rot = ebsd["rotation"]
     eu = {} if rot.get("type", "euler") == "byMatrix" else rot.get(rot.get("type", "euler"), rot.get("euler", {}))
-    used = set()
     for entry in [ebsd["phase"]] + ([pos["direct"]["x"], pos["direct"]["y"]] if pos.get("type", "direct") == "direct" else []) \
         + [eu[k] for k in ("phi", "phi1", "Phi", "phi2") if k in eu]:
-      p = h5One(paths, entry, scope)
-      if p is not None:
-        used.add(p)
-        if info.points is None and p not in groups:
-          info.points = int(np.prod(f[p].shape[:1])) if eu.get("phi") is entry and f[p].ndim > 1 and f[p].shape[-1] == 3 else int(np.prod(f[p].shape))
+      p = r.remember(entry)
+      if p is not None and info.points is None and p not in groups:
+        info.points = int(np.prod(f[p].shape[:1])) if eu.get("phi") is entry and f[p].ndim > 1 and f[p].shape[-1] == 3 else int(np.prod(f[p].shape))
     if pos.get("type", "direct") != "direct":
       ind = pos["indirect"]
-      nx, ny = h5Value(f, paths, ind["grid_size_x"], scope), h5Value(f, paths, ind.get("grid_size_y"), scope)
-      dx, dy = h5Value(f, paths, ind["step_size_x"], scope), h5Value(f, paths, ind["step_size_y"], scope)
+      nx, ny = r.value(ind["grid_size_x"]), r.value(ind.get("grid_size_y"))
       if nx is not None and ny is not None:
         info.grid = (int(_floats(nx)[0]), int(_floats(ny)[0]))
         if info.points is None:
           info.points = info.grid[0] * info.grid[1]
+      dx = r.number(ind["step_size_x"])
       if dx is not None:
-        dx = float(_floats(dx)[0])
-        info.step = (dx, float(_floats(dy)[0]) if dy is not None else dx)
+        info.step = (dx, r.number(ind["step_size_y"], dx))
     uc = ebsd.get("unitCell")
     if info.step is None and isinstance(uc, dict) and uc.get("type") == "fromStep":
-      sx, sy = h5Value(f, paths, uc["step_size_x"], scope), h5Value(f, paths, uc["step_size_y"], scope)
+      sx, sy = r.number(uc["step_size_x"]), r.number(uc["step_size_y"])
       if sx is not None and sy is not None:
-        info.step = (float(_floats(sx)[0]), float(_floats(sy)[0]))
+        info.step = (sx, sy)
     if info.grid is None:
       nx, ny = _find(header, ("ncols", "ncolumns", "x cells", "xcells")), _find(header, ("nrows", "y cells", "ycells"))
       if _isNumber(nx) and _isNumber(ny):
         info.grid = (int(_floats(nx)[0]), int(_floats(ny)[0]))
         if info.points is None:
           info.points = info.grid[0] * info.grid[1]
-    # the properties: every per pixel data set of the additions group and the fields of a table
-    n = info.points
-    add = conf.get("additions")
-    if isinstance(add, dict) and n:
-      excluded = [re.compile(str(e)) for e in add.get("exclude", {}).get("data", [])]
-      for g in (add["group"] if isinstance(add["group"], list) else [add["group"]]):
-        root = h5One(paths, g, scope)
-        if root is None:
-          continue
-        for p in paths:
-          if not p.startswith(root + "/") or p in groups or p in used:
-            continue
-          fieldName = relativeTo(p, root + "/")
-          if any(e.search(fieldName) for e in excluded):
-            continue
-          d = f[p]
-          if d.size != n or d.dtype.kind not in "iufb":
-            continue
-          key = fieldName.replace(" ", "").replace("/", "").lower()
-          if key not in info.properties:
-            info.properties.append(key)
+    # the properties: every per pixel data set of the additions groups and the fields of a table
+    if info.points:
+      info.properties += [k for k in r.additions(info.points) if k not in info.properties]
     table = ebsd.get("ebsd_data")
-    if table is not None:
-      p = h5One(paths, table, scope)
-      if p is not None and f[p].dtype.names:
-        taken = (loadedField(rot), loadedField(ebsd["phase"]))
-        info.properties += [k.replace(" ", "").lower() for k in f[p].dtype.names if k not in taken and f[p].dtype[k].ndim == 0 or False]
-        if info.points is None:
-          info.points = int(np.prod(f[p].shape))
-    correction = h5MapCorrection(f, paths, conf, scope)
-    surface = h5Surface(f, paths, conf, scope)
-    if surface is not None and (abs(surface[1]) > 1e-6 or abs(surface[2]) > 1e-6):
-      correction = correction * rotation.byEuler(0.0, surface[1] * degree, surface[2] * degree, "Bunge").inv()
-    if name.startswith("EDAX") and correction.angle() < 1e-9:
-      correction = eulerCorrectionRotation(2)
-    info.eulerCorrection = correction
+    p = None if table is None else r.one(table)
+    if p is not None and f[p].dtype.names:
+      taken = (loadedField(rot), loadedField(ebsd["phase"]))
+      info.properties += [k.replace(" ", "").lower() for k in f[p].dtype.names if k not in taken and f[p].dtype[k].ndim == 0]
+      if info.points is None:
+        info.points = int(np.prod(f[p].shape))
+    info.eulerCorrection = r.correction()
   return info
 
 

@@ -16,7 +16,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
-from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly
+from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly, scanGrid
 from .table import headerDict, leadingLines, linesFrom, readFile, readTable, text
 
 
@@ -119,12 +119,12 @@ def _loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   xs, ys, nx, ny = (header.get(k) for k in ("XStep", "YStep", "XCells", "YCells"))
   steps = isinstance(xs, float) and isinstance(ys, float) and xs > 0 and ys > 0
   unitCell = regularPoly(4, [xs, ys]) if steps else None
-  scanGrid = (nx, ny, xs, ys) if steps and isinstance(nx, float) and isinstance(ny, float) else None
+  grid = scanGrid(nx, ny, xs, ys) if steps and isinstance(nx, float) and isinstance(ny, float) else None
   meta = {"header": header, "surface": acq}
   # Channel always numbers from one with zero for a pixel that was not indexed
   return ebsdFromColumns(at["x"], at["y"], at["euler1"] * degree, at["euler2"] * degree, at["euler3"] * degree,
                          at["phase"], phases, props, eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame,
-                         meta=meta, shift=0, unitCell=unitCell, scanGrid=scanGrid)
+                         meta=meta, shift=0, unitCell=unitCell, scanGrid=grid)
 
 
 __all__ = []

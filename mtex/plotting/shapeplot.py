@@ -14,7 +14,7 @@ from ..geometry.kernels import columnMax, columnMin
 from ..geometry.crystalshape import crystalShape
 from ..geometry.session import getMTEXpref
 from ..geometry.slipsystem import slipSystem
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .colormaps import mtexColormap
 from .keywords import refuseVariants
 from .mtexfigure import gcm
@@ -218,7 +218,7 @@ def _facePolygons(cS, V):
 def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, displayName=None, **kw: Unpack[PlotKeywords]):
   """plotInnerFace(cS, N): the section of the shape by the lattice plane N through its centre"""
   from matplotlib.colors import to_rgba
-  N = N if isinstance(N, vector3d) else vector3d(N)
+  N = asVector3d(N)
   kind, target = _target(cS, kw)
   polys = []
   for n in (N.flatten() if N.ndim > 0 else [N]):
@@ -247,7 +247,7 @@ def _arrow(kind, target, cS, d, color, lineWidth, label=None):
 
 def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, displayName=None, **kw: Unpack[PlotKeywords]):
   """plotInnerDirection(cS, d): the crystal direction d as an arrow inside the shape"""
-  d = d if isinstance(d, vector3d) else vector3d(d)
+  d = asVector3d(d)
   kind, target = _target(cS, kw)
   lw = lineWidth if arrowWidth is None else 40 * arrowWidth
   hs = [_arrow(kind, target, cS, v, faceColor, lw, displayName) for v in (d.flatten() if d.ndim > 0 else [d])]

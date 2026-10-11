@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.arguments import refuseFlags
 from ..geometry.kernels import backend, closestImage, qmul
 from ..geometry.orientation import orientation
@@ -32,9 +33,6 @@ from ..geometry.install import install
 
 IDENTITY = np.array([[1.0, 0.0, 0.0, 0.0]])
 
-
-def _conj(q):
-  return q * np.array([1, -1, -1, -1], dtype=q.dtype)
 
 
 # ------------------------------------------------------------------ the neighbourhood
@@ -119,7 +117,7 @@ class mapPairs:
 
   def tangentTo(self, a, b):
     """the left tangent vector pointing from a to b, in specimen coordinates"""
-    return rotationVector(qmul(self.closest(a, b), _conj(self.rot[a])))
+    return rotationVector(qmul(self.closest(a, b), qconj(self.rot[a])))
 
   def misAngle(self, a, b):
     """the misorientation angle of a pair, from the chord to the closest element"""
@@ -411,7 +409,7 @@ def calcGROD(ebsd, grains=None, rotRef=None):
   if out is None:
     out = np.full((n, 4), np.nan)
     img = closestImage(rot[ind], ref[ind], IDENTITY, G)[1]
-    out[ind] = qmul(_conj(img), rot[ind])
+    out[ind] = qmul(qconj(img), rot[ind])
   return orientation._fromRotation(out.reshape(ebsd.shape + (4,)), (cs, cs))
 
 
@@ -499,7 +497,7 @@ def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rn
   keep = np.linalg.norm(P1[i1] - P2[i2], axis=1) > d0
   i1, i2 = i1[keep], i2[keep]
   # inv(o1) * o2 as MATLAB's o1 .\ o2: the second crystal's coordinates into the first's
-  q = qmul(_conj(ebsd.rotations.data.reshape(-1, 4)[i1].astype(float)), other.rotations.data.reshape(-1, 4)[i2].astype(float))
+  q = qmul(qconj(ebsd.rotations.data.reshape(-1, 4)[i1].astype(float)), other.rotations.data.reshape(-1, 4)[i2].astype(float))
   cs1, cs2 = ebsd.CSList[p1], other.CSList[p2]
   return orientation._fromRotation(q, (cs2, cs1), antipodal=cs1 is cs2)
 

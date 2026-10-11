@@ -61,7 +61,8 @@ class simulateEBSD:
     self.rng = None
 
   def __repr__(self):
-    fmt = lambda v: "(" + ", ".join(f"{x:g}" for x in np.round(np.asarray(v.data, dtype=float).reshape(-1)[:3], 4) + 0.0) + ")"
+    def fmt(v):
+      return "(" + ", ".join(f"{x:g}" for x in np.round(np.asarray(v.data, dtype=float).reshape(-1)[:3], 4) + 0.0) + ")"
     rows = [("xdim", f"{self.xdim:g}"), ("ydim", f"{self.ydim:g}"), ("stepSize", f"{self.stepSize:g}"),
             ("CS", f"{self.CS.pointGroup} ({self.CS.mineral})"), ("noiseFun", repr(self.noiseFun)),
             ("noiseMax", f"{self.noiseMax / degree:g}°"), ("axS", fmt(self.axS)), ("gradDir", fmt(self.gradDir)),

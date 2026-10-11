@@ -26,6 +26,7 @@ from types import SimpleNamespace
 import numpy as np
 from scipy.special import erf
 
+from ..geometry.kernels import qconj
 from .grains import _idPositions
 from ..geometry.orientation import orientation
 from ..geometry.parent2child import calcParent, calcParent2Child, calcVariantId, round2Miller
@@ -34,9 +35,6 @@ from ..geometry.units import degree
 from .phaselist import phaseList
 from ..geometry.display import aligned
 
-
-def _conj(q):
-  return q * np.array([1.0, -1, -1, -1])
 
 
 def _ori(q, frameA, frameB):
@@ -228,11 +226,11 @@ def _registerGrains(grains, pl):
   if grains.CSList is pl:
     return grains
   out = grains.copy()
-  object.__setattr__(out, "CSList", pl)
+  out.CSList = pl
   for name in ("boundary", "innerBoundary"):
     gB = getattr(out, name)
     if gB is not None:
-      object.__setattr__(out, name, gB._with(CSList=pl))
+      setattr(out, name, gB._with(CSList=pl))
   return out
 
 
@@ -357,7 +355,7 @@ class parentGrainReconstructor:
   def c2c(self):
     """the child to child misorientations of the relationship, the identity included"""
     V = self.p2c.variants().data.reshape(-1, 4)
-    return _ori(qmul(self.p2c.data.reshape(1, 4), _conj(V)), self.csChild, self.csChild)
+    return _ori(qmul(self.p2c.data.reshape(1, 4), qconj(V)), self.csChild, self.csChild)
 
   # ------------------------------------------------------------------ the state
 
@@ -465,8 +463,8 @@ class parentGrainReconstructor:
   # the grains after a change of mean orientations and phases, the boundary phases updated
   def _setGrains(self, idx, q, phase):
     g = self.grains.copy()
-    object.__setattr__(g, "meanRotation", g.meanRotation._new(g.meanRotation.data.copy()))
-    object.__setattr__(g, "phaseId", g.phaseId.copy())
+    g.meanRotation = g.meanRotation._new(g.meanRotation.data.copy())
+    g.phaseId = g.phaseId.copy()
     g.meanRotation.data.reshape(-1, 4)[idx] = q
     g.phaseId[idx] = phase
     self.grains = g.update()
@@ -866,8 +864,8 @@ class parentGrainReconstructor:
     ph[npos[doPrior]] = prior.phaseId[doPrior]
     q[npos[~doPrior]] = g.meanRotation.data.reshape(-1, 4)[at[~doPrior]]
     ph[npos[~doPrior]] = g.phaseId[at[~doPrior]]
-    object.__setattr__(merged, "meanRotation", merged.meanRotation._new(q))
-    object.__setattr__(merged, "phaseId", ph)
+    merged.meanRotation = merged.meanRotation._new(q)
+    merged.phaseId = ph
     self.grains = merged.update()
     self.mergeId = parent.astype(np.int64)
 
@@ -901,7 +899,7 @@ class parentGrainReconstructor:
     vId, pId, _, fit = calcVariantId(_ori(pm, self.csParent, fr), _ori(child, self.csChild, fr), self.p2c)
     V = self.p2c.variants().data.reshape(-1, 4)
     pfr = _ori(pm, self.csParent, fr).projectIntoFundamentalRegion().data.reshape(-1, 4)
-    q = qmul(qmul(pfr, _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    q = qmul(qmul(pfr, qconj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
     fit = np.asarray(fit, dtype=float)
     vId = self._mapVariants(vId)
     pId = np.asarray(pId, dtype=float)
@@ -931,7 +929,7 @@ class parentGrainReconstructor:
       full[tr] = val
       setattr(self.grainsPrior, name, full)
     V = self.p2c.variants().data.reshape(-1, 4)
-    q = qmul(qmul(parent.projectIntoFundamentalRegion().data.reshape(-1, 4), _conj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    q = qmul(qmul(parent.projectIntoFundamentalRegion().data.reshape(-1, 4), qconj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
     self._setGrains(at, q, self.parentPhaseId)
 
   def parent2ChildInfo(self):
@@ -944,7 +942,7 @@ class parentGrainReconstructor:
     n1, n2, d1, d2 = round2Miller(p2c, maxIndex=8)
     rational = orientation.map(n1, n2, d1, d2)
     V = p2c.variants()
-    c2c = _ori(qmul(V.data.reshape(-1, 4), _conj(V.data.reshape(-1, 4)[:1])), self.csChild, self.csChild)
+    c2c = _ori(qmul(V.data.reshape(-1, 4), qconj(V.data.reshape(-1, 4)[:1])), self.csChild, self.csChild)
     OR = SimpleNamespace(p2c=p2c, p2cRational=rational, plane=SimpleNamespace(parent=n1, child=n2),
                          direction=SimpleNamespace(parent=d1, child=d2),
                          devAngle=SimpleNamespace(plane=float(np.min(np.asarray((p2c * n1.symmetrise()).angle(n2)))),

@@ -11,14 +11,16 @@
 from __future__ import annotations
 
 import copy
+from functools import cached_property
 from typing import TYPE_CHECKING
+
 import numpy as np
 from scipy import sparse
 
 from ..orientation import orientation
 from ..quaternion import qmul, rotation
+from ..kernels import qconj, regionMembership
 from ..representations import euler2quat, quatAngle, quatAxis
-from ..kernels import regionMembership
 from ..symreduce import reductionGroups
 from ..units import degree
 from ..vector3d import vector3d, zvector
@@ -129,18 +131,22 @@ class SO3Grid(orientation):
     from .orientationtree import orientationTree
     if backend() != "numba" or not isinstance(o, orientation) or o.frameA is not self.frameA or o.frameB is not self.frameB:
       return orientationTree(self).radius(o, eps)
-    from .gridsearch import flatSO3, so3Radius
-    if getattr(self, "_flat", None) is None:
-      L, R = reductionGroups(self)
-      self._flat = flatSO3(self), _cosetReps(L, left=True), _cosetReps(R, left=False), int(np.sum(_isAboutZ(L)))
-    flat, Lr, Rr, nZL = self._flat
-    conj = np.array([1.0, -1.0, -1.0, -1.0])
-    c, q = self.center.data.reshape(4) * conj, o.data.reshape(-1, 4)
-    Q = qmul(c, np.stack([q, q * conj], axis=1) if o.antipodal else q[:, None, :])
+    from .gridsearch import so3Radius
+    flat, Lr, Rr, nZL = self._searchTables
+    c, q = qconj(self.center.data.reshape(4)), o.data.reshape(-1, 4)
+    Q = qmul(c, np.stack([q, qconj(q)], axis=1) if o.antipodal else q[:, None, :])
     indptr, cols, vals = so3Radius(flat, Q, Lr, Rr, nZL, eps)
     shape = (len(q), self.size)
     return (sparse.csr_matrix((np.ones(len(cols), dtype=bool), cols, indptr), shape=shape),
             sparse.csr_matrix((vals, cols.copy(), indptr.copy()), shape=shape))
+
+  # the ladders of the grid and the coset representatives of its groups, for the structured
+  # radius search
+  @cached_property
+  def _searchTables(self):
+    from .gridsearch import flatSO3
+    L, R = reductionGroups(self)
+    return flatSO3(self), _cosetReps(L, left=True), _cosetReps(R, left=False), int(np.sum(_isAboutZ(L)))
 
   def __repr__(self):
     return display(header("SO3Grid", self._frameSummary()), [("size", self.size), ("resolution", f"{self.res / degree:.4g}°")])
@@ -260,8 +266,7 @@ def _regionMembership(oR, rot, zL, zR, delta):
   band = np.sin(delta / 2) + 1e-3
   if oR.sector is None:
     # dot(l q r, n) = dot(q, l* n r*): the normals turned, one product for every copy
-    conj = np.array([1.0, -1.0, -1.0, -1.0])
-    N = qmul(qmul((zL * conj)[:, None, None], oR.N[None, None]), (zR * conj)[None, :, None]).reshape(-1, 4)
+    N = qmul(qmul(qconj(zL)[:, None, None], oR.N[None, None]), qconj(zR)[None, :, None]).reshape(-1, 4)
     return regionMembership(rot, N, len(zL) * len(zR), 1e-3, band)   # checkInside's tolerance
   keep = np.zeros(len(rot), dtype=bool)
   for l in zL:

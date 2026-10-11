@@ -138,3 +138,8 @@ def test_quat2mat_ofManyQuaternionsAgreesWithNumpy():
     assert np.allclose(M, quat2mat(q), rtol=0, atol=1e-14)
   finally:
     setMTEXpref("kernels", "numba")
+
+
+def test_unitRows_scalesRowsToUnitLengthAndLeavesZeroRowsZero():
+  from mtex.geometry.representations import unitRows
+  assert np.allclose(unitRows([[3.0, 4.0, 0.0], [0.0, 0.0, 0.0]]), [[0.6, 0.8, 0.0], [0.0, 0.0, 0.0]])

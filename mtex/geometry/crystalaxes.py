@@ -14,6 +14,7 @@ import re
 
 import numpy as np
 
+from .representations import unitRows
 from ._array import MtexArray
 
 from .latticetype import latticeType
@@ -103,10 +104,6 @@ def latticeDirection(token, axes, dual):
     raise ValueError(f"unknown lattice direction '{token}'") from None
 
 
-def _unit(v):
-  return v / np.linalg.norm(v)
-
-
 def alignAxes(axes, alignment):
   """the axes turned into the requested alignment"""
   spec = dict(parseAlignment(s) for s in alignment)
@@ -126,7 +123,7 @@ def alignAxes(axes, alignment):
     if k not in dirs:
       p, q = cyc[k]
       dirs[k] = np.cross(dirs[p], dirs[q])
-  M = np.array([_unit(dirs[k]) for k in ("X", "Y", "Z")])   # rows: the new x, y, z in old coordinates
+  M = np.array([unitRows(dirs[k]) for k in ("X", "Y", "Z")])   # rows: the new x, y, z in old coordinates
   if np.linalg.norm(M @ M.T - np.eye(3)) >= 1e-6:
     raise ValueError("bad alignment options: the requested axes are not orthogonal")
   if np.linalg.det(M) < 0:

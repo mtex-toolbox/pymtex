@@ -13,6 +13,8 @@
 # The quaternion k-d tree of orientationtree.py is its fallback and oracle.
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import numpy as np
 
 from ..kernels import _jit, _parallelKernel, heapBlocks, threads
@@ -252,6 +254,22 @@ def _so3RadiusLoop(Q, Lr, Rr, ringBeta, ringOff, ringAlpha, ringNode, ringMin, n
         best[touched[u]] = -1.0
 
 
+class flatSO3Grid(NamedTuple):
+  """the ladders of an equispaced SO(3) grid as flat arrays, in the order the compiled search takes them"""
+  theta: np.ndarray        # the polar angle per ring
+  ringOff: np.ndarray      # the first node of every ring, and the end
+  ringAlpha: np.ndarray    # the alpha of the nodes, folded and sorted within their ring
+  ringNode: np.ndarray     # the node of every sorted alpha
+  ringMin: np.ndarray      # the lower end of the alpha period per ring
+  cb: np.ndarray           # cos and sin of the beta per node
+  sb: np.ndarray
+  offset: np.ndarray       # the first gamma of every node, and the end
+  gammaPoints: np.ndarray
+  gammaMin: np.ndarray
+  gammaPeriod: float
+  alphaPeriod: float
+
+
 def flatSO3(g):
   """the ladders of an equispaced SO(3) grid as flat arrays: per ring its polar angle, its nodes
   with their alpha folded into [min, min + period) and sorted, per node its gamma ladder"""
@@ -265,8 +283,8 @@ def flatSO3(g):
     a = g.alpha[k0:k1] - np.floor((g.alpha[k0:k1] - ringMin[r]) / ap) * ap
     o = np.argsort(a, kind="stable")
     ringAlpha[k0:k1], ringNode[k0:k1] = a[o], k0 + o
-  return (np.ascontiguousarray(ab.thetaGrid.points, dtype=np.float64), ringOff, ringAlpha, ringNode, ringMin,
-          np.ascontiguousarray(g.cb), np.ascontiguousarray(g.sb), g.offset, g.gammaPoints, g.gammaMin, g.gammaPeriod, ap)
+  return flatSO3Grid(np.ascontiguousarray(ab.thetaGrid.points, dtype=np.float64), ringOff, ringAlpha, ringNode, ringMin,
+                     np.ascontiguousarray(g.cb), np.ascontiguousarray(g.sb), g.offset, g.gammaPoints, g.gammaMin, g.gammaPeriod, ap)
 
 
 def so3Radius(flat, Q, Lr, Rr, nZL, eps, chunk=16):
@@ -277,12 +295,12 @@ def so3Radius(flat, Q, Lr, Rr, nZL, eps, chunk=16):
   Q = np.ascontiguousarray(Q, dtype=np.float64)
   Lr, Rr = np.ascontiguousarray(Lr, dtype=np.float64), np.ascontiguousarray(Rr, dtype=np.float64)
   nq = Q.shape[0]
-  args = flat[:-2] + (float(flat[-2]), float(flat[-1]))
+  args = (*flat[:-2], float(flat.gammaPeriod), float(flat.alphaPeriod))
   counts = np.zeros(nq, dtype=np.int64)
   indptr = np.zeros(nq + 1, dtype=np.int64)
   empty = np.zeros(0, dtype=np.int64), np.zeros(0)
   # the rows of the threads, uninitialised: a thread fills its own on first use
-  nt, n = min(threads(), _jit().config.NUMBA_NUM_THREADS), len(flat[8])
+  nt, n = min(threads(), _jit().config.NUMBA_NUM_THREADS), len(flat.gammaPoints)
   with heapBlocks():
     rows = np.empty((nt, n)), np.empty((nt, n), dtype=np.int64), np.zeros(nt, dtype=np.bool_)
   loop = _COMPILED["so3Radius"]
@@ -313,13 +331,13 @@ def _compileHelpers():
 
 def _compileS2():
   if "s2Nearest" not in _COMPILED:
-    nb = _compileHelpers()
+    _compileHelpers()
     _COMPILED["s2Nearest"] = _parallelKernel(_s2NearestLoop)
 
 
 def _compileSO3():
   if "so3Radius" not in _COMPILED:
-    nb = _compileHelpers()
+    _compileHelpers()
     _COMPILED["so3Radius"] = _parallelKernel(_so3RadiusLoop)
 
 

@@ -11,6 +11,7 @@ import functools
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..functions.density import calcDensity
 from ..functions.kernelfunctions import (S2DeLaValleePoussinKernel, S2Kernel, S2KernelHandle, SO3DeLaValleePoussinKernel,
                                          SO3DirichletKernel)
@@ -49,7 +50,8 @@ def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   # the normalisation against the complete elliptic integral of the second kind, MATLAB's ellip2ke
   c = (np.pi / 2) / quad(lambda t: float(Psi.eval(t)) * ellipe(1 - t * t), 0, 1, limit=200)[0]
   Psi = S2KernelHandle(lambda t, fun=Psi.fun: c * fun(t)) if isinstance(Psi, S2KernelHandle) else S2Kernel(c * Psi.A)
-  psi = lambda v: Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, symmetry=False))
+  def psi(v):
+    return Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, symmetry=False))
   return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
 
 
@@ -118,7 +120,8 @@ def _sides(gB, source):
     ids = np.asarray(source.id).reshape(-1)
     order = np.argsort(ids)
     q = source.rotations.data.reshape(-1, 4)
-    pix = lambda col: order[np.searchsorted(ids[order], gB.ebsdId[:, col])]
+    def pix(col):
+      return order[np.searchsorted(ids[order], gB.ebsdId[:, col])]
     q1, q2 = q[pix(0)], q[pix(1)]
   elif hasattr(source, "meanRotation"):
     q = source.meanRotation.data.reshape(-1, 4)
@@ -142,7 +145,7 @@ def _qmul(a, b):
 
 
 def _qinv(a):
-  return a * np.array([1, -1, -1, -1])
+  return qconj(a)
 
 
 # the angle between rotations given as quaternions, without symmetry
@@ -217,8 +220,7 @@ def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump
   f = calcDensity(ori, weights=weights, kernel=SO3DirichletKernel(psiS2.bandwidth), harmonic=True)
   gbnd = f.conv(psiS2)
   if dSym is not None and len(dSym) > 1:
-    from ..functions.funops import rotate
-    gbnd = sum((rotate(gbnd, rotation._fromData(s)) for s in dSym[1:]), gbnd) / len(dSym)
+    gbnd = sum((gbnd.rotate(rotation._fromData(s)) for s in dSym[1:]), gbnd) / len(dSym)
   # the estimate carries the symmetry of the phase, the character distribution none; a
   # plane normal is an axis
   return S2FunHarmonic(gbnd._fhat, cs, real=True, antipodal=True, _internal=True)

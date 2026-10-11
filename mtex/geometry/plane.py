@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
-from .vector3d import vector3d
+from .vector3d import vector3d, asVector3d
 
 
 class plane3d:
@@ -30,7 +30,7 @@ class plane3d:
     if isinstance(N, plane3d):
       self.N, self.d = N.N, N.d
       return
-    N = N if isinstance(N, vector3d) else vector3d(N)
+    N = asVector3d(N)
     n = N.norm()
     self.N = N.normalize()
     if isinstance(d, vector3d):
@@ -42,7 +42,7 @@ class plane3d:
   def byPoints(v):
     """the plane through points: the least squares fit through their centroid, the normal
     the smallest principal axis of the cloud"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     xyz = v.data.reshape(-1, 3)
     xyz = xyz[np.all(np.isfinite(xyz), axis=1)]
     if len(xyz) < 3:
@@ -95,12 +95,12 @@ class plane3d:
       lam = self.N.dot(v.N, symmetry=False)
       lam = np.where(np.abs(np.abs(lam) - 1) < tol, lam, np.nan)
       return self.d - v.d * lam
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     return self.N.dot(v, symmetry=False) - self.d
 
   def project(self, v):
     """the orthogonal projection of points onto the plane"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     return v - self.N * self.dist(v)
 
   def intersect(self, v1, v2=None, tol=1e-13):
@@ -159,9 +159,9 @@ class plane3d:
 
 def lineIntersect(a, b, n, d, tol=1e-13):
   """where the segments from a to b cross the planes <n, v> = d, NaN where they do not"""
-  A = a if isinstance(a, vector3d) else vector3d(a)
-  B = b if isinstance(b, vector3d) else vector3d(b)
-  N = n if isinstance(n, vector3d) else vector3d(n)
+  A = asVector3d(a)
+  B = asVector3d(b)
+  N = asVector3d(n)
   l = B - A
   with np.errstate(divide="ignore", invalid="ignore"):
     lam = (np.asarray(d, dtype=float) - A.dot(N, symmetry=False)) / l.dot(N, symmetry=False)

@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .kernels import qconj
 from .arguments import refuseFlags
 from .display import display, header, sizeString
 from .frames import crystalFrame, referenceFrame, specimenFrame
@@ -34,9 +35,6 @@ from .framepair import installFramePair
 
 TOLERANCE = 1e-8
 
-
-def _conj(q):
-  return q * np.array([1.0, -1.0, -1.0, -1.0])
 
 
 def _splitFrames(args):
@@ -209,8 +207,8 @@ class fibre:
     """the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones"""
     L, R = reductionGroups(self.o1)
     nL, nR = len(L), len(R)
-    o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), _conj(R)[None, :, None, :])
-    o2 = qmul(qmul(L[:, None, None, :], self.o2.data[None, None]), _conj(R)[None, :, None, :])
+    o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), qconj(R)[None, :, None, :])
+    o2 = qmul(qmul(L[:, None, None, :], self.o2.data[None, None]), qconj(R)[None, :, None, :])
     h = np.broadcast_to(qrot(R[None, :, None, :], self.h.data[None, None]), o1.shape[:-1] + (3,))
     out = self._build(self.o1._new(o1.reshape((nL * nR,) + self.shape + (4,))), self.o2._new(o2.reshape((nL * nR,) + self.shape + (4,))),
                       self.h._new(h.reshape((nL * nR,) + self.shape + (3,))))
@@ -354,7 +352,7 @@ class fibre:
 
 # the axis of the rotation from o1 to o2 in the crystal frame, the c axis where they coincide
 def _axisBetween(o1, o2):
-  m = qmul(_conj(o1.data), o2.data)
+  m = qmul(qconj(o1.data), o2.data)
   xyz = np.where((quatAngle(m) < 1e-10)[..., None], [0.0, 0.0, 1.0], quatAxis(m))
   cs = o1.frameA
   return Miller(vector3d(xyz), cs, "uvw") if isinstance(cs, crystalFrame) else vector3d(xyz, frame=cs)

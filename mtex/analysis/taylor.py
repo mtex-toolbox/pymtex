@@ -87,7 +87,8 @@ def linearProgram(c, A, b, tol=1e-9, maxIter=10000, diagnostics=False):
     raise ValueError("tol has to be positive and maxIter nonnegative")
   if not (np.all(np.isfinite(A)) and np.all(np.isfinite(b)) and np.all(np.isfinite(c))):
     raise ValueError("the data of a linear program have to be finite")
-  finish = lambda status, it, x=None, res=np.inf: LinearProgramResult(x, status, it, res) if diagnostics else x
+  def finish(status, it, x=None, res=np.inf):
+    return LinearProgramResult(x, status, it, res) if diagnostics else x
   # phase one on the artificial variables, every row scaled to unit size and a nonnegative right hand side
   T = np.zeros((m + 1, n + m + 1))
   scale = np.maximum(np.max(np.abs(A), axis=1, initial=0.0), np.abs(b))
@@ -148,7 +149,8 @@ def linprogCentre(c, A, y, tol=1e-9, maxIter=100):
   n = A.shape[-1]
   c = np.broadcast_to(np.asarray(c, dtype=float), (N, n))
   At = np.swapaxes(A, 1, 2)
-  mul = lambda B, v: np.einsum("kij,kj->ki", B, v)
+  def mul(B, v):
+    return np.einsum("kij,kj->ki", B, v)
   x, s, lam = np.ones((N, n)), np.ones((N, n)), np.zeros((N, m))
   ny, nc = np.linalg.norm(y, axis=1), np.linalg.norm(c, axis=1)
   done = np.zeros(N, dtype=bool)

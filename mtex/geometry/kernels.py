@@ -355,6 +355,12 @@ def _qmulNumpy(p, q):
     d1 * a2 - c1 * b2 + b1 * c2 + a1 * d2], axis=-1)
 
 
+def qconj(q):
+  """the conjugates of quaternion coefficients, the inverse rotations of unit ones, in their dtype"""
+  q = np.asarray(q)
+  return q * np.array([1, -1, -1, -1], dtype=q.dtype if q.dtype.kind == "f" else np.float64)
+
+
 def qmul(p, q):
   """the Hamilton product on trailing axes of four, broadcast on the leading ones (quaternion/times)"""
   p, q = np.asarray(p), np.asarray(q)

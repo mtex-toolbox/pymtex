@@ -22,6 +22,7 @@ import math
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.so3grid import equispacedSO3Grid
 from ..geometry.orientation import orientation
@@ -30,13 +31,13 @@ from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
 from ..geometry.display import framesLabel
 from .funops import _rotatedCoefficients, _rotatedFrame
 from .harmonics import mtexCoefficientsSO3, _WignerD, deg2dim, degreeBlock, dim2deg, invariantProjection, projectLeft, projectRight
 from .kernelfunctions import SO3DeLaValleePoussinKernel, SO3Kernel
 from .quadrature import bandwidthFor, quadratureSO3Grid
-from .rbf import _conj, _qmul, _readFrames, _rotationsFor, supportCosine
+from .rbf import _qmul, _framesAmong, _rotationsFor, supportCosine
 from .so3fun import SO3FunHarmonic, invertedCoefficients, realizeWigner
 from .transforms import DIRECT_SUM_NODES, SO3FourierPlan, wignerPlan, wignerSeries, wignerSeriesAdjoint
 from ..geometry.display import aligned
@@ -301,7 +302,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     side, rest = _readSide(args)
     frames = [a for a in rest if isinstance(a, referenceFrame)]
-    CS, SS = _readFrames(frames)
+    CS, SS = _framesAmong(frames)
     if isinstance(fhat, SO3VectorField):
       v = fhat
       CS, SS = v.CS, v.SS
@@ -482,7 +483,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     """the inner product with a constant vector, exact, a function on the component frames"""
     if isinstance(x, SO3VectorField):
       return SO3VectorField.dot(self, x)
-    x = x if isinstance(x, vector3d) else vector3d(x)
+    x = asVector3d(x)
     # a vector of the frame of the other side takes the components of that side
     other = self.CS if self.tangentSpace == "left" else self.SS
     if x.frame is not None and x.frame is other and other is not (self.SS if self.tangentSpace == "left" else self.CS):
@@ -681,7 +682,7 @@ class SO3VectorFieldHandle(SO3VectorField):
     if isinstance(fun, SO3VectorField):
       v = fun
       fun, rest, side, bandwidth = (lambda o: v(o)), [v.CS, v.SS], v.tangentSpace, v.bandwidth
-    self.CS, self.SS = _readFrames([a for a in rest if isinstance(a, referenceFrame)])
+    self.CS, self.SS = _framesAmong([a for a in rest if isinstance(a, referenceFrame)])
     self.fun, self.tangentSpace = fun, side
     self.bandwidth = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
 
@@ -796,7 +797,7 @@ class SO3VectorFieldRBF(SO3VectorField):
     for l in L:
       for r in R:
         cj = _qmul(_qmul(l[None], cs), r[None])
-        M = (rotation(l).matrix() if t.side == "left" else rotation(_conj(r)).matrix()) / (len(L) * len(R))
+        M = (rotation(l).matrix() if t.side == "left" else rotation(qconj(r)).matrix()) / (len(L) * len(R))
         d = np.abs(cs @ cj.T)
         k = psi(np.minimum(d, 1.0)) * (d > cut)
         A += np.kron(k, M)
@@ -826,7 +827,7 @@ class SO3VectorFieldRBF(SO3VectorField):
     for l in L:
       Ml = rotation(l).matrix()
       for r in R:
-        Mr = rotation(_conj(r)).matrix()
+        Mr = rotation(qconj(r)).matrix()
         rots.append(_qmul(_qmul(l[None], c), r[None]))
         w.append(self.weights @ (Ml.T if self.tangentSpace == "left" else Mr.T))
     n = len(L) * len(R)

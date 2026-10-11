@@ -9,9 +9,6 @@ import numpy as np
 
 from .scene3d import lines3d, mesh3d, picture3d, points3d, slices3d
 
-__all__ = ["hasPyVista", "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML"]
-
-
 def hasPyVista():
   """whether PyVista can be imported, the renderer of the 3D scenes"""
   try:
@@ -307,3 +304,6 @@ def writeHTML(scene, fname, title="MTEX 3D plot"):
   with open(fname, "w", encoding="utf-8") as f:
     f.write(sceneHTML(scene, title))
   return fname
+
+
+__all__ = ["hasPyVista", "pyvistaPlotter", "renderImage", "drawMatplotlib", "writeHTML", "sceneHTML"]

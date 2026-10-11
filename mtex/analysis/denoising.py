@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.kernels import backend, closestImage, qmul
 from ..geometry.quaternion import rotation
 from ..geometry.tangent import rotationOf, rotationVector
@@ -30,9 +31,6 @@ from ..maps.lattice import lattice
 from .variational import EBSDFilter, l1TVFilter, solveField, variationalFilter
 from ..geometry.install import install
 
-
-def _conj(q):
-  return q * np.array([1, -1, -1, -1], dtype=q.dtype)
 
 
 # ------------------------------------------------------------------ the window filters
@@ -135,7 +133,6 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
 def outsideMask(l, lk, isData):
   """the pixels no measurement encloses: those the outside of the map reaches over the lattice
   without crossing a measured pixel"""
-  n = len(l.ij)
   ij = l.ij
   border = (ij[:, 0] == 0) | (ij[:, 1] == 0) | (ij[:, 0] == lk.shape[0] - 1) | (ij[:, 1] == lk.shape[1] - 1)
   out = ~isData & border
@@ -202,7 +199,7 @@ def _closestImages(m, sel, refs):
     at = idx[m.phase[idx] == p]
     if len(at):
       img[at] = closestImage(refs[at], m.rot[at], IDENTITY, G)[1]
-  u[idx] = rotationVector(qmul(_conj(refs[idx]), img[idx]))
+  u[idx] = rotationVector(qmul(qconj(refs[idx]), img[idx]))
   return img, u
 
 
@@ -238,7 +235,6 @@ def _applyWindow(F, ebsd, comp, isData, u):
            mode, out)
       return out
   act = (comp > 0) & isData
-  k = np.arange(len(u))
   W = np.full((len(u), len(offs), 3), np.nan)
   for c, o in enumerate(offs):
     nb = neighbourAt(lk, l.ij, o)[0]
@@ -367,7 +363,7 @@ def _unpad(ebsd, sel):
     # a copy of a map shares the flags with its source
     pad = ebsd._pad.copy()
     pad.reshape(-1)[sel] = False
-    object.__setattr__(ebsd, "_pad", pad if pad.any() else None)
+    ebsd._pad = pad if pad.any() else None
 
 
 # the orientations of the pixels written back from the field, and for the ones that were
@@ -437,7 +433,7 @@ def reduce(ebsd, factor=2):
   # the sublattice is the same kind of lattice factor times coarser
   l2 = out.lattice
   if l2 is not None:
-    object.__setattr__(out, "lattice", lattice._build(l2.plane, l2.origin, l2.A * factor, l2.ij // factor, l2.shape))
+    out.lattice = lattice._build(l2.plane, l2.origin, l2.A * factor, l2.ij // factor, l2.shape)
   return out
 
 

@@ -181,7 +181,8 @@ class plottingConvention:
     if self.isPictogram:
       return f"plottingConvention ({self.char()})"
     from .display import display, numString
-    fmt = lambda v: "(" + ", ".join(numString(x) for x in v.data) + ")"
+    def fmt(v):
+      return "(" + ", ".join(numString(x) for x in v.data) + ")"
     return display("plottingConvention", [("outOfScreen", fmt(self.outOfScreen)), ("north", fmt(self.north)), ("east", fmt(self.east))])
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)

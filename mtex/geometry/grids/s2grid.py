@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..frames import referenceFrame
 from ..units import degree
-from ..vector3d import vector3d
+from ..vector3d import vector3d, asVector3d
 from .s1grid import S1Grid, ladder
 from .gridsearch import flatS2, s2Nearest
 from ..display import display, header
@@ -121,7 +122,7 @@ class S2Grid(vector3d):
     the nearest node of a grid with uniform steps, arithmetic on every direction at once: the
     ring from the polar angle, the node on the ring from the azimuth against the ring's own
     first node, step and count"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     xyz = np.asarray(v.data, dtype=float).reshape(-1, 3)
     r = np.linalg.norm(xyz, axis=-1)
     th = np.arccos(np.clip(xyz[:, 2] / np.where(r > 0, r, 1.0), -1.0, 1.0))
@@ -168,7 +169,7 @@ class S2Grid(vector3d):
 
   def neighbourIndices(self, v, eps):
     """the indices of the grid points within eps of one direction"""
-    v = (v if isinstance(v, vector3d) else vector3d(v)).normalize()
+    v = asVector3d(v).normalize()
     out = self._neighbourIndicesPolar(float(v.theta), float(v.rho), eps)
     if self.antipodal:
       w = -v
@@ -178,7 +179,7 @@ class S2Grid(vector3d):
   def find(self, v, eps=None):
     """the nearest grid point of every direction, or all within eps: an index per direction,
     or a sparse incidence matrix (directions x grid) with a sparse matrix of the angles"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:
       from ..kernels import backend
@@ -216,7 +217,7 @@ def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, 
   for a in args:
     if isinstance(a, sphericalRegion):
       region = a
-    elif hasattr(a, "sym"):
+    elif isinstance(a, referenceFrame):
       fr = a.Laue() if antipodal else a
       region, frame = fundamentalSector(fr), a
   if region is not None and frame is None:

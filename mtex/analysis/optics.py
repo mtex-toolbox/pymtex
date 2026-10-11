@@ -13,7 +13,7 @@ import math
 
 import numpy as np
 
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..tensors.tensor import refractiveIndexTensor
 from ..geometry.install import install
 
@@ -22,7 +22,7 @@ ADOBE_RGB = np.array([[2.04414, -0.5649, -0.3447], [-0.9693, 1.8760, 0.0416], [0
 
 
 def _unit(rI, v):
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   if v.frame is not None and v.frame is not rI.frame and not (type(v.frame) is type(rI.frame) and v.frame.isAligned(rI.frame)):
     raise ValueError("the direction is written in another frame than the tensor")
   return v.normalize().data
@@ -75,7 +75,7 @@ def birefringence(rI, vprop=None):
     fast = S2AxisFieldHandle(lambda v: birefringence(rI, vector3d(v.data))[1].data, rI.frame, bandwidth=32)
     slow = S2AxisFieldHandle(lambda v: birefringence(rI, vector3d(v.data))[2].data, rI.frame, bandwidth=32)
     return delta, fast, slow
-  v = vprop if isinstance(vprop, vector3d) else vector3d(vprop)
+  v = asVector3d(vprop)
   delta, fast, slow, _, _ = _birefringence(rI, _unit(rI, v).reshape(-1, 3))
   shape = np.broadcast_shapes(v.shape, rI.shape)
   return delta.reshape(shape), _axes(fast.reshape(shape + (3,)), rI.frame), _axes(slow.reshape(shape + (3,)), rI.frame)
@@ -117,13 +117,13 @@ def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=Non
     grid = quadratureS2Grid(bandwidth)
     rgb = spectralTransmission(rI, vector3d(grid.nodes().data), vprop, polarizationDirection=polarizationDirection, tau=tau, phi=phi)
     return tuple(S2FunHarmonic.quadrature(grid, rgb[:, k], rI.frame, bandwidth=bandwidth, real=True, antipodal=True) for k in range(3))
-  v = vprop if isinstance(vprop, vector3d) else vector3d(vprop)
+  v = asVector3d(vprop)
   U = _unit(rI, v).reshape(-1, 3)
   delta, fast, _, _, _ = _birefringence(rI, U)
   if polarizationDirection is None:
     t = np.full(len(fast), float(tau))
   else:
-    p = polarizationDirection if isinstance(polarizationDirection, vector3d) else vector3d(polarizationDirection)
+    p = asVector3d(polarizationDirection)
     P = np.broadcast_to(p.normalize().data.reshape(-1, 3), fast.shape)
     t = np.arccos(np.minimum(1.0, np.abs(np.sum(P * fast, axis=-1))))
   d = delta * thickness

@@ -22,6 +22,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..functions.so3funclass import SO3Fun
 from ..geometry.arguments import refuseFlags
 from ..geometry.kernels import blasThreads
 from ..geometry.frames import referenceFrame
@@ -29,7 +30,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..functions.harmonics import invariantProjection, project
 from ..functions.kernelfunctions import S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel
 from ..functions.quadrature import folds
@@ -44,10 +45,6 @@ from ..geometry.install import install
 OptimalSampleResult = namedtuple("OptimalSampleResult", ["nodes", "weights", "discrepancy", "history", "iterations", "converged", "reason", "bandwidth"])
 
 
-def _isSO3(f):
-  return hasattr(f, "_poleFigure") and hasattr(f, "CS") and hasattr(f, "SS")
-
-
 # ------------------------------------------------------------------ the problem
 
 class _Problem:
@@ -55,7 +52,7 @@ class _Problem:
   projections onto the symmetric functions"""
 
   def __init__(self, f, xs, L):
-    self.sphere = not _isSO3(f)
+    self.sphere = not isinstance(f, SO3Fun)
     self.L = L
     if self.sphere:
       h = S2FunHarmonic(f, bandwidth=L).truncate(L)
@@ -354,7 +351,7 @@ def _optimize(p, xs, c, optimizeWeights, maxIter, tol, memory, warmUp, tolWeight
 
 # spherical Fibonacci points, and a quasi uniform sequence of rotations
 def _initial(f, initial):
-  sphere = not _isSO3(f)
+  sphere = not isinstance(f, SO3Fun)
   if isinstance(initial, (int, np.integer)):
     n = int(initial)
     if n <= 0:
@@ -369,7 +366,7 @@ def _initial(f, initial):
     g = 2 * np.pi * np.mod(j * math.sqrt(5), 1)
     return rotation.byEuler(a, b, g, "Matthies").data.reshape(-1, 4)
   if sphere:
-    v = initial if isinstance(initial, vector3d) else vector3d(initial)
+    v = asVector3d(initial)
     return v.normalize().data.reshape(-1, 3).astype(float)
   r = initial if isinstance(initial, quaternion) else rotation(initial)
   return r.data.reshape(-1, 4).astype(float)
@@ -387,7 +384,7 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
     v = optimalSample(sF, 1000, bandwidth=128)
     optimalSample(f, nodes, method='steepestDescent', maxIter=1000, tol=0.05*degree, minWeight=1e-4)
   """
-  sphere = not _isSO3(f)
+  sphere = not isinstance(f, SO3Fun)
   refuseFlags(args, "optimalSample")
   if not getattr(f, "isReal", True):
     raise ValueError("sampling requires a real density")

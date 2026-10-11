@@ -26,7 +26,7 @@ import numpy as np
 from .frames import crystalFrame, specimenFrame
 from .miller import Miller
 from .orientation import orientation
-from .kernels import bestDot, closestAngle, closestImage, threads, variantAngles
+from .kernels import bestDot, closestAngle, closestImage, qconj, threads, variantAngles
 from .quaternion import qmul, quaternion, rotation
 from .symmetryops import projectIntoFundamentalRegionOrientation
 from .symreduce import chordAngle, reductionGroups, symReduce
@@ -63,7 +63,7 @@ def _nearestC2C(mori, c2c):
   c = c2c.data.reshape(-1, 4)
   first = np.argmax(symReduce(c[:, None], c[None, :], L, R, ex)[0] > 1 - 1e-9, axis=1)
   reps = np.flatnonzero(first == np.arange(len(c)))
-  refs = np.concatenate([c[reps], _conj(c[reps])]) if ex else c[reps]
+  refs = np.concatenate([c[reps], qconj(c[reps])]) if ex else c[reps]
   es = qmul(qmul(L[:, None, None], refs[None, :, None]), R[None, None, :])
   label = np.broadcast_to(np.tile(reps, 2 if ex else 1)[None, :, None], es.shape[:-1]).reshape(-1)
   es = es.reshape(-1, 4)
@@ -79,23 +79,26 @@ def _nearestC2C(mori, c2c):
 # the residual of every misorientation: the nearest c_k, its angle, the chordal residual
 # 1 - cos capped at tau, the h inliers cut on the value so that ties keep the set order
 # independent; a non finite angle counts as the worst residual
+_Misfit = namedtuple("_Misfit", ["V", "c2c", "omega", "variant", "ind", "fit"])
+
+
 def _misfit(mori, p2c, h, tau):
   V, c2c = _childToChild(p2c)
   variant, omega = _nearestC2C(mori, c2c)
   r = np.where(np.isfinite(omega), np.minimum(1 - np.cos(omega), tau), tau)
   rs = np.sort(r)
   ind = r <= rs[min(h, len(rs)) - 1]
-  return dict(V=V, c2c=c2c, omega=omega, variant=variant, ind=ind & (r < tau), fit=float(np.mean(r[ind])))
+  return _Misfit(V, c2c, omega, variant, ind & (r < tau), float(np.mean(r[ind])))
 
 
 # one vote per inlier: with its variant it measures p directly, proj(m, c_k) p S_k; the
 # chordal mean of the votes is the update
 def _vote(mori, p2c, s):
   votes = []
-  for k in np.unique(s["variant"][s["ind"]]):
-    sel = s["ind"] & (s["variant"] == k)
-    proj = mori[sel].projectIntoFundamentalRegion(s["c2c"][k])
-    votes.append(qmul(proj.data.reshape(-1, 4), s["V"][k].data.reshape(1, 4)))
+  for k in np.unique(s.variant[s.ind]):
+    sel = s.ind & (s.variant == k)
+    proj = mori[sel].projectIntoFundamentalRegion(s.c2c[k])
+    votes.append(qmul(proj.data.reshape(-1, 4), s.V[k].data.reshape(1, 4)))
   if not votes:
     return None
   return p2c._new(quaternion(np.concatenate(votes)).mean().data)
@@ -112,23 +115,23 @@ def _subSample(mori, n):
 # the fixed point iteration from one start, every step backtracked until it descends
 def _fitLocal(mori, p2c, h, tau, maxIteration, verbose=False):
   s = _misfit(mori, p2c, h, tau)
-  _report(p2c, s["fit"], verbose)
+  _report(p2c, s.fit, verbose)
   for _ in range(maxIteration):
     trial = _vote(mori, p2c, s)
     if trial is None:
       break
-    step, ok = 1.0, s["fit"] * (1 + 1e-9)
+    step, ok = 1.0, s.fit * (1 + 1e-9)
     while True:
       new = p2c._new(quaternion(np.stack([p2c.data.reshape(4), trial.data.reshape(4)])).mean(weights=[1 - step, step]).data)
       sNew = _misfit(mori, new, h, tau)
-      if sNew["fit"] <= ok or step < 2.0 ** -6:
+      if sNew.fit <= ok or step < 2.0 ** -6:
         break
       step /= 2
-    if sNew["fit"] > ok:
+    if sNew.fit > ok:
       break
     moved = float(new.angle(p2c, symmetry=False))
     p2c, s = new, sNew
-    _report(p2c, s["fit"], verbose)
+    _report(p2c, s.fit, verbose)
     if moved < 0.01 * degree:
       break
   return p2c, s
@@ -158,7 +161,7 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
   for a in range(0, g.size, block):
     b = min(a + block, g.size)
     q = g.data[a:b].reshape(-1, 1, 4)
-    c2c = orientation(rotation._fromData(qmul(qmul(q, _conj(S)[None]), _conj(q))), p2c.frameB, p2c.frameB)
+    c2c = orientation(rotation._fromData(qmul(qmul(q, qconj(S)[None]), qconj(q))), p2c.frameB, p2c.frameB)
     omega = sub.reshape(sub.size, 1, 1).angle(c2c.reshape(1, b - a, len(S)))
     r = np.sort(np.minimum(1 - np.cos(np.min(omega, axis=2)), tau), axis=0)
     fit[a:b] = np.mean(r[:hSub], axis=0)
@@ -176,13 +179,10 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
   for sd in seeds:
     pj, _ = _fitLocal(pSub, sd, hLocal, tau, maxIteration)
     s = _misfit(mori, pj, h, tau)
-    if s["fit"] < bestFit:
-      best, bestFit = pj, s["fit"]
+    if s.fit < bestFit:
+      best, bestFit = pj, s.fit
   return best
 
-
-def _conj(q):
-  return q * np.array([1.0, -1, -1, -1])
 
 
 def _cat(a, b):
@@ -220,10 +220,10 @@ def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, max
   # still reach a lower minimum; it stays a candidate
   if not local:
     p0, s0 = _fitLocal(mori, start, h, tau, maxIteration)
-    if s0["fit"] < s["fit"]:
+    if s0.fit < s.fit:
       p2c = p0
   if fit:
-    return p2c, _misfit(moriAll, p2c, moriAll.size, tau)["omega"]
+    return p2c, _misfit(moriAll, p2c, moriAll.size, tau).omega
   return p2c
 
 
@@ -231,7 +231,7 @@ def misfit(mori, p2c):
   """misfit(mori, p2c): the angle of every child to child misorientation to the nearest one
   the relationship predicts"""
   mori = mori.flatten()
-  return _misfit(mori, p2c, mori.size, 2.0)["omega"]
+  return _misfit(mori, p2c, mori.size, 2.0).omega
 
 
 # ------------------------------------------------------------------ variants, packets, Bain groups
@@ -267,9 +267,9 @@ def _nearestVariant(parentOri, childOri, p2c):
     variantId = np.argmin(a, axis=1)
     return variantId, a[np.arange(len(a)), variantId]
   par = projectIntoFundamentalRegionOrientation(parentOri).data.reshape(-1, 4)
-  m = qmul(_conj(par), childOri.data.reshape(-1, 4))
+  m = qmul(qconj(par), childOri.data.reshape(-1, 4))
   V = p2c.variants().data.reshape(-1, 4)
-  es = qmul(_conj(V)[:, None], _conj(R)[None, :]).reshape(-1, 4)
+  es = qmul(qconj(V)[:, None], qconj(R)[None, :]).reshape(-1, 4)
   k = bestDot(m, es)[1]
   return k // len(R), chordAngle(m, es[k])
 
@@ -344,7 +344,7 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
         c1 = childOri[:, a].reshape(-1, 1) * PV.reshape(1, -1)
         c2 = childOri[:, b].reshape(-1, 1) * PV.reshape(1, -1)
         return np.asarray(c1.reshape(-1, numV, 1).angle(c2.reshape(-1, 1, numV)))
-      return variantAngles(qmul(_conj(q[:, a]), q[:, b]), PV.data.reshape(-1, 4), G)
+      return variantAngles(qmul(qconj(q[:, a]), q[:, b]), PV.data.reshape(-1, 4), G)
 
     if childOri.shape[1] == 2:
       # pairs of children: the variant pair whose parents agree best
@@ -523,7 +523,7 @@ def round2Miller(mori, penalty=0.002, maxIndex=None, nextFit=1):
   if mori.size > 1:
     parts = [round2Miller(mori.flatten()[i], penalty, maxIndex, nextFit) for i in range(mori.size)]
     return tuple(vector3d(np.stack([p[j].data.reshape(3) for p in parts]), frame=parts[0][j].frame, dispStyle=parts[0][j].dispStyle) for j in range(4))
-  cs, csB = mori.frameA, mori.frameB
+  cs = mori.frameA
   H = allHKL(maxIndex).astype(float)
   # all plane normals, carried over and rounded there
   n1 = Miller(H, cs)

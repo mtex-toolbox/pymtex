@@ -18,6 +18,7 @@ import warnings
 
 import numpy as np
 
+from ..geometry._array import MtexArray
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.gridlayout import gridLayout, layoutIndex
 from .kernels import gridKernel
@@ -151,7 +152,8 @@ def arrayDirections(grid):
 def _relayout(grid, lin):
   from .ebsd import EBSD, _rotations, _vectors
   k, shape = lin.reshape(-1), lin.shape
-  flat = lambda a, m: a.reshape((-1,) + a.shape[grid.ndim:])[k].reshape(shape + a.shape[grid.ndim:])
+  def flat(a, m):
+    return a.reshape((-1,) + a.shape[grid.ndim:])[k].reshape(shape + a.shape[grid.ndim:])
   l = grid.lattice
   gl = None if l is None else lattice._build(l.plane, l.origin, l.A, l.ij[k], l.shape)
   prop = {key: flat(v, grid.ndim) for key, v in grid.prop.items()}
@@ -260,7 +262,7 @@ def resample(ebsd, unitCell, layout=None, return_index=False):
   pl = ebsd.lattice.plane if ebsd.lattice is not None else mapPlane(xyz)
   P = pl.to2d(xyz)
   T = P.dtype
-  corners = np.asarray(unitCell.data if hasattr(unitCell, "data") else unitCell, dtype=float).reshape(-1, 3)
+  corners = np.asarray(unitCell.data if isinstance(unitCell, MtexArray) else unitCell, dtype=float).reshape(-1, 3)
   A = _cellBasis(pl.to2d(corners + pl.o)).astype(T)
   x0, x1, y0, y1 = P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max()
   c0 = np.array([x0, y0], dtype=T)

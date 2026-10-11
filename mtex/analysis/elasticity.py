@@ -20,9 +20,10 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..geometry._array import MtexArray
 from ..geometry.arguments import refuseFlags
 from ..geometry.frames import referenceFrame
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from ..tensors.tensor import ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor
 from ..tensors.kernels import eigh3
 from ..geometry.install import install
@@ -56,7 +57,7 @@ def _unit(T, v):
 
 # the direction as a vector, refused when it is written in another frame than the tensor
 def _inFrame(T, v):
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   if v.frame is not None and v.frame is not T.frame and not (type(v.frame) is type(T.frame) and v.frame.isAligned(T.frame)):
     raise ValueError("the direction is written in another frame than the tensor")
   return v
@@ -134,14 +135,17 @@ def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
   E = _christoffelMatrix(C, _unit(C, n))
   lam, vecs = eigh3(E)
   v = np.sqrt(np.maximum(lam, 0) / rho)
-  axes = lambda k: _axes(np.moveaxis(vecs, -1, -2)[..., k, :], C.frame)
+  def axes(k):
+    return _axes(np.moveaxis(vecs, -1, -2)[..., k, :], C.frame)
   return Velocities(v[..., 2], v[..., 1], v[..., 0], axes(2), axes(1), axes(0))
 
 
 def _velocityFields(C, rho):
   from ..functions.s2axisfield import S2AxisFieldHandle
-  speed = lambda k: _sphericalFunction(lambda v: velocity(C, v, density=rho)[k], C)
-  field = lambda k: S2AxisFieldHandle(lambda v: velocity(C, vector3d(v.data), density=rho)[k].data, C.frame, bandwidth=32)
+  def speed(k):
+    return _sphericalFunction(lambda v: velocity(C, v, density=rho)[k], C)
+  def field(k):
+    return S2AxisFieldHandle(lambda v: velocity(C, vector3d(v.data), density=rho)[k].data, C.frame, bandwidth=32)
   return Velocities(speed(0), speed(1), speed(2), field(3), field(4), field(5))
 
 
@@ -153,8 +157,10 @@ def _velocityHarmonics(C, rho, L):
   g = quadratureS2Grid(L)
   x = vector3d(g.nodes().data.reshape(-1, 3))
   w = velocity(C, x, density=rho)
-  speed = lambda k: S2FunHarmonic.quadrature(g, w[k], C.frame, bandwidth=L, antipodal=True)
-  field = lambda k: S2AxisFieldHarmonic(x, w[k].data, C.frame, bandwidth=L, weights=g.weights)
+  def speed(k):
+    return S2FunHarmonic.quadrature(g, w[k], C.frame, bandwidth=L, antipodal=True)
+  def field(k):
+    return S2AxisFieldHarmonic(x, w[k].data, C.frame, bandwidth=L, weights=g.weights)
   return Velocities(speed(0), speed(1), speed(2), field(3), field(4), field(5))
 
 
@@ -174,7 +180,7 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
   u = _unit(C, n)
   a = _unit(C, polarization)
   out = EinsteinSum(C, [1, -2, -3, -4], a, [-2], u, [-3], a, [-4])
-  data = out.data if hasattr(out, "data") else np.asarray(out)
+  data = out.data if isinstance(out, MtexArray) else np.asarray(out)
   v = vector3d(data / (rho * np.asarray(speed, dtype=float)[..., None]), frame=C.frame)
   v.dispStyle = "xyz"
   return v
@@ -341,20 +347,27 @@ def hashinShtrikmanBounds(C):
   KV = bulkModulus(C)
   GV = isotropicShearModulus(C).voigt
   top = float(np.max(np.linalg.eigvalsh((Ck + Ck.T) / 2)))
-  positive = lambda K0, G0: np.min(np.linalg.eigvalsh(_residual(Ck, K0, G0))) >= 0
-  negative = lambda K0, G0: np.max(np.linalg.eigvalsh(_residual(Ck, K0, G0))) <= 0
-  estimate = lambda K0, G0: _estimate(_residual(Ck, K0, G0), K0, G0)
+  def positive(K0, G0):
+    return np.min(np.linalg.eigvalsh(_residual(Ck, K0, G0))) >= 0
+  def negative(K0, G0):
+    return np.max(np.linalg.eigvalsh(_residual(Ck, K0, G0))) <= 0
+  def estimate(K0, G0):
+    return _estimate(_residual(Ck, K0, G0), K0, G0)
   # the lower bound: R >= 0 admits the shear moduli up to Gmax and, for each, the bulk moduli up to Kmax
   Gmax = _bisect(lambda G0: positive(0, G0), 0, GV)
-  Kmax = lambda G0: _bisect(lambda K0: positive(K0, G0), 0, KV)
-  lower = lambda G0: estimate(Kmax(G0), G0)
+  def Kmax(G0):
+    return _bisect(lambda K0: positive(K0, G0), 0, KV)
+  def lower(G0):
+    return estimate(Kmax(G0), G0)
   Glo, Ghi = 1e-6 * GV, Gmax
   KL = lower(_goldenSection(lambda G0: lower(G0).K, Glo, Ghi)).K
   GL = lower(_goldenSection(lambda G0: lower(G0).G, Glo, Ghi)).G
   # the upper bound: R <= 0 admits the shear moduli from Gmin on and, for each, the bulk moduli from Kmin on
   Gmin = -_bisect(lambda G0: negative(10 * top, -G0), -top / 2, -GV)
-  Kmin = lambda G0: -_bisect(lambda K0: negative(-K0, G0), -10 * top, 0)
-  upper = lambda G0: estimate(Kmin(G0), G0)
+  def Kmin(G0):
+    return -_bisect(lambda K0: negative(-K0, G0), -10 * top, 0)
+  def upper(G0):
+    return estimate(Kmin(G0), G0)
   KU = upper(_goldenSection(lambda G0: -upper(G0).K, Gmin, top / 2)).K
   GU = upper(_goldenSection(lambda G0: -upper(G0).G, Gmin, top / 2)).G
   return HashinShtrikman(Moduli(KL, GL), Moduli(KU, GU))

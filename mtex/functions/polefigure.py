@@ -28,7 +28,7 @@ from ..geometry.kernels import blasThreads
 from ..geometry.products import dropGroup
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .characteristics import calcError as _calcErrorODF
 from .funops import conv
 from .s2fun import S2FunHarmonic
@@ -43,7 +43,7 @@ ERROR_MODES = ("relative", "RP", "l1", "l2")
 
 # crystal directions as a flat list in a crystal frame, the frame given taking over
 def _millerList(h, CS):
-  v = h if isinstance(h, vector3d) else vector3d(h)
+  v = asVector3d(h)
   v = v.flatten()
   if CS is not None:
     v = vector3d(v)
@@ -115,7 +115,7 @@ class PoleFigure:
     if isinstance(h, (list, tuple)):
       allH = list(h)
     elif several:
-      hv = h if isinstance(h, vector3d) else vector3d(h)
+      hv = asVector3d(h)
       allH = [hv[i] for i in range(hv.size)] if hv.size > 1 else [hv] * len(allI)
     else:
       allH = [h]
@@ -635,7 +635,7 @@ def calcPoleFigure(odf, h, r=None, superposition=None, complete=False, **gridOpt
   if isinstance(h, vector3d):
     hs = [h.flatten()[i] for i in range(h.size)] if h.size > 1 else [h.flatten()]
   else:
-    hs = [x if isinstance(x, vector3d) else vector3d(x) for x in h]
+    hs = [asVector3d(x) for x in h]
   if r is None:
     from ..geometry.grids.s2grid import regularS2Grid
     r = regularS2Grid(antipodal=not complete, **gridOptions)
@@ -681,7 +681,7 @@ def calcQuadratureWeights(v, method="voronoi"):
     calcQuadratureWeights(r)                     a regular grid exactly, scattered points by Voronoi areas
     calcQuadratureWeights(r, method='harmonic')  the least norm correction that integrates every harmonic the count allows
   """
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   n = v.size
   if n == 0:
     return np.zeros(v.shape)
@@ -781,7 +781,7 @@ def refine(v):
   Delaunay triangles of the points on the sphere, none below the lowest point, so a cap
   stays a cap; returns the joined list and the new points, MATLAB's [v, r] = refine(v)"""
   from scipy.spatial import ConvexHull
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   xyz = v.flatten().normalize().data
   # the south pole closes the hull below a cap, and no triangle is wanted on it
   P = np.concatenate([xyz, [[0.0, 0.0, -1.0]]])

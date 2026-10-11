@@ -15,6 +15,8 @@ import math
 
 import numpy as np
 
+from .harmonicarithmetic import harmonicArithmetic
+from .kernels import _complexType
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from .kernelfunctions import S1GaussKernel, S1Kernel
@@ -23,17 +25,13 @@ from .transforms import fourierSeries, fourierSeriesAdjoint, isRealFourier
 from ..geometry.display import aligned
 
 
-def _complexType(dtype):
-  return np.result_type(np.dtype(dtype), 1j)
-
-
 def realizeFourier(chat):
   """the conjugate symmetry of a real valued function, c_{-k} = conj(c_k)"""
   chat[...] = (chat + np.conj(chat[::-1])) / 2
   return chat
 
 
-class S1FunHarmonic:
+class S1FunHarmonic(harmonicArithmetic):
   """a function on the circle by its Fourier coefficients fhat, k = -L..L, over e^{-ikx} as MATLAB's
 
     S1FunHarmonic(fhat)
@@ -102,8 +100,10 @@ class S1FunHarmonic:
     from .density import _lsqr
     sw = np.sqrt(w)
     reg = math.sqrt(regularisation) * np.abs(np.arange(-L, L + 1)) ** SobolevIndex
-    A = lambda c: np.concatenate([sw * fourierSeries(c[::-1], x, real=False), reg * c])
-    At = lambda z: fourierSeriesAdjoint(x, sw * z[:n], L, np.ones(n))[::-1] + reg * z[n:]
+    def A(c):
+      return np.concatenate([sw * fourierSeries(c[::-1], x, real=False), reg * c])
+    def At(z):
+      return fourierSeriesAdjoint(x, sw * z[:n], L, np.ones(n))[::-1] + reg * z[n:]
     b = np.concatenate([sw * values, np.zeros(2 * L + 1)]).astype(complex)
     return cls(_lsqr(A, At, b, 2 * L + 1, maxIter, tol), real=not np.iscomplexobj(values))
 
@@ -197,12 +197,6 @@ class S1FunHarmonic:
   def __neg__(self):
     return self._rebuild(-self.fhat)
 
-  def __sub__(self, g):
-    return self + (-g)
-
-  def __rsub__(self, a):
-    return (-self) + a
-
   def __mul__(self, a):
     if isinstance(a, S1FunHarmonic):
       from .funops import mapFun
@@ -212,21 +206,6 @@ class S1FunHarmonic:
     return NotImplemented
 
   __rmul__ = __mul__
-
-  def __truediv__(self, a):
-    if isinstance(a, S1FunHarmonic):
-      from .funops import mapFun, smoothBandwidth
-      return mapFun(np.divide, self, a, bandwidth=smoothBandwidth(self, a))
-    return self * (1 / a)
-
-  def __rtruediv__(self, a):
-    from .funops import mapFun, smoothBandwidth
-    return mapFun(lambda x: a / x, self, bandwidth=smoothBandwidth(self))
-
-  def __pow__(self, p):
-    from .funops import mapFun, smoothBandwidth
-    L = min(p * self.bandwidth, 2048) if isinstance(p, (int, np.integer)) and p >= 0 else smoothBandwidth(self)
-    return mapFun(lambda x: x ** p, self, bandwidth=L)
 
   def __abs__(self):
     from .funops import mapFun, smoothBandwidth

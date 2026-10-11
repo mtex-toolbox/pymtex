@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..frames import referenceFrame
 from ..orientation import orientation
 from ..quaternion import qmul, qrot, rotation
 from ..representations import axis2quat
-from ..symreduce import _conj, chordAngle, reductionGroups, uniqueRotations
+from ..symreduce import chordAngle, reductionGroups, uniqueRotations
 from ..units import degree
 from ..vector3d import vector3d, zvector
 from .s2grid import equispacedS2Grid
@@ -35,8 +36,8 @@ def localOrientationGrid(*args, maxAngle=None, resolution=5 * degree, center=Non
   args = list(args)
   if args and isinstance(args[0], orientation):
     center = args.pop(0)
-  frames = [a for a in args if hasattr(a, "sym")]
-  nums = [a for a in args if not hasattr(a, "sym")]
+  frames = [a for a in args if isinstance(a, referenceFrame)]
+  nums = [a for a in args if not isinstance(a, referenceFrame)]
   if nums:
     maxAngle = nums[0]
   if maxAngle is None:

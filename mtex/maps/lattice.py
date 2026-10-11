@@ -173,7 +173,8 @@ class lattice:
     return self._build(self.plane, self.origin + self.A @ lo, self.A, ij - lo, self.shape)
 
   def __repr__(self):
-    tuple_ = lambda v: "(" + ", ".join(numString(x, digits=4, tiny=1e-10 * max(self.dxy, 1)) for x in v) + ")"
+    def tuple_(v):
+      return "(" + ", ".join(numString(x, digits=4, tiny=1e-10 * max(self.dxy, 1)) for x in v) + ")"
     return display(header("lattice", self.shape), [("sites", len(self)), ("spacing", f"{self.dxy:.4g}"),
                                                    ("basis", ", ".join(tuple_(self.A[:, j]) for j in range(2))),
                                                    ("normal", tuple_(self.plane.normal))])

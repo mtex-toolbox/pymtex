@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.sparse import csr_matrix
 
+from ..geometry.kernels import qconj
 from ..geometry.kernels import qmul
 from ..maps.calcgrains import _grainTableNumba, _grainTableNumpy
 from ..maps.calcgrains import calcGrains as _calcGrains2d
@@ -129,7 +130,6 @@ def _pairs(L):
 # on the low side of every axis, then on the high side, as MATLAB orders them
 def _grains(e, g, grainId, nGrains, Dl, Dr, dim, L):
   shape = L.shape
-  n = L.size
   lat = g.lattice
   isFace = grainId[Dl] != grainId[Dr]
   a, b, d = Dl[isFace], Dr[isFace], dim[isFace]
@@ -177,7 +177,7 @@ def _grains(e, g, grainId, nGrains, Dl, Dr, dim, L):
   rot = e.rotations.data.reshape(-1, 4)
   ids = e.id.reshape(-1)
   mori = np.full((m, 4), np.nan)
-  mori[inner] = qmul(rot[b[inner]] * np.array([1, -1, -1, -1]), rot[a[inner]])
+  mori[inner] = qmul(qconj(rot[b[inner]]), rot[a[inner]])
   gB = grain3Boundary(V, T, np.stack([grainId[a], np.where(inner, grainId[bs], 0)], axis=1),
                       np.stack([ids[a], np.where(inner, ids[bs], -1)], axis=1),
                       np.stack([ph[a], np.where(inner, ph[bs], -1)], axis=1), mori, e.CSList, e.frame, e.scanUnit)

@@ -17,11 +17,12 @@ import math
 
 import numpy as np
 
+from ..geometry.kernels import qconj
 from ..geometry.kernels import qmul
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .kernelfunctions import S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel
 from .transforms import S2FourierPlan, SO3FourierPlan
 from ..geometry.display import aligned
@@ -99,15 +100,20 @@ class degreeEnergies:
   subsample; it serves UCV, which needs no errors.
   """
 
+  # the sample picks the space: orientations, or a map of them, are on SO(3), directions on S2
+  def __new__(cls, x, *args, **kwargs):
+    if cls is degreeEnergies:
+      cls = SO3DegreeEnergies if isinstance(x, quaternion) or _isMap(x) else S2DegreeEnergies
+    return super().__new__(cls)
+
   def __init__(self, x, bandwidth=32, *, weights=None, groups=None, folds=8, antipodal=None, rng=None):
     rng = np.random.default_rng() if rng is None else rng
     # a map: the orientations of its one phase, folded by its grains
-    if not isinstance(x, (quaternion, vector3d)) and hasattr(x, "orientations"):
+    if _isMap(x):
       if groups is None and "grainId" in getattr(x, "prop", {}):
         groups = np.asarray(x.prop["grainId"]).reshape(-1)
       x = x.orientations
     checkIndependent(x, groups)
-    self.space = "SO3" if isinstance(x, quaternion) else "S2"
     self.L = L = int(bandwidth)
     pts, w, groups = self._points(x, weights, groups, antipodal, L)
     n = len(w)
@@ -176,28 +182,9 @@ class degreeEnergies:
       return np.arange(n)
     return rng.choice(n, m, replace=False) if equal else rng.choice(n, m, p=w)
 
+  # the points with their weights and groups, those that are not there or weigh nothing left out
   def _points(self, x, weights, groups, antipodal, L):
-    if self.space == "S2":
-      v = x if isinstance(x, vector3d) else vector3d(x)
-      pts = v.data.reshape(-1, 3)
-      pts = pts / np.sqrt(np.einsum("ij,ij->i", pts, pts))[:, None]
-      self.antipodal = bool(v.antipodal) if antipodal is None else bool(antipodal)
-      sym = getattr(v.frame, "sym", None)
-      self.frame = v.frame
-      # the group acting on directions, as orthogonal matrices, the antipode among them
-      M = np.eye(3)[None] if sym is None else sym.rot.matrix().reshape(-1, 3, 3)
-      if self.antipodal and not any(np.allclose(m, -np.eye(3)) for m in M):
-        M = np.concatenate([M, -M])
-      self._group, self._sym = M, sym
-    else:
-      o = x if isinstance(x, orientation) else orientation(x)
-      pts = o.data.reshape(-1, 4)
-      self.antipodal = bool(o.antipodal) if antipodal is None else bool(antipodal)
-      self.CS, self.SS = o.CS, o.SS
-      self._group = (o.SS.sym.properGroup().rotations().data.reshape(-1, 4),
-                     o.CS.sym.properGroup().rotations().data.reshape(-1, 4))
-      from .harmonics import invariantProjection
-      self._projections = (invariantProjection(o.SS, L), invariantProjection(o.CS, L))
+    pts = self._read(x, antipodal, L)
     w = np.ones(len(pts)) if weights is None else np.asarray(weights, dtype=float).reshape(-1).copy()
     if len(w) != len(pts):
       raise ValueError("one weight per point")
@@ -209,48 +196,6 @@ class degreeEnergies:
     if np.all(keep):
       return pts, w, groups
     return pts[keep], w[keep], None if groups is None else groups[keep]
-
-  # the coefficients of the weighted point measure of one fold, orthonormal for the uniform
-  # probability, projected onto the invariant functions as the estimate is
-  def _coefficients(self, pts, w, L):
-    if self.space == "S2":
-      from .s2fun import evenize, projectSpherical
-      c = np.zeros((L + 1) ** 2, dtype=complex)
-      if len(w):
-        c = math.sqrt(4 * np.pi) * S2FourierPlan(vector3d(pts), L, real=True, eps=TRANSFORM_EPS).adjoint(np.ones(len(w)), w)
-      if self._sym is not None and self._sym.numSym() > 1:
-        projectSpherical(c, self._sym)
-      return evenize(c) if self.antipodal else c
-    from .harmonics import deg2dim, project
-    from .so3fun import invertedCoefficients
-    from .quadrature import folds
-    from .transforms import foldedDims
-    c = np.zeros(deg2dim(L + 1), dtype=complex)
-    if len(w):
-      # the z folds of the groups shrink the lattice, which pays where the FFT outweighs the
-      # spreading, with fewer points than a quarter of the lattice; 1.25 oversampling, since
-      # finufft spreads a thin lattice at 2.0 on many threads up to a hundred times slower
-      fd = folds(self.CS, self.SS) if len(w) < np.prod(foldedDims(L, True, (1, 1))) / 4 else (1, 1)
-      up = 1.25 if fd != (1, 1) else None
-      c = SO3FourierPlan(rotation._fromData(pts), L, real=True, folds=fd, eps=TRANSFORM_EPS, upsampfac=up).adjoint(np.ones(len(w)), w)
-    if self.nSym > 1:
-      c = project(c, *self._projections)
-    return (c + invertedCoefficients(c)) / 2 if self.antipodal else c
-
-  @property
-  def nSym(self):
-    """the number of symmetric copies of a point, the antipode included"""
-    if self.space == "S2":
-      return len(self._group)
-    return len(self._group[0]) * len(self._group[1]) * (2 if self.antipodal else 1)
-
-  # the symmetric copies of points: s x on S2; a x b on SO(3), and a x^-1 b for antipodal ones
-  def _symmetricCopies(self, pts):
-    if self.space == "S2":
-      return [pts @ m.T for m in self._group]
-    GS, GC = self._group
-    sides = [pts, pts * np.array([1, -1, -1, -1])] if self.antipodal else [pts]
-    return [qmul(qmul(a, y), b) for y in sides for a in GS for b in GC]
 
   # ---- the energies
 
@@ -274,42 +219,7 @@ class degreeEnergies:
     self.se = np.sqrt((F - 1) / F * np.sum((Ak - Ak.mean(axis=1, keepdims=True)) ** 2, axis=1))
     self.A[0], self.se[0] = 1.0, 0.0
 
-  def _degreeStarts(self, L):
-    if self.space == "S2":
-      return np.arange(L + 1) ** 2
-    from .harmonics import deg2dim
-    return np.array([deg2dim(l) for l in range(L + 1)])
-
   # ---- the symmetric traces
-
-  # the dimension of degree l without symmetry
-  def _fullDims(self, L):
-    l = np.arange(L + 1)
-    return (2 * l + 1.0) if self.space == "S2" else (2 * l + 1.0) ** 2
-
-  # c_l(x) at the subsample, degree first: the diagonal of the projected reproducing kernel,
-  # (2l+1) mean_s P_l(x . s x) on S2, (2l+1) mean_{a,b} chi_l(x^-1 a x b) on SO(3)
-  def _traces(self, L):
-    if self.space == "S2":
-      M = self._group
-      if len(M) == 1:
-        return np.broadcast_to(self._fullDims(L)[:, None], (L + 1, len(self._sample)))
-      t = np.einsum("ni,gij,nj->ng", self._sample, M, self._sample)
-      P = _legendre(np.clip(t, -1, 1), L)
-      return (2 * np.arange(L + 1) + 1.0)[:, None] * P.mean(axis=2)
-    if self.nSym == 1:
-      return np.broadcast_to(self._fullDims(L)[:, None], (L + 1, len(self._sample)))
-    x = self._sample
-    t = np.stack([np.abs(np.sum(x * y, axis=1)) for y in self._symmetricCopies(x)], axis=1)
-    # the mean character over the copies, degree by degree through U_{2l+2} = (4t^2-2) U_2l - U_{2l-2}
-    c = np.empty((L + 1, len(x)))
-    y2 = 4 * t * t - 2
-    u0, u1 = np.ones_like(t), y2 + 1
-    c[0] = 1
-    for l in range(1, L + 1):
-      c[l] = (2 * l + 1) * u1.mean(axis=1)
-      u0, u1 = u1, y2 * u1 - u0
-    return c
 
   def dims(self, L):
     """the mean of the traces weighted by w^2, E c_l, and their maximum over the subsample, computed once
@@ -323,12 +233,12 @@ class degreeEnergies:
   def estimateMax(self, h):
     """the largest value of the estimate of halfwidth h at the pilot points, the symmetrised kernel
     summed over the pilot sample"""
-    psi = _family(self.space)(halfwidth=float(h))
+    psi = self.kernel(halfwidth=float(h))
     at = self._pilot[:PILOT_POINTS]
     copies = self._copies()
     # beyond three halfwidths every member is below 2e-3 of its peak; the arguments are raised
     # to that cut, where the powers would otherwise run into slow denormal numbers, and zeroed
-    t0 = math.cos(min(3 * float(h), np.pi)) if self.space == "S2" else math.cos(min(3 * float(h), np.pi) / 2)
+    t0 = self._cosineOf(min(3 * float(h), np.pi))
     f = 0
     for g in copies:
       t = self._cosines(at, g)
@@ -338,13 +248,6 @@ class degreeEnergies:
   # the symmetric copies of the pilot sample
   def _copies(self):
     return self._symmetricCopies(self._pilot)
-
-  # the kernel's argument between points and copies: the cosine of the angle on S2, the cosine
-  # of half the angle on SO(3)
-  def _cosines(self, at, g):
-    if self.space == "S2":
-      return np.clip(at @ g.T, -1, 1)
-    return np.minimum(np.abs(at @ g.T), 1)
 
   # ---- the variance term
 
@@ -381,11 +284,158 @@ class degreeEnergies:
             f"{'groups' if self.grouped else 'units'}, {self.nFolds} folds, n_eff {self.neff:.0f}"))
 
 
+class S2DegreeEnergies(degreeEnergies):
+  """the degree energies of a sample of directions, degreeEnergies on S2"""
+  space = "S2"
+  kernel = S2DeLaValleePoussinKernel
+
+  def _read(self, x, antipodal, L):
+    v = asVector3d(x)
+    pts = v.data.reshape(-1, 3)
+    pts = pts / np.sqrt(np.einsum("ij,ij->i", pts, pts))[:, None]
+    self.antipodal = bool(v.antipodal) if antipodal is None else bool(antipodal)
+    sym = getattr(v.frame, "sym", None)
+    self.frame = v.frame
+    # the group acting on directions, as orthogonal matrices, the antipode among them
+    M = np.eye(3)[None] if sym is None else sym.rot.matrix().reshape(-1, 3, 3)
+    if self.antipodal and not any(np.allclose(m, -np.eye(3)) for m in M):
+      M = np.concatenate([M, -M])
+    self._group, self._sym = M, sym
+    return pts
+
+  # the coefficients of the weighted point measure of one fold, orthonormal for the uniform
+  # probability, projected onto the invariant functions as the estimate is
+  def _coefficients(self, pts, w, L):
+    from .s2fun import evenize, projectSpherical
+    c = np.zeros((L + 1) ** 2, dtype=complex)
+    if len(w):
+      c = math.sqrt(4 * np.pi) * S2FourierPlan(vector3d(pts), L, real=True, eps=TRANSFORM_EPS).adjoint(np.ones(len(w)), w)
+    if self._sym is not None and self._sym.numSym() > 1:
+      projectSpherical(c, self._sym)
+    return evenize(c) if self.antipodal else c
+
+  @property
+  def nSym(self):
+    """the number of symmetric copies of a point, the antipode included"""
+    return len(self._group)
+
+  # the symmetric copies s x of points
+  def _symmetricCopies(self, pts):
+    return [pts @ m.T for m in self._group]
+
+  def _degreeStarts(self, L):
+    return np.arange(L + 1) ** 2
+
+  # the dimension of degree l without symmetry
+  def _fullDims(self, L):
+    return 2 * np.arange(L + 1) + 1.0
+
+  # c_l(x) at the subsample, degree first: the diagonal of the projected reproducing kernel,
+  # (2l+1) mean_s P_l(x . s x)
+  def _traces(self, L):
+    M = self._group
+    if len(M) == 1:
+      return np.broadcast_to(self._fullDims(L)[:, None], (L + 1, len(self._sample)))
+    t = np.einsum("ni,gij,nj->ng", self._sample, M, self._sample)
+    P = _legendre(np.clip(t, -1, 1), L)
+    return (2 * np.arange(L + 1) + 1.0)[:, None] * P.mean(axis=2)
+
+  # the kernel's argument at an angle, and between points and copies: the cosine of the angle
+  def _cosineOf(self, angle):
+    return math.cos(angle)
+
+  def _cosines(self, at, g):
+    return np.clip(at @ g.T, -1, 1)
+
+
+class SO3DegreeEnergies(degreeEnergies):
+  """the degree energies of a sample of orientations, degreeEnergies on SO(3)"""
+  space = "SO3"
+  kernel = SO3DeLaValleePoussinKernel
+
+  def _read(self, x, antipodal, L):
+    o = x if isinstance(x, orientation) else orientation(x)
+    self.antipodal = bool(o.antipodal) if antipodal is None else bool(antipodal)
+    self.CS, self.SS = o.CS, o.SS
+    self._group = (o.SS.sym.properGroup().rotations().data.reshape(-1, 4),
+                   o.CS.sym.properGroup().rotations().data.reshape(-1, 4))
+    from .harmonics import invariantProjection
+    self._projections = (invariantProjection(o.SS, L), invariantProjection(o.CS, L))
+    return o.data.reshape(-1, 4)
+
+  # the coefficients of the weighted point measure of one fold, orthonormal for the uniform
+  # probability, projected onto the invariant functions as the estimate is
+  def _coefficients(self, pts, w, L):
+    from .harmonics import deg2dim, project
+    from .so3fun import invertedCoefficients
+    from .quadrature import folds
+    from .transforms import foldedDims
+    c = np.zeros(deg2dim(L + 1), dtype=complex)
+    if len(w):
+      # the z folds of the groups shrink the lattice, which pays where the FFT outweighs the
+      # spreading, with fewer points than a quarter of the lattice; 1.25 oversampling, since
+      # finufft spreads a thin lattice at 2.0 on many threads up to a hundred times slower
+      fd = folds(self.CS, self.SS) if len(w) < np.prod(foldedDims(L, True, (1, 1))) / 4 else (1, 1)
+      up = 1.25 if fd != (1, 1) else None
+      c = SO3FourierPlan(rotation._fromData(pts), L, real=True, folds=fd, eps=TRANSFORM_EPS, upsampfac=up).adjoint(np.ones(len(w)), w)
+    if self.nSym > 1:
+      c = project(c, *self._projections)
+    return (c + invertedCoefficients(c)) / 2 if self.antipodal else c
+
+  @property
+  def nSym(self):
+    """the number of symmetric copies of a point, the antipode included"""
+    return len(self._group[0]) * len(self._group[1]) * (2 if self.antipodal else 1)
+
+  # the symmetric copies a x b of points, and a x^-1 b for antipodal ones
+  def _symmetricCopies(self, pts):
+    GS, GC = self._group
+    sides = [pts, qconj(pts)] if self.antipodal else [pts]
+    return [qmul(qmul(a, y), b) for y in sides for a in GS for b in GC]
+
+  def _degreeStarts(self, L):
+    from .harmonics import deg2dim
+    return np.array([deg2dim(l) for l in range(L + 1)])
+
+  # the dimension of degree l without symmetry
+  def _fullDims(self, L):
+    return (2 * np.arange(L + 1) + 1.0) ** 2
+
+  # c_l(x) at the subsample, degree first: the diagonal of the projected reproducing kernel,
+  # (2l+1) mean_{a,b} chi_l(x^-1 a x b)
+  def _traces(self, L):
+    if self.nSym == 1:
+      return np.broadcast_to(self._fullDims(L)[:, None], (L + 1, len(self._sample)))
+    x = self._sample
+    t = np.stack([np.abs(np.sum(x * y, axis=1)) for y in self._symmetricCopies(x)], axis=1)
+    # the mean character over the copies, degree by degree through U_{2l+2} = (4t^2-2) U_2l - U_{2l-2}
+    c = np.empty((L + 1, len(x)))
+    y2 = 4 * t * t - 2
+    u0, u1 = np.ones_like(t), y2 + 1
+    c[0] = 1
+    for l in range(1, L + 1):
+      c[l] = (2 * l + 1) * u1.mean(axis=1)
+      u0, u1 = u1, y2 * u1 - u0
+    return c
+
+  # the kernel's argument at an angle, and between points and copies: the cosine of half the angle
+  def _cosineOf(self, angle):
+    return math.cos(angle / 2)
+
+  def _cosines(self, at, g):
+    return np.minimum(np.abs(at @ g.T), 1)
+
+
+# a map of orientations, which the estimate reads the orientations and the grains of
+def _isMap(x):
+  return not isinstance(x, (quaternion, vector3d)) and hasattr(x, "orientations")
+
+
 # ------------------------------------------------------------------ the selectors
 
 
 def _family(space):
-  return S2DeLaValleePoussinKernel if space == "S2" else SO3DeLaValleePoussinKernel
+  return S2DegreeEnergies.kernel if space == "S2" else SO3DegreeEnergies.kernel
 
 
 @functools.lru_cache(maxsize=4096)

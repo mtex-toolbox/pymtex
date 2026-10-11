@@ -21,11 +21,12 @@ import math
 
 import numpy as np
 
+from .kernels import _complexType
 from ..geometry._array import MtexArray
 from ..geometry.kernels import backend, heapBlocks, passiveOpenMP, threads
 from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import vector3d, asVector3d
 from .kernels import (wignerSeriesDirect, halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
                       sphericalForward, wignerAdjoint, wignerForward)
 from .nfft import NFFTPlan, nfftLibrary
@@ -55,10 +56,6 @@ def _finufft():
   passiveOpenMP()
   import finufft
   return finufft
-
-
-def _complexType(dtype):
-  return np.result_type(np.dtype(dtype), 1j)
 
 
 def _eps(eps, dtype):
@@ -485,7 +482,7 @@ class S2FourierPlan(_FourierPlan):
   reusable across coefficient vectors: plan(fhat) evaluates, plan.adjoint(values, weights)"""
 
   def __init__(self, v, L, real=False, eps=None, upsampfac=None):
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     dtype = v.data.dtype if v.data.dtype.kind == "f" else np.float64
     self.L, self.real = int(L), bool(real)
     self._init(v.size, dtype, (self.L + 1 if self.real else 2 * self.L + 1, 2 * self.L + 1), eps, upsampfac)
@@ -493,7 +490,7 @@ class S2FourierPlan(_FourierPlan):
 
   def setNodes(self, v):
     """moves the plan to other directions, the finufft plans kept"""
-    v = v if isinstance(v, vector3d) else vector3d(v)
+    v = asVector3d(v)
     x, y, phase, bad = s2Nodes(v.data.astype(self.dtype.type(0).real.dtype, copy=False), self._shift)
     self._setNodes((x, y), phase, bad)
 
@@ -887,7 +884,7 @@ def sphericalSeries(fhat, v, real=None):
     if 0 < L <= v.bandwidth:
       return sphericalPlan(v, L, real)(fhat)
     return sphericalSeries(fhat, v.nodes(), real)
-  v = v if isinstance(v, vector3d) else vector3d(v)
+  v = asVector3d(v)
   # the trigonometric sum over the transformed coefficients, kept for the next call, is ten times
   # faster than the sum of the harmonics at a few nodes too (L = 256, ten nodes: 0.55 ms against 7)
   if L == 0:
@@ -908,7 +905,7 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
     if 0 < L <= v.bandwidth:
       return sphericalPlan(v, L, real).adjoint(values, weights)
     return sphericalSeriesAdjoint(v.nodes(), values, L, weights, real)
-  v = (v if isinstance(v, vector3d) else vector3d(v)).flatten()
+  v = asVector3d(v).flatten()
   n = v.size
   weights = np.full(n, 1 / n) if weights is None else np.asarray(weights).ravel()
   if n < DIRECT_SUM_NODES or L == 0:

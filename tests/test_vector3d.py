@@ -304,3 +304,10 @@ def test_outer_dot_and_angle_pair_every_entry():
 def test_orthProj_dropsTheComponentAlongTheNormal():
   w = orthProj(vector3d(1, 2, 3), zvector)
   assert np.allclose(w.data, [1, 2, 0])
+
+
+def test_asVector3d_passesAVectorThroughAndWrapsCoordinates():
+  from mtex.geometry.vector3d import asVector3d
+  v = xvector
+  assert asVector3d(v) is v
+  assert isinstance(asVector3d([0.0, 1.0, 0.0]), vector3d) and close(asVector3d([0.0, 1.0, 0.0]).data, yvector.data)

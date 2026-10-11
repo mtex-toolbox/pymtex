@@ -68,9 +68,6 @@ def signedArea2(vs):
   return float(np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y))
 
 
-__all__ = []
-
-
 def _cross2(a, b):
   return a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
 
@@ -247,3 +244,6 @@ class polygonSet:
   if TYPE_CHECKING:
     from .shape import (principalComponents, fitEllipse, longAxis, shortAxis, aspectRatio, hullLoops, paris,
                         shapeFactor, convexity, caliper, paror, surfor)
+
+
+__all__ = []
