@@ -308,10 +308,19 @@ class orientation(rotation):
       v.antipodal = bool(antipodal)
     return v
 
-  # equal up to symmetry and a tolerance in the angle, between the same frames
-  def __eq__(self, other, tol=5e-4):
+  # equal between the same frames when the rotations are; isclose compares up to symmetry
+  def __eq__(self, other):
     if not isinstance(other, orientation):
-      return rotation.__eq__(self, other, tol)
+      return rotation.__eq__(self, other)
+    if self.frameA is not other.frameA or self.frameB is not other.frameB or self.antipodal != other.antipodal:
+      return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
+    return rotation.__eq__(self, other)
+
+  def isclose(self, other, tol=5e-4):
+    """equal up to the symmetry of the frames within the angular tolerance tol, between the same
+    frames, MATLAB's eq"""
+    if not isinstance(other, orientation):
+      return rotation.isclose(self, other, tol)
     if self.frameA is not other.frameA or self.frameB is not other.frameB or self.antipodal != other.antipodal:
       return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
     return self.dot(other) > np.cos(tol)

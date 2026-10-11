@@ -219,10 +219,14 @@ class quaternion(MtexArray):
     """the rotational axis, a unit vector"""
     return vector3d(quatAxis(self.data), isNormalized=True)
 
-  # two quaternions are equal within an angular tolerance
-  def __eq__(self, other, tol=5e-4):
+  # two quaternions are equal when their coefficients are; isclose compares within a tolerance
+  def __eq__(self, other):
     if not isinstance(other, quaternion):
       return NotImplemented
+    return np.all(self.data[..., :4] == other.data[..., :4], axis=-1)
+
+  def isclose(self, other, tol=5e-4):
+    """equal within the angular tolerance tol, MATLAB's eq"""
     return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
@@ -508,11 +512,19 @@ class rotation(quaternion):
       return other
     raise TypeError(f"expected a rotation, got {type(other).__name__}")
 
-  def __eq__(self, other, tol=5e-4):
+  # two rotations are equal when their quaternions are, q and -q being one rotation
+  def __eq__(self, other):
     if isinstance(other, orthogonalTransform):
       return orthogonalTransform(self, False) == other
     if not isinstance(other, quaternion):
       return NotImplemented
+    a, b = self.data[..., :4], other.data[..., :4]
+    return np.all(a == b, axis=-1) | np.all(a == -b, axis=-1)
+
+  def isclose(self, other, tol=5e-4):
+    """equal within the angular tolerance tol, MATLAB's eq"""
+    if isinstance(other, orthogonalTransform):
+      return orthogonalTransform(self, False).isclose(other, tol)
     return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
@@ -683,10 +695,16 @@ class orthogonalTransform(MtexArray):
     d = np.sum(self.data[..., :4] * q, axis=-1) * (self.parity == p)
     return d if not antipodal else np.abs(d)
 
-  def __eq__(self, other, tol=5e-4):
+  # two transforms are equal when their quaternions are, up to sign, and their parities
+  def __eq__(self, other):
     q, p = self._other(other)
     if q is None:
       return NotImplemented
+    a = self.data[..., :4]
+    return ((np.all(a == q, axis=-1) | np.all(a == -q, axis=-1)) & (self.parity == p))
+
+  def isclose(self, other, tol=5e-4):
+    """equal within the angular tolerance tol and of one parity, MATLAB's eq"""
     return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):

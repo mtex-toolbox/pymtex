@@ -67,7 +67,7 @@ def test_symmetrise_multiplicity_unique_mean_of_directions():
   assert symmetrise(Miller([[1, 0, 0], [1, 1, 0]], csC)).shape == (48, 2)
   assert multiplicity(Miller([[1, 0, 0], [1, 1, 0]], csC)).tolist() == [6, 12]
   # equivalent directions compare equal, and unique keeps one of each family
-  assert Miller(1, 0, 0, csC) == Miller(0, 1, 0, csC) and Miller(1, 0, 0, csC) != Miller(1, 1, 0, csC)
+  assert Miller(1, 0, 0, csC).isclose(Miller(0, 1, 0, csC)) and not Miller(1, 0, 0, csC).isclose(Miller(1, 1, 0, csC))
   assert angle(Miller(1, 0, 0, csC), Miller(0, -1, 0, csC)) < 1e-10
   assert close(angle(Miller(1, 0, 0, csC), Miller(0, -1, 0, csC), symmetry=False), pi / 2)
   assert close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC)), 3) and close(dot(Miller(1, 1, 1, csC), Miller(-1, 1, 1, csC), symmetry=False), 1)

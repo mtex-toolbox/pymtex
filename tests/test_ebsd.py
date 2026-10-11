@@ -175,7 +175,7 @@ def test_EBSD_orientationsOfSeveralPhasesAreRefused():
 def test_EBSD_carriesTheLatticeOfItsPositions():
   ebsd = sampleMap()
   assert ebsd.lattice.shape == "square" and ebsd.dPos == 1 and ebsd.unitCell.shape == (4,) and ebsd.unitCell.frame is ebsd.frame
-  assert ebsd.N == zvector
+  assert ebsd.N.isclose(zvector)
   hexa = sampleMap(A=np.array([[1.0, 0.5], [0.0, np.sqrt(3) / 2]]))
   assert hexa.lattice.shape == "hex" and hexa.unitCell.shape == (6,)
 

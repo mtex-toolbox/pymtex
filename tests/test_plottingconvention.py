@@ -7,7 +7,7 @@ from mtex import plottingConvention, vector3d, xvector, yvector, zvector, rotati
 
 def test_pictogram_and_parsing():
   pC = plottingConvention("y↑→x")
-  assert pC.north == yvector and pC.east == xvector and pC.outOfScreen == zvector
+  assert pC.north.isclose(yvector) and pC.east.isclose(xvector) and pC.outOfScreen.isclose(zvector)
   assert pC.char() == "y↑→x" and str(pC) == "y↑→x" and repr(pC) == "plottingConvention (y↑→x)"
   for s in ("y↑x→", "↑y→x", "y^->x", "x->y^"):
     assert plottingConvention(s) == pC
@@ -16,34 +16,34 @@ def test_pictogram_and_parsing():
       q = plottingConvention(oos, e)
       assert q.isPictogram and plottingConvention(q.char()) == q and plottingConvention(q.char(utf8=False)) == q
   assert plottingConvention("z⊙→x") == plottingConvention("y↑→x") and plottingConvention("z(x)->x") == plottingConvention.ij
-  assert plottingConvention("-x→↑y").east == -xvector
+  assert plottingConvention("-x→↑y").east.isclose(-xvector)
   setMTEXpref("UTF8Output", False)
   assert pC.char() == "y^->x"
 
 
 def test_named_conventions():
   ij = plottingConvention.ij
-  assert ij.east == xvector and ij.south == yvector and ij.intoScreen == zvector and ij.char() == "y↓→x"
+  assert ij.east.isclose(xvector) and ij.south.isclose(yvector) and ij.intoScreen.isclose(zvector) and ij.char() == "y↓→x"
   d3 = plottingConvention.default3D
   assert not d3.isPictogram and d3.char() == "xyz" and "outOfScreen" in repr(d3)
-  assert plottingConvention.edax(1).east == yvector and plottingConvention.edax(2).east == -yvector
-  assert plottingConvention.edax(3).east == xvector and plottingConvention.edax(4).east == -xvector
+  assert plottingConvention.edax(1).east.isclose(yvector) and plottingConvention.edax(2).east.isclose(-yvector)
+  assert plottingConvention.edax(3).east.isclose(xvector) and plottingConvention.edax(4).east.isclose(-xvector)
   with pytest.raises(ValueError):
     plottingConvention.edax(5)
-  assert plottingConvention().east == xvector and plottingConvention(rotation.id) == plottingConvention()
+  assert plottingConvention().east.isclose(xvector) and plottingConvention(rotation.id) == plottingConvention()
   assert plottingConvention(plottingConvention.ij) == plottingConvention.ij
 
 
 def test_setters_move_one_direction():
   pC = plottingConvention("y↑→x")
   pC.east = yvector
-  assert pC.east == yvector
+  assert pC.east.isclose(yvector)
   pC.north = -xvector
-  assert pC.north == -xvector
+  assert pC.north.isclose(-xvector)
   pC.west = zvector
-  assert pC.east == -zvector
+  assert pC.east.isclose(-zvector)
   pC.intoScreen = yvector
-  assert pC.outOfScreen == -yvector
+  assert pC.outOfScreen.isclose(-yvector)
 
 
 def test_rejected_strings():
@@ -55,9 +55,9 @@ def test_rejected_strings():
 def test_session_default():
   assert plottingConvention.default == plottingConvention.ij
   plottingConvention.default(north=xvector)
-  assert plottingConvention.default.north == xvector
+  assert plottingConvention.default.north.isclose(xvector)
   plottingConvention.default(intoScreen=zvector)
-  assert plottingConvention.default.intoScreen == zvector
+  assert plottingConvention.default.intoScreen.isclose(zvector)
   plottingConvention.default(east=xvector)
   assert plottingConvention.default == plottingConvention("y↓→x")
   pC = plottingConvention("y↑→x")

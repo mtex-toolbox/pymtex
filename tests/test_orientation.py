@@ -157,7 +157,7 @@ def test_map_adoptsTheFramesOfFramedInputs():
   h = Miller(1, 0, 0, cs)
   v = vector3d(0, 1, 0, frame=specimenFrame.rolling)
   om = orientation.map(h, v)
-  assert om.CS is cs and om.SS is specimenFrame.rolling and (om * h) == v
+  assert om.CS is cs and om.SS is specimenFrame.rolling and (om * h).isclose(v)
   assert orientation.map(h, xvector).SS is specimenFrame.default and orientation.map(xvector, xvector).CS.numSym() == 1
 
 

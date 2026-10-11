@@ -38,7 +38,7 @@ def test_right_vectorLivesInTheCrystalFrame():
 def test_left_andRight_areInverseAndIdempotent():
   _, _, _, v = trigonalLog()
   vr = right(v)
-  assert left(vr) == v and right(vr) is vr and left(v) is v
+  assert left(vr).isclose(v) and right(vr) is vr and left(v) is v
 
 
 def test_SO3TangentVector_rebuiltFromTheReferenceKeepsBothSymmetries():
@@ -280,8 +280,8 @@ def test_dot_crossAndAngle_ofTangentVectorsOnOneSide():
 
 def test_SO3TangentVector_equalityAcrossSides():
   _, _, _, t, u, _ = atOneReference()
-  assert np.all(t == t) and np.all(t == left(t)) and not np.any(t == u)
-  assert np.all(left(u + t) == t + u)
+  assert np.all(t == t) and np.all(t.isclose(left(t))) and not np.any(t.isclose(u))
+  assert np.all(left(u + t).isclose(t + u))
 
 
 def test_mean_andSum_ofTangentVectors():
@@ -411,7 +411,7 @@ def crystalTangent(CS):
 
 
 def test_exp_ofAPlainVectorIsARotation():
-  assert exp(v90) == rotation.byAxisAngle(vector3d.Z, pi / 2) and type(exp(v90)) is rotation
+  assert exp(v90).isclose(rotation.byAxisAngle(vector3d.Z, pi / 2)) and type(exp(v90)) is rotation
 
 
 def test_exp_ofACrystalDirectionIsAMisorientation():

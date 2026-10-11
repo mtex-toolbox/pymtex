@@ -229,6 +229,10 @@ hold(False)
 #
 # ## Behaviour that differs on purpose
 #
+# * **`==` compares coordinates.** `v1 == v2` of vectors, rotations, orientations, fibres or
+#   tangent vectors is true where the coordinates are equal (for rotations up to the sign of the
+#   quaternion); MATLAB's `==` compares within a tolerance and up to symmetry, which is
+#   `isclose(v1, v2)` or `v1.isclose(v2, tol=...)` here.
 # * **`calcGrains` changes the map it is given**, as described above.
 # * **A map read on a grid keeps its grid.** A map whose file stores a regular grid is a
 #   two-dimensional EBSD object at once, rows by columns, where MATLAB reads a list and

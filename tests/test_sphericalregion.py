@@ -202,7 +202,7 @@ def test_conventionalSector_ofATurnedMonoclinicFrameTilesTheSphere(name, angles)
 
 
 def test_sectorCenter_ofTheCubicTriangle():
-  assert sectorCenter(crystalFrame("m-3m")) == vector3d(1, 1, 1).normalize() + vector3d(1, 0, 1).normalize() + zvector
+  assert sectorCenter(crystalFrame("m-3m")).isclose(vector3d(1, 1, 1).normalize() + vector3d(1, 0, 1).normalize() + zvector)
 
 
 # the conventional sector of a frame's group, or of its Laue group, in the frame's plotting convention

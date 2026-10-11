@@ -23,7 +23,7 @@ def gossBrass():
 def test_fibre_segmentBetweenTwoComponentsCarriesTheirFrames():
   cs, oA, oB, f = gossBrass()
   assert f.CS is cs and f.SS is oA.SS and f.h.frame is cs and f.r.frame is oA.SS and f.shape == ()
-  assert f.h.round() == Miller(0, 1, 1, cs, "uvw") and f.r == zvector
+  assert f.h.round().isclose(Miller(0, 1, 1, cs, "uvw")) and f.r.isclose(zvector)
 
 
 def test_fibre_segmentEndsMapHToR():
@@ -48,7 +48,7 @@ def test_fibre_fullKeepsThePairAndDropsTheEnds():
   cs, oA, oB, f = gossBrass()
   full = fibre(f.h, f.r)
   assert full.isFull and close(full.arcAngle(), 2 * pi) and full.CS is cs and full.SS is f.SS
-  assert fibre(oA, oB, full=True).isFull and fibre(oA, f.h).isFull and fibre(oA, f.h) == full
+  assert fibre(oA, oB, full=True).isFull and fibre(oA, f.h).isFull and fibre(oA, f.h).isclose(full)
 
 
 def test_orientation_ofAFullFibreClosesTheCircle():
@@ -69,7 +69,7 @@ def test_fibre_endsHaveToShareTheirFrames():
 
 def test_fibre_coincidingEndsTurnAboutC():
   cs, oA, _, _ = gossBrass()
-  assert fibre(oA, oA).h == Miller(0, 0, 1, cs, "uvw")
+  assert fibre(oA, oA).h.isclose(Miller(0, 0, 1, cs, "uvw"))
 
 
 def test_angle_vanishesAtTheComponentsOfAFullFibre():
@@ -148,21 +148,21 @@ def test_fibre_namedFibreIsASegmentThroughItsEnds(name):
 def test_fibre_theta():
   cs = crystalFrame("432")
   th = fibre.theta(cs)
-  assert th.isFull and th.h == Miller(1, 0, 0, cs, "uvw") and th.r == zvector
+  assert th.isFull and th.h.isclose(Miller(1, 0, 0, cs, "uvw")) and th.r.isclose(zvector)
   assert fibre.theta().CS.pointGroup == cs.pointGroup
 
 
 def test_symmetrise_ofAFibreAreAllEqualToIt():
   th = fibre.theta(crystalFrame("432"), specimenFrame("222"))
   all_ = symmetrise(th)
-  assert all_.shape == (24 * 4,) and np.all(all_ == th)
+  assert all_.shape == (24 * 4,) and np.all(all_.isclose(th))
 
 
 def test_symmetrise_uniqueIdentifiesTheAntipodalPair():
   # <100> has six members, z two under 222, and (h, r) is the same fibre as (-h, -r)
   th = fibre.theta(crystalFrame("432"), specimenFrame("222"))
   u = symmetrise(th, unique=True)
-  assert u.size == 6 and multiplicity(th) == 6 and np.all(u == th)
+  assert u.size == 6 and multiplicity(th) == 6 and np.all(u.isclose(th))
 
 
 def test_multiplicity_ofAGenericFibreIsTheFullOrbit():
@@ -182,7 +182,7 @@ def test_fibre_equalityIsUpToSymmetryAndASegmentIsNotTheFullFibre():
 
 def test_fibre_equalityIdentifiesTheAntipodes():
   th = fibre.theta(crystalFrame("432"), specimenFrame("222"))
-  assert fibre(th.h, -th.r) == th and fibre(-th.h, -th.r) == th
+  assert fibre(th.h, -th.r).isclose(th) and fibre(-th.h, -th.r).isclose(th)
 
 
 def test_symmetrise_uniqueRefusesAList():

@@ -138,7 +138,7 @@ def test_rotation_keepsTheFlags():
 def test_dot_andCross():
   u, v = vector3d(1, 0, 0), vector3d(1, 1, 0)
   assert close(dot(u, v), 1) and close(u.dot(v), 1)
-  assert close(cross(u, v).data, [0, 0, 1]) and cross(xvector, yvector) == zvector
+  assert close(cross(u, v).data, [0, 0, 1]) and cross(xvector, yvector).isclose(zvector)
 
 
 def test_angle_betweenTwoVectors():
@@ -171,10 +171,11 @@ def test_angle_smallAngleStaysAccurate():
   assert close(angle(xvector, vector3d(1, 1e-9, 0)), 1e-9, tol=1e-20)
 
 
-def test_equality_is_by_direction():
-  assert vector3d(1, 0, 0) == vector3d(2, 0, 0)
+# isclose compares directions, == the coordinates
+def test_isclose_isByDirection_andEqualityByCoordinates():
+  assert vector3d(1, 0, 0).isclose(vector3d(2, 0, 0)) and not vector3d(1, 0, 0) == vector3d(2, 0, 0)
   assert not (vector3d(1, 0, 0) == vector3d(-1, 0, 0))
-  assert vector3d(1, 0, 0, antipodal=True) == vector3d(-1, 0, 0)
+  assert vector3d(1, 0, 0, antipodal=True).isclose(vector3d(-1, 0, 0))
   assert vector3d(1, 0, 0) != vector3d(0, 1, 0)
 
 
@@ -201,7 +202,7 @@ def girdle():
 
 def test_perp_isTheNormalOfAGirdle():
   N = girdle().perp()
-  assert N.antipodal and N == zvector
+  assert N.antipodal and N.isclose(zvector)
 
 
 def test_perp_ofATiltedGirdle():
@@ -211,7 +212,7 @@ def test_perp_ofATiltedGirdle():
 
 def test_eig_smallestAxisIsTheGirdleNormal():
   w, axes = girdle().eig()
-  assert axes[0] == zvector and close(w[0], 0)
+  assert axes[0].isclose(zvector) and close(w[0], 0)
 
 
 def test_mean_andSum():
@@ -227,7 +228,7 @@ def test_mean_weightedIsNormalized():
 
 def test_mean_ofAntipodalAxes():
   axes = cat(vector3d(0, 0, 1, antipodal=True), vector3d(0, 0, -1, antipodal=True))
-  assert axes.mean() == zvector and axes.mean().antipodal and axes.mean().isNormalized
+  assert axes.mean().isclose(zvector) and axes.mean().antipodal and axes.mean().isNormalized
   tilted = cat(vector3d(0, 0, 1, antipodal=True), vector3d(0, 0.01, -1, antipodal=True))
   assert angle(tilted.mean(), zvector) < 0.01
   assert vector3d([[1, 0, 0], [0, 1, 0]]).mean(antipodal=True).antipodal

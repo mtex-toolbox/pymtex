@@ -84,7 +84,7 @@ def test_axis_angle():
   assert same(rotation.byAxisAngle(vector3d(1, 2, 3), 40 * degree), rotation.byAxisAngle(vector3d(2, 4, 6), 40 * degree))
   assert same(rotation.byAxisAngle([0, 0, 1], pi / 2), Rz(pi / 2))
   assert rotation.byAxisAngle(zvector, [0.1, 0.2, 0.3]).shape == (3,)
-  assert rotation.byAxisAngle(vector3d(0, 0, 0), 0) == rotation.id and rotation.byAxisAngle(vector3d(0, 0, 0), 2 * pi) == rotation.id
+  assert rotation.byAxisAngle(vector3d(0, 0, 0), 0).isclose(rotation.id) and rotation.byAxisAngle(vector3d(0, 0, 0), 2 * pi).isclose(rotation.id)
   with pytest.raises(ValueError):
     rotation.byAxisAngle(vector3d(0, 0, 0), 1.0)
 
@@ -104,10 +104,10 @@ def test_map():
   for _ in range(20):
     u, v = vector3d.rand(rng=rng), vector3d.rand(rng=rng)
     r = rotation.map(u, v)
-    assert r * u == v and close(r.angle(), angle(u, v))
+    assert (r * u).isclose(v) and close(r.angle(), angle(u, v))
     u1, u2, s = vector3d.rand(rng=rng), vector3d.rand(rng=rng), rotation.rand(rng=rng)
     assert same(rotation.map(u1, s * u1, u2, s * u2), s)
-  assert rotation.map(xvector, xvector) == rotation.id
+  assert rotation.map(xvector, xvector).isclose(rotation.id)
   assert same(rotation.map(xvector, -xvector), rotation.byAxisAngle(yvector, pi))
   assert same(rotation.map(vector3d(1, 1, 1), zvector, vector3d(0, -1, 1), xvector) * vector3d(1, 1, 1), zvector)
   us, vs = vector3d.rand(4, rng=rng), vector3d.rand(4, rng=rng)

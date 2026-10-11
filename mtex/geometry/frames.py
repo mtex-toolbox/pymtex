@@ -472,7 +472,7 @@ def _unitRows(M):
 # which of the directions a vector is, and with which sign
 def _matchSigned(v, dirs):
   for sign, ud in ((1, True), (-1, False)):
-    hit = np.flatnonzero(v == sign * dirs)
+    hit = np.flatnonzero(v.isclose(sign * dirs))
     if hit.size:
       return int(hit[0]), ud
   return None, None

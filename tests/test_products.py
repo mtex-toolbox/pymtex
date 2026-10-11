@@ -48,7 +48,7 @@ def test_symmetrise_and_composition():
   assert (inv(orientation(rotation.rand(), cs)) * vector3d(1, 0, 0, frame=specimenFrame.default)).frame is cs
   assert (orientation(rotation.rand(), cs) * vector3d(1, 0, 0)).frame is specimenFrame.default
   assert (orientation(rotation.rand(5), cs) * Miller(1, 0, 0, cs)).shape == (5,)
-  assert rotate(Miller(1, 0, 0, cs), 0.5).frame is cs and rotate(Miller(1, 0, 0, cs), 0.5) == rotation.byAxisAngle(zvector, 0.5) * Miller(1, 0, 0, cs)
+  assert rotate(Miller(1, 0, 0, cs), 0.5).frame is cs and rotate(Miller(1, 0, 0, cs), 0.5).isclose(rotation.byAxisAngle(zvector, 0.5) * Miller(1, 0, 0, cs))
 
 
 def test_frame_change_is_not_rotation():

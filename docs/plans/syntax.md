@@ -189,3 +189,13 @@ about this; it is not part of R0 to R7.
 - The `calc` prefix (`calcGrains`, `calcODF`, ...) stays. New functions avoid it where no
   property clashes.
 - The numbered standard orientations stay.
+
+
+## The review of 2026-10-11
+
+The user decided on 2026-10-11 (`docs/plans/pythonic.md`): `==` of the geometric containers
+(quaternion, rotation, orthogonalTransform, orientation, vector3d, fibre, SO3TangentVector) is
+exact, the coordinates equal and for rotations up to the sign of the quaternion; MATLAB's
+tolerant `eq`, up to symmetry, is `isclose(other, tol=)` with MATLAB's defaults, and no `__eq__`
+takes a `tol`. Public indices count from zero; a string flag that duplicates a keyword is
+removed, the keyword stays.

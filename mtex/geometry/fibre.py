@@ -225,11 +225,19 @@ class fibre:
     """the number of distinct symmetrically equivalent fibres"""
     return self.symmetrise(unique=True).size
 
-  # two fibres are equal when their frames are the same and h and r agree up to the symmetry
-  # of their frames, both flipped counting as well; a segment is not the full fibre
-  def __eq__(self, other, tol=1e-6):
+  # two fibres are equal when their frames are and h and r are; isclose compares up to symmetry
+  def __eq__(self, other):
     if not isinstance(other, fibre):
       return NotImplemented
+    if self.CS is not other.CS or self.SS is not other.SS:
+      return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
+    return (self.h == other.h) & (self.r == other.r) & (self.isFull == other.isFull)
+
+  def isclose(self, other, tol=1e-6):
+    """equal when the frames are the same and h and r agree up to the symmetry of the frames
+    within tol, both flipped counting as well; a segment is not the full fibre (MATLAB's eq)"""
+    if not isinstance(other, fibre):
+      raise TypeError("a fibre is compared with a fibre")
     if self.CS is not other.CS or self.SS is not other.SS:
       return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
     L, R = reductionGroups(self.o1)

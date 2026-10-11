@@ -105,8 +105,8 @@ def test_rotation_actionIsAssociativeAndInverted():
   g = rng()
   r1, r2 = rotation.rand(rng=g), rotation.rand(rng=g)
   v = vector3d.rand(rng=g)
-  assert (r1 * r2) * v == r1 * (r2 * v)
-  assert inv(r1) * (r1 * v) == v and same(r1 * inv(r1), rotation.id)
+  assert ((r1 * r2) * v).isclose(r1 * (r2 * v))
+  assert (inv(r1) * (r1 * v)).isclose(v) and same(r1 * inv(r1), rotation.id)
 
 
 def test_rotation_equalityIgnoresTheSign():
@@ -132,13 +132,13 @@ def test_rotation_scaledIsAQuaternion():
 
 def test_angle_andAxis_ofAnAxisAngleRotation():
   r = rotation.byAxisAngle(vector3d(1, 2, 3), 40 * degree)
-  assert close(r.angle(), 40 * degree) and r.axis() == vector3d(1, 2, 3)
+  assert close(r.angle(), 40 * degree) and r.axis().isclose(vector3d(1, 2, 3))
   assert close(angle(r), 40 * degree)
   assert close(rotation.byAxisAngle(zvector, -30 * degree).angle(), 30 * degree)
 
 
 def test_axis_ofTheIdentityIsX():
-  assert rotation.id.axis() == xvector
+  assert rotation.id.axis().isclose(xvector)
 
 
 def test_angle_betweenRotationsFromTheDot():
@@ -160,9 +160,9 @@ def test_angle_smallAngleStaysAccurate():
 
 def test_equality_within_tolerance():
   r = rotation.rand(rng=rng())
-  assert r == r * rotation.byAxisAngle(xvector, 1e-4)
+  assert r.isclose(r * rotation.byAxisAngle(xvector, 1e-4)) and not r == r * rotation.byAxisAngle(xvector, 1e-4)
   assert r != r * rotation.byAxisAngle(xvector, 1e-2)
-  assert r.__eq__(r * rotation.byAxisAngle(xvector, 1e-2), tol=0.1)
+  assert r.isclose(r * rotation.byAxisAngle(xvector, 1e-2), tol=0.1)
 
 
 def ra():
@@ -173,18 +173,18 @@ def test_orthogonalTransform_negatedRotationIsImproper():
   r = ra()
   s = -r
   assert isinstance(s, orthogonalTransform) and s.isImproper and s.i and not orthogonalTransform(r).isImproper
-  assert s == rotation.inversion * r and orthogonalTransform.inversion == rotation.inversion
+  assert s.isclose(rotation.inversion * r) and orthogonalTransform.inversion.isclose(rotation.inversion)
 
 
 def test_inversion_negatesAVector():
-  assert rotation.inversion * vector3d(1, 2, 3) == vector3d(-1, -2, -3)
+  assert (rotation.inversion * vector3d(1, 2, 3)).isclose(vector3d(-1, -2, -3))
 
 
 def test_reflection_mirrorsInThePlane():
   n = vector3d(1, 1, 1)
   m = reflection(n)
-  assert m * n == -n and m * vector3d(1, -1, 0) == vector3d(1, -1, 0)
-  assert m == -rotation.byAxisAngle(n, pi)
+  assert (m * n).isclose(-n) and (m * vector3d(1, -1, 0)).isclose(vector3d(1, -1, 0))
+  assert m.isclose(-rotation.byAxisAngle(n, pi))
 
 
 def test_orthogonalTransform_productParity():
@@ -314,8 +314,8 @@ def test_log_isTheRotationVectorAndExpItsInverse():
 
 
 def test_exp_andLog_ofTheIdentityAndAQuarterTurn():
-  assert close(log(rotation.id).data, [0, 0, 0]) and exp(vector3d(0, 0, 0)) == rotation.id
-  assert exp(vector3d(0, 0, pi / 2)) * xvector == yvector
+  assert close(log(rotation.id).data, [0, 0, 0]) and exp(vector3d(0, 0, 0)).isclose(rotation.id)
+  assert (exp(vector3d(0, 0, pi / 2)) * xvector).isclose(yvector)
 
 
 def test_log_smallRotationKeepsItsDigits():

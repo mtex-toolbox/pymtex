@@ -584,17 +584,20 @@ class vector3d(MtexArray):
     n = self._coerce(N).normalize()
     return self - n * self.dot(n, antipodal=False, symmetry=False)
 
-  # two vectors are equal when they point the same way, up to the group of a crystal
-  # frame, vector3d/eq
+  # two vectors are equal when their coordinates are, in frames of one basis; isclose compares
+  # their directions up to symmetry
   def __eq__(self, other):
     if not isinstance(other, vector3d):
       return NotImplemented
+    if not self._sameBasisAs(other):
+      return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
+    return np.all(self.data == other.data, axis=-1)
+
+  def _sameBasisAs(self, other):
     if (self._frame is not other._frame) and self.isCrystalDirection and other.isCrystalDirection:
       from .frames import _sameBasis
-      if not _sameBasis(self._frame, other._frame):
-        return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
-    d = self.dot(other)
-    return isnull(d - self.norm() * other.norm())
+      return _sameBasis(self._frame, other._frame)
+    return True
 
   def __ne__(self, other):
     return ~(self == other)
@@ -683,13 +686,15 @@ class vector3d(MtexArray):
     out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
     return out if len(out) > 1 else u
 
-  def isclose(self, other, antipodal=False, tol=None):
-    """isclose(v, w), isclose(v, w, antipodal=True, tol=): equal up to symmetry within the
-    tolerance, and up to sign when antipodal (MATLAB's eq)"""
-    if antipodal:
-      a = self._new(self.data, antipodal=True)
-      return a.__eq__(other) if tol is None else a.__eq__(other, tol)
-    return self.__eq__(other) if tol is None else self.__eq__(other, tol)
+  def isclose(self, other, antipodal=False, tol=1e-10):
+    """isclose(v, w), isclose(v, w, antipodal=True, tol=): pointing the same way up to the group
+    of a crystal frame within the tolerance tol of the cosine, and up to sign when antipodal
+    (MATLAB's eq)"""
+    other = self._coerce(other)
+    a = self._new(self.data, antipodal=True) if antipodal else self
+    if not a._sameBasisAs(other):
+      return np.zeros(np.broadcast_shapes(a.shape, other.shape), dtype=bool)
+    return isnull(a.dot(other) - a.norm() * other.norm(), tol)
 
   def rotate(self, rot):
     """the vectors turned by a rotation, rot * v; a number is an angle about z"""

@@ -309,7 +309,7 @@ def test_makeDefault_replacesTheDefaultFramesConvention():
 
 def test_default_setsTheEastDirectionOfTheDefaultConvention():
   plottingConvention.default(east=xvector)
-  assert plottingConvention.default.east == xvector
+  assert plottingConvention.default.east.isclose(xvector)
 
 
 def test_makeDefault_anySpecimenFrameCanTakeOverTheDefault():
@@ -379,7 +379,7 @@ def test_crystalFrame_drawsCStarOutOfTheScreenAndAEast():
 
 def test_crystalFrame_monoclinicDrawsBEast():
   mono = crystalFrame("2/m", [8.6, 13, 7.2], [90, 116, 90])
-  assert mono.how2plot.east == mono.bAxis.normalize() and mono.conventionChar() == "⊙c*→b"
+  assert mono.how2plot.east.isclose(mono.bAxis.normalize()) and mono.conventionChar() == "⊙c*→b"
 
 
 def test_crystalFrame_cubicConventionYUpXRightNamesTheSameFrame():

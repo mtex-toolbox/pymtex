@@ -314,10 +314,16 @@ class SO3TangentVector(vector3d):
     c = np.linalg.norm(np.cross(self.data, other.data), axis=-1)
     return np.arctan2(c, d)
 
-  # equal vectors at the same reference, up to a tolerance in the components
-  def __eq__(self, other, tol=1e-6):
+  # equal vectors at the same reference; isclose compares within a tolerance
+  def __eq__(self, other):
     if not isinstance(other, SO3TangentVector):
       return NotImplemented
+    same = _sameReference(self.oriRef, other.oriRef)
+    other = other.toSide(self.side)
+    return np.logical_and(same, np.all(self.data == other.data, axis=-1))
+
+  def isclose(self, other, tol=1e-6):
+    """equal at the same reference within tol in the components (MATLAB's eq)"""
     same = _sameReference(self.oriRef, other.oriRef)
     other = other.toSide(self.side)
     return np.logical_and(same, np.linalg.norm(self.data - other.data, axis=-1) < tol)

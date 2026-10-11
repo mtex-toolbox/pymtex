@@ -98,7 +98,7 @@ fullFibre
 # displayed logical value confirms that the two definitions agree.
 
 directionFibre = fibre(h, r)
-sameFullFibre = fullFibre == directionFibre
+sameFullFibre = fullFibre.isclose(directionFibre)
 sameFullFibre
 
 # ## Symmetry Can Split the Plot
