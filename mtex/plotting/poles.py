@@ -42,7 +42,7 @@ def _oneDirection(h, fr, what):
     raise ValueError(f"one {what} at a time")
   # the frame of the orientations, a crystal frame compatible with it, or none at all
   if v.frame is not None and fr is not None and v.frame is not fr:
-    if not (isinstance(v.frame, crystalFrame) and isinstance(fr, crystalFrame) and v.frame.isCompatible(fr)):
+    if not (isinstance(v.frame, crystalFrame) and isinstance(fr, crystalFrame) and v.frame.isCompatible(fr)[0]):
       raise ValueError(f"the {what} lives in another frame than the orientations")
   return v
 

@@ -290,3 +290,13 @@ def test_SO3FunCBF_compiledSumIsTheKernelAtEveryFibrePair():
   H, Rv, w = f._expandedFibres()
   t = np.einsum("nij,ki,kj->nk", quat2mat(q.data.reshape(-1, 4)), Rv, H)
   assert np.allclose(f.eval(q), f.psi(np.clip(t, -1, 1)) @ w, rtol=1e-12)
+
+
+# the harmonic form kept for evaluating many terms follows the function when its weights change
+def test_SO3FunRBF_harmonicFormFollowsChangedWeights():
+  cs = crystalFrame("m-3m")
+  f = SO3FunRBF(orientation.rand(2000, cs, rng=rng), SO3DeLaValleePoussinKernel(halfwidth=10 * degree), np.full(2000, 1 / 2000))
+  q = orientation.rand(2000, cs, rng=rng)
+  before = f.eval(q)
+  f.weights = 2 * f.weights
+  assert np.allclose(f.eval(q), 2 * before)

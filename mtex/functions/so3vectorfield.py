@@ -503,7 +503,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
       if side == "left":
         if o.CS is not self.SS:
           raise ValueError("a left rotation maps out of the specimen frame of the field")
-        return self.rotate(rotation(o), side)._rebuild(None, CS=self.CS, SS=o.SS) if False else _reframe(self.rotate(rotation(o), side), self.CS, o.SS)
+        return _reframe(self.rotate(rotation(o), side), self.CS, o.SS)
       if o.SS is not self.CS:
         raise ValueError("a right rotation maps into the crystal frame of the field")
       return _reframe(self.rotate(rotation(o), side), o.CS, self.SS)

@@ -600,9 +600,7 @@ def _gradientField(f):
     from .rbf import HARMONIC_EVAL
     L, R = reductionGroups(f.center)
     if f.center.size ** 2 * len(L) * len(R) > HARMONIC_EVAL and f.psi.bandwidth <= getMTEXpref("maxSO3Bandwidth"):
-      if getattr(f, "_harmonicCache", None) is None:
-        f._harmonicCache = f._harmonic()
-      return f._harmonicCache.grad()
+      return f._harmonicForm().grad()
   if isinstance(f, (SO3FunRBF, SO3FunCBF)):
     return f.grad
   return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).grad()

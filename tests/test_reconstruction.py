@@ -303,3 +303,18 @@ def test_accumVotes_bestFitKeepsTheBestFit():
 def test_accumVotes_countCountsTheVotes():
   c = accumVotes(VOTE_GRAIN, VOTE_ID, VOTE_FIT, 2, count=True)
   assert c.kind == "count" and c.parentId[0, 0] == 2 and c.count[0, 0] == 4
+
+
+# after a merge the voted grains are the merged ones: every parent grain still fits its parent, and
+# reconsiderAll, which votes for the grains as measured, is refused
+def test_calcParentFromVote_afterAMergeTurnsTheMergedGrains(plain):
+  job = grownJob(plain)
+  job.mergeSimilar()
+  assert len(job.grains) < len(job.grainsPrior)
+  for _ in range(3):
+    job.calcGBVotes(p2c=True, threshold=3 * degree)
+    job.calcParentFromVote(minProb=0.5)
+  isP = job.grains.phaseId == job.parentPhaseId
+  assert isP.any() and np.max(fitsParent(job.grains)[isP]) < 2 * degree
+  with pytest.raises(ValueError):
+    job.calcGBVotes(p2c=True, reconsiderAll=True)

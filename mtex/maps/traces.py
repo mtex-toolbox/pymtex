@@ -45,6 +45,9 @@ def _ebsdTraces(ebsd, clusterId=None, method="Radon", minClusterSize=100, cutOff
   l = ebsd.lattice
   if l is None:
     raise ValueError("the traces are computed on a map measured on a lattice")
+  if method.lower() not in ("radon", "fourier"):
+    raise ValueError(f"the method of calcTraces on a map is 'Radon' or 'Fourier', not {method!r}")
+  radon = method.lower() == "radon"
   n = ebsd.size
   if clusterId is None:
     clusterId = (ebsd.isIndexed & ~ebsd.isPadding).reshape(-1).astype(np.int64)
@@ -54,12 +57,7 @@ def _ebsdTraces(ebsd, clusterId=None, method="Radon", minClusterSize=100, cutOff
   rel = np.zeros(sz)
   for ic in zip(*np.nonzero(cSize > minClusterSize)):
     pix = np.flatnonzero(np.all(cid == np.array(ic) + 1, axis=1))
-    if method.lower() == "radon":
-      omega[ic], rel[ic] = _radonTrace(P[pix], l, cutOff)
-    elif method.lower() == "fourier":
-      omega[ic], rel[ic] = _fourierTrace(l.ij[pix], l.A)
-    else:
-      raise ValueError(f"the method of calcTraces on a map is 'Radon' or 'Fourier', not {method!r}")
+    omega[ic], rel[ic] = _radonTrace(P[pix], l, cutOff) if radon else _fourierTrace(l.ij[pix], l.A)
   return _axes(l.plane, omega, ebsd.frame), rel, cSize
 
 

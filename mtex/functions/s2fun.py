@@ -383,8 +383,6 @@ class S2FunHarmonic:
       return S2FunHarmonic(a * self._fhat, self.frame, real=self.isReal and np.isreal(a), antipodal=self.antipodal, symmetrise=False, _internal=True)
     return NotImplemented
 
-  __rmul__ = __mul__
-
   def __truediv__(self, a):
     if isinstance(a, S2FunHarmonic):
       from .funops import mapFun, smoothBandwidth

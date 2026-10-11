@@ -327,7 +327,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     if isinstance(r, orientation):
       if self.frame is not None and r.CS is not self.frame:
         raise ValueError("the orientation maps out of the frame of the field")
-      return self.rotate(rotation(r))._rebuild(None, frame=r.SS) if False else _reframe(self.rotate(rotation(r)), r.SS)
+      return _reframe(self.rotate(rotation(r)), r.SS)
     rot = rotation(r.data.reshape(4))
     L = self.bandwidth
     D = _WignerD(rot, bandwidth=L)

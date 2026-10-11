@@ -300,8 +300,6 @@ class embedding:
   def __mul__(self, s):
     return self._new(self.u * np.asarray(s, dtype=float))
 
-  __rmul__ = __mul__
-
   def __truediv__(self, s):
     return self._new(self.u / np.asarray(s, dtype=float))
 

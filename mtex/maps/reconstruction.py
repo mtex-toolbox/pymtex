@@ -656,6 +656,8 @@ class parentGrainReconstructor:
     ind restricts reconsiderAll to prior grains of those positions and returns the table.
     """
     opts = dict(threshold=threshold, tol=tol, minFit=minFit, maxFit=maxFit, bestFit=bestFit, count=count)
+    if reconsiderAll and self.grains.size != self.grainsPrior.size:
+      raise ValueError("reconsiderAll votes for the grains as measured: call it before mergeSimilar, or after revert")
     if reconsiderAll:
       votes = self._reconsiderVotes(ind, curvatureFactor, opts)
       if ind is not None:
@@ -787,11 +789,18 @@ class parentGrainReconstructor:
         if maxCount is not None:
           do &= second < maxCount
     idx = np.flatnonzero(do)
+    # a grain that is a parent already is reconstructed again from its measured orientation, that
+    # of the one prior grain it is; a merged parent grain has no one measured orientation and stays
+    cur = self._pos(self.mergeId)
+    single = np.bincount(cur, minlength=self.grains.size) == 1
+    priorOf = np.full(self.grains.size, -1, dtype=np.int64)
+    priorOf[cur[single[cur]]] = np.flatnonzero(single[cur])
+    isP = self.grains.phaseId[idx] == self.parentPhaseId
+    idx, isP = idx[~isP | (priorOf[idx] >= 0)], isP[~isP | (priorOf[idx] >= 0)]
     if len(idx) == 0:
       return
-    # a grain that is a parent already is reconstructed again from its measured orientation
-    src = self.grainsPrior if self.isParent[idx].any() else self.grains
-    child = src.meanRotation.data.reshape(-1, 4)[idx]
+    child = self.grains.meanRotation.data.reshape(-1, 4)[idx].copy()
+    child[isP] = self.grainsPrior.meanRotation.data.reshape(-1, 4)[priorOf[idx[isP]]]
     q = qmul(child, self._PV()[v.parentId[idx, 0] - 1])
     self._setGrains(idx, q, self.parentPhaseId)
     val[idx] = np.nan

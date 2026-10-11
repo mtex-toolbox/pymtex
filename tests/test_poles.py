@@ -87,3 +87,10 @@ def test_orbit_sizes():
 def test_dynamicMarkerSize_shrinksWithTheCountBetweenBounds():
   assert dynamicMarkerSize(0) == 10 and dynamicMarkerSize(40) == 10
   assert 1.5 < dynamicMarkerSize(5000) < 5 and dynamicMarkerSize(10 ** 7) == 1.5
+
+
+# a crystal direction of a frame that no transition reaches, other lattice parameters, is refused
+def test_poles_ofADirectionInAnIncompatibleFrameAreRefused():
+  o = orientation.rand(3, crystalFrame("m-3m"))
+  with pytest.raises(ValueError):
+    poles(o, Miller(0, 0, 0, 1, crystalFrame("6/mmm", [3.2, 3.2, 5.2])))

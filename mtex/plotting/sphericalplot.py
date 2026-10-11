@@ -1202,8 +1202,7 @@ def plotKey(key, resolution=0.5 * degree, fundamentalRegion=True, **kw: Unpack[P
     if V.size == 0:
       continue
     rgb = np.clip(key.direction2color(V), 0, 1)
-    hs += [sP.ax.pcolormesh(Xb, Yb, np.ma.masked_invalid(np.ones(Xb.shape)), color=rgb[:, j0:j1].reshape(-1, 3), shading="flat",
-                            zorder=2) if False else _rgbMesh(sP.ax, X[:, j0:j1], Y[:, j0:j1], rgb[:, j0:j1]) for j0, j1 in _blocks(X)]
+    hs += [_rgbMesh(sP.ax, X[:, j0:j1], Y[:, j0:j1], rgb[:, j0:j1]) for j0, j1 in _blocks(X)]
   return hs
 
 

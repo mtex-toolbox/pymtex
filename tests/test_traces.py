@@ -55,3 +55,10 @@ def test_calcTraces_as_a_method():
   assert np.allclose(e.calcTraces(v)[0].data, calcTraces(e, v)[0].data)
   with pytest.raises(ValueError):
     calcTraces(e, v, "hist")
+
+
+# a method of another name is refused also when no cluster is large enough to be traced
+def test_calcTraces_refusesAnUnknownMethodWithoutClusters():
+  e, v = stripes(0.0)
+  with pytest.raises(ValueError):
+    calcTraces(e, v, "hist", minClusterSize=e.size)

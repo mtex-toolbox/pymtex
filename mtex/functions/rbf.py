@@ -173,6 +173,50 @@ class SO3FunRBF:
       raise ValueError("one weight per centre")
     self.c0 = float(c0)
 
+  # the centres, the kernel, the weights and the constant define the function: setting one drops
+  # the harmonic form kept for evaluation; an element assigned in place, f.weights[0] = w, does not
+  @property
+  def center(self):
+    """the centres of the kernels, a flat list of orientations"""
+    return self._center
+
+  @center.setter
+  def center(self, c):
+    self._center, self._harmonicCache = c, None
+
+  @property
+  def psi(self):
+    """the kernel"""
+    return self._psi
+
+  @psi.setter
+  def psi(self, psi):
+    self._psi, self._harmonicCache = psi, None
+
+  @property
+  def weights(self):
+    """the weight of every centre"""
+    return self._weights
+
+  @weights.setter
+  def weights(self, w):
+    self._weights, self._harmonicCache = w, None
+
+  @property
+  def c0(self):
+    """the constant added to the sum of kernels"""
+    return self._c0
+
+  @c0.setter
+  def c0(self, c):
+    self._c0, self._harmonicCache = c, None
+
+  def _harmonicForm(self):
+    """the harmonic form at the kernel's bandwidth, kept until the function is changed"""
+    if getattr(self, "_harmonicCache", None) is None:
+      self._harmonicCache = self._harmonic()
+    return self._harmonicCache
+
   @property
   def CS(self):
     """the crystal frame of the function, that of its centres"""
@@ -224,9 +268,7 @@ class SO3FunRBF:
     q = r.data.reshape(-1, 4)
     L, R = reductionGroups(self.center)
     if self.center.size * len(L) * len(R) * len(q) > HARMONIC_EVAL and self.psi.bandwidth <= getMTEXpref("maxSO3Bandwidth"):
-      if getattr(self, "_harmonicCache", None) is None:
-        self._harmonicCache = self._harmonic()
-      return np.real(self._harmonicCache.eval(r)).reshape(r.shape)
+      return np.real(self._harmonicForm().eval(r)).reshape(r.shape)
     cut = supportCosine(self.psi)
     m = len(L) * len(R) * (2 if self.antipodal else 1)
     # many terms of a local kernel through the cell list of the centres, the rest by blocks
