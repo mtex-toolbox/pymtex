@@ -174,12 +174,8 @@ class grain3d:
 
   def id2ind(self, ids):
     """the position of grain ids"""
-    ids = np.asarray(ids)
-    pos = {g: k for k, g in enumerate(self.id)}
-    try:
-      return np.array([pos[int(g)] for g in ids.reshape(-1)], dtype=np.int64).reshape(ids.shape)
-    except KeyError:
-      raise ValueError("no grain of that id") from None
+    from ..maps.grains import _idPositions
+    return _idPositions(self.id, ids)
 
   # the names grains['...'] takes, which IPython completes inside the brackets
   def _ipython_key_completions_(self):

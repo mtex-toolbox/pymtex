@@ -22,7 +22,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
-from .taylor import TaylorModel, _taylorCrystal, calcTaylor
+from .taylor import _taylorMany, TaylorModel, calcTaylor
 from ..tensors.tensor import strainTensor, tensor
 from ..geometry.install import install
 from ..geometry.display import framesLabel
@@ -200,7 +200,8 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
       for l, p in enumerate(rh):
         e = np.outer(rd, rd) - p * np.outer(td, td) - (1 - p) * np.outer(nd, nd)
         E = r @ e @ r.T
-        M[l, k] = sum(wi * _taylorCrystal(Qi.T @ E @ Qi, model, plasticWork=True)[0] for wi, Qi in zip(w, Q))
+        # the strain in every crystal frame, Q^T E Q, solved in one call
+        M[l, k] = _taylorMany(np.einsum("nji,jk,nkl->nil", Q, E, Q), model, True, model.spinSelection)[0] @ w
   elif _isSO3Fun(x):
     from ..functions.so3fun import SO3FunHarmonic
     turned = [SO3FunHarmonic(x.rotate(rotation.byAxisAngle(vector3d(nd), t)), bandwidth=bandwidth) for t in th]

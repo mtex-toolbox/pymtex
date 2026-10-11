@@ -34,6 +34,19 @@ from ..geometry.display import aligned, frameLabel
 FIELDS = ("id", "phaseId", "CSList", "numPixel", "meanRotation", "GOS", "frame", "prop", "boundary", "innerBoundary", "loops", "phaseMap")
 
 
+# the positions of the ids asked for in a list of ids, in their shape, refused when one is not in
+# it; an id the list holds twice is found at its last place
+def _idPositions(ids, query):
+  ids = np.asarray(ids, dtype=np.int64).reshape(-1)
+  a = np.asarray(query).astype(np.int64)
+  pos = np.full(int(ids.max(initial=0)) + 1, -1, dtype=np.int64)
+  pos[ids] = np.arange(len(ids))
+  inside = (a >= 0) & (a < len(pos))
+  out = np.where(inside, pos[np.where(inside, a, 0)], -1)
+  if np.any(out < 0):
+    raise ValueError("a requested grain id is not in the selection")
+  return out
+
 class grain2d(polygonSet):
   """the grains of a map, MATLAB's grain2d: a table of ids, phases, pixel counts, mean orientations
   and properties, with the boundary, the inner boundary and the loops of every grain's polygon
@@ -328,12 +341,7 @@ class grain2d(polygonSet):
     """the positions of grain ids in this list
     the positions of grain ids in the list, in the shape of the ids: one for a number, a
     pair per boundary segment for gB.grainId"""
-    pos = {int(g): k for k, g in enumerate(self.id)}
-    a = np.asarray(ids)
-    flat = a.reshape(-1)
-    if not all(int(i) in pos for i in flat):
-      raise ValueError("a requested grain id is not in the selection")
-    out = np.array([pos[int(i)] for i in flat], dtype=int).reshape(a.shape)
+    out = self._lookup(np.asarray(ids))
     return int(out) if np.isscalar(ids) else out
 
   def findByOrientation(self, ori, epsilon):
@@ -348,11 +356,7 @@ class grain2d(polygonSet):
 
   def selectByGrainId(self, ids):
     """the grains named by id, in the order asked for"""
-    ids = np.atleast_1d(np.asarray(ids)).reshape(-1)
-    pos = {int(g): k for k, g in enumerate(self.id)}
-    if not all(int(i) in pos for i in ids):
-      raise ValueError("a requested grain id is not in the selection")
-    return self._subset(np.array([pos[int(i)] for i in ids], dtype=int))
+    return self._subset(self._lookup(np.atleast_1d(np.asarray(ids)).reshape(-1)))
 
   def __iter__(self):
     return (self[k] for k in range(self.size))
@@ -428,33 +432,35 @@ class grain2d(polygonSet):
     bounds = np.searchsorted(parent[order], np.arange(1, n + 2))
     members = [order[bounds[p]:bounds[p + 1]] for p in range(n)]
     T = self.meanRotation.data.dtype
-    phaseId = np.array([self.phaseId[m[0]] for m in members], dtype=np.int8)
-    numPixel = np.array([self.numPixel[m].sum() for m in members], dtype=np.int32)
-    meanRot = np.zeros((n, 4), dtype=T)
-    gos = np.zeros(n, dtype=T)
-    hostOf = np.zeros(n, dtype=np.int64) - 1
+    grp = parent - 1
+    w = self.numPixel.astype(T)
+    size = np.bincount(grp, minlength=n)
+    phaseId = self.phaseId[order[bounds[:-1]]].astype(np.int8)
+    numPixel = np.bincount(grp, weights=self.numPixel, minlength=n).astype(np.int32)
+    gos = (np.bincount(grp, weights=self.GOS * w, minlength=n) / np.maximum(1, np.bincount(grp, weights=w, minlength=n))).astype(T)
+    # the largest member of every group, the first of the largest
+    byWeight = np.lexsort((np.arange(self.size), -w, grp))
+    big = byWeight[np.searchsorted(grp[byWeight], np.arange(n))]
+    meanRot = self.meanRotation.data[big].astype(T)
+    # a group holding an inclusion takes its host, the member of the longest boundary
     if isIncl.any():
       bSize = self.boundarySize
-      for k, m in enumerate(members):
-        if isIncl[m].any():
-          hostOf[k] = m[np.argmax(bSize[m])]
-    for k, m in enumerate(members):
-      w = self.numPixel[m].astype(T)
-      big = m[np.argmax(w)]
-      gos[k] = np.sum(self.GOS[m] * w) / max(1, w.sum())
-      if hostOf[k] >= 0:
-        phaseId[k] = self.phaseId[hostOf[k]]
-        meanRot[k] = self.meanRotation.data[hostOf[k]]
-        continue
-      if not self.CSList.isIndexed(phaseId[k]) or len(m) == 1:
-        meanRot[k] = self.meanRotation.data[big]
-        continue
-      G = self.CSList[phaseId[k]].sym.properGroup().rotations().data.reshape(-1, 4).astype(T)
-      ref = self.meanRotation.data[big]
-      q = closestImage(ref, self.meanRotation.data[m], np.array([[1.0, 0, 0, 0]], dtype=T), G, False)[1]
-      q = np.where((q @ ref)[:, None] < 0, -q, q) * w[:, None]
-      s = q.sum(axis=0)
-      meanRot[k] = s / np.linalg.norm(s)
+      for k in np.unique(grp[isIncl]):
+        m = members[k]
+        host = m[np.argmax(bSize[m])]
+        phaseId[k], meanRot[k] = self.phaseId[host], self.meanRotation.data[host]
+    # the others of several indexed members average the images closest to their largest member
+    avg = (size > 1) & np.array([self.CSList.isIndexed(p) for p in phaseId]) & ~np.isin(np.arange(n), grp[isIncl])
+    for p in np.unique(phaseId[avg]):
+      rows = np.flatnonzero(avg[grp] & (phaseId[grp] == p))
+      G = self.CSList[p].sym.properGroup().rotations().data.reshape(-1, 4).astype(T)
+      ref = self.meanRotation.data[big[grp[rows]]]
+      q = closestImage(ref, self.meanRotation.data[rows], np.array([[1.0, 0, 0, 0]], dtype=T), G, False)[1]
+      q = np.where(np.sum(q * ref, axis=1)[:, None] < 0, -q, q) * w[rows, None]
+      sums = np.zeros((n, 4))
+      np.add.at(sums, grp[rows], q)
+      ks = np.unique(grp[rows])
+      meanRot[ks] = sums[ks] / np.linalg.norm(sums[ks], axis=1, keepdims=True)
     gB, inner = self._relabelBoundary(parent, n)
     return grain2d(np.arange(1, n + 1), phaseId, self.CSList, numPixel, meanRot, gos, self.frame, {"childId": [self.id[m].tolist() for m in members]},
                    boundary=gB, innerBoundary=inner, phaseMap=self.phaseMap)
@@ -464,6 +470,9 @@ class grain2d(polygonSet):
     pos = np.full(int(self.id.max(initial=0)) + 1, -1, dtype=np.int64)
     pos[self.id] = np.arange(self.size)
     return pos
+
+  def _lookup(self, ids):
+    return _idPositions(self.id, ids)
 
   def _pairPositions(self, pairs, pos):
     def at(ids):

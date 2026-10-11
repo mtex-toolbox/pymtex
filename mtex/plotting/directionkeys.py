@@ -327,7 +327,7 @@ class HSVDirectionKey(directionColorKey):
       imgs = qrot(els[None, :, :], unit[:, None, :]) * self.sym.rot.flatten().data[None, :, 4:5]
       best = np.argmax(imgs @ wC, axis=1)
       hs = imgs[np.arange(n), best]
-      rho = np.array([azimuthAbout2(x, wC, owC) for x in hs])
+      rho = azimuthAbout2(hs, wC, owC)
       r = np.maximum(0.0, 1 - _angle(hs, wC) / self.maxAngle)
       rgb = self._sphereColor(np.where(finite, r, 0.0), np.where(finite, rho, 0.0), gray)
       return rgb.reshape(shape + (3,))
@@ -344,10 +344,12 @@ class HSVDirectionKey(directionColorKey):
 
 
 def azimuthAbout2(h, center, ref):
-  """the azimuth of h about the centre, measured from the reference direction"""
-  p = h - (h @ center) * center
+  """the azimuth of h, one direction or rows of them, about the centre, measured from the
+  reference direction"""
+  h = np.asarray(h, dtype=float)
+  p = h - (h @ center)[..., None] * center
   r = ref - (ref @ center) * center
-  return np.arctan2(np.cross(r, p) @ center, r @ p)
+  return np.arctan2(np.cross(r, p) @ center, p @ r)
 
 
 class TSLDirectionKey(directionColorKey):

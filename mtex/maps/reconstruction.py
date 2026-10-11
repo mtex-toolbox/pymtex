@@ -26,6 +26,7 @@ from types import SimpleNamespace
 import numpy as np
 from scipy.special import erf
 
+from .grains import _idPositions
 from ..geometry.orientation import orientation
 from ..geometry.parent2child import calcParent, calcParent2Child, calcVariantId, round2Miller
 from ..geometry.quaternion import qmul
@@ -707,8 +708,7 @@ class parentGrainReconstructor:
     cur = self.mergeId[sel]
     hit = np.isin(both[:, 0], cur)
     both = both[hit]
-    rowOf = {int(c): k for k, c in enumerate(cur)}
-    r = np.array([rowOf[int(c)] for c in both[:, 0]], dtype=np.int64)
+    r = _idPositions(cur, both[:, 0])
     nb = pos[both[:, 1]]
     isP = g.phaseId[nb] == P
     fit = np.full((len(both), numV), np.nan)

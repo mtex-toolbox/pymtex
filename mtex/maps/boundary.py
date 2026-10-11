@@ -218,15 +218,20 @@ class grainBoundary:
   @property
   def chainV(self):
     """the vertices of every chain in walk order, the chains separated by -1"""
-    out = []
+    n = len(self)
+    if n == 0:
+      return np.zeros(0, dtype=np.int32)
+    # the end of segment k after k segments, the first vertex of every chain so far and the
+    # separators between them: 2 c - 1 places for the c-th chain
     start = self.isChainStart
-    for k in range(len(self)):
-      if start[k]:
-        if out:
-          out.append(-1)
-        out.append(self.F[k, 0])
-      out.append(self.F[k, 1])
-    return np.array(out, dtype=np.int32)
+    c = np.cumsum(start)
+    out = np.empty(n + 2 * c[-1] - 1, dtype=np.int32)
+    at = np.arange(n) + 2 * c - 1
+    out[at] = self.F[:, 1]
+    first = np.flatnonzero(start)
+    out[at[first] - 1] = self.F[first, 0]
+    out[at[first[1:]] - 2] = -1
+    return out
 
   @property
   def componentId(self):
@@ -559,35 +564,29 @@ def triplePoints(gB):
   order = np.argsort(v, kind="stable")
   vs, ss = v[order], seg[order]
   starts = np.searchsorted(vs, np.arange(len(gB.V) + 1))
-  Vs, rows, segs, angs, vids = [], [], [], [], []
-  for vert in np.flatnonzero(deg == 3):
-    at = ss[starts[vert]:starts[vert + 1]]
-    g = np.unique(gB.grainId[at])
-    # three segments of only two grains is a cut, and a junction on the rim of the map
-    # is not a point where three grains meet
-    if len(g) != 3 or g.min() <= 0:
-      continue
-    Vs.append(gB.V[vert])
-    vids.append(vert)
-    rows.append(g)
-    segs.append(at)
-    far = np.where(gB.F[at, 0] == vert, gB.F[at, 1], gB.F[at, 0])
-    o = gB.V[far] - gB.V[vert]
-    th = np.sort(np.arctan2(o[:, 1], o[:, 0]))
-    angs.append([th[1] - th[0], th[2] - th[1], 2 * np.pi - (th[2] - th[0])])
-  n = len(Vs)
-  V = np.array(Vs, dtype=T).reshape(n, 2)
-  gid = np.array(rows, dtype=np.int32).reshape(n, 3)
-  bid = np.array(segs, dtype=np.int32).reshape(n, 3)
-  ang = np.array(angs, dtype=T).reshape(n, 3)
-  # the phase of a grain is read off the segment it borders
-  pid = np.full((n, 3), OUTSIDE, dtype=np.int8)
-  for i in range(n):
-    for c in range(3):
-      hit = np.flatnonzero(gB.grainId[bid[i]] == gid[i, c])
-      k, side = divmod(hit[0], 2)
-      pid[i, c] = gB.phaseId[bid[i, k], side]
-  return triplePointList(V, gid, pid, bid, ang, gB.CSList, gB.plane, gB.frame, np.array(vids, dtype=np.int64))
+  # the three segments of every vertex of degree three, and the grains on their six sides
+  vert = np.flatnonzero(deg == 3)
+  at = ss[starts[vert][:, None] + np.arange(3)]
+  G = np.sort(gB.grainId[at].reshape(len(vert), 6), axis=1)
+  first = np.concatenate([np.ones((len(vert), 1), dtype=bool), G[:, 1:] != G[:, :-1]], axis=1)
+  # three segments of only two grains is a cut, and a junction on the rim of the map
+  # is not a point where three grains meet
+  ok = (first.sum(axis=1) == 3) & (G[:, 0] > 0)
+  vert, at, G, first = vert[ok], at[ok], G[ok], first[ok]
+  n = len(vert)
+  gid = G[first].reshape(n, 3).astype(np.int32)
+  bid = at.astype(np.int32)
+  V = gB.V[vert].astype(T).reshape(n, 2)
+  far = np.where(gB.F[at, 0] == vert[:, None], gB.F[at, 1], gB.F[at, 0])
+  o = gB.V[far] - gB.V[vert][:, None, :]
+  th = np.sort(np.arctan2(o[..., 1], o[..., 0]), axis=1)
+  ang = np.stack([th[:, 1] - th[:, 0], th[:, 2] - th[:, 1], 2 * np.pi - (th[:, 2] - th[:, 0])], axis=1).astype(T).reshape(n, 3)
+  # the phase of a grain is read off the first side of its segments that it borders
+  sides = gB.grainId[bid].reshape(n, 6)
+  hit = np.argmax(sides[:, None, :] == gid[:, :, None], axis=2)
+  k, side = np.divmod(hit, 2)
+  pid = gB.phaseId[bid[np.arange(n)[:, None], k], side].astype(np.int8)
+  return triplePointList(V, gid, pid, bid, ang, gB.CSList, gB.plane, gB.frame, vert.astype(np.int64))
 
 
 # ------------------------------------------------------------------ the walk
