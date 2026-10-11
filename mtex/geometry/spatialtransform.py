@@ -535,9 +535,16 @@ class spatialTransformDrift(spatialTransform):
     grp = np.empty(len(t), dtype=np.int64)
     grp[order] = np.cumsum(start) - 1
     knots = ts[start]
-    u = np.array([[np.median(dx[grp == g]), np.median(dy[grp == g])] for g in range(len(knots))])
+    u = np.stack([_groupMedian(dx, grp, len(knots)), _groupMedian(dy, grp, len(knots))], axis=1)
     return spatialTransformDrift(knots, u, slowScan=vector3d(sc), extrapolate=extrapolate)
 
+
+# the median of the values of every group 0 .. k-1, each group's values sorted together
+def _groupMedian(values, grp, k):
+  order = np.lexsort((values, grp))
+  a, c = values[order], np.bincount(grp, minlength=k)
+  s = np.concatenate([[0], np.cumsum(c)[:-1]])
+  return (a[s + (c - 1) // 2] + a[s + c // 2]) / 2
 
 class spatialTransformField(spatialTransform):
   """a displacement interpolated between points: linear over their triangulation, the nearest point's

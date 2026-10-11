@@ -87,28 +87,27 @@ class OrientationTree:
       rows = np.repeat(todo, S)
       dist, ii = self.tree.query(flat[rows], k=min(k, 2 * self.n),
                                  distance_upper_bound=2 * np.sin(min(delta, np.pi) / 4), workers=threads())
-      dist = np.atleast_2d(dist.reshape(int(todo.sum()), -1))
-      gg = (np.atleast_2d(ii.reshape(int(todo.sum()), -1)) % self.n)
-      where = np.flatnonzero(todo)
-      for m, q in enumerate(where):
-        order = np.argsort(dist[m], kind="stable")
-        seen, gi, gd = {}, [], []
-        for p in order:
-          dv = dist[m, p]
-          if not np.isfinite(dv):
-            break
-          g = int(gg[m, p])
-          if g in seen:
-            continue
-          seen[g] = True
-          gi.append(g)
-          gd.append(dv)
-          if len(gi) == k:
-            break
-        if len(gi) == k:
-          outI[q] = gi
-          outD[q] = _cosFromChord(np.array(gd))
-          todo[q] = False
+      m = int(todo.sum())
+      dist = np.atleast_2d(dist.reshape(m, -1))
+      gg = np.atleast_2d(ii.reshape(m, -1)) % self.n
+      # every grid point once per query, at its nearest image, then the k nearest of them
+      row = np.repeat(np.arange(m), dist.shape[1])
+      d, g = dist.reshape(-1), gg.reshape(-1)
+      fin = np.isfinite(d)
+      row, d, g = row[fin], d[fin], g[fin]
+      o = np.lexsort((d, g, row))
+      row, d, g = row[o], d[o], g[o]
+      first = np.concatenate([[True], (row[1:] != row[:-1]) | (g[1:] != g[:-1])])
+      row, d, g = row[first], d[first], g[first]
+      o = np.lexsort((g, d, row))
+      row, d, g = row[o], d[o], g[o]
+      start = np.searchsorted(row, np.arange(m))
+      count = np.bincount(row, minlength=m)
+      done = np.flatnonzero(count >= k)
+      at = start[done][:, None] + np.arange(k)
+      where = np.flatnonzero(todo)[done]
+      outI[where], outD[where] = g[at], _cosFromChord(d[at])
+      todo[where] = False
       delta *= 1.7
       if not todo.any() or delta >= np.pi:
         break

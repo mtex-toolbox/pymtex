@@ -25,7 +25,6 @@ from ..geometry._array import MtexArray
 from ..geometry.kernels import backend, heapBlocks, passiveOpenMP, threads
 from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
-from ..geometry.representations import quat2euler
 from ..geometry.vector3d import vector3d
 from .kernels import (wignerSeriesDirect, halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
                       sphericalForward, wignerAdjoint, wignerForward)
@@ -307,12 +306,6 @@ def _quaternions(rots):
   if not isinstance(rots, quaternion):
     raise TypeError("the nodes are a container of rotations")
   return rots.data.reshape(-1, 4)
-
-
-# the Matthies angles of a rotation container as flat arrays, and their float type
-def _euler(rots):
-  q = _quaternions(rots)
-  return quat2euler(q, "Matthies"), q.dtype
 
 
 # the NUFFT of one node set, reusable across coefficient vectors: type 2 evaluates, type 1 is
@@ -773,8 +766,7 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
   n = rots.size
   weights = np.full(n, 1 / n) if weights is None else np.asarray(weights).ravel()
   if n < DIRECT_SUM_NODES or L == 0:
-    (_, _, _), dtype = _euler(rots)
-    fhat = np.zeros(deg2dim(L + 1), dtype=_complexType(np.result_type(dtype, values.dtype)))
+    fhat = np.zeros(deg2dim(L + 1), dtype=_complexType(np.result_type(_quaternions(rots).dtype, values.dtype)))
     D = _WignerD(rots.flatten(), bandwidth=L)
     for n_ in range(L + 1):
       degreeBlock(fhat, n_)[...] = math.sqrt(2 * n_ + 1) * np.einsum("i,ikl->kl", weights * values, np.conj(D[n_]))

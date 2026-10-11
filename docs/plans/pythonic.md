@@ -91,3 +91,17 @@ projections of `spherical.py`, the cost constants of `transforms.py`.
 The whole documentation is built (`docs/make.py`, every page) and every page checked against its
 MATLAB reference (`docs/matlab/<Page>/`, `docs/plans/remaining-pages.md`, `docs/findings.md`):
 the refactor must not have changed what a page shows.
+
+## Done
+
+- Phase 2, the decisions: `==` exact and `isclose(tol=)` (7af70b9), zero-based public indices
+  (9911d0b), flags as keywords with `refuseFlags` (4b51309).
+- Phase 1, the bugs, each with a test that failed before (5736f94).
+- Phase 3, the speed items, each measured, equal to what it replaces: `calcLankford` over
+  orientations 42 s to 0.55 s (50 orientations), `id2ind` 72 to 0.6 ms, `triplePoints` 159 to 26 ms,
+  `chainV` 25 to 3.5 ms, `merge` 39 to 23 ms, the S2 sample's symmetry 2.4 s to 96 ms (1e5),
+  the k nearest on a grid 306 to 96 ms (1e4), `symmetry.lattice` cached, the scan line medians
+  by group, the direction key's azimuths in one call, the pole figure's Clenshaw-Curtis weights
+  from `quadrature.clenshawCurtis`. Measured and left: `findByLocation` (a tree costs 300 ms to
+  build on 1e6 positions against 10 ms per scanned query), `vector3d`'s `_isFrame` (a fraction of
+  2.4 us), the plot of grains (26 ms of its own), the reconstruction loops (checked against MATLAB).

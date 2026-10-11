@@ -792,7 +792,7 @@ def _discreteSampleS2(f, n, resolution, rng):
   v = rotation.byAxisAngle(vector3d.rand(n, rng=rng), 1.5 * resolution * np.sqrt(rng.random(n))) * vector3d(cand[idx])
   if fr is not None:
     els = (fr.sym.Laue() if antipodal else fr.sym).rot.flatten()
-    v = vector3d(np.stack([(els[i] * v[j]).data for j, i in enumerate(rng.integers(els.size, size=n))]))
+    v = els[rng.integers(els.size, size=n)] * v
   return vector3d(v.data, frame=fr, antipodal=antipodal)
 
 

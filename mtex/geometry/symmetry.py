@@ -19,6 +19,7 @@
 # position, see docs/plans/geometry.md.
 from __future__ import annotations
 
+from functools import cached_property
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -309,7 +310,7 @@ class symmetry:
     """the highest order of a rotation axis of the group perpendicular to z, 1 if there is none"""
     return self._maxOrder(lambda r: np.abs(r.axis().dot(zvector)) < 1e-4)
 
-  @property
+  @cached_property
   def lattice(self):
     """the crystal system, from the axes the group has"""
     axes, mult = self.elements()

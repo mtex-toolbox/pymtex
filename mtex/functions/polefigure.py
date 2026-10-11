@@ -20,6 +20,7 @@ import math
 
 import numpy as np
 
+from .quadrature import clenshawCurtis
 from ..geometry._array import MtexArray
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.s2grid import S2Grid
@@ -674,20 +675,6 @@ def _productGrid(v, tol=1e-6):
 
 
 # Clenshaw-Curtis weights on the nodes cos(k pi / N), k = 0..N
-def _clenshawCurtisWeights(N):
-  if N == 0:
-    return np.array([2.0])
-  k = np.arange(N + 1)
-  w = np.zeros(N + 1)
-  for j in range(0, N // 2 + 1):
-    b = 1 if (2 * j == 0 or 2 * j == N) else 2
-    w += b * np.cos(2 * j * k * np.pi / N) / (1 - 4 * j * j)
-  w *= 2 / N
-  w[0] /= 2
-  w[-1] /= 2
-  return w
-
-
 def calcQuadratureWeights(v, method="voronoi"):
   """weights that integrate a function from samples at the directions, summing to one
 
@@ -705,7 +692,7 @@ def calcQuadratureWeights(v, method="voronoi"):
     # truncated weights as MATLAB does
     uth, urh = grid
     N = int(round(np.pi / uth[1]))
-    w = _clenshawCurtisWeights(N)[:len(uth)]
+    w = clenshawCurtis(N + 1)[1][:len(uth)]
     if len(uth) == N // 2 + 1 and N % 2 == 0 and abs(uth[-1] - np.pi / 2) < 1e-6:
       w[-1] /= 2
     th = v.flatten().theta
