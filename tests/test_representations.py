@@ -135,6 +135,6 @@ def test_quat2mat_ofManyQuaternionsAgreesWithNumpy():
   M = quat2mat(q)
   setMTEXpref("kernels", "numpy")
   try:
-    assert np.array_equal(M, quat2mat(q))
+    assert np.allclose(M, quat2mat(q), rtol=0, atol=1e-14)
   finally:
     setMTEXpref("kernels", "numba")

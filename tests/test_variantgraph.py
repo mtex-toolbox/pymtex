@@ -75,7 +75,9 @@ def test_MCL_splits_two_cliques():
   assert np.all(M[:3, 3:] < 1e-3) and np.all(M[3:, :3] < 1e-3)
 
 
-def test_mclExpand_isScipysProductInflatedAndPrunedBitForBit():
+# SciPy's product inflated and pruned, to rounding: the sums may run in another order on another
+# processor, so an entry within rounding of the threshold may be kept by one and pruned by the other
+def test_mclExpand_isScipysProductInflatedAndPruned():
   rng = np.random.default_rng(4)
   n, m = 3000, 20000
   A = csr_matrix((rng.random(m) * 0.3, (rng.integers(0, n, m), rng.integers(0, n, m) // 3)), shape=(n, n))
@@ -84,7 +86,9 @@ def test_mclExpand_isScipysProductInflatedAndPrunedBitForBit():
   S.data[S.data <= 1e-4] = 0
   S.eliminate_zeros()
   E = mclExpandNumba(A, 1.05, 1e-4)
-  assert np.array_equal(E.indptr, S.indptr) and np.array_equal(E.indices, S.indices) and np.array_equal(E.data, S.data)
+  e, s = E.toarray(), S.toarray()
+  near = np.maximum(e, s) <= 1e-4 * (1 + 1e-12)
+  assert np.all((np.abs(e - s) <= 1e-12 * np.maximum(np.abs(e), np.abs(s))) | near)
 
 
 def test_variantPairs_areTheDenseTableAboveOneTenthInChunks():

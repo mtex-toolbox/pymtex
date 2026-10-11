@@ -218,7 +218,7 @@ def test_heapBlocks_keepsTheFreedPagesOfALargeBlock():
 
 def test_superfib_agrees_with_numpy(numbaBackend):
   from mtex.geometry.kernels import _superfibNumpy, superfib
-  assert np.array_equal(superfib(1001, np.sqrt(2), 1.533751168755204), _superfibNumpy(1001, np.sqrt(2), 1.533751168755204))
+  assert np.allclose(superfib(1001, np.sqrt(2), 1.533751168755204), _superfibNumpy(1001, np.sqrt(2), 1.533751168755204), rtol=0, atol=1e-14)
 
 def test_region_membership_agrees_with_numpy(numbaBackend):
   # the planes of a fundamental region turned by the rotations about z, as the SO(3) grid tests
@@ -233,6 +233,8 @@ def test_region_membership_agrees_with_numpy(numbaBackend):
   assert np.array_equal(keep, k0) and np.array_equal(near, n0) and keep.any() and near.any() and not near.all()
 
 
+# equal to rounding: the compiled loop may fuse or order its operations otherwise on another
+# processor, as GitHub's runners showed
 def test_closestAngle_isTheChordAngleOfTheClosestImage():
   rng = np.random.default_rng(5)
   q1, q2 = rng.standard_normal((2, 3000, 4))
@@ -241,7 +243,7 @@ def test_closestAngle_isTheChordAngleOfTheClosestImage():
   L = crystalFrame("432").rotations().data.reshape(-1, 4)
   R = crystalFrame("622").rotations().data.reshape(-1, 4)
   ref = chordAngle(q1, kernels.closestImage(q1, q2, L, R, True)[1])
-  assert np.array_equal(kernels.closestAngle(q1, q2, L, R, True), ref, equal_nan=True)
+  assert np.allclose(kernels.closestAngle(q1, q2, L, R, True), ref, rtol=1e-12, atol=1e-14, equal_nan=True)
 
 
 def test_columnMinMax_areNumpysReductionsOverTheLongAxis():
