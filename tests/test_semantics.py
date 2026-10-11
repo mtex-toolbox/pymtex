@@ -201,7 +201,7 @@ def test_S17_normalised_and_antipodal():
   assert not v.isNormalized and m.normalize(v).isNormalized
   a = m.vector3d(1, 2, 3, antipodal=True)
   b = m.vector3d(-1, -2, -3, antipodal=True)
-  assert a.isclose(b) and m.angle(a, b) == 0
+  assert a == b and m.angle(a, b) == 0
   assert m.angle(a, m.vector3d(-1, 0, 0)) <= pi / 2
   assert m.angle(a, m.vector3d(-1, -2, -3)) == 0
   assert not (a + a).antipodal and not (m.normalize(v) + m.normalize(v)).isNormalized

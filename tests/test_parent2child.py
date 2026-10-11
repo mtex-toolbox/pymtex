@@ -311,12 +311,12 @@ def test_allHKL_isCoprimeAndComplete():
   assert len(H) == 98 and not np.any(np.all(H == 0, axis=1))
 
 
-# the fit is silent unless verbose, and reports the optimisation when it is
-def test_calcParent2Child_isSilentUnlessVerbose(capsys):
+# the fit reports the optimisation unasked, as MATLAB's, and is silent with verbose=False
+def test_calcParent2Child_reportsUnlessSilenced(capsys):
   cs1, cs2 = crystalFrame("m-3m", mineral="parent"), crystalFrame("m-3m", mineral="child")
   p2c = orientation.byEuler(10 * degree, 20 * degree, 30 * degree, cs1, cs2)
   mori = orientation.rand(20, cs2, cs2)
-  calcParent2Child(mori, p2c, local=True)
+  calcParent2Child(mori, p2c, local=True, verbose=False)
   assert capsys.readouterr().out == ""
-  calcParent2Child(mori, p2c, local=True, verbose=True)
+  calcParent2Child(mori, p2c, local=True)
   assert "optimizing" in capsys.readouterr().out

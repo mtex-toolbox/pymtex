@@ -134,7 +134,9 @@ def _calcTensorMap(ebsd, tensors, which, weights):
       Tp = T.inv() if inverse else T
       m = Tp._turnedMean(o, wp)
       acc = acc + (m.M.ravel() if m is not None else (o * Tp).data.reshape(o.size, -1).T @ (wp / np.sum(wp))) * np.sum(wp)
-    return tensors[0]._as(type(tensors[0]), acc / total, ss)
+    # the mean of the inverses is of the inverse's class, a compliance for a stiffness
+    T0 = tensors[0].inv() if inverse else tensors[0]
+    return T0._as(type(T0), acc / total, ss)
   dens = np.concatenate([np.full(o.size, np.nan if T.density is None else T.density) for T, o, _ in phases])
   density = float(ws @ dens / total) if np.all(np.isfinite(dens)) else None
   voigt = turned(False)

@@ -311,3 +311,8 @@ def test_asVector3d_passesAVectorThroughAndWrapsCoordinates():
   v = xvector
   assert asVector3d(v) is v
   assert isinstance(asVector3d([0.0, 1.0, 0.0]), vector3d) and close(asVector3d([0.0, 1.0, 0.0]).data, yvector.data)
+
+
+def test_equality_ofAxesIdentifiesTheNegative():
+  v = vector3d(1.0, 2.0, 3.0, antipodal=True)
+  assert bool(v == -v) and not bool(vector3d(1.0, 2.0, 3.0) == -vector3d(1.0, 2.0, 3.0))

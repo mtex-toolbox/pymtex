@@ -190,3 +190,12 @@ def test_calcTensor_ofAMapAveragesThePhasesTurnedTensors():
   inverted = np.concatenate([(oa * Ca).inv().data.reshape(200, -1), (ob * Cb).inv().data.reshape(200, -1)])
   assert np.allclose(V.M.ravel(), turned.mean(axis=0), rtol=1e-12)
   assert np.allclose(R.inv().M.ravel(), inverted.mean(axis=0), rtol=1e-10)
+
+
+def test_calcTensor_ofAMapKeepsTheClassOfTheTensorInEveryAverage():
+  from mtex import EBSD, phaseList
+  a = crystalFrame("m-3m")
+  pos = np.stack([np.arange(50.0), np.zeros(50), np.zeros(50)], axis=-1)
+  ebsd = EBSD(pos, rotation.rand(50, rng=rng), np.ones(50, dtype=np.int8), phaseList(a))
+  C = stiffnessTensor(np.eye(6) * 50 + 10, a)
+  assert all(type(T) is stiffnessTensor for T in calcTensor(ebsd, C, "all"))

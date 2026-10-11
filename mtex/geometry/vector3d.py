@@ -591,7 +591,11 @@ class vector3d(MtexArray):
       return NotImplemented
     if not self._sameBasisAs(other):
       return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
-    return np.all(self.data == other.data, axis=-1)
+    same = np.all(self.data == other.data, axis=-1)
+    # an axis is the same axis as its negative, as a rotation is its quaternion up to sign
+    if self.antipodal or other.antipodal:
+      same = same | np.all(self.data == -other.data, axis=-1)
+    return same
 
   def _sameBasisAs(self, other):
     if (self._frame is not other._frame) and self.isCrystalDirection and other.isCrystalDirection:

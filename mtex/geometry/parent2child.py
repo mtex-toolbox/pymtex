@@ -190,7 +190,7 @@ def _cat(a, b):
 
 
 def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, maxIteration=30, maxSample=50000,
-                     searchResolution=4 * degree, scanSample=250, numLocal=5, verbose=False, fit=False):
+                     searchResolution=4 * degree, scanSample=250, numLocal=5, verbose=True, fit=False):
   """calcParent2Child(c2c, p2c0), calcParent2Child(childOri, p2c0), calcParent2Child(c2c, p2c0, local=True)
 
   The parent to child orientation relationship fitted to child to child misorientations,
