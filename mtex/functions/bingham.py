@@ -13,26 +13,19 @@ import numpy as np
 
 from .s2funclass import S2Fun
 from ..geometry.frames import referenceFrame
+from ..geometry.kernels import qconj, qmul
 from ..geometry.orientation import orientation
-from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
+from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import frameLabel, framesLabel
-from .funops import _antipodalPole, _rotatedFrame
+from .funops import _antipodalPole, _rotatedFrame, _side
 from .handles import S2FunHandle, SO3FunGeneric
 from .rbf import _framesAmong, _rotationsFor
 from .s2fun import S2FunHarmonic
 from ..geometry.display import aligned
 from ..geometry.framepair import installFramePair
-
-
-# the coefficients c_1 .. c_s of prod (x - kappa_i) = x^s + c_1 x^{s-1} + ... + c_s
-def _charpolyCoefficients(kappa):
-  c = np.array([1.0])
-  for k in kappa:
-    c = np.concatenate([c, [0.0]]) - np.concatenate([[0.0], k * c])
-  return c[1:]
 
 
 def mhyper(kappa):
@@ -44,13 +37,12 @@ def mhyper(kappa):
   # the mean moves by exp(c) with kappa + c: the series runs on non-negative entries, whose terms do not cancel
   c = float(np.min(kappa))
   kappa = kappa - c
-  p = _charpolyCoefficients(kappa)[::-1]
+  # the coefficients c_s .. c_1 of prod (x - kappa_i) = x^s + c_1 x^{s-1} + ... + c_s
+  p = np.poly(kappa)[:0:-1]
   beta1 = s / 2
   d = np.ones(s) / beta1
   y = 1.0
-  i = 0
-  for j in range(1, s):
-    i = j
+  for i in range(1, s):
     d[i] = np.sum(-(np.arange(i, 2 * i) / (2 * i)) * p[s - i:s] * d[:i])
     y += d[i]
     d /= beta1 + i
@@ -166,15 +158,11 @@ class SO3FunBingham(SO3FunGeneric):
   # conjugates under exchange symmetry, one 4x4 matrix per copy
   def _symmetricAxes(self):
     L, R = reductionGroups(orientation(rotation.id, self.CS, self.SS))
-    axes = rotation(self.A.T)
-    copies = []
-    for l in rotation(L):
-      for r in rotation(R):
-        moved = l.inv() * axes * r.inv()
-        copies.append(moved.data.T)
-        if self.antipodal:
-          copies.append(moved.inv().data.T)
-    return np.stack(copies)
+    # moved[l, r, i] = l^-1 a_i r^-1, the conjugates beside them under exchange symmetry
+    moved = qmul(qmul(qconj(L)[:, None, None], self.A.T[None, None]), qconj(R)[None, :, None])
+    if self.antipodal:
+      moved = np.stack([moved, qconj(moved)], axis=2)
+    return moved.reshape(-1, 4, 4).swapaxes(-1, -2)
 
   def eval(self, x):
     """the values of the distribution at orientations, the mean over the symmetric copies of its axes"""
@@ -204,12 +192,10 @@ class SO3FunBingham(SO3FunGeneric):
     side='right', from the right (the crystal side)"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     axes = rotation(self.A.T)
-    if side == "left":
+    if _side(side) == "left":
       moved, CS, SS = rot * axes, self.CS, _rotatedFrame(self.SS, rot)
-    elif side == "right":
-      moved, CS, SS = axes * rot, _rotatedFrame(self.CS, rot), self.SS
     else:
-      raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+      moved, CS, SS = axes * rot, _rotatedFrame(self.CS, rot), self.SS
     return SO3FunBingham(self.kappa, moved.data.T, CS, SS, weight=self.weight, antipodal=self.antipodal and CS is SS)
 
   # the pole figure of one crystal direction by Kunze and Schaeben: on the fibre q(phi) =
@@ -238,7 +224,8 @@ class SO3FunBingham(SO3FunGeneric):
         a = ((A1 ** 2 + A2 ** 2) @ self.kappa) / 2
         b = ((A1 ** 2 - A2 ** 2) @ self.kappa) / 2
         c = (A1 * A2) @ self.kappa
-        acc += np.exp(a) * ive(0, np.hypot(b, c)) * np.exp(np.hypot(b, c))
+        h = np.hypot(b, c)
+        acc += np.exp(a + h) * ive(0, h)
       return (self.weight / self.C0 * acc / len(copies)).reshape(rs.shape)
 
     L = min(64, getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
@@ -290,7 +277,6 @@ def _fibreAxes(h, r):
   h = h.normalize().data.reshape(3)
   r = r.normalize().data.reshape(3)
   qr, qh = np.array([0.0, *r]), np.array([0.0, *h])
-  from ..geometry.kernels import qmul
   rh = qmul(qr[None], qh[None]).reshape(4)
   q1 = np.array([1.0, 0, 0, 0]) - rh
   q2 = qr + qh

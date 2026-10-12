@@ -23,8 +23,9 @@ from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import conv
-from .harmonics import deg2dim, dim2deg, invariantProjection, project
+from .harmonics import _s2PerDegree, _so3PerDegree, deg2dim, dim2deg, invariantProjection, project
 from .kde import calcDensityReal
+from .kernels import _groupSums
 from .kernelfunctions import SO3DirichletKernel
 from .rbf import SO3FunRBF, _densityKernel, uniformODF
 from .s1fun import calcDensity as _calcDensityS1
@@ -123,18 +124,20 @@ def _selectedKernel(x, weights, groups):
 
 
 def _sobolevWeightsSO3(L, s):
-  return np.concatenate([np.full((2 * n + 1) ** 2, (1 + n * (n + 1)) ** s) for n in range(L + 1)])
+  n = np.arange(L + 1)
+  return _so3PerDegree((1.0 + n * (n + 1)) ** s)
 
 
 def _sobolevWeightsS2(L, s):
-  return np.concatenate([np.full(2 * l + 1, (1 + l * (l + 1)) ** s) for l in range(L + 1)])
+  l = np.arange(L + 1)
+  return _s2PerDegree((1.0 + l * (l + 1)) ** s)
 
 
 def _lsqr(A, At, b, n, maxIter, tol):
   return _lsqrFull(A, At, b, n, maxIter, tol)[0]
 
 
-# the solution, scipy's stop reason, the iterations and the residual norm; the operators are
+# the solution, LSQR's flag, the relative residual and the iterations; the operators are
 # transforms and the iteration's norms and products of vectors run on BLAS, whose waiting
 # threads would take the transforms' cores (docs/research/threads.md)
 def _lsqrFull(A, At, b, n, maxIter, tol):
@@ -177,7 +180,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     # nodes closer than 0.02 are one node carrying the mean of their values, as MATLAB's
     o, iu = o.flatten().unique(tol=0.02, return_inverse=True)
     count = np.bincount(iu, minlength=o.size)
-    y = (np.bincount(iu, y.real, o.size) + 1j * np.bincount(iu, y.imag, o.size) if not real else np.bincount(iu, y, o.size)) / count
+    y = _groupSums(iu, y, o.size) / count
     if weights is not None and not isinstance(weights, str):
       weights = np.bincount(iu, np.asarray(weights, dtype=float).ravel(), o.size)
     lam = 1e-8 if lambda_ is None else lambda_
@@ -186,7 +189,7 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     nSym = nA * nB * (2 if real else 1)
     L = min(dim2deg(max(1, round(len(q) * nSym / 2))), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
     # the nodes weighted by their Voronoi volumes below 10000 of them, else equally, as MATLAB's
-    if isinstance(weights, str) and weights == "equal" or weights is None and len(q) >= 1e4:
+    if (isinstance(weights, str) and weights == "equal") or (weights is None and len(q) >= 1e4):
       w = np.full(len(q), 1 / len(q))
     elif weights is None or isinstance(weights, str):
       from .rbfinterpolation import voronoiVolumes
@@ -206,7 +209,9 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
       return (v + invertedCoefficients(v)) / 2 if o.antipodal else v
 
     def A(x):
-      return (v := sym(x), np.concatenate([sw * p(v), reg * v]))[1]
+      v = sym(x)
+      return np.concatenate([sw * p(v), reg * v])
+
     def At(z):
       return sym(p.adjoint(sw * z[:len(q)], np.ones(len(q))) + reg * z[len(q):])
     b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
@@ -271,7 +276,9 @@ def interpS2(v, y, *args, symmetry=True, **kwargs):
       raise NotImplementedError("a vector field through vectors is interpolated with 'harmonic'")
     sF = interpolate(v, y, **kwargs)
   else:
-    y = np.asarray(y).reshape(v.size, -1).squeeze(-1) if np.asarray(y).size == v.size else np.asarray(y).reshape(v.size, -1)
+    y = np.asarray(y).reshape(v.size, -1)
+    if y.shape[1] == 1:
+      y = y[:, 0]
     nodes = v.flatten()
     if "nearest" in flags:
       res = nodes.resolution
@@ -293,7 +300,8 @@ def interpS2(v, y, *args, symmetry=True, **kwargs):
       def spline(w):
         W = w.normalize().data.reshape(-1, 3)
         omega = np.arccos(np.clip(W @ V.T, -1, 1))
-        j = np.argsort(omega, axis=1)[:, :4]
+        k = min(4, omega.shape[1])
+        j = np.argpartition(omega, k - 1, axis=1)[:, :k]
         so = np.take_along_axis(omega, j, axis=1)
         M = np.minimum(1 / so, 1e10) if "inverseDistance" in flags else np.real(psi.eval(np.cos(so)))
         M = M / M.sum(axis=1, keepdims=True)

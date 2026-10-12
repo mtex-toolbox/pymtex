@@ -18,16 +18,12 @@ import numpy as np
 from ..geometry.frames import specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.units import degree
-from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
+from .table import _canonicalName, _tableStart, readFile, readTable, text
 
 # the Euler conventions by the names of their three columns
 EULER_COLUMNS = {("phi1", "phi", "phi2"): "Bunge", ("euler 1", "euler 2", "euler 3"): "Bunge",
                  ("alpha", "beta", "gamma"): "Matthies"}
 QUATERNION_COLUMNS = ("quat real", "quat i", "quat j", "quat k")
-
-
-def _canonical(name):
-  return re.sub(r"\s+", " ", str(name).strip().lower())
 
 
 def loadOrientation(fname, CS=None, SS=None, columnNames=None, columns=None, radians=False, delimiter=None, header=None,
@@ -46,13 +42,9 @@ def loadOrientation(fname, CS=None, SS=None, columnNames=None, columns=None, rad
   if delimiter is None and str(fname).lower().endswith(".csv"):
     delimiter = ","
   data = readFile(fname)
-  if header is None:
-    sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None
-    head, offset = leadingLines(data, lambda l: isNumericRow(l if sep is None else l.replace(sep, b" ")))
-    if offset >= len(data):
-      raise ValueError(f"{fname} holds no row of numbers")
-  else:
-    head, offset = linesFrom(data, 0, int(header))
+  head, offset = _tableStart(data, header, delimiter)
+  if offset is None:
+    raise ValueError(f"{fname} holds no row of numbers")
   names = list(columnNames) if columnNames is not None else (text(head[-1]).split() if head else None)
   if names is None:
     raise ValueError(f"{fname} does not name its columns; pass them as columnNames=['phi1', 'Phi', 'phi2']")
@@ -61,7 +53,7 @@ def loadOrientation(fname, CS=None, SS=None, columnNames=None, columns=None, rad
     M = M[:, list(columns)]
   if M.shape[1] < len(names):
     raise ValueError(f"{fname} has {M.shape[1]} columns, the names given are {len(names)}")
-  at = {_canonical(n): M[:, k] for k, n in enumerate(names)}
+  at = {_canonicalName(n): M[:, k] for k, n in enumerate(names)}
   used = None
   for cols, convention in EULER_COLUMNS.items():
     if all(c in at for c in cols):
@@ -77,7 +69,7 @@ def loadOrientation(fname, CS=None, SS=None, columnNames=None, columns=None, rad
       raise ValueError("the columns name no orientation: phi1, Phi, phi2; alpha, beta, gamma; or Quat real, Quat i, Quat j, Quat k")
   if passive:
     ori = orientation(ori.inv(), CS, SS)
-  S = {re.sub(r"\s+", "", _canonical(n)): at[_canonical(n)] for n in names if _canonical(n) not in used}
+  S = {re.sub(r"\s+", "", n): v for n, v in at.items() if n not in used}
   return ori, S
 
 

@@ -26,7 +26,7 @@ from .orientation import orientation
 from .quaternion import orthogonalTransform, quaternion, rotation
 from .representations import axis2quat, isnull
 from .session import SESSION
-from .vector3d import vector3d
+from .vector3d import _uniqueOutput, vector3d
 from .display import aligned
 from .framepair import installFramePair
 
@@ -359,9 +359,7 @@ class SO3TangentVector(vector3d):
     appearance; with return_index and return_inverse the index maps as well"""
     ref = self._oneReference()
     out = vector3d(self.data).unique(tol=tol, stable=True, return_index=True, return_inverse=True)
-    u = self._rebuild(out[0].data, ref)
-    out = (u,) + ((out[1],) if return_index else ()) + ((out[2],) if return_inverse else ())
-    return out if len(out) > 1 else u
+    return _uniqueOutput(self._rebuild(out[0].data, ref), out[1], out[2], return_index, return_inverse)
 
   # ------------------------------------------------------------------ display
 

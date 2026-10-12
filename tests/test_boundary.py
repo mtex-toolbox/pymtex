@@ -412,3 +412,32 @@ def test_buildBoundary_compiledIsTheNumpyOne(A):
     for f in ("F", "grainId", "ebsdId", "phaseId"):
       assert np.array_equal(getattr(a, f), getattr(b, f))
     assert np.array_equal(a.misrotation.data, b.misrotation.data, equal_nan=True) and a.V is b.V
+
+
+def test_the_runs_of_a_chain_id_start_where_it_changes():
+  from mtex.maps.boundary import _runStarts
+  assert np.array_equal(_runStarts(np.array([0, 0, 1, 2, 2, 2])), [0, 2, 3])
+
+
+def test_a_flipped_chain_takes_its_rows_in_reverse():
+  from mtex.maps.boundary import _reversedOrder
+  order, rows = _reversedOrder(np.array([0, 0, 0, 1, 1, 2, 2]), np.array([True, False, True]))
+  assert np.array_equal(order, [2, 1, 0, 3, 4, 6, 5]) and np.array_equal(rows, [1, 1, 1, 0, 0, 1, 1])
+
+
+def test_the_sides_swap_where_the_higher_phase_or_grain_comes_first():
+  from mtex.maps.boundary import _sideSwap
+  assert np.array_equal(_sideSwap(np.array([[1, 0], [1, 1], [1, 1], [-1, 1]]), np.array([[1, 2], [3, 2], [2, 3], [0, 4]])), [True, True, False, False])
+
+
+def test_indexed_names_no_phase_unless_a_mineral_is_called_so():
+  from mtex.maps.boundary import _namesNoPhase
+  assert _namesNoPhase("indexed", phaseList(CS)) and not _namesNoPhase("notIndexed", phaseList("not indexed", CS))
+
+
+def test_a_closed_chain_wraps_its_ends_onto_each_other():
+  gB = diskCircle(5, 16)[0]
+  prev, nxt, hasPrev, hasNext = gB.chainNeighbors()
+  s, e = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
+  closed = gB.isClosed[s]
+  assert closed.any() and np.array_equal(prev[s], np.where(closed, e, s)) and np.array_equal(nxt[e], np.where(closed, s, e)) and np.array_equal(hasPrev[s], closed)

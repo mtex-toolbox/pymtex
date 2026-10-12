@@ -6,6 +6,8 @@
 # the images from the metadata.
 from __future__ import annotations
 
+import importlib
+
 import numpy as np
 
 import matplotlib
@@ -16,8 +18,8 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from ..geometry.miller import Miller
+from ..io.polefigureformats import millerIndices
 from ..geometry.plottingconvention import plottingConvention
-from ..geometry.vector3d import xvector, yvector, zvector
 from . import callbacks as cb
 from .pictogram import SIDE
 
@@ -27,6 +29,8 @@ MAX_PIXELS = 1_500_000    # of the picture the map is drawn as, whatever the can
 PF_RESOLUTION = 1.5 * np.pi / 180   # the pole figures' grid, fine enough to show no facets
 KEY_PIXELS = 300          # the side a key is drawn at, once, before it is a picture
 KEY_CACHE = {}
+# the module of vector3d, whose xvector, yvector and zvector are minted on every access
+_vectors = importlib.import_module("..geometry.vector3d", __package__)
 
 
 # the window's font as matplotlib takes it: the family Qt resolves its generic one to, where
@@ -124,7 +128,9 @@ def _arrange(parts, gap):
   return out
 
 
-IPF_DIRECTIONS = {"IPF X": lambda: xvector, "IPF Y": lambda: yvector, "IPF Z": lambda: zvector}
+# the specimen direction of an IPF tab, by the name of the constant of vector3d, which mints a
+# fresh vector on every access
+IPF_DIRECTIONS = {"IPF X": "xvector", "IPF Y": "yvector", "IPF Z": "zvector"}
 
 
 class ViewCanvas(FigureCanvasQTAgg):
@@ -190,7 +196,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     """the view of the tab in force drawn: the map, the pole figures or a picture, the error as
     text and status when the drawing fails"""
     st = self.st
-    kind = st.tabKinds[st.tab] if 0 <= st.tab < len(st.tabKinds) else None
+    kind = st.currentKind
     if st.ebsd is None or kind is None:
       self.clear()
       return
@@ -310,7 +316,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     if kind == "phase":
       return "phase", {}
     if kind == "ipf":
-      return "orientation", {"ipfDirection": IPF_DIRECTIONS[name]()}
+      return "orientation", {"ipfDirection": getattr(_vectors, IPF_DIRECTIONS[name])}
     return name, {}
 
   def colorsOf(self, kind, name, at=None):
@@ -344,7 +350,6 @@ class ViewCanvas(FigureCanvasQTAgg):
   # the pole figures of the dominant drawn phase from its binned density, through the
   # package's own plotPF; the axes of the Euler frame drawn in red on every chart so that a
   # wrong Euler convention is visible
-  # ------------------------------------------------------------------ the pole figures
 
   def density(self, k):
     """the density of a phase, computed on the worker where there is one, so that the tab opens
@@ -390,8 +395,7 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   def onPoleFigures(self):
     """whether the tab in force is the pole figure tab"""
-    st = self.st
-    return 0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures"
+    return self.st.currentKind == "polefigures"
 
   def poleFigureKey(self):
     """what the picture of the pole figures shows, None when the density is not there yet"""
@@ -468,7 +472,7 @@ class ViewCanvas(FigureCanvasQTAgg):
           bar = fig.colorbar(sP.mappable, ax=ax, location="bottom", shrink=0.7, aspect=25, pad=0)
           bar.ax.tick_params(labelsize=size - 1)
       corr = st.ebsd.EulerCorrection
-      for v, n in zip((xvector, yvector, zvector), names):
+      for v, n in zip((_vectors.xvector, _vectors.yvector, _vectors.zvector), names):
         try:
           annotate(corr * v, label=n, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
         except Exception:
@@ -506,24 +510,8 @@ def _range(values):
 
 def millerOf(text, CS):
   """a Miller index typed as '100', '1-10' or '0001', on the frame's lattice"""
-  try:
-    digits = [int(c) if c.isdigit() else -int(c[1]) for c in _tokens(text)]
-    return Miller(*digits, CS)
-  except Exception:
-    return Miller(1, 0, 0, CS)
-
-
-def _tokens(text):
-  out, i = [], 0
-  text = text.replace(" ", "").replace(",", "")
-  while i < len(text):
-    if text[i] == "-" and i + 1 < len(text):
-      out.append(text[i:i + 2])
-      i += 2
-    else:
-      out.append(text[i])
-      i += 1
-  return out
+  digits = millerIndices(text)
+  return Miller(1, 0, 0, CS) if digits is None else Miller(*digits, CS)
 
 
 # ------------------------------------------------------------------ the Miller indices
@@ -564,7 +552,7 @@ class MillerBar(QWidget):
   def show_(self):
     """shown on the pole figure tab alone, naming the phase the pole figures are of"""
     st = self.st
-    self.setVisible(0 <= st.tab < len(st.tabKinds) and st.tabKinds[st.tab] == "polefigures")
+    self.setVisible(st.currentKind == "polefigures")
     k = cb.dominantPhase(st) if st.ebsd is not None else None
     self.lead.setText("pole figures of" if k is None else f"{st.ebsd.CSList.frames[k].name}: pole figures of")
 

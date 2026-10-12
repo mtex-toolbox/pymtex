@@ -18,7 +18,7 @@ import numpy as np
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
 from ..maps.phaselist import phaseList
-from .load3d import DREAM3D_SYMMETRY
+from .load3d import _dream3dPhases
 
 # the crystal systems Neper names, as point groups
 NEPER_SYMMETRY = {"triclinic": "1", "cubic": "m-3m", "hexagonal": "6/mmm", "-1": "1"}
@@ -65,8 +65,7 @@ def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
     F = np.asarray(f[f"{tri}/SharedTriList"][...], dtype=np.int64).reshape(-1, 3)
   q = np.column_stack([xyzw[:, 3], -xyzw[:, :3]])[active]
   if CS is None:
-    CS = ["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY) else "notIndexed"
-                           for s in structures[1:]]
+    CS = _dream3dPhases(structures)
   # the lower feature first, the outside -1 first of all; the first side +1, the second -1
   labels = np.sort(labels, axis=1)
   pos, neg = labels[:, 1] > 0, labels[:, 0] > 0
@@ -118,7 +117,7 @@ def loadNeperTess(fname):
     elif line.startswith("*ori"):
       kind = nxt().split(":")[0].strip().lower()
       width = 4 if kind == "quaternion" else 3
-      vals = np.array([float(v) for i in range(numCells) for v in lines[k + i].split()]).reshape(-1, width)
+      vals = np.array(" ".join(lines[k:k + numCells]).split(), dtype=float).reshape(-1, width)
       k += numCells
       ori = rotation(vals) if kind == "quaternion" else rotation.byRodrigues(vals)
     elif line.startswith("*"):
@@ -126,7 +125,7 @@ def loadNeperTess(fname):
         k += 1
     line = nxt()
   numV = int(nxt())
-  V = np.array([[float(v) for v in lines[k + i].split()[1:4]] for i in range(numV)])
+  V = np.array([l.split()[1:4] for l in lines[k:k + numV]], dtype=float)
   k += numV
   if nxt() != "**edge":
     raise ValueError(f"{fname}: **edge expected")
@@ -145,14 +144,14 @@ def loadNeperTess(fname):
     if nxt() != "**polyhedron":
       raise ValueError(f"{fname}: **polyhedron expected")
     n = int(nxt())
-    rows, cols, vals = [], [], []
-    for i in range(n):
-      v = [int(x) for x in lines[k + i].split()]
-      f = np.array(v[2:])
-      rows += [v[0] - 1] * len(f)
-      cols += list(np.abs(f) - 1)
-      vals += list(np.sign(f))
-    out.I_GF = csr_matrix((np.array(vals, dtype=float), (rows, cols)), shape=(max(rows) + 1, numF))
+    # a polyhedron line is its id, the number of its faces and the faces, signed by orientation
+    rows, faces = [], []
+    for line in lines[k:k + n]:
+      v = np.array(line.split(), dtype=np.int64)
+      rows.append(np.full(len(v) - 2, v[0] - 1))
+      faces.append(v[2:])
+    rows, faces = np.concatenate(rows), np.concatenate(faces)
+    out.I_GF = csr_matrix((np.sign(faces).astype(float), (rows, np.abs(faces) - 1)), shape=(rows.max() + 1, numF))
   return out
 
 

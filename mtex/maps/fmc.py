@@ -19,12 +19,15 @@
 # cluster and 0 otherwise; each indexed phase is clustered on its own.
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 
-from ..geometry.kernels import backend as kernelBackend, closestImage
+from ..geometry.kernels import closestImage
 from ..geometry.orientationregion import maxAngle
 from ..geometry.units import degree
 from .criteria import _bestDot, grainBoundaryCriterion
+from .kernels import grainKernel
 from ..geometry.display import aligned
 
 KAPPA = 4             # the outlier radius in standard deviations of an aggregate's own spread
@@ -95,10 +98,6 @@ class gbcFMC(grainBoundaryCriterion):
 
 # ------------------------------------------------------------------ the hierarchy
 
-class _state:
-  pass
-
-
 def _sparse(i, j, v, shape):
   from scipy.sparse import coo_matrix
   M = coo_matrix((v, (i, j)), shape=shape).tocsr()
@@ -128,7 +127,7 @@ def coarsenAll(crit, q, pos, ip, jp, fr):
   d = _bestDot(fr, q[i], q[j]) if len(i) else np.zeros(0)
   delta = 2 * np.degrees(np.real(np.arccos(np.minimum(d, 1.0))))
   finite = delta[np.isfinite(delta)]
-  s = _state()
+  s = SimpleNamespace()
   s.G_sym = G
   s.sigma = max(np.median(finite) / np.sqrt(4 * 2.3659738843), 1e-3) if len(finite) else 1e-3
   s.maxAng = maxAngle(fr) / degree
@@ -151,7 +150,7 @@ def coarsenAll(crit, q, pos, ip, jp, fr):
   s.v = np.ones(N)
   s.level = 1
   s.sizeW, s.sizeWnext = 0, N
-  hier = _state()
+  hier = SimpleNamespace()
   hier.Ps, hier.Sals, hier.numClusters, hier.nLin = [None], [np.full(N, np.inf)], [N], [0]
   hier.W0, hier.A_D, hier.sigma = W0, s.A_D.copy(), s.sigma
   while s.sizeW != s.sizeWnext:
@@ -195,10 +194,7 @@ def coarseSeeds(s):
   alphaSum = s.alpha * (np.asarray(W.sum(axis=1)).ravel() - W.diagonal())
   order = np.argsort(-(np.asarray(W.sum(axis=0)).ravel() if s.level == 1 else s.v), kind="stable")
   seed = np.zeros(s.sizeW, dtype=np.bool_)
-  loop = None
-  if kernelBackend() == "numba":
-    from .kernels import grainKernel
-    loop = grainKernel("fmcSeeds")
+  loop = grainKernel("fmcSeeds")
   if loop is not None:
     loop(order.astype(np.int64), W.indptr.astype(np.int64), W.indices.astype(np.int64), W.data.astype(np.float64), alphaSum, seed)
   else:
@@ -256,6 +252,11 @@ def _acc(j, v, n):
   return np.bincount(j, weights=v, minlength=n)[:n]
 
 
+# the columns of X summed by the row index j into n rows, one bincount a column
+def _accRows(j, X, n):
+  return np.stack([_acc(j, X[:, c], n) for c in range(X.shape[1])], axis=1)
+
+
 def aggregateStatistics(s):
   """the statistics of every aggregate from its seed and the fine nodes interpolating into it,
   all members at once: the mean orientation with the outliers beyond the aggregate's radius
@@ -284,7 +285,7 @@ def aggregateStatistics(s):
     keep = np.abs(d) > thr[j]
     sgn = np.where(d < 0, -1.0, 1.0)
     w = vi * sgn * keep
-    acc = vc[:, None] * Oc + np.stack([_acc(j, w * O[:, c], nC) for c in range(4)], axis=1)
+    acc = vc[:, None] * Oc + _accRows(j, w[:, None] * O, nC)
     nrm = np.linalg.norm(acc, axis=1)
     mu = acc / np.where(nrm > 0, nrm, 1)[:, None]
   p[~keep] = 0
@@ -302,9 +303,9 @@ def aggregateStatistics(s):
   Sxx = _acc(jm, Mm[:, 0] + wm * dx ** 2, nC)
   Sxy = _acc(jm, Mm[:, 1] + wm * dx * dy, nC)
   Syy = _acc(jm, Mm[:, 2] + wm * dy ** 2, nC)
-  Sxv = np.stack([_acc(jm, Mm[:, 3 + c] + wm * dx * tm[:, c], nC) for c in range(3)], axis=1)
-  Syv = np.stack([_acc(jm, Mm[:, 6 + c] + wm * dy * tm[:, c], nC) for c in range(3)], axis=1)
-  Sv = np.stack([_acc(jm, wm * tm[:, c], nC) for c in range(3)], axis=1)
+  Sxv = _accRows(jm, Mm[:, 3:6] + (wm * dx)[:, None] * tm, nC)
+  Syv = _accRows(jm, Mm[:, 6:9] + (wm * dy)[:, None] * tm, nC)
+  Sv = _accRows(jm, wm[:, None] * tm, nC)
   Stt = _acc(jm, Mm[:, 9] + wm * np.sum(tm ** 2, axis=1), nC)
   sseConst = np.maximum(Stt - np.sum(Sv ** 2, axis=1) / n, 0)
   # the linear model in centred coordinates, one 2 x 2 solve per component
@@ -400,8 +401,7 @@ def interpret(hier, minPixel=1):
   numS, N = len(nc), nc[0]
   A_D = ((hier.A_D + hier.A_D.T) > 0).tocsr()
   offset = np.zeros(numS, dtype=np.int64)
-  for sc in range(2, numS):
-    offset[sc] = offset[sc - 1] + nc[sc - 1]
+  offset[2:] = np.cumsum(nc[1:-1])
   numAgg = int(offset[-1] + nc[-1]) if numS > 1 else 0
   bestSal = np.full(N, np.inf)
   bestLab = np.full(N, -1, dtype=np.int64)
@@ -429,7 +429,7 @@ def interpret(hier, minPixel=1):
     if sc < numS - 1:
       parent[sc] = _rowMax(hier.Ps[sc + 1])[1]
   sel = bestLab >= 0
-  rep = _state()
+  rep = SimpleNamespace()
   rep.readPerScale = np.bincount(scaleOf[bestLab[sel]], minlength=numS)
   rep.numStranded = int((~sel).sum())
   # a chosen aggregate contained in a chosen one above it describes the same region

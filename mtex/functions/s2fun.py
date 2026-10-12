@@ -21,14 +21,13 @@ from numpy.lib.array_utils import normalize_axis_index
 from .harmonicarithmetic import harmonicArithmetic
 from .s2funclass import S2Fun
 from ..geometry.frames import referenceFrame
-from ..geometry.quaternion import rotation
 from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.vector3d import vector3d, asVector3d
-from .harmonics import _WignerD, _projectBlock, invariantProjection, mtexCoefficientsS2
+from .harmonics import _WignerD, _projectBlock, _s2Degrees, _s2PerDegree, invariantProjection, mtexCoefficientsS2
 from .kernelfunctions import S2Kernel
 from .quadrature import quadratureS2Grid
-from .kernels import realizeSpherical, _complexType
-from .transforms import isRealSpherical, sphericalSeries, sphericalSeriesAdjoint
+from .kernels import _onRows, realizeSpherical, _complexType
+from .transforms import _perColumn, isRealSpherical, sphericalSeries, sphericalSeriesAdjoint
 
 
 def quadratureBandwidth():
@@ -39,20 +38,13 @@ def quadratureBandwidth():
 
 def evenize(fhat):
   """an axis valued function has even degrees only"""
-  L = math.isqrt(fhat.shape[-1]) - 1
-  for l in range(1, L + 1, 2):
-    fhat[..., l * l:(l + 1) ** 2] = 0
+  fhat[..., _s2Degrees(math.isqrt(fhat.shape[-1]) - 1) % 2 == 1] = 0
   return fhat
 
 
 # whether every function of a coefficient array is real valued
 def _isReal(fhat):
   return all(isRealSpherical(r) for r in fhat.reshape(-1, fhat.shape[-1]))
-
-
-# the degree of every coefficient
-def _degrees(n):
-  return np.floor(np.sqrt(np.arange(n))).astype(int)
 
 
 def projectSpherical(fhat, pg):
@@ -66,14 +58,14 @@ def projectSpherical(fhat, pg):
   K = invariantProjection(pg, L, dtype)
   H = None if pg.isProper else invariantProjection(pg, L, dtype, proper=True)
   c = 2 * pg.numProper() / pg.numSym()
-  rows = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
-  for l in range(L + 1):
-    B = rows[:, l * l:(l + 1) ** 2]
-    b = _projectBlock(B.copy(), None, K, l)
-    B[...] = b if H is None or l % 2 == 0 else c * _projectBlock(B.copy(), None, H, l) - b
-  if not fhat.flags.c_contiguous:
-    fhat[...] = rows.reshape(fhat.shape)
-  return fhat
+
+  # every degree of every row: the even ones by P_K, the odd ones by c P_H - P_K
+  def projectRows(rows):
+    for l in range(L + 1):
+      B = rows[:, l * l:(l + 1) ** 2]
+      b = _projectBlock(B.copy(), None, K, l)
+      B[...] = b if H is None or l % 2 == 0 else c * _projectBlock(B.copy(), None, H, l) - b
+  return _onRows(fhat, projectRows)
 
 
 class S2FunHarmonic(S2Fun, harmonicArithmetic):
@@ -268,15 +260,15 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
   def power(self):
     """the power of every degree, the norm of the coefficients of that degree, as an array of
     length bandwidth + 1 per function"""
-    return np.stack([np.linalg.norm(self._fhat[..., l * l:(l + 1) ** 2], axis=-1) for l in range(self.bandwidth + 1)], axis=-1)
+    return np.sqrt(np.add.reduceat(np.abs(self._fhat) ** 2, np.arange(self.bandwidth + 1) ** 2, axis=-1))
 
   def truncate(self, L=None):
     """the coefficients up to degree L; without L the trailing degrees whose power, damped by
     (l+1)^2, stays below 1e-8 of the largest are dropped, MATLAB's truncate"""
     if L is None:
-      l = _degrees(self._fhat.shape[-1])
-      w = np.abs(self._fhat / (l + 1) ** 2) ** 2
-      per = np.sqrt(np.stack([np.sum(w[..., l == k], axis=-1) for k in range(self.bandwidth + 1)], axis=-1))
+      l = np.arange(self.bandwidth + 1)
+      w = np.abs(self._fhat / _s2PerDegree((l + 1) ** 2)) ** 2
+      per = np.sqrt(np.add.reduceat(w, l ** 2, axis=-1))
       per = per.reshape(-1, self.bandwidth + 1).max(axis=0)
       above = np.flatnonzero(per > per.max() * 1e-8)
       L = int(above[-1]) if above.size else 0
@@ -423,8 +415,8 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     if s is None:
       n = np.linalg.norm(self._fhat, axis=-1) / math.sqrt(4 * math.pi)
     else:
-      n = np.sqrt(sum((2 * l + 1) ** (2 * s) * np.sum(np.abs(self._fhat[..., l * l:(l + 1) ** 2]) ** 2, axis=-1)
-                      for l in range(self.bandwidth + 1))) / math.sqrt(4 * math.pi)
+      w = _s2PerDegree((2.0 * np.arange(self.bandwidth + 1) + 1) ** (2 * s))
+      n = np.sqrt(np.sum(w * np.abs(self._fhat) ** 2, axis=-1)) / math.sqrt(4 * math.pi)
     return float(n) if np.ndim(n) == 0 else n
 
   def dot(self, g):
@@ -514,24 +506,13 @@ def _cut(fhat, L):
   return out
 
 
-# the axis of the list an axis argument names, negative ones counted from the end
-# the adjoint transform column by column of values shaped (nodes, list...), the list shape
-# in front of the coefficients
-def _perColumn(adjoint, values, n):
-  values = np.asarray(values)
-  if values.size == n:
-    return adjoint(values.ravel())
-  cols = values.reshape(n, -1)
-  return np.stack([adjoint(cols[:, k]) for k in range(cols.shape[1])]).reshape(values.shape[1:] + (-1,))
-
-
 # a zonal kernel centred at z: fhat_l^0 = A_l sqrt(4 pi / (2l+1))
 def _kernelCoefficients(psi, bandwidth):
   L = psi.bandwidth if bandwidth is None else int(bandwidth)
   A = psi.calcFourier(L)
   fhat = np.zeros((L + 1) ** 2, dtype=complex)
-  for l in range(L + 1):
-    fhat[l * l + l] = A[l] * math.sqrt(4 * math.pi / (2 * l + 1))
+  l = np.arange(L + 1)
+  fhat[l * l + l] = A * np.sqrt(4 * math.pi / (2 * l + 1))
   return fhat
 
 

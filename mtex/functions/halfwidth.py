@@ -24,6 +24,7 @@ from ..geometry.quaternion import quaternion, rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
 from .kernelfunctions import S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel
+from .quadrature import legendreP
 from .transforms import S2FourierPlan, SO3FourierPlan
 from ..geometry.display import aligned
 
@@ -36,17 +37,6 @@ PILOT_POINTS = 200
 NEGLIGIBLE = 1e-3
 # the tolerance of the transforms: the energies move by about this relative amount
 TRANSFORM_EPS = 1e-6
-
-
-# the Legendre polynomials P_0 .. P_L at t, degree first
-def _legendre(t, L):
-  P = np.empty((L + 1,) + t.shape)
-  P[0] = 1
-  if L >= 1:
-    P[1] = t
-  for l in range(1, L):
-    P[l + 1] = ((2 * l + 1) * t * P[l] - l * P[l - 1]) / (l + 1)
-  return P
 
 
 # the characters chi_l(omega) = U_2l(cos omega/2) = sin((2l+1) omega/2) / sin(omega/2) at the
@@ -256,11 +246,12 @@ class degreeEnergies:
     points; for groups the measured ||mu_l||^2 - A_l where the energies were computed, and above
     the iid form times the design effect of the highest measured degrees"""
     cbar = self.dims(L)[0]
-    aa = np.zeros(L + 1)
-    k = min(len(a), L + 1)
-    aa[:k] = a[:k]
-    V = self.s2 * np.maximum(cbar - aa, 0)
-    if self.grouped:
+    if not self.grouped:
+      aa = np.zeros(L + 1)
+      k = min(len(a), L + 1)
+      aa[:k] = a[:k]
+      V = self.s2 * np.maximum(cbar - aa, 0)
+    else:
       # the unbiased energies, not the ones given: counting the uncertainty of lower bounds in
       # the variance too widened the selection by half again (plan, H2)
       k = min(self.L, L) + 1
@@ -337,7 +328,7 @@ class S2DegreeEnergies(degreeEnergies):
     if len(M) == 1:
       return np.broadcast_to(self._fullDims(L)[:, None], (L + 1, len(self._sample)))
     t = np.einsum("ni,gij,nj->ng", self._sample, M, self._sample)
-    P = _legendre(np.clip(t, -1, 1), L)
+    P = legendreP(L, np.clip(t, -1, 1))
     return (2 * np.arange(L + 1) + 1.0)[:, None] * P.mean(axis=2)
 
   # the kernel's argument at an angle, and between points and copies: the cosine of the angle
@@ -395,7 +386,7 @@ class SO3DegreeEnergies(degreeEnergies):
 
   def _degreeStarts(self, L):
     from .harmonics import deg2dim
-    return np.array([deg2dim(l) for l in range(L + 1)])
+    return deg2dim(np.arange(L + 1))
 
   # the dimension of degree l without symmetry
   def _fullDims(self, L):
@@ -476,11 +467,16 @@ def _largestArgmin(r):
   return len(r) - 1 - int(np.argmin(r[::-1]))
 
 
+# the candidates whose multipliers vanish above the bandwidth of the energies
+def _resolved(E, hs):
+  return np.array([len(familyMultipliers(E.space, h)) - 1 <= E.L for h in hs], dtype=bool)
+
+
 def ucvHalfwidth(E, halfwidths=None, returnCurve=False):
   """C1: the unbiased risk estimate, over the candidates whose multipliers vanish above the
   bandwidth of the energies"""
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
-  ok = np.array([len(familyMultipliers(E.space, h)) - 1 <= E.L for h in hs])
+  ok = _resolved(E, hs)
   if not np.any(ok):
     raise ValueError(f"no candidate halfwidth is resolved at bandwidth {E.L}; raise the bandwidth of the energies")
   hs = hs[ok]
@@ -493,7 +489,7 @@ def ucvAtEdge(E, halfwidths=None):
   """whether UCV chose the narrowest candidate the energies resolve while narrower ones exist:
   then the bandwidth of the energies, not the data, set the choice"""
   hs = candidateHalfwidths(E.space) if halfwidths is None else np.asarray(halfwidths, dtype=float)
-  ok = np.array([len(familyMultipliers(E.space, h)) - 1 <= E.L for h in hs])
+  ok = _resolved(E, hs)
   return bool(np.any(ok) and not np.all(ok) and ucvHalfwidth(E, hs) <= np.min(hs[ok]))
 
 

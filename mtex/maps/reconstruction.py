@@ -27,7 +27,7 @@ import numpy as np
 from scipy.special import erf
 
 from ..geometry.kernels import qconj
-from .grains import _idPositions
+from .grains import _at, _idPositions, _pairKey, grain2d
 from ..geometry.orientation import orientation
 from ..geometry.parent2child import calcParent, calcParent2Child, calcVariantId, round2Miller
 from ..geometry.quaternion import qmul
@@ -198,15 +198,23 @@ def majorityVote(id, votes, maxId=None, strict=False, weights=None):
   return vote, numVotes
 
 
+# the row of every boundary segment, by its grain ids gid, in a list of grain pairs, -1 where
+# it is none of them
+def _segmentRows(pairs, gid):
+  M = int(max(gid.max(initial=0), pairs.max(initial=0))) + 1
+  key, skey = _pairKey(pairs, M), _pairKey(gid, M)
+  order = np.argsort(key)
+  at = np.minimum(np.searchsorted(key[order], skey), len(key) - 1)
+  return np.where(key[order][at] == skey, order[at], -1)
+
+
 # the map with every pixel of a grain moved to the equivalent next to the grain's mean
 def _projectToGrains(ebsd, grains):
   out = ebsd.copy()
   gid = np.asarray(out.grainId).reshape(-1)
   ph = out.phaseId.reshape(-1)
   rot = out.rotations.data.reshape(-1, 4)
-  pos = grains._positions()
-  inside = (gid > 0) & (gid < len(pos))
-  gp = np.where(inside, pos[np.where(inside, gid, 0)], -1)
+  gp = _at(grains._positions(), gid)
   for p in out.CSList.indexedPhaseId:
     sel = (gp >= 0) & (ph == p)
     sel[sel] &= grains.phaseId[gp[sel]] == p
@@ -473,8 +481,9 @@ class parentGrainReconstructor:
 
   # the neighbouring grains of the kinds c2c, p2c (the parent first) or p2p, with the
   # orientations they vote with: their means, or the means of their pixels along the
-  # boundary they share; minDelta drops pairs of orientations too close to tell a parent
-  def _pairs(self, kind, minDelta=None):
+  # boundary they share, as useBoundaryOrientations or boundaryOrientations says; minDelta
+  # drops pairs of orientations too close to tell a parent
+  def _pairs(self, kind, minDelta=None, boundaryOrientations=None):
     g = self.grains
     P, C = self.parentPhaseId, self.childPhaseId
     pairs = g.neighbors()
@@ -493,7 +502,8 @@ class parentGrainReconstructor:
     a, b = pos[pairs[:, 0]], pos[pairs[:, 1]]
     q1 = g.meanRotation.data.reshape(-1, 4)[a]
     q2 = g.meanRotation.data.reshape(-1, 4)[b]
-    if self.useBoundaryOrientations and len(pairs):
+    useBoundary = self.useBoundaryOrientations if boundaryOrientations is None else boundaryOrientations
+    if useBoundary and len(pairs):
       q1, q2 = self._boundaryMeans(pairs, q1, q2)
     o1, o2 = _ori(q1, frames[0], g.frame), _ori(q2, frames[1], g.frame)
     if minDelta is not None and kind != "p2c" and len(pairs):
@@ -501,22 +511,13 @@ class parentGrainReconstructor:
       pairs, o1, o2 = pairs[far], o1[far], o2[far]
     return pairs, o1, o2
 
-  # the row of every boundary segment in a list of grain pairs, -1 where it is none of them
-  def _segmentRows(self, pairs, gid):
-    M = int(max(gid.max(initial=0), pairs.max(initial=0))) + 1
-    key = np.minimum(pairs[:, 0], pairs[:, 1]) * M + np.maximum(pairs[:, 0], pairs[:, 1])
-    order = np.argsort(key)
-    skey = np.minimum(gid[:, 0], gid[:, 1]).astype(np.int64) * M + np.maximum(gid[:, 0], gid[:, 1])
-    at = np.minimum(np.searchsorted(key[order], skey), len(key) - 1)
-    return np.where(key[order][at] == skey, order[at], -1)
-
   # the mean of the pixels of each side along the boundary of every pair, each pixel moved
   # next to the mean of its grain first; a child pixel of a grain that is a parent now
   # counts with the parent it gives nearest that mean
   def _boundaryMeans(self, pairs, q1, q2):
     g, e = self.grains, self.ebsdPrior
     gB = g.boundary
-    row = self._segmentRows(pairs, gB.grainId)
+    row = _segmentRows(pairs, gB.grainId)
     ids = np.asarray(e.id).reshape(-1)
     idOrder = np.argsort(ids)
     rot = e.rotations.data.reshape(-1, 4)
@@ -595,7 +596,7 @@ class parentGrainReconstructor:
     p2cData, nP2C = None, 0
     ph = self.ebsdPrior.phaseId.reshape(-1)
     if np.count_nonzero(ph == self.parentPhaseId) > 0.01 * ph.size and (noOpt or p2c):
-      pr, oP, oC = self._pairs_means("p2c")
+      pr, oP, oC = self._pairs("p2c", boundaryOrientations=False)
       mori = oC.inv() * oP
       for _ in range(3):
         omega = np.asarray(mori.angle(guess)).reshape(-1)
@@ -628,15 +629,6 @@ class parentGrainReconstructor:
         a = _ori(Vn.data, new.frameA.stripSym(), new.frameB).reshape(-1, 1)
         b = _ori(Vo.data, new.frameA.stripSym(), new.frameB).reshape(1, -1)
         self._variantMap = np.argmin(a.angle(b), axis=1) + 1
-
-  # the pairs with the grain means, whatever useBoundaryOrientations says
-  def _pairs_means(self, kind):
-    keep = self.useBoundaryOrientations
-    self.useBoundaryOrientations = False
-    try:
-      return self._pairs(kind)
-    finally:
-      self.useBoundaryOrientations = keep
 
   # ------------------------------------------------------------------ the votes
 
@@ -732,11 +724,9 @@ class parentGrainReconstructor:
     kappa = np.abs(np.asarray(gB.curvature(), dtype=float))
     kappa = np.minimum(kappa, _quantile(kappa, 0.9))
     kappa = factor * kappa / np.nanmax(kappa)
-    row = self._segmentRows(pairs, gB.grainId)
-    out = np.ones(len(pairs))
-    for k in np.unique(row[row >= 0]):
-      out[k] = 1 + _quantile(kappa[row == k], 0.75)
-    return np.nan_to_num(out, nan=1.0)
+    row = _segmentRows(pairs, gB.grainId)
+    ok = (row >= 0) & ~np.isnan(kappa)
+    return 1 + _groupQuantile(row[ok], np.zeros(np.count_nonzero(ok), dtype=np.int64), kappa[ok], len(pairs), 1, 0.75)[:, 0]
 
   def calcTPVotes(self, numFit=2, threshold=None, tol=None, minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False):
     """job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree): the votes the triple points of
@@ -834,7 +824,7 @@ class parentGrainReconstructor:
     g = self.grains
     if ind is None:
       do = np.ones(g.size, dtype=bool)
-    elif hasattr(ind, "numPixel"):
+    elif isinstance(ind, grain2d):
       do = np.zeros(g.size, dtype=bool)
       do[self._pos(ind.id)] = True
     else:
@@ -879,10 +869,9 @@ class parentGrainReconstructor:
     ebsd = self.ebsdPrior.copy()
     gid = np.asarray(ebsd.grainId).reshape(-1).copy()
     ph = ebsd.phaseId.reshape(-1)
-    ppos = self.grainsPrior._positions()
-    inside = (gid > 0) & (gid < len(ppos))
-    inside[inside] &= ppos[gid[inside]] >= 0
-    gid[inside] = self.mergeId[ppos[gid[inside]]]
+    pp = _at(self.grainsPrior._positions(), gid)
+    inside = (gid > 0) & (pp >= 0)
+    gid[inside] = self.mergeId[pp[inside]]
     ebsd.grainId = gid.reshape(ebsd.shape)
     cur = np.full(gid.shape, -1, dtype=np.int64)
     cur[inside] = self._pos(gid[inside])
@@ -897,9 +886,7 @@ class parentGrainReconstructor:
       pm = self._parentOf(child, pm)[0]
     fr = self.grains.frame
     vId, pId, _, fit = calcVariantId(_ori(pm, self.csParent, fr), _ori(child, self.csChild, fr), self.p2c)
-    V = self.p2c.variants().data.reshape(-1, 4)
-    pfr = _ori(pm, self.csParent, fr).projectIntoFundamentalRegion().data.reshape(-1, 4)
-    q = qmul(qmul(pfr, qconj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
+    q = self._throughVariant(_ori(pm, self.csParent, fr).projectIntoFundamentalRegion(), vId)
     fit = np.asarray(fit, dtype=float)
     vId = self._mapVariants(vId)
     pId = np.asarray(pId, dtype=float)
@@ -928,9 +915,13 @@ class parentGrainReconstructor:
       full = np.array(self._priorProp(name), dtype=float)
       full[tr] = val
       setattr(self.grainsPrior, name, full)
+    self._setGrains(at, self._throughVariant(parent.projectIntoFundamentalRegion(), vId), self.parentPhaseId)
+
+  # the parents in the fundamental region taken back through the variants vId and forward
+  # through the relationship, the representative of the parent the variants agree on
+  def _throughVariant(self, parent, vId):
     V = self.p2c.variants().data.reshape(-1, 4)
-    q = qmul(qmul(parent.projectIntoFundamentalRegion().data.reshape(-1, 4), qconj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
-    self._setGrains(at, q, self.parentPhaseId)
+    return qmul(qmul(parent.data.reshape(-1, 4), qconj(V[np.asarray(vId) - 1])), self.p2c.data.reshape(1, 4))
 
   def parent2ChildInfo(self):
     """OR = job.parent2ChildInfo(): the relationship with its closest rational parallel

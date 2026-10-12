@@ -94,3 +94,19 @@ def test_ind2color_countsFromZero():
   assert np.array_equal(ind2color(0), MTEX_COLORS[0]) and np.array_equal(ind2color(len(MTEX_COLORS)), MTEX_COLORS[0])
   c = ind2color(np.array([0, 1, -1, np.nan]))
   assert np.array_equal(c[:2], MTEX_COLORS[:2]) and np.isnan(c[2:]).all()
+
+
+def test_colorLimits_isTheExtentOfTheFiniteValues():
+  from mtex.plotting.colormaps import _colorLimits
+  assert _colorLimits(np.array([2.0, np.nan, -1.0, np.inf])) == (-1.0, 2.0)
+
+
+def test_colorLimits_ofNoFiniteValueIsZeroToOne():
+  from mtex.plotting.colormaps import _colorLimits
+  assert _colorLimits(np.array([np.nan])) == (0.0, 1.0)
+
+
+def test_colorLimits_widensARangeOfNoWidth():
+  from mtex.plotting.colormaps import _colorLimits
+  lo, hi = _colorLimits(None, (3.0, 3.0))
+  assert lo == 3.0 and hi > 3.0

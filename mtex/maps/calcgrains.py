@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import backend as kernelBackend
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
 from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import NO_PIXEL, decompose
 from .fmc import gbcFMC
 from .grains import grain2d
+from .kernels import grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 
@@ -51,21 +51,19 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     crit = crit.setMinPixel(minPixel) if minPixel > 1 else crit
     minPixel = 1
   releaseAbsorbed(ebsd)
-  # the cull changes the map the closing runs on, so it is a second pass over the whole
-  # reconstruction and not a filter on the grains that came out
-  for pas in (1, 2):
-    c = decompose(ebsd, alpha, backend=backend)
-    seg = segment(c, ebsd, crit, backend, mcl)
-    if minPixel <= 1 or pas == 2:
-      break
-    under = undersized(seg, ebsd, minPixel)
-    if not under.any():
-      break
-    markNotIndexed(ebsd, under)
-  # the second pass can cut a grain the cull kept into fragments below minPixel; they become
-  # not indexed where they lie, their geometry kept, as MATLAB's enforceMinPixel
+  c = decompose(ebsd, alpha, backend=backend)
+  seg = segment(c, ebsd, crit, backend, mcl)
   if minPixel > 1:
-    markNotIndexed(ebsd, undersized(seg, ebsd, minPixel))
+    # the cull changes the map the closing runs on, so it is a second pass over the whole
+    # reconstruction and not a filter on the grains that came out
+    under = undersized(seg.grainId, seg.nGrains, ebsd.isIndexed.reshape(-1), minPixel)
+    if under.any():
+      markNotIndexed(ebsd, under)
+      c = decompose(ebsd, alpha, backend=backend)
+      seg = segment(c, ebsd, crit, backend, mcl)
+      # the second pass can cut a grain the cull kept into fragments below minPixel; they become
+      # not indexed where they lie, their geometry kept, as MATLAB's enforceMinPixel
+      markNotIndexed(ebsd, undersized(seg.grainId, seg.nGrains, ebsd.isIndexed.reshape(-1), minPixel))
   # the diagonal ambiguity is decided on the map the grains are built from, so the split
   # runs after the cull and before anything reads the boundary
   if removeQuadruplePoints:
@@ -94,10 +92,10 @@ def releaseAbsorbed(ebsd):
   ebsd.phaseId.reshape(-1)[blank] = 0
 
 
-def undersized(seg, ebsd, minPixel):
-  """the pixels of indexed grains that came out below minPixel"""
-  n = np.bincount(seg.grainId, minlength=seg.nGrains + 1)
-  return (seg.grainId > 0) & ebsd.isIndexed.reshape(-1) & (n[seg.grainId] < minPixel)
+def undersized(grainId, nGrains, isIndexed, minPixel):
+  """the indexed pixels of the grains, numbered from 1, that came out below minPixel"""
+  n = np.bincount(grainId, minlength=nGrains + 1)
+  return (grainId > 0) & isIndexed & (n[grainId] < minPixel)
 
 
 def markNotIndexed(ebsd, mask):
@@ -124,15 +122,13 @@ def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
   siteGrain[has] = grainId[c.site2pixel[has]]
   todo = np.flatnonzero(out == 0)
   # the corners of all pixels in one compiled loop, the Python loop below its fallback
-  if (backend or kernelBackend()) == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("absorb")
-    if loop is not None:
-      s = c.sites
-      loop(todo.astype(np.int64), np.ascontiguousarray(P[:, :2], dtype=float), np.ascontiguousarray(l.ij, dtype=np.int64),
-           np.ascontiguousarray(nudge * np.asarray(corners, dtype=float)[:, :2]), np.ascontiguousarray(s.lookup, dtype=np.int64),
-           int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, out)
-      return out
+  loop = pixelKernel("absorb", backend)
+  if loop is not None:
+    s = c.sites
+    loop(todo.astype(np.int64), np.ascontiguousarray(P[:, :2], dtype=float), np.ascontiguousarray(l.ij, dtype=np.int64),
+         np.ascontiguousarray(nudge * np.asarray(corners, dtype=float)[:, :2]), np.ascontiguousarray(s.lookup, dtype=np.int64),
+         int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, out)
+    return out
   for k in todo:
     g = 0
     ok = True
@@ -160,18 +156,29 @@ def grainTable(seg, ebsd, boundary=None, innerBoundary=None, backend=None):
   ph = ebsd.phaseId.reshape(-1)
   rot = ebsd.rotations.data.reshape(-1, 4)
   numPixel = np.bincount(gid, minlength=n + 1)[1:].astype(np.int32)
-  table = _grainTableNumba(gid, ph, rot, n, numPixel, ebsd.CSList) if (backend or kernelBackend()) == "numba" else None
-  phaseId, meanRot, gos = table if table is not None else _grainTableNumpy(gid, ph, rot, n, numPixel, ebsd.CSList)
+  phaseId, meanRot, gos = _grainTable(gid, ph, rot, n, numPixel, ebsd.CSList, backend)
   return grain2d(np.arange(1, n + 1), phaseId, ebsd.CSList, numPixel, meanRot, gos, ebsd.frame, boundary=boundary, innerBoundary=innerBoundary, phaseMap=ebsd.phaseMap)
+
+
+# the phase, the mean rotation and the spread of every grain of the pixels' grain ids, numbered
+# from 1: the compiled passes, or their NumPy form without them
+def _grainTable(gid, ph, rot, n, numPixel, CSList, backend=None):
+  table = _grainTableNumba(gid, ph, rot, n, numPixel, CSList, backend)
+  return table if table is not None else _grainTableNumpy(gid, ph, rot, n, numPixel, CSList)
+
+
+# the rows scaled to unit length, a zero row kept
+def _normalizeRows(m):
+  norm = np.linalg.norm(m, axis=1, keepdims=True)
+  return np.where(norm > 0, m / np.where(norm > 0, norm, 1), m)
 
 
 # the grain table in compiled passes over all pixels at once: the images at the first pixel
 # of every grain, their sums per grain in the order of the pixels, the normalised mean, and
-# the chord angles to it; None without numba
-def _grainTableNumba(gid, ph, rot, n, numPixel, CSList):
+# the chord angles to it; None without the compiled loops
+def _grainTableNumba(gid, ph, rot, n, numPixel, CSList, backend=None):
   from .criteria import phaseGroups
-  from .kernels import grainKernel
-  loops = [grainKernel(k) for k in ("firstPixel", "toReference", "sumByGrain")]
+  loops = [grainKernel(k, backend) for k in ("firstPixel", "toReference", "sumByGrain")]
   if any(f is None for f in loops):
     return None
   firstPixel, toReference, sumByGrain = loops
@@ -188,9 +195,7 @@ def _grainTableNumba(gid, ph, rot, n, numPixel, CSList):
   toReference(r64, ph64, gid64, refs, Gall, nG, indexed, False, q, dev)
   acc = np.zeros((n + 1, 4), dtype=T)
   sumByGrain(gid64, ph64, indexed, q.astype(T, copy=False), acc)
-  m = acc[1:]
-  norm = np.linalg.norm(m, axis=1, keepdims=True)
-  m = np.where(norm > 0, m / np.where(norm > 0, norm, 1), m)
+  m = _normalizeRows(acc[1:])
   hasMean = indexed[phaseId]
   meanRot = np.full((n, 4), np.nan, dtype=T)
   meanRot[hasMean] = m[hasMean]
@@ -205,31 +210,25 @@ def _grainTableNumba(gid, ph, rot, n, numPixel, CSList):
 
 def _grainTableNumpy(gid, ph, rot, n, numPixel, CSList):
   T = rot.dtype
-  phaseId = np.zeros(n, dtype=np.int8)
   first = np.full(n + 1, -1, dtype=np.int64)
   order = np.argsort(gid, kind="stable")
-  firstOf = np.unique(gid[order], return_index=True)
-  first[firstOf[0]] = order[firstOf[1]]
-  phaseId[:] = ph[first[1:]]
+  ids, at = np.unique(gid[order], return_index=True)
+  first[ids] = order[at]
+  phaseId = ph[first[1:]].astype(np.int8)
   meanRot = np.full((n, 4), np.nan, dtype=T)
   gos = np.zeros(n, dtype=T)
-  for p in range(len(CSList)):
-    fr = CSList[p]
-    if not fr.isIndexed:
-      continue
+  L = np.array([[1.0, 0, 0, 0]], dtype=T)
+  for p, fr in enumerate(CSList):
     pix = np.flatnonzero((ph == p) & (gid > 0))
-    if len(pix) == 0:
+    if not fr.isIndexed or len(pix) == 0:
       continue
     G = fr.sym.properGroup().rotations().data.reshape(-1, 4).astype(T)
-    L = np.array([[1.0, 0, 0, 0]], dtype=T)
     ref = rot[first[gid[pix]]]
     q = closestImage(ref, rot[pix], L, G, False)[1]
     q = np.where(np.sum(q * ref, axis=1)[:, None] < 0, -q, q)
     acc = np.zeros((n + 1, 4), dtype=T)
     np.add.at(acc, gid[pix], q)
-    m = acc[1:]
-    norm = np.linalg.norm(m, axis=1, keepdims=True)
-    m = np.where(norm > 0, m / np.where(norm > 0, norm, 1), m)
+    m = _normalizeRows(acc[1:])
     grainsOfPhase = np.unique(gid[pix])
     meanRot[grainsOfPhase - 1] = m[grainsOfPhase - 1]
     dev = chordAngle(m[gid[pix] - 1], closestImage(m[gid[pix] - 1], rot[pix], L, G, False)[1])

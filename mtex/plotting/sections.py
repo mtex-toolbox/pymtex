@@ -33,7 +33,7 @@ from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sp
 from ..geometry.symmetry import symmetry
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, zvector, asVector3d
-from .spherical import makeSphericalProjection
+from .spherical import _conventionOf, makeSphericalProjection
 from ..geometry.display import aligned
 from ..geometry.arguments import refuseFlags
 
@@ -88,6 +88,8 @@ class ODFSections:
 
   axisLabels = None
   outerSector = None
+  # the resolution and the node counts of the grid makeGrid made, None before it ran
+  plotGrid = None
 
   def __init__(self, frameA, frameB, values, tol):
     self.frameA, self.frameB = frameA, frameB
@@ -133,8 +135,8 @@ class ODFSections:
   def plot(self, x, *args, **kwargs):
     """oS.plot(odf), oS.plot(ori), and oS.plot(values, 'smooth') of values on makeGrid's nodes"""
     from .sectionplot import _plotSectionFun, plotSection
-    if isinstance(x, np.ndarray) or isinstance(x, list):
-      if getattr(self, "plotGrid", None) is None:
+    if isinstance(x, (np.ndarray, list)):
+      if self.plotGrid is None:
         raise ValueError("values are drawn on the nodes of makeGrid: call oS.makeGrid() first")
       resolution, counts = self.plotGrid
       values = iter(np.split(np.asarray(x, dtype=float).reshape(-1), np.cumsum([c for c in counts if c])[:-1]))
@@ -226,18 +228,16 @@ class eulerSections(ODFSections):
     degenerate = (theta <= 1e-5) | (theta >= np.pi - 1e-5)
     k = sectionIndex(fixed, self.values, self.tol, self.period)
     keep = ~degenerate & (k >= 0)
-    th, az, sec, frm = [theta[keep]], [np.mod(azim[keep], 2 * np.pi)], [k[keep]], [src[keep]]
     # where the middle angle is 0 or pi only the sum or the difference of the outer two is
     # determined, so the orientation belongs to every section, at the azimuth that leaves
-    for i in np.flatnonzero(degenerate):
-      for j, s in enumerate(self.values):
-        a = azim[i] + fixed[i] - s if theta[i] <= 1e-5 else azim[i] - fixed[i] + s
-        th.append([np.clip(theta[i], 1e-5, np.pi - 1e-5)])
-        az.append([np.mod(a, 2 * np.pi)])
-        sec.append([j])
-        frm.append([src[i]])
-    th, az = np.concatenate(th), np.concatenate(az)
-    return vector3d.byPolar(th, az), np.concatenate(sec).astype(int), np.concatenate(frm).astype(int)
+    i, m = np.flatnonzero(degenerate), len(self.values)
+    s = self.values[None, :]
+    a = np.where((theta[i] <= 1e-5)[:, None], azim[i, None] + fixed[i, None] - s, azim[i, None] - fixed[i, None] + s)
+    th = np.concatenate([theta[keep], np.repeat(np.clip(theta[i], 1e-5, np.pi - 1e-5), m)])
+    az = np.concatenate([np.mod(azim[keep], 2 * np.pi), np.mod(a, 2 * np.pi).reshape(-1)])
+    sec = np.concatenate([k[keep], np.tile(np.arange(m), len(i))]).astype(int)
+    frm = np.concatenate([src[keep], np.repeat(src[i], m)]).astype(int)
+    return vector3d.byPolar(th, az), sec, frm
 
   def orientationsAt(self, k, vs):
     """the orientations at points vs of the chart of section k"""
@@ -348,7 +348,7 @@ class pfSections(ODFSections):
     self._values = values
     self._setAxes()
     super().__init__(frameA, frameB, self.values, self.tol)
-    self.pC = plottingConvention(frameB.how2plot) if frameB.how2plot is not None else plottingConvention.default
+    self.pC = _conventionOf(frameB)
     self.sR = conventionalSector(frameB)
 
   # h1 and h2 as unit vectors, the period of the twist from the fold of h1, and the section
@@ -356,15 +356,17 @@ class pfSections(ODFSections):
   # the angle is measured in the tangent plane, which makes the way back from a point of
   # the chart exact for a crystal whose axes are not perpendicular
   def _setAxes(self):
-    d1 = np.asarray(self._d1.data if isinstance(self._d1, vector3d) else self._d1, dtype=float).reshape(3)
-    d2 = np.asarray(self._d2.data if isinstance(self._d2, vector3d) else self._d2, dtype=float).reshape(3)
+    d1, d2 = (asVector3d(d).data.reshape(3) for d in (self._d1, self._d2))
     d1 = d1 / np.linalg.norm(d1)
     t = d2 - (d2 @ d1) * d1
     if np.linalg.norm(t) < 1e-10:
       raise ValueError("h1 and h2 must not be parallel")
     self._h1 = vector3d(d1, frame=self._CS1, isNormalized=True)
     self._h2 = vector3d(t / np.linalg.norm(t), frame=self._CS1, isNormalized=True)
-    self.period = 2 * np.pi / int(np.asarray(self._CS1.sym.nfold(vector3d(d1)))) if self._maxOmega is None else float(self._maxOmega)
+    if self._maxOmega is None:
+      self.period = 2 * np.pi / int(np.asarray(self._CS1.sym.nfold(vector3d(d1))))
+    else:
+      self.period = float(self._maxOmega)
     self.values = sectionList(self._values, self.period, self._sections)
     self.tol = sectionTolerance(self.values, self._tolerance)
 
@@ -488,7 +490,8 @@ class axisAngleSections(ODFSections):
   def __init__(self, frameA, frameB=None, sections=None, angles=None, values=None, tol=5 * degree, antipodal=False,
                volumeScaling=True, axisAngle=None):
     frameB = specimenFrame.default if frameB is None else frameB
-    angles = axisAngle if axisAngle is not None else values if values is not None else angles
+    # the angles under any of their names, axisAngle first
+    angles = next((a for a in (axisAngle, values) if a is not None), angles)
     self.oR = fundamentalRegion(frameA, frameB, antipodal=antipodal)
     maxAngle = self.oR.maxAngle()
     if sections is not None:
@@ -503,7 +506,7 @@ class axisAngleSections(ODFSections):
     # the axis is only defined modulo the rotations both groups share; the sections are drawn
     # on the conventional sector of those, in the convention of the frame the rotation maps
     # into, so that the sections sit the same way up as the pole figures
-    self.pC = plottingConvention(frameB.how2plot) if frameB.how2plot is not None else plottingConvention.default
+    self.pC = _conventionOf(frameB)
     # with grain exchange an axis and its opposite are one, the inverse misorientation
     common = self.oR.common
     if len(common) > 1 or antipodal:

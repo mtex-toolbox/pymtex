@@ -6,7 +6,7 @@ import pytest
 from mtex import EBSD, calcGrains, crystalFrame, degree, orientation, parentGrainReconstructor, rotation, vector3d
 from mtex.geometry.quaternion import qmul
 from mtex.maps.phaselist import phaseList
-from mtex.maps.reconstruction import accumVotes
+from mtex.maps.reconstruction import _segmentRows, accumVotes
 
 CSP = crystalFrame("m-3m", mineral="austenite")
 CSC = crystalFrame("m-3m", mineral="martensite")
@@ -318,3 +318,10 @@ def test_calcParentFromVote_afterAMergeTurnsTheMergedGrains(plain):
   assert isP.any() and np.max(fitsParent(job.grains)[isP]) < 2 * degree
   with pytest.raises(ValueError):
     job.calcGBVotes(p2c=True, reconsiderAll=True)
+
+
+def test_segmentRows_findsThePairsOfGrainIdsWhoseKeyOverflows32Bits():
+  # ids above 46341, whose pair key does not fit 32 bits, stored as int32 as neighbors() returns them
+  pairs = np.array([[60000, 60001], [50000, 70000]], dtype=np.int32)
+  gid = np.array([[60001, 60000], [70000, 50000], [1, 2]], dtype=np.int32)
+  assert np.array_equal(_segmentRows(pairs, gid), [0, 1, -1])

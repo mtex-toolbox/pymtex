@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
 from ..geometry.frames import crystalFrame
-from ..geometry.kernels import qrot
+from ..geometry.kernels import qconj, qrot
 from ..geometry.vector3d import vector3d, asVector3d
 from ..functions.funops import _antipodalPole
 
@@ -46,7 +45,6 @@ def _oneDirection(h, fr, what):
     if not (isinstance(v.frame, crystalFrame) and isinstance(fr, crystalFrame) and v.frame.isCompatible(fr)[0]):
       raise ValueError(f"the {what} lives in another frame than the orientations")
   return v
-
 
 
 def poles(o, h, antipodal=False):

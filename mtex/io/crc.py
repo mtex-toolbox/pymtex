@@ -19,7 +19,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
-from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly, scanGrid
+from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import coerceNumeric, readFile, text
 
 # the columns Channel numbers, and the width of each in bytes
@@ -147,10 +147,8 @@ def _loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
       raise ValueError(f"{cprPath} states no positions and no grid to place them on")
     k = np.arange(n)
     x, y = dx * (k % int(nx)), dy * (k // int(nx))
-  for key in ("phi1", "phi", "phi2"):
-    if key not in cols:
-      raise ValueError(f"{cprPath} names no Euler angles among its fields")
-  props = {name: cols[name] for name in names if name not in ("x", "y", "phi1", "phi", "phi2")}
+  props = _properties(cols, ("x", "y", "phi1", "phi", "phi2"), f"{cprPath} names no Euler angles among its fields",
+                      required=("phi1", "phi", "phi2"))
   meta = {"header": ini, "surface": crcAcquisition(ini)}
   if eulerCorrection is None:
     eulerCorrection = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")

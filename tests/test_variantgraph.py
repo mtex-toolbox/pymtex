@@ -7,7 +7,7 @@ from scipy.sparse import csr_matrix
 
 from mtex import calcGrains, degree, parentGrainReconstructor
 from mtex.maps.kernels import mclExpandNumba
-from mtex.maps.variantgraph import mclComponents
+from mtex.maps.variantgraph import _clusters, mclComponents
 from test_reconstruction import P2C, fitsParent, martensiteMap
 
 
@@ -148,3 +148,7 @@ def test_the_compiled_variant_angles_against_their_oracles():
   c1 = orientation._fromRotation(qmul(o1.data.reshape(-1, 1, 4), PV[None]), (CSP, o1.frameB)).reshape(7, 24, 1)
   c2 = orientation._fromRotation(qmul(o2.data.reshape(-1, 1, 4), PV[None]), (CSP, o2.frameB)).reshape(7, 1, 24)
   assert np.allclose(fast, slow, atol=1e-6) and np.allclose(fast, np.asarray(c1.angle(c2)), atol=1e-6)
+
+
+def test_clusters_arePositionsByLabelInIncreasingOrder():
+  assert [c.tolist() for c in _clusters(np.array([3, 1, 3, 2, 1]))] == [[1, 4], [3], [0, 2]]

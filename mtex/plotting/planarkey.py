@@ -16,7 +16,7 @@ import numpy as np
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from .colormaps import mtexColormap
-from .mtexfigure import gcm, mtexFigure
+from .mtexfigure import _freshAxes
 from ..geometry.display import aligned
 
 if TYPE_CHECKING:
@@ -103,15 +103,7 @@ class planarColorKey:
 def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw: Unpack[PlotKeywords]):
   """the key as an image, hue along x and saturation along y; with the data the axes carry
   their ranges and labels"""
-  fig = gcm()
-  if parent is not None:
-    ax = parent
-  elif fig is not None and fig.pending is not None:
-    ax = fig.takeAxis()
-  elif fig is not None and not fig.children and not fig.hold:
-    ax = fig.nextAxis()
-  else:
-    ax = mtexFigure(1, figSize=(4.5, 3.2)).nextAxis()
+  ax = parent if parent is not None else _freshAxes(default=(4.5, 3.2))[1]
   X, Y = np.meshgrid(np.linspace(0, 1, nHue), np.linspace(0, 1, nSat))
   flat = planarColorKey(pK.colorMap, satRange=pK.satRange, shading=pK.shading)
   img = flat.property2color(X.reshape(-1), Y.reshape(-1)).reshape(nSat, nHue, 3)
@@ -129,8 +121,12 @@ def plotPlanarKey(pK, v1=None, v2=None, nHue=256, nSat=128, parent=None, **kw: U
     inDegrees = np.nanmax(v1) > 2 * np.pi
     top = pK.periode / degree if inDegrees else pK.periode
     ticks = np.linspace(0, top, 7 if inDegrees else 5)
-    labels = [f"{t:g}" for t in ticks] if inDegrees else ["0", "π/4", "π/2", "3π/4", "π"] if np.isclose(pK.periode, np.pi) else \
-      ["0", "π/2", "π", "3π/2", "2π"]
+    if inDegrees:
+      labels = [f"{t:g}" for t in ticks]
+    elif np.isclose(pK.periode, np.pi):
+      labels = ["0", "π/4", "π/2", "3π/4", "π"]
+    else:
+      labels = ["0", "π/2", "π", "3π/2", "2π"]
     ax.set_xticks(ticks / top)
     ax.set_xticklabels(labels)
   else:

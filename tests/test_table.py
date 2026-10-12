@@ -108,3 +108,33 @@ def test_cprintf_prints_one_width_for_all_columns(capsys):
   # a matrix with row names keeps the row names' own width
   cprintf([[1, 2], [3, 40]], Lc=['a', 'b'], Lr=['row1', 'r2'])
   assert capsys.readouterr().out == "      a  b\nrow1  1  2\n  r2  3 40\n"
+
+
+def test_tableStart_counts_the_header_lines_it_is_given():
+  from mtex.io.table import _tableStart
+  assert _tableStart(b"a b\nc\n1 2\n", header=1) == ([b"a b"], 4)
+
+
+def test_tableStart_finds_the_block_through_a_delimiter():
+  from mtex.io.table import _tableStart
+  assert _tableStart(b"x;y\n1;2\n", delimiter=";") == ([b"x;y"], 4)
+
+
+def test_tableStart_without_a_row_of_numbers_has_no_offset():
+  from mtex.io.table import _tableStart
+  assert _tableStart(b"x y\nnames only\n") == ([b"x y", b"names only"], None)
+
+
+def test_canonicalName_lowers_and_joins_the_blank_space():
+  from mtex.io.table import _canonicalName
+  assert _canonicalName("  Polar\t Angle ") == "polar angle"
+
+
+def test_linesFrom_past_the_end_returns_the_offset():
+  assert linesFrom(b"ab\ncd", 5, 2) == ([], 5) and linesFrom(b"ab\ncd", 3, 4) == ([b"cd"], 5)
+
+
+def test_decimalComma_reads_the_first_eight_rows_past_the_comments():
+  from mtex.io.table import _decimalComma
+  rows = b"# 1,5\n" + b"1 2\n" * 8 + b"3,5 4\n"
+  assert not _decimalComma(rows, b"#") and _decimalComma(b"# x\n\n1,5 2\n", b"#")

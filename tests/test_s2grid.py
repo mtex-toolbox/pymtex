@@ -171,3 +171,34 @@ def test_equispacedS2Grid_ofAFrameAntipodalIsTheLaueSector():
 def test_equispaced_default_resolution():
   # MATLAB's default spacing of an equispaced grid is 2.5 degree
   assert np.isclose(equispacedS2Grid(antipodal=True).resolution, 2.5 * degree, rtol=0.05)
+
+
+def test_polar_ofAGridWithoutPointsIsEmpty():
+  g = equispacedS2Grid(resolution=10 * degree).subGrid(np.zeros(0, dtype=int))
+  assert g.size == 0 and all(len(x) == 0 for x in g.polar())
+
+
+def test_polar_givesEveryPointThePolarAngleOfItsRing():
+  g = equispacedS2Grid(resolution=10 * degree)
+  th, rh, _ = g.polar()
+  assert np.allclose(vector3d.byPolar(th, rh).data, g.data)
+
+
+def test_subGrid_dropsTheRingsAMaskEmpties():
+  g = equispacedS2Grid(resolution=10 * degree)
+  assert g.subGrid(np.arange(g.offset[2], g.offset[4])).numRings == 2
+
+
+def test_thetaLadder_centredHoldsOneRingMoreThanItsCount():
+  from mtex.geometry.grids.s2grid import _thetaLadder
+  assert np.allclose(_thetaLadder(0.0, 2, 0.5, True), [0, 0.5, 1]) and np.allclose(_thetaLadder(0.0, 2, 0.5, False), [0.25, 0.75])
+
+
+def test_ringCount_fitsTheRingsIntoThePolarRange():
+  from mtex.geometry.grids.s2grid import _ringCount
+  assert _ringCount(np.pi, np.pi / 4, True) == 4 and _ringCount(np.pi, np.pi / 4, False) == 4
+
+
+def test_polarRange_ofTheUpperHemisphereEndsAtTheEquator():
+  from mtex.geometry.grids.s2grid import _polarRange
+  assert _polarRange(0.0, None, "upper", False) == (0.0, np.pi / 2) and _polarRange(0.0, None, "lower", False) == (np.pi / 2, np.pi)

@@ -17,17 +17,13 @@ import numpy as np
 from ..geometry.arguments import refuseFlags
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text, writeTable
+from .table import _canonicalName, _tableStart, readFile, readTable, text, writeTable
 
 # the words a coordinate column may be named by, and what they read as
 COORDINATES = {"x": "x", "y": "y", "z": "z",
                "polar": "polar", "polar angle": "polar", "colatitude": "polar",
                "azimuth": "azimuth", "azimuth angle": "azimuth", "longitude": "azimuth",
                "latitude": "latitude"}
-
-
-def _canonical(name):
-  return re.sub(r"\s+", " ", str(name).strip().lower())
 
 
 def loadVector3d(fname, columnNames=None, columns=None, radians=False, delimiter=None, header=None):
@@ -43,13 +39,9 @@ def loadVector3d(fname, columnNames=None, columns=None, radians=False, delimiter
   directions.
   """
   data = readFile(fname)
-  if header is None:
-    sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None
-    head, offset = leadingLines(data, lambda l: isNumericRow(l if sep is None else l.replace(sep, b" ")))
-    if offset >= len(data):
-      raise ValueError(f"{fname} holds no row of numbers")
-  else:
-    head, offset = linesFrom(data, 0, int(header))
+  head, offset = _tableStart(data, header, delimiter)
+  if offset is None:
+    raise ValueError(f"{fname} holds no row of numbers")
   names = list(columnNames) if columnNames is not None else _headerNames(head)
   if names is None:
     raise ValueError(f"{fname} does not name its columns; pass them as columnNames=['x', 'y', 'z']")
@@ -58,7 +50,7 @@ def loadVector3d(fname, columnNames=None, columns=None, radians=False, delimiter
     M = M[:, list(columns)]
   if M.shape[1] < len(names):
     raise ValueError(f"{fname} has {M.shape[1]} columns, the names given are {len(names)}")
-  at = {_canonical(n): M[:, k] for k, n in enumerate(names)}
+  at = {_canonicalName(n): M[:, k] for k, n in enumerate(names)}
   kind = {COORDINATES[n]: at[n] for n in at if n in COORDINATES}
   s = 1.0 if radians else degree
   if all(k in kind for k in ("x", "y", "z")):
@@ -69,7 +61,7 @@ def loadVector3d(fname, columnNames=None, columns=None, radians=False, delimiter
     v = vector3d.byPolar(np.pi / 2 - kind["latitude"] * s, kind["azimuth"] * s)
   else:
     raise ValueError("the columns name no coordinates: x, y, z; polar and azimuth; or latitude and longitude")
-  S = {n: at[_canonical(n)] for n in names if _canonical(n) not in COORDINATES}
+  S = {n: at[_canonicalName(n)] for n in names if _canonicalName(n) not in COORDINATES}
   return v, S
 
 
@@ -89,7 +81,7 @@ def _headerNames(head):
     else:
       names.append(words[k])
       k += 1
-  return names if any(_canonical(n) in COORDINATES for n in names) else None
+  return names if any(_canonicalName(n) in COORDINATES for n in names) else None
 
 
 def exportVector3d(v, fname, *args, polar=False, radians=False):

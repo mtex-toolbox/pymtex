@@ -143,3 +143,9 @@ def test_quat2mat_ofManyQuaternionsAgreesWithNumpy():
 def test_unitRows_scalesRowsToUnitLengthAndLeavesZeroRowsZero():
   from mtex.geometry.representations import unitRows
   assert np.allclose(unitRows([[3.0, 4.0, 0.0], [0.0, 0.0, 0.0]]), [[0.6, 0.8, 0.0], [0.0, 0.0, 0.0]])
+
+
+def test_chordAngle_isTheAngleBetweenRotationsUpToSign():
+  from mtex.geometry.representations import chordAngle
+  q = rotation.byAxisAngle(xvector, 30 * degree).data
+  assert np.isclose(chordAngle(np.array([1.0, 0, 0, 0]), -q), 30 * degree)

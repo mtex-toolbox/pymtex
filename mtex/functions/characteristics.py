@@ -29,7 +29,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
+from ..geometry.vector3d import vector3d, xvector, zvector, asVector3d
 from .bingham import S2FunBingham, SO3FunBingham, binghamSample
 from .kernels import rbfSample
 from .funops import conv
@@ -59,7 +59,14 @@ def _ori(r, f):
 def textureIndex(f):
   """the texture index of a function on SO(3) or on the sphere, the squared L2 norm of its harmonic
   expansion"""
-  return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2 if isinstance(f, SO3Fun) else S2FunHarmonic(f).norm() ** 2
+  if isinstance(f, SO3Fun):
+    return (f if isinstance(f, SO3FunHarmonic) else SO3FunHarmonic(f)).norm() ** 2
+  return S2FunHarmonic(f).norm() ** 2
+
+
+# -v log v, zero where v is not positive
+def _negEntropy(v):
+  return np.where(v > 0, -v * np.log(np.where(v > 0, v, 1.0)), 0.0)
 
 
 def entropy(f, bandwidth=None):
@@ -69,11 +76,11 @@ def entropy(f, bandwidth=None):
     L = bandwidthFor(min(L0, 2 * getMTEXpref("maxSO3Bandwidth")), f.CS, f.SS)
     g = quadratureSO3Grid(L, f.CS, f.SS)
     v = np.real(f(g if isinstance(f, SO3FunHarmonic) else g.nodes()))
-    return float(-np.sum(g.weights * np.where(v > 0, v * np.log(np.where(v > 0, v, 1.0)), 0.0)))
+    return float(np.sum(g.weights * _negEntropy(v)))
   L0 = max(2 * f.bandwidth, 128) if bandwidth is None else int(bandwidth)
   g = quadratureS2Grid(min(L0, 2 * getMTEXpref("maxS2Bandwidth")))
   v = np.real(f(g if isinstance(f, S2FunHarmonic) else g.nodes()))
-  return float(-np.sum(g.weights * np.where(v > 0, v * np.log(np.where(v > 0, v, 1.0)), 0.0)) / (4 * np.pi))
+  return float(np.sum(g.weights * _negEntropy(v)) / (4 * np.pi))
 
 
 def volume(f, center, radius, resolution=None):
@@ -397,12 +404,10 @@ def _bestSeeds(cand, v, numLocal, c, copies=None):
   best = np.full(len(v), -np.inf)
   for pts in ([cand] if copies is None else copies):
     for sign in (1.0, -1.0):
-      for i, near in enumerate(tree.query_ball_point(sign * pts, r)):
-        if near:
-          best[i] = max(best[i], float(np.max(v[near])))
+      pairs = cKDTree(sign * pts).sparse_distance_matrix(tree, r, output_type="ndarray")
+      np.maximum.at(best, pairs["i"], v[pairs["j"]])
   order = np.argsort(v)[::-1]
-  seeds = [int(i) for i in order if v[i] >= best[i]]
-  return np.array(seeds[:10 * numLocal])
+  return order[v[order] >= best[order]][:10 * numLocal]
 
 
 # the copies of the grid nodes under the group elements, one array per element
@@ -440,7 +445,7 @@ def _localMaximaSO3(f, numLocal=1, resolution=5 * degree, accuracy=0.25 * degree
     modes[better], vals[better] = trial[better, i[better]], tv[better, i[better]]
   o = _ori(modes, f)
   ids = _clusterOrientations(o, 1.5 * resolution)
-  reps = [int(np.flatnonzero(ids == k)[np.argmax(vals[ids == k])]) for k in np.unique(ids)]
+  reps = _bestOfClusters(ids, vals, ids.max() + 1)
   order = np.argsort(vals[reps])[::-1][:min(numLocal, len(reps))]
   sel = np.array(reps)[order]
   # the values of the modes found, from the function itself: a sum of many kernels is
@@ -754,14 +759,8 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     w = omega[np.minimum(np.searchsorted(cdf, rng.random(n)), len(omega) - 1)]
     turned = rotation(cs[k[fromCentre]]) * rotation.byAxisAngle(vector3d.rand(int(fromCentre.sum()), rng=rng), w[fromCentre])
     out[fromCentre] = turned.data
-    if f.antipodal:
-      flip = rng.random(n) < 0.5
-      out[flip] = rotation(out[flip]).inv().data
   elif isinstance(f, SO3FunBingham):
     out = binghamSample(f.kappa, f.A, n, rng)
-    if f.antipodal:
-      flip = rng.random(n) < 0.5
-      out[flip] = rotation(out[flip]).inv().data
   else:
     res = 1.5 * degree if resolution is None else resolution
     g = equispacedSO3Grid(f.CS, f.SS, resolution=res)
@@ -769,6 +768,10 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     idx = rng.choice(g.size, size=n, p=p / p.sum())
     w = 1.5 * res * np.cbrt(rng.random(n))
     out = (rotation.byAxisAngle(vector3d.rand(n, rng=rng), w) * rotation(g.data.reshape(-1, 4)[idx])).data
+  # an exact sample of a function with exchange symmetry takes the inverse with probability one half
+  if isinstance(f, (SO3FunRBF, SO3FunBingham)) and f.antipodal:
+    flip = rng.random(n) < 0.5
+    out[flip] = rotation(out[flip]).inv().data
   left = rotation(L[rng.integers(len(L), size=n)])
   right = rotation(R[rng.integers(len(R), size=n)])
   return _ori((left * rotation(out) * right).data, f)

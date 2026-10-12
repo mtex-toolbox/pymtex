@@ -11,7 +11,7 @@ import sys
 import traceback
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QColor, QFont, QIcon
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QSizePolicy, QSplitter, QTabBar, QVBoxLayout,
                                QWidget)
 
@@ -75,6 +75,11 @@ class LoadBridge(QObject):
       self.commit = None
       self.worker.load = None
 
+  @Slot()
+  def forget(self):
+    """the job let go by the window once its thread has finished"""
+    self.window.jobs = [job for job in self.window.jobs if job[2] is not self]
+
 
 class WizardWindow(QMainWindow):
   """the import wizard's window over a WizardState: the file browser on the left, the frames, the
@@ -89,8 +94,9 @@ class WizardWindow(QMainWindow):
     self.resize(1600, 900)
     self.small = QFont(self.font())
     self.small.setPointSize(FONT_SMALL)
-    self.threads = []
-    split = QSplitter(Qt.Horizontal)
+    # the loads under way, (thread, worker, bridge), kept alive while their thread runs
+    self.jobs = []
+    split =QSplitter(Qt.Horizontal)
     self.setCentralWidget(split)
     # the browser side
     self.browser = BrowserSide(st, self.small, worker=self.worker)
@@ -142,10 +148,8 @@ class WizardWindow(QMainWindow):
     bridge = LoadBridge(self, commit, thread, w)
     thread.started.connect(w.run)
     w.done.connect(bridge.finish, Qt.QueuedConnection)
-    thread.finished.connect(lambda: self.threads.remove(thread) if thread in self.threads else None)
-    self.threads.append(thread)
-    # the jobs are kept alive while their thread runs, and dropped once it has finished
-    self._keep = [job for job in getattr(self, "_keep", []) if not job[0].isFinished()] + [(thread, w, bridge)]
+    thread.finished.connect(bridge.forget, Qt.QueuedConnection)
+    self.jobs.append((thread, w, bridge))
     thread.start()
 
   # ------------------------------------------------------------------ the strip
@@ -157,7 +161,6 @@ class WizardWindow(QMainWindow):
       self.tabs.removeTab(0)
     for name, kind in zip(self.st.tabs, self.st.tabKinds):
       k = self.tabs.addTab(name)
-      from PySide6.QtGui import QColor
       self.tabs.setTabTextColor(k, QColor(TAB_COLORS.get(kind, "#333")))
     self.tabs.setVisible(self.tabs.count() > 1)
     self.tabs.setCurrentIndex(self.st.tab)
@@ -181,9 +184,9 @@ class WizardWindow(QMainWindow):
     """a window closed with a load still running waits for it rather than tearing the thread
     down; the table is silenced first, since it announces every cell as it is destroyed"""
     self.phases.blockSignals(True)
-    for t in list(self.threads):
-      t.quit()
-      t.wait(10000)
+    for thread, _, _ in list(self.jobs):
+      thread.quit()
+      thread.wait(10000)
     super().closeEvent(event)
 
 
@@ -219,8 +222,10 @@ def runWizard(path=None, show=True, exec=None):
   st = WizardState(folder)
   cb.setFolder(st, folder)
   w = WizardWindow(st, app)
-  if show:
-    w.showMaximized() if exec is not False and "offscreen" not in os.environ.get("QT_QPA_PLATFORM", "") else w.show()
+  if show and exec is not False and "offscreen" not in os.environ.get("QT_QPA_PLATFORM", ""):
+    w.showMaximized()
+  elif show:
+    w.show()
   if file is not None:
     cb.openEntry(st, file, w.worker)
   if exec is None:

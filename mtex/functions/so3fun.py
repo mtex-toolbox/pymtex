@@ -27,34 +27,30 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.session import getMTEXpref
 from ..geometry.display import framesLabel
-from .harmonics import deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
+from .harmonics import _checkerboard, _so3PerDegree, deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
 from .kernels import realizeWigner, _complexType
-from .transforms import isRealWigner, wignerSeries, wignerSeriesAdjoint
+from .transforms import _perColumn, isRealWigner, wignerSeries, wignerSeriesAdjoint
 from ..geometry.display import aligned
+
+
+# every degree block read backwards in both indices, op applied and signed by (-1)^(k-l)
+def _mirroredBlocks(fhat, op):
+  out = np.empty_like(fhat)
+  for n in range(dim2deg(fhat.shape[-1]) + 1):
+    degreeBlock(out, n)[...] = _checkerboard(n) * op(degreeBlock(fhat, n)[..., ::-1, ::-1])
+  return out
 
 
 def invertedCoefficients(fhat):
   """f(g^-1): D_n^{kl}(g^-1) = (-1)^{k-l} D_n^{-l,-k}(g), so fhat'^{ab} = (-1)^{a-b} fhat^{-b,-a}"""
-  out = np.empty_like(fhat)
-  for n in range(dim2deg(fhat.shape[-1]) + 1):
-    F = degreeBlock(fhat, n)
-    k = np.arange(-n, n + 1)
-    sign = np.where((k[:, None] - k[None, :]) % 2, -1.0, 1.0)
-    degreeBlock(out, n)[...] = sign * F[::-1, ::-1].T
-  return out
+  return _mirroredBlocks(fhat, lambda F: F.swapaxes(-1, -2))
 
 
 def conjugateCoefficients(fhat):
   """conj(f) has the coefficients (-1)^{k-l} conj(fhat^{-k,-l})"""
-  out = np.empty_like(fhat)
-  for n in range(dim2deg(fhat.shape[-1]) + 1):
-    F = degreeBlock(fhat, n)
-    k = np.arange(-n, n + 1)
-    sign = np.where((k[:, None] - k[None, :]) % 2, -1.0, 1.0)
-    degreeBlock(out, n)[...] = sign * np.conj(F[::-1, ::-1])
-  return out
+  return _mirroredBlocks(fhat, np.conj)
 
 
 # the crystal and the specimen frame, the only arguments after the coefficients
@@ -422,7 +418,8 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
       return self._each(lambda f: f.norm(s))
     if s is None:
       return float(np.linalg.norm(self._fhat))
-    return float(math.sqrt(sum((2 * n + 1) ** (2 * s) * np.sum(np.abs(self._fhat[deg2dim(n):deg2dim(n + 1)]) ** 2) for n in range(self.bandwidth + 1))))
+    w = _so3PerDegree((2.0 * np.arange(self.bandwidth + 1) + 1) ** (2 * s))
+    return float(np.sqrt(np.sum(w * np.abs(self._fhat) ** 2)))
 
   def dot(self, g):
     """the inner product int conj(f) g, the first argument conjugated"""
@@ -542,7 +539,6 @@ def _cut(fhat, L):
   return out
 
 
-# MATLAB's dimension of a list counted from zero, the coefficient axis behind it
 # a radial kernel centred at the identity: fhat_n^{kk} = A_n / sqrt(2n+1)
 def _kernelCoefficients(psi, bandwidth):
   L = psi.bandwidth if bandwidth is None else int(bandwidth)
@@ -563,11 +559,8 @@ def _byQuadrature(fun, CS, SS, bandwidth, real, antipodal, scheme="ClenshawCurti
   # where a 2-fold axis maps half the grid onto the other, the callable sees that half only
   half = g.halfNodes()
   values = np.asarray(fun(g.nodes()) if half is None else g.fromHalf(fun(half)))
-  n = len(g)
   # a function of several values, one row per node: a list of functions, one per column
-  shape = values.shape[1:] if values.size != n else ()
-  cols = values.reshape(n, -1)
-  fhat = np.stack([wignerSeriesAdjoint(g, cols[:, k], L)[:deg2dim(L0 + 1)] for k in range(cols.shape[1])]).reshape(shape + (deg2dim(L0 + 1),))
+  fhat = _perColumn(lambda x: wignerSeriesAdjoint(g, x, L)[:deg2dim(L0 + 1)], values, len(g))
   return fhat, (values.dtype.kind != "c") if real is None else real
 
 

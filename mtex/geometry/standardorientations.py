@@ -14,7 +14,7 @@ from .miller import Miller
 from .orientation import orientation
 from .quaternion import qmul, rotation
 from .symmetryops import projectIntoFundamentalRegionOrientation, symmetrise
-from .symreduce import reductionGroups, symReduce
+from .symreduce import _firstOfClusters, reductionGroups, symReduce
 from .units import degree
 from .vector3d import vector3d, xvector, zvector
 
@@ -233,12 +233,7 @@ def _distinctModulo(cand, side):
   one = np.array([[1.0, 0, 0, 0]])
   L, R = (L, one) if side == "left" else (one, R)
   q = cand.data.reshape(-1, 4)
-  same = symReduce(q[:, None], q[None, :], L, R)[0] > 1 - 1e-4
-  keep = np.ones(len(q), dtype=bool)
-  for k in range(len(q)):
-    if keep[k]:
-      keep[k + 1:] &= ~same[k, k + 1:]
-  return np.flatnonzero(keep)
+  return np.flatnonzero(_firstOfClusters(symReduce(q[:, None], q[None, :], L, R)[0] > 1 - 1e-4))
 
 
 def copper(CS, *ss):

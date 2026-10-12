@@ -18,12 +18,17 @@ import warnings
 
 import numpy as np
 
-from ..geometry.session import getMTEXpref
+from .kernels import localVoronoiNumba, weldNumba
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
 from ..geometry.display import aligned
 
 NO_PIXEL = -1
+
+
+# the entries of values at the indices, fill where an index is negative, NO_PIXEL say
+def _gather(values, ind, fill):
+  return np.where(ind >= 0, values[np.maximum(ind, 0)], fill)
 
 
 class siteSet:
@@ -287,13 +292,8 @@ def localVoronoi(sites, A, alpha=3.1, distortTol=0.05, backend=None):
   the reach alpha leaves, as (site, neighbour) pairs and their vertices, with how many cells of
   the map stayed open; compiled with a NumPy fallback"""
   levels = candidateLevels(np.asarray(A, dtype=sites.pos.dtype), alpha, sites.pos.dtype)
-  backend = getMTEXpref("kernels", "numba") if backend is None else backend
-  if backend == "numba":
-    from .kernels import localVoronoiNumba
-    out = localVoronoiNumba(sites, levels, distortTol)
-    if out is not None:
-      return out
-  return localVoronoiNumpy(sites, levels, distortTol)
+  out = localVoronoiNumba(sites, levels, distortTol, backend=backend)
+  return out if out is not None else localVoronoiNumpy(sites, levels, distortTol)
 
 
 # ------------------------------------------------------------------ the complex
@@ -310,10 +310,8 @@ def meshVertices(cells, verts, tol, backend=None):
   # column by column, which NumPy reduces ten times faster than along the first axis
   lo = np.array([xy[:, 0].min(), xy[:, 1].min()], dtype=xy.dtype) if n else np.zeros(2)
   # the groups through one hashed pass over the points, the sorts below its fallback and oracle
-  backend = getMTEXpref("kernels", "numba") if backend is None else backend
-  if backend == "numba" and n and xy.dtype == np.float64:
-    from .kernels import weldNumba
-    out = weldNumba(xy, lo, tol * 1e-7, 50 * tol)
+  if n and xy.dtype == np.float64:
+    out = weldNumba(xy, lo, tol * 1e-7, 50 * tol, backend=backend)
     if out is not None:
       group, first = out
       return _weldedMesh(cells, xy, tol, group, first)

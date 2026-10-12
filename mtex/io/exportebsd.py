@@ -158,8 +158,7 @@ def _eulerColumns(ebsd, eulerCorrection, scale, alignment=()):
     r = eulerCorrection.inv() * r
   a, b, c = (np.asarray(v, dtype=float) for v in r.Euler("Bunge"))
   none = ~np.isfinite(a)
-  a, b, c = np.where(none, 0.0, a) * scale, np.where(none, 0.0, b) * scale, np.where(none, 0.0, c) * scale
-  return a, b, c
+  return tuple(np.where(none, 0.0, v) * scale for v in (a, b, c))
 
 
 def export(ebsd, fname, *args, **kwargs):
@@ -374,6 +373,13 @@ def _writeValue(f, path, value):
   return True
 
 
+# the rows idx of one field of a table of records written, the rest of the field left as it is
+def _writeField(d, name, idx, values):
+  field = d[name]
+  field[idx] = np.asarray(values).astype(field.dtype)
+  d[..., name] = field
+
+
 def h5PhaseColumn(ids, dtype, zeroBased, shift):
   """the phase numbers the file writes: the shift the import added taken out again, and the
   marker the vendor writes where nothing was indexed, -1 in a signed column, the largest value else"""
@@ -406,6 +412,9 @@ def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
     raise ValueError(f"{fname} is the file to copy itself, and writing it would destroy it")
   rows = rec["rows"]
   n = rec["fileLength"] if rows is None else len(rows)
+  # the rows of the file the measurements are, None for all of them in order, and as indices
+  rowIdx = None if rows is None else np.asarray(rows)
+  idx = np.arange(n) if rows is None else rowIdx
   if n != ebsd.size:
     raise ValueError(f"the map holds {ebsd.size} measurements and the record {n} rows of {ref}; a map that lost or "
                      "gained measurements is written to .ang or .ctf")
@@ -425,7 +434,7 @@ def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
       r = rec["correction"].inv() * r
     angles = [np.asarray(v, dtype=float) / eu["scale"] for v in r.Euler("Bunge")]
     ok = np.flatnonzero(np.isfinite(angles[0]))
-    okRows = ok if rows is None else np.asarray(rows)[ok]
+    okRows = idx[ok]
     if len(eu["paths"]) == 1:
       if _writeStacked(f, eu["paths"][0], okRows, [a[ok] for a in angles], eu["componentsFirst"]):
         written.append(eu["paths"][0])
@@ -439,30 +448,24 @@ def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
     table = rec.get("table")
     if table is not None:
       d = f[table["path"]]
-      idx = np.arange(n) if rows is None else np.asarray(rows)
       if table["matrixField"]:
         M = np.array(r.matrix(), dtype=float).reshape(-1, 3, 3)
         M[~np.isfinite(angles[0])] = 0.0
-        flat = M.transpose(0, 2, 1).reshape(-1, 9)
-        field = d[table["matrixField"]]
-        field[idx] = flat
-        d[..., table["matrixField"]] = field
+        _writeField(d, table["matrixField"], idx, M.transpose(0, 2, 1).reshape(-1, 9))
         written.append(table["path"] + "." + table["matrixField"])
       if table["phaseField"]:
-        field = d[table["phaseField"]]
-        field[idx] = h5PhaseColumn(ebsd.phaseId.reshape(-1), field.dtype, rec["phase"]["zeroBased"], rec["phase"]["shift"]).astype(field.dtype)
-        d[..., table["phaseField"]] = field
+        dtype = d.dtype[table["phaseField"]]
+        _writeField(d, table["phaseField"], idx,
+                    h5PhaseColumn(ebsd.phaseId.reshape(-1), dtype, rec["phase"]["zeroBased"], rec["phase"]["shift"]))
       if properties:
         for key, name in table["propFields"].items():
           if key in ebsd.prop:
-            field = d[name]
-            field[idx] = np.asarray(ebsd.prop[key]).reshape(-1).astype(field.dtype)
-            d[..., name] = field
+            _writeField(d, name, idx, np.asarray(ebsd.prop[key]).reshape(-1))
     # the phase column, in the numbering the file uses
     ph = rec["phase"]
     if ph["path"] is not None:
       column = h5PhaseColumn(ebsd.phaseId.reshape(-1), f[ph["path"]].dtype, ph["zeroBased"], ph["shift"])
-      if _writeRows(f, ph["path"], None if rows is None else np.asarray(rows), column):
+      if _writeRows(f, ph["path"], rowIdx, column):
         written.append(ph["path"])
     # the phase list: a renamed mineral and a corrected lattice are changes to the map like
     # any other, and the file states both. The symmetry is not written: every vendor codes it
@@ -493,23 +496,28 @@ def _exportEBSD_h5(ebsd, fname, *, reference=None, properties=True):
     # the properties, back into the data sets they came from; one the map gained since goes
     # next to them, which a file that packs its map into one record per measurement has no room for
     if properties:
-      group = os.path.dirname(next(iter(rec["props"].values()))) if rec["props"] else (os.path.dirname(ph["path"]) if ph["path"] else None)
+      if rec["props"]:
+        group = os.path.dirname(next(iter(rec["props"].values())))
+      elif ph["path"]:
+        group = os.path.dirname(ph["path"])
+      else:
+        group = None
       for key, v in ebsd.prop.items():
         w = np.asarray(v).reshape(-1)
         if not np.issubdtype(w.dtype, np.number):
           continue
         if key in rec["props"]:
-          if _writeRows(f, rec["props"][key], None if rows is None else np.asarray(rows), w):
+          if _writeRows(f, rec["props"][key], rowIdx, w):
             written.append(rec["props"][key])
         elif table is not None and key in table["propFields"]:
           continue
         elif group is not None:
           p = group + "/" + key
           if p in f:
-            _writeRows(f, p, None if rows is None else np.asarray(rows), w)
+            _writeRows(f, p, rowIdx, w)
           else:
             full = np.full(rec["fileLength"], np.nan)
-            full[np.arange(n) if rows is None else np.asarray(rows)] = w.astype(float)
+            full[idx] = w.astype(float)
             f.create_dataset(p, data=full)
           written.append(p)
   return fname

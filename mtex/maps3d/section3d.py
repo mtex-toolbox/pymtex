@@ -15,8 +15,9 @@ import numpy as np
 
 from ..geometry.plane import plane3d
 from ..geometry.vector3d import vector3d
-from ..maps.boundary import OUTSIDE, _walkOrder, grainBoundary
-from ..maps.grains import grain2d
+from ..maps.boundary import OUTSIDE, _sideSwap, _walkOrder, grainBoundary
+from ..maps.grains import grain2d, _at, _positionTable
+from ..maps.segment import components, _firstAppearanceLabels
 from ..maps.lattice import mapPlane
 
 
@@ -60,12 +61,12 @@ def sliceGrains(grains, plane, P0=None):
   g = gB.grainId[faces]
   newId, oldId = _pieces(F, g, P2, grains.id)
   # both sides in 2D grain ids, in the order of the 2D boundary: phases, then grains
-  side = np.stack([newId[:, 0], newId[:, 1]], axis=1)
+  side = newId.copy()
   ph = gB.phaseId[faces].astype(np.int16)
   eid = gB.ebsdId[faces].copy()
   mori = gB.misrotation.data.reshape(-1, 4)[faces].copy()
   ph = np.where(side > 0, ph, OUTSIDE)
-  flip = (ph[:, 0] > ph[:, 1]) | ((ph[:, 0] == ph[:, 1]) & (side[:, 0] > side[:, 1]))
+  flip = _sideSwap(ph, side)
   for a in (side, ph, eid):
     a[flip] = a[flip][:, ::-1]
   F[flip] = F[flip][:, ::-1]
@@ -120,17 +121,9 @@ def _pieces(F, g, P2, ids):
     cand = order[start[grp[i]]:start[grp[i]] + count[grp[i]]]
     back = np.arctan2(-d[i, 1], -d[i, 0])
     nxt[i] = cand[np.argmin(np.mod(back - phi[cand], 2 * np.pi))]
-  # the loops, the cycles of nxt
-  part = np.full(m, -1, dtype=np.int64)
-  n = 0
-  for i in range(m):
-    if part[i] >= 0:
-      continue
-    j = i
-    while part[j] < 0:
-      part[j] = n
-      j = nxt[j]
-    n += 1
+  # the loops, the cycles of nxt, numbered by their first half segment
+  labels, n = _firstAppearanceLabels(components(m, np.arange(m), nxt))
+  part = labels.astype(np.int64) - 1
   # the signed area of every loop, positive around a piece
   x0, y0 = P2[half[:, 0], 0], P2[half[:, 0], 1]
   x1, y1 = P2[half[:, 1], 0], P2[half[:, 1], 1]
@@ -139,28 +132,35 @@ def _pieces(F, g, P2, ids):
   grainOf[part] = half[:, 2]
   parts = np.arange(n)
   outer = parts[area > 0]
-  first, extra = [], []
-  for gid in ids:
-    mine = outer[grainOf[outer] == gid]
-    if len(mine):
-      first.append(mine[0])
-      extra.extend(mine[1:])
-  pieceOrder = first + extra
+  # the pieces of the grains asked for in their order, the first piece of every grain before the
+  # further ones
+  r = _at(_positionTable(ids), grainOf[outer])
+  rows = np.flatnonzero(r >= 0)
+  rows = rows[np.argsort(r[rows], kind="stable")]
+  isFirst = np.diff(r[rows], prepend=-1) != 0
+  pieceOrder = np.concatenate([outer[rows[isFirst]], outer[rows[~isFirst]]])
   label = np.zeros(n, dtype=np.int64)
   label[pieceOrder] = np.arange(1, len(pieceOrder) + 1)
+  # the half segments of every loop, in their order
+  byPart = np.argsort(part, kind="stable")
+  bounds = np.searchsorted(part[byPart], np.arange(n + 1))
+
+  def halves(p):
+    return half[byPart[bounds[p]:bounds[p + 1]]]
+
   # a hole to the smallest piece of its grain that holds it, tested at a vertex off the piece,
   # since a hole may touch it
   for h in parts[area <= 0]:
-    cand = [p for p in outer if grainOf[p] == grainOf[h]]
+    cand = outer[grainOf[outer] == grainOf[h]]
     if len(cand) == 1:
       label[h] = label[cand[0]]
       continue
-    vh = half[part == h, 0]
+    vh = halves(h)[:, 0]
     holding = []
     for p in cand:
-      vp = half[part == p, 0]
-      off = np.setdiff1d(vh, vp)
-      if len(off) and _inside(P2[off[0]], P2[vp], P2[half[part == p, 1]]):
+      hp = halves(p)
+      off = np.setdiff1d(vh, hp[:, 0])
+      if len(off) and _inside(P2[off[0]], P2[hp[:, 0]], P2[hp[:, 1]]):
         holding.append(p)
     if holding:
       label[h] = label[min(holding, key=lambda p: area[p])]

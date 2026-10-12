@@ -38,6 +38,11 @@ def eulerCorrectionRotation(setting):
   return rotation.byAxisAngle(axis, np.pi)
 
 
+# the header lines that open a numbered phase block, "# Phase 1"
+def _phaseStarts(header):
+  return [i for i, l in enumerate(header) if re.match(r"^#\s*Phase\s+\d", l)]
+
+
 # the value after a token in a block of header lines
 def _token(block, token):
   for l in block:
@@ -51,13 +56,12 @@ def angPhases(header):
   """the phases the header declares, placed by the number they declare: olivineopticalmap.ang
   declares its four phases as 4, 3, 2, 1, so reading them in file order pairs every name
   with the wrong lattice"""
-  starts = [i for i, l in enumerate(header) if re.match(r"^#\s*Phase\s+\d", l)]
+  starts = _phaseStarts(header)
   numbered = bool(starts)
   if not numbered:
     starts = [i for i, l in enumerate(header) if l.startswith("# MaterialName")]
   found, names, families = {}, [], []
-  for k, s in enumerate(starts):
-    stop = starts[k + 1] if k + 1 < len(starts) else len(header)
+  for k, (s, stop) in enumerate(zip(starts, starts[1:] + [len(header)])):
     block = header[s:stop]
     num = int(re.match(r"^#\s*Phase\s+(\d+)", header[s]).group(1)) if numbered else k + 1
     name = angMineral(_token(block, "materialname"))
@@ -97,8 +101,8 @@ def angIsEMSphInx(header, names, families):
 
 def angHeader(header):
   """the header lines outside the phase blocks as a flat dict, MATLAB's angHeaderStruct"""
-  starts = [i for i, l in enumerate(header) if re.match(r"^#\s*Phase\s+\d", l)]
-  exclude = np.zeros(len(header), dtype=bool)
+  starts = _phaseStarts(header)
+  exclude =np.zeros(len(header), dtype=bool)
   for k, s in enumerate(starts):
     if k + 1 < len(starts):
       stop = starts[k + 1]
@@ -136,12 +140,11 @@ def _loadEBSD_ang(fname, *, eulerCorrection=None, setting=None, columnNames=None
   head, offset = leadingLines(data, lambda l: not l.startswith(b"#"))
   header = [text(l) for l in head]
   phases, names, families = angPhases(header)
-  emsphinx = True if EMSphInx else (False if EDAX else angIsEMSphInx(header, names, families))
+  emsphinx = EMSphInx or (not EDAX and angIsEMSphInx(header, names, families))
   M = readTable(data, offset, comments="#")
   if M.shape[1] < 8:
     raise ValueError(f"an .ang file needs at least eight columns, this has {M.shape[1]}")
-  cols = list(columnNames) if columnNames is not None else \
-    ["phi1", "Phi", "phi2", "x", "y", "iq", "ci", "phase", "sem_signal", "fit"][:M.shape[1]] + [f"extra{k}" for k in range(1, M.shape[1] - 9)]
+  cols = list(columnNames) if columnNames is not None else _angColumnNames(M.shape[1])
   if len(cols) > M.shape[1]:
     raise ValueError(f"{len(cols)} column names for {M.shape[1]} columns")
   at = {n.lower(): M[:, k] for k, n in enumerate(cols)}
@@ -158,32 +161,36 @@ def _loadEBSD_ang(fname, *, eulerCorrection=None, setting=None, columnNames=None
   meta = {"header": angHeader(header)}
   acom = angIsACOM(header)
   if eulerCorrection is None:
-    eulerCorrection = eulerCorrectionRotation(setting if setting is not None else 4 if acom else 2)
+    if setting is None:
+      setting = 4 if acom else 2
+    eulerCorrection = eulerCorrectionRotation(setting)
   if scanUnit is None:
     scanUnit = "nm" if acom else "um"
+  unitCell, grid = _headerGrid(meta["header"])
   return ebsdFromColumns(at["x"], at["y"], at["phi1"], at["phi"], at["phi2"], at["phase"], phases, props,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta,
-                         shift=1 if emsphinx else None, unindexed=unindexed, unitCell=_cellHint(meta["header"]),
-                         scanGrid=_scanGrid(meta["header"]))
+                         shift=1 if emsphinx else None, unindexed=unindexed, unitCell=unitCell, scanGrid=grid)
 
 
-# the scan the header states: its rows and columns, the steps, the shape of the cell
-def _scanGrid(header):
+# the names of the m columns of an .ang file: the ten the vendor's versions wrote, the rest
+# numbered extra1, extra2, ...
+def _angColumnNames(m):
+  return ["phi1", "Phi", "phi2", "x", "y", "iq", "ci", "phase", "sem_signal", "fit"][:m] + [f"extra{k}" for k in range(1, m - 9)]
+
+
+# the cell the header states, preferred over the estimate from the positions, and the scan: its
+# rows and columns, the steps, the shape of the cell; None for what it does not state
+def _headerGrid(header):
   xs, ys, nOdd, nEven, nRows = (header.get(k) for k in ("XSTEP", "YSTEP", "NCOLS_ODD", "NCOLS_EVEN", "NROWS"))
-  if not all(isinstance(v, float) for v in (xs, ys, nOdd, nEven, nRows)):
-    return None
   hex = str(header.get("GRID", "")).lower() == "hexgrid"
-  return scanGrid(nOdd, nRows, xs, ys, hex, nEven)
-
-
-# the cell the header states, preferred over the estimate from the positions
-def _cellHint(header):
-  xs, ys = header.get("XSTEP"), header.get("YSTEP")
-  if not isinstance(xs, float) or not isinstance(ys, float) or xs <= 0 or ys <= 0:
-    return None
-  if str(header.get("GRID", "")).lower() == "hexgrid":
-    return regularPoly(6, xs)
-  return regularPoly(4, [xs, ys])
+  steps = isinstance(xs, float) and isinstance(ys, float)
+  unitCell = None
+  if steps and xs > 0 and ys > 0:
+    unitCell = regularPoly(6, xs) if hex else regularPoly(4, [xs, ys])
+  grid = None
+  if steps and all(isinstance(v, float) for v in (nOdd, nEven, nRows)):
+    grid = scanGrid(nOdd, nRows, xs, ys, hex, nEven)
+  return unitCell, grid
 
 
 __all__ = []

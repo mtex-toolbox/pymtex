@@ -85,3 +85,8 @@ def test_fmc_counts_as_MATLAB():
   order = np.lexsort((P[:, 1], P[:, 0]))
   e = EBSD(P[order], rotation(ebsd.rotations.data.reshape(-1, 4)[order]), ebsd.phaseId.reshape(-1)[order], ebsd.CSList)
   assert [len(calcGrains(e.copy(), fmc=c, minPixel=10)) for c in (0.5, 1.5)] == [55, 107]
+
+
+def test_accRows_sumsEveryColumnByTheRowIndex():
+  X = np.arange(8.0).reshape(4, 2)
+  assert np.array_equal(F._accRows(np.array([1, 0, 1, 1]), X, 3), [[2, 3], [10, 13], [0, 0]])

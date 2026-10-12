@@ -26,14 +26,10 @@ from ..geometry.spatialtransform import (spatialTransform, spatialTransformCompo
                                         spatialTransformList)
 from ..geometry.vector3d import vector3d
 from .mapimage import mapImage, mapImageList, edgeMap
-from .registration import pairShifts, xcfShift
+from .registration import _round, pairShifts, xcfShift
 from ..geometry.display import aligned
 
 OPTIONS = ("roiSize", "numROI", "registerOn", "edgeWidth", "highContrast", "pixelTime")
-
-
-def _round(x):
-  return np.sign(x) * np.floor(np.abs(x) + 0.5)
 
 
 def resampleNearest(ebsd, pos, at=None):
@@ -244,7 +240,8 @@ class trueEbsd:
       self.fitError = [pairShifts() for _ in range(nImg - 1)]
     nStart = next((k for k, o in enumerate(self.opt) if o["highContrast"] is True), 0)
     colw = (12, 13, 8, 18, 18)
-    state = {"at": ""}
+    # the map the printed walk stands at
+    at = ""
 
     def say(s):
       if verbose:
@@ -260,14 +257,16 @@ class trueEbsd:
       return self.resizedList[n].name
 
     def sayFrom(n):
-      if state["at"] == nameOf(n):
+      nonlocal at
+      if at == nameOf(n):
         return
-      if state["at"]:
+      if at:
         say("")
       say(f"  ● {nameOf(n)}")
-      state["at"] = nameOf(n)
+      at = nameOf(n)
 
     def runHop(n, forward, carryIn):
+      nonlocal at
       test, ref = self.resizedList[n], self.resizedList[n + 1]
       xcf = _roiSettings(self.opt[n], test.dx)
       imTest0, imRef0 = regImg[n], regImg[n + 1]
@@ -324,7 +323,7 @@ class trueEbsd:
         say(f"  │ ↻ residual over 2 px, retrying with a {xcf[0]['ROISize']} px ROI")
         self.opt[n]["roiSize"] = np.array([x["ROISize"] for x in xcf], dtype=float) * test.dx
       say(f"  ▼\n  ● {nameOf(n + 1)}")
-      state["at"] = nameOf(n + 1)
+      at = nameOf(n + 1)
       return carryOut
 
     if verbose:

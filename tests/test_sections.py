@@ -270,3 +270,9 @@ def test_values_on_the_nodes_of_makeGrid():
   assert isinstance(ori, orientation) and ori.ndim == 1
   hs = sP.plot(ori.angle(), smooth=True)
   assert any(h is not None for h in hs)
+
+
+def test_eulerSections_aDegenerateOrientationFallsIntoEverySection():
+  oS = phi2Sections(crystalFrame("m-3m"), specimenFrame.default, sections=4)
+  _, sec, src = oS.sectionData(orientation.byEuler(10 * degree, 0, 20 * degree, "Bunge", oS.frameA, oS.frameB))
+  assert set(sec.tolist()) == set(range(4)) and set(src.tolist()) == {0}

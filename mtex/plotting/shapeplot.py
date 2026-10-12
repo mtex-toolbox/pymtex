@@ -17,9 +17,11 @@ from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d, asVector3d
 from .colormaps import mtexColormap
 from .keywords import refuseVariants
+from .mapplot import _currentMap
 from .mtexfigure import gcm
+from .orientationkeys import ipfColorKey
 from .space import shapeOutlines, shapesOnMap
-from .spaceplot import _spaceAxes
+from .spaceplot import _keys, _setBox, _spaceAxes
 
 if TYPE_CHECKING:
   from typing import Unpack
@@ -37,7 +39,7 @@ FORM_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
 # the held map plot, or a 3D axes: the parent named, the current axes when it is held, else
 # a new figure
 def _target(cS, kw):
-  axesKw = {k: kw.pop(k) for k in ("figSize", "parent", "azimuth", "elevation", "title") if k in kw}
+  axesKw = _keys(kw)
   parent = axesKw.get("parent")
   if parent is not None and hasattr(parent, "_mtexMapPlot"):
     return "map", parent._mtexMapPlot
@@ -45,8 +47,9 @@ def _target(cS, kw):
     return "space", parent._mtexSpacePlot
   if parent is None:
     fig = gcm()
-    if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
-      return "map", fig.children[-1]._mtexMapPlot
+    mP = _currentMap() if fig is not None and fig.hold else None
+    if mP is not None:
+      return "map", mP
   return "space", _spaceAxes(cS.frame, **axesKw)
 
 
@@ -55,14 +58,7 @@ def _fit(sP, P, held):
   P = np.asarray(P, dtype=float).reshape(-1, 3)
   lo, hi = columnMin(P), columnMax(P)
   pad = 0.05 * max(float(np.max(hi - lo)), 1e-12)
-  lo, hi = lo - pad, hi + pad
-  if held:
-    cur = np.array([sP.ax.get_xlim(), sP.ax.get_ylim(), sP.ax.get_zlim()])
-    lo, hi = np.minimum(lo, cur[:, 0]), np.maximum(hi, cur[:, 1])
-  sP.ax.set_xlim(lo[0], hi[0])
-  sP.ax.set_ylim(lo[1], hi[1])
-  sP.ax.set_zlim(lo[2], hi[2])
-  sP.ax.set_box_aspect(tuple(hi - lo))
+  _setBox(sP.ax, lo - pad, hi + pad, held)
 
 
 # polygons in space into a 3D axes, or through the plane of a map onto its screen. In
@@ -86,7 +82,7 @@ def _draw(kind, target, polys, colors, edgeColor, lineWidth, alpha, label=None, 
   edges = np.broadcast_to(to_rgba(edgeColor) if edgeColor is not None else (0, 0, 0, 0), (len(polys), 4))
   widths = np.full(len(polys), lineWidth)
   polys = [np.asarray(p, dtype=float) for p in polys]
-  h = getattr(target, "shapes", None)
+  h = target.shapes
   if h is None or h.axes is not target.ax:
     held = len(target.ax.collections) > 0
     h = Poly3DCollection(polys, facecolors=colors, edgecolors=edges, linewidths=widths)
@@ -116,11 +112,11 @@ def faceColors(cS, faceColor=None, colored=None, colormap="viridis"):
   colour map, or with colored a colour per form or the direction key of the normals"""
   from matplotlib.colors import Normalize, to_rgba
   n, nF = len(cS), cS.numFaces
-  if colored is not None and colored is not False:
+  if colored:
     if colored is True:
       forms = np.array([to_rgba(FORM_COLORS[k % len(FORM_COLORS)]) for k in range(len(cS.N))])
     else:
-      key = colored.dirMap if hasattr(colored, "dirMap") else colored
+      key = colored.dirMap if isinstance(colored, ipfColorKey) else colored
       rgb = np.asarray(key.direction2color(cS.N), dtype=float).reshape(-1, 3)
       forms = np.concatenate([rgb, np.ones((len(rgb), 1))], axis=1)
     return np.broadcast_to(forms[cS._form], (n, nF, 4)).copy()
@@ -203,7 +199,7 @@ def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.
   else:
     polys, colors = _facePolygons(cS, V), colors.reshape(-1, 4)
   h = _draw(kind, target, polys, colors, edgeColor, lineWidth, faceAlpha, displayName)
-  if colored is not None and colored is not False:
+  if colored:
     _formLegend(target.ax, cS, faceColors(cS, faceColor, colored, colormap))
   return h
 
@@ -322,7 +318,7 @@ def plotShapesOnMap(grains, cS, faceColor=None, faceAlpha=1.0, edgeColor="k", li
   polys, shape, face = shapeOutlines(s, mP.plane, mP.layout)
   polys = [mP.plane.from2d(p @ np.linalg.inv(mP.layout).T) for p in polys]
   h = _draw("map", mP, polys, colors[shape, face], edgeColor, lineWidth, faceAlpha, displayName)
-  if colored is not None and colored is not False:
+  if colored:
     _formLegend(mP.ax, s, colors)
   _finish(mP, grains, micronbar, refFrame, False, None)
   return h

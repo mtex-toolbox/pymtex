@@ -57,7 +57,6 @@ def plotSO3Kernel(psi, **kw: Unpack[PlotKeywords]):
 def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw: Unpack[PlotKeywords]):
   """plotSpectrum(psi), plotSpectrum(odf): the Chebyshev coefficients of a kernel, or the harmonic
   power of a function, per degree (MATLAB's plotSpektra)"""
-  from ..functions.kernelfunctions import S2Kernel, SO3Kernel
   # a list of functions, MATLAB's [f, g]: one line each in the same axes
   if isinstance(x, (list, tuple)):
     from .mtexfigure import hold
@@ -99,7 +98,10 @@ def _spektra(ax, x, bandwidth, logarithmic, kw):
   from ..functions.s2fun import S2FunHarmonic
   from ..functions.so3fun import SO3FunHarmonic
   # a function on the sphere: the norm of the coefficients of each degree
-  f = x if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)) else S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
+  if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)):
+    f = x
+  else:
+    f = S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
   L = f.bandwidth if bandwidth is None else int(bandwidth)
   # a list of functions draws one line for each
   P = np.asarray(f.power).reshape(-1, f.bandwidth + 1)

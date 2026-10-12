@@ -33,6 +33,11 @@ class voxelLattice:
     self.D = np.asarray(D, dtype=float).reshape(3, 3)
     self.ijk = np.asarray(ijk, dtype=np.int64).reshape(-1, 3)
 
+  # the lattice of every voxel of a box of the shape, in the order of a C array
+  @classmethod
+  def _box(cls, origin, D, shape):
+    return cls(origin, D, np.indices(shape).reshape(3, -1).T)
+
   @property
   def shape(self):
     """the extent of the box of voxels the index spans"""

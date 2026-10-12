@@ -445,3 +445,20 @@ def test_loopSums_noLoopsSumToZero():
   from mtex.maps.polygon import loopSums
   g = holedInclusionGrains()
   assert np.array_equal(loopSums(g.V, [[] for _ in range(3)], 3), np.zeros((3, 8)))
+
+
+def test_a_position_table_reads_minus_one_outside_the_ids():
+  from mtex.maps.grains import _at, _positionTable
+  assert np.array_equal(_at(_positionTable([3, 7, 5]), np.array([[7, 0], [5, 99], [-1, 3]])), [[1, -1], [2, -1], [-1, 0]])
+
+
+def test_the_pair_key_of_ids_above_46341_does_not_overflow():
+  # int32 ids whose product with the bound overflows 32 bits
+  from mtex.maps.grains import _pairKey
+  g = np.array([[60000, 50000], [50000, 60001]], dtype=np.int32)
+  assert np.array_equal(_pairKey(g, 60002), [50000 * 60002 + 60000, 50000 * 60002 + 60001])
+
+
+def test_the_first_largest_member_of_a_group_is_the_first_of_equal_weight():
+  from mtex.maps.grains import _firstLargest
+  assert np.array_equal(_firstLargest(np.array([1, 3, 3, 2, 5]), np.array([0, 0, 0, 1, 1]), 2), [1, 4])

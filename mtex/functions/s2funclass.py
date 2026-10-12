@@ -63,7 +63,8 @@ class S2Fun:
     from .s2fun import S2FunHarmonic
     psi = S2DeLaValleePoussinKernel(halfwidth=halfwidth) if psi is None else psi
     sF = S2FunHarmonic(psi)
-    if v is not None and float(np.arccos(np.clip(v.normalize().data.reshape(3) @ [0, 0, 1], -1, 1))) > 0:
+    # a bump away from the north pole is turned there
+    if v is not None and v.normalize().data.reshape(3)[2] < 1:
       sF = rotation.map(vector3d(0, 0, 1), vector3d(v.data.reshape(3))) * sF
     return sF
 

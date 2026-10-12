@@ -448,3 +448,32 @@ def test_wignerd_table_against_the_recursion():
     T = wignerdTable(beta, 25)
     for n, d in wignerdDegrees(np.float64(beta), 25):
       assert np.max(np.abs(T[deg2dim(n):deg2dim(n + 1)].reshape(2 * n + 1, 2 * n + 1) - d)) < 1e-13
+
+
+# the degree of every coefficient, spherical and SO(3), against the block layout
+def test_degreeVectors_followTheLayout():
+  from mtex.functions.harmonics import _s2Degrees, _so3Degrees
+  assert np.array_equal(_s2Degrees(3), np.floor(np.sqrt(np.arange(16))).astype(int))
+  assert np.array_equal(_so3Degrees(3), np.concatenate([np.full((2 * n + 1) ** 2, n) for n in range(4)]))
+
+
+# a value per degree lands on every coefficient of its degree
+def test_perDegree_spreadsAValuePerDegree():
+  from mtex.functions.harmonics import _s2PerDegree, _so3PerDegree
+  a = np.array([2.0, 3.0, 5.0])
+  assert np.array_equal(_s2PerDegree(a), [2, 3, 3, 3, 5, 5, 5, 5, 5])
+  assert np.array_equal(_so3PerDegree(a)[[0, 1, 9, 10, 34]], [2, 3, 3, 5, 5]) and _so3PerDegree(a).size == deg2dim(3)
+
+
+# the sign (-1)^(k-l) of a degree block
+def test_checkerboard_isTheParityOfKMinusL():
+  from mtex.functions.harmonics import _checkerboard
+  k = np.arange(-2, 3)
+  assert np.array_equal(_checkerboard(2), (-1.0) ** (k[:, None] - k[None, :]))
+
+
+# the Clebsch-Gordan tensor only couples M = m1 + m2
+def test_clebschGordanTensor_isTheCoefficientsAtEveryIndex():
+  C = clebschGordanTensor(2, 1, 2)
+  full = np.array([[[clebschGordan(2, m1, 1, m2, 2, M) for M in range(-2, 3)] for m2 in range(-1, 2)] for m1 in range(-2, 3)])
+  assert np.array_equal(C, full)

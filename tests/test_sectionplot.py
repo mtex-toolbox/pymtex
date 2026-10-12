@@ -189,3 +189,14 @@ def test_plot_ofAnAntipodalKeyUsesAntipodalSections():
   cs = crystalFrame('mmm', [4.8, 10.2, 6.0])
   plot(PatalaColorKey(cs, cs), sections=4)
   assert gcm().sections.jointCS.isLaue
+
+
+def test_aspect_isHeightOverWidth():
+  from mtex.plotting.sectionplot import _aspect
+  assert _aspect((0, 4, 1, 3)) == 0.5
+
+
+def test_perSection_skipsTheSectionsNothingFallsInto():
+  from mtex.plotting.sectionplot import _perSection
+  out = [(k, cell, ind.tolist()) for k, cell, ind in _perSection(["a", "b", "c"], np.array([2, 0, 2]))]
+  assert out == [(0, "a", [1]), (2, "c", [0, 2])]

@@ -10,7 +10,7 @@ import numpy as np
 from ..geometry._array import MtexArray
 from ..geometry.session import getMTEXpref
 from .keywords import refuseVariants
-from .mtexfigure import gcm, mtexFigure
+from .mtexfigure import _freshAxes, gcm
 from .render3d import drawMatplotlib, hasPyVista, renderImage, writeHTML
 from .scene3d import arrows3d, boundaryMesh, ellipsoids3d, lines3d, points3d, grainMesh, picture3d, scene3d, volumeSlices
 
@@ -130,8 +130,7 @@ def _plotPoints3d(v, color=None, markerSize=6.0, **kw):
   if color is None:
     k = sum(isinstance(it, points3d) for it in s.items) if s is not None else 0
     color = COLOR_ORDER[k % len(COLOR_ORDER)]
-  size = markerSize
-  return _draw(points3d(np.asarray(v.data).reshape(-1, 3), color, size), None, None, v.frame)
+  return _draw(points3d(np.asarray(v.data).reshape(-1, 3), color, markerSize), None, None, v.frame)
 
 
 def line3(x, y, z, color="k", lineWidth=0.5, **kw: Unpack[PlotKeywords]):
@@ -169,19 +168,6 @@ def gcs(fig=None):
   return getattr(_currentAxes(gcm() if fig is None else fig), "_mtexScene", None)
 
 
-# the axes a new scene goes into: the one nextAxis prepared, the first of a fresh
-# newMtexFigure, or a new figure of its own
-def _sceneAxes(figSize):
-  fig = gcm()
-  if fig is not None and fig.pending is not None:
-    return fig, fig.takeAxis()
-  if fig is not None and not fig.children and not fig.hold:
-    return fig, fig.nextAxis()
-  from .mtexfigure import figureSize
-  fig = mtexFigure(1, figSize=figureSize(figSize, (5.5, 5.5)))
-  return fig, fig.nextAxis()
-
-
 def _draw(item, how2plot, figSize, frame):
   fig = gcm()
   s = gcs(fig) if fig is not None and fig.hold else None
@@ -189,7 +175,7 @@ def _draw(item, how2plot, figSize, frame):
   if s is None and fig is not None and fig.hold and getattr(_currentAxes(fig), "_mtexMapSources", None):
     s = toScene(fig, how2plot)
   if s is None:
-    fig, ax = _sceneAxes(figSize)
+    fig, ax = _freshAxes(figSize)
     s = scene3d(how2plot)
     ax._mtexScene = s
     fig.current = ax
@@ -345,8 +331,9 @@ def mapInto3d(plotFun, x, args, kw):
   if fig is None or not fig.hold:
     return None
   s = gcs(fig)
+  source = (plotFun, x, tuple(args), dict(kw))
   if s is not None:
-    _addMap(s, (plotFun, x, tuple(args), dict(kw)))
+    _addMap(s, source)
     return refresh(fig)
   ax = _currentAxes(fig)
   mP = getattr(ax, "_mtexMapPlot", None)
@@ -356,14 +343,16 @@ def mapInto3d(plotFun, x, args, kw):
   from .maps import planeOf
   if _samePlane(planeOf(x), mP.plane):
     return None
-  s = toScene(fig)
-  _addMap(s, (plotFun, x, tuple(args), dict(kw)))
+  _addMap(toScene(fig), source)
   return refresh(fig)
 
 
 def _samePlane(a, b):
   n1, n2 = a.normal, b.normal
-  return abs(abs(float(n1 @ n2)) - 1) < 1e-9 and abs(float(a.o @ n1) - float(b.o @ n1) * np.sign(n1 @ n2)) < 1e-9 * max(1, float(np.abs(a.o).max()))
+  parallel = abs(abs(float(n1 @ n2)) - 1) < 1e-9
+  # the offsets of the two planes along the normal agree, at the scale of their origins
+  offset = abs(float(a.o @ n1) - float(b.o @ n1) * np.sign(n1 @ n2))
+  return parallel and offset < 1e-9 * max(1, float(np.abs(a.o).max()))
 
 
 def toScene(fig=None, how2plot=None):

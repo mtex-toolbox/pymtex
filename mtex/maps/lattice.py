@@ -12,10 +12,12 @@
 # neighbour graph only where the check fails.
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 
 from ..geometry.kernels import columnMax, columnMin
-from .polygon import signedArea2, voronoiCell
+from .polygon import _cross2, signedArea2, voronoiCell
 from ..geometry.display import display, header, numString
 
 SHAPES = ("square", "hex")
@@ -258,19 +260,14 @@ def inferBasis(P):
     if counts[k] < best / 4 or counts[k] < counts[(k - 1) % nBin] or counts[k] < counts[(k + 1) % nBin]:
       continue
     vs = v[(b == k) | (b == (k - 1) % nBin) | (b == (k + 1) % nBin)]
-    ls = np.sort(np.linalg.norm(vs, axis=1))
-    shell = 1.5 * ls[max(0, (len(ls) + 9) // 10 - 1)]
-    first = vs[np.linalg.norm(vs, axis=1) <= shell]
-    ms = np.sort(np.linalg.norm(first, axis=1))
-    med = ms[(len(ms) + 1) // 2 - 1]
-    cand.append(first[np.argmin(np.abs(np.linalg.norm(first, axis=1) - med))])
+    lv = np.linalg.norm(vs, axis=1)
+    shell = 1.5 * np.sort(lv)[max(0, (len(lv) + 9) // 10 - 1)]
+    first, lf = vs[lv <= shell], lv[lv <= shell]
+    med = np.sort(lf)[(len(lf) + 1) // 2 - 1]
+    cand.append(first[np.argmin(np.abs(lf - med))])
   if len(cand) < 2:
     raise ValueError("the positions lie on a line, not on a lattice")
   return reduceBasis(np.array(cand), None)
-
-
-def _cross2(a, b):
-  return a[0] * b[1] - a[1] * b[0]
 
 
 def reduceBasis(vs, shape):
@@ -441,20 +438,22 @@ def growIndex(P, A):
     seen[s] = True
     frontier = np.array([s])
     while len(frontier):
+      # every unseen neighbour of the front, a duplicate position left where it is, is placed
+      # by the first point of the front that reaches it
       hits = tree.query_ball_point(P[frontier], r)
-      nxt = []
-      for k, js in zip(frontier, hits):
-        js = np.asarray(js, dtype=np.int64)
-        js = js[~seen[js]]
-        if len(js) == 0:
-          continue
-        step = np.rint((P[js] - P[k]) @ Ainv.T).astype(np.int64)
-        keep = np.any(step != 0, axis=1)          # a duplicate position stays where it is
-        js, step = js[keep], step[keep]
-        seen[js] = True
-        ij[js] = ij[k] + step
-        nxt.append(js)
-      frontier = np.concatenate(nxt) if nxt else np.zeros(0, dtype=np.int64)
+      count = np.fromiter(map(len, hits), dtype=np.int64, count=len(hits))
+      k = np.repeat(frontier, count)
+      js = np.fromiter(itertools.chain.from_iterable(hits), dtype=np.int64, count=int(count.sum()))
+      unseen = ~seen[js]
+      k, js = k[unseen], js[unseen]
+      step = np.rint((P[js] - P[k]) @ Ainv.T).astype(np.int64)
+      moved = np.any(step != 0, axis=1)
+      k, js, step = k[moved], js[moved], step[moved]
+      first = np.sort(np.unique(js, return_index=True)[1])
+      k, js, step = k[first], js[first], step[first]
+      seen[js] = True
+      ij[js] = ij[k] + step
+      frontier = js
   return ij
 
 

@@ -14,15 +14,14 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ._array import MtexArray
-from .display import display, sizeString, table, takeRows
-from .representations import (EULER_LABELS, axis2quat, eulerConvention, euler2quat, eulerTriple, fitKernel, isnull,
-                              map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
+from .display import aligned, display, sizeString, table, takeRows
+from .representations import (EULER_LABELS, axis2quat, chordAngle, eulerConvention, euler2quat, eulerTriple, fitKernel,
+                              isnull, map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
                               quatAngle, quatAxis, rodrigues2quat)
 from .homochoric import cubo2homo, homo2cubo, homochoric2quat, quat2homochoric
 from .kernels import qconj, qmul, qrot
 from .units import degree
-from .vector3d import classproperty, vector3d
-from .display import aligned
+from .vector3d import _uniqueOutput, _uniqueRows, _xyz, classproperty, vector3d
 
 if TYPE_CHECKING:
   from .vocabulary import EulerConventionName
@@ -210,10 +209,7 @@ class quaternion(MtexArray):
     keep their digits near 0 and pi"""
     if other is None:
       return quatAngle(self.data)
-    d = np.sum(self.data * other.data[..., :4], axis=-1)
-    s = np.where(d < 0, -1.0, 1.0)[..., None]
-    h = np.linalg.norm(self.data - s * other.data[..., :4], axis=-1)
-    return 4 * np.arcsin(np.minimum(h / 2, 1.0))
+    return chordAngle(self.data, other.data[..., :4])
 
   def axis(self):
     """the rotational axis, a unit vector"""
@@ -307,11 +303,8 @@ class quaternion(MtexArray):
   def unique(self, tol=1e-3, antipodal=False, stable=False, return_index=False, return_inverse=False):
     """the quaternions with those equal up to the tolerance in the coefficients removed; antipodal=True
     takes q and -q as one; optionally the indices of the kept ones and the index of each into them"""
-    from .vector3d import _uniqueRows
     iv, iu = _uniqueRows(self._uniqueKey(antipodal), tol, stable)
-    u = self._new(self.data.reshape(-1, self._ncoord)[iv])
-    out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
-    return out if len(out) > 1 else u
+    return _uniqueOutput(self._new(self.data.reshape(-1, self._ncoord)[iv]), iv, iu, return_index, return_inverse)
 
   def interp(self, values=None, *flags, **kwargs):
     """interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
@@ -472,17 +465,6 @@ class rotation(quaternion):
 
   # ------------------------------------------------------------------ the algebra
 
-  def __mul__(self, other):
-    if isinstance(other, orthogonalTransform):
-      return orthogonalTransform(self, False) * other
-    if isinstance(other, quaternion):
-      return self._product(other)
-    if isinstance(other, vector3d):
-      return other._rotated(self.data)
-    if isinstance(other, MtexArray) or hasattr(other, "rotate"):
-      return NotImplemented
-    return quaternion(self.data * np.asarray(other, dtype=float)[..., None])
-
   # -r is the rotation followed by the inversion
   def __neg__(self):
     return orthogonalTransform(self, True)
@@ -506,9 +488,7 @@ class rotation(quaternion):
     return d if not antipodal else np.abs(d)
 
   def _coerce(self, other):
-    if isinstance(other, quaternion):
-      return other
-    if isinstance(other, orthogonalTransform):
+    if isinstance(other, (quaternion, orthogonalTransform)):
       return other
     raise TypeError(f"expected a rotation, got {type(other).__name__}")
 
@@ -713,12 +693,9 @@ class orthogonalTransform(MtexArray):
   def unique(self, tol=1e-3, stable=False, return_index=False, return_inverse=False):
     """the transforms with those equal up to the tolerance removed, a rotation and its negative one;
     optionally the indices of the kept ones and the index of each into them"""
-    from .vector3d import _uniqueRows
     key = np.concatenate([self.rot._uniqueKey(True), self.parity.reshape(-1, 1)], axis=-1)
     iv, iu = _uniqueRows(key, tol, stable)
-    u = self._new(self.data.reshape(-1, 5)[iv])
-    out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
-    return out if len(out) > 1 else u
+    return _uniqueOutput(self._new(self.data.reshape(-1, 5)[iv]), iv, iu, return_index, return_inverse)
 
   def __repr__(self):
     lines = [type(self).__name__]
@@ -735,11 +712,6 @@ class orthogonalTransform(MtexArray):
 def reflection(n):
   """a reflection at the plane with normal n"""
   return -rotation.byAxisAngle(n, np.pi)
-
-
-# the coordinates of a vector3d or of a plain triple
-def _xyz(v):
-  return v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
 
 
 __all__ = ["quaternion", "rotation", "orthogonalTransform", "reflection"]

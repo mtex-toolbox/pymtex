@@ -14,7 +14,7 @@ import numpy as np
 from ..geometry.frames import closestAlignment, crystalFrame, notIndexedFrame
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, closestConvention, plottingConvention
 from ..geometry.units import degree
-from ..io.importscript import buildImportWizardScript
+from ..io.importscript import buildImportWizardScript, frameKey
 from ..io.inspect import ebsdFiles, inspectEBSD, isEBSDFile
 from ..maps.phaselist import phaseList
 from .state import FileRow, WizardState
@@ -289,7 +289,8 @@ def viewsOf(ebsd, images=None):
   tabs += [(p, "property") for p in sorted(ebsd.prop) if np.asarray(ebsd.prop[p]).ndim == ebsd.ndim]
   if indexed:
     tabs.append(("pole figures", "polefigures"))
-  if imagesOf(ebsd) if images is None else images:
+  pictures = imagesOf(ebsd) if images is None else images
+  if pictures:
     tabs.append(("images", "images"))
   return [t for t, _ in tabs], [k for _, k in tabs]
 
@@ -530,7 +531,7 @@ def phaseCounts(st):
   if st.ebsd is None:
     return {}
   ph = st.ebsd.phaseId
-  memo = getattr(st, "_phaseCounts", None)
+  memo = st._phaseCounts
   if memo is None or memo[0] is not ph:
     counts = np.bincount(ph.reshape(-1).astype(np.intp))
     memo = (ph, {int(i): int(c) for i, c in enumerate(counts) if c})
@@ -606,33 +607,38 @@ def snapLattice(symbol, abc, abg, driver=None):
   """the cell the lattice forces follow the one edited: b and c from a on a cubic lattice, the
   angles the lattice implies but for the free ones"""
   from ..geometry.symmetry import symmetry
-  from ..geometry.frames import _uniqueMonoclinicAxis
   lat = symmetry(symbol).lattice
   free = lat.freeLengths
   abc = list(abc)
   if not free[1]:
-    abc[1] = abc[0] if driver != "b" else abc[1]
     if driver == "b":
       abc[0] = abc[1]
+    else:
+      abc[1] = abc[0]
   if not free[2]:
-    abc[2] = abc[0] if driver != "c" else abc[2]
     if driver == "c":
       abc[0] = abc[1] = abc[2]
-  unique = _uniqueMonoclinicAxis(symbol)
-  freeAngles = lat.freeAngles(unique if unique is not None else 1)
+    else:
+      abc[2] = abc[0]
+  freeAngles = _freeAngles(lat, symbol)
   default = np.round(np.array(lat.defaultAngles) / degree, 9)
   abg = [abg[k] if freeAngles[k] else float(default[k]) for k in range(3)]
   return abc, abg
+
+
+# which of the three angles of a lattice are free, a monoclinic one about its unique axis
+def _freeAngles(lat, symbol):
+  from ..geometry.frames import _uniqueMonoclinicAxis
+  unique = _uniqueMonoclinicAxis(symbol)
+  return lat.freeAngles(unique if unique is not None else 1)
 
 
 def freeCells(CS):
   """which cells of a row the lattice leaves free"""
   if not CS.isIndexed:
     return {c: False for c in PHASE_COLUMNS}
-  from ..geometry.frames import _uniqueMonoclinicAxis
   lat = CS.lattice
-  unique = _uniqueMonoclinicAxis(CS.pointGroup)
-  lengths, angles = lat.freeLengths, lat.freeAngles(unique if unique is not None else 1)
+  lengths, angles = lat.freeLengths, _freeAngles(lat, CS.pointGroup)
   return {"a": lengths[0], "b": lengths[1], "c": lengths[2], "alpha": angles[0], "beta": angles[1], "gamma": angles[2]}
 
 
@@ -641,12 +647,6 @@ def freeCells(CS):
 def frameKeys(phases):
   """the value snapshot of a phase list, against which an edit is told: name, group, cell, setup, colour"""
   return [frameKey(f) for f in phases.frames]
-
-
-def frameKey(f):
-  """the value of a frame as a tuple, what an edit of the phase table changes"""
-  from ..io.importscript import frameKey as key
-  return key(f)
 
 
 def scriptOf(st):

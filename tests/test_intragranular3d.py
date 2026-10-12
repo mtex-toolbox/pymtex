@@ -38,6 +38,13 @@ def test_KAM_averages_over_the_face_neighbours():
   assert np.isclose(e.KAM(max=True)[2, 2, 2], A)
 
 
+def test_shifted_pairs_every_cell_with_the_one_the_offset_away():
+  from mtex.maps3d.intragranular3d import _shifted
+  a = np.arange(24).reshape(2, 3, 4)
+  src, dst = _shifted((1, -1, 0), a.shape)
+  assert np.array_equal(a[dst] - a[src], np.full((1, 2, 4), 12 - 4))
+
+
 def test_fill_closes_an_inner_hole_and_extrapolates_on_request():
   e = bent()
   f = e.copy()

@@ -20,6 +20,7 @@ import itertools
 import numpy as np
 
 from ..geometry.vector3d import vector3d
+from .kernels import grainKernel
 
 
 def clipHalfPlane(vs, gs, p, q, gen):
@@ -72,14 +73,22 @@ def _cross2(a, b):
   return a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
 
 
-# whether points (m, 2) lie inside a loop, by the crossing number of a ray to the right
-def _insideLoop(V, loop, q):
-  P, Q = V[loop], np.roll(V[loop], -1, axis=0)
+# the points times edges a point in polygon test handles at once
+INSIDE_BLOCK = 1 << 21
+
+
+# whether the ray to the right of every point (m, 2) crosses every edge P -> Q, (m, edges)
+def _crossings(P, Q, q):
   qx, qy = q[:, 0][:, None], q[:, 1][:, None]
   crosses = (P[None, :, 1] > qy) != (Q[None, :, 1] > qy)
   with np.errstate(divide="ignore", invalid="ignore"):
     x = P[None, :, 0] + (qy - P[None, :, 1]) / (Q[None, :, 1] - P[None, :, 1]) * (Q[None, :, 0] - P[None, :, 0])
-  return np.sum(crosses & (x > qx), axis=1) % 2 == 1
+  return crosses & (x > qx)
+
+
+# whether points (m, 2) lie inside a loop, by the crossing number of a ray to the right
+def _insideLoop(V, loop, q):
+  return np.sum(_crossings(V[loop], np.roll(V[loop], -1, axis=0), q), axis=1) % 2 == 1
 
 
 # ------------------------------------------------------------------ a set of polygons
@@ -88,12 +97,23 @@ def loopEdges(V, loopsPerOutline):
   """every loop of every outline as one edge list: the tails P, the heads Q, the outline each
   edge belongs to and whether it lies on the outer loop; one pass over the loops, so that
   every measure below is a bincount and not a loop over the outlines"""
-  flat, start, lengths, owner, first = _flatLoops(loopsPerOutline)
+  flat, _, lengths, owner, first = _flatLoops(loopsPerOutline)
   if not len(flat):
     return np.zeros((0, 2)), np.zeros((0, 2)), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool)
-  starts, size = np.repeat(start, lengths), np.repeat(lengths, lengths)
-  nxt = flat[starts + (np.arange(len(flat)) - starts + 1) % size]
-  return V[flat], V[nxt], np.repeat(owner, lengths), np.repeat(first, lengths)
+  return V[flat], V[flat[_cyclicNext(lengths)]], np.repeat(owner, lengths), np.repeat(first, lengths)
+
+
+# the place of every entry within its run, for runs of the lengths given laid end to end
+def _withinRun(lengths):
+  lengths = np.asarray(lengths, dtype=np.int64)
+  return np.arange(lengths.sum()) - np.repeat(np.cumsum(lengths) - lengths, lengths)
+
+
+# the entry after every entry of cyclic runs of the lengths given laid end to end, the first of
+# a run after its last
+def _cyclicNext(lengths):
+  lengths = np.asarray(lengths, dtype=np.int64)
+  return np.repeat(np.cumsum(lengths) - lengths, lengths) + (_withinRun(lengths) + 1) % np.repeat(lengths, lengths)
 
 
 # the loops as one vertex list: where each loop starts in it and how long it is, the outline
@@ -112,12 +132,8 @@ def loopSums(V, loopsPerOutline, size):
   """the sums over the edges of every outline, one row each: twice the area, the length of the
   outer loop, the length of all loops, the first moments times six (x, y), the second times
   twelve (y y, x x) and twenty four (x y), all about the origin"""
-  from ..geometry.kernels import backend
   V = np.asarray(V, dtype=float)
-  loop = None
-  if backend() == "numba":
-    from .kernels import grainKernel
-    loop = grainKernel("loopSums")
+  loop = grainKernel("loopSums")
   if loop is not None:
     flat, start, lengths, owner, first = _flatLoops(loopsPerOutline)
     out = np.zeros((size, 8))
@@ -164,14 +180,21 @@ class polygonSet:
     as a (points, outlines) matrix"""
     q = self._as2d(xy)
     out = np.zeros((len(q), self.size), dtype=bool)
-    V = self.V
-    for k, ls in enumerate(self.loops):
-      if not ls:
-        continue
-      inside = _insideLoop(V, ls[0], q)
-      for h in ls[1:]:
-        inside &= ~_insideLoop(V, h, q)
-      out[:, k] = inside
+    flat, start, lengths, owner, first = _flatLoops(self.loops)
+    if not len(flat):
+      return out
+    P, Q = self.V[flat], self.V[flat[_cyclicNext(lengths)]]
+    holes = np.flatnonzero(~first)
+    # the points in blocks, so that a block of points by edges stays bounded
+    step = max(1, INSIDE_BLOCK // len(flat))
+    for a in range(0, len(q), step):
+      inLoop = np.add.reduceat(_crossings(P, Q, q[a:a + step]), start, axis=1) % 2 == 1
+      block = out[a:a + step]
+      block[:, owner[first]] = inLoop[:, first]
+      if len(holes):
+        inHole = np.zeros(block.shape, dtype=np.int64)
+        np.add.at(inHole, (slice(None), owner[holes]), inLoop[:, holes])
+        block &= inHole == 0
     return out
 
   def findByLocation(self, xy):
@@ -203,7 +226,8 @@ class polygonSet:
   @property
   def boundarySize(self):
     """the number of vertices on the loops of an outline, the holes included"""
-    return np.array([sum(len(l) for l in ls) for ls in self.loops], dtype=np.int32)
+    _, _, lengths, owner, _ = _flatLoops(self.loops)
+    return np.bincount(owner, weights=lengths, minlength=self.size).astype(np.int32)
 
   @property
   def centroid(self):
@@ -226,14 +250,10 @@ class polygonSet:
 
   @property
   def diameter(self):
-    """the largest distance between two vertices of the outer loop"""
-    out = np.zeros(self.size)
-    for k, ls in enumerate(self.loops):
-      if ls:
-        P = self.V[ls[0]]
-        d = P[:, None, :] - P[None, :, :]
-        out[k] = np.sqrt(np.max(np.sum(d * d, axis=-1)))
-    return out
+    """the largest distance between two vertices of the outer loop, which two of its hull
+    vertices span"""
+    from .shape import _extremalWidths
+    return np.linalg.norm(_extremalWidths(self)[1], axis=1)
 
   @property
   def hasHole(self):

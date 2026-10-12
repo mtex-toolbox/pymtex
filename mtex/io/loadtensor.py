@@ -22,12 +22,14 @@ from .table import readFile, text
 from ..geometry.install import install
 
 _NUMBERS = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+# the rank of a plain tensor by the shape of its block of coefficients
+BLOCK_RANKS = {(6, 6): 4, (3, 6): 3}
 
 
 # the numeric rows of the file, the fixed width columns of a .P file split at their width
-def _numericRows(fname):
+def _numericRows(lines):
   rows = []
-  for line in text(readFile(fname)).split("\n"):
+  for line in lines:
     s = line.strip()
     if not s:
       continue
@@ -62,11 +64,10 @@ def _trailingBlock(rows, rank):
 def loadTensor(fname, *args, cls=None, **kwargs):
   """the tensor a text file holds: the last block of numeric rows, the density on the line
   after the word density, the crystal frame given positionally"""
-  fname = os.fspath(fname)
-  rows = _numericRows(fname)
+  raw = text(readFile(os.fspath(fname))).split("\n")
   cls = tensor if cls is None else cls
-  M = _trailingBlock(rows, kwargs.get("rank", cls._rank))
-  lines = [l.strip().lower() for l in text(readFile(fname)).split("\n")]
+  M = _trailingBlock(_numericRows(raw), kwargs.get("rank", cls._rank))
+  lines = [l.strip().lower() for l in raw]
   density = None
   for k, l in enumerate(lines):
     if l.startswith("density") and k + 1 < len(lines):
@@ -77,10 +78,9 @@ def loadTensor(fname, *args, cls=None, **kwargs):
           density = density / 1000
   if density is not None and "density" not in kwargs:
     kwargs["density"] = density
-  if M.shape == (6, 6) and cls is tensor and "rank" not in kwargs:
-    kwargs["rank"] = 4
-  if M.shape == (3, 6) and cls is tensor and "rank" not in kwargs:
-    kwargs["rank"] = 3
+  # a plain tensor takes its rank from the shape of the block: a Voigt matrix or a Voigt table
+  if cls is tensor and M.shape in BLOCK_RANKS:
+    kwargs.setdefault("rank", BLOCK_RANKS[M.shape])
   return cls(M, *args, **kwargs)
 
 
@@ -89,10 +89,6 @@ def _load(cls, fname, *args, **kwargs):
   return loadTensor(fname, *args, cls=cls, **kwargs)
 
 
-def _install():
-  install(tensor, classmethod(_load), "load")
-
-
-_install()
+install(tensor, classmethod(_load), "load")
 
 __all__ = ["loadTensor"]

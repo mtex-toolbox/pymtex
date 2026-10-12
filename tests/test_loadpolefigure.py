@@ -175,3 +175,8 @@ def test_the_files_MATLAB_reads_by_trying():
   for name, (npf, n) in counts.items():
     pf = loadPoleFigure(os.path.join(LOCAL, name), cub)
     assert (pf.numPF, sum(I.size for I in pf.allI)) == (npf, n), name
+
+
+def test_given_leaves_out_the_frames_not_given():
+  from mtex.io.loadpolefigure import _given
+  assert _given(None, 1, None, 2) == [1, 2]

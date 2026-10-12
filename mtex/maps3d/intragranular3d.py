@@ -38,7 +38,11 @@ def _grid(ebsd):
 def gradientDim(ebsd, dim):
   """the derivative of the orientation along the array axis dim of a gridded volume per unit length,
   the forward difference, backwards at the last voxel, NaN across a grain boundary"""
-  g, cs = _grid(ebsd)
+  return _gradient(*_grid(ebsd), dim)
+
+
+# the derivative along the array axis dim of the gridded volume g of the one phase cs
+def _gradient(g, cs, dim):
   q = g.rotations.data.astype(float)
   q[g.phaseId != g.CSList.phaseId(cs)] = np.nan
   n = g.shape[dim]
@@ -78,10 +82,10 @@ def curvature(ebsd, stencil=None):
   """the curvature tensor of every voxel, the gradients along the three lattice directions, in the
   specimen frame and in the inverse scan unit"""
   from ..tensors.tensor import curvatureTensor
-  g = ebsd.gridify()
+  g, cs = _grid(ebsd)
   D = g.lattice.D
   U = D / np.linalg.norm(D, axis=1, keepdims=True)
-  M = sum(gradientDim(ebsd, k).data[..., :, None] * U[k][None, :] for k in range(3))
+  M = sum(_gradient(g, cs, k).data[..., :, None] * U[k][None, :] for k in range(3))
   return curvatureTensor(M, g.frame, unit=f"1/{g.scanUnit}")
 
 
@@ -102,10 +106,8 @@ def KAM(ebsd, order=1, threshold=None, max=False):
   offs = [o for o in product(range(-order, order + 1), repeat=3) if 0 < sum(abs(x) for x in o) <= order]
   from ..geometry.kernels import qmul
   for o in offs:
-    src = tuple(slice(max_(0, -k), s - max_(0, k)) for k, s in zip(o, g.shape))
-    dst = tuple(slice(max_(0, k), s - max_(0, -k)) for k, s in zip(o, g.shape))
-    a, b = q[src], q[dst]
-    m = qmul(qconj(a), b)
+    src, dst = _shifted(o, g.shape)
+    m = qmul(qconj(q[src]), q[dst])
     c = np.max(np.abs(m.reshape(-1, 4) @ G.T), axis=1).reshape(m.shape[:-1])
     w = 2 * np.arccos(np.clip(c, -1, 1))
     use = ok[src] & ok[dst]
@@ -118,9 +120,11 @@ def KAM(ebsd, order=1, threshold=None, max=False):
   return _back(ebsd, g, out)
 
 
-def max_(a, b):
-  """the larger of two numbers, the builtin max being shadowed by the keyword of KAM"""
-  return a if a > b else b
+# the slices of an array of the shape that pair every cell with the one the offset o away
+def _shifted(o, shape):
+  src = tuple(slice(max(0, -k), s - max(0, k)) for k, s in zip(o, shape))
+  dst = tuple(slice(max(0, k), s - max(0, -k)) for k, s in zip(o, shape))
+  return src, dst
 
 
 # a gridded result read back in the order of the volume that was asked
@@ -173,8 +177,7 @@ def spatialProfile(ebsd, points):
   return ebsd.interp(np.concatenate(pts)), np.concatenate(dist)
 
 
-for _f in (gradientX, gradientY, gradientZ, curvature, KAM, fill, spatialProfile):
+for _f in (gradientX, gradientY, gradientZ, curvature, KAM, fill, spatialProfile, gradientDim):
   install(EBSD3, _f)
-install(EBSD3, gradientDim)
 
 __all__ = []

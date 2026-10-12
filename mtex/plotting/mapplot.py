@@ -18,12 +18,15 @@ from ..geometry.plottingconvention import plottingConvention
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, zvector, asVector3d
-from .colormaps import mtexColormap
-from .maps import (CELLS_MAX, boundaryPolyline, boundarySegments, frameOnScreen, grainPolygons, mapCells, mapExtent, mapLayout,
-                   mapPoints, mapRaster, phasePalette, planeOf, scaleBar, triadGeometry)
+from ..maps.boundary import grainBoundary, triplePointList
+from ..maps.ebsd import EBSD
+from ..maps.grains import grain2d
+from .colormaps import _colorLimits, mtexColormap
+from .maps import (CELLS_MAX, boundaryPolyline, boundarySegments, frameOnScreen, mapCells, mapExtent, mapLayout, mapPoints,
+                   mapRaster, phasePalette, planeOf, scaleBar, triadGeometry, unitLabel)
 from .keywords import refuseVariants
 from .mtexfigure import gcm, mtexFigure
-from .orientationkeys import ipfColorKey, ipfColors, orientationColorKey
+from .orientationkeys import ipfColorKey, ipfColors, orientationColorKey, _rotationsOf
 from ..geometry.display import display, frameLabel, header
 
 if TYPE_CHECKING:
@@ -48,7 +51,11 @@ class mapPlot:
     self.unit = getattr(x, "scanUnit", "um") if unit is None else unit
     self.plane = planeOf(x)
     self.frame = x.frame
-    self.mappable = None
+    self.mappables = []
+    # the scale bar, its arguments for a redraw, and whether it follows a zoom
+    self.scaleBarArtists, self.scaleBarArgs, self._followsView = [], None, False
+    # whether a held plot drew into this map after the first
+    self.reused = False
     ax._mtexMapPlot = self
     ax.set_aspect("equal")
     # a region is given in the coordinates of the map and drawn under its layout
@@ -62,7 +69,7 @@ class mapPlot:
     ax.set_ylim(ylo, yhi)
     if coordinates:
       right, up = self.screenAxisNames()
-      u = "µm" if self.unit == "um" else self.unit
+      u = unitLabel(self.unit)
       ax.set_xlabel(f"{right} / {u}")
       ax.set_ylabel(f"{up} / {u}")
     else:
@@ -75,13 +82,11 @@ class mapPlot:
   def mappable(self):
     """every drawing coloured by values, so that a colour map or range set afterwards reaches
     all of them, as MATLAB's does; the mappable is the last one, the colour bar's"""
-    return self.mappables[-1] if getattr(self, "mappables", None) else None
+    return self.mappables[-1] if self.mappables else None
 
   @mappable.setter
   def mappable(self, h):
     """adds a drawing coloured by values to the list the colour map and range reach; None adds nothing"""
-    if not hasattr(self, "mappables"):
-      self.mappables = []
     if h is not None:
       self.mappables.append(h)
 
@@ -104,6 +109,12 @@ class mapPlot:
     """screen coordinates of points of the map plane, the layout applied to them"""
     return np.asarray(xy, dtype=float) @ self.layout.T
 
+  @property
+  def outOfScreen(self):
+    """the normal of the map plane that points at the viewer, who looks from the other side
+    when the layout flips the plane"""
+    return self.plane.normal * (-1 if np.linalg.det(self.layout) < 0 else 1)
+
   def extend(self, x):
     """more data drawn into the map widen it, as hold on does in MATLAB, and the scale bar
     follows the new limits"""
@@ -118,24 +129,23 @@ class mapPlot:
     self._redrawScaleBar()
 
   def _redrawScaleBar(self):
-    if getattr(self, "scaleBarArtists", None):
+    if self.scaleBarArtists:
       for a in self.scaleBarArtists:
         a.remove()
-      args = self.scaleBarArgs
       self.scaleBarArtists = []
-      scaleBarOn(self, None, **args)
+      scaleBarOn(self, None, **self.scaleBarArgs)
 
   def followView(self):
     """a zoom, by xlim and ylim or in a window, takes the scale bar into the new view, as MATLAB
     redraws its bar in the corner of what is shown"""
-    if getattr(self, "_followsView", False):
+    if self._followsView:
       return
     self._followsView = True
 
     def moved(ax):
       (xlo, xhi), (ylo, yhi) = ax.get_xlim(), ax.get_ylim()
       view = (min(xlo, xhi), max(xlo, xhi), min(ylo, yhi), max(ylo, yhi))
-      if view != tuple(self.extent) and getattr(self, "scaleBarArtists", None):
+      if view != tuple(self.extent) and self.scaleBarArtists:
         self.extent = view
         self._redrawScaleBar()
     self.ax.callbacks.connect("xlim_changed", moved)
@@ -147,16 +157,12 @@ class mapPlot:
 
 # ------------------------------------------------------------------ where a map goes
 
+# what kind of map x is, None for anything else; an EBSD3 volume is an EBSD map
+MAP_KINDS = ((EBSD, "ebsd"), (grain2d, "grains"), (grainBoundary, "boundary"), (triplePointList, "triplePoints"))
+
+
 def _kind(x):
-  if hasattr(x, "lattice") and hasattr(x, "rotations"):
-    return "ebsd"
-  if hasattr(x, "loops"):
-    return "grains"
-  if hasattr(x, "F") and hasattr(x, "misrotation"):
-    return "boundary"
-  if hasattr(x, "boundaryId") and hasattr(x, "angles"):
-    return "triplePoints"
-  return None
+  return next((kind for cls, kind in MAP_KINDS if isinstance(x, cls)), None)
 
 
 # the size of a figure of one map: seven inches along its longer side, scaled by a named size
@@ -170,10 +176,11 @@ def _mapFigSize(x, mapKw, figSize):
 # the map plot a command draws into: the parent named, the current axes when it is held
 # and holds a map, else a new figure sized after the map
 def _target(x, mapKw):
+  plotKw = {k: v for k, v in mapKw.items() if k not in ("parent", "figSize")}
   parent = mapKw.get("parent")
   if parent is not None:
     mP = getattr(parent, "_mtexMapPlot", None)
-    return mP if mP is not None else mapPlot(parent, x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
+    return mP if mP is not None else mapPlot(parent, x, **plotKw)
   fig = gcm()
   if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
     mP = fig.children[-1]._mtexMapPlot
@@ -182,14 +189,14 @@ def _target(x, mapKw):
     return mP
   # the axes nextAxis prepared takes the map, a fresh figure of newMtexFigure its first axes
   if fig is not None and fig.pending is not None:
-    return mapPlot(fig.takeAxis(), x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
+    return mapPlot(fig.takeAxis(), x, **plotKw)
   # a fresh figure of one panel takes the shape of the map at the size it was asked for
   if fig is not None and not fig.children and not fig.hold:
     if fig.nrows * fig.ncols == 1 and not fig.fixedSize:
       fig.fig.set_size_inches(*_mapFigSize(x, mapKw, getattr(fig, "figSize", None)))
-    return mapPlot(fig.nextAxis(), x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
+    return mapPlot(fig.nextAxis(), x, **plotKw)
   fig = mtexFigure(1, figSize=_mapFigSize(x, mapKw, mapKw.get("figSize")))
-  return mapPlot(fig.nextAxis(), x, **{k: v for k, v in mapKw.items() if k not in ("parent", "figSize")})
+  return mapPlot(fig.nextAxis(), x, **plotKw)
 
 
 def _splitMap(kw):
@@ -202,9 +209,10 @@ def mapAliases(kw, grains=False):
   refuseVariants(kw)
   if grains and "transparent" in kw:
     kw["translucent"] = kw.pop("transparent")
-  for old in (() if grains else ("translucent", "transparent")):
-    if old in kw:
-      kw["faceAlpha"] = kw.pop(old)
+  if not grains:
+    for old in ("translucent", "transparent"):
+      if old in kw:
+        kw["faceAlpha"] = kw.pop(old)
   return kw
 
 
@@ -231,20 +239,18 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   thrown away. A route that yields numbers ignores `at` and stays whole, since the colour
   range is the map's and not the picture's; a route that yields colours returns one per
   entry of `at`."""
+  from matplotlib.colors import to_rgb
   color = colorRequest(color, faceColor, ipfDirection)
   n = x.size
   ids = np.asarray(x.phaseId).reshape(-1)
   sel = slice(None) if at is None else np.asarray(at).reshape(-1)
   m = n if at is None else len(sel)
   if faceColor is not None and color is None:
-    from matplotlib.colors import to_rgb
     return np.tile(to_rgb(faceColor), (m, 1)), False
-  if color is None or (isinstance(color, str) and color == "phase"):
-    palette = phasePalette(x.CSList)
-    from matplotlib.colors import to_rgb
-    rgb = np.array([to_rgb(c) for c in palette])
+  if _isPhase(color):
+    rgb = np.array([to_rgb(c) for c in phasePalette(x.CSList)])
     return rgb[ids[sel]], False
-  if isinstance(color, str) and color == "orientation":
+  if _isName(color, "orientation"):
     rgb = ipfColors(x, ipfDirection=zvector if ipfDirection is None else ipfDirection, at=at).reshape(-1, 3)
     return _withUnindexed(x, rgb, at), False
   if isinstance(color, orientation):
@@ -262,8 +268,7 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   if isinstance(color, orientationColorKey):
     direction = color.ipfDirection if isinstance(color, ipfColorKey) else zvector
     rgb = ipfColors(x, ipfDirection=direction, at=at).reshape(-1, 3)
-    rots = x.meanRotation if hasattr(x, "meanRotation") else x.rotations
-    q = rots.data.reshape(-1, 4)[sel]
+    q = _rotationsOf(x).data.reshape(-1, 4)[sel]
     for i in x.CSList.indexedPhaseId:
       fr = x.CSList[i]
       same = fr is color.frameA or fr.Laue() is color.frameA.Laue()
@@ -278,7 +283,6 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   if isinstance(color, str):
     if color in x.prop:
       return np.asarray(x.prop[color], dtype=float).reshape(-1), True
-    from matplotlib.colors import to_rgb
     return np.tile(to_rgb(color), (m, 1)), False
   arr = np.asarray(color)
   # colours in the shape of the map are one per measurement too
@@ -307,11 +311,17 @@ def _withUnindexed(x, rgb, at=None):
 
 def _norm(values, colorRange):
   from matplotlib.colors import Normalize
-  finite = values[np.isfinite(values)]
-  lo, hi = (finite.min(), finite.max()) if colorRange is None and finite.size else (0.0, 1.0) if colorRange is None else colorRange
-  if not hi > lo:
-    hi = lo + max(abs(lo), 1.0) * 1e-6
-  return Normalize(lo, hi)
+  return Normalize(*_colorLimits(values, colorRange))
+
+
+# whether a colour request is the name given, a string compared only as a string
+def _isName(color, name):
+  return isinstance(color, str) and color == name
+
+
+# whether a colour request asks for the phase palette, the default
+def _isPhase(color):
+  return color is None or _isName(color, "phase")
 
 
 # ------------------------------------------------------------------ the EBSD map
@@ -329,7 +339,8 @@ def _liftable(f):
       if out is not None:
         return out
     out = f(x, *args, **kw)
-    ax = getattr(out, "axes", None) if not isinstance(out, list) else getattr(out[0], "axes", None) if out else None
+    first = out[0] if isinstance(out, list) and out else out
+    ax = getattr(first, "axes", None)
     if ax is None and kw.get("parent") is None and gcm() is not None and gcm().children:
       ax = gcm().children[-1]
     if kw.get("parent") is None:
@@ -389,8 +400,7 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
       img = np.full(index.shape, np.nan)
       img[covered] = values[index[covered]]
       # one transparency for all or one per measurement, laid out as the picture is
-      a = np.nan_to_num(np.asarray(alpha, dtype=float), nan=0.0)
-      alphaImg = alpha if a.ndim == 0 else np.where(covered, a.reshape(-1)[np.clip(index, 0, None)], 0.0)
+      alphaImg = alpha if np.ndim(alpha) == 0 else np.where(covered, alpha[np.clip(index, 0, None)], 0.0)
       # a NaN is drawn as nothing, an infinite value at the end of the colour map, as MATLAB
       img[np.isneginf(img)], img[np.isposinf(img)] = norm.vmin - 1, norm.vmax + 1
       h = ax.imshow(np.ma.masked_invalid(img), extent=(xlo, xhi, ylo, yhi), origin="lower", interpolation="nearest",
@@ -402,9 +412,9 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
       img[..., :3] = (np.nan_to_num(np.clip(rgb, 0, 1)) * 255 + 0.5).astype(np.uint8)
       # one transparency for all or one per measurement; a measurement whose colour is no
       # colour, an unindexed one, is drawn as nothing at all
-      a = np.nan_to_num(np.asarray(alpha, dtype=float), nan=0.0)
       shown = covered & np.all(np.isfinite(rgb), axis=-1)
-      img[..., 3] = np.where(shown, int(a * 255 + 0.5) if a.ndim == 0 else (a.reshape(-1)[pick] * 255 + 0.5).astype(np.uint8), 0)
+      opacity = int(alpha * 255 + 0.5) if np.ndim(alpha) == 0 else (alpha[pick] * 255 + 0.5).astype(np.uint8)
+      img[..., 3] = np.where(shown, opacity, 0)
       h = ax.imshow(img, extent=(xlo, xhi, ylo, yhi), origin="lower", interpolation="nearest", zorder=1, **kw)
   elif style == "raster":
     raise ValueError("the map is not a rigid lattice, so it has no picture; backend='patch' draws its cells")
@@ -413,8 +423,7 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     corners = mapCells(ebsd, layout=mP.layout)
     keep = _drawn(ebsd, values, scalar)
     if keep is not None:
-      corners, values = corners[keep], values[keep]
-      alpha = alpha if np.ndim(alpha) == 0 else np.asarray(alpha).reshape(-1)[keep]
+      corners, values, alpha = corners[keep], values[keep], _alphaOf(alpha, keep)
     h = PolyCollection(corners, closed=True, linewidths=lineWidth if edgeColor is not None else 0,
                        edgecolors=edgeColor if edgeColor is not None else "face", alpha=alpha, zorder=1, **kw)
     if scalar:
@@ -430,12 +439,9 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     P = mapPoints(ebsd, layout=mP.layout)
     keep = _drawn(ebsd, values, scalar)
     if keep is not None:
-      P, values = P[keep], values[keep]
-      alpha = alpha if np.ndim(alpha) == 0 else np.asarray(alpha).reshape(-1)[keep]
-    if scalar:
-      h = ax.scatter(P[:, 0], P[:, 1], c=values, cmap=cmap, norm=norm, s=markerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
-    else:
-      h = ax.scatter(P[:, 0], P[:, 1], c=values, s=markerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **kw)
+      P, values, alpha = P[keep], values[keep], _alphaOf(alpha, keep)
+    mapped = dict(cmap=cmap, norm=norm) if scalar else {}
+    h = ax.scatter(P[:, 0], P[:, 1], c=values, s=markerSize ** 2, linewidths=0, alpha=alpha, zorder=1, **mapped, **kw)
   if displayName is not None:
     h.set_label(displayName)
   if scalar:
@@ -456,6 +462,11 @@ def _drawn(ebsd, values, scalar):
   return None if keep.all() else keep
 
 
+# the transparency of the measurements kept, one for all or one each
+def _alphaOf(alpha, keep):
+  return alpha if np.ndim(alpha) == 0 else alpha[keep]
+
+
 # twice the pixels of the axes on each side, at the figure's dpi
 def _pixelCap(ax):
   fig = ax.figure
@@ -465,28 +476,30 @@ def _pixelCap(ax):
 
 
 def _finish(mP, x, micronbar, refFrame, legend, color, location=None, ipfDirection=None):
-  # a plot into a held map adds no second scale bar
-  # MATLAB's 'micronbar', 'off'
-  if isinstance(micronbar, str):
-    micronbar = micronbar.lower() == "on"
-  # and 'refFrame', 'off'
-  if isinstance(refFrame, str):
-    refFrame = refFrame.lower() == "on"
+  # MATLAB's 'micronbar', 'off' and 'refFrame', 'off'; a plot into a held map adds no second scale bar
+  micronbar, refFrame = _onOff(micronbar), _onOff(refFrame)
   if micronbar is None:
-    micronbar = getMTEXpref("showMicronBar", True) and not getattr(mP, "reused", False)
-  if micronbar and not getattr(mP, "scaleBarArtists", None):
-    show = getMTEXpref("showRefFrame", True)
-    show = show.lower() == "on" if isinstance(show, str) else bool(show)
+    micronbar = getMTEXpref("showMicronBar", True) and not mP.reused
+  if micronbar and not mP.scaleBarArtists:
+    show = bool(_onOff(getMTEXpref("showRefFrame", True)))
     scaleBarOn(mP, x, location=location or "sw", refFrame=refFrame if show else False)
     mP.followView()
   # a phase map carries its legend unless told not to, as MATLAB draws it
   if legend is None:
-    legend = color is None or (isinstance(color, str) and color == "phase")
-  if legend:
-    if color is None or (isinstance(color, str) and color == "phase"):
-      phaseLegend(mP, x)
-    elif (isinstance(color, str) and color == "orientation") or isinstance(color, ipfColorKey):
-      keyLegend(mP, x, ipfDirection=color.ipfDirection if isinstance(color, ipfColorKey) else ipfDirection if ipfDirection is not None else zvector)
+    legend = _isPhase(color)
+  if not legend:
+    return
+  if _isPhase(color):
+    phaseLegend(mP, x)
+  elif isinstance(color, ipfColorKey):
+    keyLegend(mP, x, ipfDirection=color.ipfDirection)
+  elif _isName(color, "orientation"):
+    keyLegend(mP, x, ipfDirection=zvector if ipfDirection is None else ipfDirection)
+
+
+# MATLAB's 'on' and 'off' as a truth value, anything else as it is
+def _onOff(v):
+  return v.lower() == "on" if isinstance(v, str) else v
 
 
 # ------------------------------------------------------------------ the grains and the boundary
@@ -505,14 +518,13 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   """
   alpha = kw.pop("faceAlpha", alpha)
   color = colorRequest(color, faceColor, ipfDirection)
-  from matplotlib.path import Path
   # plot(grains, v): an axis per grain as a compass needle at its centroid
   if isinstance(color, vector3d):
     return needlesOnMap(grains, color, micronbar=micronbar, refFrame=refFrame, **kw)
   # plot(grains, cS): the crystal shape of every grain into the map
   if isinstance(color, crystalShape):
     from .shapeplot import plotShapesOnMap
-    return plotShapesOnMap(grains, color, faceColor=faceColor, faceAlpha=kw.pop("faceAlpha", alpha), edgeColor=kw.pop("edgeColor", lineColor or "k"),
+    return plotShapesOnMap(grains, color, faceColor=faceColor, faceAlpha=alpha, edgeColor=kw.pop("edgeColor", lineColor or "k"),
                            lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, displayName=displayName, **kw)
   location = kw.pop("Location", location)
   mapKw = _splitMap(kw)
@@ -521,18 +533,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   values, scalar = mapValues(grains, color, faceColor, ipfDirection)
   cmap = mtexColormap(colormap)
   # every grain is one path with its holes, all of them one collection
-  paths, at = [], []
-  for k in range(grains.size):
-    rings = grainPolygons(grains, k)
-    if not rings or len(rings[0]) < 3:
-      continue
-    verts, codes = [], []
-    for ring in rings:
-      ring = mP.onScreen(ring)
-      verts += list(ring) + [ring[0]]
-      codes += [Path.MOVETO] + [Path.LINETO] * (len(ring) - 1) + [Path.CLOSEPOLY]
-    paths.append(Path(np.array(verts), codes))
-    at.append(k)
+  paths, at = _grainPaths(grains, mP)
   if not paths:
     return None
   from matplotlib.collections import PathCollection
@@ -578,6 +579,27 @@ def _translucency(values, scalar, s):
   return np.clip(s * (1 - np.min(v[:, :3], axis=1)), 0, 1)
 
 
+# every grain as one path on the screen, its outer loop first and its holes after it, each
+# loop closed; a grain whose outer loop has fewer than three corners has no face. Returns
+# the paths and the indices of the grains they draw
+def _grainPaths(grains, mP):
+  from matplotlib.path import Path
+  V = mP.onScreen(grains.V)
+  paths, at = [], []
+  for k in range(grains.size):
+    loops = grains.loops[k]
+    if not loops or len(loops[0]) < 3:
+      continue
+    ends = np.cumsum([len(loop) + 1 for loop in loops])
+    verts = V[np.concatenate([np.append(loop, loop[0]) for loop in loops])]
+    codes = np.full(ends[-1], Path.LINETO, dtype=Path.code_type)
+    codes[np.concatenate([[0], ends[:-1]])] = Path.MOVETO
+    codes[ends - 1] = Path.CLOSEPOLY
+    paths.append(Path(verts, codes))
+    at.append(k)
+  return paths, at
+
+
 def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw: Unpack[PlotKeywords]):
   """an axis per grain as MATLAB draws it: a needle through the centroid, grey when it lies
   in the plane of the map, its half pointing out of the screen black and the other white
@@ -587,25 +609,23 @@ def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw: 
   mP = _target(grains, mapKw)
   d = np.asarray(v.normalize().data, dtype=float).reshape(-1, 3)
   c = grains.centroid.data.reshape(-1, 3)
-  length = np.asarray(grains.diameter).reshape(-1) / 4
-  n = mP.plane.normal * (-1 if np.linalg.det(mP.layout) < 0 else 1)
+  length = np.asarray(grains.diameter).reshape(-1, 1) / 4
+  n = mP.outOfScreen
   out = d @ n
   inPlane = d - out[:, None] * n
-  norm = np.linalg.norm(inPlane, axis=1)
-  u = np.where(norm[:, None] > 1e-12, inPlane / np.where(norm[:, None] > 1e-12, norm[:, None], 1), 0.0)
-  segs, colors = [], []
-  for k in range(len(c)):
-    a, b = c[k] - length[k] * u[k], c[k] + length[k] * u[k]
-    p0, pa, pb = (mP.plane.to2d(x) @ mP.layout.T for x in (c[k], a, b))
-    if abs(out[k]) < 0.1:
-      segs.append([pa, pb])
-      colors.append((0.5, 0.5, 0.5, 1))
-    else:
-      segs += [[p0, pb], [p0, pa]]
-      colors += [(0, 0, 0, 1) if out[k] > 0 else (1, 1, 1, 1), (1, 1, 1, 1) if out[k] > 0 else (0, 0, 0, 1)]
-  h = LineCollection(segs, colors=colors, linewidths=lineWidth, zorder=6, path_effects=None)
+  norm = np.linalg.norm(inPlane, axis=1, keepdims=True)
+  u = np.where(norm > 1e-12, inPlane / np.where(norm > 1e-12, norm, 1), 0.0)
+  P0, PA, PB = (mP.plane.to2d(x) @ mP.layout.T for x in (c, c - length * u, c + length * u))
+  # two segments per grain, grey from end to end where the needle lies in the plane, else
+  # its half out of the screen black and the other white from the centroid
+  flat, up = (np.abs(out) < 0.1)[:, None], (out > 0)[:, None]
+  black, white, grey = np.array([0.0, 0, 0, 1]), np.array([1.0, 1, 1, 1]), np.array([0.5, 0.5, 0.5, 1])
+  segs = np.stack([np.stack([np.where(flat, PA, P0), PB], axis=1), np.stack([P0, PA], axis=1)], axis=1).reshape(-1, 2, 2)
+  colors = np.stack([np.where(flat, grey, np.where(up, black, white)), np.where(up, white, black)], axis=1).reshape(-1, 4)
+  used = np.stack([np.ones(len(c), dtype=bool), ~flat[:, 0]], axis=1).reshape(-1)
+  h = LineCollection(segs[used], colors=colors[used], linewidths=lineWidth, zorder=6, path_effects=None)
   mP.ax.add_collection(h)
-  mP.ax.scatter(*((mP.plane.to2d(c) @ mP.layout.T).T), s=lineWidth ** 2 * 3, color="k", zorder=7)
+  mP.ax.scatter(*P0.T, s=lineWidth ** 2 * 3, color="k", zorder=7)
   _finish(mP, grains, micronbar, refFrame, False, None)
   return h
 
@@ -634,7 +654,6 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
   if color is None:
     if np.ndim(edgeAlpha) > 0:
       # one transparency per segment: the segments as a collection in their own RGBA colours
-      from matplotlib.collections import LineCollection
       from matplotlib.colors import to_rgba
       V = boundarySegments(gB)
       segs = mP.onScreen(V.reshape(-1, V.shape[-1])).reshape(-1, 2, 2)
@@ -682,7 +701,11 @@ def plotTriplePoints(tP, color=None, markerFaceColor=None, markerEdgeColor=None,
   mapKw = _splitMap(kw)
   mP = _target(tP, mapKw)
   P = mP.onScreen(np.asarray(tP.V).reshape(-1, 2))
-  edge = markerEdgeColor if markerEdgeColor is not None else (color if color is not None and isinstance(color, str) else "k")
+  # the circles are edged in the colour asked for, a colour name given as the data, else black
+  if markerEdgeColor is not None:
+    edge = markerEdgeColor
+  else:
+    edge = color if isinstance(color, str) else "k"
   size = float(markerSize) ** 2
   # no points draw nothing, an empty scatter would stretch the limits to the origin
   if len(P) == 0:
@@ -761,12 +784,11 @@ def _joinLegend(mP, h):
 
 def textMap(x, labels, fontSize=None, color="k", **kw: Unpack[PlotKeywords]):
   """text(ebsd, labels): a label at every measurement or grain of the current map, or a new one"""
-  fig = gcm()
-  if fig is not None and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
-    mP = fig.children[-1]._mtexMapPlot
+  mP = _currentMap() or _target(x, _splitMap(kw))
+  if isinstance(x, grain2d):
+    P = mP.plane.to2d(x.centroid.data.reshape(-1, 3)) @ np.asarray(mP.layout, dtype=float).T
   else:
-    mP = _target(x, _splitMap(kw))
-  P = mapPoints(x, mP.layout) if not hasattr(x, "numPixel") else mP.plane.to2d(x.centroid.data.reshape(-1, 3)) @ np.asarray(mP.layout, dtype=float).T
+    P = mapPoints(x, mP.layout)
   labels = [labels] * len(P) if isinstance(labels, str) else [str(t) for t in np.asarray(labels, dtype=object).ravel()]
   size = getMTEXpref("FontSize", 13) - 4 if fontSize is None else fontSize
   return [mP.ax.text(px, py, t, ha="center", va="center", fontsize=size, color=color, zorder=8, clip_on=True, **kw) for (px, py), t in zip(P, labels)]
@@ -813,7 +835,10 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
   u = np.stack([raw @ pl.e1, raw @ pl.e2], axis=-1)
   n = np.linalg.norm(u, axis=-1)
   ok = (n > 0) & np.all(np.isfinite(raw), axis=-1)
-  length = n[ok] if not scaling else default[ok] if scale is None else scale * n[ok]
+  if not scaling:
+    length = n[ok]
+  else:
+    length = default[ok] if scale is None else scale * n[ok]
   u = u[ok] / n[ok][:, None] * length[:, None]
   c = c[ok]
   # an axis, or MATLAB's 'antipodal', is a line centred on its point
@@ -845,7 +870,7 @@ def _quiverBoundary(mP, c, raw, f, color, lineWidth, displayName, **kw):
   d = raw * (f * 0.9 * spacing / nrm.max())
   # the half towards the viewer lies on top, the half into the map beneath the grains, as
   # MATLAB's three dimensional arrows are hidden by the faces they pierce
-  d = d * np.where(d @ (pl.normal * (-1 if np.linalg.det(mP.layout) < 0 else 1)) < 0, -1, 1)[:, None]
+  d = d * np.where(d @ mP.outOfScreen < 0, -1, 1)[:, None]
   u = np.stack([d @ pl.e1, d @ pl.e2], axis=-1)
   up = np.stack([mP.onScreen(c), mP.onScreen(c + u)], axis=1)
   down = np.stack([mP.onScreen(c), mP.onScreen(c - u)], axis=1)
@@ -872,8 +897,7 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, 
     h = LineCollection(segs, colors=color, linewidths=lineWidth, zorder=4, label=displayName, **kw)
     mP.ax.add_collection(h)
   else:
-    outOfScreen = pl.normal * (-1 if np.linalg.det(mP.layout) < 0 else 1)
-    start = c - u * (d @ outOfScreen < 0)[:, None]
+    start = c - u * (d @ mP.outOfScreen < 0)[:, None]
     p, q = mP.onScreen(start), u @ mP.layout.T
     h = mP.ax.quiver(p[:, 0], p[:, 1], q[:, 0], q[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.0015 * lineWidth,
                      label=displayName, zorder=4, **kw)
@@ -895,7 +919,7 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   if length is None:
     barLength, label = scaleBar(xhi - xlo, mP.unit, fraction)
   else:
-    barLength, label = float(length), f"{length:g} {'µm' if mP.unit == 'um' else mP.unit}"
+    barLength, label = float(length), f"{length:g} {unitLabel(mP.unit)}"
   if not barLength > 0:
     return None
   w, h = xhi - xlo, yhi - ylo

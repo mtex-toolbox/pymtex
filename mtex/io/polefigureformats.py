@@ -147,7 +147,7 @@ def numbersOf(lines):
   out = []
   for l in lines:
     for f in re.split(r"[ \t,;]+", l.strip()):
-      v = _float(f) if f else None
+      v = _float(f)
       if v is not None:
         out.append(v)
   return out
@@ -225,7 +225,7 @@ def latticeFromSymbol(s):
   for n in range(len(t), 0, -1):
     try:
       return crystalFrame(t[:n])
-    except Exception:
+    except ValueError:
       continue
   return None
 
@@ -516,10 +516,10 @@ def readXrd(lines, path, CS, h=None):
 # ------------------------------------------------------------------ the sections a marker opens
 
 def readSiemens(lines, path, CS, h=None):
-  """Siemens D5000: `*Pole figure:` opens one and names its indices, `*Khi` opens a ring at its
-  polar angle, and the background lines after it are subtracted from that ring. The counts
-  sit in eight character fields, and a five digit one fills its field, so a line is cut
-  into its fields rather than split at the blanks"""
+  """Siemens D5000, MATLAB's loadPoleFigure_siemens: `*Pole figure:` opens one and names its
+  indices, `*Khi` opens a ring at its polar angle, and the background lines after it are
+  subtracted from that ring. The counts sit in eight character fields, and a five digit one
+  fills its field, so a line is cut into its fields rather than split at the blanks"""
   CS = _frame(CS)
   hs, rs, Is = [], [], []
   for sec in markerSections(lines, lambda l: "*Pole figure:" in l):
@@ -566,7 +566,7 @@ def readJuelich(lines, path, CS, h=None):
 
 
 def readGeesthacht(lines, path, CS, h=None):
-  """Geesthacht: a `$` commented header and one row per measured direction, its second column
+  """Geesthacht, MATLAB's loadPoleFigure_geesthacht: a `$` commented header and one row per measured direction, its second column
   the scan the row belongs to and its fourth the elevation above the equator; the last field
   is the time the point was counted, written 00:07.76. The rows of one scan are one pole figure"""
   cols = readColumns([l.replace(":", " ") for l in lines if "$" not in l and not l.startswith("CREATOR")])
@@ -811,7 +811,12 @@ def readXrdml(lines, path, CS, h=None, raw=None):
           hkl = Miller(*(float(x) for x in idx), CS)
     if not I:
       continue
-    hs.append(_directionOf(h, k, len(measurements), path, CS) if h is not None else hkl if hkl is not None else _fromName(path, CS))
+    if h is not None:
+      hs.append(_directionOf(h, k, len(measurements), path, CS))
+    elif hkl is not None:
+      hs.append(hkl)
+    else:
+      hs.append(_fromName(path, CS))
     rs.append(vector3d(np.concatenate(xyz), antipodal=True))
     Is.append(np.concatenate(I))
   if not hs:

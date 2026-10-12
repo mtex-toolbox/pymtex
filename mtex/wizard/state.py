@@ -43,6 +43,7 @@ class WizardState:
     self.drawn = {}
     self.loadSeconds = None
     self.imports = 0           # the imports started, so that only the latest is committed
+    self._phaseCounts = None   # (the phase ids counted, their counts), kept by phaseCounts
     # the two reference frames as entries of AXIS_CONVENTIONS, and the axis names of each
     self.mapConvention = 0
     self.eulerConvention = 0
@@ -88,6 +89,11 @@ class WizardState:
   def currentTab(self):
     """the view of the tab shown, None when there is none"""
     return self.tabs[self.tab] if 0 <= self.tab < len(self.tabs) else None
+
+  @property
+  def currentKind(self):
+    """the kind of the view of the tab shown, None when there is none"""
+    return self.tabKinds[self.tab] if 0 <= self.tab < len(self.tabKinds) else None
 
   @property
   def hasMap(self):

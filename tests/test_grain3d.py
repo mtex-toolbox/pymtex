@@ -96,6 +96,27 @@ def test_orientations_set_and_the_misorientations_follow():
   assert np.allclose(np.asarray(gB.misorientation.angle()) / degree, 20) and np.all(gB.phaseId == g.phaseId[0])
 
 
+def test_orientations_set_on_a_selection_leave_the_faces_to_other_grains_without_misorientation():
+  from mtex import orientation
+  g = grains()["id", 2]
+  g.meanOrientation = orientation(rotation.byAxisAngle(vector3d(0, 0, 1), np.array([20.0]) * degree), crystalFrame("m-3m"))
+  outer = np.any(g.boundary.grainId != 2, axis=1)
+  assert outer.any() and np.all(np.isnan(g.boundary.misrotation.data.reshape(-1, 4)[outer]))
+
+
+def test_orientations_set_on_a_grain_whose_id_no_face_names():
+  from mtex import orientation
+  g = cube()
+  g.id = np.array([7])
+  g.meanOrientation = orientation(rotation.byAxisAngle(vector3d(0, 0, 1), np.array([20.0]) * degree), crystalFrame("m-3m"))
+  assert np.all(np.isnan(g.boundary.misrotation.data))
+
+
+def test_a_plane_beside_every_grain_intersects_none():
+  from mtex.geometry.plane import plane3d
+  assert not grains().intersected(plane3d(vector3d(0, 0, 1), vector3d(0, 0, 50))).any()
+
+
 def test_grains_from_faces():
   g = cube()
   h = grain3d.fromFaces(g.boundary.allV, g.boundary.F, g.I_GF, np.array([[1.0, 0, 0, 0]]), g.CSList)

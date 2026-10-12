@@ -20,7 +20,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion
 from ..geometry.representations import quat2euler
 from ..geometry.symmetry import symmetry
-from ..geometry.vector3d import vector3d, asVector3d
+from ..geometry.vector3d import asVector3d
 from ..geometry.display import display, header
 
 # ------------------------------------------------------------------ H1 layout
@@ -54,6 +54,34 @@ def degreeBlock(fhat, n):
   return fhat[..., degreeRange(n)].reshape(*fhat.shape[:-1], m, m).swapaxes(-1, -2)
 
 
+# the sign (-1)^(k-l) of every entry of a degree block of degree n
+def _checkerboard(n):
+  s = np.where(np.arange(2 * n + 1) % 2, -1.0, 1.0)
+  return np.outer(s, s)
+
+
+# a value per degree spread onto the coefficients of its degree in the spherical layout
+def _s2PerDegree(a):
+  a = np.asarray(a)
+  return np.repeat(a, 2 * np.arange(len(a)) + 1)
+
+
+# a value per degree spread onto the coefficients of its degree in the SO(3) layout
+def _so3PerDegree(a):
+  a = np.asarray(a)
+  return np.repeat(a, (2 * np.arange(len(a)) + 1) ** 2)
+
+
+# the degree of every coefficient of a spherical array of bandwidth L, (L+1)^2 entries
+def _s2Degrees(L):
+  return _s2PerDegree(np.arange(L + 1))
+
+
+# the degree of every coefficient of an SO(3) array of bandwidth L, deg2dim(L+1) entries
+def _so3Degrees(L):
+  return _so3PerDegree(np.arange(L + 1))
+
+
 # ------------------------------------------------------------------ MTEX's coefficients
 
 # the port computes in the Condon-Shortley basis (docs/design/harmonics.md); MTEX's spherical
@@ -70,9 +98,9 @@ def mtexCoefficientsS2(fhat):
   """the spherical coefficients converted between the internal Condon-Shortley basis and MTEX's,
   the sign (-1)^m on the odd positive orders; its own inverse"""
   fhat = np.asarray(fhat)
-  L = math.isqrt(fhat.shape[-1]) - 1
-  s = np.concatenate([_orderSign(l) for l in range(L + 1)])
-  return fhat * s
+  l = _s2Degrees(math.isqrt(fhat.shape[-1]) - 1)
+  m = np.arange(len(l)) - l * l - l
+  return fhat * np.where((m > 0) & (m % 2 == 1), -1.0, 1.0)
 
 
 def mtexCoefficientsSO3(fhat):
@@ -80,14 +108,12 @@ def mtexCoefficientsSO3(fhat):
   transposed and signed on both indices; its own inverse"""
   fhat = np.asarray(fhat)
   out = np.empty_like(fhat)
-  n = 0
-  while deg2dim(n + 1) <= fhat.shape[-1]:
+  for n in range(dim2deg(fhat.shape[-1]) + 1):
     r = degreeRange(n)
     m = 2 * n + 1
     s = _orderSign(n)
     block = fhat[..., r].reshape(*fhat.shape[:-1], m, m)
     out[..., r] = (np.outer(s, s) * block.swapaxes(-1, -2)).reshape(*fhat.shape[:-1], m * m)
-    n += 1
   return out
 
 
@@ -116,8 +142,8 @@ def wignerdDegrees(beta, L):
   three matrices and not the whole table"""
   T = beta.dtype
   x, s, c = np.cos(beta), np.sin(beta / 2), np.cos(beta / 2)
-  d = [np.ones((1, 1), dtype=T)]
-  yield 0, d[0]
+  prev2, prev = None, np.ones((1, 1), dtype=T)
+  yield 0, prev
   for n in range(1, L + 1):
     D = np.empty((2 * n + 1, 2 * n + 1), dtype=T)
     F = _frameValues(n, s, c)
@@ -135,9 +161,9 @@ def wignerdDegrees(beta, L):
       a = (m + 1) * (2 * m + 1) / w
       b = (m + 1) * np.sqrt(np.outer(m * m - k * k, m * m - k * k)) / (m * w)
       Q = np.zeros((2 * m + 1, 2 * m + 1), dtype=T)
-      Q[1:-1, 1:-1] = d[-2]
-      D[1:-1, 1:-1] = a * (x - np.outer(k, k) / (m * (m + 1))) * d[-1] - b * Q
-    d = [d[-1], D]
+      Q[1:-1, 1:-1] = prev2
+      D[1:-1, 1:-1] = a * (x - np.outer(k, k) / (m * (m + 1))) * prev - b * Q
+    prev2, prev = prev, D
     yield n, D
 
 
@@ -371,7 +397,7 @@ def project(fhat, P, Q, out=None):
     return fhat
   from ..geometry.kernels import _overRows, threads
   target = fhat if out is None else out
-  rows = zip(np.asarray(fhat).reshape(-1, fhat.shape[-1]), np.asarray(target).reshape(-1, fhat.shape[-1])) if fhat.ndim > 1 else ((fhat, target),)
+  rows = zip(fhat.reshape(-1, fhat.shape[-1]), target.reshape(-1, fhat.shape[-1]))
   L = dim2deg(fhat.shape[-1])
   # the degrees over the threads, dealt out in turn since the high ones carry the work; the
   # blocks are disjoint and the products of BLAS release the lock
@@ -470,7 +496,7 @@ def clebschGordan(j1, m1, j2, m2, J, M):
   for k in range(max(0, j2 - J - m1, j1 - J + m2), min(j1 + j2 - J, j1 - m1, j2 + m2) + 1):
     t = Fraction(1, f(k) * f(j1 + j2 - J - k) * f(j1 - m1 - k) * f(j2 + m2 - k) * f(J - j2 + m1 + k) * f(J - j1 - m2 + k))
     S += -t if k % 2 else t
-  return (1 if S > 0 else -1 if S < 0 else 0) * math.sqrt(A * B * S * S)
+  return math.copysign(math.sqrt(A * B * S * S), S) if S else 0.0
 
 
 def wigner3j(j1, j2, j3, m1, m2, m3):
@@ -481,10 +507,10 @@ def wigner3j(j1, j2, j3, m1, m2, m3):
 def clebschGordanTensor(l1, l2, J):
   """the array C[m1, m2, M] of degrees l1, l2 coupled to J"""
   C = np.zeros((2 * l1 + 1, 2 * l2 + 1, 2 * J + 1))
-  for M in range(-J, J + 1):
-    for m2 in range(-l2, l2 + 1):
-      for m1 in range(-l1, l1 + 1):
-        C[m1 + l1, m2 + l2, M + J] = clebschGordan(l1, m1, l2, m2, J, M)
+  # only M = m1 + m2 couples
+  for m1 in range(-l1, l1 + 1):
+    for m2 in range(max(-l2, -J - m1), min(l2, J - m1) + 1):
+      C[m1 + l1, m2 + l2, m1 + m2 + J] = clebschGordan(l1, m1, l2, m2, J, m1 + m2)
   return C
 
 

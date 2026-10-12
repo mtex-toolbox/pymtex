@@ -15,10 +15,10 @@ from __future__ import annotations
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from ..geometry.kernels import qconj
-from ..geometry.kernels import qmul
-from ..maps.calcgrains import _grainTableNumba, _grainTableNumpy
+from ..geometry.kernels import qconj, qmul
+from ..maps.calcgrains import _grainTable, undersized
 from ..maps.calcgrains import calcGrains as _calcGrains2d
+from ..maps.decomposition import _gather
 from ..maps.criteria import DEFAULT_ANGLE, gbcAngle, grainBoundaryCriterion
 from ..maps.segment import components
 from .ebsd3 import EBSD3
@@ -70,22 +70,25 @@ def _calcGrains3d(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, min
     sid = np.zeros(n, dtype=np.int64)
     sid[newId] = stored.reshape(-1)
     sid = sid[toC]
-  for pas in (1, 2):
+
+  # the components of the voxels the criterion, or the stored ids, join
+  def segment():
     if stored is None:
       connect = np.asarray(crit.evaluate(e, Dl, Dr), dtype=float)
     else:
       ph = e.phaseId.reshape(-1)
       connect = ((sid[Dl] == sid[Dr]) & (ph[Dl] == ph[Dr])).astype(float)
     join = (connect > 0) & ~pad[Dl] & ~pad[Dr]
-    grainId, nGrains = _byLastVoxel(components(n, Dl[join], Dr[join]), ~pad)
-    if minPixel <= 1 or pas == 2:
-      break
-    count = np.bincount(grainId, minlength=nGrains + 1)
-    under = (grainId > 0) & e.isIndexed.reshape(-1) & (count[grainId] < minPixel)
-    if not under.any():
-      break
-    e.phaseId.reshape(-1)[under] = 0
-    g.phaseId.reshape(-1)[toC[under]] = 0
+    return _byLastVoxel(components(n, Dl[join], Dr[join]), ~pad)
+
+  grainId, nGrains = segment()
+  if minPixel > 1:
+    # the cull changes what is joined, so the segmentation runs once more
+    under = undersized(grainId, nGrains, e.isIndexed.reshape(-1), minPixel)
+    if under.any():
+      e.phaseId.reshape(-1)[under] = 0
+      g.phaseId.reshape(-1)[toC[under]] = 0
+      grainId, nGrains = segment()
   grains = _grains(e, g, grainId, nGrains, Dl, Dr, dim, L)
   # the grain id and the culled phases written into the map that was passed
   gid = np.empty(n, dtype=np.int64)
@@ -133,11 +136,10 @@ def _grains(e, g, grainId, nGrains, Dl, Dr, dim, L):
   lat = g.lattice
   isFace = grainId[Dl] != grainId[Dr]
   a, b, d = Dl[isFace], Dr[isFace], dim[isFace]
-  up = np.ones(len(a), dtype=bool)
   # a face against the padding is a face of the surface of the voxel that is not padding
   padA = grainId[a] == 0
   a, b, up = np.where(padA, b, a), np.where(padA, -1, b), ~padA
-  b = np.where((b >= 0) & (grainId[np.maximum(b, 0)] == 0), -1, b)
+  b = np.where(_gather(grainId, b, 0) == 0, -1, b)
   aa, bb, dd, uu = [a], [b], [d], [up]
   for side, up in ((0, False), (-1, True)):
     for k in range(3):
@@ -182,8 +184,7 @@ def _grains(e, g, grainId, nGrains, Dl, Dr, dim, L):
                       np.stack([ids[a], np.where(inner, ids[bs], -1)], axis=1),
                       np.stack([ph[a], np.where(inner, ph[bs], -1)], axis=1), mori, e.CSList, e.frame, e.scanUnit)
   numPixel = np.bincount(grainId, minlength=nGrains + 1)[1:]
-  table = _grainTableNumba(grainId, ph, rot, nGrains, numPixel, e.CSList)
-  phaseId, meanRot, gos = table if table is not None else _grainTableNumpy(grainId, ph, rot, nGrains, numPixel, e.CSList)
+  phaseId, meanRot, gos = _grainTable(grainId, ph, rot, nGrains, numPixel, e.CSList)
   return grain3d(np.arange(1, nGrains + 1), phaseId, e.CSList, numPixel, meanRot, gos, I_GF, gB, e.frame, phaseMap=e.phaseMap)
 
 

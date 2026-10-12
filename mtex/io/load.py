@@ -52,7 +52,7 @@ def tslPointGroup(code, pointGroup=None):
   try:
     if symmetry(name).LaueName() == symmetry(laue).LaueName():
       return name
-  except Exception:
+  except ValueError:
     pass
   return laue
 
@@ -70,6 +70,11 @@ def _edaxPointGroupName(pointGroup):
     i = int(float(s))
   except ValueError:
     return s
+  return _edaxPointGroup(i)
+
+
+# the point group an EDAX point group id, 100 to 131, stands for; None for another number
+def _edaxPointGroup(i):
   return EDAX_POINT_GROUPS[i - 100] if 100 <= i < 100 + len(EDAX_POINT_GROUPS) else None
 
 
@@ -101,6 +106,15 @@ def phaseColumn(raw, shift, nPhases):
 
 # the property names that say how well a pattern was indexed
 QUALITY_MEASURES = re.compile(r"^(iq|imagequality|image_quality|ci|confidenceindex|confidence_index|confidence|metric|xc|fit|mad|error|bc|bs|bandcontrast|bandslope|quality)$")
+
+
+# the columns of a file that are properties, those of the map in mapKeys left out; a missing one
+# of required, mapKeys unless given, raises error formatted with its name
+def _properties(cols, mapKeys, error, required=None):
+  missing = next((k for k in (mapKeys if required is None else required) if k not in cols), None)
+  if missing is not None:
+    raise ValueError(error.format(missing))
+  return {k: v for k, v in cols.items() if k not in mapKeys}
 
 
 def unmeasuredRows(phi1, Phi, phi2, props):
@@ -139,6 +153,15 @@ def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bun
   if unindexed is not None:
     ids[np.asarray(unindexed, dtype=bool)] = 0
   rot = eulerRotations(phi1, Phi, phi2, convention, ids)
+  return _mapFromRotations(x, y, rot, ids, phases, props, shift, eulerCorrection=eulerCorrection, scanUnit=scanUnit,
+                           frame=frame, meta=meta, unitCell=unitCell, scanGrid=scanGrid, propType=propType)
+
+
+# the map of the rotations the file's angles or matrices made, ids its phase ids already shifted onto
+# the list by shift: the correction applied, the rotation of a measurement of no phase nan
+def _mapFromRotations(x, y, rot, ids, phases, props, shift, eulerCorrection=None, scanUnit="um", frame=None, meta=None,
+                      unitCell=None, scanGrid=None, propType=None):
+  n = len(phases)
   if eulerCorrection is not None:
     rot = eulerCorrection * rot
     meta = dict(meta or {}, EulerCorrection=eulerCorrection)
@@ -158,15 +181,10 @@ def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bun
 def rowOrderLattice(x, y, scanGrid=None):
   """the lattice of positions written row by row: the grid a header states where the positions
   confirm it, else the one their order states, else None, which leaves it to be inferred"""
-  for grid in (scanGrid, "positions"):
-    if grid == "positions":
-      grid = scanGridFromPositions(x, y)
-    if grid is None:
-      continue
-    lat = gridLattice((x, y), *grid)
-    if lat is not None:
-      return lat
-  return None
+  if scanGrid is not None and (lat := gridLattice((x, y), *scanGrid)) is not None:
+    return lat
+  grid = scanGridFromPositions(x, y)
+  return None if grid is None else gridLattice((x, y), *grid)
 
 
 def eulerRotations(phi1, Phi, phi2, convention, ids):
@@ -176,7 +194,7 @@ def eulerRotations(phi1, Phi, phi2, convention, ids):
   none = ~(np.isfinite(phi1) & np.isfinite(Phi) & np.isfinite(phi2))
   if none.any():
     ids[none] = 0
-    phi1, Phi, phi2 = np.where(none, 0.0, phi1), np.where(none, 0.0, Phi), np.where(none, 0.0, phi2)
+    phi1, Phi, phi2 = (np.where(none, 0.0, a) for a in (phi1, Phi, phi2))
   return rotation.byEuler(phi1, Phi, phi2, convention)
 
 
@@ -259,8 +277,6 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
   starts = np.concatenate([[0], breaks + 1])
   lengths = np.diff(np.append(starts, n))
   ny = len(starts)
-  if ny < 2:
-    return None
   nx = int(lengths[0])
   if dx is None:
     dx = (x[nx - 1] - x[0]) / (nx - 1) if nx > 1 else step
@@ -270,15 +286,17 @@ def scanGridFromPositions(x, y, dx=None, dy=None):
     return None
   dx, dy = float(dx), float(dy)
   shift = abs(x[starts[1]] - x[0])
+  halfShifted = abs(shift - abs(dx) / 2) < 0.25 * abs(dx)
   # a scan stopped early ends in a row shorter than the others
   full, last = lengths[:-1], lengths[-1]
   if np.all(full == nx) and last <= nx:
     if shift < 0.25 * abs(dx):
       return scanGrid(nx, ny, dx, dy)
-    return scanGrid(nx, ny, dx, dy, True, nx) if abs(shift - abs(dx) / 2) < 0.25 * abs(dx) else None
+    if halfShifted:
+      return scanGrid(nx, ny, dx, dy, True, nx)
+    return None
   second = int(lengths[1])
-  if np.all(full[0::2] == nx) and np.all(full[1::2] == second) and last <= (nx, second)[(ny - 1) % 2] \
-      and abs(shift - abs(dx) / 2) < 0.25 * abs(dx):
+  if np.all(full[0::2] == nx) and np.all(full[1::2] == second) and last <= (nx, second)[(ny - 1) % 2] and halfShifted:
     return scanGrid(nx, ny, dx, dy, True, second)
   return None
 
@@ -295,10 +313,12 @@ def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
   from ..maps.lattice import lattice, mapPlane
   if isinstance(pos, tuple):
     x, y = (np.asarray(c, dtype=float).reshape(-1) for c in pos)
+    if len(x) < 4:
+      return None
     finite = np.isfinite(x).all() and np.isfinite(y).all()
     # the plane is fitted on a sample of the positions, so the sample is all it is handed
-    S = np.round(np.linspace(0, len(x) - 1, min(len(x), 10000))).astype(int) if len(x) else np.zeros(0, dtype=int)
-    plane = mapPlane(np.column_stack([x[S], y[S], np.zeros(len(S))])) if len(x) >= 1 else None
+    S = np.round(np.linspace(0, len(x) - 1, min(len(x), 10000))).astype(int)
+    plane = mapPlane(np.column_stack([x[S], y[S], np.zeros(len(S))]))
   else:
     P3 = np.asarray(pos, dtype=float).reshape(-1, 3)
     finite = np.isfinite(P3).all()
@@ -312,9 +332,8 @@ def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
     return None
   # a hexagonal scan alternates two row lengths, and which one the first row has is what
   # the positions say, so both arrangements are tried
-  arrangements = [(nx, nx if nxEven is None else int(nxEven))] if hex else [(nx, nx)]
-  if hex and arrangements[0][0] != arrangements[0][1]:
-    arrangements.append(arrangements[0][::-1])
+  second = int(nxEven) if hex and nxEven is not None else nx
+  arrangements = [(nx, second)] + ([(second, nx)] if second != nx else [])
   for first, second in arrangements:
     got = _gridIndex(x, y, n, ny, first, second, xs, ys, hex)
     if got is not None:
@@ -333,10 +352,12 @@ def gridLattice(pos, nx, ny, xs, ys, hex=False, nxEven=None):
 def _gridIndex(x, y, n, ny, nx, nxEven, xs, ys, hex):
   sx, sy = (-1 if xs < 0 else 1), (-1 if ys < 0 else 1)
   xs, ys = abs(xs), abs(ys)
-  counts = np.where(np.arange(ny) % 2 == 0, nx, nxEven) if hex else np.full(ny, nx)
+  # a square scan is one of nxEven = nx
+  counts = np.where(np.arange(ny) % 2 == 0, nx, nxEven)
   # a scan stopped early ends in a shorter last row
+  full = counts[-1]
   counts[-1] -= counts.sum() - n
-  if not 0 < counts[-1] <= (nx, nxEven if hex else nx)[(ny - 1) % 2]:
+  if not 0 < counts[-1] <= full:
     return None
   A = np.array([[xs, xs / 2], [0.0, ys]]) if hex else np.array([[xs, 0.0], [0.0, ys]])
   # the header's steps where the positions are on them, else the basis fitted to the
@@ -346,7 +367,7 @@ def _gridIndex(x, y, n, ny, nx, nxEven, xs, ys, hex):
   ij, lo, resid = _rowOrder(x, y, counts, hex, sx, sy, A)
   # a file writing its positions as 32 bit floats rounds them to 2^-24 of their size, which far
   # from the origin is more than a ten thousandth of a step
-  size = max(abs(x[0]), abs(y[0])) + max(nx, nxEven if hex else nx) * xs + ny * ys
+  size = max(abs(x[0]), abs(y[0])) + max(nx, nxEven) * xs + ny * ys
   if not resid < 1e-4 * step + 2.0 ** -20 * size:
     M = (ij + lo).astype(float)
     G = M.T @ M

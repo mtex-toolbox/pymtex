@@ -74,8 +74,8 @@ def loadCIF(fname):
   path = _resolve(fname)
   with open(path, encoding="utf-8", errors="replace") as f:
     lines = [l.strip() for l in f]
-  mineral = next((_token(lines, t) for t in MINERAL_TAGS if _token(lines, t)), "")
-  group = next((_token(lines, t) for t in GROUP_TAGS if _token(lines, t)), "")
+  mineral = next(filter(None, (_token(lines, t) for t in MINERAL_TAGS)), "")
+  group = next(filter(None, (_token(lines, t) for t in GROUP_TAGS)), "")
   if not group:
     raise ValueError(f"{path} names no space group")
   axes = [_number(_token(lines, "_cell_length_" + a)) for a in "abc"]

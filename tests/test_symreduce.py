@@ -36,3 +36,28 @@ def test_batched_equals_pairwise():
   assert es.shape == (24, 4)
   es, frm = sr.referenceImages(np.array([1.0, 0, 0, 0]), L, R, True)
   assert es.shape == (24, 4)
+
+
+# an element joins the earlier one it equals only when that one stays
+def test_firstOfClusters_keepsTheFirstOfEveryChain():
+  same = np.array([[1, 1, 0], [1, 1, 1], [0, 1, 1]], dtype=bool)
+  assert sr._firstOfClusters(same).tolist() == [True, False, True]
+
+
+def test_firstOfClusters_ofNothingIsEmpty():
+  assert sr._firstOfClusters(np.zeros((0, 0), dtype=bool)).shape == (0,)
+
+
+def test_distinctUnitRows_dropsTheRepeatsOfEarlierRows():
+  X = np.array([[1.0, 0, 0], [0, 1, 0], [1, 1e-9, 0], [0, 0, 1]])
+  assert np.array_equal(sr._distinctUnitRows(X, 1e-6), X[[0, 1, 3]])
+
+
+def test_isAboutZ_holdsTheIdentityAndTheTurnsAboutZ():
+  q = np.array([[1.0, 0, 0, 0], [0, 0, 0, 1], [0, 1, 0, 0]])
+  assert sr._isAboutZ(q).tolist() == [True, True, False]
+
+
+def test_chordAngle_isImportableWhereOtherLayersTakeIt():
+  from mtex.geometry.representations import chordAngle
+  assert sr.chordAngle is chordAngle

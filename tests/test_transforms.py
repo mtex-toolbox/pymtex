@@ -685,3 +685,30 @@ def test_fourierSum_andItsAdjointAreTheExponentialSums():
   c, u = rng.standard_normal(2 * L + 1) + 1j * rng.standard_normal(2 * L + 1), rng.standard_normal(700) + 1j * rng.standard_normal(700)
   E = np.exp(1j * np.outer(x, np.arange(-L, L + 1)))
   assert relerr(fourierSum(c, x), E @ c) < 1e-13 and relerr(fourierAdjointSum(u, x, L), np.conj(E).T @ u) < 1e-13
+
+
+# the sums over groups of real and complex values, of one and of several columns
+def test_groupSums_ofRealAndComplexColumns():
+  from mtex.functions.kernels import _groupSums
+  inv = np.array([0, 2, 0, 1])
+  v = np.array([[1 + 1j, 2], [2, 3j], [3, 4], [4j, 5]])
+  assert np.array_equal(_groupSums(inv, v, 4), [[4 + 1j, 6], [4j, 5], [2, 3j], [0, 0]])
+  assert np.array_equal(_groupSums(inv, np.array([1.0, 2, 3, 4]), 3), [4.0, 4, 2])
+
+
+# the rows of a non-contiguous array are changed in place through a copy
+def test_onRows_writesBackIntoANonContiguousArray():
+  from mtex.functions.kernels import _onRows
+  a = np.zeros((4, 6))[:, ::2]
+
+  def fill(F):
+    F[...] = 1
+  _onRows(a, fill)
+  assert np.all(a == 1)
+
+
+# the entries from the front and from the back in turn
+def test_interleaveEnds_alternatesTheHalves():
+  from mtex.functions.kernels import _interleaveEnds
+  assert np.array_equal(_interleaveEnds(np.arange(5)), [0, 4, 1, 3, 2])
+  assert np.array_equal(_interleaveEnds(np.arange(4)), [0, 3, 1, 2])

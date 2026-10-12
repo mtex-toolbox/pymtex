@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ..functions.s2axisfield import S2AxisField
 from ..functions.so3vectorfield import SO3VectorField
 from ..functions.so3funclass import SO3Fun
 from ..geometry.kernels import columnMax, columnMin
@@ -25,7 +26,7 @@ from .colormaps import mtexColormap
 from .keywords import patchKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure, nextAxis
 from .space import axisAnglePoints, frameAxes, regionLines, regionSurface, regionWalls, sphereGridLines, sphereMesh
-from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _isAxisField, _rangeOf
+from .sphericalplot import MARKER_COLOR, _isField, _isFunction, _rangeOf
 from ..geometry.display import frameLabel, header
 
 if TYPE_CHECKING:
@@ -42,10 +43,51 @@ class spacePlot:
 
   def __init__(self, ax, frame=None):
     self.ax, self.frame, self.mappable = ax, frame, None
+    # the coordinates of orientation space the axes show and whether the orientations were
+    # brought into the fundamental region, for what is drawn into them later; None before
+    self.coordinates, self.reduced = None, None
+    # the sets of markers drawn so far, the redraw of isosurfaces, the shapes in space
+    self.markerSets, self.refill, self.shapes, self.shapeParts = 0, None, None, None
     ax._mtexSpacePlot = self
 
   def __repr__(self):
     return header("spacePlot", frameLabel(self.frame))
+
+
+# the space plot of the current axes when the figure is held, else None
+def _heldSpacePlot():
+  fig = gcm()
+  if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot"):
+    return fig.children[-1]._mtexSpacePlot
+  return None
+
+
+# the box of a 3D axes from lo to hi, at equal scale; widened to what held axes show already
+def _setBox(ax, lo, hi, held=False, **aspect):
+  if held:
+    cur = np.array([ax.get_xlim(), ax.get_ylim(), ax.get_zlim()])
+    lo, hi = np.minimum(lo, cur[:, 0]), np.maximum(hi, cur[:, 1])
+  ax.set_xlim(lo[0], hi[0])
+  ax.set_ylim(lo[1], hi[1])
+  ax.set_zlim(lo[2], hi[2])
+  ax.set_box_aspect(tuple(hi - lo), **aspect)
+
+
+# the coordinates of orientation space the flags name, the default where none is set
+def _coordinates(Euler, axisAngle, Rodrigues, default="axisAngle"):
+  if Rodrigues:
+    return "Rodrigues"
+  if Euler:
+    return "Euler"
+  return "axisAngle" if axisAngle else default
+
+
+# the axis labels of orientation space in its coordinates
+def _spaceLabels(ax, coordinates):
+  names = ("x / °", "y / °", "z / °") if coordinates == "axisAngle" else ("r1", "r2", "r3")
+  ax.set_xlabel(names[0])
+  ax.set_ylabel(names[1])
+  ax.set_zlabel(names[2])
 
 
 # the camera of MATLAB's two dimensional view: looking down the out of screen axis of the
@@ -184,8 +226,7 @@ def _eulerBox(ax, box):
 
 
 def _keys(kw):
-  axesKw = {k: kw.pop(k) for k in ("figSize", "parent", "azimuth", "elevation", "title") if k in kw}
-  return axesKw
+  return {k: kw.pop(k) for k in ("figSize", "parent", "azimuth", "elevation", "title") if k in kw}
 
 
 def plot3d(x, *args, **kw: Unpack[PlotKeywords]):
@@ -257,7 +298,9 @@ def plotFunction3d(f, resolution=2.5 * degree, colormap="WhiteJet", colorRange=N
   sP = _spaceAxes(fr, limits=limits, **axesKw)
   h = _sphere(sP, resolution, vals, colormap, colorRange, radial, grid=grid, axisLabels=False, grid_res=grid_res)
   # the axes of the frame as arrows standing on the sphere, as MATLAB draws them
-  if (not radial) if axisLabels is None else axisLabels:
+  if axisLabels is None:
+    axisLabels = not radial
+  if axisLabels:
     for d, name in frameAxes(fr):
       _axisArrow(sP.ax, d, name)
   # the camera of the convention given, else of the default 3D one
@@ -280,10 +323,11 @@ def _axisArrow(ax, d, name, length=0.15):
   t = np.linspace(0, 2 * np.pi, 17)[:-1]
   ring = np.cos(t)[:, None] * u + np.sin(t)[:, None] * w
   base, tip = d, (1 + length) * d
-  shaft = [np.array([base + 0.012 * ring[i], base + 0.012 * ring[i - 1], base + 0.6 * length * d + 0.012 * ring[i - 1],
-                     base + 0.6 * length * d + 0.012 * ring[i]]) for i in range(len(t))]
-  cone = [np.array([base + 0.6 * length * d + 0.035 * ring[i], base + 0.6 * length * d + 0.035 * ring[i - 1], tip]) for i in range(len(t))]
-  body = Poly3DCollection(shaft + cone, facecolor="k", edgecolor="none")
+  # the shaft as quads between the ring and its predecessor, the cone as triangles to the tip
+  prev, neck = np.roll(ring, 1, axis=0), base + 0.6 * length * d
+  shaft = np.stack([base + 0.012 * ring, base + 0.012 * prev, neck + 0.012 * prev, neck + 0.012 * ring], axis=1)
+  cone = np.stack([neck + 0.035 * ring, neck + 0.035 * prev, np.broadcast_to(tip, ring.shape)], axis=1)
+  body = Poly3DCollection(list(shaft) + list(cone), facecolor="k", edgecolor="none")
   ax.add_collection3d(body)
   label = ax.text(*((1 + 1.6 * length) * d), name, ha="center", va="center", fontsize=getMTEXpref("FontSize", 13) - 2, family="serif")
   ax._mtexAxisArrows = getattr(ax, "_mtexAxisArrows", []) + [(d, length, (body, label))]
@@ -341,8 +385,7 @@ def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=T
   from ..geometry.grids.s2grid import equispacedS2Grid
   axesKw = _keys(kw)
   fr = getattr(vF, "frame", None)
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  held = _heldSpacePlot() is not None
   sP = _spaceAxes(fr, limits=1.2, **axesKw)
   # a held plot draws the field onto the sphere already there; a new one is seen as the 3D
   # convention says
@@ -361,7 +404,7 @@ def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=T
   scale = 0.9 * resolution * arrowSize / max(np.max(np.linalg.norm(W, axis=1)), 1e-12)
   D = scale * W
   P = 1.01 * V
-  if _isAxisField(vF):
+  if isinstance(vF, S2AxisField):
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
     h = Line3DCollection(np.stack([P - D / 2, P + D / 2], axis=1), colors=color, linewidths=1.0)
     sP.ax.add_collection3d(h)
@@ -370,12 +413,6 @@ def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=T
 
 
 # ------------------------------------------------------------------ orientation space
-
-def _regionLabels(ax):
-  ax.set_xlabel("x / °")
-  ax.set_ylabel("y / °")
-  ax.set_zlabel("z / °")
-
 
 # the surface of a fundamental region: light grey, so that the markers inside it show
 REGION_COLOR = (0.8, 0.8, 0.8)
@@ -396,13 +433,12 @@ def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, line
   angle space, in degrees, its surface with the parallels and meridians on it and its edges"""
   axesKw = _keys(kw)
   limit = 1.15 * oR.maxAngle() / degree
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  held = _heldSpacePlot() is not None
   sP = _spaceAxes(oR.frameA, limits=limit, decorated=True, **axesKw)
   # orientations drawn into the region later come in its coordinates
-  if not hasattr(sP, "coordinates"):
+  if sP.coordinates is None:
     sP.coordinates, sP.reduced = "axisAngle", True
-  _regionLabels(sP.ax)
+  _spaceLabels(sP.ax, "axisAngle")
   h = _region(sP, oR, resolution, color, alpha, lines, lineColor, boundaryColor, surface)
   # a new plot looks at the region, as MATLAB fits its axes to it
   if not held:
@@ -421,11 +457,7 @@ def _fitRegion(sP, oR, points=None):
     P = np.concatenate([P, points])
   lo, hi = columnMin(P), columnMax(P)
   pad = 0.05 * float(np.max(hi - lo))
-  lo, hi = lo - pad, hi + pad
-  sP.ax.set_xlim(lo[0], hi[0])
-  sP.ax.set_ylim(lo[1], hi[1])
-  sP.ax.set_zlim(lo[2], hi[2])
-  sP.ax.set_box_aspect(tuple(hi - lo))
+  _setBox(sP.ax, lo - pad, hi + pad)
 
 
 def _region(sP, oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
@@ -485,7 +517,6 @@ def _markerStyle(kw, color, markerSize):
   return color, style
 
 
-# the flags of the coordinates of orientation space, as MATLAB names them
 # the values and the space a positional string names, MATLAB's 'Bunge' being 'Euler'
 def _spaceFlags(args, Euler, axisAngle, Rodrigues):
   spaces = {"euler": "Euler", "bunge": "Euler", "axisangle": "axisAngle", "rodrigues": "Rodrigues"}
@@ -520,16 +551,14 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   # an orientation with its frames scatters in the Euler region by default, a misorientation
   # and a bare rotation in axis angle space, into held axes in their coordinates, as MATLAB
   # does; a list is sampled to 2000 points unless asked otherwise
-  isOri = hasattr(o, "CS")
-  fig = gcm()
-  heldSP = fig.children[-1]._mtexSpacePlot if fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot") else None
-  if heldSP is not None and getattr(heldSP, "coordinates", None) and not (Euler or axisAngle or Rodrigues):
+  isOri = isinstance(o, orientation)
+  heldSP = _heldSpacePlot()
+  if heldSP is not None and heldSP.coordinates and not (Euler or axisAngle or Rodrigues):
     coordinates = heldSP.coordinates
   else:
-    euler = Euler or (not axisAngle and not Rodrigues and isOri and not o.isMisorientation)
-    coordinates = "Rodrigues" if Rodrigues else "Euler" if euler else "axisAngle"
+    coordinates = _coordinates(Euler, axisAngle, Rodrigues, "Euler" if isOri and not o.isMisorientation else "axisAngle")
   reduced = isOri and fundamentalRegion and not ignoreFundamentalRegion
-  if heldSP is not None and hasattr(heldSP, "reduced"):
+  if heldSP is not None and heldSP.reduced is not None:
     reduced = heldSP.reduced
   region = region and isOri and not ignoreFundamentalRegion
   # orientations kept as they are are looked at closely, without the region
@@ -542,7 +571,10 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   if not np.all(keep):
     o = o[keep]
     data = None if data is None else data[keep]
-  points = o.size if all else 2000 if points is None else points
+  if all:
+    points = o.size
+  elif points is None:
+    points = 2000
   if points < o.size:
     print(f"plot {points} random orientations out of {o.size} given orientations")
     take = np.sort(np.random.default_rng(0).permutation(o.size)[:points])
@@ -551,8 +583,7 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
   P = orientationPoints(o, coordinates, reduced)
   oR = fundamentalRegion_(o) if isOri else None
   frame = o.CS if isOri else None
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  held = heldSP is not None
   if coordinates == "Euler":
     bounds = np.array(eulerRegion(o.CS, o.SS) if reduced else (2 * np.pi, np.pi, 2 * np.pi)) / degree
     sP = _spaceAxes(frame, limits=(0, float(bounds.max())), decorated=True, **axesKw)
@@ -568,27 +599,20 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
     if zoom and not held and len(finite):
       lo, hi = columnMin(finite), columnMax(finite)
       pad = 0.05 * max(float(np.max(hi - lo)), 1e-9)
-      sP.ax.set_xlim(lo[0] - pad, hi[0] + pad)
-      sP.ax.set_ylim(lo[1] - pad, hi[1] + pad)
-      sP.ax.set_zlim(lo[2] - pad, hi[2] + pad)
-      sP.ax.set_box_aspect(tuple(hi - lo + 2 * pad))
+      _setBox(sP.ax, lo - pad, hi + pad)
+    _spaceLabels(sP.ax, coordinates)
     if coordinates == "axisAngle":
-      _regionLabels(sP.ax)
       if region:
         _region(sP, oR)
         if not held:
           _fitRegion(sP, oR, finite)
       elif not reduced and boundary and not zoom:
         _ball(sP)
-    else:
-      sP.ax.set_xlabel("r1")
-      sP.ax.set_ylabel("r2")
-      sP.ax.set_zlabel("r3")
   # the coordinates of the axes, for what is drawn into them later
   sP.coordinates, sP.reduced = coordinates, reduced
   if data is None:
     # a further set in held axes takes the next colour of the order, as MATLAB's held scatter
-    k = getattr(sP, "markerSets", 0)
+    k = sP.markerSets
     sP.markerSets = k + 1
     if color is MARKER_COLOR:
       # markers of no colour of their own are open circles, as MATLAB draws orientations
@@ -632,15 +656,13 @@ def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fal
   refuseVariants(kw)
   axesKw = _keys(kw)
   ref = t.oriRef
-  isOri = hasattr(ref, "CS")
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
-  if held:
-    sP = fig.children[-1]._mtexSpacePlot
-    coordinates, reduced = getattr(sP, "coordinates", "axisAngle"), getattr(sP, "reduced", isOri)
+  isOri = isinstance(ref, orientation)
+  sP = _heldSpacePlot()
+  if sP is not None:
+    coordinates = sP.coordinates or "axisAngle"
+    reduced = isOri if sP.reduced is None else sP.reduced
   else:
-    coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
-    reduced = isOri
+    coordinates, reduced = _coordinates(Euler, axisAngle, Rodrigues), isOri
     o = ref if ref.ndim else ref.reshape(1)
     scatterOrientations(o, coordinates, markerSize=0.1, **axesKw)
     sP = gcm().children[-1]._mtexSpacePlot
@@ -663,17 +685,15 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   res = kw.pop("resolution", 10 * degree)
   refuseVariants(kw)
   _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
-  coordinates = "Rodrigues" if Rodrigues else "Euler" if Euler else "axisAngle"
+  coordinates = _coordinates(Euler, axisAngle, Rodrigues)
   axesKw = _keys(kw)
   g = equispacedSO3Grid(F.CS, F.SS, resolution=res)
   o = orientation._fromRotation(g.data.reshape(-1, 4), (F.CS, F.SS)).projectIntoFundamentalRegion()
   t = F.eval(o)
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
-  if not held:
+  if _heldSpacePlot() is None:
     scatterOrientations(o, coordinates, markerSize=0.1, **axesKw)
   sP = gcm().children[-1]._mtexSpacePlot
-  coordinates = getattr(sP, "coordinates", coordinates)
+  coordinates = sP.coordinates or coordinates
   lengths = np.asarray(t.norm(), dtype=float).reshape(-1)
   # the direction by a small step from the representatives in the region, both ends
   # unreduced so that a step over the boundary is not folded back
@@ -700,8 +720,7 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   if labeled and label is None:
     label = [_nameOf(v.flatten()[i]) for i in range(v.size)]
   axesKw = _keys(kw)
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  held = _heldSpacePlot() is not None
   sP = _spaceAxes(v.frame, **axesKw)
   # fresh axes look down on the screen plane, as MATLAB's new axes do
   if not held and "azimuth" not in axesKw and "elevation" not in axesKw:
@@ -729,12 +748,12 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
     shaftEnd = b + n * (L - head)
     tip = b + d
     c0, c1, c2 = b + r * ring, shaftEnd + r * ring, shaftEnd + wide * r * ring
-    k = np.arange(len(t))
-    j = (k + 1) % len(t)
-    faces += [[c0[i], c0[j[i]], c1[j[i]], c1[i]] for i in k]
-    faces += [[c1[i], c1[j[i]], c2[j[i]], c2[i]] for i in k]
-    faces += [[c2[i], c2[j[i]], tip] for i in k]
-    faces.append(list(c0[::-1]))
+    # the shaft and the collar as quads round the ring, the head as triangles to the tip, the tail as a disc
+    j = (np.arange(len(t)) + 1) % len(t)
+    faces += list(np.stack([c0, c0[j], c1[j], c1], axis=1))
+    faces += list(np.stack([c1, c1[j], c2[j], c2], axis=1))
+    faces += list(np.stack([c2, c2[j], np.broadcast_to(tip, c2.shape)], axis=1))
+    faces.append(c0[::-1])
   poly = Poly3DCollection(faces, facecolors=to_rgba(faceColor), shade=True, **patchKeywords(kw))
   if edgeColor != "none":
     poly.set_edgecolor(edgeColor)
@@ -747,14 +766,8 @@ def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", la
   # the axes fit every arrow and label drawn so far, at equal scale, as MATLAB's do
   pts = np.concatenate([base, base + (1.25 if label is not None else 1.0) * D])
   lo, hi = pts.min(axis=0) - 0.1 * scale, pts.max(axis=0) + 0.1 * scale
-  if held:
-    cur = np.array([sP.ax.get_xlim(), sP.ax.get_ylim(), sP.ax.get_zlim()])
-    lo, hi = np.minimum(lo, cur[:, 0]), np.maximum(hi, cur[:, 1])
-  sP.ax.set_xlim(lo[0], hi[0])
-  sP.ax.set_ylim(lo[1], hi[1])
-  sP.ax.set_zlim(lo[2], hi[2])
   # arrows alone fill the axes; joining a held plot they leave its framing
-  sP.ax.set_box_aspect(tuple(hi - lo), zoom=1.0 if held else 1.3)
+  _setBox(sP.ax, lo, hi, held, zoom=1.0 if held else 1.3)
   return poly
 
 
@@ -765,13 +778,12 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
   _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   refuseVariants(kw)
   color = kw.pop("lineColor", color)
-  coordinates = "Rodrigues" if Rodrigues else "axisAngle" if axisAngle else "Euler"
+  coordinates = _coordinates(False, axisAngle, Rodrigues, "Euler")
   o = f.flatten().orientation(points) if f.ndim > 0 else f.orientation(points)
   reduced = fundamentalRegion and not ignoreFundamentalRegion and not complete
   P = orientationPoints(o, coordinates, reduced)
   axesKw = _keys(kw)
-  fig = gcm()
-  held = fig is not None and fig.hold and fig.children and hasattr(fig.children[-1], "_mtexSpacePlot")
+  held = _heldSpacePlot() is not None
   if coordinates == "Euler" or held:
     sP = _spaceAxes(o.CS, limits=(0, float(np.nanmax(np.abs(P)))), decorated=True, **axesKw)
     if not held:
@@ -784,17 +796,16 @@ def plotFibre3d(f, *args, lineWidth=1.5, color="k", axisAngle=False, Rodrigues=F
     if coordinates == "axisAngle":
       bound = max(bound, (oR.maxAngle() if reduced else np.pi) / degree)
     sP = _spaceAxes(o.CS, limits=1.1 * bound, decorated=True, **axesKw)
-    if coordinates == "axisAngle":
-      _regionLabels(sP.ax)
-      if region:
-        _region(sP, oR) if reduced else _ball(sP)
-    else:
-      sP.ax.set_xlabel("r1")
-      sP.ax.set_ylabel("r2")
-      sP.ax.set_zlabel("r3")
+    _spaceLabels(sP.ax, coordinates)
+    if coordinates == "axisAngle" and region:
+      if reduced:
+        _region(sP, oR)
+      else:
+        _ball(sP)
   sP.coordinates, sP.reduced = coordinates, reduced
   # a curve that wraps through the region is drawn without the jumps
-  jump = np.linalg.norm(np.diff(P, axis=0), axis=1) > 5 * np.nanmedian(np.linalg.norm(np.diff(P, axis=0), axis=1))
+  step = np.linalg.norm(np.diff(P, axis=0), axis=1)
+  jump = step > 5 * np.nanmedian(step)
   Q = P.copy()
   Q[1:][jump] = np.nan
   label = kw.pop("displayName", None)
@@ -828,7 +839,7 @@ def plotODF3d(odf, *args, surf3=10, resolution=5 * degree, colormap="parula", ax
     V[inside] = np.real(np.asarray(odf(ori[inside]))).reshape(-1)
     V = V.reshape(omega.shape)
     sP = _spaceAxes(odf.CS, limits=1.1 * w / degree, decorated=True, **axesKw)
-    _regionLabels(sP.ax)
+    _spaceLabels(sP.ax, "axisAngle")
     if region:
       _region(sP, oR)
     sP.coordinates = "axisAngle"

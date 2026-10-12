@@ -127,3 +127,10 @@ def test_find_inAnAntipodalListReadsDirectionsUpToSign():
   v.antipodal = True
   ind, d = find(v, -v)
   assert np.array_equal(ind, np.arange(20)) and np.allclose(d, 0)
+
+
+# an integer, NumPy's included, is a count of neighbours; a float or a bool is not
+@pytest.mark.parametrize("x, isCount", [(3, True), (np.int64(3), True), (3.0, False), (True, False)])
+def test_isCount_tellsACountFromARadius(x, isCount):
+  from mtex.geometry.grids.search import _isCount
+  assert _isCount(x) is isCount

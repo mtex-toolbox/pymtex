@@ -20,6 +20,7 @@ from .frames import crystalFrame
 from .display import display, header, numString, sizeString, table, takeRows
 from .miller import Miller
 from .symmetryops import symmetrise as _symmetrise
+from .symreduce import _firstOfClusters
 from .vector3d import vector3d, asVector3d
 from .display import aligned
 
@@ -353,11 +354,11 @@ class dislocationSystem:
       scale = burgersLength(fr) if isinstance(fr, crystalFrame) else 1.0
       bd = scale * sS.b.data
       ld = -np.cross(sS.n.data, bd)
-      screws = []
-      for v in bd:
-        if not any(np.linalg.norm(v - w) < 1e-8 or np.linalg.norm(v + w) < 1e-8 for w in screws):
-          screws.append(v)
-      screws = np.array(screws).reshape(-1, 3)
+      # one screw dislocation per Burgers vector up to sign
+      flat = bd.reshape(-1, 3)
+      same = ((np.linalg.norm(flat[:, None] - flat[None], axis=-1) < 1e-8)
+              | (np.linalg.norm(flat[:, None] + flat[None], axis=-1) < 1e-8))
+      screws = flat[_firstOfClusters(same)]
       b = vector3d(np.concatenate([bd, screws]), frame=fr)
       l = vector3d(np.concatenate([ld, screws]), frame=fr, antipodal=True)
       u = np.concatenate([np.full(len(bd), 2.0), np.ones(len(screws))])

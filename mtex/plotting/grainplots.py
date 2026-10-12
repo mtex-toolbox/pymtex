@@ -24,13 +24,13 @@ if TYPE_CHECKING:
   from .keywords import PlotKeywords
 
 
-# the bins and the share of the area of every phase in each, one column per indexed phase
 # the measure a grain is weighted by: its volume in 3D, its area in a map
 def _measure(grains):
   from ..maps3d.grain3d import grain3d
   return ("volume", grains.volume) if isinstance(grains, grain3d) else ("area", grains.area)
 
 
+# the bins and the share of the area of every phase in each, one column per indexed phase
 def _areaShares(grains, prop, bins):
   area = np.asarray(_measure(grains)[1], dtype=float)
   prop = area if prop is None else np.asarray(prop, dtype=float).reshape(-1)
@@ -72,7 +72,7 @@ def histogram(x, *args, **kw: Unpack[PlotKeywords]):
     return rose(x, *args, **kw)
   # a plain list of numbers is an ordinary histogram, as MATLAB's histogram(x, n) is, its bins
   # chosen from the data unless given, as MATLAB's automatic binning
-  if isinstance(x, np.ndarray) or (isinstance(x, (list, tuple)) and not hasattr(x, "loops")):
+  if isinstance(x, (np.ndarray, list, tuple)):
     bins = args[0] if args else kw.pop("bins", "auto")
     ax = _axes(kw.pop("parent", None))
     return ax.hist(np.asarray(x, dtype=float).reshape(-1), bins=bins, **kw)
@@ -109,20 +109,16 @@ def plotEllipse(c, a, b, lineColor="k", lineWidth=1.0, displayName=None, **kw: U
   """plotEllipse(c, a, b): the ellipses with the centres c and the half axes a and b drawn
   into the held map"""
   from matplotlib.collections import LineCollection
-  from .mapplot import _target
+  from .mapplot import _currentMap
   c, a, b = (asVector3d(v) for v in (c, a, b))
   phi = np.linspace(0, 2 * np.pi, 100)
   C, A, B = (v.data.reshape(-1, 3) for v in (c, a, b))
   P = C[:, None, :] + A[:, None, :] * np.cos(phi)[None, :, None] + B[:, None, :] * np.sin(phi)[None, :, None]
-  fig = gcm()
   parent = kw.pop("parent", None)
-  if parent is not None and hasattr(parent, "_mtexMapPlot"):
-    mP = parent._mtexMapPlot
-  elif fig is not None and fig.children and hasattr(fig.children[-1], "_mtexMapPlot"):
-    mP = fig.children[-1]._mtexMapPlot
-  else:
+  mP = getattr(parent, "_mtexMapPlot", None) or _currentMap()
+  if mP is None:
     raise ValueError("plotEllipse draws into a map: plot the grains first and hold")
-  flat = [mP.plane.to2d(p) @ mP.layout.T for p in P]
+  flat = mP.plane.to2d(P) @ mP.layout.T
   colors = lineColor if isinstance(lineColor, str) else np.asarray(lineColor, dtype=float)
   h = LineCollection(flat, colors=colors, linewidths=lineWidth, zorder=5, label=displayName, **kw)
   mP.ax.add_collection(h)

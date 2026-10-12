@@ -22,13 +22,13 @@ import numpy as np
 
 from ..geometry.frames import specimenFrame
 from ..geometry.hull import convexHullLoops
-from ..geometry.kernels import backend as kernelBackend
 from ..geometry.vector3d import vector3d
 from .boundary import OUTSIDE, grainBoundary, orderWalk
 from .decomposition import NO_PIXEL
 from .grains import grain2d
+from .kernels import grainKernel, pixelKernel
 from .lattice import mapPlane
-from .polygon import loopSums, polygonSet, signedArea2
+from .polygon import loopSums, polygonSet, signedArea2, _cyclicNext, _withinRun
 from ..geometry.install import install
 from ..geometry.display import aligned, frameLabel
 
@@ -120,11 +120,6 @@ def _flatHull(self):
   return self.V[flat], np.concatenate([[0], np.cumsum(lengths)]), lengths
 
 
-def outerPerimeter(self):
-  """the perimeter of the outer loop alone, without the holes"""
-  return loopSums(self.V, self.loops, self.size)[:, 1]
-
-
 def hullPerimeter(self):
   """the perimeter of the convex hull of every outline"""
   return loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 2]
@@ -135,12 +130,14 @@ def hullArea(self):
   return np.abs(loopSums(self.V, [[h] for h in hullLoops(self)], self.size)[:, 0]) / 2
 
 
-# the largest and the smallest of a value per outline over its hull vertices
-def _perOutline(values, offsets, lengths, reduce):
+# the largest minus the smallest of a value per outline over its hull vertices, zero for an
+# outline without a hull
+def _spread(values, offsets, lengths):
   out = np.zeros(len(lengths))
   ok = lengths > 0
   if ok.any():
-    out[ok] = reduce.reduceat(values, offsets[:-1][ok])
+    at = offsets[:-1][ok]
+    out[ok] = np.maximum.reduceat(values, at) - np.minimum.reduceat(values, at)
   return out
 
 
@@ -148,7 +145,7 @@ def _perOutline(values, offsets, lengths, reduce):
 
 def paris(self):
   """how much the outline is indented against its convex hull, in percent"""
-  p, hp = outerPerimeter(self), hullPerimeter(self)
+  p, hp = self.perimeter, hullPerimeter(self)
   with np.errstate(divide="ignore", invalid="ignore"):
     return np.where(hp == 0, 0.0, 200 * (p - hp) / hp)
 
@@ -165,14 +162,11 @@ def convexity(self):
     return np.where(ha == 0, 1.0, a / ha)
 
 
-# the width of every outline measured across a direction of the plane: the distance
-# between its two lines of support perpendicular to it
-def _widthAcross(self, d):
-  d = np.asarray(d, dtype=float)
-  d = d / np.linalg.norm(d)
+# the width of every outline measured across each direction of the plane: the distance between
+# its two lines of support perpendicular to it, a column per direction
+def _widthsAcross(self, directions):
   H, offsets, lengths = _flatHull(self)
-  p = H @ d
-  return _perOutline(p, offsets, lengths, np.maximum) - _perOutline(p, offsets, lengths, np.minimum)
+  return np.stack([_spread(H @ (d / np.linalg.norm(d)), offsets, lengths) for d in np.asarray(directions, dtype=float).reshape(-1, 2)], axis=-1)
 
 
 # the extremal widths as vectors in the plane: the width is extremal along a normal of one
@@ -185,26 +179,21 @@ def _extremalWidths(self):
   if T == 0:
     return shortest, longest
   # one compiled loop over the outlines, the pairs below its NumPy form
-  loop = None
-  if kernelBackend() == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("extremalWidths")
+  loop = pixelKernel("extremalWidths")
   if loop is not None:
     loop(np.ascontiguousarray(H[:, :2], dtype=float), np.ascontiguousarray(offsets, dtype=np.int64), shortest, longest)
     return shortest, longest
   starts = offsets[:-1]
   lab = np.repeat(np.arange(self.size), lengths)
   # the edges of every hull, cyclic within the outline, and their unit normals
-  pos = np.arange(T) - np.repeat(starts, lengths)
-  nxt = np.repeat(starts, lengths) + (pos + 1) % np.repeat(lengths, lengths)
-  E = H[nxt] - H
+  E = H[_cyclicNext(lengths)] - H
   eLen = np.linalg.norm(E, axis=1)
   nrm = np.stack([-E[:, 1], E[:, 0]], axis=1) / np.where(eLen > 0, eLen, 1)[:, None]
   # every (edge, point) pair of an outline, the pairs grouped by edge
   rep = np.repeat(lengths, lengths)
   ei = np.repeat(np.arange(T), rep)
   segStart = np.cumsum(rep) - rep
-  pj = np.repeat(starts[lab], rep) + (np.arange(rep.sum()) - np.repeat(segStart, rep))
+  pj = np.repeat(starts[lab], rep) + _withinRun(rep)
   proj = np.sum(H[pj] * nrm[ei], axis=1)
   width = np.maximum.reduceat(proj, segStart) - np.minimum.reduceat(proj, segStart)
   width[eLen == 0] = np.inf
@@ -248,16 +237,16 @@ def caliper(self, arg=None):
       with np.errstate(divide="ignore", invalid="ignore"):
         u = np.where(n[:, None] > 0, np.stack([-s[:, 1], s[:, 0]], axis=1) / n[:, None], 0.0)
       H, offsets, lengths = _flatHull(self)
-      p = np.sum(H * np.repeat(u, lengths, axis=0), axis=1)
-      w = _perOutline(p, offsets, lengths, np.maximum) - _perOutline(p, offsets, lengths, np.minimum)
+      w = _spread(np.sum(H * np.repeat(u, lengths, axis=0), axis=1), offsets, lengths)
       return _axisOf(self, w[:, None] * u)
     raise ValueError(f"the caliper is 'shortest', 'longest' or 'shortestPerp', not {arg!r}")
   # a list of directions or angles gives one width per outline and direction
-  if isinstance(arg, vector3d) and arg.size > 1:
-    return np.stack([_widthAcross(self, _direction2d(self, arg.flatten()[k])) for k in range(arg.size)], axis=-1)
-  if not isinstance(arg, vector3d) and np.ndim(arg) > 0:
-    return np.stack([_widthAcross(self, _direction2d(self, float(a))) for a in np.asarray(arg, dtype=float).reshape(-1)], axis=-1)
-  return _widthAcross(self, _direction2d(self, arg))
+  if isinstance(arg, vector3d):
+    many, args = arg.size > 1, [arg.flatten()[k] for k in range(arg.size)]
+  else:
+    many, args = np.ndim(arg) > 0, np.asarray(arg, dtype=float).reshape(-1)
+  W = _widthsAcross(self, [_direction2d(self, a) for a in args])
+  return W if many else W[:, 0]
 
 
 # ------------------------------------------------------------------ the projection functions
@@ -270,18 +259,17 @@ def paror(self, omega=None):
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   H, offsets, lengths = _flatHull(self)
   # one compiled pass per direction, the matrix of the projections below its NumPy form
-  loop = None
-  if kernelBackend() == "numba":
-    from .kernels import grainKernel
-    loop = grainKernel("projectionLength")
+  loop = grainKernel("projectionLength")
   if loop is not None:
     out = np.empty(len(omega))
     loop(np.ascontiguousarray(H[:, :2], dtype=float), offsets.astype(np.int64), D, out)
     return out / out.max()
   # the projections a row per direction, so that every outline's run of them is contiguous
   pr = D @ H[:, :2].T
-  ok = lengths > 0
-  out = np.sum(np.maximum.reduceat(pr, offsets[:-1][ok], axis=1) - np.minimum.reduceat(pr, offsets[:-1][ok], axis=1), axis=1) if ok.any() else np.zeros(len(omega))
+  at = offsets[:-1][lengths > 0]
+  out = np.zeros(len(omega))
+  if len(at):
+    out = np.sum(np.maximum.reduceat(pr, at, axis=1) - np.minimum.reduceat(pr, at, axis=1), axis=1)
   return out / out.max()
 
 
@@ -421,9 +409,7 @@ def _hullGrains(self):
   # of a map; the head of each edge is the next vertex of its loop
   flat = np.concatenate([h[::-1] for h, ok in zip(hl, keep) if ok]) if keep.any() else np.zeros(0, dtype=np.int64)
   lens = lengths[keep]
-  starts = np.concatenate([[0], np.cumsum(lens)[:-1]])
-  pos = np.arange(len(flat)) - np.repeat(starts, lens)
-  nxt = flat[np.repeat(starts, lens) + (pos + 1) % np.repeat(lens, lens)]
+  nxt = flat[_cyclicNext(lens)]
   n = len(flat)
   gid = np.stack([np.zeros(n, dtype=np.int32), np.repeat(self.id[keep], lens)], axis=1)
   pid = np.stack([np.full(n, OUTSIDE, dtype=np.int8), np.repeat(self.phaseId[keep], lens)], axis=1)

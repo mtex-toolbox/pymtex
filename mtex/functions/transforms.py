@@ -21,16 +21,15 @@ import math
 
 import numpy as np
 
-from .kernels import _complexType
-from ..geometry._array import MtexArray
+from .kernels import _complexType, _groupSums
 from ..geometry.kernels import backend, heapBlocks, passiveOpenMP, threads
 from ..geometry.session import getMTEXpref
 from ..geometry.quaternion import orthogonalTransform, quaternion
-from ..geometry.vector3d import vector3d, asVector3d
+from ..geometry.vector3d import asVector3d
 from .kernels import (wignerSeriesDirect, halfPiQuadrants, realDefectSpherical, realDefectWigner, s2Nodes, so3Nodes, sphericalAdjoint,
                       sphericalForward, wignerAdjoint, wignerForward)
 from .nfft import NFFTPlan, nfftLibrary
-from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
+from .harmonics import _WignerD, _checkerboard, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
 from .quadrature import bandwidthFor, quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid
 from ..geometry.display import display, sizeString
 
@@ -73,7 +72,7 @@ def _eps(eps, dtype):
 NUFFT_SINGLE_THREAD_WORK = 2e8
 
 
-def _options(nodes, dims, eps, upsampfac=None):
+def _options(nodes, dims, upsampfac=None):
   size = int(np.prod(dims))
   opts = {"nthreads": 1 if nodes * size < NUFFT_SINGLE_THREAD_WORK else threads()}
   if upsampfac is not None:
@@ -215,9 +214,7 @@ def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None, centre=
     _wignerAdjointNumpy(F, H, np.ascontiguousarray(dn[:2 * n + 1, :2 * n + 1]), n, centre, real, rA, rB, Kb, La)
     F *= _blockPhase(n, False, rdtype)
     if real:
-      k = np.arange(-n, n + 1)
-      sign = np.where((k[:, None] - k[None, :]) % 2, -1.0, 1.0)
-      F[:, :n] = (sign * np.conj(F))[::-1, ::-1][:, :n]
+      F[:, :n] = (_checkerboard(n) * np.conj(F))[::-1, ::-1][:, :n]
     degreeBlock(fhat, n)[...] = F
   return fhat
 
@@ -319,7 +316,7 @@ class _FourierPlan:
   def _init(self, n, dtype, dims, eps, upsampfac):
     self.dims, self.dtype = dims, _complexType(dtype)
     self.eps = _eps(eps, dtype)
-    self.opts, self._plans = _options(n, dims, self.eps, upsampfac), {}
+    self.opts, self._plans = _options(n, dims, upsampfac), {}
 
   # the dimensions and the nodes of the finufft plan of a kind
   def _axes(self, kind, x):
@@ -535,7 +532,7 @@ class S1FourierPlan:
     self.L, self.dtype = int(L), _complexType(dtype)
     x = np.ascontiguousarray(np.mod(x, 2 * np.pi), dtype=dtype)
     f, eps = _finufft(), _eps(eps, dtype)
-    opts = _options(len(x), (2 * self.L + 1,), eps)
+    opts = _options(len(x), (2 * self.L + 1,))
     self.forward = f.Plan(2, (2 * self.L + 1,), eps=eps, isign=1, dtype=self.dtype.name, **opts)
     self.forward.setpts(x)
     self.backward = f.Plan(1, (2 * self.L + 1,), eps=eps, isign=-1, dtype=self.dtype.name, **opts)
@@ -802,10 +799,7 @@ def wignerSeriesAdjointGridded(rots, values, L, weights=None, folds=(1, 1)):
   if bad is not None:
     u = np.where(bad, 0, u)
   idx = (c * Na + a) * nb + b
-  if values.dtype.kind == "c":
-    v = np.bincount(idx, u.real, minlength=len(g)) + 1j * np.bincount(idx, u.imag, minlength=len(g))
-  else:
-    v = np.bincount(idx, u, minlength=len(g))
+  v = _groupSums(idx, u, len(g))
   return SO3GridPlan(g, L, real=values.dtype.kind != "c").adjoint(v, np.ones(len(g)))
 
 
@@ -953,6 +947,16 @@ def fourierSeriesAdjoint(x, values, L, weights=None):
   if backend() != "numba" and x.size * (2 * L + 1) < DIRECT_SUM_WORK_S1:
     return np.exp(-1j * np.outer(np.arange(-L, L + 1), x)) @ (weights * values)
   return S1FourierPlan(x, L).adjoint(values, weights)
+
+
+# the adjoint transform column by column of values shaped (nodes, list...), the list shape
+# in front of the coefficients
+def _perColumn(adjoint, values, n):
+  values = np.asarray(values)
+  if values.size == n:
+    return adjoint(values.ravel())
+  cols = values.reshape(n, -1)
+  return np.stack([adjoint(cols[:, k]) for k in range(cols.shape[1])]).reshape(values.shape[1:] + (-1,))
 
 
 # whether the compiled direct sum on the circle beats a plan

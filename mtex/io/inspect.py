@@ -128,19 +128,10 @@ def inspectEBSD(path):
     inspectEBSD('map.h5oina')  and the data sets a project file holds
   """
   path = os.fspath(path)
-  fmt = VENDOR_FORMATS.get(os.path.splitext(path)[1].lower().lstrip("."))
-  if fmt == "ang":
-    info = _inspectAng(path)
-  elif fmt == "ctf":
-    info = _inspectCtf(path)
-  elif fmt == "crc":
-    info = _inspectCpr(path)
-  elif fmt == "osc":
-    info = _inspectOsc(path)
-  elif fmt == "h5":
-    info = _inspectH5(path)
-  else:
+  inspect = _INSPECTORS.get(VENDOR_FORMATS.get(os.path.splitext(path)[1].lower().lstrip(".")))
+  if inspect is None:
     raise ValueError(f"{path} has no extension of an EBSD file; they are {', '.join(EBSD_EXTENSIONS)}")
+  info = inspect(path)
   st = os.stat(path)
   info.size = st.st_size
   if info.date is None:
@@ -164,18 +155,19 @@ def _headLines(path, stop):
 
 
 def _inspectAng(path):
-  from .ang import angHeader, angIsACOM, angIsEMSphInx, angPhases
+  from .ang import _angColumnNames, angHeader, angIsACOM, angIsEMSphInx, angPhases
   from .table import linesFrom, text
   head, offset, buf = _headLines(path, lambda l: not l.startswith(b"#"))
   header = [text(l) for l in head]
   phases, names, families = angPhases(header)
   acom = angIsACOM(header)
-  vendor = "ACOM" if acom else "EMSphInx" if angIsEMSphInx(header, names, families) else "EDAX"
+  if acom:
+    vendor = "ACOM"
+  else:
+    vendor = "EMSphInx" if angIsEMSphInx(header, names, families) else "EDAX"
   h = angHeader(header)
   (first,), _ = linesFrom(buf, offset, 1)
-  m = len(text(first).split())
-  names = ["phi1", "Phi", "phi2", "x", "y", "iq", "ci", "phase", "sem_signal", "fit"][:m] + [f"extra{k}" for k in range(1, m - 9)]
-  cols = [c for c in names if c not in ("phi1", "Phi", "phi2", "x", "y", "phase")]
+  cols = [c for c in _angColumnNames(len(text(first).split())) if c not in ("phi1", "Phi", "phi2", "x", "y", "phase")]
   xs, ys, nOdd, nEven, nRows = (h.get(k) for k in ("XSTEP", "YSTEP", "NCOLS_ODD", "NCOLS_EVEN", "NROWS"))
   hexGrid = str(h.get("GRID", "")).lower() == "hexgrid"
   info = EBSDFileInfo(path, "ang", vendor, 0, _headerDate(h), phases, cols, header=h)
@@ -195,24 +187,13 @@ def _inspectAng(path):
 
 
 def _inspectCtf(path):
-  from .ctf import ctfHeader, ctfPhases, oxfordCorrection
+  from .ctf import _ctfHead, oxfordCorrection
   from .table import linesFrom, text
-  head, offset, buf = _headLines(path, lambda l: l.startswith(b"Phases"))
-  if offset >= len(buf):
-    raise ValueError(f"{path} declares no phases")
-  phaseLine = len(head)
-  (phasesLine,), offset = linesFrom(buf, offset, 1)
-  lines = [text(l) for l in head] + [text(phasesLine)]
-  n = int(lines[phaseLine].split("\t")[-1])
-  phaseLines, offset = linesFrom(buf, offset, n)
+  _, _, buf = _headLines(path, lambda l: l.startswith(b"Phases"))
+  h, phases, acq, offset = _ctfHead(buf, path)
   (nameLine,), _ = linesFrom(buf, offset, 1)
-  phases = ctfPhases(lines + [text(l) for l in phaseLines], phaseLine, n)
-  h = ctfHeader(lines[:phaseLine])
   names = [s.strip().lower() for s in text(nameLine).split("\t")]
   cols = [c for c in names if c not in ("phase", "x", "y", "euler1", "euler2", "euler3")]
-  acq = None
-  if all(isinstance(h.get(k), float) for k in ("AcqE1", "AcqE2", "AcqE3")):
-    acq = (h["AcqE1"], h["AcqE2"], h["AcqE3"])
   info = EBSDFileInfo(path, "ctf", "Oxford", 0, _headerDate(h), phases, cols, header=h, eulerCorrection=oxfordCorrection(acq))
   xs, ys, nx, ny = (h.get(k) for k in ("XStep", "YStep", "XCells", "YCells"))
   if isinstance(nx, float) and isinstance(ny, float):
@@ -223,15 +204,15 @@ def _inspectCtf(path):
 
 
 def _inspectCpr(path):
-  from .crc import cprPhases, crcNames, readIni
+  from .crc import _number, cprPhases, crcNames, readIni
   base = os.path.splitext(path)[0]
   cprPath = base + ".cpr"
   if not os.path.isfile(cprPath):
     raise ValueError(f"{path} has no .cpr beside it to describe its columns")
   ini = readIni(cprPath)
   phases = cprPhases(ini, cprPath)
-  count = int(ini.get("fields", {}).get("count", 0) or 0)
-  codes = [int(ini.get("fields", {}).get(f"field{k}", 0) or 0) for k in range(1, count + 1)]
+  count = int(_number(ini, "fields", "count", 0.0))
+  codes = [int(_number(ini, "fields", f"field{k}", 0.0)) for k in range(1, count + 1)]
   cols = [c for c in crcNames(ini, codes) if c not in ("x", "y", "phi1", "phi", "phi2")]
   job = ini.get("job", {})
   info = EBSDFileInfo(path, "cpr", "Oxford", 0, _headerDate(ini), phases, cols, header=ini,
@@ -250,8 +231,7 @@ def _inspectCpr(path):
 
 def _inspectOsc(path):
   from .ang import eulerCorrectionRotation
-  from .osc import (OSC_COLUMNS, OSC_HEADER_CLOSE, OSC_HEADER_OPEN, _u32, oscColumnCount, oscDataStart, oscHeader,
-                    oscPhases)
+  from .osc import OSC_HEADER_CLOSE, _oscColumnNames, _oscLayout, oscHeader
   buf = b""
   with open(path, "rb") as f:
     while len(buf) < HEAD_LIMIT:
@@ -260,18 +240,8 @@ def _inspectOsc(path):
       close = buf.find(OSC_HEADER_CLOSE)
       if close >= 0 and len(buf) >= close + 4096 or not chunk:
         break
-  if len(buf) <= 32:
-    raise ValueError(f"{path} is too short to be an .osc")
-  nx, ny, n = _u32(buf, 16), _u32(buf, 20), _u32(buf, 24)
-  opening = buf.find(OSC_HEADER_OPEN)
-  close = buf.find(OSC_HEADER_CLOSE, max(opening, 0))
-  if close < 0:
-    raise ValueError(f"{path} carries no header marker")
-  phases = phaseList() if opening < 0 else oscPhases(buf, opening + 8, close)
-  start, xstep, ystep = oscDataStart(buf, close, n)
-  m = oscColumnCount(buf, start, xstep)
-  names = OSC_COLUMNS[:m] + [f"extra{j}" for j in range(1, m - len(OSC_COLUMNS) + 1)]
-  cols = [c for c in names if c not in ("x", "y", "phi1", "phi", "phi2", "phase")]
+  nx, ny, n, phases, start, xstep, ystep, m = _oscLayout(buf, path)
+  cols = [c for c in _oscColumnNames(m) if c not in ("x", "y", "phi1", "phi", "phi2", "phase")]
   h = oscHeader(buf, nx, ny, n, xstep, ystep)
   info = EBSDFileInfo(path, "osc", "EDAX", 0, None, phases, cols, points=int(n), header=h,
                       eulerCorrection=eulerCorrectionRotation(2))
@@ -285,7 +255,7 @@ def _inspectOsc(path):
 
 def _inspectH5(path):
   import h5py
-  from .h5 import _floats, h5Reader, loadedField
+  from .h5 import _eulerEntry, _floats, h5Reader, loadedField
   with h5py.File(path, "r") as f:
     r = h5Reader(f, path)
     r.choose()
@@ -298,13 +268,20 @@ def _inspectH5(path):
     # what the loader reads as the map is not a property
     pos = ebsd["position"]
     rot = ebsd["rotation"]
-    eu = {} if rot.get("type", "euler") == "byMatrix" else rot.get(rot.get("type", "euler"), rot.get("euler", {}))
-    for entry in [ebsd["phase"]] + ([pos["direct"]["x"], pos["direct"]["y"]] if pos.get("type", "direct") == "direct" else []) \
-        + [eu[k] for k in ("phi", "phi1", "Phi", "phi2") if k in eu]:
+    eu = _eulerEntry(rot)
+    direct = pos.get("type", "direct") == "direct"
+    entries = [ebsd["phase"], *([pos["direct"]["x"], pos["direct"]["y"]] if direct else []),
+               *(eu[k] for k in ("phi", "phi1", "Phi", "phi2") if k in eu)]
+    # every entry is remembered, so that none of them is taken for a property
+    for entry in entries:
       p = r.remember(entry)
-      if p is not None and info.points is None and p not in groups:
-        info.points = int(np.prod(f[p].shape[:1])) if eu.get("phi") is entry and f[p].ndim > 1 and f[p].shape[-1] == 3 else int(np.prod(f[p].shape))
-    if pos.get("type", "direct") != "direct":
+      if p is None or p in groups or info.points is not None:
+        continue
+      d = f[p]
+      # a data set of the three angles as rows of three counts its rows
+      stacked = eu.get("phi") is entry and d.ndim > 1 and d.shape[-1] == 3
+      info.points = int(d.shape[0]) if stacked else int(np.prod(d.shape))
+    if not direct:
       ind = pos["indirect"]
       nx, ny = r.value(ind["grid_size_x"]), r.value(ind.get("grid_size_y"))
       if nx is not None and ny is not None:
@@ -314,9 +291,8 @@ def _inspectH5(path):
       dx = r.number(ind["step_size_x"])
       if dx is not None:
         info.step = (dx, r.number(ind["step_size_y"], dx))
-    uc = ebsd.get("unitCell")
-    if info.step is None and isinstance(uc, dict) and uc.get("type") == "fromStep":
-      sx, sy = r.number(uc["step_size_x"]), r.number(uc["step_size_y"])
+    if info.step is None:
+      sx, sy = r.cellSteps()
       if sx is not None and sy is not None:
         info.step = (sx, sy)
     if info.grid is None:
@@ -339,14 +315,19 @@ def _inspectH5(path):
   return info
 
 
+# the description of a file by the module that reads its format
+_INSPECTORS = {"ang": _inspectAng, "ctf": _inspectCtf, "crc": _inspectCpr, "osc": _inspectOsc, "h5": _inspectH5}
+
+
 # ------------------------------------------------------------------ the labels
 
 # a value of a nested header found by the tail of its key, case and blanks ignored
 def _find(h, keys):
   if not isinstance(h, dict):
     return None
+  wanted = {key.replace(" ", "") for key in keys}
   for k, v in h.items():
-    if str(k).replace(" ", "").lower() in [key.replace(" ", "") for key in keys]:
+    if str(k).replace(" ", "").lower() in wanted:
       return v
   for v in h.values():
     if isinstance(v, dict):

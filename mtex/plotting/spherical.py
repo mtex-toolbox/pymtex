@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.frames import referenceFrame
-from ..geometry.frames import crystalFrame
+from ..geometry.frames import crystalFrame, referenceFrame
 from ..geometry.miller import brackets, indexString
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.quaternion import rotation
@@ -158,17 +157,19 @@ class sphericalProjection:
       cols.pop()
     if not cols:
       return _emptyGrid(self.frame)
-    width = max(hi - lo for col in cols if col is not None for (_, lo, hi) in (col,))
+    width = max(col[2] - col[1] for col in cols if col is not None)
     nTheta = max(3, 2 * int(round(width / resolution / 2)) + 1)
     t = np.linspace(0, 1, nTheta)
     theta = np.empty((nTheta, len(cols)))
     rho = np.empty((nTheta, len(cols)))
     blank = np.zeros(len(cols), dtype=bool)
     last = (rhos[0], 0.0, np.pi)
+    # a blank column repeats the strip before it, its coordinates hidden afterwards
     for j, col in enumerate(cols):
       blank[j] = col is None
-      r, lo, hi = last if col is None else col
-      last = last if col is None else col
+      if col is not None:
+        last = col
+      r, lo, hi = last
       theta[:, j] = lo + t * (hi - lo)
       rho[:, j] = r
     return self._gridFrom(theta, rho, blank)
@@ -229,7 +230,7 @@ class sphericalProjection:
         V = [next(s * a for s in (1, -1) if self.sR.checkInside(s * a)) for a in (fr.aAxis, fr.bAxis, fr.cAxis)
              if self.sR.checkInside(a) or self.sR.checkInside(-a)]
         V = vector3d(np.array([v.data.reshape(3) for v in V]).reshape(-1, 3)).normalize() if V else vector3d()
-      return [(v, s) for v in V.flatten() for s in (millerLabel(v, fr),) if s is not None]
+      return [(v, s) for v in V.flatten() if (s := millerLabel(v, fr)) is not None]
     # a frame-free direction is named by the axes of the session's specimen frame
     from ..geometry.frames import specimenFrame
     names = tuple((specimenFrame.default if fr is None else fr).axesNames)
@@ -364,7 +365,6 @@ class plainProjection(sphericalProjection):
   def _gridFrom(self, theta, rho, blank):
     V = vector3d(vector3d.byPolar(theta, rho).data, frame=self.frame, isNormalized=True)
     X, Y = rho / degree, theta / degree
-    X, Y = X.copy(), Y.copy()
     X[:, blank], Y[:, blank] = np.nan, np.nan
     return V, X, Y
 
@@ -469,7 +469,8 @@ def _regionFor(v, antipodal, how2plot, fundamentalRegion):
   elif isinstance(v, referenceFrame):
     fr, ax, fundamentalRegion = v, False, True
   else:
-    fr, ax, fundamentalRegion = getattr(v, "frame", None), bool(getattr(v, "antipodal", False)), hasSymmetry(getattr(v, "frame", None)) if not fundamentalRegion else True
+    fr, ax = getattr(v, "frame", None), bool(getattr(v, "antipodal", False))
+    fundamentalRegion = fundamentalRegion or hasSymmetry(fr)
   ax = ax if antipodal is None else bool(antipodal)
   return plotRegion(fr, fundamentalRegion, ax, how2plot), how2plot, ax
 
@@ -560,9 +561,11 @@ def _equivalentVertices(fr, sR):
 
 # ------------------------------------------------------------------ helpers
 
+# the plotting convention of a frame, the session's default for a frame without one or none,
+# as a convention of its own
 def _conventionOf(fr):
   pC = None if fr is None else fr.how2plot
-  return plottingConvention(pC) if pC is not None else plottingConvention(plottingConvention.default)
+  return plottingConvention(plottingConvention.default if pC is None else pC)
 
 
 def _emptyGrid(frame):
@@ -579,7 +582,6 @@ def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=
   """plotS2Grid(resolution=0.5 * degree, 'upper', cs): the directions a chart samples its surface
   at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
   lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid"""
-  from ..geometry.frames import referenceFrame
   refuseFlags(args, "plotS2Grid")
   sR = next((a for a in args if isinstance(a, sphericalRegion)), None)
   fr = next((a for a in args if isinstance(a, referenceFrame)), None)

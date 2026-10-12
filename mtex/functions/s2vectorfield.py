@@ -22,7 +22,7 @@ from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.tangent import spinTensor
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import _rotatedFrame
-from .harmonics import mtexCoefficientsS2, _WignerD
+from .harmonics import _s2Degrees, mtexCoefficientsS2, _WignerD
 from .quadrature import quadratureS2Grid
 from .s2fun import S2FunHarmonic, realizeSpherical
 from .so3vectorfield import _projectSphericalRows, equivariantProjection
@@ -30,24 +30,40 @@ from .transforms import DIRECT_SUM_NODES, S2FourierPlan, sphericalPlan, spherica
 from ..geometry.display import aligned, frameLabel
 
 
+# the values of every column at the directions, one plan for all
 def _seriesColumns(fhat, v):
   L = math.isqrt(fhat.shape[0]) - 1
   d = vector3d(v.data.reshape(-1, 3))
   if d.size < DIRECT_SUM_NODES or L == 0:
-    return np.stack([np.real(sphericalSeries(fhat[:, i], d, real=True)) for i in range(fhat.shape[1])], axis=-1)
-  p = S2FourierPlan(d, L, real=True)
-  return np.stack([p(fhat[:, i]) for i in range(fhat.shape[1])], axis=-1)
+    def series(c):
+      return np.real(sphericalSeries(c, d, real=True))
+  else:
+    series = S2FourierPlan(d, L, real=True)
+  return np.stack([series(fhat[:, i]) for i in range(fhat.shape[1])], axis=-1)
 
 
+# the adjoint of every column of values, one plan for all; on a quadrature grid its FFT
 def _adjointColumns(nodes, values, L, w):
   if isinstance(nodes, quadratureS2Grid):
-    p = sphericalPlan(nodes, L, False)
-    return np.stack([p.adjoint(values[:, i], w) for i in range(values.shape[1])], axis=-1)
-  d = vector3d(nodes.data.reshape(-1, 3))
-  if d.size < DIRECT_SUM_NODES:
-    return np.stack([sphericalSeriesAdjoint(d, values[:, i], L, w) for i in range(values.shape[1])], axis=-1)
-  p = S2FourierPlan(d, L)
-  return np.stack([p.adjoint(values[:, i], w) for i in range(values.shape[1])], axis=-1)
+    adjoint = sphericalPlan(nodes, L, False).adjoint
+  elif nodes.size < DIRECT_SUM_NODES:
+    d = vector3d(nodes.data.reshape(-1, 3))
+
+    def adjoint(y, w):
+      return sphericalSeriesAdjoint(d, y, L, w)
+  else:
+    adjoint = S2FourierPlan(vector3d(nodes.data.reshape(-1, 3)), L).adjoint
+  return np.stack([adjoint(values[:, i], w) for i in range(values.shape[1])], axis=-1)
+
+
+# the Wigner matrices D_0 .. D_L of the rotation part of every element of a group, the odd
+# degrees of an improper element negated: how it acts on a component from the left
+def _parityWignerD(els, L):
+  out = []
+  for i in range(els.size):
+    D = _WignerD(els[i].rot, bandwidth=L)
+    out.append([(-1 if els[i].isImproper and l % 2 else 1) * D[l] for l in range(L + 1)])
+  return out
 
 
 def _values(x):
@@ -210,7 +226,7 @@ class S2VectorFieldHarmonic(S2VectorField):
   @property
   def fhat(self):
     """the coefficients of the components in MTEX's basis, one column per component"""
-    return mtexCoefficientsS2(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsS2(self._fhat)
+    return mtexCoefficientsS2(self._fhat.T).T
 
   @property
   def bandwidth(self):
@@ -274,11 +290,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     L = self.bandwidth
     els = self.frame.sym.rot.flatten()
     actions = [els[i].matrix() for i in range(els.size)]
-    Ds = []
-    for i in range(els.size):
-      D = _WignerD(els[i].rot, bandwidth=L)
-      Ds.append([(-1 if els[i].isImproper and l % 2 else 1) * D[l] for l in range(L + 1)])
-    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, Ds)))
+    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, _parityWignerD(els, L))))
 
   def __add__(self, w):
     if isinstance(w, vector3d):
@@ -339,7 +351,7 @@ class S2VectorFieldHarmonic(S2VectorField):
 
   def antipode(self):
     """the field of the antipode, v(-xi)"""
-    l = np.floor(np.sqrt(np.arange(len(self._fhat)))).astype(int)
+    l = _s2Degrees(self.bandwidth)
     return self._rebuild(np.where(l % 2, -1.0, 1.0)[:, None] * self._fhat)
 
   def __repr__(self):
@@ -361,8 +373,8 @@ _LADDERS = {}
 
 def _ladders(L):
   if L not in _LADDERS:
-    l = np.repeat(np.arange(L + 1), 2 * np.arange(L + 1) + 1)
-    m = np.concatenate([np.arange(-k, k + 1) for k in range(L + 1)])
+    l = _s2Degrees(L)
+    m = np.arange((L + 1) ** 2) - l * l - l
     up = np.where(m < l, np.sqrt(np.maximum(l * (l + 1) - m * (m + 1), 0)) / 2, 0.0)
     down = np.where(m > -l, np.sqrt(np.maximum(l * (l + 1) - (m - 1) * m, 0)) / 2, 0.0)
     _LADDERS[L] = (m, up, down)

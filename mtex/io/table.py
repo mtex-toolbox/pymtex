@@ -13,11 +13,12 @@
 # knows a format.
 from __future__ import annotations
 
+import itertools
 import re
 
 import numpy as np
 
-from .kernels import parseBlock
+from .kernels import _firstRows, parseBlock
 
 
 def readFile(path):
@@ -40,19 +41,9 @@ def readTable(data, offset=0, comments=None, delimiter=None):
   return parseBlock(block, _decimalComma(block, comments), comments)
 
 
-# whether the block writes the decimal comma: read off its first rows, not per field
+# whether the block writes the decimal comma: read off its first eight rows, not per field
 def _decimalComma(block, comments):
-  n = 0
-  for line in block[:65536].split(b"\n"):
-    s = line.strip()
-    if not s or (comments is not None and s.startswith(comments)):
-      continue
-    if b"," in s:
-      return True
-    n += 1
-    if n >= 8:
-      break
-  return False
+  return any(b"," in row for row in itertools.islice(_firstRows(block, comments), 8))
 
 
 def leadingLines(data, stop):
@@ -63,9 +54,7 @@ def leadingLines(data, stop):
   while pos < n:
     nl = data.find(b"\n", pos)
     end = n if nl < 0 else nl
-    line = data[pos:end]
-    if line.endswith(b"\r"):
-      line = line[:-1]
+    line = data[pos:end].removesuffix(b"\r")
     if stop(line):
       return lines, pos
     lines.append(line)
@@ -82,8 +71,7 @@ def linesFrom(data, offset, count):
       break
     nl = data.find(b"\n", pos)
     end = n if nl < 0 else nl
-    line = data[pos:end]
-    lines.append(line[:-1] if line.endswith(b"\r") else line)
+    lines.append(data[pos:end].removesuffix(b"\r"))
     pos = min(end + 1, n)
   return lines, pos
 
@@ -128,6 +116,22 @@ _NUMBER = re.compile(rb"^[\s]*[-+]?(\d+[.,]?\d*|[.,]\d+)([eE][-+]?\d+)?([\s,;]+[
 def isNumericRow(line):
   """whether a line is a row of numbers, a decimal comma allowed"""
   return bool(line.strip()) and _NUMBER.match(line) is not None
+
+
+# the lines above the numeric block of a table and the offset of the block: the first header lines
+# where their number is given, else the lines before the first row of numbers, a delimiter read as
+# blank space; None for the offset where no row of numbers follows
+def _tableStart(data, header=None, delimiter=None):
+  if header is not None:
+    return linesFrom(data, 0, int(header))
+  sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None
+  head, offset = leadingLines(data, lambda l: isNumericRow(l if sep is None else l.replace(sep, b" ")))
+  return head, None if offset >= len(data) else offset
+
+
+# a column name in lower case, its runs of blank space one blank
+def _canonicalName(name):
+  return re.sub(r"\s+", " ", str(name).strip().lower())
 
 
 def tableLines(names, cols, rowNames=None, uniform=False):

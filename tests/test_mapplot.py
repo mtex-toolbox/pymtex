@@ -79,7 +79,7 @@ def test_plot_throughTheScatterBackendIsPointsWithoutAScaleBar(forsterite):
   ebsd, _ = forsterite
   plot(ebsd, np.random.default_rng(1).random((ebsd.size, 3)))
   h = plot(ebsd, faceColor="black", backend="scatter", micronbar=False)
-  assert isinstance(h, matplotlib.collections.PathCollection) and not hasattr(mapOf(ebsd), "scaleBarArtists")
+  assert isinstance(h, matplotlib.collections.PathCollection) and not mapOf(ebsd).scaleBarArtists
   # the method is the function
   ebsd.plot(ebsd.bc)
 
@@ -449,3 +449,40 @@ def test_matlab_ipf_flags_point_to_the_keyword(forsterite):
   ebsd, _ = forsterite
   with pytest.raises(ValueError, match="ipfDirection=zvector"):
     plot(ebsd, "ipfz")
+
+
+def test_grainPaths_isEveryGrainWithItsLoopsClosed(forsterite):
+  from mtex.plotting.mapplot import _grainPaths
+  from mtex.plotting.maps import grainPolygons
+  _, grains = forsterite
+  plot(grains, micronbar=False)
+  paths, at = _grainPaths(grains, mapOf(grains))
+  k = max(range(len(at)), key=lambda i: len(grains.loops[at[i]]))
+  rings = grainPolygons(grains, at[k])
+  assert len(paths[k].vertices) == sum(len(r) + 1 for r in rings) and list(paths[k].codes).count(1) == len(rings)
+
+
+def test_grainPaths_ofNoGrainIsEmpty(forsterite):
+  from mtex.plotting.mapplot import _grainPaths
+  _, grains = forsterite
+  plot(grains, micronbar=False)
+  assert _grainPaths(grains[[]], mapOf(grains)) == ([], [])
+
+
+def test_needles_takeOneSegmentInThePlaneAndTwoOutOfIt(forsterite):
+  _, grains = forsterite
+  g = grains[:2]
+  h = plot(g, vector3d([[1, 0, 0], [0, 0, 1]]), micronbar=False)
+  assert len(h.get_segments()) == 3 and h.get_colors()[0][0] == 0.5
+
+
+def test_mapPlot_outOfScreen_turnsWithAFlippingLayout(forsterite):
+  ebsd, _ = forsterite
+  plot(ebsd, micronbar=False)
+  mP = mapOf(ebsd)
+  assert np.allclose(mP.outOfScreen, mP.plane.normal * np.sign(np.linalg.det(mP.layout)))
+
+
+def test_onOff_readsMATLABsSwitches():
+  from mtex.plotting.mapplot import _onOff
+  assert (_onOff("on"), _onOff("off"), _onOff(None)) == (True, False, None)

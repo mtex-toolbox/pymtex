@@ -45,6 +45,18 @@ def test_flip_swaps_the_sides_and_inverts_the_misrotation():
   assert np.allclose(gB.flipN(inner).N.data[inner], [-1, 0, 0])
 
 
+def test_flipN_reverses_the_corners_of_a_face_once_however_often_named():
+  gB = boundary()
+  assert np.array_equal(gB.flipN([3]).F[3], gB.F[3][::-1]) and np.array_equal(gB.flipN([3, 3]).F, gB.F)
+
+
+def test_the_fan_of_a_quadrilateral_is_two_triangles_from_its_first_corner():
+  from mtex.maps3d.grain3boundary import grain3Boundary
+  gB = grain3Boundary(np.eye(4, 3), [[0, 1, 2, 3]], [[1, 0]], None, [[1, -1]], [[1.0, 0, 0, 0]], phaseList([crystalFrame("m-3m")]), None)
+  T, face = gB._fanIndex()
+  assert np.array_equal(T, [[0, 1, 2], [0, 2, 3]]) and np.array_equal(face, [0, 0])
+
+
 def test_a_selection_keeps_the_ids_and_the_faces():
   gB = boundary()
   inner = np.flatnonzero(np.all(gB.grainId > 0, axis=1))

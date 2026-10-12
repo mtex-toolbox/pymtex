@@ -66,6 +66,25 @@ class phaseList:
     """whether phase i carries a lattice"""
     return self.frames[i].isIndexed
 
+  # whether every phase carries a lattice, as an array indexed by phase id
+  @property
+  def _indexedMask(self):
+    return np.array([f.isIndexed for f in self.frames], dtype=bool)
+
+  # the measurements or grains of the phase ids given that a list of selection names picks:
+  # 'indexed', 'notIndexed' where no phase is called so, and the phases named
+  def _selectionMask(self, names, phaseId):
+    indexed = self._indexedMask[phaseId]
+    mask = np.zeros(np.shape(phaseId), dtype=bool)
+    for name in names:
+      if name.lower() == "indexed":
+        mask |= indexed
+      elif name.lower() == "notindexed" and "notindexed" not in [m.lower() for m in self.mineralList]:
+        mask |= ~indexed
+      else:
+        mask |= phaseId == self.phaseId(name)
+    return mask
+
   @property
   def indexedPhaseId(self):
     """the ids of the phases that carry a lattice"""

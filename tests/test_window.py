@@ -105,7 +105,7 @@ def test_the_maps_read_before_are_let_go():
     cb.openEntry(w.st, os.path.join(FIXTURES, name), w.worker)
     pump(app, lambda: w.st.status[0] in ("loaded", "failed") and os.path.basename(w.st.selected) == name)
     read.append(weakref.ref(w.st.ebsd))
-  pump(app, lambda: not w.threads, timeout=30)
+  pump(app, lambda: not w.jobs, timeout=30)
   gc.collect()
   assert read[0]() is None and read[1]() is None and read[2]() is w.st.ebsd
   w.close()

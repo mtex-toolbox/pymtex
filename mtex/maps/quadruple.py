@@ -16,16 +16,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from .criteria import connectivity, _bestDot
+from .criteria import connectivity, _misorientationAngle
 from .decomposition import cellComplex
 from .segment import segmentFrom
 
 
-# the one site both faces bound, the cell in the wedge between them, or -1
-def _commonSite(cells, fa, fb):
-  a, b = cells[fa], cells[fb]
-  common = [x for x in a if x in b]
-  return int(common[0]) if len(common) == 1 else -1
+# the one site both of two faces bound, the cell in the wedge between them, or -1, for faces of
+# shape (..., 2) of sites
+def _commonSite(a, b):
+  match = a[..., :, None] == b[..., None, :]
+  return np.where(match.sum(axis=(-2, -1)) == 1, np.where(match[..., 0, :].any(axis=-1), a[..., 0], a[..., 1]), -1)
 
 
 def quadruplePoints(c, seg):
@@ -37,19 +37,15 @@ def quadruplePoints(c, seg):
   verts = np.flatnonzero((deg == 4) & (degOuter == 4)).astype(np.int32)
   slot = np.full(nV, -1, dtype=np.int64)
   slot[verts] = np.arange(len(verts))
-  faces = np.zeros((len(verts), 4), dtype=np.int32)
-  fill = np.zeros(len(verts), dtype=np.int64)
-  for col in range(2):
-    r = slot[c.F[:, col]]
-    for k in np.flatnonzero(r >= 0):
-      faces[r[k], fill[r[k]]] = k
-      fill[r[k]] += 1
-  for r, v in enumerate(verts):
-    p = c.V[v]
-    far = np.where(c.F[faces[r], 0] == v, c.F[faces[r], 1], c.F[faces[r], 0])
-    d = c.V[far] - p
-    faces[r] = faces[r][np.argsort(np.arctan2(d[:, 1], d[:, 0]), kind="stable")]
-  return verts, faces
+  # the four faces of every vertex, those it begins before those it ends, each in face order
+  r = slot[c.F.T].reshape(-1)
+  at = np.flatnonzero(r >= 0)
+  faces = np.tile(np.arange(len(c.F), dtype=np.int32), 2)[at[np.argsort(r[at], kind="stable")]].reshape(-1, 4)
+  # turned counterclockwise about the vertex
+  v = verts[:, None]
+  far = np.where(c.F[faces, 0] == v, c.F[faces, 1], c.F[faces, 0])
+  d = c.V[far] - c.V[v]
+  return verts, np.take_along_axis(faces, np.argsort(np.arctan2(d[..., 1], d[..., 0]), axis=1, kind="stable"), axis=1)
 
 
 # the misorientation angle of every pair, inf where none is defined, so such a pair never wins a tie
@@ -57,11 +53,10 @@ def _pairAngle(ebsd, i, j):
   rot = ebsd.rotations.data.reshape(-1, 4)
   ph = ebsd.phaseId.reshape(-1)
   out = np.full(len(i), np.inf, dtype=rot.dtype)
-  for p in range(len(ebsd.CSList)):
-    fr = ebsd.CSList[p]
+  for p, fr in enumerate(ebsd.CSList):
     sel = (ph[i] == p) & (ph[j] == p)
     if fr.isIndexed and sel.any():
-      out[sel] = 2 * np.arccos(np.minimum(_bestDot(fr, rot[i[sel]], rot[j[sel]]), 1.0))
+      out[sel] = _misorientationAngle(fr, rot[i[sel]], rot[j[sel]])
   return out
 
 
@@ -77,13 +72,11 @@ def splitQuadruplePoints(c, seg, ebsd, crit):
   then the one of smaller misorientation, then by position"""
   verts, faces = quadruplePoints(c, seg)
   sites = c.sites
-  n0 = len(verts)
-  wedge = np.zeros((n0, 4), dtype=np.int32)
-  ok = np.zeros(n0, dtype=bool)
-  for r in range(n0):
-    for m in range(4):
-      wedge[r, m] = _commonSite(c.cells, faces[r, m], faces[r, (m + 1) % 4])
-    ok[r] = np.all(wedge[r] >= 0) and len(np.unique(wedge[r])) == 4 and np.all(sites.pixel[wedge[r]] >= 0)
+  # the cell in every wedge between two neighbouring faces: four distinct measured cells
+  cells = c.cells[faces]
+  wedge = _commonSite(cells, np.roll(cells, -1, axis=1)).astype(np.int32)
+  s = np.sort(wedge, axis=1)
+  ok = np.all(wedge >= 0, axis=1) & np.all(s[:, 1:] != s[:, :-1], axis=1) & np.all(sites.pixel[wedge] >= 0, axis=1)
   keep = np.flatnonzero(ok)
   if len(keep) == 0:
     return c, seg
@@ -101,26 +94,23 @@ def splitQuadruplePoints(c, seg, ebsd, crit):
   T = c.V.dtype
   V = np.concatenate([c.V, np.zeros((n, 2), dtype=T)])
   F = c.F.copy()
-  newF = np.zeros((n, 2), dtype=np.int32)
-  newCells = np.zeros((n, 2), dtype=np.int32)
-  eps = np.sqrt(np.finfo(T).eps)
-  for r in range(n):
-    v = verts[r]
-    m = 3 if useB[r] else 0                    # the first of the two faces that move
-    move = (faces[r, m], faces[r, (m + 1) % 4])
-    wMove = wedge[r, m]                        # the cell between the two that move
-    wStay = wedge[r, (m + 2) % 4]              # the one between the two that stay
-    seg4 = np.linalg.norm(c.V[c.F[faces[r], 1]] - c.V[c.F[faces[r], 0]], axis=1).min()
-    delta = eps * seg4
-    p = c.V[v]
-    dMove, dStay = sites.pos[wMove] - p, sites.pos[wStay] - p
-    new = len(c.V) + r
-    V[new] = p + (delta / 2) * dMove / np.linalg.norm(dMove)
-    V[v] = p + (delta / 2) * dStay / np.linalg.norm(dStay)
-    for f in move:
-      F[f, 0 if F[f, 0] == v else 1] = new
-    newF[r] = (v, new)
-    newCells[r] = (wedge[r, (m + 1) % 4], wedge[r, (m + 3) % 4])
+  rows = np.arange(n)
+  # the first of the two faces that move, the cell between them and the one between the two that stay
+  m = np.where(useB, 3, 0)
+  wMove, wStay = wedge[rows, m], wedge[rows, (m + 2) % 4]
+  # the vertex and its copy pulled apart by sqrt(eps) of the shortest of its four segments
+  F4 = c.F[faces]
+  delta = np.sqrt(np.finfo(T).eps) * np.linalg.norm(c.V[F4[..., 1]] - c.V[F4[..., 0]], axis=2).min(axis=1)
+  p = c.V[verts]
+  dMove, dStay = sites.pos[wMove] - p, sites.pos[wStay] - p
+  new = (len(c.V) + rows).astype(np.int32)
+  V[new] = p + (delta / 2)[:, None] * dMove / np.linalg.norm(dMove, axis=1)[:, None]
+  V[verts] = p + (delta / 2)[:, None] * dStay / np.linalg.norm(dStay, axis=1)[:, None]
+  # the two faces that move end at the copy instead
+  for f in (faces[rows, m], faces[rows, (m + 1) % 4]):
+    F[f, np.where(F[f, 0] == verts, 0, 1)] = new
+  newF = np.stack([verts, new], axis=1).astype(np.int32)
+  newCells = np.stack([wedge[rows, (m + 1) % 4], wedge[rows, (m + 3) % 4]], axis=1)
   c2 = cellComplex(V, np.concatenate([F, newF]), np.concatenate([c.cells, newCells]), sites, c.A, c.plane, c.shape)
   # the criterion has never seen the new pairs, and it alone decides whether the two
   # cells a split joins are one grain

@@ -15,11 +15,11 @@ from ..functions.polefigure import PoleFigure
 from ..geometry.orientation import orientation
 from ..geometry.sphericalregion import projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, asVector3d
+from ..geometry.vector3d import vector3d
 from .mtexfigure import gcm, mtexFigure
 from .poles import dynamicMarkerSize, inversePoles, poles
 from .spherical import hasSymmetry, makeSphericalProjection, plotRegion
-from .sphericalplot import fillFlag, intoParents, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
+from .sphericalplot import fillFlag, intoParents, _asList, _directionTitle, _markers, _plotRow, _rangeOf, _split, sphericalPlot
 from . import sphericalplot
 from ..geometry.arguments import refuseFlags
 
@@ -27,12 +27,6 @@ if TYPE_CHECKING:
   from typing import Unpack
 
   from .keywords import PlotKeywords
-
-
-def _asList(h):
-  if isinstance(h, vector3d):
-    return [h[i] for i in range(h.size)] if h.size > 1 else [h]
-  return [asVector3d(x) for x in h]
 
 
 # a long list is thinned before it is drawn, deterministically, as MTEX thins it too
@@ -135,7 +129,9 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
       vals = np.asarray(vals)[::vs.size // w.size]
     rgb = vals if vals is not None and np.ndim(vals) == 2 and np.shape(vals)[-1] == 3 else None
     vals = None if rgb is not None else vals
-    cr = ranges.setdefault(k, _rangeOf([np.asarray(vals, dtype=float)])) if individual and vals is not None else colorRange
+    cr = colorRange
+    if individual and vals is not None:
+      cr = ranges.setdefault(k, _rangeOf([np.asarray(vals, dtype=float)]))
     size = markerSize if markerSize is not None else dynamicMarkerSize(w.size)
     # a size per orientation is repeated over its equivalents, as a value is
     if np.ndim(size) > 0 and np.size(size) != w.size and np.size(size) > 0:
@@ -146,7 +142,7 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
   if colorbar and any(v is not None for v in valuess):
     # into axes named by parent the bars go beside those axes only
     if whereKw.get("parent") is not None:
-      fig.colorbars += [fig.fig.colorbar(sP.mappable, ax=sP.ax, shrink=0.7) for sP in sPs if getattr(sP, "mappable", None) is not None]
+      fig.colorbars += [fig.fig.colorbar(sP.mappable, ax=sP.ax, shrink=0.7) for sP in sPs if sP.mappable is not None]
     else:
       fig.colorbar()
   return hs
@@ -157,14 +153,18 @@ def _dataRow(vss, titles, valuess=None, style="scatter", colorbar=False, colorRa
 def _pickData(o, args):
   h, data = None, None
   for a in args:
-    isDirection = isinstance(a, vector3d) or (isinstance(a, (list, tuple)) and len(a) > 0 and isinstance(a[0], vector3d))
-    if isDirection and h is None:
+    if _isDirections(a) and h is None:
       h = a
     else:
       data = a
   if h is None:
     raise ValueError("the directions of the pole figures are needed")
   return h, data
+
+
+# whether an argument names directions, a vector3d or a list of them
+def _isDirections(a):
+  return isinstance(a, vector3d) or (isinstance(a, (list, tuple)) and len(a) > 0 and isinstance(a[0], vector3d))
 
 
 # a fibre is the curve of its orientations, drawn as dots in its line colour
@@ -213,13 +213,12 @@ def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[Pl
   # plotPF(ori, 'add2all') without directions, or into held pole figures: the poles of the
   # directions they already show
   fig = sphericalplot.gcm()
-  if (kw.get("add2all") or (fig is not None and fig.hold)) and not any(isinstance(a, vector3d) or (isinstance(a, (list, tuple)) and a and isinstance(a[0], vector3d)) for a in args):
+  if (kw.get("add2all") or (fig is not None and fig.hold)) and not any(_isDirections(a) for a in args):
     kw["add2all"] = True
     return sphericalplot.plot(o, **kw)
   h, data = _pickData(o, args)
   hs = _asList(h)
-  flag = fillFlag(kw, None)
-  style = "scatter" if flag is None else "pcolor" if flag == "smooth" else flag
+  style = fillFlag(kw, "scatter")
   antipodal = kw.get("antipodal", False)
   # the budget is in markers, and a marker stands for an orbit
   budget = "all" if all else points if points is not None else max(10000 // (o.CS.numSym() * o.SS.numSym()), 1)
@@ -241,8 +240,7 @@ def plotIPF(o, *args, points=None, all=False, **kw: Unpack[PlotKeywords]):
     return sphericalplot.plotIPF(o, *args, **kw)
   r, data = _pickData(o, _positionalStyle(o, args, kw))
   rs = _asList(r)
-  flag = fillFlag(kw, None)
-  style = "scatter" if flag is None else "pcolor" if flag == "smooth" else flag
+  style = fillFlag(kw, "scatter")
   antipodal = kw.get("antipodal", False)
   budget = "all" if all else points if points is not None else max(100000 // (o.CS.numSym() * o.SS.numSym()), 1)
   if style == "scatter":
@@ -265,9 +263,8 @@ def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw: Unpack[Pl
   flag = fillFlag(kw, None)
   titles = [_pfTitle(pf, i) for i in range(pf.numPF)]
   if flag is not None:
-    style = "pcolor" if flag == "smooth" else flag
     fs = [S2FunHarmonic(pf.select(i), bandwidth=bandwidth) for i in range(pf.numPF)]
-    return _plotRow(fs, titles, style=style, colorRange="individual" if colorRange == "individual" else colorRange, **kw)
+    return _plotRow(fs, titles, style=flag, colorRange=colorRange, **kw)
   rs = [vector3d(pf.allR[i].data.reshape(-1, 3), frame=pf.allR[i].frame, antipodal=pf.allR[i].antipodal) for i in range(pf.numPF)]
   return _dataRow(rs, titles, [pf.allI[i].ravel() for i in range(pf.numPF)], colorRange=colorRange, **kw)
 

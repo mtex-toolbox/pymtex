@@ -537,3 +537,19 @@ def test_text_alone_stands_on_its_point():
   marked = next(t for t in gcm().children[0].texts if t.get_text() == "X1")
   assert alone.get_va() == "center" and tuple(alone.xyann) == (0, 0) and alone.get_color() == "red"
   assert alone.get_bbox_patch() is not None and marked.get_va() == "top" and marked.xyann[1] < 0
+
+
+def test_fillFlag_smoothIsPcolor():
+  from mtex.plotting.sphericalplot import fillFlag
+  assert fillFlag({"smooth": True}) == "pcolor"
+
+
+def test_markerGiven_readsEverySpellingOfAProperty():
+  from mtex.plotting.sphericalplot import _markerGiven
+  assert _markerGiven({"markerFaceColor": "k"}, "color") and not _markerGiven({"markerSize": 3}, "color")
+
+
+def test_poleDirections_ofAChartWithoutADirectionIsEmpty():
+  from mtex.plotting.sphericalplot import _poleDirections
+  sP = scatter(vector3d(1, 0, 0))[0].axes._mtexSphericalPlot
+  assert _poleDirections(sP) == []

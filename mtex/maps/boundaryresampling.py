@@ -18,13 +18,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import _jit, backend
 from .boundary import grainBoundary, orderWalk
 from .decomposition import NO_PIXEL
 from .grains import grain2d
+from .kernels import _compiledLoop
 from ..geometry.install import install
-
-_COMPILED = {}
 
 
 # ------------------------------------------------------------------ the heads that survive
@@ -73,13 +71,13 @@ def anchorClosedChains(gB, keep):
 
 def keepClosedChains(gB, keep):
   """a closed chain has no junction to anchor it, so it is given three vertices"""
-  closed = gB.isClosed
-  for s, e in zip(np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)):
-    n = e - s + 1
-    if not closed[s] or n < 3 or np.count_nonzero(keep[s:e + 1]) >= 3:
-      continue
-    for j in np.unique(np.rint(np.linspace(n / 3, n, 3)).astype(int)):
-      keep[s + j - 1] = True
+  s, e = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
+  if len(s) == 0:
+    return keep
+  n = e - s + 1
+  few = gB.isClosed[s] & (n >= 3) & (np.add.reduceat(keep.astype(np.int64), s) < 3)
+  # the vertices a third, two thirds and all the way along the chain
+  keep[s[few, None] + np.rint(n[few, None] * np.array([1, 2, 3]) / 3).astype(np.int64) - 1] = True
   return keep
 
 
@@ -178,7 +176,7 @@ def keepShapeChains(gB, epsilon, keep=None):
   keepV = np.zeros(offset[-1], dtype=np.bool_)
   if keep is not None:
     keepV[isHead] = keep
-  _compiledKeepShape()(np.ascontiguousarray(gB.V, dtype=np.float64), chainV, offset, closed, epsilon, keepV)
+  (_compiledLoop(_keepShapeLoop) or _keepShapeLoop)(np.ascontiguousarray(gB.V, dtype=np.float64), chainV, offset, closed, epsilon, keepV)
   return keepV[isHead]
 
 
@@ -264,14 +262,6 @@ def _keepShapeLoop(V, chainV, offset, closed, epsilon, keepV):
         break
       keepV[idx[best]] = True
     keepV[b] = keepV[b] or keepV[a]
-
-
-def _compiledKeepShape():
-  if backend() == "numpy":
-    return _keepShapeLoop
-  if "keepShape" not in _COMPILED:
-    _COMPILED["keepShape"] = _jit().njit(cache=True)(_keepShapeLoop)
-  return _COMPILED["keepShape"]
 
 
 # ------------------------------------------------------------------ refining

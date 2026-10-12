@@ -21,7 +21,7 @@ from .quaternion import qmul, rotation
 from .representations import quatAngle, quatAxis
 from .sphericalregion import dirichletSector, fundamentalSector, sectorCenter, sphericalRegion
 from .symmetry import symmetry
-from .symreduce import reductionGroups, uniqueRotations
+from .symreduce import _isAboutZ, reductionGroups, uniqueRotations
 from .vector3d import vector3d
 from .display import display, frameLabel, header
 
@@ -107,19 +107,16 @@ class orientationRegion:
     N = (-sin(w_i/4), cos(w_i/4) a_i) reads for q = (cos(w/2), sin(w/2) v) as
     dot(v, a_i) <= cot(w/2) tan(w_i/4), a small circle about the axis"""
     sector = self.sector if sector == "own" else sector
-    N, alpha = [], []
     t = np.inf if omega <= 0 else 1 / np.tan(omega / 2)
-    for n in self.N:
-      v = n[1:]
-      c = t * np.tan(np.arctan2(-n[0], np.linalg.norm(v)))
-      if c >= 1:
-        continue
-      N.append(-v / np.linalg.norm(v))
-      alpha.append(-min(c, 1.0))
+    v = self.N[:, 1:]
+    nv = np.linalg.norm(v, axis=1)
+    c = t * np.tan(np.arctan2(-self.N[:, 0], nv))
+    # a bound whose circle covers every axis at this angle drops out
+    keep = ~(c >= 1)
+    N, alpha = -v[keep] / nv[keep, None], -c[keep]
     if sector is not None:
-      N += list(sector.N)
-      alpha += list(sector.alpha)
-    return sphericalRegion(np.array(N).reshape(-1, 3), np.array(alpha), frame=self.frameA)
+      N, alpha = np.concatenate([N, sector.N]), np.concatenate([alpha, sector.alpha])
+    return sphericalRegion(N.reshape(-1, 3), alpha, frame=self.frameA)
 
   def maxAngle(self, v=None, hits=2000):
     """the largest rotation angle inside the region, at a vertex of it in Rodrigues space, or
@@ -128,14 +125,12 @@ class orientationRegion:
       d = v.normalize().data if isinstance(v, vector3d) else np.asarray(v, dtype=float) / np.linalg.norm(v)
       if self.sector is not None and not self.sector.checkInside(d):
         return 0.0
-      omega = float(np.pi)
-      for n in self.N:
-        a = n[1:]
-        s = np.linalg.norm(a)
-        c = a @ d / s
-        if c > 1e-9:
-          omega = min(omega, 2 * np.arctan(-n[0] / s / c))
-      return omega
+      # every bound the axis points towards limits the angle about it
+      a = self.N[:, 1:]
+      s = np.linalg.norm(a, axis=1)
+      c = a @ d.reshape(3) / s
+      bound = c > 1e-9
+      return float(np.min(2 * np.arctan(-self.N[bound, 0] / s[bound] / c[bound]), initial=np.pi))
     if len(self.N) == 0:
       return float(np.pi)
     exact = self._maxAngleVertices()
@@ -309,9 +304,7 @@ def projectIntoEulerRegion(o):
 def _zFolds(frA, frB):
   from .orientation import orientation
   L, R = reductionGroups(orientation(rotation(), frA, frB))
-  def aboutZ(q):
-    return np.sum((quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[:, 2]) > 1 - 1e-8))
-  return 2 * np.pi / aboutZ(L), 2 * np.pi / aboutZ(R), L, R
+  return 2 * np.pi / np.sum(_isAboutZ(L)), 2 * np.pi / np.sum(_isAboutZ(R)), L, R
 
 
 def eulerRegion(frA, frB=None):

@@ -434,9 +434,10 @@ class vector3d(MtexArray):
     if self.antipodal:
       xyz = np.concatenate([xyz, -xyz])
     u = np.unique(np.round(xyz / 1e-6) * 1e-6, axis=0)
+    # Qhull refuses fewer than four points and points in a plane
     try:
       area = _cellAreas(u)
-    except Exception:
+    except (RuntimeError, ValueError):
       return 2 * np.pi
     return float(np.sqrt(np.median(area)))
 
@@ -686,9 +687,7 @@ class vector3d(MtexArray):
     else:
       key = xyz
     iv, iu = _uniqueRows(key, tol, stable)
-    u = self._new(xyz[iv])
-    out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
-    return out if len(out) > 1 else u
+    return _uniqueOutput(self._new(xyz[iv]), iv, iu, return_index, return_inverse)
 
   def isclose(self, other, antipodal=False, tol=1e-10):
     """isclose(v, w), isclose(v, w, antipodal=True, tol=): pointing the same way up to the group
@@ -806,9 +805,30 @@ def _uniqueRows(key, tol, stable):
   return iv, iu
 
 
+# the indices of the kept elements and the index of every element into them, from the mask of
+# the kept ones and the kept one each element went to
+def _keptAndInverse(keep, first):
+  iv = np.flatnonzero(keep)
+  rank = np.empty(len(keep), dtype=int)
+  rank[iv] = np.arange(len(iv))
+  return iv, rank[first]
+
+
+# what unique returns: the distinct elements, with the indices of the kept and the inverse map
+# when asked
+def _uniqueOutput(u, iv, iu, return_index, return_inverse):
+  out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
+  return out if len(out) > 1 else u
+
+
 def asVector3d(v):
   """v itself if it is a vector3d (a Miller included), else the vector3d of its coordinates"""
   return v if isinstance(v, vector3d) else vector3d(v)
+
+
+# the coordinates of a vector3d, or a plain triple or array of them as floats
+def _xyz(v):
+  return v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
 
 
 # a reference frame and a plotting convention, recognised without importing their files,
@@ -832,16 +852,8 @@ def _joinFrames(a, b):
 
 # the index basis two crystal directions share: the first, since the vectors are the same
 def _joinStyle(a, b):
-  if a == b or b == "xyz":
-    return a
-  if a == "xyz":
-    return b
   # plane normals and lattice directions are the same vectors, shown in the style of the first
-  return a
-
-
-def _isReciprocal(style):
-  return style in ("hkl", "hkil")
+  return b if a == "xyz" else a
 
 
 def _otherStyle(style):

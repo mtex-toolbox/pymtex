@@ -4,9 +4,10 @@ import pytest
 
 from mtex import (Miller, S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel, calcKernel, crystalFrame, degree,
                   discreteSample, orientation, rotation, specimenFrame, unimodalODF, vector3d)
-from mtex.functions.halfwidth import (_characters, _legendre, candidateHalfwidths, degreeEnergies, familyMultipliers,
+from mtex.functions.halfwidth import (_characters, candidateHalfwidths, degreeEnergies, familyMultipliers,
                                       kernelMultipliers, lowerBoundHalfwidth, noiseFloorHalfwidth, riskCurve,
                                       selectHalfwidth, ucvHalfwidth)
+from mtex.functions.quadrature import legendreP
 
 rng = np.random.default_rng(5)
 
@@ -30,7 +31,7 @@ def test_the_energies_are_the_pairwise_sums_on_the_sphere():
   for weights in (None, w):
     E = degreeEnergies(vector3d(x), 10, weights=weights, rng=rng)
     ww = np.ones(200) / 200 if weights is None else w / w.sum()
-    P = _legendre(x @ x.T, 10)
+    P = legendreP(10, x @ x.T)
     direct = np.array([(2 * l + 1) * ww @ P[l] @ ww for l in range(11)])
     assert np.allclose(E.energy, direct, atol=1e-9)
     assert np.isclose(E.s2, np.sum(ww ** 2)) and E.nFolds == 8
@@ -50,7 +51,7 @@ def test_symmetric_directions_are_projected_onto_the_group():
   x = E._sample
   M = cs.sym.rot.matrix().reshape(-1, 3, 3)
   # the projected energy: n^-2 sum_ij (2l+1) mean_s P_l(x_i . s x_j)
-  P = _legendre(np.clip(np.einsum("ni,gij,mj->gnm", x, M, x), -1, 1), 8)
+  P = legendreP(8, np.clip(np.einsum("ni,gij,mj->gnm", x, M, x), -1, 1))
   direct = np.array([(2 * l + 1) * P[l].mean(axis=0).sum() / 150 ** 2 for l in range(9)])
   assert np.allclose(E.energy, direct, atol=1e-9)
   # the cubic group leaves nothing in the degrees 1, 2, 3 and 5

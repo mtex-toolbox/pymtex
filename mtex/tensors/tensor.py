@@ -30,6 +30,7 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
 from ..geometry.products import dropGroup, fitFrame
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
+from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import classproperty, vector3d, asVector3d
 from .kernels import directionalPolynomial, turnBlocks, voigtInverse
 
@@ -47,11 +48,16 @@ def _voigtWeights(double):
 KELVIN_WEIGHTS = np.array([1, 1, 1, math.sqrt(2), math.sqrt(2), math.sqrt(2)])
 
 
+# the two indices of every Voigt index, and the Voigt index of every pair of indices
+_VA, _VB = np.array(VOIGT).T
+_PAIR = np.zeros((3, 3), dtype=int)
+_PAIR[_VA, _VB] = _PAIR[_VB, _VA] = np.arange(6)
+
+
 # the 6 x 6 matrix of a rank four, the 3 x 6 of a rank three, the six components of a rank
 # two, the factors of the off diagonal entries given per side
 def _toVoigt(M, rank, w):
-  a = np.array([p[0] for p in VOIGT])
-  b = np.array([p[1] for p in VOIGT])
+  a, b = _VA, _VB
   if rank == 4:
     return M[..., a[:, None], b[:, None], a[None, :], b[None, :]] * w[:, None] * w[None, :]
   if rank == 3:
@@ -65,9 +71,7 @@ def _toVoigt(M, rank, w):
 # as one gather through the Voigt index of every pair
 def _fromVoigt(V, rank, w):
   V = np.asarray(V, dtype=float)
-  pair = np.zeros((3, 3), dtype=int)
-  for i, (a, b) in enumerate(VOIGT):
-    pair[a, b] = pair[b, a] = i
+  pair = _PAIR
   if rank == 4:
     I, J = pair.reshape(9, 1), pair.reshape(1, 9)
     M = (V / (w[:, None] * w[None, :]))[..., I, J]
@@ -75,7 +79,7 @@ def _fromVoigt(V, rank, w):
     M = (V / w)[..., :, pair.reshape(9)]
   else:
     M = (V / w)[..., pair.reshape(9)]
-  return M.reshape(M.shape[:-2 if rank == 4 or rank == 3 else -1] + (3,) * rank)
+  return M.reshape(M.shape[:-2 if rank in (3, 4) else -1] + (3,) * rank)
 
 
 def Voigt(T):
@@ -91,16 +95,32 @@ def Kelvin(T):
 
 # ------------------------------------------------------------------ the operands of a contraction
 
-# the coefficient array of an operand and, for a tensor, its frame
+# the coefficient array of an operand, its rank, for a tensor or a vector its frame, and whether
+# it is a container whose leading dimensions are a list
 def _operand(x):
   if isinstance(x, tensor):
-    return x.M, x.rank, x.frame
+    return x.M, x.rank, x.frame, True
   if isinstance(x, vector3d):
-    return x.data, 1, x.frame
+    return x.data, 1, x.frame, True
   if isinstance(x, quaternion):
-    return x.matrix(), 2, None
+    return x.matrix(), 2, None, True
   a = np.asarray(x, dtype=float)
-  return a, a.ndim, None
+  return a, a.ndim, None, False
+
+
+# the vector v, refused when it is written in another frame than the tensor T
+def _inFrameOf(T, v, what="the direction"):
+  v = asVector3d(v)
+  if v.frame is not None and v.frame is not T.frame and not (type(v.frame) is type(T.frame) and v.frame.isAligned(T.frame)):
+    raise ValueError(f"{what} is written in another frame than the tensor")
+  return v
+
+
+# axes in the frame of a tensor, shown by their coordinates
+def _axesIn(data, frame, antipodal=True):
+  v = vector3d(data, antipodal=antipodal, frame=frame)
+  v.dispStyle = "xyz"
+  return v
 
 
 def _readArgs(args):
@@ -218,12 +238,16 @@ class tensor(MtexArray):
     """whether every tensor of rank two or four equals its transpose, up to a relative 1e-6"""
     if self.rank not in (2, 4):
       raise ValueError("symmetry is checked on tensors of rank two and four")
-    return bool(np.all(np.linalg.norm((self - self.transpose()).data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
+    return self._negligible(self - self.transpose())
 
   @property
   def isSkewSymmetric(self):
     """whether every tensor equals minus its transpose, up to a relative 1e-6"""
-    return bool(np.all(np.linalg.norm((self + self.transpose()).data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
+    return self._negligible(self + self.transpose())
+
+  # whether every tensor of D is below a relative 1e-6 of the corresponding one of this list
+  def _negligible(self, D):
+    return bool(np.all(np.linalg.norm(D.data, axis=-1) / (1e-12 + np.linalg.norm(self.data, axis=-1)) < 1e-6))
 
   def __repr__(self):
     # a crystal tensor is headed by its frame, a specimen one by the convention it is drawn in, as a vector is
@@ -242,7 +266,7 @@ class tensor(MtexArray):
       scale = p if (p >= 3 or p <= -2) else 0
       title = {3: "tensor in compact matrix form", 4: "tensor in Voigt matrix representation"}.get(self.rank)
       if title or scale:
-        lines.append("  " + ((title + ": " if title else "") + f"*10^{scale}" if scale else title))
+        lines.append("  " + ": ".join(p for p in (title, f"*10^{scale}" if scale else None) if p))
       S = A / 10.0 ** scale
       lines.append(table([""] * S.shape[1], [S[:, j] for j in range(S.shape[1])], decimals=4).split("\n", 1)[1])
     return "\n".join(lines)
@@ -292,8 +316,7 @@ class tensor(MtexArray):
     if isinstance(other, vector3d):
       if self.rank != 2:
         raise ValueError("a tensor times a vector needs rank two")
-      if other.frame is not None and other.frame is not self._frame and not other.frame.isAligned(self._frame):
-        raise ValueError("the vector is written in another frame than the tensor")
+      _inFrameOf(self, other, "the vector")
       return vector3d(np.einsum("...ij,...j->...i", self.M, other.data), frame=self._frame)
     if isinstance(other, MtexArray) or hasattr(other, "rotate"):
       return NotImplemented
@@ -414,6 +437,10 @@ class tensor(MtexArray):
   def _inverseClass(self):
     return type(self)
 
+  # the class of the double contraction with another tensor, None for a plain tensor
+  def _productClass(self, other):
+    return None
+
   def eig(self):
     """the eigenvalues in ascending order and the eigenvectors as axes of the frame; a rank
     four tensor is diagonalised in its Voigt matrix"""
@@ -426,9 +453,7 @@ class tensor(MtexArray):
         order = np.argsort(np.real(vals), axis=-1)
         vals = np.take_along_axis(vals, order, axis=-1)
         vecs = np.take_along_axis(vecs, order[..., None, :], axis=-1)
-      v = vector3d(np.moveaxis(vecs, -1, -2), antipodal=True, frame=self._frame)
-      v.dispStyle = "xyz"
-      return vals, v
+      return vals, _axesIn(np.moveaxis(vecs, -1, -2), self._frame)
     if self.rank == 4:
       vals, vecs = np.linalg.eigh(Voigt(self))
       return vals, vecs
@@ -474,10 +499,7 @@ class tensor(MtexArray):
     the basis of its mode singular vectors, and no V"""
     if self.rank == 2:
       U, s, Vt = np.linalg.svd(self.M)
-      u = vector3d(np.swapaxes(U, -1, -2), frame=self._frame)
-      v = vector3d(Vt, frame=self._frame)
-      u.dispStyle = v.dispStyle = "xyz"
-      return u, s, v
+      return _axesIn(np.swapaxes(U, -1, -2), self._frame, False), s, _axesIn(Vt, self._frame, False)
     if self.rank == 4:
       U = np.linalg.svd(self.M.reshape(self.shape + (3, 27)))[0]
       U[..., :, 2] *= np.sign(np.linalg.det(U))[..., None]
@@ -502,19 +524,23 @@ class tensor(MtexArray):
     """the tensor turned by a rotation, an orthogonal transform or an orientation; the frame
     keeps its group only under the group's own elements, and an orientation carries the
     tensor into its specimen frame, without the specimen group"""
+    def turned(Q, fr):
+      return self._as(type(self), _applyMatrix(self.M, Q, self.rank), fr)
     if isinstance(r, orientation):
-      t = fitFrame(self._frame, r.CS) if isinstance(self._frame, crystalFrame) else None
-      q = r if t is None else rotation(r.data) * t
-      return self._as(type(self), _applyMatrix(self.M, rotation(q.data).matrix(), self.rank), r.SS.stripSym())
+      return turned(rotation(self._fittedQuaternions(r)).matrix(), r.SS.stripSym())
     if isinstance(r, orthogonalTransform):
-      fr = self._frame if all(x in self._frame for x in r.flatten()) else self._frame.stripSym()
-      return self._as(type(self), _applyMatrix(self.M, r.matrix(), self.rank), fr)
+      return turned(r.matrix(), self._frame if all(x in self._frame for x in r.flatten()) else self._frame.stripSym())
     if isinstance(r, quaternion):
-      return self._as(type(self), _applyMatrix(self.M, rotation(r.data).matrix(), self.rank), dropGroup(rotation(r.data), self._frame))
+      return turned(rotation(r.data).matrix(), dropGroup(rotation(r.data), self._frame))
     Q = np.asarray(r, dtype=float)
     if Q.shape[-2:] != (3, 3):
       raise TypeError("rotate takes a rotation, an orientation or a 3 x 3 matrix")
-    return self._as(type(self), _applyMatrix(self.M, Q, self.rank), self._frame.stripSym())
+    return turned(Q, self._frame.stripSym())
+
+  # the quaternions of orientations, turned onto the axes of the crystal frame of the tensor
+  def _fittedQuaternions(self, o):
+    t = fitFrame(self._frame, o.CS) if isinstance(self._frame, crystalFrame) else None
+    return o.data if t is None else (rotation(o.data) * t).data
 
   def _turnedMean(self, o, w):
     """the weighted mean of the tensor turned by the orientations o, the frames as rotate gives them,
@@ -522,9 +548,7 @@ class tensor(MtexArray):
     if self.ndim or np.iscomplexobj(self.M) or not isinstance(o, orientation):
       return None
     from .kernels import turnSum
-    t = fitFrame(self._frame, o.CS) if isinstance(self._frame, crystalFrame) else None
-    q = o.data.reshape(-1, 4) if t is None else (rotation(o.data) * t).data.reshape(-1, 4)
-    out = turnSum(self.M, self.rank, q, w)
+    out = turnSum(self.M, self.rank, self._fittedQuaternions(o).reshape(-1, 4), w)
     return None if out is None else self._as(type(self), out / np.sum(w), o.SS.stripSym())
 
   def transformReferenceFrame(self, fr):
@@ -561,9 +585,7 @@ class tensor(MtexArray):
       from ..functions.s2fun import S2FunHarmonic
       return S2FunHarmonic(lambda x: self.directionalMagnitude(x), self._frame, bandwidth=max(self.rank, 1), real=True,
                            antipodal=self.rank % 2 == 0)
-    v = asVector3d(v)
-    if v.frame is not None and v.frame is not self._frame and not v.frame.isAligned(self._frame):
-      raise ValueError("the direction is written in another frame than the tensor")
+    v = _inFrameOf(self, v)
     R = self.rank
     if R == 0:
       return np.broadcast_to(self.M, np.broadcast_shapes(self.shape, v.shape)).copy()
@@ -603,7 +625,7 @@ class tensor(MtexArray):
     t = self._as(type(self), out)
     if self.density is not None and np.ndim(self.density):
       d = np.asarray(self.density, dtype=float).ravel()
-      t.density = float(d.mean() if weights is None else (np.asarray(weights, dtype=float).ravel() * d).sum() / np.sum(weights))
+      t.density = float(w @ d / np.sum(w))
     return t
 
   def sum(self, axis=None):
@@ -641,7 +663,7 @@ class tensor(MtexArray):
       tensor.eye(cs)
       stiffnessTensor.eye()
       tensor.eye(rank=4)"""
-    fr, rest = _readArgs(args)
+    fr, _ = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     if rank == 2:
       return cls(np.eye(3), fr, **kwargs)
@@ -656,18 +678,22 @@ class tensor(MtexArray):
     """a tensor of ones of the rank of the class, or of rank=, the list shape given by the numbers
 
       tensor.ones(cs, 5)"""
-    fr, rest = _readArgs(args)
-    rank = (cls._rank or 2) if rank is None else int(rank)
-    return cls(np.ones(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
+    return cls._filled(np.ones, args, rank, kwargs)
 
   @classmethod
   def zeros(cls, *args, rank=None, **kwargs):
     """a tensor of zeros of the rank of the class, or of rank=, the list shape given by the numbers
 
       tensor.zeros(cs, 5)"""
+    return cls._filled(np.zeros, args, rank, kwargs)
+
+  # a list of tensors of the class filled by np.ones or np.zeros, the frame and the list shape
+  # read off the arguments
+  @classmethod
+  def _filled(cls, fill, args, rank, kwargs):
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
-    return cls(np.zeros(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
+    return cls(fill(tuple(int(n) for n in rest) + (3,) * rank), fr, rank=rank, **kwargs)
 
   @classmethod
   def rand(cls, *args, rank=None, rng=None, **kwargs):
@@ -739,7 +765,6 @@ def _applyMatrix(M, Q, rank):
     if out is not None:
       return out.reshape(shape + (3 ** rank,))
   a, b = (rank + 1) // 2, rank // 2
-  lead = M.shape[:M.ndim - rank]
   M2 = M.reshape(lead + (3 ** a, 3 ** b))
   out = _kronPower(Q, a) @ M2
   if b:
@@ -788,13 +813,10 @@ def EinsteinSum(*args):
   arrays, subs, frame = [], [], None
   labels = {}
   for op, idx in zip(ops, ids):
-    A, rank, fr = _operand(op)
+    A, rank, fr, container = _operand(op)
     if fr is not None and frame is None:
       frame = fr
-    if isinstance(op, (tensor, vector3d, quaternion)):
-      lead = A.ndim - rank
-    else:
-      lead, rank = 0, A.ndim
+    lead = A.ndim - rank
     if len(idx) != rank:
       raise ValueError(f"{len(idx)} labels for an operand of {rank} indices")
     for k, l in enumerate(idx):
@@ -804,7 +826,7 @@ def EinsteinSum(*args):
       if labels.setdefault(l, n) != n:
         raise ValueError(f"the index {l} is used with dimensions {n} and {labels[l]}")
     arrays.append(A)
-    subs.append(("..." if lead or isinstance(op, (tensor, vector3d, quaternion)) else "") + "".join(_letter(l) for l in idx))
+    subs.append(("..." if container else "") + "".join(_letter(l) for l in idx))
   free = sorted(l for l in labels if l > 0)
   fast = _multilinearSum(ops, ids, arrays, free)
   if fast is not None:
@@ -815,10 +837,7 @@ def EinsteinSum(*args):
     return result if result.ndim else float(result)
   if any(labels[l] != 3 for l in free):
     return result
-  t = tensor(result, rank=len(free))
-  if frame is not None:
-    t._frame = frame
-  return t
+  return tensor(result, rank=len(free), frame=frame)
 
 
 # one real tensor of its own contracted on every index with lists of vectors of one shape, a trace
@@ -861,7 +880,7 @@ def colon(A, B):
   """the double contraction A : B, the last two indices of A against the first two of B"""
   out = EinsteinSum(A, list(range(1, A.rank - 1)) + [-1, -2], B, [-1, -2] + [A.rank - 2 + k for k in range(1, B.rank - 1)])
   if isinstance(out, tensor):
-    cls = A._productClass(B) if hasattr(A, "_productClass") else None
+    cls = A._productClass(B)
     if cls is not None:
       out = A._as(cls, out.data)
       out.density, out.unit = None, None
@@ -1095,7 +1114,7 @@ class SchmidTensor(tensor):
   _rank = 2
 
   def __init__(self, M, *args, **kwargs):
-    if isinstance(M, vector3d) or hasattr(M, "CRSS"):
+    if isinstance(M, (vector3d, slipSystem)):
       from ..analysis.mechanics import _schmidTensor
       M, fr = _schmidTensor(M, args[0] if args else None)
       args = (fr,)

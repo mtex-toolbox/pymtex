@@ -14,12 +14,12 @@ import numpy as np
 
 from ..geometry.frames import referenceFrame
 from ..geometry.kernels import qrot
-from ..geometry.plottingconvention import plottingConvention
 from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, asVector3d
 from ..geometry.representations import unitRows
-from .sectorfold import _angle, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, uniqueNormals
+from .sectorfold import _angle, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, tangentAt, uniqueNormals
+from .spherical import _conventionOf
 from ..geometry.display import aligned
 
 # ------------------------------------------------------------------ colour arithmetic
@@ -285,9 +285,8 @@ class HSVDirectionKey(directionColorKey):
                grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False, hueLightness=0.0):
     # HSVDirectionKey() colours the whole sphere of the specimen; antipodal=True the key of axes
     from ..geometry.frames import specimenFrame
-    from ..geometry.vector3d import vector3d as _v
     # HSVDirectionKey(v): the key of the frame the directions live in, MATLAB's call
-    if isinstance(CS, _v):
+    if isinstance(CS, vector3d):
       antipodal = antipodal or CS.antipodal
       CS = specimenFrame.default if CS.frame is None else CS.frame
     CS = specimenFrame.default if CS is None else CS
@@ -299,9 +298,9 @@ class HSVDirectionKey(directionColorKey):
     self.folds = sectorFolds(self.sym, sector)
     self.sR = sphericalRegion(np.array(N).reshape(-1, 3), np.zeros(len(N)), frame=sector.frame)
     self.reduced = sphericalRegion(np.array(N + self.folds).reshape(-1, 3), np.zeros(len(N) + len(self.folds)), frame=sector.frame)
-    self.whiteCenter = vector3d(regionCenter(self.reduced) if whiteCenter is None else unitRows(_asDirections(whiteCenter)[0][0]), isNormalized=True)
-    pC = CS.how2plot if isinstance(CS, referenceFrame) and CS.how2plot is not None else plottingConvention.default
-    self.reference = pC.east
+    center = regionCenter(self.reduced) if whiteCenter is None else unitRows(_asDirections(whiteCenter)[0][0])
+    self.whiteCenter = vector3d(center, isNormalized=True)
+    self.reference = _conventionOf(CS if isinstance(CS, referenceFrame) else None).east
     self.maxAngle = float(maxAngle)
     self.colorStretching, self.grayValue, self.grayGradient = colorStretching, grayValue, grayGradient
     self.perceptual, self.hueLightness = bool(perceptual), float(hueLightness)
@@ -323,12 +322,14 @@ class HSVDirectionKey(directionColorKey):
     gray = None if gray is None else np.asarray(gray, dtype=float).reshape(-1)
     wC = self.whiteCenter.data.reshape(3)
     if np.isfinite(self.maxAngle):
-      owC = vector3d(wC).orth().data.reshape(3) if _angle(np.array([0.0, 0.0, 1.0]), wC) < 1 * degree else np.array([0.0, 0.0, 1.0])
-      els = self.sym.rot.flatten().data[:, :4]
-      imgs = qrot(els[None, :, :], unit[:, None, :]) * self.sym.rot.flatten().data[None, :, 4:5]
+      # the azimuth runs from z about the white centre, from a direction across it where z is the centre
+      z = np.array([0.0, 0.0, 1.0])
+      owC = vector3d(wC).orth().data.reshape(3) if _angle(z, wC) < 1 * degree else z
+      els = self.sym.rot.flatten().data
+      imgs = qrot(els[None, :, :4], unit[:, None, :]) * els[None, :, 4:5]
       best = np.argmax(imgs @ wC, axis=1)
       hs = imgs[np.arange(n), best]
-      rho = azimuthAbout2(hs, wC, owC)
+      rho = azimuthAbout(wC, tangentAt(wC, owC), hs)
       r = np.maximum(0.0, 1 - _angle(hs, wC) / self.maxAngle)
       rgb = self._sphereColor(np.where(finite, r, 0.0), np.where(finite, rho, 0.0), gray)
       return rgb.reshape(shape + (3,))
@@ -344,15 +345,6 @@ class HSVDirectionKey(directionColorKey):
     return rgb.reshape(shape + (3,))
 
 
-def azimuthAbout2(h, center, ref):
-  """the azimuth of h, one direction or rows of them, about the centre, measured from the
-  reference direction"""
-  h = np.asarray(h, dtype=float)
-  p = h - (h @ center)[..., None] * center
-  r = ref - (ref @ center) * center
-  return np.arctan2(np.cross(r, p) @ center, p @ r)
-
-
 class TSLDirectionKey(directionColorKey):
   """the vendors' keys, both on the Laue group whatever the frame carries (MATLAB
   TSLDirectionKey, HKLDirectionKey): TSL reads the polar coordinates of the sector from its
@@ -360,7 +352,7 @@ class TSLDirectionKey(directionColorKey):
   over the polar angle and the azimuth of the sector"""
 
   def __init__(self, CS):
-    super().__init__(CS.Laue() if isinstance(CS, referenceFrame) else CS.Laue())
+    super().__init__(CS.Laue())
     V = self.sR.vertices().data.reshape(-1, 3)
     self.center = regionCenter(self.sR)
     self.reference = V[0] if len(V) else np.array([1.0, 0.0, 0.0])

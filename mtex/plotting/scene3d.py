@@ -1,6 +1,8 @@
 # what a three dimensional plot shows, as NumPy arrays and without a renderer: polygon meshes
 # with a colour per face, orthogonal slices of a voxel volume, and the camera of a plotting
 # convention. PyVista, matplotlib and the HTML writer of render3d.py draw a scene.
+from collections import Counter
+
 import numpy as np
 
 from ..geometry.kernels import columnMax, columnMin
@@ -16,8 +18,7 @@ class mesh3d:
     used, idx = np.unique(np.asarray(idx, dtype=np.int64), return_inverse=True)
     self.V = np.asarray(V, dtype=float).reshape(-1, 3)[used]
     self.ptr, self.idx = np.asarray(ptr, dtype=np.int64), idx.astype(np.int64)
-    fc = np.asarray(faceColor, dtype=float)
-    self.faceColor = np.clip(fc.reshape(-1, 3) if fc.size != 3 else np.tile(fc.reshape(3), (len(self), 1)), 0, 1)
+    self.faceColor = np.clip(_colorRows(faceColor, len(self)), 0, 1)
     self.faceAlpha, self.edgeAlpha, self.lineWidth = float(faceAlpha), float(edgeAlpha), float(lineWidth)
     self.edgeColor = None if edgeColor is None or (isinstance(edgeColor, str) and edgeColor == "none") else _rgb(edgeColor)
     # the values the colours came from, for a colour bar
@@ -78,6 +79,10 @@ class slices3d:
       corners[k, a], corners[k, b], corners[k, c] = i, u, v
     return rgb, vis, self.origin + corners @ self.D
 
+  def planes(self):
+    """the slices shown, one plane(a) each, the axes without a slice left out"""
+    return [self.plane(a) for a in range(3) if self.at[a] is not None]
+
   def bounds(self):
     """the corners (lo, hi) of the box around the voxel volume"""
     n = np.array(self.visible.shape)
@@ -111,8 +116,7 @@ class lines3d:
 
   def __init__(self, segments, color=(0.0, 0.0, 0.0), lineWidth=1.0, alpha=1.0):
     self.segments = np.asarray(segments, dtype=float).reshape(-1, 2, 3)
-    c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
-    self.color = np.clip(np.tile(c.reshape(3), (len(self.segments), 1)) if c.size == 3 else c.reshape(-1, 3), 0, 1)
+    self.color = np.clip(_colorRows(color, len(self.segments)), 0, 1)
     self.lineWidth, self.alpha = float(lineWidth), float(alpha)
 
   def bounds(self):
@@ -128,8 +132,7 @@ def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSi
   """arrows from P along D as their shafts and cones for their heads, a quarter of their length
   long, as quiver3d draws them; antipodal arrows point both ways and have no heads"""
   P, D = np.asarray(P, dtype=float).reshape(-1, 3), np.asarray(D, dtype=float).reshape(-1, 3)
-  c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
-  c = np.tile(c.reshape(3), (len(P), 1)) if c.size == 3 else c.reshape(-1, 3)
+  c = _colorRows(color, len(P))
   ok = np.all(np.isfinite(D), axis=1) & (np.linalg.norm(D, axis=1) > 0)
   P, D, c = P[ok], D[ok], c[ok]
   if antipodal:
@@ -163,8 +166,7 @@ class points3d:
 
   def __init__(self, P, color=(0.0, 0.447, 0.741), markerSize=6.0):
     self.P = np.asarray(P, dtype=float).reshape(-1, 3)
-    c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
-    self.color = np.clip(np.tile(c.reshape(3), (len(self.P), 1)) if c.size == 3 else c.reshape(-1, 3), 0, 1)
+    self.color = np.clip(_colorRows(color, len(self.P)), 0, 1)
     self.markerSize = float(markerSize)
 
   def bounds(self):
@@ -188,8 +190,7 @@ def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12)
     return (i % n) * (m + 1) + j
   quad = np.stack([node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)], axis=-1).reshape(-1, 4)
   F = (quad[None] + (m + 1) * n * np.arange(k)[:, None, None]).reshape(-1, 4)
-  col = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
-  col = np.tile(col.reshape(3), (k, 1)) if col.size == 3 else col.reshape(-1, 3)
+  col = _colorRows(color, k)
   return mesh3d(V.reshape(-1, 3), np.arange(0, 4 * len(F) + 1, 4), F.reshape(-1), np.repeat(col, len(quad), axis=0), edgeAlpha=edgeAlpha)
 
 
@@ -220,9 +221,7 @@ class scene3d:
     return o, up
 
   def __repr__(self):
-    kinds = {}
-    for it in self.items:
-      kinds[type(it).__name__] = kinds.get(type(it).__name__, 0) + 1
+    kinds = Counter(type(it).__name__ for it in self.items)
     return display("scene3d", [("items", ", ".join(f"{n} {k}" for k, n in kinds.items()) or "none"), ("scan unit", self.scanUnit)])
 
 
@@ -231,16 +230,19 @@ def _rgb(c):
   return np.array(to_rgb(c) if isinstance(c, str) else np.asarray(c, dtype=float).reshape(3)[:3], dtype=float)
 
 
+# one colour for every one of n elements: a name or a triple repeated, else a colour per row
+def _colorRows(color, n):
+  c = np.asarray(_rgb(color) if isinstance(color, str) else color, dtype=float)
+  return np.tile(c.reshape(3), (n, 1)) if c.size == 3 else c.reshape(-1, 3)
+
+
 # the colour of every element: the values mapped by the colour map, or the colours as they are
 def _faceColors(values, isScalar, colormap, colorRange):
   if not isScalar:
     return values, None, None
-  from .colormaps import mtexColormap
+  from .colormaps import _colorLimits, mtexColormap
   v = np.asarray(values, dtype=float)
-  finite = v[np.isfinite(v)]
-  lo, hi = (finite.min(), finite.max()) if colorRange is None and finite.size else (0.0, 1.0) if colorRange is None else colorRange
-  if not hi > lo:
-    hi = lo + max(abs(lo), 1.0) * 1e-6
+  lo, hi = _colorLimits(v, colorRange)
   rgb = mtexColormap(colormap)(np.clip((v - lo) / (hi - lo), 0, 1))[:, :3]
   rgb[~np.isfinite(v)] = np.nan
   return rgb, (lo, hi), colormap
@@ -278,7 +280,7 @@ def grainMesh(grains, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", 
   faces, fc = faces[drawn], fc[drawn]
   ptr, idx = _subFaces(gB, faces)
   return mesh3d(gB.allV, ptr, idx, fc, faceAlpha, edgeColor, edgeAlpha, lineWidth,
-                values=None if values is None else values, colormap=colormap, colorRange=rng)
+                values=values, colormap=colormap, colorRange=rng)
 
 
 def boundaryMesh(gB, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", edgeAlpha=1.0, lineWidth=0.5, colormap=None, colorRange=None):

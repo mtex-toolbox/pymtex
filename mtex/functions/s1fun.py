@@ -16,7 +16,7 @@ import math
 import numpy as np
 
 from .harmonicarithmetic import harmonicArithmetic
-from .kernels import _complexType
+from .kernels import _complexType, _groupSums
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from .kernelfunctions import S1GaussKernel, S1Kernel
@@ -87,13 +87,13 @@ class S1FunHarmonic(harmonicArithmetic):
     if np.linalg.norm(x - 2 * np.pi * np.arange(n) / n) < 1e-12:
       return cls.quadrature(x, values, bandwidth=(n - 1) // 2 if bandwidth is None else bandwidth)
     w = np.full(n, 1 / n) if weights is None else np.asarray(weights, dtype=float).ravel()[order]
-    # coinciding angles, within 1e-6, take the mean of their values
-    key = np.round(x / 1e-6).astype(np.int64)
-    key[key == round(2 * np.pi / 1e-6)] = 0
-    u, first, inv = np.unique(key, return_index=True, return_inverse=True)
-    count = np.bincount(inv)
+    # coinciding angles, within tol, take the mean of their values
+    tol = 1e-6
+    key = np.round(x / tol).astype(np.int64)
+    key[key == round(2 * np.pi / tol)] = 0
+    _, first, inv = np.unique(key, return_index=True, return_inverse=True)
     x = x[first]
-    values = np.bincount(inv, weights=np.real(values)) / count + (1j * np.bincount(inv, weights=np.imag(values)) / count if np.iscomplexobj(values) else 0)
+    values = _groupSums(inv, values, len(first)) / np.bincount(inv)
     w = w[first]
     n = len(x)
     L = min(int(np.floor(n / 4 + 0.5)), getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)

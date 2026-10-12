@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+from functools import cached_property
 
 import numpy as np
 
@@ -158,42 +159,38 @@ class quadratureSO3Grid:
     equivalents coincide, the largest equivalent quaternion up to sign the key"""
     return self.nodes()
 
+  # the first of the nodes equal under the symmetries and the index of every node's one
+  @cached_property
   def _unique(self):
-    if not hasattr(self, "_uniqueIndex"):
-      full = self.nodes()
-      q = full.data.reshape(-1, 4)
-      if self.CS is None:
-        self._uniqueIndex, self._uniqueInverse = np.arange(len(q)), np.arange(len(q))
-      else:
-        a = self.CS.sym.properGroup().rotations().data.reshape(-1, 4)
-        b = (self.SS if self.SS is not None else specimenFrame.default).sym.properGroup().rotations().data.reshape(-1, 4)
-        from ..geometry.kernels import _qmulNumpy
-        eq = _qmulNumpy(_qmulNumpy(b[None, :, None, :], q[:, None, None, :]), a[None, None, :, :]).reshape(len(q), -1, 4)
-        # q and -q are one rotation: the first component that does not vanish is positive
-        lead = np.take_along_axis(eq, np.argmax(np.abs(eq) > 1e-9, axis=-1)[..., None], axis=-1)
-        key = np.round(eq * np.where(lead < 0, -1.0, 1.0), 8)
-        # the largest equivalent in lexicographic order
-        idx = np.zeros(len(q), dtype=np.int64)
-        for j in range(1, key.shape[1]):
-          cur, cand = key[np.arange(len(q)), idx], key[:, j]
-          diff = cand - cur
-          first = np.argmax(diff != 0, axis=1)
-          larger = diff[np.arange(len(q)), first] > 0
-          idx = np.where(larger, j, idx)
-        canon = key[np.arange(len(q)), idx]
-        _, first, inverse = np.unique(canon, axis=0, return_index=True, return_inverse=True)
-        self._uniqueIndex = np.sort(first)
-        self._uniqueInverse = np.searchsorted(self._uniqueIndex, first)[inverse.ravel()]
-    return self._uniqueIndex, self._uniqueInverse
+    q = self.nodes().data.reshape(-1, 4)
+    if self.CS is None:
+      return np.arange(len(q)), np.arange(len(q))
+    a = self.CS.sym.properGroup().rotations().data.reshape(-1, 4)
+    b = (self.SS if self.SS is not None else specimenFrame.default).sym.properGroup().rotations().data.reshape(-1, 4)
+    from ..geometry.kernels import _qmulNumpy
+    eq = _qmulNumpy(_qmulNumpy(b[None, :, None, :], q[:, None, None, :]), a[None, None, :, :]).reshape(len(q), -1, 4)
+    # q and -q are one rotation: the first component that does not vanish is positive
+    lead = np.take_along_axis(eq, np.argmax(np.abs(eq) > 1e-9, axis=-1)[..., None], axis=-1)
+    key = np.round(eq * np.where(lead < 0, -1.0, 1.0), 8)
+    # the largest equivalent in lexicographic order: the equivalents largest in the first
+    # component, among them in the second, and so on
+    top = np.ones(key.shape[:2], dtype=bool)
+    for c in range(4):
+      col = np.where(top, key[..., c], -np.inf)
+      top &= col == col.max(axis=1, keepdims=True)
+    canon = key[np.arange(len(q)), np.argmax(top, axis=1)]
+    _, first, inverse = np.unique(canon, axis=0, return_index=True, return_inverse=True)
+    index = np.sort(first)
+    return index, np.searchsorted(index, first)[inverse.ravel()]
 
   @property
   def size(self):
     """the number of the distinct nodes, MATLAB's numel(grid)"""
-    return len(self._unique()[0])
+    return len(self._unique[0])
 
   def flatten(self):
     """the distinct nodes, MATLAB's grid(:)"""
-    return self.nodes().flatten()[self._unique()[0]]
+    return self.nodes().flatten()[self._unique[0]]
 
   def fullValues(self, values):
     """values at the distinct nodes spread onto the full grid, values at the full grid kept"""
@@ -201,7 +198,7 @@ class quadratureSO3Grid:
     # values at every node need no distinct nodes, which take seconds to find
     if values.shape[0] == len(self):
       return values
-    index, inverse = self._unique()
+    index, inverse = self._unique
     if values.shape[0] == len(index) and len(index) != len(self):
       return values[inverse]
     return values
@@ -212,29 +209,28 @@ class quadratureSO3Grid:
   # of its step. The image of the nodes beta < pi/2 is then the rest of the grid but the equator,
   # so a function invariant under the groups need only be evaluated on the half beta <= pi/2.
   # The index maps of the gamma and the alpha axis, or None
+  @cached_property
   def _mirror(self):
-    if not hasattr(self, "_mirrorMaps"):
-      self._mirrorMaps = None
-      m = 2 * self.bandwidth + 2
-      Ng, Na, _ = self.shape
-      sides = (("crystal", self.CS), ("specimen", self.SS if self.SS is not None else specimenFrame.default))
-      for side, frame in (sides if self.CS is not None else ()):
-        q = frame.sym.properGroup().rotations().data.reshape(-1, 4)
-        for s in sorted({round(float(np.arctan2(x[2], x[1]) % np.pi) * m / np.pi, 6) for x in q if abs(x[0]) < 1e-9 and abs(x[3]) < 1e-9}):
-          if s == int(s):
-            c, a, s = np.arange(Ng), np.arange(Na), int(s)
-            if side == "crystal":
-              self._mirrorMaps = ((-c - s) % Ng, (a + m // 2) % Na)
-            else:
-              self._mirrorMaps = ((c + m // 2) % Ng, (s - a) % Na)
-            return self._mirrorMaps
-    return self._mirrorMaps
+    if self.CS is None:
+      return None
+    m = 2 * self.bandwidth + 2
+    Ng, Na, _ = self.shape
+    c, a = np.arange(Ng), np.arange(Na)
+    for side, frame in (("crystal", self.CS), ("specimen", self.SS if self.SS is not None else specimenFrame.default)):
+      q = frame.sym.properGroup().rotations().data.reshape(-1, 4)
+      # the 2-fold axes perpendicular to z by 2 psi in steps of the grid, the first on the grid
+      axes = q[(np.abs(q[:, 0]) < 1e-9) & (np.abs(q[:, 3]) < 1e-9)]
+      steps = np.unique(np.round(np.arctan2(axes[:, 2], axes[:, 1]) % np.pi * m / np.pi, 6))
+      s = next((int(x) for x in steps if x.is_integer()), None)
+      if s is not None:
+        return ((-c - s) % Ng, (a + m // 2) % Na) if side == "crystal" else ((c + m // 2) % Ng, (s - a) % Na)
+    return None
 
   def halfNodes(self):
     """the nodes beta <= pi/2 as orientations, where a 2-fold axis perpendicular to z on either side
     maps them onto the rest of the grid; fromHalf spreads the values of an invariant function there
     onto all nodes. None where the groups have no such axis"""
-    if self._mirror() is None:
+    if self._mirror is None:
       return None
     nb = len(self.beta)
     return self._nodes(self.beta[:(nb + 1) // 2])
@@ -242,7 +238,7 @@ class quadratureSO3Grid:
   def fromHalf(self, values):
     """values at halfNodes() spread onto all nodes, in the order of nodes(); the nodes beta > pi/2
     take the values of their images under the 2-fold axis"""
-    cmap, amap = self._mirror()
+    cmap, amap = self._mirror
     Ng, Na, nb = self.shape
     h = (nb + 1) // 2
     values = np.asarray(values)

@@ -90,7 +90,7 @@ class neper:
             "-domain", str(self.geometry), "-o", base]
     if self.varNeperopts:
       args += str(self.varNeperopts).split()
-    self._run(args, not verbose)
+    self._run(args, verbose)
     return base + ".tess"
 
   def simulateGrains(self, ori, odf=None, verbose=False, aspectRatio=None):
@@ -98,7 +98,7 @@ class neper:
     from .grain3d import grain3d
     if np.isscalar(ori):
       ori = odf.discreteSample(int(ori))
-    tess = self._tessellate(ori.size, self._morpho(aspectRatio), not verbose)
+    tess = self._tessellate(ori.size, self._morpho(aspectRatio), verbose)
     grains = grain3d.load(tess, CS=ori.CS)
     grains.meanOrientation = ori.flatten()
     return grains
@@ -113,7 +113,7 @@ class neper:
     morpho = self._morpho(aspectRatio) + f"::lamellar(w={width:g},v=msfile({lam}))"
     args = [self.command, "-T", "-n", f"{n}::from_morpho", "-id", str(self.id), "-morpho", morpho, "-morphooptistop",
             f"iter={self.maxIter}", "-domain", str(self.geometry), "-o", base]
-    self._run(args, not verbose)
+    self._run(args, verbose)
     return base + ".tess"
 
   # how many cells every host was cut into: the cells come host by host, and the cells of a
@@ -147,7 +147,7 @@ class neper:
     if width is None:
       size = _cubeSize(self.geometry)
       width = (np.prod(size) / numGrains) ** (1 / 3) / 4
-    grains = grain3d.load(self._lamellae(numGrains, nA, width, not verbose, aspectRatio))
+    grains = grain3d.load(self._lamellae(numGrains, nA, width, verbose, aspectRatio))
     hostId = np.repeat(np.arange(numGrains), self._cellsPerHost(grains, nA, numGrains))
     from ..geometry.kernels import qmul
     q = ori.data.reshape(-1, 4)[hostId].copy()
@@ -169,7 +169,7 @@ class neper:
     oriP = odfParent.discreteSample(numParents)
     h = Miller(1, 1, 1, p2c.CS) if habitPlane is None else habitPlane
     nA = oriP * h.normalize()
-    grains = grain3d.load(self._lamellae(numParents, nA, width, not verbose, aspectRatio))
+    grains = grain3d.load(self._lamellae(numParents, nA, width, verbose, aspectRatio))
     pId = np.repeat(np.arange(numParents), self._cellsPerHost(grains, nA, numParents))
     N = p2c.size
     vId = np.zeros(len(grains), dtype=np.int64)

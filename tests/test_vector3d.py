@@ -316,3 +316,24 @@ def test_asVector3d_passesAVectorThroughAndWrapsCoordinates():
 def test_equality_ofAxesIdentifiesTheNegative():
   v = vector3d(1.0, 2.0, 3.0, antipodal=True)
   assert bool(v == -v) and not bool(vector3d(1.0, 2.0, 3.0) == -vector3d(1.0, 2.0, 3.0))
+
+
+def test_keptAndInverse_mapsEveryElementToItsKeptOne():
+  from mtex.geometry.vector3d import _keptAndInverse
+  iv, iu = _keptAndInverse(np.array([True, False, True, False]), np.array([0, 0, 2, 2]))
+  assert iv.tolist() == [0, 2] and iu.tolist() == [0, 0, 1, 1]
+
+
+def test_uniqueOutput_isTheListAloneUnlessIndicesAreAsked():
+  from mtex.geometry.vector3d import _uniqueOutput
+  assert _uniqueOutput("u", 1, 2, False, False) == "u" and _uniqueOutput("u", 1, 2, True, True) == ("u", 1, 2)
+
+
+def test_xyz_readsAVectorAndAPlainTriple():
+  from mtex.geometry.vector3d import _xyz
+  assert np.array_equal(_xyz(xvector), [1, 0, 0]) and _xyz([0, 1, 0]).dtype == float
+
+
+def test_joinStyle_takesTheIndicesOfTheFirstUnlessItHasNone():
+  from mtex.geometry.vector3d import _joinStyle
+  assert _joinStyle("hkl", "uvw") == "hkl" and _joinStyle("xyz", "uvw") == "uvw" and _joinStyle("hkl", "xyz") == "hkl"

@@ -10,7 +10,7 @@ import os
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QPointF, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QLabel, QListView, QListWidget,
-                               QMenu, QSizePolicy, QStyledItemDelegate, QToolButton, QTreeWidget,
+                               QMenu, QSizePolicy, QStyle, QStyledItemDelegate, QToolButton, QTreeWidget,
                                QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from . import callbacks as cb
@@ -220,9 +220,6 @@ class EntryDelegate(QStyledItemDelegate):
     """a row drawn: the indent, the chevron of a folder, the elided name and the size"""
     row = index.data(Qt.UserRole)
     painter.save()
-    if option.state & QAbstractItemView.State_Selected if hasattr(QAbstractItemView, "State_Selected") else False:
-      pass
-    from PySide6.QtWidgets import QStyle
     if option.state & QStyle.State_Selected:
       painter.fillRect(option.rect, option.palette.color(QPalette.Highlight))
       painter.setPen(option.palette.color(QPalette.HighlightedText))
@@ -412,12 +409,12 @@ class DataSetList(QListWidget):
     self.refresh()
 
   def refresh(self):
-    """the list refilled with the data sets of the file, shown only for more than one"""
+    """the list refilled with the data sets of the file; its panel is shown by BrowserSide for
+    more than one"""
     self.clear()
     sets = self.st.info.dataSets if self.st.info is not None else []
     for s in sets:
       self.addItem(s)
-    self.parentWidget().setVisible(len(sets) > 1) if self.parentWidget() is not None else None
     self.setMaximumHeight(22 * max(len(sets), 1) + 6)
     self.mark()
 

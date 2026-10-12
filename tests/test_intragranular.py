@@ -371,3 +371,22 @@ def test_weightedBurgersVec_integralIsUndefinedOnTheRim():
   n = Wi.norm()
   assert n.shape == g.shape and np.all(np.isnan(n[0])) and np.all(np.isfinite(n[1:-1, 1:-1]))
   assert np.count_nonzero(np.isfinite(g.weightedBurgersVec(windowSize=2).norm())) < np.count_nonzero(np.isfinite(n))
+
+
+def test_a_grain_mean_over_no_value_in_range_is_nan():
+  e, g = grainMeanMap()
+  assert np.all(np.isnan(e.grainMean(np.zeros(e.size), g, method=np.median, llim=1.0)))
+
+
+def test_the_mean_by_sums_is_the_mean_of_every_grain():
+  e, g = grainMeanMap()
+  assert np.allclose(e.grainMean(e.val, g), e.grainMean(e.val, g, method=lambda v: np.mean(v)), rtol=1e-14)
+
+
+def test_a_pixel_at_the_joint_of_two_pieces_of_a_profile_is_met_once():
+  e, g = grainMeanMap()
+  x, y = e.x.reshape(-1), e.y.reshape(-1)
+  a, b, c = [x.min(), y.min()], [x.max(), y.min()], [x.max(), y.max()]
+  sel, d = e.spatialProfile(np.array([a, b, c]))
+  ids = np.asarray(sel.id).reshape(-1)
+  assert len(np.unique(ids)) == len(ids) and np.all(np.diff(d) >= 0)

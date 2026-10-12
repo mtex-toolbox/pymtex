@@ -14,6 +14,18 @@ prange = range
 _COMPILED = {}
 
 
+# the parallel loop compiled once under its name, prange made numba's for the loops of this
+# module; None without numba
+def _compiled(name, loop):
+  nb = _jit() if backend() == "numba" else None
+  if not nb:
+    return None
+  if name not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED[name] = _parallelKernel(loop)
+  return _COMPILED[name]
+
+
 # the shears of least norm under B x = rhs, x >= 0, from the feasible x, by the active set
 # on the zero shears started at the support of x; BT holds the columns of B as rows;
 # 0 with x overwritten, or a code
@@ -156,16 +168,13 @@ def _birefringenceLoop(U, M, delta, fast, slow, n1, n2):
 def birefringenceKernel(U, M):
   """the index difference, the fast and the slow axis and the two indices of light along the n unit
   directions U through the tensors M, one or n; None without numba"""
-  nb = _jit() if backend() == "numba" else None
-  if not nb:
+  loop = _compiled("birefringence", _birefringenceLoop)
+  if loop is None:
     return None
-  if "birefringence" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["birefringence"] = _parallelKernel(_birefringenceLoop)
   n = len(U)
   delta, n1, n2 = (np.empty(n) for _ in range(3))
   fast, slow = np.empty((n, 3)), np.empty((n, 3))
-  _COMPILED["birefringence"](np.ascontiguousarray(U, dtype=np.float64), np.ascontiguousarray(M, dtype=np.float64), delta, fast, slow, n1, n2)
+  loop(np.ascontiguousarray(U, dtype=np.float64), np.ascontiguousarray(M, dtype=np.float64), delta, fast, slow, n1, n2)
   return delta, fast, slow, n1, n2
 
 

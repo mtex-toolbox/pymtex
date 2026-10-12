@@ -154,3 +154,15 @@ def test_SM6_a_subset_smooths_as_the_whole_does():
   sm = sub.smoothBoundary(5)
   tiny = int(np.argmin(sm.numPixel))
   assert sm.numPixel[tiny] == 4 and 0.5 < sm.area[tiny] / sub.area[tiny] < 1.5
+
+
+def test_the_adjacency_lists_both_ends_of_every_edge_by_vertex():
+  from mtex.maps.smoothing import _adjacency
+  ptr, nbr = _adjacency(np.array([[0, 1], [1, 2], [2, 0], [1, 3]]), 4)
+  assert np.array_equal(ptr, [0, 2, 5, 7, 8]) and np.array_equal(nbr, [1, 2, 2, 3, 0, 0, 1, 1])
+
+
+def test_every_row_of_the_laplacian_sums_to_zero():
+  net = boundaryNetwork.byArrays([0, 2, 4, 6], [1, 2, 0, 2, 0, 1], [False] * 3, [0, 1, 2])
+  L = net.laplacian().toarray()
+  assert np.allclose(L.sum(axis=1), 0) and np.allclose(np.diag(L), -1)

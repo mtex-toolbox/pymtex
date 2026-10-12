@@ -11,16 +11,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from .kernels import qconj
 from ._array import MtexArray
+from .kernels import closestAngle, closestImage, nearestAngle, projectDirections, projectToRef, qconj, threads
+from .quaternion import qmul, qrot
+from .symreduce import (_firstOfClusters, bestDot, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
+                        symReduce, uniqueRotations)
+from .vector3d import _isCrystalFrame, _keptAndInverse, _uniqueOutput, _xyz, vector3d
 
 _ID = np.array([1.0, 0.0, 0.0, 0.0])
-
-from .quaternion import qmul, qrot
-from .kernels import closestAngle, closestImage, nearestAngle, projectDirections, projectToRef, threads
-from .symreduce import (bestDot, closestToRef, referenceImages, reductionGroups, reductionGroupsPair,
-                        symReduce, uniqueRotations)
-from .vector3d import _isCrystalFrame, vector3d
 
 
 def reducesOverGroup(v):
@@ -62,12 +60,7 @@ def symmetrise(v, unique=False, antipodal=None, tol=1e-6):
   asAxes = v.antipodal if antipodal is None else antipodal
   n = np.linalg.norm(xyz, axis=1)
   d = xyz @ xyz.T / np.outer(n, n)
-  same = (np.abs(d) if asAxes else d) > 1 - tol
-  keep = np.ones(len(xyz), dtype=bool)
-  for k in range(len(xyz)):
-    if keep[k]:
-      keep[k + 1:] &= ~same[k, k + 1:]
-  return v._new(xyz[keep])
+  return v._new(xyz[_firstOfClusters((np.abs(d) if asAxes else d) > 1 - tol)])
 
 
 def multiplicity(v, antipodal=None):
@@ -93,7 +86,9 @@ def symDot(a, b, min=False, all=False, antipodal=None):
   ds = np.sum(_images(sym.frame, sym.data) * other.data[..., None, :], axis=-1)
   if (a.antipodal or b.antipodal) if antipodal is None else antipodal:
     ds = np.abs(ds)
-  return np.moveaxis(ds, -1, 0) if all else ds.min(axis=-1) if min else ds.max(axis=-1)
+  if all:
+    return np.moveaxis(ds, -1, 0)
+  return ds.min(axis=-1) if min else ds.max(axis=-1)
 
 
 def symAngle(a, b, antipodal=None):
@@ -121,7 +116,7 @@ def projectIntoFundamentalRegion(v, center=None):
     from .sphericalregion import fundamentalSector, projectIntoRegion
     return projectIntoRegion(v, fundamentalSector(fr, antipodal=v.antipodal), fr.sym.Laue() if v.antipodal else fr.sym)
   o = fr.rot.data.reshape(-1, 5)
-  c = center.data if isinstance(center, vector3d) else np.asarray(center, dtype=float)
+  c = _xyz(center)
   imgs = qrot(o[:, :4], c[None]) * o[:, 4:5]
   return v._new(projectDirections(v.data, imgs, o[:, :4], o[:, 4]))
 
@@ -142,13 +137,9 @@ def symUnique(v, tol=1e-6, return_index=False, return_inverse=False):
       later = np.flatnonzero(same[k, k + 1:]) + k + 1
       keep[later] = False
       first[later] = k
-  iv = np.flatnonzero(keep)
-  rank = np.empty(len(rep), dtype=int)
-  rank[iv] = np.arange(len(iv))
-  iu = rank[first]
-  u = v._new(v.data.reshape(-1, 3)[iv])
-  out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
-  return out if len(out) > 1 else u
+  iv, iu = _keptAndInverse(keep, first)
+  return _uniqueOutput(v._new(v.data.reshape(-1, 3)[iv]), iv, iu, return_index, return_inverse)
+
 
 def symMean(v, weights=None, iterations=3):
   """the mean of crystal directions: every element is moved to the equivalent closest to the
@@ -209,9 +200,11 @@ def orientationDot(a, b):
   """the reduced dot product of pairs, broadcast"""
   a, b = fitOrientations(a, b)
   L, R = reductionGroupsPair(a, b)
-  if b.ndim == 0:
-    return symReduce(a.data, b.data, L, R, _exchange(a, b))[0] if a.ndim == 0 else bestDot(a.data, referenceImages(b.data, L, R, _exchange(a, b))[0])[0]
-  return symReduce(a.data, b.data, L, R, _exchange(a, b))[0]
+  exchange = _exchange(a, b)
+  # a list against one orientation goes through the images of that one
+  if b.ndim == 0 and a.ndim > 0:
+    return bestDot(a.data, referenceImages(b.data, L, R, exchange)[0])[0]
+  return symReduce(a.data, b.data, L, R, exchange)[0]
 
 
 def orientationAngle(a, b):
@@ -238,7 +231,10 @@ def projectIntoFundamentalRegionOrientation(o, ref=None):
   one per element, is the pair search of dot without the images of a single reference"""
   from .orientationregion import commonAxisCenter, commonRotations
   L, R = reductionGroups(o)
-  refq = np.array([1.0, 0, 0, 0]) if ref is None else (ref.data if isinstance(ref, MtexArray) else np.asarray(ref, dtype=float))
+  if ref is None:
+    refq = _ID
+  else:
+    refq = ref.data if isinstance(ref, MtexArray) else np.asarray(ref, dtype=float)
   if refq.ndim > 1:
     return o._new(closestImage(refq, o.data, L, R, o.antipodal)[1])
   es, frm = referenceImages(refq, L, R, o.antipodal)
@@ -259,11 +255,10 @@ def projectIntoFundamentalRegionOrientation(o, ref=None):
 # whose axis is nearest its centre
 def _exchangeIntoSector(p, common):
   from .orientationregion import commonAxisSector
-  from .kernels import qmul
   sector, center = commonAxisSector(common, True)
   q = p.reshape(-1, 4)
   cands = []
-  for c in (common if len(common) else np.array([[1.0, 0, 0, 0]])):
+  for c in (common if len(common) else _ID[None]):
     ci = qconj(c)
     for x in (q, qconj(q)):
       cands.append(qmul(qmul(ci, x), c))
@@ -316,13 +311,8 @@ def orientationUnique(o, tol=1e-3, symmetry=True, return_index=False, return_inv
       later = later[keep[later]]
       keep[later] = False
       first[later] = k
-  iv = np.flatnonzero(keep)
-  rank = np.empty(n, dtype=int)
-  rank[iv] = np.arange(len(iv))
-  iu = rank[first]
-  u = o._new(o.data.reshape(-1, 4)[iv])
-  out = (u,) + ((iv,) if return_index else ()) + ((iu,) if return_inverse else ())
-  return out if len(out) > 1 else u
+  iv, iu = _keptAndInverse(keep, first)
+  return _uniqueOutput(o._new(o.data.reshape(-1, 4)[iv]), iv, iu, return_index, return_inverse)
 
 
 def orientationMean(o, weights=None, robust=False, iterations=3):

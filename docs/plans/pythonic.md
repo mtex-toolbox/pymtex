@@ -144,3 +144,25 @@ the refactor must not have changed what a page shows.
   results). Left: keywords named like builtins (`all=`, `max=`, `iter=`, `range=`, `id=`), which
   are MATLAB's option names and shadow nothing a body calls; `pathlib` for `os.path`, a change of
   no gain.
+
+## Second pass (2026-10-12)
+
+Six read-only reviews by layer, then each layer's findings applied and checked: every change on a
+hot path timed before and after and kept only if not slower, results equal (or to rounding where
+the order of a sum changed), figures pixel-identical on 29 render cases and 16 rebuilt pages, the
+readers and exporters equal or byte-identical on every fixture and sample map. Shared helpers
+replace retyped idioms (cluster dedup, unique bookkeeping, degree index vectors, id position
+tables, pair keys, gathers, run starts, table starts, header parsers, plot holders' attributes,
+colour limits); Python loops over rows, chains, grains or degrees became array operations where
+that was faster. Measured: `ori * rot` 278 to 4.3 ms (1e4), `round2Miller`'s rounding 40 to 0.6,
+grain `caliper` 1569 to 58, `diameter` 554 to 36, `smoothBoundary` 364 to 195, reconstruction
+boundary weights 1836 to 130, `S2FunHarmonic.truncate` 469 to 2.5 (L = 512), Bingham's symmetric
+axes 23 to 0.19, the component seeds 98 to 53. Reverted where slower or not bit-safe: the halved 3D
+KAM (3e-11 rad), the SO(3) `power` by reduceat, the kernel handles' outer products, the table
+formatting mask, the shared line generator, `anchorClosedChains`.
+
+Bugs found and fixed, each with a test that failed before: `S2FunTri` with complex values, the int32
+pair key of the reconstruction above 46341 grains, 3D `calcGrains` ignoring the kernel preference,
+the 3D `meanOrientation` setter's IndexError, `closestAlignment`'s cached None, the export of a
+number beyond int64 (an endless loop in the table writer). The analysis layer was not done: the
+permission check refused the applier's edits there; tensors and the two kernels glue files were.

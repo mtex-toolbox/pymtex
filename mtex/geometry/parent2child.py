@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from math import gcd
 
 import numpy as np
 
@@ -86,8 +85,8 @@ def _misfit(mori, p2c, h, tau):
   V, c2c = _childToChild(p2c)
   variant, omega = _nearestC2C(mori, c2c)
   r = np.where(np.isfinite(omega), np.minimum(1 - np.cos(omega), tau), tau)
-  rs = np.sort(r)
-  ind = r <= rs[min(h, len(rs)) - 1]
+  kth = min(h, len(r)) - 1
+  ind = r <= np.partition(r, kth)[kth]
   return _Misfit(V, c2c, omega, variant, ind & (r < tau), float(np.mean(r[ind])))
 
 
@@ -150,7 +149,7 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
   sub = _subSample(mori, scanSample)
   hSub = max(1, int(np.ceil(h / mori.size * sub.size)))
   g = orientation(equispacedSO3Grid(p2c.frameA, p2c.frameB, resolution=searchResolution)).flatten()
-  g = orientation.cat(p2c.flatten(), g) if hasattr(orientation, "cat") else _cat(p2c, g)
+  g = orientation.cat(p2c.flatten(), g)
   # conjugating the parent group directly: the duplicates variants would drop cannot change
   # a minimum over the variants
   S = p2c.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
@@ -182,11 +181,6 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
     if s.fit < bestFit:
       best, bestFit = pj, s.fit
   return best
-
-
-
-def _cat(a, b):
-  return a._new(np.concatenate([a.data.reshape(-1, 4), b.data.reshape(-1, 4)]))
 
 
 def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, maxIteration=30, maxSample=50000,
@@ -498,8 +492,7 @@ def allHKL(maxIndex):
   """every index triple up to maxIndex, coprime, without (0, 0, 0)"""
   r = np.arange(-maxIndex, maxIndex + 1)
   h, k, l = (a.reshape(-1) for a in np.meshgrid(r, r, r, indexing="ij"))
-  g = np.array([gcd(gcd(abs(int(a)), abs(int(b))), abs(int(c))) for a, b, c in zip(h, k, l)])
-  keep = g == 1
+  keep = np.gcd(np.gcd(h, k), l) == 1
   return np.stack([h[keep], k[keep], l[keep]], axis=1)
 
 

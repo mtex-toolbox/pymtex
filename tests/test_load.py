@@ -302,3 +302,19 @@ def test_the_grid_built_while_reading_is_the_list_gridded(name):
   assert np.array_equal(a.phaseId, b.phaseId) and np.array_equal(a.id, b.id) and np.array_equal(a.isPadding, b.isPadding)
   assert set(a.prop) == set(b.prop) and all(np.array_equal(a.prop[k], b.prop[k], equal_nan=True) and a.prop[k].dtype == b.prop[k].dtype for k in a.prop)
   assert np.array_equal(a.lattice.ij, b.lattice.ij) and np.array_equal(a.lattice.A, b.lattice.A) and np.array_equal(a.lattice.origin, b.lattice.origin)
+
+
+def test_properties_leaves_out_the_columns_of_the_map():
+  from mtex.io.load import _properties
+  assert _properties({"x": 1, "y": 2, "phase": 3, "iq": 4}, ("x", "y", "phase"), "{}") == {"iq": 4}
+
+
+def test_properties_names_the_missing_required_column():
+  from mtex.io.load import _properties
+  with pytest.raises(ValueError, match="no phi"):
+    _properties({"x": 1}, ("x", "phi"), "no {}", required=("phi",))
+
+
+def test_edaxPointGroup_reads_the_ids_from_100():
+  from mtex.io.load import _edaxPointGroup
+  assert _edaxPointGroup(100) == "1" and _edaxPointGroup(131) == "m-3m" and _edaxPointGroup(132) is None

@@ -10,6 +10,7 @@
 # group. A direction is projected into either by folding it with the group.
 from __future__ import annotations
 
+import itertools
 from typing import TYPE_CHECKING
 import numpy as np
 
@@ -18,7 +19,8 @@ from .latticetype import latticeType
 from .quaternion import orthogonalTransform, qrot, rotation
 from .symmetry import symmetry
 from .units import degree
-from .vector3d import vector3d, xvector, yvector, zvector
+from .symreduce import _distinctUnitRows
+from .vector3d import _xyz, vector3d, xvector, yvector, zvector
 from .display import display
 
 
@@ -57,7 +59,7 @@ class sphericalRegion:
 
   def checkInside(self, v, tol=1e-4):
     """whether directions lie in the region, up to a small tolerance at the boundary"""
-    xyz = v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
+    xyz = _xyz(v)
     if len(self.N) == 0:
       return np.ones(xyz.shape[:-1], dtype=bool)
     n = np.linalg.norm(xyz, axis=-1)
@@ -79,12 +81,9 @@ class sphericalRegion:
     """the centre (MATLAB @sphericalRegion/center): the pole of a single circle, the bisector of
     the two boundaries furthest apart for a lune, the barycentre of the vertices of a
     triangle, and the area centroid of anything larger"""
-    N = []
-    for n in self.N:
-      if not any(m @ n > 1 - 1e-9 for m in N):
-        N.append(n)
+    N = _distinctUnitRows(self.N, 1e-9)
     if len(N) < 2:
-      return vector3d(np.array([0.0, 0.0, 1.0]) if not N else unitRows(N[0]), isNormalized=True, frame=self.frame)
+      return vector3d(np.array([0.0, 0.0, 1.0]) if len(N) == 0 else unitRows(N[0]), isNormalized=True, frame=self.frame)
     V = self.vertices().data.reshape(-1, 3)
     if len(V) < 3:
       pairs = [(i, j) for i in range(len(N) - 1) for j in range(i + 1, len(N))]
@@ -108,7 +107,7 @@ class sphericalRegion:
     """the hemisphere seen from a direction added to the region (MATLAB's sphericalRegion.restrict2Upper)"""
     from .plottingconvention import plottingConvention
     up = zvector if up is None else up.outOfScreen if isinstance(up, plottingConvention) else up
-    u = unitRows(np.asarray(up.data if isinstance(up, vector3d) else up, dtype=float))
+    u = unitRows(_xyz(up))
     if np.any((self.N @ u > 1 - 1e-10) & (self.alpha >= 0)):
       return self
     return sphericalRegion(np.concatenate([u[None], self.N]), np.concatenate([[0.0], self.alpha]), self.frame, self.antipodal)
@@ -156,14 +155,11 @@ class sphericalRegion:
 
   def vertices(self, tol=1e-8):
     """the corners of the region: the intersections of its circles that lie inside"""
-    V = []
-    n = len(self.N)
-    for i in range(n - 1):
-      for j in range(i + 1, n):
-        for v in _circleIntersection(self.N[i], self.alpha[i], self.N[j], self.alpha[j]):
-          if self.checkInside(v, tol) and not any(u @ v > 1 - 1e-9 for u in V):
-            V.append(v)
-    return vector3d(np.array(V).reshape(-1, 3), isNormalized=True, frame=self.frame)
+    cand = [v for i, j in itertools.combinations(range(len(self.N)), 2)
+            for v in _circleIntersection(self.N[i], self.alpha[i], self.N[j], self.alpha[j])]
+    cand = np.array(cand).reshape(-1, 3)
+    V = _distinctUnitRows(cand[self.checkInside(cand, tol)], 1e-9)
+    return vector3d(V, isNormalized=True, frame=self.frame)
 
   def boundary(self, resolution=1 * degree):
     """the boundary as arcs, one vector3d per arc: each circle is cut at the corners on it and
@@ -255,8 +251,8 @@ def sectorCenter(pg):
     # with a tolerance far below the gap between them
     def fold(order):
       return axes[np.abs(omega - 2 * np.pi / order) < 1e-3]
-    f = fold(5)[0]
-    t = max(fold(3), key=lambda x: abs(x @ f)) * np.sign(fold(3)[np.argmax(np.abs(fold(3) @ f))] @ f)
+    f, threes = fold(5)[0], fold(3)
+    t = threes[np.argmax(np.abs(threes @ f))]
     t = t if t @ f > 0 else -t
     w = max(fold(2), key=lambda x: abs(x @ f) + abs(x @ t))
     w = w if w @ (f + t) > 0 else -w
@@ -283,18 +279,13 @@ def _essentialNormals(N, tol=1e-4):
     return N
   # a group generated from rounded axes meets at its corners only to about 1e-5, so a corner
   # is taken to that tolerance, far below the distance between the corners of any sector
-  def inside(v):
-    return np.all(N @ v >= -tol)
-  verts = []
-  for i in range(len(N) - 1):
-    for j in range(i + 1, len(N)):
-      w = np.cross(N[i], N[j])
-      if np.linalg.norm(w) < 1e-10:
-        continue
-      for v in (unitRows(w), -unitRows(w)):
-        if inside(v) and not any(u @ v > 1 - tol ** 2 for u in verts):
-          verts.append(v)
-  if not verts:
+  i, j = np.triu_indices(len(N), 1)
+  w = np.cross(N[i], N[j])
+  w = unitRows(w[np.linalg.norm(w, axis=1) >= 1e-10])
+  # both ends of every edge line, in the order of the pairs, those inside the domain
+  cand = np.stack([w, -w], axis=1).reshape(-1, 3)
+  verts = _distinctUnitRows(cand[np.all(cand @ N.T >= -tol, axis=1)], tol ** 2)
+  if not len(verts):
     return N
   return np.array([n for n in N if sum(abs(n @ v) < tol for v in verts) >= 2])
 
@@ -310,7 +301,7 @@ def dirichletSector(pg, center=None, frame=None, antipodal=False):
     pg = pg.sym
   if antipodal:
     pg = pg.Laue()
-  c = sectorCenter(pg).data if center is None else (center.data if isinstance(center, vector3d) else np.asarray(center, dtype=float))
+  c = sectorCenter(pg).data if center is None else _xyz(center)
   # a centre the inversion cancels, as for the centrosymmetric icosahedral group: the
   # centre of the proper subgroup's sector serves, its Dirichlet cell under the whole group
   if center is None and (not np.all(np.isfinite(c)) or np.linalg.norm(c) < 1e-8):
@@ -319,11 +310,7 @@ def dirichletSector(pg, center=None, frame=None, antipodal=False):
   els = _elements(pg)
   d = c[None] - _apply(els, c)
   keep = np.linalg.norm(d, axis=1) >= 1e-10
-  N = []
-  for n in unitRows(d[keep]):
-    if not any(m @ n > 1 - 1e-10 for m in N):
-      N.append(n)
-  N = _essentialNormals(np.array(N).reshape(-1, 3))
+  N = _essentialNormals(_distinctUnitRows(unitRows(d[keep]), 1e-10))
   return sphericalRegion(N, np.zeros(len(N)), frame, antipodal)
 
 
@@ -398,8 +385,8 @@ def conventionalSector(pg, up=None, east=None, frame=None):
     east = pC.east if east is None else east
     pg = pg.sym
   n = pg.numSym()
-  u = unitRows(np.asarray(up.data if isinstance(up, vector3d) else zvector.data if up is None else up, dtype=float))
-  east = np.asarray(pg.axes[1], dtype=float) if east is None else (east.data if isinstance(east, vector3d) else np.asarray(east, dtype=float))
+  u = unitRows(zvector.data if up is None else _xyz(up))
+  east = np.asarray(pg.axes[1], dtype=float) if east is None else _xyz(east)
   lat = pg.lattice
   if lat is latticeType.triclinic:
     return sphericalRegion(None if n == 1 else u[None], frame=frame)

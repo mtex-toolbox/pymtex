@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
-from ..geometry.kernels import variantAngles
+from ..geometry.kernels import qconj, variantAngles
 from ..geometry.parent2child import calcParent
 from ..geometry.quaternion import qmul
 from ..geometry.units import degree
 from .kernels import mclExpandNumba
-from .reconstruction import _ori, _quantile, parentGrainReconstructor, probabilityOf, voteTable
+from .reconstruction import _ori, _quantile, _segmentRows, parentGrainReconstructor, probabilityOf, voteTable
 from ..geometry.install import install
 
 
@@ -84,12 +83,18 @@ def clusterGraph(job, inflationPower=None, **options):
   job.graph = mclComponents(job.graph, 1.6 if inflationPower is None else inflationPower)
 
 
+# the positions of the grains of every label, the labels in increasing order and the positions
+# of one label increasing
+def _clusters(mergeId):
+  order = np.argsort(mergeId, kind="stable")
+  _, starts = np.unique(mergeId[order], return_index=True)
+  return np.split(order, starts[1:])
+
+
 # the orientations of the grains as children or as parents, nan for the other phase
 def _grainOrientations(job):
   g = job.grains
-  q = g.meanRotation.data.reshape(-1, 4)
-  wasChild, wasParent = job.isChild, job.isParent
-  return q, wasChild, wasParent, g.numPixel.astype(float)
+  return g.meanRotation.data.reshape(-1, 4), job.isChild, job.isParent, g.numPixel.astype(float)
 
 
 def calcParentFromGraph(job):
@@ -110,12 +115,11 @@ def calcParentFromGraph(job):
   fit[~wasParent & ~wasChild] = np.nan
   clusterSize = np.ones(g.size)
   fr = g.frame
-  for k in np.unique(mergeId):
-    ind = mergeId == k
+  for ind in _clusters(mergeId):
     if wasParent[ind].all():
       fit[ind] = np.nan
       continue
-    if np.count_nonzero(ind) <= 1:
+    if len(ind) <= 1:
       continue
     if wasChild[ind].all():
       child = _ori(q[ind], job.csChild, fr)
@@ -123,12 +127,12 @@ def calcParentFromGraph(job):
       ids, f = calcParent(child, pOri, job.p2c, id=True)
       parentQ[ind] = qmul(q[ind], PV[np.asarray(ids) - 1])
       fit[ind] = f
-      clusterSize[ind] = np.count_nonzero(ind)
+      clusterSize[ind] = len(ind)
     elif (wasChild[ind] | wasParent[ind]).all():
-      pi = ind & wasParent
+      pi = ind[wasParent[ind]]
       pOri = _ori(q[pi], job.csParent, fr).mean(weights=w[pi], robust=True)
       fit[pi] = np.asarray(_ori(q[pi], job.csParent, fr).angle(pOri)).reshape(-1)
-      ci = ind & wasChild
+      ci = ind[wasChild[ind]]
       child = _ori(q[ci], job.csChild, fr)
       ids, f = calcParent(child, pOri, job.p2c, id=True)
       parentQ[ci] = qmul(q[ci], PV[np.asarray(ids) - 1])
@@ -143,6 +147,7 @@ def calcParentFromGraph(job):
 def mergeByGraph(job, threshold=5 * degree):
   """job.mergeByGraph(threshold=5*degree): every component of job.graph whose grains fit a
   common parent within the threshold becomes one parent grain of that orientation"""
+  from scipy.sparse import diags
   if job.graph is None:
     raise ValueError("no graph; compute it with job.calcGraph() and cluster it with job.clusterGraph()")
   g = job.grains
@@ -150,12 +155,11 @@ def mergeByGraph(job, threshold=5 * degree):
   mergeId = g.merge(job.graph, testRun=True)
   PV = job._PV()
   fr = g.frame
-  labels = np.unique(mergeId)
+  labels, firstOf = np.unique(mergeId, return_index=True)
   recQ = np.full((len(labels), 4), np.nan)
   fit = np.full(len(labels), np.inf)
-  for n, k in enumerate(labels):
-    ind = mergeId == k
-    if np.count_nonzero(ind) <= 1:
+  for n, ind in enumerate(_clusters(mergeId)):
+    if len(ind) <= 1:
       continue
     if wasParent[ind].all():
       recQ[n] = _ori(q[ind], job.csParent, fr).mean(weights=w[ind]).data.reshape(4)
@@ -164,7 +168,7 @@ def mergeByGraph(job, threshold=5 * degree):
       pOri, fit[n] = calcParent(_ori(q[ind], job.csChild, fr), job.p2c, weights=w[ind])
       recQ[n] = pOri.data.reshape(4)
     elif (wasChild[ind] | wasParent[ind]).all():
-      pi, ci = ind & wasParent, ind & wasChild
+      pi, ci = ind[wasParent[ind]], ind[wasChild[ind]]
       pOri = _ori(q[pi], job.csParent, fr).mean(weights=w[pi], robust=True)
       child = _ori(q[ci], job.csChild, fr)
       ids, f = calcParent(child, pOri, job.p2c, id=True)
@@ -175,7 +179,6 @@ def mergeByGraph(job, threshold=5 * degree):
   good = fit < threshold
   goodNode = good[np.searchsorted(labels, mergeId)]
   G = job.graph.tocsr().copy()
-  from scipy.sparse import diags
   D = diags(goodNode.astype(float))
   G = (D @ G @ D).tocsr()
   work = g.copy()
@@ -183,14 +186,9 @@ def mergeByGraph(job, threshold=5 * degree):
   parent = work.parentId
   job.mergeId = parent[job._pos(job.mergeId)].astype(np.int64)
   job.grains = merged
-  mpos = merged._positions()
-  at, qs = [], []
-  for n in np.flatnonzero(good):
-    members = np.flatnonzero(mergeId == labels[n])
-    at.append(mpos[parent[members[0]]])
-    qs.append(recQ[n])
-  if at:
-    job._setGrains(np.array(at), np.array(qs), job.parentPhaseId)
+  # every good cluster is the merged grain of its first member
+  if good.any():
+    job._setGrains(merged._positions()[parent[firstOf[good]]], recQ[good], job.parentPhaseId)
   else:
     job.grains = merged.update()
   job.votes = None
@@ -211,7 +209,7 @@ def plotGraph(job, **kwargs):
   G = job.graph.tocsr()
   v = np.asarray(G[pos[pairs[:, 0]], pos[pairs[:, 1]]]).reshape(-1)
   gB = g.boundary
-  row = job._segmentRows(pairs, gB.grainId)
+  row = _segmentRows(pairs, gB.grainId)
   sel = row >= 0
   return plotBoundary(gB[sel], edgeAlpha=1 - v[row[sel]], **kwargs)
 
@@ -221,9 +219,7 @@ def plotGraph(job, **kwargs):
 
 # the parent variants with a variant within 8 degrees of an earlier one pointed at it
 def _bestFriends(job, PV, tol=8 * degree):
-  o = _ori(PV, job.csParent, job.csChild.stripSym())
-  close = np.asarray(o.reshape(-1, 1).angle(o.reshape(1, -1))) < tol
-  return np.argmax(close, axis=1)
+  return np.argmax(_variantAngles(job, PV) < tol, axis=1)
 
 
 # the angle between the parent variants, the child symmetry ignored
@@ -270,7 +266,7 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
   width, first, nVG = _layout(job, numV)
   pos = g._positions()
   noOpt = not (p2c or p2p or c2c)
-  from scipy.sparse import identity, csr_matrix
+  from scipy.sparse import csr_matrix, diags, identity
   G = csr_matrix((nVG, nVG)) if not diagonal else identity(nVG, format="csr")
 
   def both(r, c, v):
@@ -302,8 +298,8 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
   if job.votes is not None and len(job.votes) == g.size:
     # every grain restricted to its best variant and the one merged with it
     friendAll = _bestFriends(job, PV)
-    partner = np.zeros(numV, dtype=np.int64) - 1
-    lone = ~np.isin(np.arange(numV), friendAll)
+    partner = np.full(numV, -1, dtype=np.int64)
+    lone = np.bincount(friendAll, minlength=numV) == 0
     partner[friendAll[lone]] = np.flatnonzero(lone)
     cp = width > 0
     best = job.votes.parentId[cp, 0] - 1
@@ -313,13 +309,11 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
     keep.append((first[cp] + second)[has])
     d = np.zeros(nVG)
     d[np.concatenate(keep)] = 1
-    from scipy.sparse import diags
     D = diags(d)
     G = (D @ G @ D).tocsr()
   if diagonal:
     lone = np.asarray((G > 0).sum(axis=0)).reshape(-1) == 1
-    from scipy.sparse import diags
-    G = (diags((~lone).astype(float)) @ G).tocsr()
+    G =(diags((~lone).astype(float)) @ G).tocsr()
   G.eliminate_zeros()
   job.graph = G
 

@@ -62,7 +62,7 @@ def calcDensityReal(x, range=None, bandwidth=None, weights=None, rng=None):
   d = x.shape[1]
   r = np.vstack([columnMin(x), columnMax(x)]) if range is None else np.asarray(range, dtype=float).reshape(2, d)
   N = round(1000000 ** (1 / d))
-  axes = [np.linspace(r[0, k], r[1, k], N) for k in np.arange(d)]
+  axes = [np.linspace(lo, hi, N) for lo, hi in zip(r[0], r[1])]
   mesh = np.meshgrid(*axes, indexing="ij")
   density, bw = kdeN(x, np.stack([m.ravel() for m in mesh], axis=-1), rng=rng)
   return griddedDensity(axes, density.reshape(mesh[0].shape), bw)
@@ -92,7 +92,7 @@ def _idct1d(data):
 def _fixedPoint(t, N, I, a2):
   l = 7
   f = 2 * np.pi ** (2 * l) * np.sum(I ** l * a2 * np.exp(-I * np.pi ** 2 * t))
-  for s in np.arange(l - 1, 1, -1):
+  for s in range(l - 1, 1, -1):
     K0 = np.prod(np.arange(1, 2 * s, 2)) / math.sqrt(2 * np.pi)
     const = (1 + 0.5 ** (s + 0.5)) / 3
     time = (2 * const * K0 / N / f) ** (2 / (3 + 2 * s))
@@ -103,15 +103,14 @@ def _fixedPoint(t, N, I, a2):
 # the root of the fixed point equation in [0, tol], the interval doubled until it holds one
 def _root(f, N):
   from scipy.optimize import brentq, fminbound
-  N = 50 if N <= 50 else (1050 if N >= 1050 else N)
+  N = min(max(N, 50), 1050)
   tol = 1e-12 + 0.01 * (N - 50) / 1000
-  while True:
-    try:
+  f0 = f(0)
+  while tol < 0.1:
+    if f0 * f(tol) <= 0:
       return brentq(f, 0, tol)
-    except ValueError:
-      tol = min(2 * tol, 0.1)
-    if tol == 0.1:
-      return fminbound(lambda t: abs(f(t)), 0, 0.1)
+    tol = min(2 * tol, 0.1)
+  return fminbound(lambda t: abs(f(t)), 0, 0.1)
 
 
 def kde1d(data, n=2 ** 14, lo=None, hi=None, weights=None, bandwidth=None):
@@ -143,19 +142,23 @@ def kde1d(data, n=2 ** 14, lo=None, hi=None, weights=None, bandwidth=None):
 # ------------------------------------------------------------------ several dimensions
 
 
+# the log of the Gaussian of mean mu and covariance Sig weighted by w at the rows of X, the
+# upper Cholesky factor of Sig and the rows whitened by it
+def _logGaussian(X, w, mu, Sig):
+  L = np.linalg.cholesky(Sig).T
+  z = np.linalg.solve(L.T, (X - mu).T).T
+  return -0.5 * np.sum(z ** 2, axis=1) - np.sum(np.log(np.diag(L))) + np.log(w) - X.shape[1] * np.log(2 * np.pi) / 2, L, z
+
+
 def _regEM(w, mu, Sig, dl, X):
   gam, d = mu.shape
   n = X.shape[0]
   logLh = np.zeros((n, gam))
   logSig = np.zeros((n, gam))
-  for i in np.arange(gam):
-    L = np.linalg.cholesky(Sig[i]).T
-    Xc = X - mu[i]
-    xRinv = np.linalg.solve(L.T, Xc.T).T
+  for i in range(gam):
+    logG, L, xRinv = _logGaussian(X, w[i], mu[i], Sig[i])
     xSig = np.sum(np.linalg.solve(L, xRinv.T).T ** 2, axis=1) + np.finfo(float).eps
-    Linv = np.linalg.inv(L)
-    logLh[:, i] = (-0.5 * np.sum(xRinv ** 2, axis=1) - np.sum(np.log(np.diag(L))) + np.log(w[i]) - d * np.log(2 * np.pi) / 2
-                   - 0.5 * dl ** 2 * np.trace(Linv @ Linv.T))
+    logLh[:, i] = logG - 0.5 * dl ** 2 * np.sum(np.linalg.inv(L) ** 2)
     logSig[:, i] = logLh[:, i] + np.log(xSig)
   maxll, maxlsig = logLh.max(axis=1), logSig.max(axis=1)
   p = np.exp(logLh - maxll[:, None])
@@ -196,16 +199,12 @@ def kdeN(X, grid, gam=None, rng=None):
   w = w / np.sum(w)
   Sig = rng.random((gam, d, d)) * (np.eye(d) * dl)
   ent = -np.inf
-  for it in np.arange(1, 1501):
+  for _ in range(201):
     old = ent
     w, mu, Sig, dl, ent = _regEM(w, mu, Sig, dl, X)
-    if abs((ent - old) / ent) < 1e-4 or it > 200:
+    if abs((ent - old) / ent) < 1e-4:
       break
-  pdf = np.zeros(len(mesh))
-  for k in np.arange(gam):
-    L = np.linalg.cholesky(Sig[k]).T
-    z = np.linalg.solve(L.T, (mesh - mu[k]).T).T
-    pdf += np.exp(-0.5 * np.sum(z ** 2, axis=1) + np.log(w[k]) - np.sum(np.log(np.diag(L))) - d * np.log(2 * np.pi) / 2)
+  pdf = sum(np.exp(_logGaussian(mesh, w[k], mu[k], Sig[k])[0]) for k in range(gam))
   return pdf / np.prod(s), dl * s
 
 

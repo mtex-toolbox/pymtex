@@ -267,3 +267,19 @@ def test_qconj_isTheInverseOfUnitQuaternionsInTheirDtype():
   q = r.data.astype(np.float32)
   assert kernels.qconj(q).dtype == np.float32
   assert np.allclose(kernels.qmul(kernels.qconj(r.data), r.data), [1, 0, 0, 0])
+
+
+def test_pairArgs_broadcastsThePairsIntoRows():
+  shape, q1, q2, L, R = kernels._pairArgs(np.zeros((2, 3, 4)), np.ones(4), np.eye(4)[:1], np.eye(4)[:2])
+  assert shape == (2, 3) and q1.shape == q2.shape == (6, 4) and q2.flags.c_contiguous
+
+
+def test_pairWork_doublesTheImagesUnderExchange():
+  L, R = np.zeros((2, 4)), np.zeros((3, 4))
+  assert kernels._pairWork(10, L, R, True) - kernels._pairWork(10, L, R, False) == 60
+
+
+@pytest.mark.parametrize("dtypes, expected", [(("float32", "float32"), np.float32), (("float32", "float64"), np.float64),
+                                              (("int64", "int64"), np.float64)])
+def test_floatType_isTheSharedFloatingType(dtypes, expected):
+  assert kernels._floatType(*(np.zeros(1, dtype=d) for d in dtypes)) == expected

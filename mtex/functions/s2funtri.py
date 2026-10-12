@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import numpy as np
 
+from .kernels import _groupSums
 from .s2funclass import S2Fun
 from ..geometry.s2triangulation import S2Triangulation
 from ..geometry.units import degree
@@ -43,7 +44,7 @@ class S2FunTri(S2Fun):
       key, first, inv = np.unique(np.round(V, 12), axis=0, return_index=True, return_inverse=True)
       inv = inv.ravel()
       count = np.bincount(inv, minlength=len(key))
-      values = np.stack([np.bincount(inv, weights=values[:, k], minlength=len(key)) / count for k in range(values.shape[1])], axis=-1)
+      values = _groupSums(inv, values, len(key)) / count[:, None]
       self.tri = S2Triangulation(vector3d(V[first], frame=nodes.frame))
     self.values = values.reshape(self.tri.vertices.size, -1)
     self.antipodal, self.isReal = False, not np.iscomplexobj(self.values)
@@ -78,7 +79,7 @@ class S2FunTri(S2Fun):
       # the barycentric mean of the values at the corners of each direction's triangle
       t, lam = self.tri.locate(vector3d(W[ok]))
       corners = self.tri.T[t]
-      f[ok] = sum(lam[:, k, None] * self.values[corners[:, k]] for k in range(3))
+      f[ok] = np.einsum("nk,nkc->nc", lam, self.values[corners])
     return f.reshape(shape) if self.values.shape[1] == 1 else f.reshape(shape + (-1,))
 
   def __call__(self, v):
@@ -98,13 +99,17 @@ class S2FunTri(S2Fun):
     f.isReal = not np.iscomplexobj(f.values)
     return f
 
+  # a function at the vertices, in the shape of the values, or a number as it is
+  def _atVertices(self, g):
+    return g.eval(self.vertices).reshape(self.values.shape) if hasattr(g, "eval") else g
+
   def __add__(self, g):
-    return self._mapped(lambda y: y + (g.eval(self.vertices).reshape(y.shape) if hasattr(g, "eval") else g))
+    return self._mapped(lambda y: y + self._atVertices(g))
 
   __radd__ = __add__
 
   def __mul__(self, g):
-    return self._mapped(lambda y: y * (g.eval(self.vertices).reshape(y.shape) if hasattr(g, "eval") else g))
+    return self._mapped(lambda y: y * self._atVertices(g))
 
   __rmul__ = __mul__
 
@@ -118,7 +123,7 @@ class S2FunTri(S2Fun):
     return (-1 * self) + g
 
   def __truediv__(self, g):
-    return self._mapped(lambda y: y / (g.eval(self.vertices).reshape(y.shape) if hasattr(g, "eval") else g))
+    return self._mapped(lambda y: y / self._atVertices(g))
 
   def __pow__(self, p):
     return self._mapped(lambda y: y ** p)

@@ -93,12 +93,17 @@ def _resolve(source, root, download):
   return full
 
 
-def _find(name):
+# the data set of a recipe by its name, case aside; None for a name with none
+def _lookup(name):
   key = str(name).lower()
-  for d in DATASETS:
-    if d["name"].lower() == key:
-      return d
-  raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
+  return next((d for d in DATASETS if d["name"].lower() == key), None)
+
+
+def _find(name):
+  d = _lookup(name)
+  if d is None:
+    raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
+  return d
 
 
 def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
@@ -108,8 +113,8 @@ def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
   files here, the Neper tessellation 'my100grains' for instance.
   """
   # a data set without a recipe here is named by the repository
-  key = str(name).lower()
-  artifact = _find(name)["artifact"].lower() if any(d["name"].lower() == key for d in DATASETS) else key
+  d = _lookup(name)
+  artifact = str(name).lower() if d is None else d["artifact"].lower()
   if artifact not in SOURCES and artifact:
     raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
   root = mtexDataPath() if root is None else os.path.abspath(os.path.expanduser(root))

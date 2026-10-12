@@ -179,3 +179,7 @@ def test_the_pole_figures_wait_for_a_rest(loaded):
   st.changed("selected")
   assert canvas.ahead.isActive() and canvas.ahead.remainingTime() >= remaining
   canvas.ahead.stop()
+
+
+def test_millerOf_reads_a_direction_typed_with_blanks(loaded):
+  assert np.allclose(millerOf("1 -1 0", loaded.ebsd.CSList.frames[1]).hkl, [1, -1, 0])

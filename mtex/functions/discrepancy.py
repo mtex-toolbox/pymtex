@@ -39,7 +39,7 @@ from ..geometry.quaternion import rotation
 from ..geometry.symmetryops import symmetriseOrientation
 from ..geometry.vector3d import vector3d
 from .characteristics import S2_KINDS, SO3_KINDS
-from .harmonics import deg2dim
+from .harmonics import _s2Degrees, _so3Degrees, deg2dim
 from .kernelfunctions import S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel
 from .s2fun import S2FunHarmonic
 from .so3fun import SO3FunHarmonic
@@ -53,6 +53,10 @@ CENTER_BLOCK = 256
 
 _S2_METRICS = {"d_cap": "D_cap", "dcap": "D_cap", "d_2": "D_2", "d2": "D_2", "l2": "L2", "e_l": "L2"}
 _SO3_METRICS = {"d_ball": "D_ball", "dball": "D_ball", "d_2": "D_2", "d2": "D_2", "l2": "L2", "e_l": "L2"}
+
+# what a measure on the sphere and one on SO(3) is given as
+_S2_INPUTS = (S2Fun, vector3d)
+_SO3_INPUTS = (SO3Fun, rotation)
 
 
 # ------------------------------------------------------------------ the inputs
@@ -286,7 +290,7 @@ def sphericalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ban
   """the discrepancy of two spherical densities or weighted point sets, D_2, D_cap or L2 (E_L);
   the shared form of S2Fun/discrepancy and vector3d/discrepancy, info=True adds the details"""
   metric = _metricName(metric, _S2_METRICS, "spherical")
-  if not ((isinstance(a, S2Fun) or isinstance(a, vector3d)) and (isinstance(b, S2Fun) or isinstance(b, vector3d))):
+  if not (isinstance(a, _S2_INPUTS) and isinstance(b, _S2_INPUTS)):
     raise TypeError("inputs must be S2Fun or vector3d")
   L, fhat, x, c, exact = _difference(a, b, S2Fun, lambda f: f.bandwidth if isinstance(f, S2FunHarmonic) else 128, _s2Representation,
                                      bandwidth, weights, weights2)
@@ -308,16 +312,15 @@ def sphericalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ban
       d = np.sqrt(np.sum((x[first:first + BLOCK, None, :] - x[None, :, :]) ** 2, axis=-1))
       energy -= c[first:first + BLOCK] @ d @ c / 4
     if np.any(fhat[1:]):
-      w = np.zeros((L + 1) ** 2)
-      for l in range(1, L + 1):
-        w[l * l:(l + 1) ** 2] = 4 * np.pi / ((2 * l - 1) * (2 * l + 1) * (2 * l + 3))
+      l = _s2Degrees(L)
+      w = np.where(l > 0, 4 * np.pi / ((2.0 * l - 1) * (2 * l + 1) * (2 * l + 3)), 0.0)
       moments = _s2Moments(x, c, L)
       energy += np.sum(w * (np.abs(fhat) ** 2 + 2 * np.real(np.conj(fhat) * moments)))
     out["method"] = "chordal atomic energy and harmonic continuous terms"
   else:
     diff = fhat + _s2Moments(x, c, L)
     dw = _degreeWeights(degreeWeights, L)
-    energy = sum(dw[l] * np.sum(np.abs(diff[l * l:(l + 1) ** 2]) ** 2) for l in range(L + 1))
+    energy = np.sum(dw[_s2Degrees(L)] * np.abs(diff) ** 2)
     out["method"] = "weighted bandlimited harmonic norm"
   res = max(0.0, float(np.real(energy)))
   return _withInfo(res if squared else math.sqrt(res), out, info)
@@ -327,10 +330,10 @@ def _s2KernelWeights(L, antipodal):
   """the weights the restricted distance kernel puts on the coefficients, degree zero dropped,
   the odd degrees too for an antipodal function"""
   A = S2RestrictedDistanceKernel(L + 1).calcFourier(L)
-  w = np.zeros((L + 1) ** 2)
-  for l in range(1, L + 1):
-    if not (antipodal and l % 2):
-      w[l * l:(l + 1) ** 2] = math.sqrt(4 * np.pi * A[l] / (2 * l + 1))
+  l = _s2Degrees(L)
+  kept = (l > 0) & ~(antipodal & (l % 2 == 1))
+  w = np.zeros(l.size)
+  w[kept] = np.sqrt(4 * np.pi * A[l[kept]] / (2 * l[kept] + 1))
   return w
 
 
@@ -339,18 +342,14 @@ def _s2SampleMoments(v, c, L):
   x = _directions(v)
   if v.antipodal:
     x, c = np.concatenate([x, -x]), np.concatenate([c, c]) / 2
-  h = np.zeros((L + 1) ** 2, dtype=complex)
-  if L > 0:
-    h = np.asarray(sphericalSeriesAdjoint(vector3d(x), c, L, weights=np.ones(c.size)), dtype=complex)
-  h[0] = c.sum() / math.sqrt(4 * np.pi)
-  return h
+  return _s2Moments(x, c, L)
 
 
 def _legacyS2(a, b, weights=None, weights2=None, bandwidth=None):
   """the squared truncated kernel objective of S2Fun/optimalSample"""
   if isinstance(a, vector3d) and isinstance(b, S2Fun):
     return _legacyS2(b, a, weights=weights, bandwidth=bandwidth)
-  if not ((isinstance(a, S2Fun) or isinstance(a, vector3d)) and (isinstance(b, S2Fun) or isinstance(b, vector3d))):
+  if not (isinstance(a, _S2_INPUTS) and isinstance(b, _S2_INPUTS)):
     raise TypeError("the second input must be an S2Fun or a vector3d point set")
   if isinstance(a, vector3d):
     L = _bandwidth(128 if bandwidth is None else bandwidth)
@@ -486,7 +485,7 @@ def rotationalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ba
   """the discrepancy of two rotational densities or weighted orientation sets, D_2, D_ball or
   L2 (E_L); the shared form of SO3Fun/discrepancy and rotation/discrepancy, info=True adds the details"""
   metric = _metricName(metric, _SO3_METRICS, "rotational")
-  if not ((isinstance(a, SO3Fun) or isinstance(a, rotation)) and (isinstance(b, SO3Fun) or isinstance(b, rotation))):
+  if not (isinstance(a, _SO3_INPUTS) and isinstance(b, _SO3_INPUTS)):
     raise TypeError("inputs must be SO3Fun or rotation")
   L, fhat, x, c, exact = _difference(a, b, SO3Fun, lambda f: f.bandwidth if isinstance(f, SO3FunHarmonic) else 64, _so3Representation,
                                      bandwidth, weights, weights2)
@@ -511,16 +510,15 @@ def rotationalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ba
       plus = np.sum((qa + x[None, :, :]) ** 2, axis=-1)
       energy -= c[first:first + BLOCK] @ np.sqrt(minus * plus) @ c / (2 * np.pi)
     if np.any(fhat[1:]):
-      w = np.zeros(deg2dim(L + 1))
-      for l in range(1, L + 1):
-        w[deg2dim(l):deg2dim(l + 1)] = 64 / ((2 * l - 1) * (2 * l + 1) ** 2 * (2 * l + 3))
+      n = _so3Degrees(L)
+      w = np.where(n > 0, 64 / ((2.0 * n - 1) * (2 * n + 1) ** 2 * (2 * n + 3)), 0.0)
       moments = _so3Moments(x, c, L)
       energy += np.sum(w * (np.abs(fhat) ** 2 + 2 * np.real(np.conj(fhat) * moments)))
     out["method"] = "chordal atomic energy and harmonic continuous terms"
   else:
     diff = fhat + _so3Moments(x, c, L)
     dw = _degreeWeights(degreeWeights, L)
-    energy = sum(dw[l] * np.sum(np.abs(diff[deg2dim(l):deg2dim(l + 1)]) ** 2) for l in range(L + 1))
+    energy = np.sum(dw[_so3Degrees(L)] * np.abs(diff) ** 2)
     out["method"] = "weighted bandlimited harmonic norm"
   res = max(0.0, float(np.real(energy)))
   return _withInfo(res if squared else math.sqrt(res), out, info)
@@ -529,9 +527,10 @@ def rotationalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, ba
 def _so3KernelWeights(L):
   """the weights the restricted distance kernel puts on the Wigner coefficients, degree zero dropped"""
   A = SO3RestrictedDistanceKernel(L + 1).calcFourier(L)
-  w = np.zeros(deg2dim(L + 1))
-  for l in range(1, L + 1):
-    w[deg2dim(l):deg2dim(l + 1)] = math.sqrt(8 * np.pi ** 2 * A[l] / (2 * l + 1))
+  n = _so3Degrees(L)
+  kept = n > 0
+  w = np.zeros(n.size)
+  w[kept] = np.sqrt(8 * np.pi ** 2 * A[n[kept]] / (2 * n[kept] + 1))
   return w
 
 
@@ -552,7 +551,7 @@ def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
   """the squared truncated kernel objective of SO3Fun/optimalSample"""
   if isinstance(a, rotation) and isinstance(b, SO3Fun):
     return _legacySO3(b, a, weights=weights, bandwidth=bandwidth)
-  if not ((isinstance(a, SO3Fun) or isinstance(a, rotation)) and (isinstance(b, SO3Fun) or isinstance(b, rotation))):
+  if not (isinstance(a, _SO3_INPUTS) and isinstance(b, _SO3_INPUTS)):
     raise TypeError("the second input must be an SO3Fun or a rotation set")
   if isinstance(a, rotation):
     L = _bandwidth(32 if bandwidth is None else bandwidth)
@@ -583,7 +582,7 @@ def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
       raise ValueError("orientation sets must not be empty")
     c = _sampleWeights(b.size, weights)
     # the nodes carry the symmetries of the density, as in optimalSample
-    mu = _so3SampleMoments(b, c, L, f.CS, f.SS, getattr(b, "antipodal", False) if isinstance(b, orientation) else False)
+    mu = _so3SampleMoments(b, c, L, f.CS, f.SS, b.antipodal if isinstance(b, orientation) else False)
     diff = _mass(a) / (math.sqrt(8) * np.pi) * mu - math.sqrt(8) * np.pi * fhat
   return float(np.sum(np.abs(_so3KernelWeights(L) * diff) ** 2))
 
@@ -601,8 +600,8 @@ def discrepancy(a, b, metric="D_2", **kwargs):
     discrepancy(f, v, metric='L2', bandwidth=32, degreeWeights=w)   'E_L' the same
     discrepancy(f, v, squared=True), discrepancy(f, v, info=True) -> (d, info)
     discrepancy(f, v, metric='kernel')                   the squared objective of optimalSample"""
-  spherical = any(isinstance(x, S2Fun) or isinstance(x, vector3d) for x in (a, b))
-  if spherical and any(isinstance(x, SO3Fun) or isinstance(x, rotation) for x in (a, b)):
+  spherical = any(isinstance(x, _S2_INPUTS) for x in (a, b))
+  if spherical and any(isinstance(x, _SO3_INPUTS) for x in (a, b)):
     raise TypeError("a measure on the sphere cannot be compared with one on SO(3)")
   if isinstance(metric, str) and metric.lower() == "kernel":
     wanted = kwargs.pop("info", False)

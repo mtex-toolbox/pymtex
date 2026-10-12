@@ -277,12 +277,11 @@ def flatSO3(g):
   ringOff = np.ascontiguousarray(ab.offset, dtype=np.int64)
   ringMin = np.array([float(r.min) for r in ab.rhoGrid])
   ap = float(g.alphaPeriod)
-  ringAlpha, ringNode = np.empty(g.numNodes), np.empty(g.numNodes, dtype=np.int64)
-  for r in range(len(ab.rhoGrid)):
-    k0, k1 = ringOff[r], ringOff[r + 1]
-    a = g.alpha[k0:k1] - np.floor((g.alpha[k0:k1] - ringMin[r]) / ap) * ap
-    o = np.argsort(a, kind="stable")
-    ringAlpha[k0:k1], ringNode[k0:k1] = a[o], k0 + o
+  # the alpha of every node folded into the period of its ring, sorted ring by ring
+  ring = np.repeat(np.arange(len(ringMin)), np.diff(ringOff))
+  a = g.alpha - np.floor((g.alpha - ringMin[ring]) / ap) * ap
+  ringNode = np.lexsort((a, ring)).astype(np.int64)
+  ringAlpha = a[ringNode]
   return flatSO3Grid(np.ascontiguousarray(ab.thetaGrid.points, dtype=np.float64), ringOff, ringAlpha, ringNode, ringMin,
                      np.ascontiguousarray(g.cb), np.ascontiguousarray(g.sb), g.offset, g.gammaPoints, g.gammaMin, g.gammaPeriod, ap)
 

@@ -62,3 +62,9 @@ def test_calcTraces_refusesAnUnknownMethodWithoutClusters():
   e, v = stripes(0.0)
   with pytest.raises(ValueError):
     calcTraces(e, v, "hist", minClusterSize=e.size)
+
+
+def test_the_members_of_a_cluster_are_its_rows_in_order():
+  from mtex.maps.traces import _clusters, _members
+  cid, sz, cSize = _clusters(np.array([2, 1, 2, 0, 1, 2]), 6, np.ones(6))
+  assert [(tuple(int(i) for i in ic), r.tolist()) for ic, r in _members(cid, sz, cSize, 2)] == [((1,), [0, 2, 5])]

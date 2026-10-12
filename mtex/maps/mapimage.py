@@ -514,7 +514,8 @@ def transformReferenceFrame(mg, target, *args, byScreenAlignment=False):
     lin, transposed = layoutIndex(tgt, (B[0], B[1]), (r, c), return_transpose=True)
     out = m.copy()
     out.img = m.img.reshape(r * c, -1)[lin].reshape(lin.shape + m.img.shape[2:])
-    first = m._posData().reshape(-1, 3)[lin[0, 0]]
+    i, j = divmod(int(lin[0, 0]), c)
+    first = m._origin + float(i) * m._d1 + float(j) * m._d2
     if m.ebsd is not None:
       from .gridify import gridify
       out.ebsd = gridify(m.ebsd, tgt)

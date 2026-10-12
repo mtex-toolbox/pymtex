@@ -291,3 +291,22 @@ def test_spaceFlags_refuseAFlagStringNamingTheKeyword():
 def test_scatterOrientations_takesCompleteAsAKeyword():
   ori = orientation.rand(3, crystalFrame("m-3m"))
   assert scatter(ori, "axisAngle", complete=True) is not None
+
+
+def test_coordinates_prefersRodriguesThenEulerThenAxisAngle():
+  from mtex.plotting.spaceplot import _coordinates
+  assert (_coordinates(True, True, True), _coordinates(True, True, False), _coordinates(False, False, False, "Euler")) == ("Rodrigues", "Euler", "Euler")
+
+
+def test_setBox_heldWidensToWhatTheAxesShow():
+  from mtex.plotting.spaceplot import _setBox
+  ax = plt.figure().add_subplot(projection="3d")
+  ax.set_xlim(-5, 5)
+  _setBox(ax, np.zeros(3), np.ones(3), held=True)
+  assert ax.get_xlim() == (-5, 5) and ax.get_zlim()[1] >= 1
+
+
+def test_heldSpacePlot_isNoneWithoutHold():
+  from mtex.plotting.spaceplot import _heldSpacePlot
+  arrow3d(vector3d(1, 0, 0))
+  assert _heldSpacePlot() is None

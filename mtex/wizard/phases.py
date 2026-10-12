@@ -186,10 +186,9 @@ class PhaseTable(QTableWidget):
       self.setItem(i, 4, self._fixed(f"{100 * count / total:.1f}", right=True))
       if f.isIndexed:
         self.setItem(i, 5, self._cell(f.pointGroup + " ▾"))
-        for j, (v, key) in enumerate(zip(f.abc, ("a", "b", "c"))):
+        cell = np.concatenate([f.abc, f.abg / degree])
+        for j, (v, key) in enumerate(zip(cell, ("a", "b", "c", "alpha", "beta", "gamma"))):
           self.setItem(i, 6 + j, self._cell(_fmt(v), right=True, grey=not free[key]))
-        for j, (v, key) in enumerate(zip(f.abg / degree, ("alpha", "beta", "gamma"))):
-          self.setItem(i, 9 + j, self._cell(_fmt(v), right=True, grey=not free[key]))
         self.setItem(i, 12, self._cell(", ".join(closestAlignment(f)) + " ▾"))
       else:
         for j in range(5, 13):
@@ -233,13 +232,12 @@ class PhaseTable(QTableWidget):
     text = self.item(i, j).text().replace("▾", "").strip()
     try:
       if column == "plot":
-        cb.editPhase(self.st, k, "plot", self.item(i, 0).checkState() == Qt.Checked)
-      elif column in ("mineral", "symmetry"):
-        cb.editPhase(self.st, k, column, text)
-      elif column == "alignment":
-        cb.editPhase(self.st, k, column, text)
+        value = self.item(i, 0).checkState() == Qt.Checked
       elif column in NUMERIC:
-        cb.editPhase(self.st, k, column, float(text))
+        value = float(text)
+      else:
+        value = text
+      cb.editPhase(self.st, k, column, value)
     except Exception as e:
       self.st.status = ("failed", f"{column}: {e}")
       self.st.changed("status")

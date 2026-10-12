@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .kernels import qconj
-from .kernels import bestDot, closestAngle, closestImage, symReduce
+from .kernels import bestDot, closestAngle, closestImage, qconj, symReduce
 from .quaternion import qmul
-
-_ID = np.array([1.0, 0.0, 0.0, 0.0])
-
+from .representations import chordAngle, quatAngle, quatAxis
 
 
 def reductionGroups(o):
@@ -41,21 +38,31 @@ def reductionGroupsPair(a, b):
   return La, uniqueRotations(prod)
 
 
-def uniqueRotations(q, tol=1e-6):
-  """distinct rotations up to sign and a tolerance, pairwise, the first of each kept"""
-  same = np.abs(q @ q.T) > 1 - tol
-  keep = np.ones(len(q), dtype=bool)
-  for k in range(len(q)):
+# the first of every cluster of a pairwise relation, as a mask: an element stays unless an
+# earlier one that stays is the same
+def _firstOfClusters(same):
+  keep = np.ones(len(same), dtype=bool)
+  for k in range(len(same)):
     if keep[k]:
       keep[k + 1:] &= ~same[k, k + 1:]
-  return q[keep]
+  return keep
 
 
-def chordAngle(p, q):
-  """the chord angle |p -/+ q| = 2 sin(w/4) between rotations, accurate over the whole range"""
-  s = np.where(np.sum(p * q, axis=-1) < 0, -1.0, 1.0)[..., None]
-  h = np.linalg.norm(p - s * q, axis=-1)
-  return 4 * np.arcsin(np.minimum(h / 2, 1.0))
+# the distinct rows of unit vectors, the first of every set whose dots exceed 1 - tol
+def _distinctUnitRows(X, tol):
+  X = np.asarray(X, dtype=float)
+  X = X.reshape(-1, X.shape[-1]) if X.size else X.reshape(0, 3)
+  return X[_firstOfClusters(X @ X.T > 1 - tol)]
+
+
+# whether rotations are about z, the identity included
+def _isAboutZ(q):
+  return (quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[..., 2]) > 1 - 1e-8)
+
+
+def uniqueRotations(q, tol=1e-6):
+  """distinct rotations up to sign and a tolerance, pairwise, the first of each kept"""
+  return q[_firstOfClusters(np.abs(q @ q.T) > 1 - tol)]
 
 
 def referenceImages(ref, L, R, exchange=False):
@@ -71,11 +78,7 @@ def referenceImages(ref, L, R, exchange=False):
     frm.append(np.stack([li.ravel(), rj.ravel(), np.full(li.size, useInv)], axis=-1))
   es, frm = np.concatenate(es), np.concatenate(frm)
   if abs(ref[0]) > 1 - 1e-12:
-    same = np.abs(es @ es.T) > 1 - 1e-10
-    keep = np.ones(len(es), dtype=bool)
-    for k in range(len(es)):
-      if keep[k]:
-        keep[k + 1:] &= ~same[k, k + 1:]
+    keep = _firstOfClusters(np.abs(es @ es.T) > 1 - 1e-10)
     es, frm = es[keep], frm[keep]
   return es, frm
 

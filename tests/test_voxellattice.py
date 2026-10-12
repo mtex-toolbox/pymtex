@@ -15,6 +15,11 @@ def shuffledLattice():
   return D, ijk, P, perm, voxelLattice.fromPositions(P[perm])
 
 
+def test_box_indexesEveryVoxelInCOrder():
+  l = voxelLattice._box(np.zeros(3), np.eye(3), (2, 3, 4))
+  assert np.array_equal(l.ijk, np.stack(np.unravel_index(np.arange(24), (2, 3, 4)), axis=1)) and l.shape == (2, 3, 4)
+
+
 def test_fromPositions_infersTheTranslationsAndTheIndex():
   D, ijk, P, perm, l = shuffledLattice()
   assert np.allclose(l.D, D) and l.shape == (4, 5, 6)

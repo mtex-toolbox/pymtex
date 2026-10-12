@@ -274,3 +274,9 @@ def test_pointwiseOperations_onTheCircle():
   c = S1FunHarmonic(S1FejerKernel(4))
   xs = rng.random(10) * 2 * pi
   assert relclose((c * c)(xs), c(xs) ** 2, 1e-8)
+
+
+# the Laplacian of a list of functions on the sphere acts on every one
+def test_laplace_ofAListOfSphericalFunctions():
+  f = S2FunHarmonic(np.eye(9)[:3], _internal=True, symmetrise=False)
+  assert np.array_equal(laplace(f)._fhat, -np.eye(9)[:3] * [0, 2, 2, 2, 6, 6, 6, 6, 6])

@@ -17,6 +17,7 @@ import numpy as np
 from ..geometry.frames import closestAlignment, crystalFrame
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.units import degree
+from ..maps.phaselist import phaseList
 
 
 def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, dataSets=(), mapConvention="y↑→x",
@@ -69,7 +70,7 @@ def phasesDiffer(phases, header):
   the header side is a phase list or the value snapshot frameKeys took of one"""
   if header is None:
     return True
-  keys = [frameKey(f) for f in header.frames] if hasattr(header, "frames") else list(header)
+  keys = [frameKey(f) for f in header.frames] if isinstance(header, phaseList) else list(header)
   return [frameKey(f) for f in phases.frames] != keys
 
 

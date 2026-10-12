@@ -11,10 +11,12 @@
 # the frame, so a plane in the specimen and a lattice plane are told apart by it.
 from __future__ import annotations
 
+import itertools
 from typing import TYPE_CHECKING
 import numpy as np
 
 from ._array import MtexArray
+from .symreduce import _firstOfClusters
 from .vector3d import vector3d, asVector3d
 
 
@@ -117,15 +119,11 @@ class plane3d:
     lo, hi = np.asarray(lo, dtype=float).reshape(3), np.asarray(hi, dtype=float).reshape(3)
     corners = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
     n, d = self.N.data.reshape(3), float(np.asarray(self.d).reshape(()))
-    pts = []
-    for i in range(8):
-      for j in range(i + 1, 8):
-        if np.sum(corners[i] != corners[j]) != 1:
-          continue
-        v = lineIntersect(corners[i], corners[j], n, d).data.reshape(3)
-        if np.all(np.isfinite(v)) and not any(np.linalg.norm(u - v) < 1e-10 for u in pts):
-          pts.append(v)
-    pts = np.array(pts).reshape(-1, 3)
+    # the crossings of the twelve edges, each corner of the polygon once
+    edges = [(i, j) for i, j in itertools.combinations(range(8), 2) if np.sum(corners[i] != corners[j]) == 1]
+    pts = np.array([lineIntersect(corners[i], corners[j], n, d).data.reshape(3) for i, j in edges])
+    pts = pts[np.all(np.isfinite(pts), axis=1)]
+    pts = pts[_firstOfClusters(np.linalg.norm(pts[:, None] - pts[None], axis=-1) < 1e-10)]
     if len(pts) >= 3:
       c = pts.mean(axis=0)
       u = self.N.orth().data.reshape(3)

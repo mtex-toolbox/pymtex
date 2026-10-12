@@ -88,7 +88,12 @@ def _loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=N
   convention = next((a for a in flags if a in EULER_NAMES), "Bunge")
   ori = orientation.byEuler(e[:, 0], e[:, 1], e[:, 2], convention, CS, SS)
   w = np.ones(len(e)) if weightCol is None else d[:, weightCol]
-  method = "interp" if "interp" in flags else "density" if "density" in flags else "interp" if len(np.unique(w)) > 1 else "density"
+  if "interp" in flags:
+    method = "interp"
+  elif "density" in flags:
+    method = "density"
+  else:
+    method = "interp" if len(np.unique(w)) > 1 else "density"
   if method == "density":
     from ..functions.density import calcDensity
     return calcDensity(ori, weights=w, halfwidth=halfwidth, **({} if resolution is None else {"resolution": resolution}))
@@ -98,6 +103,8 @@ def _loadODF_generic(fname, *args, CS=None, SS=None, columnNames=None, columns=N
 
 
 VPSC_CONVENTIONS = {"B": "Bunge", "K": "Kocks", "R": "Roe"}
+# the line that opens a block of a VPSC file: the letter of the convention and the count
+VPSC_HEAD = re.compile(r"^\s*([BbKkRr])\s+(\d+)\s*$")
 
 
 # the ODF of a VPSC texture file, one density per block of weighted orientations, a list for
@@ -109,7 +116,7 @@ def _loadODF_VPSC(fname, *args, CS=None, **kwargs):
   CS = crystalFrame("432") if CS is None else CS
   with open(fname, encoding="utf-8", errors="replace") as f:
     lines = f.read().split("\n")
-  heads = [(i, m) for i, m in ((i, re.match(r"^\s*([BbKkRr])\s+(\d+)\s*$", l)) for i, l in enumerate(lines)) if m]
+  heads = [(i, m) for i, l in enumerate(lines) if (m := VPSC_HEAD.match(l))]
   if not heads or heads[0][0] != 3:
     raise ValueError("the file is not a VPSC texture file: its fourth line names the convention and the count")
   # the leading numbers of a header line, NaN for what a weight file leaves out
@@ -121,7 +128,7 @@ def _loadODF_VPSC(fname, *args, CS=None, **kwargs):
   for i, m in heads:
     n = int(m.group(2))
     convention = VPSC_CONVENTIONS[m.group(1).upper()]
-    block = np.array([[float(x) for x in l.split()] for l in lines[i + 1:i + 1 + n]], dtype=float)
+    block = np.loadtxt(lines[i + 1:i + 1 + n], comments=None, ndmin=2)
     ori = orientation.byEuler(block[:, 0] * degree, block[:, 1] * degree, block[:, 2] * degree, convention, CS, SS)
     odf = calcDensity(ori, weights=block[:, 3], **kwargs)
     # the strain, the phase ellipsoid, the orientations and the further columns, MATLAB's odf.opt
@@ -139,7 +146,7 @@ def loadODF(fname, *args, interface=None, **kwargs):
   if interface is None:
     with open(fname, encoding="utf-8", errors="replace") as f:
       head = [next(f, "") for _ in range(4)]
-    interface = "VPSC" if re.match(r"^\s*[BbKkRr]\s+\d+\s*$", head[3]) else "generic"
+    interface = "VPSC" if VPSC_HEAD.match(head[3]) else "generic"
   if interface == "VPSC":
     return _loadODF_VPSC(fname, *args, **kwargs)
   return _loadODF_generic(fname, *args, **kwargs)

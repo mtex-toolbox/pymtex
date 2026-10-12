@@ -17,6 +17,9 @@ import numpy as np
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector
+from ..maps.boundary import triplePointList
+from ..maps.ebsd import EBSD
+from ..maps.grains import grain2d
 from ..maps.lattice import cellCorners, mapPlane
 from ..maps.phaselist import phaseColorNames
 
@@ -31,14 +34,18 @@ def identityLayout():
   return np.eye(2)
 
 
+# the layout given as a float matrix, the identity for none
+def _layoutOf(layout):
+  return identityLayout() if layout is None else np.asarray(layout, dtype=float)
+
+
 def mapLayout(pC=None):
   """the layout a convention asks for: the components of east and north along the plane's x
   and y, snapped to the signed permutation an axis aligned convention is"""
   pC = plottingConvention.default if pC is None else plottingConvention(pC)
   e, n = pC.east.data.reshape(3), pC.north.data.reshape(3)
   M = np.array([[e[0], e[1]], [n[0], n[1]]])
-  snapped = np.where(np.abs(M) < 1e-12, 0.0, np.where(np.abs(np.abs(M) - 1) < 1e-12, np.sign(M), M))
-  return snapped
+  return np.where(np.abs(M) < 1e-12, 0.0, np.where(np.abs(np.abs(M) - 1) < 1e-12, np.sign(M), M))
 
 
 # ------------------------------------------------------------------ the picture
@@ -59,9 +66,8 @@ def mapBox(x):
   in a coordinate plane is exactly its extent, and a map of forty million points is not
   projected point by point to learn where it ends. The padding of a grid is left out."""
   P = x.pos.data.reshape(-1, 3)
-  pad = getattr(x, "_pad", None)
-  if pad is not None:
-    P = P[~pad.reshape(-1)]
+  if x._pad is not None:
+    P = P[~x._pad.reshape(-1)]
   if len(P) == 0:
     return np.zeros((0, 2))
   lo, hi = _columnBounds(P)
@@ -118,7 +124,7 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   l = ebsd.lattice
   if l is None or len(l.ij) != ebsd.size or ebsd.size == 0:
     return None
-  M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
+  M = _layoutOf(layout)
   lin = latticeTable(ebsd)
   A = M @ l.A
   h = l.dxy
@@ -142,7 +148,7 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   o = M @ l.origin
   x = xs[0] + (np.arange(nx) + 0.5) * dx
   y = ys[0] + (np.arange(ny) + 0.5) * dy
-  pad = getattr(ebsd, "_pad", None)
+  pad = ebsd._pad
   from .kernels import mapRasterIndex
   index = mapRasterIndex(x, y, o, Ainv, A, aligned, lin, pad)
   if index is not None:
@@ -173,7 +179,8 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   index[inside] = lin[ia[inside], ib[inside]]
   # the padding of a grid is no measurement and shows nothing
   if pad is not None:
-    index[index >= 0] = np.where(pad.reshape(-1)[index[index >= 0]], -1, index[index >= 0])
+    shown = index >= 0
+    index[shown] = np.where(pad.reshape(-1)[index[shown]], -1, index[shown])
   return xs, ys, index
 
 
@@ -196,7 +203,7 @@ def mapCells(ebsd, layout=None):
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it has no cells to draw")
-  M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
+  M = _layoutOf(layout)
   P, lin = l.plane.to2d(ebsd.pos.data.reshape(-1, 3)), latticeTable(ebsd)
   cell = cellCorners(l.A, l.shape)
   share = cornerSharing(l, cell)
@@ -220,14 +227,13 @@ def mapCells(ebsd, layout=None):
 
 def mapPoints(ebsd, layout=None):
   """the measurements as points on the screen"""
-  M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
-  return planeOf(ebsd).to2d(ebsd.pos.data.reshape(-1, 3)) @ M.T
+  return planeOf(ebsd).to2d(ebsd.pos.data.reshape(-1, 3)) @ _layoutOf(layout).T
 
 
 def planeOf(x):
   """the plane a map, grains or a boundary lie in: the lattice's for a map, else one fitted
   to its positions"""
-  if hasattr(x, "lattice"):
+  if isinstance(x, EBSD):
     return x.lattice.plane if x.lattice is not None else mapPlane(x.pos.data.reshape(-1, 3))
   return x.plane
 
@@ -255,17 +261,18 @@ def grainPolygons(g, k):
 
 def mapExtent(x, layout=None):
   """the extent of what a map plot has to show, on the screen: (xlo, xhi, ylo, yhi)"""
-  M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
-  if hasattr(x, "lattice"):
+  M = _layoutOf(layout)
+  # a map reaches half a spacing beyond its outer measurements, anything else ends at its vertices
+  r = 0.0
+  if isinstance(x, EBSD):
     P = mapBox(x)
     r = x.lattice.dxy if x.lattice is not None else 0.0
-  elif hasattr(x, "loops"):
-    gB = x.boundary
-    P, r = gB.V[np.unique(gB.F)] if len(gB.F) else np.zeros((0, 2)), 0.0
-  elif hasattr(x, "boundaryId"):
-    P, r = (np.asarray(x.V).reshape(-1, 2) if len(x.grainId) else np.zeros((0, 2))), 0.0
+  elif isinstance(x, triplePointList):
+    P = np.asarray(x.V).reshape(-1, 2) if len(x.grainId) else np.zeros((0, 2))
   else:
-    P, r = x.V[np.unique(x.F)] if len(x.F) else np.zeros((0, 2)), 0.0
+    # grains end at their boundary, a boundary or an image outline at its segments
+    gB = x.boundary if isinstance(x, grain2d) else x
+    P = gB.V[np.unique(gB.F)] if len(gB.F) else np.zeros((0, 2))
   if len(P) == 0:
     return (0.0, 0.0, 0.0, 0.0)
   Q = P @ M.T
@@ -316,7 +323,7 @@ def scaleBar(x, unit="um", fraction=0.1):
     e = mapExtent(x)
     return scaleBar(e[1] - e[0], getattr(x, "scanUnit", "um"), fraction)
   y, u, f = switchUnit(fraction * x, unit)
-  n = SCALE_BAR_STEPS[int(np.argmin([abs(s - y) for s in SCALE_BAR_STEPS]))]
+  n = SCALE_BAR_STEPS[int(np.argmin(np.abs(np.asarray(SCALE_BAR_STEPS) - y)))]
   return n / f, f"{n:g} {unitLabel(u)}"
 
 
@@ -326,7 +333,7 @@ def frameOnScreen(pl, layout=None):
   """the (right, up, towards the viewer) components of the axes of the frame in the picture of
   a map: the plane's coordinates taken to the screen by the layout, and the normal towards
   the viewer, who looks from the other side of the plane when the layout flips it"""
-  M = identityLayout() if layout is None else np.asarray(layout, dtype=float)
+  M = _layoutOf(layout)
   side = np.sign(np.linalg.det(M))
   n = pl.normal
   out = []
@@ -357,7 +364,7 @@ def triadGeometry(screen, labels, t=1.0):
   if kSym is not None:
     r0 = 1.2 * symR
     phi = np.linspace(0, 2 * np.pi, 49)
-    symbol += [np.array([symR * np.cos(p), symR * np.sin(p)]) for p in phi]
+    symbol += list(symR * np.column_stack([np.cos(phi), np.sin(phi)]))
     if screen[kSym][2] < 0:
       r, ri = symR / np.sqrt(2), 0.62 * symR / np.sqrt(2)
       for sx, sy in ((-1, -1), (1, 1), (-1, 1), (1, -1)):

@@ -129,3 +129,14 @@ def test_B17_a_grain_list_coarsens_both_of_its_boundaries_at_once():
   p.score = [1, 2]
   q = p.simplifyBoundary()
   assert np.array_equal(q.id, p.id) and np.array_equal(q.score, [1, 2]) and q.boundarySize.sum() < p.boundarySize.sum()
+
+
+def test_a_closed_chain_with_fewer_than_three_kept_heads_keeps_its_thirds():
+  from mtex.maps.boundaryresampling import keepClosedChains
+  gB = diskCircle(5, 16)[0]
+  keep = keepClosedChains(gB, np.zeros(len(gB), dtype=bool))
+  s, e = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
+  expected = np.zeros(len(gB), dtype=bool)
+  for a, b in zip(s[gB.isClosed[s]], e[gB.isClosed[s]]):
+    expected[a + np.unique(np.rint(np.linspace((b - a + 1) / 3, b - a + 1, 3)).astype(int)) - 1] = True
+  assert expected.sum() >= 3 and np.array_equal(keep, expected)

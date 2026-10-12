@@ -36,6 +36,12 @@ def _uint8(rgb):
   return np.round(np.clip(rgb, 0, 1) * 255).astype(np.uint8)
 
 
+# the corners of the voxel faces on a slice, a grid of (nb + 1) x (nc + 1) points over its rectangle
+def _sliceGrid(corners, nb, nc):
+  u, v = np.meshgrid(np.linspace(0, 1, nb + 1), np.linspace(0, 1, nc + 1), indexing="ij")
+  return corners[0] + u[..., None] * (corners[1] - corners[0]) + v[..., None] * (corners[2] - corners[0])
+
+
 def pyvistaPlotter(scene, off_screen=False, window_size=(800, 800), plotter=None):
   """a PyVista plotter drawing the scene, its camera set by the plotting convention"""
   import pyvista as pv
@@ -49,14 +55,8 @@ def pyvistaPlotter(scene, off_screen=False, window_size=(800, 800), plotter=None
       p.add_mesh(poly, scalars="rgb", rgb=True, opacity=it.faceAlpha, lighting=False, show_edges=edges,
                  edge_color=tuple(it.edgeColor) if edges else "black", edge_opacity=it.edgeAlpha, line_width=it.lineWidth)
     elif isinstance(it, slices3d):
-      for a in range(3):
-        if it.at[a] is None:
-          continue
-        rgb, vis, corners = it.plane(a)
-        nb, nc = vis.shape
-        # the corners of the voxel faces on the slice, a structured grid of (nb + 1) x (nc + 1)
-        u, v = np.meshgrid(np.linspace(0, 1, nb + 1), np.linspace(0, 1, nc + 1), indexing="ij")
-        P = corners[0] + u[..., None] * (corners[1] - corners[0]) + v[..., None] * (corners[2] - corners[0])
+      for rgb, vis, corners in it.planes():
+        P = _sliceGrid(corners, *vis.shape)
         grid = pv.StructuredGrid(P[..., 0], P[..., 1], P[..., 2])
         grid.cell_data["rgb"] = _uint8(rgb.reshape(-1, 3, order="F"))
         p.add_mesh(grid, scalars="rgb", rgb=True, lighting=False)
@@ -103,9 +103,9 @@ def renderImage(scene, size=(800, 800)):
 
 def drawMatplotlib(scene, ax):
   """the scene on matplotlib's 3D axes, the faces sorted by depth as matplotlib does"""
-  from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
 
-  from .spaceplot import _camera
+  from .spaceplot import _camera, _setBox
   for it in scene.items:
     if isinstance(it, mesh3d):
       T, face = it.triangles()
@@ -113,17 +113,11 @@ def drawMatplotlib(scene, ax):
       pc = Poly3DCollection(it.V[T], facecolors=fc, linewidths=0)
       ax.add_collection3d(pc)
       if it.edgeColor is not None and it.edgeAlpha > 0:
-        from mpl_toolkits.mplot3d.art3d import Line3DCollection
         E = it.edges()
         ax.add_collection3d(Line3DCollection(it.V[E], colors=[(*it.edgeColor, it.edgeAlpha)], linewidths=it.lineWidth))
     elif isinstance(it, slices3d):
-      for a in range(3):
-        if it.at[a] is None:
-          continue
-        rgb, vis, corners = it.plane(a)
-        nb, nc = vis.shape
-        u, v = np.meshgrid(np.linspace(0, 1, nb + 1), np.linspace(0, 1, nc + 1), indexing="ij")
-        P = corners[0] + u[..., None] * (corners[1] - corners[0]) + v[..., None] * (corners[2] - corners[0])
+      for rgb, vis, corners in it.planes():
+        P = _sliceGrid(corners, *vis.shape)
         ax.plot_surface(P[..., 0], P[..., 1], P[..., 2], facecolors=rgb, shade=False, rstride=1, cstride=1, linewidth=0)
     elif isinstance(it, picture3d):
       # a picture of at most 150 x 150 cells, the cells nothing is drawn in left out
@@ -135,18 +129,13 @@ def drawMatplotlib(scene, ax):
       P = C[0] + u[..., None] * (C[1] - C[0]) + v[..., None] * (C[2] - C[0])
       ax.plot_surface(P[..., 0], P[..., 1], P[..., 2], facecolors=rgba, shade=False, rstride=1, cstride=1, linewidth=0)
     elif isinstance(it, lines3d):
-      from mpl_toolkits.mplot3d.art3d import Line3DCollection
       ax.add_collection3d(Line3DCollection(it.segments, colors=np.column_stack([it.color, np.full(len(it.color), it.alpha)]), linewidths=it.lineWidth))
     elif isinstance(it, points3d):
       ax.scatter(it.P[:, 0], it.P[:, 1], it.P[:, 2], c=it.color, s=it.markerSize ** 2, depthshade=False)
   # a flat scene is given a thickness of a thousandth of its size
   lo, hi = scene.bounds()
   pad = np.where(hi - lo > 0, 0, 5e-4 * max(np.max(hi - lo), 1e-12))
-  lo, hi = lo - pad, hi + pad
-  ax.set_xlim(lo[0], hi[0])
-  ax.set_ylim(lo[1], hi[1])
-  ax.set_zlim(lo[2], hi[2])
-  ax.set_box_aspect(tuple(hi - lo))
+  _setBox(ax, lo - pad, hi + pad)
   ax.set_axis_off()
   from ..geometry.plottingconvention import plottingConvention
   _camera(ax, plottingConvention.default3D if scene.how2plot is None else scene.how2plot)
@@ -174,10 +163,7 @@ def _payload(scene):
         d.update(E=_blob(it.edges().astype(np.uint32)), edgeColor=list(map(float, it.edgeColor)), edgeAlpha=it.edgeAlpha)
       items.append(d)
     elif isinstance(it, slices3d):
-      for a in range(3):
-        if it.at[a] is None:
-          continue
-        rgb, vis, corners = it.plane(a)
+      for rgb, vis, corners in it.planes():
         # the picture with the first index along its rows, as a texture wants it
         rgba = np.concatenate([_uint8(rgb), np.full(vis.shape + (1,), 255, dtype=np.uint8)], axis=-1)
         items.append({"kind": "slice", "rgba": _blob(np.transpose(rgba, (1, 0, 2))), "w": int(vis.shape[0]), "h": int(vis.shape[1]),

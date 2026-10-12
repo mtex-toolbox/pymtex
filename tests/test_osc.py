@@ -120,3 +120,15 @@ def test_the_placeholders_of_a_stopped_scan_are_dropped():
   # a placeholder inside the map, or a measured pixel at the origin, is kept
   M[0, :3] = np.float32(4 * np.pi)
   assert len(oscTrim(M)) == 4 and len(oscTrim(M[:4])) == 4
+
+
+def test_oscLayout_reads_counts_steps_and_columns_of_the_cut():
+  from mtex.io.osc import _oscLayout
+  from mtex.io.table import readFile
+  nx, ny, n, phases, start, xstep, ystep, m = _oscLayout(readFile(CUT), CUT)
+  assert m >= 5 and xstep > 0 and ystep > 0 and len(phases) >= 1
+
+
+def test_oscColumnNames_numbers_the_columns_past_the_ten():
+  from mtex.io.osc import _oscColumnNames
+  assert _oscColumnNames(12)[-3:] == ["fit", "extra1", "extra2"] and _oscColumnNames(5)[-1] == "y"

@@ -94,6 +94,19 @@ def test_round_maxHKLGivesNearbyIntegerIndices(fr):
   assert mtex.round(hs).shape == (40,)
 
 
+def test_round_keepsAZeroRowZero():
+  assert np.array_equal(Miller([[0, 0, 0], [2, 4, 0]], cubic()).round().hkl, [[0, 0, 0], [1, 2, 0]])
+
+
+def test_round_keepsANaNRowNaN():
+  assert np.all(np.isnan(Miller([[np.nan, 0, 1]], cubic()).round().hkl[0]))
+
+
+def test_round_reducesUVTWByTheGcdOfEveryRow():
+  h = Miller([[2, 2, -4, 6], [1, 3, -4, 8]], hexagonal(), "UVTW")
+  assert close(h.round().UVTW, [[1, 1, -2, 3], [1, 3, -4, 8]])
+
+
 @pytest.mark.parametrize("m", [[1, 0, 0], [1, 1, 0], [1, 1, 1], [2, 1, 0]])
 def test_Miller_cubicPlaneNormalIsTheDirectionOfTheSameIndices(m):
   csC = cubic()

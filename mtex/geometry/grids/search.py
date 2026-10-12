@@ -14,6 +14,11 @@ from ..orientation import orientation
 from ..vector3d import vector3d, asVector3d
 
 
+# whether the third argument of find is a count k, not a radius
+def _isCount(epsOrK):
+  return isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool)
+
+
 def _distances(v, w, antipodal=None):
   if isinstance(v, orientation):
     if not isinstance(w, orientation):
@@ -40,7 +45,7 @@ def _findByTree(v, w, epsOrK):
   if epsOrK is None:
     ind, c = tree.nearest(w.flatten())
     return ind.reshape(w.shape), _angle(c).reshape(w.shape)
-  if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
+  if _isCount(epsOrK):
     ind, c = tree.knn(w.flatten(), int(epsOrK))
     return ind, _angle(c)
   I, C = tree.radius(w.flatten(), float(epsOrK))
@@ -75,11 +80,10 @@ class S2Tree:
     _, ind = self.tree.query(x, k=kk, workers=threads())
     ind = np.asarray(ind).reshape(len(x), -1) % self.n
     if self.antipodal and k is not None:
-      # v and -v of one point both among the 2k: the first k distinct points, in order
-      out = np.empty((len(x), k), dtype=np.int64)
-      for r in range(len(x)):
-        out[r] = list(dict.fromkeys(ind[r].tolist()))[:k]
-      ind = out
+      # v and -v of one point both among the 2k: the first k distinct points, in order, a
+      # repeat of an earlier column sorted behind them
+      repeat = np.triu(ind[:, :, None] == ind[:, None, :], 1).any(axis=1)
+      ind = np.take_along_axis(ind, np.argsort(repeat, axis=1, kind="stable")[:, :k], axis=1)
     ind = ind[:, 0] if k is None else ind
     return ind, self._angles(self.pts[ind], x[:, None, :] if k is not None else x)
 
@@ -136,7 +140,7 @@ def find(v, w, epsOrK=None, antipodal=None):
     if epsOrK is None:
       ind, d = tree.nearest(xyz)
       return ind.reshape(w.shape), d.reshape(w.shape)
-    if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
+    if _isCount(epsOrK):
       return tree.nearest(xyz, int(epsOrK))
     return tree.radius(xyz, float(epsOrK))
   d = _distances(v, w, antipodal)
@@ -144,7 +148,7 @@ def find(v, w, epsOrK=None, antipodal=None):
   if epsOrK is None:
     ind = np.argmin(d, axis=1)
     return ind.reshape(w.shape), np.take_along_axis(d, ind[:, None], axis=1)[:, 0].reshape(w.shape)
-  if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
+  if _isCount(epsOrK):
     k = int(epsOrK)
     order = np.argsort(d, axis=1, kind="stable")[:, :k]
     return order, np.take_along_axis(d, order, axis=1)

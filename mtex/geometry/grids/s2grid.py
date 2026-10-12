@@ -26,10 +26,9 @@ class S2Grid(vector3d):
     if len(rho) != len(theta):
       raise ValueError("one azimuth grid per ring is needed")
     self.thetaGrid, self.rhoGrid = theta, list(rho)
-    self.offset = np.concatenate([[0], np.cumsum([len(r) for r in rho])])
-    th = np.concatenate([np.full(len(r), t) for t, r in zip(theta.points, rho)]) if len(rho) else np.zeros(0)
-    rh = np.concatenate([r.points for r in rho]) if len(rho) else np.zeros(0)
-    xyz = np.stack([np.sin(th) * np.cos(rh), np.sin(th) * np.sin(rh), np.cos(th)], axis=-1)
+    self.offset = np.concatenate([[0], np.cumsum([len(r) for r in rho], dtype=np.int64)])
+    th, rh = self._ringPolar()
+    xyz =np.stack([np.sin(th) * np.cos(rh), np.sin(th) * np.sin(rh), np.cos(th)], axis=-1)
     vector3d.__init__(self, xyz, antipodal=antipodal, isNormalized=True, frame=frame)
     self.res = float(resolution)
 
@@ -63,10 +62,15 @@ class S2Grid(vector3d):
       self._flatCache = flatS2(self)
     return self._flatCache
 
+  # the polar angle and the azimuth of every point, ring after ring
+  def _ringPolar(self):
+    th = np.repeat(np.asarray(self.thetaGrid.points, dtype=float), np.diff(self.offset))
+    rh = np.concatenate([r.points for r in self.rhoGrid]) if self.rhoGrid else np.zeros(0)
+    return th, rh
+
   def polar(self):
     """the polar angles of the grid points, exact from the rings"""
-    th = np.concatenate([np.full(len(r), t) for t, r in zip(self.thetaGrid.points, self.rhoGrid)])
-    rh = np.concatenate([r.points for r in self.rhoGrid])
+    th, rh = self._ringPolar()
     return th, rh, np.ones(self.size)
 
   def subGrid(self, mask, eps=None):
@@ -79,8 +83,9 @@ class S2Grid(vector3d):
       m = np.zeros(self.size, dtype=bool)
       m[mask] = True
       mask = m
-    keep = [bool(np.any(mask[self.ring(k)])) for k in range(self.numRings)]
-    rho = [self.rhoGrid[k].subGrid(mask[self.ring(k)]) for k in range(self.numRings) if keep[k]]
+    counts = np.add.reduceat(mask, self.offset[:-1]) if self.size else np.zeros(self.numRings, dtype=np.int64)
+    keep = counts > 0
+    rho = [self.rhoGrid[k].subGrid(mask[self.ring(k)]) for k in np.flatnonzero(keep)]
     g = S2Grid(self.thetaGrid.subGrid(keep), rho, self.frame, self.res, self.antipodal)
     g.dispStyle = self.dispStyle
     return g
@@ -225,14 +230,13 @@ def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, 
   if hemisphere not in ("complete", "upper", "lower", "sphere"):
     raise ValueError("hemisphere is 'complete', 'upper' or 'lower'")
   cut = antipodal and region is None
-  tmax = maxTheta if maxTheta is not None else np.pi / 2 if hemisphere == "upper" or cut else np.pi
-  tmin = max(minTheta, np.pi / 2) if hemisphere == "lower" else minTheta
+  tmin, tmax = _polarRange(minTheta, maxTheta, hemisphere, cut)
   dth, drh = tmax - tmin, maxRho - minRho
   res = resolution if points is None else _resolutionFor(points, tmin, tmax, drh, center)
   # the ring spacing divides the polar range
   res = 2 * tmax / max(np.round(2 * tmax / res), 1)
-  ntheta = max(int(np.round(2 * dth / res + (not center))) // 2, 1)
-  theta = tmin + (np.arange(ntheta) + 0.5) * res if not center else tmin + np.arange(ntheta + 1) * res
+  ntheta = max(_ringCount(dth, res, center), 1)
+  theta = _thetaLadder(tmin, ntheta, res, center)
   rho = []
   for j, t in enumerate(theta):
     odd = j % 2 == 1
@@ -251,16 +255,32 @@ def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, 
   return g.subGrid(region.checkInside(vector3d(g.data)))
 
 
+# the polar range of a hemisphere, the upper one for axes
+def _polarRange(minTheta, maxTheta, hemisphere, upper):
+  if maxTheta is not None:
+    tmax = maxTheta
+  else:
+    tmax = np.pi / 2 if hemisphere == "upper" or upper else np.pi
+  tmin = max(minTheta, np.pi / 2) if hemisphere == "lower" else minTheta
+  return tmin, tmax
+
+
+# the number of rings a polar range of dth holds at the spacing res, and their polar angles:
+# the rings at half steps, or a centred ladder from tmin with one ring more
+def _ringCount(dth, res, center):
+  return int(np.round(2 * dth / res + (not center))) // 2
+
+
+def _thetaLadder(tmin, n, res, center):
+  return tmin + np.arange(n + 1) * res if center else tmin + (np.arange(n) + 0.5) * res
+
+
 # the resolution giving about n points: the area over n, refined by counting
 def _resolutionFor(n, tmin, tmax, drh, center):
   area = drh * (np.cos(tmin) - np.cos(tmax))
   res = np.sqrt(area / n)
-
-  def thetas(r):
-    return tmin + (np.arange(int(np.round(2 * (tmax - tmin) / r + 1)) // 2) + 0.5) * r if not center else tmin + np.arange(int(np.round(2 * (tmax - tmin) / r)) // 2 + 1) * r
-
   for _ in range(4):
-    ts = thetas(res)
+    ts = _thetaLadder(tmin, _ringCount(tmax - tmin, res, center), res, center)
     c = sum(max(int(np.round(np.sin(t) * drh / (tmax - tmin) * len(ts))), 1) for t in ts)
     if c == 0:
       break
@@ -274,8 +294,7 @@ def regularS2Grid(resolution=5 * degree, points=None, theta=None, rho=None, minT
                   maxRho=2 * np.pi, antipodal=False, hemisphere="complete", frame=None):
   """the tensor product of a polar ladder and an azimuth ladder as an nRho x nTheta matrix
   of directions, the layout of the pole figure files"""
-  tmax = maxTheta if maxTheta is not None else np.pi / 2 if hemisphere == "upper" or antipodal else np.pi
-  tmin = max(minTheta, np.pi / 2) if hemisphere == "lower" else minTheta
+  tmin, tmax = _polarRange(minTheta, maxTheta, hemisphere, antipodal)
   res = np.broadcast_to(np.asarray(resolution, dtype=float), (2,))
   nr, nt = points if points is not None else (int(np.ceil((maxRho - minRho) / res[0])), int(np.ceil((tmax - tmin) / res[1] + 1)))
   th = np.asarray(theta, dtype=float) if theta is not None else np.linspace(tmin, tmax, nt)

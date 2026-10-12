@@ -30,6 +30,7 @@ from .data.pointgroupnames import (LAUE_CLASSES, POINT_GROUP_NAMES, SPACE_GROUPS
 from .latticetype import latticeType
 from .quaternion import orthogonalTransform, reflection, rotation
 from .session import getMTEXpref
+from .symreduce import _firstOfClusters
 from .units import degree
 from .vector3d import classproperty, vector3d, xvector, yvector, zvector, asVector3d
 
@@ -44,20 +45,30 @@ CANONICAL_AXES = np.eye(3)
 # the elements of a list that are not repeats of an earlier one, up to an angle and with
 # the same parity; pairwise, since a group is small and rounding keys can split a pair
 def _uniqueElements(o, tol=1e-6):
-  q, p = o.data.reshape(-1, 5)[:, :4], o.data.reshape(-1, 5)[:, 4]
-  same = (np.abs(q @ q.T) > 1 - tol) & (p[:, None] == p[None, :])
-  keep = np.ones(len(q), dtype=bool)
-  for k in range(len(q)):
-    if keep[k]:
-      keep[k + 1:] &= ~same[k, k + 1:]
-  return orthogonalTransform(o.data.reshape(-1, 5)[keep])
+  e = o.data.reshape(-1, 5)
+  return orthogonalTransform(e[_firstOfClusters(_sameElement(e, e, tol))])
+
+
+# the pairs of elements, rows of quaternion and parity, that agree up to an angle and in parity
+def _sameElement(ea, eb, tol):
+  return (np.abs(ea[:, :4] @ eb[:, :4].T) > 1 - tol) & (ea[:, 4, None] == eb[None, :, 4])
 
 
 # whether each element of a is in the list b
 def _isin(a, b, tol=1e-6):
-  qa, pa = a.data.reshape(-1, 5)[:, :4], a.data.reshape(-1, 5)[:, 4]
-  qb, pb = b.data.reshape(-1, 5)[:, :4], b.data.reshape(-1, 5)[:, 4]
-  return np.any((np.abs(qa @ qb.T) > 1 - tol) & (pa[:, None] == pb[None, :]), axis=1)
+  return np.any(_sameElement(a.data.reshape(-1, 5), b.data.reshape(-1, 5), tol), axis=1)
+
+
+# representatives r of the cosets r * d (left) or d * r of the subgroup d that cover the group
+# G, the identity first and then the first element not yet reached
+def _cosetRepresentatives(G, d, left):
+  reps = orthogonalTransform.id.reshape(1)
+  while True:
+    products = reps[:, None] * d[None, :] if left else d[:, None] * reps[None, :]
+    reached = _isin(G, products.flatten())
+    if np.all(reached):
+      return reps
+    reps = orthogonalTransform.cat(reps, G[np.argmin(reached)])
 
 
 def _sameElements(a, b, tol=1e-6):
@@ -67,7 +78,8 @@ def _sameElements(a, b, tol=1e-6):
 def closure(gens, tol=1e-6):
   """the closure of a list of elements under multiplication: the set grows by its products
   with the generators until it stops, which for a finite group is the group"""
-  gens = gens if isinstance(gens, orthogonalTransform) else orthogonalTransform.cat(*gens) if gens else orthogonalTransform()
+  if not isinstance(gens, orthogonalTransform):
+    gens = orthogonalTransform.cat(*gens) if gens else orthogonalTransform()
   gens = _uniqueElements(orthogonalTransform.cat(orthogonalTransform.id, gens), tol)
   els = gens
   while True:
@@ -385,19 +397,7 @@ class symmetry:
     d = self.rot[_isin(self.rot, other.rot)]
     if d.size == 1:
       return self.rot, d, other.rot
-    rot1 = orthogonalTransform.id.reshape(1)
-    while True:
-      reached = _isin(self.rot, (rot1[:, None] * d[None, :]).flatten())
-      if np.all(reached):
-        break
-      rot1 = orthogonalTransform.cat(rot1, self.rot[np.argmin(reached)])
-    rot2 = orthogonalTransform.id.reshape(1)
-    while True:
-      reached = _isin(other.rot, (d[:, None] * rot2[None, :]).flatten())
-      if np.all(reached):
-        break
-      rot2 = orthogonalTransform.cat(rot2, other.rot[np.argmin(reached)])
-    return rot1, d, rot2
+    return _cosetRepresentatives(self.rot, d, left=True), d, _cosetRepresentatives(other.rot, d, left=False)
 
   # ------------------------------------------------------------------ regions
 

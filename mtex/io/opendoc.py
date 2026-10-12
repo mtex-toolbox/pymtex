@@ -118,7 +118,8 @@ def docPages():
   for c in chapters:
     for f in sorted(os.listdir(os.path.join(root, c)), key=str.lower):
       if f.endswith(".py"):
-        first = open(os.path.join(root, c, f), encoding="utf-8").readline()
+        with open(os.path.join(root, c, f), encoding="utf-8") as fh:
+          first = fh.readline()
         pages.append((c, f[:-3], first[4:].strip() if first.startswith("# # ") else f[:-3]))
   return pages
 
@@ -147,7 +148,8 @@ def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=T
   path = os.path.abspath(os.path.join(folder or os.getcwd(), page + (".ipynb" if notebook else ".py")))
   if overwrite or not os.path.exists(path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    src = open(os.path.join(pagesDir(), chapter, page + ".py"), encoding="utf-8").read()
+    with open(os.path.join(pagesDir(), chapter, page + ".py"), encoding="utf-8") as fh:
+      src = fh.read()
     with open(path, "w", encoding="utf-8") as fh:
       fh.write((asNotebook if notebook else cellScript)(src, [p for _, p, _ in pages]))
   if edit:

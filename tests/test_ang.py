@@ -203,3 +203,24 @@ def test_full_olivine_matches_mtex():
   e = loadEBSD(os.path.join(DATA, "olivineopticalmap.ang"), grid=False)
   assert len(e) == 49729
   assert [int((e.phaseId == k).sum()) for k in range(5)] == [0, 44953, 1370, 2311, 1095]
+
+
+def test_angColumnNames_numbers_the_columns_past_the_ten():
+  from mtex.io.ang import _angColumnNames
+  assert _angColumnNames(12)[-3:] == ["fit", "extra1", "extra2"] and _angColumnNames(8)[-1] == "phase"
+
+
+def test_headerGrid_states_cell_and_scan_of_a_hexagonal_header():
+  from mtex.io.ang import _headerGrid
+  unitCell, grid = _headerGrid({"XSTEP": 1.0, "YSTEP": 0.866, "NCOLS_ODD": 5.0, "NCOLS_EVEN": 4.0, "NROWS": 3.0, "GRID": "HexGrid"})
+  assert len(unitCell) == 6 and (grid.hex, grid.nx, grid.nxEven, grid.ny) == (True, 5.0, 4.0, 3.0)
+
+
+def test_headerGrid_is_none_without_steps():
+  from mtex.io.ang import _headerGrid
+  assert _headerGrid({"NCOLS_ODD": 5.0, "NROWS": 3.0}) == (None, None)
+
+
+def test_phaseStarts_finds_the_numbered_blocks():
+  from mtex.io.ang import _phaseStarts
+  assert _phaseStarts(["# TEM_PIXperUM 1", "# Phase 1", "# MaterialName x", "#  Phase 2"]) == [1, 3]

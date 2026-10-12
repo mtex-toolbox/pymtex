@@ -46,7 +46,7 @@ def dropGroup(rot, fr):
   frame, silently, and keeps the frame"""
   if fr.sym.Laue().numSym() <= 2:
     return fr
-  if np.all([r in fr for r in rot.flatten()]):
+  if rot in fr:
     return fr
   return fr.stripSym()
 

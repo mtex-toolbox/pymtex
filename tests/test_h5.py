@@ -358,3 +358,18 @@ def test_pictures_of_an_oxford_file_are_indexed_not_read():
 def test_pictures_of_a_bruker_file_are_indexed():
   ebsd = loadEBSD(BRUKER_PICTURES, verbose=False)
   assert any(e["name"].endswith("SEM Image") for e in ebsd.meta["images"])
+
+
+def test_eulerColumns_reads_a_three_by_three_data_set_as_columns():
+  first, (a, _, _) = eulerColumns(np.arange(9.0).reshape(3, 3))
+  assert not first and np.array_equal(a, [0, 3, 6])
+
+
+def test_separate_lists_the_entries_by_name_without_the_type():
+  from mtex.io.h5 import _separate
+  assert _separate({"type": "separate", "b": 2, "a": 1}) == [1, 2]
+
+
+def test_eulerEntry_is_empty_for_a_table_of_matrices():
+  from mtex.io.h5 import _eulerEntry
+  assert _eulerEntry({"type": "byMatrix"}) == {} and _eulerEntry({"type": "euler_stack", "euler_stack": {"phi": 1}}) == {"phi": 1}

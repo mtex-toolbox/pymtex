@@ -44,3 +44,15 @@ def test_the_selection_names_are_the_minerals_then_indexed_and_not_indexed():
 def test_the_selection_names_of_a_boundary_add_every_pair_of_minerals():
   pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Titanium"))
   assert pl.selectionNames(pairs=True)[4:] == [("Iron", "Iron"), ("Iron", "Titanium"), ("Titanium", "Iron"), ("Titanium", "Titanium")]
+
+
+def test_the_indexed_mask_is_indexed_by_phase_id():
+  pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Mg"))
+  assert np.array_equal(pl._indexedMask, [False, True, True])
+
+
+def test_a_selection_mask_reads_indexed_notIndexed_and_minerals():
+  pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Mg"))
+  ph = np.array([[0, 1], [2, 1]])
+  assert (np.array_equal(pl._selectionMask(["indexed"], ph), ph > 0) and np.array_equal(pl._selectionMask(["notIndexed"], ph), ph == 0)
+          and np.array_equal(pl._selectionMask(["Mg", "notIndexed"], ph), ph != 1))

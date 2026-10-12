@@ -49,3 +49,9 @@ def test_interp_byMethod():
   assert np.max(np.abs(interp(v, y, w, "linear") - (w.x + w.z))) < 0.02
   assert np.max(np.abs(interp(v, y, w) - (w.x + w.z))) < 0.1
   assert np.max(np.abs(interp(v, y, w, "inverseDistance") - (w.x + w.z))) < 0.2
+
+
+# complex values are interpolated, a direction given twice taking the mean of both parts
+def test_S2FunTri_takesComplexValues():
+  s2 = S2FunTri(vector3d(np.concatenate([v.data, v.data[:1]])), np.concatenate([y, [y[0] + 1]]) * (1 + 2j))
+  assert np.isclose(s2.eval(v[0]), (y[0] + 0.5) * (1 + 2j))

@@ -274,3 +274,24 @@ def test_no_indexed_grain_below_minPixel_survives_the_second_pass():
     frag = ~np.asarray(g.isIndexed).reshape(-1) & (np.asarray(g.numPixel).reshape(-1) < 3)
     assert frag.any() and np.all(np.isnan(g.meanRotation.data.reshape(-1, 4)[frag, 0]))
     assert np.all(~e.isIndexed.reshape(-1)[np.isin(e.grainId.reshape(-1), g.id[frag])])
+
+
+def test_the_grain_loops_follow_the_kernels_preference():
+  from mtex import getMTEXpref, setMTEXpref
+  from mtex.maps.kernels import grainKernel
+  old = getMTEXpref("kernels")
+  setMTEXpref("kernels", "numpy")
+  try:
+    assert grainKernel("relabel") is None
+  finally:
+    setMTEXpref("kernels", old)
+
+
+def test_undersized_marks_the_indexed_pixels_of_small_grains():
+  from mtex.maps.calcgrains import undersized
+  assert np.array_equal(undersized(np.array([1, 1, 2, 0, 2, 2]), 2, np.array([True, True, True, True, False, True]), 3), [1, 1, 0, 0, 0, 0])
+
+
+def test_a_zero_row_stays_zero_when_the_rows_are_normalised():
+  from mtex.maps.calcgrains import _normalizeRows
+  assert np.array_equal(_normalizeRows(np.array([[0.0, 0, 0, 0], [0, 3, 0, 4]])), [[0, 0, 0, 0], [0, 0.6, 0, 0.8]])

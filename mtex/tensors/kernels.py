@@ -16,6 +16,18 @@ prange = range
 _COMPILED = {}
 
 
+# the parallel loop compiled once under its name, prange made numba's for the loops of this
+# module; None without numba
+def _compiled(name, loop):
+  nb = _jit() if backend() == "numba" else None
+  if not nb:
+    return None
+  if name not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED[name] = _parallelKernel(loop)
+  return _COMPILED[name]
+
+
 # the eigenvalues in ascending order into lam, the eigenvectors as the columns of V, as eigh;
 # the rotation of the pair (p, q) zeroes a_pq, the sweeps end when what is left off the
 # diagonal is below the rounding of the largest entry
@@ -70,21 +82,11 @@ def _eigh3Loop(E, lam, V):
       V[k, r, 0], V[k, r, 1], V[k, r, 2] = v[r, o0], v[r, o1], v[r, o2]
 
 
-def _eigh3Kernel():
-  nb = _jit()
-  if not nb:
-    return None
-  if "eigh3" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["eigh3"] = _parallelKernel(_eigh3Loop)
-  return _COMPILED["eigh3"]
-
-
 def eigh3(E):
   """the eigenvalues ascending and the eigenvectors as columns of symmetric 3 x 3 matrices over
   any leading dims, as np.linalg.eigh"""
   E = np.asarray(E, dtype=float)
-  loop = _eigh3Kernel() if backend() == "numba" else None
+  loop = _compiled("eigh3", _eigh3Loop)
   if loop is None or E.ndim == 2:
     return np.linalg.eigh(E)
   lead = E.shape[:-2]
@@ -127,20 +129,10 @@ def _turnLoop(U, alpha, offsets, Q, out, chunk):
           out[k, o0 + i] = a[i]
 
 
-def _turnKernel():
-  nb = _jit()
-  if not nb:
-    return None
-  if "turn" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["turn"] = _parallelKernel(_turnLoop)
-  return _COMPILED["turn"]
-
-
 def turnBlocks(U, alpha, offsets, Q, chunk=64):
   """the rows of U, blocks of flattened tensors of ranks alpha starting at offsets, turned by the
   rotation matrices Q on every index; U one row or n, Q one matrix or n; None without numba"""
-  loop = _turnKernel() if backend() == "numba" else None
+  loop = _compiled("turn", _turnLoop)
   if loop is None:
     return None
   U = np.ascontiguousarray(np.atleast_2d(U), dtype=np.float64)
@@ -192,21 +184,11 @@ def _voigtInverseLoop(D, flat, voigt, wIn, wOut, out, singular):
         out[k, 9 * i + j] = a[p, 6 + q] / (wOut[p] * wOut[q])
 
 
-def _voigtInverseKernel():
-  nb = _jit()
-  if not nb:
-    return None
-  if "voigtInverse" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["voigtInverse"] = _parallelKernel(_voigtInverseLoop)
-  return _COMPILED["voigtInverse"]
-
-
 def voigtInverse(D, voigtPairs, wIn, wOut):
   """the inverses of rank four tensors, rows of 81 coordinates, through their Voigt matrices of the
   index pairs voigtPairs with the off diagonal factors wIn and wOut; None without numba or where
   one is singular, so that NumPy's inverse raises for it"""
-  loop = _voigtInverseKernel() if backend() == "numba" else None
+  loop = _compiled("voigtInverse", _voigtInverseLoop)
   if loop is None:
     return None
   flat = np.array([3 * a + b for a, b in voigtPairs], dtype=np.int64)
@@ -253,20 +235,10 @@ def _polynomialLoop(v, expo, coef, R, out, chunk):
       out[q] = acc
 
 
-def _polynomialKernel():
-  nb = _jit()
-  if not nb:
-    return None
-  if "polynomial" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["polynomial"] = _parallelKernel(_polynomialLoop)
-  return _COMPILED["polynomial"]
-
-
 def directionalPolynomial(M, v, chunk=1024):
   """the real tensor with the 3^R flat coordinates M contracted on every index with the unit
   vectors along the rows of v, which need not be normalised; None without numba"""
-  loop = _polynomialKernel() if backend() == "numba" else None
+  loop = _compiled("polynomial", _polynomialLoop)
   if loop is None:
     return None
   M = np.asarray(M, dtype=np.float64).ravel()
@@ -294,20 +266,10 @@ def _multilinearLoop(M, nz, V, out):
     out[q] = acc
 
 
-def _multilinearKernel():
-  nb = _jit()
-  if not nb:
-    return None
-  if "multilinear" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["multilinear"] = _parallelKernel(_multilinearLoop)
-  return _COMPILED["multilinear"]
-
-
 def multilinear(M, V):
   """the real tensor with the 3^R flat coordinates M contracted on index k with the rows of V[k],
   V of shape (R, n, 3): M_{i1..iR} V[0]_{i1} .. V[R-1]_{iR} at every row; None without numba"""
-  loop = _multilinearKernel() if backend() == "numba" else None
+  loop = _compiled("multilinear", _multilinearLoop)
   if loop is None:
     return None
   M = np.ascontiguousarray(M, dtype=np.float64).ravel()
@@ -349,17 +311,14 @@ def _turnSumLoop(U, R, q, w, blocks, acc):
 def turnSum(U, R, q, w):
   """sum_k w_k of the flattened real tensor U of rank R turned by the quaternion q_k on every index,
   without forming the turned tensors; None without numba"""
-  nb = _jit() if backend() == "numba" else None
-  if not nb:
+  loop = _compiled("turnSum", _turnSumLoop)
+  if loop is None:
     return None
-  if "turnSum" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    _COMPILED["turnSum"] = _parallelKernel(_turnSumLoop)
   from ..geometry.kernels import threads
   q = np.ascontiguousarray(q, dtype=np.float64).reshape(-1, 4)
   blocks = max(1, min(4 * threads(), len(q) // 256))
   acc = np.zeros((blocks, 3 ** R))
-  _COMPILED["turnSum"](np.ascontiguousarray(U, dtype=np.float64).ravel(), np.int64(R), q, np.ascontiguousarray(w, dtype=np.float64),
+  loop(np.ascontiguousarray(U, dtype=np.float64).ravel(), np.int64(R), q, np.ascontiguousarray(w, dtype=np.float64),
                        np.int64(blocks), acc)
   return acc.sum(axis=0)
 

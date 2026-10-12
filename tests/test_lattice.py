@@ -157,3 +157,12 @@ def test_scattered_points_are_refused_before_an_index_is_grown():
   rng = np.random.default_rng(5)
   with pytest.raises(ValueError):
     lattice(np.c_[rng.random((3000, 2)) * 100, np.zeros(3000)])
+
+
+def test_an_index_grown_over_the_neighbours_is_the_rounded_one_on_a_rigid_lattice():
+  from mtex.maps.lattice import growIndex
+  A = np.array([[1.0, 0.3], [0.0, 0.9]])
+  i, j = np.meshgrid(np.arange(-3, 9), np.arange(5), indexing="ij")
+  ij = np.stack([i.reshape(-1), j.reshape(-1)], axis=1)
+  P = (ij @ A.T)[np.random.default_rng(2).permutation(len(ij))]
+  assert np.array_equal(growIndex(P, A), np.rint((P - P[0]) @ np.linalg.inv(A).T).astype(int))

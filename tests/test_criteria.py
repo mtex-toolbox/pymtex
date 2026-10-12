@@ -96,3 +96,9 @@ def test_the_compiled_angle_criterion_is_the_numpy_one():
     i, j = rng.integers(0, n, 3000), rng.integers(0, n, 3000)
     for crit in (gbcAngle(10 * degree), gbcAngle([15 * degree, 2 * degree]), gbcAngle(10 * degree, byPhase={"b": [60 * degree, 5 * degree]})):
       assert np.array_equal(crit.evaluate(e, i, j, backend="numba"), crit.evaluate(e, i, j, backend="numpy"))
+
+
+def test_byPhase_names_the_levels_of_one_phase():
+  from mtex.maps.criteria import _byPhaseLevels
+  pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Mg"))
+  assert _byPhaseLevels({"Mg": [10 * degree, 2 * degree]}, pl, 2) == (10 * degree, 2 * degree) and _byPhaseLevels({"Mg": 1.0}, pl, 1) is None

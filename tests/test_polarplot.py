@@ -193,3 +193,9 @@ def test_rose_diagrams_go_into_the_subplots_the_user_made():
   a2 = plt.subplot(1, 2, 2, projection="polar")
   histogram(v, 36)
   assert plt.gcf() is f and len(f.axes) == 2 and len(a1.patches) == 36 and len(a2.patches) == 36
+
+
+def test_sectionView_looksDownTheNormalOfTheSection():
+  from mtex.plotting.polarplot import _sectionView
+  east, north = _sectionView(None, vector3d(1, 0, 0))
+  assert abs(east @ [1, 0, 0]) < 1e-12 and abs(north @ [1, 0, 0]) < 1e-12

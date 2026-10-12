@@ -191,3 +191,8 @@ def test_the_ends_of_a_vanishing_face_weld(backend):
     verts = np.array([[lo, lo, x, 1.5], [x - 5e-5, 1.5, x + 5e-5, 1.5], [x + 5e-5, 1.5, x, 3.0]])
     V, F, C = meshVertices(cells, verts, tol, backend=backend)
     assert len(V) == 3 and [tuple(c) for c in C] == [(0, 1), (2, 3)]
+
+
+def test_a_gather_fills_where_the_index_is_negative():
+  from mtex.maps.decomposition import _gather
+  assert np.array_equal(_gather(np.array([10, 20, 30]), np.array([[2, -1], [0, 1]]), -5), [[30, -5], [10, 20]])

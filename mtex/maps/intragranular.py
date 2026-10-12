@@ -20,15 +20,17 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
 from ..geometry.arguments import refuseFlags
-from ..geometry.kernels import backend, closestImage, qmul
+from ..geometry.kernels import closestImage, qconj, qmul
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.symreduce import chordAngle
 from ..geometry.tangent import rotationVector
 from ..geometry.vector3d import vector3d
+from .criteria import phaseGroups
 from .ebsd import EBSD
+from .grains import _at, _positionTable
+from .kernels import pixelKernel
 from ..geometry.install import install
 
 IDENTITY = np.array([[1.0, 0.0, 0.0, 0.0]])
@@ -77,18 +79,13 @@ class mapPairs:
     self.indexed = ebsd.isIndexed.reshape(-1) & ~np.isnan(self.rot[:, 0])
     self.phase = ebsd.phaseId.reshape(-1)
     self.grain = ebsd.prop["grainId"].reshape(-1) if "grainId" in ebsd.prop else None
+    self.CSList = ebsd.CSList
     self.G = {int(p): ebsd.CSList[int(p)].sym.properGroup().rotations().data.reshape(-1, 4).astype(float)
               for p in np.unique(self.phase) if ebsd.CSList.isIndexed(int(p))}
 
   def groupTable(self):
     """the proper groups as one table indexed by phase, and their sizes"""
-    top = int(self.phase.max(initial=0)) + 1
-    width = max([len(G) for G in self.G.values()] + [1])
-    Gall = np.zeros((top, width, 4))
-    nG = np.zeros(top, dtype=np.int64)
-    for p, G in self.G.items():
-      Gall[p, :len(G)] = G
-      nG[p] = len(G)
+    Gall, nG, _ = phaseGroups(self.CSList)
     return Gall, nG
 
   def arrays(self):
@@ -182,18 +179,15 @@ def gradient(ebsd, direction=None, stencil="oneSided"):
     offs = [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)]
   offs = np.array(offs, dtype=np.int64).reshape(-1, 2)
   D = offs @ l.A.T.astype(float)
-  gx = gy = None
-  if backend() == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("gradient")
-    if loop is not None:
-      n = len(l.ij)
-      gx, gy = np.empty((n, 3)), np.empty((n, 3))
-      indexed, phase, grain, hasGrain = m.arrays()
-      Gall, nG = m.groupTable()
-      loop(m.rot, indexed, phase, grain, hasGrain, lk, np.ascontiguousarray(l.ij, dtype=np.int64), offs, np.ascontiguousarray(D), stencil == "oneSided",
-           Gall, nG, gx, gy)
-  if gx is None:
+  loop = pixelKernel("gradient")
+  if loop is not None:
+    n = len(l.ij)
+    gx, gy = np.empty((n, 3)), np.empty((n, 3))
+    indexed, phase, grain, hasGrain = m.arrays()
+    Gall, nG = m.groupTable()
+    loop(m.rot, indexed, phase, grain, hasGrain, lk, np.ascontiguousarray(l.ij, dtype=np.int64), offs, np.ascontiguousarray(D), stencil == "oneSided",
+         Gall, nG, gx, gy)
+  else:
     gx, gy = _gradientNumpy(l, lk, m, offs, D, stencil == "oneSided")
   return vector3d(gx.reshape(ebsd.shape + (3,)), frame=ebsd.frame), vector3d(gy.reshape(ebsd.shape + (3,)), frame=ebsd.frame)
 
@@ -265,10 +259,7 @@ def curvature(ebsd, stencil="oneSided"):
   pl = mapLattice(ebsd).plane
   unknown = np.abs(pl.normal) > 1e-10
   a, b = np.ascontiguousarray(gx.data, dtype=float), np.ascontiguousarray(gy.data, dtype=float)
-  loop = None
-  if backend() == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("planeTensor")
+  loop = pixelKernel("planeTensor")
   if loop is not None:
     M = np.empty(a.shape + (3,))
     loop(a.reshape(-1, 3), b.reshape(-1, 3), np.asarray(pl.e1, dtype=float), np.asarray(pl.e2, dtype=float), unknown, M.reshape(-1, 3, 3))
@@ -331,17 +322,14 @@ def KAM(ebsd, order=1, radius=None, threshold=np.inf, max=False, weights=None):
   offs = neighbourBall(l, order=order, radius=radius)
   w = np.ones(len(offs)) if weights is None else np.array([float(weights(np.linalg.norm(l.A @ o))) for o in offs])
   lk, m = latticeLookup(l), mapPairs(ebsd)
-  out = None
-  if backend() == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("kam")
-    if loop is not None:
-      out = np.empty(len(l.ij))
-      indexed, phase, grain, hasGrain = m.arrays()
-      Gall, nG = m.groupTable()
-      loop(m.rot, indexed, phase, grain, hasGrain, lk, np.ascontiguousarray(l.ij, dtype=np.int64), np.ascontiguousarray(offs, dtype=np.int64),
-           np.ascontiguousarray(w, dtype=float), float(threshold), bool(max), Gall, nG, out)
-  if out is None:
+  loop = pixelKernel("kam")
+  if loop is not None:
+    out = np.empty(len(l.ij))
+    indexed, phase, grain, hasGrain = m.arrays()
+    Gall, nG = m.groupTable()
+    loop(m.rot, indexed, phase, grain, hasGrain, lk, np.ascontiguousarray(l.ij, dtype=np.int64), np.ascontiguousarray(offs, dtype=np.int64),
+         np.ascontiguousarray(w, dtype=float), float(threshold), bool(max), Gall, nG, out)
+  else:
     out = _kamNumpy(l, lk, m, offs, w, threshold, max)
   return out.reshape(ebsd.shape)
 
@@ -382,10 +370,7 @@ def calcGROD(ebsd, grains=None, rotRef=None):
       raise ValueError("calcGROD needs the grains, or a reference rotation")
     if "grainId" not in ebsd.prop:
       raise ValueError("the map carries no grain id; reconstruct it with calcGrains(ebsd)")
-    byId = np.full(int(grains.id.max(initial=0)) + 1, -1, dtype=np.int64)
-    byId[grains.id] = np.arange(len(grains))
-    gid = ebsd.prop["grainId"].reshape(-1).astype(np.int64)
-    pos = np.where((gid > 0) & (gid < len(byId)), byId[np.clip(gid, 0, len(byId) - 1)], -1)
+    pos = _at(_positionTable(grains.id), ebsd.prop["grainId"].reshape(-1))
     # one gather from the mean rotations behind a NaN row, which a pixel without a grain takes
     means = np.vstack([np.full((1, 4), np.nan), grains.meanRotation.data.reshape(-1, 4)])
     ref = np.take(means, pos + 1, axis=0)
@@ -399,14 +384,11 @@ def calcGROD(ebsd, grains=None, rotRef=None):
   rot = np.ascontiguousarray(ebsd.rotations.data, dtype=float).reshape(-1, 4)
   # a NaN rotation is NaN in every coordinate, so the first tells
   ind = ebsd.isIndexed.reshape(-1) & ~np.isnan(ref[:, 0])
-  out = None
-  if backend() == "numba":
-    from .kernels import pixelKernel
-    loop = pixelKernel("grod")
-    if loop is not None:
-      out = np.empty((n, 4))
-      loop(rot, np.ascontiguousarray(ref, dtype=float), np.ascontiguousarray(ind), G, len(G), out)
-  if out is None:
+  loop = pixelKernel("grod")
+  if loop is not None:
+    out = np.empty((n, 4))
+    loop(rot, np.ascontiguousarray(ref, dtype=float), np.ascontiguousarray(ind), G, len(G), out)
+  else:
     out = np.full((n, 4), np.nan)
     img = closestImage(rot[ind], ref[ind], IDENTITY, G)[1]
     out[ind] = qmul(qconj(img), rot[ind])
@@ -425,12 +407,18 @@ def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf
   gid = ebsd.prop["grainId"].reshape(-1).astype(np.int64)
   ok = (gid > 0) & (v >= llim) & (v <= ulim)
   n = int(gid.max(initial=0))
-  per = np.full(n + 1, np.nan)
-  order = np.argsort(gid[ok], kind="stable")
-  g, vs = gid[ok][order], v[ok][order]
-  bounds = np.flatnonzero(np.concatenate([[True], g[1:] != g[:-1], [True]]))
-  for a, b in zip(bounds[:-1], bounds[1:]):
-    per[g[a]] = method(vs[a:b])
+  if method is np.mean:
+    # the mean as two sums per grain, equal to np.mean to rounding
+    count = np.bincount(gid[ok], minlength=n + 1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+      per = np.where(count > 0, np.bincount(gid[ok], v[ok], minlength=n + 1) / count, np.nan)
+  else:
+    per = np.full(n + 1, np.nan)
+    order = np.argsort(gid[ok], kind="stable")
+    g, vs = gid[ok][order], v[ok][order]
+    bounds = np.flatnonzero(np.concatenate([[True], g[1:] != g[:-1], [True]])) if len(g) else np.zeros(0, dtype=np.int64)
+    for a, b in zip(bounds[:-1], bounds[1:]):
+      per[g[a]] = method(vs[a:b])
   if grains is not None:
     ids = grains.id.astype(np.int64)
     return np.where(ids <= n, per[np.minimum(ids, n)], np.nan)
@@ -464,13 +452,16 @@ def spatialProfile(ebsd, lineXY, y=None, radius=None):
     d = P - a
     t = d @ u
     hit = np.flatnonzero((t >= 0) & (t <= L) & (np.abs(u[0] * d[:, 1] - u[1] * d[:, 0]) <= r))
-    for k in hit[np.argsort(t[hit], kind="stable")]:
-      if idx and idx[-1] == k:
-        continue
-      idx.append(int(k))
-      dist.append(base + t[k])
+    hit = hit[np.argsort(t[hit], kind="stable")]
+    idx.append(hit)
+    dist.append(base + t[hit])
     base += L
-  return ebsd[np.array(idx, dtype=int)], np.array(dist)
+  # a pixel at the joint of two pieces is met once
+  idx = np.concatenate(idx) if idx else np.zeros(0, dtype=int)
+  dist = np.concatenate(dist) if dist else np.zeros(0)
+  once = np.ones(len(idx), dtype=bool)
+  once[1:] = idx[1:] != idx[:-1]
+  return ebsd[idx[once]], dist[once]
 
 
 def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rng=None):

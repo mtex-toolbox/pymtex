@@ -192,3 +192,9 @@ def test_a_stopped_hexagonal_scan_grids_alike_on_both_backends():
   assert np.array_equal(a.pos.data, b.pos.data) and np.array_equal(a.rotations.data, b.rotations.data, equal_nan=True)
   assert np.array_equal(a.lattice.ij, b.lattice.ij) and np.array_equal(a.isPadding, b.isPadding) and np.array_equal(a.q, b.q)
   assert a.isPadding.sum() == 42 - n and np.array_equal(a.q.reshape(-1)[ia], np.arange(n))
+
+
+def test_the_inverse_of_a_layout_index_undoes_it():
+  from mtex.maps.gridify import _inverse
+  lin = np.array([[2, 0], [3, 1]])
+  assert np.array_equal(_inverse(lin)[lin.reshape(-1)], np.arange(4))

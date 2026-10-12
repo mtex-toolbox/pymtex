@@ -219,6 +219,11 @@ class crystalShape:
       out[:, r] = np.sum(np.cross(P, np.roll(P, -1, axis=1)), axis=1) / 2
     return out
 
+  # the mean of the vertices of every face, per shape
+  def _faceCenters(self):
+    V = self._V()
+    return np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
+
   def _single(self, a):
     return a[0] if self.V.ndim == 1 else a
 
@@ -234,9 +239,7 @@ class crystalShape:
   @property
   def faceCenter(self):
     """the centre of every face, the mean of its vertices, per shape of a list"""
-    V = self._V()
-    c = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
-    return vector3d(self._single(c), **self._attrs())
+    return vector3d(self._single(self._faceCenters()), **self._attrs())
 
   @property
   def volume(self):
@@ -244,7 +247,7 @@ class crystalShape:
     V = self._V()
     c = V.mean(axis=1)[:, None, :]
     fv = self._faceVectors()
-    fc = np.stack([V[:, f[f >= 0]].mean(axis=1) for f in self.F], axis=1)
+    fc = self._faceCenters()
     return self._single(np.sum(np.sum((fc - c) * unitRows(fv), axis=-1) * np.linalg.norm(fv, axis=-1), axis=1) / 3)
 
   @property
@@ -342,11 +345,10 @@ class crystalShape:
     scale = np.max(np.abs(V - c))
     # a vertex on the plane is a point of the section, and no crossing of its edges
     h[np.abs(h) < 1e-9 * scale] = 0
-    pts = [V[k] for k in np.nonzero(h == 0)[0]]
-    for a, b in self.E:
-      if h[a] * h[b] < 0:
-        pts.append(V[a] + (V[b] - V[a]) * (h[a] / (h[a] - h[b])))
-    pts = np.array(pts).reshape(-1, 3)
+    a, b = self.E.T
+    a, b = a[h[a] * h[b] < 0], b[h[a] * h[b] < 0]
+    crossings = V[a] + (V[b] - V[a]) * (h[a] / (h[a] - h[b]))[:, None]
+    pts = np.concatenate([V[h == 0], crossings]).reshape(-1, 3)
     if len(pts) >= 3:
       pts = pts[_distinctRows(pts, 1e-9 * scale)]
       m = pts.mean(axis=0)

@@ -11,16 +11,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-import itertools
 import math
 
 import numpy as np
 
 from .so3funclass import SO3Fun
-from ..geometry.kernels import qconj
+from ..geometry.kernels import _qmulNumpy as _qmul, qconj
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
-from ..geometry.kernels import threads
 from ..geometry.miller import Miller
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
@@ -31,8 +29,8 @@ from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import fields, framesLabel, numString
-from .funops import _antipodalPole, _rotatedFrame, conv
-from .harmonics import deg2dim, degreeBlock, _sphericalY
+from .funops import _antipodalPole, _rotatedFrame, _side, conv
+from .harmonics import _so3PerDegree, deg2dim, degreeBlock, _sphericalY
 from .kernelfunctions import S2DeLaValleePoussinKernel, S2Kernel, SO3DeLaValleePoussinKernel, SO3Kernel, SO3vonMisesFisherKernel
 from .quadrature import folds
 from .s2fun import S2FunHarmonic
@@ -48,14 +46,6 @@ BLOCK = 1 << 22
 HITS = 1 << 23
 # the query images paired with the centres in one call
 IMAGES = 1 << 18
-
-
-def _qmul(p, q):
-  a1, b1, c1, d1 = np.moveaxis(p, -1, 0)
-  a2, b2, c2, d2 = np.moveaxis(q, -1, 0)
-  return np.stack([a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2, b1 * a2 + a1 * b2 - d1 * c2 + c1 * d2,
-                   c1 * a2 + d1 * b2 + a1 * c2 - b1 * d2, d1 * a2 - c1 * b2 + b1 * c2 + a1 * d2], axis=-1)
-
 
 
 def supportCosine(psi, tol=1e-9):
@@ -293,9 +283,7 @@ class SO3FunRBF(SO3Fun):
       fhat = wignerSeriesAdjointGridded(self.center, np.ones(self.center.size), L, weights=self.weights, folds=fo)
     else:
       fhat = wignerSeriesAdjoint(self.center, np.ones(self.center.size), L, weights=self.weights, folds=fo)
-    A = self.psi.calcFourier(L)
-    for n in range(L + 1):
-      degreeBlock(fhat, n)[...] *= A[n] / (2 * n + 1)
+    fhat *= _so3PerDegree(self.psi.calcFourier(L) / (2 * np.arange(L + 1) + 1))
     fhat[0] = self.mean()
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, antipodal=self.antipodal, _internal=True)
 
@@ -309,8 +297,7 @@ class SO3FunRBF(SO3Fun):
       return SO3FunHarmonic(self).grad(side=side)
     if isinstance(x, str):
       raise TypeError("the gradient of a kernel function is evaluated at orientations")
-    if side not in ("left", "right"):
-      raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+    _side(side)
     r = _rotationsFor(self, x)
     q = r.data.reshape(-1, 4)
     cs, w = self._expandedCentres()
@@ -378,12 +365,10 @@ class SO3FunRBF(SO3Fun):
     """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
     side; the frame of the rotated side turns with it"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
-    if side == "left":
+    if _side(side) == "left":
       center = orientation._fromRotation((rot * rotation(self.center)).data, (self.CS, _rotatedFrame(self.SS, rot)), self.antipodal)
-    elif side == "right":
-      center = orientation._fromRotation((rotation(self.center) * rot).data, (_rotatedFrame(self.CS, rot), self.SS), self.antipodal)
     else:
-      raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+      center = orientation._fromRotation((rotation(self.center) * rot).data, (_rotatedFrame(self.CS, rot), self.SS), self.antipodal)
     return SO3FunRBF(center, self.psi, self.weights, self.c0)
 
   def conv(self, psi):
@@ -589,10 +574,10 @@ class SO3FunCBF(SO3Fun):
     A = self.psi.calcFourier(L)
     fhat = np.zeros(deg2dim(L + 1), dtype=complex)
     for l in range(L + 1):
-      Yh, Yr = _sphericalY(l, self.h), _sphericalY(l, self.r)
       # the average over h and -h leaves the even degrees of a Laue group
       if self._laue and l % 2:
         continue
+      Yh, Yr = _sphericalY(l, self.h), _sphericalY(l, self.r)
       degreeBlock(fhat, l)[...] = A[l] * 4 * np.pi / (2 * l + 1) ** 1.5 * np.einsum("i,ki,ai->ka", self.weights, Yr, np.conj(Yh))
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, _internal=True)
 
@@ -601,8 +586,7 @@ class SO3FunCBF(SO3Fun):
     if x is None:
       from .so3fun import SO3FunHarmonic
       return SO3FunHarmonic(self).grad(side=side)
-    if side not in ("left", "right"):
-      raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+    _side(side)
     r = _rotationsFor(self, x)
     q = rotation(r.data.reshape(-1, 4))
     H, Rv, w = self._expandedFibres()
@@ -624,11 +608,9 @@ class SO3FunCBF(SO3Fun):
     """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
     side; the frame of the rotated side turns with it"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
-    if side == "left":
+    if _side(side) == "left":
       return SO3FunCBF(vector3d(self.h.data, frame=self.CS), rot * self.r, self.weights, self.psi, _rotatedFrame(self.SS, rot))
-    if side == "right":
-      return SO3FunCBF(vector3d((rot.inv() * self.h).data, frame=_rotatedFrame(self.CS, rot)), self.r, self.weights, self.psi, self.SS)
-    raise ValueError(f"the side is 'left' or 'right', not {side!r}")
+    return SO3FunCBF(vector3d((rot.inv() * self.h).data, frame=_rotatedFrame(self.CS, rot)), self.r, self.weights, self.psi, self.SS)
 
   # the pole figure of one crystal direction, from the harmonic expansion
   def _poleFigure(self, h, bandwidth=None):

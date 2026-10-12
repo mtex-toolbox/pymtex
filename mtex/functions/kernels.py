@@ -22,7 +22,7 @@ import numpy as np
 
 from ..geometry.kernels import _jit, _loop, _parallelKernel, backend
 from ..geometry.representations import quat2euler
-from .harmonics import dim2deg
+from .harmonics import degreeRange, dim2deg
 
 _COMPILED = {}
 prange = range
@@ -62,6 +62,17 @@ def _parallel(name, f, work=None):
 
 def _complexType(dtype):
   return np.result_type(np.dtype(dtype), 1j)
+
+
+# the sums of the values (rows of a 2-D array) over the n groups inv numbers them by, complex
+# values by their two parts, since bincount takes real weights only
+def _groupSums(inv, values, n):
+  values = np.asarray(values)
+  if values.dtype.kind == "c":
+    return _groupSums(inv, values.real, n) + 1j * _groupSums(inv, values.imag, n)
+  if values.ndim == 1:
+    return np.bincount(inv, weights=values, minlength=n)
+  return np.stack([np.bincount(inv, weights=c, minlength=n) for c in values.T], axis=-1).reshape((n,) + values.shape[1:])
 
 
 # ------------------------------------------------------------------ the nodes of a NUFFT
@@ -480,16 +491,18 @@ def _realizeSphericalLoop(F, L):
 
 
 # the NumPy forms, degree by degree
+# the sign (-1)^(i+j) of every entry of a block of degree n stored flat
+def _flatCheckerboard(n):
+  m = 2 * n + 1
+  r = np.arange(m * m)
+  return np.where((r // m + r % m) % 2, -1.0, 1.0)
+
+
 def _wignerDefectNumpy(F, L, tol):
-  o = 0
   for n in range(L + 1):
-    m = 2 * n + 1
-    B = F[:, o:o + m * m]
-    r = np.arange(m * m)
-    sign = np.where((r // m + r % m) % 2, -1.0, 1.0)
-    if not np.all(np.abs(B[:, ::-1] - sign * np.conj(B)) <= tol * np.maximum(1, np.abs(B))):
+    B = F[:, degreeRange(n)]
+    if not np.all(np.abs(B[:, ::-1] - _flatCheckerboard(n) * np.conj(B)) <= tol * np.maximum(1, np.abs(B))):
       return False
-    o += m * m
   return True
 
 
@@ -503,13 +516,9 @@ def _sphericalDefectNumpy(F, L, tol):
 
 
 def _realizeWignerNumpy(F, L):
-  o = 0
   for n in range(L + 1):
-    m = 2 * n + 1
-    B = F[:, o:o + m * m]
-    r = np.arange(m * m)
-    B[...] = (B + np.where((r // m + r % m) % 2, -1.0, 1.0) * np.conj(B[:, ::-1])) / 2
-    o += m * m
+    B = F[:, degreeRange(n)]
+    B[...] = (B + _flatCheckerboard(n) * np.conj(B[:, ::-1])) / 2
 
 
 def _realizeSphericalNumpy(F, L):
@@ -546,22 +555,25 @@ def realDefectSpherical(fhat, tol=1e-10):
   return bool(_dispatch("sphericalDefect", _sphericalDefectLoop, _sphericalDefectNumpy, F, math.isqrt(F.shape[1]) - 1, tol))
 
 
-def realizeWigner(fhat):
-  """in place on a complex array, rows of coefficients on the last axis"""
-  F = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
-  _dispatch("realizeWigner", _realizeWignerLoop, _realizeWignerNumpy, F, dim2deg(F.shape[1]))
-  if not fhat.flags.c_contiguous:
+# fun applied in place to the coefficient rows of fhat as one contiguous (rows, coefficients)
+# array, through a copy written back where fhat is not contiguous
+def _onRows(fhat, fun):
+  contiguous = fhat.flags.c_contiguous
+  F = (fhat if contiguous else np.ascontiguousarray(fhat)).reshape(-1, fhat.shape[-1])
+  fun(F)
+  if not contiguous:
     fhat[...] = F.reshape(fhat.shape)
   return fhat
+
+
+def realizeWigner(fhat):
+  """in place on a complex array, rows of coefficients on the last axis"""
+  return _onRows(fhat, lambda F: _dispatch("realizeWigner", _realizeWignerLoop, _realizeWignerNumpy, F, dim2deg(F.shape[1])))
 
 
 def realizeSpherical(fhat):
   """the spherical coefficients of the real part of the function, in place on a complex array"""
-  F = fhat.reshape(-1, fhat.shape[-1]) if fhat.flags.c_contiguous else np.ascontiguousarray(fhat).reshape(-1, fhat.shape[-1])
-  _dispatch("realizeSpherical", _realizeSphericalLoop, _realizeSphericalNumpy, F, math.isqrt(F.shape[1]) - 1)
-  if not fhat.flags.c_contiguous:
-    fhat[...] = F.reshape(fhat.shape)
-  return fhat
+  return _onRows(fhat, lambda F: _dispatch("realizeSpherical", _realizeSphericalLoop, _realizeSphericalNumpy, F, math.isqrt(F.shape[1]) - 1))
 
 
 # ------------------------------------------------------------------ Wigner-d at pi/2, the quadrant
@@ -649,13 +661,20 @@ def halfPiQuadrants(L, dtype=np.float64):
 # plane once with the phase and the mirror G[l, k, -j] = (-1)^{k+l} G[l, k, j]
 
 
+# the entries from the front and from the back in turn: the first half in order, the second
+# half backwards, interleaved
+def _interleaveEnds(a):
+  out = np.empty_like(a)
+  half = (len(a) + 1) // 2
+  out[0::2], out[1::2] = a[:half], a[half:][::-1]
+  return out
+
+
 def planeOrder(real, La):
   """the planes in an order that spreads the long ones (small |l| run over most degrees) over
   the contiguous chunks the parallel loop hands its threads"""
   lp = np.arange(0, La + 1) if real else np.concatenate([[0], np.stack([np.arange(1, La + 1), -np.arange(1, La + 1)], 1).ravel()])
-  order = np.empty_like(lp)
-  order[0::2], order[1::2] = lp[:(len(lp) + 1) // 2], lp[(len(lp) + 1) // 2:][::-1]
-  return order
+  return _interleaveEnds(lp)
 
 
 # v i^e
@@ -876,10 +895,7 @@ def rowTables(L, dtype=np.float64):
 def orderOrder(L):
   """the orders in an order that spreads the long ones (small m run over most degrees) over the
   contiguous chunks of the parallel loop"""
-  m = np.arange(L + 1)
-  out = np.empty_like(m)
-  out[0::2], out[1::2] = m[:(L + 2) // 2], m[(L + 2) // 2:][::-1]
-  return out
+  return _interleaveEnds(np.arange(L + 1))
 
 
 def _sphericalForwardLoop(G, fhat, X, Y, R0, L, real, order):

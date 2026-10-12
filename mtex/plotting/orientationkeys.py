@@ -12,9 +12,8 @@ import threading
 
 import numpy as np
 
-from ..geometry.kernels import qconj
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
-from ..geometry.kernels import qrot
+from ..geometry.kernels import qconj, qrot
 from ..geometry.orientation import orientation
 from ..geometry.orientationregion import eulerRegion
 from ..geometry.quaternion import rotation
@@ -32,6 +31,10 @@ def _framesOf(x, frameB=None):
     return x.CS, x.frame, False
   return x, specimenFrame.default if frameB is None else frameB, False
 
+
+# the rotations a map is coloured by: the mean rotation of every grain, else every measurement's
+def _rotationsOf(x):
+  return x.meanRotation if hasattr(x, "meanRotation") else x.rotations
 
 
 class orientationColorKey:
@@ -268,7 +271,9 @@ class axisAngleColorKey(orientationColorKey):
       omega = np.asarray(ori.angle(r)).reshape(-1)
       axes = ori.axis(r).data.reshape(-1, 3)
     finite = np.isfinite(omega)
-    maxAngle = self.maxAngle if self.maxAngle is not None else (float(np.quantile(omega[finite], 0.8)) if np.any(finite) else 1.0)
+    maxAngle = self.maxAngle
+    if maxAngle is None:
+      maxAngle = float(np.quantile(omega[finite], 0.8)) if np.any(finite) else 1.0
     gray = np.minimum(1.0, omega / max(maxAngle, 1e-12))
     rgb = self.dirMapping.direction2color(vector3d(axes), gray=gray)
     out = np.where(((omega > self.thresholdAngle) | ~finite)[:, None], np.nan, rgb)
@@ -402,11 +407,12 @@ class colorGrid:
     """a NaN or zero direction, the pole of an unmeasured orientation, has no grid node and is
     coloured white, as MTEX greys such a cell rather than failing the map"""
     from .kernels import cubeMapIndex
+    shape = h.shape if isinstance(h, vector3d) else np.shape(h)[:-1]
     xyz = (h.data if isinstance(h, vector3d) else np.asarray(h, dtype=float)).reshape(-1, 3)
     ind = cubeMapIndex(xyz, self.n)
     out = np.tile(COLOR_NAN, (len(xyz), 1))
     out[ind >= 0] = self.colors[ind[ind >= 0]]
-    return out.reshape(np.shape(h)[:-1] + (3,) if not isinstance(h, vector3d) else h.shape + (3,))
+    return out.reshape(shape + (3,))
 
   def __repr__(self):
     return display(header("colorGrid", type(self.key).__name__), [("resolution", f"{self.resolution / degree:.3g}°"), ("nodes", self.grid.size)])
@@ -443,7 +449,7 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
   grid route is one compiled loop over the quaternions where numba is there"""
   from .kernels import ipfGridColors
   d = vector3d(zvector if ipfDirection is None else ipfDirection).normalize().data.reshape(3)
-  rots = x.meanRotation if hasattr(x, "meanRotation") else x.rotations
+  rots = _rotationsOf(x)
   q = rots.data.reshape(-1, 4)
   phaseId = np.asarray(x.phaseId).reshape(-1)
   # the measurements a picture shows are fewer than the map holds, and colouring those alone
@@ -451,8 +457,7 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
   if at is not None:
     at = np.asarray(at).reshape(-1)
     q, phaseId = np.ascontiguousarray(q[at]), phaseId[at]
-  out = np.empty((len(q), 3))
-  out[:] = np.asarray(unindexed, dtype=float)
+  out = np.tile(np.asarray(unindexed, dtype=float), (len(q), 1))
   for i in x.CSList.indexedPhaseId:
     sub = np.flatnonzero(phaseId == i)
     if len(sub) == 0:

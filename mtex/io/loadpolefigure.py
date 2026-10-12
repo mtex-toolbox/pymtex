@@ -27,7 +27,7 @@ from ..geometry.miller import Miller
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from . import polefigureformats as F
-from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
+from .table import _tableStart, isNumericRow, readFile, readTable, text
 from ..geometry.install import install
 
 # ------------------------------------------------------------------ the reflection in a name
@@ -49,6 +49,11 @@ def string2Miller(s, CS=None):
     if found:
       return vector3d.cat(*[Miller(*d, CS) for d in found]) if len(found) > 1 else Miller(*found[0], CS)
   return Miller(1, 0, 0, CS)
+
+
+# the frames among those given that are not None
+def _given(*frames):
+  return [f for f in frames if f is not None]
 
 
 def _frames(args):
@@ -80,7 +85,7 @@ def loadPoleFigure_dubna(fname, *args, **kwargs):
     r = DubnaGrid(d.shape[1])
   else:
     r = regularS2Grid(points=d.shape, maxTheta=5 * degree * (d.shape[1] - 1), antipodal=True)
-  return PoleFigure(h, r, d, *(f for f in (cs, ss) if f is not None), **kwargs)
+  return PoleFigure(h, r, d, *_given(cs, ss), **kwargs)
 
 
 def DubnaGrid(ntheta):
@@ -92,70 +97,6 @@ def DubnaGrid(ntheta):
                     285.54, 282.81, 280.16, 277.57, 275.02, 272.50, 270.00])[::-1][:ntheta] * degree
   T, R = np.meshgrid(theta, rho, indexing="xy")
   return vector3d.byPolar(T, R + start[None, :], antipodal=True)
-
-
-def loadPoleFigure_siemens(fname, *args, **kwargs):
-  """the .ptx dump of a Siemens D5000: one section per pole figure, one block of azimuths
-  per tilt, a background line subtracted where the file states one"""
-  cs, ss = _frames(args)
-  allH, allD, allTheta = [], [], []
-  bg = []
-  for line in _lines(fname):
-    if "*Pole figure:" in line:
-      allH.append(string2Miller(line[line.index(":") + 1:], cs))
-      allD.append([])
-      allTheta.append([])
-    elif "*Khi" in line:
-      allTheta[-1].append(float(line.split("=")[1]))
-      bg = []
-    elif "background" in line:
-      bg.append(float(line[-9:]))
-    elif line.startswith("*") or not line.strip():
-      continue
-    elif allD:
-      values = np.array([float(x) for x in line.split()])
-      allD[-1].extend(values - (np.mean(bg) if bg else 0.0))
-  if not allH:
-    raise ValueError(f"{fname} holds no '*Pole figure:' section")
-  allR, allI = [], []
-  for d, th in zip(allD, allTheta):
-    n = len(d) // len(th)
-    rho = np.arange(n) * 2 * np.pi / n
-    allR.append(regularS2Grid(theta=np.asarray(th) * degree, rho=rho))
-    allI.append(np.asarray(d).reshape(len(th), n).T)
-  return PoleFigure(allH, allR, allI, *(f for f in (cs, ss) if f is not None), **kwargs)
-
-
-def loadPoleFigure_geesthacht(fname, *args, **kwargs):
-  """the TEX EINZEL table of the Geesthacht neutron diffractometer: one row per count with
-  the diffraction angle that names the pole figure, the elevation and the azimuth"""
-  cs, ss = _frames(args)
-  rows = []
-  lines = _lines(fname)
-  if not lines or not lines[0].startswith("CREATOR"):
-    raise ValueError(f"{fname} is not a Geesthacht file")
-  for line in lines[1:]:
-    s = line.strip()
-    if not s or s.startswith("$"):
-      continue
-    parts = s.split()
-    if len(parts) < 6:
-      raise ValueError(f"{fname} has a row of {len(parts)} entries")
-    rows.append([float(x) for x in parts[:6]])
-  d = np.array(rows)
-  if not np.array_equal(d[:, 0], np.arange(1, len(d) + 1)):
-    raise ValueError(f"{fname} does not count its rows")
-  if np.any(d[:, 3] < 0) or np.any(d[:, 3] > 90) or np.any(np.abs(d[:, 4]) > 370):
-    raise ValueError(f"{fname} has angles out of range")
-  allH, allR, allI = [], [], []
-  pos = 0
-  while pos < len(d):
-    npos = np.flatnonzero(d[:, 1] == d[pos, 1])[-1] + 1
-    allR.append(vector3d.byPolar(np.pi / 2 - d[pos:npos, 3] * degree, d[pos:npos, 4] * degree))
-    allI.append(d[pos:npos, 5])
-    allH.append(Miller(1, 0, 0, crystalFrame("m-3m") if cs is None else cs))
-    pos = npos
-  return PoleFigure(allH, allR, allI, *(f for f in (cs, ss) if f is not None), **kwargs)
 
 
 def loadPoleFigure_uxd(fname, *args, **kwargs):
@@ -204,7 +145,7 @@ def loadPoleFigure_uxd(fname, *args, **kwargs):
   allH.append(string2Miller(fname, cs))
   allR.append(vector3d.cat(*r))
   allI.append(np.concatenate(d))
-  return PoleFigure(allH, allR, allI, *(f for f in (cs, ss) if f is not None), **kwargs)
+  return PoleFigure(allH, allR, allI, *_given(cs, ss), **kwargs)
 
 
 def loadPoleFigure_aachen_exp(fname, *args, **kwargs):
@@ -244,7 +185,7 @@ def loadPoleFigure_aachen_exp(fname, *args, **kwargs):
       k += 1
   if not allH:
     raise ValueError(f"{fname} holds no HKL block")
-  return PoleFigure(allH, [r] * len(allH), allI, *(f for f in (cs, ss) if f is not None), **kwargs)
+  return PoleFigure(allH, [r] * len(allH), allI, *_given(cs, ss), **kwargs)
 
 
 def loadPoleFigure_rw1(fname, *args, **kwargs):
@@ -257,7 +198,7 @@ def loadPoleFigure_rw1(fname, *args, **kwargs):
   description = raw[:54].decode("latin-1")
   data = np.frombuffer(raw[54 + 352:], dtype="<i2").astype(float)
   m = re.search(r"hkl:(\w*) (\w*) (\w*)", description)
-  h = string2Miller("".join(m.groups()), cs) if m else Miller(1, 0, 0, crystalFrame("m-3m") if cs is None else cs)
+  h = string2Miller("".join(m.groups()), cs) if m else Miller(1, 0, 0, F._frame(cs))
   if data.size % 72 == 0:
     d = data.reshape(-1, 72).T[:, :17]
     r = regularS2Grid(theta=np.arange(0, 81, 5) * degree, rho=np.arange(2.5, 360, 5) * degree)
@@ -266,7 +207,7 @@ def loadPoleFigure_rw1(fname, *args, **kwargs):
     r = regularS2Grid(theta=np.arange(d.shape[1]) * 5 * degree, rho=np.arange(0, 361, 5) * degree, antipodal=True)
   else:
     raise ValueError(f"{fname} holds {data.size} counts, no five degree grid")
-  return PoleFigure(h, r, d ** 2 / 500, *(f for f in (cs, ss) if f is not None), **kwargs)
+  return PoleFigure(h, r, d ** 2 / 500, *_given(cs, ss), **kwargs)
 
 
 # the names a column may carry, MATLAB's loadHelper
@@ -285,15 +226,11 @@ def _loadPoleFigure_generic(fname, *args, columnNames=None, columns=None, radian
   cs, ss = _frames(args)
   h = next((a for a in args if isinstance(a, vector3d)), None)
   data = readFile(fname)
-  if header is None:
-    sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None
-    head, offset = leadingLines(data, lambda l: isNumericRow(l if sep is None else l.replace(sep, b" ")))
-  else:
-    head, offset = linesFrom(data, 0, int(header))
-  if offset >= len(data):
+  _, offset = _tableStart(data, header, delimiter)
+  if offset is None or offset >= len(data):
     raise ValueError(f"{fname} holds no row of numbers")
   M = readTable(data, offset, delimiter=delimiter)
-  frames = [f for f in (cs, ss) if f is not None]
+  frames = _given(cs, ss)
   if M.shape[1] > 15:
     if M.shape[0] % 2 and np.array_equal(M[0], M[-1]):
       M = M[:-1]
@@ -361,14 +298,14 @@ def _vendor(read, binary=False):
   def load(fname, lines, CS, SS, h=None, **kwargs):
     extra = {"raw": readFile(fname)} if binary else {}
     hs, rs, Is, fr = read(lines, fname, CS, h=h, **extra, **kwargs)
-    return PoleFigure(hs, rs, Is, *(f for f in (fr, SS) if f is not None))
+    return PoleFigure(hs, rs, Is, *_given(fr, SS))
   return load
 
 
 # a reader of this module as one of the table
 def _own(read):
   def load(fname, lines, CS, SS, h=None, **kwargs):
-    return read(fname, *(f for f in (CS, SS) if f is not None), **kwargs)
+    return read(fname, *_given(CS, SS), **kwargs)
   return load
 
 
@@ -458,13 +395,17 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
       parts.append(_loadPoleFigure_generic(f, *frames, **kwargs))
       continue
     # the directions the caller names go to a reader whose file names none
-    hk = None if not hs else hs[0] if len(fnames) == 1 else list(hs[0])[k]
+    if not hs:
+      hk = None
+    elif len(fnames) == 1:
+      hk = hs[0]
+    else:
+      hk = list(hs[0])[k]
     lines = [] if os.path.splitext(f)[1].lower() in BINARY else _lines(f)
     parts.append(FORMATS[name][1](f, lines, cs, ss, h=hk, **kwargs))
   pf = PoleFigure.cat(*parts)
   if hs:
-    h = hs[0]
-    entries = [h[i] for i in range(h.size)] if isinstance(h, vector3d) and h.size > 1 else [h] if isinstance(h, vector3d) else list(h)
+    entries = F._entries(hs[0])
     if len(entries) != pf.numPF:
       raise ValueError(f"{len(entries)} crystal directions for {pf.numPF} pole figures")
     pf = PoleFigure(entries, pf.allR, pf.allI, *frames, superposition=[None] * pf.numPF, complete=True)

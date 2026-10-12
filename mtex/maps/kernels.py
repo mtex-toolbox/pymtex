@@ -10,9 +10,30 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.kernels import _jit, _parallelKernel
+from ..geometry.session import getMTEXpref
 
 prange = range
 _COMPILED = {}
+
+
+# whether the compiled loops run: the backend asked for, else the preference 'kernels', is numba
+# and numba is installed
+def _useNumba(backend=None):
+  return (getMTEXpref("kernels", "numba") if backend is None else backend) == "numba" and bool(_jit())
+
+
+# a loop compiled once, plain or parallel over the prange of the module it is written in; None
+# where the compiled loops do not run
+def _compiledLoop(f, parallel=False, backend=None, **options):
+  if not _useNumba(backend):
+    return None
+  key = f"{f.__module__}.{f.__name__}"
+  if key not in _COMPILED:
+    nb = _jit()
+    if parallel:
+      f.__globals__["prange"] = nb.prange
+    _COMPILED[key] = _parallelKernel(f) if parallel else nb.njit(cache=True, **options)(f)
+  return _COMPILED[key]
 K = 256            # the vertices a cell polygon may hold while it is clipped
 NO_SITE = -1
 
@@ -179,16 +200,14 @@ def _unionFindLoop(parent, size, a, b):
     parent[k] = x
 
 
-def unionFind(n, a, b):
-  """the component root of every node of a graph on n nodes, or None without numba"""
-  nb = _jit()
-  if not nb:
+def unionFind(n, a, b, backend=None):
+  """the component root of every node of a graph on n nodes, or None without the compiled loops"""
+  loop = _compiledLoop(_unionFindLoop, backend=backend)
+  if loop is None:
     return None
-  if "unionFind" not in _COMPILED:
-    _COMPILED["unionFind"] = nb.njit(cache=True)(_unionFindLoop)
   parent = np.arange(n, dtype=np.int32)
   size = np.ones(n, dtype=np.int32)
-  _COMPILED["unionFind"](parent, size, np.ascontiguousarray(a, dtype=np.int32), np.ascontiguousarray(b, dtype=np.int32))
+  loop(parent, size, np.ascontiguousarray(a, dtype=np.int32), np.ascontiguousarray(b, dtype=np.int32))
   return parent
 
 
@@ -289,51 +308,41 @@ def _weldLoop(xy, lo0, lo1, c, M, nT, group, first):
   return m
 
 
-def weldNumba(xy, lo, c, cell):
-  """the groups and first points of meshVertices through the compiled weld, or None without numba;
-  the coarse grid has cells of about cell in the units of xy"""
-  nb = _jit()
-  if not nb:
+def weldNumba(xy, lo, c, cell, backend=None):
+  """the groups and first points of meshVertices through the compiled weld, or None without the
+  compiled loops; the coarse grid has cells of about cell in the units of xy"""
+  if not _useNumba(backend):
     return None
-  if "weld" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    for name in ("_gridInsert", "_root"):
-      _COMPILED[name] = nb.njit(cache=True)(globals()[name])
-      globals()[name] = _COMPILED[name]
-    _COMPILED["_firstOnCell"] = nb.njit(cache=True, parallel=True)(_firstOnCell)
-    globals()["_firstOnCell"] = _COMPILED["_firstOnCell"]
-    _COMPILED["weld"] = _parallelKernel(_weldLoop)
+  _bindHelpers(("_gridInsert", "_root"))
+  _bindHelpers(("_firstOnCell",), parallel=True)
+  loop = _compiledLoop(_weldLoop, parallel=True, backend=backend)
   xy = np.ascontiguousarray(xy, dtype=np.float64)
   group = np.empty(len(xy), np.int32)
   first = np.empty(len(xy), np.int32)
   M = max(int(cell / c), 1)
-  m = _COMPILED["weld"](xy, float(lo[0]), float(lo[1]), float(c), np.int64(M), np.int64(nb.get_num_threads()), group, first)
+  m = loop(xy, float(lo[0]), float(lo[1]), float(c), np.int64(M), np.int64(_jit().get_num_threads()), group, first)
   return group, first[:m]
 
 
 # ------------------------------------------------------------------ compilation
 
-_HELPERS = ("_clip", "_cellOf")
-
-
-def _compile():
+# the helpers the loops of this module call, compiled once and bound in place of their Python
+# forms, so that a loop compiled after them calls the compiled ones
+def _bindHelpers(names, parallel=False):
   nb = _jit()
-  if not nb:
-    return None
-  if "localVoronoi" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    for name in _HELPERS:
-      _COMPILED[name] = nb.njit(cache=True)(globals()[name])
+  globals()["prange"] = nb.prange
+  for name in names:
+    if name not in _COMPILED:
+      _COMPILED[name] = nb.njit(cache=True, parallel=parallel)(globals()[name])
       globals()[name] = _COMPILED[name]
-    _COMPILED["localVoronoi"] = _parallelKernel(_localVoronoiLoop)
-  return _COMPILED["localVoronoi"]
 
 
-def localVoronoiNumba(sites, levels, distortTol=0.05, chunkSize=4096):
-  """the faces of every cell through the compiled loop, or None without numba"""
-  loop = _compile()
-  if loop is None:
+def localVoronoiNumba(sites, levels, distortTol=0.05, chunkSize=4096, backend=None):
+  """the faces of every cell through the compiled loop, or None without the compiled loops"""
+  if not _useNumba(backend):
     return None
+  _bindHelpers(("_clip", "_cellOf"))
+  loop = _compiledLoop(_localVoronoiLoop, parallel=True, backend=backend)
   pos = np.ascontiguousarray(sites.pos)
   ij = np.ascontiguousarray(sites.ij, dtype=np.int32)
   lookup = np.ascontiguousarray(sites.lookup, dtype=np.int32)
@@ -356,7 +365,7 @@ def localVoronoiNumba(sites, levels, distortTol=0.05, chunkSize=4096):
     if cap > 64 * chunkSize:
       return None
     cap *= 2
-  keep = np.concatenate([np.arange(t * cap, t * cap + counts[t]) for t in range(nChunks)])
+  keep = np.flatnonzero(np.arange(cap)[None, :] < counts[:, None])
   return cellsBuf.reshape(-1, 2).take(keep, axis=0), vBuf.reshape(-1, 4).take(keep, axis=0), int(unbounded.sum())
 
 
@@ -457,11 +466,10 @@ def _compactLoopsLoop(goff, nlg, nvg, loopOff, vertOff, vtmp, ltmp, atmp, loopV,
 
 def traceLoopsNumba(V, ea, eb, goff):
   """the loops of every grain through the compiled walk: the flat vertices, the loop offsets,
-  the grain and twice the signed area of every loop, in grain order; None without numba"""
-  loops = _compileLoops()
-  if loops is None:
+  the grain and twice the signed area of every loop, in grain order; None without the compiled loops"""
+  trace, compact = _pixelLoop(_traceGrainsLoop, True), _pixelLoop(_compactLoopsLoop, True)
+  if trace is None:
     return None
-  trace, compact = loops
   n, G = len(ea), len(goff) - 1
   goff = np.ascontiguousarray(goff, dtype=np.int64)
   ea, eb = np.ascontiguousarray(ea, dtype=np.int32), np.ascontiguousarray(eb, dtype=np.int32)
@@ -503,30 +511,21 @@ def _edgesByGrainLoop(F, gid, posOf, goff, ea, eb):
         ptr[g] += 1
 
 
-def _compileSorts():
-  nb = _jit()
-  if not nb:
-    return None
-  if "adjacency" not in _COMPILED:
-    _COMPILED["adjacency"] = nb.njit(cache=True)(_adjacencyLoop)
-    _COMPILED["edgesByGrain"] = nb.njit(cache=True)(_edgesByGrainLoop)
-  return _COMPILED
-
-
 def adjacencyNumba(F, offset):
-  """the adjacency of chainOrder, or None without numba"""
-  compiled = _compileSorts()
-  if compiled is None:
+  """the adjacency of chainOrder, or None without the compiled loops"""
+  loop = _compiledLoop(_adjacencyLoop)
+  if loop is None:
     return None
   at = np.empty(2 * len(F), dtype=np.int32)
-  compiled["adjacency"](np.ascontiguousarray(F, dtype=np.int32), np.ascontiguousarray(offset, dtype=np.int64), at)
+  loop(np.ascontiguousarray(F, dtype=np.int32), np.ascontiguousarray(offset, dtype=np.int64), at)
   return at
 
 
 def edgesByGrainNumba(F, gid, posOf, nIds):
-  """the directed edges of the grains in ids sorted by grain with their offsets, or None without numba"""
-  compiled = _compileSorts()
-  if compiled is None:
+  """the directed edges of the grains in ids sorted by grain with their offsets, or None without
+  the compiled loops"""
+  loop = _compiledLoop(_edgesByGrainLoop)
+  if loop is None:
     return None
   gid = np.ascontiguousarray(gid, dtype=np.int64)
   g0, g1 = posOf[gid[:, 0]], posOf[gid[:, 1]]
@@ -534,7 +533,7 @@ def edgesByGrainNumba(F, gid, posOf, nIds):
   goff = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
   ea = np.empty(goff[-1], dtype=np.int32)
   eb = np.empty(goff[-1], dtype=np.int32)
-  compiled["edgesByGrain"](np.ascontiguousarray(F, dtype=np.int32), gid, np.ascontiguousarray(posOf, dtype=np.int64), goff, ea, eb)
+  loop(np.ascontiguousarray(F, dtype=np.int32), gid, np.ascontiguousarray(posOf, dtype=np.int64), goff, ea, eb)
   return ea, eb, goff
 
 
@@ -1292,29 +1291,23 @@ _PIXEL_HELPERS = ("_range", "_closestTo", "_closestAngle", "_neighbour", "_compa
 _PARALLEL_HELPERS = ("_applyOperator",)
 
 
+# the helpers of the pixel and grain loops compiled and bound, and numba; None without numba
 def _preparePixel():
   nb = _jit()
   if not nb:
     return None
-  if "_pixelHelpers" not in _COMPILED:
-    globals()["prange"] = nb.prange
-    for name in _PIXEL_HELPERS:
-      _COMPILED[name] = nb.njit(cache=True)(globals()[name])
-      globals()[name] = _COMPILED[name]
-    for name in _PARALLEL_HELPERS:
-      _COMPILED[name] = nb.njit(cache=True, parallel=True)(globals()[name])
-      globals()[name] = _COMPILED[name]
-    _COMPILED["_pixelHelpers"] = True
+  _bindHelpers(_PIXEL_HELPERS)
+  _bindHelpers(_PARALLEL_HELPERS, parallel=True)
   return nb
 
 
-def _compileLoops():
-  nb = _preparePixel()
-  if nb is None:
+# a loop of the pixels or the grains compiled once, after the helpers they call; None where the
+# compiled loops do not run
+def _pixelLoop(f, parallel, backend=None):
+  if not _useNumba(backend):
     return None
-  if "traceLoops" not in _COMPILED:
-    _COMPILED["traceLoops"] = (_parallelKernel(_traceGrainsLoop), _parallelKernel(_compactLoopsLoop))
-  return _COMPILED["traceLoops"]
+  _preparePixel()
+  return _compiledLoop(f, parallel=parallel, backend=backend)
 
 
 # the curvature tensor of every pixel from the two derivatives in the plane, kappa = gx e1^T +
@@ -1356,16 +1349,16 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
           longest[k, 0], longest[k, 1] = dx, dy
 
 
-def pixelKernel(name):
+_PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
+                "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
+                "absorb": _absorbLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop}
+
+
+def pixelKernel(name, backend=None):
   """the compiled numba loop of the map's pixels named (gradient, kam, gnd, grod, window, ...),
-  compiled on first call; None without numba"""
-  nb = _preparePixel()
-  if nb is None:
-    return None
-  if name not in _COMPILED:
-    _COMPILED[name] = _parallelKernel({"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop, "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop, "absorb": _absorbLoop, "planeTensor": _planeTensorLoop,
-                                         "extremalWidths": _extremalWidthLoop}[name])
-  return _COMPILED[name]
+  compiled on first call; None where the backend, else the preference 'kernels', is not numba or
+  numba is missing"""
+  return _pixelLoop(_PIXEL_LOOPS[name], True, backend)
 
 
 # ------------------------------------------------------------------ the criterion and the grain table
@@ -1526,27 +1519,11 @@ _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_
                 "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False), "projectionLength": (_projectionLengthLoop, True)}
 
 
-def grainKernel(name):
+def grainKernel(name, backend=None):
   """the compiled numba loop of the segmentation and the grain table named (angleCriterion,
-  sumByGrain, relabel, ...), compiled on first call; None without numba"""
-  nb = _preparePixel()
-  if nb is None:
-    return None
-  key = "grain:" + name
-  if key not in _COMPILED:
-    f, parallel = _GRAIN_LOOPS[name]
-    _COMPILED[key] = _parallelKernel(f) if parallel else nb.njit(cache=True)(f)
-  return _COMPILED[key]
-
-
-def linearProgramNumba(c, A, b, tol=1e-9, maxIter=10000):
-  """the linear program of one problem through the compiled simplex, None without numba, and
-  None again where the program has no solution"""
-  if _preparePixel() is None:
-    return None
-  x = np.empty(len(c))
-  status = _linearProgram(np.ascontiguousarray(A, dtype=float), np.ascontiguousarray(b, dtype=float), np.ascontiguousarray(c, dtype=float), tol, maxIter, x)
-  return x if status == 0 else None
+  sumByGrain, relabel, ...), compiled on first call; None where the backend, else the preference
+  'kernels', is not numba or numba is missing"""
+  return _pixelLoop(*_GRAIN_LOOPS[name], backend)
 
 
 # ------------------------------------------------------------------ the grid of a scan
@@ -1683,22 +1660,25 @@ def _mclExpandLoop(ptr, idx, val, a, b, p, cut):
 def mclExpandNumba(A, p, cut):
   """the expansion and inflation of a Markov clustering step, A A with every entry raised to the
   power p and those at or below cut dropped, as a CSR matrix over the threads of the preference;
-  None without numba"""
+  None without the compiled loops"""
   from scipy import sparse
 
-  from ..geometry.kernels import ROW_COST, _overRows, backend
-  if backend() != "numba":
+  from ..geometry.kernels import ROW_COST, _overRows
+  loop = _compiledLoop(_mclExpandLoop, nogil=True)
+  if loop is None:
     return None
-  if "mclExpand" not in _COMPILED:
-    _COMPILED["mclExpand"] = _jit().njit(cache=True, nogil=True)(_mclExpandLoop)
-  loop = _COMPILED["mclExpand"]
   A = A.tocsr()
   n = A.shape[0]
   ptr = np.ascontiguousarray(A.indptr, dtype=np.int64)
   idx = np.ascontiguousarray(A.indices, dtype=np.int64)
   val = np.ascontiguousarray(A.data, dtype=np.float64)
   parts = {}
-  _overRows(n, n * ROW_COST + A.nnz * ROW_COST, lambda a, b: parts.__setitem__(a, loop(ptr, idx, val, a, b, float(p), float(cut))))
+
+  # the rows a to b expanded on one thread
+  def expandRows(a, b):
+    parts[a] = loop(ptr, idx, val, a, b, float(p), float(cut))
+
+  _overRows(n, n * ROW_COST + A.nnz * ROW_COST, expandRows)
   parts = [parts[a] for a in sorted(parts)]
   rowNnz = np.concatenate([q[0] for q in parts])
   indptr = np.concatenate([[0], np.cumsum(rowNnz)])
@@ -1708,16 +1688,11 @@ def mclExpandNumba(A, p, cut):
 _GRID_LOOPS = {"rowOrder": _rowOrderLoop, "scanCells": _scanCellsLoop, "scanSites": _scanSitesLoop}
 
 
-def gridKernel(name):
+def gridKernel(name, backend=None):
   """the compiled numba loop of the grid of a scan named (rowOrder, scanCells, scanSites), compiled
-  on first call; None without numba or where the preference 'kernels' asks for NumPy"""
-  from ..geometry.kernels import backend
-  if backend() != "numba":
-    return None
-  key = "grid:" + name
-  if key not in _COMPILED:
-    _COMPILED[key] = _jit().njit(cache=True)(_GRID_LOOPS[name])
-  return _COMPILED[key]
+  on first call; None where the backend, else the preference 'kernels', is not numba or numba is
+  missing"""
+  return _compiledLoop(_GRID_LOOPS[name], backend=backend)
 
 
 __all__ = []

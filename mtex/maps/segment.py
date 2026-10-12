@@ -13,20 +13,17 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.session import getMTEXpref
 from .criteria import connectivity
-from .decomposition import NO_PIXEL
+from .decomposition import _gather
+from .kernels import grainKernel, unionFind
 from ..geometry.display import aligned
 
 
 def components(n, a, b, backend=None):
   """the component of every node of a graph on n nodes with edges (a, b), labelled by a root"""
-  backend = getMTEXpref("kernels", "numba") if backend is None else backend
-  if backend == "numba":
-    from .kernels import unionFind
-    out = unionFind(n, a, b)
-    if out is not None:
-      return out
+  out = unionFind(n, a, b, backend)
+  if out is not None:
+    return out
   from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   a, b = np.asarray(a, dtype=np.int64), np.asarray(b, dtype=np.int64)
@@ -74,8 +71,7 @@ def segmentFrom(c, ebsd, connect, backend=None, mcl=None):
   hasCell = np.zeros(n, dtype=bool)
   hasCell[c.site2pixel[c.site2pixel >= 0]] = True
   grainId, nGrains = relabel(raw, hasCell, backend)
-  g1 = np.where(p1 >= 0, grainId[np.maximum(p1, 0)], 0)
-  g2 = np.where(p2 >= 0, grainId[np.maximum(p2, 0)], 0)
+  g1, g2 = _gather(grainId, p1, 0), _gather(grainId, p2, 0)
   outside = (p1 < 0) | (p2 < 0)
   isOuter = (outside & ((p1 >= 0) | (p2 >= 0))) | (~outside & (g1 != g2))
   isInner = ~outside & (g1 == g2) & (cut if mcl is not None else connect <= 0.5)
@@ -106,17 +102,21 @@ def relabel(raw, hasCell, backend=None):
   """the grains numbered from 1 in order of the first measurement of their component, over the
   measurements that have a cell"""
   n = len(raw)
-  if (getMTEXpref("kernels", "numba") if backend is None else backend) == "numba":
-    from .kernels import grainKernel
-    loop = grainKernel("relabel")
-    if loop is not None:
-      grainId = np.zeros(n, dtype=np.int32)
-      nGrains = loop(np.ascontiguousarray(raw, dtype=np.int64), hasCell, np.zeros(n, dtype=np.int64), grainId)
-      return grainId, int(nGrains)
   grainId = np.zeros(n, dtype=np.int32)
-  _, first, inverse = np.unique(raw[hasCell], return_index=True, return_inverse=True)
-  grainId[hasCell] = np.argsort(np.argsort(first))[inverse] + 1
-  return grainId, len(first)
+  loop = grainKernel("relabel", backend)
+  if loop is not None:
+    nGrains = loop(np.ascontiguousarray(raw, dtype=np.int64), hasCell, np.zeros(n, dtype=np.int64), grainId)
+    return grainId, int(nGrains)
+  grainId[hasCell], nGrains = _firstAppearanceLabels(raw[hasCell])
+  return grainId, nGrains
+
+
+# the values numbered from 1 in the order they first appear, and how many there are
+def _firstAppearanceLabels(values):
+  _, first, inverse = np.unique(values, return_index=True, return_inverse=True)
+  rank = np.empty(len(first), dtype=np.int32)
+  rank[np.argsort(first)] = np.arange(1, len(first) + 1, dtype=np.int32)
+  return rank[inverse.reshape(-1)], len(first)
 
 
 def segment(c, ebsd, crit, backend=None, mcl=None):

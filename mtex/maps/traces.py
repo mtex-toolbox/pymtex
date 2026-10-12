@@ -16,8 +16,9 @@ import numpy as np
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
+from .decomposition import _gather
 from .ebsd import EBSD
-from .grains import grain2d
+from .grains import grain2d, _at, _positionTable
 from ..geometry.install import install
 
 
@@ -31,6 +32,18 @@ def _clusters(clusterId, n, weights):
   ok = np.all(cid > 0, axis=1)
   np.add.at(cSize, tuple((cid[ok] - 1).T), weights[ok])
   return cid, sz, cSize
+
+
+# the clusters above minClusterSize, each with its members in their order: the index of the
+# cluster into the output and the rows of clusterId that carry it
+def _members(cid, sz, cSize, minClusterSize):
+  ok = np.flatnonzero(np.all(cid > 0, axis=1))
+  key = np.ravel_multi_index(tuple((cid[ok] - 1).T), sz) if len(ok) else np.zeros(0, dtype=np.int64)
+  order = np.argsort(key, kind="stable")
+  rows, key = ok[order], key[order]
+  big = np.flatnonzero((cSize > minClusterSize).reshape(-1))
+  lo, hi = np.searchsorted(key, big), np.searchsorted(key, big, side="right")
+  return [(np.unravel_index(k, sz), rows[a:b]) for k, a, b in zip(big, lo, hi)]
 
 
 # the axes of angles in the plane of a map as directions of the specimen, NaN where not computed
@@ -55,8 +68,7 @@ def _ebsdTraces(ebsd, clusterId=None, method="Radon", minClusterSize=100, cutOff
   P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
   omega = np.full(sz, np.nan)
   rel = np.zeros(sz)
-  for ic in zip(*np.nonzero(cSize > minClusterSize)):
-    pix = np.flatnonzero(np.all(cid == np.array(ic) + 1, axis=1))
+  for ic, pix in _members(cid, sz, cSize, minClusterSize):
     omega[ic], rel[ic] = _radonTrace(P[pix], l, cutOff) if radon else _fourierTrace(l.ij[pix], l.A)
   return _axes(l.plane, omega, ebsd.frame), rel, cSize
 
@@ -116,10 +128,22 @@ def _grainTraces(grains, clusterId=None, method="shape", minClusterSize=100):
   cid, sz, cSize = _clusters(clusterId, len(grains), np.asarray(grains.numPixel, dtype=float))
   omega = np.full(sz, np.nan)
   rel = np.zeros(sz)
-  ids = np.asarray(grains.id).reshape(-1)
-  for ic in zip(*np.nonzero(cSize > minClusterSize)):
-    members = ids[np.all(cid == np.array(ic) + 1, axis=1)]
-    F = gB.F[np.isin(gB.grainId, members).any(axis=1)]
+  # the cluster of the grain on either side of every segment, and the segments of every cluster
+  # in their order, a segment inside a cluster once
+  ok = np.all(cid > 0, axis=1)
+  clusterOf = np.full(len(grains), -1, dtype=np.int64)
+  clusterOf[ok] = np.ravel_multi_index(tuple((cid[ok] - 1).T), sz) if ok.any() else 0
+  side = _gather(clusterOf, _at(_positionTable(grains.id), gB.grainId), -1)
+  seg = np.repeat(np.arange(len(gB)), 2)[side.reshape(-1) >= 0]
+  key = side.reshape(-1)[side.reshape(-1) >= 0]
+  order = np.lexsort((seg, key))
+  seg, key = seg[order], key[order]
+  once = np.ones(len(seg), dtype=bool)
+  once[1:] = (seg[1:] != seg[:-1]) | (key[1:] != key[:-1])
+  seg, key = seg[once], key[once]
+  for k in np.flatnonzero((cSize > minClusterSize).reshape(-1)):
+    ic = np.unravel_index(k, sz)
+    F = gB.F[seg[np.searchsorted(key, k):np.searchsorted(key, k, side="right")]]
     if len(F) == 0:
       continue
     lS = gB.V[F[:, 0]] - gB.V[F[:, 1]]

@@ -120,3 +120,13 @@ def test_scene3d_cameraLooksAlongAUnitDirectionWithUpPerpendicular():
 
 def test_slices3d_boundsAreAnArray():
   assert isinstance(slices3d(np.ones((1, 1, 1, 3)), np.ones((1, 1, 1)), np.zeros(3), np.eye(3)).bounds()[0], np.ndarray)
+
+
+def test_colorRows_repeatsOneColourAndKeepsOnePerRow():
+  from mtex.plotting.scene3d import _colorRows
+  assert _colorRows("red", 2).tolist() == [[1, 0, 0], [1, 0, 0]] and _colorRows([[0, 1, 0], [0, 0, 1]], 2).shape == (2, 3)
+
+
+def test_slices3d_planes_leavesTheAxesWithoutASliceOut():
+  s = slices3d(np.zeros((2, 3, 4, 3)), np.ones((2, 3, 4), dtype=bool), (0, 0, 0), np.eye(3), at=(1, None, 2))
+  assert [p[1].shape for p in s.planes()] == [(3, 4), (2, 3)]

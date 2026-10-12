@@ -11,7 +11,8 @@ import numpy as np
 from ..geometry.frames import crystalFrame, specimenFrame
 from ..geometry.representations import quatAngle, quatAxis
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import asVector3d, vector3d
+from ..maps.grains import grain2d
 
 
 def sphereMesh(resolution=5 * degree):
@@ -39,7 +40,7 @@ def sphereMesh(resolution=5 * degree):
 
 def smallCircle(n, opening=90 * degree, points=361):
   """the circle of directions at an angle about a direction, closed; the plane at 90 degrees"""
-  v = (n.data if isinstance(n, vector3d) else np.asarray(n, dtype=float)).reshape(3)
+  v = asVector3d(n).data.reshape(3)
   v = v / np.linalg.norm(v)
   u = vector3d(v).orth().data.reshape(3)
   w = np.cross(v, u)
@@ -182,7 +183,7 @@ def isosurface(x, y, z, V, level):
 def visibleFaces(cS, view):
   """the faces a viewer along view sees: those whose outward normal points at the viewer, a
   mask over the faces, one row per shape of a list"""
-  v = (view.data if isinstance(view, vector3d) else np.asarray(view, dtype=float)).reshape(3)
+  v = asVector3d(view).data.reshape(3)
   n = cS.faceNormal().data.reshape(-1, cS.numFaces, 3)
   vis = n @ (v / np.linalg.norm(v)) > 1e-9
   return vis[0] if len(cS) == 1 else vis
@@ -197,13 +198,15 @@ def shapeOutlines(cS, plane, layout=None):
   n = plane.normal * (-1 if np.linalg.det(M) < 0 else 1)
   vis = visibleFaces(cS, n).reshape(-1, cS.numFaces)
   P = plane.to2d(cS.V.data.reshape(-1, cS.numVertices, 3)) @ M.T
-  polys, shape, face = [], [], []
-  for k, i in zip(*np.nonzero(vis)):
+  shape, face = np.nonzero(vis)
+  # one face of every shape that shows it at a time, the polygons kept in the order of shape and face
+  polys = [None] * len(shape)
+  for i in np.unique(face):
+    at = np.flatnonzero(face == i)
     f = cS.F[i]
-    polys.append(P[k, f[f >= 0]])
-    shape.append(k)
-    face.append(i)
-  return polys, np.array(shape, dtype=int), np.array(face, dtype=int)
+    for j, poly in zip(at, P[shape[at][:, None], f[f >= 0]]):
+      polys[j] = poly
+  return polys, shape.astype(int), face.astype(int)
 
 
 def shapesOnMap(x, cS, scale=1.0):
@@ -216,7 +219,7 @@ def shapesOnMap(x, cS, scale=1.0):
   from ..geometry.products import fitFrame
   if not isinstance(cS.CS, crystalFrame):
     raise ValueError("the shape has to be given in a crystal frame")
-  onGrains = hasattr(x, "meanOrientation")
+  onGrains = isinstance(x, grain2d)
   parts, ids = [], []
   for p in x.indexedPhaseId:
     fr = x.CSList[int(p)]

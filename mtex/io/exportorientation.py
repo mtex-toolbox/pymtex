@@ -46,12 +46,9 @@ def exportOrientation(ori, fname, *args, radians=False, quaternion=False, interf
   if interface is not None:
     raise ValueError(f"the interface of an orientation export is None or 'VPSC', not {interface!r}")
   d, names = _columns(ori.flatten(), args, radians, quaternion)
-  names = list(names)
-  for a in args:
-    if isinstance(a, dict):
-      for key, value in a.items():
-        names.append(str(key))
-        d = np.concatenate([d, np.asarray(value, dtype=float).reshape(-1, 1)], axis=1)
+  extra = [(str(key), value) for a in args if isinstance(a, dict) for key, value in a.items()]
+  names = list(names) + [key for key, _ in extra]
+  d = np.column_stack([d] + [np.asarray(value, dtype=float).reshape(-1, 1) for _, value in extra])
   writeTable(os.fspath(fname), names, d.T)
 
 
@@ -66,10 +63,10 @@ def _export_VPSC(ori, fname, *args, weights=None, radians=False):
   d, _ = _columns(o, args, radians, False)
   w = np.ones(o.size) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   w = w / np.sum(w)
+  n = min(len(d), len(w))
   with open(fname, "w", encoding="utf-8") as f:
     f.write(f"texture exported by MTEX\n\n\n{VPSC_LETTER[_convention(args)]} {o.size}\n")
-    for row, wk in zip(d, w):
-      f.write(f"{row[0]:7.2f} {row[1]:7.2f} {row[2]:7.2f} {wk:11.7f}\n")
+    np.savetxt(f, np.column_stack([d[:n, :3], w[:n]]), fmt="%7.2f %7.2f %7.2f %11.7f")
 
 
 __all__ = ["exportOrientation"]

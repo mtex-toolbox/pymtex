@@ -20,6 +20,8 @@ from ..geometry.units import degree
 from .exportorientation import EULER_NAMES, _export_VPSC
 
 INTERFACES = ("generic", "mtex", "VPSC")
+# a row of three Euler angles and a value, as the files write it
+ROW_FORMAT = "%.5f %.5f %.5f %.5f"
 
 
 def _convention(args):
@@ -71,8 +73,7 @@ def _exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, 
   with open(fname, "w", encoding="utf-8") as f:
     _header(f, odf)
     f.write(f"% {names[0]:<7s} {names[1]:<7s} {names[2]:<7s} value\n")
-    for row, val in zip(e, v):
-      f.write(f"{row[0]:.5f} {row[1]:.5f} {row[2]:.5f} {val:.5f}\n")
+    np.savetxt(f, np.column_stack([e, v]), fmt=ROW_FORMAT)
 
 
 # writes the components of an ODF to a human readable file: the uniform part, the fibres and the
@@ -92,9 +93,9 @@ def _exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
       if isinstance(c, SO3FunHarmonic):
         f.write("%\n%% harmonic component: currently not supported! \n")
       elif isinstance(c, SO3FunCBF):
+        from ..geometry.miller import Miller
         for i in range(c.h.size):
           f.write(f"%\n%% fibre component\n% weight: {c.weights[i] * c.psi.mean():.5f}\n% kernel: {c.psi}\n")
-          from ..geometry.miller import Miller
           f.write(f"% fibre h: {Miller(c.h[i], c.CS).char()}\n")
           f.write("% fibre r: " + ",".join(f"{x:g}" for x in c.r[i].data.reshape(3)) + "\n")
       elif isinstance(c, SO3FunRBF) and c.center.size:
@@ -103,8 +104,7 @@ def _exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
         if not radians:
           e = e / degree
         f.write(f"% {names[0]:<7s} {names[1]:<7s} {names[2]:<7s} weight\n")
-        for row, w in zip(e, c.weights * c.psi.mean()):
-          f.write(f"{row[0]:.5f} {row[1]:.5f} {row[2]:.5f} {w:.5f}\n")
+        np.savetxt(f, np.column_stack([e, c.weights * c.psi.mean()]), fmt=ROW_FORMAT)
 
 
 # writes a sample of points orientations drawn from an ODF as a VPSC texture file

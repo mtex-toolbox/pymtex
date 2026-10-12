@@ -78,8 +78,10 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
     else:
       density, omega = calcAngleDistribution(obj)
     # in a histogram a density of one is the percent of one bin
-    factor = 100 / (len(bars) - 1) if bars is not None else 100 if percent else 1
-    unit = "%" if bars is not None or percent else "mrd"
+    if bars is not None:
+      factor, unit = 100 / (len(bars) - 1), "%"
+    else:
+      factor, unit = (100, "%") if percent else (1, "mrd")
     kw.setdefault("linewidth", 2)
     h = ax.plot(omega / degree, factor * np.maximum(0, density), label=displayName, **kw)[0]
   if isNew:

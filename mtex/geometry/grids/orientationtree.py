@@ -16,6 +16,7 @@ from scipy.spatial import cKDTree
 
 from ..kernels import threads
 from ..symmetryops import symmetriseOrientation
+from .search import _isCount
 
 
 # cos(w/2) from the chord d between unit quaternions, |q - g|^2 = 2 - 2 q.g
@@ -166,7 +167,7 @@ def findInGrid(grid, o, epsOrK=None):
   if epsOrK is None:
     ind, d = orientationTree(grid).nearest(o.flatten())
     return ind.reshape(o.shape), d.reshape(o.shape)
-  if isinstance(epsOrK, (int, np.integer)) and not isinstance(epsOrK, bool):
+  if _isCount(epsOrK):
     ind, c = orientationTree(grid).knn(o.flatten(), int(epsOrK))
     return ind, _angle(c)
   I, C = gridRadius(grid, o.flatten(), float(epsOrK))

@@ -88,3 +88,9 @@ def test_S9_markov_clustering_counts_as_MATLAB():
     g = calcGrains(ebsd.copy(), minPixel=10, **kw)
     assert (g.size, g.innerBoundary.size) == (nGrains, nInner)
   assert [calcGrains(ebsd.copy(), criterion=soft(), minPixel=10, mcl=(p, 4)).size for p in (1.1, 1.4, 1.8)] == [45, 46, 52]
+
+
+def test_labels_count_from_one_in_the_order_values_first_appear():
+  from mtex.maps.segment import _firstAppearanceLabels
+  labels, n = _firstAppearanceLabels(np.array([7, 3, 7, 9, 3]))
+  assert np.array_equal(labels, [1, 2, 1, 3, 2]) and n == 3 and labels.dtype == np.int32

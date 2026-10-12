@@ -31,6 +31,12 @@ def desktopEntry(icon):
   ])
 
 
+# the content of a file, bytes in mode "rb", text in mode "r"
+def _read(path, mode):
+  with open(path, mode, encoding=None if "b" in mode else "utf-8") as fh:
+    return fh.read()
+
+
 def installDesktopEntry(root=None):
   """writes the desktop entry and the icon where they are missing or out of date and returns
   the path of the entry; nothing off Linux"""
@@ -42,12 +48,12 @@ def installDesktopEntry(root=None):
   entry = os.path.join(root, "applications", APP_ID + ".desktop")
   try:
     changed = False
-    if not os.path.isfile(icon) or open(icon, "rb").read() != open(source, "rb").read():
+    if not os.path.isfile(icon) or _read(icon, "rb") != _read(source, "rb"):
       os.makedirs(os.path.dirname(icon), exist_ok=True)
       shutil.copyfile(source, icon)
       changed = True
     text = desktopEntry(icon)
-    if not os.path.isfile(entry) or open(entry, encoding="utf-8").read() != text:
+    if not os.path.isfile(entry) or _read(entry, "r") != text:
       os.makedirs(os.path.dirname(entry), exist_ok=True)
       with open(entry, "w", encoding="utf-8") as fh:
         fh.write(text)

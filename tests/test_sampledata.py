@@ -188,3 +188,8 @@ def test_the_quartz_pattern_is_read_with_a_along_x():
     pytest.skip("quartzPattern.mat is not downloaded")
   a = vector3d(Miller(1, 0, 0, pattern.CS, "uvw")).normalize().data.reshape(3)
   assert np.allclose(a, [1, 0, 0], atol=1e-9)
+
+
+def test_lookup_finds_a_recipe_case_aside_and_none_for_another_name():
+  from mtex.io.sampledata import _lookup
+  assert _lookup("FORSTERITE")["name"] == "forsterite" and _lookup("my100grains") is None

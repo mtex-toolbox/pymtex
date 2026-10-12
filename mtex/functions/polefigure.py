@@ -26,11 +26,10 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.s2grid import S2Grid
 from ..geometry.kernels import blasThreads
 from ..geometry.products import dropGroup
-from ..geometry.quaternion import quaternion, rotation
+from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
 from .characteristics import calcError as _calcErrorODF
-from .funops import conv
 from .s2fun import S2FunHarmonic
 from ..geometry.install import install
 from ..geometry.display import display, framesLabel
@@ -211,12 +210,11 @@ class PoleFigure:
       return
     if value.size != sum(I.size for I in self.allI):
       raise ValueError("one intensity per specimen direction")
-    value, out = value.ravel(), []
-    start = 0
-    for I in self.allI:
-      out.append(value[start:start + I.size].reshape(I.shape))
-      start += I.size
-    self.allI = out
+    self.allI = [v.reshape(I.shape) for v, I in zip(self._perFigure(value.ravel()), self.allI)]
+
+  # an array over all measurements cut into the parts of the pole figures
+  def _perFigure(self, a):
+    return np.split(a, np.cumsum([I.size for I in self.allI])[:-1])
 
   @property
   def isempty(self):
@@ -240,13 +238,8 @@ class PoleFigure:
       mask = np.asarray(key, dtype=bool).ravel()
       if mask.size != sum(I.size for I in self.allI):
         raise ValueError("the mask has one entry per specimen direction")
-      allR, allI, start = [], [], 0
-      for r, I in zip(self.allR, self.allI):
-        m = mask[start:start + I.size]
-        allR.append(r.flatten()[m])
-        allI.append(I.ravel()[m])
-        start += I.size
-      return self._rebuild(allI, allR)
+      masks = self._perFigure(mask)
+      return self._rebuild([I.ravel()[m] for I, m in zip(self.allI, masks)], [r.flatten()[m] for r, m in zip(self.allR, masks)])
     if isinstance(key, slice):
       return self.select(range(*key.indices(self.numPF)))
     return self.select(key)
@@ -553,8 +546,8 @@ class PoleFigure:
   def cat(*pfs, axis=0):
     """the pole figures of several data sets in one, in order"""
     pfs = [pf for pf in pfs if pf is not None]
-    return PoleFigure(sum([pf.allH for pf in pfs], []), sum([pf.allR for pf in pfs], []), sum([pf.allI for pf in pfs], []),
-                      superposition=sum([pf.c for pf in pfs], []), complete=True)
+    return PoleFigure([h for pf in pfs for h in pf.allH], [r for pf in pfs for r in pf.allR], [I for pf in pfs for I in pf.allI],
+                      superposition=[c for pf in pfs for c in pf.c], complete=True)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

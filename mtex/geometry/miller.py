@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import re
-from math import gcd
 
 import numpy as np
 
@@ -133,25 +132,18 @@ def roundIndices(v, style=None, maxHKL=12):
     m = getattr(v, style).reshape(-1, len(style))
   if style == "hkil":
     m = m[:, [0, 1, 3]]
-  out = np.empty_like(m)
-  for r, row in enumerate(m):
-    mMax = np.max(np.abs(row))
-    if mMax == 0:
-      out[r] = row
-      continue
-    best, bestErr = 1, np.inf
-    for n in range(1, maxHKL + 1):
-      mNew = row / mMax * n
-      err = np.round(np.sum((mNew - np.round(mNew)) ** 2) / np.sum(mNew ** 2) * 1e7) * 1e-7
-      if err < bestErr:
-        best, bestErr = n, err
-    # adding zero turns the negative zero of a rounded small component into zero
-    rounded = np.round(row / mMax * best) + 0.0
-    if style == "UVTW":
-      ints = [int(x) for x in rounded]
-      g = max(gcd(gcd(gcd(abs(ints[0]), abs(ints[1])), abs(ints[2])), abs(ints[3])), 1)
-      rounded = rounded / g
-    out[r] = rounded
+  # every row scaled by n = 1 .. maxHKL, the first n of the least relative rounding error kept
+  mMax = np.max(np.abs(m), axis=1, keepdims=True)
+  unit = m / np.where(mMax == 0, 1, mMax)
+  scaled = unit[:, None, :] * np.arange(1, maxHKL + 1)[:, None]
+  with np.errstate(invalid="ignore"):
+    err = np.round(np.sum((scaled - np.round(scaled)) ** 2, axis=-1) / np.sum(scaled ** 2, axis=-1) * 1e7) * 1e-7
+  best = np.argmin(err, axis=1) + 1
+  # adding zero turns the negative zero of a rounded small component into zero
+  out = np.where(mMax == 0, m, np.round(unit * best[:, None]) + 0.0)
+  if style == "UVTW":
+    g = np.gcd.reduce(np.abs(np.nan_to_num(out)).astype(int), axis=1)
+    out = out / np.maximum(g, 1)[:, None]
   if style == "xyz":
     return v._new(out.reshape(v.shape + (3,)).astype(float))
   result = v.copy()

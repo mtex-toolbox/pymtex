@@ -1,5 +1,8 @@
 # the text layout every class displays with, MATLAB's displayClass: the class name with the
 # frames in parentheses, a block of aligned key: value lines, then the data as a table
+import itertools
+import re
+
 import numpy as np
 
 
@@ -96,32 +99,22 @@ def fields(pairs, indent="  "):
   return [f"{indent}{k.ljust(w)}: {v}" for k, v in pairs]
 
 
-_FIELD = None
+# a key: value line, its indent, key and value
+_FIELD = re.compile(r"^( +)([A-Za-z][^:=\n]{0,40}?) *: (.*)$")
 
 
 def aligned(text):
   """a display with every run of key: value lines at one indent aligned on its colons"""
-  global _FIELD
-  if _FIELD is None:
-    import re
-    _FIELD = re.compile(r"^( +)([A-Za-z][^:=\n]{0,40}?) *: (.*)$")
-  lines = text.split("\n")
-  out, k = [], 0
-  while k < len(lines):
-    m = _FIELD.match(lines[k])
-    if not m:
-      out.append(lines[k])
-      k += 1
+  out = []
+  # the lines in runs of key: value lines of one indent, every other line a run of its own
+  matches = [(line, _FIELD.match(line)) for line in text.split("\n")]
+  for indent, run in itertools.groupby(matches, key=lambda lm: lm[1].group(1) if lm[1] else None):
+    run = list(run)
+    if indent is None:
+      out += [line for line, _ in run]
       continue
-    run = [m]
-    while k + len(run) < len(lines):
-      n = _FIELD.match(lines[k + len(run)])
-      if not n or n.group(1) != m.group(1):
-        break
-      run.append(n)
-    w = max(len(r.group(2)) for r in run)
-    out += [f"{r.group(1)}{r.group(2).ljust(w)}: {r.group(3)}" for r in run]
-    k += len(run)
+    w = max(len(m.group(2)) for _, m in run)
+    out += [f"{m.group(1)}{m.group(2).ljust(w)}: {m.group(3)}" for _, m in run]
   return "\n".join(out)
 
 

@@ -131,3 +131,21 @@ def test_full_forsterite_matches_mtex():
   assert [int((e.phaseId == k).sum()) for k in range(5)] == [58485, 152345, 26058, 9064, 0]
   assert np.allclose(firstEuler(e), [264.675, 137.65, 113.67], atol=1e-3)
   assert loadEBSD(os.path.join(DATA, "Forsterite.ctf")).shape == (336, 732)
+
+
+def test_surfaceTilt_is_none_for_a_surface_without_tilt():
+  from mtex.io.ctf import _surfaceTilt
+  assert _surfaceTilt(None) is None and _surfaceTilt((30.0, 0.0, 0.0)) is None
+
+
+def test_surfaceTilt_undoes_the_second_and_third_angle():
+  from mtex.io.ctf import _surfaceTilt
+  assert np.allclose(_surfaceTilt((0.0, 90.0, 0.0)).data, rotation.byEuler(0.0, np.pi / 2, 0.0, "Bunge").inv().data)
+
+
+def test_ctfHead_reads_header_phases_surface_and_the_column_line():
+  from mtex.io.ctf import _ctfHead
+  data = (b"Channel Text File\r\nXStep\t2\r\nAcqE1\t0\r\nAcqE2\t10\r\nAcqE3\t0\r\nPhases\t1\r\n"
+          b"4.756;10.207;5.98\t90;90;90\tForsterite\t3\t0\r\nPhase\tX\tY\r\n")
+  header, phases, acq, offset = _ctfHead(data, "f.ctf")
+  assert (header["XStep"], phases.mineralList, acq, data[offset:]) == (2.0, ["notIndexed", "Forsterite"], (0.0, 10.0, 0.0), b"Phase\tX\tY\r\n")

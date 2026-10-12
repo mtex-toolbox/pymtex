@@ -43,10 +43,7 @@ def xcfROIGrid(roiSize, numROI, region):
                      "images share; use a smaller ROISize, or check that they overlap")
   x = _round(np.linspace(np.ceil(h + region[0]), np.floor(region[0] + region[2] - h), int(numROI[0])))
   y = _round(np.linspace(np.ceil(h + region[1]), np.floor(region[1] + region[3] - h), int(numROI[1])))
-  while len(x) and x[-1] + h > region[0] + region[2]:
-    x = x[:-1]
-  while len(y) and y[-1] + h > region[1] + region[3]:
-    y = y[:-1]
+  x, y = x[x + h <= region[0] + region[2]], y[y + h <= region[1] + region[3]]
   if not len(x) or not len(y):
     raise ValueError(f"no tile of {roiSize} pixels fits inside the {region[2]:g} x {region[3]:g} region the two images share")
   cx, cy = np.meshgrid(x, y)

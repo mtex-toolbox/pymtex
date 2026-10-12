@@ -24,10 +24,11 @@ def pseudoOperators(psSym, tol=1e-4):
   kept = []
   for g in G:
     c = qmul(g, p)
+    coset = qmul(c[None], G)
     # the coset c G holds the identity exactly when c is in G
-    if np.max(np.abs(qmul(c[None], G)[:, 0])) > np.cos(tol / 2):
+    if np.max(np.abs(coset[:, 0])) > np.cos(tol / 2):
       continue
-    if any(np.max(np.abs(qmul(c[None], G) @ k)) > np.cos(tol / 2) for k in kept):
+    if any(np.max(np.abs(coset @ k)) > np.cos(tol / 2) for k in kept):
       continue
     kept.append(c)
   return np.array(kept).reshape(-1, 4)

@@ -26,7 +26,7 @@ from .homochoric import homochoric2quat
 from .representations import axis2quat, euler2quat, eulerTriple, fitKernel, map1Kernel, map2Kernel, mat2quat, rodrigues2quat
 from .session import SESSION
 from .units import degree
-from .vector3d import classproperty, vector3d
+from .vector3d import _xyz, classproperty, vector3d
 
 if TYPE_CHECKING:
   from .vocabulary import EulerConventionName
@@ -38,6 +38,14 @@ def _splitFrames(args):
   frames = [a for a in args if isinstance(a, referenceFrame)]
   rest = [a for a in args if not isinstance(a, referenceFrame)]
   return rest, frames
+
+
+# the two frames of an orientation from the frames given: a crystal frame of the point group
+# named, the trivial one by default, and the default specimen frame where they are missing
+def _defaultFrames(frames, pointGroup="1"):
+  frameA = frames[0] if frames else crystalFrame(pointGroup)
+  frameB = frames[1] if len(frames) > 1 else specimenFrame.default
+  return frameA, frameB
 
 
 # the symmetric equivalent of the largest rotation angle, the one MATLAB's 'max' names: a
@@ -102,9 +110,7 @@ class orientation(rotation):
 
   @classmethod
   def _fromRotation(cls, data, frames, antipodal=False):
-    frames = list(frames)
-    frameA = frames[0] if frames else crystalFrame("1")
-    frameB = frames[1] if len(frames) > 1 else specimenFrame.default
+    frameA, frameB = _defaultFrames(list(frames))
     _checkExchange(antipodal, frameA, frameB)
     obj = object.__new__(cls)
     obj.data = np.asarray(data, dtype=float)
@@ -537,10 +543,6 @@ class orientation(rotation):
 def _checkExchange(antipodal, frameA, frameB):
   if antipodal and frameA is not frameB:
     raise ValueError(f"grain exchange symmetry needs a misorientation within one frame, not between {frameA.char()} and {frameB.char()}")
-
-
-def _xyz(v):
-  return v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)
 
 
 def _frameOf(v):

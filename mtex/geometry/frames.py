@@ -1057,13 +1057,14 @@ def closestAlignment(CS):
   lies nearest its basis"""
   key = (CS.pointGroup, np.round(CS._basis, 9).tobytes())
   if key in _CLOSEST_ALIGNMENT:
-    return list(_CLOSEST_ALIGNMENT[key])
+    kept = _CLOSEST_ALIGNMENT[key]
+    return None if kept is None else list(kept)
   n = unitRows(CS._basis)
   best, at = None, None
   for setup in ALIGNMENT_SETUPS:
     try:
       fr = crystalFrame(CS.pointGroup, CS.abc, CS.abg, *setup, intern=False, check=False)
-    except Exception:
+    except ValueError:
       continue
     d = float(np.max(np.abs(unitRows(fr._basis) - n)))
     if best is None or d < best - 1e-9:

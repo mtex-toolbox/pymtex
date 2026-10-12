@@ -117,9 +117,7 @@ def gridify(ebsd, layout=None, unitCell=None, return_index=False):
       d = arrayDirections(grid)
       lin = layoutIndex(layout, d, grid.shape)
       grid = _relayout(grid, lin)
-      inv = np.empty(lin.size, dtype=np.int64)
-      inv[lin.reshape(-1)] = np.arange(lin.size)
-      newId = inv[newId]
+      newId = _inverse(lin)[newId]
   return (grid, newId) if return_index else grid
 
 
@@ -152,14 +150,24 @@ def arrayDirections(grid):
 def _relayout(grid, lin):
   from .ebsd import EBSD, _rotations, _vectors
   k, shape = lin.reshape(-1), lin.shape
-  def flat(a, m):
+
+  # an array of the map in the new order
+  def flat(a):
     return a.reshape((-1,) + a.shape[grid.ndim:])[k].reshape(shape + a.shape[grid.ndim:])
+
   l = grid.lattice
   gl = None if l is None else lattice._build(l.plane, l.origin, l.A, l.ij[k], l.shape)
-  prop = {key: flat(v, grid.ndim) for key, v in grid.prop.items()}
-  return EBSD(_vectors(flat(grid.pos.data, 2), grid.frame), _rotations(flat(grid.rotations.data, 2)), flat(grid.phaseId, 2),
+  prop = {key: flat(v) for key, v in grid.prop.items()}
+  return EBSD(_vectors(flat(grid.pos.data), grid.frame), _rotations(flat(grid.rotations.data)), flat(grid.phaseId),
               grid.CSList, prop, scanUnit=grid.scanUnit, frame=grid.frame, lattice=gl, meta=grid.meta, phaseMap=grid.phaseMap,
-              id=flat(grid.id, 2), isPadding=flat(grid.isPadding, 2))
+              id=flat(grid.id), isPadding=flat(grid.isPadding))
+
+
+# the inverse of the permutation of a layout's linear index
+def _inverse(lin):
+  inv = np.empty(lin.size, dtype=np.int64)
+  inv[lin.reshape(-1)] = np.arange(lin.size)
+  return inv
 
 
 def scanArray(l):
@@ -305,10 +313,8 @@ def resample(ebsd, unitCell, layout=None, return_index=False):
     return grid
   # the site of every measurement, rounded on the new lattice, and where the layout put it
   mine = np.clip(np.rint((P - c0) @ Ainv.T).astype(np.int64), lo, hi) - lo
-  inv = np.empty(lin.size, dtype=np.int64)
-  inv[lin.reshape(-1)] = np.arange(lin.size)
   newId = np.full(ebsd.size, -1, dtype=np.int64)
-  newId[src] = inv[mine[:, 0] * dims[1] + mine[:, 1]]
+  newId[src] = _inverse(lin)[mine[:, 0] * dims[1] + mine[:, 1]]
   return grid, newId
 
 

@@ -20,7 +20,7 @@ import numpy as np
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.plane import plane3d
 from ..geometry.vector3d import vector3d
-from ..maps.ebsd import EBSD, _rotations, _vectors
+from ..maps.ebsd import EBSD, _distinct, _rotations, _vectors
 from .voxellattice import voxelLattice
 from ..geometry.display import aligned, frameLabel
 
@@ -34,7 +34,6 @@ class EBSD3(EBSD):
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, scanUnit="um", frame=None, lattice=None, meta=None,
                phaseMap=None, id=None, isPadding=None, D=None):
-    self.lattice = None
     super().__init__(pos, rotations, phaseId, CSList, prop, scanUnit=scanUnit, frame=frame, lattice=False, meta=meta,
                      phaseMap=phaseMap, id=id, isPadding=isPadding)
     if lattice is None and self.size >= 4:
@@ -101,20 +100,9 @@ class EBSD3(EBSD):
     P = self.pos.data.reshape(-1, 3)
     if self._pad is not None:
       P = P[~self._pad.reshape(-1)]
-    return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
+    return np.column_stack([columnMin(P), columnMax(P)]).reshape(-1)
 
   # ------------------------------------------------------------------ subsets
-
-  def _subset(self, sel):
-    if isinstance(sel, np.ndarray) and sel.ndim == 1 and self.ndim > 1:
-      if sel.dtype == bool and sel.size == self.size:
-        sel = sel.reshape(self.shape)
-      elif np.issubdtype(sel.dtype, np.integer):
-        sel = np.unravel_index(sel, self.shape)
-    ids = np.arange(self.size).reshape(self.shape)[sel]
-    if ids.ndim == 0:
-      ids = ids.reshape(1)
-    return self._take(ids.reshape(-1), ids.shape)
 
   # the voxels of the flat indices, in the given shape; the lattice follows the voxels
   def _take(self, flat, shape):
@@ -122,7 +110,7 @@ class EBSD3(EBSD):
     rot = _rotations(self.rotations.data.reshape(-1, 4)[flat].reshape(shape + (4,)))
     ph = self.phaseId.reshape(-1)[flat].reshape(shape)
     prop = {k: v.reshape((-1,) + v.shape[self.ndim:])[flat].reshape(shape + v.shape[self.ndim:]) for k, v in self.prop.items()}
-    l = self.lattice.subset(flat) if self.lattice is not None and len(flat) and len(np.unique(flat)) == len(flat) else None
+    l = self.lattice.subset(flat) if self.lattice is not None and len(flat) and _distinct(flat, self.size) else None
     pad = None if self._pad is None else self._pad.reshape(-1)[flat].reshape(shape)
     return EBSD3(pos, rot, ph, self.CSList, prop, scanUnit=self.scanUnit, frame=self.frame, lattice=l or False,
                  meta=self.meta, phaseMap=self.phaseMap, id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
@@ -151,7 +139,7 @@ class EBSD3(EBSD):
     shape = l.shape
     newId = np.ravel_multi_index(l.ijk.T, shape)
     n = int(np.prod(shape))
-    full = voxelLattice(l.origin, l.D, np.stack(np.unravel_index(np.arange(n), shape), axis=1))
+    full = voxelLattice._box(l.origin, l.D, shape)
     pos = full.positions().reshape(shape + (3,))
     rot = np.full((n, 4), np.nan, dtype=self.dtype)
     rot[newId] = self.rotations.data.reshape(-1, 4)
@@ -273,8 +261,7 @@ def EBSD3square(rotations, phaseId=None, CSList=None, dxyz=(1.0, 1.0, 1.0), orig
     raise ValueError("a volume is an (n1, n2, n3) array of rotations")
   D = np.diag(np.broadcast_to(np.asarray(dxyz, dtype=float), (3,))) if D is None else np.asarray(D, dtype=float)
   shape = rot.shape
-  n = int(np.prod(shape))
-  lat = voxelLattice(origin, D, np.stack(np.unravel_index(np.arange(n), shape), axis=1))
+  lat = voxelLattice._box(origin, D, shape)
   pos = lat.positions().reshape(shape + (3,))
   ph = np.ones(shape, dtype=np.int8) if phaseId is None else np.asarray(phaseId).reshape(shape)
   return EBSD3(pos, rot, ph, CSList, prop, scanUnit=scanUnit, frame=frame, lattice=lat)

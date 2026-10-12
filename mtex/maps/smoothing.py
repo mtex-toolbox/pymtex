@@ -28,6 +28,16 @@ from ..geometry.display import aligned
 
 # ------------------------------------------------------------------ the network
 
+# the neighbour lists of the edges E (m, 2) between n vertices in compressed form, the neighbours
+# of vertex i being nbr[ptr[i]:ptr[i + 1]]: both ends of every edge sorted by the vertex they
+# belong to
+def _adjacency(E, n):
+  frm, to = np.concatenate([E[:, 0], E[:, 1]]), np.concatenate([E[:, 1], E[:, 0]])
+  order = np.argsort(frm, kind="stable")
+  ptr = np.concatenate([[0], np.cumsum(np.bincount(frm, minlength=n))]).astype(np.int32)
+  return ptr, to[order].astype(np.int32)
+
+
 class boundaryNetwork:
   """the network the smoothing runs on: only the vertices the boundaries use, their neighbours
   in compressed form, and which of them may not move. The pool of vertices a boundary
@@ -45,17 +55,13 @@ class boundaryNetwork:
     used = np.flatnonzero(deg > 0).astype(np.int32)
     at = np.zeros(nV, dtype=np.int32)
     at[used] = np.arange(len(used), dtype=np.int32)
-    # the neighbour lists, both ends of every segment sorted by the vertex they belong to
-    a, b = at[F[:, 0]], at[F[:, 1]]
-    frm, to = np.concatenate([a, b]), np.concatenate([b, a])
-    order = np.argsort(frm, kind="stable")
     fixed = np.zeros(len(used), dtype=bool) if moveTriplePoints else deg[used] != 2
     if not moveOuterBoundary:
       for gB in gBs:
         rim = (gB.grainId[:, 0] == 0) | (gB.grainId[:, 1] == 0)
         fixed[at[gB.F[rim]]] = True
-    self.ptr = np.concatenate([[0], np.cumsum(deg[used])]).astype(np.int32)
-    self.nbr, self.fixed, self.used = to[order].astype(np.int32), fixed, used
+    self.ptr, self.nbr = _adjacency(at[F], len(used))
+    self.fixed, self.used = fixed, used
 
   @classmethod
   def byArrays(cls, ptr, nbr, fixed, used):
@@ -83,14 +89,12 @@ class boundaryNetwork:
 
   def laplacian(self):
     """the normalised Laplacian D^-1 A - I of the network, as a sparse matrix"""
-    from scipy.sparse import csr_matrix
+    from scipy.sparse import csr_matrix, identity
     n = len(self)
     deg = self.degree
     rows = np.repeat(np.arange(n), deg)
     w = np.repeat(1.0 / np.maximum(deg, 1), deg)
-    A = csr_matrix((w, (rows, self.nbr)), shape=(n, n))
-    A.setdiag(A.diagonal() - 1)
-    return A.tocsr()
+    return (csr_matrix((w, (rows, self.nbr)), shape=(n, n)) - identity(n, format="csr")).tocsr()
 
   def __repr__(self):
     return aligned(f"boundaryNetwork\n  vertices: {len(self)}, fixed: {int(np.count_nonzero(self.fixed))}")
@@ -183,17 +187,21 @@ class taubinFilter(boundaryFilter):
     return [("iterations", self.iter), ("lambda", self.lambda_), ("mu", self.mu)]
 
 
-# the regularisation weight of a smoothing length, by inverting the gain
-# 1 / (1 + 4 alpha sin(w/2)^4) = 1/2 at w = 2 pi h / Lambda; a wavelength shorter than
-# twice the vertex spacing is not something the sampling can represent
-def _weight(F, h):
-  if F.alpha is not None:
-    return float(F.alpha)
-  Lambda = 4 * h if F.smoothingLength is None else F.smoothingLength
-  return 1 / (4 * np.sin(np.pi * h / max(Lambda, 2 * h)) ** 4)
+# the base of the variational filters, whose weight alpha is given or stated as a smoothing length
+class _variationalFilter(boundaryFilter):
+
+  def weight(self, h):
+    """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
+    four times the spacing h by default, to half amplitude"""
+    if self.alpha is not None:
+      return float(self.alpha)
+    # the gain 1 / (1 + 4 alpha sin(w/2)^4) inverted at 1/2 for w = 2 pi h / Lambda; a wavelength
+    # shorter than twice the vertex spacing is not something the sampling can represent
+    Lambda = 4 * h if self.smoothingLength is None else self.smoothingLength
+    return 1 / (4 * np.sin(np.pi * h / max(Lambda, 2 * h)) ** 4)
 
 
-class curvatureFilter(boundaryFilter):
+class curvatureFilter(_variationalFilter):
   """the smooth boundary as the minimiser of |V - V0|^2 + alpha |L V|^2, where L V is how far
   a vertex sits off the line through its neighbours. There is no iteration count: the
   minimiser is the solution of one sparse system, so the result depends on alpha alone.
@@ -203,11 +211,6 @@ class curvatureFilter(boundaryFilter):
   def __init__(self, smoothingLength=None, alpha=None):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.alpha = None if alpha is None else float(alpha)
-
-  def weight(self, h):
-    """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
-    four times the spacing h by default, to half amplitude"""
-    return _weight(self, h)
 
   def smooth(self, V, net, h):
     """the minimiser of |V - V0|^2 + alpha |L V|^2 over the free vertices, one sparse system"""
@@ -223,7 +226,7 @@ class curvatureFilter(boundaryFilter):
     return [("smoothing length", self.smoothingLength), ("alpha", self.alpha)]
 
 
-class huberFilter(boundaryFilter):
+class huberFilter(_variationalFilter):
   """the same, with an l1/l2 penalty that leaves a faceted boundary faceted: the quadratic
   penalty of the curvature filter rounds every corner; the Huber one is quadratic below a
   threshold and linear above it, so a vertex that turns by more than the threshold is paid
@@ -234,11 +237,6 @@ class huberFilter(boundaryFilter):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.threshold, self.alpha = float(threshold), None if alpha is None else float(alpha)
     self.maxIter, self.tol = int(maxIter), float(tol)
-
-  def weight(self, h):
-    """the regularisation weight alpha: the one given, or the one that damps the smoothing length,
-    four times the spacing h by default, to half amplitude"""
-    return _weight(self, h)
 
   def smooth(self, V, net, h):
     """the minimiser of |V - V0|^2 plus alpha times the Huber penalty of the curvature L V, by

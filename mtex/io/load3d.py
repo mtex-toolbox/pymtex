@@ -36,13 +36,21 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
   import h5py
   if interface == "dream3d" or (interface is None and ext == "dream3d"):
     return _loadEBSD_dream3d(fname, CS=CS)
-  if interface == "xnovo" or interface is None and ext in ("h5", "hdf5"):
+  if interface == "xnovo" or (interface is None and ext in ("h5", "hdf5")):
     with h5py.File(fname, "r") as f:
       if "LabDCT" in f:
         return _loadEBSD_xnovo(fname, CS=CS)
       if "DataStructure" in f:
         return _loadEBSD_dream3d(fname, CS=CS)
   raise ValueError(f"{fname} is not a volume this port reads: DREAM.3D, xnovo, or a list of 2D maps")
+
+
+# the phases of DREAM.3D's crystal structures, the first the not indexed one, a number outside
+# the table not indexed too
+def _dream3dPhases(structures):
+  structures = np.asarray(structures).reshape(-1)
+  return ["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY)
+                           else "notIndexed" for s in structures[1:]]
 
 
 # (z, y, x, ...) of the file to (x, y, z, ...)
@@ -67,9 +75,7 @@ def _loadEBSD_dream3d(fname, CS=None):
     if "Mask" in cell:
       phases[_xyz(cell["Mask"][...]).reshape(shape) == 0] = 0
     if CS is None:
-      structures = np.asarray(g["CellEnsembleData/CrystalStructures"][...]).reshape(-1)
-      CS = ["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY) else "notIndexed"
-                             for s in structures[1:]]
+      CS = _dream3dPhases(g["CellEnsembleData/CrystalStructures"][...])
     # every further scalar cell array is a property, the feature ids the grain id
     prop = {}
     for name, ds in cell.items():
@@ -96,14 +102,12 @@ def _loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
       rot = rotation.byRodrigues(vector3d(_xyz(data["Rodrigues"][...]).astype(float)))
     elif "Quaternion" in data:
       rot = rotation(_xyz(data["Quaternion"][...]).astype(float))
-    elif "EulerZXZ" in data:
-      e = _xyz(data["EulerZXZ"][...]).astype(float)
-      rot = rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], "ZXZ")
-    elif "EulerZYZ" in data:
-      e = _xyz(data["EulerZYZ"][...]).astype(float)
-      rot = rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], "ZYZ")
     else:
-      raise ValueError(f"{fname} holds no orientations in {map}/Data")
+      convention = next((c for c in ("ZXZ", "ZYZ") if "Euler" + c in data), None)
+      if convention is None:
+        raise ValueError(f"{fname} holds no orientations in {map}/Data")
+      e = _xyz(data["Euler" + convention][...]).astype(float)
+      rot = rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], convention)
     q = rot.data.reshape(-1, 4)
     q[~np.all(np.isfinite(q), axis=1)] = [1, 0, 0, 0]
     prop = {}
@@ -113,7 +117,10 @@ def _loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
       prop["grainId"] = _xyz(data["GrainId"][...]).astype(float)
     center = np.asarray(g["Center"][...], dtype=float)
     spacing = np.asarray(g["Spacing"][...], dtype=float)
-    cs = ["notIndexed", CS] if isinstance(CS, crystalFrame) else CS if CS is not None else _xnovoPhases(f)
+    if isinstance(CS, crystalFrame):
+      cs = ["notIndexed", CS]
+    else:
+      cs = _xnovoPhases(f) if CS is None else CS
   origin = center - (np.array(shape) - 1) * spacing / 2
   e = EBSD3square(rot, phase, cs if isinstance(cs, phaseList) else phaseList(cs), spacing, origin=origin, prop=prop)
   e.scanUnit = "mm"

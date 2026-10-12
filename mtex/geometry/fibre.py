@@ -20,25 +20,20 @@ import numpy as np
 from .kernels import qconj
 from .arguments import refuseFlags
 from .display import display, header, sizeString
-from .frames import crystalFrame, referenceFrame, specimenFrame
+from .frames import crystalFrame, specimenFrame
 from .kernels import qmul, qrot
 from .miller import Miller
-from .orientation import orientation
+from .orientation import _defaultFrames, _splitFrames, orientation
 from .quaternion import rotation
 from .representations import axis2quat, quatAngle, quatAxis, quat2euler
 from .session import SESSION
-from .symreduce import reductionGroups
+from .symreduce import _firstOfClusters, reductionGroups
 from .units import degree
 from .vector3d import vector3d
 from .install import install
 from .framepair import installFramePair
 
 TOLERANCE = 1e-8
-
-
-
-def _splitFrames(args):
-  return [a for a in args if not isinstance(a, referenceFrame)], [a for a in args if isinstance(a, referenceFrame)]
 
 
 class fibre:
@@ -260,8 +255,7 @@ class fibre:
       f = fibre.rand(10, cs)
       f = fibre.rand(10, cs, ss, rng=rng)"""
     shape, frames = _splitFrames(args)
-    cs = frames[0] if frames else crystalFrame("1")
-    ss = frames[1] if len(frames) > 1 else specimenFrame.default
+    cs, ss = _defaultFrames(frames)
     h = vector3d.rand(*shape, rng=rng)
     r = vector3d.rand(*shape, rng=rng)
     return cls(Miller(h, cs) if isinstance(cs, crystalFrame) else vector3d(h, frame=cs), vector3d(r, frame=ss))
@@ -361,21 +355,13 @@ def _axisBetween(o1, o2):
 # the distinct unit vectors of an orbit, shape (n, 3)
 def _uniqueDirections(xyz, tol=TOLERANCE):
   xyz = xyz.reshape(-1, 3)
-  keep = np.ones(len(xyz), dtype=bool)
-  for k in range(len(xyz)):
-    if keep[k]:
-      keep[k + 1:] &= xyz[k + 1:] @ xyz[k] < 1 - tol
-  return xyz[keep]
+  return xyz[_firstOfClusters(xyz @ xyz.T >= 1 - tol)]
 
 
 # the first of every set of equal fibres: h and r agree, or both flip sign
 def _distinct(h, r, tol=TOLERANCE):
-  keep = np.ones(len(h), dtype=bool)
-  for k in range(len(h)):
-    if keep[k]:
-      hd, rd = h[k + 1:] @ h[k], r[k + 1:] @ r[k]
-      keep[k + 1:] &= ~((hd > 1 - tol) & (rd > 1 - tol) | (hd < tol - 1) & (rd < tol - 1))
-  return keep
+  hd, rd = h @ h.T, r @ r.T
+  return _firstOfClusters((hd > 1 - tol) & (rd > 1 - tol) | (hd < tol - 1) & (rd < tol - 1))
 
 
 def _eulerString(o):
@@ -394,8 +380,7 @@ NAMED_FIBRES = {"alpha": ((315, 0, 0), (180, 54.735610, 45)), "beta": ((180, 35.
 def _named(name):
   def build(cls, *frames, full=False):
     frames = _splitFrames(frames)[1]
-    cs = frames[0] if frames else crystalFrame("432")
-    ss = frames[1] if len(frames) > 1 else specimenFrame.default
+    cs, ss = _defaultFrames(frames, "432")
     (a1, b1, c1), (a2, b2, c2) = NAMED_FIBRES[name]
     o1 = orientation.byEuler(a1 * degree, b1 * degree, c1 * degree, cs, ss)
     o2 = orientation.byEuler(a2 * degree, b2 * degree, c2 * degree, cs, ss)
@@ -410,8 +395,7 @@ del _name
 
 def _theta(cls, *frames):
   frames = _splitFrames(frames)[1]
-  cs = frames[0] if frames else crystalFrame("432")
-  ss = frames[1] if len(frames) > 1 else specimenFrame.default
+  cs, ss = _defaultFrames(frames, "432")
   return cls(Miller(1, 0, 0, cs, "uvw"), vector3d(0, 0, 1, frame=ss))
 
 

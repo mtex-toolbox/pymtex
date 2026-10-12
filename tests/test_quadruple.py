@@ -92,3 +92,9 @@ def test_Q7_single_precision():
   e = quadrants(dtype=np.float32)
   q = calcGrains(e.copy(), angle=10 * degree, removeQuadruplePoints=True)
   assert len(q) == 3 and not np.any(q.boundary.vertexDegree() == 4) and q.boundary.V.dtype == np.float32
+
+
+def test_the_wedge_site_is_the_one_site_two_faces_share():
+  from mtex.maps.quadruple import _commonSite
+  a, b = np.array([[1, 2], [1, 2], [1, 2]]), np.array([[2, 5], [7, 8], [2, 1]])
+  assert np.array_equal(_commonSite(a, b), [2, -1, -1])

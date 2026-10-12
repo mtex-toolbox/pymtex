@@ -22,12 +22,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..geometry._array import MtexArray
-from ..geometry.kernels import qconj
-from ..geometry.kernels import columnMax, columnMin
+from ..geometry.kernels import columnMax, columnMin, qconj
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
 from ..geometry.display import aligned, frameLabel
+from ..maps.grains import _at, _idPositions, _positionTable
 
 
 class grain3d:
@@ -100,7 +100,7 @@ class grain3d:
   @property
   def isIndexed(self):
     """whether the phase of every grain is indexed"""
-    return np.array([self.CSList[int(p)].isIndexed for p in self.phaseId], dtype=bool)
+    return self.CSList._indexedMask[self.phaseId]
 
   @property
   def indexedPhaseId(self):
@@ -153,11 +153,10 @@ class grain3d:
     self.meanRotation = rotation._fromData(q)
     gB = self.boundary
     g = gB.grainId
-    both = np.all(g > 0, axis=1)
-    pos = np.zeros(int(g.max(initial=0)) + 1, dtype=np.int64)
-    pos[self.id] = np.arange(len(self))
+    pos = _at(_positionTable(self.id), g)
+    both = np.all(pos >= 0, axis=1)
     mori = np.full((len(gB), 4), np.nan)
-    mori[both] = qmul(qconj(q[pos[g[both, 1]]]), q[pos[g[both, 0]]])
+    mori[both] = qmul(qconj(q[pos[both, 1]]), q[pos[both, 0]])
     gB.misrotation = rotation._fromData(mori)
     gB.phaseId = np.where(g > 0, p, -1).astype(np.int8)
     gB.CSList = self.CSList
@@ -176,7 +175,6 @@ class grain3d:
 
   def id2ind(self, ids):
     """the position of grain ids"""
-    from ..maps.grains import _idPositions
     return _idPositions(self.id, ids)
 
   # the names grains['...'] takes, which IPython completes inside the brackets
@@ -209,7 +207,7 @@ class grain3d:
     gB = self.boundary
     if not keepXY:
       c = np.asarray(center.data if isinstance(center, vector3d) else center, dtype=float).reshape(3)
-      gB = gB[np.arange(len(gB))]
+      gB = gB._copy()
       gB.allV = c + (gB.allV - c) @ R.matrix().reshape(3, 3).T
     return self._new(np.arange(len(self)), self.I_GF, gB, q)
 
@@ -220,11 +218,7 @@ class grain3d:
   def triangulate(self):
     """the faces of polygonal grains as triangles, the fan from the first corner of every face"""
     gB = self.boundary
-    n = gB.numCorners - 2
-    face = np.repeat(np.arange(len(gB)), n)
-    start = np.repeat(gB._ptr[:-1], n)
-    j = np.arange(len(face)) - np.repeat(np.cumsum(n) - n, n)
-    T = np.stack([gB._idx[start], gB._idx[start + j + 1], gB._idx[start + j + 2]], axis=1)
+    T, face = gB._fanIndex()
     from .grain3boundary import grain3Boundary
     tri = grain3Boundary(gB.allV, T, gB.grainId[face], gB.ebsdId[face], gB.phaseId[face], gB.misrotation.data.reshape(-1, 4)[face],
                          gB.CSList, gB.frame, gB.scanUnit, gB.id[face])
@@ -286,7 +280,7 @@ class grain3d:
   def extent(self):
     """the box of the vertices, [xmin, xmax, ymin, ymax, zmin, zmax]"""
     P = self.boundary.allV[self.boundary.idV]
-    return np.array([P[:, 0].min(), P[:, 0].max(), P[:, 1].min(), P[:, 1].max(), P[:, 2].min(), P[:, 2].max()])
+    return np.column_stack([columnMin(P), columnMax(P)]).reshape(-1)
 
   @property
   def midPoint(self):
@@ -392,11 +386,12 @@ class grain3d:
       plane = plane3d(plane, P0 if P0 is not None else 0)
     d = np.asarray(plane.dist(vector3d(self.boundary.allV, frame=self.frame))).reshape(-1)
     I = self._vertexIncidence()
-    out = np.zeros(len(self), dtype=bool)
-    for k in range(len(self)):
-      dk = d[I.indices[I.indptr[k]:I.indptr[k + 1]]]
-      out[k] = dk.size > 0 and dk.max() > 0 and dk.min() < 0
-    return out
+    # the largest and the smallest distance of the vertices of every grain
+    rows = np.repeat(np.arange(len(self)), np.diff(I.indptr))
+    hi, lo = np.full(len(self), -np.inf), np.full(len(self), np.inf)
+    np.maximum.at(hi, rows, d[I.indices])
+    np.minimum.at(lo, rows, d[I.indices])
+    return (hi > 0) & (lo < 0)
 
   def slice(self, plane, P0=None):
     """the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain

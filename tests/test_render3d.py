@@ -71,3 +71,9 @@ def test_pyvista_renders_the_square_unlit():
   # the face in its own colour, unlit, and white around it
   red = np.all(img == [255, 0, 0], axis=-1)
   assert red.sum() > 1000 and np.all(img[0, 0] == 255)
+
+
+def test_sliceGrid_spansTheRectangleOfTheSlice():
+  from mtex.plotting.render3d import _sliceGrid
+  P = _sliceGrid(np.array([[0, 0, 0], [2, 0, 0], [0, 3, 0], [2, 3, 0]], dtype=float), 2, 3)
+  assert P.shape == (3, 4, 3) and P[-1, -1].tolist() == [2, 3, 0]

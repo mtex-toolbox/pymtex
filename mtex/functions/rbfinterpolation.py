@@ -83,19 +83,14 @@ def voronoiVolumes(nodes, resolution=2.5 * degree):
 def _spatial(M, y, density, mean, maxIter, tol, nodes):
   eps = np.max(y) * 1e-3
   signed = np.all(y > -eps) or np.all(y < eps)
-  method = "lsqr"
-  if density:
-    method = "mlsq"
-  elif mean is not None and signed:
-    method = "mlsq"
-  elif M.shape[0] < 1e4 and signed:
-    w = voronoiVolumes(nodes)
-    mean = float(np.sum(w * y))
-    method = "mlsq"
-  if method == "lsqr":
+  # weights of one sign by mlsq for a density, or for values of one sign with a mean, given or
+  # that of the values over the Voronoi cells of fewer than 10000 nodes; else LSQR
+  if not (density or (signed and (mean is not None or M.shape[0] < 1e4))):
     from .lsqr import lsqr
     x, _, _, it = lsqr(lambda c: M @ c, lambda r: M.T @ r, y, M.shape[1], tol=tol, maxIter=30 if maxIter is None else maxIter)
-    return x, it, mean
+    return x, it
+  if not density and mean is None:
+    mean = float(np.sum(voronoiVolumes(nodes) * y))
   c0 = M.T @ y
   if density:
     c0 = np.where(c0 < eps, eps, c0)
@@ -103,8 +98,7 @@ def _spatial(M, y, density, mean, maxIter, tol, nodes):
     small = np.abs(c0) <= eps
     c0 = np.where(small, np.sign(c0) * eps, c0)
   c0 = (1.0 if mean is None else mean) * c0 / np.sum(c0)
-  chat, it = mlsq(M, y, c0, 100 if maxIter is None else maxIter, tol)
-  return chat, it, mean
+  return mlsq(M, y, c0, 100 if maxIter is None else maxIter, tol)
 
 
 def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=None, SO3Grid=None, density=False,
@@ -113,8 +107,7 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   from ..geometry.grids.so3grid import equispacedSO3Grid
   from .rbf import SO3FunRBF, unimodalODF
   nodes = (nodes if isinstance(nodes, orientation) else orientation(nodes)).flatten()
-  hw = 5 * degree if resolution is None else resolution
-  hw = hw if halfwidth is None else halfwidth
+  hw = halfwidth if halfwidth is not None else (5 * degree if resolution is None else resolution)
   psi = SO3DeLaValleePoussinKernel(halfwidth=hw) if kernel is None else kernel
   res = max(0.75 * degree, psi.halfwidth()) if resolution is None else resolution
   grid = nodes if exact else (equispacedSO3Grid(nodes.CS, nodes.SS, resolution=res) if SO3Grid is None else SO3Grid)
@@ -123,7 +116,7 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   y = np.real(np.asarray(values, dtype=float)).reshape(nodes.size, -1)
   cols, its = [], []
   for k in range(y.shape[1]):
-    chat, it, _ = _spatial(M, y[:, k], density, mean, maxIter, tol, nodes)
+    chat, it = _spatial(M, y[:, k], density, mean, maxIter, tol, nodes)
     cols.append(chat)
     its.append(it)
   w = np.stack(cols, axis=-1).reshape((centres.size,) + np.asarray(values).shape[1:])
@@ -131,7 +124,7 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   # a density of one column is MATLAB's unimodalODF of the weights, which drops the centres
   # of negligible weight and scales to mean one
   if density and w.ndim == 1:
-    f = unimodalODF(centres, psi, weights=w, thinning=not (exact))
+    f = unimodalODF(centres, psi, weights=w, thinning=not exact)
   else:
     f = SO3FunRBF(centres, psi, w if w.ndim > 1 else w.ravel())
     # the mean asked for, one for a density, by scaling the weights
@@ -157,7 +150,7 @@ def interpSO3(nodes, values=None, *flags, regularisation=None, SobolevIndex=None
   if "bingham" in flags:
     from .bingham import calcBinghamODF
     return calcBinghamODF(nodes, weights=values)
-  return interpolateRBF(nodes, values, density=kwargs.pop("density", False), exact=kwargs.pop("exact", False), **kwargs)
+  return interpolateRBF(nodes, values, **kwargs)
 
 
 __all__ = ["interpolateRBF", "summationMatrix", "mlsq", "interpSO3"]

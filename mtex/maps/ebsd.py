@@ -59,7 +59,7 @@ class EBSD:
     if not isinstance(fr, specimenFrame):
       raise TypeError("the positions of a map are in a specimen frame")
     xyz = pos.data if isinstance(pos, vector3d) else np.asarray(pos)
-    if xyz.ndim >= 1 and xyz.shape[-1] != 3 and xyz.ndim == 2 and xyz.shape[-1] == 2:
+    if xyz.ndim == 2 and xyz.shape[1] == 2:
       xyz = np.concatenate([xyz, np.zeros(xyz.shape[:-1] + (1,))], axis=-1)
     xyz = np.ascontiguousarray(xyz, dtype=dtype)
     shape = xyz.shape[:-1]
@@ -71,18 +71,19 @@ class EBSD:
     cs = CSList if isinstance(CSList, phaseList) else phaseList(CSList)
     if ph.size and (ph.min() < 0 or ph.max() >= len(cs)):
       raise ValueError(f"a phase id indexes CSList, so it runs from 0 to {len(cs) - 1}")
-    object.__setattr__(self, "pos", _vectors(xyz, fr))
-    object.__setattr__(self, "rotations", _rotations(np.ascontiguousarray(rotations.data)))
-    object.__setattr__(self, "phaseId", ph.astype(np.int8))
+    self.pos = _vectors(xyz, fr)
+    self.rotations = _rotations(np.ascontiguousarray(rotations.data))
+    self.phaseId = ph.astype(np.int8)
+    # the phase ids were checked against the list above; __setattr__ would check them again
     object.__setattr__(self, "CSList", cs)
-    object.__setattr__(self, "prop", dynProp())
-    object.__setattr__(self, "meta", {} if meta is None else dict(meta))
-    object.__setattr__(self, "scanUnit", scanUnit)
-    object.__setattr__(self, "phaseMap", np.arange(len(cs)) if phaseMap is None else np.asarray(phaseMap))
-    object.__setattr__(self, "id", np.arange(ph.size).reshape(shape) if id is None else np.asarray(id).reshape(shape))
-    object.__setattr__(self, "lattice", None)
+    self.prop = dynProp()
+    self.meta = {} if meta is None else dict(meta)
+    self.scanUnit = scanUnit
+    self.phaseMap = np.arange(len(cs)) if phaseMap is None else np.asarray(phaseMap)
+    self.id = np.arange(ph.size).reshape(shape) if id is None else np.asarray(id).reshape(shape)
+    self.lattice = None
     pad = None if isPadding is None else np.asarray(isPadding, dtype=bool).reshape(shape)
-    object.__setattr__(self, "_pad", pad if pad is not None and pad.any() else None)
+    self._pad = pad if pad is not None and pad.any() else None
     for k, v in (prop or {}).items():
       self._setProp(k, v)
     # the nan positions are dropped, as MATLAB does; a test over the whole array first, since
@@ -96,7 +97,7 @@ class EBSD:
     if lattice is None and unitCell is not None:
       A, stencil, _ = latticeBasis(unitCell)
       lattice = _tryLattice(self.pos, basis=(A, "hex" if len(stencil) == 6 else "square"))
-    object.__setattr__(self, "lattice", _tryLattice(self.pos) if lattice is None else lattice)
+    self.lattice = _tryLattice(self.pos) if lattice is None else lattice
 
   # ------------------------------------------------------------------ the table
 
@@ -191,8 +192,7 @@ class EBSD:
   @property
   def isIndexed(self):
     """whether a measurement belongs to an indexed phase"""
-    indexed = np.array([f.isIndexed for f in self.CSList.frames])
-    return indexed[self.phaseId]
+    return self.CSList._indexedMask[self.phaseId]
 
   @property
   def indexedPhaseId(self):
@@ -310,15 +310,7 @@ class EBSD:
     return self.CSList.phaseId(name)
 
   def _phaseMask(self, names):
-    mask = np.zeros(self.shape, dtype=bool)
-    for name in names:
-      if name.lower() == "indexed":
-        mask |= self.isIndexed
-      elif name.lower() == "notindexed" and "notindexed" not in [m.lower() for m in self.mineralList]:
-        mask |= ~self.isIndexed
-      else:
-        mask |= self.phaseId == self.CSList.phaseId(name)
-    return mask & ~self.isPadding
+    return self.CSList._selectionMask(names, self.phaseId) & ~self.isPadding
 
   # the sub-map of a NumPy selection: every array sliced, the phases and the frame kept,
   # the lattice restricted to the sites kept
@@ -349,8 +341,11 @@ class EBSD:
     ids = np.arange(self.size).reshape(self.shape)[sel]
     if ids.ndim == 0:
       ids = ids.reshape(1)
-    flat = ids.reshape(-1)
-    shape = ids.shape
+    return self._take(ids.reshape(-1), ids.shape)
+
+  # the measurements of the flat indices, in the given shape; the lattice follows them where
+  # no measurement is taken twice
+  def _take(self, flat, shape):
     pos = _vectors(self.pos.data.reshape(-1, 3)[flat].reshape(shape + (3,)), self.frame)
     rot = _rotations(self.rotations.data.reshape(-1, 4)[flat].reshape(shape + (4,)))
     ph = self.phaseId.reshape(-1)[flat].reshape(shape)

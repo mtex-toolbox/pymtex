@@ -15,9 +15,8 @@ import numpy as np
 
 from .so3funclass import SO3Fun
 from .s2funclass import S2Fun
-from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
-from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
+from ..geometry.quaternion import orthogonalTransform, rotation
 from ..geometry.session import SESSION, getMTEXpref
 from ..geometry.symreduce import reductionGroups
 from ..geometry.vector3d import vector3d, asVector3d
@@ -306,7 +305,60 @@ def _symmetrisedS2(fun, frame, antipodal):
   return averaged
 
 
-class S2FunHandle(S2Fun):
+# what a function on the sphere evaluated directly shares, a handle or a sum of representations:
+# the integral and the norm, sums with numbers and functions, the ratio, and the pointwise
+# functions as handles evaluated when asked, as MATLAB's
+class _S2Direct(S2Fun):
+
+  def sum(self):
+    """the surface integral, 4 pi times the mean, MATLAB's sum"""
+    return 4 * np.pi * self.mean()
+
+  def norm(self):
+    """the L2 norm, through the harmonic form"""
+    return S2FunHarmonic(self).norm()
+
+  def __truediv__(self, g):
+    if isinstance(g, (int, float, complex, np.number)):
+      return self * (1 / g)
+    return _directRatio(self, g)
+
+  def __add__(self, g):
+    if isinstance(g, (int, float, complex, np.number)):
+      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal, _internal=True))
+    return S2FunSum(self, g)
+
+  __radd__ = __add__
+
+  def __sub__(self, g):
+    return self + (-1) * g
+
+  def __rsub__(self, g):
+    return g + (-1) * self
+
+  def __neg__(self):
+    return -1 * self
+
+  def _mapped(self, op):
+    return S2FunHandle(lambda v: op(self.eval(v)), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal,
+                       real=self.isReal, symmetrise=False)
+
+  def __abs__(self):
+    return self._mapped(np.abs)
+
+  def abs(self):
+    """the pointwise absolute value, a handle evaluated when asked"""
+    return abs(self)
+
+  def sqrt(self):
+    """the pointwise square root, a handle evaluated when asked"""
+    return self._mapped(np.sqrt)
+
+  def __pow__(self, p):
+    return self._mapped(lambda x: x ** p)
+
+
+class S2FunHandle(_S2Direct):
   """a function on the sphere given by a callable that receives directions
 
     S2FunHandle(fun, frame)
@@ -360,14 +412,6 @@ class S2FunHandle(S2Fun):
     """the mean over the sphere, through the harmonic form"""
     return S2FunHarmonic(self).mean()
 
-  def sum(self):
-    """the surface integral, MATLAB's sum"""
-    return 4 * np.pi * self.mean()
-
-  def norm(self):
-    """the L2 norm, through the harmonic form"""
-    return S2FunHarmonic(self).norm()
-
   def __mul__(self, a):
     if isinstance(a, (int, float, complex, np.number)):
       return S2FunHandle(lambda v: a * self.fun(v), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal, real=self.isReal and np.isreal(a), symmetrise=False)
@@ -375,49 +419,12 @@ class S2FunHandle(S2Fun):
 
   __rmul__ = __mul__
 
-  def __truediv__(self, g):
-    if isinstance(g, (int, float, complex, np.number)):
-      return self * (1 / g)
-    return _directRatio(self, g)
-
   def __rtruediv__(self, a):
     return S2FunHandle(lambda v: a / self.eval(v), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal, real=self.isReal, symmetrise=False)
-
-  def __add__(self, g):
-    if isinstance(g, (int, float, complex, np.number)):
-      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal, _internal=True))
-    return S2FunSum(self, g)
-
-  __radd__ = __add__
-
-  def __sub__(self, g):
-    return self + (-1) * g
-
-  def __rsub__(self, g):
-    return g + (-1) * self
-
-  def __neg__(self):
-    return -1 * self
 
   def rotate(self, r):
     """the function rotated by r, through the harmonic form"""
     return S2FunHarmonic(self).rotate(r)
-
-  # the pointwise functions of a handle stay handles, evaluated when asked, as MATLAB's
-  def _mapped(self, op):
-    return S2FunHandle(lambda v: op(self.eval(v)), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal,
-                       real=self.isReal, symmetrise=False)
-
-  def __abs__(self):
-    return self._mapped(np.abs)
-
-  def abs(self):
-    """the pointwise absolute value, a handle evaluated when asked"""
-    return abs(self)
-
-  def sqrt(self):
-    """the pointwise square root, a handle evaluated when asked"""
-    return self._mapped(np.sqrt)
 
   def exp(self):
     """the pointwise exponential, a handle evaluated when asked"""
@@ -426,9 +433,6 @@ class S2FunHandle(S2Fun):
   def log(self):
     """the pointwise logarithm, a handle evaluated when asked"""
     return self._mapped(np.log)
-
-  def __pow__(self, p):
-    return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
@@ -454,7 +458,7 @@ def _directRatio(f, g):
   return S2FunHandle(lambda v: f(v) / g(v), f.frame, bandwidth=max(f.bandwidth, g.bandwidth), antipodal=f.antipodal and g.antipodal, real=f.isReal and g.isReal, symmetrise=False)
 
 
-class S2FunSum(S2Fun):
+class S2FunSum(_S2Direct):
   """a sum of functions on the sphere of different representations: evaluation adds the values,
   the harmonic form adds the harmonic forms; what + returns when coefficients cannot be added"""
 
@@ -491,14 +495,6 @@ class S2FunSum(S2Fun):
     """the sum of the means of the summands"""
     return sum(t.mean() for t in self.components)
 
-  def sum(self):
-    """the surface integral, 4 pi times the mean"""
-    return 4 * np.pi * self.mean()
-
-  def norm(self):
-    """the L2 norm, through the harmonic form"""
-    return S2FunHarmonic(self).norm()
-
   def _harmonicS2(self, bandwidth=None):
     L = self.bandwidth if bandwidth is None else int(bandwidth)
     return sum(S2FunHarmonic(t, bandwidth=min(L, t.bandwidth)) for t in self.components)
@@ -509,44 +505,6 @@ class S2FunSum(S2Fun):
     return S2FunHarmonic(self) * a
 
   __rmul__ = __mul__
-
-  def __truediv__(self, g):
-    return self * (1 / g) if isinstance(g, (int, float, complex, np.number)) else _directRatio(self, g)
-
-  def __add__(self, g):
-    if isinstance(g, (int, float, complex, np.number)):
-      return S2FunSum(self, S2FunHarmonic([np.sqrt(4 * np.pi) * g], self.frame, antipodal=self.antipodal, _internal=True))
-    return S2FunSum(self, g)
-
-  __radd__ = __add__
-
-  def __sub__(self, g):
-    return self + (-1) * g
-
-  def __rsub__(self, g):
-    return g + (-1) * self
-
-  def __neg__(self):
-    return -1 * self
-
-  # the pointwise functions of a sum are handles, evaluated when asked
-  def _mapped(self, op):
-    return S2FunHandle(lambda v: op(self.eval(v)), self.frame, bandwidth=self.bandwidth, antipodal=self.antipodal,
-                       real=self.isReal, symmetrise=False)
-
-  def __abs__(self):
-    return self._mapped(np.abs)
-
-  def abs(self):
-    """the pointwise absolute value, a handle evaluated when asked"""
-    return abs(self)
-
-  def sqrt(self):
-    """the pointwise square root, a handle evaluated when asked"""
-    return self._mapped(np.sqrt)
-
-  def __pow__(self, p):
-    return self._mapped(lambda x: x ** p)
 
   def __repr__(self):
     info = "" if self.frame is None else f" ({frameLabel(self.frame)})"

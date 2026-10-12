@@ -16,7 +16,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
-from .load import CHANNEL_LAUE, ebsdFromColumns, regularPoly, scanGrid
+from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import headerDict, leadingLines, linesFrom, readFile, readTable, text
 
 
@@ -24,11 +24,12 @@ def _number(s):
   return float(s.strip().replace(",", "."))
 
 
-def ctfPhases(lines, phaseLine, n):
-  """the phases a Channel header declares: lattice, angles, name, Laue class, space group"""
+def ctfPhases(phaseLines):
+  """the phases the lines after a Channel header's Phases line declare: lattice, angles, name,
+  Laue class, space group"""
   frames = [notIndexedFrame()]
-  for k in range(1, n + 1):
-    f = lines[phaseLine + k].split("\t")
+  for k, line in enumerate(phaseLines, 1):
+    f = line.split("\t")
     if len(f) < 3:
       continue
     abc = [_number(s) for s in f[0].split(";")]
@@ -70,9 +71,33 @@ def oxfordCorrection(acq):
   surface CS1; the tilt of the surface, AcqE2 and AcqE3, is undone before the half turn
   about z, and a rotation about the surface normal is not, as far as two exports can tell"""
   half = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")
-  if acq is not None and (abs(acq[1]) > 1e-6 or abs(acq[2]) > 1e-6):
-    return half * rotation.byEuler(0.0, acq[1] * degree, acq[2] * degree, "Bunge").inv()
-  return half
+  tilt = _surfaceTilt(acq)
+  return half if tilt is None else half * tilt
+
+
+# the rotation that undoes the tilt of an acquisition surface, its second and third Euler angle in
+# degree; None for a surface without a tilt or none stated
+def _surfaceTilt(acq):
+  if acq is None or (abs(acq[1]) <= 1e-6 and abs(acq[2]) <= 1e-6):
+    return None
+  return rotation.byEuler(0.0, acq[1] * degree, acq[2] * degree, "Bunge").inv()
+
+
+# the header of a .ctf up to its column names: the general header lines as a dict, the phases,
+# the acquisition surface where all three of its angles are stated, and the offset of the line
+# naming the columns
+def _ctfHead(data, fname):
+  head, offset = leadingLines(data, lambda l: l.startswith(b"Phases"))
+  if offset >= len(data):
+    raise ValueError(f"{fname} declares no phases")
+  (phasesLine,), offset = linesFrom(data, offset, 1)
+  n = int(text(phasesLine).split("\t")[-1])
+  phaseLines, offset = linesFrom(data, offset, n)
+  header = ctfHeader([text(l) for l in head])
+  acq = None
+  if all(isinstance(header.get(k), float) for k in ("AcqE1", "AcqE2", "AcqE3")):
+    acq = (header["AcqE1"], header["AcqE2"], header["AcqE3"])
+  return header, ctfPhases([text(l) for l in phaseLines]), acq, offset
 
 
 # the Oxford/Channel map of a .ctf file
@@ -86,22 +111,10 @@ def _loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   data = readFile(fname)
   if b"Channel Text File" not in data[:200].split(b"\n")[0]:
     raise ValueError(f"{fname} does not begin with the Channel Text File marker")
-  head, offset = leadingLines(data, lambda l: l.startswith(b"Phases"))
-  if offset >= len(data):
-    raise ValueError(f"{fname} declares no phases")
-  phaseLine = len(head)
-  (phasesLine,), offset = linesFrom(data, offset, 1)
-  head = [text(l) for l in head] + [text(phasesLine)]
-  n = int(head[phaseLine].split("\t")[-1])
-  phaseLines, offset = linesFrom(data, offset, n)
-  phases = ctfPhases(head + [text(l) for l in phaseLines], phaseLine, n)
-  header = ctfHeader(head[:phaseLine])
-  acq = None
-  if all(isinstance(header.get(k), float) for k in ("AcqE1", "AcqE2", "AcqE3")):
-    acq = (header["AcqE1"], header["AcqE2"], header["AcqE3"])
+  header, phases, acq, offset = _ctfHead(data, fname)
   if eulerCorrection is None:
     eulerCorrection = oxfordCorrection(acq)
-    if acq is not None and (abs(acq[1]) > 1e-6 or abs(acq[2]) > 1e-6):
+    if _surfaceTilt(acq) is not None:
       warnings.warn(f"{fname} states an acquisition surface of {acq} degree; its tilt is undone before the half turn "
                     "about z, since the file refers its angles to CS0 and the map lies in CS1. Pass eulerCorrection "
                     "to state the alignment yourself.", stacklevel=2)
@@ -109,13 +122,8 @@ def _loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
   (nameLine,), offset = linesFrom(data, offset, 1)
   names = [s.strip().lower() for s in text(nameLine).split("\t")]
   M = readTable(data, offset)
-  m = min(len(names), M.shape[1])
-  names = names[:m]
-  at = {name: M[:, k] for k, name in enumerate(names)}
-  for key in ("phase", "x", "y", "euler1", "euler2", "euler3"):
-    if key not in at:
-      raise ValueError(f"{fname} names no column {key}")
-  props = {name: M[:, k] for k, name in enumerate(names) if name not in ("phase", "x", "y", "euler1", "euler2", "euler3")}
+  at = dict(zip(names, M.T))
+  props = _properties(at, ("phase", "x", "y", "euler1", "euler2", "euler3"), f"{fname} names no column {{}}")
   xs, ys, nx, ny = (header.get(k) for k in ("XStep", "YStep", "XCells", "YCells"))
   steps = isinstance(xs, float) and isinstance(ys, float) and xs > 0 and ys > 0
   unitCell = regularPoly(4, [xs, ys]) if steps else None

@@ -203,3 +203,19 @@ def test_h5PhaseColumn():
   assert list(h5PhaseColumn(ids, np.dtype("int32"), False, 0)) == [0, 1, 2, 1]
   assert list(h5PhaseColumn(ids, np.dtype("uint8"), True, 1)) == [255, 0, 1, 0]
   assert list(h5PhaseColumn(ids, np.dtype("int8"), True, 1)) == [-1, 0, 1, 0]
+
+
+def test_writeField_writes_the_rows_given_of_one_field(tmp_path):
+  import h5py
+  from mtex.io.exportebsd import _writeField
+  rows = np.zeros(4, dtype=[("a", "<i2"), ("b", "<f4")])
+  with h5py.File(tmp_path / "t.h5", "w") as f:
+    d = f.create_dataset("t", data=rows)
+    _writeField(d, "a", np.array([1, 3]), np.array([7.6, 9.0]))
+    assert d["a"].tolist() == [0, 7, 0, 9] and d["b"].tolist() == [0, 0, 0, 0]
+
+
+def test_formatTable_writesANumberBeyondInt64AsPrintfDoes():
+  from mtex.io.kernels import formatTable, formatTableNumpy
+  cols = np.array([[1.5, -3.4e27, 2.0], [np.nan, 7.25, 1e3]])
+  assert formatTable(cols, [2, 6, -1]) == formatTableNumpy(cols, [2, 6, -1])

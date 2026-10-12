@@ -318,7 +318,11 @@ def columnMax(a, block=64):
 # the floating type two operands share, float64 for anything else
 def _floatType(*arrays):
   dtypes = {a.dtype for a in arrays}
-  return dtypes.pop() if len(dtypes) == 1 and next(iter({a.dtype.kind for a in arrays})) == "f" else np.float64
+  if len(dtypes) == 1:
+    (dtype,) = dtypes
+    if dtype.kind == "f":
+      return dtype
+  return np.float64
 
 
 # ------------------------------------------------------------------ the Hamilton product
@@ -565,11 +569,11 @@ def variantAngles(m, PV, G):
     k = _loop("variantAngles", _variantAngleLoop)
     _overRows(len(m), len(m) * (len(PV) ** 2 * len(G) + ROW_COST), lambda a, b: k(m[a:b], PV, G, out[a:b]))
     return out
-  left = PV * np.array([1.0, -1, -1, -1])
+  left = qconj(PV)
   for s in range(0, len(m), 256):
     x = _qmulNumpy(_qmulNumpy(left[None, :, None, :], m[s:s + 256, None, None, :]), PV[None, None, :, :])
     j = np.argmax(np.abs(x @ G.T), axis=-1)
-    y = _qmulNumpy(x, G[j] * np.array([1.0, -1, -1, -1]))
+    y = _qmulNumpy(x, qconj(G[j]))
     out[s:s + 256] = 2 * np.arctan2(np.linalg.norm(y[..., 1:], axis=-1), np.abs(y[..., 0]))
   return out
 
@@ -616,10 +620,10 @@ def _symReduceNumpy(q1, q2, L, R, exchange):
   vals = np.full(n, -np.inf)
   li, rj, usedInv = np.zeros(n, dtype=int), np.zeros(n, dtype=int), np.zeros(n, dtype=bool)
   for useInv in ((False, True) if exchange else (False,)):
-    b = q2 * [1, -1, -1, -1] if useInv else q2
-    bi = b * [1, -1, -1, -1]
+    b = qconj(q2) if useInv else q2
+    bi = qconj(b)
     for l in range(len(L)):
-      m = _qmulNumpy(bi, _qmulNumpy((L[l] * [1, -1, -1, -1])[None, :], q1))
+      m = _qmulNumpy(bi, _qmulNumpy(qconj(L[l])[None, :], q1))
       d = np.abs(m @ R.T)
       r = np.argmax(d, axis=1)
       best = np.take_along_axis(d, r[:, None], axis=1)[:, 0]
@@ -628,22 +632,33 @@ def _symReduceNumpy(q1, q2, L, R, exchange):
   return vals, li, rj, usedInv
 
 
-def symReduce(q1, q2, L, R, exchange=False):
-  """the pair search of the symmetry reduction: for each pair of quaternions the largest |<q1, l q2 r>|
-  over l in L and r in R, and inv(q2) too with exchange, with the l, r and whether the inverse
-  attained it"""
+# the operands of a pair search: the pairs broadcast and flattened to contiguous rows, their
+# shape, and the two groups contiguous
+def _pairArgs(q1, q2, L, R):
   q1, q2 = np.broadcast_arrays(q1, q2)
   shape = q1.shape[:-1]
   q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
   q2 = np.ascontiguousarray(q2, dtype=np.float64).reshape(-1, 4)
-  L, R = np.ascontiguousarray(L, dtype=np.float64), np.ascontiguousarray(R, dtype=np.float64)
+  return shape, q1, q2, np.ascontiguousarray(L, dtype=np.float64), np.ascontiguousarray(R, dtype=np.float64)
+
+
+# the work of a pair search over n pairs, for _overRows
+def _pairWork(n, L, R, exchange):
+  return n * (len(L) * len(R) * (2 if exchange else 1) + ROW_COST)
+
+
+def symReduce(q1, q2, L, R, exchange=False):
+  """the pair search of the symmetry reduction: for each pair of quaternions the largest |<q1, l q2 r>|
+  over l in L and r in R, and inv(q2) too with exchange, with the l, r and whether the inverse
+  attained it"""
+  shape, q1, q2, L, R = _pairArgs(q1, q2, L, R)
   if backend() == "numpy":
     vals, li, rj, usedInv = _symReduceNumpy(q1, q2, L, R, exchange)
   else:
     n = len(q1)
     vals, li, rj, usedInv = np.empty(n), np.empty(n, dtype=np.int64), np.empty(n, dtype=np.int64), np.empty(n, dtype=bool)
     k, ex = _loop("symReduce", _symReduceLoop), bool(exchange)
-    _overRows(n, n * (len(L) * len(R) * (2 if ex else 1) + ROW_COST),
+    _overRows(n, _pairWork(n, L, R, ex),
               lambda a, b: k(q1[a:b], q2[a:b], L, R, ex, vals[a:b], li[a:b], rj[a:b], usedInv[a:b]))
   return vals.reshape(shape), li.reshape(shape), rj.reshape(shape), usedInv.reshape(shape)
 
@@ -697,7 +712,7 @@ def _closestImageLoop(q1, q2, L, R, exchange, vals, out):
 
 def _closestImageNumpy(q1, q2, L, R, exchange):
   vals, li, rj, usedInv = _symReduceNumpy(q1, q2, L, R, exchange)
-  b = np.where(usedInv[:, None], q2 * [1, -1, -1, -1], q2)
+  b = np.where(usedInv[:, None], qconj(q2), q2)
   p = _qmulNumpy(_qmulNumpy(L[li], b), R[rj])
   return vals, np.where((np.sum(p * q1, axis=-1) < 0)[:, None], -p, p)
 
@@ -705,23 +720,19 @@ def _closestImageNumpy(q1, q2, L, R, exchange):
 def closestImage(q1, q2, L, R, exchange=False):
   """the pair search of symReduce with the image it chose: for each pair the largest |<q1, l q2 r>|
   and the image l q2 r, of inv(q2) under exchange, signed so that its dot with q1 is nonnegative"""
-  q1, q2 = np.broadcast_arrays(q1, q2)
-  shape = q1.shape[:-1]
-  q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
-  q2 = np.ascontiguousarray(q2, dtype=np.float64).reshape(-1, 4)
-  L, R = np.ascontiguousarray(L, dtype=np.float64), np.ascontiguousarray(R, dtype=np.float64)
+  shape, q1, q2, L, R = _pairArgs(q1, q2, L, R)
   if backend() == "numpy":
     vals, out = _closestImageNumpy(q1, q2, L, R, exchange)
   else:
     vals, out = np.empty(len(q1)), np.empty_like(q1)
     k, ex = _loop("closestImage", _closestImageLoop), bool(exchange)
-    _overRows(len(q1), len(q1) * (len(L) * len(R) * (2 if ex else 1) + ROW_COST),
+    _overRows(len(q1), _pairWork(len(q1), L, R, ex),
               lambda a, b: k(q1[a:b], q2[a:b], L, R, ex, vals[a:b], out[a:b]))
   return vals.reshape(shape), out.reshape(shape + (4,))
 
 
 # the chord |p - q| = 2 sin(w/4) of every pair turned into the angle w, accurate over the whole
-# range, of q signed towards p already; the arithmetic of symreduce.chordAngle
+# range, of q signed towards p already; the arithmetic of representations.chordAngle
 def _chordAngleLoop(p, q, out):
   for i in range(p.shape[0]):
     d0, d1, d2, d3 = p[i, 0] - q[i, 0], p[i, 1] - q[i, 1], p[i, 2] - q[i, 2], p[i, 3] - q[i, 3]
@@ -735,14 +746,10 @@ def closestAngle(q1, q2, L, R, exchange=False):
   """the disorientation angle of every pair through the image of q2 closest to q1, as
   chordAngle(q1, closestImage(q1, q2, L, R)[1]) without the images leaving the kernel"""
   if backend() == "numpy":
-    from .symreduce import chordAngle
+    from .representations import chordAngle
     q1, q2 = np.broadcast_arrays(q1, q2)
     return chordAngle(q1, closestImage(q1, q2, L, R, exchange)[1])
-  q1, q2 = np.broadcast_arrays(q1, q2)
-  shape = q1.shape[:-1]
-  q1 = np.ascontiguousarray(q1, dtype=np.float64).reshape(-1, 4)
-  q2 = np.ascontiguousarray(q2, dtype=np.float64).reshape(-1, 4)
-  L, R = np.ascontiguousarray(L, dtype=np.float64), np.ascontiguousarray(R, dtype=np.float64)
+  shape, q1, q2, L, R = _pairArgs(q1, q2, L, R)
   ang = np.empty(len(q1))
   k, c, ex = _loop("closestImage", _closestImageLoop), _loop("chordAngle", _chordAngleLoop), bool(exchange)
 
@@ -751,7 +758,7 @@ def closestAngle(q1, q2, L, R, exchange=False):
     k(q1[a:b], q2[a:b], L, R, ex, vals, img)
     c(q1[a:b], img, ang[a:b])
 
-  _overRows(len(q1), len(q1) * (len(L) * len(R) * (2 if ex else 1) + ROW_COST), call)
+  _overRows(len(q1), _pairWork(len(q1), L, R, ex), call)
   return ang.reshape(shape)
 
 
@@ -815,15 +822,15 @@ def _projectToRefLoop(qs, es, frm, L, R, ref, common, cimgs, out):
 def _projectToRefNumpy(qs, es, frm, L, R, ref, common, cimgs):
   _, k = _bestDotNumpy(qs, es)
   li, rj, useInv = frm[k, 0], frm[k, 1], frm[k, 2].astype(bool)
-  q = np.where(useInv[:, None], qs * [1, -1, -1, -1], qs)
-  p = _qmulNumpy(_qmulNumpy(L[li] * [1, -1, -1, -1], q), R[rj] * [1, -1, -1, -1])
+  q = np.where(useInv[:, None], qconj(qs), qs)
+  p = _qmulNumpy(_qmulNumpy(qconj(L[li]), q), qconj(R[rj]))
   p = np.where((np.sum(p * ref, axis=-1) < 0)[:, None], -p, p)
   if len(common) > 1:
     small = 2 * np.arctan2(np.linalg.norm(p[:, 1:], axis=-1), np.abs(p[:, 0])) < 1e-8
     a = np.where(p[:, :1] < 0, -1.0, 1.0) * p[:, 1:]
     a = a / np.where(small, 1.0, np.linalg.norm(a, axis=-1))[:, None]
     k = np.argmax(a @ cimgs.T, axis=1)
-    conj = _qmulNumpy(_qmulNumpy(common[k] * [1, -1, -1, -1], p), common[k])
+    conj = _qmulNumpy(_qmulNumpy(qconj(common[k]), p), common[k])
     p = np.where(small[:, None], p, conj)
   return p
 
@@ -874,7 +881,7 @@ def _projectDirectionsLoop(xyz, imgs, q, parity, out):
 
 def _projectDirectionsNumpy(xyz, imgs, q, parity):
   k = np.argmax(xyz @ imgs.T, axis=1)
-  return _qrotNumpy(q[k] * [1, -1, -1, -1], xyz) * parity[k][:, None]
+  return _qrotNumpy(qconj(q[k]), xyz) * parity[k][:, None]
 
 
 # ------------------------------------------------------------------ the projection into a region
@@ -919,8 +926,13 @@ def _projectIntoSectorLoop(xyz, R, P, alpha, regionAnti, vAnti, tol, out):
 
 def _projectIntoSectorNumpy(xyz, els, N, alpha, regionAnti, vAnti, tol):
   out = xyz.copy()
-  margin = lambda w: (np.full(w.shape[:-1], np.inf) if len(N) == 0 else
-                      np.min(w @ N.T - alpha * np.linalg.norm(w, axis=-1)[..., None], axis=-1))
+
+  # how far a direction lies inside the region, its least margin to a plane, infinite without planes
+  def margin(w):
+    if len(N) == 0:
+      return np.full(w.shape[:-1], np.inf)
+    return np.min(w @ N.T - alpha * np.linalg.norm(w, axis=-1)[..., None], axis=-1)
+
   # the images in chunks, so that the block of every image of every direction stays small
   step = max(1, 200000 // max(len(els), 1))
   for k in range(0, len(xyz), step):

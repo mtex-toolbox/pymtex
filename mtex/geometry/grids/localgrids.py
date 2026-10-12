@@ -13,7 +13,7 @@ from ..frames import referenceFrame
 from ..orientation import orientation
 from ..quaternion import qmul, qrot, rotation
 from ..representations import axis2quat
-from ..symreduce import chordAngle, reductionGroups, uniqueRotations
+from ..symreduce import _distinctUnitRows, chordAngle, reductionGroups, uniqueRotations
 from ..units import degree
 from ..vector3d import vector3d, zvector
 from .s2grid import equispacedS2Grid
@@ -61,10 +61,10 @@ def localOrientationGrid(*args, maxAngle=None, resolution=5 * degree, center=Non
   if len(L) * len(R) == 1:
     return ori
   c = center.data
-  copies = uniqueRotations(qmul(qmul(L[:, None, :], c[None, None, :]), R[None, :, :]).reshape(-1, 4), 1e-8)
+  allCopies = qmul(qmul(L[:, None, :], c[None, None, :]), R[None, :, :]).reshape(-1, 4)
+  copies = uniqueRotations(allCopies, 1e-8)
   copies = copies[chordAngle(copies, c) < 2 * maxAngle]
   c2 = _genericNear(c)
-  allCopies = qmul(qmul(L[:, None, :], c[None, None, :]), R[None, :, :]).reshape(-1, 4)
   stab = chordAngle(allCopies, c) < 1e-8
   stabCopies = qmul(qmul(L[:, None, :], c2[None, None, :]), R[None, :, :]).reshape(-1, 4)[stab]
   keep = _keepInBall(chordAngle, q, c, copies, c2, stabCopies)
@@ -98,12 +98,8 @@ def localS2Grid(center, maxTheta=None, resolution=5 * degree, respectSymmetry=Tr
     return vector3d(pts, frame=fr)
   els = fr.rot.data.reshape(-1, 5)
   images = qrot(els[:, :4], c[None]) * els[:, 4:5]
-  copies = []
-  for o in images:
-    if not any(u @ o > 1 - 1e-12 for u in copies):
-      copies.append(o)
-  copies = np.array(copies)
-  sc = sectorCenter(fr.sym).data
+  copies = _distinctUnitRows(images, 1e-12)
+  sc =sectorCenter(fr.sym).data
   c2 = c + 0.3 * vector3d(c).orth().data if abs(sc @ c) > 1 - 1e-8 else c + 0.3 * (sc - (sc @ c) * c)
   c2 = c2 / np.linalg.norm(c2)
   stab = images @ c > 1 - 1e-8

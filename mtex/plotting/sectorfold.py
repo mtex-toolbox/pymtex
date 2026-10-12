@@ -16,12 +16,12 @@ import numpy as np
 
 from ..geometry.representations import unitRows
 from ..geometry.grids.s2grid import equispacedS2Grid
-from ..geometry.plottingconvention import plottingConvention
 from ..geometry.quaternion import orthogonalTransform, reflection, rotation
 from ..geometry.sphericalregion import conventionalSector, sphericalRegion
 from ..geometry.symmetry import _isin, closure
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
+from ..geometry.vector3d import asVector3d, vector3d
+from .spherical import _conventionOf
 
 
 def _angle(u, v):
@@ -59,7 +59,7 @@ def foldCandidates(sR, center):
   through two of its characteristic points, its vertices, the middles of its edges, the
   poles of its boundaries and its centre, so every plane through two of them is tried"""
   P = [unitRows(center)] + [unitRows(n) for n in uniqueNormals(sR)] + [np.eye(3)[k] for k in range(3)]
-  V = [v for v in sR.vertices().data.reshape(-1, 3)]
+  V = list(sR.vertices().data.reshape(-1, 3))
   P += V
   for i in range(len(V)):
     for j in range(i + 1, len(V)):
@@ -118,8 +118,7 @@ def sectorFolds(pg, sR=None, tol=1e-6):
   # it folds at the equator of the plotting convention, the pole white and its antipode
   # black, which is the key of a pole figure over a specimen without symmetry
   if len(sR.N) == 0:
-    pC = sR.frame.how2plot if sR.frame is not None and sR.frame.how2plot is not None else plottingConvention.default
-    return [pC.outOfScreen.data.reshape(3).copy()]
+    return [_conventionOf(sR.frame).outOfScreen.data.reshape(3).copy()]
   els = pg.rot.flatten()
   region = sR
   folds = []
@@ -173,15 +172,14 @@ def polarCoordinates(sR, v, center, ref=None, equalise=True):
   along the great circle through the centre, and the azimuth is measured about the centre
   from a reference direction and then equalised, so that a wide part of the sector takes as
   much of the turn as a narrow one and the vertices sit at equal angles"""
-  xyz = (v.data if isinstance(v, vector3d) else np.asarray(v, dtype=float)).reshape(-1, 3)
-  c = unitRows(center.data.reshape(3) if isinstance(center, vector3d) else center)
-  ref = np.array([1.0, 0.0, 0.0]) if ref is None else (ref.data.reshape(3) if isinstance(ref, vector3d) else np.asarray(ref, dtype=float))
+  xyz = asVector3d(v).data.reshape(-1, 3)
+  c = unitRows(asVector3d(center).data.reshape(3))
+  ref = np.array([1.0, 0.0, 0.0]) if ref is None else asVector3d(ref).data.reshape(3)
   N = [unitRows(n) for n in sR.N]
   r = polarRadius(N, xyz, c)
   # rho = 0 is taken from the pole of the drawing, and only where the centre is that pole
   # does the reference direction take over
-  pC = sR.frame.how2plot if sR.frame is not None and sR.frame.how2plot is not None else plottingConvention.default
-  pole = pC.outOfScreen.data.reshape(3)
+  pole = _conventionOf(sR.frame).outOfScreen.data.reshape(3)
   rx = tangentAt(c, ref) if _angle(c, pole) < 1e-8 else tangentAt(c, pole)
   rho = azimuthAbout(c, rx, xyz)
   if equalise and N:

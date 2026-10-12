@@ -436,6 +436,15 @@ def test_closestAlignment_givesTheSetupATriclinicFrameWasBuiltIn():
     assert closestAlignment(fr) == s
 
 
+# a frame no setup constructs on reports None, asked once or twice, the answer kept
+def test_closestAlignment_withoutAFittingSetupIsNoneOnEveryCall(monkeypatch):
+  import mtex.geometry.frames as frames
+  monkeypatch.setattr(frames, "ALIGNMENT_SETUPS", (("X||a", "Z||a"),))
+  monkeypatch.setattr(frames, "_CLOSEST_ALIGNMENT", {})
+  fr = crystalFrame("-1", [4.1, 5.2, 6.3], np.array([81, 86, 96]) * degree)
+  assert closestAlignment(fr) is None and closestAlignment(fr) is None
+
+
 def test_closestAlignment_hexagonalReportsOneOfTheCoincidingNames():
   # a hexagonal lattice reports Z||c whichever of the coinciding names was asked for
   hexa = crystalFrame("6/mmm", [3, 3, 5], np.array([90, 90, 120]) * degree, "X||a", "Z||c")

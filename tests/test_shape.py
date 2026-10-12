@@ -4,7 +4,7 @@ import pytest
 
 from mtex import (calcGrains, degree, vector3d, xvector, yvector, shape2d, fitEllipse, longAxis, aspectRatio, caliper, paror, surfor,
                   characteristicShape, hull, paris, shapeFactor, convexity, principalComponents)
-from mtex.maps.shape import hullArea, hullPerimeter, outerPerimeter, polygonMoments, _extremalWidths, hullLoops
+from mtex.maps.shape import hullArea, hullPerimeter, polygonMoments, _extremalWidths, hullLoops
 from conftest import close
 from test_grains import mapOf, SQ5
 
@@ -76,8 +76,8 @@ def test_H5_a_non_convex_grain_is_indented_against_its_hull():
   g = calcGrains(mapOf(SQ5, 30, lambda i, j: isL(i, j).astype(int)), angle=5 * degree)
   k = int(np.flatnonzero(g.numPixel == 300)[0])
   assert close(g.area[k], 300) and close(hullArea(g)[k], 400 - 50)                  # the hull cuts the notch
-  assert close(g.convexity()[k], 300 / 350) and g.paris()[k] > 0 and outerPerimeter(g)[k] > hullPerimeter(g)[k]
-  assert close(g.paris()[k], 200 * (outerPerimeter(g)[k] - hullPerimeter(g)[k]) / hullPerimeter(g)[k])
+  assert close(g.convexity()[k], 300 / 350) and g.paris()[k] > 0 and g.perimeter[k] > hullPerimeter(g)[k]
+  assert close(g.paris()[k], 200 * (g.perimeter[k] - hullPerimeter(g)[k]) / hullPerimeter(g)[k])
   assert len(g.hullLoops()[k]) == 5                                                 # the L hulls to a pentagon
   # the hulled grains: convex polygons on a boundary with nothing on the other side
   h = g.hull()
@@ -183,3 +183,15 @@ def test_paror_theCompiledPassIsTheMatrixOfTheProjections():
   finally:
     setMTEXpref("kernels", "numba")
   assert np.allclose(compiled, oracle, rtol=0, atol=1e-13)
+
+
+def test_the_caliper_of_several_angles_is_that_of_each_angle():
+  g = calcGrains(mapOf(SQ5, 20, lambda i, j: ((i // 7) + 3 * (j // 9)).astype(int)), angle=5 * degree)
+  w = np.linspace(0, np.pi, 5)
+  assert np.array_equal(g.caliper(w), np.stack([g.caliper(float(a)) for a in w], axis=-1))
+
+
+def test_the_diameter_is_the_largest_distance_of_two_outer_vertices():
+  g = calcGrains(mapOf(SQ5, 20, lambda i, j: ((i // 7) + 3 * (j // 9)).astype(int)), angle=5 * degree)
+  d = [np.sqrt(np.max(np.sum((g.V[ls[0]][:, None] - g.V[ls[0]][None]) ** 2, axis=-1))) for ls in g.loops]
+  assert np.allclose(g.diameter, d, rtol=1e-14)

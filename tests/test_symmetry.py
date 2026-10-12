@@ -321,3 +321,16 @@ def test_latticeType_freeLengthsAndAngles():
 
 def test_latticeType_defaultAngles():
   assert np.allclose(latticeType.hexagonal.defaultAngles, (pi / 2, pi / 2, 2 * pi / 3))
+
+
+def test_sameElement_needsTheParityToAgree():
+  from mtex.geometry.symmetry import _sameElement
+  e = np.array([[1.0, 0, 0, 0, 1], [1.0, 0, 0, 0, -1]])
+  assert _sameElement(e, e, 1e-6).tolist() == [[True, False], [False, True]]
+
+
+def test_cosetRepresentatives_coverTheGroupWithTheSubgroup():
+  from mtex.geometry.symmetry import _cosetRepresentatives
+  G, d = symmetry("432").rot, symmetry("422").rot
+  reps = _cosetRepresentatives(G, d, left=True)
+  assert reps.size == 3 and (reps[:, None] * d[None, :]).flatten().unique().size == G.size

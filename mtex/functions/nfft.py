@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
+import functools
 import os
 
 import numpy as np
@@ -65,13 +66,9 @@ def _computesRealPlans(lib):
 
 
 # the system's library, looked up once: find_library starts processes, a few ms each
-_SYSTEM = []
-
-
+@functools.cache
 def _systemLibrary():
-  if not _SYSTEM:
-    _SYSTEM.append(ctypes.util.find_library("nfft3_omp"))
-  return _SYSTEM[0]
+  return ctypes.util.find_library("nfft3_omp")
 
 
 def nfftLibrary():

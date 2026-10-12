@@ -15,28 +15,28 @@ from ..geometry.frames import referenceFrame
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import mapFun, smoothBandwidth
-from .harmonics import mtexCoefficientsS2, _WignerD
+from .harmonics import mtexCoefficientsS2
 from .quadrature import quadratureS2Grid
 from .s2fun import S2FunHarmonic, realizeSpherical
-from .s2vectorfield import S2VectorField, _adjointColumns, _seriesColumns, _values, _vectorsFor
+from .s2vectorfield import S2VectorField, _adjointColumns, _parityWignerD, _seriesColumns, _values, _vectorsFor
 from .so3vectorfield import _projectSphericalRows, equivariantProjection
 from .transforms import sphericalSeriesAdjoint
 from ..geometry.display import aligned, frameLabel
 
 AXIS_COMPONENTS = ((0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2))
+# the rows and columns of the components, and the component at every entry of the matrix
+_ROWS, _COLUMNS = np.array(AXIS_COMPONENTS).T
+_COMPONENT = np.array([[0, 1, 2], [1, 3, 4], [2, 4, 5]])
 
 
 def outerComponents(a):
   """the six components of a a^T for axes as (n, 3)"""
-  return np.stack([a[:, i] * a[:, j] for i, j in AXIS_COMPONENTS], axis=-1)
+  return a[:, _ROWS] * a[:, _COLUMNS]
 
 
 def symmetricMatrices(c):
   """the symmetric 3 x 3 matrices of the six components xx, xy, xz, yy, yz, zz, as (..., 3, 3)"""
-  M = np.empty((*c.shape[:-1], 3, 3))
-  for k, (i, j) in enumerate(AXIS_COMPONENTS):
-    M[..., i, j] = M[..., j, i] = c[..., k]
-  return M
+  return c[..., _COMPONENT]
 
 
 def symmetricAction(M):
@@ -48,6 +48,11 @@ def symmetricAction(M):
     B = M @ E @ M.T
     A[:, k] = [B[p, q] for p, q in AXIS_COMPONENTS]
   return A
+
+
+# directions in a frame, unchanged without one
+def _inFrame(v, frame):
+  return v if frame is None else vector3d(v.data, frame=frame)
 
 
 class S2AxisField:
@@ -63,7 +68,7 @@ class S2AxisField:
     return self.eval(x)
 
   def _framed(self, v):
-    return v if self.frame is None else vector3d(v.data, frame=self.frame)
+    return _inFrame(v, self.frame)
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
@@ -108,7 +113,7 @@ class S2AxisFieldHarmonic(S2AxisField):
       frame = v.frame
       L = v.bandwidth if bandwidth is None else int(bandwidth)
       g = quadratureS2Grid(L)
-      values = _values(v(self_framed(v, g.nodes())))
+      values = _values(v(v._framed(g.nodes())))
       fhat = _adjointColumns(g, outerComponents(values), L, g.weights)
     elif isinstance(fhat, vector3d) and args and not isinstance(args[0], referenceFrame):
       pts, values = fhat, args[0]
@@ -120,8 +125,7 @@ class S2AxisFieldHarmonic(S2AxisField):
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       L = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
       g = quadratureS2Grid(L)
-      v = g.nodes()
-      values = _values(fhat(v if frame is None else vector3d(v, frame=frame)))
+      values = _values(fhat(_inFrame(g.nodes(), frame)))
       fhat = _adjointColumns(g, outerComponents(values), L, g.weights)
     fhat = np.array(fhat, dtype=complex)
     if fhat.ndim != 2 or fhat.shape[1] != 6:
@@ -157,7 +161,7 @@ class S2AxisFieldHarmonic(S2AxisField):
   @property
   def fhat(self):
     """the coefficients of the components in MTEX's basis, one column per component"""
-    return mtexCoefficientsS2(np.moveaxis(self._fhat, 0, -1)).swapaxes(-1, 0) if self._fhat.ndim > 1 else mtexCoefficientsS2(self._fhat)
+    return mtexCoefficientsS2(self._fhat.T).T
 
   @property
   def bandwidth(self):
@@ -178,11 +182,7 @@ class S2AxisFieldHarmonic(S2AxisField):
     L = self.bandwidth
     els = self.frame.sym.rot.flatten()
     actions = [symmetricAction(els[i].matrix()) for i in range(els.size)]
-    Ds = []
-    for i in range(els.size):
-      D = _WignerD(els[i].rot, bandwidth=L)
-      Ds.append([(-1 if els[i].isImproper and l % 2 else 1) * D[l] for l in range(L + 1)])
-    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, Ds)))
+    return self._rebuild(_projectSphericalRows(self._fhat.copy(), equivariantProjection(actions, _parityWignerD(els, L))))
 
   def dot(self, x):
     """the cosine of the angle to a constant axis, sqrt(x^T (a a^T) x), and to another field"""
@@ -198,7 +198,7 @@ class S2AxisFieldHarmonic(S2AxisField):
     if x.frame is not None and self.frame is not None and x.frame is not self.frame:
       raise ValueError("the axis lives in another frame than the field")
     y = x.data.reshape(3)
-    q = self._fhat @ np.array([y[i] * y[j] * (1 if i == j else 2) for i, j in AXIS_COMPONENTS])
+    q = self._fhat @ (outerComponents(y[None])[0] * [1, 2, 2, 1, 2, 1])
     f = S2FunHarmonic(q, None if self.frame is None else self.frame.stripSym(), real=True, symmetrise=False, _internal=True)
     return mapFun(lambda t: np.sqrt(np.maximum(t, 0)), f, bandwidth=smoothBandwidth(f))
 
@@ -210,11 +210,6 @@ class S2AxisFieldHarmonic(S2AxisField):
   def __repr__(self):
     info = "" if self.frame is None else f" ({frameLabel(self.frame)})"
     return aligned(f"S2AxisFieldHarmonic{info}\n  bandwidth: {self.bandwidth}")
-
-
-def self_framed(v, nodes):
-  """the nodes in the frame of the field v, unchanged when it has none"""
-  return nodes if v.frame is None else vector3d(nodes.data, frame=v.frame)
 
 
 __all__ = ["S2AxisFieldHarmonic", "S2AxisFieldHandle"]

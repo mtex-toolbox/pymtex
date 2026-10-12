@@ -307,3 +307,20 @@ def test_mtexColorbar_givesABarPerColormapAlthoughTheRangesAgree():
   setColorRange("equal")
   assert len(mtexColorbar()) == 2
   plt.close("all")
+
+
+def test_freshAxes_takesTheFirstAxesOfAFreshFigure():
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  from mtex.plotting.mtexfigure import _freshAxes
+  fig = newMtexFigure(2)
+  assert _freshAxes() == (fig, fig.children[0])
+
+
+def test_freshAxes_makesANewFigureOfTheDefaultSizeOtherwise():
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  from mtex.plotting.mtexfigure import _freshAxes
+  newMtexFigure(1).nextAxis()
+  fig, ax = _freshAxes(default=(4.5, 3.2))
+  assert tuple(fig.fig.get_size_inches()) == (4.5, 3.2) and fig.children == [ax]

@@ -138,6 +138,13 @@ def quatAngle(q):
   return 2 * np.arctan2(np.linalg.norm(q[..., 1:], axis=-1), np.abs(q[..., 0]))
 
 
+def chordAngle(p, q):
+  """the chord angle |p -/+ q| = 2 sin(w/4) between rotations, accurate over the whole range"""
+  s = np.where(np.sum(p * q, axis=-1) < 0, -1.0, 1.0)[..., None]
+  h = np.linalg.norm(p - s * q, axis=-1)
+  return 4 * np.arcsin(np.minimum(h / 2, 1.0))
+
+
 def quatAxis(q):
   """the rotational axis, a unit vector; x for the identity"""
   s = np.where(q[..., 0] < 0, -1.0, 1.0)[..., None]

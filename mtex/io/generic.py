@@ -18,8 +18,8 @@ import numpy as np
 from ..geometry.frames import referenceFrame
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
-from .load import ebsdFromColumns
-from .table import isNumericRow, leadingLines, linesFrom, readFile, readTable, text
+from .load import _properties, ebsdFromColumns
+from .table import _canonicalName, _tableStart, readFile, readTable, text
 
 # the name a header gives a column, in the names this reader knows
 COLUMN_NAMES = {"x": "x", "y": "y", "phase": "phase", "phi1": "phi1", "phi": "Phi", "phi2": "phi2",
@@ -28,7 +28,7 @@ COLUMN_NAMES = {"x": "x", "y": "y", "phase": "phase", "phi1": "phi1", "phi": "Ph
 
 
 def _canonical(name):
-  n = re.sub(r"\s+", " ", str(name).strip().lower())
+  n = _canonicalName(name)
   return COLUMN_NAMES.get(n, re.sub(r"\W+", "_", n))
 
 
@@ -68,13 +68,9 @@ def _loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=
   data = readFile(fname)
   for old, new in (replaceExpr or []):
     data = data.replace(old.encode(), new.encode())
-  if header is None:
-    sep = delimiter.encode() if delimiter is not None and delimiter.strip() else None
-    head, offset = leadingLines(data, lambda l: isNumericRow(l if sep is None else l.replace(sep, b" ")))
-    if offset >= len(data):
-      raise ValueError(f"{fname} holds no row of numbers")
-  else:
-    head, offset = linesFrom(data, 0, int(header))
+  head, offset = _tableStart(data, header, delimiter)
+  if offset is None:
+    raise ValueError(f"{fname} holds no row of numbers")
   names = list(columnNames) if columnNames is not None else tableColumns(head)
   if names is None:
     raise ValueError(f"{fname} does not name its columns; pass them as columnNames=['x', 'y', 'Euler1', 'Euler2', 'Euler3', 'phase']")
@@ -84,19 +80,18 @@ def _loadEBSD_generic(fname, CS, *args, columnNames=None, columns=None, radians=
     M = M[:, list(columns)]
   if M.shape[1] < len(names):
     raise ValueError(f"{fname} has {M.shape[1]} columns, the names given are {len(names)}")
-  at = {n: M[:, k] for k, n in enumerate(names)}
-  for key in ("x", "y", "phi1", "Phi", "phi2"):
-    if key not in at:
-      raise ValueError("a map is named by x, y and the three Euler angles phi1, Phi and phi2 or Euler1, Euler2, Euler3")
+  at = dict(zip(names, M.T))
+  props = _properties(at, ("x", "y", "phi1", "Phi", "phi2", "phase"),
+                      "a map is named by x, y and the three Euler angles phi1, Phi and phi2 or Euler1, Euler2, Euler3",
+                      required=("x", "y", "phi1", "Phi", "phi2"))
   s = 1.0 if radians else degree
   # a file with no phase column holds one phase, the first indexed one of the list
   phase = at.get("phase")
   if phase is None:
     phase = np.full(M.shape[0], int(phases.indexedPhaseId[0]) if len(phases.indexedPhaseId) else 0)
-  props = {n: at[n] for n in names if n not in ("x", "y", "phi1", "Phi", "phi2", "phase")}
   return ebsdFromColumns(at["x"], at["y"], at["phi1"] * s, at["Phi"] * s, at["phi2"] * s, phase, phases, props,
                          convention=convention, eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame,
-                         shift=0 if "phase" not in at else None)
+                         shift=None if "phase" in at else 0)
 
 
 __all__ = []

@@ -20,8 +20,8 @@ from scipy import sparse
 from ..orientation import orientation
 from ..quaternion import qmul, rotation
 from ..kernels import qconj, regionMembership
-from ..representations import euler2quat, quatAngle, quatAxis
-from ..symreduce import reductionGroups
+from ..representations import euler2quat
+from ..symreduce import _isAboutZ, reductionGroups
 from ..units import degree
 from ..vector3d import vector3d, zvector
 from .s1grid import S1Grid
@@ -168,12 +168,8 @@ class SO3Grid(orientation):
       ...
 
 
-# whether rotations are about z, and one rotation per coset of the rotations about z: right
-# cosets p Z for the group acting on the right, left cosets Z p for the one on the left
-def _isAboutZ(q):
-  return (quatAngle(q) < 1e-8) | (np.abs(quatAxis(q)[..., 2]) > 1 - 1e-8)
-
-
+# one rotation per coset of the rotations about z: right cosets p Z for the group acting on
+# the right, left cosets Z p for the one on the left
 def _cosetReps(G, left):
   Z = G[_isAboutZ(G)]
   reps, covered = [], np.zeros((0, 4))
@@ -183,8 +179,6 @@ def _cosetReps(G, left):
     reps.append(p)
     covered = np.concatenate([covered, qmul(Z, p[None]) if left else qmul(p[None], Z)])
   return np.array(reps).reshape(-1, 4)
-
-
 
 
 # ------------------------------------------------------------------ construction

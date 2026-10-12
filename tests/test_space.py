@@ -186,3 +186,15 @@ def test_shapesOnMap_scaleScalesTheShapes(twoGrains):
   cube = cubeShape()
   s, _ = shapesOnMap(twoGrains, cube)
   assert np.allclose(shapesOnMap(twoGrains, cube, scale=0.5)[0].diameter, 0.5 * s.diameter)
+
+
+def test_shapeOutlines_keepsThePolygonsInTheOrderOfShapeAndFace():
+  from mtex import crystalShape
+  from mtex.maps.lattice import mapPlane
+  from mtex.plotting.space import shapeOutlines
+  cs = crystalFrame("mmm", (1, 2, 3))
+  cS = crystalShape.olivine(cs)
+  shapes = orientation.byEuler(np.array([0, 0.3]), np.array([0, 0.5]), np.array([0, 0.2]), "Bunge", cs, specimenFrame.default) * cS
+  polys, shape, face = shapeOutlines(shapes, mapPlane(np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype=float)))
+  key = shape * cS.numFaces + face
+  assert np.all(np.diff(key) > 0) and len(polys) == len(shape) and all(len(p) >= 3 for p in polys)

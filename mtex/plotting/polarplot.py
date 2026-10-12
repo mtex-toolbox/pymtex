@@ -66,7 +66,10 @@ def polarAxes(parent=None):
 def setView(pC=None, ax=None):
   """setView(pC), pC.setView(): a polar axes turned as the plotting convention says, a 3D
   axes looking down its out of screen direction"""
-  pC = plottingConvention.default if pC is None else plottingConvention(pC) if not isinstance(pC, plottingConvention) else pC
+  if pC is None:
+    pC = plottingConvention.default
+  elif not isinstance(pC, plottingConvention):
+    pC = plottingConvention(pC)
   if ax is None:
     fig = gcm()
     ax = None if fig is None else fig._axesDrawnInto()
@@ -143,7 +146,7 @@ def plotS1(sF, *args, lineWidth=1.0, displayName=None, color=None, polar=True, h
 # the great circle normal to sec, or the small circle at the angle eta from it, as the
 # polar angle omega counted from an orthogonal of sec
 def _sectionCircle(sec, eta=np.pi / 2, omega=None):
-  s = (sec.data if isinstance(sec, vector3d) else np.asarray(sec, dtype=float)).reshape(3)
+  s = asVector3d(sec).data.reshape(3)
   s = s / np.linalg.norm(s)
   u = vector3d(s).orth().data.reshape(3)
   w = np.cross(s, u)
@@ -160,19 +163,15 @@ def plotSectionS2(sF, sec, eta=np.pi / 2, omega=None, lineWidth=1.0, displayName
   fr = getattr(sF, "frame", None)
   d = np.real(np.asarray(sF(vector3d(ring, frame=fr, isNormalized=True)), dtype=complex)).reshape(-1)
   refuseVariants(kw)
-  pC = getattr(sF, "how2plot", None) if how2plot is None else how2plot
-  pC = plottingConvention(plottingConvention.default if pC is None else pC)
   if polarplot:
+    pC = _functionConvention(sF, how2plot)
     ax = polarAxes(kw.pop("parent", None))
     x, y = omega, d
   else:
     ax = _sectionAxes(kw.pop("parent", None))
-    # the camera looks down the normal of the section, as MATLAB turns the convention
-    s = vector3d((sec.data if isinstance(sec, vector3d) else np.asarray(sec, dtype=float)).reshape(3))
-    if angle(pC.outOfScreen, s, antipodal=True) > degree:
-      pC.outOfScreen = s
+    east, north = _sectionView(sF, sec, how2plot)
     P = d[:, None] * ring
-    x, y = P @ pC.east.normalize().data.reshape(3), P @ pC.north.normalize().data.reshape(3)
+    x, y = P @ east, P @ north
   # MATLAB's color 'interp': the line coloured by its values, a mappable for the colour bar
   if isinstance(color, str) and color == "interp":
     from types import SimpleNamespace
@@ -237,12 +236,7 @@ def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoS
   longest = np.max(np.linalg.norm(V, axis=1)) / spacing if spacing > 0 else 0
   V = V * (autoScaleFactor / longest if longest > 0 else autoScaleFactor)
   refuseVariants(kw)
-  pC = getattr(sF, "how2plot", None) if how2plot is None else how2plot
-  pC = plottingConvention(plottingConvention.default if pC is None else pC)
-  s = vector3d((sec.data if isinstance(sec, vector3d) else np.asarray(sec, dtype=float)).reshape(3))
-  if angle(pC.outOfScreen, s, antipodal=True) > degree:
-    pC.outOfScreen = s
-  e, nth = pC.east.normalize().data.reshape(3), pC.north.normalize().data.reshape(3)
+  e, nth = _sectionView(sF, sec, how2plot)
   ax = _sectionAxes(kw.pop("parent", None))
   x, y, u, w = P @ e, P @ nth, V @ e, V @ nth
   opt = dict(angles="xy", scale_units="xy", scale=1, color=color, width=lineWidth * 0.004, zorder=3, **kw)
@@ -256,6 +250,23 @@ def quiverSectionS2(sF, vF, sec, eta=np.pi / 2, color=None, lineWidth=0.5, autoS
     hs.append(ax.quiver(x, y, u, w, label=displayName, headwidth=2.5, headlength=3, headaxislength=2.7, **opt))
   ax.autoscale_view()
   return hs
+
+
+# the plotting convention a function on the sphere is drawn by: the one given, else its own,
+# else the default, as a convention of its own
+def _functionConvention(sF, how2plot=None):
+  pC = getattr(sF, "how2plot", None) if how2plot is None else how2plot
+  return plottingConvention(plottingConvention.default if pC is None else pC)
+
+
+# the screen directions east and north of a section seen down its normal, as MATLAB turns
+# the convention of the function
+def _sectionView(sF, sec, how2plot=None):
+  pC = _functionConvention(sF, how2plot)
+  s = vector3d(asVector3d(sec).data.reshape(3))
+  if angle(pC.outOfScreen, s, antipodal=True) > degree:
+    pC.outOfScreen = s
+  return pC.east.normalize().data.reshape(3), pC.north.normalize().data.reshape(3)
 
 
 # a plain axes, equal in its units and without axis lines, for a curve seen in space
@@ -288,13 +299,12 @@ def plotShape(shape, lineWidth=1.0, displayName=None, color=None, normalize=Fals
   ax = polarAxes(kw.pop("parent", None))
   h = ax.plot(theta, rho, linewidth=lineWidth, label=displayName, color=color, **kw)
   ax.set_rmin(0)
+  pC = getattr(shape.frame, "how2plot", None) if how2plot is None else how2plot
+  setView(pC, ax)
+  # setView draws the grid, which a plain outline goes without
   if plain:
     ax.grid(False)
     ax.set_yticks([])
-  pC = getattr(shape.frame, "how2plot", None) if how2plot is None else how2plot
-  setView(pC, ax)
-  if plain:
-    ax.grid(False)
   return h[0]
 
 

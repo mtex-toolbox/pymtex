@@ -37,10 +37,13 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
   charts = [oS.sectionCharts(k) for k in range(n)]
   wide = max(len(c) for c in charts)
   # a cell is as tall as its chart is, so a row of half discs leaves no band of white
-  aspect = max((lambda b: (b[3] - b[2]) / (b[1] - b[0]))(c[0].bounds()) for c in charts)
+  aspect = max(_aspect(c[0].bounds()) for c in charts)
   # layout=[rows, cols] names the grid, as MATLAB's option does
   layout = whereKw.get("layout")
-  ncols = (int(layout[1]) if layout is not None else columns if columns else _gridColumns(n, aspect, wide)) * wide
+  if layout is not None:
+    ncols = int(layout[1]) * wide
+  else:
+    ncols = (columns or _gridColumns(n, aspect, wide)) * wide
   nrows = -(-n * wide // ncols)
   # a held figure of the same sections takes the plot on top of what it has
   held = gcm()
@@ -95,8 +98,11 @@ def _sectionAxes(oS, columns, axesKw, whereKw, field=True, onto=False):
   return fig, plots
 
 
-# the width of the grid: the divisor of the count nearest to a slightly wide picture, so
-# that no cell of the last row is left empty
+# the height to width ratio of a chart's bounds (xmin, xmax, ymin, ymax)
+def _aspect(b):
+  return (b[3] - b[2]) / (b[1] - b[0])
+
+
 # the columns of a grid of n cells of the given height to width ratio: the figure about
 # 1.6 times as wide as tall, so wide Euler sections stack in two columns as MATLAB's do
 def _gridColumns(n, aspect=1.0, wide=1):
@@ -151,7 +157,6 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
   'gamma', 'sigma', 'pf', 'axisAngle') and the keywords of the family name its sections.
   """
   # a function on the sphere along a circle: the polar section
-  from ..geometry.vector3d import vector3d
   from .mtexfigure import firstOfList
   if isinstance(x, SO3Fun):
     x = firstOfList(x)
@@ -174,19 +179,18 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
     else:
       # plotSection(ori, values, 'sigma'): a value per orientation colours the markers
       kw["values"] = a
+  options = _sectionOptions(kw)
   if isinstance(kind, ODFSections):
     oS = kind
   else:
-    frameA, frameB = (x.CS, x.SS)
+    frameA, frameB = x.CS, x.SS
     # complete: the sections of the whole orientation space, the frames without their groups
     if kw.pop("complete", False):
       frameA, frameB = frameA.stripSym(), frameB.stripSym()
     # misorientations with grain exchange are drawn on the antipodal sections
     if getattr(x, "antipodal", False) and frameA is frameB:
-      kw.setdefault("antipodal", True)
-    oS = newODFSectionPlot(frameA, frameB, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
-  for k in SECTION_OPTIONS:
-    kw.pop(k, None)
+      options.setdefault("antipodal", True)
+    oS = newODFSectionPlot(frameA, frameB, kind, **options)
   # MATLAB's coordinates='off' hides the ticks of the Euler sections, xlabel and ylabel name the axes
   decor = {k: kw.pop(k) for k in ("coordinates", "xlabel", "ylabel") if k in kw}
   if isinstance(x, SO3Fun):
@@ -198,6 +202,20 @@ def plotSection(x, *args, **kw: Unpack[PlotKeywords]):
   if decor:
     _decorate(gcm(), decor)
   return hs
+
+
+# the options of the sections, popped from the keywords
+def _sectionOptions(kw):
+  return {k: kw.pop(k) for k in SECTION_OPTIONS if k in kw}
+
+
+# the sections some of the orientations fall into: k, the charts of section k and the
+# indices of the orientations in it
+def _perSection(plots, sec):
+  for k, cell in enumerate(plots):
+    ind = np.flatnonzero(sec == k)
+    if len(ind):
+      yield k, cell, ind
 
 
 def _decorate(fig, decor):
@@ -258,16 +276,12 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
     return quiverSectionS2(ori, w, *args, color=color, lineWidth=lineWidth, **kw)
   oS = _currentSections()
   projKw, axesKw, whereKw = _split(kw)
-  lineWidth = kw.pop("lineWidth", lineWidth)
   fig, plots = _sectionAxes(oS, 0, axesKw, whereKw, onto=True)
   vs, sec, src = oS.sectionData(ori)
   w = asVector3d(w)
   ws = vector3d(np.broadcast_to(w.data.reshape(-1, 3), (ori.size, 3)) if w.size == 1 else w.data.reshape(-1, 3))
   hs = []
-  for k, cell in enumerate(plots):
-    ind = np.flatnonzero(sec == k)
-    if len(ind) == 0:
-      continue
+  for k, cell, ind in _perSection(plots, sec):
     for sP in cell:
       hs.append(_arrows(sP, vs[ind], ws[src[ind]], resolution=resolution, normalize=True, color=color, lineWidth=lineWidth, **kw))
   return hs
@@ -347,10 +361,7 @@ def _plotSectionShapes(ori, cS, oS, faceColor=None, faceAlpha=1.0, edgeColor="k"
   vis = visibleFaces(cS, out).reshape(len(cS), cS.numFaces)
   colors = faceColors(cS, faceColor, colored, colormap)
   hs = []
-  for k, cell in enumerate(plots):
-    ind = np.flatnonzero(sec == k)
-    if len(ind) == 0:
-      continue
+  for k, cell, ind in _perSection(plots, sec):
     for sP in cell:
       x0, y0 = sP.proj.project(vs[ind])
       x0, y0 = np.asarray(x0, dtype=float).ravel(), np.asarray(y0, dtype=float).ravel()
@@ -370,8 +381,7 @@ def _plotSectionShapes(ori, cS, oS, faceColor=None, faceAlpha=1.0, edgeColor="k"
 
 def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, colorRange="equal", minmax=False,
                     field=True, **kw):
-  flag = fillFlag(kw, None)
-  style = "pcolor" if flag in (None, "smooth") else flag
+  style = fillFlag(kw, "pcolor")
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
   grids = [[sP.proj.grid(resolution) for sP in cell] for cell in plots]
@@ -384,12 +394,11 @@ def _plotSectionFun(f, oS, resolution=2.5 * degree, columns=0, colorbar=False, c
     if getattr(o, "CS", None) is not f.CS or getattr(o, "SS", None) is not f.SS:
       o = orientation(rotation(o.data), f.CS, f.SS)
     return f(o)
-  values = []
-  for k, cell in enumerate(grids):
-    vals = []
-    for V, X, Y in cell:
-      vals.append(np.real(np.asarray(at(oS.orientationsAt(k, V.flatten())), dtype=complex)).reshape(X.shape) if V.size else np.zeros((0, 0)))
-    values.append(vals)
+  def valuesAt(k, V, X):
+    if not V.size:
+      return np.zeros((0, 0))
+    return np.real(np.asarray(at(oS.orientationsAt(k, V.flatten())), dtype=complex)).reshape(X.shape)
+  values = [[valuesAt(k, V, X) for V, X, _ in cell] for k, cell in enumerate(grids)]
   if isinstance(colorRange, str) and colorRange == "equal":
     colorRange = _rangeOf([v for cell in values for v in cell])
   hs = []
@@ -416,10 +425,7 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
   if values is not None and not rgb and colorRange is None and len(values):
     colorRange = (float(np.nanmin(values)), float(np.nanmax(values)))
   hs = []
-  for k, cell in enumerate(plots):
-    ind = np.flatnonzero(sec == k)
-    if len(ind) == 0:
-      continue
+  for k, cell, ind in _perSection(plots, sec):
     dirs = vs[ind]
     vals = None if values is None else values[src[ind]]
     for sP in cell:
@@ -439,9 +445,11 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
   # an antipodal key, one with grain exchange, is drawn over the region that symmetry halves
   if getattr(key, "antipodal", False):
     kw.setdefault("antipodal", True)
-  oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.frameA, key.frameB, kind, **{k: kw[k] for k in SECTION_OPTIONS if k in kw})
-  for k in SECTION_OPTIONS:
-    kw.pop(k, None)
+  options = _sectionOptions(kw)
+  oS = kind if isinstance(kind, ODFSections) else newODFSectionPlot(key.frameA, key.frameB, kind, **options)
+  import warnings
+
+  from .sphericalplot import _blocks
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
   hs = []
@@ -451,13 +459,11 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
       if not V.size:
         continue
       rgb = key.orientation2color(oS.orientationsAt(k, V.flatten())).reshape(X.shape + (3,))
-      rgba = np.concatenate([np.clip(np.nan_to_num(rgb, nan=1.0), 0, 1), np.all(np.isfinite(rgb), axis=-1)[..., None].astype(float)], axis=-1)
+      alpha = np.all(np.isfinite(rgb), axis=-1)[..., None].astype(float)
+      rgba = np.concatenate([np.clip(np.nan_to_num(rgb, nan=1.0), 0, 1), alpha], axis=-1)
       # a chart whose region does not reach the whole grid leaves NaN coordinates; the mesh
       # is drawn over the blocks of columns that are finite, as a filled plot is. Its cells
       # follow the curved chart, so matplotlib's warning about their edges is expected
-      import warnings
-
-      from .sphericalplot import _blocks
       with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="The input coordinates to pcolormesh")
         for j0, j1 in _blocks(X):

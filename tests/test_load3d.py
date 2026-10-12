@@ -30,3 +30,9 @@ def test_a_stack_of_maps():
   assert e.gridify().isPadding.sum() == 0
   with pytest.raises(ValueError):
     EBSD3.load(files[:2], z=[0.0])
+
+
+def test_dream3dPhases_reads_the_structures_after_the_first():
+  from mtex.io.load3d import _dream3dPhases
+  phases = _dream3dPhases(np.array([[999], [1], [7], [999]], dtype=np.uint32))
+  assert phases[0] == "notIndexed" and phases[1].pointGroup == "432" and phases[2].pointGroup == "4" and phases[3] == "notIndexed"

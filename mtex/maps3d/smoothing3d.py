@@ -15,19 +15,16 @@ from __future__ import annotations
 import numpy as np
 
 from ..geometry.kernels import columnMax, columnMin
-from ..maps.smoothing import boundaryFilter, boundaryNetwork, laplaceFilter
+from ..maps.polygon import _withinRun
+from ..maps.smoothing import _adjacency, boundaryFilter, boundaryNetwork, laplaceFilter
 
 
 # the network of edges over a subset of the vertices, the fixed ones given over all vertices
 def _network(E, verts, fixed):
   at = np.full(int(max(E.max(initial=0), verts.max(initial=0))) + 1, -1, dtype=np.int64)
   at[verts] = np.arange(len(verts))
-  a, b = at[E[:, 0]], at[E[:, 1]]
-  frm, to = np.concatenate([a, b]), np.concatenate([b, a])
-  order = np.argsort(frm, kind="stable")
-  deg = np.bincount(frm, minlength=len(verts))
-  ptr = np.concatenate([[0], np.cumsum(deg)])
-  return boundaryNetwork.byArrays(ptr, to[order], fixed[verts], verts)
+  ptr, nbr = _adjacency(at[E], len(verts))
+  return boundaryNetwork.byArrays(ptr, nbr, fixed[verts], verts)
 
 
 def _smoothBoundary3d(grains, iter=1, F=None, moveOuterBoundary=False, fixTripleLines=False, scheme="hierarchical",
@@ -56,7 +53,7 @@ def _smoothBoundary3d(grains, iter=1, F=None, moveOuterBoundary=False, fixTriple
   used = np.unique(E)
   V[used] = F.smooth(V[used], _network(E, used, fixed), h)
   V = V0 + np.clip(V - V0, -maxDisplacement, maxDisplacement)
-  out = gB[np.arange(len(gB))]
+  out = gB._copy()
   out.allV = V
   return grains._new(np.arange(len(grains)), grains.I_GF, out)
 
@@ -66,7 +63,7 @@ def _smoothBoundary3d(grains, iter=1, F=None, moveOuterBoundary=False, fixTriple
 # four grains staying; the faces that collapse go, and of faces that come to lie on each other
 # the net orientation is kept
 def _reduceBoundary3d(grains, n=2, cell=None, quadric=False):
-  from scipy.sparse import csr_matrix
+  from scipy.sparse import csr_matrix, diags
   gB = grains.boundary
   V = gB.allV
   E, _ = gB.edges()
@@ -77,7 +74,7 @@ def _reduceBoundary3d(grains, n=2, cell=None, quadric=False):
   I_VG.sort_indices()
   deg = np.diff(I_VG.indptr)
   gTuple = np.zeros((len(V), 4), dtype=np.int64)
-  k = np.arange(len(I_VG.indices)) - np.repeat(I_VG.indptr[:-1], deg)
+  k = _withinRun(deg)
   rows = np.repeat(np.arange(len(V)), deg)
   first4 = k < 4
   gTuple[rows[first4], k[first4]] = I_VG.indices[first4] + 1
@@ -114,9 +111,8 @@ def _reduceBoundary3d(grains, n=2, cell=None, quadric=False):
   out = out.flip(np.flatnonzero(doFlip))
   out.id = np.arange(1, len(keep) + 1)
   out.allV = Vc
-  I = grains.I_GF[:, keep].tocsc()
-  sign = np.where(doFlip, -1.0, 1.0)
-  I = csr_matrix(I @ csr_matrix((sign, (np.arange(len(keep)), np.arange(len(keep)))), shape=(len(keep), len(keep))))
+  # the columns of the faces turned round change their sign
+  I = csr_matrix(grains.I_GF[:, keep].tocsc() @ diags(np.where(doFlip, -1.0, 1.0)))
   return grains._new(np.arange(len(grains)), I, out)
 
 

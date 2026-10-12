@@ -405,3 +405,9 @@ def test_notIID_isCarried():
   assert o[1:3].notIID and o.flatten().notIID and o.copy().notIID and orientation(o).notIID
   assert (o * rotation.rand()).notIID and (inv(o[0]) * o).notIID
   assert cat(orientation(rotation.rand(2), cs), o).notIID
+
+
+def test_defaultFrames_fillsTheTrivialCrystalAndTheDefaultSpecimen():
+  from mtex.geometry.orientation import _defaultFrames
+  cs = crystalFrame("m-3m")
+  assert _defaultFrames([cs]) == (cs, specimenFrame.default) and _defaultFrames([], "432")[0].pointGroup == "432"

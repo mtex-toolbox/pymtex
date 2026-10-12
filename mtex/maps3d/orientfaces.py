@@ -14,6 +14,10 @@ import warnings
 
 import numpy as np
 
+from ..maps.decomposition import _gather
+from ..maps.grains import _at, _positionTable
+from ..maps.polygon import _withinRun
+
 
 def orientFaces(grains):
   """the grains with their faces turned consistently, the normals pointing out of every grain:
@@ -30,7 +34,7 @@ def orientFaces(grains):
   # the edges of every half face in the sense of its face
   counts = gB.numCorners[fId]
   hf = np.repeat(np.arange(nHF), counts)
-  k = np.arange(len(hf)) - np.repeat(np.cumsum(counts) - counts, counts)
+  k = _withinRun(counts)
   start = gB._ptr[fId][hf]
   eA = gB._idx[start + k]
   eB = gB._idx[start + (k + 1) % counts[hf]]
@@ -72,17 +76,16 @@ def orientFaces(grains):
   other = np.flatnonzero(changed & ~swapped)
   if len(other):
     from ..geometry.kernels import qconj, qmul
-    pos = np.zeros(int(max(grains.id.max(initial=0), new.max(initial=0))) + 1, dtype=np.int64)
-    pos[grains.id] = np.arange(len(grains))
     g = new[other]
+    pos = _at(_positionTable(grains.id), g)
     gB.grainId[other] = g
     gB.ebsdId[other] = -1
-    gB.phaseId[other] = np.where(g > 0, grains.phaseId[pos[np.maximum(g, 0)]], -1)
+    gB.phaseId[other] = _gather(grains.phaseId, pos, -1)
     q = grains.meanRotation.data.reshape(-1, 4)
     mori = gB.misrotation.data.reshape(-1, 4)
-    both = np.all(g > 0, axis=1)
+    both = np.all(pos >= 0, axis=1)
     mori[other] = np.nan
-    mori[other[both]] = qmul(qconj(q[pos[g[both, 1]]]), q[pos[g[both, 0]]])
+    mori[other[both]] = qmul(qconj(q[pos[both, 1]]), q[pos[both, 0]])
   return grains._new(np.arange(len(grains)), I, gB)
 
 

@@ -38,6 +38,10 @@ def figureSize(figSize, default):
   return figSize
 
 
+# the holders of the plots of an axes, one per kind of plot
+PLOT_HOLDERS = ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot")
+
+
 # the redraw of a plot whose colours are cut from the map, a filled contour or isosurfaces
 def _refillOf(ax):
   for holder in ("_mtexSphericalPlot", "_mtexSpacePlot"):
@@ -70,9 +74,9 @@ class mtexFigure:
     # no plot resizes it
     self.fixedSize = figure is not None and getattr(figure.canvas, "manager", None) is None
     # MATLAB's marginx and marginy: the space around each axes in pixels, 96 to the inch
-    if figure is None and (marginx is not None or marginy is not None):
-      self.fig.get_layout_engine().set(**({} if marginx is None else {"w_pad": float(marginx) / 96}),
-                                       **({} if marginy is None else {"h_pad": float(marginy) / 96}))
+    pads = {name: float(m) / 96 for name, m in (("w_pad", marginx), ("h_pad", marginy)) if m is not None}
+    if figure is None and pads:
+      self.fig.get_layout_engine().set(**pads)
     # a figure adopted keeps its axes, the current one current
     self.children = [] if figure is None else list(figure.axes)
     self.hold = bool(hold)
@@ -108,10 +112,8 @@ class mtexFigure:
       for i, ax in enumerate(self.children):
         ax.set_subplotspec(gs[i])
       ax = self.fig.add_subplot(gs[k])
-      self.children.append(ax)
-      self.current = ax
-      return ax
-    ax = self.fig.add_subplot(self.nrows, self.ncols, k + 1)
+    else:
+      ax = self.fig.add_subplot(self.nrows, self.ncols, k + 1)
     self.children.append(ax)
     self.current = ax
     return ax
@@ -132,7 +134,7 @@ class mtexFigure:
         ax.cla()
         # a repaint the count of artists may not show, for whoever snapshots the figure
         self.fig._mtexRepaints = getattr(self.fig, "_mtexRepaints", 0) + 1
-        for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot"):
+        for holder in PLOT_HOLDERS:
           if hasattr(ax, holder):
             delattr(ax, holder)
       self.current = ax
@@ -153,11 +155,11 @@ class mtexFigure:
   def _mappables(self):
     out = []
     for ax in self.children:
-      for holder in ("_mtexSphericalPlot", "_mtexMapPlot", "_mtexSpacePlot", "_mtexLinePlot", "_mtexScenePlot"):
+      for holder in PLOT_HOLDERS:
         plot = getattr(ax, holder, None)
         m = getattr(plot, "mappable", None)
         if m is not None:
-          out += [(ax, h) for h in getattr(plot, "mappables", [m])]
+          out += [(ax, h) for h in getattr(plot, "mappables", None) or [m]]
     return out
 
   # ------------------------------------------------------------------ colour
@@ -204,11 +206,25 @@ class mtexFigure:
   # the bars follow the range: one for all once the ranges agree, as MATLAB redraws them
   def _redrawColorbars(self):
     if self.colorbars:
-      labels = [cb.ax.get_ylabel() for cb in self.colorbars]
-      for cb in self.colorbars:
-        _removeBar(cb)
-      self.colorbars = []
-      self.colorbar(label=labels[0] if labels else "")
+      label = self.colorbars[0].ax.get_ylabel()
+      self._removeBars()
+      self.colorbar(label=label)
+
+  # the colour bars of the figure taken away
+  def _removeBars(self):
+    for cb in self.colorbars:
+      _removeBar(cb)
+    self.colorbars = []
+
+  # one bar for the axes given over a range in the colour map of the figure
+  def _rangeBar(self, colorRange, axes, label, **kwargs):
+    import matplotlib.cm
+    from matplotlib.colors import Normalize
+    from .colormaps import mtexColormap
+    sm = matplotlib.cm.ScalarMappable(norm=Normalize(*colorRange), cmap=mtexColormap(self.colormap))
+    cb = self.fig.colorbar(sm, ax=axes, shrink=0.7, label=label, **kwargs)
+    self.colorbars.append(cb)
+    return [cb]
 
   def setColorScale(self, scale="linear"):
     """MATLAB's set(gca, 'ColorScale', 'log'): the colours spread over the decades of the range"""
@@ -219,12 +235,7 @@ class mtexFigure:
         m.set_norm(LogNorm(lo if lo > 0 else hi * 1e-6, hi))
       else:
         m.set_norm(Normalize(lo, hi))
-    if self.colorbars:
-      labels = [cb.ax.get_ylabel() for cb in self.colorbars]
-      for cb in self.colorbars:
-        _removeBar(cb)
-      self.colorbars = []
-      self.colorbar(label=labels[0] if labels else "")
+    self._redrawColorbars()
 
   def setColormap(self, cmap, ax=None):
     """a filled contour plot cuts its bands out of the map, so it is drawn again"""
@@ -244,9 +255,7 @@ class mtexFigure:
     """mtexColorbar: a bar per axes, or one for all when they share a range and a colour map; a
     figure that has bars loses them instead, as MATLAB's toggle does"""
     if self.colorbars:
-      for cb in self.colorbars:
-        _removeBar(cb)
-      self.colorbars = []
+      self._removeBars()
       return []
     ms = self._mappables()
     # a figure of explicit colours, as a boundary coloured by num2rgb, shows the map and the
@@ -254,13 +263,7 @@ class mtexFigure:
     if not ms:
       if self.colorRange is None or not self.children:
         return []
-      import matplotlib.cm
-      from matplotlib.colors import Normalize
-      from .colormaps import mtexColormap
-      sm = matplotlib.cm.ScalarMappable(norm=Normalize(*self.colorRange), cmap=mtexColormap(self.colormap))
-      cb = self.fig.colorbar(sm, ax=self.children, shrink=0.7, label=label, **kwargs)
-      self.colorbars.append(cb)
-      return [cb]
+      return self._rangeBar(self.colorRange, self.children, label, **kwargs)
     # a bar per axes, of the last drawing coloured by values on it
     ms = list({id(ax): (ax, m) for ax, m in ms}.values())
     # MATLAB's title list: one title per colour bar, in the order of the axes
@@ -272,15 +275,9 @@ class mtexFigure:
     # one of the axes (MATLAB #2614)
     oneMap = len({m.get_cmap().name for _, m in ms}) == 1
     # one bar for the common range setColorRange gave, whose contour plots keep their own levels
-    common = getattr(self, "colorRange", None)
+    common = self.colorRange
     if common is not None and not multiple and oneMap and len(ms) > 1 and all(getattr(m, "levels", None) is not None for _, m in ms):
-      import matplotlib.cm
-      from matplotlib.colors import Normalize
-      from .colormaps import mtexColormap
-      sm = matplotlib.cm.ScalarMappable(norm=Normalize(*common), cmap=mtexColormap(getattr(self, "colormap", None)))
-      cb = self.fig.colorbar(sm, ax=[ax for ax, _ in ms], shrink=0.7, label=label, **kwargs)
-      self.colorbars.append(cb)
-      return [cb]
+      return self._rangeBar(common, [ax for ax, _ in ms], label, **kwargs)
     clims = {tuple(np.round(m.get_clim(), 12)) for _, m in ms}
     if len(clims) == 1 and len(ms) > 1 and not multiple and oneMap:
       cb = self.fig.colorbar(_barOf(ms[-1][1]), ax=[ax for ax, _ in ms], shrink=0.7, label=label, **kwargs)
@@ -353,6 +350,18 @@ def layoutFor(n, columns=None):
   return math.ceil(n / ncols), ncols
 
 
+# the axes a plot of its own goes into, with its figure: the one nextAxis prepared, the first
+# of a fresh newMtexFigure, else that of a new figure of the size asked for or the default
+def _freshAxes(figSize=None, default=(5.5, 5.5)):
+  fig = gcm()
+  if fig is not None and fig.pending is not None:
+    return fig, fig.takeAxis()
+  if fig is not None and not fig.children and not fig.hold:
+    return fig, fig.nextAxis()
+  fig = mtexFigure(1, figSize=figureSize(figSize, default))
+  return fig, fig.nextAxis()
+
+
 def newMtexFigure(n=1, **kwargs):
   """a new mtexFigure laid out for n axes
 
@@ -408,8 +417,7 @@ def ylabel(*args, fig=None, **kwargs):
   spherical chart, which has no axis lines to carry matplotlib's own label"""
   ax, text = args if len(args) == 2 else (None, args[0])
   if ax is None:
-    fig = gcm() if fig is None else fig
-    ax = None if fig is None else (fig.pending or fig.current or (fig.children[-1] if fig.children else None))
+    ax = _labelAxes(gcm() if fig is None else fig)
   if ax is None:
     import matplotlib.pyplot as plt
     return plt.ylabel(text, **kwargs)
@@ -421,14 +429,20 @@ def ylabel(*args, fig=None, **kwargs):
 def xlabel(text, fig=None, **kwargs):
   """xlabel('text'): a label under the current axes, which a spherical chart draws without
   axis lines, so matplotlib's own label would not show"""
-  fig = gcm() if fig is None else fig
-  ax = None if fig is None else (fig.pending or fig.current or (fig.children[-1] if fig.children else None))
+  ax = _labelAxes(gcm() if fig is None else fig)
   if ax is None:
     import matplotlib.pyplot as plt
     return plt.xlabel(text, **kwargs)
   if ax.axison:
     return ax.set_xlabel(text, **kwargs)
   return ax.text(0.5, -0.02, text, transform=ax.transAxes, ha="center", va="top", **kwargs)
+
+
+# the axes a label goes to: the one nextAxis prepared, else the current one, else the last
+def _labelAxes(fig):
+  if fig is None:
+    return None
+  return fig.pending or fig.current or (fig.children[-1] if fig.children else None)
 
 
 def gcm():
@@ -554,17 +568,14 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
 
   from ..geometry.session import getMTEXpref
   fig = plt.gcf()
-  # legend('off') removes the legends of the figure
-  if names == ("off",):
-    for ax in fig.axes:
-      if ax.get_legend() is not None:
-        ax.get_legend().remove()
-    return None
-  names = [n for n in names if n != "show"]
-  # a new legend replaces the ones the figure has, inside an axes or beside the charts
+  # legend('off') removes the legends of the axes; a new legend replaces the ones the figure
+  # has, inside an axes or beside the charts
   for ax in fig.axes:
     if ax.get_legend() is not None:
       ax.get_legend().remove()
+  if names == ("off",):
+    return None
+  names = [n for n in names if n != "show"]
   for leg in list(fig.legends):
     leg.remove()
   if names:

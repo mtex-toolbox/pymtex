@@ -101,6 +101,20 @@ def str2rgb(name: ColorName | Any):
   return np.array(to_rgb(name), dtype=float)
 
 
+# the colour range of values: the one given, else the extent of their finite values, (0, 1)
+# for none; a range of no width is widened a little, so that it still divides
+def _colorLimits(values, colorRange=None):
+  if colorRange is None:
+    v = np.asarray(values, dtype=float)
+    finite = v[np.isfinite(v)]
+    lo, hi = (finite.min(), finite.max()) if finite.size else (0.0, 1.0)
+  else:
+    lo, hi = colorRange
+  if not hi > lo:
+    hi = lo + max(abs(lo), 1.0) * 1e-6
+  return lo, hi
+
+
 def contourLevels(lo, hi, n=10, log=False):
   """n levels between the extremes, logarithmic on request"""
   lo, hi = float(lo), float(hi)
@@ -180,7 +194,12 @@ def ind2color(i, cmap=None):
     ind2color(i)
     ind2color(ids, 'ordered')     the order in which neighbouring ids get related colours
     ind2color(ids, cmap)          a matrix of colours as the order"""
-  colors = MTEX_COLORS[ORDERED] if isinstance(cmap, str) and cmap == "ordered" else MTEX_COLORS if cmap is None else np.asarray(cmap, dtype=float)
+  if cmap is None:
+    colors = MTEX_COLORS
+  elif isinstance(cmap, str) and cmap == "ordered":
+    colors = MTEX_COLORS[ORDERED]
+  else:
+    colors = np.asarray(cmap, dtype=float)
   if np.ndim(i) == 0:
     return colors[int(i) % len(colors)].copy()
   ind = np.asarray(i, dtype=float).reshape(-1)

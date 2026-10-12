@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
 from ..geometry._array import MtexArray
-from ..geometry.kernels import backend as kernelBackend, qmul
+from ..geometry.kernels import qconj, qmul
+from .kernels import grainKernel
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from ..geometry.display import aligned
@@ -90,6 +90,31 @@ def _bestDot(fr, q1, q2):
   return np.max(np.abs(m @ G.T), axis=1)
 
 
+# the misorientation angle of pairs of rotations of one frame, from the largest |dot|
+def _misorientationAngle(fr, q1, q2):
+  return 2 * np.arccos(np.minimum(_bestDot(fr, q1, q2), 1.0))
+
+
+# the levels byPhase gives the phase p, None where it names other phases only
+def _byPhaseLevels(byPhase, CSList, p):
+  for key, t in (byPhase or {}).items():
+    if CSList.phaseId(key) == p:
+      return _levels(t)
+  return None
+
+
+# the connectivity of the pairs phase by phase: value(p, frame, q1, q2) where both sides are the
+# indexed phase p, 1 where both are one not indexed phase, since nothing was measured that
+# separates them, and 0 across phases
+def _byPhase(CSList, i, j, ph, rot, value):
+  out = np.zeros(len(i), dtype=rot.dtype)
+  for p, fr in enumerate(CSList):
+    sel = (ph[i] == p) & (ph[j] == p)
+    if sel.any():
+      out[sel] = value(p, fr, rot[i[sel]], rot[j[sel]]) if fr.isIndexed else 1
+  return out
+
+
 # ------------------------------------------------------------------ the angle criterion
 
 # the threshold a grain reconstruction takes when none is given, MATLAB's
@@ -111,10 +136,9 @@ class gbcAngle(grainBoundaryCriterion):
 
   def levelsFor(self, CSList, p):
     """the levels of a phase: its own from byPhase or the per phase list, else the common ones"""
-    if self.byPhase is not None:
-      for key, t in self.byPhase.items():
-        if CSList.phaseId(key) == p:
-          return _levels(t)
+    own = _byPhaseLevels(self.byPhase, CSList, p)
+    if own is not None:
+      return own
     if _perPhase(self.threshold):
       return _levels(self.threshold[p])
     return _levels(self.threshold)
@@ -125,33 +149,25 @@ class gbcAngle(grainBoundaryCriterion):
     numba is the backend"""
     i, j, ph, rot = _pairs(ebsd, i, j)
     # all pairs in one compiled loop over the tables of the phases, the loop below its fallback
-    if (backend or kernelBackend()) == "numba":
-      from .kernels import grainKernel
-      loop = grainKernel("angleCriterion")
-      if loop is not None:
-        CSList = ebsd.CSList
-        Gall, nG, indexed = phaseGroups(CSList, rot.dtype)
-        levels = [self.levelsFor(CSList, p) if CSList[p].isIndexed else (0.0,) for p in range(len(CSList))]
-        cosT = np.zeros((len(CSList), max(len(lv) for lv in levels)), dtype=rot.dtype)
-        for p, lv in enumerate(levels):
-          cosT[p, :len(lv)] = np.cos(np.array(lv, dtype=rot.dtype) / 2)
-        out = np.empty(len(i), dtype=rot.dtype)
-        loop(np.ascontiguousarray(rot), np.ascontiguousarray(ph, dtype=np.int64), np.ascontiguousarray(i, dtype=np.int64),
-             np.ascontiguousarray(j, dtype=np.int64), Gall, nG, indexed, cosT, np.array([len(lv) for lv in levels], dtype=np.int64), out)
-        return out
-    out = np.zeros(len(i), dtype=rot.dtype)
-    for p in range(len(ebsd.CSList)):
-      sel = (ph[i] == p) & (ph[j] == p)
-      if not sel.any():
-        continue
-      fr = ebsd.CSList[p]
-      if not fr.isIndexed:
-        out[sel] = 1                              # nothing was measured, nothing separates
-        continue
-      cosT = np.cos(np.array(self.levelsFor(ebsd.CSList, p), dtype=rot.dtype) / 2)
-      d = _bestDot(fr, rot[i[sel]], rot[j[sel]])
-      out[sel] = np.sum(d[:, None] > cosT[None, :], axis=1) / len(cosT)
-    return out
+    CSList = ebsd.CSList
+    loop = grainKernel("angleCriterion", backend)
+    if loop is not None:
+      Gall, nG, indexed = phaseGroups(CSList, rot.dtype)
+      levels = [self.levelsFor(CSList, p) if CSList[p].isIndexed else (0.0,) for p in range(len(CSList))]
+      cosT = np.zeros((len(CSList), max(len(lv) for lv in levels)), dtype=rot.dtype)
+      for p, lv in enumerate(levels):
+        cosT[p, :len(lv)] = np.cos(np.array(lv, dtype=rot.dtype) / 2)
+      out = np.empty(len(i), dtype=rot.dtype)
+      loop(np.ascontiguousarray(rot), np.ascontiguousarray(ph, dtype=np.int64), np.ascontiguousarray(i, dtype=np.int64),
+           np.ascontiguousarray(j, dtype=np.int64), Gall, nG, indexed, cosT, np.array([len(lv) for lv in levels], dtype=np.int64), out)
+      return out
+
+    # the share of the levels of the phase the half cosine of the pair exceeds
+    def share(p, fr, q1, q2):
+      cosT = np.cos(np.array(self.levelsFor(CSList, p), dtype=rot.dtype) / 2)
+      return np.sum(_bestDot(fr, q1, q2)[:, None] > cosT[None, :], axis=1) / len(cosT)
+
+    return _byPhase(CSList, i, j, ph, rot, share)
 
   def __repr__(self):
     t = self.threshold if _perPhase(self.threshold) else np.asarray(self.threshold) / degree
@@ -173,11 +189,9 @@ class gbcSoft(grainBoundaryCriterion):
   def levelsFor(self, CSList, p):
     """the threshold and the width of the transition for phase p, its own from byPhase or the
     common ones"""
-    if self.byPhase is not None:
-      for key, t in self.byPhase.items():
-        if CSList.phaseId(key) == p:
-          lv = _levels(t)
-          return lv[0], (lv[1] if len(lv) > 1 else self.width)
+    lv = _byPhaseLevels(self.byPhase, CSList, p)
+    if lv is not None:
+      return lv[0], (lv[1] if len(lv) > 1 else self.width)
     return self.threshold, self.width
 
   def evaluate(self, ebsd, i, j):
@@ -185,19 +199,13 @@ class gbcSoft(grainBoundaryCriterion):
     the threshold at their misorientation angle, 0 across phases"""
     from scipy.special import erf
     i, j, ph, rot = _pairs(ebsd, i, j)
-    out = np.zeros(len(i), dtype=rot.dtype)
-    for p in range(len(ebsd.CSList)):
-      sel = (ph[i] == p) & (ph[j] == p)
-      if not sel.any():
-        continue
-      fr = ebsd.CSList[p]
-      if not fr.isIndexed:
-        out[sel] = 1
-        continue
+
+    # one minus the error function step about the threshold of the phase
+    def step(p, fr, q1, q2):
       theta, w = self.levelsFor(ebsd.CSList, p)
-      omega = 2 * np.arccos(np.minimum(_bestDot(fr, rot[i[sel]], rot[j[sel]]), 1.0))
-      out[sel] = 1 - (1 + erf(2 * (omega - theta) / w)) / 2
-    return out
+      return 1 - (1 + erf(2 * (_misorientationAngle(fr, q1, q2) - theta) / w)) / 2
+
+    return _byPhase(ebsd.CSList, i, j, ph, rot, step)
 
   def __repr__(self):
     return aligned(f"gbcSoft (threshold {self.threshold / degree:.4g}°, width {self.width / degree:.4g}°)")

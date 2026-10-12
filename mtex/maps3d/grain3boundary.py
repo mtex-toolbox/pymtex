@@ -23,6 +23,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.vector3d import vector3d
 from ..geometry.display import aligned
+from ..maps.polygon import _withinRun
 
 
 class grain3Boundary:
@@ -84,16 +85,25 @@ class grain3Boundary:
     k[self._ptr[1:] - 1] = self._ptr[:-1]
     return k
 
-  # the fan triangles of every face: (k, 3, 3) corners and the face they belong to
-  def _fan(self):
+  # the fan triangles of every face from its first corner: (k, 3) vertex indices and the face
+  # they belong to
+  def _fanIndex(self):
     if self.isTriangulated:
-      return self.allV[self._idx.reshape(-1, 3)], np.arange(len(self))
+      return self._idx.reshape(-1, 3), np.arange(len(self))
     n = self.numCorners - 2
     face = np.repeat(np.arange(len(self)), n)
     start = np.repeat(self._ptr[:-1], n)
-    j = np.arange(len(face)) - np.repeat(np.cumsum(n) - n, n)
-    T = np.stack([self._idx[start], self._idx[start + j + 1], self._idx[start + j + 2]], axis=1)
+    j = _withinRun(n)
+    return np.stack([self._idx[start], self._idx[start + j + 1], self._idx[start + j + 2]], axis=1), face
+
+  # the fan triangles of every face: (k, 3, 3) corners and the face they belong to
+  def _fan(self):
+    T, face = self._fanIndex()
     return self.allV[T], face
+
+  # a copy with arrays of its own, the vertices shared
+  def _copy(self):
+    return self[np.arange(len(self))]
 
   def _sumByFace(self, x, face):
     out = np.zeros((len(self),) + x.shape[1:])
@@ -113,7 +123,7 @@ class grain3Boundary:
     rows = np.atleast_1d(rows)
     counts = self.numCorners[rows]
     ptr = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
-    idx = self._idx[np.repeat(self._ptr[rows], counts) + np.arange(ptr[-1]) - np.repeat(ptr[:-1], counts)]
+    idx = self._idx[np.repeat(self._ptr[rows], counts) + _withinRun(counts)]
     return grain3Boundary(self.allV, (ptr, idx), self.grainId[rows], self.ebsdId[rows], self.phaseId[rows],
                           self.misrotation.data.reshape(-1, 4)[rows], self.CSList, self.frame, self.scanUnit, self.id[rows])
 
@@ -131,7 +141,7 @@ class grain3Boundary:
   def flip(self, sel=None):
     """the two sides exchanged, of all faces or a selection, as MATLAB's flip"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
-    gB = self[np.arange(len(self))]
+    gB = self._copy()
     for a in (gB.grainId, gB.ebsdId, gB.phaseId):
       a[rows] = a[rows][:, ::-1]
     q = gB.misrotation.data.reshape(-1, 4)
@@ -141,10 +151,14 @@ class grain3Boundary:
   def flipN(self, sel=None):
     """the faces turned round: the corners in the reverse order, the normals the other way"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
-    gB = self[np.arange(len(self))]
-    for r in rows:
-      a, b = gB._ptr[r], gB._ptr[r + 1]
-      gB._idx[a:b] = gB._idx[a:b][::-1]
+    gB = self._copy()
+    # a face named twice is turned twice
+    turn = np.bincount(np.atleast_1d(rows).reshape(-1), minlength=len(self)) % 2 == 1
+    # the corner j of a face [a, b) takes the corner a + b - 1 - j
+    face = self._faceOfCorner()
+    rev = self._ptr[face] + self._ptr[face + 1] - 1 - np.arange(len(self._idx))
+    c = turn[face]
+    gB._idx[c] = self._idx[rev[c]]
     return gB
 
   # ------------------------------------------------------------------ geometry
@@ -244,8 +258,7 @@ class grain3Boundary:
     return orientation(rotation._fromData(q), self.CSList[a], self.CSList[b], antipodal=a == b)
 
   def hasGrain(self, g, h=None):
-    """whether a face touches a phase, or lies between two
-    whether a face touches a grain, or lies between two"""
+    """whether a face touches a grain, or lies between two"""
     if h is None:
       return np.isin(self.grainId, np.atleast_1d(g)).any(axis=1)
     return ((self.grainId[:, 0] == g) & (self.grainId[:, 1] == h)) | ((self.grainId[:, 0] == h) & (self.grainId[:, 1] == g))

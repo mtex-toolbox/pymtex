@@ -20,7 +20,7 @@ from ..geometry.frames import crystalFrame
 from ..geometry.units import degree
 from ..maps.phaselist import phaseList
 from .ang import eulerCorrectionRotation
-from .load import EDAX_POINT_GROUPS, TSL_LAUE, ebsdFromColumns, regularPoly, scanGrid
+from .load import EDAX_POINT_GROUPS, TSL_LAUE, _edaxPointGroup, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import readFile
 
 OSC_HEADER_OPEN = b"\xb9\x0b\xef\xff\x01\x00\x00\x00"
@@ -59,10 +59,10 @@ def oscPhaseAt(b, o):
   # a phase whose code is in neither table keeps its cell and loses its symmetry rather than
   # being given one it does not have
   code = _u32(b, o + OSC_PHASE_NAME)
-  symbol = TSL_LAUE.get(code) or (EDAX_POINT_GROUPS[code - 100] if 100 <= code < 100 + len(EDAX_POINT_GROUPS) else "1")
+  symbol = TSL_LAUE.get(code) or _edaxPointGroup(code) or "1"
   try:
     return crystalFrame(symbol, cell, np.array(angles) * degree, "EDAX", mineral=name)
-  except Exception:
+  except ValueError:
     return None
 
 
@@ -82,9 +82,9 @@ def oscPhases(b, first, last):
     while p >= 0:
       hits.append(p - OSC_PHASE_NAME)
       p = b.find(pat, p + 1, last)
-  after = first - 1
+  after = first
   for o in sorted(hits):
-    if o < after or o < first:
+    if o < after:
       continue
     fr = oscPhaseAt(b, o)
     if fr is not None:
@@ -141,12 +141,9 @@ def oscHeader(b, nx, ny, n, xstep, ystep):
   return header
 
 
-# the EDAX/TSL binary map of an .osc file
-#
-# loadEBSD('map.osc')                        setting 2, a half turn about (1, -1, 0)
-# loadEBSD('map.osc', eulerCorrection=rot)   the alignment stated outright
-def _loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit="um"):
-  b = readFile(fname)
+# the layout of an .osc: the cell counts and the number of measurements of its first words, the
+# phases between the two markers, where the measurements begin, the two steps and the columns
+def _oscLayout(b, fname):
   if len(b) <= 32:
     raise ValueError(f"{fname} is too short to be an .osc")
   nx, ny, n = _u32(b, 16), _u32(b, 20), _u32(b, 24)
@@ -159,16 +156,26 @@ def _loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUni
     raise ValueError(f"{fname} carries no header marker")
   phases = phaseList() if opening < 0 else oscPhases(b, opening + 8, close)
   start, xstep, ystep = oscDataStart(b, close, n)
-  m = oscColumnCount(b, start, xstep)
+  return nx, ny, n, phases, start, xstep, ystep, oscColumnCount(b, start, xstep)
+
+
+# the names of m columns: the ten the format fixes, the rest numbered
+def _oscColumnNames(m):
+  return OSC_COLUMNS[:m] + [f"extra{j}" for j in range(1, m - len(OSC_COLUMNS) + 1)]
+
+
+# the EDAX/TSL binary map of an .osc file
+#
+# loadEBSD('map.osc')                        setting 2, a half turn about (1, -1, 0)
+# loadEBSD('map.osc', eulerCorrection=rot)   the alignment stated outright
+def _loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUnit="um"):
+  b = readFile(fname)
+  nx, ny, n, phases, start, xstep, ystep, m = _oscLayout(b, fname)
   if start + 4 * n * m > len(b):
     raise ValueError(f"{fname} ends before its {n} records of {m} columns do")
   M = oscTrim(np.frombuffer(b, dtype="<f4", count=n * m, offset=start).reshape(n, m))
-  names = OSC_COLUMNS[:m] + [f"extra{j}" for j in range(1, m - len(OSC_COLUMNS) + 1)]
-  cols = {name: M[:, k] for k, name in enumerate(names)}
-  for key in ("x", "y", "phi1", "phi", "phi2", "phase"):
-    if key not in cols:
-      raise ValueError(f"{fname} holds {m} columns, too few for a map")
-  props = {name: cols[name] for name in names if name not in ("x", "y", "phi1", "phi", "phi2", "phase")}
+  cols = dict(zip(_oscColumnNames(m), M.T))
+  props = _properties(cols, ("x", "y", "phi1", "phi", "phi2", "phase"), f"{fname} holds {m} columns, too few for a map")
   # a pattern EDAX could not index carries a negative confidence index
   unindexed = cols["confidenceindex"] < 0 if "confidenceindex" in cols else None
   hex = abs(xstep - ystep) > 1e-6 * max(xstep, ystep)
@@ -178,7 +185,8 @@ def _loadEBSD_osc(fname, *, eulerCorrection=None, setting=2, frame=None, scanUni
     eulerCorrection = eulerCorrectionRotation(setting)
   return ebsdFromColumns(cols["x"], cols["y"], cols["phi1"], cols["phi"], cols["phi2"], cols["phase"], phases, props,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta, unindexed=unindexed,
-                         unitCell=unitCell if xstep > 0 and ystep > 0 else None, scanGrid=_scanGrid(nx, ny, len(M), xstep, ystep, hex), propType=np.float64)
+                         unitCell=unitCell if xstep > 0 and ystep > 0 else None,
+                         scanGrid=_scanGrid(nx, ny, len(M), xstep, ystep, hex), propType=np.float64)
 
 
 # the grid the header words state; a hexagonal scan alternates nx and a shorter row

@@ -126,13 +126,20 @@ def _compile():
   return _COMPILED["parse"]
 
 
-# the number of fields in the first row of numbers
-def _firstWidth(block, comments):
+# the rows of the first 64 kB of a block, stripped, the blank ones and the comments left out
+def _firstRows(block, comments):
   for line in block[:65536].split(b"\n"):
     s = line.strip()
     if s and not (comments is not None and s.startswith(comments)):
-      return len(s.split())
-  raise ValueError("the file holds no data rows")
+      yield s
+
+
+# the number of fields in the first row of numbers
+def _firstWidth(block, comments):
+  row = next(_firstRows(block, comments), None)
+  if row is None:
+    raise ValueError("the file holds no data rows")
+  return len(row.split())
 
 
 def parseBlockNumba(block, comma, comments):
@@ -327,6 +334,11 @@ def formatTableNumba(cols, decimals, sep=b" ", crlf=False):
     return None
   cols = np.ascontiguousarray(cols, dtype=np.float64)
   decimals = np.asarray(decimals, dtype=np.int64)
+  # the loops write a number through its scaled integer, so one beyond int64 or infinite goes
+  # to printf
+  scaled = np.abs(cols) * 10.0 ** np.maximum(decimals, 0)
+  if not np.all(np.isnan(cols) | (scaled < 2.0 ** 62)):
+    return None
   n = cols.shape[0]
   lengths = np.empty(n, dtype=np.int64)
   _COMPILED["rowLengths"](cols, decimals, lengths)

@@ -242,8 +242,6 @@ class SO3Kernel(_Kernel):
 
   def conv(self, other):
     """convolution multiplies the coefficients and divides by 2n+1, on S2 when either factor is"""
-    if isinstance(other, S2Kernel):
-      return other.conv(self)
     if not isinstance(other, SO3Kernel):
       return other.conv(self)
     L = min(self.bandwidth, other.bandwidth)
@@ -1076,7 +1074,9 @@ class S1GaussKernel(S1Kernel):
   _label = "Gauss"
 
   def __init__(self, sigma=None, *, halfwidth=None):
-    self.sigma = float(halfwidth / math.sqrt(2 * math.log(2)) if halfwidth is not None else 5 * degree if sigma is None else sigma)
+    if halfwidth is not None:
+      sigma = halfwidth / math.sqrt(2 * math.log(2))
+    self.sigma = float(5 * degree if sigma is None else sigma)
 
   def _rule(self, L):
     k = np.arange(L + 1)

@@ -14,7 +14,7 @@ from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.representations import quat2euler
-from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _sphericalY, wignerdDegrees
+from .harmonics import _WignerD, deg2dim, degreeBlock, dim2deg, _s2Degrees, _s2PerDegree, _so3Degrees, _so3PerDegree, _sphericalY, wignerdDegrees
 from .kernelfunctions import S1Kernel, S2Kernel, SO3Kernel
 from .quadrature import bandwidthFor, legendreP, quadratureS2Grid, quadratureSO3Grid
 from .s1fun import S1FunHarmonic
@@ -27,10 +27,6 @@ def _side(side):
   if side not in ("left", "right"):
     raise ValueError(f"the side is 'left' or 'right', not {side!r}")
   return side
-
-
-def _degreesOf(n):
-  return np.floor(np.sqrt(np.arange(n))).astype(int)
 
 
 # ------------------------------------------------------------------ rotation
@@ -186,7 +182,8 @@ def conv(f, g, *args, inverse=False):
         degreeBlock(fhat, n)[...] = degreeBlock(f._fhat, n) @ degreeBlock(g._fhat, n) / math.sqrt(2 * n + 1)
       return SO3FunHarmonic(fhat, g.CS, f.SS, real=f.isReal and g.isReal, symmetrise=False, _internal=True)
     if isinstance(g, SO3Kernel):
-      return _convDegrees(f, g.calcFourier(min(f.bandwidth, g.bandwidth)) / (2 * np.arange(min(f.bandwidth, g.bandwidth) + 1) + 1))
+      L = min(f.bandwidth, g.bandwidth)
+      return _convDegrees(f, g.calcFourier(L) / (2 * np.arange(L + 1) + 1))
     if isinstance(g, S2FunHarmonic):
       if g.frame is not None and g.frame is not f.SS:
         raise ValueError("the spherical function must live in the specimen frame of the SO(3) function")
@@ -214,7 +211,7 @@ def conv(f, g, *args, inverse=False):
     if isinstance(g, (S2Kernel, SO3Kernel)):
       L = min(f.bandwidth, g.bandwidth)
       A = g.calcFourier(L) / (2 * np.arange(L + 1) + 1)
-      return S2FunHarmonic(A[_degreesOf((L + 1) ** 2)] * f.truncate(L)._fhat, f.frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
+      return S2FunHarmonic(_s2PerDegree(A) * f.truncate(L)._fhat, f.frame, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
   raise TypeError(f"no convolution of {type(f).__name__} with {type(g).__name__}")
 
 
@@ -222,9 +219,7 @@ def conv(f, g, *args, inverse=False):
 # with a plain vector, which is how the odd degrees are zeroed or flipped
 def _convDegrees(f, A):
   L = min(f.bandwidth, len(A) - 1)
-  fhat = f.truncate(L)._fhat.copy()
-  for n in range(L + 1):
-    degreeBlock(fhat, n)[...] *= A[n]
+  fhat = f.truncate(L)._fhat * _so3PerDegree(A[:L + 1])
   return SO3FunHarmonic(fhat, f.CS, f.SS, real=f.isReal, antipodal=f.antipodal, symmetrise=False, _internal=True)
 
 
@@ -251,10 +246,7 @@ def grad(f, x=None, side="left"):
 
 def laplace(f):
   """the Laplace-Beltrami operator: fhat_n <- -n(n+1) fhat_n on both spaces"""
-  if isinstance(f, SO3FunHarmonic):
-    n = np.concatenate([np.full((2 * n + 1) ** 2, n) for n in range(f.bandwidth + 1)])
-  else:
-    n = _degreesOf(len(f._fhat))
+  n = (_so3Degrees if isinstance(f, SO3FunHarmonic) else _s2Degrees)(f.bandwidth)
   return f._rebuild(-(n * (n + 1)) * f._fhat)
 
 
@@ -329,7 +321,7 @@ def radon(f, h=None, r=None, superposition=None, bandwidth=None):
   if isinstance(f, S2FunHarmonic):
     delta = 0.0 if h is None else float(h)
     P = legendreP(f.bandwidth, math.cos(math.pi / 2 + delta))
-    return S2FunHarmonic(P[_degreesOf(len(f._fhat))] * f._fhat, f.frame, real=f.isReal, antipodal=delta == 0 or f.antipodal,
+    return S2FunHarmonic(_s2PerDegree(P) * f._fhat, f.frame, real=f.isReal, antipodal=delta == 0 or f.antipodal,
                          symmetrise=False, _internal=True)
   if h is None and r is None:
     raise TypeError("radon needs the crystal direction h, the specimen direction r, or both")
@@ -354,8 +346,10 @@ def invRadon(s):
   """the inverse of the Funk transform on the sphere: the even function whose means over the great
   circles are s, the odd degrees zero"""
   P = legendreP(s.bandwidth, 0.0)
-  l = _degreesOf(len(s._fhat))
-  fhat = np.where(l % 2, 0, s._fhat / np.where(l % 2, 1.0, P[l]))
+  l = _s2Degrees(s.bandwidth)
+  odd = l % 2 == 1
+  fhat = s._fhat / np.where(odd, 1.0, P[l])
+  fhat[..., odd] = 0
   return S2FunHarmonic(fhat, s.frame, real=s.isReal, antipodal=True, symmetrise=False, _internal=True)
 
 
@@ -369,6 +363,12 @@ def smoothBandwidth(*fs):
   return max(2 * max(f.bandwidth for f in fs), 32)
 
 
+# the bandwidth of a pointwise operation: the one given, else the sum of the operands' capped by
+# the preference
+def _mapBandwidth(fs, bandwidth, preference):
+  return min(sum(x.bandwidth for x in fs), getMTEXpref(preference)) if bandwidth is None else int(bandwidth)
+
+
 def mapFun(op, f, *gs, bandwidth=None):
   """the harmonic function of op applied pointwise to f and gs, by quadrature at the sum of their
   bandwidths, capped by the preference, or at the given bandwidth
@@ -378,7 +378,7 @@ def mapFun(op, f, *gs, bandwidth=None):
   if isinstance(f, SO3FunHarmonic):
     for g in gs:
       f._sameFrames(g)
-    L0 = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
+    L0 = _mapBandwidth((f, *gs), bandwidth, "maxSO3Bandwidth")
     L = bandwidthFor(L0, f.CS, f.SS)
     q = quadratureSO3Grid(L, f.CS, f.SS)
     values = np.asarray(op(f(q), *(g(q) for g in gs)))
@@ -390,11 +390,11 @@ def mapFun(op, f, *gs, bandwidth=None):
   if isinstance(f, S2FunHarmonic):
     for g in gs:
       f._sameFrames(g)
-    L = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
+    L = _mapBandwidth((f, *gs), bandwidth, "maxS2Bandwidth")
     q = quadratureS2Grid(L)
     values = op(f(q), *(g(q) for g in gs))
     return S2FunHarmonic(sphericalSeriesAdjoint(q, values, L), f.frame, real=values.dtype.kind != "c", antipodal=f.antipodal and all(g.antipodal for g in gs), _internal=True)
-  L = min(sum(x.bandwidth for x in (f, *gs)), getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)
+  L = _mapBandwidth((f, *gs), bandwidth, "maxS1Bandwidth")
   return S1FunHarmonic(lambda x: op(f(x), *(g(x) for g in gs)), bandwidth=L)
 
 
