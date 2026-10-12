@@ -21,7 +21,7 @@ from ..geometry.kernels import columnMax, columnMin
 from ..geometry.plane import plane3d
 from ..geometry.vector3d import vector3d
 from ..maps.ebsd import EBSD, _distinct, _rotations, _vectors
-from .voxellattice import voxelLattice
+from .voxellattice import boxLattice, voxelLattice
 from ..geometry.display import aligned, frameLabel
 
 
@@ -115,6 +115,15 @@ class EBSD3(EBSD):
     return EBSD3(pos, rot, ph, self.CSList, prop, scanUnit=self.scanUnit, frame=self.frame, lattice=l or False,
                  meta=self.meta, phaseMap=self.phaseMap, id=self.id.reshape(-1)[flat].reshape(shape), isPadding=pad)
 
+  # the volume with its positions and rotations moved; a lattice given, or the old one carried
+  # through the rigid motion (R, v) the positions went, else one inferred from where they land
+  def _moved(self, pos, rot, lattice=None, motion=None):
+    if lattice is None and motion is not None and self.lattice is not None:
+      R, v = motion
+      lattice = voxelLattice(self.lattice.origin @ R.T + v, self.lattice.D @ R.T, self.lattice.ijk)
+    return EBSD3(_vectors(pos, self.frame), _rotations(rot), self.phaseId, self.CSList, self.prop, scanUnit=self.scanUnit,
+                 frame=self.frame, lattice=lattice, meta=self.meta, phaseMap=self.phaseMap, id=self.id, isPadding=self._pad)
+
   def copy(self):
     """a copy of the volume with its own arrays, the frames shared"""
     return EBSD3(self.pos.copy(), self.rotations.copy(), self.phaseId.copy(), self.CSList,
@@ -139,8 +148,7 @@ class EBSD3(EBSD):
     shape = l.shape
     newId = np.ravel_multi_index(l.ijk.T, shape)
     n = int(np.prod(shape))
-    full = voxelLattice._box(l.origin, l.D, shape)
-    pos = full.positions().reshape(shape + (3,))
+    full, pos = boxLattice(l.origin, l.D, shape)
     rot = np.full((n, 4), np.nan, dtype=self.dtype)
     rot[newId] = self.rotations.data.reshape(-1, 4)
     ph = np.zeros(n, dtype=np.int8)
@@ -262,8 +270,7 @@ def EBSD3square(rotations, phaseId=None, CSList=None, dxyz=(1.0, 1.0, 1.0), orig
     raise ValueError("a volume is an (n1, n2, n3) array of rotations")
   D = np.diag(np.broadcast_to(np.asarray(dxyz, dtype=float), (3,))) if D is None else np.asarray(D, dtype=float)
   shape = rot.shape
-  lat = voxelLattice._box(origin, D, shape)
-  pos = lat.positions().reshape(shape + (3,))
+  lat, pos = boxLattice(origin, D, shape)
   ph = np.ones(shape, dtype=np.int8) if phaseId is None else np.asarray(phaseId).reshape(shape)
   return EBSD3(pos, rot, ph, CSList, prop, scanUnit=scanUnit, frame=frame, lattice=lat)
 

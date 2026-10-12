@@ -108,3 +108,37 @@ def test_real_files_fast():
     info = inspectEBSD(os.path.join(DATA, name))
     assert time.perf_counter() - t < 0.5
     assert info.points == points
+
+
+# ------------------------------------------------------------------ volumes
+
+@pytest.mark.parametrize("kind", ["dream3d", "xnovo"])
+def test_a_volume_is_described_as_EBSD3_load_reads_it(volumeFile, kind):
+  from mtex import EBSD3
+  path = volumeFile(kind)
+  info, e = inspectEBSD(path), EBSD3.load(path)
+  assert info.is3d and info.grid == e.shape and info.points == e.size and np.allclose(info.step, e.lattice.spacing)
+  assert sorted(info.properties) == sorted(e.prop) and [f.name for f in info.phases.frames] == [f.name for f in e.CSList.frames]
+  assert [f.pointGroup for f in info.phases.frames] == [f.pointGroup for f in e.CSList.frames]
+  assert info.unit == {"um": "µm"}.get(e.scanUnit, e.scanUnit) and float(info.eulerCorrection.angle()) == 0
+  assert np.allclose(info.extent, e.extent().reshape(3, 2) @ [-1, 1])
+
+
+def test_a_volume_says_its_grid_and_its_grains(volumeFile):
+  rows = dict(inspectEBSD(volumeFile()).describe())
+  assert rows["vendor"] == "DREAM.3D" and rows["grid"] == "voxel grid 5 x 4 x 3, dx = 0.5, dy = 0.25, dz = 2 µm"
+  assert rows["extent"] == "2 µm x 0.75 µm x 4 µm" and rows["grains"] == "feature ids" and rows["points"] == "60"
+  rows = dict(inspectEBSD(volumeFile("xnovo")).describe())
+  assert rows["vendor"] == "Xnovo" and rows["grid"].endswith("mm") and rows["extent"] == "20 µm x 15 µm x 20 µm" and rows["grains"] == "grain ids"
+
+
+def test_a_map_is_not_a_volume():
+  assert not inspectEBSD(fixture("Forsterite_cut.ctf")).is3d and not any(inspectEBSD(os.path.join(FIXTURES, "h5", n)).is3d for n in os.listdir(os.path.join(FIXTURES, "h5")))
+
+
+def test_a_dream3d_file_without_voxels_is_refused(tmp_path):
+  import h5py
+  with h5py.File(tmp_path / "mesh.dream3d", "w") as f:
+    f.create_dataset("DataStructure/Geometry/SharedVertexList", data=np.zeros((3, 3)))
+  with pytest.raises(ValueError, match="voxel data"):
+    inspectEBSD(tmp_path / "mesh.dream3d")

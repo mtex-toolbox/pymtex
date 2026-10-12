@@ -237,9 +237,24 @@ planes. The import wizard lists them and draws one on demand.
 **Later.** `loadODF`, `loadOrientations`, the VPSC file, the Neper tessellation, the pole
 figure export.
 
+**I9 - the volumes. DONE 2026-10-12.** `load3d.py` and `loadgrains3d.py` follow MATLAB develop:
+a DREAM.3D file is read by the names of its data sets (`dream3dDatasets`), so DREAM.3D 6
+(`DataContainers`, the grid in `_SIMPL_GEOMETRY`), DREAM3D-NX and the pipelines that write
+`Cell Data` or names of their own all load; the voxels are the attribute matrix of the first
+`EulerAngles`, `Quats` or `FeatureIds`, a file without orientations gives NaN rotations, one
+without `Phases` a single phase, and `grain3d.load` of a file without a surface mesh the
+grains of its feature ids. Only the arrays that enter the map are read, and a property
+keeps the type the file stores it in (float32, int32; user, 2026-10-12). The speed is three
+pieces: `h5array.py` reads a data set over the cores (the threads `pread` the stored bytes
+and inflate the gzip chunks, h5py the fallback and oracle), `turnVolume`, `turnBunge` and
+`turnRodrigues` of `io/kernels.py` turn (z, y, x) to (x, y, z) and convert in one compiled
+pass, and `boxLattice` of `maps3d/voxellattice.py` writes index and positions of the box in
+one. Checked against MATLAB on a DREAM3D-NX and a DREAM.3D 6 file
+(`bench/matlab/probe_dream3d.m`): the phases, the voxels probed and the sum of every property
+agree, the quaternions up to their sign; the timings are in `docs/research/benchmark-io.md`.
+
 ## 4. Left out
 
 The import wizard (now `docs/plans/wizard.md`), `loadData`'s search over every loader, the forty-phase rule of
 `loadEBSD_generic`, mineral names in the data block of an `.ang` (MATLAB substitutes
-numbers for them; no file here has them), `.mat` files, `functionSignatures.json`, the
-`dream3d` and `xnovo` loaders marked WIP in the branch.
+numbers for them; no file here has them), `.mat` files, `functionSignatures.json`.

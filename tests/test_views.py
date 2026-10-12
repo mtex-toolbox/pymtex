@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from mtex.wizard import callbacks as cb
 from mtex.wizard.state import WizardState
 from mtex.wizard.pictogram import SIDE
-from mtex.wizard.views import KeyPanel, MillerBar, ViewCanvas, millerOf
+from mtex.wizard.views import KeyPanel, MillerBar, SectionBar, ViewCanvas, millerOf
 from mtex.wizard.window import application
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -221,3 +221,96 @@ def test_a_recoloured_tab_shows_what_a_fresh_one_draws(fname, cap, first, monkey
   for name in maps:
     again, fresh = _shown(st, recoloured, name), _shown(st, ViewCanvas(st), name)
     assert all(np.array_equal(a, b) for a, b in zip(again[:2], fresh[:2])) and again[2] == fresh[2], name
+
+
+# ------------------------------------------------------------------ volumes
+
+@pytest.fixture
+def volume(volumeFile):
+  application()
+  st = WizardState(FIXTURES)
+  cb.openEntry(st, volumeFile())
+  return st
+
+
+def test_every_view_of_a_volume_draws_its_section(volume):
+  st = volume
+  canvas = ViewCanvas(st)
+  for k, name in enumerate(st.tabs):
+    cb.pickTab(st, k)
+    canvas.draw_view()
+    canvas.draw()
+    assert st.status[0] == "loaded", (name, st.status)
+  cb.pickTab(st, 0)
+  canvas.draw_view()
+  assert canvas.drawnFor[0] is st.section
+
+
+# the colours of the picture a canvas shows, whether it holds numbers with their range or colours
+def pictureOf(canvas):
+  a = canvas.image.get_array()
+  return canvas.image.to_rgba(a, bytes=True) if np.ndim(a) == 2 else np.asarray(a)
+
+
+@pytest.mark.parametrize("tab", ["phase", "IPF Z", "grainId", "ConfidenceIndex"])
+def test_a_moved_section_shows_what_its_own_drawing_shows(volume, tab):
+  # the picture after the slider moved is the picture of a canvas that opens on that layer, where
+  # it lies and with its range; the layout around a colour bar depends on the bars before it
+  st = volume
+  cb.pickTab(st, st.tabs.index(tab))
+  canvas = ViewCanvas(st)
+  canvas.draw_view()
+  for axis, index in ((None, 2), (0, None), (0, 4), (1, 0)):
+    cb.setSection(st, axis, index)
+    canvas.draw_view()
+    fresh = ViewCanvas(st)
+    fresh.draw_view()
+    assert canvas.drawnFor[0] is st.section and np.array_equal(pictureOf(canvas), pictureOf(fresh)), (axis, index)
+    assert canvas.image.get_extent() == fresh.image.get_extent()
+    assert (canvas.colorbar is None) == (fresh.colorbar is None)
+    if canvas.colorbar is not None:
+      assert (canvas.mappable.norm.vmin, canvas.mappable.norm.vmax) == (fresh.mappable.norm.vmin, fresh.mappable.norm.vmax)
+
+
+def test_a_turned_volume_recolours_the_section_drawn(volume):
+  # the Euler correction leaves the layer where it is and gives it the colours of the turned orientations
+  st = volume
+  cb.pickTab(st, st.tabs.index("IPF X"))
+  canvas = ViewCanvas(st)
+  canvas.draw_view()
+  before, image = pictureOf(canvas).copy(), canvas.image
+  cb.setEulerConvention(st, (st.eulerConvention + 2) % len(st.conventions))
+  canvas.draw_view()
+  fresh = ViewCanvas(st)
+  fresh.draw_view()
+  assert canvas.image is image and not np.array_equal(pictureOf(canvas), before) and np.array_equal(pictureOf(canvas), pictureOf(fresh))
+
+
+def test_the_section_bar_follows_and_moves_the_section(volume, loaded):
+  st = volume
+  bar = SectionBar(st)
+  assert not bar.isHidden() and bar.slider.maximum() == 2 and bar.slider.value() == 1 and bar.axes.checkedId() == 2
+  assert bar.label.text() == "layer 2 of 3 at z = 2 µm"
+  bar.slider.setValue(2)
+  assert st.sectionIndex == 2 and bar.label.text().startswith("layer 3 of 3")
+  bar.axes.button(0).click()
+  assert (st.sectionAxis, st.sectionIndex) == (0, 2) and bar.slider.maximum() == 4 and bar.slider.value() == 2
+  assert bar.label.text() == "layer 3 of 5 at x = 1 µm, drawn with y as x and z as y"
+  # a map has no section to choose
+  assert SectionBar(loaded).isHidden()
+
+
+def test_the_Euler_correction_turns_a_volume_and_its_section(volume):
+  from mtex import EBSD3
+  st = volume
+  before = st.ebsd.rotations.data.copy()
+  cb.setEulerConvention(st, (st.eulerConvention + 1) % len(st.conventions))
+  d = cb.correctionOf(st)
+  assert isinstance(st.ebsd, EBSD3) and st.ebsd.lattice is not None and st.ebsd.shape == (5, 4, 3) and float(d.angle()) > 1
+  assert np.allclose(st.ebsd.rotations.data, (d * type(d)(before)).data) and np.allclose(st.ebsd.EulerCorrection.data, d.data)
+  assert np.array_equal(st.section.rotations.data, st.ebsd.rotations.data[:, :, 1])
+  text = cb.scriptOf(st)
+  assert "ebsd = EBSD3.load(fname)\nebsd = ebsd.rotate(eulerCorrection, keepXY=True)" in text
+  scope = {}
+  exec(text.split("# a look at")[0], scope)
+  assert np.allclose(scope["ebsd"].rotations.data, st.ebsd.rotations.data)

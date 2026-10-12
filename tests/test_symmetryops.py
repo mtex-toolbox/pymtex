@@ -116,6 +116,37 @@ def test_orientation_unique_and_mean():
     mean(orientation(csC))
 
 
+# the frames of one phase, of two phases, of two lattices and of a specimen with symmetry, each
+# drawn in another plotting convention than the default
+AXIS_FRAMES = {
+  "mmm, mmm": lambda pC: (crystalFrame("mmm", [4.8, 10.2, 6.0], how2plot=pC),) * 2,
+  "mmm, another mmm": lambda pC: (crystalFrame("mmm", [4.8, 10.2, 6.0], mineral="Forsterite", how2plot=pC), crystalFrame("mmm", [18.2, 8.8, 5.2], mineral="Enstatite", how2plot=pC)),
+  "m-3m, m-3m": lambda pC: (crystalFrame("m-3m", how2plot=pC),) * 2,
+  "m-3m, 6/mmm": lambda pC: (crystalFrame("m-3m", mineral="Ferrite", how2plot=pC), crystalFrame("6/mmm", [3, 3, 4.7], mineral="Titanium", how2plot=pC)),
+  "-3m, -3m": lambda pC: (crystalFrame("-3m", [4.9, 4.9, 5.4], how2plot=pC),) * 2,
+  "321, 321": lambda pC: (crystalFrame("321", [4.9, 4.9, 5.4], how2plot=pC),) * 2,
+  "4/m, 4/mmm": lambda pC: (crystalFrame("4/m", mineral="A", how2plot=pC), crystalFrame("4/mmm", mineral="B", how2plot=pC)),
+  "2/m, 2/m": lambda pC: (crystalFrame("2/m", [5, 9, 5], [90 * degree, 100 * degree, 90 * degree], how2plot=pC),) * 2,
+  "-43m, -43m": lambda pC: (crystalFrame("-43m", how2plot=pC),) * 2,
+  "-1, -1": lambda pC: (crystalFrame("-1", how2plot=pC),) * 2,
+  "m-3m, specimen 222": lambda pC: (crystalFrame("m-3m", how2plot=pC), specimenFrame("222", how2plot=pC)),
+  "6/mmm, specimen mmm": lambda pC: (crystalFrame("6/mmm", [3, 3, 4.7], how2plot=pC), specimenFrame("mmm", how2plot=pC)),
+}
+
+
+@pytest.mark.parametrize("convention", [None, "x↑→y", "y↓→x"])
+@pytest.mark.parametrize("antipodal", [False, True])
+@pytest.mark.parametrize("frames", AXIS_FRAMES)
+def test_the_axis_lies_in_the_fundamental_sector_of_its_frame(frames, antipodal, convention):
+  # what a plot of the axes shows without folding them: the sector of the frame they carry
+  frA, frB = AXIS_FRAMES[frames](convention)
+  if antipodal and frA is not frB:
+    pytest.skip("grain exchange needs one frame")
+  o = orientation(rotation.rand(3000, rng=np.random.default_rng(5)), frA, frB, antipodal=antipodal)
+  a = axis(o)
+  assert np.all(mtex.fundamentalSector(a.frame).checkInside(a)) and np.max(np.abs(o.angle() - o.projectIntoFundamentalRegion().angle(symmetry=False))) < 1e-9
+
+
 def test_axis():
   q = crystalFrame("321", [4.9, 4.9, 5.4], mineral="Quartz")
   fe = crystalFrame("m-3m", [2.87, 2.87, 2.87], mineral="Ferrite")

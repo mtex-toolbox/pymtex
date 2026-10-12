@@ -5,6 +5,7 @@ import pytest
 
 import mtex
 from mtex import degree, loadEBSD, rotation, vector3d, yvector
+from mtex.io.h5 import additionName
 from mtex.io.h5 import (H5Scope, alignmentList, eulerColumns, h5PhaseShift, h5Resolve, hdf5Configs, _loadEBSD_h5,
                         matrixRotations, spaceGroupNumber)
 
@@ -116,7 +117,7 @@ def test_oxford_h5():
 
 def test_oxford_h5_keeps_the_eds_columns_but_not_the_positions_as_properties():
   e = loadEBSD(fixture("oxford_cut.h5"))
-  assert "windowintegralcoka1" in e.prop and "bandcontrast" in e.prop
+  assert "Co_WindowIntegral_Ka1" in e.prop and "bandcontrast" in e.prop
   assert "x" not in e.prop and "y" not in e.prop
 
 
@@ -373,3 +374,12 @@ def test_separate_lists_the_entries_by_name_without_the_type():
 def test_eulerEntry_is_empty_for_a_table_of_matrices():
   from mtex.io.h5 import _eulerEntry
   assert _eulerEntry({"type": "byMatrix"}) == {} and _eulerEntry({"type": "euler_stack", "euler_stack": {"phi": 1}}) == {"phi": 1}
+
+
+@pytest.mark.parametrize("field, name", [
+  ("Band Contrast", "bandcontrast"), ("Live Time", "livetime"),
+  ("Window Integral/Co Ka1", "Co_WindowIntegral_Ka1"), ("Window Integral/C Ka1_2", "C_WindowIntegral_Ka1_2"),
+  ("Peak Area/C K series", "C_PeakArea_Kseries"), ("Composition/Ca Wt%", "Ca_Composition_Wt"),
+  ("Window Integral/Ni Kα1", "Ni_WindowIntegral_Ka1"), ("Peak Area/Live Time", "peakarealivetime")])
+def test_additionName_putsTheElementOfAnEDSMapFirst(field, name):
+  assert additionName(field) == name

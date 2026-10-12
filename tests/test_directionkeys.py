@@ -128,8 +128,16 @@ def test_HSVDirectionKey_ofSpecimenFoldsAtTheEquatorWithTheViewerPoleWhite():
   assert key.whiteCenter.data @ pole > 1 - 1e-9
 
 
-def test_HSVDirectionKey_ofTriclinicCrystalIsWhiteTowardsTheViewer():
-  assert HSVDirectionKey(crystalFrame("1")).whiteCenter.data @ crystalFrame("1").how2plot.outOfScreen.data > 1 - 1e-9
+@pytest.mark.parametrize("group", ["1", "-1"])
+def test_HSVDirectionKey_ofTriclinicCrystalIsWhiteTowardsTheViewer(group):
+  assert HSVDirectionKey(crystalFrame(group)).whiteCenter.data @ crystalFrame(group).how2plot.outOfScreen.data > 1 - 1e-9
+
+
+def test_HSVDirectionKey_ofTheInversionAloneHasNoBlackHalf():
+  # the hemisphere stays whole: no direction is darker than the full colours of its rim
+  key = HSVDirectionKey(crystalFrame("-1"))
+  c = key.direction2color(vector3d.rand(2000, rng=rng))
+  assert len(key.folds) == 0 and np.min(c.max(axis=-1) + c.min(axis=-1)) >= 1 - 1e-6
 
 
 def test_HSVDirectionKey_ofSymmetricSpecimenFrameColoursAxes():

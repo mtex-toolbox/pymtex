@@ -16,7 +16,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import headerDict, leadingLines, linesFrom, readFile, readTable, text
 
@@ -59,7 +59,7 @@ def ctfPhases(phaseLines):
   if missing:
     warnings.warn(f"the phase lines do not describe phase {', '.join(missing)}; pixels of that phase are "
                   "imported as not indexed", stacklevel=3)
-  return phaseList(frames)
+  return phaseList(distinctMinerals(frames))
 
 
 def ctfHeader(lines):

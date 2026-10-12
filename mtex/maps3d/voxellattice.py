@@ -14,11 +14,43 @@ import numpy as np
 
 from ..geometry.kernels import columnMax, columnMin
 from ..geometry.display import aligned
+from ..maps.kernels import _compiledLoop
+
+prange = range
 
 # a quarter cell: half of what it takes to round onto the neighbouring voxel
 INDEX_TOL = 0.25
 # the unit cell as MATLAB's EBSD3square lists its corners, in units of d1, d2, d3
 CORNERS = 0.5 * np.array([[1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1], [1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1]], dtype=float)
+
+
+# the index (i, j, k) of every voxel of a box in the order of a C array, and its position
+# origin + i d1 + j d2 + k d3, written over the cores: np.indices and the product with D make
+# three passes over 48 bytes a voxel, a second for the 13 million voxels of a volume
+def _boxLoop(origin, D, n1, n2, n3, ijk, P):
+  for i in prange(n1):
+    for j in range(n2):
+      for k in range(n3):
+        r = (i * n2 + j) * n3 + k
+        ijk[r, 0] = i
+        ijk[r, 1] = j
+        ijk[r, 2] = k
+        for c in range(3):
+          P[r, c] = (i * D[0, c] + j * D[1, c] + k * D[2, c]) + origin[c]
+
+
+def boxLattice(origin, D, shape):
+  """the lattice of every voxel of a box of the shape, in the order of a C array, and the
+  positions of its voxels as an array of the shape"""
+  origin, D = np.asarray(origin, dtype=float).reshape(3), np.asarray(D, dtype=float).reshape(3, 3)
+  loop = _compiledLoop(_boxLoop, parallel=True)
+  if loop is None:
+    lat = voxelLattice(origin, D, np.indices(shape).reshape(3, -1).T)
+    return lat, lat.positions().reshape(tuple(shape) + (3,))
+  n = int(np.prod(shape))
+  ijk, P = np.empty((n, 3), dtype=np.int64), np.empty((n, 3))
+  loop(origin, D, shape[0], shape[1], shape[2], ijk, P)
+  return voxelLattice(origin, D, ijk), P.reshape(tuple(shape) + (3,))
 
 
 class voxelLattice:
@@ -32,11 +64,6 @@ class voxelLattice:
     self.origin = np.asarray(origin, dtype=float).reshape(3)
     self.D = np.asarray(D, dtype=float).reshape(3, 3)
     self.ijk = np.asarray(ijk, dtype=np.int64).reshape(-1, 3)
-
-  # the lattice of every voxel of a box of the shape, in the order of a C array
-  @classmethod
-  def _box(cls, origin, D, shape):
-    return cls(origin, D, np.indices(shape).reshape(3, -1).T)
 
   @property
   def shape(self):

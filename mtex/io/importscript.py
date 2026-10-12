@@ -21,16 +21,17 @@ from ..maps.phaselist import phaseList
 
 
 def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, dataSets=(), mapConvention="y↑→x",
-                            eulerConvention=None, vendorCorrection=None, variable="ebsd", drawn=None):
+                            eulerConvention=None, vendorCorrection=None, variable="ebsd", drawn=None, volume=False):
   """the script of an import: the file, the plotting convention, the correction, the phases, a plot
 
     buildImportWizardScript('map.ctf')                             the plain load
     buildImportWizardScript('map.oh5', dataSet=1, dataSets=sets)   a map of a project file
     buildImportWizardScript('map.ang', phases=csList, headerPhases=info.phases)
+    buildImportWizardScript('volume.dream3d', volume=True)         a volume, read by EBSD3.load
   """
   name = variable or "ebsd"
   lines = [f"# the import of {os.path.basename(path)}, written by the MTEX import wizard on {date.today().isoformat()}",
-           "from mtex import EBSD, crystalFrame, degree, notIndexedFrame, plot, plottingConvention", ""]
+           f"from mtex import {'EBSD3' if volume else 'EBSD'}, crystalFrame, degree, notIndexedFrame, plot, plottingConvention", ""]
   changed = phases is not None and phasesDiffer(phases, headerPhases)
   if changed:
     lines += ["# the crystal symmetry, lattice angles in degree", "csList = [" + ",\n          ".join(frameLiteral(f) for f in phases.frames) + "]", ""]
@@ -39,13 +40,20 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   args = ["fname"]
   if dataSets is not None and len(dataSets) > 1 and dataSet is not None:
     args.append(f"dataSet={int(dataSet)}")
+  turned = False
   if eulerConvention is not None:
     correction = plottingConvention(mapConvention).rot * plottingConvention(eulerConvention).rot.inv()
-    if vendorCorrection is None or float(correction.angle(vendorCorrection)) > 1e-9:
+    # a volume is read as its file states it
+    if (vendorCorrection is None and not volume) or float(correction.angle() if vendorCorrection is None else correction.angle(vendorCorrection)) > 1e-9:
       lines += ["# the frame the Euler angles are written in, against the frame of the map",
                 f"eulerCorrection = plottingConvention({mapConvention!r}).rot * plottingConvention({eulerConvention!r}).rot.inv()", ""]
-      args.append("eulerCorrection=eulerCorrection")
-  lines += ["# the map", f"{name} = EBSD.load({', '.join(args)})"]
+      # the reader of a volume takes no correction: its orientations are turned once it is read
+      turned = volume
+      if not volume:
+        args.append("eulerCorrection=eulerCorrection")
+  lines += ["# the volume" if volume else "# the map", f"{name} = {'EBSD3' if volume else 'EBSD'}.load({', '.join(args)})"]
+  if turned:
+    lines.append(f"{name} = {name}.rotate(eulerCorrection, keepXY=True)")
   if changed:
     lines.append(f"{name}.CSList = csList")
   lines.append("")
@@ -55,12 +63,12 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   return "\n".join(lines)
 
 
-def loadCall(path, dataSet=None, dataSets=(), variable="ebsd"):
+def loadCall(path, dataSet=None, dataSets=(), variable="ebsd", volume=False):
   """the one line load, for the clipboard"""
   args = [repr(os.path.abspath(path))]
   if dataSets is not None and len(dataSets) > 1 and dataSet is not None:
     args.append(f"dataSet={int(dataSet)}")
-  return f"{variable or 'ebsd'} = EBSD.load({', '.join(args)})"
+  return f"{variable or 'ebsd'} = {'EBSD3' if volume else 'EBSD'}.load({', '.join(args)})"
 
 
 # ------------------------------------------------------------------ the pieces

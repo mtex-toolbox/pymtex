@@ -2,7 +2,8 @@
 import numpy as np
 import pytest
 
-from mtex.maps3d.voxellattice import voxelLattice
+from mtex import setMTEXpref
+from mtex.maps3d.voxellattice import boxLattice, voxelLattice
 
 
 # a 4 x 5 x 6 lattice of translations D, its positions shuffled by perm
@@ -15,9 +16,17 @@ def shuffledLattice():
   return D, ijk, P, perm, voxelLattice.fromPositions(P[perm])
 
 
-def test_box_indexesEveryVoxelInCOrder():
-  l = voxelLattice._box(np.zeros(3), np.eye(3), (2, 3, 4))
-  assert np.array_equal(l.ijk, np.stack(np.unravel_index(np.arange(24), (2, 3, 4)), axis=1)) and l.shape == (2, 3, 4)
+@pytest.mark.parametrize("backend", ["numba", "numpy"])
+def test_boxLattice_indexesAndPlacesEveryVoxelInCOrder(backend):
+  # a sheared lattice, so that every translation enters every coordinate
+  origin, D = np.array([1.0, -2.0, 0.5]), np.array([[0.3, 0.1, 0.0], [0.0, 0.5, 0.2], [0.05, 0.0, 0.2]])
+  ijk = np.stack(np.unravel_index(np.arange(24), (2, 3, 4)), axis=1)
+  setMTEXpref("kernels", backend)
+  try:
+    l, pos = boxLattice(origin, D, (2, 3, 4))
+  finally:
+    setMTEXpref("kernels", "numba")
+  assert np.array_equal(l.ijk, ijk) and l.shape == (2, 3, 4) and np.allclose(pos, (origin + ijk @ D).reshape(2, 3, 4, 3), atol=1e-15)
 
 
 def test_fromPositions_infersTheTranslationsAndTheIndex():

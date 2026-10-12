@@ -54,7 +54,8 @@ def cubicPair():
 
 def test_maxAngles_ofTheCubicRegionAlongTheHighSymmetryAxes():
   cs, ss = cubicPair()
-  w = maxAngles(fundamentalRegion(cs, ss), [[0, 0, 1], [1, 1, 1], [1, 1, 0]])
+  # the axes inside the sector of the specimen frame, which the default convention draws from below
+  w = maxAngles(fundamentalRegion(cs, ss), [[0, 0, -1], [1, 1, -1], [1, 1, 0]])
   assert np.isclose(w[0], np.pi / 4) and np.isclose(w[1], np.pi / 3) and np.isclose(w[2], 2 * np.arctan(np.tan(np.pi / 8) * np.sqrt(2)))
 
 

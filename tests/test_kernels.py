@@ -13,7 +13,7 @@ from mtex.geometry import kernels
 from mtex.geometry.symreduce import chordAngle
 from mtex.geometry.kernels import (_bestDotNumpy, _closestImageNumpy, _projectDirectionsNumpy, _projectToRefNumpy, _qmulNumpy,
                                    _qrotNumpy, _symReduceNumpy)
-from mtex.geometry.orientationregion import commonAxisCenter, commonRotations
+from mtex.geometry.orientationregion import commonAxisSector
 from mtex.geometry.symreduce import reductionGroups, referenceImages
 
 rng = np.random.default_rng(3)
@@ -117,8 +117,8 @@ def test_searches_agree_with_numpy(numbaBackend):
     # the projection onto one reference, and onto the identity where the conjugates tie
     for ref in (o2[0].data, np.array([1.0, 0, 0, 0])):
       es, frm = referenceImages(ref, L, R, exchange)
-      common = commonRotations(L, R) if ref[0] == 1 else None
-      cimgs = kernels.qrot(common, commonAxisCenter(common)[None]) if common is not None and len(common) > 1 else None
+      _, center, common = commonAxisSector(o1) if ref[0] == 1 else (None, None, None)
+      cimgs = kernels.qrot(common, center[None]) if common is not None and len(common) > 1 else None
       got = kernels.projectToRef(o1.data, es, frm, L, R, ref, common, cimgs)
       want = _projectToRefNumpy(o1.data, es, frm, L, R, ref, np.empty((0, 4)) if cimgs is None else common, np.empty((0, 3)) if cimgs is None else cimgs)
       assert np.allclose(got, want, atol=1e-13)
@@ -283,3 +283,33 @@ def test_pairWork_doublesTheImagesUnderExchange():
                                               (("int64", "int64"), np.float64)])
 def test_floatType_isTheSharedFloatingType(dtypes, expected):
   assert kernels._floatType(*(np.zeros(1, dtype=d) for d in dtypes)) == expected
+
+
+# ------------------------------------------------------------------ the turn of a volume (io/kernels.py)
+
+@pytest.mark.parametrize("shape", [(4, 5, 6), (4, 5, 6, 1), (4, 5, 6, 3)])
+@pytest.mark.parametrize("dtype", ["f4", "i4", "u1"])
+def test_turnVolume_isTheCopyOfTheSwappedAxes(shape, dtype):
+  from mtex.io.kernels import turnVolume, turnVolumeNumpy
+  a = (np.random.default_rng(0).random(shape) * 100).astype(dtype)
+  for to in (np.float64, a.dtype):
+    t = turnVolume(a, to)
+    assert t.flags.c_contiguous and t.dtype == to and np.array_equal(t, np.swapaxes(a, 0, 2)) and np.array_equal(t, turnVolumeNumpy(a, to))
+
+
+def test_turnBunge_isTheRotationOfTheTurnedEulerAngles():
+  from mtex.io.kernels import turnBunge, turnBungeNumpy
+  a = (np.random.default_rng(0).random((4, 5, 6, 3)) * [2 * np.pi, np.pi, 2 * np.pi]).astype(np.float32)
+  e = np.swapaxes(a, 0, 2).astype(float)
+  q = turnBunge(a)
+  assert q.shape == (6, 5, 4, 4) and np.allclose(q, rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], "ZXZ").data, atol=1e-15)
+  assert np.allclose(q, turnBungeNumpy(a), atol=1e-15)
+
+
+def test_turnRodrigues_isTheRotationOfTheTurnedVectors():
+  from mtex.io.kernels import turnRodrigues, turnRodriguesNumpy
+  a = np.random.default_rng(0).normal(size=(4, 5, 6, 3)).astype(np.float32)
+  a[0, 0, 0], a[1, 2, 3] = 0, np.nan
+  q = turnRodrigues(a)
+  assert np.allclose(q, rotation.byRodrigues(vector3d(np.swapaxes(a, 0, 2).astype(float))).data, atol=1e-15, equal_nan=True)
+  assert np.allclose(q, turnRodriguesNumpy(a), atol=1e-15, equal_nan=True) and np.array_equal(q[0, 0, 0], [1, 0, 0, 0]) and np.all(np.isnan(q[3, 2, 1]))

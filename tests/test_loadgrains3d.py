@@ -79,3 +79,20 @@ def test_load_ofTheDream3dMeshGivesTheMeanOfTheVoxels(dreamGrains):
 def test_load_noOrientFacesLeavesNegativeVolumes():
   raw = grain3d.load(DREAM3D, orientFaces=False)
   assert not np.all(raw.volume > 0)
+
+
+def test_load_ofADream3dFileWithoutAMeshGivesTheGrainsOfItsFeatureIds(tmp_path):
+  # two features splitting a 4 x 3 x 2 volume along x
+  import h5py
+  from mtex import calcGrains
+  ids = np.ones((2, 3, 4, 1), dtype=np.int32)
+  ids[:, :, 2:] = 2
+  with h5py.File(tmp_path / "v.dream3d", "w") as f:
+    g = f.create_group("DataContainers/ImageDataContainer")
+    g.create_dataset("CellData/FeatureIds", data=ids)
+    g.create_dataset("CellData/EulerAngles", data=np.zeros((2, 3, 4, 3), dtype=np.float32))
+    for name, v in (("DIMENSIONS", [4, 3, 2]), ("SPACING", [1.0, 1.0, 1.0]), ("ORIGIN", [0.0, 0.0, 0.0])):
+      g.create_dataset(f"_SIMPL_GEOMETRY/{name}", data=np.array(v))
+  grains = grain3d.load(str(tmp_path / "v.dream3d"))
+  fromVoxels = calcGrains(EBSD3.load(str(tmp_path / "v.dream3d")), grainId=True)
+  assert len(grains) == 2 and np.allclose(grains.volume, [12, 12]) and np.allclose(grains.volume, fromVoxels.volume)

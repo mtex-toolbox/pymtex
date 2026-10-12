@@ -30,7 +30,8 @@ HEAD_LIMIT = 1 << 26
 @dataclass
 class EBSDFileInfo:
   """what an EBSD file says about itself from its header alone: format, vendor, phases,
-  properties, data sets, grid, step and Euler correction, as inspectEBSD returns it"""
+  properties, data sets, grid, step and Euler correction, as inspectEBSD returns it; a volume
+  has a grid and a step of three, and says what it holds of its grains"""
   path: str
   format: str
   vendor: str
@@ -45,6 +46,13 @@ class EBSDFileInfo:
   step: tuple | None = None
   eulerCorrection: rotation = None
   header: dict = field(default_factory=dict)
+  unit: str = "µm"
+  grains: list = field(default_factory=list)
+
+  @property
+  def is3d(self):
+    """whether the file holds a volume, which EBSD3.load reads"""
+    return self.grid is not None and len(self.grid) == 3
 
   @property
   def name(self):
@@ -53,12 +61,10 @@ class EBSDFileInfo:
 
   @property
   def extent(self):
-    """the width and height the grid spans, in the scan unit"""
+    """the lengths the grid spans along its axes, in the scan unit"""
     if self.grid is None or self.step is None:
       return None
-    nx, ny = self.grid
-    dx, dy = self.step
-    return ((nx - 1) * dx, (ny - 1) * dy)
+    return tuple((n - 1) * d for n, d in zip(self.grid, self.step))
 
   @property
   def eulerAxesNames(self):
@@ -80,22 +86,24 @@ class EBSDFileInfo:
     if self.points is not None:
       rows.append(("points", f"{self.points:,}".replace(",", " ")))
     if self.grid is not None:
-      nx, ny = self.grid
-      kind = "hex grid" if self.hex else "square grid"
+      kind = "voxel grid" if self.is3d else "hex grid" if self.hex else "square grid"
       stepText = ""
       if self.step is not None:
-        dx, dy = self.step
-        stepText = f", d = {dx:.4g} µm" if self.hex or abs(dx - dy) < 1e-9 * max(dx, dy, 1e-12) else f", dx = {dx:.4g}, dy = {dy:.4g} µm"
-      rows.append(("grid", f"{kind} {nx} x {ny}{stepText}"))
+        d = self.step
+        same = self.hex or all(abs(x - d[0]) < 1e-9 * max(*d, 1e-12) for x in d)
+        stepText = f", d = {d[0]:.4g} {self.unit}" if same else ", " + ", ".join(f"d{a} = {x:.4g}" for a, x in zip("xyz", d)) + f" {self.unit}"
+      rows.append(("grid", f"{kind} {' x '.join(str(n) for n in self.grid)}{stepText}"))
     if self.extent is not None:
-      w, h = self.extent
-      rows.append(("extent", f"{_length(w)} x {_length(h)}"))
+      inMicrons = 1e3 if self.unit == "mm" else 1.0
+      rows.append(("extent", " x ".join(_length(w * inMicrons) for w in self.extent)))
     if len(self.phases) and any(f.isIndexed for f in self.phases.frames):
       rows.append(("phases", ", ".join(f.name for f in self.phases.frames if f.isIndexed)))
     if self.properties:
       rows.append(("properties", ", ".join(self.properties)))
     if len(self.dataSets) > 1:
       rows.append(("data sets", str(len(self.dataSets))))
+    if self.grains:
+      rows.append(("grains", ", ".join(self.grains)))
     if self.eulerCorrection is not None:
       rows.append(("Euler correction", _rotationLabel(self.eulerCorrection)))
     return rows
@@ -126,12 +134,15 @@ def inspectEBSD(path):
 
     inspectEBSD('map.ang')     the phases, the properties, the grid and the step, the Euler correction
     inspectEBSD('map.h5oina')  and the data sets a project file holds
+    inspectEBSD('volume.dream3d')  the voxel grid of a volume, info.is3d telling it from a map
   """
   path = os.fspath(path)
   inspect = _INSPECTORS.get(VENDOR_FORMATS.get(os.path.splitext(path)[1].lower().lstrip(".")))
   if inspect is None:
     raise ValueError(f"{path} has no extension of an EBSD file; they are {', '.join(EBSD_EXTENSIONS)}")
-  info = inspect(path)
+  info = _inspectVolume(path) if inspect is _inspectH5 else None
+  if info is None:
+    info = inspect(path)
   st = os.stat(path)
   info.size = st.st_size
   if info.date is None:
@@ -313,6 +324,36 @@ def _inspectH5(path):
       if info.points is None:
         info.points = int(np.prod(f[p].shape))
     info.eulerCorrection = r.correction()
+  return info
+
+
+# the description of a volume, a DREAM.3D file or the LabDCT volume of an xnovo file, None for
+# an HDF5 file that is a map; a .dream3d file without voxels is refused
+def _inspectVolume(path):
+  import h5py
+  from .load3d import _dream3dCS, _named, _xnovoPhases, dream3dVolume
+  ext = os.path.splitext(path)[1].lstrip(".").lower()
+  with h5py.File(path, "r") as f:
+    if "LabDCT" in f and "Data/PhaseId" in f["LabDCT"]:
+      g = f["LabDCT"]
+      nz, ny, nx = g["Data/PhaseId"].shape
+      info = EBSDFileInfo(path, ext, "Xnovo", 0, None, phaseList(_xnovoPhases(f)), unit="mm")
+      info.grid, info.step = (nx, ny, nz), tuple(float(d) for d in np.asarray(g["Spacing"][...]).reshape(3))
+      info.properties = [name for key, name in (("Completeness", "Completeness"), ("GrainId", "grainId")) if key in g["Data"]]
+      info.grains = ["grain ids"] if "GrainId" in g["Data"] else []
+    else:
+      vol = dream3dVolume(f)
+      if vol is None:
+        if ext == "dream3d":
+          raise ValueError(f"{path} holds no voxel data")
+        return None
+      info = EBSDFileInfo(path, ext, "DREAM.3D", 0, None, phaseList(_dream3dCS(f, vol)))
+      info.grid, info.step = vol.shape, tuple(float(d) for d in vol.spacing)
+      info.properties = list(vol.properties)
+      info.grains = [label for label, there in (("feature ids", "FeatureIds" in vol.names),
+                                                ("surface mesh", bool(_named(vol.paths, "FaceData/FaceLabels", "Face Data/FaceLabels")))) if there]
+  info.points = info.grid[0] * info.grid[1] * info.grid[2]
+  info.eulerCorrection = rotation.id
   return info
 
 

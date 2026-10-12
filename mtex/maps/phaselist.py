@@ -14,6 +14,41 @@ from ..geometry.frames import crystalFrame, notIndexedFrame, referenceFrame
 from ..geometry.display import aligned
 
 
+# the letter of the k-th phase of one name: A to Z, then AA, AB, ...
+def _letter(k):
+  return (_letter(k // 26 - 1) if k >= 26 else "") + chr(ord("A") + k % 26)
+
+
+def distinctMinerals(frames):
+  """the phases of a file with every indexed one addressable by its mineral: phases that share
+  a name, in any case, and phases without one take a letter each in their order, 'Iron A',
+  'Iron B', or 'A', 'B' where the file names none of them; a name the file gives once stays"""
+  frames = list(frames)
+  indexed = [i for i, f in enumerate(frames) if isinstance(f, referenceFrame) and f.isIndexed]
+  taken = {frames[i].mineral.strip().lower() for i in indexed}
+  count = {}
+  for i in indexed:
+    key = frames[i].mineral.strip().lower()
+    count[key] = count.get(key, 0) + 1
+  seen = {}
+  for i in indexed:
+    name = frames[i].mineral.strip()
+    if count[name.lower()] == 1:
+      continue
+    # a letter another phase already has as its name is passed over
+    while True:
+      k = seen.get(name.lower(), 0)
+      seen[name.lower()] = k + 1
+      new = f"{name} {_letter(k)}".strip()
+      if new.lower() not in taken:
+        break
+    taken.add(new.lower())
+    fr = frames[i].clone()
+    fr.mineral = new
+    frames[i] = referenceFrame.intern(fr)
+  return frames
+
+
 class phaseList:
   """the phases of a map, the frames its measurements can belong to, the not indexed frame first at
   index 0, so that a phase id is an index into the list

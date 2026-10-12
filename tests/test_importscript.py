@@ -82,3 +82,13 @@ def test_edited_phase_reproduced_in_fresh_session(tmp_path):
   out = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, cwd=ROOT)
   assert out.returncode == 0, out.stderr
   assert out.stdout.strip().endswith("4.8")
+
+
+def test_a_volume_is_loaded_by_EBSD3():
+  text = buildImportWizardScript("/data/volume.dream3d", volume=True, eulerConvention="y↑→x")
+  assert "from mtex import EBSD3," in text and "# the volume\nebsd = EBSD3.load(fname)" in text and "eulerCorrection" not in text
+  # the reader of a volume takes no correction, so the volume is turned once it is read
+  text = buildImportWizardScript("/data/volume.dream3d", volume=True, mapConvention="y↑→x", eulerConvention="y↓→x")
+  assert "ebsd = EBSD3.load(fname)\nebsd = ebsd.rotate(eulerCorrection, keepXY=True)" in text
+  assert loadCall("/data/volume.dream3d", volume=True) == "ebsd = EBSD3.load('/data/volume.dream3d')"
+  assert loadCall("/data/map.ctf") == "ebsd = EBSD.load('/data/map.ctf')"

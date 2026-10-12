@@ -138,3 +138,29 @@ MTEX reads a 3.3 million point `.ctf` in 3.2 s where the port takes 1.2 s, and t
 slowest, `C75_350_02.ctf`, 9.6 s against 2.6 s. The Oxford pair is the one file MTEX reads
 faster, 0.58 s against 0.76 s, the fixed cost of the port's frames and point groups on a
 map of three phases.
+
+## The volumes (2026-10-12)
+
+`EBSD3.load` of DREAM.3D and xnovo files, a repeated call in a process, the file in the page
+cache, six cores (the largest file once, with the memory nearly full); MATLAB develop (R2024b) through its bridge, `bench/matlab/probe_dream3d.m`.
+The reader before is the one of fixed paths, which read two of these files at all.
+
+| volume | voxels | before | now | MATLAB |
+|---|---:|---:|---:|---:|
+| `SmallIN100_MeshStats.dream3d`, NX | 1.0 million | 0.29 s | 0.13 s | |
+| `SmallIN100_Final.dream3d`, NX, group names with blanks | 4.4 million | - | 0.52 s | 1.8 s |
+| `Zircaloy4_7Nb_slab.dream3d`, DREAM.3D 6, gzip chunks | 13.3 million | - | 2.3 s | 16.5 s |
+| `Zircaloy4_7Nb.dream3d`, DREAM.3D 6, 6.9 GB | 48.9 million | - | 7.7 s | |
+| xnovo `t1.h5` | 1.2 million | 0.45 s | 0.15 s | |
+
+On the gzip file h5py alone reads the fifteen arrays in 13.9 s, one chunk after the other
+under its lock; the threads read and inflate them in 1.2 s (the Euler angles 0.32 s against
+1.9 s). The turn of an array to (x, y, z) as float64 took NumPy 2.1 s for the Euler angles and
+takes the compiled pass 0.03 s a scalar array, the rotations from the Euler angles 0.3 s in
+the same pass instead of 0.6 s after it; the map from its arrays, with the index and the
+positions of the box, 0.27 s instead of 1.1 s, and the renormalisation of quaternions that are unit already, 1.2 s, is
+gone; the xnovo file gains from its Rodrigues vectors turned in the same way. What is left
+is the inflation, at the speed of zlib on six cores, and the first write
+of the arrays. The properties keep the types of the file, float32 and int32, where the 2D
+readers give float64: the largest volume holds 7.1 GB instead of 9.4.
+

@@ -17,7 +17,7 @@ import numpy as np
 
 from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.units import degree
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 from .ctf import oxfordCorrection
 from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import coerceNumeric, readFile, text
@@ -77,7 +77,7 @@ def cprPhases(ini, path):
   if missing:
     warnings.warn(f"{path} announces {n} phases but does not describe phase {', '.join(missing)}; "
                   "pixels of that phase are imported as not indexed", stacklevel=3)
-  return phaseList(frames)
+  return phaseList(distinctMinerals(frames))
 
 
 def crcNames(ini, codes):
