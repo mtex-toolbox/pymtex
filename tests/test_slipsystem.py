@@ -54,7 +54,10 @@ def test_dislocation_systems_of_fcc():
   ds = dislocationSystem.fcc(cs)
   # 12 edge and 6 screw systems, with the half Burgers vector
   assert np.count_nonzero(ds.isEdge) == 12 and np.count_nonzero(ds.isScrew) == 6 and len(ds) == 18 and ds.CS is cs
-  assert close(ds.b.norm(), 3.6 * np.sqrt(2) / 2) and np.all(ds.u == np.where(ds.isEdge, 2, 1))
+  assert close(ds.b.norm(), 3.6 * np.sqrt(2) / 2) and close(ds.u, 6.48 * np.where(ds.isEdge, 1, 0.7))
+  # a hexagonal slip direction is the Burgers vector
+  ti = crystalFrame("6/mmm", [2.95, 2.95, 4.68], mineral="Ti")
+  assert close(dislocationSystem(slipSystem.basal(ti).symmetrise(antipodal=True)).b.norm(), 2.95)
   assert ds.tensor().shape == (18,) and ds.tensor().M.shape == (18, 3, 3) and ds.tensor().unit == "au"
   assert ds.l.antipodal and len(ds[ds.isScrew]) == 6
   # MATLAB's display, one table for the edge and one for the screw dislocations

@@ -88,16 +88,16 @@ hold(False)
 #
 # Ferrite is body-centred cubic, so this example uses the standard BCC set of
 # 48 edge and 4 screw systems. Following the normalization on the preceding
-# page, the edge weight is one and the screw weight is $1-\nu$, with
-# Poisson's ratio $\nu=0.3$.
+# page, the line energies are taken relative to the shortest Burgers vector:
+# the edge weight is one and the screw weight is $1-\nu$, with Poisson's
+# ratio $\nu=0.3$.
 #
 # There is no universally accepted set of line-energy weights. Replace these
 # illustrative values with values appropriate to the material and model.
 
 dS = dislocationSystem.bcc(ebsd.CS)
 nu = 0.3
-dS.u[dS.isEdge] = 1
-dS.u[dS.isScrew] = 1 - nu
+dS.u = (dS.b.norm() / dS.b.norm().min()) ** 2 * (1 - nu * dS.isScrew)
 
 # [`calcGND`](EBSD.calcGND.html) returns an energy-weighted GND density for
 # each pixel and the signed density assigned to each candidate system.
