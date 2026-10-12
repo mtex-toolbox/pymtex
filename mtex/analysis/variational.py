@@ -172,6 +172,12 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
   cg = _cgKernel()
   K = None if cg is not None else (G.difference() if order == 1 else G.laplacian())
   norms, weights = (None, None) if cg is None else (_kernel("residualNorm"), _kernel("irlsWeights"))
+  # a small map on one thread: a step of the conjugate gradient is four parallel passes, each
+  # ending in a barrier of every thread, and on a loaded machine one thread waiting for its
+  # core holds up the others at each of up to 2000 steps, 12 s turned to minutes on 196 pixels
+  from ..functions.kernels import SINGLE_THREAD_WORK
+  if cg is not None and (len(G.adj) + n) * x.shape[1] < SINGLE_THREAD_WORK:
+    cg, norms, weights = cg.single, norms.single, weights.single
   edges = np.ascontiguousarray(G.edges, dtype=np.int64)
   isData = np.ascontiguousarray(isData)
   if cg is not None:

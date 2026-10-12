@@ -89,6 +89,10 @@ class WizardWindow(QMainWindow):
     super().__init__()
     self.st = st
     self.app = app or QApplication.instance()
+    # a closed window is destroyed by the event loop on the GUI thread: left to the garbage
+    # collector, which runs on whichever thread allocates, ~QWidget on a worker thread waits for
+    # the GUI thread, which may be waiting for that worker
+    self.setAttribute(Qt.WA_DeleteOnClose)
     self.setWindowTitle("MTEX import wizard")
     self.setWindowIcon(wizardIcon())
     self.resize(1600, 900)

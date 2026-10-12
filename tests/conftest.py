@@ -22,6 +22,27 @@ def fresh_session():
   if reset is not None:
     reset()
   yield
+  releaseWidgets()
+
+
+# the widgets a test left, closed and destroyed on the main thread, their children with them, so
+# that the Python wrappers the garbage collector frees later hold nothing: it runs on whichever
+# thread allocates, and a widget it frees on a worker (one of SciPy's query threads) waits in
+# ~QWidget for the GUI thread, which waits in join for that worker
+def releaseWidgets():
+  import sys
+  if "PySide6.QtWidgets" not in sys.modules:
+    return
+  from PySide6.QtCore import QCoreApplication, QEvent
+  from PySide6.QtWidgets import QApplication
+  app = QApplication.instance()
+  left = app.topLevelWidgets() if app is not None else []
+  if not left:
+    return
+  for w in left:
+    w.close()
+    w.deleteLater()
+  QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
 def close(a, b, tol=1e-12):

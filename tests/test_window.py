@@ -110,3 +110,15 @@ def test_the_maps_read_before_are_let_go():
   assert read[0]() is None and read[1]() is None and read[2]() is w.st.ebsd
   w.close()
   app.processEvents()
+
+
+# a closed window is destroyed by the deferred deletes of the GUI thread, never left to the
+# garbage collector, which would free it on whichever thread allocates
+def test_a_closed_window_is_destroyed_on_the_gui_thread():
+  import shiboken6
+  from PySide6.QtCore import QCoreApplication, QEvent
+  application()
+  w = runWizard(FIXTURES, exec=False)
+  w.close()
+  QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+  assert not shiboken6.isValid(w)
