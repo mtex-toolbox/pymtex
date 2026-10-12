@@ -160,6 +160,8 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.ahead.timeout.connect(self.drawAhead)
     self.drawnFor = None       # (map identity, map convention) the base picture stands for
     self.image = None
+    self.raster = None         # the picture's pixels as measurements, once a tab recolours it
+    self.cells = None          # the measurements the cells of a small map stand for, likewise
     self.colorbar = None
     self.mappable = None
     self.legend = None
@@ -244,7 +246,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       # the artist's own alpha would override the transparency of a phase not drawn
       self.image.set_alpha(None)
       self.ax = self.image.axes
-      self.raster, self.drawnFor, self.coloured, self.shownFor = None, key, (kind, name), shown
+      self.raster, self.cells, self.drawnFor, self.coloured, self.shownFor = None, None, key, (kind, name), shown
       # a property is the only colouring that is a number, and it states the range it was
       # drawn over, so the bar needs nothing read back; every other picture carries none
       norm = getattr(self.image, "norm", None)
@@ -266,11 +268,16 @@ class ViewCanvas(FigureCanvasQTAgg):
   def recolour(self, kind, name, shown):
     """the colours of the picture rewritten, the map's own never assembled: mapValues colours
     the measurements the picture shows and no others"""
-    from ..plotting.maps import mapRaster
+    from ..plotting.maps import mapCells, mapRaster
     st = self.st
+    layout = getattr(getattr(self.ax, "_mtexMapPlot", None), "layout", None)
     if self.raster is None and hasattr(self.image, "set_data"):
-      layout = getattr(getattr(self.ax, "_mtexMapPlot", None), "layout", None)
       self.raster = mapRaster(st.ebsd, maxPixels=MAX_PIXELS, layout=layout)
+    # the cells were drawn without the padding and without the measurements the first colouring
+    # had no colour for: every measurement gets its cell, so that a colour meets its own
+    if self.cells is None and hasattr(self.image, "set_verts") and st.ebsd.lattice is not None:
+      self.cells = np.flatnonzero(~st.ebsd.isPadding.reshape(-1))
+      self.image.set_verts(mapCells(st.ebsd, layout=layout)[self.cells])
     index = self.raster[2] if self.raster is not None else None
     pick = np.where(index >= 0, index, 0) if index is not None else None
     values, scalar = self.colorsOf(kind, name, at=None if pick is None else pick.reshape(-1))
@@ -305,7 +312,11 @@ class ViewCanvas(FigureCanvasQTAgg):
         rgba[:, :3] = np.nan_to_num(rgb)
         rgba[:, 3] = np.isfinite(rgb).all(axis=-1)
       rgba[~shown, 3] = 0
+      if self.cells is not None:
+        rgba = rgba[self.cells]
       if hasattr(self.image, "set_facecolors"):
+        # cells drawn by a number carry it, and it would colour them over the colours given
+        self.image.set_array(None)
         self.image.set_facecolors(rgba)
       elif hasattr(self.image, "set_color"):
         self.image.set_color(rgba)

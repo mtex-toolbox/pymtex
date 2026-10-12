@@ -183,3 +183,41 @@ def test_the_pole_figures_wait_for_a_rest(loaded):
 
 def test_millerOf_reads_a_direction_typed_with_blanks(loaded):
   assert np.allclose(millerOf("1 -1 0", loaded.ebsd.CSList.frames[1]).hkl, [1, -1, 0])
+
+
+# what a canvas shows of a tab: where its opaque cells or pixels are, their colours as bytes,
+# and the range of its colour bar
+def _shown(st, canvas, name):
+  cb.pickTab(st, st.tabs.index(name))
+  canvas.draw_view()
+  h = canvas.image
+  if hasattr(h, "get_paths"):
+    h.update_scalarmappable()
+    rgba = (np.asarray(h.get_facecolors()) * 255 + 0.5).astype(np.uint8)
+    where = np.array([q.vertices[0] for q in h.get_paths()])
+  else:
+    rgba = h.to_rgba(h.get_array(), bytes=True).reshape(-1, 4)
+    where = np.arange(len(rgba))
+  opaque = rgba[:, 3] > 0
+  bar = None if canvas.mappable is None else (canvas.mappable.norm.vmin, canvas.mappable.norm.vmax)
+  return where[opaque], rgba[opaque], bar
+
+
+# a tab reached from another one recolours the picture, the fast path of drawing it anew: both
+# show the same, on a square map, a hexagonal one with its padding, and one drawn as a picture,
+# whether the picture was first drawn by a number or by colours
+@pytest.mark.parametrize("fname, cap", [("Forsterite_cut.ctf", None), ("ferrite_cut.ang", None), ("ferrite_cut.ang", 0)])
+@pytest.mark.parametrize("first", [0, -1])
+def test_a_recoloured_tab_shows_what_a_fresh_one_draws(fname, cap, first, monkeypatch):
+  from mtex.plotting import mapplot
+  application()
+  if cap is not None:
+    monkeypatch.setattr(mapplot, "CELLS_MAX", cap)
+  st = WizardState(FIXTURES)
+  cb.openEntry(st, os.path.join(FIXTURES, fname))
+  maps = [t for t, k in zip(st.tabs, st.tabKinds) if k in ("phase", "ipf", "property")]
+  recoloured = ViewCanvas(st)
+  _shown(st, recoloured, maps[first])
+  for name in maps:
+    again, fresh = _shown(st, recoloured, name), _shown(st, ViewCanvas(st), name)
+    assert all(np.array_equal(a, b) for a, b in zip(again[:2], fresh[:2])) and again[2] == fresh[2], name
