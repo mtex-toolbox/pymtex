@@ -13,6 +13,8 @@
 # lattice, so the same filter means the same thing on a coarse and on a fine map.
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 
 from ..geometry.units import degree
@@ -184,9 +186,9 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
     work = np.zeros((5,) + x.shape)
     t = np.zeros(len(edges) if order == 1 else n)
     wr, wd, b = np.zeros(len(t)), np.zeros(n), np.zeros(x.shape)
+  prev = np.empty_like(x)
   for _ in range(maxIter):
-    idx = np.flatnonzero(free)
-    prev = x[idx]
+    np.copyto(prev, x)
     if cg is not None:
       norms(x, int(order), edges, G.ptr, G.adj, active, t)
       weights(t, x, f, isData, bool(pin), bool(l1Data), bool(l1Reg), float(threshold), float(eps), edges, active, wr, wd, b)
@@ -199,12 +201,16 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
         td = np.linalg.norm(x - f, axis=1)
         wd[isData] = (eps / np.sqrt(td ** 2 + eps ** 2) if l1Data else np.ones(n))[isData]
       y = _solveDirect(K, wd, wr, alpha, wd[:, None] * f, f, x, free, G)
-      x[idx] = y[idx]
+      x[free] = y[free]
     if not l1Data and not l1Reg:
       break                                          # a quadratic model is one solve
-    moved = np.zeros(nc + 1)
-    np.maximum.at(moved, comp[idx], np.max(np.abs(x[idx] - prev), axis=1))
-    activeComp &= moved >= tol
+    # a component goes on while one of its pixels moved by tol; a pixel not free never moves,
+    # so the whole map is compared, its columns one by one, NumPy's reduction along the short
+    # axis of a narrow array being a loop per row
+    step = np.abs(x - prev)
+    moving = np.zeros(nc + 1, dtype=bool)
+    moving[comp[functools.reduce(np.maximum, step.T) >= tol]] = True
+    activeComp &= moving
     active = activeComp[comp]
     free = freeBase & active
     if not free.any():

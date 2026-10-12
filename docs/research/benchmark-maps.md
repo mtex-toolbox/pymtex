@@ -83,7 +83,16 @@ benchmark led to.
   parity: 1.79 s against Julia's 1.56 s, both measured back to back on a machine at a load
   of two to four (Julia reads 1.37 s quiet). Its residual cost is the per-step overhead of
   the kernel launches and the gathers over the whole map while four grains are still
-  active, about 9 ms a step against Julia's 3 ms.
+  active, about 9 ms a step against Julia's 3 ms. The gathers are gone (2026-10-12): the
+  test of which components still move compares the whole map, a pixel not free never
+  moving, column by column instead of NumPy's per-row reduction of a narrow array, and
+  marks the moving components instead of a `maximum.at`; on the crosscheck maps the time
+  outside the kernels fell from 159 to 23 ms (twins, 22839 pixels, of which 14284 still
+  free at the cap) and from 305 to 88 ms (ferrite, 60592), the results bit for bit the
+  same. On a machine without free cores the threaded l1TV loses to one thread (load 40
+  to 50: 35 s for 6.5 at 62500 pixels), each of its ten thousand barriers waiting for the
+  thread last scheduled; at a load of 15 it is four times ahead, and `OMP_WAIT_POLICY=passive`
+  costs 1.4 to 3.4 times there, so it stays libgomp's default.
 - **What is still behind.** `calcGrains` at 1.5 times Julia's single thread, spread over
   the vertex weld, the criterion and the grain table with no one step dominant, the weld
   being the known item of `benchmark-decomposition.md`. The caliper and the hull measures
