@@ -573,7 +573,7 @@ class h5Reader:
 
   def mapCorrection(self):
     """the rotation the config says the map is turned by against its Euler angles: a constant,
-    the scan rotation the file writes, or a row of a table its own id picks"""
+    the scan rotation the file writes on top of the flip about x, or a row of a table its own id picks"""
     entry = self.ebsd.get("map_correction")
     if not isinstance(entry, dict):
       return rotation.id
@@ -583,7 +583,9 @@ class h5Reader:
     if kind == "scanRotation":
       a = self.number(entry, float(entry.get("fallback", 0.0)))
       a = 0.0 if np.isnan(a) else a
-      return rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
+      # the map runs y down, its z into the surface, where Z1 of the Euler frame points out of it
+      turn = rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
+      return rotation.byAxisAngle(vector3d(1, 0, 0), np.pi) * turn
     if kind == "by_id":
       rows = entry.get("correct_data", {}).get("data")
       if rows is None:

@@ -282,7 +282,8 @@ hold(False)
 # about the surface normal, the first. The thirteen .h5oina files at hand all state a zero
 # surface, so they add nothing. MTEX follows the second reading, since it fits both pairs:
 # the .ctf loader undoes the tilt of a stated surface and then applies the half turn about
-# z as before, so that the angles are back in CS1 with the map; a .cpr/.crc is left as it
+# y of every Oxford map (X1 west, Y1 south and Z1 out of the surface for a map drawn x east,
+# y south), so that the angles are back in CS1 with the map; a .cpr/.crc is left as it
 # stands; a rotation about the surface normal is never applied. A file with a tilted
 # surface says so in a warning, `eulerCorrection` overrides the rule, and the surface
 # stays in `ebsd.meta['header']`. An .h5oina refers its angles to CS0 as well; the loader

@@ -205,6 +205,7 @@ def _inspectCtf(path):
 
 def _inspectCpr(path):
   from .crc import _number, cprPhases, crcNames, readIni
+  from .ctf import oxfordCorrection
   base = os.path.splitext(path)[0]
   cprPath = base + ".cpr"
   if not os.path.isfile(cprPath):
@@ -216,7 +217,7 @@ def _inspectCpr(path):
   cols = [c for c in crcNames(ini, codes) if c not in ("x", "y", "phi1", "phi", "phi2")]
   job = ini.get("job", {})
   info = EBSDFileInfo(path, "cpr", "Oxford", 0, _headerDate(ini), phases, cols, header=ini,
-                      eulerCorrection=rotation.byEuler(np.pi, 0.0, 0.0, "Bunge"))
+                      eulerCorrection=oxfordCorrection(None))
   nx, ny = job.get("xcells"), job.get("ycells")
   if isinstance(nx, float) and isinstance(ny, float):
     info.grid, info.points = (int(nx), int(ny)), int(nx) * int(ny)

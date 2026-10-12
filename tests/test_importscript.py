@@ -39,7 +39,7 @@ def test_phases_differ():
 def test_script_carries_only_what_changed():
   path = os.path.join(FIXTURES, "Forsterite_cut.ctf")
   info = inspectEBSD(path)
-  text = buildImportWizardScript(path, phases=info.phases, headerPhases=info.phases, mapConvention="y↓→x", eulerConvention="x←↑y",
+  text = buildImportWizardScript(path, phases=info.phases, headerPhases=info.phases, mapConvention="y↓→x", eulerConvention="x←↓y",
                                  vendorCorrection=info.eulerCorrection)
   assert "csList" not in text and "eulerCorrection" not in text and "dataSet" not in text
   assert "ebsd = EBSD.load(fname)" in text and "plottingConvention.default('y↓→x')" in text

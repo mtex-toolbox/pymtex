@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import mtex
-from mtex import degree, loadEBSD, rotation
+from mtex import degree, loadEBSD, rotation, yvector
 from mtex.io.ctf import ctfHeader, _loadEBSD_ctf, oxfordCorrection
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -34,7 +34,7 @@ def test_forsterite_cut_reads_its_phases():
 
 def test_forsterite_first_orientation_is_mtex_s():
   e = loadEBSD(FORSTERITE, grid=False)
-  assert np.allclose(firstEuler(e), [264.675, 137.65, 113.67], atol=1e-3)
+  assert np.allclose(firstEuler(e), [275.325, 42.35, 293.67], atol=1e-3)
 
 
 def test_the_columns_are_named_by_the_file():
@@ -86,14 +86,14 @@ def test_a_tilted_surface_is_undone_with_a_warning(tmp_path):
   assert e.meta["surface"] == (0.0, 90.0, 0.0)
 
 
-def test_oxfordCorrection_isHalfATurnAboutZ_whateverTheFirstSurfaceAngle():
-  assert mtex.angle(oxfordCorrection(None), rotation.byEuler(np.pi, 0, 0)) < 1e-12
-  assert mtex.angle(oxfordCorrection((30.0, 0.0, 0.0)), rotation.byEuler(np.pi, 0, 0)) < 1e-12
+def test_oxfordCorrection_isHalfATurnAboutY_whateverTheFirstSurfaceAngle():
+  assert mtex.angle(oxfordCorrection(None), rotation.byAxisAngle(yvector, np.pi)) < 1e-12
+  assert mtex.angle(oxfordCorrection((30.0, 0.0, 0.0)), rotation.byAxisAngle(yvector, np.pi)) < 1e-12
 
 
 def test_oxfordCorrection_undoesTheSurfaceTilt():
   r = oxfordCorrection((0.0, 0.0, 45.0))
-  assert mtex.angle(r, rotation.byEuler(np.pi, 0, 0) * rotation.byEuler(0, 0, 45 * degree).inv()) < 1e-12
+  assert mtex.angle(r, rotation.byAxisAngle(yvector, np.pi) * rotation.byEuler(0, 0, 45 * degree).inv()) < 1e-12
 
 
 def test_ctfHeader_drops_the_note_of_an_odd_line():
@@ -129,7 +129,7 @@ def test_full_forsterite_matches_mtex():
   e = _loadEBSD_ctf(os.path.join(DATA, "Forsterite.ctf"))
   assert len(e) == 245952
   assert [int((e.phaseId == k).sum()) for k in range(5)] == [58485, 152345, 26058, 9064, 0]
-  assert np.allclose(firstEuler(e), [264.675, 137.65, 113.67], atol=1e-3)
+  assert np.allclose(firstEuler(e), [275.325, 42.35, 293.67], atol=1e-3)
   assert loadEBSD(os.path.join(DATA, "Forsterite.ctf")).shape == (336, 732)
 
 

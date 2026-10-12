@@ -4,7 +4,7 @@ import time
 import numpy as np
 import pytest
 
-from mtex import inspectEBSD, loadEBSD, rotation, zvector
+from mtex import inspectEBSD, loadEBSD, rotation, yvector
 from mtex.io.inspect import EBSDFileInfo, ebsdFiles, isEBSDFile
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -53,9 +53,9 @@ def test_ctf():
   assert rows["grid"] == "square grid 732 x 336, d = 50 µm"
   assert rows["extent"] == "36.55 mm x 16.75 mm"
   assert rows["phases"] == "Forsterite, Enstatite, Diopside, Silicon"
-  assert rows["Euler correction"] == "180° about z"
+  assert rows["Euler correction"] == "180° about y"
   assert info.eulerAxesNames == ("X1", "Y1", "Z1")
-  assert float(info.eulerCorrection.angle(rotation.byAxisAngle(zvector, np.pi))) < 1e-12
+  assert float(info.eulerCorrection.angle(rotation.byAxisAngle(yvector, np.pi))) < 1e-12
 
 
 def test_cpr_by_either_name():

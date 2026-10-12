@@ -144,7 +144,7 @@ configs copied into `mtex/io/hdf5_config/`, the resolver of the Julia port.
 `ebsd.export(fname)`, the format from the extension, `.ang`, `.ctf`, the HDF5 formats, and
 any other name a table `x y phi1 Phi phi2 phase` plus the properties under a line of names,
 which `loadEBSD` reads back. An exporter undoes what its loader applies, the setting's
-rotation for `.ang`, the half turn about z and the tilt of a stated surface for `.ctf`, and
+rotation for `.ang`, the half turn about y and the tilt of a stated surface for `.ctf`, and
 writes back the header the loader kept in `ebsd.meta`; only the phases present are
 declared, counted from one, since a declared and unused phase is what makes a file read
 zero based. The HDF5 write-back is the Julia design: the file the map came from, or

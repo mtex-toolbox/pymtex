@@ -1,6 +1,6 @@
 # the Oxford/Channel .ctf text format (MATLAB loadEBSD_ctf, Julia ctf.jl)
 #
-#   ebsd = loadEBSD('map.ctf')                      a half turn about z, the tilt of the surface undone
+#   ebsd = loadEBSD('map.ctf')                      a half turn about y, the tilt of the surface undone
 #   ebsd = loadEBSD('map.ctf', eulerCorrection=r)   the alignment stated outright
 #
 # A header of tab separated key and value lines, a "Phases n" line followed by one line per
@@ -15,6 +15,7 @@ import numpy as np
 from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
+from ..geometry.vector3d import vector3d
 from ..maps.phaselist import phaseList
 from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import headerDict, leadingLines, linesFrom, readFile, readTable, text
@@ -75,9 +76,10 @@ def ctfHeader(lines):
 
 def oxfordCorrection(acq):
   """a .ctf refers its angles to the sample primary frame CS0 and the map lies in the acquisition
-  surface CS1; the tilt of the surface, AcqE2 and AcqE3, is undone before the half turn
-  about z, and a rotation about the surface normal is not, as far as two exports can tell"""
-  half = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")
+  surface CS1, X1 west, Y1 south and Z1 out of the surface for the usual scan of a map drawn
+  x east, y south: a half turn about y. The tilt of the surface, AcqE2 and AcqE3, is undone
+  before it, and a rotation about the surface normal is not, as far as two exports can tell"""
+  half = rotation.byAxisAngle(vector3d(0, 1, 0), np.pi)
   tilt = _surfaceTilt(acq)
   return half if tilt is None else half * tilt
 
@@ -109,7 +111,7 @@ def _ctfHead(data, fname):
 
 # the Oxford/Channel map of a .ctf file
 #
-#   loadEBSD('map.ctf')                        the Euler angles half a turn about z from the map
+#   loadEBSD('map.ctf')                        the Euler angles half a turn about y from the map
 #   loadEBSD('map.ctf', eulerCorrection=rot)   the alignment stated outright
 #
 # A stated acquisition surface with a tilt is undone before the half turn, with a warning;
@@ -123,7 +125,7 @@ def _loadEBSD_ctf(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
     eulerCorrection = oxfordCorrection(acq)
     if _surfaceTilt(acq) is not None:
       warnings.warn(f"{fname} states an acquisition surface of {acq} degree; its tilt is undone before the half turn "
-                    "about z, since the file refers its angles to CS0 and the map lies in CS1. Pass eulerCorrection "
+                    "about y, since the file refers its angles to CS0 and the map lies in CS1. Pass eulerCorrection "
                     "to state the alignment yourself.", stacklevel=2)
   # the line after the phases names the columns; names pair with columns from the left
   (nameLine,), offset = linesFrom(data, offset, 1)
