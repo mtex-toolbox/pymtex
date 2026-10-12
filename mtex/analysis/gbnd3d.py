@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
-from ..geometry.kernels import qmul
+from ..geometry.kernels import bestDot, qconj, qmul
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 
@@ -86,18 +85,12 @@ def _gbcd(gB, grains, moriRef, hw, symmetry, total, **kwargs):
   G1 = cs1.sym.properGroup().rotations().data.reshape(-1, 4)
   G2 = cs2.sym.properGroup().rotations().data.reshape(-1, 4)
   r = moriRef.data.reshape(4)
-  mi = m[inc]
-  best = np.full(len(mi), -1.0)
-  s1 = np.zeros((len(mi), 4))
-  s2 = np.zeros((len(mi), 4))
-  for a in G1:
-    left = qmul(np.broadcast_to(qconj(a), mi.shape), mi)
-    for b in G2:
-      c = np.abs(qmul(left, np.broadcast_to(b, mi.shape)) @ r)
-      better = c > best
-      best[better] = c[better]
-      s1[better], s2[better] = a, b
-  N = _inverseRotate(qmul(o1[inc], s1), gB.N.data[inc])
+  # |<a^-1 m b, r>| = |<m, a r b^-1>|: the equivalent of the reference nearest each misorientation
+  eq = qmul(qmul(G1[:, None], r), qconj(G2)[None])
+  _, k = bestDot(m[inc], eq.reshape(-1, 4))
+  i1, i2 = np.unravel_index(k, eq.shape[:2])
+  s1, s2 = G1[i1], G2[i2]
+  N =_inverseRotate(qmul(o1[inc], s1), gB.N.data[inc])
   if moriRef.antipodal:
     N = np.concatenate([N, _inverseRotate(qmul(o2[inc], s2), gB.N.data[inc])])
     w = np.concatenate([w, w])
@@ -115,7 +108,7 @@ def _stabiliser(G1, G2, r):
   keep = []
   for a in G1:
     left = qmul(qconj(a), r)
-    if np.any(np.abs(qmul(np.broadcast_to(left, G2.shape), G2) @ r) > 1 - 1e-9):
+    if np.any(np.abs(qmul(left, G2) @ r) > 1 - 1e-9):
       keep.append(a)
   return np.array(keep)
 

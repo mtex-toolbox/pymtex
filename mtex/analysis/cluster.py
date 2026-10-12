@@ -29,6 +29,10 @@ from ..geometry.install import install
 
 # ------------------------------------------------------------------ CLASSIX
 
+# the entries of one block of distances when the small clusters are dissolved
+DISSOLVE_BLOCK = 1 << 22
+
+
 def classix(X, radius, minPts=1, mergeScale=1.5, mergeTiny=True):
   """one cluster label per row of X, counted from zero"""
   X = np.asarray(X, dtype=float)
@@ -110,11 +114,14 @@ def classix(X, radius, minPts=1, mergeScale=1.5, mergeTiny=True):
     fixed = gLabel.copy()
     large = counts[fixed] >= minPts
     if np.any(large):
-      for c in np.flatnonzero(counts < minPts):
-        for g in np.flatnonzero(fixed == c):
-          dist = gh - gx @ gx[g]
-          dist[~large] = np.inf
-          gLabel[g] = fixed[int(np.argmin(dist))]
+      # every group of a small cluster to the nearest group of a large one, in blocks of rows
+      small = np.flatnonzero(~large)
+      step = max(1, DISSOLVE_BLOCK // len(gh))
+      for a in range(0, len(small), step):
+        g = small[a:a + step]
+        dist = gh - gx[g] @ gx.T
+        dist[:, ~large] = np.inf
+        gLabel[g] = fixed[np.argmin(dist, axis=1)]
       gLabel, counts = _renumber(gLabel, sizes)
   out = np.empty(n, dtype=int)
   out[perm] = gLabel[label]
@@ -251,7 +258,8 @@ def _hierarchical(x, numCluster, maxAngle, weights, resolution):
   nTarget = 2 if numCluster is None else int(numCluster)
   cosMax = -np.inf if maxAngle is None else np.cos(maxAngle)
   members = [[i] for i in range(n)]
-  centers = [flat[i] for i in range(n)]
+  # the coordinates of the centres, one row each, the merged ones kept but never read again
+  C = np.array(flat.data.reshape(n, -1), dtype=float)
   d = _similarity(flat, flat)
   np.fill_diagonal(d, -np.inf)
   alive = np.ones(n, dtype=bool)
@@ -264,8 +272,9 @@ def _hierarchical(x, numCluster, maxAngle, weights, resolution):
     members[j] = []
     alive[j] = False
     sel = np.array(members[i])
-    centers[i] = flat[sel].mean(weights=w[sel])
-    dd = _similarity(centers[i], flat._new(np.stack([c.data.reshape(-1) for c in centers]))).ravel()
+    centre = flat[sel].mean(weights=w[sel])
+    C[i] = centre.data.reshape(-1)
+    dd = _similarity(centre, flat._new(C)).ravel()
     dd[~alive] = -np.inf
     dd[i] = -np.inf
     d[i, :] = dd
@@ -276,7 +285,7 @@ def _hierarchical(x, numCluster, maxAngle, weights, resolution):
   keep = np.flatnonzero(alive)
   for c, i in enumerate(keep):
     cId[members[i]] = c
-  center = flat._new(np.stack([centers[i].data.reshape(-1) for i in keep]))
+  center = flat._new(C[keep])
   return cId.reshape(x.shape), center
 
 

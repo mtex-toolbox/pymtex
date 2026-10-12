@@ -11,7 +11,7 @@ import functools
 
 import numpy as np
 
-from ..geometry.kernels import qconj
+from ..geometry.kernels import bestDot, qconj, qmul
 from ..functions.density import calcDensity
 from ..functions.kernelfunctions import (S2DeLaValleePoussinKernel, S2Kernel, S2KernelHandle, SO3DeLaValleePoussinKernel,
                                          SO3DirichletKernel)
@@ -19,9 +19,10 @@ from ..functions.s2fun import S2FunHarmonic
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, zvector
+from ..geometry.vector3d import vector3d
 from ..maps.boundary import grainBoundary
 from ..maps.ebsd import EBSD
+from ..maps.grains import grain2d
 from ..geometry.install import install
 
 # the bandwidth MATLAB expands the inclination kernel to
@@ -51,7 +52,7 @@ def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   c = (np.pi / 2) / quad(lambda t: float(Psi.eval(t)) * ellipe(1 - t * t), 0, 1, limit=200)[0]
   Psi = S2KernelHandle(lambda t, fun=Psi.fun: c * fun(t)) if isinstance(Psi, S2KernelHandle) else S2Kernel(c * Psi.A)
   def psi(v):
-    return Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(xvector, symmetry=False))
+    return Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(vector3d.X, symmetry=False))
   return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
 
 
@@ -123,7 +124,7 @@ def _sides(gB, source):
     def pix(col):
       return order[np.searchsorted(ids[order], gB.ebsdId[:, col])]
     q1, q2 = q[pix(0)], q[pix(1)]
-  elif hasattr(source, "meanRotation"):
+  elif isinstance(source, grain2d):
     q = source.meanRotation.data.reshape(-1, 4)
     q1, q2 = q[source.id2ind(gB.grainId[:, 0])], q[source.id2ind(gB.grainId[:, 1])]
   else:
@@ -135,17 +136,6 @@ def _sides(gB, source):
 def _proper(fr):
   d = fr.properGroup().rot.data
   return d.reshape(-1, d.shape[-1])[:, :4]
-
-
-def _qmul(a, b):
-  a0, a1, a2, a3 = np.moveaxis(a, -1, 0)
-  b0, b1, b2, b3 = np.moveaxis(b, -1, 0)
-  return np.stack([a0 * b0 - a1 * b1 - a2 * b2 - a3 * b3, a0 * b1 + a1 * b0 + a2 * b3 - a3 * b2,
-                   a0 * b2 - a1 * b3 + a2 * b0 + a3 * b1, a0 * b3 + a1 * b2 - a2 * b1 + a3 * b0], axis=-1)
-
-
-def _qinv(a):
-  return qconj(a)
 
 
 # the angle between rotations given as quaternions, without symmetry
@@ -183,28 +173,24 @@ def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump
   if moriRef is not None:
     ref = moriRef.data.reshape(-1)[:4]
     s1, s2 = _proper(moriRef.CS), _proper(moriRef.SS)
-    mori = _qmul(_qinv(q1), q2)
-    # the equivalents s1 moriRef s2^-1 of the reference, and the one nearest each misorientation
-    eq = _qmul(_qmul(s1[:, None], ref), _qinv(s2)[None])
-    d = np.abs(mori @ eq.reshape(-1, 4).T)
     if both:
-      keep = 2 * np.arccos(np.clip(d.max(axis=1), 0, 1)) < 2 * halfwidth
-      i1, i2 = np.unravel_index(np.argmax(d[keep], axis=1), eq.shape[:2])
-      q = np.concatenate([_qmul(q1[keep], s1[i1]), _qmul(q2[keep], s2[i2])])
+      # the equivalents s1 moriRef s2^-1 of the reference, and the one nearest each misorientation
+      eq = qmul(qmul(s1[:, None], ref), qconj(s2)[None])
+      best, k = bestDot(qmul(qconj(q1), q2), eq.reshape(-1, 4))
+      keep = 2 * np.arccos(np.clip(best, 0, 1)) < 2 * halfwidth
+      i1, i2 = np.unravel_index(k[keep], eq.shape[:2])
+      q = np.concatenate([qmul(q1[keep], s1[i1]), qmul(q2[keep], s2[i2])])
       l = np.concatenate([l[keep], l[keep]])
       weights = np.concatenate([weights[keep], weights[keep]])
       # the elements that fix the reference, which the result keeps: MATLAB's minimum over
       # the first side of the angles of s1 moriRef s2 to moriRef, taken as elements of s1
-      fix = _qangle(_qmul(_qmul(s1[:, None], ref), s2[None]), ref)
+      fix = _qangle(qmul(qmul(s1[:, None], ref), s2[None]), ref)
       dSym = s1[np.min(fix, axis=0) < 1e-5]
     else:
       # the reference with the crystal side turned, its first side put onto ori1 alone
-      e1 = _qmul(ref[None], s1)
-      dd = np.abs(_qmul(_qinv(q2), q1) @ e1.T)
-      idCS = np.argmax(dd, axis=1)
-      best = dd[np.arange(len(dd)), idCS]
+      best, idCS = bestDot(qmul(qconj(q2), q1), qmul(ref[None], s1))
       keep = best > np.cos(2 * halfwidth)
-      q = _qmul(q1[keep], _qinv(s1[idCS[keep]]))
+      q = qmul(q1[keep], qconj(s1[idCS[keep]]))
       psi = SO3DeLaValleePoussinKernel(halfwidth=halfwidth)
       weights = weights[keep] * psi.eval(best[keep])
       l = l[keep]
@@ -213,8 +199,8 @@ def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump
     l = np.concatenate([l, l])
     weights = np.concatenate([weights, weights])
   # the rotation taking the section normal to x and the trace to z, composed with the orientation
-  rot = rotation.map(vector3d(np.broadcast_to(N, l.shape).copy()), xvector, vector3d(l), zvector)
-  g = _qmul(rot.data.reshape(-1, 4), q)
+  rot = rotation.map(vector3d(np.broadcast_to(N, l.shape).copy()), vector3d.X, vector3d(l), vector3d.Z)
+  g = qmul(rot.data.reshape(-1, 4), q)
   _, psiS2 = calcGBNDKernel(halfwidth, nonneg=nonneg, bump=bump)
   ori = orientation._fromRotation(g, (cs.stripSym(), _specimen()))
   f = calcDensity(ori, weights=weights, kernel=SO3DirichletKernel(psiS2.bandwidth), harmonic=True)

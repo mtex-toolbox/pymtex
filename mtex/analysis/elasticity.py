@@ -23,8 +23,10 @@ import numpy as np
 from ..geometry._array import MtexArray
 from ..geometry.arguments import refuseFlags
 from ..geometry.frames import referenceFrame
-from ..geometry.vector3d import vector3d, asVector3d
-from ..tensors.tensor import ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor
+from ..geometry.vector3d import vector3d
+from ..functions.s2funclass import S2Fun
+from ..tensors.tensor import (ChristoffelTensor, EinsteinSum, Kelvin, Voigt, complianceTensor, stiffnessTensor, _axesIn,
+                              _inFrameOf)
 from ..tensors.kernels import eigh3
 from ..geometry.install import install
 
@@ -52,15 +54,7 @@ def _stiffness(T):
 
 # a direction in the frame of the tensor, as a unit vector; a bare vector is taken as is
 def _unit(T, v):
-  return _inFrame(T, v).normalize()
-
-
-# the direction as a vector, refused when it is written in another frame than the tensor
-def _inFrame(T, v):
-  v = asVector3d(v)
-  if v.frame is not None and v.frame is not T.frame and not (type(v.frame) is type(T.frame) and v.frame.isAligned(T.frame)):
-    raise ValueError("the direction is written in another frame than the tensor")
-  return v
+  return _inFrameOf(T, v).normalize()
 
 
 def _pick(bounds, which):
@@ -73,13 +67,6 @@ def _pick(bounds, which):
   if which == "all":
     return bounds
   raise ValueError("the bound is 'Voigt', 'Reuss', 'Hill' or 'all'")
-
-
-# polarisation axes in the frame of the tensor, shown by their coordinates
-def _axes(data, frame):
-  v = vector3d(data, antipodal=True, frame=frame)
-  v.dispStyle = "xyz"
-  return v
 
 
 # a function on the sphere of a loading direction, in the frame the tensor is written in;
@@ -125,9 +112,12 @@ def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
     n, args = None, (n,) + args
   refuseFlags(args, "velocity")
   numbers = [a for a in args if not isinstance(a, str)]
-  rho = numbers[0] if numbers and density is None else C.density if density is None else density
-  if rho is None:
-    rho = 1.0
+  if density is not None:
+    rho = density
+  elif numbers:
+    rho = numbers[0]
+  else:
+    rho = 1.0 if C.density is None else C.density
   if not np.isfinite(rho) or rho <= 0:
     raise ValueError("the density has to be finite and positive")
   if n is None:
@@ -136,7 +126,7 @@ def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
   lam, vecs = eigh3(E)
   v = np.sqrt(np.maximum(lam, 0) / rho)
   def axes(k):
-    return _axes(np.moveaxis(vecs, -1, -2)[..., k, :], C.frame)
+    return _axesIn(np.moveaxis(vecs, -1, -2)[..., k, :], C.frame)
   return Velocities(v[..., 2], v[..., 1], v[..., 0], axes(2), axes(1), axes(0))
 
 
@@ -172,11 +162,12 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
   rho = C.density if density is None else density
   if rho is None or not np.isfinite(rho) or rho <= 0:
     raise ValueError("the density has to be finite and positive")
-  if n is None or (hasattr(speed, "eval") and not isinstance(speed, (int, float, np.ndarray))):
+  if n is None or isinstance(speed, S2Fun):
     from ..functions.s2vectorfield import S2VectorFieldHandle
-    f, p = speed, polarization
-    return S2VectorFieldHandle(lambda v: energyVector(C, vector3d(v.data), np.real(f(vector3d(v.data, frame=C.frame))),
-                                                     p(vector3d(v.data, frame=C.frame)), density=rho).data, C.frame, bandwidth=32)
+    def field(v):
+      x = vector3d(v.data, frame=C.frame)
+      return energyVector(C, vector3d(v.data), np.real(speed(x)), polarization(x), density=rho).data
+    return S2VectorFieldHandle(field, C.frame, bandwidth=32)
   u = _unit(C, n)
   a = _unit(C, polarization)
   out = EinsteinSum(C, [1, -2, -3, -4], a, [-2], u, [-3], a, [-4])
@@ -195,7 +186,7 @@ def YoungsModulus(T, v=None):
   if v is None:
     return _sphericalFunction(lambda x: YoungsModulus(S, x), S)
   # the magnitude takes the direction of any length
-  return 1 / S.directionalMagnitude(_inFrame(S, v))
+  return 1 / S.directionalMagnitude(_inFrameOf(S, v))
 
 
 def linearCompressibility(T, v=None):
@@ -246,7 +237,7 @@ def bulkModulus(T, which=None):
   """the bulk modulus of a polycrystal: the Voigt bound, or 'Reuss', 'Hill' or 'all' three"""
   S = _compliance(T)
   KV = EinsteinSum(S.inv(), [-1, -1, -2, -2]) / 9
-  KR = 1 / EinsteinSum(S, [-1, -1, -2, -2])
+  KR = 1 / volumeCompressibility(S)
   return _pick(Bounds(KV, KR, (KV + KR) / 2), which)
 
 
@@ -270,19 +261,21 @@ KELVIN_HYDROSTATIC = np.outer(_e, _e) / 3
 KELVIN_DEVIATORIC = np.eye(6) - KELVIN_HYDROSTATIC
 
 
+# the symmetric residual C - C0 of every reference K0, G0, a 6 x 6 matrix over their shape
 def _residual(Ck, K0, G0):
-  R = Ck - 3 * K0 * KELVIN_HYDROSTATIC - 2 * G0 * KELVIN_DEVIATORIC
-  return (R + R.T) / 2
+  R = Ck - 3 * np.asarray(K0)[..., None, None] * KELVIN_HYDROSTATIC - 2 * np.asarray(G0)[..., None, None] * KELVIN_DEVIATORIC
+  return (R + np.swapaxes(R, -1, -2)) / 2
 
 
+# the estimate of the residuals R of the references K0, G0, over their shape
 def _estimate(R, K0, G0):
   alpha = -3 / (3 * K0 + 4 * G0)
   beta = -3 * (K0 + 2 * G0) / (5 * G0 * (3 * K0 + 4 * G0))
   gamma = (alpha - 3 * beta) / 9
-  S0 = beta * np.eye(6) + 3 * gamma * KELVIN_HYDROSTATIC
+  S0 = np.asarray(beta)[..., None, None] * np.eye(6) + 3 * np.asarray(gamma)[..., None, None] * KELVIN_HYDROSTATIC
   B = np.linalg.solve(np.eye(6) - R @ S0, R)
-  sB1 = np.sum(B[:3, :3])
-  sB2 = np.trace(B)
+  sB1 = np.sum(B[..., :3, :3], axis=(-2, -1))
+  sB2 = np.trace(B, axis1=-2, axis2=-1)
   B1 = (2 * sB1 - sB2) / 15
   B2 = (3 * sB2 - sB1) / 30
   return Moduli(K0 + (3 * B1 + 2 * B2) / (3 + alpha * (3 * B1 + 2 * B2)), G0 + B2 / (1 + 2 * beta * B2))
@@ -295,17 +288,13 @@ def HashinShtrikmanModulus(C, K0, G0):
   and the moduli are NaN)"""
   Ck = Kelvin(_stiffness(C))
   K0, G0 = np.broadcast_arrays(np.asarray(K0, dtype=float), np.asarray(G0, dtype=float))
-  khs, ghs, definite = np.full(K0.shape, np.nan), np.full(K0.shape, np.nan), np.zeros(K0.shape, dtype=int)
-  for idx in np.ndindex(K0.shape):
-    R = _residual(Ck, K0[idx], G0[idx])
-    lam = np.linalg.eigvalsh(R)
-    if np.all(lam > 0):
-      definite[idx] = 1
-    elif np.all(lam < 0):
-      definite[idx] = -1
-    else:
-      continue
-    khs[idx], ghs[idx] = _estimate(R, K0[idx], G0[idx])
+  khs, ghs = np.full(K0.shape, np.nan), np.full(K0.shape, np.nan)
+  R = _residual(Ck, K0, G0)
+  lam = np.linalg.eigvalsh(R)
+  definite = np.where(np.all(lam > 0, axis=-1), 1, np.where(np.all(lam < 0, axis=-1), -1, 0))
+  # the estimate only where the residual is definite, where it is a bound
+  ok = definite != 0
+  khs[ok], ghs[ok] = _estimate(R[ok], K0[ok], G0[ok])
   if K0.ndim == 0:
     return float(khs), float(ghs), int(definite)
   return khs, ghs, definite

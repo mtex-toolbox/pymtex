@@ -67,6 +67,15 @@ def test_classix_labelsFromZeroAndDissolvesSmallClusters():
   assert knnRadius(X) > 0 and knnRadius(X[:5]) == 1.0
 
 
+def test_classix_dissolvesInBlocksAsAtOnce(monkeypatch):
+  # the small clusters dissolved a few groups at a time give the labels of one block
+  import mtex.analysis.cluster as cluster
+  X = np.concatenate([rng.standard_normal((300, 2)), rng.standard_normal((300, 2)) + 6, rng.random((60, 2)) * 30])
+  whole = classix(X, 0.5, minPts=20)
+  monkeypatch.setattr(cluster, "DISSOLVE_BLOCK", 7)
+  assert np.array_equal(classix(X, 0.5, minPts=20), whole)
+
+
 def test_calcCluster_classixFindsTheCloudsOfOrientations(fourClouds):
   cs, oc, _, ori = fourClouds
   # CLASSIX on the embedding

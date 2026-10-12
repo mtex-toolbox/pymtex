@@ -225,6 +225,14 @@ def test_interp_isExactOnALinearField():
   assert close(angles(interp(e, [2.1, 0.0], [3.0, 0.0])), [1.05, 0.0], 1e-9)
 
 
+def test_interp_takesThePositionsAsVectors():
+  # positions given as vectors in the plane of the map are read as the coordinates they hold
+  from mtex import vector3d
+  e = angleMapD(lambda i, j: 0.5 * i, 9)
+  p = e.interp(vector3d(np.array([[2.1, 3.0, 0.0], [0.0, 0.0, 0.0], [2.5, 1.5, 0.0], [4.0, 1.0, 0.0], [6.5, 7.5, 0.0]])))
+  assert close(angles(p), [1.05, 0.0, 1.25, 2.0, 3.25], 1e-9)
+
+
 def test_interp_doesNotAverageAcrossAGrainBoundary():
   # and it does not average across a grain boundary
   two = angleMapD(lambda i, j: np.where(i < 4, 0.0, 20.0), 9)

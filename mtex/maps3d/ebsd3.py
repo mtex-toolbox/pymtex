@@ -223,11 +223,12 @@ class EBSD3(EBSD):
     if self.size == 0:
       return aligned(lines[0] + "\n  the volume is empty")
     lines.append(f"  size: {sizeString(self.shape)}" + (" grid" if self.isGridded else ""))
-    # a count per phase in one pass; np.unique would sort every voxel
+    # a count per phase in one pass, np.unique would sort every voxel; the shares are of the
+    # measured voxels, the padding left out, as a map's
     perPhase = np.bincount(self.phaseId[~self.isPadding].astype(np.intp), minlength=1)
     ids = np.flatnonzero(perPhase)
     counts = perPhase[ids]
-    share = [f"{c} ({float(f'{100 * c / self.size:.2g}'):g}%)" for c in counts]
+    share = [f"{c} ({float(f'{100 * c / (counts.sum() or 1):.2g}'):g}%)" for c in counts]
     lines.append(phaseTable(self.CSList.frames, ids, share))
     if self.prop:
       lines.append("  properties: " + ", ".join(sorted(self.prop)))

@@ -72,3 +72,7 @@ include = ["mtex", "tests", "tools/staticapi.py", "docs/pages/*/*.py", "hatch_bu
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# a test running longer than this is taken for hung: the stacks of every thread are written to
+# the terminal and the run ends with a failure, instead of waiting on a thread blocked in C
+faulthandler_timeout = 300
+faulthandler_exit_on_timeout = true

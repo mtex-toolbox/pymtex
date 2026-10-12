@@ -29,6 +29,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.vector3d import vector3d
 from ..tensors.kernels import turnBlocks
+from ..tensors.tensor import _vecPower
 from ..geometry.display import aligned
 
 _SPECS = {}
@@ -43,7 +44,8 @@ def _terms(CS):
   axes = axes.data.reshape(-1, 3) if axes.size else np.zeros((0, 3))
   mult = np.asarray(mult)
   def z(m):
-    return axes[np.flatnonzero(mult == m)[0]] / np.linalg.norm(axes[np.flatnonzero(mult == m)[0]])
+    v = axes[np.flatnonzero(mult == m)[0]]
+    return v / np.linalg.norm(v)
   if pg.lattice == latticeType.cubic:
     return ([z(4)], [4], [3 / (2 * math.sqrt(2))]) if 4 in mult else ([z(3)], [3], [3 / (2 * math.sqrt(2))])
   n = int(np.max(mult)) if mult.size else 1
@@ -59,7 +61,7 @@ def _terms(CS):
     return [a, b, np.cross(a, b)], [1, 2, 2], [1 / math.sqrt(2), 0.5, 0.5]
   # a principal axis of order 3, 4 or 6, with a two fold axis across it when the group has one
   c = z(n)
-  perp = [k for k in range(len(mult)) if mult[k] == 2 and abs(axes[k] @ c) < 1e-6 * np.linalg.norm(axes[k])]
+  perp = np.flatnonzero((mult == 2) & (np.abs(axes @ c) < 1e-6 * np.linalg.norm(axes, axis=1)))
   dihedral = len(perp) > 0
   if dihedral:
     l1 = axes[perp[0]] / np.linalg.norm(axes[perp[0]])
@@ -90,23 +92,16 @@ def _weights(n, dihedral):
   raise ValueError(f"no embedding is tabulated for a {n} fold principal axis")
 
 
-# v^(x alpha), flattened
-def _powerTensor(v, alpha):
-  A = np.array(1.0)
-  for _ in range(alpha):
-    A = np.multiply.outer(A, v)
-  return A.ravel()
-
-
-# the symmetric tensor delta^(x alpha/2), the only tensor of even rank every rotation fixes
+# the symmetric tensor delta^(x alpha/2), the only tensor of even rank every rotation fixes: the
+# mean of delta x ... x delta over the permutations of its indices
 def _isotropicTensor(alpha):
   if alpha % 2:
     return None
-  A = np.zeros((3,) * alpha)
+  D = np.array(1.0)
+  for _ in range(alpha // 2):
+    D = np.multiply.outer(D, np.eye(3))
   perms = list(itertools.permutations(range(alpha)))
-  for idx in np.ndindex(*A.shape):
-    A[idx] = sum(all(idx[p[2 * k]] == idx[p[2 * k + 1]] for k in range(alpha // 2)) for p in perms) / len(perms)
-  return A.ravel()
+  return (sum(np.transpose(D, p) for p in perms) / len(perms)).ravel()
 
 
 # Q on every index of the flattened rank alpha tensors, the rows of X: Q on the first index
@@ -191,7 +186,7 @@ class embeddingSpec:
     rots = rotation(CS.Laue().properGroup().rotations().data.reshape(-1, 4)).matrix()
     terms = []
     for l, a, w in zip(ls, alpha, weights):
-      u = sum(_powerTensor(Q @ l, a) for Q in rots) / len(rots)
+      u = _vecPower(rots @ l, a).sum(axis=0) / len(rots)
       z = _isotropicTensor(a)
       if z is not None:
         u = u - (z @ u) / (z @ z) * z                      # the mean over SO(3)
@@ -242,7 +237,12 @@ class embedding:
   def __init__(self, o=None, *, spec=None, u=None):
     if spec is not None:
       self.spec, self.u = spec, np.asarray(u, dtype=float).reshape(spec.u0.size, -1)
-      self.shape = () if self.u.shape[1] == 1 and not isinstance(o, tuple) else (self.u.shape[1],) if o is None else o
+      if isinstance(o, tuple):
+        self.shape = o
+      elif self.u.shape[1] == 1:
+        self.shape = ()
+      else:
+        self.shape = (self.u.shape[1],) if o is None else o
       return
     if isinstance(o, crystalFrame):
       self.spec = _spec(o)
@@ -258,7 +258,9 @@ class embedding:
   def _new(self, u, shape=None):
     e = object.__new__(embedding)
     e.spec, e.u = self.spec, np.asarray(u, dtype=float).reshape(self.spec.u0.size, -1)
-    e.shape = (() if e.u.shape[1] == 1 else (e.u.shape[1],)) if shape is None else shape
+    if shape is None:
+      shape = () if e.u.shape[1] == 1 else (e.u.shape[1],)
+    e.shape = shape
     return e
 
   @property
@@ -335,11 +337,6 @@ class embedding:
     Q = rotation(r.data).matrix()
     return self._new(_turnRows(self.u.T, self.spec.alpha, self.spec.offsets, Q).T, self.shape)
 
-  # the images of the seeds of a projection, the batch route
-  @staticmethod
-  def _images(spec, Q):
-    return _rotateBatch(spec.u0, spec.alpha, spec.offsets, Q)
-
   def __rmul__(self, r):
     if isinstance(r, quaternion):
       return self.rotate(r)
@@ -371,8 +368,10 @@ class embedding:
     n = np.linalg.norm(U, axis=1)
     out = np.empty((len(U), 4))
     for i in range(0, len(U), chunk):
+      # the targets scaled to the norm of an image, a zero one replaced by the identity image
       Ui, ni = U[i:i + chunk], n[i:i + chunk]
-      T = np.where(ni[:, None] > 0, (np.linalg.norm(sp.u0) / np.where(ni > 0, ni, 1))[:, None] * Ui, sp.u0)
+      scale = np.linalg.norm(sp.u0) / np.where(ni > 0, ni, 1)
+      T = np.where(ni[:, None] > 0, scale[:, None] * Ui, sp.u0)
       H = np.stack([_blocks(_derive, T, sp.alpha, sp.offsets, S) for S in _GENERATORS], axis=1)
       q = qs.data.reshape(-1, 4)[np.argmax(seedImages @ T.T, axis=0)]
       active = np.arange(len(T))

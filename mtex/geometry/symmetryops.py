@@ -132,9 +132,11 @@ def symUnique(v, tol=1e-6, return_index=False, return_inverse=False):
   same = d > 1 - tol
   keep = np.ones(len(rep), dtype=bool)
   first = np.arange(len(rep))
+  # every direction not yet taken absorbs the later ones within the tolerance
   for k in range(len(rep)):
     if keep[k]:
       later = np.flatnonzero(same[k, k + 1:]) + k + 1
+      later = later[keep[later]]
       keep[later] = False
       first[later] = k
   iv, iu = _keptAndInverse(keep, first)

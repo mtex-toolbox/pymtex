@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import qconj
-from ..geometry.kernels import backend, closestImage, qmul
+from ..geometry.kernels import backend, closestImage, qconj, qmul
 from ..geometry.quaternion import rotation
 from ..geometry.tangent import rotationOf, rotationVector
 from ..geometry.vector3d import vector3d
 from ..maps.ebsd import EBSD
+from ..maps.grains import grain2d
 from ..maps.intragranular import IDENTITY, latticeLookup, mapLattice, mapPairs, neighbourAt, neighbourBall
 from ..maps.lattice import lattice
 from .variational import EBSDFilter, l1TVFilter, solveField, variationalFilter
@@ -79,15 +79,14 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   comp = (m.phase.astype(np.int64) if m.grain is None else m.grain.astype(np.int64)).copy()
   comp[~isData | (comp < 0)] = 0
   source = np.where(comp > 0, np.arange(n), -1)
-  offs = np.array([tuple(int(x) for x in o) for o in l.stencil], dtype=np.int64)
+  offs = l.stencil.astype(np.int64)
   # fill=grains: an empty pixel is filled only inside the grain whose polygon holds it, a
   # cell of padding too, which a grain's polygon puts inside the scan
   host = None
-  if fill is not False and fill is not None and hasattr(fill, "checkInside"):
+  if isinstance(fill, grain2d):
     empty = np.flatnonzero(~isData)
     host = np.zeros(n, dtype=np.int64)
     if len(empty):
-      from ..geometry.vector3d import vector3d
       hit = fill.checkInside(vector3d(ebsd.pos.data.reshape(-1, 3)[empty], frame=ebsd.frame))
       has = hit.any(axis=1)
       host[empty[has]] = fill.id[np.argmax(hit[has], axis=1)]
@@ -136,7 +135,7 @@ def outsideMask(l, lk, isData):
   ij = l.ij
   border = (ij[:, 0] == 0) | (ij[:, 1] == 0) | (ij[:, 0] == lk.shape[0] - 1) | (ij[:, 1] == lk.shape[1] - 1)
   out = ~isData & border
-  offs = np.array([tuple(int(x) for x in o) for o in l.stencil], dtype=np.int64)
+  offs = l.stencil.astype(np.int64)
   front = np.flatnonzero(out)
   while len(front):
     nxt = []
@@ -292,7 +291,7 @@ def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
   along with the orientations, none by default"""
   F = l1TVFilter() if F is None else F
   window = isinstance(F, windowFilter)
-  out = ebsd.fill(grains=fill if hasattr(fill, "checkInside") else None, extrapolate=extrapolate) if fill and window else ebsd.copy()
+  out = ebsd.fill(grains=fill if isinstance(fill, grain2d) else None, extrapolate=extrapolate) if fill and window else ebsd.copy()
   comp, edges, isData, source = smoothingGraph(out, fill=False if window else fill, extrapolate=extrapolate)
   u, ref = tangentField(out, comp, isData)
   v = _applyFilter(F, out, comp, edges, isData, u, False)
@@ -310,7 +309,7 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
   the nearest measured pixel. fill(ebsd, grains), MATLAB's form, fills a pixel only from the
   grain whose polygon holds it: one inside no grain becomes notIndexed, one its grain's
   measurements do not reach over the lattice takes the grain's mean orientation"""
-  if F is not None and hasattr(F, "checkInside"):
+  if isinstance(F, grain2d):
     F, grains = None, F
   F = l1TVFilter() if F is None else F
   if isinstance(F, windowFilter):
@@ -342,7 +341,6 @@ def _fillFromGrains(ebsd, grains, unreached):
   empty = np.flatnonzero(unreached & ~ebsd.isPadding.reshape(-1))
   if not len(empty):
     return
-  from ..geometry.vector3d import vector3d
   hit = grains.checkInside(vector3d(ebsd.pos.data.reshape(-1, 3)[empty], frame=ebsd.frame))
   has = hit.any(axis=1)
   k = np.argmax(hit[has], axis=1)
@@ -452,7 +450,11 @@ def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):
   comp, _, isData, _ = smoothingGraph(src)
   u, ref = tangentField(src, comp, isData)
   P = l.plane.to2d(src.pos.data.reshape(-1, 3))
-  Q = np.asarray(pos.data if isinstance(pos, vector3d) else pos, dtype=float).reshape(-1, pos.shape[-1] if hasattr(pos, "shape") else 2)
+  # the positions as rows of their two or three coordinates
+  if isinstance(pos, vector3d):
+    Q = np.asarray(pos.data, dtype=float).reshape(-1, 3)
+  else:
+    Q = np.asarray(pos, dtype=float).reshape(-1, np.shape(pos)[-1])
   Q3 = Q if Q.shape[1] == 3 else l.plane.from2d(Q)
   Q = l.plane.to2d(Q3) if Q.shape[1] == 3 else Q
   n = len(Q)

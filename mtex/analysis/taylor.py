@@ -28,6 +28,7 @@ from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
 from ..tensors.tensor import spinTensor, strainTensor
 from .kernels import taylorKernel
+from .mechanics import _axial
 from ..geometry.install import install
 from ..geometry.display import aligned, frameLabel
 
@@ -231,13 +232,15 @@ def _minimumNormShears(A, c, y, x, tol=1e-9):
     z = np.zeros(len(x))
     z[free] = F.T @ lam
     if np.min(z, initial=0.0) < -tol:
+      # the step until the first free shear reaches zero, which leaves the free set
       d = z - x
-      alpha, j = 1.0, -1
-      for k in range(len(x)):
-        if free[k] and d[k] < -tol and -x[k] / d[k] < alpha:
-          alpha, j = max(0.0, -x[k] / d[k]), k
-      if j < 0:
+      falling = free & (d < -tol)
+      ratio = np.full(len(x), np.inf)
+      ratio[falling] = -x[falling] / d[falling]
+      j = int(np.argmin(ratio))
+      if not ratio[j] < 1.0:
         raise RuntimeError("the minimum norm selection of the Taylor shears failed")
+      alpha = max(0.0, ratio[j])
       x = np.maximum(x + alpha * d, 0)
       free[j] = False
     else:
@@ -328,16 +331,17 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
   model = sS if isinstance(sS, TaylorModel) else TaylorModel(sS)
   if not isinstance(eps, strainTensor):
     raise TypeError("calcTaylor needs a strainTensor")
+  selection = model.spinSelection if spinSelection is None else spinSelection
   fr = eps.frame
   if isinstance(fr, crystalFrame):
     # the frame of the systems, or the sibling without its group that inv(ori) * eps writes in
     if not (fr is model.frame or fr._basis is model.frame._basis):
       raise ValueError("the strain and the slip systems are of different crystals")
-    M, b, W = _taylorMany(eps.M, model, plasticWork, model.spinSelection if spinSelection is None else spinSelection)
+    M, b, W = _taylorMany(eps.M, model, plasticWork, selection)
     if eps.ndim == 0:
       return TaylorResult(float(M[0]), b[0], spinTensor(W[0], fr))
     return TaylorResult(M.reshape(eps.shape), b.reshape(eps.shape + (len(model),)), spinTensor(W.reshape(eps.shape + (3, 3)), fr))
-  return _taylorField(eps, model, plasticWork, model.spinSelection if spinSelection is None else spinSelection, bandwidth, smoothing)
+  return _taylorField(eps, model, plasticWork, selection, bandwidth, smoothing)
 
 
 # the factor and the spin over all orientations, as harmonic functions fitted on a
@@ -357,7 +361,7 @@ def _taylorField(eps, model, plasticWork, spinSelection, bandwidth, smoothing):
   nodes = grid.nodes()
   Q = rotation(nodes.data).matrix().reshape(-1, 3, 3)
   M, _, W = _taylorMany(np.einsum("nji,jk,nkl->nil", Q, eps.M, Q), model, plasticWork, spinSelection)
-  values = np.column_stack([M, np.einsum("nij,nj->ni", Q, np.stack([W[:, 2, 1], W[:, 0, 2], W[:, 1, 0]], axis=-1))])
+  values = np.column_stack([M, np.einsum("nij,nj->ni", Q, _axial(W))])
   # the projections onto the invariant and the equivariant functions remove what the
   # folded rule aliases, so they come before the truncation
   coeff = _adjointColumns(grid, values, L, grid.weights)
@@ -365,8 +369,8 @@ def _taylorField(eps, model, plasticWork, spinSelection, bandwidth, smoothing):
   spin = SO3VectorFieldHarmonic(coeff[:, 1:4], cs, ss, "left").truncate(bandwidth)
   if smoothing > 0:
     A = SO3DeLaValleePoussinKernel(halfwidth=smoothing).calcFourier(bandwidth)
-    for l in range(bandwidth + 1):
-      spin._fhat[deg2dim(l):deg2dim(l + 1), :] *= A[l] / (2 * l + 1)
+    l = np.arange(bandwidth + 1)
+    spin._fhat[:deg2dim(bandwidth + 1)] *= np.repeat(A[:bandwidth + 1] / (2 * l + 1), (2 * l + 1) ** 2)[:, None]
   return TaylorResult(factor, None, spin)
 
 
@@ -380,8 +384,7 @@ def _spinExp(W, ref=None, side=None):
   """the rotation of a spin tensor, or the orientation a spin at a reference points to; a spin
   in the crystal frame acts on the right of the orientation"""
   from ..geometry.tangent import SO3TangentVector, expVector
-  M = W.M
-  v = vector3d(np.stack([M[..., 2, 1], M[..., 0, 2], M[..., 1, 0]], axis=-1))
+  v = vector3d(_axial(W.M))
   if ref is None:
     return expVector(v)
   if side is None:

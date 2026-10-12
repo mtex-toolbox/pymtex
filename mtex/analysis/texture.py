@@ -23,6 +23,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.slipsystem import slipSystem
 from ..geometry.vector3d import vector3d
+from ..maps.ebsd import EBSD
 from .taylor import _taylorMany, TaylorModel, calcTaylor
 from ..tensors.tensor import strainTensor, tensor
 from ..geometry.install import install
@@ -53,10 +54,6 @@ def _weights(w, n):
   return w / np.sum(w)
 
 
-def _isMap(x):
-  return hasattr(x, "phaseId") and hasattr(x, "CSList") and hasattr(x, "rotations")
-
-
 # ------------------------------------------------------------------ the average of a tensor
 
 def calcTensor(x, *args, average="Voigt", weights=None):
@@ -69,7 +66,7 @@ def calcTensor(x, *args, average="Voigt", weights=None):
   """
   which = _average(args, average)
   tensors = [a for a in args if isinstance(a, tensor)]
-  if _isMap(x):
+  if isinstance(x, EBSD):
     return _calcTensorMap(x, tensors, which, weights)
   if not tensors:
     raise TypeError("calcTensor needs a tensor")
@@ -84,7 +81,7 @@ def calcTensor(x, *args, average="Voigt", weights=None):
     return (calcTensor(x, T, "Voigt", weights=weights) + calcTensor(x, T, "Reuss", weights=weights)) / 2
   if isinstance(x, orientation):
     w = _weights(weights, x.size)
-    fast = T._turnedMean(x.flatten(), np.asarray(w, dtype=float).ravel())
+    fast = T._turnedMean(x.flatten(), w)
     return fast if fast is not None else (x.flatten() * T).mean(weights=w)
   if isinstance(x, SO3Fun):
     return _calcTensorODF(x, T)
@@ -110,7 +107,7 @@ def _calcTensorODF(f, T):
 def _calcTensorMap(ebsd, tensors, which, weights):
   phaseId = np.asarray(ebsd.phaseId)
   rots = ebsd.rotations
-  indexed = np.asarray(ebsd.isIndexed) if hasattr(ebsd, "isIndexed") else phaseId > 0
+  indexed = np.asarray(ebsd.isIndexed)
   ss = getattr(rots, "frame", None)
   ss = specimenFrame.default if not isinstance(ss, referenceFrame) else ss
   w = None if weights is None else np.asarray(weights, dtype=float).ravel()
@@ -133,7 +130,7 @@ def _calcTensorMap(ebsd, tensors, which, weights):
     for T, o, wp in phases:
       Tp = T.inv() if inverse else T
       m = Tp._turnedMean(o, wp)
-      acc = acc + (m.M.ravel() if m is not None else (o * Tp).data.reshape(o.size, -1).T @ (wp / np.sum(wp))) * np.sum(wp)
+      acc = acc + (m.M.ravel() * np.sum(wp) if m is not None else wp @ (o * Tp).data.reshape(o.size, -1))
     # the mean of the inverses is of the inverse's class, a compliance for a stiffness
     T0 = tensors[0].inv() if inverse else tensors[0]
     return T0._as(type(T0), acc / total, ss)
@@ -157,11 +154,8 @@ def _sameCrystal(a, b):
     return True
   if not (isinstance(a, crystalFrame) and isinstance(b, crystalFrame)):
     return False
-  try:
-    if a.isclose(b):
-      return True
-  except Exception:
-    pass
+  if a.isclose(b):
+    return True
   return (getattr(a, "mineral", None) == getattr(b, "mineral", None) and a.Laue().pointGroup == b.Laue().pointGroup
           and np.allclose(a.abc, b.abc, rtol=1e-2) and np.allclose(a.abg, b.abg, atol=1e-2))
 
@@ -177,8 +171,7 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
     R, M, minM = calcLankford(ori, sS, theta=, rho=, RD=xvector, ND=zvector, weights=)
     R, M, minM = calcLankford(odf, sS, theta=, rho=)
   """
-  from .. import geometry as _g
-  th = np.linspace(0, np.pi / 2, 19) if theta is None else np.asarray(theta, dtype=float).ravel()
+  th =np.linspace(0, np.pi / 2, 19) if theta is None else np.asarray(theta, dtype=float).ravel()
   rh = np.linspace(0, 1, 11) if rho is None else np.asarray(rho, dtype=float).ravel()
   for a in args:
     if isinstance(a, np.ndarray):
@@ -189,6 +182,8 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
   if abs(rd @ nd) > 1e-8:
     raise ValueError("the rolling and the normal direction of a sheet are orthogonal")
   td = np.cross(rd, nd)
+  # the sheet strain of every ratio rho: the extension along RD, the contractions along TD and ND
+  e = np.outer(rd, rd) - rh[:, None, None] * np.outer(td, td) - (1 - rh)[:, None, None] * np.outer(nd, nd)
   M = np.zeros((rh.size, th.size))
   if isinstance(x, orientation):
     o = x.flatten()
@@ -196,18 +191,15 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
     Q = rotation(o.data).matrix()
     for k, t in enumerate(th):
       r = rotation.byAxisAngle(vector3d(nd), -t).matrix()
-      for l, p in enumerate(rh):
-        e = np.outer(rd, rd) - p * np.outer(td, td) - (1 - p) * np.outer(nd, nd)
-        E = r @ e @ r.T
-        # the strain in every crystal frame, Q^T E Q, solved in one call
-        M[l, k] = _taylorMany(np.einsum("nji,jk,nkl->nil", Q, E, Q), model, True, model.spinSelection)[0] @ w
+      # the strains of every ratio in every crystal frame, Q^T r e r^T Q, solved in one call
+      E = np.einsum("nji,ljk,nkm->lnim", Q, r @ e @ r.T, Q)
+      M[:, k] = _taylorMany(E, model, True, model.spinSelection)[0].reshape(rh.size, -1) @ w
   elif isinstance(x, SO3Fun):
     from ..functions.so3fun import SO3FunHarmonic
     turned = [SO3FunHarmonic(x.rotate(rotation.byAxisAngle(vector3d(nd), t)), bandwidth=bandwidth) for t in th]
     fr = x.SS
-    for l, p in enumerate(rh):
-      e = np.outer(rd, rd) - p * np.outer(td, td) - (1 - p) * np.outer(nd, nd)
-      work = calcTaylor(strainTensor(e, fr), model, plasticWork=True, bandwidth=bandwidth).M
+    for l in range(rh.size):
+      work = calcTaylor(strainTensor(e[l], fr), model, plasticWork=True, bandwidth=bandwidth).M
       for k in range(th.size):
         M[l, k] = float(np.real((work * turned[k]).mean()))
   else:

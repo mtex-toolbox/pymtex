@@ -168,6 +168,15 @@ def test_checkZeroRange_ofOnePoleFigure(zeroRange):
   assert zrm.checkZeroRange(v, 0).shape == (v.size,)
 
 
+def test_checkZeroRange_inSmallChunksIsTheSame(zeroRange, monkeypatch):
+  # the orientations split into chunks that end inside the list give the same answer
+  import mtex.analysis.pf2odf as pf2odf
+  ref, odf, pfs, zrm, g = zeroRange
+  whole = zrm.checkZeroRange(g)
+  monkeypatch.setattr(pf2odf, "ZERO_RANGE_CHUNK", 37)
+  assert np.array_equal(zrm.checkZeroRange(g), whole)
+
+
 def test_calcODF_withTheZeroRangeFitsFromFewerFunctions(zeroRange):
   # the thinned grid costs nothing: the same fit from fewer ansatz functions
   ref, odf, pfs, zrm, g = zeroRange

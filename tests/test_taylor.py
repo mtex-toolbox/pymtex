@@ -213,6 +213,17 @@ def test_calcTaylor_harmonicFactorAtThePageOrientation(harmonicTaylor):
   assert abs(np.real(MF(orientation.byEuler(0, 30 * degree, 15 * degree, cs, ss))) - 2.52) < 0.15
 
 
+def test_calcTaylor_smoothingDampsEveryDegreeOfTheSpinByTheKernel():
+  # the block of degree l of the spin is damped by A_l / (2 l + 1) of the kernel
+  from mtex.functions.harmonics import deg2dim
+  from mtex.functions.kernelfunctions import SO3DeLaValleePoussinKernel
+  sS, eps = slipSystem.fcc(crystalFrame("m-3m")), strainTensor(np.diag([1.0, 0.0, -1.0]))
+  W0, W1 = calcTaylor(eps, sS, bandwidth=4).W, calcTaylor(eps, sS, bandwidth=4, smoothing=10 * degree).W
+  A = SO3DeLaValleePoussinKernel(halfwidth=10 * degree).calcFourier(4)
+  scale = np.concatenate([np.full((2 * l + 1) ** 2, A[l] / (2 * l + 1)) for l in range(5)])
+  assert np.allclose(W1._fhat[:deg2dim(5)], W0._fhat[:deg2dim(5)] * scale[:, None])
+
+
 def test_the_compiled_solve_against_the_simplex():
   pytest.importorskip("numba")
   from mtex import getMTEXpref, setMTEXpref

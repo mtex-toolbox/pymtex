@@ -101,7 +101,8 @@ def graphEigenvalue(l, Lambda):
   A = np.asarray(l.A, dtype=float)
   a1 = A[:, 0] / np.linalg.norm(A[:, 0])
   lam = max(float(Lambda), 2 * np.linalg.norm(A[:, 0]))
-  return float(sum(1 - np.cos(2 * np.pi * (a1 @ (A @ np.asarray(o, dtype=float))) / lam) for o in l.stencil))
+  steps = np.asarray(l.stencil, dtype=float) @ A.T
+  return float(np.sum(1 - np.cos(2 * np.pi * (steps @ a1) / lam)))
 
 
 def regularisation(F, l, order, smoothingLength=None, alpha=None):
@@ -223,7 +224,7 @@ def _cgKernel():
 # that its mean is the one of the previous iterate, which is where the conjugate gradient
 # leaves it as well
 def _solveDirect(K, wd, wr, alpha, b, f, x, free, G):
-  from scipy.sparse import diags
+  from scipy.sparse import coo_matrix, csr_matrix, diags
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
   n = len(wd)
@@ -232,29 +233,30 @@ def _solveDirect(K, wd, wr, alpha, b, f, x, free, G):
   # anchors them
   on = (alpha * wr > 0) if K.shape[0] == len(G.edges) else np.ones(len(G.edges), dtype=bool)
   E = G.edges[on]
-  from scipy.sparse import coo_matrix
   nc, lab = connected_components(coo_matrix((np.ones(len(E)), (E[:, 0], E[:, 1])), shape=(n, n)), directed=False)
   anchored = np.zeros(nc, dtype=bool)
   np.logical_or.at(anchored, lab, (wd > 0) | ~free)
   loose = np.flatnonzero(~anchored)
-  A = A.tolil() if len(loose) else A
+  # the first pixel of every loose component held at the previous iterate
+  _, firstOf = np.unique(lab, return_index=True)
+  i = firstOf[loose]
+  A = (A + csr_matrix((np.ones(len(i)), (i, i)), shape=A.shape)).tocsr()
   rhs = b.copy()
-  firstOf = np.full(nc, -1)
-  firstOf[lab[::-1]] = np.arange(n)[::-1]
-  for c in loose:
-    i = firstOf[c]
-    A[i, i] += 1.0
-    rhs[i] += x[i]
-  A = A.tocsr()
+  rhs[i] += x[i]
   fixed = ~free
   y = f.astype(float).copy()
   if fixed.any():
-    y[free] = np.asarray(spsolve(A[free][:, free].tocsc(), rhs[free] - A[free][:, fixed] @ f[fixed])).reshape(-1, f.shape[1])
+    Af = A[free]
+    y[free] = np.asarray(spsolve(Af[:, free].tocsc(), rhs[free] - Af[:, fixed] @ f[fixed])).reshape(-1, f.shape[1])
   else:
     y = np.asarray(spsolve(A.tocsc(), rhs)).reshape(f.shape)
-  for c in loose:
-    m = lab == c
-    y[m] += x[m].mean(axis=0) - y[m].mean(axis=0)
+  # every loose component shifted so that its mean is the one of the previous iterate
+  if len(loose):
+    shift = np.zeros((nc, y.shape[1]))
+    np.add.at(shift, lab, x - y)
+    shift /= np.bincount(lab, minlength=nc)[:, None]
+    m = ~anchored[lab]
+    y[m] += shift[lab[m]]
   return y
 
 

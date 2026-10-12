@@ -183,3 +183,11 @@ def test_folded_directions_lie_in_the_sector_exactly(backend, s, antipodal):
     margin = np.maximum(margin, np.min(-p @ np.asarray(sR.N).T - sR.alpha, axis=1))
   assert margin.min() > -1e-12
   assert np.max(np.abs(angle(Miller(vector3d(p), cs), m, symmetry=True))) < 1e-8
+
+
+def test_symUnique_mapsADirectionToTheFirstKeptWithinTheTolerance():
+  from mtex.geometry.symmetryops import symUnique
+  t = np.array([0.0, 0.02, 0.01])
+  v = vector3d(np.cos(t), np.sin(t), 0 * t)
+  _, iu = symUnique(v, tol=1e-4, return_inverse=True)
+  assert list(iu) == [0, 1, 0]

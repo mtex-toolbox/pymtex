@@ -73,3 +73,9 @@ def test_the_IN100_volume_as_MATLAB_reads_it():
   assert s.shape == (102, 102) and s.isIndexed.sum() == 10000 and np.nansum(s.grainId) == 4724611
   s = e.slice(plane3d(vector3d(1, 1, 1), vector3d(-25, 22, -17)))
   assert s.shape == (145, 165) and s.isIndexed.sum() == 12677
+
+
+def test_repr_givesTheSharesOfTheMeasuredVoxels():
+  e = volume()
+  g = e[e.prop["ci"] > 0.5].gridify()
+  assert "57 (98%)" in repr(g)

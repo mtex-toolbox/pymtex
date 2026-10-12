@@ -64,13 +64,15 @@ def fitDislocationSystems(kappa, dS):
   l = np.ascontiguousarray(unitRows(dS.l.data).reshape(-1, ns, 3))
   u = np.ascontiguousarray(np.broadcast_to(dS.u, dS.shape).reshape(-1, ns), dtype=float)
   known = np.flatnonzero(~np.isnan(K[0])) if len(K) else np.zeros(0, dtype=int)
-  gnd, rho = np.full(len(K), np.nan), np.full((len(K), ns), np.nan)
+  rho = np.full((len(K), ns), np.nan)
   loop = None
   if backend() == "numba":
     from ..maps.kernels import pixelKernel
     loop = pixelKernel("gnd")
   if loop is not None:
-    loop(K, np.ascontiguousarray(known, dtype=np.int64), b, l, u, 1e-9, 10000, gnd, rho)
+    # the loop also writes the content sum u |rho| of every pixel, which calcGND forms in 1/m^2
+    scratch = np.full(len(K), np.nan)
+    loop(K, np.ascontiguousarray(known, dtype=np.int64), b, l, u, 1e-9, 10000, scratch, rho)
   else:
     for k in range(len(K)):
       kb = k if len(b) > 1 else 0

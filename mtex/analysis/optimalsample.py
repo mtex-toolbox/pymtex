@@ -31,7 +31,7 @@ from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
-from ..functions.harmonics import invariantProjection, project
+from ..functions.harmonics import deg2dim, invariantProjection, project
 from ..functions.kernelfunctions import S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel
 from ..functions.quadrature import folds
 from ..functions.s2fun import S2FunHarmonic, evenize, projectSpherical, realizeSpherical
@@ -60,12 +60,14 @@ class _Problem:
       if not (np.isfinite(mass) and mass > 0):
         raise ValueError("the density must have positive finite mass")
       self.target = S2FunHarmonic(h._fhat / mass, h.frame, real=True, antipodal=h.antipodal, symmetrise=False, _internal=True)
-      A = S2RestrictedDistanceKernel().calcFourier(L)
-      beta = np.zeros((L + 1) ** 2)
-      for l in range(1, L + 1):
-        if h.antipodal and l % 2:
-          continue
-        beta[l * l:(l + 1) ** 2] = 4 * np.pi * A[l] / (2 * l + 1)
+      # the kernel weight of every degree on its 2l + 1 coefficients, none on degree zero and
+      # on the odd degrees of an antipodal density
+      l = np.arange(L + 1)
+      b = 4 * np.pi * S2RestrictedDistanceKernel().calcFourier(L)[:L + 1] / (2 * l + 1)
+      b[0] = 0
+      if h.antipodal:
+        b[1::2] = 0
+      beta = np.repeat(b, 2 * l + 1)
       fr = h.frame
       self.projection = fr.sym if fr is not None and fr.numSym() > 1 else None
     else:
@@ -74,10 +76,12 @@ class _Problem:
       if not (np.isfinite(mass) and mass > 0):
         raise ValueError("the density must have positive finite mass")
       self.target = SO3FunHarmonic(h._fhat / mass, h.CS, h.SS, real=True, antipodal=h.antipodal, symmetrise=False, _internal=True)
-      A = SO3RestrictedDistanceKernel().calcFourier(L)
+      # the kernel weight of every degree on its (2l + 1)^2 coefficients, none on degree zero
+      l = np.arange(L + 1)
+      b = SO3RestrictedDistanceKernel().calcFourier(L)[:L + 1] / (2 * l + 1)
+      b[0] = 0
       beta = np.zeros(len(h._fhat))
-      for l in range(1, L + 1):
-        beta[_range(l)] = A[l] / (2 * l + 1)
+      beta[:deg2dim(L + 1)] = np.repeat(b, (2 * l + 1) ** 2)
       # the gradient evaluates left derivatives, which a left symmetry does not keep, so the
       # plan folds by the crystal side alone
       self.folds = (folds(h.CS, h.SS)[0], 1)
@@ -151,11 +155,6 @@ class _Problem:
     return vals.ravel()
 
 
-def _range(l):
-  from ..functions.harmonics import deg2dim
-  return slice(deg2dim(l), deg2dim(l + 1))
-
-
 # ------------------------------------------------------------------ the steps
 
 # a step along the direction: geodesics on the sphere, the exponential map on the left of the
@@ -164,15 +163,12 @@ def _step(p, xs, d, alpha):
   M = len(xs)
   V = d[:3 * M].reshape(M, 3)
   speed = np.linalg.norm(V, axis=1)
-  if p.sphere:
-    out = xs.copy()
-    move = speed > 0
-    s = speed[move]
-    out[move] = np.cos(alpha * s)[:, None] * xs[move] + (np.sin(alpha * s) / s)[:, None] * V[move]
-    return out
   out = xs.copy()
   move = speed > 0
-  if np.any(move):
+  if p.sphere:
+    s = speed[move]
+    out[move] = np.cos(alpha * s)[:, None] * xs[move] + (np.sin(alpha * s) / s)[:, None] * V[move]
+  elif np.any(move):
     axis = vector3d(V[move] / speed[move][:, None])
     r = rotation.byAxisAngle(axis, alpha * speed[move])
     out[move] = (r * rotation(xs[move])).data
@@ -289,7 +285,14 @@ def _optimize(p, xs, c, optimizeWeights, maxIter, tol, memory, warmUp, tolWeight
       dzmax = np.max(np.abs(d[3 * M:]))
       if dzmax > 0:
         cap = min(cap, 1 / dzmax)
-    alpha = min(cap if (entering and joint) else (2 * prevStep if not S else 1.0), cap)
+    # the first trial step: the cap where the weights join, twice the last one without a quasi
+    # Newton memory, else the unit step
+    if entering and joint:
+      alpha = cap
+    elif not S:
+      alpha = min(2 * prevStep, cap)
+    else:
+      alpha = min(1.0, cap)
     accepted = False
     xn, cn, zn, dn, vn = xs, c, z, residual, value
     for _ in range(60):

@@ -28,9 +28,13 @@ def ctfPhases(phaseLines):
   """the phases the lines after a Channel header's Phases line declare: lattice, angles, name,
   Laue class, space group"""
   frames = [notIndexedFrame()]
+  missing = []
   for k, line in enumerate(phaseLines, 1):
     f = line.split("\t")
+    # a line that states no lattice keeps its place, so that the later phase ids stay right
     if len(f) < 3:
+      frames.append(notIndexedFrame())
+      missing.append(str(k))
       continue
     abc = [_number(s) for s in f[0].split(";")]
     abg = [_number(s) for s in f[1].split(";")]
@@ -51,6 +55,9 @@ def ctfPhases(phaseLines):
       frames.append(crystalFrame(abc, np.array(abg) * degree, spaceId=spaceId, mineral=name))
     else:
       frames.append(crystalFrame("-1", abc, np.array(abg) * degree, mineral=name))
+  if missing:
+    warnings.warn(f"the phase lines do not describe phase {', '.join(missing)}; pixels of that phase are "
+                  "imported as not indexed", stacklevel=3)
   return phaseList(frames)
 
 

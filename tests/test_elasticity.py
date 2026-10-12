@@ -197,6 +197,21 @@ def test_HashinShtrikmanModulus_onAMeshReachesTheBounds():
   assert d1 == 1 and k1 <= K + 1e-9 and g1 < bounds.lower.G
 
 
+def test_HashinShtrikmanModulus_onAMeshIsTheEstimateOfEachReference():
+  # the batched estimate equals the one of every reference on its own
+  C = stiffnessTensor(CUBIC, crystalFrame("m-3m"))
+  K0, G0 = np.meshgrid(np.linspace(1, 300, 7), np.linspace(1, 300, 5))
+  khs, ghs, definite = HashinShtrikmanModulus(C, K0, G0)
+  single = [HashinShtrikmanModulus(C, k, g) for k, g in zip(K0.ravel(), G0.ravel())]
+  assert np.allclose(np.array(single), np.stack([khs.ravel(), ghs.ravel(), definite.ravel()], axis=1), rtol=1e-12, equal_nan=True)
+
+
+def test_HashinShtrikmanModulus_ofAnIndefiniteReferenceIsNaN():
+  # a reference whose residual is indefinite gives no estimate
+  k, g, d = HashinShtrikmanModulus(stiffnessTensor(CUBIC, crystalFrame("m-3m")), 1.0, 300.0)
+  assert d == 0 and np.isnan(k) and np.isnan(g)
+
+
 def test_hashinShtrikmanBounds_ofAnIsotropicTensorCoincide():
   # an isotropic tensor has coinciding bounds
   bi = hashinShtrikmanBounds(isotropic(60, 40, crystalFrame("m-3m")))

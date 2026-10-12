@@ -149,3 +149,11 @@ def test_ctfHead_reads_header_phases_surface_and_the_column_line():
           b"4.756;10.207;5.98\t90;90;90\tForsterite\t3\t0\r\nPhase\tX\tY\r\n")
   header, phases, acq, offset = _ctfHead(data, "f.ctf")
   assert (header["XStep"], phases.mineralList, acq, data[offset:]) == (2.0, ["notIndexed", "Forsterite"], (0.0, 10.0, 0.0), b"Phase\tX\tY\r\n")
+
+
+def test_ctfPhases_keepsTheIdsOfTheLaterPhasesAfterAMalformedLine():
+  from mtex.io.ctf import ctfPhases
+  lines = ["broken", "4.75;10.2;5.98\t90;90;90\tForsterite\t3\t62"]
+  with pytest.warns(UserWarning, match="phase 1"):
+    phases = ctfPhases(lines)
+  assert len(phases) == 3 and not phases[1].isIndexed and phases[2].mineral == "Forsterite"

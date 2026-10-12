@@ -29,7 +29,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
 from ..functions.funops import conv
-from ..functions.kernelfunctions import S2DeLaValleePoussinKernel, SO3DeLaValleePoussinKernel
+from ..functions.kernelfunctions import S2DeLaValleePoussinKernel, S2Kernel, SO3DeLaValleePoussinKernel, SO3Kernel
 from ..functions.polefigure import PoleFigure, calcError, calcQuadratureWeights
 from ..functions.rbf import SO3FunRBF, uniformODF
 from ..functions.s2fun import S2FunHarmonic
@@ -89,6 +89,10 @@ class PoleFigureOperator:
 
 # ------------------------------------------------------------------ the zero range method
 
+# the directions checkZeroRange evaluates in one call, orientations times symmetric poles
+ZERO_RANGE_CHUNK = 1 << 20
+
+
 # sum_i w_i psi(., v_i), the density without the normalisation calcDensity applies
 def _kernelSum(v, w, psi, L):
   s = S2FunHarmonic.quadrature(v, np.ones(v.size), bandwidth=L, weights=4 * np.pi * w, real=True, antipodal=v.antipodal)
@@ -107,9 +111,13 @@ class zeroRangeMethod:
 
   def __init__(self, pf, *args, halfwidth=None, kernel=None, threshold=None, delta=0.001, bg=None, alpha=10, bandwidth=None):
     self.pf = pf
-    kernels = [a for a in args if hasattr(a, "calcFourier")]
-    hw = 2 * pf.resolution if halfwidth is None else halfwidth
-    self.psi = kernels[0] if kernels else S2DeLaValleePoussinKernel(halfwidth=hw) if kernel is None else kernel
+    kernels = [a for a in args if isinstance(a, S2Kernel)]
+    if kernels:
+      self.psi = kernels[0]
+    elif kernel is not None:
+      self.psi = kernel
+    else:
+      self.psi = S2DeLaValleePoussinKernel(halfwidth=2 * pf.resolution if halfwidth is None else halfwidth)
     self.threshold = 0.1 * float(self.psi(1.0)) if threshold is None else float(threshold)
     self.delta, self.alpha = float(delta), float(alpha)
     self.bg = self.delta * pf.max() if bg is None else np.broadcast_to(np.asarray(bg, dtype=float), (pf.numPF,))
@@ -135,13 +143,15 @@ class zeroRangeMethod:
       p = np.real(self.pdf[i](v))
       with np.errstate(divide="ignore", invalid="ignore"):
         return (d > self.threshold) & (p / d < -0.1)
-    o = x.flatten()
-    isZero = np.zeros(o.size, dtype=bool)
-    q = rotation(o.data.reshape(-1, 1, 4))
+    q = x.flatten().data.reshape(-1, 4)
+    isZero = np.zeros(len(q), dtype=bool)
     for i, hs in enumerate(self._h):
-      for k in range(hs.size):
-        v = q * vector3d(hs[k].data.reshape(3))
-        isZero |= self.checkZeroRange(v, i)
+      h = vector3d(hs.data.reshape(-1, 3))
+      # the orientations in chunks, every symmetric pole of a chunk evaluated in one call
+      step = max(1, ZERO_RANGE_CHUNK // h.size)
+      for a in range(0, len(q), step):
+        v = rotation(q[a:a + step, None]) * h
+        isZero[a:a + step] |= self.checkZeroRange(v, i).reshape(-1, h.size).any(axis=1)
     return isZero
 
   def __repr__(self):
@@ -169,12 +179,24 @@ class MLSSolver:
     factors = np.array([mm / (10 * m) if mm > 10 * m > 0 else 1.0 for m in data.max()])
     self.pf = data * factors
     grids = [a for a in args if isinstance(a, orientation)]
-    kernels = [a for a in args if hasattr(a, "calcFourier")]
+    kernels = [a for a in args if isinstance(a, SO3Kernel)]
     res = self.pf.resolution if resolution is None else resolution
-    self.S3G = grids[0] if grids else S3G if S3G is not None else equispacedSO3Grid(self.pf.CS, self.pf.SS, resolution=res)
-    hw = getattr(self.S3G, "resolution", res) if halfwidth is None else halfwidth
-    self.psi = kernels[0] if kernels else SO3DeLaValleePoussinKernel(halfwidth=hw) if kernel is None else kernel
-    self.zrm = zeroRange if isinstance(zeroRange, zeroRangeMethod) else zeroRangeMethod(self.pf) if zeroRange else None
+    if grids:
+      self.S3G = grids[0]
+    elif S3G is not None:
+      self.S3G = S3G
+    else:
+      self.S3G = equispacedSO3Grid(self.pf.CS, self.pf.SS, resolution=res)
+    if kernels:
+      self.psi = kernels[0]
+    elif kernel is not None:
+      self.psi = kernel
+    else:
+      self.psi = SO3DeLaValleePoussinKernel(halfwidth=getattr(self.S3G, "resolution", res) if halfwidth is None else halfwidth)
+    if isinstance(zeroRange, zeroRangeMethod):
+      self.zrm = zeroRange
+    else:
+      self.zrm = zeroRangeMethod(self.pf) if zeroRange else None
     self.minIter, self.maxIter = int(minIter), max(int(maxIter), int(minIter))
     self.c = None if c0 is None else np.asarray(c0, dtype=float).ravel()
     self.c0 = 0.0
@@ -409,13 +431,13 @@ def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, ma
   degree dropped, each solved on the grid of its own width and started from the previous
   ODF evaluated on that grid, the nodes below the thinning fraction of the mean weight
   removed before the solve"""
-  kernels = [a for a in args if hasattr(a, "calcFourier")]
+  kernels = [a for a in args if isinstance(a, SO3Kernel)]
   res = pf.resolution if resolution is None else resolution
   hw = res if halfwidth is None else halfwidth
   psi = kernels[0] if kernels else kernel
   if psi is not None:
     hw = psi.halfwidth()
-  make = (lambda h: type(psi)(halfwidth=h)) if psi is not None else (lambda h: SO3DeLaValleePoussinKernel(halfwidth=h))
+  kernelType = SO3DeLaValleePoussinKernel if psi is None else type(psi)
   res = min(res, hw)
   ladder = [math.sqrt(math.e) ** (k - 1) for k in range(maxSteps, 0, -1)]
   steps = [(x * hw, x * res) for x in ladder if x * res <= 45 * degree]
@@ -428,7 +450,7 @@ def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, ma
       keep = c > min(1.0, thinning) / c.size
       grid = grid.subGrid(keep)
       c = c[keep]
-    solver = MLSSolver(pf, S3G=grid, kernel=make(h), c0=c, verbose=verbose, **kwargs)
+    solver = MLSSolver(pf, S3G=grid, kernel=kernelType(halfwidth=h), c0=c, verbose=verbose, **kwargs)
     odf = solver.calcODF()
     if verbose:
       e = calcError(pf, odf)

@@ -14,18 +14,16 @@ import math
 import numpy as np
 
 from ..geometry.vector3d import vector3d, asVector3d
-from ..tensors.tensor import refractiveIndexTensor
+from ..tensors.tensor import _axesIn, _inFrameOf, refractiveIndexTensor
 from ..geometry.install import install
 
 # CIE XYZ to Adobe RGB
 ADOBE_RGB = np.array([[2.04414, -0.5649, -0.3447], [-0.9693, 1.8760, 0.0416], [0.0134, -0.1184, 1.0154]])
 
 
+# the unit directions in the frame of the tensor, as coordinates
 def _unit(rI, v):
-  v = asVector3d(v)
-  if v.frame is not None and v.frame is not rI.frame and not (type(v.frame) is type(rI.frame) and v.frame.isAligned(rI.frame)):
-    raise ValueError("the direction is written in another frame than the tensor")
-  return v.normalize().data
+  return _inFrameOf(rI, v).normalize().data
 
 
 def refractiveIndex(rI, v):
@@ -59,8 +57,9 @@ def _birefringence(rI, U):
   delta = 2 * np.hypot((a - c) / 2, b)
   mid = (a + c) / 2
   theta = np.arctan2(2 * b, a - c)[:, None] / 2
-  slow = np.cos(theta) * p1 + np.sin(theta) * p2
-  fast = -np.sin(theta) * p1 + np.cos(theta) * p2
+  co, si = np.cos(theta), np.sin(theta)
+  slow = co * p1 + si * p2
+  fast = -si * p1 + co * p2
   return delta, fast, slow, mid - delta / 2, mid + delta / 2
 
 
@@ -71,21 +70,16 @@ def birefringence(rI, vprop=None):
   if vprop is None:
     from ..functions.handles import S2FunHandle
     from ..functions.s2axisfield import S2AxisFieldHandle
-    delta = S2FunHandle(lambda v: birefringence(rI, vector3d(v.data))[0], rI.frame, antipodal=True, bandwidth=32, symmetrise=False)
-    fast = S2AxisFieldHandle(lambda v: birefringence(rI, vector3d(v.data))[1].data, rI.frame, bandwidth=32)
-    slow = S2AxisFieldHandle(lambda v: birefringence(rI, vector3d(v.data))[2].data, rI.frame, bandwidth=32)
-    return delta, fast, slow
+    def component(k):
+      return lambda v: birefringence(rI, vector3d(v.data))[k]
+    def axis(k):
+      return lambda v: component(k)(v).data
+    delta = S2FunHandle(component(0), rI.frame, antipodal=True, bandwidth=32, symmetrise=False)
+    return delta, S2AxisFieldHandle(axis(1), rI.frame, bandwidth=32), S2AxisFieldHandle(axis(2), rI.frame, bandwidth=32)
   v = asVector3d(vprop)
   delta, fast, slow, _, _ = _birefringence(rI, _unit(rI, v).reshape(-1, 3))
   shape = np.broadcast_shapes(v.shape, rI.shape)
-  return delta.reshape(shape), _axes(fast.reshape(shape + (3,)), rI.frame), _axes(slow.reshape(shape + (3,)), rI.frame)
-
-
-# polarisation axes in the frame of the tensor, shown by their coordinates
-def _axes(data, frame):
-  v = vector3d(data, antipodal=True, frame=frame)
-  v.dispStyle = "xyz"
-  return v
+  return delta.reshape(shape), _axesIn(fast.reshape(shape + (3,)), rI.frame), _axesIn(slow.reshape(shape + (3,)), rI.frame)
 
 
 def opticalAxis(rI, tol=1e-8):
@@ -94,14 +88,14 @@ def opticalAxis(rI, tol=1e-8):
   n, V = rI.eig()
   e = V.data
   if abs(n[0] - n[2]) < tol:
-    return _axes(np.zeros((0, 3)), rI.frame)
+    return _axesIn(np.zeros((0, 3)), rI.frame)
   if abs(n[0] - n[1]) < tol:
-    return _axes(e[2], rI.frame)
+    return _axesIn(e[2], rI.frame)
   if abs(n[1] - n[2]) < tol:
-    return _axes(e[0], rI.frame)
+    return _axesIn(e[0], rI.frame)
   a = math.sqrt((n[2] - n[1]) / (n[2] - n[0]))
   b = math.sqrt((n[1] - n[0]) / (n[2] - n[0]))
-  return _axes(np.stack([-a * e[2] + b * e[0], a * e[2] + b * e[0]]), rI.frame)
+  return _axesIn(np.stack([-a * e[2] + b * e[0], a * e[2] + b * e[0]]), rI.frame)
 
 
 def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=None, tau=45 * np.pi / 180, phi=np.pi / 2, bandwidth=32):

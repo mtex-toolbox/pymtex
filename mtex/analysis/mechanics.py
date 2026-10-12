@@ -33,6 +33,11 @@ def _unit(v):
   return v.normalize().data
 
 
+# the axial vectors (W_32, W_13, W_21) of the matrices W, over their leading dimensions
+def _axial(W):
+  return np.stack([W[..., 2, 1], W[..., 0, 2], W[..., 1, 0]], axis=-1)
+
+
 # ------------------------------------------------------------------ stress and strain
 
 def meanStress(sigma):
@@ -87,7 +92,7 @@ def maxStrain(eps):
 def _schmidTensor(n, b=None):
   if isinstance(n, slipSystem):
     return n._dyads(), n.frame if n.frame is not None else specimenFrame.default
-  fr = _frameOf(n) if b is None or not isinstance(b, vector3d) or b.frame is None else b.frame
+  fr = b.frame if isinstance(b, vector3d) and b.frame is not None else _frameOf(n)
   nn, bb = _unit(n), _unit(b)
   return bb[..., :, None] * nn[..., None, :], fr
 
@@ -108,9 +113,10 @@ def SchmidFactor(sS, sigma=None, relative=False):
   if sigma is None:
     from ..functions.s2fun import S2FunHarmonic
     fr = sS.frame.stripSym() if sS.frame is not None else None
-    one = len(sS) == 1
-    return S2FunHarmonic(lambda v: (lambda m: m[:, 0] if one else m)(sS.SchmidFactor(vector3d(v.data.reshape(-1, 3))).reshape(-1, len(sS))),
-                         fr, bandwidth=2, real=True, antipodal=True)
+    def values(v):
+      m = sS.SchmidFactor(vector3d(v.data.reshape(-1, 3))).reshape(-1, len(sS))
+      return m[:, 0] if len(sS) == 1 else m
+    return S2FunHarmonic(values, fr, bandwidth=2, real=True, antipodal=True)
   if isinstance(sigma, vector3d):
     return sS.SchmidFactor(sigma, relative=relative)
   if not isinstance(sigma, stressTensor):
@@ -133,12 +139,6 @@ def SchmidFactor(sS, sigma=None, relative=False):
 
 
 # ------------------------------------------------------------------ deformation and its rate
-
-def _rotationFromTo(a, b, c=None, d=None):
-  if c is None:
-    return rotation.map(vector3d(a), vector3d(b))
-  return rotation.map(vector3d(a), vector3d(b), vector3d(c), vector3d(d))
-
 
 def _uniaxialDeformation(d, rate=2.0):
   """the deformation gradient of a uniaxial stretch by rate along d, the volume kept"""
@@ -197,7 +197,7 @@ def spin(L):
 def angularVelocityVector(L):
   """the angular velocity of a velocity gradient, the axial vector of its antisymmetric part"""
   W = L.antiSym().M
-  return vector3d(np.stack([W[..., 2, 1], W[..., 0, 2], W[..., 1, 0]], axis=-1), frame=L.frame)
+  return vector3d(_axial(W), frame=L.frame)
 
 
 def strainRateMagnitude(L):

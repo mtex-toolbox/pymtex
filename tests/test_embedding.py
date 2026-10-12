@@ -100,3 +100,11 @@ def test_the_compiled_turn_agrees_with_the_products():
       assert np.abs(out["numpy"][1] - out["numba"][1]).max() < 1e-13
   finally:
     setMTEXpref("kernels", before)
+
+
+def test_isotropicTensor_ofRankFourIsTheSymmetrisedDeltaPair():
+  # the mean of delta x delta over the permutations of its indices, (d_ij d_kl + d_ik d_jl + d_il d_jk) / 3
+  from mtex.analysis.embedding import _isotropicTensor
+  d = np.eye(3)
+  closed = (np.einsum("ij,kl->ijkl", d, d) + np.einsum("ik,jl->ijkl", d, d) + np.einsum("il,jk->ijkl", d, d)) / 3
+  assert np.allclose(_isotropicTensor(4), closed.ravel()) and _isotropicTensor(3) is None
