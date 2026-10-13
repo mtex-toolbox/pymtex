@@ -90,5 +90,5 @@ def test_a_volume_is_loaded_by_EBSD3():
   # the reader of a volume takes no correction, so the volume is turned once it is read
   text = buildImportWizardScript("/data/volume.dream3d", volume=True, mapConvention="y↑→x", eulerConvention="y↓→x")
   assert "ebsd = EBSD3.load(fname)\nebsd = ebsd.rotate(eulerCorrection, keepXY=True)" in text
-  assert loadCall("/data/volume.dream3d", volume=True) == "ebsd = EBSD3.load('/data/volume.dream3d')"
-  assert loadCall("/data/map.ctf") == "ebsd = EBSD.load('/data/map.ctf')"
+  assert loadCall("/data/volume.dream3d", volume=True) == f"ebsd = EBSD3.load({os.path.abspath('/data/volume.dream3d')!r})"
+  assert loadCall("/data/map.ctf") == f"ebsd = EBSD.load({os.path.abspath('/data/map.ctf')!r})"

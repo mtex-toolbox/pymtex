@@ -36,7 +36,7 @@ def test_pieces_areReadByTheThreadsWhereTheBytesAreKnown(tmp_path, stored):
   with h5py.File(tmp_path / "a.h5", "w") as f:
     f.create_dataset("a", data=np.arange(6 * 7 * 9 * 2, dtype=np.float32).reshape(6, 7, 9, 2), **STORED[stored][0])
   with h5py.File(tmp_path / "a.h5", "r") as f:
-    assert (_pieces(f["a"]) is not None and _filters(f["a"]) is not None) == STORED[stored][1]
+    assert (_pieces(f["a"]) is not None and _filters(f["a"]) is not None) == (STORED[stored][1] and f.driver == "sec2")
 
 
 def test_readArray_fillsTheChunksNeverWritten(tmp_path):
