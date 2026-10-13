@@ -66,6 +66,14 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
   exception is `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)`: a grain's polygon puts
   the padding it holds inside the scan, so it is filled and stops being padding, as MATLAB's
   `fill(ebsd, grains, 'gridify')` fills the dropped sites of a sparse map.
+- A property read from an HDF5 file is its data set's name in lower case without blanks
+  (`bandcontrast`); an EDS map of an Oxford file puts its element first and keeps the case,
+  `Co_WindowIntegral_Ka1`, `C_PeakArea_Kseries`, `Ca_Composition_Wt` (`additionName` in
+  `io/h5.py`), the same names as MATLAB develop's `dataSetFieldName` (user, 2026-10-12).
+- The phases a file states with one mineral name, in any case, or with none take a letter each,
+  `Iron A`, `Iron B` (`distinctMinerals` in `maps/phaselist.py`, called by every reader of maps,
+  volumes and 3D grains), so each can be addressed; MATLAB develop does the same in
+  `ensureCSArray` (user, 2026-10-12).
 - `loadEBSD` builds the grid while it reads: where the row order (or a header the positions
   confirm) gives the lattice, `mapFromColumns` in `io/load.py` writes every column into its grid
   cell and the list is never built; it must stay equal to `gridify` of the list (a test per format).
@@ -250,7 +258,7 @@ G7's `plane.py` (`plane3d`, `plot(plane)` clipped by the axes). `tensorplot.py` 
 the interference colours, `plotSeismicVelocities(C)`. The plotting subplan is complete but for the pieces `docs/plans/plotting.md`
 lists as left out. P3b, the maps of volumes (`docs/plans/maps3d.md`, `mtex/maps3d`, `../master` the one
 reference), is done through V8, its ten doc pages checked against master: `EBSD3` over a `voxelLattice`, `calcGrains` on voxels, `grain3d` and
-`grain3Boundary`, sections, the DREAM.3D and Neper readers, smoothing, the intragranular quantities,
+`grain3Boundary`, sections, the DREAM.3D and Neper readers (a DREAM.3D file read by the names of its data sets, as MATLAB develop, the data sets over the cores by `io/h5array.py` and turned to (x, y, z) by the `turn*` loops of `io/kernels.py`), smoothing, the intragranular quantities,
 and the drawing: a `scene3d` of NumPy arrays (`plotting/scene3d.py`) held by an `mtexFigure` and shown
 as the picture PyVista renders offscreen (`render3d.py`, the `plot3d` extra), so hold and `setCamera` act
 on it; `exportHTML` writes it as a three.js page and the doc build links every 3D figure to one; a 2D
@@ -268,7 +276,7 @@ The halfwidth selection (`docs/plans/halfwidth.md`) is built through H2: `mtex/f
 'conservative' | 'UCV', groups=)`, and `ori.notIID`, set by `ebsd.orientations` and carried through
 indexing and products, which every automatic halfwidth refuses without grain ids; the studies are
 `bench/halfwidth_s2.py` and `bench/halfwidth_so3.py`.
-P8, the import wizard (`docs/plans/wizard.md`), is built through W6: `importWizard()` opens a
+P8, the import wizard (`docs/plans/wizard.md`), is built through W6, and W7, volumes (`inspectEBSD(...).is3d`, `st.section` the layer of a volume the views draw, chosen by the `SectionBar` under the canvas, the script with `EBSD3.load`): `importWizard()` opens a
 PySide6 window (the `wizard` extra) over a headless core, `mtex/wizard/state.py` and
 `callbacks.py`, with `inspectEBSD` in `mtex/io/inspect.py` describing a file from its header
 and `buildImportWizardScript` in `mtex/io/importscript.py` writing the Python of an import;

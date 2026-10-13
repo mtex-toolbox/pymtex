@@ -372,4 +372,122 @@ def formatTable(cols, decimals, sep=b" ", crlf=False):
   return formatTableNumpy(cols, decimals, sep, crlf)
 
 
+# ------------------------------------------------------------------ turning a volume
+
+# a volume stored (z, y, x, c), the slowest axis first, written (x, y, z, c) in another type: a
+# plane of one y after the other, whose rows of the source and of the result both fit the cache,
+# where NumPy's copy of the swapped axes walks one of the two arrays a page per cell
+def _turnLoop(src, dst):
+  nz, ny, nx, nc = src.shape
+  for j in prange(ny):
+    for i in range(nx):
+      for k in range(nz):
+        for c in range(nc):
+          dst[i, j, k, c] = src[k, j, i, c]
+
+
+# the same turn of Bunge's Euler angles (phi1, Phi, phi2), written as the quaternions of
+# Rz(phi1) Rx(Phi) Rz(phi2): one pass from the 12 bytes a voxel of the file to its rotation
+def _turnBungeLoop(src, dst):
+  nz, ny, nx, _ = src.shape
+  for j in prange(ny):
+    for i in range(nx):
+      for k in range(nz):
+        hP = np.float64(src[k, j, i, 1]) / 2
+        hp = (np.float64(src[k, j, i, 0]) + np.float64(src[k, j, i, 2])) / 2
+        hm = (np.float64(src[k, j, i, 0]) - np.float64(src[k, j, i, 2])) / 2
+        cP = np.cos(hP)
+        sP = np.sin(hP)
+        dst[i, j, k, 0] = cP * np.cos(hp)
+        dst[i, j, k, 1] = sP * np.cos(hm)
+        dst[i, j, k, 2] = sP * np.sin(hm)
+        dst[i, j, k, 3] = cP * np.sin(hp)
+
+
+# the same turn of Rodrigues vectors r, written as the quaternions (1, r) / sqrt(1 + |r|^2)
+def _turnRodriguesLoop(src, dst):
+  nz, ny, nx, _ = src.shape
+  for j in prange(ny):
+    for i in range(nx):
+      for k in range(nz):
+        x = np.float64(src[k, j, i, 0])
+        y = np.float64(src[k, j, i, 1])
+        z = np.float64(src[k, j, i, 2])
+        s = 1 / np.sqrt(1 + x * x + y * y + z * z)
+        dst[i, j, k, 0] = s
+        dst[i, j, k, 1] = s * x
+        dst[i, j, k, 2] = s * y
+        dst[i, j, k, 3] = s * z
+
+
+def _compileTurn(name, loop):
+  nb = _jit()
+  if not nb:
+    return None
+  if name not in _COMPILED:
+    globals()["prange"] = nb.prange
+    _COMPILED[name] = _parallelKernel(loop, nogil=True)
+  return _COMPILED[name]
+
+
+# whether the compiled loops take the array of a file
+def _turns(a):
+  return backend() == "numba" and a.dtype.isnative and a.flags.c_contiguous
+
+
+def turnVolumeNumpy(a, dtype=np.float64):
+  """turnVolume in NumPy, the fallback and the oracle of the tests"""
+  return np.ascontiguousarray(np.swapaxes(np.asarray(a), 0, 2), dtype=dtype)
+
+
+def turnVolume(a, dtype=np.float64):
+  """the (z, y, x, ...) array of a file as a contiguous (x, y, z, ...) array of the type, so that
+  voxel [i, j, k] is the one MATLAB addresses as (i+1, j+1, k+1)"""
+  a = np.asarray(a)
+  turn = _compileTurn("turn", _turnLoop) if a.ndim in (3, 4) and _turns(a) else None
+  if turn is None:
+    return turnVolumeNumpy(a, dtype)
+  src = a.reshape(a.shape[:3] + (-1,))
+  dst = np.empty((src.shape[2], src.shape[1], src.shape[0], src.shape[3]), dtype=dtype)
+  turn(src, dst)
+  return dst.reshape(dst.shape[:3] + a.shape[3:])
+
+
+def turnBungeNumpy(a):
+  """turnBunge through rotation.byEuler, the fallback and the oracle of the tests"""
+  from ..geometry.quaternion import rotation
+  e = turnVolumeNumpy(a)
+  return rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], "ZXZ").data
+
+
+def turnBunge(a):
+  """the quaternions of the Bunge Euler angles a file stores as (z, y, x, 3), as an (x, y, z, 4)
+  array"""
+  a = np.asarray(a)
+  turn = _compileTurn("turnBunge", _turnBungeLoop) if _turns(a) else None
+  if turn is None:
+    return turnBungeNumpy(a)
+  dst = np.empty((a.shape[2], a.shape[1], a.shape[0], 4))
+  turn(a, dst)
+  return dst
+
+
+def turnRodriguesNumpy(a):
+  """turnRodrigues through rodrigues2quat, the fallback and the oracle of the tests"""
+  from ..geometry.representations import rodrigues2quat
+  return rodrigues2quat(turnVolumeNumpy(a))
+
+
+def turnRodrigues(a):
+  """the quaternions of the Rodrigues vectors a file stores as (z, y, x, 3), as an (x, y, z, 4)
+  array; a vector of NaN gives a quaternion of NaN"""
+  a = np.asarray(a)
+  turn = _compileTurn("turnRodrigues", _turnRodriguesLoop) if _turns(a) else None
+  if turn is None:
+    return turnRodriguesNumpy(a)
+  dst = np.empty((a.shape[2], a.shape[1], a.shape[0], 4))
+  turn(a, dst)
+  return dst
+
+
 __all__ = []

@@ -5,10 +5,12 @@ import os
 import numpy as np
 import pytest
 
-from mtex import EBSD3
+from mtex import EBSD3, rotation, setMTEXpref
 
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data")
 XNOVO = os.path.join(DATA, "EBSD3", "SimulatedMultiPhase.h5")
+# a DREAM3D-NX file with blanks in its group names and without a surface mesh
+IN100_NX = os.path.join(DATA, "..", "..", "data", "dream3d", "SmallIN100_Final.dream3d")
 
 
 @pytest.mark.skipif(not os.path.exists(XNOVO), reason="the xnovo volume of ../master/data")
@@ -30,6 +32,135 @@ def test_a_stack_of_maps():
   assert e.gridify().isPadding.sum() == 0
   with pytest.raises(ValueError):
     EBSD3.load(files[:2], z=[0.0])
+
+
+# the layouts a DREAM.3D file comes in: where the voxels, the phases' structures and the grid are
+LAYOUTS = {
+  "DREAM.3D 6": ("DataContainers/ImageDataContainer", "CellData", "CellEnsembleData", "datasets"),
+  "DREAM3D-NX": ("DataStructure/DataContainer", "CellData", "CellEnsembleData", "attributes"),
+  "names with spaces": ("DataStructure/Image Geometry", "Cell Data", "Cell Ensemble Data", "attributes"),
+  "names of a pipeline": ("DataStructure/fw-ar-IF1", "Scan Data", "Phase Data", "attributes"),
+}
+# a volume of 4 x 3 x 2 voxels along x, y, z
+SHAPE, SPACING, ORIGIN = (4, 3, 2), (0.5, 0.25, 2.0), (-1.0, 3.0, 0.5)
+
+
+# the arrays of the volume as functions of the voxel (i, j, k), each an (x, y, z, components) array
+def voxelArrays():
+  rng = np.random.default_rng(3)
+  n = SHAPE + (1,)
+  return {"EulerAngles": (rng.random(SHAPE + (3,)) * [2 * np.pi, np.pi, 2 * np.pi]).astype(np.float32),
+          "Phases": rng.integers(1, 3, n).astype(np.int32), "Mask": (rng.random(n) > 0.2).astype(np.uint8),
+          "FeatureIds": rng.integers(1, 5, n).astype(np.int32), "Confidence Index": rng.random(n).astype(np.float32),
+          "IPFColors": rng.integers(0, 255, SHAPE + (3,)).astype(np.uint8)}
+
+
+# a DREAM.3D file of the layout holding the arrays, stored (z, y, x, components) as DREAM.3D does
+def writeDream3d(path, layout, arrays, structures=(999, 1, 0), **stored):
+  import h5py
+  root, cells, ensemble, grid = LAYOUTS[layout]
+  with h5py.File(path, "w") as f:
+    g = f.create_group(root)
+    for name, a in arrays.items():
+      g.create_dataset(f"{cells}/{name}", data=np.ascontiguousarray(np.swapaxes(a, 0, 2)), **stored)
+    if structures is not None:
+      g.create_dataset(f"{ensemble}/CrystalStructures", data=np.array(structures, dtype=np.uint32).reshape(-1, 1))
+    for name, v in (("DIMENSIONS", np.array(SHAPE, dtype=np.int64)), ("SPACING", np.float32(SPACING)), ("ORIGIN", np.float32(ORIGIN))):
+      if grid == "datasets":
+        g.create_dataset(f"_SIMPL_GEOMETRY/{name}", data=v)
+      else:
+        g.attrs["_" + name] = v
+  return str(path)
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_dream3d_readsTheVoxelsOfEveryLayout(tmp_path, layout):
+  a = voxelArrays()
+  e = EBSD3.load(writeDream3d(tmp_path / "v.dream3d", layout, a))
+  eul = a["EulerAngles"].astype(float)
+  assert e.shape == SHAPE and np.allclose(e.lattice.spacing, SPACING) and np.allclose(e.pos.data[0, 0, 0], ORIGIN)
+  assert np.allclose(e.pos.data[3, 2, 1], np.array(ORIGIN) + np.array([3, 2, 1]) * SPACING)
+  assert np.allclose(e.rotations.data, rotation.byEuler(eul[..., 0], eul[..., 1], eul[..., 2], "ZXZ").data, atol=1e-15)
+  assert np.array_equal(e.phaseId, np.where(a["Mask"][..., 0] == 0, 0, a["Phases"][..., 0]))
+  assert not e.CSList.isIndexed(0) and [f.pointGroup for f in e.CSList.frames[1:]] == ["432", "622"]
+  # the scalar arrays are the properties, the feature ids the grain ids; the colours are not read
+  assert sorted(e.prop) == ["ConfidenceIndex", "grainId"]
+  assert np.array_equal(e.prop["grainId"], a["FeatureIds"][..., 0]) and np.array_equal(e.prop["ConfidenceIndex"], a["Confidence Index"][..., 0])
+  # in the types of the file
+  assert e.prop["grainId"].dtype == np.int32 and e.prop["ConfidenceIndex"].dtype == np.float32
+
+
+@pytest.mark.parametrize("stored", [{}, {"chunks": True, "compression": "gzip"}], ids=["contiguous", "gzip"])
+def test_dream3d_readOverTheCoresIsTheReadOfH5pyAndNumPy(tmp_path, monkeypatch, stored):
+  import functools
+  import mtex.io.load3d as load3d
+  fname = writeDream3d(tmp_path / "v.dream3d", "DREAM.3D 6", voxelArrays(), **stored)
+  # the threads read however small the arrays
+  monkeypatch.setattr(load3d, "readArray", functools.partial(load3d.readArray, least=0))
+  fast = EBSD3.load(fname)
+  setMTEXpref("kernels", "numpy"), setMTEXpref("threads", 1)
+  try:
+    slow = EBSD3.load(fname)
+  finally:
+    setMTEXpref("kernels", "numba"), setMTEXpref("threads", None)
+  assert np.allclose(fast.rotations.data, slow.rotations.data, atol=1e-15) and np.array_equal(fast.pos.data, slow.pos.data)
+  assert np.array_equal(fast.phaseId, slow.phaseId) and all(np.array_equal(fast.prop[k], slow.prop[k]) for k in slow.prop)
+
+
+def test_dream3d_withoutEulerAnglesTakesTheQuaternions(tmp_path):
+  # DREAM.3D's (x, y, z, w) is the passive rotation
+  a = voxelArrays()
+  eul = a.pop("EulerAngles").astype(float)
+  q = rotation.byEuler(eul[..., 0], eul[..., 1], eul[..., 2], "ZXZ").data
+  a["Quats"] = np.concatenate([-q[..., 1:], q[..., :1]], axis=-1).astype(np.float32)
+  e = EBSD3.load(writeDream3d(tmp_path / "v.dream3d", "DREAM3D-NX", a))
+  assert np.allclose(e.rotations.data, q, atol=1e-6) and "Quats" not in e.prop
+
+
+def test_dream3d_ofFeatureIdsAloneIsOnePhaseWithoutRotations(tmp_path):
+  ids = voxelArrays()["FeatureIds"]
+  e = EBSD3.load(writeDream3d(tmp_path / "v.dream3d", "DREAM.3D 6", {"FeatureIds": ids}, structures=None))
+  assert np.all(np.isnan(e.rotations.data)) and np.all(e.phaseId == 1) and e.CSList.frames[1].pointGroup == "1"
+  assert np.array_equal(e.grainId, ids[..., 0])
+
+
+def test_dream3d_takesTheSymmetryItIsGiven(tmp_path):
+  from mtex import crystalFrame
+  cs = ["notIndexed", crystalFrame("m-3m", mineral="Ni"), crystalFrame("6/mmm", mineral="Ti")]
+  e = EBSD3.load(writeDream3d(tmp_path / "v.dream3d", "DREAM3D-NX", voxelArrays()), CS=cs)
+  assert [f.mineral for f in e.CSList.frames[1:]] == ["Ni", "Ti"]
+
+
+def test_load_findsADream3dVolumeInAnH5File(tmp_path):
+  assert EBSD3.load(writeDream3d(tmp_path / "v.h5", "names of a pipeline", voxelArrays())).shape == SHAPE
+
+
+def test_load_refusesAFileWithoutVoxels(tmp_path):
+  import h5py
+  with h5py.File(tmp_path / "v.dream3d", "w") as f:
+    f.create_dataset("DataStructure/Geometry/SharedVertexList", data=np.zeros((3, 3)))
+  with pytest.raises(ValueError, match="voxel data"):
+    EBSD3.load(str(tmp_path / "v.dream3d"))
+
+
+@pytest.mark.parametrize("name, prop", [("FeatureIds", "grainId"), ("Confidence Index", "ConfidenceIndex"), ("X Position", "XPosition"),
+                                        ("Average neighbour misorientations", "AverageNeighbourMisorientations"), ("2Theta-max", "x2Theta_max")])
+def test_propertyName_isMATLABsValidName(name, prop):
+  from mtex.io.load3d import _propertyName
+  assert _propertyName(name) == prop
+
+
+@pytest.mark.skipif(not os.path.exists(IN100_NX), reason="the DREAM3D-NX volume of ../data/dream3d")
+def test_dream3d_readsADream3dNXFileAsMATLAB():
+  # bench/matlab/probe_dream3d.m on MATLAB develop; the quaternions up to their sign
+  e = EBSD3.load(IN100_NX)
+  assert e.shape == (189, 201, 117) and np.allclose(e.lattice.spacing, 0.25) and np.bincount(e.phaseId.reshape(-1)).tolist() == [1072734, 3371979]
+  assert np.allclose(e.pos.data[65, 64, 39], [-31, 16, -19.5]) and e.CSList.frames[1].pointGroup == "432"
+  assert np.allclose(e.rotations.data[94, 100, 58], [-0.30812373, 0.44180860, 0.67022787, 0.51054827], atol=1e-8)
+  assert np.allclose(e.rotations.data[65, 64, 39], [0.74085404, 0.54717957, 0.15549391, -0.35714345], atol=1e-8)
+  sums = {"ConfidenceIndex": 1315316.569, "Fit": -104365549.8, "ImageQuality": 684004956.2, "ParentIds": 3796976474, "SEMSignal": 7261014293,
+          "XPosition": 101950104.8, "YPosition": 110691801.8, "grainId": 3946028298}
+  assert sorted(e.prop) == sorted(sums) and all(np.isclose(e.prop[k].sum(dtype=float), v, rtol=1e-9) for k, v in sums.items())
 
 
 def test_dream3dPhases_reads_the_structures_after_the_first():

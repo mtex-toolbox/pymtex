@@ -680,6 +680,7 @@ def test_wignerTransformAdjoint_readsAWrappedPolarAxis(kernels):
 # the series on the circle and its adjoint as compiled direct sums, by Horner's scheme and the
 # powers of e^{-ix}, are the sums of the exponentials
 def test_fourierSum_andItsAdjointAreTheExponentialSums():
+  pytest.importorskip("numba")
   from mtex.functions.kernels import fourierAdjointSum, fourierSum
   L, x = 50, rng.uniform(0, 2 * np.pi, 700)
   c, u = rng.standard_normal(2 * L + 1) + 1j * rng.standard_normal(2 * L + 1), rng.standard_normal(700) + 1j * rng.standard_normal(700)

@@ -79,3 +79,18 @@ def test_repr_givesTheSharesOfTheMeasuredVoxels():
   e = volume()
   g = e[e.prop["ci"] > 0.5].gridify()
   assert "57 (98%)" in repr(g)
+
+
+@pytest.mark.parametrize("how", ["rotate", "keepXY", "keepEuler", "shift"])
+def test_a_moved_volume_is_a_volume_on_its_lattice(how):
+  # the lattice carried through the motion is the one the moved positions give
+  rng = np.random.default_rng(2)
+  e = EBSD3square(rotation.rand(4, 3, 2, rng=rng), None, [crystalFrame("m-3m")], dxyz=(0.5, 0.25, 2.0), origin=(1.0, -2.0, 0.5))
+  r = rotation.byAxisAngle(vector3d(1, 2, 3), 0.7)
+  m = {"rotate": lambda: e.rotate(r), "keepXY": lambda: e.rotate(r, keepXY=True), "keepEuler": lambda: e.rotate(r, keepEuler=True),
+       "shift": lambda: e.shift(vector3d(1, 2, 3))}[how]()
+  assert type(m) is EBSD3 and m.shape == e.shape and np.array_equal(m.lattice.ijk, e.lattice.ijk)
+  assert np.allclose(m.lattice.positions().reshape(m.shape + (3,)), m.pos.data, atol=1e-12)
+  turned = how in ("rotate", "keepXY")
+  assert np.allclose(m.rotations.data, (r * e.rotations).data if turned else e.rotations.data)
+  assert np.allclose(m.pos.data, e.pos.data) == (how == "keepXY")

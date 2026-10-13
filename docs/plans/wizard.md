@@ -1,6 +1,6 @@
 # Subplan P8 - the import wizard
 
-Status: W0 to W4 and W6 done, W5 the design pass open. Design reference: the Julia wizard,
+Status: W0 to W4 and W6 done, W5 the design pass open, W7 (volumes, section 4b) done but for its later pieces. Design reference: the Julia wizard,
 `../mtexJulia/docs/plans/wizard.md` (W0 to W18 done there) and `../mtexJulia/ext/MTEXWizardExt/`
 with `lib/MTEXInterfaces/src/{wizard,inspect}.jl`; its window as it stands after the W9,
 W10 and W14 design passes is the look to reproduce. Syntax reference:
@@ -516,6 +516,38 @@ faithful, and what was lost was that the colour loop is compiled `parallel=True`
   grabbed as a picture; nothing has been clicked on a screen from this side.
 - `importWizard()` blocks in a plain session and returns the map; under a running Qt loop it
   returns the window. Neither has been tried from IPython.
+
+## 4b. W7 - volumes (2026-10-12)
+
+MATLAB's wizard knows no volume, so this is this port's design: every view of the wizard is a
+view of a map, and a layer of a volume is a map, so a volume is shown one section at a time.
+
+1. **The description. DONE.** `inspectEBSD` describes a DREAM.3D file and the LabDCT volume of
+   an xnovo file from the header: `info.is3d`, a grid and a step of three, `info.unit`, the
+   properties `EBSD3.load` will give, and `info.grains` (feature ids, surface mesh). An HDF5
+   file is asked whether it is a volume before the vendor reader sees it; `dream3dVolume` of
+   `io/load3d.py` is the one description the loader and the inspector share.
+2. **The import and the state. DONE.** `startImport` reads a volume with `loadEBSD3`. `st.ebsd`
+   is the volume, `st.section` the map the views draw (the map itself for a 2D file),
+   `st.sectionAxis` and `st.sectionIndex` say which layer, the middle one across z on import;
+   `sectionOf(ebsd, axis, index)` takes the layer as a 2D `EBSD` with the two coordinates along
+   it as x and y, `setSection` moves it and announces `section`.
+3. **The views. DONE.** The canvas draws `st.section`, always as a picture; `SectionBar` under
+   it is the x | y | z choice, a slider through the layers and the layer in words (its number,
+   where it lies, and which axes of the volume the picture shows as x and y). Another layer
+   across the same axis keeps the picture and takes new colours, 55 to 130 ms a step on a
+   333 x 333 layer of 13 million voxels, where drawing it anew took 170 to 600. The pole
+   figures are those of the whole volume, thinned as a large map is. The triad of the picture
+   still names its axes x and y for a section across x or y: a frame cannot rename them.
+4. **The script. DONE.** `buildImportWizardScript(..., volume=True)` and `loadCall` write
+   `EBSD3.load(fname)`; the wizard returns the `EBSD3`.
+5. **The frames. DONE.** The Euler coordinates of a volume are corrected as those of a map:
+   `applyEuler` turns the orientations of the volume and takes the section anew, the script
+   writes `ebsd = ebsd.rotate(eulerCorrection, keepXY=True)` after the load, the reader taking
+   no correction. For this a moved volume stays a volume: `EBSD3._moved` carries the voxel
+   lattice through `rotate` and `shift`, which returned a 2D `EBSD` before.
+6. **Later.** A 3D tab of three slices, the grains of the feature ids or the mesh in the
+   script, a stack of 2D files as a volume. Open.
 
 ## 5. Left out
 

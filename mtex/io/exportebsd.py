@@ -165,7 +165,7 @@ def export(ebsd, fname, *args, **kwargs):
   """write a map to the file the extension names
 
     export(ebsd, 'map.ang')                   TSL / EDAX, the correction of setting 2 undone
-    export(ebsd, 'map.ctf')                   Oxford / Channel, the half turn about z undone
+    export(ebsd, 'map.ctf')                   Oxford / Channel, the half turn about y undone
     export(ebsd, 'map.h5oina')                into a copy of the file the map came from
     export(ebsd, 'map.txt', 'ABG', radians=True)   a table of x y, the Euler angles, the phase and the properties
     export(v, 'vectors.txt')                  a list of directions as a table, see exportVector3d
@@ -244,7 +244,7 @@ def _exportEBSD_ang(ebsd, fname, *, eulerCorrection=None, setting=2):
   return fname
 
 
-# write a map as an Oxford/Channel .ctf file, the half turn about z and the tilt of a stated surface undone
+# write a map as an Oxford/Channel .ctf file, the half turn about y and the tilt of a stated surface undone
 def _exportEBSD_ctf(ebsd, fname, *, eulerCorrection=None):
   acq = tuple(_headerNumber(ebsd, (k,), 0.0) for k in ("acqe1", "acqe2", "acqe3"))
   if eulerCorrection is None:

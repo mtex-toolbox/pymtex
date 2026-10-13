@@ -1,29 +1,39 @@
 # the import of volumes (MATLAB EBSD3.load, loadEBSD_dream3d, loadEBSD_xnovo, ../master)
 #
-#   ebsd = loadEBSD3('volume.dream3d')                   the cell data of a DREAM.3D image geometry
+#   ebsd = loadEBSD3('volume.dream3d')                   the voxel data of a DREAM.3D file
 #   ebsd = loadEBSD3('volume.h5')                        the LabDCT volume of an xnovo file
 #   ebsd = loadEBSD3(['s0.ang', 's1.ang'], z=[0, 1])     a stack of 2D maps at their heights
 #
 # HDF5 keeps its arrays in C order, the slowest axis first, where MATLAB's h5read returns them
 # reversed; the arrays are turned to (x, y, z) here, so that voxel [i, j, k] of the volume is
-# the one MATLAB addresses as (i+1, j+1, k+1).
+# the one MATLAB addresses as (i+1, j+1, k+1). A data set is read over the cores (h5array.py)
+# and turned and converted in one compiled pass (turnVolume, turnBunge and turnRodrigues of kernels.py).
+#
+# Neither the data containers of a DREAM.3D file nor their attribute matrices have fixed names
+# (DREAM.3D 6 writes DataContainers/.../CellData, DREAM3D-NX DataStructure/.../Cell Data, a
+# pipeline whatever it is told), so the data are located by the name of the data set.
 from __future__ import annotations
 
 import os
+import re
 
 import numpy as np
 
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 from ..maps3d.ebsd3 import EBSD3, EBSD3square
+from .h5array import readArray
+from .kernels import turnBunge, turnRodrigues, turnVolume
 
 # DREAM.3D's crystal structures, by their number; 999 and anything else is not indexed
 DREAM3D_SYMMETRY = ("622", "432", "6", "23", "1", "121", "222", "4", "422", "3", "322", "1")
+# the data sets that tell the voxel data of a DREAM.3D file, the first found deciding
+DREAM3D_VOXELS = ("EulerAngles", "Quats", "FeatureIds")
 
 
 def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
-  """the 3D EBSD map of a volume file, MATLAB's EBSD3.load: the cell data of a DREAM.3D file, the
+  """the 3D EBSD map of a volume file, MATLAB's EBSD3.load: the voxel data of a DREAM.3D file, the
   LabDCT volume of an xnovo file, or a stack of 2D maps at the heights z; CS replaces the
   phases of the file
 
@@ -34,58 +44,149 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
     return _stack(fname, z, *args, **kwargs)
   ext = os.path.splitext(fname)[1].lower().lstrip(".")
   import h5py
+  if interface is None and ext in ("h5", "hdf5"):
+    with h5py.File(fname, "r") as f:
+      interface = "xnovo" if "LabDCT" in f else "dream3d" if dream3dVolume(f) is not None else None
   if interface == "dream3d" or (interface is None and ext == "dream3d"):
     return _loadEBSD_dream3d(fname, CS=CS)
-  if interface == "xnovo" or (interface is None and ext in ("h5", "hdf5")):
-    with h5py.File(fname, "r") as f:
-      if "LabDCT" in f:
-        return _loadEBSD_xnovo(fname, CS=CS)
-      if "DataStructure" in f:
-        return _loadEBSD_dream3d(fname, CS=CS)
+  if interface == "xnovo":
+    return _loadEBSD_xnovo(fname, CS=CS)
   raise ValueError(f"{fname} is not a volume this port reads: DREAM.3D, xnovo, or a list of 2D maps")
+
+
+def dream3dDatasets(f):
+  """the paths of all data sets of an open DREAM.3D file, those of a group before those of its
+  subgroups; the readers locate their data by the name of the data set"""
+  import h5py
+  paths = []
+
+  def walk(group, prefix):
+    below = []
+    for name in group:
+      obj = group.get(name)
+      if isinstance(obj, h5py.Dataset):
+        paths.append(prefix + name)
+      elif isinstance(obj, h5py.Group):
+        below.append((obj, prefix + name + "/"))
+    for obj, p in below:
+      walk(obj, p)
+
+  walk(f, "")
+  return paths
+
+
+# the paths ending in one of the names, in the order of the names
+def _named(paths, *names):
+  return [p for name in names for p in paths if p.endswith("/" + name)]
+
+
+# the group of a path
+def _parent(path):
+  return path.rpartition("/")[0]
+
+
+# the attribute matrix of the voxels, the group of the first of EulerAngles, Quats and FeatureIds
+def _voxelData(paths):
+  hit = _named(paths, *DREAM3D_VOXELS)
+  return _parent(hit[0]) if hit else None
 
 
 # the phases of DREAM.3D's crystal structures, the first the not indexed one, a number outside
 # the table not indexed too
 def _dream3dPhases(structures):
   structures = np.asarray(structures).reshape(-1)
-  return ["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY)
-                           else "notIndexed" for s in structures[1:]]
+  return distinctMinerals(["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY)
+                                            else "notIndexed" for s in structures[1:]])
 
 
-# (z, y, x, ...) of the file to (x, y, z, ...)
-def _xyz(a):
-  a = np.asarray(a)
-  return np.ascontiguousarray(np.swapaxes(a, 0, 2))
+# the name a cell array has as a property: the feature ids are the grain ids, a letter after a
+# blank is a capital and whatever else no name holds an underscore, as MATLAB's makeValidName
+def _propertyName(name):
+  name = re.sub(r"\s+(\S)", lambda m: m.group(1).upper(), name.replace("FeatureIds", "grainId").strip())
+  name = re.sub(r"\W", "_", name)
+  return name if name[:1].isalpha() else "x" + name
 
 
-# the 3D EBSD map of the image geometry of a DREAM.3D file: the Euler angles, the phases with the
-# mask, every further scalar cell array as a property, the feature ids as grainId
+# the grid of an image geometry as (cells along x, y, z), spacing, origin: data sets of
+# _SIMPL_GEOMETRY in DREAM.3D 6, attributes of the data container in DREAM3D-NX
+def _dream3dGrid(f, root):
+  if root + "/_SIMPL_GEOMETRY/DIMENSIONS" in f:
+    part = {name: f[f"{root}/_SIMPL_GEOMETRY/{name}"][...] for name in ("DIMENSIONS", "SPACING", "ORIGIN")}
+  else:
+    part = {name: f[root].attrs["_" + name] for name in ("DIMENSIONS", "SPACING", "ORIGIN")}
+  dims, spacing, origin = (np.asarray(part[name], dtype=float).reshape(3) for name in ("DIMENSIONS", "SPACING", "ORIGIN"))
+  return tuple(int(n) for n in dims), spacing, origin
+
+
+# an array of a file turned to (x, y, z) in the type the file stores it in: a property of a
+# volume stays float32 or int32, half of what float64 takes on 49 million voxels
+def _turned(a):
+  return turnVolume(a, a.dtype)
+
+
+def dream3dVolume(f):
+  """what an open DREAM.3D file holds as a volume, None where it holds no voxels on a grid: the
+  attribute matrix of the voxels (cellData) in its data container (root), the cells along
+  x, y, z (shape), spacing and origin, the names of the cell arrays, the properties as
+  {name of the property: name of the array} and the path of the crystal structures"""
+  from types import SimpleNamespace
+  paths = dream3dDatasets(f)
+  cellData = _voxelData(paths)
+  if cellData is None:
+    return None
+  root = _parent(cellData)
+  if root + "/_SIMPL_GEOMETRY/DIMENSIONS" not in f and "_DIMENSIONS" not in f[root or "/"].attrs:
+    return None
+  shape, spacing, origin = _dream3dGrid(f, root)
+  n = shape[0] * shape[1] * shape[2]
+  names = [p[len(cellData) + 1:] for p in paths if _parent(p) == cellData]
+  # every scalar cell array but the phases and the mask is a property
+  scalar = [name for name in names if name not in ("Phases", "Mask") and f[cellData + "/" + name].size == n
+            and f[cellData + "/" + name].dtype.kind in "iufb"]
+  structures = [p for p in paths if p.startswith(root + "/") and p.endswith("/CrystalStructures")]
+  return SimpleNamespace(paths=paths, cellData=cellData, root=root, shape=shape, spacing=spacing, origin=origin, names=names,
+                         properties={_propertyName(name): name for name in scalar}, structures=structures[0] if structures else None)
+
+
+# the phases a DREAM.3D volume declares, one unknown triclinic phase where it declares none
+def _dream3dCS(f, vol):
+  return _dream3dPhases(f[vol.structures][...]) if vol.structures else ["notIndexed", crystalFrame("1")]
+
+
+# the 3D EBSD map of the voxel data of a DREAM.3D file: the Euler angles or else the quaternions,
+# the phases with the mask, every further scalar cell array as a property, the feature ids as
+# grainId; without orientations the rotations are NaN, without phases the voxels are one phase.
+# Only the arrays that enter the map are read
 def _loadEBSD_dream3d(fname, CS=None):
   import h5py
-  root = "DataStructure/DataContainer"
   with h5py.File(fname, "r") as f:
-    g = f[root]
-    spacing = np.asarray(g.attrs["_SPACING"], dtype=float)
-    origin = np.asarray(g.attrs["_ORIGIN"], dtype=float)
-    cell = g["CellData"]
-    eul = _xyz(cell["EulerAngles"][...]).astype(float)
-    shape = eul.shape[:3]
-    phases = _xyz(cell["Phases"][...]).reshape(shape).astype(np.int64)
-    if "Mask" in cell:
-      phases[_xyz(cell["Mask"][...]).reshape(shape) == 0] = 0
+    vol = dream3dVolume(f)
+    if vol is None:
+      raise ValueError(f"{fname} holds no voxel data: none of the data sets {', '.join(DREAM3D_VOXELS)} on a grid")
+    cellData, shape, names = vol.cellData, vol.shape, vol.names
+    nx, ny, nz = shape
+
+    # a cell array turned to (x, y, z), its components last
+    def read(name, dtype=None):
+      a = readArray(f[cellData + "/" + name]).reshape(nz, ny, nx, -1)
+      return _turned(a) if dtype is None else turnVolume(a, dtype)
+
+    if "EulerAngles" in names:
+      rot = rotation._fromData(turnBunge(readArray(f[cellData + "/EulerAngles"]).reshape(nz, ny, nx, 3)))
+    elif "Quats" in names:
+      # the passive rotation as (x, y, z, w)
+      q = read("Quats", np.float64)
+      rot = rotation(np.concatenate([q[..., 3:], -q[..., :3]], axis=-1))
+    else:
+      rot = rotation.nan(shape)
+    phases = read("Phases").reshape(shape) if "Phases" in names else np.ones(shape, dtype=np.int8)
+    if "Mask" in names:
+      phases[read("Mask", np.uint8).reshape(shape) == 0] = 0
     if CS is None:
-      CS = _dream3dPhases(g["CellEnsembleData/CrystalStructures"][...])
-    # every further scalar cell array is a property, the feature ids the grain id
-    prop = {}
-    for name, ds in cell.items():
-      if name in ("Phases", "Mask") or ds.ndim != 4 or ds.shape[-1] != 1:
-        continue
-      key = "grainId" if name == "FeatureIds" else name.replace(" ", "")
-      prop[key] = _xyz(ds[...]).reshape(shape).astype(float)
-  rot = rotation.byEuler(eul[..., 0], eul[..., 1], eul[..., 2], "ZXZ")
+      CS = _dream3dCS(f, vol)
+    prop = {key: read(name).reshape(shape) for key, name in vol.properties.items()}
   cs = CS if isinstance(CS, phaseList) else phaseList(CS)
-  return EBSD3square(rot, phases, cs, spacing, origin=origin, prop=prop)
+  return EBSD3square(rot, phases, cs, vol.spacing, origin=vol.origin, prop=prop)
 
 
 # the 3D EBSD map of the LabDCT volume of an xnovo HDF5 file, the orientations from Rodrigues
@@ -95,26 +196,25 @@ def _loadEBSD_xnovo(fname, CS=None, map="LabDCT"):
   with h5py.File(fname, "r") as f:
     g = f[map]
     data = g["Data"]
-    phase = _xyz(data["PhaseId"][...]).astype(np.int64)
+    phase = turnVolume(readArray(data["PhaseId"]), np.int64)
     shape = phase.shape
     if "Rodrigues" in data:
-      from ..geometry.vector3d import vector3d
-      rot = rotation.byRodrigues(vector3d(_xyz(data["Rodrigues"][...]).astype(float)))
+      rot = rotation._fromData(turnRodrigues(readArray(data["Rodrigues"])))
     elif "Quaternion" in data:
-      rot = rotation(_xyz(data["Quaternion"][...]).astype(float))
+      rot = rotation(turnVolume(readArray(data["Quaternion"])))
     else:
       convention = next((c for c in ("ZXZ", "ZYZ") if "Euler" + c in data), None)
       if convention is None:
         raise ValueError(f"{fname} holds no orientations in {map}/Data")
-      e = _xyz(data["Euler" + convention][...]).astype(float)
+      e = turnVolume(readArray(data["Euler" + convention]))
       rot = rotation.byEuler(e[..., 0], e[..., 1], e[..., 2], convention)
     q = rot.data.reshape(-1, 4)
     q[~np.all(np.isfinite(q), axis=1)] = [1, 0, 0, 0]
     prop = {}
     if "Completeness" in data:
-      prop["Completeness"] = _xyz(data["Completeness"][...]).astype(float)
+      prop["Completeness"] = _turned(readArray(data["Completeness"]))
     if "GrainId" in data:
-      prop["grainId"] = _xyz(data["GrainId"][...]).astype(float)
+      prop["grainId"] = _turned(readArray(data["GrainId"]))
     center = np.asarray(g["Center"][...], dtype=float)
     spacing = np.asarray(g["Spacing"][...], dtype=float)
     if isinstance(CS, crystalFrame):
@@ -144,7 +244,7 @@ def _xnovoPhases(f):
     angles = np.array([90.0, 90.0, 120.0]) if 143 <= sg <= 194 else uc[3:6]
     fr = crystalFrame(uc[:3], angles * np.pi / 180, "X||a", "Z||c*", spaceId=sg, mineral=mineral, color=color)
     cs.append(fr.Laue())
-  return cs
+  return distinctMinerals(cs)
 
 
 # a stack of 2D maps at the heights z, by default 0, 1, 2, ..., as MATLAB's EBSD3.load(files, '3d', Z)

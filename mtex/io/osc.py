@@ -18,7 +18,7 @@ import numpy as np
 
 from ..geometry.frames import crystalFrame
 from ..geometry.units import degree
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 from .ang import eulerCorrectionRotation
 from .load import EDAX_POINT_GROUPS, TSL_LAUE, _edaxPointGroup, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import readFile
@@ -90,7 +90,7 @@ def oscPhases(b, first, last):
     if fr is not None:
       frames.append(fr)
       after = o + OSC_PHASE_LENGTH
-  return phaseList(frames)
+  return phaseList(distinctMinerals(frames))
 
 
 def oscDataStart(b, close, n):

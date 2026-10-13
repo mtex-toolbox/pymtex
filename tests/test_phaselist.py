@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from mtex import phaseList, crystalFrame
+from mtex.maps.phaselist import distinctMinerals
 from mtex.geometry.frames import notIndexedFrame
 
 
@@ -56,3 +57,18 @@ def test_a_selection_mask_reads_indexed_notIndexed_and_minerals():
   ph = np.array([[0, 1], [2, 1]])
   assert (np.array_equal(pl._selectionMask(["indexed"], ph), ph > 0) and np.array_equal(pl._selectionMask(["notIndexed"], ph), ph == 0)
           and np.array_equal(pl._selectionMask(["Mg", "notIndexed"], ph), ph != 1))
+
+
+@pytest.mark.parametrize("names, distinct", [
+  (["Iron", "Titanium"], ["Iron", "Titanium"]),
+  (["Iron", "Iron", "Titanium"], ["Iron A", "Iron B", "Titanium"]),
+  (["Iron", "iron ", "IRON"], ["Iron A", "iron B", "IRON C"]),
+  (["", "", "Iron"], ["A", "B", "Iron"]),
+  (["", "Iron"], ["", "Iron"]),
+  (["A", "", ""], ["A", "B", "C"]),
+  (["x"] * 28, [f"x {c}" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"] + ["x AA", "x AB"])])
+def test_distinctMinerals_givesPhasesOfOneNameALetterEach(names, distinct):
+  # equal cells, so that only the name tells the phases apart
+  frames = distinctMinerals(["notIndexed"] + [crystalFrame("m-3m", [3, 3, 3], mineral=n) for n in names])
+  pl = phaseList(frames)
+  assert pl.mineralList[1:] == distinct and (len(set(distinct)) < len(distinct) or [pl.phaseId(n) for n in distinct if n] == [k + 1 for k, n in enumerate(distinct) if n])

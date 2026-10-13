@@ -144,7 +144,7 @@ configs copied into `mtex/io/hdf5_config/`, the resolver of the Julia port.
 `ebsd.export(fname)`, the format from the extension, `.ang`, `.ctf`, the HDF5 formats, and
 any other name a table `x y phi1 Phi phi2 phase` plus the properties under a line of names,
 which `loadEBSD` reads back. An exporter undoes what its loader applies, the setting's
-rotation for `.ang`, the half turn about z and the tilt of a stated surface for `.ctf`, and
+rotation for `.ang`, the half turn about y and the tilt of a stated surface for `.ctf`, and
 writes back the header the loader kept in `ebsd.meta`; only the phases present are
 declared, counted from one, since a declared and unused phase is what makes a file read
 zero based. The HDF5 write-back is the Julia design: the file the map came from, or
@@ -237,9 +237,24 @@ planes. The import wizard lists them and draws one on demand.
 **Later.** `loadODF`, `loadOrientations`, the VPSC file, the Neper tessellation, the pole
 figure export.
 
+**I9 - the volumes. DONE 2026-10-12.** `load3d.py` and `loadgrains3d.py` follow MATLAB develop:
+a DREAM.3D file is read by the names of its data sets (`dream3dDatasets`), so DREAM.3D 6
+(`DataContainers`, the grid in `_SIMPL_GEOMETRY`), DREAM3D-NX and the pipelines that write
+`Cell Data` or names of their own all load; the voxels are the attribute matrix of the first
+`EulerAngles`, `Quats` or `FeatureIds`, a file without orientations gives NaN rotations, one
+without `Phases` a single phase, and `grain3d.load` of a file without a surface mesh the
+grains of its feature ids. Only the arrays that enter the map are read, and a property
+keeps the type the file stores it in (float32, int32; user, 2026-10-12). The speed is three
+pieces: `h5array.py` reads a data set over the cores (the threads `pread` the stored bytes
+and inflate the gzip chunks, h5py the fallback and oracle), `turnVolume`, `turnBunge` and
+`turnRodrigues` of `io/kernels.py` turn (z, y, x) to (x, y, z) and convert in one compiled
+pass, and `boxLattice` of `maps3d/voxellattice.py` writes index and positions of the box in
+one. Checked against MATLAB on a DREAM3D-NX and a DREAM.3D 6 file
+(`bench/matlab/probe_dream3d.m`): the phases, the voxels probed and the sum of every property
+agree, the quaternions up to their sign; the timings are in `docs/research/benchmark-io.md`.
+
 ## 4. Left out
 
 The import wizard (now `docs/plans/wizard.md`), `loadData`'s search over every loader, the forty-phase rule of
 `loadEBSD_generic`, mineral names in the data block of an `.ang` (MATLAB substitutes
-numbers for them; no file here has them), `.mat` files, `functionSignatures.json`, the
-`dream3d` and `xnovo` loaders marked WIP in the branch.
+numbers for them; no file here has them), `.mat` files, `functionSignatures.json`.

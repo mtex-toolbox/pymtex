@@ -42,6 +42,11 @@ class WizardState:
     self.headerPhases = None
     self.drawn = {}
     self.loadSeconds = None
+    # the map the views draw: the map itself, or of a volume the layer sectionIndex across the
+    # axis sectionAxis (0, 1, 2 for x, y, z)
+    self.section = None
+    self.sectionAxis = 2
+    self.sectionIndex = 0
     self.imports = 0           # the imports started, so that only the latest is committed
     self._phaseCounts = None   # (the phase ids counted, their counts), kept by phaseCounts
     # the two reference frames as entries of AXIS_CONVENTIONS, and the axis names of each
@@ -100,12 +105,19 @@ class WizardState:
     """whether a map has been imported"""
     return self.ebsd is not None
 
+  @property
+  def isVolume(self):
+    """whether the map imported is a volume, shown one section at a time"""
+    return self.ebsd is not None and self.ebsd.ndim == 3
+
   def __repr__(self):
     lines = [f"importWizard state in {self.folder}", f"  status: {self.status[0]} - {self.status[1]}"]
     if self.info is not None:
       lines.append(f"  file: {self.info.name}")
     if self.ebsd is not None:
       lines.append(f"  map: {self.ebsd.size} points, tab {self.currentTab!r}")
+      if self.isVolume:
+        lines.append(f"  section: layer {self.sectionIndex} of {self.ebsd.shape[self.sectionAxis]} across {'xyz'[self.sectionAxis]}")
       lines.append(f"  map coordinates {AXIS_CONVENTIONS[self.mapConvention]}, Euler coordinates {AXIS_CONVENTIONS[self.eulerConvention]}")
     return aligned("\n".join(lines))
 

@@ -231,7 +231,7 @@ def projectIntoFundamentalRegionOrientation(o, ref=None):
   is given - which is the representative in the fundamental region; around the identity the
   conjugates tie and the axis sector of the shared rotations decides. A list of references,
   one per element, is the pair search of dot without the images of a single reference"""
-  from .orientationregion import commonAxisCenter, commonRotations
+  from .orientationregion import commonAxisSector
   L, R = reductionGroups(o)
   if ref is None:
     refq = _ID
@@ -240,39 +240,40 @@ def projectIntoFundamentalRegionOrientation(o, ref=None):
   if refq.ndim > 1:
     return o._new(closestImage(refq, o.data, L, R, o.antipodal)[1])
   es, frm = referenceImages(refq, L, R, o.antipodal)
-  common, cimgs = None, None
-  if abs(refq[0]) > 1 - 1e-12:
-    common = commonRotations(L, R)
-    if len(common) > 1:
-      cimgs = qrot(common, commonAxisCenter(common)[None])
-  p = projectToRef(o.data, es, frm, L, R, refq, common, cimgs)
-  if o.antipodal and abs(refq[0]) > 1 - 1e-12:
-    p = _exchangeIntoSector(p, commonRotations(L, R))
-  return o._new(p)
+  if abs(refq[0]) <= 1 - 1e-12:
+    return o._new(projectToRef(o.data, es, frm, L, R, refq))
+  sector, center, shared = commonAxisSector(o)
+  if sector is None:
+    return o._new(projectToRef(o.data, es, frm, L, R, refq))
+  p = projectToRef(o.data, es, frm, L, R, refq, shared, qrot(shared, center[None]))
+  return o._new(_intoAxisSector(p, shared, sector, center, o.antipodal))
 
 
-# with grain exchange the inverse, the same angle about the opposite axis, is a further
-# representative: among the conjugates of p and of its inverse by the shared rotations the
-# first whose axis lies in the sector of the shared rotations with inversion, else the one
-# whose axis is nearest its centre
-def _exchangeIntoSector(p, common):
-  from .orientationregion import commonAxisSector
-  sector, center = commonAxisSector(common, True)
-  q = p.reshape(-1, 4)
+# the kernel took the conjugate whose axis is nearest the centre of the sector, which is inside
+# wherever the sector is the centre's Dirichlet domain; an axis left outside takes the first
+# conjugate by the shared rotations that brings it in, with grain exchange of the inverse too,
+# the same angle about the opposite axis, else the one nearest the centre
+def _intoAxisSector(p, shared, sector, center, exchange):
+  q = p.reshape(-1, 4).copy()
+  ax = q[:, 1:] * np.where(q[:, :1] < 0, -1.0, 1.0)
+  nrm = np.linalg.norm(ax, axis=-1)
+  # a rotation about no axis stays as it is
+  out = np.any(ax @ sector.N.T < -1e-9 * nrm[:, None], axis=-1) & (nrm >= 1e-12)
+  if not np.any(out):
+    return p
+  x = q[out]
   cands = []
-  for c in (common if len(common) else _ID[None]):
-    ci = qconj(c)
-    for x in (q, qconj(q)):
-      cands.append(qmul(qmul(ci, x), c))
+  for c in shared:
+    for y in ((x, qconj(x)) if exchange else (x,)):
+      cands.append(qmul(qmul(qconj(c), y), c))
   cands = np.stack(cands, axis=1)
   cands *= np.where(cands[..., :1] < 0, -1.0, 1.0)
   axes = cands[..., 1:]
-  inside = np.all(axes @ sector.N.T >= -1e-9 * np.linalg.norm(axes, axis=-1, keepdims=True), axis=-1)
-  score = np.where(inside, 2.0, axes @ center / np.maximum(np.linalg.norm(axes, axis=-1), 1e-300))
-  best = cands[np.arange(len(q)), np.argmax(score, axis=1)]
-  # a rotation about no axis stays as it is
-  best = np.where((np.linalg.norm(q[:, 1:], axis=1) < 1e-12)[:, None], q, best)
-  return best.reshape(p.shape)
+  n = np.linalg.norm(axes, axis=-1)
+  inside = np.all(axes @ sector.N.T >= -1e-9 * n[..., None], axis=-1)
+  score = np.where(inside, 2.0, axes @ center / n)
+  q[out] = cands[np.arange(len(x)), np.argmax(score, axis=1)]
+  return q.reshape(p.shape)
 
 
 # the distinct orientations of a list up to symmetry: representatives in the fundamental

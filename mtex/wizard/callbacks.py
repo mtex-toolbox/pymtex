@@ -200,6 +200,7 @@ def startImport(st, worker=None):
   if st.info is None:
     return
   path, k, several = st.selected, st.dataSet, len(st.info.dataSets) > 1
+  volume = st.info.is3d
   # every import is numbered and only the latest is taken: a map clicked while another was
   # still being read would otherwise be replaced by it when the earlier one finished later
   st.imports += 1
@@ -211,9 +212,10 @@ def startImport(st, worker=None):
 
   def load():
     from ..io.load import loadEBSD
+    from ..io.load3d import loadEBSD3
     t = time.perf_counter()
     kw = {"dataSet": k, "verbose": False} if several else {}
-    ebsd = loadEBSD(path, **kw)
+    ebsd = loadEBSD3(path) if volume else loadEBSD(path, **kw)
     seconds = time.perf_counter() - t
     # the colour grids of phases the header did not name built here too, not on the main thread
     # when the map is first drawn
@@ -241,8 +243,12 @@ def startImport(st, worker=None):
 
 def commitMap(st, ebsd, seconds):
   """the map taken into the state: its phases as declared, every indexed one drawn, the raster,
-  the views it offers, the Euler frame it was read in"""
+  the views it offers, the Euler frame it was read in; a volume opens on its middle layer
+  across z"""
   st.ebsd = ebsd
+  st.sectionAxis = 2
+  st.sectionIndex = ebsd.shape[2] // 2 if ebsd.ndim == 3 else 0
+  st.section = sectionOf(ebsd, st.sectionAxis, st.sectionIndex)
   st.loadSeconds = seconds
   st.headerPhases = frameKeys(ebsd.CSList)
   st.drawn = {k: True for k in range(len(ebsd.CSList))}
@@ -261,7 +267,60 @@ def commitMap(st, ebsd, seconds):
   if st.keyPhase is None:
     st.keyPhase = next((k for k, f in enumerate(ebsd.CSList.frames) if f.isIndexed), None)
   st.status = ("loaded", f"{os.path.basename(st.selected)}: {ebsd.size} points in {seconds:.2f} s")
-  st.changed("ebsd", "phases", "eulerConvention", "tabs", "tab", "meta", "images", "keyPhase", "status")
+  st.changed("ebsd", "section", "phases", "eulerConvention", "tabs", "tab", "meta", "images", "keyPhase", "status")
+
+
+def sectionOf(ebsd, axis=2, index=None):
+  """the layer of a volume across an axis (0, 1, 2 for x, y, z) as a map, the middle one by
+  default: the two coordinates along the layer are its x and y, the orientations and the
+  properties those of its voxels; a map is its own section"""
+  if ebsd.ndim != 3:
+    return ebsd
+  from ..maps.ebsd import EBSD, _rotations
+  index = ebsd.shape[axis] // 2 if index is None else index
+
+  def layer(a):
+    return np.take(a, index, axis=axis)
+
+  along = layer(ebsd.pos.data)
+  pos = np.zeros(along.shape)
+  pos[..., :2] = along[..., [a for a in range(3) if a != axis]]
+  prop = {k: layer(v) for k, v in ebsd.prop.items() if np.ndim(v) >= 3}
+  # the cell of the layer is the voxel's face, known and not inferred from the positions
+  du, dv = (ebsd.lattice.spacing[a] / 2 for a in range(3) if a != axis)
+  cell = np.array([[du, dv, 0], [-du, dv, 0], [-du, -dv, 0], [du, -dv, 0]])
+  return EBSD(pos, _rotations(np.ascontiguousarray(layer(ebsd.rotations.data))), layer(ebsd.phaseId), ebsd.CSList, prop,
+              unitCell=cell, scanUnit=ebsd.scanUnit, frame=ebsd.frame)
+
+
+def setSection(st, axis=None, index=None):
+  """the layer of the volume the views draw: across another axis, where it opens on the middle
+  layer, or another layer across the same one"""
+  if not st.isVolume:
+    return
+  axis = st.sectionAxis if axis is None else int(axis)
+  if not 0 <= axis < 3:
+    return
+  n = st.ebsd.shape[axis]
+  index = (n // 2 if axis != st.sectionAxis else st.sectionIndex) if index is None else min(max(int(index), 0), n - 1)
+  if (axis, index) == (st.sectionAxis, st.sectionIndex):
+    return
+  st.sectionAxis, st.sectionIndex = axis, index
+  st.section = sectionOf(st.ebsd, axis, index)
+  st.changed("section")
+
+
+def sectionLabel(st):
+  """the layer of the volume in words: its number, how many there are, where it lies, and which
+  axes of the volume the picture shows as its x and y where they are not x and y"""
+  if not st.isVolume:
+    return ""
+  axis, k = st.sectionAxis, st.sectionIndex
+  at = st.ebsd.lattice.origin[axis] + k * st.ebsd.lattice.D[axis, axis]
+  unit = {"um": "µm"}.get(st.ebsd.scanUnit, st.ebsd.scanUnit)
+  u, v = (name for a, name in enumerate("xyz") if a != axis)
+  drawn = "" if axis == 2 else f", drawn with {u} as x and {v} as y"
+  return f"layer {k + 1} of {st.ebsd.shape[axis]} at {'xyz'[axis]} = {at:.4g} {unit}{drawn}"
 
 
 def _loadedPath(st):
@@ -503,8 +562,8 @@ def setEulerConvention(st, i):
 
 
 def applyEuler(st):
-  """turns the loaded map, the Euler angles only, to the correction of the chosen conventions,
-  the densities with it; nothing when it is already there"""
+  """turns the loaded map or volume, the Euler angles only, to the correction of the chosen
+  conventions, the densities with it; nothing when it is already there"""
   if st.ebsd is None:
     return
   new = correctionOf(st)
@@ -515,8 +574,9 @@ def applyEuler(st):
   ebsd = st.ebsd.rotate(d, keepXY=True)
   ebsd.meta = dict(ebsd.meta, EulerCorrection=new)
   st.ebsd = ebsd
+  st.section = sectionOf(ebsd, st.sectionAxis, st.sectionIndex)
   st.densities = {k: odf.rotate(d) for k, odf in st.densities.items()}
-  st.changed("ebsd")
+  st.changed("ebsd", "section")
 
 
 # ------------------------------------------------------------------ the phases
@@ -599,6 +659,8 @@ def editPhase(st, phaseId, column, value):
   frames = list(st.ebsd.CSList.frames)
   frames[phaseId] = new
   st.ebsd.CSList = phaseList(frames)
+  if st.isVolume:
+    st.section.CSList = st.ebsd.CSList
   st.densities.pop(phaseId, None)
   st.changed("phases")
 
@@ -656,7 +718,7 @@ def scriptOf(st):
   return buildImportWizardScript(st.selected, phases=st.ebsd.CSList, headerPhases=st.headerPhases, dataSet=st.dataSet,
                                  dataSets=st.info.dataSets, mapConvention=AXIS_CONVENTIONS[st.mapConvention],
                                  eulerConvention=AXIS_CONVENTIONS[st.eulerConvention], vendorCorrection=st.info.eulerCorrection,
-                                 variable=st.variable, drawn={k: phaseCounts(st).get(k, 0) for k, on in st.drawn.items() if on})
+                                 variable=st.variable, volume=st.isVolume, drawn={k: phaseCounts(st).get(k, 0) for k, on in st.drawn.items() if on})
 
 
 def writeScript(st, path=None):
@@ -680,4 +742,4 @@ def defaultScriptPath(st, folder=None):
 
 
 __all__ = ["WizardState", "setFolder", "toggleFolder", "pickFile", "selectEntry", "openEntry", "leaveEntry", "startImport", "setDataSet",
-           "pickTab", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]
+           "pickTab", "sectionOf", "setSection", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]

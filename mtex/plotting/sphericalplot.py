@@ -776,7 +776,7 @@ def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, edgeAlpha=1.0
   rings = []
   for r, ai, bi in zip(rots, a, b):
     # the polar distance of the ellipse from its centre, then turned into place
-    theta = ai * bi / np.sqrt((ai * np.cos(rho)) ** 2 + (bi * np.sin(rho)) ** 2)
+    theta = ai * bi / np.sqrt((bi * np.cos(rho)) ** 2 + (ai * np.sin(rho)) ** 2)
     c = rotation(r.data.reshape(4)) * vector3d.byPolar(theta, rho)
     rings.append(c.data.reshape(-1, 3))
   return _curves(rings, None, False, add2all, lineColor, lineWidth, edgeAlpha, parent, "ellipse", **kw)

@@ -331,10 +331,11 @@ class slipSystem:
 
 
 def burgersLength(CS):
-  """the Burgers vector of a slip system in lattice units"""
+  """the Burgers vector of a slip system in units of its slip direction: a hexagonal direction
+  [11-20] has the length a already, a cubic one is twice the Burgers vector"""
   lat = CS.lattice
   if lat.isTriHex:
-    return 1 / 3
+    return 1.0
   if lat.name == "cubic":
     return 1 / 2
   raise ValueError(f"the length of the Burgers vector of a {lat} lattice has to be given")
@@ -344,8 +345,9 @@ def burgersLength(CS):
 
 class dislocationSystem:
   """a Burgers vector with a line vector, edge when orthogonal and screw when parallel; from
-  slip systems, the edge dislocations of every system with the energy 2 and the screw ones
-  of every distinct Burgers vector with the energy 1"""
+  slip systems, the edge dislocations of every system and the screw ones of every distinct
+  Burgers vector. The line energy u is |b|^2 for an edge and 0.7 |b|^2 for a screw
+  dislocation unless given, the isotropic line energy with Poisson ratio 0.3"""
 
   def __init__(self, b, l=None, u=None):
     if isinstance(b, slipSystem):
@@ -361,7 +363,6 @@ class dislocationSystem:
       screws = flat[_firstOfClusters(same)]
       b = vector3d(np.concatenate([bd, screws]), frame=fr)
       l = vector3d(np.concatenate([ld, screws]), frame=fr, antipodal=True)
-      u = np.concatenate([np.full(len(bd), 2.0), np.ones(len(screws))])
       b.dispStyle = l.dispStyle = sS.b.dispStyle
     else:
       b, l = _asList(b), _asList(l)
@@ -371,8 +372,10 @@ class dislocationSystem:
       if np.any((cosang > 1e-5) & (cosang < 1 - 1e-5)):
         raise ValueError("the line vector is neither orthogonal nor parallel to the Burgers vector")
       b, l = vector3d(bd, frame=b.frame), vector3d(ld, frame=b.frame, antipodal=True)
-      u = np.ones(len(bd)) if u is None else np.broadcast_to(np.asarray(u, dtype=float), (len(bd),)).copy()
-    self.b, self.l, self.u = b, l, np.asarray(u, dtype=float)
+    self.b, self.l = b, l
+    if u is None:
+      u = b.norm() ** 2 * (1 - 0.3 * self.isScrew)
+    self.u = np.broadcast_to(np.asarray(u, dtype=float), (len(b),)).copy()
 
   @classmethod
   def _new(cls, b, l, u):

@@ -28,7 +28,7 @@ from ..geometry.frames import crystalFrame, notIndexedFrame
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 from .ang import eulerCorrectionRotation
 from .ctf import _surfaceTilt
 from .load import _mapFromRotations, ebsdFromColumns, phaseColumn, phaseShift, regularPoly, scanGrid, tslPointGroup, unmeasuredRows
@@ -321,6 +321,33 @@ def h5Image(fname, entry):
 
 # ------------------------------------------------------------------ the reader
 
+# the letters an X-ray line is named with, which no property name holds
+GREEK = {"α": "a", "β": "b", "γ": "g", "δ": "d", "ε": "e", "ζ": "z", "η": "h", "θ": "th", "ι": "i", "κ": "k", "λ": "l",
+         "μ": "mu", "ν": "n", "ξ": "xi", "π": "pi", "ρ": "rho", "σ": "s", "τ": "t", "φ": "phi", "χ": "chi", "ψ": "psi", "ω": "w"}
+
+
+# one part of a property name as MATLAB's reader cleans it: the case kept, blanks and
+# punctuation dropped, whatever else a name cannot hold an underscore
+def _namePart(text):
+  for g, latin in GREEK.items():
+    text = text.replace(g, latin)
+  text = re.sub(r"[ ,\-:|%~#\[\]()]", "", text)
+  return re.sub(r"_{2,}", "_", re.sub(r"[^0-9A-Za-z_]", "_", text)).rstrip("_")
+
+
+def additionName(field):
+  """the property a data set of an additions group becomes, by its path below the group: the
+  name in lower case without blanks, as "Band Contrast" is bandcontrast. A data set sorted into
+  a subgroup that starts with a chemical element, as the "Co Ka1" an Oxford EDS map holds under
+  "Window Integral" and again under "Peak Area", puts the element first, then the subgroup, the
+  case kept: Co_WindowIntegral_Ka1, C_PeakArea_Kseries, Ca_Composition_Wt, as MATLAB's reader"""
+  group, _, name = field.rpartition("/")
+  m = re.match(r"([A-Z][a-z]?)\s+(\S.*)$", name.strip()) if group else None
+  if m is None:
+    return field.replace(" ", "").replace("/", "").lower()
+  return "_".join([m.group(1)] + [_namePart(g) for g in group.split("/")] + [_namePart(m.group(2))])
+
+
 class h5Reader:
   """an open HDF5 file read by the config of its vendor: its paths and groups listed once, the
   data set chosen, the scope the config's entries are searched in, and the data sets read so far"""
@@ -489,7 +516,7 @@ class h5Reader:
     cs = self.ebsd.get("cs")
     root = None if cs is None else self.one(cs["key"])
     if root is None:
-      return phaseList(frames), prov
+      return phaseList(distinctMinerals(frames)), prov
     depth = root.count("/") + 1
     d = cs["default"]
     for g in [p for p in self.paths if p.startswith(root + "/") and p.count("/") == depth and p in self.groups]:
@@ -517,7 +544,7 @@ class h5Reader:
       whole = self._latticePaths(lat, inner) if lat.get("type", "") == "all_together" else []
       prov.append({"name": self.one(d.get("name"), inner), "cell": whole, "dim": self._latticePaths(lat.get("dim"), inner),
                    "angle": self._latticePaths(lat.get("angle"), inner), "angleScale": angleScale(ang)})
-    return phaseList(frames), prov
+    return phaseList(distinctMinerals(frames)), prov
 
   # ---------------------------------------------------------------- the columns
 
@@ -554,7 +581,7 @@ class h5Reader:
         d = self.f[p]
         if d.size != n or d.dtype.kind not in "iufb":
           continue
-        out.setdefault(field.replace(" ", "").replace("/", "").lower(), p)
+        out.setdefault(additionName(field), p)
     return out
 
   # ---------------------------------------------------------------- the correction
@@ -573,7 +600,7 @@ class h5Reader:
 
   def mapCorrection(self):
     """the rotation the config says the map is turned by against its Euler angles: a constant,
-    the scan rotation the file writes, or a row of a table its own id picks"""
+    the scan rotation the file writes on top of the flip about x, or a row of a table its own id picks"""
     entry = self.ebsd.get("map_correction")
     if not isinstance(entry, dict):
       return rotation.id
@@ -583,7 +610,9 @@ class h5Reader:
     if kind == "scanRotation":
       a = self.number(entry, float(entry.get("fallback", 0.0)))
       a = 0.0 if np.isnan(a) else a
-      return rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
+      # the map runs y down, its z into the surface, where Z1 of the Euler frame points out of it
+      turn = rotation.byAxisAngle(vector3d(0, 0, 1), a * _unitScale(entry, [a]))
+      return rotation.byAxisAngle(vector3d(1, 0, 0), np.pi) * turn
     if kind == "by_id":
       rows = entry.get("correct_data", {}).get("data")
       if rows is None:

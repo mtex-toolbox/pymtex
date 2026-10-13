@@ -26,7 +26,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.symmetry import symmetry
 from ..maps.ebsd import EBSD
 from ..maps.gridify import gridify
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
 
 # the Laue group a TSL symmetry code names; an older file writes 2 for 2/m
 TSL_LAUE = {1: "-1", 2: "2/m", 20: "2/m", 22: "mmm", 4: "4/m", 42: "4/mmm", 3: "-3", 32: "-3m",
@@ -422,7 +422,7 @@ def placedPhases(found):
   if not found:
     return phaseList()
   frames = [found.get(k, notIndexedFrame(f"phase {k}")) for k in range(1, max(found) + 1)]
-  return phaseList([notIndexedFrame()] + frames)
+  return phaseList(distinctMinerals([notIndexedFrame()] + frames))
 
 
 # ------------------------------------------------------------------ the grid

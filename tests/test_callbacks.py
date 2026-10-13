@@ -194,3 +194,70 @@ def test_a_load_is_dropped_when_the_cursor_moves_on():
   load, commit = held[0]
   commit(load())
   assert st.ebsd is None
+
+
+# ------------------------------------------------------------------ volumes
+
+@pytest.mark.parametrize("kind", ["dream3d", "xnovo"])
+def test_a_volume_is_imported_and_opens_on_its_middle_layer(st, volumeFile, kind):
+  from mtex import EBSD, EBSD3
+  seen = []
+  st.on("section", lambda: seen.append(st.sectionIndex))
+  cb.openEntry(st, volumeFile(kind))
+  assert st.status[0] == "loaded" and isinstance(st.ebsd, EBSD3) and st.isVolume and st.ebsd.shape == (5, 4, 3)
+  assert (st.sectionAxis, st.sectionIndex) == (2, 1) and seen == [1] and type(st.section) is EBSD and st.section.shape == (5, 4)
+  assert "phase" in st.tabs and "grainId" in st.tabs and "section: layer 1 of 3 across z" in repr(st)
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2])
+def test_a_section_is_the_layer_of_the_volume(st, volumeFile, axis):
+  # the layer's voxels with the two coordinates along it as x and y
+  cb.openEntry(st, volumeFile())
+  e, index = st.ebsd, 1
+  s = cb.sectionOf(e, axis, index)
+  along = [a for a in range(3) if a != axis]
+  layer = lambda a: np.take(a, index, axis=axis)
+  assert s.shape == tuple(e.shape[a] for a in along) and s.lattice is not None and s.CSList is e.CSList
+  assert np.array_equal(s.rotations.data, layer(e.rotations.data)) and np.array_equal(s.phaseId, layer(e.phaseId))
+  assert np.array_equal(s.pos.data[..., :2], layer(e.pos.data)[..., along]) and np.all(s.pos.data[..., 2] == 0)
+  assert sorted(s.prop) == sorted(e.prop) and all(np.array_equal(s.prop[k], layer(e.prop[k])) for k in e.prop)
+
+
+def test_setSection_moves_through_the_volume(st, volumeFile):
+  cb.openEntry(st, volumeFile())
+  seen = []
+  st.on("section", lambda: seen.append((st.sectionAxis, st.sectionIndex)))
+  cb.setSection(st, index=2)
+  assert st.section.shape == (5, 4) and np.array_equal(st.section.phaseId, st.ebsd.phaseId[:, :, 2])
+  # another axis opens on its middle layer, an index beyond the volume is its last layer, the same layer is no change
+  cb.setSection(st, axis=0)
+  cb.setSection(st, index=99)
+  cb.setSection(st, index=4)
+  assert seen == [(2, 2), (0, 2), (0, 4)] and st.section.shape == (4, 3) and np.array_equal(st.section.phaseId, st.ebsd.phaseId[4])
+
+
+def test_a_map_is_its_own_section(st):
+  cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
+  assert st.section is st.ebsd and not st.isVolume
+  cb.setSection(st, axis=0, index=3)
+  assert st.section is st.ebsd and st.sectionAxis == 2
+  cb.setEulerConvention(st, (st.eulerConvention + 1) % len(st.conventions))
+  assert st.section is st.ebsd
+
+
+def test_an_edited_phase_of_a_volume_reaches_its_section(st, volumeFile):
+  cb.openEntry(st, volumeFile())
+  cb.editPhase(st, 1, "mineral", "Nickel")
+  assert st.ebsd.CSList.frames[1].name == "Nickel" and st.section.CSList is st.ebsd.CSList
+
+
+def test_the_script_of_a_volume_reads_it_back(st, volumeFile, tmp_path):
+  from mtex import EBSD3
+  cb.openEntry(st, volumeFile())
+  cb.editPhase(st, 1, "mineral", "Nickel")
+  text = cb.scriptOf(st)
+  assert "EBSD3.load(fname)" in text and "eulerCorrection" not in text and "from mtex import EBSD3," in text
+  scope = {}
+  exec(text.split("# a look at")[0], scope)
+  e = scope["ebsd"]
+  assert isinstance(e, EBSD3) and e.shape == (5, 4, 3) and e.CSList.frames[1].name == "Nickel" and np.array_equal(e.rotations.data, st.ebsd.rotations.data)

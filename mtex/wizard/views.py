@@ -15,7 +15,7 @@ import matplotlib.figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from PySide6.QtCore import QMetaObject, Qt, QTimer, Slot
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QLineEdit, QSlider, QToolButton, QVBoxLayout, QWidget
 
 from ..geometry.miller import Miller
 from ..io.polefigureformats import millerIndices
@@ -158,15 +158,18 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.ahead.setSingleShot(True)
     self.ahead.setInterval(AHEAD_DELAY_MS)
     self.ahead.timeout.connect(self.drawAhead)
-    self.drawnFor = None       # (map identity, map convention) the base picture stands for
+    self.drawnFor = None       # (the map, the map convention) the base picture stands for; the map is held, so that
+                               # no later section can take its identity
     self.image = None
+    self.raster = None         # the picture's pixels as measurements, once a tab recolours it
+    self.cells = None          # the measurements the cells of a small map stand for, likewise
     self.colorbar = None
     self.mappable = None
     self.legend = None
     self.coloured = None
     self.shownFor = None       # the phases drawn when the picture was last coloured, per measurement
     self.pending = False
-    for name in ("ebsd", "drawn", "mapConvention", "millers", "image", "meta"):
+    for name in ("ebsd", "section", "drawn", "mapConvention", "millers", "image", "meta"):
       st.on(name, self.scheduleDraw)
     st.on("phases", self.phasesChanged)
     st.on("densities", self.onDensity)
@@ -225,7 +228,7 @@ class ViewCanvas(FigureCanvasQTAgg):
   # ------------------------------------------------------------------ the map
 
   def drawMap(self, kind):
-    """the map drawn once per import and recoloured per tab. The picture is drawn in the
+    """the map, or the section of a volume, drawn once and recoloured per tab. The picture is drawn in the
     colouring the tab asks for, so the first look at a tab colours nothing twice and builds
     no second raster; a tab after it rewrites the colours of the picture alone, which is
     what the raster index is kept for."""
@@ -234,17 +237,27 @@ class ViewCanvas(FigureCanvasQTAgg):
     st = self.st
     name = st.currentTab
     color, kw = self.colorArgs(kind, name)
-    shown = np.array([st.drawn.get(k, True) for k in range(len(st.ebsd.CSList))])[np.asarray(st.ebsd.phaseId).reshape(-1)]
-    key = (id(st.ebsd), st.mapConvention)
-    if self.drawnFor != key or self.image is None:
+    shown = np.array([st.drawn.get(k, True) for k in range(len(st.section.CSList))])[np.asarray(st.section.phaseId).reshape(-1)]
+    key = (st.section, st.mapConvention)
+    drawn = self.drawnFor if self.image is not None else None
+    fresh = drawn is None or drawn[0] is not key[0] or drawn[1] != key[1]
+    # another layer across the same axis of a volume lies where the layer drawn lies: the
+    # picture stays and takes the colours of the new layer, a fifth of drawing it anew
+    relayer = fresh and drawn is not None and drawn[1] == key[1] and st.isVolume and hasattr(self.image, "set_data") \
+      and _sameLattice(drawn[0], st.section)
+    if relayer:
+      self.drawnFor, self.coloured = key, None
+    elif fresh:
       self.figure.clear()
       self.colorbar = self.mappable = None
       mtexFigure(1, figure=self.figure)
-      self.image = plotEBSD(st.ebsd, color, legend=False, colorbar=False, maxPixels=MAX_PIXELS, **kw)
+      # the layer of a volume is a picture however few voxels it holds, so that every layer is drawn alike
+      self.image = plotEBSD(st.section, color, legend=False, colorbar=False, maxPixels=MAX_PIXELS,
+                            **({"backend": "raster"} if st.isVolume else {}), **kw)
       # the artist's own alpha would override the transparency of a phase not drawn
       self.image.set_alpha(None)
       self.ax = self.image.axes
-      self.raster, self.drawnFor, self.coloured, self.shownFor = None, key, (kind, name), shown
+      self.raster, self.cells, self.drawnFor, self.coloured, self.shownFor = None, None, key, (kind, name), shown
       # a property is the only colouring that is a number, and it states the range it was
       # drawn over, so the bar needs nothing read back; every other picture carries none
       norm = getattr(self.image, "norm", None)
@@ -266,11 +279,16 @@ class ViewCanvas(FigureCanvasQTAgg):
   def recolour(self, kind, name, shown):
     """the colours of the picture rewritten, the map's own never assembled: mapValues colours
     the measurements the picture shows and no others"""
-    from ..plotting.maps import mapRaster
+    from ..plotting.maps import mapCells, mapRaster
     st = self.st
+    layout = getattr(getattr(self.ax, "_mtexMapPlot", None), "layout", None)
     if self.raster is None and hasattr(self.image, "set_data"):
-      layout = getattr(getattr(self.ax, "_mtexMapPlot", None), "layout", None)
-      self.raster = mapRaster(st.ebsd, maxPixels=MAX_PIXELS, layout=layout)
+      self.raster = mapRaster(st.section, maxPixels=MAX_PIXELS, layout=layout)
+    # the cells were drawn without the padding and without the measurements the first colouring
+    # had no colour for: every measurement gets its cell, so that a colour meets its own
+    if self.cells is None and hasattr(self.image, "set_verts") and st.section.lattice is not None:
+      self.cells = np.flatnonzero(~st.section.isPadding.reshape(-1))
+      self.image.set_verts(mapCells(st.section, layout=layout)[self.cells])
     index = self.raster[2] if self.raster is not None else None
     pick = np.where(index >= 0, index, 0) if index is not None else None
     values, scalar = self.colorsOf(kind, name, at=None if pick is None else pick.reshape(-1))
@@ -295,7 +313,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       self.image.set_data(img)
     else:
       # a map on no lattice is drawn as its cells, one colour per measurement
-      rgba = np.zeros((st.ebsd.size, 4))
+      rgba = np.zeros((st.section.size, 4))
       if scalar:
         v = np.asarray(values, dtype=float).reshape(-1)
         finite = np.isfinite(v)
@@ -305,7 +323,11 @@ class ViewCanvas(FigureCanvasQTAgg):
         rgba[:, :3] = np.nan_to_num(rgb)
         rgba[:, 3] = np.isfinite(rgb).all(axis=-1)
       rgba[~shown, 3] = 0
+      if self.cells is not None:
+        rgba = rgba[self.cells]
       if hasattr(self.image, "set_facecolors"):
+        # cells drawn by a number carry it, and it would colour them over the colours given
+        self.image.set_array(None)
         self.image.set_facecolors(rgba)
       elif hasattr(self.image, "set_color"):
         self.image.set_color(rgba)
@@ -323,7 +345,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     """the colours or values of the map the tab asks for, of the measurements at alone if given"""
     from ..plotting.mapplot import mapValues
     color, kw = self.colorArgs(kind, name)
-    return mapValues(self.st.ebsd, color, at=at, **kw)
+    return mapValues(self.st.section, color, at=at, **kw)
 
   def setColorbar(self, cmap, lo=0.0, hi=1.0, label=""):
     """the colour bar of a property, which the picture does not carry: it is made from a
@@ -502,6 +524,12 @@ class ViewCanvas(FigureCanvasQTAgg):
 
 
 # the range a property is coloured over, its finite values
+# whether two maps lie on the same lattice, cell for cell
+def _sameLattice(a, b):
+  la, lb = a.lattice, b.lattice
+  return la is not None and lb is not None and a.shape == b.shape and np.array_equal(la.A, lb.A) and np.array_equal(la.origin, lb.origin)
+
+
 def _range(values):
   v = np.asarray(values, dtype=float).reshape(-1)
   finite = np.isfinite(v)
@@ -512,6 +540,52 @@ def millerOf(text, CS):
   """a Miller index typed as '100', '1-10' or '0001', on the frame's lattice"""
   digits = millerIndices(text)
   return Miller(1, 0, 0, CS) if digits is None else Miller(*digits, CS)
+
+
+# ------------------------------------------------------------------ the section of a volume
+
+class SectionBar(QWidget):
+  """the layer of a volume the views draw: the axis it lies across, x, y or z, and a slider
+  through its layers; shown for a volume alone"""
+
+  def __init__(self, st):
+    super().__init__()
+    self.st = st
+    lay = QHBoxLayout(self)
+    lay.setContentsMargins(6, 0, 6, 0)
+    lay.addWidget(QLabel("section across"))
+    self.axes = QButtonGroup(self)
+    for k, name in enumerate("xyz"):
+      b = QToolButton()
+      b.setText(name)
+      b.setCheckable(True)
+      b.setToolTip(f"the layers of the volume across {name}")
+      self.axes.addButton(b, k)
+      lay.addWidget(b)
+    self.slider = QSlider(Qt.Horizontal)
+    self.slider.setToolTip("the layer shown")
+    lay.addWidget(self.slider, 1)
+    self.label = QLabel()
+    lay.addWidget(self.label)
+    self.axes.idClicked.connect(lambda k: cb.setSection(self.st, axis=k))
+    self.slider.valueChanged.connect(lambda v: cb.setSection(self.st, index=v))
+    for name in ("ebsd", "section"):
+      st.on(name, self.refresh)
+    self.refresh()
+
+  def refresh(self):
+    """the controls set to the layer of the state, without announcing it again"""
+    st = self.st
+    self.setVisible(st.isVolume)
+    if not st.isVolume:
+      return
+    n = st.ebsd.shape[st.sectionAxis]
+    self.axes.button(st.sectionAxis).setChecked(True)
+    self.slider.blockSignals(True)
+    self.slider.setRange(0, n - 1)
+    self.slider.setValue(st.sectionIndex)
+    self.slider.blockSignals(False)
+    self.label.setText(cb.sectionLabel(st))
 
 
 # ------------------------------------------------------------------ the Miller indices

@@ -5,9 +5,8 @@
 #   tess = loadNeperTess('slice.tess')                   the parts of a tessellation, 2D or 3D
 #
 # DREAM.3D writes its feature quaternions as (x, y, z, w) of the passive rotation: the rotation
-# of a grain is (w, -x, -y, -z), as the Euler angles of its voxels give it. MATLAB's
-# _loadGrains_Dream3d reads them as (w, x, y, z) in the order (x, y, z, w) and so turns every
-# grain away from its voxels; this reader takes the voxels' side.
+# of a grain is (w, -x, -y, -z), as the Euler angles of its voxels give it. The mesh and the
+# grain data are located by the names of their data sets, as the voxels are (load3d.py).
 from __future__ import annotations
 
 import os
@@ -18,15 +17,16 @@ import numpy as np
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
 from ..maps.phaselist import phaseList
-from .load3d import _dream3dPhases
+from .load3d import _dream3dPhases, _loadEBSD_dream3d, _named, _parent, dream3dDatasets
 
 # the crystal systems Neper names, as point groups
 NEPER_SYMMETRY = {"triclinic": "1", "cubic": "m-3m", "hexagonal": "6/mmm", "-1": "1"}
 
 
 def loadGrains3d(fname, *args, interface=None, CS=None, orientFaces=True, **kwargs):
-  """the 3D grains of a file, MATLAB's grain3d.load: the surface mesh of a DREAM.3D file or the
-  polyhedra of a 3D Neper tessellation; the faces are oriented unless orientFaces=False
+  """the 3D grains of a file, MATLAB's grain3d.load: the surface mesh of a DREAM.3D file, the
+  grains of its feature ids where it holds no mesh, or the polyhedra of a 3D Neper tessellation;
+  the faces of a mesh are oriented unless orientFaces=False
 
     loadGrains3d('grains.dream3d')
     loadGrains3d('grains.tess', CS=cs)"""
@@ -45,25 +45,39 @@ def loadGrains3d(fname, *args, interface=None, CS=None, orientFaces=True, **kwar
   raise ValueError(f"no grain interface for {fname}")
 
 
-# the 3D grains of the surface mesh of a DREAM.3D file, the rotations those of the voxels, where
-# MATLAB's reader turns every grain away from them; the faces oriented unless noOrientFaces=True
+# the 3D grains of the surface mesh of a DREAM.3D file, the faces oriented unless
+# orientFaces=False; a file without a mesh gives the grains calcGrains forms from the feature
+# ids of its voxels. The triangle geometry is the data container of the face labels, the grain
+# data the attribute matrix of the mean orientations
 def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
   import h5py
   from scipy.sparse import csr_matrix
   from ..maps3d.grain3d import grain3d
+  from .h5array import readArray
   with h5py.File(fname, "r") as f:
-    tri = "DataStructure/TriangleDataContainer"
-    feat = "DataStructure/DataContainer/CellFeatureData"
-    if f"{tri}/FaceData/FaceLabels" not in f:
-      raise ValueError("the file does not contain any grain information")
-    labels = np.asarray(f[f"{tri}/FaceData/FaceLabels"][...], dtype=np.int64).reshape(-1, 2)
-    xyzw = np.asarray(f[f"{feat}/AvgQuats"][...], dtype=float).reshape(-1, 4)
-    active = np.asarray(f[f"{feat}/Active"][...]).reshape(-1).astype(bool) if f"{feat}/Active" in f else np.ones(len(xyzw), dtype=bool)
-    phases = np.asarray(f[f"{feat}/Phases"][...]).reshape(-1)
-    structures = np.asarray(f["DataStructure/DataContainer/CellEnsembleData/CrystalStructures"][...]).reshape(-1)
-    V = np.asarray(f[f"{tri}/SharedVertexList"][...], dtype=float).reshape(-1, 3)
-    F = np.asarray(f[f"{tri}/SharedTriList"][...], dtype=np.int64).reshape(-1, 3)
-  q = np.column_stack([xyzw[:, 3], -xyzw[:, :3]])[active]
+    paths = dream3dDatasets(f)
+    faceLabels = _named(paths, "FaceData/FaceLabels", "Face Data/FaceLabels")
+    if faceLabels:
+      mesh = [p for p in paths if p.startswith(_parent(_parent(faceLabels[0])) + "/")]
+      ori = _named(paths, "AvgQuats", "AvgEulerAngles")
+      if not ori:
+        raise ValueError(f"{fname} does not contain any grain orientations")
+      feature = [p for p in paths if _parent(p) == _parent(ori[0])]
+      labels = np.asarray(readArray(f[faceLabels[0]]), dtype=np.int64).reshape(-1, 2)
+      V = np.asarray(readArray(f[_named(mesh, "SharedVertexList")[0]]), dtype=float).reshape(-1, 3)
+      F = np.asarray(readArray(f[_named(mesh, "SharedTriList")[0]]), dtype=np.int64).reshape(-1, 3)
+      mean = np.asarray(f[ori[0]][...], dtype=float)
+      phases = np.asarray(f[_named(feature, "Phases")[0]][...]).reshape(-1)
+      structures = f[_named(paths, "CrystalStructures")[0]][...]
+  if not faceLabels:
+    from ..maps3d.calcgrains3d import calcGrains
+    return calcGrains(_loadEBSD_dream3d(fname, CS=CS), grainId=True)
+  if ori[0].endswith("AvgQuats"):
+    q = np.column_stack([mean[:, 3], -mean[:, :3]])
+  else:
+    q = rotation.byEuler(mean[:, 0], mean[:, 1], mean[:, 2], "ZXZ").data
+  # the first feature is the one no voxel belongs to
+  q, phases = q[1:], phases[1:]
   if CS is None:
     CS = _dream3dPhases(structures)
   # the lower feature first, the outside -1 first of all; the first side +1, the second -1
@@ -74,7 +88,7 @@ def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
   cols = np.concatenate([np.flatnonzero(neg), np.flatnonzero(pos)])
   vals = np.concatenate([np.ones(int(neg.sum())), -np.ones(int(pos.sum()))])
   I = csr_matrix((vals, (rows, cols)), shape=(n, len(F)))
-  grains = grain3d.fromFaces(V, F, I, q, CS, phases[active].astype(np.int8))
+  grains = grain3d.fromFaces(V, F, I, q, CS, phases.astype(np.int8))
   return grains if not orientFaces else grains.orientFaces()
 
 

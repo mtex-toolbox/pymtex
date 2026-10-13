@@ -35,8 +35,8 @@ scatter(v, markerAlpha=0.2, markerSize=2)
 # entries of `center` are the corresponding mean directions.
 #
 # Cluster labels are identifiers, not ranks: cluster 0 is not intrinsically more important
-# than cluster 1. We use the labels only to assign colors, `ind2color` counting from one, and
-# then mark each returned center.
+# than cluster 1. We use the labels only to assign colors, `ind2color` counting from zero as
+# well, and then mark each returned center.
 
 # +
 cInd, center = calcCluster(v)

@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 import mtex
-from mtex import degree, loadEBSD, rotation, vector3d
+from mtex import degree, loadEBSD, rotation, vector3d, yvector
+from mtex.io.h5 import additionName
 from mtex.io.h5 import (H5Scope, alignmentList, eulerColumns, h5PhaseShift, h5Resolve, hdf5Configs, _loadEBSD_h5,
                         matrixRotations, spaceGroupNumber)
 
@@ -86,7 +87,7 @@ def test_oxford_h5oina_reads_its_processed_data_set():
   assert e.shape == (2, 186) and e.meta["vendor"] == "Oxford"
   assert e.meta["dataSets"] == ["/1/Data Processing", "/1/EBSD"] and e.meta["dataSet"] == "/1/Data Processing"
   assert counts(e) == [3, 369] and e.CSList.mineralList[1] == "Forsterite" and e.CS.pointGroup == "mmm"
-  assert np.allclose(firstEuler(e)[1], [299.86639619, 33.54831484, 155.24092444], atol=1e-6)
+  assert np.allclose(firstEuler(e)[1], [240.13360381, 146.45168516, 335.24092444], atol=1e-6)
   assert e.meta["surface"] == (0.0, 0.0, 0.0)
   assert set(e.prop) == {"bands", "error", "meanangulardeviation"}
 
@@ -111,12 +112,12 @@ def test_oxford_h5():
   assert counts(e) == [61, 2, 796, 1]
   assert e.CSList.mineralList == ["notIndexed", "CoCr", "Co", "Cr"]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["4/mmm", "m-3m", "m-3m"]
-  assert np.allclose(firstEuler(e)[1], [61.81563989, 46.57337631, 35.5493861], atol=1e-6)
+  assert np.allclose(firstEuler(e)[1], [118.18436011, 133.42662369, 215.5493861], atol=1e-6)
 
 
 def test_oxford_h5_keeps_the_eds_columns_but_not_the_positions_as_properties():
   e = loadEBSD(fixture("oxford_cut.h5"))
-  assert "windowintegralcoka1" in e.prop and "bandcontrast" in e.prop
+  assert "Co_WindowIntegral_Ka1" in e.prop and "bandcontrast" in e.prop
   assert "x" not in e.prop and "y" not in e.prop
 
 
@@ -189,18 +190,18 @@ def test_oxford_tilted_surface_is_undone_with_a_warning(tmp_path):
   with pytest.warns(UserWarning, match="acquisition surface"):
     e = loadEBSD(p, grid=False)
   raw = loadEBSD(p, eulerCorrection=rotation.id, grid=False)
-  expected = rotation.byEuler(np.pi, 0, 0) * rotation.byEuler(0, 90 * degree, 0).inv() * raw.rotations[0]
+  expected = rotation.byAxisAngle(yvector, np.pi) * rotation.byEuler(0, 90 * degree, 0).inv() * raw.rotations[0]
   assert mtex.angle(e.rotations[0], expected) < 1e-6   # the file holds its angle as float32
   assert e.meta["surface"] == (0.0, 90.0, 0.0)
 
 
 def test_oxford_scan_rotation_the_file_states_is_applied():
   raw = loadEBSD(fixture("oli_cut.h5oina"), eulerCorrection=rotation.id, grid=False)
-  # the scan rotation the file states, in radians since it is below a full turn
+  # the scan rotation the file states, in radians since it is below a full turn, on top of the flip about x
   with h5py.File(fixture("oli_cut.h5oina")) as f:
     stated = float(np.asarray(f["1/EBSD/Header/Scanning Rotation Angle"][()]).reshape(-1)[0])
   plain = loadEBSD(fixture("oli_cut.h5oina"), grid=False)
-  assert mtex.angle(plain.rotations[0], rotation.byAxisAngle(vector3d(0, 0, 1), stated) * raw.rotations[0]) < 1e-6
+  assert mtex.angle(plain.rotations[0], rotation.byAxisAngle(vector3d(1, 0, 0), np.pi) * rotation.byAxisAngle(vector3d(0, 0, 1), stated) * raw.rotations[0]) < 1e-6
 
 
 def test_an_unknown_vendor_is_an_error(tmp_path):
@@ -274,8 +275,8 @@ def test_matrixRotations_are_column_major_and_zeros_are_none():
 @pytest.mark.parametrize("name, n, cnt, euler, prop, mean", [
   ("h5_edax.h5", 56615, [0, 56615], [304.96433441, 57.7159131, 100.76364115], "ci", 0.30648656782842953),
   ("EDAX/KamilaTi.oh5", 70760, [0, 70760], [114.06853843, 175.36763636, 71.61957914], "iq", 32563.99760105614),
-  ("Oxford/oli_test.h5oina", 30132, [423, 29709], [299.86639619, 33.54831484, 155.24092444], "bands", 11.343355900703571),
-  ("Oxford/oxford.h5", 138890, [5299, 610, 132875, 106], [61.81563989, 46.57337631, 35.5493861], "bandcontrast", 120.74588523291814),
+  ("Oxford/oli_test.h5oina", 30132, [423, 29709], [240.13360381, 146.45168516, 335.24092444], "bands", 11.343355900703571),
+  ("Oxford/oxford.h5", 138890, [5299, 610, 132875, 106], [118.18436011, 133.42662369, 215.5493861], "bandcontrast", 120.74588523291814),
   ("ThermoFisher/Example_dataset_Duplex_steel.tfs.hdf5", 310, [0, 251, 1, 58], [149.03730774, 142.57176208, 24.79652023], None, None),
   ("EMSphinx/Christos Steel Specimen 1 Site 2 Map Data 3_BW88.h5", 485140, [0, 2148, 478052, 4940], [251.63514628, 34.73104247, 124.36628874], "iq", 0.4180047965378519),
   ("Bruker/BCWQ10min2.h5", 666000, [91646, 548007, 26347], [294.0380859375, 159.52241516, 127.85329056], "mad", 0.9073786979317385),
@@ -373,3 +374,12 @@ def test_separate_lists_the_entries_by_name_without_the_type():
 def test_eulerEntry_is_empty_for_a_table_of_matrices():
   from mtex.io.h5 import _eulerEntry
   assert _eulerEntry({"type": "byMatrix"}) == {} and _eulerEntry({"type": "euler_stack", "euler_stack": {"phi": 1}}) == {"phi": 1}
+
+
+@pytest.mark.parametrize("field, name", [
+  ("Band Contrast", "bandcontrast"), ("Live Time", "livetime"),
+  ("Window Integral/Co Ka1", "Co_WindowIntegral_Ka1"), ("Window Integral/C Ka1_2", "C_WindowIntegral_Ka1_2"),
+  ("Peak Area/C K series", "C_PeakArea_Kseries"), ("Composition/Ca Wt%", "Ca_Composition_Wt"),
+  ("Window Integral/Ni Kα1", "Ni_WindowIntegral_Ka1"), ("Peak Area/Live Time", "peakarealivetime")])
+def test_additionName_putsTheElementOfAnEDSMapFirst(field, name):
+  assert additionName(field) == name

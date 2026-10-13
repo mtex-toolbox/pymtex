@@ -22,7 +22,7 @@ from .phases import PhaseTable
 from .pictogram import CoordinatePanel
 from .scriptview import ScriptView
 from .state import WizardState
-from .views import KeyPanel, MillerBar, ViewCanvas
+from .views import KeyPanel, MillerBar, SectionBar, ViewCanvas
 
 FONT_SIZE = 10
 BROWSER_WIDTH = 360   # the browser side on opening: the longest file name and the file table fit
@@ -132,6 +132,8 @@ class WizardWindow(QMainWindow):
     self.canvas = ViewCanvas(st, worker=self.worker)
     self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     rlay.addWidget(self.canvas, 1)
+    self.section = SectionBar(st)
+    rlay.addWidget(self.section)
     split.addWidget(right)
     split.setStretchFactor(0, 0)
     split.setStretchFactor(1, 1)

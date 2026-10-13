@@ -16,9 +16,9 @@ import warnings
 import numpy as np
 
 from ..geometry.frames import crystalFrame, notIndexedFrame
-from ..geometry.quaternion import rotation
 from ..geometry.units import degree
-from ..maps.phaselist import phaseList
+from ..maps.phaselist import distinctMinerals, phaseList
+from .ctf import oxfordCorrection
 from .load import CHANNEL_LAUE, _properties, ebsdFromColumns, regularPoly, scanGrid
 from .table import coerceNumeric, readFile, text
 
@@ -77,7 +77,7 @@ def cprPhases(ini, path):
   if missing:
     warnings.warn(f"{path} announces {n} phases but does not describe phase {', '.join(missing)}; "
                   "pixels of that phase are imported as not indexed", stacklevel=3)
-  return phaseList(frames)
+  return phaseList(distinctMinerals(frames))
 
 
 def crcNames(ini, codes):
@@ -102,7 +102,7 @@ def crcAcquisition(ini):
 
 # the Oxford/Channel map of a .cpr and .crc pair, by either name
 #
-#   loadEBSD('map.cpr')                        the Euler angles half a turn about z from the map
+#   loadEBSD('map.cpr')                        the Euler angles half a turn about y from the map
 #   loadEBSD('map.crc', eulerCorrection=rot)   the alignment stated outright
 #
 # The header is kept in ebsd.meta['header'] as the sections of the .cpr, the acquisition
@@ -151,7 +151,7 @@ def _loadEBSD_crc(fname, *, eulerCorrection=None, frame=None, scanUnit="um"):
                       required=("phi1", "phi", "phi2"))
   meta = {"header": ini, "surface": crcAcquisition(ini)}
   if eulerCorrection is None:
-    eulerCorrection = rotation.byEuler(np.pi, 0.0, 0.0, "Bunge")
+    eulerCorrection = oxfordCorrection(None)
   # Channel numbers its phases from one and writes zero where nothing was indexed
   return ebsdFromColumns(x, y, cols["phi1"], cols["phi"], cols["phi2"], rec["phase"], phases, props, shift=0,
                          eulerCorrection=eulerCorrection, scanUnit=scanUnit, frame=frame, meta=meta,

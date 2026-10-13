@@ -19,7 +19,7 @@ from .kernels import regionMembership
 
 from .quaternion import qmul, rotation
 from .representations import quatAngle, quatAxis
-from .sphericalregion import dirichletSector, fundamentalSector, sectorCenter, sphericalRegion
+from .sphericalregion import fundamentalSector, sphericalRegion
 from .symmetry import symmetry
 from .symreduce import _isAboutZ, reductionGroups, uniqueRotations
 from .vector3d import vector3d
@@ -31,43 +31,32 @@ def commonRotations(L, R):
   return L[np.any(np.abs(L @ R.T) > 1 - 1e-8, axis=1)]
 
 
-# the sectors built so far, by the shared rotations and the exchange; every projection asks again
+# the sectors built so far, by the frames and the exchange; every projection asks again
 _axisSectors = {}
 
 
-def commonAxisSector(common, antipodal=False):
-  """the sector of the axes: the fundamental sector of the shared rotations, and a centre whose
-  Dirichlet domain under them is that sector, the one the projection takes the conjugate
-  nearest to; with grain exchange a misorientation is its inverse, the same angle about the
-  opposite axis, so the sector is that of the shared rotations with the inversion"""
-  key = (np.round(np.asarray(common, dtype=float), 12).tobytes(), bool(antipodal))
-  if key not in _axisSectors:
-    _axisSectors[key] = _commonAxisSector(common, antipodal)
-  return _axisSectors[key]
-
-
-def _commonAxisSector(common, antipodal):
-  if len(common) <= 1 and not antipodal:
-    return None, np.array([0.0, 0.0, 1.0])
-  pg = symmetry(rotation._fromData(common if len(common) else np.array([[1.0, 0, 0, 0]])))
-  grp = pg.Laue() if antipodal else pg
+def commonAxisSector(o):
+  """the sector of the axes of orientations between two frames, its centre and the rotations
+  that turn an axis into an equivalent one: the fundamental sector of the frame the axes are
+  expressed in (axisFrame), which holds the elements both frames share, and their rotation
+  parts, since an improper element on both sides conjugates like its proper part; with grain
+  exchange the Laue group, a misorientation then being its inverse, the same angle about the
+  opposite axis. It is the sector a plot of the axes shows, so the region, the projection and
+  the plot never disagree; None where nothing is shared"""
+  from .symmetryops import axisFrame
+  key = (o.frameA, o.frameB, bool(o.antipodal))
+  if key in _axisSectors:
+    return _axisSectors[key]
+  frame = axisFrame(o)
+  shared = frame.sym.properGroup().rotations().data.reshape(-1, 4)
   # the axes are signed: the sector holds the axis, not the axis or its opposite
-  sector = sphericalRegion(fundamentalSector(pg, antipodal=antipodal))
+  sector = sphericalRegion(fundamentalSector(frame))
   sector.antipodal = False
-  center = sector.center().data.reshape(3)
-  # the centre of the conventional sector is the one of its Dirichlet domain for every group
-  # of rotations; where it were not, the sector would be the Dirichlet domain, so that the
-  # region and the projection never disagree
-  if not antipodal and dirichletSector(grp, center) != sector:
-    center = sectorCenter(grp).data.reshape(3)
-    sector = sphericalRegion(dirichletSector(grp, center))
-  return sector, center
-
-
-def commonAxisCenter(common):
-  """the centre of the sector of rotation axes of the rotations two groups share, the axis the
-  projection takes the conjugate nearest to"""
-  return commonAxisSector(common)[1]
+  found = (sector, sector.center().data.reshape(3), shared) if len(sector.N) else (None, np.array([0.0, 0.0, 1.0]), shared)
+  # a frame made for one call is no key to keep
+  if o.frameA._sealed and o.frameB._sealed:
+    _axisSectors[key] = found
+  return found
 
 
 class orientationRegion:
@@ -269,7 +258,8 @@ def fundamentalRegion(frA, frB=None, *, antipodal=False):
         angles.append(w)
   N = np.array([[-np.sin(w / 4), *(np.cos(w / 4) * d)] for d, w in zip(axes, angles)]).reshape(-1, 4)
   common = commonRotations(L, R)
-  sector, center = commonAxisSector(common, antipodal)
+  o.antipodal = antipodal
+  sector, center, _ = commonAxisSector(o)
   return orientationRegion(N, frA, frB, antipodal, common, sector, center)
 
 

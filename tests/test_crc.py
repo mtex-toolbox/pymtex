@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import mtex
-from mtex import degree, loadEBSD, rotation
+from mtex import degree, loadEBSD, rotation, yvector
 from mtex.io.crc import cprPhases, crcNames, _loadEBSD_crc, readIni
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -42,7 +42,7 @@ def test_the_cut_matches_the_julia_reader_in_its_phases():
 def test_the_cut_matches_the_julia_reader_in_its_orientations_and_positions():
   e = loadEBSD(CUT, grid=False)
   k, euler = firstIndexedEuler(e)
-  assert k == 1 and np.allclose(euler, [332.489218806, 44.301505127, 64.471699199], atol=1e-6)
+  assert k == 1 and np.allclose(euler, [207.51078119, 135.69849487, 244.4716992], atol=1e-6)
   assert np.allclose(e.pos.data[1], [0.5, 0, 0])
 
 
@@ -66,10 +66,10 @@ def test_the_acquisition_surface_is_kept():
   assert e.meta["surface"] == (0.0, 0.0, 0.0)
 
 
-def test_the_correction_is_half_a_turn_about_z():
+def test_the_correction_is_half_a_turn_about_y():
   a = loadEBSD(CUT, grid=False)
   b = loadEBSD(CUT, eulerCorrection=rotation.id, grid=False)
-  r = rotation.byEuler(np.pi, 0, 0)
+  r = rotation.byAxisAngle(yvector, np.pi)
   assert mtex.angle(a.rotations[1], r * b.rotations[1]) < 1e-12
 
 
@@ -153,6 +153,6 @@ def test_full_ti64_matches_julia():
   assert [int((e.phaseId == k).sum()) for k in range(3)] == [10449, 437, 185722]
   assert [f.pointGroup for f in e.CSList.frames[1:]] == ["m-3m", "6/mmm"]
   k, euler = firstIndexedEuler(e.flatten())
-  assert k == 1 and np.allclose(euler, [318.21199242, 111.74850644, 10.43622511], atol=1e-6)
+  assert k == 1 and np.allclose(euler, [221.78800758, 68.25149356, 190.43622511], atol=1e-6)
   assert e.meta["surface"] == (-90.0, 0.0, 0.0)
   assert abs(e.bc.mean() - 144.2910919189453) < 1e-9
