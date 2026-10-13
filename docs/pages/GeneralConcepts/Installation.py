@@ -67,8 +67,10 @@
 # per project folder.
 #
 # 1. Create a folder for your analysis, for instance `Documents/mtex-first-steps`.
-# 2. In VS Code choose *File > Open Folder...* and open it. If VS Code asks whether you trust
-#    the authors of the folder, answer yes.
+# 2. In VS Code choose *File > Open Folder...* and open it. VS Code asks whether you trust
+#    the authors of the folder; answer **Yes, I trust the authors**. After any other answer
+#    VS Code works in *Restricted Mode*, shown at the bottom left of the window, and does not
+#    run Python: click **Restricted Mode** there and then *Trust*.
 # 3. Press Ctrl+Shift+P (Cmd+Shift+P on macOS), type **Python: Create Environment** and
 #    choose it. Choose **Venv**, then the Python 3.14 you installed in step 1. A folder
 #    `.venv` appears in the file list on the left.
@@ -82,6 +84,16 @@
 # and wait until pip reports *Successfully installed*. This downloads MTEX and about 300 MB
 # of packages it builds on. The quotes matter: without them, some terminals misread the
 # square brackets.
+#
+# If the prompt does not start with `(.venv)`, close the terminal with the bin icon at its
+# right and open a new one. If `(.venv)` is still missing, call the pip of the environment
+# by its path:
+#
+# ```
+# .venv/bin/pip install "mtex[all]" ipykernel
+# ```
+#
+# on macOS and Linux, and `.venv\Scripts\pip install "mtex[all]" ipykernel` on Windows.
 #
 # `mtex[all]` installs MTEX with every optional part: the compiled kernels (numba), the
 # plotting (matplotlib), the HDF5 file formats (h5py), the 3D scenes (PyVista) and the
@@ -226,7 +238,8 @@
 # mtex-wizard
 # ```
 #
-# or from a script with `importWizard()`.
+# or from a script with `importWizard()`. Without `(.venv)` in the prompt, type
+# `.venv/bin/mtex-wizard` on macOS and Linux and `.venv\Scripts\mtex-wizard` on Windows.
 #
 # ## Updating MTEX
 #
@@ -236,7 +249,8 @@
 # pip install --upgrade "mtex[all]"
 # ```
 #
-# and restart the interactive window. `pip show mtex` tells the version you have.
+# and restart the interactive window. `pip show mtex` tells the version you have. Without
+# `(.venv)` in the prompt, call pip by its path as in step 3.
 #
 # ## A second project
 #
@@ -277,6 +291,13 @@
 # Windows on ARM) pip tries to compile it, which needs a C++ compiler and FFTW; the
 # [finufft installation notes](https://finufft.readthedocs.io/en/latest/install.html) explain
 # how.
+#
+# **The import wizard reports missing system libraries (Linux).** The window of the wizard
+# is drawn by Qt, which uses libraries of the system that pip does not install. The message
+# names them and, for Debian and Ubuntu, ends with the `sudo apt install` command that
+# installs them. On other distributions install the packages that hold the named libraries;
+# `libxcb-cursor.so.0`, the one most often missing, is in `xcb-util-cursor` on Fedora and
+# Arch Linux.
 #
 # **The interactive window asks to install `ipykernel`.** It was left out of step 3. Click
 # *Install*, or type `pip install ipykernel` in the terminal.
