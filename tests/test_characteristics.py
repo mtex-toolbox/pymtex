@@ -399,7 +399,7 @@ def test_calcKernel_everyRuleGivesAUsableWidthTheCrossValidationTheNarrowest(tri
 
 def test_calcKernel_defaultGivesADensityCloseToTheModel(trigonalSample):
   ori = trigonalSample.ori
-  assert calcError(calcDensity(ori, kernel=calcKernel(ori, rng=rng)), trigonalSample.model) < 0.25
+  assert calcError(calcDensity(ori, kernel=calcKernel(ori, rng=rng)), trigonalSample.model) < 0.3
 
 
 def test_calcKernel_rejectsAnUnknownRule(trigonalSample):

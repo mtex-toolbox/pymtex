@@ -78,6 +78,7 @@ def test_MCL_splits_two_cliques():
 # SciPy's product inflated and pruned, to rounding: the sums may run in another order on another
 # processor, so an entry within rounding of the threshold may be kept by one and pruned by the other
 def test_mclExpand_isScipysProductInflatedAndPruned():
+  pytest.importorskip("numba")
   rng = np.random.default_rng(4)
   n, m = 3000, 20000
   A = csr_matrix((rng.random(m) * 0.3, (rng.integers(0, n, m), rng.integers(0, n, m) // 3)), shape=(n, n))

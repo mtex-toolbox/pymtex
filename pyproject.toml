@@ -68,7 +68,7 @@ packages = ["mtex"]
 [tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.hatch.build.targets.sdist]
-include = ["mtex", "tests", "tools/staticapi.py", "docs/pages/*/*.py", "hatch_build.py", "README.md", "LICENSE", "CHANGELOG.md"]
+include = ["mtex", "tests", "tools/staticapi.py", "tools/syntaxcheck.py", "docs/pages/*/*.py", "hatch_build.py", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
