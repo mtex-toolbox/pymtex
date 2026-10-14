@@ -24,7 +24,10 @@ class S2Triangulation:
   surround the origin
 
     sT = S2Triangulation(v)
-    B = sT.barycentric(w)"""
+    B = sT.barycentric(w)
+
+  Input
+    vertices - vector3d directions surrounding the origin; vertices are normalised to the unit sphere"""
 
   def __init__(self, vertices):
     from scipy.spatial import ConvexHull, cKDTree

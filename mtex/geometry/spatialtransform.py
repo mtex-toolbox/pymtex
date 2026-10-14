@@ -103,11 +103,27 @@ def polyBasis(x, y, degree):
 # ------------------------------------------------------------------ the transforms
 
 class spatialTransform:
-  """the base of the spatial transforms, maps of the plane of a scan onto itself that move x and y
-  and leave z; T * pos moves positions, T1 * T2 is T2 followed by T1, T1 + T2 chains T1 first
+  """a transformation of scan positions in the xy plane
 
     pos2 = T * pos
-    T.inv(), T.displacement(pos), T.discretize(pos), transform(ebsd, T)"""
+    pos2 = T(pos)
+    u = T.displacement(pos)
+    Ti = T.inv()
+
+  Transforms map vector3d positions to positions of the same shape. The supplied transform
+  classes change x and y and preserve z and the coordinate frame. Positions and displacements
+  use the same spatial units as the input data.
+
+  Composition follows matrix order: `T1 * T2` applies T2 first, then T1. The expression
+  T1 + T2 builds a sequence applying T1 first, then T2. Transforming EBSD data with
+  transform(ebsd, T) also updates its spatial representation.
+
+  This is the base class. Construct one of the affine, projective, polynomial, drift or
+  interpolated-field subclasses, or wrap a callable with spatialTransformHandle.
+
+  See also
+    spatialTransformShift, spatialTransformProjective, spatialTransformPoly,
+    spatialTransformDrift, spatialTransformField, spatialTransformComposite"""
 
   def eval(self, pos):
     """the positions moved by the transform, T * pos"""
@@ -240,10 +256,26 @@ class spatialTransformId(spatialTransform):
 
 
 class spatialTransformShift(spatialTransform):
-  """an affine transform of the plane, given by a 3 x 3 homogeneous matrix with last row [0 0 1]
+  """an affine map of scan positions, including translation, rotation, scale and shear
 
     T = spatialTransformShift(M)
-    T = spatialTransformShift.fit(posA, posB, weights=w)"""
+    T = spatialTransformShift.fit(posA, posB, weights=w)
+    pos2 = T * pos
+
+  The homogeneous matrix acts on the column [x, y, 1]. Thus its upper-left 2-by-2 block
+  sets the linear map and M[:2, 2] sets the translation. The z coordinate is preserved.
+  The default matrix is the identity. Despite the class name, this represents a full affine
+  map; spatialTransformRigid provides a pure translation.
+
+  Input
+    M - 3-by-3 matrix with last row [0, 0, 1], or None for the identity
+  Output
+    T - spatialTransformShift
+  Properties
+    M - homogeneous affine matrix
+  See also
+    spatialTransformShift.fit, spatialTransformShift.parts, spatialTransformRigid,
+    spatialTransformProjective"""
 
   def __init__(self, M=None):
     M = np.eye(3) if M is None else np.asarray(M, dtype=float)
@@ -273,7 +305,19 @@ class spatialTransformShift(spatialTransform):
     return self.M
 
   def parts(self):
-    """the scales, the rotation and the shear of the linear part, from its QR decomposition"""
+    """decompose the affine linear part into scales, rotation and shear
+
+      sx, sy, rotationAngle, shearAngle = T.parts()
+
+    A QR decomposition separates a rotation from an upper-triangular scale and shear.
+    Both angles are returned in degrees. A reflection is represented by a signed second
+    scale. Translation is not included in these four values; it is T.M[:2, 2].
+
+    Output
+      sx - first scale factor
+      sy - second scale factor, signed for reflections
+      rotationAngle - rotation in degrees
+      shearAngle - shear angle in degrees"""
     Q, R = np.linalg.qr(self.M[:2, :2])
     d = np.sign(np.diag(R))
     d[d == 0] = 1
@@ -317,7 +361,10 @@ class spatialTransformRigid(spatialTransformShift):
   """a translation of the plane by the vector3d u
 
     T = spatialTransformRigid(vector3d(1, 2, 0))
-    T = spatialTransformRigid.fit(posA, posB, weights=w)"""
+    T = spatialTransformRigid.fit(posA, posB, weights=w)
+
+  Input
+    u - vector3d translation; only x and y are used; None gives zero displacement"""
 
   def __init__(self, u=None):
     super().__init__()
@@ -368,7 +415,10 @@ class spatialTransformProjective(spatialTransform):
 
     T = spatialTransformProjective(H)
     T = spatialTransformProjective.byTilt(theta, wd, centre)
-    T = spatialTransformProjective.fit(posA, posB, weights=w)"""
+    T = spatialTransformProjective.fit(posA, posB, weights=w)
+
+  Input
+    H - 3-by-3 homogeneous projective matrix, normalised by H[2,2]; None gives identity"""
 
   def __init__(self, H=None):
     H = np.eye(3) if H is None else np.asarray(H, dtype=float)
@@ -478,11 +528,28 @@ class spatialTransformProjective(spatialTransform):
 
 
 class spatialTransformPoly(spatialTransform):
-  """a polynomial displacement of degree 1 or 2, the coefficients c one column per coordinate over
-  the basis [1 x y] or [1 x y x^2 xy y^2]
+  """a scan distortion described by a polynomial displacement in x and y
 
     T = spatialTransformPoly(c, 2)
-    T = spatialTransformPoly.fit(posA, posB, degree=2, weights=w)"""
+    T = spatialTransformPoly.fit(posA, posB, degree=2)
+    pos2 = T * pos
+
+  The output is the input position plus the polynomial displacement. Rows of c multiply
+  the terms [1, x, y] for degree 1, or `[1, x, y, x**2, x*y, y**2]` for degree 2.
+  Its two columns give the x and y displacements. The z coordinate is unchanged.
+  A degree-1 displacement is an affine map and has an exact matrix inverse; degree 2
+  uses a numerical inverse. With no coefficients the transform is the identity.
+
+  Input
+    c - coefficient array of shape (3, 2) or (6, 2)
+    degree - 1 or 2; inferred from the number of coefficient rows when omitted
+  Output
+    T - spatialTransformPoly
+  Properties
+    c - displacement coefficients
+    degree - polynomial degree
+  See also
+    spatialTransformPoly.fit, spatialTransformPoly.shiftMatrix, spatialTransformInverse"""
 
   def __init__(self, c=None, degree=None):
     c = np.zeros((3, 2)) if c is None else np.asarray(c, dtype=float)
@@ -560,11 +627,25 @@ class spatialTransformPoly(spatialTransform):
 
 
 class spatialTransformDrift(spatialTransform):
-  """a displacement along the slow scan direction: linear between the knots s, the displacements u
-  one row each, NaN beyond them unless extrapolate=True continues the end segments
+  """a displacement that varies along the slow scan direction
 
     T = spatialTransformDrift(s, u, slowScan=vector3d(0, 1, 0))
-    T = spatialTransformDrift.fit(posA, posB)          the median displacement of every scan line"""
+    T = spatialTransformDrift.fit(posA, posB)
+
+  Project each position onto the unit slow-scan direction, then interpolate the x and y
+  displacement at that coordinate. The displacement varies linearly between supplied knots;
+  knots and their displacements are sorted together. Outside their range, positions become
+  NaN unless extrapolate=True continues the end segments. No knots gives the identity.
+
+  Input
+    s - one-dimensional array of knot coordinates in spatial units
+    u - array of shape (len(s), 2), giving x and y displacements at the knots
+    slowScan - vector3d direction, normalised internally; default is the y direction
+    extrapolate - continue the end segments outside the knot range; default False
+  Output
+    T - spatialTransformDrift
+  See also
+    spatialTransformDrift.fit, spatialTransformField"""
 
   def __init__(self, s=None, u=None, slowScan=None, extrapolate=False):
     s = np.zeros(0) if s is None else np.asarray(s, dtype=float).reshape(-1)
@@ -668,11 +749,25 @@ def _groupMedian(values, grp, k):
   return (a[s + (c - 1) // 2] + a[s + c // 2]) / 2
 
 class spatialTransformField(spatialTransform):
-  """a displacement interpolated between points: linear over their triangulation, the nearest point's
-  beyond it, where MATLAB takes natural neighbours and extrapolates linearly
+  """a scan distortion interpolated from measured displacement vectors
 
     T = spatialTransformField(pos, u)
-    T = spatialTransformField.fit(posA, posB)"""
+    T = spatialTransformField.fit(posA, posB)
+    moved = T * query
+
+  Displacements are interpolated linearly over a triangulation of the sample xy positions,
+  with coordinates rescaled for interpolation. Queries outside the convex hull use the nearest
+  sample's displacement. The interpolated x and y displacement is added to the query;
+  z is preserved. This differs from MATLAB's natural-neighbour interpolation and linear
+  extrapolation. With no samples the transform is the identity.
+
+  Input
+    pos - vector3d sample positions
+    u - vector3d displacements, one per sample position
+  Output
+    T - spatialTransformField
+  See also
+    spatialTransformField.fit, spatialTransformDrift, spatialTransformInverse"""
 
   def __init__(self, pos=None, u=None):
     if (pos is None) != (u is None):
@@ -747,9 +842,23 @@ class spatialTransformField(spatialTransform):
 
 
 class spatialTransformHandle(spatialTransform):
-  """a transform given by a function of the positions and, for the inverse, a second one
+  """a spatial transform defined by a callable and an optional inverse callable
 
-    T = spatialTransformHandle(fun, funInv)"""
+    T = spatialTransformHandle(fun, funInv)
+    moved = T * pos
+
+  The callable receives vector3d positions and must return their transformed positions,
+  rather than their displacements. It is responsible for preserving the required shape,
+  frame and z coordinates. Supply funInv to enable T.inv(); without it, requesting an
+  inverse raises ValueError. The inverse callable receives positions in the output space.
+
+  Input
+    fun - callable mapping input positions to output positions
+    funInv - inverse callable, or None if no inverse is provided
+  Output
+    T - spatialTransformHandle
+  See also
+    spatialTransform, spatialTransformInverse"""
 
   def __init__(self, fun, funInv=None):
     if not callable(fun):
@@ -774,9 +883,24 @@ class spatialTransformHandle(spatialTransform):
 
 
 class spatialTransformComposite(spatialTransform):
-  """stages applied in order, the first given first; nested composites are flattened
+  """a sequence of spatial transforms applied in the supplied order
 
-    T = spatialTransformComposite(T1, T2, T3)"""
+    T = spatialTransformComposite(T1, T2, T3)
+    moved = T * pos
+
+  This applies T1, then T2, then T3. Each argument may also be a list or tuple of stages;
+  nested composites are flattened. An empty sequence is the identity. Inversion reverses
+  the order and inverts each stage. T1 + T2 constructs the same ordering, while `T1 * T2`
+  uses matrix order and applies T2 first.
+
+  Input
+    stages - spatialTransform objects, or lists or tuples of them
+  Output
+    T - spatialTransformComposite
+  Properties
+    stages - ordered list of transforms
+  See also
+    spatialTransformComposite.fitStage, spatialTransformTilt"""
 
   def __init__(self, *stages):
     self.stages = []
@@ -814,7 +938,27 @@ class spatialTransformComposite(spatialTransform):
     return list(self.stages)
 
   def fitStage(self, s, posA, posB, **kwargs):
-    """the stage s, counted from zero, fitted to a residual measured after the ones before it"""
+    """return a composite with one stage fitted to supplied point pairs
+
+      fitted = T.fitStage(s, posA, posB, weights=w)
+
+    The zero-based stage s is replaced by a fit of the same transform class. Existing model
+    options, such as polynomial degree, are retained unless overridden by keywords. The other
+    stages are kept. The input composite is unchanged.
+
+    Point pairs are passed directly to that stage's fit method. When fitting residual
+    misalignment, supply coordinates already adjusted for the other stages; this method does
+    not calculate residual point pairs automatically.
+
+    Input
+      s - zero-based stage index
+      posA - vector3d input positions for the selected stage
+      posB - corresponding target positions
+      kwargs - options accepted by the selected stage's fit method
+    Output
+      fitted - composite with the fitted stage
+    See also
+      spatialTransformPoly.fit, spatialTransformProjective.fit"""
     if not 0 <= s < len(self.stages):
       raise IndexError(f"this transform has {len(self.stages)} stages, asked for stage {s}")
     p = self.stages[s]
@@ -827,7 +971,10 @@ class spatialTransformComposite(spatialTransform):
 class spatialTransformTilt(spatialTransformComposite):
   """specimen tilt, fitted in stages against a re-measured residual: a projective stage takes the
   bulk, then an affine and a quadratic polynomial what is left; an unfitted stage is the
-  identity, so a partly fitted tilt evaluates as far as it has got"""
+  identity, so a partly fitted tilt evaluates as far as it has got
+
+  Input
+    stages - optional spatialTransform stages in application order; by default projective, affine and quadratic stages, all initially identity"""
 
   def __init__(self, *stages):
     if not stages:
@@ -844,10 +991,27 @@ class spatialTransformTilt(spatialTransformComposite):
 
 
 class spatialTransformInverse(spatialTransform):
-  """the inverse of a transform that knows none in closed form, each preimage found by fixed point
-  iteration to the tolerance tol relative to the extent of the positions
+  """a numerical inverse of a spatial transform without a closed-form inverse
 
-    Tinv = spatialTransformInverse(T, tol=1e-10, maxIter=100)"""
+    Ti = spatialTransformInverse(T, tol=1e-10, maxIter=100)
+    original = Ti * transformed
+
+  Starting at each target position, fixed-point iteration subtracts the error between its
+  current image and the target. This works for sufficiently small, well-behaved distortions;
+  a folded map or a poorly converging iteration raises ValueError.
+
+  Convergence requires the largest xy error to be at most tol times max(1, the largest
+  absolute finite target coordinate). Iteration also stops if the error ceases to decrease
+  sufficiently after the first three steps. The z coordinate is preserved.
+
+  Input
+    T - spatialTransform to invert
+    tol - relative position tolerance; default 1e-10
+    maxIter - maximum iteration count; default 100
+  Output
+    Ti - spatialTransformInverse
+  See also
+    spatialTransform.inv, spatialTransformField, spatialTransformPoly"""
 
   def __init__(self, T, tol=1e-10, maxIter=100):
     if not isinstance(T, spatialTransform):
@@ -898,7 +1062,10 @@ class spatialTransformInverse(spatialTransform):
 
 
 class spatialTransformList(list):
-  """a list of transforms, one hop each, displayed as MATLAB's table of a spatialTransform array"""
+  """a list of transforms, one hop each, displayed as MATLAB's table of a spatialTransform array
+
+  Input
+    iterable - spatialTransform objects in hop order; an empty iterable gives an empty list"""
 
   def __getitem__(self, k):
     out = super().__getitem__(k)

@@ -240,8 +240,21 @@ class slipSystem:
     return velocityGradientTensor(M[0] if len(self) == 1 else M, self.frame)
 
   def mPrime(self, other):
-    """the Luster-Morris parameter |(n1 . n2)(b1 . b2)| and the residual Burgers vector of paired
-    systems, entry by entry as NumPy broadcasts, MATLAB's element by element"""
+    """measure the geometric alignment of paired slip systems using the Luster–Morris parameter
+
+      m = sS1.mPrime(sS2)
+
+    The result is `abs((n1 dot n2) * (b1 dot b2))`, using unit plane normals and slip directions.
+    It ranges from zero to one; one means both planes and directions are parallel. Express
+    both systems in the same coordinate frame, for example by rotating each crystal's systems
+    into the specimen frame. Arrays pair according to NumPy broadcasting.
+
+    Input
+      other - slipSystem, the systems to compare with this list
+    Output
+      m - array of dimensionless alignment parameters
+    See also
+      slipSystem.residualBurgersVector, slipSystem.rotate"""
     return np.abs(np.sum(unitRows(self.b.data) * unitRows(other.b.data), axis=-1) * np.sum(unitRows(self.n.data) * unitRows(other.n.data), axis=-1))
 
   def residualBurgersVector(self, other):
@@ -613,7 +626,12 @@ class dislocationSystem:
   """a Burgers vector with a line vector, edge when orthogonal and screw when parallel; from
   slip systems, the edge dislocations of every system and the screw ones of every distinct
   Burgers vector. The line energy u is |b|^2 for an edge and 0.7 |b|^2 for a screw
-  dislocation unless given, the isotropic line energy with Poisson ratio 0.3"""
+  dislocation unless given, the isotropic line energy with Poisson ratio 0.3
+
+  Input
+    b - Burgers vectors, or slipSystem objects from which edge and screw systems are constructed
+    l - line directions as vector3d; required when b supplies Burgers vectors
+    u - relative line energies; default |b|**2 for edge and 0.7*|b|**2 for screw systems"""
 
   def __init__(self, b, l=None, u=None):
     if isinstance(b, slipSystem):

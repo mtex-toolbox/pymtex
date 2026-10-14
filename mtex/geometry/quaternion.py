@@ -46,11 +46,27 @@ def _readCoefficients(cls, args, n):
 
 
 class quaternion(MtexArray):
-  """quaternions a + b i + c j + d k, the coefficients along the last axis; q * q2 is the product,
-  q * v rotates a vector
+  """quaternions stored as `a + b*i + c*j + d*k`, with one coefficient tuple per element.
 
-    quaternion(a, b, c, d)
-    quaternion(abcd)                     an array of shape (..., 4) or (4, N)"""
+    q = quaternion(a, b, c, d)
+    q = quaternion(abcd)
+
+  Separate coefficient arrays broadcast together. A coordinate array has shape (..., 4),
+  or (4, n) for a column-oriented list. Construction preserves the norm and sign;
+  q and -q are distinct quaternions. Use `rotation` for unit quaternions representing
+  proper rotations, where opposite signs represent the same rotation.
+
+  Quaternion multiplication composes products in the usual order. For unit quaternions,
+  `q*v` applies the rotation to a vector3d. Indexing and reshaping preserve the container.
+
+  Keywords
+    dtype - floating-point type of the stored coefficients
+  Properties
+    a, b, c, d - real and imaginary coefficients as arrays of the container shape
+    data - numeric coefficient array with a trailing axis of length four
+    shape - shape of the quaternion array, excluding the four coefficients
+  See also
+    rotation, orthogonalTransform, quaternion.normalize"""
   _ncoord = 4
 
   def __init__(self, *args, dtype=None):
@@ -73,7 +89,14 @@ class quaternion(MtexArray):
 
   @classmethod
   def nan(cls, *shape):
-    """quaternions of NaN coefficients, of the shape given"""
+    """construct quaternions whose four coefficients are NaN.
+
+      q = quaternion.nan(10)
+      rot = rotation.nan(2, 3)
+
+    Sizes may be separate integers or one tuple; no size gives one scalar element.
+    The class on which the method is called determines the result type. Missing rotations
+    can be detected with isnan and are omitted by rotation mean calculations."""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (4,), np.nan))
 
@@ -201,11 +224,26 @@ class quaternion(MtexArray):
     raise TypeError(f"expected a quaternion, got {type(other).__name__}")
 
   def conj(self):
-    """the conjugate quaternion a - b i - c j - d k, of a rotation its inverse"""
+    """return the quaternion conjugate `a - b*i - c*j - d*k`.
+
+      conjugate = q.conj()
+
+    The real coefficient is unchanged and the three imaginary coefficients change sign.
+    For a unit quaternion this is the inverse rotation; for a general quaternion use
+    `quaternion.inv` to include division by its squared norm."""
     return self._new(qconj(self.data))
 
   def inv(self):
-    """the inverse quaternion, the conjugate over the squared norm"""
+    """return the multiplicative inverse of each quaternion.
+
+      inverse = q.inv()
+
+    The inverse is `conj(q)/norm(q)**2`, so `q*inverse` is the identity for nonzero q.
+    The result is a quaternion, with the same array shape. Zero quaternions have no
+    inverse and produce nonfinite coefficients.
+
+    See also
+      quaternion.conj, rotation.inv"""
     return quaternion(self.conj().data / np.sum(self.data * self.data, axis=-1)[..., None])
 
   def norm(self):
@@ -215,7 +253,15 @@ class quaternion(MtexArray):
     return np.linalg.norm(self.data, axis=-1)
 
   def normalize(self):
-    """the quaternions divided by their norm"""
+    """divide each quaternion by its Euclidean coefficient norm.
+
+      unit = q.normalize()
+
+    The result keeps the input class and shape. A zero quaternion produces NaN coefficients.
+    Normalisation changes the norm, without choosing between the signs q and -q.
+
+    See also
+      quaternion.norm, rotation"""
     return self._new(self.data / self.norm()[..., None])
 
   def dot(self, other, antipodal=False):
@@ -258,9 +304,16 @@ class quaternion(MtexArray):
     return chordAngle(self.data, other.data[..., :4])
 
   def axis(self):
-    """the rotational axis, a unit vector
+    """return a unit vector along the rotation axis of each quaternion.
 
-      v = axis(q)"""
+      a = q.axis()
+
+    The result is a vector3d with the same shape as q. The axis of the identity rotation
+    is not geometrically unique; use `quaternion.angle` when only the rotation magnitude
+    is needed.
+
+    See also
+      rotation.byAxisAngle, quaternion.angle"""
     return vector3d(quatAxis(self.data), isNormalized=True)
 
   # two quaternions are equal when their coefficients are; isclose compares within a tolerance
@@ -321,33 +374,68 @@ class quaternion(MtexArray):
 
   @property
   def phi1(self):
-    """the first Bunge Euler angle phi1"""
+    """first Bunge Euler angle phi1 in radians, returned in the shape of the rotations."""
     return quat2euler(self.data, "Bunge")[0]
 
   @property
   def Phi(self):
-    """the second Bunge Euler angle Phi"""
+    """second Bunge Euler angle Phi in radians, returned in the shape of the rotations."""
     return quat2euler(self.data, "Bunge")[1]
 
   @property
   def phi2(self):
-    """the third Bunge Euler angle phi2"""
+    """third Bunge Euler angle phi2 in radians, returned in the shape of the rotations."""
     return quat2euler(self.data, "Bunge")[2]
 
   def matrix(self):
-    """the rotation matrices, of shape (..., 3, 3)"""
+    """return the numeric rotation matrix of each unit quaternion.
+
+      M = rot.matrix()
+      rotated = M @ vector
+
+    The output shape is rot.shape + (3, 3). Matrices act on Cartesian column vectors;
+    `rot*v` is the vector3d form of the same action. General quaternions should be
+    normalised before interpreting the matrix as a proper rotation.
+
+    See also
+      rotation.byMatrix, quaternion.Euler"""
     return quat2mat(self.data)
 
   def Rodrigues(self):
-    """the Rodrigues vectors, the axes scaled by tan(omega/2)"""
+    """express each rotation as an axis scaled by tan(omega/2).
+
+      r = rot.Rodrigues()
+
+    The result is a vector3d of dimensionless Rodrigues coordinates. The identity maps
+    to the origin; half-turns lie at infinity, so this representation is singular at pi.
+
+    See also
+      rotation.byRodrigues, quaternion.homochoric"""
     return vector3d(quat2rodrigues(self.data))
 
   def homochoric(self):
-    """the homochoric vectors, the axes scaled by (3/4 (omega - sin omega))^(1/3)"""
+    """express rotations as equal-volume coordinates in a ball.
+
+      h = rot.homochoric()
+
+    The vector points along the rotation axis and has length
+    `(3*(omega - sin(omega))/4)**(1/3)`, with omega in radians. The identity maps to zero;
+    rotations through pi reach the ball radius `(3*pi/4)**(1/3)`.
+
+    See also
+      rotation.byHomochoric, quaternion.cubochoric"""
     return vector3d(quat2homochoric(self.data))
 
   def cubochoric(self):
-    """the cubochoric vectors, the homochoric ball mapped onto the cube"""
+    """express rotations as equal-volume coordinates in a cube.
+
+      c = rot.cubochoric()
+
+    The homochoric ball is mapped to a cube centred at zero. The result is a vector3d
+    whose coordinates are dimensionless, with the same array shape as rot.
+
+    See also
+      rotation.byCubochoric, quaternion.homochoric"""
     return vector3d(homo2cubo(quat2homochoric(self.data)))
 
   def log(self, ref=None, side="left"):
@@ -404,7 +492,19 @@ class quaternion(MtexArray):
     return v.exp(self, side)
 
   def geodesic(self, other, s):
-    """the point at s in [0, 1] on the shortest path from this rotation to another"""
+    """interpolate along the shortest rotational path between two rotations.
+
+      middle = rot1.geodesic(rot2, 0.5)
+
+    Parameter s=0 gives the first endpoint and s=1 the second. The interpolation uses
+    rotation angle rather than a linear average of quaternion coefficients; orientations
+    also account for their crystal and specimen symmetries.
+
+    Input
+      other - second rotation or orientation
+      s - interpolation parameter, usually in [0, 1]
+    See also
+      geodesic, quaternion.log, quaternion.exp"""
     from .tangent import geodesic
     return geodesic(self, other, s)
 
@@ -599,12 +699,29 @@ def _groupElements(x):
 
 
 class rotation(quaternion):
-  """rotations, unit quaternions with q and -q one rotation; numbers are normalised, a point group
-  or a frame gives its elements, an improper orthogonalTransform is refused
+  """proper rotations represented by unit quaternions, with opposite signs identified.
 
-    rotation(a, b, c, d)
-    rotation(q)
-    rotation(cs)"""
+    rot = rotation(a, b, c, d)
+    rot = rotation(q)
+    rot = rotation(cs)
+
+  Numeric coefficients and general quaternions are normalised on construction. A point
+  group or reference frame supplies its proper rotational parts. Improper orthogonal
+  transforms cannot be converted to a rotation; use `orthogonalTransform` to retain parity.
+
+  For vector3d data, `rot*v` rotates each vector. The product `rot1*rot2` applies rot2 first,
+  then rot1. Array shapes broadcast, while the trailing four coefficients are internal
+  to each element.
+
+  Keywords
+    dtype - floating-point type of the stored coefficients
+  Properties
+    a, b, c, d - unit quaternion coefficients, with opposite signs representing the same rotation
+    data - coefficient array of shape rot.shape + (4,)
+    phi1, Phi, phi2 - Bunge Euler angles in radians
+    shape - shape of the rotation array
+  See also
+    rotation.byEuler, rotation.byAxisAngle, rotation.byMatrix, quaternion"""
 
   # a rotation from numbers normalises; from an orthogonal transform only when proper
   def __init__(self, *args, dtype=None):
@@ -662,15 +779,41 @@ class rotation(quaternion):
 
   @classmethod
   def byAxisAngle(cls, v, omega):
-    """the rotations by the angle omega about the axis v
+    """construct right-handed rotations about given axes.
 
       rot = rotation.byAxisAngle(v, omega)
-      rot = rotation.byAxisAngle(zvector, [10*degree, 20*degree, 30*degree])    # three about z"""
+      rot = rotation.byAxisAngle(vector3d.Z, 30*degree)
+      rot = rotation.byAxisAngle(axis, angles)
+
+    Angles are in radians and broadcast with the axes. Each nonzero axis is normalised
+    internally, so its length does not change the rotation angle.
+
+    Input
+      v - vector3d or Cartesian coordinates of shape (..., 3)
+      omega - rotation angles in radians
+    Output
+      rot - rotation container with the broadcast shape
+    See also
+      rotation.axis, rotation.angle, rotation.byEuler"""
     return cls._fromData(axis2quat(_xyz(v), omega))
 
   @classmethod
   def byMatrix(cls, M):
-    """a proper orthogonal matrix, or a list of them on the leading axes"""
+    """construct rotations from proper orthogonal matrices.
+
+      rot = rotation.byMatrix(M)
+
+    Input
+      M - numeric array of shape (..., 3, 3), with orthogonal columns and determinant +1
+    Output
+      rot - rotation with shape M.shape[:-2]
+
+    Matrices of negative determinant are refused. To retain a reflection or inversion,
+    use orthogonalTransform.byMatrix. This constructor assumes the supplied matrices
+    are orthogonal; it is not a least-squares fit to arbitrary matrices.
+
+    See also
+      rotation.matrix, orthogonalTransform.byMatrix, rotation.fit"""
     M = np.asarray(M, dtype=float)
     if np.any(np.linalg.det(M) < 0):
       raise ValueError("the matrix has determinant -1; use orthogonalTransform.byMatrix")
@@ -678,17 +821,42 @@ class rotation(quaternion):
 
   @classmethod
   def byRodrigues(cls, v):
-    """the rotations of Rodrigues vectors, the axes scaled by tan(omega/2)"""
+    """construct rotations from dimensionless Rodrigues vectors.
+
+      rot = rotation.byRodrigues(r)
+
+    The vector direction is the rotation axis and its length is tan(omega/2).
+    Input may be vector3d or Cartesian triples with shape (..., 3).
+
+    See also
+      rotation.Rodrigues, rotation.byAxisAngle"""
     return cls._fromData(rodrigues2quat(_xyz(v)))
 
   @classmethod
   def byHomochoric(cls, v):
-    """the rotations of homochoric vectors"""
+    """construct rotations from coordinates in the homochoric ball.
+
+      rot = rotation.byHomochoric(h)
+
+    Input may be vector3d or dimensionless Cartesian triples. A vector of length r
+    represents a rotation through omega satisfying `r**3 = 3*(omega - sin(omega))/4`.
+    Use coordinates inside the ball of radius `(3*pi/4)**(1/3)`.
+
+    See also
+      rotation.homochoric, rotation.byCubochoric"""
     return cls._fromData(homochoric2quat(_xyz(v)))
 
   @classmethod
   def byCubochoric(cls, v):
-    """the rotations of cubochoric vectors"""
+    """construct rotations from equal-volume cubochoric coordinates.
+
+      rot = rotation.byCubochoric(c)
+
+    Input may be vector3d or Cartesian triples in the cubochoric cube. Coordinates
+    are first mapped to the homochoric ball and then converted to rotations.
+
+    See also
+      rotation.cubochoric, rotation.byHomochoric"""
     return cls._fromData(homochoric2quat(cubo2homo(_xyz(v))))
 
   @classmethod
@@ -779,7 +947,15 @@ class rotation(quaternion):
     return super().cat(*arrays, axis=axis)
 
   def inv(self):
-    """the inverse rotation, the conjugate quaternion"""
+    """return the rotation that reverses each input rotation.
+
+      inverse = rot.inv()
+
+    For unit quaternions, inversion is quaternion conjugation. If `v2=rot*v1`, then
+    `inverse*v2=v1`, up to numerical precision. Array shape is preserved.
+
+    See also
+      quaternion.conj, orientation.inv"""
     return self.conj()
 
   def dot(self, other, antipodal=True):
@@ -862,8 +1038,13 @@ class orthogonalTransform(MtexArray):
   the rotation followed by the inversion
 
     orthogonalTransform(rot)
-    orthogonalTransform(rot, True)       the improper transform -rot
-    orthogonalTransform(cs)              the elements of a point group"""
+    orthogonalTransform(rot, True)  # the improper transform -rot
+    orthogonalTransform(cs)  # the elements of a point group
+
+  Input
+    rot - rotation, quaternion coordinates, or a referenceFrame or symmetry supplying its elements; None selects identity
+    improper - whether to apply inversion after the rotation; default False
+    dtype - floating-point type of the stored coordinates"""
   _ncoord = 5
 
   def __init__(self, rot=None, improper=False, dtype=None):

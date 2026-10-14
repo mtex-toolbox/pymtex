@@ -95,14 +95,19 @@ def _equivalents(ori):
 class ODFSections:
   """sections through orientation space
 
-    oS.frameA, oS.frameB       the two frames
-    oS.tol               the tolerance an orientation may deviate from a section
-    oS.numSections       how many
-    oS.sectionCharts(k)  the charts section k is drawn on
-    oS.sectionData(ori)  where the equivalents of a list fall: directions, section, source
-    oS.orientationsAt(k, v)   the orientations at points of a chart of section k
-    oS.plot(x, ...)      plotSection(x, oS, ...)
-  """
+    oS.frameA, oS.frameB  # the two frames
+    oS.tol  # the tolerance an orientation may deviate from a section
+    oS.numSections  # how many
+    oS.sectionCharts(k)  # the charts section k is drawn on
+    oS.sectionData(ori)  # where the equivalents of a list fall: directions, section, source
+    oS.orientationsAt(k, v)  # the orientations at points of a chart of section k
+    oS.plot(x, ...)  # plotSection(x, oS, ...)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame
+    values - section angles in radians
+    tol - angular acceptance tolerance in radians for assigning orientations to sections"""
 
   axisLabels = None
   outerSector = None
@@ -214,9 +219,18 @@ def eulerBox(maxTheta, maxRho):
 class eulerSections(ODFSections):
   """sections of constant Euler angle, the first or the third of a convention
 
-    phi2Sections(cs, ss, sections=6), phi2Sections(cs, ss, phi2=(0:15:90)*degree)
+    phi2Sections(cs, ss, sections=6), phi2Sections(cs, ss, phi2=np.arange(0, 91, 15)*degree)
     phi1Sections, alphaSections, gammaSections
-  """
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    sections - number of sections when explicit angle values are omitted; default 6
+    values - explicit section angles in radians, overriding the section count
+    tol - maximum angular assignment tolerance in radians; default 5*degree
+    maxPhi - upper limit of the middle Euler angle in radians; None uses the symmetry-dependent limit
+    maxAzimuth - upper limit of the in-section azimuth in radians; None uses its symmetry-dependent limit
+    kwargs - section angles may also be supplied as phi2=values"""
 
   convention = "Bunge"
   first = False
@@ -299,7 +313,17 @@ class phi2Sections(eulerSections):
 
     oS = phi2Sections(cs, ss)
     oS = phi2Sections(cs, ss, sections=6)
-    oS = phi2Sections(cs, ss, phi2=np.arange(0, 91, 15)*degree)"""
+    oS = phi2Sections(cs, ss, phi2=np.arange(0, 91, 15)*degree)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    sections - number of sections when explicit angle values are omitted; default 6
+    values - explicit section angles in radians, overriding the section count
+    tol - maximum angular assignment tolerance in radians; default 5*degree
+    maxPhi - upper limit of the middle Euler angle in radians; None uses the symmetry-dependent limit
+    maxAzimuth - upper limit of the in-section azimuth in radians; None uses its symmetry-dependent limit
+    kwargs - section angles may also be supplied as phi2=values"""
   convention, first = "Bunge", False
 
   @property
@@ -317,7 +341,17 @@ class phi1Sections(eulerSections):
   """sections of constant phi1 in the Bunge convention
 
     oS = phi1Sections(cs, ss, sections=6)
-    oS = phi1Sections(cs, ss, phi1=np.arange(0, 91, 15)*degree)"""
+    oS = phi1Sections(cs, ss, phi1=np.arange(0, 91, 15)*degree)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    sections - number of sections when explicit angle values are omitted; default 6
+    values - explicit section angles in radians, overriding the section count
+    tol - maximum angular assignment tolerance in radians; default 5*degree
+    maxPhi - upper limit of the middle Euler angle in radians; None uses the symmetry-dependent limit
+    maxAzimuth - upper limit of the in-section azimuth in radians; None uses its symmetry-dependent limit
+    kwargs - section angles may also be supplied as phi1=values"""
   convention, first = "Bunge", True
 
   @property
@@ -335,7 +369,17 @@ class gammaSections(eulerSections):
   """sections of constant gamma in the Matthies (ZYZ) convention
 
     oS = gammaSections(cs, ss, sections=6)
-    oS = gammaSections(cs, ss, gamma=np.arange(0, 91, 15)*degree)"""
+    oS = gammaSections(cs, ss, gamma=np.arange(0, 91, 15)*degree)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    sections - number of sections when explicit angle values are omitted; default 6
+    values - explicit section angles in radians, overriding the section count
+    tol - maximum angular assignment tolerance in radians; default 5*degree
+    maxPhi - upper limit of the middle Euler angle in radians; None uses the symmetry-dependent limit
+    maxAzimuth - upper limit of the in-section azimuth in radians; None uses its symmetry-dependent limit
+    kwargs - section angles may also be supplied as gamma=values"""
   convention, first = "Matthies", False
 
   @property
@@ -353,7 +397,17 @@ class alphaSections(eulerSections):
   """sections of constant alpha in the Matthies (ZYZ) convention
 
     oS = alphaSections(cs, ss, sections=6)
-    oS = alphaSections(cs, ss, alpha=np.arange(0, 91, 15)*degree)"""
+    oS = alphaSections(cs, ss, alpha=np.arange(0, 91, 15)*degree)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    sections - number of sections when explicit angle values are omitted; default 6
+    values - explicit section angles in radians, overriding the section count
+    tol - maximum angular assignment tolerance in radians; default 5*degree
+    maxPhi - upper limit of the middle Euler angle in radians; None uses the symmetry-dependent limit
+    maxAzimuth - upper limit of the in-section azimuth in radians; None uses its symmetry-dependent limit
+    kwargs - section angles may also be supplied as alpha=values"""
   convention, first = "Matthies", True
 
   @property
@@ -378,8 +432,18 @@ class pfSections(ODFSections):
   """pole figure sections: the pole figure of h1, split by the twist of h2 about it
 
     pfSections(cs, ss, h1=..., h2=..., sections=6, omega=values)
-    sigmaSections(cs, ss, sections=6, sigma=values)   with h1 = c*, h2 = a
-  """
+    sigmaSections(cs, ss, sections=6, sigma=values)  # with h1 = c*, h2 = a
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    h1 - first crystal direction; default reciprocal c axis
+    h2 - second crystal direction, defining twist about h1; default a axis; must not be parallel to h1
+    sections - section count when explicit twist angles are omitted; default 6
+    values - explicit twist angles in radians
+    tol - angular assignment tolerance in radians; default 5*degree
+    maxOmega - maximum twist angle in radians; None uses the symmetry-dependent period
+    kwargs - twist angles may also be supplied as omega=values"""
 
   angleName = "omega"
 
@@ -548,7 +612,18 @@ class sigmaSections(pfSections):
   sections MATLAB's sigma sections draw
 
     oS = sigmaSections(cs, ss, sections=6)
-    oS = sigmaSections(cs, ss, sigma=np.arange(0, 60, 10)*degree)"""
+    oS = sigmaSections(cs, ss, sigma=np.arange(0, 60, 10)*degree)
+
+  Input
+    frameA - crystal reference frame
+    frameB - specimen reference frame; None uses the default
+    h1 - first crystal direction; default reciprocal c axis
+    h2 - second crystal direction, defining twist about h1; default a axis; must not be parallel to h1
+    sections - section count when explicit twist angles are omitted; default 6
+    values - explicit twist angles in radians
+    tol - angular assignment tolerance in radians; default 5*degree
+    maxOmega - maximum twist angle in radians; None uses the symmetry-dependent period
+    kwargs - twist angles may also be supplied as sigma=values"""
   angleName = "sigma"
 
   @property
@@ -567,9 +642,19 @@ class sigmaSections(pfSections):
 class axisAngleSections(ODFSections):
   """sections of constant rotation angle, each on the axis sector the region allows there
 
-    axisAngleSections(cs1, cs2, angles=(10:20:180)*degree)
+    axisAngleSections(cs1, cs2, angles=np.arange(10, 181, 20)*degree)
     axisAngleSections(cs1, cs2, sections=5, volumeScaling=False, antipodal=True)
-  """
+
+  Input
+    frameA - first reference frame
+    frameB - second reference frame; None uses the default specimen frame
+    sections - number of equally spaced angle bins; their midpoints set section angles when supplied
+    angles - explicit rotation angles in radians; angles beyond the fundamental-region limit are dropped
+    values - alternative explicit angle array, taking precedence over angles
+    tol - angular assignment tolerance in radians; default 5*degree
+    antipodal - impose grain-exchange symmetry; default False
+    volumeScaling - rescale charts with angle to account for orientation-space volume; default True
+    axisAngle - alternative angle array, taking precedence over values and angles"""
 
   def __init__(self, frameA, frameB=None, sections=None, angles=None, values=None, tol=5 * degree, antipodal=False,
                volumeScaling=True, axisAngle=None):

@@ -255,6 +255,12 @@ class SO3FunHandle(SO3FunGeneric):
     antipodal - exchange symmetry, f(g) = f(inv(g)), for misorientations
     real - the function takes only real values; the imaginary part of the values is dropped
     symmetrise - average the callable over the groups of both frames on every call
+  Properties
+    fun - callable used for evaluation, including requested symmetry averaging
+    bandwidth - degree used when a harmonic approximation is needed
+    CS, SS - crystal and specimen frames passed to orientation queries
+    isReal - whether evaluation discards imaginary values
+    antipodal - whether grain exchange symmetry is requested
   See also
     SO3Fun, SO3FunHarmonic, S2FunHandle, SO3FunOperations"""
 
@@ -270,7 +276,17 @@ class SO3FunHandle(SO3FunGeneric):
     self.antipodal, self.isReal = bool(antipodal), bool(real)
 
   def eval(self, x):
-    """the callable receives orientations in the frames of the function"""
+    """evaluate the callable at orientations in the function's reference frames.
+
+      values = f(ori)
+
+    Plain rotations are wrapped as orientations carrying the function's frames. An
+    orientation query must already have compatible frames. For a scalar-valued callable,
+    values are reshaped to the query shape; real handles discard any imaginary part.
+    Any symmetry averaging requested at construction is applied during each evaluation.
+
+    See also
+      SO3FunHandle, SO3FunHarmonic.eval"""
     r = _rotationsFor(self, x)
     o = r if isinstance(r, orientation) else orientation._fromRotation(r.data, (self.CS, self.SS), self.antipodal)
     v = np.asarray(self.fun(o))
@@ -317,7 +333,10 @@ class SO3FunHandle(SO3FunGeneric):
 
 class SO3FunComposition(SO3FunGeneric):
   """a sum of functions of different representations: evaluation adds the values, the harmonic
-  form adds the harmonic forms"""
+  form adds the harmonic forms
+
+  Input
+    terms - functions on SO(3) to add, with compatible crystal and specimen frames"""
 
   def __init__(self, *terms):
     flat = []
@@ -503,6 +522,12 @@ class S2FunHandle(_S2Direct):
     real - the function takes only real values; the imaginary part of the values is dropped
     symmetrise - average the callable over the group of the frame (and over v and -v when
         antipodal) on every call; by default only when antipodal
+  Properties
+    fun - callable used for evaluation, including requested symmetry averaging
+    bandwidth - degree used when a harmonic approximation is needed
+    frame - reference frame passed to directional queries
+    isReal - whether evaluation discards imaginary values
+    antipodal - whether opposite directions are identified
   See also
     S2Fun, S2FunHarmonic, SO3FunHandle, S2FunOperations"""
 
@@ -538,7 +563,16 @@ class S2FunHandle(_S2Direct):
     return self.eval(x)
 
   def eval(self, x):
-    """the values of the callable at the directions x, taken into the frame of the function"""
+    """evaluate the callable at unit directions in the function's frame.
+
+      values = f(directions)
+
+    Query directions are normalised and checked for frame compatibility before the
+    callable receives them. Scalar-valued output is reshaped to the query shape. Real
+    handles discard the imaginary part; symmetry averaging follows the construction options.
+
+    See also
+      S2FunHandle, S2FunHarmonic.eval"""
     v = self._vectorsFor(x)
     out = np.asarray(self.fun(v))
     out = out.reshape(v.shape) if out.size == v.size else out
@@ -601,7 +635,10 @@ def _directRatio(f, g):
 
 class S2FunSum(_S2Direct):
   """a sum of functions on the sphere of different representations: evaluation adds the values,
-  the harmonic form adds the harmonic forms; what + returns when coefficients cannot be added"""
+  the harmonic form adds the harmonic forms; what + returns when coefficients cannot be added
+
+  Input
+    terms - functions on the sphere to add, in compatible coordinate frames"""
 
   def __init__(self, *terms):
     flat = []
@@ -665,10 +702,29 @@ class S2FunSum(_S2Direct):
 
 
 class S1FunHandle:
-  """a function on the circle given by a callable that receives angles
+  """represent a periodic circular function by a vectorised callable.
 
-    S1FunHandle(fun)
-    S1FunHandle(fun, bandwidth=L)     the bandwidth of its harmonic form"""
+    f = S1FunHandle(lambda x: np.cos(2*x))
+    f = S1FunHandle(fun, bandwidth=32, real=False)
+
+  The callable receives numeric angles in radians. Evaluation calls it directly;
+  the wrapper does not make a nonperiodic formula periodic. Choose a function of
+  period `2*pi` for circular data. Operations needing coefficients first approximate
+  the callable as an S1FunHarmonic at the stated bandwidth.
+
+  Input
+    fun - callable accepting an angle array and returning matching values
+  Keywords
+    bandwidth - largest Fourier mode of harmonic approximations; maxS1Bandwidth when omitted
+    real - return real values, dropping any imaginary part
+  Output
+    f - S1FunHandle, evaluated with f(angles)
+  Properties
+    fun - wrapped callable
+    bandwidth - resolution used by harmonic operations
+    isReal - whether evaluation returns only real values
+  See also
+    S1FunHarmonic, S1FunHarmonic.interpolate"""
 
   def __init__(self, fun, *, bandwidth=None, real=True):
     self.fun = fun
@@ -679,7 +735,16 @@ class S1FunHandle:
     return self.eval(x)
 
   def eval(self, x):
-    """the values of the callable at the angles x"""
+    """call the supplied function at numeric angles in radians.
+
+      values = f(angles)
+
+    Angles are passed to the callable as a floating-point array. For a real handle,
+    any imaginary part is discarded. The callable is responsible for its periodicity
+    and for returning values with a shape appropriate to the queries.
+
+    See also
+      S1FunHandle, S1FunHarmonic.eval"""
     out = np.asarray(self.fun(np.asarray(x, dtype=float)))
     return np.real(out) if self.isReal and out.dtype.kind == "c" else out
 

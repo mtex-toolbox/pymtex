@@ -15,7 +15,11 @@ class fibonacciS2Grid(vector3d):
   the azimuth advancing by the golden angle; by default the count fitting a resolution of 5 degree
 
     S2G = fibonacciS2Grid(1000)
-    S2G = fibonacciS2Grid(resolution=2*degree)"""
+    S2G = fibonacciS2Grid(resolution=2*degree)
+
+  Input
+    N - requested number of nodes, rounded to a nearby odd count
+    resolution - target angular spacing in radians when N is omitted; default 5*degree"""
 
   def __init__(self, N=None, resolution=None):
     # the count MATLAB fits to the resolution, rounded once to the half count

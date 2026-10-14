@@ -123,7 +123,14 @@ class SO3FunBingham(SO3FunGeneric):
   orthonormal quaternion axes A; BinghamODF builds it from axes, orientations or a fibre
 
     SO3FunBingham(kappa, A, cs, ss)
-    SO3FunBingham(kappa, A, cs, cs, antipodal=True)      with exchange symmetry"""
+    SO3FunBingham(kappa, A, cs, cs, antipodal=True)  # with exchange symmetry
+
+  Input
+    kappa - four Bingham concentration parameters, one per quaternion axis
+    A - orthonormal quaternion axes as columns of a 4-by-4 matrix, or four rotations or orientations
+    frames - crystal and specimen frames; inherited from orientation axes when omitted
+    weight - mean density over SO(3); default 1
+    antipodal - impose grain-exchange symmetry f(g)=f(inv(g)); default False"""
 
   def __init__(self, kappa, A, *frames, weight=1.0, antipodal=False):
     A, framesOf, exchange = _axesMatrix(A)
@@ -340,29 +347,36 @@ def _fibreAxes(h, r):
 
 
 def BinghamODF(kappa, A=None, *frames, **kwargs):
-  """a Bingham distributed ODF; MATLAB's BinghamODF
+  """construct an orientation distribution from Bingham concentrations and quaternion axes
 
-    odf = BinghamODF(20, ori)                          # about one orientation, the identity basis in its frames
-    odf = BinghamODF(20, f)                            # about a fibre
-    odf = BinghamODF(20, cs)                           # the identity basis in a crystal frame
-    odf = BinghamODF([20, 10, 0, 0], A, cs, ss)        # four concentrations, the axes a 4x4 matrix
+    odf = BinghamODF(20, cs)  # concentrated about the identity in this crystal frame
+    odf = BinghamODF(20, f)  # concentrated about an orientation fibre
+    odf = BinghamODF([20, 10, 0, 0], A, cs, ss)  # four orthogonal quaternion axes
 
-  A Bingham distribution from four concentrations and four orthogonal quaternion axes, the
-  axes as a 4x4 matrix, four orientations, or one orientation standing for the identity
-  basis; fewer concentrations are padded with zeros; a fibre takes its two axes with the
-  same concentration, as MATLAB's constructor does. The keywords of SO3FunBingham, weight
-  and antipodal, are passed on.
+  The density is proportional to `exp(sum_i kappa[i] * dot(q, A[:, i])**2)`, averaged
+  over the crystal and specimen symmetry groups. A larger concentration favours the
+  corresponding quaternion axis. Adding the same constant to all four concentrations leaves
+  the density unchanged. Missing concentrations are padded with zeros.
+
+  A fibre supplies two quaternion axes with the same concentration when kappa is scalar.
+  A single orientation supplies its frames and selects the identity quaternion basis; its
+  rotation does not set the peak position. To rotate a distribution, rotate the resulting
+  ODF, or provide four explicitly rotated orthogonal quaternion axes.
+
+  Additional keywords are passed to SO3FunBingham: weight sets the mean (default 1),
+  and antipodal imposes grain-exchange symmetry.
 
   Input
-    kappa - the form parameters, up to four concentrations
-    A - the axes: an orthogonal 4x4 matrix, four orientations, one orientation, a fibre, a
-        crystal frame, or a crystal direction h followed by a specimen direction r for the
-        fibre between them
-    frames - the crystal and the specimen frame, when A does not carry them
+    kappa - one to four concentration parameters
+    A - orthogonal 4-by-4 matrix with quaternion axes as columns, four rotations or
+        orientations, a fibre, a crystalFrame, or one orientation supplying its frames;
+        None selects the identity basis
+    frames - crystal and specimen frames when they are not supplied by A; when A is a
+        crystal direction, the first extra argument is the specimen direction of the fibre
   Output
-    odf - SO3FunBingham
+    odf - SO3FunBingham, of mean one unless a different weight is supplied
   See also
-    calcBinghamODF, fibreODF, unimodalODF, uniformODF, SO3FunBingham"""
+    SO3FunBingham, calcBinghamODF, fibreODF, unimodalODF"""
   from ..geometry.fibre import fibre
   from ..geometry.frames import referenceFrame
   kappa = np.asarray(kappa, dtype=float).ravel()
@@ -430,12 +444,35 @@ def calcBinghamODF(o, weights=None, exact=False):
 
 
 class S2FunBingham(S2Fun):
-  """the Bingham distribution on the sphere: the density exp(v' a diag(Z) a' v) of the axes v, with
-  three shape parameters Z and three orthonormal principal axes a, symmetrised over a frame
+  """an antipodally symmetric Bingham density on the unit sphere
 
-    S2FunBingham(Z)                       the coordinate axes
-    S2FunBingham(Z, a)                    the axes as directions or a 3x3 matrix
-    S2FunBingham.fit(v)                   the fit to directions"""
+    f = S2FunBingham([-20, -10, 0])  # concentrated about the z axis
+    f = S2FunBingham(Z, a)  # concentrations along supplied principal axes
+    f = S2FunBingham.fit(v)  # estimate the distribution from measured axes
+
+  For a unit direction v the density is proportional to `exp(sum_i Z[i] * dot(v, a[i])**2)`.
+  The normalisation gives mean one over the sphere, or integral `4*pi` with respect to surface
+  area. Directions v and -v have equal density. Equal parameters give the uniform density;
+  one largest parameter gives an axial peak, and two equal largest parameters give a girdle.
+  Adding a common constant to Z leaves the density unchanged.
+
+  If a frame is supplied, evaluation averages over its symmetry-equivalent axes. Parameters
+  need not be sorted: each Z[i] belongs to a[i]. The fit method returns them in ascending order.
+
+  Input
+    Z - three concentration parameters
+    a - three orthonormal vector3d axes, or a 3-by-3 matrix with axes as columns;
+        None selects the Cartesian axes; a referenceFrame can be supplied here instead
+    frame - referenceFrame of the directions and their symmetry, by default that of a
+  Output
+    f - S2FunBingham; evaluate by f(v) or f.eval(v)
+  Properties
+    Z - concentration along each principal axis
+    a - three principal axes as vector3d
+    frame - coordinate frame and symmetry
+    antipodal - True: the density describes unoriented axes
+  See also
+    S2FunBingham.fit, calcDensity, BinghamODF"""
   isReal = True
   antipodal = True
 
@@ -461,7 +498,10 @@ class S2FunBingham(S2Fun):
 
   @property
   def a(self):
-    """the principal axes as directions, the modal axis a[2], as MATLAB's a"""
+    """the three orthonormal principal axes as vector3d, with a[i] paired with Z[i]
+
+    The axis with the largest Z is a mode. After fitting, the parameters are ascending and
+    that axis is a[2]. With equal largest parameters, the maximum is a girdle or the entire sphere."""
     return vector3d(self._A.T, frame=self.frame)
 
   @property

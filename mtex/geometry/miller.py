@@ -36,8 +36,8 @@ def Miller(*args, antipodal=False, dispStyle=None):
     m = Miller(u, v, w, cs, 'uvw')             # a lattice direction, 'UVTW' with four indices
     m = Miller([[1, 0, 0], [1, 1, 1]], cs)     # many at once, the indices along the last axis
     m = Miller('{111}', cs)                    # (hkl) or [uvw] one, {hkl} or <uvw> the whole family
-    m = Miller('[100]\\[011]', cs)             # the plane holding both directions, the zone law
-    m = Miller('(100)\\(011)', cs)             # the direction both planes hold
+    m = Miller(r'[100]\\[011]', cs)             # the plane holding both directions, the zone law
+    m = Miller(r'(100)\\(011)', cs)             # the direction both planes hold
     m = Miller(v, cs)                          # a vector3d expressed in the crystal frame
     m = Miller(1, 1, 0, cs, antipodal=True)    # with antipodal symmetry
 

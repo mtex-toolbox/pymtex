@@ -44,7 +44,16 @@ class siteSet:
 
 class cellComplex:
   """the spatial decomposition of a map, one cell per site: the vertices V, the vertex pair F and
-  the site pair of every face, the sites and the lattice"""
+  the site pair of every face, the sites and the lattice
+
+  Input
+    V - planar vertex coordinates
+    F - pairs of vertex indices describing faces between cells
+    cells - pairs of adjacent site indices for every face
+    sites - measurement sites represented by the cells
+    A - lattice basis
+    plane - mapPlane of the geometry
+    shape - cell or map shape metadata"""
 
   def __init__(self, V, F, cells, sites, A, plane, shape):
     self.V, self.F, self.cells, self.sites, self.A, self.plane, self.shape = V, F, cells, sites, A, plane, shape

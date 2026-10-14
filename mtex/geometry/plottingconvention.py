@@ -30,11 +30,11 @@ ARROWS_ASCII = ("<-", "->", "^", "v", "(x)", "(.)")
 
 class plottingConvention:
   """how a reference frame is laid out on screen: one rotation taking the screen axes to the
-  reference axes, east = rot * x, north = rot * y, outOfScreen = rot * z
+  reference axes, `east = rot * x`, `north = rot * y`, `outOfScreen = rot * z`
 
     pC = plottingConvention(outOfScreen, east)
-    pC = plottingConvention('y↑→x')      each axis next to the screen direction it points to
-    pC = plottingConvention.ij          x east, y south, z into the screen"""
+    pC = plottingConvention('y↑→x')  # each axis next to the screen direction it points to
+    pC = plottingConvention.ij  # x east, y south, z into the screen"""
 
   def __init__(self, outOfScreen: ConventionName | Any = None, east=None):
     if isinstance(outOfScreen, plottingConvention):

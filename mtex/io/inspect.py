@@ -29,9 +29,35 @@ HEAD_LIMIT = 1 << 26
 
 @dataclass
 class EBSDFileInfo:
-  """what an EBSD file says about itself from its header alone: format, vendor, phases,
-  properties, data sets, grid, step and Euler correction, as inspectEBSD returns it; a volume
-  has a grid and a step of three, and says what it holds of its grains"""
+  """metadata describing an EBSD file before its measurement arrays are imported
+
+    info = inspectEBSD('map.ctf')
+    rows = info.describe()
+
+  inspectEBSD reads header information to identify the format, phases, properties and scan
+  geometry. This result describes the file; it does not contain the loaded EBSD measurements.
+  For a volume, grid and step have three entries. Metadata not available from the header
+  remains unset.
+
+  Properties
+    path - source filename
+    format - detected file interface
+    vendor - instrument or software vendor
+    size - file size in bytes
+    date - modification time when available
+    phases - phaseList of declared crystal phases
+    properties - available per-measurement property names
+    dataSets - available data sets, when the format stores several
+    points - measurement count when known
+    grid - scan dimensions when known
+    step - scan spacing along each grid axis
+    eulerCorrection - rotation used to interpret the vendor Euler convention
+    unit - spatial scan unit
+    header - remaining header metadata
+    grains - available grain data sets for volume formats
+    is3d - whether the grid has three spatial dimensions
+  See also
+    inspectEBSD, loadEBSD, loadEBSD3"""
   path: str
   format: str
   vendor: str
@@ -132,10 +158,9 @@ def ebsdFiles(folder):
 def inspectEBSD(path):
   """what an EBSD file says about itself, read from its header alone
 
-    inspectEBSD('map.ang')     the phases, the properties, the grid and the step, the Euler correction
-    inspectEBSD('map.h5oina')  and the data sets a project file holds
-    inspectEBSD('volume.dream3d')  the voxel grid of a volume, info.is3d telling it from a map
-  """
+    inspectEBSD('map.ang')  # the phases, the properties, the grid and the step, the Euler correction
+    inspectEBSD('map.h5oina')  # and the data sets a project file holds
+    inspectEBSD('volume.dream3d')  # the voxel grid of a volume, info.is3d telling it from a map"""
   path = os.fspath(path)
   inspect = _INSPECTORS.get(VENDOR_FORMATS.get(os.path.splitext(path)[1].lower().lstrip(".")))
   if inspect is None:

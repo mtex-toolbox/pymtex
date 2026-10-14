@@ -22,12 +22,33 @@ from ..geometry.display import aligned
 
 
 class S2FunTri(S2Fun):
-  """a function on the sphere by its values at the vertices of a spherical triangulation, linear
-  in between; a direction given twice takes the mean of its values
+  """interpolate sampled spherical data linearly over a triangulation.
 
-    S2FunTri(v, values)          the values at the directions v
-    S2FunTri(sT, values)         on a triangulation already made
-    S2FunTri(fun)                a callable sampled on a 1.5 degree grid"""
+    f = S2FunTri(directions, values)
+    f = S2FunTri(triangulation, values)
+    f = S2FunTri(lambda v: v.z**2)
+
+  The value within a spherical triangle is the barycentric interpolation of its three
+  vertex values. Duplicate directions are merged and their values averaged. Passing
+  a callable samples it on a grid of 1.5 degrees before constructing the triangulation.
+  The result can be evaluated with f(queryDirections).
+
+  This representation stores sample values rather than harmonic coefficients. Products,
+  powers and pointwise transforms operate at the vertices and interpolate the transformed
+  values between them. They can differ from applying the same transform after interpolation.
+
+  Input
+    nodes - vector3d directions, S2Triangulation, or a vectorised callable of directions
+    values - one row of sampled values per node; several columns represent several functions
+  Output
+    f - S2FunTri
+  Properties
+    vertices - unit directions of the triangulation
+    values - numeric array with one row per vertex and one column per function
+    tri - S2Triangulation defining the face connectivity
+    frame - reference frame carried by the vertices
+  See also
+    vector3d.interp, S2FunHarmonic, S2Triangulation"""
 
   def __init__(self, nodes, values=None):
     if callable(nodes) and not isinstance(nodes, (vector3d, S2Triangulation)):
@@ -86,7 +107,16 @@ class S2FunTri(S2Fun):
     return self.eval(v)
 
   def mean(self):
-    """the mean by the area of the Voronoi cell of every vertex"""
+    """estimate the spherical mean using Voronoi areas around the sample vertices.
+
+      average = f.mean()
+
+    Each vertex value is weighted by the area represented by that vertex. Return one
+    number per stored function. The mean is normalised by the total area, so a constant
+    function has its constant value rather than that value times `4*pi`.
+
+    See also
+      S2FunHarmonic.mean, S2FunTri.values"""
     from .polefigure import _voronoiWeights
     w = _voronoiWeights(self.vertices)
     w = np.asarray(w, dtype=float).ravel()
@@ -141,7 +171,16 @@ class S2FunTri(S2Fun):
     return abs(self)
 
   def sqrt(self):
-    """the square root of the function, taken at the vertices"""
+    """take square roots at the vertices and interpolate those values linearly.
+
+      root = f.sqrt()
+
+    The triangulation and frame are retained. Between vertices, root(v) generally differs
+    from sqrt(f(v)), since interpolation and square root do not commute. Negative real
+    vertex values produce NaN; use complex input values when a complex root is required.
+
+    See also
+      S2FunTri.abs, S2FunHarmonic.sqrt"""
     return self._mapped(np.sqrt)
 
   def __repr__(self):

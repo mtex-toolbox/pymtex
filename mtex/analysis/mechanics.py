@@ -41,12 +41,31 @@ def _axial(W):
 # ------------------------------------------------------------------ stress and strain
 
 def meanStress(sigma):
-  """the mean stress, a third of the trace of the stress tensor"""
+  """compute the mean normal stress, trace(sigma) / 3
+
+    pressureComponent = meanStress(sigma)
+
+  Return one scalar per stress tensor, in the same units as sigma. This uses the sign of
+  the tensor's normal components; a positive tensile stress gives a positive mean stress.
+  The complementary deviatoric stress has zero trace.
+
+  See also
+    deviatoricStress, equivalentStress"""
   return sigma.trace() / 3
 
 
 def deviatoric(T):
-  """the deviatoric part, the tensor less a third of its trace on the diagonal"""
+  """remove the isotropic part of a rank-two stress or strain tensor
+
+    s = deviatoric(sigma)
+    e = deviatoric(eps)
+
+  Subtract trace(T) / 3 times the identity from each tensor. The result has zero trace
+  and retains the input class, frame and array shape. The names deviatoricStress and
+  deviatoricStrain perform the same operation.
+
+  See also
+    meanStress, equivalentStress, equivalentStrain"""
   return T._rebuild(T.data - np.asarray(T.trace())[..., None] / 3 * np.eye(3).ravel())
 
 
@@ -55,33 +74,78 @@ deviatoricStrain = deviatoric
 
 
 def equivalentStress(sigma):
-  """the von Mises equivalent stress, sqrt(3/2 s:s) of the deviatoric stress s"""
+  """compute the von Mises equivalent stress
+
+    value = equivalentStress(sigma)
+
+  For deviatoric stress `s = sigma - trace(sigma)*I/3`, return `sqrt(3/2 * sum(s*s))`,
+  summing all Cartesian coefficients. The result is nonnegative, with one value per tensor
+  in the stress units. Hydrostatic stress gives zero; uniaxial stress gives its magnitude.
+
+  See also
+    deviatoricStress, meanStress, equivalentStrain"""
   s = deviatoric(sigma)
   return np.sqrt(1.5 * np.sum(s.data * s.data, axis=-1))
 
 
 def equivalentStrain(eps):
-  """the von Mises equivalent strain, sqrt(2/3 e:e) of the deviatoric strain e"""
+  """compute the von Mises equivalent strain
+
+    value = equivalentStrain(eps)
+
+  For deviatoric strain `e = eps - trace(eps)*I/3`, return `sqrt(2/3 * sum(e*e))`,
+  summing all Cartesian coefficients. Return one nonnegative scalar per strain tensor.
+  The tensor frame and the units used to express strain do not change this calculation.
+
+  See also
+    deviatoricStrain, equivalentStress"""
   e = deviatoric(eps)
   return np.sqrt(2 / 3 * np.sum(e.data * e.data, axis=-1))
 
 
 def octahedralStrain(eps):
-  """the octahedral shear and normal strain, from the principal stretches"""
+  """compute octahedral shear and normal strain from Green–Lagrange strain
+
+    shear, normal = octahedralStrain(eps)
+
+  Convert principal Green–Lagrange strains E_i to engineering stretches `q_i = sqrt(1+2*E_i)-1`.
+  The normal strain is mean(q_i); the shear strain is 2/3 times the square root of the sum
+  of squared pairwise differences. Values below E_i = -1/2 have no real stretch and give NaN.
+  Return one shear value and one normal value per tensor.
+
+  See also
+    GreenStrain, equivalentStrain"""
   q = (np.sqrt(1 + 2 * eps.eigvals()) - 1)[..., ::-1]
   oG = 2 / 3 * np.sqrt((q[..., 0] - q[..., 1]) ** 2 + (q[..., 1] - q[..., 2]) ** 2 + (q[..., 2] - q[..., 0]) ** 2)
   return oG, q.sum(axis=-1) / 3
 
 
 def axisRatios(T):
-  """the differences of the principal values, largest first"""
+  """return signed differences between the principal values of a rank-two tensor
+
+    d12, d23, d31 = axisRatios(T)
+
+  With principal values e1 >= e2 >= e3, the outputs are e1-e2, e2-e3 and e3-e1.
+  Each output has the tensor-array shape and the same units as the coefficients. Despite
+  the name, these are differences rather than quotients.
+
+  See also
+    tensor.eig, maxStrain"""
   e = T.eigvals()[..., ::-1]
   return e[..., 0] - e[..., 1], e[..., 1] - e[..., 2], e[..., 2] - e[..., 0]
 
 
 def maxStrain(eps):
-  """the magnitude of a strain is its largest principal value, which the Taylor factor is
-  measured against; norm stays the Frobenius norm on every class"""
+  """return the largest absolute principal strain of each tensor
+
+    magnitude = maxStrain(eps)
+
+  The largest magnitude among the three eigenvalues measures the strongest extension or
+  contraction. This is the strain scale used by the Taylor-factor calculation. The result
+  has one value per tensor; tensor.norm instead uses all Cartesian coefficients.
+
+  See also
+    equivalentStrain, calcTaylor, tensor.eigvals"""
   return np.max(np.abs(eps.eigvals()), axis=-1)
 
 
@@ -98,8 +162,24 @@ def _schmidTensor(n, b=None):
 
 
 def calcShearStress(sigma, sS):
-  """the shear stress the stress tensor resolves on each slip system, and the index of the
-  system carrying the largest one"""
+  """resolve a stress tensor on slip systems and identify the most highly stressed system
+
+    tau, index = calcShearStress(sigma, sS)
+
+  Compute b dot sigma dot n using unit slip directions b and plane normals n. The resolved
+  shear stress is signed and has the same units as sigma. A single stress applied to a list
+  of systems gives one value per system; an array of stresses adds a final system axis.
+  Express stress and systems in the same frame, for example with `ori * sS` in specimen coordinates.
+
+  Input
+    sigma - stressTensor
+    sS - slipSystem list
+  Output
+    tau - signed resolved shear stresses
+    index - zero-based index of the system with largest absolute shear stress, along the
+        last axis of tau
+  See also
+    SchmidFactor, slipSystem.rotate, SchmidTensor"""
   tau = np.einsum("...ij,...ij->...", SchmidTensor(sS).M, sigma.M[..., None, :, :] if sigma.ndim else sigma.M)
   return tau, np.argmax(np.abs(tau), axis=-1)
 
@@ -234,12 +314,30 @@ def _pureShearDeformation(ext, comp, lam=2.0):
 
 
 def CauchyStrain(F):
-  """the Cauchy (small) strain of a deformation gradient, its symmetric part less the identity"""
+  """compute the small-strain approximation from a deformation gradient
+
+    eps = CauchyStrain(F)
+
+  Return (F + F.transpose())/2 - I as a strainTensor in the frame of F. This linearised
+  strain is appropriate for small displacement gradients; finite rigid rotations can produce
+  nonzero values. Use GreenStrain for a finite-strain measure invariant under rigid rotation.
+
+  See also
+    GreenStrain, deformationGradientTensor"""
   return strainTensor((F.sym().M - np.eye(3)), F.frame)
 
 
 def GreenStrain(F):
-  """the Green-Lagrange strain of a deformation gradient, (F^T F - I) / 2"""
+  """compute the Green–Lagrange finite strain of a deformation gradient
+
+    eps = GreenStrain(F)
+
+  Return `(F.transpose() * F - I)/2` as a strainTensor in the frame of F. This measures strain
+  relative to the undeformed configuration and gives zero for a rigid rotation. Leading
+  array dimensions are retained.
+
+  See also
+    CauchyStrain, deformationGradientTensor"""
   return strainTensor(((F.transpose() * F).M - np.eye(3)) / 2, F.frame)
 
 
@@ -289,18 +387,43 @@ def _simpleShearFlow(d, n, e=1.0):
 
 
 def strainRate(L):
-  """the symmetric part of a velocity gradient is the strain rate, the antisymmetric one the
-  spin, whose axial vector is the angular velocity"""
+  """extract the symmetric strain-rate tensor from a velocity gradient
+
+    D = strainRate(L)
+
+  Return (L + L.transpose())/2 as a strainRateTensor in the same frame and array shape.
+  Its units are those of L, normally inverse time. Together with spin(L), it reconstructs L.
+
+  See also
+    spin, angularVelocityVector, velocityGradientTensor"""
   return strainRateTensor(L.sym().M, L.frame)
 
 
 def spin(L):
-  """the spin tensor of a velocity gradient, its antisymmetric part"""
+  """extract the antisymmetric spin tensor from a velocity gradient
+
+    W = spin(L)
+
+  Return (L - L.transpose())/2 as a spinTensor in the same frame and array shape.
+  Its axial vector is the angular velocity, and W times a vector is its cross product
+  with that angular velocity. Together with strainRate(L), it reconstructs L.
+
+  See also
+    strainRate, angularVelocityVector, spinTensor"""
   return spinTensor(L.antiSym().M, L.frame)
 
 
 def angularVelocityVector(L):
-  """the angular velocity of a velocity gradient, the axial vector of its antisymmetric part"""
+  """return the angular velocity represented by the antisymmetric part of a velocity gradient
+
+    omega = angularVelocityVector(L)
+
+  For W = (L - L.transpose())/2, the vector is (W[2,1], W[0,2], W[1,0]).
+  The output is vector3d in the tensor frame, one vector per tensor, in radians per unit time
+  when L has inverse-time units. Its length is rotationRate(L).
+
+  See also
+    spin, rotationRate, spinTensorOf"""
   W = L.antiSym().M
   return vector3d(_axial(W), frame=L.frame)
 
@@ -346,8 +469,20 @@ def spinTensorOf(v, frame=None):
 # ------------------------------------------------------------------ curvature and the dislocation density, Nye's relation
 
 def dislocationDensity(kappa):
-  """a diagonal entry of the density is minus the sum of the other two diagonal entries of the
-  curvature, so the entry a map cannot measure drops out of alpha_33"""
+  """convert lattice curvature to the Nye dislocation density tensor
+
+    alpha = dislocationDensity(kappa)
+
+  Use `alpha = kappa.transpose() - trace(kappa)*I`. In particular, each diagonal component
+  of alpha is minus the sum of the other two diagonal components of kappa. This can retain
+  a measurable alpha[2,2] even when a surface map cannot determine kappa[2,2].
+
+  Return dislocationDensityTensor in the input frame, preserving its unit and array shape.
+  The coefficients describe net dislocation content; fitting individual dislocation-system
+  densities is a separate step performed by fitDislocationSystems or calcGND.
+
+  See also
+    curvature, curvatureTensor, calcGND"""
   K = kappa.M
   M = np.swapaxes(K, -1, -2).copy()
   for i in range(3):
@@ -356,7 +491,16 @@ def dislocationDensity(kappa):
 
 
 def curvature(alpha):
-  """the curvature tensor of a dislocation density tensor by Nye's relation, kappa = alpha^T - tr(alpha) I / 2"""
+  """recover lattice curvature from a Nye dislocation density tensor
+
+    kappa = curvature(alpha)
+
+  Use `kappa = alpha.transpose() - trace(alpha)*I/2`, the inverse of dislocationDensity.
+  The result is curvatureTensor in the same frame, with the input unit and array shape.
+  Missing coefficients propagate through the relation.
+
+  See also
+    dislocationDensity, curvatureTensor, calcGND"""
   A = alpha.M
   return curvatureTensor(np.swapaxes(A, -1, -2) - 0.5 * np.trace(A, axis1=-2, axis2=-1)[..., None, None] * np.eye(3), alpha.frame,
                          unit=alpha.unit)

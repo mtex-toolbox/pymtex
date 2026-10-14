@@ -86,13 +86,73 @@ def _padFaces(faces):
 
 
 class crystalShape:
-  """a crystal shape, the polyhedron bounded by the lattice planes of the face normals N
+  """construct a convex crystal morphology from symmetry-related lattice planes.
 
-    cS = crystalShape(N)                         # faces at the reciprocal length of their normal
-    cS = crystalShape(N, habitus, extension)     # the distances from the indices alone
-    cS = crystalShape.hex(cs)                    # a hexagonal prism, crystalShape.cube(cs) a cube
-    cS = crystalShape.quartz(simple=True)        # from the catalogue, in its own crystal frame
-  """
+    cS = crystalShape(N)                         # construct from face normals in a crystal frame
+    cS = crystalShape(N, habitus=1, extension=(1, 1, 2))  # modify the relative distances of the crystal forms
+    cS = crystalShape.hex(cs)                    # construct a hexagonal prism in the frame cs
+    cS = crystalShape.quartz(simple=True)        # use a simplified shape from the mineral catalogue
+
+  Each supplied Miller normal represents a crystal form: all its symmetry equivalents
+  are generated using the point group of its crystal frame. The shape is the bounded
+  intersection of the half spaces dot(vertex, normal) <= 1. Before the common display
+  scaling, a face is therefore 1/norm(normal) from the origin. Lengthening a normal
+  moves its planes inward; shortening it can move them so far outward that other
+  planes exclude those faces entirely. Supply enough forms to enclose a finite volume.
+
+  The optional habitus and extension parameters adjust relative plane distances using
+  the Miller indices. For habitus p > 0, a normal with indices (h, k, l) is divided by
+  `((abs(h)*extension[0])**p + (abs(k)*extension[1])**p +
+  (abs(l)*extension[2])**p)**(1/p)` before symmetry expansion. With habitus=0 this step
+  is skipped and extension has no effect. This changes the morphology rather than
+  assigning an absolute size.
+
+  The vertices are initially scaled so that their largest distance from the origin is
+  0.5. For a centrally symmetric crystal this gives diameter one. Read or assign diameter
+  to set a particular size, or multiply the shape by a scale factor. Areas and volumes
+  then have the corresponding squared and cubed length units.
+
+  An orientation places the shape in specimen coordinates: `ori*cS`. A list of orientations
+  gives a list of identically connected shapes; `cS+position` translates their vertices.
+  Face selection uses cS[normals], while cS[k] selects one shape from a list. Face normals
+  used for selection are in the original crystal coordinates.
+
+  For a complete example, construct and plot a hexagonal prism without loading a data set:
+
+    cs = crystalFrame('6/mmm', [3, 3, 4.7])
+    cS = crystalShape.hex(cs)
+    cS.diameter = 2
+    plot(cS)
+
+  Input
+    N - Miller face normals, represented by vector3d data carrying one crystalFrame;
+        their lengths determine the relative distances of the planes
+  Keywords
+    habitus - nonnegative exponent controlling the relative prominence of mixed-index
+        forms; zero preserves the supplied Cartesian normals
+    extension - three relative scale factors associated with the h, k and l indices;
+        used only when habitus is positive
+  Output
+    cS - crystalShape, initially expressed in the crystal frame of N
+  Properties
+    N - original face normals, one per supplied crystal form
+    V - vertices as vector3d data; a list of shapes has shape (numShapes, numVertices)
+    F - face-to-vertex connectivity, with zero-based vertex indices and -1 padding
+    E - unique edges as pairs of zero-based vertex indices
+    CS - crystalFrame in which the face normals were defined
+    frame - frame of the current vertices, changing to the specimen frame after an orientation is applied
+    numFaces - number of polygonal faces, shared by every shape in a list
+    numVertices - number of vertices per shape
+    diameter - largest distance between any two vertices; assigning it rescales the vertices
+    faceArea - numeric area of each face, with one row per shape in a list
+    faceCenter - vector3d positions given by the mean of the vertices of each face
+    volume - enclosed volume, one value per shape
+    habitus - exponent used when the shape was constructed
+    extension - three index scale factors used when the shape was constructed
+  References
+    J. Enderlein, A package for displaying crystal morphology, Mathematica Journal 7(1), 1997
+  See also
+    Miller, crystalShape.cube, crystalShape.hex, crystalShape.innerFace, CrystalShapes"""
 
   __array_ufunc__ = None
 
@@ -168,8 +228,21 @@ class crystalShape:
     return dict(frame=self.V.frame, dispStyle="xyz")
 
   def subSet(self, NSelect):
-    """the faces whose outward normal is within a degree of one of the given normals, in
-    crystal coordinates as the shape was built"""
+    """select faces by outward normal in the original crystal coordinates.
+
+      basalFace = cS[Miller(0, 0, 1, cs)]
+      prismFaces = cS[Miller(1, 0, -1, 0, cs).symmetrise()]
+
+    A face is retained when its outward normal differs from one of the supplied directions
+    by less than one degree. Symmetry equivalents are not generated automatically here;
+    call symmetrise to select a whole crystal form. Vertices are shared with the input shape.
+    An error is raised when no faces match. The result can be an open set of faces, so its
+    volume need not describe a closed solid.
+
+    Input
+      NSelect - vector3d or Miller normals in the crystal coordinates used to construct cS
+    See also
+      crystalShape, vector3d.symmetrise, crystalShape.innerFace"""
     NSelect = asVector3d(NSelect)
     sel = unitRows(NSelect.data.reshape(-1, 3))
     ind = np.any(self._faceN0 @ sel.T > np.cos(SELECT_ANGLE), axis=1)
@@ -234,17 +307,17 @@ class crystalShape:
 
   @property
   def faceArea(self):
-    """the area of every face, per shape of a list"""
+    """area of each polygonal face in squared vertex-length units; a list of shapes has shape (numShapes, numFaces)."""
     return self._single(np.linalg.norm(self._faceVectors(), axis=-1))
 
   @property
   def faceCenter(self):
-    """the centre of every face, the mean of its vertices, per shape of a list"""
+    """mean of each face's vertices as vector3d positions in the current frame; this need not be the area centroid."""
     return vector3d(self._single(self._faceCenters()), **self._attrs())
 
   @property
   def volume(self):
-    """a third of the face areas times their distance from the centre"""
+    """enclosed polyhedron volume in cubed vertex-length units, returned once per shape; requires a closed set of faces."""
     V = self._V()
     c = V.mean(axis=1)[:, None, :]
     fv = self._faceVectors()
@@ -300,8 +373,19 @@ class crystalShape:
     return self + (-v if isinstance(v, vector3d) else -np.asarray(v, dtype=float))
 
   def rotate(self, rot):
-    """a rotation turns the shape where it is; an orientation takes it into its specimen; a
-    list of them makes a list of shapes"""
+    """rotate crystal vertices, or place them in a specimen using an orientation.
+
+      placed = ori*cS
+      turned = cS.rotate(rot)
+
+    One rotation moves all vertices of a shape. A list of rotations or orientations makes
+    a list of shapes with the same face connectivity. An orientation maps the vertices
+    from the crystal frame to its target frame; CS continues to identify the original crystal.
+
+    Input
+      rot - rotation or orientation, scalar or a list
+    See also
+      crystalShape.frame, crystalShape.CS"""
     rot = rot.reshape(-1, 1) if rot.size > 1 else rot
     return self._new(rot * self.V)
 
@@ -322,7 +406,18 @@ class crystalShape:
     return d / np.linalg.norm(d)
 
   def exitDistance(self, d):
-    """how far the ray from the centre along d runs before it leaves the shape"""
+    """measure the distance from the vertex mean to the surface along a ray.
+
+      distance = cS.exitDistance(direction)
+
+    The direction is normalised internally, so its length does not affect the result.
+    The output is a scalar in the current vertex-length units. This operation needs one
+    shape; select cS[k] when working with a list.
+
+    Input
+      d - nonzero vector3d direction or Cartesian triple
+    See also
+      crystalShape.innerFace, crystalShape.diameter"""
     if len(self) > 1:
       raise ValueError("the exit distance of a list of shapes: take one, cS[k]")
     d = self._direction(d)
@@ -335,8 +430,19 @@ class crystalShape:
     return float(np.min(h[ok] / along[ok]))
 
   def innerFace(self, n):
-    """the section of the shape by the plane through its centre with the normal n: the
-    vertices of the polygon in order, in the frame the shape stands in"""
+    """cut a single crystal shape by a plane through the mean of its vertices.
+
+      section = cS.innerFace(normal)
+
+    The plane is perpendicular to normal. Return its intersection with the shape as an
+    ordered polygon of vector3d vertices in the current frame. This is an internal section,
+    which need not coincide with an external crystal face. For a list of shapes, select one
+    with cS[k] before taking a section.
+
+    Input
+      n - nonzero vector3d normal or Cartesian triple
+    See also
+      crystalShape.subSet, crystalShape.exitDistance, crystalShape.plotInnerFace"""
     if len(self) > 1:
       raise ValueError("the inner face of a list of shapes: take one, cS[k]")
     d = self._direction(n)
@@ -374,17 +480,51 @@ class crystalShape:
 
   @staticmethod
   def cube(CS):
-    """a cube, the faces {100}"""
+    """construct a crystal bounded by the symmetry equivalents of the (100) plane.
+
+      cs = crystalFrame('m-3m')
+      cS = crystalShape.cube(cs)
+
+    A cubic crystal frame generates the six faces of a cube. Other symmetries produce the
+    forms implied by their (100) orbit and must still enclose a finite volume. The shape
+    uses the common initial display scale of crystalShape.
+
+    Input
+      CS - crystalFrame supplying the lattice and point group
+    See also
+      crystalShape, Miller"""
     return crystalShape(Miller(1, 0, 0, CS))
 
   @staticmethod
   def hex(CS):
-    """a hexagonal prism, the faces {10-10} and (0002)"""
+    """construct a hexagonal prism from prismatic and basal plane forms.
+
+      cs = crystalFrame('6/mmm', [3, 3, 4.7])
+      cS = crystalShape.hex(cs)
+
+    The supplied frame expands the (100) and (002) Miller normals into their equivalent
+    planes. With hexagonal symmetry these give six prism faces and two basal faces.
+    The cell dimensions determine the relative height before the common display scaling.
+
+    Input
+      CS - crystalFrame of the hexagonal lattice
+    See also
+      crystalShape, crystalShape.tetr, CrystalShapes"""
     return crystalShape(Miller([[1, 0, 0], [0, 0, 2]], CS))
 
   @staticmethod
   def tetr(CS):
-    """a tetragonal prism, the faces {100} and {001}"""
+    """construct a tetragonal prism from the (100) and (001) plane forms.
+
+      cS = crystalShape.tetr(cs)
+
+    The frame supplies the point-group equivalents and cell dimensions, which determine
+    the prism faces and relative height. The vertices use crystalShape's initial display scale.
+
+    Input
+      CS - crystalFrame of the tetragonal lattice
+    See also
+      crystalShape, crystalShape.hex"""
     return crystalShape(Miller([[1, 0, 0], [0, 0, 1]], CS))
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)

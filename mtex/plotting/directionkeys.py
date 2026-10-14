@@ -262,12 +262,24 @@ def _sym(CS):
 
 
 class directionColorKey:
-  """a colour key turning directions into colours
+  """base class for assigning colours to directions with crystal symmetry
 
-    rgb = key.direction2color(h)     an (..., 3) array in [0, 1]
-    key.sym, key.sR                  the group and the sector the key is defined on
-    key.plot()                       the key drawn on its sector
-  """
+    rgb = key.direction2color(h)
+    key.plot()
+
+  A concrete direction key maps symmetry-equivalent directions to the same colour. Colouring
+  returns an array of shape h.shape + (3,) with RGB channels in [0, 1]. Plot the key alongside
+  a direction or orientation map to show what its colours mean. Use HSVDirectionKey,
+  TSLDirectionKey, HKLDirectionKey or spotDirectionKey to choose the colouring rule.
+
+  Input
+    CS - referenceFrame or symmetry group defining equivalent directions
+  Properties
+    CS - frame or symmetry supplied to the key
+    sym - symmetry group used when folding directions
+    sR - fundamental spherical sector used for colouring
+  See also
+    HSVDirectionKey, TSLDirectionKey, HKLDirectionKey, ipfColorKey"""
 
   def __init__(self, CS):
     self.CS = CS
@@ -311,7 +323,18 @@ class HSVDirectionKey(directionColorKey):
   at a nearly steady rate over the sector. hueLightness, from 0 to 1, lets the lightness of
   the boundary follow the hue towards where each hue is brightest: yellow comes back as
   yellow, and the key comes closer to MTEX's and less even.
-  """
+
+  Input
+    CS - referenceFrame, symmetry, or vector3d supplying its frame; default specimen frame
+    whiteCenter - unit direction at the white centre; None uses the sector centre
+    maxAngle - angular radius in radians of concentrated colouring; default infinity uses the whole sector
+    sR - sphericalRegion to colour; None uses the conventional fundamental sector
+    colorStretching - exponent controlling how the colour varies with polar distance; default 1
+    grayValue - pair giving the gray contribution at the white and black centres
+    grayGradient - pair controlling how rapidly gray fades away from those centres
+    antipodal - colour opposite directions alike by using the Laue group; default False
+    perceptual - use the OKLab colour construction; default False
+    hueLightness - hue-dependent boundary lightness in the perceptual construction, from 0 to 1"""
 
   def __init__(self, CS=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
                grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False, hueLightness=0.0):
@@ -398,7 +421,10 @@ class TSLDirectionKey(directionColorKey):
   """the vendors' keys, both on the Laue group whatever the frame carries (MATLAB
   TSLDirectionKey, HKLDirectionKey): TSL reads the polar coordinates of the sector from its
   centre, unfolded and without the hue correction; HKL blends the three primaries linearly
-  over the polar angle and the azimuth of the sector"""
+  over the polar angle and the azimuth of the sector
+
+  Input
+    CS - crystalFrame or symmetry; colouring uses its Laue group"""
 
   def __init__(self, CS):
     super().__init__(CS.Laue())
@@ -441,7 +467,10 @@ class HKLDirectionKey(directionColorKey):
   """the HKL vendor key on the Laue group: the three primaries blended linearly over the polar
   angle and the azimuth of the fundamental sector
 
-    key = HKLDirectionKey(cs)"""
+    key = HKLDirectionKey(cs)
+
+  Input
+    CS - crystalFrame or symmetry; colouring uses its Laue group"""
 
   def __init__(self, CS):
     super().__init__(CS.Laue())
@@ -497,7 +526,12 @@ class spotDirectionKey(directionColorKey):
   the angular distance to the nearest symmetric equivalent; several centres multiply
 
     spotDirectionKey(cs, center=Miller(1, 1, 1, cs), color=(0, 0, 1), psi=S2DeLaValleePoussinKernel(halfwidth=7.5*degree))
-  """
+
+  Input
+    CS - referenceFrame or symmetry defining equivalent directions
+    center - Miller or vector3d spot centres; None selects the z direction
+    color - one RGB triplet per centre; default red for one centre
+    psi - spherical kernel controlling colour spread; default halfwidth 10*degree"""
 
   def __init__(self, CS, center=None, color=(1.0, 0.0, 0.0), psi=None):
     super().__init__(CS)

@@ -7,7 +7,22 @@ from __future__ import annotations
 
 
 class SO3Fun:
-  """the functions on SO(3): SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunBingham, SO3FunHandle, SO3FunComposition"""
+  """base class for scalar functions on orientation space SO(3)
+
+  Represent an orientation distribution or another orientation-dependent property with
+  SO3FunHarmonic coefficients, SO3FunRBF kernel sums, SO3FunCBF fibre sums,
+  SO3FunBingham distributions or SO3FunHandle callables. Evaluate a concrete function
+  at rotations or orientations using f(ori). Its crystal and specimen frames define the
+  symmetry-equivalent orientations at which values agree.
+
+  An orientation distribution of mean one uses multiples of a uniform distribution as its
+  units: a value of two means twice the uniform density. General SO3Fun objects can also
+  represent signed or complex functions and are not automatically normalised densities.
+
+  This base class provides the common interface; construct one of its representations.
+
+  See also
+    SO3FunHarmonic, SO3FunRBF, SO3FunHandle, calcDensity, unimodalODF"""
 
   @staticmethod
   def load(fname, *args, **kwargs):

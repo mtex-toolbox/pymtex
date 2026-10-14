@@ -38,11 +38,24 @@ def _rotationsOf(x):
 
 
 class orientationColorKey:
-  """a colour key turning orientations into colours
+  """base class for mapping crystal orientations to RGB colours
 
-    rgb = key.orientation2color(ori)    an (..., 3) array in [0, 1]
-    key.frameA, key.frameB, key.antipodal
-  """
+    rgb = key.orientation2color(ori)
+
+  Choose an inverse pole figure key to show which crystal direction lies along a specimen
+  direction, or an axis-angle, Euler-angle or spot key to show the whole orientation.
+  The result is a numeric array of shape ori.shape + (3,), with RGB channels in [0, 1],
+  ready to pass to plot. Construct a concrete subclass; this base does not define a colour map.
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data supplying the frames
+    frameB - specimenFrame when x is a crystal frame; default specimen frame otherwise
+  Properties
+    frameA - crystal frame
+    frameB - specimen frame
+    antipodal - grain-exchange symmetry inherited from orientation input
+  See also
+    ipfHSVKey, axisAngleColorKey, BungeColorKey, spotColorKey"""
 
   def __init__(self, x, frameB=None):
     self.frameA, self.frameB, self.antipodal = _framesOf(x, frameB)
@@ -71,14 +84,30 @@ class orientationColorKey:
 # ------------------------------------------------------------------ the inverse pole figure keys
 
 class ipfColorKey(orientationColorKey):
-  """an orientation coloured by the crystal direction it carries along a specimen direction
+  """colour orientations by the crystal direction parallel to a chosen specimen direction
 
-    ipfColorKey(cs), ipfColorKey(ebsd), ipfColorKey(ori)
+    key = ipfColorKey(cs)
     key.ipfDirection = xvector
     rgb = key.orientation2color(ori)
+    key.plot()
 
-  dirMap is the direction key doing the colouring, HSVDirectionKey unless given.
-  """
+  For each orientation, the inverse rotation carries ipfDirection into crystal coordinates.
+  The direction key then folds that crystal direction into its fundamental sector and assigns
+  a colour. Thus the same colour identifies the same crystal axis along the selected specimen
+  direction. An inverse pole figure colour alone does not determine the full orientation.
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data
+    ipfDirection - vector3d specimen direction; default zvector
+    dirMap - direction colour key; default HSVDirectionKey of the crystal frame
+  Output
+    key - ipfColorKey
+  Properties
+    ipfDirection - specimen direction used for colouring
+    dirMap - direction colour key used for crystal directions
+    CS - crystal frame of the key
+  See also
+    ipfHSVKey, ipfTSLKey, ipfHKLKey, ipfColorKey.orientation2color"""
 
   def __init__(self, x, ipfDirection=None, dirMap=None):
     super().__init__(x)
@@ -120,11 +149,21 @@ class ipfColorKey(orientationColorKey):
     return self
 
   def orientation2color(self, ori):
-    """an orientation that was never measured has no colour, and a map shows nothing for it.
-    From GRID_FROM orientations on the key goes through its grid, which it builds once
+    """convert orientations to inverse pole figure RGB colours
 
-      rgb = ipfKey.orientation2color(ori)
-      rgb = ipfKey.orientation2color(ebsd['Fo'].orientations)"""
+      rgb = key.orientation2color(ori)
+      rgb = key.orientation2color(ebsd['Fo'].orientations)
+
+    Each orientation supplies the crystal direction parallel to key.ipfDirection. The key's
+    direction map assigns its colour. A missing orientation gives NaN in all three channels.
+    Large orientation arrays use a cached colour grid; precompute can build that grid explicitly.
+
+    Input
+      ori - orientation array compatible with the crystal and specimen frames of the key
+    Output
+      rgb - numeric array of shape ori.shape + (3,), with channels in [0, 1] or NaN
+    See also
+      ipfColorKey.crystalDirection, ipfColorKey.precompute, plot"""
     if self._grid is None and ori.size >= GRID_FROM:
       self.precompute()
     if self._grid is not None:
@@ -164,10 +203,30 @@ class ipfColorKey(orientationColorKey):
 
 
 class ipfHSVKey(ipfColorKey):
-  """the MTEX default inverse pole figure key, white at the centre of the sector
+  """the default MTEX inverse pole figure colour key
 
-    ipfHSVKey(cs), ipfHSVKey(cs, maxAngle=7.5*degree, whiteCenter=v, ipfDirection=xvector)
-  """
+    key = ipfHSVKey(cs)
+    key.ipfDirection = xvector
+    rgb = key.orientation2color(ori)
+    key.plot()
+
+  Crystal directions are coloured with HSVDirectionKey: primary colours identify the vertices
+  of the fundamental sector and its centre is white. A finite maxAngle concentrates the colour
+  variation around whiteCenter. Set ipfDirection to the specimen direction whose crystal
+  alignment you want to display.
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data
+    ipfDirection - vector3d specimen direction; default zvector
+    kwargs - HSVDirectionKey options, including maxAngle, whiteCenter and perceptual
+  Output
+    key - ipfHSVKey
+  Properties
+    ipfDirection - specimen direction used for the inverse pole figure
+    maxAngle - angular radius in radians used for a concentrated colour key
+    whiteCenter - crystal direction assigned white
+  See also
+    ipfColorKey, HSVDirectionKey, ipfTSLKey, ipfHKLKey"""
 
   def __init__(self, x, ipfDirection=None, **kwargs):
     frameA = _framesOf(x)[0]
@@ -199,7 +258,11 @@ class ipfTSLKey(ipfColorKey):
 
     key = ipfTSLKey(cs)
     key = ipfTSLKey(ebsd['Iron'], ipfDirection=xvector)
-    rgb = key.orientation2color(ori)"""
+    rgb = key.orientation2color(ori)
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data
+    ipfDirection - vector3d specimen direction whose crystal alignment is coloured; default zvector"""
 
   def __init__(self, x, ipfDirection=None):
     super().__init__(x, ipfDirection, TSLDirectionKey(_framesOf(x)[0]))
@@ -210,7 +273,11 @@ class ipfHKLKey(ipfColorKey):
 
     key = ipfHKLKey(cs)
     key = ipfHKLKey(ebsd['Iron'], ipfDirection=xvector)
-    rgb = key.orientation2color(ori)"""
+    rgb = key.orientation2color(ori)
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data
+    ipfDirection - vector3d specimen direction whose crystal alignment is coloured; default zvector"""
 
   def __init__(self, x, ipfDirection=None):
     super().__init__(x, ipfDirection, HKLDirectionKey(_framesOf(x)[0]))
@@ -220,7 +287,13 @@ class ipfSpotKey(ipfColorKey):
   """single spots of the inverse pole figure in their own colours
 
     ipfSpotKey(cs, center=Miller(1, 0, 0, cs), color=(0, 0, 1), psi=S2DeLaValleePoussinKernel(halfwidth=7.5*degree))
-  """
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data
+    ipfDirection - specimen direction used for the inverse pole figure; default zvector
+    center - Miller directions at the spot centres
+    color - one RGB triplet per centre; default red for one centre
+    psi - spherical colour kernel; default S2DeLaValleePoussinKernel with halfwidth 10*degree"""
 
   def __init__(self, x, ipfDirection=None, center=None, color=(1.0, 0.0, 0.0), psi=None):
     super().__init__(x, ipfDirection, spotDirectionKey(_framesOf(x)[0], center, color, psi))
@@ -268,7 +341,13 @@ class axisAngleColorKey(orientationColorKey):
 
   The saturation is full at maxAngle, by default the 80th percentile of the angles, and the
   colour is NaN above thresholdAngle. Without a reference the identity is the reference.
-  """
+
+  Input
+    x - crystalFrame, orientation, or single-phase map supplying the frames; None uses a trivial crystal group
+    frameB - specimen reference frame when supplied separately
+    oriRef - reference orientation; None compares with identity
+    maxAngle - angle in radians at which saturation is full; None uses the 80th percentile of input angles
+    thresholdAngle - orientations beyond this angle in radians receive NaN colours; default infinity"""
 
   def __init__(self, x=None, frameB=None, oriRef=None, maxAngle=None, thresholdAngle=np.inf):
     # without a frame the key reads the axes in the specimen and needs no crystal
@@ -318,11 +397,27 @@ class axisAngleColorKey(orientationColorKey):
 
 
 class BungeColorKey(orientationColorKey):
-  """the three Euler angles of the representative inside the Euler box, scaled to red, green
-  and blue
+  """colour orientations by their three Bunge Euler angles
 
-    BungeColorKey(cs, ss)
-  """
+    key = BungeColorKey(cs, ss)
+    rgb = key.orientation2color(ori)
+
+  A symmetry-equivalent representative is selected within the Euler plotting box. Its phi1,
+  Phi and phi2 angles are divided by the box limits and assigned to red, green and blue.
+  RGB values lie in [0, 1]. Colour discontinuities can occur where the chosen symmetry
+  representative changes or an Euler angle wraps.
+
+  Input
+    x - crystalFrame, orientation, or single-phase EBSD or grain data supplying the frames
+    frameB - specimenFrame when supplied separately
+  Output
+    key - BungeColorKey
+  Properties
+    phi1Range - upper limit of the first Euler angle, in radians
+    PhiRange - upper limit of the second Euler angle, in radians
+    phi2Range - upper limit of the third Euler angle, in radians
+  See also
+    ipfHSVKey, axisAngleColorKey"""
 
   def __init__(self, x, frameB=None):
     super().__init__(x, frameB)
@@ -345,11 +440,31 @@ class BungeColorKey(orientationColorKey):
 
 
 class spotColorKey(orientationColorKey):
-  """each centre orientation given its colour, fading to white with the kernel of the
-  disorientation to it; several centres multiply
+  """highlight selected orientations with colours that fade to white with disorientation
 
-    spotColorKey(center=ori, color=(0, 0, 1), psi=SO3DeLaValleePoussinKernel(halfwidth=10*degree))
-  """
+    key = spotColorKey(center, color=(0, 0, 1))
+    key = spotColorKey(cs, center=ori, color=rgb)
+    colors = key.orientation2color(ori)
+
+  Each centre gets one RGB colour. Its contribution fades according to the chosen SO(3)
+  kernel, normalised to its peak value. Several centre contributions are multiplied channel
+  by channel. Comparisons use the crystal and specimen symmetry of the orientations.
+
+  Input
+    x - centre orientation or orientations, or a crystalFrame or single-phase map supplying
+        the frames when centres will be set separately
+    center - centre orientation or orientations; default x when x is an orientation
+    color - one RGB triplet per centre; default red for one centre
+    psi - SO3Kernel controlling angular spread; default de la Vallee Poussin kernel
+        with halfwidth 10*degree
+  Output
+    key - spotColorKey
+  Properties
+    center - orientations to highlight; must be set before colouring
+    color - array of RGB triplets, one row per centre
+    psi - angular colour kernel
+  See also
+    ipfSpotKey, axisAngleColorKey, SO3DeLaValleePoussinKernel"""
 
   # spotColorKey(ori) centres the key on the orientations given; spotColorKey(ebsd) names
   # the phase, the centre, the colour and the kernel being set afterwards as in MATLAB
@@ -394,7 +509,10 @@ class spectralTransmissionColorKey(orientationColorKey):
 
     key = spectralTransmissionColorKey(rI, thickness)
     key.propagationDirection, key.polarizer, key.phi
-  """
+
+  Input
+    rI - refractiveIndexTensor of the crystal
+    thickness - section thickness in nanometres"""
 
   def __init__(self, rI, thickness):
     super().__init__(rI.frame)
@@ -435,7 +553,11 @@ class colorGrid:
   """a direction key evaluated once on a cube map of the sphere at the resolution, its colours
   then looked up at the node nearest a direction
 
-    g = colorGrid(key, resolution=0.5*degree)"""
+    g = colorGrid(key, resolution=0.5*degree)
+
+  Input
+    key - direction colour key to sample
+    resolution - target angular spacing in radians; default 0.5*degree"""
 
   def __init__(self, key, resolution=COLOR_GRID_RESOLUTION):
     from .kernels import cubeMapNodes

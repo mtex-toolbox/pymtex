@@ -111,6 +111,18 @@ class grain2d(polygonSet):
     loops - the polygon of every grain as loops of boundary segments; traced from boundary
         when not given
     phaseMap - the phase number of the file for every entry of CSList
+  Properties
+    id - grain ids; these need not equal positions in a selected grain list
+    phaseId - phase-list index of each grain
+    meanOrientation - mean orientations for a single-phase grain selection
+    numPixel - number of measurements assigned to each grain
+    GOS - grain orientation spread in radians
+    boundary - grainBoundary segments separating grains or bordering the map
+    innerBoundary - low-angle segments within grains, when reconstructed
+    area - area enclosed by each polygon, in squared spatial units
+    centroid - geometric centroid of each grain outline
+    prop - additional data with one value per grain
+    frame - specimenFrame in which the geometry is expressed
   See also
     calcGrains, grain2d.merge, grain2d.selectByGrainId, grainBoundary, GrainReconstruction,
     SelectingGrains, GrainSpatialPlots, ShapeParameters"""
@@ -481,8 +493,22 @@ class grain2d(polygonSet):
     return int(out) if np.isscalar(ids) else out
 
   def findByOrientation(self, ori, epsilon):
-    """the grains of the phase of ori whose mean orientation lies within epsilon of it, or of
-    a fibre"""
+    """select grains whose mean orientation is close to a reference orientation or fibre
+
+      selected = grains.findByOrientation(ori, 5*degree)
+      selected = grains.findByOrientation(f, 5*degree)
+
+    Consider only grains in the reference's crystal phase. Compare their mean orientations
+    with the reference, or with its nearest orientation on the fibre, accounting for crystal
+    and specimen symmetry. The angular threshold is inclusive. Grain ids are preserved.
+
+    Input
+      ori - one reference orientation or fibre, carrying the crystal phase
+      epsilon - angular tolerance in radians
+    Output
+      selected - grain2d list satisfying the phase and angle criteria
+    See also
+      EBSD.findByOrientation, orientation.angle, fibre.angle"""
     from ..geometry.fibre import fibre
     cs = ori.CS
     ids = np.flatnonzero(self.phaseId == self.CSList.phaseId(cs))

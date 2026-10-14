@@ -26,7 +26,32 @@ if TYPE_CHECKING:
 
 
 class planarColorKey:
-  """a colour key of two properties: hue by the first, saturation by the second"""
+  """encode two scalar properties in one RGB colour
+
+    key = planarColorKey('twilight')
+    rgb = key.property2color(angleValues, magnitudeValues)
+    key.plot(angleValues, magnitudeValues)
+
+  The first property selects a colour from the colour map. The second blends it from white
+  or black to full colour, making it suitable for displaying an angle together with a magnitude.
+  A finite periode wraps the first property cyclically. Otherwise its range is scaled linearly.
+  Explicit ranges keep colours comparable between data sets; inferred ranges depend on the data.
+
+  Keywords
+    colorMap - matplotlib colour-map name, or an array of RGB rows
+    satRange - pair of blend factors at the low and high ends of the second property
+    shading - 'white' to fade towards white, otherwise fade towards black
+    periode - period of the first property in radians, or NaN for nonperiodic data;
+        angular values exceeding 2*pi are interpreted as degrees
+    quantileCap - quantile used for an inferred upper limit of the second property
+    range1 - minimum and maximum of the first property; NaN entries are inferred
+    range2 - minimum and maximum of the second property; NaN entries are inferred
+    label1 - label for the first property
+    label2 - label for the second property
+  Output
+    key - planarColorKey
+  See also
+    planarColorKey.property2color, planarColorKey.plot"""
 
   def __init__(self, colorMap="viridis", satRange=(0, 1), shading="white", periode=np.nan, quantileCap=0.975, range1=(np.nan, np.nan),
                range2=(np.nan, np.nan), label1="Property 1", label2="Property 2"):
@@ -61,7 +86,22 @@ class planarColorKey:
     return mn1, mx1, mn2, mx2
 
   def property2color(self, v1, v2):
-    """rgb = pK.property2color(v1, v2): the colour of every pair, one row per element"""
+    """convert paired property values to RGB colours
+
+      rgb = key.property2color(v1, v2)
+
+    The first property selects a colour and the second sets its blend with white or black.
+    Values are clipped to the key's ranges, or wrapped for a periodic first property. Ranges
+    not explicitly set on the key are inferred from these values, with quantileCap limiting
+    the second property's upper end.
+
+    Input
+      v1 - numeric first-property values
+      v2 - numeric second-property values, with the same number of elements as v1
+    Output
+      rgb - array of shape (v1.size, 3), with RGB channels in [0, 1]; inputs are flattened
+    See also
+      planarColorKey, planarColorKey.plot"""
     v1 = np.asarray(v1, dtype=float).reshape(-1)
     v2 = np.asarray(v2, dtype=float).reshape(-1)
     if v1.size != v2.size:

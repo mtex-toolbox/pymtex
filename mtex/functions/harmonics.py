@@ -297,12 +297,25 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
 
 
 class InvariantProjection:
-  """the same projection, held and kept in its support. P_n is nonzero only where both indices
-  are 0 mod r, r the order of the group's axis along z: the group contains that rotation,
-  whose Wigner matrix is diagonal with e^{-ik alpha}, so P = P_z P = P P_z. Only that r-th
-  part of a coefficient block is ever read or written. A group acting on orientations
-  through the identity alone (1 and -1, whose elements all have the identity as their
-  rotation part) projects with the identity and is held as no matrices at all"""
+  """symmetry projection blocks for harmonic coefficients, stored on their nonzero index support
+
+  Usually obtained from invariantProjection(frame, bandwidth). For degree n, only harmonic
+  orders divisible by the group's z-axis fold can contribute. Reduced blocks store those
+  orders, avoiding multiplication by the known zero rows and columns. A trivial rotational
+  group needs no stored projection matrices.
+
+  This is a low-level representation used by the harmonic transforms. Use invariantProjection
+  to construct it from a reference frame rather than assembling blocks by hand.
+
+  Input
+    fold - integer order of the group's rotation about z
+    blocks - reduced projection matrices, one per harmonic degree
+    held - optional existing projection sharing the stored nonzero structure
+  Properties
+    fold - retained z-axis fold
+    blocks - reduced projection blocks
+  See also
+    invariantProjection, projectLeft, projectRight"""
 
   def __init__(self, fold, blocks, held=None):
     self.fold, self.blocks = int(fold), blocks

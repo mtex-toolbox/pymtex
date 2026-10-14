@@ -104,6 +104,13 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     symmetrise - make the coefficients invariant under the two frames' symmetries
     bandwidth - the largest degree of the series
     dtype - the complex type of the coefficients, complex128 unless given
+  Properties
+    fhat - Wigner coefficients in MTEX's public basis
+    bandwidth - largest harmonic degree; assignment truncates or pads the expansion
+    CS, SS - crystal and specimen reference frames
+    isReal - whether the function takes real values; setting True projects onto the real part
+    antipodal - whether grain exchange symmetry f(g)=f(inv(g)) is imposed
+    shape - shape of a function list, excluding the coefficient axis
   See also
     SO3FunHarmonic.quadrature, SO3FunHarmonic.interpolate, SO3FunRBF, SO3FunHandle,
     SO3VectorFieldHarmonic, SO3FunHarmonicRepresentation"""
@@ -363,7 +370,18 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return self._fhat.dtype
 
   def truncate(self, L):
-    """the coefficient vector cut or padded to a bandwidth"""
+    """cut or pad a harmonic orientation function to maximum degree L.
+
+      lowerOrder = f.truncate(16)
+
+    Higher degrees are discarded when L is smaller than the current bandwidth. A larger
+    L adds zero coefficients and leaves the represented function unchanged. Frames,
+    reality and exchange-symmetry metadata are preserved.
+
+    Input
+      L - nonnegative integer maximum harmonic degree
+    See also
+      SO3FunHarmonic.bandwidth, SO3FunHarmonic.power"""
     return self if L == self.bandwidth else self._rebuild(_cut(self._fhat, L))
 
   # ------------------------------------------------------------------ evaluation
@@ -385,8 +403,23 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return self.eval(x)
 
   def eval(self, x):
-    """the coefficients are invariant under the groups of the frames, so the transform may run
-    on the reduced index set of their z folds"""
+    """evaluate a harmonic orientation function at rotations or orientations.
+
+      values = f(ori)
+      values = f.eval(ori)
+
+    An orientation argument must use the function's crystal and specimen bases; sibling
+    frames differing only in their symmetry group are also accepted. A plain rotation
+    supplies the rotation coefficients without frame checks. A quadratureSO3Grid can
+    be evaluated directly.
+
+    For one function, the result has the query shape. For a list of functions, the
+    function-list shape is appended to the query shape. Real functions return real values.
+
+    Input
+      x - orientation, rotation, quaternion, orthogonalTransform or quadratureSO3Grid
+    See also
+      SO3FunHarmonic, SO3FunHandle.eval"""
     if self.shape:
       # a list of functions: the values at the arguments first, then the shape of the list
       vals = [f.eval(x) for f in (self._rebuild(r) for r in self._fhat.reshape(-1, self._fhat.shape[-1]))]
@@ -399,7 +432,16 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   # ------------------------------------------------------------------ symmetry
 
   def symmetrise(self):
-    """the projection of H5 on both sides, and the exchange symmetry f(g) = f(g^-1)"""
+    """project the coefficients onto the symmetries carried by the two frames.
+
+      symmetric = f.symmetrise()
+
+    The result is invariant under the crystal and specimen point groups. If f.antipodal
+    is set, the result is also averaged with its inverse, imposing grain exchange
+    symmetry f(g)=f(inv(g)). Each member of a function list is projected separately.
+
+    See also
+      SO3FunHarmonic.withExchange, SO3FunHarmonic.inv"""
     if self.shape:
       return self._each(lambda f: f.symmetrise())
     L = self.bandwidth
@@ -410,7 +452,16 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return self._rebuild(fhat)
 
   def inv(self):
-    """the function of the inverse rotations, f(g^-1), its crystal and specimen frame exchanged"""
+    """form the function evaluated at inverse rotations.
+
+      reversed = f.inv()
+
+    The result satisfies reversed(g)=f(inv(g)). Its crystal and specimen frames are
+    exchanged, so a parent-to-child distribution becomes a child-to-parent distribution.
+    This is inversion of the argument, rather than a pointwise reciprocal 1/f.
+
+    See also
+      SO3FunHarmonic.withExchange, SO3FunHarmonic.conv"""
     if self.shape:
       return self._each(lambda f: f.inv())
     return self._rebuild(invertedCoefficients(self._fhat), CS=self.SS, SS=self.CS)

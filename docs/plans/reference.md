@@ -169,6 +169,33 @@ the radians `export(pf)` writes.
   `complete`; `EBSD.rotate(center=)`; `grain3d.neighbors`' matrix; `EBSD.gradient`'s basis;
   `surfor`'s omega output; `num2rgb`'s N; `setColorRange('zero2white')`.
 
+### Help quality review (2026-10-15)
+
+The follow-up review inventories 2,409 distinct documented objects and locates MATLAB
+counterparts in `../master` for 1,823 of them. It expands 427 help entries, including the
+117 flat-namespace method forwarders. Existing complete descriptions and straightforward
+property definitions stay concise. MATLAB help supplies context and examples; Python source
+determines the accepted arguments, units, return values and differences in behaviour.
+
+The additions cover constructors, coordinate and symmetry operations, kernels and harmonic
+functions, maps and boundaries, tensor mechanics, spatial transforms and colour keys.
+`crystalShape` now explains plane distances, habitus, extension, scaling, selection and its
+properties, with a self-contained plotting example. Corrections include `mPrime`'s single
+return value, affine decomposition angles in degrees, Bingham's single-orientation input,
+and valid Python syntax in the calling forms.
+
+The generator renders `Properties` tables and each class constant's own help, and writes
+NumPy type defaults as Python expressions. The reference and static API checks cover all
+published names, links, keyword tables and calling-form syntax. Focused domain checks pass
+(303 tests); representative numerical examples confirm the documented outputs and
+normalisation. The full reference exports 3,015 pages for the website preview.
+The Jekyll preview builds successfully, and 18 representative pages render at desktop
+and phone widths. Literal arithmetic is formatted as code so Markdown preserves its
+operators. A small change to `../web/css/mtex-site.css` wraps long citation URLs and
+reference-table text while keeping argument names intact. The complete reference
+export and the stylesheet are published together, with the
+reference-name map and the MATLAB/Python counterpart table kept in sync.
+
 ## 4. Open questions
 
 - A MATLAB page with no Python twin (1042 of them): stays as it is, or a note "not in the

@@ -21,12 +21,29 @@ from .vector3d import vector3d, asVector3d
 
 
 class plane3d:
-  """a plane <N, v> = d, or a list of them
+  """planes in three-dimensional space, stored by unit normals and signed offsets
 
-    plane = plane3d(N, d)           # <N, v> = d
-    plane = plane3d(N, v0)          # through the point v0
-    plane = plane3d.byPoints(v)     # fitted through the points v
-  """
+    plane = plane3d(N, d)  # planes satisfying dot(N, v) = d
+    plane = plane3d(N, v0)  # planes with normal N through v0
+    plane = plane3d.byPoints(v)  # least-squares plane through a point cloud
+
+  Normals are normalised internally. A numeric offset is divided by the original normal
+  length, so rescaling both N and d describes the same plane. With unit N, d is the signed
+  distance from the origin, in the units of the positions. Arrays of normals and offsets
+  represent arrays of planes. The normals carry the coordinate frame.
+
+  Input
+    N - vector3d plane normals, coordinate arrays, or a plane3d to copy
+    d - numeric offsets, or vector3d positions through which the planes pass; default 0
+  Output
+    plane - plane3d
+  Properties
+    N - unit normals as vector3d
+    d - signed distances from the origin
+    frame - coordinate frame of the normals
+    shape - shape of the plane array
+  See also
+    plane3d.byPoints, plane3d.dist, plane3d.project, plane3d.intersect"""
 
   __array_ufunc__ = None
 
@@ -119,7 +136,20 @@ class plane3d:
     return self.N.dot(v, symmetry=False) - self.d
 
   def project(self, v):
-    """the orthogonal projection of points onto the plane"""
+    """orthogonally project points onto the planes
+
+      projected = plane.project(v)
+
+    Subtract the signed point-to-plane distance in the unit normal direction. Points and planes
+    pair according to NumPy broadcasting. The result is vector3d positions in the input frame;
+    projected points satisfy dot(plane.N, projected) = plane.d.
+
+    Input
+      v - vector3d positions, in the same coordinate system as the planes
+    Output
+      projected - vector3d positions on the planes
+    See also
+      plane3d.dist, plane3d.intersect"""
     v = asVector3d(v)
     return v - self.N * self.dist(v)
 

@@ -91,6 +91,14 @@ class orientation(rotation):
         misorientation and its inverse are taken as one
     dtype - the floating point type of the coefficients
     points - the number of orientations sampled along a fibre
+  Properties
+    frameA - source frame of the mapping, usually the crystal frame
+    frameB - target frame, usually the specimen or a second crystal frame
+    CS, SS - aliases for frameA and frameB
+    antipodal - grain exchange symmetry for misorientations between the same crystal frame
+    notIID - whether the orientations come from spatially dependent map measurements
+    data - unit quaternion coefficients, with shape ori.shape + (4,)
+    phi1, Phi, phi2 - Bunge Euler angles in radians
   See also
     orientation.byEuler, orientation.byAxisAngle, orientation.byMiller, orientation.byMatrix,
     orientation.map, rotation, crystalFrame, OrientationDefinition, MisorientationTheory"""
@@ -180,8 +188,16 @@ class orientation(rotation):
 
   @classmethod
   def load(cls, fname, *args, **kwargs):
-    """orientation.load(fname, cs, columnNames=['phi1', 'Phi', 'phi2']): the orientations of a
-    text table; loadOrientation returns the other columns too"""
+    """read orientations from a text table.
+
+      ori = orientation.load(fname, cs, columnNames=['phi1', 'Phi', 'phi2'])
+
+    Frames, angle conventions, column assignments and other options are passed to
+    `loadOrientation`. Only its orientation result is returned; call loadOrientation
+    directly to retain additional data columns.
+
+    See also
+      loadOrientation, orientation.byEuler"""
     from ..io.orientations import loadOrientation
     return loadOrientation(fname, *args, **kwargs)[0]
 
@@ -371,14 +387,32 @@ class orientation(rotation):
 
   @classmethod
   def id(cls, *args):
-    """the identical orientations between the frames given, of the shape given (MATLAB's id and eye)"""
+    """construct identity rotations between specified reference frames.
+
+      ori = orientation.id(cs)
+      ori = orientation.id(10, cs, ss)
+
+    Sizes may be separate integers or a tuple, followed by the crystal and specimen frames.
+    Without sizes, return one scalar orientation. Identity means aligned Cartesian axes;
+    it does not infer a crystallographic orientation relationship between different phases.
+
+    See also
+      orientation.nan, orientation.rand, orientation.align"""
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.broadcast_to([1.0, 0.0, 0.0, 0.0], shape + (4,)).copy(), frames)
 
   @classmethod
   def nan(cls, *args):
-    """the orientations of NaN coefficients between the frames given, of the shape given"""
+    """construct missing orientations with their reference frames preserved.
+
+      ori = orientation.nan(10, cs, ss)
+
+    Sizes may be separate integers or one tuple; frames follow the sizes. Every quaternion
+    coefficient is NaN. Without sizes, return one scalar missing orientation.
+
+    See also
+      orientation.id, orientation.isnan"""
     args, frames = _splitFrames(args)
     shape = tuple(args[0]) if args and isinstance(args[0], (tuple, list)) else tuple(args)
     return cls._fromRotation(np.full(shape + (4,), np.nan), frames)
@@ -424,7 +458,16 @@ class orientation(rotation):
     raise TypeError(f"expected an orientation, got {type(other).__name__}")
 
   def inv(self):
-    """the inverse maps the other way: the frames swap"""
+    """reverse the direction of an orientation mapping.
+
+      reverse = ori.inv()
+
+    Quaternion coefficients are conjugated and the source and target frames are exchanged.
+    If ori maps crystal directions into specimen directions, its inverse maps them back.
+    For a misorientation, inversion exchanges the two crystal frames.
+
+    See also
+      orientation.CS, orientation.SS, rotation.inv"""
     return self._new(self.conj().data, frameA=self.frameB, frameB=self.frameA)
 
   # a plain rotation of the coefficients, the frames kept; products between frames are the
@@ -743,12 +786,30 @@ class orientation(rotation):
     return logOrientation(self, ref, side, symmetry)
 
   def fundamentalRegion(self):
-    """the fundamental region of the orientations, the orientationRegion of the groups of CS and SS"""
+    """return the region of symmetry-distinct orientations for the input frames.
+
+      region = ori.fundamentalRegion()
+
+    The result is an orientationRegion determined by the crystal and specimen point groups
+    and, for misorientations, the grain-exchange flag. It describes a domain; it does not
+    move the input orientations into that domain.
+
+    See also
+      fundamentalRegion, orientation.projectIntoFundamentalRegion"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self)
 
   def projectIntoEulerRegion(self):
-    """the Bunge Euler angles of the representative inside the Euler plotting box"""
+    """return Bunge Euler angles of symmetry-equivalent representatives in the plotting box.
+
+      phi1, Phi, phi2 = ori.projectIntoEulerRegion()
+
+    The three numeric arrays are in radians and have the shape of ori. The bounds of the
+    Euler box follow the input symmetries. This returns coordinates rather than a modified
+    orientation container.
+
+    See also
+      orientation.Euler, orientation.projectIntoFundamentalRegion"""
     from .orientationregion import projectIntoEulerRegion
     return projectIntoEulerRegion(self)
 
@@ -857,8 +918,17 @@ class orientation(rotation):
     return variants(self, second, ids, parent)
 
   def parents(self):
-    """the distinct relationships c p2c over the child group c: a child times them is every
-    parent it can come from, MATLAB's parents"""
+    """return the distinct parent variants of a parent-to-child relationship.
+
+      relationships = p2c.parents()
+
+    Child symmetry operations generate the distinct relationship variants, with duplicates
+    removed under the parent symmetry. This is p2c.variants(parent=True); the result still
+    maps parent coordinates to child coordinates. Use variants with a child orientation
+    to calculate its possible parent orientations.
+
+    See also
+      orientation.variants, variants, ParentChildVariants"""
     from .standardorientations import variants
     return variants(self, parent=True)
 
@@ -902,8 +972,16 @@ class orientation(rotation):
 
   @classmethod
   def byScreenAlignment(cls, frA, frB):
-    """the orientation between two frames that are drawn alike on the screen, from their plotting
-    conventions"""
+    """construct the orientation that makes two frames appear aligned on screen.
+
+      relation = orientation.byScreenAlignment(frameA, frameB)
+
+    The rotation is inferred from the east and out-of-screen directions of the frames'
+    plotting conventions. The result maps frameA to frameB. Use `orientation.align` when
+    the relation should be determined from the lattice bases instead.
+
+    See also
+      plottingConvention, orientation.align"""
     from .frametransform import byScreenAlignment
     return byScreenAlignment(frA, frB)
 

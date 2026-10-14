@@ -30,15 +30,42 @@ SCHEMES = ("ClenshawCurtis", "GaussLegendre")
 
 
 def gaussLegendre(n):
-  """nodes and weights of the n point Gauss-Legendre rule on [-1, 1]; scipy's Newton iteration
-  on the asymptotic nodes, since NumPy's leggauss solves a dense eigenproblem, and scipy is
-  loaded on first use"""
+  """construct an n-point Gauss–Legendre quadrature rule on [-1, 1]
+
+    x, w = gaussLegendre(n)
+    integral = np.sum(w * fun(x))
+
+  The rule integrates polynomials of degree at most `2*n-1` exactly, apart from floating-point
+  rounding. Weights sum to 2, so this approximates an integral rather than an interval mean.
+
+  Input
+    n - positive integer node count
+  Output
+    x - one-dimensional array of nodes
+    w - positive quadrature weights, one per node
+  See also
+    clenshawCurtis, quadratureS2Grid"""
   from scipy.special import roots_legendre
   return roots_legendre(n)
 
 
 def clenshawCurtis(n):
-  """Clenshaw-Curtis nodes cos(pi b/(n-1)), b = 0..n-1, and weights exact to degree n-1"""
+  """construct an n-point Clenshaw–Curtis quadrature rule on [-1, 1]
+
+    x, w = clenshawCurtis(n)
+    integral = np.sum(w * fun(x))
+
+  Nodes are `cos(pi*b/(n-1))` for b from zero to n-1, including both endpoints. Weights
+  integrate polynomials through degree n-1 exactly, apart from rounding, and sum to 2.
+  For n=1 the single node is zero with weight 2.
+
+  Input
+    n - positive integer node count
+  Output
+    x - nodes in descending order
+    w - quadrature weights corresponding to x
+  See also
+    gaussLegendre, quadratureS2Grid"""
   if n == 1:
     return np.zeros(1), np.full(1, 2.0)
   N = n - 1
@@ -316,8 +343,30 @@ class quadratureSO3Grid:
 
 
 class quadratureS2Grid(vector3d):
-  """the nodes of a quadrature rule on the sphere, a list of directions as in MATLAB, rho
-  slowest and theta fastest over the axes thetaGrid and rhoGrid, with its weights"""
+  """nodes and surface-area weights for integrating functions on the unit sphere
+
+    grid = quadratureS2Grid(16)
+    grid = quadratureS2Grid(16, 'GaussLegendre')
+    integral = np.sum(grid.weights * fun(grid.nodes()))
+
+  Equally spaced azimuths are combined with a polar quadrature rule. The default is
+  Clenshaw–Curtis; Gauss–Legendre is also supported. Weights sum to `4*pi`, so divide a
+  weighted integral by `4*pi` for the spherical mean. Flattened nodes run fastest over the
+  polar-angle axis and then over azimuth, matching grid.gridShape = (numRho, numTheta).
+
+  Input
+    bandwidth - nonnegative integer harmonic bandwidth
+    args - optional reference frame and quadrature scheme, 'ClenshawCurtis' or 'GaussLegendre'
+    dtype - floating-point type for coordinates and weights; default np.float64
+  Output
+    grid - quadratureS2Grid, also usable as vector3d directions
+  Properties
+    weights - surface quadrature weights summing to 4*pi
+    thetaGrid - polar node angles in radians
+    rhoGrid - azimuth node angles in radians
+    gridShape - azimuth and polar node counts
+  See also
+    quadratureSO3Grid, quadratureS1Grid, S2FunHarmonic"""
 
   def __init__(self, bandwidth, *args, dtype=np.float64):
     frames, self.scheme = _readArgs(args)
@@ -359,7 +408,27 @@ class quadratureS2Grid(vector3d):
 
 
 class quadratureS1Grid:
-  """the circle: 2L+2 equispaced nodes with equal weights integrate degree 2L+1 exactly"""
+  """equally spaced angles and weights for Fourier quadrature on the circle
+
+    grid = quadratureS1Grid(16)
+    x = grid.nodes()
+    average = np.sum(grid.weights * fun(x))
+
+  For bandwidth L the grid has `2*L+2` nodes in [0, `2*pi`), excluding the repeated endpoint.
+  Equal weights sum to one and integrate Fourier modes through degree `2*L+1` exactly.
+  Multiply the weighted mean by `2*pi` for the usual angular integral.
+
+  Input
+    bandwidth - nonnegative integer harmonic bandwidth L
+    dtype - floating-point type for nodes and weights; default np.float64
+  Output
+    grid - quadratureS1Grid
+  Properties
+    bandwidth - requested harmonic bandwidth
+    x - node angles in radians
+    weights - equal normalised weights
+  See also
+    S1FunHarmonic, quadratureS2Grid"""
 
   def __init__(self, bandwidth, dtype=np.float64):
     self.bandwidth = int(bandwidth)

@@ -909,7 +909,12 @@ class SO3VectorFieldHandle(SO3VectorField):
   """a vector field on SO(3) given by a callable returning vectors or tangent vectors at
   orientations, in the left or right tangent space; bandwidth is the hint for its harmonic form
 
-    SO3VectorFieldHandle(lambda ori: ..., cs, ss, 'left')"""
+    SO3VectorFieldHandle(lambda ori: ..., cs, ss, 'left')
+
+  Input
+    fun - callable receiving orientations and returning vector3d, coordinate arrays or SO3TangentVector values
+    args - crystal frame, specimen frame and tangent-space side ('left' or 'right')
+    bandwidth - harmonic degree used when approximating the callable; default defaultSO3Bandwidth preference"""
 
   def __init__(self, fun, *args, bandwidth=None):
     side, rest = _readSide(args)

@@ -73,7 +73,11 @@ def _xnum(x):
 
 class voteTable:
   """MATLAB's table of votes: a row per grain, parentId the best variants of the grain and
-  prob, fit or count their value, sorted best first"""
+  prob, fit or count their value, sorted best first
+
+  Input
+    parentId - matrix of candidate parent-variant ids, one row per grain
+    value - exactly one keyword array, prob, fit or count, matching parentId; candidates are sorted best first"""
 
   def __init__(self, parentId, **value):
     (kind, v), = value.items()

@@ -181,6 +181,13 @@ class SO3FunRBF(SO3Fun):
     c0 - the constant added
   Output
     SO3F - SO3FunRBF
+  Properties
+    center - kernel centres as orientations
+    psi - radial kernel shared by the centres
+    weights - coefficients multiplying the individual kernel contributions
+    c0 - constant contribution to the function
+    CS, SS - crystal and specimen reference frames
+    antipodal - whether grain exchange symmetry is used
   See also
     unimodalODF, SO3FunCBF, SO3FunRBF.interpolate, calcDensity, SO3FunRBF.radon,
     RadialODFs"""

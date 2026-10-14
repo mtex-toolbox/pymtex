@@ -76,6 +76,14 @@ class mapImage:
     origin - vector3d, the position of pixel (0, 0)
     name - an identifier, the property of the EBSD map an aligned image is written into
     scanUnit - the unit of the positions, by default the map's or 'um'
+  Properties
+    img - floating-point raster of shape (rows, columns) or (rows, columns, channels)
+    origin - specimen position of the centre of pixel (0, 0)
+    d1, d2 - Cartesian step vectors for increasing row and column indices
+    frame - specimenFrame of the image geometry
+    pos - derived vector3d positions of pixel centres
+    ebsd - associated EBSD map on the same grid, when supplied
+    name - image or channel name used in displays and registration
   See also
     mapImageList, trueEbsd, mapImage.rescale, xcfShift, gridLayout, EBSDMapsAndImages, EBSDTrueEbsd"""
 
@@ -415,7 +423,10 @@ def _each(mg, f):
 
 
 class mapImageList(list):
-  """a list of mapImage, displayed as MATLAB's table of a mapImage array"""
+  """a list of mapImage, displayed as MATLAB's table of a mapImage array
+
+  Input
+    iterable - mapImage objects to collect in order"""
 
   def __getitem__(self, k):
     out = super().__getitem__(k)

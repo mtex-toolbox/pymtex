@@ -121,3 +121,35 @@ def test_the_calling_forms_keep_their_explanations_out_of_the_code(rendered):
   syntax = page.split("## Syntax", 1)[1].split("\n## ", 1)[0]
   boxes = re.findall(r"```python\n(.*?)```", syntax, re.S)
   assert len(boxes) > 3 and not any("#" in b for b in boxes) and "```\n\nHigh and low angle boundaries.\n" in syntax
+
+
+def test_class_properties_are_rendered_as_a_table(rendered):
+  page = rendered["crystalShape.crystalShape"]
+  properties = page.split("## Properties\n", 1)[1].split("\n## ", 1)[0]
+  assert "| `V` |" in properties and "| `F` |" in properties
+  assert "zero-based vertex indices" in properties
+  assert "## References" in page
+
+
+def test_class_constants_show_their_own_help(rendered):
+  assert "identity" in rendered["rotation.id"]
+  assert "unit vector along x" in rendered["vector3d.X"]
+  assert "Levi-Civita symbol" in rendered["tensor.leviCivita"]
+  assert "A property of" in rendered["rotation.id"]
+  assert "a property of the class itself" not in rendered["rotation.id"]
+
+
+def test_calling_forms_are_valid_python(rendered):
+  import ast
+  invalid = {}
+  for name, page in rendered.items():
+    syntax = page.split("## Syntax\n", 1)
+    if len(syntax) < 2:
+      continue
+    syntax = syntax[1].split("\n## ", 1)[0]
+    for code in re.findall(r"```python\n(.*?)```", syntax, re.S):
+      try:
+        ast.parse(code)
+      except SyntaxError as err:
+        invalid[name] = str(err)
+  assert not invalid, invalid

@@ -83,13 +83,40 @@ def _fromVoigt(V, rank, w):
 
 
 def Voigt(T):
-  """the Voigt matrix of a tensor: 6 x 6 for rank four, 3 x 6 for rank three, six components
-  for rank two, the off diagonal entries doubled where the class prescribes it"""
+  """convert tensor coefficients to compact Voigt notation
+
+    V = Voigt(T)
+
+  The pair order is (11, 22, 33, 23, 13, 12). Rank-two tensors give six components,
+  rank-three tensors give a 3-by-6 matrix, and rank-four tensors give a 6-by-6 matrix.
+  Leading array dimensions are retained. Off-diagonal components acquire factors of two
+  when T.doubleConvention is True, as for compliance and strain conventions.
+
+  Input
+    T - tensor of rank 2, 3 or 4
+  Output
+    V - numeric array in Voigt notation
+  See also
+    Kelvin, tensor"""
   return _toVoigt(T.M, T.rank, _voigtWeights(T.doubleConvention))
 
 
 def Kelvin(T):
-  """the Kelvin matrix, the factor sqrt(2) on every off diagonal side"""
+  """convert tensor coefficients to orthonormal Kelvin (Mandel) notation
+
+    K = Kelvin(T)
+
+  The pair order is (11, 22, 33, 23, 13, 12), as in Voigt notation, with a factor sqrt(2)
+  for each off-diagonal pair. A rank-four tensor gives a 6-by-6 matrix. These factors preserve
+  the Euclidean inner product of symmetric tensors and are used for tensor matrix functions.
+  Leading array dimensions are retained.
+
+  Input
+    T - tensor of rank 2, 3 or 4
+  Output
+    K - numeric coefficient array in Kelvin notation
+  See also
+    Voigt, tensor.expm, tensor.logm"""
   return _toVoigt(T.M, T.rank, KELVIN_WEIGHTS)
 
 
@@ -146,7 +173,7 @@ class tensor(MtexArray):
   in front of them the shape of the list; the rank, when not given, is the number of trailing
   dimensions of size three. A 6 x 6 matrix is read as the Voigt matrix of a rank four tensor,
   a 3 x 6 matrix as that of a rank three one. Rotating the tensor, or an orientation acting on
-  it, ori * T, transforms the coefficients, which is what the texture averages build on.
+  it, `ori * T`, transforms the coefficients, which is what the texture averages build on.
 
   The frame is a crystalFrame or a specimenFrame, given positionally or as frame=; without one
   the tensor is in the default specimen frame. T.M gives the coefficients back, T.rank,
@@ -170,6 +197,16 @@ class tensor(MtexArray):
     name - the name of the tensor, carried along
     Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
     dtype - the NumPy type of the coefficients
+  Properties
+    M - full Cartesian coefficient array with rank trailing axes of length three
+    rank - number of tensor indices, independent of the number of tensors in a list
+    frame - reference frame of the coefficients
+    CS - alias for the tensor reference frame
+    doubleConvention - Voigt convention used for shear-component factors
+    density - material mass density, when provided
+    unit - physical unit label carried by the tensor
+    name - descriptive tensor label
+    shape - shape of the tensor list, excluding tensor-component axes
   See also
     stiffnessTensor, strainTensor, stressTensor, tensor.rotate, TensorDefinition"""
   _carried = ("rank", "_ncoord", "_frame", "doubleConvention", "density", "unit", "name")
@@ -341,6 +378,22 @@ class tensor(MtexArray):
   # a number scales, a rank two tensor times a rank two is the matrix product, times a
   # vector its image, a rank four times a rank two the double contraction
   def __mul__(self, other):
+    """scale a tensor, multiply rank-two tensors, or contract an elastic tensor with a strain
+
+      scaled = T * a
+      product = A * B
+      image = A * v
+      sigma = C * eps
+
+    A numeric operand scales every coefficient. Two rank-two tensors use matrix multiplication;
+    a rank-two tensor times vector3d gives its vector image. Rank four times rank two performs
+    a double contraction, with stiffness times strain giving stress. Operands with frames must
+    be expressed in compatible frames. Leading array dimensions follow NumPy broadcasting.
+    For a product of corresponding coefficients use T.times(other); for other contractions use
+    EinsteinSum.
+
+    See also
+      tensor.times, colon, EinsteinSum"""
     if isinstance(other, tensor):
       self._sameFrame(other)
       if self.rank == 2 and other.rank == 2:
@@ -454,7 +507,18 @@ class tensor(MtexArray):
   ctranspose = transpose
 
   def sym(self):
-    """the symmetric and the antisymmetric part, the mean over the permutations of the indices"""
+    """symmetrise a tensor over permutations of its Cartesian indices
+
+      S = T.sym()
+
+    For rank two this gives (T + T.transpose()) / 2. Higher ranks average over all index
+    permutations, giving a fully symmetric tensor. Array dimensions and the reference frame
+    are retained. This does not average over the crystal symmetry group; use symmetrise for that.
+
+    Output
+      S - tensor of the same class and rank
+    See also
+      tensor.antiSym, tensor.symmetrise"""
     if self.rank <= 1:
       return self
     M = self.M
@@ -499,8 +563,20 @@ class tensor(MtexArray):
     return None
 
   def eig(self):
-    """the eigenvalues in ascending order and the eigenvectors as axes of the frame; a rank
-    four tensor is diagonalised in its Voigt matrix"""
+    """diagonalise rank-two tensors or rank-four tensors in Voigt notation
+
+      values, axes = T.eig()
+
+    Eigenvalues are returned in ascending order. For rank two, the associated eigenvectors
+    are antipodal vector3d axes in the tensor frame, arranged as rows after the tensor-array
+    dimensions. For rank four the decomposition uses the 6-by-6 Voigt matrix and returns its
+    numeric eigenvector matrix. Symmetric matrices use a real symmetric eigensolver.
+
+    Output
+      values - eigenvalues, with the eigenvalue axis last
+      axes - vector3d eigenvectors for rank two, numeric eigenvectors for rank four
+    See also
+      tensor.eigvals, Voigt, Kelvin"""
     if self.rank == 2:
       M = self.M
       if self.isSymmetric:
@@ -564,8 +640,20 @@ class tensor(MtexArray):
     raise ValueError("the singular value decomposition is of tensors of rank two or four")
 
   def polar(self):
-    """the polar decomposition T = R SR = SL R of a rank two tensor, R orthogonal, SL and SR
-    symmetric"""
+    """factor a rank-two tensor into an orthogonal part and symmetric stretch tensors
+
+      R, SL, SR = T.polar()
+
+    The factors satisfy `T = R * SR = SL * R`. SR acts before the rotation and SL after it.
+    The decomposition uses a singular value decomposition; for a deformation with positive
+    determinant R is a proper rotation matrix. Factors retain the tensor frame and array shape.
+
+    Output
+      R - orthogonal rank-two tensor
+      SL - left symmetric stretch tensor
+      SR - right symmetric stretch tensor
+    See also
+      tensor.svd, deformationGradientTensor"""
     if self.rank != 2:
       raise ValueError("the polar decomposition is of tensors of rank two")
     U, s, Vt = np.linalg.svd(self.M)
@@ -1031,15 +1119,14 @@ def _vecPower(u, n):
 def EinsteinSum(*args):
   """the contraction of tensors, vectors, rotations or arrays over the indices they share
 
-    EinsteinSum(C, [1, 2, -1, -2], eps, [-1, -2])     sigma_ij = C_ijkl eps_kl
-    EinsteinSum(a, [1], b, [2])                        the dyad a_i b_j
-    EinsteinSum(T, [-1, -2, -1, -2])                   a label twice in one operand is a trace
+    EinsteinSum(C, [1, 2, -1, -2], eps, [-1, -2])  # sigma_ij = C_ijkl eps_kl
+    EinsteinSum(a, [1], b, [2])  # the dyad a_i b_j
+    EinsteinSum(T, [-1, -2, -1, -2])  # a label twice in one operand is a trace
 
   Every operand carries one label per index: a positive one is free and orders the result,
   a negative one is summed over. Lists of tensors combine elementwise over their leading
   dimensions. The result keeps the frame of the first tensor and is a plain tensor, or a
-  number when no index is free.
-  """
+  number when no index is free."""
   if len(args) % 2:
     raise ValueError("every operand needs an index vector")
   ops, ids = args[0::2], [list(np.atleast_1d(i).astype(int)) for i in args[1::2]]
@@ -1191,7 +1278,12 @@ def _inverseUnit(unit):
 # ------------------------------------------------------------------ the physical tensors
 
 class stiffnessTensor(tensor):
-  """the elastic stiffness C, sigma = C : eps; a 6 x 6 Voigt matrix in GPa or the full array"""
+  """the elastic stiffness C, sigma = C : eps; a 6 x 6 Voigt matrix in GPa or the full array
+
+  Input
+    M - 6-by-6 Voigt matrix, full (..., 3, 3, 3, 3) coefficients, or another tensor
+    args - optional reference frame
+    kwargs - tensor constructor options, including density, frame, unit and Kelvin; unit defaults to 'GPa'"""
   _rank, _double = 4, False
 
   def __init__(self, M, *args, **kwargs):
@@ -1212,11 +1304,44 @@ class stiffnessTensor(tensor):
                                        HashinShtrikmanModulus, hashinShtrikmanBounds)
     from ..plotting.tensorplot import plotSeismicVelocities
     def ChristoffelTensor(self, *args, **kwargs) -> Any:
-      """ChristoffelTensor(C, n): E_ik = C_ijkl n_j n_l of a stiffness and a direction"""
+      """the elastic Christoffel tensor for a wave propagation direction
+
+        E = ChristoffelTensor(C, n)
+        E = ChristoffelTensor(M, cs)
+
+      For stiffness C and a unit direction n, the rank-two tensor is E[i, k] = C[i, j, k, l]
+      n[j] n[l], summed over j and l. Its eigenvectors give the polarisation directions of the
+      three elastic waves. Dividing its eigenvalues by the material density gives squared wave
+      speeds when consistent physical units are used. The velocity function handles the
+      supported stiffness and density units.
+
+      It can also be constructed from a 3-by-3 matrix using the tensor constructor options.
+      When constructed from C, the crystal frame and density are carried from C.
+
+      Input
+        M - stiffnessTensor or complianceTensor, or a 3-by-3 Christoffel matrix;
+            compliance is inverted to stiffness before contraction
+        args - propagation direction n when M is elastic stiffness or compliance;
+            otherwise the reference frame and other positional tensor arguments
+        kwargs - tensor constructor options for direct matrix input
+      Output
+        E - ChristoffelTensor
+      Properties
+        M - numeric tensor coefficients, with trailing dimensions (3, 3)
+        rank - 2
+        frame - coordinate frame of the coefficients
+        density - material density carried from the elastic tensor
+      See also
+        stiffnessTensor, velocity, tensor.eig"""
 
 
 class complianceTensor(tensor):
-  """the elastic compliance S = inv(C), its Voigt matrix carrying the factors of the double convention"""
+  """the elastic compliance S = inv(C), its Voigt matrix carrying the factors of the double convention
+
+  Input
+    M - 6-by-6 compliance matrix in engineering Voigt notation, full rank-four coefficients, or another tensor
+    args - optional reference frame
+    kwargs - tensor constructor options; unit defaults to '1/GPa' and doubleConvention to True"""
   _rank, _double = 4, True
 
   def __init__(self, M, *args, **kwargs):
@@ -1236,7 +1361,35 @@ class complianceTensor(tensor):
                                        volumeCompressibility, shearModulus, PoissonRatio, bulkModulus,
                                        HashinShtrikmanModulus, hashinShtrikmanBounds)
     def ChristoffelTensor(self, *args, **kwargs) -> Any:
-      """ChristoffelTensor(C, n): E_ik = C_ijkl n_j n_l of a stiffness and a direction"""
+      """the elastic Christoffel tensor for a wave propagation direction
+
+        E = ChristoffelTensor(C, n)
+        E = ChristoffelTensor(M, cs)
+
+      For stiffness C and a unit direction n, the rank-two tensor is E[i, k] = C[i, j, k, l]
+      n[j] n[l], summed over j and l. Its eigenvectors give the polarisation directions of the
+      three elastic waves. Dividing its eigenvalues by the material density gives squared wave
+      speeds when consistent physical units are used. The velocity function handles the
+      supported stiffness and density units.
+
+      It can also be constructed from a 3-by-3 matrix using the tensor constructor options.
+      When constructed from C, the crystal frame and density are carried from C.
+
+      Input
+        M - stiffnessTensor or complianceTensor, or a 3-by-3 Christoffel matrix;
+            compliance is inverted to stiffness before contraction
+        args - propagation direction n when M is elastic stiffness or compliance;
+            otherwise the reference frame and other positional tensor arguments
+        kwargs - tensor constructor options for direct matrix input
+      Output
+        E - ChristoffelTensor
+      Properties
+        M - numeric tensor coefficients, with trailing dimensions (3, 3)
+        rank - 2
+        frame - coordinate frame of the coefficients
+        density - material density carried from the elastic tensor
+      See also
+        stiffnessTensor, velocity, tensor.eig"""
 
 
 class stressTensor(tensor):
@@ -1304,7 +1457,13 @@ class strainTensor(tensor):
     eps = strainTensor(M, cs)
     eps = strainTensor(np.diag([1, 0, -1]))
     eps = strainTensor(M, type='Euler')
-    eps.type"""
+    eps.type
+
+  Input
+    M - symmetric rank-two coefficients or six-component Voigt vectors, or another tensor
+    args - optional reference frame
+    type - 'Lagrange' for the reference configuration or 'Euler' for the current configuration
+    kwargs - tensor constructor options; engineering Voigt convention is used by default"""
   _rank, _double, _symmetricRank2 = 2, True, True
   _carried = tensor._carried + ("type",)
   type = "Lagrange"
@@ -1441,7 +1600,12 @@ class velocityGradientTensor(tensor):
 
 
 class spinTensor(tensor):
-  """spinTensor(M), or spinTensor(v) the skew matrix of a rotation vector, in its frame"""
+  """spinTensor(M), or spinTensor(v) the skew matrix of a rotation vector, in its frame
+
+  Input
+    M - vector3d axial vectors, numeric (..., 3) vector coordinates, or (..., 3, 3) matrices
+    args - optional reference frame
+    kwargs - tensor constructor options, including frame and unit"""
   _rank = 2
 
   def __init__(self, M, *args, **kwargs):
@@ -1532,7 +1696,35 @@ class dislocationDensityTensor(tensor):
 
 
 class ChristoffelTensor(tensor):
-  """ChristoffelTensor(C, n): E_ik = C_ijkl n_j n_l of a stiffness and a direction"""
+  """the elastic Christoffel tensor for a wave propagation direction
+
+    E = ChristoffelTensor(C, n)
+    E = ChristoffelTensor(M, cs)
+
+  For stiffness C and a unit direction n, the rank-two tensor is E[i, k] = C[i, j, k, l]
+  n[j] n[l], summed over j and l. Its eigenvectors give the polarisation directions of the
+  three elastic waves. Dividing its eigenvalues by the material density gives squared wave
+  speeds when consistent physical units are used. The velocity function handles the
+  supported stiffness and density units.
+
+  It can also be constructed from a 3-by-3 matrix using the tensor constructor options.
+  When constructed from C, the crystal frame and density are carried from C.
+
+  Input
+    M - stiffnessTensor or complianceTensor, or a 3-by-3 Christoffel matrix;
+        compliance is inverted to stiffness before contraction
+    args - propagation direction n when M is elastic stiffness or compliance;
+        otherwise the reference frame and other positional tensor arguments
+    kwargs - tensor constructor options for direct matrix input
+  Output
+    E - ChristoffelTensor
+  Properties
+    M - numeric tensor coefficients, with trailing dimensions (3, 3)
+    rank - 2
+    frame - coordinate frame of the coefficients
+    density - material density carried from the elastic tensor
+  See also
+    stiffnessTensor, velocity, tensor.eig"""
   _rank, _symmetricRank2 = 2, True
 
   def __init__(self, M, *args, **kwargs):
@@ -1580,7 +1772,12 @@ class refractiveIndexTensor(tensor):
 
 
 class SchmidTensor(tensor):
-  """SchmidTensor(n, b) of a plane normal and a slip direction, SchmidTensor(sS) of slip systems"""
+  """SchmidTensor(n, b) of a plane normal and a slip direction, SchmidTensor(sS) of slip systems
+
+  Input
+    M - slipSystem, vector3d plane normals, or numeric rank-two tensor coefficients
+    args - slip direction b when M supplies plane normals, otherwise an optional reference frame
+    kwargs - tensor constructor options"""
   _rank = 2
 
   def __init__(self, M, *args, **kwargs):

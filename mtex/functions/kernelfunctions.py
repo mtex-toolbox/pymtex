@@ -211,7 +211,29 @@ def _parameterForHalfwidth(K, hw, lo, hi, iterations=60):
 
 
 class SO3Kernel(_Kernel):
-  """a kernel on SO(3) given by its Chebyshev coefficients A"""
+  """a rotationally symmetric kernel represented by Chebyshev coefficients.
+
+    psi = SO3Kernel(A)
+    values = psi(np.cos(omega/2))
+
+  The series is `sum(A[n]*U_(2*n)(t))`, where t=cos(omega/2) and U is the Chebyshev
+  polynomial of the second kind. A[0] is the mean with respect to uniform probability
+  on SO(3); choose A[0]=1 for a mean-one density kernel. No positivity or normalisation
+  is imposed on arbitrary coefficients.
+
+  Use an SO3Kernel family to construct a specified shape or angular halfwidth.
+  For a callable formula, use SO3KernelHandle. The same kernel can be supplied to
+  unimodalODF or calcDensity for orientation smoothing.
+
+  Input
+    A - one-dimensional real coefficient array, degrees zero through L
+  Output
+    psi - SO3Kernel
+  Properties
+    A - Chebyshev coefficients through the stored bandwidth
+    bandwidth - largest stored harmonic degree
+  See also
+    SO3KernelHandle, SO3DeLaValleePoussinKernel, unimodalODF, calcDensity"""
 
   def __init__(self, A):
     self._A = np.asarray(A, dtype=float).reshape(-1)
@@ -352,10 +374,26 @@ def _dlvpKappa(halfwidth):
 
 class SO3DeLaValleePoussinKernel(SO3Kernel):
   """the de la Vallee Poussin kernel on SO(3), B(3/2, 1/2) / B(3/2, kappa + 1/2) t^(2 kappa):
-  nonnegative and a finite series, the kernel recommended for texture analysis
+  nonnegative and concentrated at zero, the kernel recommended for texture analysis
 
     SO3DeLaValleePoussinKernel(20)
-    SO3DeLaValleePoussinKernel(halfwidth=10*degree)"""
+    SO3DeLaValleePoussinKernel(halfwidth=10*degree)
+
+  A nonnegative, mean-one kernel for orientation density estimation. Larger kappa
+  gives a narrower peak. For integer kappa its harmonic series is finite; when a
+  halfwidth produces a noninteger kappa, the stored harmonic expansion is truncated.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - positive concentration parameter; larger values give a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - SO3DeLaValleePoussinKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -388,7 +426,23 @@ class SO3AbelPoissonKernel(SO3Kernel):
   """the Abel Poisson kernel on SO(3), sum_n (2n+1) kappa^(2n) U_2n(t), kappa in (0, 1)
 
     SO3AbelPoissonKernel(0.4)
-    SO3AbelPoissonKernel(halfwidth=5*degree)"""
+    SO3AbelPoissonKernel(halfwidth=5*degree)
+
+  A nonnegative kernel with mean one on orientation space. Increasing kappa towards
+  one narrows the peak and requires more harmonic degrees. It has an infinite series,
+  which MTEX truncates when a harmonic representation is needed.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - concentration in (0, 1), with larger values giving a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - SO3AbelPoissonKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "Abel Poisson"
 
   def __init__(self, kappa=0.9, *, halfwidth=None):
@@ -420,7 +474,23 @@ class SO3vonMisesFisherKernel(SO3Kernel):
   """the von Mises Fisher kernel on SO(3), proportional to e^(kappa cos omega), kappa > 0
 
     SO3vonMisesFisherKernel(90)
-    SO3vonMisesFisherKernel(halfwidth=10*degree)"""
+    SO3vonMisesFisherKernel(halfwidth=10*degree)
+
+  A nonnegative kernel with mean one on orientation space, concentrated around the
+  identity rotation. Larger kappa narrows the peak. The direct evaluation uses the
+  closed form, while its harmonic representation is truncated.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - positive concentration parameter; larger values give a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - SO3vonMisesFisherKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "von Mises Fisher"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -455,7 +525,23 @@ class SO3GaussWeierstrassKernel(SO3Kernel):
   """the Gauss Weierstrass kernel on SO(3), sum_n (2n+1) e^(-n(n+1) kappa) U_2n(t), kappa > 0
 
     SO3GaussWeierstrassKernel(0.1)
-    SO3GaussWeierstrassKernel(halfwidth=10*degree)"""
+    SO3GaussWeierstrassKernel(halfwidth=10*degree)
+
+  The heat kernel smooths an orientation function by damping degree n by
+  `exp(-n*(n+1)*kappa)`. Larger kappa produces stronger smoothing and a broader peak.
+  The kernel has mean one; its infinite series is truncated numerically.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - positive diffusion parameter; larger values give a broader kernel
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - SO3GaussWeierstrassKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "Gauss Weierstrass"
 
   def __init__(self, kappa=0.1, *, halfwidth=None):
@@ -486,7 +572,23 @@ class SO3SquareSingularityKernel(SO3Kernel):
   functions of the second kind
 
     SO3SquareSingularityKernel(0.9)
-    SO3SquareSingularityKernel(halfwidth=10*degree)"""
+    SO3SquareSingularityKernel(halfwidth=10*degree)
+
+  A nonnegative, mean-one smoothing kernel on orientation space. The parameter
+  kappa lies between zero and one; values closer to one give a sharper peak. Its
+  harmonic coefficients are computed from Legendre functions of the second kind.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - concentration in (0, 1), with larger values giving a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - SO3SquareSingularityKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "square singularity"
 
   def __init__(self, kappa=0.9, *, halfwidth=None):
@@ -512,7 +614,24 @@ class SO3BumpKernel(SO3Kernel):
   mean one
 
     SO3BumpKernel(40*degree)
-    SO3BumpKernel(halfwidth=10*degree, bandwidth=64)"""
+    SO3BumpKernel(halfwidth=10*degree, bandwidth=64)
+
+  A uniform kernel inside a rotational ball, with zero values on and outside its
+  boundary. Its constant value is chosen so that the mean over SO(3) is one. The
+  direct evaluation retains the sharp boundary; a harmonic truncation can ring there.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    delta - angular radius of the open support in radians
+    halfwidth - angular halfwidth in radians, taking precedence over delta
+    bandwidth - maximum harmonic degree; the maxS1Bandwidth preference when omitted
+  Output
+    psi - SO3BumpKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
@@ -567,11 +686,26 @@ class SO3BumpKernel(SO3Kernel):
 
 
 class SO3DirichletKernel(SO3Kernel):
-  """the Dirichlet kernel on SO(3), sum_n (2n+1) U_2n(t) up to the degree N, of integral one:
+  """the Dirichlet kernel on SO(3), sum_n (2n+1) U_2n(t) up to the degree N, of mean one:
   the kernel for physical properties
 
     SO3DirichletKernel(35)
-    SO3DirichletKernel()        N the preference maxSO3Bandwidth"""
+    SO3DirichletKernel()  # N the preference maxSO3Bandwidth
+
+  Convolution with this kernel retains harmonic degrees 0 through N unchanged and
+  removes higher degrees. It is useful for a specified harmonic resolution, including
+  physical-property calculations. It has mean one but can take negative values.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    N - maximum harmonic degree; the maxSO3Bandwidth preference when omitted
+  Output
+    psi - SO3DirichletKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "Dirichlet"
 
   def __init__(self, N=None):
@@ -600,7 +734,24 @@ class SO3DirichletKernel(SO3Kernel):
 
 class SO3RestrictedDistanceKernel(SO3Kernel):
   """the restricted distance kernel on SO(3), -sqrt(8) sin(acos(t)), cut at the degree N: negative,
-  a distance between orientations that makes points repel each other"""
+  a distance between orientations that makes points repel each other
+
+    psi = SO3RestrictedDistanceKernel()
+
+  This negative kernel measures separation between orientations and is used in
+  point-repulsion objectives. It is not a probability density. Direct evaluation uses
+  the distance formula; N limits the harmonic representation.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    N - maximum harmonic degree; the maxSO3Bandwidth preference when omitted
+  Output
+    psi - SO3RestrictedDistanceKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "restricted distance"
 
   def __init__(self, N=None):
@@ -620,7 +771,21 @@ class SO3RestrictedDistanceKernel(SO3Kernel):
 
 
 class SO3LaplaceKernel(SO3Kernel):
-  """the Laplace kernel on SO(3), sum_n (2n+1) / (4 n^2 (2n+2)^2) U_2n(t), without a constant term"""
+  """the Laplace kernel on SO(3), sum_n (2n+1) / (4 n^2 (2n+2)^2) U_2n(t), without a constant term
+
+    psi = SO3LaplaceKernel()
+
+  A radial kernel with no constant mode: its mean over orientation space is zero.
+  The degree-n coefficient for n>=1 is `(2*n+1)/(4*n**2*(2*n+2)**2)`. It is an operator
+  kernel rather than a normalised orientation density.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+  Output
+    psi - SO3LaplaceKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "Laplace"
 
   def __init__(self):
@@ -637,7 +802,23 @@ class SO3LaplaceKernel(SO3Kernel):
 class SO3SobolevKernel(SO3Kernel):
   """the Sobolev kernel on SO(3), sum_n (2n+1) (n(n+1))^s U_2n(t) up to the bandwidth
 
-    SO3SobolevKernel(1.1, bandwidth=20)"""
+    SO3SobolevKernel(1.1, bandwidth=20)
+
+  A finite spectral kernel with degree-n multiplier `(n*(n+1))**s`. Positive s
+  amplifies higher degrees instead of smoothing them. The constant mode vanishes
+  for positive s, so this kernel is not a normalised density.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    s - Sobolev exponent applied to n*(n+1)
+    bandwidth - maximum harmonic degree; the maxSO3Bandwidth preference when omitted
+  Output
+    psi - SO3SobolevKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "Sobolev"
 
   def __init__(self, s=1, *, bandwidth=None):
@@ -659,7 +840,23 @@ class fibreVonMisesFisherKernel(SO3Kernel):
   concentration, larger is sharper
 
     fibreVonMisesFisherKernel(90)
-    fibreVonMisesFisherKernel(halfwidth=10*degree)"""
+    fibreVonMisesFisherKernel(halfwidth=10*degree)
+
+  The kernel used to smooth an ideal orientation fibre in `fibreODF`. Larger kappa
+  concentrates the density closer to the fibre. It has mean one; its spherical
+  Radon kernel can be evaluated in closed form.
+
+  Evaluate psi at t=cos(omega/2), the cosine of half the rotation angle.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - positive concentration parameter; larger values give a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - fibreVonMisesFisherKernel
+  See also
+    SO3Kernel, calcDensity, calcKernel"""
   _label = "fibre von Mises Fisher"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -687,7 +884,26 @@ class fibreVonMisesFisherKernel(SO3Kernel):
 
 
 class SO3KernelHandle(SO3Kernel):
-  """a kernel given by a closed form, its coefficients by Gauss-Legendre quadrature"""
+  """wrap a callable formula as a SO3Kernel.
+
+    psi = SO3KernelHandle(fun, bandwidth=32)
+
+  The function must accept numeric arrays whose entries are cos(omega/2) and return
+  matching kernel values. Direct evaluation calls fun; harmonic coefficients are
+  computed by numerical quadrature. Choose the supplied formula's normalisation
+  explicitly; the wrapper does not rescale its values.
+
+  Input
+    fun - vectorised callable of cos(omega/2)
+  Keywords
+    bandwidth - maximum degree used for harmonic coefficients; the maxS1Bandwidth preference when omitted
+  Output
+    psi - SO3KernelHandle
+  Properties
+    fun - original callable
+    bandwidth - largest retained harmonic degree
+  See also
+    SO3Kernel, calcDensity"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun
@@ -712,7 +928,28 @@ class SO3KernelHandle(SO3Kernel):
 
 
 class S2Kernel(_Kernel):
-  """a kernel on the sphere given by its Legendre coefficients A"""
+  """a radially symmetric spherical kernel represented by Legendre coefficients.
+
+    psi = S2Kernel(A)
+    values = psi(np.cos(theta))
+
+  The series is `sum(A[n]*P_n(t))`, with t=cos(theta) and P_n the Legendre polynomial.
+  A[0] is the mean over the sphere under uniform probability. Arbitrary coefficients
+  are neither rescaled to mean one nor constrained to give nonnegative values.
+
+  Use a kernel family for a specified smoothing profile, or S2KernelHandle for a
+  callable formula. Spherical kernels describe directional density estimates and
+  smoothing around orientation fibres.
+
+  Input
+    A - one-dimensional real coefficient array, degrees zero through L
+  Output
+    psi - S2Kernel
+  Properties
+    A - Legendre coefficients through the stored bandwidth
+    bandwidth - largest stored Legendre degree
+  See also
+    S2KernelHandle, S2DeLaValleePoussinKernel, fibreODF, calcDensity"""
 
   def __init__(self, A):
     self._A = np.asarray(A, dtype=float).reshape(-1)
@@ -844,7 +1081,23 @@ class S2DeLaValleePoussinKernel(S2Kernel):
   a finite series, the kernel recommended for texture analysis
 
     S2DeLaValleePoussinKernel(20)
-    S2DeLaValleePoussinKernel(halfwidth=10*degree)"""
+    S2DeLaValleePoussinKernel(halfwidth=10*degree)
+
+  A nonnegative, mean-one kernel for densities of directions and fibre ODFs. Larger
+  kappa gives a narrower peak. Integer kappa gives a finite polynomial; for a
+  noninteger kappa the stored harmonic expansion is truncated.
+
+  Evaluate psi at t=cos(theta), the cosine of the angular distance on the sphere.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    kappa - positive concentration parameter; larger values give a sharper peak
+    halfwidth - angular halfwidth in radians, taking precedence over kappa
+  Output
+    psi - S2DeLaValleePoussinKernel
+  See also
+    S2Kernel, calcDensity, calcKernel"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, kappa=90, *, halfwidth=None):
@@ -870,10 +1123,25 @@ class S2DeLaValleePoussinKernel(S2Kernel):
 
 
 class S2DirichletKernel(S2Kernel):
-  """the Dirichlet kernel on the sphere, sum_n (2n+1) P_n(t) up to the degree N, of integral one
+  """the Dirichlet kernel on the sphere, sum_n (2n+1) P_n(t) up to the degree N, of mean one
 
     S2DirichletKernel(35)
-    S2DirichletKernel()        N the preference maxS2Bandwidth"""
+    S2DirichletKernel()  # N the preference maxS2Bandwidth
+
+  Convolution with this kernel retains spherical harmonic degrees 0 through N
+  unchanged and removes higher degrees. It has mean one but can take negative values;
+  nonnegative smoothing kernels are usually preferable for density estimation.
+
+  Evaluate psi at t=cos(theta), the cosine of the angular distance on the sphere.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    N - maximum harmonic degree; the maxS2Bandwidth preference when omitted
+  Output
+    psi - S2DirichletKernel
+  See also
+    S2Kernel, calcDensity, calcKernel"""
   _label = "Dirichlet"
 
   def __init__(self, N=None):
@@ -893,7 +1161,24 @@ class S2BumpKernel(S2Kernel):
   a density of mean one
 
     S2BumpKernel(10*degree)
-    S2BumpKernel(halfwidth=10*degree, bandwidth=64)"""
+    S2BumpKernel(halfwidth=10*degree, bandwidth=64)
+
+  A uniform kernel inside a spherical cap, with zero values on and outside its
+  boundary. Its constant value is chosen so that the mean over the sphere is one.
+  A finite harmonic representation approximates the discontinuity and can ring.
+
+  Evaluate psi at t=cos(theta), the cosine of the angular distance on the sphere.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    delta - angular radius of the open support in radians
+    halfwidth - angular halfwidth in radians, taking precedence over delta
+    bandwidth - maximum harmonic degree; chosen by the coefficient cutoff when omitted
+  Output
+    psi - S2BumpKernel
+  See also
+    S2Kernel, calcDensity, calcKernel"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None, bandwidth=None):
@@ -946,7 +1231,24 @@ class S2BumpKernel(S2Kernel):
 
 class S2RestrictedDistanceKernel(S2Kernel):
   """the restricted distance kernel on the sphere, -2 sin(acos(t) / 2), cut at the degree N:
-  negative, a distance between directions that makes points repel each other"""
+  negative, a distance between directions that makes points repel each other
+
+    psi = S2RestrictedDistanceKernel()
+
+  This is the negative chord distance between unit directions. It is used in
+  point-repulsion objectives and is not a probability density. Direct evaluation uses
+  the distance formula; N limits the harmonic representation.
+
+  Evaluate psi at t=cos(theta), the cosine of the angular distance on the sphere.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    N - maximum harmonic degree; the maxS2Bandwidth preference when omitted
+  Output
+    psi - S2RestrictedDistanceKernel
+  See also
+    S2Kernel, calcDensity, calcKernel"""
   _label = "restricted distance"
 
   def __init__(self, N=None):
@@ -966,10 +1268,26 @@ class S2RestrictedDistanceKernel(S2Kernel):
 
 
 class S2KernelHandle(S2Kernel):
-  """a kernel on the sphere given by a function of the cosine of the polar angle, its Legendre
-  coefficients by Gauss-Legendre quadrature
+  """wrap a callable formula as a S2Kernel.
 
-    S2KernelHandle(lambda t: t**2, bandwidth=16)"""
+    psi = S2KernelHandle(fun, bandwidth=32)
+
+  The function must accept numeric arrays whose entries are cos(theta) and return
+  matching kernel values. Direct evaluation calls fun; harmonic coefficients are
+  computed by numerical quadrature. Choose the supplied formula's normalisation
+  explicitly; the wrapper does not rescale its values.
+
+  Input
+    fun - vectorised callable of cos(theta)
+  Keywords
+    bandwidth - maximum degree used for harmonic coefficients; the maxS2Bandwidth preference when omitted
+  Output
+    psi - S2KernelHandle
+  Properties
+    fun - original callable
+    bandwidth - largest retained harmonic degree
+  See also
+    S2Kernel, calcDensity"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun
@@ -1014,7 +1332,25 @@ class S2RadonKernel(S2Kernel):
 
 
 class S1Kernel(_Kernel):
-  """a kernel on the circle given by its Fourier coefficients fhat, degrees -N .. N"""
+  """an even kernel on the circle represented by a finite Fourier series.
+
+    psi = S1Kernel(fhat)
+    values = psi(angles)
+
+  Input coefficients are ordered from mode -N to N and are expected to be real and
+  even: c[-k]=c[k]. The constructor stores the nonnegative half and mirrors it on
+  output. Angles are in radians, with period `2*pi`. The middle coefficient is the mean
+  over the circle; choose it as one for a mean-one smoothing kernel.
+
+  Input
+    fhat - real symmetric coefficient array of odd length 2*N+1
+  Output
+    psi - S1Kernel
+  Properties
+    fhat - two-sided coefficients, modes -N through N
+    bandwidth - largest Fourier mode N
+  See also
+    S1GaussKernel, S1DirichletKernel, S1FejerKernel, calcDensity"""
 
   def __init__(self, fhat):
     fhat = np.asarray(fhat, dtype=float).reshape(-1)
@@ -1138,7 +1474,23 @@ class S1DeLaValleePoussinKernel(S1Kernel):
   kernels: coefficients one up to n, falling to zero at 2n
 
     S1DeLaValleePoussinKernel(20)
-    S1DeLaValleePoussinKernel(halfwidth=5*degree)"""
+    S1DeLaValleePoussinKernel(halfwidth=5*degree)
+
+  A circular kernel with Fourier multipliers equal to one through degree n and
+  falling linearly to zero at `2*n`. The series is finite and has mean one. The halfwidth
+  option chooses an integer n approximately, so the requested width is not exact.
+
+  Evaluate psi at x, an angle in radians.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    n - positive integer controlling the cutoff at 2*n; omitted n is chosen for about 2.9 degrees
+    halfwidth - approximate angular halfwidth in radians, used when n is omitted
+  Output
+    psi - S1DeLaValleePoussinKernel
+  See also
+    S1Kernel, calcDensity, calcKernel"""
   _label = "de la Vallee Poussin"
 
   def __init__(self, n=None, *, halfwidth=None):
@@ -1165,7 +1517,24 @@ class S1DeLaValleePoussinKernel(S1Kernel):
 
 
 class S1DirichletKernel(S1Kernel):
-  """the Dirichlet kernel on the circle, sum_(k = -n .. n) e^(ikx), of integral one"""
+  """the Dirichlet kernel on the circle, sum_(k = -n .. n) e^(ikx), of mean one
+
+    psi = S1DirichletKernel()
+
+  The sharp Fourier cutoff: convolution retains modes -n through n unchanged and
+  removes the rest. The mean over the circle is one. Oscillating negative side lobes
+  can produce ringing when approximating discontinuous data.
+
+  Evaluate psi at x, an angle in radians.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    n - maximum harmonic degree
+  Output
+    psi - S1DirichletKernel
+  See also
+    S1Kernel, calcDensity, calcKernel"""
   _label = "Dirichlet"
 
   def __init__(self, n=25):
@@ -1188,7 +1557,24 @@ class S1DirichletKernel(S1Kernel):
 
 class S1FejerKernel(S1Kernel):
   """the Fejer kernel on the circle, the mean of the Dirichlet kernels D_0 .. D_n: nonnegative,
-  of integral one"""
+  of mean one
+
+    psi = S1FejerKernel()
+
+  A nonnegative circular smoothing kernel formed by averaging the Dirichlet kernels.
+  Its Fourier multipliers decrease linearly from one at mode zero to zero beyond n.
+  The mean over the circle is one.
+
+  Evaluate psi at x, an angle in radians.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    n - maximum harmonic degree
+  Output
+    psi - S1FejerKernel
+  See also
+    S1Kernel, calcDensity, calcKernel"""
   _label = "Fejer"
 
   def __init__(self, n=25):
@@ -1210,7 +1596,25 @@ class S1FejerKernel(S1Kernel):
 
 
 class S1BumpKernel(S1Kernel):
-  """the indicator of the interval |x| < delta scaled to a density"""
+  """the indicator of the interval |x| < delta scaled to a density
+
+    psi = S1BumpKernel()
+
+  A periodic constant kernel on the open interval (-delta, delta), with zero values
+  outside. The height is pi/delta, giving mean one over the circle. Its derivative
+  is zero away from the two discontinuities and is undefined at them.
+
+  Evaluate psi at x, an angle in radians.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    delta - angular radius of the open support in radians
+    halfwidth - angular halfwidth in radians, taking precedence over delta
+  Output
+    psi - S1BumpKernel
+  See also
+    S1Kernel, calcDensity, calcKernel"""
   _label = "bump"
 
   def __init__(self, delta=10 * degree, *, halfwidth=None):
@@ -1249,7 +1653,25 @@ class S1BumpKernel(S1Kernel):
 
 
 class S1GaussKernel(S1Kernel):
-  """the heat kernel of the circle, a wrapped Gaussian: what smooths a density of angles"""
+  """the heat kernel of the circle, a wrapped Gaussian: what smooths a density of angles
+
+    psi = S1GaussKernel()
+
+  The periodic heat kernel, obtained by wrapping a Gaussian of standard deviation
+  sigma around the circle. The mean over the circle is one, and mode k is multiplied
+  by `exp(-k**2*sigma**2/2)`. Larger sigma gives a broader smoothing kernel.
+
+  Evaluate psi at x, an angle in radians.
+  Use psi.halfwidth() for the angular width in radians and psi.bandwidth for the
+  maximum degree of its harmonic representation.
+
+  Keywords
+    sigma - Gaussian standard deviation in radians; five degrees when neither sigma nor halfwidth is supplied
+    halfwidth - angular halfwidth in radians, taking precedence over sigma
+  Output
+    psi - S1GaussKernel
+  See also
+    S1Kernel, calcDensity, calcKernel"""
   _label = "Gauss"
 
   def __init__(self, sigma=None, *, halfwidth=None):
@@ -1272,10 +1694,26 @@ class S1GaussKernel(S1Kernel):
 
 
 class S1KernelHandle(S1Kernel):
-  """a kernel on the circle given by a function of the angle, its Fourier coefficients by the
-  trapezoidal rule
+  """wrap a callable formula as a S1Kernel.
 
-    S1KernelHandle(lambda x: np.cos(x)**2, bandwidth=8)"""
+    psi = S1KernelHandle(fun, bandwidth=32)
+
+  The function must accept numeric arrays whose entries are an angle in radians and return
+  matching kernel values. Direct evaluation calls fun; harmonic coefficients are
+  computed by numerical quadrature. Choose the supplied formula's normalisation
+  explicitly; the wrapper does not rescale its values.
+
+  Input
+    fun - vectorised callable of an angle in radians
+  Keywords
+    bandwidth - maximum degree used for harmonic coefficients; the maxS1Bandwidth preference when omitted
+  Output
+    psi - S1KernelHandle
+  Properties
+    fun - original callable
+    bandwidth - largest retained harmonic degree
+  See also
+    S1Kernel, calcDensity"""
 
   def __init__(self, fun, *, bandwidth=None):
     self.fun = fun

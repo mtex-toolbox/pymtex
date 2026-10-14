@@ -431,8 +431,21 @@ class mtexFigure:
     self.fig.canvas.draw_idle()
 
   def savefig(self, *args, **kwargs):
-    """a PNG is written at zlib level 1, not Pillow's 6: the same pixels, a file about a tenth
-    larger, in half the time a large map took, most of which was the compression"""
+    """save the matplotlib figure to an image or vector-graphics file
+
+      mtexFig.savefig('map.png', dpi=300)
+      mtexFig.savefig('map.pdf', bbox_inches='tight')
+
+    The filename extension selects the format unless format is supplied. Arguments and keywords
+    are passed to matplotlib Figure.savefig, including dpi, transparent and bbox_inches.
+    For PNG output the default compression level is 1; set pil_kwargs to override it.
+    Saving writes the figure's current state and does not display a window.
+
+    Input
+      args - filename or file object, followed by any positional Figure.savefig arguments
+      kwargs - matplotlib Figure.savefig options
+    See also
+      mtexFigure.show, gcm"""
     import os
     import matplotlib
     name = args[0] if args else kwargs.get("fname")

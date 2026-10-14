@@ -70,6 +70,19 @@ class EBSD:
     phaseMap - the phase number the file gives each entry of CSList
     id - the id of every pixel, by default its position in the list
     isPadding - the mask of the cells a grid adds to close it, MATLAB's NaN phase
+  Properties
+    pos - vector3d measurement positions in the specimen frame
+    rotations - rotation coefficients of the measured orientations
+    phaseId - zero-based index into CSList for each measurement; zero is notIndexed
+    CSList - phaseList containing the phase frames and mineral metadata
+    orientations - orientation data for a selection containing one indexed phase
+    prop - additional arrays such as band contrast or grainId, also accessible as attributes
+    id - measurement ids, distinct from positional array indices after selection
+    lattice - geometry and spacing of a regular scan, or None for scattered data
+    shape - measurement-array shape: a list or a spatially gridded array
+    isPadding - mask of grid cells without an original measurement
+    scanUnit - unit of the spatial coordinates
+    grainId - grain assignments, available after calcGrains has written them to the map
   See also
     loadEBSD, EBSDsquare, gridify, simulateEBSD, EBSDImport, EBSDSelect, EBSDPlotting,
     GrainReconstruction"""
@@ -450,7 +463,22 @@ class EBSD:
     return self._subset(ids)
 
   def findByOrientation(self, ori, epsilon):
-    """the measurements of the phase of ori within an angle of it, or of a fibre"""
+    """select measurements close to a reference orientation or an orientation fibre
+
+      selected = ebsd.findByOrientation(ori, 5*degree)
+      selected = ebsd.findByOrientation(f, 5*degree)
+
+    Only the reference's crystal phase is considered. Orientations within epsilon of the
+    reference, or of any orientation on the fibre, are returned as a selected EBSD map.
+    Distances account for crystal and specimen symmetry. The threshold is inclusive.
+
+    Input
+      ori - one reference orientation, or fibre, carrying the crystal phase
+      epsilon - angular tolerance in radians
+    Output
+      selected - EBSD measurements satisfying the phase and angle criteria
+    See also
+      orientation.angle, fibre.angle, EBSD.inpolygon"""
     from ..geometry.fibre import fibre
     cs = ori.CS
     sel = self.phaseId == self.CSList.phaseId(cs)
@@ -611,8 +639,25 @@ class EBSD:
 
   @classmethod
   def load(cls, fname, *args, **kwargs):
-    """EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one;
-    the interface and the options MATLAB returns besides are what inspectEBSD reports"""
+    """read an EBSD map from a supported vendor file or a text table
+
+      ebsd = EBSD.load('map.ang')
+      ebsd = EBSD.load('map.ctf', grid=False)
+
+    This calls loadEBSD with the same arguments. The file format is selected from the extension
+    unless interface is given. Phase information, orientations, positions and available pixel
+    properties are read together; complete scans are returned on their grid by default.
+    For text-table column definitions and import corrections, consult loadEBSD. Use inspectEBSD
+    to inspect file metadata before importing.
+
+    Input
+      fname - input filename
+      args - positional options accepted by loadEBSD
+      kwargs - keyword options accepted by loadEBSD
+    Output
+      ebsd - EBSD map
+    See also
+      loadEBSD, inspectEBSD, EBSD.export"""
     from ..io.load import loadEBSD
     return loadEBSD(fname, *args, **kwargs)
 
@@ -641,7 +686,23 @@ class EBSD:
     return int(ids[0])
 
   def export(self, fname, *args, **kwargs):
-    """ebsd.export('map.ang'): the map written by the format the extension names"""
+    """write the EBSD map to a vendor format or a text table
+
+      ebsd.export('map.ang')
+      ebsd.export('map.ctf')
+      ebsd.export('map.txt')
+
+    The filename extension chooses the exporter. Orientations, positions, phase information
+    and supported pixel properties are written together. Export reverses the import correction
+    for the target vendor convention. HDF5 export uses a copy of the original vendor file;
+    consult export for supported formats, required source metadata and options.
+
+    Input
+      fname - output filename
+      args - positional export options
+      kwargs - keyword export options
+    See also
+      export, EBSD.load, loadEBSD"""
     from ..io.exportebsd import export
     return export(self, fname, *args, **kwargs)
 

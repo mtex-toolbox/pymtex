@@ -70,7 +70,20 @@ def defaultAxes(abc, abg):
 
 
 def reciprocalAxes(axes):
-  """the reciprocal axes a*, b*, c*"""
+  """compute reciprocal basis vectors from a direct crystal basis
+
+    dual = reciprocalAxes(axes)
+
+  Rows of axes are the Cartesian vectors a, b and c. Return rows `a*, b* and c*` such that
+  axes @ dual.T is the identity. No factor `2*pi` is included. Reciprocal lengths use the
+  inverse of the direct-basis units. A degenerate basis has no finite reciprocal basis.
+
+  Input
+    axes - numeric array of shape (3, 3), one direct basis vector per row
+  Output
+    dual - array of shape (3, 3), one reciprocal basis vector per row
+  See also
+    crystalFrame.basisDual, Miller"""
   axes = np.asarray(axes, dtype=float)
   a, b, c = axes
   d = np.dot(a, np.cross(b, c))

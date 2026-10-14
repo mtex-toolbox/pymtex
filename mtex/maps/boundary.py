@@ -48,13 +48,49 @@ def _namesNoPhase(a, CSList):
 
 
 class grainBoundary:
-  """the grain boundary of a map: the segments F between the vertices V in walk order, each with
-  its two grains, pixels, phases and misrotation, the grain in grainId[:, 0] to the left of the
-  walk; chains, junctions and triple points are derived from that order
+  """a list of line segments separating neighbouring grains in a two-dimensional map
 
     gB = grains.boundary
-    gB['Forsterite', 'Enstatite']
-    gB.segLength, gB.misorientation"""
+    interphase = gB['Forsterite', 'Enstatite']
+    lengths = gB.segLength
+    mori = interphase.misorientation
+
+  Grain reconstruction creates these segments together with the adjacent grain ids, EBSD
+  pixel ids, phases and rotations. Segments are stored head to tail along chains, with the
+  first adjacent grain on the left of the walk. A chain ends at a junction or closes on itself.
+  Selecting segments keeps the shared vertex table; segment indices and vertex indices are
+  different. All Python indices are zero-based.
+
+  Select by a mask, integer indices, one phase name, or a pair of phase names. Before asking
+  for misorientation, select a single phase pair so its crystal frames are unambiguous.
+  The exterior has grain id 0, pixel id -1 and phase id -1.
+
+  Input
+    V - array of shape (n, 2), vertex coordinates in the map plane
+    F - integer array of shape (m, 2), endpoint indices into V
+    grainId - array of shape (m, 2), adjacent grain ids
+    ebsdId - array of shape (m, 2), adjacent EBSD pixel ids
+    phaseId - array of shape (m, 2), adjacent phase-list indices
+    misrotation - rotation across each segment
+    CSList - list of phase frames
+    plane - map-plane coordinate system converting V to specimen positions
+    frame - specimenFrame of the geometry
+    scanUnit - unit of vertex coordinates; default 'um'
+  Output
+    gB - grainBoundary, usually obtained as grains.boundary
+  Properties
+    allV - all stored vertices as vector3d specimen positions
+    F - segment endpoint indices into V
+    grainId - grain ids on the two sides; ids need not equal array positions
+    segLength - length of each segment in scanUnit
+    direction - segment vectors as antipodal vector3d, with segment length
+    midPoint - midpoint of each segment as vector3d
+    misorientation - symmetry-aware orientation relationship for one phase pair
+    chainId - chain membership of each segment
+    arcLength - distance along the chain to the end of each segment
+    triplePoints - junctions at which three grains meet
+  See also
+    calcGrains, grain2d, grainBoundary.curvature, grainBoundary.calcMeanDirection"""
 
   def __init__(self, V, F, grainId, ebsdId, phaseId, misrotation, CSList, plane, frame, scanUnit="um"):
     self.V = V
@@ -651,7 +687,18 @@ class triplePointList:
   grains, their phases, the three boundary segments and the angles between them
 
     tP = grains.triplePoints
-    tP('Iron bcc', 'Iron bcc', 'Iron bcc')"""
+    tP('Iron bcc', 'Iron bcc', 'Iron bcc')
+
+  Input
+    V - array of triple-point coordinates in the map plane
+    grainId - three grain ids at each junction
+    phaseId - three phase-list indices at each junction
+    boundaryId - indices of the three incident boundary segments
+    angles - three enclosed angles at each junction, in radians
+    CSList - phase frames
+    plane - coordinate system of the map plane
+    frame - specimen reference frame
+    vertexId - optional ids into the full boundary vertex table"""
 
   def __init__(self, V, grainId, phaseId, boundaryId, angles, CSList, plane, frame, vertexId=None):
     self.V, self.grainId, self.phaseId, self.boundaryId, self.angles = V, grainId, phaseId, boundaryId, angles

@@ -42,7 +42,11 @@ class mapPlane:
   e1 the given direction projected into the plane, the origin the specimen origin's foot on it
 
     plane = mapPlane(pos)
-    plane.to2d(xyz), plane.from2d(xy)"""
+    plane.to2d(xyz), plane.from2d(xy)
+
+  Input
+    pts - Cartesian positions as an (n, 3) array, defining the fitted map plane
+    e1 - preferred first in-plane direction, projected onto the plane; default x direction"""
 
   # the plane of a set of positions, with e1 along the given direction projected into it
   #
@@ -102,7 +106,12 @@ class lattice:
   positions or fitted to a known basis
 
     l = lattice(pos)
-    l = lattice(pos, basis=(A, 'hex'))"""
+    l = lattice(pos, basis=(A, 'hex'))
+
+  Input
+    pos - vector3d positions of the map measurements
+    basis - optional pair (A, shape), with a 2-by-2 basis and 'square' or 'hex' cell shape
+    plane - optional mapPlane; None fits the plane from the positions"""
 
   # the lattice of measured positions: the basis from the differences of neighbouring
   # points, the index by fitting the lattice to all of them

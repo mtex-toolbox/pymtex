@@ -75,6 +75,16 @@ class vector3d(MtexArray):
         vectors crystal directions; also given as a positional argument
     dispStyle - the indices the display shows, 'hkl', 'hkil', 'uvw', 'UVTW' or 'xyz'
     dtype - the floating point type of the coordinates
+  Properties
+    xyz - Cartesian coordinates as a numeric array of shape v.shape + (3,)
+    frame - referenceFrame of the coordinates, or None for frame-free data
+    CS - crystalFrame for Miller directions, otherwise None
+    antipodal - whether opposite directions represent the same axis
+    isNormalized - whether the coordinates are known to have unit length
+    dispStyle - display convention: 'xyz', 'hkl', 'hkil', 'uvw' or 'UVTW'
+    hkl - three reciprocal-lattice indices for plane normals in a crystal frame
+    uvw - three direct-lattice indices for lattice directions in a crystal frame
+    shape - array shape excluding the trailing Cartesian coordinate axis
   See also
     Miller, vector3d.byPolar, crystalFrame, VectorDefinition, CrystalDirections"""
   _ncoord = 3
@@ -284,7 +294,16 @@ class vector3d(MtexArray):
   W = property(lambda self: self.UVTW[..., 3], doc="the Miller-Bravais index W of a lattice direction")
 
   def dspacing(self):
-    """the distance between the lattice planes with this normal, in the units of the cell"""
+    """return the spacing of the lattice planes represented by each Miller normal.
+
+      d = h.dspacing()
+
+    The spacing is 1/norm(h), in the same length units as the crystal cell. The vector
+    must carry a crystal frame. Scaling its Miller indices changes the spacing; normalising
+    the Cartesian vector therefore loses the plane spacing.
+
+    See also
+      Miller, crystalFrame.basisDual, vector3d.hkl"""
     self._needsCrystal()
     return 1 / self.norm()
 
@@ -377,26 +396,67 @@ class vector3d(MtexArray):
 
   @classmethod
   def load(cls, fname, *args, **kwargs):
-    """vector3d.load('vectors.txt', columnNames=[...]): the directions a text table holds, read
-    by the interfaces layer above this one; loadVector3d returns the other columns too"""
+    """read Cartesian directions from a text file.
+
+      v = vector3d.load('vectors.txt', columnNames=['x', 'y', 'z'])
+
+    The first result of `loadVector3d` is returned as a vector3d. File-format and column
+    options are passed to that reader. Use loadVector3d directly to retain additional columns.
+
+    Input
+      fname - path to the input file
+    See also
+      loadVector3d, vector3d.export"""
     from ..io.vectors import loadVector3d
     return loadVector3d(fname, *args, **kwargs)[0]
 
   def calcDensity(self, *args, **kwargs):
-    """v.calcDensity(): the kernel density estimate of a list of directions, by the function
-    spaces above this layer, vector3d/calcDensity"""
+    """estimate a smooth density of directions or axes on the sphere.
+
+      f = v.calcDensity()
+      f = v.calcDensity(halfwidth=10*degree)
+      f = v.calcDensity(weights=w, antipodal=True)
+
+    The result is an S2FunHarmonic with mean one: a value of two represents twice the
+    uniform directional density. The input's crystal symmetry and antipodal state are
+    respected. Without a kernel or halfwidth, the smoothing width is selected from the data.
+    Evaluate the density with f(queryDirections). All options are those of `calcDensity`.
+
+    See also
+      calcDensity, calcKernel, vector3d.interp"""
     from ..functions.density import calcDensity
     return calcDensity(self, *args, **kwargs)
 
   def interp(self, y, *args, **kwargs):
-    """interp(v, y, 'linear' | 'harmonic' | 'nearest' | 'inverseDistance'): a function on the
-    sphere through the values y at the directions v, by the function spaces above this
-    layer, vector3d/interp; interp(v, y, vi, ...) its values at vi"""
+    """interpolate values sampled at directions on the sphere.
+
+      f = v.interp(values, 'linear')
+      f = v.interp(values, 'harmonic', bandwidth=16)
+      result = v.interp(values, queryDirections, 'nearest')
+
+    Supply one value per direction. The methods are 'linear', 'harmonic', 'nearest' and
+    'inverseDistance'. Without query directions, return a callable spherical function;
+    with query directions, return its values there. Additional options are passed to
+    the selected interpolation method.
+
+    Input
+      y - values sampled at the directions in v
+    See also
+      interpolate, S2FunTri, S2FunHarmonic.interpolate"""
     from ..functions.density import interpS2
     return interpS2(self, y, *args, **kwargs)
 
   def export(self, fname, *args, **kwargs):
-    """v.export('vectors.txt'): the directions written as a text table"""
+    """write vector coordinates to a text table.
+
+      v.export('vectors.txt')
+
+    The file-writing options are passed to `exportVector3d`. The input vectors are unchanged.
+
+    Input
+      fname - destination file path
+    See also
+      exportVector3d, vector3d.load"""
     from ..io.vectors import exportVector3d
     return exportVector3d(self, fname, *args, **kwargs)
 
@@ -425,7 +485,17 @@ class vector3d(MtexArray):
 
   @classmethod
   def byXYZ(cls, xyz):
-    """an N x 3 or N x 2 matrix, z zero in the second case"""
+    """construct a list of vectors from rows of Cartesian coordinates.
+
+      v = vector3d.byXYZ([[1, 0, 0], [0, 1, 0]])
+      v = vector3d.byXYZ([[1, 2], [3, 4]])  # append a zero z coordinate
+
+    Input
+      xyz - numeric array of shape (n, 3) or (n, 2)
+    Output
+      v - vector3d of shape (n,); coordinates are not normalised
+    See also
+      vector3d, vector3d.byPolar"""
     xyz = np.asarray(xyz, dtype=float)
     if xyz.size == 0 and xyz.ndim < 2:
       xyz = np.zeros((0, 3))
@@ -489,7 +559,13 @@ class vector3d(MtexArray):
 
   @classmethod
   def nan(cls, *shape):
-    """the vectors of a shape with NaN coordinates"""
+    """construct vectors with missing Cartesian coordinates.
+
+      v = vector3d.nan(10)
+      v = vector3d.nan(2, 3)
+
+    Every coordinate is NaN. Sizes may be supplied as separate integers or one tuple;
+    without a size, return one scalar vector. Use `vector3d.isnan` to identify missing vectors."""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.full(tuple(shape) + (3,), np.nan))
 
@@ -512,7 +588,7 @@ class vector3d(MtexArray):
 
   @property
   def x(self):
-    """the x coordinates"""
+    """Cartesian x coordinate of each vector; assignment changes the coordinates and clears isNormalized."""
     return self.data[..., 0]
 
   @x.setter
@@ -523,7 +599,7 @@ class vector3d(MtexArray):
 
   @property
   def y(self):
-    """the y coordinates"""
+    """Cartesian y coordinate of each vector; assignment changes the coordinates and clears isNormalized."""
     return self.data[..., 1]
 
   @y.setter
@@ -534,7 +610,7 @@ class vector3d(MtexArray):
 
   @property
   def z(self):
-    """the z coordinates"""
+    """Cartesian z coordinate of each vector; assignment changes the coordinates and clears isNormalized."""
     return self.data[..., 2]
 
   @z.setter
@@ -545,11 +621,21 @@ class vector3d(MtexArray):
 
   @property
   def xyz(self):
-    """the coordinates, an array of shape (..., 3)"""
+    """Cartesian coordinates as a numeric array of shape v.shape + (3,); the array shares storage with v."""
     return self.data
 
   def polar(self):
-    """polar angle to z in [0, pi] and azimuth from x towards y in [0, 2pi), vector3d/polar"""
+    """return polar angle, azimuth and length for every vector.
+
+      theta, rho, radius = v.polar()
+
+    The polar angle theta is measured from +z towards the xy plane and lies in [0, pi].
+    The azimuth rho is measured from +x towards +y and lies in [0, `2*pi`). Both angles
+    are in radians. Radius has the units of the Cartesian coordinates. The three arrays
+    have the shape of v; for a zero vector the implementation returns theta=pi/2 and rho=0.
+
+    See also
+      vector3d.byPolar, vector3d.theta, vector3d.rho"""
     r = np.ones(self.shape) if self.isNormalized else self.norm()
     rho = np.arctan2(self.y, self.x)
     rho = rho + (rho < 0) * 2 * np.pi
@@ -558,12 +644,12 @@ class vector3d(MtexArray):
 
   @property
   def theta(self):
-    """the polar angle to z, in [0, pi]"""
+    """polar angle from +z in radians, in [0, pi], with one value per vector."""
     return self.polar()[0]
 
   @property
   def rho(self):
-    """the azimuth from x towards y, in [0, 2 pi)"""
+    """azimuth from +x towards +y in radians, in [0, `2*pi`), with one value per vector."""
     return self.polar()[1]
 
   @property
@@ -777,7 +863,19 @@ class vector3d(MtexArray):
     return self.reshape(self.shape + (1,) * other.ndim), other.reshape((1,) * self.ndim + other.shape)
 
   def orthProj(self, N):
-    """the component orthogonal to a normal N, vector3d/orthProj"""
+    """project each vector onto the plane perpendicular to a normal.
+
+      inPlane = v.orthProj(normal)
+
+    Compute `v - dot(v, n)*n` with n the unit normal. This uses Cartesian dot products,
+    without crystal symmetry or identification of opposite directions. Inputs broadcast.
+
+    Input
+      N - nonzero vector3d normal to the projection plane
+    Output
+      inPlane - vector3d in the frame of v, with its original length component in the plane
+    See also
+      vector3d.orth, vector3d.dot"""
     n = self._coerce(N).normalize()
     return self - n * self.dot(n, antipodal=False, symmetry=False)
 
@@ -832,7 +930,16 @@ class vector3d(MtexArray):
       return self._new(self.data / n[..., None], isNormalized=True)
 
   def orth(self):
-    """an arbitrary orthogonal direction, vector3d/orth"""
+    """choose a unit vector perpendicular to each input vector.
+
+      normal = v.orth()
+
+    The choice is deterministic but arbitrary: it specifies no preferred direction in
+    the perpendicular plane. Each result keeps the input frame. Use `vector3d.perp`
+    to fit one axis perpendicular to a collection of directions.
+
+    See also
+      vector3d.cross, vector3d.orthProj, vector3d.perp"""
     return self._new(orthKernel(self.data), isNormalized=True)
 
   def perp(self, robust=False):
@@ -866,7 +973,17 @@ class vector3d(MtexArray):
     return N
 
   def eig(self):
-    """the principal axes of the moment matrix and its eigenvalues, vector3d/eig"""
+    """return the eigenvalues and principal axes of the vector moment matrix.
+
+      values, axes = v.eig()
+
+    Flatten the list and form `sum(v_i*v_i.T)`, without normalising vector lengths or
+    reducing crystal symmetry. The three eigenvalues are in ascending order; axes[j]
+    is the corresponding unit eigenvector in the input frame. The first axis is the
+    least represented direction, and the last is the most represented.
+
+    See also
+      vector3d.perp, vector3d.mean"""
     xyz = self.data.reshape(-1, 3)
     w, V = np.linalg.eigh(xyz.T @ xyz)
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)

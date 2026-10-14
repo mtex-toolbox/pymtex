@@ -72,7 +72,16 @@ def _permute(v, perm):
 
 
 def homo2cubo(h):
-  """homo2cubo"""
+  """map equal-volume homochoric coordinates from a ball to the cubochoric cube.
+
+    cubeCoordinates = homo2cubo(ballCoordinates)
+
+  Input and output are numeric arrays with shape (..., 3). Homochoric coordinates are
+  dimensionless and lie inside the ball of radius `(3*pi/4)**(1/3)`. The map preserves
+  volume and sends the origin to the origin.
+
+  See also
+    cubo2homo, rotation.homochoric, rotation.cubochoric"""
   h = np.asarray(h, dtype=float)
   id = cuboRegionId(h)
   w = _permute(h, CUBO_PERM[id])
@@ -93,7 +102,16 @@ def homo2cubo(h):
 
 
 def cubo2homo(c):
-  """cubo2homo"""
+  """map cubochoric coordinates from a cube to the equal-volume homochoric ball.
+
+    ballCoordinates = cubo2homo(cubeCoordinates)
+
+  Input and output are numeric arrays with shape (..., 3). Coordinates are dimensionless.
+  Use the cubochoric domain produced by homo2cubo or rotation.cubochoric; the result lies
+  in the ball of radius `(3*pi/4)**(1/3)`.
+
+  See also
+    homo2cubo, rotation.byCubochoric, rotation.byHomochoric"""
   c = np.asarray(c, dtype=float)
   id = cuboRegionId(c)
   X = _permute(c, CUBO_PERM[id])

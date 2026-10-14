@@ -55,6 +55,12 @@ class S1FunHarmonic(harmonicArithmetic):
         coefficients or the sampled values
     bandwidth - the largest degree L of the series
     dtype - the complex type of the coefficients, complex128 unless given
+  Properties
+    fhat - complex coefficients ordered from Fourier mode -L through L
+    bandwidth - largest Fourier mode L
+    isReal - whether the function is constrained to have real values
+    antipodal - whether f(x+pi)=f(x), read from its coefficients
+    even, odd - boolean symmetry tests under x -> -x
   See also
     S1FunHarmonic.quadrature, S1FunHarmonic.interpolate, S1FunHandle, S1Grid"""
 
@@ -194,32 +200,62 @@ class S1FunHarmonic(harmonicArithmetic):
 
   @property
   def antipodal(self):
-    """f(x) = f(x + pi): the odd modes vanish"""
+    """whether f(x+pi)=f(x), tested by checking that every odd Fourier mode vanishes."""
     return bool(np.all(self.fhat[(self.bandwidth + 1) % 2::2] == 0))
 
   @property
   def even(self):
-    """f(x) = f(-x): c_{-k} = c_k"""
+    """whether f(x)=f(-x), tested from the Fourier coefficients; this is a boolean property, not an even-part projection."""
     return bool(np.allclose(self.fhat, self.fhat[::-1]))
 
   @property
   def odd(self):
-    """whether f(x) = -f(-x): c_{-k} = -c_k"""
+    """whether f(x)=-f(-x), tested from the Fourier coefficients; returns a boolean."""
     return bool(np.allclose(self.fhat, -self.fhat[::-1]))
 
   def truncate(self, L):
-    """the function cut, or padded with zeros, to the bandwidth L"""
+    """return the same circular function represented through Fourier mode L.
+
+      lowPass = f.truncate(8)
+
+    Modes outside -L through L are removed. If L exceeds the current bandwidth, zero
+    coefficients are appended without changing the function. The input is unchanged;
+    requesting its current bandwidth can return the original object.
+
+    Input
+      L - nonnegative integer maximum mode
+    See also
+      S1FunHarmonic.bandwidth"""
     return self if L == self.bandwidth else self._rebuild(_cut(self.fhat, L))
 
   def __call__(self, x):
     return self.eval(x)
 
   def eval(self, x):
-    """the values at the angles x"""
+    """evaluate the Fourier series at angles in radians.
+
+      values = f(angles)
+      values = f.eval(angles)
+
+    The result has the shape of the angle array. The function is periodic with period
+    `2*pi`, so angles outside the principal interval are valid. Real functions return
+    real values; complex functions retain their imaginary part.
+
+    See also
+      S1FunHarmonic, S1FunHarmonic.interpolate"""
     return fourierSeries(self.fhat[::-1], x, real=self.isReal)
 
   def diff(self):
-    """the derivative multiplies c_k by -ik"""
+    """differentiate the circular function with respect to its angle in radians.
+
+      derivative = f.diff()
+
+    For the convention `f(x)=sum(c[k]*exp(-1j*k*x))`, the derivative coefficient is
+    `-1j*k*c[k]`. Return another S1FunHarmonic with the same bandwidth. Evaluate it at
+    angles, or use grad(angles) to evaluate the derivative directly.
+
+    See also
+      S1FunHarmonic.grad, S1FunHarmonic.eval"""
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
     return S1FunHarmonic(-1j * k * self.fhat, real=self.isReal)
 
@@ -242,7 +278,17 @@ class S1FunHarmonic(harmonicArithmetic):
     return self.diff() if x is None else self.diff()(x)
 
   def rotate(self, phi):
-    """the rotation f(x - phi)"""
+    """shift the circular function by an angle in radians.
+
+      shifted = f.rotate(30*degree)
+
+    The result satisfies shifted(x)=f(x-phi), so a peak originally at zero moves to phi.
+    The Fourier coefficients are multiplied by `exp(1j*k*phi)`; the bandwidth is unchanged.
+
+    Input
+      phi - scalar rotation angle in radians
+    See also
+      S1FunHarmonic.eval"""
     k = np.arange(-self.bandwidth, self.bandwidth + 1)
     return S1FunHarmonic(np.exp(1j * k * phi) * self.fhat, real=self.isReal)
 
@@ -558,8 +604,19 @@ def _cut(chat, L):
 
 
 def silvermanWidth(x):
-  """the width of Silverman's rule, on the smaller of the standard deviation and the scaled
-  interquartile range"""
+  """choose a Gaussian smoothing width from the spread and size of a numeric sample.
+
+    sigma = silvermanWidth(angles)
+
+  The scale is the smaller of the sample standard deviation and the interquartile
+  range divided by 1.349, multiplied by an `n**(-1/5)` factor and MTEX's circular-width
+  constant. The result has the units of the input. Fewer than two samples, or a zero
+  spread estimate, give the fallback width of ten degrees in radians.
+
+  Input
+    x - one-dimensional numeric sample; angles must be in radians
+  See also
+    calcDensity, S1GaussKernel"""
   if len(x) < 2:
     return 10 * degree
   q1, q3 = np.quantile(x, 0.25), np.quantile(x, 0.75)

@@ -32,7 +32,13 @@ class SO3FibonacciGrid(orientation):
   fundamental region of the frame pair, searched through the quaternion k-d tree; built by
   superfibonacciSO3Grid
 
-    S3G = superfibonacciSO3Grid(cs, ss, resolution=5*degree)"""
+    S3G = superfibonacciSO3Grid(cs, ss, resolution=5*degree)
+
+  Input
+    rot - rotations of the grid nodes, normally supplied by superfibonacciSO3Grid
+    frameA - crystal reference frame
+    frameB - specimen reference frame
+    resolution - nominal angular node spacing in radians"""
 
   def __init__(self, rot, frameA, frameB, resolution):
     orientation.__init__(self, rot, frameA, frameB)

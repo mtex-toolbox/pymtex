@@ -42,7 +42,11 @@ class variationalFilter(EBSDFilter):
 
 class splineFilter(variationalFilter):
   """the smoothing spline: the field of least |u - f|^2 + alpha |L u|^2, with L the Laplacian
-  of the neighbour graph; one linear system, no iteration"""
+  of the neighbour graph; one linear system, no iteration
+
+  Input
+    smoothingLength - spatial wavelength controlling smoothing; None uses the default length relative to the pixel spacing
+    alpha - dimensionless regularisation weight, overriding smoothingLength"""
 
   def __init__(self, smoothingLength=None, alpha=None):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
@@ -57,7 +61,17 @@ class halfQuadraticFilter(variationalFilter):
   regularisation each quadratic or an absolute value, and an absolute value keeps a step
   where a square blurs it. eps is the difference at which the penalty turns from a square
   into a line, threshold the one above which two neighbours are not smoothed together at
-  all, a subgrain boundary the filter is to leave alone"""
+  all, a subgrain boundary the filter is to leave alone
+
+  Input
+    smoothingLength - spatial wavelength controlling smoothing
+    alpha - dimensionless regularisation weight, overriding smoothingLength
+    l1DataFit - use a robust absolute-value data penalty; default True
+    l1TV - use a robust total-variation penalty; default True
+    threshold - misorientation cutoff in radians above which neighbours are not smoothed together; default 15*degree
+    eps - transition scale between quadratic and absolute-value penalties
+    maxIter - maximum iteration count; default 100
+    tol - angular stopping tolerance in radians; default 0.001*degree"""
 
   def __init__(self, smoothingLength=None, alpha=None, l1DataFit=True, l1TV=True, threshold=15 * degree, eps=1e-3, maxIter=100,
                tol=0.001 * degree):
@@ -118,7 +132,16 @@ class l1TVFilter(halfQuadraticFilter):
 class infimalConvolutionFilter(variationalFilter):
   """the field split into two, u = u1 + u2, one penalised in its differences and one in its
   Laplacian, which keeps both a step and a slope: the infimal convolution of first and
-  second order total variation"""
+  second order total variation
+
+  Input
+    smoothingLength - spatial smoothing scale for the first-order part
+    alpha - dimensionless regularisation weight, overriding smoothingLength
+    beta - regularisation weight for the second-order part; None derives it from the smoothing length
+    threshold - misorientation cutoff in radians; default 15*degree
+    eps - transition scale used to regularise absolute-value penalties
+    maxIter - maximum iteration count; default 20
+    tol - angular stopping tolerance in radians; default 0.001*degree"""
 
   def __init__(self, smoothingLength=None, alpha=None, beta=None, threshold=15 * degree, eps=1e-3, maxIter=20, tol=0.001 * degree):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)

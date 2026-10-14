@@ -54,7 +54,10 @@ class phaseList:
   index 0, so that a phase id is an index into the list
 
     phaseList(cs1, cs2)
-    phaseList(['notIndexed', cs1, cs2])      a string names a not indexed frame"""
+    phaseList(['notIndexed', cs1, cs2])  # a string names a not indexed frame
+
+  Input
+    frames - crystal frames as separate arguments or a list; 'notIndexed' or a notIndexedFrame denotes phase zero"""
 
   def __init__(self, *frames):
     if len(frames) == 1 and isinstance(frames[0], (list, tuple)):

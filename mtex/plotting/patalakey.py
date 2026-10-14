@@ -170,9 +170,8 @@ def _foldDihedral(p, n):
 class PatalaColorKey(orientationColorKey):
   """the misorientation key of Patala, Mason and Schuh for m-3m, m-3, mmm, 4/mmm and 6/mmm
 
-    PatalaColorKey(cs), PatalaColorKey(cs1, cs2), PatalaColorKey(gB) of a grain boundary
-    rgb = key.orientation2color(mori)
-  """
+    PatalaColorKey(cs), PatalaColorKey(cs1, cs2), PatalaColorKey(gB)  # from a grain boundary
+    rgb = key.orientation2color(mori)"""
 
   def __init__(self, x, frameB=None):
     if hasattr(x, "misorientation") and not isinstance(x, orientation):

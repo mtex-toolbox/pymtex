@@ -106,6 +106,14 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     symmetrise - make the coefficients invariant under the group of the frame
     bandwidth - the largest degree of the series
     dtype - the complex type of the coefficients, complex128 unless given
+  Properties
+    fhat - spherical harmonic coefficients in MTEX's public basis
+    bandwidth - largest spherical harmonic degree
+    frame - reference frame carrying the function symmetry
+    CS - alias for the spherical reference frame
+    isReal - whether the function is real-valued
+    antipodal - whether f(v)=f(-v)
+    shape - shape of a list of functions, excluding the coefficient axis
   See also
     S2FunHarmonic.quadrature, S2FunHarmonic.interpolate, S2FunHandle, S2Kernel,
     SO3FunHarmonic, S2FunHarmonicRepresentation"""
@@ -461,7 +469,15 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return self._rebuild(fhat)
 
   def even(self):
-    """the even part, f(v) + f(-v) over two"""
+    """return the even part (f(v)+f(-v))/2 of a spherical function.
+
+      evenPart = f.even()
+
+    Odd harmonic degrees are removed. The result is unchanged by reversal of a direction,
+    which is appropriate when v and -v represent the same axis.
+
+    See also
+      S2FunHarmonic.radon, S2FunHarmonic.symmetrise"""
     return self._rebuild(evenize(self._fhat.copy()), antipodal=True)
 
   # ------------------------------------------------------------------ the algebra
@@ -705,13 +721,33 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return _rotateS2(self, rot)
 
   def conv(self, g):
-    """the convolution with a kernel or another function on the sphere; with a function on the
-    sphere the result is a function on SO(3)"""
+    """convolve a spherical function with a kernel or another spherical function.
+
+      smoothed = f.conv(psi)
+      correlation = f.conv(g)
+
+    A radial kernel multiplies each spherical harmonic degree by its kernel multiplier
+    and returns an S2FunHarmonic. With another S2Fun, convolution compares their relative
+    rotations and returns an SO3FunHarmonic. The result therefore depends on the second
+    argument's domain.
+
+    Input
+      g - S2Kernel, SO3Kernel or spherical function
+    See also
+      SO3FunHarmonic.conv, S2Kernel.conv, S2FunConvolution"""
     from .funops import conv
     return conv(self, g)
 
   def laplace(self):
-    """the Laplace-Beltrami operator applied to the function, the degree l scaled by -l(l+1)"""
+    """apply the spherical Laplace-Beltrami operator.
+
+      laplacian = f.laplace()
+
+    Coefficients of degree l are multiplied by `-l*(l+1)`; the constant mode vanishes.
+    The result is another spherical harmonic function with the same frame and bandwidth.
+
+    See also
+      S2FunHarmonic.grad, S2FunHarmonic"""
     from .funops import laplace
     return laplace(self)
 
@@ -758,7 +794,16 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return radon(self, delta)
 
   def invRadon(self):
-    """the inverse of the Funk transform: the even function whose Funk transform this is"""
+    """invert the Funk transform on the even spherical harmonics.
+
+      reconstructed = poleAverage.invRadon()
+
+    The Funk transform averages over great circles and annihilates every odd degree.
+    This operation divides the even degrees by their nonzero Funk multipliers and
+    returns an even function. Odd information cannot be recovered from great-circle means.
+
+    See also
+      S2FunHarmonic.radon, S2Kernel.radon"""
     from .funops import invRadon
     return invRadon(self)
 

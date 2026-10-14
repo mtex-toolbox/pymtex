@@ -105,7 +105,7 @@ class S2VectorField:
     constant vector
 
       dot(vF, wF)
-      dot(vF, vector3d.Z())"""
+      dot(vF, vector3d.Z)"""
     if isinstance(x, S2VectorField):
       return mapField(np.multiply, self, x, reduce=True, invariant=True)
     return S2VectorFieldHarmonic(self).dot(x)
@@ -528,7 +528,12 @@ class S2VectorFieldHandle(S2VectorField):
   """a vector field on the sphere given by a callable of the directions, the bandwidth a hint for
   its harmonic expansion
 
-    vF = S2VectorFieldHandle(lambda v: v.cross(vector3d.Z()))"""
+    vF = S2VectorFieldHandle(lambda v: v.cross(vector3d.Z))
+
+  Input
+    fun - callable receiving unit vector3d directions and returning one vector per direction
+    frame - referenceFrame of the query directions, or None for frame-free directions
+    bandwidth - harmonic degree used when approximating the callable; default defaultS2Bandwidth preference"""
 
   def __init__(self, fun, frame=None, *, bandwidth=None):
     if isinstance(fun, S2VectorField):

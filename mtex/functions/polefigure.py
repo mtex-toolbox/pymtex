@@ -108,12 +108,45 @@ def _resolutionOf(r):
 # ------------------------------------------------------------------ the container
 
 class PoleFigure:
-  """measured pole figure intensities, one or several pole figures of one specimen
+  """measured pole figure intensities with their crystal and specimen directions
 
-    PoleFigure(h, r, I)                          h a Miller, one or several superposed directions
-    PoleFigure([h1, h23], [r1, r2], [I1, I2])    one pole figure per entry
-    PoleFigure(h, r, I, cs, ss, superposition=c, complete=True)
-  """
+    pf = PoleFigure(h, r, I)
+    pf = PoleFigure([h1, h23], [r1, r2], [I1, I2])
+    pf = PoleFigure(h, r, I, cs, ss, superposition=c, complete=True)
+
+  Each pole figure records intensities for one crystal direction, or for several superposed
+  reflections, at a set of specimen directions. Store several pole figures as parallel lists
+  of crystal directions, specimen directions and intensity arrays. An intensity array must
+  have one value per specimen direction; all pole figures share their crystal and specimen
+  frames.
+
+  By default specimen directions are antipodal axes because diffraction does not distinguish
+  r and -r. Use complete=True for directional measurements that do distinguish them.
+  Index by a pole-figure number to select a reflection, or use a measurement mask to filter
+  its measured directions. Angles and corrections use radians unless stated otherwise.
+
+  Input
+    h - Miller crystal direction or directions contributing to one pole figure;
+        a list supplies one direction set per pole figure
+    r - vector3d specimen directions, or a list of direction sets
+    intensities - numeric intensity array, or a list with one array per pole figure
+    frames - optional crystalFrame and specimenFrame overriding the direction frames
+  Keywords
+    superposition - coefficients for superposed crystal directions, or one coefficient
+        array per pole figure; default equal coefficients summing to one within each figure
+    complete - keep specimen directions oriented rather than antipodal; default False
+  Output
+    pf - PoleFigure data set
+  Properties
+    allH - list of Miller direction sets, one per pole figure
+    allR - list of specimen direction sets
+    allI - list of intensity arrays matching allR
+    c - superposition coefficients for each entry of allH
+    CS, SS - crystal and specimen reference frames
+    numPF - number of pole figures
+    antipodal - whether specimen directions identify r with -r
+  See also
+    loadPoleFigure, calcODF, PoleFigure.normalize, PoleFigure.correct"""
 
   def __init__(self, h, r, intensities, *frames, superposition=None, complete=False):
     cs = next((f for f in frames if isinstance(f, crystalFrame)), None)
@@ -610,11 +643,40 @@ class PoleFigure:
   # ------------------------------------------------------------------ simulation and errors
 
   def calcPoleFigure(self, odf):
-    """the pole figures an ODF predicts on the measured directions"""
+    """recalculate this data set's pole figures from an orientation distribution
+
+      predicted = pf.calcPoleFigure(odf)
+
+    Evaluate the ODF's pole densities for the same crystal reflections, superposition
+    coefficients and specimen directions as pf. The measured intensities are not used in
+    the calculation. Return a PoleFigure that can be compared with the measurement, for
+    example using calcError or calcErrorPF.
+
+    Input
+      odf - SO3Fun orientation distribution
+    Output
+      predicted - PoleFigure containing recalculated intensities
+    See also
+      calcPoleFigure, PoleFigure.calcErrorPF, PoleFigure.calcNormalization"""
     return calcPoleFigure(odf, self.allH, self.allR, superposition=self.c, complete=True)
 
   def calcNormalization(self, other):
-    """the factor the second pole figure is scaled by to carry the mass of the first"""
+    """find intensity scale factors matching a recalculation to the measured pole figures
+
+      scale = pf.calcNormalization(other)
+      scale = pf.calcNormalization(odf)
+
+    For each pole figure, divide the quadrature-weighted mass of pf by that of other.
+    Negative intensities count as zero. A supplied ODF is first recalculated on pf's directions.
+    The factors multiply the recalculated intensities to match the measurement's mass.
+    With PoleFigure input, both data sets must use the same directions and reflection ordering.
+
+    Input
+      other - matching PoleFigure data, or an SO3Fun orientation distribution
+    Output
+      scale - numeric array with one scale factor per pole figure
+    See also
+      PoleFigure.normalize, PoleFigure.mean, PoleFigure.calcPoleFigure"""
     if not isinstance(other, PoleFigure):
       other = self.calcPoleFigure(other)
     out = []
@@ -1110,14 +1172,30 @@ def refine(v):
 # ------------------------------------------------------------------ the defocusing curve
 
 class SchulzDefocusingKernel:
-  """the defocusing of a Bragg-Brentano goniometer (MATLAB SchulzDefocusingKernel): the
-  beam of width r is smeared over the receiving slit of width w at the distance d as the
-  sample tilts by alpha, and the measured intensity drops by the factor the kernel gives
+  """model the intensity correction for defocusing in a tilted Bragg–Brentano measurement
 
     psi = SchulzDefocusingKernel(theta=45*degree, r=1, w=2, d=200, dtheta=0.5*degree)
-    psi.eval(cos(alpha))                     the factor at the tilt alpha
-    psi.defocusing(pf)                       the factor on the specimen directions of a pole figure
-  """
+    factor = psi.eval(np.cos(alpha))
+    factors = psi.defocusing(pf)
+
+  Tilting the specimen spreads the diffracted beam relative to the receiving slit. The
+  returned correction factor is one at zero tilt and increases as intensity is lost;
+  it is infinite at tilts of 90 degrees or greater. Evaluation takes the cosine of the
+  tilt angle, rather than the angle itself. The defocusing method evaluates the factor
+  at the specimen directions of a PoleFigure.
+
+  Input
+    mu_t - absorption parameter retained for compatibility; the current defocusing formula
+        does not use it
+    theta - Bragg angle in radians; default 45*degree
+    r - beam width parameter; default 1
+    w - receiving-slit width parameter; default 2
+    d - specimen-to-slit distance, in the same length unit as r; default 200
+    dtheta - angular broadening parameter in radians; default 0.5*degree
+  Output
+    psi - SchulzDefocusingKernel
+  See also
+    PoleFigure.correct, SchulzDefocusingKernel.eval, SchulzDefocusingKernel.defocusing"""
 
   def __init__(self, mu_t=1.0, theta=45 * degree, r=1.0, w=2.0, d=200.0, dtheta=0.5 * degree):
     self.mu_t, self.theta, self.r, self.w, self.d, self.dtheta = float(mu_t), float(theta), float(r), float(w), float(d), float(dtheta)

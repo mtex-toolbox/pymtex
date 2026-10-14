@@ -99,7 +99,22 @@ def principalComponents(self):
 
 
 def fitEllipse(self):
-  """the ellipse of the same second moments: its centre and its two half axes"""
+  """describe each outline by the ellipse with the same central second area moments
+
+    center, longAxis, shortAxis = grains.fitEllipse()
+
+  The centre is the polygon's area centroid. The two antipodal vector3d axes point along
+  the principal directions in the specimen frame; their lengths are the ellipse's semi-axis
+  lengths, with the longer axis first. Holes subtract from the area moments. This is a moment
+  equivalent ellipse, rather than a least-squares fit to boundary vertices, and its area need
+  not equal the polygon area.
+
+  Output
+    center - vector3d area centroid of every outline
+    longAxis - long semi-axis vectors
+    shortAxis - short semi-axis vectors
+  See also
+    principalComponents, aspectRatio, longAxis, shortAxis"""
   return (self.centroid,) + principalComponents(self)
 
 
@@ -166,19 +181,45 @@ def _spread(values, offsets, lengths):
 # ------------------------------------------------------------------ the parameters
 
 def paris(self):
-  """how much the outline is indented against its convex hull, in percent"""
+  """measure how strongly an outline is indented relative to its convex hull
+
+    p = grains.paris()
+
+  Return `200*(perimeter-hullPerimeter)/hullPerimeter`, in percent, for every outline.
+  Convex outlines give zero; concave outlines give positive values. A hull of zero perimeter
+  returns zero. Results depend on boundary resolution, so compare consistently sampled outlines.
+
+  See also
+    convexity, shapeFactor, hullPerimeter"""
   p, hp = self.perimeter, hullPerimeter(self)
   with np.errstate(divide="ignore", invalid="ignore"):
     return np.where(hp == 0, 0.0, 200 * (p - hp) / hp)
 
 
 def shapeFactor(self):
-  """the perimeter against that of the circle of the same area, one for a circle"""
+  """compare an outline's perimeter with that of a circle of equal area
+
+    factor = grains.shapeFactor()
+
+  Return `perimeter/(2*sqrt(pi*area))`, one value per outline. A circle gives one; elongation
+  or an irregular boundary increases the value. Areas subtract holes and perimeter includes
+  the outline's loops. The ratio is dimensionless and sensitive to boundary resolution.
+
+  See also
+    aspectRatio, convexity, grain2d.equivalentRadius"""
   return self.perimeter / self.equivalentPerimeter
 
 
 def convexity(self):
-  """the area against that of the convex hull, one for a convex outline"""
+  """compare an outline's area with the area of its convex hull
+
+    value = grains.convexity()
+
+  Return area/hullArea for each outline. Convex outlines without holes give one; concavity
+  or holes reduce the ratio. A hull with zero area returns one. The ratio is dimensionless.
+
+  See also
+    paris, hullArea, shapeFactor"""
   a, ha = self.area, hullArea(self)
   with np.errstate(divide="ignore", invalid="ignore"):
     return np.where(ha == 0, 1.0, a / ha)

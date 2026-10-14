@@ -80,7 +80,12 @@ class S2AxisFieldHandle(S2AxisField):
   """an axis field on the sphere given by a function of the directions, with a bandwidth hint
   for its expansion
 
-    aF = S2AxisFieldHandle(lambda v: ..., cs)"""
+    aF = S2AxisFieldHandle(lambda v: ..., cs)
+
+  Input
+    fun - callable receiving unit vector3d directions and returning axis vectors; signs are ignored
+    frame - referenceFrame of the query directions, or None for frame-free directions
+    bandwidth - harmonic degree used when approximating the callable; default defaultS2Bandwidth preference"""
 
   def __init__(self, fun, frame=None, *, bandwidth=None):
     self.fun, self.frame = fun, frame

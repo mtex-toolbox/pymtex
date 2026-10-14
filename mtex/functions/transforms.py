@@ -574,10 +574,33 @@ class _FourierPlan:
 
 
 class SO3FourierPlan(_FourierPlan):
-  """on SO(3): folds says that the function is invariant under those z folds on the two sides:
-  in the forward its coefficients outside them are zero, in the adjoint the projection of H5
-  is about to zero them. Both directions then run on the reduced index set, where the two
-  periodic axes of the array shrink by the folds and the nodes are stretched"""
+  """reusable transform plan for a Wigner series at arbitrary rotations
+
+    plan = SO3FourierPlan(ori, L)
+    values = plan(fhat)
+    coefficients = plan.adjoint(values, weights)
+
+  Evaluation maps internal Wigner coefficients to values at the nodes. The adjoint maps
+  weighted node values to coefficients; for scattered nodes it is an adjoint sum, rather
+  than a least-squares inverse. Reusing a plan avoids rebuilding transform data for each
+  coefficient vector. setNodes updates the query rotations.
+
+  The folds option specifies invariance under rotations about z on the crystal and specimen
+  sides. Coefficients outside those symmetry index sets must vanish; transforms then use
+  the reduced index sets. Public SO3FunHarmonic.fhat coefficients must be converted to the
+  internal convention before using this low-level plan directly.
+
+  Input
+    rots - rotation or orientation nodes
+    L - maximum Wigner degree; coefficient arrays have length deg2dim(L+1)
+    real - use the transform for real-valued functions; default True
+    folds - crystal and specimen z-rotation orders; default (1, 1)
+    eps - requested numerical accuracy; None uses the transform tolerance for the dtype
+    upsampfac - NUFFT oversampling factor; None uses the configured preference
+  Output
+    plan - SO3FourierPlan
+  See also
+    SO3FunHarmonic, SO3GridPlan, wignerSeries"""
 
   # the adjoint on the axes (k, j, l): the halved or folded axis l is the short one
   _adjointAxes = (1, 2, 0)
@@ -632,7 +655,14 @@ class SO3FourierPlan(_FourierPlan):
 
 class S2FourierPlan(_FourierPlan):
   """the NUFFT plan of a spherical harmonic series at arbitrary directions v up to bandwidth L,
-  reusable across coefficient vectors: plan(fhat) evaluates, plan.adjoint(values, weights)"""
+  reusable across coefficient vectors: plan(fhat) evaluates, plan.adjoint(values, weights)
+
+  Input
+    v - vector3d query directions
+    L - maximum spherical harmonic degree; coefficient arrays have length (L+1)**2
+    real - use the transform for real-valued functions; default False
+    eps - requested numerical transform accuracy; None uses the configured tolerance
+    upsampfac - NUFFT oversampling factor; None uses the configured preference"""
 
   def __init__(self, v, L, real=False, eps=None, upsampfac=None):
     v = asVector3d(v)
@@ -680,7 +710,12 @@ class S2FourierPlan(_FourierPlan):
 
 
 class S1FourierPlan:
-  """the circle: f(x) = sum_{k=-L}^{L} c_k e^{ikx}"""
+  """the circle: f(x) = sum_{k=-L}^{L} c_k e^{ikx}
+
+  Input
+    x - one-dimensional array of node angles in radians
+    L - maximum Fourier mode; coefficient arrays have length 2*L+1, ordered -L through L
+    eps - requested numerical transform accuracy; None uses the configured transform tolerance"""
 
   def __init__(self, x, L, eps=None):
     x = np.asarray(x).ravel()
@@ -763,7 +798,12 @@ def _unwrapPolar(X, L):
 
 class SO3GridPlan:
   """the plan of a Wigner series on a Clenshaw-Curtis quadrature grid of SO(3) up to bandwidth L, a
-  sequence of FFTs one axis at a time: plan(fhat) evaluates, plan.adjoint(values, weights)"""
+  sequence of FFTs one axis at a time: plan(fhat) evaluates, plan.adjoint(values, weights)
+
+  Input
+    g - quadratureSO3Grid at which to evaluate the series
+    L - maximum Wigner degree; default the grid bandwidth
+    real - whether the represented function is real-valued; default True"""
 
   def __init__(self, g, L=None, real=True):
     L = g.bandwidth if L is None else int(L)
@@ -841,7 +881,12 @@ class SO3GridPlan:
 
 class S2GridPlan:
   """the sphere: f(theta, rho) = sum G[m, j] e^{i(m rho - j theta)}, theta a transform of length
-  4Lg cut to the grid's rows, rho one of the grid's length, real valued for a real function"""
+  4Lg cut to the grid's rows, rho one of the grid's length, real valued for a real function
+
+  Input
+    g - quadratureS2Grid at which to evaluate the series
+    L - maximum harmonic degree; default the grid bandwidth
+    real - whether the represented function is real-valued; default False"""
 
   def __init__(self, g, L=None, real=False):
     L = g.bandwidth if L is None else int(L)

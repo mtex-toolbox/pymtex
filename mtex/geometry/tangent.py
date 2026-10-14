@@ -42,7 +42,18 @@ def _side(side):
 
 
 def rotationVector(q):
-  """the rotation vector of a rotation at the identity, through atan2 as the angle is"""
+  """convert unit quaternion coefficients to principal rotation vectors.
+
+  Input
+    q - numeric quaternion array of shape (..., 4), scalar coefficient first
+  Output
+    v - array of shape (..., 3); direction is the rotation axis and length is the angle in radians
+
+  The principal angle lies in [0, pi], with opposite quaternion signs identified.
+  The identity maps to the zero vector.
+
+  See also
+    rotationOf, SO3TangentVector"""
   q = np.asarray(q, dtype=float)
   v = q[..., 1:]
   n = np.linalg.norm(v, axis=-1)
@@ -53,7 +64,14 @@ def rotationVector(q):
 
 
 def rotationOf(v):
-  """the rotation of a rotation vector at the identity"""
+  """convert rotation vectors to unit quaternion coefficients.
+
+  Input
+    v - numeric array of shape (..., 3), with vector lengths interpreted as angles in radians
+  Output
+    q - numeric quaternion array of shape (..., 4), scalar coefficient first
+  See also
+    rotationVector, rotation.byAxisAngle"""
   v = np.asarray(v, dtype=float)
   return axis2quat(v, np.linalg.norm(v, axis=-1))
 
@@ -92,11 +110,16 @@ def _frameOf(ref, side):
 
 class SO3TangentVector(vector3d):
   """a tangent vector of SO(3), a rotation vector v at a reference rotation or orientation, on the
-  left, exp(v) * oriRef, or on the right, oriRef * exp(v); from vectors or skew matrices
+  left, `exp(v) * oriRef`, or on the right, `oriRef * exp(v)`; from vectors or skew matrices
 
     SO3TangentVector(v, oriRef)
     SO3TangentVector(v, oriRef, 'right')
-    SO3TangentVector(S, oriRef, side)      from skew matrices of shape (..., 3, 3)"""
+    SO3TangentVector(S, oriRef, side)  # from skew matrices of shape (..., 3, 3)
+
+  Input
+    v - rotation-vector components as vector3d or numeric arrays, or skew-symmetric matrices
+    oriRef - reference rotation or orientation at which the tangent vectors are based
+    side - 'left' for exp(v)*oriRef or 'right' for oriRef*exp(v); default 'left'"""
   _carried = ("antipodal", "isNormalized", "dispStyle", "side", "oriRef")
 
   def __init__(self, v, oriRef, side="left"):
@@ -237,13 +260,31 @@ class SO3TangentVector(vector3d):
   # ------------------------------------------------------------------ the two sides
 
   def left(self):
-    """the vectors on the left side, turned by the reference where they are on the right"""
+    """express the tangent vectors on the left of their reference rotations.
+
+      leftVector = tangent.left()
+
+    Right components are rotated by the reference. For orientations, left components
+    are expressed in the target frame. The reference and represented endpoint stay the same;
+    a vector already on the left is returned directly.
+
+    See also
+      SO3TangentVector.right, SO3TangentVector.exp"""
     if self.side == "left":
       return self
     return self._rebuild(qrot(self.oriRef.data, self.data), side="left")
 
   def right(self):
-    """the vectors on the right side, turned by the inverse reference where they are on the left"""
+    """express the tangent vectors on the right of their reference rotations.
+
+      rightVector = tangent.right()
+
+    Left components are rotated by the inverse reference. For orientations, right components
+    are expressed in the source crystal frame. The reference and represented endpoint stay
+    the same; a vector already on the right is returned directly.
+
+    See also
+      SO3TangentVector.left, SO3TangentVector.exp"""
     if self.side == "right":
       return self
     return self._rebuild(qrot(qconj(self.oriRef.data), self.data), side="right")
@@ -263,7 +304,15 @@ class SO3TangentVector(vector3d):
   # ------------------------------------------------------------------ exp, spin tensor
 
   def exp(self):
-    """the rotation or orientation the vector points to, with the frames of the reference"""
+    """return the rotations reached by the tangent vectors from their references.
+
+      endpoint = tangent.exp()
+
+    The vector length is a rotation angle in radians. A left vector gives `exp(v)*reference`;
+    a right vector gives `reference*exp(v)`. The result keeps the reference type and frames.
+
+    See also
+      quaternion.log, orientation.log, SO3TangentVector.left"""
     q = rotationOf(self.data)
     ref = self.oriRef.data
     return _withRotation(self.oriRef, qmul(q, ref) if self.side == "left" else qmul(ref, q))

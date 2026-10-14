@@ -19,6 +19,7 @@ import numpy as np
 import mtex
 from mtex.geometry._array import MtexArray
 from mtex.functions.halfwidth import selectHalfwidth
+from mtex.geometry.vector3d import classproperty
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
@@ -108,6 +109,8 @@ def writeMatlabPages(site):
 # after the summary is a calling form, and which Python 3.13 strips from __doc__ already: the
 # literal is read from the source, a docstring a factory writes into __doc__ taken as written
 def docOf(obj):
+  if isinstance(obj, classproperty):
+    return docOf(obj.f)
   f = obj if isinstance(obj, property) and obj.__doc__ else unwrap(obj)
   raw = getattr(f, "__doc__", None)
   if not isinstance(raw, str) or not raw.strip():
@@ -149,6 +152,8 @@ def sourceDocstring(f):
 
 # the function behind an attribute: a property by its getter, a static or class method by its function
 def unwrap(obj):
+  if isinstance(obj, classproperty):
+    return obj.f
   if isinstance(obj, property):
     return obj.fget
   return getattr(obj, "__func__", obj)
@@ -204,7 +209,7 @@ def resolve(page):
     if obj is not None and isOurs(obj):
       if unwrap(obj) is mtex.plot and plotImplementation(cls):
         return ("function", plotImplementation(cls), cls)
-      return ("property" if isinstance(obj, property) else "method", obj, cls)
+      return ("property" if isinstance(obj, (property, classproperty)) else "method", obj, cls)
   # a method MATLAB has on the class is a function of the flat namespace here: calcGrains(ebsd)
   # but not a forwarder, norm(x) for x.norm(), which the class does not answer
   if m in NOT_THE_METHOD:
@@ -235,7 +240,7 @@ def catalogue():
         if m.startswith("_") or not isOurs(v) or id(f) in reached or f"{n}.{m}" in pages:
           continue
         if callable(f):
-          pages[f"{n}.{m}"] = ("property" if isinstance(v, property) else "method", v, obj, None)
+          pages[f"{n}.{m}"] = ("property" if isinstance(v, (property, classproperty)) else "method", v, obj, None)
     elif id(obj) not in reached and n not in pages:
       # a documentation page has the name already: SchmidFactor
       pages[f"mtex.{n}" if n in docPages else n] = ("function", obj, None, None)
@@ -254,6 +259,8 @@ class Shown:
 
 
 def shownDefault(v):
+  if isinstance(v, type):
+    return Shown(("np." if v.__module__ == "numpy" else "") + v.__name__)
   if isinstance(v, float) and v not in (0.0,) and np.isfinite(v):
     d = v / mtex.degree
     if abs(d * 2 - round(d * 2)) < 1e-9 and abs(d) < 3600:
@@ -276,7 +283,7 @@ def signature(name, obj):
 # the sections of a docstring, MATLAB's help blocks: a header line of its own, its entries
 # indented two spaces, 'name - text' for Input, Output and Keywords, a continuation indented
 # further
-SECTIONS = ("Input", "Output", "Keywords", "References", "See also")
+SECTIONS = ("Input", "Output", "Keywords", "Properties", "References", "See also")
 
 
 def parseDoc(doc):
@@ -371,6 +378,7 @@ def renderSections(sections, target, link, seeAlso):
       out.append(f"| `{n}` | {d} | {cell(t, link)} |")
     out.append("")
   plain("Output")
+  plain("Properties")
   if "References" in sections:
     out += ["## References", ""] + [f"- {e}" for e in sections["References"]] + [""]
   if "See also" in sections:

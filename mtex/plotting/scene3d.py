@@ -10,7 +10,20 @@ from ..geometry.display import display, sizeString
 
 class mesh3d:
   """polygons over vertices: V (n, 3), the faces as ptr/idx (face k is idx[ptr[k]:ptr[k+1]]),
-  a colour per face (m, 3) in [0, 1] or one colour for all, the face and edge transparency"""
+  a colour per face (m, 3) in [0, 1] or one colour for all, the face and edge transparency
+
+  Input
+    V - array of vertex coordinates with shape (n, 3)
+    ptr - face offsets of length numFaces+1 into idx
+    idx - concatenated zero-based polygon vertex indices
+    faceColor - one RGB triplet or one triplet per face
+    faceAlpha - face opacity from 0 to 1; default 1
+    edgeColor - edge colour; None or 'none' hides edges
+    edgeAlpha - edge opacity from 0 to 1; default 1
+    lineWidth - edge width; default 0.5
+    values - optional scalar face values for the colour bar
+    colormap - optional colour map associated with values
+    colorRange - optional colour-bar range"""
 
   def __init__(self, V, ptr, idx, faceColor, faceAlpha=1.0, edgeColor=(0.0, 0.0, 0.0), edgeAlpha=1.0, lineWidth=0.5,
                values=None, colormap=None, colorRange=None):
@@ -58,7 +71,14 @@ class mesh3d:
 class slices3d:
   """three orthogonal slices of a voxel volume: the colours (nx, ny, nz, 3) in [0, 1], the
   voxels shown (nx, ny, nz), the centre of the first voxel, the steps of the three voxel axes
-  as the rows of D, and the voxel index of each slice, None for a slice not shown"""
+  as the rows of D, and the voxel index of each slice, None for a slice not shown
+
+  Input
+    rgb - voxel RGB array of shape (nx, ny, nz, 3)
+    visible - boolean voxel mask of shape (nx, ny, nz)
+    origin - position of the first voxel centre
+    D - 3-by-3 array of voxel step vectors as rows
+    at - three zero-based slice indices; None entries hide individual slices; omitted at uses middle slices"""
 
   def __init__(self, rgb, visible, origin, D, at=None):
     self.rgb = np.clip(np.asarray(rgb, dtype=float), 0, 1)
@@ -102,7 +122,11 @@ class slices3d:
 class picture3d:
   """a picture on a rectangle in space: RGBA (rows, cols, 4) in [0, 1] with its first row at
   the bottom, and the corners of the rectangle at the bottom left, the bottom right, the top
-  left and the top right; a two dimensional map drawn in the plane it lies in"""
+  left and the top right; a two dimensional map drawn in the plane it lies in
+
+  Input
+    rgba - pixel array of shape (rows, columns, 4) in [0, 1], first row at the bottom
+    corners - four Cartesian corners: bottom left, bottom right, top left, top right"""
 
   def __init__(self, rgba, corners):
     self.rgba = np.clip(np.asarray(rgba, dtype=float), 0, 1)
@@ -117,7 +141,13 @@ class picture3d:
 
 
 class lines3d:
-  """line segments (k, 2, 3), a colour per segment (k, 3) or one for all, their width"""
+  """line segments (k, 2, 3), a colour per segment (k, 3) or one for all, their width
+
+  Input
+    segments - array of shape (n, 2, 3), endpoint coordinates for every segment
+    color - one RGB triplet or one per segment
+    lineWidth - line width; default 1
+    alpha - opacity from 0 to 1; default 1"""
 
   def __init__(self, segments, color=(0.0, 0.0, 0.0), lineWidth=1.0, alpha=1.0):
     self.segments = np.asarray(segments, dtype=float).reshape(-1, 2, 3)
@@ -188,7 +218,12 @@ def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSi
 
 class points3d:
   """markers at positions (k, 3), a colour per marker (k, 3) or one for all, their size in
-  points"""
+  points
+
+  Input
+    P - marker positions of shape (n, 3)
+    color - one RGB triplet or one per marker
+    markerSize - marker size in points; default 6"""
 
   def __init__(self, P, color=(0.0, 0.447, 0.741), markerSize=6.0):
     self.P = np.asarray(P, dtype=float).reshape(-1, 3)
@@ -241,7 +276,11 @@ def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12)
 
 
 class scene3d:
-  """the items of a three dimensional plot and the plotting convention it is seen by"""
+  """the items of a three dimensional plot and the plotting convention it is seen by
+
+  Input
+    how2plot - plottingConvention of the view; None uses the current default
+    scanUnit - spatial unit for the scene; default 'um'"""
 
   def __init__(self, how2plot=None, scanUnit="um"):
     self.items, self.how2plot, self.scanUnit = [], how2plot, scanUnit

@@ -47,19 +47,28 @@ class windowFilter(EBSDFilter):
 
 
 class meanFilter(windowFilter):
-  """the mean of the neighbourhood, the fastest filter and the one that blurs a boundary most"""
+  """the mean of the neighbourhood, the fastest filter and the one that blurs a boundary most
+
+  Input
+    numNeighbours - number of lattice-neighbour rings in the window; default 1"""
   pass
 
 
 class medianFilter(windowFilter):
   """the componentwise median of the neighbourhood, which takes a wild pixel out without
-  pulling the boundary after it"""
+  pulling the boundary after it
+
+  Input
+    numNeighbours - number of lattice-neighbour rings in the window; default 1"""
   pass
 
 
 class KuwaharaFilter(windowFilter):
   """the mean of the most homogeneous of the four quadrants of the window, which smooths within
-  a grain and leaves a step where one is"""
+  a grain and leaves a step where one is
+
+  Input
+    numNeighbours - number of lattice-neighbour rings in the window; default 1"""
   pass
 
 

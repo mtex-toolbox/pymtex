@@ -30,13 +30,18 @@ class sphericalProjection:
   """a projection of the sphere to the plane, restricted to a region and a hemisphere
 
     sphericalProjection(sR, pC, antipodal=False, upper=True)
-    proj.project(v)        the plane coordinates, NaN outside the region
-    proj.iproject(x, y)    the direction drawn at a point of the plane
+    proj.project(v)  # the plane coordinates, NaN outside the region
+    proj.iproject(x, y)  # the direction drawn at a point of the plane
 
   Fields: sR, the region shown; pC, the plotting convention; antipodal, whether v and -v
   are one point; upper, whether the chart shows the hemisphere out of the screen;
   symmetric, whether the data carry the symmetry of the frame, as a function does.
-  """
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; False selects the opposite hemisphere"""
 
   name = "earea"
   symmetric = False
@@ -301,12 +306,24 @@ class sphericalProjection:
 
 
 class eareaProjection(sphericalProjection):
-  """the equal area, Schmidt, projection: r = 2 sin(theta / 2)"""
+  """the equal area, Schmidt, projection: r = 2 sin(theta / 2)
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "earea"
 
 
 class eangleProjection(sphericalProjection):
-  """the equal angle, stereographic, projection: r = tan(theta / 2)"""
+  """the equal angle, stereographic, projection: r = tan(theta / 2)
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "eangle"
 
   @staticmethod
@@ -321,7 +338,13 @@ class eangleProjection(sphericalProjection):
 
 
 class edistProjection(sphericalProjection):
-  """the equidistant projection: r = theta"""
+  """the equidistant projection: r = theta
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "edist"
 
   @staticmethod
@@ -336,7 +359,13 @@ class edistProjection(sphericalProjection):
 
 
 class orthographicProjection(sphericalProjection):
-  """the orthographic projection: r = sin(theta)"""
+  """the orthographic projection: r = sin(theta)
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "orthographic"
 
   @staticmethod
@@ -351,7 +380,13 @@ class orthographicProjection(sphericalProjection):
 
 
 class gnomonicProjection(sphericalProjection):
-  """the gnomonic projection: r = tan(theta), great circles drawn as straight lines"""
+  """the gnomonic projection: r = tan(theta), great circles drawn as straight lines
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "gnomonic"
 
   @staticmethod
@@ -371,7 +406,13 @@ class gnomonicProjection(sphericalProjection):
 
 
 class plainProjection(sphericalProjection):
-  """rho over theta in degrees: the polar angles of the frame itself, no convention"""
+  """rho over theta in degrees: the polar angles of the frame itself, no convention
+
+  Input
+    sR - sphericalRegion to display; None selects the whole sphere before hemisphere restriction
+    pC - plottingConvention defining screen axes; None uses the current default
+    antipodal - identify opposite directions; default False
+    upper - show the hemisphere pointing out of the screen; default True"""
   name = "plain"
 
   @property

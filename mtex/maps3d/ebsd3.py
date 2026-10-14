@@ -60,6 +60,15 @@ class EBSD3(EBSD):
     id - the id of every voxel, by default its position in the list
     isPadding - the mask of the cells a grid adds to close it
     D - 3 x 3 array, the steps of the voxel lattice as rows, instead of inferring them
+  Properties
+    pos - vector3d voxel-centre positions
+    rotations - measured rotation at each voxel
+    phaseId - phase-list index at each voxel, zero for notIndexed
+    CSList - phase metadata and crystal frames
+    shape - voxel-array shape or shape of a scattered selection
+    lattice - voxel grid geometry and spacing
+    isPadding - mask of unmeasured cells introduced by gridding
+    scanUnit - unit of spatial positions
   See also
     EBSD3square, EBSD, voxelLattice, calcGrains, grain3d, EBSD3Analysis"""
 

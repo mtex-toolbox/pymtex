@@ -42,7 +42,12 @@ class boundaryNetwork:
   """the network the smoothing runs on: only the vertices the boundaries use, their neighbours
   in compressed form, and which of them may not move. The pool of vertices a boundary
   indexes into is the whole cell complex, most of which no segment touches; compressing
-  first is what keeps the sparse system the size of the boundary and not of the map"""
+  first is what keeps the sparse system the size of the boundary and not of the map
+
+  Input
+    gBs - grainBoundary networks to smooth together
+    moveTriplePoints - allow triple junction vertices to move; default False
+    moveOuterBoundary - allow outer-boundary vertices to move; default False"""
 
   # the network of one or more boundaries over their shared pool of vertices: a vertex
   # where other than two segments meet is a junction and stays where it is, and so does one
@@ -145,7 +150,11 @@ class laplaceFilter(boundaryFilter):
   the count of iterations is not a physical quantity, the same call on the same sample
   measured at a finer step does something else. The averaging counts the vertex itself with
   the weight of its degree, (2V + Vl + Vr) / 4 for a degree of two, so lambda acts on half
-  the Laplacian and the default of 0.5 is in truth a rate of 0.25"""
+  the Laplacian and the default of 0.5 is in truth a rate of 0.25
+
+  Input
+    iter - number of smoothing steps; default 1
+    lambda_ - smoothing parameter, with each step moving by lambda_/2 towards the neighbour mean; default 0.5"""
 
   def __init__(self, iter=1, lambda_=0.5):
     self.iter, self.lambda_ = int(iter), float(lambda_)
@@ -166,7 +175,12 @@ class taubinFilter(boundaryFilter):
   """smoothing without the shrinking: every smoothing pass is followed by a slightly larger
   unshrinking one with a negative step, so the gain over the pair, (1 - lk)(1 - mk), is
   about one over the low frequencies and the area is given back. This is approximate; the
-  areas move, only not systematically one way (Taubin, SIGGRAPH 1995)"""
+  areas move, only not systematically one way (Taubin, SIGGRAPH 1995)
+
+  Input
+    iter - number of smoothing and unshrinking step pairs; default 5
+    lambda_ - positive smoothing parameter; default 0.5
+    mu - negative unshrinking parameter; default -0.53"""
 
   def __init__(self, iter=5, lambda_=0.5, mu=-0.53):
     self.iter, self.lambda_, self.mu = int(iter), float(lambda_), float(mu)
@@ -205,8 +219,13 @@ class curvatureFilter(_variationalFilter):
   """the smooth boundary as the minimiser of |V - V0|^2 + alpha |L V|^2, where L V is how far
   a vertex sits off the line through its neighbours. There is no iteration count: the
   minimiser is the solution of one sparse system, so the result depends on alpha alone.
-  alpha is stated as a length, the wavelength damped to half amplitude, detail finer than
-  it goes, detail coarser than it stays, which means the same thing at any step size"""
+  smoothingLength specifies the spatial wavelength damped to half amplitude. The weight
+  alpha is derived from this length and the vertex spacing, so the smoothing scale
+  remains comparable between samplings. Supplying alpha overrides that conversion.
+
+  Input
+    smoothingLength - spatial wavelength damped to half amplitude, in the units of the boundary
+    alpha - dimensionless regularisation weight, overriding smoothingLength"""
 
   def __init__(self, smoothingLength=None, alpha=None):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
@@ -227,11 +246,27 @@ class curvatureFilter(_variationalFilter):
 
 
 class huberFilter(_variationalFilter):
-  """the same, with an l1/l2 penalty that leaves a faceted boundary faceted: the quadratic
-  penalty of the curvature filter rounds every corner; the Huber one is quadratic below a
-  threshold and linear above it, so a vertex that turns by more than the threshold is paid
-  for once rather than by its square. It is solved by reweighting the same system until
-  nothing moves; maxIter is a safety limit, not a tuning knob"""
+  """smooth grain boundaries with a Huber curvature penalty that preserves sharp corners
+
+    F = huberFilter(smoothingLength=10, threshold=5*degree)
+    smoothed = grains.smooth(F)
+
+  The penalty is quadratic for small boundary turns and linear for turns above threshold.
+  This reduces small fluctuations while penalising large corners less strongly than
+  curvatureFilter. Reweighted sparse solves minimise the smoothing energy. Fixed network
+  vertices remain fixed; stopping uses tol or the maximum iteration count.
+
+  Input
+    smoothingLength - spatial wavelength controlling smoothing, in boundary coordinate units;
+        defaults to four vertex spacings when alpha is omitted
+    threshold - angular transition threshold in radians; default 5*degree
+    alpha - dimensionless regularisation weight, overriding smoothingLength
+    maxIter - maximum reweighting iterations; default 50
+    tol - maximum vertex movement below which iteration stops, in spatial units; default 1e-4
+  Output
+    F - huberFilter, used by grain and boundary smoothing methods
+  See also
+    curvatureFilter, laplaceFilter, taubinFilter, grain2d.smooth"""
 
   def __init__(self, smoothingLength=None, threshold=5 * degree, alpha=None, maxIter=50, tol=1e-4):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)

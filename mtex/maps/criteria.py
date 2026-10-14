@@ -142,7 +142,11 @@ class gbcAngle(grainBoundaryCriterion):
     gbcAngle(10*degree)
     gbcAngle([10*degree, 2*degree])
     gbcAngle([[10*degree], [15*degree, 2*degree]])  # one per indexed phase
-    gbcAngle(10*degree, byPhase={'Forsterite': 15*degree})"""
+    gbcAngle(10*degree, byPhase={'Forsterite': 15*degree})
+
+  Input
+    threshold - misorientation threshold in radians, a high/low pair, or a per-phase list of thresholds
+    byPhase - dictionary of thresholds keyed by phase name, overriding the common thresholds"""
 
   def __init__(self, threshold=DEFAULT_ANGLE, byPhase=None):
     self.threshold = threshold
@@ -210,7 +214,12 @@ class gbcAngle(grainBoundaryCriterion):
 
 class gbcSoft(grainBoundaryCriterion):
   """a smooth transition instead of a threshold, so a pair near the threshold is joined or
-  not by how far it is from it rather than by which side it fell on"""
+  not by how far it is from it rather than by which side it fell on
+
+  Input
+    threshold - centre angle of the smooth boundary transition in radians; default 10*degree
+    width - angular width of the transition in radians; None uses half the threshold, or the second entry of a threshold/width pair
+    byPhase - dictionary of threshold/width settings keyed by phase name"""
 
   def __init__(self, threshold=10 * degree, width=None, byPhase=None):
     t = _levels(threshold) if not _perPhase(threshold) else (float(threshold[0][0]),)
@@ -247,7 +256,10 @@ class gbcSoft(grainBoundaryCriterion):
 
 class gbcEqual(grainBoundaryCriterion):
   """two measurements belong together when the values of a property agree, which is how a
-  segmentation by variant, by parent grain or by any imported label is done"""
+  segmentation by variant, by parent grain or by any imported label is done
+
+  Input
+    key - name of an EBSD property whose equal labels define connected measurements"""
 
   def __init__(self, key):
     self.key = key
@@ -267,7 +279,12 @@ class gbcEqual(grainBoundaryCriterion):
 class gbcCustom(grainBoundaryCriterion):
   """a criterion given as a function of the map and the two measurement indices, or as a
   per-pixel property, its values or the name of a property of the map, with the largest
-  difference that still counts as one grain, gbcCustom('grainId', 0.5)"""
+  difference that still counts as one grain, gbcCustom('grainId', 0.5)
+
+  Input
+    values - callable of (ebsd, i, j), per-pixel values, or the name of a pixel property
+    threshold - largest allowed difference for values to remain connected; not used for a callable criterion
+    antipodal - treat opposite vectors or axes alike in angular comparisons; default False"""
 
   def __init__(self, values, threshold=None, antipodal=False):
     if callable(values):

@@ -181,7 +181,10 @@ def _orbitBasis(v, alpha, offsets, tol=1e-8):
 
 class embeddingSpec:
   """the recipe of the embedding of a crystal frame: the identity image and the orthonormal
-  basis of the space it moves in, built once per frame"""
+  basis of the space it moves in, built once per frame
+
+  Input
+    CS - crystalFrame whose proper crystal symmetry defines the embedding"""
 
   def __init__(self, CS):
     ls, alpha, weights = _terms(CS)

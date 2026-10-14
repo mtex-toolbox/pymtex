@@ -84,7 +84,11 @@ class trueEbsd:
     job = trueEbsd(imgList, T)
     job.pixelSizeMatch()
     job.calcDistortion('fitErr')
-    job.undistort()"""
+    job.undistort()
+
+  Input
+    imgList - ordered mapImage sequence, from most distorted to the final reference image
+    T - spatialTransform stages for the hops between consecutive images; None leaves the hop list unconfigured"""
 
   def __init__(self, imgList=None, T=None):
     self.imgList = mapImageList()

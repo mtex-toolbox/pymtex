@@ -58,7 +58,12 @@ class voxelLattice:
   and the integer index of every voxel, voxel n at origin + ijk[n] @ D
 
     voxelLattice(origin, D, ijk)
-    voxelLattice.fromPositions(P)"""
+    voxelLattice.fromPositions(P)
+
+  Input
+    origin - Cartesian centre of the voxel with index (0, 0, 0)
+    D - 3-by-3 array of voxel step vectors as rows
+    ijk - integer voxel indices of shape (n, 3); position is origin + ijk @ D"""
 
   def __init__(self, origin, D, ijk):
     self.origin = np.asarray(origin, dtype=float).reshape(3)
