@@ -340,11 +340,19 @@ class orientation(rotation):
     from .symmetryops import orientationUnique
     return orientationUnique(self, tol, symmetry, return_index, return_inverse)
 
-  def mean(self, weights=None, robust=False, iterations=3):
+  def mean(self, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False):
     """the mean orientation, every element moved to the equivalent closest to the running mean
-    before the quaternion mean is taken; weighted, or robust against outliers"""
+    before the quaternion mean is taken; weighted, or robust against outliers.
+    return_projected=True also gives the orientations moved to the equivalents closest to the
+    mean, return_inertia=True the principal moments and axes of inertia of quaternion.mean,
+    in MATLAB's order
+
+      m = mean(ori)
+      m, oriProjected = mean(ori, return_projected=True)
+      m, oriProjected, lam, V = mean(ori, return_projected=True, return_inertia=True)"""
     from .symmetryops import orientationMean
-    return orientationMean(self, weights=weights, robust=robust, iterations=iterations)
+    return orientationMean(self, weights=weights, robust=robust, iterations=iterations,
+                           return_projected=return_projected, return_inertia=return_inertia)
 
   def projectIntoFundamentalRegion(self, ref=None, antipodal=False):
     """the symmetric equivalents in the fundamental region, or those closest to the reference

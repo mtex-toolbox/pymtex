@@ -312,9 +312,14 @@ class quaternion(MtexArray):
     from ..functions.rbfinterpolation import interpSO3
     return interpSO3(self, values, *flags, **kwargs)
 
-  def mean(self, weights=None, robust=False):
+  def mean(self, weights=None, robust=False, return_inertia=False):
     """the mean, the principal eigenvector of the weighted moment matrix; NaN entries left out,
-    robust=True drops the outliers and averages again"""
+    robust=True drops the outliers and averages again; return_inertia=True also gives the
+    principal moments of inertia, the eigenvalues of the moment matrix normalised by the total
+    weight in ascending order, and the principal axes of inertia as four quaternions
+
+      m = mean(q)
+      m, lam, V = mean(q, return_inertia=True)"""
     q = self.data.reshape(-1, 4)
     w = np.ones(q.shape[0]) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
     # an entry that is not a number, a site without an orientation, does not enter
@@ -322,16 +327,18 @@ class quaternion(MtexArray):
     if not np.all(finite):
       q, w = q[finite], w[finite]
     if q.shape[0] == 0:
-      return self._new(np.full(4, np.nan))
-    T = (q * w[:, None]).T @ q
+      m = self._new(np.full(4, np.nan))
+      return (m, np.array([0.0, 0, 0, 1]), quaternion(np.full((4, 4), np.nan))) if return_inertia else m
+    T = (q * w[:, None]).T @ q / np.sum(w)
     vals, vecs = np.linalg.eigh(T)
     m = self._new(vecs[:, -1])
     if robust and q.shape[0] > 4:
       omega = m.angle(self._new(q))
       keep = omega <= np.quantile(omega, 0.8) * 2.5
       if not np.all(keep):
-        return self._new(q[keep]).mean(weights=None if weights is None else w[keep], robust=True)
-    return m
+        return self._new(q[keep]).mean(weights=None if weights is None else w[keep], robust=True,
+                                       return_inertia=return_inertia)
+    return (m, vals, quaternion(vecs.T)) if return_inertia else m
 
   def std(self, weights=None, robust=False):
     """the mean angular deviation from the mean, quaternion/std; for orientations the angle is

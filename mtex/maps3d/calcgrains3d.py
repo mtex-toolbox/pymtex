@@ -33,7 +33,12 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   culls smaller grains. A map of the plane also takes alpha, the bound of its decomposition,
   removeQuadruplePoints, mcl and fmc for Markov and fast multiscale clustering; a map of
   volumes grainId, the grains its file stored, a map of the plane too. The map is changed: it keeps the
-  grain ids, the pixels the minPixel cull drops and the notIndexed pixels the grains absorb"""
+  grain ids, the pixels the minPixel cull drops and the notIndexed pixels the grains absorb, so
+  MATLAB's second output is the map passed; run on ebsd.copy() to keep the map as it was
+
+    grains = calcGrains(ebsd)
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    grains = calcGrains(ebsd['indexed'], criterion=gbc)"""
   # calcGrains(ebsd, 'grainId'): MATLAB's flag
   if isinstance(angle, str) and angle == "grainId":
     angle, grainId = DEFAULT_ANGLE, True

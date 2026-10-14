@@ -337,3 +337,11 @@ def test_xyz_readsAVectorAndAPlainTriple():
 def test_joinStyle_takesTheIndicesOfTheFirstUnlessItHasNone():
   from mtex.geometry.vector3d import _joinStyle
   assert _joinStyle("hkl", "uvw") == "hkl" and _joinStyle("xyz", "uvw") == "uvw" and _joinStyle("hkl", "xyz") == "hkl"
+
+
+def test_mean_projectedCrystalDirectionsAreTheEquivalentsClosestToTheMean():
+  from mtex import Miller, crystalFrame, mean
+  h = Miller(np.random.default_rng(4).normal(size=(20, 3)), crystalFrame("m-3m"), "uvw")
+  m, hp = mean(h, return_projected=True)
+  assert np.allclose(angle(hp, h), 0, atol=1e-7)
+  assert np.allclose(angle(hp, m, symmetry=False), angle(h, m), atol=1e-7)

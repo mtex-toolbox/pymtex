@@ -517,7 +517,8 @@ class EBSD:
 
   @classmethod
   def load(cls, fname, *args, **kwargs):
-    """EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one"""
+    """EBSD.load('map.ang'): the map a file holds, read by the interfaces layer above this one;
+    the interface and the options MATLAB returns besides are what inspectEBSD reports"""
     from ..io.load import loadEBSD
     return loadEBSD(fname, *args, **kwargs)
 

@@ -411,3 +411,12 @@ def test_defaultFrames_fillsTheTrivialCrystalAndTheDefaultSpecimen():
   from mtex.geometry.orientation import _defaultFrames
   cs = crystalFrame("m-3m")
   assert _defaultFrames([cs]) == (cs, specimenFrame.default) and _defaultFrames([], "432")[0].pointGroup == "432"
+
+
+def test_mean_projectedAreTheEquivalentsClosestToTheMean():
+  cs = crystalFrame("m-3m")
+  ori = orientation.rand(40, cs, rng=np.random.default_rng(3))
+  m, p, lam, V = ori.mean(return_projected=True, return_inertia=True)
+  assert np.allclose(angle(p, ori), 0, atol=1e-7)
+  assert np.allclose(angle(p, m, symmetry=False), angle(ori, m), atol=1e-7)
+  assert lam.shape == (4,) and V.shape == (4,)

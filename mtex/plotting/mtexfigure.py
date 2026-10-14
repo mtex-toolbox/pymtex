@@ -363,7 +363,8 @@ def _freshAxes(figSize=None, default=(5.5, 5.5)):
 
 
 def newMtexFigure(n=1, **kwargs):
-  """a new mtexFigure laid out for n axes
+  """a new mtexFigure laid out for n axes; it is always new, so MATLAB's second output, whether
+  it is, has no counterpart
 
     newMtexFigure(4, figSize='large')"""
   return mtexFigure(n, **kwargs)

@@ -74,3 +74,10 @@ def test_every_page_says_what_it_is(pages):
   empty = sorted({n for n, e in pages.items() if not ref.docOf(e[1])
                   and getattr(ref.unwrap(e[1]), "__name__", "") not in ref.OPERATOR_FORMS})
   assert not empty, empty
+
+
+def test_a_class_plot_page_shows_what_plot_draws_it_with():
+  assert all(ref.plotImplementation(getattr(mtex, c)) for c in ref.PLOT)
+  assert ref.resolve("EBSD.plot")[1].__name__ == "plotEBSD"
+  # a class with a plot of its own keeps it
+  assert ref.resolve("EBSD3.plot")[1] is mtex.EBSD3.plot

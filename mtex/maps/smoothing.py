@@ -279,7 +279,12 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
   the straightened runs and means something else. Both change how many segments there are,
   and a simplified segment no longer runs between one pair of pixels, so switch them off
   where ebsdId is read per segment. Smoothing happens in the plane of the map, where the
-  vertices already are"""
+  vertices already are. iter is the number of iterations or the boundaryFilter to apply, so
+  MATLAB's second output, the filter used, is the one passed or laplaceFilter(iter)
+
+    grains = smoothBoundary(grains)
+    grains = smoothBoundary(grains, 5, moveTriplePoints=True)
+    grains = smoothBoundary(grains, laplaceFilter(5), simplify=False)"""
   F = iter if isinstance(iter, boundaryFilter) else laplaceFilter(iter)
   if grains.boundary is None or grains.boundary.isempty:
     return grains

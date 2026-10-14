@@ -651,12 +651,18 @@ class vector3d(MtexArray):
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._new(np.sum(self.data, axis=axis), **self._joined(None))
 
-  def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True):
+  def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True, return_projected=False):
     """the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
-    largest principal axis of the moment matrix"""
+    largest principal axis of the moment matrix; crystal directions are first moved to the
+    equivalents closest to the mean, which return_projected=True also gives (MATLAB's mSym)
+
+      m = mean(v)
+      m, vProjected = mean(h, return_projected=True)"""
     if symmetry and self.isCrystalDirection and self._frame.numSym() > 1 and self.size > 1:
       from .symmetryops import symMean
-      return symMean(self, weights=weights)
+      return symMean(self, weights=weights, return_projected=return_projected)
+    if return_projected:
+      return self.mean(weights=weights, antipodal=antipodal, robust=robust, axis=axis, symmetry=symmetry), self
     if robust and self.size > 4:
       m = self.mean(weights=weights, antipodal=antipodal)
       omega = m.angle(self)
@@ -717,8 +723,9 @@ class vector3d(MtexArray):
     return expVector(self, ref, side)
 
   def symmetrise(self, unique=False, antipodal=None):
-    """the symmetrically equivalent directions, the number of distinct ones, and the
-    representative in the fundamental sector of the frame"""
+    """the symmetrically equivalent directions, numSym x shape, or the distinct ones of one
+    direction with unique=True; MATLAB's second output, the multiplicity, is v.multiplicity(),
+    its third the rotations of the frame, v.frame.rotations()"""
     from .symmetryops import symmetrise
     return symmetrise(self, unique=unique, antipodal=antipodal)
 

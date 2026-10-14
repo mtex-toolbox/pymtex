@@ -51,6 +51,27 @@ OPERATOR_FORMS = {"__add__": ("a + b", "the sum"), "__radd__": ("b + a", "the su
                   "__setitem__": ("a[ind] = b", "the elements selected by ind replaced"), "__call__": ("f(x)", "the evaluation at x"),
                   "__len__": ("len(a)", "the length of the first axis")}
 
+# the function plot hands each class to, shown on that class's plot page: the generic plot
+# chooses by isinstance, its own docstring lists the forms
+PLOT = {"EBSD": "mapplot.plotEBSD", "grain2d": "mapplot.plotGrains", "grainBoundary": "mapplot.plotBoundary",
+        "triplePointList": "mapplot.plotTriplePoints", "mapImage": "mapplot.plotMapImage",
+        "ODFSections": "sectionplot.plotSections", "PoleFigure": "polefigureplot._plotPoleFigure",
+        "S1FunHarmonic": "polarplot.plotS1", "S1FunHandle": "polarplot.plotS1", "shape2d": "polarplot.plotShape",
+        "crystalShape": "shapeplot.plotShape", "plane3d": "shapeplot.plotPlane", "orientationRegion": "spaceplot.plot3d",
+        "sphericalRegion": "sphericalplot.plotRegion", "planarColorKey": "planarkey.plotPlanarKey",
+        "SO3Fun": "sectionplot.plotSection", "referenceFrame": "sphericalplot.plotSymmetry"}
+
+
+# the implementation plot uses for a class, or None
+def plotImplementation(cls):
+  import importlib
+  for c in cls.__mro__:
+    if c.__name__ in PLOT:
+      mod, name = PLOT[c.__name__].split(".")
+      return getattr(importlib.import_module(f"mtex.plotting.{mod}"), name)
+  return None
+
+
 # MATLAB methods of the language, not the mathematics, which Python has by NumPy's means
 PLUMBING = set("""subsasgn subSet setSubSet numArgumentsFromSubscript end numel length size ndims isempty
 isscalar loadobj saveobj copy delete display disp char dispLine dispData repmat reshape permute squeeze
@@ -131,12 +152,14 @@ def resolve(page):
     if cand == "T" and obj is not inspect.getattr_static(MtexArray, "T"):
       continue
     if obj is not None and isOurs(obj):
+      if unwrap(obj) is mtex.plot and plotImplementation(cls):
+        return ("function", plotImplementation(cls), cls)
       return ("property" if isinstance(obj, property) else "method", obj, cls)
   # a method MATLAB has on the class is a function of the flat namespace here: calcGrains(ebsd)
   # but not a forwarder, norm(x) for x.norm(), which the class does not answer
   obj = getattr(mtex, m, None) or lookup(renamed(m) or "_")
   if callable(obj) and not inspect.isclass(obj) and isOurs(obj) and not hasattr(obj, "forwardsTo"):
-    return ("function", obj, cls)
+    return ("function", plotImplementation(cls) if obj is mtex.plot and plotImplementation(cls) else obj, cls)
   return None
 
 
@@ -274,6 +297,9 @@ def render(name, entry, pages, calls, owners):
 
   # the name a function is called by: plotx2north is plottingConvention.default
   called = getattr(obj, "__name__", None) or renamed(name) or name
+  # what plot hands a class to is called as plot
+  if cls is not None and obj is plotImplementation(cls):
+    called = "plot"
   title = f"The class {obj.__name__}" if kind == "class" else name
   doc = docOf(obj)
   lines = [f"# {title}", ""]
@@ -296,7 +322,8 @@ def render(name, entry, pages, calls, owners):
     lines += [docBody(rest, link), ""]
   if kind == "class":
     lines += members(obj, pages)
-  used = usedOn(member or called.split(".")[-1], cls if member else None, calls, owners)
+  # a call of plot does not say what it draws
+  used = [] if called == "plot" else usedOn(member or called.split(".")[-1], cls if member else None, calls, owners)
   if used:
     lines += ["## Used on", "", ", ".join(f"[{p}]({p}_py.html)" for p in used[:12]), ""]
   if matlab:

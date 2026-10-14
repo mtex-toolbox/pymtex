@@ -143,15 +143,18 @@ def symUnique(v, tol=1e-6, return_index=False, return_inverse=False):
   return _uniqueOutput(v._new(v.data.reshape(-1, 3)[iv]), iv, iu, return_index, return_inverse)
 
 
-def symMean(v, weights=None, iterations=3):
+def symMean(v, weights=None, iterations=3, return_projected=False):
   """the mean of crystal directions: every element is moved to the equivalent closest to the
-  running mean before the vector mean is taken"""
+  running mean before the vector mean is taken; return_projected also gives the equivalents
+  closest to the mean"""
   m = v.flatten()[0]
   xs = v.flatten()
   for _ in range(iterations):
     proj = projectIntoFundamentalRegion(xs, center=m.normalize())
     m = vector3d.mean(proj, weights=weights, symmetry=False)
-  return v._new(m.data)
+  if not return_projected:
+    return v._new(m.data)
+  return v._new(m.data), v._new(projectIntoFundamentalRegion(xs, center=m.normalize()).data.reshape(v.data.shape))
 
 
 # ------------------------------------------------------------------ orientations
@@ -318,9 +321,10 @@ def orientationUnique(o, tol=1e-3, symmetry=True, return_index=False, return_inv
   return _uniqueOutput(o._new(o.data.reshape(-1, 4)[iv]), iv, iu, return_index, return_inverse)
 
 
-def orientationMean(o, weights=None, robust=False, iterations=3):
+def orientationMean(o, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False):
   """the mean orientation: every element is moved to the equivalent closest to the running mean
-  before the quaternion mean is taken (orientation/mean)"""
+  before the quaternion mean is taken (orientation/mean); return_projected also gives those
+  equivalents closest to the mean, return_inertia the moments and axes of inertia"""
   from .quaternion import quaternion
   q = o.data.reshape(-1, 4)
   # a site without an orientation does not enter
@@ -334,8 +338,16 @@ def orientationMean(o, weights=None, robust=False, iterations=3):
   m = q[0]
   for _ in range(iterations):
     moved = closestToRef(q, m, L, R, o.antipodal)
-    m = quaternion.mean(quaternion(moved), weights=weights, robust=robust).data
-  return o._new(m)
+    m, lam, V = quaternion.mean(quaternion(moved), weights=weights, robust=robust, return_inertia=True)
+    m = m.data
+  out = (o._new(m),)
+  if return_projected:
+    projected = np.full(o.data.reshape(-1, 4).shape, np.nan)
+    projected[finite] = closestToRef(q, m, L, R, o.antipodal)
+    out += (o._new(projected.reshape(o.data.shape)),)
+  if return_inertia:
+    out += (lam, V)
+  return out if len(out) > 1 else out[0]
 
 
 def axisFrame(o):

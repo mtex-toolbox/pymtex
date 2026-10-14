@@ -604,7 +604,13 @@ class tensor(MtexArray):
   # ------------------------------------------------------------------ lists
 
   def mean(self, *args, weights=None, **kwargs):
-    """the mean over the list, weighted or not; with an ODF the texture average"""
+    """the mean over the list, weighted or not; with an ODF or orientations the texture average
+    (calcTensor). MATLAB's three outputs, the Voigt, Reuss and Hill means, are asked for by name
+
+      T.mean()
+      TReuss = T.mean('Reuss')
+      TVoigt, TReuss, THill = T.mean('all')
+      T.mean(odf)"""
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)

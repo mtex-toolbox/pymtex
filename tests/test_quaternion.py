@@ -377,3 +377,12 @@ def test_rand_within_a_maximum_angle_follows_the_haar_measure():
   t = np.linspace(0, 12 * degree, 2001)
   expected = np.trapezoid(t * (1 - np.cos(t)), t) / np.trapezoid(1 - np.cos(t), t)
   assert abs(np.mean(w) - expected) < 0.05 * degree
+
+
+def test_mean_inertiaIsTheEigensystemOfTheNormalisedMomentMatrix():
+  # MATLAB's lambda and V: ascending moments summing to one for unit quaternions, the last axis the mean
+  q = rotation.rand(30, rng=rng())
+  m, lam, V = q.mean(return_inertia=True)
+  T = q.data.T @ q.data / 30
+  assert np.allclose(np.sort(np.linalg.eigvalsh(T)), lam) and np.isclose(lam.sum(), 1)
+  assert np.allclose(T @ V.data.T, V.data.T * lam) and abs(abs(np.dot(V.data[-1], m.data)) - 1) < 1e-12

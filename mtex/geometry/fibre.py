@@ -212,7 +212,8 @@ class fibre:
   # ------------------------------------------------------------------ symmetry
 
   def symmetrise(self, unique=False):
-    """the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones"""
+    """the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones;
+    MATLAB's second output, their number, is f.multiplicity()"""
     L, R = reductionGroups(self.o1)
     nL, nR = len(L), len(R)
     o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), qconj(R)[None, :, None, :])
