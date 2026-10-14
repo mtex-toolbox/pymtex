@@ -366,8 +366,28 @@ class SO3TangentVector(vector3d):
     return self._rebuild(np.sum(self.data * w[..., None], axis=axis) / np.sum(w, axis=axis), ref)
 
   def unique(self, tol=1e-6, return_index=False, return_inverse=False, **kwargs):
-    """the distinct tangent vectors at one shared reference up to a tolerance, in order of first
-    appearance; with return_index and return_inverse the index maps as well"""
+    """the disjoint list of tangent vectors at one shared reference
+
+      u = unique(v)                                           # one of each
+      u = unique(v, tol=1e-3)                                 # a coarser tolerance
+      u, iv, iu = unique(v, return_index=True, return_inverse=True)  # the index maps
+
+    Two tangent vectors are one when their components agree to tol after rounding to multiples
+    of it. The vectors must share one reference and one side, which the result keeps. The
+    order is that of first appearance, where MATLAB sorts unless 'stable' is given.
+
+    Input
+      v - SO3TangentVector
+    Output
+      u - SO3TangentVector, a one-dimensional list at the reference of v
+      iv - indices with u = v.flatten()[iv]
+      iu - indices with v.flatten() = u[iu]
+    Keywords
+      tol - the tolerance in the components, in radians
+      return_index - also return iv
+      return_inverse - also return iu
+    See also
+      vector3d.unique, orientation.unique, orientation.log"""
     ref = self._oneReference()
     out = vector3d(self.data).unique(tol=tol, stable=True, return_index=True, return_inverse=True)
     return _uniqueOutput(self._rebuild(out[0].data, ref), out[1], out[2], return_index, return_inverse)

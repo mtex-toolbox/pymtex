@@ -128,9 +128,36 @@ def _finish(gB, keep, keepGrains):
 # ------------------------------------------------------------------ the two policies
 
 def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
-  """keep every n-th vertex along each chain, whatever the shape: it thins a straight run and
-  a corner alike, so prefer simplify, which spends its vertices where the shape
-  needs them"""
+  """the boundary coarsened by keeping every n-th vertex along each chain, whatever the shape;
+  MATLAB's grainBoundary.reduce
+
+    gB = gB.reduce()                           # every second vertex
+    gB = gB.reduce(4)                          # every fourth vertex
+    gB = gB.reduce(2, protect=vertexIds)       # these vertices kept as well
+    gB = gB.reduce(2, keepGrains=grains.id)    # no grain of the list collapsed
+
+  The vertices between the kept ones are dissolved and their segments merged, so the
+  boundary stays connected and keeps its length up to the straightening of the dissolved
+  corners. The junctions, the ends of the chains, and the vertices where the pair of grains
+  changes always stay, so which grains touch, and where, is unchanged. A closed chain keeps
+  at least three vertices. A merged segment inherits grainId, ebsdId and misrotation from
+  the last segment of its run, and its ebsdId says it runs between no one pair of pixels.
+
+  It thins a straight run and a corner alike; simplify spends the vertices where the shape
+  needs them and is mostly the better choice.
+
+  Input
+    gB - grainBoundary
+  Output
+    gB - grainBoundary, the coarsened boundary
+  Keywords
+    n - keep every n-th vertex along each chain; 1 or less leaves the boundary as it is
+    protect - the ids of the vertices that must stay, on top of the junctions
+    keepGrains - the ids of the grains that must keep a polygon: a grain that would be left
+        with fewer than three vertices is not coarsened at all; MATLAB does this for every
+        grain, grain2d.reduceBoundary passes all of them
+  See also
+    grainBoundary.simplify, grainBoundary.refine, grain2d.reduceBoundary, smoothBoundary"""
   if gB.isempty or n <= 1:
     return gB
   starts = np.flatnonzero(gB.isChainStart)
@@ -140,10 +167,37 @@ def reduceBoundary(gB, n=2, protect=None, keepGrains=None):
 
 
 def simplifyBoundary(gB, epsilon=None, protect=None, keepGrains=None):
-  """drop the vertices that carry no shape, chain by chain: a vertex goes when leaving it out
-  moves the boundary by less than epsilon, which on a pixel grid turns a staircase into the
-  straight line it approximates. The default tolerance is exactly that: a staircase of
-  spacing d never strays further than d / sqrt(2) from the line it approximates"""
+  """the boundary with the vertices dropped that carry no shape, Douglas-Peucker chain by chain;
+  MATLAB's grainBoundary.simplify
+
+    gB = gB.simplify()                           # the pixel staircase straightened
+    gB = gB.simplify(0.5)                        # a tolerance of 0.5 map units
+    gB = gB.simplify(protect=vertexIds)          # these vertices kept as well
+    gB = gB.simplify(keepGrains=grains.id)       # no grain of the list collapsed
+
+  A vertex is dropped when leaving it out moves the boundary by less than epsilon, so many
+  vertices go along a straight run and none at a corner; on a pixel grid this turns a
+  staircase into the straight line it approximates. The junctions, the ends of the chains,
+  always stay, so which grains touch, and where, is unchanged; a closed chain keeps at least
+  three vertices. The dropped vertices' segments are merged as by reduce.
+
+  The default tolerance is the median segment length over sqrt(2): a staircase of spacing d
+  never strays further than d / sqrt(2) from the line it approximates, the worst case being a
+  boundary at 45 degree, so it removes the grid and nothing else.
+
+  Input
+    gB - grainBoundary
+  Output
+    gB - grainBoundary, the simplified boundary
+  Keywords
+    epsilon - the tolerance in the units of the map, how far the boundary may move; 0 leaves
+        the boundary as it is, by default the median segment length over sqrt(2)
+    protect - the ids of the vertices that must stay, on top of the junctions
+    keepGrains - the ids of the grains that must keep a polygon: a grain smaller than epsilon
+        would lose all its vertices and is not coarsened at all; MATLAB does this for every
+        grain, grain2d.simplifyBoundary passes all of them
+  See also
+    grainBoundary.reduce, grainBoundary.refine, grain2d.simplifyBoundary, smoothBoundary"""
   if gB.isempty:
     return gB
   if epsilon is None:

@@ -30,12 +30,33 @@ BANDWIDTH = 62
 
 
 def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
-  """calcGBNDKernel(halfwidth=10*degree, nonneg=True): the kernel Psi of the inclination, a
-  function of the cosine to the trace, normalised so that a uniform distribution of planes
-  gives one, and the spherical function psi(v) = Psi(v.z) sin(angle(v, x)) it is applied as;
-  without nonneg or bump Psi is the solution of the integral equation that makes the density
-  of the normals the de la Vallee Poussin kernel of that halfwidth, or the S2Kernel given
-  in its place"""
+  """the kernel of the inclination of a boundary plane about its trace, the one calcGBND
+  convolves with
+
+    Psi, psi = calcGBNDKernel()                        # the kernel of halfwidth 10 degree
+    Psi, psi = calcGBNDKernel(5*degree, nonneg=True)   # a nonnegative kernel of another halfwidth
+    Psi, psi = calcGBNDKernel(S2DeLaValleePoussinKernel(halfwidth=10*degree))  # the kernel for a given density kernel
+
+  A trace in a section leaves the inclination of the plane open. Psi is a function of the
+  cosine t between a normal and the trace, and psi(v) = Psi(v.z) sin(angle(v, x)) is the
+  spherical function it is applied as, for a trace along z in a section with normal x. Both
+  are normalised so that a uniform distribution of planes gives one.
+
+  By default Psi solves the integral equation that makes the density of the normals the de
+  la Vallee Poussin kernel of the halfwidth, or the S2Kernel given in its place; that
+  solution may be negative. nonneg takes a Gaussian in t instead, bump the indicator of
+  |t| < sin(halfwidth).
+
+  Output
+    Psi - S2Kernel, or S2KernelHandle with nonneg or bump, the kernel of the inclination
+    psi - S2FunHarmonic, the spherical function of a trace along z, antipodal
+  Keywords
+    halfwidth - the halfwidth of the kernel, or an S2Kernel, the density of the normals the
+        kernel of the inclination is to give
+    nonneg - a nonnegative kernel, a Gaussian in the cosine to the trace
+    bump - a bump kernel, one within the halfwidth and zero outside
+  See also
+    calcGBND, S2DeLaValleePoussinKernel"""
   from scipy.integrate import quad
   from scipy.special import ellipe
   if nonneg:
@@ -144,10 +165,56 @@ def _qangle(a, b):
 
 
 def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump=False, oneSide=False):
-  """calcGBND(gB, ebsd, halfwidth=5*degree, nonneg=True): the density of the boundary normals in
-  the crystal frame of the one phase of gB; calcGBND(gB, grains, moriRef, ...) the density
-  of the normals of the boundaries near that misorientation, the grain boundary character
-  distribution, taking both sides of a relation that is its own inverse unless oneSide"""
+  """the grain boundary normal distribution in the crystal frame, estimated from the traces of
+  the boundaries in a planar section; with a misorientation the grain boundary character
+  distribution
+
+    gbnd = calcGBND(gB, ebsd)                          # the normals from the orientations of the pixels
+    gbnd = calcGBND(gB, grains)                        # the normals from the mean orientations of the grains
+    gbnd = calcGBND(gB, ebsd, halfwidth=5*degree, nonneg=True)  # a smaller halfwidth, a nonnegative kernel
+    gbcd = calcGBND(gB, grains, moriRef)               # the character distribution of one misorientation
+    gbcd = calcGBND(gB, grains, moriRef, oneSide=True) # only the first side of a symmetric relation
+
+  A section shows of every boundary only its trace, a direction in the plane of the map; the
+  plane itself may be inclined about it at any angle. The orientations on the two sides turn
+  each trace into the crystal frame, and a kernel that integrates over the unknown inclination
+  spreads it to the normals it is compatible with. Summed over many boundaries, weighted by
+  their lengths, this gives the density of the boundary normals in the crystal frame, an
+  axial function normalised so that a uniform distribution of planes is one.
+
+  The boundaries must hold one pair of phases, gB['Magnesium', 'Magnesium'] for instance.
+  With an EBSD map the orientations on either side are those of the pixels gB.ebsdId names,
+  which is meaningful only while every segment still lies between two pixels: smooth with
+  smoothBoundary(grains, simplify=False, refine=False) before, or pass the grains, whose mean
+  orientations are used.
+
+  With a misorientation moriRef only the boundaries near it are kept, weighted by their
+  distance to it, and their normals are given in the crystal frame of its first side: the
+  grain boundary character distribution of that misorientation. A relation that is its own
+  inverse, a twin, takes both sides of every boundary, unless oneSide.
+
+  Input
+    gB - grainBoundary, the boundaries of one pair of phases
+    source - EBSD, the map the boundaries were computed from, or grain2d, the grains
+    moriRef - orientation, the misorientation of the character distribution
+  Output
+    gbnd - S2FunHarmonic, antipodal, in the crystal frame of the phase, or of the first side
+        of moriRef
+  Keywords
+    halfwidth - the halfwidth of the density estimation, of the kernel in the normals, and,
+        with moriRef, how far a misorientation may lie from it
+    nonneg - a nonnegative kernel of the inclination, a Gaussian in the cosine to the trace,
+        instead of the solution of the integral equation, which may ring and be negative
+    bump - a bump kernel of the inclination, constant within the halfwidth
+    oneSide - with a moriRef that is its own inverse, take only the first side of every
+        boundary
+  References
+    D.M. Saylor, G.S. Rohrer, Determining crystal habits from observations of planar
+        sections, J. Am. Ceram. Soc. 85 (2002) 2799-2804
+    R. Hielscher, R. Kilian, E. Wünsche, Efficient computation of the grain boundary normal
+        distribution from two dimensional EBSD data, not yet published
+  See also
+    calcGBNDKernel, grain3Boundary.calcGBND, smoothBoundary, BoundaryNormalDistribution"""
   both = False
   dSym = None
   if moriRef is not None:

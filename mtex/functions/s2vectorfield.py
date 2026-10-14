@@ -180,12 +180,38 @@ class S2VectorField:
 
 class S2VectorFieldHarmonic(S2VectorField):
   """a vector field on the sphere by the spherical harmonic expansions of its three Cartesian
-  components, projected onto the fields equivariant under the frame's group
+  components
 
-    vF = S2VectorFieldHarmonic(fhat, cs)
-    vF = S2VectorFieldHarmonic(fun, bandwidth=16)          a callable of the directions
-    vF = S2VectorFieldHarmonic(v, values, weights=w)      vectors at directions, by quadrature
-    vF = S2VectorFieldHarmonic([fx, fy, fz])               the component functions"""
+    vF = S2VectorFieldHarmonic(lambda v: v.cross(vector3d.Z), bandwidth=16)  # a callable of the directions
+    vF = S2VectorFieldHarmonic(v, w, weights=wq)                    # vectors at directions, by quadrature
+    vF = S2VectorFieldHarmonic([sFx, sFy, sFz])                     # the component functions
+    vF = S2VectorFieldHarmonic(fhat, cs)                            # the coefficients, (L+1)^2 x 3
+    vF = S2VectorFieldHarmonic(sF.grad())                           # the expansion of another field
+    vF = S2VectorFieldHarmonic.quadrature(lambda v: v.cross(vector3d.Z))  # MATLAB's form
+
+  A callable is evaluated on a quadrature grid of the bandwidth and expanded; vectors w at
+  directions v are expanded with the quadrature weights given, equal ones by default, which
+  suits directions spread evenly; two component functions leave z zero. The field is
+  projected onto the fields equivariant under the group of the frame, which a crystal frame
+  asks for, unless symmetrise=False. vF.x, vF.y, vF.z are the components, vF.bandwidth the
+  largest degree.
+
+  Input
+    fun - callable taking a vector3d and returning vector3d, or an S2VectorField
+    v - vector3d, the directions of given vectors
+    w - vector3d, the vectors at them
+    sFx, sFy, sFz - S2FunHarmonic, the components
+    fhat - complex array of (L+1)^2 x 3 coefficients
+    cs - crystalFrame or specimenFrame of the directions
+  Output
+    vF - S2VectorFieldHarmonic
+  Keywords
+    bandwidth - the largest degree of the expansion, by default the preference
+        'defaultS2Bandwidth'; truncates a field given
+    weights - the quadrature weights of the directions v
+    symmetrise - project onto the fields equivariant under the group of the frame
+  See also
+    S2VectorField, S2FunHarmonic, S2AxisFieldHarmonic, S2FunVectorField"""
 
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     frames = [a for a in args if isinstance(a, referenceFrame)]

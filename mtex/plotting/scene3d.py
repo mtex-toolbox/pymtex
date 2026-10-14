@@ -129,8 +129,29 @@ class lines3d:
 
 
 def arrows3d(P, D, color=(0.0, 0.0, 1.0), lineWidth=1.0, antipodal=False, headSize=0.25, sides=12):
-  """arrows from P along D as their shafts and cones for their heads, a quarter of their length
-  long, as quiver3d draws them; antipodal arrows point both ways and have no heads"""
+  """arrows in space as the items of a scene3d, a line for the shaft and a cone for the head;
+  what quiver3d and quiver of 3D grains draw
+
+    items = arrows3d(P, D)                         # arrows from the points P along D
+    items = arrows3d(P, D, color='r', antipodal=True)  # red segments pointing both ways
+
+  Every arrow runs from its point P to P + D, its head a cone headSize of its length long.
+  Arrows with a zero or non finite D are left out. The items are added to a scene with
+  scene3d.add, which the renderer of a 3D figure draws.
+
+  Input
+    P - array (n, 3), the starting points
+    D - array (n, 3), the arrows
+  Output
+    items - [lines3d, mesh3d], the shafts and the heads, or [lines3d] for antipodal arrows
+  Keywords
+    color - one colour for all arrows, a name or an RGB triple, or one RGB row per arrow
+    lineWidth - the width of the shafts in points
+    antipodal - draw segments from P - D to P + D without heads, for axes
+    headSize - the length of the head as a fraction of the arrow
+    sides - the number of sides of the cone of a head
+  See also
+    scene3d, quiver3d, ellipsoids3d, OrientationVisualization3d"""
   P, D = np.asarray(P, dtype=float).reshape(-1, 3), np.asarray(D, dtype=float).reshape(-1, 3)
   c = _colorRows(color, len(P))
   ok = np.all(np.isfinite(D), axis=1) & (np.linalg.norm(D, axis=1) > 0)
@@ -178,8 +199,28 @@ class points3d:
 
 
 def ellipsoids3d(center, a, b, c, color="lightblue", edgeAlpha=0.25, n=24, m=12):
-  """ellipsoids with the half axes a, b, c about their centres, the surfaces of MATLAB's
-  plotEllipsoid on a grid of n longitudes and m latitudes, one colour each"""
+  """ellipsoids as one polygon mesh of a scene3d; the surfaces plotEllipsoid draws, MATLAB's
+  plotEllipsoid
+
+    mesh = ellipsoids3d(center, a, b, c)           # light blue ellipsoids
+    mesh = ellipsoids3d(center, a, b, c, color=[[1, 0, 0], [0, 0, 1]], n=12, m=6)  # a colour each, coarser
+
+  Every ellipsoid is the set center + cos(theta) a + sin(theta) (sin(rho) b + cos(rho) c),
+  divided into quadrilaterals along n longitudes rho and m latitudes theta; a, b and c are
+  the half axes as vectors, as principalComponents of 3D grains returns them.
+
+  Input
+    center - array (k, 3), the centres
+    a, b, c - arrays (k, 3), the three half axes of every ellipsoid
+  Output
+    mesh - mesh3d, the surfaces of all ellipsoids
+  Keywords
+    color - one colour for all, a name or an RGB triple, or one RGB row per ellipsoid
+    edgeAlpha - the opacity of the edges of the quadrilaterals
+    n - the number of longitudes
+    m - the number of latitudes
+  See also
+    plotEllipsoid, scene3d, arrows3d, Grains3DProperties"""
   C, A, B, Cc = (np.asarray(x, dtype=float).reshape(-1, 3) for x in (center, a, b, c))
   k = len(C)
   rho, theta = np.meshgrid(np.linspace(0, 2 * np.pi, n + 1)[:-1], np.linspace(0, np.pi, m + 1), indexing="ij")
@@ -250,9 +291,36 @@ def _faceColors(values, isScalar, colormap, colorRange):
 
 def grainMesh(grains, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", edgeAlpha=1.0, lineWidth=0.5, colormap=None,
               colorRange=None, ipfDirection=None):
-  """the outer faces of the grains, each in the colour of the grain it bounds, as MATLAB's
-  grain3d/plot; a face between two of the grains is inside and drawn grey only when the faces
-  are translucent"""
+  """the faces of 3D grains as a polygon mesh of a scene3d, coloured by grain; what plot(grains)
+  draws for grain3d, MATLAB's grain3d/plot
+
+    mesh = grainMesh(grains)                       # coloured by phase
+    mesh = grainMesh(grains, grains.meanOrientation)  # by orientation, the ipf key of the phase
+    mesh = grainMesh(grains, grains.volume, colormap='viridis', faceAlpha=0.5)  # by a value, translucent
+    mesh = grainMesh(grains, faceColor='lightblue', edgeColor='none')  # one colour, no edges
+
+  A face of the set of grains is outer when it belongs to one grain and is drawn in that
+  grain's colour; a face between two of the grains is inner and drawn grey, and only when
+  the faces are translucent, faceAlpha below 1. A grain whose value is NaN is not drawn.
+
+  Input
+    grains - grain3d, the grains
+  Output
+    mesh - mesh3d, the faces with a colour each; with a value per grain it keeps the values,
+        the colour map and the range for the colour bar
+  Keywords
+    color - what colours a grain: None for its phase, an orientation per grain, a value per
+        grain mapped by the colour map, an RGB row per grain, or the name of a property
+    faceColor - one colour for all grains, when color is not given
+    faceAlpha - the opacity of the faces
+    edgeColor - the colour of the edges of the faces, 'none' for no edges
+    edgeAlpha - the opacity of the edges
+    lineWidth - the width of the edges in points
+    colormap - the colour map for values
+    colorRange - (min, max), the values the colour map spans; by default their range
+    ipfDirection - the specimen direction of the inverse pole figure key for orientations
+  See also
+    boundaryMesh, volumeSlices, scene3d, plot3d, Grains3D, EBSD3Plotting"""
   from .mapplot import mapValues
   gB = grains.boundary
   I = grains.I_GF.tocsc()
@@ -284,8 +352,31 @@ def grainMesh(grains, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", 
 
 
 def boundaryMesh(gB, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", edgeAlpha=1.0, lineWidth=0.5, colormap=None, colorRange=None):
-  """the faces of a 3D grain boundary, light blue, in one colour, or coloured by a value or a
-  colour per face, as MATLAB's grain3Boundary/plot"""
+  """the faces of a 3D grain boundary as a polygon mesh of a scene3d; what plot(gB) draws for a
+  grain3Boundary, MATLAB's grain3Boundary/plot
+
+    mesh = boundaryMesh(gB)                        # light blue faces
+    mesh = boundaryMesh(gB, gB.misorientation.angle() / degree)  # coloured by a value per face
+    mesh = boundaryMesh(gB, faceColor='red', faceAlpha=0.3, lineWidth=1)  # one colour, translucent
+
+  A face whose value or colour is NaN is not drawn.
+
+  Input
+    gB - grain3Boundary, the boundary faces
+  Output
+    mesh - mesh3d, the faces with a colour each; with a value per face it keeps the values,
+        the colour map and the range for the colour bar
+  Keywords
+    color - a value per face mapped by the colour map, an RGB row per face or one RGB triple
+    faceColor - one colour for all faces, when color is not given
+    faceAlpha - the opacity of the faces
+    edgeColor - the colour of the edges of the faces, 'none' for no edges
+    edgeAlpha - the opacity of the edges
+    lineWidth - the width of the edges in points
+    colormap - the colour map for values
+    colorRange - (min, max), the values the colour map spans; by default their range
+  See also
+    grainMesh, scene3d, plot3d, Grains3DBoundaries"""
   m = len(gB)
   if color is None:
     rgb, rng, values = np.tile(_rgb("lightblue" if faceColor is None else faceColor), (m, 1)), None, None
@@ -303,9 +394,33 @@ def boundaryMesh(gB, color=None, faceColor=None, faceAlpha=1.0, edgeColor="k", e
 
 
 def volumeSlices(ebsd, color=None, faceColor=None, colormap=None, colorRange=None, ipfDirection=None, at=None):
-  """three orthogonal slices through the voxels of an EBSD volume, coloured by phase, by a
-  value, a colour or an orientation per voxel, as MATLAB's EBSD3/plot shows the volume in
-  its slice planes; voxels not indexed or without a value are white"""
+  """three orthogonal slices through the voxels of an EBSD volume as an item of a scene3d;
+  what plot(ebsd) draws for an EBSD3, MATLAB's EBSD3/plot
+
+    s = volumeSlices(ebsd)                         # coloured by phase, through the middle
+    s = volumeSlices(ebsd, ebsd.orientations)      # by orientation, the ipf key of the phase
+    s = volumeSlices(ebsd, ebsd.orientations, ipfDirection=xvector, at=(5, None, 3))  # two slices at voxels 5 and 3
+
+  A slice is the plane of voxels normal to one of the three voxel axes. Coloured by phase,
+  the notIndexed voxels show in their own colour, as on a map; otherwise the voxels that are
+  not indexed or have no value are white.
+
+  Input
+    ebsd - EBSD3, a map of volumes
+  Output
+    s - slices3d, the colours of the voxels and the three slices; with a value per voxel it
+        keeps the values, the colour map and the range for the colour bar
+  Keywords
+    color - what colours a voxel: None for its phase, an orientation per voxel, a value per
+        voxel mapped by the colour map, an RGB row per voxel, or the name of a property
+    faceColor - one colour for all voxels, when color is not given
+    colormap - the colour map for values
+    colorRange - (min, max), the values the colour map spans; by default their range
+    ipfDirection - the specimen direction of the inverse pole figure key for orientations
+    at - the voxel index of the slice along each of the three axes, None for a slice left
+        out; by default the middle of every axis
+  See also
+    grainMesh, scene3d, plot3d, EBSD3Plotting"""
   from .mapplot import mapValues
   g, newId = ebsd.gridify(return_index=True)
   shape = g.lattice.shape

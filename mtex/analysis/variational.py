@@ -72,7 +72,44 @@ class halfQuadraticFilter(variationalFilter):
 
 
 class l1TVFilter(halfQuadraticFilter):
-  """the same filter with both norms absolute, the default of the maps layer"""
+  """the total variation filter of the orientations of a map, absolute in the data term and in
+  the differences between neighbours, which smooths noise and keeps sharp steps
+
+    F = l1TVFilter()                                   # smoothing over four steps of the map
+    F = l1TVFilter(10)                                 # smoothing over a length in the map's units
+    F = l1TVFilter(alpha=0.1, threshold=10*degree)     # the weight given, boundaries above 10 degree kept
+    ebsd = smooth(ebsd, F)                             # the smoothed map
+
+  The filtered orientations minimise the sum of the distances to the measured ones plus
+  alpha times the sum of the misorientations between neighbours, both as absolute values; an
+  absolute value keeps a step where a square, splineFilter, blurs it. It is
+  halfQuadraticFilter with l1DataFit and l1TV both on, solved by iteratively reweighted least
+  squares in the tangent space.
+
+  The smoothing is stated as a length, the wavelength damped to half its amplitude, from
+  which alpha follows on the lattice of the map, so one filter smooths alike on a coarse and
+  a fine map; alpha, when given, replaces it.
+
+  MATLAB's l1TVFilter takes alpha as its first argument and solves by a cyclic proximal
+  point iteration; here the first argument is the smoothing length.
+
+  Output
+    F - l1TVFilter, applied by smooth(ebsd, F)
+  Keywords
+    smoothingLength - the wavelength damped to half its amplitude, in the units of the map;
+        four steps of the map when neither it nor alpha is given
+    alpha - the weight of the differences against the data, larger smoother
+    threshold - the misorientation above which two neighbours are not smoothed together, a
+        boundary the filter leaves alone
+    eps - the difference at which the penalty turns from a square into a line, in radians
+    maxIter - the bound on the reweighting steps
+    tol - the change of every orientation in a connected part below which its iteration
+        stops, in radians
+  References
+    R. Bergmann, R.H. Chan, R. Hielscher, J. Persch, G. Steidl, Restoration of manifold-valued
+        images by half-quadratic minimization, Inverse Problems and Imaging 10 (2016) 281-304
+  See also
+    smooth, halfQuadraticFilter, splineFilter, infimalConvolutionFilter, EBSDDenoising"""
 
   def __init__(self, smoothingLength=None, alpha=None, threshold=15 * degree, eps=1e-3, maxIter=100, tol=0.001 * degree):
     super().__init__(smoothingLength, alpha, True, True, threshold, eps, maxIter, tol)

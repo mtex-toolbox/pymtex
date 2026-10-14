@@ -196,14 +196,51 @@ def _positionalStyle(o, args, kw):
 
 
 def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[PlotKeywords]):
-  """plotPF(ori, h), plotPF(ori, data, h), plotPF(ori, h, points=100, contourf=True, antipodal=True),
-  plotPF(odf, h), plotPF(pf)
+  """pole figures, one per crystal direction: of an ODF, of a list of orientations or of a
+  measured PoleFigure; MATLAB's plotPDF
 
-  The pole figures of a list of orientations: every orientation applied to every equivalent
-  of h, as markers on the specimen sector, coloured by a value per orientation when given;
-  a style draws the density of the poles instead. An ODF draws its pole figures, a measured
-  PoleFigure itself (MATLAB's plotPDF).
-  """
+    plotPF(odf, h)                                 # the pole figures of an ODF, h a list of Miller
+    plotPF(odf, h, superposition=[0.5, 0.5])       # one pole figure, the superposition of h
+    plotPF(ori, h)                                 # the poles of orientations as markers
+    plotPF(ori, ori.angle(), h)                    # the markers coloured by a value per orientation
+    plotPF(ori, h, contourf=True, antipodal=True)  # the density of the poles, filled contours
+    plotPF(ori, h, points=50)                      # at most 50 orientations drawn
+    plotPF(ori, h, all=True)                       # every orientation drawn
+    plotPF(f, Miller(1, 0, 0, f.CS))               # a fibre as the curve of its poles
+    plotPF(pf)                                     # a measured pole figure
+
+  A pole figure shows where the crystal direction h, with every equivalent of it, points in
+  the specimen. For an ODF it is the density of these poles, the Radon transform odf.radon(h),
+  drawn with the keywords of a spherical function: contourf, contour, pcolor, colorRange
+  ('equal' for one range over all pole figures, each its own by default), resolution,
+  antipodal (both hemispheres superposed), complete, upper and lower. A positional '3d' draws
+  it on the sphere in space.
+
+  For a list of orientations every orientation is applied to every equivalent of h and the
+  poles are drawn as markers on the specimen sector, coloured by a value or an RGB colour per
+  orientation when one is given; contourf=True or another filled style draws their density.
+  A large list is thinned to a random selection, about 10000 markers by default. A fibre is
+  drawn as the dots of 1000 orientations along it. Into held pole figures, or with
+  add2all=True, the poles of the directions already shown are added.
+
+  A measured PoleFigure draws its intensities as markers, or, with a filled style, the
+  function its harmonic expansion gives.
+
+  Input
+    odf - SO3Fun, an ODF
+    ori - orientation, or a fibre
+    data - a value or an RGB colour per orientation, optional
+    h - Miller or a list of Miller, the crystal directions, one pole figure each
+    pf - PoleFigure, measured pole figures
+  Keywords
+    points - the number of orientations drawn at most, a random selection
+    all - draw every orientation, however many
+    superposition - the weights of the directions h in one superposed pole figure, a list of
+        arrays for one superposed pole figure per entry of h, as plotPF(odf, pf.allH,
+        superposition=pf.c)
+  See also
+    plotIPF, SO3Fun.radon, PoleFigure, calcPoleFigure, annotate, ODFPoleFigure,
+    OrientationPoleFigure, PoleFigurePlot"""
   if isinstance(o, PoleFigure):
     return _plotPoleFigure(o, *args, **kw)
   o, points, all = _fibreAsCurve(o, points, all, kw)

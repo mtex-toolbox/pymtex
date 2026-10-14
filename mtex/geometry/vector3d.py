@@ -42,10 +42,41 @@ class vector3d(MtexArray):
   isNormalized, the reference frame and the display style; a vector in a crystal frame is a
   crystal direction with Miller indices
 
-    vector3d(x, y, z)
-    vector3d(xyz, frame=cs)             coordinates of shape (..., 3) or (3, N)
-    vector3d.byPolar(theta, rho)
-    vector3d.X, vector3d.Y, vector3d.Z"""
+    v = vector3d(x, y, z)                       # from the Cartesian coordinates
+    v = vector3d(xyz)                           # coordinates of shape (..., 3) or (3, N)
+    v = vector3d(x, y, z, antipodal=True)       # axes, v and -v the same
+    m = vector3d(xyz, frame=cs)                 # a crystal direction from its Euclidean coordinates
+    v = vector3d.byPolar(theta, rho)            # from the polar angles
+    v = vector3d.X                              # the axes of the frame, also Y and Z
+    m = Miller(1, 1, 1, cs)                     # a lattice plane normal by its indices hkl
+    m = Miller(1, 0, -1, 0, csHex)              # four indices hkil of a hexagonal lattice
+    m = Miller(1, 1, 0, cs, 'uvw')              # a lattice direction, 'UVTW' with four indices
+    m = Miller('{111}', cs)                     # (hkl) one plane, {hkl} the family, [uvw] and <uvw> directions
+    m = Miller(v, cs)                           # a vector restated in the crystal frame
+
+  A crystal direction is a vector3d whose frame is a crystal frame: it has the Miller
+  indices m.hkl and m.uvw, the four index forms m.hkil and m.UVTW of a trigonal or hexagonal
+  lattice, a d-spacing, and where the frame carries a point group it stands for its
+  symmetrically equivalent set, which dot, angle, mean and unique take into account. It is
+  stored in Euclidean coordinates; MATLAB's class Miller is a vector3d here, built by the
+  function Miller from its indices.
+
+  Input
+    x, y, z - arrays of the Cartesian coordinates, broadcast against each other
+    xyz - array of shape (..., 3) or (3, N), a vector3d, or a rank one tensor
+    cs - crystalFrame, also given positionally to vector3d
+  Output
+    v - vector3d
+    m - vector3d, a crystal direction
+  Keywords
+    antipodal - the vectors are axes: v and -v are the same
+    isNormalized - the coordinates are known to be of length one
+    frame - the referenceFrame the coordinates are given in, a crystal frame making the
+        vectors crystal directions; also given as a positional argument
+    dispStyle - the indices the display shows, 'hkl', 'hkil', 'uvw', 'UVTW' or 'xyz'
+    dtype - the floating point type of the coordinates
+  See also
+    Miller, vector3d.byPolar, crystalFrame, VectorDefinition, CrystalDirections"""
   _ncoord = 3
   _carried = ("antipodal", "isNormalized", "_frame", "dispStyle")
 
@@ -258,19 +289,38 @@ class vector3d(MtexArray):
     return 1 / self.norm()
 
   def round(self, style=None, maxHKL=12, maxXYZ=12, accuracy=np.pi / 180, return_error=False):
-    """a crystal direction rounded to integer indices, vector3d/round; style= the indices rounded
-    ('hkl', 'hkil', 'uvw', 'UVTW', the display's by default), maxHKL the largest multiple tried; a
-    vector3d without a lattice has its coordinates rounded, maxXYZ the largest multiple tried,
-    and keeps them where rounding would turn it by more than accuracy (1 degree);
-    return_error=True also gives the angle between the given and the rounded direction, without
-    symmetric equivalents, MATLAB's second output
+    """the direction with its indices, or its coordinates, rounded to small integers
 
-      m = round(m)
-      m = round(m, maxHKL=5)
-      m = round(m, 'uvw')       # the direct indices integer
-      v = round(v, maxXYZ=5)
-      v = round(v, accuracy=0.1*degree)
-      m, err = round(m, return_error=True)"""
+      m = round(m)                              # the indices of the display rounded
+      m = round(m, maxHKL=5)                    # no index larger than 5
+      m = round(m, 'uvw')                       # the direct indices integer
+      v = round(v, maxXYZ=5)                    # the Cartesian coordinates of a vector
+      v = round(v, accuracy=0.1*degree)         # rounded only where it turns by less
+      m, err = round(m, return_error=True)      # also the angle the rounding turned it by
+
+    The direction is scaled so that its largest index is 1, 2, ..., maxHKL, and the scale
+    that brings the indices nearest to integers is kept. For a trigonal or hexagonal lattice the three and the four index forms
+    are not integer at the same time, UVTW = (1, 3, -4, 8) is uvw = (5, 7, 8)/3, so style says
+    which is rounded. A vector without a lattice has its Cartesian coordinates rounded and
+    keeps them where the rounding would turn it by more than the accuracy.
+
+    Input
+      m - vector3d in a crystal frame
+      v - vector3d
+    Output
+      m, v - vector3d, the rounded directions
+      err - array, the angle between the given and the rounded direction, without symmetric
+          equivalents, with return_error=True
+    Keywords
+      style - the indices rounded, 'hkl', 'hkil', 'uvw' or 'UVTW'; by default those of the
+          display
+      maxHKL - the largest index of a crystal direction
+      maxXYZ - the largest coordinate of a vector without a lattice
+      accuracy - the largest angle the rounding may turn a vector without a lattice by, in
+          radians
+      return_error - also return the angle the rounding turned the directions by
+    See also
+      vector3d.char, Miller, CrystalDirections"""
     from .miller import roundIndices
     r = roundIndices(self, style, maxHKL if self.isCrystalDirection else maxXYZ)
     # a vector rounding would turn too far keeps its coordinates
@@ -285,7 +335,31 @@ class vector3d(MtexArray):
     return r, vector3d.angle(self, r, symmetry=False)
 
   def char(self, style=None, utf8=None, family=None):
-    """the indices in brackets, {111} or [uvw], Miller/char"""
+    """the Miller indices of a crystal direction in brackets, as text
+
+      s = m.char()                       # {111}, <uvw> where the frame has symmetry, else (111), [uvw]
+      s = m.char('uvw')                  # in another convention: 'hkl', 'hkil', 'uvw', 'UVTW'
+      s = m.char(family=False)           # one plane or direction, (hkl) or [uvw]
+      s = m.char('LaTex')                # as mathematics, a bar over the negative indices
+      s = m.char(utf8=False)             # a minus sign instead of the bar
+
+    A point group makes the indices stand for the whole symmetrically equivalent set, so they
+    are written in the family brackets {hkl} and <uvw>, while the trivial group leaves one plane
+    or one direction, (hkl) and [uvw]. A list of directions is written one after another.
+    MATLAB's flags no_scopes and commasep are not taken.
+
+    Input
+      m - vector3d in a crystal frame
+    Output
+      s - str
+    Keywords
+      style - the convention, 'hkl', 'hkil', 'uvw', 'UVTW' or 'xyz', or 'LaTex'; by default
+          the display's
+      utf8 - a negative index as a digit with a bar over it rather than a minus sign; by
+          default the preference 'UTF8Output'
+      family - the family brackets {hkl} and <uvw>; by default where the frame has symmetry
+    See also
+      vector3d.round, Miller, CrystalDirections"""
     from .miller import indexChar
     return indexChar(self, style, utf8, family)
 
@@ -563,10 +637,34 @@ class vector3d(MtexArray):
   # ------------------------------------------------------------------ products and angles
 
   def dot(self, other, antipodal=None, symmetry=True, min=False, all=False, outer=False):
-    """the inner product; an axis on either side reads it up to sign, antipodal=True always,
-    antipodal=False never; a crystal direction reduces over the group of its frame unless
-    symmetry=False says otherwise; outer=True pairs
-    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's dot_outer)"""
+    """the inner product of two vectors, pointwise; of crystal directions the largest over their
+    symmetric equivalents
+
+      d = dot(v1, v2)                       # pointwise, broadcast against each other
+      d = dot(v1, v2, antipodal=True)       # up to sign: the absolute value
+      d = dot(m1, m2, symmetry=False)       # crystal directions as they are given
+      d = dot(m1, m2, min=True)             # the smallest over the symmetric equivalents
+      d = dot(m1, m2, all=True)             # every symmetric equivalent
+      d = dot(v1, v2, outer=True)           # every pair, MATLAB's dot_outer
+
+    An axis on either side reads the product up to sign; antipodal=True does so always,
+    antipodal=False never. Crystal directions in a frame with symmetry give the largest product
+    over their symmetric equivalents.
+
+    Input
+      v1, v2 - vector3d
+      m1, m2 - vector3d in one crystal frame
+    Output
+      d - array, of the broadcast shape; with outer=True of shape v1.shape + v2.shape
+    Keywords
+      antipodal - read the vectors as axes: True always, False never; by default where one
+          of them is an axis
+      symmetry - take the symmetric equivalents of crystal directions into account
+      min - the smallest product over the symmetric equivalents instead of the largest
+      all - the products with every symmetric equivalent, along a new first axis
+      outer - every entry of v1 with every entry of v2
+    See also
+      vector3d.angle, vector3d.cross, vector3d.norm"""
     other = self._coerce(other)
     if outer:
       a, b = self._outerPair(other)
@@ -597,17 +695,33 @@ class vector3d(MtexArray):
     return np.linalg.norm(self.data, axis=-1)
 
   def angle(self, other, N=None, antipodal=None, symmetry=True, outer=False):
-    """the angle between two vectors, through atan2 for full accuracy near 0 and pi; an axis
-    on either side reads it up to sign, antipodal=True always, antipodal=False never; with a
-    normal N the angle in that plane, counterclockwise from self to other; outer=True pairs
-    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's angle_outer);
-    symmetry=False compares crystal directions without their symmetric equivalents
+    """the angle between two vectors; of crystal directions the smallest over their symmetric
+    equivalents
 
-      omega = angle(v1, v2)
-      omega = angle(v1, v2, antipodal=True)
-      omega = angle(h1, h2, symmetry=False)
+      omega = angle(v1, v2)                   # pointwise, broadcast against each other
+      omega = angle(v1, v2, antipodal=True)   # between axes, at most 90 degree
+      omega = angle(h1, h2, symmetry=False)   # crystal directions as they are given
       omega = angle(v1, v2, N)                # in the plane normal to N, from 0 to 2 pi
-      omega = angle(v1, v2, outer=True)       # every pair"""
+      omega = angle(v1, v2, outer=True)       # every pair, MATLAB's angle_outer
+
+    The angle is taken through atan2 of the cross and the inner product, accurate near 0 and
+    pi. An axis on either side reads it up to sign; antipodal=True does so always,
+    antipodal=False never. With a normal N both vectors are projected to the plane normal to N
+    and the angle is counted counterclockwise about N from v1 to v2.
+
+    Input
+      v1, v2 - vector3d
+      h1, h2 - vector3d in one crystal frame
+      N - vector3d, the normal of the plane the angle is measured in
+    Output
+      omega - array, in radians; with outer=True of shape v1.shape + v2.shape
+    Keywords
+      antipodal - read the vectors as axes: True always, False never; by default where one
+          of them is an axis
+      symmetry - take the symmetric equivalents of crystal directions into account
+      outer - every entry of v1 with every entry of v2
+    See also
+      vector3d.dot, vector3d.cross, VectorsAxes, CrystalOperations"""
     other = self._coerce(other)
     if outer:
       a, b = self._outerPair(other)
@@ -701,23 +815,65 @@ class vector3d(MtexArray):
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)
 
   def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
-    """the sum of the vectors, over all axes or the given ones, also as NumPy's np.sum
+    """the sum of the vectors, over all axes or the given ones
 
-      s = sum(v)
-      s = sum(v, axis=0)
-      s = np.sum(v, axis=1, keepdims=True)"""
+      s = sum(v)                              # over all vectors
+      s = sum(v, axis=0)                      # along the first axis
+      s = np.sum(v, axis=1, keepdims=True)    # NumPy's form, the summed axis kept
+
+    The result keeps the frame and the display style of the vectors. MATLAB sums along the
+    first axis that is not a singleton; the sum here is over all axes unless one is given.
+
+    Input
+      v - vector3d
+    Output
+      s - vector3d
+    Keywords
+      axis - an axis or a tuple of axes to sum over; by default all
+      dtype - NumPy's argument, refused: a container has no dtype to choose
+      out - NumPy's argument, refused: a container has no output buffer
+      keepdims - keep the summed axes with length one
+    See also
+      vector3d.mean, vector3d.norm"""
     numpyReduction("sum", dtype, out, kwargs, "vectors")
     s = self._new(np.sum(self.data, axis=tuple(range(self.ndim)) if axis is None else axis), **self._joined(None))
     return keptDims(s, self.shape, axis) if keepdims else s
 
   def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True, return_projected=False,
            dtype=None, out=None, keepdims=False, **kwargs):
-    """the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
-    largest principal axis of the moment matrix; crystal directions are first moved to the
-    equivalents closest to the mean, which return_projected=True also gives (MATLAB's mSym)
+    """the mean direction of a list of vectors, of axes, or of crystal directions
 
-      m = mean(v)
-      m, vProjected = mean(h, return_projected=True)"""
+      m = mean(v)                                     # the arithmetic mean over all vectors
+      m = mean(v, axis=0)                             # along the first axis
+      m = mean(v, weights=w)                          # the normalised weighted sum
+      m = mean(v, antipodal=True)                     # the mean axis
+      m = mean(v, robust=True)                        # without the farthest fifth
+      m, hProjected = mean(h, return_projected=True)  # also the equivalents averaged, MATLAB's mSym
+
+    Vectors give their arithmetic mean, with weights the normalised weighted sum. Axes give the
+    eigenvector of the largest eigenvalue of the moment matrix. Crystal directions in a frame
+    with symmetry are first moved to the equivalents closest to the mean, which
+    return_projected=True returns too. robust=True drops the vectors farther from a first mean
+    than 80 percent of them and averages again.
+
+    Input
+      v - vector3d
+      h - vector3d in a crystal frame
+    Output
+      m - vector3d
+      hProjected - vector3d, the equivalents of the directions the mean was taken over
+    Keywords
+      weights - array, a weight per vector
+      antipodal - average the vectors as axes
+      robust - leave out the outliers, the vectors farthest from the mean
+      axis - an axis or a tuple of axes to average over; by default all
+      symmetry - take the symmetric equivalents of crystal directions into account
+      return_projected - also return the equivalents the mean was taken over
+      dtype - NumPy's argument, refused: a container has no dtype to choose
+      out - NumPy's argument, refused: a container has no output buffer
+      keepdims - keep the averaged axes with length one
+    See also
+      vector3d.sum, vector3d.unique, VectorsOperations"""
     numpyReduction("mean", dtype, out, kwargs, "vectors")
     if keepdims:
       m = self.mean(weights=weights, antipodal=antipodal, robust=robust, axis=axis, symmetry=symmetry)
@@ -744,9 +900,34 @@ class vector3d(MtexArray):
     return self._new(np.nanmean(self.data, axis=axis), **self._joined(None))
 
   def unique(self, tol=1e-6, antipodal=None, symmetry=True, stable=False, return_index=False, return_inverse=False):
-    """the disjoint list of vectors up to a tolerance, vector3d/unique, up to sign for axes,
-    antipodal=True always, antipodal=False never; under a group the directions are projected
-    to the fundamental sector first"""
+    """the disjoint list of vectors, equal ones within a tolerance taken once
+
+      u = unique(v)                                            # sorted, each vector once
+      u = unique(v, tol=0.01)                                  # a larger tolerance
+      u = unique(v, antipodal=True)                            # v and -v the same
+      u = unique(v, stable=True)                               # in the order of their first appearance
+      u, iv, iu = unique(v, return_index=True, return_inverse=True)  # u = v[iv], v = u[iu]
+
+    Axes are equal up to sign; antipodal=True takes them so always, antipodal=False never.
+    Crystal directions in a frame with symmetry are equal when they are symmetrically
+    equivalent: they are projected to the fundamental sector first.
+
+    Input
+      v - vector3d
+    Output
+      u - vector3d, one dimensional
+      iv - array, the indices with u = v.flat[iv], with return_index=True
+      iu - array, the indices with v.flat = u[iu], with return_inverse=True
+    Keywords
+      tol - the tolerance of the coordinates within which vectors are equal
+      antipodal - take the vectors as axes: True always, False never; by default where they
+          are axes
+      symmetry - take the symmetric equivalents of crystal directions into account
+      stable - keep the order of the first appearances rather than sorting
+      return_index - also return the indices iv of the kept vectors
+      return_inverse - also return the indices iu reconstructing the list
+    See also
+      vector3d.symmetrise, vector3d.mean"""
     if symmetry and self.isCrystalDirection and self._frame.numSym() > 1:
       from .symmetryops import symUnique
       return symUnique(self, tol, return_index, return_inverse)

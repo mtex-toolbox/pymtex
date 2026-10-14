@@ -184,10 +184,32 @@ def _cosetReps(G, left):
 # ------------------------------------------------------------------ construction
 
 def equispacedSO3Grid(CS, SS=None, resolution=5 * degree, points=None, maxAngle=np.pi, center=None):
-  """nearly equidistant orientations covering one fundamental region of the frame pair: an
-  equispaced grid of the images of z at the resolution, with a ladder of the third angle at
-  each; `points` picks the resolution for that count; with `maxAngle` only the ball around
-  `center` is kept, a ball smaller than the fundamental region being a local grid"""
+  """nearly equidistant orientations covering one fundamental region of the frame pair
+
+    S3G = equispacedSO3Grid(CS, SS, points=1000)                 # about this many points
+    S3G = equispacedSO3Grid(CS, resolution=5*degree)             # of a given resolution
+    S3G = equispacedSO3Grid(CS, maxAngle=20*degree)              # only a ball about the identity
+    S3G = equispacedSO3Grid(CS, maxAngle=20*degree, center=ori)  # a ball about an orientation
+
+  An equispaced grid of the images of z at the resolution, with a ladder of the third Euler
+  angle at each, kept where it lies in the fundamental region of the crystal and the
+  specimen symmetry. The SO3Grid knows its structure, which makes its searches fast (find,
+  radius); the last four grids are kept, so that asking for the same grid again costs
+  nothing. With maxAngle only the ball about the centre is kept; a ball about the identity
+  smaller than the fundamental region is a localOrientationGrid, an orientation.
+
+  Input
+    CS - crystalFrame
+    SS - specimenFrame, by default the default specimen frame
+  Output
+    S3G - SO3Grid, or orientation for a small ball
+  Keywords
+    resolution - the spacing of the grid, in radians
+    points - the approximate number of points, which sets the resolution instead
+    maxAngle - the radius of the ball to fill
+    center - orientation, the centre of the ball, by default the identity
+  See also
+    SO3Grid, regularSO3Grid, localOrientationGrid, equispacedS2Grid"""
   from ..frames import specimenFrame
   from .localgrids import localOrientationGrid
   SS = specimenFrame.default if SS is None else SS
@@ -289,9 +311,29 @@ def _mergeClose(g, delta, candidates):
 
 
 def regularSO3Grid(CS, SS=None, resolution=5 * degree, sections=None):
-  """the Euler angle raster over the Euler box of the frames, MATLAB's regularSO3Grid: sections
-  of phi2 from zero below its bound, and on each the (Phi, phi1) grid with both ends of Phi
-  and phi1 from zero below its bound, all at the resolution"""
+  """the regular raster of Euler angles over the Euler box of the frames, as the ODF sections
+  show it
+
+    ori = regularSO3Grid(CS)                                   # the resolution 5 degree
+    ori = regularSO3Grid(CS, SS, resolution=2.5*degree)        # another resolution
+    ori = regularSO3Grid(CS, SS, sections=10)                  # ten phi2 sections
+
+  The Bunge angles phi2 run in sections from zero below their bound, and on each section
+  the (Phi, phi1) raster with both ends of Phi and phi1 from zero below its bound, all at
+  the resolution; the bounds are the Euler box of the crystal and the specimen symmetry. The
+  result is an array of the shape (Phi, phi1, phi2). MATLAB's other outputs, the section
+  flags phi1 and Phi, the 'ZYZ' convention and the Clenshaw-Curtis grid are not there.
+
+  Input
+    CS - crystalFrame
+    SS - specimenFrame, by default the default specimen frame
+  Output
+    ori - orientation of shape (Phi, phi1, phi2)
+  Keywords
+    resolution - the spacing of the Euler angles
+    sections - the number of phi2 sections, instead of the resolution
+  See also
+    equispacedSO3Grid, phi2Sections, eulerRegion"""
   from ..frames import specimenFrame
   from ..orientationregion import eulerRegion
   SS = specimenFrame.default if SS is None else SS

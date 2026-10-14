@@ -167,8 +167,37 @@ def _mirrorSign(L, real, folds):
 
 
 def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
-  """the compiled kernels of mtex/functions/kernels.py on the quadrant table, or the NumPy form
-  degree by degree on the full matrices of halfPiDegrees or of the degrees given"""
+  """the Wigner coefficient transform: the coefficients of a Wigner series as the Fourier array
+  of the same function in the Euler angles
+
+    G = wignerTransform(fhat, L)                       # the full Fourier array, axes (l, k, j)
+    G = wignerTransform(fhat, L, real=True)            # a real function, only l >= 0
+    G = wignerTransform(fhat, L, folds=(4, 2))         # a 4 fold about z in the crystal, 2 fold in the specimen
+
+  A Wigner series of bandwidth L is a trigonometric series in the Euler angles,
+  f(alpha, beta, gamma) = sum G[l, k, j] e^{-i(k alpha + j beta + l gamma)}, with
+  G[l, k, j] = sum_n sqrt(2n+1) i^{k-l} fhat_n^{kl} d_n^{jk}(pi/2) d_n^{jl}(pi/2). The array
+  is what a NUFFT or, on a Clenshaw-Curtis grid, an FFT evaluates; SO3FunHarmonic.eval goes
+  this way. Every index runs from -L to L and sits at its value plus L.
+
+  The coefficients are the internal ones, SO3FunHarmonic._fhat (docs/design/harmonics.md), not
+  the fhat a user reads. For a real function only l >= 0 is kept, the plane l = 0 halved, and
+  f is twice the real part of the sum. A function with an rA fold symmetry about z in the
+  crystal and an rB fold in the specimen has coefficients only at l = 0 mod rA and
+  k = 0 mod rB: those axes are indexed by l / rA and k / rB.
+
+  Input
+    fhat - the internal Wigner coefficients, a complex array of at least the degrees 0 to L
+    L - the bandwidth
+  Output
+    G - complex array of the shape foldedDims(L, real, folds)
+  Keywords
+    real - the function is real, the array kept for l >= 0
+    folds - (rA, rB), the folds about z in the crystal and the specimen
+    degrees - pairs (n, d_n(pi/2)) to sum over instead of the cached matrices, which selects
+        the NumPy form
+  See also
+    wignerTransformAdjoint, sphericalTransform, SO3FunHarmonic, SO3FourierPlan"""
   cdtype = _complexType(np.asarray(fhat).dtype)
   fhat = np.ascontiguousarray(fhat, dtype=cdtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
@@ -192,12 +221,36 @@ def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
 
 
 def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None, centre=None):
-  """the adjoint: fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk} d_n^{jl} h[l, k, -j] for
-  h = sum_m w_m v_m e^{i(k alpha + j beta + l gamma)}; for real values only l >= 0 is given and
-  the rest follows from fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA
-  and k by rB, since the projection of H5 zeroes the rest anyway. The order j = 0 sits at the
-  index centre of the last axis, L unless given, 0 for the output of an FFT, whose negative
-  orders wrap around"""
+  """the adjoint of the Wigner coefficient transform: the Fourier array of weighted values back
+  to Wigner coefficients
+
+    fhat = wignerTransformAdjoint(H, L)                # the coefficients of the array, j = 0 at index L
+    fhat = wignerTransformAdjoint(H, L, real=True)     # a real function, only l >= 0 given
+    fhat = wignerTransformAdjoint(H, L, centre=0)      # the output of an FFT, negative orders wrapped
+
+  fhat_n^{kl} = sqrt(2n+1) i^{k-l} sum_j d_n^{jk}(pi/2) d_n^{jl}(pi/2) H[l, k, -j], the adjoint
+  of wignerTransform. With H = sum_m w_m e^{i(k alpha_m + j beta_m + l gamma_m)}, the adjoint
+  NUFFT of weighted values at the orientations, it gives the coefficients a quadrature takes,
+  which is how the harmonic expansion of a function and calcDensity reach their coefficients.
+
+  For a real function only l >= 0 is given and the rest of every block follows from
+  fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}). The folds step l by rA and k by rB, as in
+  the forward transform.
+
+  Input
+    H - complex array (l, k, j), the Fourier array of the values
+    L - the bandwidth
+  Output
+    fhat - the internal Wigner coefficients, SO3FunHarmonic._fhat, of the degrees 0 to L
+  Keywords
+    real - the function is real, H given for l >= 0
+    folds - (rA, rB), the folds about z in the crystal and the specimen
+    degrees - pairs (n, d_n(pi/2)) to sum over instead of the cached matrices, which selects
+        the NumPy form
+    centre - the index of the order j = 0 on the last axis of H; L by default, 0 for the
+        output of an FFT
+  See also
+    wignerTransform, sphericalTransformAdjoint, SO3FourierPlan, wignerSeriesAdjoint"""
   centre = L if centre is None else int(centre)
   cdtype = H.dtype
   rdtype = np.dtype(cdtype).type(0).real.dtype

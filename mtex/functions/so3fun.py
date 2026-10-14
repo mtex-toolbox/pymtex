@@ -65,12 +65,40 @@ def _readFrames(args):
 
 class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   """a function on SO(3) as a series of Wigner functions, symmetric under its crystal and specimen
-  frame: from MTEX's coefficients fhat, another SO(3) function, a kernel or a callable (by
-  quadrature); a list of functions carries its shape in front of the coefficients
+  frame
 
-    SO3FunHarmonic(fhat, cs, ss)
-    SO3FunHarmonic(odf, bandwidth=32)               the harmonic form of another function
-    SO3FunHarmonic(lambda ori: ori.angle(), cs)     by quadrature"""
+    SO3F = SO3FunHarmonic(fhat, cs, ss)                         # from MTEX's coefficients
+    SO3F = SO3FunHarmonic(odf, bandwidth=32)                    # the harmonic form of another function
+    SO3F = SO3FunHarmonic(lambda ori: ori.angle(), cs)          # a callable by quadrature
+    SO3F = SO3FunHarmonic(lambda ori: ori.angle(), cs, 'GaussLegendre', bandwidth=16)  # on the Gauss-Legendre grid
+    SO3F = SO3FunHarmonic(psi, cs, bandwidth=24)                # the series of an SO(3) kernel
+    mdf = SO3FunHarmonic(lambda o: o.angle(), cs, cs, antipodal=True, bandwidth=8)  # a misorientation function, f(g) = f(g^-1)
+
+  The coefficients fhat are MTEX's, degree by degree, deg2dim(L + 1) of them for the bandwidth L;
+  a vector ending inside a degree block is padded with zeros to its end. Another SO(3) function
+  gives its harmonic form at the bandwidth given (an SO3FunRBF at most its kernel's), a kernel
+  its series, a callable of orientations is sampled on a quadrature grid of the bandwidth, by
+  default the preference defaultSO3Bandwidth, Clenshaw-Curtis unless 'GaussLegendre' is named
+  among the frames. The frames are the crystal frame and the specimen frame, the second by
+  default specimenFrame.default; the coefficients are made invariant under both unless
+  symmetrise=False. A list of functions carries its shape in front of the coefficients.
+
+  Input
+    fhat - array of MTEX's coefficients, an SO3Fun, an SO3Kernel or a callable of orientations
+    cs, ss - crystalFrame and specimenFrame (or a second crystalFrame)
+  Output
+    SO3F - SO3FunHarmonic
+  Keywords
+    real - whether the function takes real values only; by default read off the
+        coefficients or the sampled values
+    antipodal - f(g) = f(g^-1), the exchange symmetry of a misorientation function; needs the
+        same frame on both sides
+    symmetrise - make the coefficients invariant under the two frames' symmetries
+    bandwidth - the largest degree of the series
+    dtype - the complex type of the coefficients, complex128 unless given
+  See also
+    SO3FunHarmonic.quadrature, SO3FunHarmonic.interpolate, SO3FunRBF, SO3FunHandle,
+    SO3VectorFieldHarmonic, SO3FunHarmonicRepresentation"""
 
   def __init__(self, fhat, *frames, real=None, antipodal=None, symmetrise=True, bandwidth=None, dtype=None, _internal=False):
     # coefficients given are MTEX's, those the port passes itself its own
@@ -195,8 +223,40 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
 
   @classmethod
   def quadrature(cls, nodes, values=None, *frames, bandwidth=None, weights=None, real=None, antipodal=False):
-    """from weighted samples at nodes, projected onto the invariant functions; a quadrature
-    grid brings its weights"""
+    """the harmonic series of a function on SO(3) by quadrature; MATLAB's approximate and
+    quadrature
+
+      SO3F = SO3FunHarmonic.quadrature(odf, bandwidth=48)                 # another function to a bandwidth
+      SO3F = SO3FunHarmonic.quadrature(lambda o: o.angle(), cs, bandwidth=16)  # a callable and its frames
+      SO3F = SO3FunHarmonic.quadrature(g, odf(g.nodes()))                 # values on a quadratureSO3Grid
+      SO3F = SO3FunHarmonic.quadrature(ori, values, bandwidth=8)          # values at orientations, weighted equally
+
+    A callable or another SO(3) function is expanded as SO3FunHarmonic(f, cs, ss, bandwidth=)
+    does, exact up to the bandwidth. Values at nodes are summed with the weights against the
+    Wigner functions and projected onto the functions invariant under the frames; on a
+    quadratureSO3Grid the grid's weights make the result exact up to its bandwidth, which is
+    the default bandwidth then, the values at its distinct nodes spread onto all of them. At
+    other nodes the sum is the quadrature only when the weights are those of a quadrature
+    rule; equal weights 1/n give the series of the density of the nodes times the values, for
+    a fit see SO3FunHarmonic.interpolate. SO3FunHarmonic.approximate is the same function.
+
+    Input
+      nodes - a callable or SO3Fun, a quadratureSO3Grid, orientation or rotation
+      values - array, the values at the nodes; none for a callable, whose crystal frame may
+          stand here
+      cs, ss - the frames of a callable or of rotations
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      bandwidth - the largest degree of the series, by default the preference
+          defaultSO3Bandwidth or the grid's
+      weights - the quadrature weights of the nodes
+      real - whether the function takes real values only; by default whether the values are
+          real
+      antipodal - f(g) = f(g^-1), for a misorientation function; taken from antipodal
+          orientations as well
+    See also
+      SO3FunHarmonic, SO3FunHarmonic.interpolate, quadratureSO3Grid, calcDensity"""
     # quadrature(fun, cs, ss): a callable takes its frames right after it
     if callable(nodes) and not isinstance(nodes, quaternion) and (values is None or isinstance(values, referenceFrame)):
       frames = frames if values is None else (values, *frames)
@@ -484,13 +544,33 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return _harmonicInversePoleFigure(self, r)
 
   def radon(self, h=None, r=None, superposition=None):
-    """the Radon transform: the pole figure of h, the inverse pole figure of r, or with both the
-    values; several h superposed, weighted by superposition (MATLAB's pdf, ipdf and calcPDF)
+    """the Radon transform of a function on SO(3): its pole figures, inverse pole figures, or their
+    values (MATLAB's radon, calcPDF and calcIPDF)
 
-      f.radon(h)
-      f.radon(r=r)
-      f.radon(h, r)
-      f.radon([h1, h2], superposition=[0.4, 0.6])"""
+      pf = SO3F.radon(h)                                      # the pole figure of the crystal direction h
+      ipf = SO3F.radon(r=r)                                   # the inverse pole figure of the specimen direction r
+      v = SO3F.radon(h, r)                                    # the pole figure of h at the directions r
+      pf = SO3F.radon([h1, h2], superposition=[0.4, 0.6])     # superposed pole figures
+
+    The pole figure of h is the mean of the function over the orientations g with g h = r, a
+    function of r on the sphere in the specimen frame; the inverse pole figure of r the same
+    mean as a function of h in the crystal frame. A Laue group, or an antipodal direction,
+    makes them antipodal. Several crystal directions give the superposition of their pole
+    figures, weighted equally unless superposition is given. MATLAB's bandwidth, which cuts
+    the transform, is not taken: truncate the function first.
+
+    Input
+      SO3F - SO3FunHarmonic
+      h - Miller or vector3d, the crystal directions, or a list of them
+      r - vector3d, the specimen directions
+    Output
+      pf - S2FunHarmonic in the specimen frame
+      ipf - S2FunHarmonic in the crystal frame
+      v - array, the values at the pairs of h and r
+    Keywords
+      superposition - the weights of several crystal directions
+    See also
+      calcPoleFigure, plotPF, plotIPF, PoleFigure"""
     from .funops import radon
     return radon(self, h, r, superposition)
 

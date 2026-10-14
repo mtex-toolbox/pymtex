@@ -98,11 +98,33 @@ def _readArgs(args):
 
 
 class quadratureSO3Grid:
-  """the quadrature grid on SO(3) of bandwidth L: equispaced Euler angles alpha and gamma and a
-  Clenshaw-Curtis or Gauss-Legendre rule in beta, reduced by the folds about z of the frames
+  """the quadrature grid on SO(3) of a bandwidth: the nodes and weights that integrate every
+  harmonic function up to that degree exactly
 
-    quadratureSO3Grid(L)
-    quadratureSO3Grid(L, CS, SS, 'GaussLegendre')"""
+    G = quadratureSO3Grid(L)                                        # Clenshaw-Curtis in beta, no symmetry
+    G = quadratureSO3Grid(bandwidthFor(L, cs), cs, ss, 'GaussLegendre')  # Gauss-Legendre, reduced by the frames
+    G = quadratureSO3Grid(15, rA=4, rB=2)                           # reduced by fourfold and twofold folds about z
+    ori, w = G.nodes(), G.weights                                   # the nodes and their weights
+
+  The Euler angles alpha and gamma are equispaced, 2L + 2 of each, and beta follows a
+  Clenshaw-Curtis rule, the default, or a Gauss-Legendre rule. The frames' rotations about z
+  shorten the alpha range by the specimen fold rB and the gamma range by the crystal fold rA,
+  which must divide 2L + 2: bandwidthFor(L, cs, ss) gives the next bandwidth that they divide.
+  The weights sum to one, the Haar measure. Unlike MATLAB's, the grid is not itself an
+  orientation: G.nodes() gives the orientations, beta fastest, and G.weights the weights.
+
+  Input
+    bandwidth - int, the degree up to which the rule is exact
+    CS, SS - crystalFrame and specimenFrame (positional, optional)
+    scheme - 'ClenshawCurtis' (default) or 'GaussLegendre' (positional, optional)
+  Output
+    G - quadratureSO3Grid
+  Keywords
+    rA - the fold about z on the crystal side, without frames
+    rB - the fold about z on the specimen side, without frames
+    dtype - the floating point type of the angles and weights
+  See also
+    bandwidthFor, SO3FunHarmonic.quadrature, regularSO3Grid, SO3FunQuadrature"""
 
   # the full rule, or the one for functions with an rA fold axis along z on the crystal side
   # (periodic in gamma) and an rB fold on the specimen side (periodic in alpha); 2L+2 must

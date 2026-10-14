@@ -285,14 +285,38 @@ class SO3VectorField:
 
 
 class SO3VectorFieldHarmonic(SO3VectorField):
-  """a vector field on SO(3) whose three components are series of Wigner functions: from a
-  coefficient matrix, another field, tangent vectors at orientations, three component functions
-  or a callable, in the left or right tangent space, symmetrised to be equivariant
+  """a vector field on SO(3) whose three components are series of Wigner functions, in the left or
+  the right tangent space
 
-    SO3VectorFieldHarmonic(fhat, cs, ss, 'left')
-    SO3VectorFieldHarmonic(F, 'right')                   another field on the right side
-    SO3VectorFieldHarmonic(t, bandwidth=16)              the field through tangent vectors t
-    SO3VectorFieldHarmonic(lambda ori: ..., cs, ss)      by quadrature"""
+    SO3VF = SO3VectorFieldHarmonic(fhat, cs, ss, 'left')        # from a coefficient matrix
+    SO3VF = SO3VectorFieldHarmonic(F, 'right')                  # another field in the right tangent space
+    SO3VF = SO3VectorFieldHarmonic(F, bandwidth=8)              # another field cut to a bandwidth
+    SO3VF = SO3VectorFieldHarmonic(t, bandwidth=8)              # through tangent vectors t at orientations
+    SO3VF = SO3VectorFieldHarmonic([F1, F2, F3])                # from its three component functions
+    SO3VF = SO3VectorFieldHarmonic(lambda ori: F(ori), cs, ss, bandwidth=8)  # a callable by quadrature
+
+  The coefficient matrix has the three components as columns, deg2dim(L + 1) rows of MTEX's
+  coefficients each. A field in the left tangent space returns its tangent vectors in the
+  specimen frame, one in the right tangent space in the crystal frame, 'left' unless named;
+  another field is converted to the side named. Tangent vectors t, an SO3TangentVector with
+  its reference orientations, are summed with the weights against the Wigner functions, which
+  is the quadrature only for the weights of a quadrature rule; a callable returning tangent
+  vectors at orientations is sampled on a quadrature grid of the bandwidth, by default the
+  preference defaultSO3Bandwidth. A coefficient matrix given is made equivariant under the
+  frames unless symmetrise=False.
+
+  Input
+    fhat - (deg2dim(L + 1), 3) array, an SO3VectorField, an SO3TangentVector, three
+        SO3FunHarmonic or a callable of orientations
+    cs, ss - crystalFrame and specimenFrame
+  Output
+    SO3VF - SO3VectorFieldHarmonic
+  Keywords
+    bandwidth - the largest degree of the components
+    weights - the weights of the tangent vectors, equal unless given
+    symmetrise - make a coefficient matrix equivariant under the frames' symmetries
+  See also
+    SO3VectorFieldRBF, grad, antiderivative, mapField, SO3TangentVector, SO3FunVectorField"""
 
   def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
     side, rest = _readSide(args)
@@ -573,8 +597,28 @@ def curl(v, x=None):
 
 
 def antiderivative(v, x=None, conservative=False, tol=1e-4):
-  """the function of mean zero whose gradient the field is, Laplace^-1 div F; the field is
-  checked to be a gradient unless told it is"""
+  """the antiderivative of a gradient field, the function of mean zero whose gradient it is
+
+    f = antiderivative(SO3VF)                         # the function, an SO3FunHarmonic
+    values = antiderivative(SO3VF, x)                 # its values at orientations x
+    f = antiderivative(SO3VF, conservative=True)      # without checking the field is a gradient
+
+  The function is the inverse Laplacian of the divergence of the field, defined up to a
+  constant, which is chosen to give mean zero. A field that is no gradient is refused unless
+  conservative says it is one: the gradient of the result must give the field back within
+  tol relative to its norm.
+
+  Input
+    SO3VF - SO3VectorField, converted to its harmonic form
+    x - orientation, where to evaluate the antiderivative
+  Output
+    f - SO3FunHarmonic
+    values - array, the values at x
+  Keywords
+    conservative - the field is known to be a gradient, so it is not checked
+    tol - the relative tolerance of the check
+  See also
+    grad, div, curl, SO3VectorFieldHarmonic, SO3FunVectorField"""
   v = SO3VectorFieldHarmonic(v)
   d = div(v)
   n = _so3Degrees(d.bandwidth)
@@ -628,12 +672,35 @@ def component(v, i):
 
 
 def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
-  """the field or function of op applied pointwise to a field v and further fields, functions or
-  numbers, by quadrature on the component grid of v; reduce=True sums the result over the
-  components, invariant=True puts a scalar result on the full frames
+  """a pointwise operation on vector fields on SO(3), as a field or a function
 
-    mapField(np.cross, v, w)
-    mapField(np.multiply, v, w, reduce=True, invariant=True)     the inner product"""
+    u = mapField(np.cross, v, w)                                  # the cross product of two fields
+    f = mapField(np.multiply, v, w, reduce=True, invariant=True)  # the inner product, a function on the full frames
+    u = mapField(lambda a, f: a * f[:, None], v, F, bandwidth=8)  # a field times a scalar function
+    u = mapField(np.multiply, v, 2)                               # a field times a number
+
+  The arguments are evaluated on the quadrature grid of the component frames of v, op is
+  applied to the arrays, the tangent vectors of a field an (n, 3) array in the tangent space of
+  v, a function's values an array of n, a number itself, and the result is expanded again: an
+  (n, 3) result is a field in the tangent space of v, an (n,) one a function. The bandwidth is
+  that of the operands added, at most the preference maxSO3Bandwidth. A scalar result lives
+  on the component frames of v unless invariant says it is invariant under the full frames of
+  the field.
+
+  Input
+    op - a callable of NumPy arrays
+    v - SO3VectorField
+    args - further SO3VectorField, SO3Fun or numbers, on the frames of v
+  Output
+    u - SO3VectorFieldHarmonic
+    f - SO3FunHarmonic
+  Keywords
+    bandwidth - the bandwidth of the result
+    invariant - put a scalar result on the frames of the field rather than its component
+        frames
+    reduce - sum the result over the three components before it is expanded
+  See also
+    SO3VectorFieldHarmonic, grad, antiderivative, SO3FunVectorField"""
   others = [a for a in args if not isinstance(a, (int, float, np.number))]
   L0 = min(v.bandwidth + sum(a.bandwidth for a in others), getMTEXpref("maxSO3Bandwidth")) if bandwidth is None else int(bandwidth)
   cA, cB = v.componentFrames()
@@ -747,11 +814,32 @@ class SO3VectorFieldHandle(SO3VectorField):
 
 class SO3VectorFieldRBF(SO3VectorField):
   """a vector field on SO(3) as a sum of radial kernels at centre orientations with weight vectors,
-  exactly equivariant; from tangent vectors at orientations or another field it is fitted
+  exactly equivariant
 
-    SO3VectorFieldRBF(center, weights, psi)
-    SO3VectorFieldRBF(t, kernel=psi)                  through tangent vectors t
-    SO3VectorFieldRBF(F, resolution=5*degree)         another field on a grid"""
+    SO3VF = SO3VectorFieldRBF(center, weights, psi)                 # from centres, weight vectors and a kernel
+    SO3VF = SO3VectorFieldRBF(center, weights, None, 'right')      # in the right tangent space, the default kernel
+    SO3VF = SO3VectorFieldRBF(t, kernel=psi)                       # fitted through tangent vectors t
+    SO3VF = SO3VectorFieldRBF(F, resolution=10*degree)             # another field fitted on a grid
+
+  The field is the sum over the centres of the kernel at the misorientation to the centre
+  times the centre's weight vector, summed over the symmetric equivalents so that it is
+  equivariant under the frames. Through tangent vectors t, an SO3TangentVector at reference
+  orientations, the weights solve the dense linear system of the kernel between the
+  references, which suits hundreds of centres; another field is sampled on an equispaced grid
+  of the resolution and fitted the same way, the kernel by default of halfwidth the resolution.
+  MATLAB stores the three components as SO3FunRBF; the weights here are one vector per centre.
+
+  Input
+    center - orientation, the centres; or an SO3TangentVector or SO3VectorField to fit
+    weights - (n, 3) array, one weight vector per centre
+    psi - SO3Kernel, a de la Vallee Poussin kernel of halfwidth 10 degree unless given
+  Output
+    SO3VF - SO3VectorFieldRBF
+  Keywords
+    kernel - the kernel of a fit
+    resolution - the grid spacing of the fit of another field, 5 degree unless given
+  See also
+    SO3VectorFieldHarmonic, SO3FunRBF, SO3TangentVector, SO3FunVectorField"""
 
   def __init__(self, center, weights=None, psi=None, *args, kernel=None, resolution=None):
     side, _ = _readSide(args)

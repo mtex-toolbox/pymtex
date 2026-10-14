@@ -148,13 +148,44 @@ def _lsqrFull(A, At, b, n, maxIter, tol):
 
 def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weights=None, maxIter=100, tol=None,
                 withParameters=False):
-  """the function of least squares through values at nodes, on SO(3) for orientations, on the
-  sphere for directions, a vector field for vector values, fitted by LSQR with a Sobolev
-  penalty lambda_ of order s
+  """the function in harmonic form fitted by least squares to values at nodes: on SO(3) at
+  orientations, on the sphere at directions, a vector field for vector values or tangent vectors
 
-    interpolate(ori, y)
-    interpolate(v, y, bandwidth=16, lambda_=1e-4)
-    interpolate(ori, y, withParameters=True)      also LSQR's flag, residual and iterations"""
+    SO3F = interpolate(ori, y)                                  # an SO(3) function through values at orientations
+    SO3F = interpolate(ori, y, bandwidth=8, weights='equal')    # of a given degree, the nodes weighted equally
+    SO3F, (flag, residual, nIter) = interpolate(ori, y, withParameters=True)  # with LSQR's flag, residual and iterations
+    sF = interpolate(v, y, bandwidth=16, lambda_=1e-4)          # a function on the sphere through values at directions
+    sVF = interpolate(v, w)                                     # a vector field on the sphere through vectors w
+    SO3VF = interpolate(SO3TangentVector(w, ori), bandwidth=8)  # a vector field on SO(3) through tangent vectors
+    SO3VF = interpolate(SO3TangentVector(w, ori), lambda_=0)    # without regularisation
+
+  The harmonic coefficients up to the bandwidth minimise the weighted squared misfit at the
+  nodes plus lambda_ times the Sobolev norm of order s, solved by LSQR. On SO(3) the fit is posed
+  among the functions with the symmetries of the nodes; nodes closer than 0.02 are merged into one
+  carrying the mean of their values; the bandwidth follows from the number of nodes, at most the
+  preference 'maxSO3Bandwidth'. Values with further axes after the node axis give one function
+  per component. A vector field on SO(3) is fitted componentwise, three SO3FunHarmonic, as
+  MATLAB's SO3VectorFieldHarmonic.interpolate; MATLAB passes the tangent vectors as values,
+  here they carry their orientations.
+
+  Input
+    nodes - orientation or rotation, vector3d, or SO3TangentVector for a vector field on SO(3)
+    values - ndarray of one value per node, or vector3d for a vector field on the sphere
+  Output
+    SO3F - SO3FunHarmonic, S2FunHarmonic, S2VectorFieldHarmonic or SO3VectorFieldHarmonic
+  Keywords
+    bandwidth - the largest harmonic degree; set by hand it may undersample
+    lambda_ - the regularisation parameter, 1e-8 on SO(3) by default, 0 for none; MATLAB's
+        'regularization'
+    s - the order of the Sobolev norm; MATLAB's 'SobolevIndex'
+    weights - the weights of the nodes: by default their Voronoi volumes below 10000 nodes, else
+        equal; 'equal', or one number per node
+    maxIter - the largest number of LSQR iterations
+    tol - the tolerance of LSQR, 1e-3 on SO(3) and 1e-6 on the sphere by default
+    withParameters - return also LSQR's flag, residual and number of iterations
+  See also
+    SO3FunHarmonic.interpolate, S2FunHarmonic.interpolate, SO3FunRBF.interpolate,
+    calcDensity, SO3FunVectorValued, HarmonicApproximationTheory"""
   from ..geometry.tangent import SO3TangentVector
   if isinstance(nodes, SO3TangentVector):
     from .so3vectorfield import interpolateField

@@ -40,11 +40,39 @@ FIELDS = ("pos", "rotations", "phaseId", "CSList", "lattice", "prop", "meta", "s
 
 class EBSD:
   """an EBSD map: positions, rotations and phase ids with the list of the phases' frames and the
-  properties, a scattered list or, gridified, arrays in map shape; nan positions are dropped and
-  the lattice is read off the positions or a unit cell
+  properties of every measurement; MATLAB's EBSD
 
-    EBSD(pos, rotations, phaseId, CSList, prop)
-    EBSD(pos, rotations, phaseId, CSList, prop, unitCell=uC)"""
+    ebsd = EBSD(pos, rot, phaseId, CSList)                      # the measurements as a list
+    ebsd = EBSD(pos, rot, phaseId, CSList, {'mad': mad})        # with properties
+    ebsd = EBSD(pos, rot, phaseId, CSList, prop, unitCell=uC)   # the shape of a pixel stated
+
+  A map is a table of measurements, a row per pixel, or, gridified, the same arrays in map
+  shape, ebsd[i, j] the pixel of row i and column j. phaseId indexes CSList, 0 the not indexed
+  phase. A position that is NaN is dropped, as MATLAB drops it. The lattice of the positions,
+  square or hexagonal, is read off the positions, or off the unit cell when it is given;
+  loadEBSD, mtexdata and the simulations build maps the same way.
+
+  Input
+    pos - vector3d, or an (n, 2) or (n, 3) array, the centres of the pixels
+    rotations - rotation, the rotation of every pixel
+    phaseId - int array, the phase of every pixel as the index into CSList
+    CSList - phaseList, or a list of crystalFrame with 'notIndexed' first
+    prop - dict, a property per pixel of the shape of the map, ebsd.prop['mad'] and ebsd.mad
+  Output
+    ebsd - EBSD
+  Keywords
+    unitCell - vector3d or (k, 2) array, the corners of a pixel about its centre, from which
+        the lattice is built
+    scanUnit - the unit of the positions
+    frame - specimenFrame of the positions, by default that of pos or the default one
+    lattice - the lattice of the positions, when it is known, instead of reading it off them
+    meta - dict, what a file states besides the measurements
+    phaseMap - the phase number the file gives each entry of CSList
+    id - the id of every pixel, by default its position in the list
+    isPadding - the mask of the cells a grid adds to close it, MATLAB's NaN phase
+  See also
+    loadEBSD, EBSDsquare, gridify, simulateEBSD, EBSDImport, EBSDSelect, EBSDPlotting,
+    GrainReconstruction"""
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, unitCell=None, scanUnit="um", frame=None,
                lattice=None, meta=None, phaseMap=None, id=None, isPadding=None):
@@ -490,9 +518,38 @@ class EBSD:
     return float(np.linalg.norm(c[1:] - c[0], axis=1).min())
 
   def gridify(self, layout=None, unitCell=None, return_index=False):
-    """the same map with its arrays in map shape, the missing cells padding; with a layout the arrays
-    reordered, with a unitCell resampled onto that lattice, with return_index also the flat index
-    of every measurement in the grid"""
+    """the same map with its arrays in map shape, the missing cells padding; MATLAB's gridify
+
+      grid = ebsd.gridify()                                # the rows and columns of the scan
+      grid, newId = ebsd.gridify(return_index=True)        # and where every measurement went
+      grid = ebsd.gridify('rowMajor')                      # transposed, one scan column per array row
+      grid = ebsd.gridify(gridLayout.rowMajor())           # in the order a layout states
+      grid = ebsd.gridify(unitCell=2 * ebsd.unitCell)      # resampled onto a coarser lattice
+
+    The grid closes the map to a full rectangle: a cell with no measurement, a pixel of another
+    phase after ebsd['Forsterite'] or one outside a region, is padding, not indexed, with a NaN
+    rotation, marked in ebsd.isPadding and left out of the plots, the counts and the grains.
+    So the grid may hold more cells than the map had measurements. Nothing is interpolated.
+
+    In the default, column major, layout the first index runs along the grid direction closest
+    to y and the second along the one closest to x, both with increasing coordinates, ebsd[0, 0]
+    the corner of the smallest coordinates. Another layout reorders the arrays by a transpose and
+    flips only; a hexagonal grid is always stored column major. The gradients, the curvature,
+    the GND and KAM do not need a grid, they run on the lattice of a list too.
+
+    Input
+      ebsd - EBSD, a list or a grid
+      layout - gridLayout, or 'columnMajor' or 'rowMajor', the order of the arrays
+    Output
+      grid - EBSD in map shape
+      newId - the flat index of every measurement in the grid, grid.pos.flatten()[newId] is
+          ebsd.pos
+    Keywords
+      unitCell - the unit cell of another lattice, onto which the map is resampled by the
+          nearest measurement
+      return_index - return newId as well
+    See also
+      gridLayout, EBSD.layout, EBSDGrid, transformReferenceFrame"""
     from .gridify import gridify
     return gridify(self, layout, unitCell, return_index)
 
@@ -674,8 +731,30 @@ def _inPolygon(x, y, V, includeEdge=True):
 
 
 def EBSDsquare(rotations, phaseId=None, CSList=None, dxy=(1.0, 1.0), scanUnit="um", frame=None, prop=None):
-  """EBSDsquare(rotations, phaseId, CSList): a map on a square grid, the rows of the array its
-  rows of pixels, as MATLAB's EBSDsquare builds a synthetic map"""
+  """a map on a square grid from arrays in map shape, the rows of the array its rows of pixels;
+  MATLAB's EBSDsquare, used to build a synthetic map
+
+    ebsd = EBSDsquare(rot, phaseId, CSList)                  # pixels of unit step
+    ebsd = EBSDsquare(rot, CSList=CSList, dxy=0.5)           # one phase, another step
+    ebsd = EBSDsquare(rot, phaseId, CSList, dxy=(1, 2))      # rectangular pixels
+
+  Pixel (i, j) sits at x = j dx, y = i dy. The map is gridified, as a gridded map read from a
+  file is.
+
+  Input
+    rotations - rotation of shape (rows, columns)
+    phaseId - int array of the same shape, the index into CSList; phase 1 everywhere by
+        default
+    CSList - phaseList, or a list of crystalFrame with 'notIndexed' first
+  Output
+    ebsd - EBSD in map shape
+  Keywords
+    dxy - the step of the grid, one number or (dx, dy)
+    scanUnit - the unit of the positions
+    frame - specimenFrame of the positions
+    prop - dict of the properties, each of the shape of the map
+  See also
+    EBSD, gridify, simulateEBSD, QuadruplePoints"""
   from .gridify import gridify
   rot = rotations if isinstance(rotations, MtexArray) else rotation(rotations)
   ny, nx = rot.shape

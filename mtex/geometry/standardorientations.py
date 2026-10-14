@@ -146,18 +146,42 @@ def ShojiNishiyama(csG, csE):
 
 
 def variants(p2c, second=None, ids=None, parent=False):
-  """the child variants of a parent-to-child relationship: the distinct p2c * r over the parent
-  group modulo the child group; the parent variants with the sides swapped; the child
-  orientations of parents, all of them or one chosen per parent by its id; the parent
-  orientations of children, whose frame is the child's. The variants are numbered as MTEX
-  numbers them, which is what a variant id means
+  """the variants of a parent to child orientation relationship, and the child or parent
+  orientations they give
 
     p2cVariants = variants(p2c)                      # the child variants
     p2pVariants = variants(p2c, parent=True)         # the parent variants
-    oriChild = variants(p2c, oriParent)              # every child variant of every parent, oriParent.shape + (numVariants,)
-    oriChild = variants(p2c, oriParent, variantId)   # one per parent, chosen by its id, broadcast
-    oriParent = variants(p2c, oriChild)              # the parents of children, oriChild.shape + (numVariants,)
-    odfChild = variants(p2c, odfParent)              # the child texture"""
+    oriChild = variants(p2c, oriParent)              # every child variant of every parent
+    oriChild = variants(p2c, oriParent, variantId)   # one per parent, chosen by its id
+    oriParent = variants(p2c, oriChild)              # every parent of every child
+    oriParent = variants(p2c, oriChild, variantId)   # one per child, chosen by its id
+    odfChild = variants(p2c, odfParent)              # the child texture
+
+  The child variants are the distinct p2c * r over the rotations r of the parent group modulo
+  the child group, the parent variants the distinct r * p2c over the child group modulo the
+  parent group. They are numbered as MTEX numbers them, Morito's numbering for
+  Kurdjumov-Sachs, which is what a variant id means; the ids count from 1. The child
+  orientations of a parent orientation are those of its representative in the fundamental
+  region times the inverse child variants, along a new last axis; an orientation in the child
+  frame gives its parent orientations instead, in the parent frame.
+
+  Input
+    p2c - orientation, the parent to child misorientation, from the parent frame to the child
+        frame
+    second - orientation, the parent orientations, or the child orientations; SO3Fun, a parent
+        texture; or 'parent', 'child'
+    ids - the variant ids, one per orientation, broadcast against them; for a texture an SO3Fun
+        of the parent orientations weighting the parents
+  Output
+    p2cVariants - orientation, the variants, a list
+    oriChild - orientation, oriParent.shape + (numVariants,), or oriParent.shape with ids
+    oriParent - orientation, oriChild.shape + (numVariants,), or oriChild.shape with ids
+    odfChild - SO3Fun, the child texture
+  Keywords
+    parent - the parent variants instead of the child variants
+  See also
+    orientation.variants, orientation.parents, calcParent2Child,
+    ParentChildVariants, MartensiteVariants"""
   from .orientation import orientation
   if isinstance(second, str):
     parent, second = second == "parent", None

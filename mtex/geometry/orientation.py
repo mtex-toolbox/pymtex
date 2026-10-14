@@ -62,9 +62,38 @@ class orientation(rotation):
   """orientations and misorientations, rotations taking coordinates in the frame CS to coordinates
   in the frame SS; a misorientation is one between two crystal frames
 
-    orientation(rot, cs, ss)
-    orientation(a, b, c, d, cs, ss)      the quaternion coefficients
-    orientation(f, cs, points=1000)      points along a fibre"""
+    ori = orientation(rot, cs, ss)                # a rotation between a crystal and a specimen frame
+    ori = orientation(a, b, c, d, cs, ss)         # the quaternion coefficients
+    mori = orientation(rot, cs, cs, antipodal=True)  # a misorientation with grain exchange
+    ori = orientation(f, points=100)              # points along a fibre
+    ori = orientation.byEuler(phi1, Phi, phi2, cs, ss)  # Euler angles, and the other constructors
+
+  An orientation is a rotation that carries the two frames it maps between: frameA, the crystal
+  frame CS, from which it takes the coordinates, and frameB, the specimen frame SS or the second
+  crystal frame of a misorientation, to which it takes them. The symmetries of both frames
+  enter every comparison, angle, mean and plot. A frame left out is the triclinic crystal frame,
+  or the default specimen frame. Coefficients are normalised; an improper transform is refused,
+  an orientation is proper.
+
+  An orientation given keeps its frames unless others are named; a fibre is sampled at points
+  orientations, an embedding projected back onto the orientations.
+
+  Input
+    rot - rotation, quaternion or orientation
+    a, b, c, d - the quaternion coefficients, numbers or arrays
+    cs - crystalFrame, the frame mapped from
+    ss - specimenFrame, or the second crystalFrame of a misorientation
+    f - fibre
+  Output
+    ori - orientation
+  Keywords
+    antipodal - a misorientation with grain exchange, between two frames of one crystal: the
+        misorientation and its inverse are taken as one
+    dtype - the floating point type of the coefficients
+    points - the number of orientations sampled along a fibre
+  See also
+    orientation.byEuler, orientation.byAxisAngle, orientation.byMiller, orientation.byMatrix,
+    orientation.map, rotation, crystalFrame, OrientationDefinition, MisorientationTheory"""
   _carried = ("frameA", "frameB", "antipodal", "notIID")
   # orientations that are not independent draws, the pixels of a map: an automatic halfwidth
   # asks for their grains (docs/plans/halfwidth.md, section 10)
@@ -119,14 +148,31 @@ class orientation(rotation):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, *args: EulerConventionName | Any, antipodal=False):
-    """the orientations of the Euler angles, Bunge's ZXZ convention unless a convention is named
-    ('Bunge', 'ZXZ', 'Matthies', 'ZYZ', 'ABG', 'Roe', 'Kocks', 'Canova'); antipodal=True marks a
-    misorientation with grain exchange
+    """orientations defined by Euler angles
 
-      ori = orientation.byEuler(phi1, Phi, phi2, cs, ss)              # Bunge
-      ori = orientation.byEuler(alpha, beta, gamma, 'ZYZ', cs, ss)    # Matthies
-      ori = orientation.byEuler(phi1, Phi, phi2, 'Kocks', cs, ss)
-      ori = orientation.byEuler([phi1, Phi, phi2], cs)                # the angles as one list"""
+      ori = orientation.byEuler(phi1, Phi, phi2, cs, ss)              # Bunge's convention
+      ori = orientation.byEuler(alpha, beta, gamma, 'ZYZ', cs, ss)    # Matthies' convention
+      ori = orientation.byEuler(phi1, Phi, phi2, 'Kocks', cs, ss)     # Kocks' convention
+      ori = orientation.byEuler([phi1, Phi, phi2], cs)                # the angles as one triple, or an array of triples
+
+    The angles are in radians, arrays of them broadcast against each other. Without a
+    convention the preference EulerAngleConvention decides, Bunge's ZXZ by default. The
+    convention and the frames follow the angles, in any order.
+
+    Input
+      a - the first angle, phi1 or alpha; or an array whose last axis holds the three angles
+      b - the second angle, Phi or beta
+      c - the third angle, phi2 or gamma
+      args - the convention, 'Bunge' or 'ZXZ', 'Matthies', 'ZYZ' or 'ABG', 'Roe', 'Kocks',
+          'Canova', 'nfft'; the crystal frame cs and the specimen frame ss, or a second crystal
+          frame for a misorientation
+    Output
+      ori - orientation
+    Keywords
+      antipodal - a misorientation with grain exchange
+    See also
+      rotation.byEuler, orientation.Euler, orientation.byAxisAngle, orientation.byMiller,
+      orientation.map, OrientationDefinition"""
     a, b, c, args = eulerTriple(a, b, c, args)
     args, frames = _splitFrames(args)
     convention = args[0] if args else None
@@ -192,13 +238,27 @@ class orientation(rotation):
 
   @classmethod
   def rand(cls, *args, rng=None, antipodal=False, maxAngle=None):
-    """random orientations, uniformly distributed or within maxAngle of the identity;
-    rng= a NumPy random generator, antipodal=True misorientations with grain exchange
+    """random orientations
 
-      ori = orientation.rand(cs)                          # one
-      ori = orientation.rand(n, cs, ss)
+      ori = orientation.rand(cs)                          # one random orientation
+      ori = orientation.rand(n, cs, ss)                   # n of them
       ori = orientation.rand(m, n, cs)                    # an m x n array
-      ori = orientation.rand(n, cs, maxAngle=10*degree)"""
+      ori = orientation.rand(n, cs, maxAngle=10*degree)   # within 10 degree of the identity
+
+    The rotations are uniformly distributed on SO(3), or within the ball of radius maxAngle
+    about the identity; the symmetry of the frames does not enter the draw.
+
+    Input
+      args - the shape, as numbers; the crystal frame cs and the specimen frame ss, or a second
+          crystal frame for misorientations
+    Output
+      ori - orientation
+    Keywords
+      rng - a NumPy random generator, for draws that repeat
+      antipodal - misorientations with grain exchange
+      maxAngle - the largest rotational angle, in radians
+    See also
+      rotation.rand, orientation.id, discreteSample"""
     args, frames = _splitFrames(args)
     return cls._fromRotation(rotation.rand(*args, rng=rng, maxAngle=maxAngle).data, frames, antipodal)
 
@@ -310,15 +370,35 @@ class orientation(rotation):
     return orientationAngle(self, other)
 
   def axis(self, other=None, symmetry=True, antipodal=None):
-    """the rotational axis, of the representative in the fundamental region; with a second
-    orientation the axis of their disorientation in the specimen frame; symmetry=False the axis of
-    the rotation itself, antipodal= the axis read as an axis or not
+    """the rotational axis of a misorientation, an orientation or the misorientation between two
+    orientations
 
       h = axis(mori)                    # in the crystal frame of mori
-      h = axis(mori, symmetry=False)
+      h = axis(mori, symmetry=False)    # of the rotation as it is stored
       h = axis(mori, 'max')             # of the equivalent that turns the most
       h = axis(mori, csHex)             # expressed in csHex, one of the two frames of mori
-      v = axis(ori1, ori2)              # in the specimen frame, also of two phases"""
+      v = axis(ori1, ori2)              # in the specimen frame, also of two phases
+
+    The axis is that of the representative in the fundamental region, the disorientation, so
+    it does not depend on the representative stored. Of a misorientation it is a crystal
+    direction in its first crystal frame, or in the other one named; of an orientation a
+    specimen direction. Of two orientations it is the axis of the misorientation between them,
+    expressed in the specimen frame. The axis carries only the symmetry both frames share, and
+    with grain exchange it is an axis without sign.
+
+    Input
+      mori - orientation, a misorientation or an orientation
+      other - orientation, the second orientation, in the specimen frame; a frame of mori to
+          express the axis in; or 'max'
+    Output
+      h - Miller, the axis in a crystal frame, or vector3d in the specimen frame
+    Keywords
+      symmetry - reduce by the symmetry first; False takes the axis of the rotation as stored,
+          MATLAB's 'noSymmetry'
+      antipodal - set whether the axis is read as an axis without sign; by default as the
+          symmetry says
+    See also
+      orientation.angle, orientation.log, MisorientationTheory"""
     from .frames import referenceFrame
     from .symmetryops import orientationAxis, pairAxis
     # axis(mori, 'max'): the axis of the equivalent that turns the most, MATLAB's option
@@ -357,22 +437,73 @@ class orientation(rotation):
     return ~(self == other)
 
   def unique(self, tol=1e-3, symmetry=True, stable=False, return_index=False, return_inverse=False):
-    """the orientations with the equivalents within the tolerance removed, the first kept;
-    optionally the indices of the kept ones and the index of each into them"""
+    """the disjoint list of orientations, symmetric equivalents within a tolerance taken as one
+
+      u = unique(ori)                                         # one of each
+      u = unique(ori, tol=1*degree)                           # within 1 degree as one
+      u = unique(ori, symmetry=False)                         # the rotations as stored
+      u, iOri, iu = unique(ori, return_index=True, return_inverse=True)  # the index maps
+
+    Two orientations are one when their misorientation angle, symmetry reduced, is below tol.
+    Every orientation not yet taken takes the later ones within the tolerance, so the first of
+    each kept is returned, in the order of first appearance. MATLAB sorts unless 'stable' is
+    given; here the order is always that of first appearance.
+
+    Input
+      ori - orientation
+    Output
+      u - orientation, a one-dimensional list
+      iOri - indices with u = ori.flatten()[iOri]
+      iu - indices with ori.flatten() = u[iu]
+    Keywords
+      tol - the angular tolerance, in radians
+      symmetry - take symmetric equivalents as one; False compares the rotations as stored,
+          MATLAB's 'noSymmetry'
+      stable - accepted for MATLAB's flag; the order is that of first appearance anyway
+      return_index - also return iOri
+      return_inverse - also return iu
+    See also
+      quaternion.unique, orientation.isclose, orientation.symmetrise"""
     from .symmetryops import orientationUnique
     return orientationUnique(self, tol, symmetry, return_index, return_inverse)
 
   def mean(self, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False,
            axis=None, dtype=None, out=None, keepdims=False, **kwargs):
-    """the mean orientation, every element moved to the equivalent closest to the running mean
-    before the quaternion mean is taken; weighted, or robust against outliers.
-    return_projected=True also gives the orientations moved to the equivalents closest to the
-    mean, return_inertia=True the principal moments and axes of inertia of quaternion.mean,
-    in MATLAB's order
+    """the mean of a list of orientations, with the principal moments and axes of inertia
 
-      m = mean(ori)
-      m, oriProjected = mean(ori, return_projected=True)
-      m, oriProjected, lam, V = mean(ori, return_projected=True, return_inertia=True)"""
+      m = mean(ori)                                       # the mean orientation
+      m = mean(ori, weights=w)                            # a weighted mean
+      m = mean(ori, robust=True)                          # outliers left out
+      m, oriProjected = mean(ori, return_projected=True)  # with the equivalents nearest to it
+      m, oriProjected, lam, V = mean(ori, return_projected=True, return_inertia=True)  # and the inertia
+
+    Starting from the first orientation, every orientation is moved to its symmetric equivalent
+    closest to the running mean, and the quaternion mean of these equivalents is the next mean;
+    iterations rounds of this. A texture spread over more than the fundamental region has no
+    meaningful mean. Orientations that are not a number are left out.
+
+    The mean is taken over the whole list; axis is refused, index the list for the mean of a
+    part.
+
+    Input
+      ori - orientation
+    Output
+      m - orientation, the mean
+      oriProjected - orientation, the equivalents of ori closest to m, NaN where ori is
+      lam - the principal moments of inertia, in ascending order
+      V - quaternion, the four principal axes of inertia
+    Keywords
+      weights - one weight per orientation
+      robust - leave out the outliers, as quaternion.mean does
+      iterations - the rounds of moving to the closest equivalents and averaging
+      return_projected - also return oriProjected
+      return_inertia - also return lam and V
+      axis - NumPy's reduction axis, refused
+      dtype - NumPy's argument, refused
+      out - NumPy's argument, refused
+      keepdims - keep the reduced axes with length one, as np.mean does
+    See also
+      quaternion.mean, quaternion.std, EBSD.grainMean, BinghamODF"""
     numpyReduction("mean", dtype, out, kwargs, "orientations")
     if axis is not None:
       raise ValueError("the mean of orientations is taken over the whole list; index the list for the mean of a part")
@@ -394,8 +525,32 @@ class orientation(rotation):
     return projectIntoFundamentalRegionOrientation(o, ref)
 
   def log(self, ref=None, side="left", symmetry=True):
-    """the tangent vector at the reference pointing to this orientation, the pair reduced by
-    symmetry first so that its norm is angle(ori, ref)"""
+    """the logarithm of an orientation, the tangent vector at a reference pointing to it
+
+      v = log(ori)                          # at the identity
+      v = log(ori, oriRef)                  # at oriRef, in specimen coordinates
+      v = log(ori, oriRef, side='right')    # at oriRef, in crystal coordinates
+      v = log(mori, 'right')                # the misorientation vector in crystal coordinates
+
+    The tangent vector v at oriRef with exp(v) = ori, the misorientation vector of ori relative
+    to oriRef. The pair is reduced by symmetry first, as angle does it, so that the vector
+    describes the two crystals and not their stored representatives: norm(log(ori, oriRef)) is
+    angle(ori, oriRef). With side 'left' the vector is ori * inv(oriRef) taken to the tangent
+    space, a specimen direction; with 'right' it is inv(oriRef) * ori, a crystal direction.
+
+    Input
+      ori - orientation
+      ref - orientation, the reference, by default the identity between the frames of ori; or
+          'left' or 'right', the side
+    Output
+      v - SO3TangentVector at the reference, its norm the angle in radians
+    Keywords
+      side - 'left', the vector in specimen coordinates, or 'right', in crystal coordinates,
+          MATLAB's SO3TangentSpace.leftVector and rightVector
+      symmetry - reduce the pair by symmetry first; False takes the rotations as stored,
+          MATLAB's 'noSymmetry'
+    See also
+      SO3TangentVector.exp, orientation.angle, orientation.axis, RotationTangentSpace"""
     from .tangent import logOrientation
     return logOrientation(self, ref, side, symmetry)
 
@@ -410,7 +565,32 @@ class orientation(rotation):
     return projectIntoEulerRegion(self)
 
   def transformReferenceFrame(self, to, toB=None, rule=None, tol=1e-1):
-    """the same orientation with another crystal frame, both frames of a misorientation"""
+    """the same orientation described with another reference frame of the crystal
+
+      ori = ori.transformReferenceFrame(cs)                          # the axes aligned by the frames' conventions
+      ori = ori.transformReferenceFrame(cs, rule=rel)                # the frames related by an orientation
+      ori = ori.transformReferenceFrame(cs, 'byScreenAlignment')     # the frames related by their plotting conventions
+      mori = mori.transformReferenceFrame(cs1, cs2)                  # both frames of a misorientation
+
+    An orientation is described with respect to Cartesian axes aligned in a fixed way with the
+    crystal axes a, b, c, such as X||a, Z||c* or X||a*, Z||c. The orientation, the physical
+    relation between crystal and specimen, stays, only its coordinates change: ori' = ori *
+    inv(R), R the transition from the old crystal frame to the new one, so ori'(h') = ori(h)
+    for every crystal direction h restated as h'.
+
+    Input
+      ori - orientation
+      to - crystalFrame, the new frame, the first one of a misorientation
+      toB - crystalFrame, the new second frame of a misorientation; or the rule
+    Output
+      ori - orientation in the new frame
+    Keywords
+      rule - how the old frame relates to the new one: 'byAxes', by the crystal axes, the
+          default; 'byScreenAlignment', by the two frames being drawn alike; or an orientation
+          from the old frame to the new one
+      tol - how far from a rotation the transition by the axes may come out
+    See also
+      vector3d.transformReferenceFrame, align, byScreenAlignment, CrystalReferenceSystem"""
     from .frametransform import transformOrientation
     if isinstance(toB, (str, orientation)):
       rule, toB = toB, None
@@ -427,13 +607,41 @@ class orientation(rotation):
     return find(self, w, epsOrK)
 
   def variants(self, second=None, ids=None, parent=False):
-    """the variants of a parent-to-child relationship, the distinct p2c * r over the parent group
-    modulo the child group, or the child orientations of parents; numbered as MTEX numbers them
+    """the variants of a parent to child orientation relationship, and the child or parent
+    orientations they give
 
-      p2c.variants()
-      p2c.variants(oriParent)              oriParent.shape + (numVariants,)
-      p2c.variants(oriParent, ids)         one per parent, the ids broadcast against them
-      p2c.variants(parent=True)            the parent variants"""
+      p2cVariants = p2c.variants()                     # the child variants
+      p2pVariants = p2c.variants(parent=True)          # the parent variants
+      oriChild = p2c.variants(oriParent)               # every child variant of every parent
+      oriChild = p2c.variants(oriParent, variantId)    # one per parent, chosen by its id
+      oriParent = p2c.variants(oriChild)               # every parent of every child
+      oriParent = p2c.variants(oriChild, variantId)    # one per child, chosen by its id
+      odfChild = p2c.variants(odfParent)               # the child texture
+
+    The child variants are the distinct p2c * r over the rotations r of the parent group modulo
+    the child group, the parent variants the distinct r * p2c over the child group modulo the
+    parent group. They are numbered as MTEX numbers them, which is what a variant id means; the
+    ids count from 1. The child orientations of a parent orientation are those of its
+    representative in the fundamental region times the inverse child variants, along a new
+    last axis; an orientation in the child frame gives its parent orientations instead, in the
+    parent frame.
+
+    Input
+      p2c - orientation, the parent to child misorientation, from the parent frame to the
+          child frame
+      second - orientation, the parent orientations, or the child orientations; SO3Fun, a
+          parent texture; or 'parent', 'child'
+      ids - the variant ids, one per orientation, broadcast against them; for a texture an
+          SO3Fun of the parent orientations weighting the parents
+    Output
+      p2cVariants - orientation, the variants, a list
+      oriChild - orientation, oriParent.shape + (numVariants,), or oriParent.shape with ids
+      oriParent - orientation, oriChild.shape + (numVariants,)
+      odfChild - SO3Fun, the child texture
+    Keywords
+      parent - the parent variants instead of the child variants
+    See also
+      variants, orientation.parents, calcParent2Child, ParentChildVariants, MartensiteVariants"""
     from .standardorientations import variants
     return variants(self, second, ids, parent)
 

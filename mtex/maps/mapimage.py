@@ -47,13 +47,34 @@ def _toDouble(img):
 
 
 class mapImage:
-  """an image that knows where on the specimen it sits: a regular grid of an origin and two
-  perpendicular steps, d1 from row to row and d2 from column to column; an integer image is
-  scaled to [0, 1]
+  """an image that knows where on the specimen it sits: a raster of values on a regular grid of
+  an origin and two perpendicular steps; MATLAB's mapImage
 
-    mapImage(img)                          unit step, a frame of its own
-    mapImage(img, dxy=0.05, name='bse')    square pixels; dxy=(dx, dy) rectangular ones
-    mapImage(ebsd.bc, ebsd, name='bcImg')  a channel of a gridded square map, the map riding along"""
+    mg = mapImage(img)                                 # unit step, a frame of its own
+    mg = mapImage(img, dxy=0.05, name='bse')           # square pixels of 0.05
+    mg = mapImage(img, dxy=(0.05, 0.1))                # rectangular pixels
+    mg = mapImage(ebsd.bc, ebsd, name='bcImg')         # a channel of a gridded map, the map along
+    mg = mapImage(img, ebsd)                           # an image on the grid of the map
+
+  A forescatter or backscatter image, a band contrast map or any other value per pixel,
+  together with the part of the specimen each pixel covers, which makes an image and an EBSD
+  map comparable. The grid is regular: d1 is the step from row to row, d2 from column to
+  column, and the positions follow from them; a distortion is applied by resampling, never by
+  moving the pixels. An image with a map carries the map along, on the same grid, which must
+  be square. An integer image is scaled to [0, 1].
+
+  Input
+    img - array of rows x columns, or rows x columns x channels
+    ebsd - EBSD, gridded and square, on the grid of the image
+  Output
+    mg - mapImage
+  Keywords
+    dxy - the pixel size, one number or (dx, dy), for an image without a map
+    origin - vector3d, the position of pixel (0, 0)
+    name - an identifier, the property of the EBSD map an aligned image is written into
+    scanUnit - the unit of the positions, by default the map's or 'um'
+  See also
+    mapImageList, trueEbsd, mapImage.rescale, xcfShift, gridLayout, EBSDMapsAndImages, EBSDTrueEbsd"""
 
   def __init__(self, img=None, ebsd=None, dxy=1.0, origin=None, name="", scanUnit=None):
     self.img = np.zeros((0, 0))
@@ -290,8 +311,28 @@ class mapImage:
     from typing import Any
     from ..plotting.mapplot import plotMapImage as plot
     def rescale(self, lo=0.0, hi=1.0, perChannel=False) -> Any:
-      """the values stretched to [lo, hi], all channels of an image together or each on its own; a
-      non finite value is left out of the range and left alone, a flat image unchanged"""
+      """the values of one or more images stretched to a common range; MATLAB's rescale of a mapImage
+
+        mg = rescale(mg)                       # to [0, 1]
+        mg = rescale(mg, -1, 1)                # to another range
+        mg = rescale(mg, perChannel=True)      # every channel on its own
+
+      Cross correlation compares pictures of different detectors, whose absolute levels mean
+      nothing to each other, so putting them on one range is the usual first step. Each image is
+      rescaled on its own, all its channels together, which keeps the colour balance. A non finite
+      value is left out of the range and left alone, so the padding of a resampling stays NaN; a
+      flat image is returned unchanged.
+
+      Input
+        mg - mapImage or mapImageList
+        lo - the lower end of the range
+        hi - the upper end of the range
+      Output
+        mg - the images rescaled, new objects
+      Keywords
+        perChannel - rescale every channel separately
+      See also
+        mapImage, mapImageList, trueEbsd, EBSDTrueEbsd"""
     def imboxfilt(self, k=3) -> Any:
       """a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
       a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
@@ -342,8 +383,28 @@ class mapImageList(list):
     from typing import Any
     from ..plotting.mapplot import plotMapImage as plot
     def rescale(self, lo=0.0, hi=1.0, perChannel=False) -> Any:
-      """the values stretched to [lo, hi], all channels of an image together or each on its own; a
-      non finite value is left out of the range and left alone, a flat image unchanged"""
+      """the values of one or more images stretched to a common range; MATLAB's rescale of a mapImage
+
+        mg = rescale(mg)                       # to [0, 1]
+        mg = rescale(mg, -1, 1)                # to another range
+        mg = rescale(mg, perChannel=True)      # every channel on its own
+
+      Cross correlation compares pictures of different detectors, whose absolute levels mean
+      nothing to each other, so putting them on one range is the usual first step. Each image is
+      rescaled on its own, all its channels together, which keeps the colour balance. A non finite
+      value is left out of the range and left alone, so the padding of a resampling stays NaN; a
+      flat image is returned unchanged.
+
+      Input
+        mg - mapImage or mapImageList
+        lo - the lower end of the range
+        hi - the upper end of the range
+      Output
+        mg - the images rescaled, new objects
+      Keywords
+        perChannel - rescale every channel separately
+      See also
+        mapImage, mapImageList, trueEbsd, EBSDTrueEbsd"""
     def imboxfilt(self, k=3) -> Any:
       """a box filter of k pixels, or (rows, cols), odd: the window shrinks at the border and around
       a missing value, so a NaN padding neither spreads nor darkens the frame (MATLAB's own,
@@ -404,8 +465,28 @@ def _ebsdStr(ebsd):
 # ------------------------------------------------------------------ the verbs
 
 def rescale(mg, lo=0.0, hi=1.0, perChannel=False):
-  """the values stretched to [lo, hi], all channels of an image together or each on its own; a
-  non finite value is left out of the range and left alone, a flat image unchanged"""
+  """the values of one or more images stretched to a common range; MATLAB's rescale of a mapImage
+
+    mg = rescale(mg)                       # to [0, 1]
+    mg = rescale(mg, -1, 1)                # to another range
+    mg = rescale(mg, perChannel=True)      # every channel on its own
+
+  Cross correlation compares pictures of different detectors, whose absolute levels mean
+  nothing to each other, so putting them on one range is the usual first step. Each image is
+  rescaled on its own, all its channels together, which keeps the colour balance. A non finite
+  value is left out of the range and left alone, so the padding of a resampling stays NaN; a
+  flat image is returned unchanged.
+
+  Input
+    mg - mapImage or mapImageList
+    lo - the lower end of the range
+    hi - the upper end of the range
+  Output
+    mg - the images rescaled, new objects
+  Keywords
+    perChannel - rescale every channel separately
+  See also
+    mapImage, mapImageList, trueEbsd, EBSDTrueEbsd"""
   def stretch(v):
     f = v[np.isfinite(v)]
     if f.size == 0 or f.max() <= f.min():

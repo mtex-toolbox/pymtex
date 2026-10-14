@@ -69,13 +69,39 @@ def projectSpherical(fhat, pg):
 
 
 class S2FunHarmonic(S2Fun, harmonicArithmetic):
-  """a function on the sphere by its spherical harmonic coefficients, or a list of such functions;
-  symmetrised by the group of its frame, even when antipodal
+  """a function on the sphere by its spherical harmonic series, or a list of such functions;
+  the default representation of a function on the sphere
 
-    S2FunHarmonic(fhat)                         MTEX's coefficients
-    S2FunHarmonic(fhat, cs, antipodal=True)
-    S2FunHarmonic(lambda v: v.z**2, bandwidth=16)     a callable expanded by quadrature
-    S2FunHarmonic(psi)                          a kernel on the sphere"""
+    sF = S2FunHarmonic(fhat)                                 # from MTEX's coefficients
+    sF = S2FunHarmonic(fhat, cs, antipodal=True)             # in a crystal frame, f(v) = f(-v)
+    sF = S2FunHarmonic(lambda v: v.z**2, bandwidth=16)       # a callable expanded by quadrature
+    sF = S2FunHarmonic(psi)                                  # the series of a kernel on the sphere
+    sF = S2FunHarmonic(sF, bandwidth=8)                      # another function, truncated
+
+  The coefficients fhat are MTEX's, degree by degree, (L + 1)^2 of them for the bandwidth L;
+  a vector ending inside a degree block is padded with zeros to its end. Convolution,
+  rotation, products and quadrature are cheap on this form. A callable of vector3d is
+  sampled on a quadrature grid of the bandwidth, by default the preference
+  defaultS2Bandwidth (S2FunHarmonic.quadrature takes values at nodes), a kernel gives its
+  series, another S2Fun its harmonic form. The function is symmetrised under the group of
+  its frame, also when antipodal, unless symmetrise=False. A list of functions carries its
+  shape in front of the coefficients.
+
+  Input
+    fhat - array of MTEX's coefficients, an S2Fun, an S2Kernel or a callable of vector3d
+    frame - the crystalFrame or specimenFrame of the directions
+  Output
+    sF - S2FunHarmonic
+  Keywords
+    real - whether the function takes real values only; by default read off the
+        coefficients or the sampled values
+    antipodal - f(v) = f(-v)
+    symmetrise - make the coefficients invariant under the group of the frame
+    bandwidth - the largest degree of the series
+    dtype - the complex type of the coefficients, complex128 unless given
+  See also
+    S2FunHarmonic.quadrature, S2FunHarmonic.interpolate, S2FunHandle, S2Kernel,
+    SO3FunHarmonic, S2FunHarmonicRepresentation"""
   # NumPy leaves the arithmetic with a function to the function, not reading it as a sequence
   __array_ufunc__ = None
 
@@ -129,7 +155,37 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   @classmethod
   def quadrature(cls, nodes, values=None, frame=None, *, bandwidth=None, weights=None, real=None, antipodal=None):
-    """from weighted samples; the weights integrate to 4 pi, a quadrature grid brings its own"""
+    """the harmonic series of a function on the sphere by quadrature, from a callable or from
+    values at nodes; MATLAB's approximate is the same
+
+      sF = S2FunHarmonic.quadrature(lambda v: v.z**2)                     # a callable on a grid of the default bandwidth
+      sF = S2FunHarmonic.quadrature(lambda v: v.z**2, cs, bandwidth=16)   # in the crystal frame cs
+      sF = S2FunHarmonic.quadrature(v, values, bandwidth=8, weights=w)    # values at the nodes v
+      sF = S2FunHarmonic.quadrature(g, values)                            # values on a quadratureS2Grid g
+
+    The coefficients are the integrals of f against the conjugate spherical harmonics,
+    computed as the quadrature sum sum_m w_m f(v_m) conj(Y(v_m)) by the adjoint transform. A
+    callable is sampled on a quadrature grid exact up to the bandwidth; values at scattered
+    nodes take the weights given, which integrate to 4 pi, equal ones by default, and give a
+    good approximation only on nodes dense enough for the bandwidth (S2FunHarmonic.interpolate
+    fits values by least squares instead). A quadratureS2Grid brings its own weights and
+    bandwidth. Values for a list of functions have the nodes first.
+
+    Input
+      nodes - a callable of vector3d, vector3d, or a quadratureS2Grid
+      values - the values at the nodes, the nodes along the first axis; for a callable the
+          frame instead
+      frame - the crystalFrame or specimenFrame of the result; by default that of the nodes
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      bandwidth - the largest degree; by default the grid's for a quadrature grid, else the
+          preference defaultS2Bandwidth
+      weights - the quadrature weights of the nodes, summing to 4 pi
+      real - whether the function is real; by default read off the values
+      antipodal - f(v) = f(-v); by default that of the nodes
+    See also
+      S2FunHarmonic, S2FunHarmonic.interpolate, quadratureS2Grid, S2FunHarmonicRepresentation"""
     # quadrature(fun, cs): a callable takes the frame second
     if callable(nodes) and not isinstance(nodes, vector3d) and (values is None or isinstance(values, referenceFrame)):
       return cls(nodes, values if frame is None else frame, bandwidth=bandwidth, real=real, antipodal=bool(antipodal))

@@ -134,16 +134,44 @@ def _readArgs(args):
 class tensor(MtexArray):
   """a tensor of rank R in a reference frame, or a list of them
 
-  frame= gives the frame as a keyword, name=, unit= and density= are carried along, and
-  Kelvin=True reads a 6 x 6 matrix in the Kelvin (Mandel) notation.
+    T = tensor(M, cs)                                  # the coefficients in a crystal frame
+    T = tensor(M, cs, rank=2, name='strain', unit='%')  # the rank, a name and a unit
+    T = tensor(v)                                      # a vector as a tensor of rank one
+    T = tensor(rot)                                    # a rotation as its matrix, rank two
+    C = tensor(V, rank=4)                              # a 6 x 6 Voigt matrix
+    S = tensor(V, rank=4, doubleConvention=True)       # with the factors of two of the compliance
+    C = tensor(V, rank=4, Kelvin=True)                 # a matrix in the Kelvin notation
 
-    T = tensor(M, cs)                         # the coefficients, the list dimensions in front
-    T = tensor(M, cs, rank=2, name='strain', unit='%')
-    T = tensor(v), tensor(rot)                # a vector as a rank one, a rotation as a rank two
-    T = tensor(V, rank=4)                     # a 6 x 6 Voigt matrix
-    T = tensor(V, rank=4, doubleConvention=True)   # with the factors of two of the compliance
-    T.M, T.rank, T.frame, T.CS, T.isSymmetric
-  """
+  The coefficients M are an array whose last R indices have dimension three, the dimensions
+  in front of them the shape of the list; the rank, when not given, is the number of trailing
+  dimensions of size three. A 6 x 6 matrix is read as the Voigt matrix of a rank four tensor,
+  a 3 x 6 matrix as that of a rank three one. Rotating the tensor, or an orientation acting on
+  it, ori * T, transforms the coefficients, which is what the texture averages build on.
+
+  The frame is a crystalFrame or a specimenFrame, given positionally or as frame=; without one
+  the tensor is in the default specimen frame. T.M gives the coefficients back, T.rank,
+  T.frame (T.CS) and T.isSymmetric what they say. The physical tensors, stiffnessTensor,
+  complianceTensor, strainTensor, stressTensor, ..., are subclasses fixing the rank and the
+  Voigt convention.
+
+  Input
+    M - array of the coefficients, (..., 3, ..., 3), a Voigt matrix (..., 6, 6), a vector3d or
+        a rotation
+    cs - crystalFrame or specimenFrame the coefficients refer to
+  Output
+    T - tensor
+  Keywords
+    rank - the rank of the tensor, read from the shape of M when not given
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal,
+        as is usual for the compliance
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along (the wave velocities use it)
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    stiffnessTensor, strainTensor, stressTensor, tensor.rotate, TensorDefinition"""
   _carried = ("rank", "_ncoord", "_frame", "doubleConvention", "density", "unit", "name")
   _rank = None
   _double = False
@@ -616,15 +644,39 @@ class tensor(MtexArray):
   # ------------------------------------------------------------------ lists
 
   def mean(self, *args, weights=None, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
-    """the mean over the list, or along axes of it, weighted or not; with an ODF or orientations
-    the texture average (calcTensor). MATLAB's three outputs, the Voigt, Reuss and Hill means, are
-    asked for by name. NumPy's np.mean(T) and np.mean(T, axis=1) call it
+    """the mean of a list of tensors, over all of them or along axes, weighted or not; with an ODF
+    or orientations the texture average
 
-      T.mean()
-      T.mean(axis=1)          # along the second axis, MATLAB's mean(T, 2)
-      TReuss = T.mean('Reuss')
-      TVoigt, TReuss, THill = T.mean('all')
-      T.mean(odf)"""
+      T = T.mean()                           # the mean over the whole list
+      T = T.mean(axis=1)                     # along the second axis, MATLAB's mean(T, 2)
+      T = T.mean(weights=w)                  # the weighted mean
+      TReuss = T.mean('Reuss')               # the inverse of the mean of the inverses
+      THill = T.mean('Hill')                 # the mean of the Voigt and Reuss means
+      TVoigt, TReuss, THill = T.mean('all')  # the three averages at once
+      TVoigt = T.mean(odf)                   # the texture average over an ODF
+      TVoigt, TReuss, THill = T.mean(odf, 'all')  # its three averages
+      TVoigt = T.mean(ori, weights=w)        # the average over weighted orientations
+
+    The plain mean is MATLAB's Voigt average; MATLAB's three outputs are asked for by name,
+    'all'. With an ODF or orientations the mean is calcTensor's, the single crystal tensor
+    rotated by the orientations and averaged. NumPy's np.mean(T) and np.mean(T, axis=1) call it.
+    The density of tensors of different densities is averaged with them. MATLAB's
+    'geometric' mean is not there.
+
+    Input
+      T - tensor
+      odf - SO3Fun, the texture average over it
+      ori - orientation, the texture average over them
+    Output
+      T - tensor, the mean; TVoigt, TReuss, THill the three averages
+    Keywords
+      weights - one weight per tensor, or per orientation
+      axis - the axis or tuple of axes of the list to average along
+      dtype - NumPy's argument, refused unless None
+      out - NumPy's argument, refused unless None
+      keepdims - keep the averaged axes with length one
+    See also
+      calcTensor, tensor.sum, TensorAverage"""
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)
@@ -670,12 +722,26 @@ class tensor(MtexArray):
     return tuple(a % self.ndim for a in axes)
 
   def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
-    """the sum of all tensors, or along axes of the array, MATLAB's sum(T, 2); NumPy's np.sum(T)
-    and np.sum(T, axis=1) call it
+    """the sum of a list of tensors, over all of them or along axes
 
-      T.sum()                 # the sum of all tensors
-      T.sum(axis=1)           # along the second axis
-      np.sum(T, axis=(0, 1), keepdims=True)"""
+      T = T.sum()                                  # the sum of all tensors
+      T = T.sum(axis=1)                            # along the second axis, MATLAB's sum(T, 2)
+      T = np.sum(T, axis=(0, 1), keepdims=True)    # NumPy's sum, the axes kept
+
+    Without an axis the whole list is summed, where MATLAB sums along the first non singleton
+    dimension. NumPy's np.sum(T) and np.sum(T, axis=1) call it.
+
+    Input
+      T - tensor
+    Output
+      T - tensor, the sum
+    Keywords
+      axis - the axis or tuple of axes of the list to sum along
+      dtype - NumPy's argument, refused unless None
+      out - NumPy's argument, refused unless None
+      keepdims - keep the summed axes with length one
+    See also
+      tensor.mean"""
     numpyReduction("sum", dtype, out, kwargs, "tensors")
     if axis is None and not keepdims:
       return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
@@ -1033,10 +1099,32 @@ class complianceTensor(tensor):
 
 
 class stressTensor(tensor):
-  """a rank two symmetric stress tensor; stressTensor.uniaxial(v, sigma) the uniaxial tension along v
+  """a rank two symmetric stress tensor, or a list of them
 
-    sigma = stressTensor(M)
-    sigma = stressTensor.uniaxial(vector3d.X)"""
+    sigma = stressTensor(M)                     # by its 3 x 3 matrix
+    sigma = stressTensor.uniaxial(vector3d.X)   # the uniaxial tension along a direction
+    sigma = stressTensor.uniaxial(v, 2)         # of a given magnitude
+
+  The stress is a symmetric tensor of rank two in the frame given, by default the specimen
+  frame; the resolved shear stress on a slip system, SchmidFactor, and the equivalent stress
+  are computed from it.
+
+  Input
+    M - 3 x 3 symmetric matrix, or an array (..., 3, 3) of them
+    v - vector3d, the direction of a uniaxial tension
+  Output
+    sigma - stressTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, strainTensor, slipSystem.SchmidFactor, stressTensor.equivalentStress"""
   _rank, _symmetricRank2 = 2, True
 
   @staticmethod
@@ -1081,17 +1169,64 @@ class strainTensor(tensor):
 
 
 class strainRateTensor(tensor):
-  """a rank two symmetric strain rate tensor, the symmetric part of a velocity gradient, in the double
-  convention of the Voigt notation"""
+  """a rank two symmetric strain rate tensor, the symmetric part of a velocity gradient, in the
+  double convention of the Voigt notation
+
+    E = strainRateTensor(M)      # by its 3 x 3 matrix
+    E = strainRate(L)            # the symmetric part of a velocity gradient
+
+  The matrix given is taken as it is; strainRate(L) takes the symmetric part of a
+  velocityGradientTensor, which MATLAB's strainRateTensor(L) does on construction.
+
+  Input
+    M - 3 x 3 symmetric matrix, or an array (..., 3, 3) of them
+  Output
+    E - strainRateTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, velocityGradientTensor, strainTensor, velocityGradientTensor.strainRate"""
   _rank, _double, _symmetricRank2 = 2, True, True
 
 
 class deformationGradientTensor(tensor):
-  """a deformation gradient tensor F, the rank two tensor carrying a line segment dX of the undeformed
-  body into dx = F dX of the deformed one
+  """a deformation gradient tensor F, the rank two tensor carrying a line segment dX of the
+  undeformed body into dx = F dX of the deformed one
 
-    F = deformationGradientTensor(M)
-    F = deformationGradientTensor.uniaxial(d, rate)"""
+    F = deformationGradientTensor(M)                       # by its 3 x 3 matrix
+    F = deformationGradientTensor.uniaxial(d, rate)        # a uniaxial deformation along d
+    F = deformationGradientTensor.simpleShear(d, n, e)     # simple shear along d on the plane n
+    F = deformationGradientTensor.pureShear(ex, comp, lam) # pure shear, extension along ex
+
+  The deformation gradient holds the full local rotation and stretch of the material; a volume
+  preserving deformation has det F = 1. Its strains are F.GreenStrain() and F.CauchyStrain().
+
+  Input
+    M - 3 x 3 matrix, or an array (..., 3, 3) of them
+    d, n - vector3d, the shear direction and the shear plane normal
+    rate, e - the amount of deformation
+    ex, comp - vector3d, the extension and the compression direction
+    lam - the stretch
+  Output
+    F - deformationGradientTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, velocityGradientTensor, strainTensor"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -1104,12 +1239,33 @@ class deformationGradientTensor(tensor):
 
 
 class velocityGradientTensor(tensor):
-  """a velocity gradient tensor L, the rank two tensor of the spatial derivatives of the velocity; its
-  symmetric part the strain rate, its skew part the spin
+  """a velocity gradient tensor L, the rank two tensor of the spatial derivatives of the velocity
 
-    L = velocityGradientTensor(M)
-    L = velocityGradientTensor.uniaxial(d, e)
-    L = velocityGradientTensor.simpleShear(d, n, e)"""
+    L = velocityGradientTensor(M)                     # by its 3 x 3 matrix
+    L = velocityGradientTensor.uniaxial(d, q)         # a uniaxial flow along d
+    L = velocityGradientTensor.simpleShear(d, n, e)   # simple shear along d on the plane n
+
+  Its symmetric part is the strain rate, strainRate(L), its skew symmetric part the spin,
+  spin(L). A solid does not compress, so every velocity gradient of one has trace zero.
+
+  Input
+    M - 3 x 3 matrix, or an array (..., 3, 3) of them
+    d, n - vector3d, the flow direction and the shear plane normal
+    q - the share of the contraction across the second axis, 0.5 for an axially symmetric flow
+    e - the strain rate
+  Output
+    L - velocityGradientTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, strainRateTensor, spinTensor, deformationGradientTensor"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -1144,8 +1300,32 @@ class spinTensor(tensor):
 
 
 class curvatureTensor(tensor):
-  """the lattice curvature tensor, the rank two tensor of the spatial derivatives of the orientation
-  field, what the dislocation density tensor is derived from"""
+  """the lattice curvature tensor, the rank two tensor of the spatial derivatives of the
+  orientation field
+
+    kappa = curvatureTensor(M, cs)       # by its 3 x 3 matrix in a crystal frame
+    kappa = ebsd.curvature()             # from the orientation gradients of a map
+
+  The curvature is what the dislocation density tensor is derived from,
+  dislocationDensity(kappa). A map of the plane gives no derivative along z, so the third
+  column of a curvature computed from it is NaN.
+
+  Input
+    M - 3 x 3 matrix, or an array (..., 3, 3) of them
+    cs - crystalFrame the coefficients refer to
+  Output
+    kappa - curvatureTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, dislocationDensityTensor, EBSD.curvature, curvatureTensor.dislocationDensity"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -1154,10 +1334,32 @@ class curvatureTensor(tensor):
 
 
 class dislocationDensityTensor(tensor):
-  """the dislocation density or Nye tensor, the rank two tensor derived from the curvature tensor,
-  whose fit against dislocation systems gives the geometrically necessary densities
+  """the dislocation density or Nye tensor, the rank two tensor derived from the curvature
+  tensor of an orientation field
 
-    alpha = dislocationDensityTensor(M, cs)"""
+    alpha = dislocationDensityTensor(M, cs)   # by its 3 x 3 matrix in a crystal frame
+    alpha = dislocationDensity(kappa)         # from a curvature tensor
+
+  Fitting it against a list of dislocationSystem gives the densities of the geometrically
+  necessary dislocations, calcGND. Constructed from a curvatureTensor, the coefficients are
+  taken over as they are; dislocationDensity(kappa) computes the tensor from the curvature.
+
+  Input
+    M - 3 x 3 matrix, or an array (..., 3, 3) of them
+    cs - crystalFrame the coefficients refer to
+  Output
+    alpha - dislocationDensityTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, curvatureTensor, dislocationSystem, calcGND"""
   _rank = 2
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
@@ -1178,9 +1380,34 @@ class ChristoffelTensor(tensor):
 
 
 class refractiveIndexTensor(tensor):
-  """the rank two symmetric refractive index tensor, whose anisotropy makes a crystal birefringent
+  """the rank two symmetric refractive index tensor, whose anisotropy makes a crystal
+  birefringent
 
-    rI = refractiveIndexTensor(M, cs)"""
+    rI = refractiveIndexTensor(M, cs)    # by its 3 x 3 matrix in a crystal frame
+
+  The tensor says how light of a given propagation direction is slowed down by the crystal:
+  rI.refractiveIndex(v) the indices of the two waves along v, rI.birefringence(v) their
+  difference, rI.opticalAxis() the directions without birefringence, and
+  rI.spectralTransmission(v, thickness) the colour of a thin section between crossed
+  polarisers.
+
+  Input
+    M - 3 x 3 symmetric matrix, or an array (..., 3, 3) of them
+    cs - crystalFrame the coefficients refer to
+  Output
+    rI - refractiveIndexTensor
+  Keywords
+    rank - the rank of the tensor; for this class always two
+    doubleConvention - read and write a Voigt matrix with the factors of two off the diagonal
+    frame - the reference frame of the coefficients, instead of giving it positionally
+    density - the mass density of the material, carried along
+    unit - the physical unit of the coefficients, a string carried along
+    name - the name of the tensor, carried along
+    Kelvin - read a 6 x 6 matrix in the Kelvin (Mandel) notation
+    dtype - the NumPy type of the coefficients
+  See also
+    tensor, refractiveIndexTensor.birefringence, refractiveIndexTensor.opticalAxis,
+    refractiveIndexTensor.spectralTransmission"""
   _rank, _symmetricRank2 = 2, True
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)

@@ -100,14 +100,39 @@ def _kernelSum(v, w, psi, L):
 
 
 class zeroRangeMethod:
-  """a pole figure that vanishes on a region says the ODF vanishes on every fibre through
-  it: the density of the measurement points says where the statement is backed by data,
-  the density weighted by alpha (I > bg) - 1 where the data is zero
+  """the zero range method of the pole figure inversion: where a pole figure vanishes, the ODF
+  vanishes on every fibre through it
 
-    zrm = zeroRangeMethod(pf, halfwidth=, threshold=, delta=, bg=, alpha=)
-    zrm.checkZeroRange(ori)          the orientations every pole figure position of which is zero
-    zrm.checkZeroRange(v, i)         the positions of the i-th pole figure that are zero
-  """
+    zrm = zeroRangeMethod(pf)                                     # the defaults
+    zrm = zeroRangeMethod(pf, halfwidth=10*degree, delta=0.01)    # a wider kernel, a higher background
+    isZero = zrm.checkZeroRange(ori)                              # the orientations ruled out
+    isZero = zrm.checkZeroRange(v, i)                             # the zero positions of the i-th pole figure
+
+  The measurement positions are smoothed with a spherical kernel twice: unweighted, their
+  density, which says where the data backs a statement, and weighted by alpha where the
+  intensity exceeds the background bg and by -1 where it does not. A direction where the
+  density is above the threshold and the weighted sum below -0.1 of it counts as zero; an
+  orientation is ruled out when one of its symmetric poles falls on such a direction in some
+  pole figure. calcODF(pf, zeroRange=True) removes those orientations from the grid of the
+  ansatz functions; calcODF(pf, zeroRange=zrm) uses the method set up here.
+
+  Input
+    pf - PoleFigure
+    psi - S2Kernel, the smoothing kernel, given positionally
+  Output
+    zrm - zeroRangeMethod
+  Keywords
+    halfwidth - the halfwidth of the de la Vallee Poussin smoothing kernel, by default twice
+        the resolution of the pole figures
+    kernel - S2Kernel, the smoothing kernel instead
+    threshold - the density below which the data says nothing, by default a tenth of the
+        kernel's maximum
+    delta - the background as a fraction of the largest intensity, when bg is not given
+    bg - the background intensity, one number or one per pole figure
+    alpha - the weight of an intensity above the background against one below it
+    bandwidth - the bandwidth of the smoothed densities, by default the kernel's
+  See also
+    calcODF, MLSSolver, PoleFigureDubna"""
 
   def __init__(self, pf, *args, halfwidth=None, kernel=None, threshold=None, delta=0.001, bg=None, alpha=10, bandwidth=None):
     self.pf = pf
@@ -161,14 +186,58 @@ class zeroRangeMethod:
 # ------------------------------------------------------------------ the solver
 
 class MLSSolver:
-  """the modified least squares solver of the pole figure inversion: the ansatz functions
-  sit on an equispaced grid and have the shape of a kernel, by default the de la Vallee
-  Poussin kernel of the grid's resolution
+  """the modified least squares solver of the pole figure inversion, an ODF as a weighted sum of
+  unimodal components fitted to scattered pole figure intensities
 
-    solver = MLSSolver(pf, resolution=5*degree, halfwidth=7.5*degree)
-    odf = solver.calcODF()
-    solver.alpha                     the scaling of each pole figure
-  """
+    solver = MLSSolver(pf, resolution=5*degree, halfwidth=7.5*degree)   # set up the solver
+    odf = solver.calcODF()                                              # and run it
+    solver = MLSSolver(pf, psi, S3G=grid)                               # a kernel and the centres given
+    solver.alpha                                                        # the scaling of each pole figure
+
+  The ansatz functions have the shape of a kernel, by default the de la Vallee Poussin kernel,
+  and sit on a grid of orientations, by default an equispaced grid of the resolution. The
+  coefficients minimise the squared misfit between the pole figures of the ODF and the
+  measured intensities, every pole figure with its own scaling alpha, under the constraint
+  that they are non negative. calcODF(pf, ...) builds the solver and runs it at once.
+
+  The kernel and the grid may also be passed positionally. The solver keeps its state:
+  solver.S3G the centres, solver.psi the kernel, solver.c the coefficients, solver.alpha the
+  scaling factors, solver.zrm the zero range method; solver.odf the ODF they describe.
+
+  Input
+    pf - PoleFigure
+    psi - SO3Kernel, the shape of the ansatz functions
+    grid - orientation, the centres of the ansatz functions
+  Output
+    solver - MLSSolver
+  Keywords
+    resolution - the spacing of the grid the ansatz functions sit on, by default the
+        resolution of the pole figures (MATLAB: 3/2 of it)
+    halfwidth - the halfwidth of the ansatz functions, by default the resolution of the grid
+        (MATLAB: 2/3 of it)
+    kernel - SO3Kernel, the shape of the ansatz functions instead of the de la Vallee Poussin
+        kernel of the halfwidth
+    S3G - orientation, the centres of the ansatz functions instead of the equispaced grid
+    zeroRange - apply the zero range method: drop the centres where some pole figure says the
+        ODF vanishes; a zeroRangeMethod gives its parameters
+    minIter - the least number of iterations
+    maxIter - the largest number of iterations (MATLAB iterMax)
+    c0 - the coefficients of the ansatz functions the iteration starts from, by default all equal
+    ghostCorrection - fix the uniform portion the data allows and reconstruct only the rest;
+        MATLAB flag noGhostCorrection is ghostCorrection=False
+    quadratureWeights - weight the residuals with the quadrature weights of the measured
+        directions (no specimen symmetry)
+    intensityWeights - weight the residuals with (1 + I)^(-1/2), the counting statistics of the
+        intensities I
+    regularisation - the weight of a penalty on the Dirichlet energy, a discrete Laplacian on
+        the grid; zero for none
+    verbose - report the fit of every pole figure in every iteration
+  References
+    R. Hielscher, H. Schaeben, A novel pole figure inversion method: specification of the MTEX
+        algorithm, J. Appl. Cryst. 41 (2008) 1024-1037
+  See also
+    calcODF, MLSSolver.calcODF, calcODFIterative, zeroRangeMethod, PoleFigureTutorial,
+    PoleFigure2ODFAmbiguity, PoleFigure2ODFGhostCorrection"""
 
   def __init__(self, pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5,
                maxIter=10, c0=None, ghostCorrection=True, quadratureWeights=False, intensityWeights=False,
@@ -359,13 +428,30 @@ class MLSSolver:
     return SO3FunRBF(self.S3G, self.psi, (1 - self.c0) * self.c / np.sum(self.c) / self.psi.mean(), self.c0)
 
   def calcODF(self, minIter=None, maxIter=None, ghostCorrection=None, verbose=None):
-    """the reconstruction, with the uniform portion the data allows fixed by the ghost
-    correction and put into the constant instead of the components; minIter, maxIter,
-    ghostCorrection and verbose replace the solver's settings
+    """the ODF the solver reconstructs, with the ghost correction
 
-      odf = solver.calcODF()
-      odf = solver.calcODF(minIter=2, maxIter=4)
-      odf = solver.calcODF(ghostCorrection=False, verbose=True)"""
+      odf = solver.calcODF()                                   # with the solver's settings
+      odf = solver.calcODF(minIter=2, maxIter=4)               # another number of iterations
+      odf = solver.calcODF(ghostCorrection=False, verbose=True)  # no ghost correction, reported
+
+    The zero range method, when set, thins the grid first; then the coefficients are iterated.
+    With the ghost correction the uniform portion the data allows, the smallest intensity of
+    the scaled pole figures, is subtracted, the rest reconstructed again and the portion kept
+    as the constant of the ODF rather than spread over the components. The keywords replace
+    the solver's settings for this and later calls. The scaling of every pole figure,
+    MATLAB's second output alpha, is solver.alpha afterwards.
+
+    Input
+      solver - MLSSolver
+    Output
+      odf - SO3FunRBF, or the uniform ODF when the data says the ODF is uniform
+    Keywords
+      minIter - the least number of iterations
+      maxIter - the largest number of iterations
+      ghostCorrection - fix the uniform portion and reconstruct only the rest
+      verbose - report the fit of every pole figure in every iteration
+    See also
+      MLSSolver, calcODF, PoleFigure2ODFGhostCorrection"""
     if minIter is not None:
       self.minIter = int(minIter)
     if maxIter is not None:
@@ -411,18 +497,57 @@ class MLSSolver:
 
 def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5, maxIter=10, c0=None,
             ghostCorrection=True, quadratureWeights=False, intensityWeights=False, regularisation=0.0, verbose=False):
-  """an ODF reconstructed from pole figure intensities, an SO3FunRBF; the ansatz functions
-  are a kernel (kernel=, by default the de la Vallee Poussin kernel of the given halfwidth) on
-  a grid (S3G=, by default equispaced at the resolution), iterated minIter to maxIter times
-  from the coefficients c0; quadratureWeights and intensityWeights weight the residuals,
-  regularisation weighs a penalty on the Dirichlet energy, verbose reports the iterations
+  """an ODF reconstructed from pole figure intensities by the modified least squares method,
+  with ghost correction and, on request, the zero range method
 
-    odf = calcODF(pf)
-    odf = calcODF(pf, halfwidth=7.5*degree, resolution=5*degree)
-    odf = calcODF(pf, psi)  # the ansatz functions of the kernel psi
-    odf = calcODF(pf, zeroRange=True)  # drop the orientations the data says are empty
-    odf = calcODF(pf, ghostCorrection=False)  # keep the uniform portion in the components
-    odf = calcODF(pf, solver)  # run an MLSSolver set up before"""
+    odf = calcODF(pf)                                            # the defaults
+    odf = calcODF(pf, halfwidth=7.5*degree, resolution=5*degree)  # the halfwidth and the grid
+    odf = calcODF(pf, psi)                                       # the ansatz functions of the kernel psi
+    odf = calcODF(pf, zeroRange=True)                            # drop the orientations the data says are empty
+    odf = calcODF(pf, ghostCorrection=False)                     # keep the uniform portion in the components
+    odf = calcODF(pf, solver)                                    # run an MLSSolver set up before
+
+  The ODF is a weighted sum of many unimodal ODFs on a grid, whose pole figures are fitted to
+  the intensities in the least squares sense, every pole figure scaled by its own factor.
+  The ghost correction fixes the uniform portion the data allows before the fit; the zero
+  range method removes the components where the measured intensities vanish. MATLAB's
+  second output, the scaling factors alpha, comes from an MLSSolver, solver.alpha after
+  solver.calcODF(). A kernel or a grid of orientations may be passed positionally.
+
+  Input
+    pf - PoleFigure
+    psi - SO3Kernel, the shape of the ansatz functions
+    solver - MLSSolver, run with its own settings
+  Output
+    odf - SO3FunRBF
+  Keywords
+    resolution - the spacing of the grid the ansatz functions sit on, by default the
+        resolution of the pole figures (MATLAB: 3/2 of it)
+    halfwidth - the halfwidth of the ansatz functions, by default the resolution of the grid
+        (MATLAB: 2/3 of it)
+    kernel - SO3Kernel, the shape of the ansatz functions instead of the de la Vallee Poussin
+        kernel of the halfwidth
+    S3G - orientation, the centres of the ansatz functions instead of the equispaced grid
+    zeroRange - apply the zero range method: drop the centres where some pole figure says the
+        ODF vanishes; a zeroRangeMethod gives its parameters
+    minIter - the least number of iterations
+    maxIter - the largest number of iterations (MATLAB iterMax)
+    c0 - the coefficients of the ansatz functions the iteration starts from, by default all equal
+    ghostCorrection - fix the uniform portion the data allows and reconstruct only the rest;
+        MATLAB flag noGhostCorrection is ghostCorrection=False
+    quadratureWeights - weight the residuals with the quadrature weights of the measured
+        directions (no specimen symmetry)
+    intensityWeights - weight the residuals with (1 + I)^(-1/2), the counting statistics of the
+        intensities I
+    regularisation - the weight of a penalty on the Dirichlet energy, a discrete Laplacian on
+        the grid; zero for none
+    verbose - report the fit of every pole figure in every iteration
+  References
+    R. Hielscher, H. Schaeben, A novel pole figure inversion method: specification of the MTEX
+        algorithm, J. Appl. Cryst. 41 (2008) 1024-1037
+  See also
+    MLSSolver, calcODFIterative, calcError, PoleFigure2ODF, PoleFigure2ODFGhostCorrection,
+    PoleFigureDubna, PoleFigureTutorial"""
   solvers = [a for a in args if isinstance(a, MLSSolver)]
   if solvers:
     return solvers[0].calcODF()
@@ -436,11 +561,39 @@ def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, z
 
 def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, maxSteps=5, thinning=0.025,
                      verbose=False, **kwargs):
-  """the reconstruction refined successively (MATLAB calcODFIterative): a ladder of kernel
-  halfwidths from sqrt(e)^(steps-1) times the target down to the target, those above 45
-  degree dropped, each solved on the grid of its own width and started from the previous
-  ODF evaluated on that grid, the nodes below the thinning fraction of the mean weight
-  removed before the solve"""
+  """an ODF reconstructed from pole figures by a ladder of kernel widths, from wide to the
+  target, each step started from the last
+
+    odf = calcODFIterative(pf)                          # the defaults
+    odf = calcODFIterative(pf, halfwidth=5*degree)      # the target halfwidth
+    odf = calcODFIterative(pf, thinning=0)              # every node of every grid kept
+
+  The halfwidths run from sqrt(e)^(maxSteps-1) times the target down to the target, those
+  whose grid would be coarser than 45 degree dropped; each step solves on an equispaced grid
+  of its own resolution, started from the ODF of the previous step evaluated on the grid,
+  beginning with the uniform ODF. Missing data is filled by the volume a coarser model puts
+  along the fibres, so that highly irregular sampling still gives an ODF; it is an elaborate
+  start for calcODF and acts as a regularisation. Before every solve the nodes whose share
+  is below thinning times the uniform one are removed. MATLAB's second output alpha is not
+  returned; MATLAB's flag nothinning is thinning=0. Further keywords go to MLSSolver.
+
+  Input
+    pf - PoleFigure
+  Output
+    odf - SO3FunRBF
+  Keywords
+    resolution - the resolution of the finest grid, by default that of the pole figures
+    halfwidth - the target halfwidth of the ansatz functions, by default the resolution
+    kernel - SO3Kernel, whose type gives the ansatz functions and whose halfwidth the target,
+        instead of the de la Vallee Poussin kernel
+    maxSteps - the number of halfwidths of the ladder
+    thinning - remove the nodes below this fraction of the uniform share; 0 keeps all
+    verbose - report the fit of every pole figure in every step
+  References
+    F. Bachmann, Texturbestimmung aus Beugungsbildern, in: Optimierung der Goniometrie zur
+        Texturbestimmung aus Roentgenbeugungsbildern, Springer Spektrum, Wiesbaden (2016)
+  See also
+    calcODF, MLSSolver, PoleFigureRefinement"""
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
   res = pf.resolution if resolution is None else resolution
   hw = res if halfwidth is None else halfwidth

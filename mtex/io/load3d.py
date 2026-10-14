@@ -38,13 +38,32 @@ DREAM3D_VOXELS = ("EulerAngles", "Quats", "FeatureIds")
 
 
 def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
-  """the 3D EBSD map of a volume file, MATLAB's EBSD3.load: the voxel data of a DREAM.3D file, the
-  LabDCT volume of an xnovo file, or a stack of 2D maps at the heights z; CS replaces the
-  phases of the file
+  """the EBSD map of a volume read from a file, the voxel data of a DREAM.3D file, the LabDCT
+  volume of an xnovo file, or a stack of 2D maps; MATLAB's EBSD3.load
 
-    loadEBSD3('volume.dream3d')
-    loadEBSD3('volume.h5', interface='xnovo')
-    loadEBSD3(['s0.ang', 's1.ang'], z=[0, 1])"""
+    ebsd = loadEBSD3('volume.dream3d')                     # the format from the file
+    ebsd = loadEBSD3('volume.h5', interface='xnovo')       # the format given
+    ebsd = loadEBSD3('volume.dream3d', CS=cs)              # other phases than the file's
+    ebsd = loadEBSD3(['s0.ang', 's1.ang'], z=[0, 1])       # a stack of 2D maps at their heights
+
+  The format is told by the extension and, for an HDF5 file, by what it holds: a LabDCT group
+  makes it an xnovo file, the cell data of a grid a DREAM.3D file, whatever the data
+  containers are called. The voxels of a DREAM.3D or xnovo file form a voxelLattice, so
+  ebsd[i, j, k] addresses one of them; every further scalar array of the file becomes a
+  property. A list of files is read by loadEBSD, every file a layer at its height z, as a
+  list of voxels without a lattice; the phases and the properties are those of the first
+  file. EBSD3.load is the same function.
+
+  Input
+    fname - the file name, or a list of file names of 2D maps
+  Output
+    ebsd - EBSD3
+  Keywords
+    interface - the format, 'dream3d' or 'xnovo'; by default told by the file
+    z - the height of every map of a stack, by default 0, 1, 2, ...
+    CS - a crystalFrame or a phaseList replacing the phases of the file
+  See also
+    loadEBSD, loadGrains3d, calcGrains, EBSD3Analysis, EBSD3Plotting"""
   if isinstance(fname, (list, tuple)):
     return _stack(fname, z, *args, **kwargs)
   ext = os.path.splitext(fname)[1].lower().lstrip(".")

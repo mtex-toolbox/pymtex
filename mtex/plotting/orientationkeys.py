@@ -463,9 +463,34 @@ def keyColorGrid(CS, resolution=COLOR_GRID_RESOLUTION):
 
 def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, resolution=COLOR_GRID_RESOLUTION, at=None):
   """the colour of every measurement of a map, or of every grain, each phase by its own inverse
-  pole figure key; what is not indexed takes the background colour. The map goes through the
-  grid of the key unless exact=True colours every measurement through the key itself; the
-  grid route is one compiled loop over the quaternions where numba is there"""
+  pole figure key
+
+    rgb = ipfColors(ebsd)                            # colours along the z direction
+    rgb = ipfColors(grains, ipfDirection=xvector)    # colours of grains along x
+    rgb = ipfColors(ebsd, unindexed=(0, 0, 0))       # black where nothing is indexed
+    rgb = ipfColors(ebsd, exact=True)                # through the key itself, no colour grid
+    rgb = ipfColors(ebsd, at=ind)                    # the measurements ind alone
+
+  Every indexed phase is coloured by the HSV inverse pole figure key (ipfHSVKey) of its own
+  crystal frame: the specimen direction ipfDirection is taken into crystal coordinates,
+  folded into the fundamental sector, and coloured by its place there. What is not indexed
+  takes the colour unindexed. By default the colours are read off a grid of the key, one
+  compiled loop over the quaternions where numba is installed, which is many times faster on
+  a large map than colouring every direction through the key; exact=True does the latter.
+
+  Input
+    x - EBSD or grain2d, a map or its grains
+  Output
+    rgb - array of shape x.shape + (3,), or (len(at), 3), RGB values in [0, 1]
+  Keywords
+    ipfDirection - vector3d, the specimen direction of the inverse pole figure, zvector by
+        default
+    unindexed - the RGB colour of the measurements not indexed
+    exact - colour every measurement through the key instead of the colour grid
+    resolution - the spacing of the colour grid, in radians
+    at - the indices of the measurements to colour, the others left out
+  See also
+    ipfHSVKey, ipfColorKey, orientation2color, EBSD.plot, colorGrid, EBSDIPFMap"""
   from .kernels import ipfGridColors
   d = vector3d(zvector if ipfDirection is None else ipfDirection).normalize().data.reshape(3)
   rots = _rotationsOf(x)

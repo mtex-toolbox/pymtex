@@ -272,12 +272,36 @@ def curvature(ebsd, stencil="oneSided"):
 # ------------------------------------------------------------------ the weighted Burgers vector
 
 def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=False):
-  """weightedBurgersVec(ebsd), weightedBurgersVec(ebsd, windowSize=2), weightedBurgersVec(ebsd,
-  'gradient', stencil='full'): the net Burgers vector crossing the map per unit area, after
-  Wheeler et al. (2009), a vector per pixel in the specimen frame per scan unit. The integral
-  method sums the crystal coordinates of the specimen x and y axes around a square loop of
-  2 windowSize + 1 pixels, on the gridded map, NaN where the loop leaves the grain or the
-  map; the gradient method is the column of Nye's tensor along the normal of the map"""
+  """the weighted Burgers vector: the net Burgers vector of the dislocations crossing the map
+  per unit area, by the integral or the gradient method; MATLAB's weightedBurgersVec
+
+    W = weightedBurgersVec(ebsd)                           # in specimen coordinates, a 3 x 3 loop
+    W = weightedBurgersVec(ebsd, windowSize=2)             # around a loop of 5 x 5 pixels
+    W = ebsd.orientations.inv() * weightedBurgersVec(ebsd) # in crystal coordinates
+    W = weightedBurgersVec(ebsd, gradient=True)            # from the orientation gradient
+
+  The integral method, the default, sums the crystal coordinates of the specimen x and y axes
+  around a square loop of 2 windowSize + 1 pixels about every pixel; it needs a gridded map of
+  one indexed phase, and a loop that leaves the grain (after calcGrains) or the map gives NaN.
+  The gradient method takes the column of Nye's tensor along the normal of the map, from the
+  curvature of the nearest neighbours, and runs on a list as well. The vectors are in the
+  specimen frame, per scan unit, after Wheeler et al.
+
+  Input
+    ebsd - EBSD of one indexed phase, gridified for the integral method
+  Output
+    W - vector3d of the shape of the map, in the specimen frame
+  Keywords
+    windowSize - the half width of the loop of the integral method, in pixels
+    stencil - the stencil of the derivatives of the gradient method, 'oneSided' or 'full'
+    gradient - use the gradient method instead of the integral one
+  References
+    J. Wheeler, E. Mariani, S. Piazolo, D.J. Prior, P. Trimby, M.R. Drury, The weighted
+        Burgers vector: a new quantity for constraining dislocation densities and types using
+        electron backscatter diffraction on 2D sections through crystalline materials,
+        J. Microscopy 233 (2009) 482-494
+  See also
+    curvature, calcGND, curvatureTensor.dislocationDensity, WBV"""
   from scipy.ndimage import correlate, maximum_filter, minimum_filter
   from ..analysis.mechanics import dislocationDensity
   refuseFlags(args, "weightedBurgersVec")
@@ -313,11 +337,34 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
 # ------------------------------------------------------------------ KAM
 
 def KAM(ebsd, order=1, radius=None, threshold=np.inf, max=False, weights=None):
-  """the kernel average misorientation: the mean misorientation angle of a pixel to its
-  neighbours, NaN where it has none to compare with. The neighbours are the ones within
-  order steps over the lattice stencil, or within a physical radius; threshold drops a pair
-  above an angle, max takes the largest angle instead of the mean, and weights is a
-  function of the distance"""
+  """the kernel average misorientation: the mean misorientation angle of every pixel to its
+  neighbours; MATLAB's KAM
+
+    kam = ebsd['Forsterite'].KAM()                         # the nearest neighbours
+    kam = KAM(ebsd, threshold=10*degree)                   # misorientations above 10 degree left out
+    kam = KAM(ebsd, order=2)                               # the neighbours up to the second order
+    kam = KAM(ebsd, radius=3*ebsd.lattice.dxy)             # the neighbours within a distance
+    kam = KAM(ebsd, order=3, weights=lambda d: np.exp(-(d / dxy)**2))  # weighted by the distance
+    kam = KAM(ebsd, max=True)                              # the largest angle instead of the mean
+
+  The neighbours of a pixel are those within order steps over the stencil of the lattice,
+  square or hexagonal, or within a physical radius. Only neighbours of the same phase, both
+  indexed, count, and on a map that carries grain ids (after calcGrains) only those of the
+  same grain, so the grain boundaries are left out. A pixel with no neighbour to compare with
+  is NaN. The map needs no grid: the lattice of a list is used too. The angles are in radian.
+
+  Input
+    ebsd - EBSD
+  Output
+    kam - array of the shape of the map, the angles in radian
+  Keywords
+    order - the neighbours up to this many steps over the lattice
+    radius - the neighbours up to this distance, in the scan unit, instead of order
+    threshold - a misorientation angle above it is left out
+    max - the largest misorientation angle instead of the mean
+    weights - a function of the distance of a neighbour, its weight in the mean
+  See also
+    calcGROD, gradient, calcGrains, EBSDKAM, EBSD3.KAM"""
   l = mapLattice(ebsd)
   offs = neighbourBall(l, order=order, radius=radius)
   w = np.ones(len(offs)) if weights is None else np.array([float(weights(np.linalg.norm(l.A @ o))) for o in offs])
@@ -396,9 +443,28 @@ def calcGROD(ebsd, grains=None, rotRef=None):
 
 
 def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf):
-  """the average of a property over each grain: one value per grain when the grains are
-  given, and the value of its own grain at every pixel when they are not; method is the
-  reduction, llim and ulim the range of values it is taken over"""
+  """the average of a property over each grain; MATLAB's grainMean
+
+    meanG = grainMean(ebsd, ebsd.ci, grains)               # one value per grain
+    meanE = grainMean(ebsd, ebsd.ci)                       # the value of its grain at every pixel
+    maxG = grainMean(ebsd, ebsd.ci, grains, np.max)        # the maximum instead of the mean
+    meanG = grainMean(ebsd, ebsd.ci, grains, llim=0.1)     # only the values above 0.1
+
+  The grains are those of the grain ids the map carries, which calcGrains stores with it.
+  A pixel without a grain and a grain without a value in the range are NaN.
+
+  Input
+    ebsd - EBSD with grain ids
+    prop - array of a value per pixel, of the shape of the map
+    grains - grain2d, for one value per grain in its order; without it one value per pixel
+    method - the reduction of the values of a grain, a function of an array
+  Output
+    meanProp - array, a value per grain, or one per pixel of the shape of the map
+  Keywords
+    ulim - the largest value taken into the average
+    llim - the smallest value taken into the average
+  See also
+    calcGrains, calcGROD, grain2d.meanOrientation, GrainOrientationParameters, GrainSpatialPlots"""
   if "grainId" not in ebsd.prop:
     raise ValueError("the map carries no grain id; reconstruct it with calcGrains(ebsd)")
   v = np.asarray(prop, dtype=float).reshape(-1)
@@ -465,10 +531,32 @@ def spatialProfile(ebsd, lineXY, y=None, radius=None):
 
 
 def calcMisorientation(ebsd, other=None, sampleSize=100000, minDistance=None, rng=None):
-  """uncorrelated misorientations: random pairs of measurements far enough apart that they say
-  nothing about one another, which is what an uncorrelated distribution is compared
-  against. Both maps must carry one indexed phase; the pair is written as a boundary
-  writes it, inv(o2) o1 carrying a direction of the first phase into the second"""
+  """uncorrelated misorientations: those of random pairs of measurements far enough apart that
+  they say nothing about one another; MATLAB's calcMisorientation of a map
+
+    mori = calcMisorientation(ebsd['Forsterite'], sampleSize=1000)        # within one phase
+    mori = calcMisorientation(ebsd['Forsterite'], minDistance=100)        # pairs at least 100 apart
+    mori = calcMisorientation(ebsd['Forsterite'], ebsd['Enstatite'])      # between two phases
+
+  This is the distribution an uncorrelated misorientation distribution is compared against.
+  Both maps must hold one indexed phase. For orientations o1 of the first map and o2 of the
+  second the misorientation is inv(o1) * o2, carrying the coordinates of the second crystal
+  into those of the first. The pairs closer than minDistance are dropped from the sample, so
+  fewer than sampleSize may come back. MATLAB's second output, the pairs of orientations, is
+  not returned.
+
+  Input
+    ebsd - EBSD of one indexed phase
+    other - EBSD of one indexed phase, by default the first map
+  Output
+    mori - orientation from the crystal frame of other to that of ebsd
+  Keywords
+    sampleSize - the number of pairs drawn
+    minDistance - the least distance of a pair, in the scan unit; a hundredth of the diagonal
+        of the first map by default
+    rng - the seed or the numpy Generator of the draw
+  See also
+    calcMDF, grainBoundary.misorientation, MisorientationDistributionFunction"""
   other = ebsd if other is None else other
   # the pixels of the one indexed phase of each map, of which only the drawn ones are read
   p1 = ebsd._onePhase()

@@ -154,10 +154,31 @@ def _groupQuantile(g, v, x, n, numV, q):
 
 
 def majorityVote(id, votes, maxId=None, strict=False, weights=None):
-  """vote, numVotes = majorityVote(id, votes, maxId): the vote of every id from the votes cast
-  for it, a row per id up to maxId (position id - 1), NaN where it got none: the most frequent
-  one, the smallest of a tie; with strict only where all its votes agree; with weights the one
-  of the largest summed weight and numVotes its lead over the second"""
+  """the most frequent vote cast for every id; MATLAB's majorityVote
+
+    vote, numVotes = majorityVote([1, 1, 1, 1, 1, 2, 3, 2, 3, 2, 3], [5, 9, 5, 9, 9, 4, 1, 4, 2, 4, 1])  # the most frequent vote per id
+    vote, numVotes = majorityVote([1, 1, 2, 2, 3], [5, 5, 4, 7, 1], strict=True)  # a vote only where all agree
+    vote, numVotes = majorityVote([1, 1, 2], [5, 9, 4], maxId=5)   # a row for every id up to 5
+    vote, numVotes = majorityVote([1, 1, 1], [5, 9, 9], weights=[3, 1, 1])  # the vote of the largest summed weight
+
+  The votes are grouped by their id, and every id from 1 to maxId gets one row, at position
+  id - 1: the vote cast most often for it, the smallest of a tie, and NaN for an id without
+  votes. Votes that are NaN and ids below 1 are left out.
+
+  Input
+    id - integer array, the id every vote is cast for, from 1
+    votes - array of the same length, the votes, positive integers
+  Output
+    vote - array of maxId entries, the winning vote of every id, NaN where there is none
+    numVotes - array of maxId entries, how often the winning vote was cast; with weights the
+        lead of the winning vote, its weight over the sum of its weight and the second's
+  Keywords
+    maxId - the number of rows, by default the largest id
+    strict - give a vote only to an id whose votes all agree, NaN to the others
+    weights - array of the length of votes, a weight for every vote; the vote of the largest
+        summed weight wins
+  See also
+    parentGrainReconstructor.calcParentFromVote, parentGrainReconstructor.calcGBVotes"""
   id = np.asarray(id, dtype=np.int64).reshape(-1)
   votes = np.asarray(votes, dtype=float).reshape(-1)
   maxId = int(id.max(initial=0)) if maxId is None else int(maxId)
@@ -243,18 +264,53 @@ def _registerGrains(grains, pl):
 
 
 class parentGrainReconstructor:
-  """job = parentGrainReconstructor(ebsd, grains, p2c)
+  """the state of a parent grain reconstruction: the map and the grains it starts from, the
+  orientation relationship and the grains after every step taken; MATLAB's
+  parentGrainReconstructor
 
-  The state of a parent grain reconstruction: the map and the grains it starts from
-  (ebsdPrior, grainsPrior), the orientation relationship p2c, the grains after every step
-  taken so far (grains) and which of them every prior grain went into (mergeId, the id of
-  the current grain per prior grain). Without grains the map is segmented at 3 degrees;
-  without p2c the phases are guessed, the most frequent indexed one the child and the
-  rarest the parent, and job.p2c is set afterwards. The parent frame is added to the phase
-  lists of the job's copies when the map carries only the child. With
-  useBoundaryOrientations a pair of grains votes with the means of their pixels along the
-  boundary they share rather than with the grain means.
-  """
+    job = parentGrainReconstructor(ebsd, grains)       # the parent and child phases guessed
+    job = parentGrainReconstructor(ebsd, grains, orientation.KurdjumovSachs(csParent, csChild))  # with an initial orientation relationship
+    job = parentGrainReconstructor(ebsd, grains, p2c, useBoundaryOrientations=True)  # votes from the orientations along the boundaries
+    job = parentGrainReconstructor(ebsd)               # the grains segmented at 3 degree
+
+  The job keeps the map and the grains as given, ebsdPrior and grainsPrior, the grains at
+  the current stage, grains, with parentGrains and childGrains, and for every prior grain the
+  id of the current grain it went into, mergeId. The steps of a reconstruction are its
+  methods: calcParent2Child refines the orientation relationship p2c, calcGBVotes,
+  calcTPVotes or calcGraph with clusterVariantGraph collect votes, calcParentFromVote and
+  calcParentFromGraph turn child grains into parent grains, mergeSimilar and
+  mergeInclusions merge them, and calcParentEBSD gives the reconstructed map, with
+  variantId and packetId.
+
+  The phases are guessed from the map: the most frequent indexed phase is the child and
+  the rarest the parent, which job.csParent and job.csChild correct, or setting job.p2c,
+  whose frames then name both. The parent frame is added to the phase lists of the job's
+  copies when the map carries only the child. The map must carry the grain ids of grains,
+  which calcGrains writes into it.
+
+  Input
+    ebsd - EBSD, the map of the measured, mostly child, phase, with the grain ids of grains
+    grains - grain2d, the child grains of the map; when not given the map is segmented at 3
+        degree, on a copy
+    p2c - orientation, the initial guess of the parent to child orientation relationship
+        (MATLAB's p2c0)
+  Output
+    job - parentGrainReconstructor
+  Keywords
+    useBoundaryOrientations - a pair of grains votes with the mean orientations of their
+        pixels along the boundary they share rather than with the grain means
+    reportFit - show the quantiles of the misfit of the boundaries to p2c when the job is
+        displayed
+  References
+    R. Hielscher, T. Nyyssönen, F. Niessen, A. A. Gazder, The variant graph approach to
+        improved parent grain reconstruction, Materialia 22 (2022) 101399
+    F. Niessen, T. Nyyssönen, A. A. Gazder, R. Hielscher, Parent grain reconstruction from
+        partially or fully transformed microstructures in MTEX, J. Appl. Cryst. 55 (2022)
+        180-194
+  See also
+    parentGrainReconstructor.calcParent2Child, parentGrainReconstructor.calcGBVotes,
+    parentGrainReconstructor.calcParentFromVote, calcParent2Child, MaParentGrainReconstruction,
+    TiBetaReconstruction, GrainGraphBasedReconstruction"""
 
   def __init__(self, ebsd, grains=None, p2c=None, useBoundaryOrientations=False, reportFit=True):
     if grains is None:
@@ -580,15 +636,46 @@ class parentGrainReconstructor:
     return np.concatenate(fits), np.concatenate(pairs)
 
   def calcParent2Child(self, p2c0=None, p2c=False, c2c=False, threshold=None, quantile=None, useP2C=True, **fitOptions):
-    """job.calcParent2Child(): the relationship refined on the boundaries of the map.
+    """the parent to child orientation relationship job.p2c refined on the boundaries of the
+    map; MATLAB's calcParent2Child of the job
 
-    Where the parent phase covers more than one percent of the map, the misorientations of
-    the parent to child boundaries within threshold (5 degrees) and the quantile (0.5) of
-    the current guess are averaged, three times; where the guess is more than 5 degrees
-    from the identity, the child to child misorientations above 5 degrees are fitted by
-    calcParent2Child of the geometry, and both are combined weighted by their counts.
-    p2c or c2c takes one kind alone; the variants keep their numbers through job.variantMap.
-    """
+      job.calcParent2Child()                         # fitted to the parent to child and the child to child boundaries
+      job.calcParent2Child(c2c=True, quantile=0.8)   # to the child to child boundaries alone
+      job.calcParent2Child(p2c=True, threshold=3*degree)  # to the parent to child boundaries alone
+      job.calcParent2Child(orientation.NishiyamaWassermann(job.csParent, job.csChild))  # from another start
+
+    Two fits are made and combined, weighted by their numbers of boundaries. Where the
+    parent phase covers more than one percent of the map, the misorientations of the parent
+    to child boundaries closer to the current relationship than threshold and than the
+    quantile of all of them are averaged, three times. Where the relationship is more than
+    5 degree from the identity, or with c2c, the child to child misorientations above 5 degree are fitted
+    by calcParent2Child of the misorientations, the iteration of Nyyssönen et al.
+    from the current relationship, after a scan of the misorientation space.
+
+    job.p2c is replaced; the variants keep their numbers through job.variantMap, the
+    variant of the old relationship that every new one is closest to. Further keywords go
+    to calcParent2Child of the misorientations: local, maxIteration, searchResolution,
+    verbose, ...
+
+    Input
+      job - parentGrainReconstructor, with job.p2c or p2c0 set
+      p2c0 - orientation, the start of the fit instead of job.p2c
+    Keywords
+      p2c - fit to the parent to child boundaries alone
+      c2c - fit to the child to child boundaries alone
+      threshold - the misorientations further than this from the start are left out, 5
+          degree for the parent to child boundaries
+      quantile - the share of the misorientations closest to the start that is fitted, 0.5
+          for the parent to child boundaries
+      useP2C - combine the fit to the child to child boundaries with that to the parent to
+          child ones; False keeps the first alone
+    References
+      T. Nyyssönen, M. Isakov, P. Peura, V.-T. Kuokkala, Crystallography, morphology, and
+          martensite transformation of prior austenite in intercritically annealed
+          high-aluminum steel, Metall. Mater. Trans. A 49 (2018), doi:10.1007/s11661-018-4904-9
+    See also
+      calcParent2Child, parentGrainReconstructor.calcGBFit, orientation.KurdjumovSachs,
+      OrientationRelationshipFit, MaParentGrainReconstruction"""
     noOpt = not (p2c or c2c)
     guess = p2c0 if p2c0 is not None else self.p2c
     thr = 5 * degree if threshold is None else threshold
@@ -634,18 +721,54 @@ class parentGrainReconstructor:
 
   def calcGBVotes(self, ind=None, p2c=False, c2c=False, reconsiderAll=False, numFit=2, threshold=None, tol=None,
                   minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False, curvatureFactor=None):
-    """job.calcGBVotes(): the votes the grain boundaries cast into job.votes.
+    """the votes the grain boundaries cast for the parent orientation of their child grains,
+    written into job.votes; MATLAB's calcGBVotes
 
-    Every pair of neighbouring child grains votes for the numFit variant pairs that let both
-    come from one parent, every child next to a parent for the numFit variants that fit it;
-    a vote is the probability that its misfit still means one parent, 1 below threshold -
-    tolerance/2, 0 above threshold + tolerance/2 (threshold 2 degrees, tolerance the
-    threshold). p2c or c2c takes one kind alone. With reconsiderAll every prior child grain
-    votes afresh from its measured orientation for the variant that fits its parent
-    neighbours, which is the growth step of a reconstruction; a grain with a child
-    neighbour stays undecided then, and curvatureFactor weighs a boundary by its curvature.
-    ind restricts reconsiderAll to prior grains of those positions and returns the table.
-    """
+      job.calcGBVotes()                              # from the child to child and the parent to child boundaries
+      job.calcGBVotes(p2c=True, threshold=2.5*degree, tol=1.5*degree)  # from the parent to child boundaries alone
+      job.calcGBVotes(p2c=True, reconsiderAll=True, threshold=4*degree, tol=1.5*degree)  # every measured child grain anew, the growth step
+      job.calcGBVotes(numFit=1, bestFit=True)        # the best fit per variant instead of a probability
+      job.calcGBVotes(count=True)                    # the number of fits below the threshold
+
+    A pair of neighbouring child grains votes for the numFit pairs of variants that let both
+    come from one parent, a child grain next to a parent grain for the numFit variants of
+    that parent that fit it. A fit becomes a probability that it still means one parent: 1
+    below threshold - tol/2, 0 above threshold + tol/2, a cumulative Gaussian between. The
+    probabilities are summed per grain and variant into job.votes, a table whose rows are
+    job.grains, the best variant first, which calcParentFromVote reads.
+
+    With reconsiderAll every measured child grain votes afresh, from its own orientation,
+    for the variant that fits its parent neighbours: the growth step of a reconstruction,
+    which takes back an earlier wrong decision. It needs the grains as measured, before
+    mergeSimilar or after revert.
+
+    Input
+      job - parentGrainReconstructor, with job.p2c set
+      ind - with reconsiderAll: the positions of the prior grains to vote for; the table
+          of their votes is returned and job.votes left as it was
+    Output
+      votes - with ind: voteTable of the votes of those grains
+    Keywords
+      p2c - only the parent to child boundaries vote
+      c2c - only the child to child boundaries vote
+      reconsiderAll - every measured child grain votes for the variant that fits its parent
+          neighbours, the decided ones too
+      numFit - the number of best fitting variants every boundary votes for
+      threshold - the misfit angle at which the probability is one half, by default 2
+          degree or minFit when smaller
+      tol - the width of the angles over which the probability falls from 1 to 0, by default
+          the threshold (MATLAB's tolerance)
+      minFit - a boundary votes only when its best fit is below this angle
+      maxFit - a boundary votes only when its second best fit is above this angle
+      bestFit - the vote of a grain is the best fit per variant, an angle, instead of a
+          probability
+      count - the vote of a grain is the number of fits per variant below the threshold
+      curvatureFactor - with reconsiderAll: weigh a boundary by 1 plus this factor times its
+          normalised curvature, so that curved boundaries count more
+    See also
+      parentGrainReconstructor.calcParentFromVote, parentGrainReconstructor.calcTPVotes,
+      parentGrainReconstructor.calcGBFit, MaParentGrainReconstruction,
+      TriplePointBasedReconstruction"""
     opts = dict(threshold=threshold, tol=tol, minFit=minFit, maxFit=maxFit, bestFit=bestFit, count=count)
     if reconsiderAll and self.grains.size != self.grainsPrior.size:
       raise ValueError("reconsiderAll votes for the grains as measured: call it before mergeSimilar, or after revert")
@@ -729,9 +852,36 @@ class parentGrainReconstructor:
     return 1 + _groupQuantile(row[ok], np.zeros(np.count_nonzero(ok), dtype=np.int64), kappa[ok], len(pairs), 1, 0.75)[:, 0]
 
   def calcTPVotes(self, numFit=2, threshold=None, tol=None, minFit=np.inf, maxFit=-np.inf, bestFit=False, count=False):
-    """job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree): the votes the triple points of
-    three child grains cast, each corner for the variant of the parent that fits all three;
-    minFit asks the best fit of a triple point to be below it, maxFit the second best above"""
+    """the votes the triple points of three child grains cast for their parent orientation,
+    written into job.votes; MATLAB's calcTPVotes
+
+      job.calcTPVotes()                              # every triple point of three child grains votes
+      job.calcTPVotes(minFit=2.5*degree, maxFit=5*degree)  # only the triple points of one clear parent
+      job.calcTPVotes(numFit=1, bestFit=True)        # the best fit per variant instead of a probability
+
+    At a triple point where three child grains meet, the parent orientation that fits all
+    three, the mean of one variant of each, is computed for the numFit best fitting
+    combinations, and each of the three grains votes for its variant, weighted by the fit
+    as calcGBVotes weighs it. A triple point fits one parent clearly when its best fit is
+    small and its second best large, which minFit and maxFit ask for.
+
+    Input
+      job - parentGrainReconstructor, with job.p2c set
+    Keywords
+      numFit - the number of best fitting parents every triple point votes for
+      threshold - the misfit angle at which the probability is one half, by default 2
+          degree or minFit when smaller; also the largest misfit a parent is computed for,
+          5 degree when not given
+      tol - the width of the angles over which the probability falls from 1 to 0, by default
+          the threshold (MATLAB's tolerance)
+      minFit - a triple point votes only when its best fit is below this angle
+      maxFit - a triple point votes only when its second best fit is above this angle
+      bestFit - the vote of a grain is the best fit per variant, an angle, instead of a
+          probability
+      count - the vote of a grain is the number of fits per variant below the threshold
+    See also
+      parentGrainReconstructor.calcParentFromVote, parentGrainReconstructor.calcGBVotes,
+      TriplePointBasedReconstruction"""
     g = self.grains
     tP = g.triplePoints
     C = self.childPhaseId
@@ -752,10 +902,42 @@ class parentGrainReconstructor:
                             maxFit=maxFit, bestFit=bestFit, count=count)
 
   def calcParentFromVote(self, minProb=0, minDelta=None, minFit=5 * degree, minAlpha=None, minCount=0, maxCount=None):
-    """job.calcParentFromVote(minProb=0.5): every grain whose leading vote is strong enough
-    takes the parent orientation of that variant and the parent phase: for probabilities
-    above minProb and ahead of the second by minDelta, for fits below minFit and behind the
-    second by minDelta, for counts at least minCount with the second below maxCount"""
+    """the child grains whose vote is clear turned into parent grains, the parent orientation
+    of the variant they voted for; MATLAB's calcParentFromVote
+
+      job.calcParentFromVote()                       # every grain with a vote
+      job.calcParentFromVote(minProb=0.7)            # a probability of at least 0.7
+      job.calcParentFromVote(minProb=0.5, minDelta=0.2)  # and ahead of the second by 0.2
+      job.calcParentFromVote(minFit=2*degree, minDelta=1*degree)  # after votes of the best fit
+      job.calcParentFromVote(minCount=3, maxCount=1)  # after counted votes
+
+    The votes are those of the last calcGBVotes, calcTPVotes or clusterVariantGraph, and the
+    criteria read them as they are: probabilities with minProb, minDelta and minAlpha, fits
+    of bestFit with minFit, minDelta and minAlpha, counts with minCount and maxCount. A grain
+    that meets them takes the parent phase and the parent orientation of the variant it
+    voted for; a grain that is a parent already is reconstructed again from its measured
+    orientation, a merged parent grain is not. The votes of the grains turned are cleared.
+
+    MATLAB documents minVotes, which neither MATLAB nor this port reads; minAlpha compares
+    fits, as MATLAB's code does, not probabilities, as its help says.
+
+    Input
+      job - parentGrainReconstructor, with job.votes
+    Keywords
+      minProb - with probabilities: the best must exceed this
+      minDelta - the best must lead the second by more than this: in probability, or in
+          angle with fits
+      minFit - with fits: the best must be below this angle
+      minAlpha - with fits: the best must exceed this factor times the second
+      minCount - with counts: the best must reach this count
+      maxCount - with counts: the second must stay below this count
+    References
+      F. Niessen, T. Nyyssönen, A. A. Gazder, R. Hielscher, Parent grain reconstruction from
+          partially or fully transformed microstructures in MTEX, J. Appl. Cryst. 55 (2022)
+          180-194
+    See also
+      parentGrainReconstructor.calcGBVotes, parentGrainReconstructor.calcTPVotes,
+      parentGrainReconstructor.calcParentFromGraph, MaParentGrainReconstruction"""
     v = self.votes
     if v is None:
       raise ValueError("compute the votes first, with calcGBVotes, calcTPVotes or clusterVariantGraph")

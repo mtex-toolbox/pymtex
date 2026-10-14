@@ -132,12 +132,40 @@ def alignAxes(axes, alignment):
 
 
 def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1, check=True):
-  """the crystal axes a, b, c in Cartesian coordinates as a (3, 3) array, one axis per row, from the
-  cell of a lattice, by default X||a*, Z||c, else in the alignment asked for, then rotated
+  """the crystal axes a, b, c in Cartesian coordinates, from the cell of a lattice; MATLAB's
+  calcAxis, what crystalFrame builds its axes with
 
-    crystalAxes(lattice, abc, abg)
-    crystalAxes(lattice, abc, abg, alignment=['X||a', 'Z||c*'])
-    crystalAxes(lattice, abc, abg, alignment=['EDAX'], rotate=rot)"""
+    axes = crystalAxes(lattice, abc, abg)                                # X||a*, Z||c
+    axes = crystalAxes(lattice, abc, abg, alignment=['X||a', 'Z||c*'])   # another alignment
+    axes = crystalAxes(lattice, abc, abg, alignment=['EDAX'], rotate=rot)  # the vendor's alignment, turned
+
+  The axes are built from the metric with a* along x and c along z, the default alignment,
+  and then turned into the alignment asked for. An alignment names the lattice direction a
+  Cartesian axis lies along: a, b, c, their reciprocals a*, b*, c*, m = a + b or
+  d = a + b + c. With one of X and Y named and no Z, Z lies along c, or along c* when a
+  direct axis was named; with Z alone named, X takes the partner of the usual setting. 'EDAX'
+  (also 'TSL', 'OIM') is the vendors' alignment X||a for the triclinic, trigonal and
+  hexagonal lattices, where a and a* differ.
+
+  A length of 0 is filled from the others and an angle of 0 from its partners, as MTEX fills
+  them; a cell the lattice does not allow is refused.
+
+  Input
+    lattice - latticeType, the lattice system
+    abc - the lengths a, b, c of the cell
+    abg - the angles alpha, beta, gamma of the cell, in radians; by default those of the
+        lattice
+  Output
+    axes - a (3, 3) array, the axes a, b, c in Cartesian coordinates, one per row
+  Keywords
+    alignment - a list of strings like 'X||a', 'Z||c*' or a vendor's name
+    rotate - a rotation, or a 3 x 3 matrix, applied to the aligned axes
+    uniqueAxis - the index of the unique axis of a monoclinic lattice, 0 to 2 for a to c
+    check - refuse a cell the lattice does not allow: unequal lengths a and b of a trigonal,
+        hexagonal or tetragonal lattice, unequal lengths of a cubic one, angles not 90 degree
+        with the unique axis of a monoclinic one
+  See also
+    crystalFrame, reciprocalAxes, CrystalReferenceSystem"""
   abg = lattice.defaultAngles if abg is None else abg
   abc, abg = completeCell(abc, abg)
   if check:

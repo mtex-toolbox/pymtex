@@ -85,11 +85,30 @@ class planarColorKey:
     return np.clip(rgb, 0, 1)
 
   def plot(self, v1=None, v2=None, nHue=256, nSat=128, **kw):
-    """draws the key as an image, hue along x and saturation along y; with the two properties v1, v2
-    the axes carry their ranges and labels
+    """the colour key drawn as an image, hue along x and saturation along y; MATLAB's
+    planarColorKey.plot
 
-      pK.plot()
-      pK.plot(v1, v2)"""
+      pK.plot()                      # the key alone, no labels
+      h = pK.plot(v1, v2)            # with the ranges and the labels of the data
+      pK.plot(v1, v2, nHue=128)      # a coarser image
+
+    Without data only the colours are drawn. With the two properties v1 and v2 the x axis
+    spans the range of v1 (pK.range1, else that of the data) and the y axis that of v2
+    (pK.range2, else from the minimum to the quantile pK.quantileCap), labelled pK.label1 and
+    pK.label2; a periodic first property (pK.periode) is labelled in fractions of pi, or in
+    degrees when its values exceed 2 pi.
+
+    Input
+      pK - planarColorKey
+      v1 - the first property, mapped to the hue
+      v2 - the second property, mapped to the saturation
+    Output
+      h - the matplotlib image
+    Keywords
+      nHue - the number of pixels of the image along the hue, MATLAB 512
+      nSat - the number of pixels of the image along the saturation
+    See also
+      planarColorKey.property2color, ipfColorKey"""
     return plotPlanarKey(self, v1, v2, nHue, nSat, **kw)
 
   def __repr__(self):

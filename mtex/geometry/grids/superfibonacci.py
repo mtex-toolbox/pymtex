@@ -84,9 +84,34 @@ class SO3FibonacciGrid(orientation):
 
 
 def superfibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None):
-  """a super-Fibonacci grid of orientations covering one fundamental region of the frame
-  pair: a low-discrepancy quaternion spiral trimmed to the region. `resolution` is the mean
-  nearest-neighbour spacing; `points` sets the count in the region instead"""
+  """a super-Fibonacci grid of orientations covering one fundamental region of the frame pair,
+  its resolution the mean spacing of nearest neighbours
+
+    S3G = superfibonacciSO3Grid(cs)                            # about 5 degree spacing
+    S3G = superfibonacciSO3Grid(cs, ss, points=1000)           # about 1000 nodes in the region
+    S3G = superfibonacciSO3Grid(cs, resolution=2.5*degree)     # a finer grid
+
+  The nodes are the super-Fibonacci spiral of Alexa, a low discrepancy sequence of
+  quaternions, trimmed to the fundamental region. The length of the spiral is set from the
+  resolution, taken as the mean distance to the nearest neighbour; with points it is set from
+  the fraction of SO(3) the region fills, which is measured on a probe spiral, so that any
+  pair of symmetries calibrates itself. fibonacciSO3Grid is MATLAB's form, one node per
+  resolution^3 of the volume.
+
+  Input
+    CS - crystalFrame
+    SS - specimenFrame, by default the default specimen frame
+  Output
+    S3G - SO3FibonacciGrid, orientations from CS to SS
+  Keywords
+    resolution - the mean distance to the nearest node, in radians
+    points - the approximate number of nodes in the fundamental region, instead of the
+        resolution
+  References
+    M. Alexa, Super-Fibonacci spirals: fast, low-discrepancy sampling of SO(3), CVPR 2022,
+        8291-8300
+  See also
+    fibonacciSO3Grid, equispacedSO3Grid, localOrientationGrid, fibonacciS2Grid"""
   from ..frames import specimenFrame
   from ..orientationregion import fundamentalRegion
   SS = specimenFrame.default if SS is None else SS
@@ -106,13 +131,36 @@ def superfibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None):
 
 
 def fibonacciSO3Grid(CS, SS=None, resolution=5 * degree, points=None, antipodal=False):
-  """MATLAB's fibonacciSO3Grid: the super-Fibonacci spiral of round(8 pi^2 / resolution^3) nodes
-  over SO(3), one node per resolution^3 of its volume, trimmed to the fundamental region; points
-  sets the resolution from the volume fraction of the region instead, antipodal=True halves it
+  """a low discrepancy grid of orientations from a super-Fibonacci spiral, restricted to the
+  fundamental region of the frame pair; MATLAB's fibonacciSO3Grid
 
-    S3G = fibonacciSO3Grid(cs)
-    S3G = fibonacciSO3Grid(cs, ss, points=10000)
-    S3G = fibonacciSO3Grid(cs, ss, resolution=2.5*degree)"""
+    S3G = fibonacciSO3Grid(cs)                                 # 5 degree resolution
+    S3G = fibonacciSO3Grid(cs, ss, points=10000)               # about 10000 nodes in the region
+    S3G = fibonacciSO3Grid(cs, ss, resolution=2.5*degree)      # a finer grid
+    S3G = fibonacciSO3Grid(cs, cs, antipodal=True)             # misorientations with antipodal symmetry
+
+  The nodes are the super-Fibonacci spiral of Alexa with round(8 pi^2 / resolution^3) nodes
+  over SO(3), one node per resolution^3 of its volume, trimmed to the fundamental region. Unlike
+  a lattice the number of nodes is free; points sets the resolution from the volume fraction
+  of the fundamental region. To cover a ball around one orientation take
+  localOrientationGrid.
+
+  Input
+    CS - crystalFrame
+    SS - specimenFrame or crystalFrame, by default the default specimen frame
+  Output
+    S3G - SO3FibonacciGrid, orientations from CS to SS
+  Keywords
+    resolution - the node spacing, in radians
+    points - the approximate number of nodes in the fundamental region, instead of the
+        resolution
+    antipodal - the fundamental region with the antipodal symmetry of misorientations, half
+        the region
+  References
+    M. Alexa, Super-Fibonacci spirals: fast, low-discrepancy sampling of SO(3), CVPR 2022,
+        8291-8300
+  See also
+    superfibonacciSO3Grid, equispacedSO3Grid, localOrientationGrid, fibonacciS2Grid"""
   from ..frames import specimenFrame
   from ..orientationregion import fundamentalRegion
   SS = specimenFrame.default if SS is None else SS

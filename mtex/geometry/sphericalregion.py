@@ -25,14 +25,34 @@ from .display import display
 
 
 class sphericalRegion:
-  """a region on the sphere: all v with dot(v, N_i) >= alpha_i
+  """a region on the sphere bounded by small circles: all directions v with dot(v, N_i) >= alpha_i
+  for every normal N_i
 
-    sphericalRegion()                    the whole sphere
-    sphericalRegion(N)                   the intersection of the hemispheres about N
-    sphericalRegion(N, alpha)            the caps dot(v, N_i) >= alpha_i
-    sphericalRegion('upper'), 'lower'    a hemisphere about z
-    sphericalRegion.byVertices(V)        the polygon through the vertices
-  """
+    sR = sphericalRegion()                           # the whole sphere
+    sR = sphericalRegion(N)                          # the intersection of the hemispheres about N
+    sR = sphericalRegion(N, alpha)                   # the intersection of the caps dot(v, N_i) >= alpha_i
+    sR = sphericalRegion(N, antipodal=True)          # a region of axes, v or -v inside
+    sR = sphericalRegion('upper')                    # the hemisphere about z, 'lower' about -z
+    sR = sphericalRegion(N, frame=cs)                # a region given in a reference frame
+    sR = sphericalRegion.byVertices(V)               # the polygon through the vertices
+
+  An alpha of 0 makes the boundary a great circle, a positive alpha a cap smaller than a
+  hemisphere. The fundamental sectors of the point groups are spherical regions:
+  fundamentalSector, dirichletSector. sR.checkInside(v) tests directions, sR.volume() gives the
+  fraction of the sphere the region covers.
+
+  Input
+    N - vector3d, the normals of the bounding circles, or 'upper' or 'lower'
+    alpha - array, the cosines of the bounding circles, one for all or one per normal; by
+        default 0
+  Output
+    sR - sphericalRegion
+  Keywords
+    frame - the referenceFrame the region is given in
+    antipodal - a region of axes: a direction is inside when v or -v is
+  See also
+    fundamentalSector, dirichletSector, sphericalRegion.checkInside, VectorGrids,
+    FundamentalSector"""
 
   def __init__(self, N=None, alpha=None, frame=None, antipodal=False):
     if isinstance(N, sphericalRegion):
@@ -291,8 +311,32 @@ def _essentialNormals(N, tol=1e-4):
 
 
 def dirichletSector(pg, center=None, frame=None, antipodal=False):
-  """the great circles bisecting the centre and its images: the Dirichlet domain, a fundamental
-  domain for every group whatever axes it is written in"""
+  """the Dirichlet domain of a point group about a centre, a fundamental domain for every group,
+  whatever axes it is written in
+
+    sR = dirichletSector(cs)                             # about the centre of the conventional sector
+    sR = dirichletSector(cs, center=vector3d(1, 2, 3))   # about another centre
+    sR = dirichletSector(cs, antipodal=True)             # of the Laue group, for axes
+    sR = dirichletSector(pg, frame=cs)                   # of a group, the region given in a frame
+
+  The region is bounded by the great circles bisecting the centre and each of its images
+  under the group: the directions nearer the centre than any of its other images. Where the
+  centre is not given, it is the centre of the conventional sector, or, when the inversion
+  cancels it, the one of the proper subgroup. fundamentalSector takes the Dirichlet domain only
+  for a group the conventional sector does not fit, such as the rotations two frames share.
+
+  Input
+    pg - a point group, or a reference frame, whose group is taken and which the region is
+        given in
+  Output
+    sR - sphericalRegion
+  Keywords
+    center - vector3d, the centre of the domain; by default the centre of the conventional
+        sector
+    frame - the referenceFrame the region is given in
+    antipodal - the domain of the Laue group, for axes
+  See also
+    fundamentalSector, sphericalRegion, tilesSphere, FundamentalSector"""
   from .frames import referenceFrame
   if isinstance(pg, referenceFrame):
     frame = pg

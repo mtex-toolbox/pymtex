@@ -759,8 +759,30 @@ def _plotOnGrid(v, data, style="pcolor", colorbar=False, colorRange=None, **kw):
 
 
 def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw: Unpack[PlotKeywords]):
-  """circle(v, radius): the small circle of opening angle radius about v, on the axes nextAxis
-  chose or the last one, on every axes with add2all (MATLAB plotting/circle.m)"""
+  """a circle on a spherical plot: the small circle of the opening angle about a direction, the
+  great circle by default
+
+    circle(n)                                         # the great circle perpendicular to n
+    circle(n, 30*degree)                              # the small circle 30 degree about n
+    circle(n, 20*degree, add2all=True, lineColor='r')  # onto every spherical plot of the figure
+
+  The circle annotates the spherical plot drawn last, or the one nextAxis chose; draw the
+  plot first. A circle leaving the chart is broken where it does. Several directions give
+  several circles.
+
+  Input
+    v - vector3d, the centre, one or several
+    radius - the opening angle about v in radians, pi/2 for the great circle
+  Output
+    h - the matplotlib lines, one per circle and axes
+  Keywords
+    add2all - draw onto every spherical plot of the figure
+    lineColor - the colour of the line
+    lineWidth - the width of the line
+    edgeAlpha - the opacity of the line
+    parent - the axes, or a list of them, to draw onto
+  See also
+    ellipse, plot, scatter, text, Annotations"""
   vs = asVector3d(v)
   t = np.linspace(0, 2 * np.pi, 361)
   rings = []
@@ -774,8 +796,30 @@ def circle(v, radius=np.pi / 2, add2all=False, lineColor="k", lineWidth=1.5, edg
 
 
 def ellipse(rot, a, b, add2all=True, lineColor="k", lineWidth=1.5, edgeAlpha=1.0, parent=None, **kw: Unpack[PlotKeywords]):
-  """ellipse(rot, a, b): the ellipse of semi-axes a and b, in radians, about rot * z, its
-  axes along rot * x and rot * y, onto the spherical plots of the figure"""
+  """an ellipse on the spherical plots of a figure, about a direction and turned as a rotation
+  says
+
+    ellipse(rot, a, b)                                  # semi-axes a and b about rot * z
+    ellipse(rot, a, b, lineColor='b', add2all=False)    # onto the last plot only
+
+  The centre of the ellipse is rot * z, its semi-axes, a and b in radians, lie along rot * x
+  and rot * y; the polar distance from the centre is ab / sqrt((b cos rho)^2 + (a sin rho)^2).
+  A list of rotations, with one a and b or one per rotation, gives several ellipses.
+
+  Input
+    rot - rotation, the position and the turn of the ellipse
+    a - the semi-axis along rot * x, in radians
+    b - the semi-axis along rot * y, in radians
+  Output
+    h - the matplotlib lines, one per ellipse and axes
+  Keywords
+    add2all - draw onto every spherical plot of the figure, else onto the last one
+    lineColor - the colour of the line
+    lineWidth - the width of the line
+    edgeAlpha - the opacity of the line
+    parent - the axes, or a list of them, to draw onto
+  See also
+    circle, plot, scatter, Annotations"""
   from ..geometry.quaternion import rotation
   rots = rot.flatten() if rot.size > 1 else [rot]
   a, b = np.broadcast_to(np.asarray(a, dtype=float).ravel(), (len(rots),)), np.broadcast_to(np.asarray(b, dtype=float).ravel(), (len(rots),))
@@ -837,9 +881,39 @@ def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw: Unpack[PlotKeywords])
 
 
 def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, **kw: Unpack[PlotKeywords]):
-  """scatter(v), scatter(v, data), scatter(v, label=texts): directions as markers; scatter(ori)
-  puts orientations into axis angle space; scatter(x, y, sz, c, 'filled') of two coordinate
-  lists marks points on the current map"""
+  """directions or crystal directions drawn as markers on a spherical plot, coloured by data
+  or labelled
+
+    scatter(v)                                              # the directions as markers
+    scatter(v, data, colorbar=True)                         # coloured by values, with a colour bar
+    scatter(v, rgb)                                         # an RGB colour per direction
+    scatter(v, label=texts)                                 # a text below every marker
+    scatter(v, label=texts, textAboveMarker=True)           # the text above
+    scatter(h, symmetrised=True, labeled=True)              # every equivalent, named by its indices
+    scatter(v, marker='s', markerSize=8, markerFaceColor='r', markerEdgeColor='k')  # the markers styled
+    scatter(v, data, minmax=True)                           # the smallest and largest value marked
+    scatter(ori)                                            # orientations in axis angle space
+    scatter(x, y, 50, 'r')                                  # points of two coordinate lists on the current map
+
+  The plot is new, or the one held; its projection, hemisphere and region follow the frame
+  and the keywords of the spherical plots (upper, lower, fundamentalRegion, ...). A Miller
+  direction or plane with symmetrised=True is drawn at all its distinct symmetric equivalents.
+  Orientations go to scatter3d's axis angle space, two lists of coordinates to the map
+  held. MATLAB's numbered flag is not there.
+
+  Input
+    v - vector3d or Miller
+    data - one value per direction, or an (n, 3) array of RGB colours
+    ori - orientation
+    x, y - the coordinates of points on a map
+  Output
+    h - the matplotlib collections, one per spherical plot
+  Keywords
+    minmax - mark the smallest and the largest value
+    symmetrised - draw every distinct symmetric equivalent of a crystal direction
+    colorbar - add a colour bar for the data
+  See also
+    plot, text, circle, plotPF, plotIPF, vector3d.scatter3d, SphericalProjections"""
   from ..geometry._array import MtexArray
   from ..geometry.quaternion import quaternion
   if not isinstance(v, MtexArray) and data is not None and not isinstance(data, MtexArray) and np.ndim(v) == 1 \

@@ -77,9 +77,31 @@ def _solve(T, basis, columns, tol, budget):
 
 
 def linearProgram(c, A, b, tol=1e-9, maxIter=10000, diagnostics=False):
-  """the minimiser of c.x under A x = b, x >= 0, by a scaled two-phase simplex with Bland's
-  rule; None when the program is infeasible, unbounded or out of iterations, or with
-  diagnostics=True the result with its status, pivot count and relative residual"""
+  """the minimiser of a linear program in standard form, min c.x under A x = b, x >= 0
+
+    x = linearProgram(c, A, b)                     # the solution, None when there is none
+    res = linearProgram(c, A, b, diagnostics=True)  # with its status, pivot count and residual
+
+  A scaled two phase simplex with Bland's rule, the kind of program the Taylor model solves
+  for every strain: phase one finds a feasible vertex on artificial variables, every row scaled to unit
+  size, phase two walks to the optimum. Without diagnostics the result is None when the
+  program is infeasible, unbounded, out of iterations or numerically failed; with diagnostics a
+  LinearProgramResult (solution, status, iterations, residual), the residual the largest
+  entry of |A x - b| relative to max(1, |b|).
+
+  Input
+    c - the cost vector, n numbers
+    A - the m x n matrix of the constraints
+    b - the right hand side, m numbers
+  Output
+    x - the minimiser, n numbers, or None
+    res - LinearProgramResult
+  Keywords
+    tol - the tolerance below which a reduced cost or a pivot counts as zero
+    maxIter - the largest number of pivots
+    diagnostics - return a LinearProgramResult instead of the bare solution
+  See also
+    calcTaylor"""
   c, A, b = np.asarray(c, dtype=float).ravel(), np.asarray(A, dtype=float), np.asarray(b, dtype=float).ravel()
   m, n = A.shape
   if c.size != n or b.size != m:
@@ -315,18 +337,51 @@ def _taylorMany(E, model, plasticWork, spinSelection):
 
 
 def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=32, smoothing=0.0):
-  """the Taylor factor, the shears of the slip systems and the plastic spin of a strain
+  """the Taylor factor, the shears of the slip systems and the plastic spin of a strain the
+  crystal accommodates by slip alone
 
-    M, b, W = calcTaylor(eps, sS)                     eps in the crystal frame, one or a list of strains
-    M, b, W = calcTaylor(inv(ori) * eps, sS)          the strain of every orientation, one row of shears each
-    MFun, _, WFun = calcTaylor(eps, sS)               eps in the specimen frame: the factor as an SO3Fun and
-                                                      the spin as a vector field of the orientation
+    M, b, W = calcTaylor(eps, sS)                       # eps in the crystal frame, one or a list of strains
+    M, b, W = calcTaylor(inv(ori) * eps, sS)            # the strain of every orientation, one row of shears each
+    oriNew = ori.exp(-W)                                # the orientation the spin turns the crystal to
+    work, b, W = calcTaylor(inv(ori) * eps, sS, plasticWork=True)  # the plastic work instead of the factor
+    MFun, _, WFun = calcTaylor(eps, sS, bandwidth=32)   # eps in the specimen frame: functions of the orientation
 
-  plasticWork=True takes the work instead of the sum of the shears. The shears are the
-  analytic centre of the optimal face, which makes them and the spin unique and symmetric, as
-  MATLAB's; spinSelection 'basic' takes a vertex of the face, 'minimumNorm' the shears of least
-  norm on it. The spin is a spinTensor in the crystal frame, so ori.exp(-W) turns the crystal.
-  """
+  Taylor's model: every grain takes the macroscopic strain, which its slip systems must
+  produce. Of the shears that do, the ones of least total shear, the sum of the absolute
+  shears weighted by the critical resolved shear stresses, are taken, found by a linear
+  program; that sum divided by the size of the strain is the Taylor factor M. The shears are
+  the analytic centre of the optimal face, which makes them and the spin unique and symmetric,
+  as MATLAB's; spinSelection takes another point of the face. The spin is a spinTensor in the
+  crystal frame, so ori.exp(-W) turns the crystal.
+
+  A strain in a crystal frame, one or a list, gives numbers. A strain in the specimen frame
+  gives the factor as an SO3FunHarmonic and the spin as an SO3VectorFieldHarmonic of the
+  orientation, fitted on a quadrature grid of the bandwidth (MATLAB's 'SO3Fun' flag);
+  the shears are None then.
+
+  Input
+    eps - strainTensor, in the crystal frame of sS or in the specimen frame
+    sS - slipSystem, the systems in the crystal frame with their critical resolved shear
+        stresses, symmetrised; or a TaylorModel prepared from them
+  Output
+    M - the Taylor factor, a number or an array of the shape of eps; SO3FunHarmonic for a
+        strain in the specimen frame
+    b - the shear of every slip system, an array (..., number of systems); None for a strain
+        in the specimen frame
+    W - spinTensor, the plastic spin in the crystal frame; SO3VectorFieldHarmonic for a strain
+        in the specimen frame
+  Keywords
+    plasticWork - take the plastic work, the shears weighted by the critical resolved shear
+        stresses, instead of the geometric Taylor factor
+    spinSelection - which shears of an optimal face: 'centre' its analytic centre, 'basic' a
+        vertex, 'minimumNorm' the shears of least norm; by default the model's, 'centre'
+    bandwidth - the bandwidth of the functions for a strain in the specimen frame
+    smoothing - the halfwidth of a de la Vallee Poussin kernel the spin field is smoothed
+        with; zero for none
+  References
+    G. I. Taylor, Plastic strain in metals, J. Inst. Metals 62 (1938) 307-324
+  See also
+    slipSystem, strainTensor, linearProgram, TaylorModel, TaylorHex"""
   refuseFlags(args, "calcTaylor")
   model = sS if isinstance(sS, TaylorModel) else TaylorModel(sS)
   if not isinstance(eps, strainTensor):

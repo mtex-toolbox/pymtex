@@ -72,11 +72,48 @@ def _firstLargest(weight, grp, n):
 
 
 class grain2d(polygonSet):
-  """the grains of a map, MATLAB's grain2d: a table of ids, phases, pixel counts, mean orientations
-  and properties, with the boundary, the inner boundary and the loops of every grain's polygon
+  """the grains of a map: a table of ids, phases, pixel counts, mean orientations and
+  properties, with the boundary, the inner boundary and the polygon of every grain; MATLAB's
+  grain2d
 
-    grains = calcGrains(ebsd)
-    grains['Forsterite'], grains[grains.numPixel > 10], grains.selectByGrainId(ids)"""
+    grains = calcGrains(ebsd)                       # the grains of a map
+    grains = grain2d(grains.id, grains.phaseId, grains.CSList, grains.numPixel, grains.meanRotation, grains.GOS, grains.frame, boundary=grains.boundary)  # a table from its columns
+    grains['Forsterite']                            # the grains of one phase
+    grains[grains.numPixel > 10]                    # the grains of a condition
+    grains.selectByGrainId([1, 2, 3])               # the grains of these ids
+
+  Grains are made by calcGrains, which segments a map; the constructor takes the columns of
+  the table and the boundaries of a segmentation. The polygon of a grain is the loops of the
+  boundary segments that carry its id, traced from the boundary when no loops are given, so
+  grains without a boundary have no polygon and no shape. A property given in prop, or
+  assigned as grains.name = values, is one value per grain and follows every selection.
+
+  MATLAB builds grains also from vertices and polygons, grain2d(V, poly, ori, CSList); here
+  grains come from a segmentation alone.
+
+  Input
+    id - integer array, the id of every grain
+    phaseId - integer array, the position of every grain's phase in CSList
+    CSList - phaseList, the frames of the phases
+    numPixel - integer array, the number of pixels of every grain
+    meanRotation - rotation, the mean orientation of every grain as a rotation from the
+        crystal to the specimen
+    GOS - array, the grain orientation spread of every grain in radians
+    frame - specimenFrame, the frame the grains lie in
+  Output
+    grains - grain2d
+  Keywords
+    prop - dict of further properties, one value per grain, read as grains.name or
+        grains.prop['name']
+    boundary - grainBoundary, the segments between the grains and to the outside of the map
+    innerBoundary - grainBoundary, the segments inside the grains, the low angle boundaries
+        of a segmentation with two thresholds
+    loops - the polygon of every grain as loops of boundary segments; traced from boundary
+        when not given
+    phaseMap - the phase number of the file for every entry of CSList
+  See also
+    calcGrains, grain2d.merge, grain2d.selectByGrainId, grainBoundary, GrainReconstruction,
+    SelectingGrains, GrainSpatialPlots, ShapeParameters"""
 
   def __init__(self, id, phaseId, CSList, numPixel, meanRotation, GOS, frame, prop=None, boundary=None, innerBoundary=None, loops=None,
                phaseMap=None):
@@ -426,16 +463,52 @@ class grain2d(polygonSet):
   # ------------------------------------------------------------------ merging
 
   def merge(self, pairs=None, threshold=None, inclusions=None, host=None, maxSize=np.inf, testRun=False):
-    """join grains into one: by pairs of ids, by the segments of a boundary, by a graph of
-    grains indexed by id, by a label per grain, or by a misorientation threshold across the
-    shared boundaries; inclusions=True (or a mask) joins every inclusion below maxSize
-    pixels to the grain around it, host a mask of the grains that may take one. The merge
-    is a relabelling and nothing else: the boundary between two grains that became one
-    moves to the inner boundary, the loops are traced again, the mean is the pixel-weighted
-    mean of the parts. A phase boundary is merged only by an inclusion, and the merged
-    grain is then the host's phase and orientation. The id of the parent of every grain is
-    written into grains.parentId, the merged grains carry the ids of their parts as
-    childId; testRun returns the parent ids alone"""
+    """the grains joined into one along given boundaries, by pairs of ids, by a label per grain,
+    below a misorientation angle, or every inclusion into the grain around it; MATLAB's merge
+
+      merged = grains.merge(grains.boundary['Forsterite', 'Forsterite'])  # every pair of grains sharing a segment of the boundary
+      merged = grains.merge(np.array([[1, 2], [5, 9]]))     # the pairs of these grain ids
+      merged = grains.merge(grains.neighbors(matrix=True))  # the pairs a sparse matrix over the ids marks
+      merged = grains.merge(threshold=5*degree)             # neighbours of a misorientation below 5 degree
+      merged = grains.merge(inclusions=True, maxSize=5)     # every inclusion of fewer than 5 pixels into its host
+      merged = grains.merge(inclusions=True, host=grains.numPixel > 100)  # inclusions only into large grains
+      parentId = grains.merge(threshold=5*degree, testRun=True)  # the parent ids, nothing merged
+
+    Two grains go into one when a criterion joins them, directly or through a chain of other
+    grains; several criteria given together apply together. A boundary between grains of two
+    phases is merged only by an inclusion, which then takes the phase and the orientation of
+    its host.
+
+    The merge relabels and nothing else: the boundary between the parts of a merged grain
+    moves to its inner boundary, the polygons are traced again, the number of pixels is the
+    sum of the parts, the mean orientation is the mean of the parts weighted by their pixels
+    (MATLAB's calcMeanOrientation, always done here) and GOS the weighted mean of theirs.
+    The merged grains carry the ids of their parts as childId, and the grains passed are
+    given parentId, the id of the merged grain every grain went into, which MATLAB returns
+    as a second output.
+
+    MATLAB merges also at the grains of a triple point list, grains.merge(tP); that form is
+    not here.
+
+    Input
+      grains - grain2d
+      pairs - what is merged: a grainBoundary, whose segments join the grains on both sides;
+          an (n, 2) array of grain ids; a square matrix or sparse matrix M over the ids, M[i, j]
+          nonzero joining the grains of ids i + 1 and j + 1; or a label per grain, the grains of
+          one label joined
+    Output
+      merged - grain2d, the merged grains, numbered from 1
+      parentId - array, with testRun: the id in the merged list of every grain
+    Keywords
+      threshold - join the neighbours whose mean orientations differ by less than this angle
+      inclusions - True to join every inclusion, a grain surrounded by one other grain, to that
+          host; a mask over the grains to join only the inclusions it marks
+      host - mask over the grains of those that may take an inclusion
+      maxSize - the inclusions joined are those of fewer pixels
+      testRun - return the parent id of every grain instead of the merged grains, the grains
+          passed left unchanged
+    See also
+      grain2d.isInclusion, grain2d.neighbors, calcGrains, GrainMerge, parentGrainReconstructor"""
     from .boundary import grainBoundary
     if len(np.unique(self.id)) != self.size:
       raise ValueError("merging requires distinct grains")

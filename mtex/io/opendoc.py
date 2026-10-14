@@ -161,18 +161,34 @@ def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=T
   """a documentation page as a script to run section by section, or the reference page of a
   function in the browser
 
-  openDoc() lists the pages, openDoc('EBSDAnalysis') the pages of a chapter. openDoc('EBSDTutorial')
-  writes the page as EBSDTutorial.py, a "# %%" line before every section, into the current folder
-  (or folder=) and opens it in VS Code, unless edit=False; an existing file is kept unless
-  overwrite=True. With notebook=True the page is written as the Jupyter notebook EBSDTutorial.ipynb
-  instead. Returns the path of the file. A function, class or method, by its name or itself,
-  opens its page of the function reference on the MTEX website, unless edit=False, and returns
-  the address.
+    pages = openDoc()                            # the list of the documentation pages
+    openDoc('EBSDAnalysis')                      # the pages of one chapter
+    path = openDoc('EBSDTutorial')               # the page as a script, opened in VS Code
+    path = openDoc('EBSDTutorial', notebook=True)  # the page as a Jupyter notebook
+    url = openDoc('fibre.angle')                 # the reference page of a function by its name
+    url = openDoc(calcGrains)                    # the reference page of a function itself
+    url = openDoc(ori.mean)                      # the reference page of a method
 
-    openDoc('EBSDTutorial')
-    openDoc('fibre.angle')
-    openDoc(calcGrains)
-    openDoc(ori.mean)"""
+  A documentation page is written as <Page>.py, a "# %%" line before every section, into the
+  current folder, and opened in VS Code, where every section runs on its own; with
+  notebook=True it is written as the Jupyter notebook <Page>.ipynb. A file already there is
+  kept unless overwrite=True. A function, class or method, by its name or itself, opens its
+  page of the function reference on the MTEX website.
+
+  Input
+    name - str, a documentation page, a chapter or the name of a function; or the function,
+        class or method itself
+  Output
+    out - the list of pages for no name, the pages of a chapter, the path of the file written,
+        or the address of the reference page
+  Keywords
+    folder - the folder the script is written into, by default the current one
+    overwrite - write the page again over a file of its name
+    edit - open the script in VS Code, or the reference page in the browser; False only
+        writes the file or returns the address
+    notebook - write a Jupyter notebook instead of a script
+  See also
+    mtexdata, Installation, MATLABtoPython"""
   if name is not None and not isinstance(name, str):
     page = referencePage(name)
     if page is None:

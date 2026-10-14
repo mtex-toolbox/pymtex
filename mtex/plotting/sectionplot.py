@@ -267,9 +267,40 @@ def plotFibreSection(f, points=1000, lineColor="k", **kw: Unpack[PlotKeywords]):
 
 
 def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
-  """quiver(ori, w) on a section plot: an arrow along w at every orientation, w a specimen
-  direction per orientation; quiverSection(sF, vF, sec) the vector field along the polar
-  section of a function on the sphere"""
+  """arrows on a section plot: of a function on the sphere along one of its circles, or at
+  orientations in the sections of orientation space; MATLAB's S2Fun/quiverSection
+
+    quiverSection(sF, vF, zvector)                 # the field vF along the circle normal to z
+    quiverSection(sF, vF, zvector, np.pi/3)        # along the small circle at 60 degree from z
+    quiverSection(sF, vF, zvector, normalized=True)  # every vector of the same length
+    quiverSection(ori, xvector)                    # an arrow along x at every orientation
+    quiverSection(ori, w, color='r', resolution=5*degree)  # a direction per orientation
+
+  With a function on the sphere sF, a vector field vF, S2VectorField, S2AxisField or a
+  function of the directions, is evaluated at 36 points of the circle normal to sec, or of
+  the small circle at the polar angle eta from sec, and the vectors are drawn at the ring that
+  plotSection(sF, sec) draws, the points pushed out to the values of sF and seen down sec. The
+  longest arrow is scaled to the spacing of the points (autoScaleFactor=0.9); an axis field
+  draws segments without heads. This form also takes displayName and how2plot.
+
+  With orientations, the arrows go into the sections of the current section plot, which
+  plotSection draws first: at every orientation, in the section it lies in, an arrow along
+  the specimen direction w, one for all or one per orientation.
+
+  Input
+    sF - S2Fun, the function whose section is drawn
+    vF - S2VectorField, S2AxisField, a vector3d per point of the circle, or a function
+    sec - vector3d, the normal of the section
+    eta - the polar angle of the circle from sec, optional, pi/2 the great circle
+    ori - orientation, on a section plot
+    w - vector3d, a specimen direction for all or one per orientation
+  Keywords
+    color - the colour of the arrows
+    lineWidth - the width of the arrows
+    resolution - the spacing the arrows are scaled to, an angle: every arrow is half of it
+        long (orientations only)
+  See also
+    plotSection, quiver, S2FunHarmonic.grad, S2FunVectorField, OrientationVisualizationSections"""
   from ..geometry.quaternion import quaternion
   if not isinstance(ori, quaternion):
     from .polarplot import quiverSectionS2
@@ -288,9 +319,26 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
 
 
 def quiverSectionField(F, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
-  """plot(WFun) of a vector field on SO(3): in every section an arrow where a small turn
-  about the field's axis moves the orientation within the section, its length the size of
-  the field; into the sections of a held figure, or new phi2 sections"""
+  """plot of a vector field on SO(3) as arrows in the sections of orientation space
+
+    plot(G)                                        # arrows in phi2 sections, G = odf.grad()
+    quiverSectionField(G, 'phi1')                  # in phi1 sections
+    quiverSectionField(G, resolution=15*degree, color='b')  # a coarser grid of blue arrows
+
+  At the nodes of a grid in every section the field is evaluated, and the arrow shows where
+  a small turn about the field's axis moves the orientation within the section, its length
+  the size of the field. The arrows go into the sections of a held figure, the sections given
+  as an ODFSections object or named by a string, or new phi2 sections; Euler angle and pole
+  figure sections (sigma) are drawn, the others refused.
+
+  Input
+    G - SO3VectorField, a vector field on SO(3), as the gradient of an ODF
+  Keywords
+    color - the colour of the arrows
+    lineWidth - the width of the arrows
+    resolution - the spacing of the grid of arrows in every section, an angle
+  See also
+    SO3FunHarmonic.grad, plotSection, quiverSection, SO3FunVectorField"""
   from ..geometry.grids.s2grid import equispacedS2Grid
   from ..geometry.kernels import qmul
   from .sections import eulerSections, pfSections
@@ -439,8 +487,34 @@ def _plotSectionOri(ori, oS, columns=0, values=None, colorbar=False, colorRange=
 
 
 def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False, **kw: Unpack[PlotKeywords]):
-  """plot(key), plot(key, 'sigma', sections=6): the colours of an orientation colour key over
-  the sections of orientation space, MATLAB @orientationColorKey/plot"""
+  """plot of an orientation colour key, its colours over the sections of orientation space;
+  MATLAB's orientationColorKey/plot
+
+    plot(key)                                      # the colours in the default sections
+    plotKeySections(key, 'sigma', sections=6)      # six sigma sections
+    plotKeySections(key, resolution=5*degree, columns=3, field=True)  # coarser, in three columns
+
+  Every section is filled with the colour key.orientation2color gives the orientations of its
+  grid; orientations the key leaves without a colour stay white. The sections follow the
+  frames of the key, frameA and frameB, and are named by a string ('phi2', 'phi1', 'sigma',
+  ...) or given as an ODFSections object; the keywords of the sections (sections, phi2,
+  maxPhi, ...) choose them as for plotSection. An antipodal key, one with grain exchange
+  symmetry, is drawn over the region that symmetry halves. A key on the sphere, as
+  ipfHSVKey, draws its inverse pole figure with plot(key) instead.
+
+  Input
+    key - an orientation colour key, as BungeColorKey, axisAngleColorKey or spotColorKey;
+        ipfHSVKey through plotKeySections itself
+  Output
+    h - the list of matplotlib meshes drawn
+  Keywords
+    resolution - the spacing of the grid the colours are computed on, an angle
+    columns - the number of columns of the sections, 0 to choose it from the figure
+    field - draw into every section the arrows of the reference field its coordinate is
+        counted from
+  See also
+    orientationColorKey.orientation2color, plotSection, ipfColorKey, BungeColorKey, EBSDOrientationPlots,
+    OrientationVisualizationSections"""
   kind = next((a for a in args if isinstance(a, (str, ODFSections))), None)
   # an antipodal key, one with grain exchange, is drawn over the region that symmetry halves
   if getattr(key, "antipodal", False):

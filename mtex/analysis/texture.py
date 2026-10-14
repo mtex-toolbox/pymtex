@@ -163,14 +163,39 @@ def _sameCrystal(a, b):
 # ------------------------------------------------------------------ the sheet quantities
 
 def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=None, bandwidth=16):
-  """the Lankford coefficients of a sheet texture: for every angle theta to the rolling
-  direction the normalised plastic work is minimised over the strain ratio rho, and
-  R = rho/(1 - rho) at the minimum; returns R per angle, the work over rho and theta, and
-  its minimum per angle
+  """the Lankford coefficients, the R-values, of a sheet from its orientations or its ODF
 
-    R, M, minM = calcLankford(ori, sS, theta=, rho=, RD=xvector, ND=zvector, weights=)
-    R, M, minM = calcLankford(odf, sS, theta=, rho=)
-  """
+    R, M, minM = calcLankford(ori, sS)                 # R at 0, 5, ..., 90 degree to the rolling direction
+    R, M, minM = calcLankford(ori, sS, theta, weights=w)  # weighted orientations, chosen angles
+    R, M, minM = calcLankford(odf, sS, rho=np.linspace(0, 1, 21))  # from an ODF, a finer ratio
+
+  The R-value is the ratio of the true width strain to the true thickness strain of a strip
+  pulled at the angle theta to the rolling direction. For every theta the strip is strained
+  along the pull and contracts by the fraction rho across it and 1 - rho through the
+  thickness; the Taylor model gives the normalised plastic work M of every rho, averaged over
+  the texture, and the strip takes the rho of least work, R = rho / (1 - rho).
+
+  The mean Rbar of R over the directions tells how well a sheet resists thinning, Rbar >= 1
+  favouring deep drawing; the planar anisotropy deltaR indicates the fourfold earing of a cup.
+
+  The angles theta may also be given as a positional array after sS, as MATLAB.
+
+  Input
+    x - orientation, the crystal orientations of the sheet, or SO3Fun, its ODF
+    sS - slipSystem, or a TaylorModel, the systems the crystals deform by
+  Output
+    R - the Lankford coefficient at the least plastic work, one per theta
+    M - the normalised plastic work, an array of rho by theta
+    minM - the least normalised plastic work, one per theta
+  Keywords
+    theta - the angles of the pull to the rolling direction in radians
+    rho - the fractions of the contraction across the strip, between 0 and 1
+    RD - vector3d, the rolling direction, the pull at theta = 0
+    ND - vector3d, the normal of the sheet, orthogonal to RD
+    weights - the weights of the orientations, the area of grains for instance
+    bandwidth - the harmonic bandwidth the Taylor factor and the ODF are expanded to (an ODF)
+  See also
+    calcTaylor, TaylorModel, slipSystem, Lankford"""
   th =np.linspace(0, np.pi / 2, 19) if theta is None else np.asarray(theta, dtype=float).ravel()
   rh = np.linspace(0, 1, 11) if rho is None else np.asarray(rho, dtype=float).ravel()
   for a in args:

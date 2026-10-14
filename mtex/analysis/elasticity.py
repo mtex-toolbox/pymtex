@@ -97,16 +97,40 @@ def _christoffelMatrix(C, u):
 
 
 def velocity(C, n=None, *args, density=None, harmonic=False, bandwidth=48):
-  """the elastic wave velocities and their polarisations from the Christoffel tensor
+  """the speeds of the three elastic plane waves in a direction and their polarisations, the
+  eigenvalues and eigenvectors of the Christoffel tensor
 
-    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, n, density=rho)   in the direction n, or at a list of them
-    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, density=rho)      as functions on the sphere and axis fields
-    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, 'harmonic')       as harmonic expansions of bandwidth 48
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, n)                   # in the direction n, or at a list of them
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, n, density=rho)      # with another density than the tensor's
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C)                      # as functions on the sphere and axis fields
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, harmonic=True)       # as harmonic expansions
 
-  A stiffness in GPa and a density in g/cm^3 give velocities in km/s; the density stored
-  on the tensor is used when none is given, and MATLAB's velocity(C, n, rho) passes it
-  third.
-  """
+  The Christoffel tensor of the direction n is C_ijkl n_j n_l; its eigenvalues divided by
+  the density are the squared speeds of the quasi longitudinal wave, vp, and of the two
+  shear waves, vs1 the faster, vs2 the slower, its eigenvectors the polarisations, the
+  directions in which the particles move. A stiffness in GPa and a density in g/cm^3 give
+  speeds in km/s. A compliance tensor is inverted first.
+
+  The result is a named tuple, so velocity(C, n).vp picks one entry. Without a direction
+  the speeds are functions on the sphere, evaluated where they are asked, and the
+  polarisations axis fields; with harmonic=True they are sampled once on a quadrature grid
+  and expanded. MATLAB's velocity(C, n, rho) passes the density third, which is taken too.
+
+  Input
+    C - stiffnessTensor in GPa, or complianceTensor
+    n - vector3d, the propagation directions
+  Output
+    vp, vs1, vs2 - the speeds of the p wave and of the faster and slower s wave in km/s;
+        S2Fun without a direction
+    pp, ps1, ps2 - vector3d, the polarisations of the three waves; S2AxisField without a
+        direction
+  Keywords
+    density - the density in g/cm^3; by default the density stored on the tensor, else 1
+    harmonic - expand the functions of a call without a direction in spherical harmonics
+        instead of evaluating them where they are asked
+    bandwidth - the harmonic degree of these expansions
+  See also
+    energyVector, ChristoffelTensor, plotSeismicVelocities, WaveVelocities"""
   C = _stiffness(C)
   if isinstance(n, str):
     n, args = None, (n,) + args
@@ -155,9 +179,36 @@ def _velocityHarmonics(C, rho, L):
 
 
 def energyVector(C, n, speed=None, polarization=None, *, density=None):
-  """the energy velocity of a lossless wave, C_ijkl p_j n_k p_l / (rho v), whose projection on
-  the propagation direction is the phase speed; with a speed function and a polarisation
-  field the vector field on the sphere"""
+  """the energy velocity of a lossless elastic plane wave, the vector C_ijkl p_j n_k p_l / (rho v)
+
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C, n)
+    E = energyVector(C, n, vp, pp)                  # the energy velocity of the p wave in the direction n
+    E = energyVector(C, n, vs1, ps1, density=rho)   # of the faster s wave, with another density
+    vp, vs1, vs2, pp, ps1, ps2 = velocity(C)
+    E = energyVector(C, None, vp, pp)               # as a vector field on the sphere
+
+  The energy velocity of a medium without attenuation is the velocity at which a plane wave
+  carries its energy, a good proxy for the group velocity: Ve_i = C_ijkl p_j n_k p_l / (rho
+  v), with n the propagation direction, v the phase speed and p the polarisation of one of
+  the three waves velocity returns. Its projection onto n is the phase speed, so its length
+  is at least v. With a speed function and a polarisation field and no direction the
+  result is a vector field on the sphere.
+
+  Input
+    C - stiffnessTensor in GPa
+    n - vector3d, the propagation directions, or None for the vector field
+    speed - the phase speed of the wave in km/s, vp, vs1 or vs2 of velocity, an S2Fun for
+        the vector field
+    polarization - vector3d, the polarisation of the wave, pp, ps1 or ps2 of velocity, an
+        S2AxisField for the vector field
+  Output
+    E - vector3d, the energy velocity in km/s; S2VectorField without a direction
+  Keywords
+    density - the density in g/cm^3; by default the density stored on the tensor
+  References
+    F. I. Fedorov, Theory of Elastic Waves in Crystals, Plenum Press, New York (1968)
+  See also
+    velocity, ChristoffelTensor, WaveVelocities"""
   C = _stiffness(C)
   rho = C.density if density is None else density
   if rho is None or not np.isfinite(rho) or rho <= 0:

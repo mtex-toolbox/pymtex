@@ -22,13 +22,39 @@ from ..maps.phaselist import phaseList
 
 def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, dataSets=(), mapConvention="y↑→x",
                             eulerConvention=None, vendorCorrection=None, variable="ebsd", drawn=None, volume=False):
-  """the script of an import: the file, the plotting convention, the correction, the phases, a plot
+  """the Python script of an import as the import wizard sets it up: the file, the plotting
+  convention, the correction of the Euler angles, the phases and a first plot
 
-    buildImportWizardScript('map.ctf')                             the plain load
-    buildImportWizardScript('map.oh5', dataSet=1, dataSets=sets)   a map of a project file
-    buildImportWizardScript('map.ang', phases=csList, headerPhases=info.phases)
-    buildImportWizardScript('volume.dream3d', volume=True)         a volume, read by EBSD3.load
-  """
+    script = buildImportWizardScript('map.ctf')                               # the plain load
+    script = buildImportWizardScript('map.h5oina', dataSet=2, dataSets=sets)  # a map of a project file
+    script = buildImportWizardScript('map.ang', phases=csList, headerPhases=info.phases)  # phases edited
+    script = buildImportWizardScript('map.ctf', mapConvention='y↑→x', eulerConvention='y↓→x')  # a correction
+    script = buildImportWizardScript('volume.dream3d', volume=True)          # a volume, read by EBSD3.load
+
+  The script sets the plotting convention of the map, loads the file with EBSD.load or
+  EBSD3.load, turns the Euler angles where their frame differs from the map's, replaces the
+  phases where they differ from what the file declares, and plots the orientations of the
+  largest phase. It runs as it is and reproduces the import. The window's Script tab shows
+  it; loadCall gives the one line load.
+
+  Input
+    path - the file
+  Output
+    script - str
+  Keywords
+    phases - phaseList, the phases as edited, written out where they differ from headerPhases
+    headerPhases - the phases the file declares, a phaseList or the snapshot frameKeys took
+    dataSet - the number of the map of a file with several
+    dataSets - the maps of the file; a dataSet is written only when there are several
+    mapConvention - the plotting convention of the map
+    eulerConvention - the convention the Euler angles are written in; a correction is
+        written where it differs from the map's
+    vendorCorrection - the correction the reader applies anyway, which is then not written
+    variable - the name of the variable the map is assigned to
+    drawn - the phases the plot may show, by index, True or False or a pixel count
+    volume - the file is a volume, read by EBSD3.load
+  See also
+    importWizard, loadCall, inspectEBSD, EBSD.load, EBSDImport"""
   name = variable or "ebsd"
   lines = [f"# the import of {os.path.basename(path)}, written by the MTEX import wizard on {date.today().isoformat()}",
            f"from mtex import {'EBSD3' if volume else 'EBSD'}, crystalFrame, degree, notIndexedFrame, plot, plottingConvention", ""]
@@ -64,7 +90,26 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
 
 
 def loadCall(path, dataSet=None, dataSets=(), variable="ebsd", volume=False):
-  """the one line load, for the clipboard"""
+  """the one line load of a file, for the clipboard
+
+    line = loadCall('map.ctf')                                  # ebsd = EBSD.load('/.../map.ctf')
+    line = loadCall('map.h5oina', dataSet=2, dataSets=[1, 2, 3])  # a map of a project file
+    line = loadCall('volume.dream3d', variable='vol', volume=True)  # a volume
+
+  The file is written with its absolute path. The import wizard copies it to the clipboard;
+  buildImportWizardScript writes the whole script.
+
+  Input
+    path - the file
+  Output
+    line - str
+  Keywords
+    dataSet - the number of the map of a file with several
+    dataSets - the maps of the file; a dataSet is written only when there are several
+    variable - the name of the variable the map is assigned to
+    volume - the file is a volume, read by EBSD3.load
+  See also
+    buildImportWizardScript, importWizard, EBSD.load"""
   args = [repr(os.path.abspath(path))]
   if dataSets is not None and len(dataSets) > 1 and dataSet is not None:
     args.append(f"dataSet={int(dataSet)}")

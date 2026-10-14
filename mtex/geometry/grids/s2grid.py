@@ -18,8 +18,29 @@ from ..display import display, header
 
 class S2Grid(vector3d):
   """a grid on the sphere with ring structure, a ladder of polar angles theta and one azimuth grid
-  per ring, whose nearest and radius searches use that structure; built by equispacedS2Grid,
-  regularS2Grid and plotS2Grid, and whatever breaks the rings returns a plain vector3d"""
+  per ring, whose nearest and radius searches use that structure
+
+    S2G = equispacedS2Grid(resolution=5*degree)                 # nearly equidistant directions
+    S2G = equispacedS2Grid(resolution=5*degree, maxTheta=70*degree)  # a spherical cap
+    S2G = S2Grid(S2G.thetaGrid, S2G.rhoGrid, resolution=5*degree)  # from its rings
+
+  The difference to a plain list of vector3d is that the grid knows its rings, so finding the
+  grid points closest to a direction, or within a radius of it, searches the ladders instead
+  of every point. A grid is built by equispacedS2Grid; anything that breaks the rings, an
+  index or an operation, returns a plain vector3d. regularS2Grid and plotS2Grid return a
+  matrix of vector3d, as their layout is the matrix.
+
+  Input
+    theta - S1Grid, the ladder of polar angles of the rings
+    rho - a list of S1Grid, the azimuths of every ring
+  Output
+    S2G - S2Grid
+  Keywords
+    frame - the frame of the directions
+    resolution - the resolution the grid was built with, in radians
+    antipodal - the directions are axes
+  See also
+    equispacedS2Grid, regularS2Grid, fibonacciS2Grid, plotS2Grid, vector3d.find, VectorGrids"""
 
   # the grid from its rings: theta a ladder of polar angles, rho one azimuth grid per ring
   def __init__(self, theta, rho, frame=None, resolution=np.nan, antipodal=False):
@@ -210,14 +231,45 @@ def _dots(g, a, b):
 
 def equispacedS2Grid(*args, resolution=2.5 * degree, points=None, minTheta=0.0, maxTheta=None, minRho=0.0, maxRho=2 * np.pi,
                      antipodal=False, hemisphere="complete", center=True, rhoPeriod=2 * np.pi, region=None, frame=None):
-  """a grid of nearly equidistant directions: rings of polar angle `resolution` apart, each
-  holding sin(theta) times the equator count of azimuths, odd rings offset by half a step
+  """an equispaced spherical grid, nearly equidistant directions on rings of constant polar
+  angle
 
-    equispacedS2Grid(resolution=5*degree)
-    equispacedS2Grid(points=1000)
-    equispacedS2Grid(resolution=5*degree, antipodal=True)      axes on the upper hemisphere
-    equispacedS2Grid(cs, resolution=5*degree)                  the fundamental sector of a frame
-  """
+    S2G = equispacedS2Grid(resolution=5*degree)                    # the sphere at 5 degree
+    S2G = equispacedS2Grid(points=1000)                            # about 1000 points
+    S2G = equispacedS2Grid(resolution=5*degree, antipodal=True)    # axes, the upper hemisphere
+    S2G = equispacedS2Grid(resolution=5*degree, maxTheta=70*degree)  # a spherical cap
+    S2G = equispacedS2Grid(cs, resolution=5*degree)                # the fundamental sector of a frame
+
+  The rings lie resolution apart in the polar angle, each holding sin(theta) times the equator
+  count of azimuths, the odd rings offset by half a step. With a number of points the
+  resolution is chosen to give about that many. A frame restricts the grid to its
+  fundamental sector, of the Laue group for axes; a sphericalRegion to that region.
+
+  Python has no 'identified' hemisphere and no restrict2MinMax, and center is the flag of a
+  point at the pole, not MATLAB's centre direction.
+
+  Input
+    args - a crystalFrame or specimenFrame, whose fundamental sector the grid covers, or a
+        sphericalRegion
+  Output
+    S2G - S2Grid
+  Keywords
+    resolution - the spacing of the rings and of the points on a ring, in radians
+    points - the number of points instead of the resolution
+    minTheta - the smallest polar angle
+    maxTheta - the largest polar angle; by default pi, or pi/2 for axes and the upper
+        hemisphere
+    minRho - the smallest azimuth
+    maxRho - the largest azimuth
+    antipodal - the directions are axes, the grid covers the upper hemisphere
+    hemisphere - 'complete', 'upper' or 'lower'
+    center - the first ring is the pole; False starts half a step from it, MATLAB's
+        'no_center'
+    rhoPeriod - the period of the azimuths, of the searches on a ring
+    region - a sphericalRegion the grid is restricted to
+    frame - the frame of the directions; by default that of the frame or region given
+  See also
+    S2Grid, regularS2Grid, fibonacciS2Grid, plotS2Grid, equispacedSO3Grid, VectorGrids"""
   from ..sphericalregion import fundamentalSector, sphericalRegion
   for a in args:
     if isinstance(a, sphericalRegion):
@@ -292,8 +344,38 @@ def _resolutionFor(n, tmin, tmax, drh, center):
 
 def regularS2Grid(resolution=5 * degree, points=None, theta=None, rho=None, minTheta=0.0, maxTheta=None, minRho=0.0,
                   maxRho=2 * np.pi, antipodal=False, hemisphere="complete", frame=None):
-  """the tensor product of a polar ladder and an azimuth ladder as an nRho x nTheta matrix
-  of directions, the layout of the pole figure files"""
+  """a regular spherical grid, the tensor product of a ladder of polar angles and a ladder of
+  azimuths, the layout of pole figure files
+
+    S2G = regularS2Grid(resolution=5*degree)                       # 5 degree in both angles
+    S2G = regularS2Grid(resolution=[5*degree, 2.5*degree])         # in the azimuth and the polar angle
+    S2G = regularS2Grid(points=(72, 19))                           # 72 azimuths, 19 polar angles
+    S2G = regularS2Grid(theta=np.arange(0, 81, 5)*degree, rho=np.arange(0, 360, 5)*degree)  # the angles given
+
+  The grid is an nRho x nTheta matrix of vector3d, rho along the first axis and theta along
+  the second. The polar angles run from minTheta to maxTheta both included, the azimuths
+  from minRho to maxRho periodically, the last left out. Python has no 'identified'
+  hemisphere and no restrict2MinMax.
+
+  Output
+    S2G - vector3d, an nRho x nTheta matrix
+  Keywords
+    resolution - the spacing in radians, one for both angles, or the pair of the azimuth and
+        the polar angle
+    points - (nRho, nTheta), the number of azimuths and of polar angles instead of the
+        resolution
+    theta - the polar angles, instead of a ladder
+    rho - the azimuths, instead of a ladder
+    minTheta - the smallest polar angle
+    maxTheta - the largest polar angle; by default pi, or pi/2 for axes and the upper
+        hemisphere
+    minRho - the smallest azimuth
+    maxRho - the largest azimuth, the period of the azimuths
+    antipodal - the directions are axes, the grid covers the upper hemisphere
+    hemisphere - 'complete', 'upper' or 'lower'
+    frame - the frame of the directions
+  See also
+    equispacedS2Grid, plotS2Grid, S2Grid, VectorGrids"""
   tmin, tmax = _polarRange(minTheta, maxTheta, hemisphere, antipodal)
   res = np.broadcast_to(np.asarray(resolution, dtype=float), (2,))
   nr, nt = points if points is not None else (int(np.ceil((maxRho - minRho) / res[0])), int(np.ceil((tmax - tmin) / res[1] + 1)))

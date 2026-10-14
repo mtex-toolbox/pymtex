@@ -258,7 +258,33 @@ def plot3d(x, *args, **kw: Unpack[PlotKeywords]):
 
 def scatter3d(v, data=None, markerSize=6, color=MARKER_COLOR, colormap="viridis", colorRange=None, grid=True, axisLabels=True,
               label=None, colorbar=False, **kw: Unpack[PlotKeywords]):
-  """scatter3d(v), plot3d(v, data): directions as markers on the sphere in space"""
+  """directions as markers on the sphere in space; MATLAB's vector3d/scatter3d
+
+    scatter3d(v)                          # the directions on the sphere
+    scatter3d(v, data, colorbar=True)     # coloured by a value each, with a colour bar
+    scatter3d(v, label='a', color='r')    # red markers with a text beside them
+
+  The markers sit just outside the unit sphere, which is drawn first with its grid and the
+  axes of the frame when the axes are new. An antipodal vector is drawn with its antipode.
+  plot3d(v) of directions is the same.
+
+  Input
+    v - vector3d, the directions, normalised for drawing
+  Output
+    h - the matplotlib Path3DCollection of the markers
+  Keywords
+    data - one value per direction, the colour of its marker
+    markerSize - the size of the markers in points
+    color - the colour of the markers without data
+    colormap - the colour map of the data
+    colorRange - (lo, hi), the values of the ends of the colour map; by default the range
+        of the data
+    grid - draw the parallels and meridians on a new sphere
+    axisLabels - draw the axes of the frame on a new sphere
+    label - a text beside every marker, one for all or a list with one per direction
+    colorbar - add a colour bar of the data
+  See also
+    arrow3d, plot3d, scatter, VectorDefinition"""
   v = asVector3d(v)
   axesKw = _keys(kw)
   sP = _spaceAxes(v.frame, **axesKw)
@@ -335,9 +361,31 @@ def _axisArrow(ax, d, name, length=0.15):
 
 def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolution=5 * degree, edgeColor=(0.1, 0.1, 0.1),
          **kw: Unpack[PlotKeywords]):
-  """surf(sF): the function as the sphere pushed out to |f|, coloured by f, the real part of a
-  complex one; a list of functions one panel each; a single real function is first scaled
-  to (f - mean) / (max - min) + 1 unless scaling=False, as MATLAB's surf does"""
+  """a function on the sphere as a surface in space, the sphere pushed out to |f| and
+  coloured by f; MATLAB's S2Fun/surf
+
+    surf(sF)                                       # the function as a surface
+    surf(sF, resolution=2*degree, scaling=False)   # a finer mesh, the values as they are
+
+  The radius of the surface in a direction is the absolute value of the function there, the
+  colour its value, the real part of a complex function. A single real function is first
+  scaled to (f - mean) / (max - min) + 1, as MATLAB does, which shows its shape as an
+  ovoid around the unit sphere; scaling=False draws the values as they are. A list of
+  functions is drawn one panel each, in a new figure.
+
+  Input
+    sF - S2Fun, or a list of them
+  Output
+    h - the Poly3DCollection of the surface, a list of them for a list of functions
+  Keywords
+    layout - (rows, columns) of the panels of a list of functions
+    figSize - the size of a new figure, a name such as 'large' or (width, height) in inches
+    scaling - scale a single real function to an ovoid around the unit sphere
+    colormap - the colour map of the values
+    resolution - the spacing of the mesh on the sphere, an angle
+    edgeColor - the colour of the edges of the mesh, 'none' for none
+  See also
+    plot3d, plot, S2FunPlotting"""
   from matplotlib.colors import Normalize
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .mtexfigure import figureSize
@@ -429,8 +477,35 @@ def _ball(sP, radius=180.0):
 
 def plotRegion3d(oR, resolution=5 * degree, color=REGION_COLOR, alpha=0.25, lines=True, lineColor="k", boundaryColor="k",
                  surface=True, **kw: Unpack[PlotKeywords]):
-  """plot(oR), plot(oR, boundaryColor='r', surface=False): the fundamental region in axis
-  angle space, in degrees, its surface with the parallels and meridians on it and its edges"""
+  """a fundamental region of orientation space drawn in axis angle space; MATLAB's
+  orientationRegion/plot
+
+    plot(oR)                                      # the region with its surface and edges
+    plot(oR, boundaryColor='r', surface=False)    # only the edges, in red
+    plot(oR, color='b', alpha=0.5, lines=False)   # another surface, without the grid lines
+
+  The region is drawn in axis angle space, the coordinates in degrees: its surface, light
+  and transparent so that orientations inside it show, the parallels and meridians on it
+  and the edges where two faces meet. Orientations scattered into the held axes afterwards
+  come in the same coordinates, brought into the region. A new plot fits its axes to the
+  region; a region reaching the half turn keeps the whole ball. plot3d(oR) is the same.
+
+  Input
+    oR - orientationRegion, e.g. fundamentalRegion(cs, ss)
+  Output
+    h - the Poly3DCollection of the surface, or the list of the edges' lines when
+        surface=False
+  Keywords
+    resolution - the spacing of the mesh of the surface, an angle
+    color - the colour of the surface
+    alpha - the opacity of the surface, 0 transparent to 1 opaque
+    lines - draw the parallels and meridians on the surface
+    lineColor - the colour of the parallels and meridians
+    boundaryColor - the colour of the edges of the region
+    surface - draw the surface; False draws the edges alone
+  See also
+    fundamentalRegion, orientation.scatter, plot3d, OrientationFundamentalRegion,
+    OrientationVisualization3d"""
   axesKw = _keys(kw)
   limit = 1.15 * oR.maxAngle() / degree
   held = _heldSpacePlot() is not None
@@ -534,15 +609,52 @@ def _spaceFlags(args, Euler, axisAngle, Rodrigues):
 def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False, region=True, fundamentalRegion=True,
                         ignoreFundamentalRegion=False, complete=False, points=None, markerSize=5, color=MARKER_COLOR, colormap="viridis",
                         colorRange=None, colorbar=False, all=False, **kw: Unpack[PlotKeywords]):
-  """scatter(ori), plot3d(ori), scatter(ori, 'Rodrigues'), scatter(ori, 'Euler'), scatter(ori, data, 'axisAngle'),
-  scatter(ori, all=True)
+  """orientations as points in a three dimensional space of orientations; MATLAB's
+  orientation/scatter
 
-  Orientations as points in axis angle space, in Rodrigues space or in Euler angle space,
-  brought into the fundamental region unless ignoreFundamentalRegion, with the boundary of
-  the region behind them in axis angle space unless region=False; the space named by a
-  positional string as MATLAB names it, 'Bunge' being 'Euler'. A bare rotation has no
-  region: the whole Euler box, the ball of axis angle space.
-  """
+    scatter(ori)                                  # in Euler angle space, in the fundamental region
+    scatter(ori, axisAngle=True)                  # in axis angle space, the region around them
+    scatter(ori, Rodrigues=True)                  # in Rodrigues space
+    scatter(ori, ori.angle(), axisAngle=True, colorbar=True)  # coloured by a value each
+    scatter(ori, ignoreFundamentalRegion=True)    # the orientations as they are
+    scatter(ori, all=True)                        # every orientation, not a sample
+
+  Orientations are brought into the fundamental region of their symmetries and drawn in
+  Euler angle space by default, misorientations and bare rotations in axis angle space;
+  into held axes they go in the coordinates those already have. In axis angle space the
+  boundary of the fundamental region is drawn behind them, for a bare rotation the ball of
+  all rotations. The space can also be named by a positional string, 'axisAngle',
+  'Rodrigues', 'Euler' or 'Bunge', as MATLAB names it.
+
+  A list longer than 2000 orientations is drawn as 2000 of them taken at random, as MATLAB
+  does; NaN orientations are left out with their values. A further set into held axes
+  takes the next colour as open circles. plot3d(ori) is the same.
+
+  Input
+    ori - orientation or rotation
+    data - one value per orientation, or an (n, 3) array of RGB colours
+  Output
+    h - the matplotlib Path3DCollection of the markers
+  Keywords
+    axisAngle - draw in axis angle space
+    Rodrigues - draw in Rodrigues space
+    Euler - draw in Euler angle space
+    region - draw the boundary of the fundamental region, or the ball, in axis angle space
+    fundamentalRegion - bring the orientations into the fundamental region
+    ignoreFundamentalRegion - keep the orientations as they are, the axes fitted to them
+    complete - keep the orientations as they are in the whole space, without the region
+    points - the number of orientations drawn, taken at random
+    markerSize - the size of the markers in points
+    color - the colour of the markers without data; by default the next colour of the
+        order, as open circles
+    colormap - the colour map of the data
+    colorRange - (lo, hi), the values of the ends of the colour map; by default the range
+        of the data
+    colorbar - add a colour bar of the data
+    all - draw every orientation, however many
+  See also
+    orientationRegion.plot, quiver3d, plotPF, plotIPF, plotSection, OrientationVisualization3d,
+    RotationPlotting"""
   data, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   boundary, region = region, region and not complete
   ignoreFundamentalRegion = ignoreFundamentalRegion or complete
@@ -635,11 +747,42 @@ def scatterOrientations(o, *args, axisAngle=False, Rodrigues=False, Euler=False,
 
 
 def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=False, Rodrigues=False, Euler=False, maxHeadSize=None, **kw: Unpack[PlotKeywords]):
-  """quiver3d(t): a tangent vector as an arrow at its reference in orientation space, in the
-  coordinates of the held axes or axis angle space; the arrow ends where the vector, scaled
-  to the longest of the list, points to, as MATLAB draws it; quiver3d(vF) a field on the
-  sphere as arrows in space; quiver3d(v, d) arrows at the positions v along d in a 3D scene
-  (MATLAB's quiver3)"""
+  """arrows in space: tangent vectors in orientation space, a field on the sphere or SO(3), or
+  arrows at positions; MATLAB's quiver3
+
+    quiver3d(t)                                   # tangent vectors at their orientations
+    quiver3d(t, Rodrigues=True, normalize=True)   # in Rodrigues space, all of one length
+    quiver3d(sVF)                                 # a field on the sphere as arrows on it
+    quiver3d(F, axisAngle=True, resolution=7.5*degree)  # a vector field on SO(3)
+    quiver3d(pos, d)                              # arrows at the positions pos along d
+
+  A tangent vector is an arrow at its reference orientation, in the coordinates of the held
+  axes, else in axis angle space, the orientations scattered first; the arrow ends where
+  the exponential of the vector, scaled to the longest of the list, takes the orientation.
+
+  A vector or axis field on the sphere is drawn as arrows, or lines for an axis field, on an
+  equispaced grid of the hemisphere facing the camera (keywords resolution, color,
+  arrowSize). A vector field on SO(3) is drawn on an equispaced grid of its fundamental
+  region (keyword resolution), the longest arrow nine tenths of the grid spacing. Two
+  vector3d, positions and directions, are arrows in a 3D scene (keywords arrowSize, color,
+  lineWidth), MATLAB's vector3d/quiver3.
+
+  Input
+    t - SO3TangentVector, S2VectorField, S2AxisField or SO3VectorField
+    pos, d - vector3d, the tails of the arrows and their directions
+  Output
+    h - the matplotlib Quiver3D, or the scene3d of the arrows at positions
+  Keywords
+    lineWidth - the width of the arrows' lines
+    color - the colour of the arrows; blue for tangent vectors, black on the sphere
+    normalize - draw every arrow at one length, only its direction kept
+    axisAngle - draw in axis angle space
+    Rodrigues - draw in Rodrigues space
+    Euler - draw in Euler angle space
+    maxHeadSize - MATLAB's MaxHeadSize, accepted without effect: the heads keep their size
+  See also
+    SO3TangentVector, orientation.scatter, arrow3d, plot3d, RotationTangentSpace,
+    SO3FunVectorField, S2FunVectorField"""
   # arrows at positions in space go into a 3D scene
   if isinstance(t, vector3d) and args and isinstance(args[0], vector3d):
     from .volumeplot import _quiverVectors
@@ -710,8 +853,34 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
 
 
 def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", labeled=False, label=None, **kw: Unpack[PlotKeywords]):
-  """arrow3d(v): solid arrows from the origin, or from anchor, to the tips v, into the held
-  axes or a new figure in space, the axes widened to hold them (MATLAB @vector3d/arrow3d)"""
+  """solid arrows in space, from the origin, or from anchor, to the tips v; MATLAB's
+  vector3d/arrow3d
+
+    arrow3d(v)                                             # arrows from the origin to v
+    arrow3d(zvector, faceColor='r', label='z')             # a red arrow named z
+    arrow3d(v, anchor=vector3d(1, 0, 0), arrowWidth=0.05)  # arrows from another point, thinner
+    arrow3d(Miller(1, 0, 0, cs, 'uvw'), labeled=True)      # every arrow named by its indices
+
+  The arrows go into the held axes in space or into a new figure, whose camera looks down on
+  the screen plane of the plotting convention, and the axes widen to hold every arrow and
+  label drawn so far, at equal scale. A new figure frames the arrows; held axes keep their
+  framing. The coordinates are those of v, in its frame.
+
+  Input
+    v - vector3d, the arrows, the tips when anchor is not given
+  Output
+    h - the Poly3DCollection of the arrows' faces
+  Keywords
+    faceColor - the colour of the arrows
+    anchor - vector3d or (n, 3) array, the tails of the arrows, one for all or one per arrow
+    arrowWidth - the radius of the tail relative to the length of the arrow, the head 2.5
+        times as wide; by default the radius follows the longest arrow, for arrows of
+        equal thickness
+    edgeColor - the colour of the edges of the faces, 'none' for none
+    labeled - name every arrow by its indices or coordinates
+    label - a text at the tip of every arrow, one for all or a list with one per arrow
+  See also
+    scatter3d, quiver3d, text, VectorDefinition, RotationDefinition"""
   from matplotlib.colors import to_rgba
   from mpl_toolkits.mplot3d.art3d import Poly3DCollection
   from .sphericalplot import _nameOf

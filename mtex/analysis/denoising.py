@@ -284,11 +284,42 @@ def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
 # ------------------------------------------------------------------ smooth and fill
 
 def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
-  """the map with every orientation replaced by one computed from its neighbours, within the
-  grains where the map knows them and within the phases where it does not. fill solves for
-  the pixels that carry no measurement as well, fill=grains only for those inside a grain; a window filter can solve for nothing, so
-  there the holes are closed by fill first. props names the numeric properties smoothed
-  along with the orientations, none by default"""
+  """the map with its orientations denoised, every one replaced by one computed from its
+  neighbours, within the grains where the map knows them and within the phases otherwise
+
+    ebsd_s = smooth(ebsd)                                # the default filter, total variation
+    ebsd_s = smooth(ebsd, halfQuadraticFilter())         # another filter
+    ebsd_s = smooth(ebsd, F, fill=True)                  # the pixels without a measurement solved for as well
+    ebsd_s = smooth(ebsd, F, fill=grains)                # only those inside a grain
+    ebsd_s = smooth(ebsd, F, props=('bc',))              # a numeric property smoothed along
+
+  The orientations are turned into a field of tangent vectors per connected component of
+  the map (a grain, if calcGrains has written the grain ids, else a phase) and the filter
+  acts on that field: a variational filter (splineFilter, halfQuadraticFilter, l1TVFilter,
+  infimalConvolutionFilter) solves for the smoothed field, a window filter (meanFilter,
+  medianFilter, KuwaharaFilter) replaces each pixel by its neighbourhood. Nothing is mixed
+  across a grain boundary or a phase boundary.
+
+  With fill the pixels that carry no measurement are solved for too (this is not the same as
+  notIndexed); fill=grains fills a pixel only from the grain whose polygon holds it, so
+  pixels between grains stay empty. A window filter solves for nothing, so with it the holes
+  are closed by fill first. The map passed is not changed; MATLAB's second output, the
+  filter, is the F passed.
+
+  Input
+    ebsd - EBSD, the map
+    F - EBSDFilter, the filter; by default l1TVFilter()
+  Output
+    ebsd_s - EBSD, the smoothed map
+  Keywords
+    fill - True to fill the pixels without a measurement, or grain2d to fill only those
+        inside a grain
+    extrapolate - fill up to the outer boundary of the map, the pixels the outside reaches
+        without crossing a measurement included
+    props - the names of numeric properties of the map smoothed with the orientations, by a
+        variational filter
+  See also
+    fill, interp, halfQuadraticFilter, splineFilter, meanFilter, EBSDDenoising, EBSDFilling"""
   F = l1TVFilter() if F is None else F
   window = isinstance(F, windowFilter)
   out = ebsd.fill(grains=fill if isinstance(fill, grain2d) else None, extrapolate=extrapolate) if fill and window else ebsd.copy()
@@ -302,13 +333,38 @@ def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
 
 
 def fill(ebsd, F=None, grains=None, extrapolate=False):
-  """the map with every pixel that carries no measurement solved for, the measured ones left
-  exactly as they are: the hole is filled with the continuation of the field that encloses
-  it. A pixel the outside reaches without crossing a measurement stays empty, unless
-  extrapolate. The numeric properties are filled by the same solve, the labels copied from
-  the nearest measured pixel. fill(ebsd, grains), MATLAB's form, fills a pixel only from the
-  grain whose polygon holds it: one inside no grain becomes notIndexed, one its grain's
-  measurements do not reach over the lattice takes the grain's mean orientation"""
+  """the map with every pixel that carries no measurement filled, the measured ones left as
+  they are
+
+    ebsd_f = fill(ebsd)                                  # the holes filled
+    ebsd_f = fill(ebsd, grains)                          # filled within the grains only
+    ebsd_f = fill(ebsd, halfQuadraticFilter(), extrapolate=True)  # another filter, up to the outer boundary
+
+  A hole is filled with the continuation of the field of orientations that encloses it, by
+  the solver of a variational filter (by default l1TVFilter; a window filter has no
+  variational form and is refused), within the grains where the map knows them and within
+  the phases otherwise. The numeric properties are filled by the same solve, the labels
+  (phase, grain id, ...) copied from the nearest measured pixel. A pixel the outside reaches
+  without crossing a measurement stays empty unless extrapolate. MATLAB fills by the
+  nearest neighbour; here the hole takes the smooth continuation.
+
+  With grains, MATLAB's fill(ebsd, grains), a pixel is filled only from the grain whose
+  polygon holds it: one inside no grain becomes notIndexed, one its grain's measurements do
+  not reach over the lattice takes the grain's mean orientation; padding a polygon holds
+  becomes a cell of the map. The map needs its grain ids, from calcGrains(ebsd). The pixels
+  to fill must exist on the lattice: a gridded map, or the padding gridify adds. The map
+  passed is not changed.
+
+  Input
+    ebsd - EBSD, the map
+    F - EBSDFilter, a variational filter, or grain2d in place of grains
+  Output
+    ebsd_f - EBSD, the filled map
+  Keywords
+    grains - grain2d of the map: fill a pixel only from the grain whose polygon holds it
+    extrapolate - fill up to the outer boundary of the map
+  See also
+    smooth, interp, gridify, calcGrains, EBSDFilling"""
   if isinstance(F, grain2d):
     F, grains = None, F
   F = l1TVFilter() if F is None else F
@@ -436,12 +492,35 @@ def reduce(ebsd, factor=2):
 
 
 def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):
-  """the map read at positions of one's own choosing: the field is filled where it has holes,
-  by the same solver smooth and fill use, and interpolated within the lattice cell each
-  position falls in, linearly in the tangent space of the component the nearest measurement
-  belongs to and over the corners that belong to it as well, so nothing is averaged across a
-  grain boundary. A position no measured corner surrounds takes the nearest measurement
-  where extrapolate allows it, and is empty otherwise"""
+  """the map read at positions of one's own choosing, a new map with these positions
+
+    ebsd_new = interp(ebsd, x, y)                        # at the coordinates x, y
+    ebsd_new = interp(ebsd, pos)                         # at the positions, a vector3d
+    ebsd_new = interp(ebsd, x, y, fill=False, extrapolate=False)  # empty outside the measurements
+
+  The holes of the map are filled first, by the solver smooth and fill use, then each
+  position is interpolated within the lattice cell it falls in, linearly in the tangent
+  space of the component (grain or phase) of the nearest measured corner and over the
+  corners of that component only, so nothing is averaged across a grain boundary. A
+  position no measured corner surrounds takes the nearest measurement where extrapolate
+  allows it, and is notIndexed otherwise. The phase and the other properties are those of
+  the nearest measured corner. MATLAB takes the nearest measurement within its pixel; here
+  the orientations are interpolated.
+
+  Input
+    ebsd - EBSD, a map on a lattice
+    pos - vector3d, or an array of rows (x, y) or (x, y, z), the positions; or the x
+        coordinates, with y
+    y - the y coordinates, with pos the x coordinates
+  Output
+    ebsd_new - EBSD, the map at the positions, in the order given
+  Keywords
+    F - EBSDFilter, the variational filter the holes are filled by; by default l1TVFilter()
+    fill - fill the holes of the map before interpolating
+    extrapolate - a position outside the measured cells takes the nearest measurement
+        instead of staying empty
+  See also
+    fill, smooth, gridify, EBSDGrid"""
   if y is not None:
     pos = np.stack([np.asarray(pos, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)], axis=1)
   src = ebsd.fill(F) if fill else ebsd

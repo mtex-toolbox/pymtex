@@ -41,7 +41,39 @@ def _lineAxes(figSize):
 
 def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBins=None, percent=False, displayName=None,
                           **kw: Unpack[PlotKeywords]):
-  """plotAngleDistribution(mori), plotAngleDistribution(cs1, cs2), plotAngleDistribution(mdf)"""
+  """the distribution of the misorientation angles: a histogram of a list of
+  misorientations, a curve of a misorientation distribution function or of two random phases
+
+    plotAngleDistribution(gB.misorientation)          # histogram of boundary misorientations
+    plotAngleDistribution(mori, resolution=2*degree)  # narrower bins
+    plotAngleDistribution(mdf)                        # angle distribution of an MDF
+    plotAngleDistribution(cs1, cs2)                   # uncorrelated angle distribution of two phases
+    plotAngleDistribution(cs1, cs1, displayName='uncorrelated')  # with a legend entry
+
+  A list of misorientations is drawn as bars, the percentage of the misorientations in each
+  bin; the bins run from 0 to the largest misorientation angle the two symmetries allow, or
+  to the largest angle present when it is below half of that. A misorientation distribution
+  function, or the distribution of uncorrelated orientations of two frames, is drawn as a
+  curve, in multiples of the random distribution. Drawn into held axes holding a histogram,
+  a list takes the same bins and a curve is scaled to percent of a bin, so that the two
+  compare; each new bar set or curve takes the next of MTEX's colours. Other keywords
+  (color, lineWidth, ...) go to matplotlib's bar or plot.
+
+  Input
+    mori - misorientation, a list of misorientations
+    mdf - SO3Fun, a misorientation distribution function
+    cs1, cs2 - crystalFrame, the two phases
+  Output
+    h - the bar container of the histogram, or the line of the curve
+  Keywords
+    figSize - the size of a new figure, 'small', 'normal', 'large', ...
+    resolution - the width of the bins, in radians
+    numBins - the number of bin edges instead of the resolution
+    percent - draw a curve in percent instead of multiples of the random distribution
+    displayName - the name of the bars or the curve in a legend
+  See also
+    plotAxisDistribution, calcAngleDistribution, MisorientationDistributionFunction,
+    MisorientationTheory"""
   from ..functions.characteristics import calcAngleDistribution
   kw = lineKeywords(kw)
   ax, isNew = _lineAxes(figSize)
@@ -91,8 +123,38 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
 
 
 def plotAxisDistribution(obj, *args, halfwidth=None, weights=None, antipodal=False, **kw: Unpack[PlotKeywords]):
-  """plotAxisDistribution(mori), plotAxisDistribution(ori1, ori2), plotAxisDistribution(cs1, cs2),
-  plotAxisDistribution(mdf): the rotation axes on the sector of the symmetry the frames share"""
+  """the distribution of the misorientation axes, in the fundamental sector of the symmetry
+  the two frames share
+
+    plotAxisDistribution(mori)                   # axes of misorientations, in crystal coordinates
+    plotAxisDistribution(mori, contourf=True)    # their density, smoothed by 10 degrees
+    plotAxisDistribution(ori1, ori2)             # axes between orientations, in specimen coordinates
+    plotAxisDistribution(cs)                     # random axis distribution
+    plotAxisDistribution(cs1, cs2)               # uncorrelated axis distribution of two phases
+    plotAxisDistribution(mdf)                    # axis distribution of an MDF
+
+  A list of misorientations is drawn as its axes, one marker each; with a filled plot
+  (contourf=True, smooth=True, pcolor=True) as the density of the axes, a kernel density
+  estimate of halfwidth 10 degrees unless halfwidth says otherwise. An MDF or two frames give
+  the axis distribution function, drawn in multiples of the random distribution. The axes
+  are shown in the fundamental sector; other keywords go to the spherical plot (markerSize,
+  colorRange, ...).
+
+  Input
+    mori - misorientation, a list of misorientations
+    ori1, ori2 - orientation, two lists of orientations of one length
+    cs, cs1, cs2 - crystalFrame, the phases
+    mdf - SO3Fun, a misorientation distribution function
+  Output
+    h - the handle of the spherical plot
+  Keywords
+    halfwidth - the halfwidth of the kernel density estimate of the axes, in radians
+    weights - a weight per misorientation for the density estimate
+    antipodal - treat the axes as antipodal, as for misorientations between grains of one
+        phase whose order does not matter
+  See also
+    plotAngleDistribution, calcAxisDistribution, axis, MisorientationDistributionFunction,
+    MisorientationTheory"""
   from ..functions.characteristics import calcAxisDistribution
   from ..functions.density import calcDensity
   from .sphericalplot import FILL_FLAGS, plot

@@ -229,10 +229,39 @@ class embedding:
   components with a column per orientation, so that norm(e1 - e2) is a metric on the
   orientations modulo the crystal symmetry
 
-    e = embedding(ori)                 the images of a list, e[i] the image of one
-    double(e)                          the coordinates, one row per orientation
-    mean(e), e.orientation()           the mean image and the orientation closest to it
-  """
+    e = embedding(ori)                 # the images of a list of orientations
+    e = embedding(cs)                  # the image of the identity
+    d = double(e)                      # the coordinates, one row per orientation
+    ori = mean(e).orientation()        # the mean orientation, the projection of the mean image
+
+  An orientation g is mapped to a tuple of symmetric tensors, the mean over the proper
+  point group of the powers of the turned vectors g s l_i, less their mean over SO(3) and
+  weighted, so that symmetrically equivalent orientations have the same image and the
+  Euclidean distance of the images is a metric on the quotient. The vectors l_i and the
+  powers are taken from the group: the power is the order of the principal axis, the vectors
+  its axis and a two fold axis across it where the group has one. The coordinates of
+  double(e) are taken in an orthonormal basis of the space the images span, so they are
+  isometric and setDouble inverts them.
+
+  The images form a vector space: sums, differences, multiples, the mean, the dot product
+  and the norm act on the components, and project, or orientation, takes an image back to
+  the orientation whose image is closest. MATLAB's second form, embedding(u, cs, l) from
+  given tensors, is built here by setDouble(e, d) or from the keywords.
+
+  Input
+    o - orientation, the orientations to embed, or a crystalFrame for the image of the
+        identity
+  Output
+    e - embedding, the images, e[i] the image of one orientation
+  Keywords
+    spec - the recipe of the embedding of a crystal frame, with u: an embedding of given
+        components
+    u - the components, one column per image, with spec
+  References
+    R. Hielscher, L. Lippert, Isometric embeddings of quotients of the rotation group modulo
+        finite symmetries, arXiv:2007.09664 (2020)
+  See also
+    embedding.project, double, setDouble, calcCluster, OrientationEmbeddings"""
 
   def __init__(self, o=None, *, spec=None, u=None):
     if spec is not None:
@@ -359,9 +388,31 @@ class embedding:
     return self._new(self.spec.basis @ d.T, () if d.shape[0] == 1 else (d.shape[0],))
 
   def project(self, seeds=None, maxIter=200, tol=1e-10, chunk=2048):
-    """the orientation whose image is closest, by steepest ascent from the best of a few seeds,
-    all images at once; the gradient along a generator G is <G u, t> = -<u, G t>, the action
-    being skew, so G t is formed once per target and every step is one batch of images"""
+    """the rotations whose images are closest to the embedding, the projection of a point of
+    the Euclidean space back onto the orientations
+
+      r = e.project()                    # the rotation of every image
+      r = mean(e).project()              # the rotation of the mean image
+      r = e.project(maxIter=50, tol=1e-8)  # fewer steps, a coarser stop
+
+    Every target is scaled to the norm of an image (a zero target to the identity image), the
+    best of a few seed rotations is taken, and steepest ascent of the dot product of the
+    image with the target follows; all targets are handled at once, in blocks of chunk. The
+    result is a rotation, e.orientation() the orientation in the crystal frame of e;
+    MATLAB's second output, the projected embedding, is embedding of that orientation.
+
+    Input
+      e - embedding, the targets
+    Output
+      r - rotation, one per image, whose image is closest to it
+    Keywords
+      seeds - the rotations the ascent starts from, the best one per target; by default a
+          few spread over the fundamental region
+      maxIter - the largest number of ascent steps
+      tol - the ascent stops where the norm of the gradient falls below it
+      chunk - the number of targets handled at once
+    See also
+      embedding, embedding.orientation, OrientationEmbeddings"""
     sp = self.spec
     if seeds is None:
       qs, seedImages = sp.seeds()

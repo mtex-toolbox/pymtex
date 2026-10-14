@@ -52,14 +52,42 @@ def _refillOf(ax):
 
 
 class mtexFigure:
-  """a figure of MTEX plots
+  """a figure of MTEX plots: equally sized axes in a grid, with colour bars and legends that
+  follow them
 
-    mtexFigure()              a new figure
-    mtexFigure(n)             a new figure laid out for n axes
-    fig.nextAxis()            the next axes of the layout
-    fig.children              the axes made so far
-    fig.colorbar()            a colour bar per axes, or one when ranges and colour maps agree
-  """
+    fig = mtexFigure()                               # a new figure
+    fig = mtexFigure(4, figSize='large')             # laid out for 4 axes, large
+    fig = mtexFigure(layout=(1, 3))                  # one row of three axes
+    fig = mtexFigure(6, columns=2)                   # 6 axes in two columns
+    ax = fig.nextAxis()                              # the next axes of the layout
+    fig.children                                     # the axes made so far
+    fig.colorbar()                                   # a colour bar per axes, or one for all
+
+  The figure becomes the current one, which gcm returns and into which the plots of MTEX
+  draw; newMtexFigure makes one the same way. Without layout or columns the n axes are laid
+  out in the grid nearest to a slightly wide picture. The layout grows when more axes are
+  asked for than it holds, and the figure grows with it, so that the axes keep their size.
+  The spacing between the axes is matplotlib's constrained layout; MATLAB's
+  innerPlotSpacing and outerPlotSpacing are taken and have no effect.
+
+  Input
+    n - the number of axes the layout is made for
+  Output
+    fig - mtexFigure, with fig.fig the matplotlib figure and fig.children its axes
+  Keywords
+    figSize - 'tiny', 'small', 'medium', 'normal', 'large', 'huge', or (width, height) in
+        inches
+    hold - start with hold on: the next plot draws into the last axes
+    figure - a matplotlib figure to adopt, with its axes, instead of a new one; one embedded
+        in a window keeps its size
+    columns - the number of columns of the layout
+    layout - (rows, columns) of the layout
+    innerPlotSpacing - MATLAB's spacing between the axes, without effect
+    outerPlotSpacing - MATLAB's margin around the figure, without effect
+    marginx - the space left and right of every axes, in pixels at 96 to the inch
+    marginy - the space above and below every axes, in pixels at 96 to the inch
+  See also
+    newMtexFigure, nextAxis, gcm, hold, mtexColorbar, Multiplot"""
 
   def __init__(self, n=1, figSize: FigureSizeName | Any = None, hold=False, figure=None, columns=None, layout=None, innerPlotSpacing=None, outerPlotSpacing=None,
                marginx=None, marginy=None):
@@ -377,14 +405,28 @@ def newMtexFigure(n=1, **kwargs):
 
 
 def nextAxis(k=None, j=None, fig=None):
-  """nextAxis: the next plot goes into the next axes of the current figure; nextAxis(k) into
-  the axes k, nextAxis(i, j) into the one in row i and column j, all counted from 0 (MATLAB
-  counts them from 1); fig= names the mtexFigure, the current one by default
+  """the axes the next plot goes into: the next of the current figure, or the one given by
+  its number or its row and column
 
-    nextAxis()               # the next axes
-    nextAxis(2)              # the third axes
-    nextAxis(1, 0)           # the axes in the second row and the first column
-    ax = nextAxis(fig=mtexFig)"""
+    nextAxis()                                       # the next axes
+    nextAxis(2)                                      # the third axes
+    nextAxis(1, 0)                                   # the axes in the second row and the first column
+    ax = nextAxis(fig=mtexFig)                       # the next axes of a figure given
+
+  The axes are counted from 0, where MATLAB counts them from 1. An axes made by nextAxis stays
+  blank, without a frame, until a plot draws into it, as MATLAB leaves an unused cell; the
+  axes before k that do not exist yet are made blank too. Without a current figure a new one
+  is made.
+
+  Input
+    k - the number of the axes, counted from 0, or the row with j
+    j - the column, counted from 0
+  Output
+    ax - the matplotlib axes the next plot takes
+  Keywords
+    fig - the mtexFigure; the current one by default
+  See also
+    mtexFigure, newMtexFigure, Multiplot"""
   fig = gcm() if fig is None else fig
   if fig is None:
     fig = mtexFigure()
@@ -540,7 +582,19 @@ def saveFigure(fname, fig=None, *args, **kwargs):
 
 
 def logAxis(ax=None, xLimits=None, yLimits=None):
-  """logAxis(ax, xLimits, yLimits): both axes logarithmic, a decade the same length on each"""
+  """both axes of a plot logarithmic, a decade of the same length on either
+
+    logAxis()                                        # the current axes
+    logAxis(ax, (1, 100), (1, 1000))                 # the axes given, with their limits
+
+  Input
+    ax - the matplotlib axes; the current one by default
+    xLimits - (lo, hi) of the x axis; by default the limits it has
+    yLimits - (lo, hi) of the y axis; by default the limits it has
+  Output
+    ax - the axes
+  See also
+    plotAngleDistribution"""
   import matplotlib.pyplot as plt
   ax = plt.gca() if ax is None else ax
   ax.set_xscale("log")
@@ -578,10 +632,33 @@ LEGEND_LOCATIONS = {"north": "upper center", "south": "lower center", "east": "c
 
 
 def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
-  """legend(): one legend for the figure, from every artist a displayName named, on the last
-  chart, or beside the charts for MATLAB's outside locations (MATLAB legend('show'));
-  legend('a', 'b', ...) names the curves, bars and markers of the current axes in the order
-  they were drawn, as MATLAB's legend with labels does"""
+  """a legend: of every artist a displayName named, or naming the curves of the current axes
+
+    legend()                                         # a legend of every displayName of the figure
+    legend('first', 'second')                        # names the curves in the order they were drawn
+    legend(location='southwest', numColumns=2)       # another place, two columns
+    legend(location='northoutside')                  # beside the charts, outside the axes
+    legend('off')                                    # removes the legends
+
+  Without names the legend collects every artist of the figure that a displayName (a
+  label) named, each name once, MATLAB's legend('show'); with names it names the bars,
+  curves and markers of the current axes in the order they were drawn, as MATLAB's legend
+  with labels does. A new legend replaces those the figure has. It goes into the last axes,
+  or for a location ending in 'outside' beside the charts, the figure widened when it would
+  not fit. Every entry gets a marker of the same size. Other keywords go to matplotlib's
+  legend.
+
+  Input
+    names - str, the names of the curves; 'off' removes the legends
+  Output
+    leg - the matplotlib legend, None for 'off'
+  Keywords
+    location - MATLAB's compass names, 'north', 'northeast', ..., 'best', or with 'outside'
+        appended to place it beside the charts
+    numColumns - the number of columns of the legend
+    fontSize - the font size; by default the preference FontSize
+  See also
+    Legends, Annotations"""
   import matplotlib.pyplot as plt
 
   from ..geometry.session import getMTEXpref

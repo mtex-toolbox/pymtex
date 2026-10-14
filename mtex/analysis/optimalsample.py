@@ -377,6 +377,91 @@ def _initial(f, initial):
 
 def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=None, tol=None, weights=None, memory=5,
                   method="lbfgs", warmUp=None, tolWeights=None, tolJ=1e-4, innerIter=5, minWeight=0.0, diagnostics=False):
+  """the sample of n nodes that reproduces a density best up to the bandwidth, on the sphere
+  or the rotation group; MATLAB's optimal discrete sampling points
+
+    v = optimalSample(sF, 1000)                                  # equally weighted directions
+    v = optimalSample(sF, v0)                                    # moved from the starting nodes v0
+    v = optimalSample(sF, 1000, bandwidth=128)                   # exact up to degree 128
+    v = optimalSample(sF, n, method='steepestDescent')           # gradient descent instead of L-BFGS
+    v = optimalSample(sF, n, maxIter=1000, tol=0.005*degree)     # more iterations, a finer stop
+    v, c = optimalSample(sF, n, optimizeWeights=True)            # the weights optimised too
+    v, c = optimalSample(sF, n, optimizeWeights=True, minWeight=1e-4)  # nodes of smaller weight dropped
+    ori = optimalSample(odf, 500)                                # orientations of an ODF
+    res = optimalSample(odf, 500, diagnostics=True)              # with the discrepancy and the stop reason
+
+  The density f is represented by the discrete measure sum_j c_j delta_{x_j}, and the nodes
+  are moved so that the kernel discrepancy sum_l A_l |mu_l - f_l|^2, with the Legendre
+  coefficients A_l of the restricted distance kernel and the degrees l up to the bandwidth,
+  becomes small. f need not be normalised. The minimisation is a limited memory BFGS
+  iteration with an Armijo line search, along the geodesics of the sphere with the stored
+  steps parallel transported, and in the left components on the rotation group; memory=0
+  or method='steepestDescent' is plain gradient descent. Like discreteSample, but the nodes
+  fit the density far better, at the price of time.
+
+  With optimizeWeights=True the weights are unknowns too and stay on the simplex: through a
+  softmax moved together with the nodes on the sphere, by multiplicative steps alternating
+  with the node steps on the rotation group; the first warmUp iterations move the nodes
+  only. The weights are volume fractions, calcDensity(v, weights=c) takes them. MATLAB
+  optimises the weights when a second output is asked for; here the keyword says it.
+
+  Input
+    f - S2Fun or SO3Fun, a nonnegative real density
+    n - the number of nodes, or the starting nodes, vector3d or orientation
+  Output
+    v - vector3d, or orientation for a function on SO(3), the nodes
+    c - ndarray, the weights, nonnegative and summing to one (with optimizeWeights)
+    res - OptimalSampleResult (with diagnostics): nodes, weights, discrepancy, history,
+        iterations, converged, reason, bandwidth
+  Keywords
+    optimizeWeights - optimise the weights as well and return the nodes and the weights
+    bandwidth - the largest harmonic degree reproduced; by default the preference
+        defaultS2Bandwidth on the sphere, 32 on SO(3)
+    maxIter - the largest number of iterations; by default 1000 on the sphere, 100 on SO(3)
+    tol - stop when no node moves further, in radians; by default 0.01 degree on the
+        sphere, 0.1 degree on SO(3)
+    weights - the starting weights, fixed unless optimised; by default equal
+    memory - the number of steps L-BFGS keeps; 0 is steepest descent
+    method - 'lbfgs' or 'steepestDescent', the latter an empty memory
+    warmUp - the iterations that move the nodes only, when the weights are optimised; by
+        default a fifth of maxIter
+    tolWeights - stop when no weight changes more; by default 1e-3 / n
+    tolJ - stop below this relative decrease of the discrepancy, when the weights are
+        optimised
+    innerIter - the multiplicative weight steps per iteration on SO(3)
+    minWeight - drop the nodes of a smaller weight at the end, when the weights are
+        optimised
+    diagnostics - return an OptimalSampleResult instead of the nodes
+  References
+    M. Graef, D. Potts, G. Steidl, Quadrature errors, discrepancies, and their relations to
+        halftoning on the torus and the sphere, SIAM J. Sci. Comput. 34 (2012) A2760-A2791
+    M. Knezevic, N. W. Landry, Procedures for reducing large datasets of crystal
+        orientations using generalized spherical harmonics, Mech. Mater. 88 (2015) 73-86
+  See also
+    discreteSample, calcDensity, S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel"""
+  sphere = not isinstance(f, SO3Fun)
+  if isinstance(initial, (int, np.integer)):
+    n = int(initial)
+    if n <= 0:
+      raise ValueError("the sample count must be positive")
+    j = np.arange(1, n + 1)
+    if sphere:
+      z = 1 - 2 * (j - 0.5) / n
+      phi = j * np.pi * (3 - math.sqrt(5))
+      return np.stack([np.sqrt(1 - z * z) * np.cos(phi), np.sqrt(1 - z * z) * np.sin(phi), z], axis=-1)
+    a = 2 * np.pi * np.mod(j * math.sqrt(2), 1)
+    b = np.arccos(2 * np.mod(j * math.sqrt(3), 1) - 1)
+    g = 2 * np.pi * np.mod(j * math.sqrt(5), 1)
+    return rotation.byEuler(a, b, g, "Matthies").data.reshape(-1, 4)
+  if sphere:
+    v = asVector3d(initial)
+    return v.normalize().data.reshape(-1, 3).astype(float)
+  r = initial if isinstance(initial, quaternion) else rotation(initial)
+  return r.data.reshape(-1, 4).astype(float)
+
+
+def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=None, tol=None, weights=None, memory=5,
+                  method="lbfgs", warmUp=None, tolWeights=None, tolJ=1e-4, innerIter=5, minWeight=0.0, diagnostics=False):
   """the sample of n nodes that reproduces a density best up to the bandwidth: the nodes,
   and with optimizeWeights=True the nodes and their weights (volume fractions summing to
   one); n may be the starting nodes instead; diagnostics=True returns the result with

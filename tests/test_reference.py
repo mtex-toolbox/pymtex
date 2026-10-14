@@ -105,7 +105,8 @@ def test_a_keywords_section_lists_exactly_the_keywords_of_the_signature(pages):
     params = inspect.signature(f).parameters
     given = {ref.entry(x)[0] for x in sections["Keywords"]}
     inputs = {ref.entry(x)[0] for x in sections.get("Input", [])}
-    keywords = {k for k, p in params.items() if p.default is not inspect.Parameter.empty and k not in inputs}
+    # a parameter of the port's own code, _internal, is no keyword of the user's
+    keywords = {k for k, p in params.items() if p.default is not inspect.Parameter.empty and k not in inputs and not k.startswith("_")}
     if given != keywords:
       wrong[n] = (sorted(given - set(params)), sorted(keywords - given))
   assert not wrong, wrong

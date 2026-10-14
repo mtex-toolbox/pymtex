@@ -313,8 +313,33 @@ class quaternion(MtexArray):
     return abcd
 
   def unique(self, tol=1e-3, antipodal=False, stable=False, return_index=False, return_inverse=False):
-    """the quaternions with those equal up to the tolerance in the coefficients removed; antipodal=True
-    takes q and -q as one; optionally the indices of the kept ones and the index of each into them"""
+    """the disjoint list of quaternions, those equal up to a tolerance in the coefficients taken
+    as one
+
+      u = unique(q)                                           # sorted, one of each
+      u = unique(q, tol=0.01)                                 # a coarser tolerance
+      u = unique(q, stable=True)                              # in the order of first appearance
+      u, iq, iu = unique(q, return_index=True, return_inverse=True)  # the index maps
+
+    Two quaternions are one when their coefficients agree to tol after rounding to multiples
+    of it, so two close quaternions on either side of a rounding step stay apart. A quaternion
+    and its negative, one rotation, are kept apart unless antipodal is set; orientation.unique
+    takes them as one.
+
+    Input
+      q - quaternion
+    Output
+      u - quaternion, a one-dimensional list
+      iq - indices with u = q.flatten()[iq]
+      iu - indices with q.flatten() = u[iu]
+    Keywords
+      tol - the tolerance in the coefficients
+      antipodal - take q and -q as one
+      stable - keep the order of first appearance instead of sorting
+      return_index - also return iq
+      return_inverse - also return iu
+    See also
+      orientation.unique, vector3d.unique"""
     iv, iu = _uniqueRows(self._uniqueKey(antipodal), tol, stable)
     return _uniqueOutput(self._new(self.data.reshape(-1, self._ncoord)[iv]), iv, iu, return_index, return_inverse)
 
@@ -325,13 +350,38 @@ class quaternion(MtexArray):
     return interpSO3(self, values, *flags, **kwargs)
 
   def mean(self, weights=None, robust=False, return_inertia=False, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
-    """the mean, the principal eigenvector of the weighted moment matrix; NaN entries left out,
-    robust=True drops the outliers and averages again; return_inertia=True also gives the
-    principal moments of inertia, the eigenvalues of the moment matrix normalised by the total
-    weight in ascending order, and the principal axes of inertia as four quaternions
+    """the mean of a list of quaternions, with the principal moments and axes of inertia
 
-      m = mean(q)
-      m, lam, V = mean(q, return_inertia=True)"""
+      m = mean(q)                                  # the mean
+      m = mean(q, weights=w)                       # a weighted mean
+      m = mean(q, robust=True)                     # outliers left out
+      m, lam, V = mean(q, return_inertia=True)     # the moments and axes of inertia too
+
+    The mean is the principal eigenvector of the weighted moment matrix sum w q q^T / sum w,
+    so q and -q count alike. Entries that are not a number, sites without an orientation, are
+    left out. A robust mean drops the quaternions further from the mean than 2.5 times the 80%
+    quantile of the angles and averages again, as long as more than four remain.
+
+    The mean is taken over the whole list; axis is refused, index the list for the mean of a
+    part. orientation.mean reduces by the symmetry first.
+
+    Input
+      q - quaternion, rotation or orientation
+    Output
+      m - the mean, of the class of q
+      lam - the principal moments of inertia, the eigenvalues of the moment matrix in
+          ascending order
+      V - quaternion, the four principal axes of inertia, the eigenvectors
+    Keywords
+      weights - one weight per quaternion
+      robust - leave out the outliers
+      return_inertia - also return lam and V
+      axis - NumPy's reduction axis, refused
+      dtype - NumPy's argument, refused
+      out - NumPy's argument, refused
+      keepdims - keep the reduced axes with length one, as np.mean does
+    See also
+      quaternion.std, orientation.mean"""
     numpyReduction("mean", dtype, out, kwargs, "rotations")
     if axis is not None:
       raise ValueError("the mean of rotations is taken over the whole list; index the list for the mean of a part")
@@ -359,13 +409,30 @@ class quaternion(MtexArray):
     return (m, vals, quaternion(vecs.T)) if return_inertia else m
 
   def std(self, weights=None, robust=False, axis=None, dtype=None, out=None, keepdims=False, ddof=0, **kwargs):
-    """the mean angular deviation from the mean, quaternion/std; for orientations the angle is
-    the symmetry-reduced one, as the mean is; weights= weigh the rotations, robust=True takes the
-    robust mean
+    """the mean angular deviation of a list of rotations from their mean
 
-      sigma = std(rot)
-      sigma = std(rot, robust=True)
-      sigma = std(rot, weights=w)"""
+      sigma = std(rot)                     # the deviation in radians
+      sigma = std(rot, robust=True)        # from the robust mean
+      sigma = std(rot, weights=w)          # from the weighted mean
+
+    The root mean square of the rotational angles between the mean and every rotation; for
+    orientations the angle is the symmetry reduced one, as the mean is. The weights enter the
+    mean only, not the average of the angles.
+
+    Input
+      rot - quaternion, rotation or orientation
+    Output
+      sigma - the deviation in radians
+    Keywords
+      weights - one weight per rotation, for the mean
+      robust - deviation from the robust mean, outliers left out of the mean
+      axis - NumPy's reduction axis, refused: the deviation is over the whole list
+      dtype - NumPy's argument, refused
+      out - NumPy's argument, refused
+      keepdims - keep the reduced axes with length one, as np.std does
+      ddof - NumPy's degrees of freedom, refused
+    See also
+      quaternion.mean, orientation.mean"""
     numpyReduction("std", dtype, out, kwargs, "rotations")
     if axis is not None:
       raise ValueError("the std of rotations is taken over the whole list; index the list for the std of a part")
@@ -446,13 +513,28 @@ class rotation(quaternion):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
-    """the rotations of the Euler angles, Bunge's ZXZ convention unless a convention is named
-    ('Bunge', 'ZXZ', 'Matthies', 'ZYZ', 'ABG', 'Roe', 'Kocks', 'Canova')
+    """rotations defined by Euler angles
 
-      rot = rotation.byEuler(phi1, Phi, phi2)              # Bunge
-      rot = rotation.byEuler(alpha, beta, gamma, 'ZYZ')    # Matthies
-      rot = rotation.byEuler(phi1, Phi, phi2, 'Kocks')
-      rot = rotation.byEuler([phi1, Phi, phi2])            # the angles as one list"""
+      rot = rotation.byEuler(phi1, Phi, phi2)              # Bunge's convention
+      rot = rotation.byEuler(alpha, beta, gamma, 'ZYZ')    # Matthies' convention
+      rot = rotation.byEuler(phi1, Phi, phi2, 'Kocks')     # Kocks' convention
+      rot = rotation.byEuler([phi1, Phi, phi2])            # the angles as one triple, or an array of triples
+
+    The angles are in radians, arrays of them broadcast against each other. Without a
+    convention the preference EulerAngleConvention decides, Bunge's ZXZ by default.
+
+    Input
+      a - the first angle, phi1 or alpha; or an array whose last axis holds the three angles
+      b - the second angle, Phi or beta; the convention when a holds the triples
+      c - the third angle, phi2 or gamma
+    Output
+      rot - rotation
+    Keywords
+      convention - 'Bunge' or 'ZXZ', 'Matthies', 'ZYZ' or 'ABG', 'Roe', 'Kocks', 'Canova',
+          'nfft'
+    See also
+      rotation.Euler, orientation.byEuler, rotation.byAxisAngle, rotation.byMatrix,
+      RotationRepresentations"""
     a, b, c, rest = eulerTriple(a, b, c, () if convention is None else (convention,))
     return cls._fromData(euler2quat(a, b, c, rest[0] if rest else None))
 
@@ -617,10 +699,26 @@ class orthogonalTransform(MtexArray):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
-    """the proper transforms of the Euler angles, Bunge's ZXZ convention unless one is named
+    """proper orthogonal transforms defined by Euler angles
 
-      T = orthogonalTransform.byEuler(phi1, Phi, phi2)
-      T = orthogonalTransform.byEuler(alpha, beta, gamma, 'ZYZ')"""
+      T = orthogonalTransform.byEuler(phi1, Phi, phi2)              # Bunge's convention
+      T = orthogonalTransform.byEuler(alpha, beta, gamma, 'ZYZ')    # Matthies' convention
+
+    The rotations of rotation.byEuler as orthogonal transforms of parity one, to be combined
+    with improper ones. The angles are in radians; without a convention the preference
+    EulerAngleConvention decides, Bunge's ZXZ by default.
+
+    Input
+      a - the first angle, phi1 or alpha; or an array whose last axis holds the three angles
+      b - the second angle, Phi or beta; the convention when a holds the triples
+      c - the third angle, phi2 or gamma
+    Output
+      T - orthogonalTransform, proper
+    Keywords
+      convention - 'Bunge' or 'ZXZ', 'Matthies', 'ZYZ' or 'ABG', 'Roe', 'Kocks', 'Canova',
+          'nfft'
+    See also
+      rotation.byEuler, orthogonalTransform.byMatrix, RotationRepresentations"""
     return cls(rotation.byEuler(a, b, c, convention), False)
 
   @classmethod
@@ -748,8 +846,28 @@ class orthogonalTransform(MtexArray):
     return ~(self == other)
 
   def unique(self, tol=1e-3, stable=False, return_index=False, return_inverse=False):
-    """the transforms with those equal up to the tolerance removed, a rotation and its negative one;
-    optionally the indices of the kept ones and the index of each into them"""
+    """the disjoint list of orthogonal transforms, those equal up to a tolerance taken as one
+
+      u = unique(T)                                           # sorted, one of each
+      u = unique(T, stable=True)                              # in the order of first appearance
+      u, iT, iu = unique(T, return_index=True, return_inverse=True)  # the index maps
+
+    Two transforms are one when their parities agree and their rotational parts agree to tol,
+    a rotation and its negative counted as one.
+
+    Input
+      T - orthogonalTransform
+    Output
+      u - orthogonalTransform, a one-dimensional list
+      iT - indices with u = T.flatten()[iT]
+      iu - indices with T.flatten() = u[iu]
+    Keywords
+      tol - the tolerance in the quaternion coefficients
+      stable - keep the order of first appearance instead of sorting
+      return_index - also return iT
+      return_inverse - also return iu
+    See also
+      quaternion.unique, orientation.unique"""
     key = np.concatenate([self.rot._uniqueKey(True), self.parity.reshape(-1, 1)], axis=-1)
     iv, iu = _uniqueRows(key, tol, stable)
     return _uniqueOutput(self._new(self.data.reshape(-1, 5)[iv]), iv, iu, return_index, return_inverse)

@@ -420,7 +420,30 @@ class PoleFigure:
   findOutlier = isOutlier
 
   def noisepf(self, factor=1, background=0, nonnegative=False, rng=None):
-    """Poisson counts of factor * I + background, the background subtracted again"""
+    """simulated diffraction counts: Poisson counts of factor * I + background, the background
+    subtracted again
+
+      pfn = pf.noisepf(100)                          # counts of radiation 100
+      pfn = pf.noisepf(100, 10)                      # with a background of 10
+      pfn = pf.noisepf(100, 10, nonnegative=True)    # the negative counts set to zero
+
+    Every intensity I is replaced by a random count of the Poisson distribution of the mean
+    factor * I + background, from which the background is subtracted again: the counts a
+    diffractometer measures for a pole figure of intensity I, the factor the radiation, the
+    background the counts every direction receives. Where the background exceeds a count the
+    result is negative, unless nonnegative=True sets it to zero.
+
+    Input
+      pf - PoleFigure
+      factor - the radiation, the counts of intensity one; one per pole figure or one for all
+      background - the background radiation
+    Output
+      pfn - PoleFigure, the simulated counts
+    Keywords
+      nonnegative - set the negative counts to zero (MATLAB's flag NONNEGATIV)
+      rng - a numpy.random.Generator, for reproducible counts
+    See also
+      calcPoleFigure, PoleFigureSimulation"""
     rng = np.random.default_rng() if rng is None else rng
     factor = self._operands(factor)
     allI = []
@@ -432,9 +455,30 @@ class PoleFigure:
   # ------------------------------------------------------------------ corrections
 
   def correct(self, background=None, defocusing=None, defocusingBackground=None):
-    """the background subtracted and the defocusing divided out, each correction a pole
-    figure of its own, interpolated onto the measured directions where it was measured
-    elsewhere"""
+    """the pole figures corrected for background and defocusing
+
+      pf = pf.correct(background=pfBg)                      # the background subtracted
+      pf = pf.correct(defocusing=pfDef)                     # the defocusing divided out
+      pf = pf.correct(background=pfBg, defocusing=pfDef, defocusingBackground=pfDefBg)  # both, the defocusing without its background
+
+    The background is subtracted from the intensities, and they are divided by the
+    defocusing, from which its own background is subtracted first. Each correction is a
+    PoleFigure of its own or a number. One measured pole figure serves all, and a correction
+    measured on other specimen directions is interpolated onto those of pf: spherically
+    where it covers the sphere, by a cubic spline in the polar angle where it is measured
+    along a curve, as a defocusing usually is.
+
+    Input
+      pf - PoleFigure
+    Output
+      pf - PoleFigure, the corrected intensities
+    Keywords
+      background - PoleFigure or number, the background (MATLAB's option bg)
+      defocusing - PoleFigure, the defocusing (MATLAB's option def)
+      defocusingBackground - PoleFigure or number, the background of the defocusing
+          measurement (MATLAB's option defbg)
+    See also
+      PoleFigure.noisepf, PoleFigureCorrection"""
     out = self if background is None else self - self._adapt(background)
     if defocusing is None:
       return out
@@ -592,8 +636,30 @@ def correct(pf, **kwargs):
 
 
 def noisepf(pf, factor=1, background=0, nonnegative=False, rng=None):
-  """noisepf(pf, ...) is pf.noisepf(...): Poisson counts of factor * I + background, the background
-  subtracted again"""
+  """simulated diffraction counts: Poisson counts of factor * I + background, the background
+  subtracted again; the same as pf.noisepf
+
+    pfn = noisepf(pf, 100)                         # counts of radiation 100
+    pfn = noisepf(pf, 100, 10)                     # with a background of 10
+    pfn = noisepf(pf, 100, 10, nonnegative=True)   # the negative counts set to zero
+
+  Every intensity I is replaced by a random count of the Poisson distribution of the mean
+  factor * I + background, from which the background is subtracted again: the counts a
+  diffractometer measures for a pole figure of intensity I, the factor the radiation, the
+  background the counts every direction receives. Where the background exceeds a count the
+  result is negative, unless nonnegative=True sets it to zero.
+
+  Input
+    pf - PoleFigure
+    factor - the radiation, the counts of intensity one; one per pole figure or one for all
+    background - the background radiation
+  Output
+    pfn - PoleFigure, the simulated counts
+  Keywords
+    nonnegative - set the negative counts to zero (MATLAB's flag NONNEGATIV)
+    rng - a numpy.random.Generator, for reproducible counts
+  See also
+    calcPoleFigure, PoleFigureSimulation"""
   return pf.noisepf(factor, background, nonnegative, rng)
 
 
@@ -639,14 +705,40 @@ def _poleDensity(odf, h, r):
 
 
 def calcPoleFigure(odf, h, r=None, superposition=None, complete=False, **gridOptions):
-  """the pole figures of an ODF for the crystal directions h on the specimen directions r
+  """the pole figures an ODF predicts: simulated diffraction intensities, superposed pole
+  figures and any specimen directions
 
-    calcPoleFigure(odf, h, r)                       one pole figure per element of h
-    calcPoleFigure(odf, [h1, h23], r)               a Python list: an entry of several directions is superposed
-    calcPoleFigure(odf, [h1, h2], [r1, r2])         one set of specimen directions per pole figure
-    calcPoleFigure(odf, h, resolution=5*degree)     on a regular grid
-    calcPoleFigure(odf, pf)                         on the directions of a measurement
-  """
+    pf = calcPoleFigure(odf, h, r)                                # one pole figure per element of h
+    pf = calcPoleFigure(odf, h, resolution=5*degree)              # on a regular grid of the upper hemisphere
+    pf = calcPoleFigure(odf, h, resolution=5*degree, complete=True)  # on a regular grid of the whole sphere
+    pf = calcPoleFigure(odf, [h1, h2], [r1, r2])                  # one set of specimen directions per pole figure
+    pf = calcPoleFigure(odf, [h1, h23], r, superposition=[1, [0.2, 0.8]])  # h23 two superposed directions
+    pf = calcPoleFigure(odf, pfMeasured)                          # on the directions of a measurement
+
+  The intensity of the crystal direction h at the specimen direction r is the radon
+  transform of the ODF, the mean of the ODF over the orientations taking h to r; over the
+  directions of an axis grid it is the mean of r and -r. A Python list of crystal
+  directions makes one pole figure per entry, and an entry of several directions is their
+  superposition, weighted by the superposition coefficients, as the overlapping
+  reflections a diffractometer measures together. Without specimen directions the pole
+  figures are evaluated on regularS2Grid, which takes the remaining keywords. The result
+  can be turned into counts by noisepf.
+
+  Input
+    odf - SO3Fun
+    h - Miller or vector3d in the crystal frame of the ODF, or a list of them, one per pole
+        figure
+  Output
+    pf - PoleFigure
+  Keywords
+    r - vector3d, the specimen directions, or a list of them, one per pole figure; by
+        default a regular grid
+    superposition - the weights of the superposed directions, a list with one entry per
+        pole figure
+    complete - the whole sphere instead of the upper hemisphere, the directions without
+        antipodal symmetry (MATLAB's flag complete)
+  See also
+    PoleFigure.noisepf, calcODF, regularS2Grid, PoleFigureSimulation"""
   if isinstance(odf, PoleFigure):
     odf, h = h, odf
   if isinstance(h, PoleFigure):

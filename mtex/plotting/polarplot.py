@@ -116,8 +116,32 @@ def histogram(v, numBin=None, weights=None, antipodal=None, **kw: Unpack[PlotKey
 # ------------------------------------------------------------------ functions on the circle
 
 def plotS1(sF, *args, lineWidth=1.0, displayName=None, color=None, polar=True, how2plot=None, **kw: Unpack[PlotKeywords]):
-  """plot(sF1): a function on the circle as a polar line, or over the angle with polar=False;
-  a positional MATLAB line style, plot(sF1, '--'), as matplotlib's format"""
+  """plot of a function on the circle, its values as the radius of a polar line; MATLAB's
+  S1Fun/plot
+
+    h = plot(sF1)                                  # a polar line over the angle
+    h = plot(sF1, '--', color='r')                 # a line style and a colour
+    h = plot(sF1, polar=False)                     # the values over the angle in [0, 2 pi]
+    h = plot(sF1, lineWidth=2, displayName='f')    # a wider line named in the legend
+
+  The function is evaluated at 361 angles from 0 to 2 pi; a complex function shows its real
+  part. A positional string is matplotlib's format, MATLAB's line style. An axes the user made
+  with plt.subplot takes the line, as MATLAB's subplot does, and a held figure the next line;
+  further keywords go to matplotlib's plot.
+
+  Input
+    sF1 - S1FunHarmonic, a function on the circle
+  Output
+    h - matplotlib Line2D, the line drawn
+  Keywords
+    lineWidth - the width of the line in points
+    displayName - the name of the line in a legend
+    color - the colour of the line, a name or an RGB triple
+    polar - draw in polar coordinates, the radius the value; False draws the values over the
+        angle in Cartesian axes, MATLAB's 'notPolar'
+    how2plot - the plotting convention that places the angle 0 and the sense of rotation
+  See also
+    S1FunHarmonic, plotSection, S1FunHarmonics"""
   import matplotlib.pyplot as plt
   refuseVariants(kw)
   fmt = [a for a in args if isinstance(a, str)]
@@ -288,7 +312,29 @@ def _sectionAxes(parent=None):
 # ------------------------------------------------------------------ shapes
 
 def plotShape(shape, lineWidth=1.0, displayName=None, color=None, normalize=False, plain=False, how2plot=None, **kw: Unpack[PlotKeywords]):
-  """plot(shape): the outline of a characteristic shape in polar coordinates about its centre"""
+  """plot of a two dimensional shape, its outline in polar coordinates about its centre;
+  MATLAB's shape2d/plot
+
+    h = plot(shape)                                # the outline about its centre
+    h = plot(shape, normalize=True, plain=True)    # scaled to area 1, without grid and labels
+
+  The outline is shifted to the mean of its vertices and drawn as a closed polar line, the
+  angle measured in the plane of the map as its frame's plotting convention shows it.
+  Further keywords go to matplotlib's plot.
+
+  Input
+    shape - shape2d, a closed outline, as characteristicShape returns
+  Output
+    h - matplotlib Line2D, the outline drawn
+  Keywords
+    lineWidth - the width of the line in points
+    displayName - the name of the line in a legend
+    color - the colour of the line, a name or an RGB triple
+    normalize - scale the shape to area 1, for comparing the form of shapes of different size
+    plain - leave out the polar grid and the radial labels
+    how2plot - the plotting convention; by default that of the shape's frame
+  See also
+    characteristicShape, shape2d, ProjectionBasedParameters"""
   V = np.asarray(shape.V, dtype=float).reshape(-1, 2)
   V = V - V.mean(axis=0)
   if normalize:

@@ -43,7 +43,30 @@ def _sliceGrid(corners, nb, nc):
 
 
 def pyvistaPlotter(scene, off_screen=False, window_size=(800, 800), plotter=None):
-  """a PyVista plotter drawing the scene, its camera set by the plotting convention"""
+  """a PyVista plotter drawing a 3D scene, its camera set by the plotting convention
+
+    p = pyvistaPlotter(gcs())                                   # the scene of the current figure
+    p.show()                                                    # in an interactive window, as show3d()
+    p = pyvistaPlotter(gcs(), off_screen=True, window_size=(400, 300))  # offscreen, of a size
+    p = pyvistaPlotter(gcs(), plotter=q)                        # into a plotter of your own
+
+  A scene3d holds what plot draws of a volume, grains in 3D and maps in planes of space as
+  NumPy arrays: meshes, voxel slices, pictures, lines and points. This draws its items into
+  a pyvista.Plotter, unlit, with their colours and opacities, and sets a parallel projection
+  looking from where the plotting convention says, so that PyVista's view matches the
+  figure. show3d opens it interactively, renderImage takes its picture, exportHTML writes the
+  scene as a three.js page instead. PyVista is the plot3d extra.
+
+  Input
+    scene - scene3d, as gcs() gives it for the current figure
+  Output
+    p - pyvista.Plotter
+  Keywords
+    off_screen - render without a window
+    window_size - the size of the window in pixels, (width, height)
+    plotter - pyvista.Plotter to draw into instead of a new one
+  See also
+    show3d, renderImage, exportHTML, gcs, EBSD3Plotting"""
   import pyvista as pv
   p = pv.Plotter(off_screen=off_screen, window_size=list(window_size)) if plotter is None else plotter
   p.set_background("white")

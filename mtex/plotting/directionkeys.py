@@ -95,8 +95,35 @@ KEY_GRAY_GRADIENT = (0.5, 0.5)   # how fast the gray fades away from a centre
 
 def sphereColor(radius, rho, grayValue=KEY_GRAY_VALUE, grayGradient=KEY_GRAY_GRADIENT, colorStretching=1.0, gray=None,
                 hueCorrection=True):
-  """the colour of a point of the colour sphere: the radius, 1 at the white centre and 0 at
-  the black one, and the azimuth as the hue"""
+  """the colour of a point of the colour sphere, the hue from the azimuth and the lightness
+  from the radius; the colouring the direction keys are built of
+
+    rgb = sphereColor(radius, rho)                  # the colours of points of the sphere
+    rgb = sphereColor(radius, rho, gray=1)          # full saturation everywhere
+    rgb = sphereColor(radius, rho, colorStretching=2, hueCorrection=False)  # stretched, the plain hue circle
+
+  The colour sphere has a white centre at radius 1 and a black one at radius 0; on the circle
+  radius 0.5 between them the colours are fully saturated and the azimuth rho turns the hue
+  once around. Close to either centre the colours fade to gray: grayValue says how gray they
+  are at the centre and grayGradient how fast the gray fades away from it. A direction key
+  (HSVDirectionKey) maps its fundamental sector onto this sphere and calls sphereColor with
+  its own grayValue, grayGradient and colorStretching.
+
+  Input
+    radius - array, from 0 at the black centre to 1 at the white one
+    rho - array, the azimuth in radians, the hue
+  Output
+    rgb - array of shape (..., 3), RGB values in [0, 1]
+  Keywords
+    grayValue - (white, black), the gray at the white and at the black centre, 0 none, 1 all
+    grayGradient - (white, black), how fast the gray fades away from the white and from the
+        black centre
+    colorStretching - an exponent on the lightness, larger values giving more of the
+        saturated colours of the middle
+    gray - one saturation for every point, in [0, 1], instead of the fading towards the centres
+    hueCorrection - even out the hue circle, so that red, green and blue take equal arcs
+  See also
+    HSVDirectionKey, direction2color, ipfHSVKey, EBSDIPFMap"""
   radius, rho = np.broadcast_arrays(np.asarray(radius, dtype=float), np.asarray(rho, dtype=float))
   theta = radius * np.pi
   white = theta > np.pi / 2

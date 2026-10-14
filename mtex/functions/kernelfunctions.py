@@ -698,9 +698,28 @@ class S2Kernel(_Kernel):
     return S2Kernel(self._rule(L) * other._rule(L) / (2 * np.arange(L + 1) + 1))
 
   def grad(self, t=None, other=None, *, polynomial=False):
-    """the derivative with respect to the polar angle at the cosine argument t, dpsi/dtheta =
-    -sin(theta) dpsi/dt with dpsi/dt as its own Legendre series; polynomial=True is the
-    derivative with respect to t, and without an argument the kernel of either"""
+    """the derivative of a kernel on the sphere with respect to the polar angle, or to its cosine
+
+      d = psi.grad(t)                      # dpsi/dtheta at the cosines t
+      d = psi.grad(v, zvector)             # at the angles between the directions v and the z axis
+      d = psi.grad(t, polynomial=True)     # dpsi/dt, the derivative in the cosine
+      dpsi = psi.grad()                    # the derivative as a kernel
+
+    The kernel is a Legendre series psi(t) in the cosine t of the angle; its derivative in t is
+    a Legendre series of its own, and the derivative in the angle theta is -sin(theta) dpsi/dt.
+    Without an argument the result is a kernel: a handle of the angular derivative, or the
+    Legendre series of dpsi/dt for polynomial=True.
+
+    Input
+      psi - S2Kernel
+      t - ndarray of cosines, or vector3d
+      other - vector3d, the direction the angles of t are measured from
+    Output
+      d - ndarray, or S2Kernel / S2KernelHandle without an argument
+    Keywords
+      polynomial - the derivative with respect to the cosine t instead of the angle
+    See also
+      S2Kernel, S2FunHarmonic.grad, S2Kernels"""
     if t is None:
       return self._derivativeSeries() if polynomial else S2KernelHandle(lambda t: self.grad(t), bandwidth=self.bandwidth)
     t = self._cosine(t, other)
@@ -803,7 +822,26 @@ class S2BumpKernel(S2Kernel):
     return np.where(t > math.cos(self.delta), 2 / (1 - math.cos(self.delta)), 0.0).astype(t.dtype)
 
   def grad(self, t=None, other=None, *, polynomial=False):
-    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
+    """the derivative of the bump kernel, zero wherever it exists
+
+      d = psi.grad(t)              # zero at every cosine t
+      d = psi.grad(v, zvector)     # zero at every direction v
+      dpsi = psi.grad()            # the zero kernel
+
+    The bump kernel is constant on its cap and beyond it, so its derivative vanishes but on the
+    rim of the cap, where it does not exist; the derivative in the angle and in its cosine
+    agree.
+
+    Input
+      psi - S2BumpKernel
+      t - ndarray of cosines, or vector3d
+      other - vector3d, the direction the angles of t are measured from
+    Output
+      d - ndarray of zeros, or the zero S2Kernel without an argument
+    Keywords
+      polynomial - the derivative with respect to the cosine, the same zero
+    See also
+      S2Kernel.grad, S2BumpKernel"""
     return S2Kernel(0) if t is None else np.zeros_like(self._cosine(t, other))
 
   def halfwidth(self):

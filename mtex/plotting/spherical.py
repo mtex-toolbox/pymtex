@@ -421,9 +421,42 @@ def isLower(sR, pC):
 
 def makeSphericalProjection(v=None, projection="earea", upper=False, lower=False, complete=False, antipodal=None,
                             how2plot=None, fundamentalRegion=False, symmetric=None):
-  """the charts a region is drawn on: one, or an upper and a lower one when it reaches into
-  both hemispheres; an antipodal region needs the upper one only; the plain projection
-  shows everything in one chart (MATLAB makeSphericalProjection)"""
+  """the charts a spherical plot is drawn on, the projection of the region its data cover;
+  MATLAB's makeSphericalProjection
+
+    proj = makeSphericalProjection(v, upper=True)                  # the upper hemisphere of v
+    proj = makeSphericalProjection(sR, projection='eangle')        # a region, equal angle
+    proj = makeSphericalProjection(None, complete=True, antipodal=True)  # the whole sphere of axes
+    proj = makeSphericalProjection(cs)                             # the fundamental sector of a frame
+
+  The region is what the data cover, unless a sphericalRegion is given: the whole sphere for
+  directions, the fundamental sector for a frame, and for a function of a frame with
+  symmetry the sector of its group. A region reaching into both hemispheres takes two
+  charts, the upper and the lower one; an antipodal region needs the upper one only. The
+  plain projection shows everything in one chart. The hemispheres are those of the
+  plotting convention, whose out of screen direction is up.
+
+  Where MATLAB returns the projection, Python returns a list of one or two charts.
+
+  Input
+    v - vector3d, sphericalRegion, a reference frame, a function on the sphere, or None
+        for the whole sphere
+  Output
+    proj - list of sphericalProjection, one chart or the upper and the lower one
+  Keywords
+    projection - 'earea' (equal area), 'eangle' or 'stereo' (equal angle), 'edist',
+        'orthographic', 'gnomonic', 'plain', or a sphericalProjection class
+    upper - the upper hemisphere only
+    lower - the lower hemisphere only; with upper both
+    complete - the whole sphere, not the fundamental sector
+    antipodal - treat the directions as axes; by default as v says
+    how2plot - the plottingConvention, or its name such as 'x↑→y'; by default that of the
+        frame
+    fundamentalRegion - restrict to the fundamental sector of the frame of v
+    symmetric - whether the charts draw a function of the symmetry of its frame; by default
+        true for a function of a frame with symmetry, false for directions and regions
+  See also
+    sphericalProjection, plotS2Grid, sphericalRegion, plottingConvention, SphericalProjections"""
   sR, how2plot, ax = _regionFor(v, antipodal, how2plot, fundamentalRegion)
   antipodal = ax if antipodal is None else bool(antipodal)
   cls = projectionClass(projection)
@@ -579,9 +612,34 @@ def _withMargin(xs, ys, margin):
 
 
 def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=False, antipodal=None):
-  """plotS2Grid(resolution=0.5 * degree, 'upper', cs): the directions a chart samples its surface
-  at, a (theta, rho) array in the frame given, so that values computed on it are drawn as they
-  lie, contourf(rGrid, values), without interpolation; MATLAB's plotS2Grid"""
+  """the regular grid of directions a spherical plot samples its chart at; MATLAB's
+  plotS2Grid
+
+    r = plotS2Grid(resolution=5*degree)               # the grid of the whole sphere
+    r = plotS2Grid(cs, resolution=2*degree, upper=True)  # crystal directions, upper hemisphere
+    contourf(r, r.z ** 2)                             # values on the grid, drawn as they lie
+
+  The directions form a (theta, rho) array, the rows the polar angle, the columns the
+  azimuth, in the frame given, so that values computed on them are drawn by contourf or
+  pcolor without interpolation. A grid of both hemispheres puts them side by side with a
+  blank column between. The region is the whole sphere, or the sphericalRegion given.
+
+  MATLAB's pair of resolutions for the polar and the azimuthal angle, and the bounds minRho,
+  maxRho, minTheta, maxTheta and restrict2MinMax, are not taken: pass a sphericalRegion.
+
+  Input
+    frame - a reference frame the directions are expressed in, e.g. crystalFrame('m-3m')
+    sR - sphericalRegion, the region of the grid
+  Output
+    r - vector3d, a (theta, rho) array of directions
+  Keywords
+    resolution - the spacing of the grid, an angle
+    upper - the upper hemisphere only
+    lower - the lower hemisphere only
+    complete - the whole sphere
+    antipodal - a grid of axes, the upper hemisphere enough
+  See also
+    equispacedS2Grid, regularS2Grid, makeSphericalProjection, contourf, VectorGrids"""
   refuseFlags(args, "plotS2Grid")
   sR = next((a for a in args if isinstance(a, sphericalRegion)), None)
   fr = next((a for a in args if isinstance(a, referenceFrame)), None)

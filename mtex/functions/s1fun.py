@@ -32,12 +32,31 @@ def realizeFourier(chat):
 
 
 class S1FunHarmonic(harmonicArithmetic):
-  """a function on the circle by its Fourier coefficients fhat, k = -L..L, over e^{-ikx} as MATLAB's
+  """a function on the circle by its Fourier coefficients fhat, k = -L..L, over e^{-ikx} as
+  MATLAB's
 
-    S1FunHarmonic(fhat)
-    S1FunHarmonic(fun, bandwidth=L)     the coefficients of a callable by quadrature
-    S1FunHarmonic(psi, bandwidth=L)     the coefficients of an S1 kernel
-    S1FunHarmonic(f, bandwidth=L)       another function truncated, or any with a harmonic form"""
+    sF = S1FunHarmonic([0.25, 0, 1, 0, 0.25])                  # from the coefficients, k = -2..2
+    sF = S1FunHarmonic(lambda x: np.sin(2*x), bandwidth=16)    # a callable by quadrature
+    sF = S1FunHarmonic(psi, bandwidth=32)                      # the Fourier series of an S1 kernel
+    sF = S1FunHarmonic(sF, bandwidth=8)                        # another function, cut to a bandwidth
+
+  The coefficients run from the degree -L to L, so a coefficient vector has odd length 2 L + 1.
+  A callable is sampled on the equispaced quadrature grid of the bandwidth, by default the
+  preference maxS1Bandwidth; an S1 kernel, an S1FunHandle or another S1FunHarmonic gives its own
+  coefficients, cut or padded to the bandwidth when one is given. A real function keeps
+  c_{-k} = conj(c_k), which is checked from the coefficients unless real says it.
+
+  Input
+    fhat - array of 2 L + 1 coefficients, a callable of the angle, an S1Kernel or an S1Fun
+  Output
+    sF - S1FunHarmonic
+  Keywords
+    real - whether the function takes real values only; by default read off the
+        coefficients or the sampled values
+    bandwidth - the largest degree L of the series
+    dtype - the complex type of the coefficients, complex128 unless given
+  See also
+    S1FunHarmonic.quadrature, S1FunHarmonic.interpolate, S1FunHandle, S1Grid"""
 
   def __init__(self, fhat, *, real=None, bandwidth=None, dtype=None):
     if not isinstance(fhat, S1FunHarmonic) and hasattr(fhat, "_harmonicS1"):
@@ -76,9 +95,34 @@ class S1FunHarmonic(harmonicArithmetic):
 
   @classmethod
   def interpolate(cls, x, values, bandwidth=None, weights=None, regularisation=1e-5, SobolevIndex=2, tol=1e-6, maxIter=100):
-    """the Fourier series through samples on the circle, as MATLAB's: equispaced samples by
-    quadrature; others merged where they coincide and fitted by least squares at the
-    bandwidth round(n / 4), regularised by lambda |k|^(2 s), with LSQR"""
+    """the Fourier series through noisy samples at angles on the circle, fitted by regularised
+    least squares
+
+      sF = S1FunHarmonic.interpolate(x, values)                  # samples at the angles x
+      sF = S1FunHarmonic.interpolate(x, values, bandwidth=10, regularisation=1e-3)  # a bandwidth and a stronger smoothing
+      sF = S1FunHarmonic.interpolate(x, values, weights=w)       # the samples weighted
+
+    Equispaced samples, x = 2 pi k / n, are expanded by quadrature to the bandwidth (n - 1) / 2,
+    or the one given. Other angles are taken modulo 2 pi, samples at coinciding angles merged
+    to their mean, and the coefficients fitted by LSQR to the weighted samples, penalised by
+    regularisation times the Sobolev norm sum |k|^(2 SobolevIndex) |c_k|^2; the bandwidth is
+    round(n / 4) for n distinct angles, at most the preference maxS1Bandwidth. A bandwidth
+    set by hand may undersample the data.
+
+    Input
+      x - array of angles in radians
+      values - array, one value per angle
+    Output
+      sF - S1FunHarmonic, real when the values are
+    Keywords
+      bandwidth - the largest degree of the series
+      weights - one weight per sample, equal weights unless given
+      regularisation - the factor lambda of the Sobolev penalty; 0 fits without it
+      SobolevIndex - the exponent s of the Sobolev penalty |k|^(2 s)
+      tol - the stopping tolerance of LSQR
+      maxIter - the largest number of iterations of LSQR
+    See also
+      S1FunHarmonic.quadrature, S1FunHarmonic, SO3FunHarmonic.interpolate"""
     x = np.mod(np.asarray(x, dtype=float).reshape(-1), 2 * np.pi)
     values = np.asarray(values).reshape(len(x))
     order = np.argsort(x, kind="stable")
@@ -109,8 +153,32 @@ class S1FunHarmonic(harmonicArithmetic):
 
   @classmethod
   def quadrature(cls, x, values=None, *, bandwidth=None, weights=None, real=None):
-    """the Fourier series of values at the angles x by quadrature with the weights given, or of a
-    callable; the bandwidth defaults to the preference maxS1Bandwidth"""
+    """the Fourier series of a function on the circle by quadrature; MATLAB's approximate and
+    quadrature
+
+      sF = S1FunHarmonic.quadrature(lambda x: np.sin(2*x))                 # a callable on the grid of the bandwidth
+      sF = S1FunHarmonic.quadrature(lambda x: np.sin(2*x), bandwidth=16)   # to another bandwidth
+      sF = S1FunHarmonic.quadrature(x, values, bandwidth=16, weights=w)    # values at given angles
+
+    A callable is sampled on the equispaced quadrature grid of the bandwidth, which makes the
+    coefficients exact up to that degree; values at given angles are summed with the weights,
+    the coefficient c_k = sum_j w_j f(x_j) e^{ikx_j}, which is the quadrature only when the
+    weights are those of a quadrature rule for the angles (1/n for n equispaced ones). The
+    bandwidth is by default the preference maxS1Bandwidth. S1FunHarmonic.approximate is the
+    same function.
+
+    Input
+      x - a callable of the angle, or an array of angles in radians
+    Output
+      sF - S1FunHarmonic
+    Keywords
+      values - the values at the angles x
+      bandwidth - the largest degree of the series
+      weights - the quadrature weights of the angles
+      real - whether the function takes real values only; by default whether the values are
+          real
+    See also
+      S1FunHarmonic, S1FunHarmonic.interpolate, SO3FunHarmonic.quadrature"""
     if callable(x) and values is None:
       return cls(x, bandwidth=bandwidth, real=real)
     L = getMTEXpref("maxS1Bandwidth") if bandwidth is None else int(bandwidth)
@@ -262,28 +330,64 @@ class S1FunHarmonic(harmonicArithmetic):
     return 2 * np.pi * self.mean()
 
   def max(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
-    """the largest value and the angle it is taken at, sampled at the resolution and refined;
-    with numLocal the largest local maxima, the values descending; with a number or a second
-    function on the circle the pointwise maximum, a Fourier series of the larger bandwidth
+    """global, local and pointwise maxima of a function on the circle
 
-      v, pos = max(sF)
-      v, pos = max(sF, resolution=1*degree)
-      values, positions = max(sF, numLocal=3)
-      sF = max(sF, 0.5)
-      sF = max(sF1, sF2, bandwidth=64)"""
+      v, pos = max(sF)                           # the global maximum and the angle it is taken at
+      v, pos = max(sF, resolution=1*degree)      # searched on a coarser sampling
+      values, positions = max(sF, numLocal=3)    # the three largest local maxima
+      sF = max(sF, 0.5)                          # the pointwise maximum with a constant
+      sF = max(sF1, sF2, bandwidth=64)           # the pointwise maximum of two functions
+
+    The function is sampled at the resolution, the discrete local maxima are refined by a
+    ternary search, and the largest numLocal are returned with the values descending: a pair
+    of numbers for numLocal 1, else two arrays. With a number or a second function the result
+    is the pointwise maximum as a Fourier series, by quadrature at the larger bandwidth of the
+    two unless bandwidth is given. MATLAB's vector valued form max(sF, [], dim) and its options
+    kmax, startingNodes, tolerance and maxStepSize are not taken.
+
+    Input
+      sF, sF1, sF2 - S1FunHarmonic
+    Output
+      v, values - the largest values
+      pos, positions - the angles, in radians, they are taken at
+      sF - S1FunHarmonic, the pointwise maximum
+    Keywords
+      numLocal - the number of local maxima to return
+      resolution - the spacing of the sampling the maxima are searched on
+      bandwidth - the bandwidth of the pointwise maximum
+    See also
+      S1FunHarmonic.min, SO3FunHarmonic.max"""
     if args:
       return _pointwiseExtremumS1(np.maximum, self, args[0], bandwidth)
     return _localExtremaS1(self, 1, numLocal, resolution)
 
   def min(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
-    """the smallest value and the angle it is taken at, sampled at the resolution and refined;
-    with numLocal the smallest local minima, the values ascending; with a number or a second
-    function on the circle the pointwise minimum
+    """global, local and pointwise minima of a function on the circle
 
-      v, pos = min(sF)
-      values, positions = min(sF, numLocal=3)
-      sF = min(sF, 0)
-      sF = min(sF1, sF2, bandwidth=64)"""
+      v, pos = min(sF)                           # the global minimum and the angle it is taken at
+      values, positions = min(sF, numLocal=3)    # the three smallest local minima
+      sF = min(sF, 0)                            # the pointwise minimum with a constant
+      sF = min(sF1, sF2, bandwidth=64)           # the pointwise minimum of two functions
+
+    The function is sampled at the resolution, the discrete local minima are refined by a
+    ternary search, and the smallest numLocal are returned with the values ascending: a pair
+    of numbers for numLocal 1, else two arrays. With a number or a second function the result
+    is the pointwise minimum as a Fourier series, by quadrature at the larger bandwidth of the
+    two unless bandwidth is given. MATLAB's vector valued form min(sF, [], dim) and its options
+    kmax, startingNodes, tolerance and maxStepSize are not taken.
+
+    Input
+      sF, sF1, sF2 - S1FunHarmonic
+    Output
+      v, values - the smallest values
+      pos, positions - the angles, in radians, they are taken at
+      sF - S1FunHarmonic, the pointwise minimum
+    Keywords
+      numLocal - the number of local minima to return
+      resolution - the spacing of the sampling the minima are searched on
+      bandwidth - the bandwidth of the pointwise minimum
+    See also
+      S1FunHarmonic.max, SO3FunHarmonic.min"""
     if args:
       return _pointwiseExtremumS1(np.minimum, self, args[0], bandwidth)
     return _localExtremaS1(self, -1, numLocal, resolution)

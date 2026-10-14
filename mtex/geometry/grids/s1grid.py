@@ -11,7 +11,26 @@ class S1Grid:
   """a sorted list of angles on an interval [min, max], periodic or not, the nearest neighbour and
   radius search of the tensor product grids S2Grid and SO3Grid
 
-    S1G = S1Grid(points, 0, 2*pi, periodic=True)"""
+    S1G = S1Grid(np.arange(0, 360, 10)*degree, 0, 2*np.pi, periodic=True)  # the angles of a circle
+    S1G = S1Grid(points, 0, 1)                    # angles on an interval
+    S1G = S1Grid(points)                          # the interval from the smallest to the largest point
+
+  The points are sorted. Its use is the fast search: S1G.nearest(x), S1G.neighbours(x, eps)
+  within a radius and S1G.dist(x, y), binary searches, plain arithmetic on an equispaced
+  ladder; on a periodic grid min and max are identified and the distance wraps around the
+  period max - min.
+  MATLAB's option 'matrix', one grid per column of points, is not taken.
+
+  Input
+    points - array of angles, in radians
+    min - the start of the interval, by default the smallest point
+    max - the end of the interval, by default the largest point
+  Output
+    S1G - S1Grid
+  Keywords
+    periodic - identify min and max: the grid lies on a circle of length max - min
+  See also
+    S2Grid, SO3Grid, equispacedSO3Grid"""
 
   def __init__(self, points, min=None, max=None, periodic=False):
     p = np.sort(np.asarray(points, dtype=float).reshape(-1))

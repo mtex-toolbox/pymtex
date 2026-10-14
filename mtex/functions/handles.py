@@ -76,9 +76,33 @@ class SO3FunGeneric(SO3Fun):
     return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
 
   def radon(self, h=None, r=None, superposition=None, bandwidth=None):
-    """the Radon transform through the harmonic form of the bandwidth: radon(h) the pole figure,
-    radon(r=r) the inverse pole figure, radon(h, r) the values; several h superposed, weighted
-    by superposition (MATLAB's pdf, ipdf and calcPDF)"""
+    """the Radon transform of a function on SO(3): its pole figures, inverse pole figures or the
+    values of either, through the harmonic form of the bandwidth
+
+      S2F = SO3F.radon(h)                                     # the pole figure of the crystal direction h
+      S2F = SO3F.radon(r=r)                                   # the inverse pole figure of the specimen direction r
+      v = SO3F.radon(h, r)                                    # the pole figure of h at the directions r
+      S2F = SO3F.radon([h1, h2], superposition=[0.6, 0.4])    # a superposed pole figure
+
+    The pole figure of h at r is the mean of the function over all orientations carrying h
+    onto r. A function without coefficients, a composition, a handle, is expanded to an
+    SO3FunHarmonic of the bandwidth first. MATLAB's pdf, ipdf and calcPDF are this function.
+
+    Input
+      SO3F - SO3Fun
+      h - Miller or vector3d, the crystal direction, or a list of them to superpose
+    Output
+      S2F - S2FunHarmonic, the pole figure in the specimen frame or the inverse pole figure in
+          the crystal frame
+      v - the values at r
+    Keywords
+      r - vector3d, the specimen direction of the inverse pole figure, or the directions to
+          evaluate the pole figure at
+      superposition - the weights of several crystal directions, equal unless given
+      bandwidth - the bandwidth of the harmonic form a function without coefficients is
+          expanded to
+    See also
+      SO3FunHarmonic.radon, plotPF, plotIPF"""
     from .funops import radon
     return radon(self, h, r, superposition, bandwidth)
 
@@ -175,12 +199,33 @@ def _symmetrisedSO3(fun, CS, SS, antipodal):
 
 
 class SO3FunHandle(SO3FunGeneric):
-  """a function on SO(3) given by a callable that receives orientations in the frames
+  """a function on SO(3) given by a callable that receives orientations
 
-    SO3FunHandle(fun, CS, SS)
-    SO3FunHandle(fun, CS, SS, bandwidth=L)     the bandwidth of its harmonic form
-    SO3FunHandle(fun, CS, SS, symmetrise=True)  averaged over the groups on every call
-    SO3FunHandle(fun, CS, antipodal=True)       with exchange symmetry"""
+    SO3F = SO3FunHandle(lambda o: np.cos(angle(o, r)), cs)         # a function of the orientations of cs
+    SO3F = SO3FunHandle(fun, cs, ss, bandwidth=32)                  # both frames, the bandwidth of its harmonic form
+    SO3F = SO3FunHandle(fun, cs, ss, symmetrise=True)               # averaged over the groups on every call
+    SO3F = SO3FunHandle(fun, cs, cs, antipodal=True)                # with exchange symmetry, f(g) = f(inv(g))
+    SO3F = SO3FunHandle(odf)                                        # the handle of another SO3Fun
+
+  Nothing is precomputed: evaluating the function calls fun on orientations in the frames of
+  the function, exactly. Every operation that needs coefficients, a pole figure, a
+  convolution, a rotation, goes through SO3FunHarmonic(SO3F) of the bandwidth. The callable
+  is trusted to be invariant under the groups unless symmetrise asks for the average.
+  Exchange symmetry needs the same frame on both sides.
+
+  Input
+    fun - callable taking an orientation and returning its values, or an SO3Fun
+    frames - the crystal frame and the specimen frame, one or both, positionally
+  Output
+    SO3F - SO3FunHandle
+  Keywords
+    bandwidth - the bandwidth of the harmonic form, by default the preference
+        'defaultSO3Bandwidth'
+    antipodal - exchange symmetry, f(g) = f(inv(g)), for misorientations
+    real - the function takes only real values; the imaginary part of the values is dropped
+    symmetrise - average the callable over the groups of both frames on every call
+  See also
+    SO3Fun, SO3FunHarmonic, S2FunHandle, SO3FunOperations"""
 
   def __init__(self, fun, *frames, bandwidth=None, antipodal=False, real=True, symmetrise=False):
     if isinstance(fun, (SO3FunHarmonic, SO3FunGeneric, SO3FunRBF, SO3FunCBF)):
@@ -372,10 +417,32 @@ class _S2Direct(S2Fun):
 class S2FunHandle(_S2Direct):
   """a function on the sphere given by a callable that receives directions
 
-    S2FunHandle(fun, frame)
-    S2FunHandle(fun, frame, bandwidth=L)       the bandwidth of its harmonic form
-    S2FunHandle(fun, frame, antipodal=True)    averaged over v and -v and the group
-    S2FunHandle(fun, frame, symmetrise=True)   averaged over the group of the frame on every call"""
+    sF = S2FunHandle(lambda v: v.z**2)                              # a function of the directions
+    sF = S2FunHandle(fun, cs)                                       # in a crystal frame
+    sF = S2FunHandle(fun, cs, antipodal=True)                       # averaged over v and -v and the group
+    sF = S2FunHandle(fun, cs, symmetrise=True)                      # averaged over the group on every call
+    sF = S2FunHandle(fun, cs, bandwidth=64)                         # the bandwidth of its harmonic form
+
+  Nothing is precomputed: evaluating the function calls fun on the directions, normalised and
+  in the frame of the function, exactly. Every operation that needs coefficients, a
+  convolution, a quadrature, a smooth plot, goes through S2FunHarmonic(sF) of the bandwidth.
+  An antipodal function is averaged over v and -v and the group of the frame, unless
+  symmetrise=False says the callable is symmetric by construction. An S2FunHarmonic given as
+  fun becomes the handle of its evaluation.
+
+  Input
+    fun - callable taking a vector3d and returning its values, or an S2Fun
+    frame - crystalFrame or specimenFrame the directions are expressed in
+  Output
+    sF - S2FunHandle
+  Keywords
+    bandwidth - the bandwidth of the harmonic form, by default the quadrature bandwidth
+    antipodal - the function fulfils f(v) = f(-v)
+    real - the function takes only real values; the imaginary part of the values is dropped
+    symmetrise - average the callable over the group of the frame (and over v and -v when
+        antipodal) on every call; by default only when antipodal
+  See also
+    S2Fun, S2FunHarmonic, SO3FunHandle, S2FunOperations"""
 
   # an axis valued handle is averaged over the group of its frame and over v, -v unless
   # symmetrise=False says the callable is symmetric by construction
@@ -561,22 +628,59 @@ class S1FunHandle:
     return S1FunHarmonic(self).mean()
 
   def max(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
-    """the largest value and the angle it is taken at, numLocal local maxima, or with a number
-    or a second function on the circle the pointwise maximum, as S1FunHarmonic.max
+    """the global, local and pointwise maxima of a function on the circle given by a callable
 
-      v, pos = max(sF)
-      values, positions = max(sF, numLocal=3)
-      sF = max(sF, 0.5)"""
+      v, pos = max(sF)                              # the maximum and the angle it is taken at
+      values, positions = max(sF, numLocal=3)       # the three largest local maxima
+      sF = max(sF, 0.5)                             # the pointwise maximum with a constant
+      sF = max(sF1, sF2, bandwidth=32)              # the pointwise maximum of two functions
+
+    The maxima are searched on an equispaced raster of the resolution and refined by a ternary
+    search about every peak; numLocal returns the largest local maxima, in descending order.
+    With a number or a second function the result is the pointwise maximum, an S1FunHandle, or
+    an S1FunHarmonic of the bandwidth when one of the two is harmonic; as S1FunHarmonic.max.
+
+    Input
+      sF, sF1, sF2 - S1Fun
+    Output
+      v, values - the largest value, or an array of the local maxima
+      pos, positions - the angle in radians, or an array of them
+      sF - S1FunHandle or S1FunHarmonic, the pointwise maximum
+    Keywords
+      numLocal - the number of local maxima to return
+      resolution - the spacing of the raster the search starts from
+      bandwidth - the bandwidth of the pointwise maximum, by default the larger of the two
+    See also
+      S1FunHandle.min, S1FunHarmonic.max, S1FunHandle"""
     if args:
       return _pointwiseExtremumS1(np.maximum, self, args[0], bandwidth)
     return _localExtremaS1(self, 1, numLocal, resolution)
 
   def min(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
-    """the smallest value and the angle it is taken at, numLocal local minima, or with a number
-    or a second function on the circle the pointwise minimum, as S1FunHarmonic.min
+    """the global, local and pointwise minima of a function on the circle given by a callable
 
-      v, pos = min(sF)
-      sF = min(sF1, sF2)"""
+      v, pos = min(sF)                              # the minimum and the angle it is taken at
+      values, positions = min(sF, numLocal=3)       # the three smallest local minima
+      sF = min(sF, 0.5)                             # the pointwise minimum with a constant
+      sF = min(sF1, sF2, bandwidth=32)              # the pointwise minimum of two functions
+
+    The minima are searched on an equispaced raster of the resolution and refined by a ternary
+    search about every peak; numLocal returns the smallest local minima, in ascending order.
+    With a number or a second function the result is the pointwise minimum, an S1FunHandle, or
+    an S1FunHarmonic of the bandwidth when one of the two is harmonic; as S1FunHarmonic.min.
+
+    Input
+      sF, sF1, sF2 - S1Fun
+    Output
+      v, values - the smallest value, or an array of the local minima
+      pos, positions - the angle in radians, or an array of them
+      sF - S1FunHandle or S1FunHarmonic, the pointwise minimum
+    Keywords
+      numLocal - the number of local minima to return
+      resolution - the spacing of the raster the search starts from
+      bandwidth - the bandwidth of the pointwise minimum, by default the larger of the two
+    See also
+      S1FunHandle.max, S1FunHarmonic.min, S1FunHandle"""
     if args:
       return _pointwiseExtremumS1(np.minimum, self, args[0], bandwidth)
     return _localExtremaS1(self, -1, numLocal, resolution)

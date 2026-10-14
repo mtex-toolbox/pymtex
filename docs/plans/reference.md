@@ -113,6 +113,35 @@ Done after: `cat` of grains and boundaries (parts of one segmentation, a grain o
 parts kept once), NumPy's reductions of every container, MATLAB's `accuracy` of `round`. Left:
 `strainTensor`'s ellipsoid, the only user of its type.
 
+### Found while writing the reference sections (2026-10-14)
+
+The 239 functions with three or more keywords got MATLAB's sections (four agents, every form
+run). Not fixed yet:
+
+- Bugs: `calcParentFromVote` raises an IndexError when no vote passes the filter
+  (reconstruction.py:772); `grains.merge(labels)` joins grains across phases, the pairs form
+  refuses; `vector3d(1, 2, 3).char()` fails without a frame; `S1FunHarmonic.interpolate`
+  overwrites `tol`; `project(e)` of an embedding reaches the flat `project(P, Q)`;
+  `discreteSample` of a multiphase map refuses instead of sampling the list; `plot(gB,
+  smooth=True)` and `scatter(v, numbered=True)` pass MATLAB's flags on to matplotlib;
+  `plot(grains, 'area')` takes only names of `grains.prop`; `plotS2Grid(resolution=(a, b))`;
+  `mapField` with a scalar function does not broadcast; `S2Fun.unimodal(v, psi)` takes psi as
+  the halfwidth; `strainRateTensor(M)` keeps the antisymmetric part; `WignerD(dtype=complex64)`
+  gives complex128; `mtexdata(verbose=)` is not read; `mtexdata('NeperGrain3d')` is listed but
+  has no files; the NeperInterface page passes `silent=` where the keyword is `verbose`;
+  `S2AxisFieldHarmonic(fhat, cs)` keeps fhat unconverted; `orientation.unique(stable=)` is
+  ignored; `quiver3d(maxHeadSize=)`, `mtexFigure(innerPlotSpacing=, outerPlotSpacing=)` are
+  ignored; `calcGrains(angle={a1, a2})`, a threshold per phase, fails (gbcAngle's byPhase works).
+- Different from MATLAB, documented: `symmetry.fundamentalSector(angle=)` not cut to the
+  sector; `l1TVFilter`'s parameter and solver; `interp` and `fill`'s rules; `kde1d`'s bandwidth;
+  `calcKernel`'s default UCV; the `center` of the S2 grids; `sum` over all axes.
+- MATLAB features missing, by the reports: `grain2d(V, poly, ...)`, `merge(grains, tpList)`,
+  the maps' `refFrameDirs`, `nextAxis(i, j)` growing the layout, `calcGBND`'s texture
+  correction, laplaceFilter's variants, `calcODF`'s `alpha` output and two flags,
+  `regularSO3Grid`'s flags, `SO3FunRBF(F)`, `velocityGradientTensor.pureShear`,
+  `tensor.mean('geometric')`, `S2Grid`'s `restrict2MinMax`, `calcError`'s `L0`,
+  `calcKernel`'s `LSCV`, `BCV`, `classix`'s further outputs, `homochoricSO3Grid`.
+
 ## 4. Open questions
 
 - A MATLAB page with no Python twin (1042 of them): stays as it is, or a note "not in the

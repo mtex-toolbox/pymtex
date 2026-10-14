@@ -480,6 +480,9 @@ def render(name, entry_, pages, calls, owners, names=None, docPages=()):
     lines += ["## Signature", "", "```python", sig, "```", ""]
   if kind == "class":
     lines += members(obj, pages)
+  # a forwarder of the flat namespace, norm(x) for x.norm(): the methods it reaches
+  if hasattr(unwrap(obj), "forwardsTo"):
+    lines += forwarded(unwrap(obj).forwardsTo, pages, names or {})
   # a call of plot does not say what it draws
   used = [] if called == "plot" else usedOn(member or called.split(".")[-1], cls if member else None, calls, owners)
   if used:
@@ -497,6 +500,18 @@ def firstSentence(doc):
   text = doc.split("\n\n")[0].replace("\n", " ").replace("|", "\\|")
   m = re.search(r"[.;](\s|$)", text)
   return text[:m.start()] if m else text
+
+
+# the classes whose method a forwarder calls, each with its page and summary
+def forwarded(member, pages, names):
+  rows = []
+  for n in sorted(dir(mtex), key=str.lower):
+    c = getattr(mtex, n)
+    if inspect.isclass(c) and isOurs(c) and inspect.getattr_static(c, member, None) is not None:
+      page = names.get(f"{n}.{member}")
+      if page:
+        rows.append(f"| [{n}]({page}_py.html) | {firstSentence(docOf(inspect.getattr_static(c, member)))} |")
+  return ["## Methods it calls", "", "| | |", "|---|---|", *rows, ""] if rows else []
 
 
 # the members of a class as a table of their summaries

@@ -107,9 +107,27 @@ def _draw(kind, target, polys, colors, edgeColor, lineWidth, alpha, label=None, 
 # ------------------------------------------------------------------ what colour a face is
 
 def faceColors(cS, faceColor=None, colored=None, colormap="viridis"):
-  """the colour of every face of every shape, an (n, nF, 4) array: the colour of the mineral
-  or LightSkyBlue, one colour, one per face, one per shape, a value per face through the
-  colour map, or with colored a colour per form or the direction key of the normals"""
+  """the colour of every face of every crystal shape, as plot(cS) paints them
+
+    C = faceColors(cS)                                       # the colour of the mineral, or LightSkyBlue
+    C = faceColors(cS, 'red')                                # one colour
+    C = faceColors(cS, cS.faceArea, colormap='parula')       # a value per face through a colour map
+    C = faceColors(cS, colored=True)                         # a colour per form
+    C = faceColors(cS, colored=ipfHSVKey(cS.CS))             # the key's colour of every normal
+
+  faceColor is one colour, one RGB or RGBA row per face or per shape, or a value per face,
+  mapped through the colour map from its smallest to its largest value. colored overrides it.
+
+  Input
+    cS - crystalShape, one or a list of n shapes
+  Output
+    C - (n, number of faces, 4) array of RGBA colours
+  Keywords
+    faceColor - one colour, one per face, one per shape, or a value per face
+    colored - True for a colour per form, or a direction or ipf key colouring the normals
+    colormap - the colour map of the values per face
+  See also
+    crystalShape.plot, ipfHSVKey"""
   from matplotlib.colors import Normalize, to_rgba
   n, nF = len(cS), cS.numFaces
   if colored:
@@ -170,14 +188,42 @@ def _parse(args):
 
 def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.8, colored=None, colormap="viridis",
               displayName=None, **kw: Unpack[PlotKeywords]):
-  """plot(cS), plot(cS, faceColor='red', faceAlpha=0.5), plot(cS, colored=True), plot(cS, colored=key),
-  plot(x, y, cS), plot(x, y, z, cS), plot(xy, cS), plot(cS, N), plot(cS, sS)
+  """a crystal shape drawn as the polygons of its faces, in a 3D axes or onto a held map
 
-  A crystal shape as the polygons of its faces in a 3D axes, or seen along the normal of a
-  held map; colored gives every form its own colour with a legend, or the colours of the
-  direction key of the normals. With a plane normal the section through the centre, with
-  a slip system its plane and its direction inside the shape.
-  """
+    plot(cS)                                                     # the shape in a 3D axes
+    plot(cS, faceColor='red', faceAlpha=0.5, edgeColor='k')      # one colour, translucent
+    plot(cS, faceColor=cS.faceArea)                              # a value per face through the colour map
+    plot(cS, colored=True)                                       # a colour per form, with a legend
+    plot(cS, colored=ipfHSVKey(cS.CS))                           # the colours of a key of the normals
+    plot(x, y, cS)                                               # at positions, plot(x, y, z, cS) or plot(xy, cS)
+    plot(cS, Miller(1, 1, 0, cS.CS, 'hkl'))                      # the section by a lattice plane
+    plot(cS, sS)                                                 # a slip system inside the shape
+
+  A list of shapes, ori * cS turned by orientations for instance, is drawn at once; with
+  positions every shape is moved there first. Drawn while a map is held, the shapes are seen
+  along the normal of the map, at the positions in its plane, as plot(grains, cS) puts them.
+  By default the faces take the colour of the mineral, or LightSkyBlue. A lattice plane
+  hands over to plotInnerFace, a slip system to plotSlipSystem. The keywords of the axes,
+  parent and the like, are taken as by every plot; MATLAB's legendSpacing is not there.
+
+  Input
+    cS - crystalShape, one or a list
+    x, y, z - the positions of the shapes, or xy an (n, 2) or (n, 3) array of them
+  Output
+    h - the matplotlib collection of the faces
+  Keywords
+    faceColor - one colour, one per face, one per shape, or a value per face mapped through
+        the colour map
+    faceAlpha - the opacity of the faces
+    edgeColor - the colour of the edges
+    lineWidth - the width of the edges
+    colored - True gives every form its own colour with a legend; a direction or ipf key
+        colours the faces by their normals
+    colormap - the colour map of the values per face
+    displayName - the label of the shape in a legend
+  See also
+    crystalShape, crystalShape.plotInnerFace, crystalShape.plotInnerDirection,
+    crystalShape.plotSlipSystem, faceColors, CrystalShapes"""
   refuseVariants(kw)
   cS, rest = _parse(args)
   if rest and isinstance(rest[0], slipSystem):
@@ -212,7 +258,28 @@ def _facePolygons(cS, V):
 # ------------------------------------------------------------------ inside the shape
 
 def plotInnerFace(cS, N, faceColor="blue", faceAlpha=1.0, edgeColor="k", lineWidth=0.8, displayName=None, **kw: Unpack[PlotKeywords]):
-  """plotInnerFace(cS, N): the section of the shape by the lattice plane N through its centre"""
+  """the section of a crystal shape by a lattice plane through its centre
+
+    plotInnerFace(cS, N)                                                # the plane N inside the shape
+    plotInnerFace(cS, N, faceColor='red', faceAlpha=0.5, displayName='(101)')  # coloured, for a legend
+
+  The plane is drawn as the polygon where it cuts the shape, in the axes of the shape, so
+  that it shows inside a translucent shape drawn before: plot(cS, faceAlpha=0.2), then
+  plotInnerFace with the figure held. Several planes give several polygons.
+
+  Input
+    cS - crystalShape
+    N - Miller, the lattice plane, one or several
+  Output
+    h - the matplotlib collection of the sections, None when the plane misses the shape
+  Keywords
+    faceColor - the colour of the section
+    faceAlpha - its opacity
+    edgeColor - the colour of its edges
+    lineWidth - the width of its edges
+    displayName - its label in a legend
+  See also
+    crystalShape.plotInnerDirection, crystalShape.plotSlipSystem, crystalShape.plot, CrystalShapes"""
   from matplotlib.colors import to_rgba
   N = asVector3d(N)
   kind, target = _target(cS, kw)
@@ -242,7 +309,26 @@ def _arrow(kind, target, cS, d, color, lineWidth, label=None):
 
 
 def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, displayName=None, **kw: Unpack[PlotKeywords]):
-  """plotInnerDirection(cS, d): the crystal direction d as an arrow inside the shape"""
+  """a crystal direction drawn as an arrow from the centre of a crystal shape to its surface
+
+    plotInnerDirection(cS, d)                                                     # the direction d inside the shape
+    plotInnerDirection(cS, d, faceColor='blue', arrowWidth=0.05, displayName='[101]')  # coloured, for a legend
+
+  The arrow runs from the centre of the shape along d up to where d leaves it, so that it
+  shows inside a translucent shape drawn before. Several directions give several arrows.
+
+  Input
+    cS - crystalShape
+    d - Miller, the crystal direction, one or several
+  Output
+    h - the arrow, or a list of them
+  Keywords
+    faceColor - the colour of the arrow
+    arrowWidth - MATLAB's width of the arrow, which replaces lineWidth: 0.05 gives two points
+    lineWidth - the width of the arrow in points
+    displayName - its label in a legend
+  See also
+    crystalShape.plotInnerFace, crystalShape.plotSlipSystem, crystalShape.plot, CrystalShapes"""
   d = asVector3d(d)
   kind, target = _target(cS, kw)
   lw = lineWidth if arrowWidth is None else 40 * arrowWidth
@@ -251,8 +337,32 @@ def plotInnerDirection(cS, d, faceColor="blue", arrowWidth=None, lineWidth=2.0, 
 
 
 def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, label=None, **kw: Unpack[PlotKeywords]):
-  """plotSlipSystem(cS, sS), plot(cS, sS, label='b'): the slip plane through the centre of the
-  shape with the slip direction as an arrow in it, the arrow named at its tip"""
+  """a slip system drawn inside a crystal shape: the slip plane through the centre with the
+  slip direction as an arrow in it
+
+    plot(cS, sS)                                     # the slip plane and direction, red
+    plot(cS, sS, faceColor='blue')                   # another colour
+    plotSlipSystem(cS, sS, label='b')                # the arrow named at its tip
+
+  The plane is the section by the slip plane, as plotInnerFace draws it, the arrow the slip
+  direction from the centre to the surface; several systems are drawn together. Draw the
+  shape translucent first, plot(cS, faceAlpha=0.2), and hold the figure.
+
+  Input
+    cS - crystalShape
+    sS - slipSystem
+  Output
+    h - the matplotlib collection of the slip planes
+  Keywords
+    faceColor - the colour of the plane and the arrow
+    faceAlpha - the opacity of the plane
+    edgeColor - the colour of the edges of the plane
+    lineWidth - the width of the edges of the plane
+    displayName - the label of the plane in a legend
+    label - the text at the tip of the arrow (not on a map)
+  See also
+    crystalShape.plotInnerFace, crystalShape.plotInnerDirection, slipSystem, crystalShape.plot,
+    CrystalShapes"""
   kind, target = _target(cS, kw)
   h = plotInnerFace(cS, sS.n, faceColor=faceColor, faceAlpha=faceAlpha, edgeColor=edgeColor, lineWidth=lineWidth, displayName=displayName,
                     parent=target.ax)
@@ -268,7 +378,26 @@ def plotSlipSystem(cS, sS, faceColor="red", faceAlpha=0.5, edgeColor="k", lineWi
 # ------------------------------------------------------------------ planes
 
 def plotPlane(plane, faceColor=None, faceAlpha=0.5, edgeColor="k", lineWidth=0.8, displayName=None, **kw: Unpack[PlotKeywords]):
-  """plot(plane): planes in space, each clipped by the bounds of the axes"""
+  """planes in space drawn as polygons, each clipped by the bounds of the 3D axes
+
+    plot(plane)                                       # into the current box, translucent
+    plot(plane, faceColor='red', faceAlpha=0.3)       # coloured
+
+  Every plane is cut by the box of the current axes and drawn as the polygon that remains;
+  the box stays as it was, so draw what defines it first. A plane cannot be drawn into a map.
+
+  Input
+    plane - plane3d, one or several
+  Output
+    h - the matplotlib collection of the polygons, None when no plane meets the box
+  Keywords
+    faceColor - one colour, or one per plane
+    faceAlpha - the opacity of the polygons
+    edgeColor - the colour of their edges
+    lineWidth - the width of their edges
+    displayName - the label in a legend
+  See also
+    plane3d, crystalShape.plot, plot3d"""
   from matplotlib.colors import to_rgba
   kind, target = _target(plane, kw)
   if kind == "map":

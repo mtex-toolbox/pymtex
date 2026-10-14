@@ -51,12 +51,37 @@ def _options(kw):
 
 
 def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
-  """plot(grains), plot(grains, values), plot(grains, ori), plot(grains, faceColor=...)
+  """the 3D grains drawn by their faces, coloured by phase, by a value or an orientation per
+  grain, or in one colour; MATLAB's grain3d.plot
 
-  The outer faces of 3D grains coloured by phase, by a value or an orientation per grain, or
-  in one colour, as MATLAB's grain3d/plot. Options faceAlpha, edgeColor, edgeAlpha,
-  lineWidth, colormap, colorRange, ipfDirection; lineStyle='none' draws no edges.
-  """
+    plot(grains)                                            # coloured by phase
+    plot(grains, grains.volume)                             # coloured by a value per grain
+    plot(grains, grains.meanOrientation, lineStyle='none')  # by the orientation, no edges
+    plot(grains, faceColor='r', faceAlpha=0.5)              # one translucent colour
+
+  Only the outer faces of the set are drawn, each in the colour of the grain it bounds; a
+  face between two grains of the set is inside and is drawn grey only where the faces are
+  translucent. Values are mapped by the colour map, parula as MATLAB's patches, and
+  orientations by an ipfColorKey of their phase.
+
+  The options of the drawing are keywords too: faceColor, faceAlpha, edgeColor, edgeAlpha,
+  lineWidth, colormap, colorRange and ipfDirection; lineStyle='none' draws no edges.
+  The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
+  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
+  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
+  page.
+
+  Input
+    grains - grain3d
+    color - a value, an orientation or an RGB colour per grain; by default the phase colours
+  Output
+    fig - mtexFigure
+  Keywords
+    how2plot - the plottingConvention of the view, by default plottingConvention.default3D
+    figSize - the size of a new figure, 'small', 'normal', 'large', ..., or (width, height)
+        in inches
+  See also
+    grain3Boundary.plot, EBSD3.plot, grain2d.plot, plotEllipsoid, Grains3DOperations"""
   kw = _options(kw)
   # a patch takes the colour map of MATLAB's axes, parula, not MTEX's default
   kw.setdefault("colormap", "parula")
@@ -64,16 +89,70 @@ def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw: Unpack[
 
 
 def _plotBoundary3d(gB, color=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
-  """plot(gB), plot(gB, values), plot(gB, faceColor=...): the faces of a 3D grain boundary"""
+  """the faces of a 3D grain boundary, light blue, in one colour, or coloured by a value or a
+  colour per face; MATLAB's grain3Boundary.plot
+
+    plot(gB)                                  # light blue faces
+    plot(gB, gB.area)                         # coloured by a value per face
+    plot(gB, faceColor='r', edgeAlpha=0.2)    # one colour, faint edges
+
+  Values are mapped by the colour map, parula as MATLAB's patches. The options of the
+  drawing are keywords too: faceColor, faceAlpha, edgeColor, edgeAlpha, lineWidth, colormap
+  and colorRange; lineStyle='none' draws no edges. The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
+  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
+  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
+  page.
+
+  Input
+    gB - grain3Boundary
+    color - a value or an RGB colour per face
+  Output
+    fig - mtexFigure
+  Keywords
+    how2plot - the plottingConvention of the view, by default plottingConvention.default3D
+    figSize - the size of a new figure, 'small', 'normal', 'large', ..., or (width, height)
+        in inches
+  See also
+    grain3d.plot, grain3Boundary.quiver, Grains3DOperations"""
   kw = _options(kw)
   kw.setdefault("colormap", "parula")
   return _draw(boundaryMesh(gB, color, **kw), how2plot, figSize, gB.frame)
 
 
 def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw: Unpack[PlotKeywords]):
-  """plot(ebsd), plot(ebsd, values), plot(ebsd, ori): three orthogonal slices through the
-  voxels of a volume, as MATLAB's EBSD3/plot shows it in slice planes; at=(i, j, k) the voxel
-  index of the three slices, None for a slice left out, the middle by default"""
+  """the voxels of a volume in three orthogonal slice planes, coloured by phase, by a value, a
+  colour or an orientation per voxel; MATLAB's EBSD3.plot
+
+    plot(ebsd)                                   # coloured by phase
+    plot(ebsd, ebsd.prop['ConfidenceIndex'])     # coloured by a value per voxel
+    plot(ebsd['indexed'], ebsd['indexed'].orientations)  # coloured by the orientation
+    plot(ebsd, at=(5, None, 10))                 # two slices at the voxels given
+
+  The slices are normal to the three axes of the voxel lattice, through the middle of the
+  volume unless at gives the voxel index of each. A voxel not indexed or without a value is
+  white. Orientations are coloured by an ipfColorKey of their phase, values by the colour
+  map. The options of the drawing are keywords too: faceColor, colormap, colorRange and
+  ipfDirection. The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
+  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
+  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
+  page.
+
+  MATLAB's options of a planar map, the region, the points and the exact unit cells, have no
+  meaning here; the slices of one plane are drawn as a map by plot of ebsd.slice.
+
+  Input
+    ebsd - EBSD3
+    color - a value, an RGB colour or an orientation per voxel; by default the phase colours
+  Output
+    fig - mtexFigure
+  Keywords
+    how2plot - the plottingConvention of the view, by default plottingConvention.default3D
+    figSize - the size of a new figure, 'small', 'normal', 'large', ..., or (width, height)
+        in inches
+    at - (i, j, k), the voxel index of the slice normal to each axis of the lattice, None
+        for a slice left out; by default the middle
+  See also
+    EBSD3.slice, grain3d.plot, EBSD.plot, EBSD3Plotting"""
   kw = _options(kw)
   for k in ("faceAlpha", "edgeColor", "edgeAlpha", "lineWidth"):
     kw.pop(k, None)
@@ -81,9 +160,37 @@ def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw: Unp
 
 
 def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True, lineWidth=1.0, antipodal=None, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
-  """quiver(grains, dir), quiver(gB, dir): arrows at the centroids of 3D grains or of their
-  boundary faces, as MATLAB's; a grain's arrow as long as the direction, a face's a fifth of
-  the face's diameter, both times autoScaleFactor"""
+  """arrows at the centroids of 3D grains or of their boundary faces; MATLAB's
+  grain3Boundary.quiver and grain3d.quiver
+
+    quiver(gB, gB.N, color='r')                                # the face normals in red
+    quiver(gB, gB.N, antipodal=True, autoScaleFactor=2)        # axes, twice as long
+    quiver(grains, grains.meanOrientation * Miller(0, 0, 1, cs))  # a crystal direction per grain
+
+  A grain's arrow is as long as its direction, a face's a fifth of the face's diameter,
+  both times autoScaleFactor. Antipodal directions, axes, are drawn as lines through the
+  centroid without heads. The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
+  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
+  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
+  page.
+
+  Input
+    x - grain3d or grain3Boundary
+    d - vector3d, one direction per grain or face
+  Output
+    fig - mtexFigure
+  Keywords
+    color - the RGB colour of the arrows, one for all or one per arrow
+    autoScaleFactor - the factor of the arrow lengths
+    scaling - scale the arrows as above; False gives every arrow a quarter of its
+        direction's length
+    lineWidth - the width of the shafts
+    antipodal - draw axes, lines without heads; by default d.antipodal
+    how2plot - the plottingConvention of the view, by default plottingConvention.default3D
+    figSize - the size of a new figure, 'small', 'normal', 'large', ..., or (width, height)
+        in inches
+  See also
+    grain3Boundary.plot, grain3d.plot, quiver3d"""
   from ..maps3d.grain3boundary import grain3Boundary
   kw = _options(kw)
   P = np.asarray(x.centroid.data).reshape(-1, 3)
@@ -105,8 +212,35 @@ def _quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, h
 
 
 def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):
-  """plotEllipsoid(centre, a, b, c, faceColor=rgb): ellipsoids with the half axes a, b, c,
-  one colour for all or one per ellipsoid, as MATLAB's"""
+  """ellipsoids with the half axes a, b, c about their centres, in a 3D scene; MATLAB's
+  plotEllipsoid
+
+    a, b, c = grains.principalComponents()
+    plotEllipsoid(grains.centroid, a, b, c, faceColor='r')     # the ellipsoids of the grains
+    plotEllipsoid(grains.centroid, a, b, c, faceColor=rgb, edgeAlpha=0)  # a colour each, no edges
+
+  Every ellipsoid is a surface on a grid of 24 longitudes and 12 latitudes. With hold on it
+  joins the grains of the scene drawn before. The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
+  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
+  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
+  page.
+
+  Input
+    center - vector3d, the centres
+    a - vector3d, the first half axis of every ellipsoid
+    b - vector3d, the second half axis
+    c - vector3d, the third half axis
+  Output
+    fig - mtexFigure
+  Keywords
+    faceColor - the colour of the ellipsoids, one for all or an (n, 3) array of RGB values
+        one per ellipsoid
+    edgeAlpha - the opacity of the grid lines on the surfaces
+    how2plot - the plottingConvention of the view, by default plottingConvention.default3D
+    figSize - the size of a new figure, 'small', 'normal', 'large', ..., or (width, height)
+        in inches
+  See also
+    grain3d.principalComponents, grain3d.centroid, grain3d.plot"""
   kw = _options(kw)
   faceColor = kw.pop("faceColor", faceColor)
   def data(v):

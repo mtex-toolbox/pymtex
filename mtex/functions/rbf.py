@@ -139,10 +139,31 @@ def _rotationsFor(f, x):
 
 
 class SO3FunRBF(SO3Fun):
-  """a function on SO(3) as a sum of radial kernels psi at centre orientations with weights, plus a
-  constant c0; the weights default to a mean of one
+  """a function on SO(3) as a sum of radial kernels at centre orientations, plus a constant: a
+  radial basis function ODF
 
-    SO3FunRBF(ori, psi, weights, c0)"""
+    SO3F = SO3FunRBF(ori, psi, weights)          # kernels psi at the orientations ori
+    SO3F = SO3FunRBF(ori, psi, weights, c0)      # plus the constant c0
+    SO3F = SO3FunRBF(ori)                        # 10 degree kernels, the weights giving a mean of one
+
+  The function is c0 + sum_i w_i psi(angle(g, ori_i)), every centre taken with all its
+  symmetrically equivalent orientations, in the crystal and specimen frames of the centres.
+  It stays a kernel sum under scaling, adding a constant, adding another kernel sum of the
+  same kernel, rotation, inversion and convolution with a kernel on SO(3); the harmonic form
+  it is evaluated through is kept until a centre, the kernel, the weights or the constant
+  are set. unimodalODF and calcDensity build one; SO3FunRBF.interpolate fits one through
+  values. MATLAB's SO3FunRBF(F) approximating another SO3Fun is not ported.
+
+  Input
+    center - orientation, the centres of the kernels
+    psi - SO3Kernel; by default the de la Vallee Poussin kernel of halfwidth 10 degree
+    weights - one weight per centre; by default equal, giving a mean of one
+    c0 - the constant added
+  Output
+    SO3F - SO3FunRBF
+  See also
+    unimodalODF, SO3FunCBF, SO3FunRBF.interpolate, calcDensity, SO3FunRBF.radon,
+    RadialODFs"""
   isReal = True
 
   @staticmethod
@@ -347,13 +368,33 @@ class SO3FunRBF(SO3Fun):
     return self.inv()._poleFigure(r, bandwidth)
 
   def radon(self, h=None, r=None, superposition=None, bandwidth=None):
-    """the Radon transform: with h the pole figure, with r the inverse pole figure, with both the
-    pole figure of h evaluated at r; several h superposed, weighted by superposition
-    (MATLAB's pdf, ipdf and calcPDF); bandwidth that of the pole figure, the kernel's unless given
+    """the Radon transform of a kernel sum: the pole figure of a crystal direction, the inverse
+    pole figure of a specimen direction, or the pole density of both
 
-      SO3F.radon(h)
-      SO3F.radon(r=r)
-      SO3F.radon(h, r)"""
+      S2F = SO3F.radon(h)                                # the pole figure of h
+      S2F = SO3F.radon(r=r)                              # the inverse pole figure of r
+      v = SO3F.radon(h, r)                               # the pole figure of h at r
+      S2F = SO3F.radon([h1, h2], superposition=[0.3, 0.7])  # the superposed pole figure
+
+    The Radon transform of f at (h, r) is the mean of f over the orientations taking h to r.
+    For a kernel sum it is again a sum of radial kernels on the sphere, the kernel's Radon
+    transform at the centres applied to h, returned as a harmonic expansion. Several crystal
+    directions are superposed with the weights of superposition. It replaces MATLAB's
+    calcPDF, pdf and ipdf.
+
+    Input
+      SO3F - SO3FunRBF
+      h - Miller or vector3d, the crystal direction, or a list of them to superpose
+      r - vector3d, the specimen direction
+    Output
+      S2F - S2FunHarmonic, the pole figure on the specimen sphere or the inverse pole figure
+          on the crystal sphere
+      v - the values at r, given h and r
+    Keywords
+      superposition - the weights of the superposed crystal directions
+      bandwidth - the harmonic degree of the result, by default the kernel's
+    See also
+      calcPoleFigure, SO3FunCBF.radon, plotPF, plotIPF"""
     from .funops import radon
     return radon(self, h, r, superposition, bandwidth)
 
@@ -496,11 +537,29 @@ class SO3FunRBF(SO3Fun):
 
 
 class SO3FunCBF(SO3Fun):
-  """a fibre ODF, a sum over fibres h || r of an S2 kernel psi of the angle between g h and r, with
-  weights normalised to a mean of one by default
+  """a fibre ODF: a sum over fibres h || r of a kernel on the sphere of the angle between g h and r
 
-    SO3FunCBF(h, r, weights, psi)
-    SO3FunCBF(f, halfwidth=10*degree)      from a fibre f"""
+    SO3F = SO3FunCBF(h, r)                              # the fibre h || r, a 10 degree kernel
+    SO3F = SO3FunCBF(h, r, weights, psi)                # several fibres, weighted, the kernel psi
+    SO3F = SO3FunCBF(f, halfwidth=10*degree)            # from a fibre f
+
+  The function of the orientation g is sum_i w_i psi(g h_i . r_i), every fibre taken with all
+  its symmetrically equivalent fibres; it is constant along each fibre. The crystal frame is
+  that of h, the specimen frame that of r or SS. The weights default to equal ones giving a
+  mean of one. fibreODF builds one with the weights normalised.
+
+  Input
+    h - Miller or vector3d, the crystal directions, or a fibre
+    r - vector3d, the specimen directions, one per crystal direction
+    weights - one weight per fibre; by default a mean of one
+    psi - S2Kernel; by default the de la Vallee Poussin kernel
+  Output
+    SO3F - SO3FunCBF
+  Keywords
+    SS - the specimen frame, when r has none
+    halfwidth - the halfwidth of the default kernel, 10 degree unless given
+  See also
+    fibreODF, fibre, SO3FunRBF, SO3FunCBF.radon, FibreODFs"""
   isReal = True
   antipodal = False
 
@@ -632,9 +691,30 @@ class SO3FunCBF(SO3Fun):
     return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
 
   def radon(self, h=None, r=None, superposition=None, bandwidth=None):
-    """the Radon transform through the harmonic expansion of the bandwidth: with h the pole
-    figure, with r the inverse pole figure, with both the values; several h superposed, weighted
-    by superposition (MATLAB's pdf, ipdf and calcPDF)"""
+    """the Radon transform of a fibre ODF: the pole figure of a crystal direction, the inverse
+    pole figure of a specimen direction, or the pole density of both
+
+      S2F = SO3F.radon(h)                   # the pole figure of h
+      S2F = SO3F.radon(r=r)                 # the inverse pole figure of r
+      v = SO3F.radon(h, r)                  # the pole figure of h at r
+
+    The Radon transform of f at (h, r) is the mean of f over the orientations taking h to r,
+    computed through the harmonic expansion of the bandwidth. Several crystal directions are
+    superposed with the weights of superposition. It replaces MATLAB's calcPDF, pdf and
+    ipdf.
+
+    Input
+      SO3F - SO3FunCBF
+      h - Miller or vector3d, the crystal direction, or a list of them to superpose
+      r - vector3d, the specimen direction
+    Output
+      S2F - S2FunHarmonic, the pole figure or the inverse pole figure
+      v - the values at r, given h and r
+    Keywords
+      superposition - the weights of the superposed crystal directions
+      bandwidth - the harmonic degree of the result, by default the kernel's
+    See also
+      calcPoleFigure, SO3FunRBF.radon, plotPF, plotIPF"""
     from .funops import radon
     return radon(self, h, r, superposition, bandwidth)
 
@@ -758,14 +838,31 @@ def _densityKernel(space, kernel, halfwidth):
 
 
 def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, thinning=True):
-  """a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
-  dropped unless thinning=False
+  """a unimodal ODF, radially symmetric about a modal orientation, its shape a kernel on SO(3)
 
-    odf = unimodalODF(ori)  # the de la Vallee Poussin kernel of halfwidth 10 degree
-    odf = unimodalODF(ori, halfwidth=15*degree)
-    odf = unimodalODF(ori, cs, ss)  # the centre given as a rotation, the frames named
-    odf = unimodalODF(ori, psi)  # the kernel psi, also kernel=psi
-    odf = unimodalODF(ori, weights=w, thinning=False)  # one weight per centre, all kept"""
+    odf = unimodalODF(ori)                                 # the de la Vallee Poussin kernel of halfwidth 10 degree
+    odf = unimodalODF(ori, halfwidth=15*degree)            # another halfwidth
+    odf = unimodalODF(rot, cs, ss)                         # the centre given as a rotation, the frames named
+    odf = unimodalODF(ori, psi)                            # the kernel psi, also kernel=psi
+    odf = unimodalODF(ori, weights=w, thinning=False)      # one weight per centre, all kept
+
+  The ODF is a kernel sum, SO3FunRBF, with the kernel at the modal orientations, the weights
+  normalised to a mean of one. Given weights, the centres of negligible weight, a hundredth
+  of a kernel's peak shared among the centres, are dropped unless thinning=False. Without a
+  centre the mode is the identity.
+
+  Input
+    center - orientation, the modal orientations, or a rotation with the frames following
+    args - crystalFrame and specimenFrame of a centre given as a rotation, and an SO3Kernel
+  Output
+    odf - SO3FunRBF
+  Keywords
+    kernel - SO3Kernel, the shape; by default the de la Vallee Poussin kernel
+    halfwidth - the halfwidth of the default kernel, 10 degree unless given
+    weights - one weight per centre
+    thinning - drop the centres of negligible weight (MATLAB's flag nothinning keeps them)
+  See also
+    fibreODF, uniformODF, FourierODF, BinghamODF, SO3FunRBF, RadialODFs"""
   if isinstance(center, (referenceFrame, SO3Kernel)):
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
@@ -789,14 +886,30 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, t
 
 
 def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
-  """a fibre ODF from crystal and specimen directions or from a fibre of P1, the weights
-  normalised to a mean of one
+  """a fibre ODF, symmetric about the fibre of the orientations taking a crystal direction to a
+  specimen direction, its shape a kernel on the sphere
 
-    odf = fibreODF(h, r)  # the de la Vallee Poussin kernel of halfwidth 10 degree
-    odf = fibreODF(h, r, halfwidth=15*degree)
-    odf = fibreODF(h, r, psi)  # the S2 kernel psi, also kernel=psi
-    odf = fibreODF(h, r, ss)  # the specimen frame named
-    odf = fibreODF(f, weights=w)  # from a fibre f, one weight per fibre"""
+    odf = fibreODF(h, r)                         # the de la Vallee Poussin kernel of halfwidth 10 degree
+    odf = fibreODF(h, r, halfwidth=15*degree)    # another halfwidth
+    odf = fibreODF(h, r, psi)                    # the S2 kernel psi, also kernel=psi
+    odf = fibreODF(h, r, ss)                     # the specimen frame named
+    odf = fibreODF(f, weights=w)                 # from a fibre f, one weight per fibre
+
+  The ODF is SO3FunCBF, the kernel of the angle between g h and r, the weights normalised to a
+  mean of one. Several crystal and specimen directions give several fibres.
+
+  Input
+    h - Miller, the crystal directions, or a fibre
+    r - vector3d, the specimen directions
+    args - specimenFrame and an S2Kernel
+  Output
+    odf - SO3FunCBF
+  Keywords
+    kernel - S2Kernel, the shape; by default the de la Vallee Poussin kernel
+    halfwidth - the halfwidth of the default kernel, 10 degree unless given
+    weights - one weight per fibre
+  See also
+    unimodalODF, uniformODF, FourierODF, BinghamODF, SO3FunCBF, FibreODFs"""
   kernels = [a for a in args if isinstance(a, S2Kernel)]
   kernel = kernels[0] if kernels else kernel
   frames = [a for a in args if isinstance(a, referenceFrame)]

@@ -38,9 +38,34 @@ def _columns(ori, args, radians, quaternion):
 
 
 def exportOrientation(ori, fname, *args, radians=False, quaternion=False, interface=None, weights=None):
-  """export(ori, fname, 'Bunge'): the Euler angles of the orientations in degrees as a table,
-  with a dictionary among the arguments as further columns; export(ori, fname, 'Bunge',
-  interface='VPSC', weights=w) the VPSC texture file (MATLAB's export_VPSC)"""
+  """orientations written to a text file, as a table of Euler angles or quaternions with further
+  columns, or as a VPSC texture file; export(ori, fname) calls it
+
+    export(ori, fname)                                          # Bunge Euler angles in degree
+    export(ori, fname, 'Matthies', radians=True)                # another convention, in radians
+    export(ori, fname, quaternion=True)                         # the four quaternion components
+    export(ori, fname, {'area': grains.area})                   # further columns
+    export(ori, fname, 'Bunge', interface='VPSC', weights=w)    # the VPSC texture file
+
+  The table has one row per orientation, the columns named in a header line: phi1, Phi, phi2
+  for Bunge, alpha, beta, gamma for Matthies and ZYZ, Psi, Theta, Phi for Roe, Psi, Theta, phi
+  for Kocks, or a, b, c, d; every entry of a dictionary among the arguments adds a column, as
+  MATLAB's struct does. loadOrientation reads it back. The VPSC file, MATLAB's export_VPSC,
+  has four header lines and the weights, normalised to sum to one, in the fourth column; it
+  takes the conventions Bunge, Kocks and Roe.
+
+  Input
+    ori - orientation
+    fname - the name of the file
+    args - the Euler convention, 'Bunge', 'Matthies', 'ZYZ', 'Roe' or 'Kocks', and dictionaries
+        of further columns, one value per orientation
+  Keywords
+    radians - the angles in radians instead of degree
+    quaternion - the quaternion components instead of Euler angles
+    interface - None for the table, 'VPSC' for the VPSC texture file
+    weights - the weights of the orientations in the VPSC file, equal by default
+  See also
+    loadOrientation, export, quaternion.Euler"""
   if interface == "VPSC":
     return _export_VPSC(ori, fname, *args, weights=weights, radians=radians)
   if interface is not None:

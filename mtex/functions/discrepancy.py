@@ -287,8 +287,53 @@ def _difference(a, b, family, defaultBandwidth, represent, bandwidth, weights, w
 
 def sphericalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, bandwidth=None, degreeWeights=None,
                          numCenters=2049, numHeights=257, centers=None, squared=False, info=False):
-  """the discrepancy of two spherical densities or weighted point sets, D_2, D_cap or L2 (E_L);
-  the shared form of S2Fun/discrepancy and vector3d/discrepancy, info=True adds the details"""
+  """the discrepancy between two measures on the sphere, densities or weighted point sets in
+  any pairing: D_2, D_cap or a bandlimited L2 norm; MATLAB's S2Fun/discrepancy and
+  vector3d/discrepancy
+
+    d = sphericalDiscrepancy(v, w)                               # D_2 of two point sets
+    d = sphericalDiscrepancy(v, w, weights=c, weights2=e)        # of two weighted point sets
+    d = sphericalDiscrepancy(f, v)                               # of a density and a sample
+    d = sphericalDiscrepancy(v, w, 'L2', bandwidth=32, degreeWeights=lambda l: np.exp(-0.1 * l * (l + 1)))  # a weighted harmonic norm
+    d, info = sphericalDiscrepancy(v, w, 'D_cap', numCenters=4097, info=True)  # the largest cap difference and its cap
+
+  With C(m, t) = {x : m.x >= t} the spherical caps and nu = mu - eta the difference of the
+  two measures, D_cap is sup |nu(C(m, t))|, D_2 the root of the integral of |nu(C(m, t))|^2
+  over the centres m (normalised area) and the heights t, which Stolarsky's identity turns
+  into nu(S2)^2 - 1/4 int int |x - y| dnu dnu, and L2 the root of the sum of the squared
+  harmonic moments of nu through the bandwidth. All three count a difference in total
+  mass: two densities differing only in their integral have a positive discrepancy.
+
+  Point weights are normalised to sum one; a point set compared with a function takes the
+  function's integral, and mass one if that vanishes. An antipodal point set puts half its
+  mass at each of +x and -x. D_2 keeps the atoms exact at every bandwidth (a cost quadratic
+  in the points), the functions through their harmonic projection. D_cap is a finite search
+  over centres and heights, a lower bound, info.isExact False; raise numCenters and
+  numHeights until it settles. MATLAB's metric 'kernel', the objective of optimalSample, is
+  taken by discrepancy, not here.
+
+  Input
+    a, b - S2Fun, a real scalar density, or vector3d, a point set
+    metric - 'D_2', 'D_cap' or 'L2' (also 'E_L')
+  Output
+    d - the discrepancy, its square with squared=True
+    info - with info=True: method, isExact, bandwidth, and for D_cap the cap found, center,
+        height, closed (False for the limit of open caps), signedDifference
+  Keywords
+    weights - the non negative weights of the points of a
+    weights2 - the weights of the points of b
+    bandwidth - the harmonic degree of the projection of the functions and of the L2
+        moments; by default the largest bandwidth of the functions, 128 for two point sets
+    degreeWeights - the L2 weights of the degrees 0..L, an array or a function of the
+        degree; ones by default, degree zero weighting the difference in total mass
+    numCenters - the number of cap centres D_cap searches, besides the coordinate axes and
+        the points
+    numHeights - the number of heights D_cap searches, besides the jumps at the points
+    centers - vector3d, the cap centres D_cap searches instead
+    squared - return the square of D_2 and L2
+    info - return the details too, as a second output
+  See also
+    discrepancy, rotationalDiscrepancy, optimalSample"""
   metric = _metricName(metric, _S2_METRICS, "spherical")
   if not (isinstance(a, _S2_INPUTS) and isinstance(b, _S2_INPUTS)):
     raise TypeError("inputs must be S2Fun or vector3d")
@@ -482,8 +527,53 @@ def _maximumBall(fhat, x, c, L, numCenters, numRadii, centers):
 
 def rotationalDiscrepancy(a, b, metric="D_2", *, weights=None, weights2=None, bandwidth=None, degreeWeights=None,
                           numCenters=2049, numRadii=257, centers=None, squared=False, info=False):
-  """the discrepancy of two rotational densities or weighted orientation sets, D_2, D_ball or
-  L2 (E_L); the shared form of SO3Fun/discrepancy and rotation/discrepancy, info=True adds the details"""
+  """the discrepancy between two measures on SO(3), densities or weighted orientation sets in
+  any pairing: D_2, D_ball or a bandlimited L2 norm; MATLAB's SO3Fun/discrepancy and
+  rotation/discrepancy
+
+    d = rotationalDiscrepancy(ori1, ori2)                         # D_2 of two orientation sets
+    d = rotationalDiscrepancy(odf, ori, weights=c)                # of a density and a weighted sample
+    d = rotationalDiscrepancy(ori1, ori2, 'L2', bandwidth=16, squared=True)  # the squared bandlimited norm
+    d, info = rotationalDiscrepancy(odf, ori, 'D_ball', numCenters=4097, info=True)  # the largest ball difference and its ball
+
+  With B(C, r) = {R : angle(C, R) <= r} the balls of SO(3) and nu = mu - eta the difference
+  of the two measures, D_ball is sup |nu(B(C, r))|, D_2 the root of the integral of
+  |nu(B(C, r))|^2 over the centres (normalised Haar measure) and the radii (sin(r) dr),
+  which Stolarsky's identity turns into nu(SO3)^2 / 2 - 1/(2 sqrt(2) pi) int int |R - S|_F
+  dnu dnu, and L2 the root of the sum of the squared Wigner moments of nu through the
+  bandwidth. All three count a difference in total mass: an ODF of mean one (integral 8
+  pi^2) and the probability density of the same texture differ by that factor.
+
+  Point weights are normalised to sum one; an orientation set compared with a function takes
+  the function's integral, and mass one if that vanishes. An orientation is the uniform
+  measure on its orbit of symmetrically equivalent rotations, a bare rotation one atom.
+  D_2 keeps the atoms exact at every bandwidth, the functions through their harmonic
+  projection. D_ball is a finite search, a lower bound, info.isExact False; SO(3) is three
+  dimensional, so raise numCenters and numRadii until it settles. MATLAB's metric 'kernel',
+  the objective of optimalSample, is taken by discrepancy, not here.
+
+  Input
+    a, b - SO3Fun, a real scalar density, or rotation and orientation, a sample
+    metric - 'D_2', 'D_ball' or 'L2' (also 'E_L')
+  Output
+    d - the discrepancy, its square with squared=True
+    info - with info=True: method, isExact, bandwidth, and for D_ball the ball found,
+        center, radius, closed (False for the limit of open balls), signedDifference
+  Keywords
+    weights - the non negative weights of the orientations of a
+    weights2 - the weights of the orientations of b
+    bandwidth - the harmonic degree of the projection of the functions and of the L2
+        moments; by default the largest bandwidth of the functions, 64 for two samples
+    degreeWeights - the L2 weights of the degrees 0..L, an array or a function of the
+        degree; ones by default, degree zero weighting the difference in total mass
+    numCenters - the number of ball centres D_ball searches, besides the identity and the
+        atoms
+    numRadii - the number of radii D_ball searches, besides the jumps at the atoms
+    centers - rotation, the ball centres D_ball searches instead
+    squared - return the square of D_2 and L2
+    info - return the details too, as a second output
+  See also
+    discrepancy, sphericalDiscrepancy, optimalSample"""
   metric = _metricName(metric, _SO3_METRICS, "rotational")
   if not (isinstance(a, _SO3_INPUTS) and isinstance(b, _SO3_INPUTS)):
     raise TypeError("inputs must be SO3Fun or rotation")

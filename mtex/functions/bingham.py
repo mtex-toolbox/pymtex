@@ -238,9 +238,39 @@ class SO3FunBingham(SO3FunGeneric):
     return SO3FunHarmonic(self, bandwidth=bandwidth)._inversePoleFigure(r)
 
   def radon(self, h=None, r=None, superposition=None, bandwidth=None):
-    """the Radon transform: radon(h) the pole figure, in closed form, radon(r=r) the inverse pole
-    figure, radon(h, r) the values; several h superposed, weighted by superposition
-    (MATLAB's pdf, ipdf and calcPDF)"""
+    """the Radon transform of a Bingham distribution: its pole figure, in closed form, its
+    inverse pole figure, or their values
+
+      pdf = odf.radon(h)                                 # the pole figure of the crystal direction h
+      ipdf = odf.radon(r=r)                              # the inverse pole figure of the specimen direction r
+      val = odf.radon(h, r)                              # the pole figure at the directions r
+      pdf = odf.radon([h1, h2], superposition=[0.5, 0.5])  # the superposed pole figure of several directions
+      pdf = odf.radon(h, bandwidth=32)                   # a harmonic expansion of another bandwidth
+
+    The pole figure of h at r is the mean of the density over the orientations taking h to r,
+    a great circle in the quaternions; for a Bingham distribution it is a closed form in a
+    Bessel function, Kunze and Schaeben's formula, which is expanded into spherical harmonics.
+    The inverse pole figure goes through the harmonic form of the distribution. Several
+    crystal directions give the weighted sum of their pole figures, the pole figure of
+    superposed reflections, equally weighted unless superposition is given.
+
+    Input
+      odf - SO3FunBingham
+    Output
+      pdf - S2FunHarmonic, the pole figure in the specimen frame, or the inverse pole figure in
+          the crystal frame
+      val - the values of the pole figure at r
+    Keywords
+      h - Miller or vector3d, the crystal direction, or a list of them
+      r - vector3d, the specimen direction
+      superposition - the weights of several crystal directions
+      bandwidth - the bandwidth of the harmonic expansion; 64 or the preference
+          maxS2Bandwidth, the smaller, for the pole figure
+    References
+      K. Kunze, H. Schaeben, The Bingham distribution of quaternions and its spherical Radon
+          transform in texture analysis, Mathematical Geology 36 (2004) 917-943
+    See also
+      SO3Fun.radon, BinghamODF, calcPoleFigure, plotPF"""
     from .funops import radon
     return radon(self, h, r, superposition, bandwidth)
   def __repr__(self):
@@ -423,11 +453,36 @@ class S2FunBingham(S2Fun):
 
   @classmethod
   def fit(cls, v, weights=None, confidenceEllipse=False, p=0.95):
-    """the fit to directions or axes: the eigen decomposition of the scatter matrix gives the
-    axes, Newton on the moments the shape parameters, ascending to zero at the mode, the
-    third axis, as in MTEX; confidenceEllipse=True returns with it the semi-axes ab, in
-    radians, and the rotation rot of the confidence ellipse at the level p of the modal axis
-    (Tanaka 1999), for ellipse(rot, ab[0], ab[1])"""
+    """the Bingham distribution fitted to directions or axes, with the confidence ellipse of its
+    modal axis
+
+      f = S2FunBingham.fit(v)                            # the fitted distribution
+      f = S2FunBingham.fit(v, weights=w)                 # weighted directions
+      f, ab, rot = S2FunBingham.fit(v, confidenceEllipse=True, p=0.95)  # with the confidence ellipse
+
+    The eigen decomposition of the scatter matrix of the directions, sum of w v v^T, gives
+    the axes of the distribution, and Newton's method on the moments its shape parameters,
+    ascending to zero at the third axis, the mode. A direction and its antipode count alike.
+
+    The confidence ellipse of the modal axis is the asymptotic covariance of the largest
+    eigenvector, Tanaka's: its semi-axes ab in radians and the rotation rot turning the z axis
+    onto the mode, drawn by ellipse(rot, ab[0], ab[1]).
+
+    Input
+      v - vector3d or Miller, the directions or axes
+    Output
+      f - S2FunBingham, in the frame of v
+      ab - the two semi-axes of the confidence ellipse in radians
+      rot - rotation, the position of the confidence ellipse
+    Keywords
+      weights - the weights of the directions, equal by default
+      confidenceEllipse - return also ab and rot, MATLAB's second and third output
+      p - the confidence level of the ellipse
+    References
+      H. Tanaka, Circular asymmetry of the paleomagnetic directions observed at low latitude
+          volcanic sites, Earth Planets Space 51 (1999) 1279-1286
+    See also
+      S2FunBingham, BinghamODF, calcBinghamODF, ellipse"""
     v = asVector3d(v)
     d = v.normalize().data.reshape(-1, 3)
     w = np.full(len(d), 1 / len(d)) if weights is None else np.asarray(weights, dtype=float).ravel() / np.sum(weights)

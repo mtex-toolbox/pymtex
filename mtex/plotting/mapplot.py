@@ -230,15 +230,40 @@ def colorRequest(color, faceColor=None, ipfDirection=None):
 
 
 def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
-  """the colour of every measurement or grain, and whether it is a scalar to be mapped:
-  the phase palette, an orientation list through the inverse pole figure key of its
-  phase, an orientation colour key, the name of a property, one value or one colour per
-  element, or one colour for all
-  the value or the colour of every element, or of the elements `at` alone: a picture shows
-  fewer measurements than a large map holds, and the colour of one it never shows is work
-  thrown away. A route that yields numbers ignores `at` and stays whole, since the colour
-  range is the map's and not the picture's; a route that yields colours returns one per
-  entry of `at`."""
+  """the value or the colour of every measurement or grain, and whether it is a value a colour
+  map turns into colours: what a map plot draws, before it is drawn
+
+    rgb, scalar = mapValues(ebsd, 'phase')                    # phase colours
+    v, scalar = mapValues(ebsd, 'mad')                        # a property, scalar is True
+    rgb, scalar = mapValues(ebsd, None, ipfDirection=xvector) # inverse pole figure colours along x
+    rgb, scalar = mapValues(ebsd['Forsterite'], key)          # through an orientation colour key
+    rgb, scalar = mapValues(ebsd, 'mad', at=ind)              # the measurements ind alone
+
+  The colouring asked for is one of: None or 'phase', the colours of the phases;
+  'orientation', or an ipfDirection alone, every phase through the inverse pole figure key of
+  its own frame; an orientation per element, through the inverse pole figure key of its
+  phase; an orientationColorKey; the name of a property of the map; a value or an RGB colour
+  per element; one colour, a name or an RGB triple, for all; faceColor alone, one colour for
+  all. A site without an orientation is white, a not indexed phase white unless its frame
+  has a colour of its own.
+
+  A picture shows fewer measurements than a large map holds, and at= colours only those it
+  shows. A route that yields values ignores at and returns them all, since the colour range
+  is the map's and not the picture's; a route that yields colours returns one per entry of
+  at.
+
+  Input
+    x - EBSD or grain2d
+    color - the colouring asked for, as listed above
+  Output
+    values - array, the RGB colours (n, 3) or the values (n,)
+    scalar - bool, whether values are values a colour map maps, not colours
+  Keywords
+    faceColor - one colour for all, when no colouring is asked for
+    ipfDirection - vector3d, the specimen direction of the inverse pole figure colours
+    at - the indices of the elements to colour
+  See also
+    EBSD.plot, grain2d.plot, ipfColors, ipfColorKey"""
   from matplotlib.colors import to_rgb
   color = colorRequest(color, faceColor, ipfDirection)
   n = x.size
@@ -353,13 +378,67 @@ def _liftable(f):
 def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None,
              refFrame=True, location=None, ipfDirection=None, maxPixels=None, edgeColor=None, lineWidth=0.5, alpha=1.0, legend=None, displayName=None,
              markerSize=4, **kw: Unpack[PlotKeywords]):
-  """plot(ebsd), plot(ebsd, values), plot(ebsd, ori), plot(ebsd, rgb), plot(ebsd, faceColor='black')
+  """a spatial EBSD map, coloured by phase, by a value, by orientation or by colours given
 
-  A spatial EBSD map coloured by phase, by a value per measurement, by orientations through
-  the inverse pole figure key of their phase, by an orientation colour key, or in one
-  colour. backend is 'imagesc' for the picture a rigid lattice is, 'patch' for one cell per
-  measurement, 'scatter' for the measurements alone; by default the first the map allows.
-  """
+    plot(ebsd)                                       # colours by phase, with a legend
+    plot(ebsd, ebsd.mad)                             # colours by a value, here MAD
+    plot(ebsd, ebsd.mad, colorbar=True, colorRange=(0, 1))  # with a colour bar of a fixed range
+    plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations)  # colours by orientation
+    plot(ebsd, ipfDirection=xvector)                 # every phase by its inverse pole figure key along x
+    plot(ebsd['Forsterite'], key)                    # by an orientation colour key
+    plot(ebsd['Forsterite'], rgb)                    # by colours of one's own, n x 3
+    plot(ebsd[ebsd.mad > 1], faceColor='black', displayName='bad values')  # one colour, in the legend
+    plot(ebsd, region=(0, 400, 0, 200))              # a part of the map
+    plot(ebsd, backend='scatter', markerSize=2)      # the measurements as dots
+
+  The map is drawn in the plotting convention of its frame (ebsd.how2plot), with a scale bar
+  and the axes of the specimen frame in one corner. The colouring follows mapValues: the
+  phases by default, a value per measurement through a colour map, orientations through the
+  inverse pole figure key of their phase, an orientation colour key, an RGB colour per
+  measurement, or one colour for all. Measurements without an orientation are drawn as
+  nothing.
+
+  A map on a rigid lattice is drawn as an image of at most maxPixels pixels, twice the
+  resolution of the axes by default, so that a large map draws fast; a smaller one, or one
+  whose cells are outlined, as one polygon per cell; a map without a lattice as dots.
+  backend chooses: 'imagesc' the image, 'patch' the cells, 'scatter' the dots. MATLAB's flag
+  'points' is backend='scatter', its 'exact' a larger maxPixels or backend='patch'.
+
+  region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
+  coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
+  other than the map's, parent= the axes to draw into and figSize= the size of a new figure;
+  every other keyword goes to the matplotlib artist.
+
+  Input
+    ebsd - EBSD, a map of the plane
+    color - the colouring: an array of values or of RGB colours, orientations, an
+        orientationColorKey, a crystalShape drawn at every measurement, a property name,
+        'phase', 'orientation' or one colour
+  Output
+    h - the matplotlib image, collection or scatter drawn; MATLAB's second output, the map
+        plot, is h.axes' mapPlot
+  Keywords
+    faceColor - one colour for every measurement; 'none' outlines the cells
+    backend - 'imagesc', 'patch' or 'scatter', as above
+    colormap - the colour map of values, a name of MTEX's or matplotlib's
+    colorRange - (lo, hi), the values the colour map spans
+    colorbar - add a colour bar for values
+    micronbar - draw the scale bar; by default the preference showMicronBar
+    refFrame - draw the axes of the specimen frame in the scale bar box
+    location - the corner of the scale bar, 'sw', 'se', 'nw' or 'ne'
+    ipfDirection - vector3d, colour by orientation through the inverse pole figure key along
+        this specimen direction
+    maxPixels - the most pixels of the image drawn of a map on a rigid lattice
+    edgeColor - outline every cell in this colour
+    lineWidth - the width of the cell outlines
+    alpha - the opacity, one for all or one per measurement
+    legend - draw the legend of the phases or the inverse pole figure keys; by default for a
+        phase map
+    displayName - the name in a legend
+    markerSize - the size of the dots of backend='scatter'
+  See also
+    EBSDPlotting, EBSDIPFMap, EBSDAdvancedMaps, grain2d.plot, grainBoundary.plot, mapValues,
+    ipfColorKey"""
   color = colorRequest(color, faceColor, ipfDirection)
   # plot(ebsd, cS): the crystal shape at every measurement of its phase
   if isinstance(color, crystalShape):
@@ -508,14 +587,63 @@ def _onOff(v):
 def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRange=None, colorbar=False, micronbar=None, refFrame=True,
                location=None, ipfDirection=None, boundary=True, lineWidth=1.0, lineColor=None, alpha=1.0, legend=None, displayName=None,
                translucent=None, **kw: Unpack[PlotKeywords]):
-  """plot(grains), plot(grains, property), plot(grains, grains.meanOrientation)
+  """the grains of a map as polygons, coloured by phase, by a value or by orientation, with
+  their boundaries on top
 
-  The grains drawn as the polygons the boundary encloses, coloured by phase, by a value per
-  grain, by their mean orientations or an orientation key, or in one colour, with the
-  boundary on top unless noBoundary. translucent=s fades a grain by its colour, as MATLAB:
-  s (1 - min(r, g, b)) for a colour, s v / max(v) for a value, so pale grains let the map
-  below show.
-  """
+    plot(grains)                                     # colours by phase
+    plot(grains, grains.area, colorbar=True)         # colours by a value per grain
+    plot(grains['Forsterite'], grains['Forsterite'].meanOrientation)  # by mean orientation
+    plot(grains, ipfDirection=xvector)               # every phase by its inverse pole figure key along x
+    plot(grains, faceColor='none', lineColor='r')    # the outlines alone, in red
+    plot(grains, boundary=False, translucent=0.5)    # no boundary, faded by colour
+    plot(grains, faceColor='red', displayName='all grains')  # one colour, in the legend
+    plot(grains, cS)                                 # the crystal shape of every grain
+    plot(grains, v)                                  # an axis per grain as a needle
+
+  Every grain is one polygon with its holes, coloured as mapValues colours: by phase, by a
+  value per grain through a colour map, by orientations through the inverse pole figure key
+  of their phase, by an orientation colour key, by an RGB colour per grain or in one colour.
+  The boundary, grains.boundary, is drawn on top in lineColor, else in the face colour, else
+  black. A crystalShape draws the shape of every grain, rotated by its mean orientation, at
+  its centroid; a vector3d per grain an axis as a needle through it, its half pointing out of
+  the screen black and the other white.
+
+  translucent=s fades a grain by its colour, as MATLAB's 'translucent': the opacity of a grain
+  is s (1 - min(r, g, b)) for a colour and s v / max(v) for a value, so that pale grains let
+  what lies below show.
+
+  region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
+  coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
+  other than the map's, parent= the axes to draw into and figSize= the size of a new figure;
+  every other keyword goes to the matplotlib artist.
+
+  Input
+    grains - grain2d
+    color - the colouring: an array of values or of RGB colours, orientations, an
+        orientationColorKey, a crystalShape, a vector3d per grain, a property name, 'phase'
+        or one colour
+  Output
+    h - the matplotlib collection of the grains
+  Keywords
+    faceColor - one colour for every grain; 'none' draws the boundary alone
+    colormap - the colour map of values
+    colorRange - (lo, hi), the values the colour map spans
+    colorbar - add a colour bar for values
+    micronbar - draw the scale bar; by default the preference showMicronBar
+    refFrame - draw the axes of the specimen frame in the scale bar box
+    location - the corner of the scale bar, 'sw', 'se', 'nw' or 'ne'
+    ipfDirection - vector3d, colour by orientation through the inverse pole figure key along
+        this specimen direction
+    boundary - draw the grain boundary on top, MATLAB's flag noBoundary as boundary=False
+    lineWidth - the width of the boundary
+    lineColor - the colour of the boundary
+    alpha - the opacity of the grains
+    legend - draw the legend of the phases or the inverse pole figure keys; by default for a
+        phase map
+    displayName - the name in a legend
+    translucent - s, the opacity of a grain following its colour, as above
+  See also
+    GrainSpatialPlots, EBSD.plot, grainBoundary.plot, mapValues, crystalShape"""
   alpha = kw.pop("faceAlpha", alpha)
   color = colorRequest(color, faceColor, ipfDirection)
   # plot(grains, v): an axis per grain as a compass needle at its centroid
@@ -639,11 +767,41 @@ def _boundaryLines(mP, gB, color, lineWidth, zorder=3, **kw):
 @_liftable
 def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis", colorRange=None, colorbar=False, edgeAlpha=1.0,
                  micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
-  """plot(gB), plot(gB, values), plot(gB, rgb), plot(gB, lineColor='r', lineWidth=2)
+  """the grain boundary segments, in one colour or coloured segment by segment
 
-  The grain boundary segments: as joined chains in one colour, or segment by segment with
-  a value or a colour per segment, angle(gB.misorientation) say.
-  """
+    plot(grains.boundary)                            # all boundaries in black
+    plot(grains.innerBoundary, lineColor='r', lineWidth=2)  # the subgrain boundaries in red
+    plot(gB, gB.misorientation.angle() / degree, colorbar=True)  # by misorientation angle
+    plot(gB, rgb)                                    # by an RGB colour per segment, n x 3
+    plot(gB, edgeAlpha=a)                            # a transparency per segment
+
+  Without values the boundary is drawn as joined chains in one colour; a value per segment
+  colours it through a colour map, an RGB triple per segment directly, both segment by
+  segment with round caps, so that a staircase reads as one line. A boundary draws no phase
+  legend. MATLAB's edgeColor is a synonym of lineColor here too.
+
+  region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
+  coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
+  other than the map's, parent= the axes to draw into and figSize= the size of a new figure;
+  every other keyword goes to the matplotlib artist.
+
+  Input
+    gB - grainBoundary
+    color - an array of a value or of an RGB colour per segment
+  Output
+    h - the matplotlib line or line collection
+  Keywords
+    lineColor - the colour of the boundary without values
+    lineWidth - the width of the lines
+    colormap - the colour map of values
+    colorRange - (lo, hi), the values the colour map spans
+    colorbar - add a colour bar for values
+    edgeAlpha - the opacity, one for all or one per segment between 0 and 1
+    micronbar - draw the scale bar; by default the preference showMicronBar
+    refFrame - draw the axes of the specimen frame in the scale bar box
+    displayName - the name in a legend
+  See also
+    BoundaryPlots, grain2d.plot, EBSD.plot, triplePointList.plot"""
   from matplotlib.collections import LineCollection
   # a boundary is lines: MATLAB's edge colour is their colour
   lineColor = kw.pop("edgeColor", lineColor)
@@ -696,8 +854,40 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
 
 def plotTriplePoints(tP, color=None, markerFaceColor=None, markerEdgeColor=None, markerSize=6, lineWidth=1.0, colormap="viridis",
                      colorRange=None, colorbar=False, micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
-  """plot(tP), plot(tP, values): the triple points of a boundary network as circles, filled
-  by a value where one is given"""
+  """the triple points of a boundary network as circles, open or filled by a value
+
+    plot(grains.triplePoints)                        # black circles
+    plot(grains.triplePoints, color='r')             # red circles
+    plot(tP, values, colorbar=True)                  # filled by a value per point
+    plot(tP, markerFaceColor='b', markerEdgeColor='w', markerSize=4)  # filled in one colour
+
+  A triple point list drawn on its own opens a map of its own; drawn into a held map plot it
+  marks the points of that map. Without values the circles are open, edged in the colour
+  given, else black; values fill them through a colour map.
+
+  region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
+  coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
+  other than the map's, parent= the axes to draw into and figSize= the size of a new figure;
+  every other keyword goes to the matplotlib artist.
+
+  Input
+    tP - triplePointList
+    color - a value per triple point, or the name of a colour
+  Output
+    h - the matplotlib scatter, None when there are no points
+  Keywords
+    markerFaceColor - the fill of the circles without values
+    markerEdgeColor - the edge colour of the circles
+    markerSize - the size of the circles, in points
+    lineWidth - the width of the circles' edge
+    colormap - the colour map of values
+    colorRange - (lo, hi), the values the colour map spans
+    colorbar - add a colour bar for values
+    micronbar - draw the scale bar; by default the preference showMicronBar
+    refFrame - draw the axes of the specimen frame in the scale bar box
+    displayName - the name in a legend, which joins the legend of the map
+  See also
+    TriplePoints, grainBoundary.plot, grain2d.plot"""
   mapKw = _splitMap(kw)
   mP = _target(tP, mapKw)
   P = mP.onScreen(np.asarray(tP.V).reshape(-1, 2))
@@ -796,11 +986,39 @@ def textMap(x, labels, fontSize=None, color="k", **kw: Unpack[PlotKeywords]):
 
 def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, projectIntoPlane=False,
               antipodal=False, **kw: Unpack[PlotKeywords]):
-  """quiver(grains, v), quiver(ebsd, v), quiver(gB, v): an arrow per grain at its centroid,
-  per measurement, per segment at its midpoint; an axis is centred, a direction starts there.
-  By default an arrow is a fifth of the grain's diameter, one and a half spacings of a map,
-  three median segment lengths of a boundary; scale draws it scale times its in-plane length.
-  """
+  """arrows on a map: one per grain at its centroid, per measurement, or per boundary segment
+  at its midpoint
+
+    quiver(grains, grains.meanOrientation * Miller(1, 0, 0, cs, 'uvw'))  # a direction per grain
+    quiver(ebsd, v, color='w')                       # an arrow per measurement
+    quiver(gB, gB.direction, autoScaleFactor=0.5)    # a needle per boundary segment
+    quiver(grains, v, antipodal=True)                # axes, centred on the centroids
+    quiver(grains, v, scale=10)                      # scale times the length of v
+
+  A direction starts at its point, an axis (an antipodal vector, or antipodal=True) is centred
+  on it. By default an arrow of a grain is a fifth of its diameter, of a map one and a half
+  spacings, of a boundary three median segment lengths, and is drawn as its projection onto
+  the map, so that a direction steep to the map is short. scale=s draws every arrow s times
+  the length of its vector in the plane instead, scaling=False at the length of the vector
+  itself. Into a held map plot the arrows go on top of it, else into a map of their own.
+
+  Input
+    x - grain2d, EBSD or grainBoundary
+    v - vector3d, one per grain, measurement or segment
+  Output
+    h - the matplotlib quiver or line collection
+  Keywords
+    scale - draw every arrow scale times its length in the plane of the map
+    color - the colour of the arrows; for grains by default the next of the axes' colours
+    lineWidth - the width of the arrows
+    scaling - scale the arrows to the automatic length; False draws them at their own length
+    displayName - the name in a legend
+    autoScaleFactor - a factor on the automatic length
+    projectIntoPlane - let the arrow of a grain start at its centroid even when its direction
+        points into the map, where it would otherwise end there
+    antipodal - draw the vectors as axes, centred on their points
+  See also
+    grain2d.plot, EBSD.plot, Annotations"""
   from matplotlib.collections import LineCollection
   refuseVariants(kw)
   mapKw = _splitMap(kw)
@@ -908,8 +1126,32 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, 
 # ------------------------------------------------------------------ the scale bar and the legends
 
 def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, length=None):
-  """a scale bar in one corner of a map: a round length near a tenth of its width, over the
-  length it stands for, and above it the axes of the specimen frame as they lie in the picture"""
+  """a scale bar in one corner of a map: a round length near a tenth of its width, written
+  above the bar, and above it the axes of the specimen frame as they lie on the screen
+
+    label = scaleBarOn(mP)                           # in the lower left corner
+    label = scaleBarOn(mP, location='ne', length=500, color='w', background='k')  # 500 um, white on black
+
+  Every map plot draws one unless micronbar=False, so this is what to call to draw one into a
+  map plot without, or to draw it again elsewhere; it replaces the bar the map plot had. The
+  length is a round number near fraction of the width of the map, in a unit that keeps it
+  readable (nm, um, mm).
+
+  Input
+    mP - mapPlot, the map plot to draw into, mapPlot(h.axes, ebsd) of a map drawn as h
+    x - the map or grains drawn; the extent is taken from mP, so it may be left out
+  Output
+    label - str, the length written on the bar, None when the map has no extent
+  Keywords
+    location - the corner, 'sw', 'se', 'nw' or 'ne'
+    fraction - the length of the bar as a fraction of the width of the map, about
+    refFrame - draw the axes of the specimen frame above the bar
+    color - the colour of the bar, the text and the frame of the box
+    background - the colour of the box
+    alpha - the opacity of the box
+    length - the length of the bar in the map's unit instead of a round one
+  See also
+    EBSD.plot, scaleBar, EBSDPlotting"""
   from matplotlib.patches import Polygon, Rectangle
   ax = mP.ax
   mP.scaleBarArgs = dict(location=location, fraction=fraction, refFrame=refFrame, color=color, background=background, alpha=alpha,
@@ -990,8 +1232,29 @@ def keyResolution(px):
 
 
 def keyLegend(mP, x, ipfDirection=None, width=0.28, resolution=None):
-  """the inverse pole figure key of every indexed phase present, drawn in insets beside the map,
-  a sector reaching into both hemispheres as two; returns the inset axes"""
+  """the inverse pole figure key of every indexed phase in a map, drawn in insets to the right
+  of the map
+
+    axs = keyLegend(mP, ebsd)                        # the keys along z
+    axs = keyLegend(mP, ebsd, ipfDirection=xvector, width=0.2)  # along x, narrower
+
+  A map coloured by orientation draws these itself with legend=True. Every phase present
+  gets the HSV key of its frame, titled by its mineral, one row each; a fundamental sector
+  that reaches into both hemispheres, of a group without the inversion, takes two insets in
+  its row, the upper hemisphere above the lower.
+
+  Input
+    mP - mapPlot, the map plot beside which the keys go
+    x - EBSD or grain2d, whose phases are shown
+  Output
+    axs - list of the inset axes
+  Keywords
+    ipfDirection - vector3d, the specimen direction of the colouring; the keys, which live in
+        crystal coordinates, are the same for every direction
+    width - the width of an inset, as a fraction of the width of the map axes
+    resolution - the mesh of a key in radians; by default from the size of the inset
+  See also
+    ipfHSVKey, plotKey, EBSD.plot, EBSDIPFMap"""
   from .directionkeys import HSVDirectionKey
   from .spherical import makeSphericalProjection
   from .sphericalplot import plotKey
@@ -1036,13 +1299,37 @@ def _imageOutline(mg):
 
 
 def plotMapImage(mg, channel=None, edge=False, micronbar=None, refFrame=True, colormap=None, layout=None, figSize=None, **kw: Unpack[PlotKeywords]):
-  """plot(mg), plot(imgList), plot(imgList, edge=True), plot(mg, channel=1)
+  """an image, or a list of them, drawn where it sits on the specimen, in the specimen's
+  coordinates and in the screen orientation of its frame
 
-  An image drawn where it sits on the specimen, in the screen orientation of its frame; a list
-  of images one axes each, titled by their names. One channel is grey through the colour map,
-  three are drawn as RGB; edge draws the edge transform a registration matches on, its
-  contrast stretched over the 2nd to 98th percentile.
-  """
+    plot(mg)                                         # one image
+    plot(imgList)                                    # one axes per image, titled by its name
+    plot(imgList, edge=True)                         # the edge transform of each
+    plot(mg, channel=1)                              # one channel of a multi-channel image
+    plot(mg, micronbar=False, colormap='parula')     # no scale bar, another colour map
+    plot(ebsd, ebsd.bc); hold(True); plot(mg, alpha=0.5)  # an image over its map
+
+  An image is drawn in micrometres, not pixels, in the screen orientation its frame takes,
+  so that an image and the map it is aligned to lie on top of each other without either
+  being turned first. One channel is drawn in gray through the colour map, three as RGB. A
+  list or mapImageList draws one axes per image, the quick check that a sequence covers the
+  same area the same way up. edge=True draws edgeMap(mg), what a registration matches on,
+  its contrast stretched over the 2nd to 98th percentile.
+
+  Input
+    mg - mapImage, or a list or mapImageList of them
+  Output
+    h - the matplotlib image, a list of them for a list
+  Keywords
+    channel - the channel, or the three channels, to draw; by default all
+    edge - draw the edge transform of the image instead of its values
+    micronbar - draw the scale bar; by default the preference showMicronBar
+    refFrame - draw the axes of the specimen frame in the scale bar box
+    colormap - the colour map of a single channel, gray by default
+    layout - (rows, columns) of the axes of a list
+    figSize - the size of a new figure of a list
+  See also
+    mapImage, edgeMap, xcfShift, EBSDMapsAndImages"""
   from ..maps.mapimage import edgeMap, mapImage
   from .mtexfigure import newMtexFigure, nextAxis
   kw = mapAliases(kw)

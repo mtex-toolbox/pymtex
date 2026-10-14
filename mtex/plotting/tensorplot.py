@@ -43,12 +43,31 @@ def _anisotropy(hi, lo):
 
 
 def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False, colormap="red2blue", density=None, **kw: Unpack[PlotKeywords]):
-  """plotSeismicVelocities(C): the overview of the wave velocities of a stiffness tensor
+  """the overview of the seismic wave velocities of a stiffness tensor, six pole figures;
+  MATLAB's stiffnessTensor/plotSeismicVelocities
 
-  Six charts in two rows: Vp, the S-wave anisotropy, Vs1 with its polarisation, Vs2 with
-  its polarisation, Vp/Vs1 and Vp/Vs2, each with the maximum as a black square and the
-  minimum as a white circle, the anisotropy in percent under it, red slow to blue fast.
-  """
+    plotSeismicVelocities(C)                         # the overview, upper hemisphere
+    plotSeismicVelocities(C, lower=True, symmetriseMinMax=True)  # lower, extrema with their equivalents
+    plotSeismicVelocities(C, density=3.355)          # with a density not stored on C
+
+  Six charts in two rows: Vp, the S-wave anisotropy 200 (Vs1 - Vs2) / (Vs1 + Vs2), Vs1 with
+  the polarisation of the fast S-wave, Vs2 with that of the slow one, Vp/Vs1 and Vp/Vs2,
+  each with its maximum as a black square and its minimum as a white circle, the
+  anisotropy in percent under it, red slow to blue fast as seismology colours it. The
+  velocities are in km/s for a stiffness in GPa and a density in g/cm^3.
+
+  Input
+    C - stiffnessTensor, with its density stored (C.density) or given
+  Output
+    fig - the mtexFigure of the six charts
+  Keywords
+    symmetriseMinMax - mark every crystal direction equivalent to the extrema
+    markerSize - the size of the markers of the extrema
+    lower - the lower hemisphere instead of the upper
+    colormap - the colour map of the charts
+    density - the density in g/cm^3; by default C.density
+  See also
+    velocity, stiffnessTensor, plotPF, WaveVelocities, CPOSeismicProperties"""
   from ..analysis.elasticity import velocity
   from ..functions.handles import S2FunHandle
   from ..functions.s2axisfield import S2AxisFieldHandle

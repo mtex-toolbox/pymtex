@@ -26,11 +26,40 @@ from ..geometry.display import aligned, frameLabel
 
 
 class EBSD3(EBSD):
-  """the measurements of a volume, a list or an (n1, n2, n3) array of voxels with their positions,
-  rotations and phases, the voxel lattice inferred from the positions when not given
+  """the measurements of a volume: positions, rotations and phase ids of voxels with the list of
+  the phases' frames and the properties of every measurement
 
-    ebsd = EBSD3(pos, rot, phaseId, CSList)
-    ebsd = EBSD3(pos, rot, phaseId, CSList, prop={'ci': ci})"""
+    ebsd = EBSD3(pos, rot, phaseId, CSList)                     # the voxels as a list
+    ebsd = EBSD3(pos, rot, phaseId, CSList, prop={'ci': ci})    # with properties
+    ebsd = EBSD3(pos, rot, phaseId, CSList, D=D)                # the steps of the voxel lattice stated
+    ebsd = EBSD3square(rot, phaseId, CSList, dxyz=(dx, dy, dz))  # an (n1, n2, n3) array of voxels
+
+  A volume is the three dimensional EBSD: a list of voxels, or the same arrays of shape
+  (n1, n2, n3), ebsd[i, j, k] one voxel, where orientation gradients are available along all
+  three axes. phaseId indexes CSList, 0 the not indexed phase. The voxel lattice, the origin
+  and the three steps d1, d2, d3, is inferred from the positions when it is not given, the
+  shortest independent differences to the neighbours or the rows of D; positions on no
+  lattice leave ebsd.lattice None. EBSD3.load reads the volumes of DREAM.3D and Neper.
+
+  Input
+    pos - vector3d, or an (..., 3) array, the centres of the voxels
+    rotations - rotation, the rotation of every voxel
+    phaseId - int array, the phase of every voxel as the index into CSList
+    CSList - phaseList, or a list of crystalFrame with 'notIndexed' first
+    prop - dict, a property per voxel of the shape of the volume
+  Output
+    ebsd - EBSD3
+  Keywords
+    scanUnit - the unit of the positions
+    frame - specimenFrame of the positions, by default that of pos or the default one
+    lattice - voxelLattice of the positions, when it is known, instead of inferring it
+    meta - dict, what a file states besides the measurements
+    phaseMap - the phase number the file gives each entry of CSList
+    id - the id of every voxel, by default its position in the list
+    isPadding - the mask of the cells a grid adds to close it
+    D - 3 x 3 array, the steps of the voxel lattice as rows, instead of inferring them
+  See also
+    EBSD3square, EBSD, voxelLattice, calcGrains, grain3d, EBSD3Analysis"""
 
   def __init__(self, pos, rotations, phaseId, CSList, prop=None, scanUnit="um", frame=None, lattice=None, meta=None,
                phaseMap=None, id=None, isPadding=None, D=None):
@@ -266,8 +295,32 @@ class EBSD3(EBSD):
 
 def EBSD3square(rotations, phaseId=None, CSList=None, dxyz=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), scanUnit="um", frame=None,
                 prop=None, D=None):
-  """EBSD3square(rot, phaseId, CSList, dxyz): a volume on its (n1, n2, n3) array, the voxel
-  (i, j, k) at origin + (i dx, j dy, k dz), as MATLAB's EBSD3square builds one"""
+  """a volume on its (n1, n2, n3) array of voxels, on a rectangular lattice
+
+    ebsd = EBSD3square(rot, phaseId, CSList, dxyz=(dx, dy, dz))           # the voxel size
+    ebsd = EBSD3square(rot, phaseId, CSList, dxyz=0.5, origin=(10, 0, 0))  # a cube voxel, moved
+    ebsd = EBSD3square(rot, phaseId, CSList, D=D)                          # any steps, as rows of D
+
+  The voxel [i, j, k] sits at origin + i d1 + j d2 + k d3, the steps (dx, 0, 0), (0, dy, 0),
+  (0, 0, dz) or the rows of D; the positions are built from them, as MATLAB's EBSD3square
+  does from its voxel size. MATLAB's class EBSD3square is an EBSD3 of three dimensions here,
+  ebsd.isGridded; MATLAB passes the positions and the phaseMap too.
+
+  Input
+    rotations - rotation of shape (n1, n2, n3)
+    phaseId - int array of the same shape, the phase as the index into CSList, all 1 by default
+    CSList - phaseList, or a list of crystalFrame with 'notIndexed' first
+  Output
+    ebsd - EBSD3
+  Keywords
+    dxyz - the voxel size (dx, dy, dz), or one number for all three
+    origin - the position of the voxel [0, 0, 0]
+    scanUnit - the unit of the positions
+    frame - specimenFrame of the positions, by default the default one
+    prop - dict, a property per voxel of the shape of the volume
+    D - 3 x 3 array, the steps of the lattice as rows, instead of dxyz
+  See also
+    EBSD3, EBSDsquare, voxelLattice"""
   from ..geometry.quaternion import rotation
   from ..geometry._array import MtexArray
   rot = rotations if isinstance(rotations, MtexArray) else rotation(rotations)

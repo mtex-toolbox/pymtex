@@ -185,16 +185,48 @@ def _globalSearch(mori, p2c, h, tau, searchResolution, scanSample, numLocal, max
 
 def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, maxIteration=30, maxSample=50000,
                      searchResolution=4 * degree, scanSample=250, numLocal=5, verbose=True, fit=False):
-  """calcParent2Child(c2c, p2c0), calcParent2Child(childOri, p2c0), calcParent2Child(c2c, p2c0, local=True)
+  """the parent to child orientation relationship that fits child to child misorientations
+  best, refined from an initial guess
 
-  The parent to child orientation relationship fitted to child to child misorientations,
-  or to pairs of child orientations: the trimmed chordal misfit of the misorientations to
-  the nearest child to child misorientation the relationship predicts, minimised by a
-  fixed point iteration from p2c0 and, unless local, from the best basins of a scan over
-  the misorientation space. quantile is the share of the misorientations the fit is based
-  on, misorientations misfitting by more than threshold are treated as outliers; with
-  fit=True the disorientation angle of every misorientation to the result comes too.
-  """
+    p2c = calcParent2Child(c2c, p2c0)                           # from child to child misorientations
+    p2c = calcParent2Child(childOri, p2c0)                      # from pairs of child orientations
+    p2c = calcParent2Child(c2c, p2c0, quantile=0.8)             # the fit on the best 80 percent
+    p2c = calcParent2Child(c2c, p2c0, local=True)               # iterate from p2c0 only
+    p2c, fit = calcParent2Child(c2c, p2c0, fit=True)            # with the misfit of every misorientation
+
+  Two children of one parent grain are related by a misorientation the relationship predicts,
+  V_i^-1 V_j for two of its variants. The relationship minimises the trimmed chordal misfit
+  of the measured misorientations to the nearest predicted one, the share quantile of the
+  smallest misfits, by a fixed point iteration; unless local, the iteration also starts from
+  the best basins of a scan over the space of relationships, so that a poor start still
+  finds the global minimum. Pairs of child orientations, an (n, 2) array in the specimen
+  frame, are turned into their misorientations. The progress is reported unless
+  verbose=False.
+
+  Input
+    c2c - orientation, child to child misorientations
+    childOri - orientation, (n, 2) pairs of child orientations
+    p2c0 - orientation, the initial guess of the parent to child relationship
+  Output
+    p2c - orientation, the fitted parent to child relationship
+    fit - the disorientation angle of every misorientation to the nearest predicted one
+  Keywords
+    local - iterate from p2c0 only, without the scan
+    quantile - the share of the misorientations the fit is based on
+    threshold - misorientations misfitting by more than this angle are outliers
+    maxIteration - the largest number of iterations
+    maxSample - fit on at most this many misorientations, a random subsample of the rest
+    searchResolution - the resolution of the grid of the scan
+    scanSample - the number of misorientations that rank the basins of the scan
+    numLocal - the number of basins of the scan fitted locally
+    verbose - report the progress
+    fit - also return the misfit of every misorientation, MATLAB's second output
+  References
+    T. Nyyssonen et al., Crystallography, morphology, and martensite transformation of prior
+        austenite in intercritically annealed high-aluminum steel, Metall. Mater. Trans. A 49
+        (2018), doi:10.1007/s11661-018-4904-9
+  See also
+    calcParent, parentGrainReconstructor.calcParent2Child, misfit, OrientationRelationshipFit"""
   if isinstance(mori.frameB, specimenFrame):
     mori = mori.reshape(-1, 2)
     mori = mori[:, 0].inv() * mori[:, 1]
@@ -294,19 +326,41 @@ def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):
 # ------------------------------------------------------------------ the parent of children
 
 def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 * degree):
-  """parentOri, fit = calcParent(childOri, p2c)               the parent of the children of one grain
-  parentOri, fit = calcParent(childOri, parentOri, p2c)       the parent variant of every child
-  parentOri, fit = calcParent(childPairs, p2c)                the variant pair of every boundary
-  parentOri, fit = calcParent(childTriples, p2c)              the variant triple of every triple point
+  """the parent orientations of child orientations under a parent to child orientation
+  relationship, with their fit
 
-  The parent of many children of one grain: every child proposes its parent variants, the
-  proposal the others agree with best is refined as their weighted mean. For a child with a
-  parent orientation, one or one for all, the candidate of the child nearest it; for pairs and
-  triples of children the candidates that agree best on a parent, and their disorientation;
-  numFit gives the best few instead of one. With id=True the one based ids of the parent
-  variants instead of the orientations, child * PV[id] being the parent. The fit is the
-  disorientation to the relationship.
-  """
+    parentOri, fit = calcParent(childOri, p2c)                 # the parent of the children of one grain
+    parentOri, fit = calcParent(childOri, p2c, weights=w)      # the children weighted
+    parentOri, fit = calcParent(childOri, parentOri, p2c)      # the parent variant of every child
+    parentId, fit = calcParent(childOri, parentOri, p2c, id=True)  # its id instead
+    parentId, fit = calcParent(childOri, parentOri, p2c, numFit=2, id=True)  # the two best
+    parentOri, fit = calcParent(childPairs, p2c)               # the variant pair of every boundary
+    parentOri, fit = calcParent(childTriples, p2c)             # the variant triple of every triple point
+
+  The parent of many children of one grain: every child proposes its parent variants, and the
+  proposal the others agree with best is refined as their weighted mean. With a parent
+  orientation, one or one per child, every child takes the parent variant nearest it. For
+  pairs and triples of children, an (n, 2) or (n, 3) array as a boundary or a triple point
+  gives them, the parent variants that agree best on a parent, the fit their disorientation.
+  numFit returns the best few instead of one, along a last axis. With id=True the one based
+  ids of the parent variants, childOri * p2c.variants(parent=True)[id - 1] being the parent.
+
+  Input
+    childOri - orientation of the child phase; (n, 2) pairs or (n, 3) triples of them
+    parentOri - orientation of the parent phase, one or one per child
+    p2c - orientation, the parent to child orientation relationship, or its inverse
+  Output
+    parentOri - orientation of the parent phase
+    parentId - the one based parent variant ids
+    fit - the disorientation angle to the relationship, in radians
+  Keywords
+    numFit - the number of best fits to return
+    id - return the parent variant ids instead of the orientations
+    weights - the weights of the children of one grain in the mean
+    threshold - the largest disagreement of the first pair of a triple that is considered
+  See also
+    calcParent2Child, orientation.variants, parentGrainReconstructor, calcVariantId,
+    MaParentGrainReconstruction"""
   parentOri = None
   if len(args) == 2:
     parentOri, p2c = args
@@ -502,10 +556,34 @@ def _roundSet(v, style, maxIndex):
 
 
 def round2Miller(mori, penalty=0.002, maxIndex=None, nextFit=1):
-  """hkl, uvw = round2Miller(ori): the plane and the direction of the crystal along the
-  specimen z and x, as their nearest low indices; n1, n2, d1, d2 = round2Miller(mori): the
-  parallel planes and the parallel directions of the two crystals the misorientation
-  relates, the smallest indices that fit best, penalty weighing the size of the indices"""
+  """the lattice planes and directions of low indices an orientation or a misorientation aligns
+
+    hkl, uvw = round2Miller(ori)                           # the plane normal along z and the direction along x
+    n1, n2, d1, d2 = round2Miller(mori)                    # the parallel planes and directions of two crystals
+    n1, n2, d1, d2 = round2Miller(mori, penalty=0.01)      # smaller indices preferred more
+    n1, n2, d1, d2 = round2Miller(mori, maxIndex=6)        # indices up to 6
+    n1, n2, d1, d2 = round2Miller(mori, nextFit=2)         # the second best fit
+
+  For an orientation the plane (hkl) and the direction [uvw] of the crystal along the
+  specimen z and x, rounded to the nearest low indices. For a misorientation the planes n1,
+  n2 and the directions d1, d2, d1 in n1, with mori * n1 = n2 and mori * d1 = d2 as nearly
+  as indices up to maxIndex allow: every candidate's misfit angle plus penalty times the
+  size of its indices is minimised. The result displays as a table of the parallel planes
+  and directions with the angle the relation makes to the misorientation; a list of
+  misorientations gives lists.
+
+  Input
+    ori - orientation, crystal to specimen
+    mori - orientation, a misorientation between two crystals
+  Output
+    hkl, uvw - Miller, the plane normal and the direction
+    n1, n2, d1, d2 - Miller, the parallel planes and directions
+  Keywords
+    penalty - the weight of the size of the indices against the misfit angle
+    maxIndex - the largest index, 4 for a misorientation and 12 for an orientation by default
+    nextFit - which fit to return, 1 the best
+  See also
+    CSL, orientation.map, orientation.KurdjumovSachs, Miller.round"""
   if isinstance(mori.frameB, specimenFrame) or not isinstance(mori.frameB, crystalFrame):
     # the plane and the direction are rounded in their own indices, over MATLAB's twelve
     inv = mori.inv()

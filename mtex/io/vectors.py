@@ -27,17 +27,36 @@ COORDINATES = {"x": "x", "y": "y", "z": "z",
 
 
 def loadVector3d(fname, columnNames=None, columns=None, radians=False, delimiter=None, header=None):
-  """the directions a text table holds, and the other columns it names
+  """the directions a text table holds, read by the names of its coordinate columns, and the
+  other columns it names
 
-    loadVector3d('vectors.txt', columnNames=['polar angle', 'azimuth angle'])
-    loadVector3d('vectors.txt', columnNames=['x', 'y', 'z', 'weight'])   S['weight'] alongside
-    loadVector3d('vectors.txt', columnNames=[...], columns=[1, 0])       the columns the names sit in, from zero
-    loadVector3d('vectors.txt')                                          the names on the line above the block
+    v, S = loadVector3d('vectors.txt')                 # the names on the line above the numbers
+    v, S = loadVector3d('vectors.txt', columnNames=['polar angle', 'azimuth angle'])  # polar angles in degrees
+    v, S = loadVector3d('vectors.txt', columnNames=['x', 'y', 'z', 'weight'])  # Cartesian, with a weight in S
+    v, S = loadVector3d('vectors.txt', columnNames=['latitude', 'longitude'], columns=[1, 0])  # the columns the names sit in
+    v = vector3d.load('vectors.txt')                   # the directions alone
 
-  The coordinates are x, y, z, kept at their length; polar and azimuth, colatitude and
-  longitude, or latitude and longitude, angles in degrees unless radians=True, read as unit
-  directions.
-  """
+  The coordinates are x, y, z, kept at their length, or two angles read as unit directions:
+  the polar angle (colatitude) from z and the azimuth (longitude) in the xy plane, or the
+  latitude from the xy plane and the longitude. A name is matched without regard to case.
+  Every other named column comes back in S, a dict of one array per name.
+
+  Without columnNames the last header line names the columns, when it names coordinates;
+  the header ends at the first row of numbers.
+
+  Input
+    fname - str, the name of a text file
+  Output
+    v - vector3d, the directions
+    S - dict, the columns that are not coordinates, by name
+  Keywords
+    columnNames - the names of the columns, in their order in the file or in columns
+    columns - the positions of the named columns, counted from zero
+    radians - the angles are in radians, not degrees
+    delimiter - the delimiter between the numbers, blank space by default
+    header - the number of header lines, found from the first row of numbers by default
+  See also
+    exportVector3d, vector3d.byPolar, loadPoleFigure, loadOrientation"""
   data = readFile(fname)
   head, offset = _tableStart(data, header, delimiter)
   if offset is None:

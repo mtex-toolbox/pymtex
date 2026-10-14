@@ -34,7 +34,32 @@ DISSOLVE_BLOCK = 1 << 22
 
 
 def classix(X, radius, minPts=1, mergeScale=1.5, mergeTiny=True):
-  """one cluster label per row of X, counted from zero"""
+  """CLASSIX, fast and explainable clustering based on sorting: one cluster label per row of
+  X, counted from zero
+
+    labels = classix(X, radius)                                    # every row its cluster
+    labels = classix(X, radius, minPts=10, mergeTiny=False)        # no cluster below 10 points, small groups kept apart
+
+  The data are centred, scaled by their median norm and sorted along their first principal
+  axis. In that order every point not yet grouped starts a group of the points within the
+  radius, groups whose starting points lie within mergeScale times the radius are merged
+  into clusters, and a cluster of fewer than minPts points is dissolved, its groups joining
+  the nearest group of a large enough cluster.
+
+  Input
+    X - ndarray (n, d), a point per row; a vector is a column
+    radius - the radius of the groups, in the scaled coordinates
+  Output
+    labels - ndarray of n ints, the cluster of every row counted from zero
+  Keywords
+    minPts - the smallest cluster; smaller ones are dissolved into their neighbours
+    mergeScale - groups whose centres are closer than mergeScale times the radius are merged
+    mergeTiny - whether groups of fewer than minPts points take part in the merging
+  References
+    X. Chen, S. Guettel, Fast and explainable clustering based on sorting, arXiv:2202.01456
+        (2022)
+  See also
+    calcCluster, ClusterDemo"""
   X = np.asarray(X, dtype=float)
   if X.ndim == 1:
     X = X[:, None]
@@ -154,12 +179,56 @@ def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1
   """the clusters of directions or orientations: one cluster id per element, counted from
   zero, and the centre of every cluster
 
-    cId, center = calcCluster(v)                                          directions by CLASSIX
-    cId, center = calcCluster(ori, method='classix', radius=0.1, minPoints=15)
-    cId, center = calcCluster(ori)                                        the modes of the density
-    cId, center = calcCluster(ori, method='hierarchical', maxAngle=15*degree)
-    cId, center = calcCluster(v, method='hierarchical', numCluster=5)
-  """
+    cId, center = calcCluster(v)                                   # directions by CLASSIX
+    cId, center = calcCluster(ori)                                 # orientations by the modes of their density
+    cId, center = calcCluster(ori, method='classix', radius=0.1, minPoints=15)  # orientations by CLASSIX
+    cId, center = calcCluster(ori, method='odf', halfwidth=3*degree, numCluster=5)  # the five largest modes
+    cId, center = calcCluster(ori, method='hierarchical', maxAngle=15*degree)  # merged until the centres are 15 degree apart
+    cId, center = calcCluster(v, method='hierarchical', numCluster=5)  # merged until five clusters are left
+
+  Three methods. CLASSIX, the default for directions, sorts the points along their first
+  principal axis, groups them within a radius and merges the groups whose centres are close;
+  directions are clustered on their coordinates, axes (antipodal) on the rank one tensor
+  that identifies v with -v, orientations on the embedding that carries the symmetry. The
+  density method, the default for orientations, computes the kernel density of the
+  orientations and follows every orientation uphill to its mode; the largest modes are the
+  centres, and an orientation further from its centre than twice the mean angle gets no
+  cluster, NaN in cId. The hierarchical method merges the closest pair of centres, their
+  mean weighted by the points behind them, until numCluster clusters are left or the
+  closest centres are more than maxAngle apart; more than 1000 orientations are binned on a
+  grid of the resolution first.
+
+  The centres are the means of the clusters, symmetry reduced for orientations and axis
+  means for antipodal directions; cId has the shape of the input.
+
+  Input
+    v - vector3d, the directions
+    ori - orientation, the orientations
+  Output
+    cId - ndarray of ints, the cluster of every element counted from zero, a float array
+        with NaN for the orientations the density method leaves out
+    center - vector3d or orientation, the centre of every cluster
+  Keywords
+    method - 'classix' (default for directions), 'odf' (default for orientations, the modes
+        of the density) or 'hierarchical'; may also be given positionally
+    radius - the radius of the CLASSIX groups, in the scaled coordinates; by default
+        estimated from the distance to the tenth nearest neighbour
+    minPoints - the smallest cluster of CLASSIX, smaller ones are dissolved into the nearest
+        larger one; by default one percent of the points
+    mergeScale - CLASSIX merges groups whose centres are closer than mergeScale times the
+        radius
+    numCluster - the number of clusters of the hierarchical method (2 if neither it nor
+        maxAngle is given), or the number of modes the density method keeps (at most 20)
+    maxAngle - the hierarchical method stops when the closest centres are further apart
+    halfwidth - the halfwidth of the kernel of the density method
+    weights - a weight per element, for the density and the hierarchical method
+    resolution - the grid the hierarchical method bins more than 1000 orientations on
+    verbose - accepted for MATLAB's 'silent'; nothing is reported
+  References
+    X. Chen, S. Guettel, Fast and explainable clustering based on sorting, arXiv:2202.01456
+        (2022)
+  See also
+    classix, calcComponents, calcDensity, ClusterDemo"""
   for a in args:
     if isinstance(a, str):
       method = a

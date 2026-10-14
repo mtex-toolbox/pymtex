@@ -228,10 +228,37 @@ def _WignerD(g, degree=None, *, bandwidth=None, dtype=None):
 
 
 def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
-  """MATLAB's WignerD(R, n): the matrix of MTEX's Wigner functions, the internal one transposed
-  with the signs s_k s_l, s_m = -1 for odd m > 0, the basis the public coefficients fhat are
-  taken in; normalize=True scales by sqrt(2n + 1), so that f(R) = sum fhat_n^{kl} D_n^{kl}(R);
-  WignerD(beta, n) the real Wigner-d matrix at the second Euler angle"""
+  """the Wigner-D matrices of rotations, or the Wigner-d matrices of a second Euler angle, of one
+  degree or of all degrees up to a bandwidth
+
+    Dl = WignerD(g, l)                       # the (2l+1) x (2l+1) matrix of degree l
+    Dl = WignerD(g, l, normalize=True)       # L2 normalised, times sqrt(2l + 1)
+    D = WignerD(g, bandwidth=L)              # the list of the matrices of degree 0 to L
+    dl = WignerD(beta, l)                    # the real Wigner-d matrix at the second Euler angle
+    P = WignerD(cs, l)                       # the mean over the symmetries of a frame
+
+  The matrices are MTEX's Wigner functions, the basis the public coefficients fhat of an
+  SO3FunHarmonic are taken in: with normalize=True, f(g) = sum fhat_n^{kl} D_n^{kl}(g). A
+  list of rotations gives the matrices stacked in front, (..., 2l+1, 2l+1). For a frame or a
+  point group the matrices are averaged over its rotations, the projection onto the functions
+  invariant under the group; these are in the internal basis of docs/design/harmonics.md
+  and normalize does not apply to them. MATLAB's kernel option is not there.
+
+  Input
+    g - rotation, orientation or quaternion
+    beta - the second Euler angle in [0, pi]
+    cs - crystalFrame or point group
+    degree - the degree l of a single matrix
+  Output
+    Dl - (..., 2l+1, 2l+1) complex array
+    D - list of the matrices of degree 0 to L
+    dl - (2l+1) x (2l+1) real array
+  Keywords
+    bandwidth - all degrees up to this one, instead of a single degree
+    normalize - multiply the matrix of degree n by sqrt(2n + 1)
+    dtype - the NumPy type of the matrices
+  See also
+    sphericalY, SO3FunHarmonic, SO3FunHarmonicRepresentation"""
   L, single = _degrees(degree, bandwidth)
   if isinstance(g, (int, float, np.floating, np.integer)):
     mats = [wignerd(float(g), n) for n in range(L + 1)]

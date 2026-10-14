@@ -40,12 +40,29 @@ class S2Fun:
 
   @staticmethod
   def smiley(v=None, exact=False, even=False, **kwargs):
-    """the smiley test function on the sphere
+    """the smiley, a test function on the sphere whose face shows where a plot puts the axes
 
-      sF = S2Fun.smiley(bandwidth=256)  # its harmonic expansion by quadrature
-      values = S2Fun.smiley(v)  # its values at the directions v
-      sF = S2Fun.smiley(exact=True)  # the function itself, as a handle
-      sF = S2Fun.smiley(even=True)  # the smiley on both hemispheres, an antipodal function"""
+      sF = S2Fun.smiley()                    # its harmonic expansion by quadrature
+      sF = S2Fun.smiley(bandwidth=256)       # of a given bandwidth
+      values = S2Fun.smiley(v)               # its values at the directions v
+      sF = S2Fun.smiley(exact=True)          # the function itself, as a handle
+      sF = S2Fun.smiley(even=True)           # on both hemispheres, an antipodal function
+
+    The face is a sum of quadratic splines of the cosine about nine centres, the head, two eyes,
+    the mouth and the nose; it reads upright in the convention 'y↑→x'. The even smiley adds
+    its reflection through the origin, so it takes the same value at v and -v. Further
+    keywords go to S2FunHarmonic.quadrature.
+
+    Input
+      v - vector3d, directions to evaluate at
+    Output
+      sF - S2FunHarmonic, or S2FunHandle with exact=True
+      values - array of the shape of v
+    Keywords
+      exact - return the function as an S2FunHandle instead of its expansion
+      even - the antipodal smiley, the face also on the lower hemisphere
+    See also
+      S2FunHarmonic.quadrature, S2Fun.unimodal, S2FunHarmonicRepresentation"""
     from .handles import S2FunHandle
     from .s2fun import S2FunHarmonic
     if isinstance(v, vector3d):
@@ -57,8 +74,26 @@ class S2Fun:
 
   @staticmethod
   def unimodal(v=None, halfwidth=25 * degree, psi=None):
-    """a de la Vallee Poussin bump of the halfwidth given, or the kernel psi, about the direction v
-    (the north pole by default), as a harmonic expansion"""
+    """a unimodal function on the sphere, a radial kernel about one direction, as a harmonic
+    expansion
+
+      sF = S2Fun.unimodal()                          # about the north pole, halfwidth 25 degree
+      sF = S2Fun.unimodal(halfwidth=10*degree)       # another halfwidth
+      sF = S2Fun.unimodal(v, psi=psi)                # the kernel psi about the direction v
+
+    The function is the de la Vallee Poussin kernel of the halfwidth, or the kernel psi, turned
+    from the north pole to v. MATLAB's S2Fun.unimodal(v, psi) takes the kernel positionally;
+    here it is the keyword psi.
+
+    Input
+      v - vector3d, the direction of the maximum, by default the north pole
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      halfwidth - the halfwidth of the de la Vallee Poussin kernel
+      psi - S2Kernel, the kernel instead
+    See also
+      S2DeLaValleePoussinKernel, S2Fun.smiley, S2Kernels"""
     from ..geometry.quaternion import rotation
     from .kernelfunctions import S2DeLaValleePoussinKernel
     from .s2fun import S2FunHarmonic

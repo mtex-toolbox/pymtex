@@ -171,12 +171,41 @@ def _asAxes(axes):
 
 class symmetry:
   """a point group: the closure of the generators its Hermann-Mauguin symbol names, written in
-  the given axes; also from its elements or its number among the point groups, the Laue classes
-  or the space groups
+  given axes
 
-    pg = symmetry('m-3m')
-    pg = symmetry(pointId=32)
-    pg = symmetry(spaceId=225)"""
+    pg = symmetry('m-3m')                              # by its international symbol
+    pg = symmetry('D2')                                # by its Schoenflies symbol or an alias
+    pg = symmetry(spaceId=225)                         # the point group of a space group
+    pg = symmetry(pointId=45)                          # by its number in symmetry.pointGroups
+    pg = symmetry('2', abg=[90*degree, 100*degree, 90*degree])  # the monoclinic setting from the lattice angles
+    pg = symmetry(rotation.byAxisAngle(zvector, 90*degree))  # the group the elements generate
+
+  A group says nothing about where it acts: whether it describes a crystal or a specimen, and
+  in which coordinate system, is the business of the frame carrying it, crystalFrame or
+  specimenFrame, which builds its group from the same symbol. The elements are built from the
+  symbol in the order of its generators, as orthogonal transforms, proper rotations and
+  rotoinversions; nothing refers to an element by its position.
+
+  A symbol of a monoclinic group, '2', 'm' or '2/m', names no unique axis; with the lattice
+  angles abg the unique axis is the one whose angle is not 90 degree, as MATLAB.
+
+  Input
+    name - str, the Hermann-Mauguin or Schoenflies symbol, a lattice name or an alias such as
+        'orthotropic'; or rotation or orthogonalTransform, elements that generate the group;
+        or a symmetry to copy; the triclinic group '1' when omitted
+    axes - vector3d or an array (3, 3), the axes a, b, c the elements are written along;
+        x, y, z when omitted
+  Output
+    pg - symmetry, with pg.pointGroup its symbol, pg.rot its elements, pg.id its number
+  Keywords
+    pointId - the number of the group in symmetry.pointGroups, 1 to 47
+    laueId - the number of a Laue class, 1 to 11
+    spaceId - the number of a space group, 1 to 230, which gives its point group
+    abg - the lattice angles alpha, beta, gamma in radians, which choose the unique axis of
+        a monoclinic group
+  See also
+    crystalFrame, specimenFrame, symmetry.fundamentalSector, symmetry.fundamentalRegion,
+    CrystalSymmetries"""
 
   def __init__(self, name: PointGroupName | Any = None, axes=None, *, pointId=None, laueId=None, spaceId=None, abg=None):
     if isinstance(name, symmetry):
@@ -402,8 +431,38 @@ class symmetry:
   # ------------------------------------------------------------------ regions
 
   def fundamentalSector(self, center=None, antipodal=False, angle=None):
-    """the fundamental sector of the group on the sphere: the conventional one where it is a
-    fundamental domain, else the Dirichlet domain; with center that centre's Dirichlet domain"""
+    """the fundamental sector of the group on the sphere, the region of the directions one
+    symmetric copy of each falls into
+
+      sR = pg.fundamentalSector()                        # the conventional sector
+      sR = pg.fundamentalSector(antipodal=True)          # with the inversion added
+      sR = pg.fundamentalSector(center=vector3d(1, 2, 3))  # the Dirichlet domain about a centre
+      sR = pg.fundamentalSector(angle=55*degree)         # the rotation axes allowed at one rotation angle
+
+    The sector is the conventional one, the sector an inverse pole figure shows, wherever it is
+    a fundamental domain of the group, which it is for every crystal symmetry; for a group
+    turned against its axes it is a Dirichlet domain. With a centre it is
+    the Dirichlet domain of that centre, the directions nearer to it than to any of its
+    symmetric copies.
+
+    With an angle it is the sector of rotation axes the fundamental region of orientations
+    allows at that rotation angle: small circles about the symmetry axes, of radius set by the
+    angle and the fold of the axis; MATLAB intersects them with the conventional sector, here
+    they stand alone.
+
+    A frame's fundamentalSector places the sector by the frame's plotting convention; a group
+    has no convention and places it on x, y, z.
+
+    Input
+      pg - symmetry
+    Output
+      sR - sphericalRegion
+    Keywords
+      center - vector3d, the centre of a Dirichlet domain
+      antipodal - add the inversion to the group, the sector of axes
+      angle - the rotation angle of misorientations, in radians, whose allowed axes are sought
+    See also
+      sphericalRegion, symmetry.fundamentalRegion, conventionalSector, dirichletSector, CrystalSymmetries"""
     from .sphericalregion import fundamentalSector
     return fundamentalSector(self, center=center, antipodal=antipodal, angle=angle)
 

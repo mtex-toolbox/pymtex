@@ -382,10 +382,35 @@ class spatialTransformProjective(spatialTransform):
 
   @staticmethod
   def fit(posA, posB, weights=None, robust=True, maxIter=50):
-    """the homography of the direct linear transform, robustly reweighted. Both point sets are
-    first moved to their centroid and scaled to a mean distance of sqrt(2), Hartley's
-    normalisation: without it the algebraic residual weighs the points by their distance from
-    the origin, and ten percent of outliers can hold the reweighting in a wrong basin"""
+    """the homography best mapping the positions posA onto posB, by the direct linear transform
+
+      T = spatialTransformProjective.fit(posA, posB)               # robust against outliers
+      T = spatialTransformProjective.fit(posA, posB, weights=w)    # the points weighted
+      T = spatialTransformProjective.fit(posA, posB, robust=False) # plain least squares
+
+    The equations x' (h31 x + h32 y + 1) = h11 x + h12 y + h13, and likewise for y', are solved
+    by least squares, both coordinates under one scale, reweighted against outliers with
+    Tukey's bisquare. Both point sets are first moved to their centroid and scaled to a mean
+    distance of sqrt(2), Hartley's normalisation: without it the algebraic residual weighs the
+    points by their distance from the origin, and ten percent of outliers can hold the
+    reweighting in a wrong basin. A point with a missing position or no weight is dropped; at
+    least four points are needed.
+
+    Input
+      posA - vector3d, the positions in the first frame
+      posB - vector3d, where they went in the second, one for each
+    Output
+      T - spatialTransformProjective, T * posA close to posB
+    Keywords
+      weights - array, the weight of every point pair
+      robust - reweight against outliers with Tukey's bisquare
+      maxIter - the largest number of reweighting steps
+    References
+      R. Hartley, In defense of the eight-point algorithm, IEEE Transactions on Pattern
+          Analysis and Machine Intelligence 19 (1997) 580-593
+    See also
+      spatialTransformPoly.fit, spatialTransformProjective.byTilt, spatialTransformTilt,
+      transform"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     if len(x) < 4:
       raise ValueError(f"a homography needs at least four points, got {len(x)}")
@@ -455,8 +480,30 @@ class spatialTransformPoly(spatialTransform):
 
   @staticmethod
   def fit(posA, posB, weights=None, degree=1, robust=True, maxIter=50):
-    """the polynomial displacement fitted to point pairs by least squares, reweighted against outliers
-    with Tukey's bisquare unless robust=False"""
+    """the polynomial displacement best mapping the positions posA onto posB
+
+      T = spatialTransformPoly.fit(posA, posB)                     # an affine map
+      T = spatialTransformPoly.fit(posA, posB, degree=2)           # a quadratic displacement
+      T = spatialTransformPoly.fit(posA, posB, degree=2, weights=w, robust=False)  # weighted least squares
+
+    The displacement posB - posA is fitted over the basis [1 x y], or [1 x y x^2 xy y^2] for
+    degree 2, by least squares, reweighted against outliers with Tukey's bisquare. A point with
+    a missing position or no weight is dropped; degree 1 needs at least three points, degree 2
+    six.
+
+    Input
+      posA - vector3d, the positions in the first frame
+      posB - vector3d, where they went in the second, one for each
+    Output
+      T - spatialTransformPoly, T * posA close to posB
+    Keywords
+      weights - array, the weight of every point pair
+      degree - 1 or 2, the degree of the polynomial
+      robust - reweight against outliers with Tukey's bisquare
+      maxIter - the largest number of reweighting steps
+    See also
+      spatialTransformProjective.fit, spatialTransformDrift.fit, spatialTransformTilt,
+      transform"""
     dx, dy, w, x, y = fitData(posA, posB, weights)
     B = polyBasis(x, y, degree)
     if B.shape[0] < B.shape[1]:
@@ -525,7 +572,31 @@ class spatialTransformDrift(spatialTransform):
 
   @staticmethod
   def fit(posA, posB, weights=None, slowScan=None, extrapolate=False, **kwargs):
-    """a linear spline through the median displacement of every scan line"""
+    """a drift along the slow scan direction, the linear spline through the median displacement
+    of every scan line
+
+      T = spatialTransformDrift.fit(posA, posB)                      # scan lines along x
+      T = spatialTransformDrift.fit(posA, posB, slowScan=xvector)    # scan lines along y
+      T = spatialTransformDrift.fit(posA, posB, extrapolate=True)    # continued beyond the lines
+
+    The points of one scan line share their coordinate along the slow scan direction, up to
+    rounding; each line becomes a knot with the median displacement of its points. The median
+    rather than the mean: a line crossing a badly correlated patch is not pulled by it. The
+    weights only drop the points of weight zero, since one number per line leaves nothing for
+    them to outvote.
+
+    Input
+      posA - vector3d, the positions in the first frame
+      posB - vector3d, where they went in the second, one for each
+    Output
+      T - spatialTransformDrift, a knot per scan line
+    Keywords
+      weights - array, a weight per point pair; zero drops a point
+      slowScan - vector3d, the slow scan direction, by default y
+      extrapolate - continue the end segments beyond the first and last line, where the
+          drift is otherwise NaN
+    See also
+      spatialTransformPoly.fit, spatialTransformField, transform"""
     dx, dy, _, x, y = fitData(posA, posB, weights)
     sc = np.array([0.0, 1.0, 0.0]) if slowScan is None else _xyz(slowScan)[0]
     sc = sc / np.linalg.norm(sc)

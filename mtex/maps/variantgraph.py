@@ -33,9 +33,28 @@ def _sparse(r, c, v, n):
 # ------------------------------------------------------------------ the grain graph
 
 def calcGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, c2c=False):
-  """job.calcGraph(threshold=2.5*degree, tol=2.5*degree): job.graph, a node per grain
-  and between neighbours the probability that the misfit of their boundary to the
-  relationship still means one parent"""
+  """the graph of the grains for a parent grain reconstruction, job.graph; MATLAB's calcGraph of
+  parentGrainReconstructor
+
+    job.calcGraph()                                        # the default probabilities
+    job.calcGraph(threshold=2.5*degree, tol=2.5*degree)    # another misfit at probability 1/2
+    job.calcGraph(c2c=True)                                # the child to child boundaries only
+
+  A node per grain, and between neighbouring grains the probability that the misfit of their
+  boundary to the orientation relationship still means one parent: a cumulative Gaussian of
+  the misfit with the mean threshold and the spread tol. The child to child and the parent to
+  child boundaries are both used unless one of them is asked for. The job is changed in place.
+
+  Input
+    job - parentGrainReconstructor with its orientation relationship job.p2c
+  Keywords
+    threshold - the misfit at which the probability is 1/2
+    tol - the range about threshold over which the probability goes from 1 to 0
+    p2c - the parent to child boundaries only
+    c2c - the child to child boundaries only
+  See also
+    parentGrainReconstructor.clusterGraph, parentGrainReconstructor.calcGBFit,
+    parentGrainReconstructor.calcVariantGraph, GrainGraphBasedReconstruction"""
   fit, pairs = job.calcGBFit(p2c=p2c, c2c=c2c)
   prob = probabilityOf(fit, threshold, tol)
   pos = job.grains._positions()
@@ -253,12 +272,38 @@ def _layout(job, numV):
 
 def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p=False, c2c=False, mergeSimilar=False,
                      diagonal=True):
-  """job.calcVariantGraph(threshold=3.5*degree, tol=1.5*degree): job.graph, the variant
-  graph: a node per child grain and parent variant and one per parent grain, and an edge
-  where two neighbours agree - child to child over every pair of variants, parent to child
-  over the variants that fit the parent, parent to parent over their orientations - with
-  the probability of the agreement. mergeSimilar joins the variants within 8 degrees of
-  one another into one node; votes of the job restrict every grain to its best variant"""
+  """the variant graph of a parent grain reconstruction, job.graph; MATLAB's calcVariantGraph of
+  parentGrainReconstructor
+
+    job.calcVariantGraph()                                     # the default probabilities
+    job.calcVariantGraph(threshold=3.5*degree, tol=1.5*degree) # another misfit at probability 1/2
+    job.calcVariantGraph(mergeSimilar=True)                    # similar variants as one node
+    job.calcVariantGraph(c2c=True)                             # the child to child boundaries only
+
+  A node per child grain and parent variant and one per parent grain. An edge joins two
+  nodes of neighbouring grains where they agree: child to child over every pair of variants,
+  parent to child over the variants that fit the parent, parent to parent over their
+  orientations, with the probability of the agreement, a cumulative Gaussian of the misfit
+  with the mean threshold and the spread tol. All three kinds are used unless some are asked
+  for. When the job holds votes, every grain is restricted to its best variant. The job is
+  changed in place; clusterVariantGraph clusters the graph.
+
+  Input
+    job - parentGrainReconstructor with its orientation relationship job.p2c
+  Keywords
+    threshold - the misfit at which the probability is 1/2
+    tol - the range about threshold over which the probability goes from 1 to 0
+    p2c - the parent to child boundaries
+    p2p - the parent to parent boundaries
+    c2c - the child to child boundaries
+    mergeSimilar - join the variants within 8 degrees of one another into one node
+    diagonal - put every node on the diagonal of the graph, the loops MCL needs
+  References
+    R. Hielscher, T. Nyyssönen, F. Niessen, A.A. Gazder, The variant graph approach to
+        improved parent grain reconstruction, Materialia 22 (2022) 101399
+  See also
+    parentGrainReconstructor.clusterVariantGraph, parentGrainReconstructor.calcParentFromVote,
+    parentGrainReconstructor.calcGraph, MaParentGrainReconstruction"""
   g = job.grains
   PV = job._PV()
   numV = len(PV)
@@ -320,12 +365,39 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
 
 def clusterVariantGraph(job, inflationPower=1.05, numIter=10, cutOff=1e-4, minCluster=4, includeSimilar=False, mergeSimilar=False,
                         pseudoDiagonal=True, sym=False, keepGraph=False, **graphOptions):
-  """job.clusterVariantGraph(includeSimilar=True): the variant graph (calcVariantGraph
-  first when there is none) clustered by MCL - expansion, inflation by inflationPower,
-  pruning below cutOff, the rows of every grain normalised together - over numIter steps;
-  the score of every node of a child grain whose cluster has minCluster members at least
-  becomes its vote, job.votes. includeSimilar lends a variant a tenth of the score of the
-  variants within 5 degrees, mergeSimilar all of it"""
+  """the variant graph clustered by the MCL algorithm generalised to the variants of a grain, the
+  votes for the parent orientations; MATLAB's clusterVariantGraph of parentGrainReconstructor
+
+    job.clusterVariantGraph()                                  # job.votes from the variant graph
+    job.clusterVariantGraph(includeSimilar=True)               # similar variants share their score
+    job.clusterVariantGraph(threshold=3*degree)                # the graph built first with these options
+    job.calcParentFromVote(minProb=0.5)                        # the parents from the votes
+
+  The variant graph is built by calcVariantGraph first when the job has none, with the
+  keywords left over. Then numIter steps of MCL: the expansion, the inflation by
+  inflationPower and the pruning below cutOff, the rows of the nodes of one grain normalised
+  together. The score of every node of a child grain whose cluster has at least minCluster
+  members becomes its vote, job.votes, the variants of every grain ordered by it. The graph is
+  removed unless keepGraph. The job is changed in place.
+
+  Input
+    job - parentGrainReconstructor with its orientation relationship job.p2c
+  Keywords
+    inflationPower - the inflation power of MCL
+    numIter - the number of iterations
+    cutOff - the entries below it are pruned in every iteration
+    minCluster - the least size of a cluster whose scores become votes
+    includeSimilar - a variant takes 0.9 of the score of the variants within 5 degrees
+    mergeSimilar - a variant takes the whole score of the variants within 5 degrees
+    pseudoDiagonal - keep the links between the variants of one child grain
+    sym - make the graph symmetric in every iteration, the geometric mean of both directions
+    keepGraph - keep the clustered graph in job.graph
+  References
+    R. Hielscher, T. Nyyssönen, F. Niessen, A.A. Gazder, The variant graph approach to
+        improved parent grain reconstruction, Materialia 22 (2022) 101399
+  See also
+    parentGrainReconstructor.calcVariantGraph, parentGrainReconstructor.calcParentFromVote,
+    parentGrainReconstructor.clusterGraph, MaParentGrainReconstruction"""
   if job.graph is None:
     job.calcVariantGraph(**graphOptions)
   A = job.graph.tocsr().astype(float)

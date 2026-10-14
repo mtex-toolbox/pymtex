@@ -53,9 +53,30 @@ class grain3d:
 
   @staticmethod
   def fromFaces(V, F, I_GF, ori=None, CSList=None, phaseId=None, frame=None):
-    """the grains of vertices, faces and the incidence of grains and faces, as MATLAB's
-    constructor: the face lies between the grain it is +1 for and the one it is -1 for, the
-    misorientation from the mean rotations, the voxels unknown"""
+    """the grains of vertices, faces and the incidence of grains and faces; MATLAB's grain3d
+    constructor
+
+      grains = grain3d.fromFaces(V, F, I_GF)                                  # the geometry only
+      grains = grain3d.fromFaces(V, F, I_GF, ori, CSList, phaseId)            # with phases and orientations
+
+    A face lies between the grain whose row of I_GF is +1 for it, the side its normal points
+    away from, and the one whose row is -1; a face with one grain only lies on the outer surface.
+    The misorientation of a face follows from the mean rotations of its two grains. Every grain
+    is of phase 1 when CSList has an indexed phase, else not indexed; the voxels are unknown.
+
+    Input
+      V - (n, 3) array or vector3d, the vertices
+      F - (m, 3) array of triangles, or a list of polygons, indices into V
+      I_GF - (grains x faces) array or sparse matrix of +1, -1 and 0
+      ori - rotation or orientation, or (grains, 4) quaternions, the mean rotation of every grain
+      CSList - phaseList, or a list of crystalFrame with 'notIndexed' first
+      phaseId - int array, the phase of every grain as the index into CSList
+    Output
+      grains - grain3d
+    Keywords
+      frame - specimenFrame of the vertices
+    See also
+      grain3d.load, calcGrains, grain3d.orientFaces, Grains3D"""
     from scipy.sparse import csr_matrix
     from ..geometry.frames import specimenFrame
     from ..geometry.kernels import qmul
@@ -198,7 +219,26 @@ class grain3d:
     return self._new(np.atleast_1d(rows))
 
   def rotate(self, rot, keepXY=False, keepEuler=False, center=(0.0, 0.0, 0.0)):
-    """the grains turned about a centre: their faces and, unless keepEuler, their orientations"""
+    """the grains turned about a centre, their faces and their orientations; MATLAB's rotate of
+    grain3d
+
+      grains = grains.rotate(rotation.byAxisAngle(xvector, 180*degree))       # about the origin
+      grains = grains.rotate(rot, center=vector3d(1, 1, 1))                   # about a point
+      grains = grains.rotate(rot, keepEuler=True)                             # the faces only
+      grains = grains.rotate(rot, keepXY=True)                                # the orientations only
+      grains = rot * grains                                                   # the same as rotate
+
+    Input
+      grains - grain3d
+      rot - rotation
+    Output
+      grains - grain3d, new
+    Keywords
+      keepXY - turn only the orientations, the faces stay
+      keepEuler - turn only the faces, the orientations stay
+      center - vector3d or (x, y, z), the point the faces turn about
+    See also
+      rotation.byAxisAngle, grain3d.centroid, Grains3DOperations"""
     R = rotation(rot.data if isinstance(rot, MtexArray) else rot)
     q = self.meanRotation.data.reshape(-1, 4)
     if not keepEuler:
