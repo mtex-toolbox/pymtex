@@ -56,9 +56,11 @@ name, lists every class and function by layer; `docs/site.py ../web` exports the
 the documentation pages (3045 pages), a Python-only name that a documentation page has already
 taken as `mtex.<name>` (`mtex.SchmidFactor`). A Jekyll build of a copy of the site (seven
 minutes, the gems outside the site, whose `exclude` replaces Jekyll's default) rendered them
-with every link resolved. Only the 1538 pages with a MATLAB twin enter `python_pages.yml`, which
-`topnav.html` inlines into every page: 38 KB of a reference page's 59 KB. A list the switch
-fetches once would remove that; it is a change on the site's side. `docs/reference.py` also writes the index pages by class
+with every link resolved. Only the 1538 pages with a MATLAB twin enter `python_pages.yml`. The site's
+switch (`../web` 2026-10-14) no longer inlines that list into every page, 38 KB of a reference
+page's 59 KB: a page carries `<meta name="mx-python">` when it has a twin, written at build time,
+and `js/mx-lang.js` fetches `python_pages.json` once for the links; a link followed before the
+list arrived opens MATLAB's page, which forwards. Checked in a headless browser on a built copy. `docs/reference.py` also writes the index pages by class
 and by layer (geometry, functions, tensors, maps, maps3d, analysis, io, plotting), Python's
 twin of `function_reference.md`. `docs/site.py` exports `docs/build/reference/` into
 `pages/function_reference_python/` with front matter (`sidebar: function_reference_sidebar`,
