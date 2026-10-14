@@ -283,7 +283,7 @@ def signature(name, obj):
 # the sections of a docstring, MATLAB's help blocks: a header line of its own, its entries
 # indented two spaces, 'name - text' for Input, Output and Keywords, a continuation indented
 # further
-SECTIONS = ("Input", "Output", "Keywords", "Properties", "References", "See also")
+SECTIONS = ("Input", "Output", "Keywords", "Properties", "Example", "References", "See also")
 
 
 def parseDoc(doc):
@@ -293,6 +293,9 @@ def parseDoc(doc):
   sections = {}
   for k, h in enumerate(heads):
     body = lines[h + 1:heads[k + 1] if k + 1 < len(heads) else len(lines)]
+    if lines[h] == "Example":
+      sections["Example"] = "\n".join(body).strip("\n")
+      continue
     entries = []
     for line in body:
       if not line.strip():
@@ -341,24 +344,27 @@ def renderForms(code, link):
   return out
 
 
-def docBody(doc, link):
+def docBody(doc, link, forms=True):
   out, code = [], []
+  def renderedCode(lines):
+    lines = "\n".join(lines).strip("\n").split("\n")
+    return renderForms(lines, link) if forms else ["```python", *lines, "```", ""]
   for line in doc.split("\n"):
     if line.startswith("  ") or (code and not line.strip()):
       code.append(line[2:])
       continue
     if code:
-      out += [""] + renderForms("\n".join(code).strip("\n").split("\n"), link)
+      out += [""] + renderedCode(code)
       code = []
     out.append(re.sub(r"`([A-Za-z_][\w.]*)`", link, line))
   if code:
-    out += [""] + renderForms("\n".join(code).strip("\n").split("\n"), link)
+    out += [""] + renderedCode(code)
   return "\n".join(out).strip("\n")
 
 
 # the sections as tables and lists: Input, Keywords with the default the signature gives,
 # Output, References a list, See also links
-def renderSections(sections, target, link, seeAlso):
+def renderSections(sections, target, link, seeAlso, exampleOutput=""):
   out = []
   try:
     params = inspect.signature(target).parameters if target is not None else {}
@@ -379,6 +385,8 @@ def renderSections(sections, target, link, seeAlso):
     out.append("")
   plain("Output")
   plain("Properties")
+  if "Example" in sections:
+    out += ["## Example", "", docBody(sections["Example"], link, forms=False), "", exampleOutput, ""]
   if "References" in sections:
     out += ["## References", ""] + [f"- {e}" for e in sections["References"]] + [""]
   if "See also" in sections:
@@ -452,7 +460,7 @@ def source(obj):
   return SOURCE.format(os.path.relpath(f, root), line)
 
 
-def render(name, entry_, pages, calls, owners, names=None, docPages=()):
+def render(name, entry_, pages, calls, owners, names=None, docPages=(), exampleOutput=""):
   kind, obj, cls, matlab = entry_
   member = name.split(".", 1)[1] if "." in name and kind in ("method", "property") else None
 
@@ -517,7 +525,7 @@ def render(name, entry_, pages, calls, owners, names=None, docPages=()):
       page = (own or found or [None])[0]
     return f"[{x}]({page}_py.html)" if page else x
 
-  lines += renderSections(sections, target, link, seeAlso)
+  lines += renderSections(sections, target, link, seeAlso, exampleOutput)
   if sig and "Keywords" not in sections:
     lines += ["## Signature", ""] + renderForms([sig], link)
   if kind == "class":
@@ -652,6 +660,35 @@ def writeNames(pages):
   return names
 
 
+# Execute the worked example as published, keeping its figures beside the built reference.
+# Calling forms under Syntax are deliberately not executed: their inputs are placeholders.
+def buildExample(name, example, directory):
+  import contextlib
+  import io
+  import matplotlib
+  matplotlib.use("Agg")
+  import matplotlib.pyplot as plt
+  os.makedirs(directory, exist_ok=True)
+  for f in os.listdir(directory):
+    if re.fullmatch(re.escape(name) + r"-\d+\.png", f):
+      os.remove(os.path.join(directory, f))
+  output, namespace = io.StringIO(), {"__name__": "__main__"}
+  code = re.findall(r"```python\n(.*?)```", docBody(example, lambda m: m.group(0), forms=False), re.S)
+  plt.close("all")
+  try:
+    with contextlib.redirect_stdout(output):
+      for block in code:
+        exec(compile(block, f"{name} example", "exec"), namespace)
+    rendered = ["```text\n" + output.getvalue().rstrip() + "\n```\n"] if output.getvalue().strip() else []
+    for k, number in enumerate(plt.get_fignums(), 1):
+      filename = f"{name}-{k:02d}.png"
+      plt.figure(number).savefig(os.path.join(directory, filename), dpi=120, bbox_inches="tight")
+      rendered.append(f"![Example output for {name}](figures/python_reference/{filename})\n")
+    return "\n".join(rendered)
+  finally:
+    plt.close("all")
+
+
 def build(names=()):
   pages = catalogue()
   calls, owners = pageCalls(pageSources()), memberOwners()
@@ -659,8 +696,10 @@ def build(names=()):
   chosen = [n for n in pages if not names or n in names]
   pyNames, docPages = pythonNames(pages), set(pageSources())
   for n in chosen:
+    _, sections = parseDoc(docOf(pages[n][1]))
+    exampleOutput = buildExample(n, sections["Example"], os.path.join(outDir, "images")) if "Example" in sections else ""
     with open(os.path.join(outDir, n + ".md"), "w", encoding="utf-8") as fh:
-      fh.write(render(n, pages[n], pages, calls, owners, pyNames, docPages))
+      fh.write(render(n, pages[n], pages, calls, owners, pyNames, docPages, exampleOutput))
   if not names or INDEX in names:
     chosen.append(INDEX)
     with open(os.path.join(outDir, INDEX + ".md"), "w", encoding="utf-8") as fh:

@@ -131,6 +131,45 @@ def test_class_properties_are_rendered_as_a_table(rendered):
   assert "## References" in page
 
 
+def test_slip_system_example_runs_and_its_figure_is_exported(tmp_path, monkeypatch, pages):
+  import numpy as np
+  from PIL import Image
+  name = "crystalShape.plotSlipSystem"
+  _, sections = ref.parseDoc(ref.docOf(pages[name][1]))
+  build = tmp_path / "reference"
+  output = ref.buildExample(name, sections["Example"], build / "images")
+  filename = name + "-01.png"
+  pixels = np.array(Image.open(build / "images" / filename).convert("RGB")).astype(int)
+  # The executed example must draw both systems, not merely create an empty figure.
+  assert np.count_nonzero(pixels[:, :, 0] - pixels[:, :, 2] > 80) > 100
+  assert np.count_nonzero(pixels[:, :, 2] - pixels[:, :, 0] > 80) > 100
+  page = ref.render(name, pages[name], pages, {}, {}, exampleOutput=output)
+  assert "## Example" in page and "figures/python_reference/" + filename in page
+  (build / (name + ".md")).write_text(page)
+  spec = importlib.util.spec_from_file_location("docs_site", os.path.join(ROOT, "docs", "site.py"))
+  site = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(site)
+  monkeypatch.setattr(site, "referenceDir", str(build))
+  destination = tmp_path / "site"
+  site.exportReference(str(destination), {name: name})
+  assert (destination / "figures" / "python_reference" / filename).read_bytes() == (build / "images" / filename).read_bytes()
+  assert "## Example" in (destination / "pages" / "function_reference_python" / (name + ".md")).read_text()
+
+
+def test_example_keeps_indented_code_and_comments_between_prose(tmp_path):
+  example = """Add three terms.
+
+  total = 0
+  for k in range(3):  # retain the loop body in this block
+    total += k
+
+Print the result in a later block.
+
+  print(total)
+"""
+  assert "```text\n3\n```" in ref.buildExample("sum", example, tmp_path)
+
+
 def test_class_constants_show_their_own_help(rendered):
   assert "identity" in rendered["rotation.id"]
   assert "unit vector along x" in rendered["vector3d.X"]

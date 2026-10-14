@@ -13,6 +13,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 
 import numpy as np
@@ -204,8 +205,10 @@ def referenceFrontMatter(title, name, matlab):
 def exportReference(site, reference):
   out = os.path.join(site, "pages", "function_reference_python")
   os.makedirs(out, exist_ok=True)
+  used = set()
   for n, matlab in reference.items():
     md = open(os.path.join(referenceDir, n + ".md"), encoding="utf-8").read()
+    used.update(re.findall(r"\]\(figures/python_reference/([^/()]+\.png)\)", md))
     title, _, text = md.partition("\n")
     page = referenceFrontMatter(title[2:].strip(), n, matlab) + "\n{% raw %}\n" + text.strip("\n") + "\n{% endraw %}\n"
     path = os.path.join(out, n + ".md")
@@ -214,6 +217,16 @@ def exportReference(site, reference):
   for f in os.listdir(out):
     if f.endswith(".md") and f[:-3] not in reference:
       os.remove(os.path.join(out, f))
+  # Reference examples are executed by docs/reference.py; publish their captured figures.
+  images = os.path.join(site, "figures", "python_reference")
+  if used:
+    os.makedirs(images, exist_ok=True)
+    for filename in used:
+      shutil.copyfile(os.path.join(referenceDir, "images", filename), os.path.join(images, filename))
+  if os.path.isdir(images):
+    for filename in os.listdir(images):
+      if filename.endswith(".png") and filename not in used:
+        os.remove(os.path.join(images, filename))
   # the page of every Python name, for the links in the code of the pages (js/mx-reflinks.js)
   with open(os.path.join(root, "mtex", "io", "referencenames.json"), encoding="utf-8") as fh:
     names = {k: v for k, v in json.load(fh).items() if v in reference}
