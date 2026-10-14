@@ -4,11 +4,13 @@
 name: tests
 
 on:
+  # the pages, the benchmarks and the notes leave the tests alone, but for the function
+  # reference, which tests/test_reference.py checks
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "bench/**", "tools/graph/**", "**.md", "**.ipynb"]
+    paths: ["**", "!docs/**", "docs/reference.py", "docs/reference-matlab.txt", "!bench/**", "!tools/graph/**", "!**.md", "!**.ipynb"]
   pull_request:
-    paths-ignore: ["docs/**", "bench/**", "tools/graph/**", "**.md", "**.ipynb"]
+    paths: ["**", "!docs/**", "docs/reference.py", "docs/reference-matlab.txt", "!bench/**", "!tools/graph/**", "!**.md", "!**.ipynb"]
   workflow_dispatch:
   workflow_call:
 
