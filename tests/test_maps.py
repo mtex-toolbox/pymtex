@@ -167,6 +167,17 @@ def test_mapPoints_underAFlipNegateY():
   assert np.allclose(mapPoints(ebsd, layout=flipLayout()), mapPoints(ebsd) * [1, -1])
 
 
+# a convention read in the plane of a map: a map in the yz plane under the view along x shows y to the
+# right and z up, and under a convention whose screen is another plane its own coordinates
+def test_mapLayout_readsTheConventionInThePlaneOfTheMap():
+  from mtex.maps.lattice import mapPlane
+  y, z = np.meshgrid(np.arange(4.0), np.arange(3.0), indexing="ij")
+  pl = mapPlane(np.stack([np.full(y.size, 2.0), y.ravel(), z.ravel()], -1))
+  L = mapLayout(plottingConvention(xvector, yvector), pl)
+  assert np.allclose(L @ [pl.e1 @ [0, 1, 0], pl.e2 @ [0, 1, 0]], [1, 0]) and np.allclose(L @ [pl.e1[2], pl.e2[2]], [0, 1])
+  assert np.array_equal(mapLayout(plottingConvention(-zvector, xvector), pl), np.eye(2))
+
+
 # the default layout is the session's convention, y down under ij
 def test_mapLayout_defaultIsYDown():
   assert np.array_equal(mapLayout(), [[1, 0], [0, -1]])

@@ -121,8 +121,9 @@ symmetry as a dropdown over the point groups, `a b c α β γ` each under its ow
 the cells the lattice forces greyed background and all, and the alignment as a dropdown over
 the twelve setups; at the right end of the row the inverse pole figure key of one phase, at a
 fixed size, the phase picked by a click on its row of the table and named in bold there; and under them the tab
-strip over one canvas: *phase*, *IPF X*, *IPF Y*, *IPF Z*, one tab per property, *pole
-figures*, *images* where the file brought one, coloured by category, a strip of
+strip over one canvas: *phase*, *IPF X*, *IPF Y*, *IPF Z*, *pole figures*, one tab per
+property, *images* where the file brought one, each on a light ground of its category's colour
+(the images in the ink of the pictures in the metadata tree), a strip of
 one tab hidden. A property map carries a colour bar; the pole figures carry editable Miller
 labels and the Euler frame's axes in red; the window opens on *IPF Z* when anything is
 indexed. Every panel in a `#c8c8c8` frame, the numeric columns right aligned, two font sizes.
@@ -323,8 +324,9 @@ its maximum off), and when it arrives the pole figures are drawn off the screen 
 of the event loop, at the canvas's size, as a picture the tab shows pixel for pixel
 (`figimage`): the tab opens in 30 to 50 ms, 120 ms on 1C_1. Not on the worker thread, since
 matplotlib's fonts are shared between figures. The picture is keyed by the density, the
-directions, the Euler names and the canvas's size, so the Miller bar keeps its room when hidden
-and the canvas has one size on every tab. The charts are evaluated at 1.5 degree (3 showed the facets of the grid), the row laid out
+directions, the Euler names and the canvas's size, the size the tab shows it at: the Miller bar
+floats over the canvas and takes no room, and the height the section bar of a volume gives back
+on the tab is added to the size drawn ahead (`poleFigureSize`). The charts are evaluated at 1.5 degree (3 showed the facets of the grid), the row laid out
 in a band as tall as it needs across the middle, the titles without padding. The window's font
 reaches matplotlib through `guiFont` (the family Qt resolves its generic one to, mathtext in the
 same family); the bar is mathtext's `\bar` now wherever a spherical plot writes a Miller index
@@ -530,15 +532,17 @@ view of a map, and a layer of a volume is a map, so a volume is shown one sectio
 2. **The import and the state. DONE.** `startImport` reads a volume with `loadEBSD3`. `st.ebsd`
    is the volume, `st.section` the map the views draw (the map itself for a 2D file),
    `st.sectionAxis` and `st.sectionIndex` say which layer, the middle one across z on import;
-   `sectionOf(ebsd, axis, index)` takes the layer as a 2D `EBSD` with the two coordinates along
-   it as x and y, `setSection` moves it and announces `section`.
+   `sectionOf(ebsd, axis, index)` takes the layer as a 2D `EBSD` in the plane of the layer, its
+   voxels where they lie in space, `setSection` moves it and announces `section`.
 3. **The views. DONE.** The canvas draws `st.section`, always as a picture; `SectionBar` under
-   it is the x | y | z choice, a slider through the layers and the layer in words (its number,
-   where it lies, and which axes of the volume the picture shows as x and y). Another layer
+   it is the x | y | z choice, a slider through the layers and the layer in words (its number
+   and where it lies). A layer across z is drawn under the map convention, one across x or y
+   in a side view, z up and the other axis to the right (`sectionConvention`), so that the
+   triad names the axes the picture shows; `mapLayout(pC, plane)` reads a convention in the
+   plane of the map for this. Another layer
    across the same axis keeps the picture and takes new colours, 55 to 130 ms a step on a
    333 x 333 layer of 13 million voxels, where drawing it anew took 170 to 600. The pole
-   figures are those of the whole volume, thinned as a large map is. The triad of the picture
-   still names its axes x and y for a section across x or y: a frame cannot rename them.
+   figures are those of the whole volume, thinned as a large map is.
 4. **The script. DONE.** `buildImportWizardScript(..., volume=True)` and `loadCall` write
    `EBSD3.load(fname)`; the wizard returns the `EBSD3`.
 5. **The frames. DONE.** The Euler coordinates of a volume are corrected as those of a map:

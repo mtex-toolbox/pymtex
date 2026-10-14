@@ -426,7 +426,7 @@ class DataSetList(QListWidget):
 
 # ------------------------------------------------------------------ the file information
 
-PICTURE_INK = "#1f4e79"   # a leaf of the metadata that is a picture, and can be looked at
+PICTURE_INK = "#e65100"   # a leaf of the metadata that is a picture, and can be looked at; the images tab's ink
 
 
 class InfoTree(QTreeWidget):

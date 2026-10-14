@@ -278,9 +278,9 @@ def mapPicture(sources, pixels=1600):
   from matplotlib.backends.backend_agg import FigureCanvasAgg
   from matplotlib.figure import Figure
 
-  from .maps import mapExtent, mapLayout
+  from .maps import mapExtent, mapLayout, planeOf
   plotFun, x, args, kw = sources[0]
-  xlo, xhi, ylo, yhi = mapExtent(x, mapLayout(kw.get("how2plot")))
+  xlo, xhi, ylo, yhi = mapExtent(x, mapLayout(kw.get("how2plot"), planeOf(x)))
   w, h = xhi - xlo, yhi - ylo
   scale = pixels / max(w, h)
   fig = Figure(figsize=(max(w * scale, 2) / 100, max(h * scale, 2) / 100), dpi=100)

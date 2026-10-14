@@ -14,6 +14,7 @@ import numpy as np
 from ..geometry.frames import closestAlignment, crystalFrame, notIndexedFrame
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, closestConvention, plottingConvention
 from ..geometry.units import degree
+from ..geometry.vector3d import xvector, yvector
 from ..io.importscript import buildImportWizardScript, frameKey
 from ..io.inspect import ebsdFiles, inspectEBSD, isEBSDFile
 from ..maps.phaselist import phaseList
@@ -272,8 +273,8 @@ def commitMap(st, ebsd, seconds):
 
 def sectionOf(ebsd, axis=2, index=None):
   """the layer of a volume across an axis (0, 1, 2 for x, y, z) as a map, the middle one by
-  default: the two coordinates along the layer are its x and y, the orientations and the
-  properties those of its voxels; a map is its own section"""
+  default: a map in the plane of the layer, its voxels where they lie in space, with their
+  orientations and properties; a map is its own section"""
   if ebsd.ndim != 3:
     return ebsd
   from ..maps.ebsd import EBSD, _rotations
@@ -282,15 +283,21 @@ def sectionOf(ebsd, axis=2, index=None):
   def layer(a):
     return np.take(a, index, axis=axis)
 
-  along = layer(ebsd.pos.data)
-  pos = np.zeros(along.shape)
-  pos[..., :2] = along[..., [a for a in range(3) if a != axis]]
   prop = {k: layer(v) for k, v in ebsd.prop.items() if np.ndim(v) >= 3}
   # the cell of the layer is the voxel's face, known and not inferred from the positions
-  du, dv = (ebsd.lattice.spacing[a] / 2 for a in range(3) if a != axis)
-  cell = np.array([[du, dv, 0], [-du, dv, 0], [-du, -dv, 0], [du, -dv, 0]])
-  return EBSD(pos, _rotations(np.ascontiguousarray(layer(ebsd.rotations.data))), layer(ebsd.phaseId), ebsd.CSList, prop,
-              unitCell=cell, scanUnit=ebsd.scanUnit, frame=ebsd.frame)
+  u, v = (np.eye(3)[a] * ebsd.lattice.spacing[a] / 2 for a in range(3) if a != axis)
+  cell = np.array([u + v, -u + v, -u - v, u - v])
+  return EBSD(layer(ebsd.pos.data), _rotations(np.ascontiguousarray(layer(ebsd.rotations.data))), layer(ebsd.phaseId),
+              ebsd.CSList, prop, unitCell=cell, scanUnit=ebsd.scanUnit, frame=ebsd.frame)
+
+
+def sectionConvention(st):
+  """the plotting convention a section is drawn under: the map convention for a layer across z,
+  and across x or y a side view, z up and the other axis of the layer to the right; None for
+  the map convention"""
+  if not st.isVolume or st.sectionAxis == 2:
+    return None
+  return plottingConvention(xvector, yvector) if st.sectionAxis == 0 else plottingConvention(-yvector, xvector)
 
 
 def setSection(st, axis=None, index=None):
@@ -311,16 +318,13 @@ def setSection(st, axis=None, index=None):
 
 
 def sectionLabel(st):
-  """the layer of the volume in words: its number, how many there are, where it lies, and which
-  axes of the volume the picture shows as its x and y where they are not x and y"""
+  """the layer of the volume in words: its number, how many there are and where it lies"""
   if not st.isVolume:
     return ""
   axis, k = st.sectionAxis, st.sectionIndex
   at = st.ebsd.lattice.origin[axis] + k * st.ebsd.lattice.D[axis, axis]
   unit = {"um": "µm"}.get(st.ebsd.scanUnit, st.ebsd.scanUnit)
-  u, v = (name for a, name in enumerate("xyz") if a != axis)
-  drawn = "" if axis == 2 else f", drawn with {u} as x and {v} as y"
-  return f"layer {k + 1} of {st.ebsd.shape[axis]} at {'xyz'[axis]} = {at:.4g} {unit}{drawn}"
+  return f"layer {k + 1} of {st.ebsd.shape[axis]} at {'xyz'[axis]} = {at:.4g} {unit}"
 
 
 def _loadedPath(st):
@@ -339,15 +343,13 @@ def setDataSet(st, k, worker=None):
 # ------------------------------------------------------------------ the views
 
 def viewsOf(ebsd, images=None):
-  """the views a map has: the map always, IPF and pole figures once something is indexed, one
-  tab per property, the images where the file brought some"""
+  """the views a map has: the map always, IPF and pole figures beside them once something is
+  indexed, one tab per property, the images where the file brought some"""
   indexed = any(f.isIndexed for f in ebsd.CSList.frames) and bool(np.any(ebsd.isIndexed))
   tabs = [("phase", "phase")]
   if indexed:
-    tabs += [("IPF X", "ipf"), ("IPF Y", "ipf"), ("IPF Z", "ipf")]
+    tabs += [("IPF X", "ipf"), ("IPF Y", "ipf"), ("IPF Z", "ipf"), ("pole figures", "polefigures")]
   tabs += [(p, "property") for p in sorted(ebsd.prop) if np.asarray(ebsd.prop[p]).ndim == ebsd.ndim]
-  if indexed:
-    tabs.append(("pole figures", "polefigures"))
   pictures = imagesOf(ebsd) if images is None else images
   if pictures:
     tabs.append(("images", "images"))
@@ -742,4 +744,4 @@ def defaultScriptPath(st, folder=None):
 
 
 __all__ = ["WizardState", "setFolder", "toggleFolder", "pickFile", "selectEntry", "openEntry", "leaveEntry", "startImport", "setDataSet",
-           "pickTab", "sectionOf", "setSection", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]
+           "pickTab", "sectionOf", "sectionConvention", "setSection", "setMapConvention", "setEulerConvention", "editPhase", "scriptOf", "writeScript"]

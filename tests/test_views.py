@@ -272,6 +272,31 @@ def test_a_moved_section_shows_what_its_own_drawing_shows(volume, tab):
       assert (canvas.mappable.norm.vmin, canvas.mappable.norm.vmax) == (fresh.mappable.norm.vmin, fresh.mappable.norm.vmax)
 
 
+def test_a_map_stands_where_a_fresh_canvas_draws_it(volume):
+  # whatever tabs came before, the map of a tab stands where a canvas opening on it draws it, and a
+  # map without a colour bar stands in the middle; a colour bar once anchored it at its right side.
+  # The canvas is wide, as in the window, so that the map does not fill it
+  st = volume
+  canvas = ViewCanvas(st)
+
+  def place(c):
+    c.figure.set_size_inches(12, 4)
+    c.draw_view()
+    c.draw()
+    a = c.ax.get_position()
+    return a.x0, a.x1
+
+  for name in ("IPF Z", "ConfidenceIndex", "pole figures", "ConfidenceIndex", "IPF Z", "grainId", "phase", "pole figures", "IPF X"):
+    cb.pickTab(st, st.tabs.index(name))
+    if name == "pole figures":
+      canvas.draw_view()
+      continue
+    fresh = ViewCanvas(st)
+    assert place(canvas) == pytest.approx(place(fresh), abs=2e-3), name
+    if canvas.colorbar is None:
+      assert sum(place(canvas)) / 2 == pytest.approx(0.5, abs=1e-3), name
+
+
 def test_a_turned_volume_recolours_the_section_drawn(volume):
   # the Euler correction leaves the layer where it is and gives it the colours of the turned orientations
   st = volume
@@ -293,9 +318,14 @@ def test_the_section_bar_follows_and_moves_the_section(volume, loaded):
   assert bar.label.text() == "layer 2 of 3 at z = 2 µm"
   bar.slider.setValue(2)
   assert st.sectionIndex == 2 and bar.label.text().startswith("layer 3 of 3")
+  # the pole figures are of the whole volume, and the bar gives way on their tab
+  cb.pickTab(st, st.tabs.index("pole figures"))
+  assert bar.isHidden()
+  cb.pickTab(st, st.tabs.index("IPF Z"))
+  assert not bar.isHidden()
   bar.axes.button(0).click()
   assert (st.sectionAxis, st.sectionIndex) == (0, 2) and bar.slider.maximum() == 4 and bar.slider.value() == 2
-  assert bar.label.text() == "layer 3 of 5 at x = 1 µm, drawn with y as x and z as y"
+  assert bar.label.text() == "layer 3 of 5 at x = 1 µm"
   # a map has no section to choose
   assert SectionBar(loaded).isHidden()
 

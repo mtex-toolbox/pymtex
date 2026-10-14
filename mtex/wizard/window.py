@@ -12,11 +12,11 @@ import traceback
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QFont, QIcon
-from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QSizePolicy, QSplitter, QTabBar, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QSizePolicy, QSplitter, QStyle, QStyleOptionTab,
+                               QStylePainter, QTabBar, QVBoxLayout, QWidget)
 
 from . import callbacks as cb
-from .browser import BrowserSide, framed
+from .browser import PICTURE_INK, BrowserSide, framed
 from .desktop import APP_ID, installDesktopEntry
 from .phases import PhaseTable
 from .pictogram import CoordinatePanel
@@ -27,7 +27,35 @@ from .views import KeyPanel, MillerBar, SectionBar, ViewCanvas
 FONT_SIZE = 10
 BROWSER_WIDTH = 360   # the browser side on opening: the longest file name and the file table fit
 FONT_SMALL = 9
-TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "polefigures": "#6a1b9a", "images": "#e65100"}
+TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "polefigures": "#6a1b9a", "images": PICTURE_INK}
+TAB_TINT = (0.12, 0.28)   # how much of its ink a tab's ground takes, the others and the one shown
+TAB_MARK = 3              # the bar of its ink under the tab shown, in pixels
+
+
+def tint(ink, a):
+  """a colour mixed into white"""
+  c = QColor(ink)
+  return QColor(*(round(255 - a * (255 - v)) for v in (c.red(), c.green(), c.blue())))
+
+
+class TintedTabBar(QTabBar):
+  """a tab strip whose tabs stand on a light ground of their text's colour, the tab shown on a
+  stronger one with a bar of the colour under it, so that the kinds of views are told apart"""
+
+  def paintEvent(self, event):
+    """each tab drawn by the style, its ground tinted between the shape and the label"""
+    p = QStylePainter(self)
+    opt = QStyleOptionTab()
+    for k in range(self.count()):
+      self.initStyleOption(opt, k)
+      p.drawControl(QStyle.CE_TabBarTabShape, opt)
+      ink = self.tabTextColor(k)
+      shown = k == self.currentIndex()
+      r = opt.rect.adjusted(1, 1, -1, 0)
+      p.fillRect(r, tint(ink, TAB_TINT[shown]))
+      if shown:
+        p.fillRect(r.adjusted(0, r.height() - TAB_MARK, 0, 0), ink)
+      p.drawControl(QStyle.CE_TabBarTabLabel, opt)
 
 
 # ------------------------------------------------------------------ the worker
@@ -122,18 +150,21 @@ class WizardWindow(QMainWindow):
     top.addWidget(framed(self.script), 1)
     top.addWidget(framed(self.key), 0)
     rlay.addLayout(top)
-    self.tabs = QTabBar()
+    self.tabs = TintedTabBar()
     self.tabs.setExpanding(False)
     self.tabs.setDocumentMode(True)
     self.tabs.currentChanged.connect(self.onTab)
     rlay.addWidget(self.tabs)
-    self.millers = MillerBar(st)
-    rlay.addWidget(self.millers)
     self.canvas = ViewCanvas(st, worker=self.worker)
     self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     rlay.addWidget(self.canvas, 1)
+    # the directions of the pole figures float over the canvas, the layer of a volume is chosen
+    # under it, and gives way on the pole figure tab
+    self.millers = MillerBar(st, parent=self.canvas)
     self.section = SectionBar(st)
     rlay.addWidget(self.section)
+    self.rlay = rlay
+    self.canvas.poleFigureRoom = lambda: 0 if self.section.isHidden() else self.section.sizeHint().height() + rlay.spacing()
     split.addWidget(right)
     split.setStretchFactor(0, 0)
     split.setStretchFactor(1, 1)
@@ -179,11 +210,13 @@ class WizardWindow(QMainWindow):
       cb.pickTab(self.st, k)
 
   def showTab(self):
-    """lets the strip follow the state's tab and redraws the view"""
+    """lets the strip follow the state's tab and redraws the view, at the size the canvas has once
+    the bars under it came or went"""
     if self.tabs.currentIndex() != self.st.tab:
       self.tabs.blockSignals(True)
       self.tabs.setCurrentIndex(self.st.tab)
       self.tabs.blockSignals(False)
+    self.rlay.activate()
     self.canvas.scheduleDraw()
 
   def closeEvent(self, event):

@@ -122,3 +122,28 @@ def test_a_closed_window_is_destroyed_on_the_gui_thread():
   w.close()
   QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
   assert not shiboken6.isValid(w)
+
+
+# the bars under the canvas give way on the pole figure tab: the size the pole figures are drawn
+# ahead at on any tab is the size the tab shows them at, so the picture drawn ahead is the one shown
+@pytest.mark.parametrize("kind", ["map", "volume"])
+def test_the_pole_figures_are_drawn_ahead_at_the_size_shown(volumeFile, kind):
+  app = application()
+  w = runWizard(FIXTURES, exec=False)
+  st = w.st
+  cb.openEntry(st, volumeFile() if kind == "volume" else os.path.join(FIXTURES, "Forsterite_cut.ctf"), w.worker)
+  pump(app, lambda: st.status[0] in ("loaded", "failed"))
+  assert st.status[0] == "loaded" and st.isVolume == (kind == "volume") and w.section.isHidden() != st.isVolume
+  ahead = w.canvas.poleFigureSize()
+  cb.pickTab(st, st.tabs.index("pole figures"))
+  pump(app, lambda: False, timeout=0.3)
+  assert w.section.isHidden() and w.canvas.poleFigureSize() == ahead
+  w.close()
+  app.processEvents()
+
+
+# the tab of the file's pictures has the ink of the pictures in the tree of its metadata
+def test_the_images_tab_has_the_ink_of_the_pictures():
+  from mtex.wizard.browser import PICTURE_INK
+  from mtex.wizard.window import TAB_COLORS
+  assert TAB_COLORS["images"] == PICTURE_INK and list(TAB_COLORS.values()).count(PICTURE_INK) == 1

@@ -6,7 +6,7 @@
 # measurements have drifted from is drawn as its cells, mapCells, one polygon per
 # measurement over a cell whose corners follow the neighbouring centres, so a square and a
 # hexagonal grid are the same picture with a different cell. A map on no lattice is its
-# points. Either is drawn under a layout, the 2 x 2 matrix mapLayout(pC) that takes the
+# points. Either is drawn under a layout, the 2 x 2 matrix mapLayout(pC, plane) that takes the
 # in-plane coordinates of a measurement to the screen, east to the right and north up; a
 # convention that turns or flips the map is a signed permutation, so the picture is turned
 # rather than resampled.
@@ -39,13 +39,18 @@ def _layoutOf(layout):
   return identityLayout() if layout is None else np.asarray(layout, dtype=float)
 
 
-def mapLayout(pC=None):
-  """the layout a convention asks for: the components of east and north along the plane's x
-  and y, snapped to the signed permutation an axis aligned convention is"""
+def mapLayout(pC=None, plane=None):
+  """the layout a convention asks for: the components of east and north along the coordinates
+  of the map's plane (x and y without a plane), snapped to the signed permutation an axis
+  aligned convention is. A convention whose screen is not the plane, as the xy convention of a
+  map in the yz plane, draws the plane's own coordinates east and north."""
   pC = plottingConvention.default if pC is None else plottingConvention(pC)
   e, n = pC.east.data.reshape(3), pC.north.data.reshape(3)
-  M = np.array([[e[0], e[1]], [n[0], n[1]]])
-  return np.where(np.abs(M) < 1e-12, 0.0, np.where(np.abs(np.abs(M) - 1) < 1e-12, np.sign(M), M))
+  e1, e2 = (np.eye(3)[0], np.eye(3)[1]) if plane is None else (plane.e1, plane.e2)
+  M = np.array([[e @ e1, e @ e2], [n @ e1, n @ e2]], dtype=float)
+  if abs(np.linalg.det(M)) < 1e-6:
+    return identityLayout()
+  return np.where(np.abs(M) < 1e-9, 0.0, np.where(np.abs(np.abs(M) - 1) < 1e-9, np.sign(M), M))
 
 
 # ------------------------------------------------------------------ the picture

@@ -46,10 +46,10 @@ class mapPlot:
 
   def __init__(self, ax, x, how2plot=None, coordinates=False, title=None, region=None, unit=None):
     self.ax = ax
-    self.layout = mapLayout(how2plot)
+    self.plane = planeOf(x)
+    self.layout = mapLayout(how2plot, self.plane)
     self.extent = mapExtent(x, self.layout)
     self.unit = getattr(x, "scanUnit", "um") if unit is None else unit
-    self.plane = planeOf(x)
     self.frame = x.frame
     self.mappables = []
     # the scale bar, its arguments for a redraw, and whether it follows a zoom
@@ -168,7 +168,7 @@ def _kind(x):
 # the size of a figure of one map: seven inches along its longer side, scaled by a named size
 def _mapFigSize(x, mapKw, figSize):
   from .mtexfigure import figureSize
-  xlo, xhi, ylo, yhi = mapExtent(x, mapLayout(mapKw.get("how2plot")))
+  xlo, xhi, ylo, yhi = mapExtent(x, mapLayout(mapKw.get("how2plot"), planeOf(x)))
   w, h = max(xhi - xlo, 1e-12), max(yhi - ylo, 1e-12)
   return figureSize(figSize, (7.0, min(max(7.0 * h / w, 2.5), 9.0)) if w >= h else (max(7.0 * w / h, 3.0), 7.0))
 

@@ -58,7 +58,7 @@ def test_import_and_views(st):
   st.on("status", lambda: seen.append(st.status[0]))
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   assert seen == ["idle", "loading", "loaded"] and st.hasMap and st.loadSeconds is not None
-  assert st.tabs[:4] == ["phase", "IPF X", "IPF Y", "IPF Z"] and st.tabs[-1] == "pole figures"
+  assert st.tabs[:5] == ["phase", "IPF X", "IPF Y", "IPF Z", "pole figures"]
   assert "bc" in st.tabs and st.currentTab == "IPF Z"
   assert st.drawn == {0: True, 1: True, 2: True, 3: True, 4: True} and st.ebsd.lattice is not None
   assert cb.dominantPhase(st) == 1
@@ -211,7 +211,7 @@ def test_a_volume_is_imported_and_opens_on_its_middle_layer(st, volumeFile, kind
 
 @pytest.mark.parametrize("axis", [0, 1, 2])
 def test_a_section_is_the_layer_of_the_volume(st, volumeFile, axis):
-  # the layer's voxels with the two coordinates along it as x and y
+  # the layer's voxels where they lie in space, its lattice in the plane of the layer
   cb.openEntry(st, volumeFile())
   e, index = st.ebsd, 1
   s = cb.sectionOf(e, axis, index)
@@ -219,8 +219,23 @@ def test_a_section_is_the_layer_of_the_volume(st, volumeFile, axis):
   layer = lambda a: np.take(a, index, axis=axis)
   assert s.shape == tuple(e.shape[a] for a in along) and s.lattice is not None and s.CSList is e.CSList
   assert np.array_equal(s.rotations.data, layer(e.rotations.data)) and np.array_equal(s.phaseId, layer(e.phaseId))
-  assert np.array_equal(s.pos.data[..., :2], layer(e.pos.data)[..., along]) and np.all(s.pos.data[..., 2] == 0)
+  assert np.array_equal(s.pos.data, layer(e.pos.data)) and np.allclose(np.abs(s.lattice.plane.normal), np.eye(3)[axis])
   assert sorted(s.prop) == sorted(e.prop) and all(np.array_equal(s.prop[k], layer(e.prop[k])) for k in e.prop)
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2])
+def test_a_section_is_drawn_with_its_axes_on_screen(st, volumeFile, axis):
+  # the layout of a section shows its first axis to the right, the second up and the third out of the screen, a
+  # right-handed view; across z under the map convention
+  from mtex.plotting.maps import frameOnScreen, mapLayout
+  cb.openEntry(st, volumeFile())
+  cb.setSection(st, axis=axis)
+  pl = st.section.lattice.plane
+  pC = cb.sectionConvention(st)
+  screen = np.array(frameOnScreen(pl, mapLayout(pC, pl)))
+  expected = np.array(frameOnScreen(pl, mapLayout(None, pl))) if axis == 2 else \
+    np.array([(0, 0, 1), (1, 0, 0), (0, 1, 0)]) if axis == 0 else np.array([(1, 0, 0), (0, 0, -1), (0, 1, 0)])
+  assert np.allclose(screen, expected)
 
 
 def test_setSection_moves_through_the_volume(st, volumeFile):

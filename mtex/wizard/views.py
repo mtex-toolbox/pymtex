@@ -139,7 +139,8 @@ class ViewCanvas(FigureCanvasQTAgg):
   file; redrawn once per turn of the event loop whatever the state announced"""
 
   def __init__(self, st, worker=None):
-    super().__init__(matplotlib.figure.Figure(layout="constrained"))
+    # compressed, so that a map and the colour bar of a property stand centred as one group
+    super().__init__(matplotlib.figure.Figure(layout="compressed"))
     self.st = st
     # the window's worker runs the density of the pole figures off the main thread; the
     # (map, phase) pairs being computed there
@@ -148,6 +149,9 @@ class ViewCanvas(FigureCanvasQTAgg):
     # the pole figures drawn ahead as a picture, (what it shows, the pixels), and the timer that
     # draws them anew once a resize has settled
     self.pfPicture = None
+    # the height the canvas gains on the pole figure tab, where the bars under it give way: the
+    # pole figures drawn ahead are drawn at the size they are shown at
+    self.poleFigureRoom = lambda: 0
     self.resized = QTimer(self)
     self.resized.setSingleShot(True)
     self.resized.setInterval(250)
@@ -158,7 +162,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.ahead.setSingleShot(True)
     self.ahead.setInterval(AHEAD_DELAY_MS)
     self.ahead.timeout.connect(self.drawAhead)
-    self.drawnFor = None       # (the map, the map convention) the base picture stands for; the map is held, so that
+    self.drawnFor = None       # (the map, its convention and layer axis) the base picture stands for; the map is held, so that
                                # no later section can take its identity
     self.image = None
     self.raster = None         # the picture's pixels as measurements, once a tab recolours it
@@ -238,7 +242,8 @@ class ViewCanvas(FigureCanvasQTAgg):
     name = st.currentTab
     color, kw = self.colorArgs(kind, name)
     shown = np.array([st.drawn.get(k, True) for k in range(len(st.section.CSList))])[np.asarray(st.section.phaseId).reshape(-1)]
-    key = (st.section, st.mapConvention)
+    # a layer across x or y is drawn in its own side view, which the key tells apart from the map's
+    key = (st.section, (st.mapConvention, st.sectionAxis if st.isVolume else 2))
     drawn = self.drawnFor if self.image is not None else None
     fresh = drawn is None or drawn[0] is not key[0] or drawn[1] != key[1]
     # another layer across the same axis of a volume lies where the layer drawn lies: the
@@ -253,7 +258,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       mtexFigure(1, figure=self.figure)
       # the layer of a volume is a picture however few voxels it holds, so that every layer is drawn alike
       self.image = plotEBSD(st.section, color, legend=False, colorbar=False, maxPixels=MAX_PIXELS,
-                            **({"backend": "raster"} if st.isVolume else {}), **kw)
+                            **({"backend": "raster", "how2plot": cb.sectionConvention(st)} if st.isVolume else {}), **kw)
       # the artist's own alpha would override the transparency of a phase not drawn
       self.image.set_alpha(None)
       self.ax = self.image.axes
@@ -350,11 +355,14 @@ class ViewCanvas(FigureCanvasQTAgg):
   def setColorbar(self, cmap, lo=0.0, hi=1.0, label=""):
     """the colour bar of a property, which the picture does not carry: it is made from a
     mappable of its own. That mappable is kept and re-normed rather than replaced, since a
-    colour bar can only be removed through the one the figure registered it with."""
+    colour bar can only be removed through the one the figure registered it with. A colour bar
+    anchors the map at its right side, beside the bar, which removing it does not undo: the map
+    is centred again then."""
     if cmap is None:
       if self.colorbar is not None:
         self.colorbar.remove()
         self.colorbar, self.mappable = None, None
+        self.ax.set_anchor("C")
       return
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import Normalize
@@ -425,8 +433,13 @@ class ViewCanvas(FigureCanvasQTAgg):
     k = cb.dominantPhase(st) if st.ebsd is not None else None
     if k is None or k not in st.densities:
       return None
+    return (id(st.densities[k]), k, tuple(st.millers), tuple(st.eulerAxesNames), *self.poleFigureSize())
+
+  def poleFigureSize(self):
+    """the size in pixels the pole figure tab shows its picture at, from any tab"""
     w, h = self.figure.get_size_inches()
-    return (id(st.densities[k]), k, tuple(st.millers), tuple(st.eulerAxesNames), round(w * self.figure.dpi), round(h * self.figure.dpi))
+    room = 0 if self.onPoleFigures() else self.poleFigureRoom()
+    return round(w * self.figure.dpi), round(h * self.figure.dpi) + room
 
   @Slot()
   def drawAhead(self):
@@ -546,7 +559,7 @@ def millerOf(text, CS):
 
 class SectionBar(QWidget):
   """the layer of a volume the views draw: the axis it lies across, x, y or z, and a slider
-  through its layers; shown for a volume alone"""
+  through its layers; shown for the maps of a volume alone, not its pole figures"""
 
   def __init__(self, st):
     super().__init__()
@@ -569,14 +582,14 @@ class SectionBar(QWidget):
     lay.addWidget(self.label)
     self.axes.idClicked.connect(lambda k: cb.setSection(self.st, axis=k))
     self.slider.valueChanged.connect(lambda v: cb.setSection(self.st, index=v))
-    for name in ("ebsd", "section"):
+    for name in ("ebsd", "section", "tab", "tabs"):
       st.on(name, self.refresh)
     self.refresh()
 
   def refresh(self):
     """the controls set to the layer of the state, without announcing it again"""
     st = self.st
-    self.setVisible(st.isVolume)
+    self.setVisible(st.isVolume and st.currentKind != "polefigures")
     if not st.isVolume:
       return
     n = st.ebsd.shape[st.sectionAxis]
@@ -591,13 +604,15 @@ class SectionBar(QWidget):
 # ------------------------------------------------------------------ the Miller indices
 
 class MillerBar(QWidget):
-  """the three crystal directions of the pole figures, each a field that is its label"""
+  """the three crystal directions of the pole figures, each a field that is its label; in the
+  window it floats over the top left corner of the canvas, above the row of pole figures, and
+  takes no room from the maps"""
 
-  def __init__(self, st):
-    super().__init__()
+  def __init__(self, st, parent=None):
+    super().__init__(parent)
     self.st = st
     lay = QHBoxLayout(self)
-    lay.setContentsMargins(6, 0, 6, 0)
+    lay.setContentsMargins(6, 4, 6, 0)
     self.lead = QLabel("pole figures of")
     lay.addWidget(self.lead)
     self.fields = []
@@ -611,11 +626,6 @@ class MillerBar(QWidget):
     lay.addStretch(1)
     for name in ("tab", "tabs", "ebsd", "phases", "drawn"):
       st.on(name, self.show_)
-    # hidden it keeps its room, so the canvas has one size on every tab and the pole figures
-    # drawn ahead at that size are the ones the tab shows
-    policy = self.sizePolicy()
-    policy.setRetainSizeWhenHidden(True)
-    self.setSizePolicy(policy)
     self.show_()
 
   def commit(self, k, f):
@@ -629,6 +639,9 @@ class MillerBar(QWidget):
     self.setVisible(st.currentKind == "polefigures")
     k = cb.dominantPhase(st) if st.ebsd is not None else None
     self.lead.setText("pole figures of" if k is None else f"{st.ebsd.CSList.frames[k].name}: pole figures of")
+    if self.parentWidget() is not None:
+      self.adjustSize()
+      self.raise_()
 
 
 # ------------------------------------------------------------------ the key
