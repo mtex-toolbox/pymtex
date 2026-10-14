@@ -310,3 +310,40 @@ def test_heldSpacePlot_isNoneWithoutHold():
   from mtex.plotting.spaceplot import _heldSpacePlot
   arrow3d(vector3d(1, 0, 0))
   assert _heldSpacePlot() is None
+
+
+# what quiver3d draws: tangent vectors at orientations, a vector field on the sphere, a vector
+# field on SO(3), as matplotlib's arrows
+def _quivered(kind, **kw):
+  from mtex import SO3TangentVector, SO3VectorFieldHandle
+  if kind == "tangent":
+    o = orientation.rand(8, crystalFrame("432"), rng=np.random.default_rng(3))
+    return quiver3d(SO3TangentVector(vector3d(np.random.default_rng(4).normal(size=(8, 3))), o, "left"), **kw)
+  if kind == "sphere":
+    return quiver3d(grad(positiveFunction()), **kw)
+  cs = crystalFrame("432")
+  return quiver3d(SO3VectorFieldHandle(lambda m: m.axis() * m.angle(), cs, cs), "axisAngle", resolution=15 * degree, **kw)
+
+
+@pytest.mark.parametrize("kind", ["tangent", "sphere", "SO3"])
+@pytest.mark.parametrize("maxHeadSize", [0.1, 0.5])
+def test_quiver3d_maxHeadSize_is_the_head_as_a_fraction_of_every_arrow(kind, maxHeadSize):
+  h = _quivered(kind, maxHeadSize=maxHeadSize)
+  # matplotlib keeps the shafts of the n arrows first, then the two strokes of every head
+  segs = np.asarray(h._segments3d)
+  n = len(segs) // 3
+  shaft = np.linalg.norm(segs[:n, 1] - segs[:n, 0], axis=1)
+  for stroke in (segs[n:2 * n], segs[2 * n:]):
+    assert np.allclose(np.linalg.norm(stroke[:, 1] - stroke[:, 0], axis=1), maxHeadSize * shaft)
+
+
+def test_quiver3d_maxHeadSize_of_arrows_at_positions_is_the_cone_of_every_arrow():
+  from mtex.plotting.scene3d import lines3d
+  from mtex.plotting.volumeplot import gcs
+  pos = vector3d(np.random.default_rng(5).normal(size=(4, 3)))
+  d = vector3d(np.random.default_rng(6).normal(size=(4, 3)))
+  for maxHeadSize in (0.1, 0.5):
+    quiver3d(pos, d, maxHeadSize=maxHeadSize)
+    shafts = next(i for i in gcs().items if isinstance(i, lines3d))
+    P = np.asarray(shafts.segments)
+    assert np.allclose(np.linalg.norm(P[:, 1] - P[:, 0], axis=1), 0.05 * (1 - maxHeadSize) * np.linalg.norm(d.data, axis=1))

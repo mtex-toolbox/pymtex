@@ -428,7 +428,7 @@ def surf(sF, layout=None, figSize=None, scaling=True, colormap="parula", resolut
   return hs if len(hs) > 1 else hs[0]
 
 
-def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, axisLabels=False, **kw):
+def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=True, axisLabels=False, headSize=0.3, **kw):
   """plot3d(vF): a vector or axis field as arrows on the sphere in space"""
   from ..geometry.grids.s2grid import equispacedS2Grid
   axesKw = _keys(kw)
@@ -457,7 +457,7 @@ def _quiverField3d(vF, resolution=15 * degree, color="k", arrowSize=0.75, grid=T
     h = Line3DCollection(np.stack([P - D / 2, P + D / 2], axis=1), colors=color, linewidths=1.0)
     sP.ax.add_collection3d(h)
     return h
-  return sP.ax.quiver(P[:, 0], P[:, 1], P[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, arrow_length_ratio=0.3, linewidths=1.0, **kw)
+  return sP.ax.quiver(P[:, 0], P[:, 1], P[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, arrow_length_ratio=headSize, linewidths=1.0, **kw)
 
 
 # ------------------------------------------------------------------ orientation space
@@ -779,7 +779,8 @@ def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fal
     axisAngle - draw in axis angle space
     Rodrigues - draw in Rodrigues space
     Euler - draw in Euler angle space
-    maxHeadSize - MATLAB's MaxHeadSize, accepted without effect: the heads keep their size
+    maxHeadSize - the length of the heads as a fraction of the arrows; by default 0.25 for
+        tangent vectors and arrows at positions, 0.3 for fields
   See also
     SO3TangentVector, orientation.scatter, arrow3d, plot3d, RotationTangentSpace,
     SO3FunVectorField, S2FunVectorField"""
@@ -788,12 +789,14 @@ def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fal
     from .volumeplot import _quiverVectors
     if color is not None:
       kw["color"] = color
+    if maxHeadSize is not None:
+      kw["headSize"] = maxHeadSize
     return _quiverVectors(t, args[0], lineWidth=lineWidth if lineWidth != 1.5 else 2.0, **kw)
   # a field on the sphere is drawn as arrows on the sphere in space
   if _isField(t):
-    return _quiverField3d(t, color="k" if color is None else color, **kw)
+    return _quiverField3d(t, color="k" if color is None else color, headSize=0.3 if maxHeadSize is None else maxHeadSize, **kw)
   if isinstance(t, SO3VectorField):
-    return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw)
+    return _quiverField(t, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw, 0.3 if maxHeadSize is None else maxHeadSize)
   color = "b" if color is None else color
   _, Euler, axisAngle, Rodrigues = _spaceFlags(args, Euler, axisAngle, Rodrigues)
   refuseVariants(kw)
@@ -814,13 +817,14 @@ def quiver3d(t, *args, lineWidth=1.5, color=None, normalize=False, axisAngle=Fal
   P1 = orientationPoints(t.oriRef, coordinates, reduced)
   P2 = orientationPoints(t.exp(), coordinates, reduced)
   D = P2 - P1
-  return sP.ax.quiver(P1[:, 0], P1[:, 1], P1[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, linewidths=lineWidth, arrow_length_ratio=0.25, **kw)
+  return sP.ax.quiver(P1[:, 0], P1[:, 1], P1[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, linewidths=lineWidth,
+                      arrow_length_ratio=0.25 if maxHeadSize is None else maxHeadSize, **kw)
 
 
 # a field on SO(3): its vectors on an equispaced grid of the fundamental region, drawn in the
 # direction they move the orientations and scaled so that the longest spans nine tenths of
 # the grid spacing, as MATLAB's quiver scales them
-def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw):
+def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Euler, kw, headSize=0.3):
   from scipy.spatial import cKDTree
   from ..geometry.grids.so3grid import equispacedSO3Grid
   from ..geometry.orientation import orientation
@@ -849,7 +853,7 @@ def _quiverField(F, args, lineWidth, color, normalize, axisAngle, Rodrigues, Eul
   spacing = float(np.median(cKDTree(P1).query(P1, k=2)[0][:, 1])) if len(P1) > 1 else 1.0
   D = 0.9 * spacing * D / max(float(np.max(np.linalg.norm(D, axis=1))), 1e-12)
   return sP.ax.quiver(P1[:, 0], P1[:, 1], P1[:, 2], D[:, 0], D[:, 1], D[:, 2], color=color, linewidths=lineWidth,
-                      arrow_length_ratio=0.3, **kw)
+                      arrow_length_ratio=headSize, **kw)
 
 
 def arrow3d(v, faceColor="k", anchor=None, arrowWidth=None, edgeColor="none", labeled=False, label=None, **kw: Unpack[PlotKeywords]):

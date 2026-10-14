@@ -116,22 +116,21 @@ parts kept once), NumPy's reductions of every container, MATLAB's `accuracy` of 
 ### Found while writing the reference sections (2026-10-14)
 
 The 239 functions with three or more keywords got MATLAB's sections (four agents, every form
-run). Not fixed yet:
+run). The bugs they found were fixed the same day by three agents, each with a test of the
+general case: `calcParentFromVote` with no vote passing (the vote table padded to `numFit`, no
+grain turned); `merge(grains, labels)` joins per label and phase, as the pairs form (MATLAB joins
+across phases); `discreteSample` of maps, grains and boundaries; `calcGrains(angle=[[a1], [a2]])`,
+a threshold per indexed phase or per `CSList` entry (two numbers stay `[high, low]`, as MATLAB's
+`[a1 a2]`); `char` of a vector without a frame; `S1FunHarmonic.interpolate(tol=)`; the flat
+`project` forwards to the object's method; `mapField` broadcasts a function against a field;
+`S2Fun.unimodal(v, psi)` takes a kernel, the halfwidth a keyword; `strainRateTensor` symmetric;
+`WignerD(dtype=)`; `S2AxisFieldHarmonic(fhat)` converts MATLAB's coefficients (the columns xx, xy,
+xz, yy, yz, zz, not MATLAB's order); `unique(ori)` sorted unless `stable=True`, as MATLAB; MATLAB's
+plot flags drawn (`numbered`, `smooth` on boundaries, `maxHeadSize`) or refused with what to
+write, never handed to matplotlib; `plot(grains, 'area')` by a measure's name;
+`plotS2Grid(resolution=(a, b))`; `quiver3d(maxHeadSize=)`; `mtexFigure`'s plot spacings;
+`mtexdata(verbose=)`; `NeperGrain3d`, simulated by MATLAB, no longer offered; `silent=` on the pages.
 
-- Bugs: `calcParentFromVote` raises an IndexError when no vote passes the filter
-  (reconstruction.py:772); `grains.merge(labels)` joins grains across phases, the pairs form
-  refuses; `vector3d(1, 2, 3).char()` fails without a frame; `S1FunHarmonic.interpolate`
-  overwrites `tol`; `project(e)` of an embedding reaches the flat `project(P, Q)`;
-  `discreteSample` of a multiphase map refuses instead of sampling the list; `plot(gB,
-  smooth=True)` and `scatter(v, numbered=True)` pass MATLAB's flags on to matplotlib;
-  `plot(grains, 'area')` takes only names of `grains.prop`; `plotS2Grid(resolution=(a, b))`;
-  `mapField` with a scalar function does not broadcast; `S2Fun.unimodal(v, psi)` takes psi as
-  the halfwidth; `strainRateTensor(M)` keeps the antisymmetric part; `WignerD(dtype=complex64)`
-  gives complex128; `mtexdata(verbose=)` is not read; `mtexdata('NeperGrain3d')` is listed but
-  has no files; the NeperInterface page passes `silent=` where the keyword is `verbose`;
-  `S2AxisFieldHarmonic(fhat, cs)` keeps fhat unconverted; `orientation.unique(stable=)` is
-  ignored; `quiver3d(maxHeadSize=)`, `mtexFigure(innerPlotSpacing=, outerPlotSpacing=)` are
-  ignored; `calcGrains(angle={a1, a2})`, a threshold per phase, fails (gbcAngle's byPhase works).
 - Different from MATLAB, documented: `symmetry.fundamentalSector(angle=)` not cut to the
   sector; `l1TVFilter`'s parameter and solver; `interp` and `fill`'s rules; `kde1d`'s bandwidth;
   `calcKernel`'s default UCV; the `center` of the S2 grids; `sum` over all axes.

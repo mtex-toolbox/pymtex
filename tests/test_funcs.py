@@ -1,7 +1,7 @@
 # the verbs as functions fall through to NumPy for plain arrays
 import numpy as np
 
-from mtex import angle, dot, cross, norm, mean, unique, exp, log, inv, vector3d, rotation, rotate, cat
+from mtex import angle, dot, cross, norm, mean, unique, exp, log, inv, vector3d, rotation, rotate, cat, project
 from conftest import close
 
 
@@ -35,3 +35,15 @@ def test_the_star_import_keeps_the_builtins():
   # and objects their own
   v = vector3d([[1.2, 0, 0], [0, 2.7, 0]])
   assert np.allclose(ns["round"](v).data, v.round().data) and np.allclose(ns["sum"](v).data, [1.2, 2.7, 0])
+
+
+def _projectCases():
+  from mtex import crystalFrame, embedding, orientation, plane3d
+  ori = orientation.rand(3, crystalFrame("m-3m"), rng=np.random.default_rng(4))
+  return [(embedding(ori), ()), (plane3d(vector3d(0, 0, 2), 4), (vector3d(1, 1, 5),))]
+
+
+def test_project_isTheMethodOfTheObjectPassed():
+  # project(x, ...) reaches x.project(...) for every object that has one
+  for x, args in _projectCases():
+    assert close(project(x, *args).data, x.project(*args).data)

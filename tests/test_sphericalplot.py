@@ -553,3 +553,30 @@ def test_poleDirections_ofAChartWithoutADirectionIsEmpty():
   from mtex.plotting.sphericalplot import _poleDirections
   sP = scatter(vector3d(1, 0, 0))[0].axes._mtexSphericalPlot
   assert _poleDirections(sP) == []
+
+
+@pytest.mark.parametrize("n", [1, 3, 12])
+def test_scatter_numbered_labels_the_directions_one_to_n_in_their_order(n):
+  import matplotlib
+  v = vector3d(rng.normal(size=(n, 3)))
+  scatter(v, numbered=True)
+  # every number once, in the chart that shows its direction, at that direction
+  seen = []
+  for ax in gcm().children:
+    x, y = ax._mtexSphericalPlot.proj.project(v)
+    for t in ax.texts:
+      if isinstance(t, matplotlib.text.Annotation):
+        i = int(t.get_text()) - 1
+        assert np.allclose(t.xy, (np.ravel(x)[i], np.ravel(y)[i]))
+        seen.append(i)
+  assert sorted(seen) == list(range(n))
+
+
+@pytest.mark.parametrize("maxHeadSize", [0.1, 0.3, 0.6])
+def test_quiver_maxHeadSize_is_the_head_as_a_fraction_of_the_longest_arrow(maxHeadSize):
+  v = vector3d(rng.normal(size=(6, 3)))
+  w = vector3d(rng.normal(size=(6, 3)))
+  for h in quiver(v, w, maxHeadSize=maxHeadSize):
+    if h is not None:
+      longest = np.max(np.hypot(h.U, h.V))
+      assert h.units == "xy" and np.isclose(h.headlength * h.width, maxHeadSize * longest)

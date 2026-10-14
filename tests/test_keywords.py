@@ -65,3 +65,55 @@ def test_every_plot_declares_its_keywords_for_the_editor():
         if n.args.kwarg.annotation is None:
           bare.append(f"{module}.{n.name}")
   assert not bare
+
+
+@pytest.mark.parametrize("flag", sorted(__import__("mtex.plotting.keywords", fromlist=["MATLAB_FLAGS"]).MATLAB_FLAGS))
+def test_a_MATLAB_option_the_port_does_not_take_is_refused_with_what_to_write(flag):
+  from mtex.plotting.keywords import MATLAB_FLAGS
+  with pytest.raises(TypeError, match=f"'{flag}'.*" + MATLAB_FLAGS[flag][:12].replace("(", "\\(").replace(")", "\\)")):
+    refuseVariants({flag: True}, flags=(flag,))
+
+
+# MATLAB's documented options of the plots of directions, maps, grains, boundaries and triple
+# points (their help's Options and Flags), each with a value it takes
+MATLAB_OPTIONS = {
+  "scatter": ["numbered", "dynamicMarkerSize", "grid", "markerAlpha", "markerEdgeAlpha", "markerFaceAlpha", "marker",
+              "markerFaceColor", "markerEdgeColor", "markerSize"],
+  "plotVectors": ["smooth", "contourf", "contour", "marker", "markerSize", "markerFaceColor", "markerEdgeColor"],
+  "text": ["textColor", "textAboveMarker"],
+  "quiver": ["arrowSize", "autoArrowSize", "maxHeadSize"],
+  "plotGrains": ["noBoundary", "displayName", "region", "scale", "micronbar", "refFrame", "refFrameDirs", "refFrameLabels"],
+  "plotEBSD": ["micronbar", "refFrame", "refFrameDirs", "refFrameLabels", "backend", "displayName", "region", "points", "exact"],
+  "plotBoundary": ["smooth", "lineWidth", "lineColor", "edgeAlpha", "region", "displayName"],
+  "plotTriplePoints": ["marker", "markerSize", "markerEdgeColor", "markerFaceColor", "lineWidth"],
+}
+VALUES = {"region": (33000, 34000, 4000, 5000), "backend": "patch", "displayName": "x", "scale": 0.3, "refFrameDirs": None,
+          "refFrameLabels": ["x", "y", "z"], "lineColor": "r", "markerEdgeColor": "r", "markerFaceColor": "r", "marker": "s",
+          "markerSize": 3, "lineWidth": 1, "edgeAlpha": 0.5, "textColor": "r", "arrowSize": 0.2, "maxHeadSize": 0.3,
+          "markerAlpha": 0.5, "markerEdgeAlpha": 0.5, "markerFaceAlpha": 0.5, "micronbar": False, "refFrame": False}
+
+
+@pytest.fixture(scope="module")
+def drawn():
+  import os
+  matplotlib = pytest.importorskip("matplotlib")
+  matplotlib.use("Agg")
+  from mtex import calcGrains, degree, loadEBSD, plot, quiver, scatter, text, vector3d
+  ebsd = loadEBSD(os.path.join(os.path.dirname(__file__), "fixtures", "ebsd", "Forsterite_cut.ctf"))
+  grains = calcGrains(ebsd["indexed"], angle=10 * degree)
+  v = vector3d.rand(5, rng=__import__("numpy").random.default_rng(1))
+  return {"scatter": lambda **k: scatter(v, **k), "plotVectors": lambda **k: plot(v, **k),
+          "text": lambda **k: text(v, ["a"] * 5, **k), "quiver": lambda **k: quiver(v, v, **k),
+          "plotGrains": lambda **k: plot(grains, **k), "plotEBSD": lambda **k: plot(ebsd, **k),
+          "plotBoundary": lambda **k: plot(grains.boundary, **k), "plotTriplePoints": lambda **k: plot(grains.triplePoints, **k)}
+
+
+@pytest.mark.parametrize("call, option", [(c, o) for c, options in MATLAB_OPTIONS.items() for o in options])
+def test_a_MATLAB_option_of_a_plot_is_drawn_or_refused_by_name_never_handed_to_matplotlib(drawn, call, option):
+  import matplotlib.pyplot as plt
+  try:
+    drawn[call](**{option: VALUES.get(option, True)})
+  except TypeError as e:
+    assert repr(option) in str(e) and "unexpected keyword" not in str(e)
+  finally:
+    plt.close("all")

@@ -4,10 +4,10 @@ import pytest
 from numpy import pi
 
 import mtex
-from mtex.functions.harmonics import _WignerD
+from mtex.functions.harmonics import _WignerD, project
 from mtex import (Miller, S1FejerKernel, S1FourierPlan, S2FourierPlan, S2GridPlan, SO3FourierPlan, SO3GridPlan,
                   adjointTransform, bandwidthFor, crystalFrame, deg2dim, degreeBlock, folds, fourierSeries,
-                  fourierSeriesAdjoint, invariantProjection, isRealFourier, isRealSpherical, isRealWigner, project,
+                  fourierSeriesAdjoint, invariantProjection, isRealFourier, isRealSpherical, isRealWigner,
                   quadratureS1Grid, quadratureS2Grid, quadratureSO3Grid, rotation, setMTEXpref, specimenFrame,
                   sphericalSeries, sphericalSeriesAdjoint, sphericalTransform, sphericalTransformAdjoint, vector3d,
                   wignerSeries, wignerSeriesAdjoint, wignerTransform, wignerTransformAdjoint)

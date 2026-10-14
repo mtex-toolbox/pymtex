@@ -114,8 +114,8 @@ class S2AxisFieldHarmonic(S2AxisField):
   S2AxisField is the abstract class above it, S2AxisFieldHandle the field of a function
   evaluated where it is asked.
 
-  The coefficient form takes a (L+1)^2 x 6 matrix in the port's internal normalisation, not
-  MATLAB's six S2FunHarmonic components.
+  The coefficient form takes a (L+1)^2 x 6 matrix, one column per component xx, xy, xz, yy,
+  yz, zz, in MTEX's basis, the coefficients aF.fhat returns and S2FunHarmonic takes.
 
   Input
     fhat - a function of vector3d returning axes, S2VectorField or S2AxisField, vector3d of
@@ -132,7 +132,9 @@ class S2AxisFieldHarmonic(S2AxisField):
     S2VectorFieldHarmonic, S2FunHarmonic, S2AxisFieldHarmonic.interpolate, velocity,
     S2FunVectorField"""
 
-  def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True):
+  def __init__(self, fhat, *args, bandwidth=None, weights=None, symmetrise=True, _internal=False):
+    # coefficients given are MTEX's, those the port passes itself its own
+    fromUser = not _internal
     frames = [a for a in args if isinstance(a, referenceFrame)]
     frame = frames[0] if frames else None
     if isinstance(fhat, (S2VectorField, S2AxisField)):
@@ -142,6 +144,7 @@ class S2AxisFieldHarmonic(S2AxisField):
       g = quadratureS2Grid(L)
       values = _values(v(v._framed(g.nodes())))
       fhat = _adjointColumns(g, outerComponents(values), L, g.weights)
+      fromUser = False
     elif isinstance(fhat, vector3d) and args and not isinstance(args[0], referenceFrame):
       pts, values = fhat, args[0]
       frame = pts.frame if frame is None else frame
@@ -149,16 +152,20 @@ class S2AxisFieldHarmonic(S2AxisField):
       d = vector3d(pts.data.reshape(-1, 3)).normalize()
       w = np.full(d.size, 4 * np.pi / d.size) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(d, outerComponents(_values(values)), L, w)
+      fromUser = False
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       L = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
       g = quadratureS2Grid(L)
       values = _values(fhat(_inFrame(g.nodes(), frame)))
       fhat = _adjointColumns(g, outerComponents(values), L, g.weights)
+      fromUser = False
     fhat = np.array(fhat, dtype=complex)
     if fhat.ndim != 2 or fhat.shape[1] != 6:
       raise ValueError("an axis field has six components")
     if math.isqrt(fhat.shape[0]) ** 2 != fhat.shape[0]:
       raise ValueError("a coefficient matrix has (L+1)^2 rows for its bandwidth L")
+    if fromUser:
+      fhat = mtexCoefficientsS2(fhat.T).T
     for i in range(6):
       realizeSpherical(fhat[:, i])
     self._fhat, self.frame = fhat, frame
@@ -178,7 +185,7 @@ class S2AxisFieldHarmonic(S2AxisField):
     comps = outerComponents(_values(values))
     fs = [interpolate(d, comps[:, i], bandwidth=bandwidth, weights=weights, **kwargs) for i in range(6)]
     L = max(f.bandwidth for f in fs)
-    return cls(np.stack([f.truncate(L)._fhat for f in fs], axis=-1), nodes.frame)
+    return cls(np.stack([f.truncate(L)._fhat for f in fs], axis=-1), nodes.frame, _internal=True)
 
   def _rebuild(self, fhat):
     a = object.__new__(S2AxisFieldHarmonic)

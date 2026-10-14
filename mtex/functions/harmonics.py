@@ -270,7 +270,8 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
   for n, M in enumerate(mats):
     s = _orderSign(n)
     W = np.outer(s, s) * np.swapaxes(M, -1, -2)
-    out.append(math.sqrt(2 * n + 1) * W if normalize else W)
+    W = math.sqrt(2 * n + 1) * W if normalize else W
+    out.append(W if dtype is None else W.astype(dtype, copy=False))
   return out[-1] if single else out
 
 
@@ -542,5 +543,5 @@ def clebschGordanTensor(l1, l2, J):
 
 
 __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wignerdDegrees", "WignerD", "wignerSeries",
-           "InvariantProjection", "invariantProjection", "project", "projectLeft", "projectRight",
+           "InvariantProjection", "invariantProjection", "projectLeft", "projectRight",
            "normalizedLegendre", "sphericalY", "clebschGordan", "wigner3j", "clebschGordanTensor"]

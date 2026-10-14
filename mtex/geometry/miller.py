@@ -218,7 +218,8 @@ def indexChar(v, style=None, utf8=None, family=None):
   latex = isinstance(style, str) and style.lower() == "latex"
   utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8
   style = v.dispStyle if style is None or latex else style
-  family = v.frame.numSym() > 1 if family is None else family
+  if family is None:
+    family = v.frame is not None and v.frame.numSym() > 1
   left, right = brackets(style, family)
   coord = v.data if style == "xyz" else getattr(v, style)
   coord = np.where(np.abs(coord) < 1e-8, 0.0, coord).reshape(-1, coord.shape[-1])

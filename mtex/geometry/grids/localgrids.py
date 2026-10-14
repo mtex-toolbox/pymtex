@@ -87,7 +87,7 @@ def localOrientationGrid(*args, maxAngle=None, resolution=5 * degree, center=Non
   stab = chordAngle(allCopies, c) < 1e-8
   stabCopies = qmul(qmul(L[:, None, :], c2[None, None, :]), R[None, :, :]).reshape(-1, 4)[stab]
   keep = _keepInBall(chordAngle, q, c, copies, c2, stabCopies)
-  return ori[keep].unique(tol=res / 100, symmetry=False)
+  return ori[keep].unique(tol=res / 100, symmetry=False, stable=True)
 
 
 # a point x is kept when c is its closest copy among copies, and c2 its closest among the

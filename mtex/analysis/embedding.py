@@ -471,9 +471,4 @@ def setDouble(e, d):
   return e.setDouble(d)
 
 
-def project(e, **kwargs):
-  """project(e) is e.project(): the rotations whose images are closest to the embedding"""
-  return e.project(**kwargs)
-
-
 __all__ = ["embedding", "embeddingSpec", "double", "setDouble"]

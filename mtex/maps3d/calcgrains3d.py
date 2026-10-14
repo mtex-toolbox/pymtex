@@ -34,6 +34,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     grains = calcGrains(ebsd)                                  # grain boundaries above 15 degree
     grains = calcGrains(ebsd, angle=10*degree, minPixel=5, alpha=3.7)  # another angle, no grains below 5 pixels
     grains = calcGrains(ebsd, angle=[10*degree, 2*degree])     # high and low angle boundaries
+    grains = calcGrains(ebsd, angle=[[10*degree], [5*degree]])  # a threshold per indexed phase
     grains = calcGrains(ebsd, criterion=gbcAngle(10*degree, byPhase={'Enstatite': 5*degree}))  # a threshold per phase
     grains = calcGrains(ebsd, criterion=gbcSoft(10*degree, 2*degree), mcl=(1.4, 4))  # a soft threshold and Markov clustering
     grains = calcGrains(ebsd, fmc=1.5, minPixel=10)            # fast multiscale clustering
@@ -43,7 +44,10 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   below the threshold angle, and a grain is a connected set of such pixels. With a pair
   [high, low] the boundaries above high separate the grains, and those between low and high
   are kept as low angle boundaries inside them, grains.innerBoundary: the subgrain boundaries.
-  A threshold per phase, a soft threshold or any other rule is a grainBoundaryCriterion.
+  A list of other than two numbers, or of lists, gives every phase a threshold or a pair of its
+  own: one entry per indexed phase, or one per entry of ebsd.CSList as MATLAB's cell
+  {a1, a2, a3}; two numbers are always the pair [high, low], as MATLAB's [a1 a2], so two
+  phases take [[a1], [a2]]. A soft threshold or any other rule is a grainBoundaryCriterion.
 
   The map is divided into cells around its pixels, a Voronoi decomposition bounded by alpha:
   a not indexed region narrower than 2 alpha pixel spacings is filled by the grains around
@@ -61,7 +65,8 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   Keywords
     angle - the misorientation angle above which neighbouring pixels belong to different
         grains; a pair [high, low] also keeps the low angle boundaries between
-        low and high as grains.innerBoundary
+        low and high as grains.innerBoundary; a list of an angle or a pair per phase gives
+        every phase its own
     threshold - the same as angle, which it replaces when given
     criterion - a grainBoundaryCriterion instead of the angle: gbcAngle with thresholds per
         phase, gbcSoft for a soft threshold, gbcEqual for a property that must agree,

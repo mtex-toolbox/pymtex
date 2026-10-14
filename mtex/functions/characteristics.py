@@ -831,6 +831,7 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     v = discreteSample(sF, n)                                   # n directions of a density on the sphere
     x = discreteSample(lambda x: np.exp(-x), n, range=(0, 5))   # n numbers of a density on an interval
     ori = discreteSample(ori, n, withoutReplacement=True)       # n members of a list, none twice
+    ebsd = discreteSample(ebsd, n)                              # n measurements of a map, of any phases
 
   A density is sampled on the nodes of a grid with probability proportional to its values, and
   every node drawn is moved by a random rotation within the grid resolution and turned by a
@@ -841,7 +842,8 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
   indices of the members drawn from a list are not provided.
 
   Input
-    f - SO3Fun, S2Fun, a Python function of numbers, or a list of orientations or directions
+    f - SO3Fun, S2Fun, a Python function of numbers, or a list of orientations or directions,
+        an EBSD map, grains or grain boundary segments
     n - int, the size of the sample
   Output
     ori - orientation, vector3d, ndarray or the class of the list
@@ -860,9 +862,10 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     x = np.linspace(range[0], range[1], 10000)
     p = np.maximum(np.asarray(f(x), dtype=float), 0)
     return x[rng.choice(len(x), size=n, p=p / p.sum())]
-  # a list of orientations or directions is sampled from itself, MATLAB's discreteSample(ori, n)
-  if isinstance(f, MtexArray):
-    flat = f.flatten()
+  # a list of orientations or directions, an EBSD map of any phases, grains or boundary segments is
+  # sampled from itself, MATLAB's discreteSample(ori, n) and discreteSample(ebsd, n)
+  if isinstance(f, MtexArray) or hasattr(f, "CSList"):
+    flat = f.flatten() if isinstance(f, MtexArray) else f
     k = rng.choice(flat.size, size=min(n, flat.size) if withoutReplacement else n, replace=not withoutReplacement)
     return flat[k]
   if isinstance(f, S2Fun):

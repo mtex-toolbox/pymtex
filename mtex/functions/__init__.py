@@ -1,7 +1,7 @@
 """the function layer: harmonics, kernels, transforms, functions on S1, S2 and SO(3), pole figures"""
 from .harmonics import (deg2dim, dim2deg, degreeRange, degreeBlock, wignerd, wignerdDegrees, WignerD,
-                        InvariantProjection, invariantProjection, project, projectLeft, projectRight,
-                        normalizedLegendre, sphericalY, clebschGordan, wigner3j, clebschGordanTensor)
+                        InvariantProjection, invariantProjection, projectLeft, projectRight, normalizedLegendre,
+                        sphericalY, clebschGordan, wigner3j, clebschGordanTensor)
 from .quadrature import (gaussLegendre, clenshawCurtis, legendreP, folds, bandwidthFor, quadratureSO3Grid,
                          quadratureS2Grid, quadratureS1Grid)
 from .kernelfunctions import (SO3Kernel, SO3DeLaValleePoussinKernel, SO3AbelPoissonKernel, SO3vonMisesFisherKernel,
@@ -42,7 +42,7 @@ from .s2funclass import S2Fun
 from .discrepancy import discrepancy, sphericalDiscrepancy, rotationalDiscrepancy
 
 __all__ = ["deg2dim", "dim2deg", "degreeRange", "degreeBlock", "wignerd", "wignerdDegrees", "WignerD", "wignerSeries",
-           "InvariantProjection", "invariantProjection", "project", "projectLeft", "projectRight", "normalizedLegendre",
+           "InvariantProjection", "invariantProjection", "projectLeft", "projectRight", "normalizedLegendre",
            "sphericalY", "clebschGordan", "wigner3j", "clebschGordanTensor", "gaussLegendre", "clenshawCurtis",
            "legendreP", "folds", "bandwidthFor", "quadratureSO3Grid", "quadratureS2Grid", "quadratureS1Grid",
            "SO3Kernel", "SO3DeLaValleePoussinKernel", "SO3AbelPoissonKernel", "SO3vonMisesFisherKernel",

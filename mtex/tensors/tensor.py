@@ -1175,11 +1175,11 @@ class strainRateTensor(tensor):
     E = strainRateTensor(M)      # by its 3 x 3 matrix
     E = strainRate(L)            # the symmetric part of a velocity gradient
 
-  The matrix given is taken as it is; strainRate(L) takes the symmetric part of a
-  velocityGradientTensor, which MATLAB's strainRateTensor(L) does on construction.
+  Only the symmetric part of the matrix given is kept, as MATLAB's constructor does, so that
+  strainRateTensor(L) of a velocity gradient is strainRate(L).
 
   Input
-    M - 3 x 3 symmetric matrix, or an array (..., 3, 3) of them
+    M - 3 x 3 matrix, or an array (..., 3, 3) of them
   Output
     E - strainRateTensor
   Keywords
@@ -1194,6 +1194,14 @@ class strainRateTensor(tensor):
   See also
     tensor, velocityGradientTensor, strainTensor, velocityGradientTensor.strainRate"""
   _rank, _double, _symmetricRank2 = 2, True, True
+
+  def __init__(self, M, *args, rank=None, doubleConvention=None, frame=None, density=None, unit=None, name=None,
+               Kelvin=False, dtype=None):
+    super().__init__(M, *args, rank=rank, doubleConvention=doubleConvention, frame=frame, density=density, unit=unit,
+                     name=name, Kelvin=Kelvin, dtype=dtype)
+    # the symmetric part of the matrix given
+    d = self.data.reshape(self.data.shape[:-1] + (3, 3))
+    self.data = (0.5 * (d + np.swapaxes(d, -1, -2))).reshape(self.data.shape)
 
 
 class deformationGradientTensor(tensor):

@@ -437,3 +437,29 @@ def test_dot_withACrystalDirectionTakesTheRightComponents():
   h = Miller(1, 0, 0, cs)
   assert np.allclose(np.real(dot(g, h)(o)), np.real(dot(right(g), h)(o)))
   assert np.allclose(np.real(dot(g, h)(o)), right(g(o)).data @ np.array([1.0, 0, 0]), atol=1e-6)
+
+
+@pytest.mark.parametrize("op", [np.multiply, lambda a, f: a * f + a, lambda a, f, s: s * a * f * f])
+def test_mapField_broadcastsAFunctionAgainstAField(op):
+  # a function's values broadcast against the tangent vectors, as the arrays op is written for
+  from mtex import mapField
+  from mtex.functions.so3vectorfield import _tangentValues
+  cs, ss = crystalFrame("-3m"), specimenFrame("222")
+  v, F = randomVectorField(cs, ss, L=3), randomField(3, cs, ss) + 2
+  args = (F, 2.0)[:op.__code__.co_argcount - 1] if not isinstance(op, np.ufunc) else (F,)
+  u = mapField(op, v, *args, bandwidth=12)
+  o = orientation.rand(20, cs, ss, rng=rng)
+  vals = [np.real(a(o)).reshape(-1, 1) if not isinstance(a, float) else a for a in args]
+  expected = op(_tangentValues(v(o), v.tangentSpace), *vals)
+  assert relerr(_tangentValues(u(o), v.tangentSpace), expected) < 1e-8
+
+
+def test_mapField_aFunctionResultIsOneValuePerNode():
+  # an op of a field and a function whose result has one value per node gives a function
+  from mtex import mapField
+  cs, ss = crystalFrame("-3m"), specimenFrame("222")
+  v, F = randomVectorField(cs, ss, L=3), randomField(3, cs, ss) + 2
+  f = mapField(lambda a, g: np.sum(a * a, axis=-1, keepdims=True) * g, v, F, bandwidth=12, invariant=True)
+  o = orientation.rand(20, cs, ss, rng=rng)
+  expected = np.real(dot(v(o), v(o))).ravel() * np.real(F(o)).ravel()
+  assert isinstance(f, SO3FunHarmonic) and relerr(np.real(f(o)).ravel(), expected) < 1e-8

@@ -249,6 +249,26 @@ def test_merge_byLabelsOrAGraphOfGrains():
   assert np.array_equal(g.merge(A, testRun=True), [1, 1, 2, 3]) and len(g.merge(A)) == 3
 
 
+# the four blocks of fourBlocks, the right two of a second phase
+def twoPhaseBlocks():
+  e = mapOf(SQ5, 20, lambda i, j: i // 10 + (j // 10) * 2)
+  e = EBSD(e.pos, e.rotations, np.where(e.pos.data[:, 0] >= 10, 2, 1), phaseList(CSG, crystalFrame("6/mmm", mineral="other")))
+  return calcGrains(e, angle=5 * degree)
+
+
+# merged by labels, two grains go into one exactly when they share the label and the phase, as the
+# pairs form joins no two phases
+@pytest.mark.parametrize("labels", [[1, 1, 1, 1], [1, 2, 1, 2], [1, 1, 2, 2], [3, 1, 2, 3]])
+def test_merge_byLabelsJoinsTheGrainsOfOneLabelAndOnePhase(labels):
+  g = twoPhaseBlocks()
+  assert len(np.unique(g.phaseId)) == 2
+  labels = np.array(labels)
+  m = g.merge(labels)
+  same = (labels[:, None] == labels[None, :]) & (g.phaseId[:, None] == g.phaseId[None, :])
+  assert np.array_equal(g.parentId[:, None] == g.parentId[None, :], same)
+  assert np.array_equal(m.phaseId[g.parentId - 1], g.phaseId)
+
+
 # an inclusion joins the grain around it, which keeps its phase and orientation
 def test_merge_inclusionJoinsTheGrainAroundIt():
   gi = calcGrains(inclusionMap(), angle=5 * degree)

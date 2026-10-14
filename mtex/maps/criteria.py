@@ -64,6 +64,18 @@ def _perPhase(x):
   return len(x) != 2 or any(isinstance(t, (list, tuple, np.ndarray)) for t in x)
 
 
+# the entry of phase p in a list per phase: one entry per phase of CSList, MATLAB's cell, or one per
+# indexed phase in their order
+def _phaseEntry(x, CSList, p):
+  if len(x) == len(CSList):
+    return x[p]
+  indexed = [q for q in range(len(CSList)) if CSList[q].isIndexed]
+  if len(x) == len(indexed) and p in indexed:
+    return x[indexed.index(p)]
+  raise ValueError(f"{len(x)} thresholds for {len(indexed)} indexed phases: give one per indexed phase, or one per entry of "
+                   f"ebsd.CSList ({len(CSList)}), or a single threshold for all phases")
+
+
 def _pairs(ebsd, i, j):
   i, j = np.asarray(i).reshape(-1), np.asarray(j).reshape(-1)
   if i.shape != j.shape:
@@ -123,11 +135,13 @@ DEFAULT_ANGLE = 15 * degree
 
 class gbcAngle(grainBoundaryCriterion):
   """the criterion of a threshold on the misorientation angle: one angle, or a high and a low
-  angle threshold, the pair counting as the share of the levels it stays below; byPhase gives
-  a phase thresholds of its own
+  angle threshold, the pair counting as the share of the levels it stays below; a list of
+  other than two numbers, or of lists, gives every phase its own, one entry per indexed phase
+  or per entry of ebsd.CSList as MATLAB's cell; byPhase gives a phase thresholds by its name
 
     gbcAngle(10*degree)
     gbcAngle([10*degree, 2*degree])
+    gbcAngle([[10*degree], [15*degree, 2*degree]])  # one per indexed phase
     gbcAngle(10*degree, byPhase={'Forsterite': 15*degree})"""
 
   def __init__(self, threshold=DEFAULT_ANGLE, byPhase=None):
@@ -140,7 +154,7 @@ class gbcAngle(grainBoundaryCriterion):
     if own is not None:
       return own
     if _perPhase(self.threshold):
-      return _levels(self.threshold[p])
+      return _levels(_phaseEntry(self.threshold, CSList, p))
     return _levels(self.threshold)
 
   def evaluate(self, ebsd, i, j, backend=None):

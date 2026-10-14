@@ -439,15 +439,16 @@ class orientation(rotation):
   def unique(self, tol=1e-3, symmetry=True, stable=False, return_index=False, return_inverse=False):
     """the disjoint list of orientations, symmetric equivalents within a tolerance taken as one
 
-      u = unique(ori)                                         # one of each
+      u = unique(ori)                                         # one of each, sorted
       u = unique(ori, tol=1*degree)                           # within 1 degree as one
+      u = unique(ori, stable=True)                            # in the order of first appearance
       u = unique(ori, symmetry=False)                         # the rotations as stored
       u, iOri, iu = unique(ori, return_index=True, return_inverse=True)  # the index maps
 
     Two orientations are one when their misorientation angle, symmetry reduced, is below tol.
     Every orientation not yet taken takes the later ones within the tolerance, so the first of
-    each kept is returned, in the order of first appearance. MATLAB sorts unless 'stable' is
-    given; here the order is always that of first appearance.
+    each is kept. They are sorted by the coefficients of their equivalents in the fundamental
+    region, or with stable kept in the order of first appearance.
 
     Input
       ori - orientation
@@ -459,13 +460,13 @@ class orientation(rotation):
       tol - the angular tolerance, in radians
       symmetry - take symmetric equivalents as one; False compares the rotations as stored,
           MATLAB's 'noSymmetry'
-      stable - accepted for MATLAB's flag; the order is that of first appearance anyway
+      stable - keep the order of first appearance instead of sorting
       return_index - also return iOri
       return_inverse - also return iu
     See also
       quaternion.unique, orientation.isclose, orientation.symmetrise"""
     from .symmetryops import orientationUnique
-    return orientationUnique(self, tol, symmetry, return_index, return_inverse)
+    return orientationUnique(self, tol, symmetry, stable, return_index, return_inverse)
 
   def mean(self, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False,
            axis=None, dtype=None, out=None, keepdims=False, **kwargs):

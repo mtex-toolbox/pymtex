@@ -225,7 +225,7 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   @staticmethod
   def unimodal(*args, **kwargs):
-    """S2FunHarmonic.unimodal(v, halfwidth=w): MATLAB's other name of S2Fun.unimodal"""
+    """S2FunHarmonic.unimodal(v, psi): MATLAB's other name of S2Fun.unimodal"""
     return S2Fun.unimodal(*args, **kwargs)
 
   @classmethod

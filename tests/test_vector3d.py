@@ -375,3 +375,18 @@ def test_rand_inARegionIsUniformInIt(a):
   v = vector3d.rand(20000, sphericalRegion(zvector, a), rng=rng())
   z = np.sort(v.z)
   assert v.shape == (20000,) and np.all(z >= a) and np.max(np.abs(z - np.linspace(a, 1, len(z)))) < 0.02 * (1 - a)
+
+
+@pytest.mark.parametrize("frame", [None, "specimen", "1", "m-3m"])
+def test_char_writesEveryVectorWhateverItsFrame(frame):
+  # the coordinates outside a crystal frame, the indices inside one, str the same text
+  from mtex import crystalFrame, specimenFrame
+  v = vector3d([[1, 2, 3], [0, 0, -1]])
+  if frame == "specimen":
+    v = vector3d([[1, 2, 3], [0, 0, -1]], frame=specimenFrame())
+  elif frame is not None:
+    from mtex import Miller
+    v = Miller([[1, 2, 3], [0, 0, -1]], crystalFrame(frame), "uvw")
+  s = v.char()
+  assert isinstance(s, str) and s == str(v)
+  assert (s == "(1,2,3) (0,0,-1)") == (frame in (None, "specimen"))

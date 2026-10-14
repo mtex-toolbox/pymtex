@@ -142,5 +142,5 @@ mtexColorbar(title='mrd')
 #
 # `mtexColorbar` toggles, as MATLAB's does: it removes the colour bars of the figure when
 # it has some and adds them otherwise, which is why the call before `setColorRange` takes
-# the three panel bars away. `calcODF` is silent by default here; `silent=False` prints
+# the three panel bars away. `calcODF` is silent by default here; `verbose=True` prints
 # MATLAB's iteration trace.

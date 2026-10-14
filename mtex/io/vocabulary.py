@@ -16,7 +16,7 @@ SampleFileName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote
                          "alphaBetaTitanium", "EMSphinx", "testgrains", "dubna", "geesthacht", "steel", "ptx", "zncuti",
                          "aachenexp", "dubnaODF", "eclogite", "vectors", "dubnaValues", "smiley", "tongue", "vpsc",
                          "trueEbsdWCCoSmall", "xnovo", "SmallIN100", "odf", "quartzPiezo", "olivine1997",
-                         "quartzPattern", "3d", "NeperGrain3d", "copper29", "my100grains", "trueEbsdWCCo"]
+                         "quartzPattern", "3d", "copper29", "my100grains", "trueEbsdWCCo"]
 
 # the maps among them
 SampleEBSDName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "olivine", "twins",

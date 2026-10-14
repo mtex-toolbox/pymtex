@@ -276,7 +276,7 @@ class SO3VectorField:
   def __mul__(self, a):
     if isinstance(a, (int, float, np.number)):
       return self._scaled(a)
-    return mapField(lambda x, s: s[:, None] * x, self, a)
+    return mapField(np.multiply, self, a)
 
   __rmul__ = __mul__
 
@@ -676,13 +676,14 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
 
     u = mapField(np.cross, v, w)                                  # the cross product of two fields
     f = mapField(np.multiply, v, w, reduce=True, invariant=True)  # the inner product, a function on the full frames
-    u = mapField(lambda a, f: a * f[:, None], v, F, bandwidth=8)  # a field times a scalar function
+    u = mapField(np.multiply, v, F, bandwidth=8)                  # a field times a scalar function
     u = mapField(np.multiply, v, 2)                               # a field times a number
 
   The arguments are evaluated on the quadrature grid of the component frames of v, op is
   applied to the arrays, the tangent vectors of a field an (n, 3) array in the tangent space of
-  v, a function's values an array of n, a number itself, and the result is expanded again: an
-  (n, 3) result is a field in the tangent space of v, an (n,) one a function. The bandwidth is
+  v, a function's values an (n, 1) column, which broadcasts against them, a number itself, and
+  the result is expanded again: an (n, 3) result is a field in the tangent space of v, one
+  value per node a function. The bandwidth is
   that of the operands added, at most the preference maxSO3Bandwidth. A scalar result lives
   on the component frames of v unless invariant says it is invariant under the full frames of
   the field.
@@ -714,13 +715,15 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
       return _tangentValues(a(os), v.tangentSpace)
     if isinstance(a, (int, float, np.number)):
       return a
-    return np.real(a(os)).ravel()
+    return np.real(a(os)).reshape(-1, 1)
 
   values = op(evaluate(v), *(evaluate(a) for a in args))
   if reduce:
     values = np.sum(values, axis=-1)
-  if values.ndim == 2:
+  # three columns are a field, a single value per node a function
+  if values.ndim == 2 and values.shape[-1] == 3:
     return SO3VectorFieldHarmonic(_adjointColumns(g, values, L, g.weights), v.CS, v.SS, v.tangentSpace).truncate(L0)
+  values = np.broadcast_to(values, (len(os),) + np.shape(values)[1:]).reshape(len(os))
   fhat = wignerSeriesAdjoint(g, values, L)
   f = SO3FunHarmonic(fhat, v.CS, v.SS, real=True, _internal=True) if invariant else SO3FunHarmonic(fhat, cA, cB, real=True, _internal=True)
   return f.truncate(L0)

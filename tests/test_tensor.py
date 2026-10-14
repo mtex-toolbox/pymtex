@@ -493,3 +493,13 @@ def test_rand_drawsUniformEntriesOnTheUnitInterval(K, rank):
   M = K.rand(500, rank=rank, rng=rng).M
   assert M.min() >= 0 and M.max() <= 1 and abs(M.mean() - 0.5) < 0.02
   assert K is tensor or np.allclose(M, np.swapaxes(M, -1, -2))
+
+
+@pytest.mark.parametrize("shape", [(), (4,), (2, 3)])
+def test_strainRateTensor_keepsTheSymmetricPartOfAnyMatrix(shape):
+  # MATLAB's constructor: E.M = (M + M') / 2, so a velocity gradient gives its strain rate
+  from mtex import strainRate, strainRateTensor, velocityGradientTensor
+  M = np.random.default_rng(6).standard_normal(shape + (3, 3))
+  sym = 0.5 * (M + np.swapaxes(M, -1, -2))
+  assert np.allclose(strainRateTensor(M).M, sym)
+  assert np.allclose(strainRateTensor(velocityGradientTensor(M)).M, strainRate(velocityGradientTensor(M)).M)

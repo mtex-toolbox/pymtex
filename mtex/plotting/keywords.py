@@ -17,13 +17,36 @@ _LINE = {"lineWidth": "linewidth", "lineStyle": "linestyle", "lineColor": "color
          "markerSize": "markersize", "markerFaceColor": "markerfacecolor", "markerEdgeColor": "markeredgecolor"}
 
 
-def refuseVariants(kw):
-  """raises TypeError where a style keyword of kw is spelled otherwise than MTEX spells it"""
+# MATLAB's options of the plots this port spells otherwise or does not take, with what to write
+# instead; refused before they could reach matplotlib as a property it does not know
+MATLAB_FLAGS = {
+  "noBoundary": "write boundary=False",
+  "points": "write backend='scatter'",
+  "exact": "write backend='patch' or a larger maxPixels",
+  "dynamicMarkerSize": "a figure here is drawn once; markerSize sets the size",
+  "autoArrowSize": "the arrows take their length from the grid by default; arrowSize scales it",
+  "refFrameDirs": "the scale bar draws the axes of the specimen frame, refFrame=False leaves them out",
+  "refFrameLabels": "the scale bar draws the axes of the specimen frame, refFrame=False leaves them out",
+  "scale": "scale sizes the crystal shapes of plot(grains, cS) and the arrows of quiver",
+}
+
+
+def refuseVariants(kw, flags=()):
+  """raises TypeError where a style keyword of kw is spelled otherwise than MTEX spells it, or
+  is one of MATLAB's options of the plots this port does not take (MATLAB_FLAGS, the names of
+  flags as well where the caller does not read them)"""
   for k in kw:
     c = _SPELLINGS.get(k.lower())
     if c is not None and k != c:
       raise TypeError(f"the keyword {k!r} is spelled {c!r}")
+    if k in MATLAB_FLAGS and (k not in _READ_ELSEWHERE or k in flags):
+      raise TypeError(f"MATLAB's option {k!r} is not taken here: {MATLAB_FLAGS[k]}")
   return kw
+
+
+# the flags of MATLAB_FLAGS some other plot reads under the same name (the points of a fibre or
+# a region, the scale of crystal shapes and arrows), refused only where the caller names them
+_READ_ELSEWHERE = {"points", "scale"}
 
 
 def lineKeywords(kw):

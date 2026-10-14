@@ -4,7 +4,7 @@
 #   S2Fun.smiley(bandwidth=256)        the smiley test function, by quadrature
 #   S2Fun.smiley(v)                    its values at directions
 #   S2Fun.smiley(exact=True)           the function itself, as a handle
-#   S2Fun.unimodal(v, halfwidth=w)     a de la Vallee Poussin bump about v
+#   S2Fun.unimodal(v, psi)             the kernel psi about v, by default a de la Vallee Poussin bump
 #   S2Fun.interpolate(v, values)       a function through values
 from __future__ import annotations
 
@@ -73,30 +73,31 @@ class S2Fun:
     return S2FunHarmonic.quadrature(lambda w: _smileyValues(w, even), antipodal=even or kwargs.pop("antipodal", False), **kwargs)
 
   @staticmethod
-  def unimodal(v=None, halfwidth=25 * degree, psi=None):
+  def unimodal(v=None, psi=None, *, halfwidth=25 * degree):
     """a unimodal function on the sphere, a radial kernel about one direction, as a harmonic
     expansion
 
       sF = S2Fun.unimodal()                          # about the north pole, halfwidth 25 degree
       sF = S2Fun.unimodal(halfwidth=10*degree)       # another halfwidth
-      sF = S2Fun.unimodal(v, psi=psi)                # the kernel psi about the direction v
+      sF = S2Fun.unimodal(v, psi)                    # the kernel psi about the direction v
 
-    The function is the de la Vallee Poussin kernel of the halfwidth, or the kernel psi, turned
-    from the north pole to v. MATLAB's S2Fun.unimodal(v, psi) takes the kernel positionally;
-    here it is the keyword psi.
+    The function is the kernel psi, by default the de la Vallee Poussin kernel of the
+    halfwidth, turned from the north pole to v.
 
     Input
       v - vector3d, the direction of the maximum, by default the north pole
+      psi - S2Kernel, by default the de la Vallee Poussin kernel of the halfwidth
     Output
       sF - S2FunHarmonic
     Keywords
-      halfwidth - the halfwidth of the de la Vallee Poussin kernel
-      psi - S2Kernel, the kernel instead
+      halfwidth - the halfwidth of the default de la Vallee Poussin kernel
     See also
       S2DeLaValleePoussinKernel, S2Fun.smiley, S2Kernels"""
     from ..geometry.quaternion import rotation
     from .kernelfunctions import S2DeLaValleePoussinKernel
     from .s2fun import S2FunHarmonic
+    if isinstance(psi, (int, float, np.number)):
+      raise TypeError("S2Fun.unimodal(v, psi) takes a kernel; a halfwidth is the keyword halfwidth=")
     psi = S2DeLaValleePoussinKernel(halfwidth=halfwidth) if psi is None else psi
     sF = S2FunHarmonic(psi)
     # a bump away from the north pole is turned there

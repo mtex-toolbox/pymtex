@@ -420,3 +420,22 @@ def test_mean_projectedAreTheEquivalentsClosestToTheMean():
   assert np.allclose(angle(p, ori), 0, atol=1e-7)
   assert np.allclose(angle(p, m, symmetry=False), angle(ori, m), atol=1e-7)
   assert lam.shape == (4,) and V.shape == (4,)
+
+
+@pytest.mark.parametrize("symmetry", [True, False])
+@pytest.mark.parametrize("group", ["1", "432", "-3m"])
+def test_unique_sortsUnlessStable(group, symmetry):
+  # sorted: the same list whatever the order of the input; stable: the first of each in the order
+  # of first appearance; either way u = ori[iv] and ori = u[iu]
+  gen = np.random.default_rng(12)
+  cs = crystalFrame(group)
+  ori = orientation.rand(12, cs, rng=gen)
+  ori = cat(ori, ori[[7, 2, 7, 0]])
+  perm = gen.permutation(ori.size)
+  u, iv, iu = ori.unique(symmetry=symmetry, return_index=True, return_inverse=True)
+  s, ivs, ius = ori.unique(symmetry=symmetry, stable=True, return_index=True, return_inverse=True)
+  assert u.size == s.size == 12 and np.all(np.diff(ivs) > 0)
+  assert np.array_equal(np.sort(iv), ivs)
+  assert np.allclose(ori[perm].unique(symmetry=symmetry).data, u.data)
+  for w, i, j in ((u, iv, iu), (s, ivs, ius)):
+    assert np.array_equal(w.data, ori[i].data) and np.allclose(angle(w[j], ori, symmetry=symmetry), 0, atol=1e-6)

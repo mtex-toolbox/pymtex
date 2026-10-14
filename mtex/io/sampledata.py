@@ -45,8 +45,10 @@ if TYPE_CHECKING:
 with open(os.path.join(os.path.dirname(__file__), "sampledata.json")) as _f:
   MANIFEST = json.load(_f)
 
-# the files of every data set of the data repository, by its name in lower case
-SOURCES = {name.lower(): [dict(MANIFEST["files"][f], path=f) for f in d["files"]] for name, d in MANIFEST["datasets"].items()}
+# the files of every data set of the data repository, by its name in lower case; a data set the
+# repository lists without files (NeperGrain3d, which MATLAB simulates with Neper) is left out
+SOURCES = {name.lower(): [dict(MANIFEST["files"][f], path=f) for f in d["files"]] for name, d in MANIFEST["datasets"].items()
+           if d["files"]}
 
 # the data sets with a recipe: name, type, description, the data set whose files they read
 # ("" for none), the recipe
@@ -75,7 +77,7 @@ def _sha256(path):
 
 # where a source file is, under the data path or its EBSD or PoleFigure folder, fetched and
 # checked where it is not there yet
-def _resolve(source, root, download):
+def _resolve(source, root, download, verbose=True):
   parts = source["path"].split("/")
   full = os.path.join(root, *parts)
   short = os.path.join(root, *parts[1:]) if len(parts) > 1 else full
@@ -85,7 +87,8 @@ def _resolve(source, root, download):
   if not download:
     raise FileNotFoundError(f"the sample data file {source['path']} is not under {root}")
   os.makedirs(os.path.dirname(full), exist_ok=True)
-  print(f"  downloading {source['url']}\n  to {full}")
+  if verbose:
+    print(f"  downloading {source['url']}\n  to {full}")
   urllib.request.urlretrieve(source["url"], full)
   if _sha256(full) != source["sha256"]:
     os.remove(full)
@@ -106,13 +109,13 @@ def _find(name):
   return d
 
 
-def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
+def mtexdatafile(name: SampleFileName | Any, root=None, download=True, verbose=True):
   """the file of a sample data set, or its files, fetched on first use
 
   Besides the data sets mtexdata reads, every data set of the data repository has its
   files here, the Neper tessellation 'my100grains' for instance. root= is the folder the
   files are kept in, mtexDataPath() by default; download=False raises for a missing one
-  instead of fetching it.
+  instead of fetching it; verbose=False fetches it without saying so.
 
     fname = mtexdatafile('forsterite')
     tess, oris = mtexdatafile('my100grains')      # a data set of several files
@@ -124,7 +127,7 @@ def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
   if artifact not in SOURCES and artifact:
     raise ValueError(f"no sample data set called {name!r}; mtexdata() lists them")
   root = mtexDataPath() if root is None else os.path.abspath(os.path.expanduser(root))
-  paths = [_resolve(s, root, download) for s in SOURCES.get(artifact, [])]
+  paths = [_resolve(s, root, download, verbose) for s in SOURCES.get(artifact, [])]
   return paths[0] if len(paths) == 1 else paths
 
 
@@ -186,13 +189,14 @@ def mtexdata(name=None, root=None, download=True, verbose=True):
   Keywords
     root - the folder the files are kept in, instead of mtexDataPath()
     download - fetch a missing file; False raises instead
-    verbose - accepted for MATLAB's silent flag; reading prints nothing, a download its source
+    verbose - report a download, its source and where the file is kept; False is MATLAB's
+        silent
   See also
     mtexdatafile, loadEBSD, loadPoleFigure"""
   if name is None:
     return SampleTable()
   d = _find(name)
-  files = mtexdatafile(name, root, download) if d["files"] else None
+  files = mtexdatafile(name, root, download, verbose) if d["files"] else None
   # a binary pair is one map, named by its first file
   if isinstance(files, list) and d["type"] == "EBSD":
     files = files[0]

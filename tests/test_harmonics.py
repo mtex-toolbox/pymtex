@@ -477,3 +477,15 @@ def test_clebschGordanTensor_isTheCoefficientsAtEveryIndex():
   C = clebschGordanTensor(2, 1, 2)
   full = np.array([[[clebschGordan(2, m1, 1, m2, 2, M) for M in range(-2, 3)] for m2 in range(-1, 2)] for m1 in range(-2, 3)])
   assert np.array_equal(C, full)
+
+
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+@pytest.mark.parametrize("g", ["rotations", "beta", "frame"])
+@pytest.mark.parametrize("normalize", [False, True])
+def test_WignerD_returnsTheDtypeAskedFor(dtype, g, normalize):
+  # every matrix, of one degree or of all up to a bandwidth, is of the type asked for
+  from mtex import WignerD, crystalFrame, rotation
+  x = {"rotations": rotation.rand(4, rng=np.random.default_rng(2)), "beta": 0.3, "frame": crystalFrame("432")}[g]
+  kw = {} if g == "frame" else {"normalize": normalize}
+  assert WignerD(x, 3, dtype=dtype, **kw).dtype == dtype
+  assert all(D.dtype == dtype for D in WignerD(x, bandwidth=2, dtype=dtype, **kw))

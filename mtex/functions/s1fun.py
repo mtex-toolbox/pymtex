@@ -131,10 +131,10 @@ class S1FunHarmonic(harmonicArithmetic):
     if np.linalg.norm(x - 2 * np.pi * np.arange(n) / n) < 1e-12:
       return cls.quadrature(x, values, bandwidth=(n - 1) // 2 if bandwidth is None else bandwidth)
     w = np.full(n, 1 / n) if weights is None else np.asarray(weights, dtype=float).ravel()[order]
-    # coinciding angles, within tol, take the mean of their values
-    tol = 1e-6
-    key = np.round(x / tol).astype(np.int64)
-    key[key == round(2 * np.pi / tol)] = 0
+    # coinciding angles, within 1e-6, take the mean of their values
+    merge = 1e-6
+    key = np.round(x / merge).astype(np.int64)
+    key[key == round(2 * np.pi / merge)] = 0
     _, first, inv = np.unique(key, return_index=True, return_inverse=True)
     x = x[first]
     values = _groupSums(inv, values, len(first)) / np.bincount(inv)

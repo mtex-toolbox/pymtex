@@ -49,7 +49,7 @@ from .funcs import (angle, dot, cross, orthProj, norm, normalize, inv, mean, sum
                     LaueName, sim, isAligned, isCompatible, transformationMatrix, alignment, stripSym, fullSym,
                     dspacing, round, symmetrise, multiplicity, projectIntoFundamentalRegion, transformReferenceFrame,
                     fundamentalSector, conventionalSector, fundamentalRegion, checkInside, find, subGrid, discretize,
-                    displacement, fitStage)
+                    displacement, fitStage, project)
 
 __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vector3d", "isCrystalDirection",
            "quaternion", "rotation", "orthogonalTransform", "reflection", "homochoricRadius", "cubo2homo", "homo2cubo",
@@ -76,7 +76,7 @@ __all__ = ["degree", "mtexdegchar", "getMTEXpref", "setMTEXpref", "reset", "vect
            "properSubGroup", "disjoint", "union", "factor", "nfold", "numSym", "numProper", "LaueName", "sim",
            "isAligned", "isCompatible", "transformationMatrix", "alignment", "stripSym", "fullSym", "dspacing", "round",
            "symmetrise", "multiplicity", "projectIntoFundamentalRegion", "transformReferenceFrame", "checkInside",
-           "find", "subGrid", "discretize", "displacement", "fitStage"]
+           "find", "subGrid", "discretize", "displacement", "fitStage", "project"]
 
 from typing import TYPE_CHECKING
 

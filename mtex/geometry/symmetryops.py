@@ -298,10 +298,11 @@ def _neighbours(o, tol, symmetry):
   return OrientationTree(flat).radius(flat, tol)[0].tocsr()
 
 
-def orientationUnique(o, tol=1e-3, symmetry=True, return_index=False, return_inverse=False):
+def orientationUnique(o, tol=1e-3, symmetry=True, stable=False, return_index=False, return_inverse=False):
   """the orientations with the duplicates within the tolerance removed, symmetric equivalents
-  counting as one unless symmetry=False; the first of each kept, in order, with the indices
-  of the kept and the index of every orientation into them when asked
+  counting as one unless symmetry=False; the first of each kept, sorted by the coefficients of
+  its equivalent in the fundamental region or, stable, in the order of first appearance, with
+  the indices of the kept and the index of every orientation into them when asked
 
     u = orientationUnique(ori, tol=1*degree)
     u, iv, iu = orientationUnique(ori, return_index=True, return_inverse=True)"""
@@ -318,7 +319,22 @@ def orientationUnique(o, tol=1e-3, symmetry=True, return_index=False, return_inv
       keep[later] = False
       first[later] = k
   iv, iu = _keptAndInverse(keep, first)
+  if not stable and len(iv) > 1:
+    order = _sortedOrder(o.flatten()[iv], tol, symmetry)
+    rank = np.empty_like(order)
+    rank[order] = np.arange(len(order))
+    iv, iu = iv[order], rank[iu]
   return _uniqueOutput(o._new(o.data.reshape(-1, 4)[iv]), iv, iu, return_index, return_inverse)
+
+
+# the order of distinct orientations by the rounded coefficients of their equivalents in the
+# fundamental region, the sign of a quaternion fixed by its first coefficient that is not zero
+def _sortedOrder(u, tol, symmetry):
+  q = (u.projectIntoFundamentalRegion() if symmetry else u).data.reshape(-1, 4)
+  key = np.round(q / tol)
+  lead = key[np.arange(len(key)), np.argmax(key != 0, axis=-1)]
+  key = key * np.where(lead < 0, -1.0, 1.0)[:, None]
+  return np.lexsort(key.T[::-1])
 
 
 def orientationMean(o, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False):

@@ -305,6 +305,22 @@ def test_accumVotes_countCountsTheVotes():
   assert c.kind == "count" and c.parentId[0, 0] == 2 and c.count[0, 0] == 4
 
 
+# a vote table has at least numFit columns however few votes pass minFit, none or fewer variants than
+# numFit, and calcParentFromVote turns exactly the grains with a vote, none when no vote passed
+@pytest.mark.parametrize("kind", [{}, {"bestFit": True}, {"count": True}])
+@pytest.mark.parametrize("numFit, minFit", [(2, 0.0), (3, 0.0), (2, 0.6 * degree), (5, 0.6 * degree)])
+def test_calcParentFromVote_turnsOnlyGrainsWithAVote(plain, kind, numFit, minFit):
+  e, g = plain
+  job = parentGrainReconstructor(e, g, P2C)
+  job.calcGBVotes(numFit=numFit, minFit=minFit, **kind)
+  v = job.votes
+  assert v.parentId.shape == v.value.shape and v.value.shape[0] == len(job.grains) and v.value.shape[1] >= numFit
+  best = v.value[:, 0]
+  voted = (v.parentId[:, 0] > 0) & ~np.isnan(best) & ((best > 0) if v.kind == "prob" else True)
+  job.calcParentFromVote(minFit=np.inf)
+  assert np.array_equal(job.isParent, voted)
+
+
 # after a merge the voted grains are the merged ones: every parent grain still fits its parent, and
 # reconsiderAll, which votes for the grains as measured, is refused
 def test_calcParentFromVote_afterAMergeTurnsTheMergedGrains(plain):

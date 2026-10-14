@@ -115,7 +115,8 @@ def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tol=None, m
     np.minimum.at(M, (g, v), f)
     M[np.isinf(M)] = np.nan
     order = np.argsort(np.where(np.isnan(M), np.inf, M), axis=1, kind="stable")
-    return voteTable(order + 1, fit=np.take_along_axis(M, order, axis=1))
+    parentId, fit = _padVotes(order + 1, np.take_along_axis(M, order, axis=1), numFit)
+    return voteTable(parentId, fit=fit)
   if count:
     M = np.zeros((n, numV))
     np.add.at(M, (g, v), f < threshold)
@@ -134,8 +135,18 @@ def accumVotes(grainInd, parentId, fit, n, numFit=2, threshold=None, tol=None, m
   # descending, a row without votes first as MATLAB sorts nan
   order = np.argsort(np.where(np.isnan(M), -np.inf, -M), axis=1, kind="stable")[:, :numFit]
   value = np.take_along_axis(M, order, axis=1)
-  kind = "count" if count else "prob"
-  return voteTable(order + 1, **{kind: value})
+  parentId, value = _padVotes(order + 1, value, numFit)
+  return voteTable(parentId, **{"count" if count else "prob": value})
+
+
+# a table of fewer than numFit variants, none when no vote passed minFit and maxFit, filled up to
+# numFit columns of no variant (id 0) and no value, which no criterion of calcParentFromVote passes
+def _padVotes(parentId, value, numFit):
+  k = numFit - parentId.shape[1]
+  if k <= 0:
+    return parentId, value
+  n = len(parentId)
+  return np.hstack([parentId, np.zeros((n, k), dtype=parentId.dtype)]), np.hstack([value, np.full((n, k), np.nan)])
 
 
 # the quantile of the values of every (grain, variant) cell, 0 where a cell has none

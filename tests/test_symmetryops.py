@@ -104,7 +104,8 @@ def test_orientation_unique_and_mean():
   eq = symmetrise(o)
   assert unique(eq).size == 1 and unique(cat(eq, orientation(rotation.rand(rng=rng), csC))).size == 2
   assert unique(eq, symmetry=False).size == 24
-  u, iv, iu = unique(cat(o, o, orientation(rotation.rand(rng=rng), csC)), return_index=True, return_inverse=True)
+  u, iv, iu = unique(cat(o, o, orientation(rotation.rand(rng=rng), csC)), stable=True, return_index=True,
+                     return_inverse=True)
   assert u.size == 2 and iv.tolist() == [0, 2] and iu.tolist() == [0, 0, 1]
   small = rotation.byAxisAngle(vector3d.rand(200, rng=rng), 0.1 * rng.random(200))
   G = csC.properGroup().rotations()

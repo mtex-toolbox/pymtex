@@ -292,3 +292,16 @@ def test_plotS2Grid_and_values_drawn_on_it():
   assert g.ndim == 2 and g.frame is cs and np.nanmin(g.z) > -1e-9
   hs = contourf(g, g.z)
   assert len(hs) == 1 and hs[0] is not None
+
+
+@pytest.mark.parametrize("resolution", [5 * degree, (5 * degree, 10 * degree), (10 * degree, 2.5 * degree)])
+def test_plotS2Grid_is_spaced_by_its_resolution_in_the_polar_angle_and_the_azimuth(resolution):
+  from mtex import plotS2Grid
+  polar, azimuth = (resolution, resolution) if np.ndim(resolution) == 0 else resolution
+  g = plotS2Grid(resolution=resolution, upper=True)
+  theta, rho = np.arccos(np.clip(g.z, -1, 1)), np.unwrap(np.arctan2(g.y, g.x), axis=1)
+  # the steps that divide the ranges, 90 degree in the polar angle into an even number of
+  # them (an odd number of rows, as MATLAB), 360 degree in the azimuth
+  dTheta, dRho = np.abs(np.diff(theta[:, 1])), np.abs(np.diff(rho[1]))
+  assert np.allclose(dTheta, np.pi / 2 / (2 * round(np.pi / 2 / polar / 2)))
+  assert np.allclose(dRho, 2 * np.pi / round(2 * np.pi / azimuth))

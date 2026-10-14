@@ -486,3 +486,30 @@ def test_mapPlot_outOfScreen_turnsWithAFlippingLayout(forsterite):
 def test_onOff_readsMATLABsSwitches():
   from mtex.plotting.mapplot import _onOff
   assert (_onOff("on"), _onOff("off"), _onOff(None)) == (True, False, None)
+
+
+@pytest.mark.parametrize("values", [False, True])
+@pytest.mark.parametrize("smooth", [False, True])
+def test_plot_ofABoundaryWithSmoothRoundsItsJoins(forsterite, values, smooth):
+  _, grains = forsterite
+  gB = grains.boundary
+  h = plot(gB, np.arange(len(gB)) if values else None, lineWidth=4, smooth=smooth)
+  join = h.get_joinstyle() if values else h.get_solid_joinstyle()
+  assert (join == "round") == smooth
+
+
+@pytest.mark.parametrize("name", ["area", "perimeter", "equivalentRadius", "diameter", "numNeighbors", "aspectRatio",
+                                  "shapeFactor", "paris", "convexity"])
+def test_mapValues_ofTheNameOfAGrainMeasureAreItsValues(forsterite, name):
+  _, grains = forsterite
+  value = getattr(grains, name)
+  values, scalar = mapValues(grains, name)
+  assert scalar and np.allclose(values, np.asarray(value() if callable(value) else value, dtype=float).reshape(-1), equal_nan=True)
+  # and the plot colours the grains by them
+  assert plot(grains, name).get_array() is not None
+
+
+def test_mapValues_ofAMethodThatIsNoMeasureIsAColourName(forsterite):
+  _, grains = forsterite
+  with pytest.raises(ValueError):
+    mapValues(grains, "copy")

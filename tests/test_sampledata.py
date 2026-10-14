@@ -193,3 +193,25 @@ def test_the_quartz_pattern_is_read_with_a_along_x():
 def test_lookup_finds_a_recipe_case_aside_and_none_for_another_name():
   from mtex.io.sampledata import _lookup
   assert _lookup("FORSTERITE")["name"] == "forsterite" and _lookup("my100grains") is None
+
+
+def test_every_name_offered_reads_a_recipe_or_fetches_files():
+  # a name the editor completes is one mtexdata reads or one whose files mtexdatafile fetches
+  from typing import get_args
+
+  from mtex.io.sampledata import _lookup
+  from mtex.io.vocabulary import SampleFileName
+  for name in get_args(SampleFileName):
+    d = _lookup(name)
+    assert (d is not None and (d["files"] or not d["artifact"])) or SOURCES.get(name.lower()), name
+
+
+@pytest.mark.parametrize("verbose", [True, False])
+def test_a_download_reports_itself_exactly_when_verbose(monkeypatch, tmp_path, capsys, verbose):
+  import mtex.io.sampledata as sd
+  source = SOURCES["ferrite"][0]
+  monkeypatch.setattr(sd.urllib.request, "urlretrieve", lambda url, path: shutil.copy(os.path.join(FIXTURES, "ferrite_cut.ang"), path))
+  monkeypatch.setitem(source, "sha256", sd._sha256(os.path.join(FIXTURES, "ferrite_cut.ang")))
+  e = mtexdata("ferrite", root=tmp_path, verbose=verbose)
+  assert len(e) == 468
+  assert ("downloading" in capsys.readouterr().out) == verbose

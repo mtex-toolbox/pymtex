@@ -475,9 +475,10 @@ class grain2d(polygonSet):
       parentId = grains.merge(threshold=5*degree, testRun=True)  # the parent ids, nothing merged
 
     Two grains go into one when a criterion joins them, directly or through a chain of other
-    grains; several criteria given together apply together. A boundary between grains of two
-    phases is merged only by an inclusion, which then takes the phase and the orientation of
-    its host.
+    grains; several criteria given together apply together. Grains of two phases are merged
+    only by an inclusion, which then takes the phase and the orientation of its host: a pair
+    of them is passed over, and a label spanning phases joins the grains of each phase apart,
+    where MATLAB joins them and gives the merged grain the largest phase id.
 
     The merge relabels and nothing else: the boundary between the parts of a merged grain
     moves to its inner boundary, the polygons are traced again, the number of pixels is the
@@ -524,7 +525,9 @@ class grain2d(polygonSet):
       nz = (A.data != 0) if A is not None else np.ones(len(r), dtype=bool)
       pairs = np.stack([r[nz], c[nz]], axis=1) + 1
     elif pairs is not None and np.ndim(pairs) == 1 and len(pairs) == self.size:
-      labels = np.asarray(pairs).reshape(-1)
+      # a label spanning phases joins the grains of each phase apart
+      labels = np.unique(np.asarray(pairs).reshape(-1), return_inverse=True)[1].reshape(-1)
+      labels = labels.astype(np.int64) * 256 + self.phaseId.astype(np.int64)
       pairs = None
     pairs = np.zeros((0, 2), dtype=np.int64) if pairs is None else np.asarray(pairs, dtype=np.int64).reshape(-1, 2)
     a, b = _at(pos, pairs[:, 0]), _at(pos, pairs[:, 1])

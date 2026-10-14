@@ -51,6 +51,23 @@ def _refillOf(ax):
   return None
 
 
+# matplotlib's constrained layout keeping a margin around the axes, in inches: the pad around
+# each axes counts towards it, the rest is the inset of the layout's rectangle, renewed on every
+# layout since the figure grows with its axes
+def _marginLayout(margin, **pads):
+  from matplotlib.layout_engine import ConstrainedLayoutEngine
+
+  class marginLayout(ConstrainedLayoutEngine):
+    def execute(self, fig):
+      w, h = fig.get_size_inches()
+      p = self.get()
+      dx, dy = max(margin - p["w_pad"], 0.0) / w, max(margin - p["h_pad"], 0.0) / h
+      self.set(rect=(dx, dy, 1 - 2 * dx, 1 - 2 * dy))
+      return super().execute(fig)
+
+  return marginLayout(**pads)
+
+
 class mtexFigure:
   """a figure of MTEX plots: equally sized axes in a grid, with colour bars and legends that
   follow them
@@ -67,8 +84,10 @@ class mtexFigure:
   draw; newMtexFigure makes one the same way. Without layout or columns the n axes are laid
   out in the grid nearest to a slightly wide picture. The layout grows when more axes are
   asked for than it holds, and the figure grows with it, so that the axes keep their size.
-  The spacing between the axes is matplotlib's constrained layout; MATLAB's
-  innerPlotSpacing and outerPlotSpacing are taken and have no effect.
+  The spacing between the axes is matplotlib's constrained layout, which makes room for
+  titles, labels and colour bars; innerPlotSpacing sets the gap between neighbouring axes and
+  outerPlotSpacing the margin around them all, at least half that gap, in pixels at 96 to
+  the inch, as MATLAB's.
 
   Input
     n - the number of axes the layout is made for
@@ -82,8 +101,8 @@ class mtexFigure:
         in a window keeps its size
     columns - the number of columns of the layout
     layout - (rows, columns) of the layout
-    innerPlotSpacing - MATLAB's spacing between the axes, without effect
-    outerPlotSpacing - MATLAB's margin around the figure, without effect
+    innerPlotSpacing - the gap between neighbouring axes, in pixels at 96 to the inch
+    outerPlotSpacing - the margin around the axes, in pixels at 96 to the inch
     marginx - the space left and right of every axes, in pixels at 96 to the inch
     marginy - the space above and below every axes, in pixels at 96 to the inch
   See also
@@ -101,9 +120,14 @@ class mtexFigure:
     # a figure pyplot does not manage is embedded in a window, whose size is the widget's:
     # no plot resizes it
     self.fixedSize = figure is not None and getattr(figure.canvas, "manager", None) is None
-    # MATLAB's marginx and marginy: the space around each axes in pixels, 96 to the inch
+    # MATLAB's marginx and marginy: the space around each axes in pixels, 96 to the inch;
+    # innerPlotSpacing the gap between two axes, which is twice that space
     pads = {name: float(m) / 96 for name, m in (("w_pad", marginx), ("h_pad", marginy)) if m is not None}
-    if figure is None and pads:
+    if innerPlotSpacing is not None:
+      pads = {"w_pad": float(innerPlotSpacing) / 192, "h_pad": float(innerPlotSpacing) / 192, "wspace": 0.0, "hspace": 0.0} | pads
+    if figure is None and outerPlotSpacing is not None:
+      self.fig.set_layout_engine(_marginLayout(float(outerPlotSpacing) / 96, **pads))
+    elif figure is None and pads:
       self.fig.get_layout_engine().set(**pads)
     # a figure adopted keeps its axes, the current one current
     self.children = [] if figure is None else list(figure.axes)

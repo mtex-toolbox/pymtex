@@ -242,8 +242,9 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   The colouring asked for is one of: None or 'phase', the colours of the phases;
   'orientation', or an ipfDirection alone, every phase through the inverse pole figure key of
   its own frame; an orientation per element, through the inverse pole figure key of its
-  phase; an orientationColorKey; the name of a property of the map; a value or an RGB colour
-  per element; one colour, a name or an RGB triple, for all; faceColor alone, one colour for
+  phase; an orientationColorKey; the name of a property of the map or of a value per element
+  it computes (area, perimeter, aspectRatio, ... of grains); a value or an RGB colour per
+  element; one colour, a name or an RGB triple, for all; faceColor alone, one colour for
   all. A site without an orientation is white, a not indexed phase white unless its frame
   has a colour of its own.
 
@@ -308,6 +309,9 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   if isinstance(color, str):
     if color in x.prop:
       return np.asarray(x.prop[color], dtype=float).reshape(-1), True
+    measure = _measure(x, color)
+    if measure is not None:
+      return measure, True
     return np.tile(to_rgb(color), (m, 1)), False
   arr = np.asarray(color)
   # colours in the shape of the map are one per measurement too
@@ -318,6 +322,25 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
   if arr.shape == (3,):
     return np.tile(arr.astype(float), (m, 1)), False
   raise ValueError(f"one value or one colour per element is needed, {n} of them")
+
+
+# the values per element x computes under a name that is not a colour: a property (grains.area,
+# grains.perimeter) or a shape parameter (grains.aspectRatio()), else None
+def _measure(x, name):
+  from matplotlib.colors import is_color_like
+  if is_color_like(name) or name.startswith("_"):
+    return None
+  try:
+    value = getattr(x, name, None)
+    if callable(value):
+      # only the shape parameters are called, no other method
+      if getattr(value, "__module__", None) != "mtex.maps.shape":
+        return None
+      value = value()
+    arr = np.asarray(value, dtype=float)
+  except (TypeError, ValueError):
+    return None
+  return arr.reshape(-1) if arr.size == x.size else None
 
 
 # an inverse pole figure map has no colour for a phase that was not indexed, so it is white
@@ -445,6 +468,7 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     from .shapeplot import plotShapesOnMap
     return plotShapesOnMap(ebsd, color, faceColor=faceColor, faceAlpha=kw.pop("faceAlpha", alpha), edgeColor=kw.pop("edgeColor", edgeColor or "k"),
                            lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, displayName=displayName, **kw)
+  refuseVariants(kw, flags=("points", "scale"))
   location = kw.pop("Location", location)
   alpha = kw.pop("faceAlpha", alpha)
   # one transparency for all or one per measurement, a site without a value opaque to nothing
@@ -620,8 +644,8 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   Input
     grains - grain2d
     color - the colouring: an array of values or of RGB colours, orientations, an
-        orientationColorKey, a crystalShape, a vector3d per grain, a property name, 'phase'
-        or one colour
+        orientationColorKey, a crystalShape, a vector3d per grain, the name of a property or
+        of a measure ('area', 'aspectRatio', ...), 'phase' or one colour
   Output
     h - the matplotlib collection of the grains
   Keywords
@@ -654,6 +678,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
     from .shapeplot import plotShapesOnMap
     return plotShapesOnMap(grains, color, faceColor=faceColor, faceAlpha=alpha, edgeColor=kw.pop("edgeColor", lineColor or "k"),
                            lineWidth=lineWidth, colormap=colormap, micronbar=micronbar, refFrame=refFrame, displayName=displayName, **kw)
+  refuseVariants(kw, flags=("scale",))
   location = kw.pop("Location", location)
   mapKw = _splitMap(kw)
   mP = _target(grains, mapKw)
@@ -758,15 +783,17 @@ def needlesOnMap(grains, v, micronbar=None, refFrame=True, lineWidth=2.0, **kw: 
   return h
 
 
-def _boundaryLines(mP, gB, color, lineWidth, zorder=3, **kw):
+def _boundaryLines(mP, gB, color, lineWidth, zorder=3, smooth=False, **kw):
   P = mP.onScreen(boundaryPolyline(gB))
-  h, = mP.ax.plot(P[:, 0], P[:, 1], color=color, linewidth=lineWidth, solid_joinstyle="miter", snap=True, zorder=zorder, **kw)
+  # smooth rounds the joins and the ends, else the corners of a staircase stay sharp
+  style = {"solid_joinstyle": "round", "solid_capstyle": "round"} if smooth else {"solid_joinstyle": "miter"}
+  h, = mP.ax.plot(P[:, 0], P[:, 1], color=color, linewidth=lineWidth, snap=True, zorder=zorder, **style, **kw)
   return h
 
 
 @_liftable
 def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis", colorRange=None, colorbar=False, edgeAlpha=1.0,
-                 micronbar=None, refFrame=True, displayName=None, **kw: Unpack[PlotKeywords]):
+                 micronbar=None, refFrame=True, displayName=None, smooth=False, **kw: Unpack[PlotKeywords]):
   """the grain boundary segments, in one colour or coloured segment by segment
 
     plot(grains.boundary)                            # all boundaries in black
@@ -774,11 +801,13 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
     plot(gB, gB.misorientation.angle() / degree, colorbar=True)  # by misorientation angle
     plot(gB, rgb)                                    # by an RGB colour per segment, n x 3
     plot(gB, edgeAlpha=a)                            # a transparency per segment
+    plot(gB, lineWidth=4, smooth=True)               # the chains with rounded joins
 
   Without values the boundary is drawn as joined chains in one colour; a value per segment
   colours it through a colour map, an RGB triple per segment directly, both segment by
   segment with round caps, so that a staircase reads as one line. A boundary draws no phase
-  legend. MATLAB's edgeColor is a synonym of lineColor here too.
+  legend. MATLAB's edgeColor is a synonym of lineColor here too. smooth=True rounds the joins
+  and the ends of the lines, which shows on thick ones.
 
   region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
   coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
@@ -800,6 +829,7 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
     micronbar - draw the scale bar; by default the preference showMicronBar
     refFrame - draw the axes of the specimen frame in the scale bar box
     displayName - the name in a legend
+    smooth - draw the chains with round joins and ends
   See also
     BoundaryPlots, grain2d.plot, EBSD.plot, triplePointList.plot"""
   from matplotlib.collections import LineCollection
@@ -820,15 +850,18 @@ def plotBoundary(gB, color=None, lineColor="k", lineWidth=1.0, colormap="viridis
       # MATLAB draws thin segments as the outlines of two-vertex faces, there and back, so a
       # segment of alpha a shows as 1 - (1 - a)^2
       rgba[:, 3] = 1 - (1 - a) ** 2 if lineWidth <= 3 else a
-      h = LineCollection(segs, colors=rgba, linewidths=lineWidth, snap=True, zorder=3, capstyle="round", **kw)
+      h = LineCollection(segs, colors=rgba, linewidths=lineWidth, snap=True, zorder=3, capstyle="round",
+                         joinstyle="round" if smooth else None, **kw)
       mP.ax.add_collection(h)
     else:
-      h = _boundaryLines(mP, gB, lineColor, lineWidth, alpha=edgeAlpha, **kw)
+      h = _boundaryLines(mP, gB, lineColor, lineWidth, alpha=edgeAlpha, smooth=smooth, **kw)
   else:
     arr = np.asarray(color)
     segs = mP.onScreen(boundarySegments(gB).reshape(-1, 2)).reshape(n, 2, 2)
     # round caps join the segments of a staircase into one line, as MATLAB draws it
     kw.setdefault("capstyle", "round")
+    if smooth:
+      kw.setdefault("joinstyle", "round")
     if arr.ndim == 2 and arr.shape == (n, 3):
       h = LineCollection(segs, colors=np.clip(arr, 0, 1), linewidths=lineWidth, alpha=edgeAlpha, snap=True, zorder=3, **kw)
     elif arr.size == n:

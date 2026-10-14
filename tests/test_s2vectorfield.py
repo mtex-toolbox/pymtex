@@ -165,3 +165,17 @@ def test_angle_withAVectorIsTheAngleWithTheConstantField(v):
   H = S2VectorFieldHarmonic(rng.standard_normal((25, 3)) + 1j * rng.standard_normal((25, 3)))
   vs = vector3d.rand(6, rng=rng)
   assert np.allclose(H.angle(v)(vs), H.angle(0 * H + v)(vs), atol=1e-10)
+
+
+@pytest.mark.parametrize("op", [np.multiply, lambda a, f: a * f + a, lambda a, f: np.sum(a * a, axis=-1, keepdims=True) * f])
+def test_mapField_broadcastsAFunctionAgainstAField(op):
+  # a function's values broadcast against the vectors, a field where op gives three columns,
+  # a function where it gives one value per node
+  from mtex.functions.s2vectorfield import mapField, _values
+  w = vector3d.rand(20, rng=np.random.default_rng(5))
+  v = S2VectorFieldHarmonic(lambda x: vector3d(x.y, -x.x, 0 * x.z), bandwidth=4)
+  F = S2FunHarmonic(lambda x: 1 + x.z ** 2, bandwidth=4)
+  u = mapField(op, v, F, bandwidth=16)
+  expected = op(_values(v(w)), np.real(F(w)).reshape(-1, 1))
+  got = _values(u(w)) if expected.shape[-1] == 3 else np.real(u(w)).reshape(-1, 1)
+  assert np.max(np.abs(got - expected)) < 1e-8

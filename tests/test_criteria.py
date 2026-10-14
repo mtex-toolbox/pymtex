@@ -102,3 +102,29 @@ def test_byPhase_names_the_levels_of_one_phase():
   from mtex.maps.criteria import _byPhaseLevels
   pl = phaseList(crystalFrame("m-3m", mineral="Iron"), crystalFrame("6/mmm", mineral="Mg"))
   assert _byPhaseLevels({"Mg": [10 * degree, 2 * degree]}, pl, 2) == (10 * degree, 2 * degree) and _byPhaseLevels({"Mg": 1.0}, pl, 1) is None
+
+
+# a list per phase, one entry per indexed phase or per entry of CSList as MATLAB's cell, each an
+# angle or a pair, judges every pair as byPhase naming each phase with its entry, in both backends
+@pytest.mark.parametrize("perPhase", [[[10 * degree], [60 * degree]], [10 * degree, [60 * degree, 5 * degree]],
+                                      [[15 * degree, 2 * degree], 30 * degree], [0.0, 10 * degree, [60 * degree, 5 * degree]],
+                                      [[5 * degree], [20 * degree], [40 * degree]]])
+@pytest.mark.parametrize("backend", ["numba", "numpy"])
+def test_gbcAngle_aListPerPhaseIsByPhase(perPhase, backend):
+  n = 300
+  rot = rotation.rand(n, rng=rng)
+  pos = np.stack([np.arange(float(n)), np.zeros(n), np.zeros(n)], axis=-1)
+  e = EBSD(pos, rot, rng.integers(0, 3, n).astype(np.int8), phaseList(crystalFrame("m-3m", mineral="a"), crystalFrame("6/mmm", mineral="b")),
+           lattice=None)
+  i, j = rng.integers(0, n, 2000), rng.integers(0, n, 2000)
+  own = perPhase[-2:]
+  expected = gbcAngle(1.0, byPhase={"a": own[0], "b": own[1]}).evaluate(e, i, j, backend=backend)
+  assert np.array_equal(gbcAngle(perPhase).evaluate(e, i, j, backend=backend), expected)
+
+
+# a list per phase of another length is refused with the lengths it takes
+def test_gbcAngle_aListPerPhaseOfAnotherLengthIsRefused():
+  e = EBSD(np.zeros((2, 3)) + [[0, 0, 0], [1, 0, 0]], rotation.rand(2, rng=rng), np.array([1, 1]),
+           phaseList(crystalFrame("m-3m", mineral="a"), crystalFrame("6/mmm", mineral="b")), lattice=None)
+  with pytest.raises(ValueError, match="one per indexed phase"):
+    gbcAngle([[10 * degree]] * 4).evaluate(e, [0], [1])

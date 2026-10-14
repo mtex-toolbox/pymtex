@@ -104,7 +104,7 @@ numNegative
 # ## Reconstruct an ODF
 #
 # [calcODF](PoleFigure.calcODF.html) finds an ODF whose recalculated pole figures fit the
-# corrected measurements. `silent=True` suppresses the solver iteration history, while the
+# corrected measurements. `verbose=False` suppresses the solver iteration history, while the
 # returned object remains visible.
 
 odf = calcODF(pf, verbose=False)

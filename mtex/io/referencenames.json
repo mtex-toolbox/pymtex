@@ -1775,7 +1775,7 @@
 "polygonMoments": "polygonMoments",
 "pos2ind": "pos2ind",
 "principalComponents": "principalComponents",
-"project": "orientation.project",
+"project": "project",
 "projectIntoEulerRegion": "quaternion.project2EulerFR",
 "projectIntoFundamentalRegion": "projectIntoFundamentalRegion",
 "projectIntoRegion": "projectIntoRegion",

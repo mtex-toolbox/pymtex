@@ -345,11 +345,12 @@ class vector3d(MtexArray):
 
     A point group makes the indices stand for the whole symmetrically equivalent set, so they
     are written in the family brackets {hkl} and <uvw>, while the trivial group leaves one plane
-    or one direction, (hkl) and [uvw]. A list of directions is written one after another.
-    MATLAB's flags no_scopes and commasep are not taken.
+    or one direction, (hkl) and [uvw]. A direction outside a crystal frame is written in its
+    coordinates, (1,2,3). A list of directions is written one after another. MATLAB's flags
+    no_scopes and commasep are not taken.
 
     Input
-      m - vector3d in a crystal frame
+      m - vector3d, in a crystal frame for the indices
     Output
       s - str
     Keywords
@@ -361,15 +362,16 @@ class vector3d(MtexArray):
     See also
       vector3d.round, Miller, CrystalDirections"""
     from .miller import indexChar
+    # a direction outside a crystal frame is written in its coordinates
+    if not self.isCrystalDirection and style in (None, "xyz"):
+      d = np.round(self.data.reshape(-1, 3), 10)
+      return " ".join("(" + ",".join(f"{x:g}" for x in row) + ")" for row in d)
     return indexChar(self, style, utf8, family)
 
   def __str__(self):
     if self.size > 4:
       return f"{self.size} points"
-    if self.isCrystalDirection:
-      return self.char()
-    d = np.round(self.data.reshape(-1, 3), 10)
-    return " ".join("(" + ",".join(f"{x:g}" for x in row) + ")" for row in d)
+    return self.char()
 
   # ------------------------------------------------------------------ constructors
 

@@ -324,3 +324,25 @@ def test_freshAxes_makesANewFigureOfTheDefaultSizeOtherwise():
   newMtexFigure(1).nextAxis()
   fig, ax = _freshAxes(default=(4.5, 3.2))
   assert tuple(fig.fig.get_size_inches()) == (4.5, 3.2) and fig.children == [ax]
+
+
+@pytest.mark.parametrize("inner, outer", [(10, 40), (30, 15), (None, 25), (20, None), (8, 8)])
+def test_the_plot_spacings_are_the_gap_between_the_axes_and_the_margin_around_them(inner, outer):
+  # in pixels at 96 to the inch, as MATLAB's innerPlotSpacing and outerPlotSpacing
+  import matplotlib.pyplot as plt
+  agg()
+  from mtex import mtexFigure
+  f = mtexFigure(layout=(2, 2), figSize=(6, 5), innerPlotSpacing=inner, outerPlotSpacing=outer)
+  axes = [f.nextAxis() for _ in range(4)]
+  for ax in axes:
+    ax.axis("off")
+  f.fig.set_dpi(96)
+  f.fig.canvas.draw()
+  W, H = f.fig.get_size_inches() * 96
+  a, b, c = (ax.get_position() for ax in axes[:3])
+  if inner is not None:
+    assert np.isclose((b.x0 - a.x1) * W, inner) and np.isclose((a.y0 - c.y1) * H, inner)
+  if outer is not None:
+    margin = max(outer, (inner or 0) / 2)
+    assert np.allclose([a.x0 * W, (1 - b.x1) * W, (1 - a.y1) * H, c.y0 * H], margin)
+  plt.close("all")

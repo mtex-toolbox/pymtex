@@ -514,7 +514,8 @@ def _drawFunction(sP, f, style="pcolor", resolution=1 * degree, **kw):
 
 # arrows in the plane: the tangent vector w at v carried through the projection, the
 # longest one arrowSize times the grid spacing, all of that length with normalize
-def _arrows(sP, v, w, resolution=10 * degree, arrowSize=0.5, normalize=False, color="k", axisField=False, zorder=6, lineWidth=1.0, **kw):
+def _arrows(sP, v, w, resolution=10 * degree, arrowSize=0.5, normalize=False, color="k", axisField=False, zorder=6, lineWidth=1.0,
+            maxHeadSize=None, **kw):
   from matplotlib.collections import LineCollection
   eps = 1e-4
   x0, y0 = sP.proj.project(v)
@@ -551,7 +552,15 @@ def _arrows(sP, v, w, resolution=10 * degree, arrowSize=0.5, normalize=False, co
     h = LineCollection(segments, colors=color, linewidths=lineWidth, zorder=zorder, **kw)
     sP.ax.add_collection(h)
     return h
-  return sP.ax.quiver(x0, y0, dx, dy, angles="xy", scale_units="xy", scale=1, color=color, width=0.004 * lineWidth, zorder=zorder, **kw)
+  width = 0.004 * lineWidth
+  if maxHeadSize is not None:
+    # MATLAB's MaxHeadSize, the head as a fraction of the longest arrow: the shaft's width in
+    # the chart's units, the head in multiples of it, in the proportions of matplotlib's head
+    x = sP.ax.get_xlim()
+    width = width * abs(x[1] - x[0])
+    head = maxHeadSize * float(np.max(np.hypot(dx, dy))) / width
+    kw.update(units="xy", headlength=head, headaxislength=0.9 * head, headwidth=0.6 * head)
+  return sP.ax.quiver(x0, y0, dx, dy, angles="xy", scale_units="xy", scale=1, color=color, width=width, zorder=zorder, **kw)
 
 
 # ------------------------------------------------------------------ the commands
@@ -880,7 +889,7 @@ def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw: Unpack[PlotKeywords])
   return h
 
 
-def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, **kw: Unpack[PlotKeywords]):
+def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False, numbered=False, **kw: Unpack[PlotKeywords]):
   """directions or crystal directions drawn as markers on a spherical plot, coloured by data
   or labelled
 
@@ -889,6 +898,7 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
     scatter(v, rgb)                                         # an RGB colour per direction
     scatter(v, label=texts)                                 # a text below every marker
     scatter(v, label=texts, textAboveMarker=True)           # the text above
+    scatter(v, numbered=True)                               # every direction labelled 1, 2, ..., n
     scatter(h, symmetrised=True, labeled=True)              # every equivalent, named by its indices
     scatter(v, marker='s', markerSize=8, markerFaceColor='r', markerEdgeColor='k')  # the markers styled
     scatter(v, data, minmax=True)                           # the smallest and largest value marked
@@ -899,7 +909,7 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
   and the keywords of the spherical plots (upper, lower, fundamentalRegion, ...). A Miller
   direction or plane with symmetrised=True is drawn at all its distinct symmetric equivalents.
   Orientations go to scatter3d's axis angle space, two lists of coordinates to the map
-  held. MATLAB's numbered flag is not there.
+  held.
 
   Input
     v - vector3d or Miller
@@ -912,6 +922,7 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
     minmax - mark the smallest and the largest value
     symmetrised - draw every distinct symmetric equivalent of a crystal direction
     colorbar - add a colour bar for the data
+    numbered - label the directions by their number, 1 to n, in their order
   See also
     plot, text, circle, plotPF, plotIPF, vector3d.scatter3d, SphericalProjections"""
   from ..geometry._array import MtexArray
@@ -926,12 +937,14 @@ def scatter(v, data=None, *args, minmax=False, symmetrised=False, colorbar=False
   v = asVector3d(v)
   projKw, axesKw, whereKw = _split(kw)
   # beside labels MATLAB's FontSize is the size of their text, not of the chart's
-  if ("label" in kw or kw.get("labeled")) and "fontSize" in axesKw:
+  if ("label" in kw or kw.get("labeled") or numbered) and "fontSize" in axesKw:
     kw["labelFontSize"] = axesKw.pop("fontSize")
   if symmetrised and v.isCrystalDirection:
     # every distinct equivalent once, so that no label is written twice in one place
     s = v.symmetrise(unique=data is None and v.size == 1)
     v, data = s.flatten(), None if data is None else np.tile(np.asarray(data).ravel(), s.shape[0])
+  if numbered:
+    kw["label"] = [str(i + 1) for i in range(v.size)]
   sPs = _targets(v, projKw, axesKw, whereKw)
   rgb = None
   if data is not None:
@@ -1231,7 +1244,8 @@ smooth = pcolor
 
 def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
   """quiver(v, w), quiver(vF), quiver(ori, w): arrows at directions, a vector or axis field,
-  or arrows at orientations in the sections of the current figure"""
+  or arrows at orientations in the sections of the current figure; on the sphere arrowSize
+  scales the arrows and maxHeadSize is the length of the heads as a fraction of the longest"""
   from .volumeplot import is3dMap, _quiver3dMap
   if is3dMap(v):
     return _quiver3dMap(v, w, **kw)

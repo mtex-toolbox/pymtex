@@ -73,3 +73,19 @@ def test_S2AxisFieldHarmonic_framedRefusesDirectionsOfAnotherFrame():
   E = S2AxisFieldHarmonic(rng.standard_normal((36, 6)) + 1j * rng.standard_normal((36, 6)), cs)
   with pytest.raises(ValueError):
     E(vector3d(vector3d(1, 0, 0), frame=specimenFrame("1")))
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_S2AxisFieldHarmonic_takesTheCoefficientsS2FunHarmonicTakes(seed):
+  # the six columns are MTEX's coefficients of the components of a a^T, as S2FunHarmonic's fhat:
+  # for a = M v, whose components are of degree two, the field is the axis M v
+  from mtex.functions.s2axisfield import AXIS_COMPONENTS
+  M = np.random.default_rng(seed).standard_normal((3, 3))
+  axis = lambda v: v.data.reshape(-1, 3) @ M.T
+  cols = [S2FunHarmonic.quadrature(lambda v, i=i, j=j: axis(v)[:, i] * axis(v)[:, j], bandwidth=2).fhat
+          for i, j in AXIS_COMPONENTS]
+  aF = S2AxisFieldHarmonic(np.stack(cols, axis=-1), symmetrise=False)
+  w = vector3d.rand(30, rng=rng)
+  expected = vector3d(axis(w)).normalize()
+  assert np.allclose(np.abs(dot(aF(w), expected, antipodal=False)), 1, atol=1e-8)
+  assert np.allclose(aF.fhat, np.stack(cols, axis=-1))

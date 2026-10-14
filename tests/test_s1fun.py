@@ -118,3 +118,15 @@ def test_max_withANumberOrAFunctionIsThePointwiseExtremumByQuadrature(other):
   for op, npop in ((S1FunHarmonic.max, np.maximum), (S1FunHarmonic.min, np.minimum)):
     h = op(f, other, bandwidth=32)
     assert isinstance(h, S1FunHarmonic) and h.isclose(S1FunHarmonic(lambda x: npop(f(x), value(x)), bandwidth=32), rtol=1e-12)
+
+
+@pytest.mark.parametrize("tol", [1e-2, 1e-4, 1e-8])
+def test_interpolate_passesItsTolToLSQR(tol, monkeypatch):
+  # the stopping tolerance given is the one LSQR stops at
+  import mtex.functions.density as density
+  seen = []
+  lsqr = density._lsqr
+  monkeypatch.setattr(density, "_lsqr", lambda *a: seen.append(a[-1]) or lsqr(*a))
+  x = np.random.default_rng(3).random(40) * 2 * pi
+  S1FunHarmonic.interpolate(x, np.cos(x), tol=tol)
+  assert seen == [tol]

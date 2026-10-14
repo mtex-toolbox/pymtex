@@ -168,7 +168,7 @@ class S2VectorField:
   def __mul__(self, a):
     if isinstance(a, (int, float, np.number)):
       return self._scaled(a)
-    return mapField(lambda x, s: s[:, None] * x, self, a)
+    return mapField(np.multiply, self, a)
 
   __rmul__ = __mul__
 
@@ -455,7 +455,8 @@ def grad(f, x=None):
 
 def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
   """a pointwise operation on fields, functions and numbers by quadrature at the bandwidth, a field
-  where op returns vectors and a function on the sphere where it returns numbers"""
+  where op returns vectors and a function on the sphere where it returns numbers; a field's
+  vectors are an (n, 3) array, a function's values an (n, 1) column broadcasting against them"""
   others = [a for a in args if not isinstance(a, (int, float, np.number))]
   L = min(v.bandwidth + sum(a.bandwidth for a in others), getMTEXpref("maxS2Bandwidth")) if bandwidth is None else int(bandwidth)
   g = quadratureS2Grid(L)
@@ -469,13 +470,15 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
       return a
     if a.frame is not v.frame:
       raise ValueError("the fields live in different frames")
-    return np.real(a(xs)).ravel()
+    return np.real(a(xs)).reshape(-1, 1)
 
   values = op(evaluate(v), *(evaluate(a) for a in args))
   if reduce:
     values = np.sum(values, axis=-1)
-  if values.ndim == 2:
+  # three columns are a field, a single value per node a function
+  if values.ndim == 2 and values.shape[-1] == 3:
     return S2VectorFieldHarmonic(_adjointColumns(g, values, L, g.weights), v.frame, symmetrise=False)
+  values = np.broadcast_to(values, (len(xs),) + np.shape(values)[1:]).reshape(len(xs))
   fr = v.frame if invariant or v.frame is None else v.frame.stripSym()
   return S2FunHarmonic(sphericalSeriesAdjoint(g, values, L), fr, real=True, symmetrise=False, _internal=True)
 

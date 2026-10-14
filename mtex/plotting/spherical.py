@@ -129,10 +129,12 @@ class sphericalProjection:
     """a grid regular in the polar angles of the chart, one strip of polar angles per azimuth
     so that the cells follow the boundary: the directions, in the frame of the region, and
     their plane coordinates, all nTheta x nRho; a column of NaN separates the strips of a
-    region whose polar set has two branches, where the pieces do not touch"""
+    region whose polar set has two branches, where the pieces do not touch; a pair of
+    resolutions is the spacing in the polar angle and in the azimuth"""
+    resTheta, resRho = (resolution, resolution) if np.ndim(resolution) == 0 else (float(r) for r in resolution)
     sR = self.chartRegion()
     rhoLo, rhoHi = rhoRange(sR)
-    nRho = max(2, int(round((rhoHi - rhoLo) / resolution)) + 1)
+    nRho = max(2, int(round((rhoHi - rhoLo) / resRho)) + 1)
     rhos = np.linspace(rhoLo, rhoHi, nRho)
     ivs = [sR.thetaIntervals(rho) for rho in rhos]
     nb = max((len(iv) for iv in ivs), default=0)
@@ -158,7 +160,7 @@ class sphericalProjection:
     if not cols:
       return _emptyGrid(self.frame)
     width = max(col[2] - col[1] for col in cols if col is not None)
-    nTheta = max(3, 2 * int(round(width / resolution / 2)) + 1)
+    nTheta = max(3, 2 * int(round(width / resTheta / 2)) + 1)
     t = np.linspace(0, 1, nTheta)
     theta = np.empty((nTheta, len(cols)))
     rho = np.empty((nTheta, len(cols)))
@@ -617,6 +619,7 @@ def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=
 
     r = plotS2Grid(resolution=5*degree)               # the grid of the whole sphere
     r = plotS2Grid(cs, resolution=2*degree, upper=True)  # crystal directions, upper hemisphere
+    r = plotS2Grid(resolution=(5*degree, 2.5*degree))  # 5 degree in the polar angle, 2.5 in the azimuth
     contourf(r, r.z ** 2)                             # values on the grid, drawn as they lie
 
   The directions form a (theta, rho) array, the rows the polar angle, the columns the
@@ -624,8 +627,8 @@ def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=
   pcolor without interpolation. A grid of both hemispheres puts them side by side with a
   blank column between. The region is the whole sphere, or the sphericalRegion given.
 
-  MATLAB's pair of resolutions for the polar and the azimuthal angle, and the bounds minRho,
-  maxRho, minTheta, maxTheta and restrict2MinMax, are not taken: pass a sphericalRegion.
+  MATLAB's bounds minRho, maxRho, minTheta, maxTheta and restrict2MinMax are not taken: pass
+  a sphericalRegion.
 
   Input
     frame - a reference frame the directions are expressed in, e.g. crystalFrame('m-3m')
@@ -633,7 +636,7 @@ def plotS2Grid(*args, resolution=1 * degree, upper=False, lower=False, complete=
   Output
     r - vector3d, a (theta, rho) array of directions
   Keywords
-    resolution - the spacing of the grid, an angle
+    resolution - the spacing of the grid, an angle, or a pair (polar, azimuthal)
     upper - the upper hemisphere only
     lower - the lower hemisphere only
     complete - the whole sphere

@@ -202,13 +202,13 @@ def _quiver3dMap(x, d, color=(0.0, 0.0, 1.0), autoScaleFactor=1.0, scaling=True,
   return _draw(arrows3d(P, D, color, lineWidth, antipodal=anti), how2plot, figSize, x.frame)
 
 
-def _quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, how2plot=None, figSize=None, **kw):
+def _quiverVectors(v, d, arrowSize=0.05, color=(0.0, 0.0, 1.0), lineWidth=2.0, how2plot=None, figSize=None, headSize=0.25, **kw):
   """quiver3d(v, d): arrows at the positions v along d times arrowSize in a 3D scene, as
   MATLAB's vector3d/quiver3; an antipodal d points both ways without heads"""
   kw = _options(kw)
   P = np.asarray(v.data).reshape(-1, 3)
   D = arrowSize * np.asarray(d.data, dtype=float).reshape(-1, 3)
-  return _draw(arrows3d(P, D, color, lineWidth, antipodal=bool(getattr(d, "antipodal", False))), how2plot, figSize, v.frame)
+  return _draw(arrows3d(P, D, color, lineWidth, antipodal=bool(getattr(d, "antipodal", False)), headSize=headSize), how2plot, figSize, v.frame)
 
 
 def plotEllipsoid(center, a, b, c, faceColor="lightblue", edgeAlpha=0.25, how2plot=None, figSize=None, **kw: Unpack[PlotKeywords]):

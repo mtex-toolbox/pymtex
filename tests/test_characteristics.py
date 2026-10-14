@@ -389,6 +389,32 @@ def test_discreteSample_onTheSphere():
   assert discreteSample(S2FunHarmonic(s, antipodal=True), 5, rng=rng).antipodal
 
 
+# a list of distinct rotations, a map of two phases as a list and on its grid, its grains and their boundary
+def sampledLists():
+  from mtex import EBSD, calcGrains, gridify, phaseList
+  i, j = np.meshgrid(np.arange(12), np.arange(12), indexing="xy")
+  pos = np.stack([i.reshape(-1), j.reshape(-1), np.zeros(144)], axis=-1).astype(float)
+  rot = rotation.byAxisAngle(zvector, (i.reshape(-1) // 6 + 2 * (j.reshape(-1) // 6)) * 20 * degree)
+  ebsd = EBSD(pos, rot, np.where(pos[:, 0] >= 6, 2, 1), phaseList(crystalFrame("m-3m", mineral="a"), crystalFrame("6/mmm", mineral="b")))
+  grains = calcGrains(ebsd.copy(), angle=5 * degree)
+  return {"rotations": (rotation.rand(144, rng=rng), lambda x: x.data.reshape(-1, 4)), "ebsd": (ebsd, lambda x: x.pos.data[:, :2]),
+          "grid": (gridify(ebsd), lambda x: x.pos.data.reshape(-1, 3)[:, :2]), "grains": (grains, lambda x: x.id[:, None]),
+          "boundary": (grains.boundary, lambda x: x.F)}
+
+
+# a sample of a list is n members of it, of its class; without replacement no member twice
+@pytest.mark.parametrize("kind", ["rotations", "ebsd", "grid", "grains", "boundary"])
+@pytest.mark.parametrize("withoutReplacement", [False, True])
+def test_discreteSample_ofAListIsMembersOfIt(kind, withoutReplacement):
+  lst, key = sampledLists()[kind]
+  n = 3
+  d = discreteSample(lst, n, rng=rng, withoutReplacement=withoutReplacement)
+  assert type(d) is type(lst) and d.size == n
+  members = {tuple(r) for r in np.round(key(lst), 9)}
+  drawn = [tuple(r) for r in np.round(key(d), 9)]
+  assert set(drawn) <= members and (not withoutReplacement or len(set(drawn)) == n)
+
+
 def test_discreteSample_ofASymmetricDensityCoversTheWholeSphere():
   # the sector nodes spread by the group
   adf = calcAxisDistribution(crystalFrame("m-3m"))
