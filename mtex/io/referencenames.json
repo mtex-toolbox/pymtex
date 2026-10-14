@@ -1953,6 +1953,7 @@
 "sectionTolerance": "sectionTolerance",
 "sectorCenter": "sectorCenter",
 "sectorFolds": "sectorFolds",
+"selectHalfwidth": "selectHalfwidth",
 "setCamera": "setCamera",
 "setColorRange": "setColorRange",
 "setColorScale": "setColorScale",

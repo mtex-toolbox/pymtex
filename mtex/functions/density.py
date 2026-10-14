@@ -35,53 +35,88 @@ from .transforms import S2FourierPlan, SO3FourierPlan
 
 
 def calcDensity(x, Fourier=False, **kwargs):
-  """the density estimate of a sample: an ODF of orientations, a function on the sphere of
-  directions or axes, a function on the circle of angles or a density of real values;
-  MATLAB's calcDensity
+  """estimate a smooth density from orientations, directions, angles or real-valued samples.
 
-    odf = calcDensity(ori)                                 # the halfwidth selected by UCV
-    odf = calcDensity(ori, halfwidth=5*degree)             # a de la Vallee Poussin kernel of that halfwidth
-    odf = calcDensity(ori, kernel=SO3AbelPoissonKernel(halfwidth=10*degree))  # a kernel of your own
-    odf = calcDensity(grains.meanOrientation, weights=grains.area)  # weighted by the grain areas
-    odf = calcDensity(ebsd)                                # the orientations of a map, grouped by its grains
-    odf = calcDensity(ori, Fourier=True)                   # the harmonic form
-    odf = calcDensity(ori, harmonic=True, bandwidth=16)    # the harmonic form of order 16
-    sF = calcDensity(v, kernel=psi, weights=w)             # weighted directions
-    sF = calcDensity(v, halfwidth=10*degree, antipodal=True)  # axes
-    f = calcDensity(rho, periodic=True)                    # angles, a function on the circle
-    f = calcDensity(x, range=[0, 1])                       # real values on an interval
+    odf = calcDensity(ori)                                 # select the smoothing width from the orientations
+    odf = calcDensity(ori, halfwidth=5*degree)              # use a fixed angular halfwidth
+    odf = calcDensity(ori, kernel=SO3AbelPoissonKernel(halfwidth=10*degree))  # choose another kernel family
+    odf = calcDensity(grains.meanOrientation, weights=grains.area)  # weight each grain by its area
+    odf = calcDensity(ebsd)                                # use a single-phase map with grain ids
+    odf = calcDensity(ori, harmonic=True, bandwidth=16)     # return a harmonic expansion through degree 16
+    sF = calcDensity(v, halfwidth=10*degree, weights=w)      # estimate a weighted directional density
+    sF = calcDensity(v, halfwidth=10*degree, antipodal=True)  # treat opposite directions as the same axis
+    f = calcDensity(rho, periodic=True, sigma=5*degree)     # estimate a density of angles on the circle
+    f = calcDensity(x, range=[0, 1])                       # estimate a density of real values on an interval
+    f = calcDensity(X, range=[[0, 0], [1, 1]], rng=rng)    # estimate a joint density from rows of (x, y) samples
 
-  The kind of the sample decides the estimate:
+  The estimate replaces the sample cloud with a smooth function. Narrow kernels retain
+  finer detail; wider kernels suppress more sampling noise. Use odf(oriQuery),
+  sF(vQuery) or f(xQuery) to evaluate it. For a joint density in two dimensions, use
+  f(xQuery, yQuery); the coordinate arrays broadcast together.
 
-  - orientations: a sum of kernels, an SO3FunRBF, or an SO3FunHarmonic above 200 orientations
-  (kernel bandwidth at most 96), with a Dirichlet kernel or between two crystal frames;
-  harmonic=True or False decides instead.
-  - directions: an S2FunHarmonic, kernels convolved with the points.
-  - angles, numbers with periodic=True, sigma, kernel or antipodal: a density on the circle,
-  a Gaussian of width sigma, Silverman's rule by default.
-  - other numbers: one sample per row, a griddedDensity on the box range (minima in the first
-  row, maxima in the second), by calcDensityReal.
+  The input determines the domain and the meaning of the density:
 
-  Without a kernel or a halfwidth, the halfwidth is selected by unbiased cross validation
-  (calcKernel). A map is grouped by its grain ids when grains were computed; its pixels
-  without groups, and fewer than two orientations, take 10 degrees, the former with a
-  warning. NaN entries are dropped; an empty sample gives the uniform density.
+  | Input | Estimate | Normalisation |
+  |---|---|---|
+  | orientation or rotation | orientation distribution function (ODF) on SO(3) | mean one; a value of two is twice the uniform density |
+  | vector3d or Miller | density of directions or axes on the sphere | mean one, with the input's frame symmetry |
+  | numeric angles with periodic=True | density on the circle, with period 2*pi | mean one, with angles in radians |
+  | numeric array without circular options | density of real values, one sample per row | probability density in the units of the data |
 
-  The other keywords go to the estimator: kernel, halfwidth, weights, groups and bandwidth
-  for orientations and directions, harmonic for orientations, antipodal for directions and
-  angles, sigma for angles, range, bandwidth and rng for real values.
-  MATLAB's 'order' is bandwidth; the Bingham estimate is calcBinghamODF.
+  For orientations and directions, an explicit halfwidth uses a de la Vallee Poussin
+  kernel; halfwidth is the angle at which the kernel falls to half its peak. Without a
+  halfwidth or kernel, `calcKernel` selects the width by unbiased cross validation with
+  a noise floor. Angular halfwidths are in radians; write 5*degree for five degrees.
+
+  For an EBSD map, select one phase before calling. Its grain ids are used automatically
+  when available, so neighbouring pixels within a grain are grouped during width selection.
+  Map orientations without grain groups use a halfwidth of 10 degrees and issue a warning.
+  Automatic selection also falls back to 10 degrees when it cannot be performed, for
+  example with fewer than two valid points. NaN orientations and directions are omitted;
+  if none remain, their density is uniform. These empty-sample rules do not apply to
+  numeric angles or real-valued data.
+
+  Numeric arrays are interpreted as real-valued data by default. Use periodic=True for
+  angles; supplying sigma, kernel or antipodal also selects the circle estimator, even
+  when antipodal=False. Circular data use a Gaussian kernel with Silverman's width rule
+  unless sigma or kernel is supplied. Real-valued data use a diffusion estimate in one
+  dimension and a fitted Gaussian mixture in several dimensions.
+
+  Additional options depend on the input. Omitted weights give every sample equal weight;
+  supplied weights are normalised internally.
+
+  | Option | Meaning and default |
+  |---|---|
+  | halfwidth | orientations, directions: angular kernel halfwidth in radians; selected automatically if neither halfwidth nor kernel is given |
+  | kernel | orientations, directions, angles: SO3Kernel, S2Kernel or S1Kernel matching the domain; takes precedence over halfwidth or sigma |
+  | weights | orientations, directions, angles, one-dimensional real data: one nonnegative weight per sample, with a positive total |
+  | groups | orientations, directions: one group id per sample for automatic width selection; groups are treated as independent units |
+  | antipodal | directions, angles: identify v with -v, or rho with rho+pi; default False, while axes already marked on vector3d remain axes |
+  | harmonic | orientations: True returns SO3FunHarmonic; False keeps the kernel sum as SO3FunRBF; by default use harmonics above 200 orientations when the kernel bandwidth is at most 96, with a Dirichlet kernel, or when both frames are crystal frames |
+  | bandwidth | orientations, directions, angles: maximum harmonic degree, controlling expansion resolution rather than the smoothing width; defaults depend on the kernel and MTEX bandwidth preferences |
+  | bandwidth | one-dimensional real data: Gaussian smoothing width in the units of the data; selected automatically by default |
+  | periodic | numeric angles: True selects the circular estimator; default False |
+  | sigma | numeric angles: standard deviation of the wrapped Gaussian in radians; selected by Silverman's rule by default |
+  | range | real-valued data: [lo, hi] in one dimension, or [minima, maxima] with one column per dimension; defaults to the data's bounding box |
+  | rng | multidimensional real data: numpy.random.Generator for the Gaussian mixture's random initialisation; a new generator by default |
+
+  Multidimensional real data currently ignore weights and bandwidth. For orientations,
+  bandwidth is used when the estimate is built with harmonic=True; Fourier=True converts
+  the result to harmonics afterwards. Use harmonic=True to request a specific degree.
+  MATLAB's 'order' is bandwidth; for a Bingham model use `calcBinghamODF`.
 
   Input
-    x - orientation, vector3d, EBSD, or an array of angles or real values
+    x - orientations or rotations, directions or Miller indices, a single-phase EBSD map,
+        an array of angles, or a real array of shape (n,) or (n, d)
   Output
-    odf - SO3FunRBF or SO3FunHarmonic
-    sF - S2FunHarmonic
-    f - S1FunHarmonic for angles, a griddedDensity for real values
+    f - callable density: SO3FunRBF or SO3FunHarmonic for orientations, S2FunHarmonic for
+        directions, S1FunHarmonic for angles, or griddedDensity for real-valued data
   Keywords
-    Fourier - return orientations' density in harmonic form, MATLAB's flag 'Fourier'
+    Fourier - convert the orientation density to SO3FunHarmonic after estimation;
+        has no effect for other input types; MATLAB's flag 'Fourier'
   See also
-    calcKernel, calcBinghamODF, unimodalODF, interpolate, calcDensityReal"""
+    calcKernel, calcBinghamODF, unimodalODF, interpolate, calcDensityReal, DensityEstimation
+  """
   # a map: the orientations of its one phase, with its grain ids when grains were computed
   if not isinstance(x, (quaternion, vector3d, np.ndarray, list, tuple)) and hasattr(x, "orientations") and hasattr(x, "prop"):
     if kwargs.get("groups") is None and "grainId" in x.prop:

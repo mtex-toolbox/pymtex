@@ -6,6 +6,7 @@ import re
 import pytest
 
 import mtex
+from mtex.functions.halfwidth import selectHalfwidth
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _spec = importlib.util.spec_from_file_location("reference", os.path.join(ROOT, "docs", "reference.py"))
@@ -57,6 +58,8 @@ def test_a_matlab_page_is_what_its_name_reaches_in_python():
   # a name syntax.md replaced reaches its replacement
   assert ref.resolve("vector3d.angle_outer")[1] is inspect.getattr_static(mtex.vector3d, "angle")
   assert ref.resolve("loadEBSD_ang")[1] is mtex.loadEBSD
+  # a documented module function can be published without adding it to the flat namespace
+  assert ref.resolve("selectHalfwidth")[1] is selectHalfwidth
 
 
 def test_the_syntax_shows_the_keywords_and_angles_in_degrees(rendered):

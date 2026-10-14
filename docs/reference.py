@@ -18,6 +18,7 @@ import numpy as np
 
 import mtex
 from mtex.geometry._array import MtexArray
+from mtex.functions.halfwidth import selectHalfwidth
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
@@ -26,6 +27,8 @@ matlabList = os.path.join(root, "docs", "reference-matlab.txt")
 # the page of every Python name, which openDoc and the links of the site read
 namesFile = os.path.join(root, "mtex", "io", "referencenames.json")
 SOURCE = "https://github.com/mtex-toolbox/pymtex/blob/main/{}#L{}"
+# module functions with a MATLAB reference page that are not in the flat namespace
+MODULE_FUNCTIONS = {"selectHalfwidth": selectHalfwidth}
 sys.path.insert(0, os.path.join(root, "tools"))
 from syntaxcheck import NAMES, PREFIXES  # noqa: E402
 
@@ -183,7 +186,7 @@ def resolve(page):
     cls = publicClass(page[:-6])
     return ("class", cls, cls) if cls else None
   if "." not in page:
-    obj = getattr(mtex, page, None) or lookup(renamed(page) or "_")
+    obj = getattr(mtex, page, None) or MODULE_FUNCTIONS.get(page) or lookup(renamed(page) or "_")
     if inspect.isclass(obj) and isOurs(obj):
       return ("class", obj, obj)
     return ("function", obj, None) if callable(obj) and isOurs(obj) else None
