@@ -92,9 +92,26 @@ def writeMatlabPages(site):
   print(f"{len(names)} MATLAB pages")
 
 
-# the docstring of an attribute, a property's own before its getter's
+# the docstring of an attribute, a property's own before its getter's; its lines keep their
+# indentation relative to the body of the def, which inspect.getdoc loses when every line
+# after the summary is a calling form
 def docOf(obj):
-  return inspect.getdoc(obj) if isinstance(obj, property) and obj.__doc__ else inspect.getdoc(unwrap(obj)) or ""
+  f = obj if isinstance(obj, property) and obj.__doc__ else unwrap(obj)
+  raw = getattr(f, "__doc__", None)
+  if not isinstance(raw, str) or not raw.strip():
+    return inspect.getdoc(f) or ""
+  try:
+    src = inspect.getsourcelines(f.fget if isinstance(f, property) else f)[0]
+    head = next(line for line in src if line.lstrip().startswith(("def ", "class ", "async def ")))
+    body = len(head) - len(head.lstrip()) + 2
+  except (TypeError, OSError, StopIteration):
+    return inspect.getdoc(f) or ""
+  first, *rest = raw.expandtabs().split("\n")
+  # a docstring written into __doc__ by a factory carries no indentation of a body: its lines
+  # are relative already
+  if any(line.strip() and len(line) - len(line.lstrip()) < body for line in rest):
+    return "\n".join([first.strip()] + [line.rstrip() for line in rest]).strip("\n")
+  return "\n".join([first.strip()] + [line[body:] for line in rest]).strip("\n")
 
 
 # the function behind an attribute: a property by its getter, a static or class method by its function
@@ -315,7 +332,9 @@ def render(name, entry, pages, calls, owners):
     lines += [docBody(summary, link), ""]
   if kind in ("function", "method", "constructor"):
     shown = called if kind == "function" else f"{cls.__name__}.{member}" if member else cls.__name__
-    sig = operator[0] if operator else signature(shown, unwrap(obj) if kind != "constructor" else obj)
+    # a class or static method as it is called, without cls
+    target = obj if kind == "constructor" else obj.__get__(None, cls) if isinstance(obj, (classmethod, staticmethod)) else unwrap(obj)
+    sig = operator[0] if operator else signature(shown, target)
     if sig:
       lines += ["## Syntax", "", "```python", sig, "```", ""]
   if rest.strip():

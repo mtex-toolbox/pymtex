@@ -258,7 +258,13 @@ class vector3d(MtexArray):
     return 1 / self.norm()
 
   def round(self, style=None, maxHKL=12):
-    """a crystal direction rounded to integer indices, vector3d/round"""
+    """a crystal direction rounded to integer indices, vector3d/round; style= the indices rounded
+    ('hkl', 'hkil', 'uvw', 'UVTW', the display's by default), maxHKL the largest multiple tried; a
+    vector3d without a lattice has its coordinates rounded
+
+      m = round(m)
+      m = round(m, maxHKL=5)
+      m = round(m, 'uvw')       # the direct indices integer"""
     from .miller import roundIndices
     return roundIndices(self, style, maxHKL)
 
@@ -306,8 +312,8 @@ class vector3d(MtexArray):
   def byPolar(cls, theta, rho, antipodal=False):
     """the vectors of polar angle theta to z and azimuth rho from x towards y, unit vectors
 
-      vector3d.byPolar(theta, rho)
-      vector3d.byPolar(theta, rho, antipodal=True)      axes"""
+      v = vector3d.byPolar(theta, rho)
+      v = vector3d.byPolar(theta, rho, antipodal=True)    # axes"""
     theta, rho = np.broadcast_arrays(np.asarray(theta, dtype=float), np.asarray(rho, dtype=float))
     v = cls(np.sin(theta) * np.cos(rho), np.sin(theta) * np.sin(rho), np.cos(theta), antipodal=antipodal)
     v.isNormalized = True
@@ -327,7 +333,11 @@ class vector3d(MtexArray):
 
   @classmethod
   def rand(cls, *shape, antipodal=False, rng=None):
-    """uniformly distributed unit vectors or axes"""
+    """uniformly distributed unit vectors or axes; rng= a NumPy random generator
+
+      v = vector3d.rand()                     # one random unit vector
+      v = vector3d.rand(m, n)                 # an m x n array of them
+      v = vector3d.rand(100, antipodal=True)  # random axes"""
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     theta = np.arccos(2 * rng.random(shape) - 1)
@@ -336,7 +346,10 @@ class vector3d(MtexArray):
 
   @classmethod
   def zeros(cls, *shape):
-    """the zero vectors of a shape"""
+    """the zero vectors of a shape
+
+      v = vector3d.zeros()        # one zero vector
+      v = vector3d.zeros(m, n)    # an m x n array of them"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return cls(np.zeros(tuple(shape) + (3,)))
 
@@ -546,14 +559,23 @@ class vector3d(MtexArray):
     return self._new(np.cross(self.data, other.data), **attrs)
 
   def norm(self):
-    """the length of the vectors"""
+    """the length of the vectors
+
+      n = norm(v)"""
     return np.linalg.norm(self.data, axis=-1)
 
   def angle(self, other, N=None, antipodal=None, symmetry=True, outer=False):
     """the angle between two vectors, through atan2 for full accuracy near 0 and pi; an axis
     on either side reads it up to sign, antipodal=True always, antipodal=False never; with a
     normal N the angle in that plane, counterclockwise from self to other; outer=True pairs
-    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's angle_outer)"""
+    every entry of self with every entry of other, shape self.shape + other.shape (MATLAB's angle_outer);
+    symmetry=False compares crystal directions without their symmetric equivalents
+
+      omega = angle(v1, v2)
+      omega = angle(v1, v2, antipodal=True)
+      omega = angle(h1, h2, symmetry=False)
+      omega = angle(v1, v2, N)                # in the plane normal to N, from 0 to 2 pi
+      omega = angle(v1, v2, outer=True)       # every pair"""
     other = self._coerce(other)
     if outer:
       a, b = self._outerPair(other)
@@ -647,7 +669,10 @@ class vector3d(MtexArray):
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)
 
   def sum(self, axis=None):
-    """the sum of the vectors, over all axes or the given ones"""
+    """the sum of the vectors, over all axes or the given ones
+
+      s = sum(v)
+      s = sum(v, axis=0)"""
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._new(np.sum(self.data, axis=axis), **self._joined(None))
 

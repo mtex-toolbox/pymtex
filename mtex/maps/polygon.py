@@ -204,7 +204,11 @@ class polygonSet:
     return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
 
   def inpolygon(self, xy):
-    """the positions of the outlines holding at least one of the points xy"""
+    """the positions of the outlines holding at least one of the points xy
+
+      ind = grains.inpolygon([[x1, y1], [x2, y2]])
+      ind = inpolygon(grains, vector3d(x, y, 0))
+      grains = grains[ind]"""
     return np.flatnonzero(self.checkInside(xy).any(axis=0))
 
   @property

@@ -148,7 +148,10 @@ class MtexArray:
 
   @classmethod
   def cat(cls, *arrays, axis=0):
-    """the list of the operands, MATLAB's [a, b]; single elements are lists of one"""
+    """the list of the operands, MATLAB's [a, b]; single elements are lists of one
+
+      v = cat(v1, v2)
+      v = cat(v1, v2, axis=1)    # side by side"""
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
     first = arrays[0]
     attrs = first._join(first)

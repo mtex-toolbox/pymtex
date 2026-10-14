@@ -509,7 +509,14 @@ class PoleFigure:
     return self._rebuild(allI, allR)
 
   def calcError(self, other, mode="relative", epsilon=None):
-    """the mean deviation, one number per pole figure"""
+    """the mean deviation, one number per pole figure, from a recalculation by an ODF or from
+    other pole figures on the same directions: 'relative' (the default) damps the relative
+    error by epsilon, 'RP' keeps the directions above epsilon, 'l1' and 'l2'
+
+      e = calcError(pf, odf)
+      e = calcError(pf, pf2)
+      e = calcError(pf, odf, 'RP', epsilon=0.5)
+      e = calcError(pf, odf, 'l2')"""
     e = self.calcErrorPF(other, mode, epsilon)
     out = np.array([float(np.mean(I)) if I.size else np.nan for I in e.allI])
     if mode == "l1":
@@ -544,7 +551,10 @@ class PoleFigure:
 
   @staticmethod
   def cat(*pfs, axis=0):
-    """the pole figures of several data sets in one, in order"""
+    """the pole figures of several data sets in one, in order
+
+      pf = cat(pf1, pf2, pf3)
+      pf = PoleFigure.cat(pf1, pf2)"""
     pfs = [pf for pf in pfs if pf is not None]
     return PoleFigure([h for pf in pfs for h in pf.allH], [r for pf in pfs for r in pf.allR], [I for pf in pfs for I in pf.allI],
                       superposition=[c for pf in pfs for c in pf.c], complete=True)
@@ -595,7 +605,11 @@ def calcErrorPF(pf, other, mode="relative", epsilon=None):
 
 
 def calcError(a, b, *args, **kwargs):
-  """the error between a measurement and a recalculation, or between two SO(3) functions"""
+  """the error between a measurement and a recalculation, or between two SO(3) functions
+
+    e = calcError(pf, odf)  # one number per pole figure, PoleFigure.calcError
+    e = calcError(odf1, odf2)  # 'l1'
+    e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)"""
   if isinstance(a, PoleFigure):
     return a.calcError(b, *args, **kwargs)
   return _calcErrorODF(a, b, *args, **kwargs)

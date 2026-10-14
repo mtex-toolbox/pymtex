@@ -1043,7 +1043,13 @@ def _pointOf(proj, v):
 
 
 def annotate(v, *args, **kw: Unpack[PlotKeywords]):
-  """annotate: markers on every axes of the current figure, black by default"""
+  """annotate: markers on every axes of the current figure, black by default; the keywords are
+  those of plot
+
+    annotate(v)
+    annotate(v, markerFaceColor='r', label='a', backgroundColor='w')
+    annotate(v, plane=True, lineStyle='--')    # the great circle normal to v
+    annotate(ori, marker='v', markerSize=15)   # into the sections, pole figures or orientation space shown"""
   kw.setdefault("markerFaceColor", "k")
   kw.setdefault("add2all", True)
   # an orientation is marked in the sections of the current figure when it has some, or by

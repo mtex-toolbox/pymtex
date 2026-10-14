@@ -273,7 +273,9 @@ class grain3d:
     return abs(self.I_GF) @ self.boundary.area
 
   def surface(self):
-    """MATLAB's name for the surface area"""
+    """MATLAB's name for the surface area
+
+      s = grains.surface()      # the same as grains.surfaceArea"""
     return self.surfaceArea
 
   @property
@@ -395,7 +397,12 @@ class grain3d:
 
   def slice(self, plane, P0=None):
     """the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain
-    every section came from"""
+    every section came from; the plane is a plane3d, or its normal with a point on it or its
+    distance from the origin
+
+      grains2 = grains.slice(plane3d(vector3d.Z, vector3d(0, 0, 0.15)))
+      grains2 = grains.slice(vector3d(1, 1, 1), vector3d(0, 0, 0))   # normal and point
+      grains2 = grains.slice(vector3d.Z, 0.15)                        # normal and distance"""
     from .section3d import sliceGrains
     return sliceGrains(self, plane, P0)
 

@@ -115,7 +115,9 @@ class slipSystem:
 
   @classmethod
   def cat(cls, *systems, axis=0):
-    """the list of several systems of one crystal, MATLAB's [sS1, sS2]"""
+    """the list of several systems of one crystal, MATLAB's [sS1, sS2]
+
+      sS = cat(sS1, sS2)"""
     systems = [s for s in systems if s is not None]
     for s in systems[1:]:
       _sameFrame(systems[0].b, s.b, "the slip systems")
@@ -423,7 +425,9 @@ class dislocationSystem:
     return ~self.isEdge
 
   def tensor(self):
-    """the dislocation density tensor of every system, b (x) l^, in the length unit of the axes"""
+    """the dislocation density tensor of every system, b (x) l^, in the length unit of the axes
+
+      alpha = dS.tensor()"""
     from ..tensors.tensor import dislocationDensityTensor
     M = self.b.data[..., :, None] * unitRows(self.l.data)[..., None, :]
     return dislocationDensityTensor(M[0] if self.size == 1 else M, self.frame, unit="au")

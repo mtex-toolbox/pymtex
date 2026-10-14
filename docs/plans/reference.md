@@ -68,7 +68,14 @@ twin of `function_reference.md`. `docs/site.py` exports `docs/build/reference/` 
 `Reference`. Checked by a Jekyll build of a copy of the site, then the preview
 (`mtex-playground.github.io`, `tools/deploy-next.sh`), then live on the user's word.
 
-**R3 - the docstrings.** A one-line docstring makes a thin page. Ranked by how often MATLAB's
+**R3 - the docstrings.** Done 2026-10-14: every public name has a docstring (a test of
+`tests/test_reference.py`; an operator shows its form, `a + b`), the 200 most called functions
+show their calling forms (ranked by the calls of the doc pages, a name several classes share
+split among them), `plot` lists every kind it draws and a class's plot page shows the function
+`plot` hands it to (`PLOT` in `docs/reference.py`); `quaternion.mean` and `orientation.mean`
+give the moments of inertia and the projected orientations, `vector3d.mean` the projected
+directions, on request. The forms were written by three agents, each form run; what they found
+not working is the list below. The plan as first written: A one-line docstring makes a thin page. Ranked by how often MATLAB's
 tutorials and the Python pages call a function (the graph's call edges), the first 200 get
 their calling forms as indented lines, MATLAB's Syntax block translated, each keyword the
 function takes named in a sentence, as `fibre.angle` now has; the other optional outputs
@@ -81,7 +88,30 @@ pages add a "Reference" link per function in the doc build (`docs/make.py` links
 a page's code to their reference pages), and `openDoc('fibre.angle')` opens the page in the
 browser.
 
-## 3. Open questions
+## 3. What the calling forms found (2026-10-14)
+
+MATLAB forms that do not work in Python, left as they are:
+
+- `cat(ebsd1, ebsd2)` raises: the flat `cat` passes `axis=`, which `EBSD.cat` does not take.
+- `max(sF, c)`, `max(sF1, sF2)`, `max(sF, numLocal=3)` on an S1 function return the global
+  maximum silently: `_extremum` in `functions/characteristics.py` drops the arguments.
+- `angle(sVF, v)` with a constant vector fails on `S2VectorField` (`vector3d` has no `bandwidth`).
+- `calcError(odf, pf, 'RP')`, MATLAB's order, fails with a misleading grain exchange error.
+- `axis(o1, o2)` of two orientations of different crystal frames, MATLAB's own example, refuses
+  the frames; MATLAB's `axis(mori, cs)` choosing the frame is missing.
+- `variants(p2c, oriParent)` returns a flat list where MATLAB returns parents x variants.
+- `tensor(dS)` fails, `tensor` being the class; `dS.tensor()` works.
+- `inpolygon(grains, rect | poly)` is in MATLAB the grains whose centroid lies inside; in
+  Python `polygonSet.inpolygon(xy)` the grains holding the points.
+- Missing options: `strainTensor(M, type='Euler')`, `round(m)`'s error output and `maxXYZ`,
+  `fibre.rotation`'s `omega`, `vector3d.rand(n, sR)`, `Miller('[uvw]\\[uvw]', cs)`,
+  `sum(odf, d)` on the RBF and CBF classes, `abs(sF, bandwidth=)` on `S2FunTri`, `np.sum(T)`.
+- Different defaults: `calcError` is `'l1'` for two ODFs and `'relative'` for pole figures,
+  MATLAB's `'RP'`; `tensor.rand` draws normal entries, MATLAB's uniform ones.
+- Seen in passing: `fibre.alpha(crystalFrame('m-3m'))` prints `h || r : [0 8̅ 1̅1̅] || (-1,-1,-2)`;
+  `S2Fun.smiley(even=True).antipodal` is False.
+
+## 4. Open questions
 
 - A MATLAB page with no Python twin (1042 of them): stays as it is, or a note "not in the
   Python port" in Python mode? The note is a change on the site's side (`mx-lang.js`), which

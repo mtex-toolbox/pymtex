@@ -58,7 +58,10 @@ class orientationColorKey:
     return self.frameB
 
   def orientation2color(self, ori):
-    """the colours of orientations, an (..., 3) array in [0, 1]; defined by every key"""
+    """the colours of orientations, an (..., 3) array in [0, 1]; defined by every key
+
+      rgb = key.orientation2color(ori)
+      rgb = key.orientation2color(grains.meanOrientation)"""
     raise NotImplementedError
 
   def __repr__(self):
@@ -104,7 +107,10 @@ class ipfColorKey(orientationColorKey):
 
   def orientation2color(self, ori):
     """an orientation that was never measured has no colour, and a map shows nothing for it.
-    From GRID_FROM orientations on the key goes through its grid, which it builds once"""
+    From GRID_FROM orientations on the key goes through its grid, which it builds once
+
+      rgb = ipfKey.orientation2color(ori)
+      rgb = ipfKey.orientation2color(ebsd['Fo'].orientations)"""
     if self._grid is None and ori.size >= GRID_FROM:
       self.precompute()
     if self._grid is not None:
@@ -133,7 +139,12 @@ class ipfColorKey(orientationColorKey):
     return self.dirMap.whiteCenter
 
   def plot(self, **kwargs):
-    """the direction key drawn on its sector"""
+    """the direction key drawn on its sector, or with complete=True over the whole sphere;
+    resolution= is the spacing of the grid it is evaluated on, the other keywords those of plot
+
+      ipfKey.plot()
+      plot(ipfKey)
+      ipfKey.plot(complete=True, resolution=1*degree)"""
     from .sphericalplot import plotKey
     return plotKey(self.dirMap, **kwargs)
 
@@ -293,7 +304,9 @@ class BungeColorKey(orientationColorKey):
 
   def orientation2color(self, ori):
     """the colours of orientations, the Euler angles of the symmetric equivalent inside the Euler box
-    scaled to red, green and blue"""
+    scaled to red, green and blue
+
+      rgb = BungeColorKey(cs).orientation2color(ori)"""
     es = ori.flatten().symmetrise()
     q = es.data.reshape(es.shape[0], -1, 4)
     a, b, c = quat2euler(q, "Bunge")
@@ -328,7 +341,9 @@ class spotColorKey(orientationColorKey):
 
   def orientation2color(self, ori):
     """the colours of orientations: white, multiplied for every centre by its colour faded with the
-    kernel of the disorientation to it"""
+    kernel of the disorientation to it
+
+      rgb = spotColorKey(center, (0, 0, 1)).orientation2color(ori)"""
     if self.center is None:
       raise ValueError("the key has no centre yet; set key.center to an orientation")
     center = self.center.flatten()
@@ -365,7 +380,11 @@ class spectralTransmissionColorKey(orientationColorKey):
 
   def orientation2color(self, ori):
     """the colours of the thin section at the orientations, the transmitted spectrum of light along
-    the propagation direction between polariser and analyser"""
+    the propagation direction between polariser and analyser
+
+      key = spectralTransmissionColorKey(rI, 30000)
+      key.polarizer = vector3d.X
+      rgb = key.orientation2color(ebsd['Fo'].orientations)"""
     from ..analysis.optics import spectralTransmission
     back = ori.inv()
     prop = back * self.propagationDirection

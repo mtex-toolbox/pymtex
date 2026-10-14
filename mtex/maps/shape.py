@@ -88,7 +88,10 @@ def fitEllipse(self):
 
 
 def longAxis(self):
-  """the long half axis of the ellipse of every outline, the larger principal component"""
+  """the long half axis of the ellipse of every outline, the larger principal component
+
+    lA = grains.longAxis()
+    lA = longAxis(grains)"""
   return principalComponents(self)[0]
 
 
@@ -98,7 +101,10 @@ def shortAxis(self):
 
 
 def aspectRatio(self):
-  """the ratio of the two half axes, one for a circle"""
+  """the ratio of the two half axes, one for a circle
+
+    asp = grains.aspectRatio()
+    asp = aspectRatio(grains)"""
   A, B = _principal2d(self)
   a, b = np.linalg.norm(A, axis=1), np.linalg.norm(B, axis=1)
   with np.errstate(divide="ignore", invalid="ignore"):
@@ -225,7 +231,12 @@ def caliper(self, arg=None):
   length; with 'shortest', the narrowest one, with 'shortestPerp' the width measured across
   the direction perpendicular to it, which is the direction an outline with flat faces is
   aligned along, with 'longest' the first again; with a direction or an angle to the x axis
-  of the map, the width across it"""
+  of the map, the width across it; a list of them gives a width per outline and direction
+
+    cV = grains.caliper()                  # the longest, norm(cV) its length
+    cV = grains.caliper('shortest')        # or 'longest', 'shortestPerp'
+    c = grains.caliper(vector3d.X)         # the width across a direction
+    c = caliper(grains, [0, 30*degree])    # the widths across angles to the x axis"""
   if arg is None or (isinstance(arg, str) and arg == "longest"):
     return _axisOf(self, _extremalWidths(self)[1])
   if isinstance(arg, str):

@@ -81,7 +81,12 @@ class quaternion(MtexArray):
   def rand(cls, *shape, rng=None, maxAngle=None):
     """uniformly distributed rotations, the Haar measure; with maxAngle restricted to the ball
     of that rotational angle about the identity, the angle by inverting its distribution
-    (w - sin w) / pi, the axis uniform"""
+    (w - sin w) / pi, the axis uniform; rng= a NumPy random generator
+
+      rot = rotation.rand()                            # one
+      rot = rotation.rand(100)
+      rot = rotation.rand(10, 3)                       # a 10 x 3 array
+      rot = rotation.rand(100, maxAngle=10*degree)"""
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     if maxAngle is not None and maxAngle < np.pi:
@@ -193,7 +198,9 @@ class quaternion(MtexArray):
     return quaternion(self.conj().data / np.sum(self.data * self.data, axis=-1)[..., None])
 
   def norm(self):
-    """the norm of the quaternions, sqrt(a^2 + b^2 + c^2 + d^2)"""
+    """the norm of the quaternions, sqrt(a^2 + b^2 + c^2 + d^2)
+
+      n = norm(q)"""
     return np.linalg.norm(self.data, axis=-1)
 
   def normalize(self):
@@ -206,13 +213,18 @@ class quaternion(MtexArray):
 
   def angle(self, other=None):
     """the rotational angle in [0, pi], or the angle between two, both from atan2 forms that
-    keep their digits near 0 and pi"""
+    keep their digits near 0 and pi
+
+      omega = angle(q)
+      omega = angle(q1, q2)"""
     if other is None:
       return quatAngle(self.data)
     return chordAngle(self.data, other.data[..., :4])
 
   def axis(self):
-    """the rotational axis, a unit vector"""
+    """the rotational axis, a unit vector
+
+      v = axis(q)"""
     return vector3d(quatAxis(self.data), isNormalized=True)
 
   # two quaternions are equal when their coefficients are; isclose compares within a tolerance
@@ -342,7 +354,12 @@ class quaternion(MtexArray):
 
   def std(self, weights=None, robust=False):
     """the mean angular deviation from the mean, quaternion/std; for orientations the angle is
-    the symmetry-reduced one, as the mean is"""
+    the symmetry-reduced one, as the mean is; weights= weigh the rotations, robust=True takes the
+    robust mean
+
+      sigma = std(rot)
+      sigma = std(rot, robust=True)
+      sigma = std(rot, weights=w)"""
     if self.size == 0:
       return float("nan")
     m = self.mean(weights=weights, robust=robust)
@@ -417,15 +434,21 @@ class rotation(quaternion):
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
     """the rotations of the Euler angles, Bunge's ZXZ convention unless a convention is named
+    ('Bunge', 'ZXZ', 'Matthies', 'ZYZ', 'ABG', 'Roe', 'Kocks', 'Canova')
 
-      rotation.byEuler(phi1, Phi, phi2)
-      rotation.byEuler(alpha, beta, gamma, 'ZYZ')"""
+      rot = rotation.byEuler(phi1, Phi, phi2)              # Bunge
+      rot = rotation.byEuler(alpha, beta, gamma, 'ZYZ')    # Matthies
+      rot = rotation.byEuler(phi1, Phi, phi2, 'Kocks')
+      rot = rotation.byEuler([phi1, Phi, phi2])            # the angles as one list"""
     a, b, c, rest = eulerTriple(a, b, c, () if convention is None else (convention,))
     return cls._fromData(euler2quat(a, b, c, rest[0] if rest else None))
 
   @classmethod
   def byAxisAngle(cls, v, omega):
-    """the rotations by the angle omega about the axis v"""
+    """the rotations by the angle omega about the axis v
+
+      rot = rotation.byAxisAngle(v, omega)
+      rot = rotation.byAxisAngle(zvector, [10*degree, 20*degree, 30*degree])    # three about z"""
     return cls._fromData(axis2quat(_xyz(v), omega))
 
   @classmethod
@@ -478,7 +501,11 @@ class rotation(quaternion):
 
   @classmethod
   def cat(cls, *arrays, axis=0):
-    """a list joining rotations with an improper transform is an orthogonalTransform"""
+    """the list of the operands, MATLAB's [r1, r2]; joining rotations with an improper transform
+    gives an orthogonalTransform, orientations stay orientations between the same frames
+
+      rot = cat(rot1, rot2)
+      rot = cat(rot1, rot2, axis=1)    # side by side"""
     if any(isinstance(a, orthogonalTransform) for a in arrays):
       return orthogonalTransform.cat(*(a if isinstance(a, orthogonalTransform) else orthogonalTransform(a) for a in arrays), axis=axis)
     return super().cat(*arrays, axis=axis)
@@ -577,12 +604,17 @@ class orthogonalTransform(MtexArray):
 
   @classmethod
   def byEuler(cls, a, b=None, c=None, convention: EulerConventionName | Any = None):
-    """the proper transforms of the Euler angles, Bunge's ZXZ convention unless one is named"""
+    """the proper transforms of the Euler angles, Bunge's ZXZ convention unless one is named
+
+      T = orthogonalTransform.byEuler(phi1, Phi, phi2)
+      T = orthogonalTransform.byEuler(alpha, beta, gamma, 'ZYZ')"""
     return cls(rotation.byEuler(a, b, c, convention), False)
 
   @classmethod
   def byAxisAngle(cls, v, omega):
-    """the proper transforms rotating by omega about the axis v"""
+    """the proper transforms rotating by omega about the axis v
+
+      T = orthogonalTransform.byAxisAngle(v, omega)"""
     return cls(rotation.byAxisAngle(v, omega), False)
 
   # ------------------------------------------------------------------ parts
@@ -664,11 +696,16 @@ class orthogonalTransform(MtexArray):
     return self.parity[..., None, None] * quat2mat(self.data[..., :4])
 
   def angle(self, other=None):
-    """the rotational angle of the rotational part, or the angle between the rotational parts of two"""
+    """the rotational angle of the rotational part, or the angle between the rotational parts of two
+
+      omega = angle(T)
+      omega = angle(T1, T2)"""
     return self.rot.angle(None if other is None else other.rot if isinstance(other, orthogonalTransform) else other)
 
   def axis(self):
-    """the rotational axis of the rotational part"""
+    """the rotational axis of the rotational part
+
+      v = axis(T)"""
     return self.rot.axis()
 
   def Euler(self, convention: EulerConventionName | Any = None):

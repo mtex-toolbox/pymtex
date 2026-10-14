@@ -368,7 +368,10 @@ class grain2d(polygonSet):
     return self._subset(ids[np.asarray(d).reshape(-1) <= epsilon])
 
   def selectByGrainId(self, ids):
-    """the grains named by id, in the order asked for"""
+    """the grains named by id, in the order asked for
+
+      grains = grains.selectByGrainId([5, 3, 1])
+      grain = grains.selectByGrainId(17)"""
     return self._subset(self._lookup(np.atleast_1d(np.asarray(ids)).reshape(-1)))
 
   def __iter__(self):

@@ -145,19 +145,27 @@ class fibre:
     return self._build(self.o1.flatten(), self.o2.flatten(), self.h.flatten())
 
   def reshape(self, *shape):
-    """the fibres in another shape"""
+    """the fibres in another shape
+
+      f = f.reshape(m, n)"""
     return self._build(self.o1.reshape(*shape), self.o2.reshape(*shape), self.h.reshape(*shape))
 
   @classmethod
   def cat(cls, *fibres, axis=0):
-    """the fibres joined into one list along an axis"""
+    """the fibres joined into one list along an axis
+
+      f = cat(f1, f2)
+      f = cat(f1, f2, axis=1)    # side by side"""
     return cls._build(orientation.cat(*[f.o1 for f in fibres], axis=axis), orientation.cat(*[f.o2 for f in fibres], axis=axis),
                       vector3d.cat(*[f.h for f in fibres], axis=axis))
 
   # ------------------------------------------------------------------ sampling
 
   def rotation(self, points=1000):
-    """the rotations along the fibre, points x shape, turning about h from o1 to o2"""
+    """the rotations along the fibre, points x shape, turning about h from o1 to o2
+
+      rot = f.rotation()
+      rot = f.rotation(points=100)"""
     omega = np.linspace(0, 1, points)[(slice(None),) + (None,) * self.ndim] * self.arcAngle()
     axis = np.broadcast_to(self.h.normalize().data, omega.shape + (3,))
     return rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))

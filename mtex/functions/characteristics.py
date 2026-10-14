@@ -316,7 +316,10 @@ def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
 def calcError(f, g, mode="l1", resolution=5 * degree):
   """the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' is half
   the mean absolute difference, for densities the fraction of the volume that would have to
-  move to turn one into the other; 'l2' the norm of the difference over the norm of g"""
+  move to turn one into the other; 'l2' the norm of the difference over the norm of g
+
+    e = calcError(odf1, odf2)  # 'l1'
+    e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)"""
   mode = str(mode).lower()
   grid = equispacedSO3Grid(f.CS, f.SS, resolution=resolution)
   d1 = np.real(f(grid))
@@ -801,7 +804,15 @@ def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, wei
   (docs/plans/halfwidth.md); 'klcv' scores ten candidate halfwidths by Kullback-Leibler cross
   validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the sample
   size and the symmetries alone; directions take the first two only. groups are the grain ids
-  of pixels, which the energies fold by; a map brings its own"""
+  of pixels, which the energies fold by; a map brings its own. weights weigh the sample,
+  bandwidth and halfwidths set the degrees and the candidates of the energies, rng their
+  subsamples, samplingSize the points 'klcv' scores
+
+    psi = calcKernel(ori)
+    psi = calcKernel(ebsd)  # the grain ids of a map after calcGrains
+    psi = calcKernel(ori, 'conservative', groups=grainId)
+    psi = calcKernel(ori, 'klcv', samplingSize=500)
+    psi = calcKernel(v, noiseFloor=False)  # an S2 kernel for directions"""
   from .halfwidth import degreeEnergies, selectHalfwidth, ucvAtEdge
   from .kernelfunctions import S2DeLaValleePoussinKernel
   if not isinstance(o, (quaternion, vector3d)) and hasattr(o, "orientations"):

@@ -23,7 +23,9 @@ from .vector3d import vector3d, asVector3d
 class plane3d:
   """a plane <N, v> = d, or a list of them
 
-    plane3d(N, d), plane3d(N, v0), plane3d.byPoints(v)
+    plane = plane3d(N, d)           # <N, v> = d
+    plane = plane3d(N, v0)          # through the point v0
+    plane = plane3d.byPoints(v)     # fitted through the points v
   """
 
   __array_ufunc__ = None

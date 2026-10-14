@@ -134,9 +134,14 @@ def _readArgs(args):
 class tensor(MtexArray):
   """a tensor of rank R in a reference frame, or a list of them
 
-    tensor(M, cs, rank=2)                     the coefficients, the list dimensions in front
-    tensor(v), tensor(rot)                    a vector as a rank one, a rotation as a rank two
-    tensor(V, rank=4)                         a 6 x 6 Voigt matrix, doubleConvention=True for the compliance factors
+  frame= gives the frame as a keyword, name=, unit= and density= are carried along, and
+  Kelvin=True reads a 6 x 6 matrix in the Kelvin (Mandel) notation.
+
+    T = tensor(M, cs)                         # the coefficients, the list dimensions in front
+    T = tensor(M, cs, rank=2, name='strain', unit='%')
+    T = tensor(v), tensor(rot)                # a vector as a rank one, a rotation as a rank two
+    T = tensor(V, rank=4)                     # a 6 x 6 Voigt matrix
+    T = tensor(V, rank=4, doubleConvention=True)   # with the factors of two of the compliance
     T.M, T.rank, T.frame, T.CS, T.isSymmetric
   """
   _carried = ("rank", "_ncoord", "_frame", "doubleConvention", "density", "unit", "name")
@@ -358,7 +363,10 @@ class tensor(MtexArray):
     return isinstance(other, tensor) and other.rank == self.rank and self.data.shape == other.data.shape and bool(np.allclose(self.data, other.data, rtol=rtol, atol=atol))
 
   def norm(self):
-    """the Frobenius norm of every tensor, over all its coefficients"""
+    """the Frobenius norm of every tensor, over all its coefficients
+
+      n = T.norm()
+      n = norm(eps)"""
     return np.linalg.norm(self.data, axis=-1)
 
   def normalize(self):
@@ -635,7 +643,10 @@ class tensor(MtexArray):
     return t
 
   def sum(self, axis=None):
-    """the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)"""
+    """the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)
+
+      T.sum()                 # the sum of all tensors
+      T.sum(axis=1)           # along the second axis"""
     if axis is None:
       return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
     return self._as(type(self), self.data.sum(axis=axis % self.ndim))
@@ -683,14 +694,17 @@ class tensor(MtexArray):
   def ones(cls, *args, rank=None, **kwargs):
     """a tensor of ones of the rank of the class, or of rank=, the list shape given by the numbers
 
-      tensor.ones(cs, 5)"""
+      T = tensor.ones(cs, 5)
+      T = tensor.ones(2, 3, rank=4)"""
     return cls._filled(np.ones, args, rank, kwargs)
 
   @classmethod
   def zeros(cls, *args, rank=None, **kwargs):
     """a tensor of zeros of the rank of the class, or of rank=, the list shape given by the numbers
 
-      tensor.zeros(cs, 5)"""
+      T = tensor.zeros(cs, 5)
+      T = tensor.zeros(rank=4)
+      C = stiffnessTensor.zeros(cs)"""
     return cls._filled(np.zeros, args, rank, kwargs)
 
   # a list of tensors of the class filled by np.ones or np.zeros, the frame and the list shape
@@ -703,7 +717,15 @@ class tensor(MtexArray):
 
   @classmethod
   def rand(cls, *args, rank=None, rng=None, **kwargs):
-    """a random tensor with the symmetries its class and frame ask for"""
+    """a random tensor with the symmetries its class and frame ask for: a plain tensor of normally
+    distributed entries, a symmetric one symmetrised, a stiffness or compliance one positive
+    definite besides; the numbers give the list shape, rank= the rank of a plain tensor, rng= the
+    generator
+
+      T = tensor.rand(rank=4)
+      T = tensor.rand(100, cs, rank=2)
+      S = complianceTensor.rand()
+      C = stiffnessTensor.rand(cs, rng=np.random.default_rng(0))"""
     rng = np.random.default_rng() if rng is None else rng
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
@@ -883,7 +905,11 @@ def _letter(l):
 
 
 def colon(A, B):
-  """the double contraction A : B, the last two indices of A against the first two of B"""
+  """the double contraction A : B, the last two indices of A against the first two of B,
+  MATLAB's A:B
+
+    sigma = colon(C, eps)       # a stiffness and a strain give a stress
+    s = colon(sigma, eps)       # two rank two tensors a number"""
   out = EinsteinSum(A, list(range(1, A.rank - 1)) + [-1, -2], B, [-1, -2] + [A.rank - 2 + k for k in range(1, B.rank - 1)])
   if isinstance(out, tensor):
     cls = A._productClass(B)
@@ -997,7 +1023,8 @@ class strainTensor(tensor):
   """a rank two symmetric strain tensor, in the double convention of the Voigt notation
 
     eps = strainTensor(M)
-    eps = strainTensor(M, cs)"""
+    eps = strainTensor(M, cs)
+    eps = strainTensor(np.diag([1, 0, -1]))"""
   _rank, _double, _symmetricRank2 = 2, True, True
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)

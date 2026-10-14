@@ -233,7 +233,9 @@ class SO3Kernel(_Kernel):
     return self.calcFourier()
 
   def norm(self):
-    """the L2 norm of the kernel, the Euclidean norm of its coefficients"""
+    """the L2 norm of the kernel, the Euclidean norm of its coefficients
+
+      t = norm(psi)"""
     return float(np.linalg.norm(self.A))
 
   def radon(self):
@@ -677,7 +679,9 @@ class S2Kernel(_Kernel):
     return self.calcFourier()
 
   def norm(self):
-    """the L2 norm of the kernel, sqrt(sum_n A_n^2 / (2n+1))"""
+    """the L2 norm of the kernel, sqrt(sum_n A_n^2 / (2n+1))
+
+      t = norm(psi)"""
     A = self.A
     return float(np.sqrt(np.sum(A * A / (2 * np.arange(len(A)) + 1))))
 
@@ -935,7 +939,9 @@ class S1Kernel(_Kernel):
     return S1Kernel._fromHalf(self._rule(L) + other._rule(L))
 
   def norm(self):
-    """the L2 norm of the kernel, the Euclidean norm of its two sided coefficients"""
+    """the L2 norm of the kernel, the Euclidean norm of its two sided coefficients
+
+      t = norm(psi)"""
     c = self._coefficients
     return float(np.sqrt(c[0] ** 2 + 2 * np.sum(c[1:] ** 2)))
 

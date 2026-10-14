@@ -31,11 +31,15 @@ _STYLE = {s.lower(): s for s in STYLES}
 def Miller(*args, antipodal=False, dispStyle=None):
   """crystal directions and lattice plane normals, a vector3d in a crystal frame
 
-    Miller(h, k, l, cs)              plane normals, Miller(h, k, i, l, cs) with four indices
-    Miller(u, v, w, cs, 'uvw')       lattice directions, 'UVTW' with four indices
-    Miller([[1, 0, 0], ...], cs)     many at once, the indices along the last axis
-    Miller('{111}', cs)              (hkl) {hkl} [uvw] <uvw>, braces for the whole family
-    Miller(v, cs)                    a vector3d expressed in the crystal frame
+  antipodal=True adds the antipodal symmetry, dispStyle= the indices the display shows ('hkl',
+  'hkil', 'uvw', 'UVTW', 'xyz')
+
+    m = Miller(h, k, l, cs)                    # a lattice plane normal
+    m = Miller(h, k, i, l, cs)                 # four indices, hexagonal and trigonal lattices
+    m = Miller(u, v, w, cs, 'uvw')             # a lattice direction, 'UVTW' with four indices
+    m = Miller([[1, 0, 0], [1, 1, 1]], cs)     # many at once, the indices along the last axis
+    m = Miller('{111}', cs)                    # (hkl) or [uvw] one, {hkl} or <uvw> the whole family
+    m = Miller(v, cs)                          # a vector3d expressed in the crystal frame
   """
   style = dispStyle
   for a in args:

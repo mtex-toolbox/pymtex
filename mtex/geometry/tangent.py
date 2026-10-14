@@ -184,7 +184,9 @@ class SO3TangentVector(vector3d):
       self.oriRef[idx] = value.oriRef
 
   def reshape(self, *shape):
-    """the tangent vectors in another shape, a reference per element reshaped with them"""
+    """the tangent vectors in another shape, a reference per element reshaped with them
+
+      v = v.reshape(m, n)"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     data = self.data.reshape(tuple(shape) + (3,))
     ref = self.oriRef.reshape(data.shape[:-1]) if self.oriRef.ndim else self.oriRef
@@ -199,7 +201,10 @@ class SO3TangentVector(vector3d):
   @classmethod
   def cat(cls, *arrays, axis=0):
     """tangent vectors concatenate on one side; the references concatenate with them unless
-    every list shares the same one"""
+    every list shares the same one
+
+      v = cat(v1, v2)
+      v = cat(v1, v2, axis=1)    # side by side"""
     first = arrays[0]
     arrays = [first._fit(a, sameReference=False) for a in arrays]
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
@@ -304,7 +309,10 @@ class SO3TangentVector(vector3d):
     return self._rebuild(np.cross(self.data, self._fit(other).data))
 
   def angle(self, other=None, **kwargs):
-    """the angle of the rotation the vector describes, or the angle between two vectors"""
+    """the angle of the rotation the vector describes, or the angle between two vectors
+
+      omega = angle(v)
+      omega = angle(v1, v2)"""
     if other is None:
       return self.norm()
     other = self._fit(other)
@@ -340,7 +348,10 @@ class SO3TangentVector(vector3d):
     return ref.flatten()[0]
 
   def sum(self, axis=None, **kwargs):
-    """the sum of tangent vectors at one shared reference, over all or along an axis"""
+    """the sum of tangent vectors at one shared reference, over all or along an axis
+
+      s = sum(v)
+      s = sum(v, axis=0)"""
     ref = self._oneReference()
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._rebuild(np.sum(self.data, axis=axis), ref)

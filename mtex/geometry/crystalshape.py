@@ -88,9 +88,10 @@ def _padFaces(faces):
 class crystalShape:
   """a crystal shape, the polyhedron bounded by the lattice planes of the face normals N
 
-    cS = crystalShape(N)                       faces at the reciprocal length of their normal
-    cS = crystalShape(N, habitus, extension)   the distances from the indices alone
-    cS = crystalShape.hex(cs), crystalShape.quartz(), crystalShape.olivine(cs, simple=True)
+    cS = crystalShape(N)                         # faces at the reciprocal length of their normal
+    cS = crystalShape(N, habitus, extension)     # the distances from the indices alone
+    cS = crystalShape.hex(cs)                    # a hexagonal prism, crystalShape.cube(cs) a cube
+    cS = crystalShape.quartz(simple=True)        # from the catalogue, in its own crystal frame
   """
 
   __array_ufunc__ = None

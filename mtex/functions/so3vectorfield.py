@@ -239,7 +239,9 @@ class SO3VectorField:
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def norm(self):
-    """the length of the vectors as a function on SO(3), the same as abs"""
+    """the length of the vectors as a function on SO(3), the same as abs
+
+      SO3F = norm(SO3VF)"""
     return self.abs()
 
   def curl(self, x=None):
@@ -457,7 +459,9 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     return vector3d(np.real(self._fhat[0]))
 
   def norm(self):
-    """the length of the vectors as a function on SO(3), the same as abs"""
+    """the length of the vectors as a function on SO(3), the same as abs
+
+      SO3F = norm(SO3VF)"""
     return self.abs()
 
   def isclose(self, w, rtol=1e-8):

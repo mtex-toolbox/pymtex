@@ -132,7 +132,9 @@ class S2FunTri(S2Fun):
     return self._mapped(np.abs)
 
   def abs(self):
-    """the absolute value of the function, taken at the vertices"""
+    """the absolute value of the function, taken at the vertices
+
+      sF = abs(sF)"""
     return abs(self)
 
   def sqrt(self):

@@ -172,7 +172,9 @@ class spatialTransform:
     return self.eval(pos) - pos
 
   def norm(self, pos):
-    """the length of the displacement at every position"""
+    """the length of the displacement at every position
+
+      n = norm(T, pos)"""
     return self.displacement(pos).norm()
 
   def discretize(self, pos):

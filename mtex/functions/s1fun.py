@@ -212,7 +212,9 @@ class S1FunHarmonic(harmonicArithmetic):
     return mapFun(np.abs, self, bandwidth=smoothBandwidth(self))
 
   def abs(self):
-    """the pointwise absolute value, a Fourier series of a smoothing bandwidth"""
+    """the pointwise absolute value, a Fourier series of a smoothing bandwidth
+
+      sF = abs(sF)"""
     return abs(self)
 
   def sqrt(self, bandwidth=None):
@@ -236,7 +238,9 @@ class S1FunHarmonic(harmonicArithmetic):
     return x.real if self.isReal else x
 
   def norm(self):
-    """the L2 norm for the normalised measure, the Euclidean norm of the coefficients"""
+    """the L2 norm for the normalised measure, the Euclidean norm of the coefficients
+
+      t = norm(sF)"""
     return float(np.linalg.norm(self.fhat))
 
   def dot(self, g):
@@ -269,11 +273,16 @@ class S1FunHarmonic(harmonicArithmetic):
     return float(np.real(self(x))), float(x)
 
   def sum(self):
-    """the integral over the circle, 2 pi times the mean, MATLAB's sum"""
+    """the integral over the circle, 2 pi times the mean, MATLAB's sum
+
+      value = sum(sF)"""
     return 2 * np.pi * self.mean()
 
   def max(self, resolution=0.25 * degree):
-    """the largest value and the angle it is taken at, sampled at the resolution and refined"""
+    """the largest value and the angle it is taken at, sampled at the resolution and refined
+
+      v, pos = max(sF)
+      v, pos = max(sF, resolution=1*degree)"""
     return self._extremum(1, resolution)
 
   def min(self, resolution=0.25 * degree):

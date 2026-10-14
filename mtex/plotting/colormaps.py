@@ -67,7 +67,12 @@ def mtexColormap(name=None):
 
 
 def mtexColorMap(name: ColormapName | Any = "WhiteJet", fig=None):
-  """mtexColorMap WhiteJet: the colour map of the current figure, or of one figure"""
+  """mtexColorMap WhiteJet: the colour map of the current figure, or of one figure
+
+    mtexColorMap('LaboTeX')            # every axes of the current figure
+    mtexColorMap('white2black', mtexFig)
+    mtexColorMap(ax, 'hot')            # one axes only
+    mtexColorMap(np.array([[1, 1, 1], [0, 0, 1]]))   # an n x 3 matrix of rgb values"""
   from .mtexfigure import gcm
   # mtexColorMap(ax, name): the map of one axes of the current figure
   if hasattr(name, "get_figure"):

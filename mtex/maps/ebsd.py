@@ -365,7 +365,9 @@ class EBSD:
 
   @classmethod
   def cat(cls, *maps):
-    """the list of several maps, the phases of the first"""
+    """the list of several maps, the phases of the first, MATLAB's [ebsd1, ebsd2]
+
+      ebsd = EBSD.cat(ebsd1, ebsd2, ebsd3)"""
     first = maps[0]
     for m in maps[1:]:
       if m.frame is not first.frame:
@@ -410,7 +412,11 @@ class EBSD:
     return self._subset(ids[d <= epsilon])
 
   def inpolygon(self, region):
-    """the mask of the measurements inside a rectangle [x, y, w, h] or a polygon (N, 2), edges included"""
+    """the mask of the measurements inside a rectangle [x, y, w, h] or a polygon (N, 2), edges included
+
+      ind = ebsd.inpolygon([xmin, ymin, dx, dy])                # by a rectangle
+      ind = inpolygon(ebsd, [[x1, y1], [x2, y2], [x3, y3]])     # by a polygon
+      ebsd = ebsd[ind]"""
     region = np.asarray(region, dtype=float)
     x, y = self.pos.x, self.pos.y
     if region.ndim == 1:

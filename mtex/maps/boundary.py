@@ -328,7 +328,10 @@ class grainBoundary:
   def selectByGrainId(self, ids):
     """the segments with a grain of the list on either side, walked again: a junction of the
     whole boundary may have lost its third segment, so the chains of the subset are longer;
-    for pairs of ids the segments between the two of a pair, with the row of its pair"""
+    for pairs of ids the segments between the two of a pair, with the row of its pair
+
+      gBSub = gB.selectByGrainId([1, 2, 3])         # the boundaries of these grains
+      gBSub, pairId = gB.selectByGrainId(pairs)      # pairs (n, 2): gBSub.grainId is pairs[pairId] up to the order"""
     ids = np.asarray(ids)
     if ids.ndim == 2 and ids.shape[1] == 2:
       M = int(max(ids.max(initial=0), self.grainId.max(initial=0))) + 1
@@ -418,7 +421,11 @@ class grainBoundary:
     return vector3d(d, frame=self.frame, antipodal=True)
 
   def angle(self, x):
-    """the angle of every segment to a direction, or to the segments of another boundary"""
+    """the angle of every segment to a direction, or to the segments of another boundary, in
+    [0, pi/2], the segments having no sense
+
+      omega = gB.angle(vector3d.X)
+      omega = angle(gB1, gB2)"""
     other = x.direction if isinstance(x, grainBoundary) else x
     return self.direction.angle(other, symmetry=False)
 
@@ -450,7 +457,11 @@ class grainBoundary:
     return x, y, np.diff(np.sort(t[hit])) * np.linalg.norm(ab)
 
   def inpolygon(self, region):
-    """the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]"""
+    """the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]
+
+      ind = gB.inpolygon([xmin, ymin, dx, dy])                # by a rectangle
+      ind = inpolygon(gB, [[x1, y1], [x2, y2], [x3, y3]])     # by a polygon
+      gB = gB[ind]"""
     from .ebsd import _inPolygon
     region = np.asarray(region, dtype=float)
     mp = self._mid2d

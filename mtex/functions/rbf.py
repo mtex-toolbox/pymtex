@@ -412,7 +412,9 @@ class SO3FunRBF(SO3Fun):
     return self * -1
 
   def norm(self):
-    """the L2 norm of the function, from its harmonic expansion"""
+    """the L2 norm of the function, from its harmonic expansion
+
+      t = norm(odf)"""
     return SO3FunHarmonic(self).norm()
 
   def __repr__(self):
@@ -455,15 +457,25 @@ class SO3FunRBF(SO3Fun):
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
-      """the absolute value of the function, pointwise, as a function handle"""
+      """the absolute value of the function, pointwise, as a function handle
+
+      SO3F = abs(odf)"""
     def abs(self) -> Any:
-      """the absolute value of the function, pointwise, as a function handle"""
+      """the absolute value of the function, pointwise, as a function handle
+
+      SO3F = abs(odf)"""
     def sqrt(self) -> Any:
-      """the square root of the function, pointwise, as a function handle"""
+      """the square root of the function, pointwise, as a function handle
+
+      SO3F = sqrt(odf)"""
     def exp(self) -> Any:
-      """the exponential of the function, pointwise, as a function handle"""
+      """the exponential of the function, pointwise, as a function handle
+
+      SO3F = exp(odf)"""
     def log(self) -> Any:
-      """the logarithm of the function, pointwise, as a function handle"""
+      """the logarithm of the function, pointwise, as a function handle
+
+      SO3F = log(odf)"""
     def __pow__(self, p) -> Any:
       ...
     @property
@@ -655,7 +667,9 @@ class SO3FunCBF(SO3Fun):
     return -1 * self
 
   def norm(self):
-    """the L2 norm of the function, from its harmonic expansion"""
+    """the L2 norm of the function, from its harmonic expansion
+
+      t = norm(odf)"""
     return SO3FunHarmonic(self).norm()
 
   def __repr__(self):
@@ -683,15 +697,25 @@ class SO3FunCBF(SO3Fun):
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
-      """the absolute value of the function, pointwise, as a function handle"""
+      """the absolute value of the function, pointwise, as a function handle
+
+      SO3F = abs(odf)"""
     def abs(self) -> Any:
-      """the absolute value of the function, pointwise, as a function handle"""
+      """the absolute value of the function, pointwise, as a function handle
+
+      SO3F = abs(odf)"""
     def sqrt(self) -> Any:
-      """the square root of the function, pointwise, as a function handle"""
+      """the square root of the function, pointwise, as a function handle
+
+      SO3F = sqrt(odf)"""
     def exp(self) -> Any:
-      """the exponential of the function, pointwise, as a function handle"""
+      """the exponential of the function, pointwise, as a function handle
+
+      SO3F = exp(odf)"""
     def log(self) -> Any:
-      """the logarithm of the function, pointwise, as a function handle"""
+      """the logarithm of the function, pointwise, as a function handle
+
+      SO3F = log(odf)"""
     def __pow__(self, p) -> Any:
       ...
     @property
@@ -720,8 +744,8 @@ def _framesAmong(args):
 def uniformODF(*frames, antipodal=False):
   """the uniform ODF, constant one, between a crystal and a specimen frame
 
-    uniformODF(cs, ss)
-    uniformODF(cs, ss, antipodal=True)"""
+    odf = uniformODF(cs, ss)
+    mdf = uniformODF(cs, cs, antipodal=True)  # a uniform misorientation distribution"""
   CS, SS = _framesAmong(frames)
   return SO3FunRBF(orientation(rotation.nan(0), CS, SS, antipodal=antipodal), SO3DeLaValleePoussinKernel(halfwidth=10 * degree), np.zeros(0), 1.0)
 
@@ -735,7 +759,13 @@ def _densityKernel(space, kernel, halfwidth):
 
 def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, thinning=True):
   """a unimodal ODF, the weights normalised to a mean of one, the centres of negligible weight
-  dropped unless thinning=False"""
+  dropped unless thinning=False
+
+    odf = unimodalODF(ori)  # the de la Vallee Poussin kernel of halfwidth 10 degree
+    odf = unimodalODF(ori, halfwidth=15*degree)
+    odf = unimodalODF(ori, cs, ss)  # the centre given as a rotation, the frames named
+    odf = unimodalODF(ori, psi)  # the kernel psi, also kernel=psi
+    odf = unimodalODF(ori, weights=w, thinning=False)  # one weight per centre, all kept"""
   if isinstance(center, (referenceFrame, SO3Kernel)):
     args, center = (center, *args), None
   kernels = [a for a in args if isinstance(a, SO3Kernel)]
@@ -760,7 +790,13 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, t
 
 def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
   """a fibre ODF from crystal and specimen directions or from a fibre of P1, the weights
-  normalised to a mean of one"""
+  normalised to a mean of one
+
+    odf = fibreODF(h, r)  # the de la Vallee Poussin kernel of halfwidth 10 degree
+    odf = fibreODF(h, r, halfwidth=15*degree)
+    odf = fibreODF(h, r, psi)  # the S2 kernel psi, also kernel=psi
+    odf = fibreODF(h, r, ss)  # the specimen frame named
+    odf = fibreODF(f, weights=w)  # from a fibre f, one weight per fibre"""
   kernels = [a for a in args if isinstance(a, S2Kernel)]
   kernel = kernels[0] if kernels else kernel
   frames = [a for a in args if isinstance(a, referenceFrame)]

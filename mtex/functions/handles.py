@@ -122,15 +122,23 @@ class SO3FunGeneric(SO3Fun):
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def sqrt(self) -> Any:
-      """the square root of the function, pointwise, as a function handle"""
+      """the square root of the function, pointwise, as a function handle
+
+      SO3F = sqrt(odf)"""
     def exp(self) -> Any:
-      """the exponential of the function, pointwise, as a function handle"""
+      """the exponential of the function, pointwise, as a function handle
+
+      SO3F = exp(odf)"""
     def log(self) -> Any:
-      """the logarithm of the function, pointwise, as a function handle"""
+      """the logarithm of the function, pointwise, as a function handle
+
+      SO3F = log(odf)"""
     def __pow__(self, p) -> Any:
       ...
     def sum(self) -> Any:
-      """the integral over orientation space, 8 pi^2 times the mean"""
+      """the integral over orientation space, 8 pi^2 times the mean
+
+      value = sum(odf)"""
     @property
     def frameA(self) -> Any:
       ...
@@ -570,22 +578,24 @@ def _pointwiseSO3(f, op):
 
 
 # a pointwise operation as a method returning a function handle
-def _pointwiseMethod(op, what):
+def _pointwiseMethod(op, what, name):
   def f(self):
     return _pointwiseSO3(self, op)
-  f.__doc__ = f"the {what} of the function, pointwise, as a function handle"
+  f.__doc__ = f"the {what} of the function, pointwise, as a function handle\n\n  SO3F = {name}(odf)"
   return f
 
 
 def _integralSO3(self):
-  """the integral over orientation space, 8 pi^2 times the mean"""
+  """the integral over orientation space, 8 pi^2 times the mean
+
+    value = sum(odf)"""
   return 8 * np.pi ** 2 * self.mean()
 
 
 # the classes keep what they define themselves, the harmonic form its own products
-_POINTWISE = {"__abs__": _pointwiseMethod(np.abs, "absolute value"), "abs": _pointwiseMethod(np.abs, "absolute value"),
-              "sqrt": _pointwiseMethod(np.sqrt, "square root"), "exp": _pointwiseMethod(np.exp, "exponential"),
-              "log": _pointwiseMethod(np.log, "logarithm"), "__pow__": lambda self, p: _pointwiseSO3(self, lambda x: x ** p),
+_POINTWISE = {"__abs__": _pointwiseMethod(np.abs, "absolute value", "abs"), "abs": _pointwiseMethod(np.abs, "absolute value", "abs"),
+              "sqrt": _pointwiseMethod(np.sqrt, "square root", "sqrt"), "exp": _pointwiseMethod(np.exp, "exponential", "exp"),
+              "log": _pointwiseMethod(np.log, "logarithm", "log"), "__pow__": lambda self, p: _pointwiseSO3(self, lambda x: x ** p),
               "sum": _integralSO3}
 for _cls in (SO3FunHarmonic, SO3FunRBF, SO3FunCBF, SO3FunGeneric):
   for _name, _f in _POINTWISE.items():

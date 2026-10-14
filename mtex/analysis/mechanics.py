@@ -109,7 +109,13 @@ def SchmidFactor(sS, sigma=None, relative=False):
   on the system over the difference of the extreme principal stresses, so that a uniaxial
   tension gives the direction cosines; without a load the functions of the tension
   direction on the sphere, one function for one system and a vector valued one for several,
-  antipodal as a tension along r and along -r are one load"""
+  antipodal as a tension along r and along -r are one load; relative=True divides by the
+  critical resolved shear stress of every system
+
+    sF = SchmidFactor(sS)  # a function of the tension direction
+    tau = SchmidFactor(sS, v)  # under a uniaxial tension along v
+    tau = SchmidFactor(sS, sigma)
+    tau = SchmidFactor(sS, sigma, relative=True)"""
   if sigma is None:
     from ..functions.s2fun import S2FunHarmonic
     fr = sS.frame.stripSym() if sS.frame is not None else None

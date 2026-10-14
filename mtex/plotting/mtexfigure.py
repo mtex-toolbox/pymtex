@@ -99,7 +99,9 @@ class mtexFigure:
     return self.current if self.current in self.children else self.children[-1]
 
   def nextAxis(self):
-    """a new axes in the next cell of the layout, the layout and the figure grown when it is full"""
+    """a new axes in the next cell of the layout, the layout and the figure grown when it is full
+
+      ax = mtexFig.nextAxis()"""
     k = len(self.children)
     if k >= self.nrows * self.ncols:
       rows, cols = self.nrows, self.ncols
@@ -166,7 +168,11 @@ class mtexFigure:
 
   def setColorRange(self, colorRange="equal"):
     """one colour range over every axes ('equal'), each axes its own ('tight'), or one given
-    as (lo, hi)"""
+    as (lo, hi)
+
+      mtexFig.setColorRange()             # one range over every axes
+      mtexFig.setColorRange('tight')      # each axes the range of its own data
+      mtexFig.setColorRange((0, 5))       # the range given"""
     ms = self._mappables()
     if isinstance(colorRange, str) and colorRange == "tight":
       return self._tightColorRange(ms)
@@ -373,7 +379,12 @@ def newMtexFigure(n=1, **kwargs):
 def nextAxis(k=None, j=None, fig=None):
   """nextAxis: the next plot goes into the next axes of the current figure; nextAxis(k) into
   the axes k, nextAxis(i, j) into the one in row i and column j, all counted from 0 (MATLAB
-  counts them from 1)"""
+  counts them from 1); fig= names the mtexFigure, the current one by default
+
+    nextAxis()               # the next axes
+    nextAxis(2)              # the third axes
+    nextAxis(1, 0)           # the axes in the second row and the first column
+    ax = nextAxis(fig=mtexFig)"""
   fig = gcm() if fig is None else fig
   if fig is None:
     fig = mtexFigure()
@@ -447,7 +458,9 @@ def _labelAxes(fig):
 
 
 def gcm():
-  """the current mtexFigure, None before the first plot"""
+  """the current mtexFigure, None before the first plot
+
+    mtexFig = gcm()"""
   # a figure closed with plt.close is no longer current; a figure pyplot does not manage,
   # one embedded in a window, has no number and stays current
   if _current is not None:
@@ -459,7 +472,11 @@ def gcm():
 
 
 def hold(on=True):
-  """hold on: the next plot goes into the current axes"""
+  """hold on: the next plot goes into the current axes
+
+    hold(True)               # the next plots go into the current axes
+    hold(False)              # each plot takes its axes for itself again
+    mtexFig = hold('on')     # MATLAB's words, the figure held returned"""
   import matplotlib.pyplot as plt
   fig = gcm()
   # a plain figure the user opened after the last MTEX figure is adopted, else a new one

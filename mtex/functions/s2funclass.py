@@ -42,10 +42,10 @@ class S2Fun:
   def smiley(v=None, exact=False, even=False, **kwargs):
     """the smiley test function on the sphere
 
-      S2Fun.smiley(bandwidth=256)    its harmonic expansion by quadrature
-      S2Fun.smiley(v)                its values at the directions v
-      S2Fun.smiley(exact=True)       the function itself, as a handle
-      S2Fun.smiley(even=True)        the smiley on both hemispheres"""
+      sF = S2Fun.smiley(bandwidth=256)  # its harmonic expansion by quadrature
+      values = S2Fun.smiley(v)  # its values at the directions v
+      sF = S2Fun.smiley(exact=True)  # the function itself, as a handle
+      sF = S2Fun.smiley(even=True)  # the smiley on both hemispheres"""
     from .handles import S2FunHandle
     from .s2fun import S2FunHarmonic
     if isinstance(v, vector3d):

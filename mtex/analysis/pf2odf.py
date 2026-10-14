@@ -360,7 +360,12 @@ class MLSSolver:
 
   def calcODF(self, minIter=None, maxIter=None, ghostCorrection=None, verbose=None):
     """the reconstruction, with the uniform portion the data allows fixed by the ghost
-    correction and put into the constant instead of the components"""
+    correction and put into the constant instead of the components; minIter, maxIter,
+    ghostCorrection and verbose replace the solver's settings
+
+      odf = solver.calcODF()
+      odf = solver.calcODF(minIter=2, maxIter=4)
+      odf = solver.calcODF(ghostCorrection=False, verbose=True)"""
     if minIter is not None:
       self.minIter = int(minIter)
     if maxIter is not None:
@@ -406,13 +411,18 @@ class MLSSolver:
 
 def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, zeroRange=False, minIter=5, maxIter=10, c0=None,
             ghostCorrection=True, quadratureWeights=False, intensityWeights=False, regularisation=0.0, verbose=False):
-  """an ODF reconstructed from pole figure intensities, an SO3FunRBF
+  """an ODF reconstructed from pole figure intensities, an SO3FunRBF; the ansatz functions
+  are a kernel (kernel=, by default the de la Vallee Poussin kernel of the given halfwidth) on
+  a grid (S3G=, by default equispaced at the resolution), iterated minIter to maxIter times
+  from the coefficients c0; quadratureWeights and intensityWeights weight the residuals,
+  regularisation weighs a penalty on the Dirichlet energy, verbose reports the iterations
 
-    calcODF(pf)
-    calcODF(pf, halfwidth=5*degree, resolution=5*degree)
-    calcODF(pf, zeroRange=True)                     drop the orientations the data says are empty
-    calcODF(pf, ghostCorrection=False)             keep the uniform portion in the components
-  """
+    odf = calcODF(pf)
+    odf = calcODF(pf, halfwidth=7.5*degree, resolution=5*degree)
+    odf = calcODF(pf, psi)  # the ansatz functions of the kernel psi
+    odf = calcODF(pf, zeroRange=True)  # drop the orientations the data says are empty
+    odf = calcODF(pf, ghostCorrection=False)  # keep the uniform portion in the components
+    odf = calcODF(pf, solver)  # run an MLSSolver set up before"""
   solvers = [a for a in args if isinstance(a, MLSSolver)]
   if solvers:
     return solvers[0].calcODF()

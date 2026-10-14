@@ -62,6 +62,9 @@ def test_a_matlab_page_is_what_its_name_reaches_in_python():
 def test_the_syntax_shows_the_keywords_and_angles_in_degrees(rendered):
   assert "return_nearest=False" in rendered["fibre.angle"]
   assert "angle=15*degree" in rendered["EBSD.calcGrains"]
+  # a class method without cls, the calling forms of a docstring kept as code
+  assert "rotation.byAxisAngle(v, omega)\n```" in rendered["rotation.byAxisAngle"]
+  assert "```python\nrot = rotation.byAxisAngle(v, omega)" in rendered["rotation.byAxisAngle"]
   assert "MATLAB's [fibre.angle](fibre.angle.html)" in rendered["fibre.angle"]
 
 

@@ -204,7 +204,11 @@ class S2AxisFieldHarmonic(S2AxisField):
 
   def angle(self, x):
     """the angle between the axes of the field and a constant axis, or another field, as a function
-    on the sphere"""
+    on the sphere
+
+      f = angle(sAF, v)
+      f = angle(sAF1, sAF2)
+      f = angle(sAF, sVF)  # to the directions of a vector field"""
     return mapFun(lambda t: np.arccos(np.clip(t, -1, 1)), self.dot(x))
 
   def __repr__(self):

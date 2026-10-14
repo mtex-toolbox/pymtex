@@ -128,12 +128,16 @@ class S2VectorField:
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def angle(self, w):
-    """the angle between two fields at every direction, a function on the sphere"""
+    """the angle between two fields at every direction, a function on the sphere
+
+      f = angle(sVF1, sVF2)"""
     return mapField(lambda a, b: np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1)), self, w,
                     bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
 
   def norm(self):
-    """the length at every direction, a function on the sphere, as MATLAB's norm"""
+    """the length at every direction, a function on the sphere, as MATLAB's norm
+
+      sF = norm(sVF)"""
     return self.abs()
 
   def mean(self):

@@ -110,7 +110,13 @@ def mtexdatafile(name: SampleFileName | Any, root=None, download=True):
   """the file of a sample data set, or its files, fetched on first use
 
   Besides the data sets mtexdata reads, every data set of the data repository has its
-  files here, the Neper tessellation 'my100grains' for instance.
+  files here, the Neper tessellation 'my100grains' for instance. root= is the folder the
+  files are kept in, mtexDataPath() by default; download=False raises for a missing one
+  instead of fetching it.
+
+    fname = mtexdatafile('forsterite')
+    tess, oris = mtexdatafile('my100grains')      # a data set of several files
+    fname = mtexdatafile('forsterite', root=mtexDataPath(), download=False)
   """
   # a data set without a recipe here is named by the repository
   d = _lookup(name)

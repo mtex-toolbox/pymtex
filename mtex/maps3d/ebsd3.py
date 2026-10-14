@@ -203,7 +203,12 @@ class EBSD3(EBSD):
 
   def slice(self, plane, P0=None):
     """the section through a plane: the volume sampled on a square grid of the voxel spacing in
-    the plane, spanned by the direction of the box nearest to the plane and the one across"""
+    the plane, spanned by the direction of the box nearest to the plane and the one across; the
+    plane is a plane3d, or its normal with a point on it or its distance from the origin
+
+      ebsd = ebsd3.slice(plane3d(vector3d.Z, vector3d(0, 0, 0.15)))
+      ebsd = ebsd3.slice(vector3d(1, 1, 1), vector3d(0, 0, 0))   # normal and point
+      ebsd = ebsd3.slice(vector3d.Z, 0.15)                        # normal and distance"""
     if not isinstance(plane, plane3d):
       plane = plane3d(plane, P0 if P0 is not None else 0)
     N = plane.N.normalize().data.reshape(3)

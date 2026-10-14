@@ -103,7 +103,12 @@ def spectralTransmission(rI, vprop, thickness=None, *, polarizationDirection=Non
   polariser and an analyser at the angle phi, the fast wave at the angle tau to the
   polariser or, given the polarizationDirection, at the angle it makes with it; a list of
   directions gives one colour per direction; with the thickness alone, the three channels
-  as functions on the sphere"""
+  as functions on the sphere of the bandwidth given
+
+    rgb = spectralTransmission(rI, vprop, thickness)
+    rgb = spectralTransmission(rI, vprop, thickness, polarizationDirection=p)
+    rgb = spectralTransmission(rI, vprop, thickness, tau=30*degree, phi=90*degree)
+    r, g, b = rI.spectralTransmission(thickness, bandwidth=64)  # functions of the propagation direction"""
   from .data.cie1931 import CIE1931, WAVELENGTHS
   if thickness is None:
     from ..functions.quadrature import quadratureS2Grid

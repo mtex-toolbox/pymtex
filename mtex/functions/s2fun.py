@@ -231,7 +231,10 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return self._rebuild(fhat if fhat.ndim else fhat.reshape(1))
 
   def reshape(self, *shape):
-    """the list of functions in another shape"""
+    """the list of functions in another shape
+
+      sF = sF.reshape(2, 3)
+      sF = sF.reshape((2, 3))"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
@@ -248,8 +251,8 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
   def cat(cls, *fs, axis=0):
     """the functions joined into one list along an axis, cut or padded to the largest bandwidth
 
-      S2FunHarmonic.cat(f, g)
-      S2FunHarmonic.cat(f, g, axis=1)"""
+      sF = cat(sF1, sF2)
+      sF = S2FunHarmonic.cat(sF1, sF2, axis=1)"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -374,7 +377,9 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
                        symmetrise=False)
 
   def abs(self):
-    """the absolute value |f| as a handle, evaluated when asked"""
+    """the absolute value |f| as a handle, evaluated when asked
+
+      sF = abs(sF)"""
     return abs(self)
 
   def sqrt(self, bandwidth=None):
@@ -405,13 +410,19 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   def sum(self, axis=None):
     """the integral over the sphere, int f dS, S2Fun/sum; with an axis the sum of the functions
-    along that axis of a list"""
+    along that axis of a list
+
+      value = sum(sF)
+      sF = sum(sF, axis=0)  # the pointwise sum along the first axis"""
     if axis is not None:
       return self._rebuild(np.sum(self._fhat, axis=normalize_axis_index(axis, len(self.shape))))
     return 4 * math.pi * self.mean()
 
   def norm(self, s=None):
-    """the L2 norm for the normalised surface measure, or the Sobolev norm, one per function"""
+    """the L2 norm for the normalised surface measure, or the Sobolev norm, one per function
+
+      t = norm(sF)
+      t = norm(sF, s=1)  # the Sobolev norm of index s"""
     if s is None:
       n = np.linalg.norm(self._fhat, axis=-1) / math.sqrt(4 * math.pi)
     else:

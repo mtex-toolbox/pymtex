@@ -312,8 +312,12 @@ class embedding:
     return np.einsum("ij,ij->j", self.u, other.u).reshape(self.shape)
 
   def norm(self, normalized=False):
-    """with normalized the norm over the norm every orientation's image has; the sum of squares
-    without a temporary, which is four times faster than np.linalg.norm on a large list"""
+    """the Euclidean norm of every image, with normalized=True over the norm every orientation's
+    image has; the sum of squares without a temporary, which is four times faster than
+    np.linalg.norm on a large list
+
+      n = norm(e)
+      n = norm(e, normalized=True)"""
     n = np.sqrt(np.einsum("ij,ij->j", self.u, self.u)).reshape(self.shape)
     return n / np.linalg.norm(self.spec.u0) if normalized else n
 

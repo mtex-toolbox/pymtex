@@ -150,7 +150,14 @@ def variants(p2c, second=None, ids=None, parent=False):
   group modulo the child group; the parent variants with the sides swapped; the child
   orientations of parents, all of them or one chosen per parent by its id; the parent
   orientations of children, whose frame is the child's. The variants are numbered as MTEX
-  numbers them, which is what a variant id means"""
+  numbers them, which is what a variant id means
+
+    p2cVariants = variants(p2c)                      # the child variants
+    p2pVariants = variants(p2c, parent=True)         # the parent variants
+    oriChild = variants(p2c, oriParent)              # every child variant of every parent
+    oriChild = variants(p2c, oriParent, variantId)   # one per parent, chosen by its id
+    oriParent = variants(p2c, oriChild)              # the parents of children
+    odfChild = variants(p2c, odfParent)              # the child texture"""
   from .orientation import orientation
   if isinstance(second, str):
     parent, second = second == "parent", None

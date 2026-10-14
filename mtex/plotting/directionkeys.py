@@ -257,7 +257,12 @@ class directionColorKey:
     raise NotImplementedError
 
   def plot(self, **kwargs):
-    """the key drawn on its sector"""
+    """the key drawn on its sector, or with complete=True over the whole sphere; resolution= is
+    the spacing of the grid it is evaluated on, the other keywords those of plot
+
+      key.plot()
+      plot(key)
+      key.plot(complete=True, resolution=1*degree)"""
     from .sphericalplot import plotKey
     return plotKey(self, **kwargs)
 

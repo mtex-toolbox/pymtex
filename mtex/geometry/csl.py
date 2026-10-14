@@ -152,7 +152,12 @@ def CSL(sigma, CS, *args, delta=0):
   coincidences; with a misfit delta > 0 the metric is replaced by the one of the smallest
   denominators within the relative misfit delta, and its coincidences are the near ones of the
   real lattice (the constrained coincidence site lattices of a hexagonal metal: c^2/a^2 = 2.52
-  of titanium is 5/2 within delta = 0.01)"""
+  of titanium is 5/2 within delta = 0.01)
+
+    mori = CSL(3, cs)                # the twin of a cubic lattice
+    mori = CSL([3, 5, 7], cs)        # several orders at once
+    mori = CSL(sigma, cs, 'I')       # of the lattice centred I
+    mori = CSL(7, cs, delta=0.01)    # near coincidences within a misfit of the metric"""
   sigmas = [int(s) for s in np.atleast_1d(sigma)]
   if any(s < 1 for s in sigmas):
     raise ValueError(f"Sigma is a positive integer, not {sigma}")

@@ -155,7 +155,10 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return self._rebuild(self._fhat[idx])
 
   def reshape(self, *shape):
-    """the list of functions in another shape"""
+    """the list of functions in another shape
+
+      SO3F = SO3F.reshape(2, 3)
+      SO3F = SO3F.reshape((2, 3))"""
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     return self._rebuild(self._fhat.reshape(tuple(shape) + (self._fhat.shape[-1],)))
 
@@ -171,7 +174,10 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   @classmethod
   def cat(cls, *fs, axis=0):
     """the functions joined into one list along an axis, the coefficients padded to the largest
-    bandwidth"""
+    bandwidth
+
+      SO3F = cat(SO3F1, SO3F2)
+      SO3F = SO3FunHarmonic.cat(SO3F1, SO3F2, axis=1)"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -377,7 +383,9 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return mapFun(np.abs, self, bandwidth=smoothBandwidth(self))
 
   def abs(self):
-    """the absolute value of the function, by quadrature at twice the bandwidth"""
+    """the absolute value of the function, by quadrature at twice the bandwidth
+
+      SO3F = abs(SO3F)"""
     return abs(self)
 
   def sqrt(self, bandwidth=None):
@@ -407,13 +415,19 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return m[()] if not self.shape else m
 
   def sum(self, axis=None):
-    """the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list"""
+    """the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list
+
+      value = sum(SO3F)
+      SO3F = sum(SO3F, axis=0)  # the pointwise sum along the first axis"""
     if axis is not None:
       return self._rebuild(self._fhat.sum(axis=normalize_axis_index(axis, len(self.shape))))
     return 8 * np.pi ** 2 * self.mean()
 
   def norm(self, s=None):
-    """the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)"""
+    """the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)
+
+      t = norm(SO3F)
+      t = norm(SO3F, s=1)"""
     if self.shape:
       return self._each(lambda f: f.norm(s))
     if s is None:

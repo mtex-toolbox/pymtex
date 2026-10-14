@@ -120,9 +120,13 @@ class orientation(rotation):
   @classmethod
   def byEuler(cls, a, b=None, c=None, *args: EulerConventionName | Any, antipodal=False):
     """the orientations of the Euler angles, Bunge's ZXZ convention unless a convention is named
+    ('Bunge', 'ZXZ', 'Matthies', 'ZYZ', 'ABG', 'Roe', 'Kocks', 'Canova'); antipodal=True marks a
+    misorientation with grain exchange
 
-      orientation.byEuler(phi1, Phi, phi2, cs, ss)
-      orientation.byEuler(alpha, beta, gamma, 'ZYZ', cs, ss)"""
+      ori = orientation.byEuler(phi1, Phi, phi2, cs, ss)              # Bunge
+      ori = orientation.byEuler(alpha, beta, gamma, 'ZYZ', cs, ss)    # Matthies
+      ori = orientation.byEuler(phi1, Phi, phi2, 'Kocks', cs, ss)
+      ori = orientation.byEuler([phi1, Phi, phi2], cs)                # the angles as one list"""
     a, b, c, args = eulerTriple(a, b, c, args)
     args, frames = _splitFrames(args)
     convention = args[0] if args else None
@@ -138,7 +142,11 @@ class orientation(rotation):
   @classmethod
   def byAxisAngle(cls, v, omega, *frames, antipodal=False):
     """the orientations of the rotations by omega about the axis v; about a crystal direction and no
-    frames named the rotation of that crystal frame into itself, a misorientation"""
+    frames named the rotation of that crystal frame into itself, a misorientation; antipodal=True
+    marks a misorientation with grain exchange
+
+      ori = orientation.byAxisAngle(v, omega, cs, ss)     # an orientation
+      mori = orientation.byAxisAngle(h, omega)            # a misorientation about the crystal direction h"""
     frames = _splitFrames(frames)[1]
     # about a crystal direction without frames named: the rotation of that crystal frame into itself
     if not frames and isinstance(v, vector3d) and isinstance(v.frame, crystalFrame):
@@ -184,10 +192,13 @@ class orientation(rotation):
 
   @classmethod
   def rand(cls, *args, rng=None, antipodal=False, maxAngle=None):
-    """random orientations, uniformly distributed or within maxAngle of the identity
+    """random orientations, uniformly distributed or within maxAngle of the identity;
+    rng= a NumPy random generator, antipodal=True misorientations with grain exchange
 
-      orientation.rand(n, cs, ss)
-      orientation.rand(n, cs, maxAngle=10*degree)"""
+      ori = orientation.rand(cs)                          # one
+      ori = orientation.rand(n, cs, ss)
+      ori = orientation.rand(m, n, cs)                    # an m x n array
+      ori = orientation.rand(n, cs, maxAngle=10*degree)"""
     args, frames = _splitFrames(args)
     return cls._fromRotation(rotation.rand(*args, rng=rng, maxAngle=maxAngle).data, frames, antipodal)
 
@@ -278,7 +289,12 @@ class orientation(rotation):
 
   def angle(self, other=None, symmetry=True):
     """the rotational angle up to symmetry, of the orientation or of the misorientation to other;
-    symmetry=False the plain angle, other='max' the angle of the equivalent that turns the most"""
+    symmetry=False the plain angle, other='max' the angle of the equivalent that turns the most
+
+      omega = angle(ori)
+      omega = angle(ori, symmetry=False)     # ignore the symmetric equivalents
+      omega = angle(ori1, ori2)
+      omega = angle(mori, 'max')"""
     from .symmetryops import orientationAngle, orientationSelfAngle
     # angle(mori, 'max'): the angle of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
@@ -295,7 +311,13 @@ class orientation(rotation):
 
   def axis(self, other=None, symmetry=True, antipodal=None):
     """the rotational axis, of the representative in the fundamental region; with a second
-    orientation the axis of their disorientation in the specimen frame"""
+    orientation the axis of their disorientation in the specimen frame; symmetry=False the axis of
+    the rotation itself, antipodal= the axis read as an axis or not
+
+      h = axis(mori)                    # in the crystal frame of mori
+      h = axis(mori, symmetry=False)
+      h = axis(mori, 'max')             # of the equivalent that turns the most
+      v = axis(ori1, ori2)              # in the specimen frame"""
     from .symmetryops import orientationAxis, pairAxis
     # axis(mori, 'max'): the axis of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
