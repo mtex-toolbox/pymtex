@@ -291,7 +291,24 @@ class spatialTransformShift(spatialTransform):
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
     """the affine map fitted to point pairs by weighted least squares, the positions posA in frame A
-    and where they went, posB"""
+    and where they went, posB
+
+      T = spatialTransformShift.fit(posA, posB)              # posB = T(posA) as nearly as can be
+      T = spatialTransformShift.fit(posA, posB, weights=w)   # the points weighted
+
+    The degree one polynomial fit of spatialTransformPoly.fit, plain least squares without
+    the reweighting against outliers, as MATLAB's. A point with a missing position or weight
+    is dropped; other keywords are accepted and not used.
+
+    Input
+      posA - vector3d, the positions in frame A
+      posB - vector3d, the same points in frame B
+    Output
+      T - spatialTransformShift
+    Keywords
+      weights - one weight per point
+    See also
+      spatialTransformPoly.fit, spatialTransformRigid.fit, spatialTransformProjective.fit"""
     return spatialTransformPoly.fit(posA, posB, weights=weights, degree=1, robust=False).shiftMatrix()
 
 
@@ -324,7 +341,23 @@ class spatialTransformRigid(spatialTransformShift):
 
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
-    """the translation fitted to point pairs, the weighted mean of their displacements"""
+    """the translation fitted to point pairs, the weighted mean of their displacements
+
+      T = spatialTransformRigid.fit(posA, posB)              # the mean displacement
+      T = spatialTransformRigid.fit(posA, posB, weights=w)   # the weighted mean
+
+    A point with a missing position or weight is dropped; other keywords are accepted and not
+    used.
+
+    Input
+      posA - vector3d, the positions in frame A
+      posB - vector3d, the same points in frame B
+    Output
+      T - spatialTransformRigid
+    Keywords
+      weights - one weight per point
+    See also
+      spatialTransformShift.fit, spatialTransformField.fit"""
     dx, dy, w, _, _ = fitData(posA, posB, weights)
     return spatialTransformRigid(vector3d(np.sum(w * dx) / np.sum(w), np.sum(w * dy) / np.sum(w), 0.0))
 
@@ -372,7 +405,23 @@ class spatialTransformProjective(spatialTransform):
   @staticmethod
   def byTilt(theta, wd, centre=None):
     """the specimen tilted by theta about an axis along x through centre, seen from the working
-    distance wd: the far side shrinks and straight lines stay straight"""
+    distance wd: the far side shrinks and straight lines stay straight
+
+      T = spatialTransformProjective.byTilt(70*degree, wd)          # about the x axis
+      T = spatialTransformProjective.byTilt(70*degree, wd, centre)  # through a point left in place
+
+    cos(theta) foreshortens across the tilt axis and wd sets how much the scale varies over
+    the frame: as wd grows the perspective vanishes and only the foreshortening is left. This
+    is a tilt one knows; one that was measured is fitted by spatialTransformTilt.
+
+    Input
+      theta - the tilt angle about the x axis
+      wd - the working distance the surface is seen from, positive
+      centre - vector3d, the point the tilt leaves in place, by default the origin
+    Output
+      T - spatialTransformProjective
+    See also
+      spatialTransformProjective.fit, spatialTransformTilt"""
     c = np.zeros(3) if centre is None else _xyz(centre)[0]
     if wd <= 0:
       raise ValueError(f"a working distance is positive, got {wd}")
@@ -675,7 +724,24 @@ class spatialTransformField(spatialTransform):
 
   @staticmethod
   def fit(posA, posB, weights=None, **kwargs):
-    """the field of the displacements of the point pairs, at the points of frame A"""
+    """the field of the displacements of the point pairs, at the points of frame A
+
+      T = spatialTransformField.fit(posA, posB)              # the displacements as measured
+
+    There is nothing to fit: the field interpolates its samples exactly. The weights only
+    drop the points whose weight is not a number, as the points with a missing position are
+    dropped, so the same call works on the output of a failed correlation; other keywords are
+    accepted and not used.
+
+    Input
+      posA - vector3d, the positions in frame A
+      posB - vector3d, the same points in frame B
+    Output
+      T - spatialTransformField
+    Keywords
+      weights - one weight per point
+    See also
+      spatialTransformField, spatialTransformPoly.fit"""
     dx, dy, _, x, y = fitData(posA, posB, weights)
     z = np.zeros_like(x)
     return spatialTransformField(vector3d(np.stack([x, y, z], axis=1)), vector3d(np.stack([dx, dy, z], axis=1)))

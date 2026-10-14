@@ -64,7 +64,29 @@ def calcGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, c2c=False)
 
 
 def mclComponents(A, p, maxIter=np.inf):
-  """MCL until the columns settle: expansion, inflation by p, pruning, the columns normalised"""
+  """the components of a weighted graph by Markov clustering, MCL; MATLAB's mclComponents
+
+    A = mclComponents(job.graph, 1.6)                          # until the columns settle
+    A = mclComponents(job.graph, 1.6, maxIter=4)               # at most four iterations
+
+  The steps of S. van Dongen's algorithm repeated until the columns settle: the expansion
+  A @ A, the inflation of every entry to the power p, the entries up to 1e-4 pruned and the
+  columns normalised. Before, the entries up to 1e-4 are pruned, a graph with no symmetric
+  entry made symmetric and, where the diagonal is empty, ones put on it. The larger p, the
+  smaller the clusters; the nonzero pattern of the result joins the nodes of one cluster.
+
+  Input
+    A - sparse adjacency matrix, the weights between 0 and 1
+    p - the inflation power
+  Output
+    A - sparse matrix of the clusters
+  Keywords
+    maxIter - the iteration bound; the loop stops after maxIter - 1 steps
+  References
+    S. van Dongen, Graph clustering by flow simulation, PhD thesis, University of Utrecht
+        (2000)
+  See also
+    parentGrainReconstructor.clusterGraph, GrainReconstructionMCL"""
   from scipy.sparse import identity
   A = A.tocsr().copy()
   A.data[A.data <= 1e-4] = 0
@@ -95,8 +117,28 @@ def _diagInv(s):
 
 
 def clusterGraph(job, inflationPower=None, **options):
-  """job.clusterGraph(inflationPower=1.6): job.graph clustered by MCL, so that its
-  components are the parent grains; a variant graph is clustered by clusterVariantGraph"""
+  """the graph of a parent grain reconstruction broken into clusters, one per parent grain;
+  MATLAB's clusterGraph of parentGrainReconstructor
+
+    job.clusterGraph()                                         # the grain graph by MCL
+    job.clusterGraph(inflationPower=1.6)                       # larger for smaller clusters
+
+  A grain graph, from calcGraph, is clustered by mclComponents, so that its components are
+  the parent grains, for calcParentFromGraph or mergeByGraph. A variant graph, from
+  calcVariantGraph, is clustered by clusterVariantGraph, which takes the remaining keyword
+  arguments and an inflation power of 1.05 by default. The job is changed in place.
+
+  Input
+    job - parentGrainReconstructor with job.graph
+  Output
+    job.graph - the clustered graph
+  Keywords
+    inflationPower - the inflation power of MCL, larger for smaller clusters; by default 1.6
+        for a grain graph, 1.05 for a variant graph
+  See also
+    mclComponents, parentGrainReconstructor.calcGraph,
+    parentGrainReconstructor.calcParentFromGraph, parentGrainReconstructor.mergeByGraph,
+    parentGrainReconstructor.clusterVariantGraph, GrainGraphBasedReconstruction"""
   if job.hasVariantGraph:
     return job.clusterVariantGraph(inflationPower=1.05 if inflationPower is None else inflationPower, **options)
   job.graph = mclComponents(job.graph, 1.6 if inflationPower is None else inflationPower)
@@ -164,8 +206,28 @@ def calcParentFromGraph(job):
 
 
 def mergeByGraph(job, threshold=5 * degree):
-  """job.mergeByGraph(threshold=5*degree): every component of job.graph whose grains fit a
-  common parent within the threshold becomes one parent grain of that orientation"""
+  """the grains of every cluster of the graph merged into a parent grain; MATLAB's
+  mergeByGraph of parentGrainReconstructor
+
+    job.mergeByGraph()                                         # merged where they fit within 5 degrees
+    job.mergeByGraph(threshold=3*degree)                       # a tighter fit
+
+  The components of job.graph, after clusterGraph, are merged as a test first. For every
+  component of more than one grain the parent orientation is fitted: the mean of its parent
+  grains, the parent fitted to its child grains by calcParent, or the robust mean of both;
+  the misfit is the largest over its child grains. The components that fit within the
+  threshold become parent grains of that orientation, the others are left as they were. The
+  graph and the votes are removed; the job is changed in place.
+
+  Input
+    job - parentGrainReconstructor with a clustered job.graph
+  Output
+    job.grains - the reconstructed parent grains
+  Keywords
+    threshold - the largest misfit of a component that is merged
+  See also
+    parentGrainReconstructor.clusterGraph, parentGrainReconstructor.calcParentFromGraph,
+    calcParent, GrainGraphBasedReconstruction"""
   from scipy.sparse import diags
   if job.graph is None:
     raise ValueError("no graph; compute it with job.calcGraph() and cluster it with job.clusterGraph()")

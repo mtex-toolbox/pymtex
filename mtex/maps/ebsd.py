@@ -417,7 +417,27 @@ class EBSD:
   # ------------------------------------------------------------------ finding measurements
 
   def findByLocation(self, xy, radius=None):
-    """the measurements closest to positions, or within a radius of them"""
+    """the measurements closest to positions, or within a radius of them; MATLAB's
+    EBSD.findByLocation
+
+      e = ebsd.findByLocation([10000, 5000])                       # the nearest measurement
+      e = ebsd.findByLocation([[10000, 5000], [20000, 7000]])      # one per position
+      e = ebsd.findByLocation([10000, 5000], radius=100)           # all within 100 map units
+
+    A position is (x, y), (x, y, z) or a vector3d. Without a radius every position gives its
+    nearest measurement, in the order of the positions; with one the measurements within it
+    of any position are returned once each, in the order of the map.
+
+    Input
+      ebsd - EBSD
+      xy - the positions, (n, 2), (n, 3) or vector3d
+    Output
+      e - EBSD, the measurements found as a list
+    Keywords
+      radius - the distance within which every measurement is taken; the nearest one only
+        when not given
+    See also
+      EBSD.findByOrientation, EBSD.inpolygon"""
     q = xy.data if isinstance(xy, vector3d) else np.asarray(xy, dtype=float)
     q = q.reshape(-1, q.shape[-1])
     if q.shape[1] == 2:
@@ -450,7 +470,29 @@ class EBSD:
   # ------------------------------------------------------------------ moving the map
 
   def rotate(self, rot, keepXY=False, keepEuler=False):
-    """a rigid motion of the map; keepXY moves only the orientations, keepEuler only the positions"""
+    """a rigid motion of the map; keepXY moves only the orientations, keepEuler only the positions;
+    MATLAB's EBSD.rotate
+
+      ebsd = ebsd.rotate(10*degree)                                 # about the z axis
+      ebsd = rotate(ebsd, rotation.byAxisAngle(vector3d.X, 180*degree))  # about the x axis
+      ebsd = rotate(ebsd, 180*degree, keepEuler=True)               # only the positions
+      ebsd = ebsd.rotate(90*degree, keepXY=True)                    # only the orientations
+
+    The positions and the orientations turn together, about the origin; an angle is a
+    rotation about z. A gridded map keeps the order of its arrays: the positions move and the
+    lattice turns with them, where MATLAB stores the map anew. rot * ebsd is the same as
+    rotate(ebsd, rot). MATLAB's center= option, a centre other than the origin, is not taken.
+
+    Input
+      ebsd - EBSD
+      rot - rotation, or an angle about the z axis
+    Output
+      ebsd - EBSD
+    Keywords
+      keepXY - turn only the orientations, the Euler angles
+      keepEuler - turn only the positions
+    See also
+      EBSD.shift, EBSD.transform, transformReferenceFrame"""
     if keepXY and keepEuler:
       raise ValueError("choose either keepXY or keepEuler, not both")
     if not isinstance(rot, MtexArray):

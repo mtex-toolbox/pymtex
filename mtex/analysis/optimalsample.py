@@ -440,39 +440,6 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
   See also
     discreteSample, calcDensity, S2RestrictedDistanceKernel, SO3RestrictedDistanceKernel"""
   sphere = not isinstance(f, SO3Fun)
-  if isinstance(initial, (int, np.integer)):
-    n = int(initial)
-    if n <= 0:
-      raise ValueError("the sample count must be positive")
-    j = np.arange(1, n + 1)
-    if sphere:
-      z = 1 - 2 * (j - 0.5) / n
-      phi = j * np.pi * (3 - math.sqrt(5))
-      return np.stack([np.sqrt(1 - z * z) * np.cos(phi), np.sqrt(1 - z * z) * np.sin(phi), z], axis=-1)
-    a = 2 * np.pi * np.mod(j * math.sqrt(2), 1)
-    b = np.arccos(2 * np.mod(j * math.sqrt(3), 1) - 1)
-    g = 2 * np.pi * np.mod(j * math.sqrt(5), 1)
-    return rotation.byEuler(a, b, g, "Matthies").data.reshape(-1, 4)
-  if sphere:
-    v = asVector3d(initial)
-    return v.normalize().data.reshape(-1, 3).astype(float)
-  r = initial if isinstance(initial, quaternion) else rotation(initial)
-  return r.data.reshape(-1, 4).astype(float)
-
-
-def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=None, tol=None, weights=None, memory=5,
-                  method="lbfgs", warmUp=None, tolWeights=None, tolJ=1e-4, innerIter=5, minWeight=0.0, diagnostics=False):
-  """the sample of n nodes that reproduces a density best up to the bandwidth: the nodes,
-  and with optimizeWeights=True the nodes and their weights (volume fractions summing to
-  one); n may be the starting nodes instead; diagnostics=True returns the result with
-  the discrepancy, its history, the iteration count and the stop reason
-
-    ori = optimalSample(odf, 500)
-    ori, c = optimalSample(odf, 200, optimizeWeights=True, bandwidth=64)
-    v = optimalSample(sF, 1000, bandwidth=128)
-    optimalSample(f, nodes, method='steepestDescent', maxIter=1000, tol=0.05*degree, minWeight=1e-4)
-  """
-  sphere = not isinstance(f, SO3Fun)
   refuseFlags(args, "optimalSample")
   if not getattr(f, "isReal", True):
     raise ValueError("sampling requires a real density")

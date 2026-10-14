@@ -70,7 +70,22 @@ class sphericalRegion:
 
   @classmethod
   def byVertices(cls, V, frame=None):
-    """the region bounded by the great circles through consecutive vertices V, taken counterclockwise"""
+    """the region bounded by the great circles through consecutive vertices V, taken counterclockwise
+
+      sR = sphericalRegion.byVertices(vector3d([[0, 0, 1], [1, 0, 1], [1, 1, 1]]))  # a triangle
+      sR = sphericalRegion.byVertices(V, frame=cs)  # in a crystal frame
+
+    The normal of every side is the cross product of two consecutive vertices, the last
+    joined to the first, so the region lies to the left when walking along the vertices.
+
+    Input
+      V - vector3d, the vertices in counterclockwise order
+    Output
+      sR - sphericalRegion
+    Keywords
+      frame - the frame the region is written in
+    See also
+      sphericalRegion, sphericalRegion.vertices"""
     V = np.asarray(V.data if isinstance(V, vector3d) else V, dtype=float).reshape(-1, 3)
     N = np.cross(V, np.roll(V, -1, axis=0))
     return cls(N, frame=frame)
@@ -78,7 +93,23 @@ class sphericalRegion:
   # ------------------------------------------------------------------ membership
 
   def checkInside(self, v, tol=1e-4):
-    """whether directions lie in the region, up to a small tolerance at the boundary"""
+    """whether directions lie in the region, up to a small tolerance at the boundary
+
+      inside = sR.checkInside(v)                    # a boolean per direction
+      inside = sR.checkInside(v, tol=1e-2)          # a wider margin at the boundary
+
+    A direction is inside when <v, N> >= alpha - tol for every boundary circle, the length
+    of v not mattering. For an antipodal region or antipodal directions, -v inside counts too.
+
+    Input
+      sR - sphericalRegion
+      v - vector3d, or an (..., 3) array
+    Output
+      inside - boolean array in the shape of v
+    Keywords
+      tol - the margin in the cosines
+    See also
+      projectIntoRegion, sphericalRegion.volume"""
     xyz = _xyz(v)
     if len(self.N) == 0:
       return np.ones(xyz.shape[:-1], dtype=bool)
@@ -89,7 +120,23 @@ class sphericalRegion:
     return inside
 
   def volume(self, resolution=1 * degree):
-    """the fraction of the sphere the region covers, by a quadrature on a fine grid"""
+    """the fraction of the sphere the region covers, by a quadrature on a fine grid
+
+      a = sR.volume()                               # on a grid of 1 degree
+      a = sR.volume(resolution=0.25*degree)         # finer, more accurate
+
+    The share of the points of a regular grid in polar coordinates inside the region,
+    weighted by sin(theta); 1 is the whole sphere, so 4 pi times it is the area. Antipodal
+    regions count -v as well.
+
+    Input
+      sR - sphericalRegion
+    Output
+      a - the fraction of the sphere, between 0 and 1
+    Keywords
+      resolution - the spacing of the quadrature grid
+    See also
+      sphericalRegion.checkInside, sphericalRegion.center"""
     theta = np.arange(resolution / 2, np.pi, resolution)
     rho = np.arange(0, 2 * np.pi - resolution / 2, resolution)
     th, rh = np.meshgrid(theta, rho, indexing="ij")
@@ -100,7 +147,23 @@ class sphericalRegion:
   def center(self, resolution=1 * degree):
     """the centre (MATLAB @sphericalRegion/center): the pole of a single circle, the bisector of
     the two boundaries furthest apart for a lune, the barycentre of the vertices of a
-    triangle, and the area centroid of anything larger"""
+    triangle, and the area centroid of anything larger
+
+      c = sR.center()                               # the centre of the region
+      c = sR.center(resolution=0.5*degree)          # the centroid on a finer grid
+
+    The whole sphere has its centre at z. The area centroid is the normalised sum of the
+    points of an equispaced grid inside the region; resolution is its spacing and matters
+    only there.
+
+    Input
+      sR - sphericalRegion
+    Output
+      c - vector3d, a unit vector in the frame of the region
+    Keywords
+      resolution - the spacing of the grid of the area centroid
+    See also
+      sphericalRegion.vertices, sectorCenter"""
     N = _distinctUnitRows(self.N, 1e-9)
     if len(N) < 2:
       return vector3d(np.array([0.0, 0.0, 1.0]) if len(N) == 0 else unitRows(N[0]), isNormalized=True, frame=self.frame)
@@ -124,7 +187,22 @@ class sphericalRegion:
   __hash__ = None
 
   def restrictToUpper(self, up=None):
-    """the hemisphere seen from a direction added to the region (MATLAB's sphericalRegion.restrict2Upper)"""
+    """the hemisphere seen from a direction added to the region (MATLAB's sphericalRegion.restrict2Upper)
+
+      sR = sR.restrictToUpper()                     # the part with z >= 0
+      sR = sR.restrictToUpper(xvector)              # the part towards x
+      sR = sR.restrictToUpper(plottingConvention('y↑→x'))  # towards the viewer of a convention
+
+    The region is returned as it is when it already lies in that hemisphere.
+
+    Input
+      sR - sphericalRegion
+      up - vector3d, or a plottingConvention whose outOfScreen direction is taken; z by
+          default
+    Output
+      sR - sphericalRegion
+    See also
+      sphericalRegion.restrictToLower"""
     from .plottingconvention import plottingConvention
     up = zvector if up is None else up.outOfScreen if isinstance(up, plottingConvention) else up
     u = unitRows(_xyz(up))
@@ -134,7 +212,18 @@ class sphericalRegion:
 
   def restrictToLower(self, up=None):
     """the hemisphere opposite to a direction, z by default, added to the region
-    (MATLAB's sphericalRegion.restrict2Lower)"""
+    (MATLAB's sphericalRegion.restrict2Lower)
+
+      sR = sR.restrictToLower()                     # the part with z <= 0
+      sR = sR.restrictToLower(xvector)              # the part away from x
+
+    Input
+      sR - sphericalRegion
+      up - vector3d, z by default
+    Output
+      sR - sphericalRegion
+    See also
+      sphericalRegion.restrictToUpper"""
     up = zvector if up is None else up
     return self.restrictToUpper(-up if isinstance(up, vector3d) else -np.asarray(up, dtype=float))
 
@@ -174,7 +263,18 @@ class sphericalRegion:
     return None if not segs else (segs[0][0], segs[-1][1])
 
   def vertices(self, tol=1e-8):
-    """the corners of the region: the intersections of its circles that lie inside"""
+    """the corners of the region: the intersections of its circles that lie inside
+
+      V = sR.vertices()                             # the corners, each once
+
+    Input
+      sR - sphericalRegion
+    Output
+      V - vector3d of unit vectors in the frame of the region
+    Keywords
+      tol - the margin by which an intersection may lie outside the other circles
+    See also
+      sphericalRegion.boundary, sphericalRegion.byVertices"""
     cand = [v for i, j in itertools.combinations(range(len(self.N)), 2)
             for v in _circleIntersection(self.N[i], self.alpha[i], self.N[j], self.alpha[j])]
     cand = np.array(cand).reshape(-1, 3)
@@ -183,7 +283,19 @@ class sphericalRegion:
 
   def boundary(self, resolution=1 * degree):
     """the boundary as arcs, one vector3d per arc: each circle is cut at the corners on it and
-    the pieces whose midpoint lies inside are kept"""
+    the pieces whose midpoint lies inside are kept
+
+      arcs = sR.boundary()                          # points every degree along each arc
+      arcs = sR.boundary(resolution=5*degree)       # coarser
+
+    Input
+      sR - sphericalRegion
+    Output
+      arcs - list of vector3d, the points along every arc of the boundary
+    Keywords
+      resolution - the largest spacing of the points along an arc
+    See also
+      sphericalRegion.vertices, plot"""
     V = self.vertices().data
     arcs = []
     for n, alpha in zip(self.N, self.alpha):
@@ -392,7 +504,24 @@ _TILES = {}
 
 def tilesSphere(sR, pg, n=6000):
   """whether the region is a fundamental domain of the point group: n evenly spread directions
-  folded into it all land inside, and it covers the share of one element; cached"""
+  folded into it all land inside, and it covers the share of one element; cached
+
+    tilesSphere(cs.fundamentalSector(), cs.sym)   # True for every crystal frame
+    tilesSphere(sR, cs.sym, n=20000)              # more test directions
+
+  The region covers the share of one element when the fraction of the test directions
+  inside it times the order of the group is 1 up to 0.15. The answer is kept per group and
+  region, so n matters only on the first call.
+
+  Input
+    sR - sphericalRegion
+    pg - the point group, or a frame holding it
+  Output
+    b - True or False
+  Keywords
+    n - the number of test directions, a Fibonacci lattice
+  See also
+    fundamentalSector, dirichletSector, projectIntoRegion"""
   from .kernels import projectIntoSector
   els = _elements(pg)
   key = (np.round(els, 9).tobytes(), np.round(sR.N, 9).tobytes(), np.round(sR.alpha, 9).tobytes())
@@ -554,7 +683,21 @@ def _wedgeStart(pg, R):
 
 def projectIntoRegion(v, sR, pg=None):
   """the image of a direction that lies in a region, under the group; the antipode of an axis
-  counts as an image; the direction itself when no image lies inside"""
+  counts as an image; the direction itself when no image lies inside
+
+    w = projectIntoRegion(v, sR)                  # under the group of v's frame
+    w = projectIntoRegion(v, sR, cs.sym)          # under another group
+
+  The antipode counts when v or the region is antipodal.
+
+  Input
+    v - vector3d or Miller
+    sR - sphericalRegion
+    pg - the point group, by default that of the frame of v
+  Output
+    w - the images, of the class and shape of v
+  See also
+    sphericalRegion.checkInside, projectIntoFundamentalRegion, tilesSphere"""
   from .kernels import projectIntoSector
   pg = v.frame.sym if pg is None else pg
   xyz = v.data.reshape(-1, 3)

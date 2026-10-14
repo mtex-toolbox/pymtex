@@ -453,7 +453,7 @@ def _sampleDataOfType(kind):
 
 def _sampleFileNames():
   from mtex.io.sampledata import MANIFEST
-  return _sampleDataNames() + list(MANIFEST["datasets"])
+  return _sampleDataNames() + [name for name, d in MANIFEST["datasets"].items() if d["files"]]
 
 
 # MTEX's maps, then matplotlib's without their reversed copies

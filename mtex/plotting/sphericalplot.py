@@ -876,7 +876,25 @@ def _curves(rings, frame, antipodal, add2all, lineColor, lineWidth, edgeAlpha, p
 
 # plot(psi): a spherical kernel over the angle in degrees, into the held axes or a new figure
 def plotKernel(psi, maxAngle=np.pi, symmetric=False, **kw: Unpack[PlotKeywords]):
-  """plot(psi): a kernel on the sphere against the angle, over -180 to 180 degree with symmetric"""
+  """a kernel on the sphere as a curve over the angle in degree, into the held axes or a new
+  figure; MATLAB's S2Kernel.plot
+
+    psi = S2DeLaValleePoussinKernel(halfwidth=10*degree)
+    plot(psi)                                         # over 0 to 180 degree
+    plot(psi, maxAngle=30*degree, symmetric=True)     # over -30 to 30 degree
+
+  The value psi(cos omega) is drawn against omega; the line keywords (lineColor, lineWidth,
+  lineStyle, displayName) style the curve.
+
+  Input
+    psi - S2Kernel
+  Output
+    h - the matplotlib lines
+  Keywords
+    maxAngle - the largest angle drawn
+    symmetric - draw from -maxAngle to maxAngle
+  See also
+    S1FunHarmonic.plotSpektra, S2Kernel"""
   from .kernelplot import _lineAxes
   from .keywords import lineKeywords
   ax = _lineAxes(kw)
@@ -976,9 +994,32 @@ def _insideFirst(v, sR):
 
 
 def text(v, labels=None, *more, **kw: Unpack[PlotKeywords]):
-  """text(v, labels): text at directions, text(v, labeled=True) each direction's own name;
-  text(ebsd, labels): labels on the map; text(x, y, s) and text(x, y, z, s): text at a point
-  of the current axes, as MATLAB's text"""
+  """text at directions on the sphere, at the measurements or grains of a map, or at a point
+  of the current axes; MATLAB's vector3d.text, EBSD.text and grain2d.text
+
+    text(v, ['a', 'b', 'c'])                          # a label at every direction
+    text(Miller(1, 0, 0, cs), labeled=True)           # a crystal direction named by its indices
+    plot(ebsd); text(ebsd[0:3], 'A')                  # one text at measurements of the map
+    plot(grains); text(grains, grains.id)             # the grain ids at the centroids
+    text(grains, labels, fontSize=8, color='r')       # styled
+    text(0.5, 0.5, 'here')                            # at a point of the current axes
+    text(x, y, z, 'here')                             # at a point of 3D axes
+
+  On the sphere the text sits at its direction with no marker, in every chart of the current
+  figure unless nextAxis chose one of a held figure; the keywords of scatter style it
+  (labelFontSize, textAboveMarker, backgroundColor, ...). On a map the text is centred at
+  every measurement or grain centroid of the current map plot, or of a new one; fontSize and
+  color style it. With coordinates the text goes to the current axes, with matplotlib's text
+  properties in MATLAB's spelling (fontSize, fontWeight, horizontalAlignment, ...).
+
+  Input
+    v - vector3d or Miller; EBSD or grain2d; or the coordinates x, y (, z)
+    labels - a string per direction, measurement or grain, or one for all; with coordinates
+        the string
+  Output
+    h - the matplotlib collections, one per spherical plot, or the texts
+  See also
+    scatter, annotate, plot"""
   if labels is None and not kw.get("labeled"):
     raise TypeError("text needs the labels or labeled=True")
   if more or isinstance(labels, (int, float, np.number)):
@@ -1026,14 +1067,25 @@ def _planeCircles(v, lineStyle="-", lineWidth=1.0, lineColor="k", **kw):
   return hs
 
 
-# plot(cs): the symmetry elements of a point group as the stereographic symbols, a polygon
-# of n corners for an n-fold rotation axis, a lens for a twofold, a hollow one for a
-# rotoinversion axis, a great circle for a mirror plane, a hollow circle for the inversion
-# (MATLAB @referenceFrame/plot)
 def plotHKL(CS, complete=False, **kw: Unpack[PlotKeywords]):
-  """plotHKL(cs): the low index directions <100>, <110>, <111> of a crystal with all their
-  symmetric equivalents, labelled, on the upper hemisphere unless complete (MATLAB
-  crystalFrame/plotHKL)"""
+  """the low index directions <100>, <110>, <111> of a crystal with all their symmetric
+  equivalents, labelled by their indices; MATLAB's crystalFrame.plotHKL
+
+    plotHKL(cs)                                       # on the upper hemisphere
+    cs.plotHKL(complete=True)                         # on the whole sphere
+
+  Every family is scattered with symmetrised=True and labeled=True, <111>, <110>, <100> in
+  the colours of that order, with black marker edges over a grid; the other keywords go to
+  scatter and the spherical plots.
+
+  Input
+    CS - crystalFrame
+  Output
+    h - the matplotlib collections
+  Keywords
+    complete - the whole sphere instead of the upper hemisphere
+  See also
+    plotSymmetry, scatter, Miller.symmetrise"""
   from ..geometry.miller import Miller
   hkl = ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (0, 1, 1), (1, 0, 1), (1, 1, 1), (-1, -1, 0), (-1, -1, 1))
   ms = Miller(np.array(hkl, dtype=float), CS).unique()
@@ -1052,12 +1104,33 @@ def plotHKL(CS, complete=False, **kw: Unpack[PlotKeywords]):
   return hs
 
 
+# plot(cs): the symmetry elements of a point group as the stereographic symbols, a polygon
+# of n corners for an n-fold rotation axis, a lens for a twofold, a hollow one for a
+# rotoinversion axis, a great circle for a mirror plane, a hollow circle for the inversion
+# (MATLAB @referenceFrame/plot)
 def plotSymmetry(fr, symbolSize=None, mirrorLineWidth=2.5, **kw: Unpack[PlotKeywords]):
-  """the elements of the point group of a frame drawn on the upper hemisphere: the mirror planes as
-  great circles, the rotation and rotoinversion axes as polygons of their order; plot(cs)
+  """the elements of the point group of a frame drawn on the upper hemisphere, as the
+  international tables draw them; MATLAB's referenceFrame.plot
 
-    plot(cs)
-    plot(cs, symbolSize=2, mirrorLineWidth=1.5)"""
+    plot(cs)                                          # the symmetry elements
+    plot(cs, symbolSize=2, mirrorLineWidth=1.5)       # larger symbols, thinner mirrors
+    plotSymmetry(crystalFrame('-3m'))                 # the same by name
+
+  A mirror plane is a great circle, an n-fold rotation axis a filled polygon of n corners (a
+  lens for a twofold), a rotoinversion axis a hollow one around the polygon of its proper
+  part, and the inversion of a Laue group a hollow circle at the centre. The projection
+  follows the keywords of the spherical plots.
+
+  Input
+    fr - crystalFrame or specimenFrame
+  Output
+    sP - the spherical plot drawn into
+  Keywords
+    symbolSize - a factor on the size of the symbols, by default a third of the chart's
+        extent
+    mirrorLineWidth - the width of the great circles of the mirror planes
+  See also
+    plotHKL, crystalFrame, fundamentalSector"""
   from matplotlib.patches import Ellipse, Polygon
   from ..geometry.quaternion import orthogonalTransform
   ops = orthogonalTransform(fr).flatten()
@@ -1243,9 +1316,44 @@ smooth = pcolor
 
 
 def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
-  """quiver(v, w), quiver(vF), quiver(ori, w): arrows at directions, a vector or axis field,
-  or arrows at orientations in the sections of the current figure; on the sphere arrowSize
-  scales the arrows and maxHeadSize is the length of the heads as a fraction of the longest"""
+  """arrows: tangent vectors at directions, a vector or axis field on the sphere, arrows at
+  orientations in the sections of the current figure, or directions on a map or a volume;
+  MATLAB's vector3d.quiver, S2VectorField.quiver and EBSD.quiver
+
+    quiver(v, w)                                      # the tangent vectors w at the directions v
+    quiver(v, w, arrowSize=1, color='r')              # longer arrows, in red
+    quiver(v, w, normalize=True, maxHeadSize=0.3)     # all of one length, with larger heads
+    quiver(vF)                                        # a vector field on an equispaced grid
+    quiver(vF, resolution=5*degree)                   # on a finer grid
+    quiver(ebsd, ebsd.rotations.axis(), color='r')    # an arrow per measurement of a map
+    quiver(ebsd, ebsd.rotations.axis(), antipodal=True)  # axes, centred on the measurements
+    quiver(grains, grains.meanOrientation * Miller(1, 0, 0, grains.CS, 'uvw'))  # an arrow per grain
+    quiver(gB, gB.direction)                          # a needle per boundary segment
+
+  On the sphere an arrow is the tangential part of w at its direction carried through the
+  projection; the longest vector of all is arrowSize times the grid spacing resolution, so a
+  vector almost normal to the sphere draws almost nothing, and normalize=True draws every
+  arrow at that length. An antipodal w, or an axis field, draws centred needles without heads.
+  maxHeadSize is the length of the heads as a fraction of the longest arrow, lineWidth the
+  width of the shafts, color their colour; the projection and the charts follow the keywords
+  of the spherical plots.
+
+  A map, its grains or its boundaries go to the map plot: an arrow per measurement, grain
+  or segment, with the keywords scale, scaling, autoScaleFactor, projectIntoPlane,
+  antipodal, color, lineWidth and displayName; a map of volumes or 3D grains draws its
+  arrows into the scene of its figure, orientations into the ODF sections held.
+
+  Input
+    v - vector3d, the points of the arrows; an S2VectorField or S2AxisField; orientation;
+        EBSD, grain2d or grainBoundary; EBSD3 or grain3d
+    w - vector3d, the arrows, one per point of v
+  Output
+    h - the matplotlib quiver or line collections, one per spherical plot
+  Keywords
+    resolution - the spacing of the grid a field is drawn on, and the length unit of the
+        arrows on the sphere
+  See also
+    plot, scatter, S2VectorField, grain2d.plot, SphericalProjections"""
   from .volumeplot import is3dMap, _quiver3dMap
   if is3dMap(v):
     return _quiver3dMap(v, w, **kw)
@@ -1277,7 +1385,24 @@ def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
 
 
 def plotRegion(sR, color="k", lineWidth=1.0, **kw: Unpack[PlotKeywords]):
-  """plot(sR): the outline of a spherical region"""
+  """the outline of a spherical region on the charts of the current figure, or of a new one;
+  MATLAB's sphericalRegion.plot
+
+    plot(cs.fundamentalSector())                      # the fundamental sector of a crystal
+    plot(sR, color='r', lineWidth=2)                  # in red, thicker
+
+  The boundary is drawn as its arcs at half a degree; lineColor is taken for color, the
+  other keywords go to the spherical plots and matplotlib's lines.
+
+  Input
+    sR - sphericalRegion
+  Output
+    h - the matplotlib lines
+  Keywords
+    color - the colour of the outline
+    lineWidth - its width
+  See also
+    sphericalRegion, fundamentalSector, plot"""
   refuseVariants(kw)
   color = kw.pop("lineColor", color)
   projKw, axesKw, whereKw = _split(kw)
@@ -1293,8 +1418,28 @@ def plotRegion(sR, color="k", lineWidth=1.0, **kw: Unpack[PlotKeywords]):
 # ------------------------------------------------------------------ colour keys
 
 def plotKey(key, resolution=0.5 * degree, fundamentalRegion=True, **kw: Unpack[PlotKeywords]):
-  """a direction key drawn as the sector it colours, an inverse pole figure key as its direction
-  key: the key evaluated on the chart grid, as an rgb surface"""
+  """a colour key drawn as the colours it gives the directions of its sector, an inverse pole
+  figure key as its direction key; MATLAB's directionColorKey.plot and ipfColorKey.plot
+
+    plot(HSVDirectionKey(cs))                         # the key on the fundamental sector
+    plot(ipfHSVKey(cs), resolution=1*degree)          # an inverse pole figure key, coarser
+    plot(key, fundamentalRegion=False)                # on the whole region of the charts
+    plot(key, complete=True)                          # on the whole sphere
+
+  The key is evaluated on the grid of every chart and drawn as an rgb surface; outside the
+  sector a direction takes the colour of its equivalent inside. The other keywords are those
+  of the spherical plots.
+
+  Input
+    key - a direction key (HSVDirectionKey, TSLDirectionKey, HKLDirectionKey, ...) or an
+        ipfColorKey
+  Output
+    h - the matplotlib meshes
+  Keywords
+    resolution - the spacing of the grid
+    fundamentalRegion - draw the key's sector only; complete=True sets it False
+  See also
+    ipfColorKey, HSVDirectionKey, direction2color, orientation2color"""
   from .orientationkeys import ipfColorKey
   key = key.dirMap if isinstance(key, ipfColorKey) else key
   projKw, axesKw, whereKw = _split(kw)
@@ -1416,7 +1561,37 @@ def _plotRow(fs, titles, style=None, resolution=1 * degree, colorRange="equal", 
 
 
 def plotPF(odf, h, *args, superposition=None, **kw: Unpack[PlotKeywords]):
-  """plotPF(odf, h): the pole figures of an ODF, one axes per crystal direction (MATLAB's plotPDF)"""
+  """the pole figures of an ODF, one axes per crystal direction; MATLAB's plotPDF
+
+    plotPF(odf, Miller(1, 0, 0, cs))                  # one pole figure
+    plotPF(odf, [Miller(1, 0, 0, cs), Miller(1, 1, 1, cs)], resolution=2*degree)  # two, on a coarser grid
+    plotPF(odf, h, contourf=True, colorbar=True)      # filled contours with a colour bar
+    plotPF(odf, h, antipodal=True, complete=True)     # both hemispheres superposed, the whole sphere
+    plotPF(odf, h, colorRange='equal', minmax=True)   # one colour range, extrema marked
+    plotPF(odf, [h1, h2], superposition=[1, 2])       # one pole figure of the superposed directions
+    plotPF(odf, pf.allH, superposition=pf.c)          # the superposed pole figures of a measurement
+    plotPF(odf, h, '3d')                              # the pole figure on a sphere in space
+
+  Every pole figure is the Radon transform odf.radon(h) of the ODF, the density of the
+  specimen directions along which h lies. A list of directions draws one axes each, titled
+  by its indices (title=False leaves them untitled, MATLAB's noTitle); each takes its own
+  colour range, colorRange='equal' one for all or a pair the limits. superposition gives
+  the structure coefficients: with one coefficient per direction the directions make one
+  superposed pole figure; with a list of coefficient arrays, one per entry of a list of
+  direction sets, each set one. The other keywords are those of the spherical plots:
+  resolution, the styles pcolor, contourf=True or contour=True with their levels, colorbar,
+  minmax, antipodal, complete, upper, lower, the projection and the layout.
+
+  Input
+    odf - SO3Fun
+    h - Miller, or a list of Miller, the crystal directions
+  Output
+    h - the matplotlib surfaces, one per chart
+  Keywords
+    superposition - the structure coefficients of superposed directions, an array or one
+        array per entry of h
+  See also
+    plotIPF, plotSection, annotate, PoleFigure.plot, SphericalProjections"""
   refuseFlags(args, "plotPF", names=("3d",))
   from ..geometry.plottingconvention import plottingConvention
   for a in args:

@@ -112,15 +112,27 @@ def _find(name):
 def mtexdatafile(name: SampleFileName | Any, root=None, download=True, verbose=True):
   """the file of a sample data set, or its files, fetched on first use
 
-  Besides the data sets mtexdata reads, every data set of the data repository has its
-  files here, the Neper tessellation 'my100grains' for instance. root= is the folder the
-  files are kept in, mtexDataPath() by default; download=False raises for a missing one
-  instead of fetching it; verbose=False fetches it without saying so.
+    fname = mtexdatafile('forsterite')                # the file of a map
+    tess, oris = mtexdatafile('my100grains')          # a data set of several files
+    fname = mtexdatafile('forsterite', root=mtexDataPath(), download=False)  # only a file already there
+    fnames = mtexdatafile('dubna', verbose=False)     # fetched without saying so
 
-    fname = mtexdatafile('forsterite')
-    tess, oris = mtexdatafile('my100grains')      # a data set of several files
-    fname = mtexdatafile('forsterite', root=mtexDataPath(), download=False)
-  """
+  Besides the data sets mtexdata reads, every data set of the data repository has its
+  files here, the Neper tessellation 'my100grains' for instance. A data set of one file gives
+  its path, one of several the list of paths. A missing file is downloaded from the data
+  repository into the folder root.
+
+  Input
+    name - the name of a data set, as mtexdata() lists them, or of a data set of the
+        repository
+  Output
+    fname - the path of the file, or a list of paths
+  Keywords
+    root - the folder the files are kept in, mtexDataPath() by default
+    download - fetch a missing file; False raises for it instead
+    verbose - say when a file is fetched
+  See also
+    mtexdata, mtexDataPath"""
   # a data set without a recipe here is named by the repository
   d = _lookup(name)
   artifact = str(name).lower() if d is None else d["artifact"].lower()

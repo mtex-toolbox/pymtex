@@ -116,10 +116,29 @@ class SO3Grid(orientation):
     return orientation.__rmul__(self, other)
 
   def find(self, o, epsOrK=None):
-    """the nearest grid rotation of every orientation, or the k nearest, or all within a
-    radius, up to the symmetries of the grid's frames, through the quaternion k-d tree of
-    orientationtree.py (MATLAB SO3Grid/find): cos(w/2) of the reduced misorientation angle w
-    for the nearest, the angles for the k nearest and the radius"""
+    """the nearest grid rotation of every orientation, or the k nearest, or all within a radius,
+    up to the symmetries of the grid's frames; MATLAB's SO3Grid.find
+
+      ind, d = S3G.find(ori)               # the nearest grid point, d = cos(w/2)
+      ind, d = S3G.find(ori, 3)            # the 3 nearest, d their angles
+      I, D = S3G.find(ori, 10*degree)      # every grid point within 10 degree
+
+    The angle w is the misorientation angle reduced by the symmetries of both frames. As
+    MATLAB's SO3Grid.find, the nearest form gives cos(w/2), the other two the angles. The nearest and the k nearest go
+    through a quaternion k-d tree, the radius search through the structured search of the
+    equispaced grid, its rings and windows.
+
+    Input
+      S3G - SO3Grid
+      ori - orientation, or rotations taken between the grid's frames
+    Output
+      ind - the index of the nearest grid point, of the shape of ori; with k a (n, k) array
+      d - cos(w/2) of the nearest; with k the (n, k) angles
+      I, D - with a radius the sparse incidence and the sparse angles, (n x grid)
+    Keywords
+      epsOrK - an integer k for the k nearest, a float for the radius of the search
+    See also
+      equispacedSO3Grid, SO3Grid.radius, orientation.find"""
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
 

@@ -35,14 +35,41 @@ def pseudoOperators(psSym, tol=1e-4):
 
 
 def cleanUpPseudoSym(ebsd, grains, psSym, delta=2 * degree, threshold=1.5):
-  """the map corrected for the pseudo symmetry psSym, a misorientation of one phase with itself:
-  the boundaries of that phase within delta of it are grouped into connected components, the
-  components longer than threshold times the diagonal of their bounding box and of more than
-  four segments are taken for indexing artefacts, the grains across them are merged, and
-  every measurement of a grain that absorbed another is moved to the operator that brings it
-  nearest the merged grain's mean orientation. As calcGrains, it alters the map it is given,
-  its rotations and grain ids, and grains gets the parentId of the merge; MATLAB's three
-  outputs are returned"""
+  """the map corrected for a pseudo symmetry of one phase, detected by the tortuosity of its
+  boundaries; MATLAB's cleanUpPseudoSym
+
+    ebsd, grains, numChanged = cleanUpPseudoSym(ebsd, grains, psSym)                 # tortuosity above 1.5
+    ebsd, grains, numChanged = cleanUpPseudoSym(ebsd, grains, psSym, threshold=2)    # only the more tortuous
+
+  A pseudo symmetry is a rotation which is not a symmetry of the crystal but maps the
+  diffraction pattern almost onto itself, so the indexing picks between the two solutions at
+  random. The boundaries this leaves follow the indexing noise and are much longer than the
+  distance between their ends. The boundaries of the phase within delta of psSym are grouped
+  into connected components; a component of more than four segments whose length exceeds
+  threshold times the diagonal of its bounding box is an artefact, the grains across it are
+  merged, and every measurement of a grain that absorbed another is moved by the operator
+  that brings it nearest the merged grain's mean orientation.
+
+  The operators ori * s * psSym for every symmetry element s are generated internally, so
+  psSym, its inverse or any equivalent misorientation give the same result. The phase is the
+  one of psSym's crystal frame, one phase per call. The boundaries should not have been
+  smoothed, which destroys the tortuosity. As calcGrains, it alters the map it is given, its
+  rotations and grain ids, and grains gets the parentId of the merge.
+
+  Input
+    ebsd - EBSD with the grain ids calcGrains stores
+    grains - grain2d of the map
+    psSym - orientation, a misorientation of the phase with itself (psSym.CS is psSym.SS)
+  Output
+    ebsd - EBSD, the map passed, corrected
+    grains - grain2d, the merged grains
+    numChanged - the number of measurements whose orientation changed
+  Keywords
+    delta - the largest angle between a boundary misorientation and psSym
+    threshold - the smallest tortuosity, the length of a component over the diagonal of its
+        bounding box, taken for an artefact
+  See also
+    EBSDPseudoSymmetry, grain2d.merge, calcGrains"""
   if not isinstance(psSym, orientation):
     raise ValueError("the pseudo symmetry must be an orientation: its crystal frame says which phase to correct")
   if psSym.CS is not psSym.SS:

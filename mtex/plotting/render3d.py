@@ -115,7 +115,23 @@ def _pvCamera(p, scene):
 
 
 def renderImage(scene, size=(800, 800)):
-  """the scene drawn offscreen, an (h, w, 3) uint8 image"""
+  """the scene drawn offscreen by PyVista, as a picture
+
+    img = renderImage(gcs())                         # the scene of the current figure
+    img = renderImage(scene, size=(400, 300))        # 400 pixels wide, 300 high
+
+  The scene is drawn unlit and flat, as MATLAB draws a patch without a light, seen as its
+  plotting convention says. This is what a 3D plot shows in its figure; it needs the plot3d
+  extra (PyVista).
+
+  Input
+    scene - scene3d
+  Output
+    img - (height, width, 3) uint8 array
+  Keywords
+    size - (width, height) of the picture in pixels
+  See also
+    show3d, sceneHTML, exportHTML, gcs"""
   p = pyvistaPlotter(scene, off_screen=True, window_size=size)
   img = p.screenshot(return_img=True)
   p.close()
@@ -303,13 +319,42 @@ renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, came
 
 
 def sceneHTML(scene, title="MTEX 3D plot"):
-  """the scene as a standalone HTML page drawn by three.js"""
+  """the scene as a standalone HTML page that draws it with three.js in the browser, turned
+  and zoomed with the mouse
+
+    page = sceneHTML(gcs())                          # the scene of the current figure
+    page = sceneHTML(scene, title='grains')          # with a title of the page
+
+  The page holds the geometry and the colours compressed in itself and loads three.js from
+  a CDN.
+
+  Input
+    scene - scene3d
+  Output
+    page - str, the HTML text
+  Keywords
+    title - the title of the page
+  See also
+    writeHTML, exportHTML, renderImage"""
   data = json.dumps(_payload(scene), separators=(",", ":")).replace("</", "<\\/")
   return _PAGE % {"title": title, "three": THREE, "scene": data}
 
 
 def writeHTML(scene, fname, title="MTEX 3D plot"):
-  """writeHTML(scene, 'fig.html'): the scene as an interactive page"""
+  """the scene written to a file as an interactive HTML page, that of sceneHTML
+
+    writeHTML(gcs(), 'fig.html')                     # the scene of the current figure
+    writeHTML(scene, 'fig.html', title='grains')     # with a title of the page
+
+  Input
+    scene - scene3d
+    fname - the file name
+  Output
+    fname - the file name
+  Keywords
+    title - the title of the page
+  See also
+    sceneHTML, exportHTML"""
   with open(fname, "w", encoding="utf-8") as f:
     f.write(sceneHTML(scene, title))
   return fname

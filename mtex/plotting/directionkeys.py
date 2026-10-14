@@ -343,9 +343,26 @@ class HSVDirectionKey(directionColorKey):
     return sphereColor(radius, rho, self.grayValue, self.grayGradient, self.colorStretching, gray)
 
   def direction2color(self, h, gray=None):
-    """the colour of directions: each is brought into the sector, then into the white half, the
-    fold telling which of the two centres its colours run from. A sharp key instead brings
-    each to the equivalent nearest the white centre and reads the radius off the angle to it"""
+    """the colours of directions under the key; MATLAB's HSVDirectionKey/direction2color
+
+      rgb = key.direction2color(h)              # the colours of crystal directions
+      rgb = key.direction2color(h, gray=0.5)    # one saturation for every direction
+
+    Each direction is brought into the sector, then into the white half, the fold telling
+    which of the two centres its colours run from, and coloured by the colour sphere
+    (sphereColor) with the key's grayValue, grayGradient and colorStretching. A sharp key
+    (a finite maxAngle) instead brings each to the equivalent nearest the white centre and
+    reads the radius off the angle to it. Directions of zero or undefined length are black.
+
+    Input
+      h - vector3d or Miller, the directions
+    Output
+      rgb - an array of shape h.shape + (3,), RGB values in [0, 1]
+    Keywords
+      gray - the saturation of every direction, in [0, 1], instead of the fading towards the
+          centres; MATLAB's option grayValue
+    See also
+      sphereColor, ipfHSVKey, plotKey"""
     xyz, shape = _asDirections(h)
     n = len(xyz)
     norm = np.linalg.norm(xyz, axis=-1)
@@ -395,8 +412,23 @@ class TSLDirectionKey(directionColorKey):
     return vector3d(self.center, isNormalized=True)
 
   def direction2color(self, h, gray=None):
-    """the colours of directions, the polar coordinates in the sector about its centre turned into
-    hue and lightness without the hue correction; gray lowers the saturation"""
+    """the colours of directions under the TSL key; MATLAB's TSLDirectionKey/direction2color
+
+      rgb = key.direction2color(h)              # the colours of crystal directions
+      rgb = key.direction2color(h, gray=0.5)    # less saturated
+
+    Each direction is brought into the sector of the Laue group, its polar coordinates about
+    the centre of the sector, from the first vertex, turned into hue and lightness without
+    the hue correction: white at the centre, the full colours on the boundary.
+
+    Input
+      h - vector3d or Miller, the directions
+    Output
+      rgb - an array of shape h.shape + (3,), RGB values in [0, 1]
+    Keywords
+      gray - the saturation, in [0, 1], by default 1; MATLAB's option grayValue
+    See also
+      HSVDirectionKey, HKLDirectionKey, ipfTSLKey"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     hs = projectIntoRegion(vector3d(unit, frame=self.sR.frame, isNormalized=True), self.sR, self.sym).data.reshape(-1, 3)
@@ -425,7 +457,22 @@ class HKLDirectionKey(directionColorKey):
     return vector3d(regionCenter(self.sR), isNormalized=True)
 
   def direction2color(self, h, gray=None):
-    """the colours of directions, red at the pole of the sector, green and blue along its two edges"""
+    """the colours of directions under the HKL key; MATLAB's HKLDirectionKey/direction2color
+
+      rgb = key.direction2color(h)     # the colours of crystal directions
+
+    Each direction is brought into the sector of the Laue group, red at its pole, green and
+    blue along its two edges, blended linearly over the polar angle and the azimuth; for the
+    Laue group -1 three lobes of the upper hemisphere.
+
+    Input
+      h - vector3d or Miller, the directions
+    Output
+      rgb - an array of shape h.shape + (3,), RGB values in [0, 1]
+    Keywords
+      gray - taken for the calling form of the other keys and not used, as in MATLAB
+    See also
+      HSVDirectionKey, TSLDirectionKey, ipfHKLKey"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     hs = projectIntoRegion(vector3d(unit, frame=self.sR.frame, isNormalized=True), self.sR, self.sym).data.reshape(-1, 3)
@@ -476,8 +523,22 @@ class spotDirectionKey(directionColorKey):
     self.equivalents = [qrot(els[:, :4], (c / np.linalg.norm(c))[None]) * els[:, 4:5] for c in xyz]
 
   def direction2color(self, h, gray=None):
-    """the colours of directions: white, multiplied for every centre by its colour faded with the
-    kernel of the angle to the nearest equivalent of the centre"""
+    """the colours of directions under the spot key
+
+      rgb = key.direction2color(h)     # the colours of crystal directions
+
+    Every direction starts white and is multiplied, for every centre, by the colour of the
+    centre faded with the kernel psi of the angle to the nearest equivalent of the centre:
+    the full colour at a centre, white far from all.
+
+    Input
+      h - vector3d or Miller, the directions
+    Output
+      rgb - an array of shape h.shape + (3,), RGB values in [0, 1]
+    Keywords
+      gray - taken for the calling form of the other keys and not used
+    See also
+      spotColorKey, HSVDirectionKey"""
     xyz, shape = _asDirections(h)
     unit = xyz / np.linalg.norm(xyz, axis=-1, keepdims=True)
     psi0 = float(self.psi(1.0))

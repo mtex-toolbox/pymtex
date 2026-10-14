@@ -42,7 +42,23 @@ def regionCenter(sR, resolution=1 * degree):
   """the centre of a region (MATLAB @sphericalRegion/center): the pole of a single circle, the
   bisector of the two boundaries furthest apart for a lune, the barycentre of the vertices
   of a triangle, and the area centroid of anything larger. The fold is a symmetry of the
-  sector, so it is this centre and not the group's Dirichlet centre that it turns about"""
+  sector, so it is this centre and not the group's Dirichlet centre that it turns about
+
+    c = regionCenter(cs.fundamentalSector())                         # the centre as an (3,) array
+    c = regionCenter(cs.fundamentalSector(), resolution=0.5*degree)  # a finer grid for the centroid
+
+  The resolution matters only for a region of four or more vertices, whose centroid is
+  summed over an equispaced grid of that spacing; a region without boundary has its centre
+  at z.
+
+  Input
+    sR - sphericalRegion
+  Output
+    c - (3,) array, the unit vector of the centre
+  Keywords
+    resolution - the spacing of the grid the area centroid is summed over
+  See also
+    sphericalRegion.center, polarCoordinates, sectorFolds"""
   return sR.center(resolution).data.reshape(3)
 
 
@@ -114,7 +130,26 @@ def sectorFolds(pg, sR=None, tol=1e-6):
   every boundary plane is a mirror of the group the folds have generated. The groups -1, -3
   and -4 have no such fold and no smooth one to one key; hasSmoothKey says so. -3 and -4 fold
   their wedge once all the same; the hemisphere of -1 has no plane to single out and stays
-  whole, white at its pole, as MATLAB's key"""
+  whole, white at its pole, as MATLAB's key
+
+    folds = sectorFolds(crystalFrame('432').sym)   # one fold: 432 halves its sector to that of m-3m
+    folds = sectorFolds(crystalFrame('m-3m').sym)  # no fold: the sector is bounded by mirrors
+    folds = sectorFolds(cs.sym, cs.fundamentalSector(), tol=1e-4)  # another sector, a looser test
+
+  A candidate plane folds the sector when the reflection in it maps the boundary planes of
+  the sector onto themselves, within tol, and it is taken when it doubles the group to a
+  reflection group. Which half a fold keeps is a convention: the half the first axis of the
+  frame not lying in the plane points into.
+
+  Input
+    pg - symmetry, the point group
+    sR - sphericalRegion, the sector to fold; by default the group's conventional sector
+  Output
+    folds - list of (3,) arrays, the normals of the folding planes in the order they apply
+  Keywords
+    tol - the tolerance of the test whether a reflection maps the sector onto itself
+  See also
+    hasSmoothKey, regionCenter, HSVDirectionKey"""
   sR = conventionalSector(pg) if sR is None else sR
   # the whole sphere, the sector of the trivial group, has no boundary to read a fold off:
   # it folds at the equator of the plotting convention, the pole white and its antipode
@@ -160,7 +195,20 @@ def sectorFolds(pg, sR=None, tol=1e-6):
 
 def hasSmoothKey(pg, sR=None):
   """a group whose sector neither is bounded by its own mirrors nor folds onto such a half has
-  no continuous one to one key; the colours jump somewhere on the sector"""
+  no continuous one to one key; the colours jump somewhere on the sector
+
+    hasSmoothKey(crystalFrame('m-3m').sym)   # True
+    hasSmoothKey(crystalFrame('-3').sym)     # False: the colours of -3 jump
+
+  Input
+    pg - symmetry, the point group
+  Output
+    tf - bool, whether the boundary planes and the folds are all mirrors of the group the
+        folds generate
+  Keywords
+    sR - sphericalRegion, the sector; by default the group's conventional sector
+  See also
+    sectorFolds, HSVDirectionKey"""
   sR = conventionalSector(pg) if sR is None else sR
   folds = sectorFolds(pg, sR)
   els = closure(orthogonalTransform.cat(pg.rot.flatten(), *[reflection(vector3d(n)) for n in folds])) if folds else pg.rot.flatten()
@@ -174,7 +222,29 @@ def polarCoordinates(sR, v, center, ref=None, equalise=True):
   colour key is built on: the radius is one at the centre and zero on the boundary, taken
   along the great circle through the centre, and the azimuth is measured about the centre
   from a reference direction and then equalised, so that a wide part of the sector takes as
-  much of the turn as a narrow one and the vertices sit at equal angles"""
+  much of the turn as a narrow one and the vertices sit at equal angles
+
+    r, rho = polarCoordinates(sR, h, regionCenter(sR))                  # the radius and the equalised azimuth
+    r, rho = polarCoordinates(sR, h, regionCenter(sR), equalise=False)  # the plain azimuth about the centre
+    r, rho = polarCoordinates(sR, h, regionCenter(sR), ref=xvector)     # the reference direction for rho = 0
+
+  The azimuth starts at the pole of the plotting convention seen from the centre; only where
+  the centre is that pole does the reference direction take over. A centre at a vertex or
+  on the boundary of the region spreads the part of the turn the region covers over the
+  whole turn.
+
+  Input
+    sR - sphericalRegion
+    v - vector3d, the directions
+    center - vector3d or (3,) array, the centre of the coordinates
+  Output
+    r - array, one at the centre and zero on the boundary
+    rho - array, the azimuth about the centre in [0, 2 pi)
+  Keywords
+    ref - the direction rho = 0 points to where the centre is the pole; x by default
+    equalise - reparametrise the azimuth by the distance to the boundary
+  See also
+    regionCenter, HSVDirectionKey, sectorFolds"""
   xyz = asVector3d(v).data.reshape(-1, 3)
   c = unitRows(asVector3d(center).data.reshape(3))
   ref = np.array([1.0, 0.0, 0.0]) if ref is None else asVector3d(ref).data.reshape(3)

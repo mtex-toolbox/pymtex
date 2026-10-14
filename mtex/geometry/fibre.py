@@ -152,30 +152,65 @@ class fibre:
 
   @classmethod
   def cat(cls, *fibres, axis=0):
-    """the fibres joined into one list along an axis
+    """the fibres joined into one list along an axis, MATLAB's [f1, f2]
 
-      f = cat(f1, f2)
-      f = cat(f1, f2, axis=1)    # side by side"""
+      f = cat(f1, f2)            # one after the other
+      f = cat(f1, f2, axis=1)    # side by side
+
+    Input
+      fibres - fibre, between the same frames
+    Output
+      f - fibre
+    Keywords
+      axis - the axis of the shape along which the fibres are joined
+    See also
+      fibre.reshape, fibre.flatten"""
     return cls._build(orientation.cat(*[f.o1 for f in fibres], axis=axis), orientation.cat(*[f.o2 for f in fibres], axis=axis),
                       vector3d.cat(*[f.h for f in fibres], axis=axis))
 
   # ------------------------------------------------------------------ sampling
 
   def rotation(self, points=1000, return_angles=False):
-    """the rotations along the fibre, points x shape, turning about h from o1 to o2;
-    return_angles=True also gives the angles omega they are turned from o1 by, of the same shape,
-    MATLAB's second output
+    """the rotations along the fibre, points x shape, turning about h from o1 to o2, MATLAB's
+    fibre.rotation
 
-      rot = f.rotation()
-      rot = f.rotation(points=100)
-      rot, omega = f.rotation(return_angles=True)"""
+      rot = f.rotation()                            # 1000 rotations along the fibre
+      rot = f.rotation(points=100)                  # 100 of them
+      rot, omega = f.rotation(return_angles=True)   # and the angles from o1
+
+    The points are equispaced in the angle about h, from o1 (omega = 0) to o2; a full fibre runs
+    once around.
+
+    Input
+      f - fibre
+    Output
+      rot - rotation, of shape (points,) + f.shape
+      omega - the angles the rotations are turned from o1 by, of the same shape (return_angles)
+    Keywords
+      points - the number of rotations per fibre
+      return_angles - also return omega, MATLAB's second output
+    See also
+      fibre.orientation, fibre.arcAngle"""
     omega = np.linspace(0, 1, points)[(slice(None),) + (None,) * self.ndim] * self.arcAngle()
     axis = np.broadcast_to(self.h.normalize().data, omega.shape + (3,))
     rot = rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))
     return (rot, omega) if return_angles else rot
 
   def orientation(self, points=1000):
-    """the orientations along the fibre, points x shape, turning about h from o1 to o2"""
+    """the orientations along the fibre, points x shape, turning about h from o1 to o2, MATLAB's
+    fibre.orientation
+
+      ori = f.orientation()             # 1000 orientations along the fibre
+      ori = f.orientation(points=10)    # 10 of them
+
+    Input
+      f - fibre
+    Output
+      ori - orientation between the fibre's frames, of shape (points,) + f.shape
+    Keywords
+      points - the number of orientations per fibre
+    See also
+      fibre.rotation"""
     return orientation._fromRotation(self.rotation(points).data, (self.CS, self.SS))
 
   # ------------------------------------------------------------------ distance
@@ -189,11 +224,30 @@ class fibre:
 
   def angle(self, ori, symmetry=True, return_nearest=False):
     """the angle by which ori * h misses r, the least over both orbits, from the chord of the
-    closest pair; with another fibre the largest distance of its points to this one;
-    return_nearest=True also gives the orientation on the fibre nearest ori
+    closest pair; MATLAB's fibre.angle
 
-      omega = angle(f, ori)
-      omega, oriF = angle(f, ori, return_nearest=True)"""
+      omega = angle(f, ori)                               # the angle of orientations to the fibre
+      omega = angle(f, ori, symmetry=False)               # ignore the symmetric equivalents
+      omega, oriF = angle(f, ori, return_nearest=True)    # and the orientations on the fibre
+      omega = angle(f1, f2)                               # the angle between two fibres
+
+    The angle of an orientation to the fibre h || r is the angle between ori * h and r, the least
+    over the crystal symmetric equivalents of h and the specimen symmetric ones of r. With
+    another fibre it is the largest angle of 1000 of its orientations to this one. The fibre is
+    taken as the full fibre, its ends o1 and o2 do not count.
+
+    Input
+      f - fibre, a single one
+      ori - orientation, or a fibre
+    Output
+      omega - the angles, of the shape of ori
+      oriF - the orientations on the fibre nearest ori, which turn the closest image of h onto r
+          (return_nearest)
+    Keywords
+      symmetry - take the least over the symmetric equivalents; False compares h and r only
+      return_nearest - also return oriF, MATLAB's second output; not with a fibre
+    See also
+      orientation.angle, fibre.isclose"""
     if isinstance(ori, fibre):
       if return_nearest:
         raise ValueError("the nearest orientation is taken to an orientation, not to a fibre")
@@ -224,8 +278,23 @@ class fibre:
   # ------------------------------------------------------------------ symmetry
 
   def symmetrise(self, unique=False):
-    """the equivalent fibres s * o1 * inv(g) about g * h over both groups, or the distinct ones;
-    MATLAB's second output, their number, is f.multiplicity()"""
+    """the symmetrically equivalent fibres, MATLAB's fibre.symmetrise
+
+      fS = f.symmetrise()               # every equivalent, numSS * numCS x shape
+      fS = f.symmetrise(unique=True)    # the distinct ones of a single fibre
+
+    The equivalent fibres run from s * o1 * inv(g) about g * h, over the elements s of the
+    specimen group and g of the crystal group. MATLAB's second output, the number of distinct
+    ones, is f.multiplicity().
+
+    Input
+      f - fibre
+    Output
+      fS - fibre
+    Keywords
+      unique - keep only the distinct fibres, those whose h and r differ (a single fibre only)
+    See also
+      fibre.multiplicity, orientation.symmetrise"""
     L, R = reductionGroups(self.o1)
     nL, nR = len(L), len(R)
     o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), qconj(R)[None, :, None, :])
@@ -255,7 +324,22 @@ class fibre:
 
   def isclose(self, other, tol=1e-6):
     """equal when the frames are the same and h and r agree up to the symmetry of the frames
-    within tol, both flipped counting as well; a segment is not the full fibre (MATLAB's eq)"""
+    within tol, both flipped counting as well; MATLAB's eq
+
+      b = f1.isclose(f2)              # equal up to symmetry
+      b = f1.isclose(f2, tol=1e-3)    # within a wider tolerance
+
+    A segment is not the full fibre, and its ends are not compared. f1 == f2 compares h and r
+    as they are, without the symmetry.
+
+    Input
+      f1, f2 - fibre
+    Output
+      b - bool, of the broadcast shape
+    Keywords
+      tol - the tolerance on the dot products of h and of r, 1 - cos of the angle
+    See also
+      fibre.angle"""
     if not isinstance(other, fibre):
       raise TypeError("a fibre is compared with a fibre")
     if self.CS is not other.CS or self.SS is not other.SS:
@@ -276,10 +360,19 @@ class fibre:
   @classmethod
   def rand(cls, *args, rng=None):
     """random fibres between random crystal and specimen directions, of the shape and between the
-    frames given
+    frames given; MATLAB's fibre.rand
 
-      f = fibre.rand(10, cs)
-      f = fibre.rand(10, cs, ss, rng=rng)"""
+      f = fibre.rand(10, cs)                 # ten full fibres in the crystal frame cs
+      f = fibre.rand(10, cs, ss, rng=rng)    # between cs and ss, from a generator
+
+    Input
+      args - the shape, then the frames, crystal and specimen
+    Output
+      f - fibre, full fibres h || r with h and r uniform on the sphere
+    Keywords
+      rng - a numpy random generator
+    See also
+      orientation.rand, vector3d.rand"""
     shape, frames = _splitFrames(args)
     cs, ss = _defaultFrames(frames)
     h = vector3d.rand(*shape, rng=rng)
@@ -288,12 +381,30 @@ class fibre:
 
   @classmethod
   def fit(cls, ori, *args, diagnostics=False, symmetry=True):
-    """the fibre through a list of orientations: the plane of the two leading eigenvectors
-    of their quaternion tensor, the orientations first moved to the representatives
-    nearest their mean, or taken as stored with symmetry=False; with diagnostics the
-    eigenvalues, ascending and summing to one, and the mean angle of the orientations to
-    the fibre come too. This is the local fit of a concentrated cloud; the search through
-    the pole figures of an ODF is the business of P2"""
+    """the fibre that fits a list of orientations best, MATLAB's fibre.fit
+
+      f = fibre.fit(ori)                              # the fibre through the orientations
+      f, lam, delta = fibre.fit(ori, diagnostics=True)  # with the eigenvalues and the mean angle
+      f = fibre.fit(ori, symmetry=False)              # the orientations as stored
+
+    The fibre is the plane of the two leading eigenvectors of the quaternion tensor of the
+    orientations, after they are moved to the symmetric equivalents nearest their mean. This
+    is MATLAB's 'local' fit of a concentrated cloud, the one algorithm here; MATLAB's fit to an
+    ODF is not taken. The result is a full fibre, with r in the upper hemisphere.
+
+    Input
+      ori - orientation
+      args - 'local', MATLAB's flag, accepted
+    Output
+      f - fibre, full
+      lam - the eigenvalues of the quaternion tensor, ascending and summing to one (diagnostics)
+      delta - the mean angle of the orientations to the fibre (diagnostics)
+    Keywords
+      diagnostics - also return lam and delta, MATLAB's second and third outputs
+      symmetry - move the orientations to the equivalents nearest their mean first; False
+          takes them as stored
+    See also
+      fibre.angle, orientation.mean"""
     # 'local' names the one algorithm there is, the local quaternion tensor fit
     refuseFlags(args, "fibre.fit", names=("local",))
     for a in args:
@@ -335,40 +446,112 @@ class fibre:
     from typing import Any
     @classmethod
     def alpha(cls, *frames, full=False) -> Any:
-      """the alpha fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the alpha fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.alpha
 
-      f = fibre.alpha(cs)
-      f = fibre.alpha(cs, ss, full=True)"""
+        f = fibre.alpha(cs)  # the segment in the crystal frame cs
+        f = fibre.alpha(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (45, 0, 0) to (0, 54.7356, 45) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def beta(cls, *frames, full=False) -> Any:
-      """the beta fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the beta fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.beta
 
-      f = fibre.beta(cs)
-      f = fibre.beta(cs, ss, full=True)"""
+        f = fibre.beta(cs)  # the segment in the crystal frame cs
+        f = fibre.beta(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (180, 35.2644, 45) to (270, 62.7851, 45) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def gamma(cls, *frames, full=False) -> Any:
-      """the gamma fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the gamma fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.gamma
 
-      f = fibre.gamma(cs)
-      f = fibre.gamma(cs, ss, full=True)"""
+        f = fibre.gamma(cs)  # the segment in the crystal frame cs
+        f = fibre.gamma(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (180, 54.7356, 45) to (270, 54.7356, 45) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def eta(cls, *frames, full=False) -> Any:
-      """the eta fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the eta fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.eta
 
-      f = fibre.eta(cs)
-      f = fibre.eta(cs, ss, full=True)"""
+        f = fibre.eta(cs)  # the segment in the crystal frame cs
+        f = fibre.eta(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (0, 0, 0) to (0, 45, 0) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def tau(cls, *frames, full=False) -> Any:
-      """the tau fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the tau fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.tau
 
-      f = fibre.tau(cs)
-      f = fibre.tau(cs, ss, full=True)"""
+        f = fibre.tau(cs)  # the segment in the crystal frame cs
+        f = fibre.tau(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (315, 0, 0) to (270, 90, 45) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def epsilon(cls, *frames, full=False) -> Any:
-      """the epsilon fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+      """the epsilon fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.epsilon
 
-      f = fibre.epsilon(cs)
-      f = fibre.epsilon(cs, ss, full=True)"""
+        f = fibre.epsilon(cs)  # the segment in the crystal frame cs
+        f = fibre.epsilon(cs, ss, full=True)  # the whole fibre between cs and ss
+
+      The segment runs from the Euler angles (315, 0, 0) to (270, 54.7356, 45) degrees
+      (Bunge); the frames default to the cubic group 432 and the specimen frame.
+
+      Input
+        frames - the crystal frame, then the specimen frame
+      Output
+        f - fibre
+      Keywords
+        full - the whole fibre instead of the segment between the ends
+      See also
+        fibre, fibre.theta, fibre.orientation"""
     @classmethod
     def theta(cls, *frames) -> Any:
       """the theta fibre of rolling textures, the orientations with <100> along the normal direction"""
@@ -430,8 +613,24 @@ def _named(name):
     o1 = orientation.byEuler(a1 * degree, b1 * degree, c1 * degree, cs, ss)
     o2 = orientation.byEuler(a2 * degree, b2 * degree, c2 * degree, cs, ss)
     return cls(o1, o2, full=full)
-  build.__doc__ = (f"the {name} fibre of rolling textures, between the orientations MTEX puts at its ends; "
-                   f"full=True the whole fibre\n\n  f = fibre.{name}(cs)\n  f = fibre.{name}(cs, ss, full=True)")
+  (a1, b1, c1), (a2, b2, c2) = NAMED_FIBRES[name]
+  build.__doc__ = "\n".join([
+    f"the {name} fibre of rolling textures, between the orientations MTEX puts at its ends; MATLAB's fibre.{name}",
+    "",
+    f"  f = fibre.{name}(cs)  # the segment in the crystal frame cs",
+    f"  f = fibre.{name}(cs, ss, full=True)  # the whole fibre between cs and ss",
+    "",
+    f"The segment runs from the Euler angles ({a1:g}, {b1:g}, {c1:g}) to ({a2:g}, {b2:g}, {c2:g}) degrees",
+    "(Bunge); the frames default to the cubic group 432 and the specimen frame.",
+    "",
+    "Input",
+    "  frames - the crystal frame, then the specimen frame",
+    "Output",
+    "  f - fibre",
+    "Keywords",
+    "  full - the whole fibre instead of the segment between the ends",
+    "See also",
+    "  fibre, fibre.theta, fibre.orientation"])
   return classmethod(build)
 
 

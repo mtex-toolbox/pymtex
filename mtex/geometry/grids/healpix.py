@@ -10,7 +10,23 @@ from ..vector3d import vector3d
 
 
 def HEALPixS2Grid(resolution=None, nside=None):
-  """the HEALPix nodes of the sphere as a list of directions"""
+  """the HEALPix nodes of the sphere as a list of directions; MATLAB's HEALPixS2Grid
+
+    S2G = HEALPixS2Grid(resolution=5*degree)    # nside the power of two nearest to 1/resolution
+    S2G = HEALPixS2Grid(nside=8)                # 12 nside^2 nodes
+
+  The nodes are the centres of the hierarchical equal area iso-latitude pixels of Gorski et
+  al. 2005, in the ring scheme: 12 nside^2 of them, nside a power of two. Without either keyword
+  the resolution is 2.5 degree, nside 32. The result is a plain vector3d, not a grid with a
+  search of its own.
+
+  Output
+    S2G - vector3d, 12 nside^2 directions
+  Keywords
+    resolution - the resolution, nside = 2^round(log2(1/resolution))
+    nside - the number of divisions of a base pixel's side, instead of the resolution
+  See also
+    equispacedS2Grid, fibonacciS2Grid, regularS2Grid"""
   if nside is None:
     resolution = 2.5 * degree if resolution is None else resolution
     nside = 2 ** int(np.round(np.log2(1 / resolution)))

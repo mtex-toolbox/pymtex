@@ -67,12 +67,29 @@ def mtexColormap(name=None):
 
 
 def mtexColorMap(name: ColormapName | Any = "WhiteJet", fig=None):
-  """mtexColorMap WhiteJet: the colour map of the current figure, or of one figure
+  """the colour map of the current figure, or of one figure or axes; MATLAB's mtexColorMap
 
-    mtexColorMap('LaboTeX')            # every axes of the current figure
-    mtexColorMap('white2black', mtexFig)
-    mtexColorMap(ax, 'hot')            # one axes only
-    mtexColorMap(np.array([[1, 1, 1], [0, 0, 1]]))   # an n x 3 matrix of rgb values"""
+    mtexColorMap('LaboTeX')                          # every axes of the current figure
+    mtexColorMap('white2black', gcm())               # every axes of one MTEX figure
+    mtexColorMap(ax, 'hot')                          # one axes only
+    mtexColorMap(np.array([[1, 1, 1], [0, 0, 1]]))   # an n x 3 matrix of rgb values
+    mtexColorMap(blue2redColorMap)                   # a named map function, as MATLAB passes it
+
+  Without a figure the map is given to every axes of the current MTEX figure, so that all the
+  sections of one function share the colour scale; to give the subplots of a figure different
+  maps, pass each axes as the first argument. A name is one of MTEX's maps (WhiteJet, LaboTeX,
+  blue2red, red2blue, white2black, black2white, parula) or one of matplotlib's. In a plain
+  matplotlib figure the images and filled contours of the current figure take the map.
+
+  Input
+    name - the name of a colour map, a matplotlib Colormap, an n x 3 matrix of rgb values or a
+        function returning one; an axes, with the map following as the second argument
+  Output
+    cmap - the matplotlib Colormap set
+  Keywords
+    fig - the mtexFigure to colour instead of the current one
+  See also
+    mtexColorbar, setColorRange, num2rgb"""
   from .mtexfigure import gcm
   # mtexColorMap(ax, name): the map of one axes of the current figure
   if hasattr(name, "get_figure"):
@@ -121,7 +138,23 @@ def _colorLimits(values, colorRange=None):
 
 
 def contourLevels(lo, hi, n=10, log=False):
-  """n levels between the extremes, logarithmic on request"""
+  """n levels between the extremes, logarithmic on request: the levels of a contour plot
+
+    levels = contourLevels(0, 4)                 # ten levels from 0 to 4
+    levels = contourLevels(1, 100, 5, log=True)  # five levels equally spaced on a log scale
+
+  A range of no width is widened a little, so that the levels still differ; a logarithmic
+  spacing needs a positive lower end and is linear otherwise.
+
+  Input
+    lo, hi - the lowest and the highest level
+  Output
+    levels - an array of n levels
+  Keywords
+    n - the number of levels
+    log - equal ratios instead of equal differences between the levels
+  See also
+    contour, contourf"""
   lo, hi = float(lo), float(hi)
   if not hi > lo:
     hi = lo + max(abs(lo), 1.0) * 1e-6
@@ -131,8 +164,25 @@ def contourLevels(lo, hi, n=10, log=False):
 
 
 def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None):
-  """num2rgb(values, map, range=[lo, hi]): the colours a colour map gives those numbers,
-  MATLAB's num2rgb; the range defaults to the extent of the values"""
+  """the colours a colour map gives those numbers, MATLAB's num2rgb
+
+    rgb = num2rgb(values)                         # WhiteJet over the extent of the values
+    rgb = num2rgb(values, 'hot', range=[0, 6])    # another map, a fixed range
+    rgb = num2rgb(values, blue2redColorMap(8))    # one of eight colours of a matrix
+
+  The values are scaled to the range and clipped to it; a map given by name is sampled
+  continuously, a matrix of colours gives the nearest of its rows (MATLAB's option N, the
+  number of colours of a named map, is not taken).
+
+  Input
+    values - an array of numbers
+  Output
+    rgb - n x 3 rgb triplets, one row per value
+  Keywords
+    colormap - the name of a colour map, a matplotlib map or an n x 3 matrix of colours
+    range - [lower, upper] limit of the values, by default their minimum and maximum
+  See also
+    ind2color, mtexColorMap"""
   v = np.asarray(values, dtype=float).reshape(-1)
   lo, hi = (np.nanmin(v), np.nanmax(v)) if range is None else (float(range[0]), float(range[1]))
   t = np.zeros_like(v) if not hi > lo else np.clip((v - lo) / (hi - lo), 0, 1)
@@ -149,7 +199,14 @@ def _namedMap(key):
   def f(n=256):
     return colormapColors(key, n)
   f.__name__ = NAMES[key] + "ColorMap"
-  f.__doc__ = f"the {NAMES[key]} colour map, as MATLAB's {f.__name__} returns it"
+  f.__doc__ = (f"the {NAMES[key]} colour map, as MATLAB's {f.__name__} returns it\n\n"
+               f"  rgb = {f.__name__}()     # 256 colours\n"
+               f"  rgb = {f.__name__}(16)   # 16 colours\n\n"
+               f"The colours are interpolated linearly between the stops of the map; pass the result to\n"
+               f"mtexColorMap or as a plot's colormap.\n\n"
+               f"Output\n  rgb - an n x 3 array of rgb values in [0, 1]\n"
+               f"Keywords\n  n - the number of colours\n"
+               f"See also\n  mtexColorMap, num2rgb")
   return f
 
 
@@ -168,7 +225,21 @@ VEGA20 = np.array([(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 1
 
 
 def vega20(n=20):
-  """n colours of vega's twenty categorical ones, repeated beyond twenty, an n x 3 array"""
+  """n colours of vega's twenty categorical ones, repeated beyond twenty, an n x 3 array;
+  MATLAB's vega20, matplotlib's tab20
+
+    map = vega20()     # the twenty colours
+    map = vega20(5)    # the first five
+
+  The colours of matplotlib 2.0 for categorical data, pairs of a dark and a light shade. MATLAB
+  takes as many as the current colour map has by default and interpolates between the twenty.
+
+  Output
+    map - an n x 3 array of rgb values in [0, 1]
+  Keywords
+    n - the number of colours
+  See also
+    ind2color"""
   return VEGA20[np.arange(n) % len(VEGA20)]
 
 
@@ -194,11 +265,23 @@ ORDERED = np.array([1, 6, 19, 12, 20, 22, 3, 11, 18, 16, 23, 8, 7, 2, 14, 15, 9,
 
 def ind2color(i, cmap=None):
   """the colour of the index i in MTEX's colour order, counting from 0 (MATLAB counts from 1); an
-  RGB row per index of an array, NaN where the index is negative or NaN
+  RGB row per index of an array, NaN where the index is negative or NaN; MATLAB's ind2color
 
-    ind2color(i)
-    ind2color(ids, 'ordered')     the order in which neighbouring ids get related colours
-    ind2color(ids, cmap)          a matrix of colours as the order"""
+    rgb = ind2color(i)                  # one colour of the order of MTEX's preference
+    rgb = ind2color(ids, 'ordered')     # the order in which neighbouring ids get related colours
+    rgb = ind2color(ids, cmap)          # a matrix of colours as the order
+
+  The order has 24 colours and repeats beyond them, so that the phases or grains numbered by
+  the indices are told apart.
+
+  Input
+    i - an index, or an array of them
+  Output
+    rgb - an rgb triplet, or one row per index
+  Keywords
+    cmap - 'ordered' for MATLAB's order of related neighbours, or a matrix of colours
+  See also
+    vega20, num2rgb"""
   if cmap is None:
     colors = MTEX_COLORS
   elif isinstance(cmap, str) and cmap == "ordered":

@@ -70,7 +70,24 @@ def _negEntropy(v):
 
 
 def entropy(f, bandwidth=None):
-  """-int f log f by the exact rule at a raised bandwidth, since f log f is not bandlimited"""
+  """the entropy -int f log f of a function on SO(3) or on the sphere; MATLAB's entropy
+
+    e = odf.entropy()                 # at twice the bandwidth, at least 64 (128 on the sphere)
+    e = odf.entropy(bandwidth=128)    # the quadrature of another bandwidth
+
+  The integral is computed by the exact quadrature rule of a raised bandwidth, since f log f
+  is not bandlimited; points where f is not positive contribute zero. On the sphere it is the
+  mean over the sphere, as MATLAB divides by 4 pi.
+
+  Input
+    f - SO3Fun or S2Fun
+  Output
+    e - the entropy, a number
+  Keywords
+    bandwidth - the bandwidth of the quadrature grid, at most twice the preference
+        maxSO3Bandwidth (maxS2Bandwidth on the sphere)
+  See also
+    textureIndex, SO3FunHarmonic.norm"""
   if isinstance(f, SO3Fun):
     L0 = max(2 * f.bandwidth, 64) if bandwidth is None else int(bandwidth)
     L = bandwidthFor(min(L0, 2 * getMTEXpref("maxSO3Bandwidth")), f.CS, f.SS)
@@ -84,9 +101,33 @@ def entropy(f, bandwidth=None):
 
 
 def volume(f, center, radius, resolution=None):
-  """the share of orientations within a radius of a centre: the mean of f on a local grid in
-  the ball, times the ball's share of the fundamental region (its Haar measure times the
-  number of symmetric copies, at most one); a list of orientations gives the count instead"""
+  """the share of orientations within a radius of a centre: the integral of f over the ball,
+  int_{angle(g, c) < r} f(g) dg, relative to the integral over all orientations; MATLAB's volume
+
+    v = volume(odf, ori, 20*degree)                       # around an orientation
+    v = volume(odf, ori, 20*degree, resolution=1*degree)  # a finer local grid
+    v = volume(odf, f, 10*degree)                         # around a fibre
+    v = volume(sF, xvector, 20*degree)                    # a spherical function around a direction
+    v = volume(ori, center, 10*degree)                    # the share of a list of orientations
+
+  The volume is the mean of f on a local grid in the ball times the ball's share of the
+  fundamental region (its Haar measure times the number of symmetric copies, at most one).
+  On the sphere it is the same over a spherical cap; an antipodal function over a cap of 90
+  degree gives its mean value. A fibre as the centre gives fibreVolume; a list of
+  orientations gives the share of them within the radius; a list of centres a value each.
+  The spherical form is a function only, not a method of the spherical functions.
+
+  Input
+    f - SO3Fun, S2Fun or orientation
+    center - orientation, fibre, or vector3d on the sphere
+    radius - the radius of the ball, an angle
+  Output
+    v - the share of the volume, a number, or an array of one per centre
+  Keywords
+    resolution - the spacing of the local grid, by default the smaller of 1.25 degree and a
+        thirtieth of the radius (on the sphere 0.1 degree and a two hundredth)
+  See also
+    fibreVolume, entropy, SO3FunHarmonic.mean"""
   if isinstance(f, orientation):
     if isinstance(center, fibre):
       return float(np.count_nonzero(center.angle(f) <= radius) / f.size)
@@ -176,8 +217,24 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
 
 
 def calcMDF(f1, f2=None, bandwidth=32):
-  """the misorientation distribution of two ODFs, the density of inv(o1) o2 for independent
-  grains, (inv f1 * f2)(g) = int f1(S g^-1) f2(S) dS, with exchange symmetry for one ODF"""
+  """the uncorrelated misorientation distribution function of one or two ODFs; MATLAB's calcMDF
+
+    mdf = calcMDF(odf)                         # of one ODF, with grain exchange symmetry
+    mdf = calcMDF(odf1, odf2, bandwidth=16)    # of two ODFs, at another bandwidth
+
+  The density of inv(o1) o2 for independent grains, (inv f1 * f2)(g) = int f1(S g^-1)
+  f2(S) dS, computed by the convolution of the harmonic expansions; for one ODF the result
+  has the exchange symmetry of the misorientations within one phase.
+
+  Input
+    f1 - SO3Fun
+    f2 - SO3Fun, the second phase; f1 when omitted
+  Output
+    mdf - SO3FunHarmonic, from the crystal frame of f1 to that of f2
+  Keywords
+    bandwidth - the bandwidth the expansions are truncated to
+  See also
+    calcMIndex, calcAngleDistribution, calcAxisDistribution, SO3FunHarmonic.conv"""
   h1 = SO3FunHarmonic(f1, bandwidth=min(bandwidth, f1.bandwidth)).truncate(bandwidth)
   h2 = h1 if f2 is None or f2 is f1 else SO3FunHarmonic(f2, bandwidth=min(bandwidth, f2.bandwidth)).truncate(bandwidth)
   m = conv(h1.conj().inv(), h2)
@@ -273,8 +330,32 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
 
 
 def calcMIndex(f, resolution=1 * degree):
-  """the M-index: half the total variation between the angle distributions of the uniform
-  and the uncorrelated misorientation distribution"""
+  """the M-index of an ODF by Skemer et al., computed from the ODF instead of a discrete
+  number of orientations; MATLAB's calcMIndex
+
+    mi = calcMIndex(odf)                         # the M-index
+    mi = calcMIndex(odf, resolution=2*degree)    # angle distributions on a coarser grid
+
+  The M-index is half the total variation between the misorientation angle distributions of
+  the uniform and of the uncorrelated misorientation distribution, calcMDF(odf): zero for a
+  random texture, one for a single crystal.
+
+  Input
+    odf - SO3Fun
+  Output
+    mi - the M-index, a number between 0 and 1
+  Keywords
+    resolution - the step of the angle distributions
+  References
+    P. Skemer, I. Katayama, Z. Jiang, S.-I. Karato, The misorientation index: development of
+        a new method for calculating the strength of lattice-preferred orientation,
+        Tectonophysics 411 (2005) 157-167
+    H. Schaeben, Comment on "The misorientation index", Tectonophysics 441 (2007) 115-117
+    D. Mainprice, F. Bachmann, R. Hielscher, H. Schaeben, Descriptive tools for the analysis
+        of texture projects with large datasets using MTEX: strength, symmetry and components,
+        Geological Society, London, Special Publications 409 (2014)
+  See also
+    calcMDF, calcAngleDistribution, textureIndex"""
   m = calcMDF(f)
   pu, _ = calcAngleDistribution(uniformODF(f.CS, f.CS, antipodal=True), resolution=resolution)
   pm, _ = calcAngleDistribution(m, resolution=resolution)
@@ -333,12 +414,31 @@ def _uniformAxisDensity(oR):
 def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
   """the axis distribution of an SO(3) function, an S2 function of the rotation axes symmetric under
   the rotations the two frames share; with v its values at the axes v; for two frames the axis
-  distribution of the uniform distribution, exactly
+  distribution of the uniform distribution, exactly; MATLAB's calcAxisDistribution
 
-    adf = calcAxisDistribution(odf)
-    value = calcAxisDistribution(odf, v)
-    adf = calcAxisDistribution(odf, minAngle=20*degree, maxAngle=40*degree)
-    adf = calcAxisDistribution(cs1, cs2)"""
+    adf = calcAxisDistribution(mdf)                                          # the axis distribution
+    value = calcAxisDistribution(mdf, v)                                     # its values at the axes v
+    adf = calcAxisDistribution(mdf, minAngle=20*degree, maxAngle=40*degree)  # only rotations by 20 to 40 degree
+    value = calcAxisDistribution(mdf, v, resolution=1*degree)                # a finer angle quadrature
+    adf = calcAxisDistribution(cs1, cs2)                                     # of the uniform distribution
+
+  By default the rotation angle is integrated over the full range the fundamental region
+  allows for the axis in question, by a rectangle rule of the step resolution (2.5 degree).
+  The keywords minAngle and maxAngle restrict that range to a window, which is what the axis
+  angle sections show; an axis for which the window lies outside the fundamental region
+  contributes zero. The quadrature keeps its step, so a narrow window is integrated with
+  few points. The distribution is antipodal for a function with grain exchange.
+
+  Input
+    f - SO3Fun, or a crystal frame cs1 for the uniform distribution
+    v - vector3d, the axes to evaluate at, or the second frame cs2
+  Output
+    adf - S2FunHarmonic, or S2FunHandle for the uniform distribution
+    value - the values at the axes v
+  Keywords
+    bandwidth - the bandwidth of the harmonic expansion of adf
+  See also
+    calcAngleDistribution, calcMDF, axisAngleSections"""
   if isinstance(f, referenceFrame):
     # the uniform distribution exactly, not as a truncated expansion
     from ..geometry.orientationregion import fundamentalRegion
@@ -608,23 +708,55 @@ def _reduceHandle(f, op, axis):
 def max_(f, *args, numLocal=1, **kwargs):
   """the maximum of a function on SO(3) or the sphere, the value and the position, numLocal local maxima
   from a grid refined down to the accuracy; with a second function or a number the pointwise
-  maximum; with axis= the maximum of a list of functions along an axis
+  maximum; with axis= the maximum of a list of functions along an axis; MATLAB's max
 
-    value, ori = max(odf)
-    values, oris = max(odf, numLocal=5, resolution=5*degree, accuracy=0.25*degree)
-    f = max(odf1, odf2)
-    v, pos = max(sF)                       on the circle, the angle
-    values, positions = max(sF, numLocal=3)
-    sF = max(sF, 0.5)"""
+    value, ori = max(odf)                                                            # the global maximum and where it is
+    values, oris = max(odf, numLocal=5, resolution=5*degree, accuracy=0.25*degree)  # the five largest local maxima
+    f = max(odf1, odf2)                                                              # the pointwise maximum of two functions
+    v, pos = max(sF)                                                                 # on the sphere, the direction
+    values, positions = max(sF, numLocal=3)                                          # three local maxima on the sphere
+    sF = max(sF, 0.5)                                                                # the pointwise maximum with a number
+
+  The local maxima are searched from a grid of the spacing resolution (5 degree on SO(3), 2.5
+  on the sphere) and refined down to accuracy (0.25 and 0.05 degree); the keywords
+  resolution, accuracy and, on SO(3), startingNodes, the orientations to start from, go to
+  that search. Maxima closer than the resolution are merged, so fewer than numLocal can come
+  back. A function on the circle and a pole figure take their own max. Where MATLAB writes
+  max(SO3F, [], dim), the port writes max(SO3F, axis=dim - 1).
+
+  Input
+    f - SO3Fun, S2Fun or S1Fun; a second function or a number for the pointwise maximum
+  Output
+    value - the largest value, or numLocal values in descending order
+    ori - the position: orientation, vector3d, or the angle on the circle
+  Keywords
+    numLocal - the number of local maxima returned
+  See also
+    min, calcComponents, SO3FunHarmonic.mean"""
   return _extremum(f, args, numLocal, kwargs, largest=True)
 
 
 def min_(f, *args, numLocal=1, **kwargs):
   """the minimum of a function on SO(3) or the sphere, the value and the position, numLocal local minima;
-  with a second function or a number the pointwise minimum; with axis= along an axis of a list
+  with a second function or a number the pointwise minimum; with axis= along an axis of a list;
+  MATLAB's min
 
-    value, ori = min(odf)
-    f = min(odf, 0)"""
+    value, ori = min(odf)                        # the global minimum and where it is
+    values, oris = min(odf, numLocal=3)          # three local minima
+    f = min(odf, 0)                              # the pointwise minimum with a number
+
+  The minimum is the maximum of -f, the keywords resolution, accuracy and startingNodes as
+  for max.
+
+  Input
+    f - SO3Fun, S2Fun or S1Fun; a second function or a number for the pointwise minimum
+  Output
+    value - the smallest value, or numLocal values in ascending order
+    ori - the position: orientation, vector3d, or the angle on the circle
+  Keywords
+    numLocal - the number of local minima returned
+  See also
+    max"""
   return _extremum(f, args, numLocal, kwargs, largest=False)
 
 

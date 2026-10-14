@@ -230,8 +230,26 @@ class mapImage:
     return R @ self._d1 / (self._d1 @ self._d1), R @ self._d2 / (self._d2 @ self._d2)
 
   def pos2ind(self, pos, linear=False):
-    """the pixel covering each position: row and column, not clipped, and whether it lies on the
-    grid; linear=True the index into the flattened grid, -1 outside"""
+    """the pixel of the image covering each position; MATLAB's mapImage.pos2ind
+
+      i, j, inside = mg.pos2ind(pos)             # row and column, and whether on the grid
+      ind = mg.pos2ind(pos, linear=True)         # the index into the flattened grid
+
+    On a regular grid this is a projection and a rounding, not a search: the two steps are
+    perpendicular, so the row and the column separate. The row and column are counted from zero
+    and not clipped to the grid; the linear index is -1 outside it, where MATLAB's is NaN.
+
+    Input
+      mg - mapImage
+      pos - vector3d, or an (..., 2) or (..., 3) array of positions
+    Output
+      i, j - int arrays, row and column of the pixel
+      inside - bool array, whether it lies on the grid
+      ind - int array, the index into the flattened grid, row by row, -1 outside
+    Keywords
+      linear - return the linear index alone
+    See also
+      mapImage.interp, mapImage.subGrid"""
     u, v = self.gridCoordinates(pos)
     i, j = np.floor(u + 0.5).astype(np.int64), np.floor(v + 0.5).astype(np.int64)
     r, c = self.gridSize()
@@ -241,8 +259,27 @@ class mapImage:
     return i, j, inside
 
   def interp(self, pos, method="linear", extrapolationMethod="none"):
-    """the image values at positions: bilinear on the grid by default, 'nearest' or 'cubic';
-    outside the grid NaN, or the nearest border value with extrapolationMethod='nearest'"""
+    """the image values at arbitrary positions; MATLAB's mapImage.interp
+
+      v = mg.interp(pos)                                 # bilinear, NaN outside the grid
+      v = mg.interp(pos, 'nearest')                      # the value of the pixel covering it
+      v = mg.interp(pos, extrapolationMethod='nearest')  # the nearest border value outside
+
+    The positions reduce to fractional rows and columns of the regular grid, which are
+    interpolated: 'linear' bilinearly, 'nearest' by the covering pixel, and 'cubic', 'spline' or
+    'makima' through SciPy's RegularGridInterpolator (cubic, quintic and pchip). Resampling onto
+    another grid is this at the positions of the target.
+
+    Input
+      mg - mapImage
+      pos - vector3d, or an (..., 2) or (..., 3) array of positions
+    Output
+      v - array of the shape of pos, with the channels as a last axis when there are several
+    Keywords
+      method - 'linear', 'nearest', 'cubic', 'spline' or 'makima'
+      extrapolationMethod - 'none', NaN outside the grid, or 'nearest', the border value
+    See also
+      mapImage.pos2ind, EBSD.interp"""
     u, v = self.gridCoordinates(pos)
     shape = u.shape
     u, v = u.reshape(-1), v.reshape(-1)
@@ -273,8 +310,25 @@ class mapImage:
     return out.reshape(shape) if img.shape[2] == 1 else out.reshape(shape + (img.shape[2],))
 
   def subGrid(self, rows, cols=None):
-    """a rectangle cut out, rows and cols contiguous and ascending, or the box round a mask; the
-    map riding along is cut with it and the origin moves, nothing is resampled"""
+    """a rectangle cut out of the image; MATLAB's mapImage.subGrid
+
+      mg = mg.subGrid(range(2, 10), range(5, 20))   # rows 2 to 9, columns 5 to 19
+      mg = mg.subGrid(slice(2, 10), slice(5, 20))   # the same as slices
+      mg = mg.subGrid(mask)                         # the box round a mask over the grid
+
+    The image, the map riding along with it and the origin are cut so the geometry still says
+    where the remaining pixels are; nothing is resampled. Rows and columns count from zero and
+    must be contiguous and ascending.
+
+    Input
+      mg - mapImage
+      rows - indices or slice of the rows, or a boolean mask over the grid
+    Output
+      mg - mapImage
+    Keywords
+      cols - indices or slice of the columns, omitted with a mask
+    See also
+      mapImage.pos2ind, mapImage.extent"""
     if cols is None:
       mask = np.asarray(rows, dtype=bool)
       rr, cc = np.flatnonzero(mask.any(axis=1)), np.flatnonzero(mask.any(axis=0))

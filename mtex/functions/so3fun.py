@@ -202,10 +202,24 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   @classmethod
   def cat(cls, *fs, axis=0):
     """the functions joined into one list along an axis, the coefficients padded to the largest
-    bandwidth
+    bandwidth; MATLAB's cat and [SO3F1; SO3F2]
 
-      SO3F = cat(SO3F1, SO3F2)
-      SO3F = SO3FunHarmonic.cat(SO3F1, SO3F2, axis=1)"""
+      SO3F = cat(SO3F1, SO3F2)                     # one list after the other
+      SO3F = SO3FunHarmonic.cat(F1.T, F2.T, axis=1)  # two lists of n functions as the columns of n x 2
+
+    The lists are joined along an axis they have: two single functions give a list of two, and
+    two columns of n functions, F.T of a list F, joined along axis 1 give n x 2 functions. An axis
+    the lists do not have is not refused but joins the coefficient vectors. The real flag is
+    kept when every function is real.
+
+    Input
+      SO3F1, SO3F2, ... - SO3FunHarmonic, single functions or lists of the same frames
+    Output
+      SO3F - SO3FunHarmonic, the list of functions
+    Keywords
+      axis - the axis of the lists along which they are joined
+    See also
+      SO3FunHarmonic.truncate, SO3FunHarmonic.sum, SO3FunHarmonic.mean"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -388,7 +402,23 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
 
   def withExchange(self, x=True):
     """the function with the exchange symmetry f(g) = f(g^-1) imposed, by the mean with its inverse;
-    withExchange(False) drops the flag; needs the same frame on both sides"""
+    withExchange(False) drops the flag; needs the same frame on both sides
+
+      MDF = MDF.withExchange()       # the mean of f(g) and f(g^-1), flagged antipodal
+      MDF = MDF.withExchange(False)  # the flag dropped, the coefficients kept
+
+    A misorientation distribution between two grains of one phase does not know which grain is
+    the first, so it is invariant under g -> g^-1; MATLAB sets this by SO3F.antipodal = true. The
+    function's frames must be the same on both sides, else a ValueError is raised.
+
+    Input
+      SO3F - SO3FunHarmonic with the same frame on both sides
+    Output
+      SO3F - SO3FunHarmonic, its antipodal flag set to x
+    Keywords
+      x - impose the symmetry and set the flag (True), or only drop the flag (False)
+    See also
+      SO3FunHarmonic.inv, calcMDF"""
     if x and self.CS is not self.SS:
       raise ValueError("exchange symmetry needs the same frame on both sides")
     if self.shape:
@@ -449,17 +479,56 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return abs(self)
 
   def sqrt(self, bandwidth=None):
-    """the square root of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
+    """the square root of the function, by quadrature at twice the bandwidth, or at the bandwidth given
+
+      SO3F = sqrt(SO3F)                   # at twice the bandwidth
+      SO3F = SO3F.sqrt(bandwidth=32)      # at a bandwidth of its own
+
+    The values are taken on a quadrature grid and transformed back; negative values, which the
+    truncation of a density may leave, give NaN there.
+
+    Input
+      SO3F - SO3FunHarmonic
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      bandwidth - the bandwidth of the result; twice that of the function by default
+    See also
+      SO3FunHarmonic.exp, SO3FunHarmonic.log, mapFun"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def exp(self, bandwidth=None):
-    """the exponential of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
+    """the exponential of the function, by quadrature at twice the bandwidth, or at the bandwidth given
+
+      SO3F = exp(SO3F)                    # at twice the bandwidth
+      SO3F = SO3F.exp(bandwidth=8)        # at a bandwidth of its own
+
+    Input
+      SO3F - SO3FunHarmonic
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      bandwidth - the bandwidth of the result; twice that of the function by default
+    See also
+      SO3FunHarmonic.log, SO3FunHarmonic.sqrt, mapFun"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def log(self, bandwidth=None):
-    """the logarithm of the function, by quadrature at twice the bandwidth, or at the bandwidth given"""
+    """the logarithm of the function, by quadrature at twice the bandwidth, or at the bandwidth given
+
+      SO3F = log(SO3F + 1)                # at twice the bandwidth
+      SO3F = SO3F.log(bandwidth=32)       # at a bandwidth of its own
+
+    Input
+      SO3F - SO3FunHarmonic, positive where the logarithm is taken
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      bandwidth - the bandwidth of the result; twice that of the function by default
+    See also
+      SO3FunHarmonic.exp, SO3FunHarmonic.sqrt, mapFun"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
@@ -467,7 +536,22 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
 
   def mean(self, axis=None):
     """the mean of every function; with an axis, MATLAB's mean(SO3F, d), the function that is the
-    mean along that axis of the list"""
+    mean along that axis of the list
+
+      value = mean(SO3F)          # the mean value of every function
+      SO3F = mean(SO3F, axis=0)   # the pointwise mean along the first axis of a list
+
+    The mean value is the first Wigner coefficient, 1/(8 pi^2) times the integral over SO(3).
+
+    Input
+      SO3F - SO3FunHarmonic, a single function or a list
+    Output
+      value - float, or an array of the shape of the list
+      SO3F - SO3FunHarmonic, with axis given
+    Keywords
+      axis - the axis of the list to average the functions along; MATLAB's d, counted from 0
+    See also
+      SO3FunHarmonic.sum, SO3FunHarmonic.norm"""
     if axis is not None:
       return self._rebuild(self._fhat.mean(axis=normalize_axis_index(axis, len(self.shape))))
     m = self._fhat[..., 0]
@@ -477,8 +561,18 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   def sum(self, axis=None):
     """the integral over SO(3), 8 pi^2 times the mean; with an axis the sum along it of the list
 
-      value = sum(SO3F)
-      SO3F = sum(SO3F, axis=0)  # the pointwise sum along the first axis"""
+      value = sum(SO3F)         # the integral of every function
+      SO3F = sum(SO3F, axis=0)  # the pointwise sum along the first axis
+
+    Input
+      SO3F - SO3FunHarmonic, a single function or a list
+    Output
+      value - float, or an array of the shape of the list
+      SO3F - SO3FunHarmonic, with axis given
+    Keywords
+      axis - the axis of the list to sum the functions along; MATLAB's d, counted from 0
+    See also
+      SO3FunHarmonic.mean, SO3FunHarmonic.norm"""
     if axis is not None:
       return self._rebuild(self._fhat.sum(axis=normalize_axis_index(axis, len(self.shape))))
     return 8 * np.pi ** 2 * self.mean()
@@ -486,8 +580,21 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
   def norm(self, s=None):
     """the L2 norm, or the Sobolev norm sqrt(sum (2n+1)^{2s} |fhat_n|^2)
 
-      t = norm(SO3F)
-      t = norm(SO3F, s=1)"""
+      t = norm(SO3F)          # the L2 norm, the texture index
+      t = norm(SO3F, s=1)     # the Sobolev norm of index 1
+
+    By Parseval's equality the L2 norm sqrt(1/(8 pi^2) int |f(R)|^2 dR) is the Euclidean norm of
+    the Wigner coefficients, the Wigner functions being normalised; MATLAB calls it the texture
+    index. With a Sobolev index s every degree n is weighted by (2n+1)^{2s}.
+
+    Input
+      SO3F - SO3FunHarmonic, a single function or a list
+    Output
+      t - float, or an array of the shape of the list
+    Keywords
+      s - the Sobolev index; None or 0 for the L2 norm
+    See also
+      SO3FunHarmonic.mean, textureIndex"""
     if self.shape:
       return self._each(lambda f: f.norm(s))
     if s is None:
@@ -503,7 +610,23 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     return x.real if self.isReal and g.isReal else x
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
-    """the same coefficients up to a tolerance"""
+    """the same coefficients up to a tolerance
+
+      SO3F.isclose(SO3F2)               # equal up to the relative tolerance 1e-8
+      SO3F.isclose(SO3F2, atol=1e-12)   # or up to an absolute one
+
+    The coefficients of both functions, padded to the larger bandwidth, agree when the norm of
+    their difference is at most atol + rtol times the norm of those of g.
+
+    Input
+      SO3F, g - SO3FunHarmonic
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the norm of g
+      atol - the absolute tolerance
+    See also
+      SO3FunHarmonic.norm"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L)._fhat, g.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
@@ -512,19 +635,79 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
 
   def rotate(self, rot, side="left"):
     """the function turned by a rotation, from the left or with side='right' from the right, as
-    rotate(f, rot, side)"""
+    rotate(f, rot, side)
+
+      SO3F = rotate(SO3F, rot)                 # f(rot^-1 g), turned in the specimen frame
+      SO3F = SO3F.rotate(rot, side='right')    # f(g rot^-1), turned in the crystal frame
+
+    The Wigner coefficients are turned degree by degree. A symmetry of the side turned that the
+    rotation does not map onto itself is dropped with a warning. An orientation turns the
+    function into the other frame of the orientation: from the left its crystal frame must be the
+    specimen frame of the function, from the right its specimen frame the crystal frame.
+
+    Input
+      SO3F - SO3FunHarmonic
+      rot - rotation or orientation, one
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side; MATLAB's flag 'right'
+    See also
+      SO3FunHandle.rotate, SO3FunRBF.rotate, rotation"""
     from .funops import _rotateSO3, _side
     return _rotateSO3(self, rot, _side(side))
 
   def conv(self, g, *, inverse=False):
     """the convolution with another SO(3) function, a kernel, a function on the sphere or a vector of
-    multipliers per degree, as conv(f, g); with inverse=True of the inverse of f"""
+    multipliers per degree, as conv(f, g); with inverse=True of the inverse of f
+
+      SO3F = conv(SO3F1, SO3F2)         # two functions on SO(3)
+      SO3F = conv(SO3F1, psi)           # with an SO3Kernel, a smoothing
+      sF2 = conv(SO3F1, sF1)            # with a function on the sphere, a function on the sphere
+      SO3F = SO3F1.conv(psi, inverse=True)  # of the inverse function f(g^-1)
+
+    Two functions on SO(3) chain: the specimen frame of SO3F2 must be the crystal frame of SO3F1,
+    and the result maps from the crystal frame of SO3F2 to the specimen frame of SO3F1. A function
+    on the sphere lives in the specimen frame of SO3F1 and gives one in its crystal frame. A
+    kernel or the multipliers scale the coefficients degree by degree. See SO3FunConvolution for
+    the definitions.
+
+    Input
+      SO3F1 - SO3FunHarmonic
+      g - SO3Fun, SO3Kernel, S2Fun, S2Kernel, or an array of multipliers per degree
+    Output
+      SO3F - SO3FunHarmonic
+      sF2 - S2FunHarmonic, for a function or kernel on the sphere
+    Keywords
+      inverse - convolve the inverse function f(g^-1), its frames exchanged
+    See also
+      SO3Kernel.conv, S2FunHarmonic.conv, SO3FunConvolution"""
     from .funops import conv
     return conv(self, g, inverse=inverse)
 
   def grad(self, x=None, side="left"):
     """the gradient, a harmonic vector field on SO(3), left or with side='right' right; with x its
-    values at the orientations x"""
+    values at the orientations x
+
+      G = SO3F.grad()                     # the gradient, an SO3VectorFieldHarmonic
+      g = SO3F.grad(ori)                  # its values at orientations, tangent vectors
+      g = SO3F.grad(ori, side='right')    # the right tangent vectors, in the crystal frame
+      ori_new = exp(5*degree*normalize(g))    # 5 degree along the gradient from ori
+
+    The left gradient gives its tangent vectors in the specimen frame, the right one in the
+    crystal frame; MATLAB passes SO3TangentSpace.rightVector for the right. The tangent vectors
+    carry their orientations, so exp takes no second argument as MATLAB's exp(v, rot).
+
+    Input
+      SO3F - SO3FunHarmonic
+      x - orientation, where to evaluate the gradient
+    Output
+      G - SO3VectorFieldHarmonic
+      g - SO3TangentVector, the values at x
+    Keywords
+      side - 'left' or 'right', the tangent space
+    See also
+      SO3VectorFieldHarmonic, orientation.exp, SO3FunRBF.grad, SO3FunCBF.grad"""
     from .so3vectorfield import grad
     return grad(self, x, side)
 

@@ -117,7 +117,19 @@ class slipSystem:
   def cat(cls, *systems, axis=0):
     """the list of several systems of one crystal, MATLAB's [sS1, sS2]
 
-      sS = cat(sS1, sS2)"""
+      sS = cat(sS1, sS2)                            # one list of both
+
+    The systems must be written in one frame; None operands are skipped. The result is
+    always one flat list.
+
+    Input
+      systems - slipSystem
+    Output
+      sS - slipSystem
+    Keywords
+      axis - NumPy's axis, not used: the systems are always joined into one list
+    See also
+      slipSystem, slipSystem.symmetrise"""
     systems = [s for s in systems if s is not None]
     for s in systems[1:]:
       _sameFrame(systems[0].b, s.b, "the slip systems")
@@ -143,7 +155,26 @@ class slipSystem:
 
   def symmetrise(self, *, antipodal=False, return_index=False):
     """the systems of every family: the pairs of the orbits that stay orthogonal, both signs of
-    the Burgers vector unless antipodal"""
+    the Burgers vector unless antipodal
+
+      sSAll = sS.symmetrise()                       # 24 systems of fcc, both slip directions
+      sSAll = sS.symmetrise(antipodal=True)         # 12, one sign of each
+      sSAll, id = sS.symmetrise(return_index=True)  # with the system each one comes from
+
+    For every system the symmetrically equivalent slip directions and plane normals are
+    paired where they stay orthogonal. Systems in specimen coordinates are returned as they
+    are.
+
+    Input
+      sS - slipSystem
+    Output
+      sSAll - slipSystem
+      id - the index into sS of the system each one comes from, MATLAB's second output
+    Keywords
+      antipodal - keep one sign of each slip direction
+      return_index - also return id
+    See also
+      slipSystem, dislocationSystem"""
     # return_index also gives the system every equivalent comes from, MATLAB's slipId
     if not self.isCrystal:
       return (self, np.arange(len(self))) if return_index else self
@@ -205,7 +236,21 @@ class slipSystem:
     return np.linalg.norm(self.b.data - other.b.data, axis=-1)
 
   def trace(self, nrm=None):
-    """the trace of the slip plane in the surface normal to a direction, the xy plane by default"""
+    """the trace of the slip plane in the surface normal to a direction, the xy plane by default
+
+      t = (ori * sS).trace()                        # the traces in the map plane
+      t = (ori * sS).trace(xvector)                 # in the plane normal to x
+
+    The direction of the line in which the slip plane meets the surface, n x nrm normalised,
+    an axis.
+
+    Input
+      sS - slipSystem, usually rotated into specimen coordinates
+      nrm - vector3d, the normal of the surface, by default z
+    Output
+      t - vector3d, antipodal
+    See also
+      slipSystem.rotate, calcTraces"""
     from . import zvector
     nrm = zvector if nrm is None else nrm
     t = self.n.cross(nrm).normalize()
@@ -233,7 +278,19 @@ class slipSystem:
 
   def char(self, style=None):
     """one plane and one direction in it, (111)[01-1], one string per system; char(sS, 'latex')
-    as one piece of mathematics"""
+    as one piece of mathematics
+
+      s = sS.char()                                 # '(111)[011̅]'
+      s = sS.char('latex')                          # '$(111)[01\\bar{1}]$'
+
+    Input
+      sS - slipSystem
+    Output
+      s - str for a single system, a list of them otherwise
+    Keywords
+      style - None for plain text with combining bars, 'latex' for LaTeX, as Miller.char
+    See also
+      Miller.char"""
     out = [(self.n.reshape(-1)[k].char(style, family=False) + self.b.reshape(-1)[k].char(style, family=False)).replace("$$", "")
            for k in range(self.size)]
     return out[0] if self.size == 1 else out
@@ -262,73 +319,267 @@ class slipSystem:
 
   @staticmethod
   def primitiveCubic(CS, CRSS=1):
-    """the slip system <100>{010} of a primitive cubic crystal"""
+    """the slip system <100>{010} of a primitive cubic crystal
+
+      sS = slipSystem.primitiveCubic(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.primitiveCubic(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a cubic crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("primitiveCubic", CS, CRSS)
 
   @staticmethod
   def fcc(CS, CRSS=1):
-    """the slip system <01-1>{111} of a face-centred cubic crystal"""
+    """the slip system <01-1>{111} of a face-centred cubic crystal
+
+      sS = slipSystem.fcc(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.fcc(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a cubic crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("fcc", CS, CRSS)
 
   @staticmethod
   def bcc(CS, CRSS=1):
-    """the slip systems <1-11>{011}, <-111>{211} and <-111>{321} of a body-centred cubic crystal"""
+    """the slip systems <1-11>{011}, <-111>{211} and <-111>{321} of a body-centred cubic crystal
+
+      sS = slipSystem.bcc(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.bcc(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a cubic crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress, one or one per family
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("bcc", CS, CRSS)
 
   @staticmethod
   def hcp(CS=None, CRSS=1):
     """there is no hcp default: raises an error naming the hexagonal families to choose from
-    (basal, prismaticA, pyramidalCA, twinT1, ...) with their CRSS"""
+    (basal, prismaticA, pyramidalCA, twinT1, ...) with their CRSS
+
+      sS = cat(slipSystem.basal(cs, CRSS=1), slipSystem.prismaticA(cs, CRSS=2))  # what to write instead
+
+    The critical resolved shear stresses of the hexagonal families differ from material to
+    material, so they are chosen one by one, as MATLAB's error message says too.
+
+    Input
+      CS - crystalFrame, not used
+    Keywords
+      CRSS - not used
+    See also
+      slipSystem.basal, slipSystem.prismaticA, slipSystem.pyramidalCA, slipSystem.twinT1"""
     return _familyOf("hcp", CS, CRSS)
 
   @staticmethod
   def basal(CS, CRSS=1):
-    """the basal slip system <11-20>(0001) of a hexagonal crystal"""
+    """the basal slip system <11-20>(0001) of a hexagonal crystal
+
+      sS = slipSystem.basal(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.basal(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("basal", CS, CRSS)
 
   @staticmethod
   def prismaticA(CS, CRSS=1):
-    """the prismatic a slip system <2-1-10>{01-10} of a hexagonal crystal"""
+    """the prismatic a slip system <2-1-10>{01-10} of a hexagonal crystal
+
+      sS = slipSystem.prismaticA(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.prismaticA(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("prismaticA", CS, CRSS)
 
   @staticmethod
   def prismatic2A(CS, CRSS=1):
-    """the second prismatic a slip system <01-10>{2-1-10} of a hexagonal crystal"""
+    """the second prismatic a slip system <01-10>{2-1-10} of a hexagonal crystal
+
+      sS = slipSystem.prismatic2A(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.prismatic2A(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("prismatic2A", CS, CRSS)
 
   @staticmethod
   def pyramidalA(CS, CRSS=1):
-    """the pyramidal a slip system <2-1-10>{01-11} of a hexagonal crystal"""
+    """the pyramidal a slip system <2-1-10>{01-11} of a hexagonal crystal
+
+      sS = slipSystem.pyramidalA(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.pyramidalA(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("pyramidalA", CS, CRSS)
 
   @staticmethod
   def pyramidalCA(CS, CRSS=1):
-    """the pyramidal c+a slip system <2-1-13>{-1101} of a hexagonal crystal"""
+    """the pyramidal c+a slip system <2-1-13>{-1101} of a hexagonal crystal
+
+      sS = slipSystem.pyramidalCA(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.pyramidalCA(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("pyramidalCA", CS, CRSS)
 
   @staticmethod
   def pyramidal2CA(CS, CRSS=1):
-    """the second order pyramidal c+a slip system <2-1-13>{-2112} of a hexagonal crystal"""
+    """the second order pyramidal c+a slip system <2-1-13>{-2112} of a hexagonal crystal
+
+      sS = slipSystem.pyramidal2CA(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.pyramidal2CA(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("pyramidal2CA", CS, CRSS)
 
   @staticmethod
   def twinT1(CS, CRSS=1):
-    """the tensile twin T1 <1-101>{-1102} of a hexagonal crystal"""
+    """the tensile twin T1 <1-101>{-1102} of a hexagonal crystal
+
+      sS = slipSystem.twinT1(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.twinT1(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("twinT1", CS, CRSS)
 
   @staticmethod
   def twinT2(CS, CRSS=1):
-    """the tensile twin T2 <2-1-16>{-2111} of a hexagonal crystal"""
+    """the tensile twin T2 <2-1-16>{-2111} of a hexagonal crystal
+
+      sS = slipSystem.twinT2(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.twinT2(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("twinT2", CS, CRSS)
 
   @staticmethod
   def twinC1(CS, CRSS=1):
-    """the compressive twin C1 <-110-2>{-1101} of a hexagonal crystal"""
+    """the compressive twin C1 <-110-2>{-1101} of a hexagonal crystal
+
+      sS = slipSystem.twinC1(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.twinC1(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("twinC1", CS, CRSS)
 
   @staticmethod
   def twinC2(CS, CRSS=1):
-    """the compressive twin C2 <2-1-1-3>{2-1-12} of a hexagonal crystal"""
+    """the compressive twin C2 <2-1-1-3>{2-1-12} of a hexagonal crystal
+
+      sS = slipSystem.twinC2(cs)                  # with the critical resolved shear stress 1
+      sS = slipSystem.twinC2(cs, CRSS=2)          # with another
+
+    One system of the family; symmetrise gives every equivalent one.
+
+    Input
+      CS - crystalFrame of a hexagonal crystal
+    Output
+      sS - slipSystem
+    Keywords
+      CRSS - the critical resolved shear stress
+    See also
+      slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("twinC2", CS, CRSS)
 
 
@@ -476,7 +727,14 @@ class dislocationSystem:
 
   @staticmethod
   def hcp(CS=None):
-    """there is no hcp default: raises an error naming the hexagonal families to choose from"""
+    """there is no hcp default: raises an error naming the hexagonal families to choose from
+
+      dS = dislocationSystem(slipSystem.basal(cs).symmetrise(antipodal=True))  # what to write instead
+
+    Input
+      CS - crystalFrame, not used
+    See also
+      dislocationSystem.fcc, dislocationSystem.bcc, slipSystem.hcp"""
     return _familyOf("hcp", CS)
 
 

@@ -64,7 +64,21 @@ class plottingConvention:
 
   @classmethod
   def edax(cls, setting=2):
-    """the EDAX/TSL frame of the given setting, 1 to 4, z out of the screen"""
+    """the EDAX/TSL frame of the given setting, 1 to 4, z out of the screen
+
+      pC = plottingConvention.edax()                # setting 2, y pointing west
+      pC = plottingConvention.edax(setting=1)       # y pointing east
+
+    The conventions that match EDAX's Euler reference frames A1 to A4, to compare
+    orientation plots with EDAX's software; east is y, -y, x or -x. MATLAB warns when no
+    setting is given, the port takes 2 silently.
+
+    Output
+      pC - plottingConvention
+    Keywords
+      setting - the EDAX setting, 1 to 4
+    See also
+      plottingConvention, plottingConvention.default"""
     if not 1 <= setting <= 4:
       raise ValueError("EDAX settings are 1 to 4")
     return cls(zvector, (yvector, -yvector, xvector, -xvector)[setting - 1])
@@ -81,8 +95,16 @@ class plottingConvention:
     """makes this convention the session default, that of the default specimen frame; with
     save=True also the default of every later session, stored in the user's settings file
 
-      plottingConvention('y↑→x').makeDefault()
-      plottingConvention.default('y↑→x', save=True)"""
+      plottingConvention('y↑→x').makeDefault()      # for this session
+      plottingConvention('y↑→x').makeDefault(save=True)  # for every later session too
+      plottingConvention.default('y↑→x', save=True)  # the same
+
+    Input
+      pC - plottingConvention
+    Keywords
+      save - store the convention in mtex_settings.json as well
+    See also
+      plottingConvention.default, setMTEXpref"""
     _defaultFrame().how2plot = plottingConvention(self)
     if save:
       from .settings import conventionSetting, saveSetting
@@ -162,7 +184,22 @@ class plottingConvention:
   # ------------------------------------------------------------------ pictograms
 
   def char(self, utf8=None, names=("x", "y", "z")):
-    """'y↑→x' when both screen axes are reference axes, the three names run together otherwise"""
+    """'y↑→x' when both screen axes are reference axes, the three names run together otherwise
+
+      s = pC.char()                                 # 'y↑→x'
+      s = pC.char(utf8=False)                       # 'y^->x'
+      s = pC.char(names=('X1', 'Y1', 'Z1'))         # in the axis names of a file, 'Y1↑→X1'
+
+    Input
+      pC - plottingConvention
+    Output
+      s - str
+    Keywords
+      utf8 - arrows as Unicode characters, or as ASCII ('^', 'v', '->', '<-'); by default
+          the preference 'UTF8Output'
+      names - the names of the three reference axes
+    See also
+      conventionNames, plottingConvention.isPictogram"""
     iN, up = _axisOf(self.north)
     iE, right = _axisOf(self.east)
     if iN is None or iE is None:
@@ -261,7 +298,20 @@ AXIS_CONVENTIONS = ("y↑→x", "y↓→x", "x↑→y", "x↓→y", "x←↑y", 
 
 
 def conventionNames(names=("x", "y", "z")):
-  """the eight written in the axis names of a frame, 'Y1↑→X1' for an Oxford file"""
+  """the eight written in the axis names of a frame, 'Y1↑→X1' for an Oxford file
+
+    conventionNames()                             # 'y↑→x', 'y↓→x', ...
+    conventionNames(names=('X1', 'Y1', 'Z1'))     # 'Y1↑→X1', 'Y1↓→X1', ...
+
+  The eight conventions whose screen axes lie along reference axes, AXIS_CONVENTIONS, the
+  ones the import wizard offers, as Unicode pictograms.
+
+  Output
+    names - list of eight str
+  Keywords
+    names - the names of the three reference axes
+  See also
+    plottingConvention.char"""
   return [plottingConvention(s).char(utf8=True, names=tuple(names)) for s in AXIS_CONVENTIONS]
 
 
@@ -278,13 +328,33 @@ def closestConvention(rot):
 # what plottingConvention.default returns: the session default, and a call on it with a
 # convention sets it, plottingConvention.default('y↑→x'), as MATLAB reads it
 class _sessionDefault(plottingConvention):
-  """the default plotting convention of the session, and setting it: default('y↑→x'),
-  default(zvector, xvector) make a convention the default, default(north=xvector),
-  default(intoScreen=zvector) change those directions and keep the rest (MATLAB's plotx2north,
-  plotzIntoPlane); save=True keeps it in mtex_settings.json
+  """the default plotting convention of the session, and setting it; MATLAB's plotx2east,
+  plotx2north, plotx2west, plotx2south, plotzOutOfPlane and plotzIntoPlane
 
-    plottingConvention.default('y↓→x')
-    plottingConvention.default(north=xvector, save=True)"""
+    plottingConvention.default('y↓→x')                    # x east, y south, z into the screen
+    plottingConvention.default(zvector, xvector)          # z out of the screen, x east
+    plottingConvention.default(east=xvector)              # x east, MATLAB's plotx2east
+    plottingConvention.default(north=xvector)             # x north, MATLAB's plotx2north
+    plottingConvention.default(intoScreen=zvector)        # z into the screen, MATLAB's plotzIntoPlane
+    plottingConvention.default(outOfScreen=zvector)       # z out of the screen, MATLAB's plotzOutOfPlane
+    plottingConvention.default(north=xvector, save=True)  # kept for later sessions too
+
+  Read, plottingConvention.default is the convention of the default specimen frame, which
+  every plot of data in that frame follows. Called with a convention, its name or the pair
+  outOfScreen, east, it makes that convention the default. Called with screen directions
+  (east, west, north, south, outOfScreen, intoScreen) as keywords, it turns the current
+  default by the least rotation that puts each given reference direction there and keeps the
+  rest, as MATLAB's plotx2east, plotzIntoPlane and the like do. A fresh installation draws
+  'y↓→x'.
+
+  Input
+    outOfScreen - a convention, its name ('y↑→x', 'y^->x' in ASCII), or the reference
+        direction pointing out of the screen
+    east - the reference direction pointing east, with outOfScreen
+  Keywords
+    save - also make it the default of later sessions, stored in mtex_settings.json
+  See also
+    plottingConvention, plottingConvention.makeDefault, setMTEXpref"""
 
   def __call__(self, outOfScreen: ConventionName | Any = None, east=None, save=False, **directions):
     if isinstance(outOfScreen, (str, plottingConvention)) or (outOfScreen is not None and east is not None):

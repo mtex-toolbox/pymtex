@@ -18,7 +18,25 @@ from ..geometry.install import install
 
 
 def exportPoleFigure(pf, fname, *args, degree=False):
-  """write every pole figure of a data set to its own three column table; returns the file names"""
+  """write every pole figure of a data set to its own three column table; returns the file names;
+  MATLAB's PoleFigure/export
+
+    names = export(pf, 'dubna')                # dubna_{101̅0}.txt, ..., the angles in radians
+    names = export(pf, 'dubna', degree=True)   # the angles in degrees
+
+  Every crystal direction (or superposition of directions) gets the file
+  <fname>_<directions>.txt with three columns, the polar angle and the azimuth of the specimen
+  directions and the intensity, the table loadPoleFigure reads back.
+
+  Input
+    pf - a PoleFigure
+    fname - the base name of the files
+  Output
+    names - the names of the files written
+  Keywords
+    degree - the polar angle and the azimuth in degrees instead of radians
+  See also
+    loadPoleFigure, PoleFigure.load"""
   fname = os.fspath(fname)
   refuseFlags(args, "export")
   s = 1 / _degree if degree else 1.0

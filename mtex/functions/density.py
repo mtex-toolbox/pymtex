@@ -36,13 +36,52 @@ from .transforms import S2FourierPlan, SO3FourierPlan
 
 def calcDensity(x, Fourier=False, **kwargs):
   """the density estimate of a sample: an ODF of orientations, a function on the sphere of
-  directions or axes, a function on the circle of angles or a density of real values
+  directions or axes, a function on the circle of angles or a density of real values;
+  MATLAB's calcDensity
 
-    calcDensity(ori)                          the halfwidth selected by UCV
-    calcDensity(ori, halfwidth=5*degree)      a de la Vallee Poussin kernel of that halfwidth
-    calcDensity(ebsd)                         the orientations of a map, grouped by its grains
-    calcDensity(v, kernel=psi, weights=w)     weighted directions
-    calcDensity(ori, Fourier=True)            the harmonic form"""
+    odf = calcDensity(ori)                                 # the halfwidth selected by UCV
+    odf = calcDensity(ori, halfwidth=5*degree)             # a de la Vallee Poussin kernel of that halfwidth
+    odf = calcDensity(ori, kernel=SO3AbelPoissonKernel(halfwidth=10*degree))  # a kernel of your own
+    odf = calcDensity(grains.meanOrientation, weights=grains.area)  # weighted by the grain areas
+    odf = calcDensity(ebsd)                                # the orientations of a map, grouped by its grains
+    odf = calcDensity(ori, Fourier=True)                   # the harmonic form
+    odf = calcDensity(ori, harmonic=True, bandwidth=16)    # the harmonic form of order 16
+    sF = calcDensity(v, kernel=psi, weights=w)             # weighted directions
+    sF = calcDensity(v, halfwidth=10*degree, antipodal=True)  # axes
+    f = calcDensity(rho, periodic=True)                    # angles, a function on the circle
+    f = calcDensity(x, range=[0, 1])                       # real values on an interval
+
+  Orientations give a sum of kernels about them, the radial form up to 200 orientations and
+  the harmonic form above (or with a Dirichlet kernel, or for misorientations between two
+  crystal frames); harmonic=True or False decides. Without a kernel or a halfwidth the
+  halfwidth is selected from the sample by unbiased cross validation (calcKernel); the
+  orientations of a map are not independent, so a map is grouped by its grain ids when grains
+  were computed, and plain pixel orientations of a map without groups fall back to 10 degree
+  with a warning. NaN orientations are dropped, an empty list gives the uniform ODF.
+
+  Directions give the harmonic form of the point measure convolved with the kernel,
+  symmetrised by their frame. Numbers with periodic=True, sigma, kernel or antipodal are angles,
+  a density on the circle smoothed by a Gaussian of width sigma (Silverman's rule by default);
+  other numbers are real valued samples, one per row, whose density on the box range (the
+  minima in the first row, the maxima in the second) is a gridded interpolant: the diffusion
+  estimator in one dimension, the EM mixture in more (calcDensityReal).
+
+  The other keywords go to the estimator of the sample's kind: kernel, halfwidth, weights,
+  groups (the grain or group of every point, for the selected halfwidth) and bandwidth for
+  orientations and directions, harmonic for orientations, antipodal for directions and
+  angles, sigma for angles, range, bandwidth and rng for real values. MATLAB's 'order' is
+  bandwidth here, its flag 'Fourier' the keyword; the Bingham estimate is calcBinghamODF.
+
+  Input
+    x - orientation, vector3d, EBSD, or an array of angles or real values
+  Output
+    odf - SO3FunRBF or SO3FunHarmonic
+    sF - S2FunHarmonic
+    f - S1FunHarmonic for angles, a griddedDensity for real values
+  Keywords
+    Fourier - return orientations' density in harmonic form, MATLAB's flag 'Fourier'
+  See also
+    calcKernel, calcBinghamODF, unimodalODF, interpolate, calcDensityReal"""
   # a map: the orientations of its one phase, with its grain ids when grains were computed
   if not isinstance(x, (quaternion, vector3d, np.ndarray, list, tuple)) and hasattr(x, "orientations") and hasattr(x, "prop"):
     if kwargs.get("groups") is None and "grainId" in x.prop:

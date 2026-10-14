@@ -61,26 +61,93 @@ def _gradient(g, cs, dim):
 
 
 def gradientX(ebsd, stencil=None):
-  """the derivative of the orientation along the first axis of the volume per unit length,
-  gradientDim(ebsd, 0)"""
+  """the derivative of the orientation along the first axis of the volume per unit length;
+  MATLAB's gradientX of EBSD3square
+
+    g = ebsd3['Iron'].gradientX()                         # a vector3d per voxel
+
+  gradientDim(ebsd, 0): the logarithm of the next voxel's orientation at this one's, a left
+  tangent vector in specimen coordinates, over the voxel spacing; the forward difference,
+  backwards in the last layer, and NaN across a grain boundary when the volume stores
+  grainId. The volume is gridded first and must hold one indexed phase.
+
+  Input
+    ebsd - EBSD3 of one indexed phase
+  Output
+    g - vector3d of the shape of the gridded volume, in the inverse scan unit
+  Keywords
+    stencil - accepted for the signature of EBSD.gradientX and not used: a volume takes the
+        one sided difference
+  See also
+    EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientX"""
   return gradientDim(ebsd, 0)
 
 
 def gradientY(ebsd, stencil=None):
-  """the derivative of the orientation along the second axis of the volume per unit length,
-  gradientDim(ebsd, 1)"""
+  """the derivative of the orientation along the second axis of the volume per unit length;
+  MATLAB's gradientY of EBSD3square
+
+    g = ebsd3['Iron'].gradientY()                         # a vector3d per voxel
+
+  gradientDim(ebsd, 1): the logarithm of the next voxel's orientation at this one's, a left
+  tangent vector in specimen coordinates, over the voxel spacing; the forward difference,
+  backwards in the last layer, and NaN across a grain boundary when the volume stores
+  grainId. The volume is gridded first and must hold one indexed phase.
+
+  Input
+    ebsd - EBSD3 of one indexed phase
+  Output
+    g - vector3d of the shape of the gridded volume, in the inverse scan unit
+  Keywords
+    stencil - accepted for the signature of EBSD.gradientY and not used: a volume takes the
+        one sided difference
+  See also
+    EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientY"""
   return gradientDim(ebsd, 1)
 
 
 def gradientZ(ebsd, stencil=None):
-  """the derivative of the orientation along the third axis of the volume per unit length,
-  gradientDim(ebsd, 2)"""
+  """the derivative of the orientation along the third axis of the volume per unit length;
+  MATLAB's gradientZ of EBSD3square
+
+    g = ebsd3['Iron'].gradientZ()                         # a vector3d per voxel
+
+  gradientDim(ebsd, 2): the logarithm of the next voxel's orientation at this one's, a left
+  tangent vector in specimen coordinates, over the voxel spacing; the forward difference,
+  backwards in the last layer, and NaN across a grain boundary when the volume stores
+  grainId. The volume is gridded first and must hold one indexed phase.
+
+  Input
+    ebsd - EBSD3 of one indexed phase
+  Output
+    g - vector3d of the shape of the gridded volume, in the inverse scan unit
+  Keywords
+    stencil - accepted for the signature of EBSD.gradientZ and not used: a volume takes the
+        one sided difference
+  See also
+    EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientZ"""
   return gradientDim(ebsd, 2)
 
 
 def curvature(ebsd, stencil=None):
-  """the curvature tensor of every voxel, the gradients along the three lattice directions, in the
-  specimen frame and in the inverse scan unit"""
+  """the curvature tensor of every voxel; MATLAB's curvature of EBSD3square
+
+    kappa = ebsd3['Iron'].curvature()                  # a curvatureTensor per voxel
+
+  A volume measures the orientation gradient along all three axes of its voxels, so its
+  curvature tensor is complete: the dyads of the gradients gradientX, gradientY, gradientZ
+  with the unit steps d1, d2, d3 they are taken along, in the specimen frame and in the
+  inverse scan unit. The volume is gridded first and must hold one indexed phase.
+
+  Input
+    ebsd - EBSD3 of one indexed phase
+  Output
+    kappa - curvatureTensor of the shape of the gridded volume
+  Keywords
+    stencil - accepted for the signature of EBSD.curvature and not used: a volume takes the
+        one sided differences
+  See also
+    EBSD3.gradientX, EBSD3.calcGND, EBSD.curvature, curvatureTensor"""
   from ..tensors.tensor import curvatureTensor
   g, cs = _grid(ebsd)
   D = g.lattice.D
@@ -158,9 +225,27 @@ def _back(ebsd, g, a):
 
 
 def fill(ebsd, extrapolate=False):
-  """the empty voxels, padding and not indexed, given the phase, orientation and properties of
-  the nearest measured voxel; without extrapolate only those enclosed by measured voxels, the
-  ones the outside of the volume reaches over empty voxels staying empty"""
+  """the empty voxels of a volume filled from their nearest measured voxel; MATLAB's fill of
+  EBSD3
+
+    ebsd3 = ebsd3.fill()                               # the empty voxels enclosed by measured ones
+    ebsd3 = ebsd3.fill(extrapolate=True)               # every empty voxel, up to the outer boundary
+
+  The volume is gridded, and every empty voxel, padding or not indexed, takes the phase, the
+  orientation and the properties of the nearest indexed voxel. Without extrapolate only the
+  empty regions enclosed by measured voxels are filled; those that reach the outside of the
+  volume stay empty. MATLAB fills the voxels with a NaN phase alone, by a scattered nearest
+  interpolant, and fills grains by fill(ebsd, grains), which the port's fill of a volume does
+  not take.
+
+  Input
+    ebsd - EBSD3
+  Output
+    ebsd - EBSD3square, a copy of the gridded volume
+  Keywords
+    extrapolate - fill every empty voxel, also those connected to the outside of the volume
+  See also
+    EBSD.fill, EBSD3.gridify, EBSD3.interp"""
   from scipy.ndimage import distance_transform_edt, label
   g = ebsd.gridify().copy()
   empty = ~g.isIndexed | g.isPadding

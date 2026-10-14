@@ -46,7 +46,25 @@ def _name(key):
 
 def sectionIndex(x, values, tol, period=np.inf):
   """the section a coordinate falls in, or -1 when it falls beside every one: the distance to
-  a section value taken over the period of the coordinate"""
+  a section value taken over the period of the coordinate
+
+    k = sectionIndex(x, values, tol)                      # the nearest section within tol, -1 beside every one
+    k = sectionIndex(x, values, tol, period=360*degree)   # a coordinate that wraps, 359 degree next to 0
+
+  Every coordinate is compared with every section value; the nearest one is taken when it
+  lies within tol, else -1. With a finite period the distance is taken modulo the period,
+  so the sections of an angle that turns are found across its seam.
+
+  Input
+    x - array of coordinates, the angles that pick the section
+    values - the section values
+    tol - the largest distance from a section value that still falls into it
+  Output
+    k - int array of the shape of x, the index of the section or -1
+  Keywords
+    period - the period of the coordinate, inf for one that does not wrap
+  See also
+    sectionTolerance, ODFSections, newODFSectionPlot"""
   x = np.asarray(x, dtype=float)
   d = x[..., None] - np.asarray(values, dtype=float)
   if np.isfinite(period):
@@ -116,12 +134,41 @@ class ODFSections:
     return 1.0
 
   def sectionField(self, k, resolution=15 * degree):
-    """the directions and vectors of a field drawn over section k, None for sections without one"""
+    """the directions and vectors of a field drawn over section k, None for sections without one
+
+      oS.sectionField(k)   # None: Euler and axis angle sections carry no field
+
+    Only the pole figure sections draw a field over their charts, pfSections.sectionField;
+    every other kind of section returns None.
+
+    Input
+      k - int, the index of the section
+    Output
+      None
+    Keywords
+      resolution - the spacing of the grid the field would be given on
+    See also
+      pfSections.sectionField, quiverSectionField"""
     return None
 
   def makeGrid(self, resolution=2.5 * degree):
-    """ori = oS.makeGrid(): the orientations of the nodes of every section chart, section by
-    section, at which values are computed for oS.plot(values), MATLAB's makeGrid"""
+    """the orientations of the nodes of every section chart, section by section, at which values
+    are computed for oS.plot(values); MATLAB's makeGrid
+
+      ori = oS.makeGrid()                      # the nodes at 2.5 degree
+      ori = oS.makeGrid(resolution=5*degree)   # a coarser grid
+      oS.plot(odf.eval(ori))                   # values on the nodes drawn as sections
+
+    The nodes are the grids of the section charts, chart by chart, turned into orientations;
+    the sections remember the resolution and the node counts, so oS.plot(values) splits the
+    values onto the charts again.
+
+    Output
+      ori - orientation, a list of the nodes of every chart in turn
+    Keywords
+      resolution - the spacing of the grid on every chart
+    See also
+      plotSection, sphericalProjection.grid"""
     oris, counts = [], []
     for k in range(self.numSections):
       for proj in self.sectionCharts(k):
@@ -432,7 +479,27 @@ class pfSections(ODFSections):
 
   def sectionData(self, ori, withRotation=False):
     """where the symmetric equivalents of orientations fall: the direction of ori * h1, the section
-    of the twist of ori * h2 and the index of the orientation; withRotation=True adds the rotations"""
+    of the twist of ori * h2 and the index of the orientation; withRotation=True adds the rotations
+
+      v, k, src = oS.sectionData(ori)                       # the points of every equivalent in its section
+      v, k, src, q = oS.sectionData(ori, withRotation=True)  # with the quaternions of the equivalents
+
+    Every orientation is symmetrised; an equivalent falls into the section whose twist angle
+    of ori * h2 about ori * h1, measured against the reference field, lies within oS.tol of
+    the section's angle, and is drawn at ori * h1. Equivalents beside every section are left
+    out.
+
+    Input
+      ori - orientation between oS.frameA and oS.frameB
+    Output
+      v - vector3d of the specimen frame, the direction ori * h1 of every equivalent kept
+      k - int array, the section of every equivalent kept
+      src - int array, the index into ori.flatten() every equivalent came from
+      q - (n, 4) array, the quaternions of the equivalents kept (withRotation=True only)
+    Keywords
+      withRotation - also return the quaternions of the equivalents
+    See also
+      pfSections, sigmaSections, plotSection"""
     q, src = _equivalents(ori)
     v = vector3d(qrot(q, np.tile(self.h1.data, (len(q), 1))), isNormalized=True)
     w = vector3d(qrot(q, np.tile(self.h2.data, (len(q), 1))), isNormalized=True)
@@ -443,7 +510,24 @@ class pfSections(ODFSections):
     return out + (q[keep],) if withRotation else out
 
   def sectionField(self, k, resolution=15 * degree):
-    """the reference field turned into the section, at an equispaced grid of its region"""
+    """the reference field turned into the section, at an equispaced grid of its region
+
+      v, d = oS.sectionField(0)                         # the field of the first section
+      v, d = oS.sectionField(1, resolution=10*degree)   # on a coarser grid
+
+    The field shows where ori * h2 points for an orientation to belong to section k: the
+    reference field of the plotting convention turned about every direction by the section's
+    twist angle. quiverSectionField draws it.
+
+    Input
+      k - int, the index of the section
+    Output
+      v - vector3d, the grid directions inside the region of the chart
+      d - vector3d, the field at them
+    Keywords
+      resolution - the spacing of the equispaced grid
+    See also
+      sigmaSections, quiverSectionField"""
     g = equispacedS2Grid(resolution=resolution)
     vs = vector3d(g.data[self.sR.checkInside(g)], isNormalized=True)
     return vs, self.twisted(vs, self.values[k])
@@ -570,7 +654,32 @@ SECTION_OPTIONS = ("sections", "tol", "phi1", "phi2", "alpha", "gamma", "sigma",
 
 def newODFSectionPlot(frameA, frameB=None, kind=None, **kwargs):
   """the sections a plot uses: phi2 sections against a specimen, axis angle sections between
-  two crystals, or the kind named (MATLAB newODFSectionPlot)"""
+  two crystals, or the kind named (MATLAB newODFSectionPlot)
+
+    oS = newODFSectionPlot(cs, ss)                              # phi2 sections
+    oS = newODFSectionPlot(cs, cs)                              # axis angle sections of misorientations
+    oS = newODFSectionPlot(cs, ss, 'phi1', sections=4)          # four phi1 sections
+    oS = newODFSectionPlot(cs, ss, 'sigma', sigma=[0, 30*degree])  # sigma sections at given angles
+    oS = newODFSectionPlot(cs, ss, 'pf', h1=Miller(1,1,1,cs), h2=Miller(1,-1,0,cs), sections=3)  # pole figure sections
+
+  The kind is one of 'phi1', 'phi2', 'alpha', 'gamma' (Euler sections), 'sigma' or 'omega'
+  (sigmaSections), 'pf' (pfSections) and 'axisAngle' (axisAngleSections), in any case, or
+  sections already made, which are returned as they are. The keywords the kind takes are
+  passed on: sections, tol, the section angles by the name of the kind (phi2=..., sigma=...,
+  angles=...), maxPhi, maxAzimuth, maxOmega, h1, h2, and antipodal and volumeScaling for axis
+  angle sections; any other keyword is dropped, so the options of a plot can be passed whole.
+
+  Input
+    frameA - the first frame, the crystal frame
+    frameB - the second frame, a specimen frame or a second crystal frame; by default the
+        session's specimen frame
+  Output
+    oS - ODFSections, phi2Sections, sigmaSections, axisAngleSections, ...
+  Keywords
+    kind - the name of the section kind, or ODFSections; by default phi2 against a specimen
+        and axisAngle between two crystals
+  See also
+    phi2Sections, sigmaSections, pfSections, axisAngleSections, plotSection"""
   frameB = specimenFrame.default if frameB is None else frameB
   if isinstance(kind, ODFSections):
     return kind

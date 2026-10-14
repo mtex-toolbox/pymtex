@@ -128,7 +128,28 @@ class grain3Boundary:
                           self.misrotation.data.reshape(-1, 4)[rows], self.CSList, self.frame, self.scanUnit, self.id[rows])
 
   def hasPhase(self, a, b=None):
-    """the faces with a phase on one side, or between two phases, by name, frame or number"""
+    """the boundary faces with a phase on one side, or between two phases; MATLAB's hasPhase
+    of the boundaries
+
+      ind = gB.hasPhase('Iron')                                # a face of an Iron grain
+      ind = gB.hasPhase('Iron', 'Iron')                        # between two Iron grains
+      ind = gB.hasPhase('notIndexed')                          # at the outside or a not indexed region
+      ind = gB.hasPhase(1)                                     # a phase by its number
+
+    A phase is given by its mineral name, its crystal frame or its number in gB.CSList.
+    'indexed', when no mineral has the name, selects the faces with both sides indexed and
+    'notIndexed' the others, those with a side of phase 0: the outside of the volume or a not
+    indexed region.
+
+    Input
+      gB - grain3Boundary
+      a - a phase: mineral name, crystalFrame or phase number
+    Output
+      ind - boolean mask of the faces
+    Keywords
+      b - a second phase: the faces between a and b
+    See also
+      grain3Boundary.hasGrain, grainBoundary.hasPhase"""
     if b is None and isinstance(a, str) and a.lower() in ("indexed", "notindexed") and a.lower() not in [m.lower() for m in self.CSList.mineralList]:
       inside = np.all(self.phaseId > 0, axis=1)
       return inside if a.lower() == "indexed" else ~inside
@@ -139,7 +160,24 @@ class grain3Boundary:
     return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
   def flip(self, sel=None):
-    """the two sides exchanged, of all faces or a selection, as MATLAB's flip"""
+    """the boundary faces with their two sides exchanged, of all faces or a selection; MATLAB's
+    flip of grain3Boundary
+
+      gB = gB.flip()                                           # every face
+      gB = gB.flip(gB.hasGrain(1))                             # the faces of grain 1
+
+    The grain ids, the voxel ids and the phase ids of the two sides change places and the
+    misrotation is inverted. The corners and so the normals stay; flipN turns those. The
+    boundary is copied.
+
+    Input
+      gB - grain3Boundary
+    Output
+      gB - grain3Boundary
+    Keywords
+      sel - the faces to flip, a boolean mask or indices; by default every face
+    See also
+      grain3Boundary.flipN, grainBoundary.flip"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
     gB = self._copy()
     for a in (gB.grainId, gB.ebsdId, gB.phaseId):
@@ -149,7 +187,24 @@ class grain3Boundary:
     return gB
 
   def flipN(self, sel=None):
-    """the faces turned round: the corners in the reverse order, the normals the other way"""
+    """the boundary faces turned round, their normals pointing the other way; MATLAB's flipN of
+    grain3Boundary
+
+      gB = gB.flipN()                                          # every face
+      gB = gB.flipN(gB.hasGrain(1, 2))                         # the faces between grains 1 and 2
+
+    The corners of a face are put in the reverse order, so its normal gB.N points the other
+    way; a face selected twice is turned twice. The sides, grainId and phaseId, stay; flip
+    exchanges those. Unlike MATLAB, which turns only triangulated faces, any polygon is turned.
+
+    Input
+      gB - grain3Boundary
+    Output
+      gB - grain3Boundary
+    Keywords
+      sel - the faces to turn, a boolean mask or indices; by default every face
+    See also
+      grain3Boundary.flip"""
     rows = np.arange(len(self)) if sel is None else np.arange(len(self))[sel]
     gB = self._copy()
     # a face named twice is turned twice
@@ -258,7 +313,24 @@ class grain3Boundary:
     return orientation(rotation._fromData(q), self.CSList[a], self.CSList[b], antipodal=a == b)
 
   def hasGrain(self, g, h=None):
-    """whether a face touches a grain, or lies between two"""
+    """the boundary faces of a grain, or between two grains
+
+      ind = gB.hasGrain(1)                                     # the faces of grain 1
+      ind = gB.hasGrain([1, 2])                                # the faces of grain 1 or 2
+      ind = gB.hasGrain(1, 2)                                  # the faces between grains 1 and 2
+
+    The grains are given by their ids, grains.id. MATLAB's grain3Boundary has no hasGrain; the
+    faces of grains are there selected through grains.boundary.
+
+    Input
+      gB - grain3Boundary
+      g - a grain id, or a list of them
+    Output
+      ind - boolean mask of the faces
+    Keywords
+      h - a second grain id: the faces between g and h
+    See also
+      grain3Boundary.hasPhase, grain3d.neighbors"""
     if h is None:
       return np.isin(self.grainId, np.atleast_1d(g)).any(axis=1)
     return ((self.grainId[:, 0] == g) & (self.grainId[:, 1] == h)) | ((self.grainId[:, 0] == h) & (self.grainId[:, 1] == g))

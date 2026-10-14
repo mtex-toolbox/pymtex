@@ -84,9 +84,20 @@ class quaternion(MtexArray):
     (w - sin w) / pi, the axis uniform; rng= a NumPy random generator
 
       rot = rotation.rand()                            # one
-      rot = rotation.rand(100)
+      rot = rotation.rand(100)                         # a list of 100
       rot = rotation.rand(10, 3)                       # a 10 x 3 array
-      rot = rotation.rand(100, maxAngle=10*degree)"""
+      rot = rotation.rand(100, maxAngle=10*degree)     # within 10 degree of the identity
+      rot = rotation.rand(100, rng=np.random.default_rng(0))  # reproducible
+
+    Input
+      shape - the sizes of the array, one tuple or several integers
+    Output
+      rot - quaternions of the class it is called on, rotation or quaternion
+    Keywords
+      rng - the NumPy random generator, a fresh one by default
+      maxAngle - the largest rotational angle about the identity
+    See also
+      orientation.rand, vector3d.rand, rotation.id"""
     rng = np.random.default_rng() if rng is None else rng
     shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
     if maxAngle is not None and maxAngle < np.pi:
@@ -208,15 +219,39 @@ class quaternion(MtexArray):
     return self._new(self.data / self.norm()[..., None])
 
   def dot(self, other, antipodal=True):
-    """the inner product of the coefficients"""
+    """the inner product of the coefficients
+
+      d = dot(q1, q2)                               # a b + ... + d d of the coefficients
+
+    The plain inner product of the quaternions as vectors of R^4, signed: q and -q give
+    opposite values. rotation.dot takes its absolute value.
+
+    Input
+      q1, q2 - quaternion
+    Output
+      d - the inner products
+    Keywords
+      antipodal - not used by quaternions, which keep the sign; taken so that the call is
+          the one of rotations
+    See also
+      rotation.dot, quaternion.angle"""
     return np.sum(self.data * self._coerce(other).data, axis=-1)
 
   def angle(self, other=None):
     """the rotational angle in [0, pi], or the angle between two, both from atan2 forms that
     keep their digits near 0 and pi
 
-      omega = angle(q)
-      omega = angle(q1, q2)"""
+      omega = angle(q)                              # the rotational angle
+      omega = angle(q1, q2)                         # the angle of q1^-1 q2, between the two
+
+    Input
+      q - quaternion
+      other - quaternion, the second one; the angle is that of the rotation from one to the
+          other
+    Output
+      omega - the angles in radians
+    See also
+      quaternion.axis, quaternion.dot, orientation.angle"""
     if other is None:
       return quatAngle(self.data)
     return chordAngle(self.data, other.data[..., :4])
@@ -234,7 +269,23 @@ class quaternion(MtexArray):
     return np.all(self.data[..., :4] == other.data[..., :4], axis=-1)
 
   def isclose(self, other, tol=5e-4):
-    """equal within the angular tolerance tol, MATLAB's eq"""
+    """equal within the angular tolerance tol, MATLAB's eq
+
+      b = q1.isclose(q2)                            # equal up to 5e-4
+      b = q1.isclose(q2, tol=1e-2)                  # a coarser tolerance
+
+    True where the inner product of the coefficients exceeds cos(tol), as MATLAB's eq; for
+    unit quaternions the angle between them is below 2 tol. A quaternion and its negative
+    are not close; rotation.isclose takes them as one. The operator == compares exactly.
+
+    Input
+      q1, q2 - quaternion
+    Output
+      b - boolean array
+    Keywords
+      tol - the tolerance, an angle
+    See also
+      rotation.isclose, quaternion.dot"""
     return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):
@@ -249,8 +300,22 @@ class quaternion(MtexArray):
   def Euler(self, convention: EulerConventionName | Any = None):
     """the Euler angles (alpha, beta, gamma) in the convention named, the session's by default
 
-      phi1, Phi, phi2 = rot.Euler()
-      alpha, beta, gamma = rot.Euler('ZYZ')"""
+      phi1, Phi, phi2 = rot.Euler()                 # the session's convention, Bunge by default
+      alpha, beta, gamma = rot.Euler('ZYZ')         # Matthies' convention
+
+    The conventions are 'Bunge' or 'ZXZ', 'Matthies', 'ZYZ' or 'ABG', 'Roe', 'Kocks',
+    'Canova' and 'nfft'; the default is the preference 'EulerAngleConvention'. Where the
+    second angle is 0 only the sum of the first and third is determined, and the first takes
+    it.
+
+    Input
+      rot - quaternion
+    Output
+      alpha, beta, gamma - three arrays of angles in radians in the shape of rot
+    Keywords
+      convention - the name of the convention
+    See also
+      rotation.byEuler, quaternion.Rodrigues, quaternion.matrix"""
     return quat2euler(self.data, convention)
 
   @property
@@ -285,12 +350,52 @@ class quaternion(MtexArray):
     return vector3d(homo2cubo(quat2homochoric(self.data)))
 
   def log(self, ref=None, side="left"):
-    """the tangent vector pointing from the reference, the identity by default, to this rotation"""
+    """the tangent vector pointing from the reference, the identity by default, to this rotation
+
+      t = log(rot)                                  # the rotation vector at the identity
+      t = log(rot, rotRef)                          # the tangent vector at a reference
+      t = log(rot, rotRef, side='right')            # in the frame of the reference's crystal
+      t = log(rot, 'right')                         # the side alone, at the identity
+
+    The logarithmic map: the vector, of length the rotational angle, whose exponential at the
+    reference gives the rotation. On the left side the vector is that of rot * inv(rotRef),
+    in the specimen's coordinates; on the right that of inv(rotRef) * rot, in the crystal's.
+    orientation.log reduces the pair by the symmetry first.
+
+    Input
+      rot - rotation
+      ref - rotation, the reference, or 'left' or 'right' for the side alone
+    Output
+      t - SO3TangentVector at the reference
+    Keywords
+      side - 'left' or 'right', the side the tangent vector is taken on
+    See also
+      quaternion.exp, SO3TangentVector, geodesic"""
     from .tangent import logRotation
     return logRotation(self, ref, side)
 
   def exp(self, v, side=None):
-    """the rotation a tangent vector at this reference points to, exp(ori, v) of MATLAB"""
+    """the rotation a tangent vector at this reference points to, exp(ori, v) of MATLAB
+
+      rot = exp(rotRef, v)                          # v a rotation vector in the specimen's coordinates
+      ori = exp(oriRef, Miller(...))                # a crystal direction, taken on the right
+      ori = exp(oriRef, v, side='right')            # v in the crystal's coordinates
+
+    The exponential map: the rotation exp(v) * ref on the left side, ref * exp(v) on the
+    right, so that log(exp(ref, v), ref) is v again. An SO3TangentVector carries its own
+    reference and side, and this reference is ignored. The vectors and the references must
+    have one shape; they do not broadcast.
+
+    Input
+      ref - rotation or orientation, the reference
+      v - vector3d, a rotation vector, or an SO3TangentVector
+    Output
+      rot - rotation or orientation of the frames of the reference
+    Keywords
+      side - 'left' or 'right'; by default right for a vector in a crystal frame, left
+          otherwise
+    See also
+      quaternion.log, vector3d.exp, SO3TangentVector"""
     from .tangent import SO3TangentVector
     # a tangent vector carries its reference, which is this rotation
     if isinstance(v, SO3TangentVector):
@@ -344,8 +449,24 @@ class quaternion(MtexArray):
     return _uniqueOutput(self._new(self.data.reshape(-1, self._ncoord)[iv]), iv, iu, return_index, return_inverse)
 
   def interp(self, values=None, *flags, **kwargs):
-    """interp(ori, values, 'harmonic' | 'bingham' | 'density'): a function on SO(3) through
-    values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp"""
+    """interp(ori, values, 'harmonic' | 'bingham'): a function on SO(3) through
+    values at the rotations, by the function spaces above this layer, MATLAB's rotation/interp
+
+      SO3F = ori.interp(values)                     # a sum of kernels about the nodes
+      SO3F = ori.interp(values, halfwidth=10*degree, density=True)  # a density by a given kernel
+      SO3F = ori.interp(values, 'harmonic', bandwidth=16)  # in harmonic form
+      SO3F = ori.interp(values, 'bingham')          # a Bingham distribution
+
+    The method is the flag, and every keyword goes on to it; interpSO3 lists them.
+
+    Input
+      ori - rotation or orientation, the nodes
+      values - the values at the nodes, or vectors for a vector field
+      flags - 'harmonic' or 'bingham'
+    Output
+      SO3F - SO3FunRBF, SO3FunHarmonic, SO3FunBingham or a vector field
+    See also
+      interpSO3, interpolateRBF, interpolate, calcBinghamODF"""
     from ..functions.rbfinterpolation import interpSO3
     return interpSO3(self, values, *flags, **kwargs)
 
@@ -571,7 +692,22 @@ class rotation(quaternion):
 
   @classmethod
   def map(cls, u1, v1, u2=None, v2=None):
-    """the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2"""
+    """the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2
+
+      rot = rotation.map(u1, v1)                    # the smallest rotation with rot * u1 || v1
+      rot = rotation.map(u1, v1, u2, v2)            # u1 onto v1 and u2 onto v2
+
+    With two pairs the angle between u1 and u2 must be that between v1 and v2, up to 1e-3,
+    and u1, u2 must not be colinear; an error is raised otherwise. The lengths of the vectors
+    do not matter.
+
+    Input
+      u1, v1 - vector3d
+      u2, v2 - vector3d, a second pair
+    Output
+      rot - rotation
+    See also
+      rotation.fit, rotation.byAxisAngle, rotation.byMatrix"""
     if u2 is None:
       return cls._fromData(map1Kernel(_xyz(u1), _xyz(v1)))
     return cls._fromData(map2Kernel(_xyz(u1), _xyz(v1), _xyz(u2), _xyz(v2)))
@@ -579,7 +715,32 @@ class rotation(quaternion):
   @classmethod
   def fit(cls, u, v, weights=None, method="horn"):
     """the rotation best mapping the list u onto the list v, by Horn's quaternion method or
-    Kabsch's matrix method"""
+    Kabsch's matrix method
+
+      rot = rotation.fit(u, v)                      # rot * u is nearest v
+      rot = rotation.fit(u, v, weights=w)           # some pairs counting more
+      rot = rotation.fit(u, v, method='kabsch')     # by the singular value decomposition
+
+    The rotation maximising the weighted sum of <rot u_i, v_i> over the unit vectors: Horn's
+    method takes the largest eigenvector of a 4 x 4 matrix, Kabsch's the singular value
+    decomposition of the cross covariance; both give the same rotation. MATLAB's call is
+    rotation.fit(r, l) with l = rot * r, the same order. MATLAB's handling of antipodal
+    vectors is not ported: the vectors are taken with their sign.
+
+    Input
+      u, v - vector3d, lists of one length
+    Output
+      rot - rotation
+    Keywords
+      weights - one weight per pair
+      method - 'horn' or 'kabsch'
+    References
+      W. Kabsch, A solution for the best rotation to relate two sets of vectors, Acta Cryst.
+          A32 (1976) 922
+      B. K. P. Horn, Closed-form solution of absolute orientation using unit quaternions,
+          Journal of the Optical Society of America A 4 (1987) 629
+    See also
+      rotation.map, rotation.byMatrix"""
     return cls._fromData(fitKernel(_xyz(u), _xyz(v), weights, method))
 
   @classmethod
@@ -599,8 +760,19 @@ class rotation(quaternion):
     """the list of the operands, MATLAB's [r1, r2]; joining rotations with an improper transform
     gives an orthogonalTransform, orientations stay orientations between the same frames
 
-      rot = cat(rot1, rot2)
-      rot = cat(rot1, rot2, axis=1)    # side by side"""
+      rot = cat(rot1, rot2)            # one after the other
+      rot = cat(rot1, rot2, axis=1)    # side by side
+
+    Orientations must share their frames.
+
+    Input
+      arrays - the rotations, orientations or orthogonal transforms
+    Output
+      rot - the joined list, of the class of the operands
+    Keywords
+      axis - the axis along which they are joined, as NumPy's concatenate
+    See also
+      vector3d.cat"""
     if any(isinstance(a, orthogonalTransform) for a in arrays):
       return orthogonalTransform.cat(*(a if isinstance(a, orthogonalTransform) else orthogonalTransform(a) for a in arrays), axis=axis)
     return super().cat(*arrays, axis=axis)
@@ -610,7 +782,22 @@ class rotation(quaternion):
     return self.conj()
 
   def dot(self, other, antipodal=True):
-    """the inner product up to sign, since q and -q are one rotation"""
+    """the inner product up to sign, since q and -q are one rotation
+
+      d = dot(rot1, rot2)                           # |cos(omega/2)| of the rotation between them
+      d = dot(rot1, rot2, antipodal=False)          # with the sign of the quaternions
+
+    The absolute value is cos(omega / 2) of the angle omega between the rotations; the
+    product with an improper transform is zero. orientation.dot reduces by the symmetry.
+
+    Input
+      rot1, rot2 - rotation
+    Output
+      d - the inner products
+    Keywords
+      antipodal - take the absolute value, q and -q being one rotation
+    See also
+      quaternion.dot, rotation.angle, orientation.dot"""
     d = np.sum(self.data * self._coerce(other).data, axis=-1)
     if isinstance(other, orthogonalTransform):
       d = d * ~other.isImproper
@@ -631,7 +818,23 @@ class rotation(quaternion):
     return np.all(a == b, axis=-1) | np.all(a == -b, axis=-1)
 
   def isclose(self, other, tol=5e-4):
-    """equal within the angular tolerance tol, MATLAB's eq"""
+    """equal within the angular tolerance tol, MATLAB's eq
+
+      b = rot1.isclose(rot2)                        # equal up to 5e-4
+      b = rot1.isclose(rot2, tol=1*degree)          # a coarser tolerance
+
+    True where |cos(omega / 2)| of the angle omega between them exceeds cos(tol), as
+    MATLAB's eq, so where omega is below 2 tol; q and -q are one rotation. An improper
+    transform is never close to a rotation. The operator == compares exactly.
+
+    Input
+      rot1, rot2 - rotation
+    Output
+      b - boolean array
+    Keywords
+      tol - the tolerance, an angle
+    See also
+      quaternion.isclose, rotation.dot, orientation.isclose"""
     if isinstance(other, orthogonalTransform):
       return orthogonalTransform(self, False).isclose(other, tol)
     return self.dot(other) > np.cos(tol)
@@ -809,8 +1012,18 @@ class orthogonalTransform(MtexArray):
   def angle(self, other=None):
     """the rotational angle of the rotational part, or the angle between the rotational parts of two
 
-      omega = angle(T)
-      omega = angle(T1, T2)"""
+      omega = angle(T)                              # the angle of the rotational part
+      omega = angle(T1, T2)                         # between the rotational parts
+
+    The parity is not looked at: a transform and its negative have the angle 0 between them.
+
+    Input
+      T - orthogonalTransform
+      other - orthogonalTransform or rotation, the second one
+    Output
+      omega - the angles in radians
+    See also
+      orthogonalTransform.dot, quaternion.angle"""
     return self.rot.angle(None if other is None else other.rot if isinstance(other, orthogonalTransform) else other)
 
   def axis(self):
@@ -820,12 +1033,37 @@ class orthogonalTransform(MtexArray):
     return self.rot.axis()
 
   def Euler(self, convention: EulerConventionName | Any = None):
-    """the Euler angles of the rotational part, in the convention named or the session's"""
+    """the Euler angles of the rotational part, in the convention named or the session's
+
+      phi1, Phi, phi2 = T.Euler()                   # the session's convention
+      alpha, beta, gamma = T.Euler('ZYZ')           # Matthies' convention
+
+    Input
+      T - orthogonalTransform
+    Output
+      alpha, beta, gamma - three arrays of angles in radians
+    Keywords
+      convention - the name of the convention, as quaternion.Euler
+    See also
+      quaternion.Euler"""
     return quat2euler(self.data[..., :4], convention)
 
   def dot(self, other, antipodal=True):
     """the inner product of the rotational parts up to sign, zero between transforms of different
-    parity; antipodal=False keeps the sign"""
+    parity; antipodal=False keeps the sign
+
+      d = dot(T1, T2)                               # |cos(omega/2)|, 0 for different parity
+      d = dot(T1, T2, antipodal=False)              # with the sign of the quaternions
+
+    Input
+      T1 - orthogonalTransform
+      T2 - orthogonalTransform or rotation
+    Output
+      d - the inner products
+    Keywords
+      antipodal - take the absolute value
+    See also
+      orthogonalTransform.isclose, rotation.dot"""
     q, p = self._other(other)
     d = np.sum(self.data[..., :4] * q, axis=-1) * (self.parity == p)
     return d if not antipodal else np.abs(d)
@@ -839,7 +1077,23 @@ class orthogonalTransform(MtexArray):
     return ((np.all(a == q, axis=-1) | np.all(a == -q, axis=-1)) & (self.parity == p))
 
   def isclose(self, other, tol=5e-4):
-    """equal within the angular tolerance tol and of one parity, MATLAB's eq"""
+    """equal within the angular tolerance tol and of one parity, MATLAB's eq
+
+      b = T1.isclose(T2)                            # equal up to 5e-4
+      b = T1.isclose(T2, tol=1*degree)              # a coarser tolerance
+
+    As rotation.isclose, the angle between the rotational parts below 2 tol, and the parities
+    equal.
+
+    Input
+      T1 - orthogonalTransform
+      T2 - orthogonalTransform or rotation
+    Output
+      b - boolean array
+    Keywords
+      tol - the tolerance, an angle
+    See also
+      orthogonalTransform.dot, rotation.isclose"""
     return self.dot(other) > np.cos(tol)
 
   def __ne__(self, other):

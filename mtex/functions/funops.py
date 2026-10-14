@@ -141,9 +141,27 @@ def _rotateS2(f, r):
 
 
 def transformODF(odfP, p2c, vSel=None):
-  """the child texture of a parent texture: the mean of the parent ODF over the parents every
-  child orientation can come from (MATLAB transformODF, called as variants(p2c, odf)); with
-  vSel, a function of the parent orientations, the parents weighted by it"""
+  """the child texture of a parent texture, the transformation texture; MATLAB's transformODF,
+  called as variants(p2c, odf)
+
+    odfC = transformODF(odfP, p2c)          # every variant equally likely
+    odfC = transformODF(odfP, p2c, vSel)    # the parents weighted by a function vSel
+
+  The child ODF at a child orientation is the mean of the parent ODF over the parent
+  orientations it can come from, one per variant of p2c, expanded to the bandwidth of the
+  parent ODF. With vSel the parents are weighted by its values at them, normalised to mean
+  one per child orientation. MATLAB's 'variantSelection' takes a weight per variant or the
+  number of one variant instead; the port has no such form.
+
+  Input
+    odfP - SO3Fun, the parent ODF
+    p2c - orientation, the parent to child orientation relationship
+  Output
+    odfC - SO3FunHarmonic, the child ODF in the child crystal frame
+  Keywords
+    vSel - an SO3Fun over the parent orientations, the variant selection
+  See also
+    orientation.variants, calcParent2Child, unimodalODF"""
   from ..geometry.quaternion import qmul
   PV = p2c.variants(parent=True).data.reshape(-1, 4)
 
@@ -373,8 +391,26 @@ def mapFun(op, f, *gs, bandwidth=None):
   """the harmonic function of op applied pointwise to f and gs, by quadrature at the sum of their
   bandwidths, capped by the preference, or at the given bandwidth
 
-    mapFun(np.exp, f)
-    mapFun(np.maximum, f, g, bandwidth=64)"""
+    h = mapFun(np.exp, f)                      # exp of one function
+    h = mapFun(np.maximum, f, g, bandwidth=64)  # the pointwise maximum of two, of bandwidth 64
+
+  op is evaluated at the nodes of a quadrature grid of the bandwidth, with the values of f and
+  gs as its arguments, and the result expanded again; the functions are on SO(3)
+  (SO3FunHarmonic), on the sphere (S2FunHarmonic) or on the circle (S1FunHarmonic) and must
+  share their frames. A list of functions on SO(3) gives a list, op reducing over the axes
+  after the nodes. It is what exp, log, sqrt, max and min of the harmonic functions use.
+
+  Input
+    op - a function of arrays, applied to the values
+    f - SO3FunHarmonic, S2FunHarmonic or S1FunHarmonic
+    gs - further functions of the same kind and frames
+  Output
+    h - the harmonic function of the kind of f
+  Keywords
+    bandwidth - the bandwidth of the result; by default the sum of the bandwidths, at most
+        the preference maxSO3Bandwidth, maxS2Bandwidth or maxS1Bandwidth
+  See also
+    SO3FunHarmonic.exp, SO3FunHarmonic.sqrt, max, SO3FunHarmonic.quadrature"""
   if isinstance(f, SO3FunHarmonic):
     for g in gs:
       f._sameFrames(g)

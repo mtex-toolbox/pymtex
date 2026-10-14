@@ -40,10 +40,26 @@ def _layoutOf(layout):
 
 
 def mapLayout(pC=None, plane=None):
-  """the layout a convention asks for: the components of east and north along the coordinates
-  of the map's plane (x and y without a plane), snapped to the signed permutation an axis
-  aligned convention is. A convention whose screen is not the plane, as the xy convention of a
-  map in the yz plane, draws the plane's own coordinates east and north."""
+  """the layout a convention asks for: the 2 x 2 matrix taking the in-plane coordinates of a map
+  to the screen, east to the right and north up
+
+    M = mapLayout()                                  # the default plotting convention
+    M = mapLayout('x↑→y')                            # x up, y to the right
+    M = mapLayout(pC, ebsd.lattice.plane)            # a map in another plane
+
+  The rows are the components of east and north along the coordinates of the map's plane (x
+  and y without a plane), snapped to the signed permutation an axis aligned convention is,
+  so that the picture is turned rather than resampled. A convention whose screen is not the
+  plane, as the xy convention of a map in the yz plane, draws the plane's own coordinates
+  east and north.
+
+  Output
+    M - a 2 x 2 array
+  Keywords
+    pC - plottingConvention, or the string of one; by default plottingConvention.default
+    plane - the plane of the map, whose e1 and e2 are its coordinates
+  See also
+    plottingConvention, mapRaster, mapCells, mapPoints"""
   pC = plottingConvention.default if pC is None else plottingConvention(pC)
   e, n = pC.east.data.reshape(3), pC.north.data.reshape(3)
   e1, e2 = (np.eye(3)[0], np.eye(3)[1]) if plane is None else (plane.e1, plane.e2)
@@ -119,13 +135,29 @@ def mapRaster(ebsd, maxPixels=16_000_000, layout=None):
   every pixel, the measurement whose cell covers it or -1 where none does, as an array of
   shape (ny, nx) with the first row at the bottom; None where the map is no picture
 
+    xs, ys, index = mapRaster(ebsd)                          # one pixel per cell
+    xs, ys, index = mapRaster(ebsd, maxPixels=10000)         # a coarser picture
+    xs, ys, index = mapRaster(ebsd, layout=mapLayout('x↑→y'))  # turned to another convention
+
   A pixel belongs to the cell of the nearest site: by rounding the lattice coordinates where
   the lattice is aligned with the screen and the parallelogram is the cell, and otherwise
   among the four corners of the lattice parallelogram it lies in, since on a hexagonal
   lattice the parallelogram is a rhombus and not the cell. One pixel per cell where the
   lattice is aligned with the screen, a quarter of the spacing elsewhere. A lattice the measurements
   have drifted from has no picture, judged at the scale of the picture with a hundredth of
-  a cell as the floor."""
+  a cell as the floor. The padding of a grid shows nothing.
+
+  Input
+    ebsd - EBSD
+  Output
+    xs, ys - the screen extent (lo, hi) of the picture in x and in y
+    index - array of shape (ny, nx), the measurement of every pixel, -1 for none
+  Keywords
+    maxPixels - the largest number of pixels; a larger picture is scaled down, its shape kept
+    layout - the 2 x 2 matrix taking the plane to the screen, mapLayout; by default the
+        identity
+  See also
+    mapCells, mapPoints, mapLayout, plotEBSD"""
   l = ebsd.lattice
   if l is None or len(l.ij) != ebsd.size or ebsd.size == 0:
     return None
@@ -201,10 +233,25 @@ def cornerSharing(l, cell):
 
 
 def mapCells(ebsd, layout=None):
-  """the corners of every cell of a map, shape (n, m, 2), on the screen: a corner is shared by
-  the cells around it and sits at the mean of where each of them puts it, the measured
-  centre plus the ideal offset to the corner. On a rigid grid that is the ideal corner;
-  under a stage drift the corners follow the centres, so the cells tile without gaps"""
+  """the corners of every cell of a map, shape (n, m, 2), on the screen
+
+    V = mapCells(ebsd)                               # four corners a cell on a square grid
+    V = mapCells(ebsd, layout=mapLayout('x↑→y'))     # turned to another convention
+
+  A corner is shared by the cells around it and sits at the mean of where each of them puts
+  it, the measured centre plus the ideal offset to the corner. On a rigid grid that is the
+  ideal corner; under a stage drift the corners follow the centres, so the cells tile without
+  gaps. A map on no lattice is refused.
+
+  Input
+    ebsd - EBSD on a lattice
+  Output
+    V - array of shape (n, m, 2), the m corners of the cell of each of the n measurements
+  Keywords
+    layout - the 2 x 2 matrix taking the plane to the screen, mapLayout; by default the
+        identity
+  See also
+    mapRaster, mapPoints, mapLayout"""
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it has no cells to draw")
@@ -231,7 +278,20 @@ def mapCells(ebsd, layout=None):
 
 
 def mapPoints(ebsd, layout=None):
-  """the measurements as points on the screen"""
+  """the measurements as points on the screen
+
+    P = mapPoints(ebsd)                              # the positions in the map's plane
+    P = mapPoints(ebsd, mapLayout('x↑→y'))           # turned to another convention
+
+  Input
+    ebsd - EBSD
+  Output
+    P - array of shape (n, 2)
+  Keywords
+    layout - the 2 x 2 matrix taking the plane to the screen, mapLayout; by default the
+        identity
+  See also
+    mapRaster, mapCells"""
   return planeOf(ebsd).to2d(ebsd.pos.data.reshape(-1, 3)) @ _layoutOf(layout).T
 
 
@@ -265,7 +325,24 @@ def grainPolygons(g, k):
 
 
 def mapExtent(x, layout=None):
-  """the extent of what a map plot has to show, on the screen: (xlo, xhi, ylo, yhi)"""
+  """the extent of what a map plot has to show, on the screen: (xlo, xhi, ylo, yhi)
+
+    e = mapExtent(ebsd)                              # a map
+    e = mapExtent(grains, layout=mapLayout('x↑→y'))  # grains, turned to another convention
+
+  A map reaches a lattice spacing beyond its outer measurements, the padding of a grid left
+  out; grains end at the vertices of their boundary, a boundary or a list of triple points at
+  its vertices. Nothing to show gives zeros.
+
+  Input
+    x - EBSD, grain2d, grainBoundary or triplePointList
+  Output
+    e - (xlo, xhi, ylo, yhi)
+  Keywords
+    layout - the 2 x 2 matrix taking the plane to the screen, mapLayout; by default the
+        identity
+  See also
+    scaleBar, mapLayout"""
   M = _layoutOf(layout)
   # a map reaches half a spacing beyond its outer measurements, anything else ends at its vertices
   r = 0.0
@@ -323,7 +400,27 @@ def switchUnit(x, unit):
 
 def scaleBar(x, unit="um", fraction=0.1):
   """how long a scale bar of a map should be, in the coordinates the map is drawn in, and how
-  it reads: a round number near a tenth of the width, in the unit that keeps it readable"""
+  it reads: a round number near a tenth of the width, in the unit that keeps it readable
+
+    length, label = scaleBar(ebsd)                   # (5000.0, '5 mm') for a map 36.6 mm wide
+    length, label = scaleBar(36550.0, 'um', fraction=0.2)  # from a width in a unit
+    length, label = scaleBar(0.5, 'mm')              # (0.05, '50 µm')
+
+  The fraction of the width is brought to the unit among nm, µm, mm and m that keeps its
+  number between one and a thousand and rounded to the nearest of 1, 2, 5, 10, 15, 20, 25,
+  50, 75, 100, 125, 150, 200, 500, 750. A map, grains or boundary give their width on the
+  screen and their scanUnit.
+
+  Input
+    x - the width of the map, or the map, grains or boundary
+  Output
+    length - the length of the bar in the units of the map
+    label - its text, as '5 mm'
+  Keywords
+    unit - the unit of a width given as a number
+    fraction - the length aimed at, as a fraction of the width
+  See also
+    mapExtent, plotEBSD"""
   if not isinstance(x, (int, float, np.floating, np.integer)):
     e = mapExtent(x)
     return scaleBar(e[1] - e[0], getattr(x, "scanUnit", "um"), fraction)
@@ -337,7 +434,20 @@ def scaleBar(x, unit="um", fraction=0.1):
 def frameOnScreen(pl, layout=None):
   """the (right, up, towards the viewer) components of the axes of the frame in the picture of
   a map: the plane's coordinates taken to the screen by the layout, and the normal towards
-  the viewer, who looks from the other side of the plane when the layout flips it"""
+  the viewer, who looks from the other side of the plane when the layout flips it
+
+    s = frameOnScreen(ebsd.lattice.plane)                     # x, y, z under the identity
+    s = frameOnScreen(ebsd.lattice.plane, mapLayout('x↑→y'))  # z pointing away
+
+  Input
+    pl - the plane of the map
+  Output
+    s - a list of three (right, up, out) triples, for x, y and z
+  Keywords
+    layout - the 2 x 2 matrix taking the plane to the screen, mapLayout; by default the
+        identity
+  See also
+    triadGeometry, mapLayout"""
   M = _layoutOf(layout)
   side = np.sign(np.linalg.det(M))
   n = pl.normal
@@ -355,7 +465,23 @@ def triadGeometry(screen, labels, t=1.0):
   the plane, a circle for an axis leaving the plane with its label inside, crossed by four
   spokes when it points away from the viewer, and a label beside every arrow. Returns the
   arrows as polygons, the symbol as a polyline with NaN breaks, the labels with their
-  positions, and the bounding box (umin, umax, vmin, vmax)"""
+  positions, and the bounding box (umin, umax, vmin, vmax)
+
+    arrows, symbol, texts, bbox = triadGeometry(frameOnScreen(pl), ['x', 'y', 'z'])  # in text heights
+    arrows, symbol, texts, bbox = triadGeometry(screen, labels, t=2.0)  # twice as large
+
+  Input
+    screen - the (right, up, out) triples of the axes, frameOnScreen
+    labels - the label of every axis
+  Output
+    arrows - a list of polygons of shape (7, 2)
+    symbol - array of shape (m, 2), the circle and its spokes, NaN rows between pieces
+    texts - a list of (position, label)
+    bbox - (umin, umax, vmin, vmax)
+  Keywords
+    t - the height of the text, the unit of the drawing
+  See also
+    frameOnScreen, scaleBar"""
   arm, shaftHalf = 1.2 * t, t / 8
   headHalf, headLen = 3 * shaftHalf, 0.36 * t
   symR, pad = 0.46 * t, 0.45 * t

@@ -298,7 +298,18 @@ def _currentAxes(fig):
 
 
 def gcs(fig=None):
-  """the scene of the current axes of a figure, None when it holds none"""
+  """the scene of the current axes of a figure, the 3D scene a plot of a volume, of 3D grains
+  or of maps in several planes draws into; None when the axes hold none
+
+    plot(grains3); s = gcs()                          # the scene of the current figure
+    s = gcs(fig)                                      # of another figure
+
+  Output
+    s - scene3d, its items the meshes, lines and pictures drawn
+  Keywords
+    fig - the mtexFigure, by default the current one
+  See also
+    show3d, exportHTML, setCamera"""
   return getattr(_currentAxes(gcm() if fig is None else fig), "_mtexScene", None)
 
 
@@ -405,10 +416,26 @@ def refresh(fig=None, ax=None):
 # ------------------------------------------------------------------ maps in space
 
 def mapPicture(sources, pixels=1600):
-  """the picture of two dimensional map plots on the rectangle of the plane they lie in: the
-  plots drawn by their own commands, one over the other, into an axes filling a figure pyplot
-  does not know, so that every option of the map plots holds in space too. The picture keeps
-  its sources, so that a map in the same plane is drawn into it rather than beside it."""
+  """the picture of two dimensional map plots on the rectangle of the plane they lie in, to be
+  shown in a 3D scene
+
+    pic = mapPicture([(plotEBSD, ebsdSlice, (), {})])  # the phase map of a slice in space
+    pic = mapPicture(sources, pixels=400)             # a coarser picture
+
+  The plots are drawn by their own commands, one over the other, into an axes filling a
+  figure pyplot does not know, so that every option of the map plots holds in space too;
+  white, where nothing was measured, is transparent. The picture keeps its sources, so that a
+  map in the same plane is drawn into it rather than beside it. A held figure does this
+  itself when a map of another plane is plotted into it.
+
+  Input
+    sources - a list of (plotFun, map, args, kw), the plot commands of maps in one plane
+  Output
+    pic - picture3d, the image with the corners it spans in space
+  Keywords
+    pixels - the length of the picture's longer side in pixels
+  See also
+    gcs, setCamera, EBSD3.slice"""
   from matplotlib.backends.backend_agg import FigureCanvasAgg
   from matplotlib.figure import Figure
 
@@ -513,7 +540,19 @@ def recordMap(ax, plotFun, x, args, kw):
 
 
 def show3d(fig=None, window_size=(900, 900)):
-  """show3d(): the scene of the current figure in an interactive PyVista window"""
+  """the scene of the current figure in an interactive PyVista window, rotated and zoomed with
+  the mouse
+
+    show3d()                                          # the scene of the current figure
+    show3d(fig, window_size=(600, 400))               # of another figure, in a smaller window
+
+  Output
+    p - the pyvista Plotter of the window
+  Keywords
+    fig - the mtexFigure holding the scene, by default the current one
+    window_size - the size of the window in pixels
+  See also
+    exportHTML, gcs, setCamera"""
   from .render3d import pyvistaPlotter
   s = gcs(fig)
   if s is None:
@@ -524,7 +563,21 @@ def show3d(fig=None, window_size=(900, 900)):
 
 
 def exportHTML(fname, fig=None, title="MTEX 3D plot"):
-  """exportHTML('grains.html'): the scene of the current figure as an interactive page"""
+  """the scene of the current figure written as an interactive three.js page, which a browser
+  rotates and zooms
+
+    exportHTML('grains.html')                         # the scene of the current figure
+    exportHTML('grains.html', fig=fig, title='Iron grains')  # of another figure, with a title
+
+  Input
+    fname - the name of the HTML file
+  Output
+    fname - the file written
+  Keywords
+    fig - the mtexFigure holding the scene, by default the current one
+    title - the title of the page
+  See also
+    show3d, gcs, saveFigure"""
   s = gcs(fig)
   if s is None:
     raise ValueError("the current figure holds no 3D scene")

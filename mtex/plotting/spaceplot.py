@@ -113,8 +113,25 @@ def _camera(ax, pC):
 
 
 def setCamera(how2plot=None, ax=None):
-  """setCamera(how2plot): the 3D view of the current axes looking down how2plot.outOfScreen,
-  with how2plot.north up; without a convention the default one"""
+  """the 3D view of the current axes looking down how2plot.outOfScreen, with how2plot.north up;
+  without a convention the default one; MATLAB's setCamera
+
+    setCamera()                                    # the view of the default convention
+    setCamera(plottingConvention('x↑→y'))          # x up and y to the right
+    setCamera(plottingConvention('z↑→x'), ax=ax)   # the view of a given 3D axes
+
+  The camera is orthographic. A figure holding a 3D scene is drawn again from the new
+  camera, and a map seen from off its normal becomes a scene of the maps drawn into it.
+  Unlike MATLAB's setCamera(ax, how2plot), the axes come as a keyword and the convention
+  must be a plottingConvention, not its string.
+
+  Input
+    how2plot - plottingConvention; plottingConvention.default when None
+  Keywords
+    ax - the matplotlib 3D axes; by default the current scene or the last axes of the
+        current figure
+  See also
+    plottingConvention, plot3d, scatter3d"""
   import matplotlib.pyplot as plt
 
   from ..geometry.plottingconvention import plottingConvention

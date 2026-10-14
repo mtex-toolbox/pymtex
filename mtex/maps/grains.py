@@ -270,7 +270,29 @@ class grain2d(polygonSet):
   def neighbors(self, full=False, matrix=False):
     """the pairs of ids of grains sharing a boundary, both in the selection, or either with
     full; as a symmetric sparse matrix indexed by id with matrix; with other grains the pairs
-    of one of these and one of those"""
+    of one of these and one of those; MATLAB's grain2d.neighbors
+
+      pairs = grains.neighbors()                  # the pairs of neighbours among the grains
+      pairs = g1.neighbors(g2)                    # a grain of g1 beside a grain of g2
+      pairs = grains.neighbors(full=True)         # every neighbour, inside the selection or not
+      A = grains.neighbors(matrix=True)           # the adjacency matrix
+
+    A pair is listed once, the smaller id first; the rim of the map and a grain's own inner
+    boundary make no pair. With other grains the first column is the grain of these, the
+    second the one of those. The adjacency matrix is a symmetric boolean scipy.sparse matrix,
+    the row and column id - 1 for the grain id.
+
+    Input
+      grains - grain2d
+    Output
+      pairs - the grain ids, (n, 2)
+      A - scipy.sparse.csr_matrix (matrix=True)
+    Keywords
+      full - take the neighbours outside the selection as well; another grain2d in its place
+        gives the pairs between the two sets
+      matrix - the result as the adjacency matrix
+    See also
+      grain2d.numNeighbors, grainBoundary.selectByGrainId"""
     g = self.boundary.grainId
     a, b = g[:, 0], g[:, 1]
     # g1.neighbors(g2): the pairs with the first grain in g1 and the second in g2
@@ -314,8 +336,20 @@ class grain2d(polygonSet):
     return np.isin(self.id, rim[rim > 0])
 
   def subBoundarySize(self, sel=None):
-    """the inner boundary of every grain: how many segments and how much length of the
-    subgrain boundaries lie in it"""
+    """the inner boundary of every grain: how many segments of the subgrain boundaries lie in
+    it; MATLAB's grain2d.subBoundarySize
+
+      n = grains.subBoundarySize()                                      # every inner segment
+      n = grains.subBoundarySize(grains.innerBoundary.segLength > 40)   # the segments selected
+
+    Input
+      grains - grain2d
+    Output
+      n - the number of inner boundary segments per grain
+    Keywords
+      sel - a mask or the indices of the inner boundary segments counted, all when not given
+    See also
+      grain2d.subBoundaryLength, grain2d.neighbors"""
     ib = self.innerBoundary
     sel = np.ones(len(ib), dtype=bool) if sel is None else sel
     counts = np.bincount(ib.grainId[sel, 0], minlength=int(self.id.max(initial=0)) + 1)
@@ -323,7 +357,19 @@ class grain2d(polygonSet):
 
   def subBoundaryLength(self, sel=None):
     """the length of the subgrain boundaries inside every grain, of the inner boundary segments sel
-    selects if given"""
+    selects if given; MATLAB's grain2d.subBoundaryLength
+
+      L = grains.subBoundaryLength()                                      # every inner segment
+      L = grains.subBoundaryLength(grains.innerBoundary.segLength > 40)   # the segments selected
+
+    Input
+      grains - grain2d
+    Output
+      L - the length of the inner boundary per grain, in the units of the map
+    Keywords
+      sel - a mask or the indices of the inner boundary segments summed, all when not given
+    See also
+      grain2d.subBoundarySize, grain2d.neighbors"""
     ib = self.innerBoundary
     sel = np.ones(len(ib), dtype=bool) if sel is None else sel
     L = np.bincount(ib.grainId[sel, 0], weights=ib.segLength[sel], minlength=int(self.id.max(initial=0)) + 1)

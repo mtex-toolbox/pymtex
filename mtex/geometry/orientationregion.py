@@ -109,7 +109,24 @@ class orientationRegion:
     return self.frameB
 
   def checkInside(self, o, tol=2e-3):
-    """whether orientations lie inside the region, up to the tolerance, as a boolean array"""
+    """whether orientations lie inside the region, up to the tolerance, as a boolean array
+
+      inside = oR.checkInside(ori)                  # the orientations inside the region
+      inside = oR.checkInside(ori, tol=1*degree)    # a wider margin at the boundary
+
+    A point counts as inside when it violates no bound of the region by more than half the
+    tolerance, an angle; the sector of axes, where the region has one, is checked with the
+    same tolerance.
+
+    Input
+      oR - orientationRegion
+      o - orientation, rotation or quaternions as an (..., 4) array
+    Output
+      inside - boolean array in the shape of o
+    Keywords
+      tol - the tolerance at the boundary of the region, MATLAB's 'tolerance'
+    See also
+      orientationRegion, fundamentalRegion, projectIntoFundamentalRegion"""
     q = o.data if isinstance(o, MtexArray) else np.asarray(o, dtype=float)
     t = tol / 2
     inside = regionMembership(q, self.N, 1, t, 0.0)[0].reshape(q.shape[:-1])
@@ -120,7 +137,25 @@ class orientationRegion:
   def axisSector(self, omega, sector="own"):
     """the sector of rotation axes the region allows at a fixed rotation angle: a bound with
     N = (-sin(w_i/4), cos(w_i/4) a_i) reads for q = (cos(w/2), sin(w/2) v) as
-    dot(v, a_i) <= cot(w/2) tan(w_i/4), a small circle about the axis"""
+    dot(v, a_i) <= cot(w/2) tan(w_i/4), a small circle about the axis
+
+      sR = oR.axisSector(40*degree)                 # the axes of a 40 degree rotation in the region
+      sR = oR.axisSector(40*degree, sector=None)    # without the region's own sector of axes
+
+    The bounds whose small circle covers every axis at this angle drop out; the remaining
+    circles are joined with a sector of axes, by default the region's own, the sector its
+    symmetry leaves for the axes.
+
+    Input
+      oR - orientationRegion
+      omega - the rotation angle
+    Output
+      sR - sphericalRegion of the axes, in the first frame of the region
+    Keywords
+      sector - the sphericalRegion the axes are restricted to as well, 'own' the region's own
+          sector, None no restriction
+    See also
+      orientationRegion.maxAngle, sphericalRegion"""
     sector = self.sector if sector == "own" else sector
     t = np.inf if omega <= 0 else 1 / np.tan(omega / 2)
     v = self.N[:, 1:]
@@ -135,7 +170,26 @@ class orientationRegion:
 
   def maxAngle(self, v=None, hits=2000):
     """the largest rotation angle inside the region, at a vertex of it in Rodrigues space, or
-    about a given axis"""
+    about a given axis
+
+      omega = oR.maxAngle()                         # the largest angle in the region
+      omega = oR.maxAngle(vector3d(1, 1, 1))        # the largest angle about an axis
+
+    Without an axis the angle is found exactly at the vertices of the region in Rodrigues
+    space; only a region whose sector of axes has caps is sampled, by random rotations until
+    hits of them fall inside. About an axis it is the least angle at which a bound is met, 0
+    for an axis outside the region's sector of axes, where MATLAB first projects the axis into
+    the sector.
+
+    Input
+      oR - orientationRegion
+      v - vector3d, a single rotation axis
+    Output
+      omega - the angle in radians
+    Keywords
+      hits - the number of random rotations inside the region the sampling waits for
+    See also
+      maxAngle, orientationRegion.axisSector"""
     if v is not None:
       d = v.normalize().data if isinstance(v, vector3d) else np.asarray(v, dtype=float) / np.linalg.norm(v)
       if self.sector is not None and not self.sector.checkInside(d):
@@ -178,7 +232,21 @@ class orientationRegion:
   def edges(self, points=40, tol=1e-9):
     """the edges of the region, each a chain of points in axis angle coordinates in radians:
     every pair of planes meets in a line of Rodrigues space, kept where the other planes
-    allow it; an open region is cut at a turn of nearly 180 degrees"""
+    allow it; an open region is cut at a turn of nearly 180 degrees
+
+      E = oR.edges()                                # 40 points along every edge
+      E = oR.edges(points=5)                        # coarser chains
+
+    Input
+      oR - orientationRegion
+    Output
+      E - list of (points, 3) arrays, the axis times the angle; empty when the sector of axes
+          has caps
+    Keywords
+      points - the number of points on each edge
+      tol - the slack by which a parallel plane may miss the edge before it removes it
+    See also
+      plot, orientationRegion.maxAngle"""
     planes = self.rodriguesPlanes()
     if planes is None:
       return []
@@ -293,7 +361,20 @@ def fundamentalRegionEuler(frA, frB=None):
   """the box in Euler angles that carries every orientation at least once
   (fundamentalRegionEuler): the two-folds perpendicular to z halve Phi, and one of the
   reflections they make on phi1 or phi2 halves that angle when it folds its turn about zero
-  fundamentalRegionEuler(cs, ss): MATLAB's name of the Euler plotting box"""
+  fundamentalRegionEuler(cs, ss): MATLAB's name of the Euler plotting box
+
+    maxPhi1, maxPhi, maxPhi2 = fundamentalRegionEuler(cs)       # with the default specimen frame
+    maxPhi1, maxPhi, maxPhi2 = fundamentalRegionEuler(cs, ss)   # with a specimen symmetry
+
+  The same as eulerRegion. MATLAB's flag 'complete', the full box, is not taken.
+
+  Input
+    frA - crystalFrame
+    frB - the second frame, by default the default specimen frame
+  Output
+    maxPhi1, maxPhi, maxPhi2 - the upper bounds of the three Bunge Euler angles in radians
+  See also
+    eulerRegion, fundamentalRegion, fundamentalSector"""
   return eulerRegion(frA, frB)
 
 
@@ -327,8 +408,19 @@ def eulerRegion(frA, frB=None):
   """the ranges (phi1, Phi, phi2) of the Bunge Euler angles covering the fundamental region of
   two frames, the specimen frame the default second
 
-    maxPhi1, maxPhi, maxPhi2 = eulerRegion(cs)
-    eulerRegion(cs1, cs2)"""
+    maxPhi1, maxPhi, maxPhi2 = eulerRegion(cs)     # with the default specimen frame
+    maxPhi1, maxPhi, maxPhi2 = eulerRegion(cs, ss) # with a specimen symmetry, or a second crystal
+
+  The rotations about z of the two groups divide phi1 and phi2, the two-folds perpendicular
+  to z halve Phi, and one of the reflections they make on phi1 or phi2 halves that angle.
+
+  Input
+    frA - crystalFrame
+    frB - the second frame, by default the default specimen frame
+  Output
+    maxPhi1, maxPhi, maxPhi2 - the upper bounds of the three Bunge Euler angles in radians
+  See also
+    fundamentalRegionEuler, fundamentalRegion, projectIntoEulerRegion"""
   from .frames import specimenFrame
   frB = specimenFrame.default if frB is None else frB
   maxPhi1, maxPhi2, L, R = _zFolds(frA, frB)
@@ -354,7 +446,24 @@ def eulerRegion(frA, frB=None):
 
 def maxAngle(frA, frB=None, antipodal=False):
   """maxAngle(cs), maxAngle(cs1, cs2): the largest rotation angle of the fundamental region of
-  the frames, MATLAB's maxAngle of a symmetry"""
+  the frames, MATLAB's maxAngle of a symmetry
+
+    omega = maxAngle(cs)                          # the largest angle of an orientation
+    omega = maxAngle(cs, cs)                      # the largest misorientation angle
+    omega = maxAngle(cs, cs, antipodal=True)      # with the misorientations' inverses identified
+
+  MATLAB's maxAngle(cs, axis), the largest angle about an axis, is
+  fundamentalRegion(cs).maxAngle(axis) here.
+
+  Input
+    frA - crystalFrame
+    frB - the second frame, by default the default specimen frame
+  Output
+    omega - the angle in radians
+  Keywords
+    antipodal - identify every misorientation with its inverse
+  See also
+    orientationRegion.maxAngle, fundamentalRegion"""
   return fundamentalRegion(frA, frB, antipodal=antipodal).maxAngle()
 
 

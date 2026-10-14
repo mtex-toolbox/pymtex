@@ -301,14 +301,36 @@ def _nearestVariant(parentOri, childOri, p2c):
 
 
 def calcVariantId(parentOri, childOri, p2c, packet=None, bain=None):
-  """variantId, packetId, bainId, fit = calcVariantId(parentOri, childOri, p2c)
+  """the variant, packet and Bain group of every child orientation with respect to its parent,
+  MATLAB's calcVariantId
+
+    variantId, packetId, bainId, fit = calcVariantId(parentOri, childOri, p2c)  # the {111} packets and {001} Bain groups
+    hklParent = Miller([[1, 1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, -1]], p2c.CS)
+    variantId, packetId, bainId, fit = calcVariantId(parentOri, childOri, p2c, packet=(hklParent, Miller(1, 0, 1, p2c.SS)))  # packets by planes of one's own
 
   For every child the variant of its parent it belongs to, one based, with the misfit, and
   the packet and Bain group of that variant: the packet by the parent {111} plane the
   variant maps onto the child (011), the Bain group by the parent {001} plane mapped onto
   the child (100), unless packet=(hklParent, hklChild) or bain=(hklParent, hklChild) name
-  other families.
-  """
+  other families. MATLAB computes the packet and Bain ids only when the planes are given; the
+  port always does, with these defaults.
+
+  Input
+    parentOri - orientation of the parent phase, one or one per child
+    childOri - orientation of the child phase
+    p2c - orientation, the parent to child orientation relationship
+  Output
+    variantId - the one based variant ids, in the order of p2c.variants()
+    packetId - the one based packet ids
+    bainId - the one based Bain group ids
+    fit - the misorientation angle between the child and its variant, in radians
+  Keywords
+    packet - (hklParent, hklChild), the parent planes (one Miller per packet) and the child
+        plane they map onto
+    bain - (hklParent, hklChild), the parent directions (one Miller per Bain group) and the
+        child direction they map onto
+  See also
+    orientation.variants, calcParent, packetPlanes, bainPlanes, MartensiteVariants"""
   childOri = childOri.flatten()
   parentOri = parentOri.flatten()
   if parentOri.size == 1 and childOri.size > 1:

@@ -37,7 +37,23 @@ from ..geometry.display import aligned, frameLabel
 
 def polygonMoments(V, loops, size=None):
   """the moments of the polygon of every outline: the area, the first and the second moments
-  about the origin, summed over its loops, as six arrays; or of one list of loops"""
+  about the origin, summed over its loops
+
+    ar, cx, cy, ixx, iyy, ixy = polygonMoments(grains.V, grains.loops, grains.size)  # per grain
+    ar, cx, cy, ixx, iyy, ixy = polygonMoments(grains.V, grains.loops[0])            # one outline
+
+  The integrals over the area of 1, x, y, x^2, y^2 and xy, from the loops by Green's theorem;
+  an inner loop, stored the other way round, subtracts. The centroid is (cx, cy) / ar.
+
+  Input
+    V - (m, 2) array of the vertices
+    loops - per outline a list of loops of vertex indices, or the loops of one outline
+  Output
+    ar, cx, cy, ixx, iyy, ixy - arrays, one value per outline, or numbers for one
+  Keywords
+    size - the number of outlines; without it loops is one outline
+  See also
+    grain2d.area, grain2d.centroid, grain2d.principalComponents"""
   one = size is None
   S = loopSums(V, [loops] if one else loops, 1 if one else size)
   out = (S[:, 0] / 2, S[:, 3] / 6, S[:, 4] / 6, S[:, 5] / 12, S[:, 6] / 12, S[:, 7] / 24)
@@ -227,16 +243,30 @@ def _direction2d(self, arg):
 
 
 def caliper(self, arg=None):
-  """the caliper: with nothing, the longest width of every outline as a framed axis of that
-  length; with 'shortest', the narrowest one, with 'shortestPerp' the width measured across
-  the direction perpendicular to it, which is the direction an outline with flat faces is
-  aligned along, with 'longest' the first again; with a direction or an angle to the x axis
-  of the map, the width across it; a list of them gives a width per outline and direction
+  """the caliper, the Feret diameter, of every outline: its width across a direction, or the
+  longest or the shortest width as a framed axis of that length; MATLAB's grain2d.caliper
 
     cV = grains.caliper()                  # the longest, norm(cV) its length
-    cV = grains.caliper('shortest')        # or 'longest', 'shortestPerp'
+    cV = grains.caliper('shortest')        # the narrowest, or 'longest', 'shortestPerp'
     c = grains.caliper(vector3d.X)         # the width across a direction
-    c = caliper(grains, [0, 30*degree])    # the widths across angles to the x axis"""
+    c = caliper(grains, [0, 30*degree])    # the widths across angles to the x axis
+
+  The width across a direction is the extent of the convex hull projected onto it. 'longest'
+  is the diameter of the outline and 'shortest' its narrowest width, each the vector3d along
+  which it is measured with that length. 'shortestPerp' is the width measured along the
+  direction perpendicular to the shortest one, the direction an outline with flat faces is
+  aligned along. A list of directions or angles gives a width per outline and direction.
+
+  Input
+    grains - grain2d, or any set of outlines
+  Output
+    cV - vector3d, one per outline, norm(cV) the length
+    c - array of the widths, (n,) or (n, k) for k directions
+  Keywords
+    arg - 'longest' (by default), 'shortest' or 'shortestPerp', or a direction, an angle to
+        the x axis of the map or a list of them
+  See also
+    grain2d.diameter, grain2d.longAxis, grain2d.paror, ShapeParameters"""
   if arg is None or (isinstance(arg, str) and arg == "longest"):
     return _axisOf(self, _extremalWidths(self)[1])
   if isinstance(arg, str):
@@ -263,9 +293,28 @@ def caliper(self, arg=None):
 # ------------------------------------------------------------------ the projection functions
 
 def paror(self, omega=None):
-  """the cumulative projection length of the outlines, measured along each direction (Panozzo
-  1983): the width of the convex hull seen from that direction, summed over the outlines
-  and normalised by its largest value. The hulls are taken once for all the directions"""
+  """the cumulative particle projection function of the outlines (Panozzo 1983); MATLAB's
+  grain2d.paror
+
+    cumpl = grains.paror()                               # every degree from 0 to 180
+    cumpl = paror(grains, np.linspace(0, np.pi, 91))     # every second degree
+
+  For every direction the width of the convex hull of each outline seen from it, summed over
+  the outlines and normalised by its largest value. The hulls are taken once for all the
+  directions.
+
+  Input
+    grains - grain2d, or any set of outlines
+  Output
+    cumpl - array, one value per angle
+  Keywords
+    omega - the angles of the directions to the x axis, by default 0 to 180 degree in steps of
+        one degree
+  References
+    R. Panozzo, Two-dimensional analysis of shape fabric using projections of digitized lines
+        in a plane, Tectonophysics 95 (1983) 279-294
+  See also
+    grainBoundary.surfor, grain2d.caliper, ShapeParameters"""
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
   H, offsets, lengths = _flatHull(self)
@@ -288,9 +337,30 @@ SURFOR_BLOCK = 4096
 
 
 def surfor(x, omega=None):
-  """the cumulative projection length of the boundary segments (Panozzo 1984): a projection
-  is a dot product, the segment vector projected onto the direction, so no angle is formed
-  and none has to be folded into [0, pi)"""
+  """the cumulative projection length of the boundary segments (Panozzo 1984); MATLAB's
+  grainBoundary.surfor
+
+    lp = gB.surfor()                                   # every degree from 0 to 180
+    lp = surfor(gB, np.linspace(0, np.pi, 91))         # every second degree
+    lp = surfor(grains)                                # the boundary of the grains
+
+  For every direction the lengths of the segments projected onto it, summed and normalised by
+  the largest value. It makes sense only for sufficiently smooth boundaries. MATLAB returns
+  the angles as a second output and takes their step as 'stepwidth'; here the angles are
+  given.
+
+  Input
+    gB - grainBoundary, or grain2d for its boundary
+  Output
+    lp - array, one value per angle
+  Keywords
+    omega - the angles of the directions to the x axis, by default 0 to 180 degree in steps of
+        one degree
+  References
+    R. Panozzo, Two-dimensional strain from the orientation of lines in a plane, Journal of
+        Structural Geology 6 (1984) 215-221
+  See also
+    grain2d.paror, grainBoundary.characteristicShape, ShapeParameters"""
   gB = x.boundary if isinstance(x, grain2d) else x
   omega = np.linspace(0, np.pi, 181) if omega is None else np.asarray(omega, dtype=float).reshape(-1)
   D = np.stack([np.cos(omega), np.sin(omega)], axis=1)
@@ -303,10 +373,25 @@ def surfor(x, omega=None):
 
 
 def characteristicShape(x, nmax=1024):
-  """the characteristic shape of a set of boundary segments: every segment and its antipode,
-  sorted by direction and laid end to end, the convex, centrally symmetric outline whose
-  boundary length in each direction is the boundary length the map has in it. A convex
-  outline of a hundred thousand segments is sampled down to nmax, which keeps its extent"""
+  """the characteristic shape of a set of boundary segments; MATLAB's
+  grainBoundary.characteristicShape
+
+    cShape = characteristicShape(grains.boundary['Fo', 'Fo'])   # of the boundaries of a phase
+    cShape = grains.characteristicShape(nmax=256)               # of the boundary of the grains
+
+  Every segment and its antipode, sorted by direction and laid end to end, close into a
+  convex, centrally symmetric outline whose boundary length in each direction is the
+  boundary length the map has in it. An outline of more than nmax vertices is sampled down to
+  nmax, which keeps its extent.
+
+  Input
+    x - grainBoundary, or grain2d for its boundary
+  Output
+    cShape - shape2d
+  Keywords
+    nmax - the largest number of vertices of the outline
+  See also
+    shape2d.byFV, grainBoundary.surfor, ShapeParameters"""
   gB = x.boundary if isinstance(x, grain2d) else x
   if gB.isempty:
     raise ValueError("an empty boundary has no characteristic shape")
@@ -350,7 +435,25 @@ class shape2d(polygonSet):
 
   @staticmethod
   def byFV(F, V, nmax=1024, **kw):
-    """the outline of a set of segments laid end to end by direction, the characteristic shape"""
+    """the outline of a set of segments laid end to end by direction, the characteristic shape;
+    MATLAB's shape2d.byFV
+
+      cShape = shape2d.byFV(gB.F, gB.V)                                   # in the xy plane
+      cShape = shape2d.byFV(gB.F, gB.V, plane=gB.plane, frame=gB.frame)   # in the plane of a map
+
+    Every segment and its antipode, sorted by the angle of its direction and summed up, give a
+    closed, convex and centrally symmetric outline centred at the origin. An outline of more
+    than nmax vertices is sampled down to nmax. The plane and frame keywords go to shape2d.
+
+    Input
+      F - (n, 2) int array, the vertex indices of every segment
+      V - (m, 2) or (m, 3) array of the vertices
+    Output
+      cShape - shape2d
+    Keywords
+      nmax - the largest number of vertices of the outline
+    See also
+      grainBoundary.characteristicShape, shape2d.byRhoTheta"""
     F = np.asarray(F).reshape(-1, 2)
     V = np.asarray(V, dtype=float)
     if V.shape[1] == 3:

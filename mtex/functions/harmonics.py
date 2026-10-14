@@ -172,10 +172,25 @@ def _wignerdAll(beta, L):
 
 
 def wignerd(beta, degree=None, *, bandwidth=None):
-  """the real Wigner-d matrix d_l(beta) at one angle, or with bandwidth=L the list d_0 .. d_L
+  """the real Wigner-d matrix d_l(beta) at one angle, or with bandwidth=L the list d_0 .. d_L;
+  MATLAB's Wigner_d_recursion
 
-    wignerd(beta, l)
-    wignerd(beta, bandwidth=L)"""
+    d = wignerd(beta, l)                # the (2l+1) x (2l+1) matrix of degree l
+    ds = wignerd(beta, bandwidth=L)     # the matrices of the degrees 0 to L
+
+  The matrices are those of MTEX's Wigner blocks, indexed from -l to l, computed by a stable
+  recursion over the degrees. Give either the degree or the bandwidth.
+
+  Input
+    beta - one angle, the second Euler angle
+    degree - the degree l
+  Output
+    d - ndarray of shape (2l+1, 2l+1)
+    ds - list of the matrices of the degrees 0 to L
+  Keywords
+    bandwidth - the largest degree L of the list
+  See also
+    WignerD, SO3FunHarmonic"""
   L, single = _degrees(degree, bandwidth)
   beta = np.asarray(beta)
   beta = beta if beta.dtype.kind == "f" else beta.astype(float)
@@ -364,8 +379,31 @@ def _projectionBytes(r, L, dtype):
 
 
 def invariantProjection(g, L, dtype=np.float64, proper=False):
-  """proper=True gives the projection onto the functions invariant under the proper elements
-  of the group alone, which the sphere needs beside the rotation parts of all elements"""
+  """the projection of the harmonic coefficients onto the functions invariant under a group,
+  one matrix P_n per degree up to L
+
+    P = invariantProjection(cs, 16)                # under the rotation parts of all elements
+    P = invariantProjection(cs, 16, proper=True)   # under the proper elements alone
+    P = invariantProjection(cs, 16, dtype=np.float32)  # in single precision
+
+  P_n is the mean of the Wigner matrices of the group's rotations; it is nonzero only where
+  both indices are multiples of the order of the group's axis along z (P.fold), and only that
+  part is held. A group whose elements all have the identity as rotation part projects with
+  the identity, no matrices at all. The projections are cached per group, precision and
+  properness, and grow with the bandwidth asked; the symmetrisation of SO3FunHarmonic and
+  S2FunHarmonic uses them.
+
+  Input
+    g - pointGroup or a frame carrying one
+    L - the bandwidth, the largest degree
+  Output
+    P - InvariantProjection, its blocks the matrices of the degrees 0 to L
+  Keywords
+    dtype - the real precision of the matrices, which are complex of that precision
+    proper - project onto the functions invariant under the proper elements alone, which the
+        sphere needs beside the rotation parts of all elements
+  See also
+    WignerD, SO3FunHarmonic.symmetrise, S2FunHarmonic.symmetrise"""
   pg = g.sym if isinstance(g, referenceFrame) else g
   dtype = np.dtype(dtype)
   group = pg.properSubGroup() if proper else pg

@@ -122,8 +122,27 @@ class mapPairs:
 
 
 def neighbourBall(l, order=None, radius=None):
-  """the offsets reachable in that many steps over the stencil of the lattice, or within a
-  physical distance over as many steps as it takes to reach it"""
+  """the offsets of the lattice reachable in that many steps over its stencil, or within a
+  physical distance over as many steps as it takes to reach it; the neighbourhood KAM and the
+  denoising filters average over
+
+    offs = neighbourBall(ebsd.lattice, 1)          # the nearest neighbours, the stencil
+    offs = neighbourBall(ebsd.lattice, 2)          # the neighbours up to the second order
+    offs = neighbourBall(ebsd.lattice, radius=0.7) # the neighbours within 0.7 scan units
+
+  The offsets are integer steps (i, j) along the two lattice directions, the pixel itself
+  left out, sorted. With a radius the walk goes as many steps as the shortest step of the
+  stencil needs to reach it, and keeps the offsets whose physical length is at most radius.
+
+  Input
+    l - lattice, ebsd.lattice
+  Output
+    offs - (n, 2) int array of the offsets
+  Keywords
+    order - the number of steps over the stencil
+    radius - the largest physical distance, in the scan unit, which replaces order
+  See also
+    KAM, lattice"""
   st = [tuple(int(x) for x in o) for o in l.stencil]
   if radius is not None:
     step = min(np.linalg.norm(l.A @ np.array(o, dtype=float)) for o in st)
@@ -151,12 +170,39 @@ STENCILS = ("oneSided", "lattice", "full")
 
 def gradient(ebsd, direction=None, stencil="oneSided"):
   """the derivative of the orientation along the two axes of the plane of the map, per unit
-  length, as a pair of framed vectors; or along a direction of the specimen, which has
-  none where it leaves the plane. The stencil says which neighbours it is taken from: the
-  one sided difference along the two lattice directions, stepping backwards only where the
-  map ends and NaN where the neighbour it asks for is missing inside the map; the whole
-  stencil of the lattice, the central difference in the interior; or the same with the
-  diagonals. A pixel whose neighbours do not span two directions has none, and is NaN"""
+  length, as a pair of framed vectors; or along a direction of the specimen; MATLAB's
+  EBSD.gradient
+
+    gX, gY = gradient(ebsd)                    # one sided differences
+    gX, gY = gradient(ebsd, stencil='lattice') # least squares over the stencil of the lattice
+    gX, gY = gradient(ebsd, stencil='full')    # least squares with the diagonals
+    gD = gradient(ebsd, xvector)               # the derivative along a direction of the specimen
+
+  The derivative is a vector of the left tangent space, the rotation vector of the step to
+  the neighbour divided by its length, taken from the neighbours that are comparable: inside
+  the map, indexed, of the same phase and, where the map carries grain ids, of the same
+  grain. A pixel whose neighbours do not span two directions has none, and is NaN.
+
+  The stencil 'oneSided' takes the neighbours along the two lattice directions, stepping
+  backwards only where the map ends and NaN where the neighbour it asks for is missing inside
+  the map. 'lattice' (MATLAB's '1hop', which is taken too) fits over the stencil of the
+  lattice, four axial neighbours of a square grid and six of a hexagonal one, the central
+  difference in the interior; 'full' fits over all eight offsets in {-1, 0, 1}^2, leaving far
+  fewer pixels NaN. MATLAB returns the derivatives along the lattice directions with the basis
+  as second output; the port returns them along the axes of the plane of the map. A direction
+  off the plane of the map gives NaN.
+
+  Input
+    ebsd - EBSD of one phase
+    direction - vector3d of the specimen, or three coordinates; without it both axes
+  Output
+    gX, gY - vector3d, the derivatives along the two axes of the plane of the map, of the
+        shape of the map
+    gD - vector3d, the derivative along direction
+  Keywords
+    stencil - 'oneSided', 'lattice' ('1hop') or 'full', the neighbours it is taken from
+  See also
+    gradientX, gradientY, curvature, calcGND, weightedBurgersVec"""
   if direction is not None:
     gx, gy = gradient(ebsd, stencil=stencil)
     pl = mapLattice(ebsd).plane
@@ -231,19 +277,62 @@ def _gradientNumpy(l, lk, m, offs, D, oneSided):
 
 def gradientX(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the specimen x axis per unit length, gradient(ebsd,
-  xvector); the stencil as for gradient"""
+  xvector); MATLAB's EBSD.gradientX
+
+    gX = gradientX(ebsd)                    # one sided differences
+    gX = gradientX(ebsd, stencil='full')    # least squares with the diagonals
+
+  The stencil is that of gradient.
+
+  Input
+    ebsd - EBSD of one phase
+  Output
+    gX - vector3d, of the shape of the map
+  Keywords
+    stencil - 'oneSided', 'lattice' ('1hop') or 'full', the neighbours it is taken from
+  See also
+    gradient, curvature"""
   return gradient(ebsd, [1.0, 0.0, 0.0], stencil=stencil)
 
 
 def gradientY(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the specimen y axis per unit length, gradient(ebsd,
-  yvector); the stencil as for gradient"""
+  yvector); MATLAB's EBSD.gradientY
+
+    gY = gradientY(ebsd)                    # one sided differences
+    gY = gradientY(ebsd, stencil='full')    # least squares with the diagonals
+
+  The stencil is that of gradient.
+
+  Input
+    ebsd - EBSD of one phase
+  Output
+    gY - vector3d, of the shape of the map
+  Keywords
+    stencil - 'oneSided', 'lattice' ('1hop') or 'full', the neighbours it is taken from
+  See also
+    gradient, curvature"""
   return gradient(ebsd, [0.0, 1.0, 0.0], stencil=stencil)
 
 
 def gradientZ(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the specimen z axis per unit length, gradient(ebsd,
-  zvector), which a planar map has only where z lies in its plane"""
+  zvector); MATLAB's EBSD.gradientZ
+
+    gZ = gradientZ(ebsd)                    # one sided differences
+    gZ = gradientZ(ebsd, stencil='full')    # least squares with the diagonals
+
+  The stencil is that of gradient. A planar map has the derivative only where z lies in its
+  plane, and is NaN elsewhere.
+
+  Input
+    ebsd - EBSD of one phase
+  Output
+    gZ - vector3d, of the shape of the map
+  Keywords
+    stencil - 'oneSided', 'lattice' ('1hop') or 'full', the neighbours it is taken from
+  See also
+    gradient, curvature"""
   return gradient(ebsd, [0.0, 0.0, 1.0], stencil=stencil)
 
 
@@ -251,9 +340,24 @@ def gradientZ(ebsd, stencil="oneSided"):
 
 def curvature(ebsd, stencil="oneSided"):
   """the curvature tensor of every pixel, kappa = d omega / d x, in the specimen frame per scan
-  unit, its rows the components of the rotation vector and its columns the directions of the
-  specimen. A two dimensional map says nothing about how the orientation changes along its
-  normal, so every column the normal reaches is unknown and NaN"""
+  unit; MATLAB's EBSD.curvature, the incomplete curvature tensor
+
+    kappa = curvature(ebsd)                    # from one sided differences
+    kappa = curvature(ebsd, stencil='full')    # from the least squares fit with the diagonals
+
+  Its rows are the components of the rotation vector and its columns the directions of the
+  specimen, assembled from the gradient along the two axes of the plane of the map. A two
+  dimensional map says nothing about how the orientation changes along its normal, so every
+  column the normal reaches is unknown and NaN.
+
+  Input
+    ebsd - EBSD of one phase
+  Output
+    kappa - curvatureTensor, of the shape of the map
+  Keywords
+    stencil - 'oneSided', 'lattice' ('1hop') or 'full', passed to gradient
+  See also
+    gradient, calcGND, dislocationDensityTensor"""
   from ..tensors.tensor import curvatureTensor
   gx, gy = gradient(ebsd, stencil=stencil)
   pl = mapLattice(ebsd).plane
@@ -408,9 +512,25 @@ def _kamNumpy(l, lk, m, offs, w, threshold, maximal):
 
 def calcGROD(ebsd, grains=None, rotRef=None):
   """the grain reference orientation deviation, mis2mean: the misorientation of every pixel
-  from the mean orientation of its grain, or from a given reference. The reference is
-  taken over the symmetric equivalent closest to the pixel, so the deviation is the small
-  rotation it is meant to be"""
+  from the mean orientation of its grain, or from a given reference; MATLAB's calcGROD
+
+    grains = calcGrains(ebsd)                  # the grain ids stored with the map
+    GROD = calcGROD(ebsd, grains)              # the deviation from the grain mean
+    GROD = calcGROD(ebsd, rotRef=oriRef)       # the deviation from a reference orientation
+
+  The reference is taken over the symmetric equivalent closest to the pixel, so the deviation
+  is the small rotation it is meant to be; its angle is the GROD angle. A pixel without a
+  grain or not indexed is NaN. The map must hold one phase.
+
+  Input
+    ebsd - EBSD of one phase, with the grain ids calcGrains stores
+  Output
+    GROD - orientation, the misorientation of every pixel, of the shape of the map
+  Keywords
+    grains - grain2d whose meanRotation is the reference of its pixels
+    rotRef - rotation, the reference of every pixel or of all, instead of the grains
+  See also
+    calcGrains, grainMean, KAM"""
   n = ebsd.size
   if rotRef is None:
     if grains is None:
@@ -495,9 +615,26 @@ def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf
 
 def spatialProfile(ebsd, lineXY, y=None, radius=None):
   """the measurements along a polyline, in the order they are met, and the distance along the
-  line of each of them, as MATLAB's pair; a pixel belongs to the line when it lies within
-  radius of it, half a step by default. The line is an (N, 2) array of x and y, or x and y
-  as two lists"""
+  line of each of them; MATLAB's spatialProfile
+
+    ebsdLine, dist = spatialProfile(ebsd, [15.5, 27], [20.5, 11])     # one segment, x and y
+    ebsdLine, dist = spatialProfile(ebsd, xy)                         # a polyline, (N, 2) points
+    ebsdLine, dist = spatialProfile(ebsd, xy, radius=1)               # a wider band
+
+  A pixel belongs to the line when it lies within radius of one of its segments, half a step
+  by default; a pixel at the joint of two segments is met once.
+
+  Input
+    ebsd - EBSD
+    lineXY - (N, 2) array of the points of the line, or their x coordinates
+    y - the y coordinates, when lineXY gives x
+  Output
+    ebsdLine - EBSD, the measurements along the line
+    dist - array, the distance of each along the line from its first point
+  Keywords
+    radius - the half width of the band around the line, in the scan unit
+  See also
+    EBSD.findByLocation, EBSDProfile"""
   if y is not None:
     lineXY = np.stack([np.asarray(lineXY, dtype=float).reshape(-1), np.asarray(y, dtype=float).reshape(-1)], axis=1)
   Q = np.asarray(lineXY.data if isinstance(lineXY, vector3d) else lineXY, dtype=float)

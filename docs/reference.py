@@ -104,6 +104,9 @@ def docOf(obj):
   raw = getattr(f, "__doc__", None)
   if not isinstance(raw, str) or not raw.strip():
     return inspect.getdoc(f) or ""
+  # a callable instance, plottingConvention.default, by its class's docstring
+  if not (inspect.isroutine(f) or inspect.isclass(f) or isinstance(f, property)) and raw == type(f).__doc__:
+    f = type(f)
   literal = sourceDocstring(f.fget if isinstance(f, property) else f)
   if literal is None:
     first, *rest = raw.expandtabs().split("\n")
@@ -351,7 +354,7 @@ def renderSections(sections, target, link, seeAlso):
   if "References" in sections:
     out += ["## References", ""] + [f"- {e}" for e in sections["References"]] + [""]
   if "See also" in sections:
-    names = [x.strip() for x in " ".join(sections["See also"]).split(",") if x.strip()]
+    names = " ".join(sections["See also"]).replace(",", " ").split()
     out += ["## See also", "", ", ".join(seeAlso(x) for x in names), ""]
   return out
 
@@ -473,6 +476,17 @@ def render(name, entry_, pages, calls, owners, names=None, docPages=()):
     page = (names or {}).get(x) or (x if x in pages else None) or (f"{x}_index" if f"{x}_index" in pages else None)
     if page is None and x in docPages:
       page = x
+    # a function of the flat namespace written under MATLAB's name: exportPoleFigure on PoleFigure.export
+    if page is None and "." not in x and callable(getattr(mtex, x, None)):
+      f = unwrap(getattr(mtex, x))
+      page = next((p for p, e in pages.items() if unwrap(e[1]) is f), None)
+    # a method named without its class, or by a parent class: the member of that name,
+    # this page's class first
+    if page is None:
+      head, _, last = x.rpartition(".")
+      found = sorted(p for p in pages if p.endswith("." + last) and p.startswith(head))
+      own = [p for p in found if p.split(".")[0] == name.split(".")[0]]
+      page = (own or found or [None])[0]
     return f"[{x}]({page}_py.html)" if page else x
 
   lines += renderSections(sections, target, link, seeAlso)

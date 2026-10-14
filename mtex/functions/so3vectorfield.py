@@ -56,7 +56,23 @@ def _other(side):
 
 
 def componentFrames(CS, SS, side="left"):
-  """the frames the components are functions on: the group on the tangent side is stripped"""
+  """the frames the components are functions on: the group on the tangent side is stripped
+
+    cA, cB = componentFrames(cs, ss)                 # of a field in the left tangent space
+    cA, cB = componentFrames(cs, ss, side='right')   # of one in the right tangent space
+
+  A field in the left tangent space returns vectors in the specimen frame, which turn with a
+  specimen symmetry, so its three components are invariant only under the crystal symmetry;
+  in the right tangent space the other way round. The port's own, no MATLAB counterpart.
+
+  Input
+    CS, SS - the crystal and the specimen frame of the field
+  Output
+    cA, cB - the crystal and the specimen frame of the components
+  Keywords
+    side - 'left' or 'right', the tangent space
+  See also
+    SO3VectorFieldHarmonic"""
   return (CS, SS.stripSym()) if side == "left" else (CS.stripSym(), SS)
 
 
@@ -71,7 +87,24 @@ def _equivariantGroup(v):
 
 def differentiate(fhat, side="left"):
   """the three derivatives of a coefficient vector, on the rows for the left side and on the
-  columns for the right; the degree is preserved"""
+  columns for the right; the degree is preserved
+
+    D = differentiate(SO3F._fhat)                  # the left derivatives, one column each
+    D = differentiate(SO3F._fhat, side='right')    # the right derivatives
+
+  The three columns are the coefficients of the derivatives along the x, y and z axes of the
+  tangent space, the coefficient matrix of the gradient field; the vector is in the port's
+  internal convention (docs/design/harmonics.md), not MATLAB's fhat. The port's own, no MATLAB
+  counterpart.
+
+  Input
+    fhat - ndarray, deg2dim(L + 1) Wigner coefficients
+  Output
+    D - ndarray of shape (deg2dim(L + 1), 3)
+  Keywords
+    side - 'left' or 'right', the tangent space
+  See also
+    SO3FunHarmonic.grad, div, curl"""
   side = _side(side)
   fhat = np.asarray(fhat)
   L = dim2deg(len(fhat))
@@ -245,20 +278,64 @@ class SO3VectorField:
     return self.abs()
 
   def curl(self, x=None):
-    """the curl, a field of the same side; with x its values at the orientations x"""
+    """the curl, a field of the same side; with x its values at the orientations x
+
+      C = SO3VF.curl()        # the curl, an SO3VectorFieldHarmonic
+      c = SO3VF.curl(ori)     # its values at orientations
+
+    The field is taken in its harmonic form; the curl of a gradient vanishes. MATLAB's curl of a
+    field that is not harmonic returns a handle, here always the harmonic field.
+
+    Input
+      SO3VF - SO3VectorField
+      x - orientation, where to evaluate the curl
+    Output
+      C - SO3VectorFieldHarmonic
+      c - SO3TangentVector, the values at x
+    See also
+      div, SO3VectorField.antiderivative, SO3FunHarmonic.grad"""
     return curl(self, x)
 
   def div(self, x=None):
-    """the divergence, a function on SO(3); with x its values at the orientations x"""
+    """the divergence, a function on SO(3); with x its values at the orientations x
+
+      D = SO3VF.div()         # the divergence, an SO3FunHarmonic
+      d = SO3VF.div(ori)      # its values at orientations
+
+    The field is taken in its harmonic form; the divergence of a gradient is the Laplacian of
+    the function.
+
+    Input
+      SO3VF - SO3VectorField
+      x - orientation, where to evaluate the divergence
+    Output
+      D - SO3FunHarmonic
+      d - array, the values at x
+    See also
+      curl, SO3VectorField.antiderivative, SO3FunHarmonic.grad"""
     return div(self, x)
 
   def antiderivative(self, x=None, **kwargs):
     """the function of mean zero whose gradient the field is; raises unless the field is a gradient,
     or conservative=True says it is; with x its values at the orientations x
 
-      F.antiderivative()
-      F.antiderivative(conservative=True)
-      F.antiderivative(tol=1e-3)"""
+      F = SO3VF.antiderivative()                    # the function, an SO3FunHarmonic
+      f = SO3VF.antiderivative(ori)                 # its values at orientations
+      F = SO3VF.antiderivative(conservative=True)   # without checking the field is a gradient
+      F = SO3VF.antiderivative(tol=1e-3)            # checked with another tolerance
+
+    The keywords conservative and tol go to antiderivative: the function is the inverse
+    Laplacian of the divergence, and unless conservative=True the gradient of the result must
+    give the field back within tol (1e-4) relative to its norm, else a ValueError is raised.
+
+    Input
+      SO3VF - SO3VectorField, converted to its harmonic form
+      x - orientation, where to evaluate the antiderivative
+    Output
+      F - SO3FunHarmonic
+      f - array, the values at x
+    See also
+      antiderivative, SO3FunHarmonic.grad, SO3VectorField.curl"""
     return antiderivative(self, x, **kwargs)
 
   def __neg__(self):
@@ -373,7 +450,29 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   @classmethod
   def quadrature(cls, fun, *args, bandwidth=None, tol=1e-10):
     """MATLAB's SO3VectorFieldHarmonic.quadrature(fun, cs): the field of a callable, cut to
-    the last degree that carries more than rounding, as a polynomial field is"""
+    the last degree that carries more than rounding, as a polynomial field is
+
+      SO3VF = SO3VectorFieldHarmonic.quadrature(lambda ori: ori * xvector, cs, ss)  # a callable, cut to its degree
+      SO3VF = SO3VectorFieldHarmonic.quadrature(F.eval, cs, ss, bandwidth=20)    # at a bandwidth of its own
+      SO3VF = SO3VectorFieldHarmonic.quadrature(t, bandwidth=8)   # through tangent vectors t at orientations
+
+    The field is the SO3VectorFieldHarmonic of fun and the further arguments, a callable taking
+    orientations and returning vectors or tangent vectors evaluated by exact quadrature, another
+    field, or tangent vectors at orientations; then every degree above the last whose
+    coefficients exceed tol times the largest is dropped. A callable is in the left tangent space
+    unless 'right' is passed after the frames.
+
+    Input
+      fun - callable, SO3VectorField or SO3TangentVector
+      cs, ss - the crystal and the specimen frame, for a callable
+    Output
+      SO3VF - SO3VectorFieldHarmonic
+    Keywords
+      bandwidth - the bandwidth of the quadrature; the preference 'defaultSO3Bandwidth' (64) by
+          default
+      tol - the coefficients below tol times the largest count as rounding when the degree is cut
+    See also
+      SO3VectorFieldHarmonic, SO3FunHarmonic.quadrature, interpolate"""
     F = cls(fun, *args, bandwidth=bandwidth)
     size = np.abs(F._fhat).max(axis=1)
     big = np.flatnonzero(size > tol * max(size.max(), np.finfo(float).tiny))
@@ -489,7 +588,24 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     return self.abs()
 
   def isclose(self, w, rtol=1e-8):
-    """whether two fields have the same coefficients on one side up to the relative tolerance rtol"""
+    """whether two fields have the same coefficients on one side up to the relative tolerance rtol
+
+      SO3VF.isclose(SO3VF2)              # equal up to the relative tolerance 1e-8
+      SO3VF.isclose(SO3VF2, rtol=1e-3)   # up to another one
+
+    The second field is taken in the harmonic form and the tangent space of the first; the
+    coefficients, padded to the larger bandwidth, agree when the norm of their difference is at
+    most rtol times the norm of those of the second.
+
+    Input
+      SO3VF - SO3VectorFieldHarmonic
+      w - SO3VectorField
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the norm of w
+    See also
+      SO3FunHarmonic.isclose"""
     w = SO3VectorFieldHarmonic(w, self.tangentSpace)
     L = max(self.bandwidth, w.bandwidth)
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat
@@ -513,7 +629,25 @@ class SO3VectorFieldHarmonic(SO3VectorField):
 
   def rotate(self, r, side="left"):
     """F'(R) = q F(q^-1 R) for a rotation of the specimen acting on a left field, F(q^-1 R) on
-    a right one; F'(R) = F(R q^-1) and q^-1 F(R q^-1) for a rotation of the crystal"""
+    a right one; F'(R) = F(R q^-1) and q^-1 F(R q^-1) for a rotation of the crystal
+
+      SO3VF = rotate(SO3VF, rot)                 # turned in the specimen frame
+      SO3VF = SO3VF.rotate(rot, side='right')    # turned in the crystal frame
+
+    The coefficients of the three components are turned as those of a function, and where the
+    rotation acts on the tangent space of the field the components are combined linearly as the
+    vectors turn. A symmetry the rotation does not map onto itself is dropped with a warning. An
+    orientation turns the field into the other frame of the orientation, as SO3FunHarmonic.rotate.
+
+    Input
+      SO3VF - SO3VectorFieldHarmonic
+      rot - rotation or orientation, one
+    Output
+      SO3VF - SO3VectorFieldHarmonic
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side; MATLAB's flag 'right'
+    See also
+      SO3VectorFieldHandle.rotate, SO3VectorFieldRBF.rotate, SO3FunHarmonic.rotate"""
     side = _side(side)
     if isinstance(r, orientation):
       o = r
@@ -581,14 +715,43 @@ def _divergenceCoefficients(fhat, side):
 
 
 def div(v, x=None):
-  """the divergence, invariant under both groups"""
+  """the divergence, invariant under both groups
+
+    D = div(SO3VF)          # the divergence, an SO3FunHarmonic
+    d = div(SO3VF, ori)     # its values at orientations
+
+  The sum of the derivatives of the three components along their own axes of the tangent space,
+  of the field in its harmonic form; of a gradient it is the Laplacian of the function.
+
+  Input
+    v - SO3VectorField
+    x - orientation, where to evaluate the divergence
+  Output
+    D - SO3FunHarmonic
+    d - array, the values at x
+  See also
+    curl, antiderivative, SO3FunHarmonic.grad"""
   v = SO3VectorFieldHarmonic(v)
   f = SO3FunHarmonic(_divergenceCoefficients(v._fhat, v.tangentSpace), v.CS, v.SS, real=True, symmetrise=False, _internal=True)
   return f if x is None else f(x)
 
 
 def curl(v, x=None):
-  """the curl, the dual of the exterior derivative, a field of the same side"""
+  """the curl, the dual of the exterior derivative, a field of the same side
+
+    C = curl(SO3VF)         # the curl, an SO3VectorFieldHarmonic
+    c = curl(SO3VF, ori)    # its values at orientations
+
+  Of the field in its harmonic form, in its tangent space; the curl of a gradient vanishes.
+
+  Input
+    v - SO3VectorField
+    x - orientation, where to evaluate the curl
+  Output
+    C - SO3VectorFieldHarmonic
+    c - SO3TangentVector, the values at x
+  See also
+    div, antiderivative, SO3FunHarmonic.grad"""
   v = SO3VectorFieldHarmonic(v)
   G = [differentiate(v._fhat[:, k], v.tangentSpace) for k in range(3)]
   rot = np.stack([G[2][:, 1] - G[1][:, 2], G[0][:, 2] - G[2][:, 0], G[1][:, 0] - G[0][:, 1]], axis=-1)
@@ -766,7 +929,23 @@ class SO3VectorFieldHandle(SO3VectorField):
 
   def rotate(self, r, side="left"):
     """the field turned by a rotation, from the left or with side='right' from the right, again a
-    handle; an orientation turns its harmonic form"""
+    handle; an orientation turns its harmonic form
+
+      SO3VF = rotate(SO3VF, rot)                 # turned in the specimen frame
+      SO3VF = SO3VF.rotate(rot, side='right')    # turned in the crystal frame
+
+    The new handle evaluates the old one at the orientations turned back and turns the vectors
+    it returns where the rotation acts on their tangent space.
+
+    Input
+      SO3VF - SO3VectorFieldHandle
+      rot - rotation, or an orientation, one
+    Output
+      SO3VF - SO3VectorFieldHandle, or SO3VectorFieldHarmonic for an orientation
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side; MATLAB's flag 'right'
+    See also
+      SO3VectorField.rotate, SO3VectorFieldRBF.rotate"""
     side = _side(side)
     if isinstance(r, orientation):
       return SO3VectorFieldHarmonic(self).rotate(r, side)
@@ -955,7 +1134,24 @@ class SO3VectorFieldRBF(SO3VectorField):
 
   def rotate(self, r, side="left"):
     """the field turned by a rotation, from the left or with side='right' from the right, the centres
-    and weights moved; an orientation turns its harmonic form"""
+    and weights moved; an orientation turns its harmonic form
+
+      SO3VF = rotate(SO3VF, rot)                 # turned in the specimen frame
+      SO3VF = SO3VF.rotate(rot, side='right')    # turned in the crystal frame
+
+    The centres are multiplied by the rotation, from the left or the right, and the weight
+    vectors turned where the rotation acts on the tangent space, so the result is again a sum of
+    kernels. A symmetry the rotation does not map onto itself is dropped with a warning.
+
+    Input
+      SO3VF - SO3VectorFieldRBF
+      rot - rotation, or an orientation, one
+    Output
+      SO3VF - SO3VectorFieldRBF, or SO3VectorFieldHarmonic for an orientation
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side; MATLAB's flag 'right'
+    See also
+      SO3VectorField.rotate, SO3VectorFieldHandle.rotate"""
     side = _side(side)
     if isinstance(r, orientation):
       return SO3VectorFieldHarmonic(self).rotate(r, side)

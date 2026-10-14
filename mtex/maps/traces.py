@@ -184,7 +184,43 @@ def _shapeTrace(lS, calliper):
 
 
 def calcTraces(x, clusterId=None, *flags, **kwargs):
-  """traces, rel, cSize = calcTraces(ebsd | grains, clusterId, 'Radon' | 'Fourier' | 'calliper' | 'hist', minClusterSize=100)"""
+  """the traces of subregions of a map or of sets of grains, the direction their lamellae run
+  along; MATLAB's calcTraces
+
+    traces, rel, cSize = calcTraces(ebsd)                       # one trace of all indexed pixels, by the Radon transform
+    traces, rel, cSize = calcTraces(ebsd, ebsd.phaseId, 'Fourier', minClusterSize=50)  # a trace per phase, Fourier based
+    traces, rel, cSize = calcTraces(grains, grains.phaseId)    # a trace per phase from the characteristic shape
+    traces, rel, cSize = calcTraces(grains, grains.phaseId, 'calliper')  # the shortest calliper of the shape instead
+
+  A cluster is the set of pixels, or grains, with one value of every column of clusterId,
+  as MATLAB's clusterId = [grainId, variantId]; ids of zero or NaN belong to no cluster. By
+  default the indexed pixels of a map, or all grains, form one cluster. The outputs have the
+  shape of the largest id of every column; a cluster of minClusterSize pixels or fewer keeps a
+  NaN trace and a reliability of zero.
+
+  On a map, measured on a lattice, the method is 'Radon' (the default), the projection with
+  the most energy at the higher frequencies, or 'Fourier', the axis of the smaller second
+  moment of the Fourier transform of the cluster's image. On grains it is 'shape' (the
+  default), the principal axis of the characteristic shape of the boundary segments,
+  'calliper', the direction across its shortest calliper, or 'hist', the maximum of the
+  length weighted density of the segment directions. The method is a positional string, or
+  method= among the keyword arguments; minClusterSize= (default 100, pixels on a map, the
+  summed numPixel of the grains on grains) is a keyword argument too.
+
+  Input
+    x - EBSD on a lattice, or grain2d
+  Output
+    traces - vector3d, antipodal directions in the plane of the map, one per cluster
+    rel - the reliability, how much the winning direction stands out, zero for none
+    cSize - the size of every cluster, pixels on a map, summed numPixel of the grains
+  Keywords
+    clusterId - one or more columns of ids, a row per pixel or grain, naming the cluster
+        of each; by default one cluster
+  References
+    Determination of child phase habit planes from two-dimensional reconstructed parent
+        phase orientation maps, arXiv 2201.02103 (2022)
+  See also
+    grainBoundary.characteristicShape, parentGrainReconstructor"""
   if isinstance(clusterId, str):
     clusterId, flags = None, (clusterId,) + flags
   if flags:

@@ -189,7 +189,23 @@ class SO3FunBingham(SO3FunGeneric):
 
   def rotate(self, r, side="left"):
     """the distribution turned by a rotation, from the left (the specimen side) or, with
-    side='right', from the right (the crystal side)"""
+    side='right', from the right (the crystal side); MATLAB's rotate
+
+      odf = odf.rotate(r)                # turned in specimen coordinates
+      odf = odf.rotate(r, side='right')  # turned in crystal coordinates
+
+    The axes of the distribution are turned, and with them the frame on that side: a symmetry
+    the rotation does not map onto itself is dropped, with a warning.
+
+    Input
+      odf - SO3FunBingham
+      r - rotation
+    Output
+      odf - SO3FunBingham
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side, as MATLAB's flag 'right'
+    See also
+      SO3FunHarmonic.rotate, SO3FunRBF.rotate"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     axes = rotation(self.A.T)
     if _side(side) == "left":
@@ -323,13 +339,29 @@ def _fibreAxes(h, r):
 
 
 def BinghamODF(kappa, A=None, *frames, **kwargs):
-  """BinghamODF(kappa, U), BinghamODF(kappa, cs), BinghamODF(20, ori), BinghamODF(20, f), BinghamODF([10, 10, 10], quaternion.id, cs)
+  """a Bingham distributed ODF; MATLAB's BinghamODF
+
+    odf = BinghamODF(20, ori)                          # about one orientation, the identity basis in its frames
+    odf = BinghamODF(20, f)                            # about a fibre
+    odf = BinghamODF(20, cs)                           # the identity basis in a crystal frame
+    odf = BinghamODF([20, 10, 0, 0], A, cs, ss)        # four concentrations, the axes a 4x4 matrix
 
   A Bingham distribution from four concentrations and four orthogonal quaternion axes, the
   axes as a 4x4 matrix, four orientations, or one orientation standing for the identity
   basis; fewer concentrations are padded with zeros; a fibre takes its two axes with the
-  same concentration, as MATLAB's constructor does.
-  """
+  same concentration, as MATLAB's constructor does. The keywords of SO3FunBingham, weight
+  and antipodal, are passed on.
+
+  Input
+    kappa - the form parameters, up to four concentrations
+    A - the axes: an orthogonal 4x4 matrix, four orientations, one orientation, a fibre, a
+        crystal frame, or a crystal direction h followed by a specimen direction r for the
+        fibre between them
+    frames - the crystal and the specimen frame, when A does not carry them
+  Output
+    odf - SO3FunBingham
+  See also
+    calcBinghamODF, fibreODF, unimodalODF, uniformODF, SO3FunBingham"""
   from ..geometry.fibre import fibre
   from ..geometry.frames import referenceFrame
   kappa = np.asarray(kappa, dtype=float).ravel()
@@ -356,10 +388,27 @@ def BinghamODF(kappa, A=None, *frames, **kwargs):
 
 
 def calcBinghamODF(o, weights=None, exact=False):
-  """the estimate from orientations: the eigen decomposition of the quaternion tensor of the
-  sample projected to the fundamental region about its mean gives the axes, and the
-  concentrations follow from the eigenvalues, by the large concentration approximation
-  kappa_i = -1/(2 lambda_i) shifted to a smallest value of zero, or exactly by Newton on the moments"""
+  """the Bingham distribution estimated from orientations; MATLAB's calcBinghamODF
+
+    odf = calcBinghamODF(ori)                  # by the large concentration approximation
+    odf = calcBinghamODF(ori, weights=w)       # weighted orientations
+    odf = calcBinghamODF(ori, exact=True)      # the concentrations matching the moments exactly
+
+  The eigen decomposition of the quaternion tensor of the sample, projected to the
+  fundamental region about its mean, gives the axes, and the concentrations follow from the
+  eigenvalues, by the large concentration approximation kappa_i = -1/(2 lambda_i) shifted to a
+  smallest value of zero, or exactly by Newton on the moments.
+
+  Input
+    ori - orientation
+  Output
+    odf - SO3FunBingham
+  Keywords
+    weights - a weight per orientation
+    exact - solve for the concentrations whose moments are the eigenvalues, instead of the
+        large concentration approximation
+  See also
+    BinghamODF, calcDensity, orientation.mean"""
   o = o if isinstance(o, orientation) else orientation(o)
   m = o.mean(weights=weights)
   q = o.projectIntoFundamentalRegion(m).data.reshape(-1, 4)

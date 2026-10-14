@@ -49,8 +49,26 @@ def _oneDirection(h, fr, what):
 
 def poles(o, h, antipodal=False):
   """the poles of orientations: every orientation applied to every distinct equivalent of the
-  crystal direction h, and every image of those under the specimen group, shaped (..., m)
-  in the specimen frame (MATLAB ori.SS * (ori * symmetrise(h)))"""
+  crystal direction h, and every image of those under the specimen group; MATLAB's
+  ori.SS * (ori * symmetrise(h))
+
+    p = poles(ori, Miller(1, 0, 0, cs))            # the poles of the {100} directions
+    p = poles(ori, Miller(1, 1, 1, cs), antipodal=True)  # an axis and its antipode counted once
+
+  The poles are what plotPF draws for a list of orientations. An equivalent counts once, and
+  an axis and its antipode count once where the pole figure cannot tell h from -h: when
+  antipodal is asked for, h is an axis, or -h is an equivalent of h. The result is antipodal
+  then.
+
+  Input
+    ori - orientation, shaped (...)
+    h - Miller or vector3d, one crystal direction
+  Output
+    p - vector3d in the specimen frame, shaped (..., m) over the m distinct equivalents
+  Keywords
+    antipodal - count an axis and its antipode once
+  See also
+    inversePoles, plotPF, symmetrise"""
   h = _oneDirection(h, o.CS, "crystal direction")
   ax = antipodal or _antipodalPole(vector3d(h.data, frame=o.CS, antipodal=h.antipodal), o.CS)
   eq = orbit(h.data, o.CS, ax)
@@ -64,7 +82,24 @@ def poles(o, h, antipodal=False):
 
 def inversePoles(o, r, antipodal=False):
   """the inverse poles: the crystal directions that lie along the specimen direction r, over
-  the distinct equivalents of r under the specimen group, shaped (..., m) in the crystal frame"""
+  the distinct equivalents of r under the specimen group; MATLAB's inv(ori) * symmetrise(r)
+
+    h = inversePoles(ori, zvector)                  # the crystal directions along z
+    h = inversePoles(ori, zvector, antipodal=True)  # as axes
+
+  They are what plotIPF draws for a list of orientations, which folds them into the
+  fundamental sector of the crystal; here they are not folded. An axis and its antipode
+  count once when antipodal is asked for, r is an axis, or -r is an equivalent of r.
+
+  Input
+    ori - orientation, shaped (...)
+    r - vector3d, one specimen direction
+  Output
+    h - vector3d in the crystal frame, shaped (..., m) over the m distinct equivalents of r
+  Keywords
+    antipodal - count an axis and its antipode once
+  See also
+    poles, plotIPF, ipfColorKey"""
   r = _oneDirection(r, o.SS, "specimen direction")
   ax = antipodal or _antipodalPole(vector3d(r.data, frame=o.SS, antipodal=r.antipodal), o.SS)
   eq = orbit(r.data, o.SS, ax)
@@ -74,8 +109,22 @@ def inversePoles(o, r, antipodal=False):
 
 
 def dynamicMarkerSize(n, default=10):
-  """MTEX's dynamic marker size as one rule: fifty times the mean spacing of n markers on a
-  hemisphere, never larger than the default size"""
+  """the size of the markers of a plot of n points; MTEX's dynamic marker size as one rule
+
+    s = dynamicMarkerSize(1000)                    # the size for 1000 markers
+    s = dynamicMarkerSize(1000, default=5)         # never larger than 5
+
+  Fifty times the mean spacing of n markers on a hemisphere, sqrt(2 pi / n), never smaller
+  than 1.5 and never larger than the default size.
+
+  Input
+    n - the number of markers
+  Output
+    s - the marker size in points
+  Keywords
+    default - the largest size, that of few markers
+  See also
+    plotPF, scatter"""
   return default if n == 0 else float(np.clip(50 * np.sqrt(2 * np.pi / n), 1.5, default))
 
 

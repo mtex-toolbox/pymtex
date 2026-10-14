@@ -187,12 +187,25 @@ class orientation(rotation):
 
   @classmethod
   def byAxisAngle(cls, v, omega, *frames, antipodal=False):
-    """the orientations of the rotations by omega about the axis v; about a crystal direction and no
-    frames named the rotation of that crystal frame into itself, a misorientation; antipodal=True
-    marks a misorientation with grain exchange
+    """the orientations of the rotations by omega about the axis v; MATLAB's orientation.byAxisAngle
 
       ori = orientation.byAxisAngle(v, omega, cs, ss)     # an orientation
-      mori = orientation.byAxisAngle(h, omega)            # a misorientation about the crystal direction h"""
+      mori = orientation.byAxisAngle(h, omega)            # a misorientation about the crystal direction h
+      mori = orientation.byAxisAngle(h, omega, antipodal=True)  # with grain exchange
+
+    About a crystal direction h with no frames named it is the rotation of that crystal frame
+    into itself, a misorientation; the frames named otherwise, the crystal frame first.
+
+    Input
+      v - vector3d or Miller, the rotational axis
+      omega - the rotational angle, broadcast against v
+      frames - the crystal frame, then the specimen frame or a second crystal frame
+    Output
+      ori - orientation
+    Keywords
+      antipodal - mark a misorientation with grain exchange, mori == inv(mori)
+    See also
+      orientation.byEuler, orientation.byMatrix, orientation.map, rotation.byAxisAngle"""
     frames = _splitFrames(frames)[1]
     # about a crystal direction without frames named: the rotation of that crystal frame into itself
     if not frames and isinstance(v, vector3d) and isinstance(v.frame, crystalFrame):
@@ -201,7 +214,22 @@ class orientation(rotation):
 
   @classmethod
   def byMatrix(cls, M, *frames, antipodal=False):
-    """the orientations of rotation matrices; a matrix of determinant -1 is refused"""
+    """the orientations of rotation matrices; MATLAB's orientation.byMatrix
+
+      ori = orientation.byMatrix(M, cs, ss)                 # one 3 x 3 matrix, or (..., 3, 3)
+      mori = orientation.byMatrix(M, cs, cs, antipodal=True)  # a misorientation with grain exchange
+
+    A matrix of determinant -1 is refused: an orientation is proper.
+
+    Input
+      M - a 3 x 3 rotation matrix, or an array of them along the last two axes
+      frames - the crystal frame, then the specimen frame or a second crystal frame
+    Output
+      ori - orientation of the shape M.shape[:-2]
+    Keywords
+      antipodal - mark a misorientation with grain exchange
+    See also
+      orientation.byAxisAngle, orientation.byEuler, rotation.matrix"""
     M = np.asarray(M, dtype=float)
     if np.any(np.linalg.det(M) < 0):
       raise ValueError("the matrix has determinant -1; an orientation is proper")
@@ -209,18 +237,67 @@ class orientation(rotation):
 
   @classmethod
   def byRodrigues(cls, v, *frames, antipodal=False):
-    """the orientations of Rodrigues vectors, the axes scaled by tan(omega/2)"""
+    """the orientations of Rodrigues vectors, the axes scaled by tan(omega/2); MATLAB's
+    orientation.byRodrigues
+
+      ori = orientation.byRodrigues(v, cs, ss)                # from Rodrigues vectors
+      mori = orientation.byRodrigues(v, cs, cs, antipodal=True)  # a misorientation with grain exchange
+
+    Input
+      v - vector3d, or an array with the coordinates along its last axis
+      frames - the crystal frame, then the specimen frame or a second crystal frame
+    Output
+      ori - orientation
+    Keywords
+      antipodal - mark a misorientation with grain exchange
+    See also
+      orientation.byHomochoric, Rodrigues, orientation.byAxisAngle"""
     return cls._fromRotation(rodrigues2quat(_xyz(v)), _splitFrames(frames)[1], antipodal)
 
   @classmethod
   def byHomochoric(cls, v, *frames, antipodal=False):
-    """the orientations of homochoric vectors"""
+    """the orientations of homochoric vectors; MATLAB's rotation.byHomochoric
+
+      ori = orientation.byHomochoric(v, cs, ss)                # from homochoric vectors
+      mori = orientation.byHomochoric(v, cs, cs, antipodal=True)  # a misorientation with grain exchange
+
+    A homochoric vector points along the rotational axis and has the length
+    (3/4 (omega - sin omega))^(1/3) for the rotational angle omega, which maps the rotations
+    onto a ball of radius (3 pi / 4)^(1/3), volume preserving.
+
+    Input
+      v - vector3d, or an array with the coordinates along its last axis
+      frames - the crystal frame, then the specimen frame or a second crystal frame
+    Output
+      ori - orientation
+    Keywords
+      antipodal - mark a misorientation with grain exchange
+    See also
+      homochoric, orientation.byRodrigues, rotation.byHomochoric"""
     return cls._fromRotation(homochoric2quat(_xyz(v)), _splitFrames(frames)[1], antipodal)
 
   @classmethod
   def map(cls, u1, v1, *args, antipodal=False):
-    """the smallest rotation taking u1 to v1, or the one taking u1 to v1 and u2 to v2; the frames
-    of framed inputs are adopted, CS from u1 and SS from v1"""
+    """the orientation that maps one or two pairs of directions; MATLAB's orientation.map
+
+      ori = orientation.map(h1, r1)                         # the smallest rotation taking h1 to r1
+      ori = orientation.map(h1, r1, h2, r2)                 # h1 to r1 and h2 to r2
+      mori = orientation.map(nAlpha, nBeta, dAlpha, dBeta)  # parallel planes and directions of two phases
+      ori = orientation.map(h1, r1, cs, ss)                 # between the frames named
+
+    With two pairs the angle between h1 and h2 has to be the one between r1 and r2, within
+    1e-3, and the two must not be colinear; otherwise the pairs are refused. The frames of framed inputs are
+    adopted, CS from h1 and SS from r1, unless frames are named.
+
+    Input
+      u1, v1 - vector3d or Miller, the first pair
+      args - u2, v2, the second pair, then the frames
+    Output
+      ori - orientation
+    Keywords
+      antipodal - mark a misorientation with grain exchange
+    See also
+      orientation.fit, orientation.byMiller, orientation.byAxisAngle"""
     args, frames = _splitFrames(args)
     if not frames:
       frames = [f for f in (_frameOf(u1), _frameOf(v1)) if f is not None]
@@ -233,7 +310,25 @@ class orientation(rotation):
   @classmethod
   def fit(cls, u, v, *frames, weights=None):
     """the orientation that maps the directions u best onto the directions v in the least squares
-    sense, weighted by weights"""
+    sense; MATLAB's orientation.fit
+
+      ori = orientation.fit(u, v, cs, ss)                   # u in the crystal, v in the specimen frame
+      ori = orientation.fit(u, v, cs, ss, weights=w)        # the pairs weighted
+
+    The rotation minimises the sum of w |ori * u - v|^2 over the pairs of normalised directions,
+    by Horn's quaternion method. The frames are those
+    named; MATLAB also adopts the frames of crystal directions u and v, which the port does not:
+    without frames the result is between the triclinic frame and the session's specimen frame.
+
+    Input
+      u, v - vector3d or Miller, of one shape
+      frames - the crystal frame, then the specimen frame or a second crystal frame
+    Output
+      ori - orientation
+    Keywords
+      weights - a weight per pair; by default all one
+    See also
+      orientation.map, rotation.fit"""
     return cls._fromRotation(fitKernel(_xyz(u), _xyz(v), weights), _splitFrames(frames)[1])
 
   @classmethod
@@ -336,12 +431,47 @@ class orientation(rotation):
   # ------------------------------------------------------------------ symmetry-aware operations
 
   def symmetrise(self, unique=False):
-    """the symmetric equivalents l * o * r, shaped (numL * numR,) + shape"""
+    """all crystallographically equivalent orientations; MATLAB's orientation.symmetrise
+
+      oriSym = ori.symmetrise()                # every equivalent, (numL * numR,) + ori.shape
+      oriSym = ori.symmetrise(unique=True)     # the distinct ones, a flat list
+
+    The equivalents are l * ori * r over the elements l of the group of the target frame and r of
+    the source frame; a misorientation with grain exchange adds their inverses.
+
+    Input
+      ori - orientation
+    Output
+      oriSym - orientation
+    Keywords
+      unique - keep only the distinct equivalents, as a flat list
+    See also
+      orientation.projectIntoFundamentalRegion, vector3d.symmetrise"""
     from .symmetryops import symmetriseOrientation
     return symmetriseOrientation(self, unique=unique)
 
   def dot(self, other, symmetry=True, antipodal=True):
-    """the reduced dot product and the disorientation angle, over the groups of both frames"""
+    """the dot product up to symmetry, cos(omega/2) of the misorientation angle omega reduced over
+    the groups of both frames; MATLAB's orientation.dot and dot_outer
+
+      d = dot(ori1, ori2)                          # pairwise, broadcast
+      d = dot(ori1.reshape(-1, 1), ori2)           # every pair, MATLAB's dot_outer
+      d = dot(ori1, ori2, symmetry=False)          # of the rotations as stored
+
+    MATLAB's dot_outer is the broadcast of a column against a row. With symmetry=False, or with
+    a rotation, it is rotation.dot: |q1 . q2|, or the signed product with antipodal=False.
+
+    Input
+      ori1 - orientation
+      ori2 - orientation, or a rotation
+    Output
+      d - cos(omega/2), of the broadcast shape
+    Keywords
+      symmetry - reduce over the symmetric equivalents; False takes the rotations as stored
+      antipodal - without symmetry, the absolute value of the product; False keeps its sign.
+          With symmetry it is not used, the grain exchange comes from ori1 and ori2
+    See also
+      orientation.angle, rotation.dot"""
     from .symmetryops import orientationDot
     if not symmetry or not isinstance(other, orientation):
       return rotation.dot(self, other, antipodal=antipodal)
@@ -349,12 +479,26 @@ class orientation(rotation):
 
   def angle(self, other=None, symmetry=True):
     """the rotational angle up to symmetry, of the orientation or of the misorientation to other;
-    symmetry=False the plain angle, other='max' the angle of the equivalent that turns the most
+    MATLAB's orientation.angle
 
-      omega = angle(ori)
+      omega = angle(ori)                     # the smallest angle of the equivalents
       omega = angle(ori, symmetry=False)     # ignore the symmetric equivalents
-      omega = angle(ori1, ori2)
-      omega = angle(mori, 'max')"""
+      omega = angle(ori1, ori2)              # the misorientation angle between them
+      omega = angle(mori, 'max')             # the largest angle of the equivalents
+
+    For misorientations with grain exchange, ori1.antipodal or ori2.antipodal, the two argument
+    form is the smaller of the angles to ori2 and to inv(ori2); there is no antipodal option.
+    With a fibre as other it is the angle to the fibre.
+
+    Input
+      ori - orientation
+    Output
+      omega - the angles in radians, of the broadcast shape
+    Keywords
+      other - orientation, the second one; a fibre; or 'max'
+      symmetry - reduce over the symmetric equivalents; False the plain angle of the rotations
+    See also
+      orientation.dot, fibre.angle, rotation.angle"""
     from .symmetryops import orientationAngle, orientationSelfAngle
     # angle(mori, 'max'): the angle of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
@@ -426,7 +570,23 @@ class orientation(rotation):
 
   def isclose(self, other, tol=5e-4):
     """equal up to the symmetry of the frames within the angular tolerance tol, between the same
-    frames, MATLAB's eq"""
+    frames; MATLAB's eq
+
+      b = ori1.isclose(ori2)                    # equal up to symmetry
+      b = ori1.isclose(ori2, tol=1*degree)      # within 1 degree
+
+    Orientations between other frames, or one with grain exchange and one without, are never
+    close; ori1 == ori2 compares the rotations as stored.
+
+    Input
+      ori1 - orientation
+      other - orientation, or a rotation compared as rotation.isclose
+    Output
+      b - bool, of the broadcast shape
+    Keywords
+      tol - the angular tolerance, in radians
+    See also
+      orientation.angle, orientation.unique"""
     if not isinstance(other, orientation):
       return rotation.isclose(self, other, tol)
     if self.frameA is not other.frameA or self.frameB is not other.frameB or self.antipodal != other.antipodal:
@@ -517,9 +677,24 @@ class orientation(rotation):
 
   def projectIntoFundamentalRegion(self, ref=None, antipodal=False):
     """the symmetric equivalents in the fundamental region, or those closest to the reference
-    ref; antipodal=True adds the grain exchange of a misorientation
-    (MATLAB's orientation.project2FundamentalRegion, quaternion.project2FundamentalRegion,
-    rotation.project2FundamentalRegion)"""
+    ref (MATLAB's orientation.project2FundamentalRegion, quaternion.project2FundamentalRegion,
+    rotation.project2FundamentalRegion)
+
+      ori = ori.projectIntoFundamentalRegion()             # the equivalents in the fundamental region
+      ori = ori.projectIntoFundamentalRegion(oriRef)       # those closest to a reference
+      mori = mori.projectIntoFundamentalRegion(antipodal=True)  # with grain exchange
+
+    MATLAB's second form, the symmetry elements that do the projection, is not returned.
+
+    Input
+      ori - orientation
+    Output
+      ori - orientation, of the same shape
+    Keywords
+      ref - orientation, the reference; by default the fundamental region of the frames
+      antipodal - add the grain exchange of a misorientation, mori == inv(mori), to the reduction
+    See also
+      orientation.symmetrise, referenceFrame.fundamentalRegion"""
     from .symmetryops import projectIntoFundamentalRegionOrientation
     # antipodal adds grain exchange to the reduction, MATLAB's 'antipodal'
     o = orientation._fromRotation(self.data, (self.CS, self.SS), True) if antipodal and not self.antipodal else self
@@ -598,12 +773,28 @@ class orientation(rotation):
     return transformOrientation(self, to, toB, rule, tol)
 
   def find(self, w, epsOrK=None):
-    """the orientations of ori nearest to w up to symmetry: the pair (ind, d) of the nearest, the k
-    nearest for an integer, or two sparse matrices of those within the radius eps
+    """the orientations of ori nearest to w up to symmetry, MATLAB's orientation.find
 
-      ind, d = ori.find(w)
-      ind, d = ori.find(w, 5)
-      ind, d = ori.find(w, 5*degree)"""
+      ind, d = ori.find(w)               # the nearest of ori to every w
+      ind, d = ori.find(w, 5)            # the 5 nearest
+      I, D = ori.find(w, 5*degree)       # all within 5 degree
+
+    The distance is the misorientation angle up to the symmetries of the frames, and the grain
+    exchange where ori is antipodal; d are angles. Long lists are searched through a
+    quaternion k-d tree, short ones by all the angles.
+
+    Input
+      ori - orientation, the list searched
+      w - orientation, the orientations searched for
+    Output
+      ind - the index into ori of the nearest, of the shape of w; with k a (len(w), k) array of
+          distinct indices
+      d - the angles, of the shape of ind
+      I, D - with a radius the sparse incidence and the sparse angles, (len(w) x len(ori))
+    Keywords
+      epsOrK - an integer k for the k nearest, a float for the radius of the search
+    See also
+      vector3d.find, SO3Grid.find, orientation.angle"""
     from .grids.search import find
     return find(self, w, epsOrK)
 
@@ -666,8 +857,27 @@ class orientation(rotation):
 
   @classmethod
   def align(cls, frA, frB, tol=1e-1):
-    """the orientation two frames stand in by their axes: a point at v in frA sits at
-    orientation.align(frA, frB) * v in frB; the transition has to be a rotation"""
+    """the orientation two frames stand in by their axes, MATLAB's orientation.align
+
+      ori = orientation.align(cs1, cs2)              # the rotation from the axes of cs1 to those of cs2
+      ori = orientation.align(cs1, cs2, tol=1e-3)    # a transition nearer a rotation demanded
+
+    A point sitting at v in frA sits at ori * v in frB. Unlike orientation.byScreenAlignment,
+    which infers the rotation from how the two frames are drawn, this reads the two bases: it is
+    the rotation of referenceFrame.transformationMatrix, which vector3d.transformReferenceFrame
+    applies to move data from one frame into the other. The orientation is between the frames
+    without their groups (stripSym).
+
+    Input
+      frA - referenceFrame, the source
+      frB - referenceFrame, the target
+    Output
+      ori - orientation from frA to frB
+    Keywords
+      tol - how far, as the norm of I - M M', the transition M may be from a rotation; a
+          larger deviation is refused
+    See also
+      orientation.byScreenAlignment, referenceFrame.isCompatible, transformReferenceFrame"""
     from .frametransform import align
     return align(frA, frB, tol)
 

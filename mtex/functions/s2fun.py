@@ -210,7 +210,31 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
   @classmethod
   def adjointNFSFT(cls, nodes, values, *, bandwidth=None, weights=None):
     """S2FunHarmonic.adjointNFSFT(v, values, bandwidth=32): the adjoint transform, the
-    coefficients sum_j w_j y_j conj(Y(v_j)) with unit weights unless given, a grid's own on a grid"""
+    coefficients sum_j w_j y_j conj(Y(v_j)) with unit weights unless given, a grid's own on a grid;
+    MATLAB's adjoint and adjointNFSFT
+
+      sF = S2FunHarmonic.adjoint(v, values, bandwidth=16)                # unit weights
+      sF = S2FunHarmonic.adjoint(v, values, bandwidth=16, weights=w)     # with quadrature weights
+      sF = S2FunHarmonic.adjoint(quadratureS2Grid(16), values)          # a quadrature grid: its bandwidth and weights
+
+    With the weights of a quadrature rule exact up to twice the bandwidth the adjoint is the
+    expansion of the function the values sample; with other weights it is the adjoint of the
+    evaluation only, S2FunHarmonic.interpolate fits by least squares. A NaN value counts as 0.
+    Several values per node, an array (n, ...), give one function per column. MATLAB's flags
+    'nfsft' and 'directComputation' choose the algorithm and have no counterpart; its default
+    bandwidth is 512.
+
+    Input
+      nodes - vector3d or quadratureS2Grid
+      values - ndarray, one value or one row of values per node
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree; by default the bandwidth of the grid, else 128
+      weights - the weights of the nodes, one number or one per node; by default those of a
+          quadrature grid, else one
+    See also
+      S2FunHarmonic.quadrature, S2FunHarmonic.interpolate, sphericalSeriesAdjoint"""
     values = np.asarray(values)
     if isinstance(nodes, quadratureS2Grid):
       L, w, v = nodes.bandwidth, nodes.weights if weights is None else weights, nodes
@@ -305,10 +329,23 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   @classmethod
   def cat(cls, *fs, axis=0):
-    """the functions joined into one list along an axis, cut or padded to the largest bandwidth
+    """the functions joined into one list along an axis, padded to the largest bandwidth;
+    MATLAB's cat, horzcat and vertcat
 
-      sF = cat(sF1, sF2)
-      sF = S2FunHarmonic.cat(sF1, sF2, axis=1)"""
+      sF = cat(sF1, sF2)                                   # a list of two functions
+      sF = S2FunHarmonic.cat(sFa, sFb, axis=1)             # lists of shape (n, 1) side by side, an (n, 2) list
+
+    A single function counts as a list of one. The axis is that of the lists: the lists must
+    agree in every other axis, and to join along axis 1 they need two axes.
+
+    Input
+      fs - S2FunHarmonic, the functions or lists to join
+    Output
+      sF - S2FunHarmonic, a list of functions
+    Keywords
+      axis - the axis of the lists along which they are joined
+    See also
+      S2FunHarmonic.sum, S2FunHarmonic.mean"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
     parts = [p[None] if p.ndim == 1 else p for p in parts]
@@ -323,7 +360,23 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   def truncate(self, L=None):
     """the coefficients up to degree L; without L the trailing degrees whose power, damped by
-    (l+1)^2, stays below 1e-8 of the largest are dropped, MATLAB's truncate"""
+    (l+1)^2, stays below 1e-8 of the largest are dropped, MATLAB's truncate
+
+      sF = truncate(sF)      # the negligible degrees dropped
+      sF = truncate(sF, 8)   # cut, or padded with zeros, at degree 8
+
+    The power of a degree is the norm of its coefficients divided by (l+1)^2, a bit of
+    regularisation, as MATLAB's; of a list of functions the largest over the list counts.
+    MATLAB's truncate takes no degree.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      L - the bandwidth of the result
+    See also
+      S2FunHarmonic.power, S2FunHarmonic.bandwidth"""
     if L is None:
       l = np.arange(self.bandwidth + 1)
       w = np.abs(self._fhat / _s2PerDegree((l + 1) ** 2)) ** 2
@@ -362,7 +415,26 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   def symmetrise(self, rots=None):
     """the projection onto the functions invariant under the group of the frame, or under a
-    list of rotations forming a group the frame does not name; an axis valued function is even"""
+    list of rotations forming a group the frame does not name; an axis valued function is even;
+    MATLAB's symmetrise
+
+      sF = symmetrise(sF)                     # under the group of the frame of sF
+      sF = symmetrise(sF, crystalFrame('432'))  # under the group of another frame, the result in that frame
+      sF = sF.symmetrise(rotation.byAxisAngle(zvector, np.arange(4)*90*degree))  # the mean over a group of rotations
+
+    Each degree is averaged over the group, the mean of the Wigner matrices of its rotations
+    applied to the coefficients, which keeps exactly the invariant part. A frame given puts the
+    function in that frame, which names the group. MATLAB's symmetrise(sF, d) about a direction,
+    returning a kernel, has no counterpart.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      rots - rotation of a group, or a crystalFrame or specimenFrame whose group is taken
+    See also
+      S2FunHarmonic.eval, Miller.symmetrise"""
     # symmetrise(sF, frame): the function averaged over the group of the frame, in that frame
     if isinstance(rots, referenceFrame):
       return S2FunHarmonic(self._fhat, rots, real=self.isReal, antipodal=self.antipodal, _internal=True)
@@ -439,17 +511,65 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return abs(self)
 
   def sqrt(self, bandwidth=None):
-    """the square root of the function, expanded by quadrature, or at the bandwidth given"""
+    """the square root of the function, expanded by quadrature, or at the bandwidth given
+
+      sF = sqrt(sF)                # at twice the bandwidth, at least 32
+      sF = sqrt(sF, bandwidth=64)  # at the bandwidth given
+
+    The function is evaluated on a quadrature grid and expanded again (mapFun); the square root
+    is no polynomial, so the expansion is cut at the bandwidth: by default twice that of the
+    function, at least 32. A negative value gives NaN.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree of the result
+    See also
+      mapFun, S2FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def exp(self, bandwidth=None):
-    """the exponential of the function, expanded by quadrature, or at the bandwidth given"""
+    """the exponential of the function, expanded by quadrature, or at the bandwidth given
+
+      sF = exp(sF)                # at twice the bandwidth, at least 32
+      sF = exp(sF, bandwidth=64)  # at the bandwidth given
+
+    The function is evaluated on a quadrature grid and expanded again (mapFun); the exponential
+    is no polynomial, so the expansion is cut at the bandwidth: by default twice that of the
+    function, at least 32.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree of the result
+    See also
+      mapFun, S2FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def log(self, bandwidth=None):
-    """the logarithm of the function, expanded by quadrature, or at the bandwidth given"""
+    """the logarithm of the function, expanded by quadrature, or at the bandwidth given
+
+      sF = log(sF)                # at twice the bandwidth, at least 32
+      sF = log(sF, bandwidth=64)  # at the bandwidth given
+
+    The function is evaluated on a quadrature grid and expanded again (mapFun); the logarithm
+    is no polynomial, so the expansion is cut at the bandwidth: by default twice that of the
+    function, at least 32.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree of the result
+    See also
+      mapFun, S2FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
@@ -457,7 +577,19 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   def mean(self, axis=None):
     """the mean over the sphere, int f dS / 4 pi, one per function; with an axis the mean
-    function along that axis of a list"""
+    function along that axis of a list; MATLAB's mean
+
+      value = mean(sF)          # the mean value, one per function of a list
+      sF = mean(sF, axis=0)     # the pointwise mean of a list along its first axis
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      value - float, or an array of the shape of the list; with an axis S2FunHarmonic
+    Keywords
+      axis - the axis of the list along which the functions are averaged
+    See also
+      S2FunHarmonic.sum, S2FunHarmonic.norm"""
     if axis is not None:
       return self._rebuild(np.mean(self._fhat, axis=normalize_axis_index(axis, len(self.shape))))
     x = self._fhat[..., 0] / math.sqrt(4 * math.pi)
@@ -465,20 +597,42 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return x[()] if x.ndim == 0 else x
 
   def sum(self, axis=None):
-    """the integral over the sphere, int f dS, S2Fun/sum; with an axis the sum of the functions
-    along that axis of a list
+    """the integral over the sphere, int f dS, MATLAB's sum; with an axis the sum of the
+    functions along that axis of a list
 
-      value = sum(sF)
-      sF = sum(sF, axis=0)  # the pointwise sum along the first axis"""
+      value = sum(sF)       # the integral, one per function of a list
+      sF = sum(sF, axis=0)  # the pointwise sum along the first axis
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      value - float, or an array of the shape of the list; with an axis S2FunHarmonic
+    Keywords
+      axis - the axis of the list along which the functions are summed
+    See also
+      S2FunHarmonic.mean, S2FunHarmonic.cat"""
     if axis is not None:
       return self._rebuild(np.sum(self._fhat, axis=normalize_axis_index(axis, len(self.shape))))
     return 4 * math.pi * self.mean()
 
   def norm(self, s=None):
-    """the L2 norm for the normalised surface measure, or the Sobolev norm, one per function
+    """the L2 norm for the normalised surface measure, or the Sobolev norm, one per function;
+    MATLAB's norm
 
-      t = norm(sF)
-      t = norm(sF, s=1)  # the Sobolev norm of index s"""
+      t = norm(sF)       # the L2 norm
+      t = norm(sF, s=1)  # the Sobolev norm of index s
+
+    The L2 norm is (int |f|^2 dS / 4 pi)^(1/2); the Sobolev norm weights the coefficients of
+    degree l by (2l+1)^(2s). MATLAB's norm has no Sobolev index.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      t - float, or an array of the shape of the list
+    Keywords
+      s - the Sobolev index; None for the L2 norm
+    See also
+      S2FunHarmonic.dot, S2FunHarmonic.mean"""
     if s is None:
       n = np.linalg.norm(self._fhat, axis=-1) / math.sqrt(4 * math.pi)
     else:
@@ -504,7 +658,25 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return S2FunHarmonic(fun, self.frame, bandwidth=self.bandwidth, real=self.isReal, antipodal=self.antipodal)
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
-    """whether the coefficients agree with those of g within the tolerances, relative to the norm of g"""
+    """whether the coefficients agree with those of g within the tolerances, relative to the norm of g
+
+      tf = isclose(sF1, sF2)             # equal up to a relative 1e-8
+      tf = isclose(sF1, sF2, rtol=1e-2)  # up to a relative 1e-2
+
+    The functions are compared at the larger of their bandwidths: the norm of the difference of
+    the coefficients must not exceed atol + rtol times the norm of those of g; a list counts as
+    one array.
+
+    Input
+      sF1 - S2FunHarmonic
+      g - S2FunHarmonic, the function to compare with
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the norm of g
+      atol - the absolute tolerance
+    See also
+      S2FunHarmonic.norm"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L)._fhat, g.truncate(L)._fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
@@ -535,13 +707,44 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     return laplace(self)
 
   def grad(self, x=None):
-    """the surface gradient: a vector field, or its values at the directions x"""
+    """the surface gradient: a vector field, or its values at the directions x; MATLAB's grad
+
+      sVF = grad(sF)       # the gradient as a vector field
+      g = grad(sF, v)      # the gradient at the directions v, vector3d
+
+    The gradient is tangent to the sphere, the derivative of the function along the sphere.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sVF - S2VectorFieldHarmonic, or vector3d at x
+    Keywords
+      x - vector3d, the directions at which to evaluate the gradient
+    See also
+      S2VectorFieldHarmonic, S2FunHarmonic.laplace"""
     from .s2vectorfield import grad
     return grad(self, x)
 
   def radon(self, delta=None):
     """the Funk transform, the mean over the great circle perpendicular to every direction;
-    radon(delta) over the small circle at pi/2 + delta"""
+    radon(delta) over the small circle at pi/2 + delta; MATLAB's radon
+
+      sF = radon(sF)              # the mean over the great circles
+      sF = radon(sF, 10*degree)   # the mean over the small circles at 100 degree
+
+    The transform is a convolution: the coefficients of degree n are multiplied by the Legendre
+    polynomial P_n(cos(pi/2 + delta)), for the great circle (-1)^(n/2) (n-1)!!/n!! of an even n
+    and zero of an odd one, so the odd part of a function is lost; invRadon inverts it on the
+    even functions.
+
+    Input
+      sF - S2FunHarmonic
+    Output
+      sF - S2FunHarmonic
+    Keywords
+      delta - the angle by which the circle is moved from the great circle
+    See also
+      S2FunHarmonic.invRadon, calcPDF"""
     from .funops import radon
     return radon(self, delta)
 

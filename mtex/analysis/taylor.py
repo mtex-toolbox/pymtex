@@ -160,10 +160,28 @@ def linearProgram(c, A, b, tol=1e-9, maxIter=10000, diagnostics=False):
 
 def linprogCentre(c, A, y, tol=1e-9, maxIter=100):
   """the solutions of many linear programs min c.x under A x = y, x >= 0 at once, each the
-  analytic centre of its optimal face, which is symmetric where the program is (a simplex
-  gives any vertex), NaN where one does not converge (MATLAB's linprogCentre). c is (n,) or
-  (N, n), A (m, n) or (N, m, n), y (m,) or (N, m); a primal dual path following method, its
-  Newton steps towards the central path at 0.3 mu"""
+  analytic centre of its optimal face; MATLAB's linprogCentre
+
+    x = linprogCentre(c, A, y)                         # one program
+    x = linprogCentre(C, A, Y)                         # one program per row of C and Y
+    x = linprogCentre(c, A, y, tol=1e-6, maxIter=20)   # a coarser stop
+
+  Where the optimum is not unique the solution is the centre of the optimal face, which is
+  symmetric where the program is, where a simplex gives any vertex of it; this is the choice
+  of the shears in the Taylor model. The programs are solved together by a primal dual path
+  following method, its Newton steps aimed at the central path at 0.3 mu.
+
+  Input
+    c - (n,) or (N, n), the costs
+    A - (m, n) or (N, m, n), the constraint matrix
+    y - (m,) or (N, m), the right hand sides
+  Output
+    x - (n,) or (N, n), the solutions; NaN for a program that does not converge
+  Keywords
+    tol - the relative tolerance of the primal and dual residuals and the duality gap
+    maxIter - the largest number of Newton steps
+  See also
+    linearProgram, calcTaylor, TaylorModel"""
   y = np.asarray(y, dtype=float)
   single = y.ndim == 1
   y = y.reshape(-1, y.shape[-1])
@@ -436,8 +454,25 @@ def _install():
 
 
 def _spinExp(W, ref=None, side=None):
-  """the rotation of a spin tensor, or the orientation a spin at a reference points to; a spin
-  in the crystal frame acts on the right of the orientation"""
+  """the rotation a spin tensor generates, the exponential of its axial vector, or the
+  orientation a spin at a reference orientation leads to
+
+    rot = W.exp()                      # the rotation of the spin
+    ori = W.exp(ori0)                  # the orientation reached from ori0
+    ori = W.exp(ori0, side='right')    # the spin applied on the crystal side
+
+  A spin in a crystal frame acts on the right of the orientation, ori0 * exp(W), one in the
+  specimen frame on the left, exp(W) * ori0, unless side says otherwise.
+
+  Input
+    W - spinTensor
+  Output
+    rot - rotation, or orientation with a reference
+  Keywords
+    ref - orientation, the reference the spin starts at, ori0 above
+    side - 'left' or 'right', the side the spin acts on; by default from the frame of W
+  See also
+    spinTensorOf, SO3TangentVector, doEulerStep"""
   from ..geometry.tangent import SO3TangentVector, expVector
   v = vector3d(_axial(W.M))
   if ref is None:

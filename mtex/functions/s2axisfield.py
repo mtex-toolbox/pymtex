@@ -174,12 +174,52 @@ class S2AxisFieldHarmonic(S2AxisField):
 
   @classmethod
   def quadrature(cls, f, *args, bandwidth=None, weights=None):
-    """S2AxisFieldHarmonic.quadrature(f, bandwidth=L), MATLAB's name for the constructor"""
+    """S2AxisFieldHarmonic.quadrature(f, bandwidth=L), MATLAB's name for the constructor
+
+      aF = S2AxisFieldHarmonic.quadrature(f, bandwidth=8)               # of a function returning axes
+      aF = S2AxisFieldHarmonic.quadrature(v, a, bandwidth=8, weights=w)  # of axes a at directions v
+
+    A function is approximated by quadrature on a grid of the bandwidth, axes at scattered
+    directions by the quadrature sum with the weights given; S2AxisFieldHarmonic explains the
+    representation.
+
+    Input
+      f - a function of vector3d returning axes, S2VectorField or S2AxisField, or vector3d of
+          directions
+      args - the axes at the directions, and the frame of the field
+    Output
+      aF - S2AxisFieldHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree; by default the preference
+          'defaultS2Bandwidth', for a field the field's
+      weights - the quadrature weights of axes at scattered directions, equal ones of sum
+          4 pi by default
+    See also
+      S2AxisFieldHarmonic, S2AxisFieldHarmonic.interpolate"""
     return cls(f, *args, bandwidth=bandwidth, weights=weights)
 
   @classmethod
   def interpolate(cls, nodes, values, *, bandwidth=None, weights=None, **kwargs):
-    """the least squares fit to axes at directions: the six components of v v^T one by one"""
+    """the least squares fit to axes at directions: the six components of v v^T one by one;
+    MATLAB's S2AxisFieldHarmonic.interpolate
+
+      aF = S2AxisFieldHarmonic.interpolate(v, a)                              # an axis field through axes a at directions v
+      aF = S2AxisFieldHarmonic.interpolate(v, a, bandwidth=8, lambda_=1e-3)  # of a given degree, regularised
+
+    Each of the six components of the matrices a a^T is fitted by interpolate, a regularised
+    least squares fit, and the field evaluates to the leading eigenvector of the fitted matrix.
+    Further keywords, lambda_, s, maxIter and tol, go to interpolate.
+
+    Input
+      nodes - vector3d, the directions
+      values - vector3d, the axes at the directions
+    Output
+      aF - S2AxisFieldHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree; by default it follows from the number of nodes
+      weights - the weights of the nodes, as interpolate takes them
+    See also
+      interpolate, S2AxisFieldHarmonic.quadrature, S2VectorFieldHarmonic.interpolate"""
     from .density import interpolate
     d = vector3d(nodes.data.reshape(-1, 3)).normalize()
     comps = outerComponents(_values(values))

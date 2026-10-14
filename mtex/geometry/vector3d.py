@@ -404,8 +404,20 @@ class vector3d(MtexArray):
   def byPolar(cls, theta, rho, antipodal=False):
     """the vectors of polar angle theta to z and azimuth rho from x towards y, unit vectors
 
-      v = vector3d.byPolar(theta, rho)
-      v = vector3d.byPolar(theta, rho, antipodal=True)    # axes"""
+      v = vector3d.byPolar(theta, rho)                    # directions
+      v = vector3d.byPolar(theta, rho, antipodal=True)    # axes
+
+    theta and rho broadcast against each other.
+
+    Input
+      theta - the polar angles, 0 at z
+      rho - the azimuths, 0 at x
+    Output
+      v - vector3d of unit vectors
+    Keywords
+      antipodal - the vectors as axes, v and -v one
+    See also
+      vector3d.theta, vector3d.rho, vector3d.byXYZ"""
     theta, rho = np.broadcast_arrays(np.asarray(theta, dtype=float), np.asarray(rho, dtype=float))
     v = cls(np.sin(theta) * np.cos(rho), np.sin(theta) * np.sin(rho), np.cos(theta), antipodal=antipodal)
     v.isNormalized = True
@@ -431,7 +443,21 @@ class vector3d(MtexArray):
       v = vector3d.rand()                     # one random unit vector
       v = vector3d.rand(m, n)                 # an m x n array of them
       v = vector3d.rand(100, antipodal=True)  # random axes
-      v = vector3d.rand(100, sR)              # uniform in the region sR"""
+      v = vector3d.rand(100, sR)              # uniform in the region sR
+      v = vector3d.rand(100, rng=np.random.default_rng(0))  # reproducible
+
+    In a region the uniform vectors outside it are rejected until enough are left.
+
+    Input
+      shape - the sizes of the array, one tuple or several integers, and a sphericalRegion
+          as the last argument
+    Output
+      v - vector3d of unit vectors
+    Keywords
+      antipodal - the vectors as axes
+      rng - the NumPy random generator, a fresh one by default
+    See also
+      rotation.rand, equispacedS2Grid"""
     rng = np.random.default_rng() if rng is None else rng
     sR = shape[-1] if shape and hasattr(shape[-1], "checkInside") else None
     shape = shape[:-1] if sR is not None else shape
@@ -784,7 +810,19 @@ class vector3d(MtexArray):
   # ------------------------------------------------------------------ derived vectors
 
   def normalize(self, zeroToZero=False):
-    """the vectors scaled to unit length; with zeroToZero=True a zero vector stays zero"""
+    """the vectors scaled to unit length; with zeroToZero=True a zero vector stays zero
+
+      v = v.normalize()                             # a zero vector becomes NaN
+      v = v.normalize(zeroToZero=True)              # a zero vector stays zero
+
+    Input
+      v - vector3d
+    Output
+      v - vector3d of unit length, isNormalized set
+    Keywords
+      zeroToZero - keep vectors of length zero at zero instead of NaN
+    See also
+      vector3d.norm"""
     if self.isNormalized:
       return self
     n = self.norm()
@@ -798,7 +836,24 @@ class vector3d(MtexArray):
     return self._new(orthKernel(self.data), isNormalized=True)
 
   def perp(self, robust=False):
-    """the axis best orthogonal to a list of directions, the smallest principal axis"""
+    """the axis best orthogonal to a list of directions, the smallest principal axis
+
+      n = v.perp()                                  # e.g. the zone axis of plane normals
+      n = v.perp(robust=True)                       # outliers left out
+
+    The eigenvector of the smallest eigenvalue of sum v v^T; NaN vectors are left out. A
+    robust fit drops the 20 percent of the directions furthest from orthogonal and fits
+    again, when more than four are given. The result is an axis in the frame of v, in the
+    other display style, a zone axis of planes.
+
+    Input
+      v - vector3d or Miller
+    Output
+      n - vector3d or Miller, antipodal
+    Keywords
+      robust - fit again without the directions furthest from orthogonal
+    See also
+      vector3d.eig, vector3d.cross"""
     v = self[~self.isnan()] if np.any(self.isnan()) else self
     xyz = v.data.reshape(-1, 3)
     w, V = np.linalg.eigh(xyz.T @ xyz)
@@ -945,7 +1000,25 @@ class vector3d(MtexArray):
   def isclose(self, other, antipodal=False, tol=1e-10):
     """isclose(v, w), isclose(v, w, antipodal=True, tol=): pointing the same way up to the group
     of a crystal frame within the tolerance tol of the cosine, and up to sign when antipodal
-    (MATLAB's eq)"""
+    (MATLAB's eq)
+
+      b = v.isclose(w)                              # the same direction
+      b = v.isclose(w, antipodal=True)              # the same axis
+      b = v.isclose(w, tol=1e-6)                    # a coarser tolerance
+
+    True where <v, w> differs from |v| |w| by less than tol, the product reduced over the
+    group of a crystal frame; vectors of different frames are never close. The operator ==
+    compares exactly.
+
+    Input
+      v, w - vector3d or Miller
+    Output
+      b - boolean array
+    Keywords
+      antipodal - up to sign, also when neither vector is antipodal
+      tol - the tolerance of the cosine times the lengths
+    See also
+      vector3d.angle, vector3d.dot"""
     other = self._coerce(other)
     a = self._new(self.data, antipodal=True) if antipodal else self
     if not a._sameBasisAs(other):
@@ -965,20 +1038,69 @@ class vector3d(MtexArray):
     return self._new(qrot(q, self.data))
 
   def exp(self, ref=None, side=None):
-    """the rotation vector to its rotation: at the identity, or at a reference as a tangent vector"""
+    """the rotation vector to its rotation: at the identity, or at a reference as a tangent vector
+
+      rot = exp(v)                                  # the rotation of axis v and angle |v|
+      mori = exp(h)                                 # a crystal direction: a misorientation of its frame
+      ori = exp(h, oriRef)                          # at a reference orientation
+
+    A vector in a crystal frame gives the misorientation of that frame with itself, and is
+    taken on the right of a reference; a specimen vector on the left.
+
+    Input
+      v - vector3d or Miller, the rotation vector: the axis times the angle
+      ref - rotation or orientation, the reference
+    Output
+      rot - rotation, or orientation for a crystal direction or a reference orientation
+    Keywords
+      side - 'left' or 'right', the side of the reference; by default right for a crystal
+          direction, left otherwise
+    See also
+      quaternion.log, quaternion.exp, SO3TangentVector"""
     from .tangent import expVector
     return expVector(self, ref, side)
 
   def symmetrise(self, unique=False, antipodal=None):
     """the symmetrically equivalent directions, numSym x shape, or the distinct ones of one
     direction with unique=True; MATLAB's second output, the multiplicity, is v.multiplicity(),
-    its third the rotations of the frame, v.frame.rotations()"""
+    its third the rotations of the frame, v.frame.rotations()
+
+      hs = h.symmetrise()                           # every image, numSym x shape
+      hs = h.symmetrise(unique=True)                # the distinct ones of one direction
+      hs = h.symmetrise(antipodal=True)             # the negatives too
+
+    With antipodal=True the negatives are added, unless the group holds the inversion or h
+    is an axis; with unique=True an axis, or antipodal=True, takes v and -v as one, and
+    antipodal=False keeps them apart. A vector in no crystal frame is returned with a leading
+    axis of one.
+
+    Input
+      h - Miller
+    Output
+      hs - Miller
+    Keywords
+      unique - the distinct images of a single direction, a flat list
+      antipodal - treat the directions as axes; by default as h says
+    See also
+      Miller.multiplicity, symmetry.rotations"""
     from .symmetryops import symmetrise
     return symmetrise(self, unique=unique, antipodal=antipodal)
 
   def multiplicity(self, antipodal=None):
     """the number of distinct directions symmetrically equivalent to each vector, of axes under
-    antipodal"""
+    antipodal
+
+      n = h.multiplicity()                          # 12 for <110> in 432
+      n = h.multiplicity(antipodal=True)            # 6, the axes
+
+    Input
+      h - Miller
+    Output
+      n - an integer per vector, in the shape of h
+    Keywords
+      antipodal - count the axes, v and -v one; by default as h says
+    See also
+      Miller.symmetrise"""
     from .symmetryops import multiplicity
     return multiplicity(self, antipodal=antipodal)
 
@@ -987,8 +1109,22 @@ class vector3d(MtexArray):
     that of the Laue group; given a centre, the equivalent nearest it instead
     (MATLAB's vector3d.project2FundamentalRegion, Miller.project2FundamentalRegion)
 
-      v.projectIntoFundamentalRegion()
-      v.projectIntoFundamentalRegion(center)"""
+      h = h.projectIntoFundamentalRegion()          # into the sector of an inverse pole figure
+      h = h.projectIntoFundamentalRegion(antipodal=True)  # into the sector of the Laue group
+      h = h.projectIntoFundamentalRegion(center)    # the equivalent nearest a centre
+
+    The sector is the conventional one, fundamentalSector of the frame. Vectors in no
+    crystal frame are returned as they are.
+
+    Input
+      h - Miller
+      center - Miller, the centre the equivalent nearest to it is taken for
+    Output
+      h - Miller, in the shape of h
+    Keywords
+      antipodal - fold the directions as axes, into the sector of the Laue group
+    See also
+      fundamentalSector, projectIntoRegion, Miller.symmetrise"""
     from .symmetryops import projectIntoFundamentalRegion
     v = self
     if antipodal and self.isCrystalDirection:
@@ -997,18 +1133,71 @@ class vector3d(MtexArray):
 
   def find(self, w, epsOrK=None, antipodal=None):
     """the closest points of this list to others, the k closest, or all within a radius; up to sign
-    where either is antipodal, antipodal=True always, False never"""
+    where either is antipodal, antipodal=True always, False never
+
+      ind, d = v.find(w)                            # the nearest of v to every w, and its angle
+      ind, d = v.find(w, 3)                         # the 3 nearest, an integer
+      I, D = v.find(w, 5*degree)                    # all within 5 degree, a float
+
+    The angles are reduced over the group of a crystal frame. Within a radius the result is
+    two sparse matrices of len(w) x len(v), the hits and the angles; large lists of specimen
+    directions are searched by a tree.
+
+    Input
+      v - vector3d, the list searched
+      w - vector3d, the directions searched for
+      epsOrK - the number of neighbours, an integer, or the radius, a float
+    Output
+      ind - the indices into v, in the shape of w; (len(w), k) for k neighbours
+      d - the angles to them
+      I, D - sparse matrices of the hits and of the angles
+    Keywords
+      antipodal - read the directions up to sign; by default where v or w is antipodal
+    See also
+      vector3d.angle, S2Grid.find"""
     from .grids.search import find
     return find(self, w, epsOrK, antipodal)
 
   def transformReferenceFrame(self, to, rule=None, tol=1e-1):
-    """the same direction written in another frame"""
+    """the same direction written in another frame
+
+      h2 = h.transformReferenceFrame(cs2)           # by the axes of the two frames
+      h2 = h.transformReferenceFrame(cs2, rule='byScreenAlignment')  # as the two frames are drawn
+      h2 = h.transformReferenceFrame(cs2, rule=ori) # by a given orientation from one to the other
+
+    The direction keeps its meaning and gets the coordinates of the other frame, in hkl or
+    uvw as it was written; data of two settings of one crystal, 'X||a' and 'X||a*', are
+    combined this way.
+
+    Input
+      h - vector3d or Miller
+      to - the frame to write it in
+    Output
+      h2 - vector3d or Miller in the frame to
+    Keywords
+      rule - 'byAxes' or None, the transition of the two bases; 'byScreenAlignment', the one
+          of the plotting conventions; or an orientation from the frame of h to to
+      tol - how far the transition of the bases may be from a rotation, the norm of
+          I - M M'; a larger deviation is refused
+    See also
+      align, orientation.byScreenAlignment, orientation.transformReferenceFrame"""
     from .frametransform import transformVector
     return transformVector(self, to, rule, tol)
 
   def det(self, b=None, c=None):
     """the triple product, vector3d/det
-    det(a, b, c) the triple product; det(v) of three vectors the determinant of their matrix"""
+    det(a, b, c) the triple product; det(v) of three vectors the determinant of their matrix
+
+      d = det(a, b, c)                              # <a, b x c>, element by element
+      d = det(v)                                    # three vectors as the rows of a matrix
+
+    Input
+      a - vector3d
+      b, c - vector3d, the second and third factor
+    Output
+      d - the triple products
+    See also
+      vector3d.cross, vector3d.dot"""
     if b is None:
       return np.linalg.det(self.data.reshape(3, 3))
     return self.dot(b.cross(c), antipodal=False)

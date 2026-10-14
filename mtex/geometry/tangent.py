@@ -203,8 +203,19 @@ class SO3TangentVector(vector3d):
     """tangent vectors concatenate on one side; the references concatenate with them unless
     every list shares the same one
 
-      v = cat(v1, v2)
-      v = cat(v1, v2, axis=1)    # side by side"""
+      v = cat(v1, v2)            # one after the other
+      v = cat(v1, v2, axis=1)    # side by side
+
+    The vectors are brought to the side of the first operand.
+
+    Input
+      arrays - SO3TangentVector
+    Output
+      v - SO3TangentVector
+    Keywords
+      axis - the axis along which they are joined, as NumPy's concatenate
+    See also
+      SO3TangentVector, vector3d.cat"""
     first = arrays[0]
     arrays = [first._fit(a, sameReference=False) for a in arrays]
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
@@ -311,8 +322,18 @@ class SO3TangentVector(vector3d):
   def angle(self, other=None, **kwargs):
     """the angle of the rotation the vector describes, or the angle between two vectors
 
-      omega = angle(v)
-      omega = angle(v1, v2)"""
+      omega = angle(v)                              # the rotational angle, the length
+      omega = angle(v1, v2)                         # the angle between the vectors
+
+    The second vectors are brought to the reference and side of the first.
+
+    Input
+      v1 - SO3TangentVector
+      other - SO3TangentVector at the same reference
+    Output
+      omega - the angles in radians
+    See also
+      SO3TangentVector.norm, quaternion.log"""
     if other is None:
       return self.norm()
     other = self._fit(other)
@@ -329,7 +350,22 @@ class SO3TangentVector(vector3d):
     return np.logical_and(same, np.all(self.data == other.data, axis=-1))
 
   def isclose(self, other, tol=1e-6):
-    """equal at the same reference within tol in the components (MATLAB's eq)"""
+    """equal at the same reference within tol in the components (MATLAB's eq)
+
+      b = v1.isclose(v2)                            # equal up to 1e-6
+      b = v1.isclose(v2, tol=1e-3)                  # a coarser tolerance
+
+    True where the references are the same and the difference of the vectors, brought to
+    the side of the first, is shorter than tol. The operator == compares exactly.
+
+    Input
+      v1, v2 - SO3TangentVector
+    Output
+      b - boolean array
+    Keywords
+      tol - the largest length of the difference
+    See also
+      SO3TangentVector.angle"""
     same = _sameReference(self.oriRef, other.oriRef)
     other = other.toSide(self.side)
     return np.logical_and(same, np.linalg.norm(self.data - other.data, axis=-1) < tol)
@@ -350,14 +386,40 @@ class SO3TangentVector(vector3d):
   def sum(self, axis=None, **kwargs):
     """the sum of tangent vectors at one shared reference, over all or along an axis
 
-      s = sum(v)
-      s = sum(v, axis=0)"""
+      s = sum(v)                                    # over all
+      s = sum(v, axis=0)                            # along the first axis
+
+    Input
+      v - SO3TangentVector, every one at the same reference
+    Output
+      s - SO3TangentVector at that reference
+    Keywords
+      axis - the axis or axes of the list to sum along, all by default
+    See also
+      SO3TangentVector.mean"""
     ref = self._oneReference()
     axis = tuple(range(self.ndim)) if axis is None else axis
     return self._rebuild(np.sum(self.data, axis=axis), ref)
 
   def mean(self, weights=None, axis=None, **kwargs):
-    """the mean of tangent vectors at one shared reference, weighted when weights are given"""
+    """the mean of tangent vectors at one shared reference, weighted when weights are given
+
+      m = mean(v)                                   # over all
+      m = mean(v, axis=0)                           # along the first axis
+      m = mean(v, weights=w)                        # weighted
+
+    Without weights the vectors that are not a number are left out; with weights they are
+    not.
+
+    Input
+      v - SO3TangentVector, every one at the same reference
+    Output
+      m - SO3TangentVector at that reference
+    Keywords
+      weights - one weight per vector, in the shape of v
+      axis - the axis or axes of the list to average along, all by default
+    See also
+      SO3TangentVector.sum, mean"""
     ref = self._oneReference()
     axis = tuple(range(self.ndim)) if axis is None else axis
     if weights is None:

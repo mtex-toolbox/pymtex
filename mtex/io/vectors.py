@@ -104,12 +104,27 @@ def _headerNames(head):
 
 
 def exportVector3d(v, fname, *args, polar=False, radians=False):
-  """write directions as a text table with a line of column names
+  """write directions as a text table with a line of column names; MATLAB's vector3d/export
 
-    exportVector3d(v, 'vectors.txt')                    the Cartesian components, at their length
-    exportVector3d(v, 'vectors.txt', polar=True)        polar angle and azimuth, in degrees unless radians=True
-    exportVector3d(v, 'vectors.txt', {'weight': w})     one more column per named value
-  """
+    export(v, 'vectors.txt')                            # the Cartesian components, at their length
+    export(v, 'vectors.txt', polar=True)                # polar angle and azimuth in degrees
+    export(v, 'vectors.txt', polar=True, radians=True)  # the angles in radians
+    export(v, 'vectors.txt', {'weight': w})             # one more column per named value
+
+  The file has a line of column names, x y z or polar angle and azimuth angle, and one row per
+  vector, the table loadVector3d reads back. A dict passed adds a column per key, one value
+  per vector.
+
+  Input
+    v - vector3d
+    fname - the name of the file
+  Output
+    fname - the name of the file written
+  Keywords
+    polar - the polar coordinates instead of x, y, z
+    radians - the polar coordinates in radians instead of degrees
+  See also
+    loadVector3d, cprintf"""
   refuseFlags(args, "export")
   extra = {}
   for a in args:

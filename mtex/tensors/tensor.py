@@ -391,7 +391,24 @@ class tensor(MtexArray):
     return not self == other
 
   def isclose(self, other, rtol=1e-8, atol=0.0):
-    """whether two tensors of one rank and shape agree coefficientwise within rtol and atol"""
+    """whether two tensors of one rank and shape agree coefficientwise within rtol and atol;
+    MATLAB's eq, T1 == T2
+
+      T1.isclose(T2)                 # equal up to rounding
+      T1.isclose(T2, atol=1e-3)      # every coefficient within 1e-3
+
+    The comparison is that of np.allclose, |a - b| <= atol + rtol |b|, over all coefficients;
+    one answer for the whole list. T1 == T2 is the exact equality, of the frame too.
+
+    Input
+      T1, T2 - tensor
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the coefficients of T2
+      atol - the absolute tolerance
+    See also
+      tensor.checkSymmetry, tensor.norm"""
     return isinstance(other, tensor) and other.rank == self.rank and self.data.shape == other.data.shape and bool(np.allclose(self.data, other.data, rtol=rtol, atol=atol))
 
   def norm(self):
@@ -611,16 +628,42 @@ class tensor(MtexArray):
     return self._rebuild(out / len(Q))
 
   def checkSymmetry(self, atol=1e-6):
-    """whether the tensor is invariant under every element of the group of its frame, up to atol
-    relative to the largest norm"""
+    """whether the tensor is invariant under every element of the group of its frame; MATLAB's
+    checkSymmetry
+
+      tf = T.checkSymmetry()               # invariant up to 1e-6 of its norm
+      tf = T.checkSymmetry(atol=1e-3)      # up to 1e-3 of its norm
+
+    Input
+      T - tensor
+    Output
+      tf - bool, one answer for the whole list
+    Keywords
+      atol - the tolerance relative to the largest norm of the tensors
+    See also
+      symmetrise, tensor.isclose"""
     scale = atol * max(float(np.max(self.norm())) if self.size else 0.0, 1e-12)
     return all(np.allclose(_applyMatrix(self.M, q, self.rank), self.data, atol=scale) for q in self._frame.rot.matrix())
 
   # ------------------------------------------------------------------ magnitudes
 
   def directionalMagnitude(self, v=None):
-    """the tensor contracted with the unit direction on every index; without a direction the
-    function on the sphere, a polynomial of the rank's degree"""
+    """the magnitude of a tensor in the direction v, the tensor contracted with the unit
+    direction on every index, T_i1...iR v_i1 ... v_iR; MATLAB's directionalMagnitude
+
+      q = T.directionalMagnitude(v)      # at the directions v
+      q = T.directionalMagnitude()       # the function on the sphere
+
+    Without a direction the function on the sphere, a polynomial of the degree of the rank,
+    antipodal for an even rank.
+
+    Input
+      T - tensor
+      v - vector3d or Miller, the directions; left out for the function
+    Output
+      q - the magnitudes, or an S2FunHarmonic of the direction
+    See also
+      YoungsModulus, linearCompressibility, EinsteinSum"""
     if v is None:
       from ..functions.s2fun import S2FunHarmonic
       return S2FunHarmonic(lambda x: self.directionalMagnitude(x), self._frame, bandwidth=max(self.rank, 1), real=True,
@@ -749,8 +792,24 @@ class tensor(MtexArray):
 
   @classmethod
   def cat(cls, *arrays, axis=0):
-    """the list of tensors of different densities keeps one density per tensor, as MATLAB's
-    [C1, C2] does, which is what a weighted mean averages"""
+    """the list of the tensors, MATLAB's [T1, T2]
+
+      T = tensor.cat(T1, T2)              # one after the other
+      C = cat(C1, C2)                     # the same, the class taken from the first
+      T = tensor.cat(T1, T2, axis=1)      # along the second axis of their lists
+
+    The tensors have to agree in what they carry, the rank and the frame. Tensors of
+    different densities keep one density per tensor, as MATLAB's [C1, C2] does, which is
+    what a weighted mean averages; tensors with and without a density are refused.
+
+    Input
+      T1, T2, ... - tensor
+    Output
+      T - tensor, the list
+    Keywords
+      axis - the axis of the list along which the tensors are joined
+    See also
+      cat, tensor.mean"""
     dens = [a.density for a in arrays]
     if all(d is None for d in dens) or all(d is not None and np.array_equal(d, dens[0]) for d in dens):
       return super().cat(*arrays, axis=axis)
@@ -770,12 +829,25 @@ class tensor(MtexArray):
 
   @classmethod
   def eye(cls, *args, rank=None, **kwargs):
-    """the identity tensor, rank two the unit matrix, rank four the symmetric identity on rank two
-    tensors; the rank of the class unless rank= is given
+    """the identity tensor, of rank two the unit matrix, of rank four the symmetric identity on
+    rank two tensors; MATLAB's tensor.eye
 
-      tensor.eye(cs)
-      stiffnessTensor.eye()
-      tensor.eye(rank=4)"""
+      T = tensor.eye(cs)                  # the unit matrix in the frame cs
+      C = stiffnessTensor.eye()           # the identity of rank four
+      T = tensor.eye(rank=4)              # a plain tensor of rank four
+      T = tensor.eye(cs, unit='GPa')      # with a unit
+
+    The frame is the reference frame among the arguments; other keywords go to the
+    constructor of the class (unit, name, density, ...).
+
+    Input
+      cs - referenceFrame, the frame, the specimen frame without one
+    Output
+      T - a tensor of the class
+    Keywords
+      rank - 2 or 4, by default the rank of the class, two for a plain tensor
+    See also
+      tensor.ones, tensor.zeros, tensor.rand"""
     fr, _ = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     if rank == 2:
@@ -788,19 +860,45 @@ class tensor(MtexArray):
 
   @classmethod
   def ones(cls, *args, rank=None, **kwargs):
-    """a tensor of ones of the rank of the class, or of rank=, the list shape given by the numbers
+    """a tensor of ones of the rank of the class, or a list of them; MATLAB's tensor.ones
 
-      T = tensor.ones(cs, 5)
-      T = tensor.ones(2, 3, rank=4)"""
+      T = tensor.ones(cs, 5)              # five tensors of rank two in the frame cs
+      T = tensor.ones(2, 3, rank=4)       # a 2 x 3 list of tensors of rank four
+
+    The numbers among the arguments give the shape of the list, a reference frame the frame;
+    other keywords go to the constructor of the class (unit, name, ...).
+
+    Input
+      n, m, ... - the shape of the list
+      cs - referenceFrame, the frame
+    Output
+      T - a tensor of the class
+    Keywords
+      rank - the rank, by default that of the class, two for a plain tensor
+    See also
+      tensor.zeros, tensor.eye, tensor.rand"""
     return cls._filled(np.ones, args, rank, kwargs)
 
   @classmethod
   def zeros(cls, *args, rank=None, **kwargs):
-    """a tensor of zeros of the rank of the class, or of rank=, the list shape given by the numbers
+    """a tensor of zeros of the rank of the class, or a list of them; MATLAB's tensor.zeros
 
-      T = tensor.zeros(cs, 5)
-      T = tensor.zeros(rank=4)
-      C = stiffnessTensor.zeros(cs)"""
+      T = tensor.zeros(cs, 5)             # five tensors of rank two in the frame cs
+      T = tensor.zeros(rank=4)            # one tensor of rank four
+      C = stiffnessTensor.zeros(cs)       # a stiffness tensor of zeros
+
+    The numbers among the arguments give the shape of the list, a reference frame the frame;
+    other keywords go to the constructor of the class (unit, name, ...).
+
+    Input
+      n, m, ... - the shape of the list
+      cs - referenceFrame, the frame
+    Output
+      T - a tensor of the class
+    Keywords
+      rank - the rank, by default that of the class, two for a plain tensor
+    See also
+      tensor.ones, tensor.eye, tensor.rand"""
     return cls._filled(np.zeros, args, rank, kwargs)
 
   # a list of tensors of the class filled by np.ones or np.zeros, the frame and the list shape
@@ -813,15 +911,31 @@ class tensor(MtexArray):
 
   @classmethod
   def rand(cls, *args, rank=None, rng=None, **kwargs):
-    """a random tensor with the symmetries its class and frame ask for: a plain tensor of entries
-    drawn uniformly from [0, 1], as MATLAB's, a symmetric one the symmetric part of such a tensor,
-    symmetrised in its frame, a stiffness or compliance one positive definite besides; the numbers
-    give the list shape, rank= the rank of a plain tensor, rng= the generator
+    """a random tensor with the symmetries its class and frame ask for; MATLAB's rand of a tensor
+    class
 
-      T = tensor.rand(rank=4)
-      T = tensor.rand(100, cs, rank=2)
-      S = complianceTensor.rand()
-      C = stiffnessTensor.rand(cs, rng=np.random.default_rng(0))"""
+      T = tensor.rand(rank=4)                                    # entries uniform in [0, 1]
+      T = tensor.rand(100, cs, rank=2)                           # a list of 100 in the frame cs
+      S = complianceTensor.rand()                                # a random compliance tensor
+      C = stiffnessTensor.rand(cs, rng=np.random.default_rng(0))  # reproducible, of the symmetry of cs
+
+    A plain tensor has independent entries drawn uniformly from [0, 1], as MATLAB's, and none
+    of the symmetries a physical tensor would have. A symmetric one (strain, stress, ...) is
+    the symmetric part of such a tensor, symmetrised in its frame; a stiffness or compliance
+    tensor is besides made positive definite, as the class requires. The numbers among the
+    arguments give the shape of the list, a reference frame the frame; other keywords go to
+    the constructor of the class.
+
+    Input
+      n, m, ... - the shape of the list
+      cs - referenceFrame, the frame
+    Output
+      T - a tensor of the class
+    Keywords
+      rank - the rank of a plain tensor, by default that of the class, two for a plain tensor
+      rng - the NumPy random generator, a fresh one by default
+    See also
+      tensor.ones, tensor.zeros, tensor.eye"""
     rng = np.random.default_rng() if rng is None else rng
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
@@ -1019,7 +1133,23 @@ doubleContract = colon
 
 
 def dyad(a, b=None, n=None):
-  """the outer product of tensors or vectors"""
+  """the dyadic product of tensors or vectors, their outer product; MATLAB's dyad
+
+    T = dyad(T1, T2)       # the outer product, of the ranks added
+    T = dyad(v, 3)         # the third dyadic power v x v x v
+
+  A vector counts as a tensor of rank one; a single argument is returned as a tensor. The
+  power is given as the second argument; the keyword n is not used.
+
+  Input
+    a - tensor or vector3d, T1 above
+    b - tensor or vector3d, T2 above, or an integer power
+  Output
+    T - tensor
+  Keywords
+    n - not used
+  See also
+    EinsteinSum, colon"""
   if b is None and n is None:
     return a if isinstance(a, tensor) else tensor(a)
   if isinstance(b, (int, np.integer)) and n is None:
@@ -1129,7 +1259,22 @@ class stressTensor(tensor):
 
   @staticmethod
   def uniaxial(v, sigma=1.0):
-    """the stress of a uniaxial tension along v"""
+    """the stress of a uniaxial tension along v, sigma v v^T
+
+      sigma = stressTensor.uniaxial(v)               # of unit magnitude
+      sigma = stressTensor.uniaxial(v, sigma=100)    # of magnitude 100
+      sigma = -stressTensor.uniaxial(v)              # a uniaxial compression
+
+    The tensor is in the frame of v, the default specimen frame for a direction without one.
+
+    Input
+      v - vector3d or Miller, the tension direction
+    Output
+      sigma - stressTensor
+    Keywords
+      sigma - the magnitude of the stress
+    See also
+      SchmidFactor, velocityGradientTensor.uniaxial"""
     v = asVector3d(v)
     u = v.normalize().data
     return stressTensor(sigma * u[..., :, None] * u[..., None, :], v.frame if v.frame is not None else specimenFrame.default)
@@ -1448,14 +1593,37 @@ def symmetrise(T):
 
 
 def checkSymmetry(T, atol=1e-6):
-  """checkSymmetry(T) is T.checkSymmetry(): whether the tensor is invariant under the group of its
-  frame"""
+  """whether the tensor is invariant under the group of its frame, T.checkSymmetry(); MATLAB's
+  checkSymmetry
+
+    tf = checkSymmetry(T)                # invariant up to 1e-6 of its norm
+    tf = checkSymmetry(T, atol=1e-3)     # up to 1e-3 of its norm
+
+  Input
+    T - tensor
+  Output
+    tf - bool, one answer for the whole list
+  Keywords
+    atol - the tolerance relative to the largest norm of the tensors
+  See also
+    tensor.checkSymmetry, symmetrise"""
   return T.checkSymmetry(atol)
 
 
 def directionalMagnitude(T, v=None):
-  """directionalMagnitude(T, v) is T.directionalMagnitude(v): the tensor contracted with the direction
-  on every index, without v the function on the sphere"""
+  """the magnitude of a tensor in the direction v, the tensor contracted with the unit direction
+  on every index, T.directionalMagnitude(v); MATLAB's directionalMagnitude
+
+    q = directionalMagnitude(T, v)      # at the directions v
+    q = directionalMagnitude(T)         # the function on the sphere
+
+  Input
+    T - tensor
+    v - vector3d or Miller, the directions; left out for the function
+  Output
+    q - the magnitudes, or an S2FunHarmonic of the direction
+  See also
+    tensor.directionalMagnitude, YoungsModulus"""
   return T.directionalMagnitude(v)
 
 

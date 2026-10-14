@@ -239,7 +239,29 @@ def _currentSections():
 
 
 def plotSections(oS, columns=0, field=True, **kw: Unpack[PlotKeywords]):
-  """plot(oS): the charts of a section plot with the reference field of every section"""
+  """the empty charts of a section plot, one per section, with the reference field of every
+  section; MATLAB's ODFSections/plot
+
+    plot(oS)                                       # the charts of the sections
+    fig = plotSections(oS, columns=2)              # in two columns
+    plotSections(oS, field=False)                  # without the reference fields
+
+  A section plot of orientations or of a function draws into these charts; the figure keeps
+  oS as its sections, so that later plots of orientations, fibres or annotations go into the
+  section each lies in. Sections that rescale their coordinate show the sector all of them
+  lie in. The other keywords are those of the spherical charts, figSize and layout among
+  them.
+
+  Input
+    oS - ODFSections, as phi2Sections or sigmaSections
+  Output
+    fig - mtexFigure
+  Keywords
+    columns - the number of columns of sections; by default a grid near a slightly wide
+        picture
+    field - draw the field each section counts its coordinate from, where it has one
+  See also
+    plotSection, phi2Sections, sigmaSections, newODFSectionPlot"""
   projKw, axesKw, whereKw = _split(kw)
   fig, plots = _sectionAxes(oS, columns, axesKw, whereKw, field=field)
   return fig
@@ -255,7 +277,25 @@ def annotateSection(ori, *args, **kw: Unpack[PlotKeywords]):
 
 
 def plotFibreSection(f, points=1000, lineColor="k", **kw: Unpack[PlotKeywords]):
-  """plot(f) on a section plot: the fibre as a chain of dots through the sections"""
+  """a fibre on the current section plot, as a chain of dots through the sections it passes;
+  what plot(f) does on a section plot
+
+    odf.plotSection(); plot(f)                     # the fibre over the sections of an ODF
+    plot(f, points=200, lineColor='r')             # fewer and red dots
+    plotFibreSection(f)                            # the same, called directly
+
+  The fibre is sampled at evenly spaced orientations, each drawn as a dot in the section it
+  lies in. Further keywords go to the markers, as markerSize; lineWidth is ignored.
+
+  Input
+    f - fibre
+  Output
+    h - list of the marker handles
+  Keywords
+    points - the number of orientations along the fibre
+    lineColor - the colour of the dots
+  See also
+    fibre, plotSection, annotateSection"""
   oS = _currentSections()
   kw.pop("add2all", None)
   kw.pop("lineWidth", None)

@@ -269,9 +269,37 @@ def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[Pl
 
 
 def plotIPF(o, *args, points=None, all=False, **kw: Unpack[PlotKeywords]):
-  """plotIPF(ori, r), plotIPF(ori, data, r), plotIPF(odf, r): the inverse pole figures of a list
-  of orientations, the crystal directions along r as markers on the crystal sector, or of an ODF
-  (MATLAB's plotIPDF)"""
+  """inverse pole figures, one per specimen direction: of an ODF or of a list of orientations;
+  MATLAB's plotIPDF
+
+    plotIPF(odf, [xvector, zvector])               # the inverse pole figures of an ODF
+    plotIPF(odf, zvector, antipodal=True, complete=True)  # over the whole sphere
+    plotIPF(ori, [xvector, zvector])               # the crystal directions as markers
+    plotIPF(ori, ori.angle(), r)                   # the markers coloured by a value per orientation
+    plotIPF(ori, r, points=100)                    # at most 100 orientations drawn
+    plotIPF(ori, r, all=True)                      # every orientation drawn
+    plotIPF(ori, r, contourf=True)                 # the density of the directions, filled contours
+
+  An inverse pole figure shows which crystal directions, with all their equivalents folded
+  into the fundamental sector of the crystal, point along the specimen direction r. For an
+  ODF it is the density odf.radon(r=r), drawn with the keywords of a spherical function:
+  contourf, contour, pcolor, colorRange, resolution, antipodal, complete. For a list of
+  orientations the crystal directions are drawn as markers, coloured by a value or an RGB
+  colour per orientation when one is given, or, with contourf=True or another filled
+  style, as their density. A large list is thinned to a random selection, about 100000
+  markers divided by the order of the symmetries. A fibre is drawn as the dots of 1000
+  orientations along it. MATLAB's points='all' is all=True.
+
+  Input
+    odf - SO3Fun, an ODF
+    ori - orientation, or a fibre
+    data - a value or an RGB colour per orientation, optional
+    r - vector3d or a list of them, the specimen directions, one inverse pole figure each
+  Keywords
+    points - the number of orientations drawn at most, a random selection
+    all - draw every orientation, however many
+  See also
+    plotPF, ipfColorKey, inversePoles, SO3Fun.radon, PlotTypes"""
   o, points, all = _fibreAsCurve(o, points, all, kw)
   if not isinstance(o, orientation):
     return sphericalplot.plotIPF(o, *args, **kw)
@@ -294,8 +322,30 @@ def _pfTitle(pf, i):
 
 
 def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw: Unpack[PlotKeywords]):
-  """plot(pf), plot(pf, contourf=True), plot(pf, minmax=True): a measured pole figure, or a data
-  set of them in a row, the specimen directions as markers coloured by intensity"""
+  """measured pole figures in a row, the specimen directions as markers coloured by intensity;
+  MATLAB's PoleFigure/plot
+
+    plot(pf)                                       # every pole figure of the data set
+    plot(pf.select(0))                             # only the first pole figure
+    pf.plot(contourf=True)                         # filled contours of the harmonic expansion
+    pf.plot(contourf=True, bandwidth=16)           # of an expansion to degree 16
+    pf.plot(minmax=True)                           # with the minimum and the maximum
+    pf.plot(colorRange='equal')                    # one colour range over all pole figures
+
+  With contourf, contour, pcolor or smooth (MATLAB's flags, keywords here) each pole figure is
+  first expanded into spherical harmonics, S2FunHarmonic(pf.select(i)), and drawn as a
+  function on the sphere. The other keywords are those of plot of vector3d; mtexColorbar adds
+  the colour bars.
+
+  Input
+    pf - PoleFigure
+  Keywords
+    colorRange - 'individual', each pole figure its own range, 'equal', one range over all,
+        or (lo, hi)
+    bandwidth - the harmonic degree of the expansion a filled style draws; by default that of
+        S2FunHarmonic
+  See also
+    plotPF, PoleFigure.plotDiff, mtexColorbar, PoleFigurePlot"""
   from ..functions.s2fun import S2FunHarmonic
   flag = fillFlag(kw, None)
   titles = [_pfTitle(pf, i) for i in range(pf.numPF)]
@@ -307,9 +357,30 @@ def _plotPoleFigure(pf, colorRange="individual", bandwidth=None, **kw: Unpack[Pl
 
 
 def plotDiff(pf, other, mode="relative", epsilon=None, **kw: Unpack[PlotKeywords]):
-  """plotDiff(pf, odf), plotDiff(pf, pf2, 'l1'): the difference between a measured pole figure
-  and a recalculated one, or two measurements, as a pole figure of the error; plotDiff(odf, pf)
-  the same, plotDiff(odf1, odf2) the sections of their difference"""
+  """the difference between measured pole figures and recalculated ones, or two measurements,
+  drawn as pole figures of the error; MATLAB's plotDiff
+
+    plotDiff(pf, odf)                              # the damped relative error of a recalculation
+    plotDiff(pf, pf2)                              # against other pole figures
+    pf.plotDiff(odf, 'RP')                         # the RP error, where the recalculation exceeds 1
+    pf.plotDiff(odf, mode='l1')                    # the absolute difference
+    pf.plotDiff(odf, epsilon=1)                    # another damping
+    plotDiff(odf, pf)                              # the same, with one colour range
+    plotDiff(odf1, odf2)                           # the ODF sections of the difference of two ODFs
+
+  The error is calcErrorPF(pf, other, mode, epsilon), drawn with a colour bar; MATLAB's flags
+  'RP', 'l1', 'l2' are taken as keywords set to True too. Where neither argument is a
+  PoleFigure the difference of the two functions is drawn by plotSection. The other keywords
+  are those of plot(pf).
+
+  Input
+    pf - PoleFigure, the measurement
+    other - SO3Fun, the ODF of the recalculation, or PoleFigure on the same directions
+  Keywords
+    mode - 'relative', 'RP', 'l1' or 'l2', as calcErrorPF
+    epsilon - the damping of 'relative' (0.5) or the threshold of 'RP' (1)
+  See also
+    calcErrorPF, PoleFigure.calcError, PoleFigure.plot, plotSection"""
   from ..functions.polefigure import calcErrorPF
   # plotDiff(odf, pf): the same error, plotDiff(odf1, odf2) the sections of the difference
   if not isinstance(pf, PoleFigure):

@@ -157,11 +157,24 @@ class zeroRangeMethod:
       self._h.append(vector3d(hs, frame=pf.CS))
 
   def checkZeroRange(self, x, i=None):
-    """which orientations the zero range method rules out: those some pole figure is zero at in
-    one of their symmetric poles; with i, which directions the i-th pole figure is zero at
+    """which orientations the zero range method rules out, those some pole figure is zero at in
+    one of their symmetric poles; MATLAB's checkZeroRange
 
-      zrm.checkZeroRange(ori)
-      zrm.checkZeroRange(v, i)"""
+      isZero = zrm.checkZeroRange(ori)     # the orientations ruled out by any pole figure
+      isZero = zrm.checkZeroRange(v, i)    # the directions the i-th pole figure is zero at
+
+    A direction is in the zero range of a pole figure where the kernel density of its
+    measured directions exceeds the threshold and the kernel sum, positive at intensities
+    above the background and negative below, is negative there.
+
+    Input
+      zrm - zeroRangeMethod
+      ori - orientation, or v - vector3d, the specimen directions with an index
+      i - the index of the pole figure, counted from zero
+    Output
+      isZero - bool array, one entry per orientation or direction
+    See also
+      zeroRangeMethod, MLSSolver, calcODF"""
     if i is not None:
       v = vector3d(x.flatten().normalize().data)
       d = np.real(self.density[i](v))
@@ -308,8 +321,24 @@ class MLSSolver:
     return self
 
   def initRegularisation(self, epsilon=None):
-    """a discrete Laplacian on the grid: minus the dots within two halfwidths off the
-    diagonal, the row sums on it"""
+    """sets the regularisation matrix of the solver, its weight times a discrete Laplacian on
+    the grid; MATLAB's initRegularisation
+
+      solver.initRegularisation()                    # the neighbours within two halfwidths
+      solver.initRegularisation(epsilon=15*degree)   # within 15 degree
+
+    Off the diagonal the matrix holds minus the dots of the grid orientations closer than
+    epsilon, on the diagonal minus the sum of the row's other entries. init calls it when the
+    solver has a regularisation weight.
+
+    Input
+      solver - MLSSolver, initialised
+    Output
+      solver - the solver, its RM set
+    Keywords
+      epsilon - the radius of the neighbours, by default twice the halfwidth of the kernel
+    See also
+      MLSSolver, calcODF"""
     from scipy import sparse
     eps = 2 * self.psi.halfwidth() if epsilon is None else epsilon
     from ..geometry.grids.orientationtree import gridRadius

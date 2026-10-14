@@ -85,7 +85,20 @@ class voxelLattice:
     return voxelLattice(self.origin, self.D, self.ijk[np.asarray(flat)])
 
   def positions(self, ijk=None):
-    """the positions of every voxel of the index, or of an array of indices"""
+    """the positions of the voxels of the lattice, or of given indices
+
+      P = ebsd3.lattice.positions()                            # every voxel of the index, (n, 3)
+      P = ebsd3.lattice.positions([[1, 2, 3]])                 # the voxel (1, 2, 3)
+
+    The position of the index (i, j, k) is origin + i d1 + j d2 + k d3. The lattice of a
+    volume is ebsd3.lattice; this port's, MATLAB keeps the unit cell and d1, d2, d3 instead.
+
+    Output
+      P - (..., 3) array of positions in the scan unit
+    Keywords
+      ijk - (..., 3) integer indices; by default the index of the lattice, l.ijk
+    See also
+      voxelLattice.fromPositions, voxelLattice.index"""
     ijk = self.ijk if ijk is None else np.asarray(ijk)
     return self.origin + ijk @ self.D
 
@@ -95,8 +108,26 @@ class voxelLattice:
 
   @classmethod
   def fromPositions(cls, P, D=None):
-    """the lattice of positions P: the translations inferred as the shortest independent differences
-    to the neighbours, or taken from D, the index rounded and checked to a quarter cell"""
+    """the lattice of voxels positions lie on
+
+      l = voxelLattice.fromPositions(P)                        # the translations inferred
+      l = voxelLattice.fromPositions(P, D)                     # known translations, the rows of D
+
+    Without D the translations d1, d2, d3 are the three shortest independent differences from
+    a voxel to its neighbours, ordered and signed to run along x, y and z as far as they can,
+    as MATLAB's gridify orders the edges of the unit cell. The index of every position is
+    rounded and must lie within a quarter cell of an integer; two positions on one voxel, or
+    positions off one lattice, raise a ValueError. The origin is the corner of the box of
+    indices, so every index is nonnegative.
+
+    Input
+      P - (n, 3) array of positions, at least four
+    Output
+      l - voxelLattice
+    Keywords
+      D - the three translations as the rows of a 3 x 3 array
+    See also
+      voxelLattice.positions, EBSD3.gridify"""
     P = np.asarray(P, dtype=float).reshape(-1, 3)
     if len(P) < 4:
       raise ValueError("a volume needs at least four voxels")

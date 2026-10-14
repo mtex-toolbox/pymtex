@@ -87,11 +87,33 @@ def fitDislocationSystems(kappa, dS):
 
 
 def calcGND(ebsd, dS, stencil="oneSided"):
-  """gnd, rho = calcGND(ebsd, dS): the geometrically necessary dislocation content of every
-  pixel after Pantleon (2008), MATLAB's route: the curvature of the map, the systems rotated
-  into every pixel, the densities of least total line energy reproducing the curvature. The
-  content is the sum of the line energies times the absolute densities, in 1/m^2 for line
-  energies without a unit, and the densities one row per pixel"""
+  """the geometrically necessary dislocation content of every pixel after Pantleon (2008);
+  MATLAB's calcGND
+
+    gnd, rho = calcGND(ebsd, dS)                    # the content and the densities per system
+    gnd, rho = calcGND(ebsd, dS, stencil='full')    # the curvature from all eight neighbours
+
+  MATLAB's route: the curvature of the map, the dislocation systems rotated into every pixel,
+  and the densities of least total line energy that reproduce the curvature, a linear
+  program per pixel. The content is the sum of the line energies dS.u times the absolute
+  densities, in 1/m^2 for line energies without a unit. The map should be smoothed first, a
+  noisy curvature gives noisy densities.
+
+  Input
+    ebsd - EBSD of one phase, gridded or with a lattice
+    dS - dislocationSystem, the systems in crystal coordinates
+  Output
+    gnd - the dislocation content of every pixel, the shape of the map
+    rho - the density of every system at every pixel, one row per pixel
+  Keywords
+    stencil - the neighbours the curvature is taken from: 'oneSided' the one sided
+        differences along the lattice directions, 'lattice' the central difference over the
+        whole stencil of the lattice, 'full' the same with the diagonals
+  References
+    W. Pantleon, Resolving the geometrically necessary dislocation content by conventional
+        electron backscattering diffraction, Scripta Materialia 58 (2008) 994-997
+  See also
+    GND, curvature, dislocationSystem, fitDislocationSystems"""
   # the curvature of the map, or of the volume, whose curvature is complete
   kappa = ebsd.curvature(stencil=stencil)
   dSRot = ebsd.orientations.reshape(-1, 1) * dS

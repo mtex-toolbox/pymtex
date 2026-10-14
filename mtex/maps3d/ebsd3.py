@@ -167,8 +167,27 @@ class EBSD3(EBSD):
   # ------------------------------------------------------------------ the array
 
   def gridify(self, return_index=False):
-    """the list on the (n1, n2, n3) array of its lattice, every cell no voxel occupies padded as
-    notIndexed; with return_index the flat array index of every voxel of the list"""
+    """a list of voxels put back onto the (n1, n2, n3) array of its lattice; MATLAB's gridify of
+    EBSD3
+
+      g = ebsd3['Iron'].gridify()                              # the selection on its lattice
+      g, newId = ebsd3['Iron'].gridify(return_index=True)      # and where every voxel went
+
+    A selection from a volume, ebsd3['Iron'] or ebsd3[condition], is a list of voxels that
+    keeps the lattice of the grid it came from. gridify rebuilds that grid: every voxel goes
+    to its lattice cell, and the cells no voxel occupies are padding, notIndexed with a NaN
+    rotation, NaN (or 0) properties and ebsd.isPadding set. A volume that is gridded already
+    is returned as it is.
+
+    Input
+      ebsd - EBSD3 whose positions lie on a lattice of voxels
+    Output
+      g - EBSD3square, the gridded volume, g.pos.flat[newId] the positions of the list
+      newId - the flat (C order) array index of every voxel of the list, with return_index
+    Keywords
+      return_index - return newId as well
+    See also
+      EBSD3square, EBSD.gridify, calcGrains, voxelLattice"""
     if self.isGridded:
       return (self, np.arange(self.size)) if return_index else self
     l = self.lattice
@@ -231,13 +250,28 @@ class EBSD3(EBSD):
     return EBSD3(*args, **kw) if len(shape) == 3 else EBSD(*args, **kw)
 
   def slice(self, plane, P0=None):
-    """the section through a plane: the volume sampled on a square grid of the voxel spacing in
-    the plane, spanned by the direction of the box nearest to the plane and the one across; the
-    plane is a plane3d, or its normal with a point on it or its distance from the origin
+    """the 2D map of the section of a volume through a plane; MATLAB's slice of EBSD3
 
-      ebsd = ebsd3.slice(plane3d(vector3d.Z, vector3d(0, 0, 0.15)))
-      ebsd = ebsd3.slice(vector3d(1, 1, 1), vector3d(0, 0, 0))   # normal and point
-      ebsd = ebsd3.slice(vector3d.Z, 0.15)                        # normal and distance"""
+      ebsd = ebsd3.slice(plane3d(vector3d.Z, vector3d(0, 0, 2)))  # a plane3d
+      ebsd = ebsd3.slice(vector3d(1, 1, 1), vector3d(1, 1, 2))    # normal and a point on the plane
+      ebsd = ebsd3.slice(vector3d.Z, 2.5)                         # normal and distance from the origin
+
+    The volume is sampled on a square grid of the voxel spacing in the plane, spanned by the
+    edge of the bounding box that lies most in the plane and the direction across it, the
+    grid covering the section of the box. Every grid point takes the voxel holding it, as
+    interp does; the points outside the volume are not indexed. The result is a gridded EBSD
+    map whose positions lie in the plane.
+
+    Input
+      ebsd3 - EBSD3
+      plane - plane3d, or the normal vector3d of the plane
+    Output
+      ebsd - EBSD, a gridded map in the plane
+    Keywords
+      P0 - with a normal: a point on the plane, a vector3d, or its distance from the origin;
+          by default the plane through the origin
+    See also
+      EBSD3.interp, grain3d.slice, plane3d, EBSD3Plotting"""
     if not isinstance(plane, plane3d):
       plane = plane3d(plane, P0 if P0 is not None else 0)
     N = plane.N.normalize().data.reshape(3)

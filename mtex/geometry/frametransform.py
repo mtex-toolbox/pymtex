@@ -17,8 +17,27 @@ from .vector3d import vector3d
 
 
 def align(frA, frB, tol=1e-1):
-  """the orientation two frames stand in by their axes: a point at v in frA sits at
-  align(frA, frB) * v in frB; the transition has to be a rotation"""
+  """the orientation two frames stand in by their axes, MATLAB's orientation.align
+
+    ori = align(cs1, cs2)              # the rotation from the axes of cs1 to those of cs2
+    ori = align(cs1, cs2, tol=1e-3)    # a transition nearer a rotation demanded
+
+  A point sitting at v in frA sits at ori * v in frB. Unlike orientation.byScreenAlignment,
+  which infers the rotation from how the two frames are drawn, this reads the two bases: it is
+  the rotation of referenceFrame.transformationMatrix, which vector3d.transformReferenceFrame
+  applies to move data from one frame into the other. The orientation is between the frames
+  without their groups (stripSym).
+
+  Input
+    frA - referenceFrame, the source
+    frB - referenceFrame, the target
+  Output
+    ori - orientation from frA to frB
+  Keywords
+    tol - how far, as the norm of I - M M', the transition M may be from a rotation; a
+        larger deviation is refused
+  See also
+    orientation.byScreenAlignment, referenceFrame.isCompatible, transformReferenceFrame"""
   from .orientation import orientation
   M = frA.transformationMatrix(frB)
   dev = np.linalg.norm(np.eye(3) - M @ M.T)

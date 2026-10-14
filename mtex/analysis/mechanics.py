@@ -105,17 +105,32 @@ def calcShearStress(sigma, sS):
 
 
 def SchmidFactor(sS, sigma=None, relative=False):
-  """the Schmid factor of slip systems under a stress tensor: the shear the stress resolves
-  on the system over the difference of the extreme principal stresses, so that a uniaxial
-  tension gives the direction cosines; without a load the functions of the tension
-  direction on the sphere, one function for one system and a vector valued one for several,
-  antipodal as a tension along r and along -r are one load; relative=True divides by the
-  critical resolved shear stress of every system
+  """the Schmid factor of slip systems under a stress tensor or a uniaxial tension; MATLAB's
+  SchmidFactor
 
-    sF = SchmidFactor(sS)  # a function of the tension direction
-    tau = SchmidFactor(sS, v)  # under a uniaxial tension along v
-    tau = SchmidFactor(sS, sigma)
-    tau = SchmidFactor(sS, sigma, relative=True)"""
+    sF = SchmidFactor(sS)                         # a function of the tension direction
+    tau = SchmidFactor(sS, v)                     # under a uniaxial tension along v
+    tau = SchmidFactor(sS, sigma)                 # under a stress tensor
+    tau = SchmidFactor(sS, sigma, relative=True)  # over the critical resolved shear stress
+
+  Under a stress tensor the shear it resolves on the system over the difference of the
+  extreme principal stresses, so that a uniaxial tension gives the direction cosines
+  cos(phi) cos(lambda) of a tension direction. One stress on a list of systems gives one
+  factor per system, a list of stresses or directions on a list of systems a (loads,
+  systems) matrix. Without a load the function of the tension direction on the sphere, one
+  function for one system and a vector valued one for several, antipodal as a tension along
+  r and along -r are one load. The systems and the load must be given in the same frame:
+  both in crystal coordinates, or ori * sS and the stress as measured.
+
+  Input
+    sS - slipSystem
+    sigma - stressTensor, or vector3d or Miller, the tension directions
+  Output
+    tau - the Schmid factors, or an S2FunHarmonic of the tension direction
+  Keywords
+    relative - divide by the critical resolved shear stress sS.CRSS of every system
+  See also
+    SchmidTensor, calcShearStress, stressTensor.uniaxial"""
   if sigma is None:
     from ..functions.s2fun import S2FunHarmonic
     fr = sS.frame.stripSym() if sS.frame is not None else None
@@ -147,20 +162,67 @@ def SchmidFactor(sS, sigma=None, relative=False):
 # ------------------------------------------------------------------ deformation and its rate
 
 def _uniaxialDeformation(d, rate=2.0):
-  """the deformation gradient of a uniaxial stretch by rate along d, the volume kept"""
+  """the deformation gradient of a uniaxial stretch along d, the volume kept; MATLAB's
+  deformationGradientTensor.uniaxial
+
+    F = deformationGradientTensor.uniaxial(d)       # stretched to twice its length along d
+    F = deformationGradientTensor.uniaxial(d, 3)    # by the factor 3
+
+  The directions perpendicular to d are shortened by one over the square root of rate; a
+  rate below one compresses. The tensor is in the frame of d.
+
+  Input
+    d - vector3d or Miller, the direction of the stretch
+  Output
+    F - deformationGradientTensor
+  Keywords
+    rate - the stretch along d
+  See also
+    deformationGradientTensor.pureShear, deformationGradientTensor.simpleShear,
+    velocityGradientTensor.uniaxial"""
   rot = rotation.map(vector3d(1, 0, 0), vector3d(_unit(d)))
   F = deformationGradientTensor(np.diag([rate, 1 / math.sqrt(rate), 1 / math.sqrt(rate)]), _frameOf(d))
   return F.rotate(rot)
 
 
 def _simpleShearDeformation(d, n, gamma=45 * np.pi / 180):
-  """the deformation gradient of a simple shear along d on the plane n by the angle gamma"""
+  """the deformation gradient of a simple shear along d on the plane n by the angle gamma,
+  I + tan(gamma) d n^T; MATLAB's deformationGradientTensor.simpleShear
+
+    F = deformationGradientTensor.simpleShear(d, n)               # sheared by 45 degree
+    F = deformationGradientTensor.simpleShear(d, n, 30*degree)    # by 30 degree
+
+  Input
+    d - vector3d or Miller, the shear direction
+    n - vector3d or Miller, the normal of the shear plane
+  Output
+    F - deformationGradientTensor
+  Keywords
+    gamma - the shear angle in radians
+  See also
+    deformationGradientTensor.pureShear, velocityGradientTensor.simpleShear"""
   M = math.tan(gamma) * np.outer(_unit(d), _unit(n)) + np.eye(3)
   return deformationGradientTensor(M, _frameOf(d))
 
 
 def _pureShearDeformation(ext, comp, lam=2.0):
-  """the deformation gradient of a pure shear, stretched by lam along ext and shortened along comp"""
+  """the deformation gradient of a pure shear, stretched by lam along ext and shortened by
+  1 / lam along comp; MATLAB's deformationGradientTensor.pureShear
+
+    F = deformationGradientTensor.pureShear(ext, comp)         # stretched to twice its length
+    F = deformationGradientTensor.pureShear(ext, comp, lam=3)  # by the factor 3
+
+  The direction perpendicular to both keeps its length, so does the volume.
+
+  Input
+    ext - vector3d or Miller, the direction of extension
+    comp - vector3d or Miller, the direction of compression, perpendicular to ext
+  Output
+    F - deformationGradientTensor
+  Keywords
+    lam - the stretch ratio, MATLAB's lambda
+  See also
+    deformationGradientTensor.uniaxial, deformationGradientTensor.simpleShear"""
   rot = rotation.map(vector3d(1, 0, 0), vector3d(_unit(ext)), vector3d(0, 0, 1), vector3d(_unit(comp)))
   F = deformationGradientTensor(np.diag([lam, 1.0, 1 / lam]), _frameOf(ext))
   return F.rotate(rot)
@@ -177,7 +239,25 @@ def GreenStrain(F):
 
 
 def _uniaxialFlow(d=None, q=0.5):
-  """the velocity gradient of a uniaxial flow along d with the ratio q of the transverse rates"""
+  """the velocity gradient of a uniaxial tension along d, of unit rate along it; MATLAB's
+  velocityGradientTensor.uniaxial
+
+    L = velocityGradientTensor.uniaxial()               # axisymmetric tension along z
+    L = velocityGradientTensor.uniaxial(d)              # along d
+    L = velocityGradientTensor.uniaxial(d, q=0)         # plane strain, no flow along the second axis
+    L = -velocityGradientTensor.uniaxial(d)             # uniaxial compression
+
+  The two directions perpendicular to d contract at the rates q and 1 - q, so that the volume
+  is kept; q = 0.5 is axisymmetric. A strain rate r multiplies the tensor, r * L.
+
+  Input
+    d - vector3d or Miller, the tension direction, z when left out
+  Output
+    L - velocityGradientTensor
+  Keywords
+    q - the share of the second transverse direction in the contraction, 0 to 1
+  See also
+    velocityGradientTensor.simpleShear, deformationGradientTensor.uniaxial"""
   d = vector3d(0, 0, 1) if d is None else d
   rot = rotation.map(vector3d(1, 0, 0), vector3d(_unit(d)))
   L = velocityGradientTensor(np.diag([1.0, -q, q - 1]), _frameOf(d))
@@ -185,7 +265,21 @@ def _uniaxialFlow(d=None, q=0.5):
 
 
 def _simpleShearFlow(d, n, e=1.0):
-  """the velocity gradient of a simple shear along d on the plane n with the rate e"""
+  """the velocity gradient of a simple shear along d on the plane n, 2 e d n^T; MATLAB's
+  velocityGradientTensor.simpleShear
+
+    L = velocityGradientTensor.simpleShear(d, n)          # of the strain rate one
+    L = velocityGradientTensor.simpleShear(d, n, e=1e-3)  # of the strain rate 1e-3
+
+  Input
+    d - vector3d or Miller, the shear direction
+    n - vector3d or Miller, the normal of the shear plane
+  Output
+    L - velocityGradientTensor
+  Keywords
+    e - the strain rate
+  See also
+    velocityGradientTensor.uniaxial, deformationGradientTensor.simpleShear"""
   return velocityGradientTensor(2 * e * np.outer(_unit(d), _unit(n)), _frameOf(d))
 
 
@@ -228,7 +322,19 @@ def spinVector(W):
 
 
 def spinTensorOf(v, frame=None):
-  """the spin tensor of an axial vector v, the antisymmetric tensor W with W u = v x u"""
+  """the spin tensor of an axial vector v, the antisymmetric tensor W with W u = v x u
+
+    W = spinTensorOf(v)                  # in the frame of v
+    W = spinTensorOf(a, frame=cs)        # of the coordinates a in the frame cs
+
+  Input
+    v - vector3d, or an array of (..., 3) coordinates
+  Output
+    W - spinTensor
+  Keywords
+    frame - the frame of the tensor, for coordinates without one
+  See also
+    spinTensor, spinTensor.vector, spin"""
   return spinTensor(v, frame=frame) if frame is not None else spinTensor(v)
 
 
@@ -277,13 +383,29 @@ def _install():
   direct = slipSystem.SchmidFactor
 
   def schmidFactor(self, sigma=None, relative=False):
-    """the Schmid factor of the systems: under a stress tensor the shear it resolves on them,
-    for tension directions cos(phi) cos(lambda), without a load the functions of the tension
-    direction on the sphere; relative=True divides by the critical resolved shear stress
+    """the Schmid factor of the slip systems; MATLAB's SchmidFactor
 
-      sS.SchmidFactor(v)
-      sS.SchmidFactor(sigma)
-      sS.SchmidFactor()"""
+      tau = sS.SchmidFactor(v)                      # under a uniaxial tension along v
+      tau = sS.SchmidFactor(sigma)                  # under a stress tensor
+      tau = sS.SchmidFactor(sigma, relative=True)   # over the critical resolved shear stress
+      sF = sS.SchmidFactor()                        # a function of the tension direction
+
+    For a tension direction cos(phi) cos(lambda), the cosines of its angles to the slip
+    direction and to the plane normal; under a stress tensor the shear it resolves on the
+    system over the difference of the extreme principal stresses; without a load the
+    function of the tension direction on the sphere. A list of loads on a list of systems
+    gives a (loads, systems) matrix. The systems and the load must be given in the same
+    frame: both in crystal coordinates, or ori * sS and the stress as measured.
+
+    Input
+      sS - slipSystem
+      sigma - stressTensor, or vector3d or Miller, the tension directions
+    Output
+      tau - the Schmid factors, or an S2FunHarmonic of the tension direction
+    Keywords
+      relative - divide by the critical resolved shear stress sS.CRSS of every system
+    See also
+      SchmidFactor, SchmidTensor, calcShearStress"""
     if sigma is None or isinstance(sigma, stressTensor):
       return SchmidFactor(self, sigma, relative)
     return direct(self, sigma, relative=relative)

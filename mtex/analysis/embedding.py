@@ -341,24 +341,62 @@ class embedding:
     return np.einsum("ij,ij->j", self.u, other.u).reshape(self.shape)
 
   def norm(self, normalized=False):
-    """the Euclidean norm of every image, with normalized=True over the norm every orientation's
-    image has; the sum of squares without a temporary, which is four times faster than
-    np.linalg.norm on a large list
+    """the Euclidean norm of every image; MATLAB's norm of an embedding
 
-      n = norm(e)
-      n = norm(e, normalized=True)"""
+      n = norm(e)                     # the norm of every image
+      n = norm(e, normalized=True)    # over the norm of an orientation's image
+
+    Every orientation has an image of the same norm, so the normalized norm is one at an
+    orientation and smaller at a mean of several, a measure of their spread. The sum of
+    squares is taken without a temporary, four times faster than np.linalg.norm on a large
+    list.
+
+    Input
+      e - embedding
+    Output
+      n - array of the shape of e
+    Keywords
+      normalized - divide by the norm of the image of an orientation
+    See also
+      embedding.mean, embedding.dot, OrientationEmbeddings"""
     n = np.sqrt(np.einsum("ij,ij->j", self.u, self.u)).reshape(self.shape)
     return n / np.linalg.norm(self.spec.u0) if normalized else n
 
   def isclose(self, other, atol=1e-10):
-    """whether two embeddings belong to the same frame and have the same images up to atol"""
+    """whether two embeddings belong to the same frame and have the same images up to atol
+
+      e1.isclose(e2)               # the same images up to 1e-10
+      e1.isclose(e2, atol=1e-3)    # up to a coarser tolerance
+
+    Input
+      e1, e2 - embedding
+    Output
+      tf - bool, one answer for the whole list
+    Keywords
+      atol - the absolute tolerance of every coordinate
+    See also
+      embedding.dot, embedding.norm"""
     return isinstance(other, embedding) and other.spec is self.spec and self.u.shape == other.u.shape and bool(np.allclose(self.u, other.u, atol=atol))
 
   def mean(self, weights=None):
-    """the mean image, weighted by weights if given; NaN for an empty list
+    """the arithmetic mean of the images; MATLAB's mean of an embedding
 
-      mean(e)
-      mean(e, weights=w)"""
+      m = mean(e)                  # the mean image of the whole list
+      m = mean(e, weights=w)       # weighted, the weights normalised to sum one
+
+    The mean of the images is no image of an orientation; m.orientation() projects it back,
+    the mean orientation, and norm(m, normalized=True) measures the spread. The mean of an
+    empty list is NaN. MATLAB's mean along a dimension, mean(e, d), has no counterpart here:
+    the mean is always over the whole list.
+
+    Input
+      e - embedding
+    Output
+      m - embedding, a single image
+    Keywords
+      weights - one weight per image
+    See also
+      embedding.orientation, embedding.norm, OrientationEmbeddings"""
     # the mean of nothing is not a number, as the mean of an empty orientation list
     if self.size == 0:
       return self._new(np.full(self.spec.u0.size, np.nan), ())
@@ -376,8 +414,20 @@ class embedding:
     return self._new(self.u * np.asarray(r, dtype=float))
 
   def double(self, full=False):
-    """the Euclidean coordinates in the orthonormal basis, one row per orientation; with full
-    the tensor components, repeated ones included"""
+    """the Euclidean coordinates of the images in their orthonormal basis, one row per
+    orientation; MATLAB's double of an embedding
+
+      d = e.double()               # the packed coordinates, the dimension of the embedding
+      d = e.double(full=True)      # the tensor components, repeated ones included
+
+    Input
+      e - embedding
+    Output
+      d - array of shape e.shape + (e.dim,), or of the number of tensor components
+    Keywords
+      full - the components of the tensors instead of the packed coordinates
+    See also
+      embedding.setDouble, OrientationEmbeddings"""
     d = self.u if full else self.spec.basis.T @ self.u
     return d[:, 0] if self.shape == () else d.T.reshape(self.shape + (d.shape[0],))
 
@@ -442,11 +492,24 @@ class embedding:
     return rotation(out.reshape(self.shape + (4,)) if self.shape != () else out[0])
 
   def orientation(self, SS=None, **kwargs):
-    """the orientations whose images are closest to the embedding, the projection back to the
-    orientations of e.CS in the specimen frame SS; keywords go to project
+    """the orientations whose images are closest to the embedding, the projection back onto
+    the orientations of e.CS; MATLAB's orientation of an embedding
 
-      e.orientation()
-      mean(e).orientation()          the mean orientation of a list"""
+      ori = e.orientation()                      # the orientation of every image
+      ori = mean(e).orientation()                # the mean orientation of a list
+      ori = mean(e).orientation(maxIter=50)      # fewer steps of the projection
+
+    The projection is embedding.project, whose keywords are passed on (seeds, maxIter, tol,
+    chunk); the result is an orientation from the crystal frame of e to SS.
+
+    Input
+      e - embedding
+    Output
+      ori - orientation, one per image
+    Keywords
+      SS - the specimen frame of the orientations, by default the default specimen frame
+    See also
+      embedding.project, embedding.mean, OrientationEmbeddings"""
     return orientation(self.project(**kwargs), self.spec.frame, specimenFrame.default if SS is None else SS)
 
   def __repr__(self):
@@ -461,8 +524,20 @@ def _seedRotations(CS):
 
 
 def double(e, full=False):
-  """double(e) is e.double(): the coordinates of the images in the orthonormal basis, one row per
-  orientation; with full=True the tensor components"""
+  """the coordinates of the images of an embedding in their orthonormal basis, one row per
+  orientation, e.double(); MATLAB's double
+
+    d = double(e)                # the packed coordinates
+    d = double(e, full=True)     # the tensor components, repeated ones included
+
+  Input
+    e - embedding
+  Output
+    d - array of shape e.shape + (e.dim,), or of the number of tensor components
+  Keywords
+    full - the components of the tensors instead of the packed coordinates
+  See also
+    embedding.double, setDouble, OrientationEmbeddings"""
   return e.double(full)
 
 

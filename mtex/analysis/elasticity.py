@@ -231,8 +231,22 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
 # ------------------------------------------------------------------ the moduli
 
 def YoungsModulus(T, v=None):
-  """Young's modulus in the direction v, the reciprocal of S_ijkl v_i v_j v_k v_l; without a
-  direction the function on the sphere"""
+  """Young's modulus in the direction v, the reciprocal of S_ijkl v_i v_j v_k v_l; MATLAB's
+  YoungsModulus
+
+    E = YoungsModulus(C, v)    # at the directions v
+    E = C.YoungsModulus()      # the function on the sphere
+
+  The tensor may be a stiffness or a compliance tensor; a stiffness tensor is inverted
+  first. The direction may have any length.
+
+  Input
+    C - stiffnessTensor or complianceTensor
+    v - vector3d or Miller, the tension directions; left out for the function
+  Output
+    E - Young's modulus at every direction, or an S2Fun of the direction
+  See also
+    shearModulus, PoissonRatio, linearCompressibility, volumeCompressibility"""
   S = _compliance(T)
   if v is None:
     return _sphericalFunction(lambda x: YoungsModulus(S, x), S)
@@ -241,8 +255,19 @@ def YoungsModulus(T, v=None):
 
 
 def linearCompressibility(T, v=None):
-  """the length change per pressure in the direction v, S_ijkk v_i v_j; without a direction
-  the function on the sphere"""
+  """the linear compressibility, the length change per pressure in the direction v,
+  S_ijkk v_i v_j; MATLAB's linearCompressibility
+
+    beta = linearCompressibility(C, v)    # at the directions v
+    beta = C.linearCompressibility()      # the function on the sphere
+
+  Input
+    C - stiffnessTensor or complianceTensor, a stiffness tensor is inverted first
+    v - vector3d or Miller, the directions; left out for the function
+  Output
+    beta - the linear compressibility at every direction, or an S2Fun of the direction
+  See also
+    volumeCompressibility, YoungsModulus, bulkModulus"""
   S = _compliance(T)
   if v is None:
     return _sphericalFunction(lambda x: linearCompressibility(S, x), S)
@@ -256,9 +281,31 @@ def volumeCompressibility(T):
 
 
 def shearModulus(T, h=None, u=None, *args):
-  """the shear modulus of the plane h and the direction u, 1 / (4 S_ijkl h_i u_j h_k u_l);
-  with the plane alone the function of the direction in it; without both the isotropic
-  bound, shearModulus(C, 'Reuss'), 'Hill' or 'all' the others"""
+  """the shear modulus of the plane h and the shear direction u, 1 / (4 S_ijkl h_i u_j h_k u_l);
+  MATLAB's shearModulus
+
+    G = shearModulus(C, h, u)           # of the plane h along u
+    G = shearModulus(C, h)              # the function of the shear direction
+    G = shearModulus(C)                 # the Voigt bound of an isotropic polycrystal
+    G = shearModulus(C, 'Reuss')        # the Reuss bound, 'Hill' the mean of the two
+    GV, GR, GH = shearModulus(C, 'all') # all three
+
+  With the plane and the direction the anisotropic modulus of the single crystal; with the
+  plane alone the function on the sphere of the shear direction. Without both, or with a
+  bound's name in place of the plane, the isotropic shear modulus of a polycrystal of
+  uniformly distributed orientations: the Voigt upper bound, the Reuss lower bound or their
+  mean, Hill's; 'all' returns the three as a named tuple (voigt, reuss, hill), MATLAB's
+  three outputs. MATLAB's shearModulus(C, [], u), the function of the plane, has no
+  counterpart.
+
+  Input
+    C - stiffnessTensor or complianceTensor, a stiffness tensor is inverted first
+    h - vector3d or Miller, the shear plane; or 'Voigt', 'Reuss', 'Hill', 'all'
+    u - vector3d or Miller, the shear direction
+  Output
+    G - the shear modulus, an S2Fun of the direction, or the bounds
+  See also
+    YoungsModulus, PoissonRatio, bulkModulus, isotropicShearModulus"""
   S = _compliance(T)
   if isinstance(h, str) or (h is None and u is None):
     return _pick(isotropicShearModulus(S), h)
@@ -270,9 +317,27 @@ def shearModulus(T, h=None, u=None, *args):
 
 
 def PoissonRatio(T, x=None, y=None):
-  """the Poisson ratio of the pulling direction x and the transverse direction y, minus the
-  transverse over the longitudinal strain; with x alone the function of the transverse
-  direction; without both the isotropic ratio of the Voigt bounds"""
+  """the Poisson ratio of the tension direction x and the transverse direction y, minus the
+  transverse over the longitudinal strain, -S_ijkl x_i x_j y_k y_l / S_mnop x_m x_n x_o x_p;
+  MATLAB's PoissonRatio
+
+    nu = PoissonRatio(C, x, y)    # of the tension along x, the contraction along y
+    nu = PoissonRatio(C, x)       # the function of the transverse direction
+    nu = PoissonRatio(C)          # the isotropic ratio
+
+  Without directions the ratio of an isotropic polycrystal, (3K - 2G) / (2 (3K + G)) from
+  the Voigt bounds of the bulk and the shear modulus. MATLAB's PoissonRatio(S, [], y), the
+  function of the tension direction, has no counterpart: without x the isotropic ratio is
+  returned.
+
+  Input
+    C - stiffnessTensor or complianceTensor, a stiffness tensor is inverted first
+    x - vector3d or Miller, the tension direction
+    y - vector3d or Miller, the transverse direction, perpendicular to x
+  Output
+    nu - the Poisson ratio, or an S2Fun of the transverse direction
+  See also
+    YoungsModulus, shearModulus, bulkModulus"""
   S = _compliance(T)
   if x is None:
     K, G = bulkModulus(S), shearModulus(S)
@@ -285,7 +350,24 @@ def PoissonRatio(T, x=None, y=None):
 
 
 def bulkModulus(T, which=None):
-  """the bulk modulus of a polycrystal: the Voigt bound, or 'Reuss', 'Hill' or 'all' three"""
+  """the bulk modulus of an isotropic polycrystal, the Voigt and Reuss bounds; MATLAB's
+  bulkModulus
+
+    K = bulkModulus(C)                  # the Voigt bound
+    K = bulkModulus(C, 'Hill')          # the mean of the two bounds
+    KV, KR, KH = bulkModulus(C, 'all')  # all three
+
+  The Voigt upper bound is a ninth of C_iijj, the Reuss lower bound the reciprocal of the
+  volume compressibility S_iijj, Hill's the mean of the two. MATLAB returns the three as
+  outputs; here 'all' returns them as a named tuple (voigt, reuss, hill).
+
+  Input
+    C - stiffnessTensor or complianceTensor
+    which - 'Voigt', 'Reuss', 'Hill' or 'all'
+  Output
+    K - the bulk modulus, or the bounds
+  See also
+    shearModulus, volumeCompressibility, PoissonRatio"""
   S = _compliance(T)
   KV = EinsteinSum(S.inv(), [-1, -1, -2, -2]) / 9
   KR = 1 / volumeCompressibility(S)

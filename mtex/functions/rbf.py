@@ -51,7 +51,24 @@ IMAGES = 1 << 18
 def supportCosine(psi, tol=1e-9):
   """the cosine of the half angle beyond which the kernel stays below tol of its peak, in
   closed form for the families with one and found by a scan otherwise; a kernel that never
-  drops that far is summed in full"""
+  drops that far is summed in full
+
+    c = supportCosine(psi)            # where psi falls below 1e-9 of psi(1)
+    c = supportCosine(psi, tol=1e-4)  # a wider cut, a smaller support
+
+  The de la Vallee Poussin and von Mises-Fisher kernels have it in closed form; any other
+  kernel is scanned on a grid of 0.5 degree in the rotation angle for the first angle from
+  which every value stays below tol times the peak. The kernel sums of SO3FunRBF evaluate
+  only the centres whose cosine to the query exceeds it.
+
+  Input
+    psi - SO3Kernel
+  Output
+    c - the cosine cos(omega/2) of the support's radius, -1 when the kernel never drops below
+  Keywords
+    tol - the bound relative to the value at the identity
+  See also
+    SO3FunRBF, SO3Kernel.halfwidth"""
   if isinstance(psi, SO3DeLaValleePoussinKernel):
     return tol ** (1 / (2 * psi.kappa))
   if isinstance(psi, SO3vonMisesFisherKernel):
@@ -309,10 +326,28 @@ class SO3FunRBF(SO3Fun):
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, antipodal=self.antipodal, _internal=True)
 
   def grad(self, x=None, side="left"):
-    """the gradient: minus the kernel's angular derivative along the geodesic to every
-    equivalent within its support; a query with none in reach takes the nearest centre alone
-    the gradient at orientations, or without them the field of gradients of the harmonic
-    expansion, as MATLAB's"""
+    """the gradient of a kernel sum at orientations, or without them the vector field of the
+    gradients of its harmonic expansion, as MATLAB's grad
+
+      g = SO3F.grad(ori)                # the gradients at ori, tangent vectors on the left
+      g = SO3F.grad(ori, side='right')  # tangent vectors on the right, in crystal coordinates
+      G = SO3F.grad()                   # the gradient field, an SO3VectorFieldHarmonic
+
+    Every centre contributes minus the kernel's angular derivative along the geodesic to every
+    symmetric equivalent within its support; a query with none in reach takes the nearest
+    centre alone. The left side expresses a tangent vector in specimen coordinates, the right
+    one in crystal coordinates.
+
+    Input
+      SO3F - SO3FunRBF
+    Output
+      g - SO3TangentVector at the orientations
+      G - SO3VectorFieldHarmonic without them
+    Keywords
+      x - the orientations; without them the gradient field is returned
+      side - 'left' or 'right', the side of the tangent vectors
+    See also
+      SO3Kernel.grad, SO3FunHarmonic.grad, SO3TangentVector"""
     if x is None:
       from .so3fun import SO3FunHarmonic
       return SO3FunHarmonic(self).grad(side=side)
@@ -404,7 +439,23 @@ class SO3FunRBF(SO3Fun):
 
   def rotate(self, r, side="left"):
     """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
-    side; the frame of the rotated side turns with it"""
+    side; the frame of the rotated side turns with it; MATLAB's rotate
+
+      SO3F = rotate(SO3F, rot)                # f(rot^-1 g), the specimen side turned
+      SO3F = SO3F.rotate(rot, side='right')   # f(g rot^-1), the crystal side turned
+
+    A rotation that is no symmetry of the rotated side's group strips that group from its
+    frame, with a warning.
+
+    Input
+      SO3F - SO3FunRBF
+      r - rotation, one
+    Output
+      SO3F - SO3FunRBF
+    Keywords
+      side - 'left' or 'right'
+    See also
+      SO3FunHarmonic.rotate, rotate"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     if _side(side) == "left":
       center = orientation._fromRotation((rot * rotation(self.center)).data, (self.CS, _rotatedFrame(self.SS, rot)), self.antipodal)
@@ -652,7 +703,27 @@ class SO3FunCBF(SO3Fun):
     return SO3FunHarmonic(fhat, self.CS, self.SS, real=True, _internal=True)
 
   def grad(self, x=None, side="left"):
-    """the gradient: psi'(t) (g h x r) on the left, psi'(t) (h x g^-1 r) on the right, over every pair"""
+    """the gradient of a fibre ODF at orientations, or without them the vector field of the
+    gradients of its harmonic expansion, as MATLAB's grad
+
+      g = SO3F.grad(ori)                # the gradients at ori, tangent vectors on the left
+      g = SO3F.grad(ori, side='right')  # tangent vectors on the right, in crystal coordinates
+      G = SO3F.grad()                   # the gradient field, an SO3VectorFieldHarmonic
+
+    Over every pair of a symmetric equivalent h of the crystal direction and the specimen
+    direction r, the gradient is psi'(t) (g h x r) on the left and psi'(t) (h x g^-1 r) on
+    the right, t = g h . r and psi' the derivative of the kernel in t.
+
+    Input
+      SO3F - SO3FunCBF
+    Output
+      g - SO3TangentVector at the orientations
+      G - SO3VectorFieldHarmonic without them
+    Keywords
+      x - the orientations; without them the gradient field is returned
+      side - 'left' or 'right', the side of the tangent vectors
+    See also
+      S2Kernel.grad, SO3FunHarmonic.grad, SO3TangentVector"""
     if x is None:
       from .so3fun import SO3FunHarmonic
       return SO3FunHarmonic(self).grad(side=side)
@@ -676,7 +747,23 @@ class SO3FunCBF(SO3Fun):
 
   def rotate(self, r, side="left"):
     """the function rotated by r on the left, the specimen side, or with side='right' on the crystal
-    side; the frame of the rotated side turns with it"""
+    side; the frame of the rotated side turns with it; MATLAB's rotate
+
+      SO3F = rotate(SO3F, rot)                # f(rot^-1 g), the specimen side turned
+      SO3F = SO3F.rotate(rot, side='right')   # f(g rot^-1), the crystal side turned
+
+    A rotation that is no symmetry of the rotated side's group strips that group from its
+    frame, with a warning.
+
+    Input
+      SO3F - SO3FunCBF
+      r - rotation, one
+    Output
+      SO3F - SO3FunCBF
+    Keywords
+      side - 'left' or 'right'
+    See also
+      SO3FunHarmonic.rotate, rotate"""
     rot = rotation(r.data.reshape(4)) if not isinstance(r, orientation) else rotation(r)
     if _side(side) == "left":
       return SO3FunCBF(vector3d(self.h.data, frame=self.CS), rot * self.r, self.weights, self.psi, _rotatedFrame(self.SS, rot))
@@ -822,10 +909,24 @@ def _framesAmong(args):
 
 
 def uniformODF(*frames, antipodal=False):
-  """the uniform ODF, constant one, between a crystal and a specimen frame
+  """the uniform ODF, constant one, between a crystal and a specimen frame; MATLAB's uniformODF
 
-    odf = uniformODF(cs, ss)
-    mdf = uniformODF(cs, cs, antipodal=True)  # a uniform misorientation distribution"""
+    odf = uniformODF(cs)                       # the specimen frame the default one
+    odf = uniformODF(cs, ss)                   # between two frames
+    mdf = uniformODF(cs, cs, antipodal=True)  # a uniform misorientation distribution
+
+  The result is an SO3FunRBF without centres whose constant part is one. Without a frame the
+  crystal frame has the point group 1.
+
+  Input
+    cs, ss - crystalFrame, specimenFrame (or a second crystalFrame)
+  Output
+    odf - SO3FunRBF
+  Keywords
+    antipodal - the function symmetric under g -> g^-1, as a misorientation distribution of
+        one phase
+  See also
+    unimodalODF, fibreODF, SO3FunRBF"""
   CS, SS = _framesAmong(frames)
   return SO3FunRBF(orientation(rotation.nan(0), CS, SS, antipodal=antipodal), SO3DeLaValleePoussinKernel(halfwidth=10 * degree), np.zeros(0), 1.0)
 

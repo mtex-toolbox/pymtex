@@ -92,7 +92,23 @@ _HALF_PI_TABLES = {}
 
 def halfPiDegrees(L, dtype=np.float64):
   """the Wigner-d matrices d_0(pi/2) .. d_L(pi/2) as pairs (n, d_n), held up to bandwidth 256 and
-  streamed by the recursion above"""
+  streamed by the recursion above
+
+    pairs = list(halfPiDegrees(8))                    # d_n(pi/2), a (2n+1) x (2n+1) matrix per degree
+    pairs = list(halfPiDegrees(8, dtype=np.float32))  # in single precision
+
+  Every coefficient transform walks the degrees in order and needs one matrix at a time; up to
+  bandwidth 256 the matrices are computed once per dtype and kept, above it the recursion yields
+  them one after the other without holding them.
+
+  Input
+    L - the largest degree
+  Output
+    pairs - an iterator of (n, d_n), n = 0 .. L
+  Keywords
+    dtype - the floating point type of the matrices
+  See also
+    wignerd, sphericalTransform"""
   dtype = np.dtype(dtype)
   if L > HALF_PI_CACHE_MAX:
     return wignerdDegrees(dtype.type(np.pi / 2), L)
@@ -281,7 +297,29 @@ def wignerTransformAdjoint(H, L, real=False, folds=(1, 1), degrees=None, centre=
 
 def sphericalTransform(fhat, L, real=False, degrees=None):
   """the Fourier array G[m, j] of spherical coefficients of bandwidth L, so that f(theta, rho) is
-  the sum of G e^{i(m rho - j theta)}; for a real function only m >= 0, the column m = 0 halved"""
+  the sum of G e^{i(m rho - j theta)}; for a real function only m >= 0, the column m = 0 halved
+
+    f = S2FunHarmonic(lambda v: v.z**2, bandwidth=8)
+    G = sphericalTransform(f._fhat, 8)             # the (2L+1) x (2L+1) array
+    G = sphericalTransform(f._fhat, 8, real=True)  # the rows m >= 0 of a real function
+    G = sphericalTransform(f._fhat, 8, degrees=halfPiDegrees(8))  # the Wigner-d matrices given
+
+  The coefficients are the internal ones, f._fhat, with the Condon-Shortley phase
+  (docs/design/harmonics.md), not MATLAB's f.fhat. The transform is the first step of the
+  evaluation on a grid or by the NUFFT; with numba and no degrees given it is a compiled loop.
+
+  Input
+    fhat - the spherical coefficients, (L+1)^2 of them or more, those above L ignored
+    L - the bandwidth
+  Output
+    G - the complex array, (L+1) x (2L+1) for a real function, (2L+1) x (2L+1) otherwise
+  Keywords
+    real - the coefficients are those of a real function: only the rows m >= 0 are formed,
+        and f is twice the real part of their sum
+    degrees - the pairs (n, d_n(pi/2)) as halfPiDegrees yields them; by default those of the
+        cache, which also selects the compiled loop
+  See also
+    sphericalTransformAdjoint, sphericalSeries, halfPiDegrees"""
   fhat = np.asarray(fhat)
   cdtype = _complexType(fhat.dtype)
   rdtype = np.dtype(cdtype).type(0).real.dtype
@@ -304,7 +342,27 @@ def sphericalTransform(fhat, L, real=False, degrees=None):
 
 def sphericalTransformAdjoint(H, L, real=False, degrees=None):
   """the adjoint: fhat_l^m = sqrt((2l+1)/4pi) i^m sum_j d_l^{jm} d_l^{j0} h[m, -j] for
-  h[m, j] = sum_q w_q v_q e^{-i(m rho_q - j theta_q)}"""
+  h[m, j] = sum_q w_q v_q e^{-i(m rho_q - j theta_q)}
+
+    fhat = sphericalTransformAdjoint(H, 8)            # H of shape (2L+1) x (2L+1)
+    fhat = sphericalTransformAdjoint(H, 8, real=True)  # H of the rows m >= 0 of a real function
+
+  The adjoint of sphericalTransform: the internal spherical coefficients (with the
+  Condon-Shortley phase, not MATLAB's fhat) from the Fourier array of weighted values. For a
+  real function only the rows m >= 0 are read and the coefficients of negative order follow by
+  symmetry.
+
+  Input
+    H - the complex array h[m, j]
+    L - the bandwidth
+  Output
+    fhat - the (L+1)^2 spherical coefficients
+  Keywords
+    real - H holds the rows m >= 0 of a real function
+    degrees - the pairs (n, d_n(pi/2)) as halfPiDegrees yields them; by default those of the
+        cache, which also selects the compiled loop
+  See also
+    sphericalTransform, sphericalSeriesAdjoint, halfPiDegrees"""
   H = np.asarray(H)
   if backend() == "numba" and degrees is None:
     return sphericalAdjoint(H, L, real)
@@ -328,17 +386,59 @@ def sphericalTransformAdjoint(H, L, real=False, degrees=None):
 
 def isRealWigner(fhat, tol=1e-10):
   """a coefficient vector is real valued when fhat_n^{-k,-l} = (-1)^{k-l} conj(fhat_n^{kl}) on
-  SO(3), fhat_l^{-m} = (-1)^m conj(fhat_l^m) on S2, c_{-k} = conj(c_k) on S1"""
+  SO(3), fhat_l^{-m} = (-1)^m conj(fhat_l^m) on S2, c_{-k} = conj(c_k) on S1
+
+    isRealWigner(F._fhat)            # whether the SO(3) coefficients are those of a real function
+    isRealWigner(F._fhat, tol=1e-6)  # with a looser tolerance
+
+  Whether internal Wigner coefficients, F._fhat of an SO3FunHarmonic, belong to a real valued
+  function, every pair compared up to the relative tolerance.
+
+  Input
+    fhat - the Wigner coefficients
+  Output
+    isReal - bool
+  Keywords
+    tol - the tolerance, relative to the size of a coefficient where it exceeds one
+  See also
+    isRealSpherical, isRealFourier, wignerSeries"""
   return realDefectWigner(fhat, tol)
 
 
 def isRealSpherical(fhat, tol=1e-10):
-  """whether spherical coefficients are those of a real function, fhat_l^{-m} = (-1)^m conj(fhat_l^m)"""
+  """whether spherical coefficients are those of a real function, fhat_l^{-m} = (-1)^m conj(fhat_l^m)
+
+    isRealSpherical(f._fhat)            # whether f is real valued
+    isRealSpherical(f._fhat, tol=1e-6)  # with a looser tolerance
+
+  The coefficients are the internal ones of an S2FunHarmonic, f._fhat, with the Condon-Shortley
+  phase the relation above assumes.
+
+  Input
+    fhat - the spherical coefficients
+  Output
+    isReal - bool
+  Keywords
+    tol - the tolerance, relative to the size of a coefficient where it exceeds one
+  See also
+    isRealWigner, isRealFourier, sphericalSeries"""
   return realDefectSpherical(fhat, tol)
 
 
 def isRealFourier(chat, tol=1e-10):
-  """whether Fourier coefficients on the circle are those of a real function, c_{-k} = conj(c_k)"""
+  """whether Fourier coefficients on the circle are those of a real function, c_{-k} = conj(c_k)
+
+    isRealFourier([0.5, 1, 0.5])            # c_{-1}, c_0, c_1 of 1 + cos(x): True
+    isRealFourier([0.5, 1, 0.5], tol=1e-6)  # with a looser tolerance
+
+  Input
+    chat - the coefficients c_{-L} .. c_L
+  Output
+    isReal - bool
+  Keywords
+    tol - the tolerance, relative to the size of a coefficient where it exceeds one
+  See also
+    isRealSpherical, isRealWigner, fourierSeries"""
   chat = np.asarray(chat)
   return bool(np.all(np.abs(chat[::-1] - np.conj(chat)) <= tol * np.maximum(1, np.abs(chat))))
 
@@ -699,7 +799,27 @@ class SO3GridPlan:
 
   def adjoint(self, values, weights=None):
     """the SO(3) coefficients from weighted values on the grid, the FFTs taken backwards; without
-    weights those of the grid's rule"""
+    weights those of the grid's rule
+
+      g = quadratureSO3Grid(16)
+      p = SO3GridPlan(g, 8)
+      fhat = p.adjoint(values)                       # the quadrature of the grid's rule
+      fhat = p.adjoint(values, weights=g.weights)    # weights of the grid's shape given
+
+    The values are those at the nodes of a Clenshaw-Curtis grid in its order; real values give
+    the coefficients of a real function. With the grid's rule the adjoint is the exact
+    quadrature, p.adjoint(p(fhat)) = fhat for a bandwidth the grid holds. The coefficients are
+    the internal ones, F._fhat.
+
+    Input
+      values - the values at the grid's nodes
+    Output
+      fhat - the Wigner coefficients up to the plan's bandwidth
+    Keywords
+      weights - the quadrature weights at the nodes; by default the grid's rule in beta,
+          the same for every alpha and gamma
+    See also
+      wignerSeriesAdjoint, wignerPlan, quadratureSO3Grid"""
     values = np.asarray(values).ravel()
     real = values.dtype.kind != "c"
     fft, w, L = _fft(), threads(), self.L
@@ -766,14 +886,54 @@ class S2GridPlan:
 
 def wignerPlan(nodes, L, real=True, folds=(1, 1)):
   """the plan for a node set: the NUFFT at arbitrary nodes, the FFT on a Clenshaw-Curtis grid,
-  the NUFFT on the nodes of a grid whose polar rule is not equispaced"""
+  the NUFFT on the nodes of a grid whose polar rule is not equispaced
+
+    p = wignerPlan(rotation.rand(1000), 8)         # the NUFFT at arbitrary rotations
+    p = wignerPlan(quadratureSO3Grid(16), 8)       # the FFT on a Clenshaw-Curtis grid
+    p = wignerPlan(rotation.rand(1000), 8, real=False)  # for complex valued functions
+    f = p(F._fhat)                                 # the series at the nodes
+    fhat = p.adjoint(f, np.full(1000, 1e-3))       # the adjoint with weights
+
+  A plan holds what the transform at a fixed node set needs, so that the series of many
+  coefficient vectors or their adjoints at the same nodes cost the transform only. The
+  coefficients are the internal ones, F._fhat.
+
+  Input
+    nodes - rotations, or a quadratureSO3Grid
+    L - the bandwidth
+  Output
+    plan - SO3GridPlan or SO3FourierPlan, called with coefficients, plan.adjoint with values
+        and weights
+  Keywords
+    real - the plan for real valued functions, which needs half the Fourier array
+    folds - (rA, rB), the folds about z on the crystal and the specimen side the coefficients
+        are known to have, which shrink the Fourier array; a grid brings its own
+  See also
+    wignerSeries, wignerSeriesAdjoint, sphericalPlan"""
   if isinstance(nodes, quadratureSO3Grid):
     return SO3GridPlan(nodes, L, real) if nodes.scheme == "ClenshawCurtis" else SO3FourierPlan(nodes.nodes(), L, real, nodes.folds)
   return SO3FourierPlan(nodes, L, real, folds)
 
 
 def sphericalPlan(nodes, L, real=False):
-  """the plan for a node set on the sphere: the FFT on a Clenshaw-Curtis grid, the NUFFT otherwise"""
+  """the plan for a node set on the sphere: the FFT on a Clenshaw-Curtis grid, the NUFFT otherwise
+
+    p = sphericalPlan(vector3d.rand(1000), 8)             # the NUFFT at arbitrary directions
+    p = sphericalPlan(quadratureS2Grid(16), 8, real=True)  # the FFT on a Clenshaw-Curtis grid
+    f = p(fhat)                                           # the series at the nodes
+
+  The coefficients are the internal ones of an S2FunHarmonic, f._fhat, not MATLAB's fhat.
+
+  Input
+    nodes - directions, or a quadratureS2Grid
+    L - the bandwidth
+  Output
+    plan - S2GridPlan or S2FourierPlan, called with coefficients, plan.adjoint with values and
+        weights
+  Keywords
+    real - the plan for real valued functions, which needs half the Fourier array
+  See also
+    sphericalSeries, sphericalSeriesAdjoint, wignerPlan"""
   if isinstance(nodes, quadratureS2Grid):
     return S2GridPlan(nodes, L, real) if nodes.scheme == "ClenshawCurtis" else S2FourierPlan(nodes.nodes(), L, real)
   return S2FourierPlan(nodes, L, real)
@@ -784,7 +944,29 @@ def sphericalPlan(nodes, L, real=False):
 
 def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
   """the series at every rotation of a container or on a quadrature grid; the direct sum below
-  DIRECT_SERIES_NODES nodes (DIRECT_SUM_NODES without numba), and a grid that cannot hold the bandwidth is evaluated at its nodes"""
+  DIRECT_SERIES_NODES nodes (DIRECT_SUM_NODES without numba), and a grid that cannot hold the bandwidth is evaluated at its nodes
+
+    F = SO3FunHarmonic(unimodalODF(orientation.rand(crystalFrame('1'))), bandwidth=8)
+    f = wignerSeries(F._fhat, rotation.rand(10))              # the values at rotations, as F.eval
+    f = wignerSeries(F._fhat, quadratureSO3Grid(16))          # on a grid, by the FFT
+    f = wignerSeries(F._fhat, rotation.rand(10), real=False)  # the complex values
+
+  The sum of sqrt(2n+1) fhat_n^{kl} D_n^{kl}(R) over the degrees n up to the bandwidth of the
+  internal coefficients F._fhat; the route, the direct sum, the FFT of a Clenshaw-Curtis grid or
+  the NUFFT, is chosen by the number of nodes. The result has the shape of the rotations.
+
+  Input
+    fhat - the internal Wigner coefficients
+    rots - rotations, or a quadratureSO3Grid
+  Output
+    f - the values at the rotations, real for real coefficients
+  Keywords
+    real - whether the coefficients are those of a real function, whose values are returned
+        real; by default isRealWigner(fhat)
+    folds - (rA, rB), the folds about z the coefficients have, which shrink the NUFFT's array;
+        a grid brings its own
+  See also
+    wignerSeriesAdjoint, wignerPlan, SO3FunHarmonic.eval"""
   fhat = np.asarray(fhat)
   L = dim2deg(fhat.shape[-1])
   real = isRealWigner(fhat) if real is None else real
@@ -802,7 +984,29 @@ def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
 
 def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
   """coefficients from weighted values: the adjoint sum below DIRECT_SUM_NODES nodes; a
-  quadrature grid brings the weights of its rule"""
+  quadrature grid brings the weights of its rule
+
+    fhat = wignerSeriesAdjoint(rots, values, 8)                    # the weights 1/n
+    fhat = wignerSeriesAdjoint(rots, values, 8, weights=w)         # weighted
+    fhat = wignerSeriesAdjoint(quadratureSO3Grid(16), values, 8)   # the quadrature of a grid
+
+  The internal Wigner coefficients fhat_n^{kl} = sqrt(2n+1) sum_q w_q v_q conj(D_n^{kl}(R_q))
+  up to bandwidth L, the adjoint of wignerSeries; on a quadrature grid with its weights the
+  exact coefficients of a function of that bandwidth. Real values give the coefficients of a
+  real function.
+
+  Input
+    rots - rotations, or a quadratureSO3Grid
+    values - the values at the rotations
+    L - the bandwidth
+  Output
+    fhat - the Wigner coefficients, internal convention
+  Keywords
+    weights - the weight of every rotation; by default 1/n, or the grid's rule
+    folds - (rA, rB), the folds about z the result is known to have, which shrink the NUFFT's
+        array; a grid brings its own
+  See also
+    wignerSeries, wignerSeriesAdjointGridded, wignerPlan"""
   values = np.asarray(values).ravel()
   if isinstance(rots, quadratureSO3Grid):
     if 0 < L <= rots.bandwidth:
@@ -836,7 +1040,28 @@ GRIDDED_ROTATIONS_PER_L3 = 2
 def wignerSeriesAdjointGridded(rots, values, L, weights=None, folds=(1, 1)):
   """the SO(3) coefficients up to bandwidth L from weighted values, every rotation rounded to the
   nearest node of a Clenshaw-Curtis grid and the grid's FFT adjoint taken, MATLAB's 'gridded';
-  approximate, and its cost independent of the number of rotations"""
+  approximate, and its cost independent of the number of rotations
+
+    fhat = wignerSeriesAdjointGridded(rots, values, 8)           # the weights 1/n
+    fhat = wignerSeriesAdjointGridded(rots, values, 8, weights=w, folds=(2, 1))  # weighted, a twofold axis
+
+  The weighted values are summed at the nearest node of a Clenshaw-Curtis grid of bandwidth
+  min(2L, max(L, 128)) and the grid's exact adjoint taken; the error is at most half the grid's
+  spacing, which a kernel of bandwidth L hardly sees. MATLAB's SO3FunHarmonic.adjoint(...,
+  'gridded').
+
+  Input
+    rots - rotations
+    values - the values at the rotations
+    L - the bandwidth
+  Output
+    fhat - the Wigner coefficients, internal convention
+  Keywords
+    weights - the weight of every rotation; by default 1/n
+    folds - (rA, rB), the folds about z of the result, which the grid then covers only the
+        folded region of
+  See also
+    wignerSeriesAdjoint, SO3FunHarmonic.adjoint"""
   values = np.asarray(values).ravel()
   q = _quaternions(rots)
   w = np.full(len(q), 1 / len(q)) if weights is None else np.asarray(weights).ravel()
@@ -923,7 +1148,26 @@ def _sphericalSeriesTrig(fhat, v, real):
 
 def sphericalSeries(fhat, v, real=None):
   """the spherical harmonic series fhat at directions or on a quadrature grid, the trigonometric sum
-  or the NUFFT by the number of nodes"""
+  or the NUFFT by the number of nodes
+
+    f = S2FunHarmonic(lambda v: v.z**2, bandwidth=8)
+    y = sphericalSeries(f._fhat, vector3d.rand(100))              # the values, as f.eval
+    y = sphericalSeries(f._fhat, quadratureS2Grid(16))            # on a grid, by the FFT
+    y = sphericalSeries(f._fhat, vector3d.rand(100), real=False)  # the complex values
+
+  The coefficients are the internal ones, f._fhat, with the Condon-Shortley phase, not MATLAB's
+  f.fhat. The result has the shape of the directions.
+
+  Input
+    fhat - the spherical coefficients
+    v - vector3d, or a quadratureS2Grid
+  Output
+    y - the values at the directions, real for real coefficients
+  Keywords
+    real - whether the coefficients are those of a real function, whose values are returned
+        real; by default isRealSpherical(fhat)
+  See also
+    sphericalSeriesAdjoint, sphericalPlan, S2FunHarmonic.eval"""
   fhat = np.asarray(fhat)
   L = math.isqrt(fhat.shape[-1]) - 1
   real = isRealSpherical(fhat) if real is None else real
@@ -945,7 +1189,28 @@ def sphericalSeries(fhat, v, real=None):
 
 def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
   """the spherical coefficients up to bandwidth L from weighted values at directions, the direct sum
-  below 50 nodes; a quadrature grid brings the weights of its rule"""
+  below 50 nodes; a quadrature grid brings the weights of its rule
+
+    fhat = sphericalSeriesAdjoint(v, values, 8)                      # the weights 1/n
+    fhat = sphericalSeriesAdjoint(v, values, 8, weights=w, real=True)  # weighted, real values
+    fhat = sphericalSeriesAdjoint(quadratureS2Grid(16), values, 8)   # the quadrature of a grid
+
+  The internal coefficients fhat_l^m = sum_q w_q v_q conj(Y_l^m(v_q)), the adjoint of
+  sphericalSeries; on a quadrature grid with its weights the exact coefficients of a function
+  of that bandwidth.
+
+  Input
+    v - vector3d, or a quadratureS2Grid
+    values - the values at the directions
+    L - the bandwidth
+  Output
+    fhat - the (L+1)^2 spherical coefficients, internal convention
+  Keywords
+    weights - the weight of every direction; by default 1/n, or the grid's rule
+    real - the values are real, which halves the NUFFT's array; the direct sum below 50 nodes
+        and a grid's plan decide by the values themselves
+  See also
+    sphericalSeries, sphericalPlan"""
   values = np.asarray(values).ravel()
   if isinstance(v, quadratureS2Grid):
     weights = v.weights if weights is None else weights
@@ -965,7 +1230,25 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
 
 def fourierSeries(chat, x, real=None):
   """the Fourier series sum of chat_k e^{ikx} at the angles x, directly or by NUFFT; real when the
-  coefficients are those of a real function"""
+  coefficients are those of a real function
+
+    y = fourierSeries([0.5, 1, 0.5], np.linspace(0, 2*np.pi, 50))   # 1 + cos(x)
+    y = fourierSeries([0.5, 1, 0.5], x, real=False)                  # the complex values
+    y = fourierSeries(chat, quadratureS1Grid(16))                    # at the nodes of a grid
+
+  The coefficients are c_{-L} .. c_L over e^{ikx}, the internal ones of an S1FunHarmonic (MATLAB's
+  fhat runs over e^{-ikx}). The result has the shape of x.
+
+  Input
+    chat - the 2L+1 coefficients
+    x - the angles, or a quadratureS1Grid
+  Output
+    y - the values, real for real coefficients
+  Keywords
+    real - whether the coefficients are those of a real function, whose values are returned
+        real; by default isRealFourier(chat)
+  See also
+    fourierSeriesAdjoint, S1FunHarmonic"""
   chat = np.asarray(chat)
   L = (chat.shape[-1] - 1) // 2
   real = isRealFourier(chat) if real is None else real
@@ -987,7 +1270,25 @@ def fourierSeries(chat, x, real=None):
 
 def fourierSeriesAdjoint(x, values, L, weights=None):
   """the Fourier coefficients c_{-L} .. c_L from weighted values at the angles x, the sum of
-  w v e^{-ikx}; a quadrature grid brings the weights of its rule"""
+  w v e^{-ikx}; a quadrature grid brings the weights of its rule
+
+    chat = fourierSeriesAdjoint(x, np.cos(x), 1)                  # the weights 1/n
+    chat = fourierSeriesAdjoint(x, np.cos(x), 1, weights=w)       # weighted
+    chat = fourierSeriesAdjoint(quadratureS1Grid(16), values, 8)  # the quadrature of a grid
+
+  The adjoint of fourierSeries, directly or by the NUFFT; at equispaced angles with weights 1/n
+  the coefficients of a trigonometric polynomial of degree L.
+
+  Input
+    x - the angles, or a quadratureS1Grid
+    values - the values at the angles
+    L - the bandwidth
+  Output
+    chat - the 2L+1 coefficients, complex
+  Keywords
+    weights - the weight of every angle; by default 1/n, or the grid's rule
+  See also
+    fourierSeries, S1FunHarmonic"""
   if isinstance(x, quadratureS1Grid):
     weights = x.weights if weights is None else weights
     x = x.nodes()

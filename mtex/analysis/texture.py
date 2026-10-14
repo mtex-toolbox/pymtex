@@ -57,13 +57,32 @@ def _weights(w, n):
 # ------------------------------------------------------------------ the average of a tensor
 
 def calcTensor(x, *args, average="Voigt", weights=None):
-  """the texture average of a single crystal tensor
+  """the texture average of a single crystal tensor over an ODF, a list of orientations or a
+  map; MATLAB's calcTensor
 
-    calcTensor(odf, T)                       over an ODF, the Voigt average
-    calcTensor(odf, T, 'Reuss'), 'Hill'      the inverse averaged and inverted, and the mean of the two
-    calcTensor(ori, T, weights=w)            over a list of orientations
-    calcTensor(ebsd, T1, T2, 'all')          over a map, one tensor per phase, the triple Voigt, Reuss, Hill
-  """
+    TV = calcTensor(odf, T)                       # over an ODF, the Voigt average
+    TR = calcTensor(odf, T, 'Reuss')              # the inverse averaged and inverted
+    TH = calcTensor(odf, T, average='Hill')       # the mean of the Voigt and the Reuss average
+    TV = calcTensor(ori, T, weights=w)            # over a weighted list of orientations
+    TV, TR, TH = calcTensor(ebsd, T1, T2, 'all')  # over a map, one tensor per phase
+
+  The Voigt average is the mean of the tensor rotated by the orientations, the Reuss average
+  the inverse of the mean of the rotated inverses, Hill's the mean of the two. Over an ODF
+  the integral is exact, since a rotated tensor of rank R is a polynomial of degree R in the
+  rotation. Over a map every indexed phase takes the tensor of its crystal frame, the
+  tensors given in any order, and a phase without one is refused: select the phases first,
+  ebsd[['Forsterite', 'Enstatite']]. MATLAB's geometric mean ('geometric') is not offered.
+
+  Input
+    x - SO3Fun, orientation or EBSD
+    T - tensor, the single crystal tensor; for a map one per phase
+  Output
+    T - the average, of the class of T; with 'all' the three averages Voigt, Reuss, Hill
+  Keywords
+    average - 'Voigt', 'Reuss', 'Hill' or 'all'; also given as a string after the tensors
+    weights - one weight per orientation or pixel
+  See also
+    tensor.mean, calcODF, TensorAverage"""
   which = _average(args, average)
   tensors = [a for a in args if isinstance(a, tensor)]
   if isinstance(x, EBSD):
@@ -235,8 +254,26 @@ def calcLankford(x, sS, *args, theta=None, rho=None, RD=None, ND=None, weights=N
 
 
 def calcKearnsFactor(f, h=None, N=None):
-  """the Kearns factor, the mean squared alignment of a crystal direction with N: the
-  integral of the pole figure of h against (r . N)^2"""
+  """the Kearns factor, the mean squared alignment of a crystal direction with the specimen
+  direction N; MATLAB's calcKearnsFactor
+
+    k = calcKearnsFactor(odf, h, N)    # of the crystal direction h with N
+    k = calcKearnsFactor(odf, h)       # with the z direction
+    k = calcKearnsFactor(pdf, N)       # of a pole figure
+
+  The integral of the pole figure of h against (r . N)^2 over the sphere, normalised so that
+  a uniform texture gives 1/3. MATLAB's order is calcKearnsFactor(odf, N, h), the arguments
+  told apart by their class; here h comes first. MATLAB's default h = [0001] is not taken:
+  an ODF needs h.
+
+  Input
+    f - SO3Fun, an ODF, or S2Fun, a pole figure
+    h - Miller, the crystal direction (with an ODF); with a pole figure the place of N
+    N - vector3d, the specimen direction, z when left out
+  Output
+    k - float
+  See also
+    radon, calcLankford"""
   from ..functions.quadrature import quadratureS2Grid
   if isinstance(f, SO3Fun):
     pdf = f.radon(h)
@@ -253,7 +290,29 @@ def calcKearnsFactor(f, h=None, N=None):
 
 def SO3FunSBF(sS, E, bandwidth=None):
   """the shear banding function of a slip system and a strain (rate) tensor: the closed form
-  ODF of Schaeben that a single slip system produces under that strain, as a handle"""
+  ODF of Schaeben that a single slip system produces under that strain, as a handle; MATLAB's
+  SO3FunSBF
+
+    odf = SO3FunSBF(sS, E)                  # the deformation texture of one slip system
+    odf = SO3FunSBF(sS, E, bandwidth=32)    # with the bandwidth of its harmonic conversion
+
+  The texture follows from the finite strain and the slip system without integrating its
+  evolution; it is evaluated analytically and has no bandwidth of its own, the bandwidth is
+  the one a harmonic conversion uses. The function maps the crystal frame of the slip system
+  to the frame of E, the default specimen frame when E has none.
+
+  Input
+    sS - slipSystem, a single one, in a crystal frame
+    E - strainTensor or strainRateTensor
+  Output
+    odf - SO3FunHandle
+  Keywords
+    bandwidth - the bandwidth of the handle, by default the preference maxSO3Bandwidth
+  References
+    H. Schaeben et al., An analytical finite-strain parametrization for texture evolution in
+        deforming olivine polycrystals, Geophys. J. Int. 216 (2019)
+  See also
+    doEulerStep, SingleSlipModel, slipSystem, strainTensor"""
   from ..geometry.session import getMTEXpref
   from ..functions.handles import SO3FunHandle
 
@@ -334,8 +393,27 @@ class _TextureTransport:
 
 def doEulerStep(spin, x, n=1, bandwidth=None):
   """the orientations or the density after unit time in n Euler steps under the rotation
-  velocity field spin: orientations move along the exponential of the field, a density by
-  the explicit continuity equation in its harmonic space"""
+  velocity field spin; MATLAB's doEulerStep
+
+    ori = doEulerStep(spin, ori0, 10)                # orientations in 10 steps
+    odf = doEulerStep(spin, odf0, 40)                # a density in 40 steps
+    odf = doEulerStep(spin, odf0, 40, bandwidth=16)  # the density in harmonics up to 16
+
+  Orientations move along the exponential of the field, one step of a n-th of the time at a
+  time. A density follows the continuity equation, d f / dt = -div(f spin), integrated by the
+  explicit Euler method in its harmonic space. MATLAB's implicit variants ('implicit',
+  'implicit_fixPoint') are not offered.
+
+  Input
+    spin - SO3VectorField or a callable of orientations, the rotation velocity
+    x - orientation or SO3Fun, the start
+  Output
+    x - orientation or SO3FunHarmonic after unit time
+  Keywords
+    n - the number of steps
+    bandwidth - the bandwidth of the density, by default that of SO3FunHarmonic(x)
+  See also
+    SO3FunSBF, calcTaylor, SingleSlipModel, TaylorModel"""
   n = int(n)
   if n <= 0:
     raise ValueError("the step count is positive")

@@ -29,10 +29,7 @@ _STYLE = {s.lower(): s for s in STYLES}
 
 
 def Miller(*args, antipodal=False, dispStyle=None):
-  """crystal directions and lattice plane normals, a vector3d in a crystal frame
-
-  antipodal=True adds the antipodal symmetry, dispStyle= the indices the display shows ('hkl',
-  'hkil', 'uvw', 'UVTW', 'xyz')
+  """crystal directions and lattice plane normals, a vector3d in a crystal frame; MATLAB's Miller
 
     m = Miller(h, k, l, cs)                    # a lattice plane normal
     m = Miller(h, k, i, l, cs)                 # four indices, hexagonal and trigonal lattices
@@ -42,6 +39,29 @@ def Miller(*args, antipodal=False, dispStyle=None):
     m = Miller('[100]\\[011]', cs)             # the plane holding both directions, the zone law
     m = Miller('(100)\\(011)', cs)             # the direction both planes hold
     m = Miller(v, cs)                          # a vector3d expressed in the crystal frame
+    m = Miller(1, 1, 0, cs, antipodal=True)    # with antipodal symmetry
+
+  A crystal direction is a vector3d written in a crystal frame: it has the Miller indices hkl
+  and uvw, and where the frame carries a point group it stands for its symmetrically
+  equivalent set; it is stored in Euclidean coordinates. A string names the indices by its
+  brackets: (hkl) one plane and {hkl} its family, [uvw] one direction and <uvw> its family; a
+  single plane or direction is in the frame without its group. A vector3d keeps its
+  components and is restated in the crystal frame.
+
+  Input
+    args - three or four indices, each a number or an array, or one array with the indices
+        along its last axis; a string; or a vector3d. Then the crystalFrame cs, and a style
+        'hkl', 'hkil', 'uvw', 'UVTW' or 'xyz', in any case, saying how the indices are read
+  Output
+    m - vector3d in the crystal frame
+  Keywords
+    antipodal - the antipodal symmetry, here the frame's Laue group in place of its point
+        group; MATLAB sets the antipodal flag instead, which stays False here
+    dispStyle - the indices the display shows and the numbers are read as, the same as the
+        style given positionally ('hkl', 'hkil', 'uvw', 'UVTW', 'xyz'); a string keeps the
+        style of its brackets
+  See also
+    vector3d, crystalFrame, CrystalDirections, CrystalOperations
   """
   style = dispStyle
   for a in args:

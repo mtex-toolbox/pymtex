@@ -44,7 +44,22 @@ class latticeType(enum.Enum):
             self not in (latticeType.cubic, latticeType.icosahedral))
 
   def freeAngles(self, uniqueAxis=1):
-    """which of alpha, beta and gamma the lattice leaves independent"""
+    """which of alpha, beta and gamma the lattice leaves independent
+
+      free = latticeType.monoclinic.freeAngles()                # beta, the unique axis b
+      free = latticeType.monoclinic.freeAngles(uniqueAxis=2)    # gamma, the unique axis c
+
+    A triclinic lattice leaves all three angles free, a monoclinic one the angle between the
+    two axes perpendicular to its unique axis, every other lattice none.
+
+    Input
+      lat - latticeType
+    Output
+      free - three bools, for alpha, beta and gamma
+    Keywords
+      uniqueAxis - the unique axis of a monoclinic lattice, 0, 1 or 2 for a, b or c
+    See also
+      latticeType.freeLengths, crystalFrame"""
     if self is latticeType.triclinic:
       return (True, True, True)
     if self is latticeType.monoclinic:

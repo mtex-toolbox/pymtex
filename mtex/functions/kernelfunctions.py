@@ -95,7 +95,27 @@ class _Kernel:
 
   def eval(self, t, other=None):
     """the kernel at the cosine argument t (the angle on S1), or at a rotation or direction, or
-    between two of them: psi.eval(t), psi.eval(rot), psi.eval(rot1, rot2); psi(t) is the same"""
+    between two of them; MATLAB's eval
+
+      v = psi.eval(t)               # at the cosines t, cos(omega/2) on SO(3), cos(theta) on S2
+      v = psi(t)                    # the same
+      v = psi.eval(rot)             # at the angles of rotations, or the polar angles of directions
+      v = psi.eval(rot1, rot2)      # at the angles between two rotations or two directions
+
+    A kernel on SO(3) is a function of the cosine of half the rotation angle, one on the sphere
+    of the cosine of the polar angle, one on the circle of the angle itself. Rotations or
+    directions are reduced to that argument first: |a| of a rotation, the dot product of two;
+    the z coordinate of a direction, the cosine between two.
+
+    Input
+      psi - SO3Kernel, S2Kernel or S1Kernel
+      t - ndarray of arguments, or rotation (SO3Kernel), or vector3d (S2Kernel)
+    Output
+      v - ndarray, the values
+    Keywords
+      other - a second rotation or direction: the kernel at the angle between t and it
+    See also
+      SO3Kernel.grad, SO3Kernel.calcFourier"""
     return self._eval(self._cosine(t, other))
 
   def _cosine(self, t, other):
@@ -224,7 +244,25 @@ class SO3Kernel(_Kernel):
     return _asFloat(t)
 
   def calcFourier(self, L=None):
-    """the Chebyshev coefficients A_0 .. A_L of the kernel, to its bandwidth by default"""
+    """the Chebyshev coefficients A_0 .. A_L of the kernel, to its bandwidth by default; MATLAB's
+    calcFourier
+
+      A = psi.calcFourier()         # up to the bandwidth of the kernel, psi.A
+      A = psi.calcFourier(64)       # up to the degree 64
+
+    The kernel is the series psi(cos(omega/2)) = sum_n A_n U_2n(cos(omega/2)) of Chebyshev
+    polynomials of the second kind; the coefficients come in closed form or by a recurrence for
+    the kernel families and by quadrature for a kernel given as a function. MATLAB's
+    'GaussKronrod' and maxAngle are not taken.
+
+    Input
+      psi - SO3Kernel
+    Output
+      A - ndarray of L + 1 coefficients
+    Keywords
+      L - the largest degree, the bandwidth of the kernel when not given
+    See also
+      SO3Kernel.eval, S2Kernel.calcFourier, S1Kernel.calcFourier"""
     return self._rule(self.bandwidth if L is None else int(L))
 
   @cached_property
@@ -250,8 +288,27 @@ class SO3Kernel(_Kernel):
     return SO3Kernel(self._rule(L) * other._rule(L) / (2 * np.arange(L + 1) + 1))
 
   def grad(self, t=None, other=None):
-    """the derivative with respect to the angle at the cosine argument t, through
-    sin(omega/2) psi = sum_n A_n sin((2n+1) omega/2); without an argument the kernel of it"""
+    """the derivative with respect to the rotation angle omega at the cosine argument
+    t = cos(omega/2); MATLAB's grad
+
+      d = psi.grad(t)               # at the cosines of the half angles t
+      d = psi.grad(rot)             # at the angles of rotations
+      d = psi.grad(rot1, rot2)      # at the angles between two rotations
+      dpsi = psi.grad()             # the derivative as a kernel, an SO3KernelHandle
+
+    The derivative follows from sin(omega/2) psi = sum_n A_n sin((2n+1) omega/2); it vanishes at
+    omega = 0. MATLAB calls it the magnitude of the gradient: the gradient of the function
+    g -> psi(g) has this length.
+
+    Input
+      psi - SO3Kernel
+      t - ndarray of cosines cos(omega/2), or rotation
+    Output
+      d - ndarray, or SO3KernelHandle without an argument
+    Keywords
+      other - a second rotation: the derivative at the angle between t and it
+    See also
+      SO3Kernel.eval, SO3FunRBF.grad"""
     if t is None:
       return SO3KernelHandle(lambda t: self.grad(t), bandwidth=self.bandwidth)
     return self._grad(self._cosine(t, other))
@@ -474,7 +531,20 @@ class SO3BumpKernel(SO3Kernel):
     return np.where(t > math.cos(self.delta / 2), math.pi / (self.delta - math.sin(self.delta)), 0.0).astype(t.dtype)
 
   def grad(self, t=None, other=None):
-    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
+    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel
+
+      d = psi.grad(t)               # zeros of the shape of t
+      dpsi = psi.grad()             # the zero kernel
+
+    Input
+      psi - SO3BumpKernel
+      t - ndarray of cosines cos(omega/2), or rotation
+    Output
+      d - ndarray of zeros, or SO3Kernel without an argument
+    Keywords
+      other - a second rotation: the angle between t and it
+    See also
+      SO3Kernel.grad"""
     return SO3Kernel(0) if t is None else np.zeros_like(self._cosine(t, other))
 
   def halfwidth(self):
@@ -670,7 +740,23 @@ class S2Kernel(_Kernel):
     return _asFloat(t)
 
   def calcFourier(self, L=None):
-    """the Legendre coefficients A_0 .. A_L of the kernel, to its bandwidth by default"""
+    """the Legendre coefficients A_0 .. A_L of the kernel, to its bandwidth by default; MATLAB's
+    calcFourier
+
+      A = psi.calcFourier()         # up to the bandwidth of the kernel, psi.A
+      A = psi.calcFourier(64)       # up to the degree 64
+
+    The kernel is the series psi(t) = sum_n A_n P_n(t) of Legendre polynomials in the cosine t
+    of the polar angle.
+
+    Input
+      psi - S2Kernel
+    Output
+      A - ndarray of L + 1 coefficients
+    Keywords
+      L - the largest degree, the bandwidth of the kernel when not given
+    See also
+      S2Kernel.eval, SO3Kernel.calcFourier"""
     return self._rule(self.bandwidth if L is None else int(L))
 
   @cached_property
@@ -941,7 +1027,23 @@ class S1Kernel(_Kernel):
     return c
 
   def calcFourier(self, L=None):
-    """the Fourier coefficients of the kernel, degrees -L .. L, to its bandwidth by default"""
+    """the Fourier coefficients of the kernel, degrees -L .. L, to its bandwidth by default;
+    MATLAB's calcFourier
+
+      fhat = psi.calcFourier()      # up to the bandwidth of the kernel, psi.fhat
+      fhat = psi.calcFourier(16)    # the degrees -16 .. 16
+
+    The kernel is the even series psi(x) = sum_k c_k e^{ikx}, c_-k = c_k; the coefficients are
+    returned two sided, beyond the bandwidth as zeros.
+
+    Input
+      psi - S1Kernel
+    Output
+      fhat - ndarray of 2L + 1 coefficients
+    Keywords
+      L - the largest degree, the bandwidth of the kernel when not given
+    See also
+      S1Kernel.grad, SO3Kernel.calcFourier"""
     c = self._rule(self.bandwidth if L is None else int(L))
     return np.concatenate([c[:0:-1], c])
 
@@ -991,7 +1093,19 @@ class S1Kernel(_Kernel):
     return S1Kernel._fromHalf(self._rule(L) * other._rule(L))
 
   def grad(self, x=None):
-    """the derivative -2 sum_k k c_k sin(kx)"""
+    """the derivative of a kernel on the circle, -2 sum_k k c_k sin(kx)
+
+      d = psi.grad(x)               # at the angles x
+      dpsi = psi.grad()             # the derivative as a kernel, an S1KernelHandle
+
+    Input
+      psi - S1Kernel
+    Output
+      d - ndarray, or S1KernelHandle without an argument
+    Keywords
+      x - the angles; without them the derivative is returned as a kernel
+    See also
+      S1Kernel.calcFourier, S1FunHarmonic.grad"""
     if x is None:
       return S1KernelHandle(lambda x: self.grad(x), bandwidth=self.bandwidth)
     x = _asFloat(x)
@@ -1103,7 +1217,19 @@ class S1BumpKernel(S1Kernel):
     return np.where(np.abs(_wrap(x)) < self.delta, math.pi / self.delta, 0.0).astype(x.dtype)
 
   def grad(self, x=None):
-    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel"""
+    """the derivative of the bump kernel, zero wherever it exists; without an argument the zero kernel
+
+      d = psi.grad(x)               # zeros of the shape of x
+      dpsi = psi.grad()             # the zero kernel
+
+    Input
+      psi - S1BumpKernel
+    Output
+      d - ndarray of zeros, or S1Kernel without an argument
+    Keywords
+      x - the angles; without them the zero kernel is returned
+    See also
+      S1Kernel.grad"""
     if x is None:
       return S1Kernel([0.0])
     return np.zeros_like(_asFloat(x))

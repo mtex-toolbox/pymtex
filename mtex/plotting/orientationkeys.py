@@ -93,10 +93,24 @@ class ipfColorKey(orientationColorKey):
     return vector3d(qrot(qconj(q), np.tile(d, (len(q), 1))).reshape(ori.shape + (3,)), frame=self.frameA, isNormalized=True)
 
   def precompute(self, resolution=None):
-    """MATLAB's precompute: the direction key evaluated once on a grid of the whole sphere, the
-    colours then read off the node nearest each crystal direction without folding it into the
-    sector. An unchanged HSV key takes the grid its crystal frame keeps for the session,
-    any other key a grid of its own, rebuilt when the key has changed since"""
+    """the direction key evaluated once on a grid of the whole sphere, so that the colours of
+    many orientations are cheap; MATLAB's precompute
+
+      ipfKey.precompute()                            # the grid at half a degree
+      ipfKey.precompute(resolution=1*degree)         # a coarser grid
+
+    The colours are then read off the node nearest each crystal direction without folding it
+    into the sector. An unchanged HSV key takes the grid its crystal frame keeps for the
+    session, any other key a grid of its own, rebuilt when the key has changed since.
+    orientation2color calls this itself from 100000 orientations on, where the grid pays for
+    itself.
+
+    Output
+      ipfKey - the key itself
+    Keywords
+      resolution - the spacing of the grid; half a degree by default
+    See also
+      ipfColorKey.orientation2color, colorGrid"""
     resolution = COLOR_GRID_RESOLUTION if resolution is None else resolution
     state = _keyState(self.dirMap)
     if self._grid is not None and self._grid[0] == state and self._grid[1].resolution == resolution:
@@ -266,11 +280,23 @@ class axisAngleColorKey(orientationColorKey):
 
   def orientation2color(self, ori, oriRef=None):
     """the colours of orientations: the axis of the rotation from the reference through the key of
-    the sphere, its angle as the saturation, NaN above thresholdAngle; the reference given here
-    takes the place of the key's
+    the sphere, its angle as the saturation, NaN above thresholdAngle
 
-      rgb = key.orientation2color(ori)
-      rgb = key.orientation2color(ori, oriRef)"""
+      rgb = key.orientation2color(ori)               # from the key's reference
+      rgb = key.orientation2color(ori, oriRef)       # from a reference given here
+
+    The saturation is full at the key's maxAngle, by default the 80th percentile of the angles
+    of ori. Without any reference the identity is the reference, so the colour shows the
+    rotation itself.
+
+    Input
+      ori - orientation
+    Output
+      rgb - (..., 3) array of colours, NaN above thresholdAngle and for an unmeasured orientation
+    Keywords
+      oriRef - one reference orientation, or one per orientation, in place of the key's
+    See also
+      axisAngleColorKey, ipfColorKey.orientation2color"""
     ref = self.oriRef if oriRef is None else oriRef
     if ref is None:
       omega = np.asarray(ori.angle()).reshape(-1)

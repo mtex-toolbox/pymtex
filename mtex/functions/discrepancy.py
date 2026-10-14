@@ -682,14 +682,33 @@ def _legacySO3(a, b, weights=None, weights2=None, bandwidth=None):
 
 def discrepancy(a, b, metric="D_2", **kwargs):
   """the discrepancy between two densities and/or weighted point sets on the sphere (S2Fun,
-  vector3d) or on SO(3) (SO3Fun, rotation, orientation), in either order
+  vector3d) or on SO(3) (SO3Fun, rotation, orientation), in either order; MATLAB's discrepancy
 
-    discrepancy(v, w, weights=c, weights2=e)             D_2, the root cap or ball L2 discrepancy
-    discrepancy(f, v, metric='D_cap', numCenters=4097)   the finite search for the largest cap
-    discrepancy(odf, ori, metric='D_ball', numRadii=513)
-    discrepancy(f, v, metric='L2', bandwidth=32, degreeWeights=w)   'E_L' the same
-    discrepancy(f, v, squared=True), discrepancy(f, v, info=True) -> (d, info)
-    discrepancy(f, v, metric='kernel')                   the squared objective of optimalSample"""
+    d = discrepancy(v, w, weights=c, weights2=e)              # D_2, the root cap or ball L2 discrepancy
+    d = discrepancy(sF, v, metric='D_cap', numCenters=4097)   # the finite search for the largest cap
+    d = discrepancy(odf, ori, metric='D_ball', numRadii=513)  # the largest ball on SO(3)
+    d = discrepancy(sF, v, metric='L2', bandwidth=32)         # a bandlimited L2 norm, 'E_L' the same
+    d = discrepancy(sF, v, squared=True)                      # the square
+    d, info = discrepancy(sF, v, info=True)                   # with what was computed
+    d = discrepancy(sF, v, metric='kernel', bandwidth=16)     # the squared objective of optimalSample
+
+  The measures on the sphere go to sphericalDiscrepancy, those on SO(3) to
+  rotationalDiscrepancy, with the keywords given (weights, weights2, bandwidth,
+  degreeWeights, the search sizes, squared, info); their pages describe the metrics.
+  metric='kernel' is MATLAB's discrepancy: the squared kernel distance of the restricted
+  distance kernel over the degrees 1 to bandwidth, which optimalSample minimises; it takes
+  only weights, weights2 and bandwidth, and info.
+
+  Input
+    a, b - S2Fun or vector3d on the sphere, SO3Fun or rotation on SO(3)
+  Output
+    d - the discrepancy
+    info - with info=True, what was computed
+  Keywords
+    metric - 'D_2', 'D_cap' or 'L2' ('E_L') on the sphere, 'D_2', 'D_ball' or 'L2' on SO(3),
+        or 'kernel', MATLAB's measure
+  See also
+    sphericalDiscrepancy, rotationalDiscrepancy, optimalSample, discreteSample"""
   spherical = any(isinstance(x, _S2_INPUTS) for x in (a, b))
   if spherical and any(isinstance(x, _SO3_INPUTS) for x in (a, b)):
     raise TypeError("a measure on the sphere cannot be compared with one on SO(3)")

@@ -173,8 +173,22 @@ class mtexFigure:
     return ax
 
   def takeAxis(self, keep=False):
-    """the axes the next plot draws into: the pending one, else a new one; keep=True leaves a
-    pending one as it is, for an annotation onto the plot it holds"""
+    """the axes the next plot draws into: the pending one, else a new one
+
+      ax = mtexFig.takeAxis()                        # the axes for the next plot
+      ax = mtexFig.takeAxis(keep=True)               # the pending axes kept as drawn, to annotate it
+
+    The pending axes is the one nextAxis prepared or a plot left for the next; an axes already
+    drawn into is emptied for the new plot unless hold is on, as MATLAB's nextAxis(k) picks the
+    cell the next plot paints. Without a pending axes a new one is added to the layout.
+
+    Output
+      ax - the matplotlib axes
+    Keywords
+      keep - leave a pending axes as it is, with what is drawn in it, for an annotation onto
+          the plot it holds
+    See also
+      nextAxis, hold, mtexFigure"""
     ax, self.pending = self.pending, None
     if ax is not None:
       # an axes nextAxis left blank shows its frame again
@@ -224,7 +238,16 @@ class mtexFigure:
 
       mtexFig.setColorRange()             # one range over every axes
       mtexFig.setColorRange('tight')      # each axes the range of its own data
-      mtexFig.setColorRange((0, 5))       # the range given"""
+      mtexFig.setColorRange((0, 5))       # the range given
+
+    A filled contour plot is drawn again with its levels over the new range, and the colour
+    bars of the figure follow it. A figure of explicit colours keeps a range given for the bar
+    mtexColorbar draws.
+
+    Input
+      colorRange - 'equal', 'tight' or (lo, hi)
+    See also
+      setColorRange, mtexFigure.colorbar"""
     ms = self._mappables()
     if isinstance(colorRange, str) and colorRange == "tight":
       return self._tightColorRange(ms)
@@ -285,7 +308,17 @@ class mtexFigure:
     return [cb]
 
   def setColorScale(self, scale="linear"):
-    """MATLAB's set(gca, 'ColorScale', 'log'): the colours spread over the decades of the range"""
+    """logarithmic or linear colours on every axes of the figure; MATLAB's set(gca, 'ColorScale', 'log')
+
+      mtexFig.setColorScale('log')                   # the colours spread over the decades of the range
+      mtexFig.setColorScale('linear')                # back to linear colours
+
+    A range starting at zero or below starts at a millionth of its top on the logarithmic scale.
+
+    Input
+      scale - 'log' or 'linear'
+    See also
+      setColorScale, mtexFigure.setColorRange"""
     from matplotlib.colors import LogNorm, Normalize
     for ax, m in self._mappables():
       lo, hi = m.get_clim()
@@ -296,7 +329,20 @@ class mtexFigure:
     self._redrawColorbars()
 
   def setColormap(self, cmap, ax=None):
-    """a filled contour plot cuts its bands out of the map, so it is drawn again"""
+    """the colour map of the plots of the figure, or of one axes; MATLAB's mtexColorMap
+
+      mtexFig.setColormap('viridis')                 # every axes, and the plots to come
+      mtexFig.setColormap('hot', ax=mtexFig.children[0])  # one axes only
+
+    A filled contour plot cuts its bands out of the map, so it is drawn again.
+
+    Input
+      cmap - a matplotlib colour map or the name of one of matplotlib's; mtexColorMap resolves
+          MTEX's names, as 'LaboTeX', and calls this
+    Keywords
+      ax - the one axes to recolour; the figure keeps its colour map for the others
+    See also
+      mtexColorMap, mtexFigure.setColorRange"""
     # one axes given keeps the map of the figure for the others
     if ax is None:
       self.colormap = cmap
@@ -310,8 +356,24 @@ class mtexFigure:
         refill(colormap=cmap)
 
   def colorbar(self, label="", multiple=False, **kwargs):
-    """mtexColorbar: a bar per axes, or one for all when they share a range and a colour map; a
-    figure that has bars loses them instead, as MATLAB's toggle does"""
+    """the colour bars of the figure: a bar per axes, or one for all when they share a range and
+    a colour map; a figure that has bars loses them instead, as MATLAB's toggle does
+
+      mtexFig.colorbar()                             # a bar per axes, or one for all
+      mtexFig.colorbar(label='mrd')                  # with a label
+      mtexFig.colorbar(multiple=True)                # a bar per axes, also where the ranges agree
+
+    A figure of explicit colours, as a boundary coloured by num2rgb, shows the colour map over
+    the range setColorRange gave. mtexColorbar calls this on the current figure; further
+    keywords, as location, go to matplotlib's colorbar.
+
+    Output
+      bars - list of the matplotlib colour bars drawn, empty when they were removed
+    Keywords
+      label - the label of the bar, or a list of one label per bar in the order of the axes
+      multiple - a bar per axes even where the ranges and the colour maps agree
+    See also
+      mtexColorbar, setColorRange, mtexFigure.setColormap"""
     if self.colorbars:
       self._removeBars()
       return []
@@ -348,7 +410,16 @@ class mtexFigure:
   # ------------------------------------------------------------------ pass through
 
   def drawNow(self, figSize=None):
-    """drawNow(figSize='normal'): the figure resized to a named size of its layout, then drawn"""
+    """the figure drawn, resized first when a size is given; MATLAB's drawNow(mtexFig)
+
+      mtexFig.drawNow()                              # the figure drawn as it is
+      mtexFig.drawNow(figSize='large')               # resized to a named size of its layout
+
+    Keywords
+      figSize - 'tiny', 'small', 'medium', 'normal', 'large', 'huge', scaling the size the
+          layout gives, or (width, height) in inches; by default the size is kept
+    See also
+      mtexFigure, saveFigure"""
     if figSize is not None:
       self.fig.set_size_inches(*figureSize(figSize, (min(3.2 * self.ncols, 16), min(3.2 * self.nrows, 12))))
     self.fig.canvas.draw_idle()
@@ -421,10 +492,22 @@ def _freshAxes(figSize=None, default=(5.5, 5.5)):
 
 
 def newMtexFigure(n=1, **kwargs):
-  """a new mtexFigure laid out for n axes; it is always new, so MATLAB's second output, whether
-  it is, has no counterpart
+  """a new mtexFigure laid out for n axes, which becomes the current one
 
-    newMtexFigure(4, figSize='large')"""
+    mtexFig = newMtexFigure()                        # a new figure
+    mtexFig = newMtexFigure(4, figSize='large')      # laid out for 4 axes, large
+    mtexFig = newMtexFigure(layout=(1, 3))           # one row of three axes
+
+  The keywords are those of mtexFigure: figSize, hold, figure, columns, layout,
+  innerPlotSpacing, outerPlotSpacing, marginx, marginy. The figure is always new, so MATLAB's
+  second output, whether it is, has no counterpart.
+
+  Input
+    n - the number of axes the layout is made for
+  Output
+    mtexFig - mtexFigure
+  See also
+    mtexFigure, nextAxis, gcm"""
   return mtexFigure(n, **kwargs)
 
 
@@ -472,7 +555,24 @@ def nextAxis(k=None, j=None, fig=None):
 
 
 def mtexTitle(*args, fig=None, **kwargs):
-  """mtexTitle('text'): the title of the current axes, mtexTitle(ax, 'text') that of the axes given"""
+  """a title over an axes
+
+    mtexTitle('pole figures')                        # the title of the current axes
+    mtexTitle(ax, '(100)')                           # the title of the axes given
+    mtexTitle('(110)', fig=mtexFig, fontSize=14)     # the axes of a figure given, larger
+
+  The current axes is the one drawn into last; an axes made with plt.subplot outside an
+  mtexFigure takes the title as well. Further keywords go to matplotlib's set_title, fontSize
+  as its fontsize. MATLAB's 'global' title over all axes and its alignments have no
+  counterpart.
+
+  Input
+    ax - the matplotlib axes, before the text
+    text - the title
+  Keywords
+    fig - the mtexFigure whose axes drawn into last takes the title; the current one by default
+  See also
+    xlabel, ylabel, mtexFigure"""
   if "fontSize" in refuseVariants(kwargs):
     kwargs["fontsize"] = kwargs.pop("fontSize")
   # mtexTitle(ax, 'text'): the title of the axes named
@@ -491,8 +591,22 @@ def mtexTitle(*args, fig=None, **kwargs):
 
 
 def ylabel(*args, fig=None, **kwargs):
-  """ylabel(ax, 'text') or ylabel('text'): a label left of the axes, written beside a
-  spherical chart, which has no axis lines to carry matplotlib's own label"""
+  """a label left of an axes, written beside a spherical chart, which has no axis lines to
+  carry matplotlib's own label
+
+    ylabel('y')                                      # left of the current axes
+    ylabel(ax, 'y')                                  # left of the axes given
+
+  The current axes is the one nextAxis prepared, else the one drawn into last; without an
+  mtexFigure it is matplotlib's. Further keywords go to matplotlib's text.
+
+  Input
+    ax - the matplotlib axes, before the text
+    text - the label
+  Keywords
+    fig - the mtexFigure whose current axes takes the label; the current figure by default
+  See also
+    xlabel, mtexTitle"""
   ax, text = args if len(args) == 2 else (None, args[0])
   if ax is None:
     ax = _labelAxes(gcm() if fig is None else fig)
@@ -505,8 +619,21 @@ def ylabel(*args, fig=None, **kwargs):
 
 
 def xlabel(text, fig=None, **kwargs):
-  """xlabel('text'): a label under the current axes, which a spherical chart draws without
-  axis lines, so matplotlib's own label would not show"""
+  """a label under the current axes, which a spherical chart draws without axis lines, so
+  matplotlib's own label would not show
+
+    xlabel('x')                                      # under the current axes
+    xlabel('x', fig=mtexFig)                         # under the current axes of a figure given
+
+  The current axes is the one nextAxis prepared, else the one drawn into last; without an
+  mtexFigure it is matplotlib's. Further keywords go to matplotlib's text.
+
+  Input
+    text - the label
+  Keywords
+    fig - the mtexFigure whose current axes takes the label; the current figure by default
+  See also
+    ylabel, mtexTitle"""
   ax = _labelAxes(gcm() if fig is None else fig)
   if ax is None:
     import matplotlib.pyplot as plt
@@ -542,7 +669,17 @@ def hold(on=True):
 
     hold(True)               # the next plots go into the current axes
     hold(False)              # each plot takes its axes for itself again
-    mtexFig = hold('on')     # MATLAB's words, the figure held returned"""
+    mtexFig = hold('on')     # MATLAB's words, the figure held returned
+
+  A plain matplotlib figure opened after the last MTEX figure is adopted as an mtexFigure;
+  without any figure a new one is made.
+
+  Input
+    on - True or 'on' to hold, False or 'off' to release
+  Output
+    mtexFig - the mtexFigure held
+  See also
+    gcm, nextAxis, mtexFigure"""
   import matplotlib.pyplot as plt
   fig = gcm()
   # a plain figure the user opened after the last MTEX figure is adopted, else a new one
@@ -561,11 +698,25 @@ COLORBAR_LOCATIONS = {"southoutside": "bottom", "northoutside": "top", "eastouts
 
 def mtexColorbar(fig=None, title=None, **kwargs):
   """a colour bar per axes of the current figure, or one when the ranges agree; toggled off when
-  the figure has bars; a MATLAB location as the first argument
+  the figure has bars; MATLAB's mtexColorbar
 
-    mtexColorbar()
-    mtexColorbar('southoutside', title='mrd')
-    mtexColorbar('multiple')"""
+    mtexColorbar()                                   # a bar per axes, or one for all
+    mtexColorbar(title='misorientation angle')       # a bar with a title
+    mtexColorbar('southoutside', title='mrd')        # a horizontal bar below
+    mtexColorbar('multiple')                         # a bar per axes, also where the ranges agree
+
+  One bar for all axes needs the same colour range on them, which setColorRange('equal')
+  gives first. A MATLAB location, 'eastoutside', 'southoutside', 'northoutside',
+  'westoutside' or without 'outside', may stand in place of fig or be given as location=;
+  further keywords go to matplotlib's colorbar.
+
+  Output
+    bars - list of the matplotlib colour bars drawn, empty when they were removed
+  Keywords
+    fig - the mtexFigure; the current one by default
+    title - the label of the bar, or a list of one per bar
+  See also
+    mtexFigure.colorbar, setColorRange, setColorScale"""
   if isinstance(fig, str):
     kwargs.setdefault("location", fig)
     fig = None
@@ -582,10 +733,24 @@ def mtexColorbar(fig=None, title=None, **kwargs):
 
 
 def saveFigure(fname, fig=None, *args, **kwargs):
-  """saveFigure('name.png'): the current figure written cropped to its content, the format by the
-  extension; a bitmap at 1.5 times the screen resolution, a map at 2.5 times and without
-  smoothing between its cells, so that no colour is invented between measurements
-  (MATLAB saveFigure); 'crop' and 'pdf' of MATLAB's TeX tools need nothing here"""
+  """the figure written to a graphics file cropped to its content; MATLAB's saveFigure
+
+    saveFigure('pf.png')                             # the current figure
+    saveFigure('pf.pdf', fig=mtexFig)                # a figure given, as vector graphics
+    saveFigure('pf.png', dpi=300)                    # another resolution
+
+  The format is that of the extension. A bitmap is written at 1.5 times the screen
+  resolution, a map at 2.5 times and without smoothing between its cells, so that no colour
+  is invented between measurements. 'crop' and 'pdf' of MATLAB's TeX tools need nothing here.
+  Further keywords go to matplotlib's savefig; positional arguments after fig are ignored.
+  MATLAB's file dialog without a name has no counterpart.
+
+  Input
+    fname - the file name
+  Keywords
+    fig - the mtexFigure or matplotlib figure; the current one by default
+  See also
+    mtexFigure.savefig, mtexFigure.drawNow"""
   import os
   import matplotlib.pyplot as plt
   m = gcm() if fig is None else fig
@@ -635,15 +800,36 @@ def setColorRange(colorRange: Literal["equal", "tight"] | Any = "equal", fig=Non
   """one colour range over every axes of the current figure ('equal'), each its own ('tight') or
   the one given as (lo, hi)
 
-    setColorRange('equal')
-    setColorRange((0, 4))"""
+    setColorRange('equal')                           # one range over every axes
+    setColorRange((0, 4))                            # the range given
+    setColorRange('tight', fig=mtexFig)              # each axes of a figure given its own range
+
+  MATLAB's 'log' option is setColorScale('log'), its choice of the figures ('all', 'current',
+  'figure') the keyword fig, and 'zero2white' has no counterpart.
+
+  Input
+    colorRange - 'equal', 'tight' or (lo, hi)
+  Keywords
+    fig - the mtexFigure; the current one by default
+  See also
+    mtexFigure.setColorRange, setColorScale, mtexColorbar"""
   fig = gcm() if fig is None else fig
   if fig is not None:
     fig.setColorRange(colorRange)
 
 
 def setColorScale(scale="linear", fig=None):
-  """setColorScale('log'): logarithmic colours on every plot of the figure, 'linear' back"""
+  """logarithmic or linear colours on every plot of the figure
+
+    setColorScale('log')                             # the colours spread over the decades of the range
+    setColorScale('linear', fig=mtexFig)             # linear colours again on a figure given
+
+  Input
+    scale - 'log' or 'linear'
+  Keywords
+    fig - the mtexFigure; the current one by default
+  See also
+    mtexFigure.setColorScale, setColorRange"""
   fig = gcm() if fig is None else fig
   if fig is not None:
     fig.setColorScale(scale)

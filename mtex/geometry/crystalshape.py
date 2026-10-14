@@ -393,145 +393,902 @@ class crystalShape:
     from ..plotting.shapeplot import plotShape as plot, plotInnerFace, plotInnerDirection, plotSlipSystem
     @staticmethod
     def albite(CS=None, simple=False) -> Any:
-      """the albite crystal shape of the catalogue, in cs when given"""
+      """the albite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.albite
+
+        cS = crystalShape.albite()  # in the catalogue's own frame
+        cS = crystalShape.albite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for albite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def amphibole(CS=None, simple=False) -> Any:
-      """the amphibole crystal shape of the catalogue, in cs when given"""
+      """the amphibole crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.amphibole
+
+        cS = crystalShape.amphibole()  # in the catalogue's own frame
+        cS = crystalShape.amphibole(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for amphibole: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def analcime(CS=None, simple=False) -> Any:
-      """the analcime crystal shape of the catalogue, in cs when given"""
+      """the analcime crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.analcime
+
+        cS = crystalShape.analcime()  # in the catalogue's own frame
+        cS = crystalShape.analcime(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for analcime: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def andalusite(CS=None, simple=False) -> Any:
-      """the andalusite crystal shape of the catalogue, in cs when given"""
+      """the andalusite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.andalusite
+
+        cS = crystalShape.andalusite()  # in the catalogue's own frame
+        cS = crystalShape.andalusite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for andalusite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def anorthite(CS=None, simple=False) -> Any:
-      """the anorthite crystal shape of the catalogue, in cs when given"""
+      """the anorthite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.anorthite
+
+        cS = crystalShape.anorthite()  # in the catalogue's own frame
+        cS = crystalShape.anorthite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for anorthite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def antigorite(CS=None, simple=False) -> Any:
-      """the antigorite crystal shape of the catalogue, in cs when given"""
+      """the antigorite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.antigorite
+
+        cS = crystalShape.antigorite()  # in the catalogue's own frame
+        cS = crystalShape.antigorite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for antigorite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def apatite(CS=None, simple=False) -> Any:
-      """the apatite crystal shape of the catalogue, in cs when given"""
+      """the apatite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.apatite
+
+        cS = crystalShape.apatite()  # in the catalogue's own frame
+        cS = crystalShape.apatite(cs)  # in the crystal frame cs
+        cS = crystalShape.apatite(simple=True)  # the simple shape, fewer faces
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def aragonite(CS=None, simple=False) -> Any:
-      """the aragonite crystal shape of the catalogue, in cs when given"""
+      """the aragonite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.aragonite
+
+        cS = crystalShape.aragonite()  # in the catalogue's own frame
+        cS = crystalShape.aragonite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for aragonite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def augite(CS=None, simple=False) -> Any:
-      """the augite crystal shape of the catalogue, in cs when given"""
+      """the augite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.augite
+
+        cS = crystalShape.augite()  # in the catalogue's own frame
+        cS = crystalShape.augite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for augite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def biotite(CS=None, simple=False) -> Any:
-      """the biotite crystal shape of the catalogue, in cs when given"""
+      """the biotite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.biotite
+
+        cS = crystalShape.biotite()  # in the catalogue's own frame
+        cS = crystalShape.biotite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for biotite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def brucite(CS=None, simple=False) -> Any:
-      """the brucite crystal shape of the catalogue, in cs when given"""
+      """the brucite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.brucite
+
+        cS = crystalShape.brucite()  # in the catalogue's own frame
+        cS = crystalShape.brucite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for brucite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def calcite(CS=None, simple=False) -> Any:
-      """the calcite crystal shape of the catalogue, in cs when given"""
+      """the calcite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.calcite
+
+        cS = crystalShape.calcite()  # in the catalogue's own frame
+        cS = crystalShape.calcite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for calcite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def chromite(CS=None, simple=False) -> Any:
-      """the chromite crystal shape of the catalogue, in cs when given"""
+      """the chromite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.chromite
+
+        cS = crystalShape.chromite()  # in the catalogue's own frame
+        cS = crystalShape.chromite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for chromite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def clinochlore(CS=None, simple=False) -> Any:
-      """the clinochlore crystal shape of the catalogue, in cs when given"""
+      """the clinochlore crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.clinochlore
+
+        cS = crystalShape.clinochlore()  # in the catalogue's own frame
+        cS = crystalShape.clinochlore(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for clinochlore: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def cordierite(CS=None, simple=False) -> Any:
-      """the cordierite crystal shape of the catalogue, in cs when given"""
+      """the cordierite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.cordierite
+
+        cS = crystalShape.cordierite()  # in the catalogue's own frame
+        cS = crystalShape.cordierite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for cordierite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def corundum(CS=None, simple=False) -> Any:
-      """the corundum crystal shape of the catalogue, in cs when given"""
+      """the corundum crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.corundum
+
+        cS = crystalShape.corundum()  # in the catalogue's own frame
+        cS = crystalShape.corundum(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for corundum: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def diamond(CS=None, simple=False) -> Any:
-      """the diamond crystal shape of the catalogue, in cs when given"""
+      """the diamond crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.diamond
+
+        cS = crystalShape.diamond()  # in the catalogue's own frame
+        cS = crystalShape.diamond(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for diamond: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def diopside(CS=None, simple=False) -> Any:
-      """the diopside crystal shape of the catalogue, in cs when given"""
+      """the diopside crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.diopside
+
+        cS = crystalShape.diopside()  # in the catalogue's own frame
+        cS = crystalShape.diopside(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for diopside: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def dolomite(CS=None, simple=False) -> Any:
-      """the dolomite crystal shape of the catalogue, in cs when given"""
+      """the dolomite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.dolomite
+
+        cS = crystalShape.dolomite()  # in the catalogue's own frame
+        cS = crystalShape.dolomite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for dolomite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def enstatite(CS=None, simple=False) -> Any:
-      """the enstatite crystal shape of the catalogue, in cs when given"""
+      """the enstatite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.enstatite
+
+        cS = crystalShape.enstatite()  # in the catalogue's own frame
+        cS = crystalShape.enstatite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for enstatite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def epidote(CS=None, simple=False) -> Any:
-      """the epidote crystal shape of the catalogue, in cs when given"""
+      """the epidote crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.epidote
+
+        cS = crystalShape.epidote()  # in the catalogue's own frame
+        cS = crystalShape.epidote(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for epidote: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def fluorite(CS=None, simple=False) -> Any:
-      """the fluorite crystal shape of the catalogue, in cs when given"""
+      """the fluorite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.fluorite
+
+        cS = crystalShape.fluorite()  # in the catalogue's own frame
+        cS = crystalShape.fluorite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for fluorite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def fluoriteComplex(CS=None, simple=False) -> Any:
-      """the fluorite crystal shape of the catalogue, in cs when given"""
+      """the fluorite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.fluoriteComplex
+
+        cS = crystalShape.fluoriteComplex()  # in the catalogue's own frame
+        cS = crystalShape.fluoriteComplex(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for fluoriteComplex: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def forsterite(CS=None, simple=False) -> Any:
-      """the forsterite crystal shape of the catalogue, in cs when given"""
+      """the forsterite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.forsterite
+
+        cS = crystalShape.forsterite()  # in the catalogue's own frame
+        cS = crystalShape.forsterite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for forsterite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def garnet(CS=None, simple=False) -> Any:
-      """the garnet crystal shape of the catalogue, in cs when given"""
+      """the garnet crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.garnet
+
+        cS = crystalShape.garnet()  # in the catalogue's own frame
+        cS = crystalShape.garnet(cs)  # in the crystal frame cs
+        cS = crystalShape.garnet(simple=True)  # the simple shape, fewer faces
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def gypsum(CS=None, simple=False) -> Any:
-      """the gypsum crystal shape of the catalogue, in cs when given"""
+      """the gypsum crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.gypsum
+
+        cS = crystalShape.gypsum()  # in the catalogue's own frame
+        cS = crystalShape.gypsum(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for gypsum: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def halite(CS=None, simple=False) -> Any:
-      """the halite crystal shape of the catalogue, in cs when given"""
+      """the halite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.halite
+
+        cS = crystalShape.halite()  # in the catalogue's own frame
+        cS = crystalShape.halite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for halite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def ice_VI(CS=None, simple=False) -> Any:
-      """the ice VI crystal shape of the catalogue, in cs when given"""
+      """the ice VI crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.ice_VI
+
+        cS = crystalShape.ice_VI()  # in the catalogue's own frame
+        cS = crystalShape.ice_VI(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for ice_VI: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def ilmenite(CS=None, simple=False) -> Any:
-      """the ilmenite crystal shape of the catalogue, in cs when given"""
+      """the ilmenite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.ilmenite
+
+        cS = crystalShape.ilmenite()  # in the catalogue's own frame
+        cS = crystalShape.ilmenite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for ilmenite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def kyanite(CS=None, simple=False) -> Any:
-      """the kyanite crystal shape of the catalogue, in cs when given"""
+      """the kyanite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.kyanite
+
+        cS = crystalShape.kyanite()  # in the catalogue's own frame
+        cS = crystalShape.kyanite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for kyanite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def magnesite(CS=None, simple=False) -> Any:
-      """the magnesite crystal shape of the catalogue, in cs when given"""
+      """the magnesite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.magnesite
+
+        cS = crystalShape.magnesite()  # in the catalogue's own frame
+        cS = crystalShape.magnesite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for magnesite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def magnetite(CS=None, simple=False) -> Any:
-      """the magnetite crystal shape of the catalogue, in cs when given"""
+      """the magnetite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.magnetite
+
+        cS = crystalShape.magnetite()  # in the catalogue's own frame
+        cS = crystalShape.magnetite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for magnetite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def microcline(CS=None, simple=False) -> Any:
-      """the microcline crystal shape of the catalogue, in cs when given"""
+      """the microcline crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.microcline
+
+        cS = crystalShape.microcline()  # in the catalogue's own frame
+        cS = crystalShape.microcline(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for microcline: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def monazite(CS=None, simple=False) -> Any:
-      """the monazite crystal shape of the catalogue, in cs when given"""
+      """the monazite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.monazite
+
+        cS = crystalShape.monazite()  # in the catalogue's own frame
+        cS = crystalShape.monazite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for monazite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def muscovite(CS=None, simple=False) -> Any:
-      """the muscovite crystal shape of the catalogue, in cs when given"""
+      """the muscovite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.muscovite
+
+        cS = crystalShape.muscovite()  # in the catalogue's own frame
+        cS = crystalShape.muscovite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for muscovite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def olivine(CS=None, simple=False) -> Any:
-      """the olivine crystal shape of the catalogue, in cs when given"""
+      """the olivine crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.olivine
+
+        cS = crystalShape.olivine()  # in the catalogue's own frame
+        cS = crystalShape.olivine(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for olivine: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def orthoclase(CS=None, simple=False) -> Any:
-      """the orthoclase crystal shape of the catalogue, in cs when given"""
+      """the orthoclase crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.orthoclase
+
+        cS = crystalShape.orthoclase()  # in the catalogue's own frame
+        cS = crystalShape.orthoclase(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for orthoclase: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def plagioclase(CS=None, simple=False) -> Any:
-      """the Plagioclase crystal shape of the catalogue, in cs when given"""
+      """the Plagioclase crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.plagioclase
+
+        cS = crystalShape.plagioclase()  # in the catalogue's own frame
+        cS = crystalShape.plagioclase(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for plagioclase: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def quartz(CS=None, simple=False) -> Any:
-      """the Quartz crystal shape of the catalogue, in cs when given"""
+      """the Quartz crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.quartz
+
+        cS = crystalShape.quartz()  # in the catalogue's own frame
+        cS = crystalShape.quartz(cs)  # in the crystal frame cs
+        cS = crystalShape.quartz(simple=True)  # the simple shape, fewer faces
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def rutile(CS=None, simple=False) -> Any:
-      """the rutile crystal shape of the catalogue, in cs when given"""
+      """the rutile crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.rutile
+
+        cS = crystalShape.rutile()  # in the catalogue's own frame
+        cS = crystalShape.rutile(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for rutile: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def spinel(CS=None, simple=False) -> Any:
-      """the spinel crystal shape of the catalogue, in cs when given"""
+      """the spinel crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.spinel
+
+        cS = crystalShape.spinel()  # in the catalogue's own frame
+        cS = crystalShape.spinel(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for spinel: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def staurolite(CS=None, simple=False) -> Any:
-      """the staurolite crystal shape of the catalogue, in cs when given"""
+      """the staurolite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.staurolite
+
+        cS = crystalShape.staurolite()  # in the catalogue's own frame
+        cS = crystalShape.staurolite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for staurolite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def titanite(CS=None, simple=False) -> Any:
-      """the titanite crystal shape of the catalogue, in cs when given"""
+      """the titanite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.titanite
+
+        cS = crystalShape.titanite()  # in the catalogue's own frame
+        cS = crystalShape.titanite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for titanite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def topaz(CS=None, simple=False) -> Any:
-      """the topaz crystal shape of the catalogue, in cs when given"""
+      """the topaz crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.topaz
+
+        cS = crystalShape.topaz()  # in the catalogue's own frame
+        cS = crystalShape.topaz(cs)  # in the crystal frame cs
+        cS = crystalShape.topaz(simple=True)  # the simple shape, fewer faces
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def tourmaline(CS=None, simple=False) -> Any:
-      """the tourmaline crystal shape of the catalogue, in cs when given"""
+      """the tourmaline crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.tourmaline
+
+        cS = crystalShape.tourmaline()  # in the catalogue's own frame
+        cS = crystalShape.tourmaline(cs)  # in the crystal frame cs
+        cS = crystalShape.tourmaline(simple=True)  # the simple shape, fewer faces
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def zircon(CS=None, simple=False) -> Any:
-      """the zircon crystal shape of the catalogue, in cs when given"""
+      """the zircon crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.zircon
+
+        cS = crystalShape.zircon()  # in the catalogue's own frame
+        cS = crystalShape.zircon(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for zircon: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
     @staticmethod
     def zoisite(CS=None, simple=False) -> Any:
-      """the zoisite crystal shape of the catalogue, in cs when given"""
+      """the zoisite crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.zoisite
+
+        cS = crystalShape.zoisite()  # in the catalogue's own frame
+        cS = crystalShape.zoisite(cs)  # in the crystal frame cs
+
+      The faces are the catalogue's lattice planes at their distances from the centre, or with a
+      habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point
+      group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.
+
+      Input
+        CS - crystalFrame, the frame of the shape
+      Output
+        cS - crystalShape
+      Keywords
+        simple - the simple shape, which the catalogue does not have for zoisite: True is refused
+      See also
+        crystalShape, crystalShape.plot, CrystalShapes"""
 
 
 # the frame the catalogue writes a shape in
@@ -568,8 +1325,34 @@ def _catalogueConstructor(name):
       CS, simple = None, CS.lower() == "simple"
     return catalogueShape(name, CS, simple)
   make.__name__ = name
-  make.__doc__ = f"the {CRYSTAL_SHAPES[name]['mineral']} crystal shape of the catalogue, in cs when given"
+  make.__doc__ = _catalogueDoc(name)
   return staticmethod(make)
+
+
+# the help of a constructor of the catalogue, MATLAB's crystalShape.<name>
+def _catalogueDoc(name):
+  simple = name + "_simple" in CRYSTAL_SHAPES
+  form = f"cS = crystalShape.{name}"
+  forms = [f"  {form}()  # in the catalogue's own frame", f"  {form}(cs)  # in the crystal frame cs"]
+  if simple:
+    forms.append(f"  {form}(simple=True)  # the simple shape, fewer faces")
+  simpleText = ("the simple shape of the catalogue, with fewer faces, MATLAB's 'simple'" if simple else
+                f"the simple shape, which the catalogue does not have for {name}: True is refused")
+  return "\n".join([
+    f"the {CRYSTAL_SHAPES[name]['mineral']} crystal shape of the catalogue, in cs when given, MATLAB's crystalShape.{name}",
+    "", *forms, "",
+    "The faces are the catalogue's lattice planes at their distances from the centre, or with a",
+    "habitus and extension. Without cs the shape is in the catalogue's own crystal frame, its point",
+    "group, axes and mineral; a frame cs given has to be of the catalogue's Laue class.",
+    "",
+    "Input",
+    "  CS - crystalFrame, the frame of the shape",
+    "Output",
+    "  cS - crystalShape",
+    "Keywords",
+    f"  simple - {simpleText}",
+    "See also",
+    "  crystalShape, crystalShape.plot, CrystalShapes"])
 
 
 for _name in CRYSTAL_SHAPES:

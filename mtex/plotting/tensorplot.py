@@ -117,8 +117,24 @@ def plotSeismicVelocities(C, symmetriseMinMax=False, markerSize=10, lower=False,
 # ------------------------------------------------------------------ rgb
 
 def plotRGB(channels, resolution=0.5 * degree, **kw: Unpack[PlotKeywords]):
-  """plot((r, g, b), rgb=True): three functions on the sphere as the colour channels of one
-  surface, their values clipped to [0, 1]"""
+  """three functions on the sphere drawn as the red, green and blue channels of one surface,
+  their values clipped to [0, 1]; the interference colours of a crystal
+
+    plot((r, g, b), rgb=True)                         # the three channels as one picture
+    plotRGB((r, g, b), resolution=2*degree)           # on a coarser grid
+    plotRGB((r, g, b), complete=True, upper=True)     # the upper hemisphere, no symmetry sector
+
+  The charts follow the region of r, its sector unless complete, and the keywords of the
+  spherical plots.
+
+  Input
+    channels - a tuple of three S2Fun, the red, green and blue values
+  Output
+    h - the matplotlib meshes
+  Keywords
+    resolution - the spacing of the grid the functions are evaluated on
+  See also
+    spectralTransmission, plotSeismicVelocities, plot"""
   r, g, b = channels
   projKw, axesKw, whereKw = _split(kw)
   projKw.setdefault("antipodal", bool(getattr(r, "antipodal", False)))

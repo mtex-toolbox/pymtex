@@ -31,7 +31,22 @@ def mustKeep(gB, protect=None):
   """the heads a coarsening may not dissolve: the end of an open chain is a junction and stays
   where it is, a vertex where the pair of grains changes is a corner of both grain polygons
   even where only two segments meet there, and a protected vertex is one another boundary
-  over the same vertices still walks over"""
+  over the same vertices still walks over
+
+    keep = mustKeep(gB)                                        # the junctions and the corners
+    keep = mustKeep(gB, protect=grains.sharedVertices())       # and the vertices the inner boundary uses
+
+  A row is the head of a segment, its vertex gB.F[:, 1]; reduce and simplify keep the rows
+  marked and may dissolve the others.
+
+  Input
+    gB - grainBoundary
+  Output
+    keep - a boolean per segment, whether its head must stay
+  Keywords
+    protect - the ids of vertices that must stay as well
+  See also
+    grainBoundary.reduce, grainBoundary.simplify, grain2d.sharedVertices"""
   closed = gB.isClosed
   keep = gB.isChainEnd & ~closed
   pair = np.sort(gB.grainId, axis=1)
@@ -325,7 +340,25 @@ def refineBoundary(gB, delta=None):
   are and the new ones lie on the old segments, so the boundary keeps its shape and its
   length and only the sampling gets finer, which gives a smoothing that follows evenly
   spaced degrees of freedom. Every piece carries the grains, the phases, the pair of
-  measurements and the misorientation of the segment it lies on"""
+  measurements and the misorientation of the segment it lies on; MATLAB's grainBoundary.refine
+
+    gB = gB.refine()        # pieces of half the median segment length
+    gB = gB.refine(10)      # pieces of about 10 map units
+
+  A segment is split into round(length / delta) pieces, at least one. MATLAB resamples every
+  chain at equal arc length between the vertices that must stay and takes a protect list;
+  here every segment is split on its own, which keeps the old vertices, and there is no
+  protect.
+
+  Input
+    gB - grainBoundary
+  Output
+    gB - grainBoundary, the refined boundary
+  Keywords
+    delta - the length of the pieces in the units of the map, by default half the median
+        segment length; 0 or less leaves the boundary as it is
+  See also
+    grainBoundary.reduce, grainBoundary.simplify, grain2d.refineBoundary, smoothBoundary"""
   if gB.isempty:
     return gB
   if delta is None:
@@ -381,8 +414,25 @@ def _coarsenGrains(verb, grains, *args):
 
 
 def _refineGrains(grains, delta=None):
-  """refining appends its new vertices, so the pool has to reach the second boundary before it
-  is refined in turn, and the first one back afterwards"""
+  """the grains with their boundary and inner boundary refined, every segment split into
+  pieces of about length delta; MATLAB's grain2d.refineBoundary
+
+    grains = grains.refineBoundary()      # pieces of half the median segment length
+    grains = grains.refineBoundary(10)    # pieces of about 10 map units
+
+  The vertices stay where they are and the new ones lie on the old segments, so the grains
+  keep their shape and only the sampling gets finer, which lets a following smoothBoundary
+  move evenly spaced vertices. Both boundaries are refined over one pool of vertices.
+
+  Input
+    grains - grain2d
+  Output
+    grains - grain2d, the polygons traced again
+  Keywords
+    delta - the length of the pieces in the units of the map, by default half the median
+        segment length of the boundary
+  See also
+    grainBoundary.refine, grain2d.simplifyBoundary, grain2d.reduceBoundary, smoothBoundary"""
   if delta is None:
     delta = defaultDelta(grains.boundary)
   b = refineBoundary(grains.boundary, delta)
@@ -391,13 +441,50 @@ def _refineGrains(grains, delta=None):
 
 
 def _reduceGrains(grains, n=2):
-  """the grains thin, simplify or refine their boundary and keep their inner boundary on it"""
+  """the grains with every n-th vertex of their boundary kept along each chain, whatever the
+  shape, the inner boundary kept on it; MATLAB's grain2d.reduceBoundary
+
+    grains = grains.reduceBoundary()      # every second vertex
+    grains = grains.reduceBoundary(4)     # every fourth vertex
+
+  The junctions stay where they are, so which grains touch, and where, is unchanged, and the
+  polygons are traced again. The vertices both boundaries use stay, and no grain collapses.
+  It thins a straight run and a corner alike; simplifyBoundary spends the vertices where the
+  shape needs them.
+
+  Input
+    grains - grain2d
+  Output
+    grains - grain2d
+  Keywords
+    n - keep every n-th vertex along each chain
+  See also
+    grainBoundary.reduce, grain2d.simplifyBoundary, grain2d.refineBoundary"""
   return _coarsenGrains(reduceBoundary, grains, n)
 
 
 def _simplifyGrains(grains, epsilon=None):
   """the grains with the vertices of their boundary that carry no shape dropped, those whose
-  removal moves the boundary by less than epsilon, the inner boundary kept on it"""
+  removal moves the boundary by less than epsilon, the inner boundary kept on it; MATLAB's
+  grain2d.simplifyBoundary
+
+    grains = grains.simplifyBoundary()      # the pixel staircase straightened
+    grains = grains.simplifyBoundary(50)    # a tolerance of 50 map units
+
+  Douglas-Peucker chain by chain: a straight run collapses into one segment while a corner
+  stays. The junctions stay where they are and the polygons are traced again, so the grain
+  areas move by at most about epsilon times the perimeter. A grain too small for the
+  tolerance is left as it is rather than collapsed.
+
+  Input
+    grains - grain2d
+  Output
+    grains - grain2d
+  Keywords
+    epsilon - the tolerance in the units of the map, by default the median segment length
+        over sqrt(2), how far a staircase strays from the line it approximates
+  See also
+    grainBoundary.simplify, grain2d.reduceBoundary, grain2d.refineBoundary, smoothBoundary"""
   return _coarsenGrains(simplifyBoundary, grains, epsilon)
 
 

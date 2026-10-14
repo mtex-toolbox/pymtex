@@ -130,7 +130,19 @@ class sphericalProjection:
     so that the cells follow the boundary: the directions, in the frame of the region, and
     their plane coordinates, all nTheta x nRho; a column of NaN separates the strips of a
     region whose polar set has two branches, where the pieces do not touch; a pair of
-    resolutions is the spacing in the polar angle and in the azimuth"""
+    resolutions is the spacing in the polar angle and in the azimuth
+
+      proj = makeSphericalProjection(cs.fundamentalSector())[0]
+      V, X, Y = proj.grid()                                # 1 degree in both angles
+      V, X, Y = proj.grid(resolution=(5*degree, 2*degree))  # 5 degree in the polar angle, 2 in the azimuth
+
+    Output
+      V - vector3d, the nTheta x nRho directions
+      X, Y - nTheta x nRho arrays, their coordinates in the plane
+    Keywords
+      resolution - the spacing of the grid, an angle or a pair (polar, azimuthal)
+    See also
+      plotS2Grid, makeSphericalProjection, contourf"""
     resTheta, resRho = (resolution, resolution) if np.ndim(resolution) == 0 else (float(r) for r in resolution)
     sR = self.chartRegion()
     rhoLo, rhoHi = rhoRange(sR)
@@ -186,7 +198,17 @@ class sphericalProjection:
 
   def boundary(self, resolution=0.5 * degree):
     """the boundary of the region as plane curves, one (x, y) pair per arc; a whole
-    hemisphere has no boundary of its own and gets the horizon"""
+    hemisphere has no boundary of its own and gets the horizon
+
+      b = proj.boundary()                         # points every half degree
+      b = proj.boundary(resolution=2*degree)      # coarser arcs
+
+    Output
+      b - list of (x, y) pairs of arrays, one per arc of the region
+    Keywords
+      resolution - the spacing of the points along an arc
+    See also
+      sphericalProjection.bounds, sphericalRegion.boundary"""
     arcs = self.sR.boundary(resolution)
     if not arcs:
       arcs = [self._horizon()]
@@ -199,7 +221,20 @@ class sphericalProjection:
 
   def gridLines(self, step=30 * degree):
     """the meridians and small circles of the convention at a spacing, clipped to the region:
-    plane curves with NaN where they leave it"""
+    plane curves with NaN where they leave it
+
+      lines = proj.gridLines()                  # every 30 degree
+      lines = proj.gridLines(step=15*degree)    # every 15 degree
+
+    The step is rounded to a divisor of 180 degree. The small circles come first, about the
+    pole of the plotting convention, then the meridians through it.
+
+    Output
+      lines - list of (x, y) pairs of arrays
+    Keywords
+      step - the spacing of the small circles and of the meridians
+    See also
+      sphereGridLines"""
     step = np.pi / max(1, int(round(np.pi / step)))
     curves = []
     rhos = np.linspace(0, 2 * np.pi, 361)
@@ -211,7 +246,17 @@ class sphericalProjection:
     return curves
 
   def bounds(self, margin=0.02):
-    """the bounding box of the drawn region, from its boundary, as (xmin, xmax, ymin, ymax)"""
+    """the bounding box of the drawn region, from its boundary, as (xmin, xmax, ymin, ymax)
+
+      xmin, xmax, ymin, ymax = proj.bounds()           # with a margin of 2 percent
+      xmin, xmax, ymin, ymax = proj.bounds(margin=0)   # tight about the boundary
+
+    Output
+      xmin, xmax, ymin, ymax - floats
+    Keywords
+      margin - the widening on every side, a fraction of the shorter side of the box
+    See also
+      sphericalProjection.boundary"""
     b = self.boundary(2 * degree)
     xs = np.concatenate([x for x, _ in b])
     ys = np.concatenate([y for _, y in b])
@@ -371,11 +416,34 @@ class plainProjection(sphericalProjection):
     return V, X, Y
 
   def boundary(self, resolution=0.5 * degree):
-    """the boundary of the region as plane coordinates, one pair of arrays per arc"""
+    """the boundary of the region as plane coordinates, one pair of arrays per arc
+
+      b = plainProjection(sR).boundary()                      # (rho, theta) in degree every half degree
+      b = plainProjection(sR).boundary(resolution=2*degree)   # coarser arcs
+
+    Unlike the other charts a whole sphere or hemisphere has no boundary here: the list is
+    empty.
+
+    Output
+      b - list of (rho, theta) pairs of arrays in degree, one per arc
+    Keywords
+      resolution - the spacing of the points along an arc
+    See also
+      plainProjection.bounds, sphericalProjection.boundary"""
     return [self.projectUnchecked(arc) for arc in self.sR.boundary(resolution)]
 
   def bounds(self, margin=0.0):
-    """the azimuth and polar ranges of the region in degrees, widened by the margin"""
+    """the azimuth and polar ranges of the region in degrees, widened by the margin
+
+      rhoMin, rhoMax, thetaMin, thetaMax = plainProjection(sR).bounds()            # tight
+      rhoMin, rhoMax, thetaMin, thetaMax = plainProjection(sR).bounds(margin=0.1)  # widened
+
+    Output
+      rhoMin, rhoMax, thetaMin, thetaMax - floats in degree
+    Keywords
+      margin - the widening on every side, a fraction of the shorter of the two ranges
+    See also
+      sphericalProjection.bounds"""
     sR = self.chartRegion()
     rhoLo, rhoHi = rhoRange(sR)
     ivs = [iv for iv in (sR.thetaInterval(rho) for rho in np.linspace(rhoLo, rhoHi, 91)) if iv is not None]
@@ -526,7 +594,25 @@ def plotRegion(fr, fundamentalRegion=False, antipodal=False, how2plot=None):
 
 def plotSector(fr, antipodal=False, how2plot=None):
   """the sector of the frame's group an inverse pole figure shows, that of the Laue group for axes,
-  turned as MATLAB draws it for 321"""
+  turned as MATLAB draws it for 321
+
+    sR = plotSector(cs)                                    # the sector of an inverse pole figure
+    sR = plotSector(crystalFrame('432'), antipodal=True)   # the sector of m-3m, the Laue group
+    sR = plotSector(cs, how2plot='x↑→y')                   # under another plotting convention
+
+  The conventional sector of the group, its pole out of the screen and its first edge to the
+  east of the plotting convention; 321 is turned by 30 degree so that it starts at an m
+  direction, as MATLAB draws it.
+
+  Input
+    fr - crystalFrame, or any frame with a point group
+  Output
+    sR - sphericalRegion in the frame fr
+  Keywords
+    antipodal - the sector of the Laue group, for axes
+    how2plot - plottingConvention or its string; by default the convention of the frame
+  See also
+    fundamentalSector, plotIPF, makeSphericalProjection"""
   pC = _conventionOf(fr) if how2plot is None else plottingConvention(how2plot)
   pg = fr.sym
   if antipodal and not pg.isLaue:
@@ -566,7 +652,25 @@ def rhoRange(sR):
 
 def millerLabel(v, fr, utf8=None):
   """a direction of a crystal frame as its rounded indices, the direct basis first and the
-  reciprocal one if that does not round, in the brackets of one direction; None if neither"""
+  reciprocal one if that does not round, in the brackets of one direction; None if neither
+
+    millerLabel(Miller(1, 1, 1, cs, 'uvw'), cs)                 # '[111]'
+    millerLabel(Miller(1, -1, 1, cs, 'uvw'), cs, utf8=False)    # '[1-11]', the minus written out
+    millerLabel(vector3d(1, np.pi/10, 0), cs)                   # None: no small indices
+
+  The direction is rounded to small indices in the direct basis (uvw, UVTW for trigonal and
+  hexagonal frames) and then in the reciprocal one (hkl, hkil); the first that reaches it
+  within 1e-4 radians is written, in the brackets of a direction.
+
+  Input
+    v - vector3d, the direction
+    fr - crystalFrame
+  Output
+    s - str or None
+  Keywords
+    utf8 - write negative indices with an overline; by default the preference UTF8Output
+  See also
+    Miller, round"""
   utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8
   u = v.data.reshape(3) / np.linalg.norm(v.data.reshape(3))
   hex_ = fr.lattice.isTriHex

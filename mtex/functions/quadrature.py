@@ -73,13 +73,44 @@ def _polarRule(scheme, L):
 
 def folds(CS, SS=None):
   """the z folds on the crystal and on the specimen side: the order of the rotation about z
-  that leaves the frame's group invariant"""
+  that leaves the frame's group invariant
+
+    rA, rB = folds(cs, ss)          # the folds of both frames
+    rA, rB = folds(cs)              # the specimen side the default frame
+
+  A harmonic transform on SO(3) samples the Euler angles on grids these folds divide, so that
+  the symmetric equivalents of a node fall on nodes again.
+
+  Input
+    CS - referenceFrame, the crystal frame
+  Output
+    rA, rB - the orders of the rotations about z of the crystal and the specimen group
+  Keywords
+    SS - the specimen frame, specimenFrame.default when not given
+  See also
+    bandwidthFor, quadratureSO3Grid"""
   SS = specimenFrame.default if SS is None else SS
   return (CS.sym.multiplicityZ, SS.sym.multiplicityZ)
 
 
 def bandwidthFor(L, rA, rB=1):
-  """the smallest bandwidth at least L whose 2L+2 the folds divide"""
+  """the smallest bandwidth at least L whose 2L+2 the folds divide
+
+    L = bandwidthFor(10, 6, 2)      # 11: 24 is a multiple of lcm(6, 2)
+    L = bandwidthFor(10, cs, ss)    # the folds of two frames
+
+  The quadrature grids on SO(3) of bandwidth L have 2L+2 nodes in the first and the third
+  Euler angle; a bandwidth whose 2L+2 the folds divide lets the grid follow the symmetry.
+
+  Input
+    L - the smallest bandwidth acceptable
+    rA - the fold of the crystal side, or the crystal frame
+  Output
+    L - int
+  Keywords
+    rB - the fold of the specimen side, or the specimen frame when rA is a frame
+  See also
+    folds, quadratureSO3Grid"""
   if isinstance(rA, referenceFrame):
     rA, rB = folds(rA, rB if isinstance(rB, referenceFrame) else None)
   r = math.lcm(int(rA), int(rB))

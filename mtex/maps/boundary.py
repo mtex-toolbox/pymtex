@@ -313,7 +313,27 @@ class grainBoundary:
     return gB
 
   def hasPhase(self, a, b=None):
-    """the segments between the two phases named, in either order, or with one named on either side"""
+    """the segments between the two phases named, in either order, or with one named on either
+    side; MATLAB's grainBoundary.hasPhase
+
+      ind = gB.hasPhase('Forsterite')                # a Forsterite grain on either side
+      ind = gB.hasPhase('Forsterite', 'Enstatite')   # between Forsterite and Enstatite
+      ind = gB.hasPhase('indexed')                   # between two indexed measurements
+
+    A phase is named by its mineral or its phase id. Without a phase of that name in the list,
+    'indexed' takes the segments between two indexed measurements and 'notIndexed' the others,
+    those with a not indexed side or with the rim of the scan on one. gB['Forsterite'] selects
+    by this.
+
+    Input
+      gB - grainBoundary
+      a - the first phase, a mineral name or a phase id
+    Output
+      ind - a boolean per segment
+    Keywords
+      b - the second phase; the segments with a on either side when not given
+    See also
+      grainBoundary.flip, grainBoundary.isTwinning"""
     # 'indexed' are the segments between two indexed measurements, as MATLAB reads the name;
     # 'notIndexed' those with a not indexed side or none at all, the rim of the scan
     if b is None and _namesNoPhase(a, self.CSList):
@@ -385,14 +405,49 @@ class grainBoundary:
     return gB._flipSegments(gB.phaseId[:, 0] != p)
 
   def flip(self, ind=None):
-    """swap the two sides of the segments marked, or of all of them, and walk the chains again"""
+    """swap the two sides of the segments marked, or of all of them, and walk the chains again;
+    MATLAB's grainBoundary.flip
+
+      gB = gB.flip()                                       # every segment
+      gB = gB.flip(gB.grainId[:, 1] == grains[k].id)       # the grain k on the first side throughout
+
+    The two grains, pixels and phases of a segment swap and its misorientation inverts; the
+    segment is walked the other way, so the grain in grainId[:, 0] stays on its left.
+
+    Input
+      gB - grainBoundary
+    Output
+      gB - grainBoundary
+    Keywords
+      ind - the segments to flip, booleans or indices; all of them when not given
+    See also
+      grainBoundary.curvature, grainBoundary.hasPhase"""
     sel = np.ones(len(self), dtype=bool) if ind is None else np.zeros(len(self), dtype=bool)
     if ind is not None:
       sel[ind] = True
     return orderWalk(self._flipSegments(sel))
 
   def isTwinning(self, mori, threshold=5 * degree):
-    """the segments whose misorientation is the given one up to a threshold"""
+    """the segments whose misorientation is the given one up to a threshold; MATLAB's
+    grainBoundary.isTwinning
+
+      ind = gB.isTwinning(mori)                  # within 5 degrees of the misorientation
+      ind = gB.isTwinning(mori, 2*degree)        # within 2 degrees
+      ind = gB.isTwinning(CSL(3, ebsd['Iron'].CS))  # the Sigma 3 boundaries of a cubic phase
+
+    Only the segments between the two phases of the misorientation, its frames, are compared;
+    a segment with them the other way round is compared with the inverse. The angle is the
+    symmetry reduced misorientation angle.
+
+    Input
+      gB - grainBoundary
+      mori - the misorientation, an orientation between two crystal frames
+    Output
+      ind - a boolean per segment
+    Keywords
+      threshold - the largest misorientation angle to mori
+    See also
+      CSL, grainBoundary.hasPhase"""
     ind = np.zeros(len(self), dtype=bool)
     p1, p2 = self.CSList.phaseId(mori.frameA), self.CSList.phaseId(mori.frameB)
     sel = np.flatnonzero(self.hasPhase(p1, p2))
@@ -408,7 +463,25 @@ class grainBoundary:
   def curvature(self, n=50):
     """the signed curvature of every segment: the Menger curvature through the midpoints of a
     segment and its two neighbours along the chain, smoothed by a binomial filter along
-    it; positive where the boundary bulges into grainId[:, 1]"""
+    it; positive where the boundary bulges into grainId[:, 1]; MATLAB's grainBoundary.curvature
+
+      kappa = gB.curvature()      # smoothed 50 times
+      kappa = gB.curvature(2)     # smoothed twice
+
+    The segments are stored in walk order with the grain grainId[:, 0] on the left, so the sign
+    says into which grain the boundary bulges. To read it as convex or concave with respect to
+    one grain, put that grain first throughout, gB.flip(gB.grainId[:, 1] == id). A segment at
+    the end of an open chain has a neighbour on one side only and is NaN, as is a chain of one
+    segment; a closed chain wraps around.
+
+    Input
+      gB - grainBoundary
+    Output
+      kappa - one over the radius of the fitted circle, in the units of the map, per segment
+    Keywords
+      n - the number of passes of the binomial filter along the chain
+    See also
+      grainBoundary.flip, grainBoundary.calcMeanDirection"""
     nF = len(self)
     T = self.V.dtype
     kappa = np.full(nF, np.nan, dtype=T)
@@ -430,7 +503,23 @@ class grainBoundary:
 
   def calcMeanDirection(self, n=1):
     """the direction of a segment averaged over 2n + 1 of them along the chain: the chord
-    across a window, clamped at the end of an open chain and shorter than a closed one"""
+    across a window, clamped at the end of an open chain and shorter than a closed one;
+    MATLAB's grainBoundary.calcMeanDirection
+
+      d = gB.calcMeanDirection()     # across three segments
+      d = gB.calcMeanDirection(2)    # across five
+
+    The same as gB.direction but over a window of segments, which averages out the staircase
+    of a pixel grid. The window never crosses a junction.
+
+    Input
+      gB - grainBoundary
+    Output
+      d - vector3d, antipodal, one per segment, not normalised
+    Keywords
+      n - the number of neighbouring segments on either side
+    See also
+      grainBoundary.curvature, grainBoundary.angle"""
     nF = len(self)
     if nF == 0:
       return vector3d(np.zeros((0, 3)), frame=self.frame, antipodal=True)
@@ -464,7 +553,25 @@ class grainBoundary:
   def intersect(self, p, q, segLength=False):
     """where the line from p to q crosses each segment, MATLAB's [x, y] = intersect(gB, xy1, xy2):
     the coordinates per segment, NaN where it is not crossed; segLength=True adds the
-    intercepts between successive crossings along the line"""
+    intercepts between successive crossings along the line
+
+      x, y = gB.intersect([33500, 4500], [36000, 7500])         # the crossings
+      x, y, L = gB.intersect([33500, 4500], [36000, 7500], segLength=True)  # and the intercept lengths
+      n = np.sum(~np.isnan(x))                                    # the number of crossings
+
+    A line through a vertex crosses both segments there, as MATLAB's tolerance has it. MATLAB
+    returns the intercepts as a third output always; here segLength=True asks for them.
+
+    Input
+      gB - grainBoundary
+      p, q - the end points of the line, (x, y) or a vector3d
+    Output
+      x, y - the coordinates of the crossing per segment, NaN where none
+      L - the lengths between successive crossings along the line (segLength=True)
+    Keywords
+      segLength - also return the intercept lengths
+    See also
+      grainBoundary.inpolygon"""
     a, b = self._as2d(p).reshape(2), self._as2d(q).reshape(2)
     ab = b - a
     v1, v2 = self.V[self.F[:, 0]], self.V[self.F[:, 1]]

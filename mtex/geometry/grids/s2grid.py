@@ -95,7 +95,23 @@ class S2Grid(vector3d):
     return th, rh, np.ones(self.size)
 
   def subGrid(self, mask, eps=None):
-    """the grid points selected by a mask, or within eps of a centre; rings that empty out go"""
+    """the grid points selected by a mask, or within eps of a centre; MATLAB's S2Grid.subGrid
+
+      g = S2G.subGrid(S2G.theta < 30*degree)        # the points a condition selects
+      g = S2G.subGrid(zvector, eps=20*degree)       # the points within 20 degree of a centre
+
+    The result is again a ring grid: the rings that empty out go, the others keep the points
+    selected. A mask is a boolean array over the grid points or a list of indices.
+
+    Input
+      S2G - S2Grid
+      mask - a boolean array or indices of the grid points, or with eps the centre, a vector3d
+    Output
+      g - S2Grid
+    Keywords
+      eps - the radius about the centre mask within which the points are kept
+    See also
+      S2Grid.find, equispacedS2Grid"""
     if eps is not None:
       center, mask = mask, np.zeros(self.size, dtype=bool)
       mask[self.neighbourIndices(center, eps)] = True
@@ -203,8 +219,26 @@ class S2Grid(vector3d):
     return np.unique(out)
 
   def find(self, v, eps=None):
-    """the nearest grid point of every direction, or all within eps: an index per direction,
-    or a sparse incidence matrix (directions x grid) with a sparse matrix of the angles"""
+    """the nearest grid point of every direction and its angle, or with eps the sparse matrices of
+    the points within eps and their angles; MATLAB's S2Grid.find
+
+      ind, d = S2G.find(v)              # the nearest grid point and the angle to it
+      I, d = S2G.find(v, 10*degree)     # every grid point within 10 degree
+
+    The search for the nearest point runs over the rings, a binary search in the polar angle and in
+    the azimuth of each ring near it; the search within eps through a k-d tree. On an antipodal grid a direction and its antipode are the same.
+
+    Input
+      S2G - S2Grid
+      v - vector3d, the directions searched for
+    Output
+      ind - the index of the nearest grid point, of the shape of v
+      d - its angle to v; with eps a sparse matrix (directions x grid) of the angles
+      I - with eps a sparse boolean matrix (directions x grid) of the grid points within eps
+    Keywords
+      eps - the radius of the search; by default only the nearest point is returned
+    See also
+      equispacedS2Grid, S2Grid.subGrid, fibonacciS2Grid.find"""
     v = asVector3d(v)
     xyz = v.data.reshape(-1, 3)
     if eps is None:

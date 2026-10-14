@@ -111,7 +111,28 @@ class SO3FunGeneric(SO3Fun):
     return conv(SO3FunHarmonic(self), psi)
 
   def grad(self, x=None, side="left"):
-    """the gradient, at the orientations x or as a field, left or right sided"""
+    """the gradient with respect to the tangent space basis, at the orientations x or as a
+    field, left or right sided; MATLAB's grad
+
+      G = SO3F.grad()                       # the gradient field
+      g = G(ori)                            # its values at orientations
+      G = SO3F.grad(side='right')           # the right sided gradient
+
+    A function without a harmonic form is differentiated by central differences of 0.05
+    degree along the three axes, a field evaluated when asked. Evaluated directly, as
+    SO3F.grad(ori), it does not return at present (a recursion); evaluate the field instead.
+
+    Input
+      SO3F - SO3Fun
+    Output
+      G - SO3VectorFieldHandle, the gradient field
+      g - the gradient at the orientations
+    Keywords
+      x - orientation, where to evaluate the gradient; the field when None
+      side - 'left', the tangent vectors in specimen coordinates, or 'right', in crystal
+          coordinates
+    See also
+      SO3FunHarmonic.grad, SO3VectorField, orientation.exp"""
     from .so3vectorfield import grad
     return grad(self, x, side)
 
@@ -164,8 +185,18 @@ class SO3FunGeneric(SO3Fun):
       """the integral over orientation space, 8 pi^2 times the mean; with an axis the sum along it,
       MATLAB's sum(odf, d) with d = axis + 1, which for a single function is the function itself
 
-        value = sum(odf)
-        odf = sum(odf, axis=0)"""
+        value = sum(odf)              # the integral, 8 pi^2 for an ODF
+        odf = sum(odf, axis=0)        # along an axis of a list, the function itself for one
+
+      Input
+        odf - SO3Fun
+      Output
+        value - the integral, a number
+        odf - the function summed along the axis
+      Keywords
+        axis - the axis to sum along, a non-negative integer; the integral when None
+      See also
+        SO3FunHarmonic.sum, SO3FunHarmonic.mean"""
     @property
     def frameA(self) -> Any:
       ...
@@ -254,7 +285,23 @@ class SO3FunHandle(SO3FunGeneric):
   __rmul__ = __mul__
 
   def rotate(self, r, side="left"):
-    """the function rotated by r from the left or the right, through the harmonic form"""
+    """the function rotated by r from the left or the right, through the harmonic form;
+    MATLAB's rotate
+
+      SO3F = SO3F.rotate(r)                 # rotated in specimen coordinates
+      SO3F = SO3F.rotate(r, side='right')   # rotated in crystal coordinates
+
+    The handle is expanded into its harmonic form, which is rotated.
+
+    Input
+      SO3F - SO3FunHandle
+      r - rotation
+    Output
+      SO3F - SO3FunHarmonic
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side, as MATLAB's flag 'right'
+    See also
+      SO3FunHarmonic.rotate"""
     return SO3FunHarmonic(self).rotate(r, side)
 
   def __repr__(self):
@@ -310,7 +357,22 @@ class SO3FunComposition(SO3FunGeneric):
   __rmul__ = __mul__
 
   def rotate(self, r, side="left"):
-    """the composition of the components rotated by r from the left or the right"""
+    """the composition of the components rotated by r from the left or the right; MATLAB's rotate
+
+      SO3F = SO3F.rotate(r)                 # rotated in specimen coordinates
+      SO3F = SO3F.rotate(r, side='right')   # rotated in crystal coordinates
+
+    Every component is rotated in its own representation.
+
+    Input
+      SO3F - SO3FunComposition
+      r - rotation
+    Output
+      SO3F - SO3FunComposition
+    Keywords
+      side - 'left', the specimen side, or 'right', the crystal side, as MATLAB's flag 'right'
+    See also
+      SO3FunHarmonic.rotate, SO3FunRBF.rotate"""
     return SO3FunComposition(*(t.rotate(r, side) for t in self.components))
 
   @property
@@ -717,8 +779,18 @@ def _integralSO3(self, axis=None):
   """the integral over orientation space, 8 pi^2 times the mean; with an axis the sum along it,
   MATLAB's sum(odf, d) with d = axis + 1, which for a single function is the function itself
 
-    value = sum(odf)
-    odf = sum(odf, axis=0)"""
+    value = sum(odf)              # the integral, 8 pi^2 for an ODF
+    odf = sum(odf, axis=0)        # along an axis of a list, the function itself for one
+
+  Input
+    odf - SO3Fun
+  Output
+    value - the integral, a number
+    odf - the function summed along the axis
+  Keywords
+    axis - the axis to sum along, a non-negative integer; the integral when None
+  See also
+    SO3FunHarmonic.sum, SO3FunHarmonic.mean"""
   if axis is None:
     return 8 * np.pi ** 2 * self.mean()
   # a single function is a list of one along every axis

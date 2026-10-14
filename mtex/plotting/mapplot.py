@@ -205,7 +205,22 @@ def _splitMap(kw):
 
 def mapAliases(kw, grains=False):
   """the style keywords of a map plot, checked for their spelling; MATLAB's transparent is
-  the face alpha of a map, and the grains keep translucent, MATLAB's alpha that follows the colour"""
+  the face alpha of a map, and the grains keep translucent, MATLAB's alpha that follows the colour
+
+    kw = mapAliases({'transparent': 0.5})                # {'faceAlpha': 0.5}
+    kw = mapAliases({'transparent': 0.5}, grains=True)   # {'translucent': 0.5}
+
+  A variant spelling of a keyword is refused with the one to write. The dictionary is changed
+  in place and returned.
+
+  Input
+    kw - dict, the keywords of a map plot
+  Output
+    kw - the same dict, the aliases replaced
+  Keywords
+    grains - the keywords of a plot of grains, which keep translucent
+  See also
+    plotEBSD, plotGrains"""
   refuseVariants(kw)
   if grains and "transparent" in kw:
     kw["translucent"] = kw.pop("transparent")
@@ -968,8 +983,26 @@ def _onMap(x, y):
 
 
 def line(x, y, z=None, **kw: Unpack[PlotKeywords]):
-  """line(x, y, lineStyle=':', lineWidth=4, color='w'): a polyline in the coordinates of the
-  current map, drawn under its layout, MATLAB's line"""
+  """a polyline in the coordinates of the current map, drawn under its layout, MATLAB's line
+
+    plot(ebsd)
+    line([0, 10000], [0, 5000], lineStyle=':', lineWidth=4, color='w')  # a dotted white line across the map
+    line(x, y, z)                                                       # a polyline in a 3D scene
+
+  The points are given in the map's coordinates and placed on the screen as the map is,
+  whatever its plotting convention; without a map the line goes into the current axes as
+  given. The line is black, solid and 0.5 wide unless the keywords say otherwise; the other
+  keywords are matplotlib's. With z the polyline goes into the current 3D scene, NaN
+  separating its pieces.
+
+  Input
+    x, y - the coordinates of the points
+  Output
+    h - the matplotlib line, or the scene object of a line in space
+  Keywords
+    z - the third coordinates, a polyline in space
+  See also
+    scatterXY, text, quiver"""
   # a line in space goes into a 3D scene
   if z is not None:
     from .volumeplot import line3
@@ -981,8 +1014,25 @@ def line(x, y, z=None, **kw: Unpack[PlotKeywords]):
 
 
 def scatterXY(x, y, *args, filled=False, **kw: Unpack[PlotKeywords]):
-  """scatter(x, y, sz, c, filled=True): markers at the coordinates of the current map, MATLAB's
-  scatter of two coordinate lists; a string names the colour; NaN positions are left out"""
+  """markers at the coordinates of the current map, MATLAB's scatter of two coordinate lists
+
+    plot(ebsd)
+    scatter([1000, 2000], [1000, 1500], 40, 'r', filled=True)   # filled red markers of area 40
+    scatter(x, y, color='k')                                   # open black markers
+
+  The positional arguments after the coordinates are the marker area in points squared
+  (36 by default) and the colour, a string; positions that are NaN are left out. The points
+  are placed on the screen as the map is; without a map they go into the current axes. The
+  other keywords are matplotlib's scatter's. MATLAB's flag 'filled' is the keyword here.
+
+  Input
+    x, y - the coordinates of the points
+  Output
+    h - the matplotlib PathCollection
+  Keywords
+    filled - filled markers instead of open ones
+  See also
+    line, text"""
   if "filled" in args:
     refuseFlags(("filled",), "scatter")
   sizes = next((a for a in args if not isinstance(a, str)), 36)
@@ -1245,7 +1295,23 @@ def _hasColor(c):
 
 def phaseLegend(mP, x, loc="upper right"):
   """the legend of the phases present in a map or grains, one patch per phase in its colour,
-  a not indexed phase only when it was given a colour of its own"""
+  a not indexed phase only when it was given a colour of its own
+
+    leg = phaseLegend(mP, ebsd)                     # the phases of a map in the upper right
+    leg = phaseLegend(mP, grains, loc='lower left')  # elsewhere
+
+  A map coloured by phase draws this itself with legend=True. A patch is labelled by the
+  mineral of its phase.
+
+  Input
+    mP - mapPlot, the map plot the legend goes into
+    x - EBSD or grain2d, whose phases are shown
+  Output
+    leg - the matplotlib Legend
+  Keywords
+    loc - the place of the legend, as matplotlib's legend takes it
+  See also
+    keyLegend, plotEBSD, plotGrains"""
   from matplotlib.patches import Patch
   from matplotlib.colors import to_rgb
   pl = x.CSList

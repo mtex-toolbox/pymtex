@@ -34,8 +34,22 @@ if TYPE_CHECKING:
 
 
 def polarAxes(parent=None):
-  """a polar axes: the parent named, the held one, the one nextAxis prepared turned polar, a
-  fresh figure's first axes, or a new figure"""
+  """the polar axes a polar plot draws into
+
+    ax = polarAxes()                                 # the next polar axes
+    ax = polarAxes(ax)                               # the axes given
+
+  In this order: the parent given, a polar axes the user made with plt.subplot, the last
+  axes of a held figure when it is polar, the axes nextAxis prepared turned polar, or a new
+  axes in a new figure. MATLAB's polar plots take their axes with the keyword parent, which
+  is what the polar plots of the port pass here.
+
+  Input
+    parent - a matplotlib axes to draw into
+  Output
+    ax - the matplotlib polar axes
+  See also
+    setView, histogram, nextAxis"""
   if parent is not None:
     return parent
   fig = gcm()
@@ -64,8 +78,23 @@ def polarAxes(parent=None):
 
 # the zero of the angle where the convention's east lies and its sense from east to north
 def setView(pC=None, ax=None):
-  """setView(pC), pC.setView(): a polar axes turned as the plotting convention says, a 3D
-  axes looking down its out of screen direction"""
+  """a polar axes turned as the plotting convention says, a 3D axes looking down its out of
+  screen direction; MATLAB's plottingConvention/setView
+
+    pC.setView()                                     # the current axes as pC says
+    setView('y↓→x', ax=ax)                           # the axes given, a convention by its name
+    plottingConvention.default.setView(ax=ax)        # the default convention
+
+  A polar axes takes its zero where the convention's east lies and runs from east to north;
+  a 3D axes is turned so that the convention's out of screen direction points at the viewer.
+  Any other axes is left as it is.
+
+  Input
+    pC - plottingConvention, or the name of one, as 'x↑→y'; the default convention when None
+  Keywords
+    ax - the matplotlib axes; the axes of the current figure drawn into last by default
+  See also
+    plottingConvention, polarAxes, setCamera"""
   if pC is None:
     pC = plottingConvention.default
   elif not isinstance(pC, plottingConvention):

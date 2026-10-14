@@ -479,7 +479,25 @@ def fillByGrainId(ebsd, grains):
 
 
 def reduce(ebsd, factor=2):
-  """every n-th measurement along each lattice direction, which is the map at a coarser step"""
+  """every n-th measurement along each lattice direction, which is the map at a coarser step;
+  MATLAB's reduce
+
+    ebsd = reduce(ebsd)        # every second pixel along both lattice directions
+    ebsd = reduce(ebsd, 3)     # every third pixel
+
+  The measurements are selected by their lattice index, so a square, a hexagonal and a
+  rotated lattice are all reduced alike; the kept sites form the same kind of lattice factor
+  times coarser, which the result carries. The result is a list of measurements;
+  gridify(ebsd) turns it into a grid again.
+
+  Input
+    ebsd - EBSD with a lattice
+  Output
+    ebsd - EBSD, the kept measurements
+  Keywords
+    factor - the step of the reduction, an integer of at least one
+  See also
+    gridify, EBSD.lattice"""
   if factor < 1:
     raise ValueError("the factor of a reduction is at least one")
   l = mapLattice(ebsd)

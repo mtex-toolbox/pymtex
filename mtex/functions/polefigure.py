@@ -317,25 +317,86 @@ class PoleFigure:
     return self * alpha
 
   def max(self, other=None):
-    """max(pf) the largest intensity of each pole figure, max(pf, a) the intensities clipped"""
+    """the largest intensity of each pole figure, or the pointwise maximum with a number or
+    another pole figure; MATLAB's max
+
+      m = max(pf)                   # the largest intensity of every pole figure
+      pf = max(pf, 0)               # the intensities clipped from below at zero
+      pf = max(pf1, pf2)            # the larger intensity of two pole figures on the same directions
+
+    Input
+      pf - PoleFigure
+    Output
+      m - ndarray, one number per pole figure
+      pf - PoleFigure, with another argument
+    Keywords
+      other - a number, one per pole figure, or a PoleFigure on the same directions
+    See also
+      PoleFigure.min, PoleFigure.mean"""
     if other is None:
       return np.array([np.max(I) for I in self.allI])
     return self._apply(other, np.maximum)
 
   def min(self, other=None):
-    """min(pf) the smallest intensity of each pole figure, min(pf, a) the intensities clipped"""
+    """the smallest intensity of each pole figure, or the pointwise minimum with a number or
+    another pole figure; MATLAB's min
+
+      m = min(pf)                   # the smallest intensity of every pole figure
+      pf = min(pf, 100)             # the intensities clipped from above at 100
+      pf = min(pf1, pf2)            # the smaller intensity of two pole figures on the same directions
+
+    Input
+      pf - PoleFigure
+    Output
+      m - ndarray, one number per pole figure
+      pf - PoleFigure, with another argument
+    Keywords
+      other - a number, one per pole figure, or a PoleFigure on the same directions
+    See also
+      PoleFigure.max, PoleFigure.mean"""
     if other is None:
       return np.array([np.min(I) for I in self.allI])
     return self._apply(other, np.minimum)
 
   def mean(self, weights=None):
-    """the mean intensity of each pole figure, the integral over the sphere"""
+    """the mean intensity of each pole figure, the integral over the sphere; MATLAB's mean
+
+      m = mean(pf)                  # by the quadrature weights of the directions
+      m = pf.mean(weights=w)        # by weights of one's own, one array per pole figure
+
+    The intensities are summed with the weights calcQuadratureWeights gives the directions of
+    each pole figure, which sum to one: the exact weights of a regular grid, the Voronoi areas
+    of scattered directions.
+
+    Input
+      pf - PoleFigure
+    Output
+      m - ndarray, one number per pole figure
+    Keywords
+      weights - a list of weights, one array per pole figure of the shape of its intensities,
+          instead of the quadrature weights
+    See also
+      calcQuadratureWeights, PoleFigure.normalize"""
     if weights is None:
       weights = [calcQuadratureWeights(r) for r in self.allR]
     return np.array([float(np.sum(I.ravel() * np.asarray(w).ravel())) for I, w in zip(self.allI, weights)])
 
   def normalize(self, odf=None):
-    """scaled to mean one, or to the pole figures the ODF predicts"""
+    """the pole figures scaled to mean one, or to the pole figures an ODF predicts; MATLAB's
+    normalize
+
+      pf = normalize(pf)            # every pole figure of mean intensity one
+      pf = normalize(pf, odf)       # scaled to the mass of the pole figures of the ODF
+
+    Input
+      pf - PoleFigure
+    Output
+      pf - PoleFigure
+    Keywords
+      odf - an SO3Fun: each pole figure divided by the factor calcNormalization fits against
+          the pole figure the ODF predicts, instead of by its mean
+    See also
+      PoleFigure.mean, calcNormalization, PoleFigure.calcError"""
     return self / (self.mean() if odf is None else self.calcNormalization(odf))
 
   def rotate(self, rot):
@@ -354,8 +415,26 @@ class PoleFigure:
   # ------------------------------------------------------------------ the point sets
 
   def unique(self, tol=1e-6):
-    """equivalent specimen directions under the specimen group carry the same pole density,
-    so they are merged and their intensities averaged"""
+    """the duplicated directions removed: equivalent specimen directions under the specimen group
+    carry the same pole density, so they are merged and their intensities averaged; MATLAB's
+    unique
+
+      pf = unique(pf)               # the directions within 1e-6 merged
+      pf = pf.unique(tol=1e-3)      # a coarser tolerance
+
+    Two directions are merged when one of them, turned by a rotation of the specimen group,
+    has a dot product with the other above 1 - tol (its absolute value for axes). Only the
+    rotations of the group count, and a group of two elements is not used: the directions are
+    then merged only when they coincide.
+
+    Input
+      pf - PoleFigure
+    Output
+      pf - PoleFigure
+    Keywords
+      tol - the tolerance on the dot product of two directions
+    See also
+      PoleFigure.union, PoleFigure.cat"""
     sym = self.SS.properGroup().rotations()
     if self.SS.numSym() <= 2:
       sym = rotation.id
@@ -402,8 +481,25 @@ class PoleFigure:
     return PoleFigure(allH, allR, allI, superposition=c, complete=True)
 
   def isOutlier(self, alpha=2):
-    """the measurements whose intensity deviates from the mean of their neighbours within
-    three resolutions by more than alpha standard deviations"""
+    """the measurements whose intensity deviates from the mean of their neighbours by more than
+    alpha standard deviations; MATLAB's isOutlier and findOutlier
+
+      ind = isOutlier(pf)           # deviating by more than two standard deviations
+      ind = pf.findOutlier(alpha=3) # by more than three
+      pf = pf[~isOutlier(pf)]       # the outliers removed
+
+    The neighbours of a direction are the other directions of its pole figure within three
+    times the resolution of the grid; the standard deviation is that of all intensities of the
+    pole figure.
+
+    Input
+      pf - PoleFigure
+    Output
+      ind - ndarray of booleans, one per measurement, the pole figures one after another
+    Keywords
+      alpha - the number of standard deviations, MATLAB's 'alpha'
+    See also
+      PoleFigure.unique"""
     out = []
     for r, I in zip(self.allR, self.allI):
       xyz = r.flatten().normalize().data
@@ -532,8 +628,33 @@ class PoleFigure:
     return np.array(out)
 
   def calcErrorPF(self, other, mode="relative", epsilon=None):
-    """the pole figures of the deviation from a recalculation, normalised against each
-    other first; 'relative' is the damped relative error, 'RP', 'l1', 'l2' the others"""
+    """the pole figures of the deviation from a recalculation: the difference between measured
+    intensities and those an ODF predicts, or another pole figure on the same directions;
+    MATLAB's calcErrorPF
+
+      pfe = calcErrorPF(pf, odf)               # the damped relative error
+      pfe = calcErrorPF(pf, pf2)               # against other pole figures
+      pfe = pf.calcErrorPF(odf, 'RP', epsilon=0.5)  # |pf - pfcalc| / pfcalc where pfcalc > 0.5
+      pfe = pf.calcErrorPF(odf, 'l1')          # |pf - pfcalc|
+      pfe = pf.calcErrorPF(odf, 'l2')          # |pf - pfcalc|^2
+
+    The recalculation is first scaled to the mass of the measurement by calcNormalization.
+    'relative', the default, is |I - Ic| / max(I + epsilon, Ic + epsilon), which MATLAB computes
+    when no measure is named, though its help names RP the default; 'RP' keeps only the
+    directions where the recalculation exceeds epsilon, so its pole figures have fewer
+    directions; 'l1' and 'l2' are the plain differences. The names are taken in any case.
+
+    Input
+      pf - PoleFigure, the measurement
+      other - SO3Fun, the ODF of the recalculation, or PoleFigure on the same directions
+    Output
+      pfe - PoleFigure of the deviations
+    Keywords
+      mode - 'relative', 'RP', 'l1' or 'l2'
+      epsilon - the damping of 'relative' (0.5) or the threshold of 'RP' (1), both times the
+          normalisation
+    See also
+      PoleFigure.calcError, calcNormalization, calcPoleFigure"""
     mode = _errorMode(mode)
     # the RP measure keeps the directions above one, the regularised one damps by a half
     epsilon = (1.0 if mode == "RP" else 0.5) if epsilon is None else float(epsilon)
@@ -561,16 +682,31 @@ class PoleFigure:
 
   def calcError(self, other, mode="relative", epsilon=None):
     """the mean deviation, one number per pole figure, from a recalculation by an ODF or from
-    other pole figures on the same directions: 'relative', the default, is the relative error
-    damped by epsilon (0.5), which MATLAB computes when no measure is named (its documentation
-    calls the default RP); 'RP' keeps the directions above epsilon (1), MATLAB's 'RP', epsilon;
-    'l1' and 'l2'; the names in any case, and the ODF first or second, as MATLAB's
+    other pole figures on the same directions; MATLAB's calcError
 
-      e = calcError(pf, odf)
-      e = calcError(pf, pf2)
-      e = calcError(pf, odf, 'RP', epsilon=0.5)
-      e = calcError(odf, pf, 'RP')
-      e = calcError(pf, odf, 'l2')"""
+      e = calcError(pf, odf)                   # the damped relative error
+      e = calcError(pf, pf2)                   # against other pole figures on the same directions
+      e = calcError(pf, odf, 'RP', epsilon=0.5)  # the RP error above 0.5
+      e = calcError(odf, pf, 'RP')             # the ODF first, as MATLAB's
+      e = calcError(pf, odf, 'l2')             # the relative mean square error
+
+    The deviations are those of calcErrorPF, averaged over each pole figure: 'relative', the
+    default, the relative error damped by epsilon (0.5), which MATLAB computes when no measure is
+    named (its documentation calls the default RP); 'RP' the mean of |I - Ic| / Ic over the
+    directions where Ic exceeds epsilon (1), MATLAB's 'RP', epsilon; 'l1' and 'l2' the mean
+    absolute and squared differences divided by the mean absolute and squared intensities. The
+    names are taken in any case.
+
+    Input
+      pf - PoleFigure, the measurement
+      other - SO3Fun, the ODF of the recalculation, or PoleFigure on the same directions
+    Output
+      e - ndarray, one number per pole figure; NaN where 'RP' keeps no direction
+    Keywords
+      mode - 'relative', 'RP', 'l1' or 'l2'
+      epsilon - the damping of 'relative' or the threshold of 'RP', both times the normalisation
+    See also
+      PoleFigure.calcErrorPF, calcNormalization, SO3Fun.calcError"""
     mode = _errorMode(mode)
     e = self.calcErrorPF(other, mode, epsilon)
     out = np.array([float(np.mean(I)) if I.size else np.nan for I in e.allI])
@@ -606,10 +742,22 @@ class PoleFigure:
 
   @staticmethod
   def cat(*pfs, axis=0):
-    """the pole figures of several data sets in one, in order
+    """the pole figures of several data sets in one, in order; MATLAB's cat
 
-      pf = cat(pf1, pf2, pf3)
-      pf = PoleFigure.cat(pf1, pf2)"""
+      pf = cat(pf1, pf2, pf3)       # every pole figure of the three, in order
+      pf = PoleFigure.cat(pf1, pf2) # the same as a static method
+
+    Unlike union, pole figures of the same crystal direction stay separate; None is skipped.
+
+    Input
+      pf1, pf2, pf3 - PoleFigure
+    Output
+      pf - PoleFigure
+    Keywords
+      axis - taken for numpy's signature and ignored: the pole figures form one list, MATLAB's
+          dim
+    See also
+      PoleFigure.union"""
     pfs = [pf for pf in pfs if pf is not None]
     return PoleFigure([h for pf in pfs for h in pf.allH], [r for pf in pfs for r in pf.allR], [I for pf in pfs for I in pf.allI],
                       superposition=[c for pf in pfs for c in pf.c], complete=True)
@@ -664,8 +812,22 @@ def noisepf(pf, factor=1, background=0, nonnegative=False, rng=None):
 
 
 def isOutlier(pf, alpha=2):
-  """isOutlier(pf, alpha) is pf.isOutlier(alpha): the measurements deviating from the mean of their
-  neighbours by more than alpha standard deviations"""
+  """the measurements deviating from the mean of their neighbours by more than alpha standard
+  deviations; the same as pf.isOutlier, MATLAB's isOutlier
+
+    ind = isOutlier(pf)             # deviating by more than two standard deviations
+    ind = isOutlier(pf, alpha=3)    # by more than three
+
+  The neighbours are the directions within three times the resolution of the grid.
+
+  Input
+    pf - PoleFigure
+  Output
+    ind - ndarray of booleans, one per measurement
+  Keywords
+    alpha - the number of standard deviations
+  See also
+    PoleFigure.isOutlier, PoleFigure.unique"""
   return pf.isOutlier(alpha)
 
 
@@ -676,8 +838,23 @@ def calcNormalization(pf, other):
 
 
 def calcErrorPF(pf, other, mode="relative", epsilon=None):
-  """calcErrorPF(pf, other, mode) is pf.calcErrorPF(other, mode): the pole figures of the
-  deviation from a recalculation, 'relative', 'RP', 'l1' or 'l2'"""
+  """the pole figures of the deviation from a recalculation; the same as pf.calcErrorPF,
+  MATLAB's calcErrorPF
+
+    pfe = calcErrorPF(pf, odf)               # the damped relative error
+    pfe = calcErrorPF(pf, odf, 'RP')         # |pf - pfcalc| / pfcalc where pfcalc > 1
+    pfe = calcErrorPF(pf, pf2, 'l1')         # |pf - pf2| against other pole figures
+
+  Input
+    pf - PoleFigure, the measurement
+    other - SO3Fun or PoleFigure, the recalculation
+  Output
+    pfe - PoleFigure of the deviations
+  Keywords
+    mode - 'relative', 'RP', 'l1' or 'l2'
+    epsilon - the damping of 'relative' (0.5) or the threshold of 'RP' (1)
+  See also
+    PoleFigure.calcErrorPF, PoleFigure.calcError"""
   return pf.calcErrorPF(other, mode, epsilon)
 
 
@@ -787,11 +964,28 @@ def _productGrid(v, tol=1e-6):
 
 # Clenshaw-Curtis weights on the nodes cos(k pi / N), k = 0..N
 def calcQuadratureWeights(v, method="voronoi"):
-  """weights that integrate a function from samples at the directions, summing to one
+  """weights that integrate a function from samples at the directions, summing to one; MATLAB's
+  calcQuadratureWeights
 
-    calcQuadratureWeights(r)                     a regular grid exactly, scattered points by Voronoi areas
-    calcQuadratureWeights(r, method='harmonic')  the least norm correction that integrates every harmonic the count allows
-  """
+    w = calcQuadratureWeights(r)                     # a regular grid exactly, scattered points by Voronoi areas
+    w = calcQuadratureWeights(r, method='harmonic')  # the least norm correction that integrates every harmonic the count allows
+
+  On a regular grid of rings (a polar ladder from the pole in equal steps) the weights are the
+  Clenshaw-Curtis weights of the rings shared by their points, exact on the sphere and, with
+  the equator ring halved, on a hemisphere. Scattered directions take the areas of their
+  spherical Voronoi cells (MATLAB's only method), an axis list counted on both hemispheres,
+  duplicates sharing a cell; method='harmonic' instead corrects equal weights by the least norm
+  change that integrates every spherical harmonic the number of points allows. Where neither
+  works the weights are equal.
+
+  Input
+    r - vector3d
+  Output
+    w - ndarray of the shape of r, summing to one
+  Keywords
+    method - 'voronoi' or 'harmonic', for scattered directions
+  See also
+    PoleFigure.mean, S2FunHarmonic.quadrature"""
   v = asVector3d(v)
   n = v.size
   if n == 0:

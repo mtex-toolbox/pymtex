@@ -107,7 +107,26 @@ class S2Fun:
 
   @staticmethod
   def interpolate(nodes, values=None, **kwargs):
-    """a function on the sphere through the values at the nodes, a regularised least squares fit"""
+    """a function on the sphere through the values at the nodes, a regularised least squares fit;
+    MATLAB's S2FunHarmonic.interpolate
+
+      sF = S2Fun.interpolate(v, y)                              # a function through values at directions
+      sF = S2Fun.interpolate(v, y, bandwidth=16, lambda_=1e-4)  # of a given degree, regularised
+      sVF = S2Fun.interpolate(v, w)                             # a vector field through vectors w
+
+    The harmonic coefficients up to the bandwidth minimise the weighted squared misfit at the
+    nodes plus lambda_ times the Sobolev norm, solved by LSQR; the keywords, bandwidth, lambda_,
+    s, weights, maxIter, tol and withParameters, are those of interpolate, where they are
+    explained.
+
+    Input
+      nodes - vector3d, the directions
+    Output
+      sF - S2FunHarmonic, or S2VectorFieldHarmonic for vector values
+    Keywords
+      values - ndarray of one value per node, or vector3d for a vector field
+    See also
+      interpolate, S2FunHarmonic.adjoint, calcDensity"""
     from .density import interpolate
     return interpolate(nodes, values, **kwargs)
 

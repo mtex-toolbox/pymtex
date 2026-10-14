@@ -266,7 +266,20 @@ class symmetry:
     return POINT_GROUP_NAMES[k - 1][1] if k else "unknown"
 
   def char(self, utf8=None):
-    """the symbol with a bar over every rotoinversion axis under utf8 output"""
+    """the symbol with a bar over every rotoinversion axis under utf8 output
+
+      s = cs.sym.char()                             # '3̅m1' or '-3m1', as the preference says
+      s = cs.sym.char(utf8=False)                   # '-3m1'
+
+    Input
+      pg - symmetry
+    Output
+      s - str, the Hermann-Mauguin symbol
+    Keywords
+      utf8 - a combining bar instead of the minus sign; by default the preference
+          'UTF8Output'
+    See also
+      symmetry.pointGroup, symmetry.Schoenflies"""
     utf8 = getMTEXpref("UTF8Output") if utf8 is None else utf8
     return re.sub(r"-(\d)", "\\1\u0305", self.pointGroup) if utf8 else self.pointGroup
 
@@ -313,7 +326,23 @@ class symmetry:
     return np.where(omega < 1e-4, 1, np.round(2 * np.pi / np.where(omega < 1e-4, 1, omega))).astype(int)
 
   def elements(self, multiplicity=None):
-    """the rotational axes and their multiplicities, both signs, symmetry/elements"""
+    """the rotational axes and their multiplicities, both signs, symmetry/elements
+
+      axes, mult = cs.sym.elements()                # every axis with its order
+      axes = cs.sym.elements(multiplicity=2)        # the two-fold axes alone
+
+    Every axis of a rotation or rotoinversion of order above one, with the highest order
+    about it, and its antipode with the same order, as MATLAB lists them.
+
+    Input
+      pg - symmetry
+    Output
+      axes - vector3d, antipodal
+      mult - the order of every axis
+    Keywords
+      multiplicity - return the axes of this order alone
+    See also
+      symmetry.nfold, symmetry.rotations"""
     order = self._orders()
     sel = order > 1
     axes = self.rot[sel].axis()
@@ -336,7 +365,18 @@ class symmetry:
     return int(np.max(order[sel])) if np.any(sel) else 1
 
   def nfold(self, axis=None):
-    """the maximal n-fold of the group, and about given axes, symmetry/nfold"""
+    """the maximal n-fold of the group, and about given axes, symmetry/nfold
+
+      n = cs.sym.nfold()                            # the highest order of any axis
+      n = cs.sym.nfold(vector3d(0, 0, 1))           # about z, 1 when it is no axis
+
+    Input
+      pg - symmetry
+      axis - vector3d, the axes asked about
+    Output
+      n - an integer, or one per axis
+    See also
+      symmetry.elements, symmetry.multiplicityZ"""
     if axis is None:
       return self._maxOrder()
     axis = asVector3d(axis)
@@ -468,13 +508,50 @@ class symmetry:
 
   def conventionalSector(self, up=None, east=None):
     """the conventional sector of the group, the one MTEX draws, with up and east choosing its
-    placement"""
+    placement
+
+      sR = cs.sym.conventionalSector()              # towards z
+      sR = cs.sym.conventionalSector(up=-zvector)   # on the lower hemisphere
+
+    The hemisphere towards up when some element sends up below it, a wedge about the c axis
+    starting on a mirror plane, else on a two-fold axis, else at a, and the standard
+    triangles of the cubic groups. east matters only where the sector has a choice of side:
+    the monoclinic groups and the orthorhombic ones with a mirror. Called on the group it
+    has no frame; frame.fundamentalSector() takes up and east from the frame's plotting
+    convention.
+
+    Input
+      pg - symmetry
+    Output
+      sR - sphericalRegion
+    Keywords
+      up - vector3d, the direction out of the screen, z by default
+      east - vector3d, the direction to the right, by default the a axis
+    See also
+      fundamentalSector, dirichletSector, tilesSphere"""
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
   def fundamentalRegion(self, other=None, *, antipodal=False):
     """the fundamental region of orientations of this group and another one, the Dirichlet domain
-    of the identity"""
+    of the identity
+
+      oR = cs.sym.fundamentalRegion()               # of orientations
+      oR = cs.sym.fundamentalRegion(cs.sym)         # of misorientations
+      oR = cs.sym.fundamentalRegion(cs.sym, antipodal=True)  # a misorientation and its inverse as one
+
+    The orientations nearer the identity than any of their equivalents. The frames are
+    built from the groups, so cs.fundamentalRegion() on the frame is the usual call.
+
+    Input
+      pg - symmetry
+      other - symmetry, the second group, by default that of the default specimen frame
+    Output
+      oR - orientationRegion
+    Keywords
+      antipodal - identify every misorientation with its inverse
+    See also
+      fundamentalRegion, orientationRegion, maxAngle"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self, other, antipodal=antipodal)
 
@@ -535,7 +612,25 @@ def _groupsBySignature():
 
 
 def identifyGroup(els, axes=None):
-  """the symbol of a list of elements written in the given axes, '' when it names no group"""
+  """the symbol of a list of elements written in the given axes, '' when it names no group
+
+    s = identifyGroup(cs.sym.rot, axes=cs.sym.axes)  # '-3m1' for a trigonal crystal
+    s = identifyGroup(els)                        # in orthonormal axes x, y, z
+
+  The groups whose elements have the same angles and parities are tried in turn; the first
+  whose closure in the axes is the list names it. A group in a setting no symbol spells
+  takes the type its angles say.
+
+  Input
+    els - orthogonalTransform, the elements of the group
+  Output
+    s - str, the Hermann-Mauguin symbol
+  Keywords
+    axes - the crystal axes a, b, c as a vector3d or a 3 x 3 array, rows, by default the
+        orthonormal ones; the secondary symbols depend on them, '-3m1' and '-31m' differing
+        by the place of a
+  See also
+    symmetry, findPointGroup"""
   axes = _asAxes(axes)
   candidates = _groupsBySignature().get(_signature(els), [])
   for symbol in candidates:

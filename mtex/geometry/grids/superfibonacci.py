@@ -59,7 +59,28 @@ class SO3FibonacciGrid(orientation):
     return SO3FibonacciGrid(rotation._fromData(self.data[mask]), self.frameA, self.frameB, self.res)
 
   def find(self, o, epsOrK=None):
-    """nearest (eps None), k nearest (int) or all within a radius (float), through the tree"""
+    """the nearest grid rotation of every orientation, or the k nearest, or all within a radius,
+    up to the symmetries of the grid's frames; MATLAB's SO3FibonacciGrid.find
+
+      ind, d = S3G.find(ori)               # the nearest grid point, d = cos(w/2)
+      ind, d = S3G.find(ori, 3)            # the 3 nearest, d their angles
+      I, D = S3G.find(ori, 10*degree)      # every grid point within 10 degree
+
+    The angle w is the misorientation angle reduced by the symmetries of both frames. As
+    MATLAB's SO3Grid.find, the nearest form gives cos(w/2), the other two the angles. Every search goes through a
+    quaternion k-d tree.
+
+    Input
+      S3G - SO3FibonacciGrid
+      ori - orientation, or rotations taken between the grid's frames
+    Output
+      ind - the index of the nearest grid point, of the shape of ori; with k a (n, k) array
+      d - cos(w/2) of the nearest; with k the (n, k) angles
+      I, D - with a radius the sparse incidence and the sparse angles, (n x grid)
+    Keywords
+      epsOrK - an integer k for the k nearest, a float for the radius of the search
+    See also
+      superfibonacciSO3Grid, SO3Grid.find, orientation.find"""
     from .orientationtree import findInGrid
     return findInGrid(self, o, epsOrK)
 

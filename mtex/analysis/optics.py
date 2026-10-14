@@ -64,9 +64,28 @@ def _birefringence(rI, U):
 
 
 def birefringence(rI, vprop=None):
-  """the birefringence for light along vprop: the index difference and the fast and the
-  slow polarisation axis; at a list of directions arrays and axis lists; without a
-  direction the function on the sphere and two axis fields"""
+  """the birefringence for light propagating along vprop, the difference of the two refractive
+  indices, and the polarisation axes of the fast and the slow wave; MATLAB's birefringence
+
+    n, pMin, pMax = rI.birefringence(vprop)     # at the propagation directions
+    n, pMin, pMax = rI.birefringence()          # a function on the sphere and two axis fields
+
+  Light entering an anisotropic crystal along vprop splits into two waves polarised
+  perpendicular to each other and to vprop, the fast one of the lower and the slow one of
+  the higher refractive index. At a list of directions the differences are an array and the
+  axes lists of axes; without a direction the difference is a function of the propagation
+  direction and the axes are axis fields. MATLAB's fourth and fifth outputs, the two indices
+  nMin and nMax, are not returned.
+
+  Input
+    rI - refractiveIndexTensor
+    vprop - vector3d or Miller, the propagation directions in the frame of rI
+  Output
+    n - the birefringence nMax - nMin, or an S2Fun of the propagation direction
+    pMin - the polarisation axis of the lower index, the fast wave, or an axis field
+    pMax - the polarisation axis of the higher index, the slow wave, or an axis field
+  See also
+    refractiveIndexTensor.opticalAxis, spectralTransmission, BirefringenceDemo"""
   if vprop is None:
     from ..functions.handles import S2FunHandle
     from ..functions.s2axisfield import S2AxisFieldHandle
@@ -83,8 +102,23 @@ def birefringence(rI, vprop=None):
 
 
 def opticalAxis(rI, tol=1e-8):
-  """the optical axes of a refractive index tensor: the directions along which the two
-  indices coincide, one for a uniaxial and two for a biaxial crystal"""
+  """the optical axes of a refractive index tensor, the directions along which the two
+  refractive indices coincide and the birefringence vanishes; MATLAB's opticalAxis
+
+    oA = rI.opticalAxis()               # one axis for a uniaxial, two for a biaxial crystal
+    oA = opticalAxis(rI, tol=1e-4)      # principal indices closer than 1e-4 taken as equal
+
+  An isotropic tensor, all three principal indices equal, has no optical axis and gives an
+  empty list.
+
+  Input
+    rI - refractiveIndexTensor
+  Output
+    oA - the optical axes as axes in the frame of rI
+  Keywords
+    tol - the difference below which two principal indices count as equal
+  See also
+    refractiveIndexTensor.birefringence, BirefringenceDemo"""
   n, V = rI.eig()
   e = V.data
   if abs(n[0] - n[2]) < tol:

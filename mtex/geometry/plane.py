@@ -94,7 +94,23 @@ class plane3d:
 
   def dist(self, v, tol=1e-8):
     """the signed distance of points to the plane, or the distance of two parallel planes,
-    NaN where the planes meet"""
+    NaN where the planes meet
+
+      d = plane.dist(v)                             # the signed distance of points, <N, v> - d
+      d = plane.dist(plane2)                        # the distance of parallel planes
+
+    Two planes count as parallel when their normals agree up to tol; MATLAB requires them to
+    agree exactly and returns the first plane's d for planes that meet, the port NaN.
+
+    Input
+      plane - plane3d
+      v - vector3d of points, or a second plane3d
+    Output
+      d - the distances, positive on the side the normal points to
+    Keywords
+      tol - how far the cosine of the normals may stay from 1 for parallel planes
+    See also
+      dist, plane3d.project, plane3d.intersect"""
     if isinstance(v, plane3d):
       lam = self.N.dot(v.N, symmetry=False)
       lam = np.where(np.abs(np.abs(lam) - 1) < tol, lam, np.nan)
@@ -108,7 +124,21 @@ class plane3d:
     return v - self.N * self.dist(v)
 
   def intersect(self, v1, v2=None, tol=1e-13):
-    """where the segments from v1 to v2 cross the plane, NaN where they do not"""
+    """where the segments from v1 to v2 cross the plane, NaN where they do not
+
+      v = plane.intersect(v1, v2)                   # the crossings of the segments from v1 to v2
+      v = plane.intersect(V)                        # the segments as the pairs V[..., 0], V[..., 1]
+
+    Input
+      plane - plane3d
+      v1 - vector3d, the starting points of the segments
+      v2 - vector3d, their end points, by default the last axis of v1 holding both
+    Output
+      v - vector3d of the crossings
+    Keywords
+      tol - how far, as a fraction of the segment, a crossing may lie beyond its ends
+    See also
+      intersect, lineIntersect, plane3d.dist"""
     if v2 is None:
       v1, v2 = v1[..., 0], v1[..., 1]
     return lineIntersect(v1, v2, self.N, self.d, tol)
@@ -158,7 +188,23 @@ class plane3d:
 
 
 def lineIntersect(a, b, n, d, tol=1e-13):
-  """where the segments from a to b cross the planes <n, v> = d, NaN where they do not"""
+  """where the segments from a to b cross the planes <n, v> = d, NaN where they do not,
+  MATLAB's lineIntersect
+
+    v = lineIntersect(a, b, n, d)                 # the crossings of the segments from a to b
+
+  The segments and the planes broadcast against each other.
+
+  Input
+    a, b - vector3d, the starting and end points of the segments
+    n - vector3d, the normals of the planes
+    d - the distances of the planes, <n, v> = d
+  Output
+    v - vector3d of the crossings
+  Keywords
+    tol - how far, as a fraction of the segment, a crossing may lie beyond its ends
+  See also
+    plane3d.intersect, intersect"""
   A = asVector3d(a)
   B = asVector3d(b)
   N = asVector3d(n)
@@ -175,7 +221,18 @@ def dist(plane, v, **kw):
 
 
 def intersect(plane, v1, v2=None):
-  """intersect(plane, v1, v2): where the segments cross the plane"""
+  """intersect(plane, v1, v2): where the segments cross the plane
+
+    v = intersect(plane, v1, v2)                  # the crossings of the segments from v1 to v2
+
+  Input
+    plane - plane3d
+    v1 - vector3d, the starting points of the segments
+    v2 - vector3d, their end points, by default the last axis of v1 holding both
+  Output
+    v - vector3d of the crossings, NaN where a segment misses the plane
+  See also
+    plane3d.intersect, lineIntersect"""
   return plane.intersect(v1, v2)
 
 

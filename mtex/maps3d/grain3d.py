@@ -377,8 +377,24 @@ class grain3d:
   # ------------------------------------------------------------------ neighbours
 
   def neighbors(self, full=False):
-    """the pairs of neighbouring grains, each sorted, among the grains of the set or with full
-    all pairs any of them has"""
+    """the ids of neighbouring grains; MATLAB's neighbors of grain3d
+
+      pairs = grains.neighbors()                               # the pairs within the set
+      pairs = grains.neighbors(full=True)                      # every pair of the boundary
+
+    Two grains are neighbours when they share a boundary face. A pair is sorted, the smaller
+    id first, and listed once; the outside of the volume is no neighbour. MATLAB's flag
+    'matrix', the adjacency matrix, has no counterpart here.
+
+    Input
+      grains - grain3d
+    Output
+      pairs - (n, 2) array of grain ids
+    Keywords
+      full - every pair of grains sharing a face of the boundary, also those with a grain
+          outside the set
+    See also
+      grain3d.numNeighbors, grain2d.neighbors"""
     g = self.boundary.grainId
     g = np.unique(np.sort(g[np.all(g > 0, axis=1)], axis=1), axis=0)
     if full:
@@ -422,7 +438,25 @@ class grain3d:
   # ------------------------------------------------------------------ sections
 
   def intersected(self, plane, P0=None):
-    """whether a plane runs through a grain: vertices of it on both sides"""
+    """whether a plane runs through a grain; MATLAB's intersected of grain3d
+
+      ind = grains.intersected(vector3d(1, 1, 1), vector3d(1, 1, 1))  # normal and a point on the plane
+      ind = grains.intersected(vector3d.X, 1.4)                # normal and distance from the origin
+      grains = grains[grains.intersected(plane3d(vector3d.Z, vector3d(0, 0, 2)))]  # the grains a plane cuts
+
+    A grain is intersected when the vertices of its boundary lie on both sides of the plane,
+    strictly; a plane through vertices alone does not intersect.
+
+    Input
+      grains - grain3d
+      plane - plane3d, or the normal vector3d of the plane
+    Output
+      ind - boolean mask of the grains
+    Keywords
+      P0 - with a normal: a point on the plane, a vector3d, or its distance from the origin;
+          by default the plane through the origin
+    See also
+      grain3d.slice, plane3d"""
     from ..geometry.plane import plane3d
     if not isinstance(plane, plane3d):
       plane = plane3d(plane, P0 if P0 is not None else 0)
@@ -436,13 +470,28 @@ class grain3d:
     return (hi > 0) & (lo < 0)
 
   def slice(self, plane, P0=None):
-    """the 2D grains a plane cuts from the grains, as MATLAB's slice; prop Id3d names the grain
-    every section came from; the plane is a plane3d, or its normal with a point on it or its
-    distance from the origin
+    """the 2D grains a plane cuts from 3D grains; MATLAB's slice of grain3d
 
-      grains2 = grains.slice(plane3d(vector3d.Z, vector3d(0, 0, 0.15)))
-      grains2 = grains.slice(vector3d(1, 1, 1), vector3d(0, 0, 0))   # normal and point
-      grains2 = grains.slice(vector3d.Z, 0.15)                        # normal and distance"""
+      grains2 = grains.slice(plane3d(vector3d.Z, vector3d(0, 0, 2.2)))  # a plane3d
+      grains2 = grains.slice(vector3d(1, 1, 1), vector3d(1, 1, 2))      # normal and a point on the plane
+      grains2 = grains.slice(vector3d.Z, 2.2)                           # normal and distance from the origin
+
+    Every grain the plane intersects contributes the polygons of its section, which become
+    grains of a grain2d in the plane; grains2.prop['Id3d'] names the 3D grain every section
+    came from, and the sections keep its phase, mean orientation and GOS. The plane is moved
+    by 0.001 towards the origin, as MATLAB's, so that it runs through no vertex. A plane that
+    cuts no grain raises a ValueError, where MATLAB returns an empty grain2d.
+
+    Input
+      grains - grain3d
+      plane - plane3d, or the normal vector3d of the plane
+    Output
+      grains2 - grain2d
+    Keywords
+      P0 - with a normal: a point on the plane, a vector3d, or its distance from the origin;
+          by default the plane through the origin
+    See also
+      grain3d.intersected, EBSD3.slice, grain2d"""
     from .section3d import sliceGrains
     return sliceGrains(self, plane, P0)
 

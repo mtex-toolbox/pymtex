@@ -160,7 +160,25 @@ class gbcAngle(grainBoundaryCriterion):
   def evaluate(self, ebsd, i, j, backend=None):
     """the connectivity of the pairs i[k], j[k]: the share of the angle levels their misorientation
     stays below, 0 across phases, 1 between not indexed measurements; a compiled loop when
-    numba is the backend"""
+    numba is the backend; MATLAB's gbcAngle.evaluate
+
+      c = gbcAngle(10*degree).evaluate(ebsd, i, j)                    # 1 joined, 0 a boundary
+      c = gbcAngle([10*degree, 2*degree]).evaluate(ebsd, i, j)        # 0.5 for a low angle boundary
+      c = gbcAngle(10*degree).evaluate(ebsd, i, j, backend='numpy')   # the NumPy loop
+
+    With a pair [high, low] the value is 1 below low, 0.5 between low and high and 0 above
+    high: the share of the levels the misorientation angle stays below. calcGrains joins two
+    pixels whose value is 1 into one grain.
+
+    Input
+      ebsd - EBSD
+      i, j - the flat indices of the pairs of measurements, equally long
+    Output
+      c - the connectivity of every pair, between 0 and 1
+    Keywords
+      backend - 'numba' or 'numpy', by default the preference 'kernels'
+    See also
+      gbcSoft, gbcEqual, calcGrains"""
     i, j, ph, rot = _pairs(ebsd, i, j)
     # all pairs in one compiled loop over the tables of the phases, the loop below its fallback
     CSList = ebsd.CSList

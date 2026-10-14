@@ -161,7 +161,24 @@ def _renumber(gLabel, sizes):
 
 
 def knnRadius(X, k=10, sub=1500):
-  """the median distance to the tenth nearest neighbour of a subsample, the estimate CLASSIX suggests"""
+  """the median distance to the k-th nearest neighbour of a subsample, the radius CLASSIX suggests
+
+    r = knnRadius(X)              # the median distance to the tenth neighbour
+    r = knnRadius(X, k=5)         # to the fifth neighbour
+    r = knnRadius(X, sub=500)     # over a subsample of 500 points
+
+  The neighbours are searched among all points, the distances taken at a subsample spread
+  evenly over the list. A list of k + 1 points or fewer gives 1.
+
+  Input
+    X - (n, d) array, the points
+  Output
+    r - float, the median distance
+  Keywords
+    k - the neighbour whose distance is taken
+    sub - the number of points the median is taken over; a shorter list is taken whole
+  See also
+    calcCluster, classix"""
   from scipy.spatial import cKDTree
   X = np.asarray(X, dtype=float)
   n = len(X)

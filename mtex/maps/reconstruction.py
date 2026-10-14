@@ -626,9 +626,30 @@ class parentGrainReconstructor:
   # ------------------------------------------------------------------ the fit of the relationship
 
   def calcGBFit(self, p2c=False, c2c=False):
-    """fit, pairs = job.calcGBFit(): the misfit of every parent to child and child to child
-    boundary to the relationship, and the ids of the grains on either side; p2c or c2c
-    takes one kind alone"""
+    """the misfit of the boundaries between neighbouring grains to the orientation relationship
+    job.p2c, and the ids of the grains on either side; MATLAB's
+    parentGrainReconstructor.calcGBFit
+
+      fit, pairs = job.calcGBFit()               # every parent to child and child to child boundary
+      fit, p2cPairs = job.calcGBFit(p2c=True)    # the parent to child boundaries alone
+      fit, c2cPairs = job.calcGBFit(c2c=True)    # the child to child boundaries alone
+
+    For a pair of child grains the misfit is the angle between their misorientation and the
+    nearest child to child misorientation job.p2c admits; for a parent and a child grain the
+    angle between their misorientation and job.p2c. With neither keyword both kinds are
+    returned, the parent to child pairs first.
+
+    Input
+      job - parentGrainReconstructor
+    Output
+      fit - array of the misfit angles, in radians
+      pairs - (n, 2) int array, the ids of the two grains of every boundary
+    Keywords
+      p2c - only the boundaries between a parent and a child grain
+      c2c - only the boundaries between two child grains
+    See also
+      parentGrainReconstructor.calcParent2Child, parentGrainReconstructor.calcGBVotes,
+      MaParentGrainReconstruction"""
     noOpt = not (p2c or c2c)
     fits, pairs = [], []
     if noOpt or p2c:
@@ -997,21 +1018,61 @@ class parentGrainReconstructor:
     self.graph = None
 
   def mergeSimilar(self, threshold=5 * degree):
-    """job.mergeSimilar(threshold=7.5*degree): neighbouring grains of one phase whose mean
-    orientations are within the threshold become one; job.grains.clusterSize counts the
-    prior grains in each"""
+    """neighbouring grains of similar orientation merged; MATLAB's
+    parentGrainReconstructor.mergeSimilar
+
+      job.mergeSimilar()                         # within 5 degree
+      job.mergeSimilar(threshold=7.5*degree)     # within 7.5 degree
+
+    Neighbouring grains of one phase whose mean orientations are within the threshold become
+    one; job.grains and job.mergeId follow the merge, and job.grains.clusterSize counts the
+    prior grains in each.
+
+    Input
+      job - parentGrainReconstructor
+    Keywords
+      threshold - the misorientation angle up to which grains are merged
+    See also
+      parentGrainReconstructor.mergeInclusions, grain2d.merge"""
     self._followMerge(self.grains.merge(threshold=threshold))
     self.grains.clusterSize = np.bincount(self._pos(self.mergeId), minlength=self.grains.size)
 
   def mergeInclusions(self, maxSize=np.inf):
-    """job.mergeInclusions(maxSize=50): the child and parent grains lying inside a parent
-    grain, below maxSize pixels, become part of it, with its orientation"""
+    """the inclusions merged into the parent grains around them; MATLAB's
+    parentGrainReconstructor.mergeInclusions
+
+      job.mergeInclusions()              # every grain enclosed by a parent grain
+      job.mergeInclusions(maxSize=50)    # only those of at most 50 pixels
+
+    The child and parent grains lying inside a parent grain, of at most maxSize pixels, become
+    part of it, with its orientation; job.grains and job.mergeId follow the merge.
+
+    Input
+      job - parentGrainReconstructor
+    Keywords
+      maxSize - the largest number of pixels of an inclusion that is merged
+    See also
+      parentGrainReconstructor.mergeSimilar, grain2d.merge"""
     self._followMerge(self.grains.merge(inclusions=self.isChild | self.isParent, host=self.isParent, maxSize=maxSize))
 
   def revert(self, ind=None):
-    """job.revert(), job.revert(ind): the grains named (a mask or positions into job.grains,
-    or grains) given back the phase and the orientation of their prior grains; a grain
-    merged of several comes apart into them, the others stay merged"""
+    """the reconstruction undone, for all grains or those named; MATLAB's
+    parentGrainReconstructor.revert
+
+      job.revert()                               # undo the whole reconstruction
+      job.revert(job.grains.fit > 5*degree)      # undo the grains a mask selects
+      job.revert(job.parentGrains[:5])           # undo specific grains
+
+    The grains named, a mask or positions into job.grains, or grains, are given back the phase
+    and the orientation of their prior grains; a grain merged of several comes apart into them,
+    the others stay merged. The votes and the variant graph are dropped.
+
+    Input
+      job - parentGrainReconstructor
+      ind - bool mask or positions into job.grains, or grain2d; all grains when omitted
+    See also
+      parentGrainReconstructor.calcParentFromVote, GrainGraphBasedReconstruction,
+      MaParentGrainReconstruction"""
     self.votes = None
     self.graph = None
     g = self.grains
@@ -1055,10 +1116,26 @@ class parentGrainReconstructor:
   # ------------------------------------------------------------------ the results
 
   def calcParentEBSD(self, exactOR=False):
-    """parentEBSD = job.calcParentEBSD(): the map with the grain ids of the current grains
-    and every child pixel of a grain that is a parent now given the parent orientation of
-    its grain, its variant and packet id, and fit, its misfit to the variant; with exactOR
-    every pixel carries the parent its own orientation gives"""
+    """the reconstructed parent map; MATLAB's parentGrainReconstructor.calcParentEBSD
+
+      parentEBSD = job.calcParentEBSD()              # the parent orientation of every grain
+      parentEBSD = job.calcParentEBSD(exactOR=True)  # the parent each pixel's own orientation gives
+
+    A copy of the prior map with the grain ids of the current grains, every child pixel of a
+    grain that is a parent now given the parent orientation of its grain and the parent phase.
+    The pixels carry variantId, packetId and fit, the misfit of the pixel to its variant; the
+    other pixels are NaN there. With exactOR every pixel carries the parent orientation its own
+    orientation gives through the relationship, the variant nearest the grain's parent, so the
+    fit is zero.
+
+    Input
+      job - parentGrainReconstructor
+    Output
+      parentEBSD - EBSD, with parentEBSD.grainId, variantId, packetId and fit
+    Keywords
+      exactOR - enforce the exact orientation relationship pixel by pixel
+    See also
+      parentGrainReconstructor.calcVariants, MaParentGrainReconstruction"""
     ebsd = self.ebsdPrior.copy()
     gid = np.asarray(ebsd.grainId).reshape(-1).copy()
     ph = ebsd.phaseId.reshape(-1)

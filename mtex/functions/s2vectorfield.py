@@ -289,7 +289,28 @@ class S2VectorFieldHarmonic(S2VectorField):
   @classmethod
   def quadrature(cls, f, *args, bandwidth=None, weights=None):
     """S2VectorFieldHarmonic.quadrature(f, bandwidth=L), from a callable or from nodes and
-    values with their weights, MATLAB's name for the constructor"""
+    values with their weights, MATLAB's name for the constructor
+
+      vF = S2VectorFieldHarmonic.quadrature(lambda v: v.cross(zvector), bandwidth=8)  # of a function returning vectors
+      vF = S2VectorFieldHarmonic.quadrature(v, w, bandwidth=8, weights=wq)            # of vectors w at directions v
+
+    A function is approximated by quadrature on a grid of the bandwidth, componentwise in x, y
+    and z; vectors at scattered directions by the quadrature sum with the weights given, which
+    is exact only for the weights of a quadrature rule; S2VectorFieldHarmonic.interpolate fits
+    them by least squares.
+
+    Input
+      f - a function of vector3d returning vectors, S2VectorField, or vector3d of directions
+      args - the vectors at the directions, and the frame of the field
+    Output
+      vF - S2VectorFieldHarmonic
+    Keywords
+      bandwidth - the largest harmonic degree; by default the preference 'defaultS2Bandwidth',
+          for a field the field's
+      weights - the quadrature weights of vectors at scattered directions, equal ones of sum
+          4 pi by default
+    See also
+      S2VectorFieldHarmonic, S2VectorFieldHarmonic.interpolate"""
     return cls(f, *args, bandwidth=bandwidth, weights=weights)
 
   @classmethod
@@ -351,7 +372,24 @@ class S2VectorFieldHarmonic(S2VectorField):
     return vector3d(np.real(self._fhat[0]) / math.sqrt(4 * math.pi))
 
   def isclose(self, w, rtol=1e-8):
-    """whether two fields agree in their coefficients up to the relative tolerance rtol"""
+    """whether two fields agree in their coefficients up to the relative tolerance rtol
+
+      tf = isclose(vF1, vF2)             # equal up to a relative 1e-8
+      tf = isclose(vF1, vF2, rtol=1e-2)  # up to a relative 1e-2
+
+    The fields are compared at the larger of their bandwidths: the norm of the difference of
+    the coefficients of the three components must not exceed rtol times the norm of those of
+    w; a field of another kind is expanded first.
+
+    Input
+      vF1 - S2VectorFieldHarmonic
+      w - S2VectorField, the field to compare with
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the norm of w
+    See also
+      S2FunHarmonic.isclose"""
     w = S2VectorFieldHarmonic(w)
     L = max(self.bandwidth, w.bandwidth)
     a, b = self.truncate(L)._fhat, w.truncate(L)._fhat

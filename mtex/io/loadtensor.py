@@ -63,7 +63,30 @@ def _trailingBlock(rows, rank):
 
 def loadTensor(fname, *args, cls=None, **kwargs):
   """the tensor a text file holds: the last block of numeric rows, the density on the line
-  after the word density, the crystal frame given positionally"""
+  after the word density, the crystal frame given positionally; MATLAB's tensor.load and
+  loadTensor_generic
+
+    C = stiffnessTensor.load('Olivine1997PC.GPa', cs)          # a stiffness tensor and its density
+    C = loadTensor('Olivine1997PC.GPa', cs, cls=stiffnessTensor)  # the same
+    P = tensor.load('Single_RH_quartz_poly.P', cs, rank=3, doubleConvention=True)  # a rank three in Voigt form
+    T = loadTensor('Olivine1997PC.GPa', cs)                    # a plain tensor, the rank from the block
+
+  The coefficients are the last block of numeric rows of one width: six rows of six a Voigt
+  matrix, three of six the Voigt table of a rank three, three of three a rank two. A plain
+  tensor takes its rank from that shape unless rank= is given. A density stated on the line
+  after a line starting with 'density' is passed on, divided by 1000 when that line says kg.
+  The other keywords (rank, doubleConvention, density, unit, ...) go to the constructor of
+  the class.
+
+  Input
+    fname - the name of the file
+    cs - the crystal frame (optional)
+  Output
+    T - a tensor of the class cls
+  Keywords
+    cls - the class of the tensor, tensor by default; stiffnessTensor.load passes its own
+  See also
+    tensor, stiffnessTensor, complianceTensor"""
   raw = text(readFile(os.fspath(fname))).split("\n")
   cls = tensor if cls is None else cls
   M = _trailingBlock(_numericRows(raw), kwargs.get("rank", cls._rank))

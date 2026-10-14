@@ -150,8 +150,21 @@ class MtexArray:
   def cat(cls, *arrays, axis=0):
     """the list of the operands, MATLAB's [a, b]; single elements are lists of one
 
-      v = cat(v1, v2)
-      v = cat(v1, v2, axis=1)    # side by side"""
+      v = cat(v1, v2)            # one after the other, MATLAB's [v1; v2]
+      v = cat(v1, v2, axis=1)    # side by side, MATLAB's [v1, v2]
+
+    The operands are joined along an axis of their shape, as np.concatenate; a single element
+    counts as a list of one. They have to agree in what they carry (the frame, antipodal, ...);
+    an operand of another class is converted to the first one's where it can be.
+
+    Input
+      arrays - containers of one class, the first deciding the class of the result
+    Output
+      v - the joined container
+    Keywords
+      axis - the axis of the shape along which the operands are joined
+    See also
+      reshape"""
     arrays = [a if a.ndim > 0 else a.reshape(1) for a in arrays]
     first = arrays[0]
     attrs = first._join(first)

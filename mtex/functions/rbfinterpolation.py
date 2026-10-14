@@ -25,7 +25,30 @@ from .kernelfunctions import SO3DeLaValleePoussinKernel
 
 
 def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
-  """the values of the kernels at the centres at the nodes, rows the nodes, columns the centres"""
+  """the values of the kernels at the centres at the nodes, rows the nodes, columns the centres;
+  MATLAB's createSummationMatrix
+
+    M = summationMatrix(psi, S3G, nodes)                    # sparse, the pairs within 3.5 halfwidths
+    M = summationMatrix(psi, S3G, nodes, epsilon=20*degree)  # the pairs within 20 degree
+    M = summationMatrix(psi, S3G, nodes, exact=True)        # every pair, dense
+
+  An entry is the mean of the kernel over the symmetric equivalents of the centre, as SO3FunRBF
+  evaluates; a fit M c = y of values y at the nodes gives the weights c of the kernels. For
+  centres that are orientations and a radius below pi the matrix is a sparse csr_matrix from
+  the radius search, which keeps the nearest equivalent within the radius only; otherwise it is
+  a dense array over every pair and every equivalent.
+
+  Input
+    psi - SO3Kernel
+    centres - orientation, the centres of the kernels, an SO3Grid
+    nodes - orientation, where the values are given
+  Output
+    M - scipy.sparse.csr_matrix or ndarray, nodes x centres
+  Keywords
+    exact - every pair and every equivalent, a dense matrix
+    epsilon - the radius beyond which the kernel counts as zero, by default 3.5 halfwidths
+  See also
+    SO3FunRBF.interpolate, mlsq"""
   from scipy.sparse import csr_matrix
   L, R = reductionGroups(nodes)
   G = len(L) * len(R)
@@ -46,7 +69,29 @@ def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
 
 def mlsq(A, y, c0, maxIter=100, tol=1e-3):
   """MATLAB's mlsq: least squares over weights of the sign of the start, the steepest descent
-  direction scaled by the weights so that none crosses zero"""
+  direction scaled by the weights so that none crosses zero
+
+    c, k = mlsq(A, y, c0)                          # A c = y with c >= 0, starting at c0
+    c, k = mlsq(A, y, c0, maxIter=10, tol=1e-6)    # other bounds of the iteration
+
+  The modified least squares of A c = y keeps the weights of one sign and, when the start sums
+  to one, their sum: each step moves along the gradient projected against the weights and
+  multiplied by them, with a step length bounded so that no weight changes sign. It stops when
+  the residual decreases by less than tol. Unlike MATLAB the start is required, A is a matrix
+  (not a function handle), and tol defaults to 1e-3 instead of 1e-5.
+
+  Input
+    A - ndarray or sparse matrix, N x M
+    y - ndarray of N values
+    c0 - ndarray of M real start weights, ones(M)/M as MATLAB's default
+  Output
+    c - ndarray of the M weights
+    k - the number of iterations
+  Keywords
+    maxIter - the largest number of iterations, MATLAB's itermax
+    tol - the smallest decrease of the residual's norm that continues
+  See also
+    summationMatrix, SO3FunRBF.interpolate"""
   chat = np.real(np.asarray(c0, dtype=float))
   r = A @ chat - y
   oldErr = np.inf

@@ -55,8 +55,30 @@ def plotSO3Kernel(psi, **kw: Unpack[PlotKeywords]):
 
 
 def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw: Unpack[PlotKeywords]):
-  """plotSpectrum(psi), plotSpectrum(odf): the Chebyshev coefficients of a kernel, or the harmonic
-  power of a function, per degree (MATLAB's plotSpektra)"""
+  """the Chebyshev coefficients of a kernel, or the harmonic power of a function, per degree;
+  MATLAB's plotSpektra
+
+    plotSpectrum(psi)                                     # the Chebyshev coefficients of a kernel
+    plotSpectrum(psi, bandwidth=16, logarithmic=True)     # the absolute values, on log-log axes
+    plotSpectrum(odf)                                     # the harmonic power of an SO3Fun
+    plotSpectrum([odf1, odf2], bandwidth=20)              # one line per function
+
+  For a kernel on S2 or SO(3) the coefficients A_l / (2l + 1) are drawn over the degree l on a
+  logarithmic degree axis, up to degree 32 unless the bandwidth says otherwise. For a function
+  on S2 or SO(3) the power of every degree, the norm of its coefficients, is drawn as open
+  circles on a dotted line, up to the bandwidth of the function; a function of another kind is
+  first expanded into harmonics. A list draws one line per function in one axes. The other
+  keywords are those of a line plot; fontSize sets the size of the labels and ticks.
+
+  Input
+    x - an S2Kernel or SO3Kernel, an S2Fun or SO3Fun, or a list of them
+  Output
+    h - the matplotlib lines drawn, a list of them for a list
+  Keywords
+    bandwidth - the highest degree drawn
+    logarithmic - a kernel's absolute coefficients on log-log axes
+  See also
+    SO3FunHarmonic.power, plotSO3Kernel"""
   # a list of functions, MATLAB's [f, g]: one line each in the same axes
   if isinstance(x, (list, tuple)):
     from .mtexfigure import hold

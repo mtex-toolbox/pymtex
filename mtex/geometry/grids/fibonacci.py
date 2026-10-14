@@ -58,10 +58,24 @@ class fibonacciS2Grid(vector3d):
 
   def find(self, v, eps=None):
     """the nearest grid point of every direction and its angle, or with eps the sparse matrices of
-    the points within eps and their angles
+    the points within eps and their angles; MATLAB's fibonacciS2Grid.find
 
-      ind, d = S2G.find(v)
-      I, d = S2G.find(v, eps)"""
+      ind, d = S2G.find(v)              # the nearest grid point and the angle to it
+      I, d = S2G.find(v, 10*degree)     # every grid point within 10 degree
+
+    The search runs through a k-d tree of the grid points. On an antipodal grid a direction and its antipode are the same.
+
+    Input
+      S2G - fibonacciS2Grid
+      v - vector3d, the directions searched for
+    Output
+      ind - the index of the nearest grid point, of the shape of v
+      d - its angle to v; with eps a sparse matrix (directions x grid) of the angles
+      I - with eps a sparse boolean matrix (directions x grid) of the grid points within eps
+    Keywords
+      eps - the radius of the search; by default only the nearest point is returned
+    See also
+      fibonacciS2Grid, S2Grid.find, vector3d.find"""
     from .search import s2Tree
     v = asVector3d(v)
     xyz = v.data.reshape(-1, 3)

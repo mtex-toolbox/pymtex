@@ -160,7 +160,23 @@ def writeTable(fname, names, cols):
 
 def cprintf(d, *args, Lc=None, Lr=None):
   """MATLAB's cprintf(d, '-Lc', labels, '-Lr', rows): a matrix printed as a table, a vector as
-  one row"""
+  one row
+
+    cprintf(np.eye(2))                                          # a matrix, the columns right aligned
+    cprintf([[1, 2], [3, 4]], Lc=['a', 'b'], Lr=['x', 'y'])     # with column and row labels
+    cprintf([[1, 2], [3, 4]], '-Lc', ['a', 'b'])                # MATLAB's option pairs
+
+  The numbers are printed in the shortest form (%g), every column as wide as the widest. Of
+  MATLAB's options only the labels '-Lc' and '-Lr' are taken, as pairs or as keywords, and
+  the table is printed, not returned as a character array.
+
+  Input
+    d - a matrix or a vector of numbers
+  Keywords
+    Lc - the labels of the columns
+    Lr - the labels of the rows
+  See also
+    exportVector3d"""
   opts = dict(zip(args[::2], args[1::2]))
   Lc, Lr = opts.get("-Lc", Lc), opts.get("-Lr", Lr)
   d = np.atleast_2d(np.asarray(d, dtype=float))

@@ -18,7 +18,18 @@ from ..maps.grains import grain2d
 def sphereMesh(resolution=5 * degree):
   """the unit sphere as a mesh: rings of constant polar angle joined by quads split into
   triangles, fans at the poles, every triangle wound so that its normal points outwards;
-  the vertices as an (n, 3) array and the faces as (m, 3) index triples"""
+  the vertices as an (n, 3) array and the faces as (m, 3) index triples
+
+    V, F = sphereMesh()                       # rings 5 degree apart
+    V, F = sphereMesh(resolution=10*degree)   # a coarser mesh
+
+  Output
+    V - (n, 3) array, the vertices on the unit sphere, the poles first and last
+    F - (m, 3) int array, the triangles as indices into V
+  Keywords
+    resolution - the spacing of the rings and of the vertices along them
+  See also
+    regionSurface, sphereGridLines, plot3d"""
   nTheta = max(2, int(round(np.pi / resolution)))
   nRho = max(3, int(round(2 * np.pi / resolution)))
   theta = np.pi * np.arange(1, nTheta)[:, None] / nTheta
@@ -39,7 +50,20 @@ def sphereMesh(resolution=5 * degree):
 
 
 def smallCircle(n, opening=90 * degree, points=361):
-  """the circle of directions at an angle about a direction, closed; the plane at 90 degrees"""
+  """the circle of directions at an angle about a direction, closed; the plane at 90 degrees
+
+    c = smallCircle(zvector)                                  # the great circle perpendicular to z
+    c = smallCircle(xvector, opening=30*degree, points=91)    # the cone of 30 degree about x
+
+  Input
+    n - vector3d or three numbers, the axis of the circle
+  Output
+    c - (points, 3) array, the directions along the circle, the first repeated as the last
+  Keywords
+    opening - the angle between the axis and the circle
+    points - the number of points
+  See also
+    sphereGridLines, circle"""
   v = asVector3d(n).data.reshape(3)
   v = v / np.linalg.norm(v)
   u = vector3d(v).orth().data.reshape(3)
@@ -49,7 +73,21 @@ def smallCircle(n, opening=90 * degree, points=361):
 
 
 def sphereGridLines(step=30 * degree, points=91):
-  """the small circles about the pole and the meridians, as polylines of directions"""
+  """the small circles about the pole and the meridians, as polylines of directions
+
+    L = sphereGridLines()                              # every 30 degree
+    L = sphereGridLines(step=15*degree, points=181)    # a denser grid
+
+  The small circles about z at every multiple of step strictly between the poles, then the
+  meridians from pole to pole at every multiple of step in the azimuth.
+
+  Output
+    L - list of (k, 3) arrays, one polyline per circle
+  Keywords
+    step - the spacing of the circles in the polar angle and of the meridians in the azimuth
+    points - the number of points of a small circle; a meridian takes half as many
+  See also
+    smallCircle, sphereMesh, regionLines"""
   lines = [smallCircle([0, 0, 1], theta, points) for theta in np.arange(step, np.pi - step + 1e-9, step)]
   t = np.linspace(0, np.pi, points // 2 + 1)
   for rho in np.arange(0, 2 * np.pi - step + 1e-9, step):
@@ -106,21 +144,61 @@ def surfacePoints(oR, V):
 
 def regionSurface(oR, resolution=5 * degree):
   """the boundary of an orientation region in axis angle space: the sphere mesh pushed out to
-  the largest angle about every axis, in radians, with the faces of the mesh"""
+  the largest angle about every axis, in radians, with the faces of the mesh
+
+    P, F = regionSurface(oR)                         # the surface on a 5 degree mesh
+    P, F = regionSurface(oR, resolution=2*degree)    # a finer surface
+
+  Input
+    oR - orientationRegion, e.g. fundamentalRegion(cs, ss)
+  Output
+    P - (n, 3) array, the points of the surface, NaN about the axes outside the region's sector
+    F - (m, 3) int array, the triangles of the mesh as indices into P
+  Keywords
+    resolution - the spacing of the sphere mesh the surface is pushed out from
+  See also
+    regionWalls, regionLines, sphereMesh"""
   V, F = sphereMesh(resolution)
   return surfacePoints(oR, V), F
 
 
 def regionWalls(oR, resolution=2 * degree):
   """the walls of a region cut down to an axis sector: the plane of every boundary arc of the
-  sector from the identity out to the surface, one polygon per arc"""
+  sector from the identity out to the surface, one polygon per arc
+
+    W = regionWalls(fundamentalRegion(cs, cs))                         # the walls of a misorientation region
+    W = regionWalls(fundamentalRegion(cs, cs), resolution=5*degree)    # with coarser arcs
+
+  A region whose axes are not cut down to a sector has no walls and gives an empty list.
+
+  Input
+    oR - orientationRegion
+  Output
+    W - list of (k, 3) arrays, every polygon starting at the origin
+  Keywords
+    resolution - the spacing of the points along the boundary arcs of the sector
+  See also
+    regionSurface, regionLines"""
   if oR.sector is None:
     return []
   return [np.concatenate([np.zeros((1, 3)), surfacePoints(oR, arc.data.reshape(-1, 3))]) for arc in oR.sector.boundary(resolution)]
 
 
 def regionLines(oR, step=15 * degree):
-  """the parallels and meridians drawn on the surface, which is how a viewer reads its shape"""
+  """the parallels and meridians drawn on the surface, which is how a viewer reads its shape
+
+    L = regionLines(oR)                   # lines every 15 degree
+    L = regionLines(oR, step=30*degree)   # fewer lines
+
+  Input
+    oR - orientationRegion
+  Output
+    L - list of (k, 3) arrays, the lines of sphereGridLines pushed out to the surface, NaN
+        outside the region's sector
+  Keywords
+    step - the spacing of the parallels and meridians
+  See also
+    regionSurface, sphereGridLines"""
   return [surfacePoints(oR, l) for l in sphereGridLines(step)]
 
 
@@ -193,7 +271,23 @@ def shapeOutlines(cS, plane, layout=None):
   """the shapes seen along the normal of a plane, as polygons on the screen: the vertices in
   the coordinates of the plane under the layout, for the front faces; a layout that flips
   the plane is seen from the other side, so the other faces are the front ones. Returns
-  the polygons with the shape and the face each one is"""
+  the polygons with the shape and the face each one is
+
+    polys, shape, face = shapeOutlines(ori * cS, ebsd.lattice.plane)                    # the front faces seen down the map normal
+    polys, shape, face = shapeOutlines(cS, ebsd.lattice.plane, layout=[[1, 0], [0, -1]])  # under a layout that flips the plane
+
+  Input
+    cS - crystalShape, one shape or a list of shapes
+    plane - mapPlane, the plane the shapes are seen in
+  Output
+    polys - list of (k, 2) arrays, the polygons on the screen
+    shape - int array, the shape every polygon belongs to
+    face - int array, the face of the shape every polygon is
+  Keywords
+    layout - 2 x 2 matrix, the turn of the plane coordinates to the screen; the identity by
+        default
+  See also
+    shapesOnMap, crystalShape, mapPlane"""
   M = np.eye(2) if layout is None else np.asarray(layout, dtype=float)
   n = plane.normal * (-1 if np.linalg.det(M) < 0 else 1)
   vis = visibleFaces(cS, n).reshape(-1, cS.numFaces)
@@ -215,7 +309,22 @@ def shapesOnMap(x, cS, scale=1.0):
   of shapes over the grains that take it, whose indices come with it; on an EBSD map one
   shape per measurement of the phase, rotated by its orientation, at the shape's own size.
   A phase takes the shape when its frame fits the shape's crystal frame the way an
-  orientation fits its frame: another lattice is left out"""
+  orientation fits its frame: another lattice is left out
+
+    s, ids = shapesOnMap(grains, crystalShape.olivine(grains.CSList[1]))              # a shape per Forsterite grain
+    s, ids = shapesOnMap(grains, crystalShape.olivine(grains.CSList[1]), scale=0.5)   # at half the size
+    s, ids = shapesOnMap(ebsd['Fo'], crystalShape.olivine(ebsd.CSList[1]), scale=0.3)  # a shape per measurement
+
+  Input
+    x - grain2d or EBSD
+    cS - crystalShape in a crystal frame
+  Output
+    s - crystalShape, one list of shapes, None when no phase takes the shape
+    ids - int array, the grains or the measurements the shapes stand for
+  Keywords
+    scale - the factor on the size: the square root of the area of a grain, one on a map
+  See also
+    shapeOutlines, crystalShape"""
   from ..geometry.products import fitFrame
   if not isinstance(cS.CS, crystalFrame):
     raise ValueError("the shape has to be given in a crystal frame")

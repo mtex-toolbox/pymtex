@@ -224,7 +224,21 @@ class S1FunHarmonic(harmonicArithmetic):
     return S1FunHarmonic(-1j * k * self.fhat, real=self.isReal)
 
   def grad(self, x=None):
-    """the derivative as a function, or its values at the angles x"""
+    """the derivative as a function, or its values at the angles x
+
+      dF = grad(sF)            # the derivative, an S1FunHarmonic
+      d = grad(sF, [0.5, 1])  # the derivative at the angles
+
+    The coefficient c_k of the derivative is -ik c_k, the function diff gives.
+
+    Input
+      sF - S1FunHarmonic
+    Output
+      dF - S1FunHarmonic, or the values at x
+    Keywords
+      x - angles at which to evaluate the derivative
+    See also
+      S1FunHarmonic.diff, S2FunHarmonic.grad"""
     return self.diff() if x is None else self.diff()(x)
 
   def rotate(self, phi):
@@ -234,7 +248,26 @@ class S1FunHarmonic(harmonicArithmetic):
 
   def smooth(self, psi=None, halfwidth=2.9 * degree):
     """the convolution with a de la Vallee Poussin kernel, 2.9 degree unless a kernel or a
-    halfwidth is given"""
+    halfwidth is given; MATLAB's smooth
+
+      sF = smooth(sF)                                          # with the de la Vallee Poussin kernel of 2.9 degree
+      sF = smooth(sF, halfwidth=30*degree)                     # a wider kernel
+      sF = smooth(sF, S1DeLaValleePoussinKernel(halfwidth=30*degree))  # a kernel given
+
+    Every coefficient c_k is multiplied by the coefficient of degree k of the kernel. The
+    de la Vallee Poussin kernel of halfwidth h keeps the degrees up to n = 1.2 / h unchanged and
+    damps those up to 2n linearly to zero, so a narrow kernel leaves a function of low bandwidth
+    as it is.
+
+    Input
+      sF - S1FunHarmonic
+    Output
+      sF - S1FunHarmonic, the smoothed function
+    Keywords
+      psi - S1Kernel, the smoothing kernel, which replaces the halfwidth
+      halfwidth - the halfwidth of the de la Vallee Poussin kernel
+    See also
+      S1FunHarmonic.conv, S1DeLaValleePoussinKernel"""
     from .kernelfunctions import S1DeLaValleePoussinKernel
     return self.conv(S1DeLaValleePoussinKernel(halfwidth=halfwidth) if psi is None else psi)
 
@@ -286,17 +319,68 @@ class S1FunHarmonic(harmonicArithmetic):
     return abs(self)
 
   def sqrt(self, bandwidth=None):
-    """the pointwise square root, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
+    """the pointwise square root, a Fourier series of a smoothing bandwidth, or at the bandwidth given
+
+      sF = sqrt(sF)                 # at twice the bandwidth, at least 32
+      sF = sqrt(sF, bandwidth=64)   # at the bandwidth given
+
+    The function is evaluated on an equispaced grid and expanded again by quadrature (mapFun).
+    The square root is no trigonometric polynomial, so the expansion is cut at the bandwidth: by
+    default twice that of the function, at least 32, where MATLAB takes the default bandwidth of
+    S1FunHarmonic.quadrature.
+
+    Input
+      sF - S1FunHarmonic
+    Output
+      sF - S1FunHarmonic
+    Keywords
+      bandwidth - the largest frequency of the result
+    See also
+      mapFun, S1FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.sqrt, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def exp(self, bandwidth=None):
-    """the pointwise exponential, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
+    """the pointwise exponential, a Fourier series of a smoothing bandwidth, or at the bandwidth given
+
+      sF = exp(sF)                 # at twice the bandwidth, at least 32
+      sF = exp(sF, bandwidth=64)   # at the bandwidth given
+
+    The function is evaluated on an equispaced grid and expanded again by quadrature (mapFun).
+    The exponential is no trigonometric polynomial, so the expansion is cut at the bandwidth: by
+    default twice that of the function, at least 32, where MATLAB takes the default bandwidth of
+    S1FunHarmonic.quadrature.
+
+    Input
+      sF - S1FunHarmonic
+    Output
+      sF - S1FunHarmonic
+    Keywords
+      bandwidth - the largest frequency of the result
+    See also
+      mapFun, S1FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.exp, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
   def log(self, bandwidth=None):
-    """the pointwise logarithm, a Fourier series of a smoothing bandwidth, or at the bandwidth given"""
+    """the pointwise logarithm, a Fourier series of a smoothing bandwidth, or at the bandwidth given
+
+      sF = log(sF)                 # at twice the bandwidth, at least 32
+      sF = log(sF, bandwidth=64)   # at the bandwidth given
+
+    The function is evaluated on an equispaced grid and expanded again by quadrature (mapFun).
+    The logarithm is no trigonometric polynomial, so the expansion is cut at the bandwidth: by
+    default twice that of the function, at least 32, where MATLAB takes the default bandwidth of
+    S1FunHarmonic.quadrature.
+
+    Input
+      sF - S1FunHarmonic
+    Output
+      sF - S1FunHarmonic
+    Keywords
+      bandwidth - the largest frequency of the result
+    See also
+      mapFun, S1FunHarmonic.quadrature"""
     from .funops import mapFun, smoothBandwidth
     return mapFun(np.log, self, bandwidth=smoothBandwidth(self) if bandwidth is None else bandwidth)
 
@@ -318,7 +402,25 @@ class S1FunHarmonic(harmonicArithmetic):
     return x.real if self.isReal and g.isReal else x
 
   def isclose(self, g, rtol=1e-8, atol=0.0):
-    """whether the coefficients of g agree within atol + rtol times their norm"""
+    """whether the coefficients of g agree within atol + rtol times their norm
+
+      tf = isclose(sF1, sF2)             # equal up to a relative 1e-8
+      tf = isclose(sF1, sF2, atol=1e-3)  # with an absolute tolerance
+
+    The functions are compared at the larger of their bandwidths: the Euclidean norm of the
+    difference of the coefficients, the L2 distance for the normalised measure, must not exceed
+    atol + rtol |g|.
+
+    Input
+      sF1 - S1FunHarmonic
+      g - S1FunHarmonic, the function to compare with
+    Output
+      tf - bool
+    Keywords
+      rtol - the tolerance relative to the norm of g
+      atol - the absolute tolerance
+    See also
+      S1FunHarmonic.norm"""
     L = max(self.bandwidth, g.bandwidth)
     a, b = self.truncate(L).fhat, g.truncate(L).fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))

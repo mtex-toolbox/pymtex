@@ -148,8 +148,21 @@ class phaseList:
     raise TypeError(f"a phase is named by its mineral, its frame or its number, not by a {type(key).__name__}")
 
   def selectionNames(self, pairs=False):
-    """the names a selection ebsd['...'] takes: the minerals, 'indexed' and 'notIndexed'; with
-    pairs=True also every pair of minerals, gB['Forsterite', 'Enstatite']"""
+    """the names a selection ebsd['...'] takes: the minerals, 'indexed' and 'notIndexed'
+
+      names = ebsd.CSList.selectionNames()             # the minerals, 'indexed', 'notIndexed'
+      names = ebsd.CSList.selectionNames(pairs=True)   # also every pair of minerals
+
+    The pairs are those a boundary selection takes, gB['Forsterite', 'Enstatite'].
+
+    Input
+      pl - phaseList
+    Output
+      names - list of the names, then of the pairs as tuples
+    Keywords
+      pairs - add every ordered pair of minerals
+    See also
+      phaseList.phaseId, EBSD.select"""
     minerals = list(dict.fromkeys(f.mineral for f in self.frames if f.isIndexed))
     others = list(dict.fromkeys(f.mineral for f in self.frames if not f.isIndexed))
     names = minerals + ["indexed"] + others

@@ -50,7 +50,21 @@ SESSION = Session()
 
 
 def getMTEXpref(name=None, default=None):
-  """one preference, or with no name all of them as a new dict, MATLAB's struct"""
+  """one preference, or with no name all of them as a new dict, MATLAB's struct
+
+    value = getMTEXpref('EulerAngleConvention')   # one preference
+    value = getMTEXpref('myPref', default=1)      # a preference that may not be set
+    prefs = getMTEXpref()                         # all of them
+
+  Input
+    name - the name of the preference
+  Output
+    value - its value in this session, or default when it is not set
+    prefs - dict of every preference, a copy
+  Keywords
+    default - what an unset preference returns
+  See also
+    setMTEXpref, loadSettings"""
   if name is None:
     return dict(SESSION.prefs)
   return SESSION.prefs.get(name, default)
@@ -60,9 +74,21 @@ def setMTEXpref(name, value, save=False):
   """sets a preference of the session; with save=True also in the user's settings file, so that
   it holds in every later session
 
-    setMTEXpref('maxS2Bandwidth', 256)
-    setMTEXpref('kernels', 'numpy')
-    setMTEXpref('displayRows', 40, save=True)"""
+    setMTEXpref('maxS2Bandwidth', 256)            # for this session
+    setMTEXpref('kernels', 'numpy')               # the NumPy forms instead of the compiled loops
+    setMTEXpref('displayRows', 40, save=True)     # for every later session too
+
+  Setting 'threads' or 'hugePages' applies the new value at once to the libraries it
+  concerns. The settings file is mtex_settings.json, MATLAB's mtex_settings.m; nothing is
+  written when MTEX_SETTINGS is empty.
+
+  Input
+    name - the name of the preference
+    value - its new value
+  Keywords
+    save - store the preference in the user's settings file as well
+  See also
+    getMTEXpref, loadSettings, plottingConvention.default"""
   SESSION.prefs[name] = value
   if name == "hugePages":
     applyHugePages()

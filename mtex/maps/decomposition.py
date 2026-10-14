@@ -69,7 +69,26 @@ class cellComplex:
 
   def siteAt(self, q, ij, reach=5):
     """the site whose cell covers a point: its nearest site, since a cell is the set of points
-    nearer to its site than to any other, searched over the lattice cells around the point"""
+    nearer to its site than to any other, searched over the lattice cells around the point
+
+      c = decompose(ebsd)                        # from mtex.maps.decomposition
+      s = c.siteAt(q, ij)                        # the site of the point q near the lattice cell ij
+      s = c.siteAt(q, ij, reach=2)               # searched over fewer lattice cells
+
+    The candidates are the sites of the lattice cells within reach of ij in either index; the
+    nearest of them to q is returned, NO_PIXEL when there is none. calcGrains asks this for the
+    corners of a not indexed pixel to find the grain that absorbs it.
+
+    Input
+      c - cellComplex
+      q - the point (x, y) in the plane of the map
+      ij - the lattice indices of the cell the point lies in or near
+    Output
+      s - the index of the site, a row of c.siteIJ, or NO_PIXEL
+    Keywords
+      reach - how many lattice cells either way are searched
+    See also
+      calcGrains"""
     s = self.sites
     a0, b0 = int(ij[0]) - s.offset[0], int(ij[1]) - s.offset[1]
     n1, n2 = s.lookup.shape

@@ -234,7 +234,30 @@ IMAGE_CELLS = (("x cells", "y cells"), ("xcells", "ycells"), ("ncols", "nrows"),
 def h5ImageIndex(f, paths, groups, n=0):
   """the pictures a file holds, as an index and not as pixels: a vendor writes its electron
   images beside the map, and one Oxford file carries a dozen of three megapixels each, so
-  what the map keeps is where they are and what shape they have. h5Image reads one."""
+  what the map keeps is where they are and what shape they have. h5Image reads one.
+
+    from mtex.io.h5 import h5Paths
+    f = h5py.File(mtexdatafile('EMSphinx'))
+    images = h5ImageIndex(f, *h5Paths(f))              # every picture of the file
+    images = h5ImageIndex(f, *h5Paths(f), n=508*955)   # leaving out the columns of a map of n pixels
+
+  A picture is a numeric data set at least 16 pixels on a side: a plane, a plane of three or
+  four colour channels either way round, or a flat run whose size the cell counts of the
+  nearest Header group state. A group is never one. Every picture is a dict of its name, its
+  path, its shape (rows, columns[, channels]) and its dtype. The loaders of the vendors' HDF5
+  files store this index as ebsd.meta['images'].
+
+  Input
+    f - an open h5py file
+    paths - every group and data set of the file, as h5Paths lists them
+    groups - the set of those paths that are groups
+  Output
+    images - a list of dicts with the keys name, path, shape and dtype
+  Keywords
+    n - the number of measurements of the map; a data set of n rows, or of n values, is a
+        column of the map and no picture
+  See also
+    h5Image, loadEBSD"""
   out = []
   for p in paths:
     if p in groups:

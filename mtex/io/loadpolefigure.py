@@ -34,7 +34,26 @@ from ..geometry.install import install
 
 def string2Miller(s, CS=None):
   """the Miller indices a file name or a header line spells: four digits with optional signs,
-  else three; every such group of the name is one direction, several a superposition"""
+  else three; every such group of the name is one direction, several a superposition;
+  MATLAB's string2Miller
+
+    h = string2Miller('Q(10-11)_amp.cnv', cs)          # {10-11}
+    h = string2Miller('Q(10-11)(01-11)_amp.cnv', cs)   # two directions, a superposition
+    h = string2Miller('PF_002_R.UXD')                  # {002} of the cubic frame
+
+  Only the base name of a path is read. Four digits from 0 to 6 with optional minus signs are
+  taken when the first three sum to zero, else three digits without a sign, else three with
+  signs; a name with none is (100). MATLAB's second output, whether the name spelled one, is
+  not returned.
+
+  Input
+    s - a file name or a line of text
+  Output
+    h - Miller, one direction or several
+  Keywords
+    CS - the crystal frame of the directions, m-3m when not given
+  See also
+    loadPoleFigure, Miller"""
   CS = crystalFrame("m-3m") if CS is None else CS
   s = os.path.basename(str(s))
   # four indices with signs first, then three without a sign, then three with
@@ -371,19 +390,36 @@ def chooseFormat(fname, interface=None):
 
 
 def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
-  """the pole figures a file holds, or the files of a list, read by their format
+  """the pole figures a file holds, or the files of a list, read by their format; MATLAB's
+  PoleFigure.load and loadPoleFigure
 
-    loadPoleFigure('Q(10-10)_amp.cnv', cs)
-    loadPoleFigure([f1, f2], [h1, h23], cs, superposition=[1, [0.52, 1.23]])
-    loadPoleFigure('scan.dat', h, cs, interface='geesthacht')
-    loadPoleFigure('scan.txt', cs, columnNames=['polar angle', 'azimuth angle', 'intensity'], header=21)
+    pf = loadPoleFigure('Q(10-10)_amp.cnv', cs)              # the format and the direction found from the file
+    pf = PoleFigure.load([f1, f2, f3], cs)                   # several files, one pole figure or more each
+    pf = loadPoleFigure([f1, f2], [h1, [h2, h3]], cs, superposition=[1, [0.52, 1.23]])  # given directions, a superposed pair weighted
+    pf = loadPoleFigure('scan.dat', cs, interface='geesthacht')  # a format named
+    pf = loadPoleFigure('scan.txt', h, cs, columnNames=['polar angle', 'azimuth angle', 'intensity'], radians=True)  # a table
 
-  The crystal directions are read off the file names unless given, one per file or, for
-  a file of several pole figures, a list of them; the frames are given positionally. The
-  format follows the extension and the marker the file carries, interface= names one of
-  INTERFACES, and a table option (columnNames, columns, header, delimiter, radians) reads a
-  table whose columns the caller names.
-  """
+  The crystal directions are read off the file names (string2Miller) unless given, one per
+  file or, for a file of several pole figures, a list of them, a list inside it for a
+  superposition; the frames are given positionally. The format follows the extension and the
+  marker the file carries; interface= names one of INTERFACES when the extension leaves it
+  open. A table option (columnNames, columns, header, delimiter, radians) reads a table whose
+  columns the caller names: the polar angle and the azimuth in degrees unless radians=True,
+  or x, y, z, and the intensity.
+
+  Input
+    fname - a file name or a list of them
+    h - Miller, the crystal directions, a list of them, a list for a superposition (optional)
+    cs, ss - the crystal and the specimen frame (optional)
+  Output
+    pf - a PoleFigure
+  Keywords
+    interface - the format: 'dubna', 'uxd', 'geesthacht', 'xrdml', 'generic', ...; by
+        default told by the extension and the marker the file carries
+    superposition - the structure coefficients of the directions, one number or a list of
+        numbers per pole figure
+  See also
+    PoleFigure, string2Miller, exportPoleFigure, mtexdata"""
   fnames = [os.fspath(f) for f in fname] if isinstance(fname, (list, tuple)) else [os.fspath(fname)]
   hs = [a for a in args if isinstance(a, vector3d) or isinstance(a, (list, tuple))]
   frames = [a for a in args if isinstance(a, referenceFrame)]

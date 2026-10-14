@@ -209,15 +209,40 @@ class referenceFrame:
     return self.sym.numProper()
 
   def nfold(self, axis=None):
-    """the highest order of a symmetry axis of the group; with axes, the order about each of them"""
+    """the highest order of a symmetry axis of the group; with axes, the order about each of them;
+    MATLAB's nfold
+
+      n = cs.nfold()                          # the highest order of a rotation axis
+      n = cs.nfold(Miller(0, 0, 1, cs, 'uvw'))  # the order about an axis, 1 when it is none
+
+    Input
+      cs - referenceFrame
+    Output
+      n - int, or an array of the shape of axis
+    Keywords
+      axis - directions, the order of the rotations about each of them
+    See also
+      referenceFrame.elements, referenceFrame.numSym"""
     return self.sym.nfold(axis)
 
   def elements(self, multiplicity=None):
-    """the rotational axes of the group, both signs, and their multiplicities; with a multiplicity
-    only the axes of that order
+    """the rotational axes of the group, both signs, and their multiplicities; MATLAB's elements
 
-      axes, mult = cs.elements()
-      axes = cs.elements(3)"""
+      axes, mult = cs.elements()    # every rotational axis and its multiplicity
+      axes = cs.elements(3)         # the threefold axes
+
+    Every axis appears with both signs; its multiplicity is the highest order of a rotation
+    about it.
+
+    Input
+      cs - referenceFrame
+    Output
+      axes - vector3d, the axes
+      mult - their multiplicities (without multiplicity)
+    Keywords
+      multiplicity - return only the axes of this order
+    See also
+      referenceFrame.nfold, referenceFrame.rotations"""
     return self.sym.elements(multiplicity)
 
   def LaueName(self):
@@ -367,22 +392,68 @@ class referenceFrame:
 
   def conventionalSector(self, up=None, east=None):
     """the conventional sector of the group, the one MTEX draws, oriented by the up and east
-    directions of the frame's plotting convention"""
+    directions of the frame's plotting convention
+
+      sR = cs.conventionalSector()                                          # as the frame is drawn
+      sR = cs.conventionalSector(up=vector3d(0, 0, 1), east=vector3d(0, 1, 0))  # other directions
+
+    The sector is the hemisphere towards up where an element of the group sends up below it, a
+    wedge about the c axis of the angle the order leaves, starting on a mirror plane, a twofold
+    axis or the a axis, and the standard triangles of the cubic groups.
+
+    Input
+      cs - referenceFrame
+    Output
+      sR - sphericalRegion
+    Keywords
+      up - the direction out of the screen; by default the frame's plotting convention's
+      east - the direction to the east the wedge starts from; by default the convention's
+    See also
+      referenceFrame.fundamentalSector, sphericalRegion"""
     from .sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
   def fundamentalRegion(self, other=None, *, antipodal=False):
-    """the fundamental region in orientation space of this group, or of the pair with another frame
+    """the fundamental region in orientation space of this group, or of the pair with another
+    frame; MATLAB's fundamentalRegion
 
-      oR = cs.fundamentalRegion()
-      oR = cs1.fundamentalRegion(cs2, antipodal=True)"""
+      oR = cs.fundamentalRegion()                         # of the orientations of cs
+      oR = cs1.fundamentalRegion(cs2)                     # of the misorientations from cs2 to cs1
+      oR = cs1.fundamentalRegion(cs2, antipodal=True)     # with grain exchange
+
+    MATLAB's other outputs, the common group and the number of disjoint elements, are not
+    returned.
+
+    Input
+      cs, cs1 - referenceFrame
+      other - referenceFrame, the second frame cs2; by default the specimen frame
+    Output
+      oR - orientationRegion
+    Keywords
+      antipodal - the grain exchange symmetry mori == inv(mori) of misorientations
+    See also
+      orientationRegion, referenceFrame.fundamentalSector"""
     from .orientationregion import fundamentalRegion
     return fundamentalRegion(self, other, antipodal=antipodal)
 
   # ------------------------------------------------------------------ comparing frames by value
 
   def isAligned(self, other, tol=None):
-    """the same basis, up to a relative tolerance on the basis vectors"""
+    """whether two frames have the same basis, up to a relative tolerance on the basis vectors;
+    MATLAB's isAligned
+
+      b = cs1.isAligned(cs2)              # the same basis, no transition needed
+      b = cs1.isAligned(cs2, tol=1e-3)    # within another relative tolerance
+
+    Input
+      cs1, cs2 - referenceFrame
+    Output
+      b - bool
+    Keywords
+      tol - the relative tolerance on the basis vectors; by default referenceFrame.tolAligned,
+          0.05
+    See also
+      referenceFrame.isCompatible, referenceFrame.transformationMatrix"""
     tol = referenceFrame.tolAligned if tol is None else tol
     return bool(np.all(np.linalg.norm(self._basis - other._basis, axis=1) / np.linalg.norm(self._basis, axis=1) < tol))
 
@@ -395,7 +466,25 @@ class referenceFrame:
     return np.linalg.inv(B) @ A
 
   def isCompatible(self, other, tol=None):
-    """whether a transition between the frames exists: the matrix is close to orthogonal"""
+    """whether a transition between the frames exists, and the transition; MATLAB's isCompatible
+
+      ok, M = cs1.isCompatible(cs2)              # the transition from cs1 to cs2
+      ok, M = cs1.isCompatible(cs2, tol=1e-3)    # with another tolerance
+
+    Two frames are compatible when the transition between them is close to orthogonal: the
+    same data can be expressed in either. The lengths of the basis vectors do not enter, the
+    transition is computed on normalised bases.
+
+    Input
+      cs1, cs2 - referenceFrame
+    Output
+      ok - bool
+      M - the 3 x 3 transition matrix from cs1 to cs2
+    Keywords
+      tol - the tolerance on the orthogonality defect of M; by default
+          referenceFrame.tolCompatible, 0.1
+    See also
+      referenceFrame.isAligned, referenceFrame.transformationMatrix"""
     tol = referenceFrame.tolCompatible if tol is None else tol
     M = self.transformationMatrix(other)
     MM = M @ M.T
@@ -451,7 +540,23 @@ class referenceFrame:
 
   @staticmethod
   def byName(name, fr=None):
-    """the specimen frame registered under a name; with a frame, registers it under that name"""
+    """the specimen frame registered under a name; with a frame, registers it under that name;
+    MATLAB's referenceFrame.byName
+
+      ss = referenceFrame.byName('rolling')        # look up, None when unknown
+      referenceFrame.byName('myFrame', fr)         # store fr under the name
+
+    The register holds one instance per name: the named frames (specimenFrame.rolling, ...)
+    are built on first use and stored here, so every later call returns the same handle.
+
+    Input
+      name - str
+    Output
+      ss - referenceFrame, the frame registered under the name, or None
+    Keywords
+      fr - the frame to register under the name
+    See also
+      specimenFrame.named, referenceFrame.intern"""
     if fr is not None:
       SESSION.namedFrames[name] = fr
     return SESSION.namedFrames.get(name)
@@ -467,7 +572,23 @@ class referenceFrame:
   # ------------------------------------------------------------------ display
 
   def conventionChar(self, pC=None):
-    """the convention in the frame's own axes names, e.g. RD↑→TD, or the pictogram in x, y, z"""
+    """the plotting convention in the frame's own axes names, e.g. TD←RD↑, or the pictogram in
+    x, y, z; MATLAB's conventionChar
+
+      c = ss.conventionChar()                             # the frame's own convention
+      c = ss.conventionChar(plottingConvention('x↑→y'))   # another one, in the frame's names
+
+    The canonical X, Y, Z frame keeps the form of plottingConvention.char; empty when the frame
+    carries no convention and none is given.
+
+    Input
+      ss - referenceFrame
+    Output
+      c - str
+    Keywords
+      pC - plottingConvention; by default the frame's how2plot
+    See also
+      plottingConvention, crystalFrame.conventionChar"""
     pC = self.how2plot if pC is None else pC
     if pC is None:
       return ""
@@ -854,7 +975,24 @@ class crystalFrame(referenceFrame):
             and bool(np.all(np.abs(self.abc - other.abc) / np.max(self.abc) < 1e-2)) and bool(np.all(np.abs(self.abg - other.abg) < 1e-2)))
 
   def conventionChar(self, pC=None):
-    """the convention in crystal directions, e.g. ⊙c→a, with the reciprocal axes named too"""
+    """the plotting convention in crystal directions, e.g. ⊙c→a, with the reciprocal axes named
+    too; MATLAB's crystalFrame.conventionChar
+
+      c = cs.conventionChar()                             # the frame's own convention
+      c = cs.conventionChar(plottingConvention.ij)        # another one, in crystal axes
+
+    The axis out of the screen and the one to the east are named, from the direct and the
+    reciprocal axes, since the axis to the north is in general none of them; where none fits
+    the form of plottingConvention.char is returned.
+
+    Input
+      cs - crystalFrame
+    Output
+      c - str
+    Keywords
+      pC - plottingConvention; by default the frame's how2plot
+    See also
+      plottingConvention, referenceFrame.conventionChar"""
     pC = self.how2plot if pC is None else pC
     if pC is None:
       return ""
@@ -981,7 +1119,19 @@ class specimenFrame(referenceFrame):
   @staticmethod
   def named(name, axesNames, seed=None):
     """the interned session instance of a named frame, constructed on first use with its seed
-    convention and kept in the session's name map"""
+    convention and kept in the session's name map; MATLAB's specimenFrame.named
+
+      ss = specimenFrame.named('rolling', ('RD', 'TD', 'ND'))   # the rolling frame of the session
+
+    Input
+      name - str, the name of the frame
+      axesNames - the names of its three axes, used when it is built
+    Output
+      ss - specimenFrame
+    Keywords
+      seed - the plottingConvention it is built with on first use
+    See also
+      referenceFrame.byName, specimenFrame.rolling"""
     with SESSION.lock:
       fr = referenceFrame.byName(name)
       if fr is None:

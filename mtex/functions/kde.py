@@ -16,7 +16,22 @@ from ..geometry.display import aligned
 
 
 def Gaussian(m, delta, x=None):
-  """the normal density of mean m and width delta, the standard deviation times sqrt(2)"""
+  """the normal density of mean m and width delta, the standard deviation times sqrt(2);
+  MATLAB's Gaussian
+
+    f = Gaussian(m, delta)        # the density as a function
+    fx = Gaussian(m, delta, x)    # its values at x
+
+  Input
+    m - the mean
+    delta - the width, the standard deviation times sqrt(2)
+  Output
+    f - a function of x, exp(-(x - m)^2 / delta^2) / (delta sqrt(pi))
+    fx - its values at x
+  Keywords
+    x - the points to evaluate at; the function when None
+  See also
+    calcDensity, kde1d"""
   def f(x):
     x = np.asarray(x, dtype=float)
     return np.exp(-(x - m) ** 2 / delta ** 2) / delta / math.sqrt(math.pi)
@@ -212,8 +227,32 @@ def _regEM(w, mu, Sig, dl, X):
 
 
 def kdeN(X, grid, gam=None, rng=None):
-  """the regularised EM mixture of Botev et al. with ceil(sqrt(n)) Gaussians, fitted on the data
-  scaled to the unit box, evaluated at the rows of grid; the density and the bandwidth"""
+  """the adaptive kernel density estimate of samples in several dimensions, the regularised EM
+  mixture of Botev et al.; MATLAB's kdeN
+
+    pdf, bw = kdeN(X, grid)                 # ceil(sqrt(n)) Gaussians
+    pdf, bw = kdeN(X, grid, gam=50, rng=np.random.default_rng(1))  # more Gaussians, reproducible
+
+  A mixture of gam Gaussians is fitted by the regularised EM iteration to the data scaled to
+  their bounding box widened by a tenth on every side, and evaluated at the rows of grid. The
+  start is random: rng makes it reproducible. Rows with a NaN are dropped. MATLAB returns the
+  2d grid it builds when none is given; here the grid is required and the bandwidth is
+  returned instead. calcDensity of a matrix of samples calls it on a regular grid.
+
+  Input
+    X - ndarray of shape (n, d), one sample per row
+    grid - ndarray of shape (m, d), the points to evaluate at
+  Output
+    pdf - the density at the rows of grid
+    bw - the bandwidth per dimension
+  Keywords
+    gam - the number of Gaussians, below n; larger may be more accurate and is slower
+    rng - the numpy random generator of the start
+  References
+    Z. I. Botev, J. F. Grotowski, D. P. Kroese, Kernel density estimation via diffusion,
+        Annals of Statistics 38 (2010) 2916-2957
+  See also
+    calcDensity, calcDensityReal, kde1d"""
   rng = np.random.default_rng() if rng is None else rng
   X = np.asarray(X, dtype=float)
   X = X[~np.any(np.isnan(X), axis=1)]
