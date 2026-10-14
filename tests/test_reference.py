@@ -61,3 +61,7 @@ def test_the_syntax_shows_the_keywords_and_angles_in_degrees(rendered):
   assert "return_nearest=False" in rendered["fibre.angle"]
   assert "angle=15*degree" in rendered["EBSD.calcGrains"]
   assert "MATLAB's [fibre.angle](fibre.angle.html)" in rendered["fibre.angle"]
+
+
+def test_no_page_takes_the_name_of_a_documentation_page(pages):
+  assert not set(pages) & set(ref.pageSources())

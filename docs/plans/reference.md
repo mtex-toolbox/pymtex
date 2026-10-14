@@ -51,7 +51,14 @@ function behind several MATLAB pages writes each of them. A Python-only name (`u
 name it. Tested by `tests/test_reference.py`: every public name has a page, every link in a
 page resolves, the issue's `fibre.angle` page shows `return_nearest`.
 
-**R2 - the index and the export.** `docs/reference.py` also writes the index pages by class
+**R2 - the index and the export.** Built 2026-10-14: `FunctionReference`, MATLAB's index page
+name, lists every class and function by layer; `docs/site.py ../web` exports the reference with
+the documentation pages (3045 pages), a Python-only name that a documentation page has already
+taken as `mtex.<name>` (`mtex.SchmidFactor`). A Jekyll build of a copy of the site (seven
+minutes, the gems outside the site, whose `exclude` replaces Jekyll's default) rendered them
+with every link resolved. Only the 1538 pages with a MATLAB twin enter `python_pages.yml`, which
+`topnav.html` inlines into every page: 38 KB of a reference page's 59 KB. A list the switch
+fetches once would remove that; it is a change on the site's side. `docs/reference.py` also writes the index pages by class
 and by layer (geometry, functions, tensors, maps, maps3d, analysis, io, plotting), Python's
 twin of `function_reference.md`. `docs/site.py` exports `docs/build/reference/` into
 `pages/function_reference_python/` with front matter (`sidebar: function_reference_sidebar`,

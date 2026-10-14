@@ -7,7 +7,10 @@
 # Run docs/make.py first. Usage:
 #   .venv/bin/python docs/site.py ../web              every built page
 #   .venv/bin/python docs/site.py ../web CrystalShapes ...
+# The whole export also writes the function reference of docs/reference.py into
+# pages/function_reference_python/ and lists its pages with a MATLAB twin in python_pages.yml.
 import io
+import json
 import os
 import re
 import sys
@@ -20,6 +23,7 @@ from mtex.io.opendoc import cellScript
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
 buildDir = os.path.join(root, "docs", "build")
+referenceDir = os.path.join(buildDir, "reference")
 statusFile = os.path.join(root, "docs", "plans", "remaining-pages.md")
 EDIT = "https://github.com/mtex-toolbox/pymtex/blob/main/docs/pages/{}/{}.py"
 # where the figures are served, relative to a page at the site root
@@ -179,6 +183,40 @@ def frontMatter(title, name, status, counterpart):
   return "\n".join(lines + ["---"])
 
 
+# the function reference of docs/reference.py: name -> its MATLAB page or None
+def referencePages():
+  path = os.path.join(referenceDir, "index.json")
+  if not os.path.exists(path):
+    return {}
+  return {n: e["matlab"] for n, e in json.load(open(path, encoding="utf-8")).items()}
+
+
+def referenceFrontMatter(title, name, matlab):
+  lines = ["---", "title: '" + title.replace("'", "''") + "'", "sidebar: function_reference_sidebar",
+           f"permalink: {name}_py.html", "folder: function_reference", "toc: false", "search: exclude", "lang: python"]
+  if matlab:
+    lines.append(f"counterpart: {matlab}.html")
+  return "\n".join(lines + ["status: Reference", "---"])
+
+
+# the reference pages into pages/function_reference_python; their links are final, written by
+# docs/reference.py, so they are not relinked
+def exportReference(site, reference):
+  out = os.path.join(site, "pages", "function_reference_python")
+  os.makedirs(out, exist_ok=True)
+  for n, matlab in reference.items():
+    md = open(os.path.join(referenceDir, n + ".md"), encoding="utf-8").read()
+    title, _, text = md.partition("\n")
+    page = referenceFrontMatter(title[2:].strip(), n, matlab) + "\n{% raw %}\n" + text.strip("\n") + "\n{% endraw %}\n"
+    path = os.path.join(out, n + ".md")
+    if not os.path.exists(path) or open(path, encoding="utf-8").read() != page:
+      open(path, "w", encoding="utf-8").write(page)
+  for f in os.listdir(out):
+    if f.endswith(".md") and f[:-3] not in reference:
+      os.remove(os.path.join(out, f))
+  print(f"{len(reference)} reference pages")
+
+
 def export(site, names):
   status, chapter, known = statuses(), chapters(), permalinks(site)
   built = sorted(f[:-3] for f in os.listdir(buildDir) if f.endswith(".md") and f[:-3] in chapter)
@@ -186,7 +224,9 @@ def export(site, names):
   ok = [n for n in built if "**The page stopped here.**" not in open(os.path.join(buildDir, n + ".md"), encoding="utf-8").read()]
   for n in sorted(set(built) - set(ok)):
     print(f"skipped {n}: the page stopped")
-  python = set(ok)
+  reference = referencePages()
+  # a link to a reference page MATLAB has goes to its Python twin
+  python = set(ok) | set(reference)
   pageOut = os.path.join(site, "pages", "documentation_python")
   # the figures go into the site's checkout of mtex-toolbox/figures, which the site's
   # tools/deploy-figures.sh publishes
@@ -227,15 +267,19 @@ def export(site, names):
       fh.write("# written by pymtex docs/site.py: the documentation pages that have a Python version\n")
       for n in ok:
         fh.write(f"{n}: {{status: {pageStatus(n, status, known)}}}\n")
+      # the switch needs only the reference pages with a MATLAB twin
+      for n in sorted(n for n, matlab in reference.items() if matlab and n not in ok):
+        fh.write(f"{n}: {{status: Reference}}\n")
     for f in os.listdir(pageOut):
-      if f.endswith(".md") and f[:-3] not in python:
+      if f.endswith(".md") and f[:-3] not in ok:
         os.remove(os.path.join(pageOut, f))
     for f in os.listdir(imageOut):
       if f not in used:
         os.remove(os.path.join(imageOut, f))
     for f in os.listdir(scriptOut):
-      if f[:-3] not in python:
+      if f[:-3] not in ok:
         os.remove(os.path.join(scriptOut, f))
+    exportReference(site, reference)
   print(f"{len(names) or len(ok)} pages, {written} images written")
 
 

@@ -119,7 +119,7 @@ def resolve(page):
 
 # every page: name -> (kind, object, class, MATLAB's page or None)
 def catalogue():
-  pages, reached = {}, set()
+  pages, reached, docPages = {}, set(), set(pageSources())
   for p in matlabPages():
     hit = resolve(p)
     if hit:
@@ -139,7 +139,8 @@ def catalogue():
         if callable(f):
           pages[f"{n}.{m}"] = ("property" if isinstance(v, property) else "method", v, obj, None)
     elif id(obj) not in reached and n not in pages:
-      pages[n] = ("function", obj, None, None)
+      # a documentation page has the name already: SchmidFactor
+      pages[f"mtex.{n}" if n in docPages else n] = ("function", obj, None, None)
   return pages
 
 
@@ -298,6 +299,42 @@ def members(cls, pages):
   return ["## Members", "", "| | |", "|---|---|", *sorted(rows, key=str.lower), ""]
 
 
+# the layers in the order of the imports, as the index shows them
+LAYERS = {"geometry": "Geometry", "functions": "Function spaces", "tensors": "Tensors", "maps": "Maps",
+          "maps3d": "Maps of volumes", "analysis": "Analysis", "io": "Import and export", "plotting": "Plotting",
+          "wizard": "Import wizard"}
+INDEX = "FunctionReference"
+
+
+# the index: per layer its classes and the functions of the flat namespace, each linked to its
+# first page; MATLAB's FunctionReference is its twin
+def indexPage(pages):
+  first = {}
+  for n, e in pages.items():
+    if e[0] != "class":
+      first.setdefault(id(unwrap(e[1])), n)
+  groups = {}
+  for n in sorted(dir(mtex), key=str.lower):
+    obj = getattr(mtex, n)
+    if n.startswith("_") or not callable(obj) or not isOurs(obj):
+      continue
+    target = f"{n}_index" if inspect.isclass(obj) else first.get(id(unwrap(obj)))
+    if not target:
+      continue
+    layer = getattr(unwrap(obj), "__module__", "mtex.other").split(".")[1]
+    doc = firstSentence(inspect.getdoc(unwrap(obj)) or "")
+    groups.setdefault(layer, ([], []))[0 if inspect.isclass(obj) else 1].append(f"| [{n}]({target}_py.html) | {doc} |")
+  lines = ["# Function reference", "",
+           "Every class and function of mtex, by the layer it belongs to; a class page lists its methods and properties.", ""]
+  for layer in sorted(groups, key=lambda k: list(LAYERS).index(k) if k in LAYERS else len(LAYERS)):
+    classes, functions = groups[layer]
+    lines += [f"## {LAYERS.get(layer, layer)}", ""]
+    for title, rows in (("Classes", classes), ("Functions", functions)):
+      if rows:
+        lines += [f"### {title}", "", "| | |", "|---|---|", *rows, ""]
+  return "\n".join(lines)
+
+
 def build(names=()):
   pages = catalogue()
   calls, owners = pageCalls(pageSources()), memberOwners()
@@ -306,7 +343,12 @@ def build(names=()):
   for n in chosen:
     with open(os.path.join(outDir, n + ".md"), "w", encoding="utf-8") as fh:
       fh.write(render(n, pages[n], pages, calls, owners))
+  if not names or INDEX in names:
+    chosen.append(INDEX)
+    with open(os.path.join(outDir, INDEX + ".md"), "w", encoding="utf-8") as fh:
+      fh.write(indexPage(pages))
   index = {n: {"kind": e[0], "matlab": e[3]} for n, e in pages.items()}
+  index[INDEX] = {"kind": "index", "matlab": INDEX}
   with open(os.path.join(outDir, "index.json"), "w", encoding="utf-8") as fh:
     json.dump(index, fh, indent=0, sort_keys=True)
   paired = sum(e[3] is not None for e in pages.values())
