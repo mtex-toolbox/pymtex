@@ -58,10 +58,13 @@ class mapImage:
 
   A forescatter or backscatter image, a band contrast map or any other value per pixel,
   together with the part of the specimen each pixel covers, which makes an image and an EBSD
-  map comparable. The grid is regular: d1 is the step from row to row, d2 from column to
-  column, and the positions follow from them; a distortion is applied by resampling, never by
-  moving the pixels. An image with a map carries the map along, on the same grid, which must
-  be square. An integer image is scaled to [0, 1].
+  map comparable.
+
+  The grid is regular: d1 is the step from row to row, d2 from column to column, and the
+  positions follow from them. A distortion is applied by resampling, never by moving the
+  pixels. An image with a map carries the map along, on the same grid, which must be square;
+  a map that is not gridded is gridified first. An integer image is divided by the largest
+  value of its type, so an unsigned one lies in [0, 1].
 
   Input
     img - array of rows x columns, or rows x columns x channels

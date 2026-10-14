@@ -137,12 +137,22 @@ class quadratureSO3Grid:
     G = quadratureSO3Grid(15, rA=4, rB=2)                           # reduced by fourfold and twofold folds about z
     ori, w = G.nodes(), G.weights                                   # the nodes and their weights
 
-  The Euler angles alpha and gamma are equispaced, 2L + 2 of each, and beta follows a
-  Clenshaw-Curtis rule, the default, or a Gauss-Legendre rule. The frames' rotations about z
-  shorten the alpha range by the specimen fold rB and the gamma range by the crystal fold rA,
-  which must divide 2L + 2: bandwidthFor(L, cs, ss) gives the next bandwidth that they divide.
-  The weights sum to one, the Haar measure. Unlike MATLAB's, the grid is not itself an
-  orientation: G.nodes() gives the orientations, beta fastest, and G.weights the weights.
+  The grid integrates exactly every function of harmonic degree up to the bandwidth, which is
+  what SO3FunHarmonic.quadrature needs to compute the coefficients of a function from its values.
+  The weights sum to one, the Haar measure.
+
+  The Euler angles alpha and gamma are equispaced, 2L + 2 of each; the scheme chooses the rule
+  for beta:
+
+  - 'ClenshawCurtis', the default: 2L + 1 nodes.
+  - 'GaussLegendre': L + 1 nodes, about half as many for the same degree.
+
+  The rotations about z of the frames shorten the grid: the crystal fold rA the gamma range and
+  the specimen fold rB the alpha range. Both must divide 2L + 2; bandwidthFor(L, cs, ss) gives
+  the next bandwidth that they divide, and any other is refused.
+
+  Unlike MATLAB's, the grid is not itself an orientation: G.nodes() gives the orientations,
+  beta fastest, then alpha, then gamma, and G.weights their weights.
 
   Input
     bandwidth - int, the degree up to which the rule is exact

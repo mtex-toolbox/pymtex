@@ -812,11 +812,18 @@ class orientation(rotation):
 
     The child variants are the distinct p2c * r over the rotations r of the parent group modulo
     the child group, the parent variants the distinct r * p2c over the child group modulo the
-    parent group. They are numbered as MTEX numbers them, which is what a variant id means; the
-    ids count from 1. The child orientations of a parent orientation are those of its
-    representative in the fundamental region times the inverse child variants, along a new
-    last axis; an orientation in the child frame gives its parent orientations instead, in the
-    parent frame.
+    parent group. They are numbered as MTEX numbers them, which is what a variant id means;
+    the ids count from 1.
+
+    The second argument decides what comes back:
+
+    - none: the variants themselves, a list.
+    - parent orientations: the child orientations, those of the parent's representative in the
+    fundamental region times the inverse child variants, along a new last axis; with ids one
+    per parent.
+    - orientations in the child frame: their parent orientations in the parent frame, along a
+    new last axis; with ids one per child.
+    - an SO3Fun of the parents: the child texture.
 
     Input
       p2c - orientation, the parent to child misorientation, from the parent frame to the

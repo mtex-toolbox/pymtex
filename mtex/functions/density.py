@@ -51,26 +51,26 @@ def calcDensity(x, Fourier=False, **kwargs):
     f = calcDensity(rho, periodic=True)                    # angles, a function on the circle
     f = calcDensity(x, range=[0, 1])                       # real values on an interval
 
-  Orientations give a sum of kernels about them, the radial form up to 200 orientations and
-  the harmonic form above (or with a Dirichlet kernel, or for misorientations between two
-  crystal frames); harmonic=True or False decides. Without a kernel or a halfwidth the
-  halfwidth is selected from the sample by unbiased cross validation (calcKernel); the
-  orientations of a map are not independent, so a map is grouped by its grain ids when grains
-  were computed, and plain pixel orientations of a map without groups fall back to 10 degree
-  with a warning. NaN orientations are dropped, an empty list gives the uniform ODF.
+  The kind of the sample decides the estimate:
 
-  Directions give the harmonic form of the point measure convolved with the kernel,
-  symmetrised by their frame. Numbers with periodic=True, sigma, kernel or antipodal are angles,
-  a density on the circle smoothed by a Gaussian of width sigma (Silverman's rule by default);
-  other numbers are real valued samples, one per row, whose density on the box range (the
-  minima in the first row, the maxima in the second) is a gridded interpolant: the diffusion
-  estimator in one dimension, the EM mixture in more (calcDensityReal).
+  - orientations: a sum of kernels, an SO3FunRBF, or an SO3FunHarmonic above 200 orientations
+  (kernel bandwidth at most 96), with a Dirichlet kernel or between two crystal frames;
+  harmonic=True or False decides instead.
+  - directions: an S2FunHarmonic, kernels convolved with the points.
+  - angles, numbers with periodic=True, sigma, kernel or antipodal: a density on the circle,
+  a Gaussian of width sigma, Silverman's rule by default.
+  - other numbers: one sample per row, a griddedDensity on the box range (minima in the first
+  row, maxima in the second), by calcDensityReal.
 
-  The other keywords go to the estimator of the sample's kind: kernel, halfwidth, weights,
-  groups (the grain or group of every point, for the selected halfwidth) and bandwidth for
-  orientations and directions, harmonic for orientations, antipodal for directions and
-  angles, sigma for angles, range, bandwidth and rng for real values. MATLAB's 'order' is
-  bandwidth here, its flag 'Fourier' the keyword; the Bingham estimate is calcBinghamODF.
+  Without a kernel or a halfwidth, the halfwidth is selected by unbiased cross validation
+  (calcKernel). A map is grouped by its grain ids when grains were computed; its pixels
+  without groups, and fewer than two orientations, take 10 degrees, the former with a
+  warning. NaN entries are dropped; an empty sample gives the uniform density.
+
+  The other keywords go to the estimator: kernel, halfwidth, weights, groups and bandwidth
+  for orientations and directions, harmonic for orientations, antipodal for directions and
+  angles, sigma for angles, range, bandwidth and rng for real values.
+  MATLAB's 'order' is bandwidth; the Bingham estimate is calcBinghamODF.
 
   Input
     x - orientation, vector3d, EBSD, or an array of angles or real values
@@ -199,13 +199,16 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     SO3VF = interpolate(SO3TangentVector(w, ori), lambda_=0)    # without regularisation
 
   The harmonic coefficients up to the bandwidth minimise the weighted squared misfit at the
-  nodes plus lambda_ times the Sobolev norm of order s, solved by LSQR. On SO(3) the fit is posed
-  among the functions with the symmetries of the nodes; nodes closer than 0.02 are merged into one
-  carrying the mean of their values; the bandwidth follows from the number of nodes, at most the
-  preference 'maxSO3Bandwidth'. Values with further axes after the node axis give one function
-  per component. A vector field on SO(3) is fitted componentwise, three SO3FunHarmonic, as
-  MATLAB's SO3VectorFieldHarmonic.interpolate; MATLAB passes the tangent vectors as values,
-  here they carry their orientations.
+  nodes plus lambda_ times the Sobolev norm of order s, solved by LSQR. Without a bandwidth it
+  follows from the number of nodes, on SO(3) at most the preference 'maxSO3Bandwidth'.
+
+  On SO(3) the fit is posed among the functions with the symmetries of the nodes. Nodes closer
+  than 0.02 are merged into one carrying the mean of their values.
+
+  Values with further axes after the node axis give one function per component; withParameters
+  is then ignored, as it is on the sphere. A vector field on SO(3) is fitted componentwise,
+  three SO3FunHarmonic, as MATLAB's SO3VectorFieldHarmonic.interpolate; MATLAB passes the
+  tangent vectors as values, here they carry their orientations.
 
   Input
     nodes - orientation or rotation, vector3d, or SO3TangentVector for a vector field on SO(3)

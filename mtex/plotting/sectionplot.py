@@ -316,16 +316,16 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
     quiverSection(ori, xvector)                    # an arrow along x at every orientation
     quiverSection(ori, w, color='r', resolution=5*degree)  # a direction per orientation
 
-  With a function on the sphere sF, a vector field vF, S2VectorField, S2AxisField or a
-  function of the directions, is evaluated at 36 points of the circle normal to sec, or of
-  the small circle at the polar angle eta from sec, and the vectors are drawn at the ring that
-  plotSection(sF, sec) draws, the points pushed out to the values of sF and seen down sec. The
-  longest arrow is scaled to the spacing of the points (autoScaleFactor=0.9); an axis field
-  draws segments without heads. This form also takes displayName and how2plot.
+  With a function on the sphere sF, the field vF (an S2VectorField, an S2AxisField or a
+  function of the directions) is evaluated at 36 points of the circle normal to sec, or of
+  the small circle at the polar angle eta from sec. The vectors are drawn on the curve
+  plotSection(sF, sec) draws, seen down sec. The longest arrow is scaled to the spacing of
+  the points (autoScaleFactor=0.9); an axis field draws segments without heads. This form
+  also takes displayName and how2plot.
 
   With orientations, the arrows go into the sections of the current section plot, which
-  plotSection draws first: at every orientation, in the section it lies in, an arrow along
-  the specimen direction w, one for all or one per orientation.
+  plotSection draws first. Every orientation gets an arrow along the specimen direction w in
+  the section it lies in; w is one direction for all or one per orientation.
 
   Input
     sF - S2Fun, the function whose section is drawn
@@ -534,13 +534,15 @@ def plotKeySections(key, *args, resolution=2.5 * degree, columns=0, field=False,
     plotKeySections(key, 'sigma', sections=6)      # six sigma sections
     plotKeySections(key, resolution=5*degree, columns=3, field=True)  # coarser, in three columns
 
-  Every section is filled with the colour key.orientation2color gives the orientations of its
-  grid; orientations the key leaves without a colour stay white. The sections follow the
-  frames of the key, frameA and frameB, and are named by a string ('phi2', 'phi1', 'sigma',
-  ...) or given as an ODFSections object; the keywords of the sections (sections, phi2,
-  maxPhi, ...) choose them as for plotSection. An antipodal key, one with grain exchange
-  symmetry, is drawn over the region that symmetry halves. A key on the sphere, as
-  ipfHSVKey, draws its inverse pole figure with plot(key) instead.
+  Every section is filled with the colours key.orientation2color gives the orientations of
+  its grid; orientations the key leaves without a colour stay white. An antipodal key, one
+  with grain exchange symmetry, is drawn over the region that symmetry halves.
+
+  The sections follow the frames of the key, frameA and frameB. They are named by a string
+  ('phi2', 'phi1', 'sigma', ...) or given as an ODFSections object, and the keywords of the
+  sections (sections, phi2, maxPhi, ...) choose them as for plotSection. A key on the
+  sphere, as ipfHSVKey, draws its inverse pole figure with plot(key); plotKeySections draws
+  it in sections too.
 
   Input
     key - an orientation colour key, as BungeColorKey, axisAngleColorKey or spotColorKey;

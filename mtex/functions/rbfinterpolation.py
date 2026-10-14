@@ -158,19 +158,28 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
     SO3F = interpolateRBF(ori, y, kernel=psi, SO3Grid=S3G)              # on a grid of your own
     SO3F, it = interpolateRBF(ori, y, density=True, withIterations=True)  # a density, with the iterations
 
-  The function f(g) = sum_j w_j psi(angle(g, g_j)) with kernels centred on a grid minimises
-  sum_i |f(ori_i) - y_i|^2, the system matrix the kernel values between the nodes and the
-  centres, sparse. For a density, or values of one sign with a mean, the weights keep the
-  sign of the values and are found by the modified least squares method, mlsq; for others
-  by LSQR. A density has mean one and its centres of negligible weight are dropped. Values
-  with more than one column give one set of weights per column.
+  The function f(g) = sum_j w_j psi(angle(g, g_j)) has its kernels centred on an equispaced
+  grid, on a grid of your own or, with exact=True, at the nodes. Its weights minimise the
+  squared misfit sum_i |f(ori_i) - y_i|^2.
+
+  How the weights are found depends on the values:
+
+  - density=True: non negative weights by the modified least squares method, mlsq; the result
+  has mean one and drops the centres of negligible weight.
+  - values of one sign: weights of that sign by mlsq, scaled to the mean given, or by default
+  to the mean of the values over the Voronoi cells of the nodes. Above 10000 nodes without a
+  mean, LSQR as below.
+  - values of both signs: LSQR, the weights of any sign.
+
+  Values with more than one column raise an error, since an SO3FunRBF holds one weight per
+  centre.
 
   Input
     ori - orientation, the nodes
-    y - the values at the nodes, (n,) or (n, k)
+    y - the values at the nodes, (n,)
   Output
     SO3F - SO3FunRBF
-    it - the number of iterations, one per column of y
+    it - the number of iterations
   Keywords
     kernel - SO3Kernel, the shape of the kernels instead of the de la Vallee Poussin kernel
     halfwidth - the halfwidth of the de la Vallee Poussin kernel, by default the resolution or

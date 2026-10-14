@@ -149,17 +149,23 @@ def loadODF(fname, *args, interface=None, **kwargs):
     odf = loadODF('odf.txt', CS=cs, columnNames=['phi1', 'Phi', 'phi2', 'value'])  # a function through the values of a table
     odf = loadODF('ori.txt', cs, 'density', halfwidth=10*degree)  # kernels centred at the orientations of a table
 
-  A file whose fourth line names a convention letter (B, K or R) and a count is a VPSC texture
-  file: every block of weighted orientations becomes one density, calcDensity with the
-  weights, a list of them for several blocks, the strain, the ellipsoid, the orientations and
-  the further columns kept in odf.opt; the crystal frame is cubic unless given, since the file
-  carries none. Any other file is a generic table of Euler angles and one more column:
-  'interp' fits a function through the values (interpolate, with bandwidth, lambda_, maxIter
-  and tol), 'density' centres kernels of those masses (halfwidth, resolution); without
-  either, varying values mean 'interp' and equal ones 'density'. The angles are degrees when
-  one exceeds 15 unless radians=True; columnNames name the columns and columns, counted from
-  0 where MATLAB counts from 1, place them; 'Bunge' (the default), 'ZYZ', ... the convention.
-  The crystal frame is passed positionally or as CS=, the specimen frame as SS=.
+  The content decides the interface:
+
+  - 'VPSC': a file whose fourth line names a convention letter (B, K or R) and a count. Every
+  block of weighted orientations becomes one density, calcDensity with the weights, a list
+  of them for several blocks. The strain, the ellipsoid, the orientations and the further
+  columns are kept in odf.opt. The file names no crystal frame, so it is cubic unless given.
+  - 'generic': a table of Euler angles and one more column; it needs the crystal frame.
+
+  A generic table is read as one of two kinds. 'interp' fits a function through the values
+  (interpolate, with bandwidth, lambda_, maxIter and tol); 'density' centres kernels of those
+  masses (halfwidth, resolution). Without either, varying values mean 'interp' and equal ones
+  'density'.
+
+  The angles of a table are degrees when one exceeds 15, unless radians=True. columnNames
+  name the columns and columns place them, counted from 0 where MATLAB counts from 1; 'Bunge'
+  (the default), 'ZYZ', ... give the convention. The crystal frame is passed positionally or
+  as CS=, the specimen frame as SS=.
 
   Input
     fname - the name of the file

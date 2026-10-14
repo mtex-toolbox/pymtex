@@ -438,12 +438,11 @@ class spatialTransformProjective(spatialTransform):
       T = spatialTransformProjective.fit(posA, posB, robust=False) # plain least squares
 
     The equations x' (h31 x + h32 y + 1) = h11 x + h12 y + h13, and likewise for y', are solved
-    by least squares, both coordinates under one scale, reweighted against outliers with
-    Tukey's bisquare. Both point sets are first moved to their centroid and scaled to a mean
-    distance of sqrt(2), Hartley's normalisation: without it the algebraic residual weighs the
-    points by their distance from the origin, and ten percent of outliers can hold the
-    reweighting in a wrong basin. A point with a missing position or no weight is dropped; at
-    least four points are needed.
+    by least squares, reweighted against outliers with Tukey's bisquare unless robust=False.
+    Both point sets are first centred and scaled, Hartley's normalisation, so that points far
+    from the origin do not dominate the fit.
+
+    A point with a missing position or no weight is dropped; at least four points are needed.
 
     Input
       posA - vector3d, the positions in the first frame

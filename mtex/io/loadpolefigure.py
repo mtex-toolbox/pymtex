@@ -399,13 +399,20 @@ def loadPoleFigure(fname, *args, interface=None, superposition=None, **kwargs):
     pf = loadPoleFigure('scan.dat', cs, interface='geesthacht')  # a format named
     pf = loadPoleFigure('scan.txt', h, cs, columnNames=['polar angle', 'azimuth angle', 'intensity'], radians=True)  # a table
 
-  The crystal directions are read off the file names (string2Miller) unless given, one per
-  file or, for a file of several pole figures, a list of them, a list inside it for a
-  superposition; the frames are given positionally. The format follows the extension and the
-  marker the file carries; interface= names one of INTERFACES when the extension leaves it
-  open. A table option (columnNames, columns, header, delimiter, radians) reads a table whose
-  columns the caller names: the polar angle and the azimuth in degrees unless radians=True,
-  or x, y, z, and the intensity.
+  The format follows the extension and the marker the file carries; interface= names it when
+  the extension leaves it open, one of 'dubna', 'ana', 'popla', 'labotex', 'aachen',
+  'aachen_exp', 'philips', 'plf', 'ibm', 'out1', 'slc', 'beartex', 'xrd', 'siemens', 'uxd',
+  'juelich', 'geesthacht', 'nja', 'pwd', 'rigaku', 'rigaku_dat', 'rigaku_txt', 'gpol', 'rw1',
+  'xrdml' or 'generic'.
+
+  The crystal directions are read off the file names (string2Miller) unless given. Give one
+  per file or, for a file of several pole figures, a list of them; a list inside it is a
+  superposition of directions, weighted equally unless superposition gives the weights. The
+  frames are given positionally.
+
+  A table option (columnNames, columns, header, delimiter, radians) reads a table whose columns
+  the caller names: the polar angle and the azimuth, in degrees unless radians=True, or x, y, z,
+  and the intensity.
 
   Input
     fname - a file name or a list of them

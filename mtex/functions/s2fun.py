@@ -78,14 +78,21 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
     sF = S2FunHarmonic(psi)                                  # the series of a kernel on the sphere
     sF = S2FunHarmonic(sF, bandwidth=8)                      # another function, truncated
 
-  The coefficients fhat are MTEX's, degree by degree, (L + 1)^2 of them for the bandwidth L;
-  a vector ending inside a degree block is padded with zeros to its end. Convolution,
-  rotation, products and quadrature are cheap on this form. A callable of vector3d is
-  sampled on a quadrature grid of the bandwidth, by default the preference
-  defaultS2Bandwidth (S2FunHarmonic.quadrature takes values at nodes), a kernel gives its
-  series, another S2Fun its harmonic form. The function is symmetrised under the group of
-  its frame, also when antipodal, unless symmetrise=False. A list of functions carries its
-  shape in front of the coefficients.
+  The harmonic series is the form on which convolution, rotation, products and integrals are
+  cheap. The coefficients fhat are MTEX's, degree by degree, (L + 1)^2 of them for the
+  bandwidth L; a vector ending inside a degree is padded with zeros. A list of functions
+  carries its shape in front of the coefficients.
+
+  The first argument may also be:
+
+  - a callable of vector3d: sampled on a quadrature grid of the bandwidth, by default the
+  preference defaultS2Bandwidth; S2FunHarmonic.quadrature takes values at nodes
+  - an S2Kernel: its series
+  - another S2Fun: its harmonic form, truncated to the bandwidth if given
+
+  The function is made invariant under the group of its frame unless symmetrise=False, so a
+  callable that is not invariant becomes its mean over the symmetric directions. A frame
+  with an inversion makes the function antipodal.
 
   Input
     fhat - array of MTEX's coefficients, an S2Fun, an S2Kernel or a callable of vector3d
@@ -163,13 +170,14 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
       sF = S2FunHarmonic.quadrature(v, values, bandwidth=8, weights=w)    # values at the nodes v
       sF = S2FunHarmonic.quadrature(g, values)                            # values on a quadratureS2Grid g
 
-    The coefficients are the integrals of f against the conjugate spherical harmonics,
-    computed as the quadrature sum sum_m w_m f(v_m) conj(Y(v_m)) by the adjoint transform. A
-    callable is sampled on a quadrature grid exact up to the bandwidth; values at scattered
-    nodes take the weights given, which integrate to 4 pi, equal ones by default, and give a
-    good approximation only on nodes dense enough for the bandwidth (S2FunHarmonic.interpolate
-    fits values by least squares instead). A quadratureS2Grid brings its own weights and
-    bandwidth. Values for a list of functions have the nodes first.
+    The coefficients are the integrals of f against the spherical harmonics, approximated by
+    the quadrature sum over the nodes. A callable is sampled on a quadrature grid exact up to
+    the bandwidth, and a quadratureS2Grid brings its own weights and bandwidth.
+
+    Values at scattered nodes take the weights given, which sum to 4 pi, equal ones by
+    default. They give a good approximation only on nodes dense enough for the bandwidth;
+    S2FunHarmonic.interpolate fits scattered values by least squares instead. Values for a
+    list of functions have the nodes first.
 
     Input
       nodes - a callable of vector3d, vector3d, or a quadratureS2Grid

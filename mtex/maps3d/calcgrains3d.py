@@ -41,20 +41,23 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     grains = calcGrains(ebsd, grainId=True)                    # the grains stored with the map
 
   Two neighbouring pixels belong to one grain when the misorientation between them stays
-  below the threshold angle, and a grain is a connected set of such pixels. With a pair
-  [high, low] the boundaries above high separate the grains, and those between low and high
-  are kept as low angle boundaries inside them, grains.innerBoundary: the subgrain boundaries.
-  A list of other than two numbers, or of lists, gives every phase a threshold or a pair of its
-  own: one entry per indexed phase, or one per entry of ebsd.CSList as MATLAB's cell
-  {a1, a2, a3}; two numbers are always the pair [high, low], as MATLAB's [a1 a2], so two
-  phases take [[a1], [a2]]. A soft threshold or any other rule is a grainBoundaryCriterion.
+  below the threshold angle, and a grain is a connected set of such pixels. The angle takes
+  these forms:
 
-  The map is divided into cells around its pixels, a Voronoi decomposition bounded by alpha:
-  a not indexed region narrower than 2 alpha pixel spacings is filled by the grains around
-  it, a wider one becomes a notIndexed grain.
+  - one angle: the threshold of every phase.
+  - a pair [high, low]: the boundaries above high separate the grains, those between low and
+  high stay inside them as low angle boundaries, grains.innerBoundary.
+  - a list of other than two entries, or of lists: an angle or a pair per indexed phase or
+  per entry of ebsd.CSList, as MATLAB's cell {a1, a2, a3}; two phases take [[a1], [a2]].
+
+  Any other rule, a soft threshold included, is a grainBoundaryCriterion.
+
+  A map of the plane is divided into cells around its pixels, a Voronoi decomposition bounded
+  by alpha. A not indexed region narrower than 2 alpha pixel spacings is filled by the grains
+  around it, a wider one becomes a notIndexed grain.
 
   The map is changed: it keeps the grain ids, the pixels the minPixel cull drops and the
-  notIndexed pixels the grains absorb, so MATLAB's second output is the map passed; run on
+  notIndexed pixels the grains absorb, so MATLAB's second output is the map passed. Run on
   ebsd.copy() to keep the map as it was.
 
   Input

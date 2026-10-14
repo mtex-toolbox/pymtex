@@ -68,12 +68,13 @@ class orientationRegion:
     oR = orientationRegion(N, cs, specimenFrame())     # the region bounded by the quaternions N
 
   The region holds the quaternions q with dot(q, N) <= 0 for every bounding quaternion N; q
-  and -q are the same rotation. The fundamental region of two frames is the Dirichlet domain
-  of the identity, the rotations closer to the identity than to any of their symmetric
-  equivalents, which is what fundamentalRegion builds and projectIntoFundamentalRegion projects
-  into. Where the two frames share rotations, the rotations about a common axis for instance,
-  the planes alone do not separate the equivalents and the region keeps a sector of the
-  rotation axes besides.
+  and -q are the same rotation.
+
+  The fundamental region of two frames, which fundamentalRegion builds, is the set of
+  rotations closer to the identity than to any of their symmetric equivalents;
+  projectIntoFundamentalRegion maps orientations into it. Where the two frames share
+  rotations, about a common axis for instance, the planes alone do not separate the
+  equivalents, and the region also restricts the rotation axes to a sector.
 
   Input
     N - quaternion, or an array (n, 4), the normals of the bounding planes

@@ -184,14 +184,17 @@ def xcfShift(A, B, ROISize=None, numROI=24, XCFMesh=250):
     T = spatialTransformShift.fit(pos, pos + u, weights=peak)       # a transform fitted through the shifts
 
   The region where both images are finite is divided into a grid of tiles, and each tile of
-  A is phase correlated with the same tile of B; the peak of the correlation, upsampled,
-  gives the displacement to sub pixel accuracy (Guizar-Sicairos et al.). The feature at pos
-  in A is at pos + u in B. The peak height is the weight of the tile in a fit: a tile on
-  featureless background correlates weakly. A tile that holds a non finite value or is flat
-  returns NaN in all three outputs, which every spatialTransform fit drops. Two mapImage on
-  one grid answer in specimen units, two arrays in pixels, pixel [i, j] at (j, i); a colour
-  image is averaged over its channels. The outputs run over the tiles down the columns of the
-  grid first, as MATLAB's.
+  A is phase correlated with the same tile of B. The upsampled peak of the correlation gives
+  the displacement to sub pixel accuracy (Guizar-Sicairos et al.): the feature at pos in A is
+  at pos + u in B.
+
+  The peak height is the weight of the tile in a fit, since a tile on featureless background
+  correlates weakly. A tile that holds a non finite value or is flat returns NaN in all three
+  outputs, which every spatialTransform fit drops.
+
+  Two mapImage on one grid answer in specimen units, two arrays in pixels, pixel [i, j] at
+  (j, i); a colour image is averaged over its channels. The outputs run over the tiles down
+  the columns of the grid first, as MATLAB's.
 
   Input
     A, B - 2d arrays of the same size, or mapImage on one grid

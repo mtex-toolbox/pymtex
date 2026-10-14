@@ -234,19 +234,18 @@ class embedding:
     d = double(e)                      # the coordinates, one row per orientation
     ori = mean(e).orientation()        # the mean orientation, the projection of the mean image
 
-  An orientation g is mapped to a tuple of symmetric tensors, the mean over the proper
-  point group of the powers of the turned vectors g s l_i, less their mean over SO(3) and
-  weighted, so that symmetrically equivalent orientations have the same image and the
-  Euclidean distance of the images is a metric on the quotient. The vectors l_i and the
-  powers are taken from the group: the power is the order of the principal axis, the vectors
-  its axis and a two fold axis across it where the group has one. The coordinates of
-  double(e) are taken in an orthonormal basis of the space the images span, so they are
-  isometric and setDouble inverts them.
+  The embedding maps every orientation to a tuple of symmetric tensors such that
+  symmetrically equivalent orientations have the same image. The Euclidean distance of the
+  images is then a metric on the orientations modulo the crystal symmetry, and averages,
+  clusters or regressions can be computed in a flat space.
 
-  The images form a vector space: sums, differences, multiples, the mean, the dot product
-  and the norm act on the components, and project, or orientation, takes an image back to
-  the orientation whose image is closest. MATLAB's second form, embedding(u, cs, l) from
-  given tensors, is built here by setDouble(e, d) or from the keywords.
+  The images form a vector space: sums, differences, multiples, the mean, the dot product and
+  the norm act on the components. project, or orientation, takes an image back to the
+  orientation whose image is closest. double(e) gives the coordinates in an orthonormal basis,
+  isometric to the images, and setDouble inverts it.
+
+  MATLAB's second form, embedding(u, cs, l) from given tensors, is setDouble(e, d) here, or
+  the keywords spec and u.
 
   Input
     o - orientation, the orientations to embed, or a crystalFrame for the image of the

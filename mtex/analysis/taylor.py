@@ -365,17 +365,21 @@ def calcTaylor(eps, sS, *args, plasticWork=False, spinSelection=None, bandwidth=
     MFun, _, WFun = calcTaylor(eps, sS, bandwidth=32)   # eps in the specimen frame: functions of the orientation
 
   Taylor's model: every grain takes the macroscopic strain, which its slip systems must
-  produce. Of the shears that do, the ones of least total shear, the sum of the absolute
-  shears weighted by the critical resolved shear stresses, are taken, found by a linear
-  program; that sum divided by the size of the strain is the Taylor factor M. The shears are
-  the analytic centre of the optimal face, which makes them and the spin unique and symmetric,
-  as MATLAB's; spinSelection takes another point of the face. The spin is a spinTensor in the
+  produce. Of all shears that do, the linear program takes those of least total shear, the
+  absolute shears weighted by the critical resolved shear stresses. That sum divided by the
+  size of the strain is the Taylor factor M.
+
+  The least total shear is often reached by a whole face of shears. The shears returned are
+  the analytic centre of that face, which makes them and the spin unique and symmetric, as
+  MATLAB's; spinSelection takes another point of the face. The spin W is a spinTensor in the
   crystal frame, so ori.exp(-W) turns the crystal.
 
-  A strain in a crystal frame, one or a list, gives numbers. A strain in the specimen frame
-  gives the factor as an SO3FunHarmonic and the spin as an SO3VectorFieldHarmonic of the
-  orientation, fitted on a quadrature grid of the bandwidth (MATLAB's 'SO3Fun' flag);
-  the shears are None then.
+  What comes back depends on the frame of the strain:
+
+  - crystal frame, one strain or a list: the factor, the shears and the spin as numbers.
+  - specimen frame: the factor as an SO3FunHarmonic and the spin as an SO3VectorFieldHarmonic
+  of the orientation, fitted on a quadrature grid of the bandwidth (MATLAB's 'SO3Fun' flag);
+  the shears are None.
 
   Input
     eps - strainTensor, in the crystal frame of sS or in the specimen frame

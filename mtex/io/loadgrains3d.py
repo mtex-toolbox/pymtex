@@ -31,17 +31,18 @@ def loadGrains3d(fname, *args, interface=None, CS=None, orientFaces=True, **kwar
     grains = loadGrains3d('grains.dream3d', orientFaces=False)  # the faces as stored
     grains = loadGrains3d('grains.tess', CS=cs)                 # a Neper tessellation
 
-  DREAM.3D does not store the faces of a grain with one winding: the normals computed from
-  the vertex order point into the grain or out of it at random. The faces are therefore
-  oriented on import by grain3d.orientFaces, so that the face normals, the grain volumes and
-  boundary.grainId mean something right away; orientFaces=False keeps the winding of the
-  file. Files of DREAM3D-NX and of DREAM.3D 6 are read, whatever their data containers and
-  attribute matrices are called. A file without a surface mesh gives the grains of its voxel
-  data, those calcGrains forms from the feature ids.
+  The format is told by the extension:
 
-  A Neper tessellation (.tess) gives its polyhedra with the orientations it holds; it must be
-  3D, a 2D one is read by loadNeperTess. The format is told by the extension. grain3d.load is
-  the same function.
+  - '.dream3d': the surface mesh of DREAM.3D 6 or DREAM3D-NX, whatever its data containers are
+  called. A file without a surface mesh gives the grains calcGrains forms from the feature ids
+  of its voxels.
+  - '.tess': the polyhedra of a 3D Neper tessellation with the orientations it holds. A 2D
+  tessellation is refused; read it with loadNeperTess.
+
+  DREAM.3D stores the faces with random winding, so their normals point into or out of the
+  grain at random. The faces are therefore oriented on import by grain3d.orientFaces, which
+  makes the face normals, the grain volumes and boundary.grainId meaningful;
+  orientFaces=False keeps the winding of the file. grain3d.load is the same function.
 
   Input
     fname - the file name, .dream3d or .tess

@@ -340,19 +340,26 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
     ebsd_f = fill(ebsd, grains)                          # filled within the grains only
     ebsd_f = fill(ebsd, halfQuadraticFilter(), extrapolate=True)  # another filter, up to the outer boundary
 
-  A hole is filled with the continuation of the field of orientations that encloses it, by
-  the solver of a variational filter (by default l1TVFilter; a window filter has no
-  variational form and is refused), within the grains where the map knows them and within
-  the phases otherwise. The numeric properties are filled by the same solve, the labels
-  (phase, grain id, ...) copied from the nearest measured pixel. A pixel the outside reaches
-  without crossing a measurement stays empty unless extrapolate. MATLAB fills by the
-  nearest neighbour; here the hole takes the smooth continuation.
+  A hole is filled with the smooth continuation of the orientations around it, by a
+  variational filter, l1TVFilter by default; a window filter is refused. Nothing is filled
+  across a grain boundary, where the map has grain ids, or a phase boundary. MATLAB fills by
+  the nearest neighbour instead.
+
+  The numeric properties are filled by the same solve, the labels (phase, grain id, ...)
+  copied from the nearest measured pixel. A pixel the outside reaches without crossing a
+  measurement stays empty, unless extrapolate=True. Only pixels on the lattice are filled: a
+  gridded map, or the padding gridify adds.
 
   With grains, MATLAB's fill(ebsd, grains), a pixel is filled only from the grain whose
-  polygon holds it: one inside no grain becomes notIndexed, one its grain's measurements do
-  not reach over the lattice takes the grain's mean orientation; padding a polygon holds
-  becomes a cell of the map. The map needs its grain ids, from calcGrains(ebsd). The pixels
-  to fill must exist on the lattice: a gridded map, or the padding gridify adds. The map
+  polygon holds it, which needs the grain ids calcGrains writes into the map:
+
+  - a pixel inside no grain becomes notIndexed
+  - a pixel its grain's measurements do not reach over the lattice takes the grain's mean
+  orientation
+  - padding a polygon holds becomes a cell of the map
+
+  A pixel counts as measured by its phase: the notIndexed pixels calcGrains absorbs into a
+  grain carry its phase, so they are not filled and keep their NaN orientation. The map
   passed is not changed.
 
   Input
@@ -516,14 +523,15 @@ def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):
     ebsd_new = interp(ebsd, pos)                         # at the positions, a vector3d
     ebsd_new = interp(ebsd, x, y, fill=False, extrapolate=False)  # empty outside the measurements
 
-  The holes of the map are filled first, by the solver smooth and fill use, then each
-  position is interpolated within the lattice cell it falls in, linearly in the tangent
-  space of the component (grain or phase) of the nearest measured corner and over the
-  corners of that component only, so nothing is averaged across a grain boundary. A
-  position no measured corner surrounds takes the nearest measurement where extrapolate
-  allows it, and is notIndexed otherwise. The phase and the other properties are those of
-  the nearest measured corner. MATLAB takes the nearest measurement within its pixel; here
-  the orientations are interpolated.
+  The orientation at a position is interpolated linearly from the corners of the lattice cell
+  it falls in, over the corners that share the grain (or, without grain ids, the phase) of
+  the nearest measured corner only, so nothing is averaged across a grain boundary. The
+  phase and the other properties are those of the nearest measured corner. MATLAB takes the
+  nearest measurement within its pixel instead.
+
+  With fill=True the holes of the map are first filled as fill(ebsd, F) fills them. A
+  position no measured corner surrounds takes the nearest measurement with
+  extrapolate=True, and is notIndexed otherwise.
 
   Input
     ebsd - EBSD, a map on a lattice

@@ -676,18 +676,20 @@ class parentGrainReconstructor:
       job.calcParent2Child(p2c=True, threshold=3*degree)  # to the parent to child boundaries alone
       job.calcParent2Child(orientation.NishiyamaWassermann(job.csParent, job.csChild))  # from another start
 
-    Two fits are made and combined, weighted by their numbers of boundaries. Where the
-    parent phase covers more than one percent of the map, the misorientations of the parent
-    to child boundaries closer to the current relationship than threshold and than the
-    quantile of all of them are averaged, three times. Where the relationship is more than
-    5 degree from the identity, or with c2c, the child to child misorientations above 5 degree are fitted
-    by calcParent2Child of the misorientations, the iteration of Nyyssönen et al.
-    from the current relationship, after a scan of the misorientation space.
+    Two fits are made and combined, weighted by their numbers of boundaries:
 
-    job.p2c is replaced; the variants keep their numbers through job.variantMap, the
-    variant of the old relationship that every new one is closest to. Further keywords go
-    to calcParent2Child of the misorientations: local, maxIteration, searchResolution,
-    verbose, ...
+    - parent to child: where the parent phase covers more than one percent of the map, the
+    misorientations of the parent to child boundaries closer to the current relationship than
+    threshold and than the quantile of all of them are averaged, three times.
+    - child to child: where the relationship is more than 5 degree from the identity, or with
+    c2c, the child to child misorientations above 5 degree are fitted by calcParent2Child of
+    the misorientations, the iteration of Nyyssönen et al.
+
+    Further keywords go to calcParent2Child of the misorientations: local, maxIteration,
+    searchResolution, verbose, ...
+
+    job.p2c is replaced. The variants keep their numbers through job.variantMap, the variant of
+    the old relationship that every new one is closest to.
 
     Input
       job - parentGrainReconstructor, with job.p2c or p2c0 set

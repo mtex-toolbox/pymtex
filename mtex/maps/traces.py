@@ -192,20 +192,26 @@ def calcTraces(x, clusterId=None, *flags, **kwargs):
     traces, rel, cSize = calcTraces(grains, grains.phaseId)    # a trace per phase from the characteristic shape
     traces, rel, cSize = calcTraces(grains, grains.phaseId, 'calliper')  # the shortest calliper of the shape instead
 
-  A cluster is the set of pixels, or grains, with one value of every column of clusterId,
-  as MATLAB's clusterId = [grainId, variantId]; ids of zero or NaN belong to no cluster. By
-  default the indexed pixels of a map, or all grains, form one cluster. The outputs have the
-  shape of the largest id of every column; a cluster of minClusterSize pixels or fewer keeps a
-  NaN trace and a reliability of zero.
+  A cluster is the set of pixels, or grains, with one value of every column of clusterId, as
+  MATLAB's clusterId = [grainId, variantId]; ids of zero or NaN belong to no cluster. By
+  default all indexed pixels, or all grains, form one cluster. The outputs have the shape of
+  the largest id of every column. A cluster of minClusterSize pixels or fewer (default 100)
+  keeps a NaN trace and a reliability of zero.
 
-  On a map, measured on a lattice, the method is 'Radon' (the default), the projection with
-  the most energy at the higher frequencies, or 'Fourier', the axis of the smaller second
-  moment of the Fourier transform of the cluster's image. On grains it is 'shape' (the
-  default), the principal axis of the characteristic shape of the boundary segments,
-  'calliper', the direction across its shortest calliper, or 'hist', the maximum of the
-  length weighted density of the segment directions. The method is a positional string, or
-  method= among the keyword arguments; minClusterSize= (default 100, pixels on a map, the
-  summed numPixel of the grains on grains) is a keyword argument too.
+  On a map, measured on a lattice, the method is:
+
+  - 'Radon', the default: perpendicular to the projection of the cluster with the most
+  energy at high frequencies
+  - 'Fourier': the axis of the smaller second moment of the cluster image's Fourier transform
+
+  On grains it is:
+
+  - 'shape', the default: the principal axis of the characteristic shape of the boundaries
+  - 'calliper': the direction across the shortest calliper of that shape
+  - 'hist': the maximum of the length weighted density of the segment directions
+
+  The method is a positional string or method=. A cluster filling a rectangle has no
+  direction: 'Fourier' then gives NaN, 'Radon' a side of the rectangle with high reliability.
 
   Input
     x - EBSD on a lattice, or grain2d

@@ -43,14 +43,17 @@ class gbcFMC(grainBoundaryCriterion):
     grains = calcGrains(ebsd, criterion=gbcFMC(3.8, minPixel=5))  # as the criterion of calcGrains
     grains = calcGrains(ebsd, fmc=3.8)                     # the same by the keyword of calcGrains
 
-  Fast multiscale clustering (McMahon et al.) is an algebraic multigrid coarsening of the
-  graph of neighbouring pixels: it builds a hierarchy of nested aggregates, each with its
-  mean orientation and orientation spread, and reads every pixel off at the scale where its
-  aggregate stands out most. There is no threshold angle: the coupling of two aggregates is
-  measured against their own spread, after what the lattice gradient of each explains, so a
-  small misorientation separates two uniform aggregates and does not separate the parts of a
-  deformed grain. Each indexed phase is clustered on its own; a pair of pixels of two phases
-  is always a boundary.
+  Fast multiscale clustering (McMahon et al.) coarsens the graph of neighbouring pixels into
+  a hierarchy of nested aggregates, each with its mean orientation and orientation spread.
+  Every pixel is read off at the scale where its aggregate stands out most.
+
+  There is no threshold angle. The coupling of two aggregates is measured against their own
+  spread, after what the lattice gradient of each explains, so a small misorientation
+  separates two uniform aggregates and does not separate the parts of a deformed grain.
+  cmaha is the main parameter: larger values give more grains.
+
+  Each indexed phase is clustered on its own; a pair of pixels of two phases is always a
+  boundary.
 
   Output
     crit - gbcFMC, a grainBoundaryCriterion

@@ -254,19 +254,25 @@ def mapValues(x, color, faceColor=None, ipfDirection=None, at=None):
     rgb, scalar = mapValues(ebsd['Forsterite'], key)          # through an orientation colour key
     rgb, scalar = mapValues(ebsd, 'mad', at=ind)              # the measurements ind alone
 
-  The colouring asked for is one of: None or 'phase', the colours of the phases;
-  'orientation', or an ipfDirection alone, every phase through the inverse pole figure key of
-  its own frame; an orientation per element, through the inverse pole figure key of its
-  phase; an orientationColorKey; the name of a property of the map or of a value per element
-  it computes (area, perimeter, aspectRatio, ... of grains); a value or an RGB colour per
-  element; one colour, a name or an RGB triple, for all; faceColor alone, one colour for
-  all. A site without an orientation is white, a not indexed phase white unless its frame
-  has a colour of its own.
+  The colouring asked for is one of:
 
-  A picture shows fewer measurements than a large map holds, and at= colours only those it
-  shows. A route that yields values ignores at and returns them all, since the colour range
-  is the map's and not the picture's; a route that yields colours returns one per entry of
-  at.
+  - None or 'phase': the colours of the phases.
+  - 'orientation', or an ipfDirection alone: every phase through the inverse pole figure key of
+  its own frame.
+  - an orientation per element: through the inverse pole figure key of its phase.
+  - an orientationColorKey: the phases of its frame through the key, the others by their own
+  inverse pole figure key for an ipfColorKey, else white.
+  - the name of a property, or of a value per element the map or the grains compute (area,
+  perimeter, aspectRatio, ...): values.
+  - a value or an RGB colour per element.
+  - one colour, a name or an RGB triple, for all; or faceColor alone.
+
+  A site without an orientation is white, a not indexed phase too unless its frame has a
+  colour of its own.
+
+  at= colours only the elements a picture shows, for a large map. Values are returned for all
+  elements regardless, since the colour range belongs to the whole map; colours are returned
+  one per entry of at.
 
   Input
     x - EBSD or grain2d
@@ -633,28 +639,30 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
     plot(grains, grains.area, colorbar=True)         # colours by a value per grain
     plot(grains['Forsterite'], grains['Forsterite'].meanOrientation)  # by mean orientation
     plot(grains, ipfDirection=xvector)               # every phase by its inverse pole figure key along x
-    plot(grains, faceColor='none', lineColor='r')    # the outlines alone, in red
+    plot(grains, alpha=0, lineColor='r')             # the outlines alone, in red
     plot(grains, boundary=False, translucent=0.5)    # no boundary, faded by colour
     plot(grains, faceColor='red', displayName='all grains')  # one colour, in the legend
     plot(grains, cS)                                 # the crystal shape of every grain
     plot(grains, v)                                  # an axis per grain as a needle
 
-  Every grain is one polygon with its holes, coloured as mapValues colours: by phase, by a
-  value per grain through a colour map, by orientations through the inverse pole figure key
-  of their phase, by an orientation colour key, by an RGB colour per grain or in one colour.
-  The boundary, grains.boundary, is drawn on top in lineColor, else in the face colour, else
-  black. A crystalShape draws the shape of every grain, rotated by its mean orientation, at
-  its centroid; a vector3d per grain an axis as a needle through it, its half pointing out of
-  the screen black and the other white.
+  Every grain is one polygon with its holes, coloured as mapValues describes: by phase, by a
+  value per grain through a colour map, by orientation through the inverse pole figure key of
+  its phase or an orientation colour key, by an RGB colour per grain, or in one colour. The
+  boundary is drawn on top in lineColor, else in the face colour, else black.
 
-  translucent=s fades a grain by its colour, as MATLAB's 'translucent': the opacity of a grain
-  is s (1 - min(r, g, b)) for a colour and s v / max(v) for a value, so that pale grains let
-  what lies below show.
+  Two kinds of color draw something else at every grain:
+
+  - a crystalShape: the shape rotated by the mean orientation of the grain, at its centroid.
+  - a vector3d per grain: the axis as a needle through the centroid, the half pointing out of
+  the screen black, the other white.
+
+  translucent=s fades a grain by its colour, as MATLAB's 'translucent': the opacity is
+  s (1 - min(r, g, b)) for a colour and s v / max(v) for a value, so that pale grains let what
+  lies below show.
 
   region=(xmin, xmax, ymin, ymax) shows a part of the map, title= names the axes,
-  coordinates=True labels the axes with the map coordinates, how2plot= a plottingConvention
-  other than the map's, parent= the axes to draw into and figSize= the size of a new figure;
-  every other keyword goes to the matplotlib artist.
+  coordinates=True labels them, how2plot= sets another plottingConvention, parent= the axes
+  and figSize= the size of a new figure. Other keywords go to the matplotlib artist.
 
   Input
     grains - grain2d
@@ -664,7 +672,8 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   Output
     h - the matplotlib collection of the grains
   Keywords
-    faceColor - one colour for every grain; 'none' draws the boundary alone
+    faceColor - one colour for every grain; 'none' fills the grains black, alpha=0 draws
+        the boundary alone
     colormap - the colour map of values
     colorRange - (lo, hi), the values the colour map spans
     colorbar - add a colour bar for values
@@ -1078,12 +1087,20 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
     quiver(grains, v, antipodal=True)                # axes, centred on the centroids
     quiver(grains, v, scale=10)                      # scale times the length of v
 
-  A direction starts at its point, an axis (an antipodal vector, or antipodal=True) is centred
-  on it. By default an arrow of a grain is a fifth of its diameter, of a map one and a half
-  spacings, of a boundary three median segment lengths, and is drawn as its projection onto
-  the map, so that a direction steep to the map is short. scale=s draws every arrow s times
-  the length of its vector in the plane instead, scaling=False at the length of the vector
-  itself. Into a held map plot the arrows go on top of it, else into a map of their own.
+  A direction starts at its point, an axis (an antipodal vector, or antipodal=True) runs both
+  ways from it. The default length depends on what carries the arrows:
+
+  - grains: a fifth of the grain diameter along the direction in space, seen on the map, so
+  that a direction steep to the map is short; an axis reaches that far to either side. A
+  direction pointing into the map ends at the centroid unless projectIntoPlane=True.
+  - a map: one and a half pixel spacings on the map for every arrow, whatever its inclination.
+  - boundary segments: needles both ways from the midpoint, proportional to the length of the
+  vector in space and seen on the map; autoScaleFactor, by default 0.15, sets their size
+  relative to the spacing of the segments.
+
+  scale=s draws every arrow s times the length of its vector in the plane of the map instead,
+  scaling=False at that length itself. Into a held map plot the arrows go on top of it, else
+  into a map of their own.
 
   Input
     x - grain2d, EBSD or grainBoundary

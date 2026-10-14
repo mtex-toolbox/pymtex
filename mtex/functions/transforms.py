@@ -190,17 +190,20 @@ def wignerTransform(fhat, L, real=False, folds=(1, 1), degrees=None):
     G = wignerTransform(fhat, L, real=True)            # a real function, only l >= 0
     G = wignerTransform(fhat, L, folds=(4, 2))         # a 4 fold about z in the crystal, 2 fold in the specimen
 
-  A Wigner series of bandwidth L is a trigonometric series in the Euler angles,
+  A Wigner series of bandwidth L is a trigonometric series in the Euler angles of the ZYZ
+  convention (alpha = phi1 - pi/2, beta = Phi, gamma = phi2 + pi/2),
   f(alpha, beta, gamma) = sum G[l, k, j] e^{-i(k alpha + j beta + l gamma)}, with
-  G[l, k, j] = sum_n sqrt(2n+1) i^{k-l} fhat_n^{kl} d_n^{jk}(pi/2) d_n^{jl}(pi/2). The array
-  is what a NUFFT or, on a Clenshaw-Curtis grid, an FFT evaluates; SO3FunHarmonic.eval goes
-  this way. Every index runs from -L to L and sits at its value plus L.
+  G[l, k, j] = sum_n sqrt(2n+1) i^{k-l} fhat_n^{kl} d_n^{jk}(pi/2) d_n^{jl}(pi/2). A NUFFT, or
+  an FFT on a Clenshaw-Curtis grid, evaluates this array; SO3FunHarmonic.eval goes this way.
+  Every index runs from -L to L and sits at its value plus L.
 
-  The coefficients are the internal ones, SO3FunHarmonic._fhat (docs/design/harmonics.md), not
-  the fhat a user reads. For a real function only l >= 0 is kept, the plane l = 0 halved, and
-  f is twice the real part of the sum. A function with an rA fold symmetry about z in the
-  crystal and an rB fold in the specimen has coefficients only at l = 0 mod rA and
-  k = 0 mod rB: those axes are indexed by l / rA and k / rB.
+  The coefficients are the port's internal ones, SO3FunHarmonic._fhat, not the fhat a user
+  reads. For a real function only l >= 0 is kept, the plane l = 0 halved, and f is twice the
+  real part of the sum.
+
+  A function with an rA fold symmetry about z in the crystal and an rB fold in the specimen
+  has coefficients only at l = 0 mod rA and k = 0 mod rB; with folds=(rA, rB) those axes are
+  indexed by l / rA and k / rB.
 
   Input
     fhat - the internal Wigner coefficients, a complex array of at least the degrees 0 to L
@@ -304,9 +307,9 @@ def sphericalTransform(fhat, L, real=False, degrees=None):
     G = sphericalTransform(f._fhat, 8, real=True)  # the rows m >= 0 of a real function
     G = sphericalTransform(f._fhat, 8, degrees=halfPiDegrees(8))  # the Wigner-d matrices given
 
-  The coefficients are the internal ones, f._fhat, with the Condon-Shortley phase
-  (docs/design/harmonics.md), not MATLAB's f.fhat. The transform is the first step of the
-  evaluation on a grid or by the NUFFT; with numba and no degrees given it is a compiled loop.
+  The coefficients are the port's internal ones, f._fhat, with the Condon-Shortley phase, not
+  MATLAB's f.fhat. The transform is the first step of the evaluation on a grid or by the
+  NUFFT.
 
   Input
     fhat - the spherical coefficients, (L+1)^2 of them or more, those above L ignored

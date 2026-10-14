@@ -1330,18 +1330,24 @@ def quiver(v, w=None, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
     quiver(grains, grains.meanOrientation * Miller(1, 0, 0, grains.CS, 'uvw'))  # an arrow per grain
     quiver(gB, gB.direction)                          # a needle per boundary segment
 
-  On the sphere an arrow is the tangential part of w at its direction carried through the
-  projection; the longest vector of all is arrowSize times the grid spacing resolution, so a
-  vector almost normal to the sphere draws almost nothing, and normalize=True draws every
-  arrow at that length. An antipodal w, or an axis field, draws centred needles without heads.
+  What the first argument is decides where the arrows go:
+
+  - directions or a vector or axis field: arrows on the sphere, a field on an equispaced grid
+  of the spacing resolution.
+  - orientations: arrows in the ODF sections of the current figure.
+  - a map, its grains or its boundaries: an arrow per measurement, grain or segment on the map
+  plot, with the keywords scale, scaling, autoScaleFactor, projectIntoPlane, antipodal, color,
+  lineWidth and displayName.
+  - a map of volumes or 3D grains: arrows in the scene of its figure.
+
+  On the sphere an arrow is the tangential part of w at its direction, so a vector almost
+  normal to the sphere draws almost nothing. The longest vector of all is arrowSize times the
+  spacing resolution; normalize=True draws every arrow at that length. An antipodal w, or an
+  axis field, draws centred needles without heads.
+
   maxHeadSize is the length of the heads as a fraction of the longest arrow, lineWidth the
   width of the shafts, color their colour; the projection and the charts follow the keywords
   of the spherical plots.
-
-  A map, its grains or its boundaries go to the map plot: an arrow per measurement, grain
-  or segment, with the keywords scale, scaling, autoScaleFactor, projectIntoPlane,
-  antipodal, color, lineWidth and displayName; a map of volumes or 3D grains draws its
-  arrows into the scene of its figure, orientations into the ODF sections held.
 
   Input
     v - vector3d, the points of the arrows; an S2VectorField or S2AxisField; orientation;
@@ -1573,14 +1579,21 @@ def plotPF(odf, h, *args, superposition=None, **kw: Unpack[PlotKeywords]):
     plotPF(odf, h, '3d')                              # the pole figure on a sphere in space
 
   Every pole figure is the Radon transform odf.radon(h) of the ODF, the density of the
-  specimen directions along which h lies. A list of directions draws one axes each, titled
-  by its indices (title=False leaves them untitled, MATLAB's noTitle); each takes its own
-  colour range, colorRange='equal' one for all or a pair the limits. superposition gives
-  the structure coefficients: with one coefficient per direction the directions make one
-  superposed pole figure; with a list of coefficient arrays, one per entry of a list of
-  direction sets, each set one. The other keywords are those of the spherical plots:
-  resolution, the styles pcolor, contourf=True or contour=True with their levels, colorbar,
-  minmax, antipodal, complete, upper, lower, the projection and the layout.
+  specimen directions along which h lies. A list of directions draws one axes each, titled by
+  its indices; title=False leaves them untitled (MATLAB's noTitle).
+
+  Each pole figure takes its own colour range; colorRange='equal' gives one for all, a pair
+  the limits.
+
+  superposition gives the structure coefficients of superposed directions:
+
+  - one coefficient per direction: all directions make one superposed pole figure.
+  - a list of coefficient arrays, one per entry of a list of direction sets: one superposed
+  pole figure per set, as plotPF(odf, pf.allH, superposition=pf.c).
+
+  The other keywords are those of the spherical plots: resolution, the styles pcolor,
+  contourf=True or contour=True with their levels, colorbar, minmax, antipodal, complete,
+  upper, lower, the projection and the layout.
 
   Input
     odf - SO3Fun

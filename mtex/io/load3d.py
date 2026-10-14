@@ -48,11 +48,14 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
 
   The format is told by the extension and, for an HDF5 file, by what it holds: a LabDCT group
   makes it an xnovo file, the cell data of a grid a DREAM.3D file, whatever the data
-  containers are called. The voxels of a DREAM.3D or xnovo file form a voxelLattice, so
-  ebsd[i, j, k] addresses one of them; every further scalar array of the file becomes a
-  property. A list of files is read by loadEBSD, every file a layer at its height z, as a
-  list of voxels without a lattice; the phases and the properties are those of the first
-  file. EBSD3.load is the same function.
+  containers are called.
+
+  The voxels of a DREAM.3D or xnovo file form a voxelLattice, so ebsd[i, j, k] addresses one
+  of them; every further scalar array of the file becomes a property.
+
+  A list of files is read by loadEBSD, every file a layer at its height z, as a list of voxels
+  without a lattice. The phases are those of the first file, CS does not replace them; the
+  properties are those all files have. EBSD3.load is the same function.
 
   Input
     fname - the file name, or a list of file names of 2D maps
@@ -61,7 +64,7 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
   Keywords
     interface - the format, 'dream3d' or 'xnovo'; by default told by the file
     z - the height of every map of a stack, by default 0, 1, 2, ...
-    CS - a crystalFrame or a phaseList replacing the phases of the file
+    CS - a crystalFrame or a phaseList replacing the phases of a DREAM.3D or xnovo file
   See also
     loadEBSD, loadGrains3d, calcGrains, EBSD3Analysis, EBSD3Plotting"""
   if isinstance(fname, (list, tuple)):

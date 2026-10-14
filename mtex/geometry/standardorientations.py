@@ -158,12 +158,20 @@ def variants(p2c, second=None, ids=None, parent=False):
     odfChild = variants(p2c, odfParent)              # the child texture
 
   The child variants are the distinct p2c * r over the rotations r of the parent group modulo
-  the child group, the parent variants the distinct r * p2c over the child group modulo the
-  parent group. They are numbered as MTEX numbers them, Morito's numbering for
-  Kurdjumov-Sachs, which is what a variant id means; the ids count from 1. The child
-  orientations of a parent orientation are those of its representative in the fundamental
-  region times the inverse child variants, along a new last axis; an orientation in the child
-  frame gives its parent orientations instead, in the parent frame.
+  the child group; the parent variants, with parent=True, are the distinct r * p2c over the
+  child group modulo the parent group.
+
+  They are numbered as MTEX numbers them, for Kurdjumov-Sachs as Morito does; this order is
+  what a variant id means. The ids count from 1 up to the number of variants; an id of 0 or
+  below counts from the end, as NumPy indexes.
+
+  The second argument decides what is returned:
+
+  - parent orientations: their child orientations, the representative of each parent in the
+  fundamental region times the inverse child variants, along a new last axis, or one per
+  parent with ids.
+  - child orientations: their parent orientations instead, in the parent frame.
+  - a parent texture (an SO3Fun): the child texture.
 
   Input
     p2c - orientation, the parent to child misorientation, from the parent frame to the child

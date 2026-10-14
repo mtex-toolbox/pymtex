@@ -199,12 +199,14 @@ def plotShape(*args, faceColor=None, faceAlpha=None, edgeColor="k", lineWidth=0.
     plot(cS, Miller(1, 1, 0, cS.CS, 'hkl'))                      # the section by a lattice plane
     plot(cS, sS)                                                 # a slip system inside the shape
 
-  A list of shapes, ori * cS turned by orientations for instance, is drawn at once; with
-  positions every shape is moved there first. Drawn while a map is held, the shapes are seen
-  along the normal of the map, at the positions in its plane, as plot(grains, cS) puts them.
-  By default the faces take the colour of the mineral, or LightSkyBlue. A lattice plane
-  hands over to plotInnerFace, a slip system to plotSlipSystem. The keywords of the axes,
-  parent and the like, are taken as by every plot; MATLAB's legendSpacing is not there.
+  A list of shapes, ori * cS for instance, is drawn at once; with positions every shape is
+  moved there first. Drawn while a map is held, the shapes are seen along the normal of the
+  map at their positions in its plane, as plot(grains, cS) puts them.
+
+  By default the faces take the colour of the mineral, or LightSkyBlue. A lattice plane after
+  the shape hands over to plotInnerFace, a slip system to plotSlipSystem. The keywords of the
+  axes, parent and the like, are taken as by every plot; MATLAB's legendSpacing is not
+  provided.
 
   Input
     cS - crystalShape, one or a list

@@ -139,16 +139,17 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
     axes = crystalAxes(lattice, abc, abg, alignment=['X||a', 'Z||c*'])   # another alignment
     axes = crystalAxes(lattice, abc, abg, alignment=['EDAX'], rotate=rot)  # the vendor's alignment, turned
 
-  The axes are built from the metric with a* along x and c along z, the default alignment,
-  and then turned into the alignment asked for. An alignment names the lattice direction a
-  Cartesian axis lies along: a, b, c, their reciprocals a*, b*, c*, m = a + b or
-  d = a + b + c. With one of X and Y named and no Z, Z lies along c, or along c* when a
-  direct axis was named; with Z alone named, X takes the partner of the usual setting. 'EDAX'
-  (also 'TSL', 'OIM') is the vendors' alignment X||a for the triclinic, trigonal and
-  hexagonal lattices, where a and a* differ.
+  The default alignment puts a* along x and c along z. An alignment names the lattice
+  direction a Cartesian axis lies along: a, b, c, their reciprocals a*, b*, c*, m = a + b or
+  d = a + b + c.
+
+  - X or Y named, no Z: Z lies along c, or along c* when a direct axis was named
+  - Z alone named: X takes the partner of the usual setting
+  - 'EDAX', 'TSL' or 'OIM': the vendors' alignment X||a for the triclinic, trigonal and
+  hexagonal lattices, where a and a* differ
 
   A length of 0 is filled from the others and an angle of 0 from its partners, as MTEX fills
-  them; a cell the lattice does not allow is refused.
+  them; a cell the lattice does not allow is refused unless check=False.
 
   Input
     lattice - latticeType, the lattice system

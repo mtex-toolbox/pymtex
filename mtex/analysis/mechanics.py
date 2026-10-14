@@ -113,14 +113,19 @@ def SchmidFactor(sS, sigma=None, relative=False):
     tau = SchmidFactor(sS, sigma)                 # under a stress tensor
     tau = SchmidFactor(sS, sigma, relative=True)  # over the critical resolved shear stress
 
-  Under a stress tensor the shear it resolves on the system over the difference of the
-  extreme principal stresses, so that a uniaxial tension gives the direction cosines
-  cos(phi) cos(lambda) of a tension direction. One stress on a list of systems gives one
-  factor per system, a list of stresses or directions on a list of systems a (loads,
-  systems) matrix. Without a load the function of the tension direction on the sphere, one
-  function for one system and a vector valued one for several, antipodal as a tension along
-  r and along -r are one load. The systems and the load must be given in the same frame:
-  both in crystal coordinates, or ori * sS and the stress as measured.
+  Under a tension direction r the Schmid factor is cos(phi) cos(lambda), the product of the
+  cosines between r and the slip direction and between r and the plane normal. Under a stress
+  tensor it is the resolved shear stress divided by the difference of the largest and the
+  smallest principal stress, so a uniaxial tension gives the same number and the factor
+  lies between -0.5 and 0.5.
+
+  One load on a list of systems gives one factor per system, a list of loads a (loads,
+  systems) matrix. Without a load the result is the function of the tension direction on
+  the sphere, antipodal, vector valued for several systems; relative=True does not divide
+  this function by the CRSS, unlike MATLAB.
+
+  The systems and the load must be given in the same frame: both in crystal coordinates, or
+  ori * sS and the stress as measured.
 
   Input
     sS - slipSystem

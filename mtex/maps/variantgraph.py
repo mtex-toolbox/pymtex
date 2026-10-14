@@ -342,12 +342,17 @@ def calcVariantGraph(job, threshold=2 * degree, tol=1.5 * degree, p2c=False, p2p
     job.calcVariantGraph(mergeSimilar=True)                    # similar variants as one node
     job.calcVariantGraph(c2c=True)                             # the child to child boundaries only
 
-  A node per child grain and parent variant and one per parent grain. An edge joins two
-  nodes of neighbouring grains where they agree: child to child over every pair of variants,
-  parent to child over the variants that fit the parent, parent to parent over their
-  orientations, with the probability of the agreement, a cumulative Gaussian of the misfit
-  with the mean threshold and the spread tol. All three kinds are used unless some are asked
-  for. When the job holds votes, every grain is restricted to its best variant. The job is
+  The graph has a node per child grain and parent variant and one per parent grain. An edge
+  joins two nodes of neighbouring grains where they agree, weighted by the probability of the
+  agreement: a cumulative Gaussian of the misfit with the mean threshold and the spread tol.
+
+  Three kinds of boundaries give edges, all three unless some are asked for:
+
+  - c2c: two child grains, over every pair of their variants.
+  - p2c: a parent and a child grain, over the variants of the child that fit the parent.
+  - p2p: two parent grains, by their orientations.
+
+  When the job holds votes, every grain is restricted to its best variant. The job is
   changed in place; clusterVariantGraph clusters the graph.
 
   Input

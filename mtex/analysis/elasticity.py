@@ -187,12 +187,16 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
     vp, vs1, vs2, pp, ps1, ps2 = velocity(C)
     E = energyVector(C, None, vp, pp)               # as a vector field on the sphere
 
-  The energy velocity of a medium without attenuation is the velocity at which a plane wave
-  carries its energy, a good proxy for the group velocity: Ve_i = C_ijkl p_j n_k p_l / (rho
-  v), with n the propagation direction, v the phase speed and p the polarisation of one of
-  the three waves velocity returns. Its projection onto n is the phase speed, so its length
-  is at least v. With a speed function and a polarisation field and no direction the
-  result is a vector field on the sphere.
+  The energy velocity is the velocity at which a plane wave carries its energy through a
+  medium without attenuation, a good proxy for the group velocity. It is Ve_i = C_ijkl p_j
+  n_k p_l / (rho v), with n the propagation direction, v the phase speed and p the
+  polarisation of one of the three waves velocity returns.
+
+  Its projection onto n is the phase speed, so its length is at least v. Pass the speed and
+  the polarisation of the same wave, at the same directions.
+
+  Given a speed function and a polarisation field, the result is a vector field on the
+  sphere, also when a direction n is given; MATLAB evaluates the two at n then.
 
   Input
     C - stiffnessTensor in GPa

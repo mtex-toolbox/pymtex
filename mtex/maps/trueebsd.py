@@ -140,20 +140,23 @@ class trueEbsd:
       job.setOptions(0, roiSize=[4, 8])                       # a tile width per fit stage of map 0
       job.setOptions([0, 1], highContrast='auto')             # maps 0 and 1, measured when needed
 
-    The settings say how the job registers, not what an image is, so they live on the job. They
-    are lengths in the scan unit, not pixels, so they may be set before or after pixelSizeMatch.
-    What is left at 'auto' is measured from a coarse correlation when calcDistortion first needs
-    it, and what it chose is printed; what is set here is used as it is. The maps are counted
-    from 0, where MATLAB counts them from 1. The settings are keyword arguments, the names in
-    any case:
+    The settings say how the job registers, not what an image is, so they live on the job. The
+    lengths are in the scan unit, not in pixels, so they may be set before or after
+    pixelSizeMatch. The maps are counted from 0, where MATLAB counts them from 1.
 
-    roiSize - the width of a correlation tile, a length; one, or one per fit stage; 0 for a map
-    correlated against nothing, as the reference. numROI - the tiles across the image, the
-    number down following from the aspect ratio. registerOn - 'edge' to correlate the edge
-    transform, 'raw' the values as they are, for a pair already sharing its contrast.
-    edgeWidth - the neighbour distance of the edge transform, a length. highContrast - whether
-    the image can be registered on directly: True, False or 'auto'. pixelTime - the dwell time
-    per pixel, carried and not used.
+    A setting left at 'auto' is measured from a coarse correlation when calcDistortion first
+    needs it, and the choice is printed; a setting given here is used as it is. The settings
+    are keyword arguments, their names in any case:
+
+    - roiSize: the width of a correlation tile, a length; one, or one per fit stage; 0 for a
+    map correlated against nothing, as the reference.
+    - numROI: the number of tiles across the image, the number down following from the aspect
+    ratio; a fraction is rounded down.
+    - registerOn: 'edge' to correlate the edge transform, 'raw' the values as they are, for a
+    pair already sharing its contrast.
+    - edgeWidth: the neighbour distance of the edge transform, a length.
+    - highContrast: whether the image can be registered on directly, True, False or 'auto'.
+    - pixelTime: the dwell time per pixel, carried and not used.
 
     Input
       job - trueEbsd

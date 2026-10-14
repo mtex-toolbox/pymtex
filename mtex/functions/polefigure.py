@@ -892,14 +892,16 @@ def calcPoleFigure(odf, h, r=None, superposition=None, complete=False, **gridOpt
     pf = calcPoleFigure(odf, [h1, h23], r, superposition=[1, [0.2, 0.8]])  # h23 two superposed directions
     pf = calcPoleFigure(odf, pfMeasured)                          # on the directions of a measurement
 
-  The intensity of the crystal direction h at the specimen direction r is the radon
-  transform of the ODF, the mean of the ODF over the orientations taking h to r; over the
-  directions of an axis grid it is the mean of r and -r. A Python list of crystal
-  directions makes one pole figure per entry, and an entry of several directions is their
-  superposition, weighted by the superposition coefficients, as the overlapping
-  reflections a diffractometer measures together. Without specimen directions the pole
-  figures are evaluated on regularS2Grid, which takes the remaining keywords. The result
-  can be turned into counts by noisepf.
+  The intensity of the crystal direction h at the specimen direction r is the mean of the ODF
+  over all orientations that take h to r, its radon transform. Where the specimen directions
+  are axes, as on the default grid of the upper hemisphere, it is the mean of r and -r.
+
+  A Python list of crystal directions makes one pole figure per entry. An entry of several
+  directions is their superposition, weighted by the superposition coefficients, as the
+  overlapping reflections a diffractometer measures together.
+
+  Without specimen directions the pole figures are evaluated on regularS2Grid, which takes
+  the remaining keywords. noisepf turns the intensities into counts.
 
   Input
     odf - SO3Fun
@@ -970,13 +972,19 @@ def calcQuadratureWeights(v, method="voronoi"):
     w = calcQuadratureWeights(r)                     # a regular grid exactly, scattered points by Voronoi areas
     w = calcQuadratureWeights(r, method='harmonic')  # the least norm correction that integrates every harmonic the count allows
 
-  On a regular grid of rings (a polar ladder from the pole in equal steps) the weights are the
-  Clenshaw-Curtis weights of the rings shared by their points, exact on the sphere and, with
-  the equator ring halved, on a hemisphere. Scattered directions take the areas of their
-  spherical Voronoi cells (MATLAB's only method), an axis list counted on both hemispheres,
-  duplicates sharing a cell; method='harmonic' instead corrects equal weights by the least norm
-  change that integrates every spherical harmonic the number of points allows. Where neither
-  works the weights are equal.
+  On a regular grid of rings, a polar ladder from the pole in equal steps, the weights are
+  the Clenshaw-Curtis weights of the rings, shared by their points. They are exact on the
+  sphere and, with the equator ring halved, on a hemisphere.
+
+  For scattered directions the method chooses:
+
+  - 'voronoi', the default and MATLAB's only method: the areas of the spherical Voronoi cells,
+  an axis list counted on both hemispheres, duplicates sharing a cell. No cell counts more
+  than twice the 80 % quantile of the areas, so isolated points do not dominate.
+  - 'harmonic': equal weights corrected by the least change that integrates every spherical
+  harmonic the number of points allows.
+
+  Where neither works, as for fewer than four distinct directions, the weights are equal.
 
   Input
     r - vector3d

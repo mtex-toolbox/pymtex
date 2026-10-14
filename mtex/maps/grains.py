@@ -521,21 +521,21 @@ class grain2d(polygonSet):
       parentId = grains.merge(threshold=5*degree, testRun=True)  # the parent ids, nothing merged
 
     Two grains go into one when a criterion joins them, directly or through a chain of other
-    grains; several criteria given together apply together. Grains of two phases are merged
-    only by an inclusion, which then takes the phase and the orientation of its host: a pair
-    of them is passed over, and a label spanning phases joins the grains of each phase apart,
-    where MATLAB joins them and gives the merged grain the largest phase id.
+    grains. Inclusions combine with pairs or a threshold. A threshold, however, replaces the
+    pairs given with it, and a label per grain ignores inclusions; MATLAB applies every
+    criterion given.
 
-    The merge relabels and nothing else: the boundary between the parts of a merged grain
-    moves to its inner boundary, the polygons are traced again, the number of pixels is the
-    sum of the parts, the mean orientation is the mean of the parts weighted by their pixels
-    (MATLAB's calcMeanOrientation, always done here) and GOS the weighted mean of theirs.
-    The merged grains carry the ids of their parts as childId, and the grains passed are
-    given parentId, the id of the merged grain every grain went into, which MATLAB returns
-    as a second output.
+    Grains of two phases are merged only by an inclusion, which then takes the phase and the
+    orientation of its host. A pair of two phases is passed over, and a label spanning phases
+    joins the grains of each phase apart, where MATLAB joins them and gives the merged grain
+    the largest phase id.
 
-    MATLAB merges also at the grains of a triple point list, grains.merge(tP); that form is
-    not here.
+    The pixel counts of the parts add up, the mean orientation is their mean weighted by the
+    pixels (MATLAB's calcMeanOrientation, always done here) and GOS their weighted mean. The
+    boundary between the parts becomes inner boundary. The merged grains carry the ids of their
+    parts as childId, and the grains passed get parentId, the id of the merged grain each went
+    into, which MATLAB returns as a second output. MATLAB's merge at a triple point list,
+    grains.merge(tP), is not provided.
 
     Input
       grains - grain2d

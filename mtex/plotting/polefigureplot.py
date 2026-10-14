@@ -280,15 +280,20 @@ def plotIPF(o, *args, points=None, all=False, **kw: Unpack[PlotKeywords]):
     plotIPF(ori, r, all=True)                      # every orientation drawn
     plotIPF(ori, r, contourf=True)                 # the density of the directions, filled contours
 
-  An inverse pole figure shows which crystal directions, with all their equivalents folded
-  into the fundamental sector of the crystal, point along the specimen direction r. For an
-  ODF it is the density odf.radon(r=r), drawn with the keywords of a spherical function:
-  contourf, contour, pcolor, colorRange, resolution, antipodal, complete. For a list of
-  orientations the crystal directions are drawn as markers, coloured by a value or an RGB
-  colour per orientation when one is given, or, with contourf=True or another filled
-  style, as their density. A large list is thinned to a random selection, about 100000
-  markers divided by the order of the symmetries. A fibre is drawn as the dots of 1000
-  orientations along it. MATLAB's points='all' is all=True.
+  An inverse pole figure shows which crystal directions point along the specimen direction r,
+  all their equivalents folded into the fundamental sector of the crystal. What is drawn
+  depends on the first argument:
+
+  - an ODF: the density odf.radon(r=r), drawn with the keywords of a spherical function,
+  contourf, contour, pcolor, colorRange, resolution, antipodal, complete.
+  - a list of orientations: the crystal directions as markers, coloured by a value or an RGB
+  colour per orientation when one is given; with contourf=True or another filled style, their
+  density.
+  - a fibre: the dots of 1000 orientations along it.
+
+  A large list of orientations is thinned to a random selection of about 100000 markers
+  divided by the order of the symmetries; points sets another number, all=True keeps every
+  orientation (MATLAB's points='all').
 
   Input
     odf - SO3Fun, an ODF

@@ -389,12 +389,16 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None):
     cells = decompose(ebsd)              # the cells of the map
     cells = decompose(ebsd, alpha=5)     # wider holes filled
 
-  The cell of a pixel is its Voronoi cell, clipped against the lattice neighbours within
-  reach, so a cell of a square or hexagonal grid is its unit cell. A not indexed region
-  narrower than 2 alpha pixel spacings is filled, the cells of its indexed neighbours growing
-  into it; a wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain.
+  The cell of a pixel is its Voronoi cell among the lattice neighbours within reach, so a
+  cell of a square or hexagonal grid is its unit cell. The map must lie on a lattice; a map
+  without one is refused.
+
+  alpha decides what happens to regions of not indexed pixels. A region narrower than
+  2 alpha pixel spacings is filled, the cells of its indexed neighbours growing into it. A
+  wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain.
+
   The vertices that the cells of neighbouring pixels compute each for themselves are welded
-  within tol. The map must lie on a lattice; a map without one is refused.
+  into one when they lie within tol.
 
   Input
     ebsd - EBSD on a square or hexagonal lattice

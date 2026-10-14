@@ -129,16 +129,18 @@ def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw: Unp
     plot(ebsd, at=(5, None, 10))                 # two slices at the voxels given
 
   The slices are normal to the three axes of the voxel lattice, through the middle of the
-  volume unless at gives the voxel index of each. A voxel not indexed or without a value is
-  white. Orientations are coloured by an ipfColorKey of their phase, values by the colour
-  map. The options of the drawing are keywords too: faceColor, colormap, colorRange and
-  ipfDirection. The plot is a scene3d held by the mtexFigure, shown as the picture PyVista renders offscreen
-  (matplotlib's 3D axes without PyVista), so hold, setCamera and mtexColorbar act on it as on
-  any MTEX figure; show3d opens it in a window and exportHTML writes it as an interactive
-  page.
+  volume unless at gives the voxel index of each. Orientations are coloured by an
+  ipfColorKey of their phase (ipfDirection sets its direction), values by the colour map
+  (colormap, colorRange), and faceColor gives all voxels one colour. Coloured by phase, the
+  notIndexed voxels show in their own colour; otherwise a voxel not indexed or without a
+  value is white.
+
+  The plot is a 3D scene held by the mtexFigure and rendered by PyVista (matplotlib's 3D
+  axes without it), so hold, setCamera and mtexColorbar act on it as on any MTEX figure.
+  show3d opens it in a window, exportHTML writes it as an interactive page.
 
   MATLAB's options of a planar map, the region, the points and the exact unit cells, have no
-  meaning here; the slices of one plane are drawn as a map by plot of ebsd.slice.
+  meaning here; one plane of voxels is drawn as a map by plot(ebsd.slice(...)).
 
   Input
     ebsd - EBSD3

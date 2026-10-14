@@ -174,6 +174,35 @@ form run; 968 pages with a Keywords table). Not fixed yet:
   `complete`; `EBSD.rotate(center=)`; `grain3d.neighbors`' matrix; `EBSD.gradient`'s basis;
   `surfor`'s omega output; `num2rgb`'s N; `setColorRange('zero2white')`.
 
+### Found while rewriting the long descriptions (2026-10-14)
+
+85 descriptions over 90 words a paragraph or 200 in all rewritten as short paragraphs and lists
+(five agents, `calcKernel` the model), each claim checked against the code, the forms and their
+edge cases run. Not fixed yet:
+
+- Wrong results: `fill(ebsd)` and `interp` after `calcGrains` leave the absorbed pixels (the
+  grain's phase, a NaN rotation) unfilled, as measured (`smoothingGraph`'s `isData` by phase);
+  `SchmidFactor(sS, relative=True)` without a load ignores `relative`; `energyVector(C, n, vp, pp)`
+  ignores `n` for an S2Fun speed; `calcComponents` never reads `verbose`, and weights seeds
+  without weights equally where MATLAB weights them by the density; `calcError` compares
+  different Laue groups silently; `variants(p2c, ori, 0)` is variant 24; `interpolate(...,
+  withParameters=True)` drops the parameters for several columns and on the sphere;
+  `loadEBSD3([f1, f2], CS=)` ignores `CS`; `calcCluster` gives -1 for the dropped modes and a
+  cluster to NaN orientations; `merge(grains, ...)`: a threshold replaces the pairs, labels
+  ignore `inclusions`, MATLAB ORs every criterion; `plot(grains, faceColor='none')` fills black;
+  `calcTensor(ebsd, weights=)` of a gridded map; `calcGBNDKernel(bump=True)` has mean 0.93;
+  `legend` after `mtexColorbar` goes into the colour bar; `SO3VectorFieldHarmonic([f, f, f])`
+  loses the frames; `layoutIndex` with a 3-D shape transposes every axis; `plotSpectrum` of an
+  `S1FunHarmonic` draws its SO(3) conversion; a float `CRSS` breaks `SchmidFactor`;
+  `calcTraces('Radon')` finds a direction in an isotropic cluster.
+- Refused badly: empty input of `WignerD`, `symmetrise`, `plotAngleDistribution`,
+  `calcAngleDistribution`, `embedding`, `birefringence`, `discreteSample`, `volume`, `gradient`,
+  `interpolate`, `interpolateRBF`, `SO3FunHarmonic.quadrature`, `calcParent`,
+  `calcParent2Child`, `calcCluster`, `calcTensor`, `S2AxisFieldHarmonic`; `volume(odf, c, 0)`;
+  `weightedBurgersVec(windowSize=0)`; `discreteSample` of a NumPy ufunc; `EBSD3.plot(at=)`
+  outside the volume; `export(odf, ...)` and `trueEbsd.setOptions` take misspelled or wrong
+  values silently; `interpolateRBF` refuses several columns.
+
 ## 4. Open questions
 
 - A MATLAB page with no Python twin (1042 of them): stays as it is, or a note "not in the

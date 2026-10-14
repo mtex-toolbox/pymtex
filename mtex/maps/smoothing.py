@@ -283,26 +283,24 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
     grains = smoothBoundary(grains, taubinFilter())                   # smoothing without shrinking
     grains = smoothBoundary(grains, curvatureFilter(smoothingLength=3))  # a smoothing length
 
-  A boundary comes out of calcGrains as a staircase of pixel edges, every segment along a
-  grid axis whatever direction the boundary has. It is repaired in three steps: simplify
-  drops every vertex whose removal moves the boundary by less than a tolerance, by default
-  d / sqrt(2) for the pixel spacing d, which removes the grid and nothing else; refine
-  resamples what is left at equal arc length, by default d, which gives the smoothing evenly
-  spaced vertices no longer tied to the grid; and a boundaryFilter smooths, by default
-  laplaceFilter(iter), iter steps of local averaging. Both lengths are taken from the median
-  segment before the first step, the pixel spacing; afterwards the median is the length of
-  the straightened runs.
+  calcGrains gives a boundary as a staircase of pixel edges, every segment along a grid axis.
+  The smoothing repairs it in three steps:
 
-  Neither of the first two steps is cosmetic: simplifying alone leaves a curve as a few long
-  chords whose corners the smoothing cuts off, and smoothing alone leaves the directions of a
-  straight boundary scattered around the grid axes. They change the number of segments,
-  though, and a resampled segment no longer runs between one pair of pixels: where
-  gB.ebsdId is read per segment, switch them off with simplify=False, refine=False.
+  - simplify: drops every vertex whose removal moves the boundary by less than a tolerance,
+  by default d / sqrt(2) for the pixel spacing d, which removes the staircase and nothing else.
+  - refine: resamples what is left at equal arc length, by default d, so that the vertices are
+  evenly spaced and no longer tied to the grid.
+  - the boundaryFilter smooths, by default laplaceFilter(iter), iter steps of local averaging.
 
-  The junctions, triple and quadruple points and the ends of the inner boundary on the outer
-  one, stay where they are unless moveTriplePoints is set, and so does the outer boundary of
-  the map unless moveOuterBoundary is. The vertices move in the plane of the map. A new
-  grain2d is returned; MATLAB's second output, the filter used, is the one passed or
+  The first two steps matter: simplifying alone leaves a curve as a few long chords whose
+  corners the smoothing cuts off, and smoothing alone leaves straight boundaries scattered
+  around the grid axes. They change the segments, though, and a resampled segment no longer
+  lies between one pair of pixels: where gB.ebsdId is read per segment, as calcGBND does,
+  switch them off with simplify=False, refine=False.
+
+  The junctions (triple and quadruple points, and the ends of the inner boundary on the outer
+  one) stay fixed unless moveTriplePoints=True, the outer boundary of the map unless
+  moveOuterBoundary=True. MATLAB's second output, the filter used, is the one passed or
   laplaceFilter(iter).
 
   Input

@@ -111,11 +111,20 @@ def volume(f, center, radius, resolution=None):
     v = volume(ori, center, 10*degree)                    # the share of a list of orientations
 
   The volume is the mean of f on a local grid in the ball times the ball's share of the
-  fundamental region (its Haar measure times the number of symmetric copies, at most one).
-  On the sphere it is the same over a spherical cap; an antipodal function over a cap of 90
-  degree gives its mean value. A fibre as the centre gives fibreVolume; a list of
-  orientations gives the share of them within the radius; a list of centres a value each.
-  The spherical form is a function only, not a method of the spherical functions.
+  fundamental region, counting its symmetric copies, at most one. A uniform density gives
+  the share of the ball itself, so a value above it marks a preferred orientation.
+
+  On the sphere the ball is a spherical cap; an antipodal function over a cap of 90 degree
+  gives its mean value. The spherical form is a function only, volume(sF, v, r), not a
+  method of the spherical functions.
+
+  The centre may also be:
+
+  - a fibre: the volume of the tube about it, as fibreVolume.
+  - a list of centres: one value each.
+
+  Given a list of orientations instead of a function, the result is the share of them
+  within the radius.
 
   Input
     f - SO3Fun, S2Fun or orientation
@@ -265,14 +274,19 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
     ad, omega = calcAngleDistribution(cs, cs2)                             # the uniform one of two crystal frames
     ad, omega = calcAngleDistribution(cs, np.linspace(0, 60, 61)*degree)   # at the angles given
 
-  For a crystal frame the distribution of the uniform density is the area of the axis sector
-  of the fundamental region at each angle times sin^2(omega/2), scaled to mean one over the
-  angles. For an SO3Fun it is that uniform distribution times the mean of the function over the
-  axes at each angle: the axes are sampled with a count following sin^2(omega/2) and only the
-  rotations of minimal angle under the symmetries kept. For misorientations it is a histogram
-  of the disorientation angles in percent, summing to 100, and omega the centres of the bins.
-  The angles are in radians and end at the largest angle of the fundamental region; MATLAB's
-  outputs in this order. The angles may also be given positionally, after the second frame.
+  The result depends on the input:
+
+  - a crystal frame, or two: the distribution of the uniform density, the area of the axis
+  sector of the fundamental region at each angle times sin^2(omega/2), scaled to mean one
+  over the angles.
+  - an SO3Fun: that uniform distribution times the mean of the function over the axes at each
+  angle, scaled by the same factor, so that a uniform density gives the uniform distribution.
+  - misorientations: a histogram of the disorientation angles in percent, summing to 100,
+  with omega the centres of the bins.
+
+  The angles are in radians and end at the largest angle of the fundamental region; angles
+  given beyond it are dropped. They may also be given positionally, after the second frame.
+  MATLAB returns the same two outputs in this order.
 
   Input
     f - SO3Fun, a misorientation density; orientation, misorientations; or crystalFrame
@@ -283,8 +297,8 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
   Keywords
     omega - the angles at which the distribution is computed, 200 up to the largest angle by
         default (SO3Fun and frames)
-    edges - the bin edges of the histogram, by default between 5 and 50 bins up to the largest
-        angle (misorientations)
+    edges - the bin edges of the histogram, by default between 4 and 49 bins up to the largest
+        angle, one per 20 misorientations (misorientations)
     resolution - the spacing of the axes sampled at each angle (SO3Fun)
   See also
     calcAxisDistribution, calcMDF, calcMisorientation, plotAngleDistribution,
@@ -469,10 +483,16 @@ def calcError(f, g, mode=None, resolution=5 * degree, epsilon=None):
     e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)  # the relative L2 error on a finer grid
     e = calcError(odf, pf, 'RP')                             # the RP error against pole figures
 
-  Two functions are compared on the equispaced grid of the resolution: 'l1', the default, is
-  half the mean absolute difference, for two densities the fraction of the volume that would
-  have to move to turn one into the other; 'l2' is the norm of the difference over the norm of
-  g. With pole figures second the result is PoleFigure.calcError, one number per pole figure,
+  Two functions are compared at the nodes of an equispaced grid of the resolution in the
+  fundamental region of f; g is evaluated there whatever its own symmetry, where MATLAB
+  refuses functions of different symmetry. The mode chooses the measure:
+
+  - 'l1', the default: half the mean absolute difference. For two densities it is the fraction
+  of the volume that would have to move to turn one into the other, between 0 and 1.
+  - 'l2': the norm of the difference over the norm of g, on the grid; MATLAB computes it from
+  the harmonic series.
+
+  With pole figures second the result is PoleFigure.calcError, one number per pole figure,
   with its own modes ('relative', the default, 'RP', 'l1', 'l2') and the threshold epsilon.
   MATLAB's 'L0', the volume where the two differ by more than epsilon, is not provided.
 
@@ -876,12 +896,23 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
     modes, weights, centerId = calcComponents(odf, seed=ori)             # the modes the orientations ascend to
     modes, weights, centerId = calcComponents(odf, seed=ori, radius=10*degree, exact=True)  # volumes within a radius, every mode kept
 
-  Every seed climbs by steepest ascent to a local maximum of the function; maxima closer than
-  the tolerance are one mode, and its weight is the sum of the weights of the seeds that reached
-  it. The seeds are the centres of a radial function with their weights, else the nodes of a
-  2.5 degree grid, which first climb to their peaks on the grid. Modes of less than one percent
-  of the weight are dropped unless exact=True, and the seeds that reached them get centerId -1.
-  The modes are ordered by decreasing weight.
+  Every seed climbs by steepest ascent to a local maximum of the function. Maxima closer than
+  tol are one mode, and its weight is the sum of the weights of the seeds that reached it,
+  only of those within radius of it when a radius is given. The modes are ordered by
+  decreasing weight.
+
+  The seeds are, in this order of preference:
+
+  - the orientations given as seed, with equal weights unless weights are given; MATLAB
+  weighs them by the function's values there.
+  - the centres of a radial function, with its weights.
+  - the nodes of a 2.5 degree grid, with equal weights, which first climb to their peaks on
+  the grid; the weight of a mode is then the share of the orientation space that flows into
+  it, not its volume.
+
+  Seeds of weight zero are left out, so centerId has one entry per seed of positive weight.
+  Modes of less than one percent of the weight are dropped unless exact=True, and the seeds
+  that reached them get centerId -1. The progress is not reported, whatever verbose says.
 
   Input
     f - SO3Fun
@@ -965,13 +996,21 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     ori = discreteSample(ori, n, withoutReplacement=True)       # n members of a list, none twice
     ebsd = discreteSample(ebsd, n)                              # n measurements of a map, of any phases
 
-  A density is sampled on the nodes of a grid with probability proportional to its values, and
-  every node drawn is moved by a random rotation within the grid resolution and turned by a
-  random element of each symmetry group. A radial function is sampled exactly: a centre by its
-  weight, the angle by the inverse distribution of the kernel, a uniform axis; a Bingham
-  distribution exactly by rejection, a sum of radial functions term by term. A Python function
-  of numbers is sampled on 10000 points of the range. MATLAB's 'compact' sampling and the
-  indices of the members drawn from a list are not provided.
+  How the sample is drawn depends on what is sampled:
+
+  - a density on SO(3) or the sphere: grid nodes drawn with probability proportional to the
+  values, each moved by a random rotation of up to 1.5 times the grid resolution and turned by
+  a random element of each symmetry group. A finer resolution gives a more exact sample.
+  - a radial function (unimodalODF, calcDensity): exactly, a centre by its weight, the angle
+  by the distribution of the kernel and a uniform axis; a sum of radial functions term by term.
+  - a Bingham distribution: exactly, by rejection.
+  - a Python function of numbers (a def or a lambda, not a NumPy ufunc such as np.exp): its
+  values at 10000 points of the range.
+  - a list, a map, grains or boundary segments: n of its members, with replacement unless
+  withoutReplacement=True, which returns all members when n exceeds their number.
+
+  MATLAB's 'compact' sampling and the indices of the members drawn from a list are not
+  provided.
 
   Input
     f - SO3Fun, S2Fun, a Python function of numbers, or a list of orientations or directions,
@@ -1180,12 +1219,18 @@ def centerSpecimen(odf, v0=None, *args, delta=45 * degree, bandwidth=16, verbose
     odr, rot, v1, v2 = centerSpecimen(odf)                                   # starting at the x axis
     odr, rot, v1, v2 = centerSpecimen(odf, yvector, delta=30*degree, verbose=True)  # another start, a smaller search
 
-  The mismatch of a candidate axis is the norm of the difference between the harmonic series
-  of the density and the series turned by 180 degrees about it. The first two fold axis is
-  searched on a cap of the opening delta about v0, and refined; the second on the fan
-  perpendicular to the first. The rotation carries the two axes onto the specimen axes nearest
-  to them. The search always runs on the harmonic series, so MATLAB's flags 'Fourier' and
-  'silent' change nothing; MATLAB's 'SO3Grid' and 'resolution' are not taken.
+  The function finds the two fold axes of a texture that should have orthorhombic specimen
+  symmetry but was measured slightly turned, and turns it back. A candidate axis is scored
+  by how much the density changes when turned by 180 degree about it; the fit verbose
+  reports is one minus that change, relative to the norm of the density.
+
+  The first axis is searched on a cap of opening delta about v0 and refined, the second on
+  the fan perpendicular to the first. The rotation carries the two axes onto the specimen
+  axes nearest to them; v2 is returned made exactly perpendicular to v1.
+
+  The search and the result use the harmonic series of the given bandwidth, so odr is
+  truncated to it. MATLAB's flags 'Fourier' and 'silent' change nothing; its 'SO3Grid' and
+  'resolution' are not taken.
 
   Input
     odf - SO3Fun

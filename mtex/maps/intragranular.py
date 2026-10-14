@@ -178,22 +178,27 @@ def gradient(ebsd, direction=None, stencil="oneSided"):
     gX, gY = gradient(ebsd, stencil='full')    # least squares with the diagonals
     gD = gradient(ebsd, xvector)               # the derivative along a direction of the specimen
 
-  The derivative is a vector of the left tangent space, the rotation vector of the step to
-  the neighbour divided by its length, taken from the neighbours that are comparable: inside
-  the map, indexed, of the same phase and, where the map carries grain ids, of the same
-  grain. A pixel whose neighbours do not span two directions has none, and is NaN.
+  The derivative at a pixel is the rotation vector of the step to its neighbour divided by
+  the step length, a vector of the left tangent space, fitted over several neighbours. Only
+  comparable neighbours count: inside the map, indexed, of the same phase and, where the map
+  carries grain ids, of the same grain. A pixel whose neighbours do not span two directions
+  gets NaN, as does every pixel of a map of a single row.
 
-  The stencil 'oneSided' takes the neighbours along the two lattice directions, stepping
-  backwards only where the map ends and NaN where the neighbour it asks for is missing inside
-  the map. 'lattice' (MATLAB's '1hop', which is taken too) fits over the stencil of the
-  lattice, four axial neighbours of a square grid and six of a hexagonal one, the central
-  difference in the interior; 'full' fits over all eight offsets in {-1, 0, 1}^2, leaving far
-  fewer pixels NaN. MATLAB returns the derivatives along the lattice directions with the basis
-  as second output; the port returns them along the axes of the plane of the map. A direction
-  off the plane of the map gives NaN.
+  The stencil chooses the neighbours:
+
+  - 'oneSided', the default: the next pixel along each of the two lattice directions, the
+  previous one only where the map ends; NaN where a neighbour inside the map is missing or not
+  comparable.
+  - 'lattice' (MATLAB's '1hop'): a least squares fit over the axial neighbours, four on a
+  square grid and six on a hexagonal one, the central difference in the interior.
+  - 'full': a least squares fit over all eight neighbours, which leaves the fewest pixels NaN.
+
+  MATLAB returns the derivatives along the lattice directions with the basis as second output;
+  the port returns them along the axes of the plane of the map. A direction off the plane of
+  the map gives NaN.
 
   Input
-    ebsd - EBSD of one phase
+    ebsd - EBSD on a lattice, of one phase or several
     direction - vector3d of the specimen, or three coordinates; without it both axes
   Output
     gX, gY - vector3d, the derivatives along the two axes of the plane of the map, of the
@@ -384,20 +389,27 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
     W = ebsd.orientations.inv() * weightedBurgersVec(ebsd) # in crystal coordinates
     W = weightedBurgersVec(ebsd, gradient=True)            # from the orientation gradient
 
-  The integral method, the default, sums the crystal coordinates of the specimen x and y axes
-  around a square loop of 2 windowSize + 1 pixels about every pixel; it needs a gridded map of
-  one indexed phase, and a loop that leaves the grain (after calcGrains) or the map gives NaN.
-  The gradient method takes the column of Nye's tensor along the normal of the map, from the
-  curvature of the nearest neighbours, and runs on a list as well. The vectors are in the
-  specimen frame, per scan unit, after Wheeler et al.
+  The weighted Burgers vector of Wheeler et al. is computed by one of two methods:
+
+  - the integral method, the default: the crystal coordinates of the specimen x and y axes
+  summed around a square loop of 2 windowSize + 1 pixels about every pixel. It needs a gridded
+  map of one indexed phase. A loop that leaves the map, meets a non indexed pixel or, after
+  calcGrains, leaves the grain gives NaN, so a larger window leaves more pixels NaN.
+  - the gradient method, gradient=True: the column of Nye's tensor along the normal of the map,
+  from the curvature of the nearest neighbours. It runs on a list and on a map of several
+  phases as well.
+
+  The vectors are in the specimen frame, per scan unit. windowSize must be at least 1; 0 gives
+  infinite values.
 
   Input
-    ebsd - EBSD of one indexed phase, gridified for the integral method
+    ebsd - EBSD, of one indexed phase and gridified for the integral method
   Output
     W - vector3d of the shape of the map, in the specimen frame
   Keywords
     windowSize - the half width of the loop of the integral method, in pixels
-    stencil - the stencil of the derivatives of the gradient method, 'oneSided' or 'full'
+    stencil - the stencil of the derivatives of the gradient method, 'oneSided', 'lattice' or
+        'full'
     gradient - use the gradient method instead of the integral one
   References
     J. Wheeler, E. Mariani, S. Piazolo, D.J. Prior, P. Trimby, M.R. Drury, The weighted

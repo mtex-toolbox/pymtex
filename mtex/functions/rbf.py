@@ -165,11 +165,14 @@ class SO3FunRBF(SO3Fun):
 
   The function is c0 + sum_i w_i psi(angle(g, ori_i)), every centre taken with all its
   symmetrically equivalent orientations, in the crystal and specimen frames of the centres.
-  It stays a kernel sum under scaling, adding a constant, adding another kernel sum of the
-  same kernel, rotation, inversion and convolution with a kernel on SO(3); the harmonic form
-  it is evaluated through is kept until a centre, the kernel, the weights or the constant
-  are set. unimodalODF and calcDensity build one; SO3FunRBF.interpolate fits one through
-  values. MATLAB's SO3FunRBF(F) approximating another SO3Fun is not ported.
+  unimodalODF and calcDensity build one, SO3FunRBF.interpolate fits one through values.
+
+  Scaling, adding a constant, adding another kernel sum of the same kernel, rotation,
+  inversion and convolution with a kernel keep the function a kernel sum. Its harmonic
+  form, through which it is evaluated, is computed once and kept until a centre, the
+  kernel, the weights or the constant are set.
+
+  MATLAB's SO3FunRBF(F), approximating another SO3Fun, is not ported.
 
   Input
     center - orientation, the centres of the kernels

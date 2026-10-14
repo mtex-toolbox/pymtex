@@ -93,8 +93,8 @@ def differentiate(fhat, side="left"):
     D = differentiate(SO3F._fhat, side='right')    # the right derivatives
 
   The three columns are the coefficients of the derivatives along the x, y and z axes of the
-  tangent space, the coefficient matrix of the gradient field; the vector is in the port's
-  internal convention (docs/design/harmonics.md), not MATLAB's fhat. The port's own, no MATLAB
+  tangent space, together the coefficient matrix of the gradient field. The coefficients are
+  in the port's internal convention, those of SO3F._fhat, not MATLAB's fhat. MATLAB has no
   counterpart.
 
   Input
@@ -372,15 +372,20 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     SO3VF = SO3VectorFieldHarmonic([F1, F2, F3])                # from its three component functions
     SO3VF = SO3VectorFieldHarmonic(lambda ori: F(ori), cs, ss, bandwidth=8)  # a callable by quadrature
 
-  The coefficient matrix has the three components as columns, deg2dim(L + 1) rows of MTEX's
-  coefficients each. A field in the left tangent space returns its tangent vectors in the
-  specimen frame, one in the right tangent space in the crystal frame, 'left' unless named;
-  another field is converted to the side named. Tangent vectors t, an SO3TangentVector with
-  its reference orientations, are summed with the weights against the Wigner functions, which
-  is the quadrature only for the weights of a quadrature rule; a callable returning tangent
-  vectors at orientations is sampled on a quadrature grid of the bandwidth, by default the
-  preference defaultSO3Bandwidth. A coefficient matrix given is made equivariant under the
-  frames unless symmetrise=False.
+  A field in the left tangent space returns its tangent vectors in the specimen frame, one
+  in the right tangent space in the crystal frame; 'left' unless named. Another field given
+  is converted to the side named.
+
+  The field is built from:
+
+  - a coefficient matrix: the components as columns of MTEX's coefficients, made equivariant
+  under the frames unless symmetrise=False.
+  - tangent vectors t at reference orientations: summed with the weights against the Wigner
+  functions, a quadrature only for the weights of a quadrature rule.
+  - a callable of orientations: sampled on a quadrature grid of the bandwidth, by default the
+  preference defaultSO3Bandwidth.
+  - three component functions: their coefficients, cut to the largest bandwidth; a Python
+  list takes its frames from cs and ss, else the trivial frames.
 
   Input
     fhat - (deg2dim(L + 1), 3) array, an SO3VectorField, an SO3TangentVector, three
@@ -842,14 +847,17 @@ def mapField(op, v, *args, bandwidth=None, invariant=False, reduce=False):
     u = mapField(np.multiply, v, F, bandwidth=8)                  # a field times a scalar function
     u = mapField(np.multiply, v, 2)                               # a field times a number
 
-  The arguments are evaluated on the quadrature grid of the component frames of v, op is
-  applied to the arrays, the tangent vectors of a field an (n, 3) array in the tangent space of
-  v, a function's values an (n, 1) column, which broadcasts against them, a number itself, and
-  the result is expanded again: an (n, 3) result is a field in the tangent space of v, one
-  value per node a function. The bandwidth is
-  that of the operands added, at most the preference maxSO3Bandwidth. A scalar result lives
-  on the component frames of v unless invariant says it is invariant under the full frames of
-  the field.
+  The arguments are evaluated on a quadrature grid, op is applied to the arrays of values and
+  the result is expanded again. op sees a field as an (n, 3) array of tangent vectors in the
+  tangent space of v, a function as an (n, 1) column, which broadcasts against them, and a
+  number as itself.
+
+  An (n, 3) result is a field in the tangent space of v, one value per node a function. A
+  function lives on the component frames of v, the frames with the symmetry on the tangent
+  side stripped, unless invariant=True puts it on the full frames of the field.
+
+  The bandwidth of the result is the sum of those of the operands, at most the preference
+  maxSO3Bandwidth.
 
   Input
     op - a callable of NumPy arrays
@@ -1003,13 +1011,16 @@ class SO3VectorFieldRBF(SO3VectorField):
     SO3VF = SO3VectorFieldRBF(t, kernel=psi)                       # fitted through tangent vectors t
     SO3VF = SO3VectorFieldRBF(F, resolution=10*degree)             # another field fitted on a grid
 
-  The field is the sum over the centres of the kernel at the misorientation to the centre
-  times the centre's weight vector, summed over the symmetric equivalents so that it is
-  equivariant under the frames. Through tangent vectors t, an SO3TangentVector at reference
-  orientations, the weights solve the dense linear system of the kernel between the
-  references, which suits hundreds of centres; another field is sampled on an equispaced grid
-  of the resolution and fitted the same way, the kernel by default of halfwidth the resolution.
-  MATLAB stores the three components as SO3FunRBF; the weights here are one vector per centre.
+  The field is the sum over the centres of the kernel at the misorientation to the centre,
+  times the centre's weight vector. It is summed over the symmetric equivalents, so that it
+  is equivariant under the frames.
+
+  Through tangent vectors t, an SO3TangentVector at reference orientations, the weights solve
+  the dense linear system of the kernel between the references, which suits hundreds of
+  centres. Another field is sampled on an equispaced grid of the resolution and fitted the
+  same way, with a kernel of halfwidth the resolution unless one is given.
+
+  MATLAB stores the three components as SO3FunRBF; here the weights are one vector per centre.
 
   Input
     center - orientation, the centres; or an SO3TangentVector or SO3VectorField to fit

@@ -252,12 +252,14 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
     dl = WignerD(beta, l)                    # the real Wigner-d matrix at the second Euler angle
     P = WignerD(cs, l)                       # the mean over the symmetries of a frame
 
-  The matrices are MTEX's Wigner functions, the basis the public coefficients fhat of an
+  The matrices are MTEX's Wigner functions, the basis the coefficients fhat of an
   SO3FunHarmonic are taken in: with normalize=True, f(g) = sum fhat_n^{kl} D_n^{kl}(g). A
-  list of rotations gives the matrices stacked in front, (..., 2l+1, 2l+1). For a frame or a
-  point group the matrices are averaged over its rotations, the projection onto the functions
-  invariant under the group; these are in the internal basis of docs/design/harmonics.md
-  and normalize does not apply to them. MATLAB's kernel option is not there.
+  list of rotations gives the matrices stacked in front, (..., 2l+1, 2l+1).
+
+  For a frame or a point group the result is the projection onto the functions invariant
+  under the group. It is taken in the port's internal sign convention, which differs from
+  the mean of WignerD(g, l) over the group's rotations by the signs of some entries, and
+  normalize does not apply to it. MATLAB's kernel option is not there.
 
   Input
     g - rotation, orientation or quaternion

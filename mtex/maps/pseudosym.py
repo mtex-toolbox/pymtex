@@ -43,18 +43,23 @@ def cleanUpPseudoSym(ebsd, grains, psSym, delta=2 * degree, threshold=1.5):
 
   A pseudo symmetry is a rotation which is not a symmetry of the crystal but maps the
   diffraction pattern almost onto itself, so the indexing picks between the two solutions at
-  random. The boundaries this leaves follow the indexing noise and are much longer than the
-  distance between their ends. The boundaries of the phase within delta of psSym are grouped
-  into connected components; a component of more than four segments whose length exceeds
-  threshold times the diagonal of its bounding box is an artefact, the grains across it are
-  merged, and every measurement of a grain that absorbed another is moved by the operator
+  random. The boundaries this leaves follow the indexing noise, much longer than the distance
+  between their ends.
+
+  The boundaries of the phase whose misorientation lies within delta of psSym are grouped into
+  connected components. A component of more than four segments whose length exceeds threshold
+  times the diagonal of its bounding box is taken for an artefact: the grains across it are
+  merged, and every measurement of a merged grain is turned by the pseudo symmetry operator
   that brings it nearest the merged grain's mean orientation.
 
-  The operators ori * s * psSym for every symmetry element s are generated internally, so
   psSym, its inverse or any equivalent misorientation give the same result. The phase is the
-  one of psSym's crystal frame, one phase per call. The boundaries should not have been
-  smoothed, which destroys the tortuosity. As calcGrains, it alters the map it is given, its
-  rotations and grain ids, and grains gets the parentId of the merge.
+  one of psSym's crystal frame, one phase per call. Do not smooth the boundaries first, which
+  destroys their tortuosity.
+
+  As calcGrains, the function alters the map it is given, its rotations and grain ids, and
+  grains gets the parentId of the merge. The mean orientations of the merged grains are those
+  of the measurements before the correction, as in MATLAB; calcGrains again for the corrected
+  ones.
 
   Input
     ebsd - EBSD with the grain ids calcGrains stores

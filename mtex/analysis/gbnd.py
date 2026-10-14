@@ -175,23 +175,21 @@ def calcGBND(gB, source, moriRef=None, halfwidth=10 * degree, nonneg=False, bump
     gbcd = calcGBND(gB, grains, moriRef)               # the character distribution of one misorientation
     gbcd = calcGBND(gB, grains, moriRef, oneSide=True) # only the first side of a symmetric relation
 
-  A section shows of every boundary only its trace, a direction in the plane of the map; the
-  plane itself may be inclined about it at any angle. The orientations on the two sides turn
-  each trace into the crystal frame, and a kernel that integrates over the unknown inclination
-  spreads it to the normals it is compatible with. Summed over many boundaries, weighted by
-  their lengths, this gives the density of the boundary normals in the crystal frame, an
-  axial function normalised so that a uniform distribution of planes is one.
+  A section shows only the trace of every boundary; the boundary plane may be inclined about
+  it at any angle. The orientations on both sides turn each trace into the crystal frame, and
+  a kernel over the unknown inclination spreads it to the compatible normals. Summed over all
+  boundaries, weighted by their lengths, this gives an antipodal density of the normals,
+  normalised so that a uniform distribution of planes is one.
 
   The boundaries must hold one pair of phases, gB['Magnesium', 'Magnesium'] for instance.
-  With an EBSD map the orientations on either side are those of the pixels gB.ebsdId names,
-  which is meaningful only while every segment still lies between two pixels: smooth with
-  smoothBoundary(grains, simplify=False, refine=False) before, or pass the grains, whose mean
-  orientations are used.
+  With a map, the orientations of the two pixels of every segment are used, which requires
+  boundaries that were not resampled: smooth them with smoothBoundary(grains, simplify=False,
+  refine=False), or pass the grains to use their mean orientations.
 
-  With a misorientation moriRef only the boundaries near it are kept, weighted by their
-  distance to it, and their normals are given in the crystal frame of its first side: the
-  grain boundary character distribution of that misorientation. A relation that is its own
-  inverse, a twin, takes both sides of every boundary, unless oneSide.
+  With a misorientation moriRef, only the boundaries near it count, weighted by their distance
+  to it, and the normals are given in the crystal frame of its first side: the grain boundary
+  character distribution. A relation that is its own inverse, a twin, takes both sides of
+  every boundary unless oneSide=True.
 
   Input
     gB - grainBoundary, the boundaries of one pair of phases

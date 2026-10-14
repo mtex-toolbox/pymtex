@@ -390,20 +390,18 @@ def optimalSample(f, n, *args, optimizeWeights=False, bandwidth=None, maxIter=No
     ori = optimalSample(odf, 500)                                # orientations of an ODF
     res = optimalSample(odf, 500, diagnostics=True)              # with the discrepancy and the stop reason
 
-  The density f is represented by the discrete measure sum_j c_j delta_{x_j}, and the nodes
-  are moved so that the kernel discrepancy sum_l A_l |mu_l - f_l|^2, with the Legendre
-  coefficients A_l of the restricted distance kernel and the degrees l up to the bandwidth,
-  becomes small. f need not be normalised. The minimisation is a limited memory BFGS
-  iteration with an Armijo line search, along the geodesics of the sphere with the stored
-  steps parallel transported, and in the left components on the rotation group; memory=0
-  or method='steepestDescent' is plain gradient descent. Like discreteSample, but the nodes
-  fit the density far better, at the price of time.
+  The nodes are moved until the weighted point measure they form has the same harmonic
+  coefficients as the density, up to the bandwidth, as nearly as possible. The density need
+  not be normalised. The result fits the density far better than discreteSample, at the
+  price of time.
 
-  With optimizeWeights=True the weights are unknowns too and stay on the simplex: through a
-  softmax moved together with the nodes on the sphere, by multiplicative steps alternating
-  with the node steps on the rotation group; the first warmUp iterations move the nodes
-  only. The weights are volume fractions, calcDensity(v, weights=c) takes them. MATLAB
-  optimises the weights when a second output is asked for; here the keyword says it.
+  The minimisation is a limited memory BFGS iteration along the geodesics of the sphere or
+  of the rotation group. memory=0 or method='steepestDescent' is plain gradient descent.
+
+  With optimizeWeights=True the weights are unknowns too; they stay nonnegative and sum to
+  one, so they are volume fractions that calcDensity(v, weights=c) takes. The first warmUp
+  iterations move the nodes only. MATLAB optimises the weights when a second output is asked
+  for; here the keyword says it.
 
   Input
     f - S2Fun or SO3Fun, a nonnegative real density

@@ -74,14 +74,21 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     SO3F = SO3FunHarmonic(psi, cs, bandwidth=24)                # the series of an SO(3) kernel
     mdf = SO3FunHarmonic(lambda o: o.angle(), cs, cs, antipodal=True, bandwidth=8)  # a misorientation function, f(g) = f(g^-1)
 
-  The coefficients fhat are MTEX's, degree by degree, deg2dim(L + 1) of them for the bandwidth L;
-  a vector ending inside a degree block is padded with zeros to its end. Another SO(3) function
-  gives its harmonic form at the bandwidth given (an SO3FunRBF at most its kernel's), a kernel
-  its series, a callable of orientations is sampled on a quadrature grid of the bandwidth, by
-  default the preference defaultSO3Bandwidth, Clenshaw-Curtis unless 'GaussLegendre' is named
-  among the frames. The frames are the crystal frame and the specimen frame, the second by
-  default specimenFrame.default; the coefficients are made invariant under both unless
-  symmetrise=False. A list of functions carries its shape in front of the coefficients.
+  What the first argument is decides how the coefficients come about:
+
+  - coefficients: MTEX's, degree by degree, deg2dim(L + 1) of them for the bandwidth L; a
+  vector ending inside a degree block is padded with zeros to its end. An array of more axes
+  is a list of functions, its shape in front of the coefficients.
+  - another SO(3) function: its harmonic form at the bandwidth given; an SO3FunRBF reaches at
+  most its kernel's bandwidth.
+  - an SO(3) kernel: its series.
+  - a callable of orientations: sampled on a quadrature grid of the bandwidth, by default the
+  preference defaultSO3Bandwidth, Clenshaw-Curtis unless 'GaussLegendre' is named among the
+  frames.
+
+  The frames are the crystal frame and the specimen frame, the second by default
+  specimenFrame.default. The coefficients are made invariant under both unless
+  symmetrise=False.
 
   Input
     fhat - array of MTEX's coefficients, an SO3Fun, an SO3Kernel or a callable of orientations
@@ -246,13 +253,18 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
       SO3F = SO3FunHarmonic.quadrature(ori, values, bandwidth=8)          # values at orientations, weighted equally
 
     A callable or another SO(3) function is expanded as SO3FunHarmonic(f, cs, ss, bandwidth=)
-    does, exact up to the bandwidth. Values at nodes are summed with the weights against the
-    Wigner functions and projected onto the functions invariant under the frames; on a
-    quadratureSO3Grid the grid's weights make the result exact up to its bandwidth, which is
-    the default bandwidth then, the values at its distinct nodes spread onto all of them. At
-    other nodes the sum is the quadrature only when the weights are those of a quadrature
-    rule; equal weights 1/n give the series of the density of the nodes times the values, for
-    a fit see SO3FunHarmonic.interpolate. SO3FunHarmonic.approximate is the same function.
+    does, exact up to the bandwidth; an SO3FunRBF reaches at most its kernel's bandwidth.
+
+    Values at nodes are summed with the weights against the Wigner functions and made
+    invariant under the frames. What that gives depends on the nodes:
+
+    - a quadratureSO3Grid: the grid's weights make the result exact up to its bandwidth, the
+    default then. Values at its distinct nodes are spread onto all of them.
+    - other nodes with the weights of a quadrature rule: the quadrature of that rule.
+    - other nodes, equally weighted by 1/n: the series of the density of the nodes times the
+    values, not a fit; for a fit see SO3FunHarmonic.interpolate.
+
+    SO3FunHarmonic.approximate is the same function.
 
     Input
       nodes - a callable or SO3Fun, a quadratureSO3Grid, orientation or rotation

@@ -203,20 +203,23 @@ def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1
     cId, center = calcCluster(ori, method='hierarchical', maxAngle=15*degree)  # merged until the centres are 15 degree apart
     cId, center = calcCluster(v, method='hierarchical', numCluster=5)  # merged until five clusters are left
 
-  Three methods. CLASSIX, the default for directions, sorts the points along their first
-  principal axis, groups them within a radius and merges the groups whose centres are close;
-  directions are clustered on their coordinates, axes (antipodal) on the rank one tensor
-  that identifies v with -v, orientations on the embedding that carries the symmetry. The
-  density method, the default for orientations, computes the kernel density of the
-  orientations and follows every orientation uphill to its mode; the largest modes are the
-  centres, and an orientation further from its centre than twice the mean angle gets no
-  cluster, NaN in cId. The hierarchical method merges the closest pair of centres, their
-  mean weighted by the points behind them, until numCluster clusters are left or the
-  closest centres are more than maxAngle apart; more than 1000 orientations are binned on a
-  grid of the resolution first.
+  The method decides how the clusters are found:
 
-  The centres are the means of the clusters, symmetry reduced for orientations and axis
-  means for antipodal directions; cId has the shape of the input.
+  - 'classix', the default for directions: sorts the points along their first principal axis,
+  groups them within a radius and merges groups whose centres are close. Orientations are
+  clustered on their embedding, which respects the symmetry, antipodal directions on a form
+  that identifies v with -v.
+  - 'odf', the default for orientations: computes the kernel density and follows every
+  orientation uphill to its mode. The largest modes are the centres.
+  - 'hierarchical': merges the closest pair of centres until numCluster clusters are left or
+  the closest centres are more than maxAngle apart. More than 1000 orientations are first
+  binned on a grid of the given resolution.
+
+  The density method leaves some orientations without a cluster: those further from their
+  centre than twice the mean angle of the cluster get NaN in cId, and those whose mode is too
+  small to be kept by calcComponents get -1. The centres of 'odf' are the modes of the density,
+  those of the other methods the (weighted) means of the clusters. cId has the shape of the
+  input.
 
   Input
     v - vector3d, the directions

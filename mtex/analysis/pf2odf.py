@@ -108,13 +108,15 @@ class zeroRangeMethod:
     isZero = zrm.checkZeroRange(ori)                              # the orientations ruled out
     isZero = zrm.checkZeroRange(v, i)                             # the zero positions of the i-th pole figure
 
-  The measurement positions are smoothed with a spherical kernel twice: unweighted, their
-  density, which says where the data backs a statement, and weighted by alpha where the
-  intensity exceeds the background bg and by -1 where it does not. A direction where the
-  density is above the threshold and the weighted sum below -0.1 of it counts as zero; an
-  orientation is ruled out when one of its symmetric poles falls on such a direction in some
-  pole figure. calcODF(pf, zeroRange=True) removes those orientations from the grid of the
-  ansatz functions; calcODF(pf, zeroRange=zrm) uses the method set up here.
+  A direction of a pole figure is in its zero range where enough measurements surround it
+  and most of them lie below the background. Both are kernel sums over the measured
+  directions: their density, which must exceed the threshold, and a sum weighting an
+  intensity above the background bg by alpha - 1 and one below it by -1, which must be
+  below -0.1 times the density.
+
+  An orientation is ruled out when one of its symmetric poles falls into the zero range of
+  some pole figure. calcODF(pf, zeroRange=True) drops those orientations from the grid of
+  the ansatz functions; calcODF(pf, zeroRange=zrm) uses the method set up here.
 
   Input
     pf - PoleFigure
@@ -597,14 +599,18 @@ def calcODFIterative(pf, *args, resolution=None, halfwidth=None, kernel=None, ma
     odf = calcODFIterative(pf, halfwidth=5*degree)      # the target halfwidth
     odf = calcODFIterative(pf, thinning=0)              # every node of every grid kept
 
-  The halfwidths run from sqrt(e)^(maxSteps-1) times the target down to the target, those
-  whose grid would be coarser than 45 degree dropped; each step solves on an equispaced grid
-  of its own resolution, started from the ODF of the previous step evaluated on the grid,
-  beginning with the uniform ODF. Missing data is filled by the volume a coarser model puts
-  along the fibres, so that highly irregular sampling still gives an ODF; it is an elaborate
-  start for calcODF and acts as a regularisation. Before every solve the nodes whose share
-  is below thinning times the uniform one are removed. MATLAB's second output alpha is not
-  returned; MATLAB's flag nothinning is thinning=0. Further keywords go to MLSSolver.
+  Where the pole figures are sampled very irregularly, a coarse model fills the gaps with
+  volume along the fibres it justifies, and finer models refine it. The method is an
+  elaborate start for calcODF and acts as a regularisation.
+
+  The halfwidths run from sqrt(e)^(maxSteps-1) times the target down to the target, the
+  steps whose grid would be coarser than 45 degree left out. Each step solves on an
+  equispaced grid of its own resolution, starting from the previous ODF evaluated on that
+  grid (MATLAB interpolates it), the first from the uniform ODF. Before every solve the
+  nodes whose share is below thinning times the uniform one are removed.
+
+  MATLAB's second output alpha is not returned; MATLAB's flag nothinning is thinning=0.
+  Further keywords go to MLSSolver.
 
   Input
     pf - PoleFigure

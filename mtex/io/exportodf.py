@@ -124,14 +124,18 @@ def exportODF(odf, fname, *args, interface=None, **kwargs):
     export(odf, 'odf.mtex', interface='mtex')             # the components, human readable
     export(odf, 'odf-vpsc.txt', 'VPSC', points=5000)      # a sample of orientations for VPSC
 
-  The generic file has three header lines naming the frames and the columns and one row per
-  node, the Euler angles and the value: on an SO3Grid passed, else on a regular grid over the
-  Euler box of the frames with the step resolution= (5 degree). The angles are in degrees
-  unless radians=True, in the Bunge convention unless 'ZYZ' (or 'ABG', 'Matthies') is given.
-  The MTEX file lists the uniform, fibre and radial components with their kernels and weights;
-  a harmonic component is noted as not written. The VPSC file is the one of
-  export(ori, fname, interface='VPSC') over points= (10000) orientations drawn from the
-  function. The interface may also be named by a positional 'generic', 'mtex' or 'VPSC'.
+  The interface, by keyword or as a positional 'generic', 'mtex' or 'VPSC', chooses the file:
+
+  - 'generic', the default: a header naming the frames and the columns, then one row per node
+  with the Euler angles and the value. The nodes are those of an SO3Grid passed, else a
+  regular grid over the Euler box of the frames with the step resolution= (5 degree).
+  - 'mtex': the uniform, fibre and radial components with their kernels and weights, human
+  readable; a harmonic component is noted as not written.
+  - 'VPSC': the file of export(ori, fname, interface='VPSC') over points= (10000) orientations
+  drawn from the function.
+
+  The angles are in degrees unless radians=True, in the Bunge convention unless 'ZYZ' (or
+  'ABG', 'Matthies') is given. Keywords the interface does not know are ignored.
 
   Input
     odf - an SO3Fun

@@ -81,13 +81,16 @@ class mtexFigure:
     fig.colorbar()                                   # a colour bar per axes, or one for all
 
   The figure becomes the current one, which gcm returns and into which the plots of MTEX
-  draw; newMtexFigure makes one the same way. Without layout or columns the n axes are laid
-  out in the grid nearest to a slightly wide picture. The layout grows when more axes are
-  asked for than it holds, and the figure grows with it, so that the axes keep their size.
-  The spacing between the axes is matplotlib's constrained layout, which makes room for
-  titles, labels and colour bars; innerPlotSpacing sets the gap between neighbouring axes and
-  outerPlotSpacing the margin around them all, at least half that gap, in pixels at 96 to
-  the inch, as MATLAB's.
+  draw; newMtexFigure makes one the same way.
+
+  Without layout or columns the n axes are laid out in the grid nearest to a slightly wide
+  picture. When more axes are asked for than the layout holds, the layout grows and the
+  figure with it, so that the axes keep their size.
+
+  The spacing is matplotlib's constrained layout, which makes room for titles, labels and
+  colour bars. innerPlotSpacing sets the gap between neighbouring axes, outerPlotSpacing the
+  margin around them all, at least half that gap; both in pixels at 96 to the inch, as
+  MATLAB's.
 
   Input
     n - the number of axes the layout is made for
@@ -851,10 +854,12 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
     legend('off')                                    # removes the legends
 
   Without names the legend collects every artist of the figure that a displayName (a
-  label) named, each name once, MATLAB's legend('show'); with names it names the bars,
+  label) named, each name once, as MATLAB's legend('show'). With names it names the bars,
   curves and markers of the current axes in the order they were drawn, as MATLAB's legend
-  with labels does. A new legend replaces those the figure has. It goes into the last axes,
-  or for a location ending in 'outside' beside the charts, the figure widened when it would
+  with labels.
+
+  A new legend replaces those the figure has. It goes into the last axes of the figure, or,
+  for a location ending in 'outside', beside the charts, the figure widened when it would
   not fit. Every entry gets a marker of the same size. Other keywords go to matplotlib's
   legend.
 
