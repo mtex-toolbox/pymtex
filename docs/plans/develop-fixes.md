@@ -91,11 +91,11 @@ Left: 21 (FMC), decided for later. Nothing pushed.
 
 Found while writing the calling forms of `docs/plans/reference.md`, fixed in the port, open on develop:
 
-- `fibre.alpha` and `fibre.tau` (`geometry/@fibre/fibre.m`, the named fibres): `byMiller([111],[110])`
-  picks the equivalent [-110] perpendicular to (111) while the first end keeps [110] along RD, so the
-  geodesic between the ends turns about [0 -0.59 -0.81] over 102.2 degrees instead of about <110>
-  over 54.7; tau's h is not <110> nor its r TD either. The port now has alpha (001)[1-10] to
-  (111)[1-10] and tau (001)[110] to (110)[00-1] (from reading the code, not run in MATLAB); the
-  OrientationFibre page's figure of the named fibres differs from MATLAB's there.
+- `fibre.alpha` and `fibre.tau` (`geometry/@fibre/fibre.m`): `byMiller([111],[110])` picked a copy
+  of [110] in (111) the first end did not share, so alpha's geodesic turned about [0 -8 -11] over
+  102.2 degrees, tau's about [12 5 12]; fixed on develop `8ddab621b` (2026-10-14, unpushed):
+  alpha (001)[1-10] to (111)[1-10], tau (001)[110] to (110)[00-1], checked through the bridge
+  (h || RD over 54.74 degrees, h || TD over 90, both ends on the fibre, the fibreODF's maximum at
+  them), the port's ends to the digit.
 - `orientation/axis` of two orientations of different crystal frames: the port reduces over the
   products of both groups, as MATLAB's general branch; to check against MATLAB on the bridge.

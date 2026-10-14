@@ -106,7 +106,7 @@ variants; `inpolygon(grains, rect | poly)` by the centroids, MATLAB's meaning (t
 are `grains[x, y]`); `strainTensor(M, type=)`; NumPy's reductions of tensors; `tensor.rand`
 uniform; `round(m, return_error=True, maxXYZ=)`; `f.rotation(return_angles=True)`;
 `vector3d.rand(n, sR)`; the zone law strings `Miller('[uvw]\\[uvw]', cs)`; `sum(odf, d)`;
-`S2Fun.smiley(even=True)` antipodal; and the named fibres alpha and tau, wrong in MATLAB too
+`S2Fun.smiley(even=True)` antipodal; and the named fibres alpha and tau, wrong in MATLAB too and fixed on develop
 (`docs/plans/develop-fixes.md`). Kept: `calcError`'s defaults, which are MATLAB's code if not
 its documentation; `abs(sF, bandwidth=)` of `S2FunTri`, which MATLAB's signature does not take.
 Left: `cat` of grains and boundaries (new work), `np.sum` of a `vector3d`, MATLAB's `accuracy` of

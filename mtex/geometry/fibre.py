@@ -414,10 +414,9 @@ def _eulerString(o):
 
 
 # the named fibres of rolling textures between the orientations MTEX puts at their ends, by
-# their Bunge Euler angles in degrees; the ends of a true fibre are the representatives
-# sharing its crystal direction, alpha (001)[1-10] to (111)[1-10] about [1-10] || RD, tau
-# (001)[110] to (110)[00-1] about [-110] || TD, where MATLAB's byMiller picks ends whose
-# geodesic leaves the fibre
+# their Bunge Euler angles in degrees; the ends share the fibre's crystal direction, alpha
+# (001)[1-10] to (111)[1-10] about [1-10] || RD, tau (001)[110] to (110)[00-1] about
+# [-110] || TD
 NAMED_FIBRES = {"alpha": ((45, 0, 0), (0, 54.735610, 45)), "beta": ((180, 35.264390, 45), (270, 62.785077, 45)),
                 "gamma": ((180, 54.735610, 45), (270, 54.735610, 45)), "eta": ((0, 0, 0), (0, 45, 0)),
                 "tau": ((315, 0, 0), (270, 90, 45)), "epsilon": ((315, 0, 0), (270, 54.735610, 45))}
