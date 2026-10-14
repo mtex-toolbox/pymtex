@@ -278,10 +278,14 @@ def closestConvention(rot):
 # what plottingConvention.default returns: the session default, and a call on it with a
 # convention sets it, plottingConvention.default('y↑→x'), as MATLAB reads it
 class _sessionDefault(plottingConvention):
+  """the default plotting convention of the session, and setting it: default('y↑→x'),
+  default(zvector, xvector) make a convention the default, default(north=xvector),
+  default(intoScreen=zvector) change those directions and keep the rest (MATLAB's plotx2north,
+  plotzIntoPlane); save=True keeps it in mtex_settings.json
 
-  # default('y↑→x'), default(zvector, xvector): a convention made the default; default(north=
-  # xvector), default(intoScreen=zvector): the default with those directions changed, the rest
-  # kept (MATLAB's plotx2north, plotzIntoPlane)
+    plottingConvention.default('y↓→x')
+    plottingConvention.default(north=xvector, save=True)"""
+
   def __call__(self, outOfScreen: ConventionName | Any = None, east=None, save=False, **directions):
     if isinstance(outOfScreen, (str, plottingConvention)) or (outOfScreen is not None and east is not None):
       plottingConvention(outOfScreen, east).makeDefault(save=save)

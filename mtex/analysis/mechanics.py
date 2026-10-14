@@ -271,6 +271,13 @@ def _install():
   direct = slipSystem.SchmidFactor
 
   def schmidFactor(self, sigma=None, relative=False):
+    """the Schmid factor of the systems: under a stress tensor the shear it resolves on them,
+    for tension directions cos(phi) cos(lambda), without a load the functions of the tension
+    direction on the sphere; relative=True divides by the critical resolved shear stress
+
+      sS.SchmidFactor(v)
+      sS.SchmidFactor(sigma)
+      sS.SchmidFactor()"""
     if sigma is None or isinstance(sigma, stressTensor):
       return SchmidFactor(self, sigma, relative)
     return direct(self, sigma, relative=relative)

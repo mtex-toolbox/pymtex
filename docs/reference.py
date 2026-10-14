@@ -16,6 +16,7 @@ import sys
 import numpy as np
 
 import mtex
+from mtex.geometry._array import MtexArray
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
@@ -37,6 +38,19 @@ OPERATORS = {"subsref": "__getitem__", "eq": "__eq__", "ne": "__ne__", "plus": "
              "mrdivide": "__truediv__", "power": "__pow__", "mpower": "__pow__", "abs": "__abs__", "inv": "__invert__",
              "eval": "__call__", "lt": "__lt__", "le": "__le__", "gt": "__gt__", "ge": "__ge__",
              "horzcat": "cat", "vertcat": "cat", "transpose": "T", "ctranspose": "T"}
+# how an operator is written, and what it is when its method says nothing
+OPERATOR_FORMS = {"__add__": ("a + b", "the sum"), "__radd__": ("b + a", "the sum"), "__sub__": ("a - b", "the difference"),
+                  "__rsub__": ("b - a", "the difference"), "__mul__": ("a * b", "the product"),
+                  "__rmul__": ("b * a", "the product"), "__matmul__": ("a @ b", "the matrix product"),
+                  "__truediv__": ("a / b", "the quotient"), "__rtruediv__": ("b / a", "the quotient"),
+                  "__neg__": ("-a", "the negative"), "__pow__": ("a ** n", "the power"), "__abs__": ("abs(a)", "the absolute value"),
+                  "__invert__": ("~a", "the inverse"), "__eq__": ("a == b", "elementwise equality"),
+                  "__ne__": ("a != b", "elementwise inequality"), "__lt__": ("a < b", "elementwise comparison"),
+                  "__le__": ("a <= b", "elementwise comparison"), "__gt__": ("a > b", "elementwise comparison"),
+                  "__ge__": ("a >= b", "elementwise comparison"), "__getitem__": ("a[ind]", "the elements selected by ind"),
+                  "__setitem__": ("a[ind] = b", "the elements selected by ind replaced"), "__call__": ("f(x)", "the evaluation at x"),
+                  "__len__": ("len(a)", "the length of the first axis")}
+
 # MATLAB methods of the language, not the mathematics, which Python has by NumPy's means
 PLUMBING = set("""subsasgn subSet setSubSet numArgumentsFromSubscript end numel length size ndims isempty
 isscalar loadobj saveobj copy delete display disp char dispLine dispData repmat reshape permute squeeze
@@ -55,6 +69,11 @@ def writeMatlabPages(site):
   with open(matlabList, "w", encoding="utf-8") as fh:
     fh.write("\n".join(names) + "\n")
   print(f"{len(names)} MATLAB pages")
+
+
+# the docstring of an attribute, a property's own before its getter's
+def docOf(obj):
+  return inspect.getdoc(obj) if isinstance(obj, property) and obj.__doc__ else inspect.getdoc(unwrap(obj)) or ""
 
 
 # the function behind an attribute: a property by its getter, a static or class method by its function
@@ -108,11 +127,15 @@ def resolve(page):
     return ("constructor", cls, cls)
   for cand in (m, renamed(m), OPERATORS.get(m)):
     obj = inspect.getattr_static(cls, cand, None) if cand and cand.isidentifier() else None
+    # T transposes on the containers, but is the Miller-Bravais index T on vector3d
+    if cand == "T" and obj is not inspect.getattr_static(MtexArray, "T"):
+      continue
     if obj is not None and isOurs(obj):
       return ("property" if isinstance(obj, property) else "method", obj, cls)
   # a method MATLAB has on the class is a function of the flat namespace here: calcGrains(ebsd)
+  # but not a forwarder, norm(x) for x.norm(), which the class does not answer
   obj = getattr(mtex, m, None) or lookup(renamed(m) or "_")
-  if callable(obj) and not inspect.isclass(obj) and isOurs(obj):
+  if callable(obj) and not inspect.isclass(obj) and isOurs(obj) and not hasattr(obj, "forwardsTo"):
     return ("function", obj, cls)
   return None
 
@@ -252,18 +275,21 @@ def render(name, entry, pages, calls, owners):
   # the name a function is called by: plotx2north is plottingConvention.default
   called = getattr(obj, "__name__", None) or renamed(name) or name
   title = f"The class {obj.__name__}" if kind == "class" else name
-  doc = inspect.getdoc(unwrap(obj)) or ""
+  doc = docOf(obj)
   lines = [f"# {title}", ""]
   if kind == "property":
     lines += [f"A property of [{cls.__name__}]({cls.__name__}_index_py.html).", ""]
   elif kind == "method":
     lines += [f"A method of [{cls.__name__}]({cls.__name__}_index_py.html).", ""]
+  operator = OPERATOR_FORMS.get(getattr(unwrap(obj), "__name__", ""))
+  if operator and not doc:
+    doc = f"{operator[1]}, the operator {operator[0]}"
   summary, _, rest = doc.partition("\n\n")
   if summary:
     lines += [docBody(summary, link), ""]
   if kind in ("function", "method", "constructor"):
     shown = called if kind == "function" else f"{cls.__name__}.{member}" if member else cls.__name__
-    sig = signature(shown, unwrap(obj) if kind != "constructor" else obj)
+    sig = operator[0] if operator else signature(shown, unwrap(obj) if kind != "constructor" else obj)
     if sig:
       lines += ["## Syntax", "", "```python", sig, "```", ""]
   if rest.strip():
@@ -293,7 +319,7 @@ def members(cls, pages):
   rows = []
   for n, entry in pages.items():
     if entry[2] is cls and entry[0] in ("method", "property", "function", "constructor") and n != f"{cls.__name__}_index":
-      rows.append(f"| [{n.split('.', 1)[-1]}]({n}_py.html) | {firstSentence(inspect.getdoc(unwrap(entry[1])) or '')} |")
+      rows.append(f"| [{n.split('.', 1)[-1]}]({n}_py.html) | {firstSentence(docOf(entry[1]))} |")
   if not rows:
     return []
   return ["## Members", "", "| | |", "|---|---|", *sorted(rows, key=str.lower), ""]

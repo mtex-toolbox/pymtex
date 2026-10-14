@@ -322,25 +322,43 @@ class fibre:
     from typing import Any
     @classmethod
     def alpha(cls, *frames, full=False) -> Any:
-      ...
+      """the alpha fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.alpha(cs)
+      f = fibre.alpha(cs, ss, full=True)"""
     @classmethod
     def beta(cls, *frames, full=False) -> Any:
-      ...
+      """the beta fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.beta(cs)
+      f = fibre.beta(cs, ss, full=True)"""
     @classmethod
     def gamma(cls, *frames, full=False) -> Any:
-      ...
+      """the gamma fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.gamma(cs)
+      f = fibre.gamma(cs, ss, full=True)"""
     @classmethod
     def eta(cls, *frames, full=False) -> Any:
-      ...
+      """the eta fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.eta(cs)
+      f = fibre.eta(cs, ss, full=True)"""
     @classmethod
     def tau(cls, *frames, full=False) -> Any:
-      ...
+      """the tau fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.tau(cs)
+      f = fibre.tau(cs, ss, full=True)"""
     @classmethod
     def epsilon(cls, *frames, full=False) -> Any:
-      ...
+      """the epsilon fibre of rolling textures, between the orientations MTEX puts at its ends; full=True the whole fibre
+
+      f = fibre.epsilon(cs)
+      f = fibre.epsilon(cs, ss, full=True)"""
     @classmethod
     def theta(cls, *frames) -> Any:
-      ...
+      """the theta fibre of rolling textures, the orientations with <100> along the normal direction"""
     @property
     def frameA(self) -> Any:
       ...
@@ -398,6 +416,8 @@ def _named(name):
     o1 = orientation.byEuler(a1 * degree, b1 * degree, c1 * degree, cs, ss)
     o2 = orientation.byEuler(a2 * degree, b2 * degree, c2 * degree, cs, ss)
     return cls(o1, o2, full=full)
+  build.__doc__ = (f"the {name} fibre of rolling textures, between the orientations MTEX puts at its ends; "
+                   f"full=True the whole fibre\n\n  f = fibre.{name}(cs)\n  f = fibre.{name}(cs, ss, full=True)")
   return classmethod(build)
 
 
@@ -407,6 +427,7 @@ del _name
 
 
 def _theta(cls, *frames):
+  """the theta fibre of rolling textures, the orientations with <100> along the normal direction"""
   frames = _splitFrames(frames)[1]
   cs, ss = _defaultFrames(frames, "432")
   return cls(Miller(1, 0, 0, cs, "uvw"), vector3d(0, 0, 1, frame=ss))

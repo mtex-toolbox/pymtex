@@ -18,6 +18,9 @@ def _method(name, fallback=None):
       raise TypeError(f"{name} is not defined for {type(x).__name__}")
     return fallback(x, *args, **kwargs)
   f.__name__ = name
+  f.__doc__ = (f"{name}(x, ...) is x.{name}(...), the method of the object passed"
+               + (f"; NumPy's {fallback.__name__} for an array" if fallback is not None else ""))
+  f.forwardsTo = name
   return f
 
 
@@ -95,6 +98,7 @@ def sum(x, *args, **kwargs):
 
 
 def checkInside(region, x, **kw):
+  """whether x lies in the region, region.checkInside(x)"""
   return region.checkInside(x, **kw)
 find = _method("find", np.flatnonzero)
 subGrid = _method("subGrid")

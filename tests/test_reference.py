@@ -52,6 +52,8 @@ def test_a_matlab_page_is_what_its_name_reaches_in_python():
   assert ref.resolve("Miller.angle")[2] is mtex.vector3d
   assert ref.resolve("EBSD_index")[:2] == ("class", mtex.EBSD)
   assert ref.resolve("vector3d.subsasgn") is None
+  # a forwarder of the flat namespace is no method of a class without it, T no transpose of vector3d
+  assert ref.resolve("EBSD.isnan") is None and ref.resolve("vector3d.ctranspose") is None
   # a name syntax.md replaced reaches its replacement
   assert ref.resolve("vector3d.angle_outer")[1] is inspect.getattr_static(mtex.vector3d, "angle")
   assert ref.resolve("loadEBSD_ang")[1] is mtex.loadEBSD
@@ -65,3 +67,10 @@ def test_the_syntax_shows_the_keywords_and_angles_in_degrees(rendered):
 
 def test_no_page_takes_the_name_of_a_documentation_page(pages):
   assert not set(pages) & set(ref.pageSources())
+
+
+def test_every_page_says_what_it_is(pages):
+  # a docstring, or the operator form for an operator
+  empty = sorted({n for n, e in pages.items() if not ref.docOf(e[1])
+                  and getattr(ref.unwrap(e[1]), "__name__", "") not in ref.OPERATOR_FORMS})
+  assert not empty, empty

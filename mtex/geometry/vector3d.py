@@ -240,17 +240,17 @@ class vector3d(MtexArray):
       self.uvw = np.stack([2 * UVTW[..., 0] + UVTW[..., 1], 2 * UVTW[..., 1] + UVTW[..., 0], UVTW[..., 2]], axis=-1) / 3
     self.dispStyle = "UVTW"
 
-  h = property(lambda self: self.hkl[..., 0])
-  k = property(lambda self: self.hkl[..., 1])
-  i = property(lambda self: self.hkil[..., 2])
-  l = property(lambda self: self.hkl[..., 2])
-  u = property(lambda self: self.uvw[..., 0])
-  v = property(lambda self: self.uvw[..., 1])
-  w = property(lambda self: self.uvw[..., 2])
-  U = property(lambda self: self.UVTW[..., 0])
-  V = property(lambda self: self.UVTW[..., 1])
-  T = property(lambda self: self.UVTW[..., 2])
-  W = property(lambda self: self.UVTW[..., 3])
+  h = property(lambda self: self.hkl[..., 0], doc="the Miller index h of a plane normal")
+  k = property(lambda self: self.hkl[..., 1], doc="the Miller index k of a plane normal")
+  i = property(lambda self: self.hkil[..., 2], doc="the third Miller-Bravais index i = -(h + k) of a plane normal")
+  l = property(lambda self: self.hkl[..., 2], doc="the Miller index l of a plane normal")
+  u = property(lambda self: self.uvw[..., 0], doc="the index u of a lattice direction")
+  v = property(lambda self: self.uvw[..., 1], doc="the index v of a lattice direction")
+  w = property(lambda self: self.uvw[..., 2], doc="the index w of a lattice direction")
+  U = property(lambda self: self.UVTW[..., 0], doc="the Miller-Bravais index U of a lattice direction")
+  V = property(lambda self: self.UVTW[..., 1], doc="the Miller-Bravais index V of a lattice direction")
+  T = property(lambda self: self.UVTW[..., 2], doc="the Miller-Bravais index T = -(U + V) of a lattice direction")
+  W = property(lambda self: self.UVTW[..., 3], doc="the Miller-Bravais index W of a lattice direction")
 
   def dspacing(self):
     """the distance between the lattice planes with this normal, in the units of the cell"""

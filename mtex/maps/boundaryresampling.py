@@ -342,6 +342,8 @@ def _reduceGrains(grains, n=2):
 
 
 def _simplifyGrains(grains, epsilon=None):
+  """the grains with the vertices of their boundary that carry no shape dropped, those whose
+  removal moves the boundary by less than epsilon, the inner boundary kept on it"""
   return _coarsenGrains(simplifyBoundary, grains, epsilon)
 
 

@@ -444,6 +444,7 @@ class SO3FunRBF(SO3Fun):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from typing import Any
+    from .handles import _integralSO3 as sum
     from .characteristics import (max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume, fibreVolume,
                                   calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
                                   calcError, centerSpecimen)
@@ -454,18 +455,16 @@ class SO3FunRBF(SO3Fun):
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
-      ...
+      """the absolute value of the function, pointwise, as a function handle"""
     def abs(self) -> Any:
-      ...
+      """the absolute value of the function, pointwise, as a function handle"""
     def sqrt(self) -> Any:
-      ...
+      """the square root of the function, pointwise, as a function handle"""
     def exp(self) -> Any:
-      ...
+      """the exponential of the function, pointwise, as a function handle"""
     def log(self) -> Any:
-      ...
+      """the logarithm of the function, pointwise, as a function handle"""
     def __pow__(self, p) -> Any:
-      ...
-    def sum(self) -> Any:
       ...
     @property
     def frameA(self) -> Any:
@@ -673,6 +672,7 @@ class SO3FunCBF(SO3Fun):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from typing import Any
+    from .handles import _integralSO3 as sum
     from .characteristics import (max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume, fibreVolume,
                                   calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex,
                                   calcError, centerSpecimen)
@@ -683,18 +683,16 @@ class SO3FunCBF(SO3Fun):
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
     def __abs__(self) -> Any:
-      ...
+      """the absolute value of the function, pointwise, as a function handle"""
     def abs(self) -> Any:
-      ...
+      """the absolute value of the function, pointwise, as a function handle"""
     def sqrt(self) -> Any:
-      ...
+      """the square root of the function, pointwise, as a function handle"""
     def exp(self) -> Any:
-      ...
+      """the exponential of the function, pointwise, as a function handle"""
     def log(self) -> Any:
-      ...
+      """the logarithm of the function, pointwise, as a function handle"""
     def __pow__(self, p) -> Any:
-      ...
-    def sum(self) -> Any:
       ...
     @property
     def frameA(self) -> Any:
