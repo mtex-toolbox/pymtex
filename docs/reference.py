@@ -294,14 +294,21 @@ def entry(e):
   return name.strip(), text.strip()
 
 
-# calling forms as MATLAB's page shows them, the explanation of a form as text above its own
-# code box: a form's trailing '# comment' becomes the text, forms without one share a box
+# calling forms as the references of MATLAB and NumPy show them: the form first, in a light
+# box, and what it does below it, the two held together in one block; a form's trailing
+# '# comment' is the text, forms without one share a box
 def renderForms(code, link):
   out, plain = [], []
 
+  def block(lines, text=None):
+    out.extend(['<div class="mx-form" markdown="1">', "", "```python", *lines, "```", ""])
+    if text:
+      out.extend([text, ""])
+    out.extend(["</div>", ""])
+
   def flush():
     if plain:
-      out.extend(["```python", *plain, "```", ""])
+      block(list(plain))
       plain.clear()
 
   for line in code:
@@ -310,9 +317,9 @@ def renderForms(code, link):
       plain.append(line)
       continue
     flush()
-    text = m.group(2).strip()
-    out.extend([re.sub(r"`([A-Za-z_][\w.]*)`", link, text[0].upper() + text[1:] + ("" if text.endswith((".", ":")) else ":")), "",
-                "```python", m.group(1), "```", ""])
+    text = m.group(2).strip().rstrip(":")
+    text = text[0].upper() + text[1:] + ("" if text.endswith((".", "!", "?")) else ".")
+    block([m.group(1)], re.sub(r"`([A-Za-z_][\w.]*)`", link, text))
   flush()
   return out
 
@@ -332,25 +339,28 @@ def docBody(doc, link):
   return "\n".join(out).strip("\n")
 
 
-# the sections as tables and lists: Input and Output name and meaning, Keywords with the
-# default the signature gives, References a list, See also links
+# the sections as tables and lists: Input, Keywords with the default the signature gives,
+# Output, References a list, See also links
 def renderSections(sections, target, link, seeAlso):
   out = []
   try:
     params = inspect.signature(target).parameters if target is not None else {}
   except (TypeError, ValueError):
     params = {}
-  for head in ("Input", "Output"):
+  def plain(head):
     if head in sections:
-      out += [f"## {head}", "", "| | |", "|---|---|"]
-      out += [f"| `{n}` | {cell(t, link)} |" for n, t in map(entry, sections[head])] + [""]
+      out.extend([f"## {head}", ""])
+      out.extend([f"| `{n}` | {cell(t, link)} |" for n, t in map(entry, sections[head])] + [""])
+
+  plain("Input")
   if "Keywords" in sections:
-    out += ["## Keywords", "", "| | default | |", "|---|---|---|"]
+    out += ["## Keywords", "", "| keyword | default | description |", "|---|---|---|"]
     for n, t in map(entry, sections["Keywords"]):
       p = params.get(n)
       d = "" if p is None or p.default is inspect.Parameter.empty else f"`{shownDefault(p.default)!r}`"
       out.append(f"| `{n}` | {d} | {cell(t, link)} |")
     out.append("")
+  plain("Output")
   if "References" in sections:
     out += ["## References", ""] + [f"- {e}" for e in sections["References"]] + [""]
   if "See also" in sections:
@@ -467,10 +477,10 @@ def render(name, entry_, pages, calls, owners, names=None, docPages=()):
   if forms:
     lines += ["## Syntax", ""] + renderForms(forms, link)
   elif sig:
-    lines += ["## Syntax", "", "```python", sig, "```", ""]
+    lines += ["## Syntax", ""] + renderForms([sig], link)
     sig = None
   if prose.strip():
-    lines += [docBody(prose, link), ""]
+    lines += ["## Description", "", docBody(prose, link), ""]
 
   def seeAlso(x):
     page = (names or {}).get(x) or (x if x in pages else None) or (f"{x}_index" if f"{x}_index" in pages else None)
@@ -491,7 +501,7 @@ def render(name, entry_, pages, calls, owners, names=None, docPages=()):
 
   lines += renderSections(sections, target, link, seeAlso)
   if sig and "Keywords" not in sections:
-    lines += ["## Signature", "", "```python", sig, "```", ""]
+    lines += ["## Signature", ""] + renderForms([sig], link)
   if kind == "class":
     lines += members(obj, pages)
   # a forwarder of the flat namespace, norm(x) for x.norm(): the methods it reaches
@@ -525,7 +535,7 @@ def forwarded(member, pages, names):
       page = names.get(f"{n}.{member}")
       if page:
         rows.append(f"| [{n}]({page}_py.html) | {firstSentence(docOf(inspect.getattr_static(c, member)))} |")
-  return ["## Methods it calls", "", "| | |", "|---|---|", *rows, ""] if rows else []
+  return ["## Methods it calls", "", *rows, ""] if rows else []
 
 
 # the members of a class as a table of their summaries
@@ -536,7 +546,7 @@ def members(cls, pages):
       rows.append(f"| [{n.split('.', 1)[-1]}]({n}_py.html) | {firstSentence(docOf(entry[1]))} |")
   if not rows:
     return []
-  return ["## Members", "", "| | |", "|---|---|", *sorted(rows, key=str.lower), ""]
+  return ["## Members", "", *sorted(rows, key=str.lower), ""]
 
 
 # the layers in the order of the imports, as the index shows them
@@ -571,7 +581,7 @@ def indexPage(pages):
     lines += [f"## {LAYERS.get(layer, layer)}", ""]
     for title, rows in (("Classes", classes), ("Functions", functions)):
       if rows:
-        lines += [f"### {title}", "", "| | |", "|---|---|", *rows, ""]
+        lines += [f"### {title}", "", *rows, ""]
   return "\n".join(lines)
 
 

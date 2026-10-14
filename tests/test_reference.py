@@ -117,4 +117,4 @@ def test_the_calling_forms_keep_their_explanations_out_of_the_code(rendered):
   page = rendered["EBSD.calcGrains"]
   syntax = page.split("## Syntax", 1)[1].split("\n## ", 1)[0]
   boxes = re.findall(r"```python\n(.*?)```", syntax, re.S)
-  assert len(boxes) > 3 and not any("#" in b for b in boxes) and "High and low angle boundaries:" in syntax
+  assert len(boxes) > 3 and not any("#" in b for b in boxes) and "```\n\nHigh and low angle boundaries.\n" in syntax

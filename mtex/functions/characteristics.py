@@ -1068,15 +1068,26 @@ def calcKernel(o, method="UCV", samplingSize=1000, rng=None, *, groups=None, wei
     psi = calcKernel(ori, 'klcv', samplingSize=500)          # Kullback-Leibler cross validation, as MATLAB's default
     psi = calcKernel(v, noiseFloor=False)                    # an S2 kernel for directions, no lower bound
 
-  'UCV', the default, and 'conservative' select from the degree energies of the sample
-  (docs/plans/halfwidth.md) and are bounded below by a noise floor unless noiseFloor=False; they
-  take directions too. The others are MATLAB's: 'klcv' scores ten halfwidths by Kullback-Leibler
-  cross validation, 'ruleOfThumb' reads the nearest neighbour disorientations, 'magicRule' the
-  sample size and the symmetries alone; above 5000 orientations they score a subsample and
-  scale the result. MATLAB's default is 'klcv'. The pixels of a map are no independent draws:
-  'klcv', 'ruleOfThumb' and 'magicRule' refuse orientations taken from a map (ori.notIID), and
-  the energies need the grain ids, which a map brings along after calcGrains. MATLAB's 'LSCV'
-  and 'BCV' are not provided.
+  The method chooses the halfwidth:
+
+  - 'UCV', the default: the halfwidth that minimises an unbiased estimate of the error of the
+  density, computed from the degree energies of the sample. Orientations and directions.
+  - 'conservative': the same error with lower confidence bounds on the energies, which gives a
+  wider kernel that does not undersmooth. Orientations and directions.
+  - 'klcv': Kullback-Leibler cross validation of ten halfwidths, MATLAB's default.
+  - 'ruleOfThumb': from the distances of every orientation to its nearest neighbour.
+  - 'magicRule': from the sample size and the symmetries alone.
+
+  'UCV' and 'conservative' never go below the halfwidth at which the noise of the sample would
+  show as false peaks, unless noiseFloor=False.
+
+  Neighbouring pixels of one grain are no independent draws. For a map, 'UCV' and
+  'conservative' therefore group the pixels by their grain, which needs the grain ids that
+  calcGrains writes into the map. 'klcv', 'ruleOfThumb' and 'magicRule' refuse orientations
+  taken from a map; select from the grain mean orientations instead.
+
+  Above 5000 orientations, 'klcv', 'ruleOfThumb' and 'magicRule' score a random subsample and
+  scale the result to the whole sample. MATLAB's 'LSCV' and 'BCV' are not provided.
 
   Input
     o - orientation, vector3d, or EBSD
