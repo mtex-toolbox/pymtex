@@ -21,6 +21,7 @@ import numpy as np
 
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
+from ..geometry.units import degree
 from ..maps.phaselist import distinctMinerals, phaseList
 from ..maps3d.ebsd3 import EBSD3, EBSD3square
 from .h5array import readArray
@@ -28,6 +29,10 @@ from .kernels import turnBunge, turnRodrigues, turnVolume
 
 # DREAM.3D's crystal structures, by their number; 999 and anything else is not indexed
 DREAM3D_SYMMETRY = ("622", "432", "6", "23", "1", "121", "222", "4", "422", "3", "322", "1")
+# DREAM.3D puts the a axis of a hexagonal or trigonal cell along x: the voxels its IPF colours
+# green, which its key labels <2-1-10>, are 6.6 degrees from <2-1-10> under X||a and 28 under
+# X||a* (the Zircaloy slab of zenodo 3785085, 2026-10-14)
+DREAM3D_ALIGNMENT = {"622": "X||a", "6": "X||a", "3": "X||a", "322": "X||a"}
 # the data sets that tell the voxel data of a DREAM.3D file, the first found deciding
 DREAM3D_VOXELS = ("EulerAngles", "Quats", "FeatureIds")
 
@@ -92,11 +97,38 @@ def _voxelData(paths):
 
 
 # the phases of DREAM.3D's crystal structures, the first the not indexed one, a number outside
-# the table not indexed too
-def _dream3dPhases(structures):
+# the table not indexed too; named by the materials and on the cells (a, b, c, alpha, beta, gamma
+# in degrees) the file states, unknown and the cell of the group where it states none, the
+# hexagonal and trigonal ones X||a; phases of one name take a letter each
+def _dream3dPhases(structures, materials=None, cells=None):
   structures = np.asarray(structures).reshape(-1)
-  return distinctMinerals(["notIndexed"] + [crystalFrame(DREAM3D_SYMMETRY[s], mineral="unknown") if 0 <= s < len(DREAM3D_SYMMETRY)
-                                            else "notIndexed" for s in structures[1:]])
+  phases = ["notIndexed"]
+  for k in range(1, len(structures)):
+    s = structures[k]
+    if not 0 <= s < len(DREAM3D_SYMMETRY):
+      phases.append("notIndexed")
+      continue
+    name = _material(materials[k]) if materials is not None and k < len(materials) else ""
+    cell = np.asarray(cells[k], dtype=float).reshape(-1) if cells is not None and k < len(cells) else np.zeros(0)
+    lattice = (cell[:3], cell[3:] * degree) if cell.size == 6 and np.all(cell > 0) else ()
+    group = DREAM3D_SYMMETRY[s]
+    phases.append(crystalFrame(group, *lattice, *([DREAM3D_ALIGNMENT[group]] if group in DREAM3D_ALIGNMENT else []),
+                               mineral=name or "unknown"))
+  return distinctMinerals(phases)
+
+
+# a material name as DREAM.3D stores it, bytes or text, with the blanks around it
+def _material(name):
+  return (name.decode("utf-8", "replace") if isinstance(name, bytes) else str(name)).strip()
+
+
+# the phases of a DREAM.3D file from the ensemble data beside its crystal structures
+def _dream3dEnsemble(f, structures):
+  ensemble = [p for p in dream3dDatasets(f) if _parent(p) == _parent(structures)]
+  materials = _named(ensemble, "MaterialName", "Material Name", "PhaseName", "Phase Name")
+  cells = _named(ensemble, "LatticeConstants", "Lattice Constants")
+  return _dream3dPhases(f[structures][...], f[materials[0]][...].reshape(-1) if materials else None,
+                        f[cells[0]][...].reshape(-1, 6) if cells and f[cells[0]].size % 6 == 0 else None)
 
 
 # the name a cell array has as a property: the feature ids are the grain ids, a letter after a
@@ -150,7 +182,7 @@ def dream3dVolume(f):
 
 # the phases a DREAM.3D volume declares, one unknown triclinic phase where it declares none
 def _dream3dCS(f, vol):
-  return _dream3dPhases(f[vol.structures][...]) if vol.structures else ["notIndexed", crystalFrame("1")]
+  return _dream3dEnsemble(f, vol.structures) if vol.structures else ["notIndexed", crystalFrame("1")]
 
 
 # the 3D EBSD map of the voxel data of a DREAM.3D file: the Euler angles or else the quaternions,

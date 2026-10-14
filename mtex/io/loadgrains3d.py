@@ -17,7 +17,7 @@ import numpy as np
 from ..geometry.frames import crystalFrame
 from ..geometry.quaternion import rotation
 from ..maps.phaselist import phaseList
-from .load3d import _dream3dPhases, _loadEBSD_dream3d, _named, _parent, dream3dDatasets
+from .load3d import _dream3dEnsemble, _loadEBSD_dream3d, _named, _parent, dream3dDatasets
 
 # the crystal systems Neper names, as point groups
 NEPER_SYMMETRY = {"triclinic": "1", "cubic": "m-3m", "hexagonal": "6/mmm", "-1": "1"}
@@ -68,7 +68,8 @@ def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
       F = np.asarray(readArray(f[_named(mesh, "SharedTriList")[0]]), dtype=np.int64).reshape(-1, 3)
       mean = np.asarray(f[ori[0]][...], dtype=float)
       phases = np.asarray(f[_named(feature, "Phases")[0]][...]).reshape(-1)
-      structures = f[_named(paths, "CrystalStructures")[0]][...]
+      structures = _named(paths, "CrystalStructures")[0]
+      ensemble = _dream3dEnsemble(f, structures) if CS is None else CS
   if not faceLabels:
     from ..maps3d.calcgrains3d import calcGrains
     return calcGrains(_loadEBSD_dream3d(fname, CS=CS), grainId=True)
@@ -78,8 +79,7 @@ def _loadGrains_Dream3d(fname, CS=None, orientFaces=True):
     q = rotation.byEuler(mean[:, 0], mean[:, 1], mean[:, 2], "ZXZ").data
   # the first feature is the one no voxel belongs to
   q, phases = q[1:], phases[1:]
-  if CS is None:
-    CS = _dream3dPhases(structures)
+  CS = ensemble
   # the lower feature first, the outside -1 first of all; the first side +1, the second -1
   labels = np.sort(labels, axis=1)
   pos, neg = labels[:, 1] > 0, labels[:, 0] > 0

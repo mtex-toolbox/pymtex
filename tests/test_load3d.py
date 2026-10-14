@@ -11,6 +11,8 @@ DATA = os.path.join(os.path.dirname(__file__), "..", "..", "master", "data")
 XNOVO = os.path.join(DATA, "EBSD3", "SimulatedMultiPhase.h5")
 # a DREAM3D-NX file with blanks in its group names and without a surface mesh
 IN100_NX = os.path.join(DATA, "..", "..", "data", "dream3d", "SmallIN100_Final.dream3d")
+# a DREAM.3D 6 file of a hexagonal and a cubic phase, with DREAM.3D's IPF colours with respect to y
+ZIRCALOY = os.path.join(DATA, "..", "..", "data", "dream3d", "zenodo_3785085", "Zircaloy4_7Nb_slab.dream3d")
 
 
 @pytest.mark.skipif(not os.path.exists(XNOVO), reason="the xnovo volume of ../master/data")
@@ -56,7 +58,7 @@ def voxelArrays():
 
 
 # a DREAM.3D file of the layout holding the arrays, stored (z, y, x, components) as DREAM.3D does
-def writeDream3d(path, layout, arrays, structures=(999, 1, 0), **stored):
+def writeDream3d(path, layout, arrays, structures=(999, 1, 0), materials=None, lattices=None, **stored):
   import h5py
   root, cells, ensemble, grid = LAYOUTS[layout]
   with h5py.File(path, "w") as f:
@@ -65,6 +67,10 @@ def writeDream3d(path, layout, arrays, structures=(999, 1, 0), **stored):
       g.create_dataset(f"{cells}/{name}", data=np.ascontiguousarray(np.swapaxes(a, 0, 2)), **stored)
     if structures is not None:
       g.create_dataset(f"{ensemble}/CrystalStructures", data=np.array(structures, dtype=np.uint32).reshape(-1, 1))
+    if materials is not None:
+      g.create_dataset(f"{ensemble}/MaterialName", data=np.array(materials, dtype=object), dtype=h5py.string_dtype())
+    if lattices is not None:
+      g.create_dataset(f"{ensemble}/LatticeConstants", data=np.array(lattices, dtype=np.float32))
     for name, v in (("DIMENSIONS", np.array(SHAPE, dtype=np.int64)), ("SPACING", np.float32(SPACING)), ("ORIGIN", np.float32(ORIGIN))):
       if grid == "datasets":
         g.create_dataset(f"_SIMPL_GEOMETRY/{name}", data=v)
@@ -156,11 +162,48 @@ def test_dream3d_readsADream3dNXFileAsMATLAB():
   e = EBSD3.load(IN100_NX)
   assert e.shape == (189, 201, 117) and np.allclose(e.lattice.spacing, 0.25) and np.bincount(e.phaseId.reshape(-1)).tolist() == [1072734, 3371979]
   assert np.allclose(e.pos.data[65, 64, 39], [-31, 16, -19.5]) and e.CSList.frames[1].pointGroup == "432"
+  assert e.CSList.frames[1].mineral == "Nickel"
   assert np.allclose(e.rotations.data[94, 100, 58], [-0.30812373, 0.44180860, 0.67022787, 0.51054827], atol=1e-8)
   assert np.allclose(e.rotations.data[65, 64, 39], [0.74085404, 0.54717957, 0.15549391, -0.35714345], atol=1e-8)
   sums = {"ConfidenceIndex": 1315316.569, "Fit": -104365549.8, "ImageQuality": 684004956.2, "ParentIds": 3796976474, "SEMSignal": 7261014293,
           "XPosition": 101950104.8, "YPosition": 110691801.8, "grainId": 3946028298}
   assert sorted(e.prop) == sorted(sums) and all(np.isclose(e.prop[k].sum(dtype=float), v, rtol=1e-9) for k, v in sums.items())
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_dream3d_namesThePhasesByTheirMaterialsOnTheirCells(tmp_path, layout):
+  # the names without the blanks DREAM.3D leaves, the cells in degrees; a name the file leaves
+  # blank is unknown, a cell of zeros the group's own
+  a = voxelArrays()
+  cells = [[0] * 6, [3.52, 3.52, 3.52, 90, 90, 90], [3.231, 3.231, 5.148, 90, 90, 120]]
+  e = EBSD3.load(writeDream3d(tmp_path / "v.dream3d", layout, a, materials=["Invalid Phase", "Nickel ", "Zr"], lattices=cells))
+  assert [f.mineral for f in e.CSList.frames[1:]] == ["Nickel", "Zr"]
+  assert [np.linalg.norm(v) for v in e.CSList.frames[2].axes.data.reshape(3, 3)] == pytest.approx([3.231, 3.231, 5.148], rel=1e-6)
+  blank = EBSD3.load(writeDream3d(tmp_path / "b.dream3d", layout, a, materials=["", " ", "Zr"], lattices=[[0] * 6] * 3))
+  assert [f.mineral for f in blank.CSList.frames[1:]] == ["unknown", "Zr"]
+  assert [np.linalg.norm(v) for v in blank.CSList.frames[2].axes.data.reshape(3, 3)] == pytest.approx([1, 1, 1])
+
+
+@pytest.mark.skipif(not os.path.exists(ZIRCALOY), reason="the Zircaloy slab of zenodo 3785085")
+def test_dream3d_hexagonalPhaseIsAlignedAsDREAM3DColoursIt():
+  # the voxels DREAM.3D colours green and blue, the corners its key labels <2-1-10> and <10-10>,
+  # are nearest those directions in the frame the reader builds
+  import h5py
+  from mtex import Miller, degree, orientation, yvector
+  from mtex.io.load3d import _dream3dEnsemble
+  cells = "DataContainers/ImageDataContainer/CellData/"
+  with h5py.File(ZIRCALOY, "r") as f:
+    cs = _dream3dEnsemble(f, "DataContainers/ImageDataContainer/CellEnsembleData/CrystalStructures")[1]
+    eul = f[cells + "EulerAngles"][60].reshape(-1, 3).astype(float)
+    col = f[cells + "IPFColor"][60].reshape(-1, 3) / 255
+    hexagonal = f[cells + "Phases"][60].reshape(-1) == 1
+  assert cs.pointGroup == "622"
+  h = orientation(rotation.byEuler(eul[:, 0], eul[:, 1], eul[:, 2]), cs).inv() * yvector
+  for k, near, far in ((1, (2, -1, -1, 0), (1, 0, -1, 0)), (2, (1, 0, -1, 0), (2, -1, -1, 0))):
+    pure = np.flatnonzero(hexagonal & (col[:, k] > 0.8) & (np.delete(col, k, axis=1).max(axis=1) < 0.4))
+    assert len(pure) > 50
+    d = [np.median(np.asarray(h[pure].angle(Miller(*idx, cs, "uvw"), antipodal=True))) / degree for idx in (near, far)]
+    assert d[0] < 10 < 25 < d[1], (k, d)
 
 
 def test_dream3dPhases_reads_the_structures_after_the_first():

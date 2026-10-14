@@ -243,7 +243,13 @@ a DREAM.3D file is read by the names of its data sets (`dream3dDatasets`), so DR
 `Cell Data` or names of their own all load; the voxels are the attribute matrix of the first
 `EulerAngles`, `Quats` or `FeatureIds`, a file without orientations gives NaN rotations, one
 without `Phases` a single phase, and `grain3d.load` of a file without a surface mesh the
-grains of its feature ids. Only the arrays that enter the map are read, and a property
+grains of its feature ids. A phase is named by the `MaterialName` beside its
+`CrystalStructures` and takes the cell of `LatticeConstants`, unknown and the group's cell
+where the file leaves them blank or out, phases of one name a letter each; a hexagonal or
+trigonal phase is `X||a`, read off DREAM.3D's own IPF colours (the voxels it colours green,
+its <2-1-10> corner, lie 6.6 degrees from <2-1-10> under `X||a`, 28.4 under `X||a*`, on the
+Zircaloy slab of zenodo 3785085). MATLAB develop does the same (`dream3dCrystalSymmetry`,
+user, 2026-10-14). Only the arrays that enter the map are read, and a property
 keeps the type the file stores it in (float32, int32; user, 2026-10-12). The speed is three
 pieces: `h5array.py` reads a data set over the cores (the threads `pread` the stored bytes
 and inflate the gzip chunks, h5py the fallback and oracle), `turnVolume`, `turnBunge` and
