@@ -5,7 +5,8 @@
 #   fibre(o1, h)                      the whole fibre through o1 about h
 #   fibre.alpha(cs, ss), ..., fibre.theta(cs, ss), fibre.rand(n, cs, ss), fibre.fit(ori)
 #   f.orientation(points=1000)        orientations along the fibre, o1 * rot(h, omega)
-#   angle(f, ori)                     the angle by which ori * h misses r, over the orbits of both frames
+#   angle(f, ori)                     the angle by which ori * h misses r, over the orbits of both frames,
+#                                     with return_nearest=True also the nearest orientation on the fibre
 #   symmetrise(f), multiplicity(f)    the equivalent fibres s * o1 * inv(g) about g * h
 #
 # A fibre holds two orientations between the same frames and the crystal direction h, a
@@ -25,7 +26,7 @@ from .kernels import qmul, qrot
 from .miller import Miller
 from .orientation import _defaultFrames, _splitFrames, orientation
 from .quaternion import rotation
-from .representations import axis2quat, quatAngle, quatAxis, quat2euler
+from .representations import axis2quat, map1Kernel, quatAngle, quatAxis, quat2euler
 from .session import SESSION
 from .symreduce import _firstOfClusters, reductionGroups
 from .units import degree
@@ -174,10 +175,16 @@ class fibre:
     rs = _uniqueDirections(qrot(L, self.r.normalize().data[..., None, :]))
     return hs, rs
 
-  def angle(self, ori, symmetry=True):
+  def angle(self, ori, symmetry=True, return_nearest=False):
     """the angle by which ori * h misses r, the least over both orbits, from the chord of the
-    closest pair; with another fibre the largest distance of its points to this one"""
+    closest pair; with another fibre the largest distance of its points to this one;
+    return_nearest=True also gives the orientation on the fibre nearest ori
+
+      omega = angle(f, ori)
+      omega, oriF = angle(f, ori, return_nearest=True)"""
     if isinstance(ori, fibre):
+      if return_nearest:
+        raise ValueError("the nearest orientation is taken to an orientation, not to a fibre")
       return np.max(self.angle(ori.orientation(1000)))
     if self.size != 1:
       raise ValueError("the angle to a list of fibres is taken one fibre at a time")
@@ -193,8 +200,14 @@ class fibre:
     flat = c.reshape(c.shape[:-2] + (-1,))
     k = np.argmax(flat, axis=-1)
     kh, kr = np.unravel_index(k, c.shape[-2:])
-    best = np.take_along_axis(y, kh[..., None, None], axis=-2)[..., 0, :] - rs[kr]
-    return 2 * np.arcsin(np.minimum(np.linalg.norm(best, axis=-1) / 2, 1.0))
+    yBest = np.take_along_axis(y, kh[..., None, None], axis=-2)[..., 0, :]
+    omega = 2 * np.arcsin(np.minimum(np.linalg.norm(yBest - rs[kr], axis=-1) / 2, 1.0))
+    if not return_nearest:
+      return omega
+    # the smallest rotation turning the closest image ori * h onto its r, applied to ori
+    q = qmul(map1Kernel(yBest, rs[kr]), ori.data)
+    frames = (ori.frameA, ori.frameB) if isinstance(ori, orientation) else (self.CS, self.SS)
+    return omega, orientation._fromRotation(q, frames)
 
   # ------------------------------------------------------------------ symmetry
 

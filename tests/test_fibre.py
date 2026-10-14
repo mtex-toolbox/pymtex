@@ -122,6 +122,23 @@ def test_angle_fibreToFibre():
   assert angle(f, f) < 1e-8 and angle(fibre.alpha(cs), fibre.gamma(cs)) > 5 * degree
 
 
+def test_angle_nearestLiesOnTheFibreAtTheAngle():
+  # the orientation on the fibre nearest ori is omega away from it, for specimen symmetry and for two crystal frames
+  cs, ss, f, ori = randomFibre()
+  csB = crystalFrame("m-3m", mineral="B")
+  fM = fibre.rand(cs, csB, rng=rng())
+  for f, ori in ((f, ori), (fM, orientation.rand(20, cs, csB, rng=rng()))):
+    omega, oriF = angle(f, ori, return_nearest=True)
+    assert np.max(angle(f, oriF)) < 1e-10 and np.max(np.abs(angle(oriF, ori) - omega)) < 1e-10
+
+
+def test_angle_nearestOfAnOrientationOnTheFibreIsItself():
+  _, _, f, _ = randomFibre()
+  ori = f.orientation(10)
+  _, oriF = angle(f, ori, return_nearest=True)
+  assert np.max(angle(oriF, ori)) < 1e-7
+
+
 def test_angle_refusesAListOfFibres():
   cs, _, _, ori = randomFibre()
   with pytest.raises(ValueError):
