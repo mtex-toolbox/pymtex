@@ -350,6 +350,46 @@ class grain2d(polygonSet):
                    innerBoundary=None if self.innerBoundary is None else self.innerBoundary.selectByGrainId(keep),
                    loops=None if self.loops is None else [self.loops[i] for i in ids], phaseMap=self.phaseMap)
 
+  @classmethod
+  def cat(cls, *parts):
+    """the grains of several parts of one segmentation, MATLAB's [grains1, grains2]: the parts
+    share its phases, frame and boundary vertices; a grain in more than one part is kept once,
+    the boundaries are joined as grainBoundary.cat joins them
+
+      grains = grain2d.cat(grains['Forsterite'], grains['Enstatite'])
+      grains = cat(grains[:100], grains[500:])"""
+    from .boundary import grainBoundary
+    parts = [p for p in parts if p is not None and p.size]
+    first = parts[0]
+    for p in parts[1:]:
+      if p.CSList is not first.CSList or p.frame is not first.frame:
+        raise ValueError("grains are joined as parts of one segmentation, with the same phases and frame")
+    ids = np.concatenate([p.id for p in parts])
+    _, keep = np.unique(ids, return_index=True)
+    keep = np.sort(keep)
+
+    def joined(name):
+      return np.concatenate([getattr(p, name) for p in parts])[keep]
+
+    props = {}
+    for k in first.prop:
+      vals = [p.prop[k] for p in parts]
+      if all(isinstance(v, np.ndarray) for v in vals):
+        props[k] = np.concatenate(vals)[keep]
+      else:
+        flat = [x for v in vals for x in v]
+        props[k] = [flat[i] for i in keep]
+
+    def boundaries(name):
+      bs = [getattr(p, name) for p in parts if getattr(p, name) is not None]
+      return grainBoundary.cat(*bs) if bs else None
+
+    loops = None if any(p.loops is None for p in parts) else [l for p in parts for l in p.loops]
+    return grain2d(ids[keep], joined("phaseId"), first.CSList, joined("numPixel"),
+                   np.concatenate([p.meanRotation.data.reshape(-1, 4) for p in parts])[keep], joined("GOS"), first.frame, props,
+                   boundary=boundaries("boundary"), innerBoundary=boundaries("innerBoundary"),
+                   loops=None if loops is None else [loops[i] for i in keep], phaseMap=first.phaseMap)
+
   def id2ind(self, ids):
     """the positions of grain ids in this list
     the positions of grain ids in the list, in the shape of the ids: one for a number, a

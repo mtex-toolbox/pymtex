@@ -473,3 +473,25 @@ def test_the_pair_key_of_ids_above_46341_does_not_overflow():
 def test_the_first_largest_member_of_a_group_is_the_first_of_equal_weight():
   from mtex.maps.grains import _firstLargest
   assert np.array_equal(_firstLargest(np.array([1, 3, 3, 2, 5]), np.array([0, 0, 0, 1, 1]), 2), [1, 4])
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_cat_ofPartsIsTheGrainsOfTheirUnion(seed):
+  # two overlapping parts of one segmentation join to their union: the grains, their areas, the boundary
+  from mtex import cat
+  g = calcGrains(mapOf(SQ5, 12, lambda i, j: i // 3 + (j // 3) * 4), angle=5 * degree)
+  rng = np.random.default_rng(seed)
+  a, b = rng.random(g.size) < 0.5, rng.random(g.size) < 0.5
+  a[0] = b[0] = True
+  c, u = cat(g[a], g[b]), g[a | b]
+  order = np.argsort(c.id)
+  assert np.array_equal(c.id[order], np.sort(u.id)) and close(c.area[order], u.area[np.argsort(u.id)])
+  assert {tuple(f) for f in np.sort(c.boundary.F, axis=1)} == {tuple(f) for f in np.sort(u.boundary.F, axis=1)}
+
+
+def test_cat_refusesGrainsOfAnotherSegmentation():
+  from mtex import cat
+  g1 = fourBlocks(SQ5)
+  g2 = calcGrains(mapOf(SQ5, 20, lambda i, j: i // 10), angle=5 * degree)
+  with pytest.raises(ValueError):
+    cat(g1, g2)

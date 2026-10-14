@@ -325,6 +325,32 @@ class grainBoundary:
     q = self.CSList.phaseId(b)
     return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
 
+  @classmethod
+  def cat(cls, *parts):
+    """the segments of several parts of one boundary, MATLAB's [gB1, gB2]: the parts share the
+    vertices of the boundary they were taken from; a segment in more than one part is kept
+    once, and the chains are walked again
+
+      gB = grainBoundary.cat(gB1, gB2)
+      gB = cat(gB['Forsterite', 'Forsterite'], gB['Forsterite', 'Enstatite'])"""
+    parts = [p for p in parts if p is not None]
+    first = parts[0]
+    for p in parts[1:]:
+      if p.V is not first.V and not (np.shape(p.V) == np.shape(first.V) and np.array_equal(p.V, first.V)):
+        raise ValueError("boundaries are joined as parts of one boundary, over the same vertices")
+      if p.CSList is not first.CSList or p.frame is not first.frame:
+        raise ValueError("boundaries are joined as parts of one boundary, with the same phases and frame")
+    F = np.concatenate([p.F for p in parts])
+    # the first copy of a segment, by its two vertices in either order
+    _, keep = np.unique(np.sort(F, axis=1), axis=0, return_index=True)
+    keep = np.sort(keep)
+    gB = first._with(F=F[keep], grainId=np.concatenate([p.grainId for p in parts])[keep],
+                     ebsdId=np.concatenate([p.ebsdId for p in parts])[keep],
+                     phaseId=np.concatenate([p.phaseId for p in parts])[keep],
+                     misrotation=np.concatenate([p.misrotation.data.reshape(-1, 4) for p in parts])[keep])
+    gB._root = first._root if first._root is not None else first
+    return orderWalk(gB)
+
   def selectByGrainId(self, ids):
     """the segments with a grain of the list on either side, walked again: a junction of the
     whole boundary may have lost its third segment, so the chains of the subset are longer;

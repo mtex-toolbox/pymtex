@@ -104,13 +104,18 @@ def test_numpy_sees_the_coordinates_and_leaves_the_operators_to_the_container():
 # two operands of every class of the flat namespace that has a cat, by the class defining it
 def _catOperands():
   from mtex import (EBSD, PoleFigure, S2FunHarmonic, SO3FunHarmonic, crystalFrame, specimenFrame, orientation,
-                    rotation, vector3d, tensor, fibre, slipSystem, phaseList, Miller, log, degree)
+                    rotation, vector3d, tensor, fibre, slipSystem, phaseList, Miller, log, degree, calcGrains)
   rng = np.random.default_rng(0)
   cs, ss = crystalFrame("321"), specimenFrame("222")
   o = orientation.rand(3, cs, ss, rng=rng)
   ebsd = EBSD(np.c_[np.arange(6.0), np.zeros(6), np.zeros(6)], rotation.rand(6, rng=rng), np.ones(6, dtype=np.int8),
               phaseList(crystalFrame("m-3m", mineral="test")), {"mad": np.arange(6.0)})
   r = vector3d.rand(5, rng=rng)
+  # four grains of a 2 x 2 block map
+  i, j = np.meshgrid(np.arange(8), np.arange(8))
+  block = (i // 4 + 2 * (j // 4)).reshape(-1)
+  grains = calcGrains(EBSD(np.c_[i.reshape(-1), j.reshape(-1), np.zeros(64)], rotation.byAxisAngle(vector3d(0, 0, 1), block * 20 * degree),
+                           np.ones(64, dtype=np.int8), phaseList(crystalFrame("m-3m", mineral="test"))), angle=5 * degree)
   pf = PoleFigure(Miller(1, 0, 0, cs), r, np.ones(5))
   return {
     "MtexArray": (vector3d.rand(2, rng=rng), vector3d.rand(3, rng=rng)),
@@ -123,6 +128,8 @@ def _catOperands():
     "SO3FunHarmonic": (SO3FunHarmonic(rng.standard_normal(10), cs, ss), SO3FunHarmonic(rng.standard_normal(35), cs, ss)),
     "PoleFigure": (pf, pf),
     "EBSD": (ebsd[:2], ebsd[3:]),
+    "grain2d": (grains[:2], grains[1:]),
+    "grainBoundary": (grains.boundary[:6], grains.boundary[4:]),
   }
 
 

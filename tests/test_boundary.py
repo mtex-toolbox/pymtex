@@ -441,3 +441,22 @@ def test_a_closed_chain_wraps_its_ends_onto_each_other():
   s, e = np.flatnonzero(gB.isChainStart), np.flatnonzero(gB.isChainEnd)
   closed = gB.isClosed[s]
   assert closed.any() and np.array_equal(prev[s], np.where(closed, e, s)) and np.array_equal(nxt[e], np.where(closed, s, e)) and np.array_equal(hasPrev[s], closed)
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_cat_ofPartsIsTheirUnionWalkedAgain(seed):
+  # overlapping parts of one boundary join to the segments of their union, each once, in chains again
+  from mtex import cat
+  gB = blockBoundary()
+  rng = np.random.default_rng(seed)
+  a, b = rng.random(gB.size) < 0.5, rng.random(gB.size) < 0.5
+  c, u = cat(gB[a], gB[b]), gB[a | b]
+  key = lambda x: sorted(map(tuple, np.sort(x.F, axis=1)))
+  assert key(c) == key(u) and len(set(map(tuple, np.sort(c.F, axis=1)))) == c.size
+  assert np.array_equal(c.F, orderWalk(c).F)
+
+
+def test_cat_refusesBoundariesOverOtherVertices():
+  from mtex import cat
+  with pytest.raises(ValueError):
+    cat(blockBoundary(SQ4), blockBoundary(HEX4))

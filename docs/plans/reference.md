@@ -109,8 +109,9 @@ uniform; `round(m, return_error=True, maxXYZ=)`; `f.rotation(return_angles=True)
 `S2Fun.smiley(even=True)` antipodal; and the named fibres alpha and tau, wrong in MATLAB too and fixed on develop
 (`docs/plans/develop-fixes.md`). Kept: `calcError`'s defaults, which are MATLAB's code if not
 its documentation; `abs(sF, bandwidth=)` of `S2FunTri`, which MATLAB's signature does not take.
-Left: `cat` of grains and boundaries (new work), `np.sum` of a `vector3d`, MATLAB's `accuracy` of
-`round`, `strainTensor`'s ellipsoid, the only user of its type.
+Done after: `cat` of grains and boundaries (parts of one segmentation, a grain or segment in two
+parts kept once), NumPy's reductions of every container, MATLAB's `accuracy` of `round`. Left:
+`strainTensor`'s ellipsoid, the only user of its type.
 
 ## 4. Open questions
 
