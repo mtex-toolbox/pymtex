@@ -932,7 +932,10 @@ def calcPoleFigure(odf, h, r=None, superposition=None, complete=False, **gridOpt
     hh = _millerList(hh, odf.CS if hh.frame is None else None)
     if hh.frame is not odf.CS:
       raise ValueError("the pole figure directions have to be given in the crystal frame of the ODF")
-    rr = _specimenDirections(rr, complete, None)
+    # the specimen directions take the ODF's specimen frame, its symmetry included, as MATLAB's
+    rf = getattr(rr, "frame", None)
+    own = rf is None or odf.SS is not None and rf.stripSym() is odf.SS.stripSym()
+    rr = _specimenDirections(rr, complete, odf.SS if own else None)
     c = _coefficients(c, hh.size)
     allH.append(hh)
     allR.append(rr)
