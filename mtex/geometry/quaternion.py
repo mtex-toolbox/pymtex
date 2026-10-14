@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import numpy as np
 
-from ._array import MtexArray
+from ._array import MtexArray, numpyReduction
 from .display import aligned, display, sizeString, table, takeRows
 from .representations import (EULER_LABELS, axis2quat, chordAngle, eulerConvention, euler2quat, eulerTriple, fitKernel,
                               isnull, map1Kernel, map2Kernel, mat2quat, quat2euler, quat2mat, quat2rodrigues,
@@ -324,7 +324,7 @@ class quaternion(MtexArray):
     from ..functions.rbfinterpolation import interpSO3
     return interpSO3(self, values, *flags, **kwargs)
 
-  def mean(self, weights=None, robust=False, return_inertia=False):
+  def mean(self, weights=None, robust=False, return_inertia=False, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
     """the mean, the principal eigenvector of the weighted moment matrix; NaN entries left out,
     robust=True drops the outliers and averages again; return_inertia=True also gives the
     principal moments of inertia, the eigenvalues of the moment matrix normalised by the total
@@ -332,6 +332,12 @@ class quaternion(MtexArray):
 
       m = mean(q)
       m, lam, V = mean(q, return_inertia=True)"""
+    numpyReduction("mean", dtype, out, kwargs, "rotations")
+    if axis is not None:
+      raise ValueError("the mean of rotations is taken over the whole list; index the list for the mean of a part")
+    if keepdims:
+      m = self.mean(weights=weights, robust=robust, return_inertia=return_inertia)
+      return (m[0].reshape((1,) * self.ndim),) + m[1:] if return_inertia else m.reshape((1,) * self.ndim)
     q = self.data.reshape(-1, 4)
     w = np.ones(q.shape[0]) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
     # an entry that is not a number, a site without an orientation, does not enter
@@ -352,7 +358,7 @@ class quaternion(MtexArray):
                                        return_inertia=return_inertia)
     return (m, vals, quaternion(vecs.T)) if return_inertia else m
 
-  def std(self, weights=None, robust=False):
+  def std(self, weights=None, robust=False, axis=None, dtype=None, out=None, keepdims=False, ddof=0, **kwargs):
     """the mean angular deviation from the mean, quaternion/std; for orientations the angle is
     the symmetry-reduced one, as the mean is; weights= weigh the rotations, robust=True takes the
     robust mean
@@ -360,6 +366,13 @@ class quaternion(MtexArray):
       sigma = std(rot)
       sigma = std(rot, robust=True)
       sigma = std(rot, weights=w)"""
+    numpyReduction("std", dtype, out, kwargs, "rotations")
+    if axis is not None:
+      raise ValueError("the std of rotations is taken over the whole list; index the list for the std of a part")
+    if ddof:
+      raise ValueError("the std of rotations is the mean angular deviation; it takes no ddof")
+    if keepdims:
+      return np.reshape(self.std(weights=weights, robust=robust), (1,) * self.ndim)
     if self.size == 0:
       return float("nan")
     m = self.mean(weights=weights, robust=robust)

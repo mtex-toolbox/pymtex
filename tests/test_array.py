@@ -149,3 +149,42 @@ def test_cat_flat_joinsEveryClassAsItsOwnCat():
   assert owners == set(operands)
   for a, b in operands.values():
     assert _same(cat(a, b), type(a).cat(a, b))
+
+
+def test_numpyReductions_everyContainerTakesNumPysKeywords():
+  # np.sum(x), np.mean(x), np.std(x) call x.sum(axis=, dtype=, out=): every reduction of a container takes them
+  import inspect
+  import mtex
+  from mtex.geometry._array import MtexArray
+  missing = set()
+  for n in dir(mtex):
+    c = getattr(mtex, n)
+    if inspect.isclass(c) and issubclass(c, MtexArray):
+      for red in ("sum", "mean", "std", "max", "min", "prod"):
+        f = getattr(c, red, None)
+        if f is None:
+          continue
+        ps = inspect.signature(f).parameters
+        if not ({"axis", "out", "dtype"} <= set(ps) or any(p.kind == p.VAR_KEYWORD for p in ps.values())):
+          missing.add(f.__qualname__)
+  assert not missing, sorted(missing)
+
+
+# a container and the reductions NumPy reaches on it
+REDUCTIONS = [("vectors", "sum"), ("vectors", "mean"), ("rotations", "mean"), ("rotations", "std"),
+              ("orientations", "mean"), ("orientations", "std")]
+
+
+def reductionSample(kind):
+  from mtex import crystalFrame, orientation, rotation, vector3d
+  g = np.random.default_rng(5)
+  return {"vectors": lambda: vector3d.rand(4, 3, rng=g), "rotations": lambda: rotation.rand(6, rng=g),
+          "orientations": lambda: orientation.rand(6, crystalFrame("m-3m"), rng=g)}[kind]()
+
+
+@pytest.mark.parametrize("kind, red", REDUCTIONS)
+def test_numpyReductions_giveTheMethodsResultAndKeepDims(kind, red):
+  x = reductionSample(kind)
+  a, b = getattr(np, red)(x), getattr(x, red)()
+  assert np.allclose(np.asarray(getattr(a, "data", a)), np.asarray(getattr(b, "data", b)))
+  assert np.shape(getattr(np, red)(x, keepdims=True))[:x.ndim] == (1,) * x.ndim

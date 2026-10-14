@@ -167,6 +167,21 @@ class MtexArray:
     return aligned(header(type(self).__name__, sizeString(self.shape)))
 
 
+def numpyReduction(name, dtype, out, kwargs, what="containers"):
+  """the keywords NumPy's np.sum, np.mean, np.std pass to a container's method: a container has no
+  dtype and no output buffer, so these are refused when given, as is anything else unknown"""
+  if out is not None or dtype is not None:
+    raise TypeError(f"the {name} of {what} takes neither out= nor dtype=")
+  if kwargs:
+    raise TypeError(f"the {name} of {what} does not take {', '.join(kwargs)}")
+
+
+def keptDims(result, shape, axis):
+  """a reduced container with the reduced axes kept as length one, NumPy's keepdims"""
+  axes = range(len(shape)) if axis is None else [a % len(shape) for a in np.atleast_1d(axis)]
+  return result.reshape(tuple(1 if k in axes else n for k, n in enumerate(shape)))
+
+
 def cat(*arrays, **kwargs):
   """cat(a, b, ...) is type(a).cat(a, b, ...): the list of the operands, MATLAB's [a, b], the
   carried attributes joined; the keywords go to the class's cat, axis= the axis to concatenate

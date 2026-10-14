@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 import numpy as np
 
-from ._array import MtexArray
+from ._array import MtexArray, keptDims, numpyReduction
 from .display import display, header, sizeString, table, takeRows
 from .representations import isnull, orthKernel
 
@@ -257,10 +257,11 @@ class vector3d(MtexArray):
     self._needsCrystal()
     return 1 / self.norm()
 
-  def round(self, style=None, maxHKL=12, maxXYZ=12, return_error=False):
+  def round(self, style=None, maxHKL=12, maxXYZ=12, accuracy=np.pi / 180, return_error=False):
     """a crystal direction rounded to integer indices, vector3d/round; style= the indices rounded
     ('hkl', 'hkil', 'uvw', 'UVTW', the display's by default), maxHKL the largest multiple tried; a
-    vector3d without a lattice has its coordinates rounded, maxXYZ the largest multiple tried;
+    vector3d without a lattice has its coordinates rounded, maxXYZ the largest multiple tried,
+    and keeps them where rounding would turn it by more than accuracy (1 degree);
     return_error=True also gives the angle between the given and the rounded direction, without
     symmetric equivalents, MATLAB's second output
 
@@ -268,9 +269,17 @@ class vector3d(MtexArray):
       m = round(m, maxHKL=5)
       m = round(m, 'uvw')       # the direct indices integer
       v = round(v, maxXYZ=5)
+      v = round(v, accuracy=0.1*degree)
       m, err = round(m, return_error=True)"""
     from .miller import roundIndices
     r = roundIndices(self, style, maxHKL if self.isCrystalDirection else maxXYZ)
+    # a vector rounding would turn too far keeps its coordinates
+    if not self.isCrystalDirection:
+      far = np.asarray(vector3d.angle(self, r, symmetry=False)) > accuracy
+      if np.any(far):
+        data = r.data.copy()
+        data[far] = self.data[far]
+        r = r._new(data)
     if not return_error:
       return r
     return r, vector3d.angle(self, r, symmetry=False)
@@ -691,21 +700,28 @@ class vector3d(MtexArray):
     w, V = np.linalg.eigh(xyz.T @ xyz)
     return w, vector3d(V.T, isNormalized=True, frame=self._frame)
 
-  def sum(self, axis=None):
-    """the sum of the vectors, over all axes or the given ones
+  def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
+    """the sum of the vectors, over all axes or the given ones, also as NumPy's np.sum
 
       s = sum(v)
-      s = sum(v, axis=0)"""
-    axis = tuple(range(self.ndim)) if axis is None else axis
-    return self._new(np.sum(self.data, axis=axis), **self._joined(None))
+      s = sum(v, axis=0)
+      s = np.sum(v, axis=1, keepdims=True)"""
+    numpyReduction("sum", dtype, out, kwargs, "vectors")
+    s = self._new(np.sum(self.data, axis=tuple(range(self.ndim)) if axis is None else axis), **self._joined(None))
+    return keptDims(s, self.shape, axis) if keepdims else s
 
-  def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True, return_projected=False):
+  def mean(self, weights=None, antipodal=False, robust=False, axis=None, symmetry=True, return_projected=False,
+           dtype=None, out=None, keepdims=False, **kwargs):
     """the mean vector: the arithmetic mean, the normalised weighted sum, or for axes the
     largest principal axis of the moment matrix; crystal directions are first moved to the
     equivalents closest to the mean, which return_projected=True also gives (MATLAB's mSym)
 
       m = mean(v)
       m, vProjected = mean(h, return_projected=True)"""
+    numpyReduction("mean", dtype, out, kwargs, "vectors")
+    if keepdims:
+      m = self.mean(weights=weights, antipodal=antipodal, robust=robust, axis=axis, symmetry=symmetry)
+      return keptDims(m, self.shape, axis)
     if symmetry and self.isCrystalDirection and self._frame.numSym() > 1 and self.size > 1:
       from .symmetryops import symMean
       return symMean(self, weights=weights, return_projected=return_projected)

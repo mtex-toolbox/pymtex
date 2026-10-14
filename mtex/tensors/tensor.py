@@ -24,7 +24,7 @@ import math
 import numpy as np
 
 from ..geometry.arguments import refuseFlags
-from ..geometry._array import MtexArray
+from ..geometry._array import MtexArray, numpyReduction
 from ..geometry.display import display, frameLabel, header, numString, sizeString, table
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
@@ -628,7 +628,7 @@ class tensor(MtexArray):
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)
-    _numpyReduction("mean", dtype, out, kwargs)
+    numpyReduction("mean", dtype, out, kwargs, "tensors")
     # MATLAB's other outputs: the inverse of the mean inverse, the Hill mean, all three
     which = next((a for a in args if a in ("Reuss", "Hill", "all")), None)
     if which is not None:
@@ -676,7 +676,7 @@ class tensor(MtexArray):
       T.sum()                 # the sum of all tensors
       T.sum(axis=1)           # along the second axis
       np.sum(T, axis=(0, 1), keepdims=True)"""
-    _numpyReduction("sum", dtype, out, kwargs)
+    numpyReduction("sum", dtype, out, kwargs, "tensors")
     if axis is None and not keepdims:
       return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
     return self._as(type(self), self.data.sum(axis=self._axes(axis), keepdims=keepdims))
@@ -970,13 +970,6 @@ def dyad(a, b=None, n=None):
 
 # NumPy's keywords of a reduction that a list of tensors has no use for: out= and dtype= would
 # write or convert the coordinate array, where= and initial= mask or seed its entries
-def _numpyReduction(name, dtype, out, kwargs):
-  if out is not None or dtype is not None:
-    raise TypeError(f"the {name} of tensors takes neither out= nor dtype=")
-  if kwargs:
-    raise TypeError(f"the {name} of tensors does not take {', '.join(kwargs)}")
-
-
 # the unit of the inverse, as MATLAB writes it: GPa to 1 / GPa, 1/GPa to GPa, m/s to s / m
 def _inverseUnit(unit):
   if unit is None:

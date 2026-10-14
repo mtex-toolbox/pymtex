@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import numpy as np
 
-from ._array import MtexArray
+from ._array import MtexArray, numpyReduction
 from .display import display, frameLabel, header
 from .frames import crystalFrame, referenceFrame, specimenFrame
 from .quaternion import _readCoefficients, orthogonalTransform, qrot, quaternion, rotation
@@ -362,7 +362,8 @@ class orientation(rotation):
     from .symmetryops import orientationUnique
     return orientationUnique(self, tol, symmetry, return_index, return_inverse)
 
-  def mean(self, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False):
+  def mean(self, weights=None, robust=False, iterations=3, return_projected=False, return_inertia=False,
+           axis=None, dtype=None, out=None, keepdims=False, **kwargs):
     """the mean orientation, every element moved to the equivalent closest to the running mean
     before the quaternion mean is taken; weighted, or robust against outliers.
     return_projected=True also gives the orientations moved to the equivalents closest to the
@@ -372,9 +373,15 @@ class orientation(rotation):
       m = mean(ori)
       m, oriProjected = mean(ori, return_projected=True)
       m, oriProjected, lam, V = mean(ori, return_projected=True, return_inertia=True)"""
+    numpyReduction("mean", dtype, out, kwargs, "orientations")
+    if axis is not None:
+      raise ValueError("the mean of orientations is taken over the whole list; index the list for the mean of a part")
     from .symmetryops import orientationMean
-    return orientationMean(self, weights=weights, robust=robust, iterations=iterations,
-                           return_projected=return_projected, return_inertia=return_inertia)
+    out = orientationMean(self, weights=weights, robust=robust, iterations=iterations,
+                          return_projected=return_projected, return_inertia=return_inertia)
+    if not keepdims:
+      return out
+    return (out[0].reshape((1,) * self.ndim),) + out[1:] if isinstance(out, tuple) else out.reshape((1,) * self.ndim)
 
   def projectIntoFundamentalRegion(self, ref=None, antipodal=False):
     """the symmetric equivalents in the fundamental region, or those closest to the reference

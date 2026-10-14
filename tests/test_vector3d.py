@@ -351,10 +351,21 @@ def test_mean_projectedCrystalDirectionsAreTheEquivalentsClosestToTheMean():
 def test_round_keepsItsCoordinatesBelowMaxXYZAndReportsTheAngleItTurned(maxXYZ):
   from mtex import crystalFrame, Miller
   v = vector3d(rng().normal(size=(50, 3)))
-  r, err = v.round(maxXYZ=maxXYZ, return_error=True)
+  r, err = v.round(maxXYZ=maxXYZ, accuracy=np.pi, return_error=True)
   m = Miller(v, crystalFrame("m-3m"))
   rm, errm = m.round(maxHKL=maxXYZ, return_error=True)
   assert np.max(np.abs(r.xyz)) <= maxXYZ and close(err, angle(v, r)) and close(errm, angle(m, rm, symmetry=False)) and np.max(np.abs(rm.hkl)) <= maxXYZ
+
+
+@pytest.mark.parametrize("accuracy", [0.2 * degree, 0.5 * degree, 1 * degree])
+def test_round_keepsTheVectorsRoundingWouldTurnBeyondTheAccuracy(accuracy):
+  # MATLAB's accuracy: rounded where the turn is within it, the given coordinates elsewhere
+  v = vector3d(rng().normal(size=(200, 3)))
+  full = v.round(accuracy=np.pi)
+  r = v.round(accuracy=accuracy)
+  turned = angle(v, full) > accuracy
+  assert np.any(turned) and np.any(~turned)
+  assert np.allclose(r.xyz[turned], v.xyz[turned]) and np.allclose(r.xyz[~turned], full.xyz[~turned])
 
 
 @pytest.mark.parametrize("a", [-0.5, 0.0, 0.9])
