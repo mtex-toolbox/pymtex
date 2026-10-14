@@ -69,9 +69,10 @@ print(f'simplifying at a tolerance of {d / np.sqrt(2):.2f} {grains.scanUnit} tak
 # form. A circle with a radius of 15 pixels loses 14% of its area over 25 iterations that
 # way, compared with 0.4% when this resampling step is included.
 #
-# [`refineBoundary`](grain2d.refineBoundary.html) resamples each chain at equal arc length.
-# It changes only the sampling, not the polygonal shape. The smoothing stage then receives
-# evenly spaced degrees of freedom that are no longer tied to the measurement grid.
+# [`refineBoundary`](grain2d.refineBoundary.html) splits each segment into pieces of about
+# equal length. It changes only the sampling, not the polygonal shape. The smoothing stage
+# then receives evenly spaced degrees of freedom that are no longer tied to the measurement
+# grid.
 
 # +
 grainsRefined = refineBoundary(grainsSimple, d)

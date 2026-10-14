@@ -9,7 +9,7 @@
 # dissolved, a junction, a vertex where the pair of grains changes, a vertex another boundary
 # walks over; keeping every n-th vertex and Douglas-Peucker decide which of the others
 # survive; mergeRuns lets every survivor swallow the run of segments before it. Refining
-# resamples every piece between two protected vertices at a constant arc length. A closed
+# splits every segment into pieces of about equal length and keeps every vertex. A closed
 # chain has no junction: the vertex the walk cuts it at is an accident of the numbering, so
 # the chain is anchored at a vertex that has to stay and cut there instead. A grain list
 # coarsens both of its boundaries at once, over one pool of vertices, and traces its loops
@@ -266,75 +266,38 @@ def _keepShapeLoop(V, chainV, offset, closed, epsilon, keepV):
 
 # ------------------------------------------------------------------ refining
 
-def refineBoundary(gB, delta=None, protect=None):
-  """resample every chain at a constant spacing along its length: the new vertices lie on the
-  old boundary, so its shape does not change, only how it is sampled. The vertices that may
-  not move stay exactly where they are and cut the chain into pieces that are resampled on
-  their own, which is what lets a smoothing that follows work on degrees of freedom that
-  are not tied to the grid. grainId and phaseId are constant along a piece and carry over;
-  the pair of measurements and the misorientation are inherited from the original segment
-  covering the midpoint of the new one, and the pair is dropped where the new segment spans
-  more than one of them"""
+def refineBoundary(gB, delta=None):
+  """split every segment into pieces of about length delta: the old vertices stay where they
+  are and the new ones lie on the old segments, so the boundary keeps its shape and its
+  length and only the sampling gets finer, which gives a smoothing that follows evenly
+  spaced degrees of freedom. Every piece carries the grains, the phases, the pair of
+  measurements and the misorientation of the segment it lies on"""
   if gB.isempty:
     return gB
   if delta is None:
     delta = defaultDelta(gB)
   if delta <= 0:
     return gB
-  gB, keep = anchorClosedChains(gB, mustKeep(gB, protect))
-  T = gB.V.dtype
-  L = gB.segLength
-  Lc = np.concatenate([[0.0], np.cumsum(L)])
-  iEnd = np.flatnonzero(keep)
-  iStart = np.concatenate([[0], iEnd[:-1] + 1])
-  nCh = len(iStart)
-  # the pieces and how many samples each of them takes
-  pieceOf = np.repeat(np.arange(nCh), iEnd - iStart + 1)
-  total = np.bincount(pieceOf, weights=L, minlength=nCh)
-  m = np.maximum(1, np.rint(total / delta)).astype(np.int64)
-  M = int(m.sum())
-  cOf = np.repeat(np.arange(nCh), m)
-  kOf = np.arange(1, M + 1) - np.repeat(np.concatenate([[0], np.cumsum(m[:-1])]), m)
-  tPrev = total[cOf] * (kOf - 1) / m[cOf]
-  tEnd = total[cOf] * kOf / m[cOf]
-  gStart = Lc[iStart][cOf]
-  eps = total[cOf] * 1e-9
-  def locate(g):
-    return _locate(g, Lc, iStart[cOf], iEnd[cOf])
-  src = locate(gStart + (tPrev + tEnd) / 2)[0]
-  within = (locate(gStart + tPrev + eps)[0] == src) & (locate(gStart + tEnd - eps)[0] == src)
-  # every new segment contributes its head, except the last one of a piece
-  isLast = kOf == m[cOf]
-  iSeg, lam = _locate(gStart[~isLast] + tEnd[~isLast], Lc, iStart[cOf[~isLast]], iEnd[cOf[~isLast]])
-  P1, P2 = gB.V[gB.F[iSeg, 0]], gB.V[gB.F[iSeg, 1]]
-  V = np.concatenate([gB.V, (P1 + lam[:, None] * (P2 - P1)).astype(T)])
-  head = np.zeros(M, dtype=np.int32)
-  head[~isLast] = len(gB.V) + np.arange(np.count_nonzero(~isLast))
-  head[isLast] = gB.F[iEnd[cOf[isLast]], 1]
-  tail = np.zeros(M, dtype=np.int32)
-  first = kOf == 1
-  tail[first] = gB.F[iStart[cOf[first]], 0]
-  tail[~first] = head[np.flatnonzero(~first) - 1]
-  out = gB[src]
-  eid = out.ebsdId.copy()
-  eid[~within] = NO_PIXEL
-  return orderWalk(out._with(V=V, F=np.stack([tail, head], axis=1), ebsdId=eid))
+  # how many pieces each segment is split into, src the segment of a piece and k its one
+  # based position within it
+  m = np.maximum(1, np.rint(gB.segLength / delta)).astype(np.int64)
+  src = np.repeat(np.arange(len(gB)), m)
+  k = np.arange(1, len(src) + 1) - np.repeat(np.cumsum(m) - m, m)
+  # every piece but the last of a segment ends on a new vertex
+  new = k < m[src]
+  P1, P2 = gB.V[gB.F[src[new], 0]], gB.V[gB.F[src[new], 1]]
+  lam = (k[new] / m[src[new]])[:, None]
+  V = np.concatenate([gB.V, (P1 + lam * (P2 - P1)).astype(gB.V.dtype)])
+  head = gB.F[src, 1]
+  head[new] = len(gB.V) + np.arange(np.count_nonzero(new))
+  tail = gB.F[src, 0]
+  tail[k > 1] = head[np.flatnonzero(k > 1) - 1]
+  return gB[src]._with(V=V, F=np.stack([tail, head], axis=1))
 
 
 def defaultDelta(gB):
-  """half the median segment, which follows the polyline closely where a sample per median
-  length may cut a corner"""
+  """half the median segment"""
   return 0.0 if gB.isempty else float(np.median(gB.segLength)) / 2
-
-
-# which segment an arc length falls on, confined to the piece it belongs to, and how far
-# along it; a sample sitting exactly on a segment start belongs to that segment
-def _locate(g, Lc, lo, hi):
-  i = np.clip(np.searchsorted(Lc, g, side="right") - 1, lo, hi)
-  d = Lc[i + 1] - Lc[i]
-  with np.errstate(invalid="ignore", divide="ignore"):
-    lam = np.where(d > 0, (g - Lc[i]) / d, 0.0)
-  return i, np.clip(lam, 0, 1)
 
 
 # ------------------------------------------------------------------ the grains
@@ -368,9 +331,8 @@ def _refineGrains(grains, delta=None):
   is refined in turn, and the first one back afterwards"""
   if delta is None:
     delta = defaultDelta(grains.boundary)
-  p = sharedVertices(grains)
-  b = refineBoundary(grains.boundary, delta, protect=p)
-  ib = refineBoundary(grains.innerBoundary._with(V=b.V), delta, protect=p)
+  b = refineBoundary(grains.boundary, delta)
+  ib = refineBoundary(grains.innerBoundary._with(V=b.V), delta)
   return withBoundary(grains, b._with(V=ib.V), ib)
 
 

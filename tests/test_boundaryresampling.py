@@ -79,27 +79,28 @@ def test_the_numba_and_the_numpy_simplification_agree():
     assert np.array_equal(a, b)
 
 
-def test_B16_refining_resamples_at_a_constant_spacing():
+def test_B16_refining_splits_every_segment_and_keeps_its_vertices():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   r = gB.refine(0.5)
   assert len(r) == 240 and close(r.segLength, 0.5) and close(r.perimeter(), 120)
   assert r.chainId.max() == 7 and r.triplePoints.isempty
-  # the vertices that may not move are still there, the new ones appended
-  assert set(gB.F[gB.isChainEnd, 1]) <= set(r.F.reshape(-1))
+  # every vertex is still there, the new ones appended
+  assert set(gB.F.reshape(-1)) <= set(r.F.reshape(-1))
   assert np.array_equal(r.V[:len(gB.V)], gB.V)
-  # a piece is resampled between the vertices it may not move, so a chain of ten unit
-  # segments becomes twenty of a half, wherever the sample falls
   assert all(np.count_nonzero(r.chainId == c) in (20, 40) for c in range(8))
-  # a half pixel piece lies within one original segment and keeps its pair of pixels
+  # a piece lies within one original segment and keeps its pair of pixels
   assert np.all(r.ebsdId[r.grainId.min(axis=1) > 0] >= 0)
-  # the samples lie on the old boundary, so a closed chain keeps its area
+  # the pieces lie on the old boundary, so a closed chain keeps its area
   cir = diskCircle(12, 57)[0]
   rc = cir.refine(0.5)
   assert len(rc) == 2 * len(cir) and close(closedArea(rc), closedArea(cir))
+  # and the corners a simplification kept, so the boundary keeps its length
+  sc = cir.simplify()
+  assert close(sc.refine(0.5).perimeter(), sc.perimeter())
   # the default spacing is half the median segment
   assert len(cir.refine()) == len(rc)
-  # a spacing longer than a piece leaves one segment per piece
-  assert len(gB.refine(100)) == 8
+  # a spacing longer than every segment leaves the boundary as it is
+  assert len(gB.refine(100)) == len(gB)
 
 
 def test_B17_a_grain_list_coarsens_both_of_its_boundaries_at_once():

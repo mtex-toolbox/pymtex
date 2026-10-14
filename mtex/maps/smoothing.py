@@ -8,7 +8,7 @@
 #
 # A measured boundary is the staircase of the pixel grid: every segment runs along one of
 # the lattice directions whatever direction the boundary has. It is repaired in three steps:
-# the staircase is simplified away, what is left is resampled at equal arc length, and only
+# the staircase is simplified away, what is left is split into pieces of equal length, and only
 # then is the boundary smoothed. Neither of the first two is cosmetic: smoothing the
 # staircase itself leaves the directions scattered around the grid axes, and smoothing a
 # handful of long chords cuts the corners off the polygon they form. Which algorithm does
@@ -274,10 +274,10 @@ class huberFilter(_variationalFilter):
 def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=False,
                    moveOuterBoundary=False):
   """turn the staircase of a measured boundary into a smooth curve. The simplification and the
-  resampling both take their length from the median segment of the boundary as it came out
+  refinement both take their length from the median segment of the boundary as it came out
   of the segmentation, which is the pixel spacing; afterwards the median is the length of
   the straightened runs and means something else. Both change how many segments there are,
-  and a resampled segment no longer runs between one pair of pixels, so switch them off
+  and a simplified segment no longer runs between one pair of pixels, so switch them off
   where ebsdId is read per segment. Smoothing happens in the plane of the map, where the
   vertices already are"""
   F = iter if isinstance(iter, boundaryFilter) else laplaceFilter(iter)
