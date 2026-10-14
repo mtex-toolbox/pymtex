@@ -167,7 +167,12 @@ class MtexArray:
     return aligned(header(type(self).__name__, sizeString(self.shape)))
 
 
-def cat(*arrays, axis=0):
+def cat(*arrays, **kwargs):
   """cat(a, b, ...) is type(a).cat(a, b, ...): the list of the operands, MATLAB's [a, b], the
-  carried attributes joined; axis= the axis to concatenate along"""
-  return type(arrays[0]).cat(*arrays, axis=axis)
+  carried attributes joined; the keywords go to the class's cat, axis= the axis to concatenate
+  along for the classes whose lists have axes
+
+    v = cat(v1, v2)
+    v = cat(v1, v2, axis=1)    # side by side
+    ebsd = cat(ebsd1, ebsd2)"""
+  return type(arrays[0]).cat(*arrays, **kwargs)

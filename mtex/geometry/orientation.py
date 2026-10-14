@@ -317,7 +317,9 @@ class orientation(rotation):
       h = axis(mori)                    # in the crystal frame of mori
       h = axis(mori, symmetry=False)
       h = axis(mori, 'max')             # of the equivalent that turns the most
-      v = axis(ori1, ori2)              # in the specimen frame"""
+      h = axis(mori, csHex)             # expressed in csHex, one of the two frames of mori
+      v = axis(ori1, ori2)              # in the specimen frame, also of two phases"""
+    from .frames import referenceFrame
     from .symmetryops import orientationAxis, pairAxis
     # axis(mori, 'max'): the axis of the equivalent that turns the most, MATLAB's option
     if isinstance(other, str):
@@ -326,12 +328,10 @@ class orientation(rotation):
       v = _largestImage(self).axis(symmetry=False)
       v.frame = self.frameA
       return v
-    if other is not None:
+    if other is not None and not isinstance(other, referenceFrame):
       v = pairAxis(self, other)
-      if antipodal is not None:
-        v.antipodal = bool(antipodal)
-      return v
-    v = orientationAxis(self, symmetry=symmetry)
+    else:
+      v = orientationAxis(self, symmetry=symmetry, frame=other)
     if antipodal is not None:
       v.antipodal = bool(antipodal)
     return v
@@ -424,8 +424,8 @@ class orientation(rotation):
     modulo the child group, or the child orientations of parents; numbered as MTEX numbers them
 
       p2c.variants()
-      p2c.variants(oriParent)
-      p2c.variants(oriParent, ids)
+      p2c.variants(oriParent)              oriParent.shape + (numVariants,)
+      p2c.variants(oriParent, ids)         one per parent, the ids broadcast against them
       p2c.variants(parent=True)            the parent variants"""
     from .standardorientations import variants
     return variants(self, second, ids, parent)

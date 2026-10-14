@@ -46,7 +46,7 @@ def test_relationships_and_variants():
   for k in range(8):
     assert np.min(angle(kids[k] * Miller(0, 0, 0, 1, hem), ts)) < 1e-8
   assert variants(m2h, par, [1, 2]).size == 2 and np.all(variants(m2h, par, [1, 2]) == kids[:2])
-  assert variants(m2h, orientation.rand(3, mag)).size == 24
+  assert variants(m2h, orientation.rand(3, mag)).shape == (3, 8)
   cs2 = crystalFrame("6/mmm", [2.95, 2.95, 4.68], mineral="beta")
   assert variants(orientation.Burgers(csG, cs2)).size == 12 and orientation.Burgers(cs2, csG).CS is cs2
 
@@ -56,3 +56,15 @@ def test_variants_areANewListEveryCall():
   V = p2c.variants()
   V.data[:] = 0
   assert np.allclose(np.linalg.norm(p2c.variants().data, axis=-1), 1)
+
+
+@pytest.mark.parametrize("shape", [(), (3,), (2, 4)])
+@pytest.mark.parametrize("parent", [False, True])
+def test_the_variants_of_orientations_run_along_a_last_axis_numbered_by_their_ids(shape, parent):
+  # variants(p2c, o)[..., k] is variants(p2c, o, k + 1), for parents and for children alike
+  csG, csA = crystalFrame("m-3m", mineral="Iron fcc"), crystalFrame("m-3m", mineral="Iron bcc")
+  ks = orientation.KurdjumovSachs(csG, csA)
+  o = orientation.rand(*shape, csA if parent else csG, rng=np.random.default_rng(4))
+  V = variants(ks, o)
+  n = variants(ks, parent=parent).size
+  assert V.shape == shape + (n,) and all(np.allclose(V[..., k].data, variants(ks, o, np.full(shape, k + 1)).data) for k in range(n))

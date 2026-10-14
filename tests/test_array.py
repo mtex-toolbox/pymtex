@@ -99,3 +99,53 @@ def test_numpy_sees_the_coordinates_and_leaves_the_operators_to_the_container():
     np.asarray(p, dtype=np.float32, copy=False)
   with pytest.raises(TypeError):
     np.ones(3) + p
+
+
+# two operands of every class of the flat namespace that has a cat, by the class defining it
+def _catOperands():
+  from mtex import (EBSD, PoleFigure, S2FunHarmonic, SO3FunHarmonic, crystalFrame, specimenFrame, orientation,
+                    rotation, vector3d, tensor, fibre, slipSystem, phaseList, Miller, log, degree)
+  rng = np.random.default_rng(0)
+  cs, ss = crystalFrame("321"), specimenFrame("222")
+  o = orientation.rand(3, cs, ss, rng=rng)
+  ebsd = EBSD(np.c_[np.arange(6.0), np.zeros(6), np.zeros(6)], rotation.rand(6, rng=rng), np.ones(6, dtype=np.int8),
+              phaseList(crystalFrame("m-3m", mineral="test")), {"mad": np.arange(6.0)})
+  r = vector3d.rand(5, rng=rng)
+  pf = PoleFigure(Miller(1, 0, 0, cs), r, np.ones(5))
+  return {
+    "MtexArray": (vector3d.rand(2, rng=rng), vector3d.rand(3, rng=rng)),
+    "rotation": (rotation.rand(2, rng=rng), rotation.rand(3, rng=rng)),
+    "tensor": (tensor.rand(2, rank=2, rng=rng), tensor.rand(3, rank=2, rng=rng)),
+    "SO3TangentVector": (log(o, o[0]), log(o[1:], o[0])),
+    "fibre": (fibre(o[:2], o[1:]), fibre(o[:1], o[2:])),
+    "slipSystem": (slipSystem.basal(crystalFrame("6/mmm")), slipSystem.prismaticA(crystalFrame("6/mmm"))),
+    "S2FunHarmonic": (S2FunHarmonic(rng.standard_normal(9)), S2FunHarmonic(rng.standard_normal(16))),
+    "SO3FunHarmonic": (SO3FunHarmonic(rng.standard_normal(10), cs, ss), SO3FunHarmonic(rng.standard_normal(35), cs, ss)),
+    "PoleFigure": (pf, pf),
+    "EBSD": (ebsd[:2], ebsd[3:]),
+  }
+
+
+# the same object: the class, and the attributes equal, arrays by their entries
+def _same(a, b):
+  if isinstance(a, (np.ndarray, MtexArray)):
+    return type(a) is type(b) and np.array_equal(np.asarray(a), np.asarray(b), equal_nan=True) and \
+      (not isinstance(a, MtexArray) or _same(vars(a), vars(b)))
+  if isinstance(a, dict):
+    return a.keys() == b.keys() and all(_same(a[k], b[k]) for k in a)
+  if isinstance(a, (list, tuple)):
+    return type(a) is type(b) and len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+  if hasattr(a, "__dict__") and type(a).__module__.startswith("mtex") and not isinstance(a, type):
+    return type(a) is type(b) and (a is b or _same(vars(a), vars(b)))
+  return a is b or a == b
+
+
+def test_cat_flat_joinsEveryClassAsItsOwnCat():
+  import inspect
+  import mtex
+  owners = {getattr(mtex, n).cat.__qualname__.split(".")[0] for n in dir(mtex)
+            if inspect.isclass(getattr(mtex, n)) and hasattr(getattr(mtex, n), "cat")}
+  operands = _catOperands()
+  assert owners == set(operands)
+  for a, b in operands.values():
+    assert _same(cat(a, b), type(a).cat(a, b))

@@ -417,18 +417,7 @@ class EBSD:
       ind = ebsd.inpolygon([xmin, ymin, dx, dy])                # by a rectangle
       ind = inpolygon(ebsd, [[x1, y1], [x2, y2], [x3, y3]])     # by a polygon
       ebsd = ebsd[ind]"""
-    region = np.asarray(region, dtype=float)
-    x, y = self.pos.x, self.pos.y
-    if region.ndim == 1:
-      if len(region) != 4:
-        raise ValueError("a rectangle is [xmin, ymin, width, height]")
-      x0, y0, w, h = region
-      if not np.all(np.isfinite(region)) or w < 0 or h < 0:
-        raise ValueError("rectangle coordinates must be finite and its size nonnegative")
-      return (x0 <= x) & (x <= x0 + w) & (y0 <= y) & (y <= y0 + h)
-    if region.ndim != 2 or region.shape[1] != 2 or region.shape[0] < 3 or not np.all(np.isfinite(region)):
-      raise ValueError("polygon vertices must be a finite N x 2 matrix with at least three rows")
-    return _inPolygon(x, y, region)
+    return _inRegion(self.pos.x, self.pos.y, region)
 
   # ------------------------------------------------------------------ moving the map
 
@@ -651,6 +640,21 @@ def _tryLattice(pos, basis=None):
 
 
 # points inside a polygon, and on its edge unless told otherwise, by the crossing number
+# the mask of the points (x, y) inside a rectangle [x, y, w, h] or a polygon (N, 2), edges included
+def _inRegion(x, y, region):
+  region = np.asarray(region, dtype=float)
+  if region.ndim == 1:
+    if len(region) != 4:
+      raise ValueError("a rectangle is [xmin, ymin, width, height]")
+    x0, y0, w, h = region
+    if not np.all(np.isfinite(region)) or w < 0 or h < 0:
+      raise ValueError("rectangle coordinates must be finite and its size nonnegative")
+    return (x0 <= x) & (x <= x0 + w) & (y0 <= y) & (y <= y0 + h)
+  if region.ndim != 2 or region.shape[1] != 2 or region.shape[0] < 3 or not np.all(np.isfinite(region)):
+    raise ValueError("polygon vertices must be a finite N x 2 matrix with at least three rows")
+  return _inPolygon(x, y, region)
+
+
 def _inPolygon(x, y, V, includeEdge=True):
   x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
   inside = np.zeros(x.shape, dtype=bool)

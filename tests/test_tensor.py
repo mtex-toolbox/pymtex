@@ -447,3 +447,49 @@ def test_EinsteinSum_ofOneTensorWithVectorsIsEinsums(labels):
   finally:
     module._multilinearSum = old
   assert np.allclose(got, ref, rtol=1e-13, atol=1e-13)
+
+
+@pytest.mark.parametrize("kind", ["Lagrange", "Euler"])
+def test_strainTensor_keepsItsTypeThroughEveryDerivedStrain(kind):
+  cs = crystalFrame("m-3m")
+  eps = strainTensor(np.diag([1.0, 0, -1]), cs, type=kind)
+  o = orientation.rand(3, cs, rng=rng)
+  derived = [eps, 2 * eps, eps + eps, eps.sym(), eps.symmetrise(), strainTensor(eps), eps.copy(), o * eps, (o * eps)[1:],
+             (o * eps).mean(), (o * eps).sum(), cat(o * eps, o * eps), strainTensor.rand(type=kind, rng=rng)]
+  assert all(isinstance(e, strainTensor) and e.type == kind for e in derived)
+
+
+def test_strainTensor_isLagrangeByDefaultAndRefusesOtherTypes():
+  assert strainTensor(np.eye(3)).type == "Lagrange" and strainTensor.rand(rng=rng).type == "Lagrange"
+  with pytest.raises(ValueError):
+    strainTensor(np.eye(3), type="Eulerian")
+  with pytest.raises(ValueError):
+    cat(strainTensor(np.eye(3)), strainTensor(np.eye(3), type="Euler"))
+
+
+@pytest.mark.parametrize("axis", [None, 0, 1, -1, (0, 1), (1, 0)])
+@pytest.mark.parametrize("keepdims", [False, True])
+@pytest.mark.parametrize("name", ["sum", "mean"])
+def test_numpyReductions_reduceTheListAxesAsTheCoefficients(name, axis, keepdims):
+  T = stiffnessTensor.rand(2, 3, rng=rng)
+  axes = (0, 1) if axis is None else tuple(a % 2 for a in np.atleast_1d(axis))
+  R = getattr(np, name)(T, axis=axis, keepdims=keepdims)
+  assert isinstance(R, stiffnessTensor) and R.unit == T.unit
+  assert np.allclose(R.M, getattr(np, name)(T.M, axis=axes, keepdims=keepdims))
+  assert getattr(T, name)(axis=axis, keepdims=keepdims).isclose(R)
+
+
+def test_numpyReductions_refuseOutAndDtype():
+  T = tensor.rand(3, rank=2, rng=rng)
+  with pytest.raises(TypeError):
+    np.sum(T, out=np.zeros(9))
+  with pytest.raises(TypeError):
+    np.mean(T, dtype=np.float32)
+
+
+@pytest.mark.parametrize("K, rank", [(tensor, 2), (tensor, 4), (strainTensor, 2), (stressTensor, 2)])
+def test_rand_drawsUniformEntriesOnTheUnitInterval(K, rank):
+  # MATLAB's tensor.rand: independent uniform entries on [0, 1], a symmetric class their symmetric part
+  M = K.rand(500, rank=rank, rng=rng).M
+  assert M.min() >= 0 and M.max() <= 1 and abs(M.mean() - 0.5) < 0.02
+  assert K is tensor or np.allclose(M, np.swapaxes(M, -1, -2))

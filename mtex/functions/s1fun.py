@@ -255,39 +255,38 @@ class S1FunHarmonic(harmonicArithmetic):
     a, b = self.truncate(L).fhat, g.truncate(L).fhat
     return bool(np.linalg.norm(a - b) <= atol + rtol * np.linalg.norm(b))
 
-  # the largest and the smallest value on the circle and the angle it is taken at: a fine
-  # sampling picks the cell, a ternary search settles the angle
-  def _extremum(self, sign, resolution):
-    n = max(8, math.ceil(2 * np.pi / resolution))
-    xs = 2 * np.pi * np.arange(n) / n
-    v = sign * np.real(self(xs))
-    i = int(np.argmax(v))
-    lo, hi = xs[i] - 2 * np.pi / n, xs[i] + 2 * np.pi / n
-    for _ in range(60):
-      m1, m2 = lo + (hi - lo) / 3, hi - (hi - lo) / 3
-      if sign * np.real(self(m1)) > sign * np.real(self(m2)):
-        hi = m2
-      else:
-        lo = m1
-    x = (lo + hi) / 2 % (2 * np.pi)
-    return float(np.real(self(x))), float(x)
-
   def sum(self):
     """the integral over the circle, 2 pi times the mean, MATLAB's sum
 
       value = sum(sF)"""
     return 2 * np.pi * self.mean()
 
-  def max(self, resolution=0.25 * degree):
-    """the largest value and the angle it is taken at, sampled at the resolution and refined
+  def max(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
+    """the largest value and the angle it is taken at, sampled at the resolution and refined;
+    with numLocal the largest local maxima, the values descending; with a number or a second
+    function on the circle the pointwise maximum, a Fourier series of the larger bandwidth
 
       v, pos = max(sF)
-      v, pos = max(sF, resolution=1*degree)"""
-    return self._extremum(1, resolution)
+      v, pos = max(sF, resolution=1*degree)
+      values, positions = max(sF, numLocal=3)
+      sF = max(sF, 0.5)
+      sF = max(sF1, sF2, bandwidth=64)"""
+    if args:
+      return _pointwiseExtremumS1(np.maximum, self, args[0], bandwidth)
+    return _localExtremaS1(self, 1, numLocal, resolution)
 
-  def min(self, resolution=0.25 * degree):
-    """the smallest value and the angle it is taken at, sampled at the resolution and refined"""
-    return self._extremum(-1, resolution)
+  def min(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
+    """the smallest value and the angle it is taken at, sampled at the resolution and refined;
+    with numLocal the smallest local minima, the values ascending; with a number or a second
+    function on the circle the pointwise minimum
+
+      v, pos = min(sF)
+      values, positions = min(sF, numLocal=3)
+      sF = min(sF, 0)
+      sF = min(sF1, sF2, bandwidth=64)"""
+    if args:
+      return _pointwiseExtremumS1(np.minimum, self, args[0], bandwidth)
+    return _localExtremaS1(self, -1, numLocal, resolution)
 
   def __repr__(self):
     lines = ["S1FunHarmonic", f"  bandwidth: {self.bandwidth}", f"  mean: {self.mean():.4g}"]
@@ -298,6 +297,46 @@ class S1FunHarmonic(harmonicArithmetic):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from ..plotting.polarplot import plotS1 as plot
+
+
+# the largest (sign 1) or the smallest (sign -1) local extrema of a function on the circle and
+# the angles they are taken at: a fine sampling picks the cells of the discrete local extrema, a
+# ternary search settles each angle; one pair of numbers for numLocal 1, else arrays ordered by value
+def _localExtremaS1(f, sign, numLocal=1, resolution=0.25 * degree):
+  n = max(8, math.ceil(2 * np.pi / resolution))
+  h = 2 * np.pi / n
+  xs = h * np.arange(n)
+  v = sign * np.real(np.asarray(f(xs))).ravel()
+  peak = (v >= np.roll(v, 1)) & (v >= np.roll(v, -1))
+  # a plateau keeps its first sample
+  peak &= ~((v == np.roll(v, 1)) & np.roll(peak, 1))
+  idx = np.flatnonzero(peak)
+  if idx.size == 0:
+    idx = np.array([int(np.argmax(v))])
+  lo, hi = xs[idx] - h, xs[idx] + h
+  for _ in range(60):
+    m1, m2 = lo + (hi - lo) / 3, hi - (hi - lo) / 3
+    left = sign * np.real(np.asarray(f(m1))).ravel() > sign * np.real(np.asarray(f(m2))).ravel()
+    hi, lo = np.where(left, m2, hi), np.where(left, lo, m1)
+  x = (lo + hi) / 2 % (2 * np.pi)
+  vals = np.real(np.asarray(f(x))).ravel()
+  order = np.argsort(-sign * vals, kind="stable")[:max(1, int(numLocal))]
+  if numLocal == 1:
+    return float(vals[order[0]]), float(x[order[0]])
+  return vals[order], x[order]
+
+
+# the pointwise extremum of a function on the circle and a number or a second function, as
+# MATLAB's: a Fourier series when either is one, of the larger bandwidth, else a handle
+def _pointwiseExtremumS1(op, f, g, bandwidth=None):
+  from .handles import S1FunHandle
+  isFun = callable(g) and not np.isscalar(g)
+  fun = (lambda x: op(np.real(f(x)), np.real(g(x)))) if isFun else (lambda x: op(np.real(f(x)), g))
+  L = max(f.bandwidth, g.bandwidth) if isFun else f.bandwidth
+  L = min(L, getMTEXpref("maxS1Bandwidth")) if bandwidth is None else int(bandwidth)
+  if isinstance(f, S1FunHarmonic) or isinstance(g, S1FunHarmonic):
+    return S1FunHarmonic(fun, bandwidth=L, real=True)
+  return S1FunHandle(fun, bandwidth=L)
 
 
 def _cut(chat, L):

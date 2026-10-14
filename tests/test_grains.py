@@ -135,10 +135,21 @@ def test_checkInside_pointIsInsideTheGrainThatCoversIt():
   inside = g.checkInside([[10.0, 10.0], [2.0, 2.0], [-5.0, -5.0]])
   assert inside.shape == (3, 2)
   assert inside[0, small] and not inside[0, big] and inside[1, big] and not inside[1, small] and not inside[2].any()
-  assert np.array_equal(g.inpolygon([10.0, 10.0]), [small]) and np.array_equal(g(10, 10).id, g.id[[small]])
-  assert g(-5, -5).size == 0 and np.array_equal(g.inpolygon([2.0, 2.0]), [big])
+  assert np.array_equal(g._containing([10.0, 10.0]), [small]) and np.array_equal(g(10, 10).id, g.id[[small]])
+  assert g(-5, -5).size == 0 and np.array_equal(g._containing([2.0, 2.0]), [big]) and np.array_equal(g[2.0, 2.0].id, g.id[[big]])
   assert g.checkInside(vector3d(10.0, 10.0, 0.0)).shape == (1, 2)
   assert g.checkInside(np.zeros((0, 2))).shape == (0, 2)
+
+
+def test_inpolygon_selectsTheGrainsWhoseCentroidLiesInTheRegion():
+  g = fourBlocks(SQ5)
+  c = g.centroid
+  rng = np.random.default_rng(3)
+  for x0, y0, w, h in np.c_[rng.uniform(-5, 25, (20, 2)), rng.uniform(0, 30, (20, 2))]:
+    mask = g.inpolygon([x0, y0, w, h])
+    corners = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]]
+    assert mask.dtype == bool and np.array_equal(mask, (x0 <= c.x) & (c.x <= x0 + w) & (y0 <= c.y) & (c.y <= y0 + h))
+    assert np.array_equal(g.inpolygon(corners), mask) and g[mask].size == mask.sum()
 
 
 def test_grain2d_subsetKeepsItsGrainsAndTheirBoundary():

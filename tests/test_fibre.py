@@ -145,12 +145,14 @@ def test_angle_refusesAListOfFibres():
     angle(fibre.rand(3, cs, rng=rng()), ori)
 
 
-def test_fibre_alphaIsTheGeodesicBetweenMATLABsEnds():
-  # the geodesic between MATLAB's ends, (001)[110] at (315, 0, 0) and (111)[110] at (180, 54.74, 45)
-  a = fibre.alpha(crystalFrame("432"))
-  assert not a.isFull and close(a.arcAngle(), 102.2 * degree, tol=1e-3 * degree)
-  assert close(angle(a.o1, a.o2), 54.7356 * degree, tol=1e-4 * degree)
-  assert np.max(np.abs(a.h.data.reshape(3) - [0, -0.5907, -0.8069])) < 1e-3 and a.r.antipodal is False
+@pytest.mark.parametrize("name, h, r", [("alpha", (1, 1, 0), (1, 0, 0)), ("gamma", (1, 1, 1), (0, 0, 1)), ("eta", (1, 0, 0), (1, 0, 0)),
+                                         ("epsilon", (1, 1, 0), (0, 1, 0)), ("tau", (1, 1, 0), (0, 1, 0))])
+def test_fibre_namedFibresTurnAboutTheirCrystalDirectionAlongTheirSpecimenAxis(name, h, r):
+  # the alpha fibre is <110> || RD, gamma <111> || ND, eta <100> || RD, epsilon and tau <110> || TD
+  cs = crystalFrame("432")
+  f = getattr(fibre, name)(cs)
+  hs = symmetrise(Miller(*h, cs, "uvw"), unique=True).normalize().data.reshape(-1, 3)
+  assert np.max(np.abs(hs @ f.h.normalize().data.reshape(3))) > 1 - 1e-9 and abs(f.r.normalize().data.reshape(3) @ r) > 1 - 1e-9 and not f.isFull
 
 
 @pytest.mark.parametrize("name", ("alpha", "beta", "gamma", "epsilon", "eta", "tau"))
@@ -221,6 +223,17 @@ def test_orientation_ofAListOfFibres():
   assert f.orientation(10).shape == (10, 3) and np.all(f.isFull) and f.arcAngle().shape == (3,)
   ori = f.orientation(10)
   assert np.max(angle(ori * f.h, f.r)) < 1e-10
+
+
+@pytest.mark.parametrize("full", [False, True])
+def test_rotation_returnsTheAnglesItTurnedEachFibreBy(full):
+  # rot = o1 * rot(h, omega) for every point of every fibre
+  cs, ss = crystalFrame("432"), specimenFrame("222")
+  o1, o2 = orientation.rand(3, cs, ss, rng=rng()), orientation.rand(3, cs, ss, rng=rng())
+  f = fibre(o1, Miller(1, 1, 1, cs, "uvw")) if full else fibre(o1, projectIntoFundamentalRegion(o2, o1))
+  rot, omega = f.rotation(20, return_angles=True)
+  ref = rotation(f.o1) * rotation.byAxisAngle(vector3d(f.h.normalize().data), omega)
+  assert omega.shape == rot.shape == (20, 3) and close(omega[-1], f.arcAngle()) and np.max(angle(rot, ref)) < 1e-10
 
 
 def test_fibre_endsAndADirectionBroadcast():

@@ -39,6 +39,8 @@ def Miller(*args, antipodal=False, dispStyle=None):
     m = Miller(u, v, w, cs, 'uvw')             # a lattice direction, 'UVTW' with four indices
     m = Miller([[1, 0, 0], [1, 1, 1]], cs)     # many at once, the indices along the last axis
     m = Miller('{111}', cs)                    # (hkl) or [uvw] one, {hkl} or <uvw> the whole family
+    m = Miller('[100]\\[011]', cs)             # the plane holding both directions, the zone law
+    m = Miller('(100)\\(011)', cs)             # the direction both planes hold
     m = Miller(v, cs)                          # a vector3d expressed in the crystal frame
   """
   style = dispStyle
@@ -104,19 +106,43 @@ def Miller(*args, antipodal=False, dispStyle=None):
 
 
 # '(hkl)', '{hkl}', '[uvw]', '<uvw>': the bracket says direct or reciprocal, and whether the
-# direction stands for itself or for its whole family
+# direction stands for itself or for its whole family; '[uvw]\\[uvw]' is the plane (hkl) holding
+# both directions and '(hkl)\\(hkl)' the direction [uvw] both planes hold, the zone law
+_BRACKET = r"\s*([(\[{<⟨])\s*([-\d,\s]+)\s*([)\]}>⟩])\s*"
+
+
 def _parse(s, CS):
-  m = re.match(r"^\s*([(\[{<⟨])\s*([-\d,\s]+)\s*([)\]}>⟩])\s*$", s)
+  m = re.fullmatch(_BRACKET + r"(?:\\" + _BRACKET + ")?", s)
   if m is None:
-    raise ValueError(f"cannot read '{s}' as Miller indices, write (hkl), {{hkl}}, [uvw] or <uvw>")
-  open_, body = m.group(1), m.group(2)
+    raise ValueError(f"cannot read '{s}' as Miller indices, write (hkl), {{hkl}}, [uvw], <uvw>, [uvw]\\[uvw] or (hkl)\\(hkl)")
+  parts = [_indices(s, m.group(1), m.group(2), CS)]
+  if m.group(4) is not None:
+    parts.append(_indices(s, m.group(4), m.group(5), CS))
+  direct = [d for _, d, _ in parts]
+  single = any(o in ("(", "[") for o in (m.group(1), m.group(4)))
+  if len(parts) == 1:
+    return parts[0][0], single
+  if direct[0] != direct[1]:
+    raise ValueError(f"'{s}' joins a direction and a plane; the zone law takes two of a kind")
+  # the cross product of the three index forms is the other kind, shown as many indices as given
+  a, b = (p[0].uvw if direct[0] else p[0].hkl for p in parts)
+  four = any(n == 4 for _, _, n in parts)
+  idx = np.cross(a, b)
+  style = ("hkil" if four else "hkl") if direct[0] else ("UVTW" if four else "uvw")
+  out = Miller(*idx, CS, "hkl" if direct[0] else "uvw")
+  out.dispStyle = style
+  # the three index forms of four indices are thirds; the result is put back to integers
+  return (out.round() if four else out), single
+
+
+# the indices of one bracket, whether they are direct and how many were written
+def _indices(s, open_, body, CS):
   idx = [float(x) for x in body.split(",")] if "," in body else [float(x) for x in re.findall(r"-?\d", body)]
   if len(idx) not in (3, 4):
     raise ValueError(f"'{s}' does not hold three or four indices")
   direct = open_ in ("[", "<", "⟨")
-  single = open_ in ("(", "[")
   style = ("UVTW" if len(idx) == 4 else "uvw") if direct else ("hkil" if len(idx) == 4 else "hkl")
-  return Miller(*idx, CS, style), single
+  return Miller(*idx, CS, style), direct, len(idx)
 
 
 # ------------------------------------------------------------------ rounding

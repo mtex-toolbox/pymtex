@@ -86,3 +86,16 @@ develop claims `data/PoleFigure/Rigaku.DAT`; `data/Neper/my100grains.tess`, whic
 develop (tracked since `abac772d9`, the stray `data/Neeper` removed); `@EBSD/fillByGrainId.m:37` indexes by an undefined `ci`.
 
 Left: 21 (FMC), decided for later. Nothing pushed.
+
+## Found by the function reference (2026-10-14)
+
+Found while writing the calling forms of `docs/plans/reference.md`, fixed in the port, open on develop:
+
+- `fibre.alpha` and `fibre.tau` (`geometry/@fibre/fibre.m`, the named fibres): `byMiller([111],[110])`
+  picks the equivalent [-110] perpendicular to (111) while the first end keeps [110] along RD, so the
+  geodesic between the ends turns about [0 -0.59 -0.81] over 102.2 degrees instead of about <110>
+  over 54.7; tau's h is not <110> nor its r TD either. The port now has alpha (001)[1-10] to
+  (111)[1-10] and tau (001)[110] to (110)[00-1] (from reading the code, not run in MATLAB); the
+  OrientationFibre page's figure of the named fibres differs from MATLAB's there.
+- `orientation/axis` of two orientations of different crystal frames: the port reduces over the
+  products of both groups, as MATLAB's general branch; to check against MATLAB on the bridge.

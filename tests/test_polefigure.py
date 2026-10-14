@@ -292,6 +292,17 @@ def test_calcError_ofTheODFTheDataCameFromIsZeroInEveryMode(measured):
     assert np.all(calcError(measured.pfs, measured.odf, mode) < 1e-9)
 
 
+@pytest.mark.parametrize("mode", [None, "relative", "RP", "rp", "l1", "L1", "l2", "L2"])
+def test_calcError_takesTheODFFirstOrSecondAndTheModeInAnyCase(measured, mode):
+  # MATLAB's calcError(odf, pf, 'RP') turns to calcError(pf, odf, 'RP'), its flags in any case
+  pfs, other = measured.pfs, measured.other
+  args = () if mode is None else (mode,)
+  canonical = () if mode is None else ({"rp": "RP"}.get(mode.lower(), mode.lower()),)
+  e = calcError(pfs, other, *canonical)
+  assert np.array_equal(calcError(other, pfs, *args), e) and np.array_equal(other.calcError(pfs, *args), e)
+  assert np.array_equal(calcError(pfs, other, *args), e)
+
+
 def test_calcError_ofADifferentODFIsPositive(measured):
   assert np.all(calcError(measured.pfs, measured.other) > 0.1)
 

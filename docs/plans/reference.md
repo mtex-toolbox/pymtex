@@ -90,26 +90,19 @@ browser.
 
 ## 3. What the calling forms found (2026-10-14)
 
-MATLAB forms that do not work in Python, left as they are:
-
-- `cat(ebsd1, ebsd2)` raises: the flat `cat` passes `axis=`, which `EBSD.cat` does not take.
-- `max(sF, c)`, `max(sF1, sF2)`, `max(sF, numLocal=3)` on an S1 function return the global
-  maximum silently: `_extremum` in `functions/characteristics.py` drops the arguments.
-- `angle(sVF, v)` with a constant vector fails on `S2VectorField` (`vector3d` has no `bandwidth`).
-- `calcError(odf, pf, 'RP')`, MATLAB's order, fails with a misleading grain exchange error.
-- `axis(o1, o2)` of two orientations of different crystal frames, MATLAB's own example, refuses
-  the frames; MATLAB's `axis(mori, cs)` choosing the frame is missing.
-- `variants(p2c, oriParent)` returns a flat list where MATLAB returns parents x variants.
-- `tensor(dS)` fails, `tensor` being the class; `dS.tensor()` works.
-- `inpolygon(grains, rect | poly)` is in MATLAB the grains whose centroid lies inside; in
-  Python `polygonSet.inpolygon(xy)` the grains holding the points.
-- Missing options: `strainTensor(M, type='Euler')`, `round(m)`'s error output and `maxXYZ`,
-  `fibre.rotation`'s `omega`, `vector3d.rand(n, sR)`, `Miller('[uvw]\\[uvw]', cs)`,
-  `sum(odf, d)` on the RBF and CBF classes, `abs(sF, bandwidth=)` on `S2FunTri`, `np.sum(T)`.
-- Different defaults: `calcError` is `'l1'` for two ODFs and `'relative'` for pole figures,
-  MATLAB's `'RP'`; `tensor.rand` draws normal entries, MATLAB's uniform ones.
-- Seen in passing: `fibre.alpha(crystalFrame('m-3m'))` prints `h || r : [0 8̅ 1̅1̅] || (-1,-1,-2)`;
-  `S2Fun.smiley(even=True).antipodal` is False.
+MATLAB forms that did not work in Python, fixed the same day by three agents, each with a test of
+the general case: the flat `cat` of every class with a `cat`; `max`/`min` of S1 functions with a
+number, a function or `numLocal`; `angle(sVF, v)`; `calcError(odf, pf)` in MATLAB's order;
+`axis(o1, o2)` across crystal frames and `axis(mori, cs)`; `variants(p2c, ori)` as parents x
+variants; `inpolygon(grains, rect | poly)` by the centroids, MATLAB's meaning (the points' grains
+are `grains[x, y]`); `strainTensor(M, type=)`; NumPy's reductions of tensors; `tensor.rand`
+uniform; `round(m, return_error=True, maxXYZ=)`; `f.rotation(return_angles=True)`;
+`vector3d.rand(n, sR)`; the zone law strings `Miller('[uvw]\\[uvw]', cs)`; `sum(odf, d)`;
+`S2Fun.smiley(even=True)` antipodal; and the named fibres alpha and tau, wrong in MATLAB too
+(`docs/plans/develop-fixes.md`). Kept: `calcError`'s defaults, which are MATLAB's code if not
+its documentation; `abs(sF, bandwidth=)` of `S2FunTri`, which MATLAB's signature does not take.
+Left: `cat` of grains and boundaries (new work), `np.sum` of a `vector3d`, MATLAB's `accuracy` of
+`round`, `strainTensor`'s ellipsoid, the only user of its type.
 
 ## 4. Open questions
 

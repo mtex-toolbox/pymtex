@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
+from mtex import (S1FunHandle, S1FunHarmonic, S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
                   angle, bandwidthFor, calcAngleDistribution, calcAxisDistribution, calcComponents, calcDensity, calcError,
                   calcKernel, calcMDF, calcMIndex, centerSpecimen, conv, crystalFrame, degree, discreteSample, entropy,
                   equispacedS2Grid, equispacedSO3Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
@@ -134,6 +134,19 @@ def test_max_numLocalOfASymmetricFunctionGivesDistinctOrbits():
     for j in range(i + 1, 2):
       assert angle(pa[i], pa[j]) > 2 * degree
   assert np.isclose(va[0], np.max(np.real(adf(equispacedS2Grid(resolution=0.5 * degree)))), rtol=1e-3)
+
+
+@pytest.mark.parametrize("make", [lambda f: S1FunHarmonic(f, bandwidth=8), lambda f: S1FunHandle(f, bandwidth=8)], ids=["harmonic", "handle"])
+def test_max_andMin_ofAFunctionOnTheCircleTakeEveryForm(make):
+  # MATLAB's max(sF, c), max(sF1, sF2) and max(sF, 'numLocal', n) reach the class's own, the arguments kept
+  f = make(lambda x: np.cos(3 * x) + 0.2 * np.sin(x))
+  xs = np.linspace(0, 2 * pi, 7)
+  for flat, name in ((max, "max"), (min, "min")):
+    own = getattr(f, name)
+    assert np.allclose(flat(f, 0.5)(xs), own(0.5)(xs), atol=1e-12)
+    assert np.allclose(flat(f, 2 * f)(xs), own(2 * f)(xs), atol=1e-12)
+    v, x = flat(f, numLocal=3)
+    assert len(v) == 3 and np.allclose(v, own(numLocal=3)[0], atol=1e-12) and np.allclose(x, own(numLocal=3)[1], atol=1e-12)
 
 
 def test_max_andMin_ofPlainNumbersAreThoseOfPython():

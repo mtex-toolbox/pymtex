@@ -350,43 +350,47 @@ def orientationMean(o, weights=None, robust=False, iterations=3, return_projecte
   return out if len(out) > 1 else out[0]
 
 
-def axisFrame(o):
+def axisFrame(o, frame=None):
   """the rotational axis of a misorientation: that of the representative in the fundamental
   region; only the rotations both frames share leave it invariant, and grain exchange takes
   away its sign, which for a crystal direction is the Laue sibling of the frame
   the frame an axis is expressed in: that of the first crystal of a misorientation, as MATLAB
-  labels it, the specimen for an orientation; the axis is fixed by the rotation, so its
-  components are the same in both frames"""
+  labels it, the specimen for an orientation, or the one of its two frames given; the axis is
+  fixed by the rotation, so its components are the same in both frames"""
+  from .frames import _sameBasis
   g = o.frameA.sym.disjoint(o.frameB.sym).properGroup()
   if o.antipodal:
     g = g.Laue()
-  return (o.frameA if o.isMisorientation else o.frameB).sibling(g)
+  if frame is None:
+    frame = o.frameA if o.isMisorientation else o.frameB
+  elif not (frame is o.frameA or frame is o.frameB or _sameBasis(frame, o.frameA) or _sameBasis(frame, o.frameB)):
+    raise ValueError(f"the axis is expressed in one of the frames {o.frameA.char()} and {o.frameB.char()}, not in {frame.char()}")
+  return frame.sibling(g)
 
 
-def orientationAxis(o, symmetry=True):
+def orientationAxis(o, symmetry=True, frame=None):
   """the rotational axes of orientations or misorientations, those of the representatives in the
   fundamental region, or of the rotations as given with symmetry=False, in the frame axisFrame
   names"""
   from .representations import quatAxis
   q = o.data if not symmetry else projectIntoFundamentalRegionOrientation(o).data
-  return vector3d(quatAxis(q), isNormalized=True, frame=axisFrame(o))
+  return vector3d(quatAxis(q), isNormalized=True, frame=axisFrame(o, frame))
 
 
 def pairAxis(o1, o2):
   """the axis of the disorientation between two orientations, in the frame they share, the
-  specimen: over the equivalents o1 g inv(o2) of the crystal group the one of the smallest
-  angle, whose axis is a direction of the specimen; its two ends are one axis"""
-  from .products import fitFrame
+  specimen: over the equivalents o2 g of the crystal groups the one closest to o1, and the axis
+  of the rotation o1 inv(o2 g) turning it onto o1; two crystal frames of different phases, a
+  cubic and a hexagonal one, reduce over the products of both groups, as angle does; its two
+  ends are one axis"""
   from .representations import quatAxis
   if o1.frameB is not o2.frameB:
     raise ValueError("the two lists are not in the same specimen frame")
-  fit = fitFrame(o2.frameA, o1.frameA)
-  b = o2.data if fit is None else qmul(o2.data, qconj(fit.data))
-  G = o1.frameA.sym.properGroup().rotations().data.reshape(-1, 4)
-  a, b = np.broadcast_arrays(o1.data, b)
-  cand = qmul(qmul(a[..., None, :], G), qconj(b)[..., None, :])      # (..., |G|, 4)
-  k = np.argmax(np.abs(cand[..., 0]), axis=-1)
-  best = np.take_along_axis(cand, k[..., None, None], axis=-2)[..., 0, :]
+  a, b = fitOrientations(o1, o2)
+  # only the crystal groups: a specimen group leaves no axis between two orientations
+  _, R = reductionGroupsPair(a, b)
+  _, img = closestImage(a.data, b.data, _ID[None, :], R)
+  best = qmul(np.broadcast_to(a.data, img.shape), qconj(img))
   # q and -q are one rotation; the axis is that of the one with a positive scalar part
   best = best * np.where(best[..., :1] < 0, -1.0, 1.0)
   return vector3d(quatAxis(best), isNormalized=True, antipodal=True, frame=o1.frameB)

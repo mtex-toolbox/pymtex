@@ -211,7 +211,7 @@ class grain2d(polygonSet):
 
   # the grains containing the point (x, y) in map coordinates
   def __call__(self, x, y):
-    return self[self.inpolygon([x, y])]
+    return self[self._containing([x, y])]
 
   @property
   def isInclusion(self):
@@ -307,7 +307,7 @@ class grain2d(polygonSet):
   def __getitem__(self, key):
     if isinstance(key, tuple) and len(key) == 2 and all(isinstance(k, (int, float, np.integer, np.floating)) for k in key) \
        and any(isinstance(k, (float, np.floating)) for k in key):
-      return self._subset(self.inpolygon([float(key[0]), float(key[1])]))
+      return self._subset(self._containing([float(key[0]), float(key[1])]))
     if isinstance(key, str):
       return self._subset(self._phaseMask([key]))
     if isinstance(key, referenceFrame):

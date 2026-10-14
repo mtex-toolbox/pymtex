@@ -128,11 +128,20 @@ class S2VectorField:
     return mapField(lambda a: a / np.linalg.norm(a, axis=-1, keepdims=True), self, bandwidth=max(2 * self.bandwidth, 32))
 
   def angle(self, w):
-    """the angle between two fields at every direction, a function on the sphere
+    """the angle between two fields at every direction, or between the field and a constant
+    vector, a function on the sphere
 
-      f = angle(sVF1, sVF2)"""
-    return mapField(lambda a, b: np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1)), self, w,
-                    bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
+      f = angle(sVF1, sVF2)
+      f = angle(sVF, vector3d.X)"""
+    def between(a, b):
+      return np.arccos(np.clip(np.sum(a * b, axis=-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1), -1, 1))
+    if isinstance(w, S2VectorField):
+      return mapField(between, self, w, bandwidth=max(2 * max(self.bandwidth, w.bandwidth), 32), invariant=True)
+    x = asVector3d(w)
+    if x.frame is not None and self.frame is not None and x.frame is not self.frame:
+      raise ValueError("the vector lives in another frame than the field")
+    b = x.data.reshape(3)
+    return mapField(lambda a: between(a, b), self, bandwidth=max(2 * self.bandwidth, 32), invariant=True)
 
   def norm(self):
     """the length at every direction, a function on the sphere, as MATLAB's norm

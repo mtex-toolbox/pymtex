@@ -188,12 +188,26 @@ def test_comparison_needs_fitting_frames():
   assert not (o == orientation(o, crystalFrame("432")))
 
 
-def test_the_axis_of_a_pair_turns_the_second_onto_the_first():
-  cs = crystalFrame('432')
+@pytest.mark.parametrize("pair", [("432", "432"), ("m-3m", "6/mmm"), ("432", "-3m"), ("mmm", "2/m")])
+def test_the_axis_of_a_pair_turns_the_second_onto_the_first(pair):
+  # also of two phases, MATLAB's axis(o1, o2) of a cubic and a hexagonal orientation
+  cs1, cs2 = crystalFrame(pair[0]), crystalFrame(pair[1], mineral="second") if pair[0] != pair[1] else crystalFrame(pair[0])
   rng = np.random.default_rng(8)
-  o1, o2 = orientation.rand(500, cs, rng=rng), orientation.rand(500, cs, rng=rng)
+  o1, o2 = orientation.rand(500, cs1, rng=rng), orientation.rand(500, cs2, rng=rng)
   R = rotation.byAxisAngle(vector3d(axis(o1, o2).data), angle(o1, o2))
   assert np.max(angle(R * o2, o1)) < 1e-9
+
+
+@pytest.mark.parametrize("symmetry", [True, False])
+def test_the_axis_of_a_misorientation_is_expressed_in_the_frame_asked_for(symmetry):
+  # axis(mori, cs) has the components of axis(mori) in either frame of mori, and refuses others
+  csCube, csHex = crystalFrame("m-3m"), crystalFrame("6/mmm", [3, 3, 5], mineral="Hex")
+  mori = inv(orientation.rand(20, csCube, rng=rng)) * orientation.rand(20, csHex, rng=rng)
+  a, aC, aH = axis(mori, symmetry=symmetry), axis(mori, csCube, symmetry=symmetry), axis(mori, csHex, symmetry=symmetry)
+  assert np.allclose(aC.data, a.data) and np.allclose(aH.data, a.data) and aC.frame.sym == aH.frame.sym == a.frame.sym
+  assert np.allclose(aC.frame.abc, csCube.abc) and np.allclose(aH.frame.abc, csHex.abc)
+  with pytest.raises(ValueError):
+    axis(mori, crystalFrame("-1", [2, 3, 4], mineral="Other"))
 
 
 @pytest.mark.parametrize("backend", ["numba", "numpy"])

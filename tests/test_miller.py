@@ -5,7 +5,7 @@ import pytest
 from numpy import pi
 
 import mtex
-from mtex import Miller, crystalFrame, specimenFrame, vector3d, xvector, degree, angle, dspacing, cross, isCrystalDirection, setMTEXpref, cat, symmetrise, unique
+from mtex import Miller, dot, crystalFrame, specimenFrame, vector3d, xvector, degree, angle, dspacing, cross, isCrystalDirection, setMTEXpref, cat, symmetrise, unique
 from conftest import close
 
 hexFrames = [crystalFrame("6/mmm", [3, 3, 5]), crystalFrame("-3m", [4.9, 4.9, 5.4])]
@@ -234,6 +234,21 @@ def test_Miller_bracketStringGivesTheIndices():
   assert parallel(Miller("(110)", csC), Miller(1, 1, 0, csC))
   assert parallel(Miller("(1-10)", csC), Miller(1, -1, 0, csC)) and parallel(Miller("(1,-1,0)", csC), Miller(1, -1, 0, csC))
   assert Miller("{10-10}", hexagonal()).dispStyle == "hkil"
+
+
+@pytest.mark.parametrize("frame", [cubic, hexagonal, lambda: crystalFrame("-1", [3, 4, 5], [80 * degree, 95 * degree, 105 * degree])])
+@pytest.mark.parametrize("direct", [True, False])
+def test_Miller_zoneLawStringIsNormalToBothIndexSets(frame, direct):
+  # '[uvw]\\[uvw]' is the plane holding both directions, '(hkl)\\(hkl)' the direction both planes hold
+  cs, g = frame(), np.random.default_rng(3)
+  for _ in range(10):
+    a, b = g.integers(-3, 4, size=(2, 3))
+    if np.all(np.cross(a, b) == 0):
+      continue
+    o, c = "[]" if direct else "()"
+    m = Miller(f"{o}{a[0]},{a[1]},{a[2]}{c}\\{o}{b[0]},{b[1]},{b[2]}{c}", cs)
+    va, vb = (Miller(*x, cs, "uvw" if direct else "hkl") for x in (a, b))
+    assert m.dispStyle in (("hkl", "hkil") if direct else ("uvw", "UVTW")) and close(dot(m, va, symmetry=False), 0) and close(dot(m, vb, symmetry=False), 0)
 
 
 def test_Miller_refusesAStringWithoutBrackets():

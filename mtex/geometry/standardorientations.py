@@ -154,9 +154,9 @@ def variants(p2c, second=None, ids=None, parent=False):
 
     p2cVariants = variants(p2c)                      # the child variants
     p2pVariants = variants(p2c, parent=True)         # the parent variants
-    oriChild = variants(p2c, oriParent)              # every child variant of every parent
-    oriChild = variants(p2c, oriParent, variantId)   # one per parent, chosen by its id
-    oriParent = variants(p2c, oriChild)              # the parents of children
+    oriChild = variants(p2c, oriParent)              # every child variant of every parent, oriParent.shape + (numVariants,)
+    oriChild = variants(p2c, oriParent, variantId)   # one per parent, chosen by its id, broadcast
+    oriParent = variants(p2c, oriChild)              # the parents of children, oriChild.shape + (numVariants,)
     odfChild = variants(p2c, odfParent)              # the child texture"""
   from .orientation import orientation
   if isinstance(second, str):
@@ -169,20 +169,17 @@ def variants(p2c, second=None, ids=None, parent=False):
   if not isinstance(second, orientation) and hasattr(second, "eval"):
     from ..functions.funops import transformODF
     return transformODF(second, p2c, ids)
-  par = second.data.reshape(-1, 4)
+  # a list of ids is one variant per parent, broadcast against them; none every variant of
+  # every parent along a new last axis
+  sel = None if ids is None else np.asarray(ids).astype(int) - 1
   if second.frameA is p2c.frameB and second.frameA is not p2c.frameA:
-    PV = variants(p2c, parent=True).data
-    PV = PV if ids is None else PV[np.asarray(ids).reshape(-1) - 1]
-    q = qmul(par[:, None, :], PV[None, :, :]) if ids is None else qmul(par, PV)
-    return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameA, second.frameB)
-  # a variant id counts from the representative of the parent in the fundamental region
-  par = projectIntoFundamentalRegionOrientation(second).data.reshape(-1, 4)
-  vs = variants(p2c)
-  if ids is None:
-    q = qmul(par[:, None, :], qconj(vs.data)[None, :, :])
-    return orientation(rotation._fromData(q.reshape(-1, 4)), p2c.frameB, second.frameB)
-  ids = np.asarray(ids).reshape(-1) - 1
-  return orientation(rotation._fromData(qmul(par, qconj(vs.data[ids]))), p2c.frameB, second.frameB)
+    V, frames, par = variants(p2c, parent=True).data, (p2c.frameA, second.frameB), second.data
+  else:
+    # a variant id counts from the representative of the parent in the fundamental region
+    V, frames = qconj(variants(p2c).data), (p2c.frameB, second.frameB)
+    par = projectIntoFundamentalRegionOrientation(second).data
+  q = qmul(par[..., None, :], V) if sel is None else qmul(par, V[sel])
+  return orientation(rotation._fromData(q), *frames)
 
 
 # MTEX's numbering of the 24 child variants of a cubic parent, Morito's for Kurdjumov-Sachs

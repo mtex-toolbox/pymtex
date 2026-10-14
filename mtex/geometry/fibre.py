@@ -161,14 +161,18 @@ class fibre:
 
   # ------------------------------------------------------------------ sampling
 
-  def rotation(self, points=1000):
-    """the rotations along the fibre, points x shape, turning about h from o1 to o2
+  def rotation(self, points=1000, return_angles=False):
+    """the rotations along the fibre, points x shape, turning about h from o1 to o2;
+    return_angles=True also gives the angles omega they are turned from o1 by, of the same shape,
+    MATLAB's second output
 
       rot = f.rotation()
-      rot = f.rotation(points=100)"""
+      rot = f.rotation(points=100)
+      rot, omega = f.rotation(return_angles=True)"""
     omega = np.linspace(0, 1, points)[(slice(None),) + (None,) * self.ndim] * self.arcAngle()
     axis = np.broadcast_to(self.h.normalize().data, omega.shape + (3,))
-    return rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))
+    rot = rotation._fromData(qmul(self.o1.data, axis2quat(axis, omega)))
+    return (rot, omega) if return_angles else rot
 
   def orientation(self, points=1000):
     """the orientations along the fibre, points x shape, turning about h from o1 to o2"""
@@ -409,12 +413,14 @@ def _eulerString(o):
   return "(" + ",".join(f"{x / degree:.4g}°" for x in e) + ")"
 
 
-# the named fibres of rolling textures between the orientations MTEX puts at their ends,
-# by their Bunge Euler angles in degrees, so that the geodesic is MATLAB's whatever
-# representative byMiller would pick
-NAMED_FIBRES = {"alpha": ((315, 0, 0), (180, 54.735610, 45)), "beta": ((180, 35.264390, 45), (270, 62.785077, 45)),
+# the named fibres of rolling textures between the orientations MTEX puts at their ends, by
+# their Bunge Euler angles in degrees; the ends of a true fibre are the representatives
+# sharing its crystal direction, alpha (001)[1-10] to (111)[1-10] about [1-10] || RD, tau
+# (001)[110] to (110)[00-1] about [-110] || TD, where MATLAB's byMiller picks ends whose
+# geodesic leaves the fibre
+NAMED_FIBRES = {"alpha": ((45, 0, 0), (0, 54.735610, 45)), "beta": ((180, 35.264390, 45), (270, 62.785077, 45)),
                 "gamma": ((180, 54.735610, 45), (270, 54.735610, 45)), "eta": ((0, 0, 0), (0, 45, 0)),
-                "tau": ((315, 0, 0), (0, 45, 0)), "epsilon": ((315, 0, 0), (270, 54.735610, 45))}
+                "tau": ((315, 0, 0), (270, 90, 45)), "epsilon": ((315, 0, 0), (270, 54.735610, 45))}
 
 
 def _named(name):

@@ -313,14 +313,22 @@ def calcAxisDistribution(f, v=None, *args, bandwidth=64, **kwargs):
   return S2FunHarmonic(S2FunHandle(_axisDensity(f, **kwargs), frame, bandwidth=bandwidth, antipodal=antipodal))
 
 
-def calcError(f, g, mode="l1", resolution=5 * degree):
-  """the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' is half
-  the mean absolute difference, for densities the fraction of the volume that would have to
-  move to turn one into the other; 'l2' the norm of the difference over the norm of g
+def calcError(f, g, mode=None, resolution=5 * degree, epsilon=None):
+  """the distance of two SO(3) functions on the equispaced grid of the resolution: 'l1' (the
+  default, as MATLAB's) is half the mean absolute difference, for densities the fraction of the
+  volume that would have to move to turn one into the other; 'l2' the norm of the difference
+  over the norm of g. With pole figures second, as MATLAB's calcError(odf, pf), the error of
+  PoleFigure.calcError, one number per pole figure, the modes and the default its own
 
     e = calcError(odf1, odf2)  # 'l1'
-    e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)"""
-  mode = str(mode).lower()
+    e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)
+    e = calcError(odf, pf, 'RP')  # calcError(pf, odf, 'RP')"""
+  from .polefigure import PoleFigure
+  if isinstance(g, PoleFigure):
+    return g.calcError(f, "relative" if mode is None else mode, epsilon)
+  if epsilon is not None:
+    raise ValueError("epsilon is the threshold of the error of pole figures")
+  mode = "l1" if mode is None else str(mode).lower()
   grid = equispacedSO3Grid(f.CS, f.SS, resolution=resolution)
   d1 = np.real(f(grid))
   d2 = np.real(g(orientation._fromRotation(grid.data, (g.CS, g.SS), g.antipodal)))
@@ -540,7 +548,10 @@ def max_(f, *args, numLocal=1, **kwargs):
 
     value, ori = max(odf)
     values, oris = max(odf, numLocal=5, resolution=5*degree, accuracy=0.25*degree)
-    f = max(odf1, odf2)"""
+    f = max(odf1, odf2)
+    v, pos = max(sF)                       on the circle, the angle
+    values, positions = max(sF, numLocal=3)
+    sF = max(sF, 0.5)"""
   return _extremum(f, args, numLocal, kwargs, largest=True)
 
 
@@ -572,7 +583,7 @@ def _extremum(f, args, numLocal, kwargs, largest):
   if isinstance(f, SO3FunHarmonic) and f.shape:
     return _listExtremaSO3(f, reduce, max_ if largest else min_, numLocal, kwargs)
   if isinstance(f, (S1FunHarmonic, S1FunHandle)):
-    return getattr(f, name)(**kwargs)
+    return getattr(f, name)(*args, numLocal=numLocal, **kwargs)
   if not isinstance(f, (SO3Fun, S2Fun)):
     return (max if largest else min)(f, *args, **kwargs)
   if not largest:

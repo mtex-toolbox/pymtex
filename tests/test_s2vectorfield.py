@@ -158,3 +158,10 @@ def test_the_normal_field():
   f = S2VectorFieldHarmonic.normal()
   v = vector3d.rand(20)
   assert f.bandwidth == 2 and np.allclose(f.eval(v).data, v.normalize().data, atol=1e-10)
+
+
+@pytest.mark.parametrize("v", [xvector, yvector, zvector, vector3d(1, -2, 0.5)])
+def test_angle_withAVectorIsTheAngleWithTheConstantField(v):
+  H = S2VectorFieldHarmonic(rng.standard_normal((25, 3)) + 1j * rng.standard_normal((25, 3)))
+  vs = vector3d.rand(6, rng=rng)
+  assert np.allclose(H.angle(v)(vs), H.angle(0 * H + v)(vs), atol=1e-10)

@@ -132,7 +132,10 @@ class S2FunTri(S2Fun):
     return self._mapped(np.abs)
 
   def abs(self):
-    """the absolute value of the function, taken at the vertices
+    """the absolute value of the function, taken at the vertices, again a function on the
+    triangulation; it has no bandwidth, so MATLAB's documented abs(sF, 'bandwidth', bw), which its
+    S2FunTri/abs does not take either, has no counterpart here; the expansion of |f| at a bandwidth
+    is S2FunHarmonic(abs(sF), bandwidth=bw)
 
       sF = abs(sF)"""
     return abs(self)

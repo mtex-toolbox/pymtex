@@ -1,5 +1,6 @@
 # S1FunHarmonic and the density on the circle (docs/plans/functions.md F3e, check_S1Fun)
 import numpy as np
+import pytest
 from numpy import pi
 
 from mtex import S1FejerKernel, S1FunHarmonic, S1GaussKernel, calcDensity, conv, mean, norm, quadratureS1Grid
@@ -94,3 +95,26 @@ def test_calcDensity_ofAxesRepeatsAfterHalfATurn():
 # Silverman's rule gives a width, and a kernel of one's own is taken as it is
 def test_calcDensity_withoutAWidthHasMeanOne():
   assert np.isclose(mean(calcDensity(xs, periodic=True)), 1) and np.isclose(mean(calcDensity(xs, kernel=S1FejerKernel(12))), 1)
+
+
+@pytest.mark.parametrize("k", [1, 2, 3, 5])
+def test_max_numLocalFindsTheMaximaOfAPeriodicWave(k):
+  # cos(k (x - x0)) has k maxima of value one, 2 pi / k apart, and k minima between them
+  x0 = 0.3
+  f = S1FunHarmonic(lambda x: np.cos(k * (x - x0)), bandwidth=8)
+  for op, top in ((S1FunHarmonic.max, 1), (S1FunHarmonic.min, -1)):
+    v, x = op(f, numLocal=k + 2)
+    shift = 0 if top == 1 else pi / k
+    assert len(v) == k and np.allclose(v, top, atol=1e-9)
+    expected = np.sort((x0 + shift + 2 * pi * np.arange(k) / k) % (2 * pi))
+    assert np.allclose(np.sort(x), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("other", [0.2, -0.5, S1FunHarmonic([0.5, 0.0, 0.5])])
+def test_max_withANumberOrAFunctionIsThePointwiseExtremumByQuadrature(other):
+  # MATLAB's max(sF, c) and max(sF1, sF2): the quadrature of the pointwise extremum
+  f = S1FunHarmonic(lambda x: np.sin(x) + 0.3 * np.cos(2 * x), bandwidth=4)
+  value = (lambda x: other(x)) if callable(other) else (lambda x: other)
+  for op, npop in ((S1FunHarmonic.max, np.maximum), (S1FunHarmonic.min, np.minimum)):
+    h = op(f, other, bandwidth=32)
+    assert isinstance(h, S1FunHarmonic) and h.isclose(S1FunHarmonic(lambda x: npop(f(x), value(x)), bandwidth=32), rtol=1e-12)

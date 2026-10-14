@@ -203,12 +203,20 @@ class polygonSet:
     hit = self.checkInside(xy)
     return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
 
-  def inpolygon(self, xy):
-    """the positions of the outlines holding at least one of the points xy
+  def inpolygon(self, region):
+    """the mask of the outlines whose centroid lies inside a rectangle [xmin, ymin, dx, dy] or a
+    polygon (N, 2), edges included, as MATLAB's; the outlines holding given points are
+    findByLocation, or grains[x, y]
 
-      ind = grains.inpolygon([[x1, y1], [x2, y2]])
-      ind = inpolygon(grains, vector3d(x, y, 0))
+      ind = grains.inpolygon([xmin, ymin, dx, dy])                # by a rectangle
+      ind = inpolygon(grains, [[x1, y1], [x2, y2], [x3, y3]])     # by a polygon
       grains = grains[ind]"""
+    from .ebsd import _inRegion
+    c = self._as2d(self.centroid)
+    return _inRegion(c[:, 0], c[:, 1], region)
+
+  # the positions of the outlines holding at least one of the points xy
+  def _containing(self, xy):
     return np.flatnonzero(self.checkInside(xy).any(axis=0))
 
   @property

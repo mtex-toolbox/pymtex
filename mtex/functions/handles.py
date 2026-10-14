@@ -22,7 +22,8 @@ from ..geometry.symreduce import reductionGroups
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import conv
 from .rbf import SO3FunCBF, SO3FunRBF, _framesAmong, _rotationsFor, uniformODF
-from .s1fun import S1FunHarmonic
+from .s1fun import S1FunHarmonic, _localExtremaS1, _pointwiseExtremumS1
+from ..geometry.units import degree
 from .s2fun import S2FunHarmonic, quadratureBandwidth
 from .so3fun import SO3FunHarmonic
 from ..geometry.framepair import installFramePair
@@ -135,10 +136,12 @@ class SO3FunGeneric(SO3Fun):
       SO3F = log(odf)"""
     def __pow__(self, p) -> Any:
       ...
-    def sum(self) -> Any:
-      """the integral over orientation space, 8 pi^2 times the mean
+    def sum(self, axis=None) -> Any:
+      """the integral over orientation space, 8 pi^2 times the mean; with an axis the sum along it,
+      MATLAB's sum(odf, d) with d = axis + 1, which for a single function is the function itself
 
-      value = sum(odf)"""
+        value = sum(odf)
+        odf = sum(odf, axis=0)"""
     @property
     def frameA(self) -> Any:
       ...
@@ -557,6 +560,27 @@ class S1FunHandle:
     """the mean over the circle, through the harmonic form"""
     return S1FunHarmonic(self).mean()
 
+  def max(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
+    """the largest value and the angle it is taken at, numLocal local maxima, or with a number
+    or a second function on the circle the pointwise maximum, as S1FunHarmonic.max
+
+      v, pos = max(sF)
+      values, positions = max(sF, numLocal=3)
+      sF = max(sF, 0.5)"""
+    if args:
+      return _pointwiseExtremumS1(np.maximum, self, args[0], bandwidth)
+    return _localExtremaS1(self, 1, numLocal, resolution)
+
+  def min(self, *args, numLocal=1, resolution=0.25 * degree, bandwidth=None):
+    """the smallest value and the angle it is taken at, numLocal local minima, or with a number
+    or a second function on the circle the pointwise minimum, as S1FunHarmonic.min
+
+      v, pos = min(sF)
+      sF = min(sF1, sF2)"""
+    if args:
+      return _pointwiseExtremumS1(np.minimum, self, args[0], bandwidth)
+    return _localExtremaS1(self, -1, numLocal, resolution)
+
   def __mul__(self, a):
     return S1FunHandle(lambda x: a * self.fun(x), bandwidth=self.bandwidth, real=self.isReal and np.isreal(a))
 
@@ -585,11 +609,18 @@ def _pointwiseMethod(op, what, name):
   return f
 
 
-def _integralSO3(self):
-  """the integral over orientation space, 8 pi^2 times the mean
+def _integralSO3(self, axis=None):
+  """the integral over orientation space, 8 pi^2 times the mean; with an axis the sum along it,
+  MATLAB's sum(odf, d) with d = axis + 1, which for a single function is the function itself
 
-    value = sum(odf)"""
-  return 8 * np.pi ** 2 * self.mean()
+    value = sum(odf)
+    odf = sum(odf, axis=0)"""
+  if axis is None:
+    return 8 * np.pi ** 2 * self.mean()
+  # a single function is a list of one along every axis
+  if not isinstance(axis, (int, np.integer)) or axis < 0:
+    raise ValueError("the axis to sum along is a non-negative integer")
+  return self
 
 
 # the classes keep what they define themselves, the harmonic form its own products

@@ -45,14 +45,15 @@ class S2Fun:
       sF = S2Fun.smiley(bandwidth=256)  # its harmonic expansion by quadrature
       values = S2Fun.smiley(v)  # its values at the directions v
       sF = S2Fun.smiley(exact=True)  # the function itself, as a handle
-      sF = S2Fun.smiley(even=True)  # the smiley on both hemispheres"""
+      sF = S2Fun.smiley(even=True)  # the smiley on both hemispheres, an antipodal function"""
     from .handles import S2FunHandle
     from .s2fun import S2FunHarmonic
     if isinstance(v, vector3d):
       return _smileyValues(v, even)
+    # the even smiley takes the same value at v and -v
     if exact:
-      return S2FunHandle(lambda w: _smileyValues(w, even))
-    return S2FunHarmonic.quadrature(lambda w: _smileyValues(w, even), **kwargs)
+      return S2FunHandle(lambda w: _smileyValues(w, even), antipodal=even, symmetrise=False)
+    return S2FunHarmonic.quadrature(lambda w: _smileyValues(w, even), antipodal=even or kwargs.pop("antipodal", False), **kwargs)
 
   @staticmethod
   def unimodal(v=None, halfwidth=25 * degree, psi=None):

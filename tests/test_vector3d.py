@@ -345,3 +345,22 @@ def test_mean_projectedCrystalDirectionsAreTheEquivalentsClosestToTheMean():
   m, hp = mean(h, return_projected=True)
   assert np.allclose(angle(hp, h), 0, atol=1e-7)
   assert np.allclose(angle(hp, m, symmetry=False), angle(h, m), atol=1e-7)
+
+
+@pytest.mark.parametrize("maxXYZ", [1, 3, 12])
+def test_round_keepsItsCoordinatesBelowMaxXYZAndReportsTheAngleItTurned(maxXYZ):
+  from mtex import crystalFrame, Miller
+  v = vector3d(rng().normal(size=(50, 3)))
+  r, err = v.round(maxXYZ=maxXYZ, return_error=True)
+  m = Miller(v, crystalFrame("m-3m"))
+  rm, errm = m.round(maxHKL=maxXYZ, return_error=True)
+  assert np.max(np.abs(r.xyz)) <= maxXYZ and close(err, angle(v, r)) and close(errm, angle(m, rm, symmetry=False)) and np.max(np.abs(rm.hkl)) <= maxXYZ
+
+
+@pytest.mark.parametrize("a", [-0.5, 0.0, 0.9])
+def test_rand_inARegionIsUniformInIt(a):
+  # on the cap dot(v, z) >= a the height z of uniform points is uniform on [a, 1], Archimedes
+  from mtex import sphericalRegion
+  v = vector3d.rand(20000, sphericalRegion(zvector, a), rng=rng())
+  z = np.sort(v.z)
+  assert v.shape == (20000,) and np.all(z >= a) and np.max(np.abs(z - np.linspace(a, 1, len(z)))) < 0.02 * (1 - a)

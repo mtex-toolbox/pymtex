@@ -38,6 +38,14 @@ from ..geometry.display import aligned
 ERROR_MODES = ("relative", "RP", "l1", "l2")
 
 
+# the error measure of pole figures by its name in any case, as MATLAB's flags
+def _errorMode(mode):
+  names = {m.lower(): m for m in ERROR_MODES}
+  if str(mode).lower() not in names:
+    raise ValueError(f"the error mode is 'relative', 'RP', 'l1' or 'l2', not {mode!r}")
+  return names[str(mode).lower()]
+
+
 # ------------------------------------------------------------------ the directions
 
 # crystal directions as a flat list in a crystal frame, the frame given taking over
@@ -482,8 +490,7 @@ class PoleFigure:
   def calcErrorPF(self, other, mode="relative", epsilon=None):
     """the pole figures of the deviation from a recalculation, normalised against each
     other first; 'relative' is the damped relative error, 'RP', 'l1', 'l2' the others"""
-    if mode not in ERROR_MODES:
-      raise ValueError(f"the error mode is 'relative', 'RP', 'l1' or 'l2', not {mode!r}")
+    mode = _errorMode(mode)
     # the RP measure keeps the directions above one, the regularised one damps by a half
     epsilon = (1.0 if mode == "RP" else 0.5) if epsilon is None else float(epsilon)
     if not isinstance(other, PoleFigure):
@@ -510,13 +517,17 @@ class PoleFigure:
 
   def calcError(self, other, mode="relative", epsilon=None):
     """the mean deviation, one number per pole figure, from a recalculation by an ODF or from
-    other pole figures on the same directions: 'relative' (the default) damps the relative
-    error by epsilon, 'RP' keeps the directions above epsilon, 'l1' and 'l2'
+    other pole figures on the same directions: 'relative', the default, is the relative error
+    damped by epsilon (0.5), which MATLAB computes when no measure is named (its documentation
+    calls the default RP); 'RP' keeps the directions above epsilon (1), MATLAB's 'RP', epsilon;
+    'l1' and 'l2'; the names in any case, and the ODF first or second, as MATLAB's
 
       e = calcError(pf, odf)
       e = calcError(pf, pf2)
       e = calcError(pf, odf, 'RP', epsilon=0.5)
+      e = calcError(odf, pf, 'RP')
       e = calcError(pf, odf, 'l2')"""
+    mode = _errorMode(mode)
     e = self.calcErrorPF(other, mode, epsilon)
     out = np.array([float(np.mean(I)) if I.size else np.nan for I in e.allI])
     if mode == "l1":
@@ -608,6 +619,7 @@ def calcError(a, b, *args, **kwargs):
   """the error between a measurement and a recalculation, or between two SO(3) functions
 
     e = calcError(pf, odf)  # one number per pole figure, PoleFigure.calcError
+    e = calcError(odf, pf, 'RP')  # the same, in MATLAB's order
     e = calcError(odf1, odf2)  # 'l1'
     e = calcError(odf1, odf2, 'l2', resolution=2.5*degree)"""
   if isinstance(a, PoleFigure):

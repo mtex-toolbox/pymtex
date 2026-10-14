@@ -204,3 +204,20 @@ def test_S2FunSum_sumsAndDividesItsTerms():
   assert isinstance(ab, S2FunSum) and np.allclose(ab(ds), a(ds) + b(ds)) and np.isclose(mean(ab), mean(a) + mean(b))
   assert np.max(np.abs(S2FunHarmonic(ab)(ds) - ab(ds))) < 1e-6
   assert isinstance(b + a, S2FunSum) and np.allclose((a / b)(ds), a(ds) / b(ds))
+
+
+def test_S1FunHandle_maxAndMinWithANumberOrAHandleArePointwiseAndExact():
+  f, g = S1FunHandle(np.cos), S1FunHandle(lambda x: np.sin(2 * x))
+  xs = rng.random(10) * 2 * pi
+  assert np.allclose(f.max(0.3)(xs), np.maximum(np.cos(xs), 0.3)) and np.allclose(f.min(g)(xs), np.minimum(np.cos(xs), np.sin(2 * xs)))
+  assert isinstance(f.max(g), S1FunHandle)
+
+
+@pytest.mark.parametrize("make", [lambda cs, ss: unimodalODF(orientation(rotation.rand(rng=rng), cs, ss)),
+                                  lambda cs, ss: fibreODF(fibre(orientation(rotation.rand(rng=rng), cs, ss), Miller(1, 1, 1, cs)))],
+                         ids=["RBF", "CBF"])
+def test_sum_alongAnAxisOfASingleFunctionIsTheFunction(make):
+  # MATLAB's sum(odf, d) on a single function: a list of one along every axis
+  odf = make(crystalFrame("432"), specimenFrame("1"))
+  rs = rotation.rand(5, rng=rng)
+  assert np.allclose(odf.sum(0)(rs), odf(rs)) and np.allclose(odf.sum(axis=1)(rs), odf(rs)) and np.isclose(odf.sum(), 8 * pi ** 2 * mean(odf))

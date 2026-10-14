@@ -202,6 +202,10 @@ class tensor(MtexArray):
     obj._frame = self._frame if frame is None else frame
     obj.doubleConvention = cls._double if cls is not tensor else self.doubleConvention
     obj.density, obj.unit, obj.name = self.density, self.unit, self.name
+    # the attributes a subclass carries besides, from a source that has them
+    for name in cls._carried[len(tensor._carried):]:
+      if name in vars(self):
+        setattr(obj, name, getattr(self, name))
     return obj
 
   # ------------------------------------------------------------------ accessors
@@ -611,22 +615,27 @@ class tensor(MtexArray):
 
   # ------------------------------------------------------------------ lists
 
-  def mean(self, *args, weights=None, **kwargs):
-    """the mean over the list, weighted or not; with an ODF or orientations the texture average
-    (calcTensor). MATLAB's three outputs, the Voigt, Reuss and Hill means, are asked for by name
+  def mean(self, *args, weights=None, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
+    """the mean over the list, or along axes of it, weighted or not; with an ODF or orientations
+    the texture average (calcTensor). MATLAB's three outputs, the Voigt, Reuss and Hill means, are
+    asked for by name. NumPy's np.mean(T) and np.mean(T, axis=1) call it
 
       T.mean()
+      T.mean(axis=1)          # along the second axis, MATLAB's mean(T, 2)
       TReuss = T.mean('Reuss')
       TVoigt, TReuss, THill = T.mean('all')
       T.mean(odf)"""
     if args and not isinstance(args[0], str):
       from ..analysis.texture import calcTensor
       return calcTensor(args[0], self, *args[1:], weights=weights, **kwargs)
+    _numpyReduction("mean", dtype, out, kwargs)
     # MATLAB's other outputs: the inverse of the mean inverse, the Hill mean, all three
     which = next((a for a in args if a in ("Reuss", "Hill", "all")), None)
     if which is not None:
-      V, R = self.mean(weights=weights), self.inv().mean(weights=weights).inv()
+      V, R = self.mean(weights=weights, axis=axis, keepdims=keepdims), self.inv().mean(weights=weights, axis=axis, keepdims=keepdims).inv()
       return {"Reuss": R, "Hill": (V + R) / 2, "all": (V, R, (V + R) / 2)}[which]
+    if axis is not None or keepdims:
+      return self._meanAlong(self._axes(axis), weights, keepdims)
     if self.ndim == 0:
       return self
     flat = self.data.reshape(-1, self._ncoord)
@@ -642,14 +651,35 @@ class tensor(MtexArray):
       t.density = float(w @ d / np.sum(w))
     return t
 
-  def sum(self, axis=None):
-    """the sum of all tensors, or along one axis of the array, MATLAB's sum(T, 2)
+  # the mean along the given list axes, weighted by an array of the list's shape
+  def _meanAlong(self, axes, weights, keepdims):
+    w = np.ones(self.shape) if weights is None else np.broadcast_to(np.asarray(weights, dtype=float), self.shape)
+    ws = np.sum(w, axis=axes, keepdims=keepdims)
+    t = self._as(type(self), np.sum(w[..., None] * self.data, axis=axes, keepdims=keepdims) / ws[..., None])
+    if self.density is not None and np.ndim(self.density):
+      t.density = np.sum(w * np.asarray(self.density, dtype=float), axis=axes, keepdims=keepdims) / ws
+    return t
+
+  # the list axes NumPy's axis= names, all of them for None
+  def _axes(self, axis):
+    if axis is None:
+      return tuple(range(self.ndim))
+    axes = axis if isinstance(axis, tuple) else (axis,)
+    if any(not -self.ndim <= a < self.ndim for a in axes):
+      raise ValueError(f"axis {axis} is out of range for a list of {self.ndim} dimensions")
+    return tuple(a % self.ndim for a in axes)
+
+  def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
+    """the sum of all tensors, or along axes of the array, MATLAB's sum(T, 2); NumPy's np.sum(T)
+    and np.sum(T, axis=1) call it
 
       T.sum()                 # the sum of all tensors
-      T.sum(axis=1)           # along the second axis"""
-    if axis is None:
+      T.sum(axis=1)           # along the second axis
+      np.sum(T, axis=(0, 1), keepdims=True)"""
+    _numpyReduction("sum", dtype, out, kwargs)
+    if axis is None and not keepdims:
       return self._as(type(self), self.data.reshape(-1, self._ncoord).sum(axis=0))
-    return self._as(type(self), self.data.sum(axis=axis % self.ndim))
+    return self._as(type(self), self.data.sum(axis=self._axes(axis), keepdims=keepdims))
 
   @classmethod
   def cat(cls, *arrays, axis=0):
@@ -717,10 +747,10 @@ class tensor(MtexArray):
 
   @classmethod
   def rand(cls, *args, rank=None, rng=None, **kwargs):
-    """a random tensor with the symmetries its class and frame ask for: a plain tensor of normally
-    distributed entries, a symmetric one symmetrised, a stiffness or compliance one positive
-    definite besides; the numbers give the list shape, rank= the rank of a plain tensor, rng= the
-    generator
+    """a random tensor with the symmetries its class and frame ask for: a plain tensor of entries
+    drawn uniformly from [0, 1], as MATLAB's, a symmetric one the symmetric part of such a tensor,
+    symmetrised in its frame, a stiffness or compliance one positive definite besides; the numbers
+    give the list shape, rank= the rank of a plain tensor, rng= the generator
 
       T = tensor.rand(rank=4)
       T = tensor.rand(100, cs, rank=2)
@@ -730,7 +760,7 @@ class tensor(MtexArray):
     fr, rest = _readArgs(args)
     rank = (cls._rank or 2) if rank is None else int(rank)
     shape = tuple(int(n) for n in rest)
-    T = cls(rng.standard_normal(shape + (3,) * rank), fr, rank=rank, **kwargs)
+    T = cls(rng.random(shape + (3,) * rank), fr, rank=rank, **kwargs)
     if cls._symmetricRank2 or cls._rank == 4:
       T = T.sym().symmetrise()
     if cls._rank == 4:
@@ -938,6 +968,15 @@ def dyad(a, b=None, n=None):
   return EinsteinSum(a, list(range(1, ra + 1)), b, list(range(ra + 1, ra + rb + 1)))
 
 
+# NumPy's keywords of a reduction that a list of tensors has no use for: out= and dtype= would
+# write or convert the coordinate array, where= and initial= mask or seed its entries
+def _numpyReduction(name, dtype, out, kwargs):
+  if out is not None or dtype is not None:
+    raise TypeError(f"the {name} of tensors takes neither out= nor dtype=")
+  if kwargs:
+    raise TypeError(f"the {name} of tensors does not take {', '.join(kwargs)}")
+
+
 # the unit of the inverse, as MATLAB writes it: GPa to 1 / GPa, 1/GPa to GPa, m/s to s / m
 def _inverseUnit(unit):
   if unit is None:
@@ -1020,12 +1059,26 @@ class stressTensor(tensor):
 
 
 class strainTensor(tensor):
-  """a rank two symmetric strain tensor, in the double convention of the Voigt notation
+  """a rank two symmetric strain tensor, in the double convention of the Voigt notation; type= says
+  whether it refers to the undeformed configuration, 'Lagrange' (the default), or to the deformed
+  one, 'Euler', MATLAB's strainTensor(M, 'type', 'Euler'), and is kept by everything derived from it
 
     eps = strainTensor(M)
     eps = strainTensor(M, cs)
-    eps = strainTensor(np.diag([1, 0, -1]))"""
+    eps = strainTensor(np.diag([1, 0, -1]))
+    eps = strainTensor(M, type='Euler')
+    eps.type"""
   _rank, _double, _symmetricRank2 = 2, True, True
+  _carried = tensor._carried + ("type",)
+  type = "Lagrange"
+
+  def __init__(self, M, *args, type=None, **kwargs):
+    if type is None:
+      type = M.type if isinstance(M, strainTensor) else "Lagrange"
+    if type not in ("Lagrange", "Euler"):
+      raise ValueError(f"the type of a strain tensor is 'Lagrange' or 'Euler', not {type!r}")
+    super().__init__(M, *args, **kwargs)
+    self.type = type
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:

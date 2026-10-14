@@ -257,16 +257,23 @@ class vector3d(MtexArray):
     self._needsCrystal()
     return 1 / self.norm()
 
-  def round(self, style=None, maxHKL=12):
+  def round(self, style=None, maxHKL=12, maxXYZ=12, return_error=False):
     """a crystal direction rounded to integer indices, vector3d/round; style= the indices rounded
     ('hkl', 'hkil', 'uvw', 'UVTW', the display's by default), maxHKL the largest multiple tried; a
-    vector3d without a lattice has its coordinates rounded
+    vector3d without a lattice has its coordinates rounded, maxXYZ the largest multiple tried;
+    return_error=True also gives the angle between the given and the rounded direction, without
+    symmetric equivalents, MATLAB's second output
 
       m = round(m)
       m = round(m, maxHKL=5)
-      m = round(m, 'uvw')       # the direct indices integer"""
+      m = round(m, 'uvw')       # the direct indices integer
+      v = round(v, maxXYZ=5)
+      m, err = round(m, return_error=True)"""
     from .miller import roundIndices
-    return roundIndices(self, style, maxHKL)
+    r = roundIndices(self, style, maxHKL if self.isCrystalDirection else maxXYZ)
+    if not return_error:
+      return r
+    return r, vector3d.angle(self, r, symmetry=False)
 
   def char(self, style=None, utf8=None, family=None):
     """the indices in brackets, {111} or [uvw], Miller/char"""
@@ -333,16 +340,32 @@ class vector3d(MtexArray):
 
   @classmethod
   def rand(cls, *shape, antipodal=False, rng=None):
-    """uniformly distributed unit vectors or axes; rng= a NumPy random generator
+    """uniformly distributed unit vectors or axes, on the sphere or in a sphericalRegion given
+    last; rng= a NumPy random generator
 
       v = vector3d.rand()                     # one random unit vector
       v = vector3d.rand(m, n)                 # an m x n array of them
-      v = vector3d.rand(100, antipodal=True)  # random axes"""
+      v = vector3d.rand(100, antipodal=True)  # random axes
+      v = vector3d.rand(100, sR)              # uniform in the region sR"""
     rng = np.random.default_rng() if rng is None else rng
-    shape = shape[0] if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else shape
-    theta = np.arccos(2 * rng.random(shape) - 1)
-    rho = 2 * np.pi * rng.random(shape)
-    return cls.byPolar(theta, rho, antipodal=antipodal)
+    sR = shape[-1] if shape and hasattr(shape[-1], "checkInside") else None
+    shape = shape[:-1] if sR is not None else shape
+    shape = tuple(shape[0]) if len(shape) == 1 and isinstance(shape[0], (tuple, list)) else tuple(shape)
+    if sR is None:
+      theta = np.arccos(2 * rng.random(shape) - 1)
+      rho = 2 * np.pi * rng.random(shape)
+      return cls.byPolar(theta, rho, antipodal=antipodal)
+    # uniform on the sphere, the vectors outside the region rejected until enough are left
+    n, kept, drawn, inside = int(np.prod(shape)), [], 0, 0
+    while inside < n:
+      m = max(100, int(1.5 * (n - inside) * (drawn + 1) / (inside + 1)))
+      x = rng.standard_normal((m, 3))
+      x = x / np.linalg.norm(x, axis=1, keepdims=True)
+      x = x[sR.checkInside(x, tol=0)]
+      kept.append(x)
+      drawn, inside = drawn + m, inside + len(x)
+    xyz = np.concatenate(kept)[:n].reshape(shape + (3,))
+    return cls(xyz, isNormalized=True, antipodal=antipodal)
 
   @classmethod
   def zeros(cls, *shape):
