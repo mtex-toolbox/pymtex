@@ -84,3 +84,10 @@ def test_a_class_plot_page_shows_what_plot_draws_it_with():
   assert ref.resolve("EBSD.plot")[1].__name__ == "plotEBSD"
   # a class with a plot of its own keeps it
   assert ref.resolve("EBSD3.plot")[1] is mtex.EBSD3.plot
+
+
+def test_the_shipped_names_match_the_reference(pages):
+  # mtex/io/referencenames.json, which openDoc reads: run docs/reference.py when this fails
+  import json
+  with open(ref.namesFile, encoding="utf-8") as fh:
+    assert json.load(fh) == ref.pythonNames(pages)

@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import tokenize
 
 import numpy as np
 
@@ -22,6 +23,8 @@ root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pagesDir = os.path.join(root, "docs", "pages")
 outDir = os.path.join(root, "docs", "build", "reference")
 matlabList = os.path.join(root, "docs", "reference-matlab.txt")
+# the page of every Python name, which openDoc and the links of the site read
+namesFile = os.path.join(root, "mtex", "io", "referencenames.json")
 SOURCE = "https://github.com/mtex-toolbox/pymtex/blob/main/{}#L{}"
 sys.path.insert(0, os.path.join(root, "tools"))
 from syntaxcheck import NAMES, PREFIXES  # noqa: E402
@@ -104,7 +107,7 @@ def docOf(obj):
     src = inspect.getsourcelines(f.fget if isinstance(f, property) else f)[0]
     head = next(line for line in src if line.lstrip().startswith(("def ", "class ", "async def ")))
     body = len(head) - len(head.lstrip()) + 2
-  except (TypeError, OSError, StopIteration):
+  except (TypeError, OSError, StopIteration, SyntaxError, tokenize.TokenError):
     return inspect.getdoc(f) or ""
   first, *rest = raw.expandtabs().split("\n")
   # a docstring written into __doc__ by a factory carries no indentation of a body: its lines
@@ -407,6 +410,55 @@ def indexPage(pages):
   return "\n".join(lines)
 
 
+# the page of every name as Python spells it: a class, a function of the flat namespace, a
+# member as Class.member; a page named after MATLAB's name serves the Python name it reaches
+# whether a page name is also a Python spelling, a function or Class.member of the flat namespace
+def lookupName(name):
+  head, _, member = name.partition(".")
+  obj = getattr(mtex, head, None)
+  if not member:
+    return callable(obj) and isOurs(obj) and not inspect.isclass(obj)
+  return inspect.isclass(obj) and isOurs(obj) and inspect.getattr_static(obj, member, None) is not None
+
+
+def pythonNames(pages):
+  members = {}
+  for n in dir(mtex):
+    obj = getattr(mtex, n)
+    if inspect.isclass(obj) and isOurs(obj):
+      for m in dir(obj):
+        if not m.startswith("_"):
+          members.setdefault(id(unwrap(inspect.getattr_static(obj, m, None))), []).append(f"{n}.{m}")
+  # a page under the Python name itself first, then the pages reaching it under MATLAB's
+  found = {n: n for n in pages if pages[n][0] != "class" and (lookupName(n) or n == getattr(unwrap(pages[n][1]), "__name__", None))}
+  for n, (kind, obj, cls, _) in pages.items():
+    if kind == "class":
+      found.setdefault(obj.__name__, f"{obj.__name__}_index" if f"{obj.__name__}_index" in pages else n)
+      continue
+    f = unwrap(obj)
+    name = getattr(f, "__name__", "")
+    if kind == "function" and name and not name.startswith("_") and getattr(mtex, name, None) is f:
+      found.setdefault(name, n)
+    # a function MATLAB names apart that Python reaches by a path: plotx2north is plottingConvention.default
+    path = renamed(n)
+    if kind == "function" and path and "." in path and lookup(path) is not None:
+      found.setdefault(path, n)
+    if cls is not None and kind != "constructor":
+      for full in members.get(id(f), []):
+        if full.split(".")[0] == cls.__name__:
+          found.setdefault(full, n)
+  return dict(sorted(found.items()))
+
+
+def writeNames(pages):
+  names = pythonNames(pages)
+  text = json.dumps(names, indent=0, sort_keys=True) + "\n"
+  if not os.path.exists(namesFile) or open(namesFile, encoding="utf-8").read() != text:
+    with open(namesFile, "w", encoding="utf-8") as fh:
+      fh.write(text)
+  return names
+
+
 def build(names=()):
   pages = catalogue()
   calls, owners = pageCalls(pageSources()), memberOwners()
@@ -421,6 +473,8 @@ def build(names=()):
       fh.write(indexPage(pages))
   index = {n: {"kind": e[0], "matlab": e[3]} for n, e in pages.items()}
   index[INDEX] = {"kind": "index", "matlab": INDEX}
+  if not names:
+    writeNames(pages)
   with open(os.path.join(outDir, "index.json"), "w", encoding="utf-8") as fh:
     json.dump(index, fh, indent=0, sort_keys=True)
   paired = sum(e[3] is not None for e in pages.values())

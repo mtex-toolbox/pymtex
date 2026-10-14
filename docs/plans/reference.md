@@ -83,7 +83,15 @@ function takes named in a sentence, as `fibre.angle` now has; the other optional
 note why not. `tools/staticapi.py --check` reports public names with an empty docstring, so
 the 167 do not grow back.
 
-**R4 - in the editor and the package.** `help()` and hover already read the docstrings; the
+**R4 - in the editor and the package.** Built 2026-10-14: `docs/reference.py` writes
+`mtex/io/referencenames.json`, the page of every Python name (a class, a function of the flat
+namespace, `Class.member`; 2442 names), shipped with the package and kept current by a test;
+`openDoc('fibre.angle')`, `openDoc(calcGrains)`, `openDoc(ori.mean)` open the reference page in
+the browser, a documentation page's name keeps opening the page as a script. On the site
+`docs/site.py` writes the table as `python_refs.json`, and `js/mx-reflinks.js` (loaded on the
+pages with `lang: python`) links the names of the highlighted code after the page is drawn: a
+function or class of mtex, `Class.member`; not a method called on a variable, whose class the
+code does not say, a keyword argument or an assigned name. The plan as first written: `help()` and hover already read the docstrings; the
 pages add a "Reference" link per function in the doc build (`docs/make.py` links the names in
 a page's code to their reference pages), and `openDoc('fibre.angle')` opens the page in the
 browser.

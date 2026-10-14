@@ -82,3 +82,13 @@ def test_a_page_as_a_notebook(tmp_path):
   for c in cells:
     if c["cell_type"] == "code":
       ast.parse("".join(c["source"]))
+
+
+def test_a_function_opens_its_reference_page():
+  # by name or itself, a method through its class and the class defining it
+  from mtex import calcGrains, crystalFrame, orientation
+  site = "https://mtex-toolbox.github.io/"
+  assert openDoc("fibre.angle", edit=False) == site + "fibre.angle_py.html"
+  assert openDoc(calcGrains, edit=False) == site + "EBSD.calcGrains_py.html"
+  assert openDoc(orientation.rand(2, crystalFrame("m-3m")).mean, edit=False) == site + "orientation.mean_py.html"
+  assert openDoc(orientation, edit=False) == site + "orientation_index_py.html"

@@ -214,7 +214,12 @@ def exportReference(site, reference):
   for f in os.listdir(out):
     if f.endswith(".md") and f[:-3] not in reference:
       os.remove(os.path.join(out, f))
-  print(f"{len(reference)} reference pages")
+  # the page of every Python name, for the links in the code of the pages (js/mx-reflinks.js)
+  with open(os.path.join(root, "mtex", "io", "referencenames.json"), encoding="utf-8") as fh:
+    names = {k: v for k, v in json.load(fh).items() if v in reference}
+  with open(os.path.join(site, "python_refs.json"), "w", encoding="utf-8") as fh:
+    json.dump(names, fh, separators=(",", ":"), sort_keys=True)
+  print(f"{len(reference)} reference pages, {len(names)} names linked")
 
 
 def export(site, names):

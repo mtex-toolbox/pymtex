@@ -1,6 +1,9 @@
 # the documentation pages as scripts to run section by section: openDoc('EBSDTutorial') writes
 # the page as a cell script, a "# %%" line before every section, into the current folder and
-# opens it in VS Code, or with notebook=True as a Jupyter notebook. The pages are the sources of the documentation, shipped in the wheel as
+# opens it in VS Code, or with notebook=True as a Jupyter notebook. A function, class or method,
+# by name or itself, opens its page of the function reference in the browser: openDoc('fibre.angle'),
+# openDoc(calcGrains); referencenames.json, written by docs/reference.py, names the page of every
+# Python name. The pages are the sources of the documentation, shipped in the wheel as
 # mtex/docpages and read from docs/pages in a checkout; a page is in the jupytext light format,
 # a paragraph of comment lines prose, a paragraph of code one cell, "# +" and "# -" around a
 # cell of several paragraphs.
@@ -124,15 +127,57 @@ def docPages():
   return pages
 
 
+def referencePage(x):
+  """the page of the function reference of a name or an object, or None"""
+  path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "referencenames.json")
+  with open(path, encoding="utf-8") as fh:
+    names = json.load(fh)
+  if isinstance(x, str):
+    candidates = [x]
+  else:
+    f = getattr(x, "__func__", x)
+    owner = type(x.__self__) if hasattr(x, "__self__") and not isinstance(x.__self__, type) else getattr(x, "__self__", None)
+    name = getattr(f, "__name__", "")
+    qual = getattr(f, "__qualname__", "")
+    candidates = [name] if isinstance(x, type) else []
+    if owner is not None and isinstance(owner, type):
+      candidates += [f"{c.__name__}.{name}" for c in owner.__mro__]
+    candidates += [qual, name]
+  # a member is documented on the class defining it when its subclass has no page of its own
+  for c in candidates:
+    head, _, member = c.partition(".")
+    if c in names:
+      return names[c]
+    if member:
+      import mtex
+      cls = getattr(mtex, head, None)
+      for base in getattr(cls, "__mro__", ())[1:]:
+        if f"{base.__name__}.{member}" in names:
+          return names[f"{base.__name__}.{member}"]
+  return None
+
+
 def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=True, notebook=False):
-  """a documentation page as a script to run section by section
+  """a documentation page as a script to run section by section, or the reference page of a
+  function in the browser
 
   openDoc() lists the pages, openDoc('EBSDAnalysis') the pages of a chapter. openDoc('EBSDTutorial')
   writes the page as EBSDTutorial.py, a "# %%" line before every section, into the current folder
   (or folder=) and opens it in VS Code, unless edit=False; an existing file is kept unless
   overwrite=True. With notebook=True the page is written as the Jupyter notebook EBSDTutorial.ipynb
-  instead. Returns the path of the file.
-  """
+  instead. Returns the path of the file. A function, class or method, by its name or itself,
+  opens its page of the function reference on the MTEX website, unless edit=False, and returns
+  the address.
+
+    openDoc('EBSDTutorial')
+    openDoc('fibre.angle')
+    openDoc(calcGrains)
+    openDoc(ori.mean)"""
+  if name is not None and not isinstance(name, str):
+    page = referencePage(name)
+    if page is None:
+      raise ValueError(f"no reference page for {name!r}")
+    return _browse(page, edit)
   pages = docPages()
   if name is None:
     return pages
@@ -140,6 +185,8 @@ def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=T
   if name.lower() in chapters:
     return docIndex(e for e in pages if e[0] == chapters[name.lower()])
   byName = {p.lower(): (c, p) for c, p, _ in pages}
+  if name.lower().removesuffix(".py") not in byName and referencePage(name):
+    return _browse(referencePage(name), edit)
   if name.lower().removesuffix(".py") not in byName:
     close = difflib.get_close_matches(name, [p for _, p, _ in pages], n=3, cutoff=0.6)
     hint = f"; did you mean {', '.join(close)}?" if close else "; openDoc() lists them"
@@ -159,6 +206,15 @@ def openDoc(name: DocPageName | Any = None, folder=None, overwrite=False, edit=T
     else:
       print(f"wrote {path}; open it from the file list of your editor")
   return path
+
+
+# the address of a reference page, opened in the browser unless edit=False
+def _browse(page, edit):
+  url = f"{SITE}{page}_py.html"
+  if edit:
+    import webbrowser
+    webbrowser.open(url)
+  return url
 
 
 __all__ = ["openDoc"]
