@@ -61,7 +61,7 @@ def test_a_matlab_page_is_what_its_name_reaches_in_python():
 
 def test_the_syntax_shows_the_keywords_and_angles_in_degrees(rendered):
   assert "return_nearest=False" in rendered["fibre.angle"]
-  assert "angle=15*degree" in rendered["EBSD.calcGrains"]
+  assert "| `angle` | `15*degree` |" in rendered["EBSD.calcGrains"]
   # a class method without cls, the calling forms of a docstring kept as code
   assert "rotation.byAxisAngle(v, omega)\n```" in rendered["rotation.byAxisAngle"]
   assert "```python\nrot = rotation.byAxisAngle(v, omega)" in rendered["rotation.byAxisAngle"]
@@ -91,3 +91,29 @@ def test_the_shipped_names_match_the_reference(pages):
   import json
   with open(ref.namesFile, encoding="utf-8") as fh:
     assert json.load(fh) == ref.pythonNames(pages)
+
+
+def test_a_keywords_section_lists_exactly_the_keywords_of_the_signature(pages):
+  # every parameter with a default is named, and nothing the function does not take
+  import inspect
+  wrong = {}
+  for n, e in pages.items():
+    main, sections = ref.parseDoc(ref.docOf(e[1]))
+    if "Keywords" not in sections:
+      continue
+    f = ref.unwrap(e[1])
+    params = inspect.signature(f).parameters
+    given = {ref.entry(x)[0] for x in sections["Keywords"]}
+    inputs = {ref.entry(x)[0] for x in sections.get("Input", [])}
+    keywords = {k for k, p in params.items() if p.default is not inspect.Parameter.empty and k not in inputs}
+    if given != keywords:
+      wrong[n] = (sorted(given - set(params)), sorted(keywords - given))
+  assert not wrong, wrong
+
+
+def test_the_calling_forms_keep_their_explanations_out_of_the_code(rendered):
+  import re
+  page = rendered["EBSD.calcGrains"]
+  syntax = page.split("## Syntax", 1)[1].split("\n## ", 1)[0]
+  boxes = re.findall(r"```python\n(.*?)```", syntax, re.S)
+  assert len(boxes) > 3 and not any("#" in b for b in boxes) and "High and low angle boundaries:" in syntax

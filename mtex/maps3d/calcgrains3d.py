@@ -28,17 +28,71 @@ from .grain3d import grain3d
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
                mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
-  """the grains of a map, the pixels joined across every boundary the criterion keeps: a
-  misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
-  culls smaller grains. A map of the plane also takes alpha, the bound of its decomposition,
-  removeQuadruplePoints, mcl and fmc for Markov and fast multiscale clustering; a map of
-  volumes grainId, the grains its file stored, a map of the plane too. The map is changed: it keeps the
-  grain ids, the pixels the minPixel cull drops and the notIndexed pixels the grains absorb, so
-  MATLAB's second output is the map passed; run on ebsd.copy() to keep the map as it was
+  """the grains of a map, the pixels joined across every boundary the criterion keeps; MATLAB's
+  grain reconstruction from 2d and 3d EBSD data
 
-    grains = calcGrains(ebsd)
-    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
-    grains = calcGrains(ebsd['indexed'], criterion=gbc)"""
+    grains = calcGrains(ebsd)                                  # grain boundaries above 15 degree
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5, alpha=3.7)  # another angle, no grains below 5 pixels
+    grains = calcGrains(ebsd, angle=[10*degree, 2*degree])     # high and low angle boundaries
+    grains = calcGrains(ebsd, criterion=gbcAngle(10*degree, byPhase={'Enstatite': 5*degree}))  # a threshold per phase
+    grains = calcGrains(ebsd, criterion=gbcSoft(10*degree, 2*degree), mcl=(1.4, 4))  # a soft threshold and Markov clustering
+    grains = calcGrains(ebsd, fmc=1.5, minPixel=10)            # fast multiscale clustering
+    grains = calcGrains(ebsd, grainId=True)                    # the grains stored with the map
+
+  Two neighbouring pixels belong to one grain when the misorientation between them stays
+  below the threshold angle, and a grain is a connected set of such pixels. With a pair
+  [high, low] the boundaries above high separate the grains, and those between low and high
+  are kept as low angle boundaries inside them, grains.innerBoundary: the subgrain boundaries.
+  A threshold per phase, a soft threshold or any other rule is a grainBoundaryCriterion.
+
+  The map is divided into cells around its pixels, a Voronoi decomposition bounded by alpha:
+  a not indexed region narrower than 2 alpha pixel spacings is filled by the grains around
+  it, a wider one becomes a notIndexed grain.
+
+  The map is changed: it keeps the grain ids, the pixels the minPixel cull drops and the
+  notIndexed pixels the grains absorb, so MATLAB's second output is the map passed; run on
+  ebsd.copy() to keep the map as it was.
+
+  Input
+    ebsd - EBSD, a map of the plane, or EBSD3, a map of volumes
+  Output
+    grains - grain2d, or grain3d for a map of volumes; ebsd.grainId numbers the grain of
+        every pixel
+  Keywords
+    angle - the misorientation angle above which neighbouring pixels belong to different
+        grains; a pair [high, low] also keeps the low angle boundaries between
+        low and high as grains.innerBoundary
+    threshold - the same as angle, which it replaces when given
+    criterion - a grainBoundaryCriterion instead of the angle: gbcAngle with thresholds per
+        phase, gbcSoft for a soft threshold, gbcEqual for a property that must agree,
+        gbcCustom for a rule of your own, gbcFMC with every parameter of fast multiscale
+        clustering
+    minPixel - the smallest number of pixels of a grain; the pixels of an indexed grain
+        that would be smaller are marked notIndexed and the grains reconstructed again
+    alpha - the bound of the decomposition in pixel spacings: a not indexed region
+        narrower than 2 alpha is filled (map of the plane)
+    removeQuadruplePoints - split every point where four pixels of a square grid meet into
+        two triple points, joining the diagonal pair the criterion connects more (map of
+        the plane)
+    mcl - (p, maxIter), Markov clustering of the links between the pixels before the grains
+        are formed, the inflation power p (1.4 in MATLAB) and the number of iterations (4);
+        with a soft criterion it merges grains a hard threshold would split (map of the plane)
+    fmc - fast multiscale clustering with the sharpness cmaha, larger giving more grains;
+        gbcFMC as the criterion takes its other parameters (map of the plane)
+    verbose - report the cluster hierarchy of fast multiscale clustering
+    backend - 'numba' or 'numpy', the loops of the decomposition and the segmentation; by
+        default the preference 'kernels' (map of the plane)
+    grainId - join the pixels of one grain id stored with the map, ebsd.prop['grainId'] or
+        the voxels' ebsd.grainId, instead of a criterion on the orientations
+  References
+    F. Bachmann, R. Hielscher, H. Schaeben, Grain detection from 2d and 3d EBSD data -
+        Specification of the MTEX algorithm, Ultramicroscopy 111 (2011) 1720-1733
+    C. McMahon, B. Soe, A. Loeb, A. Vemulkar, M. Ferry, L. Bassman, Boundary identification
+        in EBSD data with a generalization of fast multiscale clustering, Ultramicroscopy
+        133 (2013) 16-25
+  See also
+    GrainReconstruction, GrainReconstructionAdvanced, GrainReconstructionMCL, gbcAngle,
+    grain2d.merge, smoothBoundary"""
   # calcGrains(ebsd, 'grainId'): MATLAB's flag
   if isinstance(angle, str) and angle == "grainId":
     angle, grainId = DEFAULT_ANGLE, True

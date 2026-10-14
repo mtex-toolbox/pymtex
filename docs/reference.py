@@ -260,6 +260,60 @@ def signature(name, obj):
 
 
 # a docstring as Markdown: prose as paragraphs, lines indented under the prose as Python code
+# the sections of a docstring, MATLAB's help blocks: a header line of its own, its entries
+# indented two spaces, 'name - text' for Input, Output and Keywords, a continuation indented
+# further
+SECTIONS = ("Input", "Output", "Keywords", "References", "See also")
+
+
+def parseDoc(doc):
+  lines = doc.split("\n")
+  heads = [k for k, line in enumerate(lines) if line.strip() in SECTIONS and not line.startswith(" ")]
+  main = "\n".join(lines[:heads[0]] if heads else lines).rstrip()
+  sections = {}
+  for k, h in enumerate(heads):
+    body = lines[h + 1:heads[k + 1] if k + 1 < len(heads) else len(lines)]
+    entries = []
+    for line in body:
+      if not line.strip():
+        continue
+      if line.startswith("  ") and not line.startswith("   ") or not entries:
+        entries.append(line.strip())
+      else:
+        entries[-1] += " " + line.strip()
+    sections[lines[h].strip()] = entries
+  return main, sections
+
+
+# a 'name - text' entry
+def entry(e):
+  name, _, text = e.partition(" - ")
+  return name.strip(), text.strip()
+
+
+# calling forms as MATLAB's page shows them, the explanation of a form as text above its own
+# code box: a form's trailing '# comment' becomes the text, forms without one share a box
+def renderForms(code, link):
+  out, plain = [], []
+
+  def flush():
+    if plain:
+      out.extend(["```python", *plain, "```", ""])
+      plain.clear()
+
+  for line in code:
+    m = re.match(r"^(.*?\S)\s{2,}#\s*(.*)$", line)
+    if m is None:
+      plain.append(line)
+      continue
+    flush()
+    text = m.group(2).strip()
+    out.extend([re.sub(r"`([A-Za-z_][\w.]*)`", link, text[0].upper() + text[1:] + ("" if text.endswith((".", ":")) else ":")), "",
+                "```python", m.group(1), "```", ""])
+  flush()
+  return out
+
+
 def docBody(doc, link):
   out, code = [], []
   for line in doc.split("\n"):
@@ -267,12 +321,56 @@ def docBody(doc, link):
       code.append(line[2:])
       continue
     if code:
-      out += ["", "```python", *[c for c in "\n".join(code).strip("\n").split("\n")], "```", ""]
+      out += [""] + renderForms("\n".join(code).strip("\n").split("\n"), link)
       code = []
     out.append(re.sub(r"`([A-Za-z_][\w.]*)`", link, line))
   if code:
-    out += ["", "```python", *"\n".join(code).strip("\n").split("\n"), "```"]
+    out += [""] + renderForms("\n".join(code).strip("\n").split("\n"), link)
   return "\n".join(out).strip("\n")
+
+
+# the sections as tables and lists: Input and Output name and meaning, Keywords with the
+# default the signature gives, References a list, See also links
+def renderSections(sections, target, link, seeAlso):
+  out = []
+  try:
+    params = inspect.signature(target).parameters if target is not None else {}
+  except (TypeError, ValueError):
+    params = {}
+  for head in ("Input", "Output"):
+    if head in sections:
+      out += [f"## {head}", "", "| | |", "|---|---|"]
+      out += [f"| `{n}` | {cell(t, link)} |" for n, t in map(entry, sections[head])] + [""]
+  if "Keywords" in sections:
+    out += ["## Keywords", "", "| | default | |", "|---|---|---|"]
+    for n, t in map(entry, sections["Keywords"]):
+      p = params.get(n)
+      d = "" if p is None or p.default is inspect.Parameter.empty else f"`{shownDefault(p.default)!r}`"
+      out.append(f"| `{n}` | {d} | {cell(t, link)} |")
+    out.append("")
+  if "References" in sections:
+    out += ["## References", ""] + [f"- {e}" for e in sections["References"]] + [""]
+  if "See also" in sections:
+    names = [x.strip() for x in " ".join(sections["See also"]).split(",") if x.strip()]
+    out += ["## See also", "", ", ".join(seeAlso(x) for x in names), ""]
+  return out
+
+
+# the calling forms, the first block of indented lines after the summary, and the prose
+# around them
+def splitForms(rest):
+  lines = rest.strip("\n").split("\n") if rest.strip() else []
+  if not lines or not lines[0].startswith("  "):
+    return [], rest
+  k = 0
+  while k < len(lines) and (lines[k].startswith("  ") or not lines[k].strip() and k + 1 < len(lines) and lines[k + 1].startswith("  ")):
+    k += 1
+  return [l[2:] for l in lines[:k] if l.strip()], "\n".join(lines[k:])
+
+
+# text for a table cell: one line, the bars escaped, the names in backticks linked
+def cell(text, link):
+  return re.sub(r"`([A-Za-z_][\w.]*)`", link, text.replace("|", "\\|"))
 
 
 # the doc pages calling a name: a function where it is called, a method only where no other
@@ -323,8 +421,8 @@ def source(obj):
   return SOURCE.format(os.path.relpath(f, root), line)
 
 
-def render(name, entry, pages, calls, owners):
-  kind, obj, cls, matlab = entry
+def render(name, entry_, pages, calls, owners, names=None, docPages=()):
+  kind, obj, cls, matlab = entry_
   member = name.split(".", 1)[1] if "." in name and kind in ("method", "property") else None
 
   def link(m):
@@ -349,18 +447,37 @@ def render(name, entry, pages, calls, owners):
   operator = OPERATOR_FORMS.get(getattr(unwrap(obj), "__name__", ""))
   if operator and not doc:
     doc = f"{operator[1]}, the operator {operator[0]}"
-  summary, _, rest = doc.partition("\n\n")
+  main, sections = parseDoc(doc)
+  summary, _, rest = main.partition("\n\n")
   if summary:
     lines += [docBody(summary, link), ""]
+  target = None
+  # the calling forms are the syntax; without forms the signature is, and it closes the page
+  # when no Keywords table gives the defaults
+  forms, prose = splitForms(rest)
+  sig = None
   if kind in ("function", "method", "constructor"):
     shown = called if kind == "function" else f"{cls.__name__}.{member}" if member else cls.__name__
     # a class or static method as it is called, without cls
     target = obj if kind == "constructor" else obj.__get__(None, cls) if isinstance(obj, (classmethod, staticmethod)) else unwrap(obj)
     sig = operator[0] if operator else signature(shown, target)
-    if sig:
-      lines += ["## Syntax", "", "```python", sig, "```", ""]
-  if rest.strip():
-    lines += [docBody(rest, link), ""]
+  if forms:
+    lines += ["## Syntax", ""] + renderForms(forms, link)
+  elif sig:
+    lines += ["## Syntax", "", "```python", sig, "```", ""]
+    sig = None
+  if prose.strip():
+    lines += [docBody(prose, link), ""]
+
+  def seeAlso(x):
+    page = (names or {}).get(x) or (x if x in pages else None) or (f"{x}_index" if f"{x}_index" in pages else None)
+    if page is None and x in docPages:
+      page = x
+    return f"[{x}]({page}_py.html)" if page else x
+
+  lines += renderSections(sections, target, link, seeAlso)
+  if sig and "Keywords" not in sections:
+    lines += ["## Signature", "", "```python", sig, "```", ""]
   if kind == "class":
     lines += members(obj, pages)
   # a call of plot does not say what it draws
@@ -483,9 +600,10 @@ def build(names=()):
   calls, owners = pageCalls(pageSources()), memberOwners()
   os.makedirs(outDir, exist_ok=True)
   chosen = [n for n in pages if not names or n in names]
+  pyNames, docPages = pythonNames(pages), set(pageSources())
   for n in chosen:
     with open(os.path.join(outDir, n + ".md"), "w", encoding="utf-8") as fh:
-      fh.write(render(n, pages[n], pages, calls, owners))
+      fh.write(render(n, pages[n], pages, calls, owners, pyNames, docPages))
   if not names or INDEX in names:
     chosen.append(INDEX)
     with open(os.path.join(outDir, INDEX + ".md"), "w", encoding="utf-8") as fh:
