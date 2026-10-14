@@ -205,7 +205,7 @@ def _cubicModes(halfwidth):
 def test_calcComponents_seededGivesOneCentreIdPerSeed():
   t = _cubicModes(6 * degree)
   seed = orientation(rotation.rand(20, rng=rng), t.cs, t.c1.SS)
-  modes, weights, centerId = calcComponents(t.odf, seed=seed, radius=5 * degree, exact=True)
+  modes, weights, centerId = calcComponents(t.odf, seed=seed, weights=np.ones(seed.size), radius=5 * degree, exact=True)
   assert len(weights) == modes.size and np.all((0 <= centerId) & (centerId < modes.size)) and len(centerId) == seed.size
 
 
@@ -235,6 +235,14 @@ def test_calcComponents_ofARadialBasisFunctionAreItsOwnCentres():
   rb = unimodalODF(orientation(rotation.cat(rotation(t.c1), rotation(t.c2)), t.cs), halfwidth=7 * degree, weights=[0.6, 0.4])
   om, ow, _ = rb.calcComponents()
   assert om.size == 2 and np.max(np.abs(np.sort(ow)[::-1] - [0.6, 0.4])) < 0.02
+
+
+def test_calcComponents_weighsTheSeedsByTheFunctionByDefault():
+  t = _cubicModes(8 * degree)
+  seed = discreteSample(t.odf, 200, rng=rng)
+  _, w, cId = calcComponents(t.odf, seed=seed, verbose=False)
+  _, we, cIde = calcComponents(t.odf, seed=seed, weights=np.real(t.odf(seed)), verbose=False)
+  assert np.allclose(w, we) and np.array_equal(cId, cIde)
 
 
 def test_components_freeze_light_seeds_on_flat_stretches():

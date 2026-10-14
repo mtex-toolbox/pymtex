@@ -503,6 +503,7 @@ class S1FunHarmonic(harmonicArithmetic):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from ..plotting.polarplot import plotS1 as plot
+    from ..plotting.kernelplot import plotSpectrum
 
 
 # the largest (sign 1) or the smallest (sign -1) local extrema of a function on the circle and

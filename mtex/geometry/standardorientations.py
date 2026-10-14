@@ -162,8 +162,8 @@ def variants(p2c, second=None, ids=None, parent=False):
   child group modulo the parent group.
 
   They are numbered as MTEX numbers them, for Kurdjumov-Sachs as Morito does; this order is
-  what a variant id means. The ids count from 1 up to the number of variants; an id of 0 or
-  below counts from the end, as NumPy indexes.
+  what a variant id means. The ids count from 1 up to the number of variants; an id outside
+  is refused.
 
   The second argument decides what is returned:
 
@@ -210,6 +210,8 @@ def variants(p2c, second=None, ids=None, parent=False):
     # a variant id counts from the representative of the parent in the fundamental region
     V, frames = qconj(variants(p2c).data), (p2c.frameB, second.frameB)
     par = projectIntoFundamentalRegionOrientation(second).data
+  if sel is not None and np.any((sel < 0) | (sel >= len(V))):
+    raise ValueError(f"the variant ids count from 1 to {len(V)}, got {np.asarray(ids)[(sel < 0) | (sel >= len(V))].reshape(-1)[0]}")
   q = qmul(par[..., None, :], V) if sel is None else qmul(par, V[sel])
   return orientation(rotation._fromData(q), *frames)
 

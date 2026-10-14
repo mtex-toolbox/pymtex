@@ -205,8 +205,8 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   On SO(3) the fit is posed among the functions with the symmetries of the nodes. Nodes closer
   than 0.02 are merged into one carrying the mean of their values.
 
-  Values with further axes after the node axis give one function per component; withParameters
-  is then ignored, as it is on the sphere. A vector field on SO(3) is fitted componentwise,
+  Values with further axes after the node axis give one function per component, and the LSQR
+  parameters then arrays of one per component. A vector field on SO(3) is fitted componentwise,
   three SO3FunHarmonic, as MATLAB's SO3VectorFieldHarmonic.interpolate; MATLAB passes the
   tangent vectors as values, here they carry their orientations.
 
@@ -224,11 +224,14 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
         equal; 'equal', or one number per node
     maxIter - the largest number of LSQR iterations
     tol - the tolerance of LSQR, 1e-3 on SO(3) and 1e-6 on the sphere by default
-    withParameters - return also LSQR's flag, residual and number of iterations
+    withParameters - return also LSQR's flag, 1 when the iterations ran out, the relative
+        residual and the number of iterations, for a function on SO(3) or the sphere
   See also
     SO3FunHarmonic.interpolate, S2FunHarmonic.interpolate, SO3FunRBF.interpolate,
     calcDensity, SO3FunVectorValued, HarmonicApproximationTheory"""
   from ..geometry.tangent import SO3TangentVector
+  if nodes.size == 0:
+    raise ValueError("there are no nodes to interpolate")
   if isinstance(nodes, SO3TangentVector):
     from .so3vectorfield import interpolateField
     return interpolateField(nodes, bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
@@ -243,11 +246,12 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
     # values with component axes after the node axis: one fit per component, a list of functions
     vals = np.asarray(values)
     cols = vals.reshape(nodes.size, -1)
-    fits = [interpolate(nodes, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
-            for k in range(cols.shape[1])]
-    L = max(f.bandwidth for f in fits)
-    fhat = np.stack([f.truncate(L)._fhat for f in fits]).reshape(vals.shape[1:] + (fits[0].truncate(L)._fhat.shape[-1],))
-    return fits[0]._rebuild(fhat, _isReal=all(f.isReal for f in fits))
+    fits = [interpolate(nodes, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol,
+                        withParameters=True) for k in range(cols.shape[1])]
+    L = max(f.bandwidth for f, _ in fits)
+    fhat = np.stack([f.truncate(L)._fhat for f, _ in fits]).reshape(vals.shape[1:] + (fits[0][0].truncate(L)._fhat.shape[-1],))
+    f = fits[0][0]._rebuild(fhat, _isReal=all(f.isReal for f, _ in fits))
+    return (f, _parameters(fits, vals.shape[1:])) if withParameters else f
   if isinstance(nodes, quaternion):
     o = nodes if isinstance(nodes, orientation) else orientation(nodes)
     # nodes closer than 0.02 are one node carrying the mean of their values, as MATLAB's
@@ -301,10 +305,11 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   if values.size != v.size:
     rest = values.shape[1:]
     cols = values.reshape(v.size, -1)
-    fits = [interpolate(v, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol)
-            for k in range(cols.shape[1])]
-    fhat = np.stack([f._fhat for f in fits]).reshape(rest + fits[0]._fhat.shape)
-    return S2FunHarmonic(fhat, v.frame, real=all(f.isReal for f in fits), antipodal=v.antipodal, _internal=True)
+    fits = [interpolate(v, cols[:, k], bandwidth=bandwidth, lambda_=lambda_, s=s, weights=weights, maxIter=maxIter, tol=tol,
+                        withParameters=True) for k in range(cols.shape[1])]
+    fhat = np.stack([f._fhat for f, _ in fits]).reshape(rest + fits[0][0]._fhat.shape)
+    f = S2FunHarmonic(fhat, v.frame, real=all(f.isReal for f, _ in fits), antipodal=v.antipodal, _internal=True)
+    return (f, _parameters(fits, rest)) if withParameters else f
   lam = 0.0 if lambda_ is None else lambda_
   L = math.ceil(math.sqrt(v.size / 2)) if bandwidth is None else int(bandwidth)
   # the nodes weighted by the areas of their Voronoi cells, so that dense regions do not
@@ -325,8 +330,14 @@ def interpolate(nodes, values=None, *, bandwidth=None, lambda_=None, s=2, weight
   def At(z):
     return p.adjoint(sw * z[:v.size], np.ones(v.size)) + reg * z[v.size:]
   b = np.concatenate([sw * y, np.zeros(len(reg))]).astype(complex)
-  fhat = _lsqr(A, At, b, (L + 1) ** 2, maxIter, tol)
-  return S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
+  fhat, flag, relres, itn = _lsqrFull(A, At, b, (L + 1) ** 2, maxIter, tol)
+  f = S2FunHarmonic(fhat, v.frame, real=real, antipodal=v.antipodal, _internal=True)
+  return (f, (flag, relres, itn)) if withParameters else f
+
+
+# the LSQR parameters of the fits of the components, an array of each over the component axes
+def _parameters(fits, shape):
+  return tuple(np.array([p[i] for _, p in fits]).reshape(shape) for i in range(3))
 
 
 def interpS2(v, y, *args, symmetry=True, **kwargs):

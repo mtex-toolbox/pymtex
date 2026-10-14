@@ -42,7 +42,7 @@ def sliceGrains(grains, plane, P0=None):
   keep = np.bincount(face[cross], minlength=len(gB)) == 2
   cross &= keep[face]
   if not cross.any():
-    raise ValueError("the plane does not cut the grains")
+    return _noGrains(grains, N, d)
   e = np.sort(np.stack([u[cross], v[cross]], axis=1), axis=1)
   E, eId = np.unique(e, axis=0, return_inverse=True)
   t = dist[E[:, 0]] / (dist[E[:, 0]] - dist[E[:, 1]])
@@ -85,6 +85,19 @@ def sliceGrains(grains, plane, P0=None):
   return grain2d(np.arange(1, len(oldId) + 1), grains.phaseId[pos], grains.CSList, np.ones(len(oldId)),
                  grains.meanRotation.data.reshape(-1, 4)[pos], grains.GOS[pos], grains.frame, {"Id3d": oldId}, boundary=b2,
                  innerBoundary=inner, phaseMap=grains.phaseMap)
+
+
+# the empty section of a plane that cuts no grain, a grain2d in that plane, as MATLAB's
+def _noGrains(grains, N, d):
+  e1 = _inPlane(N)
+  e1 = e1 - (e1 @ N) * N
+  p0 = d * N
+  pl = mapPlane(np.stack([p0, p0 + e1, p0 + np.cross(N, e1)]), e1=e1)
+  z = np.zeros((0, 2), dtype=np.int64)
+  gB = grains.boundary
+  b2 = [grainBoundary(np.zeros((0, 2)), z, z, z, z, np.zeros((0, 4)), grains.CSList, pl, grains.frame, scanUnit=gB.scanUnit) for _ in range(2)]
+  return grain2d(np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int8), grains.CSList, np.ones(0), np.zeros((0, 4)), np.zeros(0),
+                 grains.frame, {"Id3d": np.zeros(0, dtype=np.int64)}, boundary=b2[0], innerBoundary=b2[1], phaseMap=grains.phaseMap)
 
 
 # the first direction of the plane's coordinates: the one of x, y, z furthest from the normal

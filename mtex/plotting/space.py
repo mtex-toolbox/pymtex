@@ -278,7 +278,7 @@ def shapeOutlines(cS, plane, layout=None):
 
   Input
     cS - crystalShape, one shape or a list of shapes
-    plane - mapPlane, the plane the shapes are seen in
+    plane - mapPlane or plane3d, the plane the shapes are seen in
   Output
     polys - list of (k, 2) arrays, the polygons on the screen
     shape - int array, the shape every polygon belongs to
@@ -289,6 +289,7 @@ def shapeOutlines(cS, plane, layout=None):
   See also
     shapesOnMap, crystalShape, mapPlane"""
   M = np.eye(2) if layout is None else np.asarray(layout, dtype=float)
+  plane = _asMapPlane(plane)
   n = plane.normal * (-1 if np.linalg.det(M) < 0 else 1)
   vis = visibleFaces(cS, n).reshape(-1, cS.numFaces)
   P = plane.to2d(cS.V.data.reshape(-1, cS.numVertices, 3)) @ M.T
@@ -301,6 +302,25 @@ def shapeOutlines(cS, plane, layout=None):
     for j, poly in zip(at, P[shape[at][:, None], f[f >= 0]]):
       polys[j] = poly
   return polys, shape.astype(int), face.astype(int)
+
+
+# a plane3d as a mapPlane: the normal kept, e1 the specimen x projected into the plane, the
+# origin the foot of the specimen origin
+def _asMapPlane(plane):
+  from ..geometry.plane import plane3d
+  from ..maps.lattice import mapPlane
+  if not isinstance(plane, plane3d):
+    return plane
+  if plane.size != 1:
+    raise ValueError("the shapes are seen in one plane, not a list of them")
+  n = plane.N.data.reshape(3).astype(float)
+  e1 = np.array([1.0, 0.0, 0.0]) if abs(n[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+  e1 = e1 - (e1 @ n) * n
+  p = object.__new__(mapPlane)
+  p.e1 = e1 / np.linalg.norm(e1)
+  p.e2 = np.cross(n, p.e1)
+  p.o = float(np.asarray(plane.d).reshape(-1)[0]) * n
+  return p
 
 
 def shapesOnMap(x, cS, scale=1.0):

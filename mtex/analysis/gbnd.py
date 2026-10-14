@@ -45,7 +45,7 @@ def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   By default Psi solves the integral equation that makes the density of the normals the de
   la Vallee Poussin kernel of the halfwidth, or the S2Kernel given in its place; that
   solution may be negative. nonneg takes a Gaussian in t instead, bump the indicator of
-  |t| < sin(halfwidth).
+  |t| < arcsin(halfwidth), MATLAB's bound.
 
   Output
     Psi - S2Kernel, or S2KernelHandle with nonneg or bump, the kernel of the inclination
@@ -74,7 +74,12 @@ def calcGBNDKernel(halfwidth=10 * degree, nonneg=False, bump=False):
   Psi = S2KernelHandle(lambda t, fun=Psi.fun: c * fun(t)) if isinstance(Psi, S2KernelHandle) else S2Kernel(c * Psi.A)
   def psi(v):
     return Psi.eval(v.data[..., 2] / np.linalg.norm(v.data, axis=-1)) * np.sin(v.angle(vector3d.X, symmetry=False))
-  return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
+  if not bump:
+    return Psi, S2FunHarmonic.quadrature(psi, bandwidth=BANDWIDTH, antipodal=True)
+  # the jump of the bump aliases on a quadrature grid of the bandwidth: the expansion is taken
+  # on a finer one and cut, and the mean the remaining aliasing moves is set to one again
+  sF = S2FunHarmonic.quadrature(psi, bandwidth=4 * BANDWIDTH, antipodal=True).truncate(BANDWIDTH)
+  return Psi, sF / np.real(sF.mean())
 
 
 # the inclination kernel of the de la Vallee Poussin kernel of a halfwidth, a solve of five

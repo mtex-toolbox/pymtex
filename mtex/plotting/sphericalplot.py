@@ -1042,7 +1042,14 @@ def text(v, labels=None, *more, **kw: Unpack[PlotKeywords]):
 def _textAt(xyz, s, **kw):
   import matplotlib.pyplot as plt
   fig = gcm()
-  ax = fig.children[-1] if fig is not None and fig.children else plt.gca()
+  # the MTEX figure's last axes, unless a plain figure opened after it, or an axes added to
+  # it, is the current one
+  if fig is not None and fig.children and plt.get_fignums() and plt.gcf() is fig.fig and fig.fig.gca() in fig.children:
+    ax = fig.children[-1]
+  else:
+    ax = plt.gca()
+  if len(xyz) == 3 and not hasattr(ax, "get_zlim"):
+    raise ValueError("text(x, y, z, s) writes into a 3D axes; the current axes is a plane one")
   # the properties of the text in matplotlib's spelling
   names = {"fontWeight": "fontweight", "fontSize": "fontsize", "horizontalAlignment": "ha", "verticalAlignment": "va",
            "backgroundColor": "backgroundcolor"}

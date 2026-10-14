@@ -147,6 +147,11 @@ def _install():
   from . import grainplots as gp
   install(shape2d, pp.plotShape, "plot")
   install(S1FunHarmonic, pp.plotS1, "plot")
+  from ..functions.handles import S1FunHandle
+  from ..functions.kernelfunctions import S2Kernel, SO3Kernel
+  from .kernelplot import plotSpectrum
+  install((S1FunHarmonic, S1FunHandle, S2FunHarmonic, S2FunHandle, S2FunSum, S2FunBingham, S2FunTri, SO3FunHarmonic, SO3FunGeneric,
+           SO3FunBingham, SO3FunRBF, SO3FunCBF, S2Kernel, SO3Kernel), plotSpectrum)
   install((grain2d, vector3d), gp.histogram)
   install(plane3d, shp.plotPlane, "plot")
   for f in (shp.plotInnerFace, shp.plotInnerDirection, shp.plotSlipSystem):

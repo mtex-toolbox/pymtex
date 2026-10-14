@@ -119,8 +119,7 @@ class SO3FunGeneric(SO3Fun):
       G = SO3F.grad(side='right')           # the right sided gradient
 
     A function without a harmonic form is differentiated by central differences of 0.05
-    degree along the three axes, a field evaluated when asked. Evaluated directly, as
-    SO3F.grad(ori), it does not return at present (a recursion); evaluate the field instead.
+    degree along the three axes, a field evaluated when asked, as SO3F.grad(ori) is.
 
     Input
       SO3F - SO3Fun
@@ -167,6 +166,7 @@ class SO3FunGeneric(SO3Fun):
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    from ..plotting.kernelplot import plotSpectrum
     def sqrt(self) -> Any:
       """the square root of the function, pointwise, as a function handle
 
@@ -583,11 +583,12 @@ class S2FunHandle(_S2Direct):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume
     from .discrepancy import discrepancy
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
+    from ..plotting.kernelplot import plotSpectrum
 
 
 # a ratio of two functions on the sphere stays direct, its polarity untouched
@@ -655,11 +656,12 @@ class S2FunSum(_S2Direct):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume
     from .discrepancy import discrepancy
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
+    from ..plotting.kernelplot import plotSpectrum
 
 
 class S1FunHandle:
@@ -759,6 +761,10 @@ class S1FunHandle:
 
   def __repr__(self):
     return aligned(f"S1FunHandle\n  bandwidth hint: {self.bandwidth}")
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.kernelplot import plotSpectrum
 
 
 # the pointwise functions of any function on SO(3) are handles, evaluated when asked, as

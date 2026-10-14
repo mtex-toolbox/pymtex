@@ -122,8 +122,9 @@ def _fourierTrace(ij, A):
 # ------------------------------------------------------------------ the grains
 
 def _grainTraces(grains, clusterId=None, method="shape", minClusterSize=100):
-  if method not in ("shape", "calliper", "hist"):
+  if str(method).lower() not in ("shape", "calliper", "hist"):
     raise ValueError(f"the method of calcTraces on grains is 'shape', 'calliper' or 'hist', not {method!r}")
+  method = method.lower()
   gB = grains.boundary
   cid, sz, cSize = _clusters(clusterId, len(grains), np.asarray(grains.numPixel, dtype=float))
   omega = np.full(sz, np.nan)
@@ -210,8 +211,9 @@ def calcTraces(x, clusterId=None, *flags, **kwargs):
   - 'calliper': the direction across the shortest calliper of that shape
   - 'hist': the maximum of the length weighted density of the segment directions
 
-  The method is a positional string or method=. A cluster filling a rectangle has no
-  direction: 'Fourier' then gives NaN, 'Radon' a side of the rectangle with high reliability.
+  The method is a positional string or method=, in any case. A cluster filling a rectangle
+  has no direction: 'Fourier' then gives NaN, 'Radon' a side of the rectangle with high
+  reliability, as MATLAB's.
 
   Input
     x - EBSD on a lattice, or grain2d

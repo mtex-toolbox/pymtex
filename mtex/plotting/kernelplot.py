@@ -62,6 +62,7 @@ def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw: Unpack[PlotKeywords
     plotSpectrum(psi, bandwidth=16, logarithmic=True)     # the absolute values, on log-log axes
     plotSpectrum(odf)                                     # the harmonic power of an SO3Fun
     plotSpectrum([odf1, odf2], bandwidth=20)              # one line per function
+    odf.plotSpectrum()                                    # the same, as a method
 
   What is drawn depends on the input:
 
@@ -71,15 +72,14 @@ def plotSpectrum(x, bandwidth=None, logarithmic=False, **kw: Unpack[PlotKeywords
   - a function on S2 or SO(3): the power of every degree, the norm of its coefficients, as
   open circles on a dotted line, up to the bandwidth of the function. A function of another
   kind is first expanded into harmonics; logarithmic changes nothing.
+  - a function on the circle: the norm of the coefficients of k and -k over |k|, drawn the
+  same way.
   - a list: one line per entry, in one axes.
-
-  A function on the circle, S1FunHarmonic, is not supported: it is expanded as if it were a
-  function on SO(3), where MATLAB draws the absolute values of its coefficients per |k|.
 
   The other keywords are those of a line plot; fontSize sets the size of the labels and ticks.
 
   Input
-    x - an S2Kernel or SO3Kernel, an S2Fun or SO3Fun, or a list of them
+    x - an S2Kernel or SO3Kernel, an S1Fun, S2Fun or SO3Fun, or a list of them
   Output
     h - the matplotlib lines drawn, a list of them for a list
   Keywords
@@ -125,16 +125,23 @@ def _spektra(ax, x, bandwidth, logarithmic, kw):
     ax.set_xlabel("harmonic degree")
     ax.set_ylabel("Chebyshev coefficient")
     return h
+  from ..functions.s1fun import S1FunHarmonic
   from ..functions.s2fun import S2FunHarmonic
   from ..functions.so3fun import SO3FunHarmonic
-  # a function on the sphere: the norm of the coefficients of each degree
-  if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)):
-    f = x
+  if isinstance(x, S1FunHarmonic) or hasattr(x, "_harmonicS1"):
+    # a function on the circle: the norm of the coefficients k and -k
+    f = x if isinstance(x, S1FunHarmonic) else S1FunHarmonic(x)
+    c = np.abs(f.fhat) ** 2
+    P = np.sqrt(np.bincount(np.abs(np.arange(-f.bandwidth, f.bandwidth + 1)), weights=c))[None, :]
   else:
-    f = S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
+    # a function on the sphere or on SO(3): the norm of the coefficients of each degree
+    if isinstance(x, (SO3FunHarmonic, S2FunHarmonic)):
+      f = x
+    else:
+      f = S2FunHarmonic(x) if hasattr(x, "_harmonicS2") else SO3FunHarmonic(x)
+    # a list of functions draws one line for each
+    P = np.asarray(f.power).reshape(-1, f.bandwidth + 1)
   L = f.bandwidth if bandwidth is None else int(bandwidth)
-  # a list of functions draws one line for each
-  P = np.asarray(f.power).reshape(-1, f.bandwidth + 1)
   power = np.zeros((len(P), L + 1))
   LL = min(L, f.bandwidth)
   power[:, :LL + 1] = P[:, :LL + 1]

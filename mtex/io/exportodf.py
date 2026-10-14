@@ -22,6 +22,8 @@ from .exportorientation import EULER_NAMES, _export_VPSC
 INTERFACES = ("generic", "mtex", "VPSC")
 # a row of three Euler angles and a value, as the files write it
 ROW_FORMAT = "%.5f %.5f %.5f %.5f"
+# the keywords every interface's writer takes
+WRITER_KEYWORDS = {"generic": ("resolution", "radians"), "mtex": ("radians",), "VPSC": ("points",)}
 
 
 def _convention(args):
@@ -55,7 +57,7 @@ def _header(f, odf):
 #
 #   _exportODF_generic(odf, 'odf.txt', 'Bunge', resolution=10*degree)
 #   _exportODF_generic(odf, 'odf.txt', S3G, 'ZYZ')
-def _exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, **kwargs):
+def _exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False):
   from ..geometry.grids.so3grid import SO3Grid
   convention = _convention(args)
   grid = next((a for a in args if isinstance(a, SO3Grid)), None)
@@ -78,7 +80,7 @@ def _exportODF_generic(odf, fname, *args, resolution=5 * degree, radians=False, 
 
 # writes the components of an ODF to a human readable file: the uniform part, the fibres and the
 # radial centres with their kernels and weights; a harmonic component is noted as not written
-def _exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
+def _exportODF_mtex(odf, fname, *args, radians=False):
   from ..functions.handles import SO3FunComposition
   from ..functions.rbf import SO3FunCBF, SO3FunRBF
   from ..functions.so3fun import SO3FunHarmonic
@@ -108,7 +110,7 @@ def _exportODF_mtex(odf, fname, *args, radians=False, **kwargs):
 
 
 # writes a sample of points orientations drawn from an ODF as a VPSC texture file
-def _exportODF_VPSC(odf, fname, *args, points=10000, **kwargs):
+def _exportODF_VPSC(odf, fname, *args, points=10000):
   from ..functions.characteristics import discreteSample
   ori = discreteSample(odf, points)
   _export_VPSC(ori, fname, *[a for a in args if isinstance(a, str) and a in EULER_NAMES])
@@ -135,7 +137,7 @@ def exportODF(odf, fname, *args, interface=None, **kwargs):
   drawn from the function.
 
   The angles are in degrees unless radians=True, in the Bunge convention unless 'ZYZ' (or
-  'ABG', 'Matthies') is given. Keywords the interface does not know are ignored.
+  'ABG', 'Matthies') is given. A keyword the interface does not take is refused.
 
   Input
     odf - an SO3Fun
@@ -150,7 +152,12 @@ def exportODF(odf, fname, *args, interface=None, **kwargs):
   if interface not in INTERFACES:
     raise ValueError(f"unknown export interface {interface!r}; available are " + ", ".join(INTERFACES))
   args = tuple(a for a in args if not (isinstance(a, str) and a in INTERFACES))
-  return {"generic": _exportODF_generic, "mtex": _exportODF_mtex, "VPSC": _exportODF_VPSC}[interface](odf, fname, *args, **kwargs)
+  writer = {"generic": _exportODF_generic, "mtex": _exportODF_mtex, "VPSC": _exportODF_VPSC}[interface]
+  known = WRITER_KEYWORDS[interface]
+  unknown = sorted(set(kwargs) - set(known))
+  if unknown:
+    raise ValueError(f"the {interface} export takes no keyword " + ", ".join(unknown) + "; it takes " + ", ".join(known))
+  return writer(odf, fname, *args, **kwargs)
 
 
 __all__ = ["exportODF"]

@@ -54,8 +54,8 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
   of them; every further scalar array of the file becomes a property.
 
   A list of files is read by loadEBSD, every file a layer at its height z, as a list of voxels
-  without a lattice. The phases are those of the first file, CS does not replace them; the
-  properties are those all files have. EBSD3.load is the same function.
+  without a lattice. The phases are those of the first file, or CS, which every file is read
+  with; the properties are those all files have. EBSD3.load is the same function.
 
   Input
     fname - the file name, or a list of file names of 2D maps
@@ -64,11 +64,12 @@ def loadEBSD3(fname, *args, interface=None, z=None, CS=None, **kwargs):
   Keywords
     interface - the format, 'dream3d' or 'xnovo'; by default told by the file
     z - the height of every map of a stack, by default 0, 1, 2, ...
-    CS - a crystalFrame or a phaseList replacing the phases of a DREAM.3D or xnovo file
+    CS - a crystalFrame or a phaseList replacing the phases of the file, or of every map of a
+        stack
   See also
     loadEBSD, loadGrains3d, calcGrains, EBSD3Analysis, EBSD3Plotting"""
   if isinstance(fname, (list, tuple)):
-    return _stack(fname, z, *args, **kwargs)
+    return _stack(fname, z, *args, CS=CS, **kwargs)
   ext = os.path.splitext(fname)[1].lower().lstrip(".")
   import h5py
   if interface is None and ext in ("h5", "hdf5"):
@@ -302,8 +303,10 @@ def _xnovoPhases(f):
 
 
 # a stack of 2D maps at the heights z, by default 0, 1, 2, ..., as MATLAB's EBSD3.load(files, '3d', Z)
-def _stack(files, z, *args, **kwargs):
+def _stack(files, z, *args, CS=None, **kwargs):
   from .load import loadEBSD
+  if CS is not None:
+    kwargs["CS"] = CS
   maps = [loadEBSD(f, *args, grid=False, **kwargs) for f in files]
   z = np.arange(len(files), dtype=float) if z is None else np.asarray(z, dtype=float).reshape(-1)
   if len(z) != len(maps):

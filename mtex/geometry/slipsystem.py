@@ -83,7 +83,20 @@ class slipSystem:
       raise ValueError("the slip direction and the plane normal are not orthogonal")
     self.b, self.n = vector3d(bd.copy(), frame=n.frame), vector3d(nd.copy(), frame=n.frame)
     self.b.dispStyle, self.n.dispStyle = b.dispStyle, n.dispStyle
-    self.CRSS = np.broadcast_to(np.asarray(CRSS, dtype=float), (len(bd),)).copy()
+    self.CRSS = CRSS
+
+  @property
+  def CRSS(self):
+    """the critical resolved shear stress of every system; a single value set is given to all"""
+    return self._CRSS
+
+  @CRSS.setter
+  def CRSS(self, value):
+    value = np.asarray(value, dtype=float)
+    try:
+      self._CRSS = np.broadcast_to(value, self.b.shape).copy()
+    except ValueError:
+      raise ValueError(f"a CRSS of shape {value.shape} does not fit {self.b.shape} slip systems") from None
 
   @classmethod
   def _new(cls, b, n, CRSS):
@@ -118,25 +131,25 @@ class slipSystem:
     """the list of several systems of one crystal, MATLAB's [sS1, sS2]
 
       sS = cat(sS1, sS2)                            # one list of both
+      sS = cat(sS1, sS2, axis=1)                    # arrays of systems side by side
 
-    The systems must be written in one frame; None operands are skipped. The result is
-    always one flat list.
+    The systems must be written in one frame; None operands are skipped.
 
     Input
       systems - slipSystem
     Output
       sS - slipSystem
     Keywords
-      axis - NumPy's axis, not used: the systems are always joined into one list
+      axis - the axis along which they are joined, as NumPy's concatenate
     See also
       slipSystem, slipSystem.symmetrise"""
     systems = [s for s in systems if s is not None]
     for s in systems[1:]:
       _sameFrame(systems[0].b, s.b, "the slip systems")
-    b = vector3d.cat(*[s.b for s in systems])
-    n = vector3d.cat(*[s.n for s in systems])
+    b = vector3d.cat(*[s.b for s in systems], axis=axis)
+    n = vector3d.cat(*[s.n for s in systems], axis=axis)
     b.dispStyle, n.dispStyle = systems[0].b.dispStyle, systems[0].n.dispStyle
-    return cls._new(b, n, np.concatenate([s.CRSS for s in systems]))
+    return cls._new(b, n, np.concatenate([s.CRSS for s in systems], axis=axis))
 
   @property
   def CS(self):

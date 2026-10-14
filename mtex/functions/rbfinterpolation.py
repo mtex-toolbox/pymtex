@@ -171,14 +171,14 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   mean, LSQR as below.
   - values of both signs: LSQR, the weights of any sign.
 
-  Values with more than one column raise an error, since an SO3FunRBF holds one weight per
-  centre.
+  Values of shape (n, k) give a list of k functions, one per column, on the same centres, and
+  withIterations a list of the iterations of each.
 
   Input
     ori - orientation, the nodes
-    y - the values at the nodes, (n,)
+    y - the values at the nodes, (n,) or (n, k)
   Output
-    SO3F - SO3FunRBF
+    SO3F - SO3FunRBF, or a list of them for several columns
     it - the number of iterations
   Keywords
     kernel - SO3Kernel, the shape of the kernels instead of the de la Vallee Poussin kernel
@@ -201,8 +201,9 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
   See also
     interpSO3, interpolate, mlsq, SO3FunRBF, RBFApproximationTheory"""
   from ..geometry.grids.so3grid import equispacedSO3Grid
-  from .rbf import SO3FunRBF, unimodalODF
   nodes = (nodes if isinstance(nodes, orientation) else orientation(nodes)).flatten()
+  if nodes.size == 0:
+    raise ValueError("there are no nodes to interpolate")
   hw = halfwidth if halfwidth is not None else (5 * degree if resolution is None else resolution)
   psi = SO3DeLaValleePoussinKernel(halfwidth=hw) if kernel is None else kernel
   res = max(0.75 * degree, psi.halfwidth()) if resolution is None else resolution
@@ -215,20 +216,23 @@ def interpolateRBF(nodes, values, *, kernel=None, halfwidth=None, resolution=Non
     chat, it = _spatial(M, y[:, k], density, mean, maxIter, tol, nodes)
     cols.append(chat)
     its.append(it)
-  w = np.stack(cols, axis=-1).reshape((centres.size,) + np.asarray(values).shape[1:])
   centres = orientation(centres.data, centres.CS, centres.SS)
-  # a density of one column is MATLAB's unimodalODF of the weights, which drops the centres
-  # of negligible weight and scales to mean one
-  if density and w.ndim == 1:
-    f = unimodalODF(centres, psi, weights=w, thinning=not exact)
-  else:
-    f = SO3FunRBF(centres, psi, w if w.ndim > 1 else w.ravel())
-    # the mean asked for, one for a density, by scaling the weights
-    target = 1.0 if density else mean
-    if target is not None:
-      f.weights = target * f.weights / (np.sum(f.weights, axis=0) * psi.mean())
-  if withIterations:
-    return f, (its[0] if len(its) == 1 else np.array(its))
+  fs = [_rbfOf(centres, psi, w, density, mean, exact) for w in cols]
+  if np.ndim(values) == 1:
+    return (fs[0], its[0]) if withIterations else fs[0]
+  return (fs, its) if withIterations else fs
+
+
+# the sum of kernels of the weights found: a density is MATLAB's unimodalODF of the weights,
+# which drops the centres of negligible weight and scales to mean one, any other function is
+# scaled to the mean asked for
+def _rbfOf(centres, psi, w, density, mean, exact):
+  from .rbf import SO3FunRBF, unimodalODF
+  if density:
+    return unimodalODF(centres, psi, weights=w, thinning=not exact)
+  f = SO3FunRBF(centres, psi, w)
+  if mean is not None:
+    f.weights = mean * f.weights / (np.sum(f.weights) * psi.mean())
   return f
 
 

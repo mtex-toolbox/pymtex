@@ -269,6 +269,27 @@ def test_merge_byLabelsJoinsTheGrainsOfOneLabelAndOnePhase(labels):
   assert np.array_equal(m.phaseId[g.parentId - 1], g.phaseId)
 
 
+# every criterion given joins what it joins alone: the grains merged by several are the
+# components of the union of the relations each one makes
+def test_merge_joinsWhatAnyCriterionJoins():
+  from scipy.sparse.csgraph import connected_components
+  g = calcGrains(mapOf(SQ5, 20, lambda i, j: (i // 5) * (1 + (j // 5) % 2) + 4 * (j // 5)), angle=5 * degree)
+  # two pairs of neighbours the threshold leaves apart
+  nb = g.neighbors()
+  t = g.merge(threshold=25 * degree, testRun=True)
+  pairs = nb[t[nb[:, 0] - 1] != t[nb[:, 1] - 1]][:2]
+  labels = np.arange(len(g)) % 5
+  ways = (dict(pairs=pairs), dict(pairs=labels), dict(threshold=25 * degree))
+  same = [(lambda p: p[:, None] == p[None, :])(g.merge(testRun=True, **w)) for w in ways]
+  for a, b in ((0, 2), (1, 2)):
+    union = connected_components(same[a] | same[b])[1]
+    both = g.merge(testRun=True, **ways[a], **ways[b])
+    assert np.array_equal(both[:, None] == both[None, :], union[:, None] == union[None, :])
+  # a label per grain and inclusions
+  gi = calcGrains(inclusionMap(), angle=5 * degree)
+  assert len(gi.merge(np.array([1, 2]), inclusions=True)) == 1
+
+
 # an inclusion joins the grain around it, which keeps its phase and orientation
 def test_merge_inclusionJoinsTheGrainAroundIt():
   gi = calcGrains(inclusionMap(), angle=5 * degree)

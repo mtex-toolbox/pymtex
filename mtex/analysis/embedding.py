@@ -140,6 +140,8 @@ def _blocks(f, U, alpha, offsets, Q, chunk=256):
 # the rows of U, one or n, turned by Q, one matrix or n: the compiled loop, the chunked
 # products its fallback and oracle
 def _turnRows(U, alpha, offsets, Q):
+  if np.ndim(Q) == 3 and len(Q) == 0:
+    return np.empty((0, U.shape[1]))
   out = turnBlocks(U, alpha, offsets, Q)
   if out is not None:
     return out

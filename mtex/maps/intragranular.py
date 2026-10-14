@@ -210,6 +210,8 @@ def gradient(ebsd, direction=None, stencil="oneSided"):
     gradientX, gradientY, curvature, calcGND, weightedBurgersVec"""
   if direction is not None:
     gx, gy = gradient(ebsd, stencil=stencil)
+    if ebsd.size == 0:
+      return gx
     pl = mapLattice(ebsd).plane
     d = np.asarray(direction.data if isinstance(direction, vector3d) else direction, dtype=float).reshape(3)
     d = d / np.linalg.norm(d) if np.linalg.norm(d) else d
@@ -220,6 +222,10 @@ def gradient(ebsd, direction=None, stencil="oneSided"):
   stencil = "lattice" if stencil == "1hop" else stencil
   if stencil not in STENCILS:
     raise ValueError(f"the stencil is 'oneSided', 'lattice' ('1hop') or 'full', not {stencil!r}")
+  # an empty map has empty derivatives
+  if ebsd.size == 0:
+    z = np.zeros(ebsd.shape + (3,))
+    return vector3d(z, frame=ebsd.frame), vector3d(z.copy(), frame=ebsd.frame)
   l = mapLattice(ebsd)
   lk, m = latticeLookup(l), mapPairs(ebsd)
   if stencil == "oneSided":
@@ -365,6 +371,8 @@ def curvature(ebsd, stencil="oneSided"):
     gradient, calcGND, dislocationDensityTensor"""
   from ..tensors.tensor import curvatureTensor
   gx, gy = gradient(ebsd, stencil=stencil)
+  if ebsd.size == 0:
+    return curvatureTensor(np.zeros(ebsd.shape + (3, 3)), ebsd.frame, unit=f"1/{ebsd.scanUnit}")
   pl = mapLattice(ebsd).plane
   unknown = np.abs(pl.normal) > 1e-10
   a, b = np.ascontiguousarray(gx.data, dtype=float), np.ascontiguousarray(gy.data, dtype=float)
@@ -399,8 +407,8 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
   from the curvature of the nearest neighbours. It runs on a list and on a map of several
   phases as well.
 
-  The vectors are in the specimen frame, per scan unit. windowSize must be at least 1; 0 gives
-  infinite values.
+  The vectors are in the specimen frame, per scan unit. windowSize is a whole number of at
+  least 1.
 
   Input
     ebsd - EBSD, of one indexed phase and gridified for the integral method
@@ -421,6 +429,8 @@ def weightedBurgersVec(ebsd, *args, windowSize=1, stencil="oneSided", gradient=F
   from scipy.ndimage import correlate, maximum_filter, minimum_filter
   from ..analysis.mechanics import dislocationDensity
   refuseFlags(args, "weightedBurgersVec")
+  if not gradient and (int(windowSize) != windowSize or windowSize < 1):
+    raise ValueError(f"the window of the integral method is a whole number of pixels, at least 1, not {windowSize!r}")
   if gradient:
     alpha = dislocationDensity(curvature(ebsd, stencil=stencil))
     return vector3d(alpha.M[..., :, 2], frame=ebsd.frame)

@@ -910,7 +910,8 @@ def wignerPlan(nodes, L, real=True, folds=(1, 1)):
   Keywords
     real - the plan for real valued functions, which needs half the Fourier array
     folds - (rA, rB), the folds about z on the crystal and the specimen side the coefficients
-        are known to have, which shrink the Fourier array; a grid brings its own
+        are known to have, which shrink the Fourier array; not read for a quadratureSO3Grid,
+        whose own folds decide the plan
   See also
     wignerSeries, wignerSeriesAdjoint, sphericalPlan"""
   if isinstance(nodes, quadratureSO3Grid):
@@ -967,7 +968,7 @@ def wignerSeries(fhat, rots, real=None, folds=(1, 1)):
     real - whether the coefficients are those of a real function, whose values are returned
         real; by default isRealWigner(fhat)
     folds - (rA, rB), the folds about z the coefficients have, which shrink the NUFFT's array;
-        a grid brings its own
+        not read for a quadratureSO3Grid, whose own folds decide the route
   See also
     wignerSeriesAdjoint, wignerPlan, SO3FunHarmonic.eval"""
   fhat = np.asarray(fhat)
@@ -1007,7 +1008,7 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
   Keywords
     weights - the weight of every rotation; by default 1/n, or the grid's rule
     folds - (rA, rB), the folds about z the result is known to have, which shrink the NUFFT's
-        array; a grid brings its own
+        array; not read for a quadratureSO3Grid, whose own folds decide the route
   See also
     wignerSeries, wignerSeriesAdjointGridded, wignerPlan"""
   values = np.asarray(values).ravel()
@@ -1018,7 +1019,7 @@ def wignerSeriesAdjoint(rots, values, L, weights=None, folds=(1, 1)):
       return plan.adjoint(values, rots.weights if weights is None and not isinstance(plan, SO3GridPlan) else weights)
     return wignerSeriesAdjoint(rots.nodes(), values, L, rots.weights if weights is None else weights, rots.folds)
   n = rots.size
-  weights = np.full(n, 1 / n) if weights is None else np.asarray(weights).ravel()
+  weights = np.full(n, 1 / max(n, 1)) if weights is None else np.asarray(weights).ravel()
   if n < DIRECT_SUM_NODES or L == 0:
     fhat = np.zeros(deg2dim(L + 1), dtype=_complexType(np.result_type(_quaternions(rots).dtype, values.dtype)))
     D = _WignerD(rots.flatten(), bandwidth=L)
@@ -1190,7 +1191,7 @@ def sphericalSeries(fhat, v, real=None):
   return f[()] if f.ndim == 0 else f
 
 
-def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
+def sphericalSeriesAdjoint(v, values, L, weights=None, real=None):
   """the spherical coefficients up to bandwidth L from weighted values at directions, the direct sum
   below 50 nodes; a quadrature grid brings the weights of its rule
 
@@ -1200,7 +1201,8 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
 
   The internal coefficients fhat_l^m = sum_q w_q v_q conj(Y_l^m(v_q)), the adjoint of
   sphericalSeries; on a quadrature grid with its weights the exact coefficients of a function
-  of that bandwidth.
+  of that bandwidth. Every route gives the same coefficients; real chooses only the array of
+  the NUFFT, half of it for real values, the full one otherwise.
 
   Input
     v - vector3d, or a quadratureS2Grid
@@ -1210,11 +1212,12 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
     fhat - the (L+1)^2 spherical coefficients, internal convention
   Keywords
     weights - the weight of every direction; by default 1/n, or the grid's rule
-    real - the values are real, which halves the NUFFT's array; the direct sum below 50 nodes
-        and a grid's plan decide by the values themselves
+    real - the NUFFT works on half its array, complex values taken as two real ones; by default
+        when the values are real
   See also
     sphericalSeries, sphericalPlan"""
   values = np.asarray(values).ravel()
+  real = values.dtype.kind != "c" if real is None else bool(real)
   if isinstance(v, quadratureS2Grid):
     weights = v.weights if weights is None else weights
     if 0 < L <= v.bandwidth:
@@ -1222,7 +1225,7 @@ def sphericalSeriesAdjoint(v, values, L, weights=None, real=False):
     return sphericalSeriesAdjoint(v.nodes(), values, L, weights, real)
   v = asVector3d(v).flatten()
   n = v.size
-  weights = np.full(n, 1 / n) if weights is None else np.asarray(weights).ravel()
+  weights = np.full(n, 1 / max(n, 1)) if weights is None else np.asarray(weights).ravel()
   if n < DIRECT_SUM_NODES or L == 0:
     fhat = np.zeros((L + 1) ** 2, dtype=_complexType(values.dtype))
     for l in range(L + 1):

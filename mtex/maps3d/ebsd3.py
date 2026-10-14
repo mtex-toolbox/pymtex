@@ -230,11 +230,14 @@ class EBSD3(EBSD):
     P = P.reshape(-1, 3)
     g = self.gridify()
     l = g.lattice
-    t = l.index(P)
-    inside = np.all((t > -1e-9) & (t < np.array(l.shape) - 1 + 1e-9), axis=1)
+    # the index within the grid, whose first voxel a part of a volume need not have at the origin
+    shp = np.array(g.shape)
+    t = l.index(P) - (columnMin(l.ijk) if len(l.ijk) else 0)
+    inside = np.all((t > -1e-9) & (t < shp - 1 + 1e-9), axis=1)
     # a position halfway between two voxels takes the upper one, as MATLAB's nearest interpolant
-    ijk = np.clip(np.floor(t + 0.5 + 1e-9).astype(np.int64), 0, np.array(l.shape) - 1)
-    src = np.ravel_multi_index(ijk.T, l.shape)
+    ijk = np.clip(np.floor(t + 0.5 + 1e-9).astype(np.int64), 0, np.maximum(shp - 1, 0))
+    src = np.ravel_multi_index(ijk.T, g.shape) if g.size else np.zeros(len(P), dtype=np.int64)
+    inside &= g.size > 0
     inside &= ~g.isPadding.reshape(-1)[src]
     n = len(P)
     rot = np.full((n, 4), np.nan)

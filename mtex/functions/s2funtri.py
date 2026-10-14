@@ -149,9 +149,10 @@ class S2FunTri(S2Fun):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume
     from .discrepancy import discrepancy
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
+    from ..plotting.kernelplot import plotSpectrum
 
 
 __all__ = ["S2FunTri"]

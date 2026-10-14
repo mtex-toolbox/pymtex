@@ -320,10 +320,12 @@ class grainBoundary:
       ind = gB.hasPhase('Forsterite', 'Enstatite')   # between Forsterite and Enstatite
       ind = gB.hasPhase('indexed')                   # between two indexed measurements
 
-    A phase is named by its mineral or its phase id. Without a phase of that name in the list,
-    'indexed' takes the segments between two indexed measurements and 'notIndexed' the others,
-    those with a not indexed side or with the rim of the scan on one. gB['Forsterite'] selects
-    by this.
+    A phase is named by its mineral or its phase id. A not indexed phase includes the rim of
+    the scan, as MATLAB's hasPhaseId: gB.hasPhase('notIndexed') takes the segments with a not
+    indexed side or with the rim on one, and gB.hasPhase('notIndexed', 'Forsterite') the rim
+    of the Forsterite grains too. Without a phase of that name in the list, 'indexed' takes the
+    segments between two indexed measurements and 'notIndexed' the others. gB['Forsterite']
+    selects by this.
 
     Input
       gB - grainBoundary
@@ -340,10 +342,17 @@ class grainBoundary:
       inside = np.all(self.phaseId > 0, axis=1)
       return inside if a.lower() == "indexed" else ~inside
     p = self.CSList.phaseId(a)
+    # the sides of a phase; a not indexed phase takes the outer rim of the scan too
+    def side(p):
+      on = self.phaseId == p
+      return on | (self.phaseId < 0) if not self.CSList.isIndexed(p) else on
     if b is None:
-      return (self.phaseId[:, 0] == p) | (self.phaseId[:, 1] == p)
+      return side(p).any(axis=1)
     q = self.CSList.phaseId(b)
-    return ((self.phaseId[:, 0] == p) & (self.phaseId[:, 1] == q)) | ((self.phaseId[:, 0] == q) & (self.phaseId[:, 1] == p))
+    if p == q:
+      return np.all(self.phaseId == p, axis=1)
+    sp, sq = side(p), side(q)
+    return (sp[:, 0] & sq[:, 1]) | (sq[:, 0] & sp[:, 1])
 
   @classmethod
   def cat(cls, *parts):
@@ -559,8 +568,9 @@ class grainBoundary:
       x, y, L = gB.intersect([33500, 4500], [36000, 7500], segLength=True)  # and the intercept lengths
       n = np.sum(~np.isnan(x))                                    # the number of crossings
 
-    A line through a vertex crosses both segments there, as MATLAB's tolerance has it. MATLAB
-    returns the intercepts as a third output always; here segLength=True asks for them.
+    A line through a vertex crosses both segments there, as MATLAB's tolerance has it, and the
+    intercepts count that crossing once, so none is of zero length. MATLAB returns the
+    intercepts as a third output always; here segLength=True asks for them.
 
     Input
       gB - grainBoundary
@@ -587,7 +597,10 @@ class grainBoundary:
     x, y = P[:, 0], P[:, 1]
     if not segLength:
       return x, y
-    return x, y, np.diff(np.sort(t[hit])) * np.linalg.norm(ab)
+    # the crossings along the line, the two segments of a vertex crossed there counted once
+    ts = np.sort(t[hit])
+    ts = ts[np.r_[True, np.diff(ts) > tol]] if len(ts) else ts
+    return x, y, np.diff(ts) * np.linalg.norm(ab)
 
   def inpolygon(self, region):
     """the segments whose midpoint lies inside a polygon (N, 2), or the rectangle [x, y, w, h]

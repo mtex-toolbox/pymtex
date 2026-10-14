@@ -80,6 +80,11 @@ PLUMBING = set("""subsasgn subSet setSubSet numArgumentsFromSubscript end numel 
 isscalar loadobj saveobj copy delete display disp char dispLine dispData repmat reshape permute squeeze
 isequal fullDouble subsind""".split())
 
+# functions of the flat namespace that share a name with a MATLAB method but do something else:
+# line draws a polyline on a map, where MATLAB's rotation.line and vector3d.line draw
+# rotations and directions, which the port draws by plot
+NOT_THE_METHOD = {"line"}
+
 
 # the names of MATLAB's reference pages
 def matlabPages():
@@ -199,6 +204,8 @@ def resolve(page):
       return ("property" if isinstance(obj, property) else "method", obj, cls)
   # a method MATLAB has on the class is a function of the flat namespace here: calcGrains(ebsd)
   # but not a forwarder, norm(x) for x.norm(), which the class does not answer
+  if m in NOT_THE_METHOD:
+    return None
   obj = getattr(mtex, m, None) or lookup(renamed(m) or "_")
   if callable(obj) and not inspect.isclass(obj) and isOurs(obj) and not hasattr(obj, "forwardsTo"):
     return ("function", plotImplementation(cls) if obj is mtex.plot and plotImplementation(cls) else obj, cls)

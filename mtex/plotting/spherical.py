@@ -421,8 +421,8 @@ class plainProjection(sphericalProjection):
       b = plainProjection(sR).boundary()                      # (rho, theta) in degree every half degree
       b = plainProjection(sR).boundary(resolution=2*degree)   # coarser arcs
 
-    Unlike the other charts a whole sphere or hemisphere has no boundary here: the list is
-    empty.
+    A whole sphere, which has no boundary of its own, gets the rectangle of its azimuth and
+    polar ranges, as the other charts get the horizon.
 
     Output
       b - list of (rho, theta) pairs of arrays in degree, one per arc
@@ -430,7 +430,11 @@ class plainProjection(sphericalProjection):
       resolution - the spacing of the points along an arc
     See also
       plainProjection.bounds, sphericalProjection.boundary"""
-    return [self.projectUnchecked(arc) for arc in self.sR.boundary(resolution)]
+    arcs = self.sR.boundary(resolution)
+    if not arcs:
+      x0, x1, y0, y1 = self.bounds()
+      return [(np.array([x0, x1, x1, x0, x0]), np.array([y0, y0, y1, y1, y0]))]
+    return [self.projectUnchecked(arc) for arc in arcs]
 
   def bounds(self, margin=0.0):
     """the azimuth and polar ranges of the region in degrees, widened by the margin

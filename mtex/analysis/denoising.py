@@ -77,7 +77,11 @@ def smoothingGraph(ebsd, fill=False, extrapolate=False):
   n = len(l.ij)
   isData = m.indexed.copy()
   comp = (m.phase.astype(np.int64) if m.grain is None else m.grain.astype(np.int64)).copy()
-  comp[~isData | (comp < 0)] = 0
+  # a pixel calcGrains absorbed into a grain (its phase, a NaN rotation) is filled within that grain
+  absorbed = ~isData & (m.grain is not None) & (fill is not False) & (fill is not None)
+  if m.grain is not None:
+    absorbed &= (comp > 0) & ebsd.isIndexed.reshape(-1)
+  comp[(~isData & ~absorbed) | (comp < 0)] = 0
   source = np.where(comp > 0, np.arange(n), -1)
   offs = l.stencil.astype(np.int64)
   # fill=grains: an empty pixel is filled only inside the grain whose polygon holds it, a
@@ -358,9 +362,9 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
   orientation
   - padding a polygon holds becomes a cell of the map
 
-  A pixel counts as measured by its phase: the notIndexed pixels calcGrains absorbs into a
-  grain carry its phase, so they are not filled and keep their NaN orientation. The map
-  passed is not changed.
+  A pixel counts as measured when it is indexed and has an orientation: the notIndexed pixels
+  calcGrains absorbs into a grain, which carry its phase and a NaN orientation, are filled
+  from within that grain. The map passed is not changed.
 
   Input
     ebsd - EBSD, the map
@@ -383,7 +387,8 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
   # a map whose every pixel but the padding is measured has nothing to fill, and with grains only
   # the padding their polygons hold, so nothing where there is none
   pad = out.isPadding.reshape(-1)
-  if np.all(np.asarray(out.isIndexed).reshape(-1) | pad) and (grains is None or not pad.any()):
+  measured = np.asarray(out.isIndexed).reshape(-1) & ~np.isnan(out.rotations.data.reshape(-1, 4)[:, 0])
+  if np.all(measured | pad) and (grains is None or not pad.any()):
     return out
   comp, edges, isData, source = smoothingGraph(out, fill=True if grains is None else grains, extrapolate=extrapolate)
   if np.any((comp > 0) & ~isData):
@@ -494,8 +499,8 @@ def reduce(ebsd, factor=2):
 
   The measurements are selected by their lattice index, so a square, a hexagonal and a
   rotated lattice are all reduced alike; the kept sites form the same kind of lattice factor
-  times coarser, which the result carries. The result is a list of measurements;
-  gridify(ebsd) turns it into a grid again.
+  times coarser, which the result carries. A gridded map gives a grid, a list of
+  measurements a list.
 
   Input
     ebsd - EBSD with a lattice
@@ -513,7 +518,8 @@ def reduce(ebsd, factor=2):
   l2 = out.lattice
   if l2 is not None:
     out.lattice = lattice._build(l2.plane, l2.origin, l2.A * factor, l2.ij // factor, l2.shape)
-  return out
+  # a grid stays a grid, a list a list
+  return out.gridify() if ebsd.isGridded else out
 
 
 def interp(ebsd, pos, y=None, F=None, fill=True, extrapolate=True):

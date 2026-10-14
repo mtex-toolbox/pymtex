@@ -36,7 +36,7 @@ from .funops import _rotatedCoefficients, _rotatedFrame
 from .harmonics import _so3Degrees, _so3PerDegree, mtexCoefficientsSO3, _WignerD, deg2dim, degreeBlock, dim2deg, invariantProjection, projectLeft, projectRight
 from .kernelfunctions import SO3DeLaValleePoussinKernel
 from .quadrature import bandwidthFor, quadratureSO3Grid
-from .rbf import _framesAmong, _rotationsFor, supportCosine
+from .rbf import SO3FunCBF, SO3FunRBF, _framesAmong, _rotationsFor, supportCosine
 from .so3fun import SO3FunHarmonic, invertedCoefficients, realizeWigner
 from .transforms import DIRECT_SUM_NODES, SO3FourierPlan, wignerPlan, wignerSeries, wignerSeriesAdjoint
 from ..geometry.display import aligned
@@ -384,8 +384,8 @@ class SO3VectorFieldHarmonic(SO3VectorField):
   functions, a quadrature only for the weights of a quadrature rule.
   - a callable of orientations: sampled on a quadrature grid of the bandwidth, by default the
   preference defaultSO3Bandwidth.
-  - three component functions: their coefficients, cut to the largest bandwidth; a Python
-  list takes its frames from cs and ss, else the trivial frames.
+  - three component functions: their coefficients, cut to the largest bandwidth, and their
+  frames unless cs and ss are given.
 
   Input
     fhat - (deg2dim(L + 1), 3) array, an SO3VectorField, an SO3TangentVector, three
@@ -423,7 +423,7 @@ class SO3VectorFieldHarmonic(SO3VectorField):
         ref = orientation._fromRotation(ref.data, (CS, SS))
       CS, SS, side = ref.CS, ref.SS, t.side
       L = getMTEXpref("defaultSO3Bandwidth") if bandwidth is None else int(bandwidth)
-      w = np.full(ref.size, 1 / ref.size) if weights is None else np.asarray(weights, dtype=float).ravel()
+      w = np.full(ref.size, 1 / max(ref.size, 1)) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(rotation(ref).flatten(), t.data.reshape(-1, 3), L, w)
     elif isinstance(fhat, SO3FunHarmonic) and fhat.shape == (3,):
       # a list of three functions: their components, in their frames
@@ -433,6 +433,8 @@ class SO3VectorFieldHarmonic(SO3VectorField):
     elif isinstance(fhat, (list, tuple)) and fhat and isinstance(fhat[0], SO3FunHarmonic):
       if len(fhat) != 3:
         raise ValueError("three component functions are needed")
+      if not frames:
+        CS, SS = fhat[0].CS, fhat[0].SS
       L = max(f.bandwidth for f in fhat)
       fhat = np.stack([f.truncate(L)._fhat for f in fhat], axis=-1)
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
@@ -809,7 +811,7 @@ def grad(f, x=None, side="left", delta=0.05 * degree):
       raise ValueError("the gradient of a complex valued function is not a real vector field")
     field = SO3VectorFieldHarmonic(differentiate(f._fhat, side), f.CS, f.SS, side, symmetrise=False)
     return field if x is None else field(x)
-  if x is not None and hasattr(f, "grad"):
+  if x is not None and isinstance(f, (SO3FunRBF, SO3FunCBF)):
     return f.grad(x, side)
   steps = [rotation.byAxisAngle(e, delta / 2) for e in (xvector, yvector, zvector)]
 

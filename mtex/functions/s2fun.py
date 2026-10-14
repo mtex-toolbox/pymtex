@@ -18,7 +18,7 @@ import math
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index
 
-from .harmonicarithmetic import harmonicArithmetic
+from .harmonicarithmetic import _catParts, harmonicArithmetic
 from .s2funclass import S2Fun
 from ..geometry.frames import referenceFrame
 from ..geometry.session import SESSION, getMTEXpref
@@ -207,7 +207,7 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
       v = asVector3d(nodes)
       frame = v.frame if frame is None else frame
       antipodal = v.antipodal if antipodal is None else antipodal
-      w = np.full(v.size, 4 * np.pi / v.size) if weights is None else np.asarray(weights).ravel()
+      w = np.full(v.size, 4 * np.pi / max(v.size, 1)) if weights is None else np.asarray(weights).ravel()
       n, adjoint = v.size, lambda x: sphericalSeriesAdjoint(v, x, L, w)
     # values for a list of functions: the nodes first, then the shape of the list
     fhat = _perColumn(adjoint, values, n)
@@ -343,8 +343,9 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
       sF = cat(sF1, sF2)                                   # a list of two functions
       sF = S2FunHarmonic.cat(sFa, sFb, axis=1)             # lists of shape (n, 1) side by side, an (n, 2) list
 
-    A single function counts as a list of one. The axis is that of the lists: the lists must
-    agree in every other axis, and to join along axis 1 they need two axes.
+    A single function counts as a list of one, and a list lacking the axis gets it as a trailing
+    axis of length one, as MATLAB's cat(2, sF1, sF2) gives a 1 x 2 list of two functions. The
+    lists must agree in every other axis.
 
     Input
       fs - S2FunHarmonic, the functions or lists to join
@@ -356,7 +357,7 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
       S2FunHarmonic.sum, S2FunHarmonic.mean"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
-    parts = [p[None] if p.ndim == 1 else p for p in parts]
+    parts, axis = _catParts(parts, axis)
     f0 = fs[0]
     return f0._rebuild(np.concatenate(parts, axis=axis), isReal=all(f.isReal for f in fs), antipodal=all(f.antipodal for f in fs))
 
@@ -770,11 +771,12 @@ class S2FunHarmonic(S2Fun, harmonicArithmetic):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume
     from .discrepancy import discrepancy
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
+    from ..plotting.kernelplot import plotSpectrum
 
 
 def _cut(fhat, L):

@@ -114,13 +114,14 @@ def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):
   direction of gL is nearer y than x.
 
   The inverse is the same call with the two layouts swapped. The source is given as two
-  directions, since a grid may be sheared; MATLAB also takes a gridLayout there, the port
-  does not.
+  directions, since a grid may be sheared, or as the gridLayout it is in. Dimensions beyond
+  the first two are left alone.
 
   Input
     gL - gridLayout, the layout the array is to be laid out in, the target
-    d - (d1, d2), vector3d, the directions the first and the second index advance along
-    shape - the shape of the array, its two dimensions
+    d - (d1, d2), vector3d, the directions the first and the second index advance along, or
+        the gridLayout the array is in
+    shape - the shape of the array
   Output
     lin - an integer array of the reindexed shape, the linear indices into the array
     t - whether the first two dimensions were exchanged (return_transpose): a transpose also
@@ -131,6 +132,8 @@ def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):
     return_transpose - also return t, MATLAB's second output
   See also
     gridLayout, gridify, referenceFrame.transformationMatrix"""
+  if isinstance(d, gridLayout):
+    d = (d.row, d.col)
   d1, d2 = (_unit(v) for v in d)
   t1, t2 = _unit(gL.row), _unit(gL.col)
   Q = np.array([[t1 @ d1, t1 @ d2], [t2 @ d1, t2 @ d2]])
@@ -144,7 +147,7 @@ def layoutIndex(gL, d, shape, nearest=False, return_transpose=False):
   lin = np.arange(int(np.prod(shape))).reshape(shape)
   if transpose:
     Q = Q[:, ::-1]
-    lin = lin.T
+    lin = lin.swapaxes(0, 1)
   if Q[0, 0] < 0:
     lin = lin[::-1, :]
   if Q[1, 1] < 0:

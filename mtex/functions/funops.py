@@ -74,11 +74,15 @@ def _normalises(r, pg):
   return all(moved[i] in pg for i in range(els.size))
 
 
+# the frame of the side a rotation turns: kept when the rotation normalises its group, else
+# stripped of the group, with MATLAB's warning naming that side
 def _rotatedFrame(fr, r):
   if _normalises(r, fr.sym):
     return fr
   import warnings
-  warnings.warn("Rotating an ODF with specimen symmetry will remove the specimen symmetry")
+  from ..geometry.frames import crystalFrame
+  kind = "crystal" if isinstance(fr, crystalFrame) else "specimen"
+  warnings.warn(f"Rotating a function with {kind} symmetry will remove the {kind} symmetry")
   return fr.stripSym()
 
 
@@ -150,7 +154,8 @@ def transformODF(odfP, p2c, vSel=None):
   The child ODF at a child orientation is the mean of the parent ODF over the parent
   orientations it can come from, one per variant of p2c, expanded to the bandwidth of the
   parent ODF. With vSel the parents are weighted by its values at them, normalised to mean
-  one per child orientation. MATLAB's 'variantSelection' takes a weight per variant or the
+  one per child orientation, and the child ODF is scaled to the mean of the parent ODF, a
+  density again, where MATLAB leaves it unscaled. MATLAB's 'variantSelection' takes a weight per variant or the
   number of one variant instead; the port has no such form.
 
   Input
@@ -174,7 +179,8 @@ def transformODF(odfP, p2c, vSel=None):
       val = val * w / np.mean(w, axis=1, keepdims=True)
     return np.mean(val, axis=1).reshape(cori.shape)
 
-  return SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
+  odfC = SO3FunHarmonic(f, p2c.frameB, odfP.SS, bandwidth=odfP.bandwidth)
+  return odfC if vSel is None else odfC * (np.real(odfP.mean()) / np.real(odfC.mean()))
 
 
 def conv(f, g, *args, inverse=False):

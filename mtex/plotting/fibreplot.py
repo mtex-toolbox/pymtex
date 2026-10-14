@@ -21,6 +21,7 @@ def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw: Unpack[PlotKeywords]):
     f = fibre.gamma(odf.CS, odf.SS)
     plotFibre(odf, f)                                     # the values along the gamma fibre
     plotFibre(odf, f, points=200, lineWidth=3, color='r')  # fewer points, a thick red line
+    plotFibre([odf1, odf2], f)                            # one line per function
 
   The fibre is sampled at equally spaced orientations and the ODF evaluated there, the real
   part drawn against the angle along the fibre from 0 to 360 degree, in mrd. A held figure
@@ -30,7 +31,7 @@ def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw: Unpack[PlotKeywords]):
   the port returns the line.
 
   Input
-    odf - SO3Fun
+    odf - SO3Fun, or a list of them
     f - fibre
   Output
     h - the matplotlib lines drawn
@@ -46,15 +47,22 @@ def plotFibre(odf, f, points=1000, lineWidth=1.5, **kw: Unpack[PlotKeywords]):
     ax = mtexFigure(figSize=kw.pop("figSize", None)).nextAxis()
   o = f.orientation(points)
   omega = np.linspace(0, 2 * np.pi, o.size)
-  # a fibre of other frames is followed by its rotations, as MATLAB does
-  if getattr(o, "CS", None) is not odf.CS or getattr(o, "SS", None) is not odf.SS:
-    from ..geometry.quaternion import rotation
-    o = rotation(o.data)
-  h = ax.plot(omega / degree, np.real(odf.eval(o)), linewidth=lineWidth, **lineKeywords(kw))
+  # a list of functions, MATLAB's [odf1, odf2], is one line each
+  values = np.column_stack([_alongFibre(g, o) for g in (odf if isinstance(odf, (list, tuple)) else [odf])])
+  h = ax.plot(omega / degree, values, linewidth=lineWidth, **lineKeywords(kw))
   ax.set_xlim(0, 360)
   ax.set_xlabel("angle along the fibre in degree")
   ax.set_ylabel("mrd")
   return h
+
+
+# the real values of a function at the orientations of a fibre; a fibre of other frames is
+# followed by its rotations, as MATLAB does
+def _alongFibre(odf, o):
+  if getattr(o, "CS", None) is not odf.CS or getattr(o, "SS", None) is not odf.SS:
+    from ..geometry.quaternion import rotation
+    o = rotation(o.data)
+  return np.real(odf.eval(o)).reshape(o.size, -1)
 
 
 __all__ = ["plotFibre"]

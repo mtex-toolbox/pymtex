@@ -9,13 +9,12 @@
 #   calcMIndex(odf), discreteSample(odf, n, rng=), discreteSample(fun, n, range=), calcError(odf1, odf2, 'l2'), calcKernel(ori | v | ebsd, 'UCV')
 from __future__ import annotations
 
-import functools
 import math
-import types
 
 import numpy as np
 
 from ..geometry._array import MtexArray
+from ..geometry.display import framesLabel
 from ..geometry.fibre import fibre
 from ..geometry.frames import crystalFrame, referenceFrame
 from ..geometry.kernels import backend, qmul
@@ -115,13 +114,12 @@ def volume(f, center, radius, resolution=None):
   the share of the ball itself, so a value above it marks a preferred orientation.
 
   On the sphere the ball is a spherical cap; an antipodal function over a cap of 90 degree
-  gives its mean value. The spherical form is a function only, volume(sF, v, r), not a
-  method of the spherical functions.
+  gives its mean value.
 
   The centre may also be:
 
   - a fibre: the volume of the tube about it, as fibreVolume.
-  - a list of centres: one value each.
+  - a list of centres: one value each, an empty array for none.
 
   Given a list of orientations instead of a function, the result is the share of them
   within the radius.
@@ -143,8 +141,10 @@ def volume(f, center, radius, resolution=None):
     return float(np.count_nonzero(f.angle(center) <= radius) / f.size)
   if isinstance(center, fibre):
     return fibreVolume(f, center, radius)
-  if center.size > 1:
-    return np.array([volume(f, center[i], radius, resolution) for i in range(center.size)]).reshape(center.shape)
+  if center.size != 1:
+    return np.array([volume(f, center[i], radius, resolution) for i in range(center.size)], dtype=float).reshape(center.shape)
+  if radius <= 0:
+    return 0.0
   if isinstance(f, S2Fun):
     return _volumeS2(f, center, radius, resolution)
   _rotationsFor(f, center)
@@ -282,7 +282,7 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
   - an SO3Fun: that uniform distribution times the mean of the function over the axes at each
   angle, scaled by the same factor, so that a uniform density gives the uniform distribution.
   - misorientations: a histogram of the disorientation angles in percent, summing to 100,
-  with omega the centres of the bins.
+  with omega the centres of the bins, zero in every bin for no misorientations.
 
   The angles are in radians and end at the largest angle of the fundamental region; angles
   given beyond it are dropped. They may also be given positionally, after the second frame.
@@ -323,7 +323,7 @@ def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * deg
     top = fundamentalRegion(f.CS, f.SS).maxAngle()
     e = np.linspace(0, top, int(min(50, max(5, f.size / 20)))) if edges is None else np.asarray(edges, dtype=float)
     counts, _ = np.histogram(f.angle().ravel(), e)
-    return 100 * counts / np.sum(counts), (e[:-1] + e[1:]) / 2
+    return 100 * counts / max(np.sum(counts), 1), (e[:-1] + e[1:]) / 2
   L, R = _framesOf(f)
   top = fundamentalRegion(f.CS, f.SS).maxAngle()
   w = np.linspace(0, top, 200) if omega is None else omega[omega < top + 1e-8]
@@ -484,8 +484,8 @@ def calcError(f, g, mode=None, resolution=5 * degree, epsilon=None):
     e = calcError(odf, pf, 'RP')                             # the RP error against pole figures
 
   Two functions are compared at the nodes of an equispaced grid of the resolution in the
-  fundamental region of f; g is evaluated there whatever its own symmetry, where MATLAB
-  refuses functions of different symmetry. The mode chooses the measure:
+  fundamental region of f; their crystal groups and their specimen groups must be of the same
+  Laue class. The mode chooses the measure:
 
   - 'l1', the default: half the mean absolute difference. For two densities it is the fraction
   of the volume that would have to move to turn one into the other, between 0 and 1.
@@ -513,6 +513,8 @@ def calcError(f, g, mode=None, resolution=5 * degree, epsilon=None):
   if epsilon is not None:
     raise ValueError("epsilon is the threshold of the error of pole figures")
   mode = "l1" if mode is None else str(mode).lower()
+  if f.CS.sym.Laue() != g.CS.sym.Laue() or f.SS.sym.Laue() != g.SS.sym.Laue():
+    raise ValueError(f"the functions have different symmetries, {framesLabel(f.CS, f.SS)} and {framesLabel(g.CS, g.SS)}")
   grid = equispacedSO3Grid(f.CS, f.SS, resolution=resolution)
   d1 = np.real(f(grid))
   d2 = np.real(g(orientation._fromRotation(grid.data, (g.CS, g.SS), g.antipodal)))
@@ -903,8 +905,8 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
 
   The seeds are, in this order of preference:
 
-  - the orientations given as seed, with equal weights unless weights are given; MATLAB
-  weighs them by the function's values there.
+  - the orientations given as seed, weighted by the function's values there unless weights
+  are given.
   - the centres of a radial function, with its weights.
   - the nodes of a 2.5 degree grid, with equal weights, which first climb to their peaks on
   the grid; the weight of a mode is then the share of the orientation space that flows into
@@ -912,7 +914,8 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
 
   Seeds of weight zero are left out, so centerId has one entry per seed of positive weight.
   Modes of less than one percent of the weight are dropped unless exact=True, and the seeds
-  that reached them get centerId -1. The progress is not reported, whatever verbose says.
+  that reached them get centerId -1. No seed gives no modes. With verbose the number of seeds
+  and of the components found are reported.
 
   Input
     f - SO3Fun
@@ -923,7 +926,8 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
         dropped mode
   Keywords
     seed - orientation, the starting points of the ascent
-    weights - the weights of the seeds, equal by default
+    weights - the weights of the seeds, by default the values of the function at them, equal
+        for the nodes of the grid
     tol - the angle within which modes merge, and the accuracy of the ascent
     maxIter - the largest number of steps of the ascent
     radius - only the seeds within this angle of their mode count to its weight; MATLAB's
@@ -938,7 +942,12 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
   elif seed is None:
     grid = seed = equispacedSO3Grid(f.CS, f.SS, resolution=2.5 * degree)
   rots = rotation(seed).data.reshape(-1, 4)
-  w = np.ones(len(rots)) if weights is None else np.asarray(weights, dtype=float).ravel()
+  if len(rots) == 0:
+    return _ori(rots, f), np.zeros(0), np.zeros(0, dtype=int)
+  if weights is None:
+    w = np.ones(len(rots)) if grid is not None else np.real(f(_ori(rots, f))).ravel()
+  else:
+    w = np.asarray(weights, dtype=float).ravel()
   keep = w > 0
   rots, w = rots[keep], w[keep] / np.sum(w[keep])
   fg = _gradientField(f)
@@ -952,6 +961,8 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
   else:
     modes, labels = rots.copy(), np.arange(len(rots))
     vals = np.real(f(_ori(modes, f))).ravel()
+  if verbose:
+    print(f"  finding ODF components: {len(modes)} seeds ascending")
   modes, vals, labels = _ascend(f, fg, modes, vals, labels, w, np.full(len(modes), 5 * degree), exact, tol, maxIter)
   # a radial or fibre function ascended on its harmonic form climbs on to its peaks on its own
   # gradient: near a peak the truncated gradient points off the ridge and the ladder stops short
@@ -979,6 +990,8 @@ def calcComponents(f, seed=None, weights=None, tol=1.5 * degree, maxIter=100, ra
     newId = np.cumsum(keepm) - 1
     centerId = np.where(keepm[centerId], newId[centerId], -1)
     wsum, modeRots = wsum[keepm], modeRots[keepm]
+  if verbose:
+    print(f"  {len(wsum)} components found")
   return _ori(modeRots, f), wsum, centerId
 
 
@@ -1004,16 +1017,17 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
   - a radial function (unimodalODF, calcDensity): exactly, a centre by its weight, the angle
   by the distribution of the kernel and a uniform axis; a sum of radial functions term by term.
   - a Bingham distribution: exactly, by rejection.
-  - a Python function of numbers (a def or a lambda, not a NumPy ufunc such as np.exp): its
-  values at 10000 points of the range.
+  - any other callable of numbers (a def, a lambda, a NumPy ufunc such as np.exp, an
+  S1Fun): its values at 10000 points of the range.
   - a list, a map, grains or boundary segments: n of its members, with replacement unless
-  withoutReplacement=True, which returns all members when n exceeds their number.
+  withoutReplacement=True, which returns all members when n exceeds their number; an empty
+  list gives none without replacement and is refused otherwise.
 
   MATLAB's 'compact' sampling and the indices of the members drawn from a list are not
   provided.
 
   Input
-    f - SO3Fun, S2Fun, a Python function of numbers, or a list of orientations or directions,
+    f - SO3Fun, S2Fun, a callable of numbers, or a list of orientations or directions,
         an EBSD map, grains or grain boundary segments
     n - int, the size of the sample
   Output
@@ -1023,24 +1037,27 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
         on the sphere
     rng - numpy.random.Generator, the random numbers
     withoutReplacement - draw no member of a list twice (a list)
-    range - the interval of a Python function
+    range - the interval of a callable of numbers
   See also
     SO3Fun.calcComponents, calcDensity, RandomSampling, S2FunSampling"""
   rng = np.random.default_rng() if rng is None else rng
   n = int(n)
-  # a density given as a Python function of real numbers is sampled on 10000 points of range
-  if isinstance(f, (types.FunctionType, functools.partial)):
-    x = np.linspace(range[0], range[1], 10000)
-    p = np.maximum(np.asarray(f(x), dtype=float), 0)
-    return x[rng.choice(len(x), size=n, p=p / p.sum())]
   # a list of orientations or directions, an EBSD map of any phases, grains or boundary segments is
   # sampled from itself, MATLAB's discreteSample(ori, n) and discreteSample(ebsd, n)
   if isinstance(f, MtexArray) or hasattr(f, "CSList"):
     flat = f.flatten() if isinstance(f, MtexArray) else f
+    if flat.size == 0 and n > 0 and not withoutReplacement:
+      raise ValueError("an empty list has no members to draw")
     k = rng.choice(flat.size, size=min(n, flat.size) if withoutReplacement else n, replace=not withoutReplacement)
     return flat[k]
   if isinstance(f, S2Fun):
     return _discreteSampleS2(f, n, 1 * degree if resolution is None else resolution, rng)
+  # any other callable that is no function on SO(3) is a density of real numbers, sampled on
+  # 10000 points of range
+  if callable(f) and not isinstance(f, SO3Fun):
+    x = np.linspace(range[0], range[1], 10000)
+    p = np.maximum(np.real(np.asarray(f(x))).astype(float).ravel(), 0)
+    return x[rng.choice(len(x), size=n, p=p / p.sum())]
   if isinstance(f, SO3FunComposition) and all(isinstance(t, SO3FunRBF) for t in f.components):
     m = np.array([t.mean() for t in f.components])
     counts = np.bincount(rng.choice(len(m), size=n, p=m / m.sum()), minlength=len(m))
@@ -1302,7 +1319,8 @@ install(SO3_KINDS + S2_KINDS, max_, "max")
 install(SO3_KINDS + S2_KINDS, min_, "min")
 for _f in (entropy, textureIndex, discreteSample):
   install(SO3_KINDS + S2_KINDS, _f)
-for _f in (volume, fibreVolume, calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex, calcError, centerSpecimen):
+install(SO3_KINDS + S2_KINDS, volume)
+for _f in (fibreVolume, calcComponents, calcMDF, calcAngleDistribution, calcAxisDistribution, calcMIndex, calcError, centerSpecimen):
   install(SO3_KINDS, _f)
 
 __all__ = ["textureIndex", "entropy", "volume", "fibreVolume", "calcMDF", "calcAngleDistribution", "calcMIndex",

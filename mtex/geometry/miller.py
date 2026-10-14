@@ -11,8 +11,8 @@
 #
 # A crystal direction is a vector3d written in a crystalFrame: it stores Cartesian
 # coordinates and reads hkl, hkil, uvw and UVTW off the reciprocal and direct axes of the
-# frame. A crystal direction carries no antipodal state (Julia ADR 0002): 'antipodal'
-# means the Laue sibling of its frame.
+# frame. 'antipodal' sets the flag, as MATLAB, and writes the direction in the Laue sibling
+# of its frame (Julia ADR 0002), where the symmetry holds the inversion.
 from __future__ import annotations
 
 import re
@@ -55,15 +55,22 @@ def Miller(*args, antipodal=False, dispStyle=None):
   Output
     m - vector3d in the crystal frame
   Keywords
-    antipodal - the antipodal symmetry, here the frame's Laue group in place of its point
-        group; MATLAB sets the antipodal flag instead, which stays False here
+    antipodal - the antipodal symmetry: sets m.antipodal, and the frame's Laue group takes
+        the place of its point group
     dispStyle - the indices the display shows and the numbers are read as, the same as the
         style given positionally ('hkl', 'hkil', 'uvw', 'UVTW', 'xyz'); a string keeps the
         style of its brackets
   See also
     vector3d, crystalFrame, CrystalDirections, CrystalOperations
   """
-  style = dispStyle
+  m = _miller(args, antipodal, dispStyle)
+  if antipodal:
+    m.antipodal = True
+  return m
+
+
+# the crystal directions of Miller's arguments, in the Laue sibling of the frame if antipodal
+def _miller(args, antipodal, style):
   for a in args:
     if isinstance(a, str) and a.lower() in _STYLE:
       style = _STYLE[a.lower()]

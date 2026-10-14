@@ -333,11 +333,11 @@ def fundamentalRegion(frA, frB=None, *, antipodal=False):
     o = frA
     frA, frB, antipodal = o.frameA, o.frameB, o.antipodal
   if isinstance(frA, symmetry):
-    frA = crystalFrame(frA.rot, intern=False)
+    frA = crystalFrame(frA.rot, frA.axes, intern=False)
   if frB is None:
     frB = specimenFrame.default
   if isinstance(frB, symmetry):
-    frB = crystalFrame(frB.rot, intern=False)
+    frB = crystalFrame(frB.rot, frB.axes, intern=False)
   o = orientation(rotation(), frA, frB)
   L, R = reductionGroups(o)
   ids = uniqueRotations(qmul(L[:, None, :], R[None, :, :]).reshape(-1, 4))

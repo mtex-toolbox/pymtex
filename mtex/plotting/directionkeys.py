@@ -525,7 +525,8 @@ class spotDirectionKey(directionColorKey):
   def direction2color(self, h, gray=None):
     """the colours of directions under the spot key
 
-      rgb = key.direction2color(h)     # the colours of crystal directions
+      rgb = key.direction2color(h)             # the colours of crystal directions
+      rgb = key.direction2color(h, gray=0.5)   # less saturated
 
     Every direction starts white and is multiplied, for every centre, by the colour of the
     centre faded with the kernel psi of the angle to the nearest equivalent of the centre:
@@ -536,7 +537,8 @@ class spotDirectionKey(directionColorKey):
     Output
       rgb - an array of shape h.shape + (3,), RGB values in [0, 1]
     Keywords
-      gray - taken for the calling form of the other keys and not used
+      gray - the saturation, in [0, 1], one for all directions or one each, by default 1: a
+          factor on the weight every centre's colour has
     See also
       spotColorKey, HSVDirectionKey"""
     xyz, shape = _asDirections(h)
@@ -546,8 +548,9 @@ class spotDirectionKey(directionColorKey):
     color = np.asarray(self.color, dtype=float).reshape(-1, 3)
     if len(color) != len(self.equivalents):
       raise ValueError("one colour per centre")
+    g = 1.0 if gray is None else np.clip(np.asarray(gray, dtype=float).reshape(-1), 0, 1)
     for eq, c in zip(self.equivalents, color):
-      w = np.asarray(self.psi(np.clip(np.max(unit @ eq.T, axis=1), -1, 1)), dtype=float) / psi0
+      w = g * np.asarray(self.psi(np.clip(np.max(unit @ eq.T, axis=1), -1, 1)), dtype=float) / psi0
       hsv = rgb2hsv(c)
       # black has no hue to keep, so it fades through the grey of its weight
       f = np.stack([1 - w] * 3, axis=-1) if np.all(c == 0) else hsv2rgb(hsv[0], w * hsv[1], 1.0)

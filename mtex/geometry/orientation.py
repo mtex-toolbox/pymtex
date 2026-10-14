@@ -316,9 +316,10 @@ class orientation(rotation):
       ori = orientation.fit(u, v, cs, ss, weights=w)        # the pairs weighted
 
     The rotation minimises the sum of w |ori * u - v|^2 over the pairs of normalised directions,
-    by Horn's quaternion method. The frames are those
-    named; MATLAB also adopts the frames of crystal directions u and v, which the port does not:
-    without frames the result is between the triclinic frame and the session's specimen frame.
+    by Horn's quaternion method. The crystal frame is that of crystal directions u, the
+    second frame that of crystal directions v; a frame named fills the one missing, and two
+    frames named replace both. Without frames the result is between the triclinic frame and the
+    session's specimen frame.
 
     Input
       u, v - vector3d or Miller, of one shape
@@ -329,7 +330,18 @@ class orientation(rotation):
       weights - a weight per pair; by default all one
     See also
       orientation.map, rotation.fit"""
-    return cls._fromRotation(fitKernel(_xyz(u), _xyz(v), weights), _splitFrames(frames)[1])
+    named = _splitFrames(frames)[1]
+    frameA = u.frame if _isCrystal(u) else None
+    frameB = v.frame if _isCrystal(v) else None
+    if len(named) == 2:
+      frameA, frameB = named
+    elif named and frameA is None:
+      frameA = named[0]
+    elif named and frameB is None:
+      frameB = named[0]
+    frameA = crystalFrame("1") if frameA is None else frameA
+    frameB = specimenFrame.default if frameB is None else frameB
+    return cls._fromRotation(fitKernel(_xyz(u), _xyz(v), weights), [frameA, frameB])
 
   @classmethod
   def rand(cls, *args, rng=None, antipodal=False, maxAngle=None):
@@ -1010,6 +1022,10 @@ def _checkExchange(antipodal, frameA, frameB):
 
 def _frameOf(v):
   return v.frame if isinstance(v, vector3d) else None
+
+
+def _isCrystal(v):
+  return isinstance(v, vector3d) and v.isCrystalDirection
 
 
 __all__ = ["orientation"]

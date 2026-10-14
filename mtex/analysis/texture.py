@@ -136,7 +136,15 @@ def _calcTensorMap(ebsd, tensors, which, weights):
   indexed = np.asarray(ebsd.isIndexed)
   ss = getattr(rots, "frame", None)
   ss = specimenFrame.default if not isinstance(ss, referenceFrame) else ss
-  w = None if weights is None else np.asarray(weights, dtype=float).ravel()
+  w = None
+  if weights is not None:
+    w = np.asarray(weights, dtype=float)
+    if w.size != phaseId.size:
+      raise ValueError("one weight per pixel of the map is needed")
+    # the weights of a gridded map in the shape of its grid, given flat or as the grid
+    w = w.reshape(phaseId.shape)
+  if not np.any(indexed):
+    raise ValueError("the map has no indexed pixel to average over")
   phases = []
   for p in np.unique(phaseId[indexed]):
     cs = ebsd.CSList[int(p)]
@@ -266,16 +274,18 @@ def calcKearnsFactor(f, h=None, N=None):
 
     k = calcKearnsFactor(odf, h, N)    # of the crystal direction h with N
     k = calcKearnsFactor(odf, h)       # with the z direction
+    k = calcKearnsFactor(odf)          # of (0001) with the z direction
     k = calcKearnsFactor(pdf, N)       # of a pole figure
 
   The integral of the pole figure of h against (r . N)^2 over the sphere, normalised so that
-  a uniform texture gives 1/3. MATLAB's order is calcKearnsFactor(odf, N, h), the arguments
-  told apart by their class; here h comes first. MATLAB's default h = [0001] is not taken:
-  an ODF needs h.
+  a uniform texture gives 1/3. With an ODF the two directions are told apart by their class,
+  the Miller one the crystal direction, so MATLAB's order calcKearnsFactor(odf, N, h) gives
+  the same.
 
   Input
     f - SO3Fun, an ODF, or S2Fun, a pole figure
-    h - Miller, the crystal direction (with an ODF); with a pole figure the place of N
+    h - Miller, the crystal direction (with an ODF), (0001) when left out; with a pole figure
+        the place of N
     N - vector3d, the specimen direction, z when left out
   Output
     k - float
@@ -283,7 +293,16 @@ def calcKearnsFactor(f, h=None, N=None):
     radon, calcLankford"""
   from ..functions.quadrature import quadratureS2Grid
   if isinstance(f, SO3Fun):
-    pdf = f.radon(h)
+    from ..geometry.miller import Miller
+    # MATLAB's order, the specimen direction before the crystal direction, told apart by
+    # whether they are in a crystal frame
+    def crystal(v):
+      return isinstance(v, vector3d) and isinstance(v.frame, crystalFrame)
+    if crystal(N) and not crystal(h):
+      h, N = N, h
+    if h is not None and not crystal(h):
+      h, N = None, h if N is None else N
+    pdf = f.radon(Miller(0, 0, 0, 1, f.CS) if h is None else h)
   else:
     pdf, N = f, h if N is None else N
   n = (vector3d(0, 0, 1) if N is None else vector3d(N)).normalize().data.reshape(3)

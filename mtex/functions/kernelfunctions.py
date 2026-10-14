@@ -17,6 +17,7 @@
 # their closed form where there is one.
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import math
 from functools import cached_property
 
@@ -322,6 +323,10 @@ class SO3Kernel(_Kernel):
       num = num + A[n] * (2 * n + 1) / 2 * np.cos((2 * n + 1) * omega / 2)
     num = num - t * self._clenshaw(A, t) / 2
     return np.where(s < 1e-12, 0.0, num / np.where(s < 1e-12, 1.0, s))
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.kernelplot import plotSpectrum
 
 
 SO3Kernel._domain = SO3Kernel
@@ -825,6 +830,10 @@ class S2Kernel(_Kernel):
     L = len(A) - 1
     B = np.array([(2 * k + 1) * np.sum(A[k + 1::2]) for k in range(L)])
     return S2Kernel(B if L else [0.0])
+
+  # declared for the editor: the methods other modules attach (tools/staticapi.py)
+  if TYPE_CHECKING:
+    from ..plotting.kernelplot import plotSpectrum
 
 
 S2Kernel._domain = S2Kernel

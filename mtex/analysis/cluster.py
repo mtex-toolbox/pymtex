@@ -216,17 +216,19 @@ def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1
   binned on a grid of the given resolution.
 
   The density method leaves some orientations without a cluster: those further from their
-  centre than twice the mean angle of the cluster get NaN in cId, and those whose mode is too
-  small to be kept by calcComponents get -1. The centres of 'odf' are the modes of the density,
-  those of the other methods the (weighted) means of the clusters. cId has the shape of the
-  input.
+  centre than twice the mean angle of the cluster and those whose mode is not among the centres
+  get NaN in cId. Elements that are NaN themselves get NaN in cId with every method, the others
+  are clustered without them; no elements give no clusters. The centres of 'odf' are the modes
+  of the density, those of the other methods the (weighted) means of the clusters. cId has the
+  shape of the input.
 
   Input
     v - vector3d, the directions
     ori - orientation, the orientations
   Output
     cId - ndarray of ints, the cluster of every element counted from zero, a float array
-        with NaN for the orientations the density method leaves out
+        with NaN for the elements that are NaN and the orientations the density method leaves
+        out
     center - vector3d or orientation, the centre of every cluster
   Keywords
     method - 'classix' (default for directions), 'odf' (default for orientations, the modes
@@ -243,7 +245,7 @@ def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1
     halfwidth - the halfwidth of the kernel of the density method
     weights - a weight per element, for the density and the hierarchical method
     resolution - the grid the hierarchical method bins more than 1000 orientations on
-    verbose - accepted for MATLAB's 'silent'; nothing is reported
+    verbose - report the progress of calcComponents (the density method)
   References
     X. Chen, S. Guettel, Fast and explainable clustering based on sorting, arXiv:2202.01456
         (2022)
@@ -255,15 +257,28 @@ def calcCluster(x, *args, method=None, radius=None, minPoints=None, mergeScale=1
   isOri = isinstance(x, orientation)
   if method is None:
     method = "odf" if isOri else "classix"
+  if method not in ("classix", "hierarchical", "odf"):
+    raise ValueError("the method is 'classix', 'hierarchical' or 'odf'")
+  if method == "odf" and not isOri:
+    raise ValueError("the density method clusters orientations; use 'classix' or 'hierarchical' for directions")
+  # the elements that are NaN get no cluster, the others are clustered among themselves
+  flat = x.flatten()
+  bad = np.isnan(flat.data.reshape(flat.size, flat.data.shape[-1])).any(axis=1)
+  if bad.all():
+    return np.full(x.shape, np.nan) if bad.size else np.zeros(x.shape, dtype=int), flat[:0]
+  if bad.any():
+    w = None if weights is None else np.asarray(weights, dtype=float).ravel()[~bad]
+    c, center = calcCluster(flat[~bad], method=method, radius=radius, minPoints=minPoints, mergeScale=mergeScale,
+                            numCluster=numCluster, maxAngle=maxAngle, halfwidth=halfwidth, weights=w,
+                            resolution=resolution, verbose=verbose)
+    cId = np.full(flat.size, np.nan)
+    cId[~bad] = c
+    return cId.reshape(x.shape), center
   if method == "classix":
     return _classixCluster(x, radius, minPoints, mergeScale)
   if method == "hierarchical":
     return _hierarchical(x, numCluster, maxAngle, weights, resolution)
-  if method == "odf":
-    if not isOri:
-      raise ValueError("the density method clusters orientations; use 'classix' or 'hierarchical' for directions")
-    return _densityCluster(x, halfwidth, weights, numCluster)
-  raise ValueError("the method is 'classix', 'hierarchical' or 'odf'")
+  return _densityCluster(x, halfwidth, weights, numCluster, verbose)
 
 
 def _classixCluster(x, radius, minPoints, mergeScale):
@@ -298,15 +313,16 @@ def _centers(x, cId):
 
 
 # the modes of the density the orientations ascend to, the largest numCluster of them
-def _densityCluster(o, halfwidth, weights, numCluster):
+def _densityCluster(o, halfwidth, weights, numCluster, verbose):
   from ..functions.characteristics import calcComponents
   from ..functions.density import calcDensity
   flat = o.flatten()
   odf = calcDensity(flat, weights=weights, halfwidth=halfwidth)
-  modes, vol, cId = calcComponents(odf, seed=flat, weights=weights)
+  modes, vol, cId = calcComponents(odf, seed=flat, weights=weights, verbose=verbose)
   K = min(20 if numCluster is None else int(numCluster), modes.size)
   cId = np.asarray(cId).astype(float)
-  cId[cId >= K] = np.nan
+  # the seeds of a mode beyond the K largest and of a mode calcComponents dropped (-1)
+  cId[(cId >= K) | (cId < 0)] = np.nan
   center = modes[:K]
   # the points too far from their centre, beyond twice the mean angle, are dropped
   for i in range(K):

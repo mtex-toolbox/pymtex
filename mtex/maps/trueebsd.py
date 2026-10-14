@@ -150,13 +150,13 @@ class trueEbsd:
 
     - roiSize: the width of a correlation tile, a length; one, or one per fit stage; 0 for a
     map correlated against nothing, as the reference.
-    - numROI: the number of tiles across the image, the number down following from the aspect
-    ratio; a fraction is rounded down.
+    - numROI: the number of tiles across the image, a whole number, the number down following
+    from the aspect ratio.
     - registerOn: 'edge' to correlate the edge transform, 'raw' the values as they are, for a
     pair already sharing its contrast.
     - edgeWidth: the neighbour distance of the edge transform, a length.
     - highContrast: whether the image can be registered on directly, True, False or 'auto'.
-    - pixelTime: the dwell time per pixel, carried and not used.
+    - pixelTime: the dwell time per pixel, a number not below 0, carried and not used.
 
     Input
       job - trueEbsd
@@ -510,8 +510,8 @@ def _checkValue(name, value):
       raise ValueError(f"{name} is a length in the map's own unit, so it cannot be negative")
     return value if value.size > 1 else float(value[0])
   if name == "numROI":
-    if not (np.isscalar(value) and value >= 1):
-      raise ValueError("numROI is how many tiles fit across the image, one number - the count down follows from the aspect ratio")
+    if not (isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool) and value >= 1 and float(value).is_integer()):
+      raise ValueError(f"numROI is how many tiles fit across the image, one whole number - the count down follows from the aspect ratio; got {value!r}")
     return int(value)
   if name == "registerOn":
     value = str(value).lower()
@@ -523,7 +523,13 @@ def _checkValue(name, value):
       if value.lower() != "auto":
         raise ValueError(f"highContrast is True, False or 'auto'; got {value!r}")
       return "auto"
+    if not (isinstance(value, (bool, np.bool_)) or (isinstance(value, (int, np.integer)) and value in (0, 1))):
+      raise ValueError(f"highContrast is True, False or 'auto'; got {value!r}")
     return bool(value)
+  if name == "pixelTime":
+    if not (isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool) and np.isfinite(value) and value >= 0):
+      raise ValueError(f"pixelTime is the dwell time per pixel, a number not below 0; got {value!r}")
+    return float(value)
   return value
 
 

@@ -218,24 +218,25 @@ class quaternion(MtexArray):
     """the quaternions divided by their norm"""
     return self._new(self.data / self.norm()[..., None])
 
-  def dot(self, other, antipodal=True):
+  def dot(self, other, antipodal=False):
     """the inner product of the coefficients
 
       d = dot(q1, q2)                               # a b + ... + d d of the coefficients
+      d = dot(q1, q2, antipodal=True)               # its absolute value
 
     The plain inner product of the quaternions as vectors of R^4, signed: q and -q give
-    opposite values. rotation.dot takes its absolute value.
+    opposite values. rotation.dot takes its absolute value by default.
 
     Input
       q1, q2 - quaternion
     Output
       d - the inner products
     Keywords
-      antipodal - not used by quaternions, which keep the sign; taken so that the call is
-          the one of rotations
+      antipodal - take the absolute value, q and -q read as one
     See also
       rotation.dot, quaternion.angle"""
-    return np.sum(self.data * self._coerce(other).data, axis=-1)
+    d = np.sum(self.data * self._coerce(other).data[..., :4], axis=-1)
+    return np.abs(d) if antipodal else d
 
   def angle(self, other=None):
     """the rotational angle in [0, pi], or the angle between two, both from atan2 forms that
@@ -798,7 +799,7 @@ class rotation(quaternion):
       antipodal - take the absolute value, q and -q being one rotation
     See also
       quaternion.dot, rotation.angle, orientation.dot"""
-    d = np.sum(self.data * self._coerce(other).data, axis=-1)
+    d = np.sum(self.data * self._coerce(other).data[..., :4], axis=-1)
     if isinstance(other, orthogonalTransform):
       d = d * ~other.isImproper
     return d if not antipodal else np.abs(d)

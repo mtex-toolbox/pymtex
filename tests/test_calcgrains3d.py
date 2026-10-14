@@ -37,6 +37,15 @@ def test_the_grains_and_their_faces():
   assert np.allclose(g.surfaceArea.sum(), 2 * g.boundary.area[np.all(g.boundary.grainId > 0, axis=1)].sum() + g.boundary.area[g.boundary.grainId[:, 1] == 0].sum())
 
 
+# a part cut out of a volume has the grains of a volume of its own: they lie where its voxels do
+def test_the_grains_of_a_part_of_a_volume_lie_at_its_voxels():
+  e = twoGrains()
+  part = e[1:4, 1:3, 1:]
+  g, whole = calcGrains(part, angle=10 * degree), calcGrains(EBSD3square(part.rotations, part.phaseId, part.CSList, (1.0, 2.0, 0.5),
+                                                                          origin=part.pos.data[0, 0, 0]), angle=10 * degree)
+  assert np.allclose(g.centroid.data, whole.centroid.data) and np.allclose(g.boundary.allV, whole.boundary.allV)
+
+
 def test_minPixel_turns_a_lone_voxel_into_a_notIndexed_grain():
   e = twoGrains()
   g = calcGrains(e, angle=10 * degree, minPixel=2)

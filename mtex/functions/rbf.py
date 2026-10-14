@@ -551,6 +551,7 @@ class SO3FunRBF(SO3Fun):
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    from ..plotting.kernelplot import plotSpectrum
     def __abs__(self) -> Any:
       """the absolute value of the function, pointwise, as a function handle
 
@@ -866,6 +867,7 @@ class SO3FunCBF(SO3Fun):
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    from ..plotting.kernelplot import plotSpectrum
     def __abs__(self) -> Any:
       """the absolute value of the function, pointwise, as a function handle
 

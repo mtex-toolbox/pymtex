@@ -35,6 +35,12 @@ def _grid(ebsd):
   return g, g.CSList[int(ids[0])]
 
 
+# a volume takes the one sided difference alone
+def _oneSided(stencil):
+  if str(stencil).lower() != "onesided":
+    raise ValueError(f"a volume takes the one sided difference, stencil='oneSided', not {stencil!r}")
+
+
 def gradientDim(ebsd, dim):
   """the derivative of the orientation along the array axis dim of a gridded volume per unit length,
   the forward difference, backwards at the last voxel, NaN across a grain boundary"""
@@ -60,7 +66,7 @@ def _gradient(g, cs, dim):
   return vector3d(t, frame=frame)
 
 
-def gradientX(ebsd, stencil=None):
+def gradientX(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the first axis of the volume per unit length;
   MATLAB's gradientX of EBSD3square
 
@@ -76,14 +82,14 @@ def gradientX(ebsd, stencil=None):
   Output
     g - vector3d of the shape of the gridded volume, in the inverse scan unit
   Keywords
-    stencil - accepted for the signature of EBSD.gradientX and not used: a volume takes the
-        one sided difference
+    stencil - 'oneSided', the one sided difference, the one a volume takes; another is refused
   See also
     EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientX"""
+  _oneSided(stencil)
   return gradientDim(ebsd, 0)
 
 
-def gradientY(ebsd, stencil=None):
+def gradientY(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the second axis of the volume per unit length;
   MATLAB's gradientY of EBSD3square
 
@@ -99,14 +105,14 @@ def gradientY(ebsd, stencil=None):
   Output
     g - vector3d of the shape of the gridded volume, in the inverse scan unit
   Keywords
-    stencil - accepted for the signature of EBSD.gradientY and not used: a volume takes the
-        one sided difference
+    stencil - 'oneSided', the one sided difference, the one a volume takes; another is refused
   See also
     EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientY"""
+  _oneSided(stencil)
   return gradientDim(ebsd, 1)
 
 
-def gradientZ(ebsd, stencil=None):
+def gradientZ(ebsd, stencil="oneSided"):
   """the derivative of the orientation along the third axis of the volume per unit length;
   MATLAB's gradientZ of EBSD3square
 
@@ -122,14 +128,14 @@ def gradientZ(ebsd, stencil=None):
   Output
     g - vector3d of the shape of the gridded volume, in the inverse scan unit
   Keywords
-    stencil - accepted for the signature of EBSD.gradientZ and not used: a volume takes the
-        one sided difference
+    stencil - 'oneSided', the one sided difference, the one a volume takes; another is refused
   See also
     EBSD3.gradientX, EBSD3.gradientY, EBSD3.gradientZ, EBSD3.curvature, EBSD.gradientZ"""
+  _oneSided(stencil)
   return gradientDim(ebsd, 2)
 
 
-def curvature(ebsd, stencil=None):
+def curvature(ebsd, stencil="oneSided"):
   """the curvature tensor of every voxel; MATLAB's curvature of EBSD3square
 
     kappa = ebsd3['Iron'].curvature()                  # a curvatureTensor per voxel
@@ -144,11 +150,11 @@ def curvature(ebsd, stencil=None):
   Output
     kappa - curvatureTensor of the shape of the gridded volume
   Keywords
-    stencil - accepted for the signature of EBSD.curvature and not used: a volume takes the
-        one sided differences
+    stencil - 'oneSided', the one sided difference, the one a volume takes; another is refused
   See also
     EBSD3.gradientX, EBSD3.calcGND, EBSD.curvature, curvatureTensor"""
   from ..tensors.tensor import curvatureTensor
+  _oneSided(stencil)
   g, cs = _grid(ebsd)
   D = g.lattice.D
   U = D / np.linalg.norm(D, axis=1, keepdims=True)

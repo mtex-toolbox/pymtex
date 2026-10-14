@@ -65,6 +65,11 @@ class slices3d:
     self.visible = np.asarray(visible, dtype=bool)
     self.origin, self.D = np.asarray(origin, dtype=float).reshape(3), np.asarray(D, dtype=float).reshape(3, 3)
     self.at = tuple(s // 2 for s in self.visible.shape) if at is None else tuple(at)
+    if len(self.at) != 3:
+      raise ValueError("at gives one voxel index per axis, (i, j, k), None for an axis without a slice")
+    for a, (i, n) in enumerate(zip(self.at, self.visible.shape)):
+      if i is not None and not 0 <= i < n:
+        raise ValueError(f"at[{a}] = {i} lies outside the volume, whose voxel indices along that axis run from 0 to {n - 1}")
 
   def plane(self, a):
     """the slice through voxel index i along axis a: its colours (rows, cols, 3) over the other

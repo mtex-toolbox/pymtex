@@ -18,11 +18,13 @@ COLORMAP_STOPS = {
   # MATLAB's blue2redColorMap: dark blue, pure blue, white, pure red, dark red
   "blue2red": ([(0.0, 0.0, 0.53), (0.0, 0.0, 1.0), (1.0, 1.0, 1.0), (1.0, 0.0, 0.0), (0.51, 0.0, 0.0)], [0.0, 0.16, 0.5, 0.84, 1.0]),
   "red2blue": ([(0.51, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.0, 1.0), (0.0, 0.0, 0.53)], [0.0, 0.16, 0.5, 0.84, 1.0]),
-  "white2black": ([(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)], [0.0, 1.0]),
-  "black2white": ([(0.0, 0.0, 0.0), (1.0, 1.0, 1.0)], [0.0, 1.0]),
+  "white2black": ([(1.0, 1.0, 1.0), (0.7, 0.7, 0.7), (0.0, 0.0, 0.0)], [0.0, 0.5, 1.0]),
+  "black2white": ([(0.0, 0.0, 0.0), (0.7, 0.7, 0.7), (1.0, 1.0, 1.0)], [0.0, 0.5, 1.0]),
   "parula": ([(0.2081, 0.1663, 0.5292), (0.1707, 0.2919, 0.7792), (0.0265, 0.4463, 0.8797), (0.0230, 0.5641, 0.7896), (0.1834, 0.6884, 0.6146),
               (0.4147, 0.7311, 0.4842), (0.7223, 0.7517, 0.2865), (0.9634, 0.7891, 0.1663), (0.9763, 0.9831, 0.0538)], np.linspace(0, 1, 9)),
 }
+# the number of colours of MATLAB's maps: WhiteJetColorMap 100, the others 128, parula 256
+SIZES = {"whitejet": 100, "labotex": 128, "blue2red": 128, "red2blue": 128, "white2black": 128, "black2white": 128, "parula": 256}
 NAMES = {"whitejet": "WhiteJet", "labotex": "LaboTeX", "blue2red": "blue2red", "red2blue": "red2blue", "white2black": "white2black", "black2white": "black2white",
          "parula": "parula"}
 
@@ -32,13 +34,13 @@ def colormapStops(name):
   return COLORMAP_STOPS.get(str(name).lower())
 
 
-def colormapColors(name, n=256):
-  """the map sampled at n colours, an n x 3 array"""
+def colormapColors(name, n=None):
+  """the map sampled at n colours, an n x 3 array; by default as many as MATLAB's map has"""
   stops = colormapStops(name)
   if stops is None:
     raise ValueError(f"unknown MTEX colour map {name}; one of {', '.join(NAMES.values())}")
   colors, pos = np.array(stops[0]), np.asarray(stops[1], dtype=float)
-  t = np.linspace(0, 1, n)
+  t = np.linspace(0, 1, SIZES[str(name).lower()] if n is None else int(n))
   return np.stack([np.interp(t, pos, colors[:, k]) for k in range(3)], axis=1)
 
 
@@ -61,8 +63,10 @@ def mtexColormap(name=None):
   if stops is None:
     return matplotlib.colormaps[name]
   key = NAMES[str(name).lower()]
+  # as many colours as MATLAB's map has
   if key not in matplotlib.colormaps:
-    matplotlib.colormaps.register(LinearSegmentedColormap.from_list(key, colormapColors(key)), name=key)
+    C = colormapColors(key)
+    matplotlib.colormaps.register(LinearSegmentedColormap.from_list(key, C, N=len(C)), name=key)
   return matplotlib.colormaps[key]
 
 
@@ -163,16 +167,17 @@ def contourLevels(lo, hi, n=10, log=False):
   return np.linspace(lo, hi, n)
 
 
-def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None):
+def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None, N=255):
   """the colours a colour map gives those numbers, MATLAB's num2rgb
 
     rgb = num2rgb(values)                         # WhiteJet over the extent of the values
     rgb = num2rgb(values, 'hot', range=[0, 6])    # another map, a fixed range
+    rgb = num2rgb(values, 'LaboTeX', N=16)        # one of 16 colours of a named map
     rgb = num2rgb(values, blue2redColorMap(8))    # one of eight colours of a matrix
 
-  The values are scaled to the range and clipped to it; a map given by name is sampled
-  continuously, a matrix of colours gives the nearest of its rows (MATLAB's option N, the
-  number of colours of a named map, is not taken).
+  The values are scaled to the range and clipped to it, and take one of the N colours a named
+  map is sampled at, or of the rows of a matrix of colours: the value at the fraction t of the
+  range the colour ceil(t N), counted from one, the lowest value the first.
 
   Input
     values - an array of numbers
@@ -181,6 +186,7 @@ def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None):
   Keywords
     colormap - the name of a colour map, a matplotlib map or an n x 3 matrix of colours
     range - [lower, upper] limit of the values, by default their minimum and maximum
+    N - the number of colours a named map is sampled at; a matrix has its rows
   See also
     ind2color, mtexColorMap"""
   v = np.asarray(values, dtype=float).reshape(-1)
@@ -189,18 +195,21 @@ def num2rgb(values, colormap: ColormapName | Any = "WhiteJet", range=None):
   # the map is a name, a matplotlib map, or the matrix of colours one of the named maps returns
   if isinstance(colormap, np.ndarray):
     C = np.asarray(colormap, dtype=float).reshape(-1, colormap.shape[-1])[:, :3]
-    k = np.clip((t * (len(C) - 1)).round().astype(int), 0, len(C) - 1)
-    return C[k]
-  return mtexColormap(colormap)(t)[:, :3]
+  elif colormapStops(colormap) is not None:
+    C = colormapColors(colormap, N)
+  else:
+    C = mtexColormap(colormap)(np.linspace(0, 1, int(N)))[:, :3]
+  k = np.clip(np.ceil(np.nan_to_num(t) * len(C)).astype(int) - 1, 0, len(C) - 1)
+  return C[k]
 
 
 # the named maps as MATLAB names them: blue2redColorMap, LaboTeXColorMap, ...
 def _namedMap(key):
-  def f(n=256):
+  def f(n=SIZES[key]):
     return colormapColors(key, n)
   f.__name__ = NAMES[key] + "ColorMap"
   f.__doc__ = (f"the {NAMES[key]} colour map, as MATLAB's {f.__name__} returns it\n\n"
-               f"  rgb = {f.__name__}()     # 256 colours\n"
+               f"  rgb = {f.__name__}()     # {SIZES[key]} colours, as MATLAB's\n"
                f"  rgb = {f.__name__}(16)   # 16 colours\n\n"
                f"The colours are interpolated linearly between the stops of the map; pass the result to\n"
                f"mtexColorMap or as a plot's colormap.\n\n"
@@ -224,23 +233,28 @@ VEGA20 = np.array([(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 1
                    (23, 190, 207), (158, 218, 229)]) / 255
 
 
-def vega20(n=20):
+def vega20(n=None):
   """n colours of vega's twenty categorical ones, repeated beyond twenty, an n x 3 array;
-  MATLAB's vega20, matplotlib's tab20
+  MATLAB's vega20
 
-    map = vega20()     # the twenty colours
+    map = vega20()     # as many as the current colour map has
     map = vega20(5)    # the first five
 
-  The colours of matplotlib 2.0 for categorical data, pairs of a dark and a light shade. MATLAB
-  takes as many as the current colour map has by default and interpolates between the twenty.
+  The colours of matplotlib 2.0 for categorical data, matplotlib's tab20, in MATLAB's order:
+  the ten dark shades first, then the ten light ones.
 
   Output
     map - an n x 3 array of rgb values in [0, 1]
   Keywords
-    n - the number of colours
+    n - the number of colours; by default that of the colour map of the current MTEX figure,
+        else of the preference defaultColorMap
   See also
     ind2color"""
-  return VEGA20[np.arange(n) % len(VEGA20)]
+  if n is None:
+    from .mtexfigure import gcm
+    fig = gcm()
+    n = mtexColormap(getattr(fig, "colormap", None)).N
+  return VEGA20[np.r_[0:20:2, 1:20:2]][np.arange(int(n)) % len(VEGA20)]
 
 
 # the colour order MTEX sets as its preference, plotting/plotting_tools/colors.mat: the

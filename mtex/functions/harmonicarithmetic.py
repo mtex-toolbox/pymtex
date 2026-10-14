@@ -31,4 +31,17 @@ class harmonicArithmetic:
     return mapFun(lambda x: x ** p, self, bandwidth=L)
 
 
+# the coefficient arrays of lists of functions, (*shape, dim), given the axes MATLAB's cat gives
+# them: every list padded with trailing axes of length one up to the joining axis, the axis
+# counted among the list axes
+def _catParts(parts, axis):
+  nd = max(max(p.ndim - 1 for p in parts), 1)
+  if axis < 0:
+    axis += nd
+  if axis < 0:
+    raise ValueError(f"the axis {axis} is not an axis of the lists")
+  nd = max(nd, axis + 1)
+  return [p.reshape(p.shape[:-1] + (1,) * (nd - p.ndim + 1) + p.shape[-1:]) for p in parts], axis
+
+
 __all__ = []

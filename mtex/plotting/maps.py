@@ -330,8 +330,8 @@ def mapExtent(x, layout=None):
     e = mapExtent(ebsd)                              # a map
     e = mapExtent(grains, layout=mapLayout('x↑→y'))  # grains, turned to another convention
 
-  A map reaches a lattice spacing beyond its outer measurements, the padding of a grid left
-  out; grains end at the vertices of their boundary, a boundary or a list of triple points at
+  A map reaches the unit cell around its outer measurements, half a spacing on a square grid,
+  as MATLAB's plot, the padding of a grid left out; grains end at the vertices of their boundary, a boundary or a list of triple points at
   its vertices. Nothing to show gives zeros.
 
   Input
@@ -344,11 +344,12 @@ def mapExtent(x, layout=None):
   See also
     scaleBar, mapLayout"""
   M = _layoutOf(layout)
-  # a map reaches half a spacing beyond its outer measurements, anything else ends at its vertices
-  r = 0.0
+  # a map reaches the cell around its outer measurements, anything else ends at its vertices
+  cell = np.zeros((1, 2))
   if isinstance(x, EBSD):
     P = mapBox(x)
-    r = x.lattice.dxy if x.lattice is not None else 0.0
+    if x.lattice is not None:
+      cell = cellCorners(x.lattice.A, x.lattice.shape)
   elif isinstance(x, triplePointList):
     P = np.asarray(x.V).reshape(-1, 2) if len(x.grainId) else np.zeros((0, 2))
   else:
@@ -357,8 +358,9 @@ def mapExtent(x, layout=None):
     P = gB.V[np.unique(gB.F)] if len(gB.F) else np.zeros((0, 2))
   if len(P) == 0:
     return (0.0, 0.0, 0.0, 0.0)
-  Q = P @ M.T
-  return (float(Q[:, 0].min() - r), float(Q[:, 0].max() + r), float(Q[:, 1].min() - r), float(Q[:, 1].max() + r))
+  Q, C = P @ M.T, cell @ M.T
+  lo, hi = Q.min(axis=0) + C.min(axis=0), Q.max(axis=0) + C.max(axis=0)
+  return (float(lo[0]), float(hi[0]), float(lo[1]), float(hi[1]))
 
 
 def phaseColor(pl, i):

@@ -121,8 +121,8 @@ def SchmidFactor(sS, sigma=None, relative=False):
 
   One load on a list of systems gives one factor per system, a list of loads a (loads,
   systems) matrix. Without a load the result is the function of the tension direction on
-  the sphere, antipodal, vector valued for several systems; relative=True does not divide
-  this function by the CRSS, unlike MATLAB.
+  the sphere, antipodal, vector valued for several systems; relative=True divides it by the
+  CRSS as well.
 
   The systems and the load must be given in the same frame: both in crystal coordinates, or
   ori * sS and the stress as measured.
@@ -140,7 +140,7 @@ def SchmidFactor(sS, sigma=None, relative=False):
     from ..functions.s2fun import S2FunHarmonic
     fr = sS.frame.stripSym() if sS.frame is not None else None
     def values(v):
-      m = sS.SchmidFactor(vector3d(v.data.reshape(-1, 3))).reshape(-1, len(sS))
+      m = sS.SchmidFactor(vector3d(v.data.reshape(-1, 3)), relative=relative).reshape(-1, len(sS))
       return m[:, 0] if len(sS) == 1 else m
     return S2FunHarmonic(values, fr, bandwidth=2, real=True, antipodal=True)
   if isinstance(sigma, vector3d):

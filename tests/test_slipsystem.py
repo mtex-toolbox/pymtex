@@ -49,6 +49,13 @@ def test_slip_systems_of_a_family_and_their_Schmid_factors():
     slipSystem.hcp(csh)
 
 
+def test_a_CRSS_assigned_as_one_number_holds_for_every_system():
+  cs = crystalFrame("m-3m")
+  sS = slipSystem.fcc(cs).symmetrise()
+  sS.CRSS = 2.0
+  v = Miller([[0, 0, 1], [1, 2, 3]], cs, "uvw")
+  assert sS.CRSS.shape == (24,) and close(sS.SchmidFactor(v, relative=True), sS.SchmidFactor(v) / 2)
+
 def test_dislocation_systems_of_fcc():
   cs = crystalFrame("m-3m", [3.6, 3.6, 3.6], mineral="Cu")
   ds = dislocationSystem.fcc(cs)

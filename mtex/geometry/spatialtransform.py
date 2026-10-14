@@ -43,7 +43,8 @@ def _moved(pos, x, y):
 
 def fitData(posA, posB, weights=None):
   """the displacement, the weights and the positions a fit works from: a point in frame A, where
-  it went in frame B and how much it is worth; a missing or unweighted point is dropped"""
+  it went in frame B and how much it is worth; a point whose position, displacement or weight
+  is not a number is dropped, a negative weight counts as zero"""
   if not (isinstance(posA, vector3d) and isinstance(posB, vector3d)):
     raise TypeError("a transform is fitted to two vector3d point sets")
   A, B = _xyz(posA), _xyz(posB)
@@ -56,7 +57,7 @@ def fitData(posA, posB, weights=None):
     raise ValueError(f"expected {len(x)} weights, got {len(w)}")
   keep = np.isfinite(dx) & np.isfinite(dy) & np.isfinite(w) & np.isfinite(x) & np.isfinite(y)
   if not keep.any():
-    raise ValueError("every measurement handed to the fit is missing or unweighted")
+    raise ValueError("every measurement handed to the fit is missing")
   return dx[keep], dy[keep], w[keep], x[keep], y[keep]
 
 
@@ -289,7 +290,7 @@ class spatialTransformShift(spatialTransform):
     return f"scale {sx:.4g} × {sy:.4g}, rotate {rot:.3g}°, shear {shear:.3g}°, move ({self.M[0, 2]:.4g}, {self.M[1, 2]:.4g})"
 
   @staticmethod
-  def fit(posA, posB, weights=None, **kwargs):
+  def fit(posA, posB, weights=None):
     """the affine map fitted to point pairs by weighted least squares, the positions posA in frame A
     and where they went, posB
 
@@ -298,7 +299,7 @@ class spatialTransformShift(spatialTransform):
 
     The degree one polynomial fit of spatialTransformPoly.fit, plain least squares without
     the reweighting against outliers, as MATLAB's. A point with a missing position or weight
-    is dropped; other keywords are accepted and not used.
+    is dropped.
 
     Input
       posA - vector3d, the positions in frame A
@@ -340,14 +341,13 @@ class spatialTransformRigid(spatialTransformShift):
     return f"move ({self.M[0, 2]:.4g}, {self.M[1, 2]:.4g})"
 
   @staticmethod
-  def fit(posA, posB, weights=None, **kwargs):
+  def fit(posA, posB, weights=None):
     """the translation fitted to point pairs, the weighted mean of their displacements
 
       T = spatialTransformRigid.fit(posA, posB)              # the mean displacement
       T = spatialTransformRigid.fit(posA, posB, weights=w)   # the weighted mean
 
-    A point with a missing position or weight is dropped; other keywords are accepted and not
-    used.
+    A point with a missing position or weight is dropped.
 
     Input
       posA - vector3d, the positions in frame A
@@ -619,7 +619,7 @@ class spatialTransformDrift(spatialTransform):
     return {"slowScan": vector3d(self.slowScan)}
 
   @staticmethod
-  def fit(posA, posB, weights=None, slowScan=None, extrapolate=False, **kwargs):
+  def fit(posA, posB, weights=None, slowScan=None, extrapolate=False):
     """a drift along the slow scan direction, the linear spline through the median displacement
     of every scan line
 
@@ -630,8 +630,8 @@ class spatialTransformDrift(spatialTransform):
     The points of one scan line share their coordinate along the slow scan direction, up to
     rounding; each line becomes a knot with the median displacement of its points. The median
     rather than the mean: a line crossing a badly correlated patch is not pulled by it. The
-    weights only drop the points of weight zero, since one number per line leaves nothing for
-    them to outvote.
+    weights only drop the points whose weight is not a number, since one number per line
+    leaves nothing for them to outvote; a weight zero is kept, as MATLAB keeps it.
 
     Input
       posA - vector3d, the positions in the first frame
@@ -639,7 +639,7 @@ class spatialTransformDrift(spatialTransform):
     Output
       T - spatialTransformDrift, a knot per scan line
     Keywords
-      weights - array, a weight per point pair; zero drops a point
+      weights - array, a weight per point pair; not a number drops a point
       slowScan - vector3d, the slow scan direction, by default y
       extrapolate - continue the end segments beyond the first and last line, where the
           drift is otherwise NaN
@@ -722,15 +722,15 @@ class spatialTransformField(spatialTransform):
     return f"{self.pos.size} points, |u| <= {np.max(np.linalg.norm(_xyz(self.u), axis=1)):.4g}"
 
   @staticmethod
-  def fit(posA, posB, weights=None, **kwargs):
+  def fit(posA, posB, weights=None):
     """the field of the displacements of the point pairs, at the points of frame A
 
       T = spatialTransformField.fit(posA, posB)              # the displacements as measured
 
     There is nothing to fit: the field interpolates its samples exactly. The weights only
     drop the points whose weight is not a number, as the points with a missing position are
-    dropped, so the same call works on the output of a failed correlation; other keywords are
-    accepted and not used.
+    dropped, so the same call works on the output of a failed correlation; a weight zero is
+    kept, as MATLAB keeps it.
 
     Input
       posA - vector3d, the positions in frame A

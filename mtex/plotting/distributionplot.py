@@ -91,7 +91,7 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
     maxOmega = fundamentalRegion(obj.CS, obj.SS).maxAngle()
     omega = obj.angle().ravel()
     if bars is None:
-      if np.max(omega) < maxOmega / 2:
+      if omega.size and np.max(omega) < maxOmega / 2:
         maxOmega = float(np.max(omega))
       n = max(15, round(maxOmega / resolution)) if numBins is None else int(numBins)
       bins = np.linspace(-np.finfo(float).eps, maxOmega + 0.01, n)
@@ -102,7 +102,8 @@ def plotAngleDistribution(obj, *args, figSize=None, resolution=5 * degree, numBi
     label = displayName if displayName is not None else f"{obj.CS.mineral}-{obj.SS.mineral}"
     kw.setdefault("edgecolor", "k")
     kw.setdefault("linewidth", 0.5)
-    h = ax.bar(mid / degree, 100 * d / np.sum(d), width=(bins[1] - bins[0]) / degree, label=label, **kw)
+    # an empty list has bars of no height
+    h = ax.bar(mid / degree, 100 * d / max(np.sum(d), 1), width=(bins[1] - bins[0]) / degree, label=label, **kw)
     ax._mtexAngleBins = bins
     ax.set_xlim(0, bins[-1] / degree)
     unit = "%"

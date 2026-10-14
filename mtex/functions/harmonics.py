@@ -238,7 +238,8 @@ def _WignerD(g, degree=None, *, bandwidth=None, dtype=None):
   dtype = g.data.dtype if dtype is None else np.dtype(dtype)
   qs = g.data.reshape(-1, 4)
   per = [_wignerDRotation(q, L, dtype) for q in qs]
-  out = [np.stack([p[n] for p in per]).reshape(*g.shape, 2 * n + 1, 2 * n + 1) for n in range(L + 1)]
+  out = [(np.stack([p[n] for p in per]) if per else np.zeros((0, 2 * n + 1, 2 * n + 1), dtype=np.result_type(dtype, 1j)))
+         .reshape(*g.shape, 2 * n + 1, 2 * n + 1) for n in range(L + 1)]
   return out[-1] if single else out
 
 
@@ -256,10 +257,9 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
   SO3FunHarmonic are taken in: with normalize=True, f(g) = sum fhat_n^{kl} D_n^{kl}(g). A
   list of rotations gives the matrices stacked in front, (..., 2l+1, 2l+1).
 
-  For a frame or a point group the result is the projection onto the functions invariant
-  under the group. It is taken in the port's internal sign convention, which differs from
-  the mean of WignerD(g, l) over the group's rotations by the signs of some entries, and
-  normalize does not apply to it. MATLAB's kernel option is not there.
+  For a frame or a point group the result is the mean of the matrices over the rotations of
+  its proper group, the projection onto the functions invariant under the group. MATLAB's
+  kernel option is not there.
 
   Input
     g - rotation, orientation or quaternion
@@ -280,7 +280,8 @@ def WignerD(g, degree=None, *, bandwidth=None, normalize=False, dtype=None):
   if isinstance(g, (int, float, np.floating, np.integer)):
     mats = [wignerd(float(g), n) for n in range(L + 1)]
   elif isinstance(g, (referenceFrame, symmetry)):
-    return _WignerD(g, degree, bandwidth=bandwidth, dtype=dtype)
+    # the projection is the mean of the transposed internal matrices, transposed back here
+    mats = [P.T for P in _WignerD(g, bandwidth=L, dtype=dtype)]
   else:
     mats = _WignerD(g, bandwidth=L, dtype=dtype)
   out = []

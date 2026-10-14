@@ -1,10 +1,11 @@
 # measured pole figures written as text tables (MATLAB @PoleFigure/export): one file per
 # pole figure, named by the base name and the crystal directions of the entry, a row per
 # specimen direction of its polar angle, its azimuth and the intensity, the angles in
-# radians unless asked for degrees; the columns loadPoleFigure reads back
+# radians unless asked for degrees, as MATLAB writes them; the columns loadPoleFigure reads back,
+# radians=True for a table in radians
 #
 #   export(pf, 'dubna')                 dubna_{101̅0}.txt, ...
-#   export(pf, 'dubna', 'degree')       the angles in degrees, export(pf, 'dubna', degree=True) too
+#   export(pf, 'dubna', degree=True)    the angles in degrees
 from __future__ import annotations
 
 import os
@@ -26,7 +27,8 @@ def exportPoleFigure(pf, fname, *args, degree=False):
 
   Every crystal direction (or superposition of directions) gets the file
   <fname>_<directions>.txt with three columns, the polar angle and the azimuth of the specimen
-  directions and the intensity, the table loadPoleFigure reads back.
+  directions and the intensity, the table loadPoleFigure reads back, with radians=True unless
+  written with degree=True. The angles are in radians by default, as MATLAB writes them.
 
   Input
     pf - a PoleFigure

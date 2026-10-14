@@ -672,8 +672,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   Output
     h - the matplotlib collection of the grains
   Keywords
-    faceColor - one colour for every grain; 'none' fills the grains black, alpha=0 draws
-        the boundary alone
+    faceColor - one colour for every grain; 'none' draws the outlines alone
     colormap - the colour map of values
     colorRange - (lo, hi), the values the colour map spans
     colorbar - add a colour bar for values
@@ -707,7 +706,11 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   mapKw = _splitMap(kw)
   mP = _target(grains, mapKw)
   ax = mP.ax
-  values, scalar = mapValues(grains, color, faceColor, ipfDirection)
+  # faceColor='none' draws the outlines alone
+  hollow = isinstance(faceColor, str) and faceColor.lower() == "none"
+  values, scalar = mapValues(grains, color, None if hollow else faceColor, ipfDirection)
+  if hollow:
+    scalar = False
   cmap = mtexColormap(colormap)
   # every grain is one path with its holes, all of them one collection
   paths, at = _grainPaths(grains, mP)
@@ -721,7 +724,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
     h.set_norm(_norm(values, colorRange))
     mP.mappable = h
   else:
-    h.set_facecolors(values[at])
+    h.set_facecolors("none" if hollow else values[at])
     h.set_edgecolors("none")
   if translucent is not None:
     h.set_alpha(_translucency(values[at], scalar, float(translucent)))
@@ -732,7 +735,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
     # the boundary takes the line colour, else the face colour, else black, as MATLAB passes
     # its options on; faces of no colour keep a black outline
     if lineColor is None:
-      lineColor = faceColor if faceColor is not None and not (isinstance(faceColor, str) and faceColor.lower() == "none") else "k"
+      lineColor = faceColor if faceColor is not None and not hollow else "k"
     _boundaryLines(mP, grains.boundary, lineColor, lineWidth, zorder=3)
   if scalar and colorbar:
     gcm().colorbar(label=color if isinstance(color, str) else "")
@@ -744,7 +747,7 @@ def plotGrains(grains, color=None, faceColor=None, colormap="viridis", colorRang
   if named and displayName is not None:
     from matplotlib.colors import to_rgb
     from matplotlib.patches import Patch
-    mP.ax.legend(handles=[Patch(facecolor=to_rgb(faceColor), edgecolor="k", label=displayName)], loc="upper right")
+    mP.ax.legend(handles=[Patch(facecolor="none" if hollow else to_rgb(faceColor), edgecolor="k", label=displayName)], loc="upper right")
   return h
 
 
@@ -1077,7 +1080,7 @@ def textMap(x, labels, fontSize=None, color="k", **kw: Unpack[PlotKeywords]):
 
 
 def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displayName=None, autoScaleFactor=None, projectIntoPlane=False,
-              antipodal=False, **kw: Unpack[PlotKeywords]):
+              antipodal=False, maxHeadSize=None, **kw: Unpack[PlotKeywords]):
   """arrows on a map: one per grain at its centroid, per measurement, or per boundary segment
   at its midpoint
 
@@ -1086,6 +1089,7 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
     quiver(gB, gB.direction, autoScaleFactor=0.5)    # a needle per boundary segment
     quiver(grains, v, antipodal=True)                # axes, centred on the centroids
     quiver(grains, v, scale=10)                      # scale times the length of v
+    quiver(ebsd, v, maxHeadSize=0.2)                 # heads a fifth of the longest arrow
 
   A direction starts at its point, an axis (an antipodal vector, or antipodal=True) runs both
   ways from it. The default length depends on what carries the arrows:
@@ -1117,6 +1121,8 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
     projectIntoPlane - let the arrow of a grain start at its centroid even when its direction
         points into the map, where it would otherwise end there
     antipodal - draw the vectors as axes, centred on their points
+    maxHeadSize - the length of the heads as a fraction of the longest arrow, MATLAB's
+        MaxHeadSize; by default matplotlib's heads
   See also
     grain2d.plot, EBSD.plot, Annotations"""
   from matplotlib.collections import LineCollection
@@ -1147,7 +1153,8 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
   if kind == "grains" and scaling and scale is None:
     # without a colour the arrows of the grains take the next of the axes' colour order, as MATLAB's
     color = mP.ax._get_lines.get_next_color() if color is None else color
-    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, displayName, projectIntoPlane, **kw)
+    return _quiverGrains(mP, c, raw, default, v.antipodal or antipodal, color, 2.0 if lineWidth is None else lineWidth, displayName, projectIntoPlane,
+                         maxHeadSize, **kw)
   lineWidth = 1.0 if lineWidth is None else lineWidth
   color = "k" if color is None else color
   u = np.stack([raw @ pl.e1, raw @ pl.e2], axis=-1)
@@ -1166,8 +1173,20 @@ def quiverMap(x, v, scale=None, color=None, lineWidth=None, scaling=True, displa
     mP.ax.add_collection(h)
     return h
   p, d = mP.onScreen(c), u @ mP.layout.T
-  return mP.ax.quiver(p[:, 0], p[:, 1], d[:, 0], d[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.003, label=displayName,
-                      zorder=4, **kw)
+  width, heads = _heads(mP.ax, 0.003, d, maxHeadSize)
+  return mP.ax.quiver(p[:, 0], p[:, 1], d[:, 0], d[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=width, label=displayName,
+                      zorder=4, **heads, **kw)
+
+
+# MATLAB's MaxHeadSize, the head as a fraction of the longest arrow: the shaft's width in the
+# units of the axes, the head in multiples of it, in the proportions of matplotlib's head
+def _heads(ax, width, d, maxHeadSize):
+  if maxHeadSize is None or not len(d):
+    return width, {}
+  x = ax.get_xlim()
+  width = width * abs(x[1] - x[0])
+  head = maxHeadSize * float(np.max(np.hypot(d[:, 0], d[:, 1]))) / width
+  return width, {"units": "xy", "headlength": head, "headaxislength": 0.9 * head, "headwidth": 0.6 * head}
 
 
 # the needles on a boundary as MATLAB draws them: quiver3 of v and -v from every midpoint,
@@ -1201,7 +1220,7 @@ def _quiverBoundary(mP, c, raw, f, color, lineWidth, displayName, **kw):
 # the arrows on grains as MATLAB draws them: a fifth of the diameter along the direction in
 # space, seen on the map, so that a steep direction is short; an axis both ways from the
 # centroid, a direction pointing into the map ending at the centroid; a dot at the centroid
-def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, projectIntoPlane, **kw):
+def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, projectIntoPlane, maxHeadSize=None, **kw):
   from matplotlib.collections import LineCollection
   pl = mP.plane
   nrm = np.linalg.norm(raw, axis=-1)
@@ -1217,8 +1236,9 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, 
   else:
     start = c - u * (d @ mP.outOfScreen < 0)[:, None]
     p, q = mP.onScreen(start), u @ mP.layout.T
-    h = mP.ax.quiver(p[:, 0], p[:, 1], q[:, 0], q[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=0.0015 * lineWidth,
-                     label=displayName, zorder=4, **kw)
+    width, heads = _heads(mP.ax, 0.0015 * lineWidth, q, maxHeadSize)
+    h = mP.ax.quiver(p[:, 0], p[:, 1], q[:, 0], q[:, 1], angles="xy", scale_units="xy", scale=1, color=color, width=width,
+                     label=displayName, zorder=4, **heads, **kw)
   mP.ax.scatter(*mP.onScreen(c).T, s=4 * lineWidth ** 2, color=color, zorder=5)
   return h
 

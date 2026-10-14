@@ -521,9 +521,8 @@ class grain2d(polygonSet):
       parentId = grains.merge(threshold=5*degree, testRun=True)  # the parent ids, nothing merged
 
     Two grains go into one when a criterion joins them, directly or through a chain of other
-    grains. Inclusions combine with pairs or a threshold. A threshold, however, replaces the
-    pairs given with it, and a label per grain ignores inclusions; MATLAB applies every
-    criterion given.
+    grains. Every criterion given applies at once: pairs or labels, a threshold and inclusions
+    together join what any of them joins.
 
     Grains of two phases are merged only by an inclusion, which then takes the phase and the
     orientation of its host. A pair of two phases is passed over, and a label spanning phases
@@ -560,10 +559,8 @@ class grain2d(polygonSet):
     if len(np.unique(self.id)) != self.size:
       raise ValueError("merging requires distinct grains")
     pos = self._positions()
-    labels = None
-    if threshold is not None:
-      pairs = self._pairsBelow(threshold)
-    elif isinstance(pairs, grainBoundary):
+    a, b = [], []
+    if isinstance(pairs, grainBoundary):
       pairs = pairs.grainId
     elif hasattr(pairs, "tocoo") or (isinstance(pairs, np.ndarray) and pairs.ndim == 2 and pairs.shape[0] == pairs.shape[1] != 2):
       A = pairs.tocoo() if hasattr(pairs, "tocoo") else None
@@ -571,15 +568,23 @@ class grain2d(polygonSet):
       nz = (A.data != 0) if A is not None else np.ones(len(r), dtype=bool)
       pairs = np.stack([r[nz], c[nz]], axis=1) + 1
     elif pairs is not None and np.ndim(pairs) == 1 and len(pairs) == self.size:
-      # a label spanning phases joins the grains of each phase apart
+      # a label per grain joins the grains of one label and one phase, chained in list order
       labels = np.unique(np.asarray(pairs).reshape(-1), return_inverse=True)[1].reshape(-1)
       labels = labels.astype(np.int64) * 256 + self.phaseId.astype(np.int64)
+      order = np.argsort(labels, kind="stable")
+      same = np.flatnonzero(labels[order[1:]] == labels[order[:-1]])
+      a.append(order[same])
+      b.append(order[same + 1])
       pairs = None
+    if threshold is not None:
+      pairs = np.concatenate([np.zeros((0, 2), dtype=np.int64) if pairs is None else np.asarray(pairs, dtype=np.int64).reshape(-1, 2),
+                              np.asarray(self._pairsBelow(threshold), dtype=np.int64).reshape(-1, 2)])
     pairs = np.zeros((0, 2), dtype=np.int64) if pairs is None else np.asarray(pairs, dtype=np.int64).reshape(-1, 2)
-    a, b = _at(pos, pairs[:, 0]), _at(pos, pairs[:, 1])
-    ok = (a >= 0) & (b >= 0)
-    ok[ok] &= self.phaseId[a[ok]] == self.phaseId[b[ok]]
-    a, b = a[ok], b[ok]
+    pa, pb = _at(pos, pairs[:, 0]), _at(pos, pairs[:, 1])
+    ok = (pa >= 0) & (pb >= 0)
+    ok[ok] &= self.phaseId[pa[ok]] == self.phaseId[pb[ok]]
+    a.append(pa[ok])
+    b.append(pb[ok])
     isIncl = np.zeros(self.size, dtype=bool)
     if inclusions is not None and inclusions is not False:
       hostId = self.inclusionHost
@@ -589,10 +594,9 @@ class grain2d(polygonSet):
       hostPos = _at(pos, hostId)
       if host is not None:
         isIncl[isIncl] &= np.asarray(host, dtype=bool).reshape(-1)[hostPos[isIncl]]
-      a = np.concatenate([a, np.flatnonzero(isIncl)])
-      b = np.concatenate([b, hostPos[isIncl]])
-    if labels is None:
-      labels = components(self.size, a, b, backend="numpy")
+      a.append(np.flatnonzero(isIncl))
+      b.append(hostPos[isIncl])
+    labels = components(self.size, np.concatenate(a).astype(np.int64), np.concatenate(b).astype(np.int64), backend="numpy")
     parent, n = _firstAppearanceLabels(labels)
     if testRun:
       return self.id.copy() if n == self.size else parent

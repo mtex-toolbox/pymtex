@@ -15,7 +15,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
-from .keywords import refuseVariants
+from .keywords import lineKeywords, refuseVariants
 from .mtexfigure import gcm, mtexFigure
 from .sections import ODFSections, SECTION_OPTIONS, newODFSectionPlot
 from .sphericalplot import (FILL_FLAGS, fillFlag, _arrows, _filled, _markers, _rangeOf, _split, sphericalPlot)
@@ -276,34 +276,51 @@ def annotateSection(ori, *args, **kw: Unpack[PlotKeywords]):
   return _plotSectionOri(ori, oS, values=values, all=True, onto=True, **kw)
 
 
-def plotFibreSection(f, points=1000, lineColor="k", **kw: Unpack[PlotKeywords]):
-  """a fibre on the current section plot, as a chain of dots through the sections it passes;
-  what plot(f) does on a section plot
+def plotFibreSection(f, points=1000, lineColor="k", lineWidth=1.5, **kw: Unpack[PlotKeywords]):
+  """a fibre on the current section plot, as lines through the sections it passes; what
+  plot(f) does on a section plot, MATLAB's line of the orientations of the fibre
 
     odf.plotSection(); plot(f)                     # the fibre over the sections of an ODF
-    plot(f, points=200, lineColor='r')             # fewer and red dots
+    plot(f, points=200, lineColor='r', lineWidth=2)  # coarser, red and thicker
     plotFibreSection(f)                            # the same, called directly
 
-  The fibre is sampled at evenly spaced orientations, each drawn as a dot in the section it
-  lies in. Further keywords go to the markers, as markerSize; lineWidth is ignored.
+  The fibre is sampled at evenly spaced orientations and every symmetric equivalent of them
+  is put into the section it lies in; neighbours along the fibre in one section are joined by
+  a line, which breaks where the fibre leaves the section or the chart. Further keywords go to
+  the lines.
 
   Input
     f - fibre
   Output
-    h - list of the marker handles
+    h - list of the line handles
   Keywords
     points - the number of orientations along the fibre
-    lineColor - the colour of the dots
+    lineColor - the colour of the lines
+    lineWidth - the width of the lines
   See also
     fibre, plotSection, annotateSection"""
   oS = _currentSections()
   kw.pop("add2all", None)
-  kw.pop("lineWidth", None)
+  lineColor = kw.pop("color", lineColor)
   ori = f.flatten().orientation(points) if hasattr(f, "flatten") else f.orientation(points)
-  kw.setdefault("markerSize", 1.5)
-  kw.setdefault("markerFaceColor", lineColor)
-  kw.setdefault("markerEdgeColor", lineColor)
-  return _plotSectionOri(ori, oS, all=True, onto=True, **kw)
+  _, axesKw, whereKw = _split(kw)
+  kw = lineKeywords(kw)
+  fig, plots = _sectionAxes(oS, 0, axesKw, whereKw, onto=True)
+  vs, sec, src = oS.sectionData(ori)
+  hs = []
+  for k, cell, ind in _perSection(plots, sec):
+    # the points of one equivalent come in the order of the fibre: a chain breaks where the
+    # next point is not the next one of the fibre
+    gap = (np.diff(ind) != 1) | (np.diff(src[ind]) != 1)
+    for sP in cell:
+      x, y = sP.proj.project(vs[ind])
+      x, y = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+      # and where it leaves the chart and comes back elsewhere
+      step = np.hypot(np.diff(x), np.diff(y))
+      jump = np.flatnonzero(gap | (step > 0.25 * np.nanmax(np.abs(np.concatenate([x, y])), initial=1.0)))
+      x, y = np.insert(x, jump + 1, np.nan), np.insert(y, jump + 1, np.nan)
+      hs.append(sP.ax.plot(x, y, color=lineColor, linewidth=lineWidth, zorder=7, **kw))
+  return hs
 
 
 def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degree, **kw: Unpack[PlotKeywords]):
@@ -346,7 +363,8 @@ def quiverSection(ori, w, *args, color="k", lineWidth=1.0, resolution=10 * degre
     from .polarplot import quiverSectionS2
     return quiverSectionS2(ori, w, *args, color=color, lineWidth=lineWidth, **kw)
   oS = _currentSections()
-  projKw, axesKw, whereKw = _split(kw)
+  _, axesKw, whereKw = _split(kw)
+  kw = lineKeywords(kw)
   fig, plots = _sectionAxes(oS, 0, axesKw, whereKw, onto=True)
   vs, sec, src = oS.sectionData(ori)
   w = asVector3d(w)

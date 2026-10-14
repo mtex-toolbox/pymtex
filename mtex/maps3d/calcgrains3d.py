@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from ..geometry.kernels import qconj, qmul
+from ..geometry.kernels import columnMin, qconj, qmul
 from ..maps.calcgrains import _grainTable, undersized
 from ..maps.calcgrains import calcGrains as _calcGrains2d
 from ..maps.decomposition import _gather
@@ -235,7 +235,8 @@ def _grains(e, g, grainId, nGrains, Dl, Dr, dim, L):
   cId, T = np.unique(T, return_inverse=True)
   T = T.reshape(-1, 3)
   c = np.stack(np.unravel_index(cId, cshape, order="F"), axis=1)
-  V = lat.origin + (c - 0.5) @ lat.D
+  # a part of a volume starts at its first voxel, not at the origin of its lattice
+  V = lat.origin + (c + (columnMin(lat.ijk) if len(lat.ijk) else 0) - 0.5) @ lat.D
   a, b = np.repeat(a, 2), np.repeat(b, 2)
   inner = b >= 0
   bs = np.maximum(b, 0)

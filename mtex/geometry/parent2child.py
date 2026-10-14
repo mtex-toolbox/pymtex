@@ -236,6 +236,8 @@ def calcParent2Child(mori, p2c, local=False, quantile=0.9, threshold=np.inf, max
   mori = mori.flatten()
   if p2c.frameB is not mori.frameA:
     raise ValueError("the misorientations are between the child frame of the relationship")
+  if mori.size == 0:
+    raise ValueError("the relationship is fitted to child to child misorientations, and none are given")
   tau = 1 - np.cos(min(threshold, np.pi))
   moriAll = mori
   mori = _subSample(mori, maxSample)
@@ -407,6 +409,9 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
     par = parentOri.flatten()
     if par.size == 1 and child.size > 1:
       par = par._new(np.broadcast_to(par.data.reshape(1, 4), (child.size, 4)).copy())
+    if child.size == 0:
+      fit = np.zeros((0, numV))
+      return _asParents(child, PV, *_best(fit, numFit, (numV,)), id)
     mori = _stripChild(child.inv() * par)
     fit = mori.reshape(-1, 1).angle(_stripChild(PV).reshape(1, -1))
     return _asParents(childOri.flatten(), PV, *_best(fit, numFit, (numV,)), id)
@@ -432,6 +437,9 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
     f12, f23, f13 = table(0, 1), table(1, 2), table(0, 2)
     n = len(q)
     ids, vals = [], []
+    if n == 0:
+      i, v = _best(np.zeros((0, numV ** 3)), numFit, (numV, numV, numV))
+      ids, vals = [i], [v]
     for s0 in range(0, n, 256):
       b = slice(s0, min(n, s0 + 256))
       fit = np.broadcast_to(f12[b, :, :, None], (f12[b].shape[0], numV, numV, numV)).copy()
@@ -445,6 +453,8 @@ def calcParent(childOri, *args, numFit=1, id=False, weights=None, threshold=10 *
     return _asParents(childOri, PV, np.concatenate(ids), np.concatenate(vals), id)
   # many children of one parent
   childOri = childOri.flatten()
+  if childOri.size == 0:
+    raise ValueError("the parent of a grain is reconstructed from its child orientations, and none are given")
   w = np.ones(childOri.size) if weights is None else np.asarray(weights, dtype=float).reshape(-1)
   w = w / np.sum(w)
   seed = childOri[int(np.argmax(w))]
@@ -531,7 +541,7 @@ def _robustMeans(q, w):
 def _asParents(childOri, PV, ids, fit, id):
   if id:
     return ids, fit
-  q = childOri.data.reshape(childOri.shape[0], -1, 4) if childOri.ndim == 2 else childOri.data.reshape(-1, 1, 4)
+  q = childOri.data.reshape(childOri.shape[0], childOri.shape[1], 4) if childOri.ndim == 2 else childOri.data.reshape(-1, 1, 4)
   ids = np.asarray(ids)
   if ids.ndim == 1:
     parents = qmul(q[:, 0], PV.data.reshape(-1, 4)[ids - 1])

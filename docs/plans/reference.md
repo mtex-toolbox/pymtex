@@ -141,67 +141,33 @@ write, never handed to matplotlib; `plot(grains, 'area')` by a measure's name;
   `tensor.mean('geometric')`, `S2Grid`'s `restrict2MinMax`, `calcError`'s `L0`,
   `calcKernel`'s `LSCV`, `BCV`, `classix`'s further outputs, `homochoricSO3Grid`.
 
-### Found while writing the sections of the other 535 (2026-10-14)
+### Found while writing the sections of the other 535 and rewriting the long descriptions (2026-10-14)
 
-Every public function or method taking a keyword now has MATLAB's sections (six agents, every
-form run; 968 pages with a Keywords table). Not fixed yet:
+Every public function or method taking a keyword has MATLAB's sections (six agents, 968 pages
+with a Keywords table), and 85 long descriptions were rewritten as short paragraphs and lists
+(five agents, `calcKernel` the model). The about 75 bugs they found were fixed the same day by
+five agents, a test of the general case only for the main functions (`fill`, `merge`,
+`calcTensor`, `interpolate`, `SchmidFactor`, `PoissonRatio`, `calcComponents`, `calcCluster`,
+`transformODF`, `WignerD`, the CRSS of slip systems, the grains of part of a volume). Among them:
+`fill` and `interp` fill the pixels `calcGrains` absorbed; `merge` ORs every criterion, as MATLAB;
+`reduce` keeps a grid; `hasPhase('notIndexed')` includes the rim; `calcGrains` of part of a volume
+places its grains at its voxels; `calcComponents` weights seeds by the density and reports;
+`calcError` refuses different Laue groups; `WignerD` of a group is the mean of the public
+matrices; `PoissonRatio` of the uniform texture from the mean compliance, as MATLAB; the
+directional forms of `shearModulus`, `PoissonRatio`, `energyVector`; `orientation.fit` takes the
+frames of its inputs; `Miller(antipodal=True)`; `variants` refuses ids outside 1..n; the colour
+maps take MATLAB's sizes and `vega20` its order; a map's extent is padded half a spacing, as
+MATLAB; `plotSpectrum` is a method of the functions and kernels and draws S1 functions;
+`export(odf)` refuses unknown keywords; empty inputs give empty results throughout. Not bugs, as
+MATLAB: zero weights in the spatial transform fits, `PoleFigure.cat(axis=)`, `gray` of
+`HKLDirectionKey`, `dispStyle` of a Miller string, `calcTraces('Radon')` on an isotropic cluster,
+the radians `export(pf)` writes.
 
-- Bugs: `SO3F.grad(ori)` of a handle or composition recurses; `cat(F1, F2, axis=1)` of harmonic
-  functions joins the coefficients; `PoleFigure.unique` ignores a specimen group of two
-  elements; the rotate warning names the specimen side when it strips the crystal's;
-  `S2Fun.volume` is no method; `transformODF(vSel=)` is not normalised; `plotSpectrum` of an
-  `S1FunHarmonic`; `plotFibre([odf, odf], f)`; `setCamera('x↑→y')` with a string;
-  `shapeOutlines` with a `plane3d`; `quiver(ebsd, v, maxHeadSize=)` reaches matplotlib;
-  `text(x, y, z, s)` writes into the last mtexFigure; `plotFibreSection` ignores `lineWidth`;
-  `saveFigure` drops `*args`; `mapExtent` pads a full spacing; `grainBoundary.hasPhase('notIndexed')`
-  leaves out the rim; `EBSD3.gradientX/Y/Z`, `curvature` ignore `stencil`; `export(pf)` writes
-  names `string2Miller` cannot read back, and radians the reader takes as degrees;
-  `intersect(segLength=True)` gives zero lengths at vertices; `EBSD3.slice` and `grain3d.slice`
-  of a plane missing the volume raise; `Miller(..., antipodal=True)` does not set it;
-  `orientation.fit(u, v)` ignores the frames of its inputs; `layoutIndex` with a `gridLayout`;
-  `rotation.dot(orthogonalTransform)` broadcasts (2,4) against (2,5); `SO3TangentVector.cat`
-  loses references, its `sum`/`mean(axis=-1)` reduce the components; `exp(rotRef, v)` does not
-  broadcast; `quaternion.dot(antipodal=)`, `slipSystem.cat(axis=)`, `PoleFigure.cat(axis=)`,
-  `spatialTransformField.fit(weights=)` (zero weights kept), `dyad(n=)`, the `folds` of the
-  Wigner series on a quadrature grid are ignored; `symmetry.fundamentalRegion` labels -3m as
-  3̅1m; `calcKearnsFactor(odf)` without h; `shearModulus(C, None, u)`; `PoissonRatio(C, None, y)`
-  ignores y, and its isotropic ratio is Voigt where MATLAB's looks Reuss; `calcTensor` of a map
-  needs a tensor for every phase; `reduce` of a gridded map returns a list; the rotation line
-  page (`rotation.line`) resolves to the map polyline.
 - MATLAB features missing: `S2FunHarmonic.adjoint`'s flags and `symmetrise(sF, d)`;
   `SO3Kernel.calcFourier`'s `GaussKronrod`; `mlsq`'s defaults and handles; `doEulerStep`'s implicit
   modes; `birefringence`'s nMin, nMax; `embedding.mean(e, d)`; `fundamentalRegionEuler`'s
   `complete`; `EBSD.rotate(center=)`; `grain3d.neighbors`' matrix; `EBSD.gradient`'s basis;
   `surfor`'s omega output; `num2rgb`'s N; `setColorRange('zero2white')`.
-
-### Found while rewriting the long descriptions (2026-10-14)
-
-85 descriptions over 90 words a paragraph or 200 in all rewritten as short paragraphs and lists
-(five agents, `calcKernel` the model), each claim checked against the code, the forms and their
-edge cases run. Not fixed yet:
-
-- Wrong results: `fill(ebsd)` and `interp` after `calcGrains` leave the absorbed pixels (the
-  grain's phase, a NaN rotation) unfilled, as measured (`smoothingGraph`'s `isData` by phase);
-  `SchmidFactor(sS, relative=True)` without a load ignores `relative`; `energyVector(C, n, vp, pp)`
-  ignores `n` for an S2Fun speed; `calcComponents` never reads `verbose`, and weights seeds
-  without weights equally where MATLAB weights them by the density; `calcError` compares
-  different Laue groups silently; `variants(p2c, ori, 0)` is variant 24; `interpolate(...,
-  withParameters=True)` drops the parameters for several columns and on the sphere;
-  `loadEBSD3([f1, f2], CS=)` ignores `CS`; `calcCluster` gives -1 for the dropped modes and a
-  cluster to NaN orientations; `merge(grains, ...)`: a threshold replaces the pairs, labels
-  ignore `inclusions`, MATLAB ORs every criterion; `plot(grains, faceColor='none')` fills black;
-  `calcTensor(ebsd, weights=)` of a gridded map; `calcGBNDKernel(bump=True)` has mean 0.93;
-  `legend` after `mtexColorbar` goes into the colour bar; `SO3VectorFieldHarmonic([f, f, f])`
-  loses the frames; `layoutIndex` with a 3-D shape transposes every axis; `plotSpectrum` of an
-  `S1FunHarmonic` draws its SO(3) conversion; a float `CRSS` breaks `SchmidFactor`;
-  `calcTraces('Radon')` finds a direction in an isotropic cluster.
-- Refused badly: empty input of `WignerD`, `symmetrise`, `plotAngleDistribution`,
-  `calcAngleDistribution`, `embedding`, `birefringence`, `discreteSample`, `volume`, `gradient`,
-  `interpolate`, `interpolateRBF`, `SO3FunHarmonic.quadrature`, `calcParent`,
-  `calcParent2Child`, `calcCluster`, `calcTensor`, `S2AxisFieldHarmonic`; `volume(odf, c, 0)`;
-  `weightedBurgersVec(windowSize=0)`; `discreteSample` of a NumPy ufunc; `EBSD3.plot(at=)`
-  outside the volume; `export(odf, ...)` and `trueEbsd.setOptions` take misspelled or wrong
-  values silently; `interpolateRBF` refuses several columns.
 
 ## 4. Open questions
 

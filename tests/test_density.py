@@ -123,6 +123,14 @@ def test_interpolate_ofExactSamplesRecoversTheFunction():
   assert np.allclose(g(rs), f(rs), rtol=1e-4, atol=1e-4 * np.max(np.abs(f(rs))))
 
 
+def test_interpolate_ofSeveralColumnsGivesEachColumnsFitAndParameters():
+  cs, ss, f, o = mmmSamples()
+  y = np.stack([f(o), -2 * f(o)], axis=1)
+  g, (flag, res, it) = interpolate(o, y, bandwidth=5, withParameters=True)
+  g1, p1 = interpolate(o, y[:, 1], bandwidth=5, withParameters=True)
+  assert g.shape == (2,) and g[1].isclose(g1, 1e-10) and (flag[1], res[1], it[1]) == p1
+
+
 def test_interpolate_takesTheMeanOfANodeGivenTwice():
   # a node given twice with two values is one node with their mean
   cs, ss, f, o = mmmSamples()

@@ -351,6 +351,13 @@ def test_WignerD_isOrthonormalUnderTheHaarMeasure():
 groupNames = ("m-3m", "622", "-3m", "2/m", "-1", "4mm")
 
 
+@pytest.mark.parametrize("name", groupNames + ("321",))
+def test_WignerD_publicOfAGroupIsTheMeanOverItsRotations(name):
+  pg = symmetry(name)
+  for n in range(5):
+    assert close(WignerD(pg, n), np.mean(WignerD(pg.properGroup().rotations().flatten(), n), axis=0))
+
+
 @pytest.mark.parametrize("name", groupNames)
 def test_WignerD_ofAGroupIsAnOrthogonalProjection(name):
   P = _WignerD(symmetry(name), bandwidth=3)

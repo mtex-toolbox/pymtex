@@ -104,6 +104,17 @@ def test_calcCluster_byDefaultTakesTheModesOfTheDensity(fourClouds):
   assert ori.calcCluster(numCluster=2)[1].size == 2
 
 
+@pytest.mark.parametrize("method", ["odf", "classix", "hierarchical"])
+def test_calcCluster_labelsEveryValidOrientationAndNoNaNOne(fourClouds, method):
+  ori = fourClouds[3]
+  d = ori.data.copy()
+  d[:3] = np.nan
+  cId, center = calcCluster(orientation(rotation(d), ori.CS), method=method, numCluster=None if method == "classix" else 4)
+  # the NaN orientations get no cluster, every other id is a cluster or NaN, never another number
+  ok = np.isnan(cId[3:]) | ((cId[3:] >= 0) & (cId[3:] < center.size))
+  assert np.all(np.isnan(cId[:3])) and np.all(ok)
+
+
 def test_calcCluster_refusesAnUnknownMethod(fourClouds):
   ori = fourClouds[3]
   with pytest.raises(ValueError):

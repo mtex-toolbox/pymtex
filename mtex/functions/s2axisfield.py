@@ -151,7 +151,7 @@ class S2AxisFieldHarmonic(S2AxisField):
       frame = pts.frame if frame is None else frame
       L = getMTEXpref("defaultS2Bandwidth") if bandwidth is None else int(bandwidth)
       d = vector3d(pts.data.reshape(-1, 3)).normalize()
-      w = np.full(d.size, 4 * np.pi / d.size) if weights is None else np.asarray(weights, dtype=float).ravel()
+      w = np.full(d.size, 4 * np.pi / max(d.size, 1)) if weights is None else np.asarray(weights, dtype=float).ravel()
       fhat = _adjointColumns(d, outerComponents(_values(values)), L, w)
       fromUser = False
     elif callable(fhat) and not isinstance(fhat, np.ndarray):

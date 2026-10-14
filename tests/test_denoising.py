@@ -134,6 +134,20 @@ def test_fill_continuesALinearFieldIntoAHole():
   assert e.rotations.isnan()[k]                                              # the original is left alone
 
 
+# the notIndexed pixels calcGrains absorbs into a grain keep its phase and a NaN rotation; fill
+# continues the field into them as into any hole
+def test_fill_fillsThePixelsCalcGrainsAbsorbed():
+  holes = lambda i, j: ((i == 4) & (j == 4)) | ((i == 2) & (j == 6)) | ((i == 6) & (j == 3))
+  e = angleMapD(lambda i, j: 0.5 * i + 0.25 * j, 9, missingAt=holes)
+  calcGrains(e, angle=5 * degree)
+  k = np.flatnonzero(e.rotations.isnan().reshape(-1))
+  assert len(k) == 3 and np.all(e.isIndexed.reshape(-1)[k])
+  i, j = k % 9, k // 9
+  f = e.fill(splineFilter())
+  assert not f.rotations.isnan().any() and close(angles(f)[k], 0.5 * i + 0.25 * j, 1e-6)
+  assert not e.smooth(splineFilter(), fill=True).rotations.isnan().any() and e.smooth(splineFilter()).rotations.isnan().sum() == 3
+
+
 def test_fill_pinsTheMeasurements():
   # the measurements themselves do not move, which is what pinning them means
   e, k = holedLinearMap()
@@ -213,6 +227,10 @@ def test_reduce_keepsEveryNthPixelOnACoarserLattice():
   c = e.reduce(3)
   assert len(c) == 9 and close(np.sort(np.unique(np.round(angles(c), 6))), [0.0, 1.5, 3.0]) and len(reduce(e, 3)) == 9 == len(subsample(e, 3))
   assert len(e.reduce()) == 25 and c.lattice.shape == "square" and close(c.lattice.dxy, 3)
+  # a grid stays a grid, its every n-th row and column
+  g = e.gridify()
+  r = g.reduce(3)
+  assert r.isGridded and r.shape == (3, 3) and np.array_equal(r.pos.data, g.pos.data[::3, ::3])
   with pytest.raises(ValueError):
     e.reduce(0)
 

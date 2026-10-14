@@ -86,7 +86,8 @@ def threads():
     import os
     cpus = os.sched_getaffinity(0) if hasattr(os, "sched_getaffinity") else range(os.cpu_count() or 1)
     try:
-      cores = {open(f"/sys/devices/system/cpu/cpu{c}/topology/core_cpus_list").read().strip() for c in cpus}
+      from pathlib import Path
+      cores = {Path(f"/sys/devices/system/cpu/cpu{c}/topology/core_cpus_list").read_text().strip() for c in cpus}
     except OSError:
       cores = cpus
     _physicalCores = max(1, len(cores))

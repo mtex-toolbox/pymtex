@@ -26,6 +26,7 @@ from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.grids.s2grid import S2Grid
 from ..geometry.kernels import blasThreads
 from ..geometry.products import dropGroup
+from ..geometry.symmetryops import _images
 from ..geometry.quaternion import rotation
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
@@ -422,10 +423,8 @@ class PoleFigure:
       pf = unique(pf)               # the directions within 1e-6 merged
       pf = pf.unique(tol=1e-3)      # a coarser tolerance
 
-    Two directions are merged when one of them, turned by a rotation of the specimen group,
-    has a dot product with the other above 1 - tol (its absolute value for axes). Only the
-    rotations of the group count, and a group of two elements is not used: the directions are
-    then merged only when they coincide.
+    Two directions are merged when one of them, mapped by an element of the specimen group,
+    has a dot product with the other above 1 - tol (its absolute value for axes).
 
     Input
       pf - PoleFigure
@@ -435,14 +434,11 @@ class PoleFigure:
       tol - the tolerance on the dot product of two directions
     See also
       PoleFigure.union, PoleFigure.cat"""
-    sym = self.SS.properGroup().rotations()
-    if self.SS.numSym() <= 2:
-      sym = rotation.id
     allR, allI = [], []
     for r, I in zip(self.allR, self.allI):
       xyz = r.flatten().normalize().data
-      imgs = (rotation(sym.data.reshape(-1, 1, 4)) * vector3d(xyz)).data     # (|G|, n, 3)
-      d = np.einsum("gnk,mk->gnm", imgs, xyz)
+      imgs = _images(self.SS, xyz)     # (n, |G|, 3)
+      d = np.einsum("ngk,mk->gnm", imgs, xyz)
       same = (np.abs(d) if r.antipodal else d) > 1 - tol
       same = np.any(same, axis=0)
       pos = np.full(len(xyz), -1)

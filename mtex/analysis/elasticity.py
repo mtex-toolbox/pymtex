@@ -195,16 +195,15 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
   Its projection onto n is the phase speed, so its length is at least v. Pass the speed and
   the polarisation of the same wave, at the same directions.
 
-  Given a speed function and a polarisation field, the result is a vector field on the
-  sphere, also when a direction n is given; MATLAB evaluates the two at n then.
+  Given a speed function and a polarisation field, they are evaluated at the directions n;
+  without directions the result is the vector field on the sphere.
 
   Input
     C - stiffnessTensor in GPa
     n - vector3d, the propagation directions, or None for the vector field
-    speed - the phase speed of the wave in km/s, vp, vs1 or vs2 of velocity, an S2Fun for
-        the vector field
-    polarization - vector3d, the polarisation of the wave, pp, ps1 or ps2 of velocity, an
-        S2AxisField for the vector field
+    speed - the phase speed of the wave in km/s, vp, vs1 or vs2 of velocity, or an S2Fun
+    polarization - vector3d, the polarisation of the wave, pp, ps1 or ps2 of velocity, or an
+        S2AxisField
   Output
     E - vector3d, the energy velocity in km/s; S2VectorField without a direction
   Keywords
@@ -217,13 +216,16 @@ def energyVector(C, n, speed=None, polarization=None, *, density=None):
   rho = C.density if density is None else density
   if rho is None or not np.isfinite(rho) or rho <= 0:
     raise ValueError("the density has to be finite and positive")
-  if n is None or isinstance(speed, S2Fun):
+  if n is None:
     from ..functions.s2vectorfield import S2VectorFieldHandle
     def field(v):
-      x = vector3d(v.data, frame=C.frame)
-      return energyVector(C, vector3d(v.data), np.real(speed(x)), polarization(x), density=rho).data
+      return energyVector(C, vector3d(v.data), speed, polarization, density=rho).data
     return S2VectorFieldHandle(field, C.frame, bandwidth=32)
   u = _unit(C, n)
+  # a speed function and a polarisation field are evaluated at the directions
+  if isinstance(speed, S2Fun):
+    x = vector3d(u.data, frame=C.frame)
+    speed, polarization = np.real(speed(x)), polarization(x)
   a = _unit(C, polarization)
   out = EinsteinSum(C, [1, -2, -3, -4], a, [-2], u, [-3], a, [-4])
   data = out.data if isinstance(out, MtexArray) else np.asarray(out)
@@ -290,24 +292,24 @@ def shearModulus(T, h=None, u=None, *args):
 
     G = shearModulus(C, h, u)           # of the plane h along u
     G = shearModulus(C, h)              # the function of the shear direction
+    G = shearModulus(C, None, u)        # the function of the shear plane
     G = shearModulus(C)                 # the Voigt bound of an isotropic polycrystal
     G = shearModulus(C, 'Reuss')        # the Reuss bound, 'Hill' the mean of the two
     GV, GR, GH = shearModulus(C, 'all') # all three
 
   With the plane and the direction the anisotropic modulus of the single crystal; with the
-  plane alone the function on the sphere of the shear direction. Without both, or with a
-  bound's name in place of the plane, the isotropic shear modulus of a polycrystal of
-  uniformly distributed orientations: the Voigt upper bound, the Reuss lower bound or their
-  mean, Hill's; 'all' returns the three as a named tuple (voigt, reuss, hill), MATLAB's
-  three outputs. MATLAB's shearModulus(C, [], u), the function of the plane, has no
-  counterpart.
+  plane alone the function on the sphere of the shear direction, with the direction alone
+  the function of the shear plane. Without both, or with a bound's name in place of the
+  plane, the isotropic shear modulus of a polycrystal of uniformly distributed orientations:
+  the Voigt upper bound, the Reuss lower bound or their mean, Hill's; 'all' returns the
+  three as a named tuple (voigt, reuss, hill), MATLAB's three outputs.
 
   Input
     C - stiffnessTensor or complianceTensor, a stiffness tensor is inverted first
     h - vector3d or Miller, the shear plane; or 'Voigt', 'Reuss', 'Hill', 'all'
     u - vector3d or Miller, the shear direction
   Output
-    G - the shear modulus, an S2Fun of the direction, or the bounds
+    G - the shear modulus, an S2Fun of the direction or the plane, or the bounds
   See also
     YoungsModulus, PoissonRatio, bulkModulus, isotropicShearModulus"""
   S = _compliance(T)
@@ -316,6 +318,9 @@ def shearModulus(T, h=None, u=None, *args):
   if u is None:
     hh = _unit(S, h)
     return _sphericalFunction(lambda x: shearModulus(S, hh, x), S, invariant=False)
+  if h is None:
+    uu = _unit(S, u)
+    return _sphericalFunction(lambda x: shearModulus(S, x, uu), S, invariant=False)
   a, b = _unit(S, h), _unit(S, u)
   return 0.25 / EinsteinSum(S, [-1, -2, -3, -4], a, [-1], b, [-2], a, [-3], b, [-4])
 
@@ -327,25 +332,29 @@ def PoissonRatio(T, x=None, y=None):
 
     nu = PoissonRatio(C, x, y)    # of the tension along x, the contraction along y
     nu = PoissonRatio(C, x)       # the function of the transverse direction
+    nu = PoissonRatio(C, None, y) # the function of the tension direction
     nu = PoissonRatio(C)          # the isotropic ratio
 
-  Without directions the ratio of an isotropic polycrystal, (3K - 2G) / (2 (3K + G)) from
-  the Voigt bounds of the bulk and the shear modulus. MATLAB's PoissonRatio(S, [], y), the
-  function of the tension direction, has no counterpart: without x the isotropic ratio is
-  returned.
+  Without directions the ratio of an isotropic polycrystal, that of the compliance tensor
+  averaged over uniformly distributed orientations: (3K - 2G) / (2 (3K + G)) with the
+  Reuss bounds of the bulk and the shear modulus.
 
   Input
     C - stiffnessTensor or complianceTensor, a stiffness tensor is inverted first
     x - vector3d or Miller, the tension direction
     y - vector3d or Miller, the transverse direction, perpendicular to x
   Output
-    nu - the Poisson ratio, or an S2Fun of the transverse direction
+    nu - the Poisson ratio, or an S2Fun of the transverse or the tension direction
   See also
     YoungsModulus, shearModulus, bulkModulus"""
   S = _compliance(T)
-  if x is None:
-    K, G = bulkModulus(S), shearModulus(S)
+  if x is None and y is None:
+    # the ratio of the compliance averaged over all orientations, given by the Reuss bounds
+    K, G = bulkModulus(S, "Reuss"), shearModulus(S, "Reuss")
     return (3 * K - 2 * G) / (2 * (3 * K + G))
+  if x is None:
+    q = _unit(S, y)
+    return _sphericalFunction(lambda v: PoissonRatio(S, v, q), S, invariant=False)
   if y is None:
     p = _unit(S, x)
     return _sphericalFunction(lambda v: PoissonRatio(S, p, v), S, invariant=False)

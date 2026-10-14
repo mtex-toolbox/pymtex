@@ -480,7 +480,7 @@ class grain3d:
     grains of a grain2d in the plane; grains2.prop['Id3d'] names the 3D grain every section
     came from, and the sections keep its phase, mean orientation and GOS. The plane is moved
     by 0.001 towards the origin, as MATLAB's, so that it runs through no vertex. A plane that
-    cuts no grain raises a ValueError, where MATLAB returns an empty grain2d.
+    cuts no grain gives an empty grain2d.
 
     Input
       grains - grain3d

@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 
 from mtex import (ChristoffelTensor, HashinShtrikmanModulus, Miller, PoissonRatio, Voigt, YoungsModulus, bulkModulus,
-                  complianceTensor, crystalFrame, degree, energyVector, hashinShtrikmanBounds, inv, linearCompressibility,
+                  complianceTensor, crystalFrame, degree, energyVector, hashinShtrikmanBounds, inv, linearCompressibility, mean,
                   shearModulus, stiffnessTensor, strainTensor, stressTensor, vector3d, velocity, volumeCompressibility, xvector,
-                  yvector, zvector)
+                  uniformODF, yvector, zvector)
 from mtex.analysis.elasticity import isotropicShearModulus
 
 rng = np.random.default_rng(22)
@@ -216,3 +216,10 @@ def test_hashinShtrikmanBounds_ofAnIsotropicTensorCoincide():
   # an isotropic tensor has coinciding bounds
   bi = hashinShtrikmanBounds(isotropic(60, 40, crystalFrame("m-3m")))
   assert np.isclose(bi.lower.G, 40, atol=1e-3) and np.isclose(bi.upper.G, 40, atol=1e-3) and np.isclose(bi.lower.K, 60 + 80 / 3, atol=1e-3)
+
+
+def test_PoissonRatio_isotropicIsThatOfTheMeanCompliance():
+  # the isotropic ratio is the ratio of the compliance averaged over all orientations
+  S = inv(olivine())
+  Siso = mean(S, uniformODF(S.CS))
+  assert np.isclose(PoissonRatio(S), PoissonRatio(Siso, xvector, yvector))

@@ -335,17 +335,20 @@ class mtexFigure:
     """the colour map of the plots of the figure, or of one axes; MATLAB's mtexColorMap
 
       mtexFig.setColormap('viridis')                 # every axes, and the plots to come
+      mtexFig.setColormap('LaboTeX')                 # one of MTEX's maps
       mtexFig.setColormap('hot', ax=mtexFig.children[0])  # one axes only
 
     A filled contour plot cuts its bands out of the map, so it is drawn again.
 
     Input
-      cmap - a matplotlib colour map or the name of one of matplotlib's; mtexColorMap resolves
-          MTEX's names, as 'LaboTeX', and calls this
+      cmap - a matplotlib colour map, the name of one of MTEX's maps, as 'LaboTeX', or of
+          matplotlib's, or an n x 3 matrix of colours
     Keywords
       ax - the one axes to recolour; the figure keeps its colour map for the others
     See also
       mtexColorMap, mtexFigure.setColorRange"""
+    from .colormaps import mtexColormap
+    cmap = mtexColormap(cmap)
     # one axes given keeps the map of the figure for the others
     if ax is None:
       self.colormap = cmap
@@ -745,7 +748,7 @@ def saveFigure(fname, fig=None, *args, **kwargs):
   The format is that of the extension. A bitmap is written at 1.5 times the screen
   resolution, a map at 2.5 times and without smoothing between its cells, so that no colour
   is invented between measurements. 'crop' and 'pdf' of MATLAB's TeX tools need nothing here.
-  Further keywords go to matplotlib's savefig; positional arguments after fig are ignored.
+  Further keywords go to matplotlib's savefig; a positional argument after fig is refused.
   MATLAB's file dialog without a name has no counterpart.
 
   Input
@@ -756,6 +759,9 @@ def saveFigure(fname, fig=None, *args, **kwargs):
     mtexFigure.savefig, mtexFigure.drawNow"""
   import os
   import matplotlib.pyplot as plt
+  if args:
+    raise ValueError(f"saveFigure takes the file name and the figure, not {', '.join(map(repr, args))}; "
+                     "options of matplotlib's savefig go as keywords")
   m = gcm() if fig is None else fig
   figure = m.fig if isinstance(m, mtexFigure) else (m if m is not None else plt.gcf())
   ext = os.path.splitext(os.fspath(fname))[1][1:].lower()
@@ -888,11 +894,16 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
   names = [n for n in names if n != "show"]
   for leg in list(fig.legends):
     leg.remove()
+  # the MTEX figure's last chart, unless a plain figure opened after it is the current one;
+  # never a colour bar
+  m = gcm()
+  if m is not None and m.children and m.fig is fig:
+    target = m.children[-1]
+  else:
+    charts = [a for a in fig.axes if getattr(a, "_colorbar", None) is None]
+    target = plt.gca() if plt.gca() in charts or not charts else charts[-1]
   if names:
-    # the MTEX figure's last chart, unless a plain figure opened after it is the current one
-    m = gcm()
-    ax = m.children[-1] if m is not None and m.children and m.fig is fig else plt.gca()
-    handles, labels = _drawnInOrder(ax)[:len(names)], list(names)
+    handles, labels = _drawnInOrder(target)[:len(names)], list(names)
   else:
     seen, handles, labels = set(), [], []
     for ax in fig.axes:
@@ -913,8 +924,7 @@ def legend(*names, location="northeast", numColumns=1, fontSize=None, **kw):
     if width + 0.2 > w:
       fig.set_size_inches(width + 0.2, h)
     return leg
-  ax = fig.axes[-1] if fig.axes else plt.gca()
-  leg = _sameSize(ax.legend(handles, labels, loc=LEGEND_LOCATIONS.get(where, where), **kw))
+  leg = _sameSize(target.legend(handles, labels, loc=LEGEND_LOCATIONS.get(where, where), **kw))
   # above the labels of a chart, which sit on its rim in white boxes
   leg.set_zorder(100)
   return leg

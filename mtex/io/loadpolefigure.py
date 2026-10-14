@@ -41,10 +41,11 @@ def string2Miller(s, CS=None):
     h = string2Miller('Q(10-11)(01-11)_amp.cnv', cs)   # two directions, a superposition
     h = string2Miller('PF_002_R.UXD')                  # {002} of the cubic frame
 
-  Only the base name of a path is read. Four digits from 0 to 6 with optional minus signs are
-  taken when the first three sum to zero, else three digits without a sign, else three with
-  signs; a name with none is (100). MATLAB's second output, whether the name spelled one, is
-  not returned.
+  Only the base name of a path is read. A digit with a bar over it, as char(h) and
+  export(pf) write it, counts as negative. Four digits from 0 to 6 with optional minus signs
+  are taken when the first three sum to zero, else three digits without a sign, else three
+  with signs; a name with none is (100). MATLAB's second output, whether the name spelled
+  one, is not returned.
 
   Input
     s - a file name or a line of text
@@ -56,6 +57,8 @@ def string2Miller(s, CS=None):
     loadPoleFigure, Miller"""
   CS = crystalFrame("m-3m") if CS is None else CS
   s = os.path.basename(str(s))
+  # a digit with a bar over it, as char(h) writes it, is a negative index
+  s = re.sub(r"([0-9])[\u0304\u0305]", r"-\1", s)
   # four indices with signs first, then three without a sign, then three with
   for n, signed in ((4, True), (3, False), (3, True)):
     pattern = r"(?:(?:-?\s?[0-6]\s?){%d})" if signed else r"(?:(?:[0-6]\s?){%d})"

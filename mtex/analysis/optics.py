@@ -36,8 +36,11 @@ def refractiveIndex(rI, v):
 # with the directions, one of either side broadcast
 def _birefringence(rI, U):
   M = rI.M.reshape(-1, 3, 3)
-  n = max(len(U), len(M))
+  n = np.broadcast_shapes((len(U),), (len(M),))[0]
   U = np.broadcast_to(U, (n, 3))
+  if n == 0:
+    e = np.zeros(0)
+    return e, np.zeros((0, 3)), np.zeros((0, 3)), e, e
   # real tensors at many directions in one compiled pass
   if n >= 64 and M.dtype.kind == "f":
     from .kernels import birefringenceKernel

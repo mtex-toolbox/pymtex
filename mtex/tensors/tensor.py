@@ -1137,9 +1137,12 @@ def dyad(a, b=None, n=None):
 
     T = dyad(T1, T2)       # the outer product, of the ranks added
     T = dyad(v, 3)         # the third dyadic power v x v x v
+    T = dyad(v, n=3)       # the same
+    T = dyad(T1, T2, 2)    # the second dyadic power of the outer product
 
   A vector counts as a tensor of rank one; a single argument is returned as a tensor. The
-  power is given as the second argument; the keyword n is not used.
+  power is the second argument or the keyword n; after a second factor it raises their
+  outer product to that power.
 
   Input
     a - tensor or vector3d, T1 above
@@ -1147,21 +1150,29 @@ def dyad(a, b=None, n=None):
   Output
     T - tensor
   Keywords
-    n - not used
+    n - the dyadic power, a positive integer
   See also
     EinsteinSum, colon"""
   if b is None and n is None:
     return a if isinstance(a, tensor) else tensor(a)
-  if isinstance(b, (int, np.integer)) and n is None:
-    if b == 1:
-      return dyad(a)
-    args = []
-    r = _operand(a)[1]
-    for k in range(b):
-      args += [a, list(range(k * r + 1, (k + 1) * r + 1))]
-    return EinsteinSum(*args)
-  ra, rb = _operand(a)[1], _operand(b)[1]
-  return EinsteinSum(a, list(range(1, ra + 1)), b, list(range(ra + 1, ra + rb + 1)))
+  if isinstance(b, (int, np.integer)):
+    if n is not None:
+      raise ValueError("dyad takes the power once, as the second argument or as n")
+    b, n = None, b
+  if b is not None:
+    ra, rb = _operand(a)[1], _operand(b)[1]
+    a = EinsteinSum(a, list(range(1, ra + 1)), b, list(range(ra + 1, ra + rb + 1)))
+    if n is None:
+      return a
+  if not isinstance(n, (int, np.integer)) or isinstance(n, bool) or n < 1:
+    raise ValueError("the dyadic power n is a positive integer")
+  if n == 1:
+    return dyad(a)
+  args = []
+  r = _operand(a)[1]
+  for k in range(n):
+    args += [a, list(range(k * r + 1, (k + 1) * r + 1))]
+  return EinsteinSum(*args)
 
 
 # NumPy's keywords of a reduction that a list of tensors has no use for: out= and dtype= would

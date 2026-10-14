@@ -20,7 +20,7 @@ import math
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index
 
-from .harmonicarithmetic import harmonicArithmetic
+from .harmonicarithmetic import _catParts, harmonicArithmetic
 from .so3funclass import SO3Fun
 from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
 from ..geometry.orientation import orientation
@@ -29,6 +29,7 @@ from ..geometry.session import getMTEXpref
 from ..geometry.display import framesLabel
 from .harmonics import _checkerboard, _so3PerDegree, deg2dim, degreeBlock, dim2deg, invariantProjection, mtexCoefficientsSO3, project
 from .kernelfunctions import SO3Kernel
+from .s1fun import S1FunHarmonic
 from .quadrature import bandwidthFor, folds, quadratureSO3Grid
 from .kernels import realizeWigner, _complexType
 from .transforms import _perColumn, isRealWigner, wignerSeries, wignerSeriesAdjoint
@@ -128,6 +129,8 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
       CS, SS = _readFrames(frames)
       fhat = _kernelCoefficients(fhat, bandwidth)
       real, bandwidth, fromUser = True, None, False
+    elif isinstance(fhat, S1FunHarmonic) or hasattr(fhat, "_harmonicS1"):
+      raise ValueError("a function on the circle is no function on SO(3)")
     elif callable(fhat) and not isinstance(fhat, np.ndarray):
       CS, SS = _readFrames(frames)
       fhat, real = _byQuadrature(fhat, CS, SS, bandwidth, real, antipodal, scheme)
@@ -214,10 +217,10 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
       SO3F = cat(SO3F1, SO3F2)                     # one list after the other
       SO3F = SO3FunHarmonic.cat(F1.T, F2.T, axis=1)  # two lists of n functions as the columns of n x 2
 
-    The lists are joined along an axis they have: two single functions give a list of two, and
-    two columns of n functions, F.T of a list F, joined along axis 1 give n x 2 functions. An axis
-    the lists do not have is not refused but joins the coefficient vectors. The real flag is
-    kept when every function is real.
+    Two single functions give a list of two, and two columns of n functions, F.T of a list F,
+    joined along axis 1 give n x 2 functions. A list lacking the axis gets it as a trailing axis
+    of length one, as MATLAB's cat(2, F1, F2) gives a 1 x 2 list of two functions. The real flag
+    is kept when every function is real.
 
     Input
       SO3F1, SO3F2, ... - SO3FunHarmonic, single functions or lists of the same frames
@@ -229,7 +232,7 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
       SO3FunHarmonic.truncate, SO3FunHarmonic.sum, SO3FunHarmonic.mean"""
     L = max(f.bandwidth for f in fs)
     parts = [f.truncate(L)._fhat for f in fs]
-    parts = [p[None] if p.ndim == 1 else p for p in parts]
+    parts, axis = _catParts(parts, axis)
     return fs[0]._rebuild(np.concatenate(parts, axis=axis), _isReal=all(f.isReal for f in fs))
 
   # an operation written for one function applied to every function of the list
@@ -804,6 +807,7 @@ class SO3FunHarmonic(SO3Fun, harmonicArithmetic):
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    from ..plotting.kernelplot import plotSpectrum
     def __pow__(self, p) -> Any:
       ...
     @property

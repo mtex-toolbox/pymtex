@@ -303,6 +303,7 @@ class SO3FunBingham(SO3FunGeneric):
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plotPF, plotIPF
     from ..plotting.sectionplot import plotSection
+    from ..plotting.kernelplot import plotSpectrum
     @property
     def frameA(self) -> Any:
       ...
@@ -567,11 +568,12 @@ class S2FunBingham(S2Fun):
 
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
-    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample
+    from .characteristics import max_ as max, min_ as min, entropy, textureIndex, discreteSample, volume
     from .discrepancy import discrepancy
     from ..analysis.optimalsample import optimalSample
     from ..plotting.sphericalplot import plot, contourf, contour, pcolor
     from ..plotting.spaceplot import plot3d
+    from ..plotting.kernelplot import plotSpectrum
 
 
 # the two frames under their names of the Julia port, frameA and frameB

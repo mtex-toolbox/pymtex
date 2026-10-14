@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from numpy import pi
 
-from mtex import (conv, crystalFrame, deg2dim, degreeBlock, dot, grad, invRadon, laplace, Miller, norm, orientation, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation, S1FejerKernel, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic, SO3TangentVector, specimenFrame, vector3d, xvector, yvector, zvector)
+from mtex import (conv, crystalFrame, transformODF, unimodalODF, degree, deg2dim, degreeBlock, dot, grad, invRadon, laplace, Miller, norm, orientation, quadratureS2Grid, quadratureSO3Grid, radon, rotate, rotation, S1FejerKernel, S1FunHarmonic, S2DeLaValleePoussinKernel, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic, SO3TangentVector, specimenFrame, vector3d, xvector, yvector, zvector)
 
 rng = np.random.default_rng(36)
 
@@ -280,3 +280,11 @@ def test_pointwiseOperations_onTheCircle():
 def test_laplace_ofAListOfSphericalFunctions():
   f = S2FunHarmonic(np.eye(9)[:3], _internal=True, symmetrise=False)
   assert np.array_equal(laplace(f)._fhat, -np.eye(9)[:3] * [0, 2, 2, 2, 6, 6, 6, 6, 6])
+
+
+def test_transformODF_withAVariantSelectionIsADensityOfTheParentsMean():
+  csP, csC = crystalFrame("432", mineral="Iron fcc"), crystalFrame("432", mineral="Iron bcc")
+  p2c = orientation.KurdjumovSachs(csP, csC)
+  odfP = unimodalODF(orientation(rotation.rand(rng=rng), csP), halfwidth=15 * degree)
+  vSel = unimodalODF(orientation(rotation.rand(rng=rng), csP), halfwidth=20 * degree)
+  assert np.isclose(np.real(transformODF(odfP, p2c, vSel).mean()), np.real(odfP.mean()))

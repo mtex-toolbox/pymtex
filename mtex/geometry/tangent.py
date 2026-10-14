@@ -103,6 +103,13 @@ class SO3TangentVector(vector3d):
     side = _side(side)
     oriRef = _reference(oriRef)
     data = _components(v)
+    # one vector at many references, or many at one, broadcast against each other
+    if oriRef.ndim and data.shape[:-1] != oriRef.shape:
+      try:
+        shape = np.broadcast_shapes(data.shape[:-1], oriRef.shape)
+      except ValueError:
+        raise ValueError(f"the sizes of the tangent vectors {data.shape[:-1]} and their reference orientations {oriRef.shape} do not match") from None
+      data = np.broadcast_to(data, shape + (3,)).copy()
     MtexArray.__init__(self, data)
     self.side = side
     self.oriRef = _fitShape(oriRef, self.shape)
@@ -224,7 +231,7 @@ class SO3TangentVector(vector3d):
     refs = [a.oriRef for a in arrays]
     if all(r.ndim == 0 for r in refs) and all(_sameReference(refs[0], r) for r in refs[1:]):
       return first._rebuild(data, refs[0])
-    refs = [_fitShape(r, a.shape) for r, a in zip(refs, arrays)]
+    refs = [r._new(np.broadcast_to(r.data, a.shape + (4,)).copy()) for r, a in zip(refs, arrays)]
     return first._rebuild(data, type(refs[0]).cat(*refs, axis=axis))
 
   # ------------------------------------------------------------------ the two sides
@@ -312,8 +319,9 @@ class SO3TangentVector(vector3d):
     return self._rebuild(qrot(q, self.data), rotation._fromData(q) * self.oriRef)
 
   def dot(self, other, **kwargs):
-    """the inner product with tangent vectors at the same reference, brought to this side"""
-    return np.sum(self.data * self._fit(other).data, axis=-1)
+    """the inner product with tangent vectors at the same reference, brought to this side; the
+    keywords of vector3d.dot"""
+    return vector3d(self.data).dot(vector3d(self._fit(other).data), **kwargs)
 
   def cross(self, other):
     """the cross product with tangent vectors at the same reference, brought to this side"""
@@ -324,8 +332,10 @@ class SO3TangentVector(vector3d):
 
       omega = angle(v)                              # the rotational angle, the length
       omega = angle(v1, v2)                         # the angle between the vectors
+      omega = angle(v1, v2, antipodal=True)         # read as axes, at most 90 degree
 
-    The second vectors are brought to the reference and side of the first.
+    The second vectors are brought to the reference and side of the first; the keywords are
+    those of vector3d.angle and need the second vectors.
 
     Input
       v1 - SO3TangentVector
@@ -335,11 +345,10 @@ class SO3TangentVector(vector3d):
     See also
       SO3TangentVector.norm, quaternion.log"""
     if other is None:
+      if kwargs:
+        raise TypeError(f"the rotational angle of a tangent vector takes no keywords, got {', '.join(kwargs)}")
       return self.norm()
-    other = self._fit(other)
-    d = np.sum(self.data * other.data, axis=-1)
-    c = np.linalg.norm(np.cross(self.data, other.data), axis=-1)
-    return np.arctan2(c, d)
+    return vector3d(self.data).angle(vector3d(self._fit(other).data), **kwargs)
 
   # equal vectors at the same reference; isclose compares within a tolerance
   def __eq__(self, other):
@@ -383,6 +392,13 @@ class SO3TangentVector(vector3d):
       raise ValueError("the tangent vectors sit at different references")
     return ref.flatten()[0]
 
+  # the axes of the list a reduction runs along, a negative one counted from the last list axis
+  def _listAxis(self, axis):
+    if axis is None:
+      return tuple(range(self.ndim))
+    from numpy.lib.array_utils import normalize_axis_tuple
+    return normalize_axis_tuple(axis, self.ndim)
+
   def sum(self, axis=None, **kwargs):
     """the sum of tangent vectors at one shared reference, over all or along an axis
 
@@ -398,8 +414,7 @@ class SO3TangentVector(vector3d):
     See also
       SO3TangentVector.mean"""
     ref = self._oneReference()
-    axis = tuple(range(self.ndim)) if axis is None else axis
-    return self._rebuild(np.sum(self.data, axis=axis), ref)
+    return self._rebuild(np.sum(self.data, axis=self._listAxis(axis)), ref)
 
   def mean(self, weights=None, axis=None, **kwargs):
     """the mean of tangent vectors at one shared reference, weighted when weights are given
@@ -421,7 +436,7 @@ class SO3TangentVector(vector3d):
     See also
       SO3TangentVector.sum, mean"""
     ref = self._oneReference()
-    axis = tuple(range(self.ndim)) if axis is None else axis
+    axis = self._listAxis(axis)
     if weights is None:
       return self._rebuild(np.nanmean(self.data, axis=axis), ref)
     w = np.asarray(weights, dtype=float)

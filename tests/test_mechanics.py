@@ -156,3 +156,15 @@ def test_dislocationDensity_ofAListOfCurvatures():
   # a list of curvature tensors, as a map delivers them
   ks = curvatureTensor(rng.standard_normal((7, 3, 3)))
   assert ks.dislocationDensity().shape == (7,) and np.allclose(ks.dislocationDensity()[3].M, curvatureTensor(ks.M[3]).dislocationDensity().M)
+
+
+def test_SchmidFactor_relativeDividesEveryFormByTheCRSS():
+  # the relative factor is the factor over the CRSS, for a direction, a stress and the function
+  cs = crystalFrame("m-3m")
+  sS = slipSystem.fcc(cs, CRSS=2.5).symmetrise(antipodal=True)
+  r = vector3d(rng.normal(size=(4, 3)))
+  rc = Miller(r.data, cs, "uvw")
+  sigma = stressTensor.uniaxial(rc)
+  assert np.allclose(SchmidFactor(sS, rc, relative=True), SchmidFactor(sS, rc) / 2.5)
+  assert np.allclose(SchmidFactor(sS, sigma, relative=True), SchmidFactor(sS, sigma) / 2.5)
+  assert np.allclose(np.real(SchmidFactor(sS, relative=True)(rc)), np.real(SchmidFactor(sS)(rc)) / 2.5, atol=1e-10)

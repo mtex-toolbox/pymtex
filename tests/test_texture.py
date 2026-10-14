@@ -199,3 +199,17 @@ def test_calcTensor_ofAMapKeepsTheClassOfTheTensorInEveryAverage():
   ebsd = EBSD(pos, rotation.rand(50, rng=rng), np.ones(50, dtype=np.int8), phaseList(a))
   C = stiffnessTensor(np.eye(6) * 50 + 10, a)
   assert all(type(T) is stiffnessTensor for T in calcTensor(ebsd, C, "all"))
+
+
+# a weighted average over a map does not depend on whether the map is a list or a grid
+def test_calcTensor_ofAWeightedMapIsThatOfItsGrid():
+  from mtex import EBSD, gridify, phaseList
+  a = crystalFrame("m-3m")
+  i, j = np.meshgrid(np.arange(12), np.arange(9), indexing="xy")
+  pos = np.stack([i.ravel(), j.ravel(), np.zeros(i.size)], axis=-1).astype(float)
+  ebsd = EBSD(pos, rotation.rand(i.size, rng=rng), np.ones(i.size, dtype=np.int8), phaseList(a))
+  ebsd.prop["w"] = rng.random(i.size)
+  grid = gridify(ebsd)
+  C = stiffnessTensor(np.eye(6) * 50 + np.abs(rng.standard_normal((6, 6))), a)
+  ref = calcTensor(ebsd, C, weights=ebsd.prop["w"])
+  assert np.allclose(calcTensor(grid, C, weights=grid.prop["w"]).M, ref.M, rtol=1e-12)

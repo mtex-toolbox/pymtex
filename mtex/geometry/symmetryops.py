@@ -167,11 +167,11 @@ def symmetriseOrientation(o, unique=False):
   """the symmetric equivalents l * o * r, and under grain exchange their inverses; shaped
   (numL * numR,) + o.shape, or the distinct ones as a flat list"""
   L, R = reductionGroups(o)
-  q = o.data
-  es = qmul(qmul(L[:, None, None, :], q[None, None, ...]), R[None, :, None, :])   # (|L|, |R|, n, 4)
-  es = es.reshape(-1, *q.shape)
+  q = o.data.reshape(-1, 4)
+  shape = (len(L) * len(R),) + o.data.shape
+  es = qmul(qmul(L[:, None, None, :], q[None, None, ...]), R[None, :, None, :]).reshape(shape)   # (|L| |R|, ..., 4)
   if o.antipodal:
-    ei = qmul(qmul(L[:, None, None, :], qconj(q)[None, None, ...]), R[None, :, None, :]).reshape(-1, *q.shape)
+    ei = qmul(qmul(L[:, None, None, :], qconj(q)[None, None, ...]), R[None, :, None, :]).reshape(shape)
     es = np.concatenate([es, ei])
   if unique:
     return o._new(uniqueRotations(es.reshape(-1, 4)))
