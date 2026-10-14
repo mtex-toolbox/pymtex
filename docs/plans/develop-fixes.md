@@ -99,3 +99,27 @@ Found while writing the calling forms of `docs/plans/reference.md`, fixed in the
   them), the port's ends to the digit.
 - `orientation/axis` of two orientations of different crystal frames: the port reduces over the
   products of both groups, as MATLAB's general branch; to check against MATLAB on the bridge.
+
+## Found while rewriting the MATLAB help texts (2026-10-14)
+
+The help of 127 functions and classes was rewritten on develop (`9b2059d42`). Bugs the agents
+noticed in the code, not fixed:
+
+- `S2VectorFieldTri/cross.m`, `dot.m`, `times.m` use an undefined `b` (should be `a`); `times.m`
+  multiplies `sVF.values .* sVF`; `plus.m` uses an undefined `a` and `SVF.vertices`.
+- `S2VectorFieldTri/angle.m` takes `acos(dot(...))` without normalising.
+- `S2VectorFieldHarmonic/mean.m` returns `fhat(1,:)` without the `/sqrt(4*pi)` of
+  `S2FunHarmonic/mean`; check `SO3VectorFieldHarmonic/mean` too.
+- `S2VectorFieldHarmonic/mtimes.m` leaves its output undefined for two non-numeric arguments.
+- `spinTensor.m`: the rotation branch uses an undefined `M`.
+- `S1FunHarmonic/power.m`, `S2FunHarmonic/power.m`: `a.^sF` takes `a * bandwidth` as the bandwidth.
+- `quaternion/power.m` flips to `a >= 0` first, wrong for general quaternions and odd n.
+- `vector3d/plot.m` 'custom' asks `plotCustom` for outputs it does not return.
+- `planarColorKey`: the constructor does not take `'periode'`, its first argument is always a
+  colour map, and `property2color` scales by `max(v1)` instead of the period.
+- `calcGBND`: the documented `nonneg` is not read here, the `oneSide` flag it reads was undocumented.
+- `uniformComponent.loadobj` turns an old uniform component into one RBF at the identity.
+- `coolColorMap.m`, `parulaColorMap.m` define functions named `cool`, `parula`.
+- `getUnitScale('au')` is the Ångström, not the astronomical unit.
+- the stale reference pages `trueEbsd2.*` (class renamed to `trueEbsd` in f903375b2) remain on the
+  site; `remapShifted` (trueEBSD repository) has a help continuation line read as an entry.
