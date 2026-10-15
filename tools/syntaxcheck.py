@@ -32,7 +32,7 @@ KEYWORDS = {
 
 # strings that are no MTEX keywords: MATLAB's positional flags, which keep MATLAB's spelling, and
 # matplotlib's spelling of what the plots hand to it
-FLAG_STRINGS = {"cs", "ss", "Length", "silent", "noSymmetry", "linewidth"}
+FLAG_STRINGS = {"cs", "ss", "Length", "silent", "noSymmetry", "noBoundary", "linewidth"}
 
 # the public names the plan removes or renames, and what takes their place
 NAMES = {
