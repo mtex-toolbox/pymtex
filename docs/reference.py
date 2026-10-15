@@ -576,8 +576,8 @@ def members(cls, pages):
 
 
 # the layers in the order of the imports, as the index shows them
-LAYERS = {"geometry": "Geometry", "functions": "Function spaces", "tensors": "Tensors", "maps": "Maps",
-          "maps3d": "Maps of volumes", "analysis": "Analysis", "io": "Import and export", "plotting": "Plotting",
+LAYERS = {"geometry": "Geometry", "functions": "Function spaces", "tensors": "Tensors", "maps": "EBSD Analysis",
+          "analysis": "Analysis", "io": "Import and export", "plotting": "Plotting",
           "wizard": "Import wizard"}
 INDEX = "FunctionReference"
 
@@ -599,12 +599,15 @@ def indexPage(pages):
     if not target:
       continue
     layer = getattr(unwrap(obj), "__module__", "mtex.other").split(".")[1]
+    layer = "maps" if layer == "maps3d" else layer
     doc = firstSentence(inspect.getdoc(unwrap(obj)) or "")
     groups.setdefault(layer, ([], []))[0 if inspect.isclass(obj) else 1].append(f"| [{n}]({target}_py.html) | {doc} |")
   lines = ["# Function reference", "",
            "Every class and function of mtex, by the layer it belongs to; a class page lists its methods and properties.", ""]
   for layer in sorted(groups, key=lambda k: list(LAYERS).index(k) if k in LAYERS else len(LAYERS)):
     classes, functions = groups[layer]
+    if layer == "maps":
+      lines += ['<a id="maps"></a>', '<a id="maps-of-volumes"></a>', ""]
     lines += [f"## {LAYERS.get(layer, layer)}", ""]
     for title, rows in (("Classes", classes), ("Functions", functions)):
       if rows:
@@ -630,6 +633,7 @@ def navigation(pages):
     if not target:
       continue
     layer = obj.__module__.split(".")[1]
+    layer = "maps" if layer == "maps3d" else layer
     item = {"title": name, "url": target + "_py.html"}
     if inspect.isclass(obj):
       item["aliases"] = [n + "_py.html" for n, e in pages.items()

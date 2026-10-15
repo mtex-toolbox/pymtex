@@ -54,6 +54,11 @@ def test_navigation_includes_every_public_class_and_function(pages):
   assert "crystalSymmetry_index_py.html" in items["crystalFrame"]["aliases"]
   assert "orientation2color" in {m["title"] for m in items["ipfHSVKey"]["items"]}
   assert "[selectHalfwidth](selectHalfwidth_py.html)" in ref.indexPage(pages)
+  ebsd = [chapter for chapter in chapters if chapter["title"] == "EBSD Analysis"]
+  assert len(ebsd) == 1
+  assert {item["title"] for item in ebsd[0]["items"]} >= {"EBSD", "EBSD3", "grain2d", "grain3d"}
+  assert ref.indexPage(pages).count("## EBSD Analysis\n") == 1
+  assert '<a id="maps"></a>' in ref.indexPage(pages) and '<a id="maps-of-volumes"></a>' in ref.indexPage(pages)
 
 
 def test_navigation_links_only_to_published_python_pages(pages):
