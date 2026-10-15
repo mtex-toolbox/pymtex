@@ -40,6 +40,29 @@ def test_every_public_name_has_a_page(pages):
   assert not missing, missing[:20]
 
 
+def test_navigation_includes_every_public_class_and_function(pages):
+  chapters = ref.navigation(pages)
+  items = {item["title"]: item for chapter in chapters for item in chapter["items"]}
+  expected = {n for n in dir(mtex) if not n.startswith("_")
+              and callable(getattr(mtex, n)) and ref.isOurs(getattr(mtex, n))} | set(ref.MODULE_FUNCTIONS)
+  assert set(items) == expected
+  assert "items" in items["mapImageList"]
+  assert "items" in items["neper"]
+  assert "items" in items["voxelLattice"]
+  assert {m["title"] for m in items["trueEbsd"]["items"]} >= {"T", "calcDistortion", "undistort"}
+  assert "display" not in {m["title"] for m in items["trueEbsd"]["items"]}
+  assert "crystalSymmetry_index_py.html" in items["crystalFrame"]["aliases"]
+  assert "orientation2color" in {m["title"] for m in items["ipfHSVKey"]["items"]}
+  assert "[selectHalfwidth](selectHalfwidth_py.html)" in ref.indexPage(pages)
+
+
+def test_navigation_links_only_to_published_python_pages(pages):
+  for chapter in ref.navigation(pages):
+    for item in chapter["items"]:
+      urls = [item["url"], *item.get("aliases", []), *(m["url"] for m in item.get("items", []))]
+      assert all(url.endswith("_py.html") and url[:-8] in pages for url in urls), item["title"]
+
+
 def test_every_python_link_reaches_a_page(rendered):
   # a link to <name>_py.html names a reference page or a documentation page
   targets = set(rendered) | set(ref.pageSources())

@@ -232,6 +232,9 @@ def exportReference(site, reference):
     names = {k: v for k, v in json.load(fh).items() if v in reference}
   with open(os.path.join(site, "python_refs.json"), "w", encoding="utf-8") as fh:
     json.dump(names, fh, separators=(",", ":"), sort_keys=True)
+  navigation = os.path.join(referenceDir, "navigation.json")
+  if os.path.exists(navigation):
+    shutil.copyfile(navigation, os.path.join(site, "python_reference.json"))
   print(f"{len(reference)} reference pages, {len(names)} names linked")
 
 

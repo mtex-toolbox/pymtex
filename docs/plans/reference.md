@@ -261,3 +261,19 @@ Synthetic maps show denoising and filling without a download; grain workflows us
 small cached Forsterite sample. The examples capture 15 additional figures, with shared
 colour ranges for before/after maps and actual printed output. The reference/static-API
 checks pass (27 tests).
+
+## 6. Class navigation coverage
+
+The navigation audit compares all 205 classes in the MATLAB class diagrams with the
+table of contents, then checks all 223 classes defined in the reference source roots.
+It adds 145 missing class indexes, including `mapImage`, `neper`, filters, frames,
+spatial transformations, kernels and colour keys. Inline class definitions have an explicit
+constructor entry in their index contents. Existing URLs remain available; compatibility
+classes for older saved data carry a legacy label. The native coverage check also checks
+that a class can be found by searching for its API name.
+
+Python navigation is generated from the public Python API instead of borrowing the MATLAB
+class list. It covers all 206 exported classes and 564 documented functions, including the
+module-level halfwidth selector. Class aliases select the same class, and the member lists
+contain Python properties and methods. Coverage checks require every public callable to be
+listed and every link to target a generated Python page. The reference exports 3,017 pages.

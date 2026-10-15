@@ -590,8 +590,9 @@ def indexPage(pages):
     if e[0] != "class":
       first.setdefault(id(unwrap(e[1])), n)
   groups = {}
-  for n in sorted(dir(mtex), key=str.lower):
-    obj = getattr(mtex, n)
+  objects = {n: getattr(mtex, n) for n in dir(mtex)}
+  objects.update(MODULE_FUNCTIONS)
+  for n, obj in sorted(objects.items(), key=lambda item: item[0].lower()):
     if n.startswith("_") or not callable(obj) or not isOurs(obj):
       continue
     target = f"{n}_index" if inspect.isclass(obj) else first.get(id(unwrap(obj)))
@@ -609,6 +610,47 @@ def indexPage(pages):
       if rows:
         lines += [f"### {title}", "", *rows, ""]
   return "\n".join(lines)
+
+
+# the Python navigation follows the public API, including classes with no MATLAB counterpart
+def navigation(pages):
+  names, groups = pythonNames(pages), {}
+  targets = {}
+  for page, entry in pages.items():
+    if entry[0] != "class":
+      targets.setdefault(id(unwrap(entry[1])), page)
+  objects = {n: getattr(mtex, n) for n in dir(mtex) if not n.startswith("_")}
+  objects.update(MODULE_FUNCTIONS)
+  for name, obj in sorted(objects.items(), key=lambda item: item[0].lower()):
+    if not callable(obj) or not isOurs(obj):
+      continue
+    target = names.get(name)
+    if not target:
+      target = next((n for n, e in pages.items() if e[0] != "class" and unwrap(e[1]) is obj), None)
+    if not target:
+      continue
+    layer = obj.__module__.split(".")[1]
+    item = {"title": name, "url": target + "_py.html"}
+    if inspect.isclass(obj):
+      item["aliases"] = [n + "_py.html" for n, e in pages.items()
+                         if e[1] is obj and e[0] in ("class", "constructor")]
+      members = {key[len(name) + 1:]: value for key, value in names.items() if key.startswith(name + ".")}
+      for member in dir(obj):
+        if member.startswith("_") or member in members:
+          continue
+        value = inspect.getattr_static(obj, member)
+        page = targets.get(id(unwrap(value))) if isOurs(value) else None
+        if page:
+          members[member] = page
+      constructors = [n for n, e in pages.items() if e[0] == "constructor" and e[1] is obj]
+      if constructors:
+        members[name] = min(constructors, key=lambda n: (n != name + "." + name, len(n), n))
+      item["items"] = [{"title": key, "url": value + "_py.html"}
+                       for key, value in sorted(members.items(), key=lambda item: item[0].lower())]
+    groups.setdefault(layer, ([], []))[0 if inspect.isclass(obj) else 1].append(item)
+  return [{"title": LAYERS.get(layer, layer), "url": INDEX + "_py.html#" + LAYERS.get(layer, layer).lower().replace(" ", "-"),
+           "items": groups[layer][0] + groups[layer][1]}
+          for layer in sorted(groups, key=lambda key: list(LAYERS).index(key) if key in LAYERS else len(LAYERS))]
 
 
 # the page of every name as Python spells it: a class, a function of the flat namespace, a
@@ -717,6 +759,8 @@ def build(names=()):
     writeNames(pages)
   with open(os.path.join(outDir, "index.json"), "w", encoding="utf-8") as fh:
     json.dump(index, fh, indent=0, sort_keys=True)
+  with open(os.path.join(outDir, "navigation.json"), "w", encoding="utf-8") as fh:
+    json.dump(navigation(pages), fh, separators=(",", ":"))
   paired = sum(e[3] is not None for e in pages.values())
   print(f"{len(chosen)} pages written, {paired} of them MATLAB's names, {len(pages) - paired} Python's")
   return pages
