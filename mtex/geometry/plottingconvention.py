@@ -88,7 +88,31 @@ class plottingConvention:
     """the session default is the convention of the default specimen frame, so that everything
     holding that frame follows a change of it; plottingConvention.default('y↑→x') sets it,
     plottingConvention.default(north=xvector) changes one direction and keeps the others
-    (MATLAB's plotx2east, plotx2north, plotx2west, plotx2south, plotzOutOfPlane and plotzIntoPlane)"""
+    (MATLAB's plotx2east, plotx2north, plotx2west, plotx2south, plotzOutOfPlane and plotzIntoPlane)
+
+    Example
+    Display the same two specimen directions under two screen conventions. Red has positive
+    X and Z components; blue has positive Y and Z components. Restore the session convention afterward.
+
+      import matplotlib.pyplot as plt
+      from mtex import plottingConvention, vector3d, plot, hold, mtexTitle
+
+      previous = plottingConvention(plottingConvention.default)
+      try:
+          for convention in ('y↑→x', 'y←↑x'):
+              plottingConvention.default(convention)
+              plot(vector3d(1, 0, 1), upper=True, markerFaceColor='red', markerSize=10)
+              hold(True)
+              plot(vector3d(0, 1, 1), upper=True, markerFaceColor='blue', markerSize=10)
+              hold(False)
+              mtexTitle(convention)
+      finally:
+          previous.makeDefault()
+      plt.show()
+
+    The data and physical reference frame stay the same; the convention determines their
+    placement on screen. These changes are for this session and are not saved as user preferences.
+    """
     return _sessionDefault(_defaultFrame().how2plot)
 
   def makeDefault(self, save=False):

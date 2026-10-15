@@ -106,6 +106,28 @@ class ipfColorKey(orientationColorKey):
     ipfDirection - specimen direction used for colouring
     dirMap - direction colour key used for crystal directions
     CS - crystal frame of the key
+
+  Example
+  Choose specimen Z as the colouring direction, then colour three orientations and plot
+  the matching key and inverse poles. All inputs are constructed here; no EBSD file is needed.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, orientation, ipfColorKey, vector3d, degree, plotIPF
+
+    cs = crystalFrame('m-3m')
+    ori = orientation.byEuler(np.array([[0, 0, 0], [25, 35, 15], [60, 50, 30]])*degree, cs)
+    key = ipfColorKey(cs)
+    key.ipfDirection = vector3d.Z
+    rgb = key.orientation2color(ori)
+    print('RGB colours:', np.round(rgb, 3))
+    key.plot()
+    plotIPF(ori, rgb, vector3d.Z, all=True, markerSize=10)
+    plt.show()
+
+  The first figure is the colour key; the second places the same colours at the crystal
+  directions parallel to specimen Z. Changing ipfDirection changes which crystal direction is coloured.
+
   See also
     ipfHSVKey, ipfTSLKey, ipfHKLKey, ipfColorKey.orientation2color"""
 
@@ -225,6 +247,28 @@ class ipfHSVKey(ipfColorKey):
     ipfDirection - specimen direction used for the inverse pole figure
     maxAngle - angular radius in radians used for a concentrated colour key
     whiteCenter - crystal direction assigned white
+
+  Example
+  Choose specimen Z as the colouring direction, then colour three orientations and plot
+  the matching key and inverse poles. All inputs are constructed here; no EBSD file is needed.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, orientation, ipfHSVKey, vector3d, degree, plotIPF
+
+    cs = crystalFrame('m-3m')
+    ori = orientation.byEuler(np.array([[0, 0, 0], [25, 35, 15], [60, 50, 30]])*degree, cs)
+    key = ipfHSVKey(cs)
+    key.ipfDirection = vector3d.Z
+    rgb = key.orientation2color(ori)
+    print('RGB colours:', np.round(rgb, 3))
+    key.plot()
+    plotIPF(ori, rgb, vector3d.Z, all=True, markerSize=10)
+    plt.show()
+
+  The first figure is the colour key; the second places the same colours at the crystal
+  directions parallel to specimen Z. Changing ipfDirection changes which crystal direction is coloured.
+
   See also
     ipfColorKey, HSVDirectionKey, ipfTSLKey, ipfHKLKey"""
 

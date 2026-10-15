@@ -377,6 +377,33 @@ class slipSystem:
       sS - slipSystem
     Keywords
       CRSS - the critical resolved shear stress
+
+    Example
+    Construct an FCC slip family and compare its Schmid factors under crystal-axis tension.
+    In the drawing, the blue plane and arrow are one slip system and the red arrow is the loading direction.
+
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from mtex import crystalFrame, slipSystem, Miller, crystalShape, plot, hold, plotInnerDirection
+
+      cs = crystalFrame('m-3m')
+      representative = slipSystem.fcc(cs)
+      systems = representative.symmetrise(antipodal=True)
+      loading = Miller(0, 0, 1, cs, 'uvw')
+      factors = systems.SchmidFactor(loading)
+      print('Number of FCC systems:', systems.size)
+      print('Largest absolute Schmid factor:', round(float(np.max(np.abs(factors))), 4))
+      cube = crystalShape.cube(cs)
+      plot(cube, faceAlpha=0.2)
+      hold(True)
+      plot(cube, representative, faceColor='blue')
+      plotInnerDirection(cube, loading, faceColor='red')
+      hold(False)
+      plt.show()
+
+    All directions here are in crystal coordinates. For a specimen loading direction, rotate
+    the systems into the specimen frame or transform the loading direction into the crystal frame first.
+
     See also
       slipSystem, slipSystem.symmetrise, dislocationSystem"""
     return _familyOf("fcc", CS, CRSS)

@@ -826,6 +826,23 @@ class crystalFrame(referenceFrame):
     axesNames - the names of the three axes
     check - check that the cell agrees with the lattice of the point group
     centering - the centring of the lattice: 'P', 'A', 'B', 'C', 'I', 'F' or 'R'
+
+  Example
+  Define cubic aluminium and hexagonal magnesium frames using lattice lengths in angstroms.
+  The Miller direction belongs to the frame in which it was constructed.
+
+    from mtex import crystalFrame, Miller
+
+    al = crystalFrame('m-3m', [4.05, 4.05, 4.05], mineral='Aluminium')
+    mg = crystalFrame('6/mmm', [3.20927, 3.20927, 5.21033], mineral='Magnesium')
+    cAxis = Miller(0, 0, 0, 1, mg, 'UVTW')
+    print(al)
+    print(mg)
+    print(cAxis)
+
+  The point group describes symmetry; the lattice lengths and alignment determine how
+  indices become Cartesian vectors. The magnesium c-axis above uses four direct-lattice indices.
+
   See also
     specimenFrame, referenceFrame, Miller, orientation, CrystalSymmetries, CrystalReferenceSystem"""
 

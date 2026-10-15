@@ -665,6 +665,7 @@ def writeNames(pages):
 def buildExample(name, example, directory):
   import contextlib
   import io
+  import warnings
   import matplotlib
   matplotlib.use("Agg")
   import matplotlib.pyplot as plt
@@ -675,8 +676,10 @@ def buildExample(name, example, directory):
   output, namespace = io.StringIO(), {"__name__": "__main__"}
   code = re.findall(r"```python\n(.*?)```", docBody(example, lambda m: m.group(0), forms=False), re.S)
   plt.close("all")
+  mtex.referenceFrame.reset()
   try:
-    with contextlib.redirect_stdout(output):
+    with contextlib.redirect_stdout(output), warnings.catch_warnings():
+      warnings.filterwarnings("ignore", message="FigureCanvasAgg is non-interactive.*", category=UserWarning)
       for block in code:
         exec(compile(block, f"{name} example", "exec"), namespace)
     rendered = ["```text\n" + output.getvalue().rstrip() + "\n```\n"] if output.getvalue().strip() else []
@@ -695,9 +698,13 @@ def build(names=()):
   os.makedirs(outDir, exist_ok=True)
   chosen = [n for n in pages if not names or n in names]
   pyNames, docPages = pythonNames(pages), set(pageSources())
+  examples = {}
   for n in chosen:
     _, sections = parseDoc(docOf(pages[n][1]))
-    exampleOutput = buildExample(n, sections["Example"], os.path.join(outDir, "images")) if "Example" in sections else ""
+    example = sections.get("Example")
+    if example is not None and example not in examples:
+      examples[example] = buildExample(n, example, os.path.join(outDir, "images"))
+    exampleOutput = examples.get(example, "")
     with open(os.path.join(outDir, n + ".md"), "w", encoding="utf-8") as fh:
       fh.write(render(n, pages[n], pages, calls, owners, pyNames, docPages, exampleOutput))
   if not names or INDEX in names:

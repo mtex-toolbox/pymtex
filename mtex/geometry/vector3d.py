@@ -85,6 +85,21 @@ class vector3d(MtexArray):
     hkl - three reciprocal-lattice indices for plane normals in a crystal frame
     uvw - three direct-lattice indices for lattice directions in a crystal frame
     shape - array shape excluding the trailing Cartesian coordinate axis
+
+  Example
+  Store three vectors in one array, normalize them, and select the second vector with
+  Python indexing. Geometric angles are returned in radians.
+
+    import numpy as np
+    from mtex import vector3d, degree
+
+    v = vector3d([[3, 0, 0], [0, 4, 0], [0, 0, 5]])
+    u = v.normalize()
+    print('Lengths:', v.norm())
+    print('Second unit vector:', u[1].data)
+    print('First two vectors, degrees:', float(u[0].angle(u[1]) / degree))
+    print('Cross product:', np.round(u[0].cross(u[1]).data, 3))
+
   See also
     Miller, vector3d.byPolar, crystalFrame, VectorDefinition, CrystalDirections"""
   _ncoord = 3

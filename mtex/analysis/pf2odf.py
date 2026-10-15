@@ -573,6 +573,35 @@ def calcODF(pf, *args, resolution=None, halfwidth=None, kernel=None, S3G=None, z
     regularisation - the weight of a penalty on the Dirichlet energy, a discrete Laplacian on
         the grid; zero for none
     verbose - report the fit of every pole figure in every iteration
+
+  Example
+  Reconstruct a model ODF from three simulated pole figures, then compare the input and
+  reconstructed intensities. The sampling grid is deliberately coarse, and the fit uses 10-degree orientation spacing.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import (crystalFrame, orientation, degree, unimodalODF, Miller,
+                      equispacedS2Grid, calcODF, calcError, plotPF)
+
+    cs = crystalFrame('m-3m')
+    centre = orientation.byEuler(35*degree, 45*degree, 10*degree, cs)
+    model = unimodalODF(centre, halfwidth=20*degree)
+    h = [Miller(1, 0, 0, cs), Miller(1, 1, 0, cs), Miller(1, 1, 1, cs)]
+    r = equispacedS2Grid(resolution=20*degree, antipodal=True)
+    pf = model.calcPoleFigure(h, r)
+    reconstructed = calcODF(pf, resolution=10*degree, halfwidth=20*degree,
+                            minIter=5, maxIter=12, ghostCorrection=False)
+    fitted = reconstructed.calcPoleFigure(h, r)
+    print('Relative pole-figure errors:', np.round(calcError(pf, reconstructed), 3))
+    limit = float(np.max(pf.intensities))
+    plotPF(pf, colorRange=(0, limit))
+    plotPF(fitted, colorRange=(0, limit))
+    plt.show()
+
+  The first figure contains the simulated measurements and the second their reconstruction,
+  on the same colour scale. The printed residuals include the coarse-grid approximation. A small
+  pole-figure residual alone does not establish that an ODF is uniquely determined by the data.
+
   References
     R. Hielscher, H. Schaeben, A novel pole figure inversion method: specification of the MTEX
         algorithm, J. Appl. Cryst. 41 (2008) 1024-1037

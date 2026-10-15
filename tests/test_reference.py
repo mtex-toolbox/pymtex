@@ -170,6 +170,14 @@ Print the result in a later block.
   assert "```text\n3\n```" in ref.buildExample("sum", example, tmp_path)
 
 
+def test_example_plotting_conventions_do_not_leak_into_the_next_example(tmp_path):
+  mtex.referenceFrame.reset()
+  original = str(mtex.plottingConvention.default)
+  ref.buildExample("changed", "  from mtex import plottingConvention\n  plottingConvention.default('x↑→y')", tmp_path)
+  result = ref.buildExample("fresh", "  from mtex import plottingConvention\n  print(str(plottingConvention.default))", tmp_path)
+  assert original in result
+
+
 def test_class_constants_show_their_own_help(rendered):
   assert "identity" in rendered["rotation.id"]
   assert "unit vector along x" in rendered["vector3d.X"]

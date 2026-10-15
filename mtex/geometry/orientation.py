@@ -178,6 +178,23 @@ class orientation(rotation):
       ori - orientation
     Keywords
       antipodal - a misorientation with grain exchange
+
+    Example
+    Construct a Bunge orientation from angles in degrees. Applying it to a crystal direction
+    expresses that direction in specimen coordinates; the rotated cube shows the same transformation.
+
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from mtex import crystalFrame, orientation, Miller, crystalShape, degree, plot
+
+      cs = crystalFrame('m-3m')
+      ori = orientation.byEuler(45*degree, 30*degree, 60*degree, cs)
+      h = Miller(0, 0, 1, cs, 'uvw')
+      r = ori * h
+      print('Specimen direction:', np.round(r.normalize().data, 3))
+      plot(ori * crystalShape.cube(cs), faceAlpha=0.4, colored=True)
+      plt.show()
+
     See also
       rotation.byEuler, orientation.Euler, orientation.byAxisAngle, orientation.byMiller,
       orientation.map, OrientationDefinition"""

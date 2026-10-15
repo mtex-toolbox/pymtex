@@ -656,6 +656,24 @@ class EBSD:
       kwargs - keyword options accepted by loadEBSD
     Output
       ebsd - EBSD map
+
+    Example
+    Read the Forsterite vendor file directly and draw its phase map. The sample file is
+    downloaded and cached on first use. The Euler correction shown here is specific to this file.
+
+      import matplotlib.pyplot as plt
+      from mtex import EBSD, mtexdatafile, rotation, vector3d, degree, plot
+
+      filename = mtexdatafile('forsterite', verbose=False)
+      correction = rotation.byAxisAngle(vector3d.X, 180*degree)
+      ebsd = EBSD.load(filename, eulerCorrection=correction)
+      print(ebsd)
+      plot(ebsd, refFrame='on')
+      plt.show()
+
+    Inspect the phase list and the reference-frame indicator after import. For another file,
+    choose the format options and Euler correction from its acquisition convention.
+
     See also
       loadEBSD, inspectEBSD, EBSD.export"""
     from ..io.load import loadEBSD

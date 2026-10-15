@@ -238,6 +238,28 @@ def plotPF(o, *args, points=None, all=False, superposition=None, **kw: Unpack[Pl
     superposition - the weights of the directions h in one superposed pole figure, a list of
         arrays for one superposed pole figure per entry of h, as plotPF(odf, pf.allH,
         superposition=pf.c)
+
+  Example
+  Compare poles of three explicit orientations with the pole density of a model ODF.
+  Each plot contains the cubic {100} and {111} families; antipodal=True identifies opposite poles.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, orientation, Miller, degree, plotPF, unimodalODF, mtexColorbar
+
+    cs = crystalFrame('m-3m')
+    h = [Miller(1, 0, 0, cs), Miller(1, 1, 1, cs)]
+    ori = orientation.byEuler(np.array([0, 15, 30])*degree, 30*degree, 45*degree, cs)
+    plotPF(ori, h, all=True, antipodal=True, markerSize=5)
+    centre = orientation.byEuler(15*degree, 30*degree, 45*degree, cs)
+    odf = unimodalODF(centre, halfwidth=15*degree)
+    plotPF(odf, h, antipodal=True, contourf=True, resolution=5*degree, colorRange='equal')
+    mtexColorbar(title='mrd')
+    plt.show()
+
+  The first figure shows discrete poles. The second shows a continuous density in multiples
+  of a random distribution; it is the projection of the model ODF, not a fit to those three orientations.
+
   See also
     plotIPF, SO3Fun.radon, PoleFigure, calcPoleFigure, annotate, ODFPoleFigure,
     OrientationPoleFigure, PoleFigurePlot"""

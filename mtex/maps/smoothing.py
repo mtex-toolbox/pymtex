@@ -351,6 +351,27 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
         out, MATLAB's 'noRefine'
     moveTriplePoints - smooth the junctions as well
     moveOuterBoundary - smooth the outer boundary of the map as well
+
+  Example
+  Compare reconstructed and smoothed boundaries on the small Forsterite sample.
+  The sample file is downloaded and cached on first use.
+
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, calcGrains, smoothBoundary, degree, plot, hold
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    smoothed = smoothBoundary(grains, 5)
+    plot(grains.boundary, lineColor='black', lineWidth=2, displayName='Reconstructed')
+    hold(True)
+    plot(smoothed.boundary, lineColor='red', lineWidth=1, displayName='Smoothed')
+    hold(False)
+    print('Grains before and after:', grains.size, smoothed.size)
+    plt.show()
+
+  Black shows the pixel-derived outlines and red the smoothed geometry. Smoothing changes
+  the curves, while the pixel grain ids and the grain membership remain those of the reconstruction.
+
   See also
     grain2d.simplifyBoundary, grain2d.refineBoundary, grain2d.reduceBoundary, boundaryFilter,
     laplaceFilter, taubinFilter, curvatureFilter, huberFilter, GrainSmoothing"""

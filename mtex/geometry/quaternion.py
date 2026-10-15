@@ -793,6 +793,23 @@ class rotation(quaternion):
       omega - rotation angles in radians
     Output
       rot - rotation container with the broadcast shape
+
+    Example
+    Rotate the x direction by 90 degrees about z, then apply the inverse rotation.
+    The axis sets the direction of rotation; its length is immaterial.
+
+      import numpy as np
+      from mtex import rotation, vector3d, degree, inv
+
+      rot = rotation.byAxisAngle(vector3d.Z, 90*degree)
+      v = vector3d.X
+      turned = rot * v
+      recovered = inv(rot) * turned
+      print('Rotated x:', np.round(turned.data, 6))
+      print('Recovered x:', np.round(recovered.data, 6))
+
+    This is an active, right-handed rotation: positive x moves toward positive y.
+
     See also
       rotation.axis, rotation.angle, rotation.byEuler"""
     return cls._fromData(axis2quat(_xyz(v), omega))

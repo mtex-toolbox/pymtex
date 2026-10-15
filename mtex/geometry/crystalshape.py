@@ -116,14 +116,6 @@ class crystalShape:
   gives a list of identically connected shapes; `cS+position` translates their vertices.
   Face selection uses cS[normals], while cS[k] selects one shape from a list. Face normals
   used for selection are in the original crystal coordinates.
-
-  For a complete example, construct and plot a hexagonal prism without loading a data set:
-
-    cs = crystalFrame('6/mmm', [3, 3, 4.7])
-    cS = crystalShape.hex(cs)
-    cS.diameter = 2
-    plot(cS)
-
   Input
     N - Miller face normals, represented by vector3d data carrying one crystalFrame;
         their lengths determine the relative distances of the planes
@@ -149,6 +141,30 @@ class crystalShape:
     volume - enclosed volume, one value per shape
     habitus - exponent used when the shape was constructed
     extension - three index scale factors used when the shape was constructed
+
+  Example
+  Construct a hexagonal prism without a data file, then build a cubic morphology from
+  two families of lattice planes. Both examples use relative lengths; diameter sets the displayed size.
+
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, crystalShape, Miller, cat, plot
+
+    hexagonal = crystalFrame('6/mmm', [3, 3, 4.7])
+    prism = crystalShape.hex(hexagonal)
+    prism.diameter = 2
+    print('Prism faces:', prism.numFaces)
+    plot(prism, faceAlpha=0.4, colored=True)
+
+    cubic = crystalFrame('m-3m')
+    normals = cat(Miller(1, 0, 0, cubic), 0.5*Miller(1, 1, 1, cubic))
+    truncatedCube = crystalShape(normals)
+    print('Truncated-cube faces:', truncatedCube.numFaces)
+    plot(truncatedCube, faceAlpha=0.5, colored=True)
+    plt.show()
+
+  The {100} planes bound the cube and the scaled {111} normals cut its corners. Changing
+  a normal length changes its plane distance and therefore the relative prominence of that crystal form.
+
   References
     J. Enderlein, A package for displaying crystal morphology, Mathematica Journal 7(1), 1997
   See also

@@ -60,6 +60,26 @@ def Miller(*args, antipodal=False, dispStyle=None):
     dispStyle - the indices the display shows and the numbers are read as, the same as the
         style given positionally ('hkl', 'hkil', 'uvw', 'UVTW', 'xyz'); a string keeps the
         style of its brackets
+
+  Example
+  In a hexagonal lattice, a plane normal and a direct-lattice direction with the same
+  three indices need not be parallel. Compare their Cartesian directions without symmetry reduction.
+
+    import numpy as np
+    from mtex import crystalFrame, Miller, degree
+
+    cs = crystalFrame('6/mmm', [3.20927, 3.20927, 5.21033])
+    normal = Miller(1, 0, 1, cs, 'hkl')
+    direction = Miller(1, 0, 1, cs, 'uvw')
+    print('Plane normal:', np.round(normal.normalize().data, 3))
+    print('Lattice direction:', np.round(direction.normalize().data, 3))
+    print('Angle in degrees:', round(float(normal.angle(direction, symmetry=False) / degree), 2))
+    cAxis = Miller(0, 0, 0, 1, cs, 'UVTW')
+    print('Four-index c-axis:', cAxis)
+
+  Use hkl or hkil for reciprocal-lattice plane normals and uvw or UVTW for direct-lattice
+  directions. The angle above compares these particular vectors rather than their symmetry orbits.
+
   See also
     vector3d, crystalFrame, CrystalDirections, CrystalOperations
   """

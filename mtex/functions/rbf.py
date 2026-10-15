@@ -974,6 +974,26 @@ def unimodalODF(center=None, *args, kernel=None, halfwidth=None, weights=None, t
     halfwidth - the halfwidth of the default kernel, 10 degree unless given
     weights - one weight per centre
     thinning - drop the centres of negligible weight (MATLAB's flag nothinning keeps them)
+
+  Example
+  Build a model texture from a preferred orientation and an angular spread, then mix it
+  with a uniform background. The coefficients 0.3 and 0.7 are volume fractions.
+
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, orientation, degree, unimodalODF, uniformODF, Miller, plotPF, mtexColorbar
+
+    cs = crystalFrame('m-3m')
+    centre = orientation.byEuler(15*degree, 35*degree, 45*degree, cs)
+    peak = unimodalODF(centre, halfwidth=15*degree)
+    odf = 0.3*peak + 0.7*uniformODF(cs)
+    print('Mean of the mixture:', round(float(odf.mean()), 3))
+    plotPF(odf, Miller(1, 0, 0, cs), antipodal=True, contourf=True, resolution=5*degree)
+    mtexColorbar(title='mrd')
+    plt.show()
+
+  Each component has mean one, so fractions summing to one preserve that normalization.
+  The halfwidth specifies the spread about the mode, rather than a sharp cutoff.
+
   See also
     fibreODF, uniformODF, FourierODF, BinghamODF, SO3FunRBF, RadialODFs"""
   if isinstance(center, (referenceFrame, SO3Kernel)):

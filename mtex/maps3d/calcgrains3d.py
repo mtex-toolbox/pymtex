@@ -92,6 +92,28 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
         default the preference 'kernels' (map of the plane)
     grainId - join the pixels of one grain id stored with the map, ebsd.prop['grainId'] or
         the voxels' ebsd.grainId, instead of a criterion on the orientations
+
+  Example
+  Reconstruct grains in the small Forsterite sample and overlay their boundaries on an
+  orientation map. The first call downloads and caches the sample file; later calls reuse it.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, calcGrains, degree, plot, hold
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    print('Grains:', grains.size)
+    print('Grain ids assigned to pixels:', np.unique(ebsd.grainId)[:8])
+    plot(ebsd, ebsd.orientations)
+    hold(True)
+    plot(grains.boundary, lineColor='black', lineWidth=1.5)
+    hold(False)
+    plt.show()
+
+  The threshold is illustrative. calcGrains writes grain ids into ebsd and may change pixels
+  when minPixel removes small grains; call it on ebsd.copy() when the original map is needed.
+
   References
     F. Bachmann, R. Hielscher, H. Schaeben, Grain detection from 2d and 3d EBSD data -
         Specification of the MTEX algorithm, Ultramicroscopy 111 (2011) 1720-1733

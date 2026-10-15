@@ -203,6 +203,27 @@ def mtexdata(name=None, root=None, download=True, verbose=True):
     download - fetch a missing file; False raises instead
     verbose - report a download, its source and where the file is kept; False is MATLAB's
         silent
+
+  Example
+  Load the small, cropped Forsterite data set, inspect its phases, and draw a single-phase
+  orientation map. Missing files are downloaded once and cached in the configured data directory.
+
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, mtexdatafile, plot
+
+    ebsd = mtexdata('small', verbose=False)
+    print(ebsd)
+    phase = ebsd['Forsterite']
+    print('Selected Forsterite pixels:', phase.size)
+    plot(phase, phase.orientations)
+    filename = mtexdatafile('forsterite', download=False)
+    print('Cached file extension:', filename.rsplit('.', 1)[-1])
+    plt.show()
+
+  mtexdata returns a loaded object using the sample recipe. mtexdatafile returns the path
+  to its underlying file, before cropping or applying that recipe. The small sample and the
+  full Forsterite sample share this file; download=False requires it to be cached already.
+
   See also
     mtexdatafile, loadEBSD, loadPoleFigure"""
   if name is None:

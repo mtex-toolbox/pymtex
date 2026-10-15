@@ -15,6 +15,28 @@ simplifyBoundary = _method("simplifyBoundary")
 flip = _method("flip")
 refineBoundary = _method("refineBoundary")
 smoothBoundary = _method("smoothBoundary")
+smoothBoundary.__doc__ += """
+
+Example
+Compare reconstructed and smoothed boundaries on the small Forsterite sample.
+The sample file is downloaded and cached on first use.
+
+  import matplotlib.pyplot as plt
+  from mtex import mtexdata, calcGrains, smoothBoundary, degree, plot, hold
+
+  ebsd = mtexdata('small', verbose=False)['Forsterite']
+  grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+  smoothed = smoothBoundary(grains, 5)
+  plot(grains.boundary, lineColor='black', lineWidth=2, displayName='Reconstructed')
+  hold(True)
+  plot(smoothed.boundary, lineColor='red', lineWidth=1, displayName='Smoothed')
+  hold(False)
+  print('Grains before and after:', grains.size, smoothed.size)
+  plt.show()
+
+Black shows the pixel-derived outlines and red the smoothed geometry. Smoothing changes
+the curves, while the pixel grain ids and the grain membership remain those of the reconstruction.
+"""
 principalComponents = _method("principalComponents")
 fitEllipse = _method("fitEllipse")
 longAxis = _method("longAxis")

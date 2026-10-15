@@ -619,6 +619,37 @@ def selectHalfwidth(E, method="UCV", halfwidths=None, noiseFloor=True, z=2.0, al
         either tolerance allows narrower kernels
   Output
     h - selected halfwidth as a float in radians, chosen from the candidates
+
+  Example
+  Select a kernel halfwidth for grouped direction measurements and use it in a spherical
+  density estimate. Two measurements per group share a synthetic grain direction.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import vector3d, degree, calcDensity
+    from mtex.functions.halfwidth import degreeEnergies, selectHalfwidth
+
+    rng = np.random.default_rng(4)
+    grainDirections = rng.normal([0, 0, 1], [0.3, 0.3, 0.05], size=(40, 3))
+    measurements = np.repeat(grainDirections, 2, axis=0) + rng.normal(0, 0.01, size=(80, 3))
+    v = vector3d(measurements).normalize()
+    groups = np.repeat(np.arange(40), 2)
+    energies = degreeEnergies(v, groups=groups, bandwidth=64, folds=8, rng=np.random.default_rng(5))
+    candidates = np.linspace(5, 40, 36)*degree
+    halfwidth = selectHalfwidth(energies, halfwidths=candidates, noiseFloor=False)
+    density = calcDensity(v, halfwidth=halfwidth)
+    theta = np.linspace(-60, 60, 121)*degree
+    probe = vector3d(np.sin(theta), np.zeros_like(theta), np.cos(theta))
+    print('Selected halfwidth (degrees):', round(float(halfwidth/degree), 2))
+    plt.plot(theta/degree, density(probe))
+    plt.xlabel('Angle from z in the x-z plane (degrees)')
+    plt.ylabel('Direction density (mean one on the sphere)')
+    plt.show()
+
+  Group ids make the forty grain groups the independent sampling units for width selection.
+  The noise floor is switched off here to isolate UCV and keep this demonstration short; it is
+  enabled by default. Increase the energy bandwidth when considering narrower kernels.
+
   See also
     degreeEnergies, calcKernel, ucvHalfwidth, lowerBoundHalfwidth, noiseFloorHalfwidth, ucvAtEdge
   """

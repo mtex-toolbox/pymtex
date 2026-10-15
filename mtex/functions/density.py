@@ -114,6 +114,35 @@ def calcDensity(x, Fourier=False, **kwargs):
   Keywords
     Fourier - convert the orientation density to SO3FunHarmonic after estimation;
         has no effect for other input types; MATLAB's flag 'Fourier'
+
+  Example
+  Estimate an orientation density from a reproducible synthetic sample. Compare two angular
+  halfwidths along one Euler-angle section through the density.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, orientation, calcDensity, degree
+
+    rng = np.random.default_rng(7)
+    cs = crystalFrame('m-3m')
+    angles = rng.normal([25, 35, 45], [8, 8, 8], size=(80, 3)) * degree
+    ori = orientation.byEuler(angles, cs)
+    narrow = calcDensity(ori, halfwidth=7.5*degree)
+    broad = calcDensity(ori, halfwidth=20*degree)
+    phi1 = np.linspace(0, 70, 141)
+    probe = orientation.byEuler(phi1*degree, 35*degree, 45*degree, cs)
+    plt.plot(phi1, narrow(probe), label='7.5 degrees')
+    plt.plot(phi1, broad(probe), label='20 degrees')
+    plt.xlabel('phi1 (degrees), Phi=35 degrees, phi2=45 degrees')
+    plt.ylabel('Orientation density (mrd)')
+    plt.legend()
+    print('Mean orientation density:', round(float(narrow.mean()), 3))
+    plt.show()
+
+  The broader kernel smooths more strongly. Both ODFs have mean one over orientation
+  space; this one-dimensional section is not itself a probability density normalized to area one.
+  Numeric real-valued inputs to calcDensity instead return a probability density in data units.
+
   See also
     calcKernel, calcBinghamODF, unimodalODF, interpolate, calcDensityReal, DensityEstimation
   """
