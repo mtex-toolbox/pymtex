@@ -204,3 +204,35 @@ reference-name map and the MATLAB/Python counterpart table kept in sync.
 - Python-only functions: listed in the index only, or also searchable through the site's
   `search.json`, which the MATLAB pages fill?
 - R3's ranking cut: 200 functions, or every function a doc page calls?
+
+## 5. Worked examples (2026-10-15)
+
+A review of the 3,014 generated function reference pages and the calls in 238 Python tutorial pages found one executable `Example` section: `crystalShape.plotSlipSystem`. Other pages contain calling forms and some already include substantial setup in Syntax or Description. The priorities below account for that existing content as well as tutorial usage.
+
+The usage count is the number of distinct tutorial pages containing a direct call to the stated Python name, parsed from Python syntax. Calls through instance variables are excluded because the receiver type is not determined. Counts measure dependency and exposure, rather than website traffic. Constructors and generic functions can serve several reference pages; the example belongs on the appropriate constructor or domain-specific page.
+
+| Priority | Python API | Tutorial pages | Worked example | Expected output |
+|---|---|---:|---|---|
+| First | `crystalFrame` | 96 | Define cubic and hexagonal frames, supply lattice parameters, then construct Miller directions in each. | Small printed frame and direction summaries; no data download. |
+| First | `Miller` | 94 | Compare a lattice plane normal and a direct-lattice direction in a non-cubic crystal; include four-index hexagonal notation. | Numeric angle or dot-product result, with a small direction plot. |
+| First | `orientation.byEuler` | 37 | Create one orientation in degrees and apply it to a crystal direction, showing the resulting specimen direction. | Printed transformed direction, with a crystal/specimen frame diagram or plot. |
+| First | `calcGrains` | 79 | Load a small map, select a phase, reconstruct grains, inspect grain ids and overlay boundaries. | An orientation map with its reconstructed boundaries; state the data download. |
+| First | `calcDensity` | 27 | Create deterministic orientation samples, estimate an ODF with an explicit angular halfwidth, and evaluate or plot it. | A density plot with its normalization stated; a second width illustrates smoothing. |
+| First | `plotPF` | 55 | Construct a simple ODF and explicit Miller families; compare orientation markers with density contours and explain antipodal poles. | Pole figures generated from self-contained crystal and orientation setup. |
+| First | `ipfColorKey` | 32 | Choose a specimen direction, compute orientation colours and draw the corresponding inverse pole figure key. | A colour key and matching coloured orientations or a small EBSD map. |
+| First | `mtexdata` | 101 | Show the difference between obtaining a sample object and obtaining its file path for EBSD.load; select a phase and inspect it. | A map summary and phase map; make download and caching behavior explicit. |
+| Next | `plottingConvention.default` | 187 | Draw the same vector or crystal shape under two screen conventions, then restore the original convention. | Two labelled panels showing screen axes versus the physical reference frame. |
+| Next | `vector3d` | 42 | Construct a vector array, normalize it, index it with Python brackets and evaluate a geometric operation. | Short numeric results and an optional vector plot. |
+| Next | `smoothBoundary` | 53 | Use one small reconstructed map to compare original and smoothed grain boundaries; explain that segmentation is unchanged. | An overlay of both boundary geometries. |
+| Next | `unimodalODF` | 29 | Build one component from an explicitly defined centre and halfwidth, then display its texture. | A pole figure or orientation-space section, with angular units shown. |
+| Next | `plotSection` | 31 | Specify an orientation density and section definition, then label and compare the resulting sections. | An ODF section plot; use the orientation-density form of the generic plotting function. |
+| Next | `calcODF` | 18 | Construct or load a small pole-figure set, reconstruct an ODF and compare calculated and measured intensities. | Measured/reconstructed pole figures and a residual or error; note runtime and data requirements. |
+| Next | `rotation.byAxisAngle` | 21 | Construct a rotation with an angle in degrees, apply it to a vector and invert it. | Before/after directions and a numeric round-trip check. |
+| Additional | `crystalShape` | 2 | Promote the existing prism example from Description to an executable Example with imports, and add a lattice-plane morphology example. | A rendered shape; the existing description already supplies crystalFrame and shape setup. |
+| Additional | `slipSystem.fcc` | 7 | Construct and symmetrise FCC slip systems, define a loading direction and evaluate Schmid factors. | A crystal/slip-system plot and a small table of factors; pair with slipSystem.SchmidFactor. |
+| Additional | `stiffnessTensor` | 5 | Construct a tensor with explicit units and symmetry, rotate it, and calculate a directional elastic property. | A directional modulus plot and unit-labelled numerical result. |
+| Additional | `selectHalfwidth` | 0 | Use deterministic samples with explicit grouping, select a width and pass it to calcDensity. | Selected width and compared density curves; show the meaning of groups and avoid a costly demonstration. |
+
+`crystalShape` has a complete prism setup in Description, so its next improvement is to execute and illustrate that code. `selectHalfwidth` is less frequent in the current tutorials, but it deserves an example because grouping, angular units and its relationship to `calcDensity` are difficult to infer from isolated calling forms. `EBSD.load` appears directly on seven tutorial pages; include it with the sample-data example, while keeping file-format corrections specific to the demonstrated file.
+
+Each new example should define its imports, frames, data and units; use deterministic small inputs; and include the actual printed or graphical output. Prefer synthetic inputs where they explain the operation. An EBSD or pole-figure workflow may use sample data when that is what the function operates on, with the download and expected runtime stated. Keep the executable code in the source docstring so the published result can be regenerated by `docs/reference.py`.
