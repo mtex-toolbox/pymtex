@@ -1,29 +1,29 @@
-# smoothing a grain boundary (MATLAB @grain2d/smoothBoundary and BoundarySmoothing/;
-# Julia smoothing.jl)
-#
-#   grains.smoothBoundary(), grains.smoothBoundary(iter), grains.smoothBoundary(taubinFilter())
-#   grains.smoothBoundary(curvatureFilter(3)), grains.smoothBoundary(huberFilter(3, threshold=3 * degree))
-#   grains.smoothBoundary(iter, simplify=False, refine=False, moveTriplePoints=True, moveOuterBoundary=True)
-#   F.smooth(V, net, h), boundaryNetwork(gB, ib)
-#
-# A measured boundary is the staircase of the pixel grid: every segment runs along one of
-# the lattice directions whatever direction the boundary has. It is repaired in three steps:
-# the staircase is simplified away, what is left is split into pieces of equal length, and only
-# then is the boundary smoothed. Neither of the first two is cosmetic: smoothing the
-# staircase itself leaves the directions scattered around the grid axes, and smoothing a
-# handful of long chords cuts the corners off the polygon they form. Which algorithm does
-# the last step is a boundaryFilter: the iterative ones (Laplace, Taubin) smooth by how
-# densely the boundary is sampled; the variational ones (curvature, Huber) state a length
-# and mean the same thing at any step size of the map.
+"""smoothing a grain boundary (MATLAB @grain2d/smoothBoundary and BoundarySmoothing/;
+Julia smoothing.jl)
+
+  grains.smoothBoundary(), grains.smoothBoundary(iter), grains.smoothBoundary(taubinFilter())
+  grains.smoothBoundary(curvatureFilter(3)), grains.smoothBoundary(huberFilter(3, threshold=3 * degree))
+  grains.smoothBoundary(iter, simplify=False, refine=False, moveTriplePoints=True, moveOuterBoundary=True)
+  F.smooth(V, net, h), boundaryNetwork(gB, ib)
+
+A measured boundary is the staircase of the pixel grid: every segment runs along one of
+the lattice directions whatever direction the boundary has. It is repaired in three steps:
+the staircase is simplified away, what is left is split into pieces of equal length, and only
+then is the boundary smoothed. Neither of the first two is cosmetic: smoothing the
+staircase itself leaves the directions scattered around the grid axes, and smoothing a
+handful of long chords cuts the corners off the polygon they form. Which algorithm does
+the last step is a boundaryFilter: the iterative ones (Laplace, Taubin) smooth by how
+densely the boundary is sampled; the variational ones (curvature, Huber) state a length
+and mean the same thing at any step size of the map."""
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.units import degree
-from .boundaryresampling import _coarsenGrains, _refineGrains, simplifyBoundary
-from .grains import grain2d
-from ..geometry.install import install
-from ..geometry.display import aligned
+from ...geometry.units import degree
+from ..boundaryresampling import _coarsenGrains, _refineGrains, simplifyBoundary
+from ..grains import grain2d
+from ...geometry.install import install
+from ...geometry.display import aligned
 
 
 # ------------------------------------------------------------------ the network

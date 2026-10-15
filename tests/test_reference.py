@@ -68,6 +68,23 @@ def test_navigation_links_only_to_published_python_pages(pages):
       assert all(url.endswith("_py.html") and url[:-8] in pages for url in urls), item["title"]
 
 
+def test_helper_folders_keep_classes_and_functions_reachable(pages):
+  folders = ref.groupPages(pages)
+  assert len(folders) == 4
+  assert "[gbcEqual](gbcEqual_index_py.html)" in folders["grainBoundaryCriteria_index"]
+  assert "[latticeBasis](latticeBasis_py.html)" in folders["latticeHelpers_index"]
+  assert "[meanFilter](meanFilter_index_py.html)" in folders["EBSDFilters_index"]
+  assert "[taubinFilter](taubinFilter_index_py.html)" in folders["boundaryFilters_index"]
+  index = ref.indexPage(pages)
+  assert "[gbcEqual](" not in index and "[latticeBasis](" not in index
+  assert all(f"({name}_py.html)" in index for name in folders)
+  items = {i["title"]: i for ch in ref.navigation(pages) for i in ch["items"]}
+  assert items["gbcEqual"]["group"] == "grainBoundaryCriteria_index"
+  assert items["latticeBasis"]["group"] == "latticeHelpers_index"
+  for text in folders.values():
+    assert all(target in pages for target in re.findall(r"\(([\w.]+)_py\.html\)", text))
+
+
 def test_every_python_link_reaches_a_page(rendered):
   # a link to <name>_py.html names a reference page or a documentation page
   targets = set(rendered) | set(ref.pageSources())

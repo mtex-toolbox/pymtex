@@ -580,6 +580,24 @@ LAYERS = {"geometry": "Geometry", "functions": "Function spaces", "tensors": "Te
           "analysis": "Analysis", "io": "Import and export", "plotting": "Plotting",
           "wizard": "Import wizard"}
 INDEX = "FunctionReference"
+with open(os.path.join(root, "docs", "reference-groups.json"), encoding="utf-8") as fh:
+  REFERENCE_GROUPS = json.load(fh)
+GROUP_BY_NAME = {name: group for group in REFERENCE_GROUPS for name in group["members"]}
+
+
+def groupPages(pages):
+  names = pythonNames(pages)
+  found = {}
+  for group in REFERENCE_GROUPS:
+    lines = ["# " + group["title"], "", group["description"], "",
+             "| Class or function | Description |", "| --- | --- |"]
+    for name in group["members"]:
+      target = names.get(name)
+      if target:
+        obj = getattr(mtex, name, None)
+        lines.append(f"| [{name}]({target}_py.html) | {firstSentence(docOf(obj))} |")
+    found[group["page"]] = "\n".join(lines) + "\n"
+  return found
 
 
 # the index: per layer its classes and the functions of the flat namespace, each linked to its
@@ -598,6 +616,9 @@ def indexPage(pages):
     target = f"{n}_index" if inspect.isclass(obj) else first.get(id(unwrap(obj)))
     if not target:
       continue
+    if n in GROUP_BY_NAME:
+      groups.setdefault("maps", ([], []))
+      continue
     layer = getattr(unwrap(obj), "__module__", "mtex.other").split(".")[1]
     layer = "maps" if layer == "maps3d" else layer
     doc = firstSentence(inspect.getdoc(unwrap(obj)) or "")
@@ -612,6 +633,10 @@ def indexPage(pages):
     for title, rows in (("Classes", classes), ("Functions", functions)):
       if rows:
         lines += [f"### {title}", "", *rows, ""]
+    if layer == "maps":
+      lines += ["### Helper folders", "", "| Folder | Contents |", "| --- | --- |"]
+      lines += [f"| [{g['title']}]({g['page']}_py.html) | {g['description']} |" for g in REFERENCE_GROUPS]
+      lines.append("")
   return "\n".join(lines)
 
 
@@ -635,6 +660,8 @@ def navigation(pages):
     layer = obj.__module__.split(".")[1]
     layer = "maps" if layer == "maps3d" else layer
     item = {"title": name, "url": target + "_py.html"}
+    if name in GROUP_BY_NAME:
+      item["group"] = GROUP_BY_NAME[name]["page"]
     if inspect.isclass(obj):
       item["aliases"] = [n + "_py.html" for n, e in pages.items()
                          if e[1] is obj and e[0] in ("class", "constructor")]
@@ -758,6 +785,11 @@ def build(names=()):
     with open(os.path.join(outDir, INDEX + ".md"), "w", encoding="utf-8") as fh:
       fh.write(indexPage(pages))
   index = {n: {"kind": e[0], "matlab": e[3]} for n, e in pages.items()}
+  for name, text in groupPages(pages).items():
+    with open(os.path.join(outDir, name + ".md"), "w", encoding="utf-8") as fh:
+      fh.write(text)
+    index[name] = {"kind": "group", "matlab": name}
+    chosen.append(name)
   index[INDEX] = {"kind": "index", "matlab": INDEX}
   if not names:
     writeNames(pages)
@@ -765,8 +797,8 @@ def build(names=()):
     json.dump(index, fh, indent=0, sort_keys=True)
   with open(os.path.join(outDir, "navigation.json"), "w", encoding="utf-8") as fh:
     json.dump(navigation(pages), fh, separators=(",", ":"))
-  paired = sum(e[3] is not None for e in pages.values())
-  print(f"{len(chosen)} pages written, {paired} of them MATLAB's names, {len(pages) - paired} Python's")
+  paired = sum(e["matlab"] is not None for e in index.values())
+  print(f"{len(chosen)} pages written, {paired} of them MATLAB's names, {len(index) - paired} Python's")
   return pages
 
 

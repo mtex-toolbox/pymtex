@@ -6,7 +6,7 @@ from .ebsd import EBSD, EBSDsquare
 from .gridify import *  # noqa: F401,F403
 from .decomposition import decompose, cellComplex
 from .criteria import grainBoundaryCriterion, gbcAngle, gbcSoft, gbcEqual, gbcCustom, connectivity
-from .fmc import gbcFMC
+from .criteria.fmc import gbcFMC
 from .segment import *  # noqa: F401,F403
 from .boundary import grainBoundary, triplePointList, triplePoints, chainOrder
 from .quadruple import *  # noqa: F401,F403
@@ -46,3 +46,8 @@ __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane"
            "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean",
            "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId",
            "reduce", "subsample", "interp", "pos2ind", "pixelSizeMatch", "calcDistortion", "undistort", "setOptions"]
+
+
+# The module path used by existing imports.
+fmc = __import__(__name__ + ".criteria.fmc", fromlist=["fmc"])
+__import__("sys").modules[__name__ + ".fmc"] = fmc

@@ -23,12 +23,12 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from ..geometry.kernels import closestImage
-from ..geometry.orientationregion import maxAngle
-from ..geometry.units import degree
-from .criteria import _bestDot, grainBoundaryCriterion
-from .kernels import grainKernel
-from ..geometry.display import aligned
+from ...geometry.kernels import closestImage
+from ...geometry.orientationregion import maxAngle
+from ...geometry.units import degree
+from ..criteria import _bestDot, grainBoundaryCriterion
+from ..kernels import grainKernel
+from ...geometry.display import aligned
 
 KAPPA = 4             # the outlier radius in standard deviations of an aggregate's own spread
 MEMBER = 0.05         # the least membership that counts a node into an aggregate's statistics

@@ -19,7 +19,7 @@ from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
 from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import NO_PIXEL, decompose
-from .fmc import gbcFMC
+from .criteria.fmc import gbcFMC
 from .grains import grain2d
 from .kernels import grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints

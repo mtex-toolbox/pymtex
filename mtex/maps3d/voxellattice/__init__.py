@@ -1,20 +1,20 @@
-# the lattice a volume is measured on: three translations d1, d2, d3 and the integer index of
-# every voxel (MATLAB EBSD3square's d1, d2, d3 and the unit cell of EBSD3)
-#
-#   voxelLattice(origin, D, ijk)          voxel ijk[n] sits at origin + ijk[n] @ D, D's rows d1, d2, d3
-#   voxelLattice.fromPositions(P)         the translations inferred, the index checked
-#   voxelLattice.fromPositions(P, D)      the same with known translations
-#
-# The translations are the three shortest independent differences to the neighbours of a
-# voxel, ordered and signed to run along x, y and z as far as they can, as MATLAB's gridify
-# orders the edges of the unit cell. The index is one rounding, checked to a quarter cell.
+"""the lattice a volume is measured on: three translations d1, d2, d3 and the integer index of
+every voxel (MATLAB EBSD3square's d1, d2, d3 and the unit cell of EBSD3)
+
+  voxelLattice(origin, D, ijk)          voxel ijk[n] sits at origin + ijk[n] @ D, D's rows d1, d2, d3
+  voxelLattice.fromPositions(P)         the translations inferred, the index checked
+  voxelLattice.fromPositions(P, D)      the same with known translations
+
+The translations are the three shortest independent differences to the neighbours of a
+voxel, ordered and signed to run along x, y and z as far as they can, as MATLAB's gridify
+orders the edges of the unit cell. The index is one rounding, checked to a quarter cell."""
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.kernels import columnMax, columnMin
-from ..geometry.display import aligned
-from ..maps.kernels import _compiledLoop
+from ...geometry.kernels import columnMax, columnMin
+from ...geometry.display import aligned
+from ...maps.kernels import _compiledLoop
 
 prange = range
 

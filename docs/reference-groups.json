@@ -1,0 +1,69 @@
+[
+  {
+    "page": "grainBoundaryCriteria_index",
+    "title": "Grain boundary criteria",
+    "description": "Criteria used by calcGrains to decide which neighbouring measurements belong to one grain.",
+    "directory": "grainBoundaryCriteria",
+    "members": [
+      "grainBoundaryCriterion",
+      "gbcAngle",
+      "gbcSoft",
+      "gbcEqual",
+      "gbcCustom",
+      "gbcFMC",
+      "gbcVariants",
+      "connectivity"
+    ]
+  },
+  {
+    "page": "EBSDFilters_index",
+    "title": "EBSD filters",
+    "description": "Filters for smoothing orientation measurements while controlling how grain boundaries are treated.",
+    "directory": "EBSDfilters",
+    "members": [
+      "EBSDFilter",
+      "windowFilter",
+      "variationalFilter",
+      "meanFilter",
+      "medianFilter",
+      "KuwaharaFilter",
+      "splineFilter",
+      "halfQuadraticFilter",
+      "l1TVFilter",
+      "infimalConvolutionFilter"
+    ]
+  },
+  {
+    "page": "boundaryFilters_index",
+    "title": "Boundary filters",
+    "description": "Filters and shared boundary networks for smoothing reconstructed grain boundaries.",
+    "directory": "boundaryFilters",
+    "members": [
+      "boundaryFilter",
+      "laplaceFilter",
+      "taubinFilter",
+      "curvatureFilter",
+      "huberFilter",
+      "boundaryNetwork"
+    ]
+  },
+  {
+    "page": "latticeHelpers_index",
+    "title": "Lattice and grid helpers",
+    "description": "Lattices, measurement planes and grid variants used to locate and index measurements in maps and volumes.",
+    "directory": "latticeHelpers",
+    "members": [
+      "lattice",
+      "mapPlane",
+      "voxelLattice",
+      "cellComplex",
+      "latticeBasis",
+      "EBSDgrid",
+      "EBSDsquare",
+      "EBSDhex",
+      "EBSD3square",
+      "hex2cube",
+      "cube2hex"
+    ]
+  }
+]

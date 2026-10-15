@@ -1,30 +1,30 @@
-# the grain boundary criteria (MATLAB grainBoundaryCriteria/, Julia criteria.jl)
-#
-#   gbcAngle(10 * degree)                 a threshold on the misorientation angle
-#   gbcAngle([10 * degree, 2 * degree])   a high and a low angle threshold
-#   gbcAngle(..., byPhase={'Forsterite': 15 * degree})   a phase with thresholds of its own
-#   gbcSoft(10 * degree, width)           the error function transition instead of a threshold
-#   gbcEqual('variantId')                 two measurements belong together when a property agrees
-#   gbcCustom(f), gbcCustom(values, threshold)
-#   crit.evaluate(ebsd, i, j), connectivity(crit, ebsd, i, j)
-#
-# A criterion answers, for pairs of neighbouring measurements, how connected they are: 1
-# no boundary, 0.5 a low angle boundary inside a grain, 0 a boundary. Anything between
-# means the same by the same rule, above zero the two are joined and at most one half a
-# boundary is drawn, so a continuous criterion needs no separate path. Different phases
-# are never joined; two not indexed measurements always are. The angle criterion compares
-# the largest |dot| over the proper group against each level transformed once, never an
-# angle in the loop.
+"""the grain boundary criteria (MATLAB grainBoundaryCriteria/, Julia criteria.jl)
+
+  gbcAngle(10 * degree)                 a threshold on the misorientation angle
+  gbcAngle([10 * degree, 2 * degree])   a high and a low angle threshold
+  gbcAngle(..., byPhase={'Forsterite': 15 * degree})   a phase with thresholds of its own
+  gbcSoft(10 * degree, width)           the error function transition instead of a threshold
+  gbcEqual('variantId')                 two measurements belong together when a property agrees
+  gbcCustom(f), gbcCustom(values, threshold)
+  crit.evaluate(ebsd, i, j), connectivity(crit, ebsd, i, j)
+
+A criterion answers, for pairs of neighbouring measurements, how connected they are: 1
+no boundary, 0.5 a low angle boundary inside a grain, 0 a boundary. Anything between
+means the same by the same rule, above zero the two are joined and at most one half a
+boundary is drawn, so a continuous criterion needs no separate path. Different phases
+are never joined; two not indexed measurements always are. The angle criterion compares
+the largest |dot| over the proper group against each level transformed once, never an
+angle in the loop."""
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry._array import MtexArray
-from ..geometry.kernels import qconj, qmul
-from .kernels import grainKernel
-from ..geometry.units import degree
-from ..geometry.vector3d import vector3d
-from ..geometry.display import aligned
+from ...geometry._array import MtexArray
+from ...geometry.kernels import qconj, qmul
+from ..kernels import grainKernel
+from ...geometry.units import degree
+from ...geometry.vector3d import vector3d
+from ...geometry.display import aligned
 
 
 class grainBoundaryCriterion:

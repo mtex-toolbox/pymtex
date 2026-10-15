@@ -14,7 +14,7 @@ from .pf2odf import MLSSolver, zeroRangeMethod, calcODF, calcODFIterative
 from .embedding import embedding, embeddingSpec, double, setDouble
 from .optimalsample import optimalSample, OptimalSampleResult
 from .cluster import calcCluster, classix, knnRadius
-from .variational import EBSDFilter, splineFilter, halfQuadraticFilter, l1TVFilter, infimalConvolutionFilter
+from .filters.variational import EBSDFilter, splineFilter, halfQuadraticFilter, l1TVFilter, infimalConvolutionFilter
 from .dislocations import fitDislocationSystems
 from .denoising import meanFilter, medianFilter, KuwaharaFilter
 from .gbnd import calcGBNDKernel
@@ -32,3 +32,8 @@ __all__ = ["velocity", "energyVector", "YoungsModulus", "linearCompressibility",
            "OptimalSampleResult", "calcCluster", "classix", "knnRadius", "EBSDFilter", "splineFilter",
            "halfQuadraticFilter", "l1TVFilter", "infimalConvolutionFilter", "fitDislocationSystems", "meanFilter",
            "medianFilter", "KuwaharaFilter", "calcGBND", "calcGBNDKernel"]
+
+
+# The module path used by existing imports.
+variational = __import__(__name__ + ".filters.variational", fromlist=["variational"])
+__import__("sys").modules[__name__ + ".variational"] = variational

@@ -277,3 +277,19 @@ class list. It covers all 206 exported classes and 564 documented functions, inc
 module-level halfwidth selector. Class aliases select the same class, and the member lists
 contain Python properties and methods. Coverage checks require every public callable to be
 listed and every link to target a generated Python page. The reference exports 3,017 pages.
+
+
+## 7. EBSD helper folders
+
+The EBSD chapter keeps its overview and class diagram. Grain boundary criteria, EBSD
+filters, boundary filters, and lattice/grid helpers have separate reference folders,
+shared by MATLAB and Python. The main index links these folders instead of listing
+all their helpers alongside the map and grain classes. Class pages still list their
+own methods and properties; filtering includes entries inside the helper folders.
+
+Python source packages are `maps/criteria`, `maps/lattice`, `maps/smoothing`,
+`maps3d/voxellattice`, and `analysis/filters`. Public imports and the existing `maps.fmc`
+and `analysis.variational` module paths are preserved. MATLAB's lattice helper is in
+`EBSDAnalysis/latticeHelpers`; criteria and smoothing filters use their existing source
+folders. The `.toc` hierarchy defines the published folders, and the reference exporter
+preserves the nested classes and methods. Existing page basenames stay unchanged.

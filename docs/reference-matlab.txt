@@ -116,6 +116,7 @@ EBSD3square_index
 EBSDAnalysis_index
 EBSDFilter
 EBSDFilter_index
+EBSDFilters_index
 EBSDOverview
 EBSD_index
 EBSDgrid.EBSDgrid
@@ -1132,6 +1133,7 @@ black2whiteColorMap
 blue2redColorMap
 boundaryFilter
 boundaryFilter_index
+boundaryFilters_index
 bresenham
 brucite
 bucketSearch
@@ -1578,6 +1580,7 @@ grainBoundary.subSet
 grainBoundary.subsasgn
 grainBoundary.subsref
 grainBoundary.surfor
+grainBoundaryCriteria_index
 grainBoundaryCriterion
 grainBoundaryCriterion_index
 grainBoundary_index
@@ -1647,6 +1650,7 @@ l1TVFilter_index
 laplaceFilter
 laplaceFilter_index
 latticeBasis
+latticeHelpers_index
 latticeType
 latticeType_index
 laueGroups

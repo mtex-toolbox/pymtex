@@ -1,24 +1,24 @@
-# the lattice an EBSD map is measured on (MATLAB ebsd.lattice, latticeBasis; Julia lattice.jl, latticefit.jl)
-#
-#   mapPlane(pts)               an orthonormal frame of the measurement plane
-#   lattice(pos)                the basis, the plane and the integer index of every measurement, inferred
-#   lattice(pos, basis=(A, shape))  the same with a known basis
-#   latticeBasis(unitCell)      the basis, the stencil and the spacing a cell polygon describes
-#
-# The cell shape is 'square' (four neighbours, a possibly rotated and sheared rectangle)
-# or 'hex' (six). The basis holds the two shortest translations, so the stencil follows
-# from the shape alone. The basis is inferred by direction, the shape is the number of
-# edges of the Voronoi cell, and the index is one checked rounding, grown over the
-# neighbour graph only where the check fails.
+"""the lattice an EBSD map is measured on (MATLAB ebsd.lattice, latticeBasis; Julia lattice.jl, latticefit.jl)
+
+  mapPlane(pts)               an orthonormal frame of the measurement plane
+  lattice(pos)                the basis, the plane and the integer index of every measurement, inferred
+  lattice(pos, basis=(A, shape))  the same with a known basis
+  latticeBasis(unitCell)      the basis, the stencil and the spacing a cell polygon describes
+
+The cell shape is 'square' (four neighbours, a possibly rotated and sheared rectangle)
+or 'hex' (six). The basis holds the two shortest translations, so the stencil follows
+from the shape alone. The basis is inferred by direction, the shape is the number of
+edges of the Voronoi cell, and the index is one checked rounding, grown over the
+neighbour graph only where the check fails."""
 from __future__ import annotations
 
 import itertools
 
 import numpy as np
 
-from ..geometry.kernels import columnMax, columnMin
-from .polygon import _cross2, signedArea2, voronoiCell
-from ..geometry.display import display, header, numString
+from ...geometry.kernels import columnMax, columnMin
+from ..polygon import _cross2, signedArea2, voronoiCell
+from ...geometry.display import display, header, numString
 
 SHAPES = ("square", "hex")
 STENCIL = {"square": np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], dtype=np.int32),
@@ -28,7 +28,7 @@ INDEX_TOL = 0.25
 
 
 def _xyz(pts):
-  from ..geometry.vector3d import vector3d
+  from ...geometry.vector3d import vector3d
   p = pts.data if isinstance(pts, vector3d) else np.asarray(pts)
   if not np.issubdtype(p.dtype, np.floating):
     p = p.astype(np.float64)
