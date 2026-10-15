@@ -1041,6 +1041,26 @@ def fibreODF(h, r=None, *args, kernel=None, halfwidth=None, weights=None):
     kernel - S2Kernel, the shape; by default the de la Vallee Poussin kernel
     halfwidth - the halfwidth of the default kernel, 10 degree unless given
     weights - one weight per fibre
+
+  Example
+  Construct a cubic <001> fibre texture about specimen Z and display its {001} and
+  {111} pole figures. The halfwidth is explicit and no data file is needed.
+
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, Miller, vector3d, fibreODF, degree, plotPF, mtexColorbar
+
+    cs = crystalFrame('m-3m')
+    h = Miller(0, 0, 1, cs, 'uvw')
+    odf = fibreODF(h, vector3d.Z, halfwidth=10*degree)
+    print('ODF mean:', round(float(odf.mean()), 6))
+    plotPF(odf, [Miller(0, 0, 1, cs), Miller(1, 1, 1, cs)], antipodal=True, resolution=5*degree)
+    mtexColorbar(title='Pole density (mrd)')
+    plt.show()
+
+  The fibre aligns a crystal direction with a specimen direction while allowing rotation
+  around it. The ODF has mean one over orientation space. Central peaks and rings in the pole
+  figures reflect that rotational freedom; a unimodalODF instead centres on one full orientation.
+
   See also
     unimodalODF, uniformODF, FourierODF, BinghamODF, SO3FunCBF, FibreODFs"""
   kernels = [a for a in args if isinstance(a, S2Kernel)]

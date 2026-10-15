@@ -243,3 +243,21 @@ including aliases, with 24 captured figures and actual numerical output. All exa
 execute during the reference build; shared examples execute once. Each execution resets
 the reference frame so plotting conventions cannot leak between pages. The full build
 and 27 reference/static-API tests pass.
+
+### Second batch
+
+The next review follows common grain and EBSD workflows, including calls through instance
+methods that the direct-call tutorial counts omit. It adds 16 worked examples:
+
+- Maps: `smooth`, `fill`, `gridify`, `KAM`, `calcGROD`, `grainMean`, `spatialProfile`,
+  and `findByLocation`.
+- Grains: `grain2d.merge` and `grain2d.neighbors`, including id mappings and adjacency.
+- Orientations and directions: `orientation.mean`, `orientation.angle`, and
+  `vector3d.symmetrise`, with explicit symmetry and angular conventions.
+- Texture and mechanics: `fibreODF`, `discreteSample`, and `slipSystem.SchmidFactor`.
+
+Each example also appears on the corresponding top-level function where one is provided.
+Synthetic maps show denoising and filling without a download; grain workflows use the
+small cached Forsterite sample. The examples capture 15 additional figures, with shared
+colour ranges for before/after maps and actual printed output. The reference/static-API
+checks pass (27 tests).

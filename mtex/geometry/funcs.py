@@ -154,12 +154,49 @@ def _method(name, fallback=None):
 
 
 angle = _method("angle", np.angle)
+angle.__doc__ += """
+
+Example
+Compare the crystallographic misorientation angle with the angle between the stored
+rotations. A 90-degree rotation about a cubic fourfold axis is a crystal symmetry operation.
+
+  from mtex import crystalFrame, orientation, degree, angle
+
+  cs = crystalFrame('m-3m')
+  a = orientation.byEuler(0, 0, 0, cs)
+  b = orientation.byEuler(90*degree, 0, 0, cs)
+  print('With cubic symmetry (degrees):', round(float(angle(a, b)/degree), 6))
+  print('Stored rotations (degrees):', round(float(angle(a, b, symmetry=False)/degree), 6))
+
+angle returns radians. Dividing by degree converts them to degrees. The default searches
+symmetry-equivalent orientations, so these two stored rotations describe the same cubic orientation.
+"""
 dot = _method("dot", np.dot)
 cross = _method("cross", np.cross)
 norm = _method("norm", np.linalg.norm)
 normalize = _method("normalize")
 inv = _method("inv", np.linalg.inv)
 mean = _method("mean", np.mean)
+mean.__doc__ += """
+
+Example
+Average orientations that straddle a cubic symmetry boundary. The Euler angles
+1 and 89 degrees represent orientations only two degrees apart under cubic symmetry.
+
+  import numpy as np
+  from mtex import crystalFrame, orientation, degree, mean
+
+  cs = crystalFrame('m-3m')
+  ori = orientation.byEuler(np.array([1, 89])*degree, 0, 0, cs)
+  centre, projected = mean(ori, return_projected=True)
+  print('Input Euler phi1 (degrees):', [1, 89])
+  print('Misorientation to mean (degrees):', np.round(ori.angle(centre)/degree, 3))
+  print('Projected rotations to mean (degrees):', np.round(projected.angle(centre, symmetry=False)/degree, 3))
+
+The symmetry-aware mean lies near a cubic equivalent of zero degrees. Arithmetic averaging
+of the Euler angles would give 45 degrees. Use a mean for a localized orientation cluster;
+a broad or multimodal texture generally cannot be represented by one mean orientation.
+"""
 std = _method("std", np.std)
 unique = _method("unique", np.unique)
 discretize = _method("discretize")
@@ -199,6 +236,29 @@ stripSym = _method("stripSym")
 fullSym = _method("fullSym")
 dspacing = _method("dspacing")
 symmetrise = _method("symmetrise")
+symmetrise.__doc__ += """
+
+Example
+Generate the distinct cubic {100} plane normals, and compare oriented normals with
+antipodal plane axes. Opposite normals represent the same axis when antipodal=True.
+
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from mtex import crystalFrame, Miller, symmetrise, plot
+
+  cs = crystalFrame('m-3m')
+  h = Miller(1, 0, 0, cs, 'hkl')
+  normals = symmetrise(h, unique=True, antipodal=False)
+  axes = symmetrise(h, unique=True, antipodal=True)
+  print('Oriented normals:', normals.size, 'Antipodal axes:', axes.size)
+  print('Unit Cartesian normals:', np.round(normals.normalize().data, 3))
+  plot(normals, upper=True, antipodal=True, markerSize=8)
+  plt.show()
+
+unique=True removes duplicate symmetry images of this single input. The hemisphere plot
+identifies opposite poles, while normals retains both signs. Applying symmetrise without
+unique to an array keeps the symmetry-image axis so the original array can be tracked.
+"""
 multiplicity = _method("multiplicity")
 projectIntoFundamentalRegion = _method("projectIntoFundamentalRegion")
 transformReferenceFrame = _method("transformReferenceFrame")
@@ -237,6 +297,36 @@ subGrid = _method("subGrid")
 exp = _method("exp", np.exp)
 isclose = _method("isclose", np.isclose)
 merge = _method("merge")
+merge.__doc__ += """
+
+Example
+Join one neighbouring pair of reconstructed Forsterite grains and inspect the parent
+id mapping. The small sample is downloaded and cached on first use.
+
+  import numpy as np
+  import matplotlib.pyplot as plt
+  from mtex import mtexdata, calcGrains, degree, plot, hold
+
+  ebsd = mtexdata('small', verbose=False)['Forsterite']
+  grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+  pair = grains.neighbors()[:1]
+  parent = grains.merge(pair, testRun=True)
+  merged = grains.merge(pair)
+  print('Merged grain ids:', pair.tolist())
+  print('Grain count before and after:', grains.size, merged.size)
+  print('Preview agrees with parentId:', np.array_equal(parent, grains.parentId))
+  print('Total pixel count preserved:', int(grains.numPixel.sum()) == int(merged.numPixel.sum()))
+  plot(grains.boundary, lineColor='lightgray', lineWidth=3)
+  hold(True)
+  plot(merged.boundary, lineColor='black', lineWidth=1)
+  hold(False)
+  plt.show()
+
+The pair is chosen only to demonstrate the operation; an analysis should select boundaries
+using a physical criterion. Grey traces show the original network and black the merged outlines.
+parentId is stored on the original grains. Update any pixel-to-parent mapping explicitly before
+using the merged grains with EBSD measurements; merge does not rewrite ebsd.grainId.
+"""
 
 
 def rotate(v, rot, *args, **kwargs):

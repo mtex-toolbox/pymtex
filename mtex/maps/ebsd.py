@@ -449,6 +449,25 @@ class EBSD:
     Keywords
       radius - the distance within which every measurement is taken; the nearest one only
         when not given
+
+    Example
+    Find the nearest measurement to a position and every measurement within a specified
+    radius. The small sample is downloaded and cached on first use.
+
+      import numpy as np
+      from mtex import mtexdata, findByLocation
+
+      ebsd = mtexdata('small', verbose=False)['Forsterite']
+      query = np.array([np.mean(ebsd.x), np.mean(ebsd.y)])
+      nearest = findByLocation(ebsd, query)
+      nearby = findByLocation(ebsd, query, radius=30)
+      print('Query (um):', np.round(query, 2))
+      print('Nearest position (um):', np.round(nearest.pos.data.reshape(-1, 3)[0, :2], 2))
+      print('Measurements within 30 um:', nearby.size)
+
+    The result is an EBSD selection. Without radius the nearest measurement is returned even
+    when the query is outside the scan; specify a radius when distance should limit the selection.
+
     See also
       EBSD.findByOrientation, EBSD.inpolygon"""
     q = xy.data if isinstance(xy, vector3d) else np.asarray(xy, dtype=float)
@@ -618,6 +637,28 @@ class EBSD:
       unitCell - the unit cell of another lattice, onto which the map is resampled by the
           nearest measurement
       return_index - return newId as well
+
+    Example
+    Arrange a small list of measurements into a grid, leaving one interior lattice site
+    unmeasured. The index mapping identifies where each original measurement ended up.
+
+      import numpy as np
+      from mtex import EBSD, crystalFrame, phaseList, rotation, vector3d, degree, gridify
+
+      x, y = np.meshgrid(np.arange(5), np.arange(4))
+      keep = ~((x == 2) & (y == 1))
+      pos = np.c_[x[keep], y[keep]]
+      rot = rotation.byAxisAngle(vector3d.Z, x[keep]*degree)
+      ebsd = EBSD(pos, rot, np.ones(len(pos), dtype=int), phaseList(crystalFrame('m-3m')))
+      grid, newId = gridify(ebsd, return_index=True)
+      print('List shape:', ebsd.shape, 'Grid shape:', grid.shape)
+      print('Unmeasured cells:', np.count_nonzero(grid.isPadding))
+      print('Padding is indexed:', bool(np.any(grid.isIndexed[grid.isPadding])))
+      print('Positions preserved:', np.allclose(grid.pos.data.reshape(-1, 3)[newId], ebsd.pos.data))
+
+    gridify arranges the data; it does not interpolate a measurement into the missing cell.
+    Use isPadding to distinguish that absent lattice site from an acquired but unindexed point.
+
     See also
       gridLayout, EBSD.layout, EBSDGrid, transformReferenceFrame"""
     from .gridify import gridify

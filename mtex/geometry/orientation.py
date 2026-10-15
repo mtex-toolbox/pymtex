@@ -569,6 +569,22 @@ class orientation(rotation):
     Keywords
       other - orientation, the second one; a fibre; or 'max'
       symmetry - reduce over the symmetric equivalents; False the plain angle of the rotations
+
+    Example
+    Compare the crystallographic misorientation angle with the angle between the stored
+    rotations. A 90-degree rotation about a cubic fourfold axis is a crystal symmetry operation.
+
+      from mtex import crystalFrame, orientation, degree, angle
+
+      cs = crystalFrame('m-3m')
+      a = orientation.byEuler(0, 0, 0, cs)
+      b = orientation.byEuler(90*degree, 0, 0, cs)
+      print('With cubic symmetry (degrees):', round(float(angle(a, b)/degree), 6))
+      print('Stored rotations (degrees):', round(float(angle(a, b, symmetry=False)/degree), 6))
+
+    angle returns radians. Dividing by degree converts them to degrees. The default searches
+    symmetry-equivalent orientations, so these two stored rotations describe the same cubic orientation.
+
     See also
       orientation.dot, fibre.angle, rotation.angle"""
     from .symmetryops import orientationAngle, orientationSelfAngle
@@ -735,6 +751,25 @@ class orientation(rotation):
       dtype - NumPy's argument, refused
       out - NumPy's argument, refused
       keepdims - keep the reduced axes with length one, as np.mean does
+
+    Example
+    Average orientations that straddle a cubic symmetry boundary. The Euler angles
+    1 and 89 degrees represent orientations only two degrees apart under cubic symmetry.
+
+      import numpy as np
+      from mtex import crystalFrame, orientation, degree, mean
+
+      cs = crystalFrame('m-3m')
+      ori = orientation.byEuler(np.array([1, 89])*degree, 0, 0, cs)
+      centre, projected = mean(ori, return_projected=True)
+      print('Input Euler phi1 (degrees):', [1, 89])
+      print('Misorientation to mean (degrees):', np.round(ori.angle(centre)/degree, 3))
+      print('Projected rotations to mean (degrees):', np.round(projected.angle(centre, symmetry=False)/degree, 3))
+
+    The symmetry-aware mean lies near a cubic equivalent of zero degrees. Arithmetic averaging
+    of the Euler angles would give 45 degrees. Use a mean for a localized orientation cluster;
+    a broad or multimodal texture generally cannot be represented by one mean orientation.
+
     See also
       quaternion.mean, quaternion.std, EBSD.grainMean, BinghamODF"""
     numpyReduction("mean", dtype, out, kwargs, "orientations")

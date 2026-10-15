@@ -489,6 +489,31 @@ def KAM(ebsd, order=1, radius=None, threshold=np.inf, max=False, weights=None):
     threshold - a misorientation angle above it is left out
     max - the largest misorientation angle instead of the mean
     weights - a function of the distance of a neighbour, its weight in the mean
+
+  Example
+  Compute nearest-neighbour KAM within reconstructed Forsterite grains. The small
+  sample is downloaded and cached on first use; all displayed angles are in degrees.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, calcGrains, KAM, degree, plot, hold, mtexColorbar
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    kam = KAM(ebsd, order=1, threshold=2.5*degree)/degree
+    print('Median KAM (degrees):', round(float(np.nanmedian(kam)), 3))
+    print('Pixels with no accepted neighbour:', np.count_nonzero(~np.isfinite(kam)))
+    plot(ebsd, kam, colorRange=(0, 2.5))
+    mtexColorbar(title='KAM (degrees)')
+    hold(True)
+    plot(grains.boundary, lineWidth=1)
+    hold(False)
+    plt.show()
+
+  calcGrains stores grain ids on the map, so comparisons across its grain boundaries are
+  excluded. The threshold additionally rejects individual neighbour pairs above 2.5 degrees.
+  KAM depends on scan spacing, neighbourhood and noise; it is not itself a strain measurement.
+
   See also
     calcGROD, gradient, calcGrains, EBSDKAM, EBSD3.KAM"""
   l = mapLattice(ebsd)
@@ -551,6 +576,31 @@ def calcGROD(ebsd, grains=None, rotRef=None):
   Keywords
     grains - grain2d whose meanRotation is the reference of its pixels
     rotRef - rotation, the reference of every pixel or of all, instead of the grains
+
+  Example
+  Compare each Forsterite orientation with the mean of its reconstructed grain.
+  The small sample is downloaded and cached on first use.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, calcGrains, calcGROD, degree, plot, hold, mtexColorbar
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    grod = calcGROD(ebsd, grains)
+    omega = grod.angle()/degree
+    print('Median deviation from grain mean (degrees):', round(float(np.nanmedian(omega)), 3))
+    plot(ebsd, omega, colorRange=(0, 5))
+    mtexColorbar(title='GROD angle (degrees)')
+    hold(True)
+    plot(grains.boundary, lineWidth=1)
+    hold(False)
+    plt.show()
+
+  The result contains misorientations; angle extracts their magnitudes. GROD uses a grain
+  reference, while KAM uses local neighbours. Select one indexed phase before calculating GROD;
+  pixels without a reconstructed grain have no grain reference and give NaN.
+
   See also
     calcGrains, grainMean, KAM"""
   n = ebsd.size
@@ -605,6 +655,30 @@ def grainMean(ebsd, prop, grains=None, method=np.mean, ulim=np.inf, llim=-np.inf
   Keywords
     ulim - the largest value taken into the average
     llim - the smallest value taken into the average
+
+  Example
+  Average the GROD angle once per grain and map the same averages back to the pixels.
+  The small Forsterite sample is downloaded and cached on first use.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, calcGrains, calcGROD, grainMean, degree, plot, mtexColorbar
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+    omega = calcGROD(ebsd, grains).angle()/degree
+    perGrain = grainMean(ebsd, omega, grains)
+    perPixel = grainMean(ebsd, omega)
+    print('Per-grain shape:', perGrain.shape, 'Per-pixel shape:', perPixel.shape)
+    print('First five grain means (degrees):', np.round(perGrain[:5], 3))
+    plot(grains, perGrain, colorRange=(0, 5))
+    mtexColorbar(title='Mean GROD angle (degrees)')
+    plt.show()
+
+  With grains supplied, the output follows grains.id; without it, each pixel receives its
+  grain average. Averaging the deviation angle gives an angular spread, not a mean orientation.
+  Use orientation.mean to average orientations with crystal symmetry.
+
   See also
     calcGrains, calcGROD, grain2d.meanOrientation, GrainOrientationParameters, GrainSpatialPlots"""
   if "grainId" not in ebsd.prop:
@@ -655,6 +729,31 @@ def spatialProfile(ebsd, lineXY, y=None, radius=None):
     dist - array, the distance of each along the line from its first point
   Keywords
     radius - the half width of the band around the line, in the scan unit
+
+  Example
+  Extract a horizontal profile through the small Forsterite map and plot its
+  misorientation relative to the first selected orientation. The sample is cached after its first download.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import mtexdata, spatialProfile, degree
+
+    ebsd = mtexdata('small', verbose=False)['Forsterite']
+    y = float(np.median(ebsd.y))
+    line = [[float(np.min(ebsd.x)), y], [float(np.max(ebsd.x)), y]]
+    profile, distance = spatialProfile(ebsd, line)
+    omega = profile.orientations.angle(profile.orientations[0])/degree
+    print('Selected measurements:', profile.size)
+    print('Distance increases:', bool(np.all(np.diff(distance) >= 0)))
+    plt.plot(distance, omega, '.')
+    plt.xlabel('Distance along profile (um)')
+    plt.ylabel('Misorientation to first orientation (degrees)')
+    plt.show()
+
+  Distances use the scan unit and start at the first line endpoint. The default band extends
+  half a lattice step on either side of the line; radius changes that band. Large jumps can
+  mark different grains. This extracts measured pixels rather than interpolating an orientation field.
+
   See also
     EBSD.findByLocation, EBSDProfile"""
   if y is not None:

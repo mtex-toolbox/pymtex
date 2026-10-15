@@ -1038,6 +1038,32 @@ def discreteSample(f, n, resolution=None, rng=None, withoutReplacement=False, ra
     rng - numpy.random.Generator, the random numbers
     withoutReplacement - draw no member of a list twice (a list)
     range - the interval of a callable of numbers
+
+  Example
+  Draw a reproducible orientation sample from a model texture, then compare its pole
+  positions with the model pole density. No experimental data are needed.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import (crystalFrame, orientation, unimodalODF, degree, discreteSample,
+                      Miller, plotPF, mtexColorbar)
+
+    cs = crystalFrame('m-3m')
+    centre = orientation.byEuler(25*degree, 35*degree, 45*degree, cs)
+    odf = unimodalODF(centre, halfwidth=12*degree)
+    sample = discreteSample(odf, 300, rng=np.random.default_rng(9))
+    print('Sample size:', sample.size)
+    print('Median angle to centre (degrees):', round(float(np.median(sample.angle(centre))/degree), 2))
+    h = Miller(1, 0, 0, cs)
+    plotPF(odf, h, antipodal=True, resolution=5*degree)
+    mtexColorbar(title='Model pole density (mrd)')
+    plotPF(sample, h, antipodal=True, markerSize=3)
+    plt.show()
+
+  The first figure is the model density; the second contains sampled orientation poles.
+  The seed makes this draw reproducible. Sampling from a density differs from selecting members
+  of an existing list, where withoutReplacement=True prevents selecting the same member twice.
+
   See also
     SO3Fun.calcComponents, calcDensity, RandomSampling, S2FunSampling"""
   rng = np.random.default_rng() if rng is None else rng

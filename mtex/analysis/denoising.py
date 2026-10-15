@@ -331,6 +331,38 @@ def smooth(ebsd, F=None, fill=False, extrapolate=False, props=()):
         without crossing a measurement included
     props - the names of numeric properties of the map smoothed with the orientations, by a
         variational filter
+
+  Example
+  Denoise a synthetic map containing two grains and reproducible orientation noise.
+  Reconstruct the grains first so the filter respects their boundary.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import (EBSD, crystalFrame, phaseList, rotation, vector3d, degree,
+                      calcGrains, smooth, meanFilter, KAM, plot, mtexColorbar, mtexTitle, newMtexFigure)
+
+    x, y = np.meshgrid(np.arange(20), np.arange(12))
+    base = np.where(x < 10, 0.0, 20.0)
+    noise = np.random.default_rng(7).normal(0, 0.4, x.shape)
+    rot = rotation.byAxisAngle(vector3d.Z, (base + noise).ravel()*degree)
+    cs = crystalFrame('m-3m')
+    ebsd = EBSD(np.c_[x.ravel(), y.ravel()], rot, np.ones(x.size, dtype=int), phaseList(cs))
+    grains = calcGrains(ebsd, angle=10*degree)
+    filtered = smooth(ebsd, meanFilter(numNeighbours=1))
+    for data, title in ((ebsd, 'Before smoothing'), (filtered, 'After smoothing')):
+        newMtexFigure()
+        kam = KAM(data)/degree
+        print(title, 'median KAM (degrees):', round(float(np.nanmedian(kam)), 3))
+        plot(data, kam, colorRange=(0, 1.5), micronbar=False)
+        mtexColorbar(title='KAM (degrees)')
+        mtexTitle(title)
+    print('Grain ids unchanged:', np.array_equal(filtered.grainId, ebsd.grainId))
+    plt.show()
+
+  The returned map has new orientations and retains the original segmentation. Lower KAM
+  shows reduced local variation in this synthetic example; it is not a general measure of
+  denoising quality. Choose a filter and length scale appropriate to the features to retain.
+
   See also
     fill, interp, halfQuadraticFilter, splineFilter, meanFilter, EBSDDenoising, EBSDFilling"""
   F = l1TVFilter() if F is None else F
@@ -383,6 +415,38 @@ def fill(ebsd, F=None, grains=None, extrapolate=False):
   Keywords
     grains - grain2d of the map: fill a pixel only from the grain whose polygon holds it
     extrapolate - fill up to the outer boundary of the map
+
+  Example
+  Fill a three-by-three hole in a synthetic orientation gradient. The missing cells
+  exist on the grid and have phase zero and NaN rotations; no data file is needed.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import (EBSD, crystalFrame, phaseList, rotation, vector3d, degree,
+                      gridify, fill, plot, mtexColorbar, mtexTitle, newMtexFigure)
+
+    x, y = np.meshgrid(np.arange(11), np.arange(11))
+    rot = rotation.byAxisAngle(vector3d.Z, (0.3*x + 0.2*y).ravel()*degree)
+    hole = ((x >= 4) & (x <= 6) & (y >= 4) & (y <= 6)).ravel()
+    rot.data[hole] = np.nan
+    phase = np.where(hole, 0, 1)
+    ebsd = gridify(EBSD(np.c_[x.ravel(), y.ravel()], rot, phase, phaseList(crystalFrame('m-3m'))))
+    filled = fill(ebsd)
+    print('Indexed cells before and after:', np.count_nonzero(ebsd.isIndexed), np.count_nonzero(filled.isIndexed))
+    measured = ebsd.isIndexed
+    change = filled.rotations[measured].angle(ebsd.rotations[measured])/degree
+    print('Largest change at measured cells (degrees):', round(float(np.max(change)), 6))
+    for data, title in ((ebsd, 'Before filling'), (filled, 'After filling')):
+        newMtexFigure()
+        plot(data, data.rotations.angle()/degree, colorRange=(0, 5), micronbar=False)
+        mtexColorbar(title='Rotation about z (degrees)')
+        mtexTitle(title)
+    plt.show()
+
+  Only missing orientations are solved for; the measured orientations stay fixed. The
+  default uses a variational continuation, whereas MATLAB fill uses nearest neighbours.
+  A gap connected to the outer edge remains empty unless extrapolate=True is requested.
+
   See also
     smooth, interp, gridify, calcGrains, EBSDFilling"""
   if isinstance(F, grain2d):

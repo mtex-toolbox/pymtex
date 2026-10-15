@@ -214,6 +214,32 @@ def SchmidFactor(sS, sigma=None, relative=False):
     tau - the Schmid factors, or an S2FunHarmonic of the tension direction
   Keywords
     relative - divide by the critical resolved shear stress sS.CRSS of every system
+
+  Example
+  Evaluate FCC slip systems under uniaxial loading. Transform the specimen loading
+  direction into crystal coordinates before passing it to crystal-frame slip systems.
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mtex import crystalFrame, slipSystem, orientation, vector3d, degree, inv
+
+    cs = crystalFrame('m-3m')
+    systems = slipSystem.fcc(cs).symmetrise(antipodal=True)
+    ori = orientation.byEuler(25*degree, 35*degree, 45*degree, cs)
+    loading = inv(ori) * vector3d.Z
+    factors = systems.SchmidFactor(loading)
+    print('Loading in crystal coordinates:', np.round(loading.normalize().data, 3))
+    print('Largest absolute Schmid factor:', round(float(np.max(np.abs(factors))), 4))
+    plt.bar(np.arange(1, systems.size+1), np.abs(factors))
+    plt.xlabel('FCC slip-system number in this list')
+    plt.ylabel('Absolute Schmid factor')
+    plt.ylim(0, 0.5)
+    plt.show()
+
+  Factors are signed and dimensionless; absolute values compare the two shear senses.
+  Multiplying by the applied uniaxial stress gives resolved shear stress. A factor alone does
+  not establish slip activity: the critical resolved shear stress and material response also matter.
+
   See also
     SchmidTensor, calcShearStress, stressTensor.uniaxial"""
   if sigma is None:
@@ -553,6 +579,32 @@ def _install():
       tau - the Schmid factors, or an S2FunHarmonic of the tension direction
     Keywords
       relative - divide by the critical resolved shear stress sS.CRSS of every system
+
+    Example
+    Evaluate FCC slip systems under uniaxial loading. Transform the specimen loading
+    direction into crystal coordinates before passing it to crystal-frame slip systems.
+
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from mtex import crystalFrame, slipSystem, orientation, vector3d, degree, inv
+
+      cs = crystalFrame('m-3m')
+      systems = slipSystem.fcc(cs).symmetrise(antipodal=True)
+      ori = orientation.byEuler(25*degree, 35*degree, 45*degree, cs)
+      loading = inv(ori) * vector3d.Z
+      factors = systems.SchmidFactor(loading)
+      print('Loading in crystal coordinates:', np.round(loading.normalize().data, 3))
+      print('Largest absolute Schmid factor:', round(float(np.max(np.abs(factors))), 4))
+      plt.bar(np.arange(1, systems.size+1), np.abs(factors))
+      plt.xlabel('FCC slip-system number in this list')
+      plt.ylabel('Absolute Schmid factor')
+      plt.ylim(0, 0.5)
+      plt.show()
+
+    Factors are signed and dimensionless; absolute values compare the two shear senses.
+    Multiplying by the applied uniaxial stress gives resolved shear stress. A factor alone does
+    not establish slip activity: the critical resolved shear stress and material response also matter.
+
     See also
       SchmidFactor, SchmidTensor, calcShearStress"""
     if sigma is None or isinstance(sigma, stressTensor):

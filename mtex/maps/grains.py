@@ -303,6 +303,30 @@ class grain2d(polygonSet):
       full - take the neighbours outside the selection as well; another grain2d in its place
         gives the pairs between the two sets
       matrix - the result as the adjacency matrix
+
+    Example
+    Find grain-id pairs and the sparse adjacency matrix of a reconstructed map.
+    The small Forsterite sample is downloaded and cached on first use.
+
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from mtex import mtexdata, calcGrains, degree, plot, mtexColorbar
+
+      ebsd = mtexdata('small', verbose=False)['Forsterite']
+      grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+      pairs = grains.neighbors()
+      adjacency = grains.neighbors(matrix=True)
+      print('First five neighbour pairs:', pairs[:5].tolist())
+      print('Matrix is symmetric:', (adjacency != adjacency.T).nnz == 0)
+      print('Each pair contributes two entries:', adjacency.nnz == 2*len(pairs))
+      plot(grains, grains.numNeighbors)
+      mtexColorbar(title='Number of neighbouring grains')
+      plt.show()
+
+    Pairs contain grain ids, not zero-based positions in the current selection. The matrix
+    uses row id-1 and column id-1; its shape can therefore exceed the number of selected grains.
+    Use full=True to include neighbours outside a selected set of grains.
+
     See also
       grain2d.numNeighbors, grainBoundary.selectByGrainId"""
     g = self.boundary.grainId
@@ -579,6 +603,35 @@ class grain2d(polygonSet):
       maxSize - the inclusions joined are those of fewer pixels
       testRun - return the parent id of every grain instead of the merged grains, the grains
           passed left unchanged
+
+    Example
+    Join one neighbouring pair of reconstructed Forsterite grains and inspect the parent
+    id mapping. The small sample is downloaded and cached on first use.
+
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from mtex import mtexdata, calcGrains, degree, plot, hold
+
+      ebsd = mtexdata('small', verbose=False)['Forsterite']
+      grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
+      pair = grains.neighbors()[:1]
+      parent = grains.merge(pair, testRun=True)
+      merged = grains.merge(pair)
+      print('Merged grain ids:', pair.tolist())
+      print('Grain count before and after:', grains.size, merged.size)
+      print('Preview agrees with parentId:', np.array_equal(parent, grains.parentId))
+      print('Total pixel count preserved:', int(grains.numPixel.sum()) == int(merged.numPixel.sum()))
+      plot(grains.boundary, lineColor='lightgray', lineWidth=3)
+      hold(True)
+      plot(merged.boundary, lineColor='black', lineWidth=1)
+      hold(False)
+      plt.show()
+
+    The pair is chosen only to demonstrate the operation; an analysis should select boundaries
+    using a physical criterion. Grey traces show the original network and black the merged outlines.
+    parentId is stored on the original grains. Update any pixel-to-parent mapping explicitly before
+    using the merged grains with EBSD measurements; merge does not rewrite ebsd.grainId.
+
     See also
       grain2d.isInclusion, grain2d.neighbors, calcGrains, GrainMerge, parentGrainReconstructor"""
     from .boundary import grainBoundary

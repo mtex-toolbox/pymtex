@@ -104,7 +104,41 @@ def gridify(ebsd, layout=None, unitCell=None, return_index=False):
   properties, and marked in isPadding. With return_index the flat index of every measurement
   in the grid comes too, MATLAB's second output: grid.pos.flatten()[newId] is ebsd.pos. A
   layout reorders the arrays by a transpose and flips; a hexagonal grid is stored column major
-  whatever is asked, as MATLAB stores it."""
+  whatever is asked, as MATLAB stores it.
+
+  Input
+    ebsd - EBSD, the measurements on a square or hexagonal lattice
+  Output
+    grid - EBSD with arrays in spatial grid shape
+    newId - flat grid index of each input measurement, with return_index=True
+  Keywords
+    layout - gridLayout, 'rowMajor' or 'columnMajor'; hexagonal grids use column major
+    unitCell - pixel polygon specifying a new lattice for nearest-neighbour resampling
+    return_index - also return the input-to-grid index mapping
+
+  Example
+  Arrange a small list of measurements into a grid, leaving one interior lattice site
+  unmeasured. The index mapping identifies where each original measurement ended up.
+
+    import numpy as np
+    from mtex import EBSD, crystalFrame, phaseList, rotation, vector3d, degree, gridify
+
+    x, y = np.meshgrid(np.arange(5), np.arange(4))
+    keep = ~((x == 2) & (y == 1))
+    pos = np.c_[x[keep], y[keep]]
+    rot = rotation.byAxisAngle(vector3d.Z, x[keep]*degree)
+    ebsd = EBSD(pos, rot, np.ones(len(pos), dtype=int), phaseList(crystalFrame('m-3m')))
+    grid, newId = gridify(ebsd, return_index=True)
+    print('List shape:', ebsd.shape, 'Grid shape:', grid.shape)
+    print('Unmeasured cells:', np.count_nonzero(grid.isPadding))
+    print('Padding is indexed:', bool(np.any(grid.isIndexed[grid.isPadding])))
+    print('Positions preserved:', np.allclose(grid.pos.data.reshape(-1, 3)[newId], ebsd.pos.data))
+
+  gridify arranges the data; it does not interpolate a measurement into the missing cell.
+  Use isPadding to distinguish that absent lattice site from an acquired but unindexed point.
+
+  See also
+    EBSD, fill, EBSDGrid"""
   layout = _layoutOf(layout)
   if unitCell is not None:
     return resample(ebsd, unitCell, layout, return_index)
