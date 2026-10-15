@@ -70,7 +70,7 @@ def test_navigation_links_only_to_published_python_pages(pages):
 
 def test_helper_folders_keep_classes_and_functions_reachable(pages):
   folders = ref.groupPages(pages)
-  assert len(folders) == 4
+  assert len(folders) == 13
   assert "[gbcEqual](gbcEqual_index_py.html)" in folders["grainBoundaryCriteria_index"]
   assert "[latticeBasis](latticeBasis_py.html)" in folders["latticeHelpers_index"]
   assert "[meanFilter](meanFilter_index_py.html)" in folders["EBSDFilters_index"]
@@ -78,7 +78,20 @@ def test_helper_folders_keep_classes_and_functions_reachable(pages):
   index = ref.indexPage(pages)
   assert "[gbcEqual](" not in index and "[latticeBasis](" not in index
   assert all(f"({name}_py.html)" in index for name in folders)
+  # Folders belong to their subject and their members remain reachable by API name.
+  sections = dict(re.findall(r"^## ([^\n]+)\n(.*?)(?=^## |\Z)", index, re.M | re.S))
+  members = [name for g in ref.REFERENCE_GROUPS for name in g["members"]]
+  assert len(members) == len(set(members))
+  for group in ref.REFERENCE_GROUPS:
+    heading = ref.LAYERS[group["layer"]]
+    assert f"({group['page']}_py.html)" in sections[heading]
+    assert all(f"({group['page']}_py.html)" not in text for title, text in sections.items() if title != heading)
   items = {i["title"]: i for ch in ref.navigation(pages) for i in ch["items"]}
+  for group in ref.REFERENCE_GROUPS:
+    for name in group["members"]:
+      if name in items:
+        assert items[name]["group"] == group["page"]
+        assert f"[{name}](" in folders[group["page"]]
   assert items["gbcEqual"]["group"] == "grainBoundaryCriteria_index"
   assert items["latticeBasis"]["group"] == "latticeHelpers_index"
   for text in folders.values():

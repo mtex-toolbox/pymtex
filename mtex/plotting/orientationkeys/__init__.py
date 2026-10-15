@@ -1,27 +1,27 @@
-# orientation colour keys: through an inverse pole figure an orientation becomes a colour
-# (MATLAB plotting/orientationColorKeys; docs/plans/plotting.md S3)
-#
-# The crystal direction that points along a fixed specimen direction is what a direction key
-# colours, so the colour says which crystal axis lies along that direction of the specimen;
-# the keys of the whole orientation colour its axis and angle from a reference, its Euler
-# angles, or its distance to a few centres. A map holds a million orientations, so the key
-# of its crystal frame is evaluated once on a grid and looked up afterwards.
+"""orientation colour keys: through an inverse pole figure an orientation becomes a colour
+(MATLAB plotting/orientationColorKeys; docs/plans/plotting.md S3)
+
+The crystal direction that points along a fixed specimen direction is what a direction key
+colours, so the colour says which crystal axis lies along that direction of the specimen;
+the keys of the whole orientation colour its axis and angle from a reference, its Euler
+angles, or its distance to a few centres. A map holds a million orientations, so the key
+of its crystal frame is evaluated once on a grid and looked up afterwards."""
 from __future__ import annotations
 
 import threading
 
 import numpy as np
 
-from ..geometry.frames import crystalFrame, referenceFrame, specimenFrame
-from ..geometry.kernels import qconj, qrot
-from ..geometry.orientation import orientation
-from ..geometry.orientationregion import eulerRegion
-from ..geometry.quaternion import rotation
-from ..geometry.representations import quat2euler
-from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, zvector
-from .directionkeys import HKLDirectionKey, HSVDirectionKey, TSLDirectionKey, hsv2rgb, rgb2hsv, spotDirectionKey
-from ..geometry.display import aligned, display, header
+from ...geometry.frames import crystalFrame, referenceFrame, specimenFrame
+from ...geometry.kernels import qconj, qrot
+from ...geometry.orientation import orientation
+from ...geometry.orientationregion import eulerRegion
+from ...geometry.quaternion import rotation
+from ...geometry.representations import quat2euler
+from ...geometry.units import degree
+from ...geometry.vector3d import vector3d, zvector
+from ..directionkeys import HKLDirectionKey, HSVDirectionKey, TSLDirectionKey, hsv2rgb, rgb2hsv, spotDirectionKey
+from ...geometry.display import aligned, display, header
 
 
 def _framesOf(x, frameB=None):
@@ -198,7 +198,7 @@ class ipfColorKey(orientationColorKey):
   # the colours through the precomputed grid: one compiled loop over the quaternions where
   # numba is there, the grid's own look-up of the crystal directions otherwise
   def _gridColors(self, ori):
-    from .kernels import ipfGridColors
+    from ..kernels import ipfGridColors
     g = self._grid[1]
     q = np.ascontiguousarray(ori.data.reshape(-1, 4)[:, :4])
     d = self.ipfDirection.normalize().data.reshape(3)
@@ -220,7 +220,7 @@ class ipfColorKey(orientationColorKey):
       ipfKey.plot()
       plot(ipfKey)
       ipfKey.plot(complete=True, resolution=1*degree)"""
-    from .sphericalplot import plotKey
+    from ..sphericalplot import plotKey
     return plotKey(self.dirMap, **kwargs)
 
 
@@ -514,7 +514,7 @@ class spotColorKey(orientationColorKey):
   # the phase, the centre, the colour and the kernel being set afterwards as in MATLAB
   def __init__(self, x, center=None, color=None, psi=None):
     super().__init__(x)
-    from ..functions.kernelfunctions import SO3DeLaValleePoussinKernel
+    from ...functions.kernelfunctions import SO3DeLaValleePoussinKernel
     # spotColorKey(ori, color): the second argument is the colour when it is no orientation
     if center is not None and not isinstance(center, orientation):
       center, color = None, center
@@ -573,7 +573,7 @@ class spectralTransmissionColorKey(orientationColorKey):
       key = spectralTransmissionColorKey(rI, 30000)
       key.polarizer = vector3d.X
       rgb = key.orientation2color(ebsd['Fo'].orientations)"""
-    from ..analysis.optics import spectralTransmission
+    from ...analysis.optics import spectralTransmission
     back = ori.inv()
     prop = back * self.propagationDirection
     if self.polarizer is None:
@@ -604,7 +604,7 @@ class colorGrid:
     resolution - target angular spacing in radians; default 0.5*degree"""
 
   def __init__(self, key, resolution=COLOR_GRID_RESOLUTION):
-    from .kernels import cubeMapNodes
+    from ..kernels import cubeMapNodes
     self.key = key.dirMap if isinstance(key, ipfColorKey) else key
     self.resolution = resolution
     self.n = max(1, int(np.ceil(2 / resolution)))
@@ -617,7 +617,7 @@ class colorGrid:
   def direction2color(self, h):
     """a NaN or zero direction, the pole of an unmeasured orientation, has no grid node and is
     coloured white, as MTEX greys such a cell rather than failing the map"""
-    from .kernels import cubeMapIndex
+    from ..kernels import cubeMapIndex
     shape = h.shape if isinstance(h, vector3d) else np.shape(h)[:-1]
     xyz = (h.data if isinstance(h, vector3d) else np.asarray(h, dtype=float)).reshape(-1, 3)
     ind = cubeMapIndex(xyz, self.n)
@@ -683,7 +683,7 @@ def ipfColors(x, ipfDirection=None, unindexed=(1.0, 1.0, 1.0), exact=False, reso
     at - the indices of the measurements to colour, the others left out
   See also
     ipfHSVKey, ipfColorKey, orientation2color, EBSD.plot, colorGrid, EBSDIPFMap"""
-  from .kernels import ipfGridColors
+  from ..kernels import ipfGridColors
   d = vector3d(zvector if ipfDirection is None else ipfDirection).normalize().data.reshape(3)
   rots = _rotationsOf(x)
   q = rots.data.reshape(-1, 4)

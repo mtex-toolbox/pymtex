@@ -1,30 +1,30 @@
-# spatial transforms: a map of the plane of a scan onto itself, the distortion between two
-# frames of positions (MATLAB geometry/spatialTransforms)
-#
-#   T * pos                    the positions moved by T; T1 * T2 moves by T2 first
-#   T1 + T2                    the stages chained, T1 first
-#   inv(T), T.displacement(pos), T.discretize(pos), transform(ebsd, T)
-#   spatialTransformId()                         the identity
-#   spatialTransformShift(M)                     an affine map, a 3 x 3 homogeneous matrix
-#   spatialTransformRigid(u)                     a translation by the vector3d u
-#   spatialTransformProjective(H)                a homography; .byTilt(theta, wd, centre)
-#   spatialTransformPoly(c, degree)              a polynomial displacement of degree 1 or 2
-#   spatialTransformDrift(s, u, slowScan=)       a displacement along the slow scan direction
-#   spatialTransformField(pos, u)                a displacement interpolated between points
-#   spatialTransformHandle(fun, funInv)          a function of the positions
-#   spatialTransformComposite(T1, T2, ...)       stages applied in order
-#   spatialTransformTilt()                       projective, affine and quadratic stages
-#   spatialTransformInverse(T)                   the inverse of T by fixed point iteration
-#   T = spatialTransformProjective.fit(posA, posB, weights=w)   and so for every class
-#   spatialTransformList([T1, T2])               a list of hops, displayed as MATLAB's table
-#
-# A transform moves x and y and leaves z; it keeps the frame and the shape of the positions.
+"""spatial transforms: a map of the plane of a scan onto itself, the distortion between two
+frames of positions (MATLAB geometry/spatialTransforms)
+
+  T * pos                    the positions moved by T; T1 * T2 moves by T2 first
+  T1 + T2                    the stages chained, T1 first
+  inv(T), T.displacement(pos), T.discretize(pos), transform(ebsd, T)
+  spatialTransformId()                         the identity
+  spatialTransformShift(M)                     an affine map, a 3 x 3 homogeneous matrix
+  spatialTransformRigid(u)                     a translation by the vector3d u
+  spatialTransformProjective(H)                a homography; .byTilt(theta, wd, centre)
+  spatialTransformPoly(c, degree)              a polynomial displacement of degree 1 or 2
+  spatialTransformDrift(s, u, slowScan=)       a displacement along the slow scan direction
+  spatialTransformField(pos, u)                a displacement interpolated between points
+  spatialTransformHandle(fun, funInv)          a function of the positions
+  spatialTransformComposite(T1, T2, ...)       stages applied in order
+  spatialTransformTilt()                       projective, affine and quadratic stages
+  spatialTransformInverse(T)                   the inverse of T by fixed point iteration
+  T = spatialTransformProjective.fit(posA, posB, weights=w)   and so for every class
+  spatialTransformList([T1, T2])               a list of hops, displayed as MATLAB's table
+
+A transform moves x and y and leaves z; it keeps the frame and the shape of the positions."""
 from __future__ import annotations
 
 import numpy as np
 
-from .vector3d import vector3d
-from .display import aligned
+from ..vector3d import vector3d
+from ..display import aligned
 
 
 def _xyz(pos):

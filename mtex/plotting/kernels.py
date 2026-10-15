@@ -149,7 +149,7 @@ def _polarRadiusLoop(N, xyz, c, out):
 
 
 def _polarRadiusNumpy(N, xyz, c):
-  from .sectorfold import _angle as angle
+  from .directionkeys.sectorfold import _angle as angle
   w = np.cross(xyz, c)
   nw = np.linalg.norm(w, axis=-1)
   atCenter = nw < 1e-10

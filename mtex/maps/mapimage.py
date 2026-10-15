@@ -20,7 +20,7 @@ import numpy as np
 
 from ..geometry.arguments import refuseFlags
 from ..geometry.frames import specimenFrame
-from ..geometry.gridlayout import gridLayout, layoutIndex
+from ..geometry.frames.gridlayout import gridLayout, layoutIndex
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.vector3d import vector3d
 from ..geometry.install import install
@@ -638,7 +638,7 @@ def transformReferenceFrame(mg, target, *args, byScreenAlignment=False):
   frame restates where they sit by the orientation given, by 'byScreenAlignment', the
   assertion that the frames were drawn the same way up, or by nothing where the frames are
   already related. Only a transpose and flips are applied, never a resampling"""
-  from ..geometry.frametransform import byScreenAlignment as screenAlignment
+  from ..geometry.frames.transform import byScreenAlignment as screenAlignment
   from ..geometry.quaternion import rotation
   if isinstance(target, mapImage):
     target = target.layout

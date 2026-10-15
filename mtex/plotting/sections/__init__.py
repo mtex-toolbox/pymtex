@@ -1,41 +1,41 @@
-# ODF sections: the slicing of orientation space, without graphics (MATLAB
-# plotting/ODFSections; docs/plans/plotting.md S2)
-#
-# Orientation space is three dimensional, so a section plot is a change of coordinates
-# SO(3) -> S2 x R: one scalar picks the slice, the two degrees of freedom left are a
-# direction on the sphere. Three such changes cover MTEX's section classes:
-#
-#   the Euler sections   fix the first or the last angle of an Euler convention; the middle
-#                        angle is the polar angle of the picture, the other outer one its
-#                        azimuth (phi1Sections, phi2Sections, alphaSections, gammaSections)
-#   the pole figure      the direction is ori * h1, the coordinate the angle by which
-#   sections             ori * h2 is twisted about it against a reference field
-#                        (pfSections, sigmaSections)
-#   axisAngleSections    the direction is the rotation axis of the representative in the
-#                        fundamental region, the coordinate its rotation angle
-#
-# Every section is drawn on the charts of spherical.py, so the drawing layer draws
-# sections with the code it draws pole figures with, and nothing here knows about figures.
+"""ODF sections: the slicing of orientation space, without graphics (MATLAB
+plotting/ODFSections; docs/plans/plotting.md S2)
+
+Orientation space is three dimensional, so a section plot is a change of coordinates
+SO(3) -> S2 x R: one scalar picks the slice, the two degrees of freedom left are a
+direction on the sphere. Three such changes cover MTEX's section classes:
+
+  the Euler sections   fix the first or the last angle of an Euler convention; the middle
+                       angle is the polar angle of the picture, the other outer one its
+                       azimuth (phi1Sections, phi2Sections, alphaSections, gammaSections)
+  the pole figure      the direction is ori * h1, the coordinate the angle by which
+  sections             ori * h2 is twisted about it against a reference field
+                       (pfSections, sigmaSections)
+  axisAngleSections    the direction is the rotation axis of the representative in the
+                       fundamental region, the coordinate its rotation angle
+
+Every section is drawn on the charts of spherical.py, so the drawing layer draws
+sections with the code it draws pole figures with, and nothing here knows about figures."""
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.frames import crystalFrame, specimenFrame
-from ..geometry.grids.s2grid import equispacedS2Grid
-from ..geometry.kernels import qrot
-from ..geometry.orientation import orientation
-from ..geometry.orientationregion import eulerRegion, fundamentalRegion
-from ..geometry.plottingconvention import plottingConvention
-from ..geometry.quaternion import rotation
-from ..geometry.representations import EULER_LABELS, eulerConvention, quat2euler, quatAngle, quatAxis
-from ..geometry.session import getMTEXpref
-from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
-from ..geometry.symmetry import symmetry
-from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, zvector, asVector3d
-from .spherical import _conventionOf, makeSphericalProjection
-from ..geometry.display import aligned
-from ..geometry.arguments import refuseFlags
+from ...geometry.frames import crystalFrame, specimenFrame
+from ...geometry.grids.s2grid import equispacedS2Grid
+from ...geometry.kernels import qrot
+from ...geometry.orientation import orientation
+from ...geometry.orientationregion import eulerRegion, fundamentalRegion
+from ...geometry.plottingconvention import plottingConvention
+from ...geometry.quaternion import rotation
+from ...geometry.representations import EULER_LABELS, eulerConvention, quat2euler, quatAngle, quatAxis
+from ...geometry.session import getMTEXpref
+from ...geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
+from ...geometry.symmetry import symmetry
+from ...geometry.units import degree
+from ...geometry.vector3d import vector3d, xvector, zvector, asVector3d
+from ..spherical import _conventionOf, makeSphericalProjection
+from ...geometry.display import aligned
+from ...geometry.arguments import refuseFlags
 
 GREEK = {"phi1": "φ1", "Phi": "Φ", "phi2": "φ2", "alpha": "α", "beta": "β", "gamma": "γ", "sigma": "σ", "omega": "ω"}
 
@@ -186,7 +186,7 @@ class ODFSections:
 
   def plot(self, x, *args, **kwargs):
     """oS.plot(odf), oS.plot(ori), and oS.plot(values, 'smooth') of values on makeGrid's nodes"""
-    from .sectionplot import _plotSectionFun, plotSection
+    from ..sectionplot import _plotSectionFun, plotSection
     if isinstance(x, (np.ndarray, list)):
       if self.plotGrid is None:
         raise ValueError("values are drawn on the nodes of makeGrid: call oS.makeGrid() first")

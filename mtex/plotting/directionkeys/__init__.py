@@ -1,26 +1,26 @@
-# direction colour keys: a direction of the fundamental sector becomes a colour (MATLAB
-# plotting/directionColorKeys; docs/plans/plotting.md S3)
-#
-# MTEX's colour sphere (HSVDirectionKey/direction2color with ar2rgb): the radius in the
-# folded sector becomes the polar angle, pi at the white centre and 0 at the black one, the
-# two halves meeting at pi/2 on the boundary they share; the equalised azimuth becomes the
-# hue. Lightness follows the polar angle through the gray gradient, and the saturation is
-# taken in HSL, which holds the lightness steady around the circle where HSV does not.
+"""direction colour keys: a direction of the fundamental sector becomes a colour (MATLAB
+plotting/directionColorKeys; docs/plans/plotting.md S3)
+
+MTEX's colour sphere (HSVDirectionKey/direction2color with ar2rgb): the radius in the
+folded sector becomes the polar angle, pi at the white centre and 0 at the black one, the
+two halves meeting at pi/2 on the boundary they share; the equalised azimuth becomes the
+hue. Lightness follows the polar angle through the gray gradient, and the saturation is
+taken in HSL, which holds the lightness steady around the circle where HSV does not."""
 from __future__ import annotations
 
 from functools import lru_cache
 
 import numpy as np
 
-from ..geometry.frames import referenceFrame
-from ..geometry.kernels import qrot
-from ..geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
-from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, asVector3d
-from ..geometry.representations import unitRows
+from ...geometry.frames import referenceFrame
+from ...geometry.kernels import qrot
+from ...geometry.sphericalregion import conventionalSector, projectIntoRegion, sphericalRegion
+from ...geometry.units import degree
+from ...geometry.vector3d import vector3d, xvector, asVector3d
+from ...geometry.representations import unitRows
 from .sectorfold import _angle, azimuthAbout, polarCoordinates, regionCenter, sectorFolds, tangentAt, uniqueNormals
-from .spherical import _conventionOf
-from ..geometry.display import aligned
+from ..spherical import _conventionOf
+from ...geometry.display import aligned
 
 # ------------------------------------------------------------------ colour arithmetic
 
@@ -302,7 +302,7 @@ class directionColorKey:
       key.plot()
       plot(key)
       key.plot(complete=True, resolution=1*degree)"""
-    from .sphericalplot import plotKey
+    from ..sphericalplot import plotKey
     return plotKey(self, **kwargs)
 
   def __repr__(self):
@@ -339,7 +339,7 @@ class HSVDirectionKey(directionColorKey):
   def __init__(self, CS=None, whiteCenter=None, maxAngle=np.inf, sR=None, colorStretching=1.0, grayValue=KEY_GRAY_VALUE,
                grayGradient=KEY_GRAY_GRADIENT, antipodal=False, perceptual=False, hueLightness=0.0):
     # HSVDirectionKey() colours the whole sphere of the specimen; antipodal=True the key of axes
-    from ..geometry.frames import specimenFrame
+    from ...geometry.frames import specimenFrame
     # HSVDirectionKey(v): the key of the frame the directions live in, MATLAB's call
     if isinstance(CS, vector3d):
       antipodal = antipodal or CS.antipodal
@@ -535,7 +535,7 @@ class spotDirectionKey(directionColorKey):
 
   def __init__(self, CS, center=None, color=(1.0, 0.0, 0.0), psi=None):
     super().__init__(CS)
-    from ..functions.kernelfunctions import S2DeLaValleePoussinKernel
+    from ...functions.kernelfunctions import S2DeLaValleePoussinKernel
     self.psi = S2DeLaValleePoussinKernel(halfwidth=10 * degree) if psi is None else psi
     self.color = np.asarray(color, dtype=float).reshape(-1, 3)
     self.frame = CS if isinstance(CS, referenceFrame) else None

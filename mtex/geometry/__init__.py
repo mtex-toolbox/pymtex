@@ -6,11 +6,11 @@ from .vector3d import vector3d, isCrystalDirection
 from .quaternion import quaternion, rotation, orthogonalTransform, reflection
 from .homochoric import homochoricRadius, cubo2homo, homo2cubo
 from .plottingconvention import AXIS_CONVENTIONS, conventionNames, closestConvention, plottingConvention
-from .gridlayout import gridLayout, layoutIndex
+from .frames.gridlayout import gridLayout, layoutIndex
 from .latticetype import latticeType
 from .symmetry import (symmetry, findPointGroup, isPointGroupName, hm2point, monoclinicSetting, spaceGroupToPointGroup,
                        identifyGroup)
-from .crystalaxes import crystalAxes, reciprocalAxes
+from .frames.crystalaxes import crystalAxes, reciprocalAxes
 from .frames import referenceFrame, crystalFrame, specimenFrame, notIndexedFrame, alignmentSetups, closestAlignment
 from .miller import Miller
 from .orientation import orientation
@@ -20,7 +20,7 @@ from .symmetryops import *  # noqa: F401,F403
 from .sphericalregion import sphericalRegion, dirichletSector, tilesSphere, sectorCenter, projectIntoRegion
 from .s2triangulation import S2Triangulation
 from .orientationregion import orientationRegion, eulerRegion, fundamentalRegionEuler, projectIntoEulerRegion, maxAngle
-from .frametransform import align, byScreenAlignment
+from .frames.transform import align, byScreenAlignment
 from .standardorientations import variants, STANDARD_EULER
 from .csl import CSL
 from .tangent import SO3TangentVector, spinTensor, left, right, geodesic
@@ -92,3 +92,12 @@ def __getattr__(name):
 
 if TYPE_CHECKING:
   from .vector3d import xvector, yvector, zvector
+
+
+# Preserve module imports used before the helper folders were introduced.
+crystalaxes = __import__(__name__ + ".frames.crystalaxes", fromlist=["crystalaxes"])
+__import__("sys").modules[__name__ + ".crystalaxes"] = crystalaxes
+gridlayout = __import__(__name__ + ".frames.gridlayout", fromlist=["gridlayout"])
+__import__("sys").modules[__name__ + ".gridlayout"] = gridlayout
+frametransform = __import__(__name__ + ".frames.transform", fromlist=["frametransform"])
+__import__("sys").modules[__name__ + ".frametransform"] = frametransform

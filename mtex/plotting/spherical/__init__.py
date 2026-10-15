@@ -1,29 +1,29 @@
-# the geometry of spherical plots, without graphics (MATLAB @sphericalProjection,
-# makeSphericalProjection; docs/plans/plotting.md S1)
-#
-# A spherical plot draws a region of the sphere on a plane. The plotting convention says
-# which direction points out of the screen and which east; in its frame a direction has
-# the polar angle theta and the azimuth rho, and a projection is one radial function
-# r(theta), the point drawn at r (cos rho, sin rho). A region reaching into both
-# hemispheres is drawn as two charts, the lower one with theta -> pi - theta, so that it
-# is seen through the sphere from above as in MTEX; an antipodal chart draws the antipode
-# of a direction that falls into the other hemisphere. The chart also knows the grid a
-# function is evaluated on, the boundary of its region, the grid lines and the labels,
-# all as plane coordinates, which is what the drawing layer draws.
+"""the geometry of spherical plots, without graphics (MATLAB @sphericalProjection,
+makeSphericalProjection; docs/plans/plotting.md S1)
+
+A spherical plot draws a region of the sphere on a plane. The plotting convention says
+which direction points out of the screen and which east; in its frame a direction has
+the polar angle theta and the azimuth rho, and a projection is one radial function
+r(theta), the point drawn at r (cos rho, sin rho). A region reaching into both
+hemispheres is drawn as two charts, the lower one with theta -> pi - theta, so that it
+is seen through the sphere from above as in MTEX; an antipodal chart draws the antipode
+of a direction that falls into the other hemisphere. The chart also knows the grid a
+function is evaluated on, the boundary of its region, the grid lines and the labels,
+all as plane coordinates, which is what the drawing layer draws."""
 from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.frames import crystalFrame, referenceFrame
-from ..geometry.miller import brackets, indexString
-from ..geometry.plottingconvention import plottingConvention
-from ..geometry.quaternion import rotation
-from ..geometry.session import getMTEXpref
-from ..geometry.sphericalregion import conventionalSector, sphericalRegion
-from ..geometry.units import degree
-from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
-from ..geometry.display import aligned
-from ..geometry.arguments import refuseFlags
+from ...geometry.frames import crystalFrame, referenceFrame
+from ...geometry.miller import brackets, indexString
+from ...geometry.plottingconvention import plottingConvention
+from ...geometry.quaternion import rotation
+from ...geometry.session import getMTEXpref
+from ...geometry.sphericalregion import conventionalSector, sphericalRegion
+from ...geometry.units import degree
+from ...geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
+from ...geometry.display import aligned
+from ...geometry.arguments import refuseFlags
 
 
 class sphericalProjection:
@@ -284,7 +284,7 @@ class sphericalProjection:
         V = vector3d(np.array([v.data.reshape(3) for v in V]).reshape(-1, 3)).normalize() if V else vector3d()
       return [(v, s) for v in V.flatten() if (s := millerLabel(v, fr)) is not None]
     # a frame-free direction is named by the axes of the session's specimen frame
-    from ..geometry.frames import specimenFrame
+    from ...geometry.frames import specimenFrame
     names = tuple((specimenFrame.default if fr is None else fr).axesNames)
     labels = []
     # an antipodal chart shows an axis of the other hemisphere at its antipode; the axis

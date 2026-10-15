@@ -14,10 +14,10 @@ import re
 
 import numpy as np
 
-from .representations import unitRows
-from ._array import MtexArray
+from ..representations import unitRows
+from .._array import MtexArray
 
-from .latticetype import latticeType
+from ..latticetype import latticeType
 
 ALIGNMENT_VENDORS = ("EDAX", "TSL", "OIM")
 
@@ -194,7 +194,7 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   if alignment:
     axes = alignAxes(axes, alignment)
   if rotate is not None:
-    from .vector3d import vector3d
+    from ..vector3d import vector3d
     axes = (rotate * vector3d(axes)).data if isinstance(rotate, MtexArray) else axes @ np.asarray(rotate).T
   return axes
 

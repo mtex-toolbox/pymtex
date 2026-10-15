@@ -1,19 +1,19 @@
-# reference frames (MATLAB @referenceFrame, @crystalFrame, @specimenFrame, notIndexedFrame;
-# Julia ADR 0004)
-#
-# A reference frame answers "what coordinate system is this data expressed in": an
-# identity (a mineral, or 'rolling'), a basis, the point group the data is invariant
-# under, and the default convention it is drawn with. A frame is a handle: == is
-# identity, and the session register hands out one handle per key, so two imports of
-# forsterite are one frame while ferrite and martensite with one cell are two.
-#
-#   crystalFrame('m-3m', [4.05, 4.05, 4.05], mineral='Aluminium')
-#   crystalFrame('2/m', [8.6, 13, 7.2], [90, 116, 90]*degree, 'X||a')
-#   specimenFrame('222')                  the session frame in that sample symmetry
-#   specimenFrame.rolling, specimenFrame.rolling('mmm')    the named specimen frames
-#
-# A registered frame is sealed: basis, axes names and group cannot change under the
-# datasets holding it. Name, colour and the plotting convention stay open, as in MATLAB.
+"""reference frames (MATLAB @referenceFrame, @crystalFrame, @specimenFrame, notIndexedFrame;
+Julia ADR 0004)
+
+A reference frame answers "what coordinate system is this data expressed in": an
+identity (a mineral, or 'rolling'), a basis, the point group the data is invariant
+under, and the default convention it is drawn with. A frame is a handle: == is
+identity, and the session register hands out one handle per key, so two imports of
+forsterite are one frame while ferrite and martensite with one cell are two.
+
+  crystalFrame('m-3m', [4.05, 4.05, 4.05], mineral='Aluminium')
+  crystalFrame('2/m', [8.6, 13, 7.2], [90, 116, 90]*degree, 'X||a')
+  specimenFrame('222')                  the session frame in that sample symmetry
+  specimenFrame.rolling, specimenFrame.rolling('mmm')    the named specimen frames
+
+A registered frame is sealed: basis, axes names and group cannot change under the
+datasets holding it. Name, colour and the plotting convention stay open, as in MATLAB."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -22,19 +22,19 @@ import warnings
 
 import numpy as np
 
-from .representations import unitRows
+from ..representations import unitRows
 from .crystalaxes import alignment as _alignment, crystalAxes, isAlignment, reciprocalAxes
-from .data.pointgroupnames import LAUE_CLASSES, POINT_GROUP_NAMES, findPointGroup, hm2point, isPointGroupName, monoclinicSetting
-from .display import display, header, numString
-from .plottingconvention import ARROWS_ASCII, ARROWS_UTF8, plottingConvention
-from .quaternion import orthogonalTransform, quaternion, rotation
-from .session import SESSION, getMTEXpref
-from .symmetry import spaceGroupToPointGroup, symmetry
-from .vector3d import classproperty, vector3d, xvector, yvector, zvector
-from .display import aligned
+from ..data.pointgroupnames import LAUE_CLASSES, POINT_GROUP_NAMES, findPointGroup, hm2point, isPointGroupName, monoclinicSetting
+from ..display import display, header, numString
+from ..plottingconvention import ARROWS_ASCII, ARROWS_UTF8, plottingConvention
+from ..quaternion import orthogonalTransform, quaternion, rotation
+from ..session import SESSION, getMTEXpref
+from ..symmetry import spaceGroupToPointGroup, symmetry
+from ..vector3d import classproperty, vector3d, xvector, yvector, zvector
+from ..display import aligned
 
 if TYPE_CHECKING:
-  from .vocabulary import AlignmentName, ColorName, ConventionName, PointGroupName
+  from ..vocabulary import AlignmentName, ColorName, ConventionName, PointGroupName
 
 CANONICAL_BASIS = np.eye(3)
 
@@ -439,7 +439,7 @@ class referenceFrame:
     See also
       sphericalRegion, referenceFrame.fundamentalRegion, plotIPF, vector3d.projectIntoFundamentalRegion,
       FundamentalSector"""
-    from .sphericalregion import fundamentalSector
+    from ..sphericalregion import fundamentalSector
     return fundamentalSector(self, center=center, antipodal=antipodal, angle=angle)
 
   def conventionalSector(self, up=None, east=None):
@@ -462,7 +462,7 @@ class referenceFrame:
       east - the direction to the east the wedge starts from; by default the convention's
     See also
       referenceFrame.fundamentalSector, sphericalRegion"""
-    from .sphericalregion import conventionalSector
+    from ..sphericalregion import conventionalSector
     return conventionalSector(self, up=up, east=east)
 
   def fundamentalRegion(self, other=None, *, antipodal=False):
@@ -485,7 +485,7 @@ class referenceFrame:
       antipodal - the grain exchange symmetry mori == inv(mori) of misorientations
     See also
       orientationRegion, referenceFrame.fundamentalSector"""
-    from .orientationregion import fundamentalRegion
+    from ..orientationregion import fundamentalRegion
     return fundamentalRegion(self, other, antipodal=antipodal)
 
   # ------------------------------------------------------------------ comparing frames by value
@@ -929,7 +929,7 @@ class crystalFrame(referenceFrame):
 
     See also
       loadCIF, crystalFrame, referenceFrame.intern"""
-    from ..io.cif import loadCIF
+    from ...io.cif import loadCIF
     return loadCIF(fname)
 
   def __new__(cls, *args, **kwargs):
@@ -997,7 +997,7 @@ class crystalFrame(referenceFrame):
 
   # a lattice axis as a Miller direction in this frame: [100] or (100) of the frame
   def _axisMiller(self, xyz, style):
-    from .miller import Miller
+    from ..miller import Miller
     return Miller(vector3d(xyz), self, dispStyle=style)
 
   @property

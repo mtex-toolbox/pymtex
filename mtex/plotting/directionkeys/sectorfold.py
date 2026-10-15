@@ -14,14 +14,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.representations import unitRows
-from ..geometry.grids.s2grid import equispacedS2Grid
-from ..geometry.quaternion import orthogonalTransform, reflection, rotation
-from ..geometry.sphericalregion import conventionalSector, sphericalRegion
-from ..geometry.symmetry import _isin, closure
-from ..geometry.units import degree
-from ..geometry.vector3d import asVector3d, vector3d
-from .spherical import _conventionOf
+from ...geometry.representations import unitRows
+from ...geometry.grids.s2grid import equispacedS2Grid
+from ...geometry.quaternion import orthogonalTransform, reflection, rotation
+from ...geometry.sphericalregion import conventionalSector, sphericalRegion
+from ...geometry.symmetry import _isin, closure
+from ...geometry.units import degree
+from ...geometry.vector3d import asVector3d, vector3d
+from ..spherical import _conventionOf
 
 
 def _angle(u, v):
@@ -263,7 +263,7 @@ def polarCoordinates(sR, v, center, ref=None, equalise=True):
 def polarRadius(N, xyz, c):
   """one over the geodesic through the centre: the boundary crossing of that circle sets the
   scale, so the radius is one at the centre and zero where the circle leaves the region"""
-  from .kernels import polarRadius as radiusKernel
+  from ..kernels import polarRadius as radiusKernel
   if not N or all(abs(n @ c) < 1e-10 for n in N):
     return _angle(c, xyz) / np.pi
   return radiusKernel(N, xyz, c)

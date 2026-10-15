@@ -892,7 +892,7 @@ class orientation(rotation):
       tol - how far from a rotation the transition by the axes may come out
     See also
       vector3d.transformReferenceFrame, align, byScreenAlignment, CrystalReferenceSystem"""
-    from .frametransform import transformOrientation
+    from .frames.transform import transformOrientation
     if isinstance(toB, (str, orientation)):
       rule, toB = toB, None
     return transformOrientation(self, to, toB, rule, tol)
@@ -1019,7 +1019,7 @@ class orientation(rotation):
           larger deviation is refused
     See also
       orientation.byScreenAlignment, referenceFrame.isCompatible, transformReferenceFrame"""
-    from .frametransform import align
+    from .frames.transform import align
     return align(frA, frB, tol)
 
   @classmethod
@@ -1034,7 +1034,7 @@ class orientation(rotation):
 
     See also
       plottingConvention, orientation.align"""
-    from .frametransform import byScreenAlignment
+    from .frames.transform import byScreenAlignment
     return byScreenAlignment(frA, frB)
 
   # ------------------------------------------------------------------ display

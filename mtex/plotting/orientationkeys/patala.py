@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..geometry.orientation import orientation
-from .directionkeys import hsv2rgb
-from .orientationkeys import orientationColorKey
+from ...geometry.orientation import orientation
+from ..directionkeys import hsv2rgb
+from . import orientationColorKey
 
 
 # the rotation matrix of an axis and an angle, applied to rows as pts @ R
@@ -198,8 +198,8 @@ class PatalaColorKey(orientationColorKey):
 
 def rotationAboutZ(w):
   """the rotation about z by the angle w"""
-  from ..geometry.quaternion import rotation
-  from ..geometry.vector3d import zvector
+  from ...geometry.quaternion import rotation
+  from ...geometry.vector3d import zvector
   return rotation.byAxisAngle(zvector, w)
 
 

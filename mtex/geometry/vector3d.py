@@ -1335,7 +1335,7 @@ class vector3d(MtexArray):
           I - M M'; a larger deviation is refused
     See also
       align, orientation.byScreenAlignment, orientation.transformReferenceFrame"""
-    from .frametransform import transformVector
+    from .frames.transform import transformVector
     return transformVector(self, to, rule, tol)
 
   def det(self, b=None, c=None):

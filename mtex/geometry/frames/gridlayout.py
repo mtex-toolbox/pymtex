@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .vector3d import vector3d
-from .display import display, header
+from ..vector3d import vector3d
+from ..display import display, header
 
 X, Y = np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])
 
@@ -79,7 +79,7 @@ class gridLayout:
     """the layout of an array drawn with row 0 at the top and the columns to the right, read
     against the convention of the frame: what the relation was before layouts were stated,
     and named so that the assumption shows wherever the layout is displayed"""
-    from .plottingconvention import plottingConvention
+    from ..plottingconvention import plottingConvention
     pC = getattr(fr, "how2plot", None)
     pC = plottingConvention.default if pC is None else pC
     rot = pC.rot * plottingConvention.ij.rot.inv()

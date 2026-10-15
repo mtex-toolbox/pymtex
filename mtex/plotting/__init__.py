@@ -14,13 +14,13 @@ from .sections import (ODFSections, eulerSections, phi1Sections, phi2Sections, a
 from .sectionplot import (plotKeySections, plotSection, plotSections, annotateSection, plotFibreSection, quiverSection,
                           quiverSectionField)
 from .fibreplot import plotFibre
-from .sectorfold import regionCenter, sectorFolds, hasSmoothKey, polarCoordinates
+from .directionkeys.sectorfold import regionCenter, sectorFolds, hasSmoothKey, polarCoordinates
 from .directionkeys import (directionColorKey, HSVDirectionKey, TSLDirectionKey, HKLDirectionKey, spotDirectionKey,
                             sphereColor, hsv2rgb, rgb2hsv, hsl2hsv)
 from .orientationkeys import (orientationColorKey, ipfColorKey, ipfHSVKey, ipfTSLKey, ipfHKLKey, ipfSpotKey,
                               axisAngleColorKey, BungeColorKey, spotColorKey, spectralTransmissionColorKey, colorGrid,
                               ipfColors)
-from .patalakey import PatalaColorKey
+from .orientationkeys.patala import PatalaColorKey
 from .maps import (mapLayout, mapRaster, mapCells, mapPoints, mapExtent, boundaryPolyline, boundarySegments,
                    grainPolygons, scaleBar, switchUnit, triadGeometry, frameOnScreen, phaseColor, phasePalette)
 from .mapplot import (line, scatterXY, mapPlot, plotEBSD, plotGrains, plotBoundary, plotTriplePoints, quiverMap,
@@ -170,3 +170,10 @@ def _install():
 
 
 _install()
+
+
+# Preserve module imports used before the helper folders were introduced.
+sectorfold = __import__(__name__ + ".directionkeys.sectorfold", fromlist=["sectorfold"])
+__import__("sys").modules[__name__ + ".sectorfold"] = sectorfold
+patalakey = __import__(__name__ + ".orientationkeys.patala", fromlist=["patalakey"])
+__import__("sys").modules[__name__ + ".patalakey"] = patalakey

@@ -20,7 +20,7 @@ import numpy as np
 
 from ..geometry._array import MtexArray
 from ..geometry.kernels import columnMax, columnMin
-from ..geometry.gridlayout import gridLayout, layoutIndex
+from ..geometry.frames.gridlayout import gridLayout, layoutIndex
 from .kernels import gridKernel
 from .lattice import lattice, latticeBasis, mapPlane
 

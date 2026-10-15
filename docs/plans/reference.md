@@ -293,3 +293,21 @@ and `analysis.variational` module paths are preserved. MATLAB's lattice helper i
 `EBSDAnalysis/latticeHelpers`; criteria and smoothing filters use their existing source
 folders. The `.toc` hierarchy defines the published folders, and the reference exporter
 preserves the nested classes and methods. Existing page basenames stay unchanged.
+
+## 8. Geometry and plotting helper folders
+
+Geometry groups spherical/orientation grids, reference frames/layouts and spatial
+transforms. Plotting groups spherical projections, directional and orientation colour
+keys, orientation sections, orientation plots, and plot conventions/layout helpers.
+The existing projection and colour-key overview URLs are reused. Core geometric types,
+map plots and figures remain on their chapter overview; the eight subject chapters and
+seven class diagrams are preserved.
+
+`docs/reference-groups.json` records each folder's chapter, Python layer and member names.
+The full Python index places folders under that layer; the navigation keeps every public
+name searchable and points it to its shared MATLAB/Python folder. Python frame and colour
+key helpers live beside their base classes, and spatial transforms, projections and
+sections are packages. Previous Python module imports are aliases of the moved modules.
+MATLAB grids and reference frames use separate geometry subdirectories, and plotting
+layout helpers use `plotting/layoutHelpers`; other plotting families already had source
+folders. Public names and published page basenames do not change.

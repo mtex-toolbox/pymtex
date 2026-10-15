@@ -13,7 +13,9 @@
       "gbcFMC",
       "gbcVariants",
       "connectivity"
-    ]
+    ],
+    "layer": "maps",
+    "chapter": "EBSDAnalysis"
   },
   {
     "page": "EBSDFilters_index",
@@ -31,7 +33,9 @@
       "halfQuadraticFilter",
       "l1TVFilter",
       "infimalConvolutionFilter"
-    ]
+    ],
+    "layer": "maps",
+    "chapter": "EBSDAnalysis"
   },
   {
     "page": "boundaryFilters_index",
@@ -45,7 +49,9 @@
       "curvatureFilter",
       "huberFilter",
       "boundaryNetwork"
-    ]
+    ],
+    "layer": "maps",
+    "chapter": "EBSDAnalysis"
   },
   {
     "page": "latticeHelpers_index",
@@ -64,6 +70,204 @@
       "EBSD3square",
       "hex2cube",
       "cube2hex"
-    ]
+    ],
+    "layer": "maps",
+    "chapter": "EBSDAnalysis"
+  },
+  {
+    "page": "geometryGrids_index",
+    "title": "Spherical and orientation grids",
+    "description": "Grids and triangulations for sampling directions and rotations, and for finding nearby samples.",
+    "directory": "grids",
+    "members": [
+      "S1Grid",
+      "S2Grid",
+      "S2Triangulation",
+      "SO3Grid",
+      "DelaunaySO3",
+      "fibonacciS2Grid",
+      "quadratureS2Grid",
+      "fibonacciSO3Grid",
+      "homochoricSO3Grid",
+      "quadratureSO3Grid",
+      "HEALPixS2Grid",
+      "SO3FibonacciGrid",
+      "equispacedS2Grid",
+      "regularS2Grid",
+      "equispacedSO3Grid",
+      "regularSO3Grid",
+      "superfibonacciSO3Grid",
+      "localOrientationGrid",
+      "localS2Grid"
+    ],
+    "layer": "geometry",
+    "chapter": "geometry"
+  },
+  {
+    "page": "referenceFrames_index",
+    "title": "Reference frames and layouts",
+    "description": "Coordinate frames, crystal axes and array layouts used to express directions, orientations and measurement positions.",
+    "directory": "referenceFrames",
+    "members": [
+      "referenceFrame",
+      "crystalFrame",
+      "specimenFrame",
+      "notIndexedFrame",
+      "gridLayout",
+      "crystalAxes",
+      "reciprocalAxes",
+      "layoutIndex",
+      "alignmentSetups",
+      "closestAlignment",
+      "align",
+      "byScreenAlignment"
+    ],
+    "layer": "geometry",
+    "chapter": "geometry"
+  },
+  {
+    "page": "spatialTransforms_index",
+    "title": "Spatial transforms",
+    "description": "Models for moving measurement positions between frames, fitting scan distortions and applying their inverses.",
+    "directory": "spatialTransforms",
+    "members": [
+      "spatialTransform",
+      "spatialTransformId",
+      "spatialTransformShift",
+      "spatialTransformRigid",
+      "spatialTransformProjective",
+      "spatialTransformPoly",
+      "spatialTransformDrift",
+      "spatialTransformField",
+      "spatialTransformHandle",
+      "spatialTransformComposite",
+      "spatialTransformTilt",
+      "spatialTransformInverse",
+      "spatialTransformList"
+    ],
+    "layer": "geometry",
+    "chapter": "geometry"
+  },
+  {
+    "page": "sphericalProjections_index",
+    "title": "Spherical projections",
+    "description": "Projections that map directions on the sphere to plotting coordinates.",
+    "directory": "sphericalProjections",
+    "members": [
+      "sphericalProjection",
+      "eangleProjection",
+      "eareaProjection",
+      "edistProjection",
+      "full3dProjection",
+      "gnonomicProjection",
+      "gnomonicProjection",
+      "orthographicProjection",
+      "plainProjection",
+      "squareProjection",
+      "makeSphericalProjection"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
+  },
+  {
+    "page": "directionColorKeys_index",
+    "title": "Directional colour keys",
+    "description": "Colour keys that assign RGB colours to crystal or specimen directions.",
+    "directory": "directionColorKeys",
+    "members": [
+      "directionColorKey",
+      "HKLDirectionKey",
+      "HSVDirectionKey",
+      "TSLDirectionKey",
+      "spotDirectionKey",
+      "sphereColor",
+      "regionCenter",
+      "sectorFolds",
+      "hasSmoothKey",
+      "polarCoordinates"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
+  },
+  {
+    "page": "orientationColorKeys_index",
+    "title": "Orientation colour keys",
+    "description": "Inverse pole figure, Euler-angle, axis-angle and misorientation colour keys for orientation data.",
+    "directory": "orientationColorKeys",
+    "members": [
+      "orientationColorKey",
+      "BungeColorKey",
+      "PatalaColorKey",
+      "axisAngleColorKey",
+      "ipfColorKey",
+      "ipfHKLKey",
+      "ipfHSVKey",
+      "ipfSpotKey",
+      "ipfTSLKey",
+      "spectralTransmissionColorKey",
+      "spotColorKey",
+      "colorGrid",
+      "ipfColors"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
+  },
+  {
+    "page": "orientationSections_index",
+    "title": "Orientation sections",
+    "description": "Section definitions for plotting orientation distribution functions at fixed Euler angles, directions or rotation parameters.",
+    "directory": "orientationSections",
+    "members": [
+      "ODFSections",
+      "PhiSections",
+      "eulerSections",
+      "alphaSections",
+      "axisAngleSections",
+      "gammaSections",
+      "ipfSections",
+      "pfSections",
+      "omegaSections",
+      "sigmaSections",
+      "phi1Sections",
+      "phi2Sections",
+      "newODFSectionPlot",
+      "sectionIndex",
+      "sectionTolerance"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
+  },
+  {
+    "page": "orientationPlots_index",
+    "title": "Orientation plots",
+    "description": "Coordinate systems for displaying rotations and orientations in three dimensions.",
+    "directory": "orientationPlots",
+    "members": [
+      "orientationPlot",
+      "BungePlot",
+      "axisAnglePlot",
+      "RodriguesPlot",
+      "conformalPlot",
+      "cubochoricPlot",
+      "homochoricPlot",
+      "quaternionPlot",
+      "spacePlot"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
+  },
+  {
+    "page": "plotLayoutHelpers_index",
+    "title": "Plot conventions and layout helpers",
+    "description": "Plotting conventions, screen coordinates, scale bars and the layout machinery used by MTEX figures.",
+    "directory": "layoutHelpers",
+    "members": [
+      "plottingConvention",
+      "screenProjection",
+      "scaleBar",
+      "mtexLayout"
+    ],
+    "layer": "plotting",
+    "chapter": "plotting"
   }
 ]

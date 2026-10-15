@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from .kernels import qconj
-from .frames import crystalFrame
-from .quaternion import qmul, qrot, rotation
-from .vector3d import vector3d
+from ..kernels import qconj
+from . import crystalFrame
+from ..quaternion import qmul, qrot, rotation
+from ..vector3d import vector3d
 
 
 def align(frA, frB, tol=1e-1):
@@ -38,7 +38,7 @@ def align(frA, frB, tol=1e-1):
         larger deviation is refused
   See also
     orientation.byScreenAlignment, referenceFrame.isCompatible, transformReferenceFrame"""
-  from .orientation import orientation
+  from ..orientation import orientation
   M = frA.transformationMatrix(frB)
   dev = np.linalg.norm(np.eye(3) - M @ M.T)
   if dev > tol:
@@ -49,7 +49,7 @@ def align(frA, frB, tol=1e-1):
 def byScreenAlignment(frA, frB):
   """the orientation implied by two frames rendering alike: a point at v renders at
   inv(rot) * v in screen coordinates, so vB = rotB * inv(rotA) * vA"""
-  from .orientation import orientation
+  from ..orientation import orientation
   if frA.how2plot is None or frB.how2plot is None:
     raise ValueError("both frames need a plotting convention of their own; an empty one follows the session default")
   return orientation(frB.how2plot.rot * frA.how2plot.rot.inv(), frA.stripSym(), frB.stripSym())
@@ -61,7 +61,7 @@ def frameTransition(fromFr, toFr, rule=None, tol=1e-1):
     return align(fromFr, toFr, tol)
   if rule == "byScreenAlignment":
     return byScreenAlignment(fromFr, toFr)
-  from .orientation import orientation
+  from ..orientation import orientation
   if isinstance(rule, orientation):
     return rule
   raise ValueError("the frame transition rule is 'byAxes', 'byScreenAlignment' or an orientation")

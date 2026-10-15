@@ -1430,6 +1430,7 @@ gbcVariants
 gbcVariants_index
 gcm
 generic_wizard
+geometryGrids_index
 geometry_index
 geometry_tools_index
 getAllAxes
@@ -1896,6 +1897,7 @@ orientationColorKey_index
 orientationColorKeys_index
 orientationPlot
 orientationPlot_index
+orientationPlots_index
 orientationRegion.angle
 orientationRegion.angleWindow
 orientationRegion.axisSector
@@ -1914,6 +1916,7 @@ orientationRegion.plot
 orientationRegion.rotate
 orientationRegion.volume
 orientationRegion_index
+orientationSections_index
 orientation_index
 orthoclase
 orthographicProjection
@@ -1986,6 +1989,7 @@ plotAxisDistribution
 plotEllipse
 plotEllipsoid
 plotEmptySphere
+plotLayoutHelpers_index
 plotS2Grid
 plotSO3Grid
 plotSphericalGrid
@@ -2119,6 +2123,7 @@ referenceFrame.isCompatible
 referenceFrame.referenceFrame
 referenceFrame.transformationMatrix
 referenceFrame_index
+referenceFrames_index
 reflection
 refractiveIndexTensor.birefringence
 refractiveIndexTensor.opticalAxis
@@ -2274,6 +2279,7 @@ spatialTransformShift_index
 spatialTransformTilt
 spatialTransformTilt_index
 spatialTransform_index
+spatialTransforms_index
 specimenFrame.specimenFrame
 specimenFrame_index
 specimenSymmetry.char

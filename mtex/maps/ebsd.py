@@ -669,7 +669,7 @@ class EBSD:
     """the directions the indices of a gridded map run along (MATLAB ebsd.layout); a list has none"""
     if not self.isGridded:
       return None
-    from ..geometry.gridlayout import gridLayout
+    from ..geometry.frames.gridlayout import gridLayout
     from .gridify import arrayDirections
     d1, d2 = arrayDirections(self)
     gL = gridLayout(d1, d2)

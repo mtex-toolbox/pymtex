@@ -587,6 +587,7 @@ GROUP_BY_NAME = {name: group for group in REFERENCE_GROUPS for name in group["me
 
 def groupPages(pages):
   names = pythonNames(pages)
+  names.update({item["title"]: item["url"][:-8] for chapter in navigation(pages) for item in chapter["items"]})
   found = {}
   for group in REFERENCE_GROUPS:
     lines = ["# " + group["title"], "", group["description"], "",
@@ -617,7 +618,7 @@ def indexPage(pages):
     if not target:
       continue
     if n in GROUP_BY_NAME:
-      groups.setdefault("maps", ([], []))
+      groups.setdefault(GROUP_BY_NAME[n]["layer"], ([], []))
       continue
     layer = getattr(unwrap(obj), "__module__", "mtex.other").split(".")[1]
     layer = "maps" if layer == "maps3d" else layer
@@ -633,9 +634,10 @@ def indexPage(pages):
     for title, rows in (("Classes", classes), ("Functions", functions)):
       if rows:
         lines += [f"### {title}", "", *rows, ""]
-    if layer == "maps":
+    folders = [g for g in REFERENCE_GROUPS if g["layer"] == layer]
+    if folders:
       lines += ["### Helper folders", "", "| Folder | Contents |", "| --- | --- |"]
-      lines += [f"| [{g['title']}]({g['page']}_py.html) | {g['description']} |" for g in REFERENCE_GROUPS]
+      lines += [f"| [{g['title']}]({g['page']}_py.html) | {g['description']} |" for g in folders]
       lines.append("")
   return "\n".join(lines)
 

@@ -26,7 +26,7 @@ import numpy as np
 from ...geometry.kernels import closestImage
 from ...geometry.orientationregion import maxAngle
 from ...geometry.units import degree
-from ..criteria import _bestDot, grainBoundaryCriterion
+from . import _bestDot, grainBoundaryCriterion
 from ..kernels import grainKernel
 from ...geometry.display import aligned
 
