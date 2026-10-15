@@ -2359,6 +2359,7 @@ trueEbsd2.pixelSizeMatch
 trueEbsd2.setOptions
 trueEbsd2.trueEbsd2
 trueEbsd2.undistort
+trueEbsd_index
 uniformComponent
 uniformODF
 unimodalComponent
