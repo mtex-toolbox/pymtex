@@ -252,3 +252,16 @@ def test_crystalShape_catalogueHasNoOtherNames():
 def test_crystalShape_everyCatalogueEntryBuilds(k):
   name, simple = (k[:-7], True) if k.endswith("_simple") else (k, False)
   assert getattr(crystalShape, name)(simple=simple).numFaces >= 4
+
+
+@pytest.mark.parametrize("group, cell, constructor, vertices, faces", [
+  ("6/mmm", [3, 3, 5], crystalShape.hex, 12, 8),
+  ("m-3m", [3, 3, 3], crystalShape.cube, 8, 6),
+])
+def test_float32_lattice_angles_keep_the_crystal_shape(group, cell, constructor, vertices, faces):
+  exact = crystalFrame(group, cell, intern=False)
+  angles = np.asarray(exact.lattice.defaultAngles).astype(np.float32).astype(float)
+  imported = crystalFrame(group, cell, angles, intern=False)
+  reference, shape = constructor(exact), constructor(imported)
+  assert (shape.numVertices, shape.numFaces) == (vertices, faces)
+  np.testing.assert_allclose(shape.volume, reference.volume, rtol=1e-12, atol=0)

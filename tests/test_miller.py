@@ -351,7 +351,7 @@ def test_vector3d_sumRefusesTwoFrames():
 def test_vector3d_dotAndNormalizeKeepTheFrame():
   cs = aluminium()
   m = vector3d(1, 0, 0, frame=cs)
-  assert m.dot(vector3d(1, 1, 0)) == 1 and m.normalize().frame is cs and m.normalize().dispStyle == "hkl"
+  assert close(m.dot(vector3d(1, 1, 0)), 1, 1e-14) and m.normalize().frame is cs and m.normalize().dispStyle == "hkl"
 
 
 def test_vector3d_sumOfAlignedFramesTakesTheFirst():

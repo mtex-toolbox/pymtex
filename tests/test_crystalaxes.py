@@ -78,3 +78,30 @@ def test_cell_constraints_allow_roundoff(group):
   assert np.allclose(cs.abc, cell, rtol=1e-14, atol=0)
   with pytest.raises(ValueError, match="must be equal"):
     crystalFrame(group, [a * 1.001, a, cell[2]])
+
+
+@pytest.mark.parametrize("group, cell, angles", [
+  ("mmm", [2, 3, 5], [90, 90, 90]),
+  ("4/mmm", [3, 3, 5], [90, 90, 90]),
+  ("m-3m", [3, 3, 3], [90, 90, 90]),
+  ("-3m", [3, 3, 5], [90, 90, 120]),
+  ("6/mmm", [3, 3, 5], [90, 90, 120]),
+])
+def test_lattice_angles_are_fixed_before_alignment_and_rotation(group, cell, angles):
+  from mtex import rotation
+  exact = np.array(angles) * degree
+  rounded = exact.astype(np.float32).astype(float)
+  turn = rotation.byAxisAngle(vector3d(1, 2, 3), 17 * degree)
+  for setup in ((), ("EDAX",)):
+    reference = crystalFrame(group, cell, exact, *setup, rotAxes=turn, intern=False)
+    imported = crystalFrame(group, cell, rounded, *setup, rotAxes=turn, intern=False)
+    np.testing.assert_allclose(imported.basis.data, reference.basis.data, rtol=0, atol=1e-14)
+
+
+@pytest.mark.parametrize("group, angles", [("1", [81, 94, 113]), ("2/m", [90, 116, 90])])
+def test_unconstrained_cell_angles_and_raw_bases_are_preserved(group, angles):
+  abg = np.array(angles) * degree
+  frame = crystalFrame(group, [3, 4, 5], abg, intern=False)
+  np.testing.assert_allclose(frame.abg, abg, rtol=0, atol=1e-14)
+  raw = crystalFrame(frame.basis, pointId=frame.sym.id, intern=False)
+  np.testing.assert_array_equal(raw.basis.data, frame.basis.data)

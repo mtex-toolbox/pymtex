@@ -5,8 +5,8 @@
 # The default alignment is X||a*, Z||c. Any other is asked for by naming which lattice
 # direction a Cartesian axis lies along: a, b, c, their reciprocals a*, b*, c*, m = a + b
 # and d = a + b + c; 'EDAX' (also 'TSL', 'OIM') is the vendor alignment X||a for the
-# lattices where a and a* differ. One construction serves every lattice: the axes from
-# the metric with a* along x and c along z, then turned into the alignment asked for.
+# lattices where a and a* differ. Symmetry fixes the conventional hexagonal and orthogonal
+# axes; the remaining lattices use the supplied metric, before alignment and rotation.
 # Axes are (3, 3) arrays, one axis per row.
 from __future__ import annotations
 
@@ -162,7 +162,9 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   hexagonal lattices, where a and a* differ
 
   A length of 0 is filled from the others and an angle of 0 from its partners, as MTEX fills
-  them; a cell the lattice does not allow is refused unless check=False.
+  them; a cell the lattice does not allow is refused unless check=False. Trigonal and
+  hexagonal conventional cells use exact 90, 90, 120 degree angles; orthogonal lattices use
+  exact right angles, as MATLAB's calcAxis.
 
   Input
     lattice - latticeType, the lattice system
@@ -184,7 +186,12 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   abc, abg = completeCell(abc, abg)
   if check:
     checkCell(lattice, abc, abg, uniqueAxis)
-  axes = defaultAxes(abc, abg)
+  if lattice.isTriHex:
+    axes = np.asarray(abc)[:, None] * np.array([[np.sqrt(0.75), -0.5, 0], [0, 1, 0], [0, 0, 1]])
+  elif lattice.isOrthogonal:
+    axes = np.diag(abc)
+  else:
+    axes = defaultAxes(abc, abg)
   alignment = [str(s) for s in alignment]
   if any(s.upper() in ALIGNMENT_VENDORS for s in alignment):
     alignment = [s for s in alignment if s.upper() not in ALIGNMENT_VENDORS]
