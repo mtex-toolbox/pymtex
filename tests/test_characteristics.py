@@ -9,7 +9,7 @@ from numpy import pi
 from mtex import (S1FunHandle, S1FunHarmonic, S2FunHandle, Miller, S2DeLaValleePoussinKernel, S2FunBingham, S2FunHarmonic, SO3DeLaValleePoussinKernel, SO3FunHarmonic,
                   angle, bandwidthFor, calcAngleDistribution, calcAxisDistribution, calcComponents, calcDensity, calcError,
                   calcKernel, calcMDF, calcMIndex, centerSpecimen, conv, crystalFrame, degree, discreteSample, entropy,
-                  equispacedS2Grid, equispacedSO3Grid, fibreODF, fibreVolume, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
+                  equispacedS2Grid, equispacedSO3Grid, fibre, fibreODF, fibreVolume, fundamentalRegion, max, mean, min, norm, orientation, quadratureSO3Grid, rotate,
                   rotation, specimenFrame, textureIndex, unimodalODF, uniformODF, vector3d, volume, yvector, zvector)
 
 rng = np.random.default_rng(71)
@@ -54,7 +54,11 @@ def test_volume_ofTheUniformODFIsTheShareOfTheBall(cubic15):
   c = orientation(rotation.rand(rng=rng), cubic15.cs, cubic15.ss)
   u = cubic15.u
   assert np.isclose(volume(u, c, 10 * degree), 24 * (10 * degree - np.sin(10 * degree)) / pi, rtol=1e-2)
-  assert volume(u, c, 60 * degree) == 1
+
+
+def test_volume_ofABallHoldingEveryOrientationIsOne(cubic15):
+  c = orientation(rotation.rand(rng=rng), cubic15.cs, cubic15.ss)
+  assert np.isclose(volume(cubic15.u, c, pi, resolution=5 * degree), 1, rtol=1e-2)
 
 
 def test_fibreVolume_ofAFibreODFAroundItsOwnFibreIsNearlyOne(cubic15):
@@ -66,6 +70,101 @@ def test_fibreVolume_ofAFibreODFAroundItsOwnFibreIsNearlyOne(cubic15):
 def test_fibreVolume_ofTheUniformODFIsTheShareOfTheTube(cubic15):
   h, r = Miller(1, 1, 1, cubic15.cs), vector3d.rand(rng=rng)
   assert np.isclose(fibreVolume(cubic15.u, h, r, 10 * degree), min(1, 8 * (1 - np.cos(10 * degree)) / 2), rtol=5e-2)
+
+
+# the frame pairs of the volume checks; None for a misorientation of a phase with grain exchange,
+# whose functions are the antipodal ones, a fibre density not among them
+VOLUME_FRAMES = [("m-3m", "1"), ("m-3m", "mmm"), ("6/mmm", "1"), ("mmm", "mmm"), ("4/mmm", "2/m"), ("m-3m", None)]
+VOLUME_KINDS = ["uniform", "RBF", "CBF", "Fourier"]
+VOLUME_CASES = [(fr, k) for fr in VOLUME_FRAMES for k in VOLUME_KINDS if fr[1] or k != "CBF"]
+
+
+def _framesId(fr):
+  return f"{fr[0]}/{fr[1] or 'exchange'}"
+
+
+# the reference of the volume checks: the frames, an equispaced grid of the fundamental region,
+# the centres at a vertex, an edge, a face and inside the region's Rodrigues polyhedron, and a
+# function of every representation
+def _volumeCase(csName, ssName):
+  cs = crystalFrame(csName)
+  ss = specimenFrame(ssName) if ssName else cs
+  exchange = ssName is None
+  oR = fundamentalRegion(cs, ss)
+  A, b = oR.rodriguesPlanes()
+  E = oR.edges(points=3)
+  rho = lambda aa: aa * np.tan(np.linalg.norm(aa) / 2) / max(np.linalg.norm(aa), 1e-300)
+  V = np.array([rho(e[k]) for e in E for k in (0, 2)])
+  V = V[np.linalg.norm(V, axis=1) < 1e3]
+  face = np.abs(V @ A.T - b) < 1e-6
+  face = V[face[:, np.argmax(face.sum(axis=0))]].mean(axis=0)
+  def ori(x):
+    n = np.linalg.norm(x)
+    return orientation(rotation.byAxisAngle(vector3d(*(x / n)), 2 * np.arctan(n)), cs, ss, antipodal=exchange)
+  centres = {"vertex": ori(V[0]), "edge": ori(rho(E[0][1])), "face": ori(face), "interior": ori(V.mean(axis=0))}
+  mode = orientation(rotation.byAxisAngle(vector3d(1, 2, 3), 7 * degree) * rotation(centres["interior"]), cs, ss, antipodal=exchange)
+  fs = {"uniform": uniformODF(cs, ss, antipodal=exchange), "RBF": unimodalODF(mode, halfwidth=12 * degree)}
+  if not exchange:
+    fs["CBF"] = fibreODF(Miller(1, 1, 1, cs), vector3d(1, 0, 2), ss, halfwidth=15 * degree)
+  fs["Fourier"] = SO3FunHarmonic(fs["RBF"], bandwidth=32)
+  grid = equispacedSO3Grid(cs, ss, resolution=1.5 * degree)
+  values = {k: np.real(f(grid)).reshape(-1) / grid.size for k, f in fs.items()}
+  return SimpleNamespace(cs=cs, ss=ss, grid=grid, centres=centres, fs=fs, values=values)
+
+
+@pytest.fixture(scope="module")
+def volumeCases():
+  cases = {}
+  def case(fr):
+    if fr not in cases:
+      cases[fr] = _volumeCase(*fr)
+    return cases[fr]
+  return case
+
+
+@pytest.mark.parametrize("frames, kind", VOLUME_CASES, ids=[f"{_framesId(fr)}-{k}" for fr, k in VOLUME_CASES])
+def test_volume_isTheIntegralOverEveryOrientationWithinTheRadius(volumeCases, frames, kind):
+  # the symmetric copies of the ball coincide at a centre a symmetry fixes and overlap for a
+  # large radius; the union counts once, by the symmetry-reduced angle on a grid of the region
+  case = volumeCases(frames)
+  f, fg = case.fs[kind], case.values[kind]
+  for c in case.centres.values():
+    d = case.grid.angle(c)
+    for r in (15 * degree, 45 * degree):
+      assert np.isclose(volume(f, c, r, resolution=r / 15), np.sum(fg[d < r]), rtol=4e-2, atol=2e-4)
+
+
+FIBRE_CASES = [(fr, k) for fr, k in VOLUME_CASES if fr[1]]
+
+
+@pytest.mark.parametrize("frames, kind", FIBRE_CASES, ids=[f"{_framesId(fr)}-{k}" for fr, k in FIBRE_CASES])
+def test_fibreVolume_isTheIntegralOverEveryOrientationWithinTheRadiusOfTheFibre(volumeCases, frames, kind):
+  # the tubes of the symmetric equivalents of h and r overlap where they lie within twice the
+  # radius; the union counts once, by fibre.angle on a grid of the region
+  case = volumeCases(frames)
+  f, fg = case.fs[kind], case.values[kind]
+  for h, r in ((1, 0, 0), zvector), ((1, 0, 0), vector3d(0.3, 0.5, 0.8)), ((1, 1, 1), zvector), ((1, 2, 4), vector3d(0.3, 0.5, 0.8)):
+    h = Miller(*h, case.cs)
+    d = fibre(h, r, case.ss).angle(case.grid)
+    for radius in (15 * degree, 45 * degree):
+      v = fibreVolume(f, h, r, radius, resolution=2 * degree)
+      assert np.isclose(v, np.sum(fg[d < radius]), rtol=4e-2, atol=2e-4)
+
+
+@pytest.mark.parametrize("group", ["m-3m", "6/mmm", "mmm", "-3m"])
+def test_volume_onTheSphereIsTheIntegralOverEveryDirectionWithinTheRadius(group):
+  # the caps about the equivalents of a crystal direction coincide where the direction lies on a
+  # symmetry element and overlap for a large radius; the union counts once, by the angle up to
+  # symmetry on a grid of the sphere
+  cs, ss = crystalFrame(group), specimenFrame("1")
+  odf = unimodalODF(orientation.byEuler(10 * degree, 30 * degree, 50 * degree, cs, ss), halfwidth=10 * degree)
+  g = Miller(equispacedS2Grid(resolution=1 * degree), cs)
+  for f in (uniformODF(cs, ss).radon(r=zvector), odf.radon(r=zvector)):
+    fg = np.real(f(g)).reshape(-1) / g.size
+    for h in (Miller(0, 0, 1, cs), Miller(1, 0, 0, cs), Miller(1, 1, 1, cs), Miller(1, 2, 4, cs)):
+      d = angle(g, h, antipodal=f.antipodal)
+      for r in (15 * degree, 45 * degree):
+        assert np.isclose(volume(f, h, r), np.sum(fg[d < r]), rtol=3e-2, atol=2e-4)
 
 
 def test_textureindex_onTheSphereIsTheSquaredNormAndTheEntropyNegative():

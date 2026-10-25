@@ -15,15 +15,16 @@ import numpy as np
 
 from ..geometry._array import MtexArray
 from ..geometry.display import framesLabel
-from ..geometry.fibre import fibre
+from ..geometry.fibre import _uniqueDirections, fibre
 from ..geometry.frames import crystalFrame, referenceFrame
-from ..geometry.kernels import backend, qmul
+from ..geometry.kernels import backend, qconj, qmul
 from ..geometry.grids.localgrids import localOrientationGrid, localS2Grid
 from ..geometry.grids.fibonacci import fibonacciS2Grid
 from ..geometry.grids.s2grid import equispacedS2Grid
 from ..geometry.grids.so3grid import equispacedSO3Grid
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import qrot, quaternion, rotation
+from ..geometry.representations import quat2mat
 from ..geometry.session import getMTEXpref
 from ..geometry.symreduce import reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
@@ -109,9 +110,11 @@ def volume(f, center, radius, resolution=None):
     v = volume(sF, xvector, 20*degree)                    # a spherical function around a direction
     v = volume(ori, center, 10*degree)                    # the share of a list of orientations
 
-  The volume is the mean of f on a local grid in the ball times the ball's share of the
-  fundamental region, counting its symmetric copies, at most one. A uniform density gives
-  the share of the ball itself, so a value above it marks a preferred orientation.
+  The region is the union of the symmetric copies of the ball, which coincide where a symmetry
+  fixes the centre and overlap for a large radius. Every point of a local grid in the ball is
+  divided among the copies that hold it, so the union counts once: the volume is the mean of f
+  over these shares times the measure of all copies. A uniform density gives the share of the
+  region itself, so a value above it marks a preferred orientation.
 
   On the sphere the ball is a spherical cap; an antipodal function over a cap of 90 degree
   gives its mean value.
@@ -153,21 +156,39 @@ def volume(f, center, radius, resolution=None):
   g = localOrientationGrid(center, maxAngle=radius, resolution=res, respectSymmetry=False)
   if g.size == 0:
     return 0.0
-  share = min(1.0, len(L) * len(R) * (2 if f.antipodal else 1) * (radius - math.sin(radius)) / math.pi)
-  return float(np.mean(np.real(f(g))) * share)
+  copies = qmul(qmul(L[:, None, :], center.data.reshape(1, 1, 4)), R[None, :, :]).reshape(-1, 4)
+  if f.antipodal:
+    copies = np.concatenate([copies, qconj(copies)])
+  m = _coverCount(g.data.reshape(-1, 4), copies, center.data.reshape(4), radius)
+  share = len(copies) * (radius - math.sin(radius)) / math.pi
+  return float(np.mean(np.real(f(g)).reshape(-1) / m) * share)
 
 
-# the share of a spherical density within a cap: its mean over the cap times the cap's share
-# of the sphere, over the orbit of the centre under the group and both caps of an axis, S2Fun/volume
+# how many of the copies of the ball about c hold each rotation q; only the copies within twice
+# the radius of c can, and c's own ball holds every q
+def _coverCount(q, copies, c, radius):
+  near = copies[np.abs(copies @ c) >= math.cos(min(radius, np.pi / 2)) - 1e-12]
+  m = np.empty(len(q), dtype=np.int64)
+  step = max(1, 2**24 // max(len(near), 1))
+  for i in range(0, len(q), step):
+    m[i:i + step] = np.count_nonzero(np.abs(q[i:i + step] @ near.T) >= math.cos(radius / 2) - 1e-12, axis=1)
+  return np.maximum(m, 1)
+
+
+# the share of a spherical density within the caps about the distinct directions of the orbit
+# of the centre, both ends of an axis among them: every point of the cap about the centre is
+# divided among the caps that hold it, times the area of all caps, S2Fun/volume
 def _volumeS2(f, center, radius, resolution=None):
   from ..geometry.grids.localgrids import localS2Grid
   res = min(0.1 * degree, radius / 200) if resolution is None else resolution
   g = localS2Grid(center, maxTheta=radius, resolution=res, respectSymmetry=False)
   if g.size == 0:
     return 0.0
-  orbit = center.symmetrise().size if getattr(getattr(f, "frame", None), "sym", None) is not None else 1
-  share = min(1.0, orbit * (2 if f.antipodal else 1) * (1 - math.cos(radius)) / 2)
-  return float(np.mean(np.real(f(g))) * share)
+  orbit = center.symmetrise(unique=True) if getattr(getattr(f, "frame", None), "sym", None) is not None else center
+  dirs = orbit.normalize().data.reshape(-1, 3)
+  dirs = _uniqueDirections(np.concatenate([dirs, -dirs]) if f.antipodal else dirs)
+  cover = np.count_nonzero(g.normalize().data.reshape(-1, 3) @ dirs.T >= math.cos(radius) - 1e-12, axis=1)
+  return float(np.mean(np.real(f(g)).reshape(-1) / np.maximum(cover, 1)) * len(dirs) * (1 - math.cos(radius)) / 2)
 
 
 def fibreVolume(f, h, r=None, radius=None, resolution=None):
@@ -180,9 +201,12 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
 
   The function is averaged over the tube about the fibre, the orientations g with g h within
   the radius of r: the directions u on the cap of the radius about r, and for each the turns
-  about u equispaced. The mean times the tube's share of orientation space, over the
-  symmetrically equivalent copies of h, is the volume, at most one; for the uniform density it
-  is (1 - cos radius) / 2 times the number of the copies.
+  about u equispaced. The region is the union of the tubes of the symmetrically equivalent
+  pairs of h and r, the orientations whose angle to the fibre (fibre.angle) is below the
+  radius; the tubes overlap where the equivalents of h or of r lie within twice the radius, so
+  every point of the tube is divided among the tubes that hold it. The mean of these shares
+  times the measure of all tubes is the volume; for the uniform density without overlap it is
+  (1 - cos radius) / 2 times the number of the pairs.
 
   Input
     f - SO3Fun, an orientation density
@@ -190,7 +214,7 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
     r - vector3d, the specimen direction; with a fibre the radius
     radius - the angle of the tube about the fibre in radians
   Output
-    v - float, the volume between 0 and 1
+    v - float, the volume, between 0 and 1 for a density
   Keywords
     resolution - the spacing of the quadrature of the tube; by default the smaller of one
         degree and a thirtieth of the radius
@@ -217,9 +241,27 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
   about = rotation.byAxisAngle(vector3d(np.repeat(u, n, axis=0)), np.tile(omega, len(u)))
   q = (about * rotation(np.repeat(toU.data, n, axis=0))).data
   g = orientation._fromRotation(q, (f.CS, f.SS), getattr(f, "antipodal", False))
-  vals = np.real(f(g)).reshape(len(u), n).mean(axis=1)
-  copies = h.symmetrise(unique=True).size if isinstance(h, vector3d) and h.frame is not None else 1
-  return float(min(1.0, np.sum(wcap * vals) / np.sum(wcap) * copies * (1 - math.cos(radius)) / 2))
+  # the equivalent pairs of h and r, and how many of their tubes hold each point of this one
+  L, R = _framesOf(f)
+  hs = _uniqueDirections(qrot(R, hd[:1]))
+  rs = _uniqueDirections(qrot(L, rd.reshape(1, 3)))
+  vals = (np.real(f(g)).reshape(-1) / _tubeCoverCount(q, hs, rs, hd[0], rd, radius)).reshape(len(u), n).mean(axis=1)
+  return float(np.sum(wcap * vals) / np.sum(wcap) * len(hs) * len(rs) * (1 - math.cos(radius)) / 2)
+
+
+# how many of the tubes g h' . r' > cos(radius) of the pairs of hs and rs hold each rotation q of
+# the tube of h and r: a tube can meet it only where the angle of h to h' matches that of r to r'
+# within twice the radius, and r' . g h' is the matrix of q against the outer product r' h'
+def _tubeCoverCount(q, hs, rs, h, r, radius):
+  ah, ar = np.arccos(np.clip(hs @ h, -1, 1)), np.arccos(np.clip(rs @ r, -1, 1))
+  pairs = np.argwhere(np.abs(ah[:, None] - ar[None, :]) < 2 * radius + 1e-9)
+  B = np.einsum("pi,pj->pij", rs[pairs[:, 1]], hs[pairs[:, 0]]).reshape(len(pairs), 9)
+  M = quat2mat(q).reshape(-1, 9)
+  m = np.empty(len(q), dtype=np.int64)
+  step = max(1, 2**24 // max(len(pairs), 1))
+  for i in range(0, len(q), step):
+    m[i:i + step] = np.count_nonzero(M[i:i + step] @ B.T >= math.cos(radius) - 1e-12, axis=1)
+  return np.maximum(m, 1)
 
 
 # ------------------------------------------------------------------ misorientations

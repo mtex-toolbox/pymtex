@@ -123,3 +123,15 @@ noticed in the code, not fixed:
 - `getUnitScale('au')` is the Ångström, not the astronomical unit.
 - the stale reference pages `trueEbsd2.*` (class renamed to `trueEbsd` in f903375b2) remain on the
   site; `remapShifted` (trueEBSD repository) has a help continuation line read as an entry.
+
+## Found by issue #7 (2026-10-25)
+
+- `SO3Fun/volume.m`, `SO3FunHarmonic/volume.m`, `SO3FunRBF/volume.m`: the ball is multiplied by
+  `numProper(CS)*numProper(SS)`, so copies that coincide (cube or Goss with `mmm`: 4 times, brass
+  and copper 2 times, Sigma3 in an MDF 12 times) or overlap (a radius beyond half the smallest
+  distance between copies) count more than once, capped at 1 only at the end. Divide every point
+  of the local grid among the copies l*c*r (and their inverses with grain exchange) that hold it.
+- `SO3Fun/fibreVolume.m`: the cap is restricted to the crystal sector, which counts the crystal
+  copies of h once, but the specimen copies of r are left out; with specimen symmetry the tube
+  is too small (the beta fibre of OrientationFibre with `mmm`: 7.26 percent for 25.4).
+

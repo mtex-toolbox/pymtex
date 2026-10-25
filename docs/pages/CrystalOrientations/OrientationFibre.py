@@ -264,16 +264,16 @@ plotFibre(odf, fibre.eta(cs, ss), lineWidth=2, figSize='small')
 volume5Percent = 100 * volume(odf, betaFull, 5 * degree)
 volume5Percent
 
-# The result is about 58 percent within $5^\circ$ of the fibre it was built on. At the
-# $10^\circ$ kernel halfwidth, the numerical tube integral reaches unity.
+# The result is about 25 percent within $5^\circ$ of the fibre it was built on. The tube
+# is the union of the tubes about the crystal and specimen symmetric copies of the fibre,
+# which overlap: a uniform texture would already put 16 percent into it. At the
+# $10^\circ$ kernel halfwidth the share grows to
 
 volume10Percent = 100 * volume(odf, betaFull, 10 * degree)
 volume10Percent
 
-# The second result is 100 percent to the precision printed. It does not mean the ODF is a
-# zero-width line or vanishes at $10^\circ$. [fibreVolume](SO3Fun.fibreVolume.html)
-# discretises the tube and clips its numerical estimate at 1, so the displayed percentage
-# can be exactly 100.
+# about 72 percent. [fibreVolume](SO3Fun.fibreVolume.html) divides every point of the
+# tube among the copies that hold it, so the overlap counts once.
 #
 # ## The Maths Behind Pole Figures
 #
