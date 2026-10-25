@@ -111,9 +111,10 @@ def volume(f, center, radius, resolution=None):
     v = volume(ori, center, 10*degree)                    # the share of a list of orientations
 
   The region is the union of the symmetric copies of the ball, which coincide where a symmetry
-  fixes the centre and overlap for a large radius. Every point of a local grid in the ball is
-  divided among the copies that hold it, so the union counts once: the volume is the mean of f
-  over these shares times the measure of all copies. A uniform density gives the share of the
+  fixes the centre and overlap for a large radius. The ball is integrated in shells about the
+  centre, their axes a Fibonacci lattice, and every point is divided among the copies that
+  hold it, so the union counts once: the volume is the mean of f over these shares times the
+  measure of all copies. A uniform density gives the share of the
   region itself, so a value above it marks a preferred orientation.
 
   On the sphere the ball is a spherical cap; an antipodal function over a cap of 90 degree
@@ -153,15 +154,34 @@ def volume(f, center, radius, resolution=None):
   _rotationsFor(f, center)
   res = min(1.25 * degree, radius / 30) if resolution is None else resolution
   L, R = reductionGroups(center)
-  g = localOrientationGrid(center, maxAngle=radius, resolution=res, respectSymmetry=False)
-  if g.size == 0:
-    return 0.0
+  q, w = _ballShells(center.data.reshape(4), min(radius, np.pi), res)
+  g = orientation._fromRotation(q, (center.frameA, center.frameB), center.antipodal)
   copies = qmul(qmul(L[:, None, :], center.data.reshape(1, 1, 4)), R[None, :, :]).reshape(-1, 4)
   if f.antipodal:
     copies = np.concatenate([copies, qconj(copies)])
-  m = _coverCount(g.data.reshape(-1, 4), copies, center.data.reshape(4), radius)
+  m = _coverCount(q, copies, center.data.reshape(4), radius)
   share = len(copies) * (radius - math.sin(radius)) / math.pi
-  return float(np.mean(np.real(f(g)).reshape(-1) / m) * share)
+  return float(np.sum(w * np.real(f(g)).reshape(-1) / m) / np.sum(w) * share)
+
+
+# the ball of a radius about the rotation c as shells of equal width, the axes of a shell a
+# Fibonacci lattice of the spacing res, every rotation weighted by the Haar measure it stands for
+def _ballShells(c, radius, res):
+  m = max(int(np.ceil(radius / res)), 1)
+  domega = radius / m
+  omega = (np.arange(m) + 0.5) * domega
+  counts = np.maximum(np.round(16 * np.pi * np.sin(omega / 2) ** 2 / res**2).astype(int), 1)
+  shell = np.repeat(np.arange(m), counts)
+  k = np.arange(len(shell)) - np.repeat(np.cumsum(counts) - counts, counts)
+  n = counts[shell]
+  z = 1 - (2 * k + 1) / n
+  rho = np.sqrt(1 - z**2)
+  phi = k * np.pi * (3 - math.sqrt(5))
+  half = omega[shell] / 2
+  axis = np.sin(half)[:, None] * np.stack([rho * np.cos(phi), rho * np.sin(phi), z], axis=1)
+  q = np.concatenate([np.cos(half)[:, None], axis], axis=1)
+  w = (2 * np.sin(omega / 2) ** 2 * domega / np.pi / counts)[shell]
+  return qmul(q, np.broadcast_to(c, q.shape)), w
 
 
 # how many of the copies of the ball about c hold each rotation q; only the copies within twice
@@ -175,20 +195,34 @@ def _coverCount(q, copies, c, radius):
   return np.maximum(m, 1)
 
 
+# the cap of a radius about the unit vector c as rings of equal width, every point weighted by the
+# area it stands for
+def _capRings(c, radius, res):
+  m = max(int(np.ceil(radius / res)), 1)
+  dtheta = radius / m
+  theta = (np.arange(m) + 0.5) * dtheta
+  counts = np.maximum(np.round(2 * np.pi * np.sin(theta) / dtheta).astype(int), 1)
+  th = np.repeat(theta, counts)
+  ph = np.concatenate([np.linspace(0, 2 * np.pi, k, endpoint=False) for k in counts])
+  w = np.repeat(np.sin(theta) * dtheta / counts, counts)
+  local = np.stack([np.sin(th) * np.cos(ph), np.sin(th) * np.sin(ph), np.cos(th)], axis=1)
+  return qrot(np.tile(rotation.map(np.array([0.0, 0.0, 1.0]), c).data.reshape(1, 4), (len(local), 1)), local), w
+
+
 # the share of a spherical density within the caps about the distinct directions of the orbit
-# of the centre, both ends of an axis among them: every point of the cap about the centre is
-# divided among the caps that hold it, times the area of all caps, S2Fun/volume
+# of the centre, both ends of an axis among them: every point of the cap about the centre, in
+# rings of their area, is divided among the caps that hold it, times the area of all caps,
+# S2Fun/volume
 def _volumeS2(f, center, radius, resolution=None):
-  from ..geometry.grids.localgrids import localS2Grid
-  res = min(0.1 * degree, radius / 200) if resolution is None else resolution
-  g = localS2Grid(center, maxTheta=radius, resolution=res, respectSymmetry=False)
-  if g.size == 0:
-    return 0.0
+  res = min(0.25 * degree, radius / 60) if resolution is None else resolution
+  c = center.normalize().data.reshape(3)
+  u, w = _capRings(c, radius, res)
   orbit = center.symmetrise(unique=True) if getattr(getattr(f, "frame", None), "sym", None) is not None else center
   dirs = orbit.normalize().data.reshape(-1, 3)
   dirs = _uniqueDirections(np.concatenate([dirs, -dirs]) if f.antipodal else dirs)
-  cover = np.count_nonzero(g.normalize().data.reshape(-1, 3) @ dirs.T >= math.cos(radius) - 1e-12, axis=1)
-  return float(np.mean(np.real(f(g)).reshape(-1) / np.maximum(cover, 1)) * len(dirs) * (1 - math.cos(radius)) / 2)
+  cover = np.count_nonzero(u @ dirs.T >= math.cos(radius) - 1e-12, axis=1)
+  vals = np.real(f(center._new(u))).reshape(-1)
+  return float(np.sum(w * vals / np.maximum(cover, 1)) / np.sum(w) * len(dirs) * (1 - math.cos(radius)) / 2)
 
 
 def fibreVolume(f, h, r=None, radius=None, resolution=None):
@@ -201,7 +235,7 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
 
   The function is averaged over the tube about the fibre, the orientations g with g h within
   the radius of r: the directions u on the cap of the radius about r, and for each the turns
-  about u equispaced. The region is the union of the tubes of the symmetrically equivalent
+  about u a degree apart, or the resolution where it is coarser. The region is the union of the tubes of the symmetrically equivalent
   pairs of h and r, the orientations whose angle to the fibre (fibre.angle) is below the
   radius; the tubes overlap where the equivalents of h or of r lie within twice the radius, so
   every point of the tube is divided among the tubes that hold it. The mean of these shares
@@ -223,29 +257,20 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
   if isinstance(h, fibre):
     h, r, radius = h.h, h.r, r
   res = min(1 * degree, radius / 30) if resolution is None else resolution
-  # the cap about r as rings of equal width, every point weighted by the area it stands for
-  m = max(int(np.ceil(radius / res)), 1)
-  dtheta = radius / m
-  theta = (np.arange(m) + 0.5) * dtheta
-  counts = np.maximum(np.round(2 * np.pi * np.sin(theta) / dtheta).astype(int), 1)
-  th = np.repeat(theta, counts)
-  ph = np.concatenate([np.linspace(0, 2 * np.pi, c, endpoint=False) for c in counts])
-  wcap = np.repeat(np.sin(theta) * dtheta / counts, counts)
-  local = np.stack([np.sin(th) * np.cos(ph), np.sin(th) * np.sin(ph), np.cos(th)], axis=1)
   rd = vector3d(r.data.reshape(3)).normalize().data.reshape(3)
-  u = qrot(np.tile(rotation.map(np.array([0.0, 0.0, 1.0]), rd).data.reshape(1, 4), (len(local), 1)), local)
-  hd = np.broadcast_to(vector3d(h.data.reshape(3)).normalize().data, u.shape)
-  toU = rotation.map(hd, u)
-  n = max(int(np.ceil(2 * np.pi / res)), 36)
-  omega = np.linspace(0, 2 * np.pi, n, endpoint=False)
-  about = rotation.byAxisAngle(vector3d(np.repeat(u, n, axis=0)), np.tile(omega, len(u)))
-  q = (about * rotation(np.repeat(toU.data, n, axis=0))).data
+  u, wcap = _capRings(rd, radius, res)
+  hd = vector3d(h.data.reshape(3)).normalize().data.reshape(3)
+  # the circle g h = u as the map of h onto u after the turns about h, a degree apart, which
+  # resolves a kernel of a few degree along the circle
+  n = max(int(np.ceil(2 * np.pi / max(res, 1 * degree))), 36)
+  turn = rotation.byAxisAngle(vector3d(hd), np.linspace(0, 2 * np.pi, n, endpoint=False)).data.reshape(1, n, 4)
+  q = qmul(rotation.map(np.broadcast_to(hd, u.shape), u).data.reshape(-1, 1, 4), turn).reshape(-1, 4)
   g = orientation._fromRotation(q, (f.CS, f.SS), getattr(f, "antipodal", False))
   # the equivalent pairs of h and r, and how many of their tubes hold each point of this one
   L, R = _framesOf(f)
-  hs = _uniqueDirections(qrot(R, hd[:1]))
+  hs = _uniqueDirections(qrot(R, hd.reshape(1, 3)))
   rs = _uniqueDirections(qrot(L, rd.reshape(1, 3)))
-  vals = (np.real(f(g)).reshape(-1) / _tubeCoverCount(q, hs, rs, hd[0], rd, radius)).reshape(len(u), n).mean(axis=1)
+  vals = (np.real(f(g)).reshape(-1) / _tubeCoverCount(q, hs, rs, hd, rd, radius)).reshape(len(u), n).mean(axis=1)
   return float(np.sum(wcap * vals) / np.sum(wcap) * len(hs) * len(rs) * (1 - math.cos(radius)) / 2)
 
 

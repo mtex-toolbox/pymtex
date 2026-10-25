@@ -124,14 +124,21 @@ noticed in the code, not fixed:
 - the stale reference pages `trueEbsd2.*` (class renamed to `trueEbsd` in f903375b2) remain on the
   site; `remapShifted` (trueEBSD repository) has a help continuation line read as an entry.
 
-## Found by issue #7 (2026-10-25)
+## Found by issue #7 (2026-10-25), fixed on develop
 
-- `SO3Fun/volume.m`, `SO3FunHarmonic/volume.m`, `SO3FunRBF/volume.m`: the ball is multiplied by
-  `numProper(CS)*numProper(SS)`, so copies that coincide (cube or Goss with `mmm`: 4 times, brass
-  and copper 2 times, Sigma3 in an MDF 12 times) or overlap (a radius beyond half the smallest
-  distance between copies) count more than once, capped at 1 only at the end. Divide every point
-  of the local grid among the copies l*c*r (and their inverses with grain exchange) that hold it.
-- `SO3Fun/fibreVolume.m`: the cap is restricted to the crystal sector, which counts the crystal
-  copies of h once, but the specimen copies of r are left out; with specimen symmetry the tube
-  is too small (the beta fibre of OrientationFibre with `mmm`: 7.26 percent for 25.4).
+MATLAB's `SO3Fun/volume` counts the region once (its grid about the center is reduced by the
+symmetry), unlike the port before the fix; what issue #7 led to in MATLAB:
 
+- `equispacedSO3Grid` reused its last grid for another center: the cache compared frames,
+  resolution and radius only, so `volume` gave every center after the first that one's ball
+  (cube with mmm at 45 degree after the region's vertex: 0.8841 for 0.5998).
+- `SO3Fun/volume` with grain exchange ran out of memory (a 776 GB array): it took the symmetry
+  reduced angle to every symmetric copy of the antipodal center.
+- `SO3Fun/fibreVolume` left out the specimen copies of r and capped at 1 (the beta fibre of
+  OrientationFibre with `mmm`: 7.26 percent for 25.4); it integrates the tube with the cover
+  count of the port now, the tubes of (h,r) and (-h,r) apart where -h is no rotated copy of h.
+- `fibre/angle` with crystal and specimen symmetry returned one angle for a whole list.
+- `SO3FunCBF/radon` did not normalise r (pole densities up to 27).
+
+The tests are `tests/core/check_volume.m` and `tests/slow/check_volumeFull.m` over
+`tests/lib/checkVolumeCases.m`.

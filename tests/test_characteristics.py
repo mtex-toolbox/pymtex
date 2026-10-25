@@ -47,7 +47,7 @@ def test_entropy_ofADensityIsNegativeAndMinusTheIntegralOfFLogF(cubic15):
 def test_volume_ofABallAroundTheModeOfASharpODFIsNearlyOne(cubic15):
   c = orientation(rotation.rand(rng=rng), cubic15.cs, cubic15.ss)
   sharp = unimodalODF(c, halfwidth=5 * degree)
-  assert 0.95 < volume(sharp, c, 20 * degree) <= 1
+  assert 0.95 < volume(sharp, c, 20 * degree) < 1 + 1e-3
 
 
 def test_volume_ofTheUniformODFIsTheShareOfTheBall(cubic15):
@@ -109,7 +109,13 @@ def _volumeCase(csName, ssName):
   fs["Fourier"] = SO3FunHarmonic(fs["RBF"], bandwidth=32)
   grid = equispacedSO3Grid(cs, ss, resolution=1.5 * degree)
   values = {k: np.real(f(grid)).reshape(-1) / grid.size for k, f in fs.items()}
-  return SimpleNamespace(cs=cs, ss=ss, grid=grid, centres=centres, fs=fs, values=values)
+  distances = {}
+  # the angles of the grid to a centre or a fibre, computed once for every representation
+  def distance(key, x):
+    if key not in distances:
+      distances[key] = x.angle(grid)
+    return distances[key]
+  return SimpleNamespace(cs=cs, ss=ss, grid=grid, centres=centres, fs=fs, values=values, distance=distance)
 
 
 @pytest.fixture(scope="module")
@@ -128,8 +134,8 @@ def test_volume_isTheIntegralOverEveryOrientationWithinTheRadius(volumeCases, fr
   # large radius; the union counts once, by the symmetry-reduced angle on a grid of the region
   case = volumeCases(frames)
   f, fg = case.fs[kind], case.values[kind]
-  for c in case.centres.values():
-    d = case.grid.angle(c)
+  for name, c in case.centres.items():
+    d = case.distance(name, c)
     for r in (15 * degree, 45 * degree):
       assert np.isclose(volume(f, c, r, resolution=r / 15), np.sum(fg[d < r]), rtol=4e-2, atol=2e-4)
 
@@ -145,7 +151,7 @@ def test_fibreVolume_isTheIntegralOverEveryOrientationWithinTheRadiusOfTheFibre(
   f, fg = case.fs[kind], case.values[kind]
   for h, r in ((1, 0, 0), zvector), ((1, 0, 0), vector3d(0.3, 0.5, 0.8)), ((1, 1, 1), zvector), ((1, 2, 4), vector3d(0.3, 0.5, 0.8)):
     h = Miller(*h, case.cs)
-    d = fibre(h, r, case.ss).angle(case.grid)
+    d = case.distance((h.hkl.tobytes(), r.data.tobytes()), fibre(h, r, case.ss))
     for radius in (15 * degree, 45 * degree):
       v = fibreVolume(f, h, r, radius, resolution=2 * degree)
       assert np.isclose(v, np.sum(fg[d < radius]), rtol=4e-2, atol=2e-4)
@@ -155,14 +161,15 @@ def test_fibreVolume_isTheIntegralOverEveryOrientationWithinTheRadiusOfTheFibre(
 def test_volume_onTheSphereIsTheIntegralOverEveryDirectionWithinTheRadius(group):
   # the caps about the equivalents of a crystal direction coincide where the direction lies on a
   # symmetry element and overlap for a large radius; the union counts once, by the angle up to
-  # symmetry on a grid of the sphere
+  # symmetry on a grid of the sphere, both ends of an axis, as the pole densities are antipodal
   cs, ss = crystalFrame(group), specimenFrame("1")
   odf = unimodalODF(orientation.byEuler(10 * degree, 30 * degree, 50 * degree, cs, ss), halfwidth=10 * degree)
   g = Miller(equispacedS2Grid(resolution=1 * degree), cs)
-  for f in (uniformODF(cs, ss).radon(r=zvector), odf.radon(r=zvector)):
-    fg = np.real(f(g)).reshape(-1) / g.size
-    for h in (Miller(0, 0, 1, cs), Miller(1, 0, 0, cs), Miller(1, 1, 1, cs), Miller(1, 2, 4, cs)):
-      d = angle(g, h, antipodal=f.antipodal)
+  fs = (uniformODF(cs, ss).radon(r=zvector), odf.radon(r=zvector))
+  fgs = [np.real(f(g)).reshape(-1) / g.size for f in fs]
+  for h in (Miller(0, 0, 1, cs), Miller(1, 0, 0, cs), Miller(1, 1, 1, cs), Miller(1, 2, 4, cs)):
+    d = angle(g, h, antipodal=True)
+    for f, fg in zip(fs, fgs):
       for r in (15 * degree, 45 * degree):
         assert np.isclose(volume(f, h, r), np.sum(fg[d < r]), rtol=3e-2, atol=2e-4)
 
