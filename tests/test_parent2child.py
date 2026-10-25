@@ -249,8 +249,11 @@ def test_calcParent_idsOfPairsOfChildren(kids):
 
 
 def test_calcParent_parentsOfPairsOfChildren(kids):
-  pp, _ = calcParent(childPairs(kids), kids["p2c"])
-  assert pp.shape == (4, 2) and np.all(pp.angle(kids["P"]) < 2 * degree)
+  pp, fit = calcParent(childPairs(kids), kids["p2c"])
+  assert pp.shape == (4, 2)
+  np.testing.assert_allclose(pp[:, 0].angle(pp[:, 1]), fit, rtol=0, atol=1e-12)
+  # the first child pair admits several equally good parents
+  assert np.all(pp[1:].angle(kids["P"]) < 2 * degree)
 
 
 def test_calcParent_numFitOfPairsOfChildren(kids):
