@@ -38,7 +38,12 @@ grains = calcGrains(ebsd['indexed'], angle=10 * degree, minPixel=5)
 ori = ebsd['Forsterite'].orientations
 odf = calcDensity(ori, halfwidth=10 * degree)
 plotPF(odf, Miller([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ori.CS))
+saveFigure('pf.png')
 ```
+
+In a notebook, in IPython or in the interactive window of VS Code the pole figures appear as
+they are drawn. A script run with `python first.py` ends before a figure could be seen, which
+is why the last line writes them to `pf.png`.
 
 `mtexdata` downloads the sample data sets on first use from
 [mtex-toolbox/mtex-data](https://github.com/mtex-toolbox/mtex-data).
