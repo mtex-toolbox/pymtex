@@ -16,30 +16,30 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QMainWindow, QSizePoli
                                QStylePainter, QTabBar, QVBoxLayout, QWidget)
 
 from . import callbacks as cb
-from .browser import PICTURE_INK, BrowserSide, framed
+from .browser import BrowserSide, framed
 from .desktop import APP_ID, installDesktopEntry
 from .phases import PhaseTable
 from .pictogram import CoordinatePanel
 from .scriptview import ScriptView
 from .state import WizardState
+from .theme import applyScheme, colours
 from .views import KeyPanel, MillerBar, SectionBar, ViewCanvas
 
 FONT_SIZE = 10
 BROWSER_WIDTH = 360   # the browser side on opening: the longest file name and the file table fit
 FONT_SMALL = 9
-TAB_COLORS = {"phase": "#1f4e79", "ipf": "#2e7d32", "property": "#333333", "polefigures": "#6a1b9a", "images": PICTURE_INK}
 TAB_TINT = (0.12, 0.28)   # how much of its ink a tab's ground takes, the others and the one shown
 TAB_MARK = 3              # the bar of its ink under the tab shown, in pixels
 
 
 def tint(ink, a):
-  """a colour mixed into white"""
-  c = QColor(ink)
-  return QColor(*(round(255 - a * (255 - v)) for v in (c.red(), c.green(), c.blue())))
+  """a colour mixed into the ground of the panels, a share a of the ink"""
+  c, g = QColor(ink), QColor(colours()["panel"])
+  return QColor(*(round(w + a * (v - w)) for v, w in ((c.red(), g.red()), (c.green(), g.green()), (c.blue(), g.blue()))))
 
 
 class TintedTabBar(QTabBar):
-  """a tab strip whose tabs stand on a light ground of their text's colour, the tab shown on a
+  """a tab strip whose tabs stand on a ground tinted by their text's colour, the tab shown on a
   stronger one with a bar of the colour under it, so that the kinds of views are told apart"""
 
   def paintEvent(self, event):
@@ -198,7 +198,7 @@ class WizardWindow(QMainWindow):
       self.tabs.removeTab(0)
     for name, kind in zip(self.st.tabs, self.st.tabKinds):
       k = self.tabs.addTab(name)
-      self.tabs.setTabTextColor(k, QColor(TAB_COLORS.get(kind, "#333")))
+      self.tabs.setTabTextColor(k, QColor(colours()["tabInk"].get(kind, colours()["text"])))
     self.tabs.setVisible(self.tabs.count() > 1)
     self.tabs.setCurrentIndex(self.st.tab)
     self.tabs.blockSignals(False)
@@ -236,8 +236,9 @@ def wizardIcon():
   return QIcon(os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.svg"))
 
 
-def application():
-  """the running QApplication, created on first call, with the wizard's font"""
+def application(scheme=None):
+  """the running QApplication, created on first call, with the wizard's font and colours: those of
+  the desktop's scheme, or of scheme, 'light' or 'dark'"""
   app = QApplication.instance()
   if app is None:
     # the app id names the desktop entry a Wayland task manager takes the icon from; an offscreen
@@ -247,13 +248,17 @@ def application():
       installDesktopEntry()
     app = QApplication(sys.argv[:1])
     app.setWindowIcon(wizardIcon())
+  # on the application, since a palette set on the window does not reach its item views, which take
+  # the platform theme's own
+  applyScheme(app, None if scheme is None else scheme == "dark")
   app.setFont(QFont(app.font().family(), FONT_SIZE))
   return app
 
 
-def runWizard(path=None, show=True, exec=None):
-  """the window; blocks until it is closed unless an event loop already runs, and returns the map"""
-  app = application()
+def runWizard(path=None, show=True, exec=None, scheme=None):
+  """the window, in the desktop's colours or those of scheme, 'light' or 'dark'; blocks until it is
+  closed unless an event loop already runs, and returns the map"""
+  app = application(scheme)
   folder = os.path.abspath(path or os.getcwd())
   file = None
   if os.path.isfile(folder):

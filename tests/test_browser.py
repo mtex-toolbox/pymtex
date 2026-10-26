@@ -9,8 +9,9 @@ from PySide6.QtGui import QFont, QKeyEvent
 from PySide6.QtWidgets import QFileDialog
 
 from mtex.wizard import callbacks as cb
-from mtex.wizard.browser import CRUMBS, CRUMB_WIDTH, BrowserSide, STATUS_COLORS
+from mtex.wizard.browser import CRUMBS, CRUMB_WIDTH, BrowserSide
 from mtex.wizard.state import WizardState
+from mtex.wizard.theme import colours
 from mtex.wizard.window import application
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
@@ -25,13 +26,13 @@ def test_browser_side():
   assert files.model_.rowCount() == len(st.entries) and st.entries[0].isDir
   # the crumbs end in the folder, the band starts idle, the data sets are hidden for a file of one
   assert side.breadcrumb.lay.count() > 2
-  assert "idle" in STATUS_COLORS and STATUS_COLORS["idle"] in side.status.styleSheet()
+  assert colours()["statusGround"]["idle"] in side.status.styleSheet()
   # a click on the folder row unfolds it; a click on a map reads it
   files.onClick(files.model_.index(0, 0))
   assert st.entries[0].open and st.entries[1].depth == 1
   k = [r.name for r in st.entries].index("Forsterite_cut.ctf")
   files.onClick(files.model_.index(k, 0))
-  assert st.status[0] == "loaded" and STATUS_COLORS["loaded"] in side.status.styleSheet()
+  assert st.status[0] == "loaded" and colours()["statusGround"]["loaded"] in side.status.styleSheet()
   # the file's own rows the window shows nowhere else, at the top, the metadata of the map after them
   rows = dict(side.info.fileRows())
   assert rows["vendor"] == "Oxford" and "grid" in rows and "extent" in rows

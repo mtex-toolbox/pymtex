@@ -18,15 +18,13 @@ from PySide6.QtWidgets import (QAbstractButton, QGridLayout, QMenu, QSizePolicy,
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, conventionNames, plottingConvention
 from ..geometry.vector3d import xvector, yvector, zvector
 from . import callbacks as cb
+from .theme import colours
 
 # the drawing in units of its own, scaled as a whole afterwards: a font taken as a fraction
 # of the side and an arrow as another fraction do not keep their proportions together
 LEN, HEAD, LABEL, GAP, WEIGHT, PAD = 46.0, 14.0, 18.0, 8.0, 4.5, 3.0
 SIDE = 104
 CHOICE = 96
-FRAME = "#c8c8c8"
-MAP_INK = "#333333"
-EULER_INK = "#c62828"
 
 
 def conventionArrows(pC):
@@ -39,7 +37,7 @@ def conventionArrows(pC):
 
 # ------------------------------------------------------------------ the drawing
 
-def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=MAP_INK, caption=""):
+def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=None, caption=""):
   """the frame as the map draws it in its corner. The picture is laid out from its crossing
   and then centred on its ink and not on that crossing, which sits wherever the two arrows
   leave it: 'x' and 'RD' are different widths, so an origin centred picture is not."""
@@ -90,7 +88,7 @@ def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=MAP_INK, caption=""):
   p.setRenderHint(QPainter.Antialiasing)
   p.translate(rect.center().x() - scale * (lo[0] + hi[0]) / 2, rect.center().y() - scale * (lo[1] + hi[1]) / 2)
   p.scale(scale, scale)
-  colour = QColor(ink)
+  colour = QColor(ink or colours()["mapInk"])
   p.setPen(QPen(colour, WEIGHT, Qt.SolidLine, Qt.FlatCap, Qt.RoundJoin))
   p.setBrush(colour)
   p.setFont(bold)
@@ -134,9 +132,10 @@ class PictogramButton(QAbstractButton):
   def paintEvent(self, event):
     """draws the pictogram on a ground marking it checked or under the pointer"""
     p = QPainter(self)
-    ground = "#e8eef6" if self.isChecked() else ("#f2f2f2" if self.underMouse() else "white")
+    c = colours()
+    ground = c["checked"] if self.isChecked() else (c["hover"] if self.underMouse() else c["ground"])
     p.fillRect(self.rect(), QColor(ground))
-    p.setPen(QPen(QColor("#8a8a8a" if self.isChecked() or self.underMouse() else FRAME), 1))
+    p.setPen(QPen(QColor(c["hoverFrame"] if self.isChecked() or self.underMouse() else c["frame"]), 1))
     p.drawRect(self.rect().adjusted(0, 0, -1, -1))
     drawPictogram(p, QRectF(self.rect()).adjusted(3, 3, -3, -3), self.pC, self.names, self.ink)
     p.end()
@@ -212,7 +211,7 @@ class ConventionButton(QWidget):
     """the colour the frame is drawn in: the map in ink, the Euler frame in red"""
     # the two frames are told apart by colour: the map in ink, the Euler frame in the red
     # the pole figures carry its axes in
-    return EULER_INK if self.which == "euler" else MAP_INK
+    return colours()["eulerInk" if self.which == "euler" else "mapInk"]
 
   @property
   def caption(self):
@@ -253,8 +252,9 @@ class ConventionButton(QWidget):
   def paintEvent(self, event):
     """draws the pictogram of the convention in force, with its tooltip"""
     p = QPainter(self)
-    p.fillRect(self.rect(), QColor("#f2f2f2" if self.hover else "transparent"))
-    p.setPen(QPen(QColor("#8a8a8a" if self.hover else FRAME), 1))
+    c = colours()
+    p.fillRect(self.rect(), QColor(c["hover"] if self.hover else "transparent"))
+    p.setPen(QPen(QColor(c["hoverFrame"] if self.hover else c["frame"]), 1))
     p.drawRect(self.rect().adjusted(0, 0, -1, -1))
     pC = plottingConvention(AXIS_CONVENTIONS[self.index])
     self.setToolTip(f"{self.caption} coordinates: {conventionNames(self.names)[self.index]}")

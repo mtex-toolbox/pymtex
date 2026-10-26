@@ -9,12 +9,11 @@ from PySide6.QtGui import QColor, QFontDatabase, QGuiApplication, QSyntaxHighlig
 from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QPlainTextEdit, QToolButton, QWidget
 
 from . import callbacks as cb
+from .theme import colours
 
 # what the script is written from: the map, its phases, the two frames, the phases drawn and the
 # data set
 WATCHED = ("ebsd", "phases", "mapConvention", "eulerConvention", "drawn", "dataSet")
-COMMENT_INK = "#7a7a7a"
-STRING_INK = "#2e7d32"
 PLACEHOLDER = "the script of the import appears here once a map is read"
 MIN_WIDTH = 240   # narrower than that a line of the script cannot be read, and a note says so
 
@@ -24,12 +23,13 @@ def buttonStyle(palette):
   green while they say they did their work"""
   from PySide6.QtGui import QPalette
   fill, ink = palette.color(QPalette.Highlight), palette.color(QPalette.HighlightedText)
+  c = colours()
   return f"""
 QToolButton {{ background: {fill.name()}; color: {ink.name()}; border: none; border-radius: 3px; padding: 1px 7px; font-weight: bold; }}
 QToolButton:hover {{ background: {fill.lighter(115).name()}; }}
 QToolButton:pressed {{ background: {fill.darker(125).name()}; }}
-QToolButton:disabled {{ background: #c8c8c8; color: #f4f4f4; }}
-QToolButton[done="true"] {{ background: #2e7d32; color: white; }}
+QToolButton:disabled {{ background: {c["disabledFill"]}; color: {c["disabledInk"]}; }}
+QToolButton[done="true"] {{ background: {c["done"]}; color: white; }}
 """
 
 
@@ -41,8 +41,8 @@ class PythonInk(QSyntaxHighlighter):
   def __init__(self, document):
     super().__init__(document)
     self.comment, self.string = QTextCharFormat(), QTextCharFormat()
-    self.comment.setForeground(QColor(COMMENT_INK))
-    self.string.setForeground(QColor(STRING_INK))
+    self.comment.setForeground(QColor(colours()["comment"]))
+    self.string.setForeground(QColor(colours()["string"]))
 
   def highlightBlock(self, text):
     """colours one line: the strings green, from a hash outside a string on the comment grey"""
@@ -80,7 +80,7 @@ class ScriptView(QWidget):
     self.narrow = QLabel("widen the window to see the import script")
     self.narrow.setWordWrap(True)
     self.narrow.setAlignment(Qt.AlignCenter)
-    self.narrow.setStyleSheet(f"color: {COMMENT_INK};")
+    self.narrow.setStyleSheet(f"color: {colours()['comment']};")
     lay.addWidget(self.text, 0, 0)
     lay.addWidget(self.narrow, 0, 0)
     self.setMinimumWidth(0)

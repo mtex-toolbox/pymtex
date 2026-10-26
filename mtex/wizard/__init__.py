@@ -53,18 +53,22 @@ def importWizard(path=None, **kwargs):
     ebsd = importWizard()                             # browse the current folder
     ebsd = importWizard('/data/ebsd')                 # a folder, or a file to open on start
     w = importWizard(show=False, exec=False)          # the window, without its event loop
+    ebsd = importWizard(scheme='dark')                # dark, whatever the desktop's scheme
 
   The window blocks until it is closed and returns the map imported, unless a Qt event loop
   runs already, as under IPython's %gui qt, where it returns the window. From a terminal,
   mtex-wizard [path] or python -m mtex.wizard [path] opens the same. It needs PySide6, the
   wizard extra (pip install mtex[wizard]), and on Linux the system libraries of Qt, which it
-  names when they are missing. The keywords go to runWizard: show=False keeps the window
-  hidden, exec=False returns it without running the event loop.
+  names when they are missing. The window takes the desktop's light or dark colours, or those
+  scheme names. The keywords go to runWizard: show=False keeps the window hidden, exec=False
+  returns it without running the event loop.
 
   Input
     path - a folder to browse or a file to open, by default the current folder
   Output
     ebsd - the map imported, None when nothing was; or the window
+  Keywords
+    scheme - 'light' or 'dark', the colours of the window, by default the desktop's
   See also
     loadEBSD, inspectEBSD, buildImportWizardScript"""
   _checkQtLibraries()

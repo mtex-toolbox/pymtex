@@ -14,12 +14,11 @@ from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayo
                                QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from . import callbacks as cb
+from .theme import colours
 
-FRAME = "#c8c8c8"
 CRUMBS = 3          # the folders of the path drawn, the rest behind the ellipsis
 CRUMB_WIDTH = 110   # the widest a folder name is drawn before it is elided
-CRUMB_GREY = "#888" # the separators of the path and the folder before it
-STATUS_COLORS = {"idle": "#dbe9f6", "loading": "#fbe5b6", "loaded": "#d8efd3", "failed": "#f4c7c3"}
+STATUS_TICK = 400   # the dots of a running load advance this often, in milliseconds
 ROW_MARGIN = 3
 
 
@@ -30,7 +29,7 @@ def framed(widget):
   panels is a row of labels to read before the window can be."""
   box = QFrame()
   box.setFrameShape(QFrame.NoFrame)
-  box.setStyleSheet(f"QFrame#panel {{ border: 1px solid {FRAME}; background: white; }}")
+  box.setStyleSheet(f"QFrame#panel {{ border: 1px solid {colours()['frame']}; background: {colours()['panel']}; }}")
   box.setObjectName("panel")
   lay = QVBoxLayout(box)
   lay.setContentsMargins(1, 1, 1, 1)
@@ -49,7 +48,7 @@ def folderIcon(side, ratio=1.0):
   pix.fill(Qt.transparent)
   painter = QPainter(pix)
   painter.setRenderHint(QPainter.Antialiasing)
-  pen = QPen(QColor(CRUMB_GREY), max(1.0, side / 13))
+  pen = QPen(QColor(colours()["crumb"]), max(1.0, side / 13))
   pen.setJoinStyle(Qt.RoundJoin)
   painter.setPen(pen)
   # the tab on the upper left, the body below it, in units of the side
@@ -154,29 +153,53 @@ class Breadcrumb(QWidget):
 
   def _separator(self):
     sep = QLabel("/")
-    sep.setStyleSheet(f"color: {CRUMB_GREY}")
+    sep.setStyleSheet(f"color: {colours()['crumb']}")
     return sep
 
 
 # ------------------------------------------------------------------ the status band
 
 class StatusBand(QLabel):
-  """what to do and how the load went, coloured by the state"""
+  """what to do and how the load went: its text on the ground of its kind, a bar of the kind's
+  colour on the left, bold while a load runs or has failed, and the dots of a running load moving"""
 
   def __init__(self, st):
     super().__init__()
     self.st = st
-    self.setContentsMargins(8, 4, 8, 4)
+    self.setContentsMargins(8, 6, 8, 6)
     self.setWordWrap(True)
-    self.setMinimumHeight(26)
+    self.setMinimumHeight(34)
+    self.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    font = QFont(self.font())
+    font.setPointSize(font.pointSize() + 1)
+    self.setFont(font)
+    self.dots = 0
+    self.timer = QTimer(self)
+    self.timer.setInterval(STATUS_TICK)
+    self.timer.timeout.connect(self.tick)
     st.on("status", self.refresh)
     self.refresh()
 
   def refresh(self):
-    """the band redrawn from the status of the state, its text and the colour of its kind"""
+    """the band redrawn from the status of the state, its text and the colours of its kind"""
     kind, text = self.st.status
+    c = colours()
+    kind = kind if kind in c["statusGround"] else "idle"
+    self.dots = 0
     self.setText(text)
-    self.setStyleSheet(f"background: {STATUS_COLORS.get(kind, STATUS_COLORS['idle'])}; border: 1px solid {FRAME};")
+    weight = "bold" if kind in ("loading", "failed") else "normal"
+    self.setStyleSheet(f"QLabel {{ background: {c['statusGround'][kind]}; color: {c['statusInk']}; font-weight: {weight}; "
+                       f"border: 1px solid {c['frame']}; border-left: 6px solid {c['statusMark'][kind]}; }}")
+    if kind == "loading":
+      self.timer.start()
+    else:
+      self.timer.stop()
+
+  def tick(self):
+    """the trailing dots of a running load advanced, so the band shows it has not stopped"""
+    self.dots = (self.dots + 1) % 4
+    text = self.st.status[1].rstrip(". ")
+    self.setText(text + " " + "." * self.dots if self.dots else text)
 
 
 # ------------------------------------------------------------------ the tree
@@ -237,7 +260,7 @@ class EntryDelegate(QStyledItemDelegate):
     if sizeText:
       painter.setFont(self.small)
       if not option.state & QStyle.State_Selected:
-        painter.setPen(QColor("#777"))
+        painter.setPen(QColor(colours()["muted"]))
       painter.drawText(QRect(r.right() - wSize, r.top(), wSize - 4, r.height()), Qt.AlignVCenter | Qt.AlignRight, sizeText)
     painter.restore()
 
@@ -426,9 +449,6 @@ class DataSetList(QListWidget):
 
 # ------------------------------------------------------------------ the file information
 
-PICTURE_INK = "#e65100"   # a leaf of the metadata that is a picture, and can be looked at; the images tab's ink
-
-
 class InfoTree(QTreeWidget):
   """what the file says about itself, then the metadata of the map, in one tree
 
@@ -464,7 +484,7 @@ class InfoTree(QTreeWidget):
     for k, v in cb.infoRows(self.st):
       item = QTreeWidgetItem(self.invisibleRootItem(), [k, v])
       item.setData(0, Qt.UserRole, "file")
-      item.setForeground(0, QColor("#666"))
+      item.setForeground(0, QColor(colours()["muted"]))
       item.setFont(0, self.small)
       item.setToolTip(1, v)
     stack = [(-1, self.invisibleRootItem())]
@@ -478,7 +498,7 @@ class InfoTree(QTreeWidget):
         stack.append((depth, item))
         item.setExpanded(i in self.st.metaOpen)
       elif picture is not None:
-        item.setForeground(1, QColor(PICTURE_INK))
+        item.setForeground(1, QColor(colours()["pictureInk"]))
         item.setToolTip(1, "click to look at it")
     self.resizeColumnToContents(0)
     self.setColumnWidth(0, min(self.columnWidth(0) + 8, 180))
@@ -549,4 +569,4 @@ class BrowserSide(QWidget):
     self.dataSetPanel.setVisible(len(sets) > 1)
 
 
-__all__ = ["BrowserSide", "framed", "FRAME"]
+__all__ = ["BrowserSide", "framed"]

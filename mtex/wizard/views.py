@@ -22,6 +22,7 @@ from ..io.polefigureformats import millerIndices
 from ..geometry.plottingconvention import plottingConvention
 from . import callbacks as cb
 from .pictogram import SIDE
+from .theme import colours, figureRc, palette
 
 MAP_KINDS = ("phase", "ipf", "property")
 AHEAD_DELAY_MS = 700      # the rest on a file before its pole figures are drawn ahead
@@ -41,7 +42,7 @@ GUI_FALLBACK = "DejaVu Sans"
 
 def guiFont(dpi):
   """the matplotlib settings of the window's font, its family where matplotlib has it and the
-  mathtext in it too, and its size in points at the dpi given"""
+  mathtext in it too, and the window's colours; and the font's size in points at the dpi given"""
   from matplotlib import font_manager
   from PySide6.QtGui import QFontInfo
   from PySide6.QtWidgets import QApplication
@@ -55,7 +56,8 @@ def guiFont(dpi):
     except ValueError:
       pass
   rc = {"font.family": family, "mathtext.fontset": "custom", "mathtext.rm": family, "mathtext.it": f"{family}:italic",
-        "mathtext.bf": f"{family}:bold", "mathtext.sf": family, "mathtext.cal": family, "mathtext.tt": family}
+        "mathtext.bf": f"{family}:bold", "mathtext.sf": family, "mathtext.cal": family, "mathtext.tt": family,
+        **figureRc()}
   return rc, pixels * 72 / dpi
 
 
@@ -70,7 +72,7 @@ def keyPicture(CS, px=KEY_PIXELS):
   square best."""
   from ..plotting.directionkeys import HSVDirectionKey
   from ..plotting.spherical import makeSphericalProjection
-  hit = KEY_CACHE.get((id(CS), px))
+  hit = KEY_CACHE.get((id(CS), px, colours()["dark"]))
   if hit is not None and hit[0] is CS:
     return hit[1]
   key = HSVDirectionKey(CS)
@@ -81,7 +83,7 @@ def keyPicture(CS, px=KEY_PIXELS):
     # the two are shrunk to share the square, so their labels are drawn larger
     parts = [_hemispherePicture(key, CS, px, {side: True}, fontScale=1.5, label=True) for side in ("upper", "lower")]
     picture = _arrange(parts, gap=max(2, px // 30))
-  KEY_CACHE[(id(CS), px)] = (CS, picture)
+  KEY_CACHE[(id(CS), px, colours()["dark"])] = (CS, picture)
   return picture
 
 
@@ -140,7 +142,9 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   def __init__(self, st, worker=None):
     # compressed, so that a map and the colour bar of a property stand centred as one group
-    super().__init__(matplotlib.figure.Figure(layout="compressed"))
+    super().__init__(matplotlib.figure.Figure(layout="compressed", facecolor=colours()["figure"]))
+    # matplotlib gives its canvas a white palette, which the Miller bar floating on it would take
+    self.setPalette(palette())
     self.st = st
     # the window's worker runs the density of the pole figures off the main thread; the
     # (map, phase) pairs being computed there
@@ -200,8 +204,12 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.draw_view()
 
   def draw_view(self):
-    """the view of the tab in force drawn: the map, the pole figures or a picture, the error as
-    text and status when the drawing fails"""
+    """the view of the tab in force drawn in the window's colours: the map, the pole figures or a
+    picture, the error as text and status when the drawing fails"""
+    with matplotlib.rc_context(figureRc()):
+      self._drawView()
+
+  def _drawView(self):
     st = self.st
     kind = st.currentKind
     if st.ebsd is None or kind is None:
@@ -226,7 +234,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.figure.clear()
     self.image = self.colorbar = self.mappable = self.legend = self.drawnFor = None
     if text:
-      self.figure.text(0.5, 0.5, text, ha="center", va="center", color="#777")
+      self.figure.text(0.5, 0.5, text, ha="center", va="center", color=colours()["muted"])
     self.draw_idle()
 
   # ------------------------------------------------------------------ the map

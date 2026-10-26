@@ -19,13 +19,12 @@ from ..geometry.symmetry import symmetry
 from ..geometry.units import degree
 from ..maps.phaselist import CSS_255, phaseColorNames
 from . import callbacks as cb
+from .theme import colours
 
 HEADINGS = ["Plot", "Phase", "mineral", "pixels", "%", "symmetry", "a", "b", "c", "α", "β", "γ", "alignment"]
 WIDTHS = [36, 44, 118, 64, 48, 74, 56, 56, 56, 49, 49, 49, 108]
 NUMERIC = {"pixels", "percent", "a", "b", "c", "alpha", "beta", "gamma"}
-GREY = QColor("#e4e4e4")
 ROW_HEIGHT = 28
-FRAME = "#c8c8c8"
 
 
 # ------------------------------------------------------------------ the phase table
@@ -199,7 +198,7 @@ class PhaseTable(QTableWidget):
     if right:
       item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
     if grey:
-      item.setBackground(GREY)
+      item.setBackground(QColor(colours()["forced"]))
       item.setFlags(Qt.ItemIsEnabled)
     return item
 
@@ -211,7 +210,7 @@ class PhaseTable(QTableWidget):
     if center:
       item.setTextAlignment(Qt.AlignCenter)
     if grey:
-      item.setBackground(GREY)
+      item.setBackground(QColor(colours()["forced"]))
     return item
 
   def onEdit(self, i, j):

@@ -140,10 +140,3 @@ def test_the_pole_figures_are_drawn_ahead_at_the_size_shown(volumeFile, kind):
   assert w.section.isHidden() and w.canvas.poleFigureSize() == ahead
   w.close()
   app.processEvents()
-
-
-# the tab of the file's pictures has the ink of the pictures in the tree of its metadata
-def test_the_images_tab_has_the_ink_of_the_pictures():
-  from mtex.wizard.browser import PICTURE_INK
-  from mtex.wizard.window import TAB_COLORS
-  assert TAB_COLORS["images"] == PICTURE_INK and list(TAB_COLORS.values()).count(PICTURE_INK) == 1
