@@ -6,7 +6,7 @@
 #   log(ori, oriRef), log(ori, oriRef, 'right')   the vector pointing from oriRef to ori
 #   exp(t)                                  the rotation or orientation t points to
 #   left(t), right(t)                       the other side, by the adjoint action of the reference
-#   spinTensor(t)                           the skew matrix of the vector
+#   t.spinTensor()                          the skew matrix of the vector, a spinTensor
 #   geodesic(a, b, s)                       exp(s * log(b, a)), the shortest path from a to b
 #
 # A tangent vector stores its components, its side and its reference, nothing else: a
@@ -76,15 +76,9 @@ def rotationOf(v):
   return axis2quat(v, np.linalg.norm(v, axis=-1))
 
 
-def spinTensor(v):
-  """the skew matrix of a vector, and the vector of a skew matrix, spinTensor(S) reading the
-  axial vector of matrices of shape (..., 3, 3)"""
-  if isinstance(v, vector3d):
-    v = v.data
-  else:
-    v = np.asarray(v, dtype=float)
-    if v.ndim >= 2 and v.shape[-2:] == (3, 3):
-      return vector3d(_axialVector(v))
+# the skew matrices [v]_x of vectors of shape (..., 3), [v]_x w = v x w
+def _skewMatrix(v):
+  v = np.asarray(v, dtype=float)
   x, y, z = v[..., 0], v[..., 1], v[..., 2]
   o = np.zeros_like(x)
   return np.stack([np.stack([o, -z, y], -1), np.stack([z, o, -x], -1), np.stack([-y, x, o], -1)], -2)
@@ -672,4 +666,4 @@ def right(t):
 # the two frames under their names of the Julia port, frameA and frameB
 installFramePair(SO3TangentVector)
 
-__all__ = ["SO3TangentVector", "spinTensor", "left", "right", "geodesic"]
+__all__ = ["SO3TangentVector", "left", "right", "geodesic"]

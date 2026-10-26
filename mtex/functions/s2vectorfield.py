@@ -19,7 +19,7 @@ from ..geometry.frames import referenceFrame
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import rotation
 from ..geometry.session import SESSION, getMTEXpref
-from ..geometry.tangent import spinTensor
+from ..geometry.tangent import _skewMatrix
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import _rotatedFrame
 from .harmonics import _s2Degrees, mtexCoefficientsS2, _WignerD
@@ -409,7 +409,7 @@ class S2VectorFieldHarmonic(S2VectorField):
     if isinstance(x, S2VectorField):
       return S2VectorField.cross(self, x)
     x = asVector3d(x)
-    return self._rebuild(self._fhat @ spinTensor(x.data.reshape(3)))
+    return self._rebuild(self._fhat @ _skewMatrix(x.data.reshape(3)))
 
   def rotate(self, r):
     """v'(xi) = r v(r^-1 xi): the components rotate and mix"""
