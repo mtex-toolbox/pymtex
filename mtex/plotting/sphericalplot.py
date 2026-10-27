@@ -114,7 +114,7 @@ class sphericalPlot:
   # a crystal sector hangs its labels at the corners, centred over a corner in the upper half
   # and under one in the lower, so that they take no width beside the sector; a corner at half
   # height takes its label beside it, away from the centre. Any other chart writes its axes
-  # names on the rim in a white box
+  # names on the rim in a white box, in black whatever the ink of the figure's text
   def _drawLabels(self, outside):
     xlo, xhi, ylo, yhi = self.bounds
     cx, cy = (xlo + xhi) / 2, (ylo + yhi) / 2
@@ -131,7 +131,7 @@ class sphericalPlot:
                                             ha=ha, va=va, fontsize=self.fontSize, zorder=8))
       else:
         self.labels.append(self.ax.text(x, y, plotText(name), ha="center", va="center", fontsize=self.fontSize, zorder=8,
-                                        bbox=dict(boxstyle="square,pad=0.15", facecolor="white", edgecolor="none")))
+                                        color="k", bbox=dict(boxstyle="square,pad=0.15", facecolor="white", edgecolor="none")))
 
   @property
   def sR(self):

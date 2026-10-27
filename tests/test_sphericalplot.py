@@ -39,6 +39,17 @@ def test_plot_directionsOnTwoChartsWithGridBoundaryAndLabels():
   assert len(sPs[0].grid) == 11 and len(sPs[0].boundary) == 1 and sPs[0].labels
 
 
+# a name in a white box on the rim is black whatever the ink of the figure's text, a light one
+# on a dark ground included; a name outside the chart takes that ink
+def test_plot_writesTheBoxedAxisNamesInBlackUnderAnyTextColour():
+  with matplotlib.rc_context({"text.color": "#e6e6e6"}):
+    plot(specimenDirections())
+    for sP in plotsOf(gcm()):
+      for t in sP.labels:
+        boxed = t.get_bbox_patch() is not None
+        assert matplotlib.colors.to_hex(t.get_color()) == ("#000000" if boxed else "#e6e6e6")
+
+
 def test_plot_gridLiesOverSurfaceAndUnderBoundary():
   plot(specimenDirections(), grid=True)
   sPs = plotsOf(gcm())
