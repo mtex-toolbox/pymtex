@@ -65,7 +65,7 @@ def test_import_and_views(st):
   cb.pickTab(st, 0)
   assert st.currentTab == "phase"
   cb.setMiller(st, 0, "110")
-  assert st.millers[0] == "110"
+  assert cb.millers(st)[0] == "110"
   assert len(st.metaRows) and cb.visibleMeta(st)
   # the load on a worker: the window's shape of the call
   ran = []
@@ -111,6 +111,23 @@ def test_phase_edits(st):
   assert st.drawn[1] is False and cb.dominantPhase(st) != 1
   assert cb.snapLattice("6/mmm", [3, 4, 5], [80, 80, 80], "a") == ([3, 3, 5], [90.0, 90.0, 120.0])
   assert cb.snapLattice("2/m", [3, 4, 5], [90, 100, 90], "a") == ([3, 4, 5], [90.0, 100.0, 90.0])
+
+
+# the pole figures show the defaults of the crystal system of their phase, and what is typed
+# for a system stays with it, whatever phase of another system is shown in between
+def test_the_pole_figure_directions_follow_the_crystal_system(st):
+  cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
+  k = cb.dominantPhase(st)
+  assert cb.millers(st) == ["100", "010", "001"]
+  for group, shown in (("m-3m", ["100", "110", "111"]), ("6/mmm", ["0001", "10-10", "11-20"]),
+                       ("-3m", ["0001", "10-10", "11-20"]), ("4/mmm", ["001", "100", "110"])):
+    cb.editPhase(st, k, "symmetry", group)
+    assert cb.millers(st) == shown, group
+  cb.setMiller(st, 2, "1-102")
+  cb.editPhase(st, k, "symmetry", "m-3m")
+  assert cb.millers(st) == ["100", "110", "111"]
+  cb.editPhase(st, k, "symmetry", "4/mmm")
+  assert cb.millers(st) == ["001", "100", "1-102"]
 
 
 def test_the_script_follows_the_phases_and_is_written(st, tmp_path):

@@ -535,10 +535,35 @@ def pickMeta(st, i):
       pickTab(st, st.tabs.index("images"))
 
 
+# the crystal directions a pole figure of each crystal system shows unless others are typed:
+# the axes, the face diagonals and the body diagonal of a cube, the c axis and the two a-type
+# directions of a hexagonal or trigonal lattice, the c axis, a and the a diagonal of a tetragonal
+# one; the three axes of the lower systems
+DEFAULT_MILLERS = {"cubic": ("100", "110", "111"), "hexagonal": ("0001", "10-10", "11-20"),
+                   "trigonal": ("0001", "10-10", "11-20"), "tetragonal": ("001", "100", "110")}
+AXES_MILLERS = ("100", "010", "001")
+
+
+def millerSystem(st):
+  """the crystal system of the phase the pole figures show, None before one is drawn"""
+  k = dominantPhase(st) if st.ebsd is not None else None
+  return None if k is None else st.ebsd.CSList.frames[k].lattice.name
+
+
+def millers(st):
+  """the three Miller indices the pole figures show: those typed for the crystal system of the
+  phase they are of, or that system's defaults"""
+  system = millerSystem(st)
+  return list(st.typedMillers.get(system, DEFAULT_MILLERS.get(system, AXES_MILLERS)))
+
+
 def setMiller(st, k, text):
-  """sets the k-th of the three Miller indices the pole figures show, the densities dropped"""
+  """sets the k-th of the three Miller indices the pole figures show, kept for the crystal system
+  of their phase, so that every map of that system shows it; the densities dropped"""
   if 0 <= k < 3:
-    st.millers[k] = str(text).strip()
+    shown = millers(st)
+    shown[k] = str(text).strip()
+    st.typedMillers[millerSystem(st)] = shown
     st.densities = {}
     st.changed("millers")
 

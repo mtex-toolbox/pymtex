@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib
 import matplotlib.figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from PySide6.QtCore import QMetaObject, Qt, QTimer, Slot
+from PySide6.QtCore import QMetaObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QLineEdit, QSlider, QToolButton, QVBoxLayout, QWidget
 
@@ -139,6 +139,9 @@ class ViewCanvas(FigureCanvasQTAgg):
   """the canvas of the wizard's views: the map in the colouring of the tab, the pole figures of
   the dominant phase drawn ahead from a density computed on the worker, and the pictures of the
   file; redrawn once per turn of the event loop whatever the state announced"""
+  # the places of the titles of the pole figures shown, in the canvas's coordinates, empty
+  # when none are shown: the fields of the Miller bar stand on them
+  titlesPlaced = Signal(list)
 
   def __init__(self, st, worker=None):
     # compressed, so that a map and the colour bar of a property stand centred as one group
@@ -150,9 +153,10 @@ class ViewCanvas(FigureCanvasQTAgg):
     # (map, phase) pairs being computed there
     self.worker = worker
     self.computing = set()
-    # the pole figures drawn ahead as a picture, (what it shows, the pixels), and the timer that
-    # draws them anew once a resize has settled
+    # the pole figures drawn ahead as a picture, (what it shows, the pixels, the places of its
+    # titles), and the timer that draws them anew once a resize has settled
     self.pfPicture = None
+    self.titles = []
     # the height the canvas gains on the pole figure tab, where the bars under it give way: the
     # pole figures drawn ahead are drawn at the size they are shown at
     self.poleFigureRoom = lambda: 0
@@ -235,7 +239,17 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.image = self.colorbar = self.mappable = self.legend = self.drawnFor = None
     if text:
       self.figure.text(0.5, 0.5, text, ha="center", va="center", color=colours()["muted"])
+    self.placeTitles([])
     self.draw_idle()
+
+  def placeTitles(self, titles):
+    """the places of the titles of the pole figures shown announced, (centre x, centre y, font
+    pixels) in the canvas's coordinates; the figure counts device pixels, the widget logical ones"""
+    r = self.device_pixel_ratio
+    titles = [(x / r, y / r, px / r) for x, y, px in titles]
+    if titles != self.titles:
+      self.titles = titles
+      self.titlesPlaced.emit(titles)
 
   # ------------------------------------------------------------------ the map
 
@@ -441,7 +455,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     k = cb.dominantPhase(st) if st.ebsd is not None else None
     if k is None or k not in st.densities:
       return None
-    return (id(st.densities[k]), k, tuple(st.millers), tuple(st.eulerAxesNames), *self.poleFigureSize())
+    return (id(st.densities[k]), k, tuple(cb.millers(st)), tuple(st.eulerAxesNames), *self.poleFigureSize())
 
   def poleFigureSize(self):
     """the size in pixels the pole figure tab shows its picture at, from any tab"""
@@ -454,7 +468,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     """the picture of the pole figures drawn off the screen, unless the one kept shows the same"""
     key = self.poleFigureKey()
     if key is not None and (self.pfPicture is None or self.pfPicture[0] != key):
-      self.pfPicture = (key, self.renderPoleFigures(key))
+      self.pfPicture = (key, *self.renderPoleFigures(key))
 
   @Slot()
   def afterResize(self):
@@ -479,14 +493,16 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.image = self.colorbar = self.mappable = self.drawnFor = None
     # the picture pixel for pixel, as it was drawn at the canvas's size, with no axes around it
     self.figure.figimage(self.pfPicture[1], origin="upper")
+    self.placeTitles(self.pfPicture[2])
     self.draw_idle()
 
   def renderPoleFigures(self, key):
-    """the pole figures of the dominant phase drawn off the screen at the canvas's size: a colour
-    bar under each on its own range, the titles close above, the Euler frame's axes as red
-    names on a white ground where they point; the row in a band as tall as it needs across the
-    middle, since a chart keeps its aspect in a taller cell and its title and bar would stand
-    at the ends of the cell, far from it"""
+    """the pole figures of the dominant phase drawn off the screen at the canvas's size, and the
+    places of their titles: a colour bar under each on its own range, the titles close above,
+    kept clear but not drawn, since the fields of the Miller bar stand on them, the Euler frame's
+    axes as red names on a white ground where they point; the row in a band as tall as it needs
+    across the middle, since a chart keeps its aspect in a taller cell and its title and bar
+    would stand at the ends of the cell, far from it"""
     import matplotlib.figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from ..plotting.mtexfigure import mtexFigure
@@ -508,7 +524,7 @@ class ViewCanvas(FigureCanvasQTAgg):
         sP = getattr(ax, "_mtexSphericalPlot", None)
         if sP is None:
           continue
-        ax.set_title(ax.get_title(), fontsize=size + 2, pad=0)
+        ax.set_title(ax.get_title(), fontsize=size + 2, pad=0, color="none")
         for t in sP.labels:
           t.set_fontsize(size)
         if sP.mappable is not None:
@@ -521,7 +537,13 @@ class ViewCanvas(FigureCanvasQTAgg):
         except Exception:
           pass
       fig.canvas.draw()
-    return np.asarray(fig.canvas.buffer_rgba()).copy()
+      # the titles from the top left, in the order of the directions
+      titles = []
+      for ax in fig.axes:
+        if getattr(ax, "_mtexSphericalPlot", None) is not None:
+          b = ax.title.get_window_extent()
+          titles.append(((b.x0 + b.x1) / 2, h - (b.y0 + b.y1) / 2, ax.title.get_fontsize() * fig.dpi / 72))
+    return np.asarray(fig.canvas.buffer_rgba()).copy(), titles
 
 
   # ------------------------------------------------------------------ the images
@@ -612,44 +634,90 @@ class SectionBar(QWidget):
 # ------------------------------------------------------------------ the Miller indices
 
 class MillerBar(QWidget):
-  """the three crystal directions of the pole figures, each a field that is its label; in the
-  window it floats over the top left corner of the canvas, above the row of pole figures, and
-  takes no room from the maps"""
+  """the three crystal directions of the pole figures, each a field standing where the title of
+  its pole figure would, as MATLAB's import wizard edits them; the phase they are of named in the
+  top left corner of the canvas. Without a canvas the fields stand in a row after the name"""
 
   def __init__(self, st, parent=None):
     super().__init__(parent)
     self.st = st
+    self.titles = []
     lay = QHBoxLayout(self)
     lay.setContentsMargins(6, 4, 6, 0)
-    self.lead = QLabel("pole figures of")
+    self.lead = QLabel("pole figures")
     lay.addWidget(self.lead)
     self.fields = []
     for k in range(3):
-      f = QLineEdit(st.millers[k])
-      f.setFixedWidth(64)
-      f.setToolTip("a crystal direction, as 100 or 1-10")
+      f = QLineEdit(cb.millers(st)[k], parent)
+      f.setAlignment(Qt.AlignCenter)
+      f.setToolTip("the crystal direction of this pole figure, as 100 or 1-10")
       f.editingFinished.connect(lambda k=k, f=f: self.commit(k, f))
-      lay.addWidget(f)
+      f.textEdited.connect(lambda _, f=f: self.fit(f))
+      if parent is None:
+        f.setFixedWidth(64)
+        lay.addWidget(f)
       self.fields.append(f)
     lay.addStretch(1)
-    for name in ("tab", "tabs", "ebsd", "phases", "drawn"):
+    if isinstance(parent, ViewCanvas):
+      parent.titlesPlaced.connect(self.place)
+      self.titles = parent.titles
+    for name in ("tab", "tabs", "ebsd", "phases", "drawn", "millers"):
       st.on(name, self.show_)
     self.show_()
 
   def commit(self, k, f):
     """the crystal direction of the field k taken into the state when its text changed"""
-    if f.text().strip() != self.st.millers[k]:
+    if f.text().strip() != cb.millers(self.st)[k]:
       cb.setMiller(self.st, k, f.text())
 
+  def place(self, titles):
+    """the fields moved onto the titles of the pole figures shown, hidden where none are"""
+    self.titles = titles
+    self.show_()
+
+  def fit(self, f):
+    """a field as wide as its text and a margin, centred where it stands"""
+    if self.parentWidget() is None:
+      return
+    centre = f.geometry().center().x()
+    w = max(f.fontMetrics().horizontalAdvance(f.text() or "000") + 3 * f.font().pixelSize(), 56)
+    f.resize(w, f.height())
+    f.move(round(centre - w / 2 + 0.5), f.y())
+
   def show_(self):
-    """shown on the pole figure tab alone, naming the phase the pole figures are of"""
+    """shown on the pole figure tab alone, naming the phase the pole figures are of, the fields
+    on the titles of the pole figures drawn"""
     st = self.st
-    self.setVisible(st.currentKind == "polefigures")
+    on = st.currentKind == "polefigures"
+    self.setVisible(on)
     k = cb.dominantPhase(st) if st.ebsd is not None else None
-    self.lead.setText("pole figures of" if k is None else f"{st.ebsd.CSList.frames[k].name}: pole figures of")
-    if self.parentWidget() is not None:
-      self.adjustSize()
-      self.raise_()
+    self.lead.setText("pole figures" if k is None else f"{st.ebsd.CSList.frames[k].name}: pole figures")
+    for f, m in zip(self.fields, cb.millers(st)):
+      if not f.hasFocus() and f.text() != m:
+        f.setText(m)
+    if self.parentWidget() is None:
+      return
+    self.adjustSize()
+    self.raise_()
+    c = colours()
+    for n, f in enumerate(self.fields):
+      shown = on and n < len(self.titles)
+      f.setVisible(shown)
+      if not shown:
+        continue
+      x, y, px = self.titles[n]
+      font = f.font()
+      font.setPixelSize(max(round(px), 9))
+      f.setFont(font)
+      # the field reads as the title it stands for, its frame saying it can be edited
+      f.setStyleSheet(f"QLineEdit {{ background: transparent; color: {c['figureInk']}; border: 1px solid {c['frame']};"
+                      f" border-radius: 3px; padding: 0 2px; }}"
+                      f" QLineEdit:hover {{ border-color: {c['hoverFrame']}; }}"
+                      f" QLineEdit:focus {{ background: {c['base']}; border-color: {c['highlight']}; }}")
+      h = f.sizeHint().height()
+      f.setGeometry(round(x) - 28, round(y - h / 2), 56, h)
+      self.fit(f)
+      f.raise_()
 
 
 # ------------------------------------------------------------------ the key

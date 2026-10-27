@@ -5,6 +5,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6.QtCore import QRectF
 from mtex.wizard import callbacks as cb
 from mtex.wizard.state import WizardState
 from mtex.wizard.pictogram import SIDE
@@ -53,7 +54,30 @@ def test_miller_bar_shows_on_the_pole_figures_and_commits(loaded):
   assert not bar.isHidden()
   bar.fields[0].setText("110")
   bar.fields[0].editingFinished.emit()
-  assert st.millers[0] == "110"
+  assert cb.millers(st)[0] == "110"
+
+
+# over the canvas the fields stand on the titles of the pole figures, one over each, left to
+# right in the order of the directions, and hide where no pole figures are shown
+def test_miller_bar_edits_the_directions_over_the_pole_figures(loaded):
+  st = loaded
+  canvas = ViewCanvas(st)
+  canvas.resize(900, 600)
+  bar = MillerBar(st, parent=canvas)
+  canvas.show()
+  cb.pickTab(st, st.tabs.index("pole figures"))
+  canvas.density(cb.dominantPhase(st))
+  canvas.draw_view()
+  xs = [f.geometry().center().x() for f in bar.fields]
+  assert all(f.isVisible() for f in bar.fields) and xs == sorted(xs)
+  for f, (x, y, _) in zip(bar.fields, canvas.titles):
+    c = QRectF(f.geometry()).center()
+    assert abs(c.x() - x) <= 1 and abs(c.y() - y) <= 1
+  bar.fields[1].setText("111")
+  bar.fields[1].editingFinished.emit()
+  assert cb.millers(st)[1] == "111"
+  canvas.clear("computing the pole figures ...")
+  assert not any(f.isVisible() for f in bar.fields)
 
 
 # a direction is typed with its minus signs inside, and text that is none falls back to 100
@@ -156,7 +180,8 @@ def test_the_pole_figures_are_drawn_ahead(loaded):
   k = cb.dominantPhase(st)
   canvas.density(k)
   canvas.drawAhead()
-  key, picture = canvas.pfPicture
+  key, picture, titles = canvas.pfPicture
+  assert len(titles) == 3
   w, h = canvas.figure.get_size_inches() * canvas.figure.dpi
   assert key == canvas.poleFigureKey() and picture.shape[:2] == (round(h), round(w))
   cb.pickTab(st, st.tabs.index("pole figures"))

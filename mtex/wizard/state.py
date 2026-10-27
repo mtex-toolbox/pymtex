@@ -58,7 +58,9 @@ class WizardState:
     self.tabs = []
     self.tabKinds = []
     self.tab = 0
-    self.millers = ["100", "010", "001"]
+    # the crystal directions of the pole figures typed, per crystal system; the others are
+    # the defaults of their system (callbacks.millers)
+    self.typedMillers = {}
     self.densities = {}
     # the phase whose inverse pole figure key the key panel shows
     self.keyPhase = None
