@@ -114,6 +114,15 @@ def test_plot_throughThePatchBackendIsOneCellPerMeasurement():
   assert len(h.get_paths()) == 24
 
 
+# cells without outlines are stroked in their own colour, which closes the seams between
+# them; translucent cells are not, since their strokes would show
+def test_plot_closesTheSeamsOfOpaqueCellsWithAStrokeInTheirOwnColour():
+  ebsd = gridMap(6, 4, 0.5)
+  bare, faint = plot(ebsd, backend="patch"), plot(ebsd, backend="patch", alpha=0.5)
+  assert bare.get_linewidth()[0] > 0 and np.allclose(bare.get_edgecolor(), bare.get_facecolor())
+  assert faint.get_linewidth()[0] == 0
+
+
 def test_mapValues_byNameAndByArrayAgree():
   ebsd = gridMap(6, 4, 0.5)
   v1, s1 = mapValues(ebsd, "bc")

@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 
   from .keywords import PlotKeywords
 
+# the width in points of the stroke in their own colour closing the seams between cells
+SEAM_WIDTH = 0.3
 MAP_KEYS = ("how2plot", "coordinates", "title", "region", "parent", "figSize", "unit")
 
 
@@ -548,7 +550,11 @@ def plotEBSD(ebsd, color=None, faceColor=None, backend=None, colormap="viridis",
     keep = _drawn(ebsd, values, scalar)
     if keep is not None:
       corners, values, alpha = corners[keep], values[keep], _alphaOf(alpha, keep)
-    h = PolyCollection(corners, closed=True, linewidths=lineWidth if edgeColor is not None else 0,
+    # cells without edges are outlined in their own colour, a stroke thin enough to close the
+    # seams antialiasing leaves between neighbours while it still smooths the boundaries
+    # between colours; a translucent cell would show its stroke, so it keeps the seams
+    seam = SEAM_WIDTH if np.ndim(alpha) == 0 and alpha == 1 else 0
+    h = PolyCollection(corners, closed=True, linewidths=lineWidth if edgeColor is not None else seam,
                        edgecolors=edgeColor if edgeColor is not None else "face", alpha=alpha, zorder=1, **kw)
     if scalar:
       h.set_array(values)
