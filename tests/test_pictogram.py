@@ -56,6 +56,48 @@ def test_pictogram_draws_centred():
   assert len(_ink(plottingConvention("y↑→x"), ("x", "y", "z"), "map")) > len(_ink(plottingConvention("y↑→x"), ("x", "y", "z")))
 
 
+# every name stands as far off its arrow as every other, the one at the head and the one in
+# the crossing, measured on the ink: a lowercase letter below a head no farther than beside it
+def test_pictogram_spacesTheNamesEquallyOffTheArrows():
+  application()
+  n = 600
+  for s in AXIS_CONVENTIONS:
+    for names in (("x", "y", "z"), ("X1", "Y1", "Z1"), ("RD", "TD", "ND")):
+      gaps = _gaps(_inked(plottingConvention(s), names, n))
+      assert len(gaps) == 4 and max(gaps) - min(gaps) <= 0.03 * max(gaps) + 1, (s, names, gaps)
+
+
+# the distances from either end of each arrow to the ink box of the nearest letter beyond it
+# that the arrow's head, widened across, would meet
+def _gaps(ink):
+  from scipy import ndimage
+  lab, _ = ndimage.label(ink)
+  boxes = [(sl[0].start, sl[0].stop, sl[1].start, sl[1].stop) for sl in ndimage.find_objects(lab)]
+  # an arrow is a long thin piece, a figure one only thin
+  isArrow = [max(r1 - r0, c1 - c0) >= max(1.8 * min(r1 - r0, c1 - c0), ink.shape[0] / 5) for r0, r1, c0, c1 in boxes]
+  out = []
+  for (r0, r1, c0, c1), arrow in zip(boxes, isArrow):
+    if not arrow:
+      continue
+    across, along = ((r0, r1), (c0, c1)) if c1 - c0 > r1 - r0 else ((c0, c1), (r0, r1))
+    k = (0, 2) if c1 - c0 > r1 - r0 else (2, 0)
+    letters = [(b[k[1]], b[k[1] + 1]) for b, a in zip(boxes, isArrow)
+               if not a and b[k[0]] < across[1] and b[k[0] + 1] > across[0]]
+    out.append(min(along[0] - e for s0, e in letters if e <= along[0]))
+    out.append(min(s0 - along[1] for s0, e in letters if s0 >= along[1]))
+  return out
+
+
+# a pictogram drawn on a square of side n, as a mask of its dark pixels
+def _inked(pC, names, n):
+  img = QImage(n, n, QImage.Format_ARGB32)
+  img.fill(0xFFFFFFFF)
+  p = QPainter(img)
+  drawPictogram(p, QRectF(0, 0, n, n), pC, names, "#000")
+  p.end()
+  return np.frombuffer(img.constBits(), dtype=np.uint8).reshape(n, n, 4)[..., :3].sum(axis=2) < 3 * 128
+
+
 # the pixels a pictogram inks, as row and column pairs
 def _ink(pC, names, caption=""):
   img = QImage(SIDE, SIDE, QImage.Format_ARGB32)

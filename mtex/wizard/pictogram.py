@@ -12,7 +12,7 @@ from math import atan2, cos, sin
 import numpy as np
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import (QAbstractButton, QGridLayout, QMenu, QSizePolicy, QVBoxLayout, QWidget, QWidgetAction)
 
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, conventionNames, plottingConvention
@@ -22,7 +22,7 @@ from .theme import colours
 
 # the drawing in units of its own, scaled as a whole afterwards: a font taken as a fraction
 # of the side and an arrow as another fraction do not keep their proportions together
-LEN, HEAD, LABEL, GAP, WEIGHT, PAD = 46.0, 14.0, 18.0, 8.0, 4.5, 3.0
+LEN, HEAD, LABEL, GAP, WEIGHT, PAD = 46.0, 14.0, 18.0, 8.0, 4.5, 6.0
 SIDE = 104
 CHOICE = 96
 
@@ -47,7 +47,6 @@ def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=None, caption=""):
   bold.setBold(True)
   light = QFont(bold)
   light.setBold(False)
-  fmBold, fmLight = QFontMetricsF(bold), QFontMetricsF(light)
   # which axis leaves the screen, and which way the other two lean
   out, sx, sy = None, 0.0, 0.0
   for k, a in enumerate(axes):
@@ -56,33 +55,40 @@ def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=None, caption=""):
       continue
     sx, sy = sx + a[0], sy + a[1]
   outName = names[out] if out is not None else ""
-  # every arrow, with the place its name stands off the head along it; screen y grows down
+  # every arrow, with its name standing GAP off the head, measured to the name's ink; screen y
+  # grows down
   arrows = []
   for j, a in enumerate(axes):
     if j == out:
       continue
     dx, dy = a[0], -a[1]
     tx, ty = dx * LEN, dy * LEN
-    w = fmBold.horizontalAdvance(names[j])
-    arrows.append((dx, dy, tx, ty, names[j], tx + dx * (GAP + w / 2), ty + dy * (GAP + LABEL / 2), w))
-  # the shafts start clear of whatever the name in the crossing needs
-  hub = max(fmBold.horizontalAdvance(outName) / 2 if outName else 0.0, LABEL / 2) + 4
+    g = _glyphs(bold, names[j])
+    d = GAP + _reach(g, -dx, -dy)
+    arrows.append((dx, dy, tx, ty, names[j], tx + dx * d, ty + dy * d, g))
+  # the shafts start GAP clear of the ink of the name in the crossing
+  hub = _glyphs(bold, outName) if outName else None
   # the caption stands in the quadrant the arrows leave free, read after them and not before
-  capWidth = fmLight.horizontalAdvance(caption) if caption else 0.0
   cx = (1 if sx >= 0 else -1) * LEN * 0.78
   cy = -(1 if sy >= 0 else -1) * LEN * 0.78
   lo, hi = [1e9, 1e9], [-1e9, -1e9]
 
-  def see(x, y, hw, hh):
-    lo[0], hi[0] = min(lo[0], x - hw), max(hi[0], x + hw)
-    lo[1], hi[1] = min(lo[1], y - hh), max(hi[1], y + hh)
+  def see(x0, y0, x1, y1):
+    lo[0], hi[0] = min(lo[0], x0), max(hi[0], x1)
+    lo[1], hi[1] = min(lo[1], y0), max(hi[1], y1)
 
-  see(0, 0, hub, LABEL / 2)
-  for dx, dy, tx, ty, name, lx, ly, w in arrows:
-    see(tx, ty, HEAD / 2, HEAD / 2)
-    see(lx, ly, w / 2, LABEL / 2)
+  def seeText(x, y, g):
+    ink, ox, oy, _ = g
+    see(x - ox + ink.left(), y - oy + ink.top(), x - ox + ink.right(), y - oy + ink.bottom())
+
+  if hub is not None:
+    seeText(0, 0, hub)
+  for dx, dy, tx, ty, name, lx, ly, g in arrows:
+    see(tx - HEAD / 2, ty - HEAD / 2, tx + HEAD / 2, ty + HEAD / 2)
+    seeText(lx, ly, g)
   if caption:
-    see(cx, cy, capWidth / 2, LABEL / 2)
+    capGlyphs = _glyphs(light, caption)
+    seeText(cx, cy, capGlyphs)
   scale = min((rect.width() - 2 * PAD) / max(hi[0] - lo[0], 1e-9), (rect.height() - 2 * PAD) / max(hi[1] - lo[1], 1e-9))
   p.save()
   p.setRenderHint(QPainter.Antialiasing)
@@ -91,28 +97,47 @@ def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=None, caption=""):
   colour = QColor(ink or colours()["mapInk"])
   p.setPen(QPen(colour, WEIGHT, Qt.SolidLine, Qt.FlatCap, Qt.RoundJoin))
   p.setBrush(colour)
-  p.setFont(bold)
-  for dx, dy, tx, ty, name, lx, ly, w in arrows:
-    p.drawLine(QPointF(dx * hub, dy * hub), QPointF(tx - 0.9 * HEAD * dx, ty - 0.9 * HEAD * dy))
+  for dx, dy, tx, ty, name, lx, ly, g in arrows:
+    start = GAP + _reach(hub, dx, dy) if hub is not None else LABEL / 2
+    p.drawLine(QPointF(dx * start, dy * start), QPointF(tx - 0.9 * HEAD * dx, ty - 0.9 * HEAD * dy))
     a = atan2(dy, dx)
     p.setPen(Qt.NoPen)
     p.drawPolygon(QPolygonF([QPointF(tx, ty),
                              QPointF(tx - HEAD * cos(a - 0.36), ty - HEAD * sin(a - 0.36)),
                              QPointF(tx - HEAD * cos(a + 0.36), ty - HEAD * sin(a + 0.36))]))
+    _centred(p, lx, ly, g)
     p.setPen(QPen(colour, WEIGHT, Qt.SolidLine, Qt.FlatCap, Qt.RoundJoin))
-    _centred(p, lx, ly, name)
-  if outName:
-    _centred(p, 0, 0, outName)
+  p.setPen(Qt.NoPen)
+  if hub is not None:
+    _centred(p, 0, 0, hub)
   if caption:
-    p.setFont(light)
     p.setOpacity(0.6)
-    _centred(p, cx, cy, caption)
+    _centred(p, cx, cy, capGlyphs)
     p.setOpacity(1.0)
   p.restore()
 
 
-def _centred(p, x, y, text):
-  p.drawText(QRectF(x - 4 * LABEL, y - LABEL, 8 * LABEL, 2 * LABEL), Qt.AlignCenter, text)
+# a text as its outline about its origin on the baseline, the ink of that outline, and the
+# point it is centred by: the middle of its ink across, and of its ink above the baseline up
+# and down, so that a descender reaches into the gap below without lifting the letter off the
+# shaft. The outline is what is drawn, so the gaps measured on it are the gaps seen
+def _glyphs(font, text):
+  path = QPainterPath()
+  path.addText(0, 0, font, text)
+  ink = path.boundingRect()
+  return ink, ink.center().x(), (ink.top() + min(ink.bottom(), 0.0)) / 2, path
+
+
+# how far the ink of a text reaches from its centre along the direction (dx, dy)
+def _reach(g, dx, dy):
+  ink, ox, oy, _ = g
+  return max((x - ox) * dx + (y - oy) * dy for x in (ink.left(), ink.right()) for y in (ink.top(), ink.bottom()))
+
+
+# a text drawn with its centre at (x, y), in the brush
+def _centred(p, x, y, g):
+  ink, ox, oy, path = g
+  p.drawPath(path.translated(x - ox, y - oy))
 
 
 # ------------------------------------------------------------------ the chooser
