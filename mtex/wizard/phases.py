@@ -141,7 +141,7 @@ class PhaseTable(QTableWidget):
     if self.st.ebsd is None:
       return []
     counts = cb.phaseCounts(self.st)
-    return [(k, f, counts.get(k, 0)) for k, f in enumerate(self.st.ebsd.CSList.frames) if f.isIndexed or counts.get(k, 0)]
+    return [(k, f, counts.get(k, 0)) for k, f in enumerate(self.st.ebsd.CSList.frames)]
 
   def refresh(self):
     """the table filled with its signals blocked, so that no cell set here reads as an edit"""

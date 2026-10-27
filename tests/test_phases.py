@@ -23,6 +23,15 @@ def loaded():
   return st
 
 
+# every phase of the map has its row, one without measurements too, counted as none
+def test_table_listsEveryPhaseThoseWithoutMeasurementsToo(loaded):
+  st = loaded
+  st.ebsd = st.ebsd[st.ebsd.isIndexed]
+  table = PhaseTable(st, QFont())
+  assert table.rowCount() == len(st.ebsd.CSList.frames) and table.item(0, 2).text() == "notIndexed"
+  assert table.item(0, 3).text() == "0"
+
+
 def test_table_rows_and_edits(loaded):
   st = loaded
   table = PhaseTable(st, QFont())
