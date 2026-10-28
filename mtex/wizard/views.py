@@ -514,8 +514,9 @@ class ViewCanvas(FigureCanvasQTAgg):
     """the pole figures of the dominant phase drawn off the screen at the canvas's size, and the
     places of their titles: a colour bar under each on its own range, the titles close above,
     kept clear but not drawn, since the fields of the Miller bar stand on them, the Euler frame's
-    axes as red names on a white ground where they point; the row in a band as tall as it needs
-    across the middle, since a chart keeps its aspect in a taller cell and its title and bar
+    axes as red names on a white ground where they point; a direction the symmetry does not take
+    to its opposite as its two hemispheres side by side under one title and one bar; the row in a
+    band as tall as it needs across the middle, since a chart keeps its aspect in a taller cell and its title and bar
     would stand at the ends of the cell, far from it"""
     import matplotlib.figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -530,30 +531,40 @@ class ViewCanvas(FigureCanvasQTAgg):
     with matplotlib.rc_context(rc):
       fig = matplotlib.figure.Figure(figsize=(w / self.figure.dpi, h / self.figure.dpi), dpi=self.figure.dpi, layout="constrained")
       FigureCanvasAgg(fig)
-      frac = min(1.0, (0.92 * w / len(hs) + 90) / max(h, 1))
+      # a direction whose opposite the symmetry does not reach is two charts, its hemispheres
+      odf = st.densities[k]
+      halves = [1 if odf.radon(x).antipodal else 2 for x in hs]
+      n = sum(halves)
+      frac = min(1.0, (0.92 * w / n + 90) / max(h, 1))
       fig.get_layout_engine().set(rect=(0, (1 - frac) / 2, 1, frac))
-      mtexFigure(len(hs), figure=fig)
-      plotPF(st.densities[k], hs, colorbar=False, resolution=PF_RESOLUTION, fontSize=size + 1)
-      for ax in list(fig.axes):
-        sP = getattr(ax, "_mtexSphericalPlot", None)
-        if sP is None:
-          continue
-        ax.set_title(ax.get_title(), fontsize=size + 2, pad=0, color="none")
-        for t in sP.labels:
-          t.set_fontsize(size)
-        if sP.mappable is not None:
-          bar = fig.colorbar(sP.mappable, ax=ax, location="bottom", shrink=0.7, aspect=25, pad=0)
+      mtexFigure(n, figure=fig, layout=(1, n))
+      plotPF(odf, hs, colorbar=False, resolution=PF_RESOLUTION, fontSize=size + 1)
+      charts = [ax for ax in fig.axes if getattr(ax, "_mtexSphericalPlot", None) is not None]
+      groups = [charts[sum(halves[:i]):sum(halves[:i + 1])] for i in range(len(hs))]
+      for group in groups:
+        for ax in group:
+          ax.set_title(ax.get_title(), fontsize=size + 2, pad=0, color="none")
+          for t in ax._mtexSphericalPlot.labels:
+            t.set_fontsize(size)
+          # a hemisphere's name centred over its own chart, clear of the title over the pair
+          for t in ax.texts:
+            if len(group) == 2 and t.get_text() in ("upper", "lower"):
+              t.set(transform=ax.transData, position=(0, ax._mtexSphericalPlot.bounds[3]), ha="center", va="top", fontsize=size)
+        # the hemispheres of a direction share its range, so one bar under the pair
+        mappable = group[0]._mtexSphericalPlot.mappable
+        if mappable is not None:
+          bar = fig.colorbar(mappable, ax=group, location="bottom", shrink=0.7 if len(group) == 1 else 0.45, aspect=25 * len(group), pad=0)
           bar.ax.tick_params(labelsize=size - 1)
       corr = st.ebsd.EulerCorrection
-      for v, n in zip((_vectors.xvector, _vectors.yvector, _vectors.zvector), names):
-        annotate(corr * v, label=n, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
+      for v, nm in zip((_vectors.xvector, _vectors.yvector, _vectors.zvector), names):
+        annotate(corr * v, label=nm, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
       fig.canvas.draw()
-      # the titles from the top left, in the order of the directions
+      # the titles from the top left, in the order of the directions, each over its charts
       titles = []
-      for ax in fig.axes:
-        if getattr(ax, "_mtexSphericalPlot", None) is not None:
-          b = ax.title.get_window_extent()
-          titles.append(((b.x0 + b.x1) / 2, h - (b.y0 + b.y1) / 2, ax.title.get_fontsize() * fig.dpi / 72))
+      for group in groups:
+        b = group[0].title.get_window_extent()
+        left, right = group[0].get_window_extent().x0, group[-1].get_window_extent().x1
+        titles.append(((left + right) / 2, h - (b.y0 + b.y1) / 2, group[0].title.get_fontsize() * fig.dpi / 72))
     return np.asarray(fig.canvas.buffer_rgba()).copy(), titles
 
 

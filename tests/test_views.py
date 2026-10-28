@@ -228,6 +228,26 @@ def test_the_pole_figures_are_drawn_ahead(loaded):
   assert canvas.pfPicture[0] != key and canvas.pfPicture[0][2][0] == "110"
 
 
+# a direction has one title, over its two hemispheres where the symmetry does not take it to its
+# opposite: under 1 every direction is two charts, the titles evenly spaced, under mm2 only 001
+@pytest.mark.parametrize("group", ["1", "mm2"])
+def test_a_polar_direction_is_titled_once_over_its_hemispheres(loaded, group):
+  st = loaded
+  k = cb.dominantPhase(st)
+  cb.editPhase(st, k, "symmetry", group)
+  canvas = ViewCanvas(st)
+  canvas.resize(1200, 500)
+  canvas.density(k)
+  canvas.drawAhead()
+  xs = [x for x, _, _ in canvas.pfPicture[2]]
+  assert st.status[0] != "failed" and len(xs) == len(cb.millers(st)) == 3
+  gaps = np.diff(xs)
+  if group == "1":
+    assert abs(gaps[1] - gaps[0]) <= 2
+  else:
+    assert cb.millers(st)[2] == "001" and gaps[1] > 1.2 * gaps[0]
+
+
 # a density arriving off the pole figure tab waits for the cursor to rest before it is drawn
 def test_the_pole_figures_wait_for_a_rest(loaded):
   st = loaded
