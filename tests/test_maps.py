@@ -29,6 +29,13 @@ def test_scaleBar_takesJuliasLengthsAndLabels():
   assert scaleBar(1200.0, "nm") == (125.0, "125 nm")
 
 
+# a bar longer than a bound becomes the largest round length below it, in its own unit
+def test_scaleBar_noLongerThanABoundIsTheLargestRoundLengthBelowIt():
+  assert scaleBar(36000.0, "um", atMost=1800.0) == (1000.0, "1 mm")
+  assert scaleBar(36000.0, "um", atMost=900.0) == (750.0, "750 µm")
+  assert scaleBar(36000.0, "um", atMost=9000.0) == (5000.0, "5 mm")
+
+
 def test_scaleBar_liesBetweenATwentiethAndAQuarterOfTheWidth():
   for w in (1.0, 2.7, 13.0, 55.0, 480.0, 9300.0, 1.2e5):
     length, _ = scaleBar(w, "um")
@@ -193,24 +200,37 @@ def test_frameOnScreen_followsTheLayout():
   assert np.isclose(frameOnScreen(pl)[2][2], 1)
 
 
-def test_triadGeometry_drawsTwoArrowsWithTheirLabelsOnTheAxes():
-  arrows, symbol, texts, bbox = triadGeometry([(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)], ["x", "y", "z"])
+def test_triadGeometry_drawsTwoArrowsWithTheirNamesOnTheAxesAndTheThirdAtTheCrossing():
+  arrows, texts, bbox = triadGeometry([(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)], ["x", "y", "z"])
   assert len(arrows) == 2 and all(len(a) == 7 for a in arrows)
-  assert len(symbol) and not np.any(np.isnan(symbol[:, 0]))
   lab = {s: q for q, s in texts}
   assert lab["x"][0] > 0 and abs(lab["x"][1]) < 1e-9 and lab["y"][1] > 0 and abs(lab["y"][0]) < 1e-9
   assert np.all(lab["z"] == 0) and bbox[0] < 0 < bbox[1] and bbox[2] < 0 < bbox[3]
 
 
-# seen from -z the symbol gets four spokes round its label
-def test_triadGeometry_seenFromMinusZTheSymbolHasFourSpokes():
-  _, symbol2, _, _ = triadGeometry([(1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, -1.0)], ["x", "y", "z"])
-  assert np.sum(np.isnan(symbol2[:, 0])) == 4
-  assert np.all(np.isnan(symbol2[:, 0]) | (np.hypot(symbol2[:, 0], symbol2[:, 1]) > 0.25))
+# under every convention each name stands the same gap off its arrow, measured to its ink, the
+# one beyond a head and the one in the crossing alike, whatever ink the drawing measures
+@pytest.mark.parametrize("box", [None, lambda s: (-0.2 * len(s), 0.4 * len(s), -0.1, 0.5)])
+def test_triadGeometry_setsEveryNameTheSameGapOffItsArrow(box):
+  from mtex.geometry.plottingconvention import AXIS_CONVENTIONS
+  ink = box or (lambda s: (-0.248 * len(s), 0.248 * len(s), -0.288, 0.288))
+  for c in AXIS_CONVENTIONS:
+    screen = [tuple(float(a.dot(d)) for d in (pC.east, pC.north, pC.outOfScreen))
+              for pC in [plottingConvention(c)] for a in (xvector, yvector, zvector)]
+    arrows, texts, _ = triadGeometry(screen, ["x", "RD", "Y1"], box=box)
+    lab = {s: np.asarray(q) for q, s in texts}
+    hub = next(s for q, s in texts if np.all(q == 0))
+    gaps = []
+    for a, (q, s) in zip(arrows, [t for t in texts if t[1] != hub]):
+      u = (a[3] - (a[0] + a[6]) / 2) / np.linalg.norm(a[3] - (a[0] + a[6]) / 2)
+      corners = lambda n, c: [c + (x, y) for x in ink(n)[:2] for y in ink(n)[2:]]
+      gaps.append(min(p @ u for p in corners(s, lab[s])) - a[3] @ u)
+      gaps.append(((a[0] + a[6]) / 2) @ u - max(p @ u for p in corners(hub, lab[hub])))
+    assert len(gaps) == 4 and np.ptp(gaps) < 1e-9 and gaps[0] > 0, (c, gaps)
 
 
 def test_triadGeometry_tiltedAxisGetsAShorterArrow():
-  arrows3, _, texts3, _ = triadGeometry([(0.5, 0.0, np.sqrt(0.75)), (0.0, 1.0, 0.0), (0.0, 0.0, 0.0)], ["x", "y"])
+  arrows3, texts3, _ = triadGeometry([(0.5, 0.0, np.sqrt(0.75)), (0.0, 1.0, 0.0), (0.0, 0.0, 0.0)], ["x", "y"])
   tip = lambda a: np.max(np.hypot(a[:, 0], a[:, 1]))
   assert tip(arrows3[0]) < tip(arrows3[1]) and len(texts3) == 2
 

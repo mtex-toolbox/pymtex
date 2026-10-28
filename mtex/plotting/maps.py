@@ -400,13 +400,14 @@ def switchUnit(x, unit):
   return y, LENGTH_UNITS[i], f
 
 
-def scaleBar(x, unit="um", fraction=0.1):
+def scaleBar(x, unit="um", fraction=0.1, atMost=None):
   """how long a scale bar of a map should be, in the coordinates the map is drawn in, and how
   it reads: a round number near a tenth of the width, in the unit that keeps it readable
 
     length, label = scaleBar(ebsd)                   # (5000.0, '5 mm') for a map 36.6 mm wide
     length, label = scaleBar(36550.0, 'um', fraction=0.2)  # from a width in a unit
     length, label = scaleBar(0.5, 'mm')              # (0.05, '50 µm')
+    length, label = scaleBar(36550.0, 'um', atMost=2000.0)  # (2000.0, '2 mm'), no longer than 2 mm
 
   The fraction of the width is brought to the unit among nm, µm, mm and m that keeps its
   number between one and a thousand and rounded to the nearest of 1, 2, 5, 10, 15, 20, 25,
@@ -421,14 +422,20 @@ def scaleBar(x, unit="um", fraction=0.1):
   Keywords
     unit - the unit of a width given as a number
     fraction - the length aimed at, as a fraction of the width
+    atMost - a length the bar must not exceed; a longer one becomes the largest round length
+        below it
   See also
     mapExtent, plotEBSD"""
   if not isinstance(x, (int, float, np.floating, np.integer)):
     e = mapExtent(x)
-    return scaleBar(e[1] - e[0], getattr(x, "scanUnit", "um"), fraction)
+    return scaleBar(e[1] - e[0], getattr(x, "scanUnit", "um"), fraction, atMost)
+  steps = np.asarray(SCALE_BAR_STEPS)
   y, u, f = switchUnit(fraction * x, unit)
-  n = SCALE_BAR_STEPS[int(np.argmin(np.abs(np.asarray(SCALE_BAR_STEPS) - y)))]
-  return n / f, f"{n:g} {unitLabel(u)}"
+  n = steps[int(np.argmin(np.abs(steps - y)))]
+  if atMost is not None and n / f > atMost:
+    y, u, f = switchUnit(atMost, unit)
+    n = steps[max(int(np.searchsorted(steps, y, side="right")) - 1, 0)]
+  return float(n / f), f"{n:g} {unitLabel(u)}"
 
 
 # ------------------------------------------------------------------ the frame triad
@@ -461,67 +468,67 @@ def frameOnScreen(pl, layout=None):
   return out
 
 
-def triadGeometry(screen, labels, t=1.0):
-  """the reference frame indicator MTEX draws in the scale bar box, with the text height t as
-  its unit: an arrow per axis that has a direction on screen, shortened by its tilt out of
-  the plane, a circle for an axis leaving the plane with its label inside, crossed by four
-  spokes when it points away from the viewer, and a label beside every arrow. Returns the
-  arrows as polygons, the symbol as a polyline with NaN breaks, the labels with their
+def triadGeometry(screen, labels, t=1.0, box=None):
+  """the reference frame indicator MTEX draws in the scale bar box and the import wizard in its
+  pictograms, with the text height t as its unit: an arrow per axis that has a direction on
+  screen, shortened by its tilt out of the plane, with its name beyond the head, and the name
+  of the axis along the view at the crossing the arrows leave from - a right handed frame
+  needs no symbol to tell out of the screen from into it. Every name stands the same gap off
+  its arrow, measured to its ink. Returns the arrows as polygons, the names with their
   positions, and the bounding box (umin, umax, vmin, vmax)
 
-    arrows, symbol, texts, bbox = triadGeometry(frameOnScreen(pl), ['x', 'y', 'z'])  # in text heights
-    arrows, symbol, texts, bbox = triadGeometry(screen, labels, t=2.0)  # twice as large
+    arrows, texts, bbox = triadGeometry(frameOnScreen(pl), ['x', 'y', 'z'])  # in text heights
+    arrows, texts, bbox = triadGeometry(screen, labels, t=2.0)  # twice as large
 
   Input
     screen - the (right, up, out) triples of the axes, frameOnScreen
-    labels - the label of every axis
+    labels - the name of every axis; an axis without one reserves no room
   Output
     arrows - a list of polygons of shape (7, 2)
-    symbol - array of shape (m, 2), the circle and its spokes, NaN rows between pieces
-    texts - a list of (position, label)
-    bbox - (umin, umax, vmin, vmax)
+    texts - a list of (position, name), the position the point a name is centred at
+    bbox - (umin, umax, vmin, vmax) of the arrows, the names' ink and the crossing
   Keywords
-    t - the height of the text, the unit of the drawing
+    t - the height of the text, the unit of the drawing; the names are 0.8 t in size
+    box - the ink of a name about the point it is centred at, (left, right, bottom, top), as
+        the drawing measures it; by default estimated from the number of letters
   See also
     frameOnScreen, scaleBar"""
-  arm, shaftHalf = 1.2 * t, t / 8
-  headHalf, headLen = 3 * shaftHalf, 0.36 * t
-  symR, pad = 0.46 * t, 0.45 * t
-  maxLen = max((len(s) for s in labels), default=1)
-  labHalf = np.array([(0.15 + 0.25 * maxLen) * t, 0.4 * t])
-  brk = np.array([np.nan, np.nan])
-  arrows, symbol, texts = [], [], []
+  e = 0.8 * t
+  arm, headLen, shaftHalf, headHalf, gap = 2.55 * e, 0.78 * e, 0.125 * e, 0.27 * e, 0.45 * e
+  if box is None:
+    box = lambda s: (-0.31 * max(1, len(s)) * e, 0.31 * max(1, len(s)) * e, -0.36 * e, 0.36 * e)
+  names = [labels[k] if k < len(labels) and labels[k] else "" for k in range(len(screen))]
+
+  # how far the ink of a name reaches from its centre along the direction d
+  def reach(b, d):
+    return max(x * d[0] + y * d[1] for x in b[:2] for y in b[2:])
+
   inPlane = [np.hypot(s[0], s[1]) >= 0.15 for s in screen]
-  kSym = next((k for k, p in enumerate(inPlane) if not p), None)
-  r0 = 0.0
-  if kSym is not None:
-    r0 = 1.2 * symR
-    phi = np.linspace(0, 2 * np.pi, 49)
-    symbol += list(symR * np.column_stack([np.cos(phi), np.sin(phi)]))
-    if screen[kSym][2] < 0:
-      r, ri = symR / np.sqrt(2), 0.62 * symR / np.sqrt(2)
-      for sx, sy in ((-1, -1), (1, 1), (-1, 1), (1, -1)):
-        symbol += [brk, np.array([sx * r, sy * r]), np.array([sx * ri, sy * ri])]
-    if kSym < len(labels):
-      texts.append((np.zeros(2), labels[kSym]))
+  kOut = next((k for k, p in enumerate(inPlane) if not p), None)
+  hub = box(names[kOut]) if kOut is not None and names[kOut] else (0.0, 0.0, 0.0, 0.0)
+  arrows, texts, pts = [], [], [np.zeros(2)]
+  if kOut is not None and names[kOut]:
+    texts.append((np.zeros(2), names[kOut]))
   for k, p in enumerate(inPlane):
     if not p:
       continue
-    d = np.array([screen[k][0], screen[k][1]])
-    length = np.linalg.norm(d) * arm
-    d = d / np.linalg.norm(d)
-    q = np.array([-d[1], d[0]])
-    hl = min(headLen, 0.6 * length)
-    arrows.append(np.array([r0 * d + shaftHalf * q, (r0 + length - hl) * d + shaftHalf * q, (r0 + length - hl) * d + headHalf * q,
-                            (r0 + length) * d, (r0 + length - hl) * d - headHalf * q, (r0 + length - hl) * d - shaftHalf * q,
-                            r0 * d - shaftHalf * q]))
-    if k < len(labels):
-      texts.append(((r0 + length + pad) * d, labels[k]))
-  pts = [p for a in arrows for p in a] + [q for q in symbol if not np.isnan(q[0])] + [np.zeros(2)]
-  pts += [q - labHalf for q, _ in texts if np.any(q != 0)] + [q + labHalf for q, _ in texts if np.any(q != 0)]
+    # the arrow starts clear of the name in the crossing, and is shortened by its tilt
+    d = np.array([screen[k][0], screen[k][1]], dtype=float)
+    u = d / np.linalg.norm(d)
+    s0 = gap + reach(hub, u)
+    tip = s0 + max(np.linalg.norm(d) * (arm - gap), headLen)
+    b, q = tip - headLen, np.array([-u[1], u[0]])
+    arrows.append(np.array([s0 * u + shaftHalf * q, b * u + shaftHalf * q, b * u + headHalf * q, tip * u,
+                            b * u - headHalf * q, b * u - shaftHalf * q, s0 * u - shaftHalf * q]))
+    if names[k]:
+      texts.append(((tip + gap + reach(box(names[k]), -u)) * u, names[k]))
+  pts += [p for a in arrows for p in a]
+  for c, s in texts:
+    l, r, lo, hi = box(s)
+    pts += [c + (l, lo), c + (r, hi)]
   P = np.array(pts)
   bbox = (float(P[:, 0].min()), float(P[:, 0].max()), float(P[:, 1].min()), float(P[:, 1].max()))
-  return arrows, np.array(symbol).reshape(-1, 2), texts, bbox
+  return arrows, texts, bbox
 
 
 __all__ = ["mapLayout", "mapRaster", "mapCells", "mapPoints", "mapExtent", "boundaryPolyline", "boundarySegments",

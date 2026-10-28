@@ -2,14 +2,11 @@
 # the chooser that offers the eight as pictures (docs/plans/wizard.md W3)
 #
 # A convention is a picture, so the button is the picture and the chooser is eight of them:
-# a frame is read at a glance where a pictogram string is spelled out. The axis that leaves
-# the screen is named in the middle of the crossing - no ring, no cross, no line under the
-# letters - and the two that lie in the screen are arrows pointing where they point.
+# a frame is read at a glance where a pictogram string is spelled out. It is the frame a map
+# draws in its scale bar box, triadGeometry: the axis that leaves the screen is named in the
+# middle of the crossing - no ring, no cross, no line under the letters - and the two that lie
+# in the screen are arrows pointing where they point.
 from __future__ import annotations
-
-from math import atan2, cos, sin
-
-import numpy as np
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
@@ -17,12 +14,13 @@ from PySide6.QtWidgets import (QAbstractButton, QGridLayout, QMenu, QSizePolicy,
 
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, conventionNames, plottingConvention
 from ..geometry.vector3d import xvector, yvector, zvector
+from ..plotting.maps import triadGeometry
 from . import callbacks as cb
 from .theme import colours
 
-# the drawing in units of its own, scaled as a whole afterwards: a font taken as a fraction
-# of the side and an arrow as another fraction do not keep their proportions together
-LEN, HEAD, LABEL, GAP, WEIGHT, PAD = 46.0, 14.0, 18.0, 8.0, 4.5, 6.0
+# the drawing in pixels of a name LABEL high, scaled as a whole afterwards: a font taken as a
+# fraction of the side and an arrow as another fraction do not keep their proportions together
+LABEL, PAD = 18.0, 6.0
 SIDE = 104
 CHOICE = 96
 
@@ -38,78 +36,39 @@ def conventionArrows(pC):
 # ------------------------------------------------------------------ the drawing
 
 def drawPictogram(p, rect, pC, names=("x", "y", "z"), ink=None, caption=""):
-  """the frame as the map draws it in its corner. The picture is laid out from its crossing
-  and then centred on its ink and not on that crossing, which sits wherever the two arrows
-  leave it: 'x' and 'RD' are different widths, so an origin centred picture is not."""
+  """the frame as the map draws it in its corner, triadGeometry. The picture is laid out from
+  its crossing and then centred on its ink and not on that crossing, which sits wherever the
+  two arrows leave it: 'x' and 'RD' are different widths, so an origin centred picture is not."""
   axes = conventionArrows(pC)
   bold = QFont(p.font())
   bold.setPixelSize(int(LABEL))
   bold.setBold(True)
   light = QFont(bold)
   light.setBold(False)
-  # which axis leaves the screen, and which way the other two lean
-  out, sx, sy = None, 0.0, 0.0
-  for k, a in enumerate(axes):
-    if abs(a[2]) > 0.9:
-      out = k
-      continue
-    sx, sy = sx + a[0], sy + a[1]
-  outName = names[out] if out is not None else ""
-  # every arrow, with its name standing GAP off the head, measured to the name's ink; screen y
-  # grows down
-  arrows = []
-  for j, a in enumerate(axes):
-    if j == out:
-      continue
-    dx, dy = a[0], -a[1]
-    tx, ty = dx * LEN, dy * LEN
-    g = _glyphs(bold, names[j])
-    d = GAP + _reach(g, -dx, -dy)
-    arrows.append((dx, dy, tx, ty, names[j], tx + dx * d, ty + dy * d, g))
-  # the shafts start GAP clear of the ink of the name in the crossing
-  hub = _glyphs(bold, outName) if outName else None
+  # the geometry runs upwards, the painter downwards
+  glyphs = {s: _glyphs(bold, s) for s in names if s}
+  arrows, texts, bbox = triadGeometry(axes, list(names), LABEL / 0.8, box=lambda s: _upwards(glyphs[s]))
+  lo, hi = [bbox[0], -bbox[3]], [bbox[1], -bbox[2]]
   # the caption stands in the quadrant the arrows leave free, read after them and not before
-  cx = (1 if sx >= 0 else -1) * LEN * 0.78
-  cy = -(1 if sy >= 0 else -1) * LEN * 0.78
-  lo, hi = [1e9, 1e9], [-1e9, -1e9]
-
-  def see(x0, y0, x1, y1):
-    lo[0], hi[0] = min(lo[0], x0), max(hi[0], x1)
-    lo[1], hi[1] = min(lo[1], y0), max(hi[1], y1)
-
-  def seeText(x, y, g):
-    ink, ox, oy, _ = g
-    see(x - ox + ink.left(), y - oy + ink.top(), x - ox + ink.right(), y - oy + ink.bottom())
-
-  if hub is not None:
-    seeText(0, 0, hub)
-  for dx, dy, tx, ty, name, lx, ly, g in arrows:
-    see(tx - HEAD / 2, ty - HEAD / 2, tx + HEAD / 2, ty + HEAD / 2)
-    seeText(lx, ly, g)
+  sx = sum(a[0] for a in axes if abs(a[2]) <= 0.9)
+  sy = sum(a[1] for a in axes if abs(a[2]) <= 0.9)
+  cx, cy = (1 if sx >= 0 else -1) * 2 * LABEL, -(1 if sy >= 0 else -1) * 2 * LABEL
   if caption:
     capGlyphs = _glyphs(light, caption)
-    seeText(cx, cy, capGlyphs)
+    c, ox, oy, _ = capGlyphs
+    lo = [min(lo[0], cx - ox + c.left()), min(lo[1], cy - oy + c.top())]
+    hi = [max(hi[0], cx - ox + c.right()), max(hi[1], cy - oy + c.bottom())]
   scale = min((rect.width() - 2 * PAD) / max(hi[0] - lo[0], 1e-9), (rect.height() - 2 * PAD) / max(hi[1] - lo[1], 1e-9))
   p.save()
   p.setRenderHint(QPainter.Antialiasing)
   p.translate(rect.center().x() - scale * (lo[0] + hi[0]) / 2, rect.center().y() - scale * (lo[1] + hi[1]) / 2)
   p.scale(scale, scale)
-  colour = QColor(ink or colours()["mapInk"])
-  p.setPen(QPen(colour, WEIGHT, Qt.SolidLine, Qt.FlatCap, Qt.RoundJoin))
-  p.setBrush(colour)
-  for dx, dy, tx, ty, name, lx, ly, g in arrows:
-    start = GAP + _reach(hub, dx, dy) if hub is not None else LABEL / 2
-    p.drawLine(QPointF(dx * start, dy * start), QPointF(tx - 0.9 * HEAD * dx, ty - 0.9 * HEAD * dy))
-    a = atan2(dy, dx)
-    p.setPen(Qt.NoPen)
-    p.drawPolygon(QPolygonF([QPointF(tx, ty),
-                             QPointF(tx - HEAD * cos(a - 0.36), ty - HEAD * sin(a - 0.36)),
-                             QPointF(tx - HEAD * cos(a + 0.36), ty - HEAD * sin(a + 0.36))]))
-    _centred(p, lx, ly, g)
-    p.setPen(QPen(colour, WEIGHT, Qt.SolidLine, Qt.FlatCap, Qt.RoundJoin))
   p.setPen(Qt.NoPen)
-  if hub is not None:
-    _centred(p, 0, 0, hub)
+  p.setBrush(QColor(ink or colours()["mapInk"]))
+  for a in arrows:
+    p.drawPolygon(QPolygonF([QPointF(x, -y) for x, y in a]))
+  for q, s in texts:
+    _centred(p, q[0], -q[1], glyphs[s])
   if caption:
     p.setOpacity(0.6)
     _centred(p, cx, cy, capGlyphs)
@@ -128,10 +87,10 @@ def _glyphs(font, text):
   return ink, ink.center().x(), (ink.top() + min(ink.bottom(), 0.0)) / 2, path
 
 
-# how far the ink of a text reaches from its centre along the direction (dx, dy)
-def _reach(g, dx, dy):
+# the ink of a text about its centre as triadGeometry takes it, (left, right, bottom, top) upwards
+def _upwards(g):
   ink, ox, oy, _ = g
-  return max((x - ox) * dx + (y - oy) * dy for x in (ink.left(), ink.right()) for y in (ink.top(), ink.bottom()))
+  return ink.left() - ox, ink.right() - ox, oy - ink.bottom(), oy - ink.top()
 
 
 # a text drawn with its centre at (x, y), in the brush

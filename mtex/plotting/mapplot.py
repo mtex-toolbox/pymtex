@@ -1261,7 +1261,9 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   Every map plot draws one unless micronbar=False, so this is what to call to draw one into a
   map plot without, or to draw it again elsewhere; it replaces the bar the map plot had. The
   length is a round number near fraction of the width of the map, in a unit that keeps it
-  readable (nm, um, mm).
+  readable (nm, um, mm), and no wider than the axes above it, drawn as triadGeometry lays them
+  out: arrows with their names beyond the heads, the axis along the view named at their
+  crossing.
 
   Input
     mP - mapPlot, the map plot to draw into, mapPlot(h.axes, ebsd) of a map drawn as h
@@ -1278,7 +1280,8 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
     length - the length of the bar in the map's unit instead of a round one
   See also
     EBSD.plot, scaleBar, EBSDPlotting"""
-  from matplotlib.patches import Polygon, Rectangle
+  from matplotlib.patches import PathPatch, Polygon, Rectangle
+  from matplotlib.transforms import Affine2D
   ax = mP.ax
   mP.scaleBarArgs = dict(location=location, fraction=fraction, refFrame=refFrame, color=color, background=background, alpha=alpha,
                          length=length)
@@ -1294,10 +1297,15 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   t = 0.035 * min(w, h)
   gap = t / 4
   names = tuple(mP.frame.axesNames) if mP.frame is not None else ("X", "Y", "Z")
-  triad = triadGeometry(frameOnScreen(mP.plane, mP.layout), list(names), t) if refFrame else None
-  tw, th = (0.0, 0.0) if triad is None else (triad[3][1] - triad[3][0], triad[3][3] - triad[3][2])
-  boxw = max(barLength, 0.6 * t * len(label), tw) + 2 * gap
-  boxh = 3.5 * gap + t + th if refFrame else 3 * gap + t
+  glyphs = {s: _glyphs(s, 0.8 * t) for s in names}
+  triad = triadGeometry(frameOnScreen(mP.plane, mP.layout), list(names), t, box=lambda s: glyphs[s][1]) if refFrame else None
+  tw, th = (0.0, 0.0) if triad is None else (triad[2][1] - triad[2][0], triad[2][3] - triad[2][2])
+  # next to the indicator the bar is a round length no wider than it
+  if triad is not None and length is None and barLength > tw:
+    barLength, label = scaleBar(xhi - xlo, mP.unit, fraction, atMost=tw)
+  # the indicator keeps a gap above it and two at its sides
+  boxw = max(barLength, 0.6 * t * len(label), tw + 2 * gap * (triad is not None)) + 2 * gap
+  boxh = 4.5 * gap + t + th if triad is not None else 3 * gap + t
   boxx = xhi - gap - boxw if location in ("se", "ne") else xlo + gap
   boxy = yhi - gap - boxh if location in ("nw", "ne") else ylo + gap
   # the text is the unit of the box: its size follows the map on the screen
@@ -1309,18 +1317,31 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
                      zorder=11, solid_capstyle="butt")
   artists.append(ax.text(boxx + boxw / 2, boxy + 2.5 * gap, label, color=color, fontsize=fontsize, ha="center", va="bottom", zorder=11))
   if triad is not None:
-    arrows, symbol, texts, bbox = triad
+    arrows, texts, bbox = triad
     ou = boxx + boxw / 2 - (bbox[0] + bbox[1]) / 2
-    ov = boxy + 2.5 * gap + t - bbox[2]
+    ov = boxy + 3.5 * gap + t - bbox[2]
     for a in arrows:
       artists.append(ax.add_patch(Polygon(a + (ou, ov), closed=True, facecolor=color, edgecolor="none", zorder=11)))
-    if len(symbol):
-      artists += ax.plot(symbol[:, 0] + ou, symbol[:, 1] + ov, color=color, linewidth=1.0, zorder=11)
+    # the names as their outlines, in the units of the map, centred where the geometry measured them
     for q, s in texts:
-      artists.append(ax.text(q[0] + ou, q[1] + ov, s, color=color, fontsize=0.85 * fontsize, fontweight="bold", ha="center",
-                             va="center", zorder=12))
+      path, _, centre = glyphs[s]
+      artists.append(ax.add_patch(PathPatch(path.transformed(Affine2D().translate(q[0] + ou - centre[0], q[1] + ov - centre[1])),
+                                            facecolor=color, edgecolor="none", zorder=12)))
   mP.scaleBarArtists = artists
   return label
+
+
+# a name as its bold outline of size e about its origin on the baseline, the ink of that outline
+# about the point it is centred by, and that point: the middle of its ink across, and of its
+# ink above the baseline up and down, so that a descender reaches into the gap below without
+# lifting the letter off the shaft - the rule the wizard's pictograms measure by
+def _glyphs(text, e):
+  from matplotlib.font_manager import FontProperties
+  from matplotlib.textpath import TextPath
+  path = TextPath((0, 0), text, size=e, prop=FontProperties(weight="bold"))
+  ink = path.get_extents()
+  centre = ((ink.x0 + ink.x1) / 2, (ink.y1 + max(ink.y0, 0.0)) / 2)
+  return path, (ink.x0 - centre[0], ink.x1 - centre[0], ink.y0 - centre[1], ink.y1 - centre[1]), centre
 
 
 # the points of text a data unit takes, from the axes size in inches and its limits
