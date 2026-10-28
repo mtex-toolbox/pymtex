@@ -80,6 +80,42 @@ def test_miller_bar_edits_the_directions_over_the_pole_figures(loaded):
   assert not any(f.isVisible() for f in bar.fields)
 
 
+# a picture of the file is read on the worker, once however often it is drawn meanwhile, and
+# shown when it is there; a picture that cannot be read is said in the status, and not tried again
+def test_the_pictures_are_read_on_the_worker(loaded, tmp_path):
+  h5py = pytest.importorskip("h5py")
+  st = loaded
+  with h5py.File(tmp_path / "pictures.h5", "w") as f:
+    f["SE"] = np.arange(30 * 40, dtype=np.uint16).reshape(30, 40)
+  ebsd = st.ebsd
+  ebsd.meta = dict(ebsd.meta, h5={"file": str(tmp_path / "pictures.h5")},
+                   images=[{"name": "/1/SE", "path": "/SE", "shape": (30, 40), "dtype": "uint16"},
+                           {"name": "/1/gone", "path": "/gone", "shape": (30, 40), "dtype": "uint16"}])
+  cb.commitMap(st, ebsd, 0.0)
+  jobs = []
+  canvas = ViewCanvas(st, worker=lambda job, commit: jobs.append((job, commit)))
+  cb.showImage(st, 0)
+  cb.pickTab(st, st.tabs.index("images"))
+  canvas.draw_view()
+  canvas.draw_view()
+  assert len(jobs) == 1 and canvas.figure.texts[0].get_text() == "reading the picture ..."
+  job, commit = jobs.pop()
+  commit(job())
+  canvas.draw_view()
+  assert canvas.figure.axes[0].images[0].get_array().shape == (30, 40)
+  cb.showImage(st, 1)
+  canvas.draw_view()
+  job, commit = jobs.pop()
+  try:
+    result = job()
+  except Exception as e:
+    result = e
+  commit(result)
+  canvas.draw_view()
+  canvas.draw_view()
+  assert st.status[0] == "failed" and "gone" in st.status[1] and not jobs
+
+
 # a direction is typed with its minus signs inside, and text that is none falls back to 100
 def test_millerOf_reads_the_typed_direction(loaded):
   cs = loaded.ebsd.CSList.frames[1]

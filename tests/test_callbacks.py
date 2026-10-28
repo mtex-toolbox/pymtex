@@ -130,6 +130,19 @@ def test_the_pole_figure_directions_follow_the_crystal_system(st):
   assert cb.millers(st) == ["001", "100", "1-102"]
 
 
+# the map opened again is not read again, whatever its format, so its edits stay; another
+# file is read
+def test_the_loaded_file_opened_again_is_not_read_again(st):
+  path = os.path.join(FIXTURES, "Forsterite_cut.ctf")
+  cb.openEntry(st, path)
+  cb.editPhase(st, 2, "mineral", "En")
+  imports = st.imports
+  cb.openEntry(st, path)
+  assert st.imports == imports and st.ebsd.CSList.frames[2].name == "En" and st.status == ("loaded", "Forsterite_cut.ctf is loaded")
+  cb.openEntry(st, os.path.join(FIXTURES, "olivine_cut.ang"))
+  assert st.imports == imports + 1 and st.loaded[0].endswith("olivine_cut.ang")
+
+
 def test_the_script_follows_the_phases_and_is_written(st, tmp_path):
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   text = cb.scriptOf(st)

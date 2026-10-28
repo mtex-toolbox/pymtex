@@ -19,6 +19,18 @@ def pump(app, until, timeout=60):
   app.processEvents()
 
 
+# a window closed while a load runs waits for it, however long, rather than tearing its thread
+# down, and builds no colour grid it had not begun
+def test_a_window_closed_during_a_load_waits_for_it():
+  app = application()
+  w = runWizard(FIXTURES, exec=False)
+  finished = []
+  w.worker(lambda: (time.sleep(0.5), finished.append(True)), lambda result: None)
+  w.close()
+  assert finished == [True] and all(thread.isFinished() for thread, _, _ in w.jobs) and cb.COLOURS_STOP.is_set()
+  app.processEvents()
+
+
 # the window over the fixtures: a load through the worker thread shown in every panel, a grab
 def test_window_offscreen(tmp_path):
   app = application()

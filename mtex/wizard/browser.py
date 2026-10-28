@@ -304,11 +304,7 @@ class FileList(QListView):
 
   def onClick(self, index):
     """a click on a row: a folder unfolded or folded, a file read"""
-    row = self.st.entries[index.row()]
-    if row.isDir:
-      cb.toggleFolder(self.st, index.row())
-    else:
-      cb.openEntry(self.st, row.path, self.worker)
+    cb.pickFile(self.st, index.row(), self.worker)
 
   def mouseDoubleClickEvent(self, event):
     """the double click read off the row under the cursor, not off Qt's doubleClicked: the first
@@ -344,7 +340,7 @@ class FileList(QListView):
     row = self.st.entries[index.row()]
     if row.isDir:
       cb.setFolder(self.st, row.path)
-    elif self.st.selected != row.path:
+    elif self.isNewFile(row):
       self.setCurrentIndex(index)
       cb.openEntry(self.st, row.path, self.worker)
 
@@ -352,8 +348,7 @@ class FileList(QListView):
     """the arrow keys read the file the cursor stops on; the one it leaves is not drawn"""
     super().currentChanged(current, previous)
     if current.isValid() and current.row() < len(self.st.entries):
-      row = self.st.entries[current.row()]
-      if not row.isDir and self.st.selected != row.path:
+      if self.isNewFile(self.st.entries[current.row()]):
         cb.leaveEntry(self.st)
     self.walkTimer.start()
 
@@ -362,8 +357,12 @@ class FileList(QListView):
     index = self.currentIndex()
     if index.isValid() and index.row() < len(self.st.entries):
       row = self.st.entries[index.row()]
-      if not row.isDir and self.st.selected != row.path:
+      if self.isNewFile(row):
         cb.openEntry(self.st, row.path, self.worker)
+
+  def isNewFile(self, row):
+    """whether a row is a file other than the one selected"""
+    return not row.isDir and self.st.selected != row.path
 
   def keyPressEvent(self, event):
     """Return walks into a folder and reads a map, as a double click does; Right unfolds a folder

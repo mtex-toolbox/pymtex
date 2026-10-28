@@ -163,16 +163,18 @@ class PhaseTable(QTableWidget):
       # every phase is drawn or not, the one that was never indexed among them
       plot = QTableWidgetItem()
       plot.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-      plot.setCheckState(Qt.Checked if self.st.drawn.get(k, False) else Qt.Unchecked)
+      plot.setCheckState(Qt.Checked if cb.isDrawn(self.st, k) else Qt.Unchecked)
       plot.setTextAlignment(Qt.AlignCenter)
       self.setItem(i, 0, plot)
       phase = self._fixed(str(k), center=True)
+      # the id is the map's; the file's own number, which its vendor's software shows, is said beside it
+      phase.setToolTip(f"phase {int(self.st.ebsd.phaseMap[k])} in the file")
       c = colors[k] if k < len(colors) else None
       if c is not None:
         rgb = _rgb(c)
         phase.setBackground(QColor(*rgb))
         phase.setForeground(QColor("black") if 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 140 else QColor("white"))
-        phase.setToolTip("click to choose the colour")
+        phase.setToolTip(f"phase {int(self.st.ebsd.phaseMap[k])} in the file; click to choose the colour")
       self.setItem(i, 1, phase)
       # the phase whose key the panel shows stands out by its name
       name = self._cell(f.name)

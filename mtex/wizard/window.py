@@ -220,12 +220,16 @@ class WizardWindow(QMainWindow):
     self.canvas.scheduleDraw()
 
   def closeEvent(self, event):
-    """a window closed with a load still running waits for it rather than tearing the thread
-    down; the table is silenced first, since it announces every cell as it is destroyed"""
+    """a window closed with a load still running is hidden and waits for it, however long, since
+    a read cannot be stopped and a thread torn down while it runs takes the process with it; the
+    colour grids not yet begun are not built, and the table is silenced first, since it announces
+    every cell as it is destroyed"""
     self.phases.blockSignals(True)
+    cb.COLOURS_STOP.set()
+    self.hide()
     for thread, _, _ in list(self.jobs):
       thread.quit()
-      thread.wait(10000)
+      thread.wait()
     super().closeEvent(event)
 
 

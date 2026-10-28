@@ -29,7 +29,8 @@ AHEAD_DELAY_MS = 700      # the rest on a file before its pole figures are drawn
 MAX_PIXELS = 1_500_000    # of the picture the map is drawn as, whatever the canvas holds
 PF_RESOLUTION = 1.5 * np.pi / 180   # the pole figures' grid, fine enough to show no facets
 KEY_PIXELS = 300          # the side a key is drawn at, once, before it is a picture
-KEY_CACHE = {}
+KEY_CACHE = {}             # the keys drawn, by frame, size and scheme, the last KEY_CACHE_MAX
+KEY_CACHE_MAX = 32
 # the module of vector3d, whose xvector, yvector and zvector are minted on every access
 _vectors = importlib.import_module("..geometry.vector3d", __package__)
 
@@ -72,9 +73,10 @@ def keyPicture(CS, px=KEY_PIXELS):
   square best."""
   from ..plotting.directionkeys import HSVDirectionKey
   from ..plotting.spherical import makeSphericalProjection
-  hit = KEY_CACHE.get((id(CS), px, colours()["dark"]))
-  if hit is not None and hit[0] is CS:
-    return hit[1]
+  name = (CS, px, colours()["dark"])
+  if name in KEY_CACHE:
+    KEY_CACHE[name] = KEY_CACHE.pop(name)
+    return KEY_CACHE[name]
   key = HSVDirectionKey(CS)
   n = len(makeSphericalProjection(key.keySector, how2plot=CS.how2plot))
   if n == 1:
@@ -83,7 +85,9 @@ def keyPicture(CS, px=KEY_PIXELS):
     # the two are shrunk to share the square, so their labels are drawn larger
     parts = [_hemispherePicture(key, CS, px, {side: True}, fontScale=1.5, label=True) for side in ("upper", "lower")]
     picture = _arrange(parts, gap=max(2, px // 30))
-  KEY_CACHE[(id(CS), px, colours()["dark"])] = (CS, picture)
+  KEY_CACHE[name] = picture
+  while len(KEY_CACHE) > KEY_CACHE_MAX:
+    KEY_CACHE.pop(next(iter(KEY_CACHE)))
   return picture
 
 
@@ -149,10 +153,11 @@ class ViewCanvas(FigureCanvasQTAgg):
     # matplotlib gives its canvas a white palette, which the Miller bar floating on it would take
     self.setPalette(palette())
     self.st = st
-    # the window's worker runs the density of the pole figures off the main thread; the
-    # (map, phase) pairs being computed there
+    # the window's worker runs the density of the pole figures and the reading of the pictures
+    # off the main thread; what is under way there, as (kind, map, phase or picture), the map
+    # held and told by identity, so that no later map can take its place
     self.worker = worker
-    self.computing = set()
+    self.underway = []
     # the pole figures drawn ahead as a picture, (what it shows, the pixels, the places of its
     # titles), and the timer that draws them anew once a resize has settled
     self.pfPicture = None
@@ -263,7 +268,7 @@ class ViewCanvas(FigureCanvasQTAgg):
     st = self.st
     name = st.currentTab
     color, kw = self.colorArgs(kind, name)
-    shown = np.array([st.drawn.get(k, True) for k in range(len(st.section.CSList))])[np.asarray(st.section.phaseId).reshape(-1)]
+    shown = np.array([cb.isDrawn(st, k) for k in range(len(st.section.CSList))])[np.asarray(st.section.phaseId).reshape(-1)]
     # a layer across x or y is drawn in its own side view, which the key tells apart from the map's
     key = (st.section, (st.mapConvention, st.sectionAxis if st.isVolume else 2))
     drawn = self.drawnFor if self.image is not None else None
@@ -415,16 +420,25 @@ class ViewCanvas(FigureCanvasQTAgg):
       st.densities[k] = previewDensity(st.ebsd, k)
       return st.densities[k]
     ebsd = st.ebsd
-    if (id(ebsd), k) not in self.computing:
-      self.computing.add((id(ebsd), k))
 
-      def commit(odf):
-        self.computing.discard((id(ebsd), k))
-        if st.ebsd is ebsd and not isinstance(odf, BaseException):
-          st.densities[k] = odf
-          st.changed("densities")
-      self.worker(lambda: previewDensity(ebsd, k), commit)
+    def commit(odf):
+      if st.ebsd is ebsd and not isinstance(odf, BaseException):
+        st.densities[k] = odf
+        st.changed("densities")
+    self.onWorker("density", ebsd, k, lambda: previewDensity(ebsd, k), commit)
     return None
+
+  def onWorker(self, kind, ebsd, k, job, commit):
+    """a job for a map handed to the worker unless one of its kind for that map and k is under way"""
+    if any(w[0] == kind and w[1] is ebsd and w[2] == k for w in self.underway):
+      return
+    entry = (kind, ebsd, k)
+    self.underway.append(entry)
+
+    def done(result):
+      self.underway = [w for w in self.underway if w is not entry]
+      commit(result)
+    self.worker(job, done)
 
   def prepareDensity(self):
     """the density of the phase the pole figures will show started behind the map, on the worker"""
@@ -532,10 +546,7 @@ class ViewCanvas(FigureCanvasQTAgg):
           bar.ax.tick_params(labelsize=size - 1)
       corr = st.ebsd.EulerCorrection
       for v, n in zip((_vectors.xvector, _vectors.yvector, _vectors.zvector), names):
-        try:
-          annotate(corr * v, label=n, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
-        except Exception:
-          pass
+        annotate(corr * v, label=n, markerSize=0, backgroundColor="w", color="red", labelFontSize=size, add2all=True)
       fig.canvas.draw()
       # the titles from the top left, in the order of the directions
       titles = []
@@ -548,6 +559,23 @@ class ViewCanvas(FigureCanvasQTAgg):
 
   # ------------------------------------------------------------------ the images
 
+  def picture(self, k):
+    """the pixels of picture k, read on the worker where there is one, so that a picture of
+    megapixels does not hold the window; None while it is read, the view drawn when it is
+    there. A picture of a map that has since been replaced is dropped."""
+    st = self.st
+    thing = st.images[k][1]
+    if isinstance(thing, np.ndarray) or k in st.imageCache or self.worker is None:
+      return cb.pictureOf(st, k)
+    ebsd = st.ebsd
+
+    def commit(pixels):
+      if st.ebsd is ebsd:
+        st.imageCache[k] = pixels
+        st.changed("image")
+    self.onWorker("picture", ebsd, k, lambda: cb.readPicture(ebsd, thing), commit)
+    return None
+
   def drawImage(self):
     """the picture of the file the state points at, with its label and number"""
     st = self.st
@@ -558,7 +586,15 @@ class ViewCanvas(FigureCanvasQTAgg):
       return
     k = min(st.image, len(st.images) - 1)
     label, _ = st.images[k]
-    picture = cb.pictureOf(st, k)
+    picture = self.picture(k)
+    if picture is None:
+      self.clear("reading the picture ...")
+      return
+    if isinstance(picture, BaseException):
+      self.clear(f"{label}: {picture}")
+      st.status = ("failed", f"{label}: {picture}")
+      st.changed("status")
+      return
     ax = self.figure.add_subplot(111)
     ax.imshow(picture, cmap=None if picture.ndim == 3 else "gray")
     ax.set_axis_off()
@@ -566,13 +602,13 @@ class ViewCanvas(FigureCanvasQTAgg):
     self.draw_idle()
 
 
-# the range a property is coloured over, its finite values
 # whether two maps lie on the same lattice, cell for cell
 def _sameLattice(a, b):
   la, lb = a.lattice, b.lattice
   return la is not None and lb is not None and a.shape == b.shape and np.array_equal(la.A, lb.A) and np.array_equal(la.origin, lb.origin)
 
 
+# the range a property is coloured over, its finite values
 def _range(values):
   v = np.asarray(values, dtype=float).reshape(-1)
   finite = np.isfinite(v)
@@ -700,20 +736,24 @@ class MillerBar(QWidget):
     self.adjustSize()
     self.raise_()
     c = colours()
+    # the field reads as the title it stands for, its frame saying it can be edited; set only
+    # when it changes, the scheme or the size of the titles, since setting it restyles the field
+    sheet = (f"QLineEdit {{ background: transparent; color: {c['figureInk']}; border: 1px solid {c['frame']};"
+             f" border-radius: 3px; padding: 0 2px; }}"
+             f" QLineEdit:hover {{ border-color: {c['hoverFrame']}; }}"
+             f" QLineEdit:focus {{ background: {c['base']}; border-color: {c['highlight']}; }}")
     for n, f in enumerate(self.fields):
       shown = on and n < len(self.titles)
       f.setVisible(shown)
       if not shown:
         continue
       x, y, px = self.titles[n]
-      font = f.font()
-      font.setPixelSize(max(round(px), 9))
-      f.setFont(font)
-      # the field reads as the title it stands for, its frame saying it can be edited
-      f.setStyleSheet(f"QLineEdit {{ background: transparent; color: {c['figureInk']}; border: 1px solid {c['frame']};"
-                      f" border-radius: 3px; padding: 0 2px; }}"
-                      f" QLineEdit:hover {{ border-color: {c['hoverFrame']}; }}"
-                      f" QLineEdit:focus {{ background: {c['base']}; border-color: {c['highlight']}; }}")
+      if f.font().pixelSize() != max(round(px), 9):
+        font = f.font()
+        font.setPixelSize(max(round(px), 9))
+        f.setFont(font)
+      if f.styleSheet() != sheet:
+        f.setStyleSheet(sheet)
       h = f.sizeHint().height()
       f.setGeometry(round(x) - 28, round(y - h / 2), 56, h)
       self.fit(f)

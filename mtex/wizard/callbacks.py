@@ -20,8 +20,6 @@ from ..io.inspect import ebsdFiles, inspectEBSD, isEBSDFile
 from ..maps.phaselist import phaseList
 from .state import FileRow, WizardState
 
-IPF_TABS = {"IPF X": "x", "IPF Y": "y", "IPF Z": "z"}
-
 
 # ------------------------------------------------------------------ the browser
 
@@ -111,13 +109,14 @@ def breadcrumbs(st):
   return out
 
 
-def pickFile(st, i):
-  """a click on a row: a folder unfolds, a map is described and read"""
+def pickFile(st, i, worker=None):
+  """a click on a row: a folder unfolds, a map is described and read, inline or through the
+  worker given"""
   row = st.entries[i]
   if row.isDir:
     toggleFolder(st, i)
   else:
-    openEntry(st, row.path)
+    openEntry(st, row.path, worker)
 
 
 # ------------------------------------------------------------------ describing and importing
@@ -140,16 +139,26 @@ def selectEntry(st, path):
   moved = convention != st.mapConvention
   st.mapConvention = convention
   st.eulerConvention = eulerConventionOf(st, st.info.eulerCorrection)
-  st.status = ("idle", f"{st.info.name}: click to import" if st.ebsd is None or st.selected != _loadedPath(st) else f"{st.info.name} is loaded")
+  st.status = ("idle", f"{st.info.name} is loaded" if isLoaded(st, path) else f"{st.info.name}: click to import")
   st.changed("selected", "info", "status", "eulerConvention", *(["mapConvention"] if moved else []))
   return st.info
 
 
 def openEntry(st, path, worker=None):
-  """selects a file and starts its import, inline or through the worker given"""
+  """selects a file and starts its import, inline or through the worker given; the file selected
+  and loaded already is not read again, which would drop the edits made to its map"""
+  if st.selected == path and isLoaded(st, path):
+    st.status = ("loaded", f"{os.path.basename(path)} is loaded")
+    st.changed("status")
+    return
   if selectEntry(st, path) is None:
     return
   startImport(st, worker)
+
+
+def isLoaded(st, path):
+  """whether the map in the state was read from this file"""
+  return st.ebsd is not None and st.loaded is not None and st.loaded[0] == path
 
 
 def leaveEntry(st):
@@ -181,15 +190,23 @@ def warmColours(st):
   if not frames:
     return None
 
-  thread = threading.Thread(target=buildColourGrids, args=(frames,), name="mtex-wizard-colours", daemon=True)
+  COLOURS_STOP.clear()
+  thread = threading.Thread(target=buildColourGrids, args=(frames, COLOURS_STOP), name="mtex-wizard-colours", daemon=True)
   thread.start()
   return thread
 
 
-def buildColourGrids(frames):
-  """the inverse pole figure colour grid of every frame, each built once and kept"""
+# set when the window closes: the colour grids still to be built beside a read are not
+COLOURS_STOP = threading.Event()
+
+
+def buildColourGrids(frames, stop=None):
+  """the inverse pole figure colour grid of every frame, each built once and kept; the ones left
+  are not built once stop is set"""
   from ..plotting.orientationkeys import keyColorGrid
   for f in frames:
+    if stop is not None and stop.is_set():
+      return
     try:
       keyColorGrid(f)
     except Exception:
@@ -231,6 +248,7 @@ def startImport(st, worker=None):
       st.status = ("failed", f"{os.path.basename(path)}: {result}")
       st.changed("status")
     else:
+      st.loaded = (path, k)
       commitMap(st, *result)
 
   if worker is None:
@@ -326,10 +344,6 @@ def sectionLabel(st):
   return f"layer {k + 1} of {st.ebsd.shape[axis]} at {'xyz'[axis]} = {at:.4g} {unit}"
 
 
-def _loadedPath(st):
-  return st.ebsd.meta.get("h5", {}).get("file") if st.ebsd is not None else None
-
-
 def setDataSet(st, k, worker=None):
   """picking a data set of a project file is the import"""
   if st.info is None or not 0 <= k < max(len(st.info.dataSets), 1):
@@ -420,16 +434,25 @@ def asPicture(v):
 
 
 def pictureOf(st, k):
-  """the pixels of the picture at k, read from the file the first time it is looked at"""
+  """the pixels of the picture at k, read from the file the first time it is looked at; the
+  error of a read that failed, which is kept so that it is not tried on every draw"""
   if not 0 <= k < len(st.images):
     return None
-  label, thing = st.images[k]
+  thing = st.images[k][1]
   if isinstance(thing, np.ndarray):
     return thing
   if k not in st.imageCache:
-    from ..io.h5 import h5Image
-    st.imageCache[k] = h5Image(st.ebsd.meta["h5"]["file"], thing)
+    try:
+      st.imageCache[k] = readPicture(st.ebsd, thing)
+    except Exception as e:
+      st.imageCache[k] = e
   return st.imageCache[k]
+
+
+def readPicture(ebsd, entry):
+  """the pixels of a picture the file of a map holds, by its entry of the map's index"""
+  from ..io.h5 import h5Image
+  return h5Image(ebsd.meta["h5"]["file"], entry)
 
 
 def showImage(st, k):
@@ -625,11 +648,16 @@ def phaseCounts(st):
   return memo[1]
 
 
+def isDrawn(st, phaseId):
+  """whether a phase is drawn: every phase is until it is unticked"""
+  return st.drawn.get(phaseId, True)
+
+
 def dominantPhase(st):
   """the id of the drawn indexed phase with the most pixels, which the pole figures show"""
   counts = phaseCounts(st)
   frames = st.ebsd.CSList.frames if st.ebsd is not None else []
-  ids = [k for k, on in st.drawn.items() if on and k in counts and k < len(frames) and frames[k].isIndexed]
+  ids = [k for k in counts if k < len(frames) and frames[k].isIndexed and isDrawn(st, k)]
   return max(ids, key=lambda k: counts[k]) if ids else None
 
 
@@ -639,6 +667,18 @@ def pickKeyPhase(st, phaseId):
   if 0 <= phaseId < len(frames) and frames[phaseId].isIndexed and phaseId != st.keyPhase:
     st.keyPhase = phaseId
     st.changed("keyPhase")
+
+
+def checkLattice(abc, abg):
+  """refuses a cell that is none: a length not above zero, an angle not between 0 and 180
+  degrees, or three angles that close no cell, one of them at least the sum of the other two or
+  all three 360 degrees together"""
+  if not all(np.isfinite(x) and x > 0 for x in abc):
+    raise ValueError("the lengths a, b and c must be positive")
+  if not all(np.isfinite(x) and 0 < x < 180 for x in abg):
+    raise ValueError("the angles alpha, beta and gamma must lie between 0 and 180 degrees")
+  if sum(abg) >= 360 or any(2 * x >= sum(abg) for x in abg):
+    raise ValueError("the angles alpha, beta and gamma close no cell")
 
 
 def editPhase(st, phaseId, column, value):
@@ -678,6 +718,7 @@ def editPhase(st, phaseId, column, value):
     else:
       raise ValueError(f"no editable column {column!r}")
     abc, abg = snapLattice(symbol, abc, abg, column)
+    checkLattice(abc, abg)
     new = crystalFrame(symbol, abc, np.array(abg) * degree, *alignment, mineral=mineral, color=color)
     if np.max(np.abs(new.abc - abc)) > 1e-6 * max(abc) or np.max(np.abs(new.abg / degree - abg)) > 1e-6 \
         or closestAlignment(new) != list(alignment):

@@ -284,9 +284,8 @@ not the picture's.
 *A measurement with no colour is drawn through, not black.* `mapValues` answers NaN per
 channel for an unindexed measurement under an orientation colouring, so the `nan_to_num`
 that makes the bytes turns it into black unless the alpha is taken from the finite test on
-the gathered colours. The same line in `plotEBSD` paints all 58485 unindexed points of the
-Forsterite map opaque black; reported to the session that owns `mapplot.py`, not fixed
-here.
+the gathered colours. `plotEBSD` takes its alpha the same way, so an unindexed point of a map
+is drawn through there too, and the cells leave it out.
 
 **W5 - the outputs and the design pass.** The outputs are in place (W2); the IPF key of every
 phase present stands beside an IPF map, drawn once and hidden on the other tabs. Still open: To variable through the caller's frame, the

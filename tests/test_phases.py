@@ -51,6 +51,32 @@ def test_table_rows_and_edits(loaded):
   assert table.width() >= sum(WIDTHS)
 
 
+# the id cell names the phase's number in the file, which the file's vendor shows: an .ang
+# counts from zero and writes -1 for not indexed
+def test_table_namesTheFilesNumberOfEachPhase(loaded):
+  st = loaded
+  cb.openEntry(st, os.path.join(FIXTURES, "ferrite_cut.ang"))
+  table = PhaseTable(st, QFont())
+  assert [table.item(i, 1).toolTip().split(";")[0] for i in range(table.rowCount())] == ["phase -1 in the file", "phase 0 in the file"]
+
+
+# a cell that is none - a length not above zero, an angle out of (0, 180), angles closing no
+# cell - is reported and not applied, and the row shows the lattice it had
+def test_table_refusesALatticeThatIsNoCell(loaded):
+  st = loaded
+  cb.editPhase(st, 1, "symmetry", "-1")
+  table = PhaseTable(st, QFont())
+  before = st.ebsd.CSList.frames[1]
+  for j, text in ((6, "0"), (7, "-2"), (9, "180"), (10, "0"), (11, "nan")):
+    st.status = ("idle", "")
+    shown = table.item(1, j).text()
+    table.item(1, j).setText(text)
+    assert st.status[0] == "failed" and st.ebsd.CSList.frames[1] is before and table.item(1, j).text() == shown, (j, text)
+  assert cb.checkLattice([1, 1, 1], [90, 90, 90]) is None
+  with pytest.raises(ValueError):
+    cb.checkLattice([1, 1, 1], [100, 100, 170])
+
+
 # every phase has a plot box, the one that was never indexed among them, and it is centred
 def test_plot_column(loaded):
   st = loaded
