@@ -15,7 +15,7 @@ from ..geometry.frames import closestAlignment, crystalFrame, notIndexedFrame
 from ..geometry.plottingconvention import AXIS_CONVENTIONS, closestConvention, plottingConvention
 from ..geometry.units import degree
 from ..geometry.vector3d import xvector, yvector
-from ..io.importscript import buildImportWizardScript, frameKey
+from ..io.importscript import buildImportWizardScript
 from ..io.inspect import ebsdFiles, inspectEBSD, isEBSDFile
 from ..maps.phaselist import phaseList
 from .state import FileRow, WizardState
@@ -251,7 +251,6 @@ def commitMap(st, ebsd, seconds):
   st.sectionIndex = ebsd.shape[2] // 2 if ebsd.ndim == 3 else 0
   st.section = sectionOf(ebsd, st.sectionAxis, st.sectionIndex)
   st.loadSeconds = seconds
-  st.headerPhases = frameKeys(ebsd.CSList)
   st.drawn = {k: True for k in range(len(ebsd.CSList))}
   st.densities = {}
   st.eulerConvention = eulerConventionOf(st, ebsd.EulerCorrection)
@@ -733,16 +732,11 @@ def freeCells(CS):
 
 # ------------------------------------------------------------------ the outputs
 
-def frameKeys(phases):
-  """the value snapshot of a phase list, against which an edit is told: name, group, cell, setup, colour"""
-  return [frameKey(f) for f in phases.frames]
-
-
 def scriptOf(st):
   """the Python script of the import as the window has set it up, empty before a map is loaded"""
   if st.ebsd is None or st.info is None:
     return ""
-  return buildImportWizardScript(st.selected, phases=st.ebsd.CSList, headerPhases=st.headerPhases, dataSet=st.dataSet,
+  return buildImportWizardScript(st.selected, phases=st.ebsd.CSList, dataSet=st.dataSet,
                                  dataSets=st.info.dataSets, mapConvention=AXIS_CONVENTIONS[st.mapConvention],
                                  eulerConvention=AXIS_CONVENTIONS[st.eulerConvention], vendorCorrection=st.info.eulerCorrection,
                                  variable=st.variable, volume=st.isVolume, drawn={k: phaseCounts(st).get(k, 0) for k, on in st.drawn.items() if on})

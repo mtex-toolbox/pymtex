@@ -37,9 +37,8 @@ class WizardState:
     self.info = None
     self.status = ("idle", "click a map to import it, a folder to look inside")
     self.dataSet = 0
-    # the map, the phases the file declared, and which phases are drawn
+    # the map, and which phases are drawn
     self.ebsd = None
-    self.headerPhases = None
     self.drawn = {}
     self.loadSeconds = None
     # the map the views draw: the map itself, or of a volume the layer sectionIndex across the

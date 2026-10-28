@@ -1,12 +1,12 @@
 # the Python that reproduces an import the wizard settled (MATLAB buildImportWizardScript,
 # Julia importScript; docs/plans/wizard.md W1)
 #
-#   text = buildImportWizardScript('map.ctf', phases=ebsd.CSList, headerPhases=info.phases, ...)
+#   text = buildImportWizardScript('map.ctf', phases=ebsd.CSList, ...)
 #
 # A pure function of what the wizard settled, so it is tested by executing what it writes.
-# The crystallography is assigned after the load and only where it differs from what the
-# file declares, the data set only where the file holds several, the Euler correction only
-# where it differs from the vendor's; a script that changed nothing carries none of them.
+# The crystallography is always written and assigned after the load, so that the script states
+# the phases it was set up with whatever the reader makes of the header later; the data set only
+# where the file holds several, the Euler correction only where it differs from the vendor's.
 from __future__ import annotations
 
 import os
@@ -17,23 +17,22 @@ import numpy as np
 from ..geometry.frames import closestAlignment, crystalFrame
 from ..geometry.plottingconvention import plottingConvention
 from ..geometry.units import degree
-from ..maps.phaselist import phaseList
 
 
-def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, dataSets=(), mapConvention="y↑→x",
+def buildImportWizardScript(path, phases=None, dataSet=None, dataSets=(), mapConvention="y↑→x",
                             eulerConvention=None, vendorCorrection=None, variable="ebsd", drawn=None, volume=False):
   """the Python script of an import as the import wizard sets it up: the file, the plotting
   convention, the correction of the Euler angles, the phases and a first plot
 
     script = buildImportWizardScript('map.ctf')                               # the plain load
     script = buildImportWizardScript('map.h5oina', dataSet=2, dataSets=sets)  # a map of a project file
-    script = buildImportWizardScript('map.ang', phases=csList, headerPhases=info.phases)  # phases edited
+    script = buildImportWizardScript('map.ang', phases=ebsd.CSList)                       # the phases stated
     script = buildImportWizardScript('map.ctf', mapConvention='y↑→x', eulerConvention='y↓→x')  # a correction
     script = buildImportWizardScript('volume.dream3d', volume=True)          # a volume, read by EBSD3.load
 
   The script sets the plotting convention of the map, loads the file with EBSD.load or
   EBSD3.load, turns the Euler angles where their frame differs from the map's, replaces the
-  phases where they differ from what the file declares, and plots the orientations of the
+  phases with the ones it states, every one, and plots the orientations of the
   largest phase. It runs as it is and reproduces the import. The window's Script tab shows
   it; loadCall gives the one line load.
 
@@ -42,8 +41,8 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   Output
     script - str
   Keywords
-    phases - phaseList, the phases as edited, written out where they differ from headerPhases
-    headerPhases - the phases the file declares, a phaseList or the snapshot frameKeys took
+    phases - phaseList, the phases as edited, written out and assigned after the load; lattice
+        values as the shortest decimal that reads back as the file's single precision
     dataSet - the number of the map of a file with several
     dataSets - the maps of the file; a dataSet is written only when there are several
     mapConvention - the plotting convention of the map
@@ -58,8 +57,8 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   name = variable or "ebsd"
   lines = [f"# the import of {os.path.basename(path)}, written by the MTEX import wizard on {date.today().isoformat()}",
            f"from mtex import {'EBSD3' if volume else 'EBSD'}, crystalFrame, degree, notIndexedFrame, plot, plottingConvention", ""]
-  changed = phases is not None and phasesDiffer(phases, headerPhases)
-  if changed:
+  stated = phases is not None
+  if stated:
     lines += ["# the crystal symmetry, lattice angles in degree", "csList = [" + ",\n          ".join(frameLiteral(f) for f in phases.frames) + "]", ""]
   lines += ["# the plotting convention of the map", f"plottingConvention.default({mapConvention!r})", ""]
   lines += ["# the file", f"fname = {os.path.abspath(path)!r}", ""]
@@ -80,7 +79,7 @@ def buildImportWizardScript(path, phases=None, headerPhases=None, dataSet=None, 
   lines += ["# the volume" if volume else "# the map", f"{name} = {'EBSD3' if volume else 'EBSD'}.load({', '.join(args)})"]
   if turned:
     lines.append(f"{name} = {name}.rotate(eulerCorrection, keepXY=True)")
-  if changed:
+  if stated:
     lines.append(f"{name}.CSList = csList")
   lines.append("")
   mineral = plotPhase(phases, drawn)
@@ -117,23 +116,6 @@ def loadCall(path, dataSet=None, dataSets=(), variable="ebsd", volume=False):
 
 
 # ------------------------------------------------------------------ the pieces
-
-def phasesDiffer(phases, header):
-  """whether the phases differ from what the file declared, in name, group, cell, setup or colour;
-  the header side is a phase list or the value snapshot frameKeys took of one"""
-  if header is None:
-    return True
-  keys = [frameKey(f) for f in header.frames] if isinstance(header, phaseList) else list(header)
-  return [frameKey(f) for f in phases.frames] != keys
-
-
-def frameKey(f):
-  """the value of a frame as a tuple, what an edit changes"""
-  if not f.isIndexed:
-    return (False, f.name, _color(f))
-  return (True, f.name, f.pointGroup, tuple(round(float(v), 6) for v in f.abc), tuple(round(float(v) / degree, 6) for v in f.abg),
-          tuple(closestAlignment(f)), _color(f))
-
 
 def plotPhase(phases, drawn):
   """the phase the closing plot shows: the largest drawn indexed phase by name, the first indexed one otherwise"""

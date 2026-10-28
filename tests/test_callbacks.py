@@ -133,9 +133,9 @@ def test_the_pole_figure_directions_follow_the_crystal_system(st):
 def test_the_script_follows_the_phases_and_is_written(st, tmp_path):
   cb.openEntry(st, os.path.join(FIXTURES, "Forsterite_cut.ctf"))
   text = cb.scriptOf(st)
-  assert "EBSD.load(fname)" in text and "csList" not in text
+  assert "EBSD.load(fname)" in text and "mineral='Forsterite'" in text
   cb.editPhase(st, 1, "mineral", "Fo")
-  assert "csList" in cb.scriptOf(st) and "mineral='Fo'" in cb.scriptOf(st)
+  assert "mineral='Fo'" in cb.scriptOf(st) and "mineral='Forsterite'" not in cb.scriptOf(st)
   assert os.path.basename(cb.defaultScriptPath(st)) == "import_Forsterite_cut.py"
   path = cb.writeScript(st, os.path.join(tmp_path, "mine.py"))
   assert os.path.isfile(path) and open(path, encoding="utf-8").read() == cb.scriptOf(st) and st.status[1].startswith("written")

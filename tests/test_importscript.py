@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 from mtex import crystalFrame, degree, inspectEBSD, loadEBSD, notIndexedFrame, phaseList, rotation
-from mtex.io.importscript import buildImportWizardScript, frameKey, frameLiteral, loadCall, phasesDiffer, shortestFloat
+from mtex.io.importscript import buildImportWizardScript, frameLiteral, loadCall, shortestFloat
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,24 +28,19 @@ def test_frame_literal():
   assert back.pointGroup == "6/mmm" and np.allclose(back.abc, [3.2, 3.2, 5.2]) and back.color == "red"
 
 
-def test_phases_differ():
-  a = phaseList([crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Al")])
-  b = phaseList([crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Al")])
-  assert not phasesDiffer(a, b) and not phasesDiffer(a, [frameKey(f) for f in b.frames])
-  c = phaseList([crystalFrame("m-3m", [4.05, 4.05, 4.05], mineral="Aluminium")])
-  assert phasesDiffer(a, c) and phasesDiffer(a, None)
-
-
-def test_script_carries_only_what_changed():
+# the script states every phase, the correction and the data set only where they differ from
+# the vendor's and where the file holds several
+def test_script_states_the_phases_and_only_what_changed_else():
   path = os.path.join(FIXTURES, "Forsterite_cut.ctf")
   info = inspectEBSD(path)
-  text = buildImportWizardScript(path, phases=info.phases, headerPhases=info.phases, mapConvention="y↓→x", eulerConvention="x←↓y",
+  text = buildImportWizardScript(path, phases=info.phases, mapConvention="y↓→x", eulerConvention="x←↓y",
                                  vendorCorrection=info.eulerCorrection)
-  assert "csList" not in text and "eulerCorrection" not in text and "dataSet" not in text
+  assert all(frameLiteral(f) in text for f in info.phases.frames) and "ebsd.CSList = csList" in text
+  assert "eulerCorrection" not in text and "dataSet" not in text
   assert "ebsd = EBSD.load(fname)" in text and "plottingConvention.default('y↓→x')" in text
   assert "plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations)" in text
   # another Euler frame, a data set of several and a renamed variable
-  text = buildImportWizardScript(path, phases=info.phases, headerPhases=info.phases, mapConvention="y↓→x", eulerConvention="y↑→x",
+  text = buildImportWizardScript(path, phases=info.phases, mapConvention="y↓→x", eulerConvention="y↑→x",
                                  vendorCorrection=info.eulerCorrection, dataSet=1, dataSets=["a", "b"], variable="fo")
   assert "fo = EBSD.load(fname, dataSet=1, eulerCorrection=eulerCorrection)" in text
   assert "eulerCorrection = plottingConvention('y↓→x').rot * plottingConvention('y↑→x').rot.inv()" in text
@@ -56,7 +51,7 @@ def test_script_carries_only_what_changed():
 def test_script_round_trip():
   path = os.path.join(FIXTURES, "Forsterite_cut.ctf")
   info = inspectEBSD(path)
-  text = buildImportWizardScript(path, phases=info.phases, headerPhases=info.phases, mapConvention="y↓→x", eulerConvention="y↑→x",
+  text = buildImportWizardScript(path, phases=info.phases, mapConvention="y↓→x", eulerConvention="y↑→x",
                                  vendorCorrection=info.eulerCorrection)
   ns = {}
   exec(text.replace("plot(ebsd", "(ebsd"), ns)
@@ -75,7 +70,7 @@ def test_edited_phase_reproduced_in_fresh_session(tmp_path):
   info = inspectEBSD(path)
   frames = list(info.phases.frames)
   frames[1] = crystalFrame("mmm", [4.8, 10.207, 5.98], mineral="Forsterite", intern=False)
-  text = buildImportWizardScript(path, phases=phaseList(frames), headerPhases=info.phases, mapConvention="y↓→x")
+  text = buildImportWizardScript(path, phases=phaseList(frames), mapConvention="y↓→x")
   assert "crystalFrame('mmm', [4.8, 10.207, 5.98], [90, 90, 90], mineral='Forsterite')" in text
   script = tmp_path / "import_test.py"
   script.write_text(text.replace("plot(ebsd", "(ebsd") + "\nprint(ebsd.CSList.frames[1].abc[0])\n", encoding="utf-8")

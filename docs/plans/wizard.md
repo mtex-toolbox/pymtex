@@ -59,8 +59,8 @@ dropdown is labelled in the axis names of its own frame, `Y1↑→X1` for an Oxf
 for EDAX, `RD, TD, ND` for a rolling frame.
 
 **A vendor file declares its own phases, so the crystallography is assigned after the load.**
-The generated script assigns `ebsd.CSList` after the load and only where the user changed
-something.
+The generated script assigns `ebsd.CSList` after the load, every phase stated, so that it
+reproduces the import whatever a later reader makes of the header.
 
 **A header is not a map.** Selecting a file is instant on a 200 MB one: nothing about the
 preview reads a numeric block.
@@ -161,7 +161,7 @@ if the window ever feels slow: blitting the image alone, or a smaller figure.
 - `mtex/io/importscript.py`: `buildImportWizardScript(state)`, MATLAB's name, a pure
   function writing the shortest floats that read back exactly, naming the phase list
   `csList`, carrying the data set only where the file offers more than one and the phases
-  only where they differ from the header. Tested by executing what it writes and comparing
+  always, so that the script states the phases it was set up with (2026-10-27, as MATLAB's). Tested by executing what it writes and comparing
   with the direct load: positions and phase ids identical, orientations to float noise.
 - `mtex/wizard/state.py` and `mtex/wizard/callbacks.py`: the state and `selectEntry`,
   `openEntry`, `startImport`, `setDataSet`, `recolor`, `setMapConvention`,
