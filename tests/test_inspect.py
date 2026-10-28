@@ -15,7 +15,8 @@ def fixture(name):
   return os.path.join(FIXTURES, name)
 
 
-# the description agrees with the load on the phases, the properties, the step and the correction
+# the description agrees with the load on the phases, the properties, the step, the correction
+# and whether the lattice is hexagonal
 @pytest.mark.parametrize("name", ["ferrite_cut.ang", "olivine_cut.ang", "Forsterite_cut.ctf", "martensite_cut.cpr", "copper_cut.osc"])
 def test_text_and_binary_formats(name):
   info = inspectEBSD(fixture(name))
@@ -26,6 +27,7 @@ def test_text_and_binary_formats(name):
   assert info.step is not None and info.grid is not None
   assert float(ebsd.EulerCorrection.angle(info.eulerCorrection)) < 1e-12
   assert info.size == os.path.getsize(fixture(name))
+  assert info.hex == (ebsd.lattice is not None and ebsd.lattice.shape == "hex")
   assert info.date is not None
 
 
@@ -82,6 +84,7 @@ def test_hdf5(name):
   assert ["/" + s for s in info.dataSets] == ebsd.meta["dataSets"]
   assert float(ebsd.EulerCorrection.angle(info.eulerCorrection)) < 1e-12
   assert info.vendor == ebsd.meta["vendor"]
+  assert info.hex == (ebsd.lattice is not None and ebsd.lattice.shape == "hex")
 
 
 def test_data_sets_and_dates():

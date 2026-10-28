@@ -383,3 +383,20 @@ def test_eulerEntry_is_empty_for_a_table_of_matrices():
   ("Window Integral/Ni Kα1", "Ni_WindowIntegral_Ka1"), ("Peak Area/Live Time", "peakarealivetime")])
 def test_additionName_putsTheElementOfAnEDSMapFirst(field, name):
   assert additionName(field) == name
+
+
+# the map keeps the file's own numbering of the phases: phaseMap of every measurement's phase is
+# the number the file wrote for it, whether the vendor counts from zero, from one or writes -1
+@pytest.mark.parametrize("name", ["bruker_cut.h5", "edax_cut.h5", "emsphinx_cut.h5", "kamila_cut.edaxh5", "kamila_cut.oh5",
+                                  "oli_cut.h5oina", "oxford_cut.h5", "thermofisher_cut.hdf5"])
+def test_phaseMap_isTheFilesNumbering(name):
+  e = loadEBSD(fixture(name), verbose=False)
+  rec = e.meta["h5"]
+  with h5py.File(fixture(name)) as f:
+    t = rec["table"]
+    raw = (f[t["path"]][t["phaseField"]] if t is not None and t["phaseField"] else f[rec["phase"]["path"]])[()].reshape(-1)
+  if rec["rows"] is not None:
+    raw = raw[rec["rows"]]
+  shown = ~np.asarray(e.isPadding).reshape(-1) if e.isPadding is not None else np.ones(e.size, dtype=bool)
+  ids, ph = np.asarray(e.id).reshape(-1)[shown], np.asarray(e.phaseId).reshape(-1)[shown]
+  assert np.array_equal(np.asarray(e.phaseMap)[ph[np.argsort(ids)]], raw)

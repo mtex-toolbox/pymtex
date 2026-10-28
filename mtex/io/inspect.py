@@ -338,6 +338,8 @@ def _inspectH5(path):
         info.grid = (int(_floats(nx)[0]), int(_floats(ny)[0]))
         if info.points is None:
           info.points = info.grid[0] * info.grid[1]
+    # the lattice as the header names it: EDAX and EMSphInx write HexGrid or SqrGrid, Bruker isometric
+    info.hex = str(_find(header, ("grid type",)) or "").replace(" ", "").lower() in ("hexgrid", "hexagonal", "hex")
     # the properties: every per pixel data set of the additions groups and the fields of a table
     if info.points:
       info.properties += [k for k in r.additions(info.points) if k not in info.properties]

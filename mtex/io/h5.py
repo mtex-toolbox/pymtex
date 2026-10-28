@@ -777,13 +777,13 @@ def _loadEBSD_h5(fname, *, dataSet=None, eulerCorrection=None, frame=None, scanU
     # the matrices are rotations already: the map is built from their quaternions
     if byMatrix:
       ph[np.asarray(o["noRotation"], dtype=bool)] = 0
-      return _mapFromRotations(x, y, rotation(np.array(o["rots"].data, dtype=float)), ph, phases, props, 0,
+      return _mapFromRotations(x, y, rotation(np.array(o["rots"].data, dtype=float)), ph, phases, props, shift,
                                eulerCorrection=correction, scanUnit=scanUnit, frame=frame, meta=meta, unitCell=unitCell,
                                scanGrid=grid)
     scale = o["scale"]
     e1, e2, e3 = o["phi1"] * scale, o["Phi"] * scale, o["phi2"] * scale
     unindexed = unmeasuredRows(e1, e2, e3, props) if r.name == "EMSphInx" else None
-    return ebsdFromColumns(x, y, e1, e2, e3, ph, phases, props, shift=0, unindexed=unindexed, eulerCorrection=correction,
+    return ebsdFromColumns(x, y, e1, e2, e3, ph, phases, props, shift=0, fileShift=shift, unindexed=unindexed, eulerCorrection=correction,
                            scanUnit=scanUnit, frame=frame, meta=meta, unitCell=unitCell, scanGrid=grid)
 
 

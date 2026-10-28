@@ -138,12 +138,13 @@ _gridOnRead = contextvars.ContextVar("gridOnRead", default=False)
 
 def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bunge", eulerCorrection=None,
                     scanUnit="um", frame=None, meta=None, shift=None, unindexed=None, unitCell=None, scanGrid=None,
-                    propType=None):
+                    propType=None, fileShift=None):
   """the map from the columns every format has: a position, three Euler angles and a phase,
   with whatever else the file carries as properties
 
   phase is the file's own numbering; shift states it where the format fixes it and is read
-  off the values otherwise. unindexed marks what the file says failed by other means, a
+  off the values otherwise. A loader that shifted the column itself passes shift=0 and the
+  shift the file had as fileShift, which the map's phaseMap keeps. unindexed marks what the file says failed by other means, a
   negative confidence index or a pixel never measured. The rotation of a measurement of no
   phase is nan. propType is the type the properties are stored in, the file's own if None."""
   phases = phases if isinstance(phases, phaseList) else phaseList(phases)
@@ -153,12 +154,13 @@ def ebsdFromColumns(x, y, phi1, Phi, phi2, phase, phases, props, convention="Bun
   if unindexed is not None:
     ids[np.asarray(unindexed, dtype=bool)] = 0
   rot = eulerRotations(phi1, Phi, phi2, convention, ids)
-  return _mapFromRotations(x, y, rot, ids, phases, props, shift, eulerCorrection=eulerCorrection, scanUnit=scanUnit,
-                           frame=frame, meta=meta, unitCell=unitCell, scanGrid=scanGrid, propType=propType)
+  return _mapFromRotations(x, y, rot, ids, phases, props, shift if fileShift is None else fileShift, eulerCorrection=eulerCorrection,
+                           scanUnit=scanUnit, frame=frame, meta=meta, unitCell=unitCell, scanGrid=scanGrid, propType=propType)
 
 
 # the map of the rotations the file's angles or matrices made, ids its phase ids already shifted onto
-# the list by shift: the correction applied, the rotation of a measurement of no phase nan
+# the list by shift, which the map keeps as the file's numbering: the correction applied, the
+# rotation of a measurement of no phase nan
 def _mapFromRotations(x, y, rot, ids, phases, props, shift, eulerCorrection=None, scanUnit="um", frame=None, meta=None,
                       unitCell=None, scanGrid=None, propType=None):
   n = len(phases)
