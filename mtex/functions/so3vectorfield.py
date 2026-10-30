@@ -27,7 +27,7 @@ from ..geometry.grids.so3grid import equispacedSO3Grid
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
-from ..geometry.symreduce import reductionGroups
+from ..geometry.symreduce import functionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, yvector, zvector, asVector3d
@@ -1071,7 +1071,7 @@ class SO3VectorFieldRBF(SO3VectorField):
     center = orientation._fromRotation(ref.data.reshape(-1, 4), (ref.CS, ref.SS))
     cs = center.data.reshape(-1, 4)
     n = len(cs)
-    L, R = reductionGroups(center)
+    L, R = functionGroups(center.CS, center.SS)
     cut = supportCosine(psi)
     A = np.zeros((3 * n, 3 * n))
     for l in L:
@@ -1101,7 +1101,7 @@ class SO3VectorFieldRBF(SO3VectorField):
 
   # the equivalents of the centres with their turned weights
   def _expandedCentres(self):
-    L, R = reductionGroups(self.center)
+    L, R = functionGroups(self.CS, self.SS)
     c = self.center.data.reshape(-1, 4)
     rots, w = [], []
     for l in L:

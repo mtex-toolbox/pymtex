@@ -19,7 +19,7 @@ import numpy as np
 
 from ..geometry.arguments import refuseFlags
 from ..geometry.orientation import orientation
-from ..geometry.symreduce import reductionGroups
+from ..geometry.symreduce import functionGroups
 from ..geometry.units import degree
 from .kernelfunctions import SO3DeLaValleePoussinKernel
 
@@ -50,7 +50,7 @@ def summationMatrix(psi, centres, nodes, exact=False, epsilon=None):
   See also
     SO3FunRBF.interpolate, mlsq"""
   from scipy.sparse import csr_matrix
-  L, R = reductionGroups(nodes)
+  L, R = functionGroups(nodes.CS, nodes.SS)
   G = len(L) * len(R)
   eps = np.pi if exact else min(np.pi, 3.5 * psi.halfwidth() if epsilon is None else epsilon)
   if not exact and isinstance(centres, orientation) and eps < np.pi:

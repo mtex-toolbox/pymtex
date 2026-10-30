@@ -18,7 +18,7 @@ from .s2funclass import S2Fun
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, rotation
 from ..geometry.session import SESSION, getMTEXpref
-from ..geometry.symreduce import reductionGroups
+from ..geometry.symreduce import functionGroups
 from ..geometry.vector3d import vector3d, asVector3d
 from .funops import conv
 from .rbf import SO3FunCBF, SO3FunRBF, _framesAmong, _rotationsFor, uniformODF
@@ -213,7 +213,7 @@ class SO3FunGeneric(SO3Fun):
 
 # the callable averaged over the groups of the frames on every call, and the inverses under exchange
 def _symmetrisedSO3(fun, CS, SS, antipodal):
-  L, R = reductionGroups(orientation(rotation.id, CS, SS))
+  L, R = functionGroups(CS, SS)
   L, R = rotation(L), rotation(R)
 
   def averaged(o):

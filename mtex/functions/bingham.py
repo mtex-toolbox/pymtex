@@ -17,7 +17,7 @@ from ..geometry.kernels import qconj, qmul
 from ..geometry.orientation import orientation
 from ..geometry.quaternion import quaternion, rotation
 from ..geometry.session import getMTEXpref
-from ..geometry.symreduce import reductionGroups
+from ..geometry.symreduce import functionGroups
 from ..geometry.vector3d import vector3d, asVector3d
 from ..geometry.display import frameLabel, framesLabel
 from .funops import _antipodalPole, _rotatedFrame, _side
@@ -164,7 +164,7 @@ class SO3FunBingham(SO3FunGeneric):
   # the axes moved by every pair of the groups, <l q r, a> = <q, l^-1 a r^-1>, and the
   # conjugates under exchange symmetry, one 4x4 matrix per copy
   def _symmetricAxes(self):
-    L, R = reductionGroups(orientation(rotation.id, self.CS, self.SS))
+    L, R = functionGroups(self.CS, self.SS)
     # moved[l, r, i] = l^-1 a_i r^-1, the conjugates beside them under exchange symmetry
     moved = qmul(qmul(qconj(L)[:, None, None], self.A.T[None, None]), qconj(R)[None, :, None])
     if self.antipodal:

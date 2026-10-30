@@ -26,6 +26,16 @@ def reductionGroups(o):
   return L, R
 
 
+def functionGroups(CS, SS):
+  """the rotations a function on SO(3) is invariant under, on the specimen side and on the
+  crystal side: those of the Laue groups of both frames, as MATLAB's SO3Fun and the harmonic
+  projections take them; they exceed reductionGroups for a group with mirrors but without the
+  inversion (mm2, -43m, ...), where diffraction cannot tell a crystal from its inverse"""
+  L = SS.sym.properGroup().rotations().data.reshape(-1, 4)
+  R = CS.sym.properGroup().rotations().data.reshape(-1, 4)
+  return L, R
+
+
 def reductionGroupsPair(a, b):
   """the groups two orientations are compared over: the specimen sides have to fit; two
   crystal frames of different phases reduce over the products r2 * inv(r1) of both crystal

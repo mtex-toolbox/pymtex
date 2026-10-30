@@ -24,7 +24,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import orthogonalTransform, quaternion, rotation
 from ..geometry.representations import quat2mat
 from ..geometry.session import getMTEXpref
-from ..geometry.symreduce import reductionGroups
+from ..geometry.symreduce import functionGroups
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, asVector3d
@@ -286,7 +286,7 @@ class SO3FunRBF(SO3Fun):
   # the equivalents s c t of every centre with the weight w / m, the inverses included
   # under exchange symmetry, as (M, 4) quaternions
   def _expandedCentres(self):
-    L, R = reductionGroups(self.center)
+    L, R = functionGroups(self.CS, self.SS)
     c = self.center.data.reshape(-1, 4)
     if self.antipodal:
       c = np.concatenate([c, qconj(c)])
@@ -303,7 +303,7 @@ class SO3FunRBF(SO3Fun):
     harmonic form, exact for a kernel of finite bandwidth, as MTEX does"""
     r = _rotationsFor(self, x)
     q = r.data.reshape(-1, 4)
-    L, R = reductionGroups(self.center)
+    L, R = functionGroups(self.CS, self.SS)
     if self.center.size * len(L) * len(R) * len(q) > HARMONIC_EVAL and self.psi.bandwidth <= getMTEXpref("maxSO3Bandwidth"):
       return np.real(self._harmonicForm().eval(r)).reshape(r.shape)
     cut = supportCosine(self.psi)
@@ -397,7 +397,7 @@ class SO3FunRBF(SO3Fun):
     ant = _antipodalPole(h, self.CS)
     if self.center.size == 0:
       return S2FunHarmonic([math.sqrt(4 * np.pi) * self.c0], self.SS, real=True, antipodal=ant, _internal=True)
-    _, R = reductionGroups(self.center)
+    _, R = functionGroups(self.CS, self.SS)
     hs = rotation(R) * vector3d(h.normalize().data.reshape(3))
     c = self.center.data.reshape(-1, 4)
     if self.antipodal:
@@ -663,7 +663,7 @@ class SO3FunCBF(SO3Fun):
   # the fibre pairs (t h_i, s^-1 r_i) over the proper rotations, with weight w_i / m, and
   # the pairs (-t h_i, s^-1 r_i) beside them, each at half the weight, for a Laue group
   def _expandedFibres(self):
-    L, R = reductionGroups(orientation(rotation.id, self.CS, self.SS))
+    L, R = functionGroups(self.CS, self.SS)
     if self._laue:
       H, Rv, w = SO3FunCBF._pairs(self, L, R)
       return np.concatenate([H, -H]), np.concatenate([Rv, Rv]), np.concatenate([w, w]) / 2

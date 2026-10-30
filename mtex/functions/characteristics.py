@@ -26,7 +26,7 @@ from ..geometry.orientation import orientation
 from ..geometry.quaternion import qrot, quaternion, rotation
 from ..geometry.representations import quat2mat
 from ..geometry.session import getMTEXpref
-from ..geometry.symreduce import reductionGroups, symDots
+from ..geometry.symreduce import functionGroups, reductionGroups, symDots
 from ..geometry.tangent import SO3TangentVector
 from ..geometry.units import degree
 from ..geometry.vector3d import vector3d, xvector, zvector, asVector3d
@@ -359,7 +359,7 @@ def _minimalAngle(q, L, R):
 
 
 def _framesOf(f):
-  return reductionGroups(orientation(rotation.id, f.CS, f.SS))
+  return functionGroups(f.CS, f.SS)
 
 
 def calcAngleDistribution(f, *args, omega=None, edges=None, resolution=0.5 * degree):
@@ -926,7 +926,7 @@ FLAT_SLOPE = 1e-3
 def _gradientField(f):
   if isinstance(f, SO3FunRBF):
     from .rbf import HARMONIC_EVAL
-    L, R = reductionGroups(f.center)
+    L, R = functionGroups(f.CS, f.SS)
     if f.center.size ** 2 * len(L) * len(R) > HARMONIC_EVAL and f.psi.bandwidth <= getMTEXpref("maxSO3Bandwidth"):
       return f._harmonicForm().grad()
   if isinstance(f, (SO3FunRBF, SO3FunCBF)):

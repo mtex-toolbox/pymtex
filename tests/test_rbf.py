@@ -280,6 +280,17 @@ def test_SO3FunRBF_narrowKernelIsTheSumOfItsDefinition(kernel, antipodal):
   assert np.allclose(got, rbf._blockSum(q.data.reshape(-1, 4), cs_, ww, psi, cut), rtol=1e-10, atol=1e-12)
 
 
+# the direct sum and the harmonic form are one function for every kind of point group: a group with
+# mirrors and without the inversion symmetrises over the rotations of its Laue group, as MATLAB
+@pytest.mark.parametrize("pg", [("432", "1"), ("m-3m", "mmm"), ("mm2", "222"), ("-43m", "1"), ("3m", "2/m")])
+def test_SO3FunRBF_directSumIsItsHarmonicForm(pg):
+  cs, ss = crystalFrame(pg[0]), specimenFrame(pg[1])
+  f = SO3FunRBF(orientation.rand(3, cs, ss, rng=rng), SO3DeLaValleePoussinKernel(halfwidth=20 * degree))
+  q = orientation.rand(200, cs, ss, rng=rng)
+  # the form is truncated at the bandwidth of the preference, a wrong group is off by a factor
+  assert np.max(np.abs(f.eval(q) - np.real(f._harmonicForm().eval(q)))) < 5e-3
+
+
 # the fibre ODF of the de la Vallee Poussin kernel is summed in a compiled loop, with the values of
 # the kernel at the arguments of every fibre pair
 def test_SO3FunCBF_compiledSumIsTheKernelAtEveryFibrePair():
