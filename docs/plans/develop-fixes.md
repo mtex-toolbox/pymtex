@@ -143,12 +143,16 @@ symmetry), unlike the port before the fix; what issue #7 led to in MATLAB:
 The tests are `tests/core/check_volume.m` and `tests/slow/check_volumeFull.m` over
 `tests/lib/checkVolumeCases.m`.
 
-Open, found when the port took MATLAB's fibre convention (2026-10-30: the equivalents of h and
-r are their images under the point groups, improper elements included, S27):
+Found when the port took MATLAB's fibre convention (2026-10-30: the equivalents of h and r
+are their images under the point groups, improper elements included, S27), fixed on develop:
 
-- `fibre/symmetrise(f,'unique')` fails for a generic h in a Laue group ("Index exceeds the
-  number of array elements", `fibre(Miller(1,2,4,crystalSymmetry('m-3m')),zvector)`): the 48
-  images of h are indexed into the 24 rotations, and an improper element is no orientation.
-- `fibre/angle` leaves out the improper elements of the specimen group, `fibreVolume` takes
-  them: for 432 with `mmm` the orientation turning h onto -r is 17.75 degree off the fibre,
-  yet inside its tube; with crystal symmetry only the specimen side is the bare r.
+- `fibre/symmetrise(f,'unique')` failed for a generic h in a Laue group ("Index exceeds the
+  number of array elements"): `vector3d/symmetrise` returned indices into the rotations for the
+  images it doubled by -v; an improper element was applied to orientations.
+- `fibre/angle` left out the improper elements of the specimen group, `fibreVolume` took them:
+  for 432 with `mmm` the orientation turning h onto -r was 17.75 degree off the fibre.
+- `fibreVolume` chose the tubes to integrate by the orbit sizes, which misses the mirror
+  images of h in `mm2`; it integrates one tube per rotation class now (`mm2`/`222`: 0.2522,
+  the port 0.2521, Monte Carlo 0.2516).
+
+The test is `tests/core/check_fibreSymmetry.m`.
