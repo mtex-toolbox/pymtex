@@ -97,6 +97,13 @@ def h5Read(f, path):
   return v.item() if hasattr(v, "item") else v
 
 
+# the phase a master pattern file is of, for a phase the file leaves unnamed: the file's name
+# without its folder, its extension and whatever follows a '[' or '{', 'Fe(alpha-iron)' of
+# 'Fe(alpha-iron)[A2]{20kV}.sht', as MATLAB's EMSphInx reader
+def _masterName(path):
+  return re.sub(r"[\[{].*$", "", re.sub(r"\.[^.]*$", "", re.sub(r"^.*[\\/]", "", str(path)))).strip()
+
+
 def _text(x):
   if isinstance(x, bytes):
     x = x.split(b"\x00", 1)[0].decode("utf-8", errors="replace")
@@ -542,7 +549,9 @@ class h5Reader:
       return phaseList(distinctMinerals(frames)), prov
     depth = root.count("/") + 1
     d = cs["default"]
-    for g in [p for p in self.paths if p.startswith(root + "/") and p.count("/") == depth and p in self.groups]:
+    masters = self.value(self.ebsd.get("master_files"))
+    masters = [] if masters is None else [masters] if isinstance(masters, str) else list(masters)
+    for i, g in enumerate(p for p in self.paths if p.startswith(root + "/") and p.count("/") == depth and p in self.groups):
       inner = H5Scope(g, self.scope.set, self.scope.free)
       name = self.value(d.get("name"), inner)
       lat = d.get("lattice", {})
@@ -557,6 +566,8 @@ class h5Reader:
       if setup is None:
         setup = reference.get("fallback", "")
       mineral = "" if name is None else (" ".join(name) if isinstance(name, list) else str(name)).strip()
+      if not mineral and i < len(masters):
+        mineral = _masterName(masters[i])
       if isinstance(symbol, str):
         args, kw = [symbol], {}
       elif symbol:

@@ -144,6 +144,24 @@ def test_emsphinx_zero_based_phases():
   assert set(e.prop) == {"iq", "metric"}
 
 
+# a phase EMSphInx leaves unnamed takes the name of its master pattern file, whatever folder the
+# file is listed under, without the extension and the indices in brackets; a name the file
+# stores is kept
+def test_emsphinx_names_an_unnamed_phase_after_its_master_pattern(tmp_path):
+  import shutil
+  e = loadEBSD(fixture("emsphinx_cut.h5"))
+  assert [f.mineral for f in e.CSList.frames[1:]] == ["Fe(alpha-iron)", "Fe(gamma-iron)", "Co(alpha-cobalt)"]
+  f = tmp_path / "named.h5"
+  shutil.copy(fixture("emsphinx_cut.h5"), f)
+  with h5py.File(f, "r+") as h:
+    del h["/NMLparameters/IndexEBSD/masterfile"]
+    h["/NMLparameters/IndexEBSD/masterfile"] = [b"/Users/a/SHT_Library/Cu_copper_A1_30kV.sht", b"C:\\SHT\\Ni{20kV}.sht",
+                                                 b"Re(rhenium)[A3]{30kV}.master.sht"]
+    del h["/Scan 1/EBSD/Header/Phase/2/MaterialName"]
+    h["/Scan 1/EBSD/Header/Phase/2/MaterialName"] = b"Austenite"
+  assert [f.mineral for f in loadEBSD(str(f)).CSList.frames[1:]] == ["Cu_copper_A1_30kV", "Austenite", "Re(rhenium)"]
+
+
 def test_bruker_direct_positions():
   e = loadEBSD(fixture("bruker_cut.h5"), grid=False)
   assert len(e) == 2000 and e.meta["vendor"] == "Bruker"
