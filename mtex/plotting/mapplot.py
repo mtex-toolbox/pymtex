@@ -1251,12 +1251,14 @@ def _quiverGrains(mP, c, raw, length, antipodal, color, lineWidth, displayName, 
 
 # ------------------------------------------------------------------ the scale bar and the legends
 
-def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, length=None):
+def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k", background="w", alpha=0.75, length=None,
+               fontSize=None):
   """a scale bar in one corner of a map: a round length near a tenth of its width, written
   above the bar, and above it the axes of the specimen frame as they lie on the screen
 
     label = scaleBarOn(mP)                           # in the lower left corner
     label = scaleBarOn(mP, location='ne', length=500, color='w', background='k')  # 500 um, white on black
+    label = scaleBarOn(mP, fontSize=10)              # the length written in 10 points, the box to match
 
   Every map plot draws one unless micronbar=False, so this is what to call to draw one into a
   map plot without, or to draw it again elsewhere; it replaces the bar the map plot had. The
@@ -1278,13 +1280,15 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
     background - the colour of the box
     alpha - the opacity of the box
     length - the length of the bar in the map's unit instead of a round one
+    fontSize - the size in points of the length written, the box and the axes scaled with it;
+      by default they follow the size of the map on the screen
   See also
     EBSD.plot, scaleBar, EBSDPlotting"""
   from matplotlib.patches import PathPatch, Polygon, Rectangle
   from matplotlib.transforms import Affine2D
   ax = mP.ax
   mP.scaleBarArgs = dict(location=location, fraction=fraction, refFrame=refFrame, color=color, background=background, alpha=alpha,
-                         length=length)
+                         length=length, fontSize=fontSize)
   artists = []
   xlo, xhi, ylo, yhi = mP.extent
   if length is None:
@@ -1294,7 +1298,8 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   if not barLength > 0:
     return None
   w, h = xhi - xlo, yhi - ylo
-  t = 0.035 * min(w, h)
+  # the text is the unit of the box: by default its size follows the map on the screen
+  t = 0.035 * min(w, h) if fontSize is None else fontSize / (0.9 * _pointsPerUnit(ax))
   gap = t / 4
   names = tuple(mP.frame.axesNames) if mP.frame is not None else ("X", "Y", "Z")
   glyphs = {s: _glyphs(s, 0.8 * t) for s in names}
@@ -1308,7 +1313,6 @@ def scaleBarOn(mP, x=None, location="sw", fraction=0.1, refFrame=True, color="k"
   boxh = 4.5 * gap + t + th if triad is not None else 3 * gap + t
   boxx = xhi - gap - boxw if location in ("se", "ne") else xlo + gap
   boxy = yhi - gap - boxh if location in ("nw", "ne") else ylo + gap
-  # the text is the unit of the box: its size follows the map on the screen
   fontsize = _pointsPerUnit(ax) * 0.9 * t
   artists.append(ax.add_patch(Rectangle((boxx, boxy), boxw, boxh, facecolor=background, alpha=alpha, edgecolor=color, linewidth=0.8,
                                         zorder=10)))

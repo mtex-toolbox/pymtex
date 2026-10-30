@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from mtex import (EBSD, calcGrains, crystalFrame, degree, gcm, hold, ipfHSVKey, loadEBSD, phaseList, plot, quiver, rotation,
                   vector3d, xvector, zvector, mtexColorMap, mtexColorbar, setColorRange)
-from mtex.plotting.mapplot import mapValues
+from mtex.plotting.mapplot import mapValues, scaleBarOn
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "ebsd", "Forsterite_cut.ctf")
 CS = crystalFrame("m-3m", mineral="raster")
@@ -388,6 +388,20 @@ def test_the_scale_bar_follows_a_zoom():
   box = bar()
   assert box.get_x() != x0 and 20 <= box.get_x() <= 30 and 10 <= box.get_y() <= 18
   assert len([a for a in ax.patches if a.get_zorder() == 10]) == 1
+  plt.close("all")
+
+
+def test_the_scale_bar_writes_its_length_in_the_font_size_given_at_any_figure_size():
+  plt.close("all")
+  sizes = []
+  for inches in (4, 12):
+    plt.figure(figsize=(inches, inches / 2))
+    e = gridMap(40, 30, 1.0)
+    h = plot(e, e.orientations, micronbar=False)
+    mP = h.axes._mtexMapPlot
+    label = scaleBarOn(mP, fontSize=9)
+    sizes += [t.get_fontsize() for t in h.axes.texts if t.get_text() == label]
+  assert np.allclose(sizes, 9)
   plt.close("all")
 
 

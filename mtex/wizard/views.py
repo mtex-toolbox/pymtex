@@ -297,6 +297,7 @@ class ViewCanvas(FigureCanvasQTAgg):
       self.setColorbar(matplotlib.colormaps["viridis"] if scalar else None,
                        getattr(norm, "vmin", 0.0) or 0.0, getattr(norm, "vmax", 1.0) or 1.0, name)
       if shown.all():
+        self.fitScaleBar()
         self.draw_idle()
         self.prepareDensity()
         return
@@ -305,8 +306,23 @@ class ViewCanvas(FigureCanvasQTAgg):
       return
     self.recolour(kind, name, shown)
     self.shownFor = shown
+    self.fitScaleBar()
     self.draw_idle()
     self.prepareDensity()
+
+  def fitScaleBar(self):
+    """the scale bar and the axes above it drawn anew in the window's font size, at the place the
+    layout gives the map; a bar sized by the map would grow with the canvas"""
+    from ..plotting.mapplot import scaleBarOn
+    mP = getattr(getattr(self, "ax", None), "_mtexMapPlot", None)
+    if mP is None or not mP.scaleBarArtists:
+      return
+    self.figure.get_layout_engine().execute(self.figure)
+    self.ax.apply_aspect()
+    for a in mP.scaleBarArtists:
+      a.remove()
+    _, size = guiFont(self.figure.dpi)
+    scaleBarOn(mP, **{**mP.scaleBarArgs, "fontSize": size})
 
   def recolour(self, kind, name, shown):
     """the colours of the picture rewritten, the map's own never assembled: mapValues colours
@@ -490,6 +506,9 @@ class ViewCanvas(FigureCanvasQTAgg):
     if self.onPoleFigures():
       self.scheduleDraw()
     else:
+      if self.image is not None and self.st.currentKind in MAP_KINDS:
+        self.fitScaleBar()
+        self.draw_idle()
       self.drawAhead()
 
   def drawPoleFigures(self):
