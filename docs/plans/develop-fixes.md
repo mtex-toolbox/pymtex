@@ -135,10 +135,20 @@ symmetry), unlike the port before the fix; what issue #7 led to in MATLAB:
 - `SO3Fun/volume` with grain exchange ran out of memory (a 776 GB array): it took the symmetry
   reduced angle to every symmetric copy of the antipodal center.
 - `SO3Fun/fibreVolume` left out the specimen copies of r and capped at 1 (the beta fibre of
-  OrientationFibre with `mmm`: 7.26 percent for 25.4); it integrates the tube with the cover
+  OrientationFibre with `mmm`: 7.26 percent for 34.3); it integrates the tube with the cover
   count of the port now, the tubes of (h,r) and (-h,r) apart where -h is no rotated copy of h.
 - `fibre/angle` with crystal and specimen symmetry returned one angle for a whole list.
 - `SO3FunCBF/radon` did not normalise r (pole densities up to 27).
 
 The tests are `tests/core/check_volume.m` and `tests/slow/check_volumeFull.m` over
 `tests/lib/checkVolumeCases.m`.
+
+Open, found when the port took MATLAB's fibre convention (2026-10-30: the equivalents of h and
+r are their images under the point groups, improper elements included, S27):
+
+- `fibre/symmetrise(f,'unique')` fails for a generic h in a Laue group ("Index exceeds the
+  number of array elements", `fibre(Miller(1,2,4,crystalSymmetry('m-3m')),zvector)`): the 48
+  images of h are indexed into the 24 rotations, and an improper element is no orientation.
+- `fibre/angle` leaves out the improper elements of the specimen group, `fibreVolume` takes
+  them: for 432 with `mmm` the orientation turning h onto -r is 17.75 degree off the fibre,
+  yet inside its tube; with crystal symmetry only the specimen side is the bare r.

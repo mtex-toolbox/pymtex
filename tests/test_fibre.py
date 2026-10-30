@@ -106,6 +106,21 @@ def test_angle_toAFibreIsSymmetricUnderBothGroups():
     assert np.max(np.abs(angle(f, orientation(rotation(ori) * g, cs, ss)) - d)) < 1e-10
 
 
+# crystal and specimen point groups with and without the inversion and improper elements
+POINT_GROUP_PAIRS = [("m-3m", "1"), ("432", "mmm"), ("mm2", "222"), ("-43m", "1"), ("-1", "2/m")]
+
+
+@pytest.mark.parametrize("pg", POINT_GROUP_PAIRS)
+def test_angle_vanishesWhereAnImageOfHUnderThePointGroupIsAnImageOfR(pg):
+  # the improper elements count: in a centrosymmetric crystal -h is an equivalent of h
+  cs, ss = crystalFrame(pg[0]), specimenFrame(pg[1])
+  h, r = Miller(1, 2, 4, cs, "uvw"), vector3d(1, 2, 3)
+  f = fibre(h, r, ss)
+  hs, rs = cs.rot * vector3d(h.data), ss.rot * r
+  ori = orientation.map(hs[:, None], rs[None, :])
+  assert np.max(angle(f, orientation(rotation(ori), cs, ss))) < 1e-7
+
+
 def test_angle_vanishesAlongTheFibre():
   _, _, f, _ = randomFibre()
   assert np.max(angle(f, f.orientation(100))) < 1e-10
@@ -202,6 +217,25 @@ def test_fibre_equalityIsUpToSymmetryAndASegmentIsNotTheFullFibre():
 def test_fibre_equalityIdentifiesTheAntipodes():
   th = fibre.theta(crystalFrame("432"), specimenFrame("222"))
   assert fibre(th.h, -th.r).isclose(th) and fibre(-th.h, -th.r).isclose(th)
+
+
+@pytest.mark.parametrize("pg", POINT_GROUP_PAIRS)
+def test_symmetrise_ofAnArcLiesOnTheFibreAndKeepsItsLength(pg):
+  cs, ss = crystalFrame(pg[0]), specimenFrame(pg[1])
+  h = Miller(1, 2, 4, cs, "uvw")
+  o1 = orientation.byEuler(10 * degree, 20 * degree, 30 * degree, cs, ss)
+  arc = fibre(o1, o1 * orientation.byAxisAngle(h, 40 * degree))
+  full = fibre(o1, h)
+  S = symmetrise(arc).flatten()
+  assert S.size == cs.rot.size * ss.rot.size
+  assert np.max(angle(full, S.o1)) < 1e-7 and np.max(angle(full, S.o2)) < 1e-7
+  assert np.allclose(S.arcAngle(), 40 * degree)
+
+
+@pytest.mark.parametrize("pg, n", [(("m-3m", "1"), 48), (("m-3m", "mmm"), 192), (("432", "mmm"), 192), (("mm2", "222"), 16)])
+def test_multiplicity_countsThePairsOfImagesUnderThePointGroupsUpToTheCommonFlip(pg, n):
+  cs, ss = crystalFrame(pg[0]), specimenFrame(pg[1])
+  assert multiplicity(fibre(Miller(1, 2, 4, cs, "uvw"), vector3d(1, 2, 3), ss)) == n
 
 
 def test_symmetrise_uniqueRefusesAList():

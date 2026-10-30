@@ -7,7 +7,12 @@
 #   f.orientation(points=1000)        orientations along the fibre, o1 * rot(h, omega)
 #   angle(f, ori)                     the angle by which ori * h misses r, over the orbits of both frames,
 #                                     with return_nearest=True also the nearest orientation on the fibre
-#   symmetrise(f), multiplicity(f)    the equivalent fibres s * o1 * inv(g) about g * h
+#   symmetrise(f), multiplicity(f)    the equivalent fibres, one for every pair of images of h and r
+#
+# The equivalents of h and r are their images under the point groups, the improper elements
+# included, as MATLAB's h.symmetrise: in a centrosymmetric crystal, or a specimen frame holding
+# the inversion, the fibre of h || r is that of -h || r too, which no rotation of the symmetry
+# reaches.
 #
 # A fibre holds two orientations between the same frames and the crystal direction h, a
 # Miller in the frame of o1; r = o1 * h, the frames and the antipodality are read off them.
@@ -28,7 +33,8 @@ from .orientation import _defaultFrames, _splitFrames, orientation
 from .quaternion import rotation
 from .representations import axis2quat, map1Kernel, quatAngle, quatAxis, quat2euler
 from .session import SESSION
-from .symreduce import _firstOfClusters, reductionGroups
+from .symmetryops import _images
+from .symreduce import _firstOfClusters
 from .units import degree
 from .vector3d import vector3d
 from .install import install
@@ -221,12 +227,9 @@ class fibre:
 
   # ------------------------------------------------------------------ distance
 
-  # the orbit of h under the crystal group and of r under the specimen group, as unit vectors
+  # the images of h under the crystal point group and of r under the specimen point group, as unit vectors
   def _orbits(self):
-    L, R = reductionGroups(self.o1)
-    hs = _uniqueDirections(qrot(R, self.h.normalize().data[..., None, :]))
-    rs = _uniqueDirections(qrot(L, self.r.normalize().data[..., None, :]))
-    return hs, rs
+    return directionOrbits(self.CS, self.SS, self.h.normalize().data, self.r.normalize().data)
 
   def angle(self, ori, symmetry=True, return_nearest=False):
     """the angle by which ori * h misses r, the least over both orbits, from the chord of the
@@ -238,7 +241,8 @@ class fibre:
       omega = angle(f1, f2)                               # the angle between two fibres
 
     The angle of an orientation to the fibre h || r is the angle between ori * h and r, the least
-    over the crystal symmetric equivalents of h and the specimen symmetric ones of r. With
+    over the images of h under the crystal point group and of r under the specimen point group,
+    the improper elements included: in a centrosymmetric crystal -h is an equivalent of h. With
     another fibre it is the largest angle of 1000 of its orientations to this one. The fibre is
     taken as the full fibre, its ends o1 and o2 do not count.
 
@@ -289,9 +293,11 @@ class fibre:
       fS = f.symmetrise()               # every equivalent, numSS * numCS x shape
       fS = f.symmetrise(unique=True)    # the distinct ones of a single fibre
 
-    The equivalent fibres run from s * o1 * inv(g) about g * h, over the elements s of the
-    specimen group and g of the crystal group. MATLAB's second output, the number of distinct
-    ones, is f.multiplicity().
+    There is one equivalent fibre for every element g of the crystal point group and s of the
+    specimen point group, about g * h through s * r: for rotations it runs from s * o1 * inv(g),
+    for an improper element, which maps h onto -(-g) h, from the rotation -g turned by a half
+    turn about an axis normal to h (on the specimen side normal to s * r), so that an arc keeps
+    its length. MATLAB's second output, the number of distinct ones, is f.multiplicity().
 
     Input
       f - fibre
@@ -301,11 +307,12 @@ class fibre:
       unique - keep only the distinct fibres, those whose h and r differ (a single fibre only)
     See also
       fibre.multiplicity, orientation.symmetrise"""
-    L, R = reductionGroups(self.o1)
-    nL, nR = len(L), len(R)
-    o1 = qmul(qmul(L[:, None, None, :], self.o1.data[None, None]), qconj(R)[None, :, None, :])
-    o2 = qmul(qmul(L[:, None, None, :], self.o2.data[None, None]), qconj(R)[None, :, None, :])
-    h = np.broadcast_to(qrot(R[None, :, None, :], self.h.data[None, None]), o1.shape[:-1] + (3,))
+    T, hs = _crystalSide(self.CS, self.h.normalize().data)
+    U = _specimenSide(self.SS, self.r.normalize().data)
+    nL, nR = U.shape[-2], T.shape[-2]
+    o1 = qmul(qmul(np.moveaxis(U, -2, 0)[:, None], self.o1.data[None, None]), np.moveaxis(T, -2, 0)[None, :])
+    o2 = qmul(qmul(np.moveaxis(U, -2, 0)[:, None], self.o2.data[None, None]), np.moveaxis(T, -2, 0)[None, :])
+    h = np.broadcast_to(np.moveaxis(hs, -2, 0)[None] * np.linalg.norm(self.h.data, axis=-1)[..., None], o1.shape[:-1] + (3,))
     out = self._build(self.o1._new(o1.reshape((nL * nR,) + self.shape + (4,))), self.o2._new(o2.reshape((nL * nR,) + self.shape + (4,))),
                       self.h._new(h.reshape((nL * nR,) + self.shape + (3,))))
     if not unique:
@@ -350,9 +357,8 @@ class fibre:
       raise TypeError("a fibre is compared with a fibre")
     if self.CS is not other.CS or self.SS is not other.SS:
       return np.zeros(np.broadcast_shapes(self.shape, other.shape), dtype=bool)
-    L, R = reductionGroups(self.o1)
-    hd = np.sum(qrot(R, self.h.normalize().data[..., None, :]) * other.h.normalize().data[..., None, :], axis=-1)
-    rd = np.sum(qrot(L, self.r.normalize().data[..., None, :]) * other.r.normalize().data[..., None, :], axis=-1)
+    hd = np.sum(_images(self.CS, self.h.normalize().data) * other.h.normalize().data[..., None, :], axis=-1)
+    rd = np.sum(_images(self.SS, self.r.normalize().data) * other.r.normalize().data[..., None, :], axis=-1)
     same = np.any(hd > 1 - tol, axis=-1) & np.any(rd > 1 - tol, axis=-1)
     flipped = np.any(hd < tol - 1, axis=-1) & np.any(rd < tol - 1, axis=-1)
     return (same | flipped) & (self.isFull == other.isFull)
@@ -576,6 +582,42 @@ class fibre:
 
 
 # ------------------------------------------------------------------ helpers
+
+def directionOrbits(cs, ss, h, r):
+  """the distinct images of the unit vectors h under the crystal point group and r under the
+  specimen point group, the improper elements included, as rows; -h and -r are among them where
+  either group holds the inversion, and a tube about -h || r is that about h || -r"""
+  return _uniqueDirections(_images(cs, h.reshape(3))), _uniqueDirections(_images(ss, r.reshape(3)))
+
+
+# the rotations t with t (g h) = h for every element g of the crystal point group, (..., n, 4), and
+# the images g h: inv(g) for a rotation, the half turn about an axis normal to h after inv(-g) for
+# an improper element
+def _crystalSide(frame, h):
+  o = frame.rot.data.reshape(-1, 5)
+  t = np.broadcast_to(qconj(o[:, :4]), h.shape[:-1] + (len(o), 4)).copy()
+  flip = o[:, 4] < 0
+  t[..., flip, :] = qmul(_halfTurn(h)[..., None, :], t[..., flip, :])
+  return t, _images(frame, h)
+
+
+# the rotations u with u r = s r for every element s of the specimen point group, (..., n, 4): s for
+# a rotation, the half turn about an axis normal to s r after -s for an improper element
+def _specimenSide(frame, r):
+  o = frame.rot.data.reshape(-1, 5)
+  u = np.broadcast_to(o[:, :4], r.shape[:-1] + (len(o), 4)).copy()
+  flip = o[:, 4] < 0
+  u[..., flip, :] = qmul(_halfTurn(_images(frame, r)[..., flip, :]), u[..., flip, :])
+  return u
+
+
+# the half turn about an axis normal to the unit vectors v, as quaternions
+def _halfTurn(v):
+  a = np.cross(v, [1.0, 0, 0])
+  a = np.where((np.linalg.norm(a, axis=-1) < 0.5)[..., None], np.cross(v, [0, 1.0, 0]), a)
+  a = a / np.linalg.norm(a, axis=-1, keepdims=True)
+  return np.concatenate([np.zeros(a.shape[:-1] + (1,)), a], axis=-1)
+
 
 # the axis of the rotation from o1 to o2 in the crystal frame, the c axis where they coincide
 def _axisBetween(o1, o2):

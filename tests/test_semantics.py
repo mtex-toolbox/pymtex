@@ -336,3 +336,17 @@ def test_S26_default_convention():
   fr.how2plot = None
   m.plottingConvention.default("y↑→x")
   assert _conventionOf(fr) == m.plottingConvention("y↑→x")
+
+
+def test_S27_a_fibre_is_that_of_every_equivalent_pair():
+  m = ori()
+  cs = m.crystalFrame("m-3m")
+  h = m.Miller(1, 2, 4, cs, "uvw")
+  f = m.fibre(h, m.vector3d.Z)
+  g = m.orientation(m.rotation.map(m.vector3d(-h.data), m.vector3d.Z), cs, f.SS)
+  assert m.angle(f, g) < 1e-7 and m.multiplicity(f) == 48
+  # a specimen frame with the inversion adds -r: 432 has no -h, mmm brings it in
+  cs4 = m.crystalFrame("432")
+  f4 = m.fibre(m.Miller(1, 2, 4, cs4, "uvw"), m.vector3d(1, 2, 3), m.specimenFrame("mmm"))
+  g4 = m.orientation(m.rotation.map(m.vector3d(f4.h.data), -m.vector3d(1, 2, 3)), cs4, f4.SS)
+  assert m.angle(f4, g4) < 1e-7

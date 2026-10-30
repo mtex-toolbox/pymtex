@@ -264,15 +264,16 @@ plotFibre(odf, fibre.eta(cs, ss), lineWidth=2, figSize='small')
 volume5Percent = 100 * volume(odf, betaFull, 5 * degree)
 volume5Percent
 
-# The result is about 25 percent within $5^\circ$ of the fibre it was built on. The tube
-# is the union of the tubes about the crystal and specimen symmetric copies of the fibre,
-# which overlap: a uniform texture would already put 16 percent into it. At the
-# $10^\circ$ kernel halfwidth the share grows to
+# The result is about 34 percent within $5^\circ$ of the fibre it was built on. The tube
+# is the union of the tubes about every pair of an equivalent of h and one of r under the
+# point groups, which overlap; the inversion of the orthorhombic specimen frame adds the
+# fibre of h || -r, which no rotation reaches. A uniform texture would already put 23
+# percent into it. At the $10^\circ$ kernel halfwidth the share grows to
 
 volume10Percent = 100 * volume(odf, betaFull, 10 * degree)
 volume10Percent
 
-# about 72 percent. [fibreVolume](SO3Fun.fibreVolume.html) divides every point of the
+# about 81 percent. [fibreVolume](SO3Fun.fibreVolume.html) divides every point of the
 # tube among the copies that hold it, so the overlap counts once.
 #
 # ## The Maths Behind Pole Figures

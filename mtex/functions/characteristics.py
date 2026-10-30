@@ -15,7 +15,7 @@ import numpy as np
 
 from ..geometry._array import MtexArray
 from ..geometry.display import framesLabel
-from ..geometry.fibre import _uniqueDirections, fibre
+from ..geometry.fibre import _uniqueDirections, directionOrbits, fibre
 from ..geometry.frames import crystalFrame, referenceFrame
 from ..geometry.kernels import backend, qconj, qmul
 from ..geometry.grids.localgrids import localOrientationGrid, localS2Grid
@@ -235,9 +235,10 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
 
   The function is averaged over the tube about the fibre, the orientations g with g h within
   the radius of r: the directions u on the cap of the radius about r, and for each the turns
-  about u a degree apart, or the resolution where it is coarser. The region is the union of the tubes of the symmetrically equivalent
-  pairs of h and r, the orientations whose angle to the fibre (fibre.angle) is below the
-  radius; the tubes overlap where the equivalents of h or of r lie within twice the radius, so
+  about u a degree apart, or the resolution where it is coarser. The region is the union of the
+  tubes of the pairs of the images of h under the crystal point group and of r under the
+  specimen point group, the improper elements included (-h in a centrosymmetric crystal), the
+  orientations whose angle to the fibre (fibre.angle) is below the radius; the tubes overlap where the equivalents of h or of r lie within twice the radius, so
   every point of the tube is divided among the tubes that hold it. The mean of these shares
   times the measure of all tubes is the volume; for the uniform density without overlap it is
   (1 - cos radius) / 2 times the number of the pairs.
@@ -257,21 +258,53 @@ def fibreVolume(f, h, r=None, radius=None, resolution=None):
   if isinstance(h, fibre):
     h, r, radius = h.h, h.r, r
   res = min(1 * degree, radius / 30) if resolution is None else resolution
-  rd = vector3d(r.data.reshape(3)).normalize().data.reshape(3)
-  u, wcap = _capRings(rd, radius, res)
   hd = vector3d(h.data.reshape(3)).normalize().data.reshape(3)
-  # the circle g h = u as the map of h onto u after the turns about h, a degree apart, which
-  # resolves a kernel of a few degree along the circle
+  rd = vector3d(r.data.reshape(3)).normalize().data.reshape(3)
+  # the equivalent pairs of h and r fall into classes under the rotations of the symmetry, one
+  # for every class of h' and of r', as the improper elements add images (-h in a centrosymmetric
+  # crystal) no rotation reaches; the tubes of a class hold the same share of the function, and
+  # that of (-h', -r') is the tube of (h', r')
+  hs, rs = directionOrbits(f.CS, f.SS, hd, rd)
+  L, R = _framesOf(f)
+  hClass, rClass = _rotationClasses(hs, R), _rotationClasses(rs, L)
+  share = {}
+  for a in range(len(hs)):
+    for b in range(len(rs)):
+      if hClass[a] != a or rClass[b] != b:
+        continue
+      ia, ib = _indexOf(hs, -hs[a]), _indexOf(rs, -rs[b])
+      key = (a, b) if ia is None or ib is None or (a, b) <= (hClass[ia], rClass[ib]) else (hClass[ia], rClass[ib])
+      share[key] = share.get(key, 0) + np.count_nonzero(hClass == a) * np.count_nonzero(rClass == b)
+  v = sum(n * _tubeMean(f, hs[a], rs[b], hs, rs, radius, res) for (a, b), n in share.items())
+  return float(v * (1 - math.cos(radius)) / 2)
+
+
+# the mean of f over the tube g h close to r, every point divided among the tubes of the pairs of hs
+# and rs that hold it: the directions u on the cap of the radius about r, and for each the turns
+# about h a degree apart, or the resolution where it is coarser, which resolves a kernel of a few
+# degree along the circle g h = u
+def _tubeMean(f, hd, rd, hs, rs, radius, res):
+  u, wcap = _capRings(rd, radius, res)
   n = max(int(np.ceil(2 * np.pi / max(res, 1 * degree))), 36)
   turn = rotation.byAxisAngle(vector3d(hd), np.linspace(0, 2 * np.pi, n, endpoint=False)).data.reshape(1, n, 4)
   q = qmul(rotation.map(np.broadcast_to(hd, u.shape), u).data.reshape(-1, 1, 4), turn).reshape(-1, 4)
   g = orientation._fromRotation(q, (f.CS, f.SS), getattr(f, "antipodal", False))
-  # the equivalent pairs of h and r, and how many of their tubes hold each point of this one
-  L, R = _framesOf(f)
-  hs = _uniqueDirections(qrot(R, hd.reshape(1, 3)))
-  rs = _uniqueDirections(qrot(L, rd.reshape(1, 3)))
   vals = (np.real(f(g)).reshape(-1) / _tubeCoverCount(q, hs, rs, hd, rd, radius)).reshape(len(u), n).mean(axis=1)
-  return float(np.sum(wcap * vals) / np.sum(wcap) * len(hs) * len(rs) * (1 - math.cos(radius)) / 2)
+  return np.sum(wcap * vals) / np.sum(wcap)
+
+
+# for every unit vector the index of the first one of its class under the rotations
+def _rotationClasses(xs, Q):
+  cls = np.full(len(xs), -1)
+  for k in range(len(xs)):
+    if cls[k] < 0:
+      cls[np.max(qrot(Q, xs[k]) @ xs.T, axis=0) > 1 - 1e-9] = k
+  return cls
+
+
+def _indexOf(xs, x):
+  k = np.flatnonzero(xs @ x > 1 - 1e-9)
+  return int(k[0]) if len(k) else None
 
 
 # how many of the tubes g h' . r' > cos(radius) of the pairs of hs and rs hold each rotation q of

@@ -141,3 +141,11 @@ orientation lands in `ori.frameB`.
 `specimenFrame.specimen`, the generic `X, Y, Z` frame, drawn with `x` east, `y` south
 and `z` into the screen (`plottingConvention.ij`), the convention of SEM images. A
 frame without a convention follows the session default at render time.
+
+**S27. A fibre is that of every equivalent pair.** `fibre(h, r)` stands for the orientations
+mapping an image of `h` under the crystal point group onto an image of `r` under the
+specimen point group, the improper elements included, as S24 compares directions:
+`angle(f, ori)`, `volume(ori, f, radius)`, `fibreVolume` and `symmetrise(f)` all take that
+union. Where either group holds the inversion it holds the fibre of `-h || r`, which no
+rotation of the symmetry reaches: in `m-3m` the orientation turning `-(124)` onto `z` lies
+on the fibre `(124) || z`.
