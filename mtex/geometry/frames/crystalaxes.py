@@ -61,8 +61,14 @@ def checkCell(lattice, abc, abg, uniqueAxis=1):
       raise ValueError(f"for a {lattice} lattice a, b and c must be equal")
 
 
-def defaultAxes(abc, abg):
-  """the axes in the default alignment X||a*, Z||c, from the metric"""
+def defaultAxes(lattice, abc, abg):
+  """the axes in the default alignment X||a*, Z||c: those the symmetry fixes for a trigonal,
+  hexagonal or orthogonal lattice, else from the metric"""
+  # the angles of these lattices are their own, whatever the cell gives
+  if lattice.isTriHex:
+    return np.asarray(abc)[:, None] * np.array([[np.sqrt(0.75), -0.5, 0], [0, 1, 0], [0, 0, 1]])
+  if lattice.isOrthogonal:
+    return np.diag(abc)
   (a, b, c), (alpha, beta, gamma) = abc, abg
   ca, cb, cg, sa = np.cos(alpha), np.cos(beta), np.cos(gamma), np.sin(alpha)
   V = np.sqrt(1 + 2 * ca * cb * cg - ca ** 2 - cb ** 2 - cg ** 2)
@@ -162,15 +168,14 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   hexagonal lattices, where a and a* differ
 
   A length of 0 is filled from the others and an angle of 0 from its partners, as MTEX fills
-  them; a cell the lattice does not allow is refused unless check=False. Trigonal and
-  hexagonal conventional cells use exact 90, 90, 120 degree angles; orthogonal lattices use
-  exact right angles, as MATLAB's calcAxis.
+  them; a cell the lattice does not allow is refused unless check=False.
 
   Input
     lattice - latticeType, the lattice system
     abc - the lengths a, b, c of the cell
     abg - the angles alpha, beta, gamma of the cell, in radians; by default those of the
-        lattice
+        lattice. A trigonal, hexagonal or orthogonal lattice keeps its own and ignores those
+        given, also with check=False, so that rounded angles give its exact axes
   Output
     axes - a (3, 3) array, the axes a, b, c in Cartesian coordinates, one per row
   Keywords
@@ -186,12 +191,7 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   abc, abg = completeCell(abc, abg)
   if check:
     checkCell(lattice, abc, abg, uniqueAxis)
-  if lattice.isTriHex:
-    axes = np.asarray(abc)[:, None] * np.array([[np.sqrt(0.75), -0.5, 0], [0, 1, 0], [0, 0, 1]])
-  elif lattice.isOrthogonal:
-    axes = np.diag(abc)
-  else:
-    axes = defaultAxes(abc, abg)
+  axes = defaultAxes(lattice, abc, abg)
   alignment = [str(s) for s in alignment]
   if any(s.upper() in ALIGNMENT_VENDORS for s in alignment):
     alignment = [s for s in alignment if s.upper() not in ALIGNMENT_VENDORS]
