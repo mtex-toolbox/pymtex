@@ -474,11 +474,12 @@ class EBSD:
     q = q.reshape(-1, q.shape[-1])
     if q.shape[1] == 2:
       q = np.concatenate([q, np.zeros((len(q), 1))], axis=1)
-    P = self.pos.data.reshape(-1, 3)
+    from scipy.spatial import cKDTree
+    tree = cKDTree(self.pos.data.reshape(-1, 3))
     if radius is None:
-      ids = np.array([np.argmin(np.linalg.norm(P - p, axis=1)) for p in q])
+      ids = tree.query(q)[1]
     else:
-      ids = np.unique(np.concatenate([np.flatnonzero(np.linalg.norm(P - p, axis=1) <= radius) for p in q]))
+      ids = np.unique(np.concatenate([np.asarray(i, dtype=int) for i in tree.query_ball_point(q, radius)]))
     return self._subset(ids)
 
   def findByOrientation(self, ori, epsilon):
