@@ -252,3 +252,14 @@ def test_crystalShape_catalogueHasNoOtherNames():
 def test_crystalShape_everyCatalogueEntryBuilds(k):
   name, simple = (k[:-7], True) if k.endswith("_simple") else (k, False)
   assert getattr(crystalShape, name)(simple=simple).numFaces >= 4
+
+
+@pytest.mark.parametrize("group, cell, constructor, vertices, faces", [
+  ("6/mmm", [3, 3, 5], crystalShape.hex, 12, 8),
+  ("m-3m", [3, 3, 3], crystalShape.cube, 8, 6),
+])
+def test_crystalShape_keepsItsFacesUnderRoundedAngles(group, cell, constructor, vertices, faces):
+  # float32 angles, as an HDF5 file stores them
+  angles = np.asarray(crystalFrame(group, cell, intern=False).lattice.defaultAngles).astype(np.float32).astype(float)
+  shape = constructor(crystalFrame(group, cell, angles, intern=False))
+  assert (shape.numVertices, shape.numFaces) == (vertices, faces)

@@ -5,8 +5,8 @@
 # The default alignment is X||a*, Z||c. Any other is asked for by naming which lattice
 # direction a Cartesian axis lies along: a, b, c, their reciprocals a*, b*, c*, m = a + b
 # and d = a + b + c; 'EDAX' (also 'TSL', 'OIM') is the vendor alignment X||a for the
-# lattices where a and a* differ. One construction serves every lattice: the axes from
-# the metric with a* along x and c along z, then turned into the alignment asked for.
+# lattices where a and a* differ. Symmetry fixes the conventional hexagonal and orthogonal
+# axes; the remaining lattices use the supplied metric, before alignment and rotation.
 # Axes are (3, 3) arrays, one axis per row.
 from __future__ import annotations
 
@@ -61,8 +61,14 @@ def checkCell(lattice, abc, abg, uniqueAxis=1):
       raise ValueError(f"for a {lattice} lattice a, b and c must be equal")
 
 
-def defaultAxes(abc, abg):
-  """the axes in the default alignment X||a*, Z||c, from the metric"""
+def defaultAxes(lattice, abc, abg):
+  """the axes in the default alignment X||a*, Z||c: those the symmetry fixes for a trigonal,
+  hexagonal or orthogonal lattice, else from the metric"""
+  # the angles of these lattices are their own, whatever the cell gives
+  if lattice.isTriHex:
+    return np.asarray(abc)[:, None] * np.array([[np.sqrt(0.75), -0.5, 0], [0, 1, 0], [0, 0, 1]])
+  if lattice.isOrthogonal:
+    return np.diag(abc)
   (a, b, c), (alpha, beta, gamma) = abc, abg
   ca, cb, cg, sa = np.cos(alpha), np.cos(beta), np.cos(gamma), np.sin(alpha)
   V = np.sqrt(1 + 2 * ca * cb * cg - ca ** 2 - cb ** 2 - cg ** 2)
@@ -168,7 +174,8 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
     lattice - latticeType, the lattice system
     abc - the lengths a, b, c of the cell
     abg - the angles alpha, beta, gamma of the cell, in radians; by default those of the
-        lattice
+        lattice. A trigonal, hexagonal or orthogonal lattice keeps its own and ignores those
+        given, also with check=False, so that rounded angles give its exact axes
   Output
     axes - a (3, 3) array, the axes a, b, c in Cartesian coordinates, one per row
   Keywords
@@ -184,7 +191,7 @@ def crystalAxes(lattice, abc, abg=None, alignment=(), rotate=None, uniqueAxis=1,
   abc, abg = completeCell(abc, abg)
   if check:
     checkCell(lattice, abc, abg, uniqueAxis)
-  axes = defaultAxes(abc, abg)
+  axes = defaultAxes(lattice, abc, abg)
   alignment = [str(s) for s in alignment]
   if any(s.upper() in ALIGNMENT_VENDORS for s in alignment):
     alignment = [s for s in alignment if s.upper() not in ALIGNMENT_VENDORS]
