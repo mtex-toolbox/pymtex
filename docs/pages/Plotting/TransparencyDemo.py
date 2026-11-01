@@ -78,7 +78,7 @@ plot(ebsd, ebsd.bc)
 mtexColorMap('black2white')
 
 hold(True)
-plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations, faceAlpha=0.5)
+plot(ebsd['Forsterite'], ipfDirection=zvector, faceAlpha=0.5)
 hold(False)
 # -
 
@@ -99,7 +99,7 @@ ebsdF = ebsd['Forsterite']
 
 alpha = np.minimum(ebsdF.bc / np.mean(ebsdF.bc), 1)
 
-plot(ebsdF, ebsdF.orientations, faceAlpha=alpha, figSize='large')
+plot(ebsdF, ipfDirection=zvector, faceAlpha=alpha, figSize='large')
 # -
 
 # Low-band-contrast pixels fade while pixels at or above the mean remain
@@ -123,7 +123,7 @@ plot(ebsd, ebsd.bc)
 mtexColorMap('black2white')
 
 hold(True)
-plot(grains['Forsterite'], grains['Forsterite'].meanOrientation, faceAlpha=0.5)
+plot(grains['Forsterite'], ipfDirection=zvector, faceAlpha=0.5)
 hold(False)
 # -
 

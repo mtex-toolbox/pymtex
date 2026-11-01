@@ -26,7 +26,7 @@ ebsd = mtexdata('martensite', verbose=False)
 # +
 grains = calcGrains(ebsd, angle=3 * degree, minPixel=2, alpha=12)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -104,7 +104,7 @@ job
 fit, c2cPairs = job.calcGBFit()
 gB, pairId = job.grains.boundary.selectByGrainId(c2cPairs)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large', faceAlpha=0.5)
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large', faceAlpha=0.5)
 hold(True)
 plot(gB, edgeAlpha=np.clip((fit[pairId] / degree - 2.5) / 2, 0, 1), lineWidth=2)
 hold(False)
@@ -176,7 +176,7 @@ mtexColorbar()
 job.calcParentFromVote(minProb=0.5)
 print(job)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The map contains transformed parent fragments rather than final parent grain footprints. The
@@ -205,7 +205,7 @@ print(job)
 job.calcParentFromVote()
 print(job)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # Earlier versions passed `'tortuosity'` to `calcGBVotes` as well. That function also has no
@@ -223,7 +223,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 job.mergeSimilar(threshold=7.5 * degree)
 job.grains = smoothBoundary(job.grains, 20)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The similarly coloured fragments have coalesced into larger parent grains. Small enclosed
@@ -239,7 +239,7 @@ plot(job.parentGrains, job.parentGrains.meanOrientation)
 # +
 job.mergeInclusions(maxSize=50)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The large parent-grain shapes remain, while small enclosed fragments no longer break them
@@ -283,7 +283,7 @@ childGrains = job.grainsPrior[job.mergeId == grainSelected.id]
 selectedParentId = grainSelected.id
 print(selectedParentId)
 
-plot(childGrains, childGrains.meanOrientation)
+plot(childGrains, ipfDirection=zvector)
 hold(True)
 plot(grainSelected.boundary, lineWidth=2)
 hold(False)
@@ -329,7 +329,7 @@ hold(False)
 # +
 parentEBSD = job.calcParentEBSD()
 
-plot(parentEBSD['Iron fcc'], parentEBSD['Iron fcc'].orientations, figSize='large')
+plot(parentEBSD['Iron fcc'], ipfDirection=zvector, figSize='large')
 # -
 
 # The reconstructed pixel colours follow the parent-grain partition. Remaining blank pixels
@@ -363,7 +363,7 @@ hold(False)
 parentGrains = calcGrains(parentEBSD, angle=3 * degree, minPixel=10)
 parentGrains = smoothBoundary(parentGrains, 20)
 
-plot(ebsd, ebsd.orientations, figSize='large')
+plot(ebsd, ipfDirection=zvector, figSize='large')
 hold(True)
 plot(parentGrains.boundary, lineWidth=2)
 hold(False)
@@ -376,7 +376,7 @@ hold(False)
 F = halfQuadraticFilter()
 parentEBSD = smooth(parentEBSD, F, fill=parentGrains)
 
-plot(parentEBSD['Iron fcc'], parentEBSD['Iron fcc'].orientations, figSize='large')
+plot(parentEBSD['Iron fcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(parentGrains.boundary, lineWidth=2)
 hold(False)

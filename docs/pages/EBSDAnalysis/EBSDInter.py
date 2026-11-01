@@ -29,7 +29,7 @@ ebsd = mtexdata('twins')
 x = 30.5
 y = 5.5
 
-plot(ebsd, ebsd.orientations)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plt.plot(x, y, 'ko', markerfacecolor='w', markersize=7)
 hold(False)
@@ -87,7 +87,7 @@ ebsdNewGrid
 
 # +
 # plot only cells that received source data
-plot(ebsdNewGrid['indexed'], ebsdNewGrid['indexed'].orientations)
+plot(ebsdNewGrid['indexed'], ipfDirection=zvector)
 ext = ebsd.extent()
 plt.xlim(ext[0], ext[1])
 plt.ylim(ext[2], ext[3])
@@ -115,7 +115,7 @@ hexGridSize = ebsd.shape
 hexGridSize
 # -
 
-plot(ebsd[0:50, 0:100], ebsd[0:50, 0:100].orientations)
+plot(ebsd[0:50, 0:100], ipfDirection=zvector)
 
 # The staggered pixel rows reveal the hexagonal sampling lattice. Their orientations are
 # measurements; the next figure only redraws those values on a different lattice.
@@ -135,7 +135,7 @@ squareGridSize = ebsdS.shape
 squareGridSize
 # -
 
-plot(ebsdS[0:150, 0:350], ebsdS[0:150, 0:350].orientations)
+plot(ebsdS[0:150, 0:350], ipfDirection=zvector)
 
 # The result is a square grid with 808 by 809 cells in place of the 270 by 234 hexagonal
 # cells, about ten times as many. The stepped colour regions show that each new cell

@@ -211,7 +211,7 @@ ebsd = ebsd[ebsd.inpolygon([0, 0, 200, 50])]
 grains = calcGrains(ebsd)
 grains = smoothBoundary(grains, 5)
 
-plot(ebsd, ebsd.orientations, micronbar='off')
+plot(ebsd, ipfDirection=zvector, micronbar='off')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)

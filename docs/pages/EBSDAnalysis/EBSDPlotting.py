@@ -128,6 +128,14 @@ plot(ebsd['Forsterite'], colors)
 # the same data look different. [IPF Maps](EBSDIPFMap.html) explains those choices.
 # [Advanced Plotting](EBSDAdvancedMaps.html) covers keys that answer questions other than
 # "which direction points where".
+#
+# The keyword `ipfDirection` alone is the short form of this map. It colours every phase
+# with its own key for the given specimen direction.
+
+plot(ebsd, ipfDirection=zvector)
+
+# Forsterite appears exactly as above. Enstatite and diopside now carry the colours of
+# their own keys, and the notIndexed measurements keep the grey given to them above.
 
 # ## Two maps in one figure
 #

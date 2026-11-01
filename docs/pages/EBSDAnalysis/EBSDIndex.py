@@ -33,7 +33,7 @@ ebsd
 # list. Writing the list position into every square reveals the order in which the
 # entries are stored.
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, micronbar=False, edgeColor='k', backend='patch')
+plot(ebsd, ipfDirection=zvector, micronbar=False, edgeColor='k', backend='patch')
 text(ebsd, np.arange(len(ebsd)))
 
 # A single numeric subscript selects by list position, counted from zero. The red outline
@@ -54,7 +54,7 @@ hold(False)
 # Cropping changed every measurement's position in the list. Entry 15 of the crop was not
 # entry 15 of the full map. Its identifier in that parent map is stored in `ebsd.id`.
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, micronbar=False, edgeColor='k', backend='patch')
+plot(ebsd, ipfDirection=zvector, micronbar=False, edgeColor='k', backend='patch')
 text(ebsd, ebsd.id)
 
 # The key `'id'` selects by those identifiers. It therefore highlights the same three
@@ -94,7 +94,7 @@ ebsd.shape
 # The labels now show `(row, column)` rather than a single linear index.
 
 # +
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, micronbar=False, edgeColor='black', backend='patch')
+plot(ebsd, ipfDirection=zvector, micronbar=False, edgeColor='black', backend='patch')
 
 i, j = np.indices(ebsd.shape)
 labels = [f'({a},{b})' for a, b in zip(i.ravel(), j.ravel())]
@@ -130,7 +130,7 @@ ebsd
 # +
 ebsd = ebsd[9:16, 67:79]
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, edgeColor='k', micronbar=False, backend='patch')
+plot(ebsd, ipfDirection=zvector, edgeColor='k', micronbar=False, backend='patch')
 plt.axis('off')
 
 i, j = np.indices(ebsd.shape)
@@ -153,7 +153,7 @@ text(ebsd, labels)
 # construction and further algorithms.
 
 # +
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, edgeColor='k', micronbar=False, backend='patch')
+plot(ebsd, ipfDirection=zvector, edgeColor='k', micronbar=False, backend='patch')
 plt.axis('off')
 
 x, y, z = ebsd.hex2cube(i, j)

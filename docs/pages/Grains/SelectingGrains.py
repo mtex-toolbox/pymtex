@@ -28,7 +28,7 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=5, alpha=6)
 grains = smoothBoundary(grains, 5)
 
 # plot forsterite by orientation
-plot(ebsd['Fo'], ebsd['Fo'].orientations, ipfDirection=zvector)
+plot(ebsd['Fo'], ipfDirection=zvector)
 
 # plot the other two phases in grey
 hold(True)
@@ -186,7 +186,7 @@ similarGrains = grains.findByOrientation(referenceGrain.meanOrientation, 20 * de
 similarGrains
 # -
 
-plot(ebsd['Fo'], ebsd['Fo'].orientations, ipfDirection=zvector)
+plot(ebsd['Fo'], ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=2)
 plot(similarGrains.boundary, lineWidth=4, lineColor='gold')
@@ -250,7 +250,7 @@ sameMeasurements
 largestGrain = grains[maxIndex]
 largestGrainEbsd = ebsd[largestGrain]
 
-plot(largestGrainEbsd, largestGrainEbsd.orientations, ipfDirection=zvector)
+plot(largestGrainEbsd, ipfDirection=zvector)
 hold(True)
 plot(largestGrain.boundary, lineWidth=2)
 hold(False)

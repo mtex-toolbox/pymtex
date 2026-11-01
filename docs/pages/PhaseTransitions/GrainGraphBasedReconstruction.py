@@ -27,7 +27,7 @@ ebsd = mtexdata('martensite', verbose=False)
 grains = calcGrains(ebsd, angle=3 * degree, minPixel=5, alpha=6.1)
 grains = smoothBoundary(grains, 5)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -117,7 +117,7 @@ graphWeightQuantiles
 # [`plotGraph`](parentGrainReconstructor.plotGraph.html) maps the edge weights back to their
 # grain boundaries.
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large', faceAlpha=0.5)
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large', faceAlpha=0.5)
 hold(True)
 job.plotGraph(lineWidth=2)
 hold(False)
@@ -153,7 +153,7 @@ print(job)
 
 numGraphTransformed = np.count_nonzero(job.isTransformed)
 print(numGraphTransformed)
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # Most child grains now appear in the parent phase. The graph transforms 4,414 grains and
@@ -188,7 +188,7 @@ print(numGrainsFailingGraphCriteria)
 job.revert(rejectGraphAssignment)
 print(job)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # [`revert`](parentGrainReconstructor.revert.html) restores the measured child phase and
@@ -211,7 +211,7 @@ for k in range(1, 4):
   childGrainsAfterVote[k - 1] = len(job.childGrains)
 
 print(childGrainsAfterVote)
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The printed sequence should decrease as the reconstructed neighbourhood expands. It is 614,
@@ -234,7 +234,7 @@ job.mergeInclusions(maxSize=50)
 numParentsAfterInclusionMerge = len(job.parentGrains)
 print(numParentsBeforeMerge, numParentsAfterSimilarMerge, numParentsAfterInclusionMerge)
 
-plot(job.parentGrains, job.parentGrains.meanOrientation)
+plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The first count change measures orientation-based merging. The second measures topological

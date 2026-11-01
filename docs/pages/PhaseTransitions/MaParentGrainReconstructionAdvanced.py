@@ -33,7 +33,7 @@ csFCC = ebsd.CSList[2]
 
 grains = calcGrains(ebsd, angle=3 * degree, minPixel=5, removeQuadruplePoints=True)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -90,7 +90,7 @@ plt.ylabel('grain-pair count')
 # +
 gB, pairId = grains.boundary.selectByGrainId(grainPairs)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(gB, lineWidth=3, lineColor='white')
 plot(gB, boundaryFit[pairId] / degree, lineWidth=2)
@@ -170,7 +170,7 @@ boundaryParentEBSD = ebsd.copy()
 old2new = np.r_[0, boundaryParentId]
 boundaryParentEBSD.grainId = old2new[ebsd.grainId]
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(boundaryParentGrains.boundary, lineWidth=4, lineColor='white')
 plot(boundaryParentGrains.boundary, lineWidth=2, lineColor='black')
@@ -228,7 +228,7 @@ boundaryParentEBSD.grainId = old2new[boundaryParentEBSD.grainId]
 numParentsAfterOrientationMerge = len(boundaryParentGrains['Iron fcc'])
 print(numParentsAfterOrientationMerge)
 
-plot(boundaryParentGrains['Iron fcc'], boundaryParentGrains['Iron fcc'].meanOrientation, figSize='large')
+plot(boundaryParentGrains['Iron fcc'], ipfDirection=zvector, figSize='large')
 # -
 
 # The orientation merge reduces 360 accepted components to 222 fcc parent grains. Their
@@ -302,7 +302,7 @@ boundaryParentEBSD[isNowFCC] = parentOri
 pixelFitQuantiles = np.nanquantile(pixelFit / degree, [0.5, 0.9, 0.99])
 print(pixelFitQuantiles)
 
-plot(boundaryParentEBSD['Iron fcc'], boundaryParentEBSD['Iron fcc'].orientations, figSize='large')
+plot(boundaryParentEBSD['Iron fcc'], ipfDirection=zvector, figSize='large')
 # -
 
 # The pixel colours preserve variation inside the reconstructed austenite footprints. Blank
@@ -329,7 +329,7 @@ setColorRange([0, 5])
 # filledGrains = smoothBoundary(filledGrains, 20)
 # F = halfQuadraticFilter()
 # filledEBSD = smooth(filledEBSD['indexed'], F, fill=filledGrains)
-# plot(filledEBSD['Iron fcc'], filledEBSD['Iron fcc'].orientations, figSize='large')
+# plot(filledEBSD['Iron fcc'], ipfDirection=zvector, figSize='large')
 # hold(True)
 # plot(filledGrains.boundary, lineWidth=2)
 # hold(False)
@@ -368,7 +368,7 @@ _, tripleFit = calcParent(tPori, fcc2bcc, id=True, threshold=5 * degree)
 tripleFitQuantiles = np.nanquantile(tripleFit / degree, [0.2, 0.4, 0.6, 0.8])
 print(tripleFitQuantiles)
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(grains.boundary, lineWidth=2)
 plot(tP, tripleFit / degree, markerEdgeColor='k', markerSize=8)
@@ -415,7 +415,7 @@ tripleParentEBSD = ebsd.copy()
 old2new = np.r_[0, tripleParentId]
 tripleParentEBSD.grainId = old2new[ebsd.grainId]
 
-plot(ebsd['Iron bcc'], ebsd['Iron bcc'].orientations, figSize='large')
+plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(tripleParentGrains.boundary, lineWidth=2)
 hold(False)

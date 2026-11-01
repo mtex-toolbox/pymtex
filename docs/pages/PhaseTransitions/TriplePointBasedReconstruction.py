@@ -13,7 +13,7 @@ from mtex import *
 ebsd = mtexdata('alphaBetaTitanium', verbose=False)
 
 # plot the measured alpha phase with inverse pole figure colours
-plot(ebsd['Ti (alpha)'], ebsd['Ti (alpha)'].orientations, figSize='large')
+plot(ebsd['Ti (alpha)'], ipfDirection=zvector, figSize='large')
 # -
 
 # The indexed measurements contain 99.8% alpha titanium and 0.2% beta titanium. The goal is
@@ -272,7 +272,7 @@ hold(False)
 # reconstructed beta-grain boundaries.
 
 # +
-plot(ebsd['Ti (Alpha)'], ebsd['Ti (Alpha)'].orientations, figSize='large')
+plot(ebsd['Ti (Alpha)'], ipfDirection=zvector, figSize='large')
 
 hold(True)
 parentGrains = smoothBoundary(job.parentGrains, 5)

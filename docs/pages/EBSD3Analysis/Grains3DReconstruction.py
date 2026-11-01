@@ -40,7 +40,7 @@ print(grains)
 # The summary lists the grains with their volume. The voxel data now carries a `grainId`
 # per voxel. Plotting the mean orientation colours every face on the outside of the volume.
 
-plot(grains, grains.meanOrientation, edgeAlpha=0.1, micronbar='off')
+plot(grains, ipfDirection=zvector, edgeAlpha=0.1, micronbar='off')
 setCamera(how2plot)
 
 # The colour is constant over each grain and changes sharply at the grain boundaries. The

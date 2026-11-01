@@ -41,7 +41,7 @@ grainSelected
 # plot the selected grain with its measured orientations
 plot(grainSelected.boundary, lineWidth=2)
 hold(True)
-plot(ebsd[grainSelected], ebsd[grainSelected].orientations, ipfDirection=zvector)
+plot(ebsd[grainSelected], ipfDirection=zvector)
 hold(False)
 # -
 

@@ -155,7 +155,7 @@ setCamera(plottingConvention.default3D)
 # +
 for p in ebsdZ.indexedPhaseId:
   ebsdP = ebsdZ[ebsdZ.CSList[p].mineral]
-  plot(ebsdP, ebsdP.orientations, micronbar='off')
+  plot(ebsdP, ipfDirection=zvector, micronbar='off')
   hold(True)
 hold(False)
 # -

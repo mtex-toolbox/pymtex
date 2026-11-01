@@ -241,7 +241,7 @@ ebsd = ebsd[largeGrains]
 # +
 plot(largeGrains.boundary, lineWidth=2)
 hold(True)
-plot(ebsd, ebsd.orientations)
+plot(ebsd, ipfDirection=zvector)
 hold(False)
 # -
 

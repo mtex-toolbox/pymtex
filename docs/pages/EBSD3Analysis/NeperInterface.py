@@ -109,7 +109,7 @@ print(grains)
 # stored geometry and orientations. The ODF controls grain orientations, not a
 # boundary-normal distribution or a constitutive law.
 
-plot(grains, grains.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(grains, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 how2plot = plottingConvention.default3D
 setCamera(how2plot)
 
@@ -151,13 +151,13 @@ grains224 = grains.slice(N[2], A)
 print(grains224)
 
 newMtexFigure(layout=[1, 3], figSize='large')
-plot(grains001, grains001.meanOrientation, micronbar='off')
+plot(grains001, ipfDirection=zvector, micronbar='off')
 mtexTitle('normal || specimen z')
 nextAxis()
-plot(grains1_10, grains1_10.meanOrientation, micronbar='off')
+plot(grains1_10, ipfDirection=zvector, micronbar='off')
 mtexTitle('normal || (1,-1,0)')
 nextAxis()
-plot(grains224, grains224.meanOrientation, micronbar='off')
+plot(grains224, ipfDirection=zvector, micronbar='off')
 mtexTitle('normal || (2,2,4)')
 # -
 
@@ -174,9 +174,9 @@ mtexTitle('normal || (2,2,4)')
 # +
 inPlane = grains.intersected(N[0], A)
 
-plot(grains001, grains001.meanOrientation, micronbar='off')
+plot(grains001, ipfDirection=zvector, micronbar='off')
 hold(True)
-plot(grains[inPlane], grains[inPlane].meanOrientation, faceAlpha=0.55, edgeAlpha=0.1)
+plot(grains[inPlane], ipfDirection=zvector, faceAlpha=0.55, edgeAlpha=0.1)
 hold(False)
 setCamera(how2plot)
 # -

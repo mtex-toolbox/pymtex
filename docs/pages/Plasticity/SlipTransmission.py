@@ -35,7 +35,7 @@ ebsd
 # +
 gB = grains.boundary['indexed']
 
-plot(ebsd, ebsd.orientations)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary)
 hold(False)

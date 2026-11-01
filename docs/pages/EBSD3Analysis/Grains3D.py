@@ -34,7 +34,7 @@ print(grains)
 # Plotting the mean orientation assigns one orientation colour to each polyhedron; it does
 # not display pointwise orientation variation.
 
-plot(grains, grains.meanOrientation, edgeAlpha=0.1, micronbar='off')
+plot(grains, ipfDirection=zvector, edgeAlpha=0.1, micronbar='off')
 setCamera(how2plot)
 
 # The colour changes sharply at grain contacts. Faint triangle edges reveal the surface
@@ -91,7 +91,7 @@ plane = plane3d(vector3d(1, 1, 1), vector3d(-20, 20, -15))
 grains2 = grains.slice(plane)
 print(grains2)
 
-plot(grains2, grains2.meanOrientation, micronbar='off')
+plot(grains2, ipfDirection=zvector, micronbar='off')
 setCamera(how2plot)
 # -
 
@@ -119,7 +119,7 @@ gB = grain.boundary
 neighbourIds = np.setdiff1d(np.unique(gB.grainId), np.r_[0, grain.id])
 neighbours = grains['id', neighbourIds]
 
-plot(neighbours, neighbours.meanOrientation, faceAlpha=0.2, edgeAlpha=0.1, micronbar='off')
+plot(neighbours, ipfDirection=zvector, faceAlpha=0.2, edgeAlpha=0.1, micronbar='off')
 hold(True)
 plot(grain, faceColor=[0.85, 0.25, 0.15], edgeAlpha=0.1)
 hold(False)

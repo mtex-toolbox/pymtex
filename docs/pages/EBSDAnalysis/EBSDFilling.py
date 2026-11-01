@@ -48,7 +48,7 @@ grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
 grains = smoothBoundary(grains, 5)
 
 # plot the orientation map and its reconstructed grain boundaries
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=1.5)
 hold(False)
@@ -70,7 +70,7 @@ ebsdSub
 
 # +
 # plot the retained data
-plot(ebsdSub, ebsdSub.orientations, ipfDirection=zvector)
+plot(ebsdSub, ipfDirection=zvector)
 # -
 
 # The object summary gives the exact retained counts. The plot now consists of isolated
@@ -110,7 +110,7 @@ hold(False)
 # +
 ebsdSub_filled = fill(ebsdSub.gridify(), grainsSub)
 
-plot(ebsdSub_filled['indexed'], ebsdSub_filled['indexed'].orientations, ipfDirection=zvector)
+plot(ebsdSub_filled['indexed'], ipfDirection=zvector)
 
 hold(True)
 plot(grainsSub.boundary, lineWidth=1.5)
@@ -142,7 +142,7 @@ F.alpha = 0.25
 # interpolate and smooth the missing orientations
 ebsdSub_smoothed = smooth(ebsdSub.gridify(), F, fill=grainsSub)
 
-plot(ebsdSub_smoothed['indexed'], ebsdSub_smoothed['indexed'].orientations, ipfDirection=zvector)
+plot(ebsdSub_smoothed['indexed'], ipfDirection=zvector)
 
 hold(True)
 plot(grainsSub.boundary, lineWidth=1.5)
@@ -205,10 +205,8 @@ ebsd = ebsd[inpolygon(ebsd, np.array([10, 4, 5, 3]) * 10**3)]
 
 print(f'The submap contains {100 * np.sum(~ebsd.isIndexed) / ebsd.size:.1f} percent notIndexed measurements')
 
-plot(ebsd['Fo'], ebsd['Fo'].orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
-plot(ebsd['En'], ebsd['En'].orientations, ipfDirection=zvector)
-plot(ebsd['Di'], ebsd['Di'].orientations, ipfDirection=zvector)
 
 # compute and smooth grains
 grains = calcGrains(ebsd, angle=10 * degree, minPixel=3, alpha=3)
@@ -245,10 +243,8 @@ F.alpha = 10
 
 ebsdS = smooth(ebsd, F, fill=grains)
 
-plot(ebsdS['Fo'], ebsdS['Fo'].orientations, ipfDirection=zvector)
+plot(ebsdS, ipfDirection=zvector)
 hold(True)
-plot(ebsdS['En'], ebsdS['En'].orientations, ipfDirection=zvector)
-plot(ebsdS['Di'], ebsdS['Di'].orientations, ipfDirection=zvector)
 
 # plot the boundary of all grains
 plot(grains.boundary, lineWidth=1.5)

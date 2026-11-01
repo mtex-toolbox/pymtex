@@ -233,7 +233,7 @@ ebsd = mtexdata('EMSphinx')
 # the deformed austenite
 ebsd = ebsd['Iron fcc']
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 # -
 
 # The colour gradients within the elongated grains show the bent lattice. We zoom into a
@@ -243,7 +243,7 @@ plot(ebsd, ebsd.orientations, ipfDirection=zvector)
 region = [40, 30, 80, 60]
 ebsd = ebsd[ebsd.inpolygon(region)]
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 # -
 
 # At the usual 10 degree threshold, the reconstruction misses every boundary below that
@@ -252,7 +252,7 @@ plot(ebsd, ebsd.orientations, ipfDirection=zvector)
 # +
 grains = smoothBoundary(calcGrains(ebsd, angle=10 * degree, minPixel=10), 5)
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=1.5)
 hold(False)
@@ -266,7 +266,7 @@ hold(False)
 # +
 grains = smoothBoundary(calcGrains(ebsd, angle=0.5 * degree, minPixel=10), 5)
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=1.5)
 hold(False)
@@ -288,7 +288,7 @@ hold(False)
 # +
 grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=0.5, minPixel=10), 5)
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=1.5)
 hold(False)
@@ -303,7 +303,7 @@ hold(False)
 # +
 grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=1.5, minPixel=10), 5)
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=1.5)
 hold(False)
@@ -319,7 +319,7 @@ ebsd = mtexdata('EMSphinx')['Iron fcc']
 
 grains = smoothBoundary(calcGrains(ebsd, fmc=1.5, minPixel=10, verbose=True), 5)
 
-plot(ebsd, ebsd.orientations, ipfDirection=zvector)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary)
 hold(False)

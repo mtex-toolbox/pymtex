@@ -33,7 +33,7 @@ plottingConvention.default('y↑→x')
 ebsd = mtexdata('forsterite')
 
 ebsdF = ebsd['Forsterite']
-plot(ebsdF, ebsdF.orientations)
+plot(ebsdF, ipfDirection=zvector)
 # -
 
 # Notice the sharp changes of colour between neighbouring measurements. The
@@ -91,7 +91,7 @@ assert os.path.isfile(outMap), 'The orientation-map export was not created.'
 # figure. To obtain a larger or smaller image, create a larger or smaller
 # figure with `figSize` before exporting it.
 
-plot(ebsdF, ebsdF.orientations, figSize='small')
+plot(ebsdF, ipfDirection=zvector, figSize='small')
 
 # This map uses a smaller canvas than the first map. Saving it now would
 # therefore produce a smaller bitmap with the same map content.

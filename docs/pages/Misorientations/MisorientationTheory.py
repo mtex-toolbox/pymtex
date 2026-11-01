@@ -42,7 +42,7 @@ CS = grains.CS
 # MATLAB, where these two are grains 57 and 58.
 
 # +
-plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
+plot(grains, ipfDirection=zvector, micronbar='off')
 
 hold(True)
 plot(grains[[42, 46]].boundary, edgeColor='w', lineWidth=2)
@@ -233,7 +233,7 @@ gB = grains.boundary['Magnesium', 'Magnesium']
 isTwinning = angle(gB.misorientation, twinning) < 5 * degree
 
 # plot the grains and highlight candidate twin boundaries
-plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
+plot(grains, ipfDirection=zvector, micronbar='off')
 hold(True)
 plot(gB[isTwinning], edgeColor='w', lineWidth=2)
 hold(False)

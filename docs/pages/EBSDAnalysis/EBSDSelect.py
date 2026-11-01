@@ -53,7 +53,7 @@ ebsd['indexed']
 
 # Plotting a phase selection uses the ordinary plot command.
 
-plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations, ipfDirection=zvector)
+plot(ebsd['Forsterite'], ipfDirection=zvector)
 
 # Only the forsterite footprint remains. Its colour still varies with orientation because
 # selection changes the list, not the plotting rule; see [Plot](EBSDPlotting.html).

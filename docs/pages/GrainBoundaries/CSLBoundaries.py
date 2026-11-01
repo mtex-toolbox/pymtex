@@ -46,7 +46,7 @@ grains = calcGrains(ebsd)
 grains = smoothBoundary(grains, 5)
 
 # plot the reconstructed grains by their mean orientations
-plot(grains, grains.meanOrientation, ipfDirection=zvector)
+plot(grains, ipfDirection=zvector)
 # -
 
 # ## What the orientation map shows
@@ -67,7 +67,7 @@ setColorRange([.5, 5])
 
 # make the orientation layer translucent
 hold(True)
-plot(grains, grains.meanOrientation, ipfDirection=zvector, faceAlpha=0.4, lineWidth=3)
+plot(grains, ipfDirection=zvector, faceAlpha=0.4, lineWidth=3)
 hold(False)
 # -
 

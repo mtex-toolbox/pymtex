@@ -87,7 +87,7 @@ ebsdCut = ebsd.slice(plane3d(vector3d(1, 1, 1), vector3d(0, 0, 0)))
 plot(ebsdCut, ebsdCut.prop['Completeness'], faceAlpha=0.1)
 mtexColorMap('white2black')
 hold(True)
-plot(ebsdCut['Quartz'], ebsdCut['Quartz'].orientations, micronbar='off')
+plot(ebsdCut['Quartz'], ipfDirection=zvector, micronbar='off')
 hold(False)
 # -
 

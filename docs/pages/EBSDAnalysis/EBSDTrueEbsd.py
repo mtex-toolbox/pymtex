@@ -219,7 +219,7 @@ ebsdOut
 # +
 newMtexFigure(layout=[2, 3], figSize='huge')
 nextAxis()
-plot(ebsdOut['W C'], ebsdOut['W C'].orientations, ipfDirection=zvector, coordinates=True)
+plot(ebsdOut['W C'], ipfDirection=zvector, coordinates=True)
 mtexTitle('Undistorted EBSD map (WC IPF into screen)')
 
 for m in job.undistortedList:

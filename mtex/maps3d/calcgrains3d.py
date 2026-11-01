@@ -99,13 +99,13 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
 
     import numpy as np
     import matplotlib.pyplot as plt
-    from mtex import mtexdata, calcGrains, degree, plot, hold
+    from mtex import mtexdata, calcGrains, degree, plot, hold, zvector
 
     ebsd = mtexdata('small', verbose=False)['Forsterite']
     grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
     print('Grains:', grains.size)
     print('Grain ids assigned to pixels:', np.unique(ebsd.grainId)[:8])
-    plot(ebsd, ebsd.orientations)
+    plot(ebsd, ipfDirection=zvector)
     hold(True)
     plot(grains.boundary, lineColor='black', lineWidth=1.5)
     hold(False)

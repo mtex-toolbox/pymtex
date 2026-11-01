@@ -119,7 +119,7 @@ ebsd = mtexdata('titanium')
 CS = ebsd.CS
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=6)
 
-plot(ebsd, ebsd.orientations)
+plot(ebsd, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)

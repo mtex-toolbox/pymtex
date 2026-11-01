@@ -74,7 +74,7 @@ EulerCorrection
 # map is switched on by `refFrame=True`. It states the current screen layout: $x$ points
 # east, $y$ south and $z$ into the screen.
 
-plot(ebsd['olivine'], ebsd['olivine'].orientations, ipfDirection=zvector, refFrame=True)
+plot(ebsd['olivine'], ipfDirection=zvector, refFrame=True)
 
 # ## Screen layout is a different question
 #
@@ -87,7 +87,7 @@ plot(ebsd['olivine'], ebsd['olivine'].orientations, ipfDirection=zvector, refFra
 # changes the data. Passing `how2plot` to one plot changes that plot alone.
 
 # draw x down and y east for this plot only
-plot(ebsd['olivine'], ebsd['olivine'].orientations, ipfDirection=zvector, how2plot='x↓→y', refFrame=True)
+plot(ebsd['olivine'], ipfDirection=zvector, how2plot='x↓→y', refFrame=True)
 
 # The two screen directions are unchanged, but the axes drawn along them have swapped: $x$
 # now runs down and $y$ to the right. The picture is therefore reflected about the
@@ -128,7 +128,7 @@ numLargeGrains
 
 # +
 # draw the measured orientations and overlay the crystal shapes
-plot(ebsd['olivine'], ebsd['olivine'].orientations, refFrame=True, ipfDirection=zvector, location='se')
+plot(ebsd['olivine'], ipfDirection=zvector, refFrame=True, location='se')
 hold(True)
 plot(largeGrains, cS, colored=True)
 hold(False)
@@ -177,7 +177,7 @@ grains = calcGrains(ebsd_rot)
 largeGrains = grains[grains.numPixel > 500]
 
 # put the reference-frame indicator where no crystal covers it
-plot(ebsd_rot['olivine'], ebsd_rot['olivine'].orientations, ipfDirection=zvector, refFrame=True, location='ne')
+plot(ebsd_rot['olivine'], ipfDirection=zvector, refFrame=True, location='ne')
 
 # overlay the crystal shapes
 hold(True)
@@ -204,7 +204,7 @@ grains = calcGrains(ebsd_rot)
 # select only large grains
 largeGrains = grains[grains.numPixel > 500]
 
-plot(ebsd_rot['olivine'], ebsd_rot['olivine'].orientations, ipfDirection=zvector, refFrame=True, location='se')
+plot(ebsd_rot['olivine'], ipfDirection=zvector, refFrame=True, location='se')
 
 # overlay the crystal shapes
 hold(True)
@@ -242,7 +242,7 @@ grains = calcGrains(ebsd_rot)
 # select only large grains
 largeGrains = grains[grains.numPixel > 500]
 
-plot(ebsd_rot['olivine'], ebsd_rot['olivine'].orientations, ipfDirection=zvector, refFrame=True, location='se')
+plot(ebsd_rot['olivine'], ipfDirection=zvector, refFrame=True, location='se')
 
 # overlay the crystal shapes
 hold(True)

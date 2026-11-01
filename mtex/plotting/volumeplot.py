@@ -57,6 +57,7 @@ def _plotGrains3d(grains, color=None, how2plot=None, figSize=None, **kw: Unpack[
     plot(grains)                                            # coloured by phase
     plot(grains, grains.volume)                             # coloured by a value per grain
     plot(grains, grains.meanOrientation, lineStyle='none')  # by the orientation, no edges
+    plot(grains, ipfDirection=zvector)                      # every phase by its inverse pole figure key along z
     plot(grains, faceColor='r', faceAlpha=0.5)              # one translucent colour
 
   Only the outer faces of the set are drawn, each in the colour of the grain it bounds; a
@@ -126,6 +127,7 @@ def _plotEBSD3(ebsd, color=None, how2plot=None, figSize=None, at=None, **kw: Unp
     plot(ebsd)                                   # coloured by phase
     plot(ebsd, ebsd.prop['ConfidenceIndex'])     # coloured by a value per voxel
     plot(ebsd['indexed'], ebsd['indexed'].orientations)  # coloured by the orientation
+    plot(ebsd, ipfDirection=zvector)             # every phase by its inverse pole figure key along z
     plot(ebsd, at=(5, None, 10))                 # two slices at the voxels given
 
   The slices are normal to the three axes of the voxel lattice, through the middle of the

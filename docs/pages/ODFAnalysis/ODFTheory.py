@@ -41,7 +41,7 @@ cS = crystalShape.hex(ebsd.CS)
 ebsdPlot = reduce(ebsd, 4)
 
 # plot coloured orientations
-plot(ebsd, ebsd.orientations, ipfDirection=zvector, micronbar=False, figSize='large')
+plot(ebsd, ipfDirection=zvector, micronbar=False, figSize='large')
 
 # overlay the orientations as rotated hexagonal prisms
 hold(True)

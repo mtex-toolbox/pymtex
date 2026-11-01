@@ -26,7 +26,7 @@ ebsd
 # 167 matrix, with one entry per scan position. Apart from its matrix shape, it behaves
 # like any other `EBSD` variable.
 
-plot(ebsd['Magnesium'], ebsd['Magnesium'].orientations)
+plot(ebsd['Magnesium'], ipfDirection=zvector)
 
 # The rectangular outline follows the square measurement grid. The four corners of one
 # pixel give the same information directly.
@@ -164,7 +164,7 @@ ebsdMg
 # The empty sites complete the rectangle. Row and column ranges can therefore select and
 # plot a rectangular subregion.
 
-plot(ebsdMg[49:100, 4:100], ebsdMg[49:100, 4:100].orientations)
+plot(ebsdMg[49:100, 4:100], ipfDirection=zvector)
 
 # ## Gridding Reorders the Measurements
 #
@@ -229,7 +229,7 @@ ebsd
 
 # ---
 
-plot(ebsd[0:20, 0:40], ebsd[0:20, 0:40].orientations, micronbar=False, edgeColor='black')
+plot(ebsd[0:20, 0:40], ipfDirection=zvector, micronbar=False, edgeColor='black')
 
 # The black cell edges reveal the alternating half-step offset between scan rows. The
 # matrix is rectangular even though its pixel footprints are hexagons.
@@ -253,9 +253,9 @@ ebsdS
 # +
 # visualize the result
 newMtexFigure(layout=[1, 2])
-plot(ebsd, ebsd.orientations)
+plot(ebsd, ipfDirection=zvector)
 nextAxis()
-plot(ebsdS, ebsdS.orientations)
+plot(ebsdS, ipfDirection=zvector)
 # -
 
 # This operation differs fundamentally from restoring a map's own lattice. The new grid
@@ -279,7 +279,7 @@ ebsdS
 # ---
 
 # +
-plot(ebsdS, ebsdS.orientations)
+plot(ebsdS, ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)
@@ -305,7 +305,7 @@ ebsdR
 
 # ---
 
-plot(ebsdR, ebsdR.orientations)
+plot(ebsdR, ipfDirection=zvector)
 
 # The map is turned on screen, while the object summary still identifies a hexagonal
 # grid. If the same data arrives as a plain list, `gridify` recovers the rotated lattice
@@ -370,11 +370,7 @@ distort
 # +
 ebsdDistorted = transform(ebsd, distort)
 
-plot(ebsdDistorted['Fo'], ebsdDistorted['Fo'].orientations)
-hold(True)
-plot(ebsdDistorted['En'], ebsdDistorted['En'].orientations)
-plot(ebsdDistorted['Di'], ebsdDistorted['Di'].orientations)
-hold(False)
+plot(ebsdDistorted, ipfDirection=zvector)
 # -
 
 # The following pair measures the imposed distortion in cell units. Its first value is the
@@ -407,10 +403,8 @@ np.array_equal(ebsdDistorted['Fo'].lattice.ij, ebsd['Fo'].lattice.ij)
 # [calcGrains](EBSD.calcGrains.html) the wrong neighbours.
 
 # +
-plot(ebsdDistorted['Fo'], ebsdDistorted['Fo'].orientations, edgeColor='black')
+plot(ebsdDistorted['indexed'], ipfDirection=zvector, edgeColor='black')
 hold(True)
-plot(ebsdDistorted['En'], ebsdDistorted['En'].orientations, edgeColor='black')
-plot(ebsdDistorted['Di'], ebsdDistorted['Di'].orientations, edgeColor='black')
 
 # grain reconstruction consequently sees the distorted map as the same neighbourhood graph
 grains = calcGrains(ebsdDistorted, minPixel=3)

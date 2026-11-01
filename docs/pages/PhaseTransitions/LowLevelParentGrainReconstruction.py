@@ -19,7 +19,7 @@ ebsd = mtexdata('alphaBetaTitanium', verbose=False)
 alphaName = 'Ti (alpha)'
 betaName = 'Ti (Beta)'
 
-plot(ebsd[alphaName], ebsd[alphaName].orientations, figSize='large')
+plot(ebsd[alphaName], ipfDirection=zvector, figSize='large')
 # -
 
 # The preceding page measures the same 99.8% alpha and 0.2% beta phase fractions and explains
@@ -41,7 +41,7 @@ grains = calcGrains(ebsd, threshold=1.5 * degree, removeQuadruplePoints=True)
 grains = smoothBoundary(grains, 1, moveTriplePoints=True)
 
 region = [299, 401, 440, 500]
-plot(ebsd[alphaName], ebsd[alphaName].orientations, region=region, micronbar='off', figSize='large')
+plot(ebsd[alphaName], ipfDirection=zvector, region=region, micronbar='off', figSize='large')
 
 hold(True)
 plot(grains.boundary, lineWidth=2, region=region)
@@ -327,7 +327,7 @@ hold(False)
 #
 # Return to the measured alpha orientations and overlay the reconstructed grain boundaries.
 
-plot(ebsd[alphaName], ebsd[alphaName].orientations, figSize='large')
+plot(ebsd[alphaName], ipfDirection=zvector, figSize='large')
 hold(True)
 plot(parentGrains.boundary, lineWidth=3, lineColor='white')
 hold(False)

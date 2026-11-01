@@ -157,7 +157,7 @@ candidateTracePercent
 # With this segmentation, smoothing, and tolerance, candidates account for about 49 percent
 # of the magnesium-to-magnesium boundary trace length.
 
-plot(grains, grains.meanOrientation, ipfDirection=zvector, micronbar='off')
+plot(grains, ipfDirection=zvector, micronbar='off')
 hold(True)
 plot(gB[isCandidate], lineColor='w', lineWidth=3)
 hold(False)

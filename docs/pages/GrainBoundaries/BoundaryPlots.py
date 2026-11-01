@@ -211,7 +211,7 @@ with np.errstate(divide='ignore'):
 plot(ebsd, logIq, figSize='large', colormap='black2white', colorRange=[0.5, 5])
 
 hold(True)
-plot(grains, grains.meanOrientation, faceAlpha=0.4)
+plot(grains, ipfDirection=zvector, faceAlpha=0.4)
 
 # colour the boundaries by their full misorientation
 ironKey = PatalaColorKey(gB)

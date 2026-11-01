@@ -78,8 +78,10 @@ plot(ebsd['Forsterite'], ebsd['Forsterite'].orientations, micronbar='off')
 
 # Similar colours suggest similar orientations, but a colour patch is not a grain. The
 # default IPF-Z key is a projection, so it can hide orientation differences, and a real
-# grain may contain a smooth orientation gradient. See [IPF Maps](EBSDIPFMap.html) to draw
-# and choose the colour key explicitly.
+# grain may contain a smooth orientation gradient. The keyword `ipfDirection` alone draws
+# this map for every phase at once, each with its own key:
+# `plot(ebsd, ipfDirection=zvector)`. See [IPF Maps](EBSDIPFMap.html) to draw and choose
+# the colour key explicitly.
 
 # ## Grain reconstruction
 #

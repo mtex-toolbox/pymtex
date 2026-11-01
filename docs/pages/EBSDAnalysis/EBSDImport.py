@@ -137,7 +137,7 @@ ebsd = EBSD.load(fname, csList, dataSet=0, eulerCorrection=EulerCorrection, verb
 # The script ends with an orientation plot. Unlike the phase map above, this plot checks
 # that orientations and positions have arrived together as a spatially coherent map.
 
-plot(ebsd['Fe(gamma-iron)'], ebsd['Fe(gamma-iron)'].orientations, ipfDirection=zvector)
+plot(ebsd['Fe(gamma-iron)'], ipfDirection=zvector)
 
 # Coherent elongated domains and smooth colour changes inside them show that the
 # orientations have not been scrambled across the scan. An equally coherent map can still

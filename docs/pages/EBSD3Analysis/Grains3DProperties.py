@@ -32,7 +32,7 @@ tessFile = mtexdatafile('my100grains')[0]
 grains = grain3d.load(tessFile, CS=cs)
 print(grains)
 
-plot(grains, grains.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(grains, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 setCamera(plottingConvention.default3D)
 # -
 

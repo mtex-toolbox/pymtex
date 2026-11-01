@@ -63,8 +63,10 @@ hold(False)
 plot(grains['Fo'], grains['Fo'].meanOrientation)
 
 # MTEX chooses the specimen z direction for this implicit form and reports the standard
-# colour key in an interactive session. To choose the direction yourself, construct an
-# `ipfColorKey` and ask it for the colours explicitly.
+# colour key in an interactive session. The keyword `ipfDirection` alone does the same
+# for every phase at once, each with its own key: `plot(grains, ipfDirection=zvector)`.
+# For more control over the key, construct an `ipfColorKey` and ask it for the colours
+# explicitly.
 
 # +
 # a colour key for the forsterite phase
@@ -267,7 +269,7 @@ ebsd = mtexdata('csl')
 
 grains = calcGrains(ebsd, minPixel=5)
 grains = smoothBoundary(grains, 5)
-plot(grains, grains.meanOrientation, micronbar=False, region=[50, 300, 100, 250], ipfDirection=zvector)
+plot(grains, ipfDirection=zvector, micronbar=False, region=[50, 300, 100, 250])
 
 # where one representative of the [100] family points in each grain
 dir = grains.meanOrientation * Miller(1, 0, 0, grains.CS)
@@ -296,7 +298,7 @@ hold(False)
 # pixels are labelled by id.
 
 # +
-plot(grains, grains.meanOrientation, micronbar=False, region=[50, 300, 100, 250], ipfDirection=zvector)
+plot(grains, ipfDirection=zvector, micronbar=False, region=[50, 300, 100, 250])
 
 bigGrains = grains[grains.numPixel > 100]
 

@@ -27,7 +27,7 @@ tessFile = mtexdatafile('my100grains')[0]
 grains = grain3d.load(tessFile, CS=cs)
 print(grains)
 
-plot(grains, grains.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(grains, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 setCamera(plottingConvention.default3D)
 # -
 
@@ -51,7 +51,7 @@ N = vector3d(1, -1, 1)
 grainSlice = grains.slice(N, P0)
 print(grainSlice)
 
-plot(grainSlice, grainSlice.meanOrientation, micronbar='off')
+plot(grainSlice, ipfDirection=zvector, micronbar='off')
 setCamera(plottingConvention.default3D)
 # -
 
@@ -77,12 +77,12 @@ parentIds = np.unique(grainSlice.Id3d)
 parentGrains = grains['id', parentIds]
 
 newMtexFigure(layout=[1, 2])
-plot(grainSlice, grainSlice.meanOrientation, micronbar='off')
+plot(grainSlice, ipfDirection=zvector, micronbar='off')
 setCamera(sectionView)
 mtexTitle('Planar sections')
 
 nextAxis()
-plot(parentGrains, parentGrains.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(parentGrains, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 setCamera(plottingConvention.default3D)
 mtexTitle('Parent grains')
 # -
@@ -123,7 +123,7 @@ z = grains.V.z
 zLevels = np.linspace(z.min(), z.max(), 7)
 for k in zLevels[1:-1]:
   grainSlice = grains.slice(N, vector3d(0, 0, k))
-  plot(grainSlice, grainSlice.meanOrientation)
+  plot(grainSlice, ipfDirection=zvector)
   hold(True)
 hold(False)
 setCamera(plottingConvention.default3D)
@@ -145,7 +145,7 @@ print(grainsTri)
 
 print([selectedGrains.numFaces.sum(), grainsTri.numFaces.sum()])
 
-plot(grainsTri, grainsTri.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(grainsTri, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 setCamera(plottingConvention.default3D)
 # -
 
@@ -163,7 +163,7 @@ setCamera(plottingConvention.default3D)
 rot = rotation.byAxisAngle(vector3d(1, 1, 1), 30 * degree)
 grainsRotated = rot * grains
 
-plot(grainsRotated, grainsRotated.meanOrientation, micronbar='off', edgeAlpha=0.1)
+plot(grainsRotated, ipfDirection=zvector, micronbar='off', edgeAlpha=0.1)
 setCamera(plottingConvention.default3D)
 # -
 

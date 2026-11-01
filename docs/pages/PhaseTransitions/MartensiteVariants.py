@@ -41,7 +41,7 @@ grains = smoothBoundary(grains, 4)
 # direction. This is inverse pole figure colouring. Retained austenite grains are blue, and
 # the grey lines are grain boundaries.
 
-plot(ebsd['Fe'], ebsd['Fe'].orientations)
+plot(ebsd['Fe'], ipfDirection=zvector)
 hold(True)
 plot(grains.boundary, lineWidth=2, lineColor='gray')
 plot(grains['Aus'], faceColor='blue', displayName='Austenite')
