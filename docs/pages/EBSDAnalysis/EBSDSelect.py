@@ -143,7 +143,9 @@ setColorRange([0, 1.2])
 # -
 
 # The yellow speckles have gone, because every measurement above 0.8° was removed. Those
-# 881 positions are now empty and render as background.
+# 881 positions are now empty and render as background. Marking them instead,
+# `ebsdRegion[ebsdRegion.mad > 0.8] = 'notIndexed'`, keeps their positions and other
+# properties. For [filling](EBSDFilling.html) the two are the same.
 #
 # The deep blue patches are still there, and that is the point to take from this figure.
 # This threshold does *not* remove notIndexed points: they have no fit to report, so their

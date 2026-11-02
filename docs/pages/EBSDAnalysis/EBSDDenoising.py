@@ -8,8 +8,9 @@
 #
 # Random errors appear instead as scatter between nearby measurements. This page reduces
 # that scatter while trying to preserve real orientation gradients and abrupt changes
-# inside grains. Filling measurements whose phase is `notIndexed` is a different
-# operation; see [Filling Missing Data](EBSDFilling.html).
+# inside grains. `smooth` also fills the `notIndexed` pixels inside the grains, which
+# [Filling Missing Data](EBSDFilling.html) explains; the option `fill=False` leaves them
+# as they are.
 #
 # The examples assume that you can reconstruct grains and read an orientation map. Those
 # steps are introduced in [Grain Reconstruction](GrainReconstruction.html) and
@@ -37,12 +38,9 @@ grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
 # smooth grain boundaries
 grains = smoothBoundary(grains, 5)
 
-# consider only indexed data
-ebsd = ebsd['indexed']
-
-# plot the orientation map
-ipfKey = ipfColorKey(ebsd.CS.properGroup())
-plot(ebsd, ipfKey.orientation2color(ebsd.orientations))
+# plot the orientation map of the indexed pixels
+ipfKey = ipfColorKey(ebsd['indexed'].CS.properGroup())
+plot(ebsd['indexed'], ipfKey.orientation2color(ebsd['indexed'].orientations))
 
 # and on top the grain boundaries
 hold(True)
@@ -61,15 +59,15 @@ hold(False)
 
 # +
 # use the original grain means as reference orientations
-grainMean = grains.selectByGrainId(ebsd.grainId).meanOrientation
-colorKey = axisAngleColorKey(ebsd)
+grainMean = grains.selectByGrainId(ebsd['indexed'].grainId).meanOrientation
+colorKey = axisAngleColorKey(ebsd['indexed'])
 colorKey.oriRef = grainMean
 
 # keep one colour scale for every comparison on this page
-rawDeviation = angle(ebsd.orientations, grainMean)
+rawDeviation = angle(ebsd['indexed'].orientations, grainMean)
 colorKey.maxAngle = np.nanquantile(rawDeviation, 0.8)
 
-plot(ebsd, colorKey.orientation2color(ebsd.orientations))
+plot(ebsd['indexed'], colorKey.orientation2color(ebsd['indexed'].orientations))
 hold(True)
 plot(grains.boundary, lineWidth=2)
 hold(False)

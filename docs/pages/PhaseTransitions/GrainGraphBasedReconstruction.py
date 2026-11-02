@@ -305,7 +305,7 @@ pixelFitQuantiles
 # parentGrains = calcGrains(parentEBSD, angle=3 * degree, minPixel=10)
 # parentGrains = smoothBoundary(parentGrains, 10)
 # F = halfQuadraticFilter()
-# parentEBSD = smooth(parentEBSD['indexed'], F, fill=parentGrains)
+# parentEBSD = smooth(parentEBSD['indexed'], F, parentGrains)
 # ```
 #
 # The grain boundaries constrain the fill so it does not blur across the reconstructed parent

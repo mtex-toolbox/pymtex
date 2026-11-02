@@ -39,7 +39,7 @@ grains = smoothBoundary(grains, 5)
 
 # denoise the orientations
 F = halfQuadraticFilter()
-ebsd = smooth(ebsd, F, fill=True)
+ebsd = smooth(ebsd, F, grains)
 
 ipfKey = ipfColorKey(ebsd.CS)
 plot(ebsd, ipfKey.orientation2color(ebsd.orientations))

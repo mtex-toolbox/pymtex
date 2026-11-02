@@ -71,7 +71,7 @@ hold(False)
 
 # +
 F = halfQuadraticFilter()
-ebsd = smooth(ebsd, F, fill=grains)
+ebsd = smooth(ebsd, F, grains)
 
 axisKey.oriRef = grains['id', ebsd['indexed'].grainId].meanOrientation
 plot(ebsd['indexed'], axisKey.orientation2color(ebsd['indexed'].orientations), micronbar='off', figSize='medium')

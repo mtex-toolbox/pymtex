@@ -309,7 +309,7 @@ parentGrains = smoothBoundary(parentGrains, 5)
 # +
 F = halfQuadraticFilter()
 F.alpha = 0.1
-parentEBSD = smooth(parentEBSD, F, fill=parentGrains)
+parentEBSD = smooth(parentEBSD, F, parentGrains)
 
 parentColor = ipfKey.orientation2color(parentEBSD[betaName].orientations)
 plot(parentEBSD[betaName], parentColor, figSize='large')

@@ -67,6 +67,14 @@ def test_EBSD_propertiesAreAttributesOfOneRowPerMeasurement():
     ebsd.ci = np.arange(10)
 
 
+def test_EBSD_aPhaseNameAssignedChangesThePhaseOnly():
+  # ebsd[sel] = 'notIndexed' marks pixels, their rotation and properties stay, as MATLAB's
+  ebsd = sampleMap()
+  q, mad = ebsd.rotations.data.copy(), ebsd.mad.copy()
+  ebsd[ebsd.mad > 100] = 'notIndexed'
+  assert np.all(~ebsd.isIndexed[mad > 100]) and np.array_equal(ebsd.rotations.data, q, equal_nan=True) and np.array_equal(ebsd.mad, mad)
+
+
 def test_EBSD_multiChannelPropertyKeepsItsColumns():
   ebsd = sampleMap()
   ebsd.fs = np.arange(144 * 5).reshape(144, 5)

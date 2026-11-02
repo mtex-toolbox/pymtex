@@ -974,16 +974,17 @@ def _gndLoop(kappa, known, b, l, u, tol, maxIter, gnd, rho):
 
 # ------------------------------------------------------------------ the window filters
 
-# the window filter of every measured pixel over the offsets of its window, within its own
-# component: mode 0 the mean, 1 the componentwise median, 2 Kuwahara, the mean of the most
-# homogeneous of the four quadrants quad marks per offset
+# the window filter of every pixel of a component over the measured pixels of its window,
+# within the component: mode 0 the mean, 1 the componentwise median, 2 Kuwahara, the mean of
+# the most homogeneous of the four quadrants quad marks per offset; a pixel whose window
+# holds no measurement keeps its value
 def _windowLoop(u, comp, isData, lk, ij, offs, quad, mode, out):
   n = u.shape[0]
   no = offs.shape[0]
   for k in prange(n):
     for c in range(3):
       out[k, c] = u[k, c]
-    if comp[k] == 0 or not isData[k]:
+    if comp[k] == 0:
       continue
     buf = np.empty((no, 3))
     which = np.empty(no, dtype=np.int64)
@@ -996,6 +997,8 @@ def _windowLoop(u, comp, isData, lk, ij, offs, quad, mode, out):
         buf[cnt, c] = u[nb, c]
       which[cnt] = o
       cnt += 1
+    if cnt == 0:
+      continue
     if mode == 0:
       for c in range(3):
         s = 0.0

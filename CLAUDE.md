@@ -62,10 +62,10 @@ The Python port of MTEX, the crystallographic texture analysis toolbox. The plan
 - The padding `gridify` adds to close a grid is notIndexed (phase 0, since a phase id indexes
   the phase list) and marked in `ebsd.isPadding`, MATLAB's NaN phase: the extent, the phase
   counts and selections, the plots, the decomposition and `fill` leave it out, so a grid
-  segments exactly as its list does. New code over a map's cells must do the same. The one
-  exception is `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)`: a grain's polygon puts
-  the padding it holds inside the scan, so it is filled and stops being padding, as MATLAB's
-  `fill(ebsd, grains, 'gridify')` fills the dropped sites of a sparse map.
+  segments exactly as its list does. New code over a map's cells must do the same. The
+  exceptions are `fill` and `smooth`, as MATLAB's: with grains, the padding whose whole cell
+  a grain's polygon holds is inside the scan, and without grain ids, so is the padding inside
+  the convex hull of the measurements; such padding is filled and stops being padding.
 - A property read from an HDF5 file is its data set's name in lower case without blanks
   (`bandcontrast`); an EDS map of an Oxford file puts its element first and keeps the case,
   `Co_WindowIntegral_Ka1`, `C_PeakArea_Kseries`, `Ca_Composition_Wt` (`additionName` in

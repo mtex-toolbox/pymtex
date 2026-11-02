@@ -40,7 +40,7 @@ ebsdNoisy = ebsd.copy()
 
 # denoise without smoothing across grain boundaries
 F = halfQuadraticFilter()
-ebsd = smooth(ebsd, F, fill=grains)
+ebsd = smooth(ebsd, F, grains)
 # -
 
 # ## Integral method: compute the default WBV

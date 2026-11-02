@@ -198,7 +198,7 @@ hold(False)
 
 # +
 F = halfQuadraticFilter()
-ebsdS = smooth(ebsd, F, fill=True)
+ebsdS = smooth(ebsd, F, grains)
 indexedS = ebsdS['indexed']
 
 # compare with the same references and saturation scale

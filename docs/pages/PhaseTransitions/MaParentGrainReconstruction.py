@@ -374,7 +374,7 @@ hold(False)
 
 # +
 F = halfQuadraticFilter()
-parentEBSD = smooth(parentEBSD, F, fill=parentGrains)
+parentEBSD = smooth(parentEBSD, F, parentGrains)
 
 plot(parentEBSD['Iron fcc'], ipfDirection=zvector, figSize='large')
 hold(True)

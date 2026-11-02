@@ -8,7 +8,7 @@ the pages on mtex-toolbox.github.io beside MATLAB's. This note orders what is le
 
 - `mtexdata('vpsc')` loads.
 - `calcGBND` has its default kernel by inversion, MATLAB's to the digit.
-- `fill(ebsd, grains)` and `smooth(ebsd, F, fill=grains)` fill by the grain polygons.
+- `fill(ebsd, grains)` and `smooth(ebsd, F, grains)` fill by the grain polygons.
 - The RBF evaluation and `max(odf)` no longer hang. With 500 centres, m-3m, 5 degrees:
   1000 evaluations take 0.4 s and `max` takes 3.3 s. `calcComponents` still takes 39 s (R3).
 

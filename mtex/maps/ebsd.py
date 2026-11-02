@@ -342,6 +342,10 @@ class EBSD:
   def __setitem__(self, key, ori):
     flat = isinstance(key, np.ndarray) and key.ndim == 1 and self.ndim > 1
     ind = (np.arange(self.size)[key] if flat else np.arange(self.size).reshape(self.shape)[key]).reshape(-1)
+    # a phase name, ebsd[sel] = 'notIndexed', changes the phase only, as MATLAB's
+    if isinstance(ori, str):
+      self.phaseId.reshape(-1)[ind] = self.name2id(ori)
+      return
     q = self.rotations.data.reshape(-1, 4)
     q[ind] = np.broadcast_to(ori.data.reshape(-1, 4), (len(ind), 4))
     self.phaseId.reshape(-1)[ind] = self.CSList.phaseId(ori.CS)

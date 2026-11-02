@@ -5,14 +5,15 @@
 # neighbouring grains. Cracks, pores, scratches, surface contamination, or a phase
 # omitted during indexing may also prevent a usable solution.
 #
-# A missing lattice site is different: no retained measurement occupies that position.
-# This can happen when a scan is interrupted or when selecting or cropping a map leaves
-# an irregular footprint. Both cases appear as missing orientations, but their
-# experimental meanings are not interchangeable.
+# A missing lattice site is different: no measurement occupies that position. This can
+# happen when a scan is interrupted or when selecting or cropping a map leaves an
+# irregular footprint. The experimental meanings of the two cases differ.
 #
-# MTEX can assign orientations to these positions from their neighbours. The assigned
-# values are reconstructions, not measurements. Keep that provenance when the filled map
-# is used for quantitative analysis.
+# For filling, both are the same: a position without an orientation.
+# [fill](EBSD.fill.html) assigns an orientation to every such position inside the
+# scanned area, unless a mask excludes it. The assigned values are reconstructions, not
+# measurements. Keep that provenance when the filled map is used for quantitative
+# analysis.
 #
 # This page assumes familiarity with [selecting EBSD data](EBSDSelect.html),
 # [orientation maps](EBSDIPFMap.html), and
@@ -59,12 +60,14 @@ hold(False)
 
 # ## A very sparse measured data set
 #
-# To make the two filling methods easy to compare, we discard approximately 75 percent of
-# the measurements and retain approximately 25 percent. This removes measured positions
-# as well as retaining the `notIndexed` measurements that happen to be sampled.
+# To make the two filling methods easy to compare, we mark approximately 75 percent of
+# the measurements as `notIndexed` and keep approximately 25 percent. A marked pixel keeps
+# its position and its other properties, but its orientation no longer counts as
+# measured.
 
 # +
-ebsdSub = ebsd[np.random.default_rng(0).random(ebsd.size) > 0.75]
+ebsdSub = ebsd.copy()
+ebsdSub[np.random.default_rng(0).random(ebsd.shape) > 0.25] = 'notIndexed'
 ebsdSub
 # -
 
@@ -84,7 +87,7 @@ plot(ebsdSub, ipfDirection=zvector)
 
 # +
 # reconstruct the grain structure
-grainsSub = calcGrains(ebsdSub, angle=10 * degree, minPixel=5, alpha=15)
+grainsSub = calcGrains(ebsdSub, angle=9 * degree, minPixel=2, alpha=15)
 
 grainsSub = smoothBoundary(grainsSub, 5)
 
@@ -99,16 +102,22 @@ hold(False)
 
 # ## Filling within the grains
 #
-# [fill](EBSD.fill.html) estimates the missing orientations. Pass the reconstructed grains
-# whenever boundaries are known. MTEX then rejects positions outside every grain and
-# prevents an orientation from being carried across a grain boundary: a position is filled
-# only from the grain whose polygon holds it, and where the measurements of that grain do
-# not reach it, the grain's mean orientation stands in. `gridify` first materialises the
-# empty sites of the scan lattice as a matrix-shaped map, which is what `fill` then fills;
-# it does not change which values are assigned.
+# [fill](EBSD.fill.html) repeats the orientation of the nearest measured pixel. It fills
+# every `notIndexed` pixel and every missing lattice site inside the convex hull of the
+# measurements. Pass the reconstructed grains whenever boundaries are known. A pixel then
+# takes an orientation only from its own grain, so no orientation is carried across a
+# grain boundary.
+#
+# Some pixels have no grain to fill from:
+#
+# * A pixel a grain boundary passes through belongs to no grain and stays `notIndexed`.
+# * The pixels of a `notIndexed` grain stay `notIndexed`.
+#
+# Without the grains, a missing lattice site takes the grain of its nearest pixel instead,
+# which fills most of the corridors along the boundaries as well.
 
 # +
-ebsdSub_filled = fill(ebsdSub.gridify(), grainsSub)
+ebsdSub_filled = fill(ebsdSub, grainsSub)
 
 plot(ebsdSub_filled['indexed'], ipfDirection=zvector)
 
@@ -117,16 +126,16 @@ plot(grainsSub.boundary, lineWidth=1.5)
 hold(False)
 # -
 
-# The grain interiors are now coloured. Positions not covered by a grain remain
-# notIndexed, which preserves holes along the grain boundaries. MATLAB's `fill` repeats the
-# nearest measurement, which leaves sharp patches; the port continues the orientation
-# field of the grain across the hole, by the edge preserving filter `smooth` uses.
+# The grain interiors are now coloured. Sharp patches remain because a nearest-neighbour
+# estimate repeats a measured orientation instead of creating a gradual orientation field.
+# The white pixels lie on grain boundaries: they belong to no grain and remain
+# `notIndexed`.
 
 # ## Filling with a denoising filter
 #
 # A denoising filter can estimate the missing orientations while smoothing the
-# orientation field. Supply the option `fill` and the grains to
-# [smooth](EBSD.smooth.html). The `halfQuadraticFilter` used here is a
+# orientation field. [smooth](EBSD.smooth.html) fills the same positions as `fill` before
+# it filters, so pass it the grains as well. The `halfQuadraticFilter` used here is a
 # total-variation method for rotation-valued data; its mathematical basis is described by
 # [Bergmann et al. (2016)](https://doi.org/10.3934/ipi.2016001).
 #
@@ -140,7 +149,7 @@ F = halfQuadraticFilter()
 F.alpha = 0.25
 
 # interpolate and smooth the missing orientations
-ebsdSub_smoothed = smooth(ebsdSub.gridify(), F, fill=grainsSub)
+ebsdSub_smoothed = smooth(ebsdSub, F, grainsSub)
 
 plot(ebsdSub_smoothed['indexed'], ipfDirection=zvector)
 
@@ -149,34 +158,34 @@ plot(grainsSub.boundary, lineWidth=1.5)
 hold(False)
 # -
 
-# The repeated colour patches have become continuous fields inside the grains. The
-# unfilled corridors still follow the reconstructed boundaries, so the smoother result
-# has not erased the segmentation constraint.
+# The repeated colour patches have become continuous fields inside the grains. The white
+# corridors still follow the reconstructed boundaries, so the smoother result has not
+# erased the segmentation constraint.
 
 # ## Which data is interpolated
 #
 # In these grain-constrained calls, both `fill` and `smooth` recover the orientation,
-# phase, and `grainId` of a filled position. The ferrite map carries these properties
-# after filling:
+# phase, and `grainId` of a filled position. The other per-pixel properties keep what the
+# pixel had. The ferrite map carries these properties:
 
 list(ebsdSub_filled.prop)
 
 # The properties `ci`, `fit`, and `iq` describe the recorded pattern or its indexing
-# solution. The property `sem_signal` is the simultaneously recorded SEM signal. None has
-# a measured value at a lattice site created by `fill`. MATLAB leaves each of them as
-# `NaN` there, so that a reconstructed orientation does not acquire invented evidence of
-# pattern quality; this port solves every floating point property on the same graph as
-# the orientations, so the properties of a filled site are interpolated too.
+# solution. The property `sem_signal` is the simultaneously recorded SEM signal. A pixel
+# marked `notIndexed` keeps the values recorded with it. A lattice site that was never
+# measured has none, so MTEX leaves each of them as `NaN` there.
 
 plot(ebsdSub_filled, ebsdSub_filled.ci)
 mtexColorbar(title='confidence index')
 
-# Provenance therefore has to be kept from the ids: a site that was not in the sparse
-# subset has no measured confidence index, whatever the filled map says there. Store such
-# a mask before filling when provenance must be tracked independently.
+# The confidence index therefore does not tell which orientations were filled. Take that
+# from the map before filling: a pixel without an orientation then and with one afterwards
+# was filled. A pixel `calcGrains` absorbed into a grain has the grain's phase but no
+# orientation, so both conditions are needed.
 
-hasNoMeasuredCI = ~np.isin(ebsdSub_filled.id, ebsdSub.id)
-print(f'{np.sum(hasNoMeasuredCI)} of {ebsdSub_filled.size} positions have no measured confidence index')
+noOrientation = ~ebsdSub.isIndexed | ebsdSub.rotations.isnan()
+isFilled = noOrientation & ebsdSub_filled.isIndexed & ~ebsdSub_filled.rotations.isnan()
+print(f'{np.sum(isFilled)} of {ebsdSub_filled.size} positions have a filled orientation')
 
 # MATLAB's `smooth` provides a second marker, a per-pixel property named `quality` set to
 # zero at every position that had no orientation before filtering; it is not ported.
@@ -190,7 +199,7 @@ print(f'{np.sum(hasNoMeasuredCI)} of {ebsdSub_filled.size} positions have no mea
 #
 # The requested position must be covered by an existing measurement cell. Thus `interp`
 # resamples a map but does not fill a hole. Conversely, `fill` reconstructs missing
-# orientations inside the grains.
+# orientations but leaves the other properties as they were.
 
 # ## A multiphase geological map
 #
@@ -233,15 +242,15 @@ hold(False)
 
 # ## Fill only grain interiors
 #
-# The option `fill` asks `smooth` to fill holes inside the grains. Passing `grains` is what
-# lets MTEX decide whether a position is inside a grain. `notIndexed` positions along grain
-# boundaries remain untouched.
+# The command `smooth` fills every `notIndexed` pixel that `calcGrains` assigned to an
+# indexed grain. The `notIndexed` measurements on grain boundaries belong to no grain, and
+# the two large patches are `notIndexed` grains; both remain `notIndexed`.
 
 # +
 F = halfQuadraticFilter()
 F.alpha = 10
 
-ebsdS = smooth(ebsd, F, fill=grains)
+ebsdS = smooth(ebsd, F, grains)
 
 plot(ebsdS, ipfDirection=zvector)
 hold(True)
@@ -254,6 +263,48 @@ hold(False)
 # Colour now extends through holes in the grain interiors. The narrow white corridors
 # that remain coincide with reconstructed boundaries, so the filled map does not claim a
 # phase or orientation where the segmentation was deliberately unresolved.
+
+# ## Filling selected pixels
+#
+# A mask restricts filling to the pixels it marks. It never fills a pixel that `smooth`
+# would leave alone, so grain boundaries and `notIndexed` grains stay `notIndexed` whatever
+# the mask says. A mask can select by phase, here the pixels of the enstatite grains.
+
+# +
+# the pixels of the enstatite grains
+isEnstatite = np.isin(ebsd.grainId, grains['Enstatite'].id)
+ebsdEn = smooth(ebsd, F, grains, fill=isEnstatite)
+
+plot(ebsdEn, ipfDirection=zvector)
+hold(True)
+plot(grains.boundary, lineWidth=1.5)
+hold(False)
+# -
+
+# The enstatite grains are filled, while the holes in the forsterite and diopside grains
+# remain.
+#
+# A mask can also use any property of the pixels. The band contrast `bc` measures the
+# quality of the diffraction pattern. A `notIndexed` pixel with a low band contrast
+# probably did not see a crystal at all, for example above a pore. The next call fills
+# only the pixels whose band contrast is at least 80; nine in ten indexed measurements
+# exceed 85.
+
+# +
+# the pixels with a pattern of at least moderate contrast
+hasPattern = ebsd.bc >= 80
+ebsdBC = smooth(ebsd, F, grains, fill=hasPattern)
+
+plot(ebsdBC['notIndexed'], faceColor='black')
+hold(True)
+plot(ebsdBC['indexed'], ipfDirection=zvector)
+plot(grains.boundary, lineWidth=1.5)
+hold(False)
+# -
+
+# The black pixels are `notIndexed`: they lie on grain boundaries or in the `notIndexed`
+# grains. The white holes inside the grains are the pixels with a weak pattern, which the
+# mask left unfilled.
 
 # ## Read the recovered orientation field
 #

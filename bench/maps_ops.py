@@ -149,7 +149,7 @@ def run(ops):
   for m, e0 in maps.items():
     np.column_stack([np.asarray(e0.pos.data, float).reshape(-1, 3)[:, :2],
                      np.asarray(e0.rotations.data, float).reshape(-1, 4)]).astype("<f8").tofile(os.path.join(OUT, f"input_{m}.bin"))
-  denoise = lambda op: lambda: maps[op.split("_")[2]].smooth(filters[op.split("_")[1]](), fill=op.split("_")[1] == "fill")["indexed"]
+  denoise = lambda op: lambda: maps[op.split("_")[2]].smooth(filters[op.split("_")[1]]())["indexed"]
   table = {
     "calcgrains_1C_1": (large, byLarge),
     "calcgrains": (grains, lambda g: byGrain(g.area)),

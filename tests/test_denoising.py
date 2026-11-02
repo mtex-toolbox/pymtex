@@ -124,83 +124,98 @@ def test_splineFilter_keepsTheMeanOfANoisyField():
   assert abs(np.mean(angles(e.smooth(splineFilter()))) - np.mean(angles(e))) < 0.05
 
 
-def test_fill_continuesALinearFieldIntoAHole():
-  # a hole in a linear field is filled with the continuation of it, not with a copy of a
-  # neighbour: the field is harmonic, so the answer is exact
+def test_fill_repeatsANeighbourInAHole():
+  # a hole takes the orientation of its nearest measurement, as MATLAB's fill
   e, k = holedLinearMap()
   assert e.rotations.isnan()[k] and not e.isIndexed[k]
-  f = e.fill(splineFilter())
-  assert not f.rotations.isnan()[k] and close(angles(f)[k], 0.5 * 4 + 0.25 * 4, 1e-6) and f.isIndexed[k]
+  f = e.fill()
+  assert f.isIndexed[k] and min(abs(angles(f)[k] - angles(e)[[k - 1, k + 1, k - 9, k + 9]])) < 1e-9
   assert e.rotations.isnan()[k]                                              # the original is left alone
 
 
-# the notIndexed pixels calcGrains absorbs into a grain keep its phase and a NaN rotation; fill
-# continues the field into them as into any hole
-def test_fill_fillsThePixelsCalcGrainsAbsorbed():
+# the notIndexed pixels calcGrains absorbs into a grain keep its phase and a NaN rotation;
+# smooth fills them and solves for them without a data term, so they continue a linear field
+def test_smooth_fillsThePixelsCalcGrainsAbsorbed():
   holes = lambda i, j: ((i == 4) & (j == 4)) | ((i == 2) & (j == 6)) | ((i == 6) & (j == 3))
   e = angleMapD(lambda i, j: 0.5 * i + 0.25 * j, 9, missingAt=holes)
   calcGrains(e, angle=5 * degree)
   k = np.flatnonzero(e.rotations.isnan().reshape(-1))
   assert len(k) == 3 and np.all(e.isIndexed.reshape(-1)[k])
   i, j = k % 9, k // 9
-  f = e.fill(splineFilter())
-  assert not f.rotations.isnan().any() and close(angles(f)[k], 0.5 * i + 0.25 * j, 1e-6)
-  assert not e.smooth(splineFilter(), fill=True).rotations.isnan().any() and e.smooth(splineFilter()).rotations.isnan().sum() == 3
+  s = e.smooth(splineFilter())
+  assert not s.rotations.isnan().any() and close(angles(s)[k], 0.5 * i + 0.25 * j, 0.1)
 
 
-def test_fill_pinsTheMeasurements():
-  # the measurements themselves do not move, which is what pinning them means
+def test_fill_keepsTheMeasurements():
   e, k = holedLinearMap()
-  f = e.fill(splineFilter())
   others = np.arange(81) != k
-  assert np.max(np.abs(angles(f)[others] - angles(e)[others])) < 1e-9
+  assert np.array_equal(e.fill().rotations.data[others], e.rotations.data[others])
 
 
-def test_fill_edgePreservingFillsALittleShort():
-  # the edge preserving filter fills too, a little short of the continuation
+def test_fill_withoutGrainIdsFillsTheNotIndexedPixelsInsideTheScan():
+  # a notIndexed pixel inside the hull of the indexed ones is filled, one at the corner of the map is not
+  b = angleMapD(lambda i, j: np.full(len(i), 3.0), 7, missingAt=lambda i, j: ((i == 0) & (j == 0)) | ((i == 3) & (j == 3)))
+  f = b.fill()
+  assert f.isIndexed[3 + 3 * 7] and not f.isIndexed[0]
+
+
+def test_smooth_fillsHoles():
+  # smooth fills before it filters, with a variational filter and a window filter alike
   e, k = holedLinearMap()
-  assert abs(angles(fill(e, l1TVFilter()))[k] - 3.0) < 0.2 and abs(angles(e.fill())[k] - 3.0) < 0.2
+  assert not e.smooth(splineFilter()).rotations.isnan()[k] and not e.smooth(meanFilter()).rotations.isnan()[k]
 
 
-def test_fill_leavesAHoleAtTheBorderUnlessExtrapolating():
-  # a hole at the border is outside the measured region, so it stays empty
-  b = angleMapD(lambda i, j: np.full(len(i), 3.0), 7, missingAt=lambda i, j: (i == 0) & (j == 0))
-  assert b.fill().rotations.isnan()[0] and not b.fill(extrapolate=True).rotations.isnan()[0]
-
-
-def test_smooth_fillsHolesOnlyWhenAsked():
-  # smoothing solves for the holes as well when it is asked to, and a window filter, which
-  # can solve for nothing, has them closed first instead
+def test_smooth_aWindowFilterComputesAFilledPixelFromItsMeasuredNeighbours():
+  # the hole is the mean of its measured neighbours, exact on a linear field, not the copy fill made
   e, k = holedLinearMap()
-  assert not e.smooth(splineFilter(), fill=True).rotations.isnan()[k] and e.smooth(splineFilter()).rotations.isnan()[k]
-  assert not e.smooth(meanFilter(), fill=True).rotations.isnan()[k] and e.smooth(meanFilter()).rotations.isnan()[k]
+  assert close(angles(e.smooth(meanFilter()))[k], 3.0, 1e-9) and abs(angles(e.fill())[k] - 3.0) > 0.1
 
 
-def test_fill_refusesAWindowFilter():
+def test_fill_withoutGrainIdsFillsThePaddingInsideTheMeasurements():
+  # a site missing inside the hull of the measurements is a hole, the padding outside it stays empty
+  e = angleMapD(lambda i, j: 0.5 * i, 7)
+  g = e[np.arange(49) != 3 + 3 * 7].gridify()
+  f = g.fill()
+  assert g.isPadding.sum() == 1 and f.isPadding.sum() == 0 and not f.rotations.isnan().any()
+
+
+def test_fill_keepsTheGrainIdsAndFillsWithinTheGrain():
+  # a hole takes an orientation of its own grain, never one across the boundary
+  e = angleMapD(lambda i, j: np.where(i < 4, 0.0, 30.0), 8, missingAt=lambda i, j: (i == 6) & (j == 3))
+  calcGrains(e, angle=10 * degree)
+  f = e.fill()
+  k = 6 + 3 * 8
+  assert np.array_equal(f.grainId, e.grainId) and abs(angles(f)[k] - 30.0) < 1e-9
+
+
+def test_fill_isRestrictedToTheMask():
+  # only the pixels without an orientation that are masked are filled, the others stay as they are
+  holes = lambda i, j: ((i == 2) & (j == 2)) | ((i == 5) & (j == 5))
+  e = angleMapD(lambda i, j: np.where(i < 4, 0.2 * j, 20.0 + 0.1 * j), 8, missingAt=holes)
+  calcGrains(e, angle=10 * degree)
+  mask = np.zeros(64, dtype=bool)
+  mask[[2 + 2 * 8, 9]] = True
+  f = e.fill(mask)
+  nan = f.rotations.isnan()
+  assert not nan[2 + 2 * 8] and nan[5 + 5 * 8] and np.array_equal(f.rotations.data[9], e.rotations.data[9])
+
+
+def test_fill_refusesAMaskOfTheWrongSize():
   e, _ = holedLinearMap()
-  with pytest.raises(TypeError):
-    e.fill(meanFilter())
+  with pytest.raises(ValueError):
+    e.fill(np.ones(5, dtype=bool))
 
 
-def test_fill_solvesForANumericProperty():
-  # a numeric property is filled by the same solve, so a linear one is exact
+def test_fill_leavesThePropertiesAlone():
+  # only orientation, phase and grain id are filled, as MATLAB's fill
   e, k = holedMapWithProperties()
-  f = e.fill(splineFilter())
-  assert close(f.ci[k], 4.0, 1e-6) and np.max(np.abs(f.ci - e.ci)) < 1e-6
-
-
-def test_fill_copiesALabelFromTheNearestMeasurement():
-  # a label is copied from the nearest measurement, since continuing it is meaningless
-  e, k = holedMapWithProperties()
-  f = e.fill(splineFilter())
-  assert f.label[k] in (1, 2) and f.label.dtype == np.int32
+  f = e.fill()
+  assert np.array_equal(f.ci, e.ci) and np.array_equal(f.label, e.label)
 
 
 def test_smooth_leavesThePropertiesAloneUnlessAsked():
-  # smoothing leaves the properties alone unless it is asked
   e, _ = holedMapWithProperties()
-  n = e.smooth(splineFilter(), fill=True)
-  assert np.array_equal(n.ci, e.ci) and not np.array_equal(e.smooth(splineFilter(), fill=True, props=["ci"]).ci, e.ci)
+  assert np.array_equal(e.smooth(splineFilter()).ci, e.ci) and not np.array_equal(e.smooth(splineFilter(), props=["ci"]).ci, e.ci)
 
 
 def test_smooth_refusesPropertiesItCannotSmooth():
@@ -294,7 +309,7 @@ def test_the_compiled_and_the_numpy_filters_agree():
     for kernels in ("numba", "numpy"):
       setMTEXpref("kernels", kernels)
       out[kernels] = [angles(e.smooth(F)) for F in (meanFilter(), medianFilter(2), KuwaharaFilter(), splineFilter(), l1TVFilter(), halfQuadraticFilter(l1TV=False))]
-      out[kernels] += [angles(e.fill(splineFilter())), angles(e.fill(l1TVFilter(threshold=0.01))), angles(e.smooth(infimalConvolutionFilter(alpha=1.0, beta=1.0), fill=True))]
+      out[kernels] += [angles(e.smooth(splineFilter())), angles(e.smooth(l1TVFilter(threshold=0.01))), angles(e.smooth(infimalConvolutionFilter(alpha=1.0, beta=1.0)))]
   finally:
     setMTEXpref("kernels", before)
   for a, b in zip(out["numba"], out["numpy"]):
@@ -305,10 +320,10 @@ def test_the_padding_of_a_grid_is_never_filled():
   from test_gridify import turnedMap
   g = turnedMap().gridify()
   pad = g.isPadding.reshape(-1)
-  for f in (g.fill(), g.fill(extrapolate=True), g.smooth(halfQuadraticFilter(), fill=True, extrapolate=True)):
+  for f in (g.fill(), g.smooth(halfQuadraticFilter())):
     assert np.all(f.isPadding.reshape(-1) == pad) and f.rotations.isnan().reshape(-1)[pad].all() and np.all(f.phaseId.reshape(-1)[pad] == 0)
-  # the one measured notIndexed pixel is filled, since it is inside the scan
-  assert len(g.fill(extrapolate=True)["notIndexed"]) == 0
+  # the one measured notIndexed pixel is filled, since the map has no grain ids
+  assert len(g.fill()["notIndexed"]) == 0
 
 
 def test_fill_within_the_grains_fills_their_padding_too():
@@ -320,21 +335,67 @@ def test_fill_within_the_grains_fills_their_padding_too():
   grains = calcGrains(sub, 5 * degree)
   g = sub.gridify()
   pad = g.isPadding.reshape(-1).copy()
-  f = fill(g, grains, splineFilter())
+  f = fill(g, grains)
   assert np.array_equal(g.isPadding.reshape(-1), pad)
   measured = ~g.rotations.isnan().reshape(-1)
   assert np.array_equal(f.rotations.data.reshape(-1, 4)[measured], g.rotations.data.reshape(-1, 4)[measured])
-  # what is left empty is padding outside every grain or a measured site in none
+  # what is left empty is padding outside every grain or crossed by a boundary, or a measured site in none
   empty = f.rotations.isnan().reshape(-1)
-  assert pad.sum() > 1000 and f.isPadding.sum() < pad.sum() / 10
+  assert pad.sum() > 1000 and f.isPadding.sum() < pad.sum() / 5
   assert np.all(f.isPadding.reshape(-1)[empty] | (f.phaseId.reshape(-1)[empty] == 0))
   # a filled site lies in the grain it was filled from
   k = np.flatnonzero(pad & ~empty)[:200]
   from mtex import vector3d
   hit = grains.checkInside(vector3d(f.pos.data.reshape(-1, 3)[k], frame=f.frame))
   assert np.all(hit[np.arange(len(k)), grains.id2ind(f.grainId.reshape(-1)[k])])
-  # the grains are the second argument or the keyword, and the filter may come first
-  assert np.array_equal(fill(g, splineFilter(), grains=grains).grainId, f.grainId)
+  # smooth fills the same sites before it filters
+  assert np.array_equal(smooth(g, splineFilter(), grains).grainId, f.grainId)
+
+
+# the sparse map of the grains test and its grains, every third measurement dropped
+def sparseGrainsMap():
+  from mtex.io.sampledata import testGrainsMap as grainsMap
+  e = grainsMap()
+  sub = e[np.random.default_rng(1).random(e.size) > 0.6]
+  return sub, calcGrains(sub, 5 * degree)
+
+
+def test_fill_turnsTheEmptySitesOnABoundaryIntoNotIndexedCells():
+  # with grains every empty site of the scan is a cell afterwards, in a grain or notIndexed on a boundary
+  sub, grains = sparseGrainsMap()
+  f = fill(sub.gridify(), grains)
+  added = ~np.isin(np.asarray(f.id).reshape(-1), np.asarray(sub.id).reshape(-1)) & ~f.isPadding.reshape(-1)
+  gid = f.grainId.reshape(-1)[added]
+  assert np.any(gid == 0) and np.all(f.phaseId.reshape(-1)[added][gid == 0] == 0)
+
+
+def test_fill_withGrainIdsOnlyGivesAnEmptySiteTheGrainOfItsNearestPixel():
+  sub, _ = sparseGrainsMap()
+  f = fill(sub)
+  from scipy.spatial import cKDTree
+  new = ~np.isin(np.asarray(f.id), np.asarray(sub.id))
+  P, Q = np.asarray(sub.pos.data).reshape(-1, 3), np.asarray(f.pos.data).reshape(-1, 3)[new]
+  assert new.sum() > 1000 and np.array_equal(f.grainId[new], sub.grainId[cKDTree(P).query(Q)[1]])
+
+
+def test_fill_keepsTheOrderOfAList():
+  sub, _ = sparseGrainsMap()
+  assert np.array_equal(np.asarray(fill(sub).id)[:sub.size], np.asarray(sub.id))
+
+
+def test_smooth_withoutFillLeavesThePixelsWithoutOrientationAsTheyWere():
+  e, k = holedLinearMap()
+  s = e.smooth(splineFilter(), fill=False)
+  assert s.rotations.isnan()[k] and not s.isIndexed[k] and s.size == e.size
+
+
+def test_smooth_fillsOnlyTheMask():
+  holes = lambda i, j: ((i == 2) & (j == 2)) | ((i == 6) & (j == 6))
+  e = angleMapD(lambda i, j: 0.5 * i + 0.25 * j, 9, missingAt=holes)
+  mask = np.zeros(81, dtype=bool)
+  mask[2 + 2 * 9] = True
+  s = e.smooth(splineFilter(), fill=mask)
+  assert s.isIndexed[2 + 2 * 9] and s.rotations.isnan()[6 + 6 * 9]
 
 
 # a map read at scattered positions is a list of them, read on a grid it has the grid's lattice;
