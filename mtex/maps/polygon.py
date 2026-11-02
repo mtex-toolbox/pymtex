@@ -128,6 +128,49 @@ def _flatLoops(loopsPerOutline):
   return flat, np.cumsum(lengths) - lengths, lengths, owner, first
 
 
+# the point in outline test as one compiled loop over the points, each tested only against the
+# outlines whose bounding box holds it, found through a uniform grid of buckets about the size
+# of the median outline: dense fills hit, else the least outline holding each point is
+# returned. None without numba, where checkInside's NumPy form decides
+def _insideCompiled(ps, q, dense, hit):
+  loop = grainKernel("insideOutlines")
+  if loop is None:
+    return None
+  first = np.full(len(q), -1, dtype=np.int64)
+  V = np.ascontiguousarray(ps.V, dtype=float)
+  flat, start, lengths, owner, isOuter = _flatLoops(ps.loops)
+  if not len(flat) or not len(q):
+    return first
+  # the loops of an outline are consecutive; its box is the one of its outer loop
+  loopStart = np.searchsorted(owner, np.arange(ps.size + 1)).astype(np.int64)
+  outer = np.flatnonzero(isOuter & (lengths > 0))
+  if not len(outer):
+    return first
+  # a segment from one outer loop to the next takes in the holes between, which lie inside it
+  box = np.full((ps.size, 4), np.nan)
+  P = V[flat]
+  for c, (red, col) in enumerate(((np.minimum, 0), (np.minimum, 1), (np.maximum, 0), (np.maximum, 1))):
+    box[owner[outer], c] = red.reduceat(P[:, col], start[outer])
+  has = np.flatnonzero(~np.isnan(box[:, 0]))
+  lo, hi = box[has, :2].min(axis=0), box[has, 2:].max(axis=0)
+  size = np.maximum(box[has, 2:] - box[has, :2], 0).max(axis=1)
+  h = max(float(np.median(size)), float((hi - lo).max()) / 4096, 1e-300)
+  nx, ny = (np.floor((hi - lo) / h).astype(np.int64) + 1).tolist()
+  # every outline listed in each bucket its box meets, outlines ascending within a bucket
+  i0 = np.floor((box[has, :2] - lo) / h).astype(np.int64)
+  i1 = np.floor((box[has, 2:] - lo) / h).astype(np.int64)
+  w = i1[:, 0] - i0[:, 0] + 1
+  cnt = w * (i1[:, 1] - i0[:, 1] + 1)
+  r = np.arange(cnt.sum()) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+  bucket = (np.repeat(i0[:, 1], cnt) + r // np.repeat(w, cnt)) * nx + np.repeat(i0[:, 0], cnt) + r % np.repeat(w, cnt)
+  order = np.argsort(bucket, kind="stable")
+  items = np.repeat(has, cnt)[order]
+  bstart = np.concatenate([[0], np.cumsum(np.bincount(bucket, minlength=nx * ny))]).astype(np.int64)
+  loop(V, flat, start.astype(np.int64), lengths, loopStart, box, bstart, items, float(lo[0]), float(lo[1]), h, nx, ny,
+       np.ascontiguousarray(q, dtype=float), dense, hit, first)
+  return first
+
+
 def loopSums(V, loopsPerOutline, size):
   """the sums over the edges of every outline, one row each: twice the area, the length of the
   outer loop, the length of all loops, the first moments times six (x, y), the second times
@@ -180,6 +223,8 @@ class polygonSet:
     as a (points, outlines) matrix"""
     q = self._as2d(xy)
     out = np.zeros((len(q), self.size), dtype=bool)
+    if _insideCompiled(self, q, True, out) is not None:
+      return out
     flat, start, lengths, owner, first = _flatLoops(self.loops)
     if not len(flat):
       return out
@@ -200,7 +245,11 @@ class polygonSet:
   def findByLocation(self, xy):
     """the positions of the outlines a point lies in
     the position of the outline holding each point, -1 for a point in none"""
-    hit = self.checkInside(xy)
+    q = self._as2d(xy)
+    first = _insideCompiled(self, q, False, np.zeros((1, 1), dtype=bool))
+    if first is not None:
+      return first
+    hit = self.checkInside(q)
     return np.where(hit.any(axis=1), np.argmax(hit, axis=1), -1)
 
   def inpolygon(self, region):

@@ -200,6 +200,18 @@ def test_fill_isRestrictedToTheMask():
   assert not nan[2 + 2 * 8] and nan[5 + 5 * 8] and np.array_equal(f.rotations.data[9], e.rotations.data[9])
 
 
+def test_fill_refusesAFilter():
+  e, _ = holedLinearMap()
+  with pytest.raises(TypeError):
+    e.fill(splineFilter())
+
+
+def test_smooth_refusesAFillThatIsNeitherAFlagNorAMask():
+  e, _ = holedLinearMap()
+  with pytest.raises(TypeError):
+    e.smooth(splineFilter(), fill=None)
+
+
 def test_fill_refusesAMaskOfTheWrongSize():
   e, _ = holedLinearMap()
   with pytest.raises(ValueError):

@@ -1517,9 +1517,52 @@ def _projectionLengthLoop(H, offsets, D, out):
     out[w] = acc
 
 
+# the outlines every point lies in, tested only against the outlines whose bounding box holds
+# it, found through the buckets of a uniform grid (bucket b lists items[bstart[b]:bstart[b + 1]],
+# ascending); inside is within the outer loop, the first of an outline, and outside its holes,
+# by the crossing number of a ray to the right, as polygonSet.checkInside. dense writes every
+# hit into hit, else first gets the least outline holding the point, -1 for none
+def _insideOutlinesLoop(V, flat, start, length, loopStart, box, bstart, items, x0, y0, h, nx, ny, q,
+                        dense, hit, first):
+  for k in prange(q.shape[0]):
+    qx, qy = q[k, 0], q[k, 1]
+    first[k] = -1
+    if not (qx == qx and qy == qy):
+      continue
+    bx, by = int(np.floor((qx - x0) / h)), int(np.floor((qy - y0) / h))
+    if bx < 0 or by < 0 or bx >= nx or by >= ny:
+      continue
+    b = by * nx + bx
+    for t in range(bstart[b], bstart[b + 1]):
+      o = items[t]
+      if qx < box[o, 0] or qx > box[o, 2] or qy < box[o, 1] or qy > box[o, 3]:
+        continue
+      inside = True
+      for l in range(loopStart[o], loopStart[o + 1]):
+        s, n = start[l], length[l]
+        odd = False
+        for i in range(n):
+          px, py = V[flat[s + i], 0], V[flat[s + i], 1]
+          j = flat[s + (i + 1) % n]
+          ex, ey = V[j, 0], V[j, 1]
+          if (py > qy) != (ey > qy):
+            if px + (qy - py) / (ey - py) * (ex - px) > qx:
+              odd = not odd
+        if odd != (l == loopStart[o]):
+          inside = False
+          break
+      if inside:
+        if dense:
+          hit[k, o] = True
+        else:
+          first[k] = o
+          break
+
+
 _GRAIN_LOOPS = {"angleCriterion": (_angleCriterionLoop, True), "toReference": (_toReferenceLoop, True),
                 "firstPixel": (_firstPixelLoop, False), "sumByGrain": (_sumByGrainLoop, False), "relabel": (_relabelLoop, False),
-                "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False), "projectionLength": (_projectionLengthLoop, True)}
+                "fmcSeeds": (_fmcSeedsLoop, False), "loopSums": (_loopSumsLoop, False), "projectionLength": (_projectionLengthLoop, True),
+                "insideOutlines": (_insideOutlinesLoop, True)}
 
 
 def grainKernel(name, backend=None):

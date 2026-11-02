@@ -265,9 +265,12 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   See also
     fill, interp, halfQuadraticFilter, splineFilter, meanFilter, EBSDDenoising, EBSDFilling"""
   F = l1TVFilter() if F is None else F
-  mask = None if isinstance(fill, (bool, np.bool_)) else np.asarray(fill, dtype=bool).reshape(-1)
-  if mask is not None and mask.size != ebsd.size:
-    raise ValueError("a mask has one entry per pixel of the map")
+  if isinstance(fill, (bool, np.bool_)):
+    mask, fill = None, bool(fill)
+  elif np.ndim(fill) == 0:
+    raise TypeError(f"fill is True, False or a mask of the pixels, not {fill!r}")
+  else:
+    mask = _asMask(ebsd, fill, "smooth")
   # the empty sites exist on the grid, the mask goes along as a property
   out = ebsd.copy()
   if mask is not None:
@@ -291,10 +294,10 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   rot[keep] = rot0[keep]
   for key in props:
     _solveProperty(out, key, F, comp, edges, isData, False)
-  return out if out is ebsd or ebsd.isGridded or not out.isGridded else _asList(ebsd, out)
+  return out if ebsd.isGridded or not out.isGridded else _asList(ebsd, out)
 
 
-def fill(ebsd, *args):
+def fill(ebsd, grains=None, mask=None):
   """the map with every pixel without an orientation given the one of the nearest measured
   pixel of its own grain; MATLAB's fill
 
@@ -317,7 +320,8 @@ def fill(ebsd, *args):
 
   Input
     ebsd - EBSD, the map
-    grains - grain2d of the map, the outlines that decide the grain of an empty site
+    grains - grain2d of the map, the outlines that decide the grain of an empty site; a mask
+        in its place is taken as the mask
     mask - boolean mask of the pixels of the map filling is restricted to
   Output
     ebsd_f - EBSD, the filled map
@@ -343,10 +347,11 @@ def fill(ebsd, *args):
 
   See also
     smooth, interp, gridify, calcGrains, EBSDFilling"""
-  grains = next((a for a in args if isinstance(a, grain2d)), None)
-  mask = next((np.asarray(a, dtype=bool).reshape(-1) for a in args if a is not None and not isinstance(a, grain2d)), None)
-  if mask is not None and mask.size != ebsd.size:
-    raise ValueError("a mask has one entry per pixel of the map")
+  if grains is not None and not isinstance(grains, grain2d):
+    if mask is not None:
+      raise TypeError(f"grains is a grain2d, not {type(grains).__name__}")
+    grains, mask = None, grains
+  mask = _asMask(ebsd, mask, "fill")
   hasGrains = "grainId" in ebsd.prop
   if grains is not None and not hasGrains:
     raise ValueError("filling within grains needs the grain ids of the map; reconstruct them with calcGrains(ebsd)")
@@ -367,9 +372,9 @@ def fill(ebsd, *args):
     held = grains[np.isin(grains.id, gid)]
     empty = np.flatnonzero(pad & sel)
     corners = 0.95 * np.asarray(out.unitCell.data, dtype=float).reshape(-1, 3)
-    hit = np.logical_and.reduce([held.checkInside(vector3d(pos[empty] + c, frame=out.frame)) for c in corners])
-    has = hit.any(axis=1)
-    k = np.argmax(hit[has], axis=1)
+    at = [held.findByLocation(vector3d(pos[empty] + c, frame=out.frame)) for c in corners]
+    has = (at[0] >= 0) & np.logical_and.reduce([a == at[0] for a in at])
+    k = at[0][has]
     ph[empty[has]] = held.phaseId[k]
     gid[empty[has]] = held.id[k]
     inScan[empty[has]] = True
@@ -410,15 +415,31 @@ def _asList(ebsd, out):
   return out[np.concatenate([first, np.setdiff1d(np.arange(len(ids)), first)])]
 
 
-# which pixels lie inside the convex hull of the selected ones, the scanned area
+# which pixels lie inside the convex hull of the selected ones, the scanned area: on the inner
+# side of every facet of the hull, up to rounding
 def _inHull(ebsd, sel):
-  from scipy.spatial import Delaunay
-  from scipy.spatial import QhullError
+  from scipy.spatial import ConvexHull, QhullError
   P = mapLattice(ebsd).plane.to2d(np.asarray(ebsd.pos.data, dtype=float).reshape(-1, 3))
   try:
-    return Delaunay(P[sel]).find_simplex(P) >= 0
+    E = ConvexHull(P[sel]).equations
   except (QhullError, ValueError):
     return sel.copy()
+  tol = 1e-9 * max(float(np.abs(P[sel]).max()), 1.0)
+  return np.all(P @ E[:, :2].T + E[:, 2] <= tol, axis=1)
+
+
+# a mask of the pixels of a map as a flat boolean array, None for none
+def _asMask(ebsd, mask, name):
+  if mask is None:
+    return None
+  if isinstance(mask, EBSDFilter):
+    raise TypeError(f"{name} copies the nearest measurement and takes no filter; smooth(ebsd, F) fills and filters")
+  mask = np.asarray(mask)
+  if mask.dtype.kind not in "bui":
+    raise TypeError(f"a mask of {name} is boolean, not {mask.dtype}")
+  if mask.size != ebsd.size:
+    raise ValueError("a mask has one entry per pixel of the map")
+  return mask.astype(bool).reshape(-1)
 
 
 # orientation, phase and grain id of the nearest source for every target closer than maxDist
