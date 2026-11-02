@@ -136,8 +136,9 @@ print(f'Total variation mean deviation: {np.nanmean(hqDeviation) / degree:.2f} d
 
 # ## The smoothing spline filter
 #
-# The `splineFilter` is the filter that `smooth` uses when none is supplied. It
-# penalizes curvature rather than first-order variation. The result is rounder than the
+# The `splineFilter` is the filter MATLAB's `smooth` uses when none is supplied; here the
+# default is the total variation filter `l1TVFilter`. The spline penalizes curvature
+# rather than first-order variation. The result is rounder than the
 # total variation result, but fine subgrain boundaries are smoothed with the noise.
 #
 # In MATLAB it is the only filter on this page that selects its own regularization
