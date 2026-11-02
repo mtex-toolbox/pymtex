@@ -1216,6 +1216,46 @@ def _residualNormLoop(x, order, edges, ptr, adj, active, out):
       out[i] = np.sqrt(acc)
 
 
+# the energy the reweighting minimises, per component, over the active pixels and the edges
+# between them: eps sqrt(t^2 + eps^2) for an absolute value and t^2 / 2 for a square, the
+# regularisation capped at the threshold, the data term where the field is not pinned. The
+# edges and pixels in E.shape[0] chunks, each summing into its own row, which the caller adds
+# up; _componentEnergy is the oracle
+def _irlsEnergyLoop(x, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, edges, ptr, adj, comp, active, E):
+  d = x.shape[1]
+  nch = E.shape[0]
+  m = edges.shape[0] if order == 1 else x.shape[0]
+  n = x.shape[0]
+  for ch in prange(nch):
+    for j in range(E.shape[1]):
+      E[ch, j] = 0.0
+    for e in range(ch * m // nch, (ch + 1) * m // nch):
+      a = edges[e, 0] if order == 1 else e
+      if not active[a]:
+        continue
+      acc = 0.0
+      if order == 1:
+        b = edges[e, 1]
+        for c in range(d):
+          acc += (x[a, c] - x[b, c]) ** 2
+      else:
+        for c in range(d):
+          v = 0.0
+          for k in range(ptr[a], ptr[a + 1]):
+            v += x[a, c] - x[adj[k], c]
+          acc += v * v
+      t = min(np.sqrt(acc), threshold)
+      E[ch, comp[a]] += alpha * (eps * np.sqrt(t * t + eps * eps) if l1Reg else t * t / 2)
+    if not pin:
+      for i in range(ch * n // nch, (ch + 1) * n // nch):
+        if not (active[i] and isData[i]):
+          continue
+        acc = 0.0
+        for c in range(d):
+          acc += (x[i, c] - f[i, c]) ** 2
+        E[ch, comp[i]] += eps * np.sqrt(acc + eps * eps) if l1Data else acc / 2
+
+
 # every pixel of a component as the left tangent vector at its reference, over the
 # equivalent closest to it: u = log(closest(rot) conj(ref)), and the closest image itself
 def _tangentLoop(rot, ref, indexed, phase, Gall, nG, img, u):
@@ -1354,7 +1394,7 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
 
 _PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
                 "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
-                "absorb": _absorbLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop}
+                "absorb": _absorbLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
 
 
 def pixelKernel(name, backend=None):

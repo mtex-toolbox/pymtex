@@ -52,3 +52,61 @@ def test_infimalConvolutionFilter_keepsASlope():
   ramp = angleMapD(lambda i, j: 0.3 * i, 15)
   ic = ramp.smooth(infimalConvolutionFilter(alpha=2.0, beta=2.0, threshold=np.pi))
   assert np.max(np.abs(angles(ic) - angles(ramp))) < 0.5
+
+
+# a random graph of three components over a vector field, some pixels measured
+def randomGraphField(seed=3, n=60, d=3):
+  from mtex.analysis.filters.variational import graphCSR
+  rng = np.random.default_rng(seed)
+  comp = np.repeat([1, 2, 3], n // 3)
+  a, b = rng.integers(0, n, 400), rng.integers(0, n, 400)
+  keep = (comp[a] == comp[b]) & (a < b)
+  edges = np.unique(np.stack([a[keep], b[keep]], axis=1), axis=0)
+  return graphCSR(edges, n), rng.normal(size=(n, d)), rng.normal(size=(n, d)), rng.random(n) > 0.3, comp
+
+
+@pytest.mark.parametrize("order", [1, 2])
+@pytest.mark.parametrize("pin", [False, True])
+def test_the_compiled_energy_is_the_numpy_energy(order, pin):
+  from mtex.analysis.filters.variational import _energyOf, _componentEnergy
+  G, f, x, isData, comp = randomGraphField()
+  active = comp != 2
+  args = (f, isData, pin, True, True, 0.8, 1e-2, 0.7, order, comp, 3)
+  E = _energyOf(G, *args)(x, active)
+  ref = _componentEnergy(G, G.laplacian() if order == 2 else None, *args, x)
+  assert np.allclose(E[[1, 3]], ref[[1, 3]], rtol=1e-12) and E[2] == 0
+
+
+def test_the_history_updated_step_by_step_is_anderson_rebuilt_from_the_last_steps():
+  # the extrapolation from the ring of differences and its Gram matrix, against the least
+  # squares over the last five iterates and steps stacked anew
+  from mtex.analysis.filters.variational import _andersonHistory
+  rng = np.random.default_rng(5)
+  h, prev, Y, R = _andersonHistory((20, 3), 5), rng.normal(size=(20, 3)), [], []
+  for _ in range(8):
+    x = prev + rng.normal(size=(20, 3)) * 0.1
+    xa = h.extrapolate(x, prev)
+    Y, R = (Y + [x.ravel()])[-5:], (R + [(x - prev).ravel()])[-5:]
+    if len(Y) > 1:
+      dY, dR = np.diff(np.array(Y), axis=0).T, np.diff(np.array(R), axis=0).T
+      gam = np.linalg.solve(dR.T @ dR + 1e-12 * np.eye(dR.shape[1]), dR.T @ R[-1])
+      assert np.allclose(xa.ravel(), x.ravel() - dY @ gam, atol=1e-10)
+    prev = x
+
+
+def test_a_stopped_pixel_leaves_the_history():
+  # once dropped, the rows of a pixel frozen at its value contribute nothing to the extrapolation
+  from mtex.analysis.filters.variational import _andersonHistory
+  rng = np.random.default_rng(6)
+  h, prev = _andersonHistory((10, 3), 5), rng.normal(size=(10, 3))
+  for _ in range(4):
+    x = prev + rng.normal(size=(10, 3)) * 0.1
+    h.extrapolate(x, prev)
+    prev = x
+  h.drop(np.array([0, 1]), prev)
+  x = prev.copy()
+  x[2:] += rng.normal(size=(8, 3)) * 0.1
+  h.extrapolate(x, prev)
+  assert np.all(h.DY[:h.count, :6] == 0) and np.all(h.DR[:h.count, :6] == 0)
+  assert np.allclose(h.gram[:h.count, :h.count], h.DR[:h.count] @ h.DR[:h.count].T)
+

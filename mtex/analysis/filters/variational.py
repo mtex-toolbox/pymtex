@@ -247,9 +247,8 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
     t = np.zeros(len(edges) if order == 1 else n)
     wr, wd, b = np.zeros(len(t)), np.zeros(n), np.zeros(x.shape)
   prev = np.empty_like(x)
-  lap = G.laplacian() if order == 2 else None
-  energy = functools.partial(_componentEnergy, G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc)
-  Y, R = [], []
+  energy = _energyOf(G, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc)
+  history = _andersonHistory(x.shape, ANDERSON_DEPTH)
   for _ in range(maxIter):
     np.copyto(prev, x)
     if cg is not None:
@@ -273,31 +272,102 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
     step = np.abs(x - prev)
     moving = np.zeros(nc + 1, dtype=bool)
     moving[comp[functools.reduce(np.maximum, step.T) >= tol]] = True
-    # Anderson extrapolation over the last five steps, taken in the components whose energy
-    # it lowers: the reweighting alone crawls where a pixel's optimum is flat, as the median
-    # of its neighbours is for a pixel without a measurement
-    Y.append(x.copy())
-    R.append(x - prev)
-    if len(Y) > 5:
-      del Y[0], R[0]
-    if len(Y) > 1:
-      dR = np.stack([(b - a).ravel() for a, b in zip(R[:-1], R[1:])], axis=1)
-      dY = np.stack([(b - a).ravel() for a, b in zip(Y[:-1], Y[1:])], axis=1)
-      gam = np.linalg.solve(dR.T @ dR + 1e-12 * np.eye(dR.shape[1]), dR.T @ R[-1].ravel())
-      xa = x - (dY @ gam).reshape(x.shape)
-      better = energy(xa) < energy(x)
+    # Anderson extrapolation over the last steps, taken in the components whose energy it
+    # lowers: the reweighting alone crawls where a pixel's optimum is flat, as the median of
+    # its neighbours is for a pixel without a measurement
+    xa = history.extrapolate(x, prev)
+    if xa is not None:
+      better = energy(xa, active) < energy(x, active)
       take = better[comp] & free
       x[take] = xa[take]
       if not better.any():
-        del Y[:-1], R[:-1]
-    if (activeComp & ~moving).any():
-      Y, R = [], []                                  # the history holds only the components still moving
+        history.clear()
+    # a component that stops leaves the history, the others keep theirs
+    stops = activeComp & ~moving
+    if stops.any():
+      history.drop(np.flatnonzero(stops[comp]), x)
     activeComp &= moving
     active = activeComp[comp]
     free = freeBase & active
     if not free.any():
       break
   return x
+
+
+# the steps of the reweighting the extrapolation looks back on
+ANDERSON_DEPTH = 5
+
+
+class _andersonHistory:
+  """the last steps of the reweighting, updated step by step: the differences of the iterates
+  and of their steps in a ring of depth - 1 rows over the whole map, the Gram matrix of the
+  step differences, and the last iterate and step. A pixel that stops has its rows zeroed
+  instead of the history cleared, which on a map of thousands of grains would happen at
+  nearly every step, and every product runs over the whole map as one BLAS call"""
+
+  def __init__(self, shape, depth):
+    m, N = depth - 1, int(np.prod(shape))
+    self.shape = shape
+    self.DY, self.DR = np.zeros((m, N)), np.zeros((m, N))
+    self.gram = np.zeros((m, m))
+    self.y, self.r = np.zeros(N), np.zeros(N)
+    self.count, self.head, self.started = 0, 0, False
+
+  def extrapolate(self, x, prev):
+    """record the step prev -> x and return the extrapolation of x from the history, None
+    while it holds less than two steps"""
+    y = x.reshape(-1)
+    r = y - prev.reshape(-1)
+    if not self.started:
+      self.started = True
+      self.y[:], self.r[:] = y, r
+      return None
+    # the new differences overwrite the oldest, their column of the Gram matrix with them
+    s = self.head
+    np.subtract(y, self.y, out=self.DY[s])
+    np.subtract(r, self.r, out=self.DR[s])
+    self.y[:], self.r[:] = y, r
+    self.count = min(self.count + 1, len(self.DY))
+    self.head = (s + 1) % len(self.DY)
+    k = self.count
+    self.gram[:k, s] = self.gram[s, :k] = self.DR[:k] @ self.DR[s]
+    gam = np.linalg.solve(self.gram[:k, :k] + 1e-12 * np.eye(k), self.DR[:k] @ r)
+    return (y - gam @ self.DY[:k]).reshape(self.shape)
+
+  def clear(self):
+    """forget every step but the last"""
+    self.count, self.head = 0, 0
+
+  def drop(self, stopped, x):
+    """the pixels stopped (indices) leave the history: their rows zeroed and their last
+    iterate the value they are frozen at, so that their next differences are zero, and the
+    Gram matrix recomputed"""
+    d = self.shape[1] if len(self.shape) > 1 else 1
+    rows = (stopped[:, None] * d + np.arange(d)).reshape(-1)
+    k = self.count
+    for a in (self.DY[:k], self.DR[:k]):
+      a[:, rows] = 0.0
+    self.y[rows], self.r[rows] = x.reshape(-1)[rows], 0.0
+    self.gram[:k, :k] = self.DR[:k] @ self.DR[:k].T
+
+
+# the energy per component of an iterate over the active pixels: the compiled loop, or
+# _componentEnergy over the whole map without numba
+def _energyOf(G, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc):
+  loop = _kernel("irlsEnergy")
+  if loop is None:
+    lap = G.laplacian() if order == 2 else None
+    return lambda x, active: _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x)
+  from ...geometry.kernels import threads
+  E = np.zeros((threads(), nc + 1))
+  edges = np.ascontiguousarray(G.edges, dtype=np.int64)
+  fc, dc, cc = np.ascontiguousarray(f, dtype=float), np.ascontiguousarray(isData), np.ascontiguousarray(comp)
+
+  def energy(x, active):
+    loop(np.ascontiguousarray(x), fc, dc, bool(pin), bool(l1Data), bool(l1Reg), float(threshold), float(eps), float(alpha),
+         int(order), edges, G.ptr, G.adj, cc, np.ascontiguousarray(active), E)
+    return E.sum(axis=0)
+  return energy
 
 
 def _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x):
