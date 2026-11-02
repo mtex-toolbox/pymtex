@@ -247,6 +247,9 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
     t = np.zeros(len(edges) if order == 1 else n)
     wr, wd, b = np.zeros(len(t)), np.zeros(n), np.zeros(x.shape)
   prev = np.empty_like(x)
+  lap = G.laplacian() if order == 2 else None
+  energy = functools.partial(_componentEnergy, G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc)
+  Y, R = [], []
   for _ in range(maxIter):
     np.copyto(prev, x)
     if cg is not None:
@@ -264,18 +267,55 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
       x[free] = y[free]
     if not l1Data and not l1Reg:
       break                                          # a quadratic model is one solve
-    # a component goes on while one of its pixels moved by tol; a pixel not free never moves,
-    # so the whole map is compared, its columns one by one, NumPy's reduction along the short
-    # axis of a narrow array being a loop per row
+    # a component goes on while the reweighting moved one of its pixels by tol; a pixel not
+    # free never moves, so the whole map is compared, its columns one by one, NumPy's
+    # reduction along the short axis of a narrow array being a loop per row
     step = np.abs(x - prev)
     moving = np.zeros(nc + 1, dtype=bool)
     moving[comp[functools.reduce(np.maximum, step.T) >= tol]] = True
+    # Anderson extrapolation over the last five steps, taken in the components whose energy
+    # it lowers: the reweighting alone crawls where a pixel's optimum is flat, as the median
+    # of its neighbours is for a pixel without a measurement
+    Y.append(x.copy())
+    R.append(x - prev)
+    if len(Y) > 5:
+      del Y[0], R[0]
+    if len(Y) > 1:
+      dR = np.stack([(b - a).ravel() for a, b in zip(R[:-1], R[1:])], axis=1)
+      dY = np.stack([(b - a).ravel() for a, b in zip(Y[:-1], Y[1:])], axis=1)
+      gam = np.linalg.solve(dR.T @ dR + 1e-12 * np.eye(dR.shape[1]), dR.T @ R[-1].ravel())
+      xa = x - (dY @ gam).reshape(x.shape)
+      better = energy(xa) < energy(x)
+      take = better[comp] & free
+      x[take] = xa[take]
+      if not better.any():
+        del Y[:-1], R[:-1]
+    if (activeComp & ~moving).any():
+      Y, R = [], []                                  # the history holds only the components still moving
     activeComp &= moving
     active = activeComp[comp]
     free = freeBase & active
     if not free.any():
       break
   return x
+
+
+def _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x):
+  """the energy the reweighting minimises, per component: eps sqrt(t^2 + eps^2) for an
+  absolute value and t^2 / 2 for a square, the regularisation capped at the threshold"""
+  def phi(t, l1):
+    return eps * np.sqrt(t * t + eps * eps) if l1 else t * t / 2
+  if order == 1:
+    t = np.linalg.norm(x[G.edges[:, 0]] - x[G.edges[:, 1]], axis=1)
+    at = comp[G.edges[:, 0]]
+  else:
+    t = np.linalg.norm(np.asarray(lap @ x), axis=1)
+    at = comp
+  E = alpha * np.bincount(at, phi(np.minimum(t, threshold), l1Reg), nc + 1)
+  if not pin:
+    td = np.linalg.norm(x[isData] - f[isData], axis=1)
+    E += np.bincount(comp[isData], phi(td, l1Data), nc + 1)
+  return E
 
 
 def _kernel(name):
