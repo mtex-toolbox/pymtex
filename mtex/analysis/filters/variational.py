@@ -209,15 +209,16 @@ class graphCSR:
     return (D.T @ D).tocsr()
 
 
-def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData, pin, comp):
+def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData, fixed, comp):
   """iteratively reweighted least squares for the model over the whole graph: an absolute
   value is minimised through the quadratic that touches it, and the surrogate is solved
   exactly at every step, which is what half quadratic minimisation is. The weight is
   eps / sqrt(t^2 + eps^2), one at a difference of zero and eps / |t| above, Huber's
-  penalty, so one alpha means one thing whichever of the two penalties is absolute. Where
-  the field is pinned the measured pixels are not unknowns at all; where it is not they
-  carry the data term; a pixel with no measurement is free and has none. The surrogate is
-  solved by the conjugate gradient kernel over the graph, or by SuperLU without numba"""
+  penalty, so one alpha means one thing whichever of the two penalties is absolute. A
+  measured pixel carries the data term, one without a measurement is free and has none, and
+  a fixed one (the mask fixed, or None) is no unknown at all but a boundary value of its
+  neighbours. The surrogate is solved by the conjugate gradient kernel over the graph, or by
+  SuperLU without numba"""
   n = G.n
   x = f.astype(float).copy()
   # a component stops on its own once nothing in it moves by more than tol, as it would
@@ -227,7 +228,7 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
   activeComp = np.ones(nc + 1, dtype=bool)
   activeComp[0] = False
   active = activeComp[comp]
-  freeBase = active & (~isData if pin else True)
+  freeBase = active if fixed is None else active & ~fixed
   free = freeBase.copy()
   if not free.any():
     return x
@@ -247,21 +248,20 @@ def irls(G, f, alpha, order, l1Data, l1Reg, threshold, eps, maxIter, tol, isData
     t = np.zeros(len(edges) if order == 1 else n)
     wr, wd, b = np.zeros(len(t)), np.zeros(n), np.zeros(x.shape)
   prev = np.empty_like(x)
-  energy = _energyOf(G, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc)
+  energy = _energyOf(G, f, isData, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc)
   history = _andersonHistory(x.shape, ANDERSON_DEPTH)
   for _ in range(maxIter):
     np.copyto(prev, x)
     if cg is not None:
       norms(x, int(order), edges, G.ptr, G.adj, active, t)
-      weights(t, x, f, isData, bool(pin), bool(l1Data), bool(l1Reg), float(threshold), float(eps), edges, active, wr, wd, b)
+      weights(t, x, f, isData, bool(l1Data), bool(l1Reg), float(threshold), float(eps), edges, active, wr, wd, b)
       cg(x, b, wd, wr, float(alpha), int(order), G.ptr, G.adj, G.eid, free, active, 1e-7, 2000, work)
     else:
       tt = np.linalg.norm(np.asarray(K @ x), axis=1)
       wr = np.where(tt > threshold, 0.0, eps / np.sqrt(tt ** 2 + eps ** 2) if l1Reg else 1.0)
       wd = np.zeros(n)
-      if not pin:
-        td = np.linalg.norm(x - f, axis=1)
-        wd[isData] = (eps / np.sqrt(td ** 2 + eps ** 2) if l1Data else np.ones(n))[isData]
+      td = np.linalg.norm(x - f, axis=1)
+      wd[isData] = (eps / np.sqrt(td ** 2 + eps ** 2) if l1Data else np.ones(n))[isData]
       y = _solveDirect(K, wd, wr, alpha, wd[:, None] * f, f, x, free, G)
       x[free] = y[free]
     if not l1Data and not l1Reg:
@@ -353,24 +353,24 @@ class _andersonHistory:
 
 # the energy per component of an iterate over the active pixels: the compiled loop, or
 # _componentEnergy over the whole map without numba
-def _energyOf(G, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc):
+def _energyOf(G, f, isData, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc):
   loop = _kernel("irlsEnergy")
   if loop is None:
     lap = G.laplacian() if order == 2 else None
-    return lambda x, active: _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x)
+    return lambda x, active: _componentEnergy(G, lap, f, isData, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x)
   from ...geometry.kernels import threads
   E = np.zeros((threads(), nc + 1))
   edges = np.ascontiguousarray(G.edges, dtype=np.int64)
   fc, dc, cc = np.ascontiguousarray(f, dtype=float), np.ascontiguousarray(isData), np.ascontiguousarray(comp)
 
   def energy(x, active):
-    loop(np.ascontiguousarray(x), fc, dc, bool(pin), bool(l1Data), bool(l1Reg), float(threshold), float(eps), float(alpha),
+    loop(np.ascontiguousarray(x), fc, dc, bool(l1Data), bool(l1Reg), float(threshold), float(eps), float(alpha),
          int(order), edges, G.ptr, G.adj, cc, np.ascontiguousarray(active), E)
     return E.sum(axis=0)
   return energy
 
 
-def _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x):
+def _componentEnergy(G, lap, f, isData, l1Data, l1Reg, threshold, eps, alpha, order, comp, nc, x):
   """the energy the reweighting minimises, per component: eps sqrt(t^2 + eps^2) for an
   absolute value and t^2 / 2 for a square, the regularisation capped at the threshold"""
   def phi(t, l1):
@@ -382,10 +382,8 @@ def _componentEnergy(G, lap, f, isData, pin, l1Data, l1Reg, threshold, eps, alph
     t = np.linalg.norm(np.asarray(lap @ x), axis=1)
     at = comp
   E = alpha * np.bincount(at, phi(np.minimum(t, threshold), l1Reg), nc + 1)
-  if not pin:
-    td = np.linalg.norm(x[isData] - f[isData], axis=1)
-    E += np.bincount(comp[isData], phi(td, l1Data), nc + 1)
-  return E
+  td = np.linalg.norm(x[isData] - f[isData], axis=1)
+  return E + np.bincount(comp[isData], phi(td, l1Data), nc + 1)
 
 
 def _kernel(name):
@@ -442,23 +440,23 @@ def _solveDirect(K, wd, wr, alpha, b, f, x, free, G):
   return y
 
 
-def solveField(F, l, edges, f, isData, pin, comp):
+def solveField(F, l, edges, f, isData, fixed, comp):
   """the field over the whole graph under one filter: the edges of the map, the values f
-  (n, d), which pixels carry a measurement, whether they are pinned, and the component of
-  every pixel, zero for none"""
+  (n, d), which pixels carry a measurement, which are fixed (a mask, or None), and the
+  component of every pixel, zero for none"""
   G = graphCSR(np.asarray(edges, dtype=np.int64).reshape(-1, 2), len(f))
   if isinstance(F, splineFilter):
-    return irls(G, f, regularisation(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, pin, comp)
+    return irls(G, f, regularisation(F, l, 2), 2, False, False, np.inf, 1.0, 1, 0.0, isData, fixed, comp)
   if isinstance(F, halfQuadraticFilter):
-    return irls(G, f, regularisation(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.maxIter, F.tol, isData, pin, comp)
+    return irls(G, f, regularisation(F, l, 1), 1, F.l1DataFit, F.l1TV, F.threshold, F.eps, F.maxIter, F.tol, isData, fixed, comp)
   if isinstance(F, infimalConvolutionFilter):
     # the two fields minimised in turn, one over the differences and one over the Laplacian
     alpha = regularisation(F, l, 1)
     beta = regularisation(F, l, 2, alpha=F.beta)
     u1, u2 = np.zeros(f.shape), np.zeros(f.shape)
     for _ in range(F.maxIter):
-      p = irls(G, f - u2, alpha, 1, False, True, F.threshold, F.eps, 20, F.tol, isData, pin, comp)
-      q = irls(G, f - p, beta, 2, False, True, F.threshold, F.eps, 20, F.tol, isData, pin, comp)
+      p = irls(G, f - u2, alpha, 1, False, True, F.threshold, F.eps, 20, F.tol, isData, fixed, comp)
+      q = irls(G, f - p, beta, 2, False, True, F.threshold, F.eps, 20, F.tol, isData, fixed, comp)
       delta = max(np.max(np.abs(p - u1)), np.max(np.abs(q - u2)))
       u1, u2 = p, q
       if delta < F.tol:

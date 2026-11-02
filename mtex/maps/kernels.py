@@ -1159,8 +1159,8 @@ def _cgLoop(x, b, wd, wr, alpha, order, ptr, adj, eid, free, active, tol, maxIte
 
 # the weights of one reweighting step: per edge or pixel from the residual norm t, zero
 # above the threshold and Huber's eps / sqrt(t^2 + eps^2) below it where the penalty is
-# absolute; per pixel the data weight where the field is not pinned; and the right hand side
-def _irlsWeightsLoop(t, x, f, isData, pin, l1Data, l1Reg, threshold, eps, edges, active, wr, wd, b):
+# absolute; per pixel the data weight of a measurement; and the right hand side
+def _irlsWeightsLoop(t, x, f, isData, l1Data, l1Reg, threshold, eps, edges, active, wr, wd, b):
   for e in prange(t.shape[0]):
     if edges.shape[0] == t.shape[0] and not active[edges[e, 0]]:
       continue
@@ -1177,7 +1177,7 @@ def _irlsWeightsLoop(t, x, f, isData, pin, l1Data, l1Reg, threshold, eps, edges,
     if not active[i]:
       continue
     w = 0.0
-    if (not pin) and isData[i]:
+    if isData[i]:
       if l1Data:
         td = 0.0
         for c in range(d):
@@ -1218,10 +1218,10 @@ def _residualNormLoop(x, order, edges, ptr, adj, active, out):
 
 # the energy the reweighting minimises, per component, over the active pixels and the edges
 # between them: eps sqrt(t^2 + eps^2) for an absolute value and t^2 / 2 for a square, the
-# regularisation capped at the threshold, the data term where the field is not pinned. The
+# regularisation capped at the threshold, and the data term of the measurements. The
 # edges and pixels in E.shape[0] chunks, each summing into its own row, which the caller adds
 # up; _componentEnergy is the oracle
-def _irlsEnergyLoop(x, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, order, edges, ptr, adj, comp, active, E):
+def _irlsEnergyLoop(x, f, isData, l1Data, l1Reg, threshold, eps, alpha, order, edges, ptr, adj, comp, active, E):
   d = x.shape[1]
   nch = E.shape[0]
   m = edges.shape[0] if order == 1 else x.shape[0]
@@ -1246,14 +1246,13 @@ def _irlsEnergyLoop(x, f, isData, pin, l1Data, l1Reg, threshold, eps, alpha, ord
           acc += v * v
       t = min(np.sqrt(acc), threshold)
       E[ch, comp[a]] += alpha * (eps * np.sqrt(t * t + eps * eps) if l1Reg else t * t / 2)
-    if not pin:
-      for i in range(ch * n // nch, (ch + 1) * n // nch):
-        if not (active[i] and isData[i]):
-          continue
-        acc = 0.0
-        for c in range(d):
-          acc += (x[i, c] - f[i, c]) ** 2
-        E[ch, comp[i]] += eps * np.sqrt(acc + eps * eps) if l1Data else acc / 2
+    for i in range(ch * n // nch, (ch + 1) * n // nch):
+      if not (active[i] and isData[i]):
+        continue
+      acc = 0.0
+      for c in range(d):
+        acc += (x[i, c] - f[i, c]) ** 2
+      E[ch, comp[i]] += eps * np.sqrt(acc + eps * eps) if l1Data else acc / 2
 
 
 # every pixel of a component as the left tangent vector at its reference, over the

@@ -200,6 +200,59 @@ def test_fill_isRestrictedToTheMask():
   assert not nan[2 + 2 * 8] and nan[5 + 5 * 8] and np.array_equal(f.rotations.data[9], e.rotations.data[9])
 
 
+FIXING = [meanFilter(), medianFilter(), KuwaharaFilter(), splineFilter(), halfQuadraticFilter(), l1TVFilter(), infimalConvolutionFilter()]
+FIXING_IDS = ["mean", "median", "Kuwahara", "spline", "halfQuadratic", "l1TV", "infimalConvolution"]
+
+
+@pytest.mark.parametrize("F", FIXING, ids=FIXING_IDS)
+def test_smooth_keepsTheFixedPixelsAndSmoothsTheOthers(F):
+  e = noisyMap()
+  fixed = np.zeros(e.size, dtype=bool)
+  fixed[::7] = True
+  s = e.smooth(F, fixed=fixed)
+  q, q0 = s.rotations.data.reshape(-1, 4), e.rotations.data.reshape(-1, 4)
+  assert np.array_equal(q[fixed], q0[fixed]) and not np.allclose(q[~fixed], q0[~fixed])
+
+
+@pytest.mark.parametrize("F", FIXING, ids=FIXING_IDS)
+def test_smooth_withEveryPixelFixedIsTheMap(F):
+  e = noisyMap()
+  assert np.array_equal(e.smooth(F, fixed=np.ones(e.size, dtype=bool)).rotations.data, e.rotations.data)
+
+
+def test_smooth_continuesTheFieldBetweenFixedPixels():
+  # two fixed columns and nothing measured between them: a quadratic filter gives the straight
+  # line between them, which the data term alone would have pulled together
+  e = angleMapD(lambda i, j: np.where(i == 0, 0.0, 9.0), 10, missingAt=lambda i, j: (i > 0) & (i < 9))
+  fixed = (np.arange(100) % 10 == 0) | (np.arange(100) % 10 == 9)
+  s = e.smooth(halfQuadraticFilter(l1TV=False, l1DataFit=False), fixed=fixed)
+  assert close(angles(s), np.arange(100) % 10, 1e-6)
+
+
+def test_smooth_keepsAPropertyAtTheFixedPixels():
+  e, _ = holedMapWithProperties()
+  e.ci = e.ci + np.random.default_rng(2).normal(size=81)
+  fixed = np.arange(81) % 9 == 0
+  s = e.smooth(splineFilter(), fixed=fixed, props=["ci"])
+  assert np.array_equal(s.ci[fixed], e.ci[fixed]) and not np.allclose(s.ci[~fixed], e.ci[~fixed])
+
+
+def test_smooth_carriesTheFixedPixelsOfAListThroughItsGrid():
+  # a list is gridded to be filled, and the mask names its pixels in their order
+  e = noisyMap()
+  sub = e[np.random.default_rng(3).permutation(e.size)[:200]]
+  fixed = np.zeros(sub.size, dtype=bool)
+  fixed[:50] = True
+  s = sub.smooth(splineFilter(), fixed=fixed)
+  assert np.array_equal(s.rotations.data[:50], sub.rotations.data[:50])
+
+
+def test_smooth_refusesAFixedMaskOfTheWrongSize():
+  e = noisyMap()
+  with pytest.raises(ValueError):
+    e.smooth(splineFilter(), fixed=np.ones(3, dtype=bool))
+
+
 def test_fill_refusesAFilter():
   e, _ = holedLinearMap()
   with pytest.raises(TypeError):
@@ -321,7 +374,8 @@ def test_the_compiled_and_the_numpy_filters_agree():
     for kernels in ("numba", "numpy"):
       setMTEXpref("kernels", kernels)
       out[kernels] = [angles(e.smooth(F)) for F in (meanFilter(), medianFilter(2), KuwaharaFilter(), splineFilter(), l1TVFilter(), halfQuadraticFilter(l1TV=False))]
-      out[kernels] += [angles(e.smooth(splineFilter())), angles(e.smooth(l1TVFilter(threshold=0.01))), angles(e.smooth(infimalConvolutionFilter(alpha=1.0, beta=1.0)))]
+      out[kernels] += [angles(e.smooth(splineFilter())), angles(e.smooth(l1TVFilter(threshold=0.01))), angles(e.smooth(infimalConvolutionFilter(alpha=1.0, beta=1.0))),
+                       angles(e.smooth(l1TVFilter(), fixed=np.arange(e.size) % 5 == 0))]
   finally:
     setMTEXpref("kernels", before)
   for a, b in zip(out["numba"], out["numpy"]):

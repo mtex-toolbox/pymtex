@@ -170,6 +170,40 @@ print(f'Spline mean deviation: {np.nanmean(splineDeviation) / degree:.2f} degree
 # result is not the same: the spline makes the colour fields rounder and removes more of
 # the fine internal structure.
 
+# ## Keeping reliable pixels fixed
+#
+# Not every measurement is equally noisy. The option `fixed` takes a mask of the pixels
+# that keep their orientation; the filter smooths the other pixels towards them. Here the
+# quarter of the pixels with the lowest mean angular deviation (MAD) of the band fit,
+# the most reliable indexing, is kept as measured. Only pixels with an orientation are
+# chosen: the notIndexed pixels `calcGrains` absorbed into a grain count as indexed but
+# carry none, and a fixed pixel without one keeps what filling gives it. This option has
+# no MATLAB counterpart.
+
+# +
+measured = ebsd.isIndexed & ~ebsd.rotations.isnan()
+reliable = measured & (ebsd.mad <= np.nanquantile(ebsd[measured].mad, 0.25))
+ebsdS = smooth(ebsd, splineFilter(), fixed=reliable)
+
+# the fixed pixels are unchanged
+change = angle(ebsdS[reliable].orientations, ebsd[reliable].orientations)
+print(f'Fixed pixels: {np.count_nonzero(reliable)}, their largest change: {np.max(change) / degree:.2f} degree')
+
+ebsdS = ebsdS['indexed']
+colorKey.oriRef = grains.selectByGrainId(ebsdS.grainId).meanOrientation
+plot(ebsdS, colorKey.orientation2color(ebsdS.orientations))
+
+hold(True)
+plot(grains.boundary, lineWidth=2)
+hold(False)
+
+fixedDeviation = angle(ebsdS.orientations, colorKey.oriRef)
+print(f'Spline with fixed pixels, mean deviation: {np.nanmean(fixedDeviation) / degree:.2f} degree')
+# -
+
+# The speckle of the reliable pixels remains, since they are not smoothed, and the rest of
+# the map is drawn towards them rather than towards a fully smoothed field.
+
 # ## Technical details - further filters
 #
 # The filters below are retained for comparison and completeness. In practice they are

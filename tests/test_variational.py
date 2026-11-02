@@ -66,12 +66,11 @@ def randomGraphField(seed=3, n=60, d=3):
 
 
 @pytest.mark.parametrize("order", [1, 2])
-@pytest.mark.parametrize("pin", [False, True])
-def test_the_compiled_energy_is_the_numpy_energy(order, pin):
+def test_the_compiled_energy_is_the_numpy_energy(order):
   from mtex.analysis.filters.variational import _energyOf, _componentEnergy
   G, f, x, isData, comp = randomGraphField()
   active = comp != 2
-  args = (f, isData, pin, True, True, 0.8, 1e-2, 0.7, order, comp, 3)
+  args = (f, isData, True, True, 0.8, 1e-2, 0.7, order, comp, 3)
   E = _energyOf(G, *args)(x, active)
   ref = _componentEnergy(G, G.laplacian() if order == 2 else None, *args, x)
   assert np.allclose(E[[1, 3]], ref[[1, 3]], rtol=1e-12) and E[2] == 0

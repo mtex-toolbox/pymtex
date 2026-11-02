@@ -126,9 +126,16 @@ def _expAt(ref, v, sel):
 
 # the window filters over the lattice, never across a component: every pixel of a component
 # takes the filter of the measured pixels of its window, a filled one too, and a pixel whose
-# window holds no measurement keeps its value. The compiled loop, or the NumPy gather of the
-# windows without it
-def _applyWindow(F, ebsd, comp, isData, u):
+# window holds no measurement keeps its value, as a fixed one does. The compiled loop, or the
+# NumPy gather of the windows without it
+def _applyWindow(F, ebsd, comp, isData, u, fixed):
+  out = _windowed(F, ebsd, comp, isData, u)
+  if fixed is not None:
+    out[fixed] = u[fixed]
+  return out
+
+
+def _windowed(F, ebsd, comp, isData, u):
   l = mapLattice(ebsd)
   lk = latticeLookup(l)
   offs = np.concatenate([[[0, 0]], neighbourBall(l, F.numNeighbours)]).astype(np.int64)
@@ -173,22 +180,22 @@ def _applyWindow(F, ebsd, comp, isData, u):
   return out
 
 
-def _applyFilter(F, ebsd, comp, edges, isData, u, pin):
+def _applyFilter(F, ebsd, comp, edges, isData, u, fixed):
   if isinstance(F, variationalFilter):
-    return _applyVariational(F, ebsd, comp, edges, isData, u, pin)
+    return _applyVariational(F, ebsd, comp, edges, isData, u, fixed)
   if isinstance(F, windowFilter):
-    return _applyWindow(F, ebsd, comp, isData, u)
+    return _applyWindow(F, ebsd, comp, isData, u, fixed)
   raise TypeError(f"{type(F).__name__} is not an EBSD filter")
 
 
 # the variational filters over the whole map at once: the edges never cross a component,
 # so the one system is block diagonal in them, and a pixel of no component has no edge and
-# no data term and stays where it is
-def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
+# no data term and stays where it is, as a fixed one (the mask fixed, or None) does
+def _applyVariational(F, ebsd, comp, edges, isData, f, fixed):
   out = f.copy()
   if len(edges) == 0:
     return out
-  x = solveField(F, mapLattice(ebsd), edges, f.astype(float), isData & (comp > 0), pin, comp)
+  x = solveField(F, mapLattice(ebsd), edges, f.astype(float), isData & (comp > 0), fixed, comp)
   w = comp > 0
   out[w] = x[w]
   return out
@@ -196,7 +203,7 @@ def _applyVariational(F, ebsd, comp, edges, isData, f, pin):
 
 # ------------------------------------------------------------------ smooth and fill
 
-def smooth(ebsd, F=None, grains=None, fill=True, props=()):
+def smooth(ebsd, F=None, grains=None, fill=True, fixed=None, props=()):
   """the map with its orientations denoised, every one replaced by one computed from its
   neighbours, within the grains where the map knows them and within the phases otherwise
 
@@ -204,6 +211,7 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
     ebsd_s = smooth(ebsd, halfQuadraticFilter())         # another filter
     ebsd_s = smooth(ebsd, F, grains)                     # the grains of the empty sites from the outlines
     ebsd_s = smooth(ebsd, F, fill=mask)                  # only the pixels of the mask filled
+    ebsd_s = smooth(ebsd, F, fixed=ebsd.ci > 0.9)        # the pixels of the mask kept as they are
     ebsd_s = smooth(ebsd, F, props=('bc',))              # a numeric property smoothed along
 
   The orientations are turned into a field of tangent vectors per connected component of
@@ -219,6 +227,11 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   window. Grain ids and phases stay as fill leaves them. The map passed is not changed;
   MATLAB's second output, the filter, is the F passed.
 
+  A fixed pixel keeps its orientation, and the properties smoothed along keep their values
+  there; it is no unknown of a variational filter but a value its neighbours are smoothed
+  towards, and a window filter counts it among the neighbours of the others. A fixed pixel
+  without an orientation keeps the one fill gives it.
+
   Input
     ebsd - EBSD, the map
     F - EBSDFilter, the filter; by default l1TVFilter()
@@ -228,6 +241,7 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   Keywords
     fill - True to fill the pixels without an orientation, False to leave them as they are,
         or a boolean mask of the pixels of the map filling is restricted to
+    fixed - a boolean mask of the pixels of the map that keep their orientation
     props - the names of numeric properties of the map smoothed with the orientations, by a
         variational filter
 
@@ -270,14 +284,18 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   elif np.ndim(fill) == 0:
     raise TypeError(f"fill is True, False or a mask of the pixels, not {fill!r}")
   else:
-    mask = _asMask(ebsd, fill, "smooth")
-  # the empty sites exist on the grid, the mask goes along as a property
+    mask = _asMask(ebsd, fill, "fill")
+  fixed = _asMask(ebsd, fixed, "fixed")
+  # the empty sites exist on the grid, the masks go along as properties
   out = ebsd.copy()
-  if mask is not None:
-    out.prop["_fillMask"] = mask.reshape(ebsd.shape).astype(float)
+  for key, m in (("_fillMask", mask), ("_fixedMask", fixed)):
+    if m is not None:
+      out.prop[key] = m.reshape(ebsd.shape).astype(float)
   if fill is not False and not out.isGridded:
     out = out.gridify()
   estimate = np.full(out.size, fill is not False) if mask is None else out.prop.pop("_fillMask").reshape(-1) == 1
+  if fixed is not None:
+    fixed = out.prop.pop("_fixedMask").reshape(-1) == 1
   measured = smoothingGraph(out)[2]
   rot0 = out.rotations.data.reshape(-1, 4).copy()
   if fill is not False:
@@ -285,15 +303,15 @@ def smooth(ebsd, F=None, grains=None, fill=True, props=()):
   comp, edges, isData = smoothingGraph(out)
   isData &= measured
   u, ref = tangentField(out, comp, isData)
-  v = _applyFilter(F, out, comp, edges, isData, u, False)
+  v = _applyFilter(F, out, comp, edges, isData, u, fixed)
   rot = out.rotations.data.reshape(-1, 4)
-  w = comp > 0
+  w = comp > 0 if fixed is None else (comp > 0) & ~fixed
   rot[w] = _expAt(ref[comp], v, w).astype(rot.dtype)
   # the pixels without an orientation that are not to be filled, as they were
   keep = ~measured & ~estimate
   rot[keep] = rot0[keep]
   for key in props:
-    _solveProperty(out, key, F, comp, edges, isData, False)
+    _solveProperty(out, key, F, comp, edges, isData, fixed)
   return out if ebsd.isGridded or not out.isGridded else _asList(ebsd, out)
 
 
@@ -351,7 +369,9 @@ def fill(ebsd, grains=None, mask=None):
     if mask is not None:
       raise TypeError(f"grains is a grain2d, not {type(grains).__name__}")
     grains, mask = None, grains
-  mask = _asMask(ebsd, mask, "fill")
+  if isinstance(mask, EBSDFilter):
+    raise TypeError("fill copies the nearest measurement and takes no filter; smooth(ebsd, F) fills and filters")
+  mask = _asMask(ebsd, mask, "mask")
   hasGrains = "grainId" in ebsd.prop
   if grains is not None and not hasGrains:
     raise ValueError("filling within grains needs the grain ids of the map; reconstruct them with calcGrains(ebsd)")
@@ -428,15 +448,13 @@ def _inHull(ebsd, sel):
   return np.all(P @ E[:, :2].T + E[:, 2] <= tol, axis=1)
 
 
-# a mask of the pixels of a map as a flat boolean array, None for none
+# a mask of the pixels of a map, the argument name, as a flat boolean array; None for none
 def _asMask(ebsd, mask, name):
   if mask is None:
     return None
-  if isinstance(mask, EBSDFilter):
-    raise TypeError(f"{name} copies the nearest measurement and takes no filter; smooth(ebsd, F) fills and filters")
   mask = np.asarray(mask)
   if mask.dtype.kind not in "bui":
-    raise TypeError(f"a mask of {name} is boolean, not {mask.dtype}")
+    raise TypeError(f"{name} is a boolean mask of the pixels, not {mask.dtype}")
   if mask.size != ebsd.size:
     raise ValueError("a mask has one entry per pixel of the map")
   return mask.astype(bool).reshape(-1)
@@ -466,9 +484,9 @@ def _unpad(ebsd, sel):
     ebsd._pad = pad if pad.any() else None
 
 
-# one numeric property over the same graph, by the same solver, pinned where the
-# orientations were
-def _solveProperty(ebsd, key, F, comp, edges, isData, pin):
+# one numeric property over the same graph, by the same solver, fixed where the
+# orientations are
+def _solveProperty(ebsd, key, F, comp, edges, isData, fixed):
   if key not in ebsd.prop:
     raise ValueError(f"the map carries no property {key!r}")
   val = ebsd.prop[key]
@@ -485,8 +503,8 @@ def _solveProperty(ebsd, key, F, comp, edges, isData, pin):
   for c in range(f.shape[1]):
     mean = np.bincount(comp[data], f[data, c], nc + 1) / np.maximum(cnt, 1)
     f[~data & (comp > 0), c] = mean[comp[~data & (comp > 0)]]
-  x = _applyVariational(F, ebsd, comp, edges, isData, f, pin)
-  w = (comp > 0) & (~isData if pin else np.ones(len(comp), dtype=bool))
+  x = _applyVariational(F, ebsd, comp, edges, isData, f, fixed)
+  w = (comp > 0) if fixed is None else (comp > 0) & ~fixed
   flat[w] = x[w].astype(val.dtype)
 
 
