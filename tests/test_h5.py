@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import numpy as np
 import pytest
@@ -104,6 +105,31 @@ def test_oxford_h5oina_an_unknown_data_set_is_an_error():
     loadEBSD(fixture("oli_cut.h5oina"), dataSet=2)
   with pytest.raises(ValueError, match="no data set"):
     loadEBSD(fixture("oli_cut.h5oina"), dataSet="Mars")
+
+
+def test_oxford_symmetry_is_the_space_group_then_the_laue_class_of_each_phase(tmp_path):
+  # space group, Laue code, lowercase field names, expected point group - one phase each
+  cases = [(0, 9, False, "6/mmm"), (186, 9, False, "6mm"), (None, 9, False, "6/mmm"), (np.nan, 5, False, "4/mmm"),
+           ("194", 9, False, "6/mmm"), (194, None, False, "6/mmm"), (None, None, False, "-1"), (0, 9, True, "6/mmm")]
+  path = tmp_path / "symmetry.h5oina"
+  shutil.copy(fixture("oli_cut.h5oina"), path)
+  with h5py.File(path, "r+") as f:
+    phases = f["1/Data Processing/Header/Phases"]
+    phases.move("1", "olivine")
+    for k, (space, laue, lower, pg) in enumerate(cases, 1):
+      f.copy(phases["olivine"], phases, name=str(k))
+      phase = phases[str(k)]
+      phase["Lattice Dimensions"][()] = [[1.0, 1.0, 1.0]]
+      phase["Lattice Angles"][()] = [[np.pi / 2, np.pi / 2, 2 * np.pi / 3 if pg.startswith("6") else np.pi / 2]]
+      for field, value in (("Space Group", space), ("Laue Group", laue)):
+        del phase[field]
+        if value is not None:
+          phase[field.lower() if lower else field] = value
+    del phases["olivine"]
+    ids = f["1/Data Processing/Data/Phase"]
+    ids[()] = (np.arange(ids.size) % len(cases) + 1).reshape(ids.shape).astype(ids.dtype)
+  e = loadEBSD(path, verbose=False)
+  assert [frame.pointGroup for frame in e.CSList.frames[1:]] == [c[3] for c in cases]
 
 
 def test_oxford_h5():
