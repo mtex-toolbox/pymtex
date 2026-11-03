@@ -31,7 +31,7 @@ from ..geometry.vector3d import vector3d
 from ..maps.phaselist import distinctMinerals, phaseList
 from .ang import eulerCorrectionRotation
 from .ctf import _surfaceTilt
-from .load import _mapFromRotations, ebsdFromColumns, phaseColumn, phaseShift, regularPoly, scanGrid, tslPointGroup, unmeasuredRows
+from .load import CHANNEL_LAUE, _mapFromRotations, ebsdFromColumns, phaseColumn, phaseShift, regularPoly, scanGrid, tslPointGroup, unmeasuredRows
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "hdf5_config")
 # what EDAX writes into the coordinates of a pixel it did not measure
@@ -524,8 +524,23 @@ class h5Reader:
     return out
 
   # the point group of a phase: the space group number where the file states one, the EDAX
-  # codes where it states those, and the triclinic group where it states neither
+  # codes where it states those, and Oxford's Laue code where its space group is unknown
   def _pointGroup(self, entry, scope, idEntry=None):
+    if isinstance(entry, dict) and entry.get("type", "") == "Oxford":
+      group = self.one(entry.get("group"), scope)
+      header = {} if group is None else h5ReadGroup(self.f, self.paths, self.groups, group)
+      header = {name.casefold(): value for name, value in header.items()}
+      def code(field, limit):
+        value = np.asarray(header.get(field.casefold()))
+        if value.size != 1 or value.dtype.kind not in "iuf":
+          return None
+        x = float(value.reshape(-1)[0])
+        return int(x) if np.isfinite(x) and x.is_integer() and 1 <= x <= limit else None
+      n = code("Space Group", 230)
+      if n is not None:
+        return n
+      laue = code("Laue Group", len(CHANNEL_LAUE))
+      return None if laue is None else CHANNEL_LAUE[laue - 1]
     if isinstance(entry, dict) and entry.get("type", "") == "EDAX":
       code = self.value(entry.get("laue_code"), scope)
       if code is None:
