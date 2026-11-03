@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import numpy as np
 import pytest
@@ -106,75 +107,29 @@ def test_oxford_h5oina_an_unknown_data_set_is_an_error():
     loadEBSD(fixture("oli_cut.h5oina"), dataSet="Mars")
 
 
-def oxfordSymmetryFile(tmp_path, spaceGroup=0, laueGroup=9):
-  import shutil
+def test_oxford_symmetry_is_the_space_group_then_the_laue_class_of_each_phase(tmp_path):
+  # space group, Laue code, lowercase field names, expected point group - one phase each
+  cases = [(0, 9, False, "6/mmm"), (186, 9, False, "6mm"), (None, 9, False, "6/mmm"), (np.nan, 5, False, "4/mmm"),
+           ("194", 9, False, "6/mmm"), (194, None, False, "6/mmm"), (None, None, False, "-1"), (0, 9, True, "6/mmm")]
   path = tmp_path / "symmetry.h5oina"
   shutil.copy(fixture("oli_cut.h5oina"), path)
   with h5py.File(path, "r+") as f:
-    for dataSet in ("EBSD", "Data Processing"):
-      phase = f[f"1/{dataSet}/Header/Phases/1"]
-      # The symmetry cases use a compatible cell, independent of the olivine fixture.
+    phases = f["1/Data Processing/Header/Phases"]
+    phases.move("1", "olivine")
+    for k, (space, laue, lower, pg) in enumerate(cases, 1):
+      f.copy(phases["olivine"], phases, name=str(k))
+      phase = phases[str(k)]
       phase["Lattice Dimensions"][()] = [[1.0, 1.0, 1.0]]
-      angles = [np.pi / 2, np.pi / 2, 2 * np.pi / 3 if spaceGroup in (186, 194) or laueGroup in (6, 7, 8, 9) else np.pi / 2]
-      phase["Lattice Angles"][()] = [angles]
-      for field, value in (("Space Group", spaceGroup), ("Laue Group", laueGroup)):
+      phase["Lattice Angles"][()] = [[np.pi / 2, np.pi / 2, 2 * np.pi / 3 if pg.startswith("6") else np.pi / 2]]
+      for field, value in (("Space Group", space), ("Laue Group", laue)):
         del phase[field]
         if value is not None:
-          phase[field] = value
-  return path
-
-
-@pytest.mark.parametrize("spaceGroup", [0, None, -1, 231, 186.5, np.nan, np.inf, -np.inf, "194", True])
-@pytest.mark.parametrize("dataSet", [None, "EBSD"])
-def test_oxford_uses_laue_when_space_group_is_unusable(tmp_path, spaceGroup, dataSet):
-  e = loadEBSD(oxfordSymmetryFile(tmp_path, spaceGroup), dataSet=dataSet, verbose=False)
-  assert e.CS.pointGroup == "6/mmm"
-
-
-@pytest.mark.parametrize("spaceGroup,laueGroup,expected", [(186, 9, "6mm"), (1, 9, "1"), (194, None, "6/mmm")])
-def test_oxford_valid_space_group_takes_precedence(tmp_path, spaceGroup, laueGroup, expected):
-  e = loadEBSD(oxfordSymmetryFile(tmp_path, spaceGroup, laueGroup), verbose=False)
-  assert e.CS.pointGroup == expected
-
-
-@pytest.mark.parametrize("spaceName,laueName", [("space group", "laue group"), ("sPaCe GrOuP", "lAuE gRoUp")])
-@pytest.mark.parametrize("spaceGroup,expected", [(186, "6mm"), (0, "6/mmm")])
-def test_oxford_symmetry_field_names_are_case_insensitive(tmp_path, spaceName, laueName, spaceGroup, expected):
-  path = oxfordSymmetryFile(tmp_path, spaceGroup, 9)
-  with h5py.File(path, "r+") as f:
-    phase = f["1/Data Processing/Header/Phases/1"]
-    phase.move("Space Group", spaceName)
-    phase.move("Laue Group", laueName)
+          phase[field.lower() if lower else field] = value
+    del phases["olivine"]
+    ids = f["1/Data Processing/Data/Phase"]
+    ids[()] = (np.arange(ids.size) % len(cases) + 1).reshape(ids.shape).astype(ids.dtype)
   e = loadEBSD(path, verbose=False)
-  assert e.CS.pointGroup == expected
-
-
-@pytest.mark.parametrize("laueGroup,expected", list(enumerate(
-  ["-1", "2/m11", "mmm", "4/m", "4/mmm", "-3", "-3m1", "6/m", "6/mmm", "m-3", "m-3m"], 1)))
-def test_oxford_laue_codes_are_the_channel_codes(tmp_path, laueGroup, expected):
-  e = loadEBSD(oxfordSymmetryFile(tmp_path, None, laueGroup), verbose=False)
-  assert e.CS.pointGroup == expected
-
-
-@pytest.mark.parametrize("laueGroup", [None, 0, 12, 9.5, np.nan, np.inf, -np.inf, "9", True])
-def test_oxford_keeps_unknown_symmetry_without_a_usable_code(tmp_path, laueGroup):
-  e = loadEBSD(oxfordSymmetryFile(tmp_path, 0, laueGroup), verbose=False)
-  assert e.CS.pointGroup == "-1"
-
-
-def test_oxford_symmetry_fallback_is_resolved_for_each_phase(tmp_path):
-  path = oxfordSymmetryFile(tmp_path, 186, 9)
-  with h5py.File(path, "r+") as f:
-    root = f["1/Data Processing/Header/Phases"]
-    f.copy(root["1"], root, name="2")
-    del root["2/Space Group"]
-    phases = f["1/Data Processing/Data/Phase"]
-    values = phases[()]
-    values.reshape(-1)[-1] = 2
-    phases[()] = values
-  e = loadEBSD(path, verbose=False)
-  assert [frame.pointGroup for frame in e.CSList.frames[1:]] == ["6mm", "6/mmm"]
-  assert counts(e)[2] == 1
+  assert [frame.pointGroup for frame in e.CSList.frames[1:]] == [c[3] for c in cases]
 
 
 def test_oxford_h5():

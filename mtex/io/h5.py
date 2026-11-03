@@ -529,18 +529,13 @@ class h5Reader:
     if isinstance(entry, dict) and entry.get("type", "") == "Oxford":
       group = self.one(entry.get("group"), scope)
       header = {} if group is None else h5ReadGroup(self.f, self.paths, self.groups, group)
-      header = {name.casefold(): value for name, value in header.items()}
+      header = {name.casefold(): np.asarray(value) for name, value in header.items()}
+      # a stated code from 1 to limit, else None
       def code(field, limit):
-        value = np.asarray(header.get(field.casefold()))
-        if value.size != 1 or value.dtype.kind not in "iuf":
-          return None
-        x = float(value.reshape(-1)[0])
-        return int(x) if np.isfinite(x) and x.is_integer() and 1 <= x <= limit else None
-      n = code("Space Group", 230)
-      if n is not None:
-        return n
-      laue = code("Laue Group", len(CHANNEL_LAUE))
-      return None if laue is None else CHANNEL_LAUE[laue - 1]
+        v = header.get(field, np.empty(0))
+        return int(v.flat[0]) if v.size == 1 and v.dtype.kind in "iuf" and v.flat[0] in range(1, limit + 1) else None
+      laue = code("laue group", len(CHANNEL_LAUE))
+      return code("space group", 230) or (CHANNEL_LAUE[laue - 1] if laue else None)
     if isinstance(entry, dict) and entry.get("type", "") == "EDAX":
       code = self.value(entry.get("laue_code"), scope)
       if code is None:
