@@ -76,6 +76,8 @@ class grainBoundary:
     plane - map-plane coordinate system converting V to specimen positions
     frame - specimenFrame of the geometry
     scanUnit - unit of vertex coordinates; default 'um'
+    pixelDist - the distance of the two pixel centres where a segment is their common edge, 0
+        elsewhere; calcGrains records it, by default 0 throughout
   Output
     gB - grainBoundary, usually obtained as grains.boundary
   Properties
@@ -92,10 +94,11 @@ class grainBoundary:
   See also
     calcGrains, grain2d, grainBoundary.curvature, grainBoundary.calcMeanDirection"""
 
-  def __init__(self, V, F, grainId, ebsdId, phaseId, misrotation, CSList, plane, frame, scanUnit="um"):
+  def __init__(self, V, F, grainId, ebsdId, phaseId, misrotation, CSList, plane, frame, scanUnit="um", pixelDist=None):
     self.V = V
     self.scanUnit = scanUnit
     self.F = np.asarray(F, dtype=np.int32).reshape(-1, 2)
+    self.pixelDist = np.zeros(len(self.F)) if pixelDist is None else np.asarray(pixelDist, dtype=float).reshape(-1)
     self.grainId = np.asarray(grainId, dtype=np.int32).reshape(-1, 2)
     self.ebsdId = np.asarray(ebsdId, dtype=np.int32).reshape(-1, 2)
     self.phaseId = np.asarray(phaseId, dtype=np.int8).reshape(-1, 2)
@@ -109,7 +112,7 @@ class grainBoundary:
 
   def _with(self, **kw):
     fields = dict(V=self.V, F=self.F, grainId=self.grainId, ebsdId=self.ebsdId, phaseId=self.phaseId, misrotation=self.misrotation,
-                  CSList=self.CSList, plane=self.plane, frame=self.frame, scanUnit=self.scanUnit)
+                  CSList=self.CSList, plane=self.plane, frame=self.frame, scanUnit=self.scanUnit, pixelDist=self.pixelDist)
     fields.update(kw)
     gB = grainBoundary(**fields)
     if "V" not in kw:
@@ -341,7 +344,8 @@ class grainBoundary:
       return self._withFirstPhase(self[self.hasPhase(*key)], key[0])
     sel = np.arange(len(self))[key]
     k = sel.reshape(-1)
-    gB = self._with(F=self.F[k], grainId=self.grainId[k], ebsdId=self.ebsdId[k], phaseId=self.phaseId[k], misrotation=self.misrotation.data[k])
+    gB = self._with(F=self.F[k], grainId=self.grainId[k], ebsdId=self.ebsdId[k], phaseId=self.phaseId[k], misrotation=self.misrotation.data[k],
+                    pixelDist=self.pixelDist[k])
     gB._root = self if self._root is None else self._root
     # a matrix of segment ids, the three arms of triple points, keeps its shape for the misorientations
     if sel.ndim > 1:
@@ -412,7 +416,8 @@ class grainBoundary:
     gB = first._with(F=F[keep], grainId=np.concatenate([p.grainId for p in parts])[keep],
                      ebsdId=np.concatenate([p.ebsdId for p in parts])[keep],
                      phaseId=np.concatenate([p.phaseId for p in parts])[keep],
-                     misrotation=np.concatenate([p.misrotation.data.reshape(-1, 4) for p in parts])[keep])
+                     misrotation=np.concatenate([p.misrotation.data.reshape(-1, 4) for p in parts])[keep],
+                     pixelDist=np.concatenate([p.pixelDist for p in parts])[keep])
     gB._root = first._root if first._root is not None else first
     return orderWalk(gB)
 
@@ -888,7 +893,22 @@ def buildBoundary(c, seg, ebsd, inner=False):
     return np.where((p1[r] >= 0)[:, None], sites.pos[s1[r]], 2 * mid - sites.pos[s2[r]])
 
   idx, F = _walkOrder(F, c.V, leftOf)
-  return grainBoundary(c.V, F, gid[idx], eid[idx], pid[idx], mori[idx], ebsd.CSList, c.plane, ebsd.frame, scanUnit=ebsd.scanUnit)
+  inMap = (sites.pixel >= 0) | sites.isHole
+  return grainBoundary(c.V, F, gid[idx], eid[idx], pid[idx], mori[idx], ebsd.CSList, c.plane, ebsd.frame, scanUnit=ebsd.scanUnit,
+                       pixelDist=pixelDistance(c.V, F, sites.pos[s1[idx]], sites.pos[s2[idx]], inMap[s1[idx]] & inMap[s2[idx]]))
+
+
+def pixelDistance(V, F, P, Q, both):
+  """the distance of the sites P and Q on the two sides of every segment where the segment is
+  their common edge, 0 elsewhere: the two lie symmetric to its midpoint on its normal, and are
+  nearest neighbours, as a diagonal neighbour is at least sqrt(2) times as far; both says
+  which segments have a site of the map on either side"""
+  t = V[F[:, 1]] - V[F[:, 0]]
+  dPQ = np.linalg.norm(Q - P, axis=1)
+  isEdge = both & (np.linalg.norm(P + Q - V[F[:, 0]] - V[F[:, 1]], axis=1) < 1e-6 * dPQ) & \
+    (np.abs(np.sum((Q - P) * t, axis=1)) < 1e-6 * dPQ * np.linalg.norm(t, axis=1))
+  isEdge &= dPQ < 1.2 * dPQ[isEdge].min(initial=np.inf)
+  return np.where(isEdge, dPQ, 0.0)
 
 
 # the two sides of every face as the boundary lists them: the sites, the measurements, the
@@ -1050,7 +1070,8 @@ def orderWalk(gB):
     return gB
   head = entry[perm] == 1
   F = np.where(head[:, None], gB.F[perm], gB.F[perm][:, ::-1])
-  out = gB._with(F=F, grainId=gB.grainId[perm], ebsdId=gB.ebsdId[perm], phaseId=gB.phaseId[perm], misrotation=gB.misrotation.data[perm])
+  out = gB._with(F=F, grainId=gB.grainId[perm], ebsdId=gB.ebsdId[perm], phaseId=gB.phaseId[perm], misrotation=gB.misrotation.data[perm],
+                 pixelDist=gB.pixelDist[perm])
   out = out._flipSegments(~head)._with(F=F)
   cid = out.chainId
   kept = np.bincount(cid, weights=head)
@@ -1067,7 +1088,8 @@ def reverseChains(gB, cid, flip):
   order, rows = _reversedOrder(cid, flip)
   F = gB.F[order]
   F[rows] = F[rows][:, ::-1]
-  out = gB._with(F=F, grainId=gB.grainId[order], ebsdId=gB.ebsdId[order], phaseId=gB.phaseId[order], misrotation=gB.misrotation.data[order])
+  out = gB._with(F=F, grainId=gB.grainId[order], ebsdId=gB.ebsdId[order], phaseId=gB.phaseId[order], misrotation=gB.misrotation.data[order],
+                 pixelDist=gB.pixelDist[order])
   return out._flipSegments(rows)._with(F=F)
 
 

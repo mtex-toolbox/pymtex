@@ -36,7 +36,7 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=10)
 # a grain cut off by the edge of the map has no shape of its own
 grains = grains[~grains.isBoundary]
 
-grains = smoothBoundary(grains['indexed'], 10, moveTriplePoints=True)
+grains = smoothBoundary(grains['indexed'], 10)
 
 # plot the grains
 plot(grains, lineWidth=2)

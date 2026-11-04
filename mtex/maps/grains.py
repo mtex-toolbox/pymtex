@@ -797,7 +797,8 @@ class grain2d(polygonSet):
 
     # the segments selected, with their new grain ids
     def sub(sel):
-      return gB._with(F=gB.F[sel], grainId=gid[sel], ebsdId=gB.ebsdId[sel], phaseId=gB.phaseId[sel], misrotation=gB.misrotation.data[sel])
+      return gB._with(F=gB.F[sel], grainId=gid[sel], ebsdId=gB.ebsdId[sel], phaseId=gB.phaseId[sel], misrotation=gB.misrotation.data[sel],
+                      pixelDist=gB.pixelDist[sel])
 
     return sub(outer), catBoundaries(sub(~outer), ib._with(grainId=table[ib.grainId]))
 
@@ -928,7 +929,8 @@ def catBoundaries(a, b):
   if a.V is not b.V and not np.array_equal(a.V, b.V):
     raise ValueError("the two boundaries do not share their vertices")
   return a._with(F=np.concatenate([a.F, b.F]), grainId=np.concatenate([a.grainId, b.grainId]), ebsdId=np.concatenate([a.ebsdId, b.ebsdId]),
-                 phaseId=np.concatenate([a.phaseId, b.phaseId]), misrotation=np.concatenate([a.misrotation.data, b.misrotation.data]))
+                 phaseId=np.concatenate([a.phaseId, b.phaseId]), misrotation=np.concatenate([a.misrotation.data, b.misrotation.data]),
+                 pixelDist=np.concatenate([a.pixelDist, b.pixelDist]))
 
 
 __all__ = ["grain2d"]

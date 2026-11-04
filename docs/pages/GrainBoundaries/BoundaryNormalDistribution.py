@@ -63,12 +63,12 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=3)
 # `gB.ebsdId`. That property is meaningful only while every segment still lies between
 # one specific pair of pixels.
 #
-# [smoothBoundary](grain2d.smoothBoundary.html) normally simplifies and resamples the
-# segment list. The options `simplify=False` and `refine=False` smooth the vertex positions
-# without changing that list.
+# [smoothBoundary](grain2d.smoothBoundary.html) normally merges segments after smoothing.
+# The option `simplify=False` smooths the vertex positions without changing the segment
+# list.
 
 # +
-grains = smoothBoundary(grains, 10, simplify=False, refine=False)
+grains = smoothBoundary(grains, 10, simplify=False)
 CS = grains.CS
 
 # compute IPF colours explicitly to keep the published output quiet

@@ -33,12 +33,12 @@ beta2alpha
 #
 # The preceding page defines a triple point and explains why this workflow uses a 1.5-degree
 # segmentation threshold with [`removeQuadruplePoints`](QuadruplePoints.html). We add one
-# boundary-smoothing iteration while keeping the triple points attached to the boundary
-# network.
+# boundary-smoothing step. The triple points move with the boundary network, each within its
+# pixel cell.
 
 # +
 grains = calcGrains(ebsd, threshold=1.5 * degree, removeQuadruplePoints=True)
-grains = smoothBoundary(grains, 1, moveTriplePoints=True)
+grains = smoothBoundary(grains, 1)
 
 region = [299, 401, 440, 500]
 plot(ebsd[alphaName], ipfDirection=zvector, region=region, micronbar='off', figSize='large')

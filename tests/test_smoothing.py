@@ -29,35 +29,29 @@ def test_SM1_the_network_is_what_may_move_and_what_may_not():
   # every vertex of the boundary, and nothing else out of the pool of the map
   assert len(net) == len(np.unique(g.boundary.F)) and len(net) < len(g.boundary.V)
   assert np.all(net.degree >= 2) and all(net.numNeighbors(i) == len(net.neighbors(i)) for i in range(len(net)))
-  # the border of the map is held, and so are the junctions; what is left to move is the
-  # cross between the blocks, its four ends and its centre apart
-  assert np.count_nonzero(~net.fixed) == 36
+  # the border of the map is held; what is left to move is the cross between the blocks, its
+  # four ends on the border apart
+  assert np.count_nonzero(~net.fixed) == 37
   rim = np.unique(g.boundary.F[g.boundary.grainId.min(axis=1) == 0])
   assert np.all(net.fixed[np.isin(net.used, rim)])
-  free = boundaryNetwork(g.boundary, g.innerBoundary, moveOuterBoundary=True)
-  assert np.count_nonzero(free.fixed) == 5           # four triple and one quadruple point
-  assert not boundaryNetwork(g.boundary, g.innerBoundary, moveTriplePoints=True, moveOuterBoundary=True).fixed.any()
+  assert not boundaryNetwork(g.boundary, g.innerBoundary, moveOuterBoundary=True).fixed.any()
   # the Laplacian averages the neighbours and takes the vertex off
   L = net.laplacian()
   assert close(L.sum(axis=1), 0) and close(L.diagonal(), -1)
   assert "vertices" in repr(net)
 
 
-def test_SM2_the_three_steps_leave_a_straight_boundary_where_it_is():
+def test_SM2_the_smoothing_leaves_a_straight_boundary_where_it_is():
   g = calcGrains(boundaryMap(SQ4, 2, 10), angle=5 * degree)
   h = g.smoothBoundary(10)
-  # the cross between the blocks is straight and its ends are junctions, so there is
-  # nothing for the smoothing to move
+  # the cross between the blocks is straight and its centre is symmetric, so there is nothing
+  # for the smoothing to move, and the simplification leaves one segment per straight run
   assert close(h.area, g.area) and close(h.area.sum(), 400) and close(h.perimeter, g.perimeter)
-  # the fixed vertices are exactly where the first two steps left them
-  h0 = smoothBoundary(g, 0)
-  net = boundaryNetwork(h.boundary, h.innerBoundary)
-  assert np.array_equal(h.boundary.V[net.used[net.fixed]], h0.boundary.V[net.used[net.fixed]])
-  # simplifying and resampling are the first two steps and can be left out
-  assert len(g.smoothBoundary(1, simplify=False, refine=False).boundary) == len(g.boundary)
-  assert len(g.smoothBoundary(1, simplify=False, refine=False).boundary) == len(g.boundary)
-  assert len(g.smoothBoundary(1).boundary) == 120     # simplified, then resampled at the pixel
-  assert len(g.smoothBoundary(1, refine=0.5).boundary) == 240
+  assert len(h.boundary) == 12 and len(smoothBoundary(g, 0).boundary) == 12
+  # every pixel edge is recorded, the border of the map is none
+  assert np.array_equal(np.unique(g.boundary.pixelDist), [0, 1]) and np.count_nonzero(g.boundary.pixelDist) == 40
+  # the simplification can be left out
+  assert len(g.smoothBoundary(1, simplify=False).boundary) == len(g.boundary)
   # the loops still index the one pool of vertices both boundaries share
   assert h.boundary.V is h.innerBoundary.V and np.array_equal(h.id, g.id)
   # a filter is the first argument as an iteration count is
@@ -154,6 +148,30 @@ def test_SM6_a_subset_smooths_as_the_whole_does():
   sm = sub.smoothBoundary(5)
   tiny = int(np.argmin(sm.numPixel))
   assert sm.numPixel[tiny] == 4 and 0.5 < sm.area[tiny] / sub.area[tiny] < 1.5
+
+
+def test_SM6_the_pixels_next_to_a_pixel_edge_stay_in_their_grain():
+  from scipy.spatial import cKDTree
+  n = 40
+  i, j = np.meshgrid(np.arange(n), np.arange(n), indexing="xy")
+  P = np.stack([i.reshape(-1), j.reshape(-1)], axis=1).astype(float)
+  rng = np.random.default_rng(3)
+  grain = cKDTree(rng.uniform(0, n, (12, 2))).query(P)[1]
+  # notIndexed discs, which the fill model gives to the grains around them
+  phase = (cKDTree(rng.uniform(5, n - 5, (3, 2))).query(P)[0] > 1.5).astype(np.int8)
+  e = EBSD(np.column_stack([P, np.zeros(n * n)]), rotation.byAxisAngle(zvector, np.arange(12)[grain] * 7 * degree), phase,
+           phaseList(crystalFrame("m-3m", mineral="t")))
+  g = calcGrains(e, angle=5 * degree)
+  b = g.boundary
+  d = float(np.median(b.pixelDist[b.pixelDist > 0]))
+  px = np.isin(np.asarray(e.id).reshape(-1), b.ebsdId[b.pixelDist > 0])
+  xy, gid = P[px], np.asarray(e.grainId).reshape(-1)[px]
+  jct = np.flatnonzero(b.vertexDegree() > 2)
+  for F in (taubinFilter(20), laplaceFilter(3), curvatureFilter(), huberFilter()):
+    for h in (smoothBoundary(g, F), smoothBoundary(g, F, simplify=False)):
+      assert np.array_equal(h.id[h.findByLocation(xy)], gid), type(F).__name__
+    # a junction moves no further than into the corner of its cell
+    assert np.linalg.norm(h.boundary.V[jct] - b.V[jct], axis=1).max() < d / np.sqrt(2)
 
 
 def test_the_adjacency_lists_both_ends_of_every_edge_by_vertex():

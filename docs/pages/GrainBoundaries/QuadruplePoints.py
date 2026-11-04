@@ -110,15 +110,13 @@ hold(False)
 # ## Separate the coincident junctions for display
 #
 # The two replacement junctions initially have identical coordinates.
-# [smoothBoundary](grain2d.smoothBoundary.html) normally fixes every junction. Its
-# `moveTriplePoints` option releases every interior junction, despite the narrower name,
-# and lets the two points move apart.
-#
-# A [taubinFilter](taubinFilter.html) suppresses the pixel staircase while limiting the
+# [smoothBoundary](grain2d.smoothBoundary.html) moves every interior junction within the
+# square of the pixel centres around it, so the two points can move apart. Its default
+# [taubinFilter](taubinFilter.html) suppresses the pixel staircase while limiting the
 # systematic area loss of Laplacian smoothing.
 
 # +
-grains = smoothBoundary(grains, taubinFilter(), moveTriplePoints=True)
+grains = smoothBoundary(grains)
 
 grainColors = colorKey.orientation2color(grains.meanOrientation)
 plot(grains, grainColors, lineWidth=2, micronbar='off')

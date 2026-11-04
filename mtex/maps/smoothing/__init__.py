@@ -1,33 +1,36 @@
 """smoothing a grain boundary (MATLAB @grain2d/smoothBoundary and BoundarySmoothing/;
 Julia smoothing.jl)
 
-  grains.smoothBoundary(), grains.smoothBoundary(iter), grains.smoothBoundary(taubinFilter())
+  grains.smoothBoundary(), grains.smoothBoundary(iter), grains.smoothBoundary(taubinFilter(40))
   grains.smoothBoundary(curvatureFilter(3)), grains.smoothBoundary(huberFilter(3, threshold=3 * degree))
-  grains.smoothBoundary(iter, simplify=False, refine=False, moveTriplePoints=True, moveOuterBoundary=True)
-  F.smooth(V, net, h), boundaryNetwork(gB, ib)
+  grains.smoothBoundary(iter, simplify=False, moveOuterBoundary=True)
+  F.smooth(V, net, h, project), boundaryNetwork(gB, ib)
 
 A measured boundary is the staircase of the pixel grid: every segment runs along one of
-the lattice directions whatever direction the boundary has. It is repaired in three steps:
-the staircase is simplified away, what is left is split into pieces of equal length, and only
-then is the boundary smoothed. Neither of the first two is cosmetic: smoothing the
-staircase itself leaves the directions scattered around the grid axes, and smoothing a
-handful of long chords cuts the corners off the polygon they form. Which algorithm does
-the last step is a boundaryFilter: the iterative ones (Laplace, Taubin) smooth by how
-densely the boundary is sampled; the variational ones (curvature, Huber) state a length
-and mean the same thing at any step size of the map."""
+the lattice directions whatever direction the boundary has. It is repaired in two steps: the
+vertices are smoothed, every vertex of a pixel edge held in the cell of the pixel centres
+around it, and the smooth curve is then simplified. Which algorithm smooths is a
+boundaryFilter: the iterative ones (Taubin, Laplace) smooth by how densely the boundary is
+sampled; the variational ones (curvature, Huber) state a length and mean the same thing at
+any step size of the map."""
 from __future__ import annotations
 
 import numpy as np
 
 from ...geometry.hull import convexHull
 from ...geometry.units import degree
-from ..boundaryresampling import _coarsenGrains, _refineGrains, simplifyBoundary
+from ..boundaryresampling import _coarsenGrains, simplifyBoundary
 from ..grains import grain2d
 from ...geometry.install import install
 from ...geometry.display import aligned
 
 
 # ------------------------------------------------------------------ the network
+
+# no projection: every position is allowed
+def _keep(V):
+  return V
+
 
 # the neighbour lists of the edges E (m, 2) between n vertices in compressed form, the neighbours
 # of vertex i being nbr[ptr[i]:ptr[i + 1]]: both ends of every edge sorted by the vertex they
@@ -57,22 +60,20 @@ class boundaryNetwork:
 
   Input
     gBs - grainBoundary networks to smooth together
-    moveTriplePoints - allow triple junction vertices to move; default False
     moveOuterBoundary - let the junctions of the outer boundary and the vertices on the convex
         hull of the network move; default False"""
 
-  # the network of one or more boundaries over their shared pool of vertices: a vertex
-  # where other than two segments meet is a junction and stays where it is, and so do the
-  # junctions of the outer boundary and the vertices on the convex hull, so that the map keeps
-  # its extent while a ragged outer boundary is smoothed
-  def __init__(self, *gBs, moveTriplePoints=False, moveOuterBoundary=False):
+  # the network of one or more boundaries over their shared pool of vertices: a loose end stays
+  # where it is, and so do the junctions of the outer boundary and the vertices on the convex
+  # hull, so that the map keeps its extent while a ragged outer boundary is smoothed
+  def __init__(self, *gBs, moveOuterBoundary=False):
     nV = len(gBs[0].V)
     F = np.concatenate([gB.F for gB in gBs]).reshape(-1, 2)
     deg = np.bincount(F.reshape(-1), minlength=nV)
     used = np.flatnonzero(deg > 0).astype(np.int32)
     at = np.zeros(nV, dtype=np.int32)
     at[used] = np.arange(len(used), dtype=np.int32)
-    fixed = np.zeros(len(used), dtype=bool) if moveTriplePoints else deg[used] != 2
+    fixed = deg[used] < 2
     if not moveOuterBoundary:
       for gB in gBs:
         rim = gB.F[(gB.grainId == 0).any(axis=1)].reshape(-1)
@@ -121,10 +122,12 @@ class boundaryNetwork:
 # ------------------------------------------------------------------ the filters
 
 class boundaryFilter:
-  """the base of the boundary smoothing filters: smooth(V, net, h) moves the free vertices V of a
-  boundary network sampled at the spacing h, the fixed ones stay"""
+  """the base of the boundary smoothing filters: smooth(V, net, h, project) moves the free
+  vertices V of a boundary network sampled at the spacing h, the fixed ones stay; project(V)
+  moves the vertices back where they may be, after every step of an iterative filter and after
+  the solve of a variational one"""
 
-  def smooth(self, V, net, h):
+  def smooth(self, V, net, h, project=_keep):
     """V are the vertices (n, 2) of the network, h the spacing they are sampled at"""
     raise NotImplementedError
 
@@ -158,7 +161,7 @@ class boundaryFilter:
 
 
 class laplaceFilter(boundaryFilter):
-  """repeated local averaging, the default. A Laplacian is a low pass filter with gain 1 - lk,
+  """repeated local averaging. A Laplacian is a low pass filter with gain 1 - lk,
   below one everywhere but at k = 0, so it shrinks every convex region, without bound; and
   the count of iterations is not a physical quantity, the same call on the same sample
   measured at a finer step does something else. The averaging counts the vertex itself with
@@ -172,12 +175,12 @@ class laplaceFilter(boundaryFilter):
   def __init__(self, iter=1, lambda_=0.5):
     self.iter, self.lambda_ = int(iter), float(lambda_)
 
-  def smooth(self, V, net, h):
+  def smooth(self, V, net, h, project=_keep):
     """the vertices after iter steps of local averaging at the rate lambda_ / 2, the fixed ones kept"""
     L, free = net.laplacian(), ~net.fixed
     out = np.array(V, dtype=float)
     for _ in range(self.iter):
-      out = self.laplaceStep(out, L, free, self.lambda_ / 2)
+      out = project(self.laplaceStep(out, L, free, self.lambda_ / 2))
     return out
 
   def _items(self):
@@ -198,7 +201,7 @@ class taubinFilter(boundaryFilter):
   def __init__(self, iter=5, lambda_=0.5, mu=-0.53):
     self.iter, self.lambda_, self.mu = int(iter), float(lambda_), float(mu)
 
-  def smooth(self, V, net, h):
+  def smooth(self, V, net, h, project=_keep):
     """the vertices after iter pairs of a smoothing step lambda_ and an unshrinking step mu, the fixed
     ones kept; mu has to be negative"""
     if self.mu >= 0:
@@ -206,8 +209,8 @@ class taubinFilter(boundaryFilter):
     L, free = net.laplacian(), ~net.fixed
     out = np.array(V, dtype=float)
     for _ in range(self.iter):
-      out = self.laplaceStep(out, L, free, self.lambda_)
-      out = self.laplaceStep(out, L, free, self.mu)
+      out = project(self.laplaceStep(out, L, free, self.lambda_))
+      out = project(self.laplaceStep(out, L, free, self.mu))
     return out
 
   def _items(self):
@@ -244,7 +247,7 @@ class curvatureFilter(_variationalFilter):
     self.smoothingLength = None if smoothingLength is None else float(smoothingLength)
     self.alpha = None if alpha is None else float(alpha)
 
-  def smooth(self, V, net, h):
+  def smooth(self, V, net, h, project=_keep):
     """the minimiser of |V - V0|^2 + alpha |L V|^2 over the free vertices, one sparse system"""
     from scipy.sparse import identity
     alpha = self.weight(h)
@@ -252,7 +255,7 @@ class curvatureFilter(_variationalFilter):
     if alpha <= 0:
       return V
     L = net.laplacian()
-    return self.solveDirichlet(identity(len(net), format="csr") + alpha * (L.T @ L), V, net.fixed)
+    return project(self.solveDirichlet(identity(len(net), format="csr") + alpha * (L.T @ L), V, net.fixed))
 
   def _items(self):
     return [("smoothing length", self.smoothingLength), ("alpha", self.alpha)]
@@ -286,7 +289,7 @@ class huberFilter(_variationalFilter):
     self.threshold, self.alpha = float(threshold), None if alpha is None else float(alpha)
     self.maxIter, self.tol = int(maxIter), float(tol)
 
-  def smooth(self, V, net, h):
+  def smooth(self, V, net, h, project=_keep):
     """the minimiser of |V - V0|^2 plus alpha times the Huber penalty of the curvature L V, by
     reweighting the sparse system until nothing moves, the fixed vertices kept"""
     from scipy.sparse import identity, diags
@@ -310,60 +313,111 @@ class huberFilter(_variationalFilter):
         break
       r = np.linalg.norm(L @ out, axis=1)
       w = np.minimum(1, delta / np.maximum(r, np.finfo(float).eps))
-    return out
+    return project(out)
 
   def _items(self):
     return [("smoothing length", self.smoothingLength), ("threshold", f"{self.threshold / degree:g}°"), ("alpha", self.alpha),
             ("iterations", self.maxIter)]
 
 
-# ------------------------------------------------------------------ the three steps
+# ------------------------------------------------------------------ the cells
 
-def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=False,
-                   moveOuterBoundary=False):
+class pixelCells:
+  """where the vertices of a boundary may go while it is smoothed: every vertex of a pixel edge
+  stays in its cell, the polygon of the pixel centres around it, a square or on a hexagonal grid
+  a triangle, shrunk by margin. Its faces lie at half the edge length, one facing along the
+  edge, so the boundary passes every pixel it was measured next to on the side it was
+  measured on. A junction without a cell gets one of inradius d/2 - margin, so it stays within
+  half a step
+
+    cells = pixelCells(V, E, pixelDist, junctions, d, margin)
+    V = cells.project(V)
+
+  Input
+    V - the vertices (n, 2) where the cells are centred
+    E - the pixel edges (m, 2), indices into V
+    pixelDist - the distance of the two pixel centres of every pixel edge
+    junctions - the indices of the vertices that get a cell of their own unless they are
+        on a pixel edge
+    d - the pixel spacing
+    margin - how far the cells are shrunk"""
+
+  def __init__(self, V, E, pixelDist, junctions, d, margin):
+    t = V[E[:, 1]] - V[E[:, 0]]
+    L = np.linalg.norm(t, axis=1)
+    # a pixel edge of a square grid is as long as the step, of a hexagonal one sqrt(3) shorter
+    self.K = 3 if len(E) and np.median(pixelDist / L) > 1.5 else 4
+    ids, first = np.unique(np.concatenate([E[:, 0], E[:, 1]]), return_index=True)
+    phi = np.arctan2(t[:, 1], t[:, 0])
+    j = np.setdiff1d(junctions, ids)
+    self.id = np.concatenate([ids, j]).astype(np.int64)
+    self.V0 = np.asarray(V, dtype=float)[self.id]
+    self.h = np.concatenate([np.concatenate([L, L])[first] / 2 - margin, np.full(len(j), d / 2 - margin)])
+    # the directions of the faces, the first along the edge
+    a = np.concatenate([np.concatenate([phi, phi + np.pi])[first], np.zeros(len(j))])[:, None] + 2 * np.pi * np.arange(self.K) / self.K
+    self.cos, self.sin = np.cos(a), np.sin(a)
+
+  def project(self, V):
+    """the vertices with those outside their cell moved onto its nearest face, as far along it as
+    its corners allow"""
+    x = V[self.id] - self.V0
+    o = x[:, :1] * self.cos + x[:, 1:] * self.sin - self.h[:, None]
+    k = np.argmax(o, axis=1)
+    r = np.arange(len(k))
+    c, s, out = self.cos[r, k], self.sin[r, k], o[r, k] > 0
+    w = self.h * np.tan(np.pi / self.K)
+    w = np.clip(x[:, 1] * c - x[:, 0] * s, -w, w)
+    x[out] = (self.h * np.stack([c, s]) + w * np.stack([-s, c])).T[out]
+    V = V.copy()
+    V[self.id] = x + self.V0
+    return V
+
+
+# ------------------------------------------------------------------ the two steps
+
+def smoothBoundary(grains, iter=20, simplify=None, moveOuterBoundary=False):
   """the grains with the pixel staircase of their boundaries turned into smooth curves; MATLAB's
   grain2d.smoothBoundary
 
-    grains = smoothBoundary(grains)                                   # one smoothing step
-    grains = smoothBoundary(grains, 5, moveTriplePoints=True)         # five steps, the junctions moving too
-    grains = smoothBoundary(grains, 3, simplify=False, refine=False)  # the segments kept, smoothing only
-    grains = smoothBoundary(grains, 3, simplify=0.5, refine=1)        # own tolerance and resampling length
-    grains = smoothBoundary(grains, taubinFilter())                   # smoothing without shrinking
+    grains = smoothBoundary(grains)                                   # 20 Taubin pairs, then simplified
+    grains = smoothBoundary(grains, 40)                               # 40 pairs
+    grains = smoothBoundary(grains, simplify=False)                   # every segment kept
+    grains = smoothBoundary(grains, simplify=0.2)                     # own tolerance of the simplification
+    grains = smoothBoundary(grains, laplaceFilter(5))                 # another smoothing
     grains = smoothBoundary(grains, curvatureFilter(smoothingLength=3))  # a smoothing length
 
   calcGrains gives a boundary as a staircase of pixel edges, every segment along a grid axis.
-  The smoothing repairs it in three steps:
+  The smoothing repairs it in two steps:
 
-  - simplify: drops every vertex whose removal moves the boundary by less than a tolerance,
-  by default d / sqrt(2) for the pixel spacing d, which removes the staircase and nothing else.
-  - refine: splits every segment left into pieces of about length d, by default the pixel
-  spacing, so that the vertices are evenly spaced and no longer tied to the grid.
-  - the boundaryFilter smooths, by default laplaceFilter(iter), iter steps of local averaging.
+  - the vertices are smoothed, by default by iter pairs of taubinFilter steps. After every
+  step each vertex of a pixel edge is moved back into its cell, the square of the four pixel
+  centres around it, the triangle of three on a hexagonal grid, shrunk by d/20, d being the
+  pixel spacing. So the boundary passes every pixel it was measured next to on the side it
+  was measured on, and a triple point stays within half a step of where it was. A loose end
+  stays put.
+  - simplifyBoundary drops every vertex whose removal moves the boundary by less than a
+  tolerance, d/10 by default, unless that would bring one of those pixel centres closer than
+  d/20 to the boundary or put it on the other side.
 
-  The first two steps matter: simplifying alone leaves a curve as a few long chords whose
-  corners the smoothing cuts off, and smoothing alone leaves straight boundaries scattered
-  around the grid axes. They change the segments, though, and a resampled segment no longer
+  The pixel edges are those with a nonzero gB.pixelDist, which calcGrains records. Grains built
+  otherwise have none; then only the junctions are held within half a step. The outer boundary
+  is smoothed as well, its junctions and the vertices on the convex hull of the map staying
+  fixed unless moveOuterBoundary=True, so that the map keeps its extent.
+
+  The simplification changes the number of boundary segments, and a merged segment no longer
   lies between one pair of pixels: where gB.ebsdId is read per segment, as calcGBND does,
-  switch them off with simplify=False, refine=False.
-
-  The junctions (triple and quadruple points, and the ends of the inner boundary on the outer
-  one) stay fixed unless moveTriplePoints=True. The outer boundary is smoothed too, its
-  junctions and the vertices on the convex hull of the map staying fixed unless
-  moveOuterBoundary=True, so that the map keeps its extent. MATLAB's second output, the
-  filter used, is the one passed or laplaceFilter(iter).
+  switch it off with simplify=False. MATLAB's second output, the filter used, is the one passed
+  or taubinFilter(iter).
 
   Input
     grains - grain2d
-    iter - the number of smoothing steps of the default laplaceFilter, or the boundaryFilter
-        to smooth with: laplaceFilter, taubinFilter, curvatureFilter or huberFilter
+    iter - the number of Taubin pairs of the default taubinFilter, or the boundaryFilter to
+        smooth with: taubinFilter, laplaceFilter, curvatureFilter or huberFilter
   Output
     grains - grain2d with the smoothed boundary and inner boundary
   Keywords
-    simplify - the tolerance of the simplification in the units of the map, by default
-        d / sqrt(2) for the pixel spacing d; False leaves it out, MATLAB's 'noSimplify'
-    refine - the resampling length in the units of the map, by default d; False leaves it
-        out, MATLAB's 'noRefine'
-    moveTriplePoints - smooth the junctions as well
+    simplify - the tolerance of the simplification in the units of the map, by default d/10
+        for the pixel spacing d; False leaves it out, MATLAB's 'noSimplify'
     moveOuterBoundary - let the junctions of the outer boundary and the vertices on the convex
         hull of the map move as well
 
@@ -376,7 +430,7 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
 
     ebsd = mtexdata('small', verbose=False)['Forsterite']
     grains = calcGrains(ebsd, angle=10*degree, minPixel=5)
-    smoothed = smoothBoundary(grains, 5)
+    smoothed = smoothBoundary(grains)
     plot(grains.boundary, lineColor='black', lineWidth=2, displayName='Reconstructed')
     hold(True)
     plot(smoothed.boundary, lineColor='red', lineWidth=1, displayName='Smoothed')
@@ -389,26 +443,30 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
 
   See also
     grain2d.simplifyBoundary, grain2d.refineBoundary, grain2d.reduceBoundary, boundaryFilter,
-    laplaceFilter, taubinFilter, curvatureFilter, huberFilter, GrainSmoothing"""
-  F = iter if isinstance(iter, boundaryFilter) else laplaceFilter(iter)
-  if grains.boundary is None or grains.boundary.isempty:
+    laplaceFilter, taubinFilter, curvatureFilter, huberFilter, pixelCells, GrainSmoothing"""
+  F = iter if isinstance(iter, boundaryFilter) else taubinFilter(iter)
+  b, ib = grains.boundary, grains.innerBoundary
+  if b is None or b.isempty:
     return grains
-  d0 = float(np.median(grains.boundary.segLength))
-  if not (np.isfinite(d0) and d0 > 0):
+  net = boundaryNetwork(b, ib, moveOuterBoundary=moveOuterBoundary)
+  V0 = np.asarray(b.V, dtype=float)
+  # the pixel edges and the pixel spacing d
+  E, pd = np.concatenate([b.F, ib.F]), np.concatenate([b.pixelDist, ib.pixelDist])
+  E, pd = E[pd > 0], pd[pd > 0]
+  d = float(np.median(pd)) if len(pd) else float(np.median(b.segLength))
+  at = np.zeros(len(V0), dtype=np.int64)
+  at[net.used] = np.arange(len(net.used))
+  cells = pixelCells(V0[net.used], at[E], pd, np.flatnonzero((net.degree > 2) & ~net.fixed), d, d / 20)
+  V = V0.copy()
+  V[net.used] = F.smooth(V0[net.used], net, float(np.median(b.segLength)), cells.project)
+  V = V.astype(b.V.dtype, copy=False)
+  grains = grain2d(grains.id, grains.phaseId, grains.CSList, grains.numPixel, grains.meanRotation, grains.GOS, grains.frame, grains.prop,
+                   boundary=b._with(V=V), innerBoundary=ib._with(V=V), loops=grains.loops, phaseMap=grains.phaseMap)
+  if simplify is False:
     return grains
-  if simplify is not False:
-    grains = _coarsenGrains(simplifyBoundary, grains, d0 / np.sqrt(2) if simplify is None else simplify)
-  if refine is not False:
-    grains = _refineGrains(grains, d0 if refine is None else refine)
-  net = boundaryNetwork(grains.boundary, grains.innerBoundary, moveTriplePoints=moveTriplePoints, moveOuterBoundary=moveOuterBoundary)
-  h = float(np.median(grains.boundary.segLength))
-  V = np.array(grains.boundary.V, dtype=float)
-  V[net.used] = F.smooth(V[net.used], net, h)
-  V = V.astype(grains.boundary.V.dtype, copy=False)
-  return grain2d(grains.id, grains.phaseId, grains.CSList, grains.numPixel, grains.meanRotation, grains.GOS, grains.frame, grains.prop,
-                 boundary=grains.boundary._with(V=V), innerBoundary=grains.innerBoundary._with(V=V), loops=grains.loops, phaseMap=grains.phaseMap)
+  return _coarsenGrains(simplifyBoundary, grains, d / 10 if simplify is None else simplify, margin=d / 20, measuredV=V0)
 
 
 install(grain2d, smoothBoundary)
 
-__all__ = ["boundaryFilter", "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork"]
+__all__ = ["boundaryFilter", "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells"]

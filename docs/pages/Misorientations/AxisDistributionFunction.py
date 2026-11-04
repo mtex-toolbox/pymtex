@@ -126,12 +126,12 @@ mtexColorbar()
 #
 # Passing two orientations separately to `plotAxisDistribution` asks where that axis points
 # in the specimen frame. The two EBSD ids stored for every segment recover the orientations
-# on its two sides. A segment that smoothing simplified or resampled no longer runs between
-# one pair of pixels, and the port leaves its ids empty, so the pairs are read from the
-# boundaries smoothed without those two stages, as the help of `smoothBoundary` advises.
+# on its two sides. A segment merged by simplification no longer runs between one pair of
+# pixels, and the port leaves its ids empty, so the pairs are read from boundaries smoothed
+# without simplification, as the help of `smoothBoundary` advises.
 
 # +
-gBp = smoothBoundary(calcGrains(ebsd, angle=5 * degree), 5, simplify=False, refine=False)
+gBp = smoothBoundary(calcGrains(ebsd, angle=5 * degree), 5, simplify=False)
 gBp = gBp.boundary['Magnesium', 'Magnesium']
 ori1 = ebsd['id', gBp.ebsdId[:, 0]].orientations
 ori2 = ebsd['id', gBp.ebsdId[:, 1]].orientations

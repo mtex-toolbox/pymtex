@@ -79,6 +79,14 @@ def test_the_numba_and_the_numpy_simplification_agree():
     assert np.array_equal(a, b)
 
 
+def test_simplify_keeps_the_same_vertices_whichever_way_the_chains_are_walked():
+  gB = diskCircle(12, 57)[0]
+  for g in (gB, boundaryOf(boundaryMap(SQ4, 3, 7))[0]):
+    sl = float(np.median(g.segLength))
+    for eps in (sl / 4, sl / 2, sl / np.sqrt(2), sl, 2 * sl):
+      assert np.array_equal(np.unique(g.simplify(eps).F), np.unique(g.flip().simplify(eps).F))
+
+
 def test_B16_refining_splits_every_segment_and_keeps_its_vertices():
   gB = boundaryOf(boundaryMap(SQ4, 2, 10))[0]
   r = gB.refine(0.5)

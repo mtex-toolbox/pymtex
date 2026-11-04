@@ -33,7 +33,7 @@ ebsd = mtexdata('forsterite')
 # reconstruct grains, discard boundary grains, and smooth their outlines
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=5)
 grains = grains[~grains.isBoundary]
-grains = smoothBoundary(grains['indexed'], 10, moveTriplePoints=True)
+grains = smoothBoundary(grains['indexed'], 10)
 
 # plot all grains and highlight one complete grain
 plot(grains)

@@ -282,11 +282,12 @@ fractalDimension
 # Treat the estimate with care. Pixel spacing sets the smallest visible feature, small
 # grains provide very few boundary samples, and smoothing removes exactly the excursions
 # that the measure is intended to count. The next comparison reuses one reconstruction so
-# that only the boundary processing changes. The zero-iteration case is the actual pixel
-# staircase; calling `smoothBoundary(rawGrains, 0)` would still simplify and resample it.
+# that only the boundary processing changes. With zero steps `smoothBoundary` moves no
+# vertex and only merges segments that lie within a tenth of a pixel of a straight line, so
+# the first case is the pixel staircase itself.
 
 for iter in [0, 5, 25]:
-  g = rawGrains if iter == 0 else smoothBoundary(rawGrains, iter)
+  g = smoothBoundary(rawGrains, iter)
   ab = np.polyfit(np.log(g.equivalentRadius), np.log(g.perimeter), 1)
   print(f'{iter:2d} smoothing iterations: fractal dimension {ab[0]:.3f}')
 
