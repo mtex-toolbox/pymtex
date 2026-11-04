@@ -236,27 +236,39 @@ baseline.
 ## Cross-check of the ports
 
 `run.py compare T0` matches every grain of one port to the grain of the other most of its pixels
-lie in, and measures the Hausdorff distance of the two boundaries:
+lie in, and measures the Hausdorff distance of the two inner boundaries:
 
 | case | instances | same partition | pixels differing, max | Hausdorff max | median |
 |---|---|---|---|---|---|
-| raw, either track | 12 | 8 | 0.51 % | 1.0 | 6 · 10⁻¹⁴ |
-| noSimplify, either track | 12 | 8 | 0.51 % | 1.0 | 6 · 10⁻¹⁴ |
-| smooth, either track | 12 | 8 | 0.51 % | 1.1 | 0.64 |
+| raw, either track | 12 | 10 | 0.39 % | 1.4 · 10⁻¹³ | 6 · 10⁻¹⁴ |
+| noSimplify, either track | 12 | 10 | 0.39 % | 1.4 · 10⁻¹³ | 6 · 10⁻¹⁴ |
+| smooth, either track | 12 | 10 | 0.39 % | 0.71 | 0.59 |
 
-(`python` against `matlabNoStraighten`.) The ports agree to rounding on every map without
-notIndexed pixels, hexagonal ones included, raw and with the Laplace step alone. Two
-differences remain, both inherited from MATLAB develop having moved since the port:
+(`python` against `matlabNoStraighten`.) The ports draw the same inner boundaries to rounding on
+every map, hexagonal ones and filled notIndexed cells included, raw and with the Laplace step
+alone. Three differences remain, each decided by a tie rather than by a step one port lacks:
 
-1. On the square maps with filled notIndexed cells (04, 06, 07, 12; the hexagonal 10 agrees),
-   MATLAB gives 4–21 pixels another grain, and its boundary lies up to one step away. Changes to
-   MATLAB's fill after the port are the likely cause: dd94245c0 makes a hole joined to the
-   outside by a short filled path part of the outside, and 89e8bbf85 calls calcPolygonsC. The
-   commit responsible has not been isolated.
-2. Simplify and refine differ on every map, by 0.6 d at the median, while the Laplace step
-   alone agrees to 10⁻¹³. MATLAB's refine subdivides each segment since dc3e96fc2 (#2641) and
-   this port resamples at equal arc length; that this alone explains the difference is not
-   checked.
+1. Absorbed pixels. On 06 and 12, 23 notIndexed pixels in filled cells join a grain in one port
+   and stay 0 in the other. Every one has a corner of its nudged footprint exactly on the
+   bisector of two neighbours of different grains: a filled pixel with grain A on three sides
+   and B on the fourth is three quarters A, and its two corners towards B lie on the A|B
+   boundary. MATLAB's `insidepoly` counts such a corner as inside, so the pixel joins the grain
+   `knnsearch` proposed; this port's site lookup breaks the tie by site order. A boundary runs
+   through each of these pixels, so 0 is what `absorbInteriorPixels` promises, and neither
+   port gives it reliably.
+2. Simplify. Douglas-Peucker at the default tolerance d/√2 decides by ties on a staircase: the
+   corner of a 45° step lies exactly d/√2 from its chord, and of several corners equally far from
+   a longer chord the first in walk order wins. The walk follows the grain ids, the smaller on
+   the left, and the ports number grains differently (this port by the first pixel along x,
+   MATLAB by the last pixel along y, through `etree`); this port anchors a closed chain at a
+   vertex that must stay, MATLAB at the start of the walk; and MATLAB's vertices next to the map
+   border carry rounding noise of 10⁻¹⁴, which tips the ties at the tolerance. With MATLAB's
+   numbering imitated, 7 of the 12 maps agree to 10⁻¹⁴ farther than eight steps from the
+   border. Parity needs a tie rule independent of the walk, in both ports.
+3. The outer boundary, which the table leaves out. MATLAB's map corners lie 2 · 10⁻⁴ to
+   6 · 10⁻⁴ outside the true corners, so the raw outer boundaries differ by that much; and as
+   its convex hull then runs through the corners alone, `smoothBoundary` releases the edge
+   vertices it means to hold: on the hexagonal maps the zigzag of the edge moves in by d/16.
 
 Every reconstruction of all three ports passes `orientOK`, so both conventions for the left
 grain hold, after smoothing too.

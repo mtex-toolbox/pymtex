@@ -22,6 +22,7 @@ from .kernels import localVoronoiNumba, weldNumba
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
 from ..geometry.display import aligned
+from ..geometry.hull import convexHull
 
 NO_PIXEL = -1
 
@@ -118,13 +119,18 @@ class cellComplex:
 
 # ------------------------------------------------------------------ the alpha closing
 
-def diskOffsets(A, r):
-  """the lattice offsets within a physical radius r, shape (m, 2)"""
+def diskOffsets(A, r, stencil):
+  """the structuring element of the closing, shape (m, 2): the lattice offsets within a physical
+  radius r, and beside the extreme of the disk along every stencil direction the offsets one
+  step to the side, so that a one cell recess at a straight edge is covered from its
+  neighbours wherever r falls between the lattice points"""
   wi = int(np.ceil(r / np.linalg.norm(A[:, 0]))) + 1
   wj = int(np.ceil(r / np.linalg.norm(A[:, 1]))) + 1
   di, dj = np.meshgrid(np.arange(-wi, wi + 1), np.arange(-wj, wj + 1), indexing="ij")
   offs = np.stack([di.reshape(-1), dj.reshape(-1)], axis=1)
-  return offs[np.linalg.norm(offs @ A.T, axis=1) <= r]
+  M = np.floor(r / np.linalg.norm(stencil @ A.T, axis=1)).astype(int)
+  side = [M[k] * s - t for k, s in enumerate(stencil) if M[k] >= 1 for t in stencil if not np.all((t == s) | (t == -s))]
+  return np.unique(np.concatenate([offs[np.linalg.norm(offs @ A.T, axis=1) <= r], np.array(side, dtype=int).reshape(-1, 2)]), axis=0)
 
 
 def dilate(m, offs):
@@ -141,29 +147,53 @@ def dilate(m, offs):
   return out
 
 
-def alphaClose(present, A, r):
+def alphaClose(present, A, r, stencil, outside=None):
   """the closing of a set by a disk of radius r: the cells no empty disk of that radius
-  covers, as the De Morgan pair of dilations"""
-  offs = diskOffsets(np.asarray(A, dtype=float), r)
+  covers, as the De Morgan pair of dilations; the cells outside count as present while it
+  erodes and are clipped away after"""
+  offs = diskOffsets(np.asarray(A, dtype=float), r, np.asarray(stencil))
   present = np.asarray(present, dtype=bool)
-  return ~dilate(~dilate(present, offs), offs) | present
+  outside = np.zeros_like(present) if outside is None else outside
+  return ~dilate(~(dilate(present, offs) | outside), offs) & ~outside | present
 
 
-def scanned(hasPixel):
-  """the cells the scan covered: between the first and the last measurement of every row of
-  the raster, or of every column"""
-  hasPixel = np.asarray(hasPixel, dtype=bool)
-  n1, n2 = hasPixel.shape
-  out = np.zeros_like(hasPixel)
-  for axis in (0, 1):
-    m = hasPixel if axis == 0 else hasPixel.T
-    any_ = m.any(axis=0)
-    first = np.argmax(m, axis=0)
-    last = m.shape[0] - 1 - np.argmax(m[::-1], axis=0)
-    rows = np.arange(m.shape[0])[:, None]
-    span = (rows >= first) & (rows <= last) & any_
-    out |= span if axis == 0 else span.T
-  return out
+def hullCells(cells, dims):
+  """the cells of a raster inside the convex hull of the cells given, all of them when none is
+  given: each row meets the hull in one interval, bounded by the edges of the hull crossing it"""
+  if len(cells) == 0:
+    return np.ones(dims, dtype=bool)
+  h = cells[convexHull(cells)].astype(float)
+  R, C = [h[:, 0]], [h[:, 1]]
+  for (r0, c0), (r1, c1) in zip(h, np.roll(h, -1, axis=0)):
+    if r0 != r1:
+      R.append(np.arange(min(r0, r1), max(r0, r1) + 1))
+      C.append(c0 + (R[-1] - r0) * (c1 - c0) / (r1 - r0))
+  R, C = np.concatenate(R).astype(int), np.concatenate(C)
+  lo, hi = np.full(dims[0], np.inf), np.full(dims[0], -np.inf)
+  np.minimum.at(lo, R, C)
+  np.maximum.at(hi, R, C)
+  j = np.arange(dims[1])
+  return (j >= lo[:, None] - 1e-9) & (j <= hi[:, None] + 1e-9)
+
+
+def steps(seed, mask, stencil, n):
+  """the number of stencil steps from the seed to every cell of the mask, through the mask,
+  infinite beyond n"""
+  d = np.full(seed.shape, np.inf)
+  reached = front = seed
+  for k in range(1, n + 1):
+    front = dilate(front, stencil) & mask & ~reached
+    d[front] = k
+    reached = reached | front
+  return d
+
+
+def recesses(material, A, r, stencil):
+  """the cells with material within the reach of the closing on both sides along a stencil
+  direction"""
+  def reach(s):
+    return dilate(material, -np.outer(np.arange(1, np.floor(r / np.linalg.norm(A @ s)) + 1), s))
+  return np.any([reach(s) & reach(-s) for s in stencil], axis=0)
 
 
 def floodBorder(bg, stencil):
@@ -200,18 +230,36 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   hasPixel[a[m], b[m]] = True
   pixelOf[a[m], b[m]] = np.arange(n, dtype=np.int32)[m]
   isPresent[a[present], b[present]] = True
-  # the edge of the map is not the edge of a hole: what the scan never covered counts as
-  # material while the closing runs and is clipped away after, so a cell on the rim is
-  # absorbed exactly when a cell in its place further in would be
-  fp = scanned(hasPixel)
-  closed = alphaClose(isPresent | ~fp, l.A, r) & fp
+  # the edge of the map is not the edge of a hole: beyond the convex hull of the indexed cells
+  # the material counts as present while the closing erodes, so a gap along the edge closes
+  # as one further in would
+  closed = alphaClose(isPresent, l.A, r, st, ~hullCells(np.stack([a[present], b[present]], axis=1), dims))
+  # a cell with material on more than half of its stencil is a one cell recess, which the
+  # alpha shape fills; filling the mouth of a slit exposes the next cell
+  while alpha >= 1:
+    add = ~closed & (sum(dilate(closed, [s]).astype(int) for s in st) > len(st) // 2)
+    if not add.any():
+      break
+    closed |= add
   ext = floodBorder(~closed, st)
+  # a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps is part of the
+  # outside, and so is the path
+  k = 2 * int(np.ceil(alpha))
+  path = closed & ~isPresent
+  path &= steps(ext, path, st, k) + steps(~closed & ~ext, path, st, k) <= k
+  if path.any():
+    closed &= ~path
+    ext = floodBorder(~closed, st)
   material = ~ext
   filled = closed & ~isPresent                 # the neighbours grow into these
-  isSite = material & ~filled
-  band = dilate(material, st) & ext            # one ring outside, so the map's cells close
-  dummy = dilate(material | band, st) & ext & ~band
-  isSite = isSite | band | dummy
+  # the band, one ring outside, closes the map's cells; a band cell touching only filled cells,
+  # or in a recess too wide for the closing, makes way for one further out, so that the outer
+  # boundary runs straight across the filled cells
+  band = dilate(material, st) & ext
+  vacated = band & (~dilate(material & ~filled, st) | recesses(material, l.A, r, st))
+  band = (band | dilate(vacated, st) & ext) & ~vacated
+  dummy = dilate(material | band, st) & ext & ~band & ~vacated
+  isSite = (material & ~filled) | band | dummy
   flat = np.flatnonzero(isSite.reshape(-1))
   ns = len(flat)
   lookup = np.full(dims, NO_PIXEL, dtype=np.int32)
@@ -404,7 +452,8 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None):
 
   alpha decides what happens to regions of not indexed pixels. A region narrower than
   2 alpha pixel spacings is filled, the cells of its indexed neighbours growing into it. A
-  wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain.
+  wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain, unless a filled
+  path of at most 2 alpha steps joins it to the outside, of which it is then a part.
 
   The vertices that the cells of neighbouring pixels compute each for themselves are welded
   into one when they lie within tol.

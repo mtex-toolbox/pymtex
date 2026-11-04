@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ...geometry.hull import convexHull
 from ...geometry.units import degree
 from ..boundaryresampling import _coarsenGrains, _refineGrains, simplifyBoundary
 from ..grains import grain2d
@@ -38,6 +39,16 @@ def _adjacency(E, n):
   return ptr, to[order].astype(np.int32)
 
 
+# the points on the boundary of their convex hull, the ones along its edges included
+def _onHull(P):
+  h = P[convexHull(P)]
+  tol = 1e-9 * max(float(np.abs(P).max(initial=0)), 1.0)
+  on = np.zeros(len(P), dtype=bool)
+  for a, b in zip(h, np.roll(h, -1, axis=0)):
+    on |= np.abs((P[:, 0] - a[0]) * (b[1] - a[1]) - (P[:, 1] - a[1]) * (b[0] - a[0])) <= tol * np.hypot(*(b - a))
+  return on
+
+
 class boundaryNetwork:
   """the network the smoothing runs on: only the vertices the boundaries use, their neighbours
   in compressed form, and which of them may not move. The pool of vertices a boundary
@@ -47,12 +58,13 @@ class boundaryNetwork:
   Input
     gBs - grainBoundary networks to smooth together
     moveTriplePoints - allow triple junction vertices to move; default False
-    moveOuterBoundary - allow outer-boundary vertices to move; default False"""
+    moveOuterBoundary - let the junctions of the outer boundary and the vertices on the convex
+        hull of the network move; default False"""
 
   # the network of one or more boundaries over their shared pool of vertices: a vertex
-  # where other than two segments meet is a junction and stays where it is, and so does one
-  # on the border of the map, which is not a boundary between grains but the edge of what
-  # was measured
+  # where other than two segments meet is a junction and stays where it is, and so do the
+  # junctions of the outer boundary and the vertices on the convex hull, so that the map keeps
+  # its extent while a ragged outer boundary is smoothed
   def __init__(self, *gBs, moveTriplePoints=False, moveOuterBoundary=False):
     nV = len(gBs[0].V)
     F = np.concatenate([gB.F for gB in gBs]).reshape(-1, 2)
@@ -63,8 +75,9 @@ class boundaryNetwork:
     fixed = np.zeros(len(used), dtype=bool) if moveTriplePoints else deg[used] != 2
     if not moveOuterBoundary:
       for gB in gBs:
-        rim = (gB.grainId[:, 0] == 0) | (gB.grainId[:, 1] == 0)
-        fixed[at[gB.F[rim]]] = True
+        rim = gB.F[(gB.grainId == 0).any(axis=1)].reshape(-1)
+        fixed[at[rim[deg[rim] != 2]]] = True
+      fixed |= _onHull(np.asarray(gBs[0].V, dtype=float)[used, :2])
     self.ptr, self.nbr = _adjacency(at[F], len(used))
     self.fixed, self.used = fixed, used
 
@@ -323,8 +336,8 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
 
   - simplify: drops every vertex whose removal moves the boundary by less than a tolerance,
   by default d / sqrt(2) for the pixel spacing d, which removes the staircase and nothing else.
-  - refine: resamples what is left at equal arc length, by default d, so that the vertices are
-  evenly spaced and no longer tied to the grid.
+  - refine: splits every segment left into pieces of about length d, by default the pixel
+  spacing, so that the vertices are evenly spaced and no longer tied to the grid.
   - the boundaryFilter smooths, by default laplaceFilter(iter), iter steps of local averaging.
 
   The first two steps matter: simplifying alone leaves a curve as a few long chords whose
@@ -334,9 +347,10 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
   switch them off with simplify=False, refine=False.
 
   The junctions (triple and quadruple points, and the ends of the inner boundary on the outer
-  one) stay fixed unless moveTriplePoints=True, the outer boundary of the map unless
-  moveOuterBoundary=True. MATLAB's second output, the filter used, is the one passed or
-  laplaceFilter(iter).
+  one) stay fixed unless moveTriplePoints=True. The outer boundary is smoothed too, its
+  junctions and the vertices on the convex hull of the map staying fixed unless
+  moveOuterBoundary=True, so that the map keeps its extent. MATLAB's second output, the
+  filter used, is the one passed or laplaceFilter(iter).
 
   Input
     grains - grain2d
@@ -350,7 +364,8 @@ def smoothBoundary(grains, iter=1, simplify=None, refine=None, moveTriplePoints=
     refine - the resampling length in the units of the map, by default d; False leaves it
         out, MATLAB's 'noRefine'
     moveTriplePoints - smooth the junctions as well
-    moveOuterBoundary - smooth the outer boundary of the map as well
+    moveOuterBoundary - let the junctions of the outer boundary and the vertices on the convex
+        hull of the map move as well
 
   Example
   Compare reconstructed and smoothed boundaries on the small Forsterite sample.

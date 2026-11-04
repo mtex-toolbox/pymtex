@@ -4,6 +4,7 @@ import pytest
 
 from mtex import EBSD, phaseList, crystalFrame, rotation, vector3d, zvector, degree, shift, decompose
 from mtex.maps.decomposition import alphaClose, dilate, localVoronoi, meshVertices, NO_PIXEL
+from mtex.maps.lattice import STENCIL
 from mtex.geometry.kernels import _jit
 
 CSTEST = crystalFrame("m-3m", mineral="test")
@@ -127,11 +128,11 @@ def test_D5_the_alpha_closing_is_the_morphological_one():
   m = np.zeros((41, 41), dtype=bool)
   m[5:36, 5:36] = True
   m[19:21, 5:26] = False                          # a two cell wide slit
-  closed = alphaClose(m, np.eye(2), 3.1)
+  closed = alphaClose(m, np.eye(2), 3.1, STENCIL["square"])
   assert closed[19:21, 7:24].all() and closed[9, 9]   # filled, and extensive
   m2 = m.copy()
   m2[15:25, 5:26] = False                          # a ten cell wide slit
-  assert not alphaClose(m2, np.eye(2), 3.1)[19, 14]
+  assert not alphaClose(m2, np.eye(2), 3.1, STENCIL["square"])[19, 14]
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
