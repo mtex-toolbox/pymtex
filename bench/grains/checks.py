@@ -124,7 +124,7 @@ def partitionCases():
   i, j = np.meshgrid(np.arange(20), np.arange(10))
   t = np.where(i.ravel() < 10, 1, 2)
   inst = dict(label=t, phase=np.ones(200), wild=np.zeros(200, bool), pos=np.column_stack([i.ravel(), j.ravel()]).astype(float),
-              grainQ=np.array([[1, 0, 0, 0], [1, 0, 0, 0], [np.cos(0.2), np.sin(0.2), 0, 0]]))
+              grainQ=np.array([[1, 0, 0, 0], [1, 0, 0, 0], [np.cos(0.2), np.sin(0.2), 0, 0]]), grainPhase=np.ones(4, int), phases=["Iron"])
   yield "identical", inst, t, dict(ari=1.0, vi=0.0, f1_50=1.0, f1_75=1.0, splits=0, merges=0, sizeW1=0.0)
   yield "merged", inst, np.ones(200, np.int64), dict(ari=0.0, vi=1.0, f1_50=0.0, merges=1, splits=0)
   yield "split", inst, np.where(i.ravel() < 5, 3, t), dict(vi=0.5, f1_50=0.4, f1_75=0.4, splits=1, merges=0)

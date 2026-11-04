@@ -11,9 +11,10 @@ from scipy.sparse import coo_matrix
 from scipy.spatial import cKDTree
 from scipy.stats import wasserstein_distance
 
+import measure
 import planar as pl
 
-BINS = (0, 2, 3, 5, 10, 15, 180)
+BINS = (0, 0.5, 1, 1.5, 2, 3, 5, 10, 15, 180)
 
 
 def contingency(a, b):
@@ -44,13 +45,17 @@ def matching(n, ni, nj, rows, cols):
   return f1, int(np.maximum(splits - 1, 0).sum()), int(np.maximum(merges - 1, 0).sum())
 
 
-def misorientationAngles(grainQ, pairs):
-  if not len(pairs):
-    return np.zeros(0)
-  from mtex import angle, crystalFrame, degree, orientation, rotation
-  cs = crystalFrame("m-3m", mineral="Iron")
-  o1, o2 = (orientation(rotation(grainQ[pairs[:, k]]), cs) for k in (0, 1))
-  return np.asarray(angle(o1, o2)) / degree
+def misorientationAngles(inst, pairs):
+  """the disorientation angle of every pair of grains of one phase, NaN across a phase boundary"""
+  from mtex import angle, degree, orientation, rotation
+  out = np.full(len(pairs), np.nan)
+  ph = inst["grainPhase"]
+  for n, name in enumerate(inst["phases"], 1):
+    sel = (ph[pairs[:, 0]] == n) & (ph[pairs[:, 1]] == n)
+    if sel.any():
+      o1, o2 = (orientation(rotation(inst["grainQ"][pairs[sel, k]]), measure.frame(str(name))) for k in (0, 1))
+      out[sel] = np.asarray(angle(o1, o2)) / degree
+  return out
 
 
 def partition(inst, gid):
@@ -72,13 +77,13 @@ def partition(inst, gid):
   key = np.sort(np.column_stack([ta, tb])[cross], axis=1)
   pairs, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
   sep = np.bincount(inv.ravel(), g[pp[cross, 0]] != g[pp[cross, 1]], len(pairs))
-  ang = misorientationAngles(inst["grainQ"], ut[pairs])
+  ang = misorientationAngles(inst, ut[pairs])
   found = dom[pairs[:, 0]] != dom[pairs[:, 1]]
   out = dict(ari=ari, vi=vi, f1_50=f1[0.5], f1_75=f1[0.75], splits=splits, merges=merges, nTrue=len(ut), nRecon=len(ug))
   for lo, hi in zip(BINS[:-1], BINS[1:]):
     s = (ang >= lo) & (ang < hi)
-    out[f"det{lo}_n"], out[f"det{lo}_k"] = int(s.sum()), int(found[s].sum())
-    out[f"sep{lo}"] = sep[s].sum() / max(cnt[s].sum(), 1)
+    out[f"det{lo:g}_n"], out[f"det{lo:g}_k"] = int(s.sum()), int(found[s].sum())
+    out[f"sep{lo:g}"] = sep[s].sum() / max(cnt[s].sum(), 1)
   # the size distributions: Wasserstein distance of the log equivalent circle diameters
   out["sizeW1"] = wasserstein_distance(np.log(ni), np.log(nj))
   return out
@@ -119,8 +124,8 @@ def geometry(inst, S, h=1 / 32):
   sIn = S[(sl > 0) & (sr > 0) & (sl != sr)]
   ps, ws, us = pl.sample(sB, h)
   pt, wt, ut = pl.sample(np.column_stack([tB, np.zeros((len(tB), 2))]), h)
-  dRT, aRT = pl.nearest(tIn, ps, us)
-  dTR, _ = pl.nearest(sIn, pt)
+  dRT, aRT, _ = pl.nearest(tIn, ps, us)
+  dTR = pl.nearest(sIn, pt)[0]
   for k, d, w in (("rt", dRT, ws), ("tr", dTR, wt)):
     o = np.argsort(d)
     c = np.cumsum(w[o]) / w.sum()

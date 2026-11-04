@@ -19,12 +19,15 @@ import planar as pl
 
 
 def generate(rng, box, generator, **p):
-  S = {"G1": voronoi, "G2": laguerre, "G3": inclusions, "G5": stretched, "G5L": lamellae}[generator](rng, box, **p)
+  """the partition, and per region what the generator knows beyond it (parent grain, phase)"""
+  out = {"G1": voronoi, "G2": laguerre, "G3": inclusions, "G5": stretched, "G5L": lamellae}[generator](rng, box, **p)
+  S, extra = out if isinstance(out, tuple) else (out, {})
   # the regions present numbered 1, 2, ... in the order of their labels
   lab, inv = np.unique(S[:, 4:6], return_inverse=True)
   inv = inv.reshape(-1, 2) + (lab[0] != 0)
   S[:, 4:6] = np.where(S[:, 4:6] == 0, 0, inv)
-  return S
+  old = np.r_[0, lab[lab > 0]].astype(np.int64)
+  return S, {k: np.asarray(v)[old] for k, v in extra.items()}
 
 
 def voronoi(rng, box, D):

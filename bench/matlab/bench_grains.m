@@ -55,10 +55,16 @@ fclose(fid);
 fid = fopen(fullfile(d, [name '.labels.bin']), 'r');
 lab = fread(fid, inf, 'double', 0, 'ieee-le');
 fclose(fid);
-f = strsplit(strtrim(fileread(fullfile(d, [name '.phases']))), sprintf('\t'), 'CollapseDelimiters', false);
-CSList = {'notIndexed', crystalSymmetry(f{2}, str2num(f{3}), str2num(f{4})*degree, 'mineral', f{1})}; %#ok<ST2NM>
+lines = splitlines(strtrim(fileread(fullfile(d, [name '.phases']))));
+CSList = {'notIndexed'};
+for k = 1:numel(lines)
+  f = strsplit(lines{k}, sprintf('\t'), 'CollapseDelimiters', false);
+  al = {};
+  if numel(f) > 4 && ~isempty(f{5}), al = strsplit(f{5}, ','); end
+  CSList{end+1} = crystalSymmetry(f{2}, str2num(f{3}), str2num(f{4})*degree, al{:}, 'mineral', f{1}); %#ok<ST2NM,AGROW>
+end
 pos = vector3d(A(1, :).', A(2, :).', zeros(size(A, 2), 1));
 rot = rotation(quaternion(A(4, :).', A(5, :).', A(6, :).', A(7, :).'));
-ebsd = EBSD(pos, rot, A(3, :).' + 1, CSList, struct('grainId', lab), 'phaseMap', [0 1]);
+ebsd = EBSD(pos, rot, A(3, :).' + 1, CSList, struct('grainId', lab), 'phaseMap', 0:numel(CSList)-1);
 ebsd = ebsd.gridify;
 end

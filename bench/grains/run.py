@@ -65,10 +65,13 @@ def loadMap(tier, name):
   d = os.path.join(OUT, tier)
   A = np.fromfile(os.path.join(d, name + ".bin"), "<f8").reshape(-1, 7)
   lab = np.fromfile(os.path.join(d, name + ".labels.bin"), "<f8")
+  frames = []
+  for line in open(os.path.join(d, name + ".phases")).read().splitlines():
+    mineral, pg, abc, abg, al = line.split("\t")
+    frames.append(crystalFrame(pg, [float(x) for x in abc.split()], [float(x) for x in abg.split()], mineral=mineral,
+                               **({"alignment": al.split(",")} if al else {})))
   pos = np.column_stack([A[:, :2], np.zeros(len(A))])
-  e = EBSD(pos, rotation(A[:, 3:7]), A[:, 2].astype(np.int8), phaseList(crystalFrame(measure.PHASE[1], mineral=measure.PHASE[0])),
-           prop=dict(grainId=lab))
-  return e.gridify()
+  return EBSD(pos, rotation(A[:, 3:7]), A[:, 2].astype(np.int8), phaseList(*frames), prop=dict(grainId=lab)).gridify()
 
 
 def writeResult(res, port, name, case, t, g, e):

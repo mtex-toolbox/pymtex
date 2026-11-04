@@ -144,12 +144,13 @@ def areas(S):
 
 
 def nearest(S, xy, u=None, h=0.25):
-  """the distance from every point to the nearest segment of S; with unit directions u, also the
-  angle in degrees between u and the nearest segment, the smallest where several are nearest"""
+  """the distance from every point to the nearest segment of S and that segment's (left, right);
+  with unit directions u, also the angle in degrees between u and the nearest segment, the
+  smallest where several are nearest"""
   S = subdivide(S[lengths(S) > 0], h)
   xy = np.asarray(xy, float).reshape(-1, 2)
   tree = cKDTree((S[:, :2] + S[:, 2:4]) / 2)
-  dist, ang = np.full(len(xy), np.inf), np.zeros(len(xy))
+  dist, ang, best = np.full(len(xy), np.inf), np.zeros(len(xy)), np.zeros(len(xy), np.int64)
   todo, k = np.arange(len(xy)), 8
   while len(todo):
     k = min(k, len(S))
@@ -158,7 +159,8 @@ def nearest(S, xy, u=None, h=0.25):
     P, D = S[c, :2], S[c, 2:4] - S[c, :2]
     t = np.clip(np.einsum("ijk,ijk->ij", xy[todo, None] - P, D) / np.maximum(np.einsum("ijk,ijk->ij", D, D), 1e-300), 0, 1)
     d = np.hypot(*(P + t[..., None] * D - xy[todo, None]).transpose(2, 0, 1))
-    dist[todo] = d.min(axis=1)
+    a = np.argmin(d, axis=1)
+    dist[todo], best[todo] = d[np.arange(len(todo)), a], c[np.arange(len(todo)), a]
     if u is not None:
       cos = np.abs(np.einsum("ijk,ik->ij", D, u[todo])) / np.hypot(*D.transpose(2, 0, 1))
       cos = np.where(d <= dist[todo, None] + 1e-9, cos, 0)
@@ -167,7 +169,7 @@ def nearest(S, xy, u=None, h=0.25):
     # candidates once the farthest of them is further than that
     todo = todo[(dm[:, -1] < dist[todo] + h / 2) & (k < len(S))]
     k *= 4
-  return dist, ang
+  return dist, ang, S[best, 4:6].astype(np.int64)
 
 
 def sample(S, h=1 / 32):
