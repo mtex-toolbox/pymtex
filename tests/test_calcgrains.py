@@ -81,7 +81,8 @@ def test_S5_the_threshold_decides_how_much_is_one_grain():
 
 
 def test_S6_not_indexed_regions_become_their_own_grains():
-  e = blockMap(SQ3, 4, 5, notIndexed=((10, 10, 3.0),))
+  # a disc the closing at alpha 3.1 keeps open
+  e = blockMap(SQ3, 4, 5, notIndexed=((10, 10, 3.5),))
   g = calcGrains(e, angle=5 * degree)
   assert (~g.isIndexed).sum() == 1 and g.isIndexed.sum() == 16
   ni = g[~g.isIndexed]
