@@ -21,7 +21,7 @@ from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
-from .kernels import grainKernel, pixelKernel, segmentGridNumba
+from .kernels import grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 from .straighten import straightenInFill
@@ -137,16 +137,10 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, r
   s = c.sites
   args = (todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
           int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, seg,
-          1e-9 * c.dxy)
-  # all pixels in one compiled loop, which skips the polygons far from a boundary; the Python
-  # form below as fallback and oracle
+          1e-9 * c.dxy, out)
+  # all pixels in one compiled loop, its Python form below as fallback
   loop = pixelKernel("absorb", backend)
-  a, b = np.ascontiguousarray(V[boundary.F[:, 0]]), np.ascontiguousarray(V[boundary.F[:, 1]])
-  grid = segmentGridNumba(a, b, np.arange(len(a)), c.dxy) if loop is not None and len(a) else None
-  if grid is None:
-    _absorbPython(*args, out)
-    return out
-  loop(*args, float(np.linalg.norm(corners, axis=1).max()), np.ascontiguousarray(np.column_stack([a, b])), grid[0], grid[1], c.dxy, *grid[2:], out)
+  (loop or _absorbPython)(*args)
   return out
 
 
