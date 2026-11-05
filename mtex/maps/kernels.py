@@ -1572,9 +1572,171 @@ def _crossingLoop(W, e, q, x0, y0, h, ny, starts, items, ioff, out):
     out[s] = hit
 
 
-_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+# the solve of straightenInFill, (D + eps) W - A W = rhs over the free vertices, through its
+# chains: a chain is a path of vertices with at most two free neighbours between anchors, the
+# vertices with three or more, or the lowest vertex of a cycle without one. Along a chain the
+# equations are tridiagonal, so the Thomas recursion from the first anchor A writes every vertex
+# as x_i = p_i + q_i x_{i+1} + r_i x_A, which leaves the last vertex's share in the equation of
+# the second anchor B, and the recursion from B the first vertex's share in A's; a chain end
+# without an anchor drops that term. The matrix M is symmetric in CSC (indptr, indices, data)
+# with the diagonal among the entries; the loop emits the reduced equations of the anchors as
+# triplets (I, J, val) over the vertex numbers with their right hand sides, and the chains in
+# prv, last, chA, chB for the back substitution
+def _chainEliminateLoop(indptr, indices, data, b, isAnchor, p, q, r, prv, last, chA, chB, I, J, val, rhs):
+  n = indptr.shape[0] - 1
+  seen = np.zeros(n, np.bool_)
+  nc = 0
+  t = 0
+  # the vertices with three or more free neighbours are the anchors
+  for i in range(n):
+    isAnchor[i] = indptr[i + 1] - indptr[i] > 3
+  for stage in range(3):
+    for s0 in range(n):
+      if stage == 0 and not isAnchor[s0]:
+        continue
+      if stage == 1 and (isAnchor[s0] or seen[s0] or indptr[s0 + 1] - indptr[s0] > 2):
+        continue
+      if stage == 2:
+        if isAnchor[s0] or seen[s0]:
+          continue
+        isAnchor[s0] = True
+      # the chains leaving s0 (an anchor) or starting at s0 (a free end)
+      for m in range(indptr[s0], indptr[s0 + 1]):
+        u = indices[m]
+        if stage == 0:
+          if u == s0 or isAnchor[u] or seen[u]:
+            continue
+          A, v, mp = s0, u, data[m]
+        else:
+          if u != s0:
+            continue
+          A, v, mp = -1, s0, 0.0
+        if stage == 2:
+          A, mp = s0, 0.0
+          for m2 in range(indptr[s0], indptr[s0 + 1]):
+            if indices[m2] != s0 and not seen[indices[m2]]:
+              v, mp = indices[m2], data[m2]
+              break
+          if mp == 0.0:
+            break
+        # forward from A: p, q, r of every vertex
+        pp0, pp1, qq, rr = 0.0, 0.0, 0.0, 1.0 if A >= 0 else 0.0
+        prev, B = A, -1
+        while True:
+          seen[v] = True
+          prv[v] = prev
+          d, nxt, mn = 0.0, -1, 0.0
+          for m2 in range(indptr[v], indptr[v + 1]):
+            j = indices[m2]
+            if j == v:
+              d = data[m2]
+            elif j != prev:
+              nxt, mn = j, data[m2]
+          D = d + mp * qq
+          pp0, pp1 = (b[v, 0] - mp * pp0) / D, (b[v, 1] - mp * pp1) / D
+          rr = -mp * rr / D
+          qq = -mn / D
+          p[v, 0], p[v, 1], q[v], r[v] = pp0, pp1, qq, rr
+          if nxt < 0:
+            break
+          if isAnchor[nxt]:
+            B = nxt
+            break
+          prev, v, mp = v, nxt, mn
+        last[nc], chA[nc], chB[nc] = v, A, B
+        nc += 1
+        if B >= 0:
+          # the last vertex in B's equation: d_B x_B + mn x_last + ... = b_B
+          I[t], J[t], val[t] = B, B, mn * qq
+          t += 1
+          rhs[B, 0] -= mn * pp0
+          rhs[B, 1] -= mn * pp1
+          if A >= 0:
+            I[t], J[t], val[t] = B, A, mn * rr
+            t += 1
+        if A >= 0:
+          # backward from B to the first vertex, its share in A's equation
+          pp0, pp1, qq, rr = 0.0, 0.0, 0.0, 1.0 if B >= 0 else 0.0
+          w, mp = v, mn
+          while w != A:
+            d, mn2 = 0.0, 0.0
+            for m2 in range(indptr[w], indptr[w + 1]):
+              j = indices[m2]
+              if j == w:
+                d = data[m2]
+              elif j == prv[w]:
+                mn2 = data[m2]
+            D = d + mp * qq
+            pp0, pp1 = (b[w, 0] - mp * pp0) / D, (b[w, 1] - mp * pp1) / D
+            rr = -mp * rr / D
+            qq = -mn2 / D
+            w, mp = prv[w], mn2
+          I[t], J[t], val[t] = A, A, mp * qq
+          t += 1
+          rhs[A, 0] -= mp * pp0
+          rhs[A, 1] -= mp * pp1
+          if B >= 0:
+            I[t], J[t], val[t] = A, B, mp * rr
+            t += 1
+  # the anchors' own equations
+  for i in range(n):
+    if not isAnchor[i]:
+      continue
+    rhs[i, 0] += b[i, 0]
+    rhs[i, 1] += b[i, 1]
+    for m in range(indptr[i], indptr[i + 1]):
+      j = indices[m]
+      if j == i or isAnchor[j]:
+        I[t], J[t], val[t] = i, j, data[m]
+        t += 1
+  return nc, t
+
+
+# the chains substituted back from their last vertex, the anchors' values in x
+def _chainBackLoop(prv, last, chA, chB, p, q, r, isAnchor, x):
+  for c in prange(last.shape[0]):
+    A, B = chA[c], chB[c]
+    xA0, xA1 = (x[A, 0], x[A, 1]) if A >= 0 else (0.0, 0.0)
+    xn0, xn1 = (x[B, 0], x[B, 1]) if B >= 0 else (0.0, 0.0)
+    v = last[c]
+    while v >= 0 and not isAnchor[v]:
+      xn0 = p[v, 0] + q[v] * xn0 + r[v] * xA0
+      xn1 = p[v, 1] + q[v] * xn1 + r[v] * xA1
+      x[v, 0], x[v, 1] = xn0, xn1
+      v = prv[v]
+
+
+def chainSolveNumba(M, b, backend=None):
+  """the solution of the symmetric system M x = b of straightenInFill with its chains eliminated,
+  the anchors solved by spsolve; None without the compiled loops"""
+  if not _useNumba(backend):
+    return None
+  _preparePixel()
+  from scipy.sparse import coo_matrix
+  from scipy.sparse.linalg import spsolve
+  M = M.tocsc()
+  M.sum_duplicates()
+  n = M.shape[0]
+  b = np.ascontiguousarray(b, dtype=float).reshape(n, 2)
+  isAnchor, p, q, r = np.zeros(n, np.bool_), np.zeros((n, 2)), np.zeros(n), np.zeros(n)
+  prv, last, chA, chB = np.full(n, -1, np.int64), np.empty(n, np.int64), np.empty(n, np.int64), np.empty(n, np.int64)
+  cap = 4 * n + M.nnz
+  I, J, val, rhs = np.empty(cap, np.int64), np.empty(cap, np.int64), np.empty(cap), np.zeros((n, 2))
+  nc, t = _COMPILED["_chainEliminateLoop"](M.indptr.astype(np.int64), M.indices.astype(np.int64), M.data.astype(float), b,
+                                           isAnchor, p, q, r, prv, last, chA, chB, I, J, val, rhs)
+  x = np.zeros((n, 2))
+  a = np.flatnonzero(isAnchor)
+  if len(a):
+    ra = np.cumsum(isAnchor) - 1
+    R = coo_matrix((val[:t], (ra[I[:t]], ra[J[:t]])), shape=(len(a), len(a))).tocsc()
+    x[a] = spsolve(R, rhs[a]).reshape(-1, 2)
+  _COMPILED["_chainBackLoop"](prv, last[:nc], chA[:nc], chB[:nc], p, q, r, isAnchor, x)
+  return x
+
+
+_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
-_PARALLEL_HELPERS = ("_applyOperator",)
+_PARALLEL_HELPERS = ("_applyOperator", "_chainBackLoop")
 
 
 # the helpers of the pixel and grain loops compiled and bound, and numba; None without numba

@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
-from .kernels import adjacencyNumba, pixelKernel, segmentGridNumba
+from .kernels import adjacencyNumba, chainSolveNumba, pixelKernel, segmentGridNumba
 from .segment import segmentation
 
 
@@ -92,7 +92,9 @@ def straightenInFill(c, seg):
       key, cnt = np.unique(rows[fx].astype(np.int64) * nB + j[fx], return_counts=True)
       r, col = key // nB, key % nB
       rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
-      Wm = spsolve(M, rhs).reshape(-1, 2)
+      Wm = chainSolveNumba(M, rhs)
+      if Wm is None:
+        Wm = spsolve(M, rhs).reshape(-1, 2)
       moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
