@@ -18,7 +18,7 @@ import warnings
 
 import numpy as np
 
-from .kernels import localVoronoiNumba, pixelKernel, weldNumba
+from .kernels import geoDistNumba, localVoronoiNumba, pixelKernel, weldNumba
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
 from ..geometry.display import aligned
@@ -170,11 +170,16 @@ def alphaClose(present, A, r, stencil, outside=None):
   return ~dilate(~(dilate(present, offs) | outside), offs) & ~outside | present
 
 
-def hullCells(cells, dims):
-  """the cells of a raster inside the convex hull of the cells given, all of them when none is
-  given: each row meets the hull in one interval, bounded by the edges of the hull crossing it"""
-  if len(cells) == 0:
+def hullCells(mask):
+  """the cells of a raster inside the convex hull of the cells of the mask, all of them when it
+  is empty: each row meets the hull in one interval, bounded by the edges of the hull crossing it"""
+  dims = mask.shape
+  rows = np.flatnonzero(mask.any(axis=1))
+  if len(rows) == 0:
     return np.ones(dims, dtype=bool)
+  # the hull of the first and the last cell of every row is the hull of all
+  first, last = mask[rows].argmax(axis=1), dims[1] - 1 - mask[rows, ::-1].argmax(axis=1)
+  cells = np.concatenate([np.column_stack([rows, first]), np.column_stack([rows, last])])
   h = cells[convexHull(cells)].astype(float)
   R, C = [h[:, 0]], [h[:, 1]]
   for (r0, c0), (r1, c1) in zip(h, np.roll(h, -1, axis=0)):
@@ -195,7 +200,11 @@ def geoDist(seed, mask, stencil, n):
   d = np.where(seed.reshape(-1), 0.0, np.inf)
   src = np.where(seed.reshape(-1), np.arange(d.size), -1)
   m = np.flatnonzero(mask)
-  nb = m[:, None] + (stencil[:, 0] * seed.shape[1] + stencil[:, 1])[None, :]
+  off = (stencil[:, 0] * seed.shape[1] + stencil[:, 1]).astype(np.int64)
+  # the layers in one compiled loop, the NumPy form below as fallback and oracle
+  if geoDistNumba(d, src, m, off, n):
+    return d.reshape(seed.shape), src
+  nb = m[:, None] + off[None, :]
   for k in range(1, n + 1):
     eq = d[nb] == k - 1
     j = eq.argmax(axis=1)
@@ -289,7 +298,7 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   # the edge of the map is not the edge of a hole: beyond the convex hull of the indexed cells
   # the material counts as present while the closing erodes, so a gap along the edge closes
   # as one further in would
-  outside = ~hullCells(np.stack([a[present], b[present]], axis=1), dims)
+  outside = ~hullCells(isPresent)
   closed = alphaClose(isPresent, l.A, r, st, outside)
   # a cell with material on more than half of its stencil is a one cell recess, which the
   # alpha shape fills; filling the mouth of a slit exposes the next cell
@@ -332,7 +341,7 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   pos, sij = cellPos(flat)
   # a site on the map without an indexed pixel is a hole, part of a notIndexed grain
   isHole = onMap & ~isPresent.reshape(-1)[flat]
-  fill = fillDistance(filled, lo, P[present], ij[present], l.A, st, cellPos) if filled.any() else None
+  fill = fillDistance(filled, lo, P[present], ij[present], l.origin, l.A, st, cellPos) if filled.any() else None
   return siteSet(pos, sij, pixel, isHole, lookup, lo, fill)
 
 
@@ -343,13 +352,11 @@ class fillDistance:
   among the four lattice points around the point, on a distorted one they are searched among the
   filled cells and the others within two cells of them"""
 
-  def __init__(self, fill, lo, P, ij, A, stencil, cellPos):
+  def __init__(self, fill, lo, P, ij, origin, A, stencil, cellPos):
     self.fill, self.lo = fill, np.asarray(lo)
-    X = np.column_stack([np.ones(len(ij)), ij]).astype(float)
-    fit = np.linalg.lstsq(X, P.astype(float), rcond=None)[0]
+    self.p0, self.M = np.asarray(origin, dtype=float), np.asarray(A, dtype=float).T
     dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
-    self.rigid = np.mean(np.linalg.norm(P - X @ fit, axis=1)) / dxy < 1e-2
-    self.p0, self.M = fit[0], fit[1:]
+    self.rigid = np.mean(np.linalg.norm(P - self.p0 - ij @ self.M, axis=1)) / dxy < 1e-2
     self.Minv = np.linalg.inv(self.M)
     if not self.rigid:
       from scipy.spatial import cKDTree

@@ -1344,6 +1344,89 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
         break
 
 
+# the stencil steps from the seeds through the mask cells m, layer by layer up to n: a cell reached
+# in layer k takes the seed of its first neighbour in stencil order (off) reached in layer k - 1;
+# decomposition.geoDist is the NumPy form
+def _geoDistLoop(d, src, m, off, n):
+  hit = np.empty(m.shape[0], np.int64)
+  hsrc = np.empty(m.shape[0], np.int64)
+  for k in range(1, n + 1):
+    cnt = 0
+    for t in range(m.shape[0]):
+      c = m[t]
+      if not np.isinf(d[c]):
+        continue
+      for q in range(off.shape[0]):
+        if d[c + off[q]] == k - 1:
+          hit[cnt], hsrc[cnt] = c, src[c + off[q]]
+          cnt += 1
+          break
+    if cnt == 0:
+      break
+    for u in range(cnt):
+      d[hit[u]], src[hit[u]] = k, hsrc[u]
+
+
+def geoDistNumba(d, src, m, off, n, backend=None):
+  """the layers of decomposition.geoDist written into d and src; False without numba"""
+  loop = _compiledLoop(_geoDistLoop, backend=backend)
+  if loop is None:
+    return False
+  loop(d, src, m.astype(np.int64), off, n)
+  return True
+
+
+# ------------------------------------------------------------------ the smoothing of a boundary
+
+# steps of the normalised Laplacian L (indptr, indices, data) at the rates given, each free vertex
+# moving by its rate times the row of L V, and after every step the vertices cid moved back into
+# their cells as pixelCells.project moves them: centred at V0, faces along the directions (cs, sn)
+# at the distances h, as far along a face as w; smoothing.taubinFilter's NumPy loop is the oracle
+def _laplaceStepsLoop(V, indptr, indices, data, free, rates, cid, V0, cs, sn, h, w, out):
+  cur, nxt = V.copy(), V.copy()
+  for r in range(rates.shape[0]):
+    rate = rates[r]
+    for i in prange(V.shape[0]):
+      if free[i]:
+        s0, s1 = 0.0, 0.0
+        for jj in range(indptr[i], indptr[i + 1]):
+          s0 += data[jj] * cur[indices[jj], 0]
+          s1 += data[jj] * cur[indices[jj], 1]
+        nxt[i, 0], nxt[i, 1] = cur[i, 0] + rate * s0, cur[i, 1] + rate * s1
+      else:
+        nxt[i, 0], nxt[i, 1] = cur[i, 0], cur[i, 1]
+    for k in prange(cid.shape[0]):
+      i = cid[k]
+      x0, x1 = nxt[i, 0] - V0[k, 0], nxt[i, 1] - V0[k, 1]
+      best, bo = 0, -np.inf
+      for q in range(cs.shape[1]):
+        o = x0 * cs[k, q] + x1 * sn[k, q] - h[k]
+        if o > bo:
+          best, bo = q, o
+      if bo > 0:
+        c, s = cs[k, best], sn[k, best]
+        t = min(max(x1 * c - x0 * s, -w[k]), w[k])
+        x0, x1 = h[k] * c + t * -s, h[k] * s + t * c
+      nxt[i, 0], nxt[i, 1] = x0 + V0[k, 0], x1 + V0[k, 1]
+    cur, nxt = nxt, cur
+  out[:, :] = cur
+
+
+def laplaceStepsNumba(V, L, free, rates, cells=None, backend=None):
+  """the vertices after the Laplacian steps at the rates given, each followed by the projection of
+  the pixelCells cells, in one compiled loop; None without numba"""
+  loop = _compiledLoop(_laplaceStepsLoop, parallel=True, backend=backend)
+  if loop is None:
+    return None
+  L = L.tocsr()
+  out = np.empty_like(V)
+  arrays = cells.arrays() if cells is not None else (np.zeros(0, np.int64), np.zeros((0, 2)), np.zeros((0, 1)), np.zeros((0, 1)),
+                                                     np.zeros(0), np.zeros(0))
+  loop(np.ascontiguousarray(V, dtype=float), L.indptr.astype(np.int64), L.indices.astype(np.int64), L.data.astype(float),
+       np.ascontiguousarray(free), np.asarray(rates, dtype=float), *arrays, out)
+  return out
+
+
 # ------------------------------------------------------------------ the straightening through the fill
 
 # where the point (x, y) lies to the filled cells of the rigid lattice p0 + (i, j) M, Minv its

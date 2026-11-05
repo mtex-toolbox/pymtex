@@ -21,6 +21,7 @@ from ...geometry.hull import convexHull
 from ...geometry.units import degree
 from ..boundaryresampling import _coarsenGrains, simplifyBoundary
 from ..grains import grain2d
+from ..kernels import laplaceStepsNumba
 from ...geometry.install import install
 from ...geometry.display import aligned
 
@@ -208,6 +209,12 @@ class taubinFilter(boundaryFilter):
       raise ValueError("mu is the unshrinking step and has to be negative")
     L, free = net.laplacian(), ~net.fixed
     out = np.array(V, dtype=float)
+    # every step in one compiled loop where the projection is none or into pixel cells
+    cells = getattr(project, "__self__", None)
+    if project is _keep or isinstance(cells, pixelCells):
+      fast = laplaceStepsNumba(out, L, free, [self.lambda_, self.mu] * self.iter, cells if project is not _keep else None)
+      if fast is not None:
+        return fast
     for _ in range(self.iter):
       out = project(self.laplaceStep(out, L, free, self.lambda_))
       out = project(self.laplaceStep(out, L, free, self.mu))
@@ -356,6 +363,12 @@ class pixelCells:
     # the directions of the faces, the first along the edge
     a = np.concatenate([np.concatenate([phi, phi + np.pi])[first], np.zeros(len(j))])[:, None] + 2 * np.pi * np.arange(self.K) / self.K
     self.cos, self.sin = np.cos(a), np.sin(a)
+
+  def arrays(self):
+    """the cells as the compiled smoothing reads them: the vertices, the centres, the face
+    directions, their distances and how far along a face a vertex may go"""
+    return (self.id, np.ascontiguousarray(self.V0), np.ascontiguousarray(self.cos), np.ascontiguousarray(self.sin), self.h,
+            self.h * np.tan(np.pi / self.K))
 
   def project(self, V):
     """the vertices with those outside their cell moved onto its nearest face, as far along it as
