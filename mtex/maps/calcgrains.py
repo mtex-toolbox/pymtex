@@ -21,7 +21,7 @@ from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
-from .kernels import grainKernel, pixelKernel
+from .kernels import edgesByGrainNumba, grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 from .straighten import straightenInFill
@@ -126,17 +126,22 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, r
   has = c.site2pixel >= 0
   siteGrain[has] = grainId[c.site2pixel[has]]
   todo = np.flatnonzero((out == 0) & ~ebsd.isPadding.reshape(-1))
-  # the segments of every grain, each listed for both its sides
-  g = boundary.grainId.reshape(-1)
-  k = np.repeat(np.arange(len(boundary.F)), 2)
-  order = np.argsort(g, kind="stable")
-  order = order[g[order] > 0]
-  V = np.asarray(boundary.V, dtype=float)[:, :2]
-  seg = np.ascontiguousarray(np.column_stack([V[boundary.F[k[order], 0]], V[boundary.F[k[order], 1]]]))
-  segStart = np.searchsorted(g[order], np.arange(int(max(grainId.max(initial=0), g.max(initial=0))) + 2)).astype(np.int64)
+  # the segments of every grain, each listed for both its sides, as directed edges ea -> eb
+  V = np.ascontiguousarray(np.asarray(boundary.V, dtype=float)[:, :2])
+  top = int(max(grainId.max(initial=0), boundary.grainId.max(initial=0))) + 1
+  posOf = np.arange(top)
+  posOf[0] = -1
+  edges = edgesByGrainNumba(boundary.F, boundary.grainId, posOf, top)
+  if edges is None:
+    g = boundary.grainId.reshape(-1)
+    order = np.argsort(g, kind="stable")
+    order = order[g[order] > 0]
+    F2 = np.column_stack([boundary.F, boundary.F[:, ::-1]]).reshape(-1, 2)
+    edges = F2[order, 0], F2[order, 1], np.searchsorted(g[order], np.arange(top + 1))
+  ea, eb, segStart = (np.ascontiguousarray(x, dtype=np.int64) for x in edges)
   s = c.sites
   args = (todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
-          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, seg,
+          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, V, ea, eb,
           1e-9 * c.dxy, out)
   # all pixels in one compiled loop, its Python form below as fallback
   loop = pixelKernel("absorb", backend)
@@ -144,7 +149,7 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, r
   return out
 
 
-def _absorbPython(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
+def _absorbPython(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, V, ea, eb, eps, out):
   for k in todo:
     a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
     block = lookup[max(0, a0 - reach):a0 + reach + 1, max(0, b0 - reach):b0 + reach + 1].reshape(-1)
@@ -154,7 +159,7 @@ def _absorbPython(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, 
       continue
     d = np.sum((sitePos[cand] - P[k]) ** 2, axis=1)
     for g in siteGrain[cand[d <= d.min() * (1 + 1e-9)]]:
-      S = seg[segStart[g]:segStart[g + 1]]
+      S = np.column_stack([V[ea[segStart[g]:segStart[g + 1]]], V[eb[segStart[g]:segStart[g + 1]]]])
       q = P[k] + corners
       cross = ((S[:, 1] > q[:, 1, None]) != (S[:, 3] > q[:, 1, None])) & \
         (q[:, 0, None] < S[:, 0] + (q[:, 1, None] - S[:, 1]) * (S[:, 2] - S[:, 0]) / np.where(S[:, 3] == S[:, 1], 1, S[:, 3] - S[:, 1]))

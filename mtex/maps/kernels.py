@@ -1301,10 +1301,10 @@ def _expLoop(ref, v, out):
 
 # the grain of every pixel the closing left without a cell: the grains of the sites with a grain
 # nearest to its centre, searched over the lattice cells around the pixel, are the candidates,
-# and the pixel joins the first whose polygon, the segments of grain g at segStart[g] ..
-# segStart[g + 1] - 1 of seg (x1, y1, x2, y2), holds every nudged corner of its footprint
+# and the pixel joins the first whose polygon, the edges ea -> eb of grain g at segStart[g] ..
+# segStart[g + 1] - 1 between the vertices V, holds every nudged corner of its footprint
 # strictly, farther than eps from its boundary; calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, V, ea, eb, eps, out):
   n1, n2 = lookup.shape
   for t in prange(len(todo)):
     k = todo[t]
@@ -1328,7 +1328,7 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
           inside = False
           near = False
           for m in range(segStart[g], segStart[g + 1]):
-            x1, y1, x2, y2 = seg[m, 0], seg[m, 1], seg[m, 2], seg[m, 3]
+            x1, y1, x2, y2 = V[ea[m], 0], V[ea[m], 1], V[eb[m], 0], V[eb[m], 1]
             if (y1 > qy) != (y2 > qy) and qx < x1 + (qy - y1) * (x2 - x1) / (y2 - y1):
               inside = not inside
             dx, dy = x2 - x1, y2 - y1
