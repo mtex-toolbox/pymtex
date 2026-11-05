@@ -1533,8 +1533,8 @@ def segmentGridNumba(W, e, idx, sel, x0, y0, h, nx, ny):
   return _segmentGrid(W, e, np.ascontiguousarray(idx, dtype=np.int64), np.ascontiguousarray(sel, dtype=np.int64), x0, y0, h, nx, ny)
 
 
-# whether segment s, from W[e[s, 0]] to W[e[s, 1]], properly crosses one of the segments listed in
-# the cells of the grid (x0, y0, h, ny, start, items) its box meets, without a common vertex
+# the first segment listed in the cells of the grid (x0, y0, h, ny, start, items) that segment s,
+# from W[e[s, 0]] to W[e[s, 1]], properly crosses, without a common vertex, or -1
 def _gridCross(W, e, s, x0, y0, h, ny, start, items):
   nx = (start.shape[0] - 1) // ny
   ax, ay, bx, by = W[e[s, 0], 0], W[e[s, 0], 1], W[e[s, 1], 0], W[e[s, 1], 1]
@@ -1554,22 +1554,22 @@ def _gridCross(W, e, s, x0, y0, h, ny, start, items):
         u = (wx * ey - wy * ex) / den
         v = (wx * dy - wy * dx) / den
         if 0 < u < 1 and 0 < v < 1:
-          return True
-  return False
+          return r
+  return -1
 
 
-# whether each segment q crosses another one, the candidates the segments listed in the grids
+# the segment each segment q crosses, or -1, the candidates the segments listed in the grids
 # starts[g], items[ioff[g]:ioff[g + 1]] of one geometry: the first of every segment where it was
 # when it was built, the others of the segments moved in a round, where they were then
 def _crossingLoop(W, e, q, x0, y0, h, ny, starts, items, ioff, out):
   for k in prange(q.shape[0]):
     s = q[k]
-    hit = False
+    out[s] = -1
     for g in range(starts.shape[0]):
-      if _gridCross(W, e, s, x0, y0, h, ny, starts[g], items[ioff[g]:ioff[g + 1]]):
-        hit = True
+      r = _gridCross(W, e, s, x0, y0, h, ny, starts[g], items[ioff[g]:ioff[g + 1]])
+      if r >= 0:
+        out[s] = r
         break
-    out[s] = hit
 
 
 # the solve of straightenInFill, (D + eps) W - A W = rhs over the free vertices, through its
@@ -1770,7 +1770,143 @@ def farthestOfChainsNumba(cs, first, last, prv, mi, W, W0):
   return out
 
 
-_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+# ------------------------------------------------------------------ the straightening chain by chain
+
+# whether the quad from the old segment (ax0, ay0)-(bx0, by0) to the new (ax1, ay1)-(bx1, by1)
+# leaves the fill by more than tol, sampled as _sweepLoop does
+def _quadOut(ax0, ay0, bx0, by0, ax1, ay1, bx1, by1, dxy, p0, Minv, M, fill, lo0, lo1, tol):
+  L0 = np.sqrt((bx0 - ax0) * (bx0 - ax0) + (by0 - ay0) * (by0 - ay0))
+  L1 = np.sqrt((bx1 - ax1) * (bx1 - ax1) + (by1 - ay1) * (by1 - ay1))
+  da = np.sqrt((ax1 - ax0) * (ax1 - ax0) + (ay1 - ay0) * (ay1 - ay0))
+  db = np.sqrt((bx1 - bx0) * (bx1 - bx0) + (by1 - by0) * (by1 - by0))
+  T = max(1, int(np.ceil(3 * max(L0, L1) / dxy)))
+  K = max(1, int(np.ceil(3 * max(da, db) / dxy)))
+  for li in range(K, -1 if da > 0 or db > 0 else K - 1, -1):
+    l = li / K
+    for ti in range(T + 1):
+      t = ti / T
+      x = (1 - l) * ((1 - t) * ax0 + t * bx0) + l * ((1 - t) * ax1 + t * bx1)
+      y = (1 - l) * ((1 - t) * ay0 + t * by0) + l * ((1 - t) * ay1 + t * by1)
+      if _fillAt(x, y, p0, Minv, M, fill, lo0, lo1) < -tol:
+        return True
+  return False
+
+
+# the chains of the boundary: every maximal path through free vertices of degree two, from an
+# end (a held vertex or a free one of another degree) to the next, as the vertex lists
+# chainV[chainPtr[c]:chainPtr[c + 1]] with the segment from each vertex to the next in chainS;
+# a cycle of free degree-two vertices starts and ends at its lowest; the half edges of every
+# vertex are hseg[ptr[v]:ptr[v + 1]] with the neighbours nbr; returns the count
+def _chainsLoop(ptr, hseg, nbr, isFixed, chainPtr, chainV, chainS):
+  nB, m = ptr.shape[0] - 1, hseg.shape[0] // 2
+  seen = np.zeros(m, np.bool_)
+  nc, t = 0, 0
+  chainPtr[0] = 0
+  for stage in range(2):
+    for s in range(nB):
+      inner = not isFixed[s] and ptr[s + 1] - ptr[s] == 2
+      if inner != (stage == 1):
+        continue
+      for h in range(ptr[s], ptr[s + 1]):
+        sg = hseg[h]
+        if seen[sg]:
+          continue
+        chainV[t], chainS[t] = s, sg
+        t += 1
+        seen[sg] = True
+        v = nbr[h]
+        while v != s and not isFixed[v] and ptr[v + 1] - ptr[v] == 2:
+          h2 = ptr[v] if hseg[ptr[v]] != sg else ptr[v] + 1
+          sg = hseg[h2]
+          chainV[t], chainS[t] = v, sg
+          t += 1
+          seen[sg] = True
+          v = nbr[h2]
+        chainV[t], chainS[t] = v, -1
+        t += 1
+        nc += 1
+        chainPtr[nc] = t
+  return nc
+
+
+# the chains cs straightened one by one, Douglas-Peucker: the vertices between two decided ones
+# (the ends, at W, and the pinned, at W0) placed evenly on the chord between them; where a
+# segment's sweep leaves the fill, the vertex whose old position lies farthest from the chord
+# is pinned and both parts are done again; a failing segment between two decided vertices
+# marks a moved end in reset, a junction to hold
+def _chainDPLoop(chainPtr, chainV, cs, W0, W, pin, reset, dxy, p0, Minv, M, fill, lo0, lo1, tol):
+  for kk in prange(cs.shape[0]):
+    c = cs[kk]
+    i0, n = chainPtr[c], chainPtr[c + 1] - chainPtr[c]
+    stack = np.empty((n, 2), np.int64)
+    sp, last = 0, 0
+    for i in range(1, n):
+      v = chainV[i0 + i]
+      if i == n - 1 or pin[v]:
+        if pin[v]:
+          W[v, 0], W[v, 1] = W0[v, 0], W0[v, 1]
+        stack[sp, 0], stack[sp, 1] = last, i
+        sp += 1
+        last = i
+    while sp > 0:
+      sp -= 1
+      a, b = stack[sp, 0], stack[sp, 1]
+      va, vb = chainV[i0 + a], chainV[i0 + b]
+      for i in range(a + 1, b):
+        v, t = chainV[i0 + i], (i - a) / (b - a)
+        W[v, 0] = W[va, 0] + t * (W[vb, 0] - W[va, 0])
+        W[v, 1] = W[va, 1] + t * (W[vb, 1] - W[va, 1])
+      bad = False
+      for i in range(a, b):
+        u, v = chainV[i0 + i], chainV[i0 + i + 1]
+        if _quadOut(W0[u, 0], W0[u, 1], W0[v, 0], W0[v, 1], W[u, 0], W[u, 1], W[v, 0], W[v, 1], dxy, p0, Minv, M, fill, lo0, lo1, tol):
+          bad = True
+          break
+      if not bad:
+        continue
+      if b - a == 1:
+        for v in (va, vb):
+          if W[v, 0] != W0[v, 0] or W[v, 1] != W0[v, 1]:
+            reset[v] = True
+        continue
+      dx, dy = W[vb, 0] - W[va, 0], W[vb, 1] - W[va, 1]
+      L = np.sqrt(dx * dx + dy * dy)
+      j, dmax = a + 1, -1.0
+      for i in range(a + 1, b):
+        v = chainV[i0 + i]
+        wx, wy = W0[v, 0] - W[va, 0], W0[v, 1] - W[va, 1]
+        d = abs(dx * wy - dy * wx) / L if L > 0 else np.sqrt(wx * wx + wy * wy)
+        if d > dmax:
+          j, dmax = i, d
+      v = chainV[i0 + j]
+      pin[v] = True
+      W[v, 0], W[v, 1] = W0[v, 0], W0[v, 1]
+      stack[sp, 0], stack[sp, 1], stack[sp + 1, 0], stack[sp + 1, 1] = a, j, j, b
+      sp += 2
+
+
+def chainsNumba(ptr, hseg, nbr, isFixed):
+  """the chains of the boundary as chainPtr, chainV, chainS of _chainsLoop; None without the compiled loops"""
+  if not _useNumba():
+    return None
+  _preparePixel()
+  m = len(hseg) // 2
+  chainPtr, chainV, chainS = np.empty(m + 2, np.int64), np.empty(2 * m + 2, np.int64), np.empty(2 * m + 2, np.int64)
+  nc = _COMPILED["_chainsLoop"](np.ascontiguousarray(ptr, dtype=np.int64), np.ascontiguousarray(hseg, dtype=np.int64),
+                                np.ascontiguousarray(nbr, dtype=np.int64), np.ascontiguousarray(isFixed), chainPtr, chainV, chainS)
+  return chainPtr[:nc + 1], chainV[:chainPtr[nc]], chainS[:chainPtr[nc]]
+
+
+def chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, lattice, tol):
+  """the chains cs straightened by _chainDPLoop in place; None without the compiled loops"""
+  loop = _pixelLoop(_chainDPLoop, True)
+  if loop is None:
+    return None
+  loop(chainPtr, chainV, np.ascontiguousarray(cs, dtype=np.int64), np.ascontiguousarray(W0), W, pin, reset, dxy, *lattice, tol)
+  return W
+
+
+_PIXEL_HELPERS = ("_fillAt", "_quadOut", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_chainsLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator", "_chainBackLoop")
 

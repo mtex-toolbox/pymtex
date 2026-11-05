@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
-from .kernels import adjacencyNumba, chainSolveNumba, farthestOfChainsNumba, pixelKernel, segmentGridNumba
+from .kernels import adjacencyNumba, chainDPNumba, chainSolveNumba, chainsNumba, farthestOfChainsNumba, pixelKernel, segmentGridNumba
 from .segment import segmentation
 
 # the pinning rule under study: True holds, of a chain of free vertices with a segment that
@@ -23,6 +23,10 @@ from .segment import segmentation
 # as Douglas-Peucker, instead of both ends of every such segment; it changes the result and
 # leaves the parity with MATLAB develop, so it stays off
 PIN_FARTHEST = False
+# the second rule under study: True keeps the first solve for the junctions, holds them there and
+# straightens every chain of degree-two vertices between them on its own, Douglas-Peucker on its
+# chord (straightenChains); it changes the result too, so it stays off
+CHAIN_DP = False
 
 
 def straightenInFill(c, seg):
@@ -106,6 +110,9 @@ def straightenInFill(c, seg):
       moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
+      if CHAIN_DP:
+        W = straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, dxy, inFill, tol, box)
+        break
     moved = np.concatenate(moved)
     isM = np.zeros(m, dtype=bool)
     isM[hseg[_ranges(ptr, moved)]] = True
@@ -133,6 +140,51 @@ def straightenInFill(c, seg):
   split = lambda x: np.concatenate([x, x[cut]])
   return (cellComplex(V.astype(c.V.dtype, copy=False), F.astype(c.F.dtype, copy=False), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype, copy=False)),
           segmentation(grainId, seg.nGrains, split(seg.connect), split(seg.isInner), split(seg.isOuter)))
+
+
+def straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, dxy, inFill, tol, box):
+  """the vertices under CHAIN_DP: the free junctions held where the first solve put them, every
+  chain of degree-two vertices between held vertices straightened on its own (chainDPNumba); a
+  junction whose segment to a decided vertex sweeps out of the fill goes back and its chains are
+  done again, and so are the chains of a segment that crosses another, its vertices pinned"""
+  chainPtr, chainV, chainS = chainsNumba(ptr, hseg, nbr, isFixed)
+  nB, m = len(W0), len(e)
+  ends = np.column_stack([chainV[chainPtr[:-1]], chainV[chainPtr[1:] - 1]])
+  inner = np.ones(len(chainV), dtype=bool)
+  inner[chainPtr[:-1]] = inner[chainPtr[1:] - 1] = False
+  segChain, k = np.full(m, -1, dtype=np.int64), chainS >= 0
+  segChain[chainS[k]] = np.repeat(np.arange(len(chainPtr) - 1), np.diff(chainPtr))[k]
+  pin, reset = np.zeros(nB, dtype=bool), np.zeros(nB, dtype=bool)
+  cs, grids, q = np.arange(len(chainPtr) - 1), [], None
+  while len(cs):
+    chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, inFill.lattice, tol)
+    r = np.flatnonzero(reset)
+    if len(r):
+      # the junctions back where they were, held, their chains again without their pins
+      W[r], isFixed[r], reset[r] = W0[r], True, False
+      cs = np.flatnonzero(np.isin(ends, r).any(axis=1))
+      pin[chainV[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr)) & inner]] = False
+      continue
+    # the crossings of the segments moved, or since the last check of the chains done again
+    if q is None:
+      moved = (W[:, 0] != W0[:, 0]) | (W[:, 1] != W0[:, 1])
+      q = np.flatnonzero(moved[e[:, 0]] | moved[e[:, 1]])
+    partner, grids = crossing(W, e, q, 2 * dxy, box, grids, q, partner=True)
+    isX = partner >= 0
+    if not isX.any():
+      break
+    # both segments of a crossing keep their vertices: pinned in a chain, held as a junction
+    isX[partner[isX]] = True
+    v = e[isX].reshape(-1)
+    j = v[~np.isin(v, chainV[inner])]
+    W[j], isFixed[j] = W0[j], True
+    pin[v] = True
+    W[v] = W0[v]
+    cs = np.unique(np.concatenate([segChain[isX], np.flatnonzero(np.isin(ends, j).any(axis=1))]))
+    cs = cs[cs >= 0]
+    q = chainS[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr))]
+    q = q[q >= 0]
+  return W
 
 
 def pinFarthest(eb, chains, loc, mi, W, W0):
@@ -174,14 +226,15 @@ def _ranges(ptr, v):
   return np.repeat(ptr[v] - np.cumsum(n) + n, n) + np.arange(n.sum())
 
 
-def crossing(V, e, q, h, box, grids=(), moved=None):
-  """the segments q of e that cross another one of e properly, without a common vertex, and the
+def crossing(V, e, q, h, box, grids=(), moved=None, partner=False):
+  """the segments q of e that cross another one of e properly, without a common vertex (with
+  partner=True the one each crosses, -1 for none), and the
   grids of spacing h over box the compiled test lists the segments in: the ones given, the first
   of every segment where it was when it was built, the others of the segments moved in a round,
   where they were then, and one more of the segments moved now, each over the cells the segments
   q meet. Without numba the pairs whose midpoints lie in neighbouring cells of a grid as large as
   the longest segment"""
-  isX = np.zeros(len(e), dtype=bool)
+  isX = np.full(len(e), -1, dtype=np.int64)
   loop = pixelKernel("crossing")
   if loop is not None:
     (x0, y0), (nx, ny) = box[0], (np.floor((box[1] - box[0]) / h).astype(np.int64) + 1)
@@ -190,7 +243,8 @@ def crossing(V, e, q, h, box, grids=(), moved=None):
     if len(q):
       loop(np.ascontiguousarray(V), np.ascontiguousarray(e, dtype=np.int64), q, x0, y0, h, int(ny), np.vstack([g[0] for g in grids]),
            np.concatenate([g[1] for g in grids]), ioff, isX)
-    return isX, grids
+    return (isX if partner else isX >= 0), grids
+  isX = isX >= 0
   if len(q) == 0:
     return isX, grids
   a, b = V[e[:, 0]], V[e[:, 1]]
