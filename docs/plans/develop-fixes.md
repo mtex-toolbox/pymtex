@@ -156,3 +156,24 @@ are their images under the point groups, improper elements included, S27), fixed
   the port 0.2521, Monte Carlo 0.2516).
 
 The test is `tests/core/check_fibreSymmetry.m`.
+
+## Found by the port of develop's calcGrains (2026-11-05), open
+
+`bench/calcgrains_ops.py` against develop 175d8c803; `docs/research/benchmark-calcgrains.md` has the
+numbers. Not fixed; each waits for a decision.
+
+- `straightenInFill` samples the area a segment sweeps with `T = ceil(3*len/dxy)` points along it, and
+  a segment exactly one pixel long has `len` = 1 pixel ± 1e-14, so it gets 3 or 4 samples by rounding;
+  the fourth finds a sliver of a measured cell the third misses and holds the segment (forsterite: one
+  chain of five segments; the hexagonal T1 instance: 2 of 400 segments, then 1877 vertices up to 0.22
+  pixels apart). `ceil(3*len/dxy - 1e-9)`, and the same for `K`, would decide it the same way in every
+  port; an exact test of the swept quadrilateral against the cells would close the slivers.
+- The bisection of a cut point decides a midpoint exactly on a lattice edge, where `inFill` is 0, by the
+  1e-14 of the affine fit; the port takes a tie as 0, so its side is deterministic. Moves a cut point by
+  up to 1/2^17 of its segment.
+- `absorbInteriorPixels` counts a nudged corner on a grain boundary as inside (`insidepoly`), so it
+  absorbs a pixel a diagonal bisector runs through (forsterite: about 1000 pixels), and it tests only
+  the grain of the one pixel `knnsearch` returns as nearest, so after straightening a pixel wholly
+  inside the other grain of a tie stays at 0 (forsterite: 597 pixels, 199 of the first 200 checked to
+  lie in one of MATLAB's own grain polygons). The port tests the grains of all tied nearest sites and
+  takes a corner on a boundary as outside.
